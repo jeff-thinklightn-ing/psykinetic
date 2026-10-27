@@ -25,9 +25,6 @@ var _rush_ends: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	World.entity_damaged.connect(_on_entity_damaged)
 	World.rush_ended.connect(_on_rush_ended)
 
@@ -102,9 +99,11 @@ func _test_momentum() -> void:
 	player = e["P"][0]
 	dummy = e["m"][0]
 	_give(player, "hammer")
-	_check(World.try_move(player, Vector2i.RIGHT), "a step toward it")
-	var duration := player.next_move_tick - World.tick
-	while World.tick < player.next_move_tick:
+	# A player walks free (703, step 2): 3 ticks east, to x 2.2, the dummy's
+	# neighbour still.
+	var duration := World.step_ticks(player, Vector2i.RIGHT)
+	for i in 3:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT)
 		World.step()
 	var velocity := World.body_velocity(player)
 	_check(velocity.is_equal_approx(Vector2(1.0 / duration, 0.0)), "its velocity, a cell over %.1f ticks (%s)" % [duration, velocity])
@@ -116,10 +115,9 @@ func _test_momentum() -> void:
 	player = e["P"][0]
 	dummy = e["m"][0]
 	_give(player, "hammer")
-	_check(World.try_move(player, Vector2i.LEFT), "a step away from it")
-	while World.tick < player.next_move_tick:
-		World.step()
-	World._relocate(player, Vector2i(2, 1))
+	World.free_input(player, Vector2(-1, 0), World.TICK_DT)
+	World.step()
+	_check(player.tile == Vector2i(2, 1) and World.body_velocity(player).x < 0.0, "a tick's walk away from it, its cell kept (%s)" % player.free_pos)
 	_blow(player, dummy)
 	_check(dummy.tile == Vector2i(3, 1), "backing away takes nothing off and adds nothing: 1.46, it stays (at %s)" % dummy.tile)
 
@@ -463,9 +461,11 @@ func _test_hurl() -> void:
 	hands[Player.RIGHT_HAND] = "giant_axe"
 	World.set_slots(thrower, hands)
 	out = World.hurl(thrower, Player.RIGHT_HAND, Vector2(-1, 0), 8, 20.0)
-	# 5 kg x 20 = 100 on the 80 kg player: 1.25, 1 cell.
-	_check(out["hit"] == player and player.tile == Vector2i(2, 1) and out["landed"] == Vector2i(3, 1),
-			"a monster throws its 5 kg axe: the player knocked 1 cell, the axe at their feet (%s, %s)" % [player.tile, out["landed"]])
+	# 5 kg x 20 = 100 on the 80 kg player: 1.25. A player's free body
+	# slides it all, slide_per_speed 1.5 a unit (688 amended (2)): 1.875
+	# cells, to x 1.125, (1, 1); the grid's step would floor it to 1 cell.
+	_check(out["hit"] == player and player.tile == Vector2i(1, 1) and out["landed"] == Vector2i(3, 1),
+			"a monster throws its 5 kg axe: the player's free body slid 1.875 cells, the axe where they stood (%s, %s)" % [player.tile, out["landed"]])
 
 
 func _test_pack_throw() -> void:
@@ -637,8 +637,12 @@ func _test_clank() -> void:
 		var dummy := e["m"][0] as Monster
 		World.put_item(player, player, Items.ARMOUR, World.items.mint(worn, "built"))
 		dummy.senses.heard.clear()
-		player.next_move_tick = 0
-		_check(World.try_move(player, Vector2i(1, 0)), "%s: a step east" % worn)
+		for i in 8:
+			if player.tile != Vector2i(1, 1):
+				break
+			World.free_input(player, Vector2(1, 0), World.TICK_DT)
+			World.step()
+		_check(player.tile == Vector2i(2, 1), "%s: walked free into the next cell east" % worn)
 		var kinds: Array = dummy.senses.heard.map(func(n: Dictionary) -> String: return "%s %d" % [n["kind"], n["radius"]])
 		# 4 cells off: leather's body (86 kg) steps 3 and reaches nobody there; plate's
 		# (100 kg) steps 4 (Senses.step_radius), and its clank (5 at its own pace, 2.56 ticks) too.

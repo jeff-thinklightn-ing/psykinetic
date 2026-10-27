@@ -30,9 +30,6 @@ var _damage_log: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	World.entity_damaged.connect(_on_entity_damaged)
 
 	_test_shove_into_wall()
@@ -46,7 +43,6 @@ func _ready() -> void:
 	_test_no_friendly_fire()
 	_test_stamina()
 	_test_stun()
-	_test_approach()
 	_test_toss()
 
 	print("")
@@ -139,28 +135,29 @@ func _test_diagonals() -> void:
 	print("\n== eight directions ==")
 	var e := _build([
 		"####",
-		"#P##",
+		"#m##",
 		"#..#",
 		"####",
 	])
-	var player: GridEntity = e["P"][0]
-	_check(not World.try_move(player, Vector2i(1, 1)), "diagonal past a wall corner is refused")
+	# A monster walks the grid; a player walks free (703, step 2).
+	var walker: GridEntity = e["m"][0]
+	_check(not World.try_move(walker, Vector2i(1, 1)), "diagonal past a wall corner is refused")
 	_check(World.find_path(Vector2i(1, 1), Vector2i(2, 2)).size() == 2, "A* goes around the corner in 2 steps")
 
 	e = _build([
 		"#####",
-		"#Pm.#",
+		"#mm.#",
 		"#m..#",
 		"#...#",
 		"#####",
 	])
-	player = e["P"][0]
+	walker = e["m"][0]
 	_check(World.find_path(Vector2i(1, 1), Vector2i(3, 3)).size() == 2, "A* uses diagonals: 2 steps to (3, 3)")
-	_check(World.try_move(player, Vector2i(1, 1)), "diagonal between two creatures is allowed")
-	_check(player.tile == Vector2i(2, 2), "player is at (2, 2)")
-	_check(is_equal_approx(player._move_duration, 3.75), "diagonal step takes 3.75 ticks (got %s)" % player._move_duration)
-	_walk_to(player, Vector2i(3, 2))
-	_check(is_equal_approx(player._move_duration, 2.5), "orthogonal step takes 2.5 ticks (got %s)" % player._move_duration)
+	_check(World.try_move(walker, Vector2i(1, 1)), "diagonal between two creatures is allowed")
+	_check(walker.tile == Vector2i(2, 2), "the walker is at (2, 2)")
+	var straight := World.step_ticks(walker, Vector2i(1, 0))
+	_check(is_equal_approx(walker._move_duration, straight * World.DIAGONAL_TICK_SCALE),
+			"the diagonal step took DIAGONAL_TICK_SCALE times a straight one (%s, %s)" % [walker._move_duration, straight])
 
 
 func _test_resolution_order() -> void:
@@ -269,9 +266,9 @@ func _test_stamina() -> void:
 	_check(player.stamina == 83, "nothing comes back for %d ticks after a shove (stamina %d)" % [World.stamina_regen_delay, player.stamina])
 	World.step()
 	_check(player.stamina == 85, "then a resting tick regains 2 (stamina %d)" % player.stamina)
-	World.order_move(player, Vector2i(2, 1))
+	World.free_input(player, Vector2(1, 0), World.TICK_DT)
 	World.step()
-	_check(player.tile == Vector2i(2, 1) and player.stamina == 87, "a walking tick regains 2 as well (stamina %d)" % player.stamina)
+	_check(player.free_pos.x > 1.0 and player.stamina == 87, "a walking tick regains 2 as well (stamina %d)" % player.stamina)
 
 	e = _build(lane)
 	player = e["P"][0]
@@ -349,9 +346,10 @@ func _test_stamina() -> void:
 		var before := imp.tile.x
 		_shove(player, imp)
 		thrown.append(imp.tile.x - before)
-	# Each shove comes straight off a step, its momentum keeping the last
-	# one moving (decision 592).
-	_check(thrown == [3, 2, 2, 1, 1, 1], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
+	# Each shove comes straight off a walk, its momentum keeping the last
+	# one moving (decision 592): a free body's walk up (703, step 2) carries
+	# the fourth one cell farther than the grid's step did (3, 2, 2, 1, 1, 1).
+	_check(thrown == [3, 2, 2, 2, 1, 1], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
 
 
 func _test_stun() -> void:
@@ -417,40 +415,6 @@ func _test_stun() -> void:
 	])
 	_shove(e["P"][0], e["c"][0])
 	_check(not World.is_stunned(e["c"][0]), "crates are not stunned")
-
-
-func _test_approach() -> void:
-	print("\n== attack and shove orders walk into reach first ==")
-	var e := _build([
-		"########",
-		"#P...m.#",
-		"########",
-	])
-	var player: GridEntity = e["P"][0]
-	var imp: GridEntity = e["m"][0]
-	World.order_shove(player, imp)
-	for i in 30:
-		if imp.tile != Vector2i(5, 1):
-			break
-		World.step()
-	_check(player.tile == Vector2i(4, 1), "player walked up next to the imp (at %s)" % player.tile)
-	_check(imp.tile == Vector2i(6, 1), "and shoved it on arrival (imp at %s)" % imp.tile)
-	_check(player.action_order == GridEntity.Order.NONE, "the order is done")
-
-	e = _build([
-		"########",
-		"#P...m.#",
-		"########",
-	])
-	player = e["P"][0]
-	imp = e["m"][0]
-	World.order_attack(player, imp)
-	for i in 30:
-		if imp.hp < imp.max_hp:
-			break
-		World.step()
-	_check(player.tile == Vector2i(4, 1), "an attack order closes in the same way (at %s)" % player.tile)
-	_check(_damage(imp, &"attack") == 2, "and lands its hit (attack damage %d)" % _damage(imp, &"attack"))
 
 
 func _test_toss() -> void:
@@ -620,7 +584,17 @@ func _shove(attacker: GridEntity, target: GridEntity) -> void:
 	World.step()
 
 
+## Walks [param entity] to [param tile]: a player's free body pressed
+## straight at its centre a tick at a time till it holds the cell (703, step
+## 2: a player walks free), anything else ordered there on the grid.
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
+	if entity is Player:
+		for i in 40:
+			if entity.tile == tile:
+				return
+			World.free_input(entity, (Vector2(tile) - entity.free_pos).normalized(), World.TICK_DT)
+			World.step()
+		return
 	World.order_move(entity, tile)
 	for i in 40:
 		if entity.tile == tile:
