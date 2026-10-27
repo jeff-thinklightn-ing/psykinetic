@@ -1217,7 +1217,12 @@ func _tier(entity: GridEntity, near: Array[Vector2i]) -> Tier:
 	for at in near:
 		nearest = mini(nearest, distance(entity.tile, at))
 	var was: int = monster.tier if monster.tier_tick >= 0 else Tier.FAR
-	monster.tier = Tier.NEAR if nearest <= NEAR_TILES else Tier.MID if nearest <= MID_TILES else Tier.FAR
+	# One walking where a player can still see it (VIEW_TILES) keeps every tick
+	# too: on MID its step waited for a think, ceil(pace / MID_EVERY_TICKS) of
+	# them, and the client's tween at its pace ran, stopped and ran again.
+	var walking := entity.next_move_tick + MID_EVERY_TICKS >= tick
+	monster.tier = Tier.NEAR if nearest <= NEAR_TILES or nearest <= VIEW_TILES and walking \
+			else Tier.MID if nearest <= MID_TILES else Tier.FAR
 	if monster.tier != Tier.FAR:
 		monster.far_since = -1
 	elif monster.far_since < 0:

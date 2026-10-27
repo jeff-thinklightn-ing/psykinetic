@@ -32764,3 +32764,24 @@ tipped as she went in and out, not as he did. _focus_points now puts his
 points first, hers after. view_test _test_inside_is_his: a companion
 first in the zone's list, the first point his. Client only, protocol
 unchanged, no new class_name.
+
+## 238 amended (2): a monster walking in view keeps the full rate
+
+After "238 amended" (a fleeing monster keeps NEAR), the same stop-start held
+for any monster walking 23 to 30 cells from a player: on MID past
+NEAR_TILES its step waited for a think every MID_EVERY_TICKS, so a pace p
+became ceil(p / 4) * 4 ticks a cell (a brute walking home, 7.06: 8), and the
+client's tween at its pace ran and stopped. World._tier now keeps one within
+VIEW_TILES (30, what a screen can show at its widest) on NEAR while it walks
+(its next step due within MID_EVERY_TICKS); one standing within 30 still
+goes to MID past 22, as before.
+
+tools/map_bench on v0.1.187 (ddea2519), 256x256 castle density, 16 players
+spread, free walk, 6 blocks of 600 ticks, alternating, three rounds each,
+under the gate and the bench lock: the server tick's block median 39.13 /
+40.88 / 39.89 ms on main, 42.53 / 39.40 / 40.39 with this (+0.5 to +0.8 ms,
+about +1.5 on the average), inside main's own spread; worst ticks alike
+(134 to 153 ms). The coordinator approved it on those numbers. (The
+16-player baseline has grown from 238's 21.8 ms to about 40; passed to
+perf.) monster_test _test_far_pace: a brute walking home 30 cells off steps
+at its pace (7, main 8). Server only, protocol unchanged, no new class_name.

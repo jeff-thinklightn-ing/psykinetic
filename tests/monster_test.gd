@@ -1885,9 +1885,10 @@ func _test_wild_shot_near() -> void:
 ## phase glitch while at a distance"): past NEAR_TILES a monster on MID
 ## stepped only on its every MID_EVERY_TICKS think, a cell at twice its
 ## pace, the client's tween at its pace running and stopping. One fleeing
-## keeps every tick, as one with a target does: its steps come at its pace.
+## keeps every tick, as one with a target does, and so does one walking
+## within VIEW_TILES (238 amended (2)): its steps come at its pace.
 func _test_far_pace() -> void:
-	print("%s== past %d cells, a fleeing stag steps at its own pace ==" % [char(10), World.NEAR_TILES])
+	print("%s== past %d cells, a fleeing stag and a walking brute step at their own pace ==" % [char(10), World.NEAR_TILES])
 	Monster.idling = true
 	var rows: Array[String] = ["#".repeat(70)]
 	for y in 5:
@@ -1920,6 +1921,23 @@ func _test_far_pace() -> void:
 	_check(gaps.size() >= 4 and gaps.max() <= ceili(stag.move_ticks) + 1,
 		"fleeing past %d cells: a cell every %s ticks, its pace %.2f (no MID gap of %d)" % [World.NEAR_TILES, gaps, stag.move_ticks, 2 * World.MID_EVERY_TICKS])
 	World.despawn(stag)
+	var walker := EntityFactory.build(SPECS["b"].merged({"name": "FarBrute", "tile": Vector2i(26, 3)})) as Monster
+	_room.add_child(walker)
+	World.spawn(walker, Vector2i(26, 3))
+	walker.home = Vector2i(32, 3)  # Away home along its row, in view: it walks there.
+	gaps.clear()
+	last = walker.tile
+	at = World.tick
+	for i in 80:
+		World.step()
+		if walker.tile != last:
+			gaps.append(World.tick - at)
+			last = walker.tile
+			at = World.tick
+	var paced := gaps.slice(2)  # Its first steps wait for a think and its tier, as before.
+	_check(paced.size() >= 2 and paced.max() < 2 * World.MID_EVERY_TICKS,
+		"a brute walking home %d cells off, in view: a cell every %s ticks, its pace %.2f" % [World.distance(walker.tile, hunter.tile), gaps, walker.move_ticks])
+	World.despawn(walker)
 	World.despawn(hunter)
 
 

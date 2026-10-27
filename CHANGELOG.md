@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Monsters walking at the edge of your view (23 to 30 cells off) move smoothly at their own pace instead of stepping and stopping (238 amended (2); like the fleeing stag's fix).
+
 ## v0.1.187
 
 - Camera: walking into a house goes top-down for you again even when your companion is outside (671 amended (3))
