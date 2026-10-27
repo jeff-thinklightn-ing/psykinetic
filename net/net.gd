@@ -440,7 +440,12 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## applied, the tick, the held cell; empty on the grid). While the server's free_walk is on
 ## a player's client sends commands, not steps or walk orders; an old client
 ## sends steps the server no longer takes.
-const PROTOCOL_REVISION := 39
+## 40 (695): a companion leading a free body (Guide) sends its owner the
+## route to her heel, the "world" message's "guide_route" {companion, zone,
+## path}, which their client steers; the "guide" command takes "stop"
+## ("moved": their own key or click took over). An old client never steers
+## it, and its player stands while she leads.
+const PROTOCOL_REVISION := 40
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

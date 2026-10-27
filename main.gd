@@ -6533,6 +6533,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	else:
 		walk = Guide.new(to)
 	walk.bind(pet, player)
+	walk.send_route = _send_guide_route  # (Unbound: a walk holding itself would never be freed.)
 	_guides[pet.keeper_id] = walk
 	pet.guide = walk
 	player.led_by = String(pet.name)
@@ -6540,6 +6541,27 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead." % [_display_name(player), to["name"]]
 	party_log.add("%s leads the way to %s." % [pet.name, to["name"]])
 	print("[guide] %s leads %s to %s (%s)" % [pet.name, _display_name(player), to["name"], to["key"]])
+
+
+## [param walk]'s route for its leader's free body to her heel (695): the
+## owner's "world" message's "guide_route" {companion, zone, path: [[x, y],
+## ...]}, empty when the walk ends; their client steers it as a click's
+## route, and their own key or click stops it ("guide" {"stop": "moved"}).
+func _send_guide_route(path: Array, walk: Guide) -> void:
+	if not is_instance_valid(walk.leader) or not is_instance_valid(walk.pet) or _world_news == null or not _world_news.send.is_valid():
+		return
+	_world_news.send.call(walk.leader.owner_peer, {"full": false, "guide_route": {"companion": String(walk.pet.name),
+		"zone": walk.leader.zone, "path": path}})
+
+
+## The "guide" command's "stop" (695): [param player]'s own key or click
+## took over the route their client was steering; her walk stops as
+## "moved", as a grid body's own step stops it.
+func _guide_stop_asked(player: Player, why: String) -> void:
+	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
+	if why != "moved" or not is_instance_valid(pet) or pet.guide == null or not pet.guide.going() or pet.guide.leader != player:
+		return
+	_guide_done(pet, "moved")
 
 
 ## The "guide" command (decision 551, the map's "ask her to lead you
@@ -10384,7 +10406,10 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	if command_name == "view_ready" and entity is Player:
 		_view_ready(entity as Player, str(args.get("zone", "")))
 	elif command_name == "guide" and entity is Player:
-		_guide_asked(entity, str(args.get("to", "")))
+		if args.has("stop"):
+			_guide_stop_asked(entity, str(args["stop"]))  # Their own key or click took over her route (695).
+		else:
+			_guide_asked(entity, str(args.get("to", "")))
 	elif command_name == "greet" and entity is Player:
 		var hailed := get_node_or_null(NodePath(str(args.get("resident", ""))))
 		if hailed is Resident:

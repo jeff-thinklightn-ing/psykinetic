@@ -102,7 +102,7 @@ func _ready() -> void:
 	_test_companion_named()
 	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
 	var free_was := World.free_walk
-	World.set_free_walk(false)  # (Guide leads a grid body; a free one's lead waits on ui, 693.)
+	World.set_free_walk(false)  # (Its own step is the grid's; a free body led is _test_guide_free's, 695.)
 	await _test_guide()
 	World.set_free_walk(free_was)
 	_test_guide_refuses()
@@ -119,6 +119,7 @@ func _ready() -> void:
 	_on_grid(_test_heel_leaves_his_line)
 	_test_heel_no_way()
 	_test_heel_free_leader()
+	_test_guide_free()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3331,6 +3332,72 @@ func _test_heel_keeps_clear() -> void:
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+
+## Guide leading a free body (695): no move order (a free body takes
+## none); its client is sent the route to her heel ("world"'s
+## "guide_route"), each time the heel moves, and steers it (here, as
+## tests/walk.gd's input); the "guide" command's "stop" ends it "moved";
+## an empty route when it ends.
+func _test_guide_free() -> void:
+	print("\n== she leads a free-walking player: the route to her heel goes to their client, which steers it (695) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var free_was := World.free_walk
+	World.set_free_walk(true)
+	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
+	var routes: Array[Array] = []
+	var send_was: Callable = _main._world_news.send
+	_main._world_news.send = func(peer: int, data: Dictionary) -> void:
+		if data.has("guide_route") and peer == owner.owner_peer:
+			routes.append(data["guide_route"]["path"])
+		send_was.call(peer, data)
+	var came_from := owner.tile
+	var far := _far_cell(owner.tile, 9, 14)
+	var goal := {"key": "test/free_far", "kind": "place", "name": "the far corner", "area": String(World.zone.name), "cell": far}
+	_main._start_guide(pet, owner, goal)
+	var steer := func() -> void:
+		# Their client: the last route steered, to its end.
+		if not routes.is_empty() and not (routes.back() as Array).is_empty():
+			var end: Array = (routes.back() as Array).back()
+			Walk.toward(owner, Vector2i(int(end[0]), int(end[1])))
+	for i in 120:
+		steer.call()
+		World.step()
+		if World.distance(owner.tile, came_from) >= 3:
+			break
+	_check(not routes.is_empty() and not owner.has_move_order and pet.guide.going() and World.distance(owner.tile, came_from) >= 3,
+		"routes to her heel go to their client, no move order, and they follow her (%d routes, %s to %s)" % [routes.size(), came_from, owner.tile])
+	var first: Array = routes[0] if not routes.is_empty() else []
+	_check(not first.is_empty() and first[0] is Array and (first[0] as Array).size() == 2, "each a path of cells ([x, y]) (%s)" % [first.slice(0, 2)])
+	# Their own key takes over: their client says so, and the walk stops.
+	var sent := routes.size()
+	_main._on_command(owner, "guide", {"stop": "moved"})
+	_check(not pet.guide.going() and pet.guide.stopped == "moved" and owner.led_by == "", "their own key: the walk stops, control theirs (%s)" % pet.guide.stopped)
+	_check(routes.size() == sent + 1 and (routes.back() as Array).is_empty(), "and an empty route ends their client's steering")
+	_main._on_command(owner, "guide", {"stop": "moved"})
+	_check(routes.size() == sent + 1, "(not twice)")
+	_main._guide_said(owner, pet, "lead on")
+	for i in 600:
+		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
+			_kill_monsters()
+		if pet.guide == null:
+			break
+		steer.call()
+		World.step()
+	var last := routes.size()
+	var there := pet.tile
+	for i in 40:
+		steer.call()  # Their client finishes the last route.
+		World.step()
+	_check(pet.guide == null and World.distance(there, far) <= 3 and World.distance(owner.tile, pet.tile) <= 3,
+		"lead on, and there: she has brought them, and they come up beside her (her %s at the end, now %s, them %s, %s)" % [there, pet.tile, owner.tile, far])
+	_check(routes.size() == last and not (routes.back() as Array).is_empty(), "arrived: no new route, the last one theirs to finish")
+	_main._world_news.send = send_was
+	_bond_as(0, kept_bond)
+	World.set_free_walk(free_was)
 
 
 func _test_heel_free_leader() -> void:

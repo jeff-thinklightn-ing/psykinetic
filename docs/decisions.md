@@ -32430,3 +32430,43 @@ practice all walk free.
 Server and client; protocol unchanged, no new class_name. The player's
 grid step path (6b) stays till free walk has run clean as the default for
 a few days, on the coordinator's word.
+
+## 695, companions' side. Guide leads a free body: her heel's route to its client
+
+Guide (551) led her player's body by setting its move order to her heel's
+cell each tick. A free body takes no move order (688): under free walk
+only the player's client steers it, a click's route included (689). So
+with free walk on live, Guide was broken on the box: she walked off and
+her player stood. The coordinator chose to send the route to the client
+(a), against the server feeding his body commands (b: each a correction,
+his client never sent them) or her walking ahead for him to steer
+himself (c: his own step would no longer stop it). ui and I agreed the
+shape; "695, ui's side" is the client half.
+
+- **The route:** each time her heel's cell (Heel.cell) changes, about once
+  per step she takes, the owner's "world" message carries "guide_route"
+  {companion, zone, path: [[x, y], ...]}. The path is World.walk_path from
+  his cell to her heel. It goes out through Guide.send_route
+  (Main._send_guide_route, set unbound: a walk holding a Callable bound to
+  itself is never freed). His client steers it as a click's route, at his
+  own pace; she walks her leg at hers, so he never passes her. Within
+  Heel.STOP of her, none is sent and he waits, as on the grid.
+- **The end:** a walk stopped for any reason but arriving sends an empty
+  path, and his client stops steering. Arriving, none is sent: he finishes
+  the last route and comes up beside her.
+- **His own move:** the server can't tell his own input from his client
+  steering her route (both come as request_free), so Guide doesn't read a
+  free body's own move as "moved". His client, when his own key or click
+  takes over a live route, sends the "guide" command with {"stop":
+  "moved"} once (Main._guide_stop_asked), and the walk stops as "moved":
+  control his, "lead on" within keep_minutes. "guide" with "to" is as
+  before.
+- **The grid:** a grid body is led by its move order as before.
+
+PROTOCOL_REVISION 40: "world" carries a new key and "guide" a new arg; an
+old client never steers the route, and its player stands while she leads.
+companion_test _test_guide_free (free walk on, bond devoted): routes go out
+and no move order is set; a client steering them follows her; "stop" ends
+the walk "moved" with an empty route, once; "lead on" reaches the goal,
+arriving sends no new route, and he comes up beside her. _test_guide stays
+on the grid (its own-step check is the grid's). No new class_name.
