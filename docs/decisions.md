@@ -33151,3 +33151,24 @@ left 2). An 80 kg player ahead is thrown 3 cells (1.86); plate (100 kg)
 the wall a kill from full, as before. F7: Telegraphs and boss moves,
 combat.moves.spin.impulse_scale. combat_test asserts 3 of 20 in both spin
 cases. Server only, protocol unchanged, no new class_name.
+
+## 392 amended: a free body's wind-up is given up by walking off it
+
+ui and items (the coordinator's approval of ui's rule): under free walk a
+heavy weapon's wind-up could never be given up. _halt_for_blow halts the
+free body and drops its commands, and 392's cancel, a step off its cell,
+never came; so every axe or maul wind-up landed, where on the grid a step
+away gave it up.
+
+World.free_input (_free_give_up_wind_up): a free body winding up whose
+command's intent is at least WIND_UP_LEAVE_INTENT (0.5) and more than 45
+degrees off the way to its target (the centres, 699; else the wind-up's
+direction) gives it up (cancel_wind_up: nothing struck, its stamina paid as
+ever and not refunded) and its halt is lifted, so that command walks.
+Pressing on at the foe, as a chase's commands still in flight do, and a
+weak lean keep it.
+
+combat_test _test_free_wind_up_given_up: a full step sideways and back and
+aside give it up, nothing struck, the body walking; pressing on and a lean
+of 0.42 aside keep it, and it lands. Server only, protocol unchanged, no
+new class_name.

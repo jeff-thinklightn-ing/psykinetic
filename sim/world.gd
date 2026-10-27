@@ -457,6 +457,9 @@ var free_walk := false
 ## A free body is a circle of this radius, in cells, against cell edges
 ## and others' cells (688).
 const FREE_RADIUS := 0.3
+## How strong a free body's walk must be to give up its wind-up (392
+## amended): half a full intent, more than 45 degrees off its target.
+const WIND_UP_LEAVE_INTENT := 0.5
 ## How far past its cell's edge a free body's centre goes before it holds
 ## the next cell (688): a body on a border does not flicker between two.
 const FREE_HYSTERESIS := 0.1
@@ -8362,10 +8365,32 @@ func free_input(entity: GridEntity, intent: Vector2, seconds: float, seq := -1) 
 	if not Net.is_authority() or not free_body(entity) or not is_finite(intent.x) or not is_finite(intent.y):
 		return
 	var player := entity as Player
+	_free_give_up_wind_up(player, intent)
 	if player.free_inputs.size() >= FREE_INPUTS_MAX:
 		_free_acked(player, player.free_inputs.pop_front())
 	player.free_inputs.append({"intent": intent.limit_length(1.0), "ticks": clampf(seconds * TICK_RATE, 0.0, FREE_BANK_TICKS),
 		"used": 0.0, "seq": seq})
+
+
+## A free body's wind-up given up by walking off it (392 amended, the
+## coordinator's; ui and items: under free walk the halt dropped every
+## command and the grid's cancel, a step off its cell, never came, so every
+## heavy wind-up landed): an [param intent] of at least
+## WIND_UP_LEAVE_INTENT more than 45 degrees off the way to its target ends
+## it (cancel_wind_up, paid and not refunded as ever) and lifts its halt, so
+## the command walks. Pressing on at the foe, as a chase's late commands
+## do, keeps it.
+func _free_give_up_wind_up(player: Player, intent: Vector2) -> void:
+	if player.wind_up.is_empty() or intent.length() < WIND_UP_LEAVE_INTENT:
+		return
+	var target: Variant = player.wind_up.get("target")
+	var way := Vector2(player.wind_up["direction"])
+	if is_instance_valid(target):
+		way = body_centre(target) - body_centre(player)
+	if way.length() > 0.001 and intent.normalized().dot(way.normalized()) >= cos(PI / 4.0):
+		return
+	cancel_wind_up(player)
+	player.free_halt_until = tick
 
 
 ## [param command] is done with, whether applied or dropped (688 amended):

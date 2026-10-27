@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_free_blows()
 	_test_free_chase()
 	_test_body_reach()
+	_test_free_wind_up_given_up()
 	_test_lob_aim_on_client()
 	_test_armour()
 
@@ -459,6 +460,33 @@ func _room_with(player: Vector2i, dummy: Vector2i) -> Array[String]:
 		row[at.x] = "P" if at == player else "m"
 		rows[at.y] = row
 	return rows
+
+
+## A free body's wind-up given up by walking off it (392 amended; ui and
+## items: under free walk every heavy wind-up landed): a strong walk more
+## than 45 degrees off the target ends it, nothing struck, and the body
+## walks; pressing on at the foe, or a weak sideways lean, keeps it.
+func _test_free_wind_up_given_up() -> void:
+	print("\n== a free body's wind-up given up by walking off it, kept pressing on (392 amended) ==")
+	for each: Array in [[Vector2(0, 1), false, "a full step sideways"], [Vector2(-0.7, 0.7), false, "back and aside"],
+			[Vector2(1, 0), true, "pressing on at the foe"], [Vector2(0.3, 0.3), true, "a weak lean aside (0.42)"]]:
+		var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
+		var host: Player = e["P"][0]
+		var foe: GridEntity = e["m"][0]
+		_give(host, "giant_axe")
+		host.free_pos = Vector2(4.2, 2.0)
+		var hp := foe.hp
+		_check(World.windup_ticks(host) > 0 and World.try_wind_up(host, foe), "(%s) the giant axe wound up" % each[2])
+		World.free_input(host, each[0], World.TICK_DT * 3)
+		var kept := not host.wind_up.is_empty()
+		var from := host.free_pos
+		for i in World.windup_ticks(host) + 2:
+			World.step()
+		if each[1]:
+			_check(kept and foe.hp < hp, "%s: kept, and it lands (%d -> %d)" % [each[2], hp, foe.hp])
+		else:
+			_check(not kept and foe.hp == hp and host.free_pos.distance_to(from) > 0.2,
+					"%s: given up, nothing struck, and it walks (%s -> %s)" % [each[2], from, host.free_pos])
 
 
 ## A free body's attack order is held while its own commands walk it (its
