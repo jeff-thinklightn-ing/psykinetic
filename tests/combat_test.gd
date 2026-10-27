@@ -25,9 +25,6 @@ var _room: Node2D
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 
 	_test_rules_file()
 	_test_costs()
@@ -376,7 +373,6 @@ func _test_lob_aim_on_client() -> void:
 	Net.mode = mode
 	_check(World.shot_origin(host) == Vector2(1, 1), "the server's own reckoning: free_pos")
 	host.free_view = null
-	World.free_walk = false
 
 
 ## Reach by bodies where a free body is in it (699, combat's side; enemy-
@@ -401,7 +397,6 @@ func _test_body_reach() -> void:
 		var both := World.in_reach(host, foe) and World.in_reach(foe, host)
 		var neither := not World.in_reach(host, foe) and not World.in_reach(foe, host)
 		_check(both if each[2] else neither, "%s: %s both ways" % [each[3], "struck" if each[2] else "missed"])
-	World.free_walk = false
 	# A wall's corner between the centres, in reach: no blow.
 	var e := _build(["#######", "#...P##", "#...#m#", "#######"])
 	var host: Player = e["P"][0]
@@ -451,9 +446,9 @@ func _test_body_reach() -> void:
 	_check(Vector2i(5, 2) not in cells and Vector2i(4, 1) in cells and Vector2i(4, 3) in cells and Vector2i(4, 2) not in cells,
 			"strike_cells for a body at the back of its cell: not the cell beside it (1.55), the ones above and below its centre (%s)" % [cells])
 	_check(not cells.is_empty() and Vector2(cells[0] - foe.tile).length() <= Vector2(cells[-1] - foe.tile).length(), "nearest the attacker first")
-	World.free_walk = false
-	var grid := World.strike_cells(foe, host)
-	_check(grid.size() == 8 and Vector2i(5, 2) in grid, "on the grid: its eight neighbours (%d)" % grid.size())
+	e = _build(["##########", "#........#", "#...m..m.#", "#........#", "##########"])  # Two on the grid (players walk free, 703).
+	var grid := World.strike_cells(e["m"][1], e["m"][0])
+	_check(grid.size() == 8 and Vector2i(5, 2) in grid, "a body on the grid: its eight neighbours (%d)" % grid.size())
 
 
 ## A room with a player at [param player] and a dummy at [param dummy].
@@ -495,7 +490,6 @@ func _test_free_chase() -> void:
 		World.step()
 	_check(reached and foe.hp < hp and host.action_order == GridEntity.Order.NONE,
 			"walked into reach by its own commands: struck (%d -> %d)" % [hp, foe.hp])
-	World.free_walk = false
 
 
 ## A free body's blows and shots (688, combat's side; ui: "an attack or
@@ -543,7 +537,6 @@ func _test_free_blows() -> void:
 	_check(World.lob_aim(host, Vector2i(10, 1)) == Vector2i((host.free_pos + Vector2(9.0, 0.0)).round()),
 			"a lob is drawn in to its reach from the body's own centre (%s)" % World.lob_aim(host, Vector2i(10, 1)))
 	World.try_stance(host, "")
-	World.free_walk = false
 	World.fields.outdoor = false
 
 
@@ -925,7 +918,7 @@ func _test_spin_throws() -> void:
 		if armour.is_empty():
 			_check(is_equal_approx(front.mass, 80.0) and cells[armour][0] >= 2 and World.is_down(front),
 					"80 kg, rested, bare: thrown %d cells (%.2f) and knocked down" % [cells[armour][0], cells[armour][1]])
-			_check(side.spawned and side.hp == 3 and hp == 20, "the one beside, swept into the wall from full: left at a sliver (%d of %d)" % [side.hp, hp])
+			_check(side.spawned and side.hp == 4 and hp == 20, "the one beside, swept into the wall from full: left at a sliver (%d of %d; a free body, 703: 3 on the grid)" % [side.hp, hp])
 		elif armour == "exhausted":
 			print("    exhausted (stamina 0), 80 kg, bare: thrown %d cells at %.2f; swept into the wall from %d: %s" % [cells[armour][0], cells[armour][1], hp,
 					"%d left" % side.hp if side.spawned and side.hp > 0 else "killed"])

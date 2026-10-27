@@ -33123,3 +33123,17 @@ same commit as they do.
 - _test_barrow_free_walk (8d8c4e28) folded into those passes: each check once.
 - Residents' and monsters' try_move stay: they walk the grid after 6b.
 Test only, protocol unchanged, no new class_name.
+## 703, step 2 (combat): combat_test walks its players free
+
+703 removes the player's grid walking (ui's design 6b, the coordinator's
+approval); step 2 is the tests. combat_test drops its 693 pin (Net and
+World free_walk off in _ready) and the five `World.free_walk = false` that
+closed its free cases, so every room it builds walks its players free, as
+the game does; monsters stay on the grid. Nothing in it moved a player by
+grid steps. Two checks follow:
+- strike_cells on the grid is checked between two monsters, a player no
+  longer being a body on the grid.
+- 603 amended (4)'s sweep into a wall from full leaves an 80 kg player at
+  4 of 20 as a free body (the free push meets the wall as 688 amended (2)
+  has it), where the grid's was 3 (603 amended (5) tunes it back).
+No behaviour changes. Test only.
