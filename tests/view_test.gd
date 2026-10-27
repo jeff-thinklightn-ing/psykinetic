@@ -4724,6 +4724,8 @@ func _test_indoor_camera() -> void:
 == indoors (671): top-down in a walled space, out after a hold, never a bob ==")
 	var room := Rect2i(2, 2, 6, 5)
 	var overhead_was: bool = _rig.overhead
+	var outdoor_was: bool = _rig._outdoor
+	_rig._outdoor = true  # A building's walls, out on a map (671 amended (2)).
 	_rig.indoor_view = true
 	_rig.overhead = false
 	_rig.indoors = false
@@ -4759,14 +4761,37 @@ func _test_indoor_camera() -> void:
 	_rig.set_overhead(true)
 	_rig._ease_tilt(1.0)
 	_rig.inside_changed.emit(true, room)
+	_rig._ease_tilt(1.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH), "in again: top-down (%.0f)" % _rig.pitch)
 	_rig.set_overhead(false)
 	_rig._ease_tilt(1.0)
-	_check(is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH) and not _rig.overhead, "S indoors: still top-down, the view to come back to set")
+	_check(is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH) and not _rig.overhead,
+			"S indoors: the player's view wins, the normal pitch (671 amended (2); %.0f)" % _rig.pitch)
+	_rig.inside_changed.emit(true, Rect2i(8, 2, 4, 4))
+	_rig._ease_tilt(1.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH), "room to room: their choice kept (%.0f)" % _rig.pitch)
+	_rig.set_overhead(true)
+	_rig._ease_tilt(1.0)
+	_check(is_equal_approx(_rig.pitch, Client3D.OVERHEAD_PITCH), "and W: overhead (%.0f)" % _rig.pitch)
+	_rig.set_overhead(false)
 	_rig.inside_changed.emit(false, Rect2i())
 	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 2.0
 	_rig._update_indoors()
 	_rig._ease_tilt(1.0)
 	_check(is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH), "and out: the normal pitch, as S left it (%.0f)" % _rig.pitch)
+	_rig.inside_changed.emit(true, room)
+	_rig._ease_tilt(Client3D.INSIDE_EASE_SECONDS)
+	_check(is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH), "left and in again: top-down, the choice gone with the space")
+	_rig.inside_changed.emit(false, Rect2i())
+	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 2.0
+	_rig._update_indoors()
+	_rig._outdoor = false
+	_rig.inside_changed.emit(true, room)
+	_rig._ease_tilt(Client3D.INSIDE_EASE_SECONDS)
+	_check(not _rig.indoors and is_equal_approx(_rig.pitch, Client3D.CAMERA_PITCH),
+			"underground (the barrow's rooms, all walled): no tip, the normal pitch (%.0f)" % _rig.pitch)
+	_rig.inside_changed.emit(false, Rect2i())
+	_rig._outdoor = outdoor_was
 	_rig.set_overhead(overhead_was)
 	_rig._ease_tilt(1.0)
 	_rig.indoor_view = false

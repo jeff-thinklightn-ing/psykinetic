@@ -1511,6 +1511,9 @@ var _left_inside_at := -1.0
 ## Whether being indoors tips the view (true in the game; a test of the
 ## other pitches, in its walled test room, turns it off).
 var indoor_view := true
+## The player's own W or S since coming inside (671 amended (2); Jeff: "not
+## able to change view"): their view, not the top-down, till they leave.
+var _inside_chosen := false
 ## Camera feel (673 step 2): the view's eases and pulls as vars, read at
 ## setup from art/kit/feel.json's "camera" section (load_camera_feel), so the
 ## tuning panel sets them live (Main's "camera" source) and a tuned set is
@@ -2735,7 +2738,7 @@ func low_camera() -> bool:
 ## The pitch at rest: OVERHEAD_PITCH with the overhead view on (671),
 ## else normal_pitch.
 func rest_pitch() -> float:
-	if indoors and indoor_view and not _low:
+	if indoors and indoor_view and not _low and not _inside_chosen:
 		return inside_pitch  # 671: top-down inside a walled space.
 	return overhead_pitch if overhead else normal_pitch()
 
@@ -2743,6 +2746,10 @@ func rest_pitch() -> float:
 ## Buildings' inside_changed (671): in, at once (a leave under way called
 ## off); out, held INSIDE_LEAVE_HOLD first (_update_indoors).
 func _on_inside_changed(inside: bool, _rect: Rect2i) -> void:
+	# Underground every room is walled in: no tip there (671 amended (2);
+	# Jeff: "barrows became a top down dungeon by default"). Buildings and
+	# ruins outdoors only, as his 671 words were.
+	inside = inside and _outdoor
 	if inside:
 		_left_inside_at = -1.0
 		if not indoors:
@@ -2758,6 +2765,7 @@ func _on_inside_changed(inside: bool, _rect: Rect2i) -> void:
 func _update_indoors() -> void:
 	if indoors and _left_inside_at >= 0.0 and _fade_clock - _left_inside_at >= inside_leave_hold:
 		indoors = false
+		_inside_chosen = false
 		_left_inside_at = -1.0
 		if not _peeking:
 			_ease_pitch(inside_ease_seconds)
@@ -3188,6 +3196,7 @@ static func settle_target(from: float, degrees: float, direction: float) -> floa
 func set_overhead(on: bool) -> void:
 	if _peeking:
 		return
+	_inside_chosen = indoors  # Inside, the player's own choice wins (671 amended (2)).
 	if overhead != on:
 		overhead = on
 		Net.set_camera_overhead(on)

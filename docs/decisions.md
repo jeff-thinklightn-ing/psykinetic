@@ -32488,3 +32488,22 @@ cell after his first), an empty path on any stop but arriving. The client:
   both come through request_free.
 controls_test _test_guide_route. Rides companions' protocol revision 40
 (no bump here); client only, no new class_name.
+
+## 671 amended (2): top-down only in outdoor buildings and ruins, and the player's W/S wins inside
+
+Jeff in the barrow: "barrows became a top down dungeon by default not able
+to change view". 671 counted every space closed in by walls as inside, and
+underground every room is (buildings' side: "underground every room"), so
+the barrow was always top-down; and rest_pitch gave the inside pitch before
+anything else, so W and S did nothing that lasted. His 671 words were about
+going into buildings. Now:
+- Client3D._on_inside_changed takes inside only on an outdoor map: a
+  dungeon keeps the normal pitch (the roofs and inside_building() are as
+  before).
+- Inside, W or S (set_overhead, a committed peek too) is the player's
+  choice (_inside_chosen): their view, not the top-down, till they leave the
+  space (cleared with indoors, after the leave hold); room to room keeps it;
+  coming in again starts top-down.
+view_test _test_indoor_camera: S inside the normal pitch, kept room to
+room, W overhead, top-down again after leaving, none underground. Client
+only, protocol unchanged, no new class_name.

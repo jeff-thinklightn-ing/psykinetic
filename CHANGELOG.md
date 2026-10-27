@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Camera: dungeons like the barrow keep the normal view instead of going top-down; inside buildings W and S change the view again, and your choice holds until you leave (671 amended (2))
 - Free movement: a companion asked to lead you walks you along her way again, and any key or click of your own takes over (695, ui's side)
 - Asking your companion to lead you somewhere works again with free movement: she walks ahead and you follow at her heel; any key or click of your own takes over (695, the server's half).
 - Free movement is now the default everywhere: online, hosting, offline and practice. The admin's `free_walk off` still switches it off, and stays off over a restart (693)
