@@ -33338,3 +33338,25 @@ its own:
 4. ui: the removal, with PROTOCOL_REVISION bumped and a forced cut, on the
    coordinator's word once free walk has run clean as the default (about
    2026-10-29) and release has drilled a rollback to the release before it.
+## 703, step 2 (companions). companion_test off the grid for players
+
+6b (703): a player walks free, while monsters, residents and companions
+keep the grid. companion_test now needs no grid for a player:
+- The _on_grid wrapper and the guide test's set_free_walk(false) pin are
+  gone.
+- A player walks with Walk (free_input a tick at a time): _walk_to,
+  _walk_held, the follow, loop and straight-line tests.
+- The grid guide test is led free. Its routes are steered as his client
+  does (695), and his own key is the "guide" command's stop.
+- The swap rule's checks are a free body pressing into her instead
+  (688 amended (4)). Walked into, she makes way and he walks through. In
+  the dead end, he and she are never in one cell, and she says she has no
+  room.
+- _put no longer clears grid steps.
+
+Found on the way: under free walk, _test_heel_keeps_clear and
+_test_heel_on_the_line had been passing with the owner never moving ("0
+turns in 0 steps"). _walk_held queued grid steps a free body never took.
+They walk now, and pass.
+
+Test only, no CHANGELOG bullet. Protocol unchanged, no new class_name.

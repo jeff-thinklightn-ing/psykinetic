@@ -30,14 +30,14 @@ func _ready() -> void:
 	_test_quick_phrases()
 	_test_phrase_stances()
 	_test_calm_guards()
-	_on_grid(_test_following)
+	_test_following()
 	_test_persists_and_resumes()
 	_test_idles_while_owner_offline()
 	_test_malformed_llm_reply()
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
-	_on_grid(_test_yields_when_bumped)
-	_on_grid(_test_says_so_with_no_room)
+	_test_yields_when_bumped()
+	_test_says_so_with_no_room()
 	_test_stance_events()
 	_test_stances()
 	_test_retreat_moves_away()
@@ -98,10 +98,7 @@ func _ready() -> void:
 	_test_focus()
 	_test_companion_named()
 	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
-	var free_was := World.free_walk
-	World.set_free_walk(false)  # (Its own step is the grid's; a free body led is _test_guide_free's, 695.)
 	await _test_guide()
-	World.set_free_walk(free_was)
 	_test_guide_refuses()
 	_bond_as(0, kept_bond)
 	_test_loyalty()
@@ -110,10 +107,10 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_seated_boss()
-	_on_grid(_test_follow_without_backsteps)
+	_test_follow_without_backsteps()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
-	_on_grid(_test_heel_leaves_his_line)
+	_test_heel_leaves_his_line()
 	_test_heel_no_way()
 	_test_heel_free_leader()
 	_test_guide_free()
@@ -285,8 +282,8 @@ func _test_following() -> void:
 	var far: Array[int] = []
 	var in_the_way := 0
 	var logged := MindLog.written
-	World.order_move(owner, Vector2i(18, 11))
 	for i in 40:
+		Walk.toward(owner, Vector2i(18, 11))
 		World.step()
 		far.append(World.distance(pet.tile, owner.tile))
 		if pet.tile == owner.tile + owner.facing:
@@ -301,9 +298,9 @@ func _test_following() -> void:
 	_put(pet, owner_was)
 	pet.stance = Companion.Stance.HOLD  # Away, holding: the imp walking is not hers to fight.
 	pet.hold_tile = owner_was
-	World.order_move(owner, Vector2i(14, 11))
 	var behind: Array[int] = []
 	for i in 40:
+		Walk.toward(owner, Vector2i(14, 11))
 		World.step()
 		heel.follow(walker, owner)
 		behind.append(World.distance(walker.tile, owner.tile))
@@ -509,7 +506,7 @@ func _test_old_record_gets_a_companion() -> void:
 
 
 func _test_says_so_with_no_room() -> void:
-	print("\n== bumped in the dead end, with nowhere to step aside: she and her player change places ==")
+	print("\n== pressed in the dead end, with nowhere to step aside: never in one cell, and she says so ==")
 	var owner := _player()
 	var pet := _companion()
 	_settle(pet)
@@ -518,16 +515,18 @@ func _test_says_so_with_no_room() -> void:
 	var heard: Array[String] = []
 	var listen := func(text: String) -> void: heard.append(text)
 	pet.said.connect(listen)
-	World.order_step(owner, Vector2i(-1, 0), owner.refusals, false)
-	World.step()
+	# He presses on into her (703: a player walks free; 688 amended (4)'s
+	# press is a step refused there, and a refused step into her a bump).
+	for i in 16:
+		World.free_input(owner, Vector2(-1, 0), World.TICK_DT)
+		World.step()
 	pet.said.disconnect(listen)
-	_check(owner.tile == Vector2i(1, 8) and pet.tile == Vector2i(2, 8),
-			"at once: her player where she stood, she where they were (the swap rule) (%s at %s, %s at %s)" % [owner.name, owner.tile, pet.name, pet.tile])
-	_check(heard.is_empty() and World.get_entity_at(Vector2i(1, 8)) == owner and World.get_entity_at(Vector2i(2, 8)) == pet,
-			"no word of it, and the grid knows them where they are (%s)" % [heard])
+	_check(owner.tile != pet.tile and World.get_entity_at(pet.tile) == pet and World.get_entity_at(owner.tile) == owner,
+			"never in one cell: he %s, she %s, the grid knows them where they are" % [owner.tile, pet.tile])
+	_check(heard.size() == 1, "she says so, once: no room to move (%s)" % [heard])
 	for i in 12:
 		World.step()
-	_check(pet.tile != Vector2i(1, 8) and owner.tile == Vector2i(1, 8), "and she does not walk back into them")
+	_check(owner.tile != pet.tile, "and she does not walk back into them")
 
 
 func _test_last_words() -> void:
@@ -1999,6 +1998,22 @@ func _test_guide() -> void:
 	var here := String(World.zone.name)
 	var came_from := owner.tile
 	record.companion.erase("roads")
+	# A player walks free (703): her routes go to their client, which steers
+	# them (695); the test is that client.
+	var sent_routes: Array[Array] = []
+	var send_was: Callable = _main._world_news.send
+	_main._world_news.send = func(peer: int, data: Dictionary) -> void:
+		if data.has("guide_route") and peer == _player().owner_peer:
+			sent_routes.append(data["guide_route"]["path"])
+		send_was.call(peer, data)
+	var steered := func(condition: Callable, limit: int) -> void:
+		for i in limit:
+			if condition.call():
+				return
+			if not sent_routes.is_empty() and not (sent_routes.back() as Array).is_empty() and is_instance_valid(_player()):
+				var end: Array = (sent_routes.back() as Array).back()
+				Walk.toward(_player(), Vector2i(int(end[0]), int(end[1])))
+			World.step()
 	# What she knows: where she stands with her player, and places within sight.
 	var card := {}
 	_check(Guide.observe(card, "a", Vector2i(10, 10), [{"id": "a/near", "cell": Vector2i(14, 15)}, {"id": "a/far", "cell": Vector2i(30, 10)}])
@@ -2024,15 +2039,14 @@ func _test_guide() -> void:
 	_main._start_guide(pet, owner, goal)
 	_check(pet.guide != null and pet.guide.going() and owner.led_by == String(pet.name) and owner.led_to == "test/far" and "leading them there now" in pet.guide_note,
 		"asked: she sets off, her player led by her, her voice told she agreed")
-	_step_until(func() -> bool: return pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3, 120)
+	steered.call(func() -> bool: return pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3, 120)
 	_check(pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3 and "leading" in pet.doing(),
 		"she walks ahead and their body follows at her heel (%s to %s)" % [came_from, owner.tile])
-	# Their own step takes control back.
-	World.order_step(owner, Vector2i(0, 1), owner.refusals, false)
+	# Their own key takes control back (their client says so, 695).
+	_main._on_command(owner, "guide", {"stop": "moved"})
 	World.step()
-	_check(not pet.guide.going() and pet.guide.stopped == "moved" and owner.led_by == "" and owner.led_to == "" and not owner.has_move_order,
-		"their own step: the walk stops, control theirs (%s)" % pet.guide.stopped)
-	_step_until(func() -> bool: return owner.queued_steps.is_empty(), 10)
+	_check(not pet.guide.going() and pet.guide.stopped == "moved" and owner.led_by == "" and owner.led_to == "",
+		"their own key: the walk stops, control theirs (%s)" % pet.guide.stopped)
 	_main._guide_said(owner, pet, "lead on")
 	_check(pet.guide.going() and owner.led_by == String(pet.name), "lead on: taken up again")
 	# A danger she sees.
@@ -2052,12 +2066,14 @@ func _test_guide() -> void:
 	_check(not pet.guide.going() and pet.guide.stopped == "moved", "a command (the lantern): control theirs")
 	_main._on_command(owner, "lantern", {})
 	_main._guide_said(owner, pet, "lead on")
-	_step_until(func() -> bool:
+	steered.call(func() -> bool:
 		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
 			_kill_monsters()
 		return pet.guide == null, 600)
-	_check(pet.guide == null and owner.led_by == "" and World.distance(pet.tile, far) <= 3 and World.distance(owner.tile, pet.tile) <= 3,
-		"there: she has brought them, the walk done (her %s, them %s, %s)" % [pet.tile, owner.tile, far])
+	var ended_at := pet.tile
+	steered.call(func() -> bool: return World.distance(owner.tile, pet.tile) <= 3, 40)  # Their client finishes the last route.
+	_check(pet.guide == null and owner.led_by == "" and World.distance(ended_at, far) <= 3 and World.distance(owner.tile, pet.tile) <= 3,
+		"there: she has brought them, the walk done (her %s at the end, them %s, %s)" % [ended_at, owner.tile, far])
 	# What she lives through is a danger of the place.
 	World.damage(pet, pet.hp - 1, null, &"attack")
 	var dangers: Array = Guide.roads_of(record.companion)["dangers"]
@@ -2093,7 +2109,7 @@ func _test_guide() -> void:
 	_main._guide_said(owner, pet, "Take me to %s" % named)
 	_check(pet.guide != null and pet.guide.going() and str(pet.guide.goal.get("key")) == there, "asked by name for %s, where she has been: she leads" % named)
 	var walk: Guide = pet.guide
-	_step_until(func() -> bool:
+	steered.call(func() -> bool:
 		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
 			_kill_monsters()  # The test room's own, respawning: no danger on this walk.
 		return walk.crossing_now or not walk.going(), 3000)
@@ -2107,6 +2123,7 @@ func _test_guide() -> void:
 	walk.stop("moved")
 	owner.led_by = ""
 	_main._guides.clear()
+	_main._world_news.send = send_was
 	_main.travel(Net.local_id, here, "", {}, came_from)
 	World.enter_named(here)
 	_settle(_companion())
@@ -2775,7 +2792,7 @@ func _test_native_ollama_endpoint() -> void:
 
 
 func _test_yields_when_bumped() -> void:
-	print("\n== walking into her: they change places on the step's tick (the swap rule), no mind asked ==")
+	print("\n== walking into her: she makes way, and he walks on, no mind asked ==")
 	_kill_monsters()
 	var owner := _player()
 	var pet := _companion()
@@ -2784,16 +2801,11 @@ func _test_yields_when_bumped() -> void:
 	_settle(pet)
 	_put(owner, Vector2i(9, 6))
 	_put(pet, Vector2i(10, 6))
-	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
-	World.step()
-	# She is swapped to where he stood, or (678, companions' side, amended)
-	# has stepped out of his way on the tick his step came.
-	_check(owner.tile == Vector2i(10, 6) and World.are_adjacent(pet.tile, owner.tile), "the step into her lands on its tick: he at %s, she beside him (%s)" % [owner.tile, pet.tile])
+	# He walks on into her (703: free; his press into her a bump, 688
+	# amended (4)): she makes way, and he walks on through where she was.
+	var through := Walk.to(owner, Vector2i(11, 6), 60)
+	_check(through and owner.tile == Vector2i(11, 6) and pet.tile != owner.tile, "walking into her: she makes way and he walks on through (he %s, she %s)" % [owner.tile, pet.tile])
 	_check(mind.stance_asks.is_empty() and mind.voice_asks.is_empty(), "no mind asked")
-	World.order_step(owner, Vector2i(1, 0), owner.refusals, false)
-	for i in 3:
-		World.step()
-	_check(owner.tile == Vector2i(11, 6), "and they walk on (%s)" % owner.tile)
 	var log_size: int
 	print("\n== a left click on her beside you: she makes way, as for a bump ==")
 	_settle(pet)
@@ -3138,11 +3150,25 @@ func _test_follow_without_backsteps() -> void:
 	var farthest := 0
 	var was := pet.tile
 	var ticks := 0
+	# A crate on the loop (the room's Crate3 on row 2) moved off it for the
+	# walk and put back after: a free body shoves one along (703), and one
+	# jammed at the wall would stop him.
+	var crates := {}
+	var at := owner.tile
+	for way: Vector2i in route:
+		at += way
+		var there := World.get_entity_at(at)
+		if there != null and there.pushable and not crates.has(there):
+			crates[there] = there.tile
+			World._relocate(there, _main._nearest_free(Vector2i(4, 9)))
+	var next: Vector2i = owner.tile + route.front()
 	while not route.is_empty() and ticks < 600:
-		if World.tick >= owner.next_move_tick:
-			var way: Vector2i = route.front()
-			if World.try_move(owner, way):
-				route.pop_front()
+		if Walk.arrived(owner, next):
+			route.pop_front()
+			if route.is_empty():
+				break
+			next = owner.tile + route.front()
+		Walk.toward(owner, next)  # A player walks free (703): a held key's commands.
 		if ticks % 3 == 1:
 			# The cursor's turn, sent as "face" a few times a second: not always the way they walk.
 			var looks: Array[Vector2i] = [Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(0, -1)]
@@ -3160,6 +3186,8 @@ func _test_follow_without_backsteps() -> void:
 			was = pet.tile
 	for i in 40:
 		World.step()
+	for crate: GridEntity in crates:
+		_put(crate, crates[crate])
 	var minutes := float(ticks) / (World.TICK_RATE * 60.0)
 	print("  (walked %d ticks: her %d steps, %d back, farthest %d)" % [ticks, steps, backsteps, farthest])
 	_check(backsteps <= 1, "walking with turns: at most one step back (%d of %d, %.0f a minute)" % [backsteps, steps, backsteps / maxf(minutes, 0.001)])
@@ -3251,15 +3279,21 @@ func _test_bandage_words() -> void:
 	_settle(pet)
 
 
-## [param owner] walks [param route] (directions) as a held key walks: a
-## step queued ahead, as the client sends it (predicted), so each is taken
-## the tick it falls due. [param watch] is called after every tick.
+## [param owner] walks [param route] (directions) as a held key walks, a
+## free body's commands a tick at a time toward each next cell (703: a
+## player walks free). [param watch] is called after every tick. The
+## route's cells not reached are left in it.
 func _walk_held(owner: Player, route: Array[Vector2i], watch: Callable, limit := 400) -> void:
+	var next: Vector2i = owner.tile + route.front() if not route.is_empty() else owner.tile
 	for i in limit:
-		if route.is_empty() and owner.queued_steps.is_empty() and World.tick >= owner.next_move_tick:
-			return
-		if not route.is_empty() and owner.queued_steps.is_empty():
-			owner.queued_steps.append({"direction": route.pop_front(), "predicted": true})
+		if Walk.arrived(owner, next):
+			if route.is_empty():
+				return
+			route.pop_front()
+			if route.is_empty():
+				return
+			next = owner.tile + route.front()
+		Walk.toward(owner, next)
 		World.step()
 		watch.call()
 
@@ -3405,6 +3439,8 @@ func _test_spear_reach() -> void:
 	_kill_monsters()
 	var pet := _companion()
 	_settle(pet)
+	_put(_player(), Vector2i(5, 11))  # The corridor along the bottom: a clear run east.
+	_put(pet, Vector2i(6, 12))
 	var start := pet.tile
 	var way := Vector2i.ZERO
 	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
@@ -3537,6 +3573,10 @@ func _test_guide_free() -> void:
 	_settle(pet)
 	var free_was := World.free_walk
 	World.set_free_walk(true)
+	# From the corridor along the bottom (y 11-12), clear of the room's fire,
+	# which spreads (her way does not keep off a burning cell).
+	_put(owner, Vector2i(14, 11))
+	_put(pet, Vector2i(13, 11))
 	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
 	var routes: Array[Array] = []
 	var send_was: Callable = _main._world_news.send
@@ -3558,8 +3598,8 @@ func _test_guide_free() -> void:
 		World.step()
 		if World.distance(owner.tile, came_from) >= 3:
 			break
-	_check(not routes.is_empty() and not owner.has_move_order and pet.guide.going() and World.distance(owner.tile, came_from) >= 3,
-		"routes to her heel go to their client, no move order, and they follow her (%d routes, %s to %s)" % [routes.size(), came_from, owner.tile])
+	_check(not routes.is_empty() and pet.guide.going() and World.distance(owner.tile, came_from) >= 3,
+		"routes to her heel go to their client, and they follow her (%d routes, %s to %s)" % [routes.size(), came_from, owner.tile])
 	var first: Array = routes[0] if not routes.is_empty() else []
 	_check(not first.is_empty() and first[0] is Array and (first[0] as Array).size() == 2, "each a path of cells ([x, y]) (%s)" % [first.slice(0, 2)])
 	# Their own key takes over: their client says so, and the walk stops.
@@ -3723,22 +3763,25 @@ func _test_heel_leaves_his_line() -> void:
 		for i in 20:
 			World.step()
 		_check(not pet.heel.catching_up and pet.tile == her, "(settled at %s)" % pet.tile)
-		owner.move_order = run[1]
-		owner.move_via = World.line_cells(owner.tile, owner.move_order)
-		owner.has_move_order = true
 		var line: Array[Vector2i] = [owner.tile]
-		line.append_array(owner.move_via)
+		line.append_array(World.line_cells(owner.tile, run[1]))
 		_check(her in line, "(his line %s runs through her cell)" % [line])
 		var walked: Array[Vector2i] = [owner.tile]
 		var held := pet.tile
+		var along := 1
 		for i in 60:
+			# His client's straight line (a click's via cells), cell by cell.
+			if along < line.size() and Walk.arrived(owner, line[along]):
+				along += 1
+			if along < line.size():
+				Walk.toward(owner, line[along])
 			World.step()
 			if owner.tile != walked.back():
 				if owner.tile == held:
 					swaps += 1
 				walked.append(owner.tile)
 			held = pet.tile
-			if owner.tile == owner.move_order:
+			if Walk.arrived(owner, run[1]):
 				break
 		runs += 1
 		if walked == line:
@@ -5326,9 +5369,6 @@ func _put(entity: GridEntity, tile: Vector2i) -> void:
 		var aside: Vector2i = _main._nearest_free(tile + Vector2i(0, 2))
 		World._relocate(occupant, aside)
 	World._relocate(entity, tile)
-	if entity is Player:
-		entity.queued_steps.clear()
-		entity.has_move_order = false
 
 func _player() -> Player:
 	for entity in World.get_entities():
@@ -5383,24 +5423,14 @@ func _kill_monsters() -> void:
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
-	if World.free_body(entity):
-		Walk.to(entity, tile, 120)  # A free body takes no move order (688): its commands, as a client's.
+	if entity is Player:
+		Walk.to(entity, tile, 120)  # A player walks free (703): its commands, as a client's.
 		return
 	World.order_move(entity, tile)
 	for i in 120:
 		if entity.tile == tile:
 			return
 		World.step()
-
-
-## Runs [param test], a check of the grid's walk (move orders, try_move,
-## the swap rule), on the grid whatever free_walk is (688: a free body's
-## counterparts are _test_heel_free_leader's), then puts it back.
-func _on_grid(test: Callable) -> void:
-	var free_was := World.free_walk
-	World.set_free_walk(false)
-	test.call()
-	World.set_free_walk(free_was)
 
 
 func _step_until(condition: Callable, limit: int) -> void:
