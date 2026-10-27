@@ -72,6 +72,7 @@ func _ready() -> void:
 	_test_favour()
 	_test_parting()
 	_test_recruit()
+	_test_whereabouts()
 	_test_visible_work()
 	_test_field_work()
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
@@ -235,30 +236,51 @@ func _test_goes_when_not_told() -> void:
 
 
 func _test_legacy_rests_in_town() -> void:
-	print("
-== Wren and Nix rest in town between trips: their player gone from the game, they go to the town ==")
+	print("\n== Wren, Nix and Pip rest in town between trips when their player leaves the game on its ground; anywhere else they wait, and are beside them when they are back (Jeff's barrow) ==")
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var was: String = record.companion["name"]
 	record.companion["name"] = "Nix"
-	_main.travel(Net.local_id, ROAD)
-	var pet := _companion()
-	_check(pet != null and World.zone.name == ROAD, "(her player and she are on the road)")
-	_main._on_peer_disconnected(Net.local_id)
-	_check(not pet.spawned and record.companion.get("resident", {}).get("zone", "") == TOWN and record.companion.get("tile") == null,
-		"her player gone, she goes back to the town to rest (%s)" % [record.companion.get("resident", {})])
 	var told: Array[String] = []
 	var note := func(kind: String, data: Dictionary) -> void:
 		if kind == "party":
 			told.append(str(data.get("text", "")))
 	Net.message_received.connect(note)
+	# Gone from the road (a deploy's restart mid-trip): she waits there.
+	_main.travel(Net.local_id, ROAD)
+	var pet := _companion()
+	_check(pet != null and World.zone.name == ROAD, "(her player and she are on the road)")
+	_main._on_peer_disconnected(Net.local_id)
+	_check(pet.spawned and not record.companion.has("resident") and pet.zone == ROAD,
+		"her player gone off town ground: she does not go home; she waits on the road (%s)" % [record.companion.get("resident", {})])
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
-	Net.message_received.disconnect(note)
+	pet = _companion()
+	_check(World.zone.name == ROAD and pet != null and pet.keeper == _player() and World.distance(pet.tile, _player().tile) <= 3,
+		"back on the road: she is there with them, theirs again")
+	# Waiting in a zone they are not back in (a town after death, a start tile): she comes to them.
+	_main._on_peer_disconnected(Net.local_id)
+	World.enter_named(TOWN)
+	told.clear()
+	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+	pet = _companion()
+	_check(pet != null and pet.zone == TOWN and World.distance(pet.tile, _player().tile) <= 2 and pet.keeper == _player(),
+		"back somewhere else: she comes with them, beside them, nobody's left alone on the road (%s)" % [pet.zone if pet != null else "none"])
+	_check(not told.any(func(line: String) -> bool: return line.begins_with("Nix is ")), "and nothing says she is elsewhere (%s)" % [told])
+	# Gone from the town's own ground: she rests there between trips, and is told of where they are not.
+	var store_cell: Vector2i = _main._nearest_free(World.holdings.place(STORE).get("cell", _player().tile))
+	_put(pet, store_cell)
+	_main._on_peer_disconnected(Net.local_id)
+	_check(record.companion.get("resident", {}).get("place", "") == STORE,
+		"her player gone on the town's ground: she stays in the town, at her trade (%s)" % [record.companion.get("resident", {})])
+	World.enter_named(ROAD)
+	told.clear()
+	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
 	_check(World.zone.name == ROAD and _companion() == null, "her player back on the road: she is in the town, not with them")
-	_check(told.any(func(line: String) -> bool: return line.begins_with("Nix is ") and TOWN in line), "and they are told where she is: %s" % [told])
+	_check(told.any(func(line: String) -> bool: return line.begins_with("Nix is ") and "Go to" in line), "and they are told where she is, and what brings her: %s" % [told])
+	Net.message_received.disconnect(note)
 	_main.travel(Net.local_id, TOWN)
 	pet = _companion()
-	_check(pet != null and World.distance(pet.tile, _player().tile) <= 2 and not record.companion.has("resident"),
-		"in the town she joins them again, beside them")
+	_check(pet != null and pet.keeper == _player() and not record.companion.has("resident"),
+		"in the town she leaves her work and goes with them again")
 	record.companion["name"] = was
 
 
@@ -1607,6 +1629,47 @@ func _test_parting() -> void:
 	_check(pet != null, "(restored)")
 	if pet != null:
 		_settle(pet)
+
+
+## Where her player's companion is, told where she is not (Jeff's barrow:
+## Pip rested in the wilds' town between trips, and he thought Pip had
+## failed to follow): the line on joining, again once the view is built,
+## and when they call for her where she is not; "" where she is with them.
+func _test_whereabouts() -> void:
+	print("\n== where she is, told where she is not: on joining, the view built, called for (Jeff's barrow) ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var kept := record.companion.duplicate(true)
+	record.companion = {"name": "Pip", "alive": true, "traits": {"pronoun": "he", "trade": "cook"},
+		"resident": {"place": STORE, "zone": TOWN, "trade": "cook"}}
+	var words: String = _main._companion_whereabouts(record, ROAD)
+	_check("Pip is working in" in words and "Go to" in words and "he will travel with you" in words, "elsewhere: where, and what brings him back, his own words (%s)" % words)
+	_check(_main._companion_whereabouts(record, TOWN).is_empty(), "in his town: nothing said")
+	record.companion["resident"]["trade"] = ""
+	_check("resting in" in _main._companion_whereabouts(record, ROAD), "resting, with no trade")
+	record.companion.erase("resident")
+	_check(_main._companion_whereabouts(record, ROAD).is_empty(), "with them: nothing")
+	record.companion["parted"] = {"day": 1, "place": STORE}
+	_check("Ask him there" in _main._companion_whereabouts(record, ROAD), "parted: ask him there")
+	record.companion.erase("parted")
+	record.companion["resident"] = {"place": STORE, "zone": TOWN, "trade": "cook"}
+	# Called for by name where he is not: told, once in WHERE_AGAIN_MS.
+	var player := _player()
+	_main._where_told.erase(player.owner_peer)
+	var pet: Companion = _main._companions.get(Net.player_id)
+	var away := player.zone == TOWN
+	if away:
+		# (The test player stands in his town: the call is checked as from the road.)
+		player.zone = ROAD
+	_check(_main._calls_absent(player, null, "Pip, come here", 0), "called by name where he is not: told where")
+	_check(not _main._calls_absent(player, null, "Pip, come here", 0), "not twice at once")
+	_main._where_told.erase(player.owner_peer)
+	_check(not _main._calls_absent(player, null, "nice weather", 0), "words not meant for him: nothing")
+	_check(_main._calls_absent(player, null, "", 3), "a quick phrase meant for him: told")
+	if away:
+		player.zone = TOWN
+	_main._where_told.erase(player.owner_peer)
+	record.companion = kept
+	_check(pet == null or is_instance_valid(pet), "(her own companion as she was)")
 
 
 func _test_recruit() -> void:

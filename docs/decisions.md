@@ -32347,3 +32347,43 @@ a few ticks on holds, one far past none; grid orders logged once; saved
 on and off load as saved, never saved as none. Server half: the line and
 the snapshot; client half: the re-bind, the factory order, the clamp.
 Protocol unchanged, no new class_name.
+
+## 694. A companion from before the roll rests in town only when left on its ground; where she is, told
+
+Jeff went into the barrow and Pip did not come. The box's journal: Pip,
+a companion from before the roll (CompanionCard.is_legacy: Wren, Nix,
+Pip), went to rest in the first town every time her player left the game
+(_rest_in_town). His logout at 16:09, just before a deploy's restart,
+came in the dungeon's zone, so Pip went to the wilds' town. Joining again
+in the dungeon he got one party line ("Pip is resting in the wilds. Go
+there...") under the loading, missed it, thought she had failed to
+follow, and pressed the room reset. The coordinator approved both parts.
+
+- **Between trips only from the town's ground:** a legacy companion
+  rests in town only when her player leaves the game on ground a town's
+  stockpile holds (Stockpile.place_at), in that town. Anywhere else she
+  waits where she was, as every companion does.
+- **Never left alone:** a companion waiting in a zone her player rejoins
+  somewhere else (a start tile, a town after death) is remembered, her
+  body there taken off, and she comes beside them. Her record keeps the
+  zone her tile is in ("tile_zone", PlayerRecord.companion_from); a saved
+  tile from another zone is not used, she is put beside them.
+- **Where she is, told:** Main._companion_whereabouts(record, zone) is
+  one line for every case where she is not with them: held by raiders,
+  parted, left them, resting, working or sick in a town, each with what
+  brings her back, in her card's pronouns (_companion_subject,
+  _companion_object; Pip is "he"). It is said on joining and on each
+  arrival where she is not, once (_tell_whereabouts). It is said once
+  more when their client's view is built (_view_ready), if that took over
+  WHERE_AGAIN_MS (2 s), so it is not lost under the loading. When they
+  call for her where she is not (her name, or a quick phrase,
+  _calls_absent), they are told where, at most every WHERE_AGAIN_MS.
+  Travelling on after telling her to stay, they are told she stays in
+  the town at her trade and comes when they are back.
+
+resident_test _test_legacy_rests_in_town (off town ground she waits and
+is with them on rejoin; rejoining in another zone she comes beside them;
+from the town's ground she stays, and they are told where with what
+brings her) and _test_whereabouts (each case's line, the pronouns, a call
+by name or phrase, not twice at once); record_keys_test samples
+tile_zone. Server only, protocol unchanged, no new class_name.

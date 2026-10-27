@@ -223,6 +223,8 @@ static func companion_from(pet: Variant) -> Dictionary:
 		"slots": Array(Items.tidy(pet.get("slots", []), Companion.SLOTS)),
 		"items": Array(_uids(pet.get("items", []))),
 	}
+	if not str(pet.get("tile_zone", "")).is_empty():
+		out["tile_zone"] = str(pet["tile_zone"])  # The zone her tile is in.
 	var traits: Variant = pet.get("traits")
 	if traits is Dictionary and not traits.is_empty():
 		var kept := {}

@@ -147,6 +147,12 @@ const ARRIVAL_SHELTER_TICKS := 60
 const SHELTER_COOLDOWN_MSEC := 30000
 ## Commands that keep an arrival's shelter (decision 661): talk and looking.
 ## Any other ends it at once, so nobody stands untouchable doing things.
+## By peer: when their companion's whereabouts were last told
+## (_tell_whereabouts), msec.
+var _where_told := {}
+## How long a view's build or a call for her goes before the line is said
+## again.
+const WHERE_AGAIN_MS := 2000
 const SHELTER_KEEPS: Array[String] = ["say", "party", "face", "greet", "town_sheet", "view_ready"]
 ## A client that loses the server it played on tries again this often, for
 ## this long (decision 240).
@@ -4515,8 +4521,10 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	if is_instance_valid(pet) and pet.spawned:
 		_remember_companion(id)
 		# Told to stay, on town ground: she stays and works (decision 284).
-		if pet.stays_put():
-			_stay_in_town(record, pet)
+		if pet.stays_put() and _stay_in_town(record, pet):
+			Net.broadcast_to([peer], "party", {"from": "Server", "text": "%s stays in %s, working as its %s. Come back and %s will travel with you again." % [
+				record.companion.get("name", "Your companion"), _town_words(str(record.companion["resident"].get("place", ""))), record.companion["resident"].get("trade", ""),
+				_companion_subject(record)]})
 		World.despawn(pet)
 	_travelling = false
 	_players.erase(peer)
@@ -4568,6 +4576,15 @@ func _view_ready(player: Player, zone_name: String) -> void:
 	if zone_name != player.zone:
 		return
 	World.unshelter(player, SPAWN_GRACE_TICKS)
+	# Where their companion is, said again once they can see (the first
+	# went by under the loading), when the view took a while.
+	if Time.get_ticks_msec() - int(_where_told.get(player.owner_peer, 0)) > WHERE_AGAIN_MS and _where_told.has(player.owner_peer):
+		var record: PlayerRecord = _records.get(_peer_ids.get(player.owner_peer, ""))
+		if record != null:
+			var words := _companion_whereabouts(record, player.zone)
+			if not words.is_empty():
+				Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": words})
+	_where_told.erase(player.owner_peer)
 	var pet: Companion = _companions.get(_peer_ids.get(player.owner_peer, ""))
 	if is_instance_valid(pet) and pet.shelter_lead == player:
 		World.unshelter(pet, SPAWN_GRACE_TICKS)
@@ -6160,6 +6177,44 @@ func _on_shop_message(data: Dictionary) -> void:
 
 # --- Companions ----------------------------------------------------------------
 
+## Where [param record]'s companion is when she is not with them in
+## [param zone] (Jeff's barrow: Pip worked in town and he thought she had
+## failed to follow), as one line for her player: held by raiders, gone
+## home as a friend, left them, or resting, working or sick in a town, each
+## with what brings her back. "" when she is with them, or there is none.
+func _companion_whereabouts(record: PlayerRecord, zone: String) -> String:
+	var hers := record.companion
+	if hers.is_empty() or bool(hers.get("solo", false)) or not hers.get("alive", true):
+		return ""
+	var her_name := str(hers.get("name", "Your companion"))
+	if hers.has("taken"):
+		return "%s was carried off by raiders and is held by them still." % her_name
+	if hers.get("parted") is Dictionary:
+		return "%s went home to %s. Ask %s there to travel with you again." % [her_name, _town_words(str(hers["parted"].get("place", ""))), _companion_object(record)]
+	if hers.has("left"):
+		return "%s left you and lives in %s now." % [her_name, _town_words(str(hers["left"].get("place", "")))]
+	var resident: Dictionary = hers.get("resident", {})
+	var town := str(resident.get("zone", ""))
+	if resident.is_empty() or town == zone:
+		return ""
+	var town_name := str(Level.load_level(town).get("display_name", town)) if Level.exists(town) else town
+	var doing := "working" if not str(resident.get("trade", "")).is_empty() else "resting"
+	if hers.get("sick") is Dictionary and not hers["sick"].is_empty():
+		doing = "sick in %s bed" % {"her": "her", "him": "his", "them": "their"}.get(_companion_object(record), "her")  # Decision 501.
+	return "%s is %s in %s, not with you. Go to %s and %s will travel with you again." % [her_name, doing, town_name, town_name, _companion_subject(record)]
+
+
+## Tells [param player] where their companion is, if not with them
+## (_companion_whereabouts), and keeps the time, so the line is said again
+## once their view of the zone is built (_view_ready) if it took a while.
+func _tell_whereabouts(record: PlayerRecord, player: Player) -> void:
+	var words := _companion_whereabouts(record, player.zone if not player.zone.is_empty() else World.zone.name)
+	if words.is_empty():
+		return
+	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": words})
+	_where_told[player.owner_peer] = Time.get_ticks_msec()
+
+
 ## Gives [param player] its record's companion: a new one on first join,
 ## spawned adjacent; the remembered one, where it was, if it is alive; none
 ## if it died. A companion that is already in the world (its owner was away)
@@ -6173,20 +6228,17 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if record.companion.has("taken"):
 		print("[net] %s's companion %s is held by raiders (%s); none spawned" % [record.name, record.companion.get("name", "?"),
 			record.companion["taken"].get("by", "?")])
-		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s was carried off by raiders and is held by them still." % [
-			record.companion.get("name", "Your companion")]})
+		_tell_whereabouts(record, player)
 		return
 	# Parted as friends (581 amended (3)): she rests in her town till asked there.
 	if record.companion.get("parted") is Dictionary:
-		var home := _town_words(str(record.companion["parted"].get("place", "")))
-		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s went home to %s. Ask her there to travel with you again." % [
-			record.companion.get("name", "Your companion"), home]})
+		_tell_whereabouts(record, player)
 		return
 	# Gone home, having left them (decision 581): she does not come.
 	if record.companion.has("left"):
 		var town := _town_words(str(record.companion["left"].get("place", "")))
 		print("[net] %s's companion %s left them and lives in %s" % [record.name, record.companion.get("name", "?"), town])
-		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s left you and lives in %s now." % [record.companion.get("name", "Your companion"), town]})
+		_tell_whereabouts(record, player)
 		return
 	# Working in a town (decision 284): elsewhere, she stays at it; here,
 	# she leaves it and goes with them, her job waiting.
@@ -6198,14 +6250,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	if not resident.is_empty():
 		if str(resident.get("zone", "")) != World.zone.name:
 			print("[net] %s's companion %s works in %s; not here" % [record.name, record.companion.get("name", "?"), resident.get("zone", "?")])
-			# Told where she is, so she does not read as lost.
-			var town := str(resident.get("zone", ""))
-			var town_name := str(Level.load_level(town).get("display_name", town)) if Level.exists(town) else town
-			var doing := "working" if not str(resident.get("trade", "")).is_empty() else "resting"
-			if record.companion.get("sick") is Dictionary and not record.companion["sick"].is_empty():
-				doing = "sick in %s bed" % {"her": "her", "him": "his", "them": "their"}.get(_companion_object(record), "her")  # Decision 501.
-			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s is %s in %s. Go there to travel together again." % [
-				record.companion.get("name", "Your companion"), doing, town_name]})
+			_tell_whereabouts(record, player)  # Told where she is, so she does not read as lost.
 			return
 		_heard_from_worker(record)
 		if World.towns != null:
@@ -6223,6 +6268,16 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 				World.despawn(body)
 				_travelling = false
 	var existing: Companion = _companions.get(record.player_id)
+	if is_instance_valid(existing) and existing.spawned and existing.zone != player.zone:
+		# Waiting in a zone they are not in (a rejoin somewhere else: a start
+		# tile, a town after death): she comes to them, never left alone.
+		_remember_companion(record.player_id)
+		record.companion["tile"] = null
+		_travelling = true
+		World.despawn(existing)
+		_travelling = false
+		_companions.erase(record.player_id)
+		existing = null
 	if is_instance_valid(existing) and existing.spawned:
 		existing.works_as = ""
 		existing.home = record.companion.get("home", {})
@@ -6251,6 +6306,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	# somewhere safe.
 	var saved: Variant = Snapshot.vector(record.companion.get("tile"))
 	var wanted: Vector2i = player.tile
+	if saved != null and str(record.companion.get("tile_zone", player.zone)) != player.zone:
+		saved = null  # Her tile is another zone's (she waited there; they are back somewhere else).
 	if saved != null and not is_new:
 		if _nearest_hostile_distance(saved) > SPAWN_SAFE_DISTANCE:
 			wanted = saved
@@ -8069,6 +8126,13 @@ func companion_named(wanted: String) -> Dictionary:
 		var where := "taken" if pet.has("taken") else "resting" if pet.has("resident") else "party"
 		return {"player_id": id, "where": where}
 	return {}
+
+
+## Her subject pronoun by her card ("she", "he", "they").
+func _companion_subject(record: PlayerRecord) -> String:
+	var traits: Dictionary = record.companion.get("traits", {})
+	var pronoun := str(traits.get("pronoun", "she"))
+	return pronoun if pronoun in ["she", "he", "they"] else "she"
 
 
 ## Her object pronoun by her card ("her", "him", "them").
@@ -10296,6 +10360,7 @@ func _remember_companion(id: String) -> void:
 	record.companion["hp"] = pet.hp
 	record.companion["stamina"] = pet.stamina
 	record.companion["tile"] = [pet.tile.x, pet.tile.y]
+	record.companion["tile_zone"] = pet.zone  # (Her tile is in this zone; elsewhere she comes beside her player.)
 	record.companion["alive"] = true
 	record.companion["said"] = pet.said_lines()
 	record.companion["slots"] = Array(pet.slots)
@@ -11275,12 +11340,32 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 		_monster_said(talker, player, line)
 		if hears:
 			pet.overheard(_display_name(player), line, false)
+	elif not hears and _calls_absent(player, pet, line, phrase):
+		pass  # Told where she is (the barrow: he called for Pip, who worked in town).
 	elif to != "":
 		if phrase == 0 and _part_said(player, pet, line):
 			return  # They part for a while (581 amended (3)): she answers as she sets off.
 		if phrase == 0:
 			_guide_said(player, pet, line)  # An ask to lead the way (decision 551).
 		pet.owner_spoke(line, phrase)
+
+
+## Whether [param player] called for their companion where she is not
+## ([param line] names her, or a quick phrase, [param phrase] not 0, meant
+## her): if she is elsewhere (_companion_whereabouts), they are told where,
+## at most every WHERE_AGAIN_MS. True if told.
+func _calls_absent(player: Player, pet: Companion, line: String, phrase: int) -> bool:
+	if is_instance_valid(pet) and pet.spawned and pet.zone == player.zone:
+		return false
+	var record: PlayerRecord = _records.get(_peer_ids.get(player.owner_peer, ""))
+	if record == null or not (phrase != 0 or Companion._named(line, str(record.companion.get("name", "")))):
+		return false
+	var words := _companion_whereabouts(record, player.zone)
+	if words.is_empty() or Time.get_ticks_msec() - int(_where_told.get(player.owner_peer, -WHERE_AGAIN_MS)) < WHERE_AGAIN_MS:
+		return false
+	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": words})
+	_where_told[player.owner_peer] = Time.get_ticks_msec()
+	return true
 
 
 ## The peers whose players can hear something said at [param at] in the
@@ -12011,8 +12096,14 @@ func _leave(peer: int, player: Player, id: String) -> void:
 		_remember_companion(id)
 		pet.keeper = null
 		pet.current_intent = Companion.Intent.IDLE
-		if record != null and not _stay_in_town(record, pet) and CompanionCard.is_legacy(str(record.companion.get("name", ""))):
-			_rest_in_town(record, pet, id)
+		# One from before the roll rests in town between trips only when her
+		# player left on its ground (Jeff's barrow: a deploy's restart mid-dungeon
+		# sent Pip home); elsewhere she waits, as any companion, and is beside
+		# them when they are back.
+		var town_ground := Stockpile.place_at(World.holdings, pet.zone, pet.tile) if World.holdings != null else ""
+		if record != null and not _stay_in_town(record, pet) and CompanionCard.is_legacy(str(record.companion.get("name", ""))) \
+				and not town_ground.is_empty():
+			_rest_in_town(record, pet, id, town_ground)
 	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
 	party_log.add("%s left." % (record.name if record != null else "someone"))
 
