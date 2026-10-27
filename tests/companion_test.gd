@@ -13,9 +13,6 @@ const Walk := preload("res://tests/walk.gd")
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17786)  # Not 7777: the editor may be hosting there.
 	# The test room's monsters stay where they stand: these tests stage what
 	# they need beside them, and a wandering imp would join in.
@@ -121,6 +118,7 @@ func _ready() -> void:
 	_test_heel_free_leader()
 	_test_guide_free()
 	_test_look_asked()
+	_test_reset_free()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3344,6 +3342,39 @@ func _test_heel_keeps_clear() -> void:
 ## and the way in them; she goes where that way she cannot see, sees it,
 ## comes back; what she saw a card fact, among what she scouted, her voice
 ## told; a monster turning her back is a fact too, and told.
+## A free-walking player resets the room with her along (Jeff's barrow:
+## the reset that froze him, 689 amended (3) and (4)): his body is made
+## anew, and she is his again, beside him, and heels the new body as it
+## walks off.
+func _test_reset_free() -> void:
+	print("\n== a free player resets the room with her along: she heels his new body (the barrow's reset) ==")
+	_kill_monsters()
+	var free_was := World.free_walk
+	World.set_free_walk(true)
+	var before := _player()
+	var pet := _companion()
+	_settle(pet)
+	_main._on_command(before, "reset", {})
+	var owner := _player()
+	pet = _companion()
+	_check(owner != null and owner != before and World.free_body(owner), "the reset: his body made anew, a free body")
+	_check(pet != null and pet.keeper == owner and pet.keeper_peer == owner.owner_peer and World.distance(pet.tile, owner.tile) <= 2,
+		"she is his again, beside him (at %s, he %s)" % [pet.tile if pet != null else Vector2i(-1, -1), owner.tile])
+	if pet == null or owner == null:
+		World.set_free_walk(free_was)
+		return
+	var start := owner.tile
+	var goal := _far_cell(start, 5, 8)
+	var most := 0
+	var walked := Walk.to(owner, goal, 300)
+	for i in 40:
+		World.step()
+		most = maxi(most, World.distance(pet.tile, owner.tile))
+	_check(walked and pet.current_intent == Companion.Intent.FOLLOW and World.distance(pet.tile, owner.tile) <= Heel.STOP + 1,
+		"he walks off: she follows the new body to his heel (he %s to %s, she %s)" % [start, owner.tile, pet.tile])
+	World.set_free_walk(free_was)
+
+
 func _test_look_asked() -> void:
 	print("\n== asked to go and look, she goes, sees, comes back; what she saw is a fact on her card (696) ==")
 	_check(Companion.look_in(" go and look north-east, would you ") == {"verb": "look", "way": "north-east"}
