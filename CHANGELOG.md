@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.189
+
 - A lob's draw follows the arc: with a flatter arc set in tuning (F7, lob_apex) the bow is aimed lower, at the angle the arrow leaves at (677, pc-character's side, amended).
 - Drawing a bow for a lob, you aim it up at the sky, 45 degrees, the angle the arrow leaves at; switching between a lob and a flat shot mid-draw blends smoothly (677, pc-character's side).
 - Free movement: dying or travelling while knocked back no longer carries the slide to where you reappear (688 amended (6)).
@@ -15,8 +17,8 @@ notes (decision 324).
 - The draugr's spin hits a little harder under free walk (603 amended (5)): a player swept into a wall from full is left at 3 of 20 again, not 4 (F7 combat.moves.spin.impulse_scale 1.0 to 1.06).
 - Coming back into the game somewhere other than where you left (a start tile, away from a monster), your companion is beside you, not left where you parted (705).
 - A companion walking a long way back to you no longer slows the server (it searched the whole way afresh at every step; 704).
-
 - Server: an address that sends five wrong passwords within ten minutes is refused for fifteen minutes (701)
+
 ## v0.1.188
 
 - Camera: walking into a house goes top-down with the low camera on too (671 amended (4))
