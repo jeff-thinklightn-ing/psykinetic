@@ -789,6 +789,8 @@ const HUMANOID_MOVES := {
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
 	"hits": {"front": ["Hit_Chest", "Hit_Head"], "left": ["Hit_Shoulder_L"], "right": ["Hit_Shoulder_R"], "back": ["Hit_Back"]},
 	"deaths": ["Death01", "Death02"], "bow_draw": "Bow_Draw", "bow_aim": "Bow_Hold", "bow_shoot": "Bow_Loose", "bow_idle": "Bow_Idle",
+	# The same aimed at the sky, for a lob (677, pc-character's side; _sync_bow mixes them in).
+	"bow_draw_sky": "Bow_Draw_Sky", "bow_aim_sky": "Bow_Hold_Sky", "bow_shoot_sky": "Bow_Loose_Sky",
 	"dodges": ["Dodge_Left", "Dodge_Right"], "stance": "Sword_Idle", "ready": "Axe_Ready",
 }
 ## Attach points (decision 451): where a humanoid holds and hangs things, on
@@ -14325,6 +14327,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 			"", "carry", "stowed", "sheathed":
 				rig.upper_off()
 	puppet.set_meta("bow_state", want)
+	_sky_bow(entity, puppet, rig, moves, want, now)
 	if want == "stowed" or state == "stowed":
 		_stow_bow(sockets, want == "stowed")
 	if want == "sheathed" or (state == "sheathed" and want != "drawing"):
@@ -14334,6 +14337,25 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	if bow != "":
 		_turn_carried(puppet, want == "carry", now)
 	_show_nocked(puppet, ids, want in ["draw", "hold"])
+
+
+## The bow aimed at the sky for a lob (677, pc-character's side): drawn or
+## held while GridEntity.lobbing, the upper layer's flat clip has its sky
+## clip (HUMANOID_MOVES' bow_*_sky, key for key alike) mixed over it
+## (AnimRig.sky), the mix eased toward lobbing over SKY_FADE, so a draw
+## turned up or down mid-pull crossfades; the loose keeps the mix it was
+## loosed with (the sim clears lobbing as it looses); anything else lets it go.
+const SKY_FADE := 0.2
+const SKY_CLIPS := {"draw": "bow_draw_sky", "hold": "bow_aim_sky", "loose": "bow_shoot_sky"}
+func _sky_bow(entity: GridEntity, puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String, now: int) -> void:
+	var amount := rig.sky_amount()
+	if want in ["draw", "hold"]:
+		var step := (now - int(puppet.get_meta("sky_msec", now))) / 1000.0 / SKY_FADE
+		amount = move_toward(amount, 1.0 if entity.lobbing else 0.0, step)
+	elif want != "loose":
+		amount = 0.0
+	puppet.set_meta("sky_msec", now)
+	rig.sky(str(moves.get(SKY_CLIPS.get(want, ""), "")), amount)
 
 
 ## The rest [param puppet] stands at (662 (b)): RESTS' row for the piece in

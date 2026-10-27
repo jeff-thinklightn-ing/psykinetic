@@ -8,7 +8,8 @@ extends Node
 ##           each change crossfaded over the rig's blend;
 ##   upper   a clip over the body above the hips (a guard, a bow drawn),
 ##           the legs left to the base (left out of the tree with
-##           upper = false: a quadruped has no such bones);
+##           upper = false: a quadruped has no such bones); its sky clip
+##           (sky) mixed over it in step, the bow's flat and sky draws;
 ##   posture an additive pose on top (stooped, slouching), made outside the
 ##           rig and only added by it;
 ##   action  a blow over everything (strike): timed so its contact lands
@@ -50,6 +51,8 @@ var _has_upper := false
 var _upper_clip := ""
 ## The upper layer's speed (upper()): its clip played this many times as fast.
 var _upper_speed := 1.0
+var _sky_clip := ""
+var _sky_amount := 0.0
 var _posture: Animation
 var _action_clip := ""
 var _action_speed := 1.0
@@ -107,9 +110,18 @@ func _build(upper: bool) -> void:
 		_root.add_node("upper_speed", AnimationNodeTimeScale.new())
 		_root.connect_node("upper_seek", 0, "upper_clip")
 		_root.connect_node("upper_speed", 0, "upper_seek")
+		# The sky clip (sky), mixed over the upper clip in step with it.
+		_root.add_node("sky_clip", AnimationNodeAnimation.new())
+		_root.add_node("sky_seek", AnimationNodeTimeSeek.new())
+		_root.add_node("sky_speed", AnimationNodeTimeScale.new())
+		_root.connect_node("sky_seek", 0, "sky_clip")
+		_root.connect_node("sky_speed", 0, "sky_seek")
+		_root.add_node("sky", AnimationNodeBlend2.new())
+		_root.connect_node("sky", 0, "upper_speed")
+		_root.connect_node("sky", 1, "sky_speed")
 		_root.add_node("upper", layer)
 		_root.connect_node("upper", 0, under)
-		_root.connect_node("upper", 1, "upper_speed")
+		_root.connect_node("upper", 1, "sky")
 		under = "upper"
 	_root.add_node("pose", AnimationNodeAnimation.new())
 	_root.add_node("posture", AnimationNodeAdd2.new())
@@ -139,6 +151,7 @@ func _build(upper: bool) -> void:
 	_frames = get_instance_id() % 8
 	if upper:
 		tree.set("parameters/upper/blend_amount", 0.0)
+		tree.set("parameters/sky/blend_amount", 0.0)
 	tree.set("parameters/posture/add_amount", 0.0)
 	tree.active = true
 
@@ -273,10 +286,12 @@ func upper(clip: String, speed := 1.0, from_start := false) -> void:
 		return
 	_upper_speed = speed
 	tree.set("parameters/upper_speed/scale", speed)
+	tree.set("parameters/sky_speed/scale", speed)
 	if clip != _upper_clip or from_start:
 		(_root.get_node("upper_clip") as AnimationNodeAnimation).animation = clip
 		_upper_clip = clip
 		tree.set("parameters/upper_seek/seek_request", 0.0)
+		tree.set("parameters/sky_seek/seek_request", 0.0)
 		tree.set("parameters/upper/blend_amount", 1.0)
 		_apply()
 		return
@@ -294,7 +309,41 @@ func upper_at(clip: String, seconds: float) -> void:
 	if _upper_clip == "":
 		return
 	tree.set("parameters/upper_seek/seek_request", seconds)
+	tree.set("parameters/sky_seek/seek_request", seconds)
 	_apply()
+
+
+## The upper clip's sky clip (677, pc-character's side): [param clip] played
+## in step with the upper clip (its time and speed; upper and upper_at move
+## both), mixed over it at [param amount], 0 the upper clip alone, 1 the
+## sky's. The bow's flat and sky clips, key for key alike, so a draw turned
+## up mid-pull crossfades rather than snaps. "" or 0 lets it go (an input
+## at no weight isn't posed); taken up again, it starts where the upper
+## clip is.
+func sky(clip: String, amount: float) -> void:
+	if not _has_upper:
+		return
+	clip = _name(clip) if clip != "" else ""
+	if clip == "" or amount <= 0.0 or not player.has_animation(clip):
+		if _sky_amount > 0.0:
+			tree.set("parameters/sky/blend_amount", 0.0)
+		_sky_amount = 0.0
+		return
+	if clip != _sky_clip or _sky_amount <= 0.0:
+		(_root.get_node("sky_clip") as AnimationNodeAnimation).animation = clip
+		_sky_clip = clip
+		tree.set("parameters/sky_seek/seek_request", upper_position())
+		tree.set("parameters/sky/blend_amount", amount)
+		_sky_amount = amount
+		_apply()
+		return
+	_sky_amount = amount
+	tree.set("parameters/sky/blend_amount", amount)
+
+
+## How much of the sky clip is mixed over the upper clip (sky).
+func sky_amount() -> float:
+	return _sky_amount
 
 
 ## The base layer held still on [param clip] at [param seconds] into it: a

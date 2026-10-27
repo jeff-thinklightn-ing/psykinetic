@@ -22,6 +22,7 @@ func _ready() -> void:
 	await _test_one_strike_clip()
 	await _test_spear_jab()
 	await _test_bow_clear()
+	await _test_sky_bow()
 	await _test_bow_back()
 	await _test_sheathed()
 	await _test_sheathe_clips()
@@ -336,7 +337,11 @@ func _test_bow_clear() -> void:
 		["stand", "Idle", "Bow_Idle", 0.0], ["lift", "Idle", "Bow_Draw", 0.15],
 		["nock", "Idle", "Bow_Draw", 0.3], ["raise", "Idle", "Bow_Draw", 0.42], ["raised", "Idle", "Bow_Draw", 0.5],
 		["pull", "Idle", "Bow_Draw", 0.68], ["full", "Idle", "Bow_Draw", 1.0], ["release", "Idle", "Bow_Loose", 0.09],
-		["down", "Idle", "Bow_Loose", 0.8]]
+		["down", "Idle", "Bow_Loose", 0.8],
+		# The lob's (677, pc-character's side): the same aimed at the sky.
+		["sky raise", "Idle", "Bow_Draw_Sky", 0.42], ["sky raised", "Idle", "Bow_Draw_Sky", 0.55],
+		["sky pull", "Idle", "Bow_Draw_Sky", 0.68], ["sky full", "Idle", "Bow_Draw_Sky", 1.0],
+		["sky release", "Idle", "Bow_Loose_Sky", 0.09], ["sky down", "Idle", "Bow_Loose_Sky", 0.8]]
 	var found: Array[String] = []
 	var anchors: Array[String] = []
 	for build: Array in builds:
@@ -369,17 +374,79 @@ func _test_bow_clear() -> void:
 			if counts != Vector3i.ZERO:
 				found.append("%s %s%s: bow %d, left forearm %d, right arm %d" % [build[0], pose[0],
 					" %.2f" % rig.position() if pose[2] == "" else "", counts.x, counts.y, counts.z])
-			if pose[0] == "full":
+			if pose[0] in ["full", "sky full"]:
 				var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 				var head := skeleton.get_bone_global_pose(skeleton.find_bone("Head")).origin
 				var wrist := skeleton.get_bone_global_pose(skeleton.find_bone("RightHand")).origin
 				# Skeleton space: the body faces +z; behind the head is -z.
 				if wrist.distance_to(head) > 0.2 or wrist.z - head.z < -0.04:
-					anchors.append("%s: wrist %.2f from the head, %.2f ahead of it" % [build[0], wrist.distance_to(head), wrist.z - head.z])
+					anchors.append("%s %s: wrist %.2f from the head, %.2f ahead of it" % [build[0], pose[0], wrist.distance_to(head), wrist.z - head.z])
 			model.queue_free()
 			holder.free()
-	_check(found.is_empty(), "no bow nor arm inside the body, five builds, carried, nocked, drawn, released (%s)" % ", ".join(found))
-	_check(anchors.is_empty(), "at full draw the string hand at the jaw, not behind the head (%s)" % ", ".join(anchors))
+	_check(found.is_empty(), "no bow nor arm inside the body, five builds, carried, nocked, drawn, released, flat and at the sky (%s)" % ", ".join(found))
+	_check(anchors.is_empty(), "at full draw, flat and at the sky, the string hand at the jaw, not behind the head (%s)" % ", ".join(anchors))
+
+
+## The lob's draw (677, pc-character's side): at full draw and held (Bow_Draw_Sky, Bow_Hold_Sky)
+## the arrow's line (the string hand's socket to the bow hand's) within SKY_AIM of the lob's
+## launch (World.lob_point's slope at the default lob_apex, 45 degrees), man and woman, while the
+## flat draw's stays within SKY_AIM of level; the bow standing to that line within SKY_AIM of how
+## it stands drawn flat (turned with the arm and the lean, it lay back too far); and AnimRig.sky: half mixed, the line halfway
+## between; let go, the flat clip's again; played (Bow_Hold), the sky clip in step with it.
+const SKY_AIM := 5.0
+func _test_sky_bow() -> void:
+	print("== the lob's draw at the sky ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var launch := rad_to_deg(atan(4.0 * 0.25))
+	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
+		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+		add_child(model)
+		var holder := Node3D.new()
+		model.add_child(holder)
+		Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+		var sockets: Dictionary = holder.get_meta("sockets")
+		var bow := ArtKit.instance("item.bow")
+		(sockets["hand_l"] as Node3D).add_child(bow)
+		var rig := AnimRig.make(model, lib, 0.0, true, null)
+		rig.loop("Idle", 0.0)
+		var square := func() -> float:  # The bow's length to the arrow's line, degrees.
+			var d := ((sockets["hand_l"] as Node3D).global_position - (sockets["hand_r"] as Node3D).global_position).normalized()
+			return rad_to_deg(acos(clampf(d.dot(bow.global_basis.y.normalized()), -1.0, 1.0)))
+		var squares := {}
+		var pitch := func() -> float:
+			var d := ((sockets["hand_l"] as Node3D).global_position - (sockets["hand_r"] as Node3D).global_position).normalized()
+			return rad_to_deg(asin(d.y))
+		var at := {}
+		for moment: Array in [["flat", "Bow_Draw", "", 0.0], ["sky", "Bow_Draw", "Bow_Draw_Sky", 1.0], ["half", "Bow_Draw", "Bow_Draw_Sky", 0.5],
+				["held", "Bow_Hold", "Bow_Hold_Sky", 1.0], ["let go", "Bow_Draw", "", 0.0]]:
+			rig.upper_at(moment[1], 1.0 if moment[1] == "Bow_Draw" else 0.4)
+			rig.sky(moment[2], moment[3])
+			await _frames(3)
+			at[moment[0]] = pitch.call()
+			squares[moment[0]] = square.call()
+		_check(absf(at["sky"] - launch) <= SKY_AIM and absf(at["held"] - launch) <= SKY_AIM,
+			"%s: drawn and held at the sky, the arrow %.1f and %.1f deg up (the lob leaves at %.0f)" % [build[0], at["sky"], at["held"], launch])
+		_check(absf(at["flat"]) <= SKY_AIM, "%s: the flat draw level (%.1f deg)" % [build[0], at["flat"]])
+		_check(absf(squares["sky"] - squares["flat"]) <= SKY_AIM, "%s: the bow stands to the arrow at the sky as drawn flat (%.0f, %.0f deg)" % [
+			build[0], squares["sky"], squares["flat"]])
+		_check(at["half"] > at["flat"] + 10.0 and at["half"] < at["sky"] - 10.0,
+			"%s: half mixed, between (%.1f of %.1f..%.1f)" % [build[0], at["half"], at["flat"], at["sky"]])
+		_check(absf(at["let go"] - at["flat"]) < 1.0 and rig.sky_amount() == 0.0, "%s: let go, the flat draw again (%.1f)" % [build[0], at["let go"]])
+		model.queue_free()
+	var rig := _goblin()
+	rig.loop("Idle")
+	rig.upper("Bow_Hold", 1.0, true)
+	rig.sky("Bow_Hold_Sky", 0.5)
+	rig.tree.advance(0.4)
+	var sky_at := float(rig.tree.get("parameters/sky_clip/current_position"))
+	_check(absf(sky_at - rig.upper_position()) < 0.02, "played, the sky clip in step with the upper clip (%.3f, %.3f)" % [sky_at, rig.upper_position()])
+	rig.sky("", 0.0)
+	rig.tree.advance(0.3)
+	rig.sky("Bow_Hold_Sky", 0.3)
+	rig.tree.advance(0.0)
+	sky_at = float(rig.tree.get("parameters/sky_clip/current_position"))
+	_check(absf(sky_at - rig.upper_position()) < 0.02, "let go and taken up again, it starts where the upper clip is (%.3f, %.3f)" % [sky_at, rig.upper_position()])
+	rig.get_parent().queue_free()
 
 
 ## The bow on the back (662 amended (d)), each face: clear of the body through
@@ -759,7 +826,7 @@ static func _bow_inside(model: Node3D, bow: Node3D) -> Vector3i:
 	var trunk: Array = parts["trunk"]
 	return Vector3i(_inside(points, trunk[0] + parts["leg"][0], trunk[1] + parts["leg"][1]),
 		_inside(parts["forearm"][0], trunk[0], trunk[1]),
-		_inside(parts["right"][0], trunk[0] + parts["head"][0], trunk[1] + parts["head"][1]))
+		_inside(parts["right"][0], trunk[0], trunk[1]) + _inside(parts["right"][0], parts["head"][0], parts["head"][1], true))
 
 
 ## [param model]'s Body skinned as it stands, by part: {part: [points, normals]} for "trunk",
@@ -819,9 +886,20 @@ static func _skinned_parts(model: Node3D) -> Dictionary:
 	return parts
 
 
-static func _inside(points: PackedVector3Array, surface: PackedVector3Array, normals: PackedVector3Array) -> int:
+## [param boxed]: a point outside the surface's box (grown 1 cm) is never counted (a lone part:
+## the head's nearest vertex to a string hand held out beside it was the neck's open rim, its normal
+## up, and counted the hand inside the head 28 cm off the body's middle; 677, pc-character's side).
+static func _inside(points: PackedVector3Array, surface: PackedVector3Array, normals: PackedVector3Array, boxed := false) -> int:
 	var n := 0
+	if surface.is_empty():
+		return 0
+	var box := AABB(surface[0], Vector3.ZERO)
+	for q in surface:
+		box = box.expand(q)
+	box = box.grow(0.01)
 	for p in points:
+		if boxed and not box.has_point(p):
+			continue
 		var best := INF
 		var at := -1
 		for j in surface.size():

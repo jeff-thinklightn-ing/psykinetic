@@ -33218,3 +33218,65 @@ its free_press (688 amended (4)). free_walk_test _test_kick_respawn: kicked
 east, respawned at (2, 4) mid-slide: no slide, no momentum, no press, and it
 stands there 6 ticks on (without the fix it slid back to (4, 2)). Server
 only, protocol unchanged, no new class_name.
+## 677, pc-character's side. The lob drawn at the sky
+
+Combat asked for it, and the coordinator approved the design. While a body
+draws or holds a bow with GridEntity.lobbing set, the bow is drawn aimed at
+the sky.
+
+The angle: a lob leaves the bow on World.lob_point's slope, 4 x lob_apex.
+No bow sets lob_apex, so every bow uses the default 0.25: 45 degrees. One
+pose fits every lob, and SKY_PITCH in the clip tool is the one place to
+change it.
+
+Three clips in tools/humanoid_clips.py: Bow_Draw_Sky, Bow_Hold_Sky and
+Bow_Loose_Sky. Each is key for key with Bow_Draw, Bow_Hold and Bow_Loose:
+
+- The low and nock keys are the same as the flat ones.
+- From the raise on, the bow arm's wrist is turned up SKY_PITCH (52
+  degrees) about the shoulder (sky_bow), and the bow's length back
+  SKY_BOW_TILT (45), so the trunk's lean carries it the rest. Turned the
+  full pitch, the bow lay 6 degrees farther back than drawn flat, which
+  read as lying back in the first still.
+- The trunk leans back and the head lifts to look along the arrow
+  (SKY_LEAN). The head lifts only once the string hand has passed the chin.
+- The string hand still anchors at the jaw. On the way up it is held
+  farther out, its elbow raised, so it clears the jaw and the shoulder.
+
+Measured at full draw and held, the arrow's line (string hand to bow hand)
+is at 44 to 45 degrees for both man and woman. The flat draw's is level.
+
+HUMANOID_MOVES gains bow_draw_sky, bow_aim_sky and bow_shoot_sky. Client3D
+(_sky_bow) mixes the sky clip over the flat one while drawing or holding.
+The mix is eased toward GridEntity.lobbing over SKY_FADE (0.2 s), so a draw
+turned up or down mid-pull crossfades rather than snapping (the
+coordinator: a snap would read as a glitch). A loose keeps the mix it was
+loosed with, since the sim clears lobbing as it looses. Anything else lets
+the mix go.
+
+AnimRig gains a second upper slot, sky(clip, amount). It is a Blend2 inside
+the upper layer, its clip played in step with the upper clip: upper() and
+upper_at() seek both, and taken up again it starts where the upper clip
+is. Only the bow's flat and sky clips use it. At no weight its input isn't
+posed.
+
+_on_lobbed already flies the arrow from _bow_tip, so the lob now leaves
+from the raised bow, with no change on combat's side. Only player.gd
+replicates lobbing, so today only players lob.
+
+Tests:
+
+- anim_rig_test _test_bow_clear runs its five builds over the sky clips
+  too: the bow and arms clear of the body, and at full draw the string
+  hand at the jaw. The string arm is now checked against the trunk and the
+  head separately, the head with the points outside its box left out. The
+  neck's open rim, its normal up, had counted a hand held 28 cm out beside
+  the head as inside it.
+- _test_sky_bow: drawn and held at the sky within SKY_AIM (5 degrees) of
+  the lob's 45. The flat draw level. The bow stands to the arrow within 5
+  degrees of how it stands drawn flat (101 and 101). Half mixed, between
+  the two. Let go,
+  the flat draw again. Played, the sky clip in step; let go and taken up,
+  it starts where the upper clip is.
+
+Client only, protocol unchanged, no new class_name.

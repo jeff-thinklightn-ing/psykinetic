@@ -277,6 +277,66 @@ CLIPS["Bow_Loose"] = {"keys": [
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
 ]}
 
+# The lob (677, pc-character's side; combat's lob, the bow aimed at the sky): the draw, the hold
+# and the release key for key with Bow_Draw, Bow_Hold and Bow_Loose (so Client3D scrubs and
+# crossfades them alike), from the raise on the bow arm turned up SKY_PITCH about its shoulder,
+# the bow's length turned back with it, the trunk leaning back and the head lifted to look along
+# the arrow, the string hand still anchored at the jaw. The arrow leaves on World.lob_point's
+# slope, 4 x lob_apex: 45 degrees at the default 0.25.
+SKY_PITCH = 52.0
+# The bow's length turned back less than the arm (the trunk's lean carries it the rest), so it
+# stands to the arrow as the flat draw's does (at the full pitch it lay 6 degrees farther back).
+SKY_BOW_TILT = 45.0
+SKY_LEAN = [("spine_01", LIFT, 5.0), ("spine_02", LIFT, 6.0), ("spine_03", LIFT, 4.0), ("Head", LIFT, 14.0)]
+
+
+def pitched(ahead: float, up: float, share: float) -> tuple:
+	"""(ahead, up) turned up SKY_PITCH x [share] about the shoulder."""
+	a = math.radians(SKY_PITCH * share)
+	return ahead * math.cos(a) - up * math.sin(a), ahead * math.sin(a) + up * math.cos(a)
+
+
+def sky_bow(ahead: float, out: float, up: float, length: tuple, share: float = 1.0) -> list:
+	"""bow_arm aimed up SKY_PITCH x [share], the bow's length turned back SKY_BOW_TILT x [share]."""
+	a, u = pitched(ahead, up, share)
+	t = math.radians(SKY_BOW_TILT * share)
+	x, y, z = length
+	return bow_arm(a, out, u, (x, y * math.cos(t) + z * math.sin(t), -y * math.sin(t) + z * math.cos(t)))
+
+
+def sky_lean(share: float = 1.0, head: float = 1.0) -> list:
+	"""SKY_LEAN [share] of the way, the head's [head] of it (lifted only once the string hand has
+	passed the chin: lifted early, the hand came up through the jaw)."""
+	return [(bone, axis, degrees * share * (head if bone == "Head" else 1.0)) for bone, axis, degrees in SKY_LEAN]
+
+
+SKY_DRAWN = SIDE_ON + sky_bow(*DRAWN_ARM, BOW_UP) + string_arm(1.0, (-1.0, 0.6, 0.1)) + sky_lean()
+CLIPS["Bow_Draw_Sky"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
+	(0.15, P("Idle_Loop", 0.15, LIFTING)),
+	(0.3, P("Idle_Loop", 0.3, NOCK)),
+	(0.42, P("Idle_Loop", 0.4, side_on(0.35) + [("clavicle_r", TURN, 20.0)] + sky_bow(0.4, -0.14, -0.12, (-0.05, 0.0, 1.0), 0.5)
+		+ string_arm(0.12, (-1.0, -0.2, 0.1), out=0.12) + sky_lean(0.5, 0.0))),
+	(0.55, P("Idle_Loop", 0.5, side_on(0.6) + [("clavicle_r", TURN, 15.0)] + sky_bow(0.45, -0.13, 0.0, BOW_UP, 0.85)
+		+ string_arm(0.25, (-1.0, -0.1, 0.0), out=0.16) + sky_lean(0.85, 0.0))),
+	(0.68, P("Idle_Loop", 0.6, side_on(0.95) + sky_bow(0.48, -0.15, 0.04, BOW_UP) + string_arm(0.5, (-0.8, 0.5, 0.6), out=0.18) + sky_lean(1.0, 0.3))),
+	(0.8, P("Idle_Loop", 0.7, SIDE_ON + sky_bow(*DRAWN_ARM, BOW_UP) + string_arm(0.7, (-1.0, 0.4, -0.25)) + sky_lean())),
+	(1.0, P("Idle_Loop", 0.9, SKY_DRAWN)),
+]}
+CLIPS["Bow_Hold_Sky_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, SKY_DRAWN)),
+	(0.75, P("Idle_Loop", 0.75, [("spine_02", LIFT, 1.0)] + SKY_DRAWN)),
+	(1.5, P("Idle_Loop", 0.0, SKY_DRAWN)),
+]}
+CLIPS["Bow_Loose_Sky"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, SKY_DRAWN)),
+	(0.08, P("Idle_Loop", 0.08, SIDE_ON + sky_bow(0.49, -0.16, 0.02, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.05), 0.09) + sky_lean())),
+	(0.3, P("Idle_Loop", 0.3, SIDE_ON + sky_bow(0.48, -0.16, -0.01, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.0), 0.1) + sky_lean())),
+	(0.6, P("Idle_Loop", 0.6, NOCK)),
+	(0.8, P("Idle_Loop", 0.8, LIFTING)),
+	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
+]}
+
 # Visible work (566, pc-character's side; Jeff: "town people need to be doing activities to better
 # the town, chopping wood ... building a half constructed building"): the work a resident shows,
 # looped, a tool in the right hand (art-kit's tool.*: the grip at the origin, the length +y, the
