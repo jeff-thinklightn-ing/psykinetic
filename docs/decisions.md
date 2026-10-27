@@ -32553,3 +32553,38 @@ Server only, protocol unchanged, no new class_name. companion_test
 _test_look_asked (the words and ways; a way she cannot see; she goes, sees
 a thing on the ground, comes back; the fact and the scouted line; an imp
 turning her back is a fact), passing with free walk off and on.
+## 688 amended (4): a free body pressing an edge it cannot cross is a step refused there
+
+Jeff on v0.1.186: "the hidden niche in the altar room doesn't activate by
+stepping on that tile anymore since the free-walk change". World.try_move's
+refusal was the only teller of a step that did not go: niche_pressed (608's
+burial niche, the hidden door's slab), walked_off (the map's edge, a
+neighbour's way), link_bumped (571, a link's cell someone stands on) and
+entity_bumped. A free body never calls try_move, so pressed into a niche or
+the map's edge it told nothing.
+
+- **One teller**: try_move's refusal is now World._step_refused(entity,
+  direction), the same for both.
+- **A press** (World._free_pressed, from tend_free_body each tick with that
+  tick's intent): each straight way the intent leans at least
+  FREE_PRESS_LEAN (0.5: up to 60 degrees off straight) into, whose edge from
+  the body's cell it cannot cross (_terrain_blocks_step: a wall, a closed or
+  held door, a step, the walkable's edge) and its circle is against (a
+  radius off it), is counted a tick at a time (Player.free_press, cleared
+  on a new cell); at FREE_PRESS_TICKS (2: 0.2 s) it is _step_refused that
+  way, and counts again from none, as a held key's refused steps come
+  again. Brushing past along a wall leans too little into it; a corner
+  grazed is not against. A held body (free_held) presses nothing.
+- **Already right for a free body**: a link's cell with someone on it is
+  bumped from _free_off_cell (688), a step onto a link, the draft line and
+  everything on entity_moved come from its claim (_relocate), a held
+  door's lock stops it (may_open), its own companion is bumped from
+  _free_claim; _stepped_off is shared. _meets_brace is a charging monster's.
+
+free_walk_test: the niche's edge pressed once after 2 ticks against it, not
+after 1, again held on, leaning 17 degrees off; brushing along the wall over
+two niches presses neither; the grid's refused step presses it as ever; the
+map's edge walked off west, nothing walking along it; a held door stops it a
+radius off, let go of opens to the press; a link's cell walked onto, and
+bumped with another player on it. Server only, protocol unchanged, no new
+class_name.

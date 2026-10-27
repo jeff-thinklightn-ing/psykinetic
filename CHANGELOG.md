@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement (--free-walk): pressing into the barrow's burial niches works again (the hidden door opens), and walking into the map's edge takes you to the next area as on the grid (688 amended (4)).
 - Ask your companion to go and look ('go look north', 'check out that door', 'have a look ahead'): she walks over until she can see it, comes back and tells you what was there, and remembers it; something coming at her turns her back, and she tells you that too (696).
 ## v0.1.186
 

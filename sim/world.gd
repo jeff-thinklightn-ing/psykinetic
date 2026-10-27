@@ -470,6 +470,13 @@ const FREE_BUMP_TICKS := 5
 ## its way off the wall's normal; 30 degrees) is stopped by it; at more of a
 ## slant it slides along it (688 amended (2)).
 const FREE_GLANCE_COS := 0.87
+## A free body held pressing against an edge it cannot cross this many
+## ticks (0.2 s) is a step refused there (688 amended (4)): the hidden
+## niche's press, the map's edge walked off. Its intent must lean at least
+## FREE_PRESS_LEAN into the edge (60 degrees off along it), so brushing
+## past a wall presses nothing.
+const FREE_PRESS_TICKS := 2
+const FREE_PRESS_LEAN := 0.5
 ## Free movement's wire (decision 689).
 const FreeNet := preload("res://net/free_net.gd")
 ## SHOVE_COST_BASE and SHOVE_COST_SCALE: a shove costs
@@ -6331,22 +6338,7 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	if tick - entity.next_move_tick < 1.0:
 		start = entity.next_move_tick
 	if not _swap_with_own(entity, direction, duration, start) and not _shift(entity, entity, direction, entity.mass, duration, start):
-		var ahead: GridEntity = _occupancy.get(entity.tile + direction)
-		if ahead != null and ahead.is_creature() \
-				and not _terrain_blocks_step(entity.tile, direction, true):
-			entity_bumped.emit(entity, ahead, direction)
-		elif not is_walkable(entity.tile + direction):
-			walked_off.emit(entity, direction)
-		# Someone on a link's cell does not shut the way: a player who
-		# steps at it takes the link all the same (decision 571).
-		if entity is Player and is_link_cell(entity.tile + direction) \
-				and not _terrain_blocks_step(entity.tile, direction, true):
-			link_bumped.emit(entity, entity.tile + direction)
-		# A step into a burial niche's edge that stops it presses on the
-		# niche (608): the hidden door's slab gives to a press, nothing else.
-		if (direction.x == 0 or direction.y == 0) and niche_edges.has(Terrain.edge_key(entity.tile, direction)) \
-				and edge_blocks(entity.tile, direction):
-			niche_pressed.emit(entity, Terrain.edge_key(entity.tile, direction))
+		_step_refused(entity, direction)
 		return false
 	entity.next_move_tick = start + duration
 	entity.step_velocity = Vector2(direction) / duration  # Its momentum (body_velocity).
@@ -6355,6 +6347,30 @@ func try_move(entity: GridEntity, direction: Vector2i) -> bool:
 	entity._world_set_facing(direction)
 	_stepped_off(entity, entity.tile - direction, duration)
 	return true
+
+
+## What a step of [param entity]'s in [param direction] that did not go
+## tells (try_move's refusal; a free body pressing an edge it cannot cross,
+## _free_pressed, 688 amended (4)): a creature ahead bumped, the map's edge
+## walked off, a link's cell someone stands on taken all the same, a burial
+## niche's edge pressed.
+func _step_refused(entity: GridEntity, direction: Vector2i) -> void:
+	var ahead: GridEntity = _occupancy.get(entity.tile + direction)
+	if ahead != null and ahead.is_creature() \
+			and not _terrain_blocks_step(entity.tile, direction, true):
+		entity_bumped.emit(entity, ahead, direction)
+	elif not is_walkable(entity.tile + direction):
+		walked_off.emit(entity, direction)
+	# Someone on a link's cell does not shut the way: a player who
+	# steps at it takes the link all the same (decision 571).
+	if entity is Player and is_link_cell(entity.tile + direction) \
+			and not _terrain_blocks_step(entity.tile, direction, true):
+		link_bumped.emit(entity, entity.tile + direction)
+	# A step into a burial niche's edge that stops it presses on the
+	# niche (608): the hidden door's slab gives to a press, nothing else.
+	if (direction.x == 0 or direction.y == 0) and niche_edges.has(Terrain.edge_key(entity.tile, direction)) \
+			and edge_blocks(entity.tile, direction):
+		niche_pressed.emit(entity, Terrain.edge_key(entity.tile, direction))
 
 
 ## What a step does as [param entity] leaves [param left] for its tile
@@ -8344,10 +8360,13 @@ func tend_free_body(player: Player) -> void:
 		return
 	var was := player.free_pos
 	var way := Vector2.ZERO
+	var pressing := Vector2.ZERO
 	while not player.free_inputs.is_empty() and player.free_bank > 0.001:
 		var command: Dictionary = player.free_inputs[0]
 		var ticks := minf(float(command["ticks"]), player.free_bank)
 		way = _free_glide(player, player.free_pos, command["intent"], ticks, true)[1]
+		if not free_held(player):
+			pressing = command["intent"]
 		player.free_bank -= ticks
 		command["ticks"] = float(command["ticks"]) - ticks
 		command["used"] = float(command["used"]) + ticks
@@ -8355,10 +8374,37 @@ func tend_free_body(player: Player) -> void:
 		if float(command["ticks"]) <= 0.001:
 			_free_acked(player, player.free_inputs.pop_front())
 	player.free_way = way
+	_free_pressed(player, pressing)
 	if player.free_pos.distance_to(was) > 0.01:
 		player.last_step_tick = tick
 		player.step_velocity = way
 		player.step_until = tick + 1.0
+
+
+## [param player]'s free body pressing [param intent] (this tick's, ZERO for
+## none) into the edges of its cell (688 amended (4); Jeff: the barrow's
+## hidden niche no longer opened): each straight way the intent leans at
+## least FREE_PRESS_LEAN into, whose edge the body cannot cross and its
+## circle is against, counted a tick at a time; at FREE_PRESS_TICKS it is a
+## step refused there (_step_refused: the niche pressed, the map's edge
+## walked off), and counts again from none, as a grid walk's refused steps
+## come again while it is held. Brushing past along a wall leans too little
+## into it to press.
+func _free_pressed(player: Player, intent: Vector2) -> void:
+	if player.free_press_tile != player.tile:
+		player.free_press.clear()
+		player.free_press_tile = player.tile
+	for axis: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var against := intent.dot(Vector2(axis)) >= FREE_PRESS_LEAN \
+				and (player.free_pos - Vector2(player.tile)).dot(Vector2(axis)) >= 0.5 - FREE_RADIUS - 0.01 \
+				and _terrain_blocks_step(player.tile, axis)
+		if not against:
+			player.free_press.erase(axis)
+			continue
+		player.free_press[axis] = int(player.free_press.get(axis, 0)) + 1
+		if int(player.free_press[axis]) >= FREE_PRESS_TICKS:
+			player.free_press.erase(axis)
+			_step_refused(player, axis)
 
 
 ## Where [param entity]'s free body would go from [param from] by

@@ -47,6 +47,11 @@ var free_acked := -1
 var free_used := 0.0
 ## Server: the tick it last bumped its own companion as a free body (688).
 var free_bumped_tick := -100000
+## Server: the ticks its free body has pressed each straight way against an
+## edge of free_press_tile it cannot cross (688 amended (4),
+## World._free_pressed): {Vector2i: ticks}.
+var free_press: Dictionary[Vector2i, int] = {}
+var free_press_tile := Vector2i(-99999, -99999)
 ## Its free body on the wire (decision 689; FreeNet.pack_state): the
 ## server's centre, the last command applied and the tick; empty while it
 ## walks the grid. Replicated. Each peer feeds its view from it (free_view).

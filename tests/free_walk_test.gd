@@ -80,6 +80,10 @@ func _ready() -> void:
 	_test_kick_glance()
 	_test_kick_body()
 	_test_kick_fall()
+	_test_press_niche()
+	_test_press_edge()
+	_test_held_door()
+	_test_link_cells()
 	_test_glide()
 	_test_replay_matches()
 	_test_acks()
@@ -402,6 +406,101 @@ func _test_kick_fall() -> void:
 	var slid := World._push(dummy, player, Vector2(1, 0), 2.0)
 	_check(player.tile == Vector2i(4, 2) and str(slid[0]["stopped_by"]).begins_with("a fall"),
 			"east at 2 from (2, 2) on a ledge: off it into (4, 2), %s" % slid[0]["stopped_by"])
+
+
+## A free body pressing an edge it cannot cross (688 amended (4); Jeff:
+## the barrow's hidden niche no longer opened): FREE_PRESS_TICKS against it
+## and it is a step refused there, as a grid walk's.
+func _test_press_niche() -> void:
+	print("
+== pressing a burial niche's edge: the niche pressed, as a refused step presses it ==")
+	var player := _build(WALLED, Vector2i(2, 1))
+	var key := Terrain.edge_key(Vector2i(2, 1), Vector2i(0, 1))
+	World.niche_edges[key] = "hidden"
+	var pressed: Array = []
+	var on_press := func(entity: GridEntity, edge: Vector3i) -> void: pressed.append([entity, edge])
+	World.niche_pressed.connect(on_press)
+	_hold(player, Vector2(0, 1), World.FREE_PRESS_TICKS - 1)
+	_check(pressed.is_empty(), "%d tick into the wall: not yet pressed (at %s)" % [World.FREE_PRESS_TICKS - 1, player.free_pos])
+	_hold(player, Vector2(0, 1), 1)
+	_check(pressed.size() == 1 and pressed[0][0] == player and pressed[0][1] == key,
+			"%d ticks against it: the niche's edge pressed once (%s)" % [World.FREE_PRESS_TICKS, pressed])
+	_hold(player, Vector2(0, 1), World.FREE_PRESS_TICKS)
+	_check(pressed.size() == 2, "held on: pressed again, as a held key's refused steps come again (%d)" % pressed.size())
+	pressed.clear()
+	_hold(player, Vector2(0.3, 1).normalized(), World.FREE_PRESS_TICKS)
+	_check(pressed.size() == 1, "leaning in a little off straight (17 degrees): pressed")
+	pressed.clear()
+	player = _build(WALLED, Vector2i(1, 1))
+	World.niche_edges[Terrain.edge_key(Vector2i(2, 1), Vector2i(0, 1))] = "hidden"
+	World.niche_edges[Terrain.edge_key(Vector2i(1, 1), Vector2i(0, 1))] = "hidden"
+	_hold(player, Vector2(0, 1), 2)
+	pressed.clear()
+	_hold(player, Vector2(1, 0.3).normalized(), 4)
+	_check(pressed.is_empty() and player.tile.x >= 2, "brushing east along the wall over the niches: nothing pressed (at %s)" % player.free_pos)
+	World.niche_pressed.disconnect(on_press)
+	var grid := _build(WALLED, Vector2i(2, 1))
+	World.free_walk = false
+	World.niche_edges[key] = "hidden"
+	World.niche_pressed.connect(on_press)
+	World.try_move(grid, Vector2i(0, 1))
+	_check(pressed.size() == 1 and pressed[0][1] == key, "on the grid a refused step presses it as ever")
+	World.niche_pressed.disconnect(on_press)
+	World.free_walk = true
+
+
+func _test_press_edge() -> void:
+	print("
+== pressing the map's edge: walked off, as a refused step there is (a neighbour's way) ==")
+	var player := _build(OPEN, Vector2i(0, 2))
+	var off: Array = []
+	var on_off := func(entity: GridEntity, direction: Vector2i) -> void: off.append([entity, direction])
+	World.walked_off.connect(on_off)
+	_hold(player, Vector2(-1, 0), World.FREE_PRESS_TICKS + 1)
+	_check(off.size() == 1 and off[0][1] == Vector2i(-1, 0), "west against the map's edge: walked off west (%s)" % [off])
+	off.clear()
+	_hold(player, Vector2(0, 1), 3)
+	_check(off.is_empty(), "walking south along it: nothing")
+	World.walked_off.disconnect(on_off)
+
+
+func _test_held_door() -> void:
+	print("
+== a door held shut (the Hall's seal) stops a free body as it stops a step ==")
+	var player := _build(WALLED, Vector2i(2, 3))
+	var door := Door.build({"script": "res://sim/door.gd", "name": "Door", "edge": [DOOR_KEY.x, DOOR_KEY.y, DOOR_KEY.z], "props": {"max_hp": 20}})
+	_room.add_child(door)
+	World.hold_door(door, true, "ossuary_dead")
+	_hold(player, Vector2(1, 0), 6)
+	_check(not door.open and player.tile == Vector2i(2, 3) and player.free_pos.x <= 2.2 + 0.001,
+			"pressed east into it 6 ticks: shut, the body a radius off it (%s)" % player.free_pos)
+	World.hold_door(door, false, "ossuary_dead")
+	_hold(player, Vector2(1, 0), 6)
+	_check(player.tile.x >= 3, "let go of: it opens to the press as any door (%s)" % player.tile)
+
+
+func _test_link_cells() -> void:
+	print("
+== a link's cell: taken by moving onto it (entity_moved), and bumped when someone stands there ==")
+	var player := _build(OPEN, Vector2i(2, 2))
+	World.fields.link_cells[Vector2i(4, 2)] = true
+	var moved_to: Array = []
+	var on_moved := func(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
+		if entity == player:
+			moved_to.append(to)
+	World.entity_moved.connect(on_moved)
+	_hold(player, Vector2(1, 0), 6)
+	_check(moved_to.has(Vector2i(4, 2)), "walked east onto it: moved there, as Main._take_link hears (%s)" % [moved_to])
+	World.entity_moved.disconnect(on_moved)
+	player = _build(OPEN, Vector2i(2, 2))
+	World.fields.link_cells[Vector2i(4, 2)] = true
+	_spawn("res://sim/player.gd", "Player2", Vector2i(4, 2))  # (No monster steps onto a link: 571.)
+	var bumped: Array = []
+	var on_bump := func(entity: GridEntity, at: Vector2i) -> void: bumped.append(at)
+	World.link_bumped.connect(on_bump)
+	_hold(player, Vector2(1, 0), 6)
+	_check(bumped.has(Vector2i(4, 2)), "someone on it: pressed into, the link bumped all the same (571; %s)" % [bumped])
+	World.link_bumped.disconnect(on_bump)
 
 
 func _test_glide() -> void:
