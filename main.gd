@@ -2693,6 +2693,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	if Net.controls == "wasd":
 		var along := wasd_vector(key_vector(_held_key_names()), _view_yaw())
 		if along.length() > 0.01:
+			_guide_taken_over(player)
 			_free["path"] = []
 			return along.normalized()
 	var held := Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _test_holding
@@ -2702,6 +2703,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	# steers to the cursor instead (Jeff: "wasn't one click enough before?").
 	var steering: bool = _free["held"] and Time.get_ticks_msec() - int(_free["at"]) > FREE_HOLD_SECONDS * 1000.0
 	if steering and Net.controls != "wasd":
+		_guide_taken_over(player)
 		var cursor := _mouse_grid()
 		if not is_nan(cursor.x):
 			var way := cursor - at
@@ -2737,9 +2739,44 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	return Vector2.ZERO
 
 
+## Her route for his body while she leads him (695, ui's side; Guide under
+## free walk, companions' side sends it each time her heel cell moves, from
+## the cell after his): walked as a click route is. An empty path ends her
+## lead (any stop but arriving: arriving sends none, the last route walked
+## out). Another zone's, or a body on the grid, is not ours to steer.
+func _guide_route(route: Dictionary) -> void:
+	var player := _local_player()
+	if player == null or String(route.get("zone", "")) != String(player.zone) or _free_own(player) == null:
+		return
+	var path: Array = []
+	for at: Variant in route.get("path", []):
+		if at is Vector2i:
+			path.append(at)
+		elif at is Array and (at as Array).size() == 2:
+			path.append(Vector2i(int(at[0]), int(at[1])))
+	if path.is_empty():
+		if _free.get("guided", false):
+			_free["path"] = []
+		_free["guided"] = false
+		return
+	_free["path"] = path
+	_free["guided"] = true
+
+
+## The player's own key, click or held steer while she leads (695): her
+## route dropped and the server told (the "guide" command's stop "moved":
+## it cannot tell his input from her route's, both come as request_free).
+func _guide_taken_over(player: Player) -> void:
+	if not _free.get("guided", false):
+		return
+	_free["guided"] = false
+	World.command(player, "guide", {"stop": "moved"})
+
+
 ## A click on [param tile]: its route (World.walk_path's cells), steered
 ## along; the button held from here steers to the cursor instead.
 func _free_route(player: Player, tile: Vector2i) -> void:
+	_guide_taken_over(player)
 	_held_target = NONE
 	_free["held"] = true
 	_free["at"] = Time.get_ticks_msec()
@@ -11449,6 +11486,8 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "world":
+		if data.get("guide_route") is Dictionary:
+			_guide_route(data["guide_route"])
 		world_state = WorldNews.merge(world_state, data)
 		world_changed.emit()
 		return

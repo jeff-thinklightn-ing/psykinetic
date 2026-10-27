@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_telegraph_message()
 	_test_item_keys()
 	_test_free_click()
+	_test_guide_route()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1183,6 +1184,48 @@ func _player() -> Player:
 		if entity is Player and entity.spawned:
 			return entity
 	return null
+
+
+## Guide under free walk (695, ui's side): her route ("guide_route" in the
+## world message) is walked as a click's; his own click takes over and tells
+## the server once (the "guide" command's stop "moved"); an empty path ends
+## it; another zone's is not ours.
+func _test_guide_route() -> void:
+	print("
+== she leads a free body: her route walked, his click takes over and says so once ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(4, 3))
+	World.set_free_walk(true)
+	var stops := {"n": 0}
+	var on_command := func(_entity: GridEntity, command_name: String, args: Dictionary) -> void:
+		if command_name == "guide" and args.get("stop") == "moved":
+			stops["n"] += 1
+	World.command_received.connect(on_command)
+	_free_frames(player, 2)
+	var zone := String(player.zone)
+	_main._on_message("world", {"full": false, "guide_route": {"companion": "Pip", "zone": "elsewhere", "path": [[5, 3]]}})
+	_check(not _main._free.get("guided", false), "another zone's route: not taken")
+	var path: Array = []
+	for at: Vector2i in World.walk_path(player.tile, Vector2i(8, 3), player):
+		path.append([at.x, at.y])
+	_main._on_message("world", {"full": false, "guide_route": {"companion": "Pip", "zone": zone, "path": path}})
+	var arrived := _free_frames(player, 300, Vector2i(8, 3))
+	_check(arrived and _main._free.get("guided", false), "her route walked to her heel, (8, 3) (at %s)" % player.free_pos)
+	_main._on_message("world", {"full": false, "guide_route": {"companion": "Pip", "zone": zone, "path": [[7, 3], [6, 3]]}})
+	_main._test_holding = true
+	_main._move_click(player, Vector2i(8, 5))
+	_main._test_holding = false
+	_main._move_click(player, Vector2i(8, 6))
+	_check(stops["n"] == 1 and not _main._free.get("guided", false), "his click took over: the server told once (%d)" % stops["n"])
+	_free_frames(player, 300, Vector2i(8, 6))
+	_main._on_message("world", {"full": false, "guide_route": {"companion": "Pip", "zone": zone, "path": [[7, 6]]}})
+	_main._on_message("world", {"full": false, "guide_route": {"companion": "Pip", "zone": zone, "path": []}})
+	_check(not _main._free.get("guided", false) and (_main._free["path"] as Array).is_empty(), "an empty path: her lead over, nothing left to walk")
+	World.command_received.disconnect(on_command)
+	World.set_free_walk(false)
+	player.free_view = null
+	Net.controls = saved
 
 
 ## The host's player, moved to [param tile] with nothing queued.

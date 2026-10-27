@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement: a companion asked to lead you walks you along her way again, and any key or click of your own takes over (695, ui's side)
 - Asking your companion to lead you somewhere works again with free movement: she walks ahead and you follow at her heel; any key or click of your own takes over (695, the server's half).
 - Free movement is now the default everywhere: online, hosting, offline and practice. The admin's `free_walk off` still switches it off, and stays off over a restart (693)
 - A badly hurt companion with nothing near no longer stands a few cells off from you; she comes to your side.

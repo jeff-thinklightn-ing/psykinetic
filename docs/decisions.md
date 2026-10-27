@@ -32470,3 +32470,21 @@ and no move order is set; a client steering them follows her; "stop" ends
 the walk "moved" with an empty route, once; "lead on" reaches the goal,
 arriving sends no new route, and he comes up beside her. _test_guide stays
 on the grid (its own-step check is the grid's). No new class_name.
+## 695, ui's side: her route walked by a free body
+
+Guide (551) led by setting the player's move_order, which a free body
+never reads (companions found it; the coordinator picked the server sending
+her route to the owner's client, to steer as a click route). Companions'
+side sends "guide_route" {companion, zone, path} in the owner's world
+message each time her heel cell moves (World.walk_path from his cell, the
+cell after his first), an empty path on any stop but arriving. The client:
+- Main._guide_route puts the path in _free["path"], walked as a click's,
+  and marks it guided; another zone's route, or a body not walking free, is
+  left alone. An empty path ends it (nothing left to walk); arriving sends
+  none, so the last route is walked out.
+- His own WASD key, held steer or click (_free_route) while guided drops
+  her route and sends the "guide" command's stop "moved" once
+  (_guide_taken_over): the server cannot tell his input from her route's,
+  both come through request_free.
+controls_test _test_guide_route. Rides companions' protocol revision 40
+(no bump here); client only, no new class_name.
