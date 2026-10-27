@@ -7,16 +7,16 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.188
+
 - Camera: walking into a house goes top-down with the low camera on too (671 amended (4))
 - Pointing at a grave robber (or any human foe) outlines it again instead of turning it white and see-through (177 amended)
 - Routed robbers in a barrow now run for the entrance and get away by it (gone, not dead: no drops, and they come back later); the barrow's undead never leave. Outdoors they flee as before (702).
-
 - A spear strikes with a straight jab along the facing, its point driven out about two cells, instead of a sideways slash, for players, companions and monsters alike (344 amended).
 - A companion holding a spear strikes from its full reach, two cells off, instead of walking in next to the monster (699, companions' side).
 - Monsters cut the corner on a player who runs circles round them, making for where you'll be; a brute winds up on where you'll be as its blow falls (dodge by changing course). Walking straight away still escapes (700).
 - Monsters step to where they can actually reach you: a player standing at the back of a cell no longer has a monster waiting beside him out of reach, and archers aim at where you really are (699, enemy-ai's side).
 - Under free walk a blow reaches by where bodies are, not the cells they hold (699, combat's side): 1.5 cells centre to centre with no wall between, the same for you and for monsters, so stepping back out of reach really dodges and you can no longer strike from where you cannot be struck; telegraphed attacks hit you only when your centre is in the red. Tune it in F7 (combat.melee_reach).
-
 - A dodge that looks clean is clean with free walk: walking out of a draugr's spin, throw or charge through your own companion no longer counts you as still on the red ground (688 amended (5)).
 - Monsters walking at the edge of your view (23 to 30 cells off) move smoothly at their own pace instead of stepping and stopping (238 amended (2); like the fleeing stag's fix).
 
