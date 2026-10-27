@@ -4351,12 +4351,16 @@ func _retreat() -> void:
 	if tile != _retreat_at:
 		_retreat_heading = tile - _retreat_at if _retreat_at != NONE and World.are_adjacent(tile, _retreat_at) else Vector2i.ZERO
 		_retreat_at = tile
-	var scores := _safe_cells(_retreat_heading)
+	# Her heading and her goal's margin keep her from turning back and forth
+	# while something is after her; with nothing near she makes for her
+	# player (a stale heading held her three cells off a free one, 693).
+	var pressed := _hostile_within(RETREAT_REACH + 1)
+	var scores := _safe_cells(_retreat_heading if pressed else Vector2i.ZERO)
 	var best := NONE
 	for cell: Vector2i in scores:
 		if best == NONE or scores[cell] < scores[best]:
 			best = cell
-	var margin := RETREAT_KEEP_MARGIN if _hostile_within(RETREAT_REACH + 1) else 0.0
+	var margin := RETREAT_KEEP_MARGIN if pressed else 0.0
 	if not scores.has(_retreat_goal) or best != NONE and scores[_retreat_goal] > scores[best] + margin:
 		_retreat_goal = best
 	var cell := _retreat_goal

@@ -32387,3 +32387,23 @@ from the town's ground she stays, and they are told where with what
 brings her) and _test_whereabouts (each case's line, the pronouns, a call
 by name or phrase, not twice at once); record_keys_test samples
 tile_zone. Server only, protocol unchanged, no new class_name.
+
+## 693, companions' side. Companions hold for a free body before free walk is the default
+
+Before ui's 6a makes free walk the default (Jeff signed off), the coordinator
+asked for every companion scene to be run with it forced on. companion_test
+failed 16 checks; resident, return, settled, record_keys, raids, interest,
+gossip and blessing passed.
+
+- **Grid checks on the grid:** five tests check the grid's own walk (move
+  orders, try_move, the swap rule) and run on the grid whatever free_walk is
+  (companion_test _on_grid). _test_heel_free_leader has their free
+  counterparts. _test_guide stays on the grid until 695 leads a free body.
+  _walk_to walks a free body with tests/walk.gd.
+- **Retreat with nothing near:** her heading (from her last step) and her
+  goal's margin keep her from turning back and forth while something is
+  after her. With nothing within reach they held her three cells off a free
+  player. Both now count only while a hostile is within reach, so she
+  comes to her player.
+
+Server only, protocol unchanged, no new class_name.

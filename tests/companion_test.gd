@@ -8,6 +8,9 @@ var _main: Node
 var _imps := 0
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
 func _ready() -> void:
 	World.set_process(false)
 	Net.port = preload("res://tests/test_ports.gd").of(17786)  # Not 7777: the editor may be hosting there.
@@ -27,14 +30,14 @@ func _ready() -> void:
 	_test_quick_phrases()
 	_test_phrase_stances()
 	_test_calm_guards()
-	_test_following()
+	_on_grid(_test_following)
 	_test_persists_and_resumes()
 	_test_idles_while_owner_offline()
 	_test_malformed_llm_reply()
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
-	_test_yields_when_bumped()
-	_test_says_so_with_no_room()
+	_on_grid(_test_yields_when_bumped)
+	_on_grid(_test_says_so_with_no_room)
 	_test_stance_events()
 	_test_stances()
 	_test_retreat_moves_away()
@@ -95,7 +98,10 @@ func _ready() -> void:
 	_test_focus()
 	_test_companion_named()
 	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
+	var free_was := World.free_walk
+	World.set_free_walk(false)  # (Guide leads a grid body; a free one's lead waits on ui, 693.)
 	await _test_guide()
+	World.set_free_walk(free_was)
 	_test_guide_refuses()
 	_bond_as(0, kept_bond)
 	_test_loyalty()
@@ -104,10 +110,10 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_seated_boss()
-	_test_follow_without_backsteps()
+	_on_grid(_test_follow_without_backsteps)
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
-	_test_heel_leaves_his_line()
+	_on_grid(_test_heel_leaves_his_line)
 	_test_heel_no_way()
 	_test_heel_free_leader()
 	_test_quiet()
@@ -3332,6 +3338,7 @@ func _test_heel_free_leader() -> void:
 	_settle(pet)
 	var owner_was := owner.tile
 	var pet_was := pet.tile
+	var free_was := World.free_walk
 	World.free_walk = true
 	var count := {"bumps": 0, "backs": 0, "in_way": 0, "ticks": 0, "far": 0, "most": 0}  # (A lambda takes ints by value.)
 	var bumped := func(mover: GridEntity, occupant: GridEntity, _direction: Vector2i) -> void:
@@ -3390,7 +3397,7 @@ func _test_heel_free_leader() -> void:
 		for i in 16:
 			hold.call(Vector2.ZERO)
 	World.entity_bumped.disconnect(bumped)
-	World.free_walk = false
+	World.set_free_walk(free_was)
 	print("  (six runs, %d ticks: %d bumps of his into her, %d steps back, %d ticks in the cells he was about to cross, %d ticks more than %d away, %d at most)" % [
 		count["ticks"], count["bumps"], count["backs"], count["in_way"], count["far"], Heel.STOP + 1, count["most"]])
 	_check(count["bumps"] == 0 and count["backs"] == 0, "she is never in his way when he gets there, and never steps straight back (%d, %d)" % [count["bumps"], count["backs"]])
@@ -5116,11 +5123,24 @@ func _kill_monsters() -> void:
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
+	if World.free_body(entity):
+		Walk.to(entity, tile, 120)  # A free body takes no move order (688): its commands, as a client's.
+		return
 	World.order_move(entity, tile)
 	for i in 120:
 		if entity.tile == tile:
 			return
 		World.step()
+
+
+## Runs [param test], a check of the grid's walk (move orders, try_move,
+## the swap rule), on the grid whatever free_walk is (688: a free body's
+## counterparts are _test_heel_free_leader's), then puts it back.
+func _on_grid(test: Callable) -> void:
+	var free_was := World.free_walk
+	World.set_free_walk(false)
+	test.call()
+	World.set_free_walk(free_was)
 
 
 func _step_until(condition: Callable, limit: int) -> void:

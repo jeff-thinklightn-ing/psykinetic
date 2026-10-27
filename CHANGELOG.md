@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A badly hurt companion with nothing near no longer stands a few cells off from you; she comes to your side.
 - Wren, Nix and Pip no longer go home to town when you leave the game away from a town (a server restart mid-dungeon sent Pip home): they wait and are beside you when you are back; and when your companion is elsewhere you are told where, and what brings them back, on arriving, after loading, and when you call for them (694).
 - Free movement: the server remembers whether free movement is on across a restart, and your client takes hold of your character again if it was rebuilt (a room reset) and didn't respond (689 amended (4))
 ## v0.1.185
