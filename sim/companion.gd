@@ -608,6 +608,11 @@ var _wolf_warned_tick := -100000
 ## The wild animal "Get them!" marked (decision 332), or null: hostile to
 ## her as a monster is, till it dies, is out of sight or the call lapses.
 var _quarry: GridEntity = null
+## How far her foe's centre moves before she works out where to strike it
+## from again (decision 699, as a monster does).
+const STRIKE_REPLAN := 0.3
+## Her last World.strike_cells for _close_in: {target, from, centre, cells}.
+var _strike_plan := {}
 ## Targets _approach found out of reach, by instance id: {until, her, its}
 ## (_out_of_reach).
 var _unreachable: Dictionary = {}
@@ -4353,7 +4358,7 @@ func _execute() -> void:
 	if not _danger.is_empty() and current_intent != Intent.DODGE and current_intent != Intent.RETREAT:
 		# A telegraph showing (decision 663): she steps into none of it; she
 		# strikes from where she stands if she can, else waits it out.
-		if current_intent == Intent.ATTACK and _alive(intent_target) and World.can_melee(tile, intent_target.tile):
+		if current_intent == Intent.ATTACK and _alive(intent_target) and World.in_reach(self, intent_target):
 			World.try_attack(self, intent_target)
 		return
 	match current_intent:
@@ -4369,10 +4374,10 @@ func _execute() -> void:
 			if not _alive(intent_target):
 				current_intent = Intent.FOLLOW
 				intent_target = null
-			elif World.can_melee(tile, intent_target.tile):
+			elif World.in_reach(self, intent_target):
 				World.try_attack(self, intent_target)
 			else:
-				_approach(intent_target, 1)
+				_close_in(intent_target)
 		Intent.YIELD:
 			if _yield_tile != NONE and tile != _yield_tile and World.is_free(_yield_tile):
 				_step_toward(_yield_tile, false)
@@ -4459,11 +4464,12 @@ func _read_telegraphs(fighting: GridEntity) -> Vector2i:
 	if from == null:
 		return NONE
 	var scored: Array[Array] = []
+	var strikes := World.strike_cells(self, fighting) if _alive(fighting) else ([] as Array[Vector2i])
 	for cell in _cells_within(DODGE_REACH):
 		if _danger.has(cell) or not World.is_walkable(cell) or (cell != tile and not World.is_free(cell)):
 			continue
 		var score := World.distance(tile, cell) * 100.0 - World.distance(from.tile, cell)
-		if _alive(fighting) and World.can_melee(cell, fighting.tile):
+		if cell in strikes:  # She can strike from it (decision 699).
 			score -= 50.0
 		scored.append([score, scored.size(), cell])
 	# The best she has a short way to (685): one behind a wall is no dodge,
@@ -4540,7 +4546,7 @@ func _retreat() -> void:
 	var cell := _retreat_goal
 	if cell == NONE:
 		var foe := _adjacent_hostile()
-		if foe != null and World.can_melee(tile, foe.tile):
+		if foe != null and World.in_reach(self, foe):
 			World.try_attack(self, foe)
 		return
 	if cell != tile and not _step_toward(cell, false):
@@ -4624,6 +4630,23 @@ func _find_yield_tile() -> Vector2i:
 				best_steps = path.size()
 				best_ahead = ahead
 	return best
+
+
+## ATTACK out of reach (decision 699, companions' side): she walks to the
+## nearest cell she can strike [param target] from (World.strike_cells:
+## beside a body on the grid, as ever; where a free body's centre is in her
+## reach; a reach weapon's line), worked out again once its centre has
+## moved STRIKE_REPLAN or she has stepped; none to be had, she closes on
+## it as before (_approach).
+func _close_in(target: GridEntity) -> void:
+	var centre := World.body_centre(target)
+	if _strike_plan.get("target") != target or _strike_plan.get("from") != tile \
+			or (_strike_plan["centre"] as Vector2).distance_to(centre) > STRIKE_REPLAN:
+		_strike_plan = {"target": target, "from": tile, "centre": centre, "cells": World.strike_cells(self, target)}
+	var cells: Array[Vector2i] = _strike_plan["cells"]
+	if not cells.is_empty() and _step_toward(cells[0], true):
+		return
+	_approach(target, 0 if World.free_body(target) else 1)
 
 
 ## Walks until within [param reach] of [param target].

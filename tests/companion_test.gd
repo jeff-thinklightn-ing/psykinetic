@@ -119,6 +119,7 @@ func _ready() -> void:
 	_test_guide_free()
 	_test_look_asked()
 	_test_reset_free()
+	_test_spear_reach()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3346,6 +3347,50 @@ func _test_heel_keeps_clear() -> void:
 ## the reset that froze him, 689 amended (3) and (4)): his body is made
 ## anew, and she is his again, beside him, and heels the new body as it
 ## walks off.
+## Her approach on World.strike_cells (decision 699, companions' side): with
+## a spear she stops where its reach strikes, two cells off, and strikes,
+## by the same in_reach a blow lands by.
+func _test_spear_reach() -> void:
+	print("
+== with a spear she strikes from where its reach strikes, two cells off (699) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var start := pet.tile
+	var way := Vector2i.ZERO
+	for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var clear := true
+		for d in range(1, 6):
+			var cell := start + direction * d
+			clear = clear and World.is_walkable(cell) and World.is_free(cell) and World.can_melee(start + direction * (d - 1), cell)
+		if clear:
+			way = direction
+			break
+	_check(way != Vector2i.ZERO, "(a straight clear way from her, %s)" % way)
+	if way == Vector2i.ZERO:
+		return
+	var held: String = pet.slots[Player.RIGHT_HAND]
+	if not held.is_empty():
+		World.items.end(World.take_item(pet, pet, Player.RIGHT_HAND), "gone")
+	World.put_item(pet, pet, Player.RIGHT_HAND, World.items.mint("spear", "built"))
+	var imp := _spawn_imp(start + way * 4)
+	imp.sight_range = 0
+	imp.target = pet  # (Set on her, as one that saw her: she fights what is after her or hers.)
+	var cells := World.strike_cells(pet, imp)
+	_check(not cells.is_empty() and World.distance(cells[0], imp.tile) == 2, "her strike cells reach two off with a spear (%s)" % [cells.slice(0, 3)])
+	var struck_from := -1
+	var hp := imp.hp
+	for i in 120:
+		World.step()
+		if not imp.spawned or imp.hp < hp:
+			struck_from = World.distance(pet.tile, imp.tile) if imp.spawned else struck_from
+			break
+	_check(struck_from == 2, "she closed to two cells and struck with the spear (from %d)" % struck_from)
+	_kill_monsters()
+	World.items.end(World.take_item(pet, pet, Player.RIGHT_HAND), "gone")
+	_settle(pet)
+
+
 func _test_reset_free() -> void:
 	print("\n== a free player resets the room with her along: she heels his new body (the barrow's reset) ==")
 	_kill_monsters()

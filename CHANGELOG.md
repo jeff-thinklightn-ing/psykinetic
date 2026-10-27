@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- A companion holding a spear strikes from its full reach, two cells off, instead of walking in next to the monster (699, companions' side).
 - Monsters cut the corner on a player who runs circles round them, making for where you'll be; a brute winds up on where you'll be as its blow falls (dodge by changing course). Walking straight away still escapes (700).
 - Monsters step to where they can actually reach you: a player standing at the back of a cell no longer has a monster waiting beside him out of reach, and archers aim at where you really are (699, enemy-ai's side).
 - Under free walk a blow reaches by where bodies are, not the cells they hold (699, combat's side): 1.5 cells centre to centre with no wall between, the same for you and for monsters, so stepping back out of reach really dodges and you can no longer strike from where you cannot be struck; telegraphed attacks hit you only when your centre is in the red. Tune it in F7 (combat.melee_reach).

@@ -32915,3 +32915,27 @@ blows (2 and 20 hp; an imp 9, a sneak 33); walking straight away from a
 robber 3 cells off, no blow, 36 cells clear in 120 ticks. _test_free_chase's
 zig-zag: no more than one step back and forth (the imp's dart aside).
 Server only, protocol unchanged, no new class_name.
+## 699, companions' side. Her approach on strike cells
+
+Combat's body reach (699; C:/dev/review/combat/body_reach.md, approved),
+step 3. Her fighting reads are moved onto it:
+
+- Striking from where she stands asks World.in_reach, the rule a blow lands
+  by, instead of World.can_melee. This applies in the attack branch, while
+  a telegraph shows, and in a retreat with nowhere to go.
+- Out of reach, ATTACK walks her to the nearest cell she can strike from
+  (Companion._close_in, on World.strike_cells), worked out again once the
+  foe's centre has moved STRIKE_REPLAN (0.3) or she has stepped, as a
+  monster's is. With no such cell she closes on it as before (_approach).
+- A dodge's cell scores better when it is one of her strike cells.
+- Her player and a patient stay on cells (_heel, bandaging), since those
+  are standing beside someone, not striking.
+
+Her foes are monsters, which are grid bodies, so against them she behaves
+as before. The visible change is a reach weapon: with a spear she stops two
+cells off and strikes, where she used to walk in to one. A free body as her
+foe would be met on its centre.
+
+companion_test _test_spear_reach (her strike cells two off; she closes to
+two and strikes); companion_test passes with free walk off and on. Server
+only, protocol unchanged, no new class_name.
