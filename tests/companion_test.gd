@@ -120,6 +120,7 @@ func _ready() -> void:
 	_test_heel_no_way()
 	_test_heel_free_leader()
 	_test_guide_free()
+	_test_look_asked()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -3339,6 +3340,70 @@ func _test_heel_keeps_clear() -> void:
 ## "guide_route"), each time the heel moves, and steers it (here, as
 ## tests/walk.gd's input); the "guide" command's "stop" ends it "moved";
 ## an empty route when it ends.
+## Asked to go and look (decision 696): the words (the rules' look_words)
+## and the way in them; she goes where that way she cannot see, sees it,
+## comes back; what she saw a card fact, among what she scouted, her voice
+## told; a monster turning her back is a fact too, and told.
+func _test_look_asked() -> void:
+	print("\n== asked to go and look, she goes, sees, comes back; what she saw is a fact on her card (696) ==")
+	_check(Companion.look_in(" go and look north-east, would you ") == {"verb": "look", "way": "north-east"}
+		and Companion.look_in(" can you check out that door? ").get("way") == "door"
+		and Companion.look_in(" have a look ahead ").get("way") == "ahead"
+		and Companion.look_in(" go see what's there ").get("way") == ""
+		and Companion.look_in(" nice weather today ").is_empty(), "the words and the way in them; none, nothing")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	# A way with somewhere she cannot see.
+	var way := ""
+	var target := Vector2i(-1, -1)
+	for point: String in World.COMPASS:
+		var cell := pet.look_target(point)
+		if cell != Vector2i(-1, -1) and not pet._sees(cell) and not World.find_path(pet.tile, cell, true).is_empty():
+			way = point
+			target = cell
+			break
+	_check(not way.is_empty(), "a way she cannot see all of (%s, %s)" % [way, target])
+	if way.is_empty():
+		return
+	var uid := World.items.mint("bandaging_kit", "built")
+	World.put_on_ground(uid, target)
+	var facts_were: int = pet.grown.facts.size()
+	_main._chat_tick.clear()
+	_main._player_said(owner, "Go and look %s for me" % way)
+	_check(str(pet.errand.get("verb", "")) == "look" and pet.errand.get("asked", false), "asked: she sets off to look, no model asked (%s)" % [pet.errand.get("words", "")])
+	var saw := false
+	for i in 400:
+		World.step()
+		saw = saw or str(pet.errand.get("phase", "")) == "returning"
+		if pet.errand.is_empty():
+			break
+	_check(saw and pet.errand.is_empty() and World.distance(pet.tile, owner.tile) <= Companion.ERRAND_BACK + 1, "she saw it and came back to them (%s, them %s)" % [pet.tile, owner.tile])
+	var fact: Dictionary = pet.grown.facts.back() if pet.grown.facts.size() > facts_were else {}
+	_check("went to look" in str(fact.get("text", "")) and "bandaging kit" in str(fact.get("text", "")), "what she saw is a fact on her card (%s)" % fact.get("text", ""))
+	_check("bandaging kit" in pet.scouted_words(), "and among what she scouted, for her voice (%s)" % pet.scouted_words())
+	# Turned back: a monster near where she looks.
+	_put(owner, owner_was)
+	_settle(pet)
+	_main._chat_tick.clear()
+	_main._player_said(owner, "Go and look %s for me" % way)
+	var cell: Vector2i = pet.errand.get("cell", target)
+	var imp := _spawn_imp(_main._nearest_free(cell))
+	imp.sight_range = 7
+	facts_were = pet.grown.facts.size()
+	for i in 400:
+		World.step()
+		if pet.errand.is_empty():
+			break
+	_check(pet.errand.is_empty() and pet.grown.facts.size() > facts_were and "turned back" in str(pet.grown.facts.back().get("text", "")),
+		"a monster coming at her: she is turned back, and that is a fact (%s)" % (pet.grown.facts.back().get("text", "") if not pet.grown.facts.is_empty() else ""))
+	_kill_monsters()
+	_put(owner, owner_was)
+	_settle(pet)
+
+
 func _test_guide_free() -> void:
 	print("\n== she leads a free-walking player: the route to her heel goes to their client, which steers it (695) ==")
 	_kill_monsters()

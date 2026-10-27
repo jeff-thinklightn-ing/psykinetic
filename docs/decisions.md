@@ -32507,3 +32507,49 @@ going into buildings. Now:
 view_test _test_indoor_camera: S inside the normal pitch, kept room to
 room, W overhead, top-down again after leaving, none underground. Client
 only, protocol unchanged, no new class_name.
+
+## 696. Asked to go and look: she goes, sees, comes back, and what she saw is a fact
+
+The roadmap's companion LOOK verb ("go check that dark spot and report
+back"), phase 1, the coordinator approving with three points: the ask's
+words in the rules file, her report her voice told the facts (never a
+scripted line), and the lantern rule checked before it is leaned on.
+Phase 2 (pointing at a cell, marks on the map) is held for Jeff.
+
+- **Asked in words:** the rules' "look" table (companion_traits.json,
+  beside "guide") holds look_words. Companion.look_in reads them as whole
+  words, with the way named: a compass point (two-word points first), ahead,
+  behind, left or right of her player, "that door", or none (ahead of
+  them). order_in returns {"verb": "look", "way"} before its other orders,
+  so the hands take it at once (obey), no model's [DO: n] waited on. "look"
+  is in ORDER_VERBS, so a wary companion hesitates over it as over any
+  plain order (621).
+- **Where:** Companion.look_target. For the door, the far side of the
+  nearest shut door she sees. Otherwise, of the walkable cells within
+  SIGHT_RANGE plus the rules' beyond (4) that lie within 45 degrees of the
+  way, the nearest she cannot see, the darkest first. If she sees all of
+  that way, the farthest she sees.
+- **The lantern:** there is no rule to lift one, and none is needed. Every
+  companion carries a lit lantern (Companion emit_light), and Senses.is_lit
+  counts carried light, so a dark spot becomes visible as she nears it.
+  The look's errand walks her until she sees the cell (_errand_there). One
+  she can't get near enough to ends undone ("there was no way there",
+  "taking too long"), told so, and is never reported as "nothing there".
+- **What she sees:** Companion.look_findings, within the rules' near (3) of
+  the cell. Monsters by kind and count (Companion.counted), roused or
+  "unaware of you" (Monster.alert); people; chests; crates; things on the
+  ground; doors (open, shut, locked, broken); fire.
+- **What she reports:** one fact on her card (note_fact, from "event"):
+  "<name> went to look <where> in <place> and saw ...". It is also kept
+  among what she scouted (Companion.scouted {text, zone, cell, tick}, the
+  rules' scouted_most 8, each kept scout_minutes 10), which her voice reads
+  among what is true now (scouted_words). Back within ERRAND_BACK, the
+  narration gives the bare summary and her voice is told it (_report_errand),
+  to say in her own words.
+- **Turned back:** a monster she sees within ERRAND_BREAK ends an asked look
+  told ("<it> came at you"), and that is a fact and a scouted entry too.
+
+Server only, protocol unchanged, no new class_name. companion_test
+_test_look_asked (the words and ways; a way she cannot see; she goes, sees
+a thing on the ground, comes back; the fact and the scouted line; an imp
+turning her back is a fact), passing with free walk off and on.

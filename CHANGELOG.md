@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Ask your companion to go and look ('go look north', 'check out that door', 'have a look ahead'): she walks over until she can see it, comes back and tells you what was there, and remembers it; something coming at her turns her back, and she tells you that too (696).
 ## v0.1.186
 
 - What goes over the network changes, so v0.1.185 and older can't join the server: update through the launcher first.

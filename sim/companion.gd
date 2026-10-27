@@ -130,7 +130,7 @@ const REST_LEAVE := 8
 const HESITATE_TICKS := 15
 ## How often she looks over her day for the deeds that move her bond (decision 621).
 const DEED_EVERY := 10
-const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give", "play"]
+const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give", "play", "look"]
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
 const PHRASE_MEANINGS := {
@@ -476,6 +476,9 @@ var guide_routes := Callable()
 var guide_done := Callable()
 var guide_words := Callable()
 var guide_note := ""
+## What she went and looked at lately (decision 696): {text, zone, cell,
+## tick}, newest last, the rules' scouted_most, each kept scout_minutes.
+var scouted: Array[Dictionary] = []
 var talk: Array[String] = []
 var _talk_tick := -100000
 var _merging: Array[Dictionary] = []
@@ -1058,6 +1061,9 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 			return false
 		var before := said.substr(0, at.get_start())
 		return RegEx.create_from_string(ORDER_NOT).search(before) == null
+	var looking := look_in(said)
+	if not looking.is_empty():
+		return looking
 	if found.call(ORDER_BANDAGE):
 		var own := RegEx.create_from_string("\\b(yourself|your (own )?wounds?|you up|your (cut|bleeding|leg|arm))").search(said) != null
 		var mine := RegEx.create_from_string("\\b(me|my|us|our)\\b").search(said) != null
@@ -1081,6 +1087,159 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 	if found.call(ORDER_WAIT):
 		return {"verb": "wait"}
 	return {}
+
+
+## An ask to go and look (decision 696) in [param said] (lower case,
+## padded with spaces): one of the rules' look_words as whole words, with
+## the way it names: {"verb": "look", "way": a compass point, "ahead",
+## "behind", "left", "right", "door" or "" for none}. {} if it asks none.
+static func look_in(said: String) -> Dictionary:
+	var rules := look_rules()
+	var asked := false
+	for words: Variant in rules.get("look_words", []):
+		if RegEx.create_from_string("\\b%s\\b" % _escaped(str(words))).search(said) != null:
+			asked = true
+			break
+	if not asked:
+		return {}
+	var way := ""
+	if RegEx.create_from_string("\\b(behind|through|past|beyond) (that|the|this) door\\b|\\b(that|the) door\\b").search(said) != null:
+		way = "door"
+	else:
+		var points: Array[String] = World.COMPASS.duplicate()
+		points.sort_custom(func(a: String, b: String) -> bool: return a.length() > b.length())  # (Two-word points first: north-east before east.)
+		for point in points:
+			if RegEx.create_from_string("\\b%s\\b" % point.replace("-", "[- ]?")).search(said) != null:
+				way = point
+				break
+		if way.is_empty():
+			for word: String in ["ahead", "behind", "left", "right"]:
+				if RegEx.create_from_string("\\b%s\\b" % word).search(said) != null:
+					way = word
+					break
+			if way.is_empty() and RegEx.create_from_string("\\b(in front|forward|up there|down there)\\b").search(said) != null:
+				way = "ahead"
+	return {"verb": "look", "way": way}
+
+
+## The rules' "look" table (decision 696).
+static func look_rules() -> Dictionary:
+	return CompanionCard.tables().get("look", {})
+
+
+## Where an ask to look [param way] (look_in's) sends her (decision 696):
+## the far side of the nearest shut door she sees for "door"; else, of the
+## walkable cells within SIGHT_RANGE and the rules' beyond more that lie
+## within 45 degrees of the way (a compass point; ahead, behind, left or
+## right of her player, or ahead of them for none), the nearest she
+## cannot see, the darkest first; seeing all that way, the farthest she
+## sees. NONE for nowhere.
+func look_target(way: String) -> Vector2i:
+	if way == "door":
+		var best := NONE
+		for door: Door in World.get_doors():
+			if door.is_open() or door.is_broken():
+				continue
+			var sides := Terrain.edge_cells(door.key)
+			var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
+			var far: Vector2i = sides[1] if near == sides[0] else sides[0]
+			if World.distance(tile, near) <= SIGHT_RANGE and (_sees(sides[0]) or _sees(sides[1])) \
+					and (best == NONE or World.distance(tile, far) < World.distance(tile, best)):
+				best = far
+		return best
+	var facing_of := Vector2(keeper.facing if _alive(keeper) else facing)
+	var toward := facing_of
+	match way:
+		"", "ahead":
+			pass
+		"behind":
+			toward = -facing_of
+		"right":
+			toward = Vector2(-facing_of.y, facing_of.x)  # A quarter turn clockwise on the map.
+		"left":
+			toward = Vector2(facing_of.y, -facing_of.x)
+		_:
+			var up := Vector2(World.north)
+			var turn := deg_to_rad(45.0 * World.COMPASS.find(way))
+			toward = up * cos(turn) + Vector2(-up.y, up.x) * sin(turn)
+	if toward.length() < 0.01:
+		return NONE
+	toward = toward.normalized()
+	var from := keeper.tile if _alive(keeper) and way in ["", "ahead", "behind", "left", "right"] else tile
+	var reach := SIGHT_RANGE + int(look_rules().get("beyond", 4))
+	var unseen := NONE
+	var unseen_score := INF
+	var farthest := NONE
+	for cell in _cells_within(reach):
+		var offset := Vector2(cell - from)
+		if cell == from or not World.is_walkable(cell) or offset.normalized().dot(toward) < cos(deg_to_rad(45.0)):
+			continue
+		var d := World.distance(from, cell)
+		if _sees(cell):
+			if farthest == NONE or d > World.distance(from, farthest):
+				farthest = cell
+			continue
+		var score := d + Senses.light_level(cell) * 2.0  # The nearer, then the darker.
+		if score < unseen_score:
+			unseen = cell
+			unseen_score = score
+	return unseen if unseen != NONE else farthest
+
+
+## What she sees within the rules' near of [param cell] (decision 696), in
+## words: who is there (kinds counted, roused or not), chests, things on
+## the floor, doors and how they stand, fire; each a phrase.
+func look_findings(cell: Vector2i) -> Array[String]:
+	var near := int(look_rules().get("near", 3))
+	var seen: Array[String] = []
+	var kinds: Dictionary[String, Array] = {}
+	for entity in World.get_entities():
+		if entity == self or entity == keeper or not entity.spawned or World.distance(entity.tile, cell) > near or not senses.sees(entity):
+			continue
+		if entity is Monster:
+			var kind := kind_of(entity)
+			if not kinds.has(kind):
+				kinds[kind] = []
+			kinds[kind].append(entity)
+		elif entity is Player or entity is Companion or entity is Resident:
+			seen.append(refer(entity))
+		elif entity is Chest:
+			seen.append("a chest")
+		elif entity.pushable:
+			seen.append("a " + object_word(entity))
+	for kind: String in kinds:
+		var them: Array = kinds[kind]
+		var roused := them.any(func(each: Monster) -> bool: return each.alert != Monster.Alert.IDLE)
+		var count := them.size()
+		var named := counted(kind, count)
+		seen.push_front("%s, %s" % [named, "on the watch" if roused else "unaware of you"])
+	var things: Array[String] = []
+	var burning := false
+	for each in _cells_within_of(cell, near):
+		if not _sees(each):
+			continue
+		for id: String in World.ground_at(each):
+			things.append(_a(Items.name_of(id)))
+		burning = burning or World.is_burning(each)
+	if not things.is_empty():
+		seen.append("%s on the ground" % _listed(things))
+	for door: Door in World.get_doors():
+		var sides := Terrain.edge_cells(door.key)
+		if mini(World.distance(sides[0], cell), World.distance(sides[1], cell)) > near or not (_sees(sides[0]) or _sees(sides[1])):
+			continue
+		seen.append("a %s door" % ("broken" if door.is_broken() else "open" if door.is_open() else "locked" if not door.lock.is_empty() else "shut"))
+	if burning:
+		seen.append("fire")
+	return seen
+
+
+## The cells within [param reach] of [param cell].
+static func _cells_within_of(cell: Vector2i, reach: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for y in range(-reach, reach + 1):
+		for x in range(-reach, reach + 1):
+			out.append(cell + Vector2i(x, y))
+	return out
 
 
 ## Does what [param read] (order_in) asks at once, the hands, no model
@@ -1160,6 +1319,18 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 			else:
 				_game = {"round": 0, "at": World.tick + int(rules.get("round_ticks", 60)), "hers": 0, "theirs": 0}
 				done = "You sit down by the fire with %s for a game of knucklebones, best of three." % keeper_name()
+		"look":
+			# Asked to go and look (decision 696): the errand's look, asked.
+			var cell := look_target(str(read.get("way", "")))
+			if in_fight():
+				done = "%s asked you to go and look, but there is fighting here: not now." % keeper_name()
+			elif cell == NONE:
+				done = "%s asked you to go and look, but there is nowhere that way to go." % keeper_name()
+			else:
+				var why := "where you cannot see" if not _sees(cell) else "as far as you can see"
+				_start_errand({"verb": "look", "cell": cell, "at": cell, "asked": true,
+					"words": "go and look %s, %s, and come back" % [_paces_toward(Vector2(cell)), why]}, _serial)
+				done = "You go to look %s, as %s asked, and will come back and tell them." % [_paces_toward(Vector2(cell)), keeper_name()]
 		"give":
 			var item := str(read["item"])
 			_start_errand({"verb": "give", "item": item, "at": keeper.tile if _alive(keeper) else tile,
@@ -2604,6 +2775,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	if not guide_note.is_empty():
 		now.append(guide_note)
 		guide_note = ""
+	var scouted := scouted_words()
+	if not scouted.is_empty():
+		now.append(scouted)
 	var standing := standing_words()
 	if not standing.is_empty():
 		met += " " + standing
@@ -4882,6 +5056,13 @@ func _on_errand() -> bool:
 		return false
 	for entity in World.get_entities():
 		if _hostile(entity) and World.distance(tile, entity.tile) <= ERRAND_BREAK and senses.sees(entity):
+			if str(errand.get("verb", "")) == "look" and errand.get("asked", false):
+				# Turned back looking (decision 696): what drove her back is
+				# what she found, a fact, and her voice told it.
+				note_fact("%s was turned back by %s while looking about in %s." % [_name_of(self), refer(entity), _place_words()])
+				_scouted_add("turned back by %s" % refer(entity), entity.tile)
+				_end_errand("%s came at you" % refer(entity), true)
+				return false
 			_end_errand("a monster came near", false)
 			return false
 	return true
@@ -5087,19 +5268,15 @@ func _errand_do() -> void:
 			_report_errand("You looked round inside %s: %s." % [short, "there is nothing in it" if seen.is_empty() else "there is " + _listed(seen)])
 		_:
 			var cell: Vector2i = errand["cell"]
-			var seen: Array[String] = []
-			for entity in World.get_entities():
-				if entity == self or entity == keeper or not entity.spawned or World.distance(entity.tile, cell) > LOOK_AROUND \
-						or not senses.sees(entity):
-					continue
-				if entity is Monster or entity is Player or entity is Companion:
-					seen.append(refer(entity))
-				elif entity is Chest:
-					seen.append("a chest")
-				elif entity.pushable:
-					seen.append("a " + object_word(entity))
-			errand["told"] = "You went and looked %s, and came back: %s." % [str(errand["words"]).get_slice(", ", 0).trim_prefix("go and look "),
-				"nothing there" if seen.is_empty() else "you saw " + ", ".join(seen) + " there"]
+			var seen := look_findings(cell)
+			var where := str(errand["words"]).get_slice(", ", 0).trim_prefix("go and look ")
+			if not seen.is_empty():
+				# What she saw is true of her now (decision 696): her card's fact,
+				# and among what she scouted, for her voice to tell.
+				note_fact("%s went to look %s in %s and saw %s." % [_name_of(self), where, _place_words(), _listed(seen)])
+			_scouted_add("%s: %s" % [where, "nothing there" if seen.is_empty() else _listed(seen)], cell)
+			errand["told"] = "You went and looked %s, and came back: %s." % [where,
+				"nothing there" if seen.is_empty() else "you saw " + _listed(seen) + " there"]
 			errand["phase"] = "returning"
 
 
@@ -5136,6 +5313,27 @@ static func _listed(things: Array[String]) -> String:
 	if things.size() <= 1:
 		return "".join(things)
 	return "%s and %s" % [", ".join(things.slice(0, -1)), things.back()]
+
+
+## What she scouted (decision 696), [param text] at [param cell]: kept
+## among what she knows now (scouted_words) for the rules' scout_minutes.
+func _scouted_add(text: String, cell: Vector2i) -> void:
+	scouted.append({"text": text, "zone": zone, "cell": cell, "tick": World.tick})
+	while scouted.size() > int(look_rules().get("scouted_most", 8)):
+		scouted.pop_front()
+
+
+## What she scouted in this zone within the rules' scout_minutes, for her
+## voice, or "".
+func scouted_words() -> String:
+	var keep := int(float(look_rules().get("scout_minutes", 10)) * 60.0 * World.TICK_RATE)
+	var lines: Array[String] = []
+	for each: Dictionary in scouted:
+		if each["zone"] == zone and World.tick - int(each["tick"]) <= keep:
+			lines.append(str(each["text"]))
+	if lines.is_empty():
+		return ""
+	return "What you went and looked at lately: %s." % "; ".join(lines)
 
 
 ## Her errand is done: [param told] narrated, and her voice asked to tell it.
