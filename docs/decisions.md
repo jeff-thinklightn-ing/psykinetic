@@ -33310,3 +33310,31 @@ keeps the route's last cell, its intent zero, until FreeNet.Own has no
 unacknowledged command (own.pending empty): a body put back short walks
 on from where the server has it. Client only, protocol unchanged, no new
 class_name.
+
+## 703: removing the player's grid path
+
+Free walk has been the default since 693; a player's body is to walk only
+free, and the grid's own-body machinery goes: the client's grid input
+(Main's held, steered and line steps), MovePrediction for the own body,
+World's grid move and step orders for players (command_move, command_step,
+the request_move and request_step RPCs), Player._sim_tick's grid walk, and
+the free_walk switches (World/Net.free_walk, --free-walk, --grid-walk, the
+admin's "free_walk", the save's key). Monsters, animals, residents and
+companions keep the grid; a free player still holds a cell. The
+coordinator approved the design (2026-10-27), in four steps, each green on
+its own:
+1. ui: the test harness's moves (--test-move, --test-contest, --test-steer,
+   --test-chase, the channel and offer tests) go as clicks (Main._move_click:
+   free or grid as the body is), waiting till the client has heard its
+   body's free state (a server not yet ticking: a click before would go to
+   the grid and be refused); net_test and state_test run free. net_test's
+   contest at (9, 1): the loser stops beside it (no grid misprediction to
+   count), and who holds it is read at the end (a free body may cross into
+   it a moment and give it back).
+2. Each tree's tests off the grid for players (companions, combat, physics,
+   enemy-ai, items, npc, dungeon; ui's own 693 pins with step 4).
+3. companions: Heel and Guide read a free leader, with no grid branch for
+   players.
+4. ui: the removal, with PROTOCOL_REVISION bumped and a forced cut, on the
+   coordinator's word once free walk has run clean as the default (about
+   2026-10-29) and release has drilled a rollback to the release before it.

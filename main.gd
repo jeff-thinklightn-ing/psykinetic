@@ -16142,9 +16142,11 @@ func _run_test_move(player: Player) -> void:
 	if Net.test_move == Vector2i.ZERO or _test_arrived or player == null:
 		return
 	if not _test_ordered:
+		if Net.free_walk and not World.free_body(player):
+			return  # 703: its free state not heard yet (the server not ticking): a click would go to the grid.
 		_test_ordered = true
 		_test_target = player.tile + Net.test_move
-		World.command_move(player, _test_target)
+		_move_click(player, _test_target, false)  # 703 step 1: as a click, free or grid.
 		print("[test] %s ordered from %s to %s" % [player.name, player.tile, _test_target])
 	elif player.tile == _test_target:
 		_test_arrived = true
@@ -16342,7 +16344,7 @@ func _run_test_channel(player: Player) -> void:
 		return
 	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 		if World.is_walkable(body.tile + step) and World.is_free(body.tile + step):
-			World.command_move(player, body.tile + step)
+			_move_click(player, body.tile + step, false)  # 703 step 1: as a click, free or grid.
 			break
 
 
@@ -16377,7 +16379,7 @@ func _run_test_offer(player: Player) -> void:
 				_test_offer_since = now
 				for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 					if World.is_walkable(body.tile + step):
-						World.command_move(player, body.tile + step)
+						_move_click(player, body.tile + step, false)  # 703 step 1: as a click, free or grid.
 						break
 			return
 		_test_offer_asked = true
@@ -16661,8 +16663,10 @@ func _run_test_contest(player: Player, tick: int) -> void:
 	if Net.test_contest_tick <= 0 or _test_contested or player == null \
 			or tick < Net.test_contest_tick:
 		return
+	if Net.free_walk and not World.free_body(player):
+		return
 	_test_contested = true
-	World.command_move(player, Net.test_contest_tile)
+	_move_click(player, Net.test_contest_tile, false)  # 703 step 1: as a click, free or grid.
 	print("[test] contest: %s at %s ordered to %s, now showing %s" % [
 		player.name, player.tile, Net.test_contest_tile, player.shown_tile()])
 
@@ -17117,7 +17121,7 @@ func _run_test_steer() -> void:
 	var want := player.shown_tile() + turns[turn]
 	if World.is_walkable(want) and want != _test_target:
 		_test_target = want
-		World.command_move(player, want)
+		_move_click(player, want, false)  # 703 step 1: as a click, free or grid.
 
 
 ## --test-chase: hold-to-move on the nearest animal as this view draws it
@@ -17162,7 +17166,7 @@ func _run_test_chase() -> void:
 		_test_chase_order_at = Time.get_ticks_msec()
 		_test_target = want
 		_test_chase_orders += 1
-		World.command_move(player, want)
+		_move_click(player, want, false)  # 703 step 1: as a click, free or grid.
 
 
 ## --test-fight (with --test-steer): every that many seconds, a strike at

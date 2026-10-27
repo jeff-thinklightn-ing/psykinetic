@@ -39,7 +39,7 @@ ID_R=5e5e5e5e-0000-4000-8000-00000000000e
 start() {
 	name="$1"
 	shift
-	"$GODOT" --log-file "$(godot_log "net_$name")" --headless --path . --grid-walk "$@" "--port=$P" "--test-exit-on=$LOGS/$name.done" \
+	"$GODOT" --log-file "$(godot_log "net_$name")" --headless --path . "$@" "--port=$P" "--test-exit-on=$LOGS/$name.done" \
 		</dev/null >"$LOGS/$name.log" 2>"$LOGS/$name.err" &
 	eval "pid_$name=$! started_$name=$SECONDS"
 }
@@ -152,9 +152,9 @@ phase_1_2() {
 	# first, as Player1 at (11, 2); three tiles west is Crate1, so its move ends
 	# by pushing the crate to (7, 2). Client 2 joins as Player2 on the next start
 	# tile, (12, 1), and walks to (10, 1). Both are then one step from (9, 1), and
-	# at server tick 70 both order a move into it; the server holds tick 70 until
-	# both orders are in, so they land on one tick. Each client predicts the
-	# step; the server lets only one of them have the tile.
+	# at server tick 70 both click it; the server holds tick 70 until both
+	# are in, so they set off on one tick. Both walk free (703): the server
+	# lets only one of them have the tile, and the other stops beside it.
 	server server --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE" \
 		--test-wait-players=2 --test-hold=70,2
 	wait_for server 'listening on port'
@@ -162,7 +162,6 @@ phase_1_2() {
 	wait_for server 'joined as Player1 '
 	client client2 $GOOD --test-move=-2,0 --test-contest=9,1,70
 	wait_any 'reached the contested tile \(9, 1\)' client1 client2
-	wait_any 'mispredict: Player[0-9]+ step into \(9, 1\) refused' client1 client2
 	# A third client with the wrong token must be rejected and never get a player.
 	client client3 --client --address=127.0.0.1 --token=wrong-secret --test-move=0,1
 	# A fourth joins with no mode argument, from a settings file like an exported
@@ -322,16 +321,16 @@ for name in server client1 client2; do
 	check "$crate" 1 "$name has the pushed crate at (7, 2)"
 done
 clients="$LOGS/client1.log $LOGS/client2.log"
-contest=$(count 'moved .* -> \(9, 1\)' "$LOGS/server.log")
-check "$contest" 1 "exactly one player took the contested tile (9, 1) on the server"
+# Who holds it at the end: a free body may cross into it a moment before the
+# other stops it, and give it back (703).
+contest=$(grep -E '\[test\] tiles: ' "$LOGS/client1.log" | grep -oE 'Player[0-9]+=\(9, 1\)' | wc -l | tr -d ' ')
+check "$contest" 1 "exactly one player holds the contested tile (9, 1) as the server sends it"
 shown=$(cat $clients | grep -c 'display: .*server_tile=\(([^)]*)\) shown_tile=\1 ' || true)
 check "$shown" 2 "both clients end up showing their player on the server's tile"
-winner=$(cat $clients | grep -cE 'display: .*server_tile=\(9, 1\) .*mispredicts=0' || true)
-check "$winner" 1 "the winner is on (9, 1) with no mispredictions"
-loser=$(cat $clients | grep -E 'display: .*mispredicts=1' | grep -vc 'server_tile=(9, 1)' || true)
-check "$loser" 1 "the loser is not on (9, 1) and counted exactly one misprediction"
-predicted=$(cat $clients | grep -cE 'mispredict: Player[0-9]+ step into \(9, 1\) refused' || true)
-check "$predicted" 1 "the loser was told its step into (9, 1) was refused and re-planned"
+winner=$(cat $clients | grep -cE 'display: .*server_tile=\(9, 1\) ' || true)
+check "$winner" 1 "the winner is on (9, 1)"
+loser=$(cat $clients | grep -cE 'display: .*server_tile=\((8|9|10), (0|1|2)\) ' || true)
+check "$loser" 2 "the loser stands beside it (703: a free body stops where the other is)"
 check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at ' "$LOGS/server.log")" 1 "phase 1: Casey joined as Player3"
 check "$(count '\[net\] Casey \(c0ffee00\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and id"
 check "$(count '\[state\] loaded 10 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"

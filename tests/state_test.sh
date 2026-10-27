@@ -24,7 +24,7 @@ PORT=$((17781 + PORT_OFFSET))
 run_host() {
 	name="$1"
 	shift
-	"$GODOT" --log-file "$(godot_log "state_$name")" --headless --path . --host --grid-walk --still-monsters --no-companions --map=test_room "--port=$PORT" "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
+	"$GODOT" --log-file "$(godot_log "state_$name")" --headless --path . --host --still-monsters --no-companions --map=test_room "--port=$PORT" "--state=$STATE" "$@" </dev/null >"$DIR/$name.log" 2>"$DIR/$name.err"
 }
 
 failures=0
