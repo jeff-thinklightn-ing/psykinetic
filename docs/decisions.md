@@ -33204,3 +33204,17 @@ once:
 
 companion_test _test_order_holds (each hold kept, then let go; the panel's
 source), both modes. Server only, protocol unchanged, no new class_name.
+
+## 688 amended (6): a body placed anew leaves its slide behind
+
+enemy-ai's 703 step 2, through ui: in monster_test's draugr two-zone case a
+player despawned and respawned under free walk was back by the draugr a few
+ticks later, x 12.2 against his new tile's 2. GridEntity._world_place (every
+spawn: a respawn, a travel, a join) reset free_pos and free_way but kept
+free_kick_path (688 amended (2): a push's slide shown over its ticks),
+step_velocity and step_until; _tend_free_kicks played the old slide on from
+its old place. _world_place now clears all three, and Player._world_place
+its free_press (688 amended (4)). free_walk_test _test_kick_respawn: kicked
+east, respawned at (2, 4) mid-slide: no slide, no momentum, no press, and it
+stands there 6 ticks on (without the fix it slid back to (4, 2)). Server
+only, protocol unchanged, no new class_name.

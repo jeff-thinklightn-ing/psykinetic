@@ -178,6 +178,7 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	free_seen = -1
 	free_acked = -1
 	free_used = 0.0
+	free_press.clear()
 
 
 ## Whether this is the player this peer plays.

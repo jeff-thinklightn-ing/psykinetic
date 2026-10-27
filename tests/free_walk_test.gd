@@ -80,6 +80,7 @@ func _ready() -> void:
 	_test_kick_glance()
 	_test_kick_body()
 	_test_kick_fall()
+	_test_kick_respawn()
 	_test_press_niche()
 	_test_press_edge()
 	_test_held_door()
@@ -386,6 +387,32 @@ func _test_kick_body() -> void:
 	pusher = _spawn("res://sim/monster.gd", "Pusher", Vector2i(0, 0))
 	World._push(pusher, pip, Vector2(1, 0), 2.0)
 	_check(pip.tile == Vector2i(3, 2), "its own companion it walks through, but a push meets her (%s)" % pip.tile)
+
+
+## A slide being shown when its body is placed anew (a respawn, a travel)
+## ends there (688 amended (6)): nothing of the old place carried over.
+func _test_kick_respawn() -> void:
+	print("
+== respawned mid-slide: the slide and its momentum left behind ==")
+	var player := _build(OPEN, Vector2i(1, 2))
+	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(0, 4))
+	World._push(dummy, player, Vector2(1, 0), 2.0)
+	World.step()
+	_check(not player.free_kick_path.is_empty(), "kicked east: its slide being shown (at %s)" % player.free_pos)
+	press_into(player)
+	World.despawn(player)
+	World.spawn(player, Vector2i(2, 4))
+	_check(player.free_kick_path.is_empty() and World.body_velocity(player) == Vector2.ZERO and player.free_press.is_empty(),
+			"respawned at (2, 4): no slide, no momentum, no press left (%s)" % World.body_velocity(player))
+	for i in 6:
+		World.step()
+	_check(player.tile == Vector2i(2, 4) and player.free_pos.is_equal_approx(Vector2(2, 4)),
+			"6 ticks on it stands where it was put (%s)" % player.free_pos)
+
+
+## A press counted against [param player]'s free body, as a wall's would be.
+func press_into(player: Player) -> void:
+	player.free_press[Vector2i(1, 0)] = 1
 
 
 func _test_kick_fall() -> void:

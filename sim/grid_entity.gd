@@ -785,6 +785,11 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	tile = at
 	free_pos = Vector2(at)
 	free_way = Vector2.ZERO
+	# Nothing of its last place carried here (a respawn, a travel): no slide
+	# being shown, no momentum (688 amended (6)).
+	free_kick_path = PackedVector2Array()
+	step_velocity = Vector2.ZERO
+	step_until = -100000.0
 	_from_tile = at
 	_move_duration = 0
 	hp = max_hp

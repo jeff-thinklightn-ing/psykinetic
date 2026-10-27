@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement: dying or travelling while knocked back no longer carries the slide to where you reappear (688 amended (6)).
 - Your companion no longer stutter-steps between fighting and following, or between leaping clear and stepping back into a blow's way (or your bow line), and a fighting stance you gave her lasts past a short lull; the three holds are on the F7 tuning panel under Companions (706).
 - Under free walk a heavy weapon's wind-up can be given up again (392 amended): walk firmly away or aside (not toward the foe) while it winds and the blow is dropped and you move; before, every axe or maul wind-up landed.
 - The draugr's spin hits a little harder under free walk (603 amended (5)): a player swept into a wall from full is left at 3 of 20 again, not 4 (F7 combat.moves.spin.impulse_scale 1.0 to 1.06).
