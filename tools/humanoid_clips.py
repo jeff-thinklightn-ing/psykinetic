@@ -122,17 +122,6 @@ CLIPS = {
 			("spine_01", LIFT, -6.0)], move=(0.0, -0.06, 0.0))),
 		(0.55, P("Sword_Idle", 0.0)),
 	]},
-	# The spear, both hands: drawn back, the body turned away; then thrust, the body
-	# turning in, a step forward.
-	"Spear_Thrust": {"keys": [
-		(0.0, P("Sword_Idle", 0.0, HOLD)),
-		(0.22, P("Sword_Idle", 0.0, HOLD + [("upperarm_r", LIFT, -35.0), ("lowerarm_r", LIFT, 25.0), ("spine_02", TURN, -22.0)],
-			move=(0.0, 0.05, 0.0))),
-		(0.36, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, 75.0), ("lowerarm_r", LIFT, 5.0), ("upperarm_l", LIFT, 75.0),
-			("upperarm_l", TURN, -30.0), ("lowerarm_l", LIFT, 15.0), ("spine_02", TURN, 16.0), ("spine_01", LIFT, -8.0)],
-			move=(0.0, -0.12, -0.02))),
-		(0.8, P("Sword_Idle", 0.0, HOLD)),
-	]},
 	# The shield bash: from the guard, the left shoulder drawn back, then driven forward
 	# behind the shield, a lunge.
 	"Shield_Bash": {"keys": [
@@ -421,6 +410,27 @@ CLIPS["Mace_Overhead"] = {"keys": [
 	(0.48, P("Idle_Loop", 0.0, MACE_DOWN, move=(0.0, -0.05, -0.03))),
 	(0.62, P("Idle_Loop", 0.0, MACE_DOWN, move=(0.0, -0.05, -0.03))),
 	(1.0, P("Idle_Loop", 0.0, MACE_READY)),
+]}
+# The spear's jab (Jeff on v0.1.187: "spear needs a jabbing animation instead of slash"): the
+# right hand at the waist, the shaft level along the facing (one_hand), drawn back with the right
+# shoulder, then driven straight ahead, the trunk turning in behind it and a half step forward, the
+# point running out along the line it lies on; held there a moment, then brought back. The left
+# hand kept forward at the waist (a shield's arm, GUARDING_LEFT). The shaft dips a little so the
+# point comes in at a body's chest from two cells off.
+SPEAR_AHEAD = (0.0, -1.0, 0.04)
+SPEAR_FACE = (0.0, 0.0, 1.0)
+SPEAR_POLE = (-1.0, 0.6, -0.4)
+SPEAR_READY = one_hand((0.24, 0.14, -0.28), SPEAR_AHEAD, SPEAR_FACE, SPEAR_POLE) + GUARDING_LEFT
+SPEAR_DRAWN = one_hand((-0.02, 0.18, -0.3), SPEAR_AHEAD, SPEAR_FACE, SPEAR_POLE) + GUARDING_LEFT + [
+	("spine_02", TURN, -16.0), ("spine_03", TURN, -8.0)]
+SPEAR_OUT = one_hand((0.46, 0.06, -0.24), SPEAR_AHEAD, SPEAR_FACE, SPEAR_POLE) + GUARDING_LEFT + [
+	("spine_02", TURN, 14.0), ("spine_03", TURN, 8.0), ("spine_01", LIFT, -6.0)]
+CLIPS["Spear_Thrust"] = {"keys": [
+	(0.0, P("Sword_Idle", 0.0, SPEAR_READY)),
+	(0.2, P("Sword_Idle", 0.0, SPEAR_DRAWN, move=(0.0, 0.04, 0.0))),
+	(0.32, P("Sword_Idle", 0.0, SPEAR_OUT, move=(0.0, -0.12, -0.02))),
+	(0.44, P("Sword_Idle", 0.0, SPEAR_OUT, move=(0.0, -0.12, -0.02))),
+	(0.8, P("Sword_Idle", 0.0, SPEAR_READY)),
 ]}
 CLIPS["Axe_Overhead"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_READY)),

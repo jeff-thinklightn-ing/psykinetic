@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_feel_source()
 	await _test_strike()
 	await _test_one_strike_clip()
+	await _test_spear_jab()
 	await _test_bow_clear()
 	await _test_bow_back()
 	await _test_sheathed()
@@ -242,6 +243,71 @@ func _test_one_strike_clip() -> void:
 		"two clips: never the same twice running (%s)" % [bare])
 	client.free()
 	puppet.queue_free()
+
+
+## The spear's strike is a jab (Jeff on v0.1.187: "spear needs a jabbing animation instead of
+## slash"), on every body that fights with one (man, woman, goblin, orc, draugr): through
+## Spear_Thrust, every 0.05 s, the shaft within SPEAR_LEVEL of level and of the facing, its point
+## running out ahead at least SPEAR_DRIVE of the body's height and swinging no more than
+## SPEAR_SWAY of it across or up and down (the old clip swung the point 0.5 m up and across).
+const SPEAR_LEVEL := 10.0
+const SPEAR_DRIVE := 0.3
+const SPEAR_SWAY := 0.12
+func _test_spear_jab() -> void:
+	print("== the spear's jab ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var clip := str(Client3D.HUMANOID_MOVES["strikes"]["spear"][0][0])
+	var bodies := [["man", Client3D.HUMAN, 1.75], ["woman", Client3D.HUMAN_F, 1.65], ["goblin", Client3D.MODELS["imp"], 1.2],
+		["orc", Client3D.MODELS["brute"], 1.95], ["draugr", Client3D.MODELS["draugr"], 1.75]]
+	for body: Array in bodies:
+		var model: Dictionary = body[1]
+		var puppet := Node3D.new()
+		add_child(puppet)
+		var scene := (load(model["scene"]) as PackedScene).instantiate() as Node3D
+		scene.rotation.y = float(model["faces"])
+		puppet.add_child(scene)
+		var holder := Node3D.new()
+		puppet.add_child(holder)
+		Client3D._attach_sockets(scene, model["sockets"], 1.0, holder)
+		var sockets: Dictionary = holder.get_meta("sockets")
+		Client3D._hold(sockets, 0, "spear")
+		var spear := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+		var ends := _held_ends(spear)
+		var rig := AnimRig.make(scene, lib, 0.0, true, null)
+		var worst := 0.0
+		var ahead := Vector2(INF, -INF)
+		var across := Vector2(INF, -INF)
+		var up := Vector2(INF, -INF)
+		var t := 0.0
+		while t <= rig.length(clip) + 0.001:
+			rig.base_at(clip, t)
+			await _frames(2)
+			var tip := puppet.global_transform.affine_inverse() * (spear.global_transform * ends[1])
+			var butt := puppet.global_transform.affine_inverse() * (spear.global_transform * ends[0])
+			var d := (tip - butt).normalized()  # The puppet's front is +x.
+			worst = maxf(worst, maxf(absf(rad_to_deg(asin(d.y))), absf(rad_to_deg(atan2(d.z, d.x)))))
+			ahead = Vector2(minf(ahead.x, tip.x), maxf(ahead.y, tip.x))
+			across = Vector2(minf(across.x, tip.z), maxf(across.y, tip.z))
+			up = Vector2(minf(up.x, tip.y), maxf(up.y, tip.y))
+			t += 0.05
+		var height: float = body[2]
+		_check(worst <= SPEAR_LEVEL, "%s: the shaft within %.0f deg of level and the facing (%.1f)" % [body[0], SPEAR_LEVEL, worst])
+		_check(ahead.y - ahead.x >= SPEAR_DRIVE * height, "%s: the point driven %.2f m ahead (at least %.2f), out to %.2f m" % [
+			body[0], ahead.y - ahead.x, SPEAR_DRIVE * height, ahead.y])
+		_check(maxf(across.y - across.x, up.y - up.x) <= SPEAR_SWAY * height, "%s: the point swung %.2f m across, %.2f m up and down (at most %.2f)" % [
+			body[0], across.y - across.x, up.y - up.x, SPEAR_SWAY * height])
+		puppet.queue_free()
+
+
+## The two ends of a held piece along its length (its +y), in its own frame: [butt, point].
+static func _held_ends(piece: Node3D) -> Array[Vector3]:
+	var low := INF
+	var high := -INF
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		var box := piece.global_transform.affine_inverse() * mesh.global_transform * mesh.get_aabb()
+		low = minf(low, box.position.y)
+		high = maxf(high, box.end.y)
+	return [Vector3(0.0, low, 0.0), Vector3(0.0, high, 0.0)]
 
 
 ## The bow clear of the body (Jeff: "arm and bow clipping body"; on v0.1.160: "the bow draw back

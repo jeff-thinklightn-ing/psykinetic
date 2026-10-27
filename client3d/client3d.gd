@@ -781,7 +781,7 @@ const HUMANOID_MOVES := {
 		"hammer": [["Mace_Overhead", 0.42]],  # One-handed: Axe_Overhead's left hand would grip nothing.
 		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
 		"dagger": [["Dagger_Stab", 0.17]],
-		"spear": [["Spear_Thrust", 0.29]],
+		"spear": [["Spear_Thrust", 0.25]],  # A level jab (Jeff, v0.1.187: "jabbing ... instead of slash").
 		"shield": [["Shield_Bash", 0.17]],
 		"kick": [["Kick", 0.25]],
 	},

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A spear strikes with a straight jab along the facing, its point driven out about two cells, instead of a sideways slash, for players, companions and monsters alike (344 amended).
 - A companion holding a spear strikes from its full reach, two cells off, instead of walking in next to the monster (699, companions' side).
 - Monsters cut the corner on a player who runs circles round them, making for where you'll be; a brute winds up on where you'll be as its blow falls (dodge by changing course). Walking straight away still escapes (700).
 - Monsters step to where they can actually reach you: a player standing at the back of a cell no longer has a monster waiting beside him out of reach, and archers aim at where you really are (699, enemy-ai's side).

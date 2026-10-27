@@ -32939,3 +32939,46 @@ foe would be met on its centre.
 companion_test _test_spear_reach (her strike cells two off; she closes to
 two and strikes); companion_test passes with free walk off and on. Server
 only, protocol unchanged, no new class_name.
+## 344 amended. The spear's strike is a jab
+
+Jeff on v0.1.187, Pip with a spear: "spear needs a jabbing animation
+instead of slash". The coordinator asked for a straight jab along the
+facing, timed to the same blow, that reads at two cells' reach, on every
+body.
+
+Every spear already played Spear_Thrust (HUMANOID_MOVES' strikes). The
+clip itself was the slash: it held the shaft about 107 degrees off the
+facing and 40 to 58 degrees up, and swung the point about 0.5 m.
+
+Spear_Thrust is authored again in tools/humanoid_clips.py with one_hand
+(REACH and GRASP, as Mace_Overhead is):
+
+- At rest, the right hand is at the waist with the shaft level along the
+  facing (SPEAR_AHEAD).
+- It is drawn back with the right shoulder.
+- It is driven straight ahead, the trunk turning in and a half step
+  forward. The point runs out along the line it lies on.
+- It is held a moment, then brought back.
+- The left arm is kept forward at the waist (GUARDING_LEFT), where a
+  shield would be, since a spear is one-handed.
+
+The clip tool's contact measure moves from 0.29 s to 0.25 s, so the jab
+still lands with the blow. The server's blow timing is untouched: Client3D's _strike
+fits the clip so its contact falls when the drawn body's blow does
+(AnimRig.strike), so the visible contact and the server's hit may differ
+only by that fitting. The same clip plays on every body that fights
+with a spear: player, companion, the goblin, orc, kobold, draugr and
+skeleton bodies.
+
+anim_rig_test _test_spear_jab checks the clip on man, woman, goblin, orc
+and draugr, sampled every 0.05 s:
+
+- The shaft stays within SPEAR_LEVEL (10 degrees) of level and of the
+  facing. Measured: 4.4 degrees.
+- The point is driven at least SPEAR_DRIVE (0.3) of the body's height
+  ahead. Measured: 0.47 to 1.39 m, out to 1.70 to 2.17 m ahead, about two
+  cells, at chest height.
+- The point swings no more than SPEAR_SWAY (0.12) of the body's height
+  across or up and down. Measured: at most 0.14 m.
+
+Client only, protocol unchanged, no new class_name.
