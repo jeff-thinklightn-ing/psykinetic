@@ -32785,3 +32785,29 @@ about +1.5 on the average), inside main's own spread; worst ticks alike
 16-player baseline has grown from 238's 21.8 ms to about 40; passed to
 perf.) monster_test _test_far_pace: a brute walking home 30 cells off steps
 at its pace (7, main 8). Server only, protocol unchanged, no new class_name.
+
+## 688 amended (5): a blow finds a free body by struck_cell
+
+The coordinator's free-walk audit (1), "a dodge that looks clean must be
+clean". Blows found a free body by the cell it holds. That is fair while its
+circle overlaps that cell: the claim moves FREE_HYSTERESIS (0.1) past the
+edge, under FREE_RADIUS (0.3), so a body whose circle has cleared a
+telegraph's cells has claimed past them. Measured: the spin's red ends at
+4.5; struck with the centre at 4.30, 4.45 and 4.55, not from 4.62 on. The
+throw's line, a side step: struck at 2.30 and 2.55, not past 2.6.
+The one exception: a player walking through his own companion, whose claim
+waits on her cell (688), kept the red cell while visibly out of it (centre
+5.2) and was struck. Now World.struck_cell(body) is a free body's held cell
+while its circle overlaps it, else its centre's cell, and
+bodies_struck_at(cell) is the holder (unless a free body gone from it) and
+any free body whose centre has strayed in. World._bodies_in (the spin and
+spin_targets), axe_line_hit, _throw_lands, physics' hurl and a charge
+(physics' _lunge_cell; physics: "one rule landing once") read it, the holder
+first when there are two. A charge comes to a held cell whose free body has
+left it: the cell stops it (two bodies never share one), and nobody is
+struck.
+free_walk_test _test_free_dodge (the spin at six centres, the throw's line
+at four, through one's companion not struck, a charge stopped at his
+held cell striking nobody); _test_free_chase and
+_test_free_kite pin the audit's (2) reach and (3) kiting as found. Server
+only, protocol unchanged, no new class_name.

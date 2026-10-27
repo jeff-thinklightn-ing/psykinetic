@@ -4318,9 +4318,9 @@ func axe_line_hit(by: GridEntity, at: Vector2i) -> GridEntity:
 	if at == by.tile:
 		return null
 	for cell in telegraph_cells(_throw_shape(by, at)):
-		var body: GridEntity = _occupancy.get(cell)
-		if body != null and body != by and body.spawned:
-			return body
+		for body in bodies_struck_at(cell):
+			if body != by and body.spawned:
+				return body
 	return null
 
 
@@ -4502,9 +4502,37 @@ func _axe_slot(by: GridEntity) -> int:
 func _bodies_in(by: GridEntity, cells: Array[Vector2i]) -> Array[GridEntity]:
 	var out: Array[GridEntity] = []
 	for cell in cells:
-		var body: GridEntity = _occupancy.get(cell)
-		if body != null and body != by and _alive(body):
-			out.append(body)
+		for body in bodies_struck_at(cell):
+			if body != by and _alive(body) and body not in out:
+				out.append(body)
+	return out
+
+
+## The cell a blow finds [param body] in (enemy-ai's free-walk audit): the
+## cell it holds, but a free body whose circle has left it (its claim waiting
+## on its own companion's cell, 688) is where its centre is. While the
+## circle still overlaps the held cell (FREE_HYSTERESIS under FREE_RADIUS),
+## it is there: a body clear of a telegraph's cells has claimed past them.
+func struck_cell(body: GridEntity) -> Vector2i:
+	if not free_body(body):
+		return body.tile
+	var off := body.free_pos - Vector2(body.tile)
+	if absf(off.x) < 0.5 + FREE_RADIUS and absf(off.y) < 0.5 + FREE_RADIUS:
+		return body.tile
+	return Vector2i(roundi(body.free_pos.x), roundi(body.free_pos.y))
+
+
+## Who a blow at [param cell] strikes (struck_cell): its holder unless that
+## is a free body gone from it, and any free body whose centre has strayed
+## into it; [] for nobody.
+func bodies_struck_at(cell: Vector2i) -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	var holder: GridEntity = _occupancy.get(cell)
+	if holder != null and struck_cell(holder) == cell:
+		out.append(holder)
+	for each in sought():
+		if each != holder and each.tile != cell and free_body(each) and struck_cell(each) == cell:
+			out.append(each)
 	return out
 
 
@@ -4598,9 +4626,11 @@ func _throw_lands(by: GridEntity, shape: Dictionary) -> void:
 	var hit: GridEntity = null
 	var rest := by.tile
 	for cell in telegraph_cells(shape):
-		var body: GridEntity = _occupancy.get(cell)
-		if body != null and body != by and _alive(body):
-			hit = body
+		for body in bodies_struck_at(cell):
+			if body != by and _alive(body):
+				hit = body
+				break
+		if hit != null:
 			break
 		rest = cell
 	var weight := Items.weight_of(by.slots[slot])
@@ -7898,7 +7928,17 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 		state["stopped_by"] = "a braced spear"
 		return
 	var blow: Dictionary = state["blow"]
-	var body: GridEntity = _occupancy.get(next)
+	var body: GridEntity = null
+	for each in bodies_struck_at(next):  # Its holder first, as the hurl's (688 amended (5)).
+		if each != entity:
+			body = each
+			break
+	if body == null and _occupancy.has(next) and _occupancy[next] != entity:
+		# A free body's held cell its circle has left (its claim waiting on
+		# its own companion's): the cell stops the charge, nobody is struck.
+		state["reason"] = "body"
+		state["stopped_by"] = "a cell held (%s)" % (_occupancy[next] as GridEntity).name
+		return
 	if body != null:
 		if not state["through"]:
 			state["reason"] = "body"
@@ -8058,9 +8098,11 @@ func hurl(by: GridEntity, slot: int, toward: Vector2, cells: int, speed: float, 
 		var step := next - at
 		if _terrain_blocks_step(at, step, false, false) and not is_water(next) or edge_blocks(at, step):
 			break
-		var body: GridEntity = _occupancy.get(next)
-		if body != null and body != by:
-			hit = body
+		for body in bodies_struck_at(next):  # A free body by struck_cell (enemy-ai's free-walk audit).
+			if body != by:
+				hit = body
+				break
+		if hit != null:
 			at = next
 			break
 		at = next

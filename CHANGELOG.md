@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A dodge that looks clean is clean with free walk: walking out of a draugr's spin, throw or charge through your own companion no longer counts you as still on the red ground (688 amended (5)).
 - Monsters walking at the edge of your view (23 to 30 cells off) move smoothly at their own pace instead of stepping and stopping (238 amended (2); like the fleeing stag's fix).
 
 ## v0.1.187

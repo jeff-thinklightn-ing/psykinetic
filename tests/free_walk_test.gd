@@ -88,6 +88,9 @@ func _ready() -> void:
 	_test_replay_matches()
 	_test_acks()
 	_test_walk_helper()
+	_test_free_dodge()
+	_test_free_chase()
+	_test_free_kite()
 	World.free_walk = false
 
 	print("")
@@ -622,6 +625,177 @@ func _test_walk_helper() -> void:
 
 
 ## A room from [param rows] with a player at [param at], free_walk on.
+## Open ground [param w] x [param h] in the double-resolution format.
+static func _open(w: int, h: int) -> Array[String]:
+	var rows: Array[String] = []
+	for y in h:
+		var row := ""
+		for x in w:
+			row += ". " if x < w - 1 else "."
+		rows.append(row)
+		if y < h - 1:
+			rows.append(" ".repeat(row.length()))
+	return rows
+
+
+func _draugr(at: Vector2i, facing: Vector2i) -> Monster:
+	var by := EntityFactory.build({"script": "res://sim/draugr.gd", "shape": "capsule", "name": "Draugr", "kind": "draugr", "tile": at}) as Monster
+	by.sight_range = 0
+	by.acts = false
+	_room.add_child(by)
+	World.spawn(by, at)
+	by.max_stamina = 100
+	by.stamina = by.max_stamina
+	by.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)
+	World.set_slots(by, Items.tidy(["", "", "", "", "battle_axe" if Items.exists("battle_axe") else "giant_axe", ""], Items.CARRIED))
+	World.face(by, facing)
+	return by
+
+
+## A dodge that looks clean is clean (the coordinator's free-walk audit, 1):
+## a blow finds a free body by World.struck_cell, the cell it holds while
+## its circle overlaps it. The claim moves 0.1 past the edge, under the
+## circle's 0.3, so a body clear of the red has already claimed past it;
+## through its own companion, whose cell its claim waits on, by its centre.
+func _test_free_dodge() -> void:
+	print("
+== a dodge that looks clean is clean: the spin, the throw's line, through one's own companion ==")
+	var struck: Array[float] = []
+	for x: float in [4.3, 4.45, 4.55, 4.62, 4.75, 4.85]:
+		var player := _sturdy(_build(_open(10, 5), Vector2i(4, 2)))
+		var by := _draugr(Vector2i(2, 2), Vector2i(1, 0))
+		World.try_spin(by)
+		player.free_pos = Vector2(x, 2)
+		World._free_claim(player, 2.5)
+		for i in 16:
+			World.step()
+		if player.hp < player.max_hp:
+			struck.append(x)
+	_check(struck == [4.3, 4.45, 4.55], "the spin's red ends at 4.5: struck with the centre at %s, its circle over it; none at 4.62 on, its claim past it" % [struck])
+	_check(struck.all(func(x: float) -> bool: return x - World.FREE_RADIUS < 4.5), "never struck with its circle clear of the red")
+	struck.clear()
+	for y: float in [2.3, 2.55, 2.65, 2.85]:
+		var player := _sturdy(_build(_open(10, 5), Vector2i(6, 2)))
+		var by := _draugr(Vector2i(2, 2), Vector2i(1, 0))
+		World.try_axe_throw(by, Vector2i(8, 2))
+		player.free_pos = Vector2(6, y)
+		World._free_claim(player, 2.5)
+		for i in 14:
+			World.step()
+		if player.hp < player.max_hp:
+			struck.append(y)
+	_check(struck == [2.3, 2.55], "the throw's line, a side step: struck at %s, not past 2.6" % [struck])
+	var player := _sturdy(_build(_open(10, 5), Vector2i(4, 2)))
+	var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow", "props": {"max_hp": 10}}) as Companion
+	pet.acts = false
+	_room.add_child(pet)
+	World.spawn(pet, Vector2i(5, 2))
+	pet.keeper = player
+	var by := _draugr(Vector2i(2, 2), Vector2i(1, 0))
+	World.try_spin(by)
+	for i in 3:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT)
+		World.step()
+	var held := player.tile
+	for i in 13:
+		World.step()
+	_check(held == Vector2i(4, 2) and player.hp == player.max_hp,
+			"into his companion's cell out of the red, his claim still on the red cell (%s): not struck (centre %s, %d hp)" % [held, player.free_pos, player.hp])
+	# The charge (physics' rush, _lunge_cell) by the same rule: his held cell
+	# stops it, for two bodies never share a cell, but strikes nobody.
+	player = _sturdy(_build(_open(10, 5), Vector2i(4, 2)))
+	pet = EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow", "props": {"max_hp": 10}}) as Companion
+	pet.acts = false
+	_room.add_child(pet)
+	World.spawn(pet, Vector2i(5, 2))
+	pet.keeper = player
+	by = _draugr(Vector2i(2, 2), Vector2i(1, 0))
+	for i in 3:
+		World.free_input(player, Vector2(1, 0), World.TICK_DT)
+		World.step()
+	var ended: Array = []
+	var heard := func(entity: GridEntity, reason: String, _at: Variant = null, _result: Variant = null) -> void:
+		if entity == by:
+			ended.append(reason)
+	World.rush_ended.connect(heard)
+	World.rush(by, Vector2(1, 0), 6, {"blow": {"impulse": 40.0}})
+	for i in 12:
+		World.step()
+	World.rush_ended.disconnect(heard)
+	_check(player.tile == Vector2i(4, 2) and by.tile == Vector2i(3, 2) and ended == ["body"] and player.hp == player.max_hp and pet.hp == 10,
+			"a charge along the row: stopped at %s by the cell he holds, %s, nobody struck (%d hp, hers %d; ended %s)" % [by.tile, player.tile, player.hp, pet.hp, ended])
+
+
+## A monster's blows on a free body that walks away and zig-zags (the
+## audit, 2): reach is still cell to cell (688, combat's side), so a blow
+## lands up to 0.6 of a cell past adjacency while the claim lags; no dance at
+## a cell's border (a dart's in and out is its tactic).
+func _test_free_chase() -> void:
+	print("
+== a monster after a free body: blows within its cell's reach, no dance at a border ==")
+	for kind: String in ["imp", "brute", "skeleton", "robber"]:
+		var player := _sturdy(_build(_open(24, 9), Vector2i(4, 4)))
+		var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": kind, "tile": Vector2i(2, 4), "temperament": "bold", "props": Monster.bodies()[kind]}) as Monster
+		_room.add_child(foe)
+		World.spawn(foe, Vector2i(2, 4))
+		foe.sight_range = 12
+		foe.senses.cone_cos = -1.0
+		var hits: Array[float] = []
+		var hurt := func(entity: GridEntity, _amount: int, source: GridEntity, _cause: StringName) -> void:
+			if entity == player and source == foe:
+				hits.append(snappedf(player.free_pos.distance_to(Vector2(foe.tile)), 0.01))
+		World.entity_damaged.connect(hurt)
+		var turns := 0
+		var last_way := Vector2i.ZERO
+		var last_tile := foe.tile
+		for i in 200:
+			var way := Vector2(1, 0) if i < 40 else Vector2(-1, 0.6 if (i / 6) % 2 == 0 else -0.6).normalized()
+			World.free_input(player, way, World.TICK_DT)
+			World.step()
+			if foe.tile != last_tile:
+				var d := foe.tile - last_tile
+				if last_way != Vector2i.ZERO and d == -last_way:
+					turns += 1
+				last_way = d
+				last_tile = foe.tile
+		World.entity_damaged.disconnect(hurt)
+		var reach := Vector2(1.5 + World.FREE_HYSTERESIS, 1.5 + World.FREE_HYSTERESIS).length()  # Diagonal, the claim's lag on both axes.
+		_check(not hits.is_empty() and hits.max() <= reach and (turns <= 1 or kind == "imp"),
+				"%s: %d blows, at centres %s apart (cell reach and the lag: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
+
+
+## Kiting (the audit, 3; reported to the coordinator, not changed): a free
+## body walks 0.4 cells a tick any way, a diagonal no slower; a grid
+## walker's diagonal costs 1.5 its pace. Circling at 4 cells, no kind is as
+## quick (a sneak's 3.0 the nearest, a player's 2.5), and none lands a blow. This pins what is so:
+## a change that answers kiting turns it.
+func _test_free_kite() -> void:
+	print("
+== kiting: a free body circling a grid walker at 4 (as found, reported) ==")
+	for kind: String in ["imp", "brute", "robber", "sneak"]:
+		var player := _sturdy(_build(_open(24, 24), Vector2i(12, 8)))
+		var foe := EntityFactory.build({"script": "res://sim/monster.gd", "shape": "capsule", "name": "Foe", "kind": kind, "tile": Vector2i(12, 12), "temperament": "bold", "props": Monster.bodies()[kind]}) as Monster
+		_room.add_child(foe)
+		World.spawn(foe, Vector2i(12, 12))
+		foe.sight_range = 20
+		foe.senses.cone_cos = -1.0
+		var near := 99.0
+		for i in 400:
+			var off := player.free_pos - Vector2(12, 12)
+			var way := Vector2(-off.y, off.x).normalized() - off.normalized() * (off.length() - 4.0) * 0.3
+			World.free_input(player, way.limit_length(1.0), World.TICK_DT)
+			World.step()
+			if i > 50:
+				near = minf(near, player.free_pos.distance_to(Vector2(foe.tile)))
+		_check(player.hp == player.max_hp, "%s (its pace %.1f): no blow in 400 ticks of circling; nearest %.2f" % [kind, foe._pace, near])
+
+
+func _sturdy(player: Player) -> Player:
+	player.max_hp = 9999
+	player.hp = player.max_hp
+	return player
+
+
 func _build(rows: Array[String], at: Vector2i) -> Player:
 	World.reset()
 	World.free_walk = true
