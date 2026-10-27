@@ -134,6 +134,9 @@ const TEMPLE_COUNTER_TICKS := 5
 var returns := true
 ## A player is not put down (on respawn or on coming back) with a hostile
 ## this close to the intended tile; it goes to the safest start tile instead.
+## A companion waiting farther than this from where her player comes back
+## (a start tile, a town) is put beside them (decision 705).
+const REJOIN_NEAR := 8
 const SPAWN_SAFE_DISTANCE := 5
 ## Ticks a newly spawned player is ignored by monsters, unless it moves or
 ## attacks first.
@@ -6403,6 +6406,14 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 		_companions.erase(record.player_id)
 		existing = null
 	if is_instance_valid(existing) and existing.spawned:
+		if World.distance(existing.tile, player.tile) > REJOIN_NEAR:
+			# He was put somewhere else (a start tile away from a hostile, a
+			# town): she comes with him, beside him (decision 705; Jeff came
+			# back 130 cells from Pip, and she walked it alone).
+			var was := existing.tile
+			World._relocate(existing, _nearest_free(player.tile))
+			print("[spawn] %s's companion %s waited at %s, %d from where %s came back; beside them" % [
+				record.name, existing.name, was, World.distance(was, player.tile), record.name])
 		existing.works_as = ""
 		existing.home = record.companion.get("home", {})
 		existing.keeper = player
@@ -6432,6 +6443,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	var wanted: Vector2i = player.tile
 	if saved != null and str(record.companion.get("tile_zone", player.zone)) != player.zone:
 		saved = null  # Her tile is another zone's (she waited there; they are back somewhere else).
+	if saved != null and World.distance(saved, player.tile) > REJOIN_NEAR:
+		saved = null  # He came back somewhere else in it (705): beside him.
 	if saved != null and not is_new:
 		if _nearest_hostile_distance(saved) > SPAWN_SAFE_DISTANCE:
 			wanted = saved

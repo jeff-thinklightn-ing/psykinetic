@@ -53,6 +53,8 @@ func _ready() -> void:
 	_test_sought_body()
 	_test_sought_band()
 	_test_what_is_true()
+	_test_rejoin_moved()
+	_test_far_walk_kept_route()
 	_test_two_sentences()
 	_test_sick_body()
 	_test_placed_captive()
@@ -276,6 +278,70 @@ func _test_wilds_town_ground() -> void:
 		_main.travel(Net.local_id, TOWN)
 	Net.message_received.disconnect(note)
 	record.companion["name"] = was
+
+
+## Jeff on v0.1.187: logged out by the wilds' ruins with Pip, came back
+## at the start tile by the castle (a hostile by his saved tile), and Pip
+## was 130 cells off, nothing said. Moved on his rejoin, she comes beside
+## him (decision 705): waiting there still, or from her saved tile.
+func _test_rejoin_moved() -> void:
+	print("
+== come back somewhere else in the zone: she is beside them, not left where they parted (705) ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var was: String = record.companion["name"]
+	record.companion["name"] = "Pip"
+	_main.travel(Net.local_id, "wilds")
+	var pet := _companion()
+	_check(World.zone.name == "wilds" and pet != null, "(her player and she are in the wilds)")
+	if pet == null:
+		record.companion["name"] = was
+		_main.travel(Net.local_id, TOWN)
+		return
+	_put(_player(), _main._nearest_free(Vector2i(126, 152)))
+	_put(pet, _main._nearest_free(Vector2i(128, 154)))
+	_main._on_peer_disconnected(Net.local_id)
+	_check(pet.spawned and pet.zone == "wilds", "gone by the ruins: she waits there")
+	record.tile = Vector2i(126, 22)  # Where the join puts him (the start tile, a hostile by the ruins).
+	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
+	pet = _companion()
+	_check(pet != null and World.distance(pet.tile, _player().tile) <= 2 and pet.keeper == _player(),
+		"back at the start tile: she is beside them at once (she %s, they %s)" % [pet.tile if pet != null else Vector2i(-1, -1), _player().tile])
+	record.companion["name"] = was
+	_main.travel(Net.local_id, TOWN)
+
+
+## A long walk back to her player (decision 704): Pip waited by the ruins
+## while Jeff came back in at the wilds' start tile, 130 cells off, and
+## the box spent 55 to 507 ms a tick finding the whole way afresh at each
+## step. She walks a kept route now, searching again only when it gives
+## out or he moves on: a handful of searches, not one a step.
+func _test_far_walk_kept_route() -> void:
+	print("
+== the long walk back across the wilds: a kept route, a handful of searches, not one a step (704) ==")
+	_main.travel(Net.local_id, "wilds")
+	var pet := _companion()
+	var owner := _player()
+	_check(World.zone.name == "wilds" and pet != null, "(her player and she are in the wilds)")
+	if pet == null:
+		_main.travel(Net.local_id, TOWN)
+		return
+	_put(owner, _main._nearest_free(Vector2i(126, 22)))
+	_put(pet, _main._nearest_free(Vector2i(128, 154)))
+	var from := Heel.searches
+	var worst := 0
+	# Her steps alone: Heel.searches counts every body's (the town's resting
+	# companions' too), and the town's day is held still for later checks.
+	for i in 400:
+		pet.next_move_tick = 0
+		var t0 := Time.get_ticks_usec()
+		Heel.step(pet, owner.tile, true)
+		worst = maxi(worst, Time.get_ticks_usec() - t0)
+		if World.distance(pet.tile, owner.tile) <= Heel.STOP:
+			break
+	var asked := Heel.searches - from
+	_check(World.distance(pet.tile, owner.tile) <= Heel.STOP, "she walks the 130 cells back to him (at %s, he %s)" % [pet.tile, owner.tile])
+	_check(asked <= 20, "on a kept route: %d searches for the walk, not one a step (the worst turn %.1f ms)" % [asked, worst / 1000.0])
+	_main.travel(Net.local_id, TOWN)
 
 
 func _test_legacy_rests_in_town() -> void:

@@ -63,6 +63,17 @@ var _no_way: Dictionary[Vector2i, int] = {}
 var _no_way_until := -1
 ## Ways asked for (step's searches), for tests and benches.
 static var searches := 0
+## A goal this far or farther is walked on a kept route (step): the box
+## spent 55 to 507 ms a tick searching the whole way afresh each step as
+## Pip walked 130 cells back across the wilds (decision 704).
+const FAR := 12
+## A failed search is not asked again for this long while neither the
+## body nor its goal has moved (704).
+const NO_ROUTE_TICKS := 20
+## Kept routes by body (instance id): {goal, at, path (the cells still to
+## walk)}; failed searches: {from, goal, until}.
+static var _routes := {}
+static var _failed := {}
 
 
 ## One tick of [param body] following [param leader]: still, or one step
@@ -327,17 +338,42 @@ static func cell(body: GridEntity, leader: GridEntity, clear := {}, way := NONE)
 static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leader: GridEntity = null) -> bool:
 	if World.tick < body.next_move_tick:
 		return true
-	searches += 1
-	var path := World.find_path(body.tile, goal, occupied_goal_ok)
-	if path.is_empty():
-		return false
-	if path.size() >= 3 and (occupied_goal_ok or World.is_free(goal)):
-		var pulled := World.walk_path(body.tile, goal, body)
-		if not pulled.is_empty():
-			path = pulled
+	var id := body.get_instance_id()
+	var failed: Dictionary = _failed.get(id, {})
+	if not failed.is_empty() and failed["from"] == body.tile and failed["goal"] == goal and World.tick < int(failed["until"]):
+		return false  # No way a moment ago, and nothing has moved (704).
+	var far := World.distance(body.tile, goal)
+	var path: Array[Vector2i] = []
+	var route: Dictionary = _routes.get(id, {})
+	# Far off: the kept route while it holds (704): she is where it left
+	# her, its next cell is open, and the goal has moved less than a
+	# quarter of the way since it was found.
+	if far >= FAR and not route.is_empty() and route["at"] == body.tile and not (route["path"] as Array).is_empty() \
+			and World.distance(route["goal"], goal) <= maxi(2, far / 4) and World.is_free(route["path"][0]):
+		path.assign(route["path"])
+	else:
+		searches += 1
+		path = World.find_path(body.tile, goal, occupied_goal_ok)
+		if path.is_empty():
+			_failed[id] = {"from": body.tile, "goal": goal, "until": World.tick + NO_ROUTE_TICKS}
+			_routes.erase(id)
+			return false
+		_failed.erase(id)
+		if far >= FAR:
+			route = {"goal": goal}
+		else:
+			route = {}
+			if path.size() >= 3 and (occupied_goal_ok or World.is_free(goal)):
+				var pulled := World.walk_path(body.tile, goal, body)
+				if not pulled.is_empty():
+					path = pulled
 	if leader != null and is_instance_valid(leader) and leader.spawned and path[0] != goal and keep_clear(leader).has(path[0]):
 		return true
 	World.try_move(body, path[0] - body.tile)
+	if not route.is_empty() and body.tile == path[0]:
+		_routes[id] = {"goal": route["goal"], "at": body.tile, "path": path.slice(1)}
+	else:
+		_routes.erase(id)
 	return true
 
 

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Coming back into the game somewhere other than where you left (a start tile, away from a monster), your companion is beside you, not left where you parted (705).
+- A companion walking a long way back to you no longer slows the server (it searched the whole way afresh at every step; 704).
 
 - Server: an address that sends five wrong passwords within ten minutes is refused for fifteen minutes (701)
 ## v0.1.188

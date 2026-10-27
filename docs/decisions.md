@@ -33065,3 +33065,42 @@ protocol_test _test_token_lockout (times given, as a unit): 4 let try, the
 spread wider than the window never lock. Not in net_test: its clients all
 connect from 127.0.0.1, so a lockout there would refuse its other phases.
 Server only, protocol unchanged, no new class_name.
+
+## 704. A far walk keeps its route
+
+The box journal from Jeff's v0.1.187 play (09:22-09:29): slow ticks, all
+in "act: companions", of 507, 86, 88, 55 and 62 ms, with Pip in the wilds.
+Cause: Heel.step ran an unbounded World.find_path at every step she took.
+In the wilds, one search over a long way costs up to 110 ms here and more
+on the box, and she walked 130 cells back to him (705) searching it afresh
+each step.
+
+- A goal Heel.FAR (12) cells or more away is walked on a kept route
+  (Heel._routes, by body). The route holds while she stands where it left
+  her, its next cell is open, and the goal has moved no more than a quarter
+  of the way (at least 2) since the route was found. Otherwise she searches
+  again.
+- A failed search is not asked again for Heel.NO_ROUTE_TICKS (20) while
+  neither she nor her goal has moved (Heel._failed).
+- A near goal is as before: searched each step, with walk_path's pulled
+  line.
+
+resident_test _test_far_walk_kept_route, on the wilds' real cells: from the
+ruins to the start tile in 10 searches, not one a step. Server only,
+protocol unchanged, no new class_name.
+
+## 705. Come back somewhere else in the zone: she is beside them
+
+Jeff on v0.1.187: he logged out by the ruins with Pip and came back at the
+start tile by the castle (the join moved him, a hostile being by his saved
+tile). Pip was 130 cells off with nothing said, and walked it alone. The
+694 approval had it that when his rejoin moves him, she comes with him.
+
+- Main.REJOIN_NEAR (8). A companion still waiting in the zone farther than
+  that from where her player comes back is put beside them
+  (World._relocate) and logged.
+- A saved tile farther than that from where he comes back is passed over
+  for beside him, as one by a hostile already was.
+
+resident_test _test_rejoin_moved, on the wilds' real cells. Server only,
+protocol unchanged, no new class_name.
