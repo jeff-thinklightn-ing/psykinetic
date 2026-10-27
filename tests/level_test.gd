@@ -23,9 +23,6 @@ var _pushes: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17790)
 	Net.companions = false
 	_main = preload("res://main.tscn").instantiate()
@@ -33,6 +30,7 @@ func _ready() -> void:
 	World.entity_pushed.connect(func(entity: GridEntity, _by: GridEntity, _direction: Vector2i, tiles: int, impact: int, stopped_by: String) -> void:
 		_pushes.append({"entity": entity, "tiles": tiles, "impact": impact, "stopped_by": stopped_by}))
 	_register_maps()
+	_check(World.free_walk, "free walk is on: every player's walk below is a free body's (6b)")
 
 	_test_test_room_unchanged()
 	_test_every_level()
@@ -62,7 +60,6 @@ func _ready() -> void:
 	_test_barrow_won()
 	await _test_hall_door()
 	await _test_hidden_niche()
-	await _test_barrow_free_walk()
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
@@ -1003,13 +1000,13 @@ func _test_heights_and_stairs() -> void:
 	_check(World._terrain_blocks_step(Vector2i(2, 2), Vector2i(1, -1)), "not diagonally off it")
 	var player := _player()
 	_put(player, Vector2i(2, 2))
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(3, 2), "Player walks up the stair (%s)" % player.tile)
-	_wait_for_step(player)
-	_check(not World.try_move(player, Vector2i(0, -1)) or World.height_at(player.tile) == 1, "along the top, still on level 1")
+	_hold_free(player, Vector2(1, 0), 3)
+	_check(player.tile == Vector2i(3, 2), "Player walks up the stair (%s)" % player.free_pos)
+	_hold_free(player, Vector2(0, -1), 4)
+	_check(World.height_at(player.tile) == 1, "along the top, still on level 1 (%s)" % player.free_pos)
 	_put(player, Vector2i(3, 1))
-	_wait_for_step(player)
-	_check(not World.try_move(player, Vector2i(-1, 0)) and player.tile == Vector2i(3, 1), "and does not step off the ledge (%s)" % player.tile)
+	_hold_free(player, Vector2(-1, 0), 4)
+	_check(player.tile == Vector2i(3, 1), "and does not walk off the ledge (%s)" % player.free_pos)
 	var path := World.find_path(Vector2i(1, 1), Vector2i(3, 1), true)
 	_check(not path.is_empty() and Vector2i(2, 2) in path and Vector2i(3, 2) in path, "a path to level 1 goes by the stair: %s" % [path])
 	_check(World.find_path(Vector2i(1, 1), Vector2i(4, 1)).is_empty(), "and none reaches level 2, which no stair joins")
@@ -1061,19 +1058,9 @@ func _test_hills() -> void:
 	var path := World.find_path(player.tile, plateau)
 	_check(not path.is_empty(),
 		"a way up to the plateau (%d steps)" % path.size())
-	World.order_move(player, plateau)
-	var highest := 0.0
-	for i in 1200:
-		if player.tile == plateau:
-			break
-		World.step()
-		highest = maxf(highest, World.elevation_at(player.tile))
+	_walk_free(player, plateau)
 	_check(player.tile == plateau, "the bot walks up there, round by the spur (%s)" % player.tile)
-	World.order_move(player, foot)
-	for i in 1200:
-		if player.tile == foot:
-			break
-		World.step()
+	_walk_free(player, foot)
 	_check(player.tile == foot, "and back down to the valley (%s)" % player.tile)
 	# The rim on row 38: the face wanders (585), so the first cell east of the
 	# valley standing well over the one west of it.
@@ -1665,8 +1652,7 @@ func _test_level_links() -> void:
 	_main.load_map("test_link_a")
 	var player := _player()
 	_put(player, Vector2i(3, 1))
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(1, 0)), "Player steps onto the link")
+	_hold_free(player, Vector2(1, 0), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var arrived := _player()
@@ -1696,15 +1682,22 @@ func _test_links_kept_clear() -> void:
 		if body.tile != link:
 			break
 	_check(body.tile != link, "one put on it steps off it (%s)" % [body.tile])
+	if body.spawned:
+		World.despawn(body)
 	var player := _player()
 	_put(player, Vector2i(2, 1))
-	World._relocate(body, link)
-	_put(player, Vector2i(3, 1))
-	_wait_for_step(player)
-	World.try_move(player, Vector2i(1, 0))
+	# Another player on it: a resident put there steps off before it is reached.
+	var other := Player.new()
+	other.name = "Tam"
+	World.spawn(other, link)
+	_hold_free(player, Vector2(1, 0), 8)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(_main.map_name == "test_link_b", "a player stepping at it with a body on it takes the link (%s)" % _main.map_name)
+	_check(_main.map_name == "test_link_b", "a player walking at it with a body on it takes the link (%s)" % _main.map_name)
+	if is_instance_valid(other):
+		if other.spawned:
+			World.despawn(other)
+		other.free()
 	_main.load_map("test_link_a")
 	var uid := World.items.mint("bandaging_kit", "made")
 	var landed := World.put_on_ground(uid, link)
@@ -1726,11 +1719,10 @@ func _test_sealed_link() -> void:
 	_check(record.marks.is_empty() and not _main.mark_player(id, "", true) and not _main.mark_player("nobody", "draugr"),
 		"no marks to start; no mark with no word or no record")
 	_put(player, Vector2i(3, 1))
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(1, 0)), "Player steps onto the sealed link")
+	_hold_free(player, Vector2(1, 0), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(_main.map_name == "test_link_s" and _player() == player and player.tile == Vector2i(4, 1), "and stays (%s)" % _main.map_name)
+	_check(_main.map_name == "test_link_s" and _player() == player, "Player walking onto the sealed link stays (%s)" % _main.map_name)
 	_check(_main.party_log.last(1) == ["The way is sealed."], "told the way is sealed (%s)" % [_main.party_log.last(1)])
 	_check(_main.admin_command("mark Player -draugr") == "Player lacks draugr already", "the console takes no mark off that is not there")
 	var answer: String = _main.admin_command("mark Player draugr")
@@ -1739,12 +1731,11 @@ func _test_sealed_link() -> void:
 	_check(_main.admin_command("mark Player not a word") == "mark: a mark is one word of letters, digits and underscores (not a word)" or
 		_main.admin_command("mark Nobody draugr") == "mark: no player Nobody online", "a bad mark or an unknown player is refused")
 	_put(player, Vector2i(3, 1))
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(1, 0)), "marked, Player steps onto it again")
+	_hold_free(player, Vector2(1, 0), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var arrived := _player()
-	_check(_main.map_name == "test_link_b" and arrived != null and arrived.tile == Vector2i(2, 2), "and goes through to test_link_b's gate (%s)" % _main.map_name)
+	_check(_main.map_name == "test_link_b" and arrived != null and arrived.tile == Vector2i(2, 2), "marked, walking onto it again goes through to test_link_b's gate (%s)" % _main.map_name)
 	_check(PlayerRecord.from_dict(record.to_dict().merged({"player_id": record.player_id})).marks == ["draugr"], "the mark is saved with the record")
 	_main.mark_player(id, "draugr", false)
 	_check(record.marks.is_empty(), "and taken off again")
@@ -1814,11 +1805,11 @@ func _test_hall_door() -> void:
 	_check(door != null and not door.open and door.lock.is_empty() and _main._hall_doors("lt_hall").size() == 1 and _main._hall_doors("lt_hall")[0] == door,
 		"the hall's one door, on its lair anchor's north wall, is found (%s)" % [door])
 	_put(player, Vector2i(5, 3))
-	_wait_for_step(player)
 	_main._hold_hall_door("lt_hall", true)
 	_check(door != null and not door.open and door.lock == "draugr_hall" and door.body_material == GridEntity.BodyMaterial.STONE
 		and _main.party_log.last(1) == ["The hall's door shuts behind you."], "held: shut, locked with a key nobody holds, stone, and said (%s)" % [_main.party_log.last(1)])
-	_check(not World.try_move(player, Vector2i(0, 1)) and player.tile == Vector2i(5, 3), "no walk goes through it")
+	_hold_free(player, Vector2(0, 1), 8)
+	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "no walk goes through it: stopped at its face (%s)" % player.free_pos)
 	_check(not World.try_toggle_door(player, key) and not door.open, "and E rattles it")
 	_main._hold_hall_door("lt_hall", false)
 	_check(door.lock.is_empty() and not door.open and _main.party_log.last(1) == ["The hall's door opens."], "let go: the lock lifted, still shut till opened, and said")
@@ -1828,8 +1819,14 @@ func _test_hall_door() -> void:
 	_main._seal_hall("lt_hall", true)
 	_check(not door.open and door.lock == _main.DEAD_LOCK and door.body_material == GridEntity.BodyMaterial.STONE and not World.try_toggle_door(player, key),
 		"the Ossuary's dead standing: the hall's door sealed with a key nobody holds, E rattles it (%s)" % door.lock)
+	_hold_free(player, Vector2(0, 1), 8)
+	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "and stops a walk at its face (%s)" % player.free_pos)
 	_main._seal_hall("lt_hall", false)
 	_check(door.lock.is_empty(), "every one of them down: the seal lifted")
+	await get_tree().process_frame
+	World.try_toggle_door(player, key)
+	_hold_free(player, Vector2(0, 1), 8)
+	_check(door.open and player.tile.y >= 5, "opened, it is walked through into the hall (%s)" % [player.tile])
 	_put(player, Vector2i(5, 6))
 	_main._seal_hall("lt_hall", true)
 	_check(door.lock.is_empty(), "risen while a living player stands in the hall: no seal, nobody shut in by the dead")
@@ -1932,49 +1929,49 @@ func _test_hidden_niche() -> void:
 		"the hall is the entrance anchor's rect, none for a level that does not regenerate (%s)" % [_main.hall_rect("lt_niche")])
 	_check(World.hidden_niche() == {"cell": Vector2i(6, 1), "edge": key, "open": false},
 		"World.hidden_niche is the marker: its floor cell, its door's edge, shut (%s)" % [World.hidden_niche()])
-	_check(World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(4, 3) and heard.count(draft) == 1,
-		"the first step in the hall says the draft line to the player alone (%s)" % [heard])
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(1, 0)) and heard.count(draft) == 1, "the next step says it no more")
+	_hold_free(player, Vector2(1, 0), 3)
+	_check(player.tile == Vector2i(4, 3) and heard.count(draft) == 1,
+		"the first cell crossed in the hall says the draft line to the player alone (%s)" % [heard])
+	_hold_free(player, Vector2(1, 0), 3)
+	_check(player.tile == Vector2i(5, 3) and heard.count(draft) == 1, "the next says it no more")
 	_put(player, Vector2i(2, 1))
-	_wait_for_step(player)
+	_hold_free(player, Vector2(0, -1), 6)
 	var line := "Only the dead lie here."
-	_check(not World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line],
-		"a step into a plain niche is stopped and says the line (%s)" % [_main.party_log.last(1)])
-	_wait_for_step(player)
+	_check(player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line],
+		"pressing into a plain niche is stopped and says the line (%s)" % [_main.party_log.last(1)])
 	var told: Array = _main.party_log.last(3)
-	World.try_move(player, Vector2i(0, -1))
+	_hold_free(player, Vector2(0, -1), 6)
 	_check(_main.party_log.last(3) == told, "pressing on at it says nothing more")
 	_put(player, Vector2i(4, 1))
-	_wait_for_step(player)
-	World.try_move(player, Vector2i(0, -1))
+	_hold_free(player, Vector2(0, -1), 6)
 	_check(_main.party_log.last(2) == [line, line], "another niche says it again")
 	_put(player, Vector2i(6, 1))
-	_wait_for_step(player)
 	_check(not World.may_open(player, door) and not World.try_toggle_door(player, key) and not door.open, "no walk opens the hidden niche's door and E rattles it")
-	_wait_for_step(player)
-	_check(not World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(6, 1) and door.open and door.lock.is_empty()
+	for i in 10:
+		_hold_free(player, Vector2(0, -1), 1)
+		if door.open:
+			break
+	_check(player.tile == Vector2i(6, 1) and door.open and door.lock.is_empty()
 		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
-		"a step into the hidden niche finds it: the lock lifted, the door open, and said (%s)" % [_main.party_log.last(1)])
+		"pressing into the hidden niche finds it: the lock lifted, the door open, and said (%s)" % [_main.party_log.last(1)])
 	_check(World.hidden_niche()["open"], "the marker says open")
 	# 608 amended: found, no draft, not even in a new generation; laid again
 	# with the door shut, it is felt again.
 	_main._regen["lt_niche"] = {"generation": 1, "at_step": 0}
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(-1, 0)) and player.tile == Vector2i(5, 1) and heard.count(draft) == 1,
-		"found, a step in the hall feels no draft (%s)" % [heard])
+	_hold_free(player, Vector2(-1, 0), 4)
+	_check(player.tile == Vector2i(5, 1) and heard.count(draft) == 1,
+		"found, a cell crossed in the hall feels no draft (%s)" % [heard])
 	World.hold_door(door, true, "hidden_niche")
-	_wait_for_step(player)
-	_check(not door.open and World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(6, 1) and heard.count(draft) == 2,
+	_hold_free(player, Vector2(1, 0), 4)
+	_check(not door.open and player.tile == Vector2i(6, 1) and heard.count(draft) == 2,
 		"laid again with the door shut, the draft is felt once more (%s)" % [heard])
 	Net.message_received.disconnect(hear)
 	World.hold_door(door, false, "hidden_niche")
 	door.open = true
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(0, -1)) and player.tile == Vector2i(6, 0), "the alcove behind it is walked into")
+	_hold_free(player, Vector2(0, -1), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(World.zone.name == "test_room" or World.peer_zone.get(Net.local_id, "") == "test_room", "and its stair is taken (%s)" % [World.peer_zone.get(Net.local_id, "")])
+	_check(World.zone.name == "test_room" or World.peer_zone.get(Net.local_id, "") == "test_room", "the alcove behind it is walked into and its stair taken (%s)" % [World.peer_zone.get(Net.local_id, "")])
 	# Shut and locked again (a restart lays the door locked): a climb from
 	# below pushes it open from behind.
 	var there: Zone = World.zones["lt_niche"]
@@ -2275,23 +2272,20 @@ func _test_edge_links() -> void:
 		"test_edge_w is 4 x 3 cells with test_edge_e east (%s, %s)" % [_main.level["size"], _main.level["neighbours"]])
 	var player := _player()
 	_put(player, Vector2i(3, 0))
-	_wait_for_step(player)
-	_check(not World.try_move(player, Vector2i(0, -1)), "walking into the north edge, which has no neighbour, is a wall")
+	_hold_free(player, Vector2(0, -1), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(_main.map_name == "test_edge_w", "and Player stays (%s)" % _main.map_name)
+	_check(_main.map_name == "test_edge_w" and player.tile == Vector2i(3, 0), "walking into the north edge, which has no neighbour, is a wall: Player stays (%s)" % _main.map_name)
 	player = _player()
 	_put(player, Vector2i(3, 2))
-	_wait_for_step(player)
-	_check(not World.try_move(player, Vector2i(1, 0)), "walking into the east edge is not a step on the map")
+	_hold_free(player, Vector2(1, 0), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var arrived := _player()
 	_check(_main.map_name == "test_edge_e" and arrived != null and arrived.zone == "test_edge_e", "it takes Player to test_edge_e (%s)" % _main.map_name)
 	_check(arrived != null and arrived.tile == Vector2i(0, 2), "arriving on its west edge at the same row, (0, 2) (%s)" % [arrived.tile if arrived else "none"])
 	_put(arrived, Vector2i(0, 4))
-	_wait_for_step(arrived)
-	World.try_move(arrived, Vector2i(-1, 0))
+	_hold_free(arrived, Vector2(-1, 0), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var back := _player()
@@ -2327,21 +2321,19 @@ func _test_castle() -> void:
 			turns.append(here)
 	print("    the way: %s -> %s" % [start, " -> ".join(turns.map(func(t: Vector2i) -> String: return str(t)))])
 	_put(player, Vector2i(30, 33))
-	_wait_for_step(player)
-	_check(World.try_move(player, Vector2i(0, 1)), "Player steps onto it")
+	_hold_free(player, Vector2(0, 1), 6)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var there := _player()
 	_check(World.outdoor and castle["terrain"]["outdoor"] and not room["terrain"]["outdoor"],
 			"the castle is outdoors (level.json \"outdoor\"), the test room is not")
 	_check(_main.map_name == "castle" and there != null and there.tile == Vector2i(26, 13),
-			"and arrives in the castle beside its link, at (26, 13) (%s %s)" % [_main.map_name, there.tile if there else "none"])
-	_wait_for_step(there)
-	_check(World.try_move(there, Vector2i(1, -1)), "steps onto the castle's link")
+			"Player walks onto it and arrives in the castle beside its link, at (26, 13) (%s %s)" % [_main.map_name, there.tile if there else "none"])
+	_hold_free(there, Vector2(1, -1).normalized(), 8)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var home := _player()
-	_check(not World.outdoor, "and World is indoors again in the test room")
+	_check(not World.outdoor, "walking onto the castle's link, World is indoors again in the test room")
 	_check(_main.map_name == "test_room" and home != null and home.tile == Vector2i(30, 33),
 			"and is back in the test room beside its link, at (30, 33) (%s %s)" % [_main.map_name, home.tile if home else "none"])
 
@@ -2372,119 +2364,24 @@ func _named(entity_name: String) -> Node:
 	return _main.find_child(entity_name, true, false)
 
 
-## The barrow's step-triggered pieces again with free walk on (decision
-## 688; free walk is what players play now; the grid's passes above stay
-## until 6b): a link walked onto and one with a body on it, a sealed link,
-## the hall door held and the dead's seal, the draft line, the niches
-## pressed and the hidden one found, its stair taken. Bodies driven by
-## free_input a tick at a time (_hold_free).
-func _test_barrow_free_walk() -> void:
-	print("\n== the barrow's links, hall door, seal and niches with free walk on (688) ==")
-	Net.free_walk = true
-	World.set_free_walk(true)
-	# A link walked onto.
-	_main.load_map("test_link_a")
-	var player := _player()
-	_put(player, Vector2i(3, 1))
-	_hold_free(player, Vector2(1, 0), 6)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(_main.map_name == "test_link_b" and _player() != null and _player().tile == Vector2i(2, 2),
-		"free: a player walking onto a link goes through to its spawn (%s)" % _main.map_name)
-	# A body on the link's cell never shuts the way (571).
-	_main.load_map("test_link_a")
-	player = _player()
-	_put(player, Vector2i(2, 1))
-	# Another player: a resident put on a link steps off it (571) before it is reached.
-	var body := Player.new()
-	body.name = "Tam"
-	World.spawn(body, Vector2i(4, 1))
-	_hold_free(player, Vector2(1, 0), 8)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(_main.map_name == "test_link_b", "free: pressing at a link a body stands on takes it all the same (%s)" % _main.map_name)
-	if is_instance_valid(body):
-		if body.spawned:
-			World.despawn(body)
-		body.free()
-	# A sealed link (540): refused and said, then through once marked.
-	_main.load_map("test_link_s")
-	player = _player()
-	var id: String = _main._peer_ids[Net.local_id]
-	_main.mark_player(id, "draugr", false)
-	_put(player, Vector2i(3, 1))
-	_hold_free(player, Vector2(1, 0), 6)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(_main.map_name == "test_link_s" and _main.party_log.last(1) == ["The way is sealed."], "free: the sealed link refuses and says so (%s)" % [_main.party_log.last(1)])
-	_main.mark_player(id, "draugr", true)
-	_put(player, Vector2i(3, 1))
-	_hold_free(player, Vector2(1, 0), 6)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(_main.map_name == "test_link_b", "free: marked, it goes through (%s)" % _main.map_name)
-	_main.mark_player(id, "draugr", false)
-	# The hall door held and the dead's seal (573 amended, 666).
-	_register_hall("lt_hall_free")
-	_main.load_map("lt_hall_free")
-	player = _player()
-	var key := Terrain.edge_key(Vector2i(5, 4), Vector2i(0, -1))
-	var door := World.door_on(key)
-	_put(player, Vector2i(5, 3))
-	_main._hold_hall_door("lt_hall_free", true)
-	_hold_free(player, Vector2(0, 1), 8)
-	_check(player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6, "free: the held hall door stops the body at its face (%s)" % player.free_pos)
-	_main._hold_hall_door("lt_hall_free", false)
-	_main._seal_hall("lt_hall_free", true)
-	_hold_free(player, Vector2(0, 1), 8)
-	_check(door.lock == _main.DEAD_LOCK and player.tile == Vector2i(5, 3) and player.free_pos.y < 3.6,
-		"free: the dead's seal stops it the same (%s)" % player.free_pos)
-	_main._seal_hall("lt_hall_free", false)
-	await get_tree().process_frame
-	World.try_toggle_door(player, key)
-	_hold_free(player, Vector2(0, 1), 8)
-	_check(door.open and player.tile.y >= 5, "free: the seal lifted and the door opened, it walks into the hall (%s)" % [player.tile])
-	_main._seal_hall("lt_hall_free", true)
-	_check(door.lock.is_empty(), "free: risen while a living player stands in the hall, no seal")
-	_main._hall_seals.erase("lt_hall_free")
-	# The niches (608) and the draft (608 amended).
-	_register_niche("lt_niche_free")
-	_main.load_map("lt_niche_free")
-	player = _player()
-	var heard: Array[String] = []
-	var hear := func(kind: String, data: Dictionary) -> void:
-		if kind == "party":
-			heard.append(str(data.get("text", "")))
-	Net.message_received.connect(hear)
-	var draft := "You feel a cool draft coming from one of the niches."
-	_hold_free(player, Vector2(1, 0), 3)
-	_check(player.tile != Vector2i(3, 3) and heard.count(draft) == 1, "free: the first cell crossed in the hall says the draft line (%s)" % [heard])
-	Net.message_received.disconnect(hear)
-	_put(player, Vector2i(2, 1))
-	_hold_free(player, Vector2(0, -1), 6)
-	var line := "Only the dead lie here."
-	_check(player.tile == Vector2i(2, 1) and _main.party_log.last(1) == [line], "free: pressing into a plain niche says the line (%s)" % [_main.party_log.last(1)])
-	var slab := World.door_on(Terrain.edge_key(Vector2i(6, 1), Vector2i(0, -1)))
-	_put(player, Vector2i(6, 1))
-	_hold_free(player, Vector2(0, -1), 6)
-	_check(slab != null and slab.open and slab.lock.is_empty() and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
-		"free: pressing into the hidden niche finds it (%s)" % [_main.party_log.last(1)])
-	_hold_free(player, Vector2(0, -1), 6)
-	await get_tree().process_frame
-	await get_tree().process_frame
-	_check(World.peer_zone.get(Net.local_id, "") == "test_room", "free: walked into the alcove, its stair is taken (%s)" % [World.peer_zone.get(Net.local_id, "")])
-	World.set_free_walk(false)
-	Net.free_walk = false
-	_main.load_map("test_room")
-	Level.unregister("lt_hall_free")
-	Level.unregister("lt_niche_free")
-
-
 ## [param player]'s free body held on [param intent] for [param ticks] ticks.
 func _hold_free(player: Player, intent: Vector2, ticks: int) -> void:
 	for i in ticks:
 		World.free_input(player, intent, World.TICK_DT)
 		World.step()
+
+
+## [param player]'s free body walked to [param to] along World.find_path's
+## way, cell by cell, as a click's route is (a free body takes no move
+## order, 688).
+func _walk_free(player: Player, to: Vector2i) -> void:
+	for cell: Vector2i in World.find_path(player.tile, to):
+		for i in 20:
+			var way := Vector2(cell) - player.free_pos
+			if way.length() < 0.1:
+				break
+			World.free_input(player, way.normalized() if way.length() > 0.4 else way / 0.4, World.TICK_DT)
+			World.step()
 
 
 func _player() -> Player:

@@ -33104,3 +33104,22 @@ tile). Pip was 130 cells off with nothing said, and walked it alone. The
 
 resident_test _test_rejoin_moved, on the wilds' real cells. Server only,
 protocol unchanged, no new class_name.
+## 703, step 2 (dungeon): level_test walks no player on the grid
+
+6b (703) takes the player's grid walking away; a tree's step 2 is that none
+of its tests needs the grid for a Player once it lands (ui's rule). ui handed
+level_test whole to dungeon: its 693 pin (Net.free_walk and World.free_walk
+off at the top) stood only for the barrow's grid cases, so the pin goes in the
+same commit as they do.
+- The pin removed; the test's first check says free walk is on.
+- Every Player walk is a free body's: _hold_free (free_input a tick at a time)
+  for a step or a press, _walk_free (find_path's cells as a click's route) for
+  the hills' bot, which order_move no longer moves (688). The stair and ledge,
+  the level links, a link with another player on it (a resident put on one
+  steps off it first, 571), the sealed link, the hall door and the dead's seal
+  (stopped at its face, walked through once opened), the draft line, the
+  niches pressed and the hidden one found (688 amended (4)), its stair, the
+  map's edges and the castle's links.
+- _test_barrow_free_walk (8d8c4e28) folded into those passes: each check once.
+- Residents' and monsters' try_move stay: they walk the grid after 6b.
+Test only, protocol unchanged, no new class_name.
