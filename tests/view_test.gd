@@ -1928,6 +1928,7 @@ func _test_kinds() -> void:
 	_test_camp()
 	_test_decline()
 	_test_inside()
+	_test_inside_is_his()
 
 
 ## A building being built (decision 566): its stages by its town record's
@@ -2338,6 +2339,30 @@ func _test_inside() -> void:
 			"its roof back, whole, after FADE_HOLD")
 	_rig.inside_changed.disconnect(listen)
 	_rig.town_states.erase("inside_town")
+
+
+## Inside is the player's own place, not his companion's (671 amended (3);
+## Jeff on v0.1.186: walking into a house did not tip the view): the focus
+## points start with his, even when she came into the zone before him.
+func _test_inside_is_his() -> void:
+	print("
+== the first focus point is the player's, whoever spawned first ==")
+	var player := _player()
+	var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Inside", "props": {"max_hp": 10}}) as Companion
+	pet.keeper_peer = Net.local_id
+	var free := player.tile + Vector2i(3, 0)
+	for cell: Vector2i in [player.tile + Vector2i(3, 0), player.tile + Vector2i(0, 3), player.tile + Vector2i(-3, 0), player.tile + Vector2i(0, -3)]:
+		if World.is_walkable(cell) and World.get_entity_at(cell) == null:
+			free = cell
+			break
+	World.spawn(pet, free)
+	World._entities.erase(pet)
+	World._entities.push_front(pet)  # Hers first, as a client can hear them.
+	var points := _rig._focus_points()
+	var his := _rig.to_local(points[0])
+	_check(Vector2i(roundi(his.x), roundi(his.z)) == player.tile and points.size() == 2 * Client3D.FADE_HEIGHTS.size(),
+			"his first (%s at %s, she at %s)" % [Vector2i(roundi(his.x), roundi(his.z)), player.tile, free])
+	World.despawn(pet)
 
 
 ## BuildingComposer (decision 489): a wing's walls drawn to its own lower

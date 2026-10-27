@@ -12828,6 +12828,7 @@ func _update_grown() -> void:
 
 func _focus_points() -> Array[Vector3]:
 	var out: Array[Vector3] = []
+	var hers: Array[Vector3] = []
 	for entity in World.get_entities():
 		if not entity.spawned:
 			continue
@@ -12835,8 +12836,12 @@ func _focus_points() -> Array[Vector3]:
 			continue
 		var puppet: Node3D = _puppets.get(entity.get_instance_id())
 		var at := puppet.global_position if puppet != null else to_global(_tile_position(entity.tile))
+		# The player's first, whatever order they came in: _update_roofs
+		# tells inside_changed from the first point (671 amended (3): a
+		# companion spawned first had the view tip as she went in, not him).
 		for height in FADE_HEIGHTS:
-			out.append(at + Vector3(0.0, height, 0.0))
+			(out if entity is Player else hers).append(at + Vector3(0.0, height, 0.0))
+	out.append_array(hers)
 	return out
 
 

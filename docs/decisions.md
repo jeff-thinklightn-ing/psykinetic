@@ -32752,3 +32752,15 @@ peer: one after a travel shows (the coordinator, on the box's "not its
 body: .../wilds/Player1" line). controls_test _test_free_chase: walked a
 cell from the imp and struck; a click elsewhere gives it up. Client, plus
 the server's log line; protocol unchanged, no new class_name.
+
+## 671 amended (3): inside is the player's own place, never his companion's
+
+Jeff's v0.1.186 checklist: walking into a house did not tip the view
+top-down. Client3D._update_roofs tells inside_changed from the first of
+_focus_points, taken as the player's; the points were gathered in the
+zone's spawn order, his and his companion's together, so when her body
+came into the zone before his (a client may hear hers first) the view
+tipped as she went in and out, not as he did. _focus_points now puts his
+points first, hers after. view_test _test_inside_is_his: a companion
+first in the zone's list, the first point his. Client only, protocol
+unchanged, no new class_name.

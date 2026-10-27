@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Camera: walking into a house goes top-down for you again even when your companion is outside (671 amended (3))
 - Free movement: clicking a monster to fight walks you to it smoothly, following it as it moves, and strikes when you reach it (697)
 - Tests: a rebuilt room's old pieces are let go at the frame's end, so a busy machine no longer logs a free error mid-build (660 amended (3)).
 - Leaving the game anywhere in the wilds' town (by the well, the starts, the huts), not only right at the store, now has your companion stay in town at her trade, with one line on joining that says where she is (694 amended).
