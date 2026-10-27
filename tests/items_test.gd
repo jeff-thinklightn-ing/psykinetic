@@ -1113,7 +1113,6 @@ func _test_wind_up() -> void:
 	for pet: GridEntity in pets:
 		pet.acts = false  # Nobody else fights the imp.
 	var ready := func() -> void:
-		host.has_move_order = false
 		if host.tile != home:
 			World._relocate(host, home)
 		if imp.tile != home + d:
@@ -1152,8 +1151,13 @@ func _test_wind_up() -> void:
 	wound.clear()
 	World.command_attack(host, imp)
 	_steps(1)
-	World.order_move(host, home - d)
-	_check(World.winding(host).is_empty() and wound == [8, 0], "a move order gives it up; the views told (0 ticks) (%s)" % [wound])
+	var was_free := World.free_walk
+	World.free_walk = true  # A free move straight away (703: the player's grid orders are going; 392 amended).
+	World.free_input(host, Vector2(-d).normalized(), 1.0)
+	_steps(1)
+	_check(World.winding(host).is_empty() and wound == [8, 0], "a free move away gives it up; the views told (0 ticks) (%s)" % [wound])
+	World.free_drop(host)
+	World.free_walk = was_free
 	hp = imp.hp
 	_steps(10)
 	_check(imp.hp == hp, "and nothing is struck")
