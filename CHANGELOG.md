@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Under free walk a blow reaches by where bodies are, not the cells they hold (699, combat's side): 1.5 cells centre to centre with no wall between, the same for you and for monsters, so stepping back out of reach really dodges and you can no longer strike from where you cannot be struck; telegraphed attacks hit you only when your centre is in the red. Tune it in F7 (combat.melee_reach).
 
 - A dodge that looks clean is clean with free walk: walking out of a draugr's spin, throw or charge through your own companion no longer counts you as still on the red ground (688 amended (5)).
 - Monsters walking at the edge of your view (23 to 30 cells off) move smoothly at their own pace instead of stepping and stopping (238 amended (2); like the fleeing stag's fix).

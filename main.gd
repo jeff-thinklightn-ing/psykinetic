@@ -2792,8 +2792,9 @@ func _guide_route(route: Dictionary) -> void:
 ## (697, ui's side; Jeff on v0.1.186: "left click on grave robber does move
 ## to them, but quite choppy"): the server's order holds and never steps a
 ## free body (combat's side), so the client walks it there, a route to the
-## target's cell planned again as it moves (_free_chase), and stops a cell
-## from it, where the server strikes.
+## target's cell planned again as it moves (_free_chase), and stops in
+## reach of it (699: centres within World.reach_limit), where the server
+## strikes.
 func _free_chase_start(player: Player, target: GridEntity, shove := false) -> void:
 	if _free_own(player) == null:
 		return
@@ -2804,7 +2805,8 @@ func _free_chase_start(player: Player, target: GridEntity, shove := false) -> vo
 	_free["chase_sent"] = Time.get_ticks_msec()
 
 
-## Each frame of a chase (697): over a cell from the target or the target
+## Each frame of a chase (697): in reach of the target (the centres within
+## World.reach_limit, 699) or the target
 ## gone, done; its tile moved, the route planned again; the attack order
 ## sent again each FREE_CHASE_RESEND_MS while more than two cells off (the
 ## server drops one 4 s old: Player.FREE_CHASE_TICKS), never nearer, so a
@@ -2820,7 +2822,7 @@ func _free_chase(player: Player, at: Vector2) -> void:
 	var target := foe as GridEntity
 	var cell := World.free_cell(player, at)
 	var apart := World.distance(cell, target.tile)
-	if apart <= 1:
+	if at.distance_to(World.body_centre(target)) <= World.reach_limit(player) - 0.02:
 		_free["chase"] = null
 		_free["path"] = []
 		return

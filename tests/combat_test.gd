@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_lob()
 	_test_free_blows()
 	_test_free_chase()
+	_test_body_reach()
 	_test_lob_aim_on_client()
 	_test_armour()
 
@@ -376,6 +377,93 @@ func _test_lob_aim_on_client() -> void:
 	_check(World.shot_origin(host) == Vector2(1, 1), "the server's own reckoning: free_pos")
 	host.free_view = null
 	World.free_walk = false
+
+
+## Reach by bodies where a free body is in it (699, combat's side; enemy-
+## ai's audit: blows landed at centres 1.62-1.83 apart, a player who had
+## stepped away still struck): centres at most melee_reach + 2 x 0.3 apart
+## (1.5), a clear line, the same both ways; checked as the blow lands, so a
+## wind-up is stepped out of; a spear 2.5; strike_cells for where to stand.
+func _test_body_reach() -> void:
+	print("\n== reach by bodies under free walk: 1.5 centre to centre, both ways, a clear line (699, combat's side) ==")
+	var cases := [  # [the free player's cell, its centre, hit?, what]
+		[Vector2i(4, 2), Vector2(3.75, 2.0), true, "straight at 1.25"],
+		[Vector2i(4, 2), Vector2(3.45, 2.0), false, "straight at 1.55, its cell still beside (today: hit)"],
+		[Vector2i(4, 3), Vector2(3.95, 2.95), true, "diagonal at 1.48"],
+		[Vector2i(4, 3), Vector2(3.6, 3.6), false, "diagonal at 2.13, its cell still beside (today: hit)"],
+	]
+	for each: Array in cases:
+		var e := _build(_room_with(each[0], Vector2i(5, 2)))
+		var host: Player = e["P"][0]
+		var foe: GridEntity = e["m"][0]
+		World.free_walk = true
+		host.free_pos = each[1]
+		var both := World.in_reach(host, foe) and World.in_reach(foe, host)
+		var neither := not World.in_reach(host, foe) and not World.in_reach(foe, host)
+		_check(both if each[2] else neither, "%s: %s both ways" % [each[3], "struck" if each[2] else "missed"])
+	World.free_walk = false
+	# A wall's corner between the centres, in reach: no blow.
+	var e := _build(["#######", "#...P##", "#...#m#", "#######"])
+	var host: Player = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	World.free_walk = true
+	host.free_pos = Vector2(4.2, 1.2)
+	_check(not World.in_reach(host, foe) and not World.in_reach(foe, host), "a wall's corner between, 1.13 apart: no blow either way")
+	# A wind-up stepped out of before it lands misses; stood in, it strikes.
+	for steps_out: bool in [true, false]:
+		e = _build(_room_with(Vector2i(4, 2), Vector2i(5, 2)))
+		host = e["P"][0]
+		foe = e["m"][0]
+		_boss(foe)
+		World.free_walk = true
+		host.free_pos = Vector2(3.75, 2.0)
+		var hp := host.hp
+		_check(World.try_wind_up(foe, host), "(%s) the axe wound up at 1.25" % ("steps out" if steps_out else "stands"))
+		if steps_out:
+			host.free_pos = Vector2(3.4, 2.0)  # 1.6, its cell still (4, 2).
+		for i in World.windup_ticks(foe) + 2:
+			World.step()
+		_check(host.hp == hp if steps_out else host.hp < hp,
+				"stepped out to 1.6 before it lands: missed" if steps_out else "stood at 1.25: struck (%d -> %d)" % [hp, host.hp])
+	# A spear: 2.5, straight or at a slant with a clear line; a body between stops it.
+	e = _build(_room_with(Vector2i(3, 2), Vector2i(5, 2)))
+	host = e["P"][0]
+	foe = e["m"][0]
+	_give(host, "spear")
+	World.free_walk = true
+	host.free_pos = Vector2(2.7, 2.0)
+	_check(World.in_reach(host, foe), "a spear at 2.3 straight: in reach")
+	host.free_pos = Vector2(3.0, 2.9)
+	_check(World.in_reach(host, foe) and not World.in_reach(foe, host), "a spear at 2.2 on a slant: in reach; the foe's fists not")
+	e = _build(["##########", "#........#", "#..P.mm..#", "#........#", "##########"])
+	host = e["P"][0]
+	_give(host, "spear")
+	World.free_walk = true
+	host.free_pos = Vector2(3.3, 2.0)
+	_check(not World.in_reach(host, e["m"][1]), "a body on the spear's line: refused")
+	# Where to stand: strike_cells against a free body at the back of its cell.
+	e = _build(["##########", "#........#", "#...P..m.#", "#........#", "##########"])
+	host = e["P"][0]
+	foe = e["m"][0]
+	World.free_walk = true
+	host.free_pos = Vector2(3.45, 2.0)
+	var cells := World.strike_cells(foe, host)
+	_check(Vector2i(5, 2) not in cells and Vector2i(4, 1) in cells and Vector2i(4, 3) in cells and Vector2i(4, 2) not in cells,
+			"strike_cells for a body at the back of its cell: not the cell beside it (1.55), the ones above and below its centre (%s)" % [cells])
+	_check(not cells.is_empty() and Vector2(cells[0] - foe.tile).length() <= Vector2(cells[-1] - foe.tile).length(), "nearest the attacker first")
+	World.free_walk = false
+	var grid := World.strike_cells(foe, host)
+	_check(grid.size() == 8 and Vector2i(5, 2) in grid, "on the grid: its eight neighbours (%d)" % grid.size())
+
+
+## A room with a player at [param player] and a dummy at [param dummy].
+func _room_with(player: Vector2i, dummy: Vector2i) -> Array[String]:
+	var rows: Array[String] = ["##########", "#........#", "#........#", "#........#", "#........#", "##########"]
+	for at: Vector2i in [player, dummy]:
+		var row := rows[at.y]
+		row[at.x] = "P" if at == player else "m"
+		rows[at.y] = row
+	return rows
 
 
 ## A free body's attack order is held while its own commands walk it (its

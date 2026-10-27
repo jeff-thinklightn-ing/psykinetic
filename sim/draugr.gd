@@ -321,7 +321,8 @@ func _special_tick() -> bool:
 		return true
 	backing_off = false
 	var winded := bool(World.call("is_winded", self))
-	World.face(self, Senses.way_toward(tile, target.tile))  # His sweep's gap behind him, away from his target.
+	var toward: Vector2i = World.call("melee_way", self, target) if World.free_body(target) else Senses.way_toward(tile, target.tile)  # A free body by its centre (699).
+	World.face(self, toward)  # His sweep's gap behind him, away from his target.
 	var foes := 0
 	for each: Variant in World.call("spin_targets", self):
 		if each is GridEntity and each != self and (each is Player or each is Companion) and not _is_dead(each):

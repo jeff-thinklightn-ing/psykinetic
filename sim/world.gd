@@ -375,6 +375,10 @@ var whiff_scale := 1.25
 var recover_at := 25
 var winded_move_scale := 1.5
 var winded_blow_scale := 0.5
+## Melee reach where a free body is in it (decision 699): a plain blow
+## lands while the two centres are at most this past both bodies' edges
+## (2 x FREE_RADIUS), 1.5 at 0.9; a reach verb's is its cells less 0.1.
+var melee_reach := 0.9
 var winded_regen_delay := 20
 ## A boss's moves (decision 603), by name: "spin", "throw", "charge", each a
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
@@ -2530,7 +2534,7 @@ func attack_ticks_of(attacker: GridEntity) -> int:
 ## Whether [param attacker] stands behind [param target]: on the side
 ## away from where it faces (as a flanker's backstab reads it).
 func is_behind(attacker: GridEntity, target: GridEntity) -> bool:
-	return Vector2(attacker.tile - target.tile).dot(Vector2(target.facing)) < 0.0
+	return (body_centre(attacker) - body_centre(target)).dot(Vector2(target.facing)) < 0.0  # Centres (699).
 
 
 ## [param entity]'s slots changed: its mass follows what it carries (its
@@ -4120,7 +4124,7 @@ func load_combat_rules(text: String) -> void:
 					push_warning("World: %s's moves.%s is not a move" % [COMBAT_RULES, move])
 			continue
 		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
-				"winded_blow_scale", "winded_regen_delay"]:
+				"winded_blow_scale", "winded_regen_delay", "melee_reach"]:
 			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(key, int(given) if get(key) is int else float(given))
@@ -4508,18 +4512,14 @@ func _bodies_in(by: GridEntity, cells: Array[Vector2i]) -> Array[GridEntity]:
 	return out
 
 
-## The cell a blow finds [param body] in (enemy-ai's free-walk audit): the
-## cell it holds, but a free body whose circle has left it (its claim waiting
-## on its own companion's cell, 688) is where its centre is. While the
-## circle still overlaps the held cell (FREE_HYSTERESIS under FREE_RADIUS),
-## it is there: a body clear of a telegraph's cells has claimed past them.
+## The cell a blow finds [param body] in (enemy-ai's free-walk audit): a
+## body on the grid's own; a free body's the cell under its centre, held or
+## not (699, combat's side: a telegraph by the centre's cell, so a body seen
+## out of the red is spared and one seen in it struck).
 func struck_cell(body: GridEntity) -> Vector2i:
 	if not free_body(body):
 		return body.tile
-	var off := body.free_pos - Vector2(body.tile)
-	if absf(off.x) < 0.5 + FREE_RADIUS and absf(off.y) < 0.5 + FREE_RADIUS:
-		return body.tile
-	return Vector2i(roundi(body.free_pos.x), roundi(body.free_pos.y))
+	return Vector2i(body_centre(body).round())
 
 
 ## Who a blow at [param cell] strikes (struck_cell): its holder unless that
@@ -5661,7 +5661,7 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 	var verb := Items.verb_of(held) if not held.is_empty() else {}
 	if verb.get("kind") != "block" or target.facing == Vector2i.ZERO:
 		return {}
-	var off := absf(Vector2(source.tile - target.tile).angle_to(Vector2(target.facing)))
+	var off := absf((body_centre(source) - body_centre(target)).angle_to(Vector2(target.facing)))  # Centres (699).
 	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 else {}
 
 
@@ -6540,7 +6540,7 @@ func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
 		return false
 	if tick < by.next_attack_tick or tick < by.next_move_tick or not in_reach(by, target):
 		return false
-	var direction := (target.tile - by.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
+	var direction := melee_way(by, target)
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile}
 	_halt_for_blow(by, tick + ticks)
 	_pay_swing(by, false)  # Paid as it begins; given up, not refunded (decision 597).
@@ -6631,12 +6631,13 @@ func try_bash(by: GridEntity, target: GridEntity) -> bool:
 		return false
 	if not by.spawned or not target.spawned or by == target or not can_target(by, target) or not bash_ready(by):
 		return false
-	if not can_melee(by.tile, target.tile) or tick < by.next_move_tick:
+	if not in_reach(by, target, true) or tick < by.next_move_tick:
 		return false
 	var verb := bash_verb(by)
 	var aim := target.tile - by.tile
-	var way := Vector2(aim).normalized() * push_force(by, target) * ATTACK_FORCE_FACTOR * float(verb["bash_force"]) \
-			+ momentum_push(by, target, Vector2(aim))  # Lunging into it (decision 592).
+	var line := melee_way(by, target)  # The cells' way, or the centres' where a free body is in it (699).
+	var way := Vector2(line).normalized() * push_force(by, target) * ATTACK_FORCE_FACTOR * float(verb["bash_force"]) \
+			+ momentum_push(by, target, Vector2(line))  # Lunging into it (decision 592).
 	var force := way.length()
 	var raw_force := force
 	if force < knockback_min_force:
@@ -6646,13 +6647,13 @@ func try_bash(by: GridEntity, target: GridEntity) -> bool:
 	by.next_bash_tick = tick + int(verb["bash_ticks"])
 	by.bash_moment_until = tick + int(verb["bash_stagger"])
 	_halt_for_blow(by, by.bash_moment_until)  # A free body stands for its bash (688).
-	by._world_set_facing(aim)
-	by._world_swung(aim)
-	entity_swung.emit(by, aim)
+	by._world_set_facing(line)
+	by._world_swung(line)
+	entity_swung.emit(by, line)
 	by._world_note_exertion(tick)
 	by.protected = false
 	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
-	_queue_hit(by, target, aim, aim.clamp(Vector2i(-1, -1), Vector2i(1, 1)), 0, force, raw_force, true, 0)
+	_queue_hit(by, target, aim, line, 0, force, raw_force, true, 0)
 	_hits[-1].push_way = way
 	_hits[-1].bash = int(verb["bash_stagger"])
 	return true
@@ -7324,11 +7325,12 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	if tick < attacker.next_move_tick:
 		return false
 	var aim: Vector2i = target.tile - attacker.tile
+	var way := melee_way(attacker, target)  # The cells' way, or the centres' where a free body is in it (699).
 	if push_direction == Vector2i.ZERO:
-		push_direction = aim.clamp(Vector2i(-1, -1), Vector2i(1, 1))  # A spear's reach: pushed one cell's way.
+		push_direction = way  # A spear's reach: pushed one cell's way.
 	elif push_direction not in DIRECTIONS:
 		return false
-	elif push_direction == -aim and not _can_land_behind(attacker, push_direction):
+	elif push_direction == -way and not _can_land_behind(attacker, push_direction):
 		# Overhead toss with nowhere to come down: refused, costs nothing.
 		return false
 	# The weapon in the blow (decision 338): its speed, and below its
@@ -7336,10 +7338,10 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	var verb := {} if is_shove else blow_verb(attacker)
 	attacker.next_attack_tick = tick + attack_ticks_of(attacker) if not is_shove else tick + attacker.attack_ticks
 	_halt_for_blow(attacker, attacker.next_attack_tick)
-	attacker._world_set_facing(target.tile - attacker.tile)
+	attacker._world_set_facing(way)
 	if not is_shove:
-		attacker._world_swung(aim)
-		entity_swung.emit(attacker, aim)
+		attacker._world_swung(way)
+		entity_swung.emit(attacker, way)
 	attacker._world_note_exertion(tick)
 	attacker.protected = false  # So does attacking or shoving.
 	var force := push_force(attacker, target)
@@ -7360,7 +7362,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	# Moving into it adds the attacker's momentum (decision 592), and
 	# moving across it angles the push; a toss is aimed, and takes none.
 	var push_way := Vector2(push_direction)
-	if push_direction == aim.clamp(Vector2i(-1, -1), Vector2i(1, 1)):
+	if push_direction == way:
 		push_way = push_way.normalized() * force + momentum_push(attacker, target, push_way)
 		force = push_way.length()
 	var raw_force := force
@@ -7383,13 +7385,13 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	_hits[-1].push_way = push_way
 	_hits[-1].deed = deed
 	_hits[-1].pierce = verb.get("kind") in ["backstab", "reach"]
-	if down > 0 and aim in DIRECTIONS:
+	if down > 0 and way in DIRECTIONS:
 		# A giant axe's arc (decision 343): the cells either side of the
 		# one struck, a step of 45 degrees each, take the same blow.
 		for turn in range(1, int(verb["arc"]) + 1):
 			for side in [-1, 1]:
-				var way := Vector2(aim).rotated(side * turn * PI / 4.0)
-				var cell := attacker.tile + Vector2i(clampi(roundi(way.x), -1, 1), clampi(roundi(way.y), -1, 1))
+				var side_way := Vector2(way).rotated(side * turn * PI / 4.0)
+				var cell := attacker.tile + Vector2i(clampi(roundi(side_way.x), -1, 1), clampi(roundi(side_way.y), -1, 1))
 				var other: GridEntity = _occupancy.get(cell)
 				if other != null and other != target and other != attacker and other.spawned \
 						and can_target(attacker, other) and can_melee(attacker.tile, cell):
@@ -7691,7 +7693,7 @@ func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dic
 		return result
 	var direction: Vector2 = blow.get("direction", Vector2.ZERO)
 	if direction == Vector2.ZERO:
-		direction = Vector2(target.tile - source.tile)
+		direction = body_centre(target) - body_centre(source)  # Centres (699).
 	if direction == Vector2.ZERO:
 		return result
 	var way := direction.normalized() * float(blow.get("impulse", 0.0)) / maxf(pushed_mass(target), 0.001) \
@@ -9315,24 +9317,137 @@ func pushed_mass(entity: GridEntity) -> float:
 ## [param shove], as far as its cells in a straight line (also diagonal)
 ## with every cell between empty and every step open (decision 344).
 func in_reach(attacker: GridEntity, target: GridEntity, shove := false) -> bool:
-	if can_melee(attacker.tile, target.tile):
-		return true
 	var verb := {} if shove else blow_verb(attacker)
+	if free_body(attacker) or free_body(target):
+		return _body_reach(body_centre(attacker), body_centre(target), attacker, target, verb)
+	return _cell_reach(attacker.tile, target.tile, verb)
+
+
+## The grid's reach (in_reach), from [param from] to [param to]: adjacent
+## with no wall between, or a reach verb's straight line, no body on it.
+func _cell_reach(from: Vector2i, to: Vector2i, verb: Dictionary) -> bool:
+	if can_melee(from, to):
+		return true
 	if verb.get("kind") != "reach":
 		return false
-	var offset := target.tile - attacker.tile
-	var cells := distance(attacker.tile, target.tile)
+	var offset := to - from
+	var cells := distance(from, to)
 	if cells > int(verb["cells"]) or cells < 2:
 		return false
 	var step := offset / cells
 	if step * cells != offset:
 		return false  # Not on a straight line.
-	var at := attacker.tile
+	var at := from
 	for i in cells:
 		if not can_melee(at, at + step) or i < cells - 1 and _occupancy.has(at + step):
 			return false
 		at += step
 	return true
+
+
+## Reach by bodies (decision 699), where a free body is in it: [param target]
+## at [param to] struck from [param from] (centres, or a cell it might
+## stand on) while they are at most the verb's reach plus both radii apart
+## and nothing that would stop a step lies between; a reach verb past a
+## plain blow's, no body on the cells between either.
+func _body_reach(from: Vector2, to: Vector2, attacker: GridEntity, target: GridEntity, verb: Dictionary) -> bool:
+	var apart := from.distance_to(to)
+	var reach := melee_reach
+	if verb.get("kind") == "reach":
+		reach = maxf(reach, float(verb["cells"]) - 0.1)
+	if apart > reach + 2.0 * FREE_RADIUS or apart < 0.001:
+		return false
+	var cells := _cells_between(from, to)
+	if cells.is_empty():
+		return false  # A wall, a closed door or a step up between.
+	if apart > melee_reach + 2.0 * FREE_RADIUS:
+		for cell in cells.slice(1, cells.size() - 1):
+			var other: GridEntity = _occupancy.get(cell)
+			if other != null and other != attacker and other != target:
+				return false
+	return true
+
+
+## The cells the segment [param from] to [param to] crosses, in order, or
+## [] when an edge between two of them would stop a step (decision 699:
+## melee's clear line, terrain only).
+func _cells_between(from: Vector2, to: Vector2) -> Array[Vector2i]:
+	var out: Array[Vector2i] = [Vector2i(from.round())]
+	var samples := maxi(1, ceili(from.distance_to(to) / 0.05))
+	for i in range(1, samples + 1):
+		var cell := Vector2i(from.lerp(to, float(i) / samples).round())
+		if cell == out[-1]:
+			continue
+		if _terrain_blocks_step(out[-1], cell - out[-1]):
+			return []
+		out.append(cell)
+	return out
+
+
+## How far apart two centres may be for [param attacker]'s blow to land
+## where a free body is in it (decision 699): its reach plus both radii.
+func reach_limit(attacker: GridEntity) -> float:
+	var verb := blow_verb(attacker)
+	var reach := melee_reach
+	if verb.get("kind") == "reach":
+		reach = maxf(reach, float(verb["cells"]) - 0.1)
+	return reach + 2.0 * FREE_RADIUS
+
+
+## Where [param entity]'s body is, in cells (decision 699): a free body's
+## centre (as its shots start, shot_origin), else its cell's.
+func body_centre(entity: GridEntity) -> Vector2:
+	return shot_origin(entity)
+
+
+## The way [param attacker] strikes [param target], one of DIRECTIONS
+## (decision 699): on the grid the cells' (clamped); where a free body is
+## in it, the line between the centres to the nearest 45 degrees.
+func melee_way(attacker: GridEntity, target: GridEntity) -> Vector2i:
+	if not free_body(attacker) and not free_body(target):
+		return (target.tile - attacker.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
+	var v := body_centre(target) - body_centre(attacker)
+	if v.length() < 0.001:
+		return Vector2i.ZERO
+	var angle := snappedf(v.angle(), PI / 4.0)
+	return Vector2i(roundi(cos(angle)), roundi(sin(angle)))
+
+
+## The cells [param attacker] could stand on to strike [param target] where
+## it is now (decision 699; enemy-ai's approach), nearest [param attacker]
+## first: strike_cells_at its centre.
+func strike_cells(attacker: GridEntity, target: GridEntity) -> Array[Vector2i]:
+	return strike_cells_at(attacker, body_centre(target), target)
+
+
+## The cells [param attacker] could stand on to strike [param target] were
+## its centre at [param centre] (a lead on a moving target; enemy-ai's):
+## walkable, nobody else's, in its reach by in_reach's rule from there,
+## nearest [param attacker] first. A body on the grid at its own cell: the
+## neighbours with no wall between (and a reach verb's line), as ever.
+func strike_cells_at(attacker: GridEntity, centre: Vector2, target: GridEntity) -> Array[Vector2i]:
+	var verb := blow_verb(attacker)
+	var reach := melee_reach
+	if verb.get("kind") == "reach":
+		reach = maxf(reach, float(verb["cells"]) - 0.1)
+	var span := ceili(reach + 2.0 * FREE_RADIUS)
+	var at := Vector2i(centre.round())
+	var by_cells := not free_body(attacker) and not free_body(target)
+	var out: Array[Vector2i] = []
+	for dy in range(-span, span + 1):
+		for dx in range(-span, span + 1):
+			var cell := at + Vector2i(dx, dy)
+			if cell == at or cell == target.tile or not is_walkable(cell):
+				continue
+			var other: GridEntity = _occupancy.get(cell)
+			if other != null and other != attacker and other != target:
+				continue
+			if _cell_reach(cell, at, verb) if by_cells else _body_reach(Vector2(cell), centre, attacker, target, verb):
+				out.append(cell)
+	var from := attacker.tile
+	out.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return Vector2(a - from).length_squared() < Vector2(b - from).length_squared())
+	return out
 
 
 ## Whether [param entity]'s spear is braced (decision 344): a reach

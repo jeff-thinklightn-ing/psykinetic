@@ -1228,9 +1228,12 @@ func _test_free_chase() -> void:
 	while frames < 400 and imp.hp == hp:
 		_free_frames(player, 6)
 		frames += 6
-	_free_frames(player, 2)  # The client's next frame sees it in reach.
-	_check(imp.hp < hp and World.distance(player.tile, imp.tile) <= 1 and _main._free["chase"] == null,
-			"walked a cell from it and struck (%d -> %d, at %s, %d frames)" % [hp, imp.hp, player.free_pos, frames])
+	var settle := 0
+	while settle < 30 and _main._free["chase"] != null:  # Its view catches up with where it was stopped for the blow.
+		_free_frames(player, 2)
+		settle += 2
+	_check(imp.hp < hp and player.free_pos.distance_to(World.body_centre(imp)) <= World.reach_limit(player) and _main._free["chase"] == null,
+			"walked into reach (699: the centres within %.1f) and struck (%d -> %d, at %s, %d frames, the chase over %d after)" % [World.reach_limit(player), hp, imp.hp, player.free_pos, frames, settle])
 	_main._free_chase_start(player, imp)
 	_main._move_click(player, Vector2i(4, 3))
 	_check(_main._free["chase"] == null, "a click elsewhere: the chase given up")

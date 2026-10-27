@@ -671,7 +671,7 @@ func _test_free_dodge() -> void:
 			World.step()
 		if player.hp < player.max_hp:
 			struck.append(x)
-	_check(struck == [4.3, 4.45, 4.55], "the spin's red ends at 4.5: struck with the centre at %s, its circle over it; none at 4.62 on, its claim past it" % [struck])
+	_check(struck == [4.3, 4.45], "the spin's red ends at 4.5: struck with the centre at %s, in it; none from 4.55 on, the centre out of it (699)" % [struck])
 	_check(struck.all(func(x: float) -> bool: return x - World.FREE_RADIUS < 4.5), "never struck with its circle clear of the red")
 	struck.clear()
 	for y: float in [2.3, 2.55, 2.65, 2.85]:
@@ -684,7 +684,7 @@ func _test_free_dodge() -> void:
 			World.step()
 		if player.hp < player.max_hp:
 			struck.append(y)
-	_check(struck == [2.3, 2.55], "the throw's line, a side step: struck at %s, not past 2.6" % [struck])
+	_check(struck == [2.3], "the throw's line, a side step: struck at %s, not with the centre past 2.5 (699)" % [struck])
 	var player := _sturdy(_build(_open(10, 5), Vector2i(4, 2)))
 	var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow", "props": {"max_hp": 10}}) as Companion
 	pet.acts = false

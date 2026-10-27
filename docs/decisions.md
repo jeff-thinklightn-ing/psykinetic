@@ -32811,3 +32811,59 @@ at four, through one's companion not struck, a charge stopped at his
 held cell striking nobody); _test_free_chase and
 _test_free_kite pin the audit's (2) reach and (3) kiting as found. Server
 only, protocol unchanged, no new class_name.
+
+## 699, combat's side: melee reach measured by bodies under free walk
+
+Enemy-ai's free-walk audit: melee reach was still cell adjacency (688,
+combat's side) on the cells free bodies hold, and a free body keeps its
+cell till its centre is 0.6 off it; blows landed at centres 1.62 to 1.83
+apart, and a player who had visibly stepped away was still struck, and
+still struck back. The coordinator approved the design in
+C:/dev/review/combat/body_reach.md as written.
+
+- in_reach: where either body is a free body, the centres (body_centre: a
+  free body's free_pos, its own view's on a client as shot_origin, else
+  its cell) at most reach + 2 x FREE_RADIUS apart, and nothing that would
+  stop a step on the segment between (_cells_between). A plain blow's
+  reach is melee_reach (0.9: 1.5 apart; the grid's 1.0 and 1.414 still
+  hit, 2.0 not); a reach verb's cells less 0.1 (the spear 2.5), with no
+  body on the cells between past a plain blow's. One rule for players,
+  monsters and companions, both ways: whoever can strike can be struck
+  from there. Two grid bodies keep the cell rule (_cell_reach) exactly.
+- Checked as the blow lands, as it already was (_try_hit, _tend_wind_ups),
+  so a wind-up is stepped out of by leaving 1.5.
+- Telegraphs (the spin, the throw's line, the charge, physics' hurl): a
+  free body is struck in the cell under its centre (World.struck_cell,
+  enemy-ai's 688 amended (5), changed here as it asked), so one seen out
+  of the red is spared and one seen in it struck.
+- Angles by the centres: melee_way (a blow's facing, swing, push and the
+  giant axe's arc; a wind-up's; a bash's), is_behind, guarding's cone,
+  apply_blow's default direction; on the grid the same as before. The
+  draugr faces a free target by melee_way.
+- Positioning: strike_cells(attacker, target) and strike_cells_at(attacker,
+  centre, target) (enemy-ai's ask, for a lead on a moving target): the
+  walkable cells nobody else holds from which in_reach's rule would hold,
+  nearest the attacker first; for two grid bodies the neighbours with no
+  wall between, as ever. reach_limit(attacker) gives the distance.
+- F7: combat.melee_reach (0.3 to 2.0), in levels/combat.json.
+- ui's chase (697, ui's side) ends when the centres are within
+  reach_limit rather than a cell from the target: a body two held cells
+  off can be in reach, and one beside it not.
+
+Measured, a scripted 20 s duel against a grid foe winding up a battle axe
+(8 ticks), the free player stepping back when it begins and holding till
+it lands, blows landed: standing 7 of 8 before and after; a step of 1 tick
+(0.4 cells) 7 of 8 before, 6 of 8 after; 2 ticks (0.8) 0 of 8 both. The
+dodge asks the same step as before, so melee monsters lose nothing to it;
+instant blows (no wind-up) land as before.
+
+combat_test _test_body_reach: centres 1.25 struck both ways, 1.55 missed
+both ways (its cell still beside it: today struck), a diagonal at 1.48
+struck and at 2.13 missed, a wall's corner between, a wind-up stepped out
+of and stood in, the spear straight and on a slant and a body on its
+line, strike_cells for a body at the back of its cell and on the grid.
+free_walk_test's dodges by the centre's cell (the spin struck at x 4.3 and
+4.45, not 4.55; the throw at y 2.3, not 2.55). controls_test's chase by
+the centres. Server only bar ui's chase stop, protocol unchanged, no new
+class_name. Enemy-ai's side (monster.gd's approach on strike_cells) ships
+in the same deploy.
