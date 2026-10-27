@@ -889,7 +889,7 @@ func _test_spin_throws() -> void:
 		var e := _build(["##############", "#........P...#", "#.......PmP..#", "#............#", "##############"])  # Room ahead to show the distance.
 		var boss: GridEntity = e["m"][0]
 		_boss(boss)
-		boss.strength = 0  # The draugr's row: strength 0, his 7 kg battle axe, so the push is its swing alone (140: 1.75 on 80 kg, 1.40 on 100).
+		boss.strength = 0  # The draugr's row: strength 0, his 7 kg battle axe, so the push is its swing alone (140 x 1.06: 1.86 on 80 kg, 1.48 on 100).
 		World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
 		var front: GridEntity = e["P"][1]
 		var side: GridEntity = e["P"][0]
@@ -918,7 +918,7 @@ func _test_spin_throws() -> void:
 		if armour.is_empty():
 			_check(is_equal_approx(front.mass, 80.0) and cells[armour][0] >= 2 and World.is_down(front),
 					"80 kg, rested, bare: thrown %d cells (%.2f) and knocked down" % [cells[armour][0], cells[armour][1]])
-			_check(side.spawned and side.hp == 4 and hp == 20, "the one beside, swept into the wall from full: left at a sliver (%d of %d; a free body, 703: 3 on the grid)" % [side.hp, hp])
+			_check(side.spawned and side.hp == 3 and hp == 20, "the one beside, swept into the wall from full: left at a sliver (%d of %d; impulse_scale 1.06, 703)" % [side.hp, hp])
 		elif armour == "exhausted":
 			print("    exhausted (stamina 0), 80 kg, bare: thrown %d cells at %.2f; swept into the wall from %d: %s" % [cells[armour][0], cells[armour][1], hp,
 					"%d left" % side.hp if side.spawned and side.hp > 0 else "killed"])

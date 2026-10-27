@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The draugr's spin hits a little harder under free walk (603 amended (5)): a player swept into a wall from full is left at 3 of 20 again, not 4 (F7 combat.moves.spin.impulse_scale 1.0 to 1.06).
 - Coming back into the game somewhere other than where you left (a start tile, away from a monster), your companion is beside you, not left where you parted (705).
 - A companion walking a long way back to you no longer slows the server (it searched the whole way afresh at every step; 704).
 

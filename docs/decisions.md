@@ -33137,3 +33137,17 @@ grid steps. Two checks follow:
   4 of 20 as a free body (the free push meets the wall as 688 amended (2)
   has it), where the grid's was 3 (603 amended (5) tunes it back).
 No behaviour changes. Test only.
+
+## 603 amended (5), combat's side: the spin back to a sliver under free walk
+
+703 step 2 walked combat_test's players free: the draugr's spin sweeping a
+rested, unarmoured 80 kg player into a wall from full left them at 4 of 20
+as a free body (the free push meets the wall as 688 amended (2) has it),
+where 603 amended (4) set 3 on the grid. The coordinator (Jeff found the
+draugr too easy this morning, so no drift the other way): back to 3 under
+free walk. The spin's impulse_scale 1.0 -> 1.06 (1.03 still left 4; 1.1
+left 2). An 80 kg player ahead is thrown 3 cells (1.86); plate (100 kg)
+1.48, under the floor, still thrown (no_floor); an exhausted one 5 cells,
+the wall a kill from full, as before. F7: Telegraphs and boss moves,
+combat.moves.spin.impulse_scale. combat_test asserts 3 of 20 in both spin
+cases. Server only, protocol unchanged, no new class_name.
