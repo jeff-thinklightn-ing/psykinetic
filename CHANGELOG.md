@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's hidden niche: its cracked wall is now the slab that moves when the niche opens (the slab no longer stands swung out in the room), with a pocket in the doorway's side for it to slide into; the footprints lose the slab's swing arc (608 amended (2))
 - The admin console can give a player gold: `gold <player or id prefix> <amount> [why]`, never a negative amount, logged with its why (709).
 - The draugr throws his axe at a player standing back while a companion holds him in melee; before, a companion beside him kept the axe in his hand all fight (603 amended).
 - Your companion goes round fire instead of through it, when following, on errands and when leading you (and doesn't lead you into it); villagers walking at someone's heel do the same (707).

@@ -33469,3 +33469,36 @@ while drawn, guarded by SoundKit.has.
 sound_kit_test: placed, a door's reach, three takes. No CHANGELOG bullet:
 nothing plays it until dungeon's call lands. Client only, protocol unchanged, no
 new class_name.
+## 608 amended (2), art-kit's side: the hidden niche's slab apart
+
+Jeff: the hidden niche "barely shows". Dungeon's draw (approved by the
+coordinator) has the slab grind back and slide aside over about 1 s, so the
+slab can no longer be baked into wall.crypt.niche_open.
+
+- wall.crypt.niche_open is now wall.crypt.cracked with its doorway region
+  (0.64 x 1.9, cut to the floor) gone. Everything else is cracked's: the face,
+  the joints, the crack above the lintel and the dust. The steps and the
+  black back are as before. The +z jamb is a black pocket the slab slides
+  into, with a 15 mm stone edge left at the room face. Size 0.86 deep,
+  middle x 0.18, the same as cracked's.
+- New prop.niche_slab is cracked's doorway region as one piece. Its room
+  face is the doorway's full size, so no seam shows at the swap. It carries
+  the arched niche in a closed housing, the shrouded body, the shelf lip,
+  the crack, its pale edge and the joints. Behind the face is a 0.1 panel,
+  2 mm in from each side and the lintel. The other faces are plain stone.
+  Its frame: origin the middle of its foot on its room face, +x the room.
+  Placed at x 0.25 in the wall piece's frame, open + slab draws as cracked:
+  Blender renders head on, from both sides and from the game's angle differ
+  by under 20 pixels.
+- Cracked's niche is now 0.35 deep (was 0.4) and its shelf lip 0.62 wide
+  (was 0.68). The slab carries both whole, and once dungeon grinds it back
+  0.13 it sits within the wall's 0.5: lip front at 0.21, housing back at
+  -0.24.
+- prop.footprints drops the slab's swing arc.
+- The pieces come from C:/dev/review/crypt_walls/make_cryptset.py (cracked,
+  open, slab) and make_footprints.py.
+
+Dungeon's side places and moves the slab. Without prop.niche_slab its draw
+keeps the old swap, so this side lands first. Until dungeon's lands, a found
+niche shows its doorway with no slab beside it. Art only, protocol
+unchanged, no new class_name.

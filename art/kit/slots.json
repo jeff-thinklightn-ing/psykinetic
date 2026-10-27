@@ -674,7 +674,7 @@
 			"size": [0.86, 3, 1],
 			"middle": [0.18, 0, 0],
 			"budget": 400,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py cracked: niche_a's open arched niche with a crack running up the face from the floor to above the arch, a pale edge beside it, and pale dust fanned on the floor at its foot (176 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_cryptset.py cracked: niche_a's open arched niche (0.35 deep, its shelf lip 0.62 wide, so prop.niche_slab carries both whole) with a crack running up the face from the floor to above the arch, a pale edge beside it, and pale dust fanned on the floor at its foot (176 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
 			"uses": "the hidden door's tell (decision 580): the locked niche Door's edge drawn as this until it is found; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
 			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.43, 0.005, 0], "size": [0.36, 0.01, 0.38]}]
 		},
@@ -682,12 +682,12 @@
 			"category": "walls",
 			"type": "mesh",
 			"kind": "edge",
-			"size": [1.004, 3, 1],
-			"middle": [0.252, 0, 0],
+			"size": [0.86, 3, 1],
+			"middle": [0.18, 0, 0],
 			"budget": 300,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_cryptset.py open: a doorway 0.64 wide and 1.9 tall cut to the floor, steps going down into the dark within the wall's depth, a black back; the niche's slab swung out on its edge, standing 0.5 m into the room beside the doorway (50 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the cut 0.4 deep (its back black), a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
-			"uses": "the hidden door found (decision 580): the niche Door's look when open, keyed by the Door's state; the level's link does the moving; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
-			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.5, 0.925, 0], "size": [0.5, 1.85, 0.07]}]
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_cryptset.py open: wall.crypt.cracked with its doorway region gone (0.64 wide, 1.9 tall, cut to the floor; the same face, joints, crack above the lintel and dust as cracked's, so with prop.niche_slab at x 0.25 it draws as cracked), steps going down into the dark within the wall's depth, a black back; the +z jamb a black pocket from 15 mm behind the room face to the back, where the slab slides in (80 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, a 0.1 back skin to x -0.25; the room on +x (the draw turns the piece so +x is the floor cell); the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "the hidden door found (decision 580; its slab apart since 608 amended (2), art-kit's side): the niche Door's look when open, keyed by the Door's state, with prop.niche_slab drawn over its doorway and moved by dungeon's draw; the level's link does the moving; the barrow's niche walls in wall.stone's runs (Jeff: \"i like all the crypt walls, mix and match\"; dungeon's 580 step 2 picks a piece per niche edge by layer, its rock always behind)",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.43, 0.005, 0], "size": [0.36, 0.01, 0.38]}]
 		},
 		"wall.dark.profile": {
 			"category": "walls",
@@ -1237,17 +1237,28 @@
 			"uses": "the draugr's remains (Jeff: \"when draugr falls ... he probably leaves a pile of his clothes, his crown, his axe on the ground\"; the coordinator: him gone, his things left, no bones, no body; enemy-ai places it where he vanishes): 1 cell, not solid, origin the cell's middle on the floor, front +z. His axe is full size (1.6 m, as he carried it), so it reaches past the cell: about 0.21 m past the local +x and -x edges and 0.1 m past +z and -z; its two ends are the sockets axe_head and axe_butt, so the placer turns it to a facing with floor (no wall) at both",
 			"grey": [{"at": [0, 0.1815, 0], "size": [1.443, 0.363, 1.198]}]
 		},
+		"prop.niche_slab": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.454, 1.9, 0.64],
+			"middle": [-0.133, 0, 0],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_cryptset.py slab: wall.crypt.cracked's doorway region as one piece: its room face the doorway's full 0.64 x 1.9 with cracked's arched niche (0.35 deep, in a closed housing), the shrouded body, the shelf lip 9 cm proud, the crack, its pale edge and the joints, so at x 0.25 over wall.crypt.niche_open it draws as cracked; behind the face a 0.1 panel 2 mm in from each side and the lintel; its sides, back and the housing's outside plain stone (row 1's #77766f); 196 tris"},
+			"uses": "the hidden niche's slab (608 amended (2), art-kit's side; dungeon's draw: Jeff's \"hidden niche barely shows\"): drawn over wall.crypt.niche_open's doorway at x 0.25 in its frame when the niche Door opens; dungeon grinds it back 0.13 and slides it along +z into the +z jamb's pocket, hidden at 0.65. Its own frame: origin the middle of its foot on its room face, +x the room, along z its width. Back at x -0.36: within the wall's 0.5 once ground back",
+			"grey": [{"at": [-0.133, 0.95, 0], "size": [0.454, 1.9, 0.64]}]
+		},
 		"prop.footprints": {
 			"category": "props",
 			"type": "mesh",
 			"kind": "cell",
-			"size": [0.774, 0.004, 0.806],
-			"middle": [-0.136, 0, 0.002],
+			"size": [0.762, 0.003, 0.806],
+			"middle": [-0.142, 0, 0.002],
 			"budget": 100,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-22", "notes": "C:/dev/review/crypt_walls/make_footprints.py: flat, a hair above the floor (6 to 10 mm, over wall.crypt.cracked's own dust): an irregular patch of dust a shade lighter than floor.stone (row 1's #77766f on its #686661), boot prints pressed darker in it (#545049), three going in toward the wall and one coming back out, and a thin scuffed arc where wall.crypt.niche_open's slab swings out about its hinge; all short of the wall's face at x 0.25 (an edge piece takes half of wall.stone's 0.5 in the cell); 50 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_footprints.py: flat, a hair above the floor (6 to 10 mm, over wall.crypt.cracked's own dust): an irregular patch of dust a shade lighter than floor.stone (row 1's #77766f on its #686661), boot prints pressed darker in it (#545049), three going in toward the wall and one coming back out; no slab's arc (prop.niche_slab slides into the wall); all short of the wall's face at x 0.25 (an edge piece takes half of wall.stone's 0.5 in the cell); 36 tris"},
 			"uses": "the hidden door's clue (decision 608 amended; Jeff's clues to the hidden door): on the floor cell before the true niche, +x toward its wall (terrain places it from the level's hidden niche entry, +x along -out), not solid; it stays on the open look (the prints are what was walked)",
 			"grey": [
-				{"at": [-0.136, 0.008, 0.002], "size": [0.774, 0.004, 0.806]}
+				{"at": [-0.142, 0.0075, 0.002], "size": [0.762, 0.003, 0.806]}
 			]
 		},
 		"building.weapon_rack": {
