@@ -6,12 +6,15 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
-- The bow's lob no longer shows a red line under free walk (677 amended): the client aimed it from the cell you joined on, not where you stand, so the circle fell in walls; the plain shot's aim was skewed the same way.
 
+## v0.1.185
+
+- The bow's lob no longer shows a red line under free walk (677 amended): the client aimed it from the cell you joined on, not where you stand, so the circle fell in walls; the plain shot's aim was skewed the same way.
 - A town's resident who trusts you will travel with you as your companion when asked ("come with me"), if nobody is with you; your companion away in her town stays there as one of its people, and can be asked back (686).
 - Free movement (--free-walk): after a respawn or rejoin your body no longer stays frozen until you leave the area; at worst it waits about a second (689 amended (3)).
 - Tell your companion to go home for a while and she parts as a friend, resting in her town; ask her there ("come with me") and she comes back, her bond as it was (581 amended (3)).
 - Recruiting a townsperson, npc's side (686): a resident who turns you down knows why when you speak to them again, a companion who comes home has your bond written onto their card, and a companion handed back for good becomes a settled resident of her town with her mind and what she has heard.
+
 ## v0.1.184
 
 - The draugr's spin throws whoever it strikes (603 amended (4)): an 80 kg player in no armour was hit and knocked down but never moved, the push under the knockback floor; the spin now skips the floor and pushes with his whole swing (impulse_scale 0.84 to 1.0), so a player ahead is thrown 2 cells and one swept into a wall from full is left at 3 of 20; plate moves less; an exhausted player is thrown 5 cells and the wall kills from full. Tune it in F7 (Telegraphs and boss moves, combat.moves.spin.impulse_scale) if the throw feels too long.
