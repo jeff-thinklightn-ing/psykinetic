@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Clicking a monster under free walk no longer walks you to it in jerks from cell to cell (697, combat's side): the server holds the attack while your client walks you there, strikes once you are beside it, and gives up after 4 s out of reach.
 
 - Free movement (--free-walk): pressing into the barrow's burial niches works again (the hidden door opens), and walking into the map's edge takes you to the next area as on the grid (688 amended (4)).
 - Ask your companion to go and look ('go look north', 'check out that door', 'have a look ahead'): she walks over until she can see it, comes back and tells you what was there, and remembers it; something coming at her turns her back, and she tells you that too (696).

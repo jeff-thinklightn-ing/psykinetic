@@ -6830,6 +6830,7 @@ func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEnti
 	entity.action_order = order
 	entity.action_target = target
 	entity.action_direction = direction
+	entity.action_tick = tick
 	entity.has_move_order = false
 	entity.move_via = via.slice(0, MAX_QUEUED_STEPS)
 

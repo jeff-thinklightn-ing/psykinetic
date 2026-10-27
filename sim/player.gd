@@ -19,6 +19,9 @@ const RIGHT_HAND := Items.RIGHT_HAND
 const LEFT_HAND := Items.LEFT_HAND
 ## Its lantern's light (GridEntity.emit_light) while lit.
 const LANTERN := 0.9
+## How long a free body's attack or shove order waits for its client's
+## chase to bring it into reach before it is given up (4 s).
+const FREE_CHASE_TICKS := 4 * World.TICK_RATE
 
 ## WASD steps waiting for the movement timer: {direction, predicted}.
 ## The armour it wears (decision 622): the Items id in its armour slot
@@ -347,6 +350,13 @@ func _pursue_action() -> void:
 			World.try_attack(self, target)
 		else:
 			World.try_shove(self, target, direction)
+		return
+	# A free body (688) closes in by its own commands, its client chasing
+	# (697): the order held till in reach, given up after FREE_CHASE_TICKS;
+	# a grid step would snap it from centre to centre (the chop Jeff saw).
+	if World.free_body(self):
+		if World.tick - action_tick > FREE_CHASE_TICKS:
+			_clear_action()
 		return
 	# Out of reach: close in, re-pathing each step in case the target moves.
 	# No way, or the step taken first: the order is dropped, and the client

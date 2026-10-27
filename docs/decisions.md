@@ -32588,3 +32588,35 @@ map's edge walked off west, nothing walking along it; a held door stops it a
 radius off, let go of opens to the press; a link's cell walked onto, and
 bumped with another player on it. Server only, protocol unchanged, no new
 class_name.
+
+## 697, combat's side: a free body's attack order holds while its client chases
+
+Jeff on v0.1.186, free_walk on, in the barrow with sword and shield: "left
+click on grave robber does move to them, but quite choppy ... the chop
+makes the fight hard". A click on a creature sends command_attack only; the
+server's order (Player._pursue_action) walked the body by World.try_move,
+a grid step at a time re-planned each step, and on a free body each step
+snapped free_pos to the cell's centre, so its client's view (689) saw only
+snaps.
+
+Split with ui (the coordinator's approval): ui's side (697, ui's side)
+chases on the client, a click or held hover on a creature routing its free
+body to the target's cell from where it is shown, re-planned as the target
+moves, stopping within a cell; command_attack sent as before. Combat's
+side, here: a free body with an attack or shove order never takes the grid
+step. The order is held while its own commands walk it; once in_reach
+holds (cell adjacency, as 688 keeps melee) it strikes as before, wind-up
+and all. It is dropped as before (the target gone or untargetable, another
+order), and after Player.FREE_CHASE_TICKS (4 s) from the order
+(GridEntity.action_tick, set by World._order_action) still out of reach.
+Free commands never drop it: the chase is made of them. On the grid
+nothing changes.
+
+Shipping: a v0.1.186 client would stand still holding the order, so this
+side never reaches the box before ui's side is in a client cut (the
+coordinator; release holds the box from this push).
+
+combat_test _test_free_chase: ordered from 8 cells, no grid step in 1 s;
+past 4 s given up, nothing struck; ordered again and walked by its own
+commands (Walk.to) to beside the target: struck. Server only, protocol
+unchanged, no new class_name.

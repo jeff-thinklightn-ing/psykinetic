@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_draw_held()
 	_test_lob()
 	_test_free_blows()
+	_test_free_chase()
 	_test_lob_aim_on_client()
 	_test_armour()
 
@@ -350,11 +351,6 @@ func _test_cone_spread() -> void:
 			"a bow verb without a spread: no cone, the aim flown")
 	host.raised = ""
 
-## A free body's blows and shots (688, combat's side; ui: "an attack or
-## swing stops the body for its windup"): a swing mid-walk is taken, not
-## refused, and stops the body until its attack is ready again; a wind-up
-## until it lands; shots and lobs start from its own centre (shot_origin),
-## so an arrow from the edge of its cell flies that line.
 ## A client's own free body aims its lob and shots from where its view
 ## draws it, not from free_pos, which a client never moves (677 amended;
 ## Jeff on v0.1.184: "right click archery gives a red line with free move":
@@ -382,6 +378,43 @@ func _test_lob_aim_on_client() -> void:
 	World.free_walk = false
 
 
+## A free body's attack order is held while its own commands walk it (its
+## client's chase, ui's half), struck once in reach, given up after
+## Player.FREE_CHASE_TICKS; never a grid step, which snapped it from centre
+## to centre (697, combat's side; Jeff on v0.1.186: "left click on grave robber
+## does move to them, but quite choppy").
+func _test_free_chase() -> void:
+	print("
+== a free body's attack order: held, no grid step, struck in reach, given up after 4 s (697, combat's side) ==")
+	var e := _build(["###########", "#P.......m#", "###########"])
+	var host: Player = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	foe.stunned_until_tick = 1 << 30  # Stands still: the test walks only the player.
+	World.free_walk = true
+	host.free_pos = Vector2(host.tile)
+	var hp := foe.hp
+	World.order_attack(host, foe)
+	for i in 10:
+		World.step()
+	_check(host.tile == Vector2i(1, 1) and host.free_pos == Vector2(1, 1) and host.action_order == GridEntity.Order.ATTACK,
+			"held: no grid step taken in 1 s (%s, %s)" % [host.tile, host.free_pos])
+	for i in Player.FREE_CHASE_TICKS:
+		World.step()
+	_check(host.action_order == GridEntity.Order.NONE and foe.hp == hp, "out of reach past 4 s: given up, nothing struck")
+	World.order_attack(host, foe)
+	var reached := Walk.to(host, Vector2i(8, 1))
+	for i in 3:
+		World.step()
+	_check(reached and foe.hp < hp and host.action_order == GridEntity.Order.NONE,
+			"walked into reach by its own commands: struck (%d -> %d)" % [hp, foe.hp])
+	World.free_walk = false
+
+
+## A free body's blows and shots (688, combat's side; ui: "an attack or
+## swing stops the body for its windup"): a swing mid-walk is taken, not
+## refused, and stops the body until its attack is ready again; a wind-up
+## until it lands; shots and lobs start from its own centre (shot_origin),
+## so an arrow from the edge of its cell flies that line.
 func _test_free_blows() -> void:
 	print("\n== a free body: a swing mid-walk stops it for the blow; its shots fly from its own centre (688, combat's side) ==")
 	var e := _build(["############", "#P.........#", "#.........m#", "############"])
