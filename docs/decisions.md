@@ -33010,3 +33010,19 @@ routed 8 to 10 cells in, the player deeper, make for the entrance (40, 1)
 and are gone beside it by tick 57; a skeleton routed beside them stays; a
 robber routed under the sky flees as ever. Server only, protocol unchanged,
 no new class_name.
+
+## 177 amended: every body shader marks the stencil under the target outline
+
+Jeff on v0.1.187: "mousing over or left clicking an enemy causes their whole
+model to go white translucent - i think it the outline gone buggy". The
+outline (177) draws its eight nudged passes only where the body did not
+mark the stencil; Client3D._marking_copy made a marking copy of a standard
+material and of the goblin's shader (its own twin file), but a human body's
+shader (243 amended: one shared ShaderMaterial for residents, robbers and
+players) was copied as it was, marking nothing, so the passes drew over the
+whole body in the outline's off-white. Now _marking_shader gives any
+spatial body shader a twin: its code with "stencil_mode write,
+compare_always, 1" put after its first line (cached a shader; the goblin
+keeps its file; a shader that sets its own stencil is kept). view_test
+_test_target_marked: the human body's copy marks the stencil, its palette
+the same. Client only, protocol unchanged, no new class_name.

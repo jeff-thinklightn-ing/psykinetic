@@ -6295,6 +6295,13 @@ func _test_target_marked() -> void:
 				and drawn.stencil_reference == Client3D.OUTLINE_STENCIL and drawn.albedo_texture == was.albedo_texture \
 				and drawn.albedo_color == was.albedo_color and drawn.roughness_texture == was.roughness_texture
 	_check(same, "its body marks the stencil, with its own colours and textures")
+	# A human's body (a robber's): its shader's twin marks the stencil too,
+	# or the rim's passes drew over the whole body (Jeff on v0.1.187: "their
+	# whole model to go white translucent").
+	var human := _rig._marking_copy(Client3D.HUMAN_MATERIAL) as ShaderMaterial
+	_check(human != null and human.shader != Client3D.HUMAN_MATERIAL.shader and "stencil_mode write" in human.shader.code
+			and human.get_shader_parameter("palette") == Client3D.HUMAN_MATERIAL.get_shader_parameter("palette"),
+			"a human body's copy marks the stencil, its palette the same")
 	_check(_outlined(beside) == 0, "the one beside it is not outlined")
 	_rig.target(other)
 	_check(_outlined(puppet) == 0 and meshes[0].get_active_material(0) == own[0] and _outlined(beside) > 0,

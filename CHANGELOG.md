@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Pointing at a grave robber (or any human foe) outlines it again instead of turning it white and see-through (177 amended)
 - Routed robbers in a barrow now run for the entrance and get away by it (gone, not dead: no drops, and they come back later); the barrow's undead never leave. Outdoors they flee as before (702).
 
 - A spear strikes with a straight jab along the facing, its point driven out about two cells, instead of a sideways slash, for players, companions and monsters alike (344 amended).

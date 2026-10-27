@@ -1832,6 +1832,8 @@ var _outline: ShaderMaterial
 var _seen_through: ShaderMaterial
 var _outlined: Node3D
 var _marking: Dictionary[Material, Material] = {}
+## Body shaders' stencil-marking twins (_marking_shader).
+var _marking_shaders: Dictionary[Shader, Shader] = {}
 var _toss: MeshInstance3D
 var _ring_mesh: ArrayMesh
 ## Main's speech bubbles, for last words.
@@ -4643,10 +4645,31 @@ func _marking_copy(material: Material) -> Material:
 			copy.stencil_flags = BaseMaterial3D.STENCIL_FLAG_WRITE
 			copy.stencil_compare = BaseMaterial3D.STENCIL_COMPARE_ALWAYS
 			copy.stencil_reference = OUTLINE_STENCIL
-		elif copy is ShaderMaterial and (material as ShaderMaterial).shader == GOBLIN_MATERIAL.shader:
-			(copy as ShaderMaterial).shader = GOBLIN_MARKING_SHADER
+		elif copy is ShaderMaterial and (material as ShaderMaterial).shader != null:
+			(copy as ShaderMaterial).shader = _marking_shader((material as ShaderMaterial).shader)
 		_marking[material] = copy
 	return _marking[material]
+
+
+## [param shader]'s twin that marks the stencil as it draws (cached): the
+## goblin's own file, else its code with the stencil's line put in after
+## its first (the human body's, Jeff on v0.1.187: "mousing over or left
+## clicking an enemy causes their whole model to go white translucent": a
+## robber's body marked nothing, so the outline's passes drew over all of
+## it, not round it). A shader that sets its own stencil, or is not a
+## spatial one, is kept.
+func _marking_shader(shader: Shader) -> Shader:
+	if shader == GOBLIN_MATERIAL.shader:
+		return GOBLIN_MARKING_SHADER
+	if not _marking_shaders.has(shader):
+		var code := shader.code
+		var marked := shader
+		if code.begins_with("shader_type spatial;") and not "stencil_mode" in code:
+			marked = Shader.new()
+			marked.code = code.replace("shader_type spatial;", "shader_type spatial;
+stencil_mode write, compare_always, %d;" % OUTLINE_STENCIL)
+		_marking_shaders[shader] = marked
+	return _marking_shaders[shader]
 
 
 ## The toss aim during a right drag: an arrow on the floor from
