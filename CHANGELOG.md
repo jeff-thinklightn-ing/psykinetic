@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The admin console can give a player gold: `gold <player or id prefix> <amount> [why]`, never a negative amount, logged with its why (709).
 - The draugr throws his axe at a player standing back while a companion holds him in melee; before, a companion beside him kept the axe in his hand all fight (603 amended).
 - Your companion goes round fire instead of through it, when following, on errands and when leading you (and doesn't lead you into it); villagers walking at someone's heel do the same (707).
 

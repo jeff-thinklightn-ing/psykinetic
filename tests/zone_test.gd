@@ -276,6 +276,15 @@ func _test_console() -> void:
 	reply = _main.admin_command("zone move bo test_room")
 	_check(reply == "Bo moved to test_room" and _player(BO).zone == "test_room", "zone move bo test_room: %s" % reply)
 	_check(_main.admin_command("zone move nobody sample") == "no player nobody online", "an unknown player is refused")
+	# The admin's gold (decision 709): by name or id prefix, a why, never negative.
+	var had: int = World.economy.gold(BO_ID)
+	reply = _main.admin_command("gold bo 25")
+	_check(World.economy.gold(BO_ID) == had + 25 and reply.ends_with("%d now" % (had + 25)) and "admin grant" in reply, "gold bo 25: %s" % reply)
+	reply = _main.admin_command("gold %s 5 for the draugr" % BO_ID.left(6))
+	_check(World.economy.gold(BO_ID) == had + 30 and "for the draugr" in reply, "gold by an id prefix, with a why: %s" % reply)
+	_check(_main.admin_command("gold bo -5").begins_with("gold: the amount must be above 0") and World.economy.gold(BO_ID) == had + 30,
+		"a negative amount is refused")
+	_check(_main.admin_command("gold nobody 5") == "no player nobody" and _main.admin_command("gold bo").begins_with("usage"), "no such player, no amount: refused")
 
 
 func _test_speech_by_zone() -> void:

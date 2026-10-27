@@ -33434,3 +33434,13 @@ draugr_fight_test _test_real_throw on barrow_deep as it loads: the player
 six off, he throws; his companion beside him, he throws; another player
 beside him, no throw in 200 ticks. Server only, protocol unchanged, no new
 class_name.
+## 709: the admin's gold command
+
+Jeff needed to give his character gold (25, for the draugr), and the console had no way to do it. The coordinator asked for one.
+
+- `gold <player or id prefix> <amount> [why]` in Main.admin_command. Only the admin console runs it: the admin port, the server's stdin, and an admin's panel (672). The player is found by name (Main._admin_player, online or off), else by the one record id starting with what was typed; if several ids match, it asks for more of the id.
+- The gold goes through Main._give_gold to Economy.add_gold, so it is in the player's gold log with its why. The why defaults to "admin grant" and says what the gold was for when a player's gold is read later.
+- Only giving: an amount of 0 or less is refused. Jeff's rule is that a player's gold is lost only through spending, so the console never takes any.
+- It is logged: Economy.add_gold's usual "[economy] ... got N gold (why)" line, plus "[economy] the admin gave N gold (why)" with no name or id. The reply gives the player's new total.
+
+zone_test _test_console: by name, by id prefix with a why, a negative amount refused, no such player and no amount refused. Server only: no wire change, no new class_name.

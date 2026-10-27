@@ -15907,6 +15907,7 @@ const CONSOLE_HELP: Array[String] = [
 	"quests reset [all|<giver>] [player]: your quests (or that player's) undone, all or one quest giver's here",
 	"zone reset <name>: that zone rebuilt from its map",
 	"zone move <player> <zone>: that player and their companion to that zone's start",
+	"gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said)",
 	"move <player> <x> <y> [zone] | move <player> <building code> [zone]: a player to a cell",
 	"mark <player> <mark>|-<mark>: a mark on a player, or one taken off",
 	"reset: this room rebuilt from its map",
@@ -16084,9 +16085,38 @@ func admin_command(line: String, caller: Player = null) -> String:
 				if link != null:
 					peers.append("%s rtt %d ms" % [_players[peer].name, roundi(link.get_statistic(ENetPacketPeer.PEER_ROUND_TRIP_TIME))])
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
+		"gold":
+			return _gold_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
+
+
+## "gold <player or id prefix> <amount> [why]" (decision 709): the admin gives
+## a player gold, online or off, why "admin grant" unless said; never a
+## negative amount. The player by name, else by the one id starting so.
+func _gold_command(words: PackedStringArray) -> String:
+	if words.size() < 3 or not words[2].is_valid_int():
+		return "usage: gold <player or id prefix> <amount> [why]"
+	var amount := words[2].to_int()
+	if amount <= 0:
+		return "gold: the amount must be above 0 (gold is only ever given here)"
+	if World.economy == null:
+		return "gold: no economy"
+	var id := str(_admin_player(words[1]).get("id", ""))
+	if id.is_empty():
+		var ids := _records.keys().filter(func(each: String) -> bool: return each.begins_with(words[1]))
+		if ids.size() == 1:
+			id = ids[0]
+		elif ids.size() > 1:
+			return "gold: %d players' ids start %s; give more of it" % [ids.size(), words[1]]
+	if id.is_empty():
+		return "no player %s" % words[1]
+	var why := " ".join(words.slice(3)) if words.size() > 3 else "admin grant"
+	_give_gold(id, amount, why)
+	print("[economy] the admin gave %d gold (%s)" % [amount, why])
+	var record: PlayerRecord = _records.get(id)
+	return "%s: %d gold given (%s), %d now" % [record.name if record != null else id.left(8), amount, why, World.economy.gold(id)]
 
 
 ## The console's zones: each loaded zone, awake or asleep, its tick, and who
