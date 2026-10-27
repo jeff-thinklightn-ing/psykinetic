@@ -384,7 +384,7 @@ func _walk_of(routes: WorldRoutes, leg: Dictionary) -> Array[Vector2i]:
 	if routes.has_method("leg_cells"):
 		cells.assign(routes.call("leg_cells", leg))
 	else:
-		cells.assign(World.find_path(pet.tile, leg["to"], true))
+		cells.assign(World.find_path(pet.tile, leg["to"], true, null, 0, false, {}, true, World.PATH_FIRE_AVOID))  # Off fire (707).
 	var here := cells.find(pet.tile)
 	return cells.slice(here + 1) if here != -1 else cells
 
@@ -403,11 +403,25 @@ func _walk() -> void:
 		# Pushed off her walk: back to it.
 		Heel.step(pet, next, true)
 		return
+	if World.is_burning(next):
+		# Fire on the leg's cells (707: maps' routes know none): round it, to
+		# the first cell past it, by a way that keeps off fire.
+		var beyond := _cells.size() - 1
+		for i in _cells.size():
+			if not World.is_burning(_cells[i]):
+				beyond = i
+				break
+		var round := World.find_path(pet.tile, _cells[beyond], true, null, 400, false, {}, true, World.PATH_FIRE_AVOID)
+		if not round.is_empty() and World.try_move(pet, round[0] - pet.tile):
+			var on := _cells.find(pet.tile)
+			if on != -1:
+				_cells = _cells.slice(on + 1)
+		return
 	if World.is_free(next) and World.try_move(pet, next - pet.tile):
 		_cells.pop_front()
 		return
 	var past := _cells[mini(4, _cells.size() - 1)]
-	var path := World.find_path(pet.tile, past, true, null, 200)
+	var path := World.find_path(pet.tile, past, true, null, 200, false, {}, true, World.PATH_FIRE_AVOID)
 	if not path.is_empty() and World.try_move(pet, path[0] - pet.tile):
 		var at := _cells.find(pet.tile)
 		if at != -1:
@@ -427,7 +441,7 @@ func _heel() -> void:
 	if World.free_body(leader):
 		if heel != _ordered and send_route.is_valid():
 			var path: Array = []
-			for cell: Vector2i in World.walk_path(leader.tile, heel, leader):
+			for cell: Vector2i in World.walk_path(leader.tile, heel, leader, World.PATH_FIRE_AVOID):  # Not led into fire (707).
 				path.append([cell.x, cell.y])
 			send_route.call(path, self)
 		_ordered = heel

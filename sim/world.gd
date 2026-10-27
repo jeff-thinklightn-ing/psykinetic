@@ -293,6 +293,11 @@ const PATH_STEP_COST := 1000
 const PATH_DIAGONAL_COST := int(PATH_STEP_COST * DIAGONAL_TICK_SCALE)
 const PATH_DIAGONAL_EXTRA := 1
 const PATH_FIRE_EXTRA := 5000
+## The cost of a burning cell to those that keep off fire (decision 707,
+## find_path's fire_extra: her heel, errands and Guide, a resident's walk
+## by a Heel): forty steps, so she goes the long way round, yet not a
+## wall: with no other way she crosses.
+const PATH_FIRE_AVOID := 40000
 ## A closed door on the way costs a step: it is opened by walking into it.
 const PATH_DOOR_EXTRA := PATH_STEP_COST
 
@@ -9903,8 +9908,12 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## cannot open doors, or will not now: Monster.opens_doors_now); the memo of
 ## steps (_path_step) is shared and says a door is passable, so that is
 ## asked here, on door steps only.
+## [param fire_extra]: what a burning cell costs beyond a step
+## (PATH_FIRE_EXTRA, a short detour; PATH_FIRE_AVOID, decision 707, for
+## those that keep off fire).
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
-		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}, opens_doors := true) -> Array[Vector2i]:
+		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}, opens_doors := true,
+		fire_extra := PATH_FIRE_EXTRA) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
@@ -10033,7 +10042,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 				if shut:
 					next_cost += PATH_DOOR_EXTRA
 			if is_burning(next) if heat_carried else hot_any and hot.has(next):
-				next_cost += PATH_FIRE_EXTRA
+				next_cost += fire_extra
 			var seen := _search_opened[next_at] == stamp
 			if not seen or next_cost < _search_cost[next_at]:
 				_search_cost[next_at] = next_cost
@@ -10080,8 +10089,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 ## fire); never longer, as a line of n cells is n steps and the same
 ## diagonals. Players' own routes only (the prediction's plan and
 ## Player's re-path); monsters keep find_path.
-func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null) -> Array[Vector2i]:
-	var path := find_path(from, to, true, ignore)
+func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_extra := PATH_FIRE_EXTRA) -> Array[Vector2i]:
+	var path := find_path(from, to, true, ignore, 0, false, {}, true, fire_extra)
 	if path.size() < 3:
 		return path
 	var pulled: Array[Vector2i] = []

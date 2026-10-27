@@ -302,7 +302,8 @@ static func keep_clear(leader: GridEntity) -> Dictionary:
 
 ## The cell at [param leader]'s heel for [param body]: of the free walkable
 ## cells within STOP of them (hers among them), never a door's
-## (Companion.door_cells) nor one of [param clear] (keep_clear), one on
+## (Companion.door_cells) nor one of [param clear] (keep_clear) nor one
+## burning (707), one on
 ## their side of a building's walls (inside with them, or outside), then one
 ## behind [param way] (their facing by default; not ahead, nor beside if any
 ## behind is free), the nearest to them, then to her; NONE if none.
@@ -318,8 +319,8 @@ static func cell(body: GridEntity, leader: GridEntity, clear := {}, way := NONE)
 			var at := leader.tile + Vector2i(dx, dy)
 			if at == leader.tile or World.distance(at, leader.tile) > STOP or doors.has(at) or clear.has(at):
 				continue
-			if at != body.tile and not (World.is_walkable(at) and World.is_free(at)):
-				continue
+			if at != body.tile and not (World.is_walkable(at) and World.is_free(at)) or World.is_burning(at):
+				continue  # (Never a burning one, hers or not: 707.)
 			var along := ahead_of(Vector2i(dx, dy), way)
 			var apart := 0 if Companion._inside_of(at) == theirs else 10
 			var key := Vector2i(apart + (0 if along < 0 else 1 + along), World.distance(at, leader.tile) * 100 + World.distance(body.tile, at))
@@ -346,14 +347,15 @@ static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leade
 	var path: Array[Vector2i] = []
 	var route: Dictionary = _routes.get(id, {})
 	# Far off: the kept route while it holds (704): she is where it left
-	# her, its next cell is open, and the goal has moved less than a
-	# quarter of the way since it was found.
+	# her, its next cell is open, the goal has moved less than a quarter of
+	# the way since it was found, and no cell still on it has caught fire
+	# since (707: find_path's way keeps off fire; a kept one must too).
 	if far >= FAR and not route.is_empty() and route["at"] == body.tile and not (route["path"] as Array).is_empty() \
-			and World.distance(route["goal"], goal) <= maxi(2, far / 4) and World.is_free(route["path"][0]):
+			and World.distance(route["goal"], goal) <= maxi(2, far / 4) and World.is_free(route["path"][0]) 			and not (route["path"] as Array).any(World.is_burning):
 		path.assign(route["path"])
 	else:
 		searches += 1
-		path = World.find_path(body.tile, goal, occupied_goal_ok)
+		path = World.find_path(body.tile, goal, occupied_goal_ok, null, 0, false, {}, true, World.PATH_FIRE_AVOID)  # Off fire (707).
 		if path.is_empty():
 			_failed[id] = {"from": body.tile, "goal": goal, "until": World.tick + NO_ROUTE_TICKS}
 			_routes.erase(id)
@@ -364,7 +366,7 @@ static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leade
 		else:
 			route = {}
 			if path.size() >= 3 and (occupied_goal_ok or World.is_free(goal)):
-				var pulled := World.walk_path(body.tile, goal, body)
+				var pulled := World.walk_path(body.tile, goal, body, World.PATH_FIRE_AVOID)
 				if not pulled.is_empty():
 					path = pulled
 	if leader != null and is_instance_valid(leader) and leader.spawned and path[0] != goal and keep_clear(leader).has(path[0]):

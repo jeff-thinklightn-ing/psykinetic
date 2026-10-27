@@ -33360,3 +33360,39 @@ turns in 0 steps"). _walk_held queued grid steps a free body never took.
 They walk now, and pass.
 
 Test only, no CHANGELOG bullet. Protocol unchanged, no new class_name.
+
+## 707. Her ways keep off fire
+
+Found in 703 step 2: her guide walk took her into the test room's spread
+fire (4 hp), and the walk stopped "struck". The coordinator: a burning
+cell is a high cost, not a wall, opt-in, for her heel, errands and Guide,
+and a kept route (704) re-plans across new fire.
+
+find_path already added PATH_FIRE_EXTRA (5 steps) for every walker, so
+fire was gone round only on a short detour. She walked into it four ways:
+- the Guide walks maps' route cells (WorldRoutes.leg_cells), which know no
+  fire;
+- Heel.cell could pick a burning heel cell, for her or, led, for him;
+- a long way round the fire cost more than 5 steps;
+- a kept route (704) never looked again.
+
+Now:
+- **The cost:** find_path and walk_path take fire_extra, PATH_FIRE_EXTRA
+  by default, so monsters are unchanged (enemy-ai told). Those that keep
+  off fire pass World.PATH_FIRE_AVOID: forty steps, still not a wall, so
+  with no other way she crosses.
+- **Who keeps off it:** Heel.step's searches and pulled lines (her follow,
+  errands, guide steps, and a resident walking at heel by a Heel, decision
+  485, which shares the call), and the Guide's own searches and the route
+  it sends a free leader's client (695).
+- **Guide._walk:** a leg's next cell burning, she goes round to the first
+  cell past the fire.
+- **Heel.cell:** never a burning cell.
+- **Heel.step (704):** a kept route holds only while no cell still on it
+  burns.
+
+companion_test _test_keeps_off_fire in the test room's fire (round it, not
+a wall, her steps never in it, her heel not in it, a kept route searched
+again), and _test_guide_free led past the spreading fire with neither in it
+(0 ticks); both modes. resident_test and path_bound_test pass. Server only,
+protocol unchanged, no new class_name.

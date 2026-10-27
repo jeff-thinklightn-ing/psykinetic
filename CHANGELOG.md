@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Your companion goes round fire instead of through it, when following, on errands and when leading you (and doesn't lead you into it); villagers walking at someone's heel do the same (707).
 
 - Walking: after a server hitch you no longer stop a step short of where you clicked (689 amended (6))
 ## v0.1.189

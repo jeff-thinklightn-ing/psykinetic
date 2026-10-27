@@ -118,6 +118,7 @@ func _ready() -> void:
 	_test_reset_free()
 	_test_spear_reach()
 	_test_order_holds()
+	_test_keeps_off_fire()
 	_test_quiet()
 	_test_dodge()
 	_test_firing_cone()
@@ -2011,8 +2012,7 @@ func _test_guide() -> void:
 			if condition.call():
 				return
 			if not sent_routes.is_empty() and not (sent_routes.back() as Array).is_empty() and is_instance_valid(_player()):
-				var end: Array = (sent_routes.back() as Array).back()
-				Walk.toward(_player(), Vector2i(int(end[0]), int(end[1])))
+				Walk.toward(_player(), _route_next(_player(), sent_routes.back()))
 			World.step()
 	# What she knows: where she stands with her player, and places within sight.
 	var card := {}
@@ -3389,6 +3389,59 @@ func _test_heel_keeps_clear() -> void:
 ## FOLLOW six times in six seconds, ATTACK and FOLLOW five in one, the
 ## model's stance undone by calm two seconds on): the rules' "holds",
 ## tunable on F7 (companions.holds.<key>).
+## Fire (decision 707): her ways keep off a burning cell (find_path's
+## PATH_FIRE_AVOID, not a wall), her heel is never one, and a kept route
+## (704) is searched again once a cell on it burns. The test room's fire
+## burns row 5 from x 7.
+func _test_keeps_off_fire() -> void:
+	print("
+== her ways keep off fire: round it, never at a burning heel, a kept route searched again (707) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	_check(World.is_burning(Vector2i(8, 5)), "(the room's fire burns at (8, 5))")
+	var through := World.find_path(Vector2i(8, 3), Vector2i(8, 7), true)
+	var round := World.find_path(Vector2i(8, 3), Vector2i(8, 7), true, null, 0, false, {}, true, World.PATH_FIRE_AVOID)
+	_check(not round.is_empty() and not round.any(World.is_burning), "her way from (8, 3) to (8, 7) goes round the fire (%s; a monster's: %s)" % [round, through])
+	_check(not World.find_path(Vector2i(8, 4), Vector2i(8, 5), true, null, 0, false, {}, true, World.PATH_FIRE_AVOID).is_empty(), "not a wall: a burning cell can still be gone to")
+	# Her steps: round it.
+	_put(owner, Vector2i(14, 11))
+	_put(pet, Vector2i(8, 3))
+	var stood_in := 0
+	for i in 60:
+		pet.next_move_tick = 0
+		Heel.step(pet, Vector2i(8, 7), true)
+		stood_in += int(World.is_burning(pet.tile))
+		if pet.tile == Vector2i(8, 7):
+			break
+	_check(pet.tile == Vector2i(8, 7) and stood_in == 0, "she walks there round it, never in it (at %s, %d in fire)" % [pet.tile, stood_in])
+	# Her heel: never a burning cell.
+	_put(owner, Vector2i(8, 6))
+	_put(pet, Vector2i(10, 8))
+	var heel := Heel.cell(pet, owner)
+	_check(heel != Vector2i(-1, -1) and not World.is_burning(heel), "beside the fire, her heel is not in it (%s)" % heel)
+	# A kept route through a cell that has caught fire since: searched again.
+	_put(owner, Vector2i(17, 12))
+	_put(pet, Vector2i(2, 2))
+	var goal := Vector2i(14, 11)
+	pet.next_move_tick = 0
+	Heel.step(pet, goal, true)
+	var kept: Dictionary = Heel._routes.get(pet.get_instance_id(), {})
+	_check(not kept.is_empty(), "(a far walk keeps its route)")
+	if not kept.is_empty():
+		(kept["path"] as Array).insert(1, Vector2i(8, 5))  # As if fire spread onto it.
+		var searched := Heel.searches
+		pet.next_move_tick = 0
+		Heel.step(pet, goal, true)
+		_check(Heel.searches == searched + 1, "fire on the kept route: she looks for her way again")
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
 func _test_order_holds() -> void:
 	print("
 == her orders hold a moment: the foe kept, a dodge stood, calm waited for (706) ==")
@@ -3573,10 +3626,7 @@ func _test_guide_free() -> void:
 	_settle(pet)
 	var free_was := World.free_walk
 	World.set_free_walk(true)
-	# From the corridor along the bottom (y 11-12), clear of the room's fire,
-	# which spreads (her way does not keep off a burning cell).
-	_put(owner, Vector2i(14, 11))
-	_put(pet, Vector2i(13, 11))
+	var burnt := {"ticks": 0}  # Ticks she or they stood in fire (707). (A lambda takes ints by value.)
 	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
 	var routes: Array[Array] = []
 	var send_was: Callable = _main._world_news.send
@@ -3591,11 +3641,11 @@ func _test_guide_free() -> void:
 	var steer := func() -> void:
 		# Their client: the last route steered, to its end.
 		if not routes.is_empty() and not (routes.back() as Array).is_empty():
-			var end: Array = (routes.back() as Array).back()
-			Walk.toward(owner, Vector2i(int(end[0]), int(end[1])))
+			Walk.toward(owner, _route_next(owner, routes.back()))
 	for i in 120:
 		steer.call()
 		World.step()
+		burnt["ticks"] += int(World.is_burning(pet.tile) or World.is_burning(owner.tile))
 		if World.distance(owner.tile, came_from) >= 3:
 			break
 	_check(not routes.is_empty() and pet.guide.going() and World.distance(owner.tile, came_from) >= 3,
@@ -3617,6 +3667,7 @@ func _test_guide_free() -> void:
 			break
 		steer.call()
 		World.step()
+		burnt["ticks"] += int(World.is_burning(pet.tile) or World.is_burning(owner.tile))
 	var last := routes.size()
 	var there := pet.tile
 	for i in 40:
@@ -3625,6 +3676,7 @@ func _test_guide_free() -> void:
 	_check(pet.guide == null and World.distance(there, far) <= 3 and World.distance(owner.tile, pet.tile) <= 3,
 		"lead on, and there: she has brought them, and they come up beside her (her %s at the end, now %s, them %s, %s)" % [there, pet.tile, owner.tile, far])
 	_check(routes.size() == last and not (routes.back() as Array).is_empty(), "arrived: no new route, the last one theirs to finish")
+	_check(burnt["ticks"] == 0, "led past the room's fire, neither she nor they ever stood in it (707: %d ticks)" % burnt["ticks"])
 	_main._world_news.send = send_was
 	_bond_as(0, kept_bond)
 	World.set_free_walk(free_was)
@@ -5431,6 +5483,17 @@ func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
 		if entity.tile == tile:
 			return
 		World.step()
+
+
+## The next cell of a guide route ([x, y] cells, 695) for [param body] to
+## steer to, as its client does: the one after where it stands, else the
+## first.
+func _route_next(body: GridEntity, route: Array) -> Vector2i:
+	var cells: Array[Vector2i] = []
+	for each: Array in route:
+		cells.append(Vector2i(int(each[0]), int(each[1])))
+	var at := cells.find(body.tile)
+	return cells[mini(at + 1, cells.size() - 1)]
 
 
 func _step_until(condition: Callable, limit: int) -> void:
