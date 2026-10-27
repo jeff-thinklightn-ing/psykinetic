@@ -2740,8 +2740,10 @@ func low_camera() -> bool:
 ## The pitch at rest: OVERHEAD_PITCH with the overhead view on (671),
 ## else normal_pitch.
 func rest_pitch() -> float:
-	if indoors and indoor_view and not _low and not _inside_chosen:
-		return inside_pitch  # 671: top-down inside a walled space.
+	if indoors and indoor_view and not _inside_chosen:
+		# 671: top-down inside a walled space, under the low camera too (671
+		# amended (4); his words had no exception).
+		return inside_pitch
 	return overhead_pitch if overhead else normal_pitch()
 
 

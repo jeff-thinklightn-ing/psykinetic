@@ -4693,7 +4693,7 @@ func _test_low_camera() -> void:
 	_rig.indoor_view = true
 	_rig.inside_changed.emit(true, Rect2i(0, 0, 4, 4))
 	_rig._ease_tilt(1.0)
-	_check(_rig.indoors and is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "indoors under the low camera: it keeps its own pitch (671; %.0f)" % _rig.pitch)
+	_check(_rig.indoors and is_equal_approx(_rig.pitch, Client3D.INSIDE_PITCH), "indoors under the low camera: top-down too (671 amended (4); %.0f)" % _rig.pitch)
 	_rig.inside_changed.emit(false, Rect2i())
 	_rig._fade_clock += Client3D.INSIDE_LEAVE_HOLD * 2.0
 	_rig._update_indoors()

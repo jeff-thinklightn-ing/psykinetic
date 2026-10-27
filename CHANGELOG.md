@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Camera: walking into a house goes top-down with the low camera on too (671 amended (4))
 - Pointing at a grave robber (or any human foe) outlines it again instead of turning it white and see-through (177 amended)
 - Routed robbers in a barrow now run for the entrance and get away by it (gone, not dead: no drops, and they come back later); the barrow's undead never leave. Outdoors they flee as before (702).
 

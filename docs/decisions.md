@@ -33026,3 +33026,16 @@ compare_always, 1" put after its first line (cached a shader; the goblin
 keeps its file; a shader that sets its own stencil is kept). view_test
 _test_target_marked: the human body's copy marks the stencil, its palette
 the same. Client only, protocol unchanged, no new class_name.
+
+## 671 amended (4): top-down inside under the low camera too
+
+Jeff's v0.1.187 checklist: walking into an outdoor house, "no camera
+change". With the real wilds loaded, every house in Umbrage (the forge,
+kitchen, temple, the small houses) counts as inside, worked out each frame
+from his drawn body (free walk changes nothing there); but 671 kept the
+low camera's own pitch indoors (rest_pitch: "not _low"), so with the low
+camera on (Options, decision 623) going in did nothing. His 671 words had
+no exception (the coordinator): inside tips top-down under the low camera
+as well, and the player's W/S inside still wins (671 amended (2)).
+view_test: indoors under the low camera rests at the inside pitch. Client
+only, protocol unchanged, no new class_name.
