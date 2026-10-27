@@ -636,6 +636,15 @@
 			"volume_db": -2.0,
 			"uses": "one beat (lub-dub) of the downed local player's heart, at Player.heart's pace, over the ducked mix (587); client3d/heartbeat.gd, a beat every 60/heart s and a last one at bleed out"
 		},
+		"sfx.slab_grind": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door",
+			"volume_db": -12.0,
+			"uses": "a crypt's stone slab drawn open, about 1.1 s with its motion: a knock, a short grind as it's pushed back, a longer scraping slide, a low settling thud (the barrow's hidden niche; Client3D, the door shut to open while drawn); heard like a door",
+			"fallback": "sfx.knockback_stone"
+		},
 		"sfx.door_wood_open": {
 			"category": "doors",
 			"type": "oneshot",

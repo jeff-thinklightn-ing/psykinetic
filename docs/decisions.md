@@ -33444,3 +33444,28 @@ Jeff needed to give his character gold (25, for the draugr), and the console had
 - It is logged: Economy.add_gold's usual "[economy] ... got N gold (why)" line, plus "[economy] the admin gave N gold (why)" with no name or id. The reply gives the player's new total.
 
 zone_test _test_console: by name, by id prefix with a why, a negative amount refused, no such player and no amount refused. Server only: no wire change, no new class_name.
+## 608 amended (2), sound's side. The slab's grind
+
+Dungeon and the coordinator (2026-10-27; Jeff: the barrow's hidden niche
+opening barely shows): a sound for the stone slab drawn open, for his trailer.
+sfx.slab_grind, a positional one-shot of about 1.1 s that follows the slab's
+motion: a heavy knock (0 to 0.15 s), a short grind as it's pushed back (to 0.45
+s), a longer scraping slide, and a low settling thud from about 0.9 s. Dungeon's
+Client3D plays it once at the slab's edge when the door goes from shut to open
+while drawn, guarded by SoundKit.has.
+
+- **The slot**: noise "door", so it's heard as far as sfx.door_wood_open (6
+  cells), through the barrow's halls. -12 dB: dry crypt stone, not metallic,
+  above the footsteps and the wooden door so it reads. Falls back to
+  sfx.knockback_stone, a stone knock; a wooden door's creak would read wrong on
+  stone.
+- **The takes**: three, CC0, each built from one recording's own knock, grind,
+  slide and thud, levelled (-12, -16, -19, -14 dB rms), crossfaded 25 ms,
+  high-passed at 35 Hz and low-passed at 9 kHz: freesound 552483 (a heavy tomb
+  door), 243699 (a hidden wall opening), 558254 (a heavy stone push). 1.07 to
+  1.19 s, peak -3, rms -16 to -19, most of their energy under 2 kHz. Listening
+  copies in C:/dev/review/sound/slab.
+
+sound_kit_test: placed, a door's reach, three takes. No CHANGELOG bullet:
+nothing plays it until dungeon's call lands. Client only, protocol unchanged, no
+new class_name.

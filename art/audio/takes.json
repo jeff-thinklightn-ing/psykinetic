@@ -1718,6 +1718,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.slab_grind": [
+			{
+				"file": "sfx.slab_grind.ogg",
+				"from": "freesound",
+				"original": "freesound 552483: Tomb_door.wav, a knock, grind, slide and settling thud cut from 0.25 s, 1.2 s, 2.0 s and 6.78 s, crossfaded",
+				"sha256": "46bc4aad5c6bcecc95f486ebb32740d9e4c52ba6dc13aae09fed94b7975d4e4a",
+				"by": "MPTSound",
+				"url": "https://freesound.org/people/MPTSound/sounds/552483/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.slab_grind.2.ogg",
+				"from": "freesound",
+				"original": "freesound 243699: Hidden Wall Opening, a knock, grind, slide and settling thud cut from 0.24 s, 0.6 s, 1.5 s and 2.55 s, crossfaded",
+				"sha256": "223b2a8ca494abbfaae8a28e99d23c097c2c7d905aa9eedfc34c5acd53881216",
+				"by": "ertfelda",
+				"url": "https://freesound.org/people/ertfelda/sounds/243699/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.slab_grind.3.ogg",
+				"from": "freesound",
+				"original": "freesound 558254: Heavy Stone Push, a knock, grind, slide and settling thud cut from 0.06 s, 0.21 s, 0.4 s and 0.07 s, crossfaded",
+				"sha256": "92694c62c5273f042cb7d0f125d5baa21b12856ec7daee9fc0882325dbda8198",
+				"by": "msavioti",
+				"url": "https://freesound.org/people/msavioti/sounds/558254/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.splash": [
 			{
 				"file": "sfx.splash.ogg",

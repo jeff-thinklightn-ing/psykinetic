@@ -106,6 +106,9 @@ func _test_noises_are_the_sims() -> void:
 	for slot: String in ["sfx.arrow_lob_rise", "sfx.arrow_lob_fall"]:
 		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and SoundKit.takes(slot).size() == 3,
 				"%s: placed, no noise for monsters (the loose is the bow's), three takes of its own" % slot)
+	_check(SoundKit.positional("sfx.slab_grind") and SoundKit.reach("sfx.slab_grind") == SoundKit.reach("sfx.door_wood_open")
+			and SoundKit.takes("sfx.slab_grind").size() == 3,
+			"a stone slab drawn open: placed, heard as far as a door (%d cells), three takes" % SoundKit.reach("sfx.slab_grind"))
 	_check(SoundKit.reach("sfx.arrow_lob_fall") >= 5, "a lob's falling whistle heard a few cells round where it lands (%d)" % SoundKit.reach("sfx.arrow_lob_fall"))
 	_check(SoundKit.footstep("grass", 80.0) == "sfx.footstep_grass_medium" and SoundKit.footstep("water", 25.0) == "sfx.footstep_water_small"
 			and SoundKit.footstep("mud", 120.0) == "sfx.footstep_stone_large", "a footstep by ground and body: grass medium, water small, unknown ground as stone")
