@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Server: an address that sends five wrong passwords within ten minutes is refused for fifteen minutes (701)
 ## v0.1.188
 
 - Camera: walking into a house goes top-down with the low camera on too (671 amended (4))

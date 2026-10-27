@@ -23,6 +23,7 @@ func _ready() -> void:
 	_test_self_update()
 	_test_fingerprint()
 	_test_token_from_env()
+	_test_token_lockout()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -170,3 +171,29 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## A token guessed at (701): TOKEN_TRIES wrong ones from one address within
+## the window lock it out for TOKEN_LOCKOUT_SECONDS; misses spread wider
+## than the window never do; another address is not touched.
+func _test_token_lockout() -> void:
+	print("
+== wrong tokens from one address: locked out after %d in %d s, for %d s ==" % [
+		Net.TOKEN_TRIES, roundi(Net.TOKEN_WINDOW_SECONDS), roundi(Net.TOKEN_LOCKOUT_SECONDS)])
+	var window := roundi(Net.TOKEN_WINDOW_SECONDS * 1000.0)
+	var lockout := roundi(Net.TOKEN_LOCKOUT_SECONDS * 1000.0)
+	var t0 := 1000000
+	var locked := false
+	for i in Net.TOKEN_TRIES - 1:
+		locked = Net.token_missed("10.0.0.1", t0 + i * 1000) or locked
+	_check(not locked and not Net.token_locked("10.0.0.1", t0 + 5000), "%d wrong: still let try" % (Net.TOKEN_TRIES - 1))
+	_check(Net.token_missed("10.0.0.1", t0 + 6000) and Net.token_locked("10.0.0.1", t0 + 7000), "the %dth within the window: locked out" % Net.TOKEN_TRIES)
+	_check(not Net.token_locked("10.0.0.2", t0 + 7000), "another address: not")
+	_check(Net.token_locked("10.0.0.1", t0 + 6000 + lockout - 1000) and not Net.token_locked("10.0.0.1", t0 + 6000 + lockout + 1000),
+			"for %d s, then let in again" % roundi(Net.TOKEN_LOCKOUT_SECONDS))
+	locked = false
+	for i in Net.TOKEN_TRIES * 2:
+		locked = Net.token_missed("10.0.0.3", t0 + i * (window / (Net.TOKEN_TRIES - 1) + 1000)) or locked
+	_check(not locked, "wrong ones spread wider than the window: never locked out")
+	Net._token_misses.clear()
+	Net._locked_out.clear()

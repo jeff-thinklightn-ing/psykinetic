@@ -33039,3 +33039,29 @@ no exception (the coordinator): inside tips top-down under the low camera
 as well, and the player's W/S inside still wins (671 amended (2)).
 view_test: indoors under the low camera rests at the inside pitch. Client
 only, protocol unchanged, no new class_name.
+
+## 701: a token guessed at locks its address out
+
+The coordinator: Net.authenticate rejected a wrong token but kept no
+count, so the server's token could be guessed by trying over and over from
+the public port. Now (server only):
+- Net.token_missed counts each address's wrong or empty tokens; TOKEN_TRIES
+  (5) of them within TOKEN_WINDOW_SECONDS (600, 10 minutes) lock it out for
+  TOKEN_LOCKOUT_SECONDS (900, 15 minutes). Misses older than the window are
+  forgotten, so a player mistyping now and then is never locked out.
+- Net._on_peer_connected refuses a locked address at once (its reason "too
+  many wrong tokens: try again later", Net.token_locked; a lockout run out
+  is forgotten). Only token misses count: an old build, a full server or a
+  taken id never do.
+- In the journal by count only, never the address: the lockout's line is
+  "an address locked out for 900 s after 5 wrong tokens in 600 s (n locked
+  out now)", and a locked address's refusals print "rejected peer N (locked
+  out)" without it (Net._reject's show_address). The wrong-token
+  rejections before the lockout keep their existing line, which names the
+  address as every rejection does (net_test reads it).
+- In memory only: a server restart clears the counts and lockouts.
+protocol_test _test_token_lockout (times given, as a unit): 4 let try, the
+5th locks out, another address untouched, let in again after 900 s, misses
+spread wider than the window never lock. Not in net_test: its clients all
+connect from 127.0.0.1, so a lockout there would refuse its other phases.
+Server only, protocol unchanged, no new class_name.

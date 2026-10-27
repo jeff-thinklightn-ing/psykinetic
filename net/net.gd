@@ -158,6 +158,12 @@ const MAX_PLAYERS := 16
 const AUTH_TIMEOUT := 5.0
 ## Seconds between telling a peer why it is rejected and disconnecting it.
 const REJECT_GRACE := 0.25
+## A token guessed at (decision 701): this many wrong or empty tokens from
+## one address within TOKEN_WINDOW_SECONDS lock it out for
+## TOKEN_LOCKOUT_SECONDS, its connections refused at once.
+const TOKEN_TRIES := 5
+const TOKEN_WINDOW_SECONDS := 600.0
+const TOKEN_LOCKOUT_SECONDS := 900.0
 
 ## Server: a peer is gone, once per peer, before anything else is sent.
 signal peer_left(peer: int)
@@ -606,6 +612,10 @@ var _leaving: Dictionary[int, bool] = {}
 var _dropped: Dictionary[int, bool] = {}
 ## Server only: authenticated peer -> its player_id.
 var _authenticated: Dictionary[int, String] = {}
+## Server (701): each address's wrong or empty tokens lately (msec ticks),
+## and the addresses locked out, till when (msec ticks).
+var _token_misses: Dictionary[String, Array] = {}
+var _locked_out: Dictionary[String, int] = {}
 ## True when an exported build has no settings file and must ask for one.
 var needs_setup := false
 ## Which client view Main shows: "2d" or "3d". Nothing on a server.
@@ -1473,6 +1483,35 @@ func is_authority() -> bool:
 	return multiplayer.is_server()
 
 
+## Server (701): a wrong or empty token from [param address] at
+## [param now] (msec ticks): TOKEN_TRIES of them within TOKEN_WINDOW_SECONDS
+## lock it out for TOKEN_LOCKOUT_SECONDS. The log names the count, never the
+## address. Whether this one locked it out.
+func token_missed(address: String, now: int) -> bool:
+	var misses: Array = _token_misses.get(address, []).filter(func(at: int) -> bool:
+		return now - at < TOKEN_WINDOW_SECONDS * 1000.0)
+	misses.append(now)
+	_token_misses[address] = misses
+	if misses.size() < TOKEN_TRIES:
+		return false
+	_token_misses.erase(address)
+	_locked_out[address] = now + roundi(TOKEN_LOCKOUT_SECONDS * 1000.0)
+	print("[net] an address locked out for %d s after %d wrong tokens in %d s (%d locked out now)" % [
+		roundi(TOKEN_LOCKOUT_SECONDS), misses.size(), roundi(TOKEN_WINDOW_SECONDS), _locked_out.size()])
+	return true
+
+
+## Server (701): whether [param address] is locked out at [param now]
+## (msec ticks); a lockout run out is forgotten.
+func token_locked(address: String, now: int) -> bool:
+	if not _locked_out.has(address):
+		return false
+	if now < _locked_out[address]:
+		return true
+	_locked_out.erase(address)
+	return false
+
+
 ## Server side: has [param peer] sent the right token? The authority itself
 ## always has.
 func is_peer_authenticated(peer: int) -> bool:
@@ -1509,6 +1548,7 @@ func authenticate(hello: Dictionary) -> void:
 		_reject(peer, "build mismatch: this client and the server are different builds of v%s" % version, why)
 	elif token != "" and offered != token:
 		_reject(peer, "authentication failed", "empty token" if offered == "" else "wrong token")
+		token_missed(_peer_address(peer), Time.get_ticks_msec())
 	elif id.is_empty() or id.length() > 64:
 		_reject(peer, "authentication failed", "bad player id")
 	elif reserved_id(id, mode):
@@ -1535,7 +1575,9 @@ static func reserved_id(id: String, run_mode: int) -> bool:
 
 
 func _on_peer_connected(peer: int) -> void:
-	if _authenticated.size() >= max_players:
+	if token_locked(_peer_address(peer), Time.get_ticks_msec()):
+		_reject(peer, "too many wrong tokens: try again later", "locked out", false)  # 701: no address in the log.
+	elif _authenticated.size() >= max_players:
 		_reject(peer, "server full")
 	else:
 		# Even without a token the peer must say hello, so its version is checked.
@@ -1604,9 +1646,9 @@ func test_note_order(peer: int, tick: int) -> void:
 
 
 ## [param reason] is what the player sees; [param detail] is for the log.
-func _reject(peer: int, reason: String, detail := "") -> void:
-	print("[net] rejected peer %d from %s (%s)" % [
-		peer, _peer_address(peer), reason if detail == "" else detail])
+func _reject(peer: int, reason: String, detail := "", show_address := true) -> void:
+	print("[net] rejected peer %d%s (%s)" % [
+		peer, " from %s" % _peer_address(peer) if show_address else "", reason if detail == "" else detail])
 	# Tell it why first. Disconnecting at once would drop that packet, so
 	# give the message a moment to go out, then disconnect gracefully (an
 	# outright cut leaves the peer in the multiplayer list for good). From
