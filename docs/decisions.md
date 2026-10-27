@@ -32311,3 +32311,39 @@ combat_test _test_lob_aim_on_client: as a client, a body placed at (1, 1)
 and replicated to (7, 2): no view yet, its cell; a view at (7.3, 2.2),
 there; as the server, free_pos. Client only, protocol unchanged, no new
 class_name.
+## 689 amended (4): guards for a free body rebuilt under its client, and free_walk kept over a restart
+
+Jeff on v0.1.184 with free_walk on: after a room reset (pressed to bring
+his companion in) his body stood frozen, the camera still working; the box
+logged him rebuilt at the start tile (a hostile within 5 of his saved
+tile), then no move and no refused command till he left. Headless over the
+wire (test_room and the barrow, a reset mid-walk then walking) it did not
+happen: the client got a new node and replay, the server took and applied
+its commands. What fits his case is a client that does not drive its new
+body free: its state heard before the body was known for its own (no
+replay made; standing, no state written again to mend it), so it walks
+the grid and the free body clears its orders each tick. Physics' resend
+(689 amended (3)) writes a standing body's state again each second; these
+close the rest:
+- Main._free_own on a client makes its own replay whenever its body's
+  state is there and the body is its own (Player._free_heard again), each
+  frame.
+- EntityFactory sets owner_peer before a spec's props, so a setter asking
+  whose the body is (free_state's) has the answer.
+- FreeNet.Own.held_by_server ignores a hold further off than
+  HOLD_MAX_TICKS (1200, past any downing): a tick of a zone clock since
+  begun again (a reset restarts it), not a hold.
+- The server logs once a body "grid orders from Player<n>'s client while
+  it walks free" (World._grid_order_for_free, from request_move and
+  request_step): the box shows it if it comes again. No player id or
+  name in it.
+
+And the admin's switch outlives a restart, as 689 meant: Snapshot.load
+returned a fixed set of keys and dropped "free_walk", so the box came back
+off after both of today's deploys. It now returns it (null when never
+saved), and Main._boot reads it. free_net_test: a body built with its
+state among its props makes its replay (none with the old order); a hold
+a few ticks on holds, one far past none; grid orders logged once; saved
+on and off load as saved, never saved as none. Server half: the line and
+the snapshot; client half: the re-bind, the factory order, the clamp.
+Protocol unchanged, no new class_name.

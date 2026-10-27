@@ -70,13 +70,15 @@ static func build(spec: Dictionary) -> GridEntity:
 	if scale > 0.0 and scale != 1.0:
 		entity.scale = Vector2(scale, scale)
 	entity.label = str(spec.get("label", ""))
+	# Its peer before its props: a property's setter may ask whose it is (a
+	# player's free_state makes its own client's replay, decision 689).
+	entity.owner_peer = int(spec.get("peer", 0))
 	var props: Dictionary = spec.get("props", {})
 	for property: String in props:
 		entity.set(property, props[property])
 	if entity.has_method("fit_slots"):
 		entity.fit_slots()  # A chest's or a container's contents, to its size.
 
-	entity.owner_peer = int(spec.get("peer", 0))
 	entity.zone = str(spec.get("zone", ""))
 	entity.spawn_spec = spec
 	entity.start_tile = spec.get("tile", Vector2i.ZERO)

@@ -35,6 +35,9 @@ const USED_SCALE := 80.0
 ## A correction of the own body under this many cells is blended out over
 ## BLEND_SECONDS; a bigger one (a push, a link) is shown at once.
 const BLEND_MAX := 0.75
+## The longest the server holds a body (a downing's, the longest), ticks: a
+## hold further off than this is a stale clock's (held_by_server).
+const HOLD_MAX_TICKS := 1200
 ## Held by the server (a push): its centre blended in however far, up to this.
 const HELD_BLEND_MAX := 3.0
 const BLEND_SECONDS := 0.1
@@ -257,7 +260,10 @@ class Own:
 	## Whether the server is moving [param entity] itself now, dropping its
 	## commands: a push's slide, a stun, down or downed.
 	func held_by_server(entity: GridEntity) -> bool:
-		return World.tick < maxf(maxf(hold_until, entity._reel_until), maxf(entity.down_until, entity.downed_until))
+		var until := maxf(maxf(hold_until, entity._reel_until), maxf(entity.down_until, entity.downed_until))
+		# Further off than any hold runs: a tick of a clock since begun again
+		# (a room reset restarts the zone's), not a hold.
+		return World.tick < until and until - World.tick <= HOLD_MAX_TICKS
 
 	func _glide(entity: GridEntity, command: Dictionary) -> void:
 		var glided: Array = World.free_glide(entity, base, command["intent"], float(command["ticks"]), held)

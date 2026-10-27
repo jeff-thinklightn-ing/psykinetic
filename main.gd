@@ -2648,6 +2648,12 @@ func _free_own(player: Player) -> FreeNet.Own:
 	if Net.is_authority() and World.free_body(player):
 		player.free_view = FreeNet.Own.new()
 		return player.free_view
+	if not player.free_state.is_empty():
+		# Its state heard before it was known for its own (a body rebuilt by a
+		# reset, its spawn bringing the state): heard again, as its own.
+		player._free_heard()
+		if player.free_view is FreeNet.Own:
+			return player.free_view
 	return null
 
 
@@ -3835,7 +3841,7 @@ func _boot() -> void:
 	# Each regenerating level's generation (decision 465), before any zone opens.
 	_regen = Regen.states_from(snapshot.get("regen", {}))
 	# Free movement (decision 689): as the admin last left it, or --free-walk.
-	World.free_walk = Net.free_walk or bool(snapshot.get("free_walk", false))
+	World.free_walk = Net.free_walk or snapshot.get("free_walk") == true
 	# The draugr's rest over the barrow's dead (decision 580): none after a restart (573 amended (4);
 	# Jeff: "why does his health and status not reset on server restart"): he is back seated, whole,
 	# his dead awake. A room reset keeps it (_start_level); it is not saved.

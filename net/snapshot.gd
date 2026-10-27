@@ -205,7 +205,10 @@ static func load(path: String) -> Dictionary:
 	var herds: Variant = data.get("herds", {})
 	var sky: Variant = data.get("sky", {})
 	var regen: Variant = data.get("regen", {})
+	var free_walk: Variant = data.get("free_walk")
 	return {"ok": true, "zones": zones, "players": players,
+		# The admin's free_walk switch as saved (689 amended (4)); null, never saved.
+		"free_walk": free_walk if free_walk is bool else null,
 		"regen": regen if regen is Dictionary else {},
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
 		"holdings": holdings if holdings is Dictionary else {},

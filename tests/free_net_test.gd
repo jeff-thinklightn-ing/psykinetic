@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_lag_across_fords()
 	_test_kick_under_lag()
 	_test_companion_on_a_client()
+	_test_rebuilt_body()
 	_test_switch()
 	_test_resend()
 	World.free_walk = false
@@ -282,6 +283,39 @@ func _test_kick_under_lag() -> void:
 	_check(player.free_pos.x > slid_to.x + 0.5, "walked east again after the slide (%s)" % player.free_pos)
 	_check(own.pending.is_empty() and own.shown(player).distance_to(player.free_pos) < 0.02,
 			"the view ends on the server's centre, nothing left to replay (%s, %s)" % [own.shown(player), player.free_pos])
+
+
+## Jeff's freeze after a room reset (689 amended (4)): the rebuilt body's
+## spawn can bring its state before it is known for one's own.
+func _test_rebuilt_body() -> void:
+	print("
+== a body rebuilt with its state in its spawn: one's own replay, a hold of a stale clock none, grid orders logged ==")
+	var player := _build(OPEN, Vector2i(2, 2))
+	World.free_input(player, Vector2.RIGHT, World.TICK_DT)
+	World.step()
+	player.pack_free()
+	var spec := {"script": "res://sim/player.gd", "shape": "capsule", "name": "Rebuilt", "peer": Net.local_id,
+			"props": {"free_state": player.free_state.duplicate()}}
+	var rebuilt := EntityFactory.build(spec) as Player
+	_check(rebuilt.free_view is FreeNet.Own, "its peer set before its props: the state heard as its own, its replay made (%s)" % rebuilt.free_view)
+	rebuilt.free()
+	var own := FreeNet.Own.new()
+	own.hold_until = World.tick + 5
+	_check(own.held_by_server(player), "a push's hold a few ticks on: held")
+	own.hold_until = World.tick + FreeNet.HOLD_MAX_TICKS + 5000
+	_check(not own.held_by_server(player), "a hold far past any (a clock begun again): not held")
+	var logged := World.logged
+	World._grid_order_for_free(player)
+	World._grid_order_for_free(player)
+	_check(World.logged == logged + 1, "grid orders for a free body: logged once (%d)" % (World.logged - logged))
+	# The admin's switch outlives a restart (the box came back off twice).
+	var path := preload("res://tests/test_ports.gd").scratch_path("free_walk_state.json")
+	for saved: bool in [true, false]:
+		Snapshot.save(path, {}, [], {"steps": 0, "free_walk": saved})
+		_check(Snapshot.load(path).get("free_walk") == saved, "free_walk saved %s: loaded %s" % [saved, Snapshot.load(path).get("free_walk")])
+	Snapshot.save(path, {}, [], {"steps": 0})
+	_check(Snapshot.load(path).get("free_walk") == null, "never saved: none (the default rules)")
+	DirAccess.remove_absolute(path)
 
 
 func _test_companion_on_a_client() -> void:

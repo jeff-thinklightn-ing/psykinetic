@@ -6945,6 +6945,7 @@ func request_move(entity_path: NodePath, target: Vector2i, via: Array) -> void:
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity == null:
 		return
+	_grid_order_for_free(entity)
 	var tiles: Array[Vector2i] = []
 	for at: Variant in via:
 		if at is Vector2i:
@@ -6961,9 +6962,20 @@ func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predic
 	Net.test_note_order(multiplayer.get_remote_sender_id(), tick)
 	var entity := _entity_owned_by_sender(entity_path)
 	if entity != null:
+		_grid_order_for_free(entity)
 		var was := enter_named(entity.zone)
 		order_step(entity, direction, epoch, predicted)
 		enter(was)
+
+
+## A grid order (a step or a walk) from the client of a body walking free
+## (689 amended (4)): its client is not driving it free (Jeff's freeze after
+## a room reset: nothing it sent moved the body). The free body clears such
+## orders each tick; logged once a body, so the box shows it.
+func _grid_order_for_free(entity: GridEntity) -> void:
+	if free_body(entity) and not entity.has_meta(&"grid_order_logged"):
+		entity.set_meta(&"grid_order_logged", true)
+		_log("grid orders from %s's client while it walks free (peer %d): its client is not driving it free" % [entity.name, entity.owner_peer])
 
 
 ## A free body's input commands from its client (decision 689;

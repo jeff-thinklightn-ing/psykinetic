@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Free movement: the server remembers whether free movement is on across a restart, and your client takes hold of your character again if it was rebuilt (a room reset) and didn't respond (689 amended (4))
 ## v0.1.185
 
 - The bow's lob no longer shows a red line under free walk (677 amended): the client aimed it from the cell you joined on, not where you stand, so the circle fell in walls; the plain shot's aim was skewed the same way.
