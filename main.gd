@@ -2642,6 +2642,9 @@ var _free := {"path": [], "held": false, "at": 0}
 ## How long the button is held after a click before it steers to the
 ## cursor rather than walking the click's route.
 const FREE_HOLD_SECONDS := 0.25
+## How far along its route a free body looks for a cell in clear line
+## (_free_pull, 689 amended (5)): a few line checks a frame at most.
+const FREE_PULL_CELLS := 12
 
 
 ## The own body's view while it is a free body, else null: a client's from
@@ -2725,9 +2728,7 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			if (_free["path"] as Array).is_empty():
 				return way.normalized() if way.length() > 0.25 else Vector2.ZERO
 	var path: Array = _free["path"]
-	# The line pulled: a cell passed by on the way to the next is not gone back for.
-	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])):
-		path.pop_front()
+	_free_pull(player, path, at)
 	while not path.is_empty():
 		var next := Vector2(path[0])
 		var near := 0.05 if path.size() == 1 else 0.45
@@ -2737,6 +2738,24 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			return way.normalized() * (clampf(way.length() * 4.0, 0.2, 1.0) if path.size() == 1 else 1.0)
 		path.pop_front()
 	return Vector2.ZERO
+
+
+## The route's string pulled (689 amended (5); Jeff: "mouse move directions is
+## very unreponsive"): from where the body stands, straight at the farthest
+## of its next FREE_PULL_CELLS cells in clear line (World._line_clear, as a
+## held steer goes straight at the cursor), not cell centre to centre: a
+## new click mid-walk heads its way at once instead of angling to the next
+## centre first (765 ms to settle on the new way, the grid 150). Else a cell
+## passed by on the way to the next is not gone back for.
+func _free_pull(player: Player, path: Array, at: Vector2) -> void:
+	var from := World.free_cell(player, at)
+	for k in range(mini(path.size() - 1, FREE_PULL_CELLS), 0, -1):
+		if World._line_clear(from, path[k], path[k], player):
+			for i in k:
+				path.pop_front()
+			return
+	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])):
+		path.pop_front()
 
 
 ## Her route for his body while she leads him (695, ui's side; Guide under

@@ -32620,3 +32620,24 @@ combat_test _test_free_chase: ordered from 8 cells, no grid step in 1 s;
 past 4 s given up, nothing struck; ordered again and walked by its own
 commands (Walk.to) to beside the target: struck. Server only, protocol
 unchanged, no new class_name.
+
+## 689 amended (5): a free body's route steered straight at the farthest cell in clear line
+
+Jeff: "mouse move directions is very unreponsive". 683's harness on
+v0.1.186 (headless client through the proxy at the box's round trip,
+wilds, companions, medians in ms) had free walk's stops at 16 and a key's
+turn at 75, but a new click mid-walk took 765 to settle on its new way
+(the grid 150), a held steer 343. A route was walked cell centre to cell
+centre (_free_intent): a click off the body's centre first angled to the
+next cell's centre, then bent onto the line, past 20 degrees off its way
+for half a second. Now Main._free_pull steers at the farthest of the
+route's next FREE_PULL_CELLS (12) cells in clear line from where the body
+stands (World._line_clear, as a held steer goes straight at the cursor in
+the open), else as before (a cell passed by not gone back for).
+10 rounds a case, before and after on the same build otherwise: a click's
+turn 500 (8 rounds; 765 in the 5-round run) to 50 and 67 in two runs; a
+held steer's turn 83 (343 in the 5-round run) to 67 and 64; the grid's
+150 and 101. Starts (83), stops (17 to 33) and the first frame showing a
+turn (17) unchanged. Rounds that never start are the harness walking off
+to the map's edge after a few rounds, the same before. controls_test
+_test_free_pull. Client only, protocol unchanged, no new class_name.

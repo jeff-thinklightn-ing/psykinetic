@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_item_keys()
 	_test_free_click()
 	_test_guide_route()
+	_test_free_pull()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1184,6 +1185,21 @@ func _player() -> Player:
 		if entity is Player and entity.spawned:
 			return entity
 	return null
+
+
+## A free body's route (689 amended (5); Jeff: "mouse move directions is
+## very unreponsive"): steered straight at the farthest cell in clear line,
+## not from centre to centre, so a new click heads its way at once.
+func _test_free_pull() -> void:
+	print("
+== a route's string pulled: straight at the farthest cell in clear line ==")
+	var player := _place_player(Vector2i(4, 3))
+	var path: Array = []
+	for cell: Vector2i in World.walk_path(Vector2i(4, 3), Vector2i(9, 3), player):
+		path.append(cell)
+	var cells := path.size()
+	_main._free_pull(player, path, Vector2(4.4, 3.3))
+	_check(cells >= 5 and path.size() == 1 and path[0] == Vector2i(9, 3), "from off its centre: straight at (9, 3) (%d cells to %s)" % [cells, path])
 
 
 ## Guide under free walk (695, ui's side): her route ("guide_route" in the
