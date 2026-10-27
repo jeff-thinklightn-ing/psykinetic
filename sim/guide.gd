@@ -301,9 +301,7 @@ func stop(why: String) -> void:
 	clean = false
 	_leg = {}
 	_cells.clear()
-	if is_instance_valid(leader) and leader.spawned and leader.has_move_order and leader.move_order == _ordered:
-		leader.has_move_order = false
-	if _ordered != NONE and why != "arrived" and is_instance_valid(leader) and World.free_body(leader) and send_route.is_valid():
+	if _ordered != NONE and why != "arrived" and is_instance_valid(leader) and send_route.is_valid():
 		send_route.call([], self)  # Stopped: their client stops steering it (arrived, they finish the last one).
 	_ordered = NONE
 
@@ -340,9 +338,8 @@ func step(routes: WorldRoutes, threat: Callable) -> String:
 	_hp = Vector2i(leader.hp, pet.hp)
 	if leader.max_hp > 0 and float(leader.hp) / leader.max_hp < setting("hurt_below", 0.5):
 		return "hurt"
-	if not leader.queued_steps.is_empty() or leader.action_order != GridEntity.Order.NONE \
-			or leader.has_move_order and leader.move_order != _ordered and not World.free_body(leader):
-		return "moved"  # (A free body's own move is its client's word, the "guide" command's "stop", 695.)
+	if leader.action_order != GridEntity.Order.NONE:
+		return "moved"  # (His own walk is his client's word, the "guide" command's "stop", 695; 703: no grid steps.)
 	for entity in World.get_entities():
 		if entity is Monster and entity.spawned and World.distance(pet.tile, entity.tile) <= Companion.SIGHT_RANGE \
 				and threat.call(entity) and (pet.senses == null or pet.senses.sees(entity, -1, false)):
@@ -428,27 +425,20 @@ func _walk() -> void:
 			_cells = _cells.slice(at + 1)
 
 
-## Her player's body follows her: their move order her heel's cell once
-## they are two or more cells off. A free body takes no move order (688):
-## its client is sent the route to her heel each time the heel moves (695),
-## and steers it as a click's route.
+## Her player's body follows her, once two or more cells off: a player
+## walks free (688, 703), so their client is sent the route to her heel
+## each time the heel moves (695), and steers it as a click's route.
 func _heel() -> void:
 	if World.distance(leader.tile, pet.tile) < Heel.STOP:
 		return
 	var heel := Heel.cell(leader, pet)
 	if heel == NONE or heel == leader.tile:
 		return
-	if World.free_body(leader):
-		if heel != _ordered and send_route.is_valid():
-			var path: Array = []
-			for cell: Vector2i in World.walk_path(leader.tile, heel, leader, World.PATH_FIRE_AVOID):  # Not led into fire (707).
-				path.append([cell.x, cell.y])
-			send_route.call(path, self)
-		_ordered = heel
-		return
-	leader.move_order = heel
-	leader.has_move_order = true
-	leader.move_via.clear()
+	if heel != _ordered and send_route.is_valid():
+		var path: Array = []
+		for cell: Vector2i in World.walk_path(leader.tile, heel, leader, World.PATH_FIRE_AVOID):  # Not led into fire (707).
+			path.append([cell.x, cell.y])
+		send_route.call(path, self)
 	_ordered = heel
 
 

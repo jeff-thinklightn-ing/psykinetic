@@ -225,25 +225,13 @@ static func _serves(goal: Vector2i, body: GridEntity, leader: GridEntity, way: V
 	return Companion._inside_of(goal) == Companion._inside_of(leader.tile) and ahead_of(goal - leader.tile, way) <= 0
 
 
-## The next two cells of [param leader]'s way, a player's (WASD steps
-## queued, the via cells, else the line to their move order); none known,
-## or not a player's, empty.
+## The next cells of [param leader]'s way, a player's: where his free body
+## is heading (free_cells; 703: a player walks free, no grid steps to
+## read); not a player's, empty.
 static func next_cells(leader: GridEntity) -> Array[Vector2i]:
-	var next: Array[Vector2i] = []
-	var player := leader as Player
-	if player == null:
-		return next
-	if World.free_body(player):
-		return free_cells(player)
-	var at := player.tile
-	for queued: Dictionary in player.queued_steps.slice(0, 2):
-		at += queued["direction"] as Vector2i
-		next.append(at)
-	if next.is_empty():
-		next.assign(player.move_via.slice(0, 2))
-	if next.is_empty() and player.has_move_order and player.move_order != player.tile:
-		next.assign(World.line_cells(player.tile, player.move_order).slice(0, 2))
-	return next
+	if leader is not Player:
+		return []
+	return free_cells(leader)
 
 
 ## A free-walking leader's next cells (688; 689 sends no route, only the

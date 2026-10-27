@@ -33396,3 +33396,19 @@ a wall, her steps never in it, her heel not in it, a kept route searched
 again), and _test_guide_free led past the spreading fire with neither in it
 (0 ticks); both modes. resident_test and path_bound_test pass. Server only,
 protocol unchanged, no new class_name.
+
+## 703, step 3 (companions). Heel and Guide read a free leader only
+
+6b (703): a player walks free. Heel and Guide drop their grid branch for a
+player leader:
+- Heel.next_cells reads only where his free body is heading (free_cells),
+  not queued_steps, move_via or a move order.
+- Guide._heel always sends his client the route to her heel (695), with no
+  move order.
+- Guide.stop no longer clears a move order.
+- Guide.step's "moved" is his action order (an attack or shove he gave);
+  his own walk is his client's "guide" stop.
+
+No change under free walk, which has been the default for a day; the grid
+branch was dead in play. companion_test (both modes) and resident_test
+pass. Server only, protocol unchanged, no new class_name.
