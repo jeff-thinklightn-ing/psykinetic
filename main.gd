@@ -2746,6 +2746,11 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			var way := next - at
 			# The last cell: slower as it comes, so it stops on the centre.
 			return way.normalized() * (clampf(way.length() * 4.0, 0.2, 1.0) if path.size() == 1 else 1.0)
+		if path.size() == 1 and not own.pending.is_empty():
+			# 689 amended (6): the last cell is kept till the server has every step: one
+			# it dropped (a stall past FREE_BANK_TICKS) puts the body back
+			# short, and the route walks on from there instead of ending.
+			return Vector2.ZERO
 		path.pop_front()
 	return Vector2.ZERO
 

@@ -33299,3 +33299,14 @@ the launch. Measured 20.7 and 20.9 against 21.8, and 34.4 and 34.7
 against 35.8.
 
 Client only, protocol unchanged, no new class_name.
+## 689 amended (6): a click route ends only when the server has the walk
+
+Found by 703's net_test running free: when the server stalls (net_test's
+2 s hold; any hitch past FREE_BANK_TICKS), the free input it cannot bank
+is dropped, but the client's predicted body had already walked the click
+route to its end and popped every cell; corrected back, it stood short
+(Fay one cell from her click) with no route left. Now Main._free_intent
+keeps the route's last cell, its intent zero, until FreeNet.Own has no
+unacknowledged command (own.pending empty): a body put back short walks
+on from where the server has it. Client only, protocol unchanged, no new
+class_name.

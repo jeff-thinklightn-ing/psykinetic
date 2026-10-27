@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Walking: after a server hitch you no longer stop a step short of where you clicked (689 amended (6))
 ## v0.1.189
 
 - A lob's draw follows the arc: with a flatter arc set in tuning (F7, lob_apex) the bow is aimed lower, at the angle the arrow leaves at (677, pc-character's side, amended).
