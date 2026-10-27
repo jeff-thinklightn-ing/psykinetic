@@ -25,6 +25,9 @@ var _room: Node2D
 
 func _ready() -> void:
 	World.set_process(false)
+	# The grid's steps: free walk is the default (decision 693).
+	Net.free_walk = false
+	World.free_walk = false
 
 	_test_rules_file()
 	_test_costs()
@@ -364,6 +367,7 @@ func _test_lob_aim_on_client() -> void:
 	World.free_walk = true
 	host.tile = Vector2i(7, 2)  # Replicated there; free_pos left at the join cell (1, 1). Lob and shot aim both start at shot_origin.
 	host.free_pos = Vector2(1, 1)
+	host.pack_free()  # Its state, as the server sends it: a client's free body is one with its state (693).
 	var mode := Net.mode
 	Net.mode = Net.Mode.CLIENT
 	_check(World.shot_origin(host) == Vector2(7, 2), "no view yet: its cell (%s)" % World.shot_origin(host))

@@ -32,6 +32,9 @@ var _damage_log: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
+	# The grid's steps: free walk is the default (decision 693).
+	Net.free_walk = false
+	World.free_walk = false
 	World.entity_damaged.connect(func(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
 		_damage_log.append({"entity": entity, "amount": amount, "source": source, "cause": cause, "tick": World.tick}))
 

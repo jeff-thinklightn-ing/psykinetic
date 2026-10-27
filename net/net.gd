@@ -562,9 +562,14 @@ var companions := true
 ## a real level (Monster.idling, Monster.noticing): without it, test_room's
 ## imps hunted net_test's players under load.
 var still_monsters := false
-## --free-walk: players' bodies move freely (World.free_walk, decision 688),
-## on whoever is the authority; the grid's steps without it.
-var free_walk := false
+## Players' bodies move freely (World.free_walk, decision 688) on whoever is
+## the authority: the default (decision 693; Jeff: "it should be the default
+## setting"); --grid-walk for the grid's steps (tests staging steps), and
+## --free-walk to say so. A server's saved switch (the admin's free_walk
+## on|off) rules when neither is given.
+var free_walk := true
+## Whether --free-walk or --grid-walk was given (over the saved switch).
+var free_walk_given := false
 ## --no-player-reset turns this off: any player may rebuild the room with R.
 ## On while the game is only being tested; the console's reset always works.
 var player_reset := true
@@ -1912,6 +1917,10 @@ func _parse_args() -> void:
 				companions = false
 			"--free-walk":
 				free_walk = true
+				free_walk_given = true
+			"--grid-walk":
+				free_walk = false
+				free_walk_given = true
 			"--still-monsters":
 				still_monsters = true
 				Monster.idling = false

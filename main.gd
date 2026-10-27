@@ -3847,7 +3847,8 @@ func _boot() -> void:
 	# Each regenerating level's generation (decision 465), before any zone opens.
 	_regen = Regen.states_from(snapshot.get("regen", {}))
 	# Free movement (decision 689): as the admin last left it, or --free-walk.
-	World.free_walk = Net.free_walk or snapshot.get("free_walk") == true
+	# As given, else as the admin last left it, else on (decision 693).
+	World.free_walk = Net.free_walk if Net.free_walk_given or not snapshot.get("free_walk") is bool else bool(snapshot["free_walk"])
 	# The draugr's rest over the barrow's dead (decision 580): none after a restart (573 amended (4);
 	# Jeff: "why does his health and status not reset on server restart"): he is back seated, whole,
 	# his dead awake. A room reset keeps it (_start_level); it is not saved.

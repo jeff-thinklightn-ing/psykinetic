@@ -32407,3 +32407,26 @@ gossip and blessing passed.
   comes to her player.
 
 Server only, protocol unchanged, no new class_name.
+## 693: free walking is the default
+
+Jeff (step 6a): "ok the free-movement fix is clean so far, it should be the
+default setting". Players' bodies move freely (688, 689) wherever nothing
+says otherwise: Net.free_walk starts true, so a server, a host, offline and
+practice all walk free.
+- What rules, first to last: --free-walk or --grid-walk on the command line
+  (Net.free_walk_given); else the admin's switch as saved in the state
+  (free_walk on|off, kept over a restart since 689 amended (4)); else on.
+  The admin's "free_walk off" stays the fallback, and its off outlives a
+  restart. A saved "off" from before 693 would keep a world on the grid
+  after the update; the box has none (its saved state says on).
+- A client's rule follows each body (World.free_body): a player whose
+  server sends its free state (Player.free_state) is free, one without is
+  on the grid, whatever the client was started with. So a client never
+  disagrees with its server, its own flag or the default aside.
+- Tests that stage grid steps set the grid themselves (Net.free_walk and
+  World.free_walk false in their _ready; --grid-walk on net_test's and
+  state_test's instances); free_walk_test, free_net_test and the free
+  cases in combat, companion and controls tests cover the default.
+Server and client; protocol unchanged, no new class_name. The player's
+grid step path (6b) stays till free walk has run clean as the default for
+a few days, on the coordinator's word.

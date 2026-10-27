@@ -25,6 +25,9 @@ var _rush_ends: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
+	# The grid's steps: free walk is the default (decision 693).
+	Net.free_walk = false
+	World.free_walk = false
 	World.entity_damaged.connect(_on_entity_damaged)
 	World.rush_ended.connect(_on_rush_ended)
 

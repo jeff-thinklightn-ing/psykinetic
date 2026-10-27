@@ -19,6 +19,9 @@ var _main: Node
 
 func _ready() -> void:
 	World.set_process(false)
+	# The grid's steps: free walk is the default (decision 693).
+	Net.free_walk = false
+	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17793)
 	Net.companions = false
 	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("chest_test_world.json")

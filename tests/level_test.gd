@@ -23,6 +23,9 @@ var _pushes: Array[Dictionary] = []
 
 func _ready() -> void:
 	World.set_process(false)
+	# The grid's steps: free walk is the default (decision 693).
+	Net.free_walk = false
+	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17790)
 	Net.companions = false
 	_main = preload("res://main.tscn").instantiate()

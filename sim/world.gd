@@ -4062,7 +4062,7 @@ func _ready() -> void:
 	entity_pushed.connect(_on_pushed_for_stockpile)
 	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
 	load_physics_rules(FileAccess.get_file_as_string(PHYSICS_RULES))
-	free_walk = Net.free_walk  # --free-walk (688).
+	free_walk = Net.free_walk  # On unless --grid-walk (688, 693).
 	load_combat_rules(FileAccess.get_file_as_string(COMBAT_RULES))
 
 
@@ -8269,6 +8269,10 @@ func shot_origin(entity: GridEntity) -> Vector2:
 ## Whether [param entity] moves as a free body (decision 688): a player,
 ## while free_walk is on.
 func free_body(entity: GridEntity) -> bool:
+	if not Net.is_authority():
+		# A client's rules follow each body (decision 693): free while the
+		# server sends its free state, whatever a client starts with.
+		return entity is Player and not (entity as Player).free_state.is_empty()
 	return free_walk and entity is Player
 
 
