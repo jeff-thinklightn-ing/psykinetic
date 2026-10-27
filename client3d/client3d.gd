@@ -5031,21 +5031,45 @@ func _appear(kind: String, chunk: Vector2i) -> void:
 
 
 ## Frees what is left of earlier builds' rooms within [param budget] µs
-## from [param started]; true while some are left.
+## from [param started]; true while some are left. Each piece is queued
+## (queue_free), deleted at the frame's end, its cost counted as
+## FREE_USEC_PER_NODE a node: a free() in place met a piece still locked
+## mid-signal under a suite's load ("Object is locked and can't be freed",
+## view_test after a rebuild mid-build), and the pieces stay in the tree
+## till then (taken out, the shadows' pass read a light's place off-tree).
 func _free_old_rooms(started: int, budget: int) -> bool:
+	var queued := 0
 	while not _old_rooms.is_empty():
 		var old := _old_rooms[0]
-		if not is_instance_valid(old):
+		if not is_instance_valid(old) or old.is_queued_for_deletion():
 			_old_rooms.pop_front()
 			continue
-		if old.get_child_count() == 0:
+		var piece: Node = null
+		for i in range(old.get_child_count() - 1, -1, -1):
+			if not old.get_child(i).is_queued_for_deletion():
+				piece = old.get_child(i)
+				break
+		if piece == null:
 			_old_rooms.pop_front()
-			old.free()
+			old.queue_free()
 			continue
-		if Time.get_ticks_usec() - started >= budget:
+		if Time.get_ticks_usec() - started + queued * FREE_USEC_PER_NODE >= budget:
 			return true
-		old.get_child(old.get_child_count() - 1).free()
+		queued += _node_count(piece)
+		piece.queue_free()
 	return false
+
+
+## What deleting a room's node costs, about (perf: 2 µs headless, more with
+## the meshes' render state), for _free_old_rooms' budget.
+const FREE_USEC_PER_NODE := 5
+
+
+static func _node_count(node: Node) -> int:
+	var count := 1
+	for child in node.get_children():
+		count += _node_count(child)
+	return count
 
 
 ## The ground's and cliffs' chunks all built (decision 660): the shade's

@@ -31261,6 +31261,27 @@ made them before the view grew its first grass.
   first draws, as made behind the card.
 - view_test _test_scatter: a room's build makes every kind's mesh (fails
   without this, all six unmade).
+## 660 amended (3): old rooms' pieces queued for deletion, not freed in place
+
+Release's report: in enemy-ai's landing, under the suite's load, view_test
+printed RESULT: PASS but logged "ERROR: Object is locked and can't be freed"
+at Client3D._free_old_rooms (from _fill_step, right after "a rebuild
+mid-build"), which fails a scene in land.sh. It passed alone. A piece of an
+old room was still locked, mid-signal, when free() reached it; which signal
+was not found, and it was brief (one error).
+- _free_old_rooms queues each piece (queue_free) instead, deleted at the
+  frame's end by the engine, which makes no such check. The slice budget
+  counts FREE_USEC_PER_NODE (5 µs) for each node queued (measured 2 µs
+  headless, more with the meshes' render state), so a room still goes a
+  few ms a frame as 660 has it. The room itself is queued once all its
+  pieces are.
+- The pieces stay in the tree till then. Taken out at once instead, the
+  shadows' pass (_update_shadows keeps old rooms' lights in _shadow_lights
+  till they are freed) read a light's place off the tree, an error a frame.
+view_test passes: built over frames, the last room freed; a rebuild
+mid-build, the first's room gone; no orphan nodes. Client only, protocol
+unchanged, no new class_name.
+
 ## 683: Stops, turns and let-go land on the step under way
 
 The coordinator, on Jeff's "movement isn't right yet" after v0.1.179: stop
