@@ -47,6 +47,10 @@ func _test_counter() -> void:
 			counter = entity
 	var player := _player()
 	_check(counter != null and player != null, "(the test room's chest and a player)")
+	# The room's imps outnumber a lone host and close in (decision 698): too
+	# tough to die of them while the counter is worked.
+	player.max_hp = 1000000
+	player.hp = player.max_hp
 	counter.temple = true
 	counter.shop = false
 	counter.depot = false

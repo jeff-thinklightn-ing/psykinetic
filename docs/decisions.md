@@ -32619,6 +32619,43 @@ coordinator; release holds the box from this push).
 combat_test _test_free_chase: ordered from 8 cells, no grid step in 1 s;
 past 4 s given up, nothing struck; ordered again and walked by its own
 commands (Walk.to) to beside the target: struck. Server only, protocol
+## 698. A band counts its own before it holds back or breaks
+
+Jeff on v0.1.186, in the barrow: "the grave robbers tend to scatter upon us
+entering the room not putting up a fight even though theres 4 of them".
+Robbers are only cautious or cowardly (their temperament row), and both hold
+back HOLD_BACK_RANGE off till one or two others are at the target. With
+none bold, nobody went first, and four stood off three cells away. A hit
+then broke a coward (FLEE_BELOW 0.6), its rout broke every coward and every
+hurt cautious one, and the rest scattered.
+Now a monster weighs its band (Monster._band_odds): itself and those of its
+side within BAND_TILES (6) not fleeing, against the players and companions
+as near (a dreaded target counted as two, as before). A band is band_min
+strong or more (3; the coordinator: "so a pair stays as cautious as
+before"; "band_min" in the fight block of levels/monsters.json, on the F7
+panel as monsters.fight.band_min):
+- Holding back: it waits only while it is no band or its band does not
+  outnumber them, so four against two close together; a pair holds back.
+- A coward in a band breaks at odds when two or more are near and the band
+  no longer outnumbers them. With fewer than a band, the old rule: it breaks
+  alone within COWARD_ODDS_TILES of any monster.
+- A rout heard breaks a coward, or a cautious one under ROUT_HURT, unless its
+  band still outnumbers them. Animals are left out: a herd runs together.
+Its own hurt (FLEE_BELOW, DREAD_FLEE_BELOW) still breaks any of them.
+It holds for every kind, not robbers alone: a group of three or more
+cautious or cowardly monsters with no bold one among them now closes in
+where it stood off. A real difficulty step, tunable by band_min.
+A player just come back keeps his spawn grace (Main.SPAWN_GRACE_TICKS, 30,
+World.protect): no monster targets one protected, so no band closes on him
+till it ends or he moves or strikes. test_room's five imps beside a lone host
+respawned there (returns off, the old respawn; the game brings one back at a
+temple) still kill him after it, so respawn_test (the old-snapshot wait) and
+blessing_test (the counter) make their host too tough to die of them.
+monster_test _test_band_stands: four cowards against two all close and none
+breaks; two removed, the pair fights on, and one hurt breaks both; a
+cautious pair against two holds back; five beside one in his spawn grace
+leave him be, and go for him after. _test_call_and_rout's rout case has two
+players near; _test_fight_panel counts 17 rows. Server only, protocol
 unchanged, no new class_name.
 
 ## 689 amended (5): a free body's route steered straight at the farthest cell in clear line

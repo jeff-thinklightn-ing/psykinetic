@@ -254,6 +254,10 @@ func _test_old_snapshot_gets_current_looks() -> void:
 	]}))
 	file.close()
 	_main._start_level(true)
+	# The room's imps outnumber the host and its companion and close in
+	# (decision 698): too tough to die of them over the wait below.
+	_player().max_hp = 1000000
+	_player().hp = _player().max_hp
 
 	var crate := _slot_entity(5)
 	_check(crate != null and crate.tile == Vector2i(5, 5) and crate.hp == 7, "the crate is where the snapshot left it, with its hp")

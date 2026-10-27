@@ -54,10 +54,13 @@ const TACTIC_NAMES := {"plain": Tactic.PLAIN, "dart": Tactic.DART, "heavy": Tact
 const KINDS_PATH := "res://levels/monsters.json"
 const FLOAT_PROPS: Array[String] = ["mass", "move_ticks"]
 ## BOLD: never holds back, a longer leash (BOLD_LEASH), breaks only when
-## nearly dead. CAUTIOUS: holds back till another is at its target, calls
-## for help when it first sees someone. COWARDLY: calls for help, holds
-## back till two others are at its target, breaks early, or alone against
-## two or more (COWARD_ODDS_TILES). Each breaks below FLEE_BELOW of its hp;
+## nearly dead. CAUTIOUS: holds back till another is at its target or its
+## band (band_min strong, BAND_TILES, decision 698) outnumbers the foes,
+## calls for help when it first sees someone. COWARDLY: calls for help,
+## holds back till two others are at its target or its band outnumbers
+## them, breaks early, or against two or more its band no longer
+## outnumbers (fewer than a band: alone, COWARD_ODDS_TILES). Each breaks
+## below FLEE_BELOW of its hp;
 ## its boldness (holding back) is drawn within BOLDNESS. Its target holding
 ## a dread weapon (World.holder_dread, decision 365): a coward counts it as
 ## two, the cautious hold back till two others are at it and break below
@@ -73,7 +76,16 @@ const DREAD_FLEE_BELOW := 0.5
 const WORN_BUNDLE_CHANCE := 0.3
 const WORN_BUNDLE := Vector2i(4, 9)
 const BOLD_LEASH := 1.5
+## A coward with fewer than a band (band_min) breaks alone within so many
+## cells of any monster.
 const COWARD_ODDS_TILES := 3
+## A band (decision 698): those of its side within so many cells, and the
+## foes as near, counted against each other.
+const BAND_TILES := 6
+## A band stands as one (_band_holds) only this many strong, itself counted
+## (the coordinator: "so a pair stays as cautious as before"); "band_min" in
+## the fight block.
+const BAND_MIN := 3
 ## Fleeing (Alert.FLEEING): it runs FLEE_TILES at most at a time, and
 ## recovers after FLEE_TICKS with nobody within FLEE_NEAR_TILES.
 const FLEE_TICKS := 60
@@ -107,15 +119,16 @@ const FIGHT_DEFAULTS := {"windup_ticks": WINDUP_TICKS, "charge_range": CHARGE_RA
 	"dart_after_ticks": DART_AFTER_TICKS, "backstab_damage": BACKSTAB_DAMAGE, "pace_spread": PACE_SPREAD,
 	"cooldown_spread": COOLDOWN_SPREAD, "flank_patience_ticks": FLANK_PATIENCE_TICKS, "flee_ticks": FLEE_TICKS,
 	"flee_tiles": FLEE_TILES, "flee_near_tiles": FLEE_NEAR_TILES, "rout_hurt": ROUT_HURT,
-	"dread_flee_below": DREAD_FLEE_BELOW, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6}}
+	"dread_flee_below": DREAD_FLEE_BELOW, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
+	"band_min": BAND_MIN}
 ## Each fight value's range on the tuning panel (673 step 2), by name
 ## (flee_below's three share one).
 const FIGHT_SPANS := {"windup_ticks": [1, 30], "charge_range": [1, 10], "charge_pace": [0.1, 1.5],
 	"dart_after_ticks": [0, 20], "backstab_damage": [0, 10], "pace_spread": [0.0, 0.5], "cooldown_spread": [0, 10],
 	"flank_patience_ticks": [0, 100], "flee_ticks": [0, 300], "flee_tiles": [1, 20], "flee_near_tiles": [1, 20],
-	"rout_hurt": [0.0, 1.0], "dread_flee_below": [0.0, 1.0], "flee_below": [0.0, 1.0]}
+	"rout_hurt": [0.0, 1.0], "dread_flee_below": [0.0, 1.0], "flee_below": [0.0, 1.0], "band_min": [2, 10]}
 const FIGHT_INTS: Array[String] = ["windup_ticks", "charge_range", "dart_after_ticks", "backstab_damage",
-	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles"]
+	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles", "band_min"]
 const REACTION_TICKS_MAX := 6
 const PAUSE_CHANCE_MAX := 0.12
 const PAUSE_TICKS := Vector2i(2, 6)
@@ -427,6 +440,7 @@ var flee_ticks := FLEE_TICKS
 var flee_tiles := FLEE_TILES
 var flee_near_tiles := FLEE_NEAR_TILES
 var rout_hurt := ROUT_HURT
+var band_min := BAND_MIN
 var dread_flee_below := DREAD_FLEE_BELOW
 var flee_below := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 ## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
@@ -717,8 +731,9 @@ func _sim_tick() -> void:
 	if World.wielded(self).is_empty() and _pick_up(true):
 		return  # Bare-handed: the weapon at its feet first.
 	if (boldness < HOLD_BACK_BELOW or _dreads_target()) \
-			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()):
-		return  # Waits for the others.
+			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
+			and not _band_holds():
+		return  # Waits for the others; a band that outnumbers them goes in together.
 	if _rng.randf() < pause_chance:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
 		return
@@ -1827,8 +1842,9 @@ static func _marks(kind: String) -> Dictionary:
 
 
 ## Fighting: whether it breaks and runs (FLEE_BELOW of its hp, DREAD_FLEE_BELOW
-## for the cautious at a dread holder, or a coward alone against two or more
-## near, a dread holder counted as two).
+## for the cautious at a dread holder, or a coward against two or more near
+## that its band (band_min strong) no longer outnumbers, or alone against
+## them with fewer, a dread holder counted as two).
 func _should_flee() -> bool:
 	if fearless:
 		return false
@@ -1840,18 +1856,49 @@ func _should_flee() -> bool:
 		return true
 	if temper != Temper.COWARDLY:
 		return false
-	var foes := 0
-	for entity in World.sought():
-		if World.distance(tile, entity.tile) <= COWARD_ODDS_TILES:
-			foes += 2 if dreaded and entity == target else 1
-	if foes < 2:
+	var odds := _band_odds()
+	if odds.y < 2:
 		return false
+	if odds.x >= band_min:
+		return odds.x <= odds.y
+	# Fewer than a band: alone within COWARD_ODDS_TILES, as before 698.
 	for dy in range(-COWARD_ODDS_TILES, COWARD_ODDS_TILES + 1):
 		for dx in range(-COWARD_ODDS_TILES, COWARD_ODDS_TILES + 1):
 			var other := World.get_entity_at(tile + Vector2i(dx, dy))
 			if other != null and other != self and other is Monster:
 				return false  # Not alone.
 	return true
+
+
+## Its band against its foes (decision 698; Jeff on v0.1.186, the barrow: "the
+## grave robbers tend to scatter upon us entering the room not putting up a
+## fight even though theres 4 of them"): x, itself and those of its side
+## within BAND_TILES not running; y, the players and companions as near, its
+## dreaded target counted as two.
+func _band_odds() -> Vector2i:
+	var foes := 0
+	var dreaded := _dreads_target()
+	for entity in World.sought():
+		if World.distance(tile, entity.tile) <= BAND_TILES:
+			foes += 2 if dreaded and entity == target else 1
+	var band := 1
+	if foes > 0:
+		for entity in World.monsters():
+			var other := entity as Monster
+			if other != self and other.spawned and other.alert != Alert.FLEEING \
+					and World.distance(tile, other.tile) <= BAND_TILES and _same_side(other):
+				band += 1
+	return Vector2i(band, foes)
+
+
+## Whether its band, band_min strong or more, outnumbers the foes about it
+## (_band_odds): it holds. No
+## foe near, nothing to hold against; an animal's herd runs together.
+func _band_holds() -> bool:
+	if self is Animal:
+		return false
+	var odds := _band_odds()
+	return odds.y > 0 and odds.x >= band_min and odds.x > odds.y
 
 
 ## It breaks: away from [param threat] for FLEE_TICKS (more while the threat
@@ -1949,7 +1996,8 @@ func _same_side(other: GridEntity) -> bool:
 
 
 ## A rout heard since it last looked, from its side: a coward breaks, and
-## a cautious one under ROUT_HURT of its hp.
+## a cautious one under ROUT_HURT of its hp, unless its band still
+## outnumbers the foes (decision 698).
 func _heard_rout() -> bool:
 	if senses.last_tick <= _rout_tick:
 		return false
@@ -1964,6 +2012,8 @@ func _heard_rout() -> bool:
 		if source == self or not is_instance_valid(source) or not _same_side(source):
 			continue
 		if temper == Temper.COWARDLY or (max_hp > 0 and hp < max_hp * rout_hurt):
+			if _band_holds():
+				return false  # Its band still outnumbers them: it stands.
 			_flee(noise["at"], false)
 			return true
 	return false

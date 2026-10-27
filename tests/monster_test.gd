@@ -90,6 +90,7 @@ func _ready() -> void:
 	_test_wild_prey()
 	_test_wild_ears()
 	_test_clank()
+	_test_band_stands()
 	_test_wild_shot_near()
 	_test_far_pace()
 	_test_wild_scent()
@@ -1512,7 +1513,8 @@ func _test_call_and_rout() -> void:
 	_check(cries == [&"call"], "and cries out, for views and sound (%s)" % [cries])
 	_check(other.alert == Monster.Alert.HUNTING and other._lead == e["P"][0].tile,
 			"and comes after whom it fights (%s, %s)" % [Monster.Alert.keys()[other.alert], other._lead])
-	e = _build(["################", "#..............#", "#.P.i...i...b..#", "#..............#", "################"])
+	# Two near: the coward and the bold one no longer outnumber them (698).
+	e = _build(["################", "#..............#", "#.PPi...i...b..#", "#..............#", "################"])
 	var breaking: Monster = e["i"][0]
 	var coward: Monster = e["i"][1]
 	var bold: Monster = e["b"][0]
@@ -1749,6 +1751,77 @@ func _test_wild_ears() -> void:
 ## add a clank sound that scares prey"): its own kind beside the step, so
 ## game bolts from it within its reach, turns only to a step, and a monster
 ## goes to look.
+## A band counts its own (Jeff on v0.1.186, the barrow: "the grave robbers
+## tend to scatter upon us entering the room not putting up a fight even
+## though theres 4 of them"): four cowards spread over a room stand against
+## a player and a companion; with two of them down, the rest may break. A
+## pair is no band (band_min), and none closes on one in his spawn grace.
+func _test_band_stands() -> void:
+	print("\n== four robbers stand against two; two down, the rest may break; a pair holds back; the spawn grace holds ==")
+	Monster.idling = false
+	var e := _build(["##################", "#................#", "#.........x......#", "#............x...#", "#......P........#",
+		"#......P........#", "#..........x.....#", "#.............x..#", "#................#", "##################"])
+	var band: Array = e["x"]
+	for robber: Monster in band:
+		robber.temper = Monster.Temper.COWARDLY
+		robber.sight_range = 8  # A lit room, eyes all round: they see the two come in.
+		robber.senses.cone_cos = -1.0
+	var broke := []
+	for i in 40:
+		World.step()
+		for robber: Monster in band:
+			if robber.alert == Monster.Alert.FLEEING and not robber in broke:
+				broke.append(robber)
+	var fighting := band.filter(func(r: Monster) -> bool: return r.alert == Monster.Alert.FIGHTING)
+	var closed := band.filter(func(r: Monster) -> bool: return e["P"].any(func(p: GridEntity) -> bool: return World.are_adjacent(r.tile, p.tile)))
+	_check(broke.is_empty() and fighting.size() == 4 and closed.size() >= 2,
+			"four against two: none breaks, they close and fight (%d broke, %d fighting, %d at them)" % [broke.size(), fighting.size(), closed.size()])
+	for robber: Monster in [band[0], band[1]]:
+		robber.hp = robber.max_hp
+		World.despawn(robber)
+	var rest: Array = [band[2], band[3]]
+	for robber: Monster in rest:
+		robber.hp = robber.max_hp
+	for i in 10:
+		World.step()
+	_check(rest.all(func(r: Monster) -> bool: return r.alert != Monster.Alert.FLEEING),
+			"two down: the pair left is no band, but not alone either: they fight on, as a pair did")
+	rest[0].hp = rest[0].max_hp / 2  # Under a coward's FLEE_BELOW: it breaks, crying a rout.
+	for i in 10:
+		World.step()
+	_check(rest.all(func(r: Monster) -> bool: return r.alert == Monster.Alert.FLEEING),
+			"one of them hurt: it breaks, and its rout breaks the other (%s)" % [rest.map(func(r: Monster) -> String: return Monster.Alert.keys()[r.alert])])
+	# A pair is no band (band_min 3): it holds back as before 698.
+	e = _build(["##################", "#................#", "#.........x......#", "#......P.........#",
+		"#......P.........#", "#..........x.....#", "#................#", "##################"])
+	for robber: Monster in e["x"]:
+		robber.temper = Monster.Temper.CAUTIOUS
+		robber.sight_range = 8
+		robber.senses.cone_cos = -1.0
+	for i in 40:
+		World.step()
+	var pair_at := (e["x"] as Array).filter(func(r: Monster) -> bool: return e["P"].any(func(p: GridEntity) -> bool: return World.are_adjacent(r.tile, p.tile)))
+	_check(pair_at.is_empty(), "a pair of cautious ones against two: they hold back, as before (%d at them)" % pair_at.size())
+	# One just come back (spawn grace, Main.SPAWN_GRACE_TICKS): no band closes on him.
+	e = _build(["############", "#..........#", "#..a...a...#", "#....P.....#", "#..a...a...#", "#....a.....#", "############"])
+	var back: GridEntity = e["P"][0]
+	for imp: Monster in e["a"]:
+		imp.temper = Monster.Temper.CAUTIOUS
+		imp.sight_range = 8
+		imp.senses.cone_cos = -1.0
+	World.protect(back, 30)
+	var full: int = back.hp
+	var aimed := false
+	for i in 28:  # The grace ends on its 30th tick.
+		World.step()
+		aimed = aimed or (e["a"] as Array).any(func(m: Monster) -> bool: return m.target == back)
+	_check(back.hp == full and not aimed, "five beside one in his spawn grace: none goes for him (%d of %d hp)" % [back.hp, full])
+	for i in 30:
+		World.step()
+	_check((e["a"] as Array).any(func(m: Monster) -> bool: return m.target == back), "the grace over, they do")
+	Monster.idling = true
+
+
 func _test_clank() -> void:
 	print("\n== a clank heard: game bolts, a monster goes to look; a step only turns it ==")
 	Monster.idling = true
@@ -2539,8 +2612,8 @@ func _test_fight_panel() -> void:
 	Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)
 	var rows: Array = Tuning.fields().filter(func(r: Dictionary) -> bool: return str(r["path"]).begins_with("monsters."))
 	var windup: Array = rows.filter(func(r: Dictionary) -> bool: return r["path"] == "monsters.fight.windup_ticks")
-	_check(rows.size() == 16 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
-		"16 rows listed, windup_ticks an int taken at spawn (%s)" % [windup])
+	_check(rows.size() == 17 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
+		"17 rows listed (698's band_min too), windup_ticks an int taken at spawn (%s)" % [windup])
 	_check(Tuning.apply("monsters.fight.windup_ticks", 9) and Tuning.apply("monsters.fight.flee_below.bold", 0.2),
 		"windup_ticks and the bold one's flee_below set")
 	var e := _build(["#####", "#.b.#", "#####"])
@@ -2566,7 +2639,8 @@ func _test_fight_data() -> void:
 	Monster.set_fight_block(null)
 	var old := {"windup_ticks": 6, "charge_range": 4, "charge_pace": 0.5, "dart_after_ticks": 3, "backstab_damage": 1,
 		"pace_spread": 0.15, "cooldown_spread": 2, "flank_patience_ticks": 20, "flee_ticks": 60, "flee_tiles": 6,
-		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6}}
+		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
+		"band_min": 3}
 	var differ: Array[String] = []
 	for kind: String in Monster.kinds():
 		var rules := Monster.fight_for(kind)

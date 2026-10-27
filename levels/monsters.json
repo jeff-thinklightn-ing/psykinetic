@@ -1,7 +1,8 @@
 {
 	"fight": {"windup_ticks": 6, "charge_range": 4, "charge_pace": 0.5, "dart_after_ticks": 3, "backstab_damage": 1,
 		"pace_spread": 0.15, "cooldown_spread": 2, "flank_patience_ticks": 20, "flee_ticks": 60, "flee_tiles": 6,
-		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6}},
+		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
+		"band_min": 3},
 	"imp": {
 		"body": {"mass": 40.0},
 		"tactic": "dart",
