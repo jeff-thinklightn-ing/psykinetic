@@ -75,6 +75,7 @@ func _ready() -> void:
 	_test_arrows()
 	_test_loot()
 	_test_remedy_heal()  # After the timed checks: its 400 ticks would shift them.
+	_test_bandage_reach()  # So too its ticks.
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -2558,11 +2559,12 @@ func _test_bandage() -> void:
 	_check(not World.try_bandage(host, host), "not twice at once")
 	_check(host.tending == String(host.name), "tending itself, for the views' kneel (%s)" % host.tending)
 	_steps(World.BANDAGE_TICKS)
-	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL, "bandaged: mending now (%d hp to come)" % World.BANDAGE_HEAL)
+	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL - 1 and host.hp == hurt + 1,
+			"bandaged: the first point as it is done (713), mending now (%d more to come)" % (World.BANDAGE_HEAL - 1))
 	_check(host.tending == "", "done: tending no one")
 	World._relocate(host, _open_line(host, 1))
 	_steps(World.BANDAGE_REGEN_TICKS * 3)
-	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL - 3 and host.hp >= hurt + 3,
+	_check(host.mending == 2 and World._mending[host]["left"] == World.BANDAGE_HEAL - 4 and host.hp >= hurt + 4,
 			"walking about, a point every %d ticks: %d to %d" % [World.BANDAGE_REGEN_TICKS, hurt, host.hp])
 	World.damage(host, 1)
 	_steps(1)
@@ -2594,6 +2596,101 @@ func _test_bandage() -> void:
 			World._relocate(imp, was)
 		World.try_transfer(host, pet, 0, host, 2)
 	World.items.end(World.take_item(host, host, 2), "gone")
+
+
+## Jeff's bandage-kneel.md (decision 713): the heal as it is done, a
+## companion bandaged from two cells, an E-hold out of reach not turned on
+## yourself, and banked free steps dropped at the start.
+func _test_bandage_reach() -> void:
+	var host := _player(Net.local_id)
+	var pet: GridEntity = null
+	for entity in World.get_entities():
+		if entity is Companion and entity.spawned and entity.keeper_peer == host.owner_peer:
+			pet = entity
+	_check(pet != null, "a companion to bandage")
+	if pet == null:
+		return
+	var kit := _give(host, "bandaging_kit", 2) if host.slots[2].is_empty() else 0
+	var host_was := host.tile
+	World._relocate(pet, _open_line(host, 1))
+	print("\n== bandaging from two cells, the heal as it is done (decision 713) ==")
+	var parked: Dictionary[GridEntity, Vector2i] = {}  # The run's monsters (and any respawned) out of the way: calm here.
+	var park := func() -> void:
+		for monster: GridEntity in World.monsters():
+			if not parked.has(monster):
+				parked[monster] = monster.tile
+				World._occupancy.erase(monster.tile)
+				monster.acts = false
+		World._roster_current = false
+	park.call()
+	var settle := func() -> void:
+		World._bandaging.erase(host)
+		World._mending.erase(host)
+		World._mending.erase(pet)
+		host.mending = 0
+		pet.mending = 0
+		host.tending = ""
+		_steps(World.BANDAGE_CALM_TICKS + 1)
+		park.call()
+	var pet_was := pet.tile
+	settle.call()
+	# The first hp the tick it is done.
+	host.hp = host.max_hp - 5
+	_check(World.try_bandage(host, host), "case: bandaging yourself starts")
+	_steps(World.BANDAGE_TICKS)
+	_check(host.mending == 2 and host.hp == host.max_hp - 4, "case: done, the first hp at once, not a second later (%d)" % host.hp)
+	# A companion two cells off, a clear line.
+	settle.call()
+	var two := _open_line(host, 2)
+	World._relocate(pet, two)
+	pet.hp = pet.max_hp - 6
+	_check(World.distance(host.tile, pet.tile) == 2 and World.bandage_refusal(host, pet) == "" and World.try_bandage(host, pet),
+			"case: a companion two cells off, nothing between: bandaged (%s -> %s, '%s')" % [host.tile, pet.tile, World.bandage_refusal(host, pet)])
+	World._relocate(pet, host.tile + (two - host.tile) / 2)
+	_steps(1)
+	_check(pet.mending == 1 and host.tending == String(pet.name), "case: she steps closer within reach: it goes on")
+	var far := host.tile
+	for cell: Vector2i in _main._terrain["floor"]:  # Five off: her follow step back still leaves her out of reach.
+		if World.distance(cell, host.tile) == 5 and World.is_free(cell) and not World.zone.ground.has(cell):
+			far = cell
+			break
+	World._relocate(pet, far)
+	_check(World.bandage_refusal(host, pet) == "not_beside", "case: out of reach: not begun, too far (%s -> %s)" % [host.tile, pet.tile])
+	_steps(1)
+	_check(pet.mending == 0 and host.tending == "" and World.bandage_broke_why == "patient_moved",
+			"case: she goes out of reach: broken off, she moved (%s)" % World.bandage_broke_why)
+	# An E-hold on her out of reach says why; it never bandages you instead.
+	settle.call()
+	host.hp = host.max_hp - 3
+	_main._e_target = pet
+	_main._e_held = true
+	_main._e_since = Time.get_ticks_msec() - 10000
+	World._relocate(pet, far)
+	_main._check_bandage_hold()
+	_check(host.mending == 0 and pet.mending == 0, "case: E held on her out of reach: not you instead, not her (the server's line says why)")
+	# Banked free steps dropped as it starts.
+	settle.call()
+	var was_free := World.free_walk
+	World.free_walk = true
+	World.free_input(host, Vector2(1, 0), 1.0)
+	World.free_input(host, Vector2(1, 0), 1.0)
+	var queued := host.free_inputs.size()
+	_check(World.try_bandage(host, host) and host.free_inputs.is_empty(),
+			"case: free walk, %d steps banked: dropped as the bandage starts" % queued)
+	_steps(2)
+	_check(host.mending == 1 and host.tending == String(host.name), "case: and it is still running two ticks on (not broken by a banked step)")
+	World.free_walk = was_free
+	settle.call()
+	host.hp = host.max_hp
+	pet.hp = pet.max_hp
+	World._relocate(pet, pet_was)
+	World._relocate(host, host_was)
+	for monster: GridEntity in parked:
+		World._occupancy[parked[monster]] = monster
+		monster.acts = true
+	World._roster_current = false
+	if kit != 0:
+		World.items.end(World.take_item(host, host, 2), "gone")
 
 
 func _steps(count: int) -> void:

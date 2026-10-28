@@ -3308,13 +3308,15 @@ func _test_bandage_words() -> void:
 	_say_to(pet, owner, "Bandage me.")
 	_step_until(func() -> bool: return owner.mending == 1, 40)
 	_check(owner.mending == 1, "the bandage begun on her player")
-	var off := owner.tile + Vector2i(0, 1)
-	if not World.is_free(off):
-		off = owner.tile + Vector2i(0, -1)
+	var off := owner.tile  # Out of her reach (713: a step within two cells goes on).
+	for d: Vector2i in [Vector2i(0, 3), Vector2i(0, -3), Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 4), Vector2i(0, -4)]:
+		if World.is_free(owner.tile + d) and World.distance(owner.tile + d, pet.tile) > World.BANDAGE_REACH:
+			off = owner.tile + d
+			break
 	_put(owner, off)
 	_step_until(func() -> bool: return pet.errand.is_empty(), 20)
 	_check(owner.mending == 0 and World.bandage_broke_why == "patient_moved" and str(says["patient_moved"]) in spoken,
-		"her player's first step: broken off, and \"hold still\" (%s, %s)" % [World.bandage_broke_why, spoken])
+		"her player goes out of reach: broken off, and \"hold still\" (%s, %s)" % [World.bandage_broke_why, spoken])
 	# A player's own bandage, refused: the reason worded for them.
 	pet.hp = pet.max_hp
 	_check(World.bandage_refusal(owner, pet) == "not_beside" or World.bandage_refusal(owner, pet) == "no_wound", "a player's own: refused with a reason")

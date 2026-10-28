@@ -33793,3 +33793,35 @@ change ... smoke from chimney if occupied". Buildings' kind draws it; the frame 
 The source is C:/dev/review/hut/make_turf_slot.py (w, f, pot, pot2, bed, shelf). Nothing places it until
 buildings' kind lands, so there is no CHANGELOG bullet (buildings' says what a player sees). Art only,
 protocol unchanged, no new class_name.
+## 713: bandaging another from two cells; the heal as it is done; banked steps dropped
+
+Jeff on bandage-kneel.md: "Bandaging ruffle works most of the time, the
+kneeling is inconstent, the healing comes with a delay. Player has no way to
+apply bandages to their companion." Causes found first (coordinator's ask),
+then three fixes as one change:
+
+1. The delay: a finished bandage's first hp was due BANDAGE_REGEN_TICKS (1 s)
+   after the 2 s of kneeling. `_mending`'s first point is now due on the
+   finishing tick; the rate is unchanged (1 hp a second, BANDAGE_HEAL in all).
+2. The companion: the server path worked (B and a click, or E held on her),
+   but only from the cell beside her, and any step of hers broke it (625).
+   Under free walk she keeps her follow gap, so she was seldom beside. Now
+   `World.bandage_within(by, patient)`: beside (can_melee), or within
+   BANDAGE_REACH (2) cells with a clear line (has_line_of_sight), one zone.
+   It is the start's rule and the break's: 625's "patient_moved" now means
+   the patient left that reach, not their cell. An E held on a player or
+   companion out of reach sends the bandage to them anyway, and the server's
+   refusal says why ("come within two steps of them, nothing between");
+   before, it quietly fell back to bandaging yourself. Companions are asked to hold her
+   still while she is bandaged (their side, read from mending == 1).
+3. The kneel and ruffle that sometimes never showed: both read the
+   replicated `tending`. Under free walk, inputs still banked when the
+   bandage began moved the body a tick later and broke it ("moved") before a
+   view saw it. try_bandage now halts a free bandager at once (`halt(by,
+   tick)`, its banked inputs dropped and acknowledged). pc-character's side
+   (a fidget playing holds off the kneel) is theirs.
+
+items_test's `_test_bandage_reach` names each case; companion_test's break
+check moves her player out of reach. Server and client (the E-hold path);
+protocol unchanged (the bandage command keeps its target; the server checks
+the reach), no new class_name.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bandaging: you can bandage your companion or another player from up to two steps away with nothing between, and the bandage no longer breaks when they shift a step within that; holding E on someone out of reach tells you so instead of bandaging you. The first point of healing now comes the moment the bandage is done, and a bandage started while walking no longer breaks at once (so the kneel and the cloth sound show) (713).
 - Bandaging kneels at once (713): someone shifting their weight or crossing their arms when they start bandaging no longer finishes that first, so a quick bandage now shows the kneel.
 - Your companion holds still while you bandage her, so her own steps no longer break the bandage off (713).
 - The admin's "quests reset all" now also clears what the townsfolk remember of the player: today's hails and greetings, refusals to travel, and (for a full reset) each resident's trust, so quests can be tested from a clean start (672 amended, npc's side).

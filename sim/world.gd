@@ -6079,7 +6079,7 @@ func _fade_buffs() -> void:
 ## and a bleed or a burn runs beside it. At death it ends (this pass fades it).
 func _heal_tick(entity: GridEntity) -> void:
 	var on: Array = entity.buffs.get("heal", [])
-	if on.is_empty() or int(on[1]) < tick or on.size() > 2 and tick <= int(on[2]):  # Its last tick heals too, then this pass fades it.
+	if on.is_empty() or int(on[1]) < tick or (on.size() > 2 and tick <= int(on[2])):  # Its last tick heals too, then this pass fades it.
 		return
 	if entity.hp <= 0:
 		var now: Dictionary = entity.buffs.duplicate(true)
@@ -6145,20 +6145,38 @@ func try_bandage(by: GridEntity, patient: GridEntity) -> bool:
 		return false
 	if not is_instance_valid(patient) or not patient.spawned or patient.hp <= 0 or not has_hands(patient):
 		return false
-	if patient != by and (patient.zone != by.zone or not can_melee(by.tile, patient.tile)):
+	if not bandage_within(by, patient):
 		return false
 	if patient.hp >= patient.max_hp or patient.mending != 0 or by.mending == 1 or _bandaging.has(by):
 		return false
 	if bandage_kit(by) < 0 or not calm(by) or not calm(patient):
 		return false
 	_bandaging[by] = {"patient": patient, "until": tick + BANDAGE_TICKS, "from": tick, "tile": by.tile,
-		"patient_tile": patient.tile, "exerted": by.last_exertion_tick()}
+		"exerted": by.last_exertion_tick()}
 	patient.mending = 1
 	by.tending = String(patient.name)  # The views' kneel and ruffle.
+	if free_body(by):
+		halt(by, tick)  # Its banked free steps dropped (713): one after this would break it before a view saw it.
 	cure(patient, "bleed")  # A bandage stops bleeding at once (decision 375).
 	_log("bandage: %s starts on %s" % [by.name, patient.name])
 	bandage_changed.emit(by, patient, &"started")
 	return true
+
+
+## How far a bandager reaches its patient (decision 713; Jeff: "Player has
+## no way to apply bandages to their companion"): a step beside, or within
+## BANDAGE_REACH cells with a clear line (has_line_of_sight), in one zone.
+const BANDAGE_REACH := 2
+
+
+## Whether [param by] reaches [param patient] to bandage it (itself always).
+func bandage_within(by: GridEntity, patient: GridEntity) -> bool:
+	if patient == by:
+		return true
+	if patient.zone != by.zone:
+		return false
+	return can_melee(by.tile, patient.tile) \
+			or distance(by.tile, patient.tile) <= BANDAGE_REACH and has_line_of_sight(by.tile, patient.tile)
 
 
 ## Why [param by] could not begin bandaging [param patient] now
@@ -6170,7 +6188,7 @@ func try_bandage(by: GridEntity, patient: GridEntity) -> bool:
 func bandage_refusal(by: GridEntity, patient: GridEntity) -> String:
 	if not is_instance_valid(by) or not is_instance_valid(patient) or not patient.spawned or patient.hp <= 0 or not has_hands(patient):
 		return "gone"
-	if patient != by and (patient.zone != by.zone or not can_melee(by.tile, patient.tile)):
+	if not bandage_within(by, patient):
 		return "not_beside"
 	if patient.hp >= patient.max_hp:
 		return "no_wound"
@@ -6225,16 +6243,16 @@ func _tend_wounds() -> void:
 		if not broken:
 			broken = by.tile != job["tile"] or by.last_exertion_tick() != job["exerted"] \
 					or by.hurt_tick >= job["from"] or patient.hurt_tick >= job["from"] \
-					or patient != by and not can_melee(by.tile, patient.tile) or not calm(by) or not calm(patient)
-		if not broken and patient != by and patient.tile != job.get("patient_tile", patient.tile):
-			broken = true  # The patient's first step off their cell (decision 625, Jeff: "if target moves it interrupts").
+					or not calm(by) or not calm(patient)
+		if not broken and not bandage_within(by, patient):
+			broken = true  # The patient gone out of reach (713; 625's "if target moves it interrupts", now past the reach).
 		if broken:
 			_bandaging.erase(by)
 			if is_instance_valid(by):
 				by.tending = ""
 			if _alive(patient):
 				patient.mending = 0
-			bandage_broke_why = "gone" if not _alive(by) or not _alive(patient) else "patient_moved" if patient != by and patient.tile != job.get("patient_tile", patient.tile) \
+			bandage_broke_why = "gone" if not _alive(by) or not _alive(patient) else "patient_moved" if not bandage_within(by, patient) \
 				else "moved" if by.tile != job["tile"] or by.last_exertion_tick() != job["exerted"] \
 				else "hurt" if by.hurt_tick >= job["from"] or patient.hurt_tick >= job["from"] else "not_safe"
 			_log("bandage: %s's bandaging of %s broken off" % [by.name, patient.name])
@@ -6243,7 +6261,7 @@ func _tend_wounds() -> void:
 			_bandaging.erase(by)
 			by.tending = ""
 			patient.mending = 2
-			_mending[patient] = {"left": BANDAGE_HEAL, "next": tick + BANDAGE_REGEN_TICKS, "from": tick}
+			_mending[patient] = {"left": BANDAGE_HEAL, "next": tick, "from": tick}  # The first hp as it is done (713).
 			_log("bandage: %s bandaged %s" % [by.name, patient.name])
 			bandage_changed.emit(by, patient, &"done")
 	for patient: GridEntity in _mending.keys():

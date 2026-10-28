@@ -2063,7 +2063,7 @@ func _update_note() -> void:
 
 
 ## E held BANDAGE_HOLD_MSEC: a bandage command, on the player or companion
-## under the cursor if it is beside you, else on yourself.
+## under the cursor (within reach, or the server says why: 713), else on yourself.
 func _check_bandage_hold() -> void:
 	if not _e_held or Time.get_ticks_msec() - _e_since < BANDAGE_HOLD_MSEC:
 		return
@@ -2073,9 +2073,8 @@ func _check_bandage_hold() -> void:
 		return
 	var patient: GridEntity = player
 	var target := _e_target
-	if is_instance_valid(target) and (target is Player or target is Companion) \
-			and World.can_melee(player.tile, target.tile):
-		patient = target
+	if is_instance_valid(target) and (target is Player or target is Companion):
+		patient = target  # Out of reach, the server says so (713), never yourself instead.
 	bandage(player, patient)
 
 
@@ -6024,7 +6023,7 @@ func _tell_bandage_broke(by: GridEntity, patient: GridEntity, state: StringName)
 
 
 ## Why a player's own bandage could not begin (decision 625), %s whom.
-const BANDAGE_REFUSED := {"not_beside": "You can't bandage %s: stand beside them.", "no_wound": "You can't bandage %s: there's no wound to bind.",
+const BANDAGE_REFUSED := {"not_beside": "You can't bandage %s: come within two steps of them, nothing between.", "no_wound": "You can't bandage %s: there's no wound to bind.",
 	"mending": "You can't bandage %s: the wound is bound already.", "busy": "You can't bandage %s: your hands are busy.",
 	"no_kit": "You can't bandage %s: you have no bandaging kit.", "hurt_now": "You can't bandage %s: give it a breath after that blow.",
 	"not_safe": "You can't bandage %s: a monster is too near."}
