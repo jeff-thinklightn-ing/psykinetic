@@ -73,7 +73,11 @@ var _hp := Vector2i(-1, -1)
 ## again, which).
 const WAIT_LOOK := 1
 const WAIT_BECKON := 2
-var wait_cue := 0
+var wait_cue := 0:
+	set(cue):
+		wait_cue = cue
+		if is_instance_valid(pet) and pet.guide_wait != cue:
+			pet.guide_wait = cue  # Replicated (708 amended): her body's beckon.
 var _trail: Array[Vector2i] = []
 var _pause_until := -1
 var _looked_tick := -1

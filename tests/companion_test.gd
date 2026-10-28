@@ -3740,6 +3740,7 @@ func _test_guide_free() -> void:
 		"lead on, and there: she has brought them, and they come up beside her (her %s at the end, now %s, them %s, %s)" % [there, pet.tile, owner.tile, far])
 	_check(routes.size() == last and not (routes.back() as Array).is_empty(), "arrived: no new route, the last one theirs to finish")
 	_check(burnt["ticks"] == 0, "led past the room's fire, neither she nor they ever stood in it (707: %d ticks)" % burnt["ticks"])
+	_check(pet.guide_wait == 0, "arrived: her body's cue is cleared (708 amended: %d)" % pet.guide_wait)
 	var told: Dictionary = Guide.rules()["set_off"]
 	var said_off: bool = not set_off.is_empty() and set_off[0] in (told.get(str(pet.traits.get("temperament", "")), told["default"]) as Array)
 	_check(said_off, "as she sets off she says so, a line of the rules' (708: %s)" % [set_off])
@@ -3764,6 +3765,10 @@ func _test_guide_free() -> void:
 	_put(owner, Vector2i(10, 8))
 	corner.step(null, func(_e: GridEntity) -> bool: return false)
 	_check(corner.wait_cue == 0, "they come up: on (cue %d)" % corner.wait_cue)
+	corner._pause(Guide.WAIT_BECKON, 30)
+	_check(pet.guide_wait == Guide.WAIT_BECKON, "her body carries the cue, replicated, for the beckon (708 amended: %d)" % pet.guide_wait)
+	corner.stop("moved")
+	_check(pet.guide_wait == 0, "the walk stopped: no cue (%d)" % pet.guide_wait)
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)

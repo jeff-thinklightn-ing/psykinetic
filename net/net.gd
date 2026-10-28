@@ -456,13 +456,17 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## path}, which their client steers; the "guide" command takes "stop"
 ## ("moved": their own key or click took over). An old client never steers
 ## it, and its player stands while she leads.
-const PROTOCOL_REVISION := 40
+## 41 (708 amended): Companion.guide_wait (SUBCLASS_REPLICATED), her guide
+## walk's pause cue (Guide.WAIT_LOOK 1 a look back, WAIT_BECKON 2 waiting
+## for her player; 0 walking or not leading), for her body's beckon. The
+## forced cut with 703 step 4 (the grid walk's removal) and 677 amended (2).
+const PROTOCOL_REVISION := 41
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "gone", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "peaceable", "person", "pile_at", "pile_facing", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "peaceable", "person", "pile_at", "pile_facing", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

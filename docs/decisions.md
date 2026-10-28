@@ -34889,3 +34889,19 @@ revert commit and a full landing first.
   line changed.
 
 Tooling only; protocol unchanged; no new class_name.
+## 708 amended. Her guide pause, replicated
+
+Part 2 of 708, in the rev-41 forced cut (release's order: this first, then
+703 step 4, then 677 amended (2) combat and ui; no cut between them):
+- Guide.wait_cue's setter writes Companion.guide_wait, a replicated value
+  (SUBCLASS_REPLICATED): WAIT_LOOK 1 for a look back, WAIT_BECKON 2 for
+  waiting for her player at a turn, a way out or when he is far behind, 0
+  walking or not leading. stop and bind clear it.
+- pc-character plays a beckon on 2 (agreed: she stands facing him in both
+  cues, so the clip plays in her facing; no target needed).
+- PROTOCOL_REVISION 40 to 41 here, the cut's one bump. An old client
+  doesn't have the value.
+
+companion_test: her body carries the cue at a corner pause, and it is 0
+once the walk has stopped and once it has arrived. protocol_test passes.
+Server and wire; the client's beckon is pc-character's. No new class_name.

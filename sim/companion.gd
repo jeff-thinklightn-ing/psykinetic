@@ -658,6 +658,10 @@ var _sleeping := {}
 ## Asleep by the fire while her player keeps watch (621 amended: her intent
 ## SLEEP), replicated so her body lies down on their client.
 var asleep := false
+## Her guide walk's pause cue (708 amended; Guide.wait_cue: 1 a look back, 2
+## waiting for her player, 0 walking or not leading), replicated so her body
+## beckons on their client (pc-character's).
+var guide_wait := 0
 ## A boss's telegraph (decision 663, drafts for Jeff): one whose source she
 ## sees and that lands within DODGE_LOOK ticks, her cell in it, she steps
 ## clear of after DODGE_REACT ticks (DODGE_WARY more, wary or worse) to a
@@ -738,6 +742,7 @@ func _init() -> void:
 	replicate("asleep")  # 621 amended: her body lies down by the fire.
 	replicate("bond_why")
 	replicate("body")
+	replicate("guide_wait")  # 708 amended: her guide walk's pause, for the beckon.
 	mass = 75.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 	emit_light = 0.9  # Her lantern.
