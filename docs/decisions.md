@@ -34472,3 +34472,23 @@ so no player met it.
 monster_test: a cautious shield-bearer against a sword's lead neither
 steps out nor bashes and takes the blow (on main it bashed, 0 blows); the
 heavy cases as before. Server only, protocol unchanged, no new class_name.
+## 672 amended, ui's side: quests reset all takes everything quest-shaped
+
+Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,
+this is so that things can be tested properly". The admin's "quests reset
+all" (Main._quests_reset_all) now also calls each owner's part, landed
+under 672 amended: companions' companion_let_go (her "taken", a raid
+group's and a town's captive entry), dungeon's reset_barrow (the draugr's
+blessing and its sealed way, the deal won, the amulet's charges, the draft
+line), items' World.reset_totem (the amulet itself, wherever it is), every
+Draugr's forget_player in every zone (his asking and an open pact; see 716),
+and npc's quests_forget with standing (hails, refusals to travel, each
+resident's standing: a stranger again). ui clears the record's caches
+searched and the healer's care (care, care_given; economy: safe, nothing
+caches them). Kept, as economy and the coordinator ruled: gold, a town's
+debts to them, plots, her bond and story, former companions. The world's
+own state (the barrow's niche opened, the draugr's rest) is every
+player's and stays with "zone reset <name>". The per-giver reset ("quests
+reset <giver>") is unchanged. ui_test _test_admin_panel: caches, care and
+the blessing set, then gone after quests reset all, each named in the
+reply. Server only, protocol unchanged, no new class_name.

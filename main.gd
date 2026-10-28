@@ -16300,10 +16300,16 @@ static func card_without(card: Dictionary, id: String) -> Array[String]:
 	return dropped
 
 
-## Every quest of player [param id] undone: each giver's (as
-## _quests_reset_giver), the standing offer, the sought they freed (sent back
-## to wait, a led one's body taken away), the draugr's paid deals, their
-## companion held by raiders let go (she comes at the next join).
+## Every quest of player [param id] undone (672 amended; Jeff: "allow
+## everything to be reset, this is so that things can be tested properly"):
+## each giver's (as _quests_reset_giver), the standing offer, the sought they
+## freed (sent back to wait, a led one's body taken away), the draugr's paid
+## deals, their companion held by raiders let go (she comes at the next
+## join; companion_let_go), the barrow's (reset_barrow), the amulet
+## (World.reset_totem), every draugr's asking and pact (Draugr.forget_player),
+## the caches searched, the healer's care, and the townsfolk's hails,
+## refusals and standing (quests_forget). Money, debts, plots, bonds and
+## stories stay; the world's own (a niche opened) is "zone reset"'s.
 func _quests_reset_all(record: PlayerRecord, id: String, player: Player) -> String:
 	var cleared: Array[String] = []
 	var givers := 0
@@ -16327,7 +16333,27 @@ func _quests_reset_all(record: PlayerRecord, id: String, player: Player) -> Stri
 	if "paid_deals" in record and not (record.get("paid_deals") as Dictionary).is_empty():
 		record.set("paid_deals", {})
 		cleared.append("the draugr's paid deals")
-	cleared.append_array(companion_let_go(id))  # Let go; she comes at the next join (Jeff's pick pending: quest-reset-captive).
+	cleared.append_array(companion_let_go(id))  # Let go; she comes at the next join (Jeff: "allow everything to be reset").
+	cleared.append_array(reset_barrow(id))  # The draugr's blessing, the deal won, the totem's charges, the draft line.
+	cleared.append_array(World.reset_totem(id))  # The amulet itself, wherever it is (items').
+	var asked := 0
+	var was := World.zone
+	for each: Zone in World.zones.values():
+		World.enter(each)
+		for entity in World.get_entities():
+			if entity is Draugr:
+				asked += (entity as Draugr).forget_player(id).size()
+	World.enter(was)
+	if asked > 0:
+		cleared.append("the draugr's asking and pact")
+	if not record.caches.is_empty():
+		record.caches = []
+		cleared.append("caches searched")
+	if not record.care.is_empty() or not record.care_given.is_empty():
+		record.care = {}
+		record.care_given = {}
+		cleared.append("the healer's care")
+	cleared.append_array(quests_forget(id, true))  # Hails, refusals to travel, standing: a stranger again.
 	_resend_offers(id, player)
 	return "%s: quests reset (%s)" % [record.name, ", ".join(cleared) if not cleared.is_empty() else "nothing was held"]
 

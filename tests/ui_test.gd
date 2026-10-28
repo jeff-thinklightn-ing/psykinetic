@@ -1117,6 +1117,17 @@ func _test_admin_panel() -> void:
 			"from the console, go and quests reset ask for the player")
 	var me: Player = _main._local_player()
 	if me != null:
+		# 672 amended: everything quest-shaped goes (Jeff: "so that things can be tested properly").
+		var record: PlayerRecord = _main._records.get(_main._peer_ids.get(me.owner_peer, Net.player_id))
+		if record != null:
+			record.caches = ["test_cache"]
+			record.care = {"test_hut": "gold"}
+			record.care_given = {"test_hut": {"herbs": 1}}
+			_main.mark_player(record.player_id, Main.BLESSED)
+		var everything: String = _main.admin_command("quests reset", me)
+		_check(record != null and record.caches.is_empty() and record.care.is_empty() and record.care_given.is_empty()
+				and not Main.BLESSED in record.marks and everything.contains("caches searched") and everything.contains("the healer's care"),
+				"quests reset all: the caches searched, the healer's care and the draugr's blessing go too (%s)" % everything)
 		var all_reset: String = _main.admin_command("quests reset", me)
 		var giver_reset: String = _main.admin_command("quests reset Nobody Here", me)
 		var gone: String = _main.admin_command("go no_such_map", me)
