@@ -4196,6 +4196,8 @@ func _boot() -> void:
 	Offers.watch(World.towns, World.holdings, World.stockpile)
 	if not World.handed.is_connected(_on_handed):
 		World.handed.connect(_on_handed)  # A gift to one of them (decision 443).
+	if not World.named_event.is_connected(_on_named_event):
+		World.named_event.connect(_on_named_event)  # A named enemy's memories (716, npc's side).
 	_make_lawspeaker()
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
@@ -13924,12 +13926,87 @@ func _hail_struck(_target: GridEntity, _amount: int, source: GridEntity, _cause:
 		_blow_at[player.player_id] = World.tick
 
 
+## How many ways from a named one's zone a town hears of its rising (716).
+const NAMED_NEWS_WAYS := 3
+## A named one's meeting lines at most one a minute (716): msec of its last, by id.
+var _named_said_at: Dictionary = {}
+
+
+## A named enemy's event (decision 716, npc's side; enemy-ai's
+## World.named_event): kept on its record (NamedMind: its card rolled once,
+## a memory, the player's count). Met is its line to them (an emote for a
+## kind that doesn't talk); rose is news in the towns near it.
+func _on_named_event(named_id: String, kind: String, player_id: String) -> void:
+	var record := World.named_record(named_id).duplicate(true)
+	if record.is_empty():
+		return
+	var body := _named_body(named_id)
+	NamedMind.ensure_card(record, named_id)
+	# Its words for them as they stood before this meeting.
+	var line := NamedMind.meeting_line(record, named_id, player_id) if NamedMind.speaks(record) else ""
+	var act := NamedMind.emote(record, named_id, player_id) if not NamedMind.speaks(record) else ""
+	NamedMind.remember(record, kind, player_id, World.steps, body.zone if body != null else "")
+	World.set_named_record(named_id, record)
+	if kind == "rose":
+		_named_rose_news(named_id, record, body)
+	elif kind == "met" and body != null and body.spawned:
+		var now := Time.get_ticks_msec()
+		if _named_said_at.has(named_id) and now - int(_named_said_at[named_id]) < 60000:
+			return
+		_named_said_at[named_id] = now
+		var name := str(record.get("name", named_id))
+		if not line.is_empty():
+			_say_plain(body, name, line)
+		elif not act.is_empty():
+			party_log.add("%s %s." % [name, act])
+
+
+## The named one [param named_id]'s body in the world, null for none.
+func _named_body(named_id: String) -> Monster:
+	for zone_name: String in World.zones:
+		for entity: Variant in World.zones[zone_name].entities:
+			if entity is Monster and is_instance_valid(entity) and (entity as Monster).named_id == named_id:
+				return entity
+	return null
+
+
+## The towns within NAMED_NEWS_WAYS of [param body]'s zone remember its
+## rising as the day's news (a hail's "news" cue tells it once, 554).
+func _named_rose_news(named_id: String, record: Dictionary, body: Monster) -> void:
+	if body == null or World.towns == null or _world_map == null:
+		return
+	var text := NamedMind.rose_news(record, named_id)
+	if text.is_empty():
+		return
+	var near := _zones_within(body.zone, NAMED_NEWS_WAYS)
+	for town: String in World.towns._towns:
+		if near.has(town.get_slice("/", 0)):
+			Townsfolk._remember(town, text, "", false, World.steps)
+
+
+## The zones within [param most] ways of [param from], either way: {zone: ways}.
+func _zones_within(from: String, most: int) -> Dictionary:
+	var seen := {from: 0}
+	var frontier: Array[String] = [from]
+	for depth in most:
+		var next: Array[String] = []
+		for area: String in frontier:
+			for way: Dictionary in _world_map.ways_from(area) + _world_map.ways_into(area):
+				var other := str(way["to"]) if str(way["from"]) == area else str(way["from"])
+				if not seen.has(other):
+					seen[other] = depth + 1
+					next.append(other)
+		frontier = next
+	return seen
+
+
 ## The admin's quest reset (ui's _quests_reset_all; Jeff: "allow everything
 ## to be reset"), npc's side: what the townsfolk keep of [param player_id]
 ## outside their record and the cards' asks. Their hails today (the marks
 ## on each card and Main's caps), the greeting and rumour marks, a
 ## refusal to travel (686), and with [param standing] what each resident
-## thinks of them (443), else kept. What was cleared, as words.
+## thinks of them (443) and what each named enemy remembers of them (716),
+## else kept. What was cleared, as words.
 func quests_forget(player_id: String, standing := false) -> Array[String]:
 	var cleared: Array[String] = []
 	if player_id.is_empty():
@@ -13965,12 +14042,23 @@ func quests_forget(player_id: String, standing := false) -> Array[String]:
 				changed = true
 			if changed:
 				World.production.set_card(id, card)
+	var grudges := 0
+	if standing:
+		for named_id: String in World.named:
+			var record := World.named_record(named_id).duplicate(true)
+			if record.get("track") is Dictionary and (record["track"] as Dictionary).erase(player_id):
+				record["memories"] = (record.get("memories", []) as Array).filter(func(memory: Variant) -> bool:
+					return not memory is Dictionary or str(memory.get("player", "")) != player_id)
+				World.set_named_record(named_id, record)
+				grudges += 1
 	if marks + hailed > 0:
 		cleared.append("hails and greetings")
 	if refused > 0:
 		cleared.append("%d refusal%s to travel" % [refused, "" if refused == 1 else "s"])
 	if known > 0:
 		cleared.append("standing with %d resident%s" % [known, "" if known == 1 else "s"])
+	if grudges > 0:
+		cleared.append("memories of %d named enem%s" % [grudges, "y" if grudges == 1 else "ies"])
 	return cleared
 
 

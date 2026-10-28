@@ -1,4 +1,16 @@
 {
 	"_about": "Named enemies (decision 716): a level entity's \"named\": <id> spawns that one. Each: name, kind, rise_days (world-clock days dead before it rises; F7), strength {hp, damage, speed} (multipliers, fixed for life; left out: rolled once by its id). None in play yet: the barrow's robber leader comes with dungeon's barrow redesign.",
-	"named": {}
+	"named": {},
+	"lines": {
+		"_about": "npc's (decision 716, npc's side): what a named one says on meeting a player, by its word for them (NamedMind.ENEMY: stranger, known, foe, bane = they put it down twice, prey = it put them down twice), fled_from when their last meeting was their running; rose is the towns' news of its rising (%s its name; a hail tells it after \"I heard today that\"); speaks lists the kinds that talk, the rest get an emote in the party log. One picked per player per life.",
+		"stranger": ["Fresh meat.", "Lost, are you?", "You picked the wrong hole to crawl into."],
+		"known": ["You again.", "I know your face."],
+		"foe": ["Back for more?", "You should have stayed gone."],
+		"bane": ["You put me in the ground. It didn't take.", "Not this time."],
+		"prey": ["Come to lie down again?", "You never learn."],
+		"fled_from": ["Last time you ran.", "Running again, are we?"],
+		"rose": ["%s walks again.", "%s is up and about again."],
+		"emote": ["snarls", "bares its teeth"],
+		"speaks": ["robber", "draugr"]
+	}
 }

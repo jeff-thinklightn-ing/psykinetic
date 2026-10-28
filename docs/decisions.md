@@ -33927,3 +33927,42 @@ monster_test's struck case: a guard struck from behind inside its room, from
 one cell outside and from two (a spear's reach) turns on its striker within
 a tick and lands a blow (by tick 5 at two); after the blows stop it is back
 in its room. Server only, protocol unchanged, no new class_name.
+## 716, npc's side: a named enemy's memories, track record and lines
+
+npc's half of named enemies (enemy-ai's 716; Jeff: "they have contexts and
+memories ... they don't level up"). Nothing here touches a named one's
+strength: World.set_named_record keeps it, and resident_test pins it after
+a run of fights.
+
+Main._on_named_event takes enemy-ai's World.named_event (met, fought,
+killed, killed_by, fled_from, rose). Through NamedMind (new class_name) it
+keeps, on the named record (World.named_record / set_named_record):
+- card: ResidentCard.roll("named:<id>", name, kind, "named"), rolled once
+  and never by a model. It colours words, never fighting.
+- memories: the last 8 of {kind, player, step, where}. The player is an
+  id, a key only and never put into words (692).
+- track: per player, counts of each kind and the step of the last. Plain
+  counts on the record, not Standing, because a town's standing takes
+  hearsay and decays and a grudge does neither. It lasts across risings.
+
+Its word for a player comes from the counts (NamedMind.ENEMY): stranger,
+known (met), foe (fought, or a death either way), prey (it put them down
+twice) and bane (they put it down twice), with bane checked first.
+
+- **Meeting a player:** on met (enemy-ai's: once a player per life), it
+  says one line picked by its id, the player and its life from
+  levels/named_enemies.json "lines". The line comes from the word as it
+  stood before this meeting, or "fled_from" when their newest memory was
+  their running. It goes through Main._say_plain, at most one a minute per
+  named one. A kind not in "speaks" (robber and draugr do) gets an emote
+  in the party log instead ("Gorm snarls."). No model is asked, and the
+  lines name no player.
+- **Rising:** on rose, every town within NAMED_NEWS_WAYS (3) ways of its
+  zone remembers "<name> walks again." as the day's news
+  (Townsfolk._remember, event). A hail's news cue tells it once a day per
+  player, and gossip spreads it as any news does. It is not a broadcast.
+- **Quest reset (672 amended, npc's side):** quests_forget with standing
+  also erases the player's track and memories on every named record.
+
+resident_test covers each. monster_test passes. Server only, protocol
+unchanged; new class_name NamedMind.

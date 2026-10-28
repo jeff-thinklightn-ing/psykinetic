@@ -79,6 +79,7 @@ func _ready() -> void:
 	_test_visible_work()
 	_test_field_work()
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
+	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 
@@ -3461,3 +3462,86 @@ func _reachable_from(from: Vector2i, area: Rect2i) -> Vector2i:
 				best = cell
 				best_d = d
 	return best
+
+
+## A named enemy's memories (716, npc's side): its card rolled once, a
+## capped list of memories, a track per player and the word from it, its
+## meeting line by that word (or by their running), an emote for a kind
+## that doesn't talk, its rising as news in the towns near, a quest reset
+## forgetting the player, and its strength never moved by any of it.
+func _test_named_enemy() -> void:
+	print("\n== a named enemy remembers who it met, fought, fell to and saw run (716, npc's side) ==")
+	var player := _player()
+	_check(player != null, "(a player in the town)")
+	if player == null:
+		return
+	var pid := Net.player_id
+	NamedEnemy.define_for_test("rs-gorm", {"name": "Gorm", "kind": "robber", "strength": {"hp": 1.2, "damage": 1.1, "speed": 1.0}})
+	NamedMind.use_lines({"stranger": ["Fresh meat."], "known": ["You again."], "foe": ["Back for more?"], "bane": ["Not this time."],
+		"prey": ["You never learn."], "fled_from": ["Last time you ran."], "rose": ["%s walks again."], "emote": ["snarls"], "speaks": ["robber"]})
+	var strength: Dictionary = World.named_enter("rs-gorm", "robber")["strength"].duplicate()
+	var foe := _main._spawn({"script": "res://tests/foe_stub.gd", "shape": "capsule", "name": "Gorm", "tile": _main._nearest_free(player.tile + Vector2i(3, 0))}) as Monster
+	_check(foe != null, "(Gorm stands near)")
+	if foe == null:
+		return
+	foe.named_id = "rs-gorm"
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	_main._named_said_at.clear()
+	_main._on_named_event("rs-gorm", "met", pid)
+	var record := World.named_record("rs-gorm")
+	_check(not record["card"].is_empty() and str(record["card"]["traits"]["name"]) == "Gorm", "its card rolled once (%s)" % [record["card"].get("traits", {})])
+	_check(spoken == ["Fresh meat."], "a stranger met: its stranger line (%s)" % [spoken])
+	_check(NamedMind.word(record, pid) == "known" and record["memories"].size() == 1 and str(record["memories"][0]["player"]) == pid,
+		"kept: a memory and a count, the word known")
+	var card: Dictionary = record["card"].duplicate(true)
+	_main._on_named_event("rs-gorm", "fought", pid)
+	_main._on_named_event("rs-gorm", "killed_by", pid)
+	_check(World.named_record("rs-gorm")["card"] == card, "the card stays as rolled")
+	_check(NamedMind.word(World.named_record("rs-gorm"), pid) == "foe", "fought and fell once: a foe")
+	_main._on_named_event("rs-gorm", "killed_by", pid)
+	_check(NamedMind.word(World.named_record("rs-gorm"), pid) == "bane", "fell to them twice: its bane")
+	_main._named_said_at.clear()
+	spoken.clear()
+	_main._on_named_event("rs-gorm", "met", pid)
+	_check(spoken == ["Not this time."], "met again: its bane line (%s)" % [spoken])
+	_main._on_named_event("rs-gorm", "fled_from", pid)
+	_main._named_said_at.clear()
+	spoken.clear()
+	_main._on_named_event("rs-gorm", "met", pid)
+	_check(spoken == ["Last time you ran."], "after their running: that, whatever the word (%s)" % [spoken])
+	spoken.clear()
+	_main._on_named_event("rs-gorm", "met", pid)
+	_check(spoken.is_empty(), "a second line within the minute: none")
+	for i in 4:
+		_main._on_named_event("rs-gorm", "fought", pid)
+	record = World.named_record("rs-gorm")
+	_check(record["memories"].size() == NamedMind.MEMORIES_KEPT and int(record["track"][pid]["fought"]) == 5 and int(record["track"][pid]["met"]) == 4,
+		"memories capped at %d, the counts kept whole (%s)" % [NamedMind.MEMORIES_KEPT, record["track"][pid]])
+	_check(record["strength"] == strength, "its strength as it was (%s)" % [record["strength"]])
+	print("\n== one that doesn't talk snarls; its rising is the towns' news ==")
+	record["kind"] = "skeleton"
+	World.set_named_record("rs-gorm", record)
+	_main._named_said_at.clear()
+	spoken.clear()
+	_main._on_named_event("rs-gorm", "met", pid)
+	_check(spoken.is_empty() and _main.party_log.last(1) == ["Gorm snarls."], "an emote in the party log (%s)" % [_main.party_log.last(1)])
+	_main._on_named_event("rs-gorm", "rose", "")
+	var log: Array = Offers._call(Offers.ctx, "memory", [STORE])
+	var news := log.filter(func(entry: Variant) -> bool: return entry is Dictionary and str(entry.get("text", "")) == "Gorm walks again")
+	_check(news.size() == 1 and bool(news[0].get("event", false)), "the town near remembers it as news (%d)" % news.size())
+	_check(World.named_record("rs-gorm")["memories"].size() == NamedMind.MEMORIES_KEPT and World.named_record("rs-gorm")["track"].size() == 1, "rose is no player's memory")
+	Offers._call(Offers.ctx, "set_memory", [STORE, log.filter(func(entry: Variant) -> bool: return not news.has(entry))])
+	print("\n== the quest reset forgets them, with standing ==")
+	var cleared: Array[String] = _main.quests_forget(pid, true)
+	record = World.named_record("rs-gorm")
+	_check(cleared.has("memories of 1 named enemy") and not record["track"].has(pid) and record["memories"].is_empty(), "forgotten (%s)" % [cleared])
+	Net.message_received.disconnect(heard)
+	World.despawn(foe)
+	World.named.erase("rs-gorm")
+	NamedEnemy.reset_for_test()
+	NamedMind.use_lines({})
+	_main._named_said_at.clear()
