@@ -9057,6 +9057,26 @@ A lean suite now starts at today's baseline and leaves about 7 GB of commit
 free while it runs. heavy_job_test: the commit watch stops the newest job
 only, says what ran short, and today's baseline starts a lean suite.
 
+Amended a seventeenth time (2026-10-28, the coordinator; release's report):
+a test scene run alone goes through the gate as `scene`. On the night of
+10-27, three landings failed net_test once each and passed on a retry
+(perf's phase-4 crate push, dungeon's "saw its own move replicated", and
+combat's, which turned out to be a real bug). heavy_jobs.log showed no gated
+overlap: every suite ran alone, on 62 GB and 16 logical cores. The CPU went
+to what the gate never saw. Sessions ran `--scene tests/x.tscn` checks
+beside the landings (perf ran view_test four times beside ui's and npc's
+suites). Each retry cost about 15 minutes of the queue.
+- `scene`: 1.5 GB to start (then measured), at most 2 at once, never beside
+  a bench (a bench now excludes it too), a 30-minute limit before it has
+  runs. It runs beside a suite at below-normal priority, as a soak does, so
+  the landing's scenes and net_test come first.
+- The run: `sh tools/heavy_job.sh run <tree> scene -- /usr/bin/timeout 900
+  "$GODOT_PATH" --headless --path . --scene tests/x.tscn -- --run-marker=<n>
+  </dev/null`.
+heavy_job_test: a scene starts beside a suite, and a suite beside it; two
+at once, not three; never with a bench either way; a kinds.json from before
+it still keeps a bench from one; and it runs below normal priority.
+
 
 ## 395. UI sounds
 

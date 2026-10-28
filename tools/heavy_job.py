@@ -21,7 +21,11 @@ art-gen, which lets it start only when there is room:
     nor a bench and a soak; a soak (sim steps counted, no timings: town_soak,
     town_balance) runs beside a suite, below normal priority, one at a time
     (394 amended (8): economy's 150-minute soak as a bench held five
-    landings and a cut).
+    landings and a cut); a scene (one test scene run alone, a session
+    checking its change) runs beside a suite too, below normal priority, two
+    at most, never beside a bench (394 amended (17): solo scene runs outside
+    the gate took a landing's CPU, and three landings' net_test timing
+    checks failed one night, each passing again on a retry).
 
 An entry names its processes by id and start time (pid_since, waiter_since,
 adopted_since): one whose id now belongs to another process, or queued
@@ -163,7 +167,7 @@ KINDS = {
     # A suite run lean (394 amended (9), (10), (12)): its estimate and runs only;
     # it runs as a suite (lean_row), never as a kind of its own.
     "suite_lean3": {"ram_gb": 8.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
-    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak"], "max_minutes": 90},
+    "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak", "scene"], "max_minutes": 90},
     "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     # A soak (394 amended an eighth time) counts sim steps, not time: it
@@ -172,6 +176,10 @@ KINDS = {
     # limit is max_minutes, not its median run, since --days sets its length.
     "soak": {"ram_gb": 2.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 180,
         "fixed_limit": True, "below_normal": True},
+    # A test scene run alone (394 amended (17)): beside a suite, below
+    # normal priority so the landing's scenes and net_test come first.
+    "scene": {"ram_gb": 1.5, "gpu_gb": 0.0, "gpu": False, "max_running": 2, "excludes": ["bench"], "max_minutes": 30,
+        "below_normal": True},
 }
 GB = 1024.0 ** 3
 
@@ -771,7 +779,7 @@ def kinds():
     table = {}
     for name, first in KINDS.items():
         row = dict(first, **saved.get(name, {}))
-        # Exclusions the code adds (a bench never beside a soak) hold over a
+        # Exclusions the code adds (a bench never beside a soak or a scene) hold over a
         # kinds.json written before them.
         row["excludes"] = sorted(set(first.get("excludes", [])) | set(saved.get(name, {}).get("excludes", [])))
         if not row["excludes"]:

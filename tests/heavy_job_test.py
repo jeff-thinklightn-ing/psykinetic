@@ -198,14 +198,30 @@ check(gate.may_pass(soak_row, [dict(table["suite"], kind="suite")], [suite_runni
 check(gate.limit_seconds(dict(table["soak"], runs_s=[60.0, 60.0, 60.0])) == 180 * 60.0,
     "its limit is 180 minutes, whatever its runs took")
 check(gate.limit_seconds(table["soak"], expect_minutes=600) == 36000.0, "--expect over that")
+
+print("== a scene (394 amended (17)) ==")
+scene_row = dict(table["scene"], kind="scene")
+check(gate.decide(scene_row, [suite_running], True, 60.0, None)[0], "a scene starts beside a suite")
+check(gate.decide(dict(table["suite"], kind="suite"), [dict(running(1, 1), kind="scene")], True, 60.0, None)[0],
+    "and a suite beside a scene")
+check(gate.decide(scene_row, [suite_running, dict(running(1, 1), kind="scene")], True, 60.0, None)[0],
+    "two scenes at once")
+ok, why = gate.decide(scene_row, [dict(running(1, 1), kind="scene"), dict(running(1, 1), kind="scene")], True, 60.0, None)
+check(not ok and "at most 2" in why, "not three (%s)" % why)
+ok, why = gate.decide(scene_row, [dict(running(1, 1), kind="bench")], True, 60.0, None)
+check(not ok and "never beside" in why, "never beside a bench (%s)" % why)
+ok, why = gate.decide(dict(table["bench"], kind="bench"), [dict(running(1, 1), kind="scene")], True, 60.0, None)
+check(not ok and "never beside" in why, "nor a bench beside a scene (%s)" % why)
 with gate.StateLock():
     gate._write(gate._path("kinds.json"), {"bench": {"ram_gb": 1.2, "gpu_gb": 0.0, "gpu": False, "excludes": ["suite"]}})
 check("soak" in gate.kinds()["bench"]["excludes"], "a kinds.json from before the soak still keeps a bench from one")
+check("scene" in gate.kinds()["bench"]["excludes"], "and from a scene")
 os.remove(gate._path("kinds.json"))
 if os.name == "nt":
     probe = "import ctypes; k = ctypes.windll.kernel32; k.GetCurrentProcess.restype = ctypes.c_void_p; " \
         "raise SystemExit(0 if k.GetPriorityClass(ctypes.c_void_p(k.GetCurrentProcess())) == 0x4000 else 1)"
     check(gate.run("test", "soak", [sys.executable, "-c", probe]) == 0, "a soak runs below normal priority")
+    check(gate.run("test", "scene", [sys.executable, "-c", probe]) == 0, "a scene runs below normal priority")
     check(gate.run("test", "suite", [sys.executable, "-c", probe]) == 1, "a suite does not")
 
 code = gate.run("test", "suite", [sys.executable, "-c", "import time; time.sleep(1)"])
