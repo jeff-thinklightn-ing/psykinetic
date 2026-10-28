@@ -16,7 +16,8 @@
 #   (bone, Vector, AIM): the bone pointed along that direction (character axes: up is
 #     (0, 0, 1), ahead (0, -1, 0), its left (1, 0, 0)), from wherever it points.
 #   ("upperarm_x", (target, pole), REACH): the arm's two bones turned so its wrist (the hand's
-#     head) comes to [target], the elbow bent toward [pole] (a direction); [target] is
+#     head) comes to [target], the elbow bent toward [pole] (a direction, or a point given as a
+#     target is: the elbow then as near it as the arm lets it be); [target] is
 #     [(bone, offset, weight), ...], the weighted sum of those bones' heads (as the pose stands
 #     without its reaches; reaches are met in order, each seeing the ones before) plus offsets.
 #   ("hand_x", (length, side), GRASP): the hand turned so a held piece's length (the hand's own +Z;
@@ -202,7 +203,6 @@ NOCK = side_on(0.2) + [("clavicle_r", TURN, 20.0)] + bow_arm(0.36, -0.14, -0.2, 
 # Between the thigh and the nock, the bow swung out before the leg.
 LIFTING = side_on(0.1) + bow_arm(0.32, 0.12, -0.32, (-0.1, -0.6, 1.0), (1.0, 0.0, 0.0), (0.6, 0.6, -0.3)) + [
 	("upperarm_r", Vector((-0.4, -0.05, -1.0)), AIM), ("lowerarm_r", Vector((-0.3, -0.6, -0.8)), AIM)]
-DRAWN = SIDE_ON + bow_arm(*DRAWN_ARM, BOW_UP) + string_arm(1.0, (-1.0, 0.6, 0.1))
 # Fidgets (Jeff: "the idle need variability and same scratch is very predictable"): short
 # things a person does standing about, each from Idle and back to it, so any may follow any.
 # Shift: the weight onto one leg, the hip out and the shoulders tilting against it.
@@ -242,6 +242,54 @@ CLIPS["Fidget_ArmsCrossed"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0)), (0.7, P("Idle_Loop", 0.7, CROSSED)),
 	(2.6, P("Idle_Loop", 2.6, CROSSED + [("Head", TURN, 8.0)])), (3.4, P("Idle_Loop", 0.0)),
 ]}
+# Full draw in form (Jeff on the lob still: "look at the shoulders, theres some joint there that should
+# be a continous T from arm across back, the back should be tilted, the back elbow angle dropped to be
+# a line with the arrow, the arrow notch fairly close to eye level"), flat and at the sky alike:
+# the trunk turned side-on (FORM_TURN) and leaned back from the waist [lean] degrees (the lean, not the
+# arms, raising the aim); the bow wrist reached out along the shoulder line carried on (FORM_REACH of it
+# past the left shoulder, [raise] up), so bow arm, shoulders and the draw shoulder make one T; the
+# string hand at the anchor ([anchor_up] from the jaw, toward the eye), its elbow pole back along the
+# arrow so the elbow lies on its line (its pole moved [elbow_x] along the body's left, to keep it there
+# when the shoulders shrug); the head turned back to the target and pitched [look] more.
+FORM_TURN = [("spine_01", TURN, -24.0), ("spine_02", TURN, -28.0), ("spine_03", TURN, -28.0)]
+# The neck and head turned back to the target about their own leaned up (each turn is about the
+# character's axes: turned about the plain up after the lean, the head rolled over onto its right
+# side, where the string hand anchors).
+FORM_LOOK = [("neck_01", 40.0), ("Head", 38.0)]
+FORM_REACH = 1.5
+FORM_FOREARM = 0.27
+
+
+def form(pitch: float, lean: float, raise_: float = 0.0, anchor_up: float = 0.0, look: float = 0.0, nock: float = 1.0,
+		back: float = 0.0, out: float = 0.0, girdle: float = 0.0, shrug: float = 0.0, elbow_x: float = 0.0, yaw: float = 0.0) -> list:
+	"""Drawn [nock] of the way at an aim [pitch] degrees up (see above)."""
+	t = math.radians(pitch)
+	x, y, z = BOW_UP
+	length = (x, y * math.cos(t) + z * math.sin(t), -y * math.sin(t) + z * math.cos(t))
+	string = (-0.04 - out, 0.13, 0.0)
+	# The anchor turned with the head (the lean and the look tip it back): by the cheek in its frame,
+	# not inside the back of the skull.
+	anchor = tuple(Quaternion(LIFT, math.radians(lean + look)) @ Vector((-0.14 - out, 0.03 + back, -0.04 + anchor_up)))
+	# The elbow toward the arrow's line a forearm (FORM_FOREARM) back from the string hand.
+	behind = (elbow_x, FORM_FOREARM * math.cos(t), -FORM_FOREARM * math.sin(t))
+	pole = [("hand_l", tuple(Vector(string) + Vector(behind)), 1.0 - nock), ("Head", tuple(Vector(anchor) + Vector(behind)), nock)]
+	looks = [turn for bone, degrees in FORM_LOOK for turn in ((bone, LIFT, -lean), (bone, TURN, degrees - (yaw if bone == "neck_01" else 0.0)), (bone, LIFT, lean))]
+	turned = [(bone, TURN, degrees + yaw * share) for (bone, _, degrees), share in zip(FORM_TURN, (0.3, 0.35, 0.35))]
+	return turned + [("clavicle_r", TURN, girdle), ("clavicle_l", LIFT, shrug), ("clavicle_r", LIFT, shrug), ("spine_01", LIFT, lean * 0.3), ("spine_02", LIFT, lean * 0.35), ("spine_03", LIFT, lean * 0.35)] + looks + [
+		("Head", LIFT, look),
+		("upperarm_l", ([("upperarm_l", (0.0, 0.0, raise_), 1.0 + FORM_REACH), ("upperarm_r", (0.0, 0.0, 0.0), -FORM_REACH)],
+			(1.0, 0.1, -0.5)), REACH), ("hand_l", (length, (1.0, 0.0, 0.1)), GRASP),
+		("upperarm_r", ([("hand_l", string, 1.0 - nock), ("Head", anchor, nock)], pole), REACH),
+		("hand_r", Vector((0.1, -1.0, 0.0)), AIM)]
+
+
+FLAT_FORM = {"pitch": 0.0, "lean": 1.0, "raise_": 0.03, "out": 0.0}
+# The lob's volley (677 amended (2); Jeff picked B, the shoulders shrugged into the T): drawn at a
+# fixed LOB_PITCH (Client3D, 70 degrees: the arrow's line, nock to bow hand) for every lob, B's lean and
+# shrug taken further for the steeper aim and the elbow's pole moved to keep it on the line.
+SKY_FORM = {"pitch": 70.0, "lean": 38.0, "shrug": 45.0, "raise_": 0.19, "anchor_up": 0.12, "out": 0.02, "look": 8.0, "girdle": 15.0, "elbow_x": -0.12, "yaw": -16.0}
+SKY_DRAWN = form(**SKY_FORM)
+FLAT_DRAWN = form(**FLAT_FORM)
 CLIPS["Bow_Idle_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
 	(1.25, P("Idle_Loop", 1.25, BOW_LOW + [("spine_02", LIFT, -2.0)])),
@@ -257,21 +305,21 @@ CLIPS["Bow_Draw"] = {"keys": [
 		+ string_arm(0.12, (-1.0, -0.2, 0.1), out=0.1))),
 	(0.55, P("Idle_Loop", 0.5, side_on(0.6) + [("clavicle_r", TURN, 15.0)] + bow_arm(0.45, -0.13, 0.0, BOW_UP) + string_arm(0.25, (-1.0, -0.1, 0.0), out=0.1))),
 	(0.68, P("Idle_Loop", 0.6, side_on(0.95) + bow_arm(0.48, -0.15, 0.04, BOW_UP) + string_arm(0.5, (-1.0, 0.3, -0.3), out=0.08))),
-	(0.8, P("Idle_Loop", 0.7, SIDE_ON + bow_arm(*DRAWN_ARM, BOW_UP) + string_arm(0.7, (-1.0, 0.4, -0.25)))),
-	(1.0, P("Idle_Loop", 0.9, DRAWN)),
+	(0.8, P("Idle_Loop", 0.7, form(**FLAT_FORM, nock=0.7))),
+	(1.0, P("Idle_Loop", 0.9, FLAT_DRAWN)),
 ]}
 CLIPS["Bow_Hold_Loop"] = {"loop": True, "keys": [
-	(0.0, P("Idle_Loop", 0.0, DRAWN)),
-	(0.75, P("Idle_Loop", 0.75, [("spine_02", LIFT, 1.0)] + DRAWN)),
-	(1.5, P("Idle_Loop", 0.0, DRAWN)),
+	(0.0, P("Idle_Loop", 0.0, FLAT_DRAWN)),
+	(0.75, P("Idle_Loop", 0.75, [("spine_02", LIFT, 1.0)] + FLAT_DRAWN)),
+	(1.5, P("Idle_Loop", 0.0, FLAT_DRAWN)),
 ]}
 CLIPS["Bow_Loose"] = {"keys": [
-	(0.0, P("Idle_Loop", 0.0, DRAWN)),
+	(0.0, P("Idle_Loop", 0.0, FLAT_DRAWN)),
 	# The release (Jeff: "firing animation is awkward"): the string hand slides back along the
 	# jaw past the ear, the bow arm dropping a touch with the string's kick; held a moment; then
 	# the hand back to the nock and the bow down.
-	(0.08, P("Idle_Loop", 0.08, SIDE_ON + bow_arm(0.49, -0.16, 0.02, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.05), 0.09))),
-	(0.3, P("Idle_Loop", 0.3, SIDE_ON + bow_arm(0.48, -0.16, -0.01, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.0), 0.1))),
+	(0.08, P("Idle_Loop", 0.08, form(**{**FLAT_FORM, "raise_": FLAT_FORM["raise_"] - 0.02}, back=0.09))),
+	(0.3, P("Idle_Loop", 0.3, form(**{**FLAT_FORM, "raise_": FLAT_FORM["raise_"] - 0.04}, back=0.1))),
 	(0.6, P("Idle_Loop", 0.6, NOCK)),
 	(0.8, P("Idle_Loop", 0.8, LIFTING)),
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
@@ -281,13 +329,13 @@ CLIPS["Bow_Loose"] = {"keys": [
 # and the release key for key with Bow_Draw, Bow_Hold and Bow_Loose (so Client3D scrubs and
 # crossfades them alike), from the raise on the bow arm turned up SKY_PITCH about its shoulder,
 # the bow's length turned back with it, the trunk leaning back and the head lifted to look along
-# the arrow, the string hand still anchored at the jaw. The arrow leaves on World.lob_point's
-# slope, 4 x lob_apex: 45 degrees at the default 0.25.
-SKY_PITCH = 52.0
+# the arrow, the string hand still anchored at the jaw. Every lob is drawn at Client3D.LOB_PITCH,
+# 70 degrees (677 amended (2): the volley leaves steep, whatever its reach).
+SKY_PITCH = 64.0
 # The bow's length turned back less than the arm (the trunk's lean carries it the rest), so it
 # stands to the arrow as the flat draw's does (at the full pitch it lay 6 degrees farther back).
-SKY_BOW_TILT = 45.0
-SKY_LEAN = [("spine_01", LIFT, 5.0), ("spine_02", LIFT, 6.0), ("spine_03", LIFT, 4.0), ("Head", LIFT, 14.0)]
+SKY_BOW_TILT = 58.0
+SKY_LEAN = [("spine_01", LIFT, 9.0), ("spine_02", LIFT, 11.0), ("spine_03", LIFT, 9.0), ("Head", LIFT, 18.0)]
 
 
 def pitched(ahead: float, up: float, share: float) -> tuple:
@@ -310,7 +358,6 @@ def sky_lean(share: float = 1.0, head: float = 1.0) -> list:
 	return [(bone, axis, degrees * share * (head if bone == "Head" else 1.0)) for bone, axis, degrees in SKY_LEAN]
 
 
-SKY_DRAWN = SIDE_ON + sky_bow(*DRAWN_ARM, BOW_UP) + string_arm(1.0, (-1.0, 0.6, 0.1)) + sky_lean()
 CLIPS["Bow_Draw_Sky"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
 	(0.15, P("Idle_Loop", 0.15, LIFTING)),
@@ -319,8 +366,8 @@ CLIPS["Bow_Draw_Sky"] = {"keys": [
 		+ string_arm(0.12, (-1.0, -0.2, 0.1), out=0.12) + sky_lean(0.5, 0.0))),
 	(0.55, P("Idle_Loop", 0.5, side_on(0.6) + [("clavicle_r", TURN, 15.0)] + sky_bow(0.45, -0.13, 0.0, BOW_UP, 0.85)
 		+ string_arm(0.25, (-1.0, -0.1, 0.0), out=0.16) + sky_lean(0.85, 0.0))),
-	(0.68, P("Idle_Loop", 0.6, side_on(0.95) + sky_bow(0.48, -0.15, 0.04, BOW_UP) + string_arm(0.5, (-0.8, 0.5, 0.6), out=0.18) + sky_lean(1.0, 0.3))),
-	(0.8, P("Idle_Loop", 0.7, SIDE_ON + sky_bow(*DRAWN_ARM, BOW_UP) + string_arm(0.7, (-1.0, 0.4, -0.25)) + sky_lean())),
+	(0.68, P("Idle_Loop", 0.6, side_on(0.95) + sky_bow(0.48, -0.15, 0.04, BOW_UP) + string_arm(0.5, (-0.8, 0.5, 0.6), out=0.24) + sky_lean(1.0, 0.3))),
+	(0.8, P("Idle_Loop", 0.7, form(**SKY_FORM, nock=0.7))),
 	(1.0, P("Idle_Loop", 0.9, SKY_DRAWN)),
 ]}
 CLIPS["Bow_Hold_Sky_Loop"] = {"loop": True, "keys": [
@@ -330,8 +377,8 @@ CLIPS["Bow_Hold_Sky_Loop"] = {"loop": True, "keys": [
 ]}
 CLIPS["Bow_Loose_Sky"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, SKY_DRAWN)),
-	(0.08, P("Idle_Loop", 0.08, SIDE_ON + sky_bow(0.49, -0.16, 0.02, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.05), 0.09) + sky_lean())),
-	(0.3, P("Idle_Loop", 0.3, SIDE_ON + sky_bow(0.48, -0.16, -0.01, BOW_UP) + string_arm(1.0, (-1.0, 0.7, 0.0), 0.1) + sky_lean())),
+	(0.08, P("Idle_Loop", 0.08, form(**{**SKY_FORM, "raise_": SKY_FORM["raise_"] - 0.02}, back=0.09))),
+	(0.3, P("Idle_Loop", 0.3, form(**{**SKY_FORM, "raise_": SKY_FORM["raise_"] - 0.04}, back=0.1))),
 	(0.6, P("Idle_Loop", 0.6, NOCK)),
 	(0.8, P("Idle_Loop", 0.8, LIFTING)),
 	(1.0, P("Idle_Loop", 1.0, BOW_LOW)),
@@ -736,6 +783,8 @@ class Rig:
 			now = self.turned(spec, turns)
 			fore, hand = bone.replace("upperarm", "lowerarm"), bone.replace("upperarm", "hand")
 			at = sum(((now[b].translation + Vector(off)) * w for b, off, w in target), Vector())
+			if isinstance(pole, list):  # A point: toward it from the shoulder.
+				pole = sum(((now[b].translation + Vector(off)) * w for b, off, w in pole), Vector()) - now[bone].translation
 			upper, lower = solve(now[bone].translation, now[fore].translation, now[hand].translation, at, Vector(pole))
 			turns = turns + [(bone, upper, AIM), (fore, lower, AIM)]
 		return self.turned(spec, turns)

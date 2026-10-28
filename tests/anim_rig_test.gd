@@ -360,6 +360,23 @@ func _test_sword_slash() -> void:
 	_check(picked[0] != picked[1] and picked[1] != picked[2] and picked[2] != picked[3], "a string of blows alternates forehand and backhand (%s)" % [picked])
 
 
+## The form of a full draw: "bow_t" (degrees the bow arm turns off the shoulder line carried on),
+## "elbow_off" (the draw elbow's distance from the arrow's line), "elbow_behind" (how far behind the
+## nock along it), "nock_eye" (the nock's height over the eyes, Head + 0.07 m).
+static func _bow_form(model: Node3D, sockets: Dictionary) -> Dictionary:
+	var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+	var at := func(bone: String) -> Vector3:
+		return sk.global_transform * sk.get_bone_global_pose(sk.find_bone(bone)).origin
+	var ls: Vector3 = at.call("LeftUpperArm")
+	var nock := (sockets["hand_r"] as Node3D).global_position
+	var line := ((sockets["hand_l"] as Node3D).global_position - nock).normalized()
+	var elbow: Vector3 = at.call("RightLowerArm")
+	var head: Vector3 = at.call("Head")
+	return {"bow_t": rad_to_deg((at.call("LeftHand") - ls).normalized().angle_to((ls - at.call("RightUpperArm")).normalized())),
+		"elbow_off": ((elbow - nock) - line * (elbow - nock).dot(line)).length(), "elbow_behind": -(elbow - nock).dot(line),
+		"nock_eye": nock.y - (head.y + 0.07)}
+
+
 ## The two ends of a held piece along its length (its +y), in its own frame: [butt, point].
 static func _held_ends(piece: Node3D) -> Array[Vector3]:
 	var low := INF
@@ -436,11 +453,15 @@ func _test_bow_clear() -> void:
 					" %.2f" % rig.position() if pose[2] == "" else "", counts.x, counts.y, counts.z])
 			if pose[0] in ["full", "sky full"]:
 				var skeleton := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
-				var head := skeleton.get_bone_global_pose(skeleton.find_bone("Head")).origin
+				var bone := skeleton.find_bone("Head")
+				var head := skeleton.get_bone_global_pose(bone).origin
 				var wrist := skeleton.get_bone_global_pose(skeleton.find_bone("RightHand")).origin
-				# Skeleton space: the body faces +z; behind the head is -z.
-				if wrist.distance_to(head) > 0.2 or wrist.z - head.z < -0.04:
-					anchors.append("%s %s: wrist %.2f from the head, %.2f ahead of it" % [build[0], pose[0], wrist.distance_to(head), wrist.z - head.z])
+				# Skeleton space: the body faces +z at rest; the face turns with the head (leaned back
+				# at the sky, its forward tips up), so behind the head is against its posed forward.
+				var turned := skeleton.get_bone_global_pose(bone).basis * skeleton.get_bone_global_rest(bone).basis.inverse()
+				var ahead := (wrist - head).dot((turned * Vector3.BACK).normalized())
+				if wrist.distance_to(head) > 0.2 or ahead < -0.04:
+					anchors.append("%s %s: wrist %.2f from the head, %.2f ahead of it" % [build[0], pose[0], wrist.distance_to(head), ahead])
 			model.queue_free()
 			holder.free()
 	_check(found.is_empty(), "no bow nor arm inside the body, five builds, carried, nocked, drawn, released, flat and at the sky (%s)" % ", ".join(found))
@@ -449,15 +470,24 @@ func _test_bow_clear() -> void:
 
 ## The lob's draw (677, pc-character's side): at full draw and held (Bow_Draw_Sky, Bow_Hold_Sky)
 ## the arrow's line (the string hand's socket to the bow hand's) within SKY_AIM of the lob's
-## launch (World.lob_point's slope at the default lob_apex, 45 degrees), man and woman, while the
+## launch (Client3D.LOB_PITCH, 70 degrees, every lob alike: 677 amended (2)), man and woman, while the
 ## flat draw's stays within SKY_AIM of level; the bow standing to that line within SKY_AIM of how
 ## it stands drawn flat (turned with the arm and the lean, it lay back too far); and AnimRig.sky: half mixed, the line halfway
 ## between; let go, the flat clip's again; played (Bow_Hold), the sky clip in step with it.
+## And in form at full draw, flat and at the sky (Jeff on the lob still: "a continous T from arm
+## across back ... the back elbow angle dropped to be a line with the arrow, the arrow notch fairly
+## close to eye level"): the bow arm within FORM_T of the shoulder line carried on, the draw elbow
+## within FORM_ELBOW of the arrow's line (the nock to the bow hand) and FORM_BEHIND behind the nock;
+## at the sky the nock within FORM_EYE below the eyes (Head + 0.07 m).
 const SKY_AIM := 5.0
+const FORM_T := 12.0
+const FORM_ELBOW := 0.07
+const FORM_BEHIND := 0.2
+const FORM_EYE := 0.06
 func _test_sky_bow() -> void:
 	print("== the lob's draw at the sky ==")
 	var lib := load(CLIPS) as AnimationLibrary
-	var launch := rad_to_deg(atan(4.0 * 0.25))
+	var launch := Client3D.LOB_PITCH
 	for build: Array in [["man", "res://art/models/characters/human_m.glb"], ["woman", "res://art/models/characters/human_f.glb"]]:
 		var model := (load(build[1]) as PackedScene).instantiate() as Node3D
 		add_child(model)
@@ -487,19 +517,21 @@ func _test_sky_bow() -> void:
 		_check(absf(at["sky"] - launch) <= SKY_AIM and absf(at["held"] - launch) <= SKY_AIM,
 			"%s: drawn and held at the sky, the arrow %.1f and %.1f deg up (the lob leaves at %.0f)" % [build[0], at["sky"], at["held"], launch])
 		_check(absf(at["flat"]) <= SKY_AIM, "%s: the flat draw level (%.1f deg)" % [build[0], at["flat"]])
+		for drawn: Array in [["flat", "Bow_Draw", false], ["sky", "Bow_Draw_Sky", true]]:
+			rig.sky("", 0.0)
+			rig.upper_at(drawn[1], 1.0)
+			await _frames(3)
+			var form := _bow_form(model, sockets)
+			_check(form["bow_t"] <= FORM_T and form["elbow_off"] <= FORM_ELBOW and form["elbow_behind"] >= FORM_BEHIND,
+				"%s %s: one T, the bow arm %.0f deg off the shoulder line; the draw elbow %.3f m off the arrow's line, %.2f m behind the nock" % [
+				build[0], drawn[0], form["bow_t"], form["elbow_off"], form["elbow_behind"]])
+			if drawn[2]:
+				_check(form["nock_eye"] >= -FORM_EYE and form["nock_eye"] <= 0.02, "%s sky: the nock at eye level (%.3f m)" % [build[0], form["nock_eye"]])
 		_check(absf(squares["sky"] - squares["flat"]) <= SKY_AIM, "%s: the bow stands to the arrow at the sky as drawn flat (%.0f, %.0f deg)" % [
 			build[0], squares["sky"], squares["flat"]])
 		_check(at["half"] > at["flat"] + 10.0 and at["half"] < at["sky"] - 10.0,
 			"%s: half mixed, between (%.1f of %.1f..%.1f)" % [build[0], at["half"], at["flat"], at["sky"]])
 		_check(absf(at["let go"] - at["flat"]) < 1.0 and rig.sky_amount() == 0.0, "%s: let go, the flat draw again (%.1f)" % [build[0], at["let go"]])
-		# A flatter arc (lob_apex tuned in F7): mixed Client3D.sky_share of the way, the arrow at its launch.
-		for apex: float in [0.1, 0.18]:
-			rig.upper_at("Bow_Draw", 1.0)
-			rig.sky("Bow_Draw_Sky", Client3D.sky_share(apex))
-			await _frames(3)
-			var want := rad_to_deg(atan(4.0 * apex))
-			_check(absf(pitch.call() - want) <= SKY_AIM, "%s: lob_apex %.2f, mixed %.2f, the arrow %.1f deg up (it leaves at %.1f)" % [
-				build[0], apex, Client3D.sky_share(apex), pitch.call(), want])
 		rig.sky("", 0.0)
 		model.queue_free()
 	var rig := _goblin()

@@ -14575,24 +14575,20 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 ## (AnimRig.sky), the mix eased toward lobbing over SKY_FADE, so a draw
 ## turned up or down mid-pull crossfades; the loose keeps the mix it was
 ## loosed with (the sim clears lobbing as it looses); anything else lets it go.
-## How far it is mixed follows the arc (combat: lob_apex is an F7 field):
-## the lob leaves at atan(4 x lob_apex), the sky clips are aimed SKY_POSE
-## up, and mixed a share of the way the arrow rises about that share of it
-## (sky_share), so a flatter arc is drawn lower; a steeper one than the
-## clips' is drawn at theirs.
+## Every lob is drawn alike, fully mixed (677 amended (2), the volley: it
+## leaves steep whatever its reach): the sky clips aim the arrow's line,
+## nock to bow hand, LOB_PITCH degrees up, and the loosed arrow (ui's side)
+## leaves on that line.
 const SKY_FADE := 0.2
-const SKY_POSE := 45.0
+const LOB_PITCH := 70.0
 const SKY_CLIPS := {"draw": "bow_draw_sky", "hold": "bow_aim_sky", "loose": "bow_shoot_sky"}
-static func sky_share(apex: float) -> float:
-	return clampf(rad_to_deg(atan(4.0 * apex)) / SKY_POSE, 0.0, 1.0)
 
 
 func _sky_bow(entity: GridEntity, puppet: Node3D, rig: AnimRig, moves: Dictionary, want: String, now: int) -> void:
 	var amount := rig.sky_amount()
 	if want in ["draw", "hold"]:
 		var step := (now - int(puppet.get_meta("sky_msec", now))) / 1000.0 / SKY_FADE
-		var apex := float(Items.verb_of(World.drawn_with(entity)).get("lob_apex", 0.25))
-		amount = move_toward(amount, sky_share(apex) if entity.lobbing else 0.0, step)
+		amount = move_toward(amount, 1.0 if entity.lobbing else 0.0, step)
 	elif want != "loose":
 		amount = 0.0
 	puppet.set_meta("sky_msec", now)

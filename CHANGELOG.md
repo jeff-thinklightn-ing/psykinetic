@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A lob is drawn steep and in form (677 amended (2)): the bow aimed about 70 degrees up for every volley, the back leaning and the shoulders, bow arm and drawing arm one straight line, the drawing elbow behind the arrow and the nock near the eye; a flat shot stands the same way.
 - The bow's lob is now a volley (677 amended (2)): three arrows rain into a circle around where you aimed, each for half a shot, the first knocking down; the circle is tighter the longer you draw. Step out of the circle when you hear the whistle.
 - Options: tidied into tabs (Character, Display, Interface, Sound, Controls, Credits), with the keys grouped by what they do (731).
 - Camera: the low-horizon view is now the default; turn it off under Options, Camera: low horizon (623 amended).

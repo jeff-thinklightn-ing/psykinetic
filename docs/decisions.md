@@ -34941,3 +34941,43 @@ combat_test _test_lob: three falls in the circle on open ground in a
 corridor, two on the target and one beside (damage per arrow, knocked
 down once, a thud), forty rolled volleys all inside, the step-out missed
 by all three, the draugr staggered. view_test emits the new signal.
+
+## 677 amended (2), pc-character's side: the lob drawn at 70 degrees in form
+
+Jeff on the lob still: "look at the shoulders, theres some joint there
+that should be a continous T from arm across back, the back should be
+tilted, the back elbow angle dropped to be a line with the arrow, the
+arrow notch fairly close to eye level". Two forms were offered him: A,
+the hips leaned back 58 degrees, and B, 30 degrees with the shoulders
+shrugged into the T. He picked B. Combat then remade the lob as a volley
+(677 amended (2)): it leaves fast and steep, whatever its reach, and
+rains three arrows into a circle. So every lob is drawn alike, at a fixed
+pitch: no more following lob_apex (the 677 pc-character amendment's
+sky_share goes).
+
+- The full draw in form (tools/humanoid_clips.py form(), flat and at the
+  sky): the trunk turned side-on and leaned back from the waist; the
+  bow wrist reached out along the shoulder line carried on, so bow arm,
+  shoulders and draw arm make one T, the clavicles shrugged; the string
+  hand anchored by the cheek toward the eye; the draw elbow's pole back
+  along the arrow's line so the elbow lies on it; the head turned back
+  to the target. Bow_Draw, Bow_Hold and Bow_Loose take the flat form.
+- At the sky (SKY_FORM): B's lean and shrug taken further for the steep
+  aim (lean 38, shrug 45), the elbow's pole moved in (elbow_x) to keep
+  it on the line once the shoulders shrug, and the trunk turned 16
+  degrees more (yaw, the head turned back as much) so the steep line
+  keeps to the facing (it swung 39 degrees toward the bow side). The
+  draw's mid keys rise to SKY_PITCH 64. Bow_Draw_Sky, Bow_Hold_Sky and
+  Bow_Loose_Sky re-authored. Measured at full draw, man and woman: the
+  arrow 71 to 72 degrees up, 6 off the facing; the bow arm 11 degrees
+  off the shoulder line; the elbow 1 cm off the arrow's line, 0.27 m
+  behind the nock; the nock 4 cm below the eyes.
+- Client3D.LOB_PITCH = 70: the arrow's line, nock to bow hand, above
+  level at full draw. ui's loosed arrow leaves on it. _sky_bow mixes the
+  sky clips fully while lobbing. sky_share and SKY_POSE are gone.
+
+anim_rig_test _test_sky_bow: drawn and held within SKY_AIM of LOB_PITCH;
+the T, the elbow on the line and the nock at the eye, flat and at the
+sky; the flatter-arc cases go. The bow is clear of the body on five
+builds through the sky draw (the pull key's string arm moved out for the
+deeper lean). Client only, protocol unchanged, no new class_name.
