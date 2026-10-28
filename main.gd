@@ -1167,6 +1167,8 @@ func _process(delta: float) -> void:
 		_client3d.show_all_bars = Input.is_key_pressed(KEY_ALT)
 	_drag_yaw()
 	_drive_camera_keys(delta)
+	if Engine.get_process_frames() % 6 == 0:
+		_watch_locker()
 	_update_pick()
 	_run_test_hold_near()
 	_run_test_latency()
@@ -10901,6 +10903,10 @@ func _build_talk() -> void:
 	pack_panel = PackPanel.new()
 	pack_panel.name = "Pack"
 	pack_panel.transfer = _transfer
+	pack_panel.double_click = pack_double_click
+	pack_panel.deposit_all = func() -> void:
+		if _local_player() != null:
+			World.command(_local_player(), "deposit_all", {})
 	pack_panel.sound = _sound
 	pack_panel.use = use_slot
 	item_icons = ItemIcons.new()
@@ -11126,6 +11132,8 @@ func context_hint_for(thing: Node) -> String:
 	if thing == null or player == null or not Net.hints:
 		return ""  # Jeff (2026-10-22): no control hints over things; settings.cfg hints=on brings them back for a test.
 	if thing is Chest:
+		if (thing as Chest).locker:
+			return "%s  open your chest" % Keys.name_of("open")  # Decision 722.
 		return "%s  open the shop" % Keys.name_of("open") if (thing as Chest).shop else "E  open"
 	if thing is Cargo:
 		return "%s  open" % Keys.name_of("open")
@@ -15334,6 +15342,14 @@ func toggle_pack() -> void:
 ## beside it, and open on arrival (_update_pack). On the one already open,
 ## it closes.
 func _open_pack(player: Player, target: GridEntity) -> void:
+	if target is Locker:
+		# 722 (items): your chest is never opened by hand; the locker under it is.
+		var prop := World.get_entity_at(target.tile)
+		if prop is Chest and (prop as Chest).locker:
+			target = prop
+	if pack_panel != null and pack_panel.other is Locker and target is Chest and (target as Chest).locker:
+		close_other()  # E on the locker again: your chest shuts.
+		return
 	if pack_panel != null and pack_panel.other == target:
 		close_other()
 		return
@@ -15414,6 +15430,12 @@ func search(player: Player, chest: Chest) -> bool:
 ## Opens [param target]'s row (a chest, or a companion's pack), with its sound.
 func open_other(target: GridEntity) -> void:
 	_pack_wanted = null
+	if target is Chest and (target as Chest).locker:
+		# A town's locker (decision 722): the server stands your own chest
+		# there (Locker), and its opened count shows it (_watch_locker).
+		if _local_player() != null:
+			World.command(_local_player(), "locker", {"prop": str(target.get_path())})
+		return
 	if target is Chest and not (target as Chest).cache.is_empty():
 		# A cache is searched, not opened (decision 599): the server hands over the find.
 		if _local_player() != null:
@@ -15440,6 +15462,48 @@ func open_other(target: GridEntity) -> void:
 		var player := _local_player()
 		if player != null:
 			World.command(player, "counter", {"counter": str(target.get_path()), "do": "look"})
+
+
+## 722, ui's side: a double-click on slot [param index] of the player's
+## row ([param mine]) or the open one: with your chest open, a pack thing is
+## deposited and a chest thing withdrawn (a stack whole); otherwise a pack
+## thing is equipped into its hand or the armour (a hand's or the armour's
+## taken off), in your own companion's pack hers ("of"). The server decides
+## and words a refusal (slot_refused). The command sent, or "".
+func pack_double_click(mine: bool, index: int) -> String:
+	var player := _local_player()
+	if player == null or pack_panel == null:
+		return ""
+	var open := pack_panel.other
+	var command := ""
+	var args := {"slot": index}
+	if open is Locker:
+		command = ("deposit" if Items.is_pack(index) else "equip") if mine else "withdraw"
+	elif mine:
+		command = "equip"
+	elif _is_own_companion(open):
+		command = "equip"
+		args["of"] = str(open.get_path())
+	if command.is_empty():
+		return ""
+	World.command(player, command, args)
+	return command
+
+
+## 722, ui's side, a few times a second: your own chest (Locker; only its
+## owner is sent it) opened again, its opened count risen since last seen,
+## shows in the pack panel's open row.
+var _locker_opened := {}
+func _watch_locker() -> void:
+	if pack_panel == null:
+		return
+	for entity in World.get_entities():
+		if entity is Locker and entity.spawned:
+			var count := (entity as Locker).opened
+			if count != int(_locker_opened.get(entity.get_instance_id(), 0)):
+				_locker_opened[entity.get_instance_id()] = count
+				if count > 0 and pack_panel.other != entity:
+					open_other(entity)
 
 
 func close_other() -> void:
@@ -17213,7 +17277,7 @@ func _run_test_show(player: Player) -> void:
 				var sample := "Wren's dagger (quiet), imp-bane
 felled 12 imps
 story: carried by Wren for 3 days; named for Wren"
-				pack_panel.tip.show_for("dagger", sample, pack_panel._player_row.get_child(0).get_global_rect().position)
+				pack_panel.tip.show_for("dagger", sample, pack_panel.box_in(true, Items.PACK_SLOTS[0]).get_global_rect().position)
 			"menu":
 				_show_menu()
 			"menu_options":

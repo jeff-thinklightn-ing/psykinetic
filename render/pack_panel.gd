@@ -84,6 +84,11 @@ var shown := true:
 ## drag); the mouse over one, or off (index -1), to hover_hook; the slots
 ## selected to give are framed (set_selected) and never dragged.
 var select_hook: Callable
+## A double-click on a box (decision 722): called (mine, index); Main
+## equips, deposits or withdraws.
+var double_click: Callable
+## The personal chest's "Deposit unequipped" button (722): Main sends deposit_all.
+var deposit_all: Callable
 var hover_hook: Callable
 var selected: Dictionary = {}
 
@@ -186,6 +191,14 @@ class SlotBox:
 				and panel.select_hook.call(mine, index, click.shift_pressed):
 			accept_event()
 			return
+		# 722: a double-click equips, or with a chest open deposits or withdraws.
+		if click != null and click.pressed and click.double_click and click.button_index == MOUSE_BUTTON_LEFT \
+				and panel.double_click.is_valid():
+			var entity_clicked := owner_entity()
+			if is_instance_valid(entity_clicked) and index < entity_clicked.slots.size() and not entity_clicked.slots[index].is_empty():
+				panel.double_click.call(mine, index)
+				accept_event()
+				return
 		if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_RIGHT or not mine:
 			return
 		var entity := owner_entity()
@@ -202,6 +215,8 @@ class SlotBox:
 
 ## "Jeff's Pack"; a chest is "Chest".
 static func title_of(entity: GridEntity) -> String:
+	if entity is Locker:
+		return "Your chest"  # Decision 722: the same 48 at every town's locker.
 	if entity is Chest:
 		return "Chest"
 	if entity is Cargo:
@@ -234,6 +249,19 @@ func _ready() -> void:
 	_other_mood.size_flags_vertical = Control.SIZE_SHRINK_END
 	_other_mood.mouse_filter = Control.MOUSE_FILTER_PASS
 	_other_head.add_child(_other_mood)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_other_head.add_child(spacer)
+	var deposit := Button.new()
+	deposit.name = "Deposit"
+	deposit.text = "Deposit unequipped"
+	deposit.tooltip_text = "Everything in your pack (not your hands or armour) into your chest"
+	deposit.focus_mode = Control.FOCUS_NONE
+	deposit.visible = false
+	deposit.pressed.connect(func() -> void:
+		if deposit_all.is_valid():
+			deposit_all.call())
+	_other_head.add_child(deposit)
 	_other_row = _row(false)
 	column.add_child(_other_row)
 	_player_title = _title()
@@ -292,61 +320,130 @@ func _title() -> Label:
 	return title
 
 
+## A row's layout for [param entity] (decision 722, ui's side): "carrier"
+## (a player's or a companion's Items.CARRIED: the pack's eight in a 4 x 2
+## grid, the hands and the armour beside), "locker" (a personal chest's 48,
+## LOCKER_COLUMNS a line) or "line:<n>" (a chest, crate or cart, one line).
+static func layout_of(entity: GridEntity) -> String:
+	if entity == null or entity.slots.size() == Items.CARRIED:
+		return "carrier"
+	if entity is Locker:
+		return "locker"
+	return "line:%d" % entity.slots.size()
+
+
+## A personal chest's boxes a line.
+const LOCKER_COLUMNS := 12
+## The pack's grid, boxes a line (4 x 2, decision 722).
+const PACK_COLUMNS := 4
+
+
 func _row(mine: bool) -> HBoxContainer:
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", UiTheme.constant("slot_gap"))
-	for i in maxi(Player.SLOTS, Cargo.MAX):
-		var box := SlotBox.new()
-		box.panel = self
-		box.mine = mine
-		box.index = i
-		box.custom_minimum_size = SLOT_SIZE
-		var hand := i < Items.CARRIED and not Items.is_pack(i)
-		box.theme_type_variation = &"HandSlot" if hand else &"Inset"
-		if hand:
-			var mark := Label.new()
-			mark.text = "R" if i == Items.RIGHT_HAND else "L" if i == Items.LEFT_HAND else "A"  # The armour worn (622).
-			mark.theme_type_variation = &"Small"
-			mark.add_theme_color_override("font_color", UiTheme.color("brass"))
-			mark.position = Vector2(10, 4)
-			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			box.add_child(mark)
-		var picture := TextureRect.new()
-		picture.set_anchors_preset(Control.PRESET_FULL_RECT)
-		picture.offset_left = ICON_INSET
-		picture.offset_top = ICON_INSET
-		picture.offset_right = -ICON_INSET
-		picture.offset_bottom = -ICON_CAPTION
-		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		box.icon = picture
-		box.add_child(picture)
-		var label := Label.new()
-		label.set_anchors_preset(Control.PRESET_FULL_RECT)
-		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.add_theme_font_size_override("font_size", FONT_SIZE)
-		box.label = label
-		box.add_child(label)
-		# The stack's count, small in brass in the bottom-right corner (619,
-		# ui's side), over the caption's end.
-		var count := Label.new()
-		count.theme_type_variation = &"Small"
-		count.add_theme_color_override("font_color", UiTheme.color("brass"))
-		count.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-		count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-		count.grow_vertical = Control.GROW_DIRECTION_BEGIN
-		count.offset_right = -6
-		count.offset_bottom = -2
-		count.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		count.visible = false
-		box.count = count
-		box.add_child(count)
-		row.add_child(box)
+	row.add_theme_constant_override("separation", UiTheme.constant("slot_gap") * 4)
+	_lay_out(row, mine, "carrier")
 	return row
+
+
+## [param row]'s boxes made again for [param layout] (layout_of), if it
+## changed; the boxes in GridContainers, each its slot's index.
+func _lay_out(row: HBoxContainer, mine: bool, layout: String) -> void:
+	if row.get_meta(&"layout", "") == layout:
+		return
+	row.set_meta(&"layout", layout)
+	for child in row.get_children():
+		row.remove_child(child)
+		child.queue_free()
+	var gap := UiTheme.constant("slot_gap")
+	var grids: Array[Array] = []  # [columns, indices]
+	if layout == "carrier":
+		grids.append([PACK_COLUMNS, Items.PACK_SLOTS])
+		grids.append([2, [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]])
+	elif layout == "locker":
+		grids.append([LOCKER_COLUMNS, range(Locker.LOCKER_SLOTS)])
+	else:
+		var n := maxi(layout.get_slice(":", 1).to_int(), 1)
+		grids.append([n, range(n)])
+	for each: Array in grids:
+		var grid := GridContainer.new()
+		grid.columns = int(each[0])
+		grid.add_theme_constant_override("h_separation", gap)
+		grid.add_theme_constant_override("v_separation", gap)
+		grid.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		for i: int in each[1]:
+			grid.add_child(_box(mine, i, layout == "carrier" and not Items.is_pack(i)))
+		row.add_child(grid)
+
+
+## The boxes of [param row], in no set order.
+static func boxes_of(row: HBoxContainer) -> Array[SlotBox]:
+	var out: Array[SlotBox] = []
+	for grid in row.get_children():
+		for box in grid.get_children():
+			if box is SlotBox and not box.is_queued_for_deletion():
+				out.append(box)
+	return out
+
+
+## The box for slot [param index] in the open row ([param mine] false) or
+## the player's, or null.
+func box_in(mine: bool, index: int) -> SlotBox:
+	for box in boxes_of(_player_row if mine else _other_row):
+		if box.index == index:
+			return box
+	return null
+
+
+func _box(mine: bool, i: int, hand: bool) -> SlotBox:
+	var box := SlotBox.new()
+	box.panel = self
+	box.mine = mine
+	box.index = i
+	box.custom_minimum_size = SLOT_SIZE
+	box.theme_type_variation = &"HandSlot" if hand else &"Inset"
+	if hand:
+		var mark := Label.new()
+		mark.text = "R" if i == Items.RIGHT_HAND else "L" if i == Items.LEFT_HAND else "A"  # The armour worn (622).
+		mark.theme_type_variation = &"Small"
+		mark.add_theme_color_override("font_color", UiTheme.color("brass"))
+		mark.position = Vector2(10, 4)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		box.add_child(mark)
+	var picture := TextureRect.new()
+	picture.set_anchors_preset(Control.PRESET_FULL_RECT)
+	picture.offset_left = ICON_INSET
+	picture.offset_top = ICON_INSET
+	picture.offset_right = -ICON_INSET
+	picture.offset_bottom = -ICON_CAPTION
+	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.icon = picture
+	box.add_child(picture)
+	var label := Label.new()
+	label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_theme_font_size_override("font_size", FONT_SIZE)
+	box.label = label
+	box.add_child(label)
+	# The stack's count, small in brass in the bottom-right corner (619,
+	# ui's side), over the caption's end.
+	var count := Label.new()
+	count.theme_type_variation = &"Small"
+	count.add_theme_color_override("font_color", UiTheme.color("brass"))
+	count.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	count.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	count.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	count.offset_right = -6
+	count.offset_bottom = -2
+	count.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	count.visible = false
+	box.count = count
+	box.add_child(count)
+	return box
 
 
 func _process(_delta: float) -> void:
@@ -411,23 +508,22 @@ static func shift_down() -> bool:
 
 ## The badge box [param index] of the open row or the player's shows (tests).
 func count_in(mine: bool, index: int) -> String:
-	var row := _player_row if mine else _other_row
-	var box := row.get_child(index) as SlotBox
-	return box.count.text if box.count.visible else ""
+	var box := box_in(mine, index)
+	return box.count.text if box != null and box.count.visible else ""
 
 
 ## What box [param index] of the open row ([param mine] false) or the
 ## player's shows: the item's short name, "" for empty.
 func shown_in(mine: bool, index: int) -> String:
-	var row := _player_row if mine else _other_row
-	return (row.get_child(index) as SlotBox).label.text
+	var box := box_in(mine, index)
+	return box.label.text if box != null else ""
 
 
 ## The icon box [param index] of the open row or the player's shows, or
 ## null (names only).
 func icon_in(mine: bool, index: int) -> Texture2D:
-	var row := _player_row if mine else _other_row
-	return (row.get_child(index) as SlotBox).icon.texture
+	var box := box_in(mine, index)
+	return box.icon.texture if box != null else null
 
 
 ## The player's slots selected to give in a barter (560): [param indices]
@@ -439,7 +535,7 @@ func set_selected(indices: Array) -> void:
 			selected[int(index)] = true
 	if _player_row == null:
 		return
-	for box: SlotBox in _player_row.get_children():
+	for box: SlotBox in boxes_of(_player_row):
 		if selected.has(box.index):
 			box.add_theme_stylebox_override("panel", selected_style())
 		else:
@@ -489,6 +585,8 @@ func _refresh() -> void:
 	_other_title.tooltip_text = why
 	_player_title.text = title_of(player) if is_instance_valid(player) else ""
 	var landed: GridEntity = null
+	_lay_out(_other_row, false, layout_of(other))
+	_other_head.get_node(^"Deposit").visible = other is Locker
 	for row: HBoxContainer in [_other_row, _player_row]:
 		var entity: GridEntity = player if row == _player_row else other
 		if not is_instance_valid(entity) or not row.visible or not visible:
@@ -501,7 +599,7 @@ func _refresh() -> void:
 					if not item.is_empty() and i < before[1].size() and before[1][i] != item:
 						landed = entity
 			_last[row] = [entity, entity.slots.duplicate()]
-		for box: SlotBox in row.get_children():
+		for box: SlotBox in boxes_of(row):
 			var has := is_instance_valid(entity) and box.index < entity.slots.size()
 			box.visible = has or not is_instance_valid(entity)
 			var item := entity.slots[box.index] if has else ""

@@ -35271,3 +35271,28 @@ On buildings' 715 (the temple carries its stair down as a level link, "building"
 level_test: the stair found where the temple stands at two places, up from below beside it, the
 sealed stair's line; the Ossuary's rooms. Server only (the room card and the line ride existing
 messages), protocol unchanged, no new class_name.
+## 722, ui's side: the pack's grid, your chest's screen, the double-click
+
+The screens for items' 722 (C:/dev/review/inventory/design.md). The pack
+panel's rows are laid out by what they show (PackPanel.layout_of, made again
+when it changes): a player's or a companion's eleven as the pack's eight in
+a 4 x 2 grid (Items.PACK_SLOTS' order) with the hands and the armour beside
+in brass (R, L / A); a personal chest's 48 twelve a line, titled "Your
+chest", with a "Deposit unequipped" button (deposit_all); a chest, crate or
+cart in one line as before. Boxes are found by slot (box_in, boxes_of), not
+by child position.
+
+A double-click on a thing (Main.pack_double_click): with your chest open, a
+pack thing is deposited and a chest thing withdrawn, a stack whole (a hand's
+or the armour's double-click still takes it off); otherwise a pack thing is
+equipped and a worn one taken off ("equip" {slot}), in your own companion's
+row hers ("of" her path). The server decides and words a refusal
+(slot_refused). Dragging is unchanged ("transfer").
+
+A town's locker (Chest.locker): E or a click on it sends "locker" {prop}
+instead of opening it, and its hint reads "E  open your chest". Your chest
+(Locker, sent to you alone) shows in the open row when it spawns or its
+opened count rises (Main._watch_locker, five times a second). ui_test
+_test_inventory_panel: the 4 x 2 grid and the gear beside, the chest's 48
+and its button, each double-click's command. Client only; rides 722's
+revision, no new class_name of ui's.

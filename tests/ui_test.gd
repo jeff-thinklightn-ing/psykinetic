@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_access()
 	_test_keys()
 	_test_options_tabs()
+	_test_inventory_panel()
 	_test_barter()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -226,16 +227,16 @@ func _test_stacks_ui() -> void:
 	if pack_for_armour != null:
 		for mine: bool in [true, false]:
 			var row: HBoxContainer = pack_for_armour._player_row if mine else pack_for_armour._other_row
-			var armour_box: PackPanel.SlotBox = row.get_child(Items.ARMOUR)
+			var armour_box: PackPanel.SlotBox = pack_for_armour.box_in(mine, Items.ARMOUR)
 			var marks: Array[String] = []
 			for child in armour_box.get_children():
 				if child is Label and child != armour_box.label and child != armour_box.count:
 					marks.append((child as Label).text)
-			_check(row.get_child_count() >= Items.CARRIED and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
+			_check(PackPanel.boxes_of(row).size() >= Items.CARRIED and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
 				"%s row: the seventh box is the armour worn, edged like the hands, marked A" % ["the player's" if mine else "the other"])
-		var right_box: PackPanel.SlotBox = pack_for_armour._player_row.get_child(Items.RIGHT_HAND)
+		var right_box: PackPanel.SlotBox = pack_for_armour.box_in(true, Items.RIGHT_HAND)
 		var armour_data := {"slots_of": _main._local_player(), "slot": 0, "count": 0}
-		_check(_main._local_player() == null or (pack_for_armour._player_row.get_child(Items.ARMOUR) as PackPanel.SlotBox)._can_drop_data(Vector2.ZERO, armour_data)
+		_check(_main._local_player() == null or pack_for_armour.box_in(true, Items.ARMOUR)._can_drop_data(Vector2.ZERO, armour_data)
 				and right_box._can_drop_data(Vector2.ZERO, armour_data),
 			"a drag lands on the armour box or a hand alike: the server decides and words a refusal (World.slot_refused)")
 	_check(Main.pile_words(PackedStringArray(["herbs", "herbs", "herbs", "herbs", "herbs"])) == "5 herbs"
@@ -284,7 +285,7 @@ func _test_stacks_ui() -> void:
 			pack._refresh()
 			_check(slot >= 0 and World.slot_count(player, slot) == 3 and pack.count_in(true, slot) == "3",
 				"three herbs picked up: the slot's corner reads 3 (%s)" % pack.count_in(true, slot))
-			var box: PackPanel.SlotBox = pack._player_row.get_child(slot)
+			var box: PackPanel.SlotBox = pack.box_in(true, slot)
 			var whole: Variant = box.drag_payload()
 			PackPanel.test_shift = true
 			var one: Variant = box.drag_payload()
@@ -1625,6 +1626,49 @@ func _test_options_tabs() -> void:
 	panel.dev_keys = dev_was
 	if panel.visible != was_shown:
 		panel.toggle()
+
+
+## 722, ui's side: the pack's eight in a 4 x 2 grid with the hands and the
+## armour beside; a personal chest's 48 twelve a line, titled "Your chest",
+## with "Deposit unequipped"; a double-click deposits, withdraws or equips.
+func _test_inventory_panel() -> void:
+	print("== the inventory (722): the pack 4 x 2, your chest of 48, a double-click ==")
+	var pack: PackPanel = _main.pack_panel
+	if pack == null:
+		_check(false, "the pack panel exists")
+		return
+	pack.open(null)
+	var grids := pack._player_row.get_children()
+	var in_grid: Array[int] = []
+	for box in grids[0].get_children():
+		in_grid.append((box as PackPanel.SlotBox).index)
+	var gear: Array[int] = []
+	for box in grids[1].get_children():
+		gear.append((box as PackPanel.SlotBox).index)
+	_check(PackPanel.layout_of(null) == "carrier" and grids.size() == 2 and (grids[0] as GridContainer).columns == 4
+			and in_grid == Items.PACK_SLOTS and gear == [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]
+			and pack.box_in(true, Items.ARMOUR).theme_type_variation == &"HandSlot" and pack.box_in(true, Items.PACK_SLOTS[4]).theme_type_variation == &"Inset",
+			"the player's row: the pack's eight 4 x 2 (%s), the hands and the armour beside (%s)" % [in_grid, gear])
+	var locker := Locker.new()
+	locker.name = "TestLocker"
+	add_child(locker)
+	pack.open(locker)
+	var chest_boxes := PackPanel.boxes_of(pack._other_row)
+	_check(PackPanel.layout_of(locker) == "locker" and chest_boxes.size() == Locker.LOCKER_SLOTS
+			and (pack._other_row.get_child(0) as GridContainer).columns == PackPanel.LOCKER_COLUMNS
+			and pack.title_shown(false) == "Your chest" and pack._other_head.get_node(^"Deposit").visible,
+			"your chest: %d boxes, 12 a line, titled \"Your chest\", Deposit unequipped shown" % chest_boxes.size())
+	var player: Player = _main._local_player()
+	if player != null:
+		var pack_slot: int = Items.PACK_SLOTS[5]
+		_check(_main.pack_double_click(true, pack_slot) == "deposit" and _main.pack_double_click(true, Items.RIGHT_HAND) == "equip"
+				and _main.pack_double_click(false, 3) == "withdraw",
+				"chest open, a double-click: a pack thing deposited, a hand's taken off, a chest thing withdrawn")
+	pack.open(null)
+	_check(not pack._other_head.get_node(^"Deposit").visible and (player == null or _main.pack_double_click(true, Items.PACK_SLOTS[0]) == "equip"),
+			"the chest closed: no deposit button; a double-click in the pack equips")
+	_check(_main.context_hint_for(null) == "", "no hint for nothing")
+	locker.queue_free()
 
 
 func _test_keys() -> void:
