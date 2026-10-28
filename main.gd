@@ -487,6 +487,8 @@ var _bump_sent_at := 0
 ## of the local player's shown position, [msec, grid], for the report.
 var _walk_index := -1
 var _walk_since := 0
+## --test-walk-on-wind: when the local player's own wind-up began (msec), or -1.
+var _wind_at := -1
 var _walk_samples: Array[Array] = []
 ## --test-smooth's meter (net/smooth_meter.gd), made with the first frame.
 var _smooth_meter: RefCounted = null
@@ -2683,6 +2685,7 @@ func _free_drive(delta: float) -> bool:
 		_free["path"] = []
 		return false
 	var intent := _free_intent(player, own)
+	_record_walk(player)
 	if intent != Vector2.ZERO:
 		player.aim = Vector2.ZERO
 	elif Net.controls == "wasd" and (_free["path"] as Array).is_empty():
@@ -5837,6 +5840,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 		record.seen_generation[World.zone.name] = generation
 	_join_companion(record, player)
 	_on_gold_changed(id, World.gold_of(id))
+	_test_foe(player)
 	if admin_peer_allowed(peer, id) and peer != Net.local_id:
 		Net.message_to(peer, "admin", {"admin": true})  # 672: their F10 opens the panel.
 
@@ -17227,6 +17231,8 @@ func _test_walk_keys() -> String:
 	if _local_player() == null:
 		return ""
 	if _walk_index == -1:
+		if Net.test_walk_on_wind and not _wind_walk_started(_local_player()):
+			return ""
 		_walk_index = 0
 		_walk_since = Time.get_ticks_msec()
 	while _walk_index < Net.test_walk.size() \
@@ -17259,9 +17265,43 @@ func _measure_smoothness(delta: float) -> void:
 	_smooth_meter.sample(player, aim, delta)
 
 
+## --test-foe: [param player] given the weapon in hand and the monster 3
+## cells east (392 amended's wind-up on a real client).
+func _test_foe(player: Player) -> void:
+	if Net.test_foe.size() != 2:
+		return
+	World.set_slots(player, Items.tidy(["", "", "", "", Net.test_foe[1], ""], Items.CARRIED))
+	var foe := _spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": Net.test_foe[0], "name": "Foe",
+		"tile": _nearest_free(player.tile + Vector2i(3, 0))})
+	print("[test] foe %s at %s, %s in hand at %s" % [Net.test_foe[0], foe.tile if foe != null else Vector2i.ZERO,
+			Net.test_foe[1], player.tile])
+
+
+## --test-walk-on-wind: true once the local player's own wind-up has begun;
+## logs each winding (start and give-up) and each hurt from then on.
+func _wind_walk_started(player: Player) -> bool:
+	if not player.winding.is_connected(_on_test_wind):
+		player.winding.connect(_on_test_wind)
+		player.damaged.connect(func(amount: int) -> void: print("[test] wind-walk hurt %d at %d ms" % [amount, Time.get_ticks_msec()]))
+	if _wind_at < 0:
+		_run_test_fight(player)  # --test-fight: strike till the wind-up begins.
+	return _wind_at >= 0
+
+
+func _on_test_wind(_direction: Vector2i, ticks: int) -> void:
+	var player := _local_player()
+	print("[test] wind-walk winding ticks=%d at %d ms, shown %s" % [ticks, Time.get_ticks_msec(),
+			Iso.local_to_grid(player.position) if player != null else Vector2.ZERO])
+	if ticks > 0 and _wind_at < 0:
+		_wind_at = Time.get_ticks_msec()
+
+
 func _record_walk(player: Player) -> void:
 	if not Net.test_walk.is_empty() and _walk_index != -1:
 		_walk_samples.append([Time.get_ticks_msec(), Iso.local_to_grid(player.position)])
+		if Net.test_walk_on_wind and _walk_samples.size() % 6 == 1:
+			print("[test] wind-walk %d ms after: shown %s keys %s" % [Time.get_ticks_msec() - _wind_at,
+					Iso.local_to_grid(player.position), _test_walk_keys()])
 
 
 ## --test-walk's report: the shown speed over the walk, frame by frame

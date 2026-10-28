@@ -140,6 +140,8 @@ extends Node
 ##   --test-chase=<seconds>       hold-to-move on the nearest animal as drawn (a deer first) for this long, as a
 ##                                cursor kept on a fleeing deer does (tools/net_chase.sh)
 ##   --test-walk=<keys:secs,...>  WASD: hold these keys (e.g. w:1.5,wd:1) in turn, then let go
+##   --test-walk-on-wind          --test-walk starts at the local player's own wind-up (392 amended), logged
+##   --test-foe=<kind>,<weapon>   server: each player joins with that weapon in hand and that monster 3 cells east
 ##   --test-smooth                count jumps and back steps in what is drawn, frame by frame (60 fps), and report
 ##                                them at exit (net/smooth_meter.gd; tools/net_smooth.sh)
 ##
@@ -811,6 +813,10 @@ var test_hold_flip := 0.0
 var test_smooth := false
 ## --test-walk: [{"keys": "wd", "seconds": 1.0}, ...]
 var test_walk: Array[Dictionary] = []
+## --test-walk-on-wind: the walk waits for the local player's own wind-up.
+var test_walk_on_wind := false
+## --test-foe: [monster kind, weapon] each joining player is given, or empty.
+var test_foe: PackedStringArray = []
 
 var mispredicts_total := 0
 ## Tick times, bandwidth, corrections: see NetStats.
@@ -1992,6 +1998,8 @@ func _parse_args() -> void:
 				regenerate = true
 			"--test-smooth":
 				test_smooth = true
+			"--test-walk-on-wind":
+				test_walk_on_wind = true
 			"--world-map":
 				world_map = true
 			"--builder-stub":
@@ -2003,7 +2011,7 @@ func _parse_args() -> void:
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -2067,6 +2075,8 @@ func _set_option(key: String, value: String) -> void:
 				var pieces := part.split(":")
 				if pieces.size() == 2 and pieces[1].is_valid_float():
 					test_walk.append({"keys": pieces[0].to_lower(), "seconds": pieces[1].to_float()})
+		"--test-foe":
+			test_foe = value.split(",")
 		"--player-id":
 			player_id = value.strip_edges()
 		"--name":
