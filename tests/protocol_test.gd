@@ -23,6 +23,8 @@ func _ready() -> void:
 	_test_self_update()
 	_test_fingerprint()
 	_test_token_from_env()
+	_test_token_credential()
+	_test_no_unsafe_tls()
 	_test_token_lockout()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -165,6 +167,81 @@ func _test_token_from_env() -> void:
 	if was_env != "":
 		OS.set_environment("PSYKINETIC_TOKEN", was_env)
 	Net.token = was_token
+
+
+## The service's systemd credential "token" (717): read before the
+## environment's, trimmed; no directory or no file leaves the environment's.
+func _test_token_credential() -> void:
+	print("== the token from the systemd credential ==")
+	var dir: String = preload("res://tests/test_ports.gd").scratch("protocol_test_credentials/")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var file := FileAccess.open(dir.path_join("token"), FileAccess.WRITE)
+	file.store_string("from-credential
+")
+	file.close()
+	var path := ProjectSettings.globalize_path(dir)
+	_check(Net.credential_token(path) == "from-credential", "the credential's token is read, its newline trimmed")
+	_check(Net.credential_token("") == null and Net.credential_token(path.path_join("none")) == null,
+			"no credentials directory, or no token in it: none")
+	var was_token := Net.token
+	var was_source := Net.token_source
+	var was_env := OS.get_environment("PSYKINETIC_TOKEN")
+	var was_dir := OS.get_environment("CREDENTIALS_DIRECTORY")
+	OS.set_environment("PSYKINETIC_TOKEN", "from-env")
+	OS.set_environment("CREDENTIALS_DIRECTORY", path)
+	Net.token = ""
+	Net._token_from_env()
+	_check(Net.token == "from-credential" and Net.token_source == "credential", "with both, the credential wins over the environment")
+	OS.set_environment("CREDENTIALS_DIRECTORY", path.path_join("none"))
+	Net.token = ""
+	Net._token_from_env()
+	_check(Net.token == "from-env" and Net.token_source == "env", "a credentials directory without a token: the environment's")
+	file = FileAccess.open(dir.path_join("token"), FileAccess.WRITE)
+	file.store_string(" 
+")
+	file.close()
+	OS.set_environment("CREDENTIALS_DIRECTORY", path)
+	Net.token = "x"
+	Net._token_from_env()
+	_check(Net.token == "" and Net.token_source == "credential",
+			"a blank credential is no token (a --server refuses), never passed over for the environment's")
+	OS.unset_environment("CREDENTIALS_DIRECTORY")
+	OS.set_environment("PSYKINETIC_TOKEN", "  ")
+	Net.token = "x"
+	Net._token_from_env()
+	_check(Net.token == "" and Net.token_source == "env", "a blank PSYKINETIC_TOKEN is no token either")
+	Net.token_source = was_source
+	DirAccess.remove_absolute(dir.path_join("token"))
+	if was_dir != "":
+		OS.set_environment("CREDENTIALS_DIRECTORY", was_dir)
+	else:
+		OS.unset_environment("CREDENTIALS_DIRECTORY")
+	if was_env != "":
+		OS.set_environment("PSYKINETIC_TOKEN", was_env)
+	else:
+		OS.unset_environment("PSYKINETIC_TOKEN")
+	Net.token = was_token
+
+
+## 717: the client pins the server's certificate (TLSOptions.client with the
+## pinned bundle); TLSOptions.client_unsafe, which trusts any, is never used,
+## not even by a test's --dtls-trust.
+func _test_no_unsafe_tls() -> void:
+	print("== no unsafe TLS ==")
+	var found: Array[String] = []
+	for path: String in ["res://main.gd"] + _scripts_in("res://net/"):
+		var text := FileAccess.get_file_as_string(path)
+		if "client" + "_unsafe" in text:
+			found.append(path)
+	_check(found.is_empty(), "no TLSOptions.client_unsafe in main.gd or net/ (%s)" % ", ".join(found))
+
+
+func _scripts_in(dir: String) -> Array[String]:
+	var out: Array[String] = []
+	for name: String in DirAccess.get_files_at(dir):
+		if name.ends_with(".gd"):
+			out.append(dir.path_join(name))
+	return out
 
 
 func _check(ok: bool, label: String) -> void:

@@ -10,8 +10,8 @@ extends Node
 ##   --bind=<ip>                  server/host: listen on this address only (game and status ports;
 ##                                default every address); tests' servers take 127.0.0.1, which
 ##                                Windows' firewall doesn't ask about
-##   --token=<string>             server: required (or PSYKINETIC_TOKEN, which the service uses so
-##                                the token stays out of the process list); a peer must send it
+##   --token=<string>             server: required (or the service's systemd credential "token",
+##                                else PSYKINETIC_TOKEN: out of the process list); a peer must send it
 ##                                (Net.authenticate)
 ##                                within 5 s or it is disconnected. host: optional; without
 ##                                it anyone may join (local play). client: sent on connect
@@ -594,6 +594,9 @@ var player_reset := true
 signal message_received(kind: String, data: Dictionary)
 ## Join token. Never written anywhere in the repo; see server/env.example.
 var token := ""
+## Where the token came from: "credential", "env", "flag", or "" (none),
+## said once as a server starts ("[net] token from ..."), never the token.
+var token_source := ""
 ## Who this client says it is. From settings.cfg, --player-id/--name, or
 ## for a project host the dev id.
 var player_id := ""
@@ -1899,9 +1902,13 @@ func start() -> void:
 		print("[net] client connecting to %s:%d" % [address, port])
 	else:
 		if mode == Mode.SERVER and token == "":
-			push_error("[net] --server needs a token (PSYKINETIC_TOKEN, or --token=<string>): refusing to run an open server")
+			push_error("[net] --server needs a token (%s): refusing to run an open server" % (
+				"token credential empty" if token_source == "credential" else "PSYKINETIC_TOKEN empty" if token_source == "env"
+				else "the token credential, PSYKINETIC_TOKEN or --token=<string>"))
 			get_tree().quit(1)
 			return
+		if mode == Mode.SERVER:
+			print("[net] token from %s" % token_source)
 		# No relay: clients talk to the server only, so the server never
 		# forwards packets or announces one peer's coming and going to the
 		# others. Those announcements were the main sender into a closing
@@ -1961,12 +1968,29 @@ func _on_server_disconnected() -> void:
 	print("[net] server disconnected")
 
 
-## The token from PSYKINETIC_TOKEN, before _parse_args, so an explicit --token
-## still wins. The service passes it only in the environment: argv is readable
-## by every local process (ps, /proc/<pid>/cmdline). Decision 690.
+## The token before _parse_args, so an explicit --token still wins: the
+## service's systemd credential "token" ($CREDENTIALS_DIRECTORY/token,
+## LoadCredential; 717) if that file is there, else PSYKINETIC_TOKEN from
+## the environment. Never on argv, readable by every local process (ps,
+## /proc/<pid>/cmdline; decision 690), and never printed. A credential
+## that is there but blank is taken as it is (no token), never passed over
+## for the environment's: a --server then refuses to start.
 func _token_from_env() -> void:
-	if OS.get_environment("PSYKINETIC_TOKEN") != "":
-		token = OS.get_environment("PSYKINETIC_TOKEN")
+	var held: Variant = credential_token(OS.get_environment("CREDENTIALS_DIRECTORY"))
+	if held != null:
+		token = held
+		token_source = "credential"
+	elif OS.has_environment("PSYKINETIC_TOKEN"):
+		token = OS.get_environment("PSYKINETIC_TOKEN").strip_edges()
+		token_source = "env"
+
+
+## The token in [param directory]'s "token" file, its whitespace trimmed
+## ("" for a blank one), or null for no directory or no file.
+static func credential_token(directory: String) -> Variant:
+	if directory.is_empty() or not FileAccess.file_exists(directory.path_join("token")):
+		return null
+	return FileAccess.get_file_as_string(directory.path_join("token")).strip_edges()
 
 
 func _parse_args() -> void:
@@ -2066,6 +2090,7 @@ func _set_option(key: String, value: String) -> void:
 			state_path = value
 		"--token":
 			token = value
+			token_source = "flag"
 		"--settings":
 			_settings_override = value
 		"--renderer":

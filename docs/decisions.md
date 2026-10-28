@@ -34374,3 +34374,48 @@ items_test's totem check covers the rename (a saved book and a saved slot),
 the reset, the relic (marks, save, its name, never taken the usual way,
 consumed) and the sledge's row. Server and catalog; protocol as measured in
 the landing (new ids in the catalog).
+
+## 717 amended (1): the token a credential too; no unsafe TLS
+
+From the box's Claude through Jeff and the coordinator, with release's
+conditions.
+
+The token. The server takes it from the systemd credential "token"
+($CREDENTIALS_DIRECTORY/token, the unit's LoadCredential, in the same one
+unit change as the DTLS key and cert) before PSYKINETIC_TOKEN in the
+environment (Net._token_from_env, credential_token; an explicit --token
+still wins, tests'). A credential file that is there decides, even blank:
+blank is no token and a --server refuses to start ("token credential
+empty"), never falling through to the environment's or to an open server;
+a blank PSYKINETIC_TOKEN likewise ("PSYKINETIC_TOKEN empty"). A server says
+once where it came from, "[net] token from credential|env|flag", never the
+token. This code lands before Jeff runs the script and well before the
+unit change, so a rollback to any server from before it still has env's
+token (EnvironmentFile stays: ANTHROPIC_API_KEY is there).
+
+The script. server/install_dtls.sh gains a token step and its two steps
+are independent, each skipped if its file is there ("already there"), so a
+re-run finishes a partial one; it exits non-zero if either failed. The
+token step reads the first PSYKINETIC_TOKEN= line of /etc/psykinetic/env
+(an "export " before it, a trailing CR or blanks, one pair of quotes
+allowed), holds the value in a variable only, and writes
+/etc/psykinetic/token 0600 root:root through token.new and mv, with no
+trailing newline (the server trims whitespace anyway); with no line or an
+empty value it says "token: none in env; nothing written" and writes
+nothing. env itself is never changed.
+
+From now on the token is changed in /etc/psykinetic/token (sudo, kept 0600
+root:root, then restart psykinetic), not in env: once the file is there,
+env's line changes nothing (Jeff rotated through env on 10-26; the
+coordinator tells him). deploy_box checks the three credential files' mode
+and owner by stat only (/etc/psykinetic is 755 root:root), never reading
+them.
+
+No unsafe TLS. The client pins the server's certificate with
+TLSOptions.client and the pinned bundle; TLSOptions.client_unsafe is never
+used, not even under a test's --dtls-trust (which only changes the bundle).
+protocol_test _test_no_unsafe_tls fails on it anywhere in main.gd or net/.
+protocol_test _test_token_credential: read and trimmed, credential over
+env, a directory without the file falls to env, a blank credential and a
+blank env each give no token. Server only, protocol unchanged, no new
+class_name.
