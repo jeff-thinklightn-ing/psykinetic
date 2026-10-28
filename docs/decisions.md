@@ -34800,3 +34800,26 @@ garde builds and in sessions' test windows (727's bells and 729's buffer were no
   silent levels; view_test: the practice hall plays nothing.
 
 Client only; protocol unchanged; no new class_name.
+
+## 727 amended (2): sound_sync keeps a missing take's copy; only a re-cut one is removed
+
+The coordinator (2026-10-28): the NAS (N:) dropped again; does 727 amended's removal wipe the
+local takes when the store is unreachable rather than mismatched? It must touch nothing.
+
+- Tested in a scratch copy: a library that doesn't answer at the start stopped sound_sync
+  before any removal (460 files kept). But a takes folder that answers empty (a share
+  half-mounted, or one dropping mid-run, where every Test-Path reads false) made every take
+  "missing", and 727 amended removed all 460 copies.
+- Now (the coordinator's rule) a take whose library file is missing keeps its local copy: it is
+  named, "its copy here is kept", and the exit is still 1, so tools/release_client.ps1 still
+  stops. Only a take the library holds as another file (re-cut) has its copy removed, and only
+  after the copy loop, once the library has been probed again and still answers; otherwise it
+  fails "store unreachable ... nothing removed". `-Check` never removes anything.
+- So a checkout whose takes.json still lists a retired take keeps the old copy, as before 727
+  amended; its sync fails naming it, and merging main drops it (a file takes.json no longer
+  lists is removed, which doesn't read the library).
+- Hand-tested in a scratch copy: N: down (exit 1, 460 kept), an empty library (230 missing,
+  460 kept), a full one (exit 0), one take re-cut and 70 missing (`-Check` kept all 460; the
+  real run removed only the re-cut copy and its .import).
+
+Tooling only (no game code); protocol unchanged; no new class_name.

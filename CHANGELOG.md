@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Builds: a sound sync with the sound library unreachable or half there keeps every sound it already has; only a sound re-cut since is replaced (727 amended (2)).
 - Sound: the high squeal at the start of every map is gone: the discovery chime is removed for good, a discovery cue no longer plays for the map you start on, and the practice hall and test room play no music (728).
 - Sound: a larger audio buffer (50 ms, was 15), so a busy machine no longer starves the sound output, the likely source of the ringing or feedback-like noise heard while testing (729).
 - Builds: a sound take the sound library no longer holds as listed (retired or re-cut since) is left out of a build rather than shipped from an old copy; en garde build 3's ringing was 727's retired bells shipped that way (727 amended).

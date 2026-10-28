@@ -9,7 +9,9 @@
 # N:\assets\sound (the NAS). Each is copied to art\audio\external\<slot>\<file> (git ignores
 # that folder) and checked against the sha256 takes.json gives it; a file there that
 # takes.json no longer lists is removed, and so is the copy of a listed take the library
-# doesn't hold as listed (727 amended). tools\release_client.ps1 runs this before it
+# holds as another file (727 amended); a take the library lacks keeps its copy, since a
+# share that's down or half-mounted looks the same (727 amended (2)). A library that doesn't
+# answer stops it before anything it would need is touched. tools\release_client.ps1 runs this before it
 # exports, so a release has every listed take or stops.
 #
 # Exit 0 when every listed take is in place (or none is listed: the library isn't needed
@@ -78,30 +80,26 @@ if ($reachable -ne 'yes') {
 
 $problems = @()
 $copied = 0
-# A take the library doesn't hold as listed (missing, or another file: retired or re-cut
-# since this checkout's takes.json) has its copy here removed with its .import, so the
-# slot plays as if it had none (a blip; a bed silence), never a file left by an earlier
-# sync: combat's en garde build 3 shipped 727's retired bells that way.
-function Drop-Unheld($to) {
-	if (-not (Test-Path -LiteralPath $to)) { return }
-	if ($Check) { Write-Output "would remove: $to"; return }
-	Remove-Item -LiteralPath $to
-	if (Test-Path -LiteralPath "$to.import") { Remove-Item -LiteralPath "$to.import" }
-	$script:changed = $true
-	Write-Output "sound_sync: removed $to (the library doesn't hold it as listed; the slot plays as if it had none)"
-}
+# A take the library holds as another file (re-cut since this checkout's takes.json) has its
+# copy here removed with its .import, so the slot plays as if it had none (a blip; a bed
+# silence), never a file left by an earlier sync: combat's en garde build 3 shipped 727's
+# pre-notch draft that way (727 amended). That happens after the loop, and only while the
+# library still answers. A missing take keeps its copy (named, and the exit is 1): a share
+# that drops mid-run or comes back half-mounted reads as every take missing, and removing
+# those took every copy (727 amended (2)).
+$unheld = @()
 foreach ($take in $wanted) {
 	$from = Join-Path (Join-Path (Join-Path $Library 'takes') $take.Slot) $take.File
 	$to = Join-Path (Join-Path $external $take.Slot) $take.File
 	if (-not (Test-Path -LiteralPath $from)) {
-		$problems += "missing: $from ($($take.Slot))"
-		Drop-Unheld $to
+		$kept = if (Test-Path -LiteralPath $to) { '; its copy here is kept' } else { '' }
+		$problems += "missing: $from ($($take.Slot))$kept"
 		continue
 	}
 	$hash = (Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash
 	if ($hash -ne $take.Sha256) {
 		$problems += "differs: $from has sha256 $hash, takes.json says $($take.Sha256)"
-		Drop-Unheld $to
+		$unheld += $to
 		continue
 	}
 	if ((Test-Path -LiteralPath $to) -and (Get-FileHash -LiteralPath $to -Algorithm SHA256).Hash -eq $hash) {
@@ -115,6 +113,20 @@ foreach ($take in $wanted) {
 	Copy-Item -LiteralPath $from -Destination $to -Force
 	$copied += 1
 	$changed = $true
+}
+
+if ($unheld.Count -gt 0) {
+	if ((Test-SoundLibrary (Join-Path $Library 'takes') $TimeoutSeconds) -ne 'yes') {
+		Fail "store unreachable: the sound library $Library stopped answering during the sync; nothing removed"
+	}
+	foreach ($to in $unheld) {
+		if (-not (Test-Path -LiteralPath $to)) { continue }
+		if ($Check) { Write-Output "would remove: $to"; continue }
+		Remove-Item -LiteralPath $to
+		if (Test-Path -LiteralPath "$to.import") { Remove-Item -LiteralPath "$to.import" }
+		$changed = $true
+		Write-Output "sound_sync: removed $to (the library doesn't hold it as listed; the slot plays as if it had none)"
+	}
 }
 
 if ($problems.Count -gt 0) {
