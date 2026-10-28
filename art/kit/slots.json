@@ -2503,12 +2503,12 @@
 			"category": "props",
 			"type": "mesh",
 			"kind": "cell",
-			"size": [1.0, 0.25, 1.04],
+			"size": [1.06, 0.25, 1.04],
 			"base": -0.25,
 			"variants": 2,
 			"budget": 300,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "planks of uneven width laid across on two stringers, a little tilted and gapped, one now and then darker; row 2's browns; variant 2 has a cross brace underneath; 84 and 96 tris"},
-			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): one 1 x 1 m plank deck segment, repeated along the bridge's facing (z) and twice side by side for width 2; its origin the cell's centre with the deck's top at y 0, the walking surface at the cell's floor height, its planks and stringers hanging below to -0.25 (\"base\"); 1.04 along z so neighbours overlap (and cover the joins when ramps come: each segment pitched about x by its cells' slope, capped near 0.3 m a cell); no railings (bridge.wood.rail)"
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "planks of uneven width laid across on two stringers, a little tilted and gapped, one now and then darker; the planks 1.06 across (ends 0.51 to 0.53 out), so the two rows of a 2-wide bridge overlap and show no slit of water (505 amended (2)); row 2's browns; variant 2 has a cross brace underneath; 84 and 96 tris"},
+			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): one 1 x 1 m plank deck segment, repeated along the bridge's facing (z) and twice side by side for width 2; its origin the cell's centre with the deck's top at y 0, the walking surface at the cell's floor height, its planks and stringers hanging below to -0.25 (\"base\"); 1.04 along z and 1.06 across so neighbours overlap (and cover the joins when ramps come: each segment pitched about x by its cells' slope, capped near 0.3 m a cell); no railings (bridge.wood.rail)"
 		},
 		"bridge.wood.rail": {
 			"category": "props",

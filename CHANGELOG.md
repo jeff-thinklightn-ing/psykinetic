@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Bridges: a 2-wide bridge no longer shows a thin line of water down its middle (the deck's planks now reach over the join)
 
 - Bridges in the wilds, the hills and Umbrage now cross the river square on a straight stretch, two wide, with the road meeting both ends (no more walking off the side onto thin air) (505 amended (2)).
 - The draugr now uses his spin in a fight (603 amended (6)): it needed more breath than he ever had after his opening throw, so he never spun; now he spins about once a fight. Step out of the red when it shows.
