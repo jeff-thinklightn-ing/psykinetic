@@ -28,9 +28,11 @@ signal hints_changed(shown: bool)
 static var FONT_SIZE: int = UiTheme.size("body")
 const WIDTH := 760.0
 const SLIDER_WIDTH := 420.0
-## The sound section's sliders: [Net's setting, the label].
-const VOLUMES := [["master_volume", "Master"], ["sfx_volume", "Effects"], ["voice_volume", "Voices"],
-	["ambience_volume", "Ambience"], ["ui_volume", "Interface"]]
+## The sound section's sliders: [Net's setting, the label]. Music (Jeff:
+## "options has no way to adjust music volume") drives the Music bus, the
+## title screen's theme's too (TitleMusic; the Options open from the menu).
+const VOLUMES := [["master_volume", "Master"], ["music_volume", "Music"], ["sfx_volume", "Effects"],
+	["voice_volume", "Voices"], ["ambience_volume", "Ambience"], ["ui_volume", "Interface"]]
 
 var _column: VBoxContainer
 var _scroll: ScrollContainer

@@ -512,6 +512,12 @@ func _test_options_panel() -> void:
 			"the ambience slider at 25%%: Net and the Ambience bus follow (%.2f)" % Net.ambience_volume)
 	panel.sliders["ambience_volume"].value = 0.0
 	_check(AudioServer.is_bus_mute(AudioServer.get_bus_index("Ambience")), "at 0: muted")
+	var music_was := Net.music_volume
+	panel.sliders["music_volume"].value = 0.5
+	_check(is_equal_approx(Net.music_volume, 0.5)
+			and is_equal_approx(AudioServer.get_bus_volume_db(AudioServer.get_bus_index("Music")), linear_to_db(0.5)),
+			"the music slider at half: Net and the Music bus follow (Jeff: \"no way to adjust music volume\")")
+	panel.sliders["music_volume"].value = music_was
 	var settings: Array = [Net._settings_override, Net.player_id, Net.player_name]
 	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("view_test_body.cfg")
 	Net.save_settings("127.0.0.1", 17789, "", Net.player_name)  # A file to rewrite, as a client has.
