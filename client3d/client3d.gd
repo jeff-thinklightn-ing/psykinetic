@@ -13423,8 +13423,16 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		_knockdown_blow(puppet)
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity
-		sfx.play(_struck_with(struck), puppet.position + Vector3.UP * 0.8)
-		_pain(struck, puppet)
+		var blow := _struck_with(struck)
+		var wait := (int(blow[1]) - Time.get_ticks_msec()) / 1000.0
+		if wait > 0.0:
+			_play_later(str(blow[0]), puppet.position + Vector3.UP * 0.8, wait)
+			get_tree().create_timer(wait).timeout.connect(func() -> void:
+				if is_instance_valid(struck) and is_instance_valid(puppet) and is_instance_valid(sfx) and sfx.is_inside_tree():
+					_pain(struck, puppet))
+		else:
+			sfx.play(str(blow[0]), puppet.position + Vector3.UP * 0.8)
+			_pain(struck, puppet)
 		if music != null and struck != null and sfx.listener != null and _cells_apart(struck.tile, sfx.listener) <= Music.TENSION_NEAR:
 			music.fight_near()
 
@@ -13613,7 +13621,10 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 			node.queue_free()
 	var kind := str(data.get("kind", "monster"))
 	var death_slot: String = DEATH_SOUNDS.get(kind, "sfx.goblin_death")
-	if kind == "monster":
+	var person := _person_body(puppet)
+	if kind == "monster" and person != &"":
+		death_slot = "sfx.death_player"  # A person's fall and cry, as a player's (a grave robber's).
+	elif kind == "monster":
 		death_slot = SoundKit.death(str(puppet.get_meta("creature", "")))
 	# A player or companion who lay downed (Mortally Wounded) and bled out
 	# breathes their last (628, Jeff: "the scream on bleed out is not a good
@@ -13622,7 +13633,8 @@ func _fall(puppet: Node3D, data: Dictionary) -> void:
 	if not bled:
 		sfx.play(death_slot, puppet.position + Vector3.UP * 0.5)
 	# Their body's voice (decision 388), kept on the puppet: the entity may be gone.
-	var voice := "voice.%s_%s" % ["last_breath" if bled else "death", puppet.get_meta("body", "male" if kind == "player" else "female")] if kind in ["player", "companion"] else ""
+	var voice := "voice.%s_%s" % ["last_breath" if bled else "death", puppet.get_meta("body", "male" if kind == "player" else "female")] if kind in ["player", "companion"] \
+			else SoundKit.voice(null, "death", person)
 	if voice != "":
 		sfx.play(voice, puppet.position + Vector3.UP * 1.5)
 	_play_later("sfx.bodyfall", puppet.position, FALL_SECONDS * 0.75)
@@ -13686,13 +13698,16 @@ func _mourn_local() -> void:
 		music.sting("death")
 
 
-## What a blow on [param struck] sounds like: the weapon of whoever swung
-## beside it just now (_swings; a person's, whose hands are known), else
-## the plain hit.
-func _struck_with(struck: GridEntity) -> String:
+## What a blow on [param struck] sounds like and when, [slot, msec]: the
+## weapon of whoever swung beside it just now (_swings; a person's, whose
+## hands are known), else the plain hit, on its flesh or its worn metal
+## (SoundKit.hit); heard when that swing's drawn blow lands (its strike's
+## contact), now if that has passed or there was no swing.
+func _struck_with(struck: GridEntity) -> Array:
 	if struck == null:
-		return "sfx.hit_flesh"
+		return ["sfx.hit_flesh", Time.get_ticks_msec()]
 	var now := Time.get_ticks_msec()
+	var armour := SoundKit.armour_look(struck)
 	var best := -1
 	var best_cells := BLOW_REACH + 1
 	for swinger_id: int in _swings:
@@ -13703,18 +13718,26 @@ func _struck_with(struck: GridEntity) -> String:
 		if cells < best_cells:
 			best = swinger_id
 			best_cells = cells
+	var plain := "sfx.hit_blunt_armor" if armour in SoundKit.ARMOUR_STRUCK else "sfx.hit_flesh"
 	if best < 0:
-		return "sfx.hit_flesh"
+		return [plain, now]
+	var lands := maxi(int(_swings[best][2]), now)
 	var by := instance_from_id(best) as GridEntity
 	if not (by is Player or by is Companion):
-		return "sfx.hit_flesh"  # A monster's hands aren't sent to clients.
-	return SoundKit.hit(str(_swings[best][1]))
+		return [plain, lands]  # A monster's hands aren't sent to clients.
+	return [SoundKit.hit(str(_swings[best][1]), armour), lands]
+
+
+## The body whose voice a monster drawn as a person (person_words: a grave
+## robber) cries with, its look's (male or female); &"" for anything else.
+static func _person_body(puppet: Node3D) -> StringName:
+	return StringName(puppet.get_meta("person_body")) if puppet.has_meta("person_body") else &""
 
 
 ## [param struck] cries out at a blow: a person's grunt now and then, a
 ## goblin's yelp, pitched by its kind.
 func _pain(struck: GridEntity, puppet: Node3D) -> void:
-	var voice := SoundKit.voice(struck, "effort_hurt")
+	var voice := SoundKit.voice(struck, "effort_hurt", _person_body(puppet))
 	if voice != "":
 		sfx.play(voice, puppet.position + Vector3.UP * 1.5)
 		return
@@ -15092,6 +15115,8 @@ static func _vary(entity: GridEntity, puppet: Node3D, model: Dictionary) -> void
 		# painted ally its stature only (decision 529).
 		var look := look_for(entity)
 		puppet.set_meta("look", look)
+		if not person_words(entity).is_empty():
+			puppet.set_meta("person_body", look.body)  # Its voice a person's (_person_body).
 		size = look.scale
 	puppet.set_meta("model_scale", size)
 	puppet.set_meta("pace", size * (1.0 + rng.randf_range(-PACE_SPREAD, PACE_SPREAD)))
@@ -16038,13 +16063,18 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 	var swinger := instance_from_id(id) as GridEntity
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
 	var weapon := World.wielded(swinger) if swinger != null else ""
-	_swings[id] = [Time.get_ticks_msec(), weapon]
+	var now := Time.get_ticks_msec()
+	_swings[id] = [now, weapon, now]
 	sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
-	var effort := SoundKit.voice(swinger, "effort_swing")
+	var effort := SoundKit.voice(swinger, "effort_swing", _person_body(puppet))
 	if effort != "" and randi() % EFFORT_EVERY == 0:
 		sfx.play(effort, puppet.position + Vector3.UP * 1.5)
-	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
+	if now > int(puppet.get_meta("wound_until", 0)):
 		_strike(puppet, swinger, weapon)
+		# Its blow heard as the drawn blade lands (_struck_with), not as it sets off.
+		var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
+		if rig != null and rig.contact_msec >= now:
+			_swings[id][2] = rig.contact_msec
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).swing()
 	var body := puppet.get_node("Body") as Node3D

@@ -126,6 +126,14 @@ func _test_noises_are_the_sims() -> void:
 			"a death by kind: an animal's own, a goblin's")
 	_check(SoundKit.hit("") == "sfx.hit_fist_flesh" and SoundKit.hit("hammer") == "sfx.hit_blunt_flesh" and SoundKit.hit("sword") == "sfx.hit_blade_flesh"
 			and SoundKit.hit("dagger") == "sfx.hit_blade_flesh", "a blow by weapon: fists, a blunt hammer, a blade")
+	_check(SoundKit.hit("sword", "plate") == "sfx.hit_blade_armor" and SoundKit.hit("hammer", "mail") == "sfx.hit_blunt_armor"
+			and SoundKit.hit("", "plate") == "sfx.hit_blunt_armor" and SoundKit.hit("sword", "leather") == "sfx.hit_blade_flesh"
+			and SoundKit.hit("sword", "robes") == "sfx.hit_blade_flesh", "on worn plate or mail: a blade's or a knock's on metal; leather and robes as flesh")
+	_check(SoundKit.voice(null, "death", &"female") == "voice.death_female" and SoundKit.voice(null, "death") == "",
+			"a person-drawn monster's voice by its look's body; none without one")
+	_check(SoundKit.takes("sfx.hit_blade_flesh").size() == 3 and SoundKit.takes("sfx.hit_blade_flesh").all(
+			func(take: Dictionary) -> bool: return str(take.get("from", "")) == "freesound"),
+			"the sword's hit: three freesound impacts with an onset (the slash swish gone)")
 	_check(SoundKit.block("shield") == "sfx.block_shield" and SoundKit.block("sword") == "sfx.block_weapon" and SoundKit.block("") == "sfx.block_weapon",
 			"a guard: a shield's knock, else a parry")
 	_check(SoundKit.swing("giant_axe") == "sfx.swing_heavy" and SoundKit.swing("sword") == "sfx.swing" and SoundKit.swing("") == "sfx.swing"

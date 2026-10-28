@@ -32,7 +32,7 @@ func _ready() -> void:
 
 	_test_every_sound_has_its_files()
 	await _test_hp_bars()
-	_test_sounds_follow_events()
+	await _test_sounds_follow_events()
 	await _test_bow_sounds()
 	await _test_armour_footfalls()
 	await _test_monster_death()
@@ -886,9 +886,22 @@ func _test_sounds_follow_events() -> void:
 	_check(_heard(func() -> void: imp.cried.emit(&"call")) == ["sfx.goblin_alert"], "a goblin calls its pack: its alert")
 	_check(_heard(func() -> void: imp.cried.emit(&"rout")) == ["sfx.goblin_rout"], "a goblin breaks and runs: its rout")
 	_check(_heard(func() -> void: imp.cried.emit(&"howl_unknown")).is_empty(), "a cry with no slot: nothing")
-	var blow := _heard(func() -> void: World.damage(imp, 1, player, &"attack"))
+	# Its hit heard as the drawn blow lands (its strike's contact), not with the whoosh.
+	var swung_at := int(_rig._swings[player.get_instance_id()][0])
+	var lands := int(_rig._swings[player.get_instance_id()][2])
+	var before := _rig.sfx.played.size()
+	var at_once := _heard(func() -> void: World.damage(imp, 1, player, &"attack"))
+	await get_tree().create_timer(maxf((lands - Time.get_ticks_msec()) / 1000.0, 0.0) + 0.1).timeout
+	var blow: Array = _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return entry[0])
+	_check(lands > swung_at and (at_once.is_empty() or Time.get_ticks_msec() >= lands), "the swing's blow lands %d ms after it sets off; nothing heard before (%s)" % [lands - swung_at, at_once])
 	_check(blow.slice(0, 1) == [SoundKit.hit(World.wielded(player))] and blow.slice(1) in [[], ["sfx.goblin_pain"]],
 			"a blow just after the player's swing: its weapon's hit on flesh, the imp crying out now and then (%s)" % [blow])
+	# On worn metal: the imp's blow (its hands unknown) on the player in plate knocks on it.
+	var worn_before: String = player.worn
+	player.worn = "plate_armour"
+	_check(_heard(func() -> void: World.damage(player, 1, imp, &"attack")).slice(0, 1) == ["sfx.hit_blunt_armor"], "a blow on a player in plate: on metal")
+	player.worn = worn_before
+	player.hp = player.max_hp
 	_check(_heard(func() -> void: World._impact(imp, 1, player, &"stone")) == ["sfx.knockback_stone"], "into a wall: stone")
 	_check(_heard(func() -> void: World._impact(imp, 1, player, &"wood")) == ["sfx.knockback_wood"], "into a door or crate: wood")
 	_check(_heard(func() -> void: World._impact(imp, 1, player, &"body")) == ["sfx.knockback_body", "sfx.knockback_body_soft"],
@@ -5668,7 +5681,14 @@ func _test_person_monster() -> void:
 	_check(scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]] and look != null and hood != null and hood.visible
 			and sockets.has("hand_r") and sockets.has("hand_l"),
 			"a grave robber in the human body (%s), its look's words worn (its hood up: %s), a person's hands" % [scene.scene_file_path.get_file(), hood != null and hood.visible])
-	World.despawn(robber)
+	# Its voice a person's, its look's body's (Jeff: "grave robbers are using monster death sounds").
+	var body := look.body if look != null else &""
+	var hurt := _heard(func() -> void: World.damage(robber, 1, null, &"attack"))
+	_check(body in [&"male", &"female"] and ("voice.effort_hurt_%s" % body) in hurt and not "sfx.goblin_pain" in hurt,
+			"a grave robber struck cries out as a %s person (%s)" % [body, hurt])
+	var died := _heard(func() -> void: World.damage(robber, 999, null, &"attack"); _rig._process(0.0))
+	_check(("voice.death_%s" % body) in died and "sfx.death_player" in died and not "sfx.goblin_death" in died,
+			"and dies as one: a person's fall and cry, no monster's (%s)" % [died])
 	_rig._process(0.0)
 	row.erase("person")
 	var plain := _spawn_imp(Vector2i(9, 6), "robber")

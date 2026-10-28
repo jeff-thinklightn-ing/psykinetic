@@ -33825,3 +33825,43 @@ items_test's `_test_bandage_reach` names each case; companion_test's break
 check moves her player out of reach. Server and client (the E-hold path);
 protocol unchanged (the bandage command keeps its target; the server checks
 the reach), no new class_name.
+## 720. Robbers sound like people; a sword blow lands as it connects
+
+Jeff: "grave robbers are using monster death sounds", and "no impact sound"
+on sword swings (via the coordinator, cc combat).
+
+- Causes. A robber (the only monster kind drawn as a person, monsters.json
+  "person") died with SoundKit.death's fallback, sfx.goblin_death, and had
+  no hurt or swing voice: SoundKit.voice answered only for Player and
+  Companion. A sword's blow did fire (combat: damage &"attack" reaches
+  Client3D._on_struck), but sfx.hit_blade_flesh's only take was a Sonniss
+  "Sword Slash Impact" that swells over 100 to 250 ms with no onset, played
+  on the server's blow, the same moment as the swing's whoosh and about
+  0.15 s before the drawn blade connects. It was heard as a second whoosh.
+- A monster drawn as a person keeps its look's body on its puppet
+  ("person_body", Client3D._person_body). SoundKit.voice takes that body,
+  so it grunts on a swing, cries when hurt, and dies as a player does:
+  sfx.death_player's blow and voice.death_<body>.
+- Client3D._on_swung keeps the strike's drawn contact (AnimRig.contact_msec)
+  with the swing. _struck_with returns the slot and when it lands, and
+  _on_struck plays the hit and the pain cry then, or at once when there is
+  no drawn strike.
+- SoundKit.hit(weapon, armour): on worn plate or mail (ARMOUR_STRUCK, the
+  struck one's worn armour's look, SoundKit.armour_look), a blade plays
+  hit_blade_armor and a blunt weapon or bare hands play hit_blunt_armor.
+  A monster's blow, whose hands are unknown, plays hit_blunt_armor. Leather
+  and robes are heard as flesh. Both armour slots had takes but were
+  never played before this.
+- sfx.hit_blade_flesh's takes are now three CC0 freesound impacts with a
+  sharp onset, peak -1 dB: 779805 "Meaty Damage Impact" (modusmogulus, the
+  first 0.5 s), 522091 "Pound of Flesh 1" (magnuswaker, the first 0.45 s),
+  420674 "Deep Cut / Slash / Gash" (SypherZent, 0.35 s from 0.02 s). The
+  Sonniss take is retired from takes.json. Listening copies are in
+  C:/dev/review/sound/sword_hit.
+- Tests: sound_kit_test checks the hit by armour, the voice by a look's
+  body, and the three takes. view_test checks that a player's blow is heard
+  only at its swing's contact, that an imp's blow on a player in plate
+  rings on metal, and that a grave robber is hurt and dies with its body's
+  voice and no goblin sound.
+
+Client only; protocol unchanged; no new class_name.

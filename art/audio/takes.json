@@ -1548,9 +1548,30 @@
 		"sfx.hit_blade_flesh": [
 			{
 				"file": "sfx.hit_blade_flesh.ogg",
-				"from": "sonniss-gdc-2021-23",
-				"original": "2021-23/David Dumais Audio - Melee Weapons Sound Effects Pack 1/SWSH_Sword Slash Impact V2 Assorted 18_DDUMAIS_NONE.wav",
-				"sha256": "bdcc47902f9f3d7bec48c530c8a805b3c30b4a1b4cfecf1cb7c079fac44275c1"
+				"from": "freesound",
+				"original": "freesound 779805: Meaty Damage Impact (from 0 s for 0.5 s)",
+				"sha256": "9bbdb3998c061d336c1d3cd82d8f61766e880d8a2da2a56020cecceae48656fb",
+				"by": "modusmogulus",
+				"url": "https://freesound.org/people/modusmogulus/sounds/779805/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hit_blade_flesh.2.ogg",
+				"from": "freesound",
+				"original": "freesound 522091: Pound of Flesh 1 (from 0 s for 0.45 s)",
+				"sha256": "0cdfbe71292d5382bbc210f236fc3e1c96bd8073cae912e12f6c2cad12e589d4",
+				"by": "magnuswaker",
+				"url": "https://freesound.org/people/magnuswaker/sounds/522091/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hit_blade_flesh.3.ogg",
+				"from": "freesound",
+				"original": "freesound 420674: Deep Cut / Slash / Gash (from 0.02 s for 0.35 s)",
+				"sha256": "927935b2f90a2de73687a874cc919481a2d6a5e1653503ecf8223730306ded4f",
+				"by": "SypherZent",
+				"url": "https://freesound.org/people/SypherZent/sounds/420674/",
+				"license": "CC0 1.0"
 			}
 		],
 		"sfx.hit_blunt_armor": [

@@ -122,7 +122,7 @@ No takes: played as its fallback's sound where it has one, else as a blip (a bed
 | `sfx.grass_rustle` | 3 | players 4 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.heartbeat` | 3 |  | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.hit_blade_armor` | 1 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
-| `sfx.hit_blade_flesh` | 1 | fight 5 | #GameAudioGDC 2021 to 2023 bundle, Sonniss | Sonniss #GameAudioGDC Bundle licence v2.0 |
+| `sfx.hit_blade_flesh` | 3 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.hit_blunt_armor` | 1 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.hit_blunt_flesh` | 1 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |
 | `sfx.hit_fist_flesh` | 1 | fight 5 | Freesound | CC0 1.0 or CC BY (each take's own, in art/audio/takes.json) |

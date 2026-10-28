@@ -269,12 +269,28 @@ const GOBLINS := ["", "imp", "brute", "sneak"]
 const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05}
 ## The slot a blow lands with, by the weapon [param id] it was struck with
 ## (World.wielded): bare hands a fist's, a blunt weapon (Items' blunt) a
-## blunt one's, any other weapon a blade's. Always on flesh: there is no
-## armour yet.
-static func hit(id: String) -> String:
-	if id == "" or Items.verb_of(id).is_empty():
+## blunt one's, any other weapon a blade's; on flesh, or on metal where the
+## one struck wears [param armour] (its armour's look, Items.armour_of) of
+## ARMOUR_STRUCK, where bare hands knock as a blunt weapon does.
+static func hit(id: String, armour := "") -> String:
+	var bare := id == "" or Items.verb_of(id).is_empty()
+	if armour in ARMOUR_STRUCK:
+		return "sfx.hit_blunt_armor" if bare or bool(Items.def(id).get("blunt", false)) else "sfx.hit_blade_armor"
+	if bare:
 		return "sfx.hit_fist_flesh"
 	return "sfx.hit_blunt_flesh" if bool(Items.def(id).get("blunt", false)) else "sfx.hit_blade_flesh"
+
+
+## The armour looks a blow is heard on as metal (hit); leather and robes
+## are heard as flesh.
+const ARMOUR_STRUCK: Array[String] = ["plate", "mail"]
+
+
+## The look of the armour [param entity] wears (its worn, a player's or
+## companion's; Items.armour_of), "" for none or anyone else.
+static func armour_look(entity: Object) -> String:
+	var worn: Variant = entity.get("worn") if entity != null else null
+	return str(Items.armour_of(worn).get("look", "")) if worn is String else ""
 
 
 ## The slot a blow taken on a guard makes: a shield's (Items tag shield)
@@ -340,10 +356,13 @@ static func step_pace(seconds: float) -> float:
 
 ## A person's voice slot for [param what] (effort_swing, effort_hurt,
 ## effort_lift, death), by its body (Player.body, Companion.body: male or
-## female; decision 388); "" for anyone else.
-static func voice(entity: Object, what: String) -> String:
+## female; decision 388), or [param body] for a monster drawn as a person
+## (its look's, Client3D.person_words: a grave robber); "" for anyone else.
+static func voice(entity: Object, what: String, body := &"") -> String:
 	if entity is Player or entity is Companion:
 		return "voice.%s_%s" % [what, "female" if entity.get("body") == &"female" else "male"]
+	if body in [&"male", &"female"]:
+		return "voice.%s_%s" % [what, body]
 	return ""
 
 

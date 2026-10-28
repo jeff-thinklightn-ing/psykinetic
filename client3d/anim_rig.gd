@@ -59,6 +59,8 @@ var _action_speed := 1.0
 ## A strike's speed after its contact, and the msec it changes to it.
 var _recover_speed := 1.0
 var _contact_msec := -1
+## The msec the last strike's blow lands (its contact), kept after: its hit is heard then.
+var contact_msec := -1
 var _busy_msec := 0  # A clip played once runs till then.
 var _strike_msec := 0  # A strike runs till then.
 var _rng: RandomNumberGenerator
@@ -252,6 +254,7 @@ func strike(clip: String, contact: float, lands_in: float, recover: float) -> fl
 	_apply()
 	var now := Time.get_ticks_msec()
 	_contact_msec = now + int(contact / before * 1000.0)
+	contact_msec = _contact_msec
 	var seconds := contact / before + (length - contact) / _recover_speed
 	_strike_msec = now + int(seconds * 1000.0)
 	return seconds

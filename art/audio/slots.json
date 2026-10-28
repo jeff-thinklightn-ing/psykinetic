@@ -106,7 +106,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a blade blow on armor; not played yet",
+			"uses": "a blade blow on plate or mail; Client3D._on_struck, a person's blade on worn metal (SoundKit.hit)",
 			"fallback": "sfx.hit_flesh"
 		},
 		"sfx.hit_blunt_flesh": {
@@ -124,7 +124,7 @@
 			"bus": "sfx",
 			"noise": "fight",
 			"volume_db": -2.0,
-			"uses": "a blunt blow on armor; not played yet",
+			"uses": "a blunt blow, bare hands or a monster's on plate or mail; Client3D._on_struck (SoundKit.hit)",
 			"fallback": "sfx.hit_flesh"
 		},
 		"sfx.hit_fist_flesh": {
@@ -929,7 +929,7 @@
 			"bus": "voice",
 			"noise": "fight",
 			"volume_db": 0.0,
-			"uses": "a player killed (Client3D._fall)",
+			"uses": "a player killed, or a monster drawn as a person (a grave robber; Client3D._fall)",
 			"fill": {
 				"from": "kenney-impact",
 				"files": [
