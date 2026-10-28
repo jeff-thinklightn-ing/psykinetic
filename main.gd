@@ -7766,6 +7766,53 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 	return blessed
 
 
+## The level the holy knights lie in (714): its generation names the one.
+const KNIGHTS_LEVEL := "barrow_deep"
+
+
+## The holy knight of barrow_deep's generation now (714, dungeon's side
+## (1); Jeff: "the knights name could be different each time you go"): one
+## of its regenerate block's "knights" (lore's fourteen), drawn by
+## Regen.seed_for from the level and its generation, the same on every
+## machine; "" before its first generation or with no list.
+func barrow_knight() -> String:
+	var knights: Array = Regen.config_of(KNIGHTS_LEVEL).get("knights", [])
+	var generation := generation_of(KNIGHTS_LEVEL)
+	if knights.is_empty() or generation <= 0:
+		return ""
+	return str(knights[posmod(Regen.seed_for(KNIGHTS_LEVEL + "#knight", generation), knights.size())])
+
+
+## Server: a relic of tier [param tier] (the deal it was won at, its place
+## among the deals: 0 the least) laid on the altar for [param player] (714,
+## dungeon's side (1); npc's Aldous calls it): their amulet charged with
+## that deal's charges (573's field_tokens), up to its capacity
+## (barrow_capacity), the spill lost and said; an amulet minted, uncharged,
+## if they have none (reset, or lost). The charges taken, 0 for none (no
+## room left, no such tier, no record or not in the game); the player told
+## (_sync_charges). The line is the caller's.
+func charge_from_relic(player: Player, tier: int) -> int:
+	if not Net.is_authority() or not is_instance_valid(player):
+		return 0
+	var id := player.player_id
+	var record: PlayerRecord = _records.get(id)
+	if record == null:
+		return 0
+	var field := _field_rules()
+	var deals := Economy.deals(field)
+	if tier < 0 or tier >= deals.size():
+		return 0
+	var uid := World.totem_of(id)
+	if uid == 0:
+		uid = World.mint_totem(player)
+	var given := Economy.field_tokens(str(deals[tier].get("name", "")), field)
+	var took := World.totem_add(uid, given, Economy.barrow_capacity(record.barrow, field))
+	_sync_charges(record)
+	if given - took > 0:
+		party_log.add("The relic's gift spills: %d more than %s can hold." % [given - took, record.name])
+	return took
+
+
 ## Server: capability [param id] (levels/capabilities.json, decision 576)
 ## given to each player of [param player_ids] in the game, and to the
 ## companion with them, alive and up, in their zone: her mark, the

@@ -34496,3 +34496,23 @@ reply. Server only, protocol unchanged, no new class_name.
 ## 723. Superseded: the whole saved state backed up on the host
 
 Not built. 723 was to be an admin console command (`backup <label>`) copying world.json, mind.log and the level overlay as the service user before a risky cut. On 2026-10-28 the box gained a host-side `sudo psykinetic-backup` (no arguments, on the deploy user's sudo allowlist) that saves over the admin console, copies /var/lib/psykinetic to a timestamped folder under /var/lib/psykinetic-backups/ and keeps the newest 20; restoring one needs Jeff. Release runs it before every risky cut or migration (714's totem rename, 722, 712). The number stays taken.
+## 714, dungeon's side (1): the relic's charge and the generation's knight
+
+Two calls on Main for npc's Aldous (the relic laid on the altar), ahead of the rest of the
+dungeon's side (the sepulcher, the barred stair, the robbers' latch), which waits on buildings'
+level_link (715):
+- `charge_from_relic(player, tier) -> int`: the relic's tier is the deal it was won at (its place
+  among the field's deals, 0 the least); the amulet takes that deal's charges (573's
+  field_tokens) up to the room (barrow_capacity), the spill lost and said in the party log ("The
+  relic's gift spills: N more than <name> can hold."), as barrow_won's is. With no amulet (taken by
+  items' reset_totem, or never had) one is minted first, uncharged. Returns the charges taken, 0
+  for none (full, no such tier, no record); the player told (_sync_charges). Aldous's own words
+  are npc's.
+- `barrow_knight() -> String`: the holy knight of barrow_deep's generation now (Jeff: "the
+  knights name could be different each time you go"), drawn from lore's fourteen, kept as
+  "knights" in barrow_deep's regenerate block (data, beside the generator's own keys, which
+  regenerate_from passes through), by Regen.seed_for(level + "#knight", generation): the same on
+  every machine for a generation, "" before the first. The sepulcher's plaque and the relic's
+  name read it in (2).
+level_test: the tiers' charges, the spill, a full amulet, no such tier, an amulet minted after a
+reset, the knight per generation. Server only, protocol unchanged, no new class_name.

@@ -1837,6 +1837,15 @@ func _test_barrow_won() -> void:
 	_check(_main.migrate_totem(record) == uid and World.totem_charges(uid) == 69 and not record.barrow.has("tokens"),
 		"a count from before moves onto the totem on join (%d)" % World.totem_charges(uid))
 	_check(_main.barrow_won(["nobody"], "easy") == 0, "no record: nobody blessed")
+	# 714, dungeon's side (1): a relic laid on the altar charges the amulet
+	# with its tier's deal, up to the room; the spill said.
+	_check(_main.charge_from_relic(player, 0) == 5 and World.totem_charges(uid) == 74 and player.charges == 74,
+		"a relic of the least deal adds its 5: 74 of 75, the player told")
+	_check(_main.charge_from_relic(player, 1) == 1 and World.totem_charges(uid) == 75
+		and _main.party_log.last(1) == ["The relic's gift spills: 9 more than %s can hold." % record.name],
+		"a normal deal's 10 at the room's edge: 1 taken, the 9 spilled and said (%s)" % [_main.party_log.last(1)])
+	_check(_main.charge_from_relic(player, 1) == 0 and _main.charge_from_relic(player, 7) == 0 and _main.charge_from_relic(player, -1) == 0,
+		"full, nothing taken; no such tier, nothing")
 	# 672 amended, dungeon's side: quests reset, the barrow as if never come.
 	_main._draft_told["%s@lt_niche" % id] = 1
 	var cleared: Array[String] = _main.reset_barrow(id)
@@ -1845,6 +1854,32 @@ func _test_barrow_won() -> void:
 		and not _main._draft_told.has("%s@lt_niche" % id) and player.charges == 0 and player.charge_room == 0,
 		"reset_barrow: the blessing off, the deal won gone, the totem emptied, the draft said again, the player told (%s)" % [cleared])
 	_check(_main.reset_barrow(id).is_empty() and _main.reset_barrow("nobody").is_empty(), "nothing more to clear the second time; no record, nothing")
+	# 714 (1): the amulet taken away (items' reset_totem), a relic mints one,
+	# uncharged while they are unblessed (no room); blessed again, it fills.
+	World.reset_totem(id)
+	_check(World.totem_of(id) == 0 and _main.charge_from_relic(player, 2) == 0 and World.totem_of(id) != 0
+		and World.totem_charges(World.totem_of(id)) == 0, "no amulet: the relic mints one, empty, as there is no room unblessed")
+	record.barrow = {"best": "easy", "containers": []}
+	_check(_main.charge_from_relic(player, 2) == 15 and _main.charge_from_relic(player, 2) == 10 and World.totem_charges(World.totem_of(id)) == 25,
+		"blessed at the easy deal (room 25): a hard relic's 15, then 10 of the next, full at 25 (%d)" % World.totem_charges(World.totem_of(id)))
+	_main.reset_barrow(id)
+	# 714 (1): the generation's knight, lore's fourteen, drawn by its seed.
+	var knights: Array = Regen.config_of("barrow_deep").get("knights", [])
+	var kept: Variant = _main._regen.get("barrow_deep")
+	_main._regen.erase("barrow_deep")
+	_check(knights.size() == 14 and _main.barrow_knight() == "", "before barrow_deep's first generation, no knight; lore's fourteen listed")
+	var named: Array[String] = []
+	for generation in range(1, 9):
+		_main._regen["barrow_deep"] = {"generation": generation, "at_step": 0}
+		named.append(_main.barrow_knight())
+	_main._regen["barrow_deep"] = {"generation": 3, "at_step": 0}
+	_check(named.all(func(knight: String) -> bool: return knight in knights) and _main.barrow_knight() == named[2]
+		and named.any(func(knight: String) -> bool: return knight != named[0]),
+		"each generation names one of them, the same each time asked, not always the same (%s)" % [named])
+	if kept == null:
+		_main._regen.erase("barrow_deep")
+	else:
+		_main._regen["barrow_deep"] = kept
 
 
 ## The draugr's hall door held shut (573 amended, dungeon's side): the door

@@ -250,6 +250,22 @@
 		"generator": "labyrinth",
 		"style": "barrow",
 		"layer": 2,
+		"knights": [
+			"Sir Edric the Steadfast",
+			"Sir Osric the Pale",
+			"Sir Wystan the Merciful",
+			"Sir Godric of the Long Watch",
+			"Sir Eadmund the Unbowed",
+			"Sir Baldwin the Just",
+			"Sir Leofric the Silent",
+			"Sir Cuthbert the Lamp-bearer",
+			"Sir Hereward the Penitent",
+			"Sir Ansel the Faithful",
+			"Sir Wulfric the Ashen",
+			"Sir Ealdred the Patient",
+			"Sir Oswin the Gentle",
+			"Sir Aethelstan the Last"
+		],
 		"ways": 5,
 		"every_days": 3,
 		"anchors": [
