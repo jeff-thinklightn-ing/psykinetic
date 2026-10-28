@@ -2931,10 +2931,70 @@ func mint_bound(id: String, owner: String, entity: GridEntity, at_zone := "", ti
 	return uid
 
 
-## The Draugr's Totem (decision 573 amended; Jeff: "the first time you kill
-## him you get a Draugr's Totem that holds the charges"): the one item that
-## holds a player's resurrection charges.
-const TOTEM := "draugr_totem"
+## The Encolpion Amulet (decision 573 amended; 714: Jeff, "amulet replaces
+## the draugr deal but works the same way"; it was the Draugr's Totem, and
+## a saved totem reads as one, Items.RENAMED): the one item that holds a
+## player's resurrection charges.
+const TOTEM := "encolpion_amulet"
+## A holy knight's remains (decision 714): won in the barrow's sepulcher,
+## bound to its finder, given to Aldous to charge the amulet.
+const RELIC := "holy_remains"
+
+
+## A relic of [param knight], won at deal [param tier], minted bound to
+## [param finder] (decision 714; dungeon's sepulcher puts it in its slots).
+## Its uid, not yet in any slot; 0 for no finder. Server only.
+func mint_relic(knight: String, tier: int, finder: GridEntity) -> int:
+	if not Net.is_authority() or not is_instance_valid(finder):
+		return 0
+	var uid := mint_bound(RELIC, holder_key(finder), finder, finder.zone, finder.tile)
+	items.mark_relic(uid, knight, tier)
+	return uid
+
+
+## The knight and tier [param uid] carries, if it is a relic: {knight,
+## tier}, else {} (decision 714). Read it before consume ends the uid.
+func relic_of(uid: int) -> Dictionary:
+	return items.relic_of(uid) if items.id_of(uid) == RELIC else {}
+
+
+## [param uid] taken out of [param entity]'s slots and ended, [param why]
+## its last event (decision 714: a relic laid on the altar), past the
+## soulbound rule that keeps it from any other taking. False, nothing done,
+## when [param entity] does not hold it. Server only.
+func consume(entity: GridEntity, uid: int, why: String) -> bool:
+	if not Net.is_authority() or uid == 0 or not is_instance_valid(entity):
+		return false
+	for slot in entity.slots.size():
+		if slot_uid(entity, slot) == uid or uid in items.stack_of(slot_uid(entity, slot)):
+			if _unit_out(entity, slot, uid) != uid:
+				return false
+			_slots_changed(entity)
+			items.end(uid, why)
+			return true
+	return false
+
+
+## [param player_id]'s amulet gone, wherever it is (ui's quest reset; 672
+## amended, items' side): ended "reset", out of the slots that hold it. What
+## was cleared, a line each; [] for none. Won again, it is minted again.
+func reset_totem(player_id: String) -> Array[String]:
+	var cleared: Array[String] = []
+	if not Net.is_authority() or player_id.is_empty():
+		return cleared
+	var uid := totem_of(player_id)
+	while uid != 0:
+		var line := "%s (uid %d, %d charges)" % [Items.name_of(TOTEM), uid, items.charges_of(uid)]
+		var held := false
+		for entity: GridEntity in get_entities():
+			if consume(entity, uid, "reset"):
+				held = true
+				break
+		if not held:
+			items.end(uid, "reset")
+		cleared.append(line + " taken")
+		uid = totem_of(player_id)
+	return cleared
 
 
 ## Whether [param uid] never leaves its bound carrier (tag "soulbound",
@@ -3227,6 +3287,8 @@ func _consider_name(entity: GridEntity, slot: int) -> void:
 ## rendered for what it is now (a reforged thing keeps its name), and its
 ## strength ("Wren's dagger (quiet)"); "" for a thing with no name.
 func item_title(uid: int) -> String:
+	if not relic_of(uid).is_empty():
+		return "the holy remains of %s" % relic_of(uid)["knight"]  # Decision 714.
 	var name := items.name_of(uid)
 	if name.is_empty():
 		return ""

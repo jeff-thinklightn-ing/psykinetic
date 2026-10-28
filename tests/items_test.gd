@@ -1623,7 +1623,7 @@ func _ground_cell(uid: int) -> Vector2i:
 
 
 func _test_totem() -> void:
-	print("\n== the Draugr's Totem: the charges on one thing that never leaves its player (decision 573 amended) ==")
+	print("\n== the Encolpion Amulet (was the Draugr's Totem): the charges on one thing that never leaves its player (decisions 573 amended, 714) ==")
 	var host := _player(Net.local_id)
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var had_slots := host.slots.duplicate()
@@ -1639,9 +1639,9 @@ func _test_totem() -> void:
 			"charges up to its capacity: 3 of 5 taken, the rest spill; full, none more")
 	_check(World.totem_spend(uid) and World.totem_charges(uid) == 2, "one spent: 2 left")
 	var note := World.item_note(uid)
-	_check(note.begins_with("Draugr's Totem") and "2 charges" in note and not "Carrying" in note
-			and str(Items.def(World.TOTEM)["about"]).ends_with("Carrying this totem allows you to receive another chance to fight."),
-			"its note: its charges; Jeff's words its about, which the tip shows (%s)" % note)
+	_check(note.begins_with("Encolpion Amulet") and "2 charges" in note and not "Aldous" in note
+			and "another chance to fight" in str(Items.def(World.TOTEM)["about"]),
+			"its note: its charges; its about the tip's (%s)" % note)
 	var chest := _chest()
 	var host_at := host.tile
 	_beside(host, chest)
@@ -1656,7 +1656,37 @@ func _test_totem() -> void:
 	_check(_main.migrate_totem(record) == uid and World.totem_charges(uid) == 6 and not record.barrow.has("tokens"),
 			"a record's old tokens moved onto the totem, off the record")
 	_check(_main.migrate_totem(record) == 0, "nothing more to move")
-	World.items.end(uid, "gone")
+	# A saved totem (714): its old id reads as the amulet, the same uid, binding and charges.
+	var saved := World.items.to_dict().duplicate(true)  # to_dict hands out the live entries.
+	saved["book"][str(uid)]["id"] = "draugr_totem"
+	var read := ItemBook.from_dict(saved)
+	_check(read.id_of(uid) == World.TOTEM and read.charges_of(uid) == 6 and read.bound_to(uid) == "player:" + Net.player_id,
+			"a saved Draugr's Totem reads back as the amulet: uid, binding and charges kept")
+	var old_slots := host.slots.duplicate()
+	old_slots[other] = "draugr_totem"
+	World.set_slots(host, old_slots, World.slot_uids(host))
+	_check(host.slots[other] == World.TOTEM and host.slot_items[other] == uid, "a saved slot holding the totem: the amulet, the same uid")
+	# ui's quest reset (672 amended, items' side): the amulet gone, wherever.
+	var cleared := World.reset_totem(Net.player_id)
+	_check(cleared.size() == 1 and World.totem_of(Net.player_id) == 0 and host.slot_items.find(uid) < 0 and not World.items.has(uid),
+			"reset: the amulet taken from the pack and ended (%s)" % [cleared])
+	_check(World.reset_totem(Net.player_id).is_empty(), "reset again: nothing to clear")
+	# The relic (714): a knight's remains, bound to its finder, consumed when given.
+	var relic := World.mint_relic("Ser Aldric", 2, host)
+	World.put_item(host, host, other, relic)
+	_check(World.relic_of(relic) == {"knight": "Ser Aldric", "tier": 2} and World.soulbound(relic)
+			and World.item_title(relic) == "the holy remains of Ser Aldric" and World.item_note(relic).begins_with("the holy remains of Ser Aldric"),
+			"a relic: its knight and tier, soulbound, named for him (%s)" % World.item_note(relic))
+	_check(ItemBook.from_dict(World.items.to_dict()).relic_of(relic) == {"knight": "Ser Aldric", "tier": 2}, "its knight and tier saved and read back")
+	_check(World.take_item(host, host, other) == 0, "never taken out by the usual ways")
+	_check(not World.consume(chest, relic, "given"), "consume: false from one who does not hold it")
+	_check(World.consume(host, relic, "laid on the altar") and host.slots[other] == "" and not World.items.has(relic),
+			"consume: out of the pack past the soulbound rule, ended")
+	_check(World.relic_of(9999999).is_empty() and World.mint_relic("x", 1, null) == 0, "no relic: {}; no finder: none minted")
+	var sledge := Items.def("tomb_sledge")
+	_check(int(sledge["hands"]) == 2 and float(sledge["weight"]) >= 9.0 and Items.has_tag("tomb_sledge", "trophy") and Items.has_tag("tomb_sledge", "weapon")
+			and not Items.has_tag("tomb_sledge", "soulbound") and Items.stack_of("tomb_sledge") == 1,
+			"the Tomb Sledge: two-handed, 9 kg, a weapon and a trophy, unbound, single")
 	World.set_slots(host, had_slots, had_uids)
 	World._relocate(host, host_at)
 	record.barrow = had_barrow

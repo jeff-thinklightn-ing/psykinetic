@@ -13,6 +13,7 @@ notes (decision 324).
 - After a connection drop you can rejoin at once: the server lets your new connection in and drops the dead one, instead of refusing "already connected" until it timed out (721).
 
 - Houses: the shingle roof no longer shows a gap by the ridge with the wall boards through it (its pieces now sit on a closed underlay with a ridge cap); the hut's roof rows no longer show thin slits at an angle.
+- The Draugr's Totem is now the Encolpion Amulet: the same charges and rules, and a totem you already carry becomes the amulet with its charges. New things for the temple's underground: a knight's holy remains (bound to whoever finds them, for Aldous) and the Tomb Sledge, a very heavy two-handed hammer (714).
 - Chimneys smoke while their fire is in use: a forge while the smith works it, a house while someone is awake inside; Umbrage's forge and kitchen now have a chimney, and window lamps follow who is home (710).
 - The draugr's spin shows as a full red circle, filled right under him (603 amended (7)), and strikes the whole circle: there is no safe slice behind him any more. Step out of the circle.
 - Named enemies remember you (716, npc's side): each keeps what happened between you (met, fought, fell to you, put you down, saw you run) across its risings, greets you by it ("Fresh meat.", "Last time you ran.", "Not this time.") or snarls if its kind doesn't talk, and nearby towns tell of it as news when it rises; none is in play yet.

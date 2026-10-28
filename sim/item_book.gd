@@ -473,6 +473,18 @@ func charges_of(uid: int) -> int:
 	return int(_book[uid].get("charges", 0)) if _book.has(uid) else 0
 
 
+## The knight and deal tier a relic carries (decision 714): {knight, tier},
+## {} for anything else.
+func relic_of(uid: int) -> Dictionary:
+	return _book[uid].get("relic", {}).duplicate() if _book.has(uid) else {}
+
+
+## [param uid] marked a relic of [param knight], won at [param tier].
+func mark_relic(uid: int, knight: String, tier: int) -> void:
+	if _book.has(uid):
+		_book[uid]["relic"] = {"knight": knight, "tier": tier}
+
+
 ## [param uid]'s charges set to [param amount] (at least 0).
 func set_charges(uid: int, amount: int) -> void:
 	if _book.has(uid):
@@ -616,7 +628,7 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				if event is Dictionary and event.get("kind") is String:
 					events.append({"kind": event["kind"], "step": int(event.get("step", 0)),
 						"zone": str(event.get("zone", "")), "tile": _tile(event.get("tile")), "what": str(event.get("what", ""))})
-			items._book[int(key)] = {"id": entry["id"], "made": int(entry.get("made", 0)),
+			items._book[int(key)] = {"id": str(Items.RENAMED.get(entry["id"], entry["id"])), "made": int(entry.get("made", 0)),
 				"at": str(entry.get("at", "")), "holder": str(entry.get("holder", "")),
 				"carriers": carriers, "events": events}
 			if entry.get("condition") is float or entry.get("condition") is int:
@@ -637,6 +649,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["stack"] = entry["stack"].map(func(each: Variant) -> int: return int(each))  # Decision 619.
 			if entry.get("charges") is float or entry.get("charges") is int:
 				items._book[int(key)]["charges"] = maxi(int(entry["charges"]), 0)  # Decision 573 amended.
+			if entry.get("relic") is Dictionary and entry["relic"].get("knight") is String:
+				items._book[int(key)]["relic"] = {"knight": entry["relic"]["knight"], "tier": int(entry["relic"].get("tier", 0))}  # Decision 714.
 			if entry.get("bane") is String and not entry["bane"].is_empty():
 				items._book[int(key)]["bane"] = entry["bane"]
 			if entry.get("grudge") is Dictionary and entry["grudge"].get("kind") is String:

@@ -271,7 +271,7 @@
 				]
 			},
 			"type": "mesh",
-			"uses": "Draugr's Totem (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+			"uses": "Encolpion Amulet (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.food_sack": {
 			"budget": 500,
@@ -372,6 +372,25 @@
 			},
 			"type": "mesh",
 			"uses": "raw hide (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.holy_remains": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.22,
+				0.12,
+				0.12
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "holy remains (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.knife": {
 			"budget": 500,
@@ -777,6 +796,30 @@
 			},
 			"type": "mesh",
 			"uses": "sword (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.tomb_sledge": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.36,
+				1.3,
+				0.2
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				],
+				"grip_2": [
+					0,
+					0.78,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Tomb Sledge (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.tusks": {
 			"budget": 500,

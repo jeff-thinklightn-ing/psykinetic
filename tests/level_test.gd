@@ -1812,8 +1812,8 @@ func _test_barrow_won() -> void:
 	_check(_main.barrow_won([id], "normal") == 1 and record.barrow == {"best": "normal", "containers": []} and "draugr" in record.marks,
 		"laid to rest at the normal deal: blessed, best normal, no count on the record (%s)" % [record.barrow])
 	var uid := World.totem_of(id)
-	_check(uid != 0 and World.soulbound(uid) and World.totem_charges(uid) == 10 and player.slots.has("draugr_totem"),
-		"the Draugr's Totem is minted into their pack, bound for life, holding the deal's 10 charges")
+	_check(uid != 0 and World.soulbound(uid) and World.totem_charges(uid) == 10 and player.slots.has(World.TOTEM),
+		"the amulet is minted into their pack, bound for life, holding the deal's 10 charges")
 	_check(_main.party_log.last(1) == ["The draugr yields. %s is blessed and takes 10 charges (10 of 50)." % record.name],
 		"said with the count and the room (%s)" % [_main.party_log.last(1)])
 	_check(player.charges == 10 and player.charge_room == 50 and _main.charges_in_zone("test_link_s") == 10 and _main.charges_in_zone("wilds") == 0,

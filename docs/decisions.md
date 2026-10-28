@@ -34320,3 +34320,57 @@ anim_rig_test _test_sword_slash: the paces at 7 ticks (one's own,
 another's, wound up), each slash from
 the guard and back to it, the cuts across, the alternation. Client only,
 protocol unchanged, no new class_name.
+## 714. The barrow and the temple's underground (Jeff's answer to barrow-sepulcher.md)
+
+Jeff, 2026-10-27: the barrow is the ancient mound and barrow_deep the
+temple's underground; the draugr has taken up residence there, angry at the
+robbers digging for holy relics to sell; "amulet replaces the draugr deal but
+works the same way ... the amulet gets charged by aldous when you return to
+him with the relic ... the knights name could be different each time you
+go". The agreed design, with each tree's part, is dungeon's
+(temple_undercroft_design.md, led by dungeon; settled by the coordinator,
+with Jeff's Amendment 1, the Tomb Sledge). In short: the levels stay and
+their meaning moves; the temple stair stays sealed and the barrow's hidden
+niche is the way in, once the robbers are cleared; the Draugr's Totem
+becomes the Encolpion Amulet, given uncharged on the win; the Hall chest is
+the knight's sepulcher, holding a relic per winner that Aldous lays on the
+altar to charge the amulet; a different knight each generation; the
+robbers' big named one carries the Tomb Sledge and drops it once as a
+trophy. Each tree's side is its own "714, <tree>'s side" entry.
+
+## 714, items' side: the amulet, the relic, consume, the quest reset, the Tomb Sledge
+
+- **The amulet.** The row draugr_totem became "encolpion_amulet" (Encolpion
+  Amulet, tags token and soulbound), and World.TOTEM names it, so
+  mint_bound, mint_totem, totem_of, the charges and their capacity (573
+  amended) follow unchanged. `Items.RENAMED` {"draugr_totem":
+  "encolpion_amulet"} reads a saved old id as the new one, in Items.tidy
+  (every set_slots: players, companions, chests) and in ItemBook.from_dict,
+  so a saved totem comes back as an amulet with its uid, binding and
+  charges. Its art is still the totem's slot (item.draugr_totem) until
+  art-kit makes item.encolpion_amulet.
+- **The relic.** The row "holy_remains" (tags relic and soulbound).
+  `World.mint_relic(knight, tier, finder) -> uid` mints it bound to its
+  finder and marks it {knight, tier} (ItemBook.mark_relic, saved);
+  `World.relic_of(uid)` reads that, {} for anything else. item_title names
+  it "the holy remains of <knight>". Bound, it is never traded, dropped or
+  given by the usual ways; only the give to Aldous takes it (npc's).
+- **Consume.** `World.consume(entity, uid, why) -> bool`: the uid taken out
+  of the slots that hold it (a stack's unit too), past the soulbound rule,
+  and ended with why; false, nothing done, when the entity does not hold it.
+  npc's give reads relic_of first, consumes, then calls dungeon's
+  Main.charge_from_relic.
+- **The quest reset** (ui's "quests reset all <player>", 672 amended,
+  items' side): `World.reset_totem(player_id) -> Array[String]` ends the
+  player's amulet wherever it is ("reset"), a line each for the log; a win
+  mints it again.
+- **The Tomb Sledge.** The row "tomb_sledge": a two-handed hammer of 9 kg,
+  the knockback verb (force 4.5, slow, wound up), blunt, tags weapon and
+  trophy (716's kept weapons skip a trophy, so it drops once as loot;
+  enemy-ai's), unbound and single. Its art slot item.tomb_sledge is
+  art-kit's.
+
+items_test's totem check covers the rename (a saved book and a saved slot),
+the reset, the relic (marks, save, its name, never taken the usual way,
+consumed) and the sledge's row. Server and catalog; protocol as measured in
+the landing (new ids in the catalog).

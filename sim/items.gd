@@ -43,6 +43,10 @@ const HANDED := LEFT_HAND + 1
 const ARMOUR_LOOKS: Array[String] = ["leather", "mail", "plate", "robes"]
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
 	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack", "armour"]
+## Ids renamed since a save (decision 714, the Draugr's Totem became the
+## Encolpion Amulet): a saved old id reads as its new one, its uid, binding
+## and charges kept (tidy, ItemBook.from_dict).
+const RENAMED := {"draugr_totem": "encolpion_amulet"}
 ## Tags whose things never stack (decision 619): each is its own.
 const UNSTACKED_TAGS: Array[String] = ["weapon", "shield", "token", "soulbound"]
 ## Who makes things (made's "by"), as economy's production has them.
@@ -943,6 +947,6 @@ static func tidy(contents: Variant, count: int) -> PackedStringArray:
 	slots.resize(count)
 	if contents is Array or contents is PackedStringArray:
 		for i in mini(count, contents.size()):
-			var id := str(contents[i])
+			var id := str(RENAMED.get(str(contents[i]), str(contents[i])))
 			slots[i] = id if exists(id) else ""
 	return slots
