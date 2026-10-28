@@ -6680,7 +6680,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	pet.guide = walk
 	player.led_by = String(pet.name)
 	player.led_to = str(to.get("key", ""))
-	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead." % [_display_name(player), to["name"]]
+	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again." % [_display_name(player), to["name"]]
 	party_log.add("%s leads the way to %s." % [pet.name, to["name"]])
 	print("[guide] %s leads %s to %s (%s)" % [pet.name, _display_name(player), to["name"], to["key"]])
 

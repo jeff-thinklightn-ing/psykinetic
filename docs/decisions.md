@@ -33502,3 +33502,40 @@ Dungeon's side places and moves the slab. Without prop.niche_slab its draw
 keeps the old swap, so this side lands first. Until dungeon's lands, a found
 niche shows its doorway with no slab beside it. Art only, protocol
 unchanged, no new class_name.
+## 708. Leading reads as leading
+
+From Jeff's trailer footage, Pip guiding to the barrow looked like walking
+together: Guide steered her player's client to Heel.cell beside her, and
+she stopped only once he was more than 3 cells behind. The coordinator
+approved the design. Part 1, server only (all numbers in
+companion_traits.json "guide"):
+- **Gap:** his route (695) goes to a cell lead_gap (3) behind her on her
+  own trail (the cells she stood on in this area, kept 16), free, walkable
+  and not burning, else Heel's cell. Within lead_gap no route is sent. On
+  arriving he is sent one last route, to beside her.
+- **Set off:** on her first step she says a line from "set_off" by her
+  temperament (else default), or "resume" ("On we go.") on a walk taken up
+  again. It is said at once, with no model call. Her voice's guide_note
+  says she told them to follow, so the model doesn't repeat it.
+- **Look back:** every look_ticks (60), and the first time he falls more
+  than lead_gap + 1 behind, she pauses look_beat_ticks (8), facing him
+  (World.face; facing is replicated and shown on a standing body).
+- **Waits:** while he is more than wait cells off (raised 3 to 5), at a way
+  out, and at a turn of her way (the step in and the next step at a right
+  angle or more) while he is more than lead_gap off, she pauses facing him
+  for corner_ticks (30) at most, going on once he is within lead_gap.
+- **Off her walk:** round a body in her way (he often stands on her cells
+  now), she rejoins it at the nearest of its next eight cells, never back to
+  the one she went round. Before, she stepped back and forth.
+Guide.wait_cue (WAIT_LOOK 1, WAIT_BECKON 2, else 0) holds the pause's cue
+on the server.
+
+Part 2, "708 amended", rides the rev-41 forced cut with 703 step 4: the cue
+is replicated as Companion.guide_wait, for pc-character's beckon (agreed: 1
+a look back, 2 a beckon; she stands facing him in both).
+
+companion_test: the guide walk keeps a gap of at least 2 (4 cells), the
+free walk has her set-off line and "On we go.", a look-back, at most a
+tenth of walking ticks beside him (2 of 32), and at a turn with him 4 back
+she waits facing him, then goes on once he comes up. Both modes;
+resident_test passes. Server only, protocol unchanged, no new class_name.

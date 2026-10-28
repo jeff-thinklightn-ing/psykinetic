@@ -2039,9 +2039,10 @@ func _test_guide() -> void:
 	_main._start_guide(pet, owner, goal)
 	_check(pet.guide != null and pet.guide.going() and owner.led_by == String(pet.name) and owner.led_to == "test/far" and "leading them there now" in pet.guide_note,
 		"asked: she sets off, her player led by her, her voice told she agreed")
-	steered.call(func() -> bool: return pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3, 120)
-	_check(pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 3 and "leading" in pet.doing(),
-		"she walks ahead and their body follows at her heel (%s to %s)" % [came_from, owner.tile])
+	steered.call(func() -> bool: return pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 2, 120)
+	_check(pet.current_intent == Companion.Intent.GUIDE and World.distance(owner.tile, came_from) >= 2 and "leading" in pet.doing(),
+		"she walks ahead and their body follows behind her (%s to %s)" % [came_from, owner.tile])
+	_check(World.distance(owner.tile, pet.tile) >= 2, "ahead of them, not beside them (708: %d cells)" % World.distance(owner.tile, pet.tile))
 	# Their own key takes control back (their client says so, 695).
 	_main._on_command(owner, "guide", {"stop": "moved"})
 	World.step()
@@ -3634,6 +3635,16 @@ func _test_guide_free() -> void:
 		if data.has("guide_route") and peer == owner.owner_peer:
 			routes.append(data["guide_route"]["path"])
 		send_was.call(peer, data)
+	var lines: Array[String] = []
+	var heard := func(line: String) -> void: lines.append(line)
+	pet.said.connect(heard)
+	var lead := {"cues": {}, "beside": 0, "ticks": 0}  # Leading that reads (708): cues seen, ticks walking beside them.
+	var watch := func() -> void:
+		if pet.guide == null or not pet.guide.going():
+			return
+		lead["cues"][pet.guide.wait_cue] = true
+		lead["ticks"] += 1
+		lead["beside"] += int(pet.guide.wait_cue == 0 and World.distance(owner.tile, pet.tile) <= 1)
 	var came_from := owner.tile
 	var far := _far_cell(owner.tile, 9, 14)
 	var goal := {"key": "test/free_far", "kind": "place", "name": "the far corner", "area": String(World.zone.name), "cell": far}
@@ -3648,6 +3659,7 @@ func _test_guide_free() -> void:
 		burnt["ticks"] += int(World.is_burning(pet.tile) or World.is_burning(owner.tile))
 		if World.distance(owner.tile, came_from) >= 3:
 			break
+	var set_off := lines.duplicate()
 	_check(not routes.is_empty() and pet.guide.going() and World.distance(owner.tile, came_from) >= 3,
 		"routes to her heel go to their client, and they follow her (%d routes, %s to %s)" % [routes.size(), came_from, owner.tile])
 	var first: Array = routes[0] if not routes.is_empty() else []
@@ -3660,6 +3672,7 @@ func _test_guide_free() -> void:
 	_main._on_command(owner, "guide", {"stop": "moved"})
 	_check(routes.size() == sent + 1, "(not twice)")
 	_main._guide_said(owner, pet, "lead on")
+	lines.clear()
 	for i in 600:
 		if World.get_entities().any(func(each: GridEntity) -> bool: return each is Monster):
 			_kill_monsters()
@@ -3667,6 +3680,7 @@ func _test_guide_free() -> void:
 			break
 		steer.call()
 		World.step()
+		watch.call()
 		burnt["ticks"] += int(World.is_burning(pet.tile) or World.is_burning(owner.tile))
 	var last := routes.size()
 	var there := pet.tile
@@ -3677,6 +3691,35 @@ func _test_guide_free() -> void:
 		"lead on, and there: she has brought them, and they come up beside her (her %s at the end, now %s, them %s, %s)" % [there, pet.tile, owner.tile, far])
 	_check(routes.size() == last and not (routes.back() as Array).is_empty(), "arrived: no new route, the last one theirs to finish")
 	_check(burnt["ticks"] == 0, "led past the room's fire, neither she nor they ever stood in it (707: %d ticks)" % burnt["ticks"])
+	var told: Dictionary = Guide.rules()["set_off"]
+	var said_off: bool = not set_off.is_empty() and set_off[0] in (told.get(str(pet.traits.get("temperament", "")), told["default"]) as Array)
+	_check(said_off, "as she sets off she says so, a line of the rules' (708: %s)" % [set_off])
+	_check(not lines.is_empty() and lines[0] in (told["resume"] as Array), "taken up again: \"on we go\" (%s)" % [lines.slice(0, 1)])
+	_check(lead["cues"].has(Guide.WAIT_LOOK), "on the way she looks back at them (708: cues %s)" % [lead["cues"].keys()])
+	# At a turn of her way, they 4 cells back: she waits there, facing them.
+	_kill_monsters()
+	var pet_was := pet.tile
+	var owner_was := owner.tile
+	_put(pet, Vector2i(12, 8))
+	_put(owner, Vector2i(8, 8))
+	var corner := Guide.new({"key": "test/turn", "kind": "place", "name": "the turn", "area": String(World.zone.name), "cell": Vector2i(12, 14)})
+	corner.bind(pet, owner)
+	corner._leg = {"area": String(World.zone.name), "from": Vector2i(11, 8), "to": Vector2i(12, 14), "way": {}}
+	corner._cells = [Vector2i(12, 9), Vector2i(12, 10)]
+	corner._trail = [Vector2i(11, 8), Vector2i(12, 8)]
+	corner._said_off = true
+	pet.next_move_tick = 0
+	var why := corner.step(null, func(_e: GridEntity) -> bool: return false)
+	_check(pet.tile == Vector2i(12, 8) and owner.tile == Vector2i(8, 8) and why == "" and corner.wait_cue == Guide.WAIT_BECKON and pet.facing == Vector2i(-1, 0),
+		"at a turn, they 4 back, she waits for them there, facing them (708: at %s, cue %d, facing %s)" % [pet.tile, corner.wait_cue, pet.facing])
+	_put(owner, Vector2i(10, 8))
+	corner.step(null, func(_e: GridEntity) -> bool: return false)
+	_check(corner.wait_cue == 0, "they come up: on (cue %d)" % corner.wait_cue)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+	_check(lead["beside"] * 10 <= lead["ticks"], "walking, she is ahead of them, seldom beside them (%d of %d ticks)" % [lead["beside"], lead["ticks"]])
+	pet.said.disconnect(heard)
 	_main._world_news.send = send_was
 	_bond_as(0, kept_bond)
 	World.set_free_walk(free_was)

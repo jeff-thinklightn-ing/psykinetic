@@ -64,6 +64,23 @@ var _ordered := NONE
 ## the walk ends, and this walk. Main sets it; unset, none is sent.
 var send_route := Callable()
 var _hp := Vector2i(-1, -1)
+## Leading that reads as leading (decision 708): the cells she stood on
+## this area (his route ends lead_gap of them behind her, not beside her),
+## a pause (till World.tick) and its cue (WAIT_LOOK a look back,
+## WAIT_BECKON waiting for him at a turn or a way out; 0 walking), when she
+## last looked back, whether she looked back as he fell behind, the corner
+## she last waited at, and whether her set-off line is said (and, taken up
+## again, which).
+const WAIT_LOOK := 1
+const WAIT_BECKON := 2
+var wait_cue := 0
+var _trail: Array[Vector2i] = []
+var _pause_until := -1
+var _looked_tick := -1
+var _looked_far := false
+var _waited_at := NONE
+var _said_off := false
+var _resumed := false
 ## Whether the walk came into this area by a way and has not stopped since:
 ## leaving it by a way then is a safe passage (RoadKnowledge.passed).
 var clean := false
@@ -283,6 +300,11 @@ func bind(with_pet: Companion, with_leader: Player) -> void:
 	_cells.clear()
 	_ordered = NONE
 	_hp = Vector2i(-1, -1)
+	_trail = [pet.tile]
+	_pause_until = -1
+	wait_cue = 0
+	_looked_tick = World.tick
+	_waited_at = NONE
 	clean = crossing_now and going()
 	crossing_now = false
 
@@ -301,8 +323,12 @@ func stop(why: String) -> void:
 	clean = false
 	_leg = {}
 	_cells.clear()
-	if _ordered != NONE and why != "arrived" and is_instance_valid(leader) and send_route.is_valid():
-		send_route.call([], self)  # Stopped: their client stops steering it (arrived, they finish the last one).
+	wait_cue = 0
+	_pause_until = -1
+	if why == "arrived" and is_instance_valid(leader) and is_instance_valid(pet) and send_route.is_valid():
+		_send_to(Heel.cell(leader, pet))  # There: they come up beside her (708).
+	elif _ordered != NONE and is_instance_valid(leader) and send_route.is_valid():
+		send_route.call([], self)  # Stopped: their client stops steering it.
 	_ordered = NONE
 
 
@@ -312,6 +338,8 @@ func resume() -> void:
 	stopped_at = -1
 	_leg = {}
 	_cells.clear()
+	_said_off = false
+	_resumed = true
 
 
 ## Whether a stopped walk may still be taken up again (keep_minutes).
@@ -362,16 +390,83 @@ func step(routes: WorldRoutes, threat: Callable) -> String:
 			return "no_way"
 	var near := World.distance(pet.tile, leader.tile)
 	_heel()
+	var gap := int(setting("lead_gap", 3.0))
+	if World.tick < _pause_until:
+		World.face(pet, _toward(leader.tile))
+		if wait_cue == WAIT_BECKON and near <= gap:
+			_pause_until = -1  # He has come up: on.
+		else:
+			return ""
+	wait_cue = 0
+	if near <= gap:
+		_looked_far = false
 	if not (_leg["way"] as Dictionary).is_empty() and World.distance(pet.tile, _leg["to"]) <= 1:
-		if near > int(setting("wait", 3.0)):
-			return ""  # At the way out: they come up first.
+		if near > int(setting("wait", 5.0)):
+			_pause(WAIT_BECKON, int(setting("corner_ticks", 30.0)))  # At the way out: they come up first.
+			return ""
 		crossing = _leg["way"]
 		crossing_at = _leg["to"]
 		return "cross"
-	if near > int(setting("wait", 3.0)) or World.tick < pet.next_move_tick:
+	if near > int(setting("wait", 5.0)):
+		_pause(WAIT_BECKON, int(setting("corner_ticks", 30.0)))  # Too far behind: she waits for them.
 		return ""
+	if World.tick < pet.next_move_tick:
+		return ""
+	if _said_off and (World.tick - _looked_tick >= int(setting("look_ticks", 60.0)) or near > gap + 1 and not _looked_far):
+		_looked_far = near > gap + 1
+		_looked_tick = World.tick
+		_pause(WAIT_LOOK, int(setting("look_beat_ticks", 8.0)))  # A look back.
+		return ""
+	if _said_off and near > gap and pet.tile != _waited_at and _at_turn():
+		_waited_at = pet.tile
+		_pause(WAIT_BECKON, int(setting("corner_ticks", 30.0)))  # A turn: she waits at it for them.
+		return ""
+	if not _said_off:
+		_said_off = true
+		_looked_tick = World.tick
+		_set_off_line()
 	_walk()
+	if _trail.is_empty() or _trail.back() != pet.tile:
+		_trail.append(pet.tile)
+		if _trail.size() > 16:
+			_trail.pop_front()
 	return ""
+
+
+## A pause of [param ticks] with [param cue] (708), facing her player.
+func _pause(cue: int, ticks: int) -> void:
+	wait_cue = cue
+	_pause_until = World.tick + ticks
+	World.face(pet, _toward(leader.tile))
+
+
+## The way from her to [param cell], one of World.DIRECTIONS.
+func _toward(cell: Vector2i) -> Vector2i:
+	var way := Vector2i(signi(cell.x - pet.tile.x), signi(cell.y - pet.tile.y))
+	return way if way in World.DIRECTIONS else pet.facing
+
+
+## Whether she stands where her way turns (708): the step that brought her
+## here and her next one at a right angle or more.
+func _at_turn() -> bool:
+	if _trail.size() < 2 or _cells.is_empty():
+		return false
+	var came := pet.tile - _trail[_trail.size() - 2]
+	var next := _cells[0] - pet.tile if _cells[0] != pet.tile else (_cells[1] - pet.tile if _cells.size() > 1 else Vector2i.ZERO)
+	return came != Vector2i.ZERO and next != Vector2i.ZERO and came.x * next.x + came.y * next.y <= 0
+
+
+## Her line as she sets off (708): the rules' "set_off" lines for her
+## temperament (else "default"), the walk taken up again "resume"'s; said
+## at once, no model asked.
+func _set_off_line() -> void:
+	var lines: Variant = rules().get("set_off", {})
+	if lines is not Dictionary:
+		return
+	var temper := str(pet.traits.get("temperament", ""))
+	var pick: Variant = lines.get("resume") if _resumed else lines.get(temper, lines.get("default"))
+	if pick is Array and not (pick as Array).is_empty():
+		pet._say(str(pick[World.tick % (pick as Array).size()]), true)
 
 
 ## The cells of [param leg] ahead of her: maps' WorldRoutes.leg_cells
@@ -395,11 +490,23 @@ func _walk() -> void:
 		if pet.tile != _leg["to"]:
 			Heel.step(pet, _leg["to"], true)
 		return
+	if World.distance(pet.tile, _cells[0]) > 1:
+		# Off her walk (pushed, or round a body in her way): back to it at its
+		# nearest cell of the next few, the later on a tie, never back to the
+		# one she went round (708: he stands behind her now, often on it).
+		var join := 0
+		for i in mini(8, _cells.size()):
+			if World.distance(pet.tile, _cells[i]) <= World.distance(pet.tile, _cells[join]):
+				join = i
+		_cells = _cells.slice(join)
+		while not _cells.is_empty() and _cells[0] == pet.tile:
+			_cells.pop_front()
+		if _cells.is_empty():
+			return
+		if World.distance(pet.tile, _cells[0]) > 1:
+			Heel.step(pet, _cells[0], true)
+			return
 	var next := _cells[0]
-	if World.distance(pet.tile, next) > 1:
-		# Pushed off her walk: back to it.
-		Heel.step(pet, next, true)
-		return
 	if World.is_burning(next):
 		# Fire on the leg's cells (707: maps' routes know none): round it, to
 		# the first cell past it, by a way that keeps off fire.
@@ -429,17 +536,36 @@ func _walk() -> void:
 ## walks free (688, 703), so their client is sent the route to her heel
 ## each time the heel moves (695), and steers it as a click's route.
 func _heel() -> void:
-	if World.distance(leader.tile, pet.tile) < Heel.STOP:
+	var gap := int(setting("lead_gap", 3.0))
+	if World.distance(leader.tile, pet.tile) <= gap:
 		return
-	var heel := Heel.cell(leader, pet)
+	var heel := _behind(gap)
 	if heel == NONE or heel == leader.tile:
 		return
 	if heel != _ordered and send_route.is_valid():
-		var path: Array = []
-		for cell: Vector2i in World.walk_path(leader.tile, heel, leader, World.PATH_FIRE_AVOID):  # Not led into fire (707).
-			path.append([cell.x, cell.y])
-		send_route.call(path, self)
+		_send_to(heel)
 	_ordered = heel
+
+
+## The cell [param gap] behind her on her trail (708: he walks behind her,
+## not beside her), free, walkable and not burning, else the nearest such
+## before it, else Heel's cell; NONE if none.
+func _behind(gap: int) -> Vector2i:
+	for i in range(_trail.size() - 1 - gap, -1, -1):
+		var at := _trail[i]
+		if at == leader.tile or World.is_walkable(at) and World.is_free(at) and not World.is_burning(at):
+			return at
+	return Heel.cell(leader, pet)
+
+
+## Sends her player's client the route to [param cell] (695).
+func _send_to(cell: Vector2i) -> void:
+	if cell == NONE:
+		return
+	var path: Array = []
+	for at: Vector2i in World.walk_path(leader.tile, cell, leader, World.PATH_FIRE_AVOID):  # Not led into fire (707).
+		path.append([at.x, at.y])
+	send_route.call(path, self)
 
 
 ## Why the walk stopped, in words for her voice ("%s" her player's name).

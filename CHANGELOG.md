@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion leads like a guide now: she walks a few steps ahead instead of beside you, says a word as she sets off, looks back now and then, and waits for you at corners and doorways (708).
 - The barrow's hidden niche: its cracked wall is now the slab that moves when the niche opens (the slab no longer stands swung out in the room), with a pocket in the doorway's side for it to slide into; the footprints lose the slab's swing arc (608 amended (2))
 - The admin console can give a player gold: `gold <player or id prefix> <amount> [why]`, never a negative amount, logged with its why (709).
 - The draugr throws his axe at a player standing back while a companion holds him in melee; before, a companion beside him kept the axe in his hand all fight (603 amended).
