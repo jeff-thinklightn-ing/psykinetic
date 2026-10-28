@@ -288,6 +288,15 @@ func _test_companions() -> void:
 		"no such resident (or one taken already): false")
 	_check(_towns.note_rescue(TOWN, "dag", "Dag", "carpenter") and "dag" in _towns.residents(TOWN), "and home again when rescued")
 	_check(_towns.taken_before("dag") == 1 and _towns.taken_before("companion:Wren") == 1, "each taken once (%d, %d)" % [_towns.taken_before("dag"), _towns.taken_before("companion:Wren")])
+	var count := calls.size()
+	_towns.carried_home(TOWN, "g10", "goblins", ["companion:p1"], "forest/camp")
+	_check(_towns.drop_captive("companion:p1") and _towns.captives(TOWN).filter(func(each: Dictionary) -> bool: return each["id"] == "companion:p1").is_empty()
+		and calls.size() == count and not _towns.drop_captive("companion:p1"),
+		"let go (672 amended): Wren off the captives, nobody told, and not twice (%s)" % [_towns.captives(TOWN)])
+	var raids := Raids.new()
+	raids._groups["g11"] = {"carries": {"items": [], "captives": ["companion:p1", "resident:dag"]}}
+	_check(raids.drop_captive("companion:p1") and raids.carries("g11")["captives"] == ["resident:dag"] and not raids.drop_captive("companion:p1"),
+		"and a raid group carrying her lets her go, the rest kept (%s)" % [raids.carries("g11")])
 
 
 func _check(ok: bool, label: String) -> void:

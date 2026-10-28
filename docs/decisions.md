@@ -33994,3 +33994,24 @@ the drawn cells, never himself; the outline check over 2543 shapes takes
 the origin inside a whole disc. free_walk_test, draugr_fight_test,
 monster_test, view_test, ui_test pass. Server only, protocol unchanged, no
 new class_name.
+## 672 amended, companions' side: the quest reset lets her captors go
+
+ui's "quests reset all" erased only her record's "taken". A raid group
+still carrying her, or a town camp still holding her as a captive, would
+free her again later (a second bond, a second fact, a rescue's experience)
+after she had already rejoined. Main.companion_let_go(player_id) ->
+Array[String] lets her go everywhere, and returns what it cleared for the
+reset's line:
+- her record's "taken" erased and her tile cleared, so she comes at the
+  next join (as before);
+- Raids.drop_captive(who) takes "companion:<player id>" off every group's
+  carries.captives (enemy-ai's file, approved). False if no group had her;
+- Towns.drop_captive(who_id) takes entries with that id off every town's
+  captives (economy's file, approved). No rescue, no experience, and no
+  companion_freed call: the caller frees her.
+No bond, fact or party line: an admin's reset isn't a rescue.
+_quests_reset_all calls it in place of its own erase. raids_test covers
+both drop_captives (nobody told, not twice, other captives kept), and
+resident_test covers companion_let_go (taken again, a group carrying her,
+let go, nothing left to free, and she comes at the next join). Server only,
+protocol unchanged, no new class_name.

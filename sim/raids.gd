@@ -184,6 +184,19 @@ func clear() -> void:
 	_groups.clear()
 
 
+## Captive [param who] ("companion:<keeper id>" or "resident:<worker id>")
+## let go by every group carrying it (672 amended, the admin's quest
+## reset): it is no longer theirs to drop when beaten. False if none did.
+func drop_captive(who: String) -> bool:
+	var dropped := false
+	for id: String in _groups:
+		var held: Array = _groups[id]["carries"]["captives"]
+		while who in held:
+			held.erase(who)
+			dropped = true
+	return dropped
+
+
 # --- Inside -------------------------------------------------------------------------
 
 func _hook() -> void:

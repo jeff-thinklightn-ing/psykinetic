@@ -10385,6 +10385,26 @@ func companion_taken(player_id: String, by: String) -> bool:
 	return true
 
 
+## The companion of player [param player_id] let go by whoever holds her
+## (672 amended, the admin's quest reset): her record's "taken" cleared (she
+## comes at the next join), and no raid group (Raids) or town (Towns) holds
+## her as a captive any more, so no later rescue or beaten group frees her
+## twice. No bond, fact or rescue. What was cleared, for the reset's line.
+func companion_let_go(player_id: String) -> Array[String]:
+	var out: Array[String] = []
+	var record: PlayerRecord = _records.get(player_id)
+	if record != null and record.companion.has("taken"):
+		record.companion.erase("taken")
+		record.companion["tile"] = null
+		out.append("companion let go by the raiders")
+	var who := "companion:%s" % player_id
+	if World.raids != null and World.raids.drop_captive(who):
+		out.append("a raid group's captive")
+	if World.towns != null and World.towns.drop_captive(who):
+		out.append("a camp's captive")
+	return out
+
+
 ## The companion of player [param player_id] is freed from the raiders who
 ## held her (decision 314): with [param place] (a stockpile place, the
 ## town that freed her) she rests there, a resident working her trade, till
@@ -16065,10 +16085,7 @@ func _quests_reset_all(record: PlayerRecord, id: String, player: Player) -> Stri
 	if "paid_deals" in record and not (record.get("paid_deals") as Dictionary).is_empty():
 		record.set("paid_deals", {})
 		cleared.append("the draugr's paid deals")
-	if record.companion.has("taken"):
-		record.companion.erase("taken")  # Let go; she comes at the next join (Jeff's pick pending: quest-reset-captive).
-		record.companion["tile"] = null
-		cleared.append("companion let go by the raiders")
+	cleared.append_array(companion_let_go(id))  # Let go; she comes at the next join (Jeff's pick pending: quest-reset-captive).
 	_resend_offers(id, player)
 	return "%s: quests reset (%s)" % [record.name, ", ".join(cleared) if not cleared.is_empty() else "nothing was held"]
 

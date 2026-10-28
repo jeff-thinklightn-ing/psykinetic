@@ -348,6 +348,20 @@ func add_xp(town: String, amount: int, reason: String) -> int:
 	return xp(town)
 
 
+## Captive [param who_id] let go from every town's captives (672 amended,
+## the admin's quest reset): no rescue, no experience, nobody told (the
+## caller frees her). False if no town held it.
+func drop_captive(who_id: String) -> bool:
+	var dropped := false
+	for town: String in _towns:
+		var held: Array = _towns[town].get("captives", [])
+		for each: Dictionary in held.duplicate():
+			if str(each.get("id", "")) == who_id:
+				held.erase(each)
+				dropped = true
+	return dropped
+
+
 ## [param name] ([param who_id]), rescued, has reached [param town]: a
 ## resident, of [param trade], working if the town has the building for it,
 ## waiting for it if not. Experience for the rescue. False if they are a

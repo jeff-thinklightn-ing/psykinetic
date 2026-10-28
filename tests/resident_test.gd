@@ -436,6 +436,22 @@ func _test_taken_by_raiders() -> void:
 	World.spared = was_spared
 	_check(_companion() == null and _main.companion_freed(Net.player_id) and _companion() != null
 		and World.distance(_companion().tile, _player().tile) <= 2, "freed in the field (her captors beaten): beside her player at once")
+	pet = _companion()
+	World.spared = func(target: GridEntity, _source: GridEntity, _cause: StringName) -> String:
+		return "raid-9" if target is Companion else ""
+	World.damage(pet, pet.hp + 5)
+	World.spared = was_spared
+	World.raids._groups["raid-9"] = {"carries": {"items": [], "captives": ["companion:%s" % Net.player_id]}}
+	var facts := (record.companion.get("facts", []) as Array).size()
+	var cleared: Array = _main.companion_let_go(Net.player_id)
+	_check(not record.companion.has("taken") and cleared.has("companion let go by the raiders") and cleared.has("a raid group's captive")
+		and World.raids.carries("raid-9")["captives"].is_empty() and (record.companion.get("facts", []) as Array).size() == facts,
+		"let go (672 amended): her record cleared, off the group's captives, no fact (%s)" % [cleared])
+	_check(not _main.companion_freed(Net.player_id) and _main.companion_let_go(Net.player_id).is_empty(), "nothing left to free or let go")
+	World.raids._groups.erase("raid-9")
+	_main.travel(Net.local_id, ROAD)
+	_main.travel(Net.local_id, TOWN)
+	_check(_companion() != null, "she comes at the next join")
 
 
 func _test_bodies_in_town() -> void:
