@@ -7763,6 +7763,17 @@ func _test_phased_build() -> void:
 	var drawn := func() -> int:
 		return _rig._room.find_children("*", "", true, false).filter(
 				func(node: Node) -> bool: return not String(node.name).begins_with("Scatter_")).size()
+	# The counted nodes by their parent's name and their own, each up to its
+	# first "_" or "@", and class: a count that differs names what.
+	var kinds := func() -> Dictionary:
+		var out := {}
+		for node: Node in _rig._room.find_children("*", "", true, false):
+			if String(node.name).begins_with("Scatter_"):
+				continue
+			var kind := "%s/%s %s" % [String(node.get_parent().name).get_slice("_", 0).get_slice("@", 0),
+				String(node.name).get_slice("_", 0).get_slice("@", 0), node.get_class()]
+			out[kind] = int(out.get(kind, 0)) + 1
+		return out
 	# Each ground and cliff chunk's mesh by name (built in another order over
 	# frames): its arrays, the ground's shade bytes from the CPU copy the
 	# floor's shade writes (_ground_bytes), and how many vertices in all.
@@ -7797,6 +7808,7 @@ func _test_phased_build() -> void:
 	_rig.rebuild(terrain, castle["centre"])
 	await _frames(Client3D.WARM_FRAMES + 2)
 	var at_once: int = drawn.call()
+	var at_once_kinds: Dictionary = kinds.call()
 	var once: Dictionary = meshes.call()
 	var orphans := Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)
 	built[0] = 0
@@ -7811,6 +7823,12 @@ func _test_phased_build() -> void:
 			"building over %d frames, then whole, told once (%d), the last room freed" % [frames, built[0]])
 	await _frames(Client3D.WARM_FRAMES + 2)
 	_check(drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
+	if drawn.call() != at_once:
+		# Under a suite's load once (2308, 2250, ui's landing 2026-10-27): which kinds differ.
+		var now: Dictionary = kinds.call()
+		for kind: String in now.merged(at_once_kinds):
+			if now.get(kind, 0) != at_once_kinds.get(kind, 0):
+				print("    %s: %d, at once %d" % [kind, now.get(kind, 0), at_once_kinds.get(kind, 0)])
 	var phased: Dictionary = meshes.call()
 	_check(once["vertices"] > 0 and phased == once, "each ground and cliff chunk the same mesh and shade as built at once (%d chunks, %d vertices)" % [
 		once.size() - 1, once["vertices"]])
