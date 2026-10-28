@@ -34068,3 +34068,51 @@ that is a room's only way through is 2 cells wide.
 The source is C:/dev/review/crypt_walls/make_cryptset.py (breach1/2/3, smashed, rubble). Nothing places
 these until dungeon's generator does, so there is no CHANGELOG bullet. Art only, protocol unchanged, no
 new class_name.
+## 717. The game connection encrypted (DTLS)
+
+Jeff (decisions/server-encryption.md): "1 - encrypt it". The ENet game port
+is put under Godot's ENet DTLS (ENetConnection.dtls_server_setup after
+create_server, dtls_client_setup after create_client); the status port
+(UDP, version and protocol before joining) and the localhost admin port stay
+plain. No domain, so the server's certificate is self-signed and pinned in
+the client (TLSOptions.client(trusted_chain), hostname "psykinetic"):
+net/dtls/pinned.crt, a PEM bundle of up to two certificates (the one in use
+and the next, so a rotation is a client cut first, then the box's swap).
+No silent fall back to plain: a failed handshake is said on the connect
+screen. Its code is PROTOCOL_REVISION 42, a forced cut of its own after the
+rev-41 window, with release's rollback drill.
+
+Step 0 (ui, Godot 4.7.2, one process): both setups after create_* return
+OK and a packet arrives; a self-signed cert pinned connects; a two-cert
+bundle trusts either; the box's openssl EC P-256 key and cert load
+(CryptoKey, X509Certificate) and connect; a wrong pinned cert is refused
+(mbedtls -0x2700) and a plain client too (-0x7780), each with an engine
+ERROR line a refusal test expects. Crypto has no generate_ecdsa: tests
+make RSA 2048 certs per run.
+
+The key: made on the box by server/install_dtls.sh, which Jeff runs once
+with sudo (release read it in full). It touches only /etc/psykinetic/dtls.*
+(dtls.next.* with --rotate), writes both to .new names under a trap and
+moves the certificate, then the key (the key's being there is "already
+done"), key 0600 root:root, cert 0644, and prints the cert's SHA-256
+fingerprint and the cert (public); the key is never printed. The box's
+hardening drop-in hides /etc/psykinetic from the service
+(InaccessiblePaths), and is not changed: the unit hands the key and cert
+over as systemd credentials (LoadCredential=dtls.key:/etc/psykinetic/dtls.key,
+LoadCredential=dtls.crt:/etc/psykinetic/dtls.crt), read from
+$CREDENTIALS_DIRECTORY; no path is on the command line. The unit's diff is
+shown to Jeff with the script.
+
+The order (release, coordinator): (1) this script lands alone; (2) Jeff
+runs it; (3) the unit change lands alone (LoadCredential only, no code:
+a missing credential file fails the unit's start, so never before (2));
+(4) release deploys server-only, still rev 41 (deploy_box says the unit
+differs); (5) Jeff installs the unit, and release sees the rev-41 server
+come up clean with the credential (it ignores it: the rollback check);
+(6) later the rev-42 code. A rollback keeps the files and the unit and
+swaps the binary only. A rotation: install_dtls.sh --rotate, a client cut
+pinning both, then by hand mv dtls.next.key/.crt over dtls.key/.crt and
+restart, then a cut dropping the old certificate.
+
+This change: server/install_dtls.sh only. Nothing runs it in the repo or on
+the box until Jeff does. Protocol unchanged, no new class_name.
