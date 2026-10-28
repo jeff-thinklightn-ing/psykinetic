@@ -33583,3 +33583,29 @@ companion won in 12.3 s, the companion struck for 8 (today lost). No hp
 scale change ("not needing a big fix"). F7: Telegraphs and boss moves,
 combat.moves.spin.needs. draugr_fight_test, monster_test, combat_test,
 free_walk_test pass. Server only, protocol unchanged, no new class_name.
+## 505 amended (2). Bridges square across a straight reach, the road at both ends
+
+Jeff's trailer footage ("holo-bridge"): the wilds bridge at (94,128), 1 wide,
+lay on the river's bend nearly along the water, and the road met the far
+bank beside it, not at its end, so walkers seemed to cross on thin air. The
+coordinator: place bridges square across a straight stretch of the river,
+the road meeting both ends, and check every bridge.
+
+- **Wilds:** the bridge moves to (95,130), 3 long and 2 wide, on the river's
+  near north-south run, five rows short of its north-east turn. The road
+  runs through rows 130-131 to both banks.
+- **Hills:** the bridge moves to (40,75), 2 wide (it keeps code B1). Its four
+  bank cells are levelled to one height (Level._bridge leaves a bridge out
+  when its banks differ). The road runs through both rows.
+- **Held (make_held):** _bridge picks the nearest pair of rows to BRIDGE_ROW
+  whose crossings match (_crossing_at: the same span, walkable banks), levels
+  the four banks and writes width 2. _roads runs the road through both rows.
+  Held's bridge is now (37,95).
+- **Layouts:** cells newly under a road are painted dirt, and cells a road
+  left are painted back to grass, so the deck (which copies its bank's
+  layout kind) is dirt like the road.
+
+level_test _test_bridges checks every world-plane zone with a bridge: no
+bridge warnings, width 2, water beside the span along both long sides, both
+ends dry floor, and both ends on road cells. That is three bridges today.
+Level files and make_held only; protocol unchanged; no new class_name.

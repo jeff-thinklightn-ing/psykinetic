@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Bridges in the wilds, the hills and Umbrage now cross the river square on a straight stretch, two wide, with the road meeting both ends (no more walking off the side onto thin air) (505 amended (2)).
 - The draugr now uses his spin in a fight (603 amended (6)): it needed more breath than he ever had after his opening throw, so he never spun; now he spins about once a fight. Step out of the red when it shows.
 - A heavy weapon's wind-up is easier to step out of (392 amended (2)): any walking key now gives it up unless you press almost straight at the foe (within 30 degrees, was 45), so backing off with S no longer keeps the swing and freezes you.
 

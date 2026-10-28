@@ -202,21 +202,49 @@ func _ford(water: Dictionary) -> void:
 	print("[held] the ford at %s" % [across])
 
 
-## The bridge over the river on the row nearest BRIDGE_ROW: its banks
-## levelled at the higher of them.
+## The bridge over the river, two cells wide (no one-cell ways), on the two
+## rows nearest BRIDGE_ROW the river crosses alike, square across its
+## straight run: its four bank cells dry, levelled at the highest of them.
 func _bridge(water: Dictionary) -> void:
-	var across := _crossing(water, BRIDGE_ROW)
+	var across: Array[Vector2i] = []
+	for offset in range(0, SIZE.y):
+		for y in [BRIDGE_ROW + offset, BRIDGE_ROW - offset]:
+			var row := _crossing_at(water, y)
+			if not row.is_empty() and _crossing_at(water, y + 1).map(func(cell: Vector2i) -> int: return cell.x) == row.map(func(cell: Vector2i) -> int: return cell.x):
+				across = row
+				break
+		if not across.is_empty():
+			break
 	if across.is_empty():
 		push_error("[held] no bridge")
 		return
 	var west := across[0]
 	var east := across[across.size() - 1]
-	var banks: Array[Vector2i] = [west - Vector2i(1, 0), east + Vector2i(1, 0)]
-	var top := maxf(map.relief_at(banks[0]), map.relief_at(banks[1]))
+	var banks: Array[Vector2i] = [west - Vector2i(1, 0), east + Vector2i(1, 0), west + Vector2i(-1, 1), east + Vector2i(1, 1)]
+	var top := -INF
+	for bank in banks:
+		top = maxf(top, map.relief_at(bank))
 	for bank in banks:
 		map.set_relief(bank, top)
-	config["buildings"] = [{"slot": "bridge", "at": [west.x, west.y], "facing": [1, 0], "length": across.size()}]
-	print("[held] the bridge at %s" % [across])
+	config["buildings"] = [{"slot": "bridge", "at": [west.x, west.y], "facing": [1, 0], "length": across.size(), "width": 2}]
+	print("[held] the bridge at %s, two wide" % [across])
+
+
+## The crossing of row [param y] (_crossing's rule) with dry ground beside
+## it east and west, or [] for none.
+func _crossing_at(water: Dictionary, y: int) -> Array[Vector2i]:
+	if y < 0 or y >= SIZE.y or absi(y - _ford_row) <= 6:
+		return []
+	var cells: Array[Vector2i] = []
+	for x in SIZE.x:
+		if water.has(Vector2i(x, y)) and map.cell(Vector2i(x, y)) == "water":
+			cells.append(Vector2i(x, y))
+	if cells.size() < 1 or cells.size() > 3 or cells[cells.size() - 1].x - cells[0].x != cells.size() - 1:
+		return []
+	for bank: Vector2i in [cells[0] - Vector2i(1, 0), cells[cells.size() - 1] + Vector2i(1, 0)]:
+		if not map.walkable(bank):
+			return []
+	return cells
 
 
 ## The water cells of the row nearest [param row] that the river crosses
@@ -276,7 +304,10 @@ func _roads(arrival: Vector2i) -> void:
 	var length := int(bridge["length"])
 	var crossings := {}
 	for i in length:
-		crossings[west + Vector2i(i, 0)] = true
+		for row in int(bridge.get("width", 1)):
+			crossings[west + Vector2i(i, row)] = true
+	# A road ROAD_WIDTH wide laid through the second row covers both.
+	west += Vector2i(0, int(bridge.get("width", 1)) - 1)
 	var ford := _ford_cells()
 	var roads := []
 	var plans: Array[Array] = [

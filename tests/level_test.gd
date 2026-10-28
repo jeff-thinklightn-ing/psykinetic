@@ -205,6 +205,7 @@ func _test_every_level() -> void:
 	_test_unplot()
 	_test_refuges()
 	_test_held()
+	_test_bridges()
 	_test_herders()
 	_test_forest_healer()
 	_test_world_plane()
@@ -690,6 +691,57 @@ func _test_unplot() -> void:
 ## the Old Tower stamped (its door reached over the bridge, and over the
 ## ford with the bridge gone), the store's cell reserved on a level pad,
 ## no town yet (no houses, the fort working for no town).
+## Every bridge in the world's levels (those on the world plane; Jeff on the
+## trailer, the wilds' on a bend: "holo-bridge"): two cells wide, square
+## across a run of river (water on past both its long sides), its ends on
+## dry banks, and on road where the level has roads, so a walker steps off
+## it onto the way. (levels/sample's one-cell bridge is a fixture.)
+func _test_bridges() -> void:
+	print("
+== bridges: square across the water, the road at both ends ==")
+	var found := 0
+	var plane: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/world_plane.json"))
+	for name: String in plane["zones"]:
+		var path := "res://levels/%s/level.json" % name
+		if not FileAccess.file_exists(path) or not FileAccess.get_file_as_string(path).contains("\"slot\": \"bridge\""):
+			continue
+		var level := Level.load_level(name)
+		var terrain: Dictionary = level["terrain"]
+		var wet := {}
+		for key in ["water", "bridged", "fords"]:
+			for cell: Vector2i in terrain.get(key, []):
+				wet[cell] = true
+		var roads := {}
+		for road: Dictionary in terrain.get("roads", []):
+			roads.merge(Curves.cells(road["curve"], false))
+		var bridges: Array = level["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == Level.BRIDGE)
+		var left_out: Array = level["warnings"].filter(func(warning: String) -> bool: return warning.contains("bridge"))
+		_check(not bridges.is_empty() and left_out.is_empty(), "%s: its bridges are laid (%s)" % [name, left_out])
+		for bridge: Dictionary in bridges:
+			found += 1
+			var rect: Rect2i = bridge["rect"]
+			var along := Vector2i(absi(bridge["facing"].x), absi(bridge["facing"].y))
+			var side := Vector2i(along.y, along.x)
+			var length := rect.size.x if along.x != 0 else rect.size.y
+			var width := rect.size.y if along.x != 0 else rect.size.x
+			var beside := [0, 0]
+			for i in length:
+				var cell := rect.position + along * i
+				if wet.has(cell - side):
+					beside[0] += 1
+				if wet.has(cell + side * width):
+					beside[1] += 1
+			var ends: Array[Vector2i] = []
+			for row in width:
+				ends.append(rect.position - along + side * row)
+				ends.append(rect.position + along * length + side * row)
+			var dry := ends.all(func(cell: Vector2i) -> bool: return not wet.has(cell) and cell in terrain["floor"])
+			var on_road := roads.is_empty() or ends.all(func(cell: Vector2i) -> bool: return roads.has(cell))
+			_check(width == 2 and beside[0] >= length - 1 and beside[1] >= length - 1 and dry and on_road,
+				"%s's bridge at %s: two wide (%d), the river on past both sides (%s of %d), its ends dry (%s) and on the road (%s)" % [name, rect.position, width, beside, length, dry, on_road])
+	_check(found >= 3, "the bridges found: %d" % found)
+
+
 func _test_held() -> void:
 	print("
 == Held, step 1 (651): its own map, the Old Tower stamped, the store's cell reserved, no town yet ==")
