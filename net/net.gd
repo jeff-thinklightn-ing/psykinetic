@@ -468,6 +468,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## move_refused RPCs are gone and request_attack / request_shove lose their
 ## via list; a player walks only free (an old client's grid input is
 ## refused), and the snapshot's free_walk key is no more.
+## 718 on the same revision: building.turf_house's bank ring (Level.BANKED)
+## and furnishings (FURNISHED) are terrain "solid", and its outline's walls
+## are art-walled (ART_WALLED, none drawn); an old client walks the bank and
+## draws square walls round the healer's huts.
 const PROTOCOL_REVISION := 41
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

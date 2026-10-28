@@ -335,10 +335,10 @@
 			"town": "store"
 		},
 		{
-			"slot": "building.healers_hut",
+			"slot": "building.turf_house",
 			"at": [
-				151.0,
-				233.0
+				149.0,
+				232.0
 			],
 			"facing": [
 				0.0,

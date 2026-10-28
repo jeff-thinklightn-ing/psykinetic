@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bb11n57qwt58e"
+path="res://.godot/imported/layout.png-835711cabedcc55a2bf2dd05bf3b3157.image"
+
+[deps]
+
+source_file="res://levels/prefabs/building_turf_house/layout.png"
+dest_files=["res://.godot/imported/layout.png-835711cabedcc55a2bf2dd05bf3b3157.image"]
+
+[params]
+

@@ -5505,13 +5505,14 @@ func _add_walls() -> void:
 
 ## The edges that are a fence, not a wall: an open-air building's outline
 ## (Level.OPEN_AIR, its slot draws the fence) and a bridge's railings
-## (decision 505, its slot draws them).
+## (decision 505, its slot draws them); and (false) those its slot's own
+## walls stand for, its door too (Level.ART_WALLED, 718), none drawn.
 func _fence_keys() -> Dictionary[Vector3i, bool]:
 	var fences: Dictionary[Vector3i, bool] = {}
 	for building: Dictionary in _terrain.get("buildings", []):
-		if building["slot"] in Level.OPEN_AIR:
+		if building["slot"] in Level.OPEN_AIR or building["slot"] in Level.ART_WALLED:
 			for key in Level.building_outline(building):
-				fences[key] = true
+				fences[key] = building["slot"] in Level.OPEN_AIR
 	for key: Vector3i in _terrain.get("railings", []):
 		fences[key] = true
 	return fences
@@ -5523,7 +5524,7 @@ func _fence_keys() -> Dictionary[Vector3i, bool]:
 ## drawn, not a wall round it).
 func _edge_drawn(key: Vector3i, fences: Dictionary[Vector3i, bool]) -> bool:
 	var kind: int = _terrain["edges"].get(key, Terrain.Edge.OPEN)
-	if kind == Terrain.Edge.OPEN or _outdoor and _is_outline(key):
+	if kind == Terrain.Edge.OPEN or _outdoor and _is_outline(key) or not fences.get(key, true):
 		return false
 	return kind != Terrain.Edge.WALL or not fences.has(key) and not _rock_edge(key)
 
@@ -5575,6 +5576,9 @@ func _add_buildings() -> void:
 		# Leaves that turn with the seasons (a great tree's crown, 567).
 		if ArtKit.spec(slot).get("leaf", false):
 			season_dress(node, true)
+		var hearth: Node3D = null
+		if slot in Level.ART_WALLED:
+			hearth = BuildingComposer.art_dress(node, slot, hash(rect.position))
 		# Whole (decision 287): its damaged roof and its rubble shown only damaged.
 		var damaged := node.find_children("state_*", "Node3D", true, false)
 		if node.get_node_or_null("roof_damaged") != null:
@@ -5598,6 +5602,18 @@ func _add_buildings() -> void:
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
 			"open_air": slot in Level.OPEN_AIR, "crop": "", "code": str(building.get("code", ""))})
+		# A banked one's inside (718) is its block, not its plot: its ring
+		# is its bank, its walls round the block.
+		var inner: Rect2i = building.get("blocks", [rect])[0]
+		if Level.BANKED.has(slot):
+			var inside: Dictionary[Vector2i, bool] = {}
+			for cell in Level.rect_cells(inner):
+				inside[cell] = true
+			_buildings[index]["inside"] = inside
+			_buildings[index]["outline"] = Level.building_outline(building)
+		if slot in Level.ART_WALLED:
+			_buildings[index]["hearth"] = hearth
+			_buildings[index]["quarters"] = BuildingComposer.quarters(node)
 		_show_state(_buildings[index])
 		_add_smoke(_buildings[index])
 		if ArtKit.spec(slot).get("stand") is Array:
@@ -5609,10 +5625,10 @@ func _add_buildings() -> void:
 		# (decision 309; WeatherView's heightfield sees only what is drawn).
 		var keep_dry := GPUParticlesCollisionBox3D.new()
 		var eaves := float(ArtKit.spec(slot).get("wall_height", WALL_HEIGHT))
-		keep_dry.size = Vector3(rect.size.x, eaves, rect.size.y)
+		keep_dry.size = Vector3(inner.size.x, eaves, inner.size.y)
 		keep_dry.position = Vector3(middle.x, _elevation(rect.position) + eaves * 0.5, middle.y)
 		_room.add_child(keep_dry)
-		for cell in Level.rect_cells(rect):
+		for cell in Level.rect_cells(inner):
 			_building_at[cell] = index
 
 
@@ -5632,8 +5648,8 @@ func _building_sets(building: Dictionary) -> void:
 				_building_dry.append(cell)
 				_dry_water[cell] = true
 		return
-	if building["slot"] in Level.OPEN_AIR or building["slot"] in Level.SPANS_WATER:
-		return  # Its fence (a bridge's railings) is its slot's mesh; a bridge's water stays.
+	if building["slot"] in Level.OPEN_AIR or building["slot"] in Level.SPANS_WATER or building["slot"] in Level.ART_WALLED:
+		return  # Its fence (a bridge's railings, an art wall) is its slot's mesh; a bridge's water stays.
 	# A kind (decision 488) names its sets and eaves; a slot's spec does.
 	var spec: Dictionary = {"wall_set": building["wall_set"], "wall_height": building["eaves"], "floor_set": building["floor_set"]} \
 			if building.has("kind") else ArtKit.spec(str(building["slot"]))
@@ -6096,7 +6112,8 @@ func _show_state(building: Dictionary) -> void:
 
 
 ## [param building]'s chimney smoke (Flames.chimney_smoke), if it has a
-## chimney (its composer's, or slot_chimney's): drawn as _show_smoke says.
+## chimney (its composer's, slot_chimney's, or art_dress's): drawn as
+## _show_smoke says.
 func _add_smoke(building: Dictionary) -> void:
 	var chimney := (building["node"] as Node3D).find_child("Chimney", true, false) as Node3D
 	if chimney == null or not chimney.has_meta(BuildingComposer.SMOKE_AT) or _glimpse:
@@ -6111,13 +6128,19 @@ func _add_smoke(building: Dictionary) -> void:
 ## in decline or a ruin.
 func _show_smoke(building: Dictionary) -> void:
 	var smoke: Node3D = building.get("smoke")
-	if smoke == null or not is_instance_valid(smoke):
+	var hearth: Node3D = building.get("hearth")
+	if (smoke == null or not is_instance_valid(smoke)) and hearth == null:
 		return
 	var state := Towns.STANDING
 	if not str(building["use"]).is_empty():
 		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
-	smoke.visible = smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
+	var lit := smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
 		not building.has("kind") or int(building["stage"]) == BuildingComposer.STANDING)
+	if smoke != null and is_instance_valid(smoke):
+		smoke.visible = lit
+	# Its hearth's fire (718: the turf house's pot) burns as its chimney smokes.
+	if hearth != null:
+		hearth.visible = lit
 
 
 ## Whose "awake" a building's lamp and chimney read (Main._awake_tick):
@@ -6222,6 +6245,7 @@ func _show_decline(building: Dictionary, decline: String) -> void:
 					changed.append(key)
 	if down:
 		_floor_gone(building, decline)
+	_art_decline(building, decline)
 	_weeds(building, decline != DECLINE_GONE)
 	if not changed.is_empty():
 		rebuild_walls(changed)
@@ -6257,8 +6281,25 @@ func _undo_decline(building: Dictionary) -> void:
 			(_doorways[key] as Node3D).visible = true
 	_weeds(building, false)
 	_floor_gone(building, "")
+	_art_decline(building, "")
 	if not changed.is_empty():
 		rebuild_walls(changed)
+
+
+## An art-walled building's ruin (718: BuildingComposer.art_dress): its
+## walls_ruin and state_ruin in place of its wall quarters, its pot tipped
+## over ("ruin_pot") in place of its furnishings (its "parts", which a ruin
+## hides); out of it, as built.
+func _art_decline(building: Dictionary, decline: String) -> void:
+	if not building.has("quarters"):
+		return
+	var ruin := decline == Towns.RUIN
+	for quarter: Array in building["quarters"]:
+		(quarter[0] as Node3D).visible = not ruin
+	for name: String in [BuildingComposer.WALLS_RUIN, BuildingComposer.STATE_RUIN, BuildingComposer.RUIN_POT]:
+		var part := (building["node"] as Node3D).find_child(name, true, false) as Node3D
+		if part != null:
+			part.visible = ruin
 
 
 ## A kind's roof sagging, damaged or in disrepair (649): tilted KIND_SAG
@@ -12832,6 +12873,10 @@ func _inside_walls(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3D
 			if outward.dot(flat) > NEAR_SIDE:
 				for piece: Node3D in _runs[key]:
 					out[piece] = true
+		# An art-walled one's (718) wall quarters on the camera's side.
+		for quarter: Array in _buildings[index].get("quarters", []):
+			if (quarter[1] as Vector2).dot(flat) > NEAR_SIDE:
+				out[quarter[0]] = true
 	return out
 
 
@@ -13146,6 +13191,9 @@ func _index_occluders() -> void:
 	for building in _buildings:
 		if building["roof"] != null:
 			_occluders.append([building["roof"], _bounds(building["roof"]), false, [building["roof"]]])
+		# An art-walled one's wall quarters (718) fade as walls do.
+		for quarter: Array in building.get("quarters", []):
+			_occluders.append([quarter[0], _bounds(quarter[0]), false, [quarter[0]]])
 	_occluder_chunks.clear()
 	_occluder_top = 0.0
 	for index in _occluders.size():

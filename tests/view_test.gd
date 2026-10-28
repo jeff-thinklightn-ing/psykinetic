@@ -2018,6 +2018,7 @@ func _test_kinds() -> void:
 	_test_decline()
 	_test_inside()
 	_test_chimney_smoke()
+	_test_turf_house()
 	_test_inside_is_his()
 
 
@@ -2413,6 +2414,110 @@ func _test_chimney_smoke() -> void:
 	var chimneys := _rig._buildings.filter(func(b: Dictionary) -> bool: return (b["node"] as Node3D).find_child("Chimney", true, false) != null)
 	_check(not chimneys.is_empty() and chimneys.all(func(b: Dictionary) -> bool: return b.get("smoke") != null),
 			"every composed chimney has its smoke (%d of %d houses)" % [chimneys.size(), _rig._buildings.size()])
+
+
+## The healer's turf house (718): a 7 x 5 plot (Level.BANKED), its inside
+## the middle 5 x 3 walled square in the sim, its bank's ring and its bed
+## and hearth solid, the approach before its door its place; drawn by its
+## slot's own walls (Level.ART_WALLED: none of the map's), its quarters on
+## the camera's side faded while you are inside, its pot, bed and shelf at
+## their sockets, its pot's fire and chimney smoke while someone is awake
+## inside, its disrepair and ruin its slot's own looks.
+func _test_turf_house() -> void:
+	print("\n== the healer's turf house: banked plot, art walls, furnishings, its fire and its ruin (718) ==")
+	var map := LevelMap.new(Vector2i(16, 12))
+	for y in 12:
+		for x in 16:
+			map.set_cell(Vector2i(x, y), "grass")
+	var config := {"outdoor": true}
+	var changes := Prefab.stamp_changes(Prefab.load_prefab("building_turf_house"), map, Vector2i(2, 2), config)
+	for cell: Vector2i in changes["cells"]:
+		map.set_cell(cell, changes["cells"][cell])
+	for key: Vector3i in changes["edges"]:
+		map.set_edge(key, changes["edges"][key])
+	config.merge(changes.get("config", {}), true)
+	var level := Level.parse(map.to_image(), null, config)
+	var said := (level["warnings"] as Array).filter(func(text: String) -> bool: return text.contains("building"))
+	_check(level["buildings"].size() == 1 and said.is_empty(), "the prefab stamps the turf house, nothing said (%s)" % [said])
+	if level["buildings"].size() != 1:
+		return
+	var parsed: Dictionary = level["buildings"][0]
+	var inner := Rect2i(4, 4, 5, 3)
+	_check(parsed["rect"] == Rect2i(3, 3, 7, 5) and parsed["blocks"] == [inner] and parsed["front"] == Vector2i(6, 7),
+			"its footprint the 7 x 5 plot, its inside the middle 5 x 3, its front the approach (%s %s %s)" % [parsed["rect"], parsed["blocks"], parsed["front"]])
+	var terrain: Dictionary = level["terrain"]
+	var solid: Array = terrain.get("solid", [])
+	var furnished: Array[Vector2i] = [Vector2i(8, 5), Vector2i(4, 4), Vector2i(5, 4)]
+	var ring := Level.rect_cells(parsed["rect"]).filter(func(cell: Vector2i) -> bool: return not inner.has_point(cell) and cell != Vector2i(6, 7))
+	_check(solid.size() == ring.size() + 3 and ring.all(func(cell: Vector2i) -> bool: return cell in solid and not cell in terrain["floor"])
+			and furnished.all(func(cell: Vector2i) -> bool: return cell in solid and not cell in terrain["floor"])
+			and Vector2i(6, 7) in terrain["floor"] and Vector2i(6, 5) in terrain["floor"],
+			"its bank's ring (but the approach) and its hearth and bed solid, out of the floor (%d)" % solid.size())
+	var outline := Level.building_outline(parsed)
+	var kinds := outline.map(func(key: Vector3i) -> int: return terrain["edges"].get(key, Terrain.Edge.OPEN))
+	_check(outline.size() == 16 and kinds.count(Terrain.Edge.DOOR) == 1 and kinds.count(Terrain.Edge.WALL) == 15,
+			"the sim walls its inside square, one door (%s)" % [kinds])
+	_check(level["places"].has("healers_hut@6,7") and Level.building_cells(parsed).has(Vector2i(6, 5)) and not Level.building_cells(parsed).has(Vector2i(3, 3))
+			and not Level.building_cells(parsed).has(Vector2i(6, 7)), "the healer's place on the approach; its inside the block, not the bank")
+	_check([Level.land_variant("building.turf_house", "wilds"), Level.land_variant("building.turf_house", "forest"),
+			Level.land_variant("building.turf_house", "hills"), Level.land_variant("building.hut", "forest")] == [1, 2, 1, 1],
+			"its look by land: the wilds' turf, the forest's logs, else 1")
+	parsed["use"] = "hut"
+	parsed["town_id"] = "turf_town"
+	parsed["code"] = "T1"
+	_rig.rebuild(terrain, Vector2i(6, 9))
+	var found := _rig._buildings.filter(func(b: Dictionary) -> bool: return b["rect"] == parsed["rect"])
+	_check(found.size() == 1, "drawn")
+	if found.size() != 1:
+		return
+	var house: Dictionary = found[0]
+	var node: Node3D = house["node"]
+	var drawn := outline.filter(func(key: Vector3i) -> bool: return _rig._runs.has(key) or _rig._walls.has(key) or _rig._doorways.has(key))
+	_check(drawn.is_empty(), "none of the map's walls or doorway drawn round it: its slot's own walls (%s)" % [drawn])
+	_check(_rig._building_at.has(Vector2i(6, 5)) and not _rig._building_at.has(Vector2i(3, 3)) and not _rig._building_at.has(Vector2i(6, 7)),
+			"its inside the block (its roof off there), not its bank or approach")
+	var parts := node.get_node_or_null("parts") as Node3D
+	var names := ["Hearth", "Bed", "Shelf"].filter(func(name: String) -> bool: return parts != null and parts.get_node_or_null(name) != null)
+	_check(names.size() == 3 and is_equal_approx((parts.get_node("Bed") as Node3D).rotation.y, PI / 2.0),
+			"its pot, bed (turned head west) and shelf at their sockets (%s)" % [names])
+	if names.size() != 3:
+		return
+	var quarters: Array = house.get("quarters", [])
+	_check(quarters.size() == 4 and node.get_node_or_null("roof_damaged") != null and not (node.get_node("roof_damaged") as Node3D).visible
+			and not (node.get_node(BuildingComposer.WALLS_RUIN) as Node3D).visible and not (node.get_node(BuildingComposer.RUIN_POT) as Node3D).visible,
+			"four quarters; its disrepair roof, ruin walls and tipped pot hidden while it stands")
+	var near: Dictionary = _rig._inside_walls([_rig.to_global(Vector3(6, 0.5, 5))], Vector3(0, 0.7, 0.7))
+	var faded := quarters.filter(func(q: Array) -> bool: return near.has(q[0])).map(func(q: Array) -> String: return str((q[0] as Node3D).name))
+	faded.sort()
+	_check(faded == ["wall_se", "wall_sw"], "inside, the camera south: its south quarters faded, the north ones not (%s)" % [faded])
+	var far: Dictionary = _rig._inside_walls([_rig.to_global(Vector3(12, 0.5, 9))], Vector3(0, 0.7, 0.7))
+	_check(quarters.all(func(q: Array) -> bool: return not far.has(q[0])), "outside it: none faded for being inside")
+	var smoke: Node3D = house.get("smoke")
+	var hearth: Node3D = house.get("hearth")
+	_check(smoke != null and hearth != null and not smoke.visible and not hearth.visible, "nobody known inside: no smoke, the pot's fire out")
+	if smoke == null or hearth == null:
+		return
+	_rig.set_awake("turf_town", {"T1": true})
+	_check(smoke.visible and hearth.visible, "the healer awake inside: the pot's fire lit, the chimney smoking")
+	var top := smoke.global_position.y - Flames.CHIMNEY_SMOKE.y * 0.45
+	_check(absf(top - _rig.global_position.y - 2.95) < 0.05, "the smoke rises from the chimney socket (%.2f m)" % (top - _rig.global_position.y))
+	_rig.set_town("turf_town", {"hut": {"state": Towns.DISREPAIR, "level": 1}})
+	_check((node.get_node("roof_damaged") as Node3D).visible and not (node.get_node("roof") as Node3D).visible,
+			"in disrepair: its sagged, holed dome in its roof's place")
+	_rig.set_town("turf_town", {"hut": {"state": Towns.RUIN, "level": 0, "walls": false}})
+	_check(quarters.all(func(q: Array) -> bool: return not (q[0] as Node3D).visible) and (node.get_node(BuildingComposer.WALLS_RUIN) as Node3D).visible
+			and (node.get_node(BuildingComposer.RUIN_POT) as Node3D).visible and not parts.visible and not smoke.is_visible_in_tree()
+			and not (node.get_node("roof_damaged") as Node3D).visible and not (node.get_node("roof") as Node3D).visible,
+			"a ruin: its broken walls for its quarters, its pot tipped over, no roof, bed, shelf or smoke")
+	drawn = outline.filter(func(key: Vector3i) -> bool: return _rig._runs.has(key) or _rig._walls.has(key) or _rig._doorways.has(key))
+	_check(drawn.is_empty(), "nor any of the map's rubble or stubs drawn round it in ruin (%s)" % [drawn])
+	_rig.set_town("turf_town", {"hut": {"state": Towns.STANDING, "level": 1}})
+	_check(quarters.all(func(q: Array) -> bool: return (q[0] as Node3D).visible) and not (node.get_node(BuildingComposer.WALLS_RUIN) as Node3D).visible
+			and not (node.get_node(BuildingComposer.RUIN_POT) as Node3D).visible and parts.visible and smoke.visible and hearth.visible
+			and (node.get_node("roof") as Node3D).visible, "built again: standing, furnished, its fire lit")
+	_rig.set_awake("turf_town", {})
+	_rig.town_states.erase("turf_town")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## Inside (Jeff: "going inside buildings should go into top down view and

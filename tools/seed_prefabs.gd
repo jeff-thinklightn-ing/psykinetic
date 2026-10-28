@@ -214,6 +214,28 @@ const PREFABS := {
 		],
 		"config": {"buildings": [{"slot": "building.healers_hut", "at": [1, 1], "facing": [0, 1]}]},
 	},
+	# The healer's turf house (718): a 7 x 5 plot, its inside the middle
+	# 5 x 3 of dirt walled square (Level.ART_WALLED: the slot's oval wall
+	# draws them), the door the front's middle; the ring of grass round it
+	# is its bank (Level.BANKED: solid but the approach before the door).
+	"building_turf_house": {
+		"rows": [
+			", , , , , , , , ,",
+			"                 ",
+			", . . . . . . . ,",
+			"    # # # # #    ",
+			", .#, , , , ,#. ,",
+			"                 ",
+			", .#, , , , ,#. ,",
+			"                 ",
+			", .#, , , , ,#. ,",
+			"    # # + # #    ",
+			", . . . . . . . ,",
+			"                 ",
+			", , , , , , , , ,",
+		],
+		"config": {"buildings": [{"slot": "building.turf_house", "at": [1, 1], "facing": [0, 1]}]},
+	},
 	# A town's field (decision 452, economy's farms): a 4 x 4 plot of dirt,
 	# fenced on its outline (walls Level.OPEN_AIR keeps from blocking sight
 	# or being drawn; the slot's mesh is the fence), its gate a gap in the

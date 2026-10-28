@@ -52,6 +52,19 @@ const SMOKE_AT := &"smoke_at"
 ## The uses whose slot building (art with no chimney of its own) is given
 ## one (slot_chimney): a fire's trades.
 const SLOT_HEARTHS: Array[String] = ["forge", "kitchen"]
+## An art-walled slot's (Level.ART_WALLED, 718: the turf house) furnishings,
+## each a socket of its own -> [prop slot, turn about y (radians)]: the pot
+## on its tripod over the hearth, the bed its head to -x (art-kit's bed
+## lies head -z), the shelf hung on the back wall.
+const FURNISHINGS := {"hearth": ["prop.pot_tripod", 0.0], "bed": ["prop.bed_straw", PI / 2.0], "shelf": ["prop.shelf_herbs", 0.0]}
+## Its wall quarters (north -z), each its way out from its middle (x, z).
+const QUARTERS := {"wall_nw": Vector2(-1, -1), "wall_ne": Vector2(1, -1), "wall_sw": Vector2(-1, 1), "wall_se": Vector2(1, 1)}
+## Its parts and the piece art_dress adds that only a ruin shows.
+const WALLS_RUIN := "walls_ruin"
+const STATE_RUIN := "state_ruin"
+const RUIN_POT := "ruin_pot"
+## Its hearth's flame (m), the pot's fire under it.
+const HEARTH_FLAME := 0.5
 ## The kinds that may have a porch over their front door, and how likely;
 ## those with a cruck frame on a gable end, and the gable's span (cells)
 ## its 4.16 m frame suits.
@@ -564,6 +577,70 @@ static func slot_chimney(slot: String, use: String, seed: int) -> Node3D:
 	piece.position.y = eaves + rise * (1.0 - absf(off) / half)
 	out.add_child(piece)
 	out.set_meta(SMOKE_AT, Vector3(0.0, piece.position.y + ArtKit.size("chimney.stone").y, 0.0))
+	return out
+
+
+## An art-walled [param slot]'s [param node] (Level.ART_WALLED, 718: the turf house)
+## dressed: its roof_disrepair and state_disrepair named as a slot's
+## damaged roof and rubble (roof_damaged, state_damaged: Client3D's damage
+## shows them in disrepair, there being no roof_damaged), its walls_ruin
+## hidden; in a "parts" its FURNISHINGS at their sockets and a "Chimney" at
+## its chimney socket (SMOKE_AT its own middle: 710's smoke); beside them
+## its pot tipped over and cold (RUIN_POT, variant 2), hidden. Its pot's
+## flame (HEARTH_FLAME, its noise by [param seed]), or null.
+static func art_dress(node: Node3D, slot: String, seed: int) -> Node3D:
+	for names: Array in [["roof_disrepair", "roof_damaged"], ["state_disrepair", "state_damaged"]]:
+		var part := node.get_node_or_null(str(names[0]))
+		if part != null:
+			part.name = str(names[1])
+	var ruin := node.get_node_or_null(WALLS_RUIN) as Node3D
+	if ruin != null:
+		ruin.visible = false
+	var sockets: Dictionary = ArtKit.spec(slot).get("sockets", {}) if ArtKit.has(slot) else {}
+	var parts := Node3D.new()
+	parts.name = "parts"
+	node.add_child(parts)
+	var flame: Node3D = null
+	for socket: String in FURNISHINGS:
+		var prop := str(FURNISHINGS[socket][0])
+		if not sockets.get(socket) is Array or not ArtKit.has(prop):
+			continue
+		var at := Vector3(float(sockets[socket][0]), float(sockets[socket][1]), float(sockets[socket][2]))
+		var piece := ArtKit.instance(prop)
+		piece.name = socket.capitalize()
+		piece.position = at
+		piece.rotation.y = float(FURNISHINGS[socket][1])
+		parts.add_child(piece)
+		if socket == "hearth":
+			var socket_at: Variant = Flames.socket_of(prop)
+			if socket_at != null:
+				flame = Flames.light(piece, socket_at, HEARTH_FLAME, seed)
+			var tipped := ArtKit.instance(prop, 2)
+			tipped.name = RUIN_POT
+			tipped.position = at
+			tipped.visible = false
+			node.add_child(tipped)
+	if sockets.get("chimney") is Array:
+		var chimney := Node3D.new()
+		chimney.name = "Chimney"
+		chimney.position = Vector3(float(sockets["chimney"][0]), float(sockets["chimney"][1]), float(sockets["chimney"][2]))
+		chimney.set_meta(SMOKE_AT, Vector3.ZERO)
+		parts.add_child(chimney)
+	return flame
+
+
+## [param node]'s wall quarters (QUARTERS, art_dress's slot), each
+## [quarter, its way out on the map (Vector2: x, z) as [param node] is
+## turned]: what Client3D fades on the camera's side while you are inside.
+static func quarters(node: Node3D) -> Array:
+	var out: Array = []
+	for name: String in QUARTERS:
+		var quarter := node.get_node_or_null(name) as Node3D
+		if quarter == null:
+			continue
+		var way: Vector2 = QUARTERS[name]
+		var turned := node.basis * Vector3(way.x, 0.0, way.y)
+		out.append([quarter, Vector2(turned.x, turned.z).normalized()])
 	return out
 
 

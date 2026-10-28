@@ -112,7 +112,7 @@ const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "sto
 const REFUGE_WHERE: Array[String] = ["wilds", "hills", "forest", "woods", "castle_dungeon"]
 ## The buildings that make a place of their own where they stand
 ## (building_places, decision 372): where the fallen come back.
-const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut"}
+const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut", "building.turf_house": "healers_hut"}
 ## A place's radius when level.json gives none, in cells.
 const PLACE_RADIUS := 8
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
@@ -130,7 +130,27 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2),
 	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
 	"building.throne": Vector2i(1, 1), "building.dark_pillar": Vector2i(1, 1), "building.hatch_sealed": Vector2i(1, 1),
-	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1)}
+	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1), "building.turf_house": Vector2i(7, 5)}
+## The buildings whose footprint is a plot round a smaller inside (718: the
+## healer's turf house, its earth bank heaped round it): slot -> the ring's
+## width in cells. Its one block (its inside, walled on its outline as any
+## building's) is the footprint less the ring; the ring is out of the floor
+## and solid (as a SOLID building's cells, decision 550) but for the
+## approach, the cell before its door (its "front", where its place is).
+const BANKED := {"building.turf_house": 1}
+## The buildings whose own mesh is their walls (718: the turf house's oval
+## wall in quarters): the sim keeps square wall edges on their inside's
+## outline, as any building's, and the client draws none of them.
+const ART_WALLED: Array[String] = ["building.turf_house"]
+## The cells a building's furnishings take, out of the floor and solid
+## (718): slot -> cells in its own frame (art-kit's: x across, east when it
+## faces south; y to its front; (0, 0) its inside's middle cell): the turf house's hearth (the pot on its
+## tripod) and its bed, two cells along x; its shelf hangs on the wall and
+## takes none.
+const FURNISHED := {"building.turf_house": [Vector2i(2, 0), Vector2i(-2, -1), Vector2i(-1, -1)]}
+## The slots drawn in their land's look (718): level.json's "land", else
+## the level's name -> the variant; a land not named here is 1.
+const LAND_VARIANTS := {"building.turf_house": {"wilds": 1, "forest": 2}}
 ## The buildings that stand on water, not floor: no inside, no walls (a
 ## well: its water is what stops walkers, and sight passes over it).
 const ON_WATER: Array[String] = ["building.well"]
@@ -467,6 +487,11 @@ static func load_level(level_name: String) -> Dictionary:
 	var level := parse(layout, made["height"], made["config"], made.get("relief"))
 	level["name"] = level_name
 	level["terrain"]["level"] = level_name
+	# A slot in its land's look (718), unless the entry names a variant.
+	var land := str(made["config"].get("land", level_name))
+	for building: Dictionary in level["buildings"]:
+		if LAND_VARIANTS.has(building["slot"]) and not building.has("variant"):
+			building["variant"] = land_variant(building["slot"], land)
 	# A linked building's town by its id, as Towns and Holdings name it.
 	for building: Dictionary in level["buildings"]:
 		building["town_id"] = "%s/%s" % [level_name, building["town"]] if not building["town"].is_empty() else ""
@@ -1399,13 +1424,15 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 				out.append(bridge)
 			continue
 		var under := wet if on_water else ground
-		var bad := cells.filter(func(cell: Vector2i) -> bool: return not under.has(cell) or taken.has(cell))
+		# A BANKED one stands on its whole plot, its bank's ring too (718).
+		var stands_on := rect_cells(rect) if BANKED.has(what) else cells
+		var bad := stands_on.filter(func(cell: Vector2i) -> bool: return not under.has(cell) or taken.has(cell))
 		if bad.is_empty():
-			bad = _uneven(terrain, cells)
+			bad = _uneven(terrain, stands_on)
 		if not bad.is_empty():
 			warnings.append("the %s at %s is not all on %s of one height (%s): left out" % [what, rect.position, "water" if on_water else "clear floor", bad[0]])
 			continue
-		for cell in cells:
+		for cell in stands_on:
 			taken[cell] = true
 		var open: Array[Vector3i] = []
 		# A kind's own open edges (its "open": a forge's front) are meant so.
@@ -1425,6 +1452,9 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 			building["variant"] = maxi(1, int(entry["variant"]))
 		if entry.get("yaw") is float or entry.get("yaw") is int:
 			building["yaw"] = float(entry["yaw"])
+		# A BANKED one's door opens onto its approach, inside its plot (718).
+		if BANKED.has(what):
+			building["front"] = front_cell(blocks[0], building["facing"])
 		if entry.has("kind"):
 			_kind_of(building, entry)
 		_link(building, entry, config, linked, warnings)
@@ -2067,6 +2097,9 @@ static func _lay_solid(level: Dictionary) -> void:
 	var terrain: Dictionary = level["terrain"]
 	var solid: Array[Vector2i] = []
 	for building: Dictionary in level["buildings"]:
+		for cell in banked_cells(building):
+			terrain["floor"].erase(cell)
+			solid.append(cell)
 		if not str(building["slot"]) in SOLID:
 			continue
 		var door := solid_door_of(building)
@@ -2077,6 +2110,33 @@ static func _lay_solid(level: Dictionary) -> void:
 				terrain["floor"].erase(cell)
 				solid.append(cell)
 	terrain["solid"] = solid
+
+
+## A parsed building's cells laid solid though it is no SOLID one (718): a
+## BANKED one's ring but its approach (its "front"), and its FURNISHED
+## cells, turned to its facing about its inside's middle; [] for others.
+static func banked_cells(building: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var slot := str(building.get("slot", ""))
+	if not BANKED.has(slot) and not FURNISHED.has(slot):
+		return out
+	var inside: Rect2i = building.get("blocks", [building["rect"]])[0]
+	if BANKED.has(slot):
+		for cell in rect_cells(building["rect"]):
+			if not inside.has_point(cell) and cell != building.get("front", Vector2i(-1, -1)):
+				out.append(cell)
+	var facing: Vector2i = building["facing"]
+	var middle := inside.position + (inside.size - Vector2i.ONE) / 2
+	for at: Vector2i in FURNISHED.get(slot, []):
+		# Its own x east when it faces south (art-kit's +x), its y to its front.
+		out.append(middle + Vector2i(facing.y, -facing.x) * at.x + facing * at.y)
+	return out
+
+
+## [param slot]'s variant in [param land] (LAND_VARIANTS, 718): 1 where
+## none is named.
+static func land_variant(slot: String, land: String) -> int:
+	return int(LAND_VARIANTS.get(slot, {}).get(land, 1))
 
 
 ## The bridges in [param level]'s buildings laid into its terrain: their
@@ -2525,7 +2585,7 @@ static func building_blocks(entry: Variant) -> Array[Rect2i]:
 	if rect == null:
 		return out
 	if not entry.has("kind") or BUILDINGS.has(str(entry.get("slot", ""))):
-		out.append(rect)
+		out.append((rect as Rect2i).grow(-int(BANKED.get(str(entry.get("slot", "")), 0))))
 		return out
 	var spec := kind_size(entry)
 	var size := _frame(spec)

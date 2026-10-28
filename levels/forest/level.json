@@ -90,10 +90,10 @@
 	},
 	"buildings": [
 		{
-			"slot": "building.healers_hut",
+			"slot": "building.turf_house",
 			"at": [
-				44,
-				28
+				42,
+				27
 			],
 			"facing": [
 				0,

@@ -35109,3 +35109,55 @@ grid cases or read the free route (controls_test's _walking_to);
 the 693 pins and grid moves in camp_fall, chest, respawn, spawn, stream,
 view, return, push, companion, combat, items and level tests walk free
 (Walk.to). Protocol changed (rides rev 41), no new class_name.
+## 718. The healer's turf house: a banked plot, its own walls, furnished; the healer's huts swapped for it
+
+Jeff picked concept B for the healer's hut (C:/dev/review/hut; "new building type for huts, not a plain box";
+"pot inside, allow going inside, could be dugout, material/texture could change for different environments.
+decor changes, animal skulls change ... smoke from chimney if occupied"). Art-kit's slots are "718, art-kit's
+side" (building.turf_house, prop.pot_tripod, prop.bed_straw, prop.shelf_herbs). This is the building that
+places and draws them, as a slot building (Level.BUILDINGS), not a composed kind.
+
+- **The plot (sim):** the slot's footprint is its 7 x 5 plot, front +z.
+  - Level.BANKED gives the ring's width (1). The building's one block, its inside, is the plot less the ring:
+    5 x 3, walled square on its outline by the map's own edges, as any building's. The door is the front's
+    middle edge.
+  - The plot must be clear floor of one height, ring and all.
+  - The ring is the earth bank: out of the floor and in terrain "solid" (as 550's solid buildings), except the
+    approach, the cell before the door. The approach is the building's "front", so the healer's place
+    (BUILDING_PLACES: healers_hut) stands there.
+  - Level.FURNISHED: the hearth cell and the bed's two cells are solid too (the shelf hangs on the wall and
+    takes none). That leaves two-wide ways in from the door to the bed and the pot.
+  - Level.banked_cells lists those cells.
+  - Main._awake_map still counts the whole plot. Only the approach is ever stood on there, and the healer
+    keeps his place on it, so his hut smokes while he is at work, awake.
+- **The look (client):** Level.ART_WALLED. None of the map's walls, doorway or posts are drawn on its outline;
+  the slot's oval wall stands for them (Client3D._fence_keys marks them undrawn). It gets no wall or floor sets.
+  - BuildingComposer.art_dress adds the pot, the bed (turned so its head points west in its frame) and the
+    shelf at their sockets in a "parts" node, with a "Chimney" at the chimney socket for 710's smoke.
+  - The wall quarters (wall_nw/ne/sw/se) fade as walls do: those on the camera's side while you are inside
+    (Client3D._inside_walls), and any between the camera and a player outside.
+  - Its inside for the roof is the block, not the plot.
+- **The fire:** the pot's flame (Flames.light, 0.5 m) burns exactly while the chimney smokes: someone awake
+  inside (710's rule), standing, damaged or in disrepair.
+- **The states:** the slot's roof_disrepair and state_disrepair are renamed to a slot's roof_damaged and
+  state_damaged, so 649's disrepair shows them. A ruin shows walls_ruin and state_ruin in place of the
+  quarters, and the pot tipped over and cold (prop.pot_tripod variant 2). The furnishings, roof and smoke are
+  hidden. "Gone" hides it all, as 649 does.
+- **The variants by land:** level.json "land", else the level's name, picks the variant (Level.LAND_VARIANTS):
+  1 for the wilds (turf on stone), 2 for the forest (logs and bark), 1 for any other land.
+- **The prefab:** building_turf_house (tools/seed_prefabs.gd), so the editor and builder can stamp it.
+- **The content (Jeff-asked, the coordinator):** the wilds' and the forest's healer's huts are now turf houses.
+  - Each plot is laid so its approach is the old hut's front cell, so the healer's place keys
+    (wilds/healers_hut@152,232, forest/healers_hut@45,31) and their keepers stay.
+  - The old hut's walls were cleared, and the inside laid in dirt and walled square with its door.
+  - The wilds' plot is at (149, 232), facing north; the forest's at (42, 27), facing south.
+  - The wilds hut had no written code, so it is now T2 by its letter (was H5); no other code moved.
+  - Floor cells: each level loses 22, its bank's 19 and its furnishings' 3 (wilds 49151 to 49129, forest 6159
+    to 6137 on main as of this landing). Neither level regenerates, so the swap shows at once.
+- **Not yet:** the hut has no town record, so it always stands. Decay when empty, and the healer rebuilding it
+  from supplies, are to be agreed with npc and economy.
+
+view_test _test_turf_house; level_test (the forest's healer's hut is the turf house, walked to and in).
+Server and client both change (the server lays the bank and the furnishings), so the server needs a redeploy
+with the next cut. Protocol: rides revision 41 (release), a line under its comment in net/net.gd. Like 550's
+solid slots, a client without it would walk the bank and draw the old walls. No new class_name.
