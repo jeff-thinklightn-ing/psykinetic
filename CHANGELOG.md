@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- A heavy weapon's wind-up is easier to step out of (392 amended (2)): any walking key now gives it up unless you press almost straight at the foe (within 30 degrees, was 45), so backing off with S no longer keeps the swing and freezes you.
 
 - Your companion leads like a guide now: she walks a few steps ahead instead of beside you, says a word as she sets off, looks back now and then, and waits for you at corners and doorways (708).
 - The barrow's hidden niche: its cracked wall is now the slab that moves when the niche opens (the slab no longer stands swung out in the room), with a pocket in the doorway's side for it to slide into; the footprints lose the slab's swing arc (608 amended (2))

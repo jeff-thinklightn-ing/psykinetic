@@ -463,12 +463,14 @@ func _room_with(player: Vector2i, dummy: Vector2i) -> Array[String]:
 
 
 ## A free body's wind-up given up by walking off it (392 amended; ui and
-## items: under free walk every heavy wind-up landed): a strong walk more
-## than 45 degrees off the target ends it, nothing struck, and the body
-## walks; pressing on at the foe, or a weak sideways lean, keeps it.
+## items: under free walk every heavy wind-up landed): a strong walk not
+## within 30 degrees of the target ends it, nothing struck, and the body
+## walks (392 amended (2): a diagonal key, 45, too); pressing on at the
+## foe, or a weak sideways lean, keeps it.
 func _test_free_wind_up_given_up() -> void:
 	print("\n== a free body's wind-up given up by walking off it, kept pressing on (392 amended) ==")
 	for each: Array in [[Vector2(0, 1), false, "a full step sideways"], [Vector2(-0.7, 0.7), false, "back and aside"],
+			[Vector2(1, 1).normalized(), false, "a diagonal key, 45 degrees (392 amended (2))"], [Vector2(1, 0.5).normalized(), true, "pressing on 27 degrees off"],
 			[Vector2(1, 0), true, "pressing on at the foe"], [Vector2(0.3, 0.3), true, "a weak lean aside (0.42)"]]:
 		var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
 		var host: Player = e["P"][0]

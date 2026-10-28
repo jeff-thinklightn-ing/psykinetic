@@ -33539,3 +33539,27 @@ free walk has her set-off line and "On we go.", a look-back, at most a
 tenth of walking ticks beside him (2 of 32), and at a turn with him 4 back
 she waits facing him, then goes on once he comes up. Both modes;
 resident_test passes. Server only, protocol unchanged, no new class_name.
+
+## 392 amended (2), combat's side: a wind-up is kept only pressing within 30 degrees
+
+Jeff: "axe did knock down enemy and Pip when it connected, but hard to
+interrupt it". ui ran it on a real headless client (wasd, a battle axe
+against a skeleton due east): at the default camera yaw every WASD key is a
+world diagonal, exactly 45 degrees off a foe on an axis, and 392 amended
+kept the wind-up for a walk within 45 inclusive. S held: not given up,
+struck at its 8th tick, the own view walking off 0.5 and snapped back
+(the server held it). A held: given up on the tick it began.
+
+- A free body's wind-up is kept only by a walk strictly within
+  WIND_UP_KEEP_ANGLE (30 degrees) of the way to its target; any walk of at
+  least WIND_UP_LEAVE_INTENT (0.5) further off gives it up, so every
+  diagonal key leaves and pressing straight on (a chase's late commands)
+  keeps it. Both are World consts; ui's side holds the own view by the
+  same two during the own winding, so a press that keeps it stands
+  rather than walks off and snaps back.
+- Safe alone on the box: an old client draws every press as a walk
+  anyway; the server now agrees with more of them.
+
+combat_test _test_free_wind_up_given_up: a 45-degree diagonal given up,
+27 degrees off kept and landing. Server only, protocol unchanged, no new
+class_name.

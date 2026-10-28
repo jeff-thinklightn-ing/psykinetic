@@ -463,8 +463,13 @@ var free_walk := false
 ## and others' cells (688).
 const FREE_RADIUS := 0.3
 ## How strong a free body's walk must be to give up its wind-up (392
-## amended): half a full intent, more than 45 degrees off its target.
+## amended): half a full intent, not within WIND_UP_KEEP_ANGLE of its target.
 const WIND_UP_LEAVE_INTENT := 0.5
+## Degrees off its target a free body's walk may press and keep its
+## wind-up, strictly within (392 amended (2): at 45 every WASD key at the
+## default yaw, a diagonal, kept it against a foe on an axis). The client
+## holds its own view by the same two (ui's).
+const WIND_UP_KEEP_ANGLE := 30.0
 ## How far past its cell's edge a free body's centre goes before it holds
 ## the next cell (688): a body on a border does not flicker between two.
 const FREE_HYSTERESIS := 0.1
@@ -8381,7 +8386,7 @@ func free_input(entity: GridEntity, intent: Vector2, seconds: float, seq := -1) 
 ## coordinator's; ui and items: under free walk the halt dropped every
 ## command and the grid's cancel, a step off its cell, never came, so every
 ## heavy wind-up landed): an [param intent] of at least
-## WIND_UP_LEAVE_INTENT more than 45 degrees off the way to its target ends
+## WIND_UP_LEAVE_INTENT not strictly within WIND_UP_KEEP_ANGLE of the way to its target ends
 ## it (cancel_wind_up, paid and not refunded as ever) and lifts its halt, so
 ## the command walks. Pressing on at the foe, as a chase's late commands
 ## do, keeps it.
@@ -8392,7 +8397,7 @@ func _free_give_up_wind_up(player: Player, intent: Vector2) -> void:
 	var way := Vector2(player.wind_up["direction"])
 	if is_instance_valid(target):
 		way = body_centre(target) - body_centre(player)
-	if way.length() > 0.001 and intent.normalized().dot(way.normalized()) >= cos(PI / 4.0):
+	if way.length() > 0.001 and intent.normalized().dot(way.normalized()) > cos(deg_to_rad(WIND_UP_KEEP_ANGLE)):
 		return
 	cancel_wind_up(player)
 	player.free_halt_until = tick
