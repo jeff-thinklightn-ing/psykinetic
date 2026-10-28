@@ -25,7 +25,7 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	python -B tools/changelog_check.py || { echo "LANDING TESTS: FAIL (CHANGELOG.md, decision 539: fix it as above)"; exit 1; }
 	# Every Godot the tooling starts writes its own log in build/logs, never
 	# the shared user:// logs folder (decision 664).
-	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file, decision 664: fix it as above)"; exit 1; }
+	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file or silence, decision 664 and its amendment: fix it as above)"; exit 1; }
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No

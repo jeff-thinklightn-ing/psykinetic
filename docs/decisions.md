@@ -34728,3 +34728,22 @@ not matching the store, "placeholders".
   sync rather than shipping the old file; merging main brings the listed takes back.
 
 Tooling only (no game code); protocol unchanged; no new class_name.
+
+## 664 amended: every Godot the tooling starts is silent
+
+The coordinator (2026-10-28): Jeff heard music ringing from sessions' test windows on his
+speakers. Every Godot a session starts now runs with `--audio-driver Dummy` (CLAUDE.md, d85909ea),
+sound's own capture runs excepted.
+
+- `--headless` already means `--display-driver headless --audio-driver Dummy` (Godot 4.7's
+  `--help`), so the suite, net_test, state_test, server_boot_test and release's export and
+  print-protocol were silent all along and are unchanged.
+- The windowed launches, tools/clip.sh and tools/terrain_shots.ps1, pass `--audio-driver Dummy`.
+  The movie maker still writes the clip's frame.wav: it mixes the sound itself.
+- tools/godot_log_check.py (land.sh runs it before the gate) now also fails a launch in tests/
+  or tools/ with neither `--headless` nor `--audio-driver` near it, naming what each lacks. A
+  capture run that names a real driver (`--audio-driver WASAPI`) passes.
+- Shot runs a session writes in its own scratchpad are outside the check; the CLAUDE.md line
+  covers them.
+
+Tooling only; protocol unchanged; no new class_name.

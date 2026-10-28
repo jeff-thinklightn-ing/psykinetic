@@ -7,7 +7,12 @@ launch in tests/ and tools/ passes --log-file into its checkout's build/logs
 (tests/godot_log.sh's godot_log, tests/godot_log.ps1's Get-GodotLog). This
 fails any launch line that doesn't; land.sh runs it before the gate.
 
-  python -B tools/godot_log_check.py      prints each line missing it, exit 1
+Every launch is silent too (664 amended): Jeff heard sessions' test windows
+play music on his speakers. --headless already means --audio-driver Dummy; a
+windowed run (a clip, a shot) passes --audio-driver Dummy itself. Sound's own
+capture runs name a real driver (--audio-driver WASAPI), which also passes.
+
+  python -B tools/godot_log_check.py      prints each line missing either, exit 1
 """
 import pathlib
 import re
@@ -34,9 +39,12 @@ def missing(path: pathlib.Path) -> list[str]:
 		if line.lstrip().startswith("#") or not pattern.search(line):
 			continue
 		near = "\n".join(lines[max(0, i - SPAN):i + SPAN + 1])
-		if "--version" in line or "--log-file" in near:
+		if "--version" in line:
 			continue
-		found.append("%s:%d: %s" % (path.relative_to(ROOT).as_posix(), i + 1, line.strip()))
+		lacks = [why for why, ok in (("no --log-file", "--log-file" in near),
+				("not silent (--headless or --audio-driver Dummy)", "--headless" in near or "--audio-driver" in near)) if not ok]
+		if lacks:
+			found.append("%s:%d: %s: %s" % (path.relative_to(ROOT).as_posix(), i + 1, ", ".join(lacks), line.strip()))
 	return found
 
 
@@ -49,7 +57,7 @@ def main() -> int:
 	for line in found:
 		print(line)
 	if found:
-		print("godot_log_check: %d Godot launch(es) without --log-file (decision 664: give each its own log in build/logs)" % len(found))
+		print("godot_log_check: %d Godot launch(es) without --log-file or silence (decision 664: give each its own log in build/logs; 664 amended: --headless or --audio-driver Dummy)" % len(found))
 		return 1
 	return 0
 
