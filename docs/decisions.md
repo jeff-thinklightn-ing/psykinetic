@@ -33563,3 +33563,23 @@ struck at its 8th tick, the own view walking off 0.5 and snapped back
 combat_test _test_free_wind_up_given_up: a 45-degree diagonal given up,
 27 degrees off kept and landing. Server only, protocol unchanged, no new
 class_name.
+
+## 603 amended (6), combat's side: the draugr's spin needs 50 stamina
+
+Jeff found the draugr too easy. Measured on main e882d286 (enemy-ai's
+throw fix 2bc11db2 in), the draugr built as draugr_fight_test builds him
+against a free player with a sword trading blows, by pact, alone and with a
+companion: his spin never fired. It needed 90 stamina; his opening throw
+costs 40 and his swings eat his regen (8 every 7 ticks), so he sat at 48
+to 60 all fight, and the spin's leaves (his own stamina after it) changed
+nothing. The coordinator's pick: moves.spin.needs 90 -> 50, one spin a
+fight.
+
+A bare 20 hp player with a sword, stepping out of the spin's red when it
+shows (3 seeds each): easy alone won 3/3 in 13.5 s, lowest 4 hp (today
+8.9 s, 4); easy with a companion 10.2 s, lowest 9 (today 6.4 s); normal
+alone lost, as today (normal wants armour or help); normal with a
+companion won in 12.3 s, the companion struck for 8 (today lost). No hp
+scale change ("not needing a big fix"). F7: Telegraphs and boss moves,
+combat.moves.spin.needs. draugr_fight_test, monster_test, combat_test,
+free_walk_test pass. Server only, protocol unchanged, no new class_name.

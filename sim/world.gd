@@ -389,7 +389,7 @@ var winded_regen_delay := 20
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
 var moves := {
 	"spin": {"windup": 15, "length": 2.0, "half_angle": 150.0, "fists_length": 1.0, "damage_scale": 2.5,
-		"down_ticks": 15, "needs": 90, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 1.06},
+		"down_ticks": 15, "needs": 50, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 1.06},
 	"throw": {"windup": 12, "length": 8.0, "width": 1, "damage_scale": 2.0, "cost": 40, "speed": 14.0},
 	"charge": {"roar": 6, "cells": 12},
 }
