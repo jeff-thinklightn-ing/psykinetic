@@ -1,0 +1,4 @@
+{
+	"_about": "Named enemies (decision 716): a level entity's \"named\": <id> spawns that one. Each: name, kind, rise_days (world-clock days dead before it rises; F7), strength {hp, damage, speed} (multipliers, fixed for life; left out: rolled once by its id). None in play yet: the barrow's robber leader comes with dungeon's barrow redesign.",
+	"named": {}
+}

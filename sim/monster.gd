@@ -477,6 +477,11 @@ var picks_up := false
 ## Its kind's "bound" (decision 702): of its level, never leaving it (the
 ## undead of a barrow); one not bound, routed indoors, runs for a way out.
 var bound := false
+## Its named one's id (decision 716; its spawn spec's "named"), "" for a
+## monster known by its kind; and whom it has met and fought this life, by
+## "kind/player id" (World.named_note says each once a life).
+var named_id := ""
+var named_noted := {}
 var _pick_look_tick := -100000
 var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
@@ -558,6 +563,7 @@ func _ready() -> void:
 		_sprite.modulate = SHADE_LIGHT.lerp(SHADE_DARK, heaviness)
 	if Net.is_authority():
 		_temper()
+		_be_named()
 		_settle_idle()
 		var kind := str(spawn_spec.get("kind", ""))
 		_wary = kinds().has(kind)
@@ -623,6 +629,18 @@ func _settle_idle() -> void:
 	_idle_until = World.tick + _idle_rng.randi_range(0, GLANCE_EVERY_TICKS.y)
 
 
+## A named one (decision 716): its record (made at its first spawn), its
+## name over it, and its numbers times its fixed strength.
+func _be_named() -> void:
+	named_id = str(spawn_spec.get("named", ""))
+	if named_id.is_empty():
+		return
+	var record := World.named_enter(named_id, str(spawn_spec.get("kind", "")))
+	spawn_spec["label"] = str(record["name"])
+	NamedEnemy.strengthen(self, record)
+	_pace = move_ticks
+
+
 ## Its kind's tactic and its own manner, the same every time for the same
 ## name (a respawn, a restart). A monster of no kind is PLAIN, as it was.
 func _temper() -> void:
@@ -686,6 +704,8 @@ func _sim_tick() -> void:
 			if target == null:
 				move_ticks = _pace
 				pose = Pose.STAND
+	if seen != null and seen != target and not named_id.is_empty():
+		World.named_note(self, "met", seen)  # Decision 716: npc's memory of it.
 	target = seen
 	if target == null:
 		_drop_windup()
@@ -2098,6 +2118,10 @@ func _flee_tick() -> void:
 func _escape_tick() -> void:
 	if World.distance(tile, _way_out) <= 1 and World.can_melee(tile, _way_out):
 		print("[monster] %s got away by %s, step %d" % [name, _way_out, World.tick])
+		if not named_id.is_empty():
+			for entity in World.sought():
+				if entity is Player and World.distance(tile, entity.tile) <= sight_range:
+					World.named_note(self, "fled_from", entity)  # Decision 716: whom it fled.
 		World.despawn(self)
 		return
 	if World.is_stunned(self) or World.tick < next_move_tick:

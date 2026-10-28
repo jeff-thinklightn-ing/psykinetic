@@ -708,6 +708,22 @@ func _pact_holds() -> bool:
 	return player != null and player.spawned and player.hp > 0 and _in_lair(player)
 
 
+## The admin's "quests reset all <player>" (ui's): what he holds of
+## [param player_id] forgotten: his asking them (he asks again) and a pact
+## of theirs, ended as lost. The words of what it cleared.
+func forget_player(player_id: String) -> PackedStringArray:
+	var cleared := PackedStringArray()
+	if _spoken_to.erase(player_id):
+		cleared.append("asked")
+	if _asking == player_id:
+		_asking = ""
+		_ask_at = -1
+	if challenger_id == player_id and not player_id.is_empty():
+		_end_pact()
+		cleared.append("pact")
+	return cleared
+
+
 ## The pact lost (the challenger fallen, or gone): he heals, keeps the gold,
 ## and sits again (or rests on, if he was resting).
 func _end_pact() -> void:

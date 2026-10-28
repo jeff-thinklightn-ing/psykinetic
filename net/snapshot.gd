@@ -103,6 +103,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			entry["spawn_key"] = str(spec["spawn_key"])
 		if spec.has("kind"):
 			entry["kind"] = str(spec["kind"])
+		if spec.has("named"):
+			entry["named"] = str(spec["named"])  # Decision 716.
 		if spec.has("art"):
 			entry["art"] = str(spec["art"])
 		# A herd's body (decision 367): its group and the group's home.
@@ -313,6 +315,8 @@ static func _parse_entry(entry: Variant) -> Dictionary:
 		spec["kind"] = entry["kind"]
 	if entry.get("group") is String and not entry["group"].is_empty():
 		spec["group"] = entry["group"]
+	if entry.get("named") is String and not entry["named"].is_empty():
+		spec["named"] = entry["named"]
 	if vector(entry.get("home")) != null:
 		spec["home"] = vector(entry.get("home"))
 	return {

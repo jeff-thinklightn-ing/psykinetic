@@ -33628,3 +33628,51 @@ give up on the tick the wind-up began, the view walking from the first
 frame; S+D (straight at it) is held, the view still at (11, 2) through
 the wind-up, and the blow strikes 8 ticks on. Client only, protocol
 unchanged, no new class_name.
+
+## 716. Named enemies: a fixed strength, risen by magic, their weapon kept
+
+Jeff on concept-first-prototype (2026-10-27): "enemies with unique names
+work similarly to companions, they have contexts and memories, I would
+specifically keep them from ranking up and getting stronger, they just exist
+for story - each individual named will have different strength levels, they
+don't survive, they come back through magical resurrections, and they dont
+level up, but their weapon might be a special weapon the longer they used it".
+The design, enemy-ai's with npc's, was approved by the coordinator the same
+day (C:/dev/review/enemy-ai/named_enemies.md); this is enemy-ai's side.
+
+A named enemy is a monster of an ordinary kind whose level entity carries
+`"named": <id>` (Level puts it in the spawn spec; the snapshot keeps it).
+`levels/named_enemies.json` "named" says who each is: name, kind, rise_days,
+strength. Its record (`World.named`, saved as "named", kept through a room
+reset like the draugr's rests) is made at its first spawn
+(`NamedEnemy.new_record`): its name, its strength {hp, damage, speed} (the
+row's, clamped to `STRENGTH_SPANS`, else rolled once by its id), alive,
+returns_at, weapon_uid, lives, and npc's card, memories and track.
+
+- Strength is fixed: Monster._be_named multiplies its kind's max hp, a
+  blow's damage and its pace once as it spawns. Nothing changes the
+  numbers; `set_named_record` (npc's writes) keeps the strength it had.
+- It dies like any monster (its loot and purse drop). Its record is dead
+  until `rise_days` (F7 "named.<id>.rise_days", 0.5 to 10; the coordinator:
+  "around 2-4") of the world clock on; Main's respawn check holds its slot
+  till then (`World.named_may_rise`), then it rises at its post, the same
+  record, a life more, and `named_event` "rose" (npc: townsfolk say it as
+  news). Routed out of a dungeon (702) it is only away, its slot's usual wait.
+- Its weapon goes back to it (the coordinator: players get ordinary drops
+  only). At its death or as it leaves, the thing in its right hand is kept
+  for it (placed at `named:<id>/kept`, its time held stopped) and put back in
+  its hand when it rises, in place of what its spawn gave it. Its holder key
+  is `named:<id>`, the same every life, and it names things (365's
+  `_names_things`): the weapon counts deeds and time held across its lives
+  and takes "Gorm's dagger" and its strength by 365's rules and numbers.
+- For npc: `World.named_event(named_id, kind, player_id)` for met (its
+  target first a player, once a life), fought (a blow either way, once a
+  life), killed (its blow brought a player to 0), killed_by, fled_from (702's
+  escape, each player in sight) and rose; `named_record` and
+  `set_named_record`. made_flee is not told yet.
+
+None is named in play: the barrow's robber leader comes with dungeon's barrow
+redesign. monster_test's named case: its name and strength, fought once, its
+death and kept dagger, its rising a day on, ten lives with the same numbers
+and dagger, npc's writes not changing its strength. Also `Draugr.forget_player`
+for ui's "quests reset all <player>": his asking them and a pact of theirs.

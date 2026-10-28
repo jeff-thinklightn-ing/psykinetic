@@ -92,6 +92,7 @@ func _ready() -> void:
 	_test_far_pace()
 	_test_strike_cells()
 	_test_rout_way_out()
+	_test_named()
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
@@ -2055,6 +2056,63 @@ func _test_rout_way_out() -> void:
 	World.despawn(outside)
 	World.despawn(bones)
 	World.despawn(player)
+
+
+func _test_named() -> void:
+	print("\n== a named one (716): its own fixed strength, dies, rises days later with its weapon, never grows ==")
+	NamedEnemy.define_for_test("test_named", {"name": "Gorm", "kind": "robber", "rise_days": 1.0,
+		"strength": {"hp": 1.5, "damage": 2.0, "speed": 1.0}})
+	var events: Array = []
+	var on_event := func(id: String, kind: String, player_id: String) -> void: events.append([id, kind, player_id])
+	World.named_event.connect(on_event)
+	var e := _build(["#######", "#.Px..#", "#######"], {"x": {"named": "test_named"}})
+	var gorm: Monster = e["x"][0]
+	var player: Player = e["P"][0]
+	player.player_id = "p1"
+	var spec := gorm.spawn_spec.duplicate(true)
+	var base_hp := int(Level.MONSTER_TYPES["robber"]["max_hp"])
+	_check(gorm.named_id == "test_named" and str(gorm.spawn_spec.get("label")) == "Gorm", "its name over it (%s)" % gorm.spawn_spec.get("label"))
+	_check(gorm.max_hp == roundi(base_hp * 1.5) and gorm.hp == gorm.max_hp, "its hp its kind's times its strength (%d)" % gorm.max_hp)
+	var damage := gorm.attack_damage
+	var slots := Items.tidy([], Items.CARRIED)  # A robber's hands, as Level arms it.
+	slots[Items.RIGHT_HAND] = "dagger"
+	gorm.slots = Items.tidy([], Items.CARRIED)
+	World.set_slots(gorm, slots)
+	spec["props"]["slots"] = Items.tidy([], Items.CARRIED)
+	var dagger := World.slot_uid(gorm, Items.RIGHT_HAND)
+	_check(dagger != 0 and World.holder_key(gorm) == "named:test_named" and World._names_things(gorm),
+			"its dagger held by it by name, which can name it (365)")
+	World.damage(gorm, 1, player)
+	World.damage(gorm, 1, player)
+	_check(events.count(["test_named", "fought", "p1"]) == 1, "fought told once a life (%s)" % [events])
+	World.damage(gorm, 999, player)
+	var record := World.named_record("test_named")
+	_check(not gorm.spawned and not bool(record["alive"]) and events.has(["test_named", "killed_by", "p1"]), "it dies, killed_by told")
+	_check(World.items.at_of(dagger) == NamedEnemy.KEPT % "test_named" and int(record["weapon_uid"]) == dagger,
+			"its dagger kept for it, not dropped (%s)" % World.items.at_of(dagger))
+	_check(not World.named_may_rise(spec), "it does not rise at once")
+	World.steps = int(record["returns_at"])
+	_check(World.named_may_rise(spec), "it may rise when its day is past")
+	var strength: Dictionary = record["strength"].duplicate()
+	for life in 10:
+		var back := EntityFactory.build(spec.duplicate(true)) as Monster
+		_room.add_child(back)
+		World.spawn(back, Vector2i(3, 1))
+		if life == 0 or life == 9:
+			_check(back.max_hp == roundi(base_hp * 1.5) and back.attack_damage == damage and World.slot_uid(back, Items.RIGHT_HAND) == dagger,
+					"life %d: the same numbers and its own dagger in hand" % (life + 2))
+		World.damage(back, 999, player)
+		World.steps = int(World.named_record("test_named")["returns_at"])
+	record = World.named_record("test_named")
+	_check(record["strength"] == strength and int(record["lives"]) == 11 and events.count(["test_named", "rose", ""]) == 10,
+			"ten risings: strength untouched, lives %d" % int(record["lives"]))
+	var faked := record.duplicate(true)
+	faked["strength"] = {"hp": 9.0}
+	World.set_named_record("test_named", faked)
+	_check(World.named_record("test_named")["strength"] == strength, "npc's writes never change its strength")
+	World.named_event.disconnect(on_event)
+	NamedEnemy.reset_for_test()
+	World.steps = 0
 
 
 func _test_wild_scent() -> void:

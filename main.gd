@@ -2107,6 +2107,7 @@ func _show_3d() -> void:
 		Tuning.register_source("feel", ArtKit.feel_value, ArtKit.set_feel_value, ArtKit.feel_fields)  # 673 step 2: art/kit/feel.json.
 		Tuning.register_source("effects", Items.effect_value, Items.set_effect_value, Items.effect_fields)  # 682: the remedy's heal.
 		Tuning.register_source("companions", CompanionCard.tuning_value, CompanionCard.set_tuning_value, CompanionCard.tuning_fields)  # 706: her holds.
+		Tuning.register_source("named", NamedEnemy.tuning_value, NamedEnemy.set_tuning_value, NamedEnemy.tuning_fields)  # 716: days dead.
 
 
 # --- WASD ---------------------------------------------------------------------------
@@ -4015,6 +4016,13 @@ func _boot() -> void:
 	# Jeff: "why does his health and status not reset on server restart"): he is back seated, whole,
 	# his dead awake. A room reset keeps it (_start_level); it is not saved.
 	World.dead_rest.clear()
+	# The named enemies' records (decision 716), alive or dead, as saved.
+	World.named.clear()
+	var named: Variant = snapshot.get("named", {})
+	if named is Dictionary:
+		for id: Variant in named:
+			if named[id] is Dictionary:
+				World.named[str(id)] = (named[id] as Dictionary).duplicate(true)
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
 	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
@@ -4893,8 +4901,10 @@ func _start_level(from_snapshot := false, whole := true, with_saved := {}) -> vo
 		if not is_instance_valid(pet) or pet.zone == here:
 			_companions.erase(id)
 	var rests := World.dead_rest.duplicate(true)  # The draugr's rests (580; 573 amended (3)): every zone's, not this room's to lose.
+	var named := World.named.duplicate(true)  # Decision 716: every named one's, alive or dead.
 	World.reset()
 	World.dead_rest = rests
+	World.named = named
 	for child in entities.get_children():
 		entities.remove_child(child)
 		child.queue_free()
@@ -5478,7 +5488,7 @@ func _check_respawns(tick: int, force := false) -> int:
 			continue
 		var spec := _slot_spec(slot)
 		var tile: Vector2i = spec["tile"]
-		if not World.is_free(tile) or not _camp_lets_back(spec):
+		if not World.is_free(tile) or not _camp_lets_back(spec) or not World.named_may_rise(spec):
 			continue
 		var away := _nearest_player(tile, tick)
 		if not force and away < 0:
@@ -5608,6 +5618,7 @@ func _save_state(wait := true) -> void:
 		"items": World.items.to_dict(),
 		"regen": _regen,
 		"free_walk": World.free_walk,  # Decision 689: the admin's switch outlives a restart.
+		"named": World.named,  # Decision 716: the named enemies' records.
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()
 	_saver = Thread.new()

@@ -938,6 +938,8 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				var idle := idle_from(entry["idle"], warnings, at)
 				if not idle.is_empty():
 					spec["idle"] = idle
+			if entry.get("named") is String and not str(entry["named"]).is_empty():
+				spec["named"] = str(entry["named"])  # Decision 716: this spawn is that named one.
 		entities.append(spec)
 	# Starts: level.json's order, then any other start marker by scan.
 	var starts: Array[Vector2i] = []

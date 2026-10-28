@@ -50,6 +50,10 @@ signal entity_despawned(entity: GridEntity)
 ## Reduced to 0 hp by [param cause] (&"attack", &"shot", &"impact", &"fire"), just
 ## before it is removed.
 signal entity_died(entity: GridEntity, cause: StringName)
+## A named enemy's moment for npc's memory of it (decision 716): [param kind]
+## met, fought, killed_by, killed, fled_from (with [param player_id], a
+## player's id) or rose ("" for nobody).
+signal named_event(named_id: String, kind: String, player_id: String)
 ## Beaten down and spared (spared): left at 1 hp, taken by [param by] (a
 ## raid group's id), not killed. Whoever keeps it (Main, a companion's
 ## record) takes it off the map.
@@ -690,6 +694,10 @@ var roofs_damaged: Dictionary[String, bool] = {}
 ## one his level "stills". Kept through a room reset (Main._start_level),
 ## never saved: a restart ends every rest (573 amended (4), Jeff's).
 var dead_rest: Dictionary[String, Dictionary] = {}
+## The named enemies' records by id (decision 716; NamedEnemy.new_record's,
+## npc's card, memories and track on them). Kept through a room reset
+## (Main's) and saved.
+var named: Dictionary[String, Dictionary] = {}
 ## A roof of [param level] was damaged or mended (Main tells the peers).
 signal roof_changed(level: String)
 ## A client's: each town's buildings as the server told ("town"), for
@@ -1721,6 +1729,7 @@ func reset() -> void:
 	_cover_rect = Rect2i()
 	_next_id = 1
 	dead_rest.clear()
+	named.clear()
 	zone.tier_origins = []
 	tick = 0
 	tick_alpha = 0.0
@@ -3026,14 +3035,134 @@ func holder_key(entity: GridEntity) -> String:
 	var keeper_id: Variant = entity.get("keeper_id")
 	if keeper_id is String and not keeper_id.is_empty():
 		return "companion:%s:%s" % [keeper_id, entity.name]
+	if entity is Monster and not (entity as Monster).named_id.is_empty():
+		return "named:" + (entity as Monster).named_id  # Decision 716: the same holder every life.
 	return "%s/%s" % [entity.zone, entity.name]
 
 
 ## Whether [param entity] is a named holder, who can name what it carries
-## (decision 365): a player or a companion. A monster is known by its kind.
+## (decision 365): a player or a companion, or a named enemy (716). Any
+## other monster is known by its kind.
 func _names_things(entity: GridEntity) -> bool:
 	var who := _carrier_of(entity)[0]
-	return who.begins_with("player:") or who.begins_with("companion:")
+	return who.begins_with("player:") or who.begins_with("companion:") or who.begins_with("named:")
+
+
+# --- Named enemies (decision 716) -------------------------------------------------
+
+## [param id]'s record, made (NamedEnemy.new_record, of [param kind]) at
+## its first spawn.
+func named_enter(id: String, kind: String) -> Dictionary:
+	if not named.has(id):
+		named[id] = NamedEnemy.new_record(id, kind)
+		print("[named] %s is %s, strength %s" % [id, named[id]["name"], named[id]["strength"]])
+	return named[id]
+
+
+## [param id]'s record (npc reads its card, memories and track); {} for none.
+func named_record(id: String) -> Dictionary:
+	return named.get(id, {})
+
+
+## [param id]'s record set (npc writes its card, memories and track). Its
+## strength stays what it was: it never grows.
+func set_named_record(id: String, record: Dictionary) -> void:
+	if not named.has(id):
+		return
+	var strength: Variant = named[id].get("strength")
+	named[id] = record.duplicate(true)
+	named[id]["strength"] = strength
+
+
+## Whether a level slot's spawn [param spec] may spawn now: a named one
+## alive, or its days dead past (NamedEnemy.rise_steps from its death). Any
+## other spawn may.
+func named_may_rise(spec: Dictionary) -> bool:
+	var id := str(spec.get("named", ""))
+	if id.is_empty() or not named.has(id) or bool(named[id].get("alive", true)):
+		return true
+	return steps >= int(named[id].get("returns_at", 0))
+
+
+## [param monster] (a named one) has [param kind] (named_event's) with
+## [param other]: told when other is a player; met and fought once a life.
+func named_note(monster: Monster, kind: String, other: GridEntity) -> void:
+	if not is_instance_valid(other) or not other is Player or monster.named_id.is_empty():
+		return
+	var player_id := str(other.get("player_id"))
+	if kind in ["met", "fought"]:
+		if monster.named_noted.has(kind + "/" + player_id):
+			return
+		monster.named_noted[kind + "/" + player_id] = true
+	named_event.emit(monster.named_id, kind, player_id)
+
+
+## A blow between a named one and a player: fought, each way, and killed
+## when the named one's blow brought the player to 0.
+func _named_fight(target: GridEntity, source: GridEntity) -> void:
+	if target is Monster and not (target as Monster).named_id.is_empty():
+		named_note(target as Monster, "fought", source)
+	elif source is Monster and not (source as Monster).named_id.is_empty():
+		named_note(source as Monster, "fought", target)
+		if target.hp == 0:
+			named_note(source as Monster, "killed", target)
+
+
+## [param monster] (a named one) dies: its weapon kept for its next life,
+## its record dead till NamedEnemy.rise_steps on, killed_by told.
+func _named_fell(monster: Monster, by: GridEntity) -> void:
+	_keep_named_weapon(monster)
+	var record := named_enter(monster.named_id, str(monster.spawn_spec.get("kind", "")))
+	record["alive"] = false
+	record["returns_at"] = steps + NamedEnemy.rise_steps(monster.named_id)
+	print("[named] %s fell, rises at step %d" % [record["name"], record["returns_at"]])
+	named_note(monster, "killed_by", by)
+
+
+## [param monster]'s right hand's thing out of its hands and kept for it
+## (NamedEnemy.KEPT): never dropped, its time held stopped till it rises.
+func _keep_named_weapon(monster: Monster) -> void:
+	var uid := slot_uid(monster, Items.RIGHT_HAND)
+	if uid == 0:
+		return
+	var slots := monster.slots.duplicate()
+	var uids := monster.slot_items.duplicate()
+	slots[Items.RIGHT_HAND] = ""
+	uids[Items.RIGHT_HAND] = 0
+	monster.slots = slots
+	monster.slot_items = uids
+	_slots_changed(monster)
+	items.place(uid, NamedEnemy.KEPT % monster.named_id)
+	named_enter(monster.named_id, str(monster.spawn_spec.get("kind", "")))["weapon_uid"] = uid
+
+
+## [param monster] (a named one) in the world: up again if it was dead (rose
+## told), its kept weapon back in its right hand in place of what its spawn
+## gave it.
+func _named_arrived(monster: Monster) -> void:
+	var record := named_enter(monster.named_id, str(monster.spawn_spec.get("kind", "")))
+	if not bool(record.get("alive", true)):
+		record["alive"] = true
+		record["lives"] = int(record.get("lives", 1)) + 1
+		print("[named] %s rose, life %d" % [record["name"], record["lives"]])
+		named_event.emit(monster.named_id, "rose", "")
+	var uid := int(record.get("weapon_uid", 0))
+	if uid == 0 or not items.has(uid) or items.at_of(uid) != NamedEnemy.KEPT % monster.named_id \
+			or monster.slots.size() <= Items.RIGHT_HAND:
+		return
+	_fit_uids(monster)
+	var given := monster.slot_items[Items.RIGHT_HAND]
+	if given != 0 and items.has(given):
+		items.end(given, "lost", "its named holder's own came back", zone.name, monster.tile)
+	var slots := monster.slots.duplicate()
+	var uids := monster.slot_items.duplicate()
+	slots[Items.RIGHT_HAND] = items.id_of(uid)
+	uids[Items.RIGHT_HAND] = uid
+	monster.slots = slots
+	monster.slot_items = uids
+	var carrier := _carrier_of(monster)
+	items.place(uid, holder_key(monster), carrier[0], carrier[1])
+	_slots_changed(monster)
 
 
 ## [param entity] did a deed of [param kind] (Items.DEEDS) with the thing
@@ -6205,6 +6334,8 @@ func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	if entity is Player:
 		free_drop(entity as Player)  # What a body sent before it was placed is not walked (688 amended).
 	_next_id += 1
+	if entity is Monster and not (entity as Monster).named_id.is_empty():
+		_named_arrived(entity as Monster)
 	return true
 
 
@@ -6221,6 +6352,8 @@ func despawn(entity: GridEntity) -> void:
 		despawn(entity)
 		enter(was)
 		return
+	if entity is Monster and not (entity as Monster).named_id.is_empty():
+		_keep_named_weapon(entity as Monster)  # Gone away (702): it comes back with it.
 	_let_go_things(entity)
 	_forget_jobs(entity)
 	if _occupancy.get(entity.tile) == entity:
@@ -6722,6 +6855,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	entity_damaged.emit(target, amount, source, cause)
 	if is_instance_valid(source):
 		_take_grudges(target, source, lost)  # Decisions 417, 473.
+		_named_fight(target, source)
 	if target.hp == 0 and spared.is_valid():
 		var by := str(spared.call(target, source, cause))
 		if by != "":
@@ -6737,6 +6871,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	if target.hp == 0:
 		if not target.is_creature():
 			noise(target.tile, Senses.NOISE_BREAK, &"break", source)  # A crate or a barrel smashed.
+		if target is Monster and not (target as Monster).named_id.is_empty():
+			_named_fell(target as Monster, source)
 		entity_died.emit(target, cause)
 		var spilt: Array[int] = []
 		if target is Cargo:
