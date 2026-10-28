@@ -123,6 +123,7 @@ func _ready() -> void:
 	_test_dodge()
 	_test_firing_cone()
 	_test_bandage_words()
+	_test_held_for_bandage()
 	_test_tends_unasked()
 	_test_drinks_a_remedy()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
@@ -3218,6 +3219,52 @@ func _test_follow_without_backsteps() -> void:
 	_put(pet, pet_was)
 	owner.hp = owner.max_hp
 	pet.hp = pet.max_hp
+	_settle(pet)
+
+
+## Bandaged by her player, she holds her cell (decision 713, items' reach;
+## Jeff's bandage-kneel): sent off mid-bandage, she stays till it is done,
+## then goes.
+func _test_held_for_bandage() -> void:
+	print("
+== bandaged by her player, she holds still till it is done (713) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var slots_was: Array = owner.slots.duplicate()
+	_put(owner, Vector2i(11, 8))
+	_put(pet, Vector2i(12, 8))
+	var given: Array = owner.slots.duplicate()
+	var empty := given.find("")
+	given[empty if empty != -1 else 0] = "bandaging_kit"
+	owner.slots = given
+	pet.hp = pet.max_hp - 5
+	for i in 40:
+		World.step()  # Calm a while.
+	var began := World.try_bandage(owner, pet)
+	_check(began and pet.mending == 1, "her player starts bandaging her (%s, mending %d)" % [began, pet.mending])
+	var look := Vector2i(12, 12)
+	pet._start_errand({"verb": "look", "cell": look, "at": look, "asked": true, "words": "go and look south, and come back"}, pet._serial)
+	var moved := 0
+	for i in 15:
+		World.step()
+		moved += int(pet.tile != Vector2i(12, 8))
+	_check(moved == 0 and pet.mending == 1, "sent off mid-bandage, she holds her cell (%d ticks off it, mending %d)" % [moved, pet.mending])
+	for i in 30:
+		if pet.mending != 1:
+			break
+		World.step()
+	_check(pet.mending == 2, "the bandage done, not broken off (mending %d)" % pet.mending)
+	_check(str(pet.errand.get("verb", "")) == "look", "and her errand waited for her, not timed out (%s)" % pet.errand.get("verb", "none"))
+	if not pet.errand.is_empty():
+		pet._end_errand("test", false)
+	owner.slots = slots_was
+	pet.hp = pet.max_hp
+	_put(owner, owner_was)
+	_put(pet, pet_was)
 	_settle(pet)
 
 

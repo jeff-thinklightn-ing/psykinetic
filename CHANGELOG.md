@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion holds still while you bandage her, so her own steps no longer break the bandage off (713).
 - The admin's "quests reset all" now also clears what the townsfolk remember of the player: today's hails and greetings, refusals to travel, and (for a full reset) each resident's trust, so quests can be tested from a clean start (672 amended, npc's side).
 - Named enemies (716): a named robber or skeleton keeps a fixed strength of its own, rises again at its post a few days after it dies, and keeps its weapon across lives, where it can earn a name of its own; none is placed in a level yet.
 - While your heavy weapon winds up, pressing toward the foe now keeps you standing in place instead of sliding off and snapping back (392 amended (2)).

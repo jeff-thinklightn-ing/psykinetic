@@ -1905,8 +1905,26 @@ func _sim_tick() -> void:
 	_tend_unasked()
 	_drink_if_low()
 	_act()
-	_execute()
+	if _held_for_bandage():
+		current_intent = Intent.IDLE  # Held still while she is bandaged (decision 713): no step to break it.
+		if errand.has("until"):
+			errand["until"] = int(errand["until"]) + 1  # Her errand's time waits with her.
+	else:
+		_execute()
 	_note_fight()
+
+
+## Whether she holds her cell this tick because someone else is bandaging
+## her (decision 713, items' reach; Jeff's bandage-kneel: "if target moves
+## it interrupts"): mending 1 by another's hands, and nothing making her
+## move: no blow to dodge, no foe she fights, no fire under her.
+func _held_for_bandage() -> bool:
+	if mending != 1 or current_intent in [Intent.DODGE, Intent.ATTACK] or World.is_burning(tile):
+		return false
+	for by: GridEntity in World._bandaging:
+		if by != self and (World._bandaging[by] as Dictionary).get("patient") == self:
+			return true
+	return false
 
 
 # --- Watching: what asks her mind ---------------------------------------------

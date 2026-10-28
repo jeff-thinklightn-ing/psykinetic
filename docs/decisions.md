@@ -33694,3 +33694,25 @@ townsfolk keep of a player outside the record and the cards' asks:
 ui's "quests reset all" passes standing true; the per-giver reset keeps
 the default. resident_test covers both. Server only, protocol unchanged,
 no new class_name.
+
+## 713, companions' side: she holds still to be bandaged
+
+713 is items' bandage fixes (Jeff's bandage-kneel: "if target moves it
+interrupts"; items widens the reach to 2 cells with a clear line). The
+coordinator: while someone else bandages her, she holds still until it
+finishes or breaks; the hook was agreed with items.
+- **The hold:** Companion._held_for_bandage reads World's existing state:
+  her mending is 1 and World._bandaging has another body bandaging her
+  (bandaging herself, she isn't held; her own hands keep her). While it
+  holds, her tick takes no step: no follow, heel, errand walk or idle step.
+  Her intent reads IDLE, and she still talks.
+- **Unless she must move:** not while she dodges a blow, fights a foe, or
+  stands in fire. Those break the bandage anyway (a blow, or not calm).
+- **Her errand waits:** an errand's deadline (until) moves on a tick for
+  each tick she is held, so an errand given mid-bandage isn't timed out by
+  it.
+
+companion_test _test_held_for_bandage: her player bandages her, she's sent
+on a look errand mid-bandage, she holds her cell for all 15 ticks (mending
+1), the bandage finishes (mending 2), and her errand is still there. Both
+modes. Server only, protocol unchanged, no new class_name.
