@@ -25,6 +25,7 @@ notes (decision 324).
 - Your companion goes round fire instead of through it, when following, on errands and when leading you (and doesn't lead you into it); villagers walking at someone's heel do the same (707).
 
 - Walking: after a server hitch you no longer stop a step short of where you clicked (689 amended (6))
+- The barrow's Hall of Fallen Souls: the pillar standing right in front of the draugr's throne is gone.
 ## v0.1.189
 
 - A lob's draw follows the arc: with a flatter arc set in tuning (F7, lob_apex) the bow is aimed lower, at the angle the arrow leaves at (677, pc-character's side, amended).

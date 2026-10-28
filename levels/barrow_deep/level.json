@@ -40,13 +40,6 @@
 		{
 			"slot": "building.crypt_pillar",
 			"at": [
-				49,
-				70
-			]
-		},
-		{
-			"slot": "building.crypt_pillar",
-			"at": [
 				59,
 				70
 			]

@@ -1837,11 +1837,14 @@ func _test_barrow_won() -> void:
 	_check(_main.migrate_totem(record) == uid and World.totem_charges(uid) == 69 and not record.barrow.has("tokens"),
 		"a count from before moves onto the totem on join (%d)" % World.totem_charges(uid))
 	_check(_main.barrow_won(["nobody"], "easy") == 0, "no record: nobody blessed")
-	record.marks.erase("draugr")
-	record.barrow = {}
-	World.items.set_charges(uid, 0)
-	_main._sync_charges(record)
-	_check(player.charges == 0 and player.charge_room == 0, "and the player's count follows the totem and the record")
+	# 672 amended, dungeon's side: quests reset, the barrow as if never come.
+	_main._draft_told["%s@lt_niche" % id] = 1
+	var cleared: Array[String] = _main.reset_barrow(id)
+	_check(cleared == ["the draugr's blessing", "the deal won", "the totem's charges", "the draft felt"]
+		and not "draugr" in record.marks and record.barrow.is_empty() and World.totem_charges(uid) == 0
+		and not _main._draft_told.has("%s@lt_niche" % id) and player.charges == 0 and player.charge_room == 0,
+		"reset_barrow: the blessing off, the deal won gone, the totem emptied, the draft said again, the player told (%s)" % [cleared])
+	_check(_main.reset_barrow(id).is_empty() and _main.reset_barrow("nobody").is_empty(), "nothing more to clear the second time; no record, nothing")
 
 
 ## The draugr's hall door held shut (573 amended, dungeon's side): the door
@@ -2034,6 +2037,11 @@ func _test_hidden_niche() -> void:
 	_main.travel(Net.local_id, "lt_niche", "from_below")
 	_check(door.open and door.lock.is_empty() and _player().tile == Vector2i(6, 1) and _main.party_log.last(2)[0] == "The slab swings aside from behind.",
 		"come up from below, the slab is pushed open from behind and said; the player stands before it (%s)" % [_main.party_log.last(2)])
+	# 672 amended, dungeon's side: the world's barrow is every player's,
+	# laid again by the console's zone reset, the slab shut and locked.
+	_main.admin_command("zone reset lt_niche")
+	var laid := World.door_on(key)
+	_check(laid != null and not laid.open and laid.lock == "hidden_niche", "zone reset lays the found niche shut and locked again")
 	_main.load_map("test_room")
 	_main._regen.erase("lt_niche")
 	Level.unregister("lt_niche")
@@ -2113,9 +2121,9 @@ func _test_barrow_level() -> void:
 	var king_table: Array = barrow["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.burial_table")
 	var pillars: Array = deep["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.crypt_pillar")
 	_check(king_table.size() == 1 and king_table[0]["rect"] == Rect2i(38, 8, 3, 2) and barrow["terrain"]["solid"].size() == 6
-		and not barrow["terrain"]["floor"].has(Vector2i(39, 8)) and pillars.size() == 6 and deep["terrain"]["solid"].size() == 24 + 9 + 8
+		and not barrow["terrain"]["floor"].has(Vector2i(39, 8)) and pillars.size() == 5 and deep["terrain"]["solid"].size() == 20 + 9 + 8 and deep["terrain"]["floor"].has(Vector2i(49, 70))
 		and not deep["terrain"]["floor"].has(Vector2i(49, 60)) and deep["terrain"]["floor"].has(Vector2i(48, 62)),
-		"the burial table (3 x 2), the six pillars (2 x 2), the round table (3 x 3) and the four broken tables (2 x 1) stand as solid buildings, their cells out of the floor (%d, %d solid)" % [barrow["terrain"]["solid"].size(), deep["terrain"]["solid"].size()])
+		"the burial table (3 x 2), the five pillars (2 x 2; none before his seat, 580 amended (2)), the round table (3 x 3) and the four broken tables (2 x 1) stand as solid buildings, their cells out of the floor (%d, %d solid)" % [barrow["terrain"]["solid"].size(), deep["terrain"]["solid"].size()])
 	# The feast (3b): the chairs and the throne are walked onto, the throne at
 	# the draugr's cell facing the hall, the broken tables along the walls.
 	var by_slot := {}
@@ -2150,7 +2158,7 @@ func _test_barrow_level() -> void:
 		"a generation of each depth is laid and joins every anchor (%d and %d tries)" % [made.get("tries", 0), made_deep.get("tries", 0)])
 	var gen_barrow := Level.parse(made["layout"], made["height"], made["config"])
 	var gen_deep := Level.parse(made_deep["layout"], made_deep["height"], made_deep["config"])
-	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == 6 and gen_deep["terrain"]["solid"].size() == 24 + 9 + 8
+	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == 6 and gen_deep["terrain"]["solid"].size() == 20 + 9 + 8
 		and gen_deep["terrain"]["stairs"].size() == 12 and int(gen_deep["terrain"]["heights"].get(Vector2i(49, 75), 0)) == 1 and made_deep["height"] != null
 		and Level.narrow_runs(gen_barrow["terrain"]).is_empty() and Level.narrow_runs(gen_deep["terrain"]).is_empty()
 		and made["config"].get("rooms", {}).size() == 3 and made_deep["config"].get("rooms", {}).has("lair"),

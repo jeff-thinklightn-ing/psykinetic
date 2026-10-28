@@ -33733,3 +33733,24 @@ changes; a work with only an upper clip (carrying) leaves fidgets alone.
 view_test: a fidget playing when the tending starts, calm, kneels at
 once (fails without the change). Client only, protocol unchanged, no new
 class_name.
+## 580 amended (2), dungeon's side: the pillar before the draugr's seat removed
+
+Jeff: "remove the pillar that sits right in front of him". Of the Hall of Fallen Souls' six
+pillars (580 step 3, moved whole in 666), the one at (49, 70), straight before his throne at
+(49, 75), goes: plan_sheet's LAIR_PILLARS loses it and barrow_deep's level.json its building.
+Five pillars stand; the cells it held are floor. His throw and spin are unchanged in rule (the
+fight test passes: the throw down a clear line, the spin landing); his view down the Hall is
+open. labyrinth_test and level_test count five (20 of the solid cells, not 24).
+
+## 672 amended, dungeon's side: the barrow reset for one player
+
+The admin's "quests reset all <player>" (ui's _quests_reset_all; Jeff: reset everything
+quest-shaped, so things can be tested) calls Main.reset_barrow(id) -> Array[String]: the
+draugr's blessing taken off (the "draugr" mark, the sealed temple way), the deal won cleared
+(record.barrow, and with it the charge room), the Draugr's Totem's charges emptied
+(World.items.set_charges(totem, 0), economy's way; the totem itself stays items'), and the
+draft line said again (Main._draft_told's entries for that player); the player told
+(_sync_charges). It returns what it cleared, in words, for the reset's reply. The world's barrow
+(the hidden niche found, and 714's robber latch to come) is every player's, never one player's
+reset: the console's "zone reset <name>" lays it again (level_test: the found slab shut and
+locked after it).

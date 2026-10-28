@@ -380,10 +380,11 @@ func _test_barrow() -> void:
 		var sides := Terrain.edge_cells(key)
 		if level["terrain"]["edges"][key] == Terrain.Edge.DOOR and Sheet.LAIR_HALL.has_point(sides[0]) != Sheet.LAIR_HALL.has_point(sides[1]):
 			hall_doors += 1
-	_check(in_hall == 0 and hall_doors == 1 and a.walkable(Sheet.LAIR_DOOR) and a.walkable(Sheet.LAIR_DOOR - Vector2i(0, 1)) and pillars.size() == 6
-		and level["terrain"]["solid"].size() == 24 + 9 + 8 and level["terrain"]["stairs"].size() == 12 and level["buildings"].size() == 20
+	_check(in_hall == 0 and hall_doors == 1 and a.walkable(Sheet.LAIR_DOOR) and a.walkable(Sheet.LAIR_DOOR - Vector2i(0, 1)) and pillars.size() == 5
+		and level["terrain"]["solid"].size() == 20 + 9 + 8 and level["terrain"]["stairs"].size() == 12 and level["buildings"].size() == 19
+		and not pillars.any(func(b: Dictionary) -> bool: return b.get("at") == [49, 70]) and level["terrain"]["floor"].has(Vector2i(49, 70))
 		and config.get("rooms", {}).has("lair") and str(hall_chest.get("script", "")) == Level.CHEST and Sheet.LAIR_DAIS.has_point(Sheet.LAIR_CHEST),
-		"nothing is laid in the Hall but its own chest on the dais beside the throne; one door into it, the way reaching it from the north; the pillars, the round table and the broken tables solid, the chairs and throne walked onto, the dais's twelve stairs, the Hall's name kept for its card (%d pillars, %d solid, %d doors)" % [pillars.size(), level["terrain"]["solid"].size(), hall_doors])
+		"nothing is laid in the Hall but its own chest on the dais beside the throne; one door into it, the way reaching it from the north; the pillars (none before his seat, 580 amended (2)), the round table and the broken tables solid, the chairs and throne walked onto, the dais's twelve stairs, the Hall's name kept for its card (%d pillars, %d solid, %d doors)" % [pillars.size(), level["terrain"]["solid"].size(), hall_doors])
 	_check(not config.has("damp") and not config.has("ambient") and not config.has("dead") and config.get("stills", []) == ["barrow"],
 		"the dark below's keys left with it: no damp, no ambient, no word on the dead; his rest stills the barrow above (%s)" % [config.get("stills")])
 

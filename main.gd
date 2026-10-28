@@ -7937,6 +7937,38 @@ func migrate_totem(record: PlayerRecord) -> int:
 	return uid
 
 
+## The barrow as player [param id] had never been there (672 amended,
+## dungeon's side: the admin's "quests reset all", ui's _quests_reset_all;
+## Jeff: reset everything quest-shaped, so things can be tested): the
+## draugr's blessing off (BLESSED, the sealed temple way), the deal won and
+## its room (record.barrow), the Draugr's Totem's charges emptied (the totem
+## itself is items'), and the draft line said again. What it cleared, in
+## words; [] for no record. The world's barrow (the hidden niche found) is
+## every player's: "zone reset <name>" lays that again.
+func reset_barrow(id: String) -> Array[String]:
+	var cleared: Array[String] = []
+	var record: PlayerRecord = _records.get(id)
+	if record == null:
+		return cleared
+	if BLESSED in record.marks:
+		mark_player(id, BLESSED, false)
+		cleared.append("the draugr's blessing")
+	if not record.barrow.is_empty():
+		record.barrow = {}
+		cleared.append("the deal won")
+	var totem := World.totem_of(id)
+	if totem != 0 and World.totem_charges(totem) > 0:
+		World.items.set_charges(totem, 0)
+		cleared.append("the totem's charges")
+	var told := _draft_told.keys().filter(func(key: String) -> bool: return key.begins_with(id + "@"))
+	for key: String in told:
+		_draft_told.erase(key)
+	if not told.is_empty():
+		cleared.append("the draft felt")
+	_sync_charges(record)
+	return cleared
+
+
 ## [param record]'s player, if in the game, told its charges and the most it
 ## may hold (Player.charges and charge_room, replicated; decision 573).
 func _sync_charges(record: PlayerRecord) -> void:

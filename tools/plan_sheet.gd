@@ -83,8 +83,10 @@ const DEEP_FROM_ABOVE := Vector2i(49, 2)
 ## cells further south than it lay in the dark below, against the south rim).
 const LAIR_HALL := Rect2i(34, 56, 32, 22)
 const LAIR_DOOR := Vector2i(49, 56)
+## The one before his seat at (49, 70) taken out (580 amended (2), Jeff:
+## "remove the pillar that sits right in front of him").
 const LAIR_PILLARS: Array[Rect2i] = [Rect2i(39, 60, 2, 2), Rect2i(49, 60, 2, 2), Rect2i(59, 60, 2, 2),
-	Rect2i(39, 70, 2, 2), Rect2i(49, 70, 2, 2), Rect2i(59, 70, 2, 2)]
+	Rect2i(39, 70, 2, 2), Rect2i(59, 70, 2, 2)]
 const LAIR_TABLE := Rect2i(48, 64, 3, 3)
 ## The feast (580 step 3b): eight chairs on the ring round the table facing
 ## in, four broken tables against the east and west walls between the
