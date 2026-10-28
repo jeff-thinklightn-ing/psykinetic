@@ -477,6 +477,14 @@ angered by the robbers, the knight's remains charging the amulet.
   the names, which pass: the Temple Ossuary's and the Hall's, the 14 knights. The lines (the
   barred stair, the cold draft, the draugr's anger line) stay drafts; the coordinator has asked
   him (2026-10-27).
+- **[Jeff]**, later the same day: "ok, all the names and lines pass". **Agreed:** the Ossuary
+  (the level), the Temple Ossuary naming, the Charnel Vault (its first room), the Hall of Fallen
+  Souls, the 14 holy knights of Theus, the barred stair ("The stair down is barred from
+  below."), the cold draft ("Now the barrow is quiet, a cold draft breathes from this niche."),
+  the plaque and the relic text, the draugr's anger line ("Thieves in my barrow, thieves in my
+  hall. You are all the same to me."), the band's nine names (Brand the Ox, who carries the
+  sledge; Crake, Mott, Nabb, Wicket, Fenn, Rook, Sedge, Tull) and their name in town talk, the
+  Mound-breakers (now in crypt.robbers_dig).
 - **[Jeff]** The barrow's grave robbers are unique and named; each is either dead or escaped.
   They may keep a small camp and a chest in the barrow, and in it the Tomb Sledge, a heavy hammer.
 - **[Jeff]** The robbers have been looking for a way to break through to the holy relics, to
@@ -546,3 +554,4 @@ angered by the robbers, the knight's remains charging the amulet.
 - 2026-10-25: Jeff's rough draft of the sepulcher, the knight's remains, the Encolpion Amulet and night robbers recorded as [Jeff] draft lines; nothing built till barrow-sepulcher.md is answered.
 - 2026-10-27: Jeff answered barrow-sepulcher.md: the barrow an ancient mound, the temple's own underground (Ossuary, Hall) joined to it, the amulet replacing the deal, a different holy knight's relic each time; lore's names, knights and lines drafted for dungeon's temple_undercroft design.
 - 2026-10-27: Jeff on the wording: the Ossuary, named grave robbers digging for the holy relics to sell, the Tomb Sledge and its broken walls; facts in 714.
+- 2026-10-27: Jeff passed all the names and lines ("ok, all the names and lines pass"); the Mound-breakers named in crypt.robbers_dig.

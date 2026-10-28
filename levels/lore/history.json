@@ -310,7 +310,7 @@
 				},
 				{
 					"id": "crypt.robbers_dig",
-					"text": "The grave robbers in the barrow have been looking for a way to break through to the holy relics, to sell them on the black market.",
+					"text": "The Mound-breakers, the grave robbers in the barrow, have been looking for a way to break through to the holy relics, to sell them on the black market.",
 					"known": "rumour",
 					"true": true,
 					"where": [
