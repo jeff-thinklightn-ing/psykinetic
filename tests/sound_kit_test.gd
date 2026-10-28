@@ -376,6 +376,8 @@ func _test_music() -> void:
 			and fight["music.wilds_base"] == 0.5, "a fight: the high layer, the ground down, the melody out")
 	_check(Music.weights("wilds", 1.0, 0.5, true)["music.melody_wilds"] == 0.0 and Music.weights("wilds", 1.0, 0.3, true)["music.melody_wilds"] > 0.0,
 			"the melody leaves by half tension")
+	# 729: a 50 ms output buffer, so a loaded machine doesn't starve the mix (a starved WASAPI buffer replays its last chunk: a ring).
+	_check(int(ProjectSettings.get_setting("audio/driver/output_latency", 15)) == 50, "the audio output buffer is 50 ms (729)")
 	# 668: a level's own music, named in its level.json, in place of the zone's ground and melody.
 	_check(Music.level_music("barrow") == "music.barrow" and Music.level_music("barrow_deep") == "" and Music.level_music("") == "",
 			"the barrow's first level names its own music; the levels below none")

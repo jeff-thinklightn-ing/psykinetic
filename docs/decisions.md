@@ -34747,3 +34747,27 @@ sound's own capture runs excepted.
   covers them.
 
 Tooling only; protocol unchanged; no new class_name.
+
+## 729. A 50 ms audio output buffer
+
+Jeff's ringing still there with 727's bells gone ("its not a normal sounds its a feedback loop or
+glitch", "it happens a lot on testing"), via the coordinator, who approved this ahead of his
+recording.
+
+- What the game runs on: project.godot had no [audio] section, so Godot's defaults: WASAPI, a
+  15 ms output buffer, the device's own rate in shared mode (48 kHz; mix_rate unused there), no
+  input (nothing opens a microphone, so no acoustic feedback path). Nothing in the game changes
+  them.
+- The suspect: the mix thread decodes every playing Ogg itself (up to about ten indoors in a fight:
+  music layers, stingers, ambience beds). On a machine loaded by suites, or through a main-thread
+  stall at a map load, a mix that misses its 15 ms makes WASAPI play its last chunk again: a
+  buzz at about 67 Hz and its multiples, metallic, heard as ringing or feedback.
+- Instrumented headless (Music driven as view_test drives it, its bus recorded): no player restarted
+  or seeking each frame, no take on two players at once, no resonant effect or bus loop, pitch 1,
+  clean loop wraps. So the game's own mix is clean; what is left is the real driver's path.
+- audio/driver/output_latency is 50 (ms): 3.3 times the slack, unnoticed on music and beds and
+  acceptable on blows (40 if blows feel late). Jeff's recording would show an underrun as one
+  short block repeated; if the ring outlives this, that is where to look next.
+- sound_kit_test checks the setting.
+
+Client only; protocol unchanged; no new class_name.

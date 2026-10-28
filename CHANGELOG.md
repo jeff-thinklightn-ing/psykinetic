@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Sound: a larger audio buffer (50 ms, was 15), so a busy machine no longer starves the sound output, the likely source of the ringing or feedback-like noise heard while testing (729).
 - Builds: a sound take the sound library no longer holds as listed (retired or re-cut since) is left out of a build rather than shipped from an old copy; en garde build 3's ringing was 727's retired bells shipped that way (727 amended).
 - Generated halls (barrow, Ossuary, castle halls, tower floors), from each level's next generation: no more one-cell niches or tight one-cell turns, every door two wide and drawn as one double door that opens as one (the crypt's tall door in the barrow), and torches beside doorways instead of in front of them.
 
