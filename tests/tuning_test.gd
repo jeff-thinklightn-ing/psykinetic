@@ -252,8 +252,10 @@ func _test_dummy() -> void:
 	var fighting := Tuning.spawn_kind("imp", Vector2i(2, 2))
 	_check(fighting is Monster and not (fighting as Monster).practice_still, "one that fights is a plain monster")
 	_check(Tuning.spawn_kind("no_such_kind", Vector2i(3, 2)) == null, "an unknown kind: none")
+	var robber := Tuning.spawn_kind("robber", Vector2i(6, 1))
+	_check(robber is Monster and World.wielded(robber) == "dagger", "armed with its kind's wields, as a level's (%s)" % [World.wielded(robber) if robber != null else ""])
 	Tuning.clear()
-	_check(not dummy.spawned and not standing.spawned and not fighting.spawned, "clear: every one the arena made gone")
+	_check(not dummy.spawned and not standing.spawned and not fighting.spawned and not robber.spawned, "clear: every one the arena made gone")
 
 
 func _test_give() -> void:

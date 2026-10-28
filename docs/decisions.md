@@ -34536,3 +34536,13 @@ level_link (715):
   name read it in (2).
 level_test: the tiers' charges, the spill, a full amulet, no such tier, an amulet minted after a
 reset, the knight per generation. Server only, protocol unchanged, no new class_name.
+
+## 673 amended, enemy-ai's side: the practice hall's spawns armed as a level's are
+
+The practice hall's spawns (Tuning.spawn_kind, the F7 panel's monsters and its
+dummy) came bare-handed: a level's monster takes its kind's "wields"
+(monsters.json: a robber's dagger, the draugr's battle axe) through Level.arm
+when the level is read, and spawn_kind built its spec without it. Combat's
+en garde arena armed its robbers by hand. spawn_kind now calls Level.arm on
+its spec before spawning, as raids do (672). tuning_test: a practice robber
+holds its dagger. Local host only, protocol unchanged, no new class_name.

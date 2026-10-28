@@ -266,7 +266,8 @@ static func spawn_dummy(at: Vector2i) -> GridEntity:
 
 
 ## One of [param kind] (monsters.json's) at [param at]: [param fights], or
-## standing guard where it is.
+## standing guard where it is; armed with its kind's "wields" as a level's is
+## (Level.arm).
 static func spawn_kind(kind: String, at: Vector2i, fights := true) -> GridEntity:
 	if not allowed() or not World.spawn_spec.is_valid():
 		return null
@@ -277,6 +278,7 @@ static func spawn_kind(kind: String, at: Vector2i, fights := true) -> GridEntity
 	spec["tile"] = at
 	if not fights:
 		spec["idle"] = {"mode": "guard"}
+	Level.arm(spec)
 	var made: Variant = World.spawn_spec.call(spec)
 	if made is not GridEntity:
 		return null
