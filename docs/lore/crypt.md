@@ -468,6 +468,29 @@ the temple, joined to the barrow"; crypt.totem becomes the Encolpion Amulet; new
 his words: the temple's underground, Aldous kept from the relics by the draugr, the draugr
 angered by the robbers, the knight's remains charging the amulet.
 
+
+### Jeff on the wording (2026-10-27, undercroft-wording.md)
+
+> "can the level be the **Ossuary** and i like the names. the barrows has unique grave robbers that have names, they have to either be dead or escaped, they might have set up a small camp and a chest in the barrows, in the chest is the item "Tomb Sledge" its a heavy hammer. The robbers have been looking for a way to break through to get holy relics to sell on the black market. thats why Draugr is angry. there might be broken walls and tombs that was done with the sledge or it could be one of the bigger guards, a named one, larger, the rest can't carry the hammer its too heavy. Some connections between rooms aren't doors but broken down walls."
+
+- **[Jeff]** The level under the temple is **the Ossuary** (not the Temple Undercroft). He likes
+  the other names and lines, which pass: the 14 knights, the barred stair, the cold draft, the
+  draugr's anger line.
+- **[Jeff]** The barrow's grave robbers are unique and named; each is either dead or escaped.
+  They may keep a small camp and a chest in the barrow, and in it the Tomb Sledge, a heavy hammer.
+- **[Jeff]** The robbers have been looking for a way to break through to the holy relics, to
+  sell them on the black market. That is why the draugr is angry.
+- **[Jeff]** Broken walls and smashed tombs are the sledge's work, swung by one of the bigger
+  robbers, a named one; the rest cannot carry the hammer, it is too heavy. Some ways between
+  rooms are broken-down walls, not doors.
+- **[proposal]** The Ossuary's first room, now that the level has the name: **the Charnel
+  Vault**.
+- **[proposal]** The band (enemy-ai's named robbers may take these or their own): the big one
+  who carries the sledge, **Brand the Ox**; the rest **Crake, Mott, Nabb, Wicket, Fenn, Rook,
+  Sedge and Tull**. The band is called **the Mound-breakers** in town talk.
+- Facts (decision 714, lore's side): crypt.ossuary names the Ossuary; crypt.robbers_dig and
+  crypt.tomb_sledge (his words, rumours, true); crypt.draugr_angry gives the why.
+
 ---
 
 ## Log
@@ -521,3 +544,4 @@ angered by the robbers, the knight's remains charging the amulet.
 - 2026-10-22: the temple and town follow Theus, the homeland's one god; Psyke, the tribal god of war, empowers the draugr; Pip knows only enough for the job, paid for his silence and promised a holy knighthood of Theus (Jeff, B3).
 - 2026-10-25: Jeff's rough draft of the sepulcher, the knight's remains, the Encolpion Amulet and night robbers recorded as [Jeff] draft lines; nothing built till barrow-sepulcher.md is answered.
 - 2026-10-27: Jeff answered barrow-sepulcher.md: the barrow an ancient mound, the temple's own underground (Ossuary, Hall) joined to it, the amulet replacing the deal, a different holy knight's relic each time; lore's names, knights and lines drafted for dungeon's temple_undercroft design.
+- 2026-10-27: Jeff on the wording: the Ossuary, named grave robbers digging for the holy relics to sell, the Tomb Sledge and its broken walls; facts in 714.

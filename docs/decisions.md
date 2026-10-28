@@ -35878,5 +35878,8 @@ the draugr's secret, as the totem was); new agreed facts in his words: crypt.mou
 crypt.temple_underground, crypt.draugr_angry, crypt.relics and crypt.relic_charges (rumours,
 true, in the Woodlands, so Aldous's secret budget is untouched). The display names (the Temple
 Undercroft, the Temple Ossuary), the fourteen holy knights of Theus and the set-dressing lines
-are lore's drafts in crypt.md for dungeon, items and npc. Data and docs only, protocol unchanged.
+are lore's drafts in crypt.md for dungeon, items and npc. Amended the same day on Jeff's wording answer: the level is the Ossuary (crypt.ossuary
+names it), and two more agreed facts, crypt.robbers_dig (the robbers dig for the holy relics to
+sell on the black market) and crypt.tomb_sledge (the heavy hammer only the biggest robber can
+carry, and its broken walls and smashed tombs); crypt.draugr_angry gives the why. Data and docs only, protocol unchanged.
 

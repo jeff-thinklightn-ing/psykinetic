@@ -82,7 +82,7 @@
 			"name": "the Barrow of the Fallen",
 			"status": "agreed",
 			"source": "Jeff",
-			"summary": "The Barrow of the Fallen, an ancient burial mound a little outside town: the wealthy town's newer dead on its top floor, grave robbers within; joined by a hidden way to the temple's own underground, the Temple Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714).",
+			"summary": "The Barrow of the Fallen, an ancient burial mound a little outside town: the wealthy town's newer dead on its top floor, a named band of grave robbers within, breaking walls and tombs with the Tomb Sledge to reach the holy relics; joined by a hidden way to the temple's own underground, the Ossuary and the draugr's Hall of Fallen Souls, where the holy knights' relics lie (docs/lore/crypt.md; Jeff 2026-10-27, decision 714).",
 			"relations": [],
 			"tags": [
 				"history"
@@ -137,7 +137,7 @@
 				},
 				{
 					"id": "crypt.ossuary",
-					"text": "Beneath the temple lies the Temple Ossuary, where the ancient dead were moved, joined to the barrow by a hidden way.",
+					"text": "Beneath the temple lies the Ossuary, where the ancient dead were moved, joined to the barrow by a hidden way.",
 					"known": "common",
 					"where": [
 						"town_lands"
@@ -309,8 +309,32 @@
 					"status": "agreed"
 				},
 				{
+					"id": "crypt.robbers_dig",
+					"text": "The grave robbers in the barrow have been looking for a way to break through to the holy relics, to sell them on the black market.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.tomb_sledge",
+					"text": "The Tomb Sledge, a heavy hammer, is carried by the biggest of the grave robbers; the rest cannot lift it, and the broken walls and smashed tombs in the barrow are its work.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
 					"id": "crypt.draugr_angry",
-					"text": "The draugr is angry because of the robbers in the barrow.",
+					"text": "The draugr is angry because the robbers in the barrow dig for the holy relics.",
 					"known": "rumour",
 					"true": true,
 					"where": [
