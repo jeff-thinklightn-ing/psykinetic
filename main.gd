@@ -427,6 +427,12 @@ var _had_player := false
 var _rejected := false
 ## Client: trying to get back to the server (decision 240).
 var _reconnecting := false
+## "already connected" refusals tried again in a row (721: an older server
+## holding this player's dropped link), at most ALREADY_TRIES, each after
+## ALREADY_RETRY_SECONDS.
+var _already_tries := 0
+const ALREADY_TRIES := 12
+const ALREADY_RETRY_SECONDS := 5.0
 ## While reload_zone rebuilds a zone: the players in it were standing there,
 ## so they stay, monsters near or not (no spawn safety's start tile).
 var _reloading := false
@@ -14742,6 +14748,7 @@ func _on_world_ticked(tick: int) -> void:
 		hint_panel.set_lines(hint_lines())
 	if player != null:
 		_had_player = true
+		_already_tries = 0
 	if player != null:
 		player.enable_prediction()
 	_run_test_move(player)
@@ -15538,6 +15545,15 @@ func _log_player_move(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
 
 
 func _on_join_rejected(reason: String, server_version: String) -> void:
+	if reason == "already connected" and _already_tries < ALREADY_TRIES:
+		# An older server (before decision 721) refusing while it still
+		# holds this player's dropped link: tried again till it lets go.
+		_already_tries += 1
+		_rejected = true
+		_connect_status("the server still holds your last connection; trying again")
+		get_tree().create_timer(ALREADY_RETRY_SECONDS).timeout.connect(_retry_connect)
+		return
+	_already_tries = 0
 	_rejected = true
 	if reason == "client out of date":
 		# An exported game updates itself and starts again (decision 241).

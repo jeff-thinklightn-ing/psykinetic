@@ -34116,3 +34116,43 @@ restart, then a cut dropping the old certificate.
 
 This change: server/install_dtls.sh only. Nothing runs it in the repo or on
 the box until Jeff does. Protocol unchanged, no new class_name.
+## 721. A join of a player already in replaces the stale connection
+
+Jeff was "locked out" twice (2026-10-27): after a network blip his client
+reconnected within seconds (Main._reconnect; Net.reconnect closes the old
+connection first, so a client never holds two), while the server's ENet
+still counted his dropped link alive until its own timeout. Net.authenticate
+refused a hello for an id already in ("already connected"), and the client,
+told so, stopped trying (_rejected): he sat at the refusal after the stale
+link had timed out.
+
+Now the newest wins. A hello with the right token, protocol and an id an
+authenticated peer holds lets that peer go (Net._replace_stale): it is sent
+JOINED_ELSEWHERE ("you joined from elsewhere"), forgotten at once through
+_drop (so its leave runs now: Main saves the record and despawns the body),
+its link closed after REJECT_GRACE so the word goes out; the new peer is
+admitted on the next frame (the old body freed, so it is Player<n> again,
+not a renamed one) from the fresh record, where the old one stood. The log
+says "[net] replaced a stale peer", with no id or address (release counts
+them). The full-server check no longer counts a replacing id. 701's
+wrong-token lockout and every other refusal are unchanged.
+
+A client told JOINED_ELSEWHERE is a refusal like any: it shows it and does
+not reconnect, so two running clients of one id (two machines, a stuck old
+window) cannot knock each other off for ever. A client told "already
+connected" (a server from before this) tries again every
+ALREADY_RETRY_SECONDS (5), ALREADY_TRIES (12) times, till the old server
+lets the stale link go; the count resets once in.
+
+Trust: the token is shared and player_id is said by the client. Before,
+whoever had the token and someone's id could take that id only while its
+owner was off; now also while they are on, knocking them off. The ids are
+random and never shown, and the token's holders are Jeff and his friends,
+so the coordinator and release accept it; DTLS (717, rev 42) keeps the id
+off the wire, and per-player auth, if ever, closes it.
+
+net_test phase 2: Casey back on her record, then a second client with her
+id joins while she is on: the server logs one replacement, the new one comes
+in as Player3 at (11, 3) (back) in her colour, Casey's client is told and
+does not reconnect, and Dana still joins. Server and client (both only
+refuse less), protocol unchanged, no new class_name.

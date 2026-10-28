@@ -156,6 +156,9 @@ const DEFAULT_PORT := 7777
 const MAX_CLIENTS := 8
 ## Authenticated peers at once by default; later ones are refused.
 const MAX_PLAYERS := 16
+## What a peer is told when the same player joins again from elsewhere
+## (decision 721); its client does not reconnect on it.
+const JOINED_ELSEWHERE := "you joined from elsewhere"
 ## Seconds a connected peer has to send the token.
 const AUTH_TIMEOUT := 5.0
 ## Seconds between telling a peer why it is rejected and disconnecting it.
@@ -1559,17 +1562,48 @@ func authenticate(hello: Dictionary) -> void:
 		_reject(peer, "authentication failed", "bad player id")
 	elif reserved_id(id, mode):
 		_reject(peer, "authentication failed", "reserved player id")
-	elif id in _authenticated.values():
-		_reject(peer, "already connected", "already connected as %s" % id.left(8))
-	elif _authenticated.size() >= max_players:
+	elif _authenticated.size() >= max_players and not id in _authenticated.values():
 		_reject(peer, "server full")
 	else:
 		if client_version != version:
 			print("[net] peer %d is v%s, the server v%s: the same protocol %s, so it plays" % [
 				peer, client_version, version, protocol()])
+		if _replace_stale(id):
+			# The old body is freed at the frame's end: its name (Player<n>)
+			# is the new one's.
+			await get_tree().process_frame
+			if not peer in multiplayer.get_peers() or _authenticated.has(peer):
+				return
 		_bodies[id] = tidy_body(hello.get("body", ""))
 		_looks[id] = tidy_look(hello.get("look", ""))
 		_admit(peer, id, player_name_given)
+
+
+## Server: the peer that holds [param id] already, if any, let go so a new
+## join of that id comes in (decision 721: the newest wins; a dropped link
+## the server has not timed out yet locked its player out). It is told
+## JOINED_ELSEWHERE (its client does not reconnect on it) and forgotten
+## at once, its leave run now (Main saves the record and takes the body), so
+## the new peer's player comes from the fresh record. Whether one was.
+func _replace_stale(id: String) -> bool:
+	var replaced := false
+	for old: int in _authenticated.keys():
+		if _authenticated[old] != id:
+			continue
+		print("[net] replaced a stale peer")
+		if not old in multiplayer.get_peers():
+			_authenticated.erase(old)
+			continue
+		# Told first (queued), forgotten now, its link closed once the word
+		# has had REJECT_GRACE to go out; ENet's own event then is swallowed.
+		rejected.rpc_id(old, JOINED_ELSEWHERE, version)
+		_drop(old)
+		var link := (multiplayer.multiplayer_peer as ENetMultiplayerPeer).get_peer(old)
+		get_tree().create_timer(REJECT_GRACE).timeout.connect(func() -> void:
+			if link != null and link.is_active():
+				link.peer_disconnect())
+		replaced = true
+	return replaced
 
 
 ## Whether a remote hello may not claim [param id] in [param run_mode]

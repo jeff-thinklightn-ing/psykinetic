@@ -184,14 +184,16 @@ phase_1_2() {
 	finish
 
 	# Phase 2: the server restarts from its snapshot. Casey (client 4's id) must
-	# come back where she left, a second Casey is turned away while she is on,
-	# and Dana is new.
+	# come back where she left; a second Casey joining while she is on takes
+	# her place (721: the newest wins), and the first is told so and stays
+	# off; and Dana is new.
 	server server2 --server --still-monsters --no-companions "--token=$TOKEN" "--state=$STATE"
 	wait_for server2 'listening on port'
 	client clientC "--settings=$LOGS/settings.cfg"
 	wait_for server2 'Casey \(c0ffee00\) joined'
 	client clientE $GOOD "--player-id=$ID_C" --name=Impostor
-	wait_for clientE 'already connected'
+	wait_for clientC 'you joined from elsewhere'
+	wait_for server2 'Impostor \(c0ffee00\) joined'
 	client clientD $GOOD "--player-id=$ID_D" --name=Dana
 	wait_for server2 'Dana \(d0d0d0d0\) joined'
 	finish
@@ -335,12 +337,13 @@ check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at ' "$LOGS/server.
 check "$(count '\[net\] Casey \(c0ffee00\) left' "$LOGS/server.log")" 1 "phase 1: her leaving was logged with her name and id"
 check "$(count '\[state\] loaded 10 entities and 3 player records' "$LOGS/server2.log")" 1 "phase 2: the restarted server loads three player records"
 color_before=$(grep -oE 'display: Player3 .*color=[0-9a-f]+' "$LOGS/client4.log" | grep -oE 'color=[0-9a-f]+' | head -1)
-color_after=$(grep -oE 'display: Player3 server_tile=\(11, 3\).*color=[0-9a-f]+' "$LOGS/clientC.log" | grep -oE 'color=[0-9a-f]+' | head -1)
+color_after=$(grep -oE 'display: Player3 server_tile=\(11, 3\).*color=[0-9a-f]+' "$LOGS/clientE.log" | grep -oE 'color=[0-9a-f]+' | head -1)
 check "$([ -n "$color_before" ] && echo "$color_after")" "$color_before" "phase 2: Casey is back on (11, 3) as Player3 in her colour"
 check "$(count '\[net\] Casey \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: the server says she joined back"
 check "$(count '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \([0-9]+, [0-9]+\)$' "$LOGS/server2.log")" 1 "phase 2: a new id gets a fresh spawn as Player4"
-check "$(count '\[net\] rejected peer [0-9]+ from [^ ]+ \(already connected as c0ffee00\)' "$LOGS/server2.log")" 1 "phase 2: a second connection with an online id is rejected"
-check "$(count '\[net\] already connected' "$LOGS/clientE.log")" 1 "phase 2: and told so"
+check "$(count '\[net\] replaced a stale peer' "$LOGS/server2.log")" 1 "phase 2: a second connection with an online id replaces the first (721)"
+check "$(count '\[net\] Impostor \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: and comes in as her, where she stood"
+check "$(count '\[net\] you joined from elsewhere' "$LOGS/clientC.log")$(count 'reconnecting' "$LOGS/clientC.log")$(count 'Casey \(c0ffee00\) joined' "$LOGS/server2.log")" 101 "phase 2: the first is told so and stays off"
 check "$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientF.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientG.log")" 11 "phase 3: both reached their ends of the passage"
 check "$(count '\[test\] display: .*server_tile=\(12, 12\)' "$LOGS/clientF.log")" 1 "phase 3: Fay crossed to (12, 12)"
 check "$(count '\[net\] peer [0-9]+ is v0\.0\.2, the server v[0-9.]+: the same protocol' "$LOGS/server3.log")" 1 "phase 3: Fay is another build with the same protocol, and the server let her play"

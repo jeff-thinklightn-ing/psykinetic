@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- After a connection drop you can rejoin at once: the server lets your new connection in and drops the dead one, instead of refusing "already connected" until it timed out (721).
 
 - Houses: the shingle roof no longer shows a gap by the ridge with the wall boards through it (its pieces now sit on a closed underlay with a ridge cap); the hut's roof rows no longer show thin slits at an angle.
 - Chimneys smoke while their fire is in use: a forge while the smith works it, a house while someone is awake inside; Umbrage's forge and kitchen now have a chimney, and window lamps follow who is home (710).
