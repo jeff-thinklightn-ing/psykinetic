@@ -89,6 +89,8 @@ which worktree owns each step, and the design rules not to break without asking 
   tree opens one until the all-clear; headless tests and landings go on (Jeff, 2026-10-21: "godot
   needs to be opened in --headless, i can't get anything done in blender"). A shot run that must
   happen puts its window off-screen (`--position 4000,4000`) and never takes focus.
+  Every test, shot or clip Godot a session starts also runs silent, with `--audio-driver Dummy`
+  (Jeff, 2026-10-28: test windows' music rang on his speakers).
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
   generation, a full test suite, a bench, a Godot import or export, run it through the gate:
   `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
