@@ -254,14 +254,14 @@
 			"type": "mesh",
 			"uses": "dagger (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
-		"item.draugr_totem": {
+		"item.encolpion_amulet": {
 			"budget": 500,
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.06,
-				0.14,
-				0.06
+				0.05,
+				0.07,
+				0.015
 			],
 			"sockets": {
 				"grip": [
