@@ -35864,3 +35864,19 @@ view_test _test_horizon checks:
 - with the camera high, all three as before;
 - under stone, no skirt.
 Client only, protocol unchanged, no new class_name.
+
+## 714, lore's side: the barrow and the temple's underground
+
+Jeff (2026-10-27): "the barrows is an ancient burial mound, the temple has its own underground
+area - its connected to the barrows, the temple always has the underground even if it moves.
+... aldous can't get to the relics because the draugr took up residence. the draugr is angry
+because of the robbers in the barrow. ... the amulet gets charged by aldous when you return to
+him with the relic. the knights holy remains." (full in docs/lore/crypt.md). Lore's facts follow
+dungeon's build in the same window: crypt.ossuary and crypt.fallen_souls now lie beneath the
+temple, joined to the barrow; crypt.totem is replaced by crypt.amulet (the Encolpion Amulet,
+the draugr's secret, as the totem was); new agreed facts in his words: crypt.mound (common),
+crypt.temple_underground, crypt.draugr_angry, crypt.relics and crypt.relic_charges (rumours,
+true, in the Woodlands, so Aldous's secret budget is untouched). The display names (the Temple
+Undercroft, the Temple Ossuary), the fourteen holy knights of Theus and the set-dressing lines
+are lore's drafts in crypt.md for dungeon, items and npc. Data and docs only, protocol unchanged.
+
