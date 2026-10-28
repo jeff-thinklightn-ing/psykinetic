@@ -60,6 +60,7 @@ func _ready() -> void:
 	_test_barrow_won()
 	await _test_hall_door()
 	await _test_hidden_niche()
+	_test_double_doors()
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
@@ -1967,6 +1968,56 @@ func _register_hall(level_name: String) -> void:
 		rows.append(row)
 	Level.register(level_name, Level.image_from_rows(rows, {Vector2i(5, 1): "start"}), null,
 		{"regenerate": {"anchors": [{"rect": [2, 4, 8, 5], "name": "lair"}]}})
+
+
+## A 12 x 10 level [param level_name]: open floor walled across between
+## y 3 and 4 from x 2 to 9, with doors side by side at x 5 and 6 (and a
+## third, lone one at x 8, locked when [param locked]);
+## [param generated] gives it a regenerate block.
+func _register_pair(level_name: String, generated: bool) -> void:
+	var rows: Array[String] = []
+	for py in 10 * 2 - 1:
+		var row := ""
+		for px in 12 * 2 - 1:
+			var floor_here := px % 2 == 0 and py % 2 == 0
+			var north_wall := py == 7 and px % 2 == 0 and px / 2 >= 2 and px / 2 <= 9
+			row += ("+" if px / 2 in [5, 6, 8] else "#") if north_wall else ("." if floor_here else " ")
+		rows.append(row)
+	var config := {"regenerate": {"anchors": [{"rect": [0, 4, 12, 6], "name": "below"}]}} if generated else {}
+	Level.register(level_name, Level.image_from_rows(rows, {Vector2i(5, 4): "start"}), null, config)
+
+
+## The generated halls' doors two edges wide (725): the pair side by side
+## swings as one (World.door_partner, the client's Level.door_pairs), the
+## lone third its own; a level that does not regenerate keeps 403's rule,
+## each edge its own door.
+func _test_double_doors() -> void:
+	print("
+== the generated halls' double doors swing as one (725) ==")
+	var pairs := Level.door_pairs([Vector3i(5, 3, 1), Vector3i(6, 3, 1), Vector3i(7, 3, 1), Vector3i(9, 3, 1), Vector3i(10, 3, 1)], func(_key: Vector3i) -> bool: return true)
+	_check(pairs == {Vector3i(5, 3, 1): Vector3i(6, 3, 1), Vector3i(9, 3, 1): Vector3i(10, 3, 1)},
+		"pairs two at a time from a run's start, a third left on its own (%s)" % [pairs])
+	for generated: bool in [true, false]:
+		var name := "lt_pair" if generated else "lt_pair_plain"
+		_register_pair(name, generated)
+		_main.load_map(name)
+		var player := _player()
+		var left := World.door_on(Terrain.edge_key(Vector2i(5, 4), Vector2i(0, -1)))
+		var right := World.door_on(Terrain.edge_key(Vector2i(6, 4), Vector2i(0, -1)))
+		var lone := World.door_on(Terrain.edge_key(Vector2i(8, 4), Vector2i(0, -1)))
+		player.next_move_tick = 0
+		var opened := World.try_toggle_door(player, left.key)
+		if generated:
+			_check(opened and left.open and right.open and not lone.open and World.door_partner(left) == right and World.door_partner(right) == left and World.door_partner(lone) == null,
+				"in a generated hall the pair opens as one, the lone door stays shut (%s %s %s)" % [left.open, right.open, lone.open])
+			player.next_move_tick = 0
+			World.try_toggle_door(player, left.key)
+			_check(not left.open and not right.open, "and shuts as one")
+		else:
+			_check(opened and left.open and not right.open and World.door_partner(left) == null,
+				"a level that does not regenerate: each edge its own door (403)")
+		_main.load_map("test_room")
+		Level.unregister(name)
 
 
 ## An 8 x 6 level [param level_name]: a room x 1..6, y 1..4 in the rock,

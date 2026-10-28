@@ -198,12 +198,12 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		# galleries, the dark below has none.
 		var layer := int(config.get("layer", 2))
 		var barrow := str(config.get("style", "")) == "barrow"
-		generated["graves"] = graves_of(map, config) if layer != 1 else []
 		generated["niches"] = []
 		if barrow and layer == 1 and generator.has_method("niche_plan"):
 			_lay_hidden(generated, generator.niche_plan(config, seed))
 		elif barrow and layer == 2:
 			generated["niches"] = niches_of(map, anchors, seed)
+		generated["graves"] = graves_of(map, config, generated["niches"] if layer == 2 else []) if layer != 1 else []
 		# Moss and webs (647): the template's own kept inside the anchors
 		# (generated_config), the rest rolled over the generation.
 		if barrow:
@@ -218,17 +218,23 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 ## The graves of a generated [param map] (542 amended, enemy-ai's crypt
 ## design: a walking skeleton is given a grave of its own in a shallower
 ## band): [[x, y, band], ...], one per dead-end floor cell outside the
-## anchors (one walkable neighbour: the tomb niches and the blind ways'
-## ends alike), none with a chest on it, in cell order; the band 0, 1 or 2
+## anchors (one walkable neighbour: a blind way's end) and, since the
+## two-cell rule left no lone cells (725), one per wall niche in
+## [param niches] (niches_of's, [x, y, dx, dy, kind, variant]: the floor
+## cell before it), none with a chest on it, in cell order; the band 0, 1 or 2
 ## by the cell's distance from the "entrance" anchor's centre (the first
 ## anchor unless [param config] names one) over the farthest the map
 ## reaches from it (BANDS). Written into the generated level.json as
 ## "graves".
-static func graves_of(map: LevelMap, config: Dictionary) -> Array:
+static func graves_of(map: LevelMap, config: Dictionary, niches: Array = []) -> Array:
 	var out: Array = []
 	var anchors: Array = config.get("anchors", [])
 	if anchors.is_empty():
 		return out
+	var before := {}
+	for niche: Variant in niches:
+		if niche is Array and (niche as Array).size() >= 2:
+			before[Vector2i(int(niche[0]), int(niche[1]))] = true
 	var entrance: Dictionary = anchors[0]
 	for anchor: Dictionary in anchors:
 		if str(anchor.get("name", "")) == str(config.get("entrance", "")):
@@ -244,7 +250,7 @@ static func graves_of(map: LevelMap, config: Dictionary) -> Array:
 				var next := cell + direction
 				if map.in_bounds(next) and map.walkable(next) and map.edge(Terrain.edge_key(cell, direction)) != "wall":
 					open += 1
-			if open != 1:
+			if open != 1 and not before.has(cell):
 				continue
 			out.append([x, y, band_at(frame, cell)])
 	return out

@@ -34,19 +34,28 @@ extends RefCounted
 ## near the top, the old dead below, oldest deepest): what each room is
 ## goes by its depth, the distance from the "entrance" anchor as a share of
 ## the farthest the map reaches (BANDS). Shallow: the town's tombs, square
-## chambers with a door where a way comes in, torches inside the doors and
-## along the ways, burial niches (an alcove cell) off the walls. Middle:
-## passage graves, narrow and long, crooked ways in, no doors, niches
-## along them. Deep: the old caverns round the lair, no doors, no torches.
-## Chests go in the deepest niches first; the dead, on open floor only (a
+## chambers with a door where a way comes in, torches by the doors and
+## along the ways. Middle: passage graves, narrow and long, crooked ways in,
+## no doors. Deep: the old caverns round the lair, no doors, no torches.
+## Its niches are wall pieces (Regen.niches_of), never alcove cells (725).
+## Chests go in the deepest blind ways' ends first; the dead, on open floor only (a
 ## cell with floor all round it and no wall edge of its own: never an
 ## alcove, a grave or a wall's foot; 631 amended), a third in each depth
 ## band, deepest first within a band (decision 631; layers with one band
 ## deepest first), monsters otherwise deepest first unless
 ## "near" sends a kind to an anchor (the robbers to the altar). Its ways
 ## are three cells wide (541 amended, Jeff: "way too cramped"), a brush
-## along the path, narrowing to the one door cell into a shallow tomb;
-## the torches stand by the walls; the deep blind ways are short.
+## along the path to a shallow tomb's door; the torches stand by the
+## walls; the deep blind ways are short.
+##
+## Every style (725, Jeff: "the torches are always put in front of door
+## ways. there are still too many 1 tile niches and 1 tile tight turns,
+## often around doors. doors are still kind of small and narrow"): a door
+## is two edges wide where the wall allows (_pair_doors; Client3D draws
+## the pair as one door.double, World opens both), every floor cell outside
+## the anchors stands in a clear 2 x 2 (Tools.clear_pinches; the test runs
+## many seeds), alcoves and blind ways are two wide, and no torch stands
+## on a door's cell or in its line (door_line).
 ##
 ## "tower" (decision 659, the tower's inside; Jeff: "The tower's inside
 ## shifts too"): a floor of a tower, each floor a small level of its own
@@ -94,8 +103,6 @@ const TORCH_EVERY := 8
 ## How far a crooked way leans toward where it goes.
 const LEAN := 0.65
 ## Barrow: the depth bands are Regen.BANDS, shared with the graves it writes.
-## Barrow: niches off a shallow or middle room, at most.
-const NICHES := 3
 ## Barrow: a deep blind way is this long at most (541 amended; the old
 ## style's wander up to BLIND_LONG).
 ## 612: the rock between any two rooms, and from the anchors (two: a way
@@ -152,6 +159,26 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	Tools.join_all(map, anchors, carved)
 	var widened := Tools.widen(map, anchors, carved, ring)
 	_wall_rooms(map, rooms, ends, paths, widened)
+	# 725 (Jeff: "doors are still kind of small and narrow ... 1 tile tight
+	# turns, often around doors"): every door two edges wide where it can
+	# be, then every floor cell in a clear 2 x 2 (Tools.clear_pinches), never
+	# into a walled room's ring; what that carved beside a room walled.
+	# Nooks left (a cell the rock round a room's ring will not widen) are
+	# filled (Tools.fill_nooks), and the clearing tried again on what that
+	# leaves.
+	var opened := _pair_doors(map, anchors, rooms, carved)
+	var room_cells := {}
+	for room in rooms:
+		if not (room["doors"] as Array).is_empty():
+			room_cells.merge(room["cells"])
+	for pass_number in 3:
+		var cleared := Tools.clear_pinches(map, anchors, carved, ring, room_cells)
+		cleared.merge(opened)
+		opened = {}
+		if not cleared.is_empty():
+			_wall_rooms(map, rooms, ends, paths, cleared)  # Never with none: an empty "only" walls every room again.
+		if Tools.fill_nooks(map, anchors).is_empty() and cleared.is_empty():
+			break
 	if not old:
 		_torches(map, anchors, rooms, corridors, depth, LIGHTS.get(style, "torch"))
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
@@ -686,6 +713,47 @@ static func _wall_rooms(map: LevelMap, rooms: Array[Dictionary], ends: Array[Vec
 	return ring
 
 
+## Every lone door into a room made two edges wide (725): the edge beside
+## it along the room's wall, from the room cell beside its own to the cell
+## beside the one outside, made a door too, on whichever side the room and
+## the way go on (the outside cell carved from rock if it is not floor, off
+## the rim and out of every anchor); a door with a door beside it already
+## is left. Client3D draws each pair as one door.double (403's pairing) and
+## World opens and shuts them together (World.door_partner). The cells it
+## carved.
+static func _pair_doors(map: LevelMap, anchors: Array, rooms: Array[Dictionary], carved: Dictionary[Vector2i, bool]) -> Dictionary[Vector2i, bool]:
+	var opened: Dictionary[Vector2i, bool] = {}
+	for room in rooms:
+		var cells: Dictionary = room["cells"]
+		for inside: Vector2i in Tools.sorted_cells(cells):
+			for direction in DIRECTIONS:
+				var outside := inside + direction
+				if cells.has(outside) or map.edge(Terrain.edge_key(inside, direction)) != "door":
+					continue
+				var along := Vector2i(direction.y, direction.x)
+				if map.edge(Terrain.edge_key(inside + along, direction)) == "door" or map.edge(Terrain.edge_key(inside - along, direction)) == "door":
+					continue  # Already two wide.
+				var best := Vector2i.ZERO
+				for side: Vector2i in [along, -along]:
+					var beside := outside + side
+					if not cells.has(inside + side) or map.edge(Terrain.edge_key(outside, side)) != "clear":
+						continue
+					if map.walkable(beside):
+						best = side
+						break
+					if best == Vector2i.ZERO and map.cell(beside) == "void" and Tools.rock(map, anchors, beside) \
+							and beside.x > 0 and beside.y > 0 and beside.x < map.size.x - 1 and beside.y < map.size.y - 1:
+						best = side
+				if best == Vector2i.ZERO:
+					continue
+				if not map.walkable(outside + best):
+					Tools.carve(map, outside + best, carved)
+					opened[outside + best] = true
+				map.set_edge(Terrain.edge_key(inside + best, direction), "door")
+				room["doors"].append(inside + best)
+	return opened
+
+
 # --- Blind ways, torches, markers ------------------------------------------------------
 
 ## Ways that go nowhere, so the halls are never quite the same: dwarven,
@@ -696,17 +764,15 @@ static func _blind_ways(map: LevelMap, anchors: Array, rooms: Array[Dictionary],
 		rng: RandomNumberGenerator, carved: Dictionary[Vector2i, bool], depth: Dictionary) -> Array[Vector2i]:
 	var ends: Array[Vector2i] = []
 	var barrow := not depth.is_empty()
-	if not old:
+	# Barrow: no alcove cells (725, Jeff: "too many 1 tile niches"): its
+	# niches are wall pieces, the first hall's (608) and the Ossuary's cut
+	# along its galleries (Regen.niches_of). Dwarven: a bay two cells wide
+	# off about half the rooms, never a lone cell.
+	if not old and not barrow:
 		for room in rooms:
-			# Barrow: niches, up to NICHES off every tomb and passage grave;
-			# the caverns below have none. Dwarven: one alcove off about half.
-			var wanted := 1
-			if barrow:
-				if int(room["band"]) == 2:
-					continue
-				wanted = NICHES
-			elif rng.randf() < 0.5:
+			if rng.randf() < 0.5:
 				continue
+			var wanted := 1
 			var border: Array[Vector2i] = []
 			var rect: Rect2i = room["rect"]
 			for cell in Tools.sorted_cells(room["cells"]):
@@ -721,8 +787,20 @@ static func _blind_ways(map: LevelMap, anchors: Array, rooms: Array[Dictionary],
 					var out := cell + direction
 					if rect.has_point(out) or not _lonely(map, anchors, out, cell, carved):
 						continue
+					# Two wide (725): the bay's other cell beside it along the
+					# wall, off a room cell too.
+					var along := Vector2i(direction.y, direction.x)
+					var pair := Vector2i(-1, -1)
+					for side: Vector2i in [along, -along]:
+						if room["cells"].has(cell + side) and _bay_cell(map, anchors, out + side, [out, cell + side]):
+							pair = out + side
+							break
+					if pair == Vector2i(-1, -1):
+						continue
 					Tools.carve(map, out, carved)
+					Tools.carve(map, pair, carved)
 					ends.append(out)
+					ends.append(pair)
 					placed += 1
 					break
 		if not barrow:
@@ -738,6 +816,7 @@ static func _blind_ways(map: LevelMap, anchors: Array, rooms: Array[Dictionary],
 		var direction := DIRECTIONS[rng.randi_range(0, 3)]
 		var length := rng.randi_range(2, BLIND_SHORT) if barrow else rng.randi_range(4, BLIND_LONG)
 		var last := at
+		# Two wide (725): each cell of the walk with the one on its left.
 		for step in length:
 			if rng.randf() > 0.7:
 				direction = DIRECTIONS[rng.randi_range(0, 3)]
@@ -745,10 +824,24 @@ static func _blind_ways(map: LevelMap, anchors: Array, rooms: Array[Dictionary],
 			if not _lonely(map, anchors, next, last, carved):
 				break
 			Tools.carve(map, next, carved)
+			var beside := next + Vector2i(direction.y, -direction.x)
+			if beside.x > 0 and beside.y > 0 and beside.x < map.size.x - 1 and beside.y < map.size.y - 1 					and map.cell(beside) == "void" and Tools.rock(map, anchors, beside):
+				Tools.carve(map, beside, carved)
 			last = next
 		if last != at:
 			ends.append(last)
 	return _deepest_first(depth, ends) if barrow else ends
+
+
+## Whether [param at] may be a bay's second cell (725): rock off the rim,
+## in no anchor, touching nothing walkable but the cells in [param beside].
+static func _bay_cell(map: LevelMap, anchors: Array, at: Vector2i, beside: Array) -> bool:
+	if not Tools.rock(map, anchors, at) or map.walkable(at) or at.x == 0 or at.y == 0 or at.x == map.size.x - 1 or at.y == map.size.y - 1:
+		return false
+	for direction in DIRECTIONS:
+		if map.walkable(at + direction) and not (at + direction) in beside:
+			return false
+	return true
 
 
 ## Whether [param at] is rock that touches nothing carved but [param from]
@@ -768,17 +861,28 @@ static func _lonely(map: LevelMap, anchors: Array, at: Vector2i, from: Vector2i,
 const LIGHTS := {"tower": "lamp_cold"}
 
 
-## Dwarven light: a [param light] (a torch) on the cell inside each door,
-## and one every TORCH_EVERY corridor cells, never beside an anchor.
+## Dwarven light: a [param light] (a torch) by each doorway, and one every
+## TORCH_EVERY corridor cells, never beside an anchor. 725 (Jeff: "the
+## torches are always put in front of door ways"): never on a door's cell,
+## within two of it along the wall, or straight in from it (door_line); a room's stands on a plain wall run inside it, the nearest
+## clear one to its door, one for each doorway (a pair is one).
 static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], corridors: Dictionary[Vector2i, bool], depth: Dictionary, light := "torch") -> void:
 	# Barrow: the town's tombs are lit, the shallow band alone.
 	var barrow := not depth.is_empty()
+	var kept := door_line(map)
 	for room in rooms:
 		if barrow and int(room["band"]) > 0:
 			continue
-		for cell: Vector2i in room["doors"]:
-			if map.cell(cell) == FLOOR:
-				map.set_cell(cell, light)
+		var lit: Dictionary[Vector2i, bool] = {}
+		for door: Vector2i in room["doors"]:
+			if lit.has(door):
+				continue
+			for direction in DIRECTIONS:
+				lit[door + direction] = true  # Its pair's cell: one torch for both.
+			var spot: Variant = _by_wall_near(map, room["cells"], door, kept)
+			if spot != null and not _beside_anchor(anchors, spot):
+				map.set_cell(spot, light)
+				kept[spot] = true
 	var i := 0
 	for cell in Tools.sorted_cells(corridors):
 		if barrow and _band_of(depth, cell) > 0:
@@ -786,9 +890,55 @@ static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 		i += 1
 		# Barrow: the way is three wide, so the torch stands by its wall.
 		var spot := _by_wall(map, cell) if barrow else cell
-		if i % TORCH_EVERY != 0 or map.cell(spot) != FLOOR or _beside_anchor(anchors, spot):
+		if i % TORCH_EVERY != 0 or map.cell(spot) != FLOOR or _beside_anchor(anchors, spot) or kept.has(spot):
 			continue
 		map.set_cell(spot, light)
+
+
+## The cells no torch stands on (725): each door edge's two cells, the
+## two cells either side of them along the door's wall, and one more
+## straight in from the door on each side (its line, where the way through
+## it runs).
+static func door_line(map: LevelMap) -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for key: Vector3i in map.edges:
+		if map.edges[key] != "door":
+			continue
+		var sides := Terrain.edge_cells(key)
+		var across: Vector2i = sides[1] - sides[0]
+		var along := Vector2i(across.y, across.x)
+		for at: Vector2i in [sides[0], sides[0] - across, sides[1], sides[1] + across]:
+			out[at] = true
+		for cell: Vector2i in sides:
+			for step in [1, 2]:
+				out[cell + along * step] = true
+				out[cell - along * step] = true
+	return out
+
+
+## The floor cell of [param cells] (a room) nearest [param door] that
+## touches a wall (a shut edge, or rock beside it) and is in no door's
+## line ([param kept]); null if there is none.
+static func _by_wall_near(map: LevelMap, cells: Dictionary, door: Vector2i, kept: Dictionary[Vector2i, bool]) -> Variant:
+	var best: Variant = null
+	var best_d := 0
+	for cell: Vector2i in Tools.sorted_cells(cells):
+		if kept.has(cell) or map.cell(cell) != FLOOR:
+			continue
+		var by_wall := false
+		for direction in DIRECTIONS:
+			var key := Terrain.edge_key(cell, direction)
+			if map.edge(key) == "wall" or not map.walkable(cell + direction):
+				by_wall = map.edge(key) != "door"
+				if by_wall:
+					break
+		if not by_wall:
+			continue
+		var d := Tools.distance(cell, door)
+		if best == null or d < best_d:
+			best = cell
+			best_d = d
+	return best
 
 
 ## A floor cell beside [param cell] that touches rock (a wall to stand a

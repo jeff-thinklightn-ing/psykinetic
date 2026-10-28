@@ -34680,3 +34680,32 @@ login/options screen now and theres no use for first harmony right now".
   its last second fades out; played through, it starts again silent and fades in.
 
 Client only; protocol unchanged; no new class_name.
+## 725. The generated halls keep two cells: no lone niches, every door two edges wide, torches off the doorways
+
+Jeff on the barrow: "the torches are always put in front of door ways. there are still too many
+1 tile niches and 1 tile tight turns, often around doors. doors are still kind of small and
+narrow". The two-cell rule for laid pieces (two-cell passages) now holds for what the labyrinth
+generator carves too (coordinator approved, 2026-10-28).
+- Every floor cell outside the anchors stands in a clear 2 x 2 (`Tools.pinches` finds those that
+  don't). After the rooms are walled: `_pair_doors` makes each lone door edge two wide (the edge
+  beside it along the wall, carving rock outside where it must); `Tools.clear_pinches` carves the
+  fewest rock cells to make a pinched cell's 2 x 2 whole (never the rim or an anchor; a room's
+  ring only for a square with no room cell in it); `Tools.fill_nooks` fills a pinched dead end
+  that no carving can widen, back to the cell it opened on; up to three rounds, the rooms walled
+  again round what was carved. A tower's cells against its outline (659) are its own wall's and
+  are left.
+- The barrow's one-cell alcoves are gone; a dwarven alcove is a two-cell bay; blind ways are cut
+  two wide. The graves (542 amended) are then the blind ways' ends and every wall niche's floor
+  cell (`Regen.graves_of(map, config, niches)`), none lone.
+- Torches: one per doorway (a pair shares one), on the floor cell nearest it against a wall,
+  never in its line (`Labyrinth.door_line`: the door's two cells, one more straight in each side,
+  and two along the wall either way); corridor torches skip those cells too.
+- Paired door edges in a regenerating level are one door.double (`Level.door_pairs`, 403's rule
+  of two at a time from a run's start, now shared), art-kit's crypt door (variant 3) in a barrow
+  style; and they swing as one (`World.door_partner`: `_set_door` sets the partner's `open`,
+  never a locked door's or a niche's). Each edge keeps its own Door, so nothing replicated
+  changes: protocol unchanged.
+- It reaches barrow, barrow_deep and castle_halls (and the tower floors) only at each level's
+  next generation; nothing shows on the box before one turns. labyrinth_test checks 20
+  generations of each style: no pinch, no lone door, no torch in a door's line; level_test the
+  pair swinging as one and a plain level's doors their own.

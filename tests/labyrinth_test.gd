@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_barrow()
 	_test_castle_halls()
 	_test_tower()
+	_test_two_cell()
 	_test_sheet()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -323,9 +324,13 @@ func _test_barrow() -> void:
 		and level["spawn_points"].size() == 2 and level["spawn_points"].get("from_temple") == Sheet.DEEP_FROM_TEMPLE,
 		"no warnings; the stair up, the sealed shortcut's end on the dais behind the throne, the spawn points (%s)" % [level["warnings"]])
 	_check(Regen.generate("lab_barrow_deep", 1)["layout"].get_data() == deep["layout"].get_data(), "the same seed gives the same Ossuary")
-	# The graves (542 amended): every dead end outside the anchors, bar the
-	# chests, with its band.
+	# The graves (542 amended; 725: the niches' cells, the two-cell rule
+	# leaving no lone ones): every dead end outside the anchors and every
+	# wall niche's floor cell, bar the chests, with its band.
 	var graves: Array = config.get("graves", [])
+	var niche_cells := {}
+	for niche: Array in config.get("niches", []):
+		niche_cells[Vector2i(int(niche[0]), int(niche[1]))] = true
 	var dead_ends := 0
 	var chests_in := 0
 	var bands_ok := true
@@ -334,7 +339,7 @@ func _test_barrow() -> void:
 		for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 			if a.walkable(cell + direction) and a.edge(Terrain.edge_key(cell, direction)) != "wall":
 				open += 1
-		if open == 1 and a.cell(cell) != "chest":
+		if (open == 1 or niche_cells.has(cell)) and a.cell(cell) != "chest" and not Level.in_anchors(anchors, cell):
 			dead_ends += 1
 	for grave: Array in graves:
 		var cell := Vector2i(int(grave[0]), int(grave[1]))
@@ -344,7 +349,7 @@ func _test_barrow() -> void:
 		if int(grave[2]) != band_wanted:
 			bands_ok = false
 	_check(graves.size() >= 6 and graves.size() == dead_ends and chests_in == 0 and bands_ok,
-		"the generated config lists every dead end outside the anchors as a grave with its band, none on a chest (%d graves, %d dead ends)" % [graves.size(), dead_ends])
+		"the generated config lists every dead end and niche cell outside the anchors as a grave with its band, none on a chest (%d graves, %d places)" % [graves.size(), dead_ends])
 	# The Ossuary's niches (608): cut into the galleries' walls, rock behind
 	# each, shelves and columbarium cells with a hollow here and there.
 	niches = config.get("niches", [])
@@ -592,6 +597,52 @@ func _broad(map: LevelMap, floor_cells: Array[Vector2i]) -> int:
 		if (map.walkable(cell + Vector2i(1, 0)) and map.walkable(cell - Vector2i(1, 0))) or (map.walkable(cell + Vector2i(0, 1)) and map.walkable(cell - Vector2i(0, 1))):
 			broad += 1
 	return broad
+
+
+## The two-cell rule over many seeds (725; Jeff: "the torches are always
+## put in front of door ways. there are still too many 1 tile niches and 1
+## tile tight turns, often around doors. doors are still kind of small and
+## narrow"): every generated floor cell outside the anchors in a clear 2 x 2,
+## every door edge one of a pair, no torch on a door's cell or in its line.
+const TWO_CELL_SEEDS := 20
+func _test_two_cell() -> void:
+	print("
+== the two-cell rule, %d generations of each style (725) ==" % TWO_CELL_SEEDS)
+	for name: String in ["lab_dwarven", "lab_old", "lab_barrow", "lab_barrow_deep", "lab_castle_halls", "lab_tower_1", "lab_wide_2"]:
+		var pinched: Array[String] = []
+		var lone: Array[String] = []
+		var lit: Array[String] = []
+		var doors := 0
+		var walled := 0
+		for generation in range(1, TWO_CELL_SEEDS + 1):
+			var made := Regen.generate(name, generation)
+			if made.is_empty():
+				pinched.append("g%d: not made" % generation)
+				continue
+			var map := LevelMap.from_image(made["layout"], made["config"])
+			if str(Regen.config_of(name).get("style", "")) == "tower":
+				var inside := Labyrinth.footprint(map.size, str(Regen.config_of(name).get("footprint", "square")))
+				if not inside.is_empty():
+					map.extras["footprint"] = inside
+			for at in Tools.pinches(map, made["anchors"]):
+				if Tools.against_outline(map, at):
+					walled += 1  # The tower's own wall pinches it (659: nothing carved outside).
+					continue
+				pinched.append("g%d %s" % [generation, at])
+			for key: Vector3i in map.edges:
+				if map.edges[key] != "door" or Level.in_anchors(made["anchors"], Terrain.edge_cells(key)[0]) or Level.in_anchors(made["anchors"], Terrain.edge_cells(key)[1]):
+					continue
+				doors += 1
+				var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+				if map.edge(key + step) != "door" and map.edge(key - step) != "door":
+					lone.append("g%d %s" % [generation, key])
+			var line := Labyrinth.door_line(map)
+			for at: Vector2i in map.cells:
+				if map.cells[at] in ["torch", "lamp_cold"] and line.has(at):
+					lit.append("g%d %s" % [generation, at])
+		_check(pinched.is_empty(), "%s: every floor cell outside the anchors in a clear 2 x 2 (%d pinched: %s; %d against the tower's outline)" % [name, pinched.size(), pinched.slice(0, 6), walled])
+		_check(lone.is_empty(), "%s: every door two edges wide (%d doors, %d lone: %s)" % [name, doors, lone.size(), lone.slice(0, 6)])
+		_check(lit.is_empty(), "%s: no torch on a door's cell or in its line (%s)" % [name, lit.slice(0, 6)])
 
 
 func _test_sheet() -> void:

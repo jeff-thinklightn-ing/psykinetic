@@ -2192,6 +2192,29 @@ func _set_door(door: Door, open: bool, by: GridEntity) -> void:
 		_log("door: %s %s %s" % [by.name, "opened" if open else "closed", door.name])
 	noise(by.tile, Senses.NOISE_DOOR, &"door", by)
 	door_changed.emit(door, by)
+	var partner := door_partner(door)
+	if partner != null and partner.open != open and not partner.is_broken():
+		partner.open = open
+		door_changed.emit(partner, by)
+
+
+## The other leaf of [param door]'s double door (725): in a generated
+## level's halls each pair of door edges side by side (Level.door_pairs,
+## as the client draws them) swings as one; null elsewhere, for a locked
+## door or a niche's (608), or for one with no partner.
+func door_partner(door: Door) -> Door:
+	if door == null or door.lock != "" or not Level.regenerates(door.zone):
+		return null
+	var each: Zone = zones.get(door.zone, zone) if Net.is_authority() else zone
+	var doors: Dictionary[Vector3i, Door] = _doors if each == zone else each.doors
+	var free := func(key: Vector3i) -> bool: return doors.has(key) and doors[key].lock == "" and not niche_edges.has(key)
+	var pairs := Level.door_pairs(doors.keys(), free)
+	for first: Vector3i in pairs:
+		if first == door.key:
+			return doors.get(pairs[first])
+		if pairs[first] == door.key:
+			return doors.get(first)
+	return null
 
 
 ## Impact on a door, from a push against it: wood breaks once its hp is

@@ -422,6 +422,8 @@ const DOOR_LEAF := ^"Door/leaf"
 ## A door's variant by its wall's set (659 amended): the dark tower's doors
 ## in its blue-black; any other set's variant 1.
 const DOOR_VARIANTS := {"dark": 2}
+## A generated barrow's door.double (725): art-kit's crypt door, variant 3.
+const CRYPT_DOUBLE_VARIANT := 3
 ## Near pieces blend only their nearest surface: every near piece's depth
 ## is drawn first (NEAR_DEPTH_SHADER, at NEAR_DEPTH_PRIORITY), then their
 ## colour where it matches (NEAR_PRIORITY). Plain alpha showed every face
@@ -12440,6 +12442,8 @@ func _add_doorway(key: Vector3i, pair := key) -> void:
 	doorway.position = (_edge_midpoint(key) + _edge_midpoint(pair)) * 0.5 + Vector3(0.0, _edge_base(key), 0.0)
 	doorway.rotation.y = _edge_yaw(key)
 	var variant := int(DOOR_VARIANTS.get(_set_of(key), 1))
+	if double and _crypt_doors():
+		variant = CRYPT_DOUBLE_VARIANT
 	var piece := ArtKit.instance("door.double" if double else "door.single", variant)
 	piece.name = "Door"
 	piece.set_meta("variant", variant)
@@ -12487,23 +12491,34 @@ func _add_doorway(key: Vector3i, pair := key) -> void:
 
 
 ## The doorways drawn as one door.double (decision 403): a building's door
-## edges side by side on its outline, two at a time from each run's start
-## (a third left a door.single). First edge -> the next along.
+## edges side by side on its outline, and in a generated level's halls
+## every door edge's (725), two at a time from each run's start
+## (Level.door_pairs; a third left a door.single). First edge -> the next
+## along.
 func _double_doors() -> Dictionary[Vector3i, Vector3i]:
 	var edges: Dictionary = _terrain["edges"]
+	var door := func(key: Vector3i) -> bool:
+		return edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.DOOR and not _niche_at.has(key)
+	if _generated_doors():
+		return Level.door_pairs(edges.keys(), door)  # 725: every pair in a generated level's halls.
 	var out: Dictionary[Vector3i, Vector3i] = {}
 	for building: Dictionary in _drawn_buildings():
-		var outline := Level.building_outline(building)
-		var door := func(key: Vector3i) -> bool: return key in outline and edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.DOOR
-		for key in outline:
-			var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
-			if not door.call(key) or door.call(key - step):
-				continue
-			var at := key
-			while door.call(at) and door.call(at + step):
-				out[at] = at + step
-				at += step * 2
+		out.merge(Level.door_pairs(Level.building_outline(building), door))
 	return out
+
+
+## Whether this map is a generated barrow (725: its regenerate block's
+## style "barrow"), its double doors the crypt's.
+func _crypt_doors() -> bool:
+	var level := str(_terrain.get("level", ""))
+	var block: Variant = Level.template_config(level).get("regenerate")
+	return block is Dictionary and str((block as Dictionary).get("style", "")) == "barrow"
+
+
+## Whether this map's doors are all the generator's (725: a regenerating
+## level's halls), every pair of them a door.double, not only a building's.
+func _generated_doors() -> bool:
+	return Level.regenerates(str(_terrain.get("level", "")))
 
 
 ## How tall the wall a doorway stands in is: the tallest of the walls on

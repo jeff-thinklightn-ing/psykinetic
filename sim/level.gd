@@ -2646,6 +2646,27 @@ static func building_cells(building: Dictionary) -> Array[Vector2i]:
 	return _union(building.get("blocks", [building["rect"]]))
 
 
+## Door edges drawn and swung as one double door (403; 725 for the
+## generated halls): of [param keys], those [param is_door] says are doors
+## and side by side along one line, two at a time from each run's start (a
+## third left on its own). First edge -> the next along.
+static func door_pairs(keys: Array, is_door: Callable) -> Dictionary[Vector3i, Vector3i]:
+	var given := {}
+	for key: Vector3i in keys:
+		if is_door.call(key):
+			given[key] = true
+	var out: Dictionary[Vector3i, Vector3i] = {}
+	for key: Vector3i in given:
+		var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+		if given.has(key - step):
+			continue
+		var at := key
+		while given.has(at) and given.has(at + step):
+			out[at] = at + step
+			at += step * 2
+	return out
+
+
 ## A parsed building's outline: the edges round its blocks' union.
 static func building_outline(building: Dictionary) -> Array[Vector3i]:
 	return blocks_outline(building_cells(building))

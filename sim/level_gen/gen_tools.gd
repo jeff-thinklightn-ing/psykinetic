@@ -94,6 +94,162 @@ static func widen(map: LevelMap, anchors: Array, carved: Dictionary[Vector2i, bo
 	return widened
 
 
+## The two-cell rule (725, Jeff: "too many 1 tile niches and 1 tile tight
+## turns, often around doors"): the walkable cells of [param map] outside
+## [param anchors] that stand in no clear 2 x 2, four walkable cells with no
+## edge between them (a wall or a door shuts one): a lone nook, a run one
+## wide, a turn or a pocket one cell wide, at a door or anywhere. Sorted.
+## The anchors are hand-made and keep their own rules.
+static func pinches(map: LevelMap, anchors: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for at: Vector2i in sorted_cells(map.cells):
+		if map.walkable(at) and not Level.in_anchors(anchors, at) and not in_clear_square(map, at):
+			out.append(at)
+	return out
+
+
+## The corners of the 2 x 2 squares a cell is in, as their top-left cells.
+const SQUARES: Array[Vector2i] = [Vector2i(0, 0), Vector2i(-1, 0), Vector2i(0, -1), Vector2i(-1, -1)]
+
+
+## Whether [param at] is one of a clear 2 x 2 on [param map] (pinches).
+static func in_clear_square(map: LevelMap, at: Vector2i) -> bool:
+	for corner in SQUARES:
+		if square_clear(map, at + corner):
+			return true
+	return false
+
+
+## Whether the 2 x 2 at [param top_left] is four walkable cells with no
+## edge shut between them; with [param carvable] (725's clearing), a cell
+## that is rock there counts as floor to be.
+static func square_clear(map: LevelMap, top_left: Vector2i, carvable := {}) -> bool:
+	for cell: Vector2i in square_cells(top_left):
+		if not map.walkable(cell) and not carvable.has(cell):
+			return false
+	for key: Vector3i in square_edges(top_left):
+		if map.edge(key) != "clear":
+			return false
+	return true
+
+
+static func square_cells(top_left: Vector2i) -> Array[Vector2i]:
+	return [top_left, top_left + Vector2i(1, 0), top_left + Vector2i(0, 1), top_left + Vector2i(1, 1)]
+
+
+## The four edges inside the 2 x 2 at [param top_left].
+static func square_edges(top_left: Vector2i) -> Array[Vector3i]:
+	return [Terrain.edge_key(top_left, Vector2i(1, 0)), Terrain.edge_key(top_left + Vector2i(0, 1), Vector2i(1, 0)),
+		Terrain.edge_key(top_left, Vector2i(0, 1)), Terrain.edge_key(top_left + Vector2i(1, 0), Vector2i(0, 1))]
+
+
+## The two-cell rule kept (725): each pinch (pinches) cleared by carving
+## the rock that makes one of its 2 x 2s whole, the one needing fewest
+## cells, never the map's rim or an anchor's cell, and a cell in
+## [param avoid] (the ring outside a walled room: a cell carved there is
+## walled off it again) last, only for a square holding none of the rooms'
+## cells [param inside], until none is left or WIDEN_PASSES passes are
+## spent. Carves rock alone, so nothing joined comes apart. Returns what it
+## carved; what it could not clear stays, and the test says so.
+static func clear_pinches(map: LevelMap, anchors: Array, carved: Dictionary[Vector2i, bool], avoid: Dictionary[Vector2i, bool] = {},
+		inside: Dictionary = {}) -> Dictionary[Vector2i, bool]:
+	var cleared: Dictionary[Vector2i, bool] = {}
+	for pass_number in WIDEN_PASSES:
+		var found := pinches(map, anchors)
+		if found.is_empty():
+			break
+		var changed := false
+		for at in found:
+			if in_clear_square(map, at):
+				continue  # Cleared by a neighbour's carving this pass.
+			var best: Array[Vector2i] = []
+			var best_cost := -1
+			for corner in SQUARES:
+				var top_left := at + corner
+				var missing: Array[Vector2i] = []
+				var ok := true
+				var in_ring := false
+				var in_room := false
+				for cell in square_cells(top_left):
+					in_room = in_room or inside.has(cell)
+					if map.walkable(cell):
+						continue
+					if cell.x <= 0 or cell.y <= 0 or cell.x >= map.size.x - 1 or cell.y >= map.size.y - 1 \
+							or map.cell(cell) != "void" or not rock(map, anchors, cell):
+						ok = false
+						break
+					in_ring = in_ring or avoid.has(cell)
+					missing.append(cell)
+				# A ring cell only for a square with no room cell in it: the
+				# wall it gets against the room then lies outside the square.
+				if in_ring and in_room:
+					ok = false
+				var carvable := {}
+				for cell in missing:
+					carvable[cell] = true
+				if not ok or not square_clear(map, top_left, carvable):
+					continue
+				var cost := missing.size() + (10 if in_ring else 0)
+				if best_cost < 0 or cost < best_cost:
+					best = missing
+					best_cost = cost
+			var best_ok := best_cost >= 0
+			if not best_ok:
+				continue
+			for cell in best:
+				carve(map, cell, carved)
+				cleared[cell] = true
+			changed = true
+		if not changed:
+			break
+	return cleared
+
+
+## The two-cell rule's last word (725): a pinched cell (pinches) that is a
+## dead end, one way out of it, no door on it, and no cell [param keep] names (the
+## ways' own path cells) nor a marker, filled with rock again, and the
+## cell it opened onto tried next, until none is left: a nook filled can
+## part nothing. The cells filled.
+static func fill_nooks(map: LevelMap, anchors: Array, keep: Dictionary = {}) -> Array[Vector2i]:
+	var filled: Array[Vector2i] = []
+	var queue := pinches(map, anchors)
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_front()
+		if not map.walkable(at) or keep.has(at) or map.cell(at) != FLOOR or in_clear_square(map, at):
+			continue
+		var exits: Array[Vector2i] = []
+		var by_door := false
+		for direction in DIRECTIONS:
+			var edge := map.edge(Terrain.edge_key(at, direction))
+			by_door = by_door or edge == "door"
+			if map.walkable(at + direction) and edge != "wall":
+				exits.append(at + direction)
+		if exits.size() != 1 or by_door:
+			continue  # A way on, or a door's own cell: never filled.
+		map.set_cell(at, "void")
+		for direction in DIRECTIONS:
+			map.set_edge(Terrain.edge_key(at, direction), "clear")
+		filled.append(at)
+		if not Level.in_anchors(anchors, exits[0]):
+			queue.append(exits[0])
+	return filled
+
+
+## Whether [param at] stands against a tower's outline (659: the map's
+## extras "footprint", nothing carved outside it): a cell beside it, or
+## across a corner, is outside; such a cell may be pinched by the tower's
+## own wall, and the two-cell rule leaves it (725).
+static func against_outline(map: LevelMap, at: Vector2i) -> bool:
+	if not map.extras.has("footprint"):
+		return false
+	var inside: Dictionary = map.extras["footprint"]
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if not inside.has(at + Vector2i(dx, dy)):
+				return true
+	return false
+
+
 ## The walkable parts of [param map] that hold anchor cells, each the
 ## cells of it, flood filled through open and door edges; the biggest first.
 static func parts(map: LevelMap, anchors: Array) -> Array[Array]:
