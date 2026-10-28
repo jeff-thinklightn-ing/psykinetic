@@ -2420,6 +2420,87 @@ func worn_refusal(entity: GridEntity, slots: PackedStringArray) -> String:
 
 ## False, a move refused: [param by] is told why if it broke the armour
 ## slot's rule for [param entity]'s [param slots] (slot_refused).
+## [param by] equips what is in [param carrier]'s pack slot [param slot]
+## (decision 722; Jeff: "double click equips item, for weapons that swaps
+## weapon into the correct hand, for armor that swaps armor into armor slot.
+## if you have an no inventory room it doesn't work"): armour to the armour
+## slot, a shield to the left hand, a held thing to the right (a two-handed
+## one empties the left too); what was there goes to the pack, into the
+## slot it left and then the first free ones. A hand or the armour slot
+## given: it is taken off into the pack. [param carrier] is [param by] or a
+## companion it reaches. "" when done, else why (said through slot_refused);
+## nothing moves then. Server only.
+func try_equip(by: GridEntity, carrier: GridEntity, slot: int) -> String:
+	if not Net.is_authority() or not _can_handle(by) or not reaches(by, carrier) or not has_hands(carrier):
+		return "not yours to change"
+	if slot < 0 or slot >= carrier.slots.size() or carrier.slots[slot].is_empty():
+		return "nothing there"
+	var id := carrier.slots[slot]
+	var slots := carrier.slots.duplicate()
+	var uids := slot_uids(carrier)
+	var why := ""
+	if not Items.is_pack(slot):
+		var free := free_pack_slot(carrier)
+		if free < 0:
+			why = "no room in your pack for the %s" % Items.name_of(id)
+		else:
+			slots[free] = id
+			uids[free] = uids[slot]
+			slots[slot] = ""
+			uids[slot] = 0
+	else:
+		var targets: Array[int] = []  # Where it goes first, then what else must be emptied.
+		if not Items.armour_of(id).is_empty():
+			targets = [Items.ARMOUR]
+		elif Items.has_tag(id, "shield"):
+			targets = [Items.LEFT_HAND]
+			if not slots[Items.RIGHT_HAND].is_empty() and int(Items.def(slots[Items.RIGHT_HAND]).get("hands", 1)) == 2:
+				targets.append(Items.RIGHT_HAND)
+		elif int(Items.def(id).get("hands", 0)) == 2:
+			targets = [Items.RIGHT_HAND, Items.LEFT_HAND]
+		elif int(Items.def(id).get("hands", 0)) == 1:
+			targets = [Items.RIGHT_HAND]
+		else:
+			why = "the %s can't be held or worn" % Items.name_of(id)
+		if why.is_empty():
+			var out_ids: Array[String] = []
+			var out_uids: Array[int] = []
+			for target in targets:
+				if not slots[target].is_empty():
+					out_ids.append(slots[target])
+					out_uids.append(uids[target])
+					slots[target] = ""
+					uids[target] = 0
+			slots[targets[0]] = id
+			uids[targets[0]] = uids[slot]
+			slots[slot] = ""
+			uids[slot] = 0
+			for i in out_ids.size():
+				var into := slot if i == 0 else -1
+				if into < 0:
+					for each: int in Items.PACK_SLOTS:
+						if each < slots.size() and slots[each].is_empty():
+							into = each
+							break
+				if into < 0:
+					why = "no room in your pack for the %s" % Items.name_of(out_ids[i])
+					break
+				slots[into] = out_ids[i]
+				uids[into] = out_uids[i]
+	if why.is_empty() and not hands_allow(carrier, slots):
+		why = worn_refusal(carrier, slots)
+		if why.is_empty():
+			why = "the %s can't be held so" % Items.name_of(id)
+	if not why.is_empty():
+		slot_refused.emit(by, why)
+		return why
+	carrier.slots = slots
+	carrier.slot_items = uids
+	_log("slots: %s equipped %s on %s from %d" % [by.name, id, carrier.name, slot])
+	_slots_changed(carrier)
+	return ""
+
+
 func _refused(by: GridEntity, entity: GridEntity, slots: PackedStringArray) -> bool:
 	var why := worn_refusal(entity, slots)
 	if not why.is_empty():
@@ -3063,12 +3144,13 @@ func mint_totem(player: GridEntity) -> int:
 		return have
 	var uid := mint_bound(TOTEM, holder_key(player), player, player.zone, player.tile)
 	items.set_charges(uid, 0)
-	var slot := player.slots.slice(0, Items.PACK).find("")
+	var slot := free_pack_slot(player)
 	if slot < 0:
-		slot = Items.PACK - 1
+		var last := Items.PACK_SLOTS.filter(func(i: int) -> bool: return i < player.slots.size())
+		slot = last[last.size() - 1]
 		var out := slot_uid(player, slot)
 		if soulbound(out):
-			slot = Items.PACK - 2
+			slot = last[last.size() - 2]
 			out = slot_uid(player, slot)
 		var slots := player.slots.duplicate()
 		var uids := slot_uids(player)
@@ -5189,7 +5271,7 @@ func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
 ## stack it joins (decision 619; the hands, then the pack), else
 ## free_slot_for's; -1 for none.
 func room_for(entity: GridEntity, uid: int) -> int:
-	var order: Array = [Items.RIGHT_HAND, Items.LEFT_HAND] + range(Items.PACK) if has_hands(entity) else range(entity.slots.size())
+	var order: Array = [Items.RIGHT_HAND, Items.LEFT_HAND] + Items.PACK_SLOTS if has_hands(entity) else range(entity.slots.size())
 	for slot: int in order:
 		if slot < entity.slots.size() and stacks_onto(slot_uid(entity, slot), uid):
 			return slot
@@ -5207,8 +5289,28 @@ func free_slot_for(entity: GridEntity, id: String) -> int:
 				trial[hand] = id
 				if hands_allow(entity, trial):
 					return hand
-	for slot in mini(entity.slots.size(), Items.PACK if has_hands(entity) else entity.slots.size()):
+	if has_hands(entity):
+		return free_pack_slot(entity)
+	for slot in entity.slots.size():
 		if entity.slots[slot].is_empty():
+			return slot
+	return -1
+
+
+## [param player_id]'s own chest (Locker, decision 722) where it stands
+## open now; null for none.
+func locker_of(player_id: String) -> Locker:
+	for entity: GridEntity in _entities:
+		if entity is Locker and (entity as Locker).player_id == player_id:
+			return entity as Locker
+	return null
+
+
+## [param entity]'s first empty pack slot (Items.PACK_SLOTS, decision 722);
+## -1 for none.
+func free_pack_slot(entity: GridEntity) -> int:
+	for slot: int in Items.PACK_SLOTS:
+		if slot < entity.slots.size() and entity.slots[slot].is_empty():
 			return slot
 	return -1
 
@@ -6433,10 +6535,11 @@ func _purses_migrated(entity: GridEntity, contents: Variant, uids: Variant) -> V
 func spawn(entity: GridEntity, at: Vector2i) -> bool:
 	if not Net.is_authority():
 		return false
-	if entity.spawned or not is_free(at):
+	if entity.spawned or entity.holds_cell and not is_free(at):
 		push_warning("World.spawn: cannot place %s at %s" % [entity.name, at])
 		return false
-	_occupancy[at] = entity
+	if entity.holds_cell:
+		_occupancy[at] = entity  # One holding no cell (a Locker, 722) stands where it is put.
 	_entities.append(entity)
 	_roster_changed()
 	if entity is Cargo or entity is Monster and not entity.slots.is_empty():
@@ -6467,6 +6570,10 @@ func despawn(entity: GridEntity) -> void:
 		return
 	if entity is Monster and not (entity as Monster).named_id.is_empty():
 		_keep_named_weapon(entity as Monster)  # Gone away (702): it comes back with it.
+	if entity is Player:
+		for each: GridEntity in _entities.duplicate():
+			if each is Locker and (each as Locker).player_id == (entity as Player).player_id:
+				despawn(each)  # Its chest goes with it (722); the record keeps what is in it.
 	_let_go_things(entity)
 	_forget_jobs(entity)
 	if _occupancy.get(entity.tile) == entity:

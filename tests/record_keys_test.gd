@@ -55,6 +55,7 @@ func _ready() -> void:
 		"marks": ["draugr"] as Array[String], "barrow": {"best": "hard", "containers": ["c1"]}, "care": {"hut": "gold"},
 		"paid_deals": {"barrow": {"level": "easy", "paid_step": 40}}, "care_given": {"hut": {"herbs": 2}},
 		"caches": ["k1"] as Array[String],
+		"locker_slots": Items.tidy(["bandaging_kit"], Locker.LOCKER_SLOTS), "locker_items": PackedInt32Array([6]),
 		"former": [{"companion": {"name": "Nix", "card": "", "hp": 0, "stamina": 0, "tile": null, "alive": true, "said": [],
 			"slots": Array(Items.tidy([], Companion.SLOTS)), "items": [], "parted": {"day": 2, "place": "t/store"},
 			"standing": {"p": {"score": 2, "met": 1, "since": 2, "why": ["travelled with you"], "own": true}}}, "worker": "settled:Nix"}],

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Inventory: your pack and your companion's hold 8 things. Double-click a weapon or armour in the pack to put it on (it swaps with what you had, or says there's no room). Each character has a personal chest of 48 slots at the town's locker, with a deposit-unequipped button and double-click to move a stack in or out. More things stack: tokens, sacks, nails and drinks (722).
 - The wilds: the temple's sealed stair down to the Ossuary is now inside the temple, in its north-west back corner, and moves with it if the town ever moves (715).
 - The healer's huts in the wilds and the forest are now turf houses you can walk into: an oval house dug into an earth bank, a pot brewing over the hearth, a bed and a shelf of herbs inside; turf on stone in the wilds, bark and bent poles in the forest. Smoke rises and the pot's fire burns while the healer is there and awake (718).
 - The lob's volley drawn (677 amended (2)): the arrow shoots up fast and fades out high, a red circle marks where the volley falls until the last arrow is down, and each of the three arrows rains down steeply onto its own spot with a thud.

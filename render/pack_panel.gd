@@ -301,7 +301,7 @@ func _row(mine: bool) -> HBoxContainer:
 		box.mine = mine
 		box.index = i
 		box.custom_minimum_size = SLOT_SIZE
-		var hand := i >= Items.PACK
+		var hand := i < Items.CARRIED and not Items.is_pack(i)
 		box.theme_type_variation = &"HandSlot" if hand else &"Inset"
 		if hand:
 			var mark := Label.new()

@@ -409,8 +409,18 @@ func _test_in_town() -> void:
 	_check(not World.try_transfer(host, host, 1, counter, 0) and host.slots[1] == "herbs"
 		and _main.shop_panel.why_shown() == "the medicine man buys herbs", "herbs in the counter: refused, said why (only their maker buys them)")
 	World.items.end(World.take_item(host, host, 1), "gone")
+	# A stack sold (722: sacks stack 5): each unit sold and paid, none lost.
+	var sacks := [World.items.mint("ore_sack", "found", "test"), World.items.mint("ore_sack", "found", "test")]
+	World.put_item(host, host, 1, sacks[0])
+	World.put_item(host, host, 1, sacks[1])
+	var ore_was := World.stockpile.count(STORE, "ore")
+	var gold_was: int = _main.gold
+	_check(World.slot_count(host, 1) == 2 and World.try_transfer(host, host, 1, counter, 0) and host.slots[1] == ""
+		and World.stockpile.count(STORE, "ore") == ore_was + 10 and _main.gold > gold_was,
+		"a stack of 2 sacks sold: both banked (ore +10), paid for, the slot empty (%d -> %d gold)" % [gold_was, _main.gold])
+	var sold_gold: int = _main.gold
 	_main._save_state()
-	_check(Snapshot.load(Net.state_path)["economy"]["purses"].get(me) == 18, "the snapshot keeps the host's 18 gold")
+	_check(Snapshot.load(Net.state_path)["economy"]["purses"].get(me) == sold_gold, "the snapshot keeps the host's gold (%d)" % sold_gold)
 	await _test_barter_in_town(host, counter)
 	_test_robber_falls(host)
 	await _test_give_in_town(host)

@@ -3001,7 +3001,7 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 		if entry.has("loot"):
 			warnings.append("loot at %s: a cache rolls its own find (its \"cache\" table); no loot" % at)
 		return
-	var chest: bool = script == CHEST and not props.get("depot", false) and not props.get("shop", false)
+	var chest: bool = script == CHEST and not props.get("depot", false) and not props.get("shop", false) and not props.get("locker", false)
 	var monster := script == MONSTER or script == ANIMAL or _own_class(spec)
 	var kind := str(spec.get("kind", ""))
 	var defaults: Variant = config.get("loot", {})

@@ -20,6 +20,9 @@ var shop := false
 ## 424): where a player hands the priest a thing and an offering, and
 ## collects what waits (economy's job, ui's screen).
 var temple := false
+## Whether this is a town's locker (props {"locker": true}, decision 722):
+## it keeps nothing; E on it opens the player's own chest there (Locker).
+var locker := false
 ## A cache (props {"cache": a loot table}, decision 599; Jeff: "old
 ## farmstead in the wilds - abandoned, tools and bandages found inside"):
 ## its slots stay empty, and E on it searches (Main.search): each player

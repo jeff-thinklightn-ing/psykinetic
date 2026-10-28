@@ -35193,3 +35193,61 @@ level_test `_test_building_level_link` (the four facings, the refusals, the wild
 wilds' cue check moves to (216, 195). Server and client both read the level (an older client
 draws the slab at the old cell); no message or replicated value changes, so the protocol is
 unchanged. No new class_name.
+## 722: a pack of 8, double-click equip, a personal chest of 48, more stacking
+
+Jeff (2026-10-27, through the coordinator): "lets try this: 8 for pack, 8 for
+companion pack, each char gets chest in town with 48 slots for the chest. ,
+buttons for deposit unequipped; double click to deposit one at a time, when
+pack open, double click equips item, for weapons that swaps weapon into the
+correct hand, for armor that swaps armor into armor slot. if you have an no
+inventory room it doesn't work. for most loot, found items, quest items, and
+components are all stackable." Design: C:/dev/review/inventory/design.md,
+approved by the coordinator with its defaults (a double-click moves a whole
+stack; one chest per character, reached from any town's locker).
+
+- **The pack of 8.** A carrier's slots are 11: the pack's first four (0-3),
+  the hands (4, 5), the armour (6), then the pack's last four (7-10):
+  `Items.CARRIED` 11, `Items.PACK_SLOTS`, `Items.is_pack(i)`. Added after the
+  armour, not renumbered, so saves and levels that name hands by place keep
+  them; a save of 7 is padded (tidy). Players and companions alike.
+  `World.free_pack_slot`; room_for, free_slot_for and the totem's mint go by
+  the pack's slots.
+- **Double-click equips** (`World.try_equip(by, carrier, slot)`, the
+  "equip" command {slot, of}): armour to the armour slot, a shield to the
+  left hand (a two-handed thing held goes to the pack), any other held thing
+  to the right (a two-handed one empties the left too). What comes out goes
+  into the slot it left, then the first free pack slots; with no room
+  nothing moves and the why is said (slot_refused, "no room in your pack for
+  the ..."). A hand or the armour double-clicked is taken off into the pack.
+  The same in a companion's pack, by her keeper.
+- **The locker.** A chest prop {"locker": true} (buildings places Umbrage's)
+  keeps nothing; the "locker" command {prop} there opens the player's own
+  chest, `Locker` (a new class_name, a Chest of `LOCKER_SLOTS` 48): spawned
+  on the locker's cell holding no cell (World.spawn spawns a body with
+  holds_cell false without occupancy), sent to its owner's peer alone
+  (`_visible_to`), its `opened` count replicated as the client's cue. Its
+  slots are the player record's (`locker_slots`, `locker_items`, saved as
+  "locker" only while it holds something), kept from slots_changed; the
+  world snapshot skips it; it is despawned with its player. `World.locker_of`.
+  "deposit" {slot} and "withdraw" {slot} move a whole slot to the first room
+  (a matching stack first); "deposit_all" moves every pack slot (never hands
+  or armour, never a bound thing) and says "your chest is full" if some stay.
+- **Stacking.** "token" left UNSTACKED_TAGS (quest tokens stack; a bound one
+  stays single by its binding). Stacks: barrow_half and return_token 10,
+  nails 10, axe_head 5, ore_sack, wood_bundle, cloth_bolt and food_sack 5,
+  wine and the two draughts 5 (from 3). Weapons, shields, armour, anything
+  with a condition (arrow bundles, until physics makes the arrow the unit)
+  and named, bound, cursed or blessed things stay single (619). A stack sold
+  at a counter is sold a unit at a time (economy_test).
+- **Saves and rollback** (release). An old record loads: 7 slots padded to
+  11, no locker. A build from before 722 reading a record this one saved
+  keeps its known keys only (PlayerRecord.from_dict) and tidies slots to 7:
+  it drops "locker" and pack slots 7-10 on its next save, for good. So a
+  rollback past 722 restores the pre-cut world copy the server makes, losing
+  play since the cut, not the old build over the new world. Main logs
+  "[state] lockers: N players' chests hold M slots of things" at load, no ids.
+
+items_test's `_test_inventory` names each case; economy_test sells a stack
+of 2; chest, stockpile and companion tests take the 11 slots. Server and
+client, a protocol change (11 replicated slots, the Locker and its "opened",
+new commands): its own revision line. New class_name: Locker.

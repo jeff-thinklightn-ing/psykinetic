@@ -1516,7 +1516,10 @@ func _test_deeds() -> void:
 	_check("road" in seen, "the day's walk together, on the roads: a deed (%s)" % [seen])
 	# Worked like a mule: warned at half, then once until she rests.
 	var slots_were := pet.slots.duplicate()
-	World.set_slots(pet, ["ration", "ration", "ration", "ration", "ration", "ration", "ration", "ration"].slice(0, pet.slots.size()))
+	var full: Array = []  # Every pack slot and both hands (722: the pack is 8).
+	for i in pet.slots.size():
+		full.append("" if i == Items.ARMOUR else "ration")
+	World.set_slots(pet, full)
 	pet._deeds.merge({"heavy": int(watch["heavy_cells"]) / 2 - 1, "warned_heavy": false, "mule_spent": false, "last": pet.tile + Vector2i(0, 1)}, true)
 	tick_on.call()
 	_check(str(watch["heavy_warn"]) in spoken and not "mule" in seen, "a heavy pack walked: she warns first (%s)" % [spoken])

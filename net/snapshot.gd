@@ -78,8 +78,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 	for entity in entities:
 		if not is_instance_valid(entity) or not entity.spawned or entity.owner_peer != 0:
 			continue
-		if entity is Companion:
-			continue  # Kept in its owner's player record instead.
+		if entity is Companion or entity is Locker:
+			continue  # Kept in its owner's player record instead (a locker: decision 722).
 		if entity is Resident:
 			continue  # Its town's records are its truth (decision 333).
 		var spec := entity.spawn_spec

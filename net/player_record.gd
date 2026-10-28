@@ -82,6 +82,10 @@ var care_given: Dictionary = {}
 ## The caches they have searched (decision 599: Chest.cache, a loot
 ## table's name): each gives a player its find once.
 var caches: Array[String] = []
+## Their own chest (decision 722, Locker): its ids ("" empty) and the
+## instance in each, LOCKER_SLOTS of them; saved only while it holds something.
+var locker_slots := Items.tidy([], Locker.LOCKER_SLOTS)
+var locker_items := PackedInt32Array()
 ## Companions who travelled with this player once and were handed to a
 ## town (686): {"companion": her record as she was, "worker": the town's
 ## worker id she is now}, newest first, a few at most.
@@ -128,6 +132,7 @@ func to_dict() -> Dictionary:
 		"care_given": care_given.duplicate(true),
 		"paid_deals": paid_deals.duplicate(true),
 		"caches": caches.duplicate(),
+		"locker": {"slots": Array(locker_slots), "items": Array(locker_items)} if locker_slots.count("") < locker_slots.size() else {},
 		"former": former.duplicate(true),
 	}
 
@@ -160,6 +165,10 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.known_places = _strings(entry.get("known_places", []))
 	record.marks = _strings(entry.get("marks", []))
 	record.caches = _strings(entry.get("caches", []))
+	var locker: Variant = entry.get("locker", {})
+	if locker is Dictionary:
+		record.locker_slots = Items.tidy(locker.get("slots", []), Locker.LOCKER_SLOTS)
+		record.locker_items = _uids(locker.get("items", []))
 	var barrow: Variant = entry.get("barrow", {})
 	if barrow is Dictionary and not barrow.is_empty():
 		record.barrow = Economy.barrow_migrated(barrow)

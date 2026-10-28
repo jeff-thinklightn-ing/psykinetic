@@ -76,6 +76,7 @@ func _ready() -> void:
 	_test_loot()
 	_test_remedy_heal()  # After the timed checks: its 400 ticks would shift them.
 	_test_bandage_reach()  # So too its ticks.
+	_test_inventory()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -218,7 +219,7 @@ func _test_given() -> void:
 	_check(World.try_transfer(host, host, 0, pet, 1), "the host gives the kit to %s" % pet.name)
 	var events: Array = World.items.history(uid)["events"]
 	_check(events[-1]["kind"] == "given" and pet.name in str(events[-1]["what"]), "given, to her (%s)" % [events[-1]])
-	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0, 0], "her player's record has its instance")
+	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0, 0, 0, 0, 0, 0], "her player's record has its instance")
 	World.steps += 20
 	_check(World.try_transfer(pet, pet, 1, host, 3), "she hands it back herself")
 	_check(World.items.held_by(uid, World.holder_key(pet)) == 20 and host.slot_items[3] == uid, "she held it 20 steps; the host has it")
@@ -858,7 +859,7 @@ func _test_blows() -> void:
 	var by_tile := {}
 	for spec: Dictionary in level["entities"]:
 		by_tile[spec["tile"]] = spec["props"].get("slots", PackedStringArray())
-	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield", ""]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
+	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield", "", "", "", "", ""]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
 	_check(by_tile[Vector2i(2, 1)][Items.RIGHT_HAND] == "giant_axe" and by_tile[Vector2i(2, 1)][Items.LEFT_HAND] == ""
 			and level["warnings"].any(func(w: String) -> bool: return "no left hand" in w), "a giant axe takes both: the shield left out, and said")
 	imp.acts = true
@@ -1838,7 +1839,8 @@ func _test_stacks() -> void:
 
 func _test_armour() -> void:
 	print("\n== armour: one slot, worn, never held (decision 622) ==")
-	_check(Items.CARRIED == 7 and Items.ARMOUR == 6 and Player.SLOTS == 7 and Companion.SLOTS == 7, "a seventh carried slot, the armour worn")
+	_check(Items.CARRIED == 11 and Items.ARMOUR == 6 and Player.SLOTS == 11 and Companion.SLOTS == 11 and Items.PACK_SLOTS == [0, 1, 2, 3, 7, 8, 9, 10],
+			"a seventh carried slot, the armour worn; the pack 8 round it (722)")
 	_check(Items.armour_of("mail_armour").get("look") == "mail" and Items.armour_of("robes").get("look") == "robes"
 			and Items.armour_of("knife").is_empty() and not Items.armour_of("plate_armour").has("range_steps"),
 			"four kinds, each with its look and stats; a knife is not armour")
@@ -2715,6 +2717,121 @@ func _test_bandage_reach() -> void:
 	World._roster_current = false
 	if kit != 0:
 		World.items.end(World.take_item(host, host, 2), "gone")
+
+
+
+## Jeff's inventory (decision 722): a pack of 8, double-click equips into
+## the right place or not at all, his own 48-slot chest at a town's locker.
+func _test_inventory() -> void:
+	print("\n== the pack of 8, double-click equip, the locker's own chest (decision 722) ==")
+	var host := _player(Net.local_id)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	var had_at := host.tile
+	var empty: Array = []
+	empty.resize(Items.CARRIED)
+	empty.fill("")
+	World.set_slots(host, empty)  # Its own things put back at the end.
+	_check(host.slots.size() == 11 and Items.PACK_SLOTS.size() == 8 and not Items.is_pack(Items.RIGHT_HAND) and not Items.is_pack(Items.ARMOUR)
+			and Items.is_pack(7) and Items.is_pack(10), "case: 11 slots, the pack 8 (0-3 and 7-10), the hands and armour not in it")
+	var old := PlayerRecord.from_dict({"player_id": "old", "tile": [1, 1], "slots": ["ration", "", "", "", "sword", "", "robes"]})
+	_check(old.slots.size() == 11 and old.slots[0] == "ration" and old.slots[Items.RIGHT_HAND] == "sword" and old.slots[Items.ARMOUR] == "robes"
+			and old.slots[10] == "", "case: a record saved with 7 slots reads as 11, everything where it was")
+	# Double-click equips.
+	var sword := _give(host, "sword", 0)
+	_check(World.try_equip(host, host, 0) == "" and host.slots[Items.RIGHT_HAND] == "sword" and host.slots[0] == "",
+			"case: a one-handed weapon to the right hand")
+	var dagger := _give(host, "dagger", 1)
+	_check(World.try_equip(host, host, 1) == "" and host.slots[Items.RIGHT_HAND] == "dagger" and host.slot_items[1] == sword,
+			"case: another: swapped, the sword into the slot it left")
+	var shield := _give(host, "shield", 2)
+	_check(World.try_equip(host, host, 2) == "" and host.slots[Items.LEFT_HAND] == "shield", "case: a shield to the left hand")
+	var axe := _give(host, "giant_axe", 3)
+	_check(World.try_equip(host, host, 3) == "" and host.slots[Items.RIGHT_HAND] == "giant_axe" and host.slots[Items.LEFT_HAND] == ""
+			and host.slot_items.has(dagger) and host.slot_items.has(shield) and Items.is_pack(host.slot_items.find(shield)),
+			"case: a two-handed one: both hands, the dagger and the shield into the pack")
+	var shield_at := host.slot_items.find(shield)
+	_check(World.try_equip(host, host, shield_at) == "" and host.slots[Items.LEFT_HAND] == "shield" and host.slots[Items.RIGHT_HAND] == ""
+			and Items.is_pack(host.slot_items.find(axe)), "case: the shield with the axe held: the axe into the pack")
+	var mail := _give(host, "mail_armour", World.free_pack_slot(host))
+	var mail_at := host.slot_items.find(mail)
+	_check(World.try_equip(host, host, mail_at) == "" and host.slots[Items.ARMOUR] == "mail_armour" and host.slots[mail_at] == "",
+			"case: armour to the armour slot")
+	var robes := _give(host, "robes", World.free_pack_slot(host))
+	var robes_at := host.slot_items.find(robes)
+	_check(World.try_equip(host, host, robes_at) == "" and host.slots[Items.ARMOUR] == "robes" and host.slot_items[robes_at] == mail,
+			"case: other armour: swapped, the mail into its slot")
+	_check(World.try_equip(host, host, Items.ARMOUR) == "" and host.slots[Items.ARMOUR] == "" and Items.is_pack(host.slot_items.find(robes)),
+			"case: double-click the armour: off, into the pack")
+	var fillers: Array[int] = []
+	while World.free_pack_slot(host) >= 0:
+		fillers.append(_give(host, "knife", World.free_pack_slot(host)))
+	_check(World.try_equip(host, host, Items.LEFT_HAND).begins_with("no room") and host.slots[Items.LEFT_HAND] == "shield",
+			"case: the pack full: the shield stays on, and why")
+	var sword_at := host.slot_items.find(sword)
+	World.try_equip(host, host, sword_at)  # The sword in the right hand, the shield in the left.
+	fillers.append(_give(host, "knife", sword_at))  # The pack full again.
+	var axe_at := host.slot_items.find(axe)
+	_check(World.try_equip(host, host, axe_at).begins_with("no room") and host.slots[Items.RIGHT_HAND] == "sword" and host.slots[Items.LEFT_HAND] == "shield",
+			"case: a two-handed one with both hands full and the pack full: nothing moves")
+	World.items.end(World.take_item(host, host, host.slot_items.find(fillers[0])), "gone")
+	var herbs := _give(host, "herbs", World.free_pack_slot(host))
+	_check(World.try_equip(host, host, host.slot_items.find(herbs)) == "" and host.slots[Items.RIGHT_HAND] == "herbs",
+			"case: a held thing that is no weapon goes to the right hand too")
+	_clear(host)
+	# The locker: his own chest, at a town's locker, seen by him alone.
+	var prop_at := _free_near(host, 2)
+	var prop := _main._spawn({"script": "res://sim/chest.gd", "name": "TestLocker", "tile": prop_at}) as Chest
+	prop.locker = true
+	_beside(host, prop)
+	var kit := _give(host, "bandaging_kit", 0)
+	var kit2 := _give(host, "bandaging_kit", 7)
+	var held := _give(host, "dagger", Items.RIGHT_HAND)
+	var locker: Locker = _main.open_locker(host, prop)
+	_check(locker != null and locker.slots.size() == Locker.LOCKER_SLOTS and locker.tile == prop.tile and World._occupancy.get(prop.tile) == prop
+			and locker.opened == 1 and World.locker_of(Net.player_id) == locker, "case: opened at the locker: his chest of 48, on its cell, the locker still there")
+	_check(locker._visible_to(host.owner_peer) == World.peer_sees(host.owner_peer, locker.zone) and not locker._visible_to(host.owner_peer + 1000),
+			"case: sent to him alone")
+	_check(_main.deposit_all(host, locker) == 2 and locker.slots[0] == "bandaging_kit" and World.slot_count(locker, 0) == 2
+			and host.slots[0] == "" and host.slots[7] == "" and host.slots[Items.RIGHT_HAND] == "dagger",
+			"case: deposit unequipped: the pack's two kits as one stack, the dagger in hand kept")
+	_check(record.locker_slots[0] == "bandaging_kit" and record.locker_items[0] in [kit, kit2], "case: his record has it at once")
+	_check(_main._move_slot(host, locker, 0, host) and host.slots[0] == "bandaging_kit" and World.slot_count(host, 0) == 2 and locker.slots[0] == "",
+			"case: double-click it in the chest: the whole stack back to the pack")
+	_check(_main._move_slot(host, host, 0, locker) and locker.slots[0] == "bandaging_kit" and host.slots[0] == "", "case: double-click it in the pack: the stack in")
+	_check(not _main._move_slot(host, host, Items.RIGHT_HAND, locker) and host.slots[Items.RIGHT_HAND] == "dagger", "case: a hand's thing is not deposited")
+	var saved := record.to_dict()
+	var back := PlayerRecord.from_dict(saved.duplicate(true))
+	_check(back.locker_slots[0] == "bandaging_kit" and back.locker_items[0] == record.locker_items[0] and back.locker_slots.size() == Locker.LOCKER_SLOTS,
+			"case: saved and read back with the record")
+	_check(PlayerRecord.from_dict({"player_id": "x", "tile": [1, 1]}).locker_slots.count("") == Locker.LOCKER_SLOTS
+			and not PlayerRecord.new().to_dict().has("locker") or PlayerRecord.new().to_dict()["locker"].is_empty(), "case: none saved: empty, nothing written")
+	var snapshot_entries := Snapshot._entries(World.get_entities())
+	_check(not snapshot_entries.any(func(e: Dictionary) -> bool: return str(e.get("script", "")).ends_with("locker.gd")), "case: never in the world's snapshot")
+	World.despawn(locker)
+	_check(World.locker_of(Net.player_id) == null and World.items.has(record.locker_items[0]), "case: closed: gone from the world, its things still in the book")
+	locker = _main.open_locker(host, prop)
+	_check(locker != null and locker.slots[0] == "bandaging_kit" and World.slot_count(locker, 0) == 2 and locker.opened == 1, "case: opened again: the same things")
+	# Stacking (722): tokens and the heavy sacks stack; gear and bound things never.
+	_check(Items.stack_of("barrow_half") == 10 and Items.stack_of("ore_sack") == 5 and Items.stack_of("stamina_potion") == 5
+			and Items.stack_of("sword") == 1 and Items.stack_of("encolpion_amulet") == 1 and Items.stack_of("mail_armour") == 1 and Items.stack_of("arrows") == 1,
+			"case: tokens, sacks and drinks stack; weapons, the amulet, armour and arrow bundles stay single")
+	_clear(locker)
+	World.despawn(locker)
+	World.despawn(prop)
+	_clear(host)
+	World.set_slots(host, had_slots, had_uids)
+	World._relocate(host, had_at)
+
+
+
+## Everything in [param entity]'s slots ended and the slots emptied.
+func _clear(entity: GridEntity) -> void:
+	for slot in entity.slots.size():
+		for uid in World.slot_units(entity, slot):
+			World.items.end(uid, "gone")
+	World.set_slots(entity, [])
 
 
 func _steps(count: int) -> void:

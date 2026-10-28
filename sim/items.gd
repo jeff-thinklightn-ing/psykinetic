@@ -25,17 +25,22 @@ const LOOT := "res://levels/loot.json"
 ## The ArtKit manifest of items' slots, generated from the catalog.
 const ART_SLOTS := "res://art/kit/slots_items.json"
 const ART_BUDGET := 500
-## A carrier's slots (a player's, a companion's): the pack first, then two
-## hands, right and left, then the armour worn (decision 622). A thing in a
-## hand is held (hands 1 or 2; a two-handed one in the right hand with the
-## left empty); only armour is worn, and armour is worn or packed, never
-## held; World keeps to it. A save from before hands had the pack alone,
-## one from before armour six slots: tidy pads the rest empty.
+## A carrier's slots (a player's, a companion's): the pack's first four,
+## then two hands, right and left, then the armour worn (decision 622), then
+## the pack's last four (decision 722; Jeff: "8 for pack, 8 for companion
+## pack": after the armour, so saves and levels naming hands by place keep
+## them). A thing in a hand is held (hands 1 or 2; a two-handed one in the
+## right hand with the left empty); only armour is worn, and armour is worn
+## or packed, never held; World keeps to it. A save from before hands had
+## the pack's first four alone, one from before armour six slots, one from
+## before 722 seven: tidy pads the rest empty.
 const PACK := 4
 const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const ARMOUR := 6
-const CARRIED := 7
+const CARRIED := 11
+## The pack's slots, in order (decision 722): the first four, then the last.
+const PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10]
 ## Slots enough to have hands (the pack and both): a monster armed by a
 ## level before armour (decision 622) has six, and still holds what it holds.
 const HANDED := LEFT_HAND + 1
@@ -47,8 +52,16 @@ const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight"
 ## Encolpion Amulet): a saved old id reads as its new one, its uid, binding
 ## and charges kept (tidy, ItemBook.from_dict).
 const RENAMED := {"draugr_totem": "encolpion_amulet"}
-## Tags whose things never stack (decision 619): each is its own.
-const UNSTACKED_TAGS: Array[String] = ["weapon", "shield", "token", "soulbound"]
+## Whether slot [param i] of a carrier is in its pack (decision 722), not
+## a hand or the armour.
+static func is_pack(i: int) -> bool:
+	return i in PACK_SLOTS
+
+
+## Tags whose things never stack (decision 619): each is its own. A token
+## stacks since 722 (Jeff: "quest items ... are all stackable"); a bound one
+## stays single by its binding (World.stacks_onto's _plain).
+const UNSTACKED_TAGS: Array[String] = ["weapon", "shield", "soulbound"]
 ## Who makes things (made's "by"), as economy's production has them.
 const TRADES: Array[String] = ["smith", "cook", "carpenter", "tanner", "fletcher", "weaver", "medicine_man"]
 

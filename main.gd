@@ -4145,6 +4145,14 @@ func _boot() -> void:
 	if snapshot["ok"]:
 		print("[state] loaded %d entities and %d player records from %s (zones: %s)" % [
 			restored, snapshot["players"].size(), Net.state_path, ", ".join(saved.keys())])
+		var lockers := 0
+		var kept := 0
+		for each: PlayerRecord in _records.values():
+			var held := each.locker_slots.size() - each.locker_slots.count("")
+			if held > 0:
+				lockers += 1
+				kept += held
+		print("[state] lockers: %d players' chests hold %d slots of things (722)" % [lockers, kept])
 	World.enter(World.zones[default_zone()])
 	if Net.mode != Net.Mode.SERVER:
 		_admit(Net.local_id, Net.player_id, Net.player_name)
@@ -10669,6 +10677,27 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		var facing := _direction_arg(args)
 		if facing != Vector2i.ZERO:
 			World.face(entity, facing)
+	elif command_name == "locker" and entity is Player:
+		var prop := get_node_or_null(NodePath(str(args.get("prop", "")))) as Chest
+		if prop != null:
+			open_locker(entity as Player, prop)
+	elif command_name in ["deposit", "withdraw", "deposit_all"] and entity is Player:
+		var locker := World.locker_of((entity as Player).player_id)
+		if locker != null:
+			if command_name == "deposit_all":
+				deposit_all(entity, locker)
+			elif command_name == "deposit":
+				_move_slot(entity, entity, int(args.get("slot", -1)), locker)
+			else:
+				_move_slot(entity, locker, int(args.get("slot", -1)), entity)
+	elif command_name == "equip":
+		# A double-click in a pack (decision 722): on its own, or its
+		# companion's ("of"); refused, the why is said (slot_refused).
+		var carrier := entity
+		if not str(args.get("of", "")).is_empty():
+			carrier = get_node_or_null(NodePath(str(args["of"]))) as GridEntity
+		if carrier != null:
+			World.try_equip(entity, carrier, int(args.get("slot", -1)))
 	elif command_name == "transfer":
 		var from := get_node_or_null(NodePath(str(args.get("from", "")))) as GridEntity
 		var to := get_node_or_null(NodePath(str(args.get("to", "")))) as GridEntity
@@ -15488,8 +15517,8 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 			var slot := held
 			if player.slots[slot].is_empty():
 				slot = -1
-				for i in Items.PACK:
-					if not player.slots[i].is_empty():
+				for i: int in Items.PACK_SLOTS:
+					if i < player.slots.size() and not player.slots[i].is_empty():
 						slot = i
 			if slot >= 0:
 				World.try_drop(player, slot, null, int(args.get("count", 0)))  # A count of a stack (decision 619).
@@ -15581,10 +15610,88 @@ func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, c
 	World.command(player, "transfer", args)
 
 
+## Server: [param player] opens [param prop], a town's locker they reach
+## (decision 722): their own chest (Locker) stands there, its slots from
+## their record, and its opened count rises (the client's cue to show it).
+## One already open elsewhere moves here. Its Locker, or null.
+func open_locker(player: Player, prop: Chest) -> Locker:
+	var record: PlayerRecord = _records.get(player.player_id)
+	if not Net.is_authority() or not prop.locker or not World.reaches(player, prop) or record == null:
+		return null
+	var locker := World.locker_of(player.player_id)
+	if locker != null and (locker.zone != prop.zone or locker.tile != prop.tile):
+		World.despawn(locker)
+		locker = null
+	if locker == null:
+		locker = _spawn({"script": "res://sim/locker.gd", "shape": "chest", "name": "Locker_%d" % record.index, "tile": prop.tile}) as Locker
+		if locker == null:
+			return null
+		locker.player_id = player.player_id
+		locker.viewer = player.owner_peer
+		World.set_slots(locker, record.locker_slots, record.locker_items)
+		World.update_visibility(player.owner_peer, prop.zone)  # Asked at its spawn, before it had a viewer.
+	locker.opened += 1
+	return locker
+
+
+## Server: [param from]'s whole [param slot] (a stack whole) into the first
+## room [param to] has for it (decision 722: a double-click deposits or
+## withdraws); refused, nothing moves and the why is said.
+func _move_slot(by: GridEntity, from: GridEntity, slot: int, to: GridEntity) -> bool:
+	if slot < 0 or slot >= from.slots.size() or from.slots[slot].is_empty():
+		return false
+	if from == by and not Items.is_pack(slot):
+		return false  # Only what is in the pack goes in: hands and armour stay.
+	var uid := World.slot_uid(from, slot)
+	var into := -1
+	for each in to.slots.size():
+		if World.stacks_onto(World.slot_uid(to, each), uid, World.slot_count(from, slot)):
+			into = each
+			break
+	if into < 0:
+		into = World.free_pack_slot(to) if to is Player else to.slots.find("")
+	if into < 0:
+		World.slot_refused.emit(by, "no room in your %s" % ("pack" if to is Player else "chest"))
+		return false
+	return World.try_transfer(by, from, slot, to, into)
+
+
+## Server: everything in [param player]'s pack (never the hands or the
+## armour) into [param locker], each stack onto a matching one first (the
+## chest screen's button, decision 722). What does not fit stays; said once.
+func deposit_all(player: GridEntity, locker: Locker) -> int:
+	var moved := 0
+	var full := false
+	for slot: int in Items.PACK_SLOTS:
+		if slot >= player.slots.size() or player.slots[slot].is_empty() or World.soulbound(World.slot_uid(player, slot)):
+			continue
+		var uid := World.slot_uid(player, slot)
+		var into := -1
+		for each in locker.slots.size():
+			if World.stacks_onto(World.slot_uid(locker, each), uid, World.slot_count(player, slot)):
+				into = each
+				break
+		if into < 0:
+			into = locker.slots.find("")
+		if into < 0:
+			full = true
+			continue
+		if World.try_transfer(player, player, slot, locker, into):
+			moved += 1
+	if full:
+		World.slot_refused.emit(player, "your chest is full")
+	return moved
+
+
 ## Server: a player's or a companion's pack changed: their record has it at
 ## once, so it survives a death, a trip and a restart.
 func _on_slots_changed(entity: GridEntity) -> void:
-	if entity is Player:
+	if entity is Locker:
+		var owner: PlayerRecord = _records.get((entity as Locker).player_id)
+		if owner != null:
+			owner.locker_slots = entity.slots.duplicate()  # Decision 722.
+			owner.locker_items = World.slot_uids(entity)
+	elif entity is Player:
 		var record: PlayerRecord = _records.get(_peer_ids.get(entity.owner_peer, ""))
 		if record != null and _players.get(entity.owner_peer) == entity:
 			record.slots = entity.slots.duplicate()
