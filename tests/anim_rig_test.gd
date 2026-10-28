@@ -21,6 +21,7 @@ func _ready() -> void:
 	await _test_strike()
 	await _test_one_strike_clip()
 	await _test_spear_jab()
+	await _test_sword_slash()
 	await _test_bow_clear()
 	await _test_sky_bow()
 	await _test_bow_back()
@@ -298,6 +299,65 @@ func _test_spear_jab() -> void:
 		_check(maxf(across.y - across.x, up.y - up.x) <= SPEAR_SWAY * height, "%s: the point swung %.2f m across, %.2f m up and down (at most %.2f)" % [
 			body[0], across.y - across.x, up.y - up.x, SPEAR_SWAY * height])
 		puppet.queue_free()
+
+
+## The sword's slashes (338 amended, pc-character's side; Jeff: "sword swings a little too fast", "a
+## small reset to guard between slashes"): the recovery is what's left of the blow's time after the
+## lead it took (AnimRig.lead_of), so at a blow every 7 ticks (sword speed 1.4) one's own slash plays
+## near its natural speed (SLASH_PACE); each slash starts and ends at the guard (the right hand within
+## SLASH_GUARD of it, both ways alike), the forehand cutting right to left and the backhand left to
+## right; Client3D picks them by turns.
+const SLASH_PACE := [0.6, 1.6]
+const SLASH_GUARD := 0.02
+func _test_sword_slash() -> void:
+	print("== the sword's slashes ==")
+	var strikes: Array = Client3D.HUMANOID_MOVES["strikes"]["sword"]
+	var between := 7 * World.TICK_DT
+	# One's own blow, another's, and either wound up 2 ticks (Client3D.WOUND_STRIKES: its lead
+	# played over the wind-up, a slash seen, not only its reset).
+	_check("sword" in Client3D.WOUND_STRIKES, "a wound-up sword blow plays its own slash")
+	for case: Array in [["one's own", 0.0], ["another's", Client3D.STRIKE_LANDS_IN], ["a wound-up", 2 * World.TICK_DT]]:
+		var lands_in := float(case[1])
+		var contact := float(strikes[0][1])
+		var lead := AnimRig.lead_of(contact, lands_in)
+		var length := (load(CLIPS) as AnimationLibrary).get_animation(str(strikes[0][0])).length
+		var recover := (length - contact) / maxf(between - lead, 0.2)
+		_check(recover >= SLASH_PACE[0] and recover <= SLASH_PACE[1] and lead <= maxf(lands_in, contact / AnimRig.STRIKE_SPEED_MAX) + 0.001
+				and lead >= minf(lands_in, contact / AnimRig.STRIKE_SPEED_MIN) - 0.001,
+			"%s blow every 7 ticks: the lead %.2f s, the follow-through and the guard at x%.2f" % [case[0], lead, recover])
+	var lib := load(CLIPS) as AnimationLibrary
+	var at := {}
+	for strike: Array in strikes:
+		var clip := str(strike[0])
+		var length := lib.get_animation(clip).length
+		for t: float in [0.0, 0.18, 0.36, length]:
+			var body := (load("res://art/models/characters/human_m.glb") as PackedScene).instantiate() as Node3D
+			add_child(body)
+			var rig := AnimRig.make(body, lib, 0.0, true, null)
+			for i in 3:
+				rig.base_at(clip, t)
+				await get_tree().process_frame
+			var sk := body.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+			at["%s %.2f" % [clip, t]] = sk.get_bone_global_pose(sk.find_bone("RightHand")).origin
+			at["%s end" % clip] = at["%s %.2f" % [clip, t]] if t == length else at.get("%s end" % clip, Vector3.ZERO)
+			body.free()
+		var start: Vector3 = at["%s 0.00" % clip]
+		_check(start.distance_to(at["%s end" % clip]) <= SLASH_GUARD and start.distance_to(at["Sword_Slash_F 0.00"]) <= SLASH_GUARD,
+			"%s: from the guard and back to it (%.3f m)" % [clip, start.distance_to(at["%s end" % clip])])
+		# Skeleton space: the body's left is +x.
+		var across: float = (at["%s 0.36" % clip] as Vector3).x - (at["%s 0.18" % clip] as Vector3).x
+		var forehand := clip.ends_with("_F")
+		_check(across > 0.2 if forehand else across < -0.2, "%s: the cut %s, %.2f m across" % [clip, "right to left" if forehand else "left to right", absf(across)])
+	var puppet := Node3D.new()
+	puppet.set_meta("rng", RandomNumberGenerator.new())
+	var names: Array[String] = []
+	for strike: Array in strikes:
+		names.append(str(strike[0]))
+	var picked: Array[String] = []
+	for i in 4:
+		picked.append(Client3D._pick_clip(puppet, names))
+	puppet.free()
+	_check(picked[0] != picked[1] and picked[1] != picked[2] and picked[2] != picked[3], "a string of blows alternates forehand and backhand (%s)" % [picked])
 
 
 ## The two ends of a held piece along its length (its +y), in its own frame: [butt, point].

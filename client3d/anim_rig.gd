@@ -228,6 +228,15 @@ func _to_base(clip: String, speed: float, fade: float, seek: float, restart := f
 	_apply()
 
 
+## The seconds a strike's lead (its [param contact] seconds in, at speed 1)
+## takes, played to land in [param lands_in]: its speed kept within the
+## strike speeds, as strike() plays it.
+static func lead_of(contact: float, lands_in: float) -> float:
+	var least := ArtKit.feel("anim_rig.strike_speed_min", STRIKE_SPEED_MIN)
+	var most := ArtKit.feel("anim_rig.strike_speed_max", STRIKE_SPEED_MAX)
+	return contact / clampf(contact / maxf(lands_in, 0.001), least, most)
+
+
 ## [param clip] struck once over everything: played so the blow lands
 ## (its [param contact], seconds into the clip at speed 1; CONTACT_DEFAULT
 ## of it if negative) [param lands_in] seconds from now, then what follows

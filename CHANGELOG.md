@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The sword swings like a sword (338 amended): forehand and backhand slashes in turn, each wound up for a moment and settling back to a guard at the right shoulder before the next, played at about their own pace instead of three times too fast.
 
 - The sword swings slower and hits harder (338 amended): a blow every 0.7 s instead of 0.5, for 3 instead of 2, about the same damage over a fight; each slash winds up 0.2 s before it lands (a step straight back out of reach dodges it, a sidestep doesn't), and a sword mid-swing doesn't parry.
 - Strangers pass through towns (711, npc's side): travellers, pedlars and pilgrims now stand at the inn, store or temple, walk in from the road and out again, greet you when clicked and pass on news from other towns once a visit; a pedlar sells wares from afar through the offers panel, into your hands.

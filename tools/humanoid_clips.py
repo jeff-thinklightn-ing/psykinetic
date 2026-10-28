@@ -133,7 +133,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -492,6 +492,29 @@ CLIPS["Spear_Thrust"] = {"keys": [
 	(0.44, P("Sword_Idle", 0.0, SPEAR_OUT, move=(0.0, -0.12, -0.02))),
 	(0.8, P("Sword_Idle", 0.0, SPEAR_READY)),
 ]}
+# The sword's slashes (338 amended, pc-character's side; Jeff: "sword swings a little too fast",
+# "a small reset to guard between slashes"): from a guard (the hand before the right shoulder, the
+# blade up and back past it, clear of the face; the coordinator on the strip), a short wind-up, the
+# cut across the front, a follow-through, and back to the guard by the clip's end, so a string of
+# blows settles to it between each. Forehand (right to left) and backhand (left to right); Client3D
+# picks one not the last, so they alternate; a wind-up (the sword's 2 ticks) stretches the lead.
+# one_hand: the wrist (ahead, out to its right, up) of the shoulder, the blade's length and its edge
+# (face) in the body's axes (left +X, ahead -Y, up +Z). About 0.7 s natural, a blow every 7 ticks.
+SWORD_GUARD = one_hand((0.2, 0.12, -0.22), (-0.25, 0.3, 0.92), (0.0, -1.0, 0.3)) + GUARDING_LEFT
+SLASH_KEYS = (0.0, 0.18, 0.27, 0.36, 0.44, 0.7)
+def slash(way: float) -> list:
+	"""A slash's keys: [way] 1 forehand (right to left), -1 backhand (left to right)."""
+	wind = one_hand((0.06, 0.24 * way, 0.14), (-0.5 * way, 0.2, 0.85), (1.0 * way, -0.3, 0.0)) + GUARDING_LEFT + [
+		("spine_02", TURN, -20.0 * way), ("spine_03", TURN, -8.0 * way)]
+	cut = one_hand((0.46, 0.0, -0.06), (0.4 * way, -0.9, 0.1), (1.0 * way, 0.2, -0.2)) + GUARDING_LEFT + [
+		("spine_02", TURN, 6.0 * way), ("spine_01", LIFT, -6.0)]
+	follow = one_hand((0.3, -0.24 * way, -0.16), (0.9 * way, 0.2, -0.15), (0.2 * way, 1.0, 0.0)) + GUARDING_LEFT + [
+		("spine_02", TURN, 24.0 * way), ("spine_03", TURN, 8.0 * way), ("spine_01", LIFT, -8.0)]
+	poses = (SWORD_GUARD, wind, cut, follow, follow, SWORD_GUARD)
+	steps = ((0, 0, 0), (0, 0.03, 0), (0, -0.08, -0.02), (0, -0.08, -0.02), (0, -0.08, -0.02), (0, 0, 0))
+	return [(t, P("Sword_Idle", 0.0, pose, move=step)) for t, pose, step in zip(SLASH_KEYS, poses, steps)]
+CLIPS["Sword_Slash_F"] = {"keys": slash(1.0)}
+CLIPS["Sword_Slash_B"] = {"keys": slash(-1.0)}
 CLIPS["Axe_Overhead"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
 	(0.3, P("Idle_Loop", 0.0, AXE_UP)),

@@ -34277,3 +34277,46 @@ it up, lead_slack on F7), companion_test, draugr_fight_test,
 free_walk_test, controls_test, monster_test, items_test, tuning_test,
 ui_test pass. Server only, protocol unchanged, no new class_name; ships
 with pc-character's slash.
+## 338 amended, pc-character's side: the sword slashes back to guard
+
+Jeff: "sword swings a little too fast", and a small reset to guard
+between slashes. Combat's side slows the blow (sword speed 1.4, a blow
+every 7 ticks); ours is how it reads.
+
+Measured: the UAL's Sword_Attack is 1.53 s, its contact 0.38 s in. One's
+own blow lands at once (lands_in 0), so its lead ran at the 3x cap
+(0.13 s). Client3D._strike gave the recovery the time between blows less
+lands_in less the clip's contact, the lead at speed 1, not the 0.13 s it
+took: at 5 ticks 0.12 s, raised to the 0.2 floor, so the 1.15 s tail ran at
+3x too. The whole swing showed at three times its speed.
+
+- The recovery is what's left of the blow's time after the lead it took:
+  AnimRig.lead_of(contact, lands_in), the lead's seconds at the speed
+  strike() plays it. Every humanoid strike recovers this way (a blow whose
+  lead was hurried no longer recovers hurried as well).
+- Two sword slashes (tools/humanoid_clips.py, one_hand on Sword_Idle):
+  Sword_Slash_F, right to left, and Sword_Slash_B, left to right, each
+  from a guard (the hand before the right shoulder, the blade up and back
+  past it, clear of the face: the coordinator on the first strip), a short
+  wind-up, the cut across the front, a follow-through,
+  and back to the guard by the clip's end: 0.71 s, contact 0.21 s
+  (measured). HUMANOID_MOVES' sword strikes; _pick_clip takes one not the
+  last, so a string of blows alternates. At 7 ticks one's own slash leads
+  in 0.07 s and recovers at x0.79, another's at 0.15 s and x0.91: near its
+  natural speed, settling to the guard between blows. Contact stays on the
+  hit tick.
+- The swing itself seen, not only its reset (the coordinator: Jeff asked
+  for "a slower swing"): combat gives the sword a 2-tick lead (its verb's
+  "lead", told through GridEntity.winding like a wind-up, never crushing)
+  in the 7-tick cycle. Client3D.WOUND_STRIKES (the sword) plays the
+  weapon's own slash on winding instead of CLIP_HEAVY, its lead over the 2
+  ticks (_strike's wound): 0.2 s from guard to the hit, one's own blow
+  too, then 0.5 s back to guard (x1.00). Given up (0 ticks), it is cut
+  short as before. A swing at nothing and a companion's blow come with no
+  lead and play the slash at once, as before; the pick, giant axe and
+  hammer keep CLIP_HEAVY.
+
+anim_rig_test _test_sword_slash: the paces at 7 ticks (one's own,
+another's, wound up), each slash from
+the guard and back to it, the cuts across, the alternation. Client only,
+protocol unchanged, no new class_name.

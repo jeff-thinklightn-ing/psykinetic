@@ -776,7 +776,8 @@ const FOREST_DEPTH := 3
 const HUMANOID_MOVES := {
 	"strikes": {
 		"": [["Punch_Jab", 0.17], ["Punch_Cross", 0.21]],
-		"sword": [["Sword_Attack", 0.38], ["Sword_Attack_Standing", 0.38]],
+		# Forehand and backhand, each back to a guard (338 amended, pc-character's side); alternate.
+		"sword": [["Sword_Slash_F", 0.21], ["Sword_Slash_B", 0.21]],
 		"giant_axe": [["Axe_Overhead", 0.42]],
 		"hammer": [["Mace_Overhead", 0.42]],  # One-handed: Axe_Overhead's left hand would grip nothing.
 		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
@@ -963,6 +964,10 @@ const TIRED_BELOW := 0.34
 ## blow's own swing then plays no other clip.
 const CLIP_HEAVY := "Sword_Attack"
 const CLIP_HEAVY_CONTACT := 0.45
+## Weapons whose wind-up plays their own strike instead (_strike, its lead
+## stretched over the wind-up): the sword's short one (338 amended: the
+## slash itself seen, not only its reset).
+const WOUND_STRIKES := ["sword"]
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
 const CLIP_JOG := "Jog_Fwd"
@@ -15899,9 +15904,13 @@ func _play_once(puppet: Node3D, clip: String) -> bool:
 ## hands' if it has none for it), not the last one, played so its contact
 ## lands when the drawn body's blow does (STRIKE_LANDS_IN: bodies are drawn
 ## that far behind the sim, the local player's own at once) and recovered
-## by its next. A model with no strikes plays one of ATTACK_CLIPS. False if
-## there is no model.
-func _strike(puppet: Node3D, swinger: GridEntity, weapon: String) -> bool:
+## by its next: the rest of the time between blows after the lead it took
+## (AnimRig.lead_of; it was the clip's contact, the lead at speed 1, and so
+## a swing whose lead ran fast recovered fast too, 338 amended). A wound-up
+## blow ([param wound] seconds to its landing, WOUND_STRIKES) lands then
+## instead, its lead played over the wind-up. A model with no strikes plays
+## one of ATTACK_CLIPS. False if there is no model.
+func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0) -> bool:
 	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
 	var choices: Array = strikes.get(weapon, strikes.get("", []))
 	if choices.is_empty() or not puppet.has_meta("rig"):
@@ -15912,11 +15921,11 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String) -> bool:
 	var clip := _pick_clip(puppet, names)
 	var contact := float(choices[names.find(clip)][1])
 	var own := swinger is Player and (swinger as Player).owner_peer == Net.local_id
-	var lands_in := 0.0 if own else STRIKE_LANDS_IN
+	var lands_in := wound if wound > 0.0 else (0.0 if own else STRIKE_LANDS_IN)
 	var between := World.attack_ticks_of(swinger) * World.TICK_DT if swinger != null else 1.0
 	var rig := puppet.get_meta("rig") as AnimRig
 	puppet.set_meta("fidgeting", false)
-	var seconds := rig.strike(clip, contact, lands_in, maxf(between - lands_in - contact, 0.2))
+	var seconds := rig.strike(clip, contact, lands_in, maxf(between - AnimRig.lead_of(contact, lands_in), 0.2))
 	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(seconds * 1000.0))
 	return true
 
@@ -16550,6 +16559,12 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	if puppet.has_meta("creature_view"):
 		# A creature's wound-up blow: its attack, timed to land with the sim's.
 		(puppet.get_meta("creature_view") as CreatureView).wind(ticks * World.TICK_DT)
+		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) + 400)
+		return
+	var swinger := instance_from_id(id) as GridEntity
+	var weapon := World.wielded(swinger) if swinger != null else ""
+	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
+	if weapon in WOUND_STRIKES and strikes.has(weapon) and _strike(puppet, swinger, weapon, ticks * World.TICK_DT):
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) + 400)
 		return
 	if not puppet.has_meta("rig") or not (puppet.get_meta("rig") as AnimRig).has(CLIP_HEAVY):
