@@ -34492,3 +34492,7 @@ player's and stays with "zone reset <name>". The per-giver reset ("quests
 reset <giver>") is unchanged. ui_test _test_admin_panel: caches, care and
 the blessing set, then gone after quests reset all, each named in the
 reply. Server only, protocol unchanged, no new class_name.
+
+## 723. Superseded: the whole saved state backed up on the host
+
+Not built. 723 was to be an admin console command (`backup <label>`) copying world.json, mind.log and the level overlay as the service user before a risky cut. On 2026-10-28 the box gained a host-side `sudo psykinetic-backup` (no arguments, on the deploy user's sudo allowlist) that saves over the admin console, copies /var/lib/psykinetic to a timestamped folder under /var/lib/psykinetic-backups/ and keeps the newest 20; restoring one needs Jeff. Release runs it before every risky cut or migration (714's totem rename, 722, 712). The number stays taken.

@@ -7,21 +7,20 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.190
+
 - Admin: "quests reset all" now resets everything quest-shaped for testing: the draugr's blessing, deal and amulet, his questions and pact, searched caches, the healer's care, a companion held by raiders, and the townsfolk's standing (672 amended).
 - The barrow's hidden niche now gives way where you can see it: the slab shudders, grinds back and slides aside into the wall in a burst of dust, with the grinding of stone; you stand a moment while it gives way. Pressing on the shut niche no longer drops you straight down the stair behind it before it opens.
 - Items: the Encolpion Amulet, the holy remains and the Tomb Sledge have art of their own (a small bronze reliquary cross with a pale inlay and a red stone, a linen bundle of bones bound with cords, a heavy iron-headed sledge on a long haft); the amulet no longer draws as the Draugr's Totem.
 - The sword swings like a sword (338 amended): forehand and backhand slashes in turn, each wound up for a moment and settling back to a guard at the right shoulder before the next, played at about their own pace instead of three times too fast.
-
 - The sword swings slower and hits harder (338 amended): a blow every 0.7 s instead of 0.5, for 3 instead of 2, about the same damage over a fight; each slash winds up 0.2 s before it lands (a step straight back out of reach dodges it, a sidestep doesn't), and a sword mid-swing doesn't parry.
 - Strangers pass through towns (711, npc's side): travellers, pedlars and pilgrims now stand at the inn, store or temple, walk in from the road and out again, greet you when clicked and pass on news from other towns once a visit; a pedlar sells wares from afar through the offers panel, into your hands.
 - After a connection drop you can rejoin at once: the server lets your new connection in and drops the dead one, instead of refusing "already connected" until it timed out (721).
-
 - Houses: the shingle roof no longer shows a gap by the ridge with the wall boards through it (its pieces now sit on a closed underlay with a ridge cap); the hut's roof rows no longer show thin slits at an angle.
 - The Draugr's Totem is now the Encolpion Amulet: the same charges and rules, and a totem you already carry becomes the amulet with its charges. New things for the temple's underground: a knight's holy remains (bound to whoever finds them, for Aldous) and the Tomb Sledge, a very heavy two-handed hammer (714).
 - Chimneys smoke while their fire is in use: a forge while the smith works it, a house while someone is awake inside; Umbrage's forge and kitchen now have a chimney, and window lamps follow who is home (710).
 - The draugr's spin shows as a full red circle, filled right under him (603 amended (7)), and strikes the whole circle: there is no safe slice behind him any more. Step out of the circle.
 - Named enemies remember you (716, npc's side): each keeps what happened between you (met, fought, fell to you, put you down, saw you run) across its risings, greets you by it ("Fresh meat.", "Last time you ran.", "Not this time.") or snarls if its kind doesn't talk, and nearby towns tell of it as news when it rises; none is in play yet.
-
 - Monsters fight back when struck (719): a barrow guard hit from its doorway or from just outside its room, or anything hit from behind, now turns on whoever struck it instead of standing and taking the blows.
 - Towns get visitors: a traveller, a pedlar or a pilgrim comes now and then, stays a day or three and goes on; the town never grows by them, the pedlar buys its spare raws and the inn and temple take their gold (711, economy's side; bodies and talk follow).
 - Combat sounds: a sword blow now lands with a real impact, heard as the blade connects rather than with the swing's whoosh; a blow on someone in plate or mail rings on metal; grave robbers grunt, cry out and die with human voices instead of monster ones (720).
@@ -33,19 +32,17 @@ notes (decision 324).
 - Named enemies (716): a named robber or skeleton keeps a fixed strength of its own, rises again at its post a few days after it dies, and keeps its weapon across lives, where it can earn a name of its own; none is placed in a level yet.
 - While your heavy weapon winds up, pressing toward the foe now keeps you standing in place instead of sliding off and snapping back (392 amended (2)).
 - Bridges: a 2-wide bridge no longer shows a thin line of water down its middle (the deck's planks now reach over the join)
-
 - Bridges in the wilds, the hills and Umbrage now cross the river square on a straight stretch, two wide, with the road meeting both ends (no more walking off the side onto thin air) (505 amended (2)).
 - The draugr now uses his spin in a fight (603 amended (6)): it needed more breath than he ever had after his opening throw, so he never spun; now he spins about once a fight. Step out of the red when it shows.
 - A heavy weapon's wind-up is easier to step out of (392 amended (2)): any walking key now gives it up unless you press almost straight at the foe (within 30 degrees, was 45), so backing off with S no longer keeps the swing and freezes you.
-
 - Your companion leads like a guide now: she walks a few steps ahead instead of beside you, says a word as she sets off, looks back now and then, and waits for you at corners and doorways (708).
 - The barrow's hidden niche: its cracked wall is now the slab that moves when the niche opens (the slab no longer stands swung out in the room), with a pocket in the doorway's side for it to slide into; the footprints lose the slab's swing arc (608 amended (2))
 - The admin console can give a player gold: `gold <player or id prefix> <amount> [why]`, never a negative amount, logged with its why (709).
 - The draugr throws his axe at a player standing back while a companion holds him in melee; before, a companion beside him kept the axe in his hand all fight (603 amended).
 - Your companion goes round fire instead of through it, when following, on errands and when leading you (and doesn't lead you into it); villagers walking at someone's heel do the same (707).
-
 - Walking: after a server hitch you no longer stop a step short of where you clicked (689 amended (6))
 - The barrow's Hall of Fallen Souls: the pillar standing right in front of the draugr's throne is gone.
+
 ## v0.1.189
 
 - A lob's draw follows the arc: with a flatter arc set in tuning (F7, lob_apex) the bow is aimed lower, at the angle the arrow leaves at (677, pc-character's side, amended).
