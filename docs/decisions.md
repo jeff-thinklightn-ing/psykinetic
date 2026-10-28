@@ -34546,3 +34546,46 @@ when the level is read, and spawn_kind built its spec without it. Combat's
 en garde arena armed its robbers by hand. spawn_kind now calls Level.arm on
 its spec before spawning, as raids do (672). tuning_test: a practice robber
 holds its dagger. Local host only, protocol unchanged, no new class_name.
+## 714, npc's side: the knight's remains given to Aldous
+
+The relic goes back to the temple's priest by hand, either way a player
+would give a resident something:
+
+- **Into his hands, or onto his temple's counter.** Main's transfer command
+  checks first (`Main._relic_handed`): a relic moved from the player's own
+  slot to a resident whose trade is priest, or onto a temple counter they
+  reach (that town's priest, `_priest_of`), goes to `_relic_returned`.
+  World's hand-over never sees it, so its soulbound rule doesn't refuse it.
+- **From his panel.** `Offers.RELIC`: the priest offers "Give him the
+  remains of <knight>" (him or her from his card) for each relic the player
+  carries (ctx "relics", `Main._relics_held`: [{uid, knight}]). The offer
+  comes before the regard check, so even a player he feels wronged by can
+  bring a knight home. Accepted, it returns {relic: uid} and Main lays it.
+- **`_relic_returned(player, priest, uid)`.** It does nothing unless the
+  body is a priest within hearing. The order is items' and dungeon's:
+  `World.relic_of(uid)` is read first, then
+  `World.consume(player, uid, "laid on the altar")`, and only if that
+  succeeds `Main.charge_from_relic(player, tier)` (dungeon's; it mints an
+  amulet for a player with none). Then:
+  - he says, with no model asked: "<knight> is home at last. Bless you. The
+    blessing is on your amulet: it holds N now.", or, at no charge taken
+    (a full amulet, or a player never blessed: dungeon's 0), "The knight
+    rests now, though your amulet takes no more of the blessing.";
+  - his standing with the player rises by the new key "relic" (3), for the
+    reason "brought home the remains of <knight>";
+  - his card learns that the player (by `Offers.name_of`, never the id)
+    brought the knight's remains up and he laid them on the altar.
+  - The log line names the knight and the town, never the player.
+- **What he knows.** A priest's world facts end with
+  `Resident.relic_line(knight)`, outside the lore budget like KEPT_LINE. It
+  says the temple's holy knights lie in the barrow and grave robbers dig
+  for their bones, and that a knight's remains brought to him charge the
+  bringer's Encolpion Amulet (a player with none is given one). With
+  dungeon's `Main.barrow_knight()` (ctx "barrow_knight") it also names the
+  knight whose sepulcher stands open now. It says "grave robbers" until
+  lore's crypt.robbers_dig (the Mound-breakers) is on main.
+
+resident_test `_test_relic`: the offer and nobody else's, the hand-in
+(taken past the soulbound rule, thanked by name, regard, the card's fact
+without the id), the panel's accept, a non-priest taking nothing, and the
+priest's line. Server only; protocol as measured.

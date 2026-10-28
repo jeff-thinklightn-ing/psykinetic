@@ -67,6 +67,9 @@ const COMMISSION := "commission"
 ## The priest's crypt commissions (decision 546, npc's side, part 3): sub OFFERING (carry
 ## the temple's offering down to the altar) and RUNNER (find what became of Pip).
 const OFFERING := "offering"
+## A knight's remains given back to the priest (decision 714, npc's side): ctx
+## "relics" lists the player's; Main lays one on the altar (Main._relic_returned).
+const RELIC := "relic"
 const RUNNER := "runner"
 const RUMOUR := "rumour"
 const PLEA := "plea"
@@ -216,6 +219,8 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 	# What they think of this player scales it (decision 443): one they feel
 	# wronged by gets nothing but a plea; one they trust, the commission
 	# first and a second open one.
+	for relic: Dictionary in _relic_offers(worker_id, who, card, player_id, given):
+		out.append(relic)  # The priest takes a knight home from anyone, wronged or not (714, npc's side).
 	var regard := Standing.words(card, player_id)
 	var trusted := regard == "trusted"
 	var fresh: Array[Dictionary] = []
@@ -327,6 +332,24 @@ static func _trade_of(who: Dictionary) -> String:
 ## by uid, at the shop's price: "I have a knife at the counter for 12 gold."
 ## A pedlar's wares (711, npc's side): a line for each thing in their stock
 ## (ctx "visitor": the Towns.visitors entry of the body's id), at the
+## The priest's "Give him the remains of <knight>" (decision 714, npc's
+## side), one for each relic [param player_id] holds (ctx "relics":
+## [{uid, knight}]); none from anyone else.
+static func _relic_offers(worker_id: String, who: Dictionary, card: Dictionary, player_id: String, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if "priest" not in who.get("trades", []):
+		return out
+	var relics: Variant = _call(given, "relics", [player_id])
+	for relic: Variant in relics if relics is Array else []:
+		var uid := int(relic.get("uid", 0)) if relic is Dictionary else 0
+		if uid == 0:
+			continue
+		var knight := str(relic.get("knight", "the knight"))
+		out.append(_offer(worker_id, RELIC, str(uid), "Give %s the remains of %s" % [_them(card), knight],
+			"%s's remains, brought up from the barrow, for the altar." % knight, {"uid": uid, "knight": knight}, RELIC))
+	return out
+
+
 ## price economy will take (ctx "visitor_price"). A traveller or a pilgrim
 ## offers nothing.
 static func _visitor_offers(worker_id: String, given: Dictionary) -> Array[Dictionary]:
@@ -895,6 +918,9 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		BUY:
 			out["buy"] = int(offer["what"].get("uid", 0))
 			out["ok"] = out["buy"] > 0
+		RELIC:
+			out["relic"] = int(offer["what"].get("uid", 0))  # Laid on the altar by Main (_relic_returned), 714.
+			out["ok"] = int(out["relic"]) > 0
 		WARES:
 			out["ware"] = str(offer["what"].get("item", ""))  # Sold by Main (Towns.visitor_sell), 711.
 			out["ok"] = not out["ware"].is_empty()

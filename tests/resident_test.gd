@@ -81,6 +81,7 @@ func _ready() -> void:
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
 	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
 	_test_visitors()  # After them: its syncs step the world.
+	_test_relic()  # 714: the knight's remains to Aldous.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 
@@ -2322,7 +2323,7 @@ func _test_crypt_secrets() -> void:
 	days["lore_chars"] = {voice.hidden_type(): 1}
 	told.clear()
 	var squeezed := voice.world_facts()
-	_check(squeezed.is_empty() and told.is_empty(), "a budget too small for any secret: none said, none reported told (%s / %s)" % [squeezed, told])
+	_check(squeezed.size() == 1 and squeezed[0] == Resident.relic_line(_main.barrow_knight()) and told.is_empty(), "a budget too small for any secret: none said, none reported told (%s / %s)" % [squeezed, told])
 	if had_chars == null:
 		days.erase("lore_chars")
 	else:
@@ -3580,6 +3581,87 @@ func _test_named_enemy() -> void:
 ## wares are offers, bought through economy and minted into the hands;
 ## typed words never reach one; going on, the body walks to the road's edge
 ## and is gone.
+func _test_relic() -> void:
+	print("
+== a knight's remains given to the priest: laid on the altar, the amulet charged, thanked by name (714, npc's side) ==")
+	var player := _player()
+	_check(player != null, "(a player in the town)")
+	if player == null:
+		return
+	var pid := Net.player_id
+	var priest := "priest:" + STORE
+	if World.production.worker(priest).is_empty():
+		World.production.add_worker(priest, "Aldous", ["priest"], STORE, "appointed")
+	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+	var spot := Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+	var aldous := _body(priest)
+	if aldous == null:  # Not among the town's residents here: a body of his own for the test, gone at the next sync.
+		aldous = _main._spawn_resident({"key": priest, "town": STORE, "trade": "priest", "name": "Aldous", "player": "", "type": "",
+			"places": {"work": spot, "home": spot, "square": spot}})
+	_check(aldous != null, "(Aldous has a body)")
+	if aldous == null:
+		return
+	_put(player, _main._nearest_free(aldous.tile + Vector2i(1, 0)))
+	var mint := func() -> int:
+		var uid := World.mint_relic("Sir Ewald", 1, player)
+		var slot := World.room_for(player, uid)
+		if slot >= 0:
+			World.put_item(player, player, slot, uid)
+		return uid
+	var uid: int = mint.call()
+	_check(player.slot_items.has(uid), "(the relic in the player's slots)")
+	var offers := Offers.of(priest, pid).filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.RELIC)
+	_check(offers.size() == 1 and str(offers[0]["title"]).ends_with("the remains of Sir Ewald"), "the priest offers to take it (%s)" % [offers])
+	var other := World.production.worker_ids(STORE).filter(func(id: String) -> bool: return "priest" not in World.production.worker(id).get("trades", []))
+	_check(other.is_empty() or Offers.of(str(other[0]), pid).all(func(o: Dictionary) -> bool: return str(o["kind"]) != Offers.RELIC), "nobody else does")
+	var score := Standing.score(Townsfolk.card_of(World.production, priest), pid)
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	var slot := player.slot_items.find(uid)
+	_main._on_command(player, "transfer", {"from": str(player.get_path()), "from_slot": slot, "to": str(aldous.get_path()), "to_slot": 0})
+	_check(not player.slot_items.has(uid) and not aldous.slot_items.has(uid), "put in his hands: taken, past the soulbound rule, held by nobody")
+	_check(spoken.size() == 1 and spoken[0].contains("Sir Ewald"), "he thanks them by the knight's name (%s)" % [spoken])
+	_check(Standing.score(Townsfolk.card_of(World.production, priest), pid) == score + Standing.setting("relic"), "his regard rises by \"relic\"")
+	var facts: Array = Townsfolk.card_of(World.production, priest).get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
+	_check(facts.any(func(f: String) -> bool: return f.contains("Sir Ewald") and not f.contains(pid)), "his card keeps it, the player by name, never the id")
+	_check(Offers.of(priest, pid).all(func(o: Dictionary) -> bool: return str(o["kind"]) != Offers.RELIC), "no offer left once it is given")
+	_check(spoken.size() == 1 and spoken[0].contains("no more"), "unblessed (no room on the amulet): the knight rests, no charge said")
+	var record: PlayerRecord = _main._records.get(pid)
+	var barrow_was: Dictionary = record.barrow.duplicate(true) if record != null else {}
+	var deals := Economy.deals(_main._field_rules())
+	if record != null and not deals.is_empty():
+		record.barrow = {"best": str(deals[0].get("name", "")), "containers": []}  # Blessed once: room on the amulet.
+	uid = mint.call()
+	offers = Offers.of(priest, pid).filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.RELIC)
+	spoken.clear()
+	if not offers.is_empty():
+		_main._accept_offer(player, str(offers[0]["id"]), 0)
+	var held := World.totem_charges(World.totem_of(pid))
+	_check(not player.slot_items.has(uid) and spoken.size() == 1 and held > 0 and spoken[0].contains("it holds %d now" % held),
+		"the panel's offer does the same, and a blessed player's amulet is charged and said (%s)" % [spoken])
+	if record != null:
+		record.barrow = barrow_was
+	uid = mint.call()
+	slot = player.slot_items.find(uid)
+	var smith: Resident = null
+	for body: GridEntity in World.townsfolk():
+		if body is Resident and body != aldous and "priest" not in World.production.worker((body as Resident).worker_id).get("trades", []):
+			smith = body
+	_check(smith != null and not _main._relic_returned(player, smith, uid) and player.slot_items.has(uid), "given to one who is no priest: nothing taken")
+	World.consume(player, uid, "the test")
+	Net.message_received.disconnect(heard)
+	var voice := Resident.new()
+	voice.trade = "priest"
+	voice.town = STORE
+	_check(Resident.relic_line(_main.barrow_knight()) in voice.world_facts(), "the priest knows what a knight's remains are for")
+	voice.trade = "smith"
+	_check(voice.world_facts().all(func(f: String) -> bool: return not f.contains("Encolpion")), "a smith does not")
+	voice.free()
+
+
 func _test_visitors() -> void:
 	print("\n== a stranger passing through: a body, a greeting, one piece of news, a pedlar's wares (711, npc's side) ==")
 	var player := _player()

@@ -1112,6 +1112,16 @@ func lore_budget() -> int:
 ## What a kept secret becomes in the prompt (615, npc's side; lore's kept_by; Jeff: "part of his pay is to keep
 ## what he sees to himself"): the deflection in the speaker's own words and never the fact's text, so no slip of
 ## the model can leak what it holds back.
+## The priest's standing knowledge (decision 714, npc's side), outside the
+## lore budget like KEPT_LINE: the knights under the barrow and the relic's
+## use; [param knight] the one whose sepulcher stands now, "" for none.
+static func relic_line(knight: String) -> String:
+	var now := "" if knight.is_empty() or knight == "<null>" else " The knight whose sepulcher lies open below now is %s." % knight
+	return ("Holy knights of the temple lie in the old barrow under the town, and grave robbers dig there for their bones to sell.%s"
+		+ " Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet;"
+		+ " one who has no amulet is given one.") % now
+
+
 const KEPT_LINE := "Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it."
 
 
@@ -1181,6 +1191,8 @@ func world_facts() -> Array[String]:
 			Offers._call(Offers.ctx, "secret_told", [asked_by, str(fact.get("id", ""))])
 	if kept:
 		out.append(KEPT_LINE)  # Outside the budget: a stance, not a fact (615, npc's side).
+	if trade == "priest":
+		out.append(relic_line(str(Offers._call(Offers.ctx, "barrow_knight") if Offers.ctx.has("barrow_knight") else "")))  # 714, npc's side.
 	# What the town remembers (447, ruled on by the lawspeaker, 448): as
 	# memory, not fact, after lore's facts, within the same budget.
 	var log: Variant = Offers._call(Offers.ctx, "memory", [town]) if not town.is_empty() else null

@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Aldous takes a holy knight's remains back (714, npc's side): hand them to the temple's priest, or put them on his counter, or choose "Give him the remains of <knight>" in his talk panel; he lays them on the altar, thanks you by the knight's name, says what your Encolpion Amulet now holds (you get one if you have none), thinks better of you and remembers it.
 
 ## v0.1.190
 

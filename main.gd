@@ -9321,6 +9321,8 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
 	elif not str(result.get("ware", "")).is_empty():
 		_visitor_sells(player, body, str(result["ware"]))
+	elif int(result.get("relic", 0)) > 0:
+		_relic_returned(player, body, int(result["relic"]))
 	elif int(result.get("buy", 0)) > 0:
 		var counter := _counter_near(player, str(World.production.worker(worker_id).get("town", "")))
 		if counter == null:
@@ -9397,6 +9399,8 @@ func _offers_context() -> Dictionary:
 		"set_memory": _set_town_memory,
 		"visitor": _visitor_of,
 		"visitor_price": _visitor_price,
+		"relics": _relics_held,
+		"barrow_knight": barrow_knight,
 		"lawspeaker": func(town: String) -> Dictionary: return World.towns.lawspeaker(town) if World.towns != null and World.towns.has_method("lawspeaker") else _lawspeaker_records.get(town, {}).duplicate(true),
 		"set_lawspeaker": func(town: String, record: Dictionary) -> void:
 			if World.towns != null and World.towns.has_method("set_lawspeaker"):
@@ -10852,7 +10856,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "transfer":
 		var from := get_node_or_null(NodePath(str(args.get("from", "")))) as GridEntity
 		var to := get_node_or_null(NodePath(str(args.get("to", "")))) as GridEntity
-		if from != null and to != null:
+		if from != null and to != null and not _relic_handed(entity, from, int(args.get("from_slot", -1)), to):
 			World.try_transfer(entity, from, int(args.get("from_slot", -1)), to, int(args.get("to_slot", -1)), int(args.get("count", 0)))
 	elif command_name == "door":
 		var edge: Variant = args.get("edge")
@@ -14147,6 +14151,70 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 ## Every place of a routine at [param spot]: a visitor keeps to it all day.
 func _visitor_places(spot: Rect2i) -> Dictionary:
 	return {"work": spot, "home": spot, "square": spot, "inn": spot, "temple": spot, "well": spot, "visit": spot}
+
+
+## The relics [param player_id] carries (decision 714; ctx "relics", the
+## priest's offers): [{uid, knight}].
+func _relics_held(player_id: String) -> Array:
+	var out: Array = []
+	for entity in World.get_entities():
+		if entity is Player and entity.spawned and (entity as Player).player_id == player_id:
+			for slot in entity.slots.size():
+				var relic := World.relic_of(World.slot_uid(entity, slot))
+				if not relic.is_empty():
+					out.append({"uid": World.slot_uid(entity, slot), "knight": str(relic.get("knight", ""))})
+			break
+	return out
+
+
+## Server: [param by] moving a relic from their own slot [param from_slot]
+## into the priest's hands, or onto his temple's counter (decision 714): it
+## goes to the altar (_relic_returned) before World's hand-over, which
+## would refuse a soulbound thing. Whether it was a relic for a priest.
+func _relic_handed(by: GridEntity, from: GridEntity, from_slot: int, to: GridEntity) -> bool:
+	if not by is Player or from != by or from_slot < 0 or from_slot >= from.slots.size():
+		return false
+	var uid := World.slot_uid(from, from_slot)
+	if World.relic_of(uid).is_empty():
+		return false
+	var priest: Resident = null
+	if to is Resident and World.production != null and "priest" in World.production.worker((to as Resident).worker_id).get("trades", []):
+		priest = to
+	elif to is Chest and (to as Chest).temple and World.reaches(by, to):
+		priest = _resident_body(_priest_of(World.temple_town(to)))
+	if priest == null:
+		return false
+	_relic_returned(by as Player, priest, uid)
+	return true
+
+
+## Server: [param player] gives the priest [param body] the relic
+## [param uid] (decision 714, npc's side): read (World.relic_of) before it
+## ends, consumed off them (World.consume), and only then their amulet
+## charged by its tier (dungeon's charge_from_relic, which mints one for a
+## player with none). He thanks them by the knight's name and the charge;
+## his card keeps it (the player through Offers.name_of) and his standing
+## rises ("relic"). False, nothing done, when the body is no priest, is out
+## of hearing, or they do not hold it.
+func _relic_returned(player: Player, body: Resident, uid: int) -> bool:
+	if not Net.is_authority() or player == null or body == null or World.production == null:
+		return false
+	if "priest" not in World.production.worker(body.worker_id).get("trades", []) or World.distance(body.tile, player.tile) > HEARING_RANGE:
+		return false
+	var relic := World.relic_of(uid)
+	if relic.is_empty() or not World.consume(player, uid, "laid on the altar"):
+		return false
+	var knight := str(relic.get("knight", "the knight"))
+	var added := charge_from_relic(player, int(relic.get("tier", 0)))
+	var held := World.totem_charges(World.totem_of(player.player_id))
+	var who := Offers.name_of(Offers.ctx, player.player_id)
+	Offers._regard(World.production, body.worker_id, player.player_id, Standing.setting("relic"), "brought home the remains of %s" % knight)
+	Townsfolk.learn(World.production, body.worker_id, "%s brought the remains of %s up from the barrow, and you laid them on the altar." % [who, knight])
+	var thanks := "%s is home at last. Bless you." % knight
+	var charge := ("The blessing is on your amulet: it holds %d now." % held) if added > 0 else "The knight rests now, though your amulet takes no more of the blessing."
+	_say_plain(body, body.person, thanks + " " + charge)
+	print("[relic] the remains of %s laid on the altar in %s, %d charge(s) added" % [knight, body.town, added])
+	return true
 
 
 ## The body of [param worker_id] among the townsfolk here, null for none.
@@ -17997,3 +18065,4 @@ func _report_test() -> void:
 				func(item: String) -> bool: return not item.is_empty()))])
 	held.sort()
 	print("[test] slots: %s" % " ".join(held))
+
