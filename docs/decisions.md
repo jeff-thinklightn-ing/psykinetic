@@ -34981,3 +34981,35 @@ the T, the elbow on the line and the nock at the eye, flat and at the
 sky; the flatter-arc cases go. The bow is clear of the body on five
 builds through the sky draw (the pull key's string arm moved out for the
 deeper lean). Client only, protocol unchanged, no new class_name.
+
+## 708 amended, pc-character's side: the guide beckons him on
+
+Companions' side (708 amended) replicates the guide's pause as
+Companion.guide_wait: 0 walking or not guiding, 1 a look back (about
+0.8 s), 2 waiting at a corner, a door or an exit, up to 3 s or till he is
+within 3 cells. In 1 and 2 the server turns her to face him. At 2 she
+now beckons him on (the coordinator approved it, with an open hand, palm
+to him: a fist reads as a cheer).
+
+- Beckon_R and Beckon_L (tools/humanoid_clips.py beckon(), on Idle_Loop,
+  0.9 s): one arm up before her, the hand open, fingers straight up and
+  the palm to him, then the forearm scooping in toward her twice, the
+  fingers tipping back. The chest leans a little forward and the head
+  tips toward the arm. The hand is posed with its fingers (the game's
+  mitten skins all four to the middle bones), so the clip plays whole-body
+  (rig.once through _play_fidget), not on the upper layer, which leaves
+  the fingers out. The palm design is turned out toward its own side,
+  against the hand's roll, which turned it 40 degrees in toward her
+  middle. Measured out, man and woman: the palm 14 degrees off straight
+  ahead, the middle finger bent 3.
+- Client3D: _sync_puppets keeps a companion's guide_wait on the puppet.
+  beckon_clip picks Beckon_R, Beckon_L when the right hand holds
+  something, and none with both hands full or at any other guide_wait.
+  _animate plays it after the shuffle and before addressing and the
+  fidget roll, again every BECKON_EVERY (1.6 s) while she waits. At 1
+  she only turns (the server's facing).
+
+anim_rig_test _test_beckon: the picks by guide_wait and hands; each clip,
+man and woman, about 0.9 s, the hand open to him out, above the head and
+scooping in twice, the arm clear of the trunk and the head. Client only,
+protocol unchanged (it reads companions' rev-41 field), no new class_name.

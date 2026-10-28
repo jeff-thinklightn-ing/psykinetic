@@ -290,6 +290,34 @@ FLAT_FORM = {"pitch": 0.0, "lean": 1.0, "raise_": 0.03, "out": 0.0}
 SKY_FORM = {"pitch": 70.0, "lean": 38.0, "shrug": 45.0, "raise_": 0.19, "anchor_up": 0.12, "out": 0.02, "look": 8.0, "girdle": 15.0, "elbow_x": -0.12, "yaw": -16.0}
 SKY_DRAWN = form(**SKY_FORM)
 FLAT_DRAWN = form(**FLAT_FORM)
+
+
+# The guide's beckon (companions' guide_wait 2: she waits at a corner, a door or an exit for the
+# one she leads, turned to him by the server): one arm up before her, its forearm scooping in
+# toward her twice ("come on"), the chest a little forward, the head tipped toward the arm. On
+# the right arm (Beckon_R), or the left (Beckon_L) when the right hand holds something.
+def beckon(side: str, scoop: float) -> list:
+	"""The beckoning arm up, its hand [scoop] of the way in (0 fingers up, the palm to him; 1 tipped
+	back toward her, the palm up and ahead)."""
+	x = -1.0 if side == "r" else 1.0
+	fingers_way = Vector((0.0, -0.2 + 0.8 * scoop, 1.0 - 0.2 * scoop)).normalized()
+	# Ahead, square to the fingers; turned out toward its own side as much as the hand's roll turns it
+	# in (measured: 40 degrees toward her middle without it).
+	palm = Vector((0.8 * x, -fingers_way.z, fingers_way.y)).normalized()
+	# The hand open (the coordinator: a fist reads as a cheer), its fingers straight; its own +Y the
+	# fingers, its palm its -Z: so held (GRASP) with its length (+Z) away from the palm.
+	fingers = [(f"{finger}_0{joint}_{side}", fingers_way, AIM) for finger in ("index", "middle", "ring", "pinky") for joint in (1, 2, 3)]
+	return [("upperarm_" + side, Vector((0.45 * x, -0.75, 0.42)), AIM),
+		("lowerarm_" + side, Vector((0.3 * x, -0.62 + 0.72 * scoop, 0.72 + 0.25 * scoop)), AIM),
+		("hand_" + side, (tuple(-palm), tuple(fingers_way.cross(palm))), GRASP)] + fingers + [
+		("spine_03", LIFT, -4.0), ("Head", TILT, 6.0 * x), ("Head", LIFT, -4.0 * scoop)]
+
+
+for side, name in (("r", "Beckon_R"), ("l", "Beckon_L")):
+	CLIPS[name] = {"keys": [
+		(0.0, P("Idle_Loop", 0.0)), (0.2, P("Idle_Loop", 0.2, beckon(side, 0.0))), (0.36, P("Idle_Loop", 0.36, beckon(side, 1.0))),
+		(0.5, P("Idle_Loop", 0.5, beckon(side, 0.1))), (0.64, P("Idle_Loop", 0.64, beckon(side, 1.0))), (0.9, P("Idle_Loop", 0.9)),
+	]}
 CLIPS["Bow_Idle_Loop"] = {"loop": True, "keys": [
 	(0.0, P("Idle_Loop", 0.0, BOW_LOW)),
 	(1.25, P("Idle_Loop", 1.25, BOW_LOW + [("spine_02", LIFT, -2.0)])),

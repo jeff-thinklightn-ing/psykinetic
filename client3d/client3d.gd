@@ -13366,6 +13366,8 @@ func _sync_puppets() -> void:
 			_sync_work(entity as Resident, puppet)
 		elif entity is Player or entity is Companion:
 			_sync_work(entity, puppet)  # Its bandaging (the kneel); a companion's sleep.
+			if entity is Companion:
+				puppet.set_meta("guide_wait", (entity as Companion).guide_wait)
 		_sync_bow(entity, puppet)
 		if entity is Player:
 			var lantern := puppet.get_node_or_null("Lantern") as Node3D
@@ -15386,6 +15388,21 @@ static func in_hand(puppet: Node3D) -> Array:
 	return held
 
 
+## A guide's beckon (companions' guide_wait, replicated on the Companion: 0 walking or not
+## guiding, 1 a look back, 2 waiting at a corner, a door or an exit till he catches up): at 2,
+## Beckon_R, or Beckon_L when the right hand holds something; neither with both hands full. Her
+## turn to him is the server's facing (shown on a standing body), so at 1 she only turns.
+const BECKON_EVERY := 1.6
+static func beckon_clip(puppet: Node3D, rig: AnimRig) -> String:
+	if int(puppet.get_meta("guide_wait", 0)) != 2:
+		return ""
+	var held := in_hand(puppet)
+	for side: Array in [["Beckon_R", 0], ["Beckon_L", 1]]:
+		if (held.size() <= side[1] or str(held[side[1]]) == "") and rig.has(side[0]):
+			return side[0]
+	return ""
+
+
 static func fidget_with(clip: String, held: Array) -> bool:
 	if held.all(func(id: Variant) -> bool: return str(id) == ""):
 		return true
@@ -15863,6 +15880,13 @@ func _animate(puppet: Node3D) -> void:
 	if now < int(puppet.get_meta("shuffle_until", 0)) and rig.has(CLIP_WALK):
 		# Turning where it stands (_standing_turn): its feet shuffle round.
 		rig.loop(CLIP_WALK, STAND_SHUFFLE_PACE)
+		return
+	var beckon := beckon_clip(puppet, rig)
+	if beckon != "" and now >= int(puppet.get_meta("beckon_at", 0)):
+		# A guide waiting for the one she leads (companions' guide_wait 2, the server turning her to
+		# him): she beckons him on, again every BECKON_EVERY while she waits.
+		puppet.set_meta("beckon_at", now + int(BECKON_EVERY * 1000.0))
+		_play_fidget(puppet, rig, beckon, now, tempo)
 		return
 	if str(puppet.get_meta("addressing", "")) != "" and rig.has(CLIP_TALKING) and fidget_with(CLIP_TALKING, in_hand(puppet)):
 		# Addressing someone (560): it talks to them (with a thing in hand,

@@ -29,6 +29,7 @@ func _ready() -> void:
 	await _test_sheathe_clips()
 	await _test_work_clear()
 	await _test_armed_fidgets()
+	await _test_beckon()
 	await _test_rests()
 	_test_warm_painted()
 	await _test_upper()
@@ -1051,6 +1052,76 @@ func _test_warm_painted() -> void:
 	piece = Client3D.warm_painted(models)
 	_check(piece.get_child_count() == 2, "a model without its paint passed over (%d warmed)" % piece.get_child_count())
 	piece.free()
+
+## The guide's beckon (companions' guide_wait 2): Client3D.beckon_clip picks the right arm, the
+## left when the right hand holds something, neither with both full or not waiting; each clip, man
+## and woman, about 0.9 s, the hand above the head at the scoops in (0.36, 0.64) and BECKON_SCOOP
+## nearer her than out at 0.2 and 0.5, and the arm never inside the trunk or the head; out (0.2)
+## the hand open, palm to him (the coordinator: a fist reads as a cheer): the palm within
+## BECKON_PALM of straight ahead (its way: the fingers crossed with the thumb's side, signed so the
+## rest pose's palms read down), the middle finger bent at most BECKON_OPEN.
+const BECKON_SCOOP := 0.1
+const BECKON_PALM := 25.0
+const BECKON_OPEN := 20.0
+func _test_beckon() -> void:
+	print("== the guide's beckon ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var model := (load("res://art/models/characters/human_f.glb") as PackedScene).instantiate() as Node3D
+	add_child(model)
+	var rig := AnimRig.make(model, lib, 0.0, true, null)
+	var picks := []
+	for case: Array in [[0, ["", ""]], [1, ["", ""]], [2, ["", ""]], [2, ["sword", ""]], [2, ["", "bow"]], [2, ["sword", "shield"]]]:
+		model.set_meta("guide_wait", case[0])
+		model.set_meta("held", case[1])
+		picks.append(Client3D.beckon_clip(model, rig))
+	_check(picks == ["", "", "Beckon_R", "Beckon_L", "Beckon_R", ""],
+		"beckoning only at guide_wait 2, with a free hand, the right first (%s)" % [picks])
+	model.free()
+	for path: String in ["res://art/models/characters/human_m.glb", "res://art/models/characters/human_f.glb"]:
+		for clip: String in ["Beckon_R", "Beckon_L"]:
+			var ahead := {}
+			var notes: Array[String] = []
+			var length := 0.0
+			for t: float in [0.2, 0.36, 0.5, 0.64]:
+				var body := (load(path) as PackedScene).instantiate() as Node3D
+				add_child(body)
+				var r := AnimRig.make(body, lib, 0.0, true, null)
+				r.loop("Idle", 0.0)
+				length = r.length(clip)
+				for i in 3:
+					r.base_at(clip, t)  # As Client3D plays it: the whole body (_play_fidget), the fingers too.
+					await get_tree().process_frame
+				var sk := body.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+				var hand := sk.get_bone_global_pose(sk.find_bone("RightHand" if clip == "Beckon_R" else "LeftHand")).origin
+				var head := sk.get_bone_global_pose(sk.find_bone("Head")).origin
+				ahead[t] = hand.z - head.z  # Skeleton space: the body faces +z.
+				if t == 0.2:
+					var side := "Right" if clip == "Beckon_R" else "Left"
+					var pose := func(bone: String) -> Vector3: return sk.get_bone_global_pose(sk.find_bone(side + bone)).origin
+					var rest := func(bone: String) -> Vector3: return sk.get_bone_global_rest(sk.find_bone(side + bone)).origin
+					var down: float = ((rest.call("MiddleProximal") - rest.call("Hand")) as Vector3).cross(rest.call("ThumbProximal") - rest.call("Hand")).y
+					var along: Vector3 = (pose.call("MiddleProximal") - hand).normalized()
+					var palm := along.cross((pose.call("ThumbProximal") - hand).normalized()).normalized() * (-1.0 if down > 0.0 else 1.0)
+					var off := rad_to_deg(palm.angle_to(Vector3.BACK))
+					var bend := rad_to_deg(along.angle_to(pose.call("MiddleDistal") - pose.call("MiddleProximal")))
+					if off > BECKON_PALM or bend > BECKON_OPEN:
+						notes.append("out: the palm %.0f deg off ahead, the middle finger bent %.0f" % [off, bend])
+				if t in [0.36, 0.64] and hand.y <= head.y:
+					notes.append("%.2f: the hand %.2f under the head" % [t, head.y - hand.y])
+				var parts: Dictionary = _skinned_parts(body)
+				var arm: PackedVector3Array = parts["right" if clip == "Beckon_R" else "forearm"][0]
+				var inside := _inside(arm, parts["trunk"][0], parts["trunk"][1]) + _inside(arm, parts["head"][0], parts["head"][1], true)
+				if inside > 0:
+					notes.append("%.2f: %d inside" % [t, inside])
+				body.free()
+			var scoop := minf(ahead[0.2] - ahead[0.36], ahead[0.5] - ahead[0.64])
+			if scoop < BECKON_SCOOP:
+				notes.append("scooped in only %.2f" % scoop)
+			if length < 0.7 or length > 1.0:
+				notes.append("%.2f s long" % length)
+			_check(notes.is_empty(), "%s %s: about 0.9 s, the hand open to him, scooping in twice (%.2f), the hand up, clear of the body (%s)" % [
+				path.get_file(), clip, scoop, ", ".join(notes)])
+
 
 ## Fidgets with a thing in hand (662; Jeff: "definitely not scratching head or anything that sword
 ## goes near body"): each one-handed held kind as Client3D holds it (a blade edge first, the
