@@ -489,6 +489,9 @@ var _walk_index := -1
 var _walk_since := 0
 ## --test-walk-on-wind: when the local player's own wind-up began (msec), or -1.
 var _wind_at := -1
+## The local player's own wind-up as the client last heard it: until (msec)
+## and the way to its target (_wind_up_held).
+var _own_wind := {"until": 0, "way": Vector2.ZERO}
 var _walk_samples: Array[Array] = []
 ## --test-smooth's meter (net/smooth_meter.gd), made with the first frame.
 var _smooth_meter: RefCounted = null
@@ -2684,7 +2687,7 @@ func _free_drive(delta: float) -> bool:
 	if own == null:
 		_free["path"] = []
 		return false
-	var intent := _free_intent(player, own)
+	var intent := _wind_up_held(player, _free_intent(player, own))
 	_record_walk(player)
 	if intent != Vector2.ZERO:
 		player.aim = Vector2.ZERO
@@ -2698,6 +2701,30 @@ func _free_drive(delta: float) -> bool:
 	else:
 		World._to_server(&"request_free", [player.get_path(), FreeNet.pack_commands(commands)])
 	return true
+
+
+## [param intent], or ZERO while the local player's own heavy blow winds up
+## and the server would hold it (392 amended (2): under
+## World.WIND_UP_LEAVE_INTENT, or strictly within World.WIND_UP_KEEP_ANGLE
+## of the way to its target), so the view stands as the server does; any
+## other way goes, and the server gives the wind-up up.
+func _wind_up_held(player: Player, intent: Vector2) -> Vector2:
+	if not player.winding.is_connected(_on_own_winding):
+		player.winding.connect(_on_own_winding)
+	if Time.get_ticks_msec() >= int(_own_wind["until"]):
+		return intent
+	var way: Vector2 = _own_wind["way"]
+	if intent.length() < World.WIND_UP_LEAVE_INTENT 			or (way.length() > 0.001 and intent.normalized().dot(way.normalized()) > cos(deg_to_rad(World.WIND_UP_KEEP_ANGLE))):
+		return Vector2.ZERO
+	_own_wind["until"] = 0  # Left: the server's give-up follows.
+	return intent
+
+
+## The local player's own wind-up begun ([param ticks] > 0, towards
+## [param direction]) or given up (0), for _wind_up_held.
+func _on_own_winding(direction: Vector2i, ticks: int) -> void:
+	_own_wind["way"] = Vector2(direction)
+	_own_wind["until"] = Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) if ticks > 0 else 0
 
 
 ## The way the player means to go this frame, a unit vector or ZERO.

@@ -33609,3 +33609,22 @@ level_test _test_bridges checks every world-plane zone with a bridge: no
 bridge warnings, width 2, water beside the span along both long sides, both
 ends dry floor, and both ends on road cells. That is three bridges today.
 Level files and make_held only; protocol unchanged; no new class_name.
+
+## 392 amended (2), ui's side: the own view stands while the server holds a wind-up
+
+Combat's numbers wanted on a real client (tools/net_wind.sh, a9a5402d). The
+client predicted no wind-up hold: a press the server held (within the
+keep angle) walked the own view off, to snap back once the blow struck,
+and a press it let go walked at once as the server's give-up came a round
+trip later. Main._wind_up_held, between _free_intent and FreeNet.Own.hold:
+from the local player's own winding (ticks > 0: until that many ticks on,
+its direction the way to the target; 0: given up) it returns ZERO for an
+intent under World.WIND_UP_LEAVE_INTENT or strictly within
+World.WIND_UP_KEEP_ANGLE of that way, the server's own test and constants
+(World._free_give_up_wind_up), so the two never drift; any other press
+goes through and ends the hold on the client, and the server's give-up
+follows. net_wind at the start yaw, foe east, battle_axe: S, A, W, D each
+give up on the tick the wind-up began, the view walking from the first
+frame; S+D (straight at it) is held, the view still at (11, 2) through
+the wind-up, and the blow strikes 8 ticks on. Client only, protocol
+unchanged, no new class_name.

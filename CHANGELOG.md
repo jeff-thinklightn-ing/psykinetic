@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- While your heavy weapon winds up, pressing toward the foe now keeps you standing in place instead of sliding off and snapping back (392 amended (2)).
 - Bridges: a 2-wide bridge no longer shows a thin line of water down its middle (the deck's planks now reach over the join)
 
 - Bridges in the wilds, the hills and Umbrage now cross the river square on a straight stretch, two wide, with the road meeting both ends (no more walking off the side onto thin air) (505 amended (2)).
