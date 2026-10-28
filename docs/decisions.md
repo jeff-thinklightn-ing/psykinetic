@@ -34625,3 +34625,58 @@ Without 724 it fails every time; with it one steps right ("[free] ... steps
 right ... round ...") and neither gives up. NET_TEST_GROUPS runs some of
 net_test.sh's groups by hand. Client only (and the server's test hook),
 protocol unchanged, no new class_name.
+## 727. The ringing at every map: the town's bells retired, the draft's line notched
+
+Jeff: "theres this annoying ringing that starts with the map, it happens a lot
+on testing.. i think its audio bug somehow" (via the coordinator, cc ui; seen in
+the en garde practice build).
+
+- Cause, by measure (no ear here): music.melody_town's one take, Sonniss
+  "Enchanting_Bells_4" (CB Sound Design, Dreamcatcher), is a continuous 72 s wash
+  of shimmering bells, -20 to -28 dB rms every second, its partials steady at 2.6
+  to 3.9 kHz; no sparse melody. Music.zone_of counts any indoor map as "town" (the
+  practice hall, the test rooms), and a phrase starts on the first weighing after
+  a map loads (_phrase_left starts at 0), so the town's ground and those bells
+  played from the moment the map showed, for 60 to 120 s, and came back.
+- Ruled out: every other loop and bed take scanned for a steady tone (the music
+  beds' high peaks are under -120 dBFS); a slot with no take is silent for a bed
+  and a one-off blip otherwise, never looped (SoundKit.placeholder, Sfx.looping);
+  the only bus effect is the muffled low-pass; vsync is on (frame-rate coil whine
+  unlikely).
+- The bells take is retired from takes.json (the file to the sound library's
+  retired/ folder), so the town's melody is silent until a sparse melody comes;
+  the slot stays, as Music weighs it. The practice hall and test rooms stay "town"
+  for the ground (the coordinator left it to sound): with no melody there, nothing
+  more to keep from them.
+- Found on the way: amb.draft (the barrow's hidden door, 608 amended) carried the
+  15625 Hz line of an old television, -44 dBFS in its take, in every second. It is
+  re-cut from the same freesound 651541 (nsstudios, CC BY 4.0) with that line and
+  its two side lines (15574, 15673 Hz) notched out, at the old take's loudness
+  (-15.8 dB mean, peak -2.9 before encoding); the line now sits at the noise floor.
+- sound_kit_test: the town's melody has no take and plays silence.
+
+Client only; protocol unchanged; no new class_name.
+
+## 656 amended: Jeff's psykinetic-theme1 as music.title
+
+Jeff (2026-10-28, via the coordinator): "use the psykinetic theme1 wav for the
+login/options screen now and theres no use for first harmony right now".
+
+- **The take**: his master psykinetic-theme1.wav (2026-10-27; not the -youtube
+  one), 48 kHz 24-bit stereo, 34.91 s, 16 bars at 110 bpm, made in Ableton Live
+  (the .asd beside it), copied from his music folder, never moved or edited; Ogg
+  Vorbis quality 7 at his own level (peak -3.9 dBFS, mean -18.9 dB), 817 KB, in
+  place of first-harmony's take. first-harmony has no other use and stays only in
+  his folder. The slot's "source" names it; an own take gains no THIRD_PARTY line.
+- **How it plays**: the same screens (the main menu, its options, the connect
+  screen) and the same 1 s fade in and out as the world loads. Measured as 656
+  measured first-harmony, its wrap from the last frame to the first steps 0.070,
+  steeper than at any of its own 15 bar lines (0.009 to 0.044 within 1 ms of each):
+  a likely click, which goes back to Jeff rather than being edited here. So it is
+  not looped raw: TitleMusic plays it through, fades it out over its last FADE_OUT
+  (_process) and starts it again from its start, faded in over FADE_IN (_again).
+  A seamless loop would need a re-export from him with a clean wrap.
+- view_test _test_title_music: a whole track (over 30 s), not looped by its stream;
+  its last second fades out; played through, it starts again silent and fades in.
+
+Client only; protocol unchanged; no new class_name.

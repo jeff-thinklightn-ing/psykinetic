@@ -6,6 +6,9 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Sound: the ringing that started with indoor maps (the practice hall, the test rooms) is gone: the town music's bell layer is retired, so the town plays its ground only for now; the barrow's hidden-door draft no longer carries a faint high whine (727).
+- Music: the title, login and options screens play Jeff's psykinetic theme in place of first-harmony, played through, faded out at its end and in again from its start (656 amended).
 - Options: a Music volume slider, also on the title screen's Options, so the theme can be turned down.
 
 - Two players walking into each other by click no longer stand stuck face to face: the one with room steps to its right and goes round; a route blocked for 2 s is given up (724).

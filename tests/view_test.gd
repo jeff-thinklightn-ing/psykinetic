@@ -406,10 +406,23 @@ func _test_title_music() -> void:
 	var player: AudioStreamPlayer = title.player if title != null else null
 	_check(player != null and player.playing and player.bus == "Music" and player.stream.resource_path.ends_with("music.title/music.title.ogg"),
 		"the menu shows: music.title plays on the Music bus, Jeff's own take")
-	_check(player != null and (player.stream as AudioStreamOggVorbis).loop and is_equal_approx(player.volume_db, title.SILENT_DB),
-		"looped, and it starts silent")
+	_check(player != null and not (player.stream as AudioStreamOggVorbis).loop and is_equal_approx(player.volume_db, title.SILENT_DB),
+		"a whole track, not looped by the stream, and it starts silent")
 	title._tween.custom_step(title.FADE_IN)
 	_check(player != null and is_equal_approx(player.volume_db, SoundKit.volume_db("music.title")), "faded in over %.1f s to the slot's level" % title.FADE_IN)
+	# 656 amended: Jeff's theme rounds faded, its end never clicking into its start.
+	var length := player.stream.get_length() if player != null else 0.0
+	_check(length > 30.0, "music.title is Jeff's theme, a whole track (%.1f s)" % length)
+	if player != null:
+		player.seek(length - 0.5)
+		title._process(0.0)
+		title._tween.custom_step(0.6)
+		_check(title._ending and player.volume_db <= title.SILENT_DB + 0.01, "its last %.1f s: faded out (%.1f dB)" % [title.FADE_OUT, player.volume_db])
+		title._again()
+		_check(player.playing and player.get_playback_position() < 0.5 and not title._ending and is_equal_approx(player.volume_db, title.SILENT_DB),
+				"played through: again from its start, silent")
+		title._tween.custom_step(title.FADE_IN)
+		_check(is_equal_approx(player.volume_db, SoundKit.volume_db("music.title")), "and faded in again")
 	_main._show_menu()
 	_check(_main.title_music == title, "the menu again: the same title, not a second")
 	_main._play()

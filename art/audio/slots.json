@@ -1332,7 +1332,7 @@
 			"bus": "music",
 			"positional": false,
 			"volume_db": -12.0,
-			"uses": "a town or a house: a sparse melodic layer over the ground, out when tension is high (Music)"
+			"uses": "a town or a house: a sparse melodic layer over the ground, out when tension is high (Music); no take for now: its bells rang over every indoor map (Jeff), so it is silent until a sparse melody comes"
 		},
 		"music.wilds_base": {
 			"category": "music",
@@ -1438,13 +1438,13 @@
 			"bus": "music",
 			"positional": false,
 			"volume_db": 0.0,
-			"uses": "the main menu (title screen): faded in over about 1 s as the menu opens, on through the connect screen, out over about 1 s as the world starts loading (client3d/title_music.gd, from Main; decision 656)",
+			"uses": "the main menu (title screen, its options): faded in over about 1 s as the menu opens, on through the connect screen, out over about 1 s as the world starts loading; played through, faded out over its last second and in again from its start (client3d/title_music.gd, from Main; decision 656 and its amendment)",
 			"source": {
 				"by": "Jeff",
 				"tool": "Ableton Live",
 				"license": "own",
-				"date": "2026-10-24",
-				"notes": "Jeff's first track, \"first-harmony\" (his master: 48 kHz 24-bit stereo WAV, 11.29 s, 4 bars at 85 bpm, a loop cut on the bar; kept in his music folder, not the repo); Ogg Vorbis q7, 1 dB down for headroom (peak -1.2 dBFS); Jeff, 2026-10-24, by way of the coordinator: \"try this one for the title screen\""
+				"date": "2026-10-27",
+				"notes": "Jeff's theme, \"psykinetic-theme1\" (his master, not the -youtube one: 48 kHz 24-bit stereo WAV, 34.91 s, 16 bars at 110 bpm; kept in his music folder, not the repo); Ogg Vorbis q7 at his level (peak -3.9 dBFS, mean -18.9 dB); its end steps into its start harder than any step within it (0.07, max inside 0.061), so it rounds faded, never looped raw; Jeff, 2026-10-28, by way of the coordinator: \"use the psykinetic theme1 wav for the login/options screen now and theres no use for first harmony right now\""
 			}
 		},
 		"music.barrow": {

@@ -346,6 +346,9 @@ func _test_music() -> void:
 	for zone: String in Music.ZONES:
 		_check(SoundKit.has("music.%s_base" % zone) and (zone in Music.NO_MELODY or SoundKit.has("music.melody_" + zone)),
 				"%s has a base, and a melody unless it goes without" % zone)
+	# Jeff's ringing at every indoor map: the town's melody was a bell wash; no take now, and a bed with none is silent.
+	_check(SoundKit.takes("music.melody_town").is_empty() and SoundKit.placeholder(SoundKit.bus("music.melody_town")) == null,
+			"the town's melody: no take, silent (its bells rang over every indoor map)")
 	var temple := Music.weights("temple", 0.0, 0.0, true)
 	_check(temple["music.temple_base"] == 1.0 and temple.keys().all(func(k: String) -> bool: return k == "music.temple_base" or temple[k] == 0.0),
 			"in a temple, by night too: its ground alone")

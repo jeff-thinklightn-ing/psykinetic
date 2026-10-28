@@ -43,8 +43,8 @@
 			{
 				"file": "amb.draft.ogg",
 				"from": "freesound",
-				"original": "freesound 651541: wind draft loop 1",
-				"sha256": "bd45a89026ecc38b4dca5eea360aac09da0f02f8b7157dc79cb4e10242f6c47d",
+				"original": "freesound 651541: wind draft loop 1 (its 15625 Hz line notched out)",
+				"sha256": "182fe44638281bbedce667bd28f2bd7d40ce5c66ad48d0af0f340703bcf50d65",
 				"by": "nsstudios",
 				"url": "https://freesound.org/people/nsstudios/sounds/651541/",
 				"license": "CC BY 4.0"
@@ -256,14 +256,6 @@
 				"from": "sonniss-gdc-2021-23",
 				"original": "2021-23/BluezoneCorp - Afterlife - Ethereal Ambient Samples/Bluezone_BC0285_afterlife_ambient_synth_melodic_texture_008.wav",
 				"sha256": "31217cbafcd41a55e01b2f12327445c6cb5ea5010c7e545a1051a617fde4e2b3"
-			}
-		],
-		"music.melody_town": [
-			{
-				"file": "music.melody_town.ogg",
-				"from": "sonniss-gdc-2021-23",
-				"original": "2021-23/CB Sound Design - Dreamcatcher - The Sound of Dreams & Magic/Enchanting_Bells_4.wav",
-				"sha256": "331b1ac84920d1f035ed2eac54a40000e3304cf38fe7a409f0037ae22804cd74"
 			}
 		],
 		"music.melody_wilds": [
