@@ -474,8 +474,9 @@ angered by the robbers, the knight's remains charging the amulet.
 > "can the level be the **Ossuary** and i like the names. the barrows has unique grave robbers that have names, they have to either be dead or escaped, they might have set up a small camp and a chest in the barrows, in the chest is the item "Tomb Sledge" its a heavy hammer. The robbers have been looking for a way to break through to get holy relics to sell on the black market. thats why Draugr is angry. there might be broken walls and tombs that was done with the sledge or it could be one of the bigger guards, a named one, larger, the rest can't carry the hammer its too heavy. Some connections between rooms aren't doors but broken down walls."
 
 - **[Jeff]** The level under the temple is **the Ossuary** (not the Temple Undercroft). He likes
-  the other names and lines, which pass: the 14 knights, the barred stair, the cold draft, the
-  draugr's anger line.
+  the names, which pass: the Temple Ossuary's and the Hall's, the 14 knights. The lines (the
+  barred stair, the cold draft, the draugr's anger line) stay drafts; the coordinator has asked
+  him (2026-10-27).
 - **[Jeff]** The barrow's grave robbers are unique and named; each is either dead or escaped.
   They may keep a small camp and a chest in the barrow, and in it the Tomb Sledge, a heavy hammer.
 - **[Jeff]** The robbers have been looking for a way to break through to the holy relics, to
