@@ -34589,3 +34589,39 @@ resident_test `_test_relic`: the offer and nobody else's, the hand-in
 (taken past the soulbound rule, thanked by name, regard, the card's fact
 without the id), the panel's accept, a non-priest taking nothing, and the
 priest's line. Server only; protocol as measured.
+## 724. Click routes keep right when another body blocks them
+
+Physics, from combat's landing (net_test phase 3, "Fay crossed to (12,
+12)": got 0): two click routes met head-on in the two-wide passage and
+stood face to face for good. The server stops each free body a radius off
+the other and steers neither (689: the client drives its own body), and no
+client planned again. The coordinator's rule, client side
+(Main._free_blocked): a route whose next step another body stands in the
+way of, the body standing still against it (moved under FREE_BLOCKED_MOVED
+0.15 cells) for FREE_BLOCKED_SECONDS 0.25, steps once to its own right if
+that cell is walkable, empty and in clear line, and plans again from there
+round the other as a wall (find_path's walls; not when the other stands on
+the route's end, which it will leave). Two coming head-on have opposite
+rights, so they never pick the same side; one whose right is shut (a wall)
+waits for the other, whose right is then open. Blocked FREE_GIVE_UP_SECONDS
+2.0, the route is given up, with a "[free] ... route given up" line.
+Counted in the sim's ticks, not the wall clock: a stalled server stops the
+count with the bodies.
+
+Where the other stands is its mirror's newest state (Main._free_stands),
+not its tile or where it is drawn: on a client another's free body's tile
+lagged (a phantom at a start long left) and the drawn body is
+display_delay_ticks behind.
+
+The test's hold. --test-hold (the sim waits at a tick for n orders) counted
+only grid orders, so with free walk it waited its 20 s every run: physics'
+"server froze for one 20.4 s frame", with the clients predicting on alone.
+World.free_from now notes a free body's first moving command as its order,
+so the hold releases both at once, as it was meant to.
+
+net_test phase 3 now sets both on the passage's row 12 and crosses them
+along it, released on one tick by the hold: head-on whatever the timing.
+Without 724 it fails every time; with it one steps right ("[free] ... steps
+right ... round ...") and neither gives up. NET_TEST_GROUPS runs some of
+net_test.sh's groups by hand. Client only (and the server's test hook),
+protocol unchanged, no new class_name.

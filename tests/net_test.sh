@@ -202,15 +202,17 @@ phase_1_2() {
 phase_3() {
 	P=$((PORT + 1))
 	# Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
-	# the bottom of the room, then at tick 70 cross it toward each other. Fay is
+	# the bottom of the room, both on its row 12, then at tick 70 cross it
+	# toward each other along that row: head-on, whatever the timing (decision
+	# 724; physics: after a stall both met face to face and stayed). Fay is
 	# Player1 from (11, 2), Gus Player2 from (12, 1), the sim waiting for both.
 	server server3 --server --still-monsters --no-companions "--token=$TOKEN" \
 		--test-wait-players=2 --test-hold=70,2
 	wait_for server3 'listening on port'
 	# Fay is another build with the same protocol: she plays (decision 239).
-	client clientF $GOOD --name=Fay --test-version=0.0.2 --test-move=-6,9 --test-contest=12,12,70
+	client clientF $GOOD --name=Fay --test-version=0.0.2 --test-move=-6,10 --test-contest=12,12,70
 	wait_for server3 'Fay \([a-z0-9-]+\) joined as Player1 '
-	client clientG $GOOD --name=Gus --test-move=0,10 --test-contest=5,12,70
+	client clientG $GOOD --name=Gus --test-move=0,11 --test-contest=5,12,70
 	wait_for clientF 'reached the contested tile'
 	wait_for clientG 'reached the contested tile'
 	finish
@@ -266,7 +268,9 @@ phase_5() {
 # helpers' state its own); what each printed (a wait given up) after. With
 # NET_TEST_SERIAL (a lean landing, 394 amended (12)) one after another: the
 # groups at once are fourteen Godots, a lean landing's peak.
-for group in phase_1_2 phase_3 phase_4 phase_5; do
+# NET_TEST_GROUPS (by hand only, never in a landing): just those groups,
+# e.g. "phase_3"; the checks of the others then fail.
+for group in ${NET_TEST_GROUPS:-phase_1_2 phase_3 phase_4 phase_5}; do
 	if [ -n "${NET_TEST_SERIAL:-}" ]; then
 		( "$group" ) >"$LOGS/$group.out" 2>&1
 	else
@@ -348,6 +352,7 @@ check "$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientF.log")$(count '\[te
 check "$(count '\[test\] display: .*server_tile=\(12, 12\)' "$LOGS/clientF.log")" 1 "phase 3: Fay crossed to (12, 12)"
 check "$(count '\[net\] peer [0-9]+ is v0\.0\.2, the server v[0-9.]+: the same protocol' "$LOGS/server3.log")" 1 "phase 3: Fay is another build with the same protocol, and the server let her play"
 check "$(count '\[test\] display: .*server_tile=\(5, 12\)' "$LOGS/clientG.log")" 1 "phase 3: Gus crossed to (5, 12)"
+check "$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -cE '\[free\] (Fay|Gus|Player[0-9]+) steps right .* round (Fay|Gus|Player[0-9]+)' || true)$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -c 'route given up' || true)" 10 "phase 3: head-on, one stepped to its right and neither gave up (724)"
 check "$(count '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: launch\.bat updates it' "$LOGS/clientF.log")$(count '\[update\]' "$LOGS/clientG.log")" 10 "phase 3: Fay is told once that a newer game is out; Gus, the same build, is not"
 check "$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -c 'display: .*snaps=0 ' || true)" 2 "phase 3: neither client snapped more than 2 tiles"
 # Hal's walk goes on till the reset: on a slow machine it pushes the crate

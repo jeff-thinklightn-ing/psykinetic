@@ -172,14 +172,16 @@ if ($Phase -eq '12') {
 
 if ($Phase -eq '3') {
 	# Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
-	# the bottom of the room, then at tick 70 cross it toward each other. Fay is
-	# Player1 from (11, 2), Gus Player2 from (12, 1), the sim waiting for both.
+	# the bottom of the room, both on its row 12, then at tick 70 cross it
+	# toward each other along that row: head-on, whatever the timing (decision
+	# 724). Fay is Player1 from (11, 2), Gus Player2 from (12, 1), the sim
+	# waiting for both.
 	Start-Server 'server3' @('--server', '--still-monsters', '--no-companions', "--token=$token", '--test-wait-players=2', '--test-hold=70,2')
 	Wait-Log 'server3' 'listening on port'
 	# Fay is another build with the same protocol: she plays (decision 239).
-	Start-Client 'clientF' ($good + @('--name=Fay', '--test-version=0.0.2', '--test-move=-6,9', '--test-contest=12,12,70'))
+	Start-Client 'clientF' ($good + @('--name=Fay', '--test-version=0.0.2', '--test-move=-6,10', '--test-contest=12,12,70'))
 	Wait-Log 'server3' 'Fay \([a-z0-9-]+\) joined as Player1 '
-	Start-Client 'clientG' ($good + @('--name=Gus', '--test-move=0,10', '--test-contest=5,12,70'))
+	Start-Client 'clientG' ($good + @('--name=Gus', '--test-move=0,11', '--test-contest=5,12,70'))
 	Wait-Log 'clientF' 'reached the contested tile'
 	Wait-Log 'clientG' 'reached the contested tile'
 	Complete-Phase
@@ -389,6 +391,7 @@ $fay = @($clientFLog | Select-String '\[test\] display: .*server_tile=\((\d+), (
 $gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
 Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "phase 3: Fay crossed to (12, 12) ($($fay | ForEach-Object { $_.Line }))"
 Assert ($gus.Count -eq 1 -and $gus[0].Line -match 'server_tile=\(5, 12\)') "phase 3: Gus crossed to (5, 12) ($($gus | ForEach-Object { $_.Line }))"
+Assert ((@($clientFLog + $clientGLog | Select-String '\[free\] (Fay|Gus|Player[0-9]+) steps right .* round (Fay|Gus|Player[0-9]+)').Count -ge 1) -and (@($clientFLog + $clientGLog | Select-String 'route given up').Count -eq 0)) 'phase 3: head-on, one stepped to its right and neither gave up (724)'
 Assert (@($clientFLog | Select-String '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: launch\.bat updates it').Count -eq 1 -and @($clientGLog | Select-String '\[update\]').Count -eq 0) 'phase 3: Fay is told once that a newer game is out; Gus, the same build, is not'
 Assert ($fay.Count -eq 1 -and $gus.Count -eq 1 -and $fay[0].Matches[0].Groups[3].Value -eq '0' -and $gus[0].Matches[0].Groups[3].Value -eq '0') 'phase 3: neither client snapped more than 2 tiles'
 # Hal's walk goes on till the reset: on a slow machine it pushes the crate

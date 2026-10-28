@@ -7325,6 +7325,11 @@ func free_from(sender: int, entity_path: NodePath, packed: PackedByteArray) -> b
 	if commands.is_empty():
 		_free_refused(sender, "a packet of %d bytes" % packed.size())
 		return false
+	if commands.any(func(command: Dictionary) -> bool: return (command["intent"] as Vector2).length() > 0.01):
+		# 724: a free body's first move is its order, for --test-hold (it
+		# waited its 20 s for grid orders that never come: physics' "server
+		# froze for one 20.4 s frame").
+		Net.test_note_order(sender, tick)
 	var was := enter_named(entity.zone)
 	take_free(entity as Player, commands)
 	enter(was)

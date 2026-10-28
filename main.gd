@@ -2660,6 +2660,16 @@ var _free := {"path": [], "held": false, "at": 0, "chase": null}
 ## How long the button is held after a click before it steers to the
 ## cursor rather than walking the click's route.
 const FREE_HOLD_SECONDS := 0.25
+## 724: a click route whose next step another body has stood in the way
+## of for FREE_BLOCKED_SECONDS (of the sim's ticks) steps to its own right, if that cell is
+## open, and plans again round the body as a wall; with its right shut it
+## waits, as the other, coming the other way, has its right open. Past
+## FREE_GIVE_UP_SECONDS blocked, the route is given up.
+const FREE_BLOCKED_SECONDS := 0.25
+const FREE_GIVE_UP_SECONDS := 2.0
+## Blocked means stood still against another: past this far (cells) from
+## where the block began, it got on, and the count starts again.
+const FREE_BLOCKED_MOVED := 0.15
 ## How far along its route a free body looks for a cell in clear line
 ## (_free_pull, 689 amended (5)): a few line checks a frame at most.
 const FREE_PULL_CELLS := 12
@@ -2780,6 +2790,8 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 		var near := 0.05 if path.size() == 1 else 0.45
 		if at.distance_to(next) > near:
 			var way := next - at
+			if _free_blocked(player, at, way, path):
+				return Vector2.ZERO if (_free["path"] as Array).is_empty() else (Vector2(_free["path"][0]) - at).normalized()
 			# The last cell: slower as it comes, so it stops on the centre.
 			return way.normalized() * (clampf(way.length() * 4.0, 0.2, 1.0) if path.size() == 1 else 1.0)
 		if path.size() == 1 and not own.pending.is_empty():
@@ -2789,6 +2801,95 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 			return Vector2.ZERO
 		path.pop_front()
 	return Vector2.ZERO
+
+
+## 724: where [param entity] stands now, as this peer last heard: another's
+## free body its mirror's newest state (not drawn display_delay_ticks
+## behind, nor its tile, which lags: physics' test saw a phantom at a
+## start long left), anyone else its tile.
+static func _free_stands(entity: GridEntity) -> Vector2:
+	if entity is Player and (entity as Player).free_view is FreeNet.Mirror:
+		var samples: Array = ((entity as Player).free_view as FreeNet.Mirror).samples
+		if not samples.is_empty():
+			return samples.back()[1]
+	return Vector2(entity.tile)
+
+
+## 724: the body (not [param player]) against [param at] ahead along
+## [param heading]: its centre (_free_stands) within two FREE_RADIUS and a
+## little, less than 60 degrees off the way.
+func _free_body_ahead(player: Player, at: Vector2, heading: Vector2) -> GridEntity:
+	var best: GridEntity = null
+	var nearest := World.FREE_RADIUS * 2.0 + 0.2
+	for entity in World.get_entities():
+		if entity == player or not is_instance_valid(entity) or not entity.spawned:
+			continue
+		var off := _free_stands(entity) - at
+		if off.length() < nearest and off.length() > 0.001 and off.normalized().dot(heading) > 0.5:
+			nearest = off.length()
+			best = entity
+	return best
+
+
+## 724 (physics: two click routes met head-on in the two-wide passage and
+## stood face to face for good; the server stops each body a radius off the
+## other and steers neither): whether another body stands in the route's
+## way at [param at], heading [param way]. Blocked FREE_BLOCKED_SECONDS, the
+## route steps to the body's own right (two coming head-on pick opposite
+## sides) if that cell is walkable and empty, then goes round the other as
+## a wall to the route's end; with the right shut it waits for the other
+## to step aside. Blocked FREE_GIVE_UP_SECONDS, the route is given up.
+## True when [member _free]'s path was changed (or emptied).
+func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bool:
+	var other := _free_body_ahead(player, at, way.normalized())
+	# Counted in the sim's ticks, not the wall's: a server that stalls (a
+	# test's hold, a long frame) stops the clock with the bodies.
+	var now := World.tick
+	if not is_same(_free.get("blocked_route"), path):
+		# Another route (a new click): its own count, from nothing.
+		_free["blocked_route"] = path
+		_free.erase("blocked_since")
+		_free.erase("blocked_at")
+		_free.erase("sidestepped")
+	if other == null or at.distance_to(_free.get("blocked_at", at)) > FREE_BLOCKED_MOVED:
+		# Nobody against it, or it got on (a body passing beside, the other
+		# stepping aside): not blocked.
+		_free.erase("blocked_since")
+		_free.erase("blocked_at")
+		_free.erase("sidestepped")
+		return false
+	var since: int = _free.get("blocked_since", now)
+	_free["blocked_since"] = since
+	_free["blocked_at"] = _free.get("blocked_at", at)
+	var blocked := float(now - since) / World.TICK_RATE
+	if blocked >= FREE_GIVE_UP_SECONDS:
+		print("[free] %s's route given up at %s: %s at %s in the way %.1f s (tick %d)" % [player.name, at, other.name, _free_stands(other), blocked, now])
+		_free["path"] = []
+		_free.erase("blocked_since")
+		_free.erase("blocked_at")
+		_free.erase("sidestepped")
+		return true
+	if blocked < FREE_BLOCKED_SECONDS or _free.get("sidestepped", false):
+		return false
+	var heading := way.normalized()
+	var from := World.free_cell(player, at)
+	var side := from + Vector2i(Vector2(-heading.y, heading.x).round())
+	var there := Vector2i(_free_stands(other).round())
+	if side == there or not World.is_walkable(side) or World.get_entity_at(side) != null 			or not World._line_clear(from, side, side, player):
+		return false  # The right is shut: wait; the other's is open.
+	_free["sidestepped"] = true
+	var goal: Vector2i = path[-1]
+	var route: Array = [side]
+	# Round the other as a wall, unless it stands on the route's end (it
+	# will go; walled, there would be no way at all).
+	for cell: Vector2i in World.find_path(side, goal, true, player, 0, false, {} if there == goal else {there: true}):
+		route.append(cell)
+	if route.back() != goal:
+		route.append(goal)  # No way round now: on for the end, blocked again or not.
+	print("[free] %s steps right from %s to %s round %s at %s (tick %d)" % [player.name, from, side, other.name, there, now])
+	_free["path"] = route
+	_free["blocked_route"] = route  # The same block: its clock and its one step aside go on.
+	return true
 
 
 ## The route's string pulled (689 amended (5); Jeff: "mouse move directions is
