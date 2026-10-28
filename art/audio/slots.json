@@ -46,6 +46,14 @@
 			"notes": "CC0 and CC BY sounds only (nothing non-commercial, no Sampling+), fetched by tools/freesound.ps1 into the sound library's freesound/<slot>/<id>/ and cut into its takes/ like Sonniss's; each take names its maker, page and licence, and THIRD_PARTY.md credits it"
 		}
 	},
+	"rejected": [
+		{
+			"from": "sonniss-gdc-2021-23",
+			"file": "Bluezone_BC0273_eternity_synth_chimes_texture_001.wav",
+			"was": "music.sting_discovery",
+			"why": "Jeff, 2026-10-28: the squeal at every map start (a 1969 Hz chime, 8.5 s); \"that sound should probably be axed completely i can't think of a more annoying sound\" (decision 728)"
+		}
+	],
 	"slots": {
 		"sfx.swing": {
 			"category": "combat",
@@ -1406,7 +1414,7 @@
 			"bus": "music",
 			"positional": false,
 			"volume_db": -6.0,
-			"uses": "a stinger: a level entered for the first time this session (Music)"
+			"uses": "a stinger: a level entered for the first time this session (Music); no take for now: its chime (a 1969 Hz line, 8.5 s) was the squeal Jeff heard at every map start (728)"
 		},
 		"music.sting_danger": {
 			"category": "music",

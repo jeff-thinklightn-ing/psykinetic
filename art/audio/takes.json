@@ -282,14 +282,6 @@
 				"sha256": "8a46c4de2991dd4afb817d2404605fb464f9768da8e6d31e001cb652e18d6285"
 			}
 		],
-		"music.sting_discovery": [
-			{
-				"file": "music.sting_discovery.ogg",
-				"from": "sonniss-gdc-2021-23",
-				"original": "2021-23/BluezoneCorp - Eternity - Ethereal Ambient/Bluezone_BC0273_eternity_synth_chimes_texture_001.wav",
-				"sha256": "8f7982e2b244f0466289de4705ec2a23ac2ba619f409ae9cf674a972f5b6963f"
-			}
-		],
 		"music.sting_victory": [
 			{
 				"file": "music.sting_victory.ogg",

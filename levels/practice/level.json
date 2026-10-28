@@ -1,5 +1,6 @@
 {
 	"name": "Practice hall",
+	"music": "none",
 	"centre": [12, 12],
 	"starts": [[3, 19], [4, 19], [3, 20], [4, 20]],
 	"entities": [],

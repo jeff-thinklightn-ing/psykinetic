@@ -349,6 +349,25 @@ func _test_music() -> void:
 	# Jeff's ringing at every indoor map: the town's melody was a bell wash; no take now, and a bed with none is silent.
 	_check(SoundKit.takes("music.melody_town").is_empty() and SoundKit.placeholder(SoundKit.bus("music.melody_town")) == null,
 			"the town's melody: no take, silent (its bells rang over every indoor map)")
+	# 728: the discovery stinger's chime was the squeal at every map start; retired, rejected for good, and never for the zone a session starts in.
+	_check(SoundKit.takes("music.sting_discovery").is_empty() and SoundKit.files("music.sting_discovery").is_empty()
+			and SoundKit.placeholder(SoundKit.bus("music.sting_discovery")) == null, "the discovery stinger: no take, silent (no blip on Music)")
+	var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SoundKit.MANIFEST))
+	var rejected_listed := []
+	for rejected: Dictionary in manifest.get("rejected", []):
+		for slot: String in SoundKit.slots():
+			for take: Dictionary in SoundKit.takes(slot):
+				if str(take.get("original", "")).get_file().begins_with(str(rejected.file)):
+					rejected_listed.append(slot)
+	_check(manifest.get("rejected", []).size() >= 1 and rejected_listed.is_empty(), "no slot plays a rejected recording %s" % [rejected_listed])
+	var visited_was := Music._visited.duplicate()
+	Music._visited.clear()
+	_check(not Music.discovers("practice") and not Music.discovers("practice") and Music.discovers("barrow") and not Music.discovers("barrow")
+			and not Music.discovers(""), "a discovery: a zone first entered, never the one a session starts in")
+	Music._visited = visited_was
+	_check(Music.silent_level("practice") and Music.silent_level("test_room") and not Music.silent_level("barrow")
+			and not Music.silent_level("wilds") and not Music.silent_level("") and Music.level_music("practice") == "",
+			"the practice hall and the test room play no music; the barrow, the wilds and an unnamed level do")
 	var temple := Music.weights("temple", 0.0, 0.0, true)
 	_check(temple["music.temple_base"] == 1.0 and temple.keys().all(func(k: String) -> bool: return k == "music.temple_base" or temple[k] == 0.0),
 			"in a temple, by night too: its ground alone")

@@ -71,7 +71,8 @@ const TEMPLE_FAR := 8.0
 const STINGS: Array[String] = ["discovery", "danger", "death", "victory"]
 
 ## Levels (World.zone's names) been in this session: a stinger on the
-## first visit to each.
+## first visit to each, but never the one the session starts in (728: every
+## launch, test window and practice hall chimed on its first map).
 static var _visited: Dictionary[String, bool] = {}
 ## Level -> its level.json (empty for none), read once.
 static var _level_files: Dictionary[String, Dictionary] = {}
@@ -90,6 +91,8 @@ var _fight_heard := false
 ## In a phrase or resting, and the seconds left of it.
 var phrase_on := false
 var _phrase_left := 0.0
+## In a level with no music (silent_level): nothing weighed, no stinger.
+var _silent := false
 var rng := RandomNumberGenerator.new()
 ## Seconds since this started (the stinger clock), the last stinger's time
 ## and each kind's.
@@ -140,7 +143,7 @@ func fight_near() -> void:
 ## Plays the stinger of [param kind] (STINGS) unless one played too lately
 ## (may_sting). False when it doesn't.
 func sting(kind: String) -> bool:
-	if not muted() and may_sting(kind, clock, _last_sting, _last_sting_of):
+	if not muted() and not _silent and may_sting(kind, clock, _last_sting, _last_sting_of):
 		var files := SoundKit.files("music.sting_" + kind)
 		if files.is_empty():
 			return false
@@ -253,7 +256,8 @@ static func weights(zone: String, day: float, level_tension: float, in_phrase: b
 func _weigh(delta: float) -> void:
 	if view == null or view.sfx == null or view.sfx.listener == null:
 		return
-	if muted():
+	_silent = silent_level(str(view._terrain.get("level", "")))
+	if muted() or _silent:
 		targets.clear()
 		for layer: String in players:
 			players[layer].stop()
@@ -262,8 +266,7 @@ func _weigh(delta: float) -> void:
 	var zone_name := World.zone.name if World.zone != null else ""
 	if zone_name != _zone_name:
 		_zone_name = zone_name
-		if zone_name != "" and not _visited.has(zone_name):
-			_visited[zone_name] = true
+		if discovers(zone_name):
 			sting("discovery")
 	var near: Array = []
 	var hunted := false
@@ -306,6 +309,23 @@ func _weigh(delta: float) -> void:
 	targets.assign(by_take(wanted))
 	if view.ambience != null:
 		view.ambience.duck_db = AMBIENCE_DUCK_DB * clampf((tension - 0.5) / 0.5, 0.0, 1.0)
+
+
+## Whether entering [param zone_name] is a discovery, noting it visited: a
+## zone first entered this session, but not the session's first (where it
+## arrived), and not "" (no zone).
+static func discovers(zone_name: String) -> bool:
+	if zone_name == "" or _visited.has(zone_name):
+		return false
+	var arrived := _visited.is_empty()
+	_visited[zone_name] = true
+	return not arrived
+
+
+## Whether level [param level_name] plays no music at all (728): its
+## level.json's "music" is "none" (the practice hall, the test room).
+static func silent_level(level_name: String) -> bool:
+	return str(_config_of(level_name).get("music", "")) == "none"
 
 
 ## Level [param level_name]'s own music slot (668): its level.json's "music"

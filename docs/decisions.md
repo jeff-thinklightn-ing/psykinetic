@@ -34771,3 +34771,32 @@ recording.
 - sound_kit_test checks the setting.
 
 Client only; protocol unchanged; no new class_name.
+
+## 728. The discovery stinger's chime retired and rejected; no stinger for the zone a session starts in; no music in the practice hall and the test room
+
+Jeff, after listening to every music take (C:/dev/review/ringing/): "the sound is sting
+discovery", and "that sound should probably be axed completely i can't think of a more annoying
+sound". The "high pitch squeel that fades out eventually" heard at every map start, in the en
+garde builds and in sessions' test windows (727's bells and 729's buffer were not it).
+
+- The take: music.sting_discovery, Sonniss #GameAudioGDC 2021-23, BluezoneCorp "Eternity -
+  Ethereal Ambient", Bluezone_BC0273_eternity_synth_chimes_texture_001.wav: a synth chime whose
+  1969 Hz line peaks at -8 dBFS 3 s in and rings 8.5 s as it fades (with 7.9 kHz at -23 and
+  3.3 kHz at -25), played at the slot's -6 dB: about -14 dBFS, over a quiet room.
+- Why at every map start: Music stings "discovery" on the first visit to each zone this session
+  (Music._visited, static), and the zone a session starts in was a first visit too, so every
+  launch, test window and practice hall played it about a second in. Music.discovers now notes
+  the session's first zone without a stinger; a zone first entered after it still stings.
+- The take is retired from takes.json (the file to the sound library's retired/ folder; its
+  THIRD_PARTY entry goes), so the slot plays silence (a stinger on Music has no blip). It is
+  listed in slots.json's new "rejected" (source and file, what it was, why), which
+  tools/sound_take.ps1 refuses to cut again for any slot, and sound_kit_test fails on any take
+  of a rejected recording. A future discovery stinger goes to Jeff as a pick before it is used.
+- A level.json "music": "none" (Music.silent_level) plays no music there at all, no layer and
+  no stinger, what played stopped; the practice hall and the test room carry it.
+- First drafted (unlanded) as retiring the town's ground drones; dropped once Jeff named the
+  stinger. town_base and town_night stay.
+- sound_kit_test: the stinger silent, no rejected recording played, Music.discovers, the
+  silent levels; view_test: the practice hall plays nothing.
+
+Client only; protocol unchanged; no new class_name.

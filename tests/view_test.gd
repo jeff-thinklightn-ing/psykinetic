@@ -356,6 +356,14 @@ func _test_level_music() -> void:
 	_check(music.targets.get("music.barrow") == 0.0, "gone below: wanted at 0, so it eases out")
 	music._process(Music.LEVEL_FADE * 2.0)
 	_check(float(music.levels.get("music.barrow", 1.0)) < Music.SILENT and not player.playing, "eased out and stopped")
+	_rig._terrain["level"] = "barrow"
+	music._weigh(0.25)
+	music._process(Music.LEVEL_FADE)
+	_rig._terrain["level"] = "practice"
+	music._weigh(0.25)
+	var sounding := music.players.values().filter(func(p: AudioStreamPlayer) -> bool: return p.playing)
+	_check(music.targets.is_empty() and sounding.is_empty() and not music.sting("danger"),
+		"the practice hall (728): no music at all, what played stopped, no stinger (%d playing)" % sounding.size())
 	if level_was == null:
 		_rig._terrain.erase("level")
 	else:

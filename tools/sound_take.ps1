@@ -49,6 +49,12 @@ $sourceEntry = $manifest.sources.PSObject.Properties[$From]
 if ($null -eq $sourceEntry) { Fail "no source $From in art\audio\slots.json (sources: $(($manifest.sources.PSObject.Properties | ForEach-Object Name) -join ', '))" }
 $sourceEntry = $sourceEntry.Value
 if (-not (Test-Path -LiteralPath $Source)) { Fail "no file $Source" }
+# A recording Jeff rejected is never cut again, for any slot (slots.json "rejected", 728).
+foreach ($rejected in @($manifest.rejected)) {
+	if ($null -ne $rejected -and $rejected.from -eq $From -and (Split-Path $Source -Leaf) -eq $rejected.file) {
+		Fail "$($rejected.file) is rejected (it was $($rejected.was)): $($rejected.why)"
+	}
+}
 if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { Fail 'ffmpeg is not on PATH' }
 
 # Where it goes.
