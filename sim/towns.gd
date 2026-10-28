@@ -137,6 +137,19 @@ var placed := Callable()
 ## A herder's fold changed its count (640): [param place_id]'s sheep, for
 ## the "folds" message the views draw it by.
 signal folds_changed(place_id: String)
+## A visitor came to [param town] or left it (711): its Towns.visitors
+## entry by [param id], for npc's bodies.
+signal visitor_came(town: String, id: String)
+signal visitor_left(town: String, id: String)
+## (town) -> Array of place names a visitor to it may come from (711; Main,
+## from the world plane); "the road" while unset.
+var visitor_from := Callable()
+## (town, entry) -> String: what a visitor does as they come (711;
+## Economy.visitor_arrives, set by Main): words for the log, "" for nothing.
+var visitor_arrives := Callable()
+## (town, entry, player_id, item) -> {ok, say, gold}: a pedlar's sale's gold
+## (711; Economy.visitor_sale, set by Main). No sale while unset.
+var visitor_sale := Callable()
 
 ## Town -> {xp, spent, residents: Array[String] (worker ids), buildings:
 ## {kind: {kind, level, state, since, job}}, objectives (done, by id),
@@ -557,6 +570,7 @@ func tick() -> void:
 		_decline(town)
 		_maker_comes(town)
 		_sought_turn(town)
+		_visitors_turn(town)
 		# One build at a time, unless the one in hand has stalled on its
 		# materials (decision 522).
 		if production.building_in(town) and not production.builds_stalled(town):
@@ -2797,6 +2811,126 @@ func _seated(who: String) -> bool:
 	return production.workshop_of(who) != ""
 
 
+# --- Visitors (decision 711) -----------------------------------------------------------
+
+## [param town]'s visitors (711; Jeff: strangers come and go, the town never
+## grows by them): [{id, kind, name, from, came, leaves (steps), stock (item
+## id -> count, a pedlar's), news (npc's, set_visitor_news)}]. Never
+## residents: no worker, no rent, no needs, not counted for a stage.
+func visitors(town: String) -> Array:
+	return (_towns.get(town, {}).get("visitors", []) as Array).duplicate(true)
+
+
+## npc's news for visitor [param id] of [param town], set once as they come.
+func set_visitor_news(town: String, id: String, news: Array) -> void:
+	for entry: Dictionary in _towns.get(town, {}).get("visitors", []):
+		if str(entry["id"]) == id:
+			entry["news"] = news.duplicate(true)
+
+
+## Player [param player_id] buys one [param item] from pedlar [param
+## visitor_id] (711): {ok, say, gold (paid)}; the gold through
+## visitor_sale, one off the pedlar's stock.
+func visitor_sell(visitor_id: String, player_id: String, item: String) -> Dictionary:
+	for town: String in _towns:
+		for entry: Dictionary in _towns[town].get("visitors", []):
+			if str(entry["id"]) != visitor_id:
+				continue
+			var stock: Dictionary = entry.get("stock", {})
+			if int(stock.get(item, 0)) <= 0:
+				return {"ok": false, "say": "I've none of that left.", "gold": 0}
+			if not visitor_sale.is_valid():
+				return {"ok": false, "say": "Not today.", "gold": 0}
+			var done: Dictionary = visitor_sale.call(town, entry, player_id, item)
+			if bool(done.get("ok", false)):
+				stock[item] = int(stock[item]) - 1
+				if int(stock[item]) <= 0:
+					stock.erase(item)
+			return done
+	return {"ok": false, "say": "", "gold": 0}
+
+
+## [param town]'s visitors' day (711): those whose time is up go on; then
+## once a day, with fewer than rules' visitors.most and people of its own,
+## one comes at visitors.chance: a kind drawn by weight among those whose
+## "needs" building stands, staying visitors.days (a range) days, a
+## pedlar's wares drawn from the lines no trade of the town's makes (each
+## line's "unless").
+func _visitors_turn(town: String) -> void:
+	var rule: Dictionary = rules.get("visitors", {})
+	if rule.is_empty():
+		return
+	var record := _town(town)
+	var here: Array = record.get("visitors", [])
+	for entry: Dictionary in here.duplicate():
+		if now() >= int(entry["leaves"]):
+			here.erase(entry)
+			_note(town, "%s the %s goes on from %s" % [entry["name"], entry["kind"], town])
+			visitor_left.emit(town, str(entry["id"]))
+	var day := now() / maxi(DayNight.day_steps, 1)
+	if int(record.get("visitor_day", -1)) == day:
+		return
+	record["visitor_day"] = day
+	if here.size() >= int(rule.get("most", 2)) or residents(town).is_empty():
+		return
+	var draw := RandomNumberGenerator.new()
+	draw.seed = hash("%s/visitor/%d" % [town, day])
+	if draw.randf() >= float(rule.get("chance", 0.35)):
+		return
+	var kinds: Dictionary = rule.get("kinds", {})
+	var open: Array[String] = []
+	var total := 0.0
+	for kind: String in kinds:
+		var needs := str(kinds[kind].get("needs", ""))
+		if needs.is_empty() or _stands(town, needs):
+			open.append(kind)
+			total += float(kinds[kind].get("weight", 1))
+	if open.is_empty() or total <= 0.0:
+		return
+	open.sort()
+	var roll := draw.randf() * total
+	var kind := open[-1]
+	for each in open:
+		roll -= float(kinds[each].get("weight", 1))
+		if roll < 0.0:
+			kind = each
+			break
+	var kind_rule: Dictionary = kinds[kind]
+	var names: Array = kind_rule.get("names", ["A stranger"])
+	var places: Array = visitor_from.call(town) if visitor_from.is_valid() else []
+	var days: Array = rule.get("days", [1, 3])
+	var count := int(record.get("visitors_made", 0)) + 1
+	record["visitors_made"] = count
+	var entry := {"id": "visitor_%s_%d" % [town.replace("/", "_"), count], "kind": kind,
+		"name": str(names[draw.randi_range(0, names.size() - 1)]),
+		"from": str(places[draw.randi_range(0, places.size() - 1)]) if not places.is_empty() else "the road",
+		"came": now(), "leaves": now() + draw.randi_range(int(days[0]), int(days[-1])) * maxi(DayNight.day_steps, 1),
+		"stock": {}, "news": []}
+	var trades := {}
+	for who in residents(town):
+		for trade: Variant in production.worker(who).get("trades", []):
+			trades[str(trade)] = true
+	var wares: Array = (kind_rule.get("wares", []) as Array).filter(func(line: Variant) -> bool:
+		return line is Dictionary and not trades.has(str(line.get("unless", ""))))
+	var draws: Array = kind_rule.get("draw", [3, 5])
+	for i in draw.randi_range(int(draws[0]), int(draws[-1])) if not wares.is_empty() else 0:
+		var weight := 0.0
+		for line: Dictionary in wares:
+			weight += float(line.get("weight", 1))
+		var pick := draw.randf() * weight
+		for line: Dictionary in wares:
+			pick -= float(line.get("weight", 1))
+			if pick < 0.0:
+				var item := str(line["item"])
+				entry["stock"][item] = int(entry["stock"].get(item, 0)) + int(line.get("count", 1))
+				break
+	here.append(entry)
+	record["visitors"] = here
+	var did := str(visitor_arrives.call(town, entry)) if visitor_arrives.is_valid() else ""
+	_note(town, "%s the %s from %s comes to %s%s" % [entry["name"], kind, entry["from"], town, ": " + did if not did.is_empty() else ""])
+	visitor_came.emit(town, str(entry["id"]))
+
+
 func _note(town: String, what: String) -> void:
 	var record := _town(town)
 	record["log"].append({"step": now(), "what": what})
@@ -2923,6 +3057,13 @@ func from_dict(saved: Dictionary) -> void:
 			for camp: Variant in restock:
 				record["restock"][str(camp)] = int(restock[camp])
 		record["strangers_made"] = maxi(int(entry.get("strangers_made", 0)), 0)
+		# Its visitors (711), as they are; one without an id or a kind dropped.
+		if entry.get("visitors") is Array:
+			record["visitors"] = (entry["visitors"] as Array).filter(func(each: Variant) -> bool:
+				return each is Dictionary and str(each.get("id", "")) != "" and str(each.get("kind", "")) != "").duplicate(true)
+		for key: String in ["visitors_made", "visitor_day"]:
+			if entry.has(key):
+				record[key] = int(entry[key])
 		var sought_saved: Variant = entry.get("sought", {})
 		if sought_saved is Dictionary:
 			for id: Variant in sought_saved:

@@ -33865,3 +33865,44 @@ on sword swings (via the coordinator, cc combat).
   voice and no goblin sound.
 
 Client only; protocol unchanged; no new class_name.
+## 711. Visitors come and go; the town never grows by them
+
+Jeff on town-grows-alone: "the town is shaped by player interactions,
+doesn't grow on its own -- there could be a balance where strangers come
+and go, to add to the town, traveler, trader etc. always rotating bringing
+news, but never growing the population". So no drift home and no more
+founders: visitors (the coordinator approved economy and npc's design).
+
+Economy's side. Towns keeps each town's visitors beside its residents:
+{id, kind, name, from, came, leaves, stock, news}. They have no worker, no
+rent, no needs, and are never counted for a stage, room, strain or
+sole_needed. Once a day (_visitors_turn), a town with people of its own
+and fewer than visitors.most (2) gets one at visitors.chance (0.35), a
+kind drawn by weight among those whose "needs" building stands, staying
+visitors.days (1 to 3) days; then they go on. "from" is the name of a far
+end of one of the town's trade routes (Main, visitor_from), "the road"
+when it has none. Kinds, in economy.json visitors.kinds:
+- traveller: spends visitors.kinds.traveller.inn (2 to 6) gold at the
+  inn, where one stands, into the treasury.
+- pedlar: buys the store's spare raws (over comfort; ore, wood, cloth),
+  4 at most, at the store's price, into the treasury; carries wares (items'
+  list: spice, wine, silver ring, remedy, tusks, buckler), 3 to 5 drawn,
+  never one a trade of the town makes (a line's "unless"). A player buys
+  one through Towns.visitor_sell -> Economy.visitor_sale: its value x
+  merchant.sell, the town's sale tax to the treasury, the rest away with
+  the pedlar.
+- pilgrim: only where a temple stands; an offering (2 to 5 gold) to its
+  alms.
+A visitor's gold comes from outside the world with them and leaves with
+them; players lose gold only by spending. Logged in the town's log as
+"<name> the <kind> from <from> comes to <town>: <what they did>" and
+"... goes on from <town>"; signals visitor_came and visitor_left, and
+set_visitor_news for npc's news. Kept in the save. farm_test: one a day,
+not a resident, wares the smith makes left out, spare wood bought, a sale
+taxed and off the stock, no gold no sale, the save, leaving, the most, a
+pilgrim only with a temple.
+
+Safe on the box alone: before npc's side a visitor has no body and no
+words, and the town's log isn't spoken; only the treasury's small takes
+show. npc's side (bodies, news, the wares panel) and items' side follow
+as "711, npc's side" and "711, items' side".

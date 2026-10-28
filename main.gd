@@ -4208,6 +4208,8 @@ func _boot() -> void:
 	World.economy.before_harvest = World.towns.before_harvest
 	# The hill herders' droves, bought by the town (640).
 	World.towns.drove = World.economy.buy_drove
+	World.towns.visitor_arrives = World.economy.visitor_arrives  # Visitors (711).
+	World.towns.visitor_sale = World.economy.visitor_sale
 	# Each healer's hut its own potions (641).
 	World.production.workshop_makes = _workshop_makes
 	# Where a town's building stands, for decline's edge and the ground a
@@ -4230,6 +4232,15 @@ func _boot() -> void:
 					out.append({"id": way["id"], "market": market, "eta": World.trade.eta(way["id"]), "risk": World.trade.risk(way["id"])})
 			return out
 		World.economy.send_caravan = World.trade.send
+		# Visitors come from the far ends of the town's roads (711).
+		World.towns.visitor_from = func(town: String) -> Array:
+			var out: Array = []
+			for way: Dictionary in World.trade.routes():
+				var far := str(way["to"]) if str(way["from"]) == town else str(way["from"]) if str(way["to"]) == town else ""
+				var name := str(World.trade.end_of(far).get("name", "")) if not far.is_empty() else ""
+				if not name.is_empty() and not name in out:
+					out.append(name)
+			return out
 		World.trade.caravan_arrived.connect(World.economy.caravan_arrived)
 		World.trade.caravan_raided.connect(World.economy.caravan_raided)
 		World.trade.caravan_lost.connect(World.economy.caravan_lost)

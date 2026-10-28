@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns get visitors: a traveller, a pedlar or a pilgrim comes now and then, stays a day or three and goes on; the town never grows by them, the pedlar buys its spare raws and the inn and temple take their gold (711, economy's side; bodies and talk follow).
 - Combat sounds: a sword blow now lands with a real impact, heard as the blade connects rather than with the swing's whoosh; a blow on someone in plate or mail rings on metal; grave robbers grunt, cry out and die with human voices instead of monster ones (720).
 - Bandaging: you can bandage your companion or another player from up to two steps away with nothing between, and the bandage no longer breaks when they shift a step within that; holding E on someone out of reach tells you so instead of bandaging you. The first point of healing now comes the moment the bandage is done, and a bandage started while walking no longer breaks at once (so the kneel and the cloth sound show) (713).
 - Bandaging kneels at once (713): someone shifting their weight or crossing their arms when they start bandaging no longer finishes that first, so a quick bandage now shows the kneel.

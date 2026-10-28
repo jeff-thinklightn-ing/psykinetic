@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_maker_comes()
 	_test_sought()
 	_test_herders()
+	_test_visitors()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -553,6 +554,74 @@ func _test_ruin_regrows() -> void:
 	_check(towns.unlock(TOWN, "inn") and cells.all(func(cell: Vector2i) -> bool: return clearing.built_over.get(ZONE, {}).has(cell) and not clearing._kept(ZONE, cell)),
 		"the inn built again: its ground cleared and built over")
 	Level.unregister(ZONE)
+
+
+## Visitors (711): one a day at most, never a resident, a pedlar's spare raws
+## bought and wares sold (none a trade of the town makes), a pilgrim only
+## with a temple, gone when their days are up, kept in the save.
+func _test_visitors() -> void:
+	print("
+== visitors come and go, the town never growing ==")
+	var towns := _towns(1, true)
+	towns.note_rescue(TOWN, "s1", "Bran", "smith")
+	var work := towns.production
+	var rules := _rules.duplicate(true)
+	rules["visitors"]["chance"] = 1.0
+	rules["visitors"]["kinds"] = {"pedlar": rules["visitors"]["kinds"]["pedlar"]}
+	towns.rules = rules
+	var economy := Economy.new({}, work.stockpile, work, func() -> int: return _now, rules)
+	economy.building_stands = func(town: String, kind: String) -> bool: return str(towns.building(town, kind).get("state", "")) == Towns.STANDING
+	towns.visitor_arrives = economy.visitor_arrives
+	towns.visitor_sale = economy.visitor_sale
+	var seen := {"came": 0, "left": 0}
+	towns.visitor_came.connect(func(_town: String, _id: String) -> void: seen["came"] += 1)
+	towns.visitor_left.connect(func(_town: String, _id: String) -> void: seen["left"] += 1)
+	var folk := towns.residents(TOWN).size()
+	work.stockpile.deposit(TOWN, "wood", work.comfort(TOWN, "wood") + 3, "test")
+	var gold := work.stockpile.count(TOWN, "gold")
+	_now = 2 * DAY
+	towns._visitors_turn(TOWN)
+	towns._visitors_turn(TOWN)
+	var here := towns.visitors(TOWN)
+	_check(here.size() == 1 and str(here[0]["kind"]) == "pedlar" and seen["came"] == 1, "a pedlar comes, one a day (%d)" % here.size())
+	_check(towns.residents(TOWN).size() == folk and work.worker(str(here[0]["id"])).is_empty(), "not a resident, no worker")
+	var stock: Dictionary = here[0]["stock"]
+	_check(not stock.is_empty() and not stock.has("silver_ring"), "wares, none the smith makes (%s)" % [stock])
+	_check(work.stockpile.count(TOWN, "wood") == work.comfort(TOWN, "wood") and work.stockpile.count(TOWN, "gold") > gold,
+		"the spare wood bought into the treasury (%d gold)" % (work.stockpile.count(TOWN, "gold") - gold))
+	var item: String = stock.keys()[0]
+	economy.add_gold("p1", 100, "test")
+	gold = work.stockpile.count(TOWN, "gold")
+	var sold := towns.visitor_sell(str(here[0]["id"]), "p1", item)
+	_check(bool(sold["ok"]) and economy.gold("p1") == 100 - int(sold["gold"]) and int(sold["gold"]) > 0, "a player buys %s for %d" % [item, int(sold["gold"])])
+	_check(work.stockpile.count(TOWN, "gold") - gold == Economy.taxed(int(sold["gold"]), Economy.goods_class(item), rules)[0], "the town's tax on it")
+	_check(int(towns.visitors(TOWN)[0]["stock"].get(item, 0)) == int(stock[item]) - 1, "one off the stock")
+	_check(not bool(towns.visitor_sell(str(here[0]["id"]), "p2", item)["ok"]) and economy.gold("p2") == 0, "no gold, no sale")
+	towns.set_visitor_news(TOWN, str(here[0]["id"]), [{"kind": "road", "text": "test"}])
+	var again := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), work, rules, towns.clock)
+	_check(again.visitors(TOWN) == JSON.parse_string(JSON.stringify(towns.visitors(TOWN))) and again.visitors(TOWN)[0]["news"].size() == 1, "kept in the save")
+	_now = int(here[0]["leaves"])
+	towns._visitors_turn(TOWN)
+	_check(seen["left"] == 1 and towns.visitors(TOWN).size() <= 1 and towns.residents(TOWN).size() == folk, "gone on when their days are up")
+	rules["visitors"]["days"] = [9, 9]
+	for i in 5:
+		_now += DAY
+		towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).size() == 2, "never more than most (%d)" % towns.visitors(TOWN).size())
+	print("
+== a pilgrim only where a temple stands ==")
+	towns = _towns(1, true)
+	towns.rules = rules
+	rules["visitors"]["kinds"] = {"pilgrim": _rules["visitors"]["kinds"]["pilgrim"]}
+	economy = Economy.new({}, towns.production.stockpile, towns.production, func() -> int: return _now, rules)
+	towns.visitor_arrives = economy.visitor_arrives
+	_now = 2 * DAY
+	towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).is_empty(), "no temple, no pilgrim")
+	towns._town(TOWN)["buildings"]["temple"] = {"kind": "temple", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	_now += DAY
+	towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).size() == 1 and economy.alms(TOWN) > 0, "a pilgrim, an offering (%d)" % economy.alms(TOWN))
 
 
 func _check(ok: bool, what: String) -> void:

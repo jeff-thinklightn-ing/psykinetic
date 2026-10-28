@@ -1253,6 +1253,60 @@ func temple_offering(town: String, player_id: String, waived: bool, for_name := 
 	return paid
 
 
+# --- Visitors (decision 711) -----------------------------------------------------------
+
+## What visitor [param entry] does as they come to [param town] (711; Towns'
+## visitor_arrives): by their kind's rules (visitors.kinds), a stay at the
+## inn ("inn": a gold range, where an inn stands), the store's spare raws
+## bought ("raws": what it holds over comfort, "buys" at most, at
+## raw_price) or an offering at the temple ("offering": a gold range, to
+## its alms). Their gold comes with them from outside the world and what
+## they buy leaves with them. Words for the log, "" for nothing.
+func visitor_arrives(town: String, entry: Dictionary) -> String:
+	var rule: Dictionary = rules.get("visitors", {}).get("kinds", {}).get(str(entry.get("kind", "")), {})
+	var draw := RandomNumberGenerator.new()
+	draw.seed = hash(str(entry.get("id", "")))
+	var did: Array[String] = []
+	var id := str(entry.get("id", ""))
+	if rule.get("inn") is Array and building_stands.is_valid() and bool(building_stands.call(town, "inn")):
+		var spent := draw.randi_range(int(rule["inn"][0]), int(rule["inn"][-1]))
+		if spent > 0:
+			stockpile.deposit(town, "gold", spent, "visitor:%s" % id, "%s's stay at the inn, %d" % [entry.get("name", ""), spent])
+			did.append("a stay at the inn, %d gold" % spent)
+	var left := int(rule.get("buys", 0))
+	for what: Variant in rule.get("raws", []):
+		var spare := mini(stockpile.count(town, str(what)) - production.comfort(town, str(what)), left)
+		if spare <= 0:
+			continue
+		var paid := raw_price(town, str(what)) * spare
+		stockpile.take(town, str(what), spare, "bought by %s the pedlar" % entry.get("name", ""))
+		stockpile.deposit(town, "gold", paid, "visitor:%s" % id, "%d %s sold to %s, %d" % [spare, what, entry.get("name", ""), paid])
+		did.append("%d %s bought for %d" % [spare, what, paid])
+		left -= spare
+	if rule.get("offering") is Array:
+		var given := draw.randi_range(int(rule["offering"][0]), int(rule["offering"][-1]))
+		if given > 0:
+			_alms[town] = int(_alms.get(town, 0)) + given
+			stockpile.note(town, "gold", given, "alms:%s" % id, "alms at the temple, %d" % given)
+			did.append("an offering at the temple, %d gold" % given)
+	return ", ".join(did)
+
+
+## Player [param player_id] buys one [param item] from pedlar [param entry]
+## in [param town] (711; Towns.visitor_sell): its value x merchant.sell, the
+## town's sale tax on it to the treasury, the rest away with the pedlar.
+## {ok, say, gold (paid)}.
+func visitor_sale(town: String, entry: Dictionary, player_id: String, item: String) -> Dictionary:
+	var cost := maxi(roundi(value_of(item) * float(rules.get("merchant", {}).get("sell", 1.15))), 1)
+	if gold(player_id) < cost:
+		return {"ok": false, "say": "That's %d gold, friend." % cost, "gold": 0}
+	add_gold(player_id, -cost, "%s from %s the pedlar" % [item, entry.get("name", "")])
+	var cut := mini(Economy.taxed(cost, goods_class(item), rules)[0], cost)
+	if cut > 0:
+		stockpile.deposit(town, "gold", cut, "tax:sale", "%s from a pedlar: tax %d" % [item, cut])
+	return {"ok": true, "say": "Yours, for %d." % cost, "gold": cost}
+
+
 ## The acolyte lives on the alms (546 amended; the coordinator's ruling
 ## for Pip, Aldous's acolyte): each resident of return.acolyte.trade is
 ## paid return.acolyte.keep a day for [param days] days from their town's
