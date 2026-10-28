@@ -925,10 +925,11 @@ func _blow() -> void:
 ## 412): in its reach, a shield-bearer with its bash ready bashes (the
 ## stagger gives the blow up); else one not bold steps out of reach
 ## (_step_back), and keeps out till the blow has fallen; a bold one, or one
-## with nowhere to step, fights on. Whether that was its turn.
+## with nowhere to step, fights on. Whether that was its turn. A sword's
+## lead (338 amended (2)) is its plain blow, not one to meet: it fights on.
 func _meet_wind_up() -> bool:
 	var theirs := World.winding(target)
-	if theirs.is_empty() or theirs.get("target") != self:
+	if theirs.is_empty() or theirs.get("target") != self or theirs.get("lead", false):
 		return false
 	var reached := World.in_reach(target, self)
 	if reached and World.bash_ready(self) and World.try_bash(self, target):

@@ -3435,16 +3435,16 @@ func _test_meets_wind_up() -> void:
 	print("
 == a foe winding a heavy blow up at it: the cautious step out of reach, a shield-bearer bashes, the bold fight on ==")
 	Monster.idling = false
-	for case in ["cautious", "shield", "bold"]:
+	for case in ["cautious", "shield", "bold", "sword"]:
 		var e := _build(["########", "#.Pi...#", "########"])
 		var imp: Monster = e["i"][0]
 		var player: GridEntity = e["P"][0]
 		_bold(imp)
-		if case == "cautious":
+		if case == "cautious" or case == "sword":
 			imp.temper = Monster.Temper.CAUTIOUS
-		if case == "shield":
+		if case == "shield" or case == "sword":
 			imp.slots = PackedStringArray(["", "", "", "", "", "shield"])
-		player.slots[Items.RIGHT_HAND] = "giant_axe"
+		player.slots[Items.RIGHT_HAND] = "sword" if case == "sword" else "giant_axe"
 		for i in 30:
 			World.step()
 			if imp.target == player and World.try_wind_up(player, imp):
@@ -3453,7 +3453,10 @@ func _test_meets_wind_up() -> void:
 		_check(not wound.is_empty(), "%s: the player winds up at it" % case)
 		var hits_on_imp := 0
 		var reached_when_due := false
+		var stood := true
 		for i in World.windup_ticks(player) + 2:
+			if World.tick < int(wound.get("lands", -1)):
+				stood = stood and imp.tile == Vector2i(3, 1)
 			World.step()
 			if World.tick == int(wound.get("lands", -1)):
 				reached_when_due = World.in_reach(player, imp)
@@ -3468,6 +3471,9 @@ func _test_meets_wind_up() -> void:
 					"a shield-bearer bashes it: the wind-up given up, no blow")
 			"bold":
 				_check(hits_on_imp == 1 and imp.tile == Vector2i(3, 1), "a bold one stands and takes it (%d blows)" % hits_on_imp)
+			"sword":
+				_check(hits_on_imp == 1 and stood and imp.next_bash_tick == 0,
+					"a sword's lead (338 amended (2)) is no heavy blow: a cautious shield-bearer neither steps out nor bashes, and takes it (%d blows)" % hits_on_imp)
 	Monster.idling = true
 
 

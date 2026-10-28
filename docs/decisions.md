@@ -34457,3 +34457,18 @@ along 0.65 and hidden; no replay while open; back in place when shut.
   it has given way; then the way is open. level_test: held after the find,
   pressing on, still before it; no link bump through the locked slab.
 Client and server, protocol unchanged, no new class_name.
+
+## 338 amended (2), combat's side: a sword's lead isn't a wind-up a monster meets
+
+338 amended gave the sword a 2-tick lead through World.try_wind_up, and
+Monster._meet_wind_up (decision 412) answers any wind-up aimed at a
+monster: a shield-bearer with its bash ready bashed every slash away (the
+wind-up given up, nothing struck), and a cautious one stepped back from
+each. 412 is for a heavy blow, seen coming; a lead is a sword's plain
+blow. _meet_wind_up now passes over a wind-up with "lead", so a monster
+fights on as it did against an instant blow. Found on main before the cut,
+so no player met it.
+
+monster_test: a cautious shield-bearer against a sword's lead neither
+steps out nor bashes and takes the blow (on main it bashed, 0 blows); the
+heavy cases as before. Server only, protocol unchanged, no new class_name.
