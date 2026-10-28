@@ -34215,3 +34215,65 @@ leaves it, none stands over that cell; the shaped telegraph's check reads
 "over or against a sent cell" (the half-cell-in point). Client only,
 protocol unchanged, no new class_name; no CHANGELOG bullet (combat's disc
 carries the change a player sees).
+
+## 338 amended, combat's side: the sword slower and heavier
+
+Jeff: "sword swings a little too fast, no impact sound"; then "yeah i
+think it might be a slower swing, plus a small reset between slashes".
+The sword had no speed of its own: a player's blow every attack_ticks (5,
+0.5 s), 2 a blow (attack_damage 2), 4 a second. pc-character found most of
+the "too fast" was the clip played at three times its speed to fit; their
+side (338 amended, pc-character's side) is a slash about 0.7 s long, a
+short wind-up, contact on the tick, back to guard.
+
+- The sword's verb: speed 1.4 (attack_ticks_of: a player's blow every 7
+  ticks, 0.7 s, the slash at its own pace; a companion's 11) and damage
+  1.25 (3 a blow, round(2.5); 4.3 a second, today's near enough: heavier,
+  rarer blows). The coordinator's pick of 7 over 6 (6 squeezed the guard's
+  beat), with the damage lifted rather than 2.9 a second. A parry's absorb,
+  armour's deflect and a companion's sword scale by the blow as before.
+- The blow is struck on its tick as ever; nothing on the server reads a
+  clip's contact. The client's recovery reads attack_ticks_of.
+
+The draugr (bench as 603 amended (6): a bare 20 hp player with a sword,
+stepping out of the spin): easy alone 13.0 s, won 3/3, lowest 4 hp (13.5 s,
+4 before); normal with a sworded companion 12.3 s, won 3/3, lowest 2
+(12.3 s, 2 before). The impact sound (ui's real client: every sword blow
+played sfx.hit_blade_flesh) is sound's take, not the event.
+
+The lead (the coordinator: "a 2-tick (0.2 s) server wind-up for the
+sword, so the drawn swing can be slower to the hit, inside the 7-tick
+cycle"):
+
+- A verb's lead (Items.COMMON "lead", the sword's 2): a light weapon's
+  wind-up through World.try_wind_up, so GridEntity.winding tells the
+  views as a heavy one's does, but never crushing (a heavy windup's blow
+  falls through any guard; pc-character's catch) and inside the cycle: its
+  next blow attack_ticks_of after it began, hit to hit 7, contact 2 ticks
+  after the winding and 5 before the next. windup_ticks is the verb's
+  windup, else its lead; the giant axe, pick and the draugr's own as
+  before.
+- A sword mid-lead parries nothing (guarding): it is swinging.
+- Struck at contact on its target if still in reach, or up to lead_slack
+  (combat.json, 0.5; on the F7 panel) past it where a body is free. Without
+  the slack (a scratch bench, a free target walking 0.4 m a tick) every
+  target walking away or across from the edge of reach, where an attack
+  order strikes, slipped it; with it a sidestep is struck, and only a step
+  straight back from the edge (2.25 m at contact) or a grid foe stepping
+  off diagonally escapes.
+- 392 amended's give-up by walking keys is a heavy wind-up's only (the
+  coordinator's pick): a client sends its keys every frame, so a strafe
+  held while striking would have given up nearly every slash, stamina paid.
+  A stun, a knockdown or being moved off its cell still give a lead up; on
+  the grid a step or move order still does.
+- A swing at nothing and a companion's blow (try_attack) have no lead.
+
+The draugr with the lead: easy alone 13.9 s, won 3/3, lowest 4; normal
+with a companion 12.7 s, won 3/3, lowest 2.
+
+combat_test (the lead: 2 ticks, not crushing, 7 from its start, no parry
+mid-lead, the slack across and straight back, own keys kept, a stun gives
+it up, lead_slack on F7), companion_test, draugr_fight_test,
+free_walk_test, controls_test, monster_test, items_test, tuning_test,
+ui_test pass. Server only, protocol unchanged, no new class_name; ships
+with pc-character's slash.

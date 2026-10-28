@@ -388,6 +388,11 @@ var winded_blow_scale := 0.5
 ## lands while the two centres are at most this past both bodies' edges
 ## (2 x FREE_RADIUS), 1.5 at 0.9; a reach verb's is its cells less 0.1.
 var melee_reach := 0.9
+## A sword's lead (338 amended): its blow, begun in reach, lands at
+## contact on a target that has got at most this past reach meanwhile, so
+## no sidestep slips a slash, and only a step straight back from its edge
+## does (2.0 at 0.9 and 0.5).
+var lead_slack := 0.5
 var winded_regen_delay := 20
 ## A boss's moves (decision 603), by name: "spin", "throw", "charge", each a
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
@@ -4266,7 +4271,7 @@ func load_combat_rules(text: String) -> void:
 					push_warning("World: %s's moves.%s is not a move" % [COMBAT_RULES, move])
 			continue
 		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
-				"winded_blow_scale", "winded_regen_delay", "melee_reach"]:
+				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack"]:
 			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(key, int(given) if get(key) is int else float(given))
@@ -5799,8 +5804,8 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 	if target.raised == "block":
 		if tick >= target.bash_moment_until:  # Down for a bash's moment (decision 379).
 			held = target.slots[Items.LEFT_HAND]
-	elif target.raised.is_empty() and tick >= target.next_attack_tick:
-		held = target.slots[Items.RIGHT_HAND]
+	elif target.raised.is_empty() and tick >= target.next_attack_tick and target.wind_up.is_empty():
+		held = target.slots[Items.RIGHT_HAND]  # Not mid-lead (338 amended): the sword is swinging.
 	var verb := Items.verb_of(held) if not held.is_empty() else {}
 	if verb.get("kind") != "block" or target.facing == Vector2i.ZERO:
 		return {}
@@ -6683,9 +6688,14 @@ func try_shove(attacker: GridEntity, target: GridEntity,
 
 
 ## The ticks [param entity]'s weapon winds a blow up before striking it
-## (decision 392: its verb's windup; the giant axe's 8); 0, it strikes at once.
+## (decision 392: its verb's windup, the giant axe's 8; else its lead, the
+## sword's 2, 338 amended); 0, it strikes at once.
 func windup_ticks(entity: GridEntity) -> int:
-	return int(blow_verb(entity).get("windup", 0)) if is_instance_valid(entity) else 0
+	if not is_instance_valid(entity):
+		return 0
+	var verb := blow_verb(entity)
+	var heavy := int(verb.get("windup", 0))
+	return heavy if heavy > 0 else int(verb.get("lead", 0))
 
 
 ## The blow [param entity] is winding up (try_wind_up): {target, lands,
@@ -6713,7 +6723,10 @@ func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
 	if tick < by.next_attack_tick or tick < by.next_move_tick or not in_reach(by, target):
 		return false
 	var direction := melee_way(by, target)
-	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile}
+	# A lead (338 amended) is no heavy blow: never crushing, and its
+	# ticks come out of the weapon's own cycle, hit to hit attack_ticks_of.
+	var lead := int(blow_verb(by).get("windup", 0)) <= 0
+	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile, "began": tick, "lead": lead}
 	_halt_for_blow(by, tick + ticks)
 	_pay_swing(by, false)  # Paid as it begins; given up, not refunded (decision 597).
 	_winders[by] = true
@@ -6756,17 +6769,34 @@ func _tend_wind_ups() -> void:
 		# Untyped till checked: a target freed since cannot be a GridEntity.
 		var aimed: Variant = entity.wind_up["target"]
 		var direction: Vector2i = entity.wind_up["direction"]
+		var lead: bool = entity.wind_up.get("lead", false)
+		var began: int = entity.wind_up.get("began", tick)
 		entity.wind_up = {}
 		_winders.erase(entity)
 		var first := _hits.size()
-		if is_instance_valid(aimed) and (aimed as GridEntity).spawned and in_reach(entity, aimed as GridEntity) \
-				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true):
+		if is_instance_valid(aimed) and (aimed as GridEntity).spawned and _wind_up_reaches(entity, aimed as GridEntity, lead) \
+				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true, lead):
 			for i in range(first, _hits.size()):
-				_hits[i].crushing = true
+				_hits[i].crushing = not lead
 			_log("windup: %s at %s strikes %s at %s" % [entity.name, entity.tile, (aimed as GridEntity).name, (aimed as GridEntity).tile])
 		else:
 			try_swing(entity, direction, true)
 			_log("windup: %s at %s strikes the air" % [entity.name, entity.tile])
+		if lead:
+			# Its next blow attack_ticks_of after this one began, not after it landed.
+			entity.next_attack_tick = mini(entity.next_attack_tick, began + attack_ticks_of(entity))
+			entity.free_halt_until = mini(entity.free_halt_until, entity.next_attack_tick)
+
+
+## Whether a wound-up blow by [param entity] reaches [param aimed] as it
+## lands: in reach, or for a [param lead] (338 amended) up to
+## lead_slack past it with nothing between, where a body is free.
+func _wind_up_reaches(entity: GridEntity, aimed: GridEntity, lead: bool) -> bool:
+	if in_reach(entity, aimed):
+		return true
+	if not lead or not (free_body(entity) or free_body(aimed)):
+		return false
+	return _body_reach(body_centre(entity), body_centre(aimed), entity, aimed, blow_verb(entity), lead_slack)
 
 
 ## The shield in [param entity]'s left hand, if it can bash (decision 379):
@@ -7488,14 +7518,14 @@ func mirror_changed() -> void:
 
 
 func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shove: bool,
-		push_direction := Vector2i.ZERO, paid := false) -> bool:
+		push_direction := Vector2i.ZERO, paid := false, lead := false) -> bool:
 	if not Net.is_authority():
 		return false
 	if not attacker.spawned or not target.spawned or attacker == target:
 		return false
 	if not can_target(attacker, target) or is_stunned(attacker):
 		return false
-	if tick < attacker.next_attack_tick or not in_reach(attacker, target, is_shove):
+	if tick < attacker.next_attack_tick or not (in_reach(attacker, target, is_shove) or lead and _wind_up_reaches(attacker, target, true)):
 		return false
 	# No hitting mid-step: the attacker's tile changes when a step starts, but
 	# on screen it is still crossing over, so the blow would land from afar.
@@ -8548,8 +8578,8 @@ func free_input(entity: GridEntity, intent: Vector2, seconds: float, seq := -1) 
 ## the command walks. Pressing on at the foe, as a chase's late commands
 ## do, keeps it.
 func _free_give_up_wind_up(player: Player, intent: Vector2) -> void:
-	if player.wind_up.is_empty() or intent.length() < WIND_UP_LEAVE_INTENT:
-		return
+	if player.wind_up.is_empty() or player.wind_up.get("lead", false) or intent.length() < WIND_UP_LEAVE_INTENT:
+		return  # A lead is the swing itself, never walked off (338 amended).
 	var target: Variant = player.wind_up.get("target")
 	var way := Vector2(player.wind_up["direction"])
 	if is_instance_valid(target):
@@ -9549,9 +9579,9 @@ func _cell_reach(from: Vector2i, to: Vector2i, verb: Dictionary) -> bool:
 ## stand on) while they are at most the verb's reach plus both radii apart
 ## and nothing that would stop a step lies between; a reach verb past a
 ## plain blow's, no body on the cells between either.
-func _body_reach(from: Vector2, to: Vector2, attacker: GridEntity, target: GridEntity, verb: Dictionary) -> bool:
+func _body_reach(from: Vector2, to: Vector2, attacker: GridEntity, target: GridEntity, verb: Dictionary, slack := 0.0) -> bool:
 	var apart := from.distance_to(to)
-	var reach := melee_reach
+	var reach := melee_reach + slack
 	if verb.get("kind") == "reach":
 		reach = maxf(reach, float(verb["cells"]) - 0.1)
 	if apart > reach + 2.0 * FREE_RADIUS or apart < 0.001:

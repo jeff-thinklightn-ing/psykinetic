@@ -75,7 +75,7 @@
 			"made": {"by": "smith", "from": {"ore": 2, "wood": 1}, "steps": 2400}},
 		{"id": "sword", "name": "sword", "short": "Sword", "color": "c8ccd4",
 			"art": "item.sword", "kind": "held", "size": [0.2, 0.9, 0.04], "weight": 1.5, "hands": 1,
-			"tags": ["weapon"], "verb": {"kind": "block", "says": "parries a blow from straight ahead when ready to strike", "arc": 0, "absorb": 0.5, "stamina": 10, "breaks_at": 2.0},
+			"tags": ["weapon"], "verb": {"kind": "block", "says": "parries a blow from straight ahead when ready to strike", "speed": 1.4, "damage": 1.25, "lead": 2, "arc": 0, "absorb": 0.5, "stamina": 10, "breaks_at": 2.0},
 			"made": {"by": "smith", "from": {"ore": 3, "wood": 1}, "steps": 3000}},
 		{"id": "shield", "name": "round shield", "short": "Shield", "color": "8a6a44",
 			"art": "item.shield", "kind": "held", "size": [0.6, 0.6, 0.06], "weight": 4.0, "hands": 1,

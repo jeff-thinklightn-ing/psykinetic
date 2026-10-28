@@ -582,8 +582,10 @@ const VERBS := {
 }
 ## Every verb's: speed (a multiple of the wielder's attack time: under 1
 ## quicker), damage and force (multiples of the wielder's blow); windup, the
-## ticks a blow is wound up before it is struck (decision 392; 0, none).
-const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0}
+## ticks a blow is wound up before it is struck (decision 392; 0, none);
+## lead, a light weapon's short wind-up inside its own cycle, never crushing
+## (338 amended: the sword's 2; World.try_wind_up).
+const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0, "lead": 0}
 
 
 ## [param verb] as the catalog gives it, every number filled in from its

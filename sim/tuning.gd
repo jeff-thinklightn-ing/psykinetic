@@ -39,7 +39,7 @@ const RANGED_SKIP: Array[String] = ["draw_full", "cells"]
 const COMBAT_KEYS := {
 	"swing_base": [0.0, 20.0], "swing_per_kg": [0.0, 10.0], "ref_mass": [10.0, 200.0], "whiff_scale": [1.0, 3.0],
 	"recover_at": [0, 100], "winded_move_scale": [1.0, 3.0], "winded_blow_scale": [0.0, 1.0], "winded_regen_delay": [0, 100],
-	"melee_reach": [0.3, 2.0],
+	"melee_reach": [0.3, 2.0], "lead_slack": [0.0, 2.0],
 }
 const PHYSICS_KEYS := {
 	"shove_scale": [0.0, 3.0], "knockback_min_speed": [0.0, 10.0], "slide_per_speed": [0.0, 3.0], "max_travel": [0, 12],

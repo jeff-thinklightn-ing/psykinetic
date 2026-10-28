@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_free_chase()
 	_test_body_reach()
 	_test_free_wind_up_given_up()
+	_test_sword_lead()
 	_test_lob_aim_on_client()
 	_test_armour()
 
@@ -491,6 +492,83 @@ func _test_free_wind_up_given_up() -> void:
 		else:
 			_check(not kept and foe.hp == hp and host.free_pos.distance_to(from) > 0.2,
 					"%s: given up, nothing struck, and it walks (%s -> %s)" % [each[2], from, host.free_pos])
+
+
+## The sword's lead (338 amended; the coordinator: "a 2-tick server
+## wind-up, so the drawn swing can be slower to the hit, inside the 7-tick
+## cycle"): wound up 2 ticks and struck, never crushing, its next blow 7
+## after it began; no parry while it swings; struck on a target lead_slack
+## past reach, so a sidestep doesn't slip it, a step straight back from the
+## edge does; walking keys never give it up, a stun does.
+func _test_sword_lead() -> void:
+	print("\n== the sword's lead: 2 ticks inside its 7, never crushing, slack past reach, not walked off (338 amended) ==")
+	var e := _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])
+	World.free_walk = true
+	var host: Player = e["P"][0]
+	var foe: Player = e["P"][1]
+	_give(host, "sword")
+	_check(World.windup_ticks(host) == 2 and int(Items.verb_of("sword")["windup"]) == 0 and World.attack_ticks_of(host) == 7,
+			"a sword leads 2 ticks, no heavy windup, a blow every 7")
+	var paths := Tuning.fields().map(func(r: Dictionary) -> String: return str(r["path"]))
+	_check(is_equal_approx(World.lead_slack, 0.5) and "combat.lead_slack" in paths,
+			"lead_slack 0.5 from combat.json, on the F7 panel")
+	host.free_pos = Vector2(3.0, 3.0)
+	foe.free_pos = Vector2(4.2, 3.0)
+	host.next_attack_tick = 0
+	host.next_move_tick = 0
+	var hp := foe.hp
+	var began := World.tick
+	_check(World.try_wind_up(host, foe), "wound up at the foe in reach")
+	World.step()
+	_check(foe.hp == hp and not host.wind_up.is_empty(), "one tick in: not yet struck")
+	World.tick = int(host.wind_up["lands"])
+	var first := World._hits.size()
+	World._tend_wind_ups()
+	_check(World._hits.size() > first and not World._hits[-1].crushing, "struck on its second tick, and not crushing")
+	World._resolve_hits()
+	_check(foe.hp < hp, "the foe struck (%d -> %d)" % [hp, foe.hp])
+	_check(host.next_attack_tick == began + 7 and host.free_halt_until <= host.next_attack_tick,
+			"its next blow 7 ticks after it began, not after it landed (%d, began %d)" % [host.next_attack_tick, began])
+	# No parry mid-lead: a sword held ready guards, not while it swings.
+	_give(foe, "sword")
+	foe.facing = Vector2i(-1, 0)
+	foe.next_attack_tick = 0
+	_check(not World.guarding(foe, host).is_empty(), "(the foe's sword ready: it guards)")
+	foe.next_move_tick = 0
+	World.tick += 10
+	_check(World.try_wind_up(foe, host) and World.guarding(foe, host).is_empty(), "mid-lead, it guards nothing")
+	World.cancel_wind_up(foe)
+	# The slack, and walking keys.
+	for each: Array in [[1.45, Vector2(0, 1), true, "across from the edge of reach: struck, the slack's"],
+			[1.45, Vector2(1, 0), false, "straight back from the edge: out of it, missed"],
+			[1.1, Vector2(1, 0), true, "straight back from 1.1: struck"],
+			[0.9, Vector2(-0.7, 0.7), true, "the striker's own keys back and aside: kept, and struck"]]:
+		e = _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])
+		World.free_walk = true
+		host = e["P"][0]
+		foe = e["P"][1]
+		_give(host, "sword")
+		host.free_pos = Vector2(3.0, 3.0)
+		World._relocate(foe, Vector2i(4, 3))
+		foe.free_pos = Vector2(3.0 + float(each[0]), 3.0)
+		hp = foe.hp
+		_check(World.try_wind_up(host, foe), "(%s) wound up" % each[3])
+		var own_keys: bool = each[0] == 0.9
+		for i in World.windup_ticks(host) + 1:
+			if own_keys:
+				World.free_input(host, each[1], World.TICK_DT)
+			else:
+				World.free_input(foe, each[1], World.TICK_DT)
+			World.step()
+		_check((foe.hp < hp) == each[2], "%s (%d -> %d, %.2f apart)" % [each[3], hp, foe.hp,
+				World.body_centre(host).distance_to(World.body_centre(foe))])
+	# A stun still gives it up.
+	host.next_attack_tick = 0
+	foe.free_pos = Vector2(4.0, 3.0)
+	_check(World.try_wind_up(host, foe), "(wound up again)")
+	host.stunned_until_tick = World.tick + 5
+	World.step()
+	_check(host.wind_up.is_empty(), "stunned mid-lead: given up")
 
 
 ## A free body's attack order is held while its own commands walk it (its
