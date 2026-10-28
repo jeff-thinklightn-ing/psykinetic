@@ -3154,10 +3154,18 @@ func _test_visible_work() -> void:
 	_check(mara.doing == Resident.Doing.HOME and mara.tile == bed and mara.activity == "sleep" and mara.facing == head, "at home at night she lies on the bed, head to the wall (%s at %s, %s)" % [mara.activity, mara.tile, mara.facing])
 	var awake: Dictionary = _main._awake_map()
 	var code := ""
+	var town_id := ""
 	for building: Dictionary in _main._world_map.areas.get(World.zone.name, {}).get("buildings", []):
 		if building.get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(bed):
 			code = str(building.get("code", ""))
+			town_id = Client3D.awake_town(building, World.zone.name)
 	_check(code.is_empty() or (awake.has(code) and awake[code] == false), "the lamp: her house is asleep (%s: %s)" % [code, awake])
+	# Told under the house's own town, as the "town" message and the view
+	# name it (the lamp's and the chimney's smoke); a home of no town, its
+	# level's.
+	_main._awake_tick()
+	_check(code.is_empty() or World.towns.awake_of(town_id).get(code) == false,
+		"told under its town %s: %s" % [town_id, World.towns.awake_of(town_id)])
 	DayNight.set_hour(8.0)
 	for i in Resident.FAR_EVERY + 2:
 		World.step()

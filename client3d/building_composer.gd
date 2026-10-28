@@ -47,6 +47,11 @@ const FACET_STRAY := 0.05
 const CHIMNEYS := {"house": 0.7, "l_house": 0.7, "house_leanto": 0.6, "house_wing": 0.7, "two_storey": 0.8,
 	"cottage": 0.8, "inn": 0.9, "hall": 0.6, "longhouse": 0.5, "hut": 0.3, "healers_hut": 0.5, "forge": 1.0, "butchery": 0.5}
 const CHIMNEY := Vector3(0.75, 0.9, 0.65)
+## A chimney's meta: where its smoke rises from (its top, in its frame).
+const SMOKE_AT := &"smoke_at"
+## The uses whose slot building (art with no chimney of its own) is given
+## one (slot_chimney): a fire's trades.
+const SLOT_HEARTHS: Array[String] = ["forge", "kitchen"]
 ## The kinds that may have a porch over their front door, and how likely;
 ## those with a cruck frame on a gable end, and the gable's span (cells)
 ## its 4.16 m frame suits.
@@ -498,7 +503,8 @@ static func _cone(size: Vector2, eaves: float, rng: RandomNumberGenerator, mater
 ## A chimney at one gable end of [param main], a little off its middle:
 ## art-kit's chimney.stone seated on the roof where it stands (the slope's
 ## height there, so its stack clears the roof round it however steep), else
-## a stack and cap of the stone set from the ground to over the ridge.
+## a stack and cap of the stone set from the ground to over the ridge. Its
+## top (meta SMOKE_AT, in its own frame) is where its smoke rises from.
 static func _chimney(building: Dictionary, main: Rect2i, rect: Rect2i, eaves: float, rng: RandomNumberGenerator) -> Node3D:
 	var middle := Vector2(main.position - rect.position) + Vector2(main.size - Vector2i.ONE) * 0.5
 	var along_x := main.size.x > main.size.y
@@ -516,6 +522,7 @@ static func _chimney(building: Dictionary, main: Rect2i, rect: Rect2i, eaves: fl
 		var piece := ArtKit.instance("chimney.stone")
 		piece.position.y = eaves + rise * (1.0 - absf(off) / half)
 		out.add_child(piece)
+		out.set_meta(SMOKE_AT, Vector3(0.0, piece.position.y + ArtKit.size("chimney.stone").y, 0.0))
 		return out
 	var stone := Client3D._wall_material("stone")
 	var tall := ridge + rng.randf_range(0.4, 0.8)
@@ -527,6 +534,36 @@ static func _chimney(building: Dictionary, main: Rect2i, rect: Rect2i, eaves: fl
 		box.material_override = stone
 		box.position.y = part[1]
 		out.add_child(box)
+	out.set_meta(SMOKE_AT, Vector3(0.0, tall + 0.14, 0.0))
+	return out
+
+
+## A chimney for slot building [param slot] (its art has none) used as
+## [param use]: one of SLOT_HEARTHS, art-kit's chimney.stone seated on the
+## roof near one gable end, a little down the slope (the slot's ridge runs
+## along z over its middle, its eaves at wall_height); null for another
+## use, a slot without a pitched roof, or no chimney.stone.
+static func slot_chimney(slot: String, use: String, seed: int) -> Node3D:
+	if not use in SLOT_HEARTHS or not ArtKit.has("chimney.stone") or not ArtKit.has(slot):
+		return null
+	var spec := ArtKit.spec(slot)
+	var size := ArtKit.size(slot)
+	var eaves := float(spec.get("wall_height", Client3D.WALL_HEIGHT))
+	var rise := size.y - eaves
+	if rise < 0.3 or size.x < 1.5:
+		return null
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var half := size.x * 0.5
+	var off := rng.randf_range(0.35, 0.55) * (1.0 if rng.randf() < 0.5 else -1.0)
+	var end := (size.z * 0.5 - 0.7) * (1.0 if rng.randf() < 0.5 else -1.0)
+	var out := Node3D.new()
+	out.name = "Chimney"
+	out.position = Vector3(off, 0.0, end)
+	var piece := ArtKit.instance("chimney.stone")
+	piece.position.y = eaves + rise * (1.0 - absf(off) / half)
+	out.add_child(piece)
+	out.set_meta(SMOKE_AT, Vector3(0.0, piece.position.y + ArtKit.size("chimney.stone").y, 0.0))
 	return out
 
 

@@ -283,7 +283,7 @@ var _notes: Dictionary = {}  # zone -> the "notes" list last sent (decision 643)
 var _rumour_said: Dictionary = {}  # "town|player id|day" -> true: the sought rumour told on a greeting (decision 643).
 var _greet_at: Dictionary = {}  # "worker id|player id" -> msec of the last click greeting (560): one a greet.again_seconds
 ## Visible work (decision 566): a site's spot for a body (site id -> {cell, face}),
-## what was last told of each house's waking (building code -> bool), and
+## what was last told of each house's waking ("town id|code" -> bool), and
 ## the tests' stand-ins for economy's trip and build (worker id -> ...).
 var _site_spots: Dictionary = {}
 var _awake_sent: Dictionary = {}
@@ -13823,15 +13823,26 @@ func _build_task(building: Dictionary, progress: float) -> Dictionary:
 
 
 ## Each house with someone inside: awake when any of them is not asleep
-## (the lamp, buildings' pane by building code; economy's Towns.set_awake
-## carries it); told only when it changes, and only for houses with a body
-## in them, the rest falling back to the hour on the client.
+## (the lamp and the chimney's smoke, buildings' by building code;
+## economy's Towns.set_awake carries it), under the building's own town
+## (its town_id, as the "town" message and the view name it), a building
+## of no town (a home) under its level's name (Client3D.awake_town); told
+## only when it changes, a house emptied told not awake, a house no body
+## has been in not told (the client falls back to the hour).
 func _awake_tick() -> void:
 	var now := _awake_map()
-	for code: String in now:
-		if _awake_sent.get(code) != now[code]:
-			_awake_sent[code] = now[code]
-			World.towns.set_awake(World.zone.name, code, now[code])
+	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		var code := str(building.get("code", ""))
+		var town := str(building.get("town_id", ""))
+		if town.is_empty():
+			town = World.zone.name
+		var key := town + "|" + code
+		if code.is_empty() or not (now.has(code) or _awake_sent.has(key)):
+			continue
+		var awake := bool(now.get(code, false))
+		if _awake_sent.get(key) != awake:
+			_awake_sent[key] = awake
+			World.towns.set_awake(town, code, awake)
 
 
 ## Building code -> whether anyone inside it is awake, for the bodies in

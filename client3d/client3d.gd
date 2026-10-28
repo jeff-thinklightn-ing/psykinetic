@@ -5531,13 +5531,22 @@ func _add_buildings() -> void:
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
 		node.position = Vector3(middle.x, _elevation(rect.position), middle.y)
 		node.rotation.y = deg_to_rad(float(building["yaw"])) if building.has("yaw") else atan2(float(facing.x), float(facing.y))
+		# A forge or a kitchen in a slot house: a chimney for its fire, in
+		# its "parts" (a ruin hides them, as a kind's).
+		var chimney := BuildingComposer.slot_chimney(slot, str(building.get("use", "")), hash(rect.position))
+		if chimney != null:
+			var parts := Node3D.new()
+			parts.name = "parts"
+			parts.add_child(chimney)
+			node.add_child(parts)
 		_room.add_child(node)
 		var index := _buildings.size()
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
-			"open_air": slot in Level.OPEN_AIR, "crop": ""})
+			"open_air": slot in Level.OPEN_AIR, "crop": "", "code": str(building.get("code", ""))})
 		_show_state(_buildings[index])
+		_add_smoke(_buildings[index])
 		if ArtKit.spec(slot).get("stand") is Array:
 			for cell in Level.rect_cells(rect):
 				_stand_at[cell] = stand_offset(slot, rect, node.rotation.y, cell)
@@ -5606,7 +5615,7 @@ func _building_sets(building: Dictionary) -> void:
 		if building.has("kind") and wall_set == "wood" and key in windows \
 				and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH:
 			_set_wall_state(key, "window")
-			_window_code[key] = [str(building.get("town_id", "")), str(building.get("code", "")), true]
+			_window_code[key] = [awake_town(building, str(_terrain.get("level", ""))), str(building.get("code", "")), true]
 			var sides := Terrain.edge_cells(key)
 			# A run's +x is east for an east edge, north (its first cell) for a south one.
 			var outside_first := not cells.has(sides[0])
@@ -5706,13 +5715,14 @@ func _add_kind(building: Dictionary) -> void:
 		"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
 		"open_air": false, "crop": "", "inside": inside, "outline": Level.building_outline(building),
 		"kind": building, "stage": BuildingComposer.STANDING, "scaffold": false, "heights": {}, "windows": [],
-		"plot": building.get("plot", false)})
+		"plot": building.get("plot", false), "code": str(building.get("code", ""))})
 	# Its walls as built (566): what a stage cuts down and puts back.
 	for key: Vector3i in _buildings[index]["outline"]:
 		_buildings[index]["heights"][key] = _height_of(key)
 		if _wall_states.get(key) == "window":
 			_buildings[index]["windows"].append(key)
 	_show_state(_buildings[index])
+	_add_smoke(_buildings[index])
 	if _glimpse or roof == null:
 		return  # A glimpse is drawn only; a ruin is open to the sky.
 	for block: Rect2i in building["blocks"]:
@@ -6029,6 +6039,48 @@ func _show_state(building: Dictionary) -> void:
 		_show_damage(building, damaged)
 	if decline != building.get("decline", ""):
 		_show_decline(building, decline)
+	_show_smoke(building)
+
+
+## [param building]'s chimney smoke (Flames.chimney_smoke), if it has a
+## chimney (its composer's, or slot_chimney's): drawn as _show_smoke says.
+func _add_smoke(building: Dictionary) -> void:
+	var chimney := (building["node"] as Node3D).find_child("Chimney", true, false) as Node3D
+	if chimney == null or not chimney.has_meta(BuildingComposer.SMOKE_AT) or _glimpse:
+		return
+	building["smoke"] = Flames.chimney_smoke(chimney, chimney.get_meta(BuildingComposer.SMOKE_AT), hash(building["rect"].position))
+	_show_smoke(building)
+
+
+## Whether [param building]'s chimney smokes: its fire in use, someone
+## awake inside (_awake, the "town" message's "awake": npc's bodies), the
+## building standing, built (a kind at its last stage) or damaged, never
+## in decline or a ruin.
+func _show_smoke(building: Dictionary) -> void:
+	var smoke: Node3D = building.get("smoke")
+	if smoke == null or not is_instance_valid(smoke):
+		return
+	var state := Towns.STANDING
+	if not str(building["use"]).is_empty():
+		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+	smoke.visible = smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
+		not building.has("kind") or int(building["stage"]) == BuildingComposer.STANDING)
+
+
+## Whose "awake" a building's lamp and chimney read (Main._awake_tick):
+## its town's (town_id), a building of no town (a home) its level's.
+static func awake_town(building: Dictionary, level_name: String) -> String:
+	var town := str(building.get("town_id", ""))
+	return town if not town.is_empty() else level_name
+
+
+## Whether a chimney smokes (_show_smoke): its building [param code] said
+## awake in [param awake] ({code: bool}), its town's [param state] one it
+## is lived in or worked (standing, damaged, in disrepair), [param built].
+## Nobody known inside: no smoke (the lamp falls back to the hour; a fire
+## is never guessed).
+static func smoking(awake: Dictionary, code: String, state: String, built: bool) -> bool:
+	return built and state in [Towns.STANDING, Towns.DAMAGED, Towns.DISREPAIR] and bool(awake.get(code, false))
 
 
 ## [param building] damaged or not (_show_state): a disrepair's too (649).
@@ -6354,10 +6406,13 @@ func _unbuilt(key: Vector3i) -> bool:
 
 
 ## [param town]'s buildings awake ({code: bool}: economy's "town" message,
-## npc's flag; decision 566): their window lights as they say.
+## npc's flag; decision 566): their window lights and chimneys as they say.
 func set_awake(town: String, awake: Dictionary) -> void:
 	_awake[town] = awake
 	_update_lamps()
+	for building in _buildings:
+		if awake_town(building, str(_terrain.get("level", ""))) == town:
+			_show_smoke(building)
 
 
 ## The beasts drawn in this zone's folds (640, maps' side; economy's

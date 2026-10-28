@@ -1941,6 +1941,7 @@ func _test_kinds() -> void:
 	_test_camp()
 	_test_decline()
 	_test_inside()
+	_test_chimney_smoke()
 	_test_inside_is_his()
 
 
@@ -2288,6 +2289,54 @@ func _test_decline() -> void:
 	_check(bytes_of.call(worn_byte) == 0 and bytes_of.call(Client3D.FLOOR_SETS["wood"]) == cells,
 			"built again: its boards new (%d worn, %d of %d plain)" % [bytes_of.call(worn_byte), bytes_of.call(Client3D.FLOOR_SETS["wood"]), cells])
 	_rig.town_states.erase("decline_town")
+
+
+## Chimney smoke (the coordinator, from ui's trailer takes: Umbrage's forge
+## showed none): a slot forge or kitchen given a chimney (slot_chimney), a
+## composed kind's chimney its own; each smokes while its building is
+## said awake (someone awake inside, the "town" message's "awake") and
+## stands, never in ruin, never with nobody known inside.
+func _test_chimney_smoke() -> void:
+	print("
+== chimney smoke: a forge's fire in use, a lived-in house's hearth ==")
+	var terrain := _building_terrain()
+	for building: Dictionary in terrain["buildings"]:
+		if building["slot"] == "building.house":
+			building["use"] = "forge"
+			building["town_id"] = "smoke_town/square"
+			building["code"] = "H1"
+	_rig.rebuild(terrain, Vector2i(7, 7))
+	var forge: Dictionary = _rig._buildings.filter(func(b: Dictionary) -> bool: return b["use"] == "forge")[0]
+	var hut: Dictionary = _rig._buildings.filter(func(b: Dictionary) -> bool: return b["rect"] == Rect2i(10, 3, 3, 3))[0]
+	var smoke: Node3D = forge.get("smoke")
+	_check(smoke != null and (forge["node"] as Node3D).find_child("Chimney", true, false) != null and hut.get("smoke") == null,
+			"a slot forge given a chimney and its smoke; a plain hut none")
+	if smoke == null:
+		return
+	var top := smoke.global_position.y - Flames.CHIMNEY_SMOKE.y * 0.45
+	_check(top > _rig.global_position.y + Client3D.WALL_HEIGHT + 0.5, "the smoke rises from over the roof (%.2f m)" % (top - _rig.global_position.y))
+	_check(not smoke.visible, "nobody known inside: no smoke")
+	_rig.set_awake("smoke_town/square", {"H1": true})
+	_check(smoke.visible, "the smith at work (awake inside): it smokes")
+	_rig.set_town("smoke_town/square", {"forge": {"state": Towns.RUIN, "level": 0, "walls": false}})
+	_check(not smoke.is_visible_in_tree(), "a ruin: no smoke, its chimney down with its roof")
+	_rig.set_town("smoke_town/square", {"forge": {"state": Towns.STANDING, "level": 1}})
+	_check(smoke.visible, "standing again, still worked: it smokes")
+	_rig.set_awake("smoke_town/square", {"H1": false})
+	_check(not smoke.visible, "the forge emptied or asleep: no smoke")
+	_rig.set_awake("smoke_town/square", {})
+	_rig.town_states.erase("smoke_town/square")
+	var said := [Client3D.smoking({"H1": true}, "H1", Towns.DAMAGED, true), Client3D.smoking({"H1": true}, "H1", Towns.STANDING, false),
+		Client3D.smoking({"H1": true}, "H1", Towns.PLANNED, true), Client3D.smoking({}, "H1", Towns.STANDING, true)]
+	_check(said == [true, false, false, false], "damaged still smokes; being built, planned or nobody known: not (%s)" % [said])
+	# A composed kind's chimney (its composer's) has its smoke too.
+	var stamps: Array = []
+	for i in 6:
+		stamps.append(["building_house_small", Vector2i(2 + (i % 3) * 7, 2 + floori(i / 3.0) * 9), false])
+	_rig.rebuild(_kinds_level(stamps)["terrain"], Vector2i(4, 20))
+	var chimneys := _rig._buildings.filter(func(b: Dictionary) -> bool: return (b["node"] as Node3D).find_child("Chimney", true, false) != null)
+	_check(not chimneys.is_empty() and chimneys.all(func(b: Dictionary) -> bool: return b.get("smoke") != null),
+			"every composed chimney has its smoke (%d of %d houses)" % [chimneys.size(), _rig._buildings.size()])
 
 
 ## Inside (Jeff: "going inside buildings should go into top down view and

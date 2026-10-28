@@ -34015,3 +34015,35 @@ both drop_captives (nobody told, not twice, other captives kept), and
 resident_test covers companion_let_go (taken again, a group carrying her,
 let go, nothing left to free, and she comes at the next join). Server only,
 protocol unchanged, no new class_name.
+## 710. Chimney smoke: a fire in use shows (buildings; the coordinator, from ui's trailer takes: Umbrage's forge showed no smoke with its smith in town)
+
+No chimney drew smoke, and Umbrage's forge, a slot building.house, had no
+chimney at all. The flag that should drive it, npc's "someone awake
+inside" (566, the window lamps'), never reached a client: Main._awake_tick
+filed it under the zone's name ("wilds"), while the view looks a building
+up by its town_id ("wilds/store"), and a home has no town at all. It was
+never told false either, so a building emptied stayed awake.
+
+- BuildingComposer.slot_chimney: a slot building whose use is in
+  SLOT_HEARTHS (forge, kitchen; its art has no chimney) gets art-kit's
+  chimney.stone on its roof near one gable end, in a "parts" node, so a
+  ruin hides it as it hides a kind's. Every chimney, the composer's too,
+  carries meta SMOKE_AT, its top.
+- Flames.chimney_smoke: a pale stream CHIMNEY_SMOKE (2.4 x 4 m), its own
+  chimney_smoke.gdshader. It is lit, unlike a flame's unshaded wisp, so it
+  reads pale by day and dim at night. It narrows at the pot, widens and
+  bends downwind, and every edge fades, so the quad never shows.
+- Client3D._show_smoke and smoking(): a chimney smokes while its building
+  is said awake, standing, damaged or in disrepair, and built (a kind at
+  its last stage). Never in a ruin, while it is being built, or with
+  nobody known inside: a fire is never guessed by the hour, as the lamp is.
+- Client3D.awake_town(building, level): the key both the lamps and the
+  chimneys read. It is the building's town_id, else its level's name.
+- Main._awake_tick (server) tells each building under that key, and tells
+  a building that has emptied false. A building no body has been in is
+  still not told. So window lamps now follow the bodies too.
+
+view_test _test_chimney_smoke; resident_test (the lamp told under its
+town). Server and client both change, so the server needs a redeploy with
+the next cut. Protocol unchanged (the same "town" "awake" field), no new
+class_name.

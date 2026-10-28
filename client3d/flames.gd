@@ -21,10 +21,13 @@ const DAY_SHARE := 0.3
 ## The quads stand this many flame heights tall: the flame fills the lower
 ## part, its embers rise through the rest.
 const REACH := 1.6
+## A chimney's smoke (chimney_smoke): its height and width (m).
+const CHIMNEY_SMOKE := Vector2(2.4, 4.0)
 
 static var _mesh: ArrayMesh
 static var _flame_material: ShaderMaterial
 static var _smoke_mesh: QuadMesh
+static var _chimney_mesh: QuadMesh
 
 
 ## A flame [param size] m tall standing at [param at] in [param parent],
@@ -52,6 +55,26 @@ static func light(parent: Node3D, at: Vector3, size: float, seed := 0) -> Node3D
 	flame.add_child(smoke)
 	parent.add_child(flame)
 	return flame
+
+
+## A chimney's smoke rising from [param at] in [param parent] (its top):
+## a pale stream CHIMNEY_SMOKE in size (chimney_smoke.gdshader, lit), its
+## foot in the pot; returns its node.
+static func chimney_smoke(parent: Node3D, at: Vector3, seed := 0) -> MeshInstance3D:
+	if _chimney_mesh == null:
+		_chimney_mesh = QuadMesh.new()
+		_chimney_mesh.size = Vector2(CHIMNEY_SMOKE.x, CHIMNEY_SMOKE.y)
+		var material := ShaderMaterial.new()
+		material.shader = preload("res://client3d/chimney_smoke.gdshader")
+		_chimney_mesh.material = material
+	var smoke := MeshInstance3D.new()
+	smoke.name = "ChimneySmoke"
+	smoke.mesh = _chimney_mesh
+	smoke.position = at + Vector3(0.0, CHIMNEY_SMOKE.y * 0.45, 0.0)
+	smoke.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	smoke.set_instance_shader_parameter("seed", float(posmod(seed, 997)))
+	parent.add_child(smoke)
+	return smoke
 
 
 ## A flame at [param instance]'s "flame" socket, [param slot]'s (art-kit's
