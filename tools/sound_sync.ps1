@@ -8,7 +8,8 @@
 # sound library: <library>\takes\<slot>\<file>. The library is $env:PSYK_SOUND_DIR, else
 # N:\assets\sound (the NAS). Each is copied to art\audio\external\<slot>\<file> (git ignores
 # that folder) and checked against the sha256 takes.json gives it; a file there that
-# takes.json no longer lists is removed. tools\release_client.ps1 runs this before it
+# takes.json no longer lists is removed, and so is the copy of a listed take the library
+# doesn't hold as listed (727 amended). tools\release_client.ps1 runs this before it
 # exports, so a release has every listed take or stops.
 #
 # Exit 0 when every listed take is in place (or none is listed: the library isn't needed
@@ -77,16 +78,30 @@ if ($reachable -ne 'yes') {
 
 $problems = @()
 $copied = 0
+# A take the library doesn't hold as listed (missing, or another file: retired or re-cut
+# since this checkout's takes.json) has its copy here removed with its .import, so the
+# slot plays as if it had none (a blip; a bed silence), never a file left by an earlier
+# sync: combat's en garde build 3 shipped 727's retired bells that way.
+function Drop-Unheld($to) {
+	if (-not (Test-Path -LiteralPath $to)) { return }
+	if ($Check) { Write-Output "would remove: $to"; return }
+	Remove-Item -LiteralPath $to
+	if (Test-Path -LiteralPath "$to.import") { Remove-Item -LiteralPath "$to.import" }
+	$script:changed = $true
+	Write-Output "sound_sync: removed $to (the library doesn't hold it as listed; the slot plays as if it had none)"
+}
 foreach ($take in $wanted) {
 	$from = Join-Path (Join-Path (Join-Path $Library 'takes') $take.Slot) $take.File
 	$to = Join-Path (Join-Path $external $take.Slot) $take.File
 	if (-not (Test-Path -LiteralPath $from)) {
 		$problems += "missing: $from ($($take.Slot))"
+		Drop-Unheld $to
 		continue
 	}
 	$hash = (Get-FileHash -LiteralPath $from -Algorithm SHA256).Hash
 	if ($hash -ne $take.Sha256) {
 		$problems += "differs: $from has sha256 $hash, takes.json says $($take.Sha256)"
+		Drop-Unheld $to
 		continue
 	}
 	if ((Test-Path -LiteralPath $to) -and (Get-FileHash -LiteralPath $to -Algorithm SHA256).Hash -eq $hash) {

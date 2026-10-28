@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Builds: a sound take the sound library no longer holds as listed (retired or re-cut since) is left out of a build rather than shipped from an old copy; en garde build 3's ringing was 727's retired bells shipped that way (727 amended).
 - Generated halls (barrow, Ossuary, castle halls, tower floors), from each level's next generation: no more one-cell niches or tight one-cell turns, every door two wide and drawn as one double door that opens as one (the crypt's tall door in the barrow), and torches beside doorways instead of in front of them.
 
 - Sound: the ringing that started with indoor maps (the practice hall, the test rooms) is gone: the town music's bell layer is retired, so the town plays its ground only for now; the barrow's hidden-door draft no longer carries a faint high whine (727).

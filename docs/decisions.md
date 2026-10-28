@@ -34709,3 +34709,22 @@ generator carves too (coordinator approved, 2026-10-28).
   next generation; nothing shows on the box before one turns. labyrinth_test checks 20
   generations of each style: no pinch, no lone door, no torch in a door's line; level_test the
   pair swinging as one and a plain level's doors their own.
+
+## 727 amended: a take the library doesn't hold as listed plays as if it had none
+
+The coordinator (2026-10-28): Jeff still heard a "veryyyy loud" ringing in combat's en garde
+build 3, exported before 727 landed; its export reported the town melody and the draft as
+not matching the store, "placeholders".
+
+- Cause: they were not placeholders. tools/sound_sync.ps1 named a listed take the library
+  lacked or held as another file, and exited 1, but left the copy an earlier sync had put in
+  art/audio/external; SoundKit plays whatever file is there (no hash check at run time). The
+  build's pck held 727's retired bells (music.melody_town) and the draft from before its notch.
+- sound_sync now removes that copy with its .import (`-Check` names it, "would remove"), so
+  the slot plays as if it had none: its fallback, else a blip, a bed (music, ambience)
+  silence. A take the library holds as listed is copied as before; a library that doesn't
+  answer still stops it before anything is removed.
+- A tree whose takes.json predates a retirement or a re-cut now loses those sounds at its next
+  sync rather than shipping the old file; merging main brings the listed takes back.
+
+Tooling only (no game code); protocol unchanged; no new class_name.
