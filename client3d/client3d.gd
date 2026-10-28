@@ -15594,9 +15594,11 @@ func _animate(puppet: Node3D) -> void:
 	if puppet.has_meta("knock") and _knocked(puppet, rig, speed, now):
 		return
 	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)
-	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm):
+	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
+	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm or work.has("clip")):
 		# A fidget (or sitting down, or getting up) is no reason to stand
-		# still: it goes.
+		# still, nor to put off a work begun (a bandage's kneel, items' (3)):
+		# it goes.
 		puppet.set_meta("fidgeting", false)
 		puppet.set_meta("busy_until", 0)
 	if speed > WALKING and puppet.get_meta("seated", false):
@@ -15626,7 +15628,6 @@ func _animate(puppet: Node3D) -> void:
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
 		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
-	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
 	if speed <= WALKING and work.has("clip") and rig.has(str(work["clip"])):
 		# At its work (566): the work's clip, looped.
 		rig.loop(str(work["clip"]), tempo)

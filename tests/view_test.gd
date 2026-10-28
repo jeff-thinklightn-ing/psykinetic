@@ -6694,6 +6694,19 @@ func _test_visible_work() -> void:
 		_rig._lay(puppet, body, yaw)
 		_check(rig.base_clip() != "Fixing_Kneeling" and body.position == Vector3.ZERO and Client3D._tending_yaw(player, 1.0) == 1.0,
 				"done or broken off: standing again, its own facing (%s)" % rig.base_clip())
+		# A fidget already playing when the tending starts gives way to the kneel at once (items'
+		# (3): the fidget held it off up to 3.4 s, and a short bandage showed no kneel at all).
+		_rig._combat_at.erase(int(puppet.get_meta("entity_id", 0)))  # Calm: a fight drops a fidget anyway.
+		Client3D._play_fidget(puppet, rig, "Fidget_Shift", Time.get_ticks_msec(), 1.0)
+		var fidget := rig.base_clip()
+		player.tending = String(patient.name)
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
+		_check(fidget == "Fidget_Shift" and rig.base_clip() == "Fixing_Kneeling",
+				"a fidget playing (%s) when the tending starts: kneeling at once (%s)" % [fidget, rig.base_clip()])
+		player.tending = ""
+		_rig._sync_work(player, puppet)
+		_rig._animate(puppet)
 	_rig._sync_held(player, puppet)
 	puppet.set_meta("work", "")
 	_rig._animate(puppet)

@@ -33716,3 +33716,20 @@ companion_test _test_held_for_bandage: her player bandages her, she's sent
 on a look errand mid-bandage, she holds her cell for all 15 ticks (mending
 1), the bandage finishes (mending 2), and her errand is still there. Both
 modes. Server only, protocol unchanged, no new class_name.
+
+## 713, pc-character's side: the kneel cuts a fidget short
+
+Items' (3): the bandage kneel was sometimes missed. Their half is the
+sim's (free-walk inputs breaking the bandage before tending is seen).
+Ours: Client3D._animate let a fidget already playing (busy_until) run to
+its end, up to 3.4 s, giving way only to moving or a fight. A bandage
+begun mid-fidget knelt late, and a short one not at all. Now a playing
+fidget also goes when the body's work has a clip (ACTIVITIES "clip": the
+bandage's Fixing_Kneeling, a resident's chop or sleep), so the work's clip
+takes the base layer that frame. A body already at a work never starts a
+fidget (the work's clip returns before the fidget roll), so nothing else
+changes; a work with only an upper clip (carrying) leaves fidgets alone.
+
+view_test: a fidget playing when the tending starts, calm, kneels at
+once (fails without the change). Client only, protocol unchanged, no new
+class_name.
