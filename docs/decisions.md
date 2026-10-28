@@ -33906,3 +33906,24 @@ Safe on the box alone: before npc's side a visitor has no body and no
 words, and the town's log isn't spoken; only the treasury's small takes
 show. npc's side (bodies, news, the wares panel) and items' side follow
 as "711, npc's side" and "711, items' side".
+## 719. A struck monster answers its striker
+
+Jeff: "barrow guards aren't aggro enough sometimes just stand and take hits".
+The cause was 547's room keepers (the barrow's and the altar's guards,
+keeps_room): a keeper chose targets only inside its room and heard no noise,
+so a player striking it from the doorway, from just across the room's edge or
+with a spear's reach from outside was never answered.
+
+World.damage tells a monster struck by a blow or a shot who struck it
+(Monster.note_struck: struck_by, struck_tick; a give-up on them ends). For
+ANSWER_TICKS (40) after each blow it answers them: felt whatever its sight
+cone (no cone check for them), and, for any monster, a target it may take.
+A room keeper (547) fights them from up to ANSWER_REACH (2) cells outside its
+room and may step that far out after them (its leash, _beyond_leash, is its
+room grown by 2 while it answers). Unstruck for 40 ticks it lets them be and
+goes back into its room as 547 has it.
+
+monster_test's struck case: a guard struck from behind inside its room, from
+one cell outside and from two (a spear's reach) turns on its striker within
+a tick and lands a blow (by tick 5 at two); after the blows stop it is back
+in its room. Server only, protocol unchanged, no new class_name.

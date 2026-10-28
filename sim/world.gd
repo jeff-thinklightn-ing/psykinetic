@@ -6874,6 +6874,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	if is_instance_valid(source):
 		_take_grudges(target, source, lost)  # Decisions 417, 473.
 		_named_fight(target, source)
+		if target is Monster and cause in [&"attack", &"shot"]:
+			(target as Monster).note_struck(source)  # It answers who struck it.
 	if target.hp == 0 and spared.is_valid():
 		var by := str(spared.call(target, source, cause))
 		if by != "":

@@ -106,6 +106,7 @@ func _ready() -> void:
 	_test_sides_on_sight()
 	_test_homeward()
 	_test_room_guard()
+	_test_struck_answers()
 	_test_draugr()
 	_test_draugr_paid()
 	_test_ossuary_sealed()
@@ -2704,6 +2705,44 @@ func _test_room_guard() -> void:
 	_check(guard.target == null and not left, "gone out of the room, it is let go, and the guard never left the room")
 	Level.unregister("mt_altar")
 	Monster.idling = true
+
+
+## Jeff: "barrow guards aren't aggro enough sometimes just stand and take
+## hits". A guard struck answers the one who struck it within a few ticks:
+## from behind it (out of its cone), and from just outside the room it keeps
+## (a doorway, a spear's reach).
+func _test_struck_answers() -> void:
+	print("%s== a struck guard answers who struck it: from behind, from outside its room ==" % char(10))
+	Monster.idling = true
+	var rows: Array[String] = ["############", "#..........#", "#...g......#", "#..........#", "############"]
+	Level.register("mt_struck", Level.image_from_rows(rows), null, {"regenerate": {"anchors": [{"rect": [1, 1, 4, 3], "name": "altar"}]}})
+	for case: Array in [["behind it, inside its room", Vector2i(3, 2), Vector2i(1, 0)], ["just outside its room", Vector2i(5, 2), Vector2i(-1, 0)],
+			["outside its room, a reach of two", Vector2i(6, 2), Vector2i(-1, 0)]]:
+		var e := _build(rows, {"g": {"facing": case[2]}}, {}, "mt_struck")
+		var guard: Monster = e["g"][0]
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as GridEntity
+		_room.add_child(player)
+		World.spawn(player, case[1])
+		_bold(guard)
+		World.face(guard, case[2])
+		World.step()
+		var answered := -1
+		var landed := -1
+		for i in 40:
+			if i % 8 == 0:
+				World.damage(guard, 1, player)
+			World.step()
+			if answered < 0 and guard.target == player:
+				answered = i
+			if landed < 0 and _damage_log.any(func(hit: Dictionary) -> bool: return hit["source"] == guard):
+				landed = i
+		_check(answered >= 0 and answered <= 5 and landed >= 0 and landed <= 30,
+				"%s: it turns on them (tick %d) and strikes (tick %d)" % [case[0], answered, landed])
+		_move_to(player, Vector2i(10, 2))
+		for i in Monster.ANSWER_TICKS + 60:
+			World.step()
+		_check(guard.target == null and guard._room.has_point(guard.tile), "%s: let be once the blows stop, back in its room (%s)" % [case[0], guard.tile])
+	Level.unregister("mt_struck")
 
 
 ## Paid once, fought again (548 amended; Jeff: "as long as you paid once you

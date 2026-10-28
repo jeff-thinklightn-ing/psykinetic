@@ -382,6 +382,15 @@ var _blocked_last := -1
 ## fights nobody outside it, and goes after no noise.
 var fearless := false
 var keeps_room := false
+## Who struck it last, and when (World.damage; Jeff: "barrow guards aren't
+## aggro enough sometimes just stand and take hits"). For ANSWER_TICKS after
+## each blow it answers them: seen whatever its cone, and fought by a room
+## keeper from up to ANSWER_REACH outside its room, a step or two out after
+## them. Unanswered that long, it lets them be as before.
+var struck_by: GridEntity = null
+var struck_tick := -100000
+const ANSWER_TICKS := 40
+const ANSWER_REACH := 2
 ## Its kind's "never_lies" (573 amended (4); Jeff: the draugr "should not lie
 ## down, he is otherworldly"): World.knock_down only staggers it.
 var never_lies := false
@@ -1250,13 +1259,13 @@ func _nearest_visible_target() -> GridEntity:
 		var times := farther if entity in bane else 1.0
 		if d > sight_range * times or entity.protected or World.is_downed(entity):
 			continue  # Too far, in its spawn grace, or downed (no finishing blows: decision 544).
-		if keeps_room and not _room.has_point(at):
-			continue  # Outside the room it keeps.
+		if keeps_room and not _room.has_point(at) and not _answering(entity):
+			continue  # Outside the room it keeps (unless it struck it just now).
 		if entity is Player or (entity is Companion and entity.keeper != null):
 			if not _given_up.is_empty() and _letting_be(entity):
 				continue
-			# Its target it follows, cone or not (it turns as it goes).
-			if senses.sees(entity, d, entity != target, times):
+			# Its target it follows, cone or not (it turns as it goes); one that struck it, felt.
+			if _answering(entity) or senses.sees(entity, d, entity != target, times):
 				if entity == target:
 					kept = d
 				if d < nearest_distance:
@@ -1294,7 +1303,8 @@ func _nearest_visible_target() -> GridEntity:
 				continue
 			var d := World.distance(tile, entity.tile)
 			if d <= sight_range and d < nearest_distance and not entity.protected \
-					and (not keeps_room or _room.has_point(entity.tile)) and senses.sees(entity, d, entity != target):
+					and (not keeps_room or _room.has_point(entity.tile) or _answering(entity)) \
+					and (_answering(entity) or senses.sees(entity, d, entity != target)):
 				if entity == target:
 					kept = d
 				nearest = entity
@@ -1562,7 +1572,7 @@ func _bash() -> bool:
 ## fight at his throne, gave up 12 cells into his 32-cell hall).
 func _beyond_leash() -> bool:
 	if keeps_room and _room.has_area():
-		return not _room.has_point(tile)
+		return not _room.has_point(tile) and not (_answering(target) and _room.grow(ANSWER_REACH).has_point(tile))
 	return _post != NO_TILE and World.distance(tile, _post) > leash
 
 
@@ -2403,7 +2413,7 @@ func _may_fight(other: GridEntity) -> bool:
 func threatens(entity: GridEntity) -> bool:
 	if not _may_threaten(entity):
 		return false
-	if keeps_room and not _room.has_point(entity.tile):
+	if keeps_room and not _room.has_point(entity.tile) and not _answering(entity):
 		return false
 	if entity is Player or (entity is Companion and (entity as Companion).keeper != null):
 		return _given_up.is_empty() or not _letting_be(entity)
@@ -2442,6 +2452,26 @@ func _in_the_way() -> GridEntity:
 			if d > sight_range or not senses.sees(_provoked, d, false):
 				_provoked = null
 	return _provoked
+
+
+## Whether it answers [param entity]: it struck it within ANSWER_TICKS, and
+## stands within ANSWER_REACH of its room (a room keeper's) or of it.
+func _answering(entity: GridEntity) -> bool:
+	if entity == null or entity != struck_by or not is_instance_valid(entity) or World.tick - struck_tick > ANSWER_TICKS:
+		return false
+	if keeps_room and _room.has_area():
+		return _room.grow(ANSWER_REACH).has_point(entity.tile)
+	return World.distance(tile, entity.tile) <= ANSWER_REACH + 1
+
+
+## [param by] struck it (World.damage): answered for ANSWER_TICKS, and no
+## longer let be.
+func note_struck(by: GridEntity) -> void:
+	if not is_instance_valid(by) or by == self or not (by is Player or by is Companion or by is Monster):
+		return
+	struck_by = by
+	struck_tick = World.tick
+	_given_up.erase(by.get_instance_id())
 
 
 ## Whoever struck it just now (a fight noise on its own tile from someone),
