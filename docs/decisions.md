@@ -33676,3 +33676,21 @@ redesign. monster_test's named case: its name and strength, fought once, its
 death and kept dagger, its rising a day on, ten lives with the same numbers
 and dagger, npc's writes not changing its strength. Also `Draugr.forget_player`
 for ui's "quests reset all <player>": his asking them and a pact of theirs.
+
+## 672 amended, npc's side: the quest reset forgets the townsfolk's marks
+
+Jeff: "allow everything to be reset, this is so that things can be tested
+properly". The admin's "quests reset all <player>" clears all quest state
+for that player. npc's side is Main.quests_forget(player_id, standing =
+false) -> Array[String] (what it cleared, as words). It forgets what the
+townsfolk keep of a player outside the record and the cards' asks:
+- each card's hails.to for that player, and Main's hail, greeting and
+  rumour marks (_hail_tried, _greet_at, _rumour_said, _hail_at, _blow_at,
+  _hail_heard, _hail_greetings);
+- every resident's refusal to travel (686's worker.asked);
+- with standing, each resident's Standing entry for the player (443), so
+  they are a stranger again, since trust gates travel, the standing offer
+  and what is told.
+ui's "quests reset all" passes standing true; the per-giver reset keeps
+the default. resident_test covers both. Server only, protocol unchanged,
+no new class_name.

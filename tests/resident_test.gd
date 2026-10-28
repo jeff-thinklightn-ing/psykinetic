@@ -566,6 +566,24 @@ func _test_bodies_in_town() -> void:
 		_check(Standing.score(bond, "rs-rep") == -2 and Standing.entry(bond, "rs-rep")["why"].size() == 2 and int(Standing.entry(bond, "rs-rep")["met"]) == 40,
 			"set again: the score replaced, reasons added, met kept")
 		_check(not Standing.heard(bond, "rs-rep", 1, "x", "y", 60), "hearsay leaves it be")
+		print("\n== the admin's quest reset, npc's side: hails, greetings, refusals; standing kept unless asked ==")
+		World.production.set_asked(asked_id, "rs-reset", "Reset asked you to come.")
+		var reset_card := Townsfolk.card_of(World.production, asked_id)
+		Resident.hails_of(reset_card)["to"]["rs-reset"] = 3
+		Standing.bump(reset_card, "rs-reset", 2, "brought a fish", 10)
+		World.production.set_card(asked_id, reset_card)
+		_main._greet_at["%s|rs-reset" % asked_id] = 1
+		_main._rumour_said["%s|rs-reset|3" % STORE] = true
+		_main._hail_heard["rs-reset"] = {"x": 3}
+		var cleared: Array[String] = _main.quests_forget("rs-reset")
+		reset_card = Townsfolk.card_of(World.production, asked_id)
+		_check(cleared.has("hails and greetings") and cleared.has("1 refusal to travel") and not _main._greet_at.has("%s|rs-reset" % asked_id)
+			and not _main._rumour_said.has("%s|rs-reset|3" % STORE) and not _main._hail_heard.has("rs-reset") and not Resident.hails_of(reset_card)["to"].has("rs-reset")
+			and str(World.production.worker(asked_id).get("asked", {}).get("rs-reset", "")).is_empty(), "cleared: %s" % [cleared])
+		_check(Standing.score(reset_card, "rs-reset") == 2, "standing kept by default")
+		cleared = _main.quests_forget("rs-reset", true)
+		_check(cleared == ["standing with 1 resident"] and Standing.entry(Townsfolk.card_of(World.production, asked_id), "rs-reset").is_empty(),
+			"with standing: forgotten (%s)" % [cleared])
 	print("\n== a companion handed back for good: a resident of her town, settled (686, npc's side) ==")
 	World.towns.note_companion_in(STORE, "Sel", "cook", "rs-sel")
 	World.production.set_heard("companion:Sel", [{"text": "x"}])

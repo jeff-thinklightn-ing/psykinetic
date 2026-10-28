@@ -13882,6 +13882,56 @@ func _hail_struck(_target: GridEntity, _amount: int, source: GridEntity, _cause:
 		_blow_at[player.player_id] = World.tick
 
 
+## The admin's quest reset (ui's _quests_reset_all; Jeff: "allow everything
+## to be reset"), npc's side: what the townsfolk keep of [param player_id]
+## outside their record and the cards' asks. Their hails today (the marks
+## on each card and Main's caps), the greeting and rumour marks, a
+## refusal to travel (686), and with [param standing] what each resident
+## thinks of them (443), else kept. What was cleared, as words.
+func quests_forget(player_id: String, standing := false) -> Array[String]:
+	var cleared: Array[String] = []
+	if player_id.is_empty():
+		return cleared
+	var marks := 0
+	for key: Variant in _hail_tried.keys() + _greet_at.keys():
+		if str(key).ends_with("|" + player_id):
+			_hail_tried.erase(key)
+			_greet_at.erase(key)
+			marks += 1
+	for key: Variant in _rumour_said.keys():
+		if str(key).contains("|%s|" % player_id):
+			_rumour_said.erase(key)
+			marks += 1
+	for each: Dictionary in [_hail_at, _blow_at, _hail_heard, _hail_greetings]:
+		if each.erase(player_id):
+			marks += 1
+	var hailed := 0
+	var refused := 0
+	var known := 0
+	if World.production != null:
+		for id: String in World.production.worker_ids():
+			if not World.production.worker(id).get("asked", {}).get(player_id, "").is_empty():
+				World.production.set_asked(id, player_id, "")
+				refused += 1
+			var card: Dictionary = World.production.worker(id).get("card", {})  # Stored only: none rolled to be cleared.
+			var changed := false
+			if card.get("hails") is Dictionary and card["hails"].get("to") is Dictionary and card["hails"]["to"].erase(player_id):
+				hailed += 1
+				changed = true
+			if standing and card.get("standing") is Dictionary and card["standing"].erase(player_id):
+				known += 1
+				changed = true
+			if changed:
+				World.production.set_card(id, card)
+	if marks + hailed > 0:
+		cleared.append("hails and greetings")
+	if refused > 0:
+		cleared.append("%d refusal%s to travel" % [refused, "" if refused == 1 else "s"])
+	if known > 0:
+		cleared.append("standing with %d resident%s" % [known, "" if known == 1 else "s"])
+	return cleared
+
+
 func _crypt_asks_tick() -> void:
 	if World.production == null:
 		return
