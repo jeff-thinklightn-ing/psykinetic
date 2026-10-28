@@ -4204,6 +4204,9 @@ func _boot() -> void:
 		World.handed.connect(_on_handed)  # A gift to one of them (decision 443).
 	if not World.named_event.is_connected(_on_named_event):
 		World.named_event.connect(_on_named_event)  # A named enemy's memories (716, npc's side).
+	if not World.towns.visitor_came.is_connected(_on_visitor_came):
+		World.towns.visitor_came.connect(_on_visitor_came)  # Visitors' news and bodies (711, npc's side).
+		World.towns.visitor_left.connect(_on_visitor_left)
 	_make_lawspeaker()
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
@@ -8566,6 +8569,10 @@ func _sync_residents() -> void:
 								stops.append({"rect": homes[k], "who": str(folk[k]["name"]), "id": str(folk[k]["key"])})
 						each["places"]["rounds"] = stops
 					wanted[each["key"]] = each
+			# Strangers passing through (711, npc's side): at the inn, the store or the temple by kind.
+			for each: Dictionary in _visitors_wanted(area, place_id, place):
+				if wanted.size() < RESIDENTS_MAX:
+					wanted[each["key"]] = each
 		# The healer's hut (decision 404): whoever economy seats there (the
 		# medicine man, a worker whose town is the hut's place id) has a body
 		# at the hut as a town's folk have theirs, only while someone is near.
@@ -9176,8 +9183,8 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 	for entity: GridEntity in World.townsfolk():
 		var body := entity as Resident
 		var d := World.distance(body.tile, player.tile)
-		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE:
-			continue
+		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE or body.worker_id.begins_with(Offers.VISITOR):
+			continue  # A visitor answers a click, not the mind (711, npc's side).
 		if not body.person.is_empty() and Companion._named(line, body.person):
 			return body
 		if d <= RESIDENT_EARSHOT and (nearest == null or d < World.distance(nearest.tile, player.tile)):
@@ -9260,6 +9267,8 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 	_standing.erase(player.player_id)  # Taken, or tried: nothing stands (decision 536).
 	if result.get("read") is Array and not result["read"].is_empty():
 		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
+	elif not str(result.get("ware", "")).is_empty():
+		_visitor_sells(player, body, str(result["ware"]))
 	elif int(result.get("buy", 0)) > 0:
 		var counter := _counter_near(player, str(World.production.worker(worker_id).get("town", "")))
 		if counter == null:
@@ -9334,6 +9343,8 @@ func _offers_context() -> Dictionary:
 		"players_in": _players_in,
 		"memory": _town_memory,
 		"set_memory": _set_town_memory,
+		"visitor": _visitor_of,
+		"visitor_price": _visitor_price,
 		"lawspeaker": func(town: String) -> Dictionary: return World.towns.lawspeaker(town) if World.towns != null and World.towns.has_method("lawspeaker") else _lawspeaker_records.get(town, {}).duplicate(true),
 		"set_lawspeaker": func(town: String, record: Dictionary) -> void:
 			if World.towns != null and World.towns.has_method("set_lawspeaker"):
@@ -10268,6 +10279,8 @@ func _spawn_resident(each: Dictionary) -> Resident:
 		spot = (stops[index] as Dictionary).get("rect", Rect2i()) if index >= 0 and index < stops.size() and stops[index] is Dictionary 				else places.get("square", Rect2i())
 	var area: Rect2i = spot if spot is Rect2i else Rect2i()
 	var at := _nearest_free(area.get_center() if area.size != Vector2i.ZERO else World.holdings.place(town).get("cell", Vector2i.ZERO))
+	if each.get("enter_at") is Vector2i:
+		at = _nearest_free(each["enter_at"])  # A visitor just come walks in from the road (711, npc's side).
 	var label := Resident.label_of(str(each["name"]), trade)
 	# Their look for the character generator (decision 419): a companion
 	# resting in town as she looks out with her player (293 amended), the
@@ -13893,6 +13906,9 @@ func _greeted(player: Player, body: Resident) -> void:
 		_held_tongue("greet")  # No word, no turning to them near a fight (675, npc's side).
 		return
 	_greet_at[key] = now_msec
+	if body.worker_id.begins_with(Offers.VISITOR):
+		_visitor_greeted(player, body, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
+		return
 	var busy := false
 	for each: Dictionary in _resident_asks:
 		if int(each["body"]) == body.get_instance_id():
@@ -13961,6 +13977,196 @@ func _hail_struck(_target: GridEntity, _amount: int, source: GridEntity, _cause:
 	var player := source as Player
 	if player != null and not player.player_id.is_empty():
 		_blow_at[player.player_id] = World.tick
+
+
+## Visitors (decision 711, npc's side; economy's Towns.visitors): strangers
+## passing through a town, a body while a player is near as its folk have,
+## "visitor:" + their id (Offers.VISITOR), no worker and no card. A body
+## going on walks to the road's edge, at most this long, then is gone.
+const VISITOR_WALK_OUT_SECONDS := 60
+## Visitors walking out (711): body key -> {town, name, edge, until (tick)}.
+var _visitors_leaving: Dictionary = {}
+## "body key|player id" -> true: a visitor's news told that player this visit (711).
+var _visitor_told: Dictionary = {}
+
+
+## [param worker_id]'s Towns.visitors entry with its "town", {} for none
+## (or one already on their way out): Offers' ctx "visitor".
+func _visitor_of(worker_id: String) -> Dictionary:
+	if World.towns == null or not worker_id.begins_with(Offers.VISITOR):
+		return {}
+	var id := worker_id.trim_prefix(Offers.VISITOR)
+	for town: String in World.towns._towns:
+		for entry: Dictionary in World.towns.visitors(town):
+			if str(entry.get("id", "")) == id:
+				entry["town"] = town
+				return entry
+	return {}
+
+
+## What a pedlar asks for [param item]: economy's own sum in
+## Economy.visitor_sale (its value times merchant.sell, at least 1), so
+## the panel's price is the one taken. Offers' ctx "visitor_price".
+func _visitor_price(item: String) -> Variant:
+	if World.economy == null:
+		return null
+	return maxi(roundi(World.economy.value_of(item) * float(World.economy.rules.get("merchant", {}).get("sell", 1.15))), 1)
+
+
+## A visitor came to [param town] (Towns.visitor_came): what they carry to
+## tell, drawn once (set_visitor_news).
+func _on_visitor_came(town: String, id: String) -> void:
+	for entry: Dictionary in World.towns.visitors(town):
+		if str(entry.get("id", "")) == id:
+			World.towns.set_visitor_news(town, id, _visitor_news(town, entry))
+
+
+## A visitor went on from [param town] (Towns.visitor_left): a body of
+## theirs here walks out to the road's edge; whom they told is let go.
+func _on_visitor_left(town: String, id: String) -> void:
+	var key := Offers.VISITOR + id
+	for told: String in _visitor_told.keys():
+		if told.begins_with(key + "|"):
+			_visitor_told.erase(told)
+	var body := _resident_body(key)
+	if body != null and body.spawned:
+		_visitors_leaving[key] = {"town": town, "name": body.person, "edge": _town_edge(World.holdings.place(town)),
+			"until": World.tick + VISITOR_WALK_OUT_SECONDS * World.TICK_RATE}
+
+
+## The news a visitor to [param town] carries: the newest happening of up
+## to two other towns ("In Westfold, the wagon came home."), else a word of
+## the road from where they came (townsfolk.json visitors.road).
+func _visitor_news(town: String, entry: Dictionary) -> Array:
+	var out: Array = []
+	var others: Array = World.towns._towns.keys()
+	others.sort()
+	for other: String in others:
+		if other == town or out.size() >= 2:
+			continue
+		var newest := {}
+		for said: Variant in _town_memory(other):
+			if said is Dictionary and bool(said.get("event", false)) and str(said.get("tier", "")) != TownMemory.LEFT \
+					and int(said.get("first_said", -1)) >= int(newest.get("first_said", -1)):
+				newest = said
+		if not newest.is_empty():
+			out.append({"kind": "town", "text": "In %s, %s." % [_town_words(other), Resident._lead(str(newest.get("text", ""))).trim_suffix(".")]})
+	var road: Array = Townsfolk.rules().get("visitors", {}).get("road", [])
+	if out.is_empty() and not road.is_empty():
+		var line := str(road[absi(hash(str(entry.get("id", "")))) % road.size()])
+		out.append({"kind": "road", "text": line % str(entry.get("from", "the road")) if line.contains("%s") else line})
+	return out
+
+
+## The visitors of [param place_id] wanted here as bodies (_sync_residents):
+## a pedlar at the store, a pilgrim at the temple, the rest at the inn (else
+## the square), one just come walking in from the road's edge; and those
+## going on, walking out to it till they reach it or their time is up.
+func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var no_homes: Array[Rect2i] = []
+	var base := _resident_places(area, place, "", no_homes, 0)
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	for entry: Dictionary in World.towns.visitors(place_id):
+		var kind := str(entry.get("kind", ""))
+		var spot: Rect2i = base.get("inn", base["square"])
+		if kind == "pedlar":
+			spot = Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
+		elif kind == "pilgrim" and base.has("temple"):
+			spot = base["temple"]
+		var each := {"key": Offers.VISITOR + str(entry.get("id", "")), "name": str(entry.get("name", "")), "trade": "", "player": "",
+			"town": place_id, "places": _visitor_places(spot)}
+		if World.towns.now() - int(entry.get("came", 0)) < maxi(DayNight.day_steps, 1) / 12:
+			each["enter_at"] = _town_edge(place)
+		out.append(each)
+	for key: String in _visitors_leaving.keys():
+		var going: Dictionary = _visitors_leaving[key]
+		if str(going["town"]) != place_id:
+			continue
+		var body := _resident_body(key)
+		if body == null or World.tick > int(going["until"]) or World.distance(body.tile, going["edge"]) <= 1:
+			_visitors_leaving.erase(key)
+			continue
+		out.append({"key": key, "name": str(going["name"]), "trade": "", "player": "", "town": place_id,
+			"places": _visitor_places(Rect2i(going["edge"], Vector2i.ONE))})
+	return out
+
+
+## Every place of a routine at [param spot]: a visitor keeps to it all day.
+func _visitor_places(spot: Rect2i) -> Dictionary:
+	return {"work": spot, "home": spot, "square": spot, "inn": spot, "temple": spot, "well": spot, "visit": spot}
+
+
+## The body of [param worker_id] among the townsfolk here, null for none.
+func _resident_body(worker_id: String) -> Resident:
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and (entity as Resident).worker_id == worker_id:
+			return entity
+	return null
+
+
+## Where the road leaves [param place]'s area nearest its store: an edge
+## the area joins another by (the cell on it across from the store), or a
+## link's cell; the store's cell for none.
+func _town_edge(place: Dictionary) -> Vector2i:
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	var area_name := str(place.get("area", World.zone.name))
+	var size: Vector2i = _world_map.areas.get(area_name, {}).get("size", Vector2i.ZERO)
+	var best := Companion.NONE
+	for way: Dictionary in _world_map.ways_from(area_name):
+		var cell := Companion.NONE
+		if str(way["kind"]) == "edge":
+			match str(way["side"]):
+				"east": cell = Vector2i(size.x - 2, store.y)
+				"west": cell = Vector2i(1, store.y)
+				"south": cell = Vector2i(store.x, size.y - 2)
+				"north": cell = Vector2i(store.x, 1)
+		else:
+			cell = way["at"]
+		if cell != Companion.NONE and (best == Companion.NONE or World.distance(cell, store) < World.distance(best, store)):
+			best = cell
+	return store if best == Companion.NONE else best
+
+
+## [param player] clicked visitor [param body] (_greeted, 711): a greeting
+## by their kind and where they came from, and once a visit one piece of
+## the news they carry (the neighbours hear it: hearsay); their wares come
+## with the panel. One going on only says so.
+func _visitor_greeted(player: Player, body: Resident, stop_ticks: int) -> void:
+	body.address(player, stop_ticks)
+	var words: Dictionary = Townsfolk.rules().get("visitors", {})
+	var entry := _visitor_of(body.worker_id)
+	if entry.is_empty():
+		var leaving: Array = words.get("leaving", [])
+		if not leaving.is_empty():
+			_resident_says(body, str(leaving[absi(hash(body.worker_id)) % leaving.size()]), "", player)
+		return
+	var from := str(entry.get("from", "the road"))
+	var greetings: Array = words.get("greetings", {}).get(str(entry.get("kind", "")), [])
+	if not greetings.is_empty():
+		var line := str(greetings[absi(hash(body.worker_id + player.player_id)) % greetings.size()])
+		_resident_says(body, line % from if line.contains("%s") else line, "", player)
+	var told := body.worker_id + "|" + player.player_id
+	var news: Array = entry.get("news", [])
+	if _visitor_told.has(told) or news.is_empty():
+		return
+	_visitor_told[told] = true
+	var item: Variant = news[absi(hash(told)) % news.size()]
+	var text := str(item.get("text", "")) if item is Dictionary else str(item)
+	if not text.is_empty():
+		_resident_says(body, text, "", player)
+
+
+## [param player] bought [param item] from pedlar [param body] (711):
+## economy takes the gold, the tax and the stock (Towns.visitor_sell); the
+## thing is minted into their hands; the pedlar says how it went.
+func _visitor_sells(player: Player, body: Resident, item: String) -> void:
+	var done := World.towns.visitor_sell(body.worker_id.trim_prefix(Offers.VISITOR), player.player_id, item)
+	if bool(done.get("ok", false)):
+		_hand_item(player.player_id, item, body.person)
+	var say := str(done.get("say", ""))
+	if not say.is_empty():
+		_resident_says(body, say, "", player)
 
 
 ## How many ways from a named one's zone a town hears of its rising (716).
@@ -14053,6 +14259,10 @@ func quests_forget(player_id: String, standing := false) -> Array[String]:
 		if str(key).ends_with("|" + player_id):
 			_hail_tried.erase(key)
 			_greet_at.erase(key)
+			marks += 1
+	for key: Variant in _visitor_told.keys():
+		if str(key).ends_with("|" + player_id):
+			_visitor_told.erase(key)  # A visitor's news, told again (711).
 			marks += 1
 	for key: Variant in _rumour_said.keys():
 		if str(key).contains("|%s|" % player_id):

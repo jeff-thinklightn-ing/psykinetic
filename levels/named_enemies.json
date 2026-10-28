@@ -11,6 +11,6 @@
 		"fled_from": ["Last time you ran.", "Running again, are we?"],
 		"rose": ["%s walks again.", "%s is up and about again."],
 		"emote": ["snarls", "bares its teeth"],
-		"speaks": ["robber", "draugr"]
+		"speaks": ["robber", "robber_brute", "draugr"]
 	}
 }

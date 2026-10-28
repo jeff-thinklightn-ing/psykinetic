@@ -80,6 +80,7 @@ func _ready() -> void:
 	_test_field_work()
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
 	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
+	_test_visitors()  # After them: its syncs step the world.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 
@@ -3558,7 +3559,9 @@ func _test_named_enemy() -> void:
 	var news := log.filter(func(entry: Variant) -> bool: return entry is Dictionary and str(entry.get("text", "")) == "Gorm walks again")
 	_check(news.size() == 1 and bool(news[0].get("event", false)), "the town near remembers it as news (%d)" % news.size())
 	_check(World.named_record("rs-gorm")["memories"].size() == NamedMind.MEMORIES_KEPT and World.named_record("rs-gorm")["track"].size() == 1, "rose is no player's memory")
-	Offers._call(Offers.ctx, "set_memory", [STORE, log.filter(func(entry: Variant) -> bool: return not news.has(entry))])
+	for town: String in World.towns._towns:
+		var kept: Array = Offers._call(Offers.ctx, "memory", [town])
+		Offers._call(Offers.ctx, "set_memory", [town, kept.filter(func(entry: Variant) -> bool: return not entry is Dictionary or str(entry.get("text", "")) != "Gorm walks again")])
 	print("\n== the quest reset forgets them, with standing ==")
 	var cleared: Array[String] = _main.quests_forget(pid, true)
 	record = World.named_record("rs-gorm")
@@ -3569,3 +3572,78 @@ func _test_named_enemy() -> void:
 	NamedEnemy.reset_for_test()
 	NamedMind.use_lines({})
 	_main._named_said_at.clear()
+
+
+## Visitors (711, npc's side): a stranger passing through has a body at
+## the inn, store or temple while the town is near, no worker and no card;
+## a click greets by kind and tells one piece of news a visit; a pedlar's
+## wares are offers, bought through economy and minted into the hands;
+## typed words never reach one; going on, the body walks to the road's edge
+## and is gone.
+func _test_visitors() -> void:
+	print("\n== a stranger passing through: a body, a greeting, one piece of news, a pedlar's wares (711, npc's side) ==")
+	var player := _player()
+	_check(player != null, "(a player in the town)")
+	if player == null:
+		return
+	var pid := Net.player_id
+	var visitors: Array = World.towns._towns[STORE].get_or_add("visitors", [])
+	var entry := {"id": "visitor_rs_1", "kind": "pedlar", "name": "Odo", "from": "Saltmarsh", "came": World.towns.now() - DayNight.day_steps,
+		"leaves": World.towns.now() + DayNight.day_steps, "stock": {"spice": 2}, "news": []}
+	visitors.append(entry)
+	_main._on_visitor_came(STORE, "visitor_rs_1")
+	var news: Array = World.towns.visitors(STORE).filter(func(each: Dictionary) -> bool: return each["id"] == "visitor_rs_1")[0]["news"]
+	_check(not news.is_empty() and not str(news[0].get("text", "")).is_empty(), "their news drawn as they came (%s)" % [news])
+	_sync()
+	var odo := _body("visitor:visitor_rs_1")
+	_check(odo != null and odo.person == "Odo" and Townsfolk.card_of(World.production, odo.worker_id).is_empty() and World.production.worker(odo.worker_id).is_empty(),
+		"a body, no worker, no card")
+	if odo == null:
+		visitors.clear()
+		return
+	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+	_check(odo.places.get("work", Rect2i()).has_point(store), "a pedlar keeps to the store (%s)" % [odo.places.get("work")])
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	_put(player, _main._nearest_free(odo.tile + Vector2i(1, 0)))
+	_main._resident_fight_at.clear()
+	_main._greeted(player, odo)
+	_check(spoken.size() == 2 and spoken[0].contains("Saltmarsh") and spoken[1] == str(news[0]["text"]) if news.size() == 1 else spoken.size() == 2,
+		"a greeting by kind and where they came from, then their news (%s)" % [spoken])
+	spoken.clear()
+	_main._greet_at.clear()
+	_main._greeted(player, odo)
+	_check(spoken.size() == 1, "clicked again: the greeting only, the news told once a visit (%s)" % [spoken])
+	var offers := Offers.of(odo.worker_id, pid)
+	_check(offers.size() == 1 and str(offers[0]["kind"]) == Offers.WARES and int(offers[0]["cost"]) == _main._visitor_price("spice"),
+		"a pedlar's wares, at economy's price (%s)" % [offers])
+	_check(_main._resident_addressed(player, "hello there", null) != odo, "typed words never reach a visitor")
+	if World.economy != null and not offers.is_empty():
+		World.economy.add_gold(pid, int(offers[0]["cost"]) + 5, "the test")
+		var gold_before := World.economy.gold(pid)
+		_main._accept_offer(player, str(offers[0]["id"]), 0)
+		_check(World.economy.gold(pid) == gold_before - int(offers[0]["cost"]), "bought: the gold paid (%d -> %d)" % [gold_before, World.economy.gold(pid)])
+		_check(player.slots.has("spice"), "the spice in hand (%s)" % [player.slots])
+		_check(int(_main._visitor_of(odo.worker_id).get("stock", {}).get("spice", 0)) == 1, "one off the stock (%s)" % [_main._visitor_of(odo.worker_id)])
+	print("\n== going on: the body walks to the road's edge, then is gone ==")
+	World.towns._towns[STORE]["visitors"] = []
+	_put(odo, _main._nearest_free(store + Vector2i(4, 0)))  # Away from the edge (this town's store: it has no road out).
+	_main._on_visitor_left(STORE, "visitor_rs_1")
+	_check(_main._visitors_leaving.has("visitor:visitor_rs_1") and not _main._visitor_told.has("visitor:visitor_rs_1|" + pid), "walking out; whom they told let go")
+	_sync()
+	odo = _body("visitor:visitor_rs_1")
+	var edge: Vector2i = _main._visitors_leaving.get("visitor:visitor_rs_1", {}).get("edge", Vector2i.ZERO)
+	_check(odo != null and odo.places.get("home", Rect2i()).has_point(edge), "still here, bound for the edge %s" % [edge])
+	spoken.clear()
+	_main._greet_at.clear()
+	if odo != null:
+		_main._greeted(player, odo)
+	_check(spoken.size() == 1 and spoken[0] in Townsfolk.rules()["visitors"]["leaving"], "clicked: they're on their way (%s)" % [spoken])
+	_main._visitors_leaving["visitor:visitor_rs_1"]["until"] = World.tick - 1
+	_sync()
+	_sync()
+	_check(_body("visitor:visitor_rs_1") == null and _main._visitors_leaving.is_empty(), "past their time: gone")
+	Net.message_received.disconnect(heard)

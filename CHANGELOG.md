@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Strangers pass through towns (711, npc's side): travellers, pedlars and pilgrims now stand at the inn, store or temple, walk in from the road and out again, greet you when clicked and pass on news from other towns once a visit; a pedlar sells wares from afar through the offers panel, into your hands.
 - After a connection drop you can rejoin at once: the server lets your new connection in and drops the dead one, instead of refusing "already connected" until it timed out (721).
 
 - Houses: the shingle roof no longer shows a gap by the ridge with the wall boards through it (its pieces now sit on a closed underlay with a ridge cap); the hut's roof rows no longer show thin slits at an angle.

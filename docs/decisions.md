@@ -34156,3 +34156,44 @@ id joins while she is on: the server logs one replacement, the new one comes
 in as Player3 at (11, 3) (back) in her colour, Casey's client is told and
 does not reconnect, and Dana still joins. Server and client (both only
 refuse less), protocol unchanged, no new class_name.
+## 711, npc's side: visitors' bodies, words and wares
+
+npc's half of visitors (economy's 711; the design the coordinator
+approved). A visitor (Towns.visitors) has a body as a town's folk do,
+while a player is near the town. The body's id is "visitor:" + their id
+(Offers.VISITOR), with no production worker and no card. So nothing keyed
+on a worker (cards, hails, gossip as a teller, sickness, rent) touches
+them, and they never count among the residents.
+
+- **Where they stand** (Main._visitors_wanted, after a town's folk, under
+  RESIDENTS_MAX): a pedlar at the store's 5x5, a pilgrim at the temple
+  when one stands, anyone else at the inn (else the store's square). They
+  keep to that spot whatever the hour. One who came within the last
+  twelfth of a day appears at the road's edge (Main._town_edge: the
+  area's edge-way cell across from the store, or a link's cell) and walks
+  in.
+- **Going on** (Towns.visitor_left): a body here walks to that edge. It
+  is gone once there, or after VISITOR_WALK_OUT_SECONDS (60).
+- **News, drawn once as they come** (Towns.visitor_came ->
+  set_visitor_news): the newest happening ("event") in up to two other
+  towns' memories, as "In <town>, <it>.". With none, a word of the road
+  from where they came (townsfolk.json visitors.road). A named one's
+  rising (716) travels this way.
+- **Clicked** (Main._greeted -> _visitor_greeted): a greeting by kind
+  with where they came from (townsfolk.json visitors.greetings), then,
+  once a visit for each player, one piece of their news. It goes through
+  _resident_says, so the neighbours hear it as hearsay. One going on says
+  only that they are leaving. No model is asked, and typed words skip
+  visitors (_resident_addressed).
+- **Wares:** a pedlar's panel (Offers._visitor_offers) has a line per
+  thing in stock (kind and accept Offers.WARES) at economy's price (its
+  value times merchant.sell, the sum Economy.visitor_sale takes). Taking
+  one calls Towns.visitor_sell (gold, tax, stock), and on ok
+  Main._hand_item mints the thing into the buyer's hands. The panel is the
+  existing offers message, with a new offer kind value its rows show by
+  title.
+
+quests_forget forgets a visitor's news told. The named-enemy lines speak
+for robber_brute too (enemy-ai's coming kind). resident_test covers each
+step, and townsfolk_test, farm_test and companion_test pass. Server only,
+protocol unchanged (measured), no new class_name.

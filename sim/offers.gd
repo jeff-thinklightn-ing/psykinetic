@@ -75,6 +75,10 @@ const PLEA := "plea"
 const PAGE := "page"
 const READ := "read"
 const BUY := "buy"
+## A visitor's body (711, npc's side): "visitor:" + their Towns.visitors id;
+## no worker, no card. A pedlar's things are WARES, sold by WARES.
+const VISITOR := "visitor:"
+const WARES := "wares"
 const TAKE := "take"
 const LEND := "lend"
 const CARRY := "carry"
@@ -193,6 +197,8 @@ static func _call(given: Dictionary, key: String, args: Array = []) -> Variant:
 static func of(worker_id: String, player_id: String, given: Dictionary = ctx) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var production: Production = given.get("production")
+	if worker_id.begins_with(VISITOR):
+		return _visitor_offers(worker_id, given)
 	if production == null or worker_id.begins_with(Townsfolk.COMPANION):
 		return out
 	var who := production.worker(worker_id)
@@ -319,6 +325,29 @@ static func _trade_of(who: Dictionary) -> String:
 
 ## A thing in the town's shop that this resident's trade makes, the first
 ## by uid, at the shop's price: "I have a knife at the counter for 12 gold."
+## A pedlar's wares (711, npc's side): a line for each thing in their stock
+## (ctx "visitor": the Towns.visitors entry of the body's id), at the
+## price economy will take (ctx "visitor_price"). A traveller or a pilgrim
+## offers nothing.
+static func _visitor_offers(worker_id: String, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var entry: Variant = _call(given, "visitor", [worker_id])
+	if not entry is Dictionary or str(entry.get("kind", "")) != "pedlar":
+		return out
+	var catalog: Variant = _call(given, "catalog")
+	var stock: Dictionary = entry.get("stock", {})
+	var items: Array = stock.keys()
+	items.sort()
+	for item: Variant in items:
+		var price: Variant = _call(given, "visitor_price", [str(item)])
+		if int(stock[item]) <= 0 or not price is int:
+			continue
+		var name := str(catalog.get(str(item), {}).get("name", str(item).replace("_", " "))) if catalog is Dictionary else str(item).replace("_", " ")
+		out.append(_offer(worker_id, WARES, str(item), "%s, %d gold" % [_upper_first(Companion._a(name)), price],
+			"I can let you have %s for %d gold." % [Companion._a(name), price], {"item": str(item), "price": price}, WARES, price))
+	return out
+
+
 static func _shop_offer(worker_id: String, who: Dictionary, town: String, given: Dictionary) -> Dictionary:
 	var trade := _trade_of(who)
 	var goods: Variant = _call(given, "goods", [town])
@@ -866,6 +895,9 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		BUY:
 			out["buy"] = int(offer["what"].get("uid", 0))
 			out["ok"] = out["buy"] > 0
+		WARES:
+			out["ware"] = str(offer["what"].get("item", ""))  # Sold by Main (Towns.visitor_sell), 711.
+			out["ok"] = not out["ware"].is_empty()
 		READ:
 			# A page read (decision 491): the lines back to Main, nothing on the card but that they met.
 			var card := Townsfolk.card_of(production, worker_id)
