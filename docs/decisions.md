@@ -34197,3 +34197,21 @@ quests_forget forgets a visitor's news told. The named-enemy lines speak
 for robber_brute too (enemy-ai's coming kind). resident_test covers each
 step, and townsfolk_test, farm_test and companion_test pass. Server only,
 protocol unchanged (measured), no new class_name.
+
+## 603 amended (7), ui's side: the disc's rim whole
+
+Combat's whole-disc spin (half_angle 180) drew its rim, the curtain, with
+two short breaks (stills, spin_disc_1.png). Client3D.telegraph_curtain_segments
+kept a segment only when its middle lay in a struck cell's square; the rim
+runs at length + Telegraph.REACH_SLACK, so where it crosses cells past the
+reach (their centres further out than the rim, never struck) between the
+struck ones, it was dropped. Now a segment of the outer rim (both ends at
+the outline's longest reach) whose middle lies in a cell past the reach
+stands when the cell half a cell in from its middle is struck; a cell
+within reach that a wall leaves out still cuts it, and every other segment
+keeps the old test. view_test _test_telegraph_disc_rim: a length-3 disc on
+open ground keeps all 127 rim segments; with (3, 0) left out as a wall
+leaves it, none stands over that cell; the shaped telegraph's check reads
+"over or against a sent cell" (the half-cell-in point). Client only,
+protocol unchanged, no new class_name; no CHANGELOG bullet (combat's disc
+carries the change a player sees).

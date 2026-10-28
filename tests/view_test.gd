@@ -104,6 +104,7 @@ func _ready() -> void:
 	await _test_seen_through()
 	_test_telegraph_smooth()
 	_test_telegraph_fill_honest()
+	_test_telegraph_disc_rim()
 	await _test_target_marked()
 	await _test_goblin()
 	_test_humans()
@@ -6254,9 +6255,11 @@ func _test_telegraph_smooth() -> void:
 	var outside := 0
 	for segment in segments:
 		var middle: Vector2 = (segment[0] + segment[1]) * 0.5
-		if not inside.call(Vector3(middle.x, 0.0, middle.y)):
+		# The outer rim may cross a cell past the reach: it bounds the one half a cell in.
+		var inward := Vector2(9, 4) + (middle - Vector2(9, 4)) * (1.0 - 0.5 / (middle - Vector2(9, 4)).length())
+		if not inside.call(Vector3(middle.x, 0.0, middle.y)) and not inside.call(Vector3(inward.x, 0.0, inward.y)):
 			outside += 1
-	_check(segments.size() > 0 and outside == 0, "every curtain piece stands over a sent cell (%d pieces)" % segments.size())
+	_check(segments.size() > 0 and outside == 0, "every curtain piece stands over or against a sent cell (%d pieces)" % segments.size())
 	_rig.telegraph_tick(World.tick)
 	var fill_alpha := (fill.material_override as StandardMaterial3D).albedo_color.a
 	_check(is_equal_approx(material.albedo_color.a, _rig.curtain_alpha(fill_alpha)) and material.albedo_color.a > fill_alpha,
@@ -6266,6 +6269,38 @@ func _test_telegraph_smooth() -> void:
 	_rig.telegraph_show("plain", cells, World.tick, World.tick + 10)
 	_check(_rig._telegraphs["plain"]["quads"].size() == cells.size() and _rig._telegraphs["plain"]["curtain"] == null, "a message without a shape: a quad a cell, no curtain, as before")
 	_rig.telegraph_drop("plain")
+
+## The spin's whole disc (603 amended (7): half_angle 180): its rim stands
+## whole on open ground, every outer segment kept (two broke where the rim,
+## at length + REACH_SLACK, ran past the squares between struck cells); with
+## a cell left out as a wall leaves it, no rim segment stands over that cell.
+func _test_telegraph_disc_rim() -> void:
+	var shape := {"kind": "cone", "origin": [0, 0], "facing": [1, 0], "length": 3, "half_angle": 180}
+	var outline := Client3D.telegraph_outline(shape)
+	var struck := Telegraph.cells(shape)
+	struck.append(Vector2i.ZERO)
+	var rim := 0.0
+	for point in outline:
+		rim = maxf(rim, point.length())
+	var on_rim := 0
+	for i in outline.size():
+		if absf(outline[i].length() - rim) < 0.01 and absf(outline[(i + 1) % outline.size()].length() - rim) < 0.01:
+			on_rim += 1
+	var kept := Client3D.telegraph_curtain_segments(outline, Vector2.ZERO, struck)
+	var kept_rim := 0
+	for segment in kept:
+		if absf(segment[0].length() - rim) < 0.01 and absf(segment[1].length() - rim) < 0.01:
+			kept_rim += 1
+	_check(on_rim > 8 and kept_rim == on_rim, "a disc's rim stands whole on open ground (%d of %d rim segments)" % [kept_rim, on_rim])
+	var walled := Vector2i(3, 0)
+	struck.erase(walled)
+	var over_wall := 0
+	for segment in Client3D.telegraph_curtain_segments(outline, Vector2.ZERO, struck):
+		var middle: Vector2 = (segment[0] + segment[1]) * 0.5
+		if absf(middle.x - walled.x) < 0.5 and absf(middle.y - walled.y) < 0.5:
+			over_wall += 1
+	_check(over_wall == 0, "a cell a wall leaves out cuts the rim there (%d pieces over it)" % over_wall)
+
 
 ## Combat's check on the smooth telegraph's fill (602 amended's rule): a
 ## body is struck exactly when its cell's centre is inside what is drawn.

@@ -4179,10 +4179,19 @@ static func telegraph_fill_polygons(outline: PackedVector2Array, origin: Vector2
 ## The curtain's pieces: each segment of [param outline] (closed) whose
 ## middle lies in a [param struck] cell, as [a, b] in grid units; a full
 ## ring's two seam segments (between its rims at one angle) are left out.
+## A segment of the outer rim (both ends at the outline's longest reach)
+## whose middle lies in a cell past the reach (its centre further out than
+## the rim, so never struck) stands when the cell half a cell in from it is
+## struck: the rim runs at length + Telegraph.REACH_SLACK, through cells
+## beyond the struck ones (603 amended (7)'s disc showed two breaks there),
+## while a cell within reach that a wall leaves out still cuts it.
 static func telegraph_curtain_segments(outline: PackedVector2Array, origin: Vector2, struck: Array[Vector2i]) -> Array[PackedVector2Array]:
 	var out: Array[PackedVector2Array] = []
 	if outline.size() < 2:
 		return out
+	var rim := 0.0
+	for point in outline:
+		rim = maxf(rim, point.length())
 	for i in outline.size():
 		var a := outline[i]
 		var b := outline[(i + 1) % outline.size()]
@@ -4196,6 +4205,10 @@ static func telegraph_curtain_segments(outline: PackedVector2Array, origin: Vect
 			if absf(middle.x - cell.x) <= 0.51 and absf(middle.y - cell.y) <= 0.51:
 				inside = true
 				break
+		if not inside and absf(a.length() - rim) < 0.01 and absf(b.length() - rim) < 0.01 				and (Vector2(Vector2i(middle.round())) - origin).length() > rim:
+			# The outer rim over a cell past the reach: it bounds the cell
+			# inside it, half a cell in, if that one is struck.
+			inside = struck.has(Vector2i((origin + (middle - origin) * (1.0 - 0.5 / rim)).round()))
 		if inside:
 			out.append(PackedVector2Array([a + origin, b + origin]))
 	return out
