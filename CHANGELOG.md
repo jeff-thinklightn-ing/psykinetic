@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The draugr's spin shows as a full red circle, filled right under him (603 amended (7)), and strikes the whole circle: there is no safe slice behind him any more. Step out of the circle.
 - Named enemies remember you (716, npc's side): each keeps what happened between you (met, fought, fell to you, put you down, saw you run) across its risings, greets you by it ("Fresh meat.", "Last time you ran.", "Not this time.") or snarls if its kind doesn't talk, and nearby towns tell of it as news when it rises; none is in play yet.
 
 - Monsters fight back when struck (719): a barrow guard hit from its doorway or from just outside its room, or anything hit from behind, now turns on whoever struck it instead of standing and taking the blows.

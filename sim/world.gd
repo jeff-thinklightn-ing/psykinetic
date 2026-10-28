@@ -392,7 +392,7 @@ var winded_regen_delay := 20
 ## A boss's moves (decision 603), by name: "spin", "throw", "charge", each a
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
 var moves := {
-	"spin": {"windup": 15, "length": 2.0, "half_angle": 150.0, "fists_length": 1.0, "damage_scale": 2.5,
+	"spin": {"windup": 15, "length": 2.0, "half_angle": 180.0, "fists_length": 1.0, "damage_scale": 2.5,
 		"down_ticks": 15, "needs": 50, "leaves": 10, "weight_impulse": 20.0, "impulse_scale": 1.06},
 	"throw": {"windup": 12, "length": 8.0, "width": 1, "damage_scale": 2.0, "cost": 40, "speed": 14.0},
 	"charge": {"roar": 6, "cells": 12},
@@ -4353,7 +4353,7 @@ func telegraph_cells(shape: Dictionary) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	var origin := Telegraph.origin_of(shape) if Telegraph.valid(shape) else Vector2i.ZERO
 	for cell in Telegraph.cells(shape):
-		if (is_walkable(cell) or is_water(cell)) and _clear_between(origin, cell):
+		if cell == origin or (is_walkable(cell) or is_water(cell)) and _clear_between(origin, cell):
 			out.append(cell)
 		elif str(shape["kind"]) == "line":
 			break
@@ -4394,7 +4394,8 @@ var _axes: Dictionary[GridEntity, Dictionary] = {}
 ## [param by] winds up its spin (decision 603; the draugr's, Jeff's
 ## "telegraphed wind up spin that he stands still, winds up for 1.5
 ## seconds"): it stands, a cone telegraph round it (moves.spin: length,
-## half_angle either side of its facing, a gap behind), and windup ticks on
+## half_angle either side of its facing: 180, a whole disc, 603 amended
+## (7)), and windup ticks on
 ## every body in the cone's cells takes damage_scale times its blow, its
 ## guard broken, pushed outward by its weapon (apply_blow at
 ## swing_impulse) and knocked down; then it is spent: its stamina at

@@ -43,7 +43,9 @@ static func cells(shape: Dictionary) -> Array[Vector2i]:
 				for x in range(-reach, reach + 1):
 					var offset := Vector2(x, y)
 					var far := offset.length()
-					if far == 0.0 or far > length + REACH_SLACK or far <= inner:
+					if far == 0.0 and (str(shape["kind"]) != "cone" or half < PI):
+						continue  # The origin, but in a whole disc (603 amended (7): drawn full, no hole under him).
+					if far > length + REACH_SLACK or far > 0.0 and far <= inner:
 						continue
 					if str(shape["kind"]) == "cone" and absf(facing.angle_to(offset)) > half + 0.001:
 						continue

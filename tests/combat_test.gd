@@ -223,7 +223,9 @@ func _test_telegraph_outline() -> void:
 				if _edge_distance(drawn, centre) < 0.01:
 					close += 1
 					continue
-				var inside := _crossed(drawn, centre) and centre != Vector2.ZERO
+				# The origin only in a whole disc (603 amended (7)).
+				var whole := str(shape["kind"]) == "cone" and float(shape.get("half_angle", 180.0)) >= 180.0
+				var inside := _crossed(drawn, centre) and (centre != Vector2.ZERO or whole)
 				if inside != struck.has(Vector2i(x, y)) and wrong.size() < 5:
 					wrong.append([shape, Vector2i(x, y), inside])
 	_check(wrong.is_empty(), "%d shapes at every angle: inside the outline exactly the struck centres (%d centres on an edge let be) %s" % [shapes.size(), close, wrong])
@@ -957,7 +959,7 @@ func _test_spin_throws() -> void:
 
 
 func _test_spin() -> void:
-	print("\n== the spin: 1.5 s standing, the cone struck, the gap behind spared, then spent (decision 603) ==")
+	print("\n== the spin: 1.5 s standing, the whole disc struck, then spent (decision 603; 603 amended (7): no gap behind) ==")
 	var e := _build(["#########", "#...P...#", "#..PmP..#", "#.......#", "#########"])
 	var boss: GridEntity = e["m"][0]
 	_boss(boss)
@@ -967,8 +969,11 @@ func _test_spin() -> void:
 	var behind: GridEntity = e["P"][2]  # (5,2), straight behind.
 	var side: GridEntity = e["P"][0]  # (4,1), beside.
 	var hp := [front.hp, behind.hp, side.hp]
-	_check(World.spin_targets(boss).size() == 2 and front in World.spin_targets(boss) and behind not in World.spin_targets(boss),
-			"the cone holds the one ahead and the one beside, not the one behind")
+	_check(World.spin_targets(boss).size() == 3 and front in World.spin_targets(boss) and behind in World.spin_targets(boss),
+			"the disc holds the one ahead, the one beside and the one behind")
+	var shown: Array = World.telegraph_cells(World._spin_shape(boss))
+	_check(boss.tile in shown and Vector2i(6, 2) in shown and Vector2i(2, 2) in shown,
+			"drawn whole: his own cell in it, two behind as two ahead (%d cells)" % shown.size())
 	_check(World.try_spin(boss) and World.boss_busy(boss) and World.telegraphs().size() == 1, "he winds up: busy, a telegraph shown")
 	_check(not World.try_spin(boss), "not twice at once")
 	for i in 14:
@@ -976,8 +981,9 @@ func _test_spin() -> void:
 	_check(front.hp == hp[0], "nothing yet at 14 ticks")
 	World.step()
 	World.step()
-	_check(front.hp < hp[0] and side.hp < hp[1 + 1] and behind.hp == hp[1],
-			"at 15: ahead and beside struck (%d, %d), behind spared (%d)" % [front.hp, side.hp, behind.hp])
+	_check(front.hp < hp[0] and side.hp < hp[1 + 1] and behind.hp < hp[1],
+			"at 15: ahead, beside and behind struck (%d, %d, %d)" % [front.hp, side.hp, behind.hp])
+	_check(boss.spawned and boss.hp == boss.max_hp, "and never himself")
 	_check(World.is_down(front) and front.tile != Vector2i(3, 2), "the one ahead knocked down and thrown (%s)" % front.tile)
 	_check(side.spawned and side.hp > 0 and side.hp <= 5, "the one beside, swept into the wall from full: left at a sliver (%d)" % side.hp)
 	_check(boss.stamina <= 10 and World.is_winded(boss), "spent: %d stamina, winded" % boss.stamina)

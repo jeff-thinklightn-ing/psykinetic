@@ -33966,3 +33966,31 @@ twice) and bane (they put it down twice), with bane checked first.
 
 resident_test covers each. monster_test passes. Server only, protocol
 unchanged; new class_name NamedMind.
+
+## 603 amended (7), combat's side: the spin a full disc
+
+Jeff: "draugrs telegraph is silly it should just be a full circle instead
+of a mostly full circle only missing a small slice, also it should be full
+not a blank square under him." Both were real: the spin's cone was
+half_angle 150 either side of his facing, its 60-degree wedge behind him
+spared; and his own cell was never among a shape's cells (Telegraph.cells
+skips the origin), and the view fills the outline only over the struck
+cells, so a square stood empty under him. The coordinator: what's drawn is
+what's struck.
+
+- moves.spin.half_angle 150 -> 180: the whole disc is struck, nobody
+  behind him spared (the facing enemy-ai turns him by no longer leaves a
+  gap).
+- A whole disc (a cone at 180) holds its origin: Telegraph.cells and
+  World.telegraph_cells (which drops cells nobody can stand in) keep it,
+  so the fill runs under him. He is never struck by his own spin
+  (_bodies_in skips its maker). Other shapes as before.
+- The telegraph message carries the struck cells and Telegraph.outline was
+  already a full circle at 180, so clients today draw the disc as they
+  are.
+
+combat_test _test_spin: ahead, beside and behind all struck, his cell in
+the drawn cells, never himself; the outline check over 2543 shapes takes
+the origin inside a whole disc. free_walk_test, draugr_fight_test,
+monster_test, view_test, ui_test pass. Server only, protocol unchanged, no
+new class_name.
