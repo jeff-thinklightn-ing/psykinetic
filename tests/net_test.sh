@@ -350,7 +350,12 @@ check "$(count '\[net\] peer [0-9]+ is v0\.0\.2, the server v[0-9.]+: the same p
 check "$(count '\[test\] display: .*server_tile=\(5, 12\)' "$LOGS/clientG.log")" 1 "phase 3: Gus crossed to (5, 12)"
 check "$(count '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: launch\.bat updates it' "$LOGS/clientF.log")$(count '\[update\]' "$LOGS/clientG.log")" 10 "phase 3: Fay is told once that a newer game is out; Gus, the same build, is not"
 check "$(cat "$LOGS/clientF.log" "$LOGS/clientG.log" | grep -c 'display: .*snaps=0 ' || true)" 2 "phase 3: neither client snapped more than 2 tiles"
-check "$(count 'push: Player1 -> Crate1' "$LOGS/server4.log")$(count '\[world\] Ivy reset the room' "$LOGS/server4.log")" 11 "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
+# Hal's walk goes on till the reset: on a slow machine it pushes the crate
+# again before Ivy's reset arrives (two pushes at ticks 8 and 11, perf's
+# landing 2026-10-27), so one push or more, the first before the reset.
+first_push=$(grep -nE 'push: Player1 -> Crate1' "$LOGS/server4.log" 2>/dev/null | head -1 | cut -d: -f1)
+reset_at=$(grep -nE '\[world\] Ivy reset the room' "$LOGS/server4.log" 2>/dev/null | head -1 | cut -d: -f1)
+check "$([ -n "$first_push" ] && [ -n "$reset_at" ] && [ "$first_push" -lt "$reset_at" ] && echo 1)$(count '\[world\] Ivy reset the room' "$LOGS/server4.log")" 11 "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
 check "$(count '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' "$LOGS/server4.log")" 4 "phase 4: both players were put back into the rebuilt room"
 # Hal stood on the crate's spawn tile, so he is put on the nearest free one.
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=' "$LOGS/clientI.log")" 1 "phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself"

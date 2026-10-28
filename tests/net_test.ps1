@@ -391,7 +391,12 @@ Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "pha
 Assert ($gus.Count -eq 1 -and $gus[0].Line -match 'server_tile=\(5, 12\)') "phase 3: Gus crossed to (5, 12) ($($gus | ForEach-Object { $_.Line }))"
 Assert (@($clientFLog | Select-String '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: launch\.bat updates it').Count -eq 1 -and @($clientGLog | Select-String '\[update\]').Count -eq 0) 'phase 3: Fay is told once that a newer game is out; Gus, the same build, is not'
 Assert ($fay.Count -eq 1 -and $gus.Count -eq 1 -and $fay[0].Matches[0].Groups[3].Value -eq '0' -and $gus[0].Matches[0].Groups[3].Value -eq '0') 'phase 3: neither client snapped more than 2 tiles'
-Assert (@($server4Log | Select-String 'push: Player1 -> Crate1').Count -eq 1 -and @($server4Log | Select-String '\[world\] Ivy reset the room').Count -eq 1) "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
+# Hal's walk goes on till the reset: on a slow machine it pushes the crate
+# again before Ivy's reset arrives (two pushes, perf's landing 2026-10-27),
+# so one push or more, the first before the reset.
+$pushes = @($server4Log | Select-String 'push: Player1 -> Crate1')
+$resets = @($server4Log | Select-String '\[world\] Ivy reset the room')
+Assert ($pushes.Count -ge 1 -and $resets.Count -eq 1 -and $pushes[0].LineNumber -lt $resets[0].LineNumber) "phase 4: Hal pushed the crate, then Ivy's reset reached the server"
 Assert (@($server4Log | Select-String '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player').Count -eq 4) 'phase 4: both players were put back into the rebuilt room'
 # Hal stood on the crate's spawn tile, so he is put on the nearest free one.
 Assert (@($clientILog | Select-String '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=').Count -eq 1) 'phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself'
