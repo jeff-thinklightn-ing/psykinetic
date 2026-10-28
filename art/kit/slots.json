@@ -1237,6 +1237,38 @@
 			"uses": "the draugr's remains (Jeff: \"when draugr falls ... he probably leaves a pile of his clothes, his crown, his axe on the ground\"; the coordinator: him gone, his things left, no bones, no body; enemy-ai places it where he vanishes): 1 cell, not solid, origin the cell's middle on the floor, front +z. His axe is full size (1.6 m, as he carried it), so it reaches past the cell: about 0.21 m past the local +x and -x edges and 0.1 m past +z and -z; its two ends are the sockets axe_head and axe_butt, so the placer turns it to a facing with floor (no wall) at both",
 			"grey": [{"at": [0, 0.1815, 0], "size": [1.443, 0.363, 1.198]}]
 		},
+		"wall.crypt.breach": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.8, 3, 1],
+			"variants": 3,
+			"budget": 600,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_cryptset.py breach1 / breach2 / breach3: a plain coursed edge smashed through to the floor, no door and no frame: the opening's edge ragged up both sides and across a top at about 2.1, the broken faces through the wall pale and grey, loose blocks at the break; rubble low (under 0.2) on both faces and in the gap, pale dust through it, all within the edge's metre so a pair tiles. Variant 1 a lone breach about 0.9 wide, a stub of wall at each end; variant 2 a pair's -z end (its stub at -z, open through its +z edge at 2.15); variant 3 a pair's +z end (open through its -z edge, its stub at +z): 2 and 3 side by side draw one smash about 1.9 wide with no stub between. 392 to 424 tris. an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the back face at x -0.25, along z 1 m; the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "the barrow's broken-down walls (714; Jeff: \"there might be broken walls and tombs that was done with the sledge ... Some connections between rooms aren't doors but broken down walls\"): a room-to-room way that is a breach, not a Door, walkable both sides. A breach that is a room's only way through is 2 cells wide: variant 2 on the edge at lower z, variant 3 on the next edge along +z (in the piece's own frame; turned 180 degrees, swap them); a lone 1-cell breach (variant 1) only beside another way in",
+			"grey": [{"at": [0, 2.55, 0], "size": [0.5, 0.9, 1]}, {"at": [0, 0.08, 0], "size": [1.8, 0.16, 1]}]
+		},
+		"wall.crypt.niche_smashed": {
+			"category": "walls",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [1.15, 3, 1],
+			"middle": [0.32, 0, 0],
+			"budget": 500,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_cryptset.py smashed: niche_a's tomb broken open: the arch smashed wider and ragged, fresh pale breaks round it, the shelf lip broken to a stub, the shroud dragged out over it and torn into strips hanging to different lengths; on the floor before it six bones, the skull, five shards of the carved slab, broken stone and a scrap of the shroud (338 tris). an edge piece for wall.stone's runs, 0.5 thick as wall.stone.profile: the room face at x 0.25, the back face at x -0.25, along z 1 m; the face palette row 1's #6b6660, at material.wall.stone's mean"},
+			"uses": "the barrow's smashed tombs (714; Jeff: \"there might be broken walls and tombs that was done with the sledge ... Some connections between rooms aren't doors but broken down walls\"): a niche kind \"smashed\" among the whole ones, on the robbers' way toward the First Hall's niches; the room on +x",
+			"grey": [{"at": [0, 1.5, 0], "size": [0.5, 3, 1]}, {"at": [0.6, 0.06, 0], "size": [0.7, 0.12, 0.9]}]
+		},
+		"prop.rubble_spill": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.88, 0.16, 0.91],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/crypt_walls/make_cryptset.py rubble: sixteen broken blocks under 0.16 high, scattered over a cell on pale dust (194 tris)"},
+			"uses": "the rubble along the barrow's breaches (714): a cell's low scatter, walkable, not blocking",
+			"grey": [{"at": [0, 0.08, 0], "size": [0.88, 0.16, 0.91]}]
+		},
 		"prop.niche_slab": {
 			"category": "props",
 			"type": "mesh",

@@ -34047,3 +34047,24 @@ view_test _test_chimney_smoke; resident_test (the lamp told under its
 town). Server and client both change, so the server needs a redeploy with
 the next cut. Protocol unchanged (the same "town" "awake" field), no new
 class_name.
+
+## 714, art-kit's side: the sledge's broken walls and smashed tombs
+
+Dungeon's Amendment 1 to 714. Jeff: "there might be broken walls and tombs that was done with the sledge
+... Some connections between rooms aren't doors but broken down walls". The coordinator's rule: a breach
+that is a room's only way through is 2 cells wide.
+
+- **wall.crypt.breach** is an edge piece. It is a plain coursed edge smashed through to the floor, with no
+  Door and no frame, and its rubble stays under 0.2 on both faces, so it is walkable.
+  - Variant 1 is a lone breach about 0.9 wide.
+  - Variants 2 and 3 are a pair's ends: 2 is open through its +z edge, 3 through its -z edge, and both
+    meet the edge at 2.15. Variant 2 on the lower-z edge and 3 on the next draw one smash about 1.9 wide,
+    with no stub between. Turned 180 degrees, they swap.
+  - Each variant keeps its rubble within the edge's metre, so a pair tiles.
+- **wall.crypt.niche_smashed** is niche_a's tomb broken open: the arch smashed wider, the lip a stub, the
+  shroud torn and hanging, and bones, the skull and slab shards on the floor before it.
+- **prop.rubble_spill** is a cell's low scatter, walkable, for cells beside a breach.
+
+The source is C:/dev/review/crypt_walls/make_cryptset.py (breach1/2/3, smashed, rubble). Nothing places
+these until dungeon's generator does, so there is no CHANGELOG bullet. Art only, protocol unchanged, no
+new class_name.
