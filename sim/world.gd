@@ -5772,55 +5772,85 @@ func try_lob(by: GridEntity, cell: Vector2i) -> bool:
 	by.lobbing = false
 	if step < 0 or verb.is_empty() or aimed == by.tile or not lob_open(aimed):
 		return false
-	var roll := RandomNumberGenerator.new()
-	roll.seed = hash("lob/%d/%s/%d" % [shot_salt, by.name, tick])
-	var off := Vector2.from_angle(roll.randf() * TAU) * radius * sqrt(roll.randf())
-	var lands := aimed + Vector2i(off.round())
-	if not lob_open(lands):
-		lands = aimed
+	radius = maxf(radius, float(verb.get("lob_volley_min", 1.0)))
+	var falls := volley_falls(aimed, radius, int(verb.get("lob_volley", 3)),
+			hash("lob/%d/%s/%d" % [shot_salt, by.name, tick]))
 	if by.max_stamina > 0 and by.pays_swings:
 		by.stamina = maxi(0, by.stamina - int(verb.get("lob_cost", 0)))
 		by._world_note_exertion(tick)
-	var ticks := lob_ticks(verb, distance(by.tile, lands))
-	var way := Vector2(lands - by.tile).normalized()
+	var ticks := lob_ticks(verb, distance(by.tile, aimed))
+	var way := Vector2(aimed - by.tile).normalized()
 	by._world_set_facing(Vector2i(roundi(way.x), roundi(way.y)))
-	_lobs.append({"by": by, "zone": zone.name, "cell": lands, "at": tick + ticks,
+	_lobs.append({"by": by, "zone": zone.name, "falls": falls, "at": tick + ticks, "next": 0, "struck": {},
 		"amount": maxi(1, roundi(by.attack_damage * float(verb["damage"]) * float(verb.get("lob_damage", 1.0)))),
 		"down": int(verb.get("lob_down", 0)), "slot": drawn_slot(by)})
-	_log("lob: %s at %s, lands %s (circle %.1f, step %d) in %d ticks" % [by.name, aimed, lands, radius, step, ticks])
-	by._world_lobbed(lands, ticks)
+	_log("lob: %s at %s, %d falls in a circle %.1f (step %d) from %d ticks" % [by.name, aimed, falls.size(), radius, step, ticks])
+	by._world_lobbed(aimed, ticks, radius, falls)
 	noise(by.tile, NOISE_BOW, &"bow", by)
 	return true
 
 
-## Each tick, the lobs due in this zone come down (decision 677): whoever
-## stands on the cell then is struck by its lob's damage (no guard meets
-## it; armour's deflect_shot does) and knocked down lob_down ticks (a
+## A volley's [param count] falls in the circle [param radius] about
+## [param centre] (677 amended (2)), rolled by [param seed]: points in cell
+## units, each in a cell open to the sky (lob_open), rolled again a few
+## times, else the centre.
+func volley_falls(centre: Vector2i, radius: float, count: int, seed_value: int) -> PackedVector2Array:
+	var roll := RandomNumberGenerator.new()
+	roll.seed = seed_value
+	var falls := PackedVector2Array()
+	for i in count:
+		var at := Vector2(centre)
+		for attempt in 4:
+			var point := Vector2(centre) + Vector2.from_angle(roll.randf() * TAU) * radius * sqrt(roll.randf())
+			if lob_open(Vector2i(point.round())):
+				at = point
+				break
+		falls.append(at)
+	return falls
+
+
+## Each tick, the volleys due in this zone come down (decision 677; 677
+## amended (2): a fall a tick from "at"): whoever's struck cell holds a
+## fall's point then (struck_cell: a free body by its centre, 699) takes
+## one arrow's damage (no guard meets it; armour's deflect_shot does), and
+## the first of a volley to strike a body knocks it down lob_down ticks (a
 ## draugr staggers: knock_down); a friend is spared, as by a flat shot.
-## Nobody there, a thud. lob_landed either way.
+## Nobody there, a thud. lob_landed each fall either way.
 func _tend_lobs() -> void:
 	for lob: Dictionary in _lobs.duplicate():
-		if lob["zone"] != zone.name or tick < int(lob["at"]):
+		if lob["zone"] != zone.name:
 			continue
-		_lobs.erase(lob)
-		var by: GridEntity = lob["by"] if is_instance_valid(lob["by"]) else null
-		var cell: Vector2i = lob["cell"]
-		var hit := get_entity_at(cell)
-		if hit == null or by == null or hit == by or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
-			noise(cell, Senses.NOISE_THUD_LIGHT, &"thud", by)
-			lob_landed.emit(by, cell, null)
-			continue
-		var amount := armour_turns(hit, int(lob["amount"]), "deflect_shot")
-		_log("lob: %s's hits %s at %s for %d" % [by.name, hit.name, cell, amount])
-		if amount > 0 and not is_sheltered(hit):
-			damage(hit, amount, by, &"shot")
-			if hit.is_creature():
-				_credit(by, int(lob["slot"]), "felled" if not _alive(hit) else "shot")
-				if not _alive(hit):
-					_felled_with(by, int(lob["slot"]), hit)
-			if _alive(hit):
-				knock_down(hit, by, int(lob["down"]))
-		lob_landed.emit(by, cell, hit)
+		var falls: PackedVector2Array = lob["falls"]
+		while int(lob["next"]) < falls.size() and tick >= int(lob["at"]) + int(lob["next"]):
+			_lob_falls(lob, Vector2i(falls[int(lob["next"])].round()))
+			lob["next"] = int(lob["next"]) + 1
+		if int(lob["next"]) >= falls.size():
+			_lobs.erase(lob)
+
+
+func _lob_falls(lob: Dictionary, cell: Vector2i) -> void:
+	var by: GridEntity = lob["by"] if is_instance_valid(lob["by"]) else null
+	var hit: GridEntity = null
+	for body in bodies_struck_at(cell) if by != null else []:
+		if body != by and _alive(body):
+			hit = body
+			break
+	if hit == null or not can_target(by, hit) or spares(by, hit) or not hit.is_breakable():
+		noise(cell, Senses.NOISE_THUD_LIGHT, &"thud", by)
+		lob_landed.emit(by, cell, null)
+		return
+	var amount := armour_turns(hit, int(lob["amount"]), "deflect_shot")
+	_log("lob: %s's hits %s at %s for %d" % [by.name, hit.name, cell, amount])
+	if amount > 0 and not is_sheltered(hit):
+		damage(hit, amount, by, &"shot")
+		if hit.is_creature():
+			_credit(by, int(lob["slot"]), "felled" if not _alive(hit) else "shot")
+			if not _alive(hit):
+				_felled_with(by, int(lob["slot"]), hit)
+		if _alive(hit) and not (lob["struck"] as Dictionary).has(hit):
+			knock_down(hit, by, int(lob["down"]))
+		(lob["struck"] as Dictionary)[hit] = true
+	lob_landed.emit(by, cell, hit)
 
 
 ## [param by]'s shot at [param angle], its bow drawn to [param step]

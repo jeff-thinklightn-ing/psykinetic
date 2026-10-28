@@ -16458,7 +16458,9 @@ static func lob_heading(from: Vector3, to: Vector3, t: float, apex := 0.25) -> V
 ## down on [param to] in [param ticks]: the bow's twang, and its arrow flies
 ## World.lob_point's arc from the bow there, to stand in the ground nose
 ## first (a body struck there is heard by its hurt); into water it's gone.
-func _on_lobbed(to: Vector2i, ticks: int, id: int) -> void:
+## 677 amended (2): the volley's circle and falls are ui's to draw; till
+## then the arrow flies to the centre as before.
+func _on_lobbed(to: Vector2i, ticks: int, _radius: float, _falls: PackedVector2Array, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null or puppet.get_parent() == null:
 		return

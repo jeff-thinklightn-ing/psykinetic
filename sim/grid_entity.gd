@@ -30,9 +30,11 @@ signal swung(direction: Vector2i)
 ## (its range spent: it comes down past the point). Views draw the arrow.
 ## On every peer.
 signal shot(to: Vector2, struck: StringName)
-## Its bow lobbed an arrow (World.try_lob, decision 677) to come down on
-## [param to] in [param ticks]: views fly it there on its arc. On every peer.
-signal lobbed(to: Vector2i, ticks: int)
+## Its bow lobbed an arrow (World.try_lob, decision 677; 677 amended (2),
+## a volley): aimed at [param to], a circle [param radius] cells about it,
+## and [param falls] (points in cell units) come down one a tick from
+## [param ticks] on. On every peer.
+signal lobbed(to: Vector2i, ticks: int, radius: float, falls: PackedVector2Array)
 ## A thing it held (Items id [param item_id]) was thrown down a line
 ## (World.hurl, decision 606) and came down at [param to]: views draw its
 ## flight with the thing's art. On every peer.
@@ -1001,10 +1003,10 @@ func _world_shot(to: Vector2, struck: StringName) -> void:
 		_net_shot.rpc_id(peer, to, struck)
 
 
-func _world_lobbed(to: Vector2i, ticks: int) -> void:
-	lobbed.emit(to, ticks)
+func _world_lobbed(to: Vector2i, ticks: int, radius: float, falls: PackedVector2Array) -> void:
+	lobbed.emit(to, ticks, radius, falls)
 	for peer in viewers():
-		_net_lobbed.rpc_id(peer, to, ticks)
+		_net_lobbed.rpc_id(peer, to, ticks, radius, falls)
 
 
 func _world_hurled(item_id: String, to: Vector2i) -> void:
@@ -1430,8 +1432,8 @@ func _net_shot(to: Vector2, struck: StringName) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _net_lobbed(to: Vector2i, ticks: int) -> void:
-	lobbed.emit(to, ticks)
+func _net_lobbed(to: Vector2i, ticks: int, radius: float, falls: PackedVector2Array) -> void:
+	lobbed.emit(to, ticks, radius, falls)
 
 
 @rpc("authority", "call_remote", "reliable")

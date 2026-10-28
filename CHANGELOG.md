@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The bow's lob is now a volley (677 amended (2)): three arrows rain into a circle around where you aimed, each for half a shot, the first knocking down; the circle is tighter the longer you draw. Step out of the circle when you hear the whistle.
 - Options: tidied into tabs (Character, Display, Interface, Sound, Controls, Credits), with the keys grouped by what they do (731).
 - Camera: the low-horizon view is now the default; turn it off under Options, Camera: low horizon (623 amended).
 

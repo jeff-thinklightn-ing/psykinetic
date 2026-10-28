@@ -34905,3 +34905,39 @@ Part 2 of 708, in the rev-41 forced cut (release's order: this first, then
 companion_test: her body carries the cue at a corner pause, and it is 0
 once the walk has stopped and once it has arrived. protocol_test passes.
 Server and wire; the client's beckon is pc-character's. No new class_name.
+
+## 677 amended (2), combat's side: the lob is a volley of three
+
+Jeff: "make it a 3 arrow spraw, the arrow goes up, gives a small telegraph
+circle and 3 arrows randomly hit within that. this gives time to add the
+sound and dodge it"; and "the arrow still shoots off fast -- it just
+appears to go up, fade, then a arrow rains down in the shot was aimed".
+The coordinator's design, approved as sent:
+
+- The loose is as before (the draw's step, the aim drawn in to the reach,
+  lob_cost, the flight lob_ticks to the aimed cell: the whistle and the
+  step-out stay). The circle is centred on the aimed cell, its radius the
+  draw's lob_circle step, at least lob_volley_min (1.0): a quick loose
+  sprays wide, full draw is tight.
+- lob_volley (3) falls, points rolled uniformly in the circle by the
+  server (World.volley_falls, seeded as the old single roll), each in a
+  cell open to the sky (lob_open), rolled again up to four times, else the
+  centre. Fall i comes down at ticks + i.
+- Each fall strikes the body whose struck cell (699) holds its point:
+  lob_damage 1.2 -> 0.5 an arrow (half a shot; all three 1.5x), armour's
+  deflect_shot and shelter per arrow; the first to strike a body knocks it
+  down lob_down ticks (a draugr staggers), the rest do not. lob_landed per
+  fall. One _lobs entry a volley.
+- Bows spend no arrows (a bundle only gates the draw), so neither does a
+  volley. No monster lobs yet; one would get the same volley.
+- Wire: GridEntity.lobbed / _net_lobbed (to, ticks) -> (to, ticks, radius,
+  falls), PROTOCOL_REVISION 41 (rides the rev-41 cut). Client3D._on_lobbed
+  takes the new arguments and still flies one arrow to the centre; ui's
+  side draws the fast steep loose fading high, the circle, and the falls
+  (sfx.arrow_land each, sound-1b's pick); pc-character's draw a fixed 70
+  degrees.
+
+combat_test _test_lob: three falls in the circle on open ground in a
+corridor, two on the target and one beside (damage per arrow, knocked
+down once, a thud), forty rolled volleys all inside, the step-out missed
+by all three, the draugr staggered. view_test emits the new signal.

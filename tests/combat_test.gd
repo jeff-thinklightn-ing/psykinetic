@@ -653,8 +653,9 @@ func _test_free_blows() -> void:
 ## The lob (decision 677; Jeff: "right click hold and release to fire. a hit
 ## would cause a knock down impact"): a draw aimed at the sky, its first step
 ## lob_draw_min in; its circle narrowing by the step; aimed in to the reach;
-## loosed for lob_cost; down lob_ticks later on whoever stands there then,
-## knocked down (a draugr staggered); one that stepped out is missed; never
+## loosed for lob_cost; from lob_ticks later a volley (677 amended (2)), a
+## fall a tick, each on whoever stands where it falls then, the first
+## knocking down (a draugr staggered); one that stepped out is missed; never
 ## onto a roof or a wall.
 func _test_lob() -> void:
 	print("\n== the lob: the bow at the sky, a circle, down on whoever stands there when it lands, knocked down (decision 677) ==")
@@ -688,12 +689,35 @@ func _test_lob() -> void:
 	var ticks := World.lob_ticks(verb, 8)
 	_check(World.try_lob(host, near.tile) and host.raised == "" and not host.lobbing and host.stamina == 50 - int(verb["lob_cost"]),
 			"let go: loosed, the stance ended, %d stamina paid (%d)" % [int(verb["lob_cost"]), host.stamina])
+	var lob: Dictionary = World._lobs.back()
+	var falls: PackedVector2Array = lob["falls"]
+	var inside := true
+	for point in falls:
+		inside = inside and point.distance_to(Vector2(near.tile)) <= 1.0 + 0.001 and World.lob_open(Vector2i(point.round()))
+	_check(falls.size() == int(verb["lob_volley"]) and inside,
+			"a volley: %d falls, each within the circle (1.0, held on: lob_volley_min) and on open ground in the corridor (%s)" % [falls.size(), falls])
+	# Two on it and one beside, to read each fall.
+	var aside := near.tile + Vector2i(1, 0)
+	lob["falls"] = PackedVector2Array([Vector2(near.tile), Vector2(near.tile) + Vector2(0.3, 0.2), Vector2(aside)])
 	for i in ticks - 1:
 		World.step()
 	_check(near.hp == 100 and landed.is_empty(), "aloft %d ticks at 8 cells: nothing yet" % ticks)
 	World.step()
+	var down_until := near.down_until
 	_check(near.hp == 100 - blow and World.is_down(near) and landed == [[near.tile, near]],
-			"down on it: %d (lob_damage %.1f at any reach) and knocked down" % [100 - near.hp, float(verb["lob_damage"])])
+			"the first down on it: %d (lob_damage %.1f an arrow) and knocked down" % [100 - near.hp, float(verb["lob_damage"])])
+	World.step()
+	_check(near.hp == 100 - 2 * blow and near.down_until == down_until and landed.size() == 2,
+			"the second, a tick on, a point off its centre in its cell: %d more, not knocked down again" % blow)
+	World.step()
+	_check(near.hp == 100 - 2 * blow and landed.size() == 3 and landed[2] == [aside, null] and World._lobs.is_empty(),
+			"the third beside it: a thud in the ground, the volley done")
+	var seen_outside := 0
+	for n in 40:
+		for point in World.volley_falls(Vector2i(10, 1), 1.0, 3, n):
+			if point.distance_to(Vector2(10, 1)) > 1.001 or not World.lob_open(Vector2i(point.round())):
+				seen_outside += 1
+	_check(seen_outside == 0, "forty volleys rolled in a corridor: every fall in the circle and on open ground (%d not)" % seen_outside)
 	# One that steps out before it comes down is missed.
 	landed.clear()
 	far.max_hp = 100
@@ -702,17 +726,19 @@ func _test_lob() -> void:
 	host.raised_tick = World.tick - 60
 	var aimed := far.tile
 	_check(World.try_lob(host, aimed), "lobbed at the far one, 13 cells")
+	World._lobs.back()["falls"] = PackedVector2Array([Vector2(aimed), Vector2(aimed), Vector2(aimed)])
 	World._relocate(far, aimed + Vector2i(2, 0))
-	for i in World.lob_ticks(verb, 13):
+	for i in World.lob_ticks(verb, 13) + 2:
 		World.step()
-	_check(far.hp == 100 and landed == [[aimed, null]], "it stepped out: missed, the arrow in the ground (%s)" % [landed])
+	_check(far.hp == 100 and landed == [[aimed, null], [aimed, null], [aimed, null]], "it stepped out: all three missed, in the ground (%s)" % [landed])
 	# A draugr never lies: staggered.
 	(far as Monster).never_lies = true
 	World._relocate(far, aimed)
 	World.try_stance(host, "draw", true)
 	host.raised_tick = World.tick - 60
 	World.try_lob(host, aimed)
-	for i in World.lob_ticks(verb, 13):
+	World._lobs.back()["falls"] = PackedVector2Array([Vector2(aimed), Vector2(aimed), Vector2(aimed)])
+	for i in World.lob_ticks(verb, 13) + 2:
 		World.step()
 	_check(far.hp < 100 and not World.is_down(far) and World.is_stunned(far), "one that never lies is staggered instead")
 	# Never onto a roof, nor before its first step.

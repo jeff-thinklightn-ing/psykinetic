@@ -869,7 +869,7 @@ func _test_bow_sounds() -> void:
 		var lob_unheard := _rig.sfx.unheard.size()
 		var lob_sounds := func() -> Array:
 			return _rig.sfx.played.slice(lob_played).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(lob_unheard)
-		player._world_lobbed(open, 6)
+		player._world_lobbed(open, 6, 1.0, PackedVector2Array([Vector2(open), Vector2(open), Vector2(open)]))
 		_check(lob_sounds.call().has("sfx.bow_loose") and lob_sounds.call().has("sfx.arrow_lob_rise") and not lob_sounds.call().has("sfx.arrow_lob_fall"),
 				"a lob loosed: the twang and its whoosh up, its whistle not yet (%s)" % [lob_sounds.call()])
 		await get_tree().create_timer(0.3).timeout

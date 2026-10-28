@@ -568,10 +568,13 @@ static func weight_of(id: String) -> float:
 ##     narrowest it comes to (spread_at). The lob (decision 677, the right
 ##     button): lob_draw_min, its ticks to the first step (the steps after
 ##     as the flat draw's); lob_cost, the stamina its loose takes;
-##     lob_damage, its multiple at any reach, no bands; lob_down, the ticks
-##     a hit knocks down; lob_apex, its arc's height over the cells flown;
+##     lob_damage, each arrow's multiple at any reach, no bands; lob_volley,
+##     the arrows that come down (677 amended (2): a volley, one a tick, in
+##     the circle); lob_down, the ticks the first to strike a body knocks it
+##     down; lob_apex, its arc's height over the cells flown (the aim's);
 ##     lob_flight and lob_per_cell, its seconds aloft, the first plus each
-##     cell's; lob_circle, the landing circle's radius in cells by step.
+##     cell's; lob_circle, the circle's radius in cells by step, at least
+##     lob_volley_min.
 const VERBS := {
 	"knockback": {"force": 3.0},
 	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0,
@@ -581,7 +584,7 @@ const VERBS := {
 	"backstab": {"behind": 2.0},
 	"ranged": {"steps": [5, 7, 9, 11, 13, 15], "damage_at": [0.8, 1.2, 1.6, 1.2, 0.8, 0.4], "full": 2, "draw_min": 3,
 		"draw_steps": [4, 5, 6, 7, 8], "drain": 0, "cells": 15, "draw_full": 12, "spread": [], "spread_floor": 4.0,
-		"lob_draw_min": 5, "lob_cost": 8, "lob_damage": 1.2, "lob_down": 15, "lob_apex": 0.25, "lob_flight": 0.6,
+		"lob_draw_min": 5, "lob_cost": 8, "lob_damage": 0.5, "lob_volley": 3, "lob_volley_min": 1.0, "lob_down": 15, "lob_apex": 0.25, "lob_flight": 0.6,
 		"lob_per_cell": 0.05, "lob_circle": [2.5, 1.75, 1.0, 0.5, 0.5, 0.5]},
 }
 ## Every verb's: speed (a multiple of the wielder's attack time: under 1

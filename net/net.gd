@@ -460,6 +460,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## walk's pause cue (Guide.WAIT_LOOK 1 a look back, WAIT_BECKON 2 waiting
 ## for her player; 0 walking or not leading), for her body's beckon. The
 ## forced cut with 703 step 4 (the grid walk's removal) and 677 amended (2).
+## 41 (677 amended (2)): a lob is a volley. GridEntity._net_lobbed carries
+## {to, ticks, radius, falls}: the circle about the aimed cell and the
+## points its arrows come down on, one a tick from ticks on. An old client's
+## RPC no longer matches.
 const PROTOCOL_REVISION := 41
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
