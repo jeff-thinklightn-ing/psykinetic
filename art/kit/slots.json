@@ -1499,6 +1499,67 @@
 				]}
 			]
 		},
+		"building.turf_house": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [7, 5],
+			"size": [6.9, 2.95, 4.95],
+			"variants": 2,
+			"budget": 7000,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/hut/make_turf_slot.py w (variant 1) / f (variant 2): Jeff's pick, concept B revised (C:/dev/review/hut/turf_house.png): an oval house, its inner face a superellipse (exponent 6, half-axes 2.65 x 1.65) round the 5 x 3 floor, the wall 0.25 thick and 1.4 high in courses (variant 1: turf blocks on a dry-stone footing; variant 2: split logs on a timber sill), a dome to 2.75 (turf held by stones on ropes / bark with poles bent over it), its inside dark so the doorway shows a dark room, a gabled hood over the door, a chimney over the hearth (a stone collar / wattle and clay); an earth bank heaped against the wall to 0.8, grassed, cut at the door between stone cheeks; the land's skull over the door (a red deer's with antlers / a boar's with tusks) and a post of small skulls and red charms by it; the doorway's hide curtain drawn aside, a threshold, herbs hung inside along the back wall. Disrepair: the dome sagged and holed, the chimney broken, stones and sods fallen at the foot; ruin: the wall broken to about half height, sods, stones and poles fallen inside. Variant 1 about 4,900 tris in all its parts, variant 2 about 5,300"},
+			"uses": "the healer's hut (718, art-kit's side; buildings' kind, Jeff: \"new building type for huts, not a plain box ... the house doesn't need to be square\", then concept B: \"pot inside, allow going inside, could be dugout, material/texture could change for different environments. decor changes, animal skulls change ... smoke from chimney if occupied\"): a 7 x 5 cell plot, front +z, its floor the middle 5 x 3 cells (x +-2.5, z +-1.5) at the ground, the origin the floor's middle; the sim keeps square wall edges on the floor's outline and the client draws these walls for them; the door the middle cell's front edge (x -0.5..0.5, a 1.1 m cut, lintel 1.85). Parts: roof (pivot at the wall top, 1.4; hidden while inside, 671), wall_nw / wall_ne / wall_sw / wall_se (the oval wall in quarters split on x and z, north -z; the client hides the quarters nearest the camera while inside), bank (the earth in the plot's one-cell ring, never hidden), trim; states disrepair (roof_disrepair in place of roof, state_disrepair added) and ruin (walls_ruin in place of the quarters, state_ruin, no roof). Variants by land: 1 the wilds, 2 the forest; the same parts and sockets. Sockets: chimney (710's smoke while someone is awake inside), hearth (prop.pot_tripod), bed (prop.bed_straw, turned head -x), shelf (prop.shelf_herbs, its back on the wall)",
+			"grey": "none",
+			"states": ["disrepair", "ruin"],
+			"sockets": {"chimney": [2.0, 2.95, 0], "hearth": [2.0, 0, 0], "bed": [-1.5, 0, -1.0], "shelf": [1.0, 0, -1.6]},
+			"parts": [
+				{"name": "roof", "motion": "fixed", "pivot": [0, 1.4, 0], "grey": [{"at": [0, 0.775, 0], "size": [6.2, 1.55, 4.3]}]},
+				{"name": "wall_nw", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [-1.45, 0.7, -0.95], "size": [2.9, 1.4, 1.9]}]},
+				{"name": "wall_ne", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [1.45, 0.7, -0.95], "size": [2.9, 1.4, 1.9]}]},
+				{"name": "wall_sw", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [-1.45, 0.7, 0.99], "size": [2.9, 1.4, 1.98]}]},
+				{"name": "wall_se", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [1.45, 0.7, 0.99], "size": [2.9, 1.4, 1.98]}]},
+				{"name": "bank", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [0, 0.43, 0], "size": [6.9, 0.86, 4.95]}]},
+				{"name": "trim", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [-0.5, 0.95, 0.4], "size": [2.2, 1.9, 3.8]}]},
+				{"name": "roof_disrepair", "motion": "fixed", "pivot": [0, 1.4, 0], "grey": [{"at": [0, 0.5, 0], "size": [6.2, 1.0, 4.3]}]},
+				{"name": "state_disrepair", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [0, 0.8, 0], "size": [6.7, 0.32, 3.7]}]},
+				{"name": "walls_ruin", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [0, 0.6, 0], "size": [5.8, 1.2, 3.9]}]},
+				{"name": "state_ruin", "motion": "fixed", "pivot": [0, 0, 0], "grey": [{"at": [0, 0.18, 0], "size": [5.1, 0.36, 3.2]}]}
+			]
+		},
+		"prop.pot_tripod": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.0, 1.33, 1.0],
+			"variants": 2,
+			"budget": 600,
+			"sockets": {"flame": [0, 0.12, 0]},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/hut/make_turf_slot.py pot / pot2: a ring of nine hearth stones, four logs crossed in it, a tripod of three poles to 1.25 m, an iron pot hung on a chain with a bail, its brew green; variant 2 tipped over and cold: two poles still crossed and leaning, the third broken on the ground, the pot on its side, its brew spilled, the hearth's ash black"},
+			"uses": "the healer's brewing pot over the hearth (718, art-kit's side): building.turf_house's hearth socket, 1 cell, blocking; its fire at the flame socket as prop.campfire's. Variant 2: tipped over and cold, in the ruined house",
+			"grey": [{"at": [0, 0.665, 0], "size": [1.0, 1.33, 1.0]}]
+		},
+		"prop.bed_straw": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.85, 0.5, 1.8],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/hut/make_turf_slot.py bed: a frame of poles on four short legs, a straw tick, furs over it, a rolled pillow at the head, a blanket at the foot; 204 tris"},
+			"uses": "the healer's bed (718, art-kit's side): 1 x 2 cells along z, its head toward -z, blocking; building.turf_house's bed socket (turned so its head points -x)",
+			"grey": [{"at": [0, 0.25, 0], "size": [0.85, 0.5, 1.8]}]
+		},
+		"prop.shelf_herbs": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.0, 0.92, 0.28],
+			"base": 0.57,
+			"middle": [0, 0, 0.14],
+			"budget": 400,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-27", "notes": "C:/dev/review/hut/make_turf_slot.py shelf: two planks on pegs at 0.95 and 1.35, pots and jars on the lower, small round pots on the upper, five bundles of herbs hung under it; 288 tris"},
+			"uses": "the healer's shelf (718, art-kit's side): wall-hung, not blocking: its back on the wall at z 0, its front +z, the origin on the floor below it; building.turf_house's shelf socket",
+			"grey": [{"at": [0, 1.03, 0.14], "size": [1.0, 0.92, 0.28]}]
+		},
 		"building.healers_hut": {
 			"category": "buildings",
 			"type": "mesh",

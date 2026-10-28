@@ -33754,3 +33754,42 @@ draft line said again (Main._draft_told's entries for that player); the player t
 (the hidden niche found, and 714's robber latch to come) is every player's, never one player's
 reset: the console's "zone reset <name>" lays it again (level_test: the found slab shut and
 locked after it).
+## 718, art-kit's side: the healer's turf house
+
+Jeff picked concept B of four (C:/dev/review/hut) for the healer's hut: "pot inside, allow going inside,
+could be dugout, material/texture could change for different environments. decor changes, animal skulls
+change ... smoke from chimney if occupied". Buildings' kind draws it; the frame was agreed with buildings.
+
+- **The plot:** 7 x 5 cells, front +z. The floor is the middle 5 x 3 cells at the ground, and the origin
+  is the floor's middle. The sim keeps square wall edges on the floor's outline, and these meshes draw
+  them. The door is the middle cell's front edge, a 1.1 m cut with its lintel at 1.85.
+- **The wall:** the inner face is a superellipse (exponent 6, half-axes 2.65 x 1.65). It stays 0.15 off
+  the floor on its axes and cuts 0.11 into the corner cells. The wall is 0.25 thick and 1.4 high.
+- **The parts:**
+  - roof: the dome (inside drawn dark, so the doorway shows a dark room), the door's hood, the chimney
+    and the skull over the door. Its pivot is at the wall top, and it hides while you are inside.
+  - wall_nw, wall_ne, wall_sw, wall_se: the oval wall in quarters, split on x and z, north -z, their cut
+    faces capped. The client hides the quarters nearest the camera while you are inside.
+  - bank: the earth heaped in the plot's one-cell ring, cut at the door between stone cheeks. It is never
+    hidden, so the house reads as dug in while the floor stays at the ground.
+  - trim: the post of skulls, the hide curtain, the threshold, herbs inside.
+- **The states:** disrepair (roof_disrepair, sagged and holed; state_disrepair) and ruin (walls_ruin at
+  about half height; state_ruin). There is no roof_damaged; disrepair's roof stands in.
+- **The variants by land:**
+  - 1, the wilds: turf on stone, a turf dome held by stones on ropes, a red deer's skull.
+  - 2, the forest: logs on a timber sill, a bark dome with bent poles, a boar's and a wolf's skull.
+  - Both have the same parts and the same sockets.
+- **The sockets:**
+  - chimney [2, 2.95, 0], where 710's smoke rises;
+  - hearth [2, 0, 0];
+  - bed [-1.5, 0, -1];
+  - shelf [1, 0, -1.6].
+- **The props:**
+  - prop.pot_tripod: the pot on its tripod over the hearth stones, its fire at "flame". Variant 2 is
+    tipped over and cold.
+  - prop.bed_straw: 1 x 2 cells, head -z.
+  - prop.shelf_herbs: wall-hung, base 0.57.
+
+The source is C:/dev/review/hut/make_turf_slot.py (w, f, pot, pot2, bed, shelf). Nothing places it until
+buildings' kind lands, so there is no CHANGELOG bullet (buildings' says what a player sees). Art only,
+protocol unchanged, no new class_name.
