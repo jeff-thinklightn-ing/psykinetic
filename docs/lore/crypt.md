@@ -414,6 +414,62 @@ Open: who the knight was.
 
 ---
 
+## The temple's underground (Jeff, 2026-10-27, answering barrow-sepulcher.md)
+
+> "the barrows is an ancient burial mound, the temple has its own underground area - its connected to the barrows, the temple always has the underground even if it moves. for the draugr's deal, amulet replaces the draugr deal but works the same way. aldous can't get to the relics because the draugr took up residence. the draugr is angry because of the robbers in the barrow. i want to lock the temple and draugr fights behind the barrow and robbers. you clear the robbers, then you find the secret access to the temple ossuary and hall. there you defeat draugr and get the amulet. the amulet gets charged by aldous when you return to him with the relic. the knights holy remains. the knights name could be different each time you go, you are retreiving a different relic of a different holy knight."
+
+This answers the four points above and supersedes, where they differ, "The barrow lies a little
+outside town, not directly under the temple" (the barrow stays outside town; the Ossuary and the
+Hall are now the temple's own underground, joined to it), the Ossuary and the Hall as layers of
+the barrow, and the Draugr's Totem (the amulet replaces the deal, working the same way). His
+earlier lines above are kept as they were said.
+
+- **[Jeff]** The barrow is an ancient burial mound.
+- **[Jeff]** The temple has its own underground, connected to the barrow. The temple always
+  has the underground, even if it moves.
+- **[Jeff]** The way in is through the barrow: clear the robbers, then find the secret access to
+  the Temple Ossuary and the Hall. The temple's own way down is locked.
+- **[Jeff]** Aldous cannot get to the relics because the draugr has taken up residence there.
+- **[Jeff]** The draugr is angry because of the robbers in the barrow.
+- **[Jeff]** Defeating the draugr gives the Encolpion Amulet. It replaces the draugr's deal and
+  works the same way. Aldous charges it when the relic, a holy knight's remains, is returned
+  to him.
+- **[Jeff]** The knight differs each time: each descent retrieves a different relic of a
+  different holy knight.
+
+### Lore's part for dungeon's design (temple_undercroft, [proposal] until Jeff's wording check)
+
+Names:
+- The barrow keeps its agreed name, the Barrow of the Fallen, described as an ancient burial
+  mound.
+- barrow_deep's display name: **the Temple Undercroft**. Its rooms: **the Temple Ossuary** (the
+  entrance) and **the Hall of Fallen Souls** (the name kept).
+
+The holy knights: knights of Theus from the days when knights were still made (agreed: no one
+has been knighted in ages), laid to rest beneath the temple. One is drawn for each generation of
+the undercroft:
+Sir Edric the Steadfast, Sir Osric the Pale, Sir Wystan the Merciful, Sir Godric of the Long
+Watch, Sir Eadmund the Unbowed, Sir Baldwin the Just, Sir Leofric the Silent, Sir Cuthbert the
+Lamp-bearer, Sir Hereward the Penitent, Sir Ansel the Faithful, Sir Wulfric the Ashen, Sir Ealdred
+the Patient, Sir Oswin the Gentle, Sir Aethelstan the Last.
+
+Lines (set dressing and refusals; items and npc word their own):
+- The temple's stair down, before the win: "The stair down is barred from below."
+- The niche, once no robber stands in the barrow: "Now the barrow is quiet, a cold draft breathes
+  from this niche."
+- The sepulcher's plaque: "Here rest the holy remains of <knight>, knight of Theus, until the
+  altar calls them home."
+- The relic's text: "The holy remains of <knight>, knight of Theus. Aldous would lay them on the
+  temple altar."
+
+Facts that change once dungeon's build lands (same window, so the town never says what the game
+no longer shows): crypt.ossuary and crypt.fallen_souls move from "below the barrow" to "beneath
+the temple, joined to the barrow"; crypt.totem becomes the Encolpion Amulet; new agreed facts in
+his words: the temple's underground, Aldous kept from the relics by the draugr, the draugr
+angered by the robbers, the knight's remains charging the amulet.
+
+---
+
 ## Log
 
 - 2026-10-19: crypt under the temple, delve-again, small boss, gold offering until
@@ -464,3 +520,4 @@ Open: who the knight was.
 - 2026-10-22, cont.: the draugr's hall as a puzzle: the door shuts behind you, gold returned or his defeat opens it, the Draugr's Totem (Jeff, 573 amended).
 - 2026-10-22: the temple and town follow Theus, the homeland's one god; Psyke, the tribal god of war, empowers the draugr; Pip knows only enough for the job, paid for his silence and promised a holy knighthood of Theus (Jeff, B3).
 - 2026-10-25: Jeff's rough draft of the sepulcher, the knight's remains, the Encolpion Amulet and night robbers recorded as [Jeff] draft lines; nothing built till barrow-sepulcher.md is answered.
+- 2026-10-27: Jeff answered barrow-sepulcher.md: the barrow an ancient mound, the temple's own underground (Ossuary, Hall) joined to it, the amulet replacing the deal, a different holy knight's relic each time; lore's names, knights and lines drafted for dungeon's temple_undercroft design.
