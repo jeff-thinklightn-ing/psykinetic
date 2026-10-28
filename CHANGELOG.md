@@ -6,16 +6,17 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+## v0.1.191
+
 - Builds: a sound sync with the sound library unreachable or half there keeps every sound it already has; only a sound re-cut since is replaced (727 amended (2)).
 - Sound: the high squeal at the start of every map is gone: the discovery chime is removed for good, a discovery cue no longer plays for the map you start on, and the practice hall and test room play no music (728).
 - Sound: a larger audio buffer (50 ms, was 15), so a busy machine no longer starves the sound output, the likely source of the ringing or feedback-like noise heard while testing (729).
 - Builds: a sound take the sound library no longer holds as listed (retired or re-cut since) is left out of a build rather than shipped from an old copy; en garde build 3's ringing was 727's retired bells shipped that way (727 amended).
 - Generated halls (barrow, Ossuary, castle halls, tower floors), from each level's next generation: no more one-cell niches or tight one-cell turns, every door two wide and drawn as one double door that opens as one (the crypt's tall door in the barrow), and torches beside doorways instead of in front of them.
-
 - Sound: the ringing that started with indoor maps (the practice hall, the test rooms) is gone: the town music's bell layer is retired, so the town plays its ground only for now; the barrow's hidden-door draft no longer carries a faint high whine (727).
 - Music: the title, login and options screens play Jeff's psykinetic theme in place of first-harmony, played through, faded out at its end and in again from its start (656 amended).
 - Options: a Music volume slider, also on the title screen's Options, so the theme can be turned down.
-
 - Two players walking into each other by click no longer stand stuck face to face: the one with room steps to its right and goes round; a route blocked for 2 s is given up (724).
 - Aldous takes a holy knight's remains back (714, npc's side): hand them to the temple's priest, or put them on his counter, or choose "Give him the remains of <knight>" in his talk panel; he lays them on the altar, thanks you by the knight's name, says what your Encolpion Amulet now holds (you get one if you have none), thinks better of you and remembers it.
 
