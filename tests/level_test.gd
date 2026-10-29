@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_canopy()
 	_test_building_links()
 	_test_building_level_link()
+	_test_umbrage_locker()
 	_test_place_towns()
 	_test_regenerate_mark()
 	_test_town_walls()
@@ -1627,6 +1628,21 @@ func _test_building_level_link() -> void:
 		and stair[0]["sealed"] == "draugr" and stair[0]["to_spawn"] == "from_temple" and not Vector2i(217, 193) in wilds["terrain"]["links_at"]
 		and wilds["warnings"].filter(func(w: String) -> bool: return "link" in w).is_empty(),
 		"the wilds' temple carries the sealed stair down in its north-west back corner; the old one behind it is gone (%s)" % [stair])
+
+
+## Umbrage's locker (722): one chest prop {"locker": true} in the square by
+## the depot and the shop, its back to the temple's west wall, the cell
+## before it open floor.
+func _test_umbrage_locker() -> void:
+	print("\n== Umbrage's locker (722) ==")
+	var wilds := Level.load_level("wilds")
+	var lockers: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return bool((spec.get("props", {}) as Dictionary).get("locker", false)))
+	var at := Vector2i(215, 199)
+	_check(lockers.size() == 1 and lockers[0]["tile"] == at
+		and wilds["terrain"]["edges"].get(Terrain.edge_key(at, Vector2i(1, 0))) == Terrain.Edge.WALL
+		and wilds["terrain"]["floor"].has(at + Vector2i(-1, 0)) and not wilds["terrain"]["edges"].has(Terrain.edge_key(at, Vector2i(-1, 0)))
+		and wilds["entities"].all(func(spec: Dictionary) -> bool: return spec["tile"] != at + Vector2i(-1, 0)),
+		"one locker, at (215, 199), its back to the temple's wall, the cell before it clear floor (%s)" % [lockers])
 
 
 func _test_building_links() -> void:

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage: a locker stands in the square by the depot and the shop, against the temple's west wall; E on it opens your own chest (722).
 - Inventory: your pack shows as a 4 x 2 grid beside your hands and armour; double-click a thing to equip it, or with your chest open to deposit or take it back; your chest's 48 slots have a "Deposit unequipped" button; E on a town's locker opens your own chest (722).
 - The Ossuary: its way up behind the draugr's throne now comes out inside the wilds' temple, beside its stair down; the stair down, still sealed, says "The stair down is barred from below."; the Ossuary's first room is named the Charnel Vault.
 - Inventory: your pack and your companion's hold 8 things. Double-click a weapon or armour in the pack to put it on (it swaps with what you had, or says there's no room). Each character has a personal chest of 48 slots at the town's locker, with a deposit-unequipped button and double-click to move a stack in or out. More things stack: tokens, sacks, nails and drinks (722).

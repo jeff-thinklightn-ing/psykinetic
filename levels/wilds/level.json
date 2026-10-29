@@ -243,6 +243,19 @@
 			"props": {
 				"temple": true
 			}
+		},
+		{
+			"at": [
+				215.0,
+				199.0
+			],
+			"facing": [
+				-1.0,
+				0.0
+			],
+			"props": {
+				"locker": true
+			}
 		}
 	],
 	"buildings": [
