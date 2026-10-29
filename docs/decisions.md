@@ -35251,3 +35251,23 @@ items_test's `_test_inventory` names each case; economy_test sells a stack
 of 2; chest, stockpile and companion tests take the 11 slots. Server and
 client, a protocol change (11 replicated slots, the Locker and its "opened",
 new commands): its own revision line. New class_name: Locker.
+
+## 714, dungeon's side (2): the way up beside the temple's stair, the stair line, the Charnel Vault
+
+On buildings' 715 (the temple carries its stair down as a level link, "building" its code).
+- The way up: travel into a level puts one coming from [from_map] beside the link a building there
+  carries back down to it (`Main.building_link_back(level, from_map)`, `_beside_link`: a free
+  neighbour of the stair tile that is no link and no wall away, else the nearest free cell), read
+  from the level as parsed now, so a town moved keeps it. barrow_deep's sealed shortcut up to the
+  wilds now comes out inside the temple beside its stair; the wilds' "from_barrow_shortcut" spawn
+  point stays as the fallback when no building carries one. An edge crossing or an explicit cell
+  (admin move) is not changed.
+- The stair line (lore's, Jeff passed): a sealed link's refusal is `Main.SEALED_LINES` by where it
+  goes, "The stair down is barred from below." for barrow_deep; any other sealed way "The way is
+  sealed." as before.
+- Names: the Ossuary's entrance anchor is a named room, "The Charnel Vault" (lore's, Jeff passed),
+  beside the Hall of Fallen Souls (`plan_sheet.DEEP_ROOMS`, barrow_deep's level.json "rooms"); the
+  level's display name was already "The Ossuary".
+level_test: the stair found where the temple stands at two places, up from below beside it, the
+sealed stair's line; the Ossuary's rooms. Server only (the room card and the line ride existing
+messages), protocol unchanged, no new class_name.

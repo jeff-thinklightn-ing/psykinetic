@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Ossuary: its way up behind the draugr's throne now comes out inside the wilds' temple, beside its stair down; the stair down, still sealed, says "The stair down is barred from below."; the Ossuary's first room is named the Charnel Vault.
 - Inventory: your pack and your companion's hold 8 things. Double-click a weapon or armour in the pack to put it on (it swaps with what you had, or says there's no room). Each character has a personal chest of 48 slots at the town's locker, with a deposit-unequipped button and double-click to move a stack in or out. More things stack: tokens, sacks, nails and drinks (722).
 - The wilds: the temple's sealed stair down to the Ossuary is now inside the temple, in its north-west back corner, and moves with it if the town ever moves (715).
 - The healer's huts in the wilds and the forest are now turf houses you can walk into: an oval house dug into an earth bank, a pot brewing over the hearth, a bed and a shelf of herbs inside; turf on stone in the wilds, bark and bent poles in the forest. Smoke rises and the pot's fire burns while the healer is there and awake (718).

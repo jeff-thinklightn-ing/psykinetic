@@ -4552,6 +4552,9 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	record.tile = spawns.get(to_spawn, player_starts[0] if not player_starts.is_empty() else Vector2i.ZERO)
 	if not edge.is_empty():
 		record.tile = WorldMap.arrival(edge["side"], edge["cell"], level["size"])
+	var stair := building_link_back(level, from_name)
+	if edge.is_empty() and stair != World.NO_CELL:
+		record.tile = _beside_link(level, stair)  # Up the stair into the building that carries it (714), wherever it now stands.
 	if at != World.NO_CELL:
 		record.tile = at
 	record.zone = to_map
@@ -4566,6 +4569,30 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	party_log.add("%s went to %s." % [record.name, str(level.get("display_name", to_map))])
 	World.enter(World.home())
 	return true
+
+
+## Where a way up from [param from_map] comes out in [param level] (714,
+## the way up resolved to buildings' 715): the tile of the level link a
+## building in it carries back down to [param from_map] (the temple's stair
+## to the Ossuary), found by that and read where the building now stands,
+## so a town moved keeps it; World.NO_CELL when no building carries one.
+static func building_link_back(level: Dictionary, from_map: String) -> Vector2i:
+	for link: Dictionary in level.get("links", []):
+		if str(link.get("to_map", "")) == from_map and not str(link.get("building", "")).is_empty():
+			return link["tile"]
+	return World.NO_CELL
+
+
+## A free floor cell beside the link at [param stair] in [param level],
+## not itself a link: where one coming up the stair stands (World in that
+## level's zone). The nearest free cell to it if none beside is.
+func _beside_link(level_now: Dictionary, stair: Vector2i) -> Vector2i:
+	var links: Array = level_now.get("terrain", {}).get("links_at", [])
+	for direction in World.DIRECTIONS:
+		var next := stair + direction
+		if World.is_free(next) and not next in links and not World.edge_blocks(stair, direction):
+			return next
+	return _nearest_free(stair)
 
 
 ## Server: [param peer]'s player just arrived by travel (World in their new
@@ -4641,6 +4668,12 @@ func _on_link_bumped(entity: GridEntity, at: Vector2i) -> void:
 		_take_link(entity, at)
 
 
+## A sealed way's own line, by where it goes (714, lore's line Jeff passed):
+## the temple's stair down to the Ossuary, held from below by the draugr;
+## any other sealed way "The way is sealed.".
+const SEALED_LINES := {"barrow_deep": "The stair down is barred from below."}
+
+
 ## [param entity] (a player) at level link [param to] goes through it, or is
 ## told it is closed or sealed; off any link, told again next time.
 func _take_link(entity: GridEntity, to: Vector2i) -> void:
@@ -4655,7 +4688,7 @@ func _take_link(entity: GridEntity, to: Vector2i) -> void:
 			# Sealed (decision 540): open to the marked alone, said once a stand.
 			if _told_closed.get(entity.owner_peer) != to:
 				_told_closed[entity.owner_peer] = to
-				party_log.add("The way is sealed.")
+				party_log.add(str(SEALED_LINES.get(str(link["to_map"]), "The way is sealed.")))
 			return
 		if link["tile"] == to:
 			_told_closed.erase(entity.owner_peer)

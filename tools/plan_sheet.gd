@@ -135,7 +135,8 @@ const BARROW_ROOMS := {
 	"entrance": {"name": "The First Hall", "rect": [27, 1, 26, 16]},
 	"altar": {"name": "The Altar Room", "rect": [30, 24, 18, 14]},
 	"camp": {"name": "The Robbers' Camp", "rect": [6, 42, 10, 8]}}
-const DEEP_ROOMS := {"lair": {"name": "The Hall of Fallen Souls", "rect": [34, 56, 32, 22]}}
+const DEEP_ROOMS := {"entrance": {"name": "The Charnel Vault", "rect": [46, 1, 8, 6]},  # 714: lore's name, Jeff passed.
+		"lair": {"name": "The Hall of Fallen Souls", "rect": [34, 56, 32, 22]}}
 const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
 ## The Dwarven Halls under the castle (613, dungeon's side; Jeff: the smith
 ## sought a great dwarven forge deep below, his guards were ambushed, he is

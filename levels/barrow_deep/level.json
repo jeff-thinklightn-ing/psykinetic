@@ -561,6 +561,15 @@
 		]
 	],
 	"rooms": {
+		"entrance": {
+			"name": "The Charnel Vault",
+			"rect": [
+				46,
+				1,
+				8,
+				6
+			]
+		},
 		"lair": {
 			"name": "The Hall of Fallen Souls",
 			"rect": [

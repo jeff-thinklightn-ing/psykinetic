@@ -58,6 +58,7 @@ func _ready() -> void:
 	await _test_level_links()
 	await _test_links_kept_clear()
 	await _test_sealed_link()
+	await _test_temple_stair()
 	_test_barrow_won()
 	await _test_hall_door()
 	await _test_hidden_niche()
@@ -1840,6 +1841,48 @@ func _test_sealed_link() -> void:
 	_check(record.marks.is_empty(), "and taken off again")
 
 
+## The temple's stair (714, dungeon's side (2), on buildings' 715): the
+## way up from the level below comes out beside the stair the building
+## carries, wherever it stands, and the stair down sealed says its own line.
+func _test_temple_stair() -> void:
+	print("
+== the temple's stair (714): up beside it, wherever the temple stands; barred from below ==")
+	var rows: Array[String] = []
+	for y in 2 * 14 - 1:
+		rows.append(".".repeat(2 * 14 - 1))
+	var layout := Level.image_from_rows(rows, {Vector2i(1, 1): "start"})
+	for at: Array in [[3, 3], [7, 5]]:
+		var name := "lt_temple_%d" % at[0]
+		Level.register(name, layout, null, {"outdoor": true, "spawn_points": {"from_below": [12, 12]},
+			"buildings": [{"slot": "building.temple", "at": at, "facing": [0, 1], "level_link": {"cell": [0, 0], "to_map": "test_room", "to_spawn": ""}}]})
+		var parsed := Level.load_level(name)
+		var stair := Main.building_link_back(parsed, "test_room")
+		_check(stair == Vector2i(at[0], at[1]) and Main.building_link_back(parsed, "barrow") == World.NO_CELL,
+			"the stair the temple at %s carries back to the level below is found at %s; none to another level" % [at, stair])
+		_main.load_map("test_room")
+		_main.travel(Net.local_id, name, "from_below")
+		await get_tree().process_frame
+		var player := _player()
+		_check(_main.map_name == name and player != null and (player.tile - stair).length_squared() == 1 and not player.tile in parsed["terrain"]["links_at"],
+			"come up from below: beside the stair at %s, not at the old spawn point (%s)" % [stair, player.tile if player != null else null])
+		_main.load_map("test_room")
+		Level.unregister(name)
+	Level.register("lt_temple_shut", layout, null, {"outdoor": true,
+		"buildings": [{"slot": "building.temple", "at": [3, 3], "facing": [0, 1], "level_link": {"cell": [0, 0], "to_map": "barrow_deep", "to_spawn": "from_temple", "sealed": "draugr"}}]})
+	_main.load_map("lt_temple_shut")
+	var walker := _player()
+	var id: String = _main._peer_ids[Net.local_id]
+	_main.mark_player(id, "draugr", false)
+	_put(walker, Vector2i(3, 4))
+	_hold_free(walker, Vector2(0, -1), 6)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(_main.map_name == "lt_temple_shut" and _main.party_log.last(1) == ["The stair down is barred from below."],
+		"unblessed at the stair down: it stays shut, barred from below (%s)" % [_main.party_log.last(1)])
+	_main.load_map("test_room")
+	Level.unregister("lt_temple_shut")
+
+
 ## The draugr's win as the record keeps it (decision 573, dungeon's side):
 ## the deal's charges up to the capacity, the spill said, the count on the
 ## player, a zone's sum, a record from before migrated.
@@ -2252,8 +2295,9 @@ func _test_barrow_level() -> void:
 	var barrow_rooms: Dictionary = Level.template_config("barrow").get("rooms", {})
 	var deep_rooms: Dictionary = Level.template_config("barrow_deep").get("rooms", {})
 	_check(barrow_rooms.keys() == ["entrance", "altar", "camp"] and str(barrow_rooms["entrance"]["name"]) == "The First Hall"
-		and deep_rooms.keys() == ["lair"] and str(deep_rooms["lair"]["name"]) == "The Hall of Fallen Souls" and Level.town_wall_rect(deep_rooms["lair"]) == Rect2i(34, 56, 32, 22),
-		"the first hall, the altar room and the camp are named on the barrow, the Hall of Fallen Souls on the Ossuary, each on its anchor (%s %s)" % [barrow_rooms.keys(), deep_rooms.keys()])
+		and deep_rooms.keys() == ["entrance", "lair"] and str(deep_rooms["lair"]["name"]) == "The Hall of Fallen Souls" and Level.town_wall_rect(deep_rooms["lair"]) == Rect2i(34, 56, 32, 22)
+		and str(deep_rooms["entrance"]["name"]) == "The Charnel Vault" and Level.town_wall_rect(deep_rooms["entrance"]) == Rect2i(46, 1, 8, 6),
+		"the first hall, the altar room and the camp are named on the barrow, the Charnel Vault (714) and the Hall of Fallen Souls on the Ossuary, each on its anchor (%s %s)" % [barrow_rooms.keys(), deep_rooms.keys()])
 	# The hidden door (608): the template's stair lies behind the south-east
 	# niche's door, the link hidden; the 14 niches read.
 	var niches: Array = barrow["terrain"]["niches"]
