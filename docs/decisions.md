@@ -34823,3 +34823,16 @@ local takes when the store is unreachable rather than mismatched? It must touch 
   real run removed only the re-cut copy and its .import).
 
 Tooling only (no game code); protocol unchanged; no new class_name.
+
+## 623 amended: the low-horizon camera on by default
+
+Jeff (2026-10-28): "we should go ahead and make horizon view the default -
+new players shouldnt have to find that in options". A player's build starts
+with Net.camera_low on unless settings.cfg says camera=high
+(Net.camera_low_from). Only the Options' toggle writes camera=, so a missing
+line means never touched (or a build from before the toggle) and gets the
+new default; a camera=high was chosen by hand and stays. No migration line
+is needed. The editor and the tests, with no settings file, keep the high
+camera as before, so shots and benches don't move unless they ask for low
+(Net.set_camera_low, as the trailer does). The Options row loses "(trial)".
+ui_test: the four readings. Client only.

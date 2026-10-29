@@ -1566,6 +1566,8 @@ func _test_access() -> void:
 		"Off: told, and settings.cfg camera=high")
 	Net.camera_low_changed.disconnect(hear)
 	Net.set_camera_low(low_was, false)
+	_check(Net.camera_low_from("") and Net.camera_low_from("low") and not Net.camera_low_from("high") and not Net.camera_low_from(" high\r"),
+		"623 amended: camera= missing (never touched) or low reads low; high, chosen by hand, stays high")
 	DirAccess.remove_absolute(Net._settings_override)
 	Net._settings_override = kept[0]
 	Net.player_id = kept[1]

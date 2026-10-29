@@ -649,7 +649,10 @@ var camera_yaw := 0.0
 ## The 3D camera's wheel zoom, a factor on its default size, kept with the
 ## yaw.
 var camera_zoom := 1.0
-## The low-horizon camera trial (decision 623): settings.cfg camera=low.
+## The low-horizon camera (decision 623): settings.cfg camera=low|high. On
+## in a player's build unless camera=high was chosen by hand (623 amended,
+## Jeff 2026-10-28: "new players shouldnt have to find that in options");
+## off in the editor and tests, which have no settings file.
 var camera_low := false
 ## The 3D camera's overhead view (decision 671, W/S): settings.cfg
 ## camera_overhead=on|off, off by default.
@@ -1102,6 +1105,8 @@ func _apply_window_settings() -> void:
 ## before the first frame (the colours before any panel loads).
 func _apply_access_settings() -> void:
 	var path := settings_path()
+	if path != "":
+		camera_low = true  # 623 amended: low unless the file says camera=high.
 	if path != "" and FileAccess.file_exists(path):
 		var settings := _read_settings(path)
 		var scale := str(settings.get("ui_scale", ""))
@@ -1113,7 +1118,7 @@ func _apply_access_settings() -> void:
 		var set := str(settings.get("colours", "normal"))
 		if UiTheme.COLOUR_SETS.has(set):
 			colours = set
-		camera_low = str(settings.get("camera", "")).strip_edges() == "low"
+		camera_low = camera_low_from(str(settings.get("camera", "")))
 		camera_overhead = str(settings.get("camera_overhead", "")).strip_edges() == "on"
 		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
 		screenshot_dir = str(settings.get("screenshot_dir", "")).strip_edges()
@@ -1194,6 +1199,13 @@ func set_camera_low(value: bool, save := true) -> void:
 	if save:
 		_settings_kept["camera"] = "low" if value else "high"
 		save_view_settings()
+
+
+## camera= as read from the settings file (623 amended): low unless it says
+## high. Only the Options' toggle writes the line, so a missing one (never
+## touched, or a build before the toggle) gets the new default.
+static func camera_low_from(text: String) -> bool:
+	return text.strip_edges() != "high"
 
 
 ## camera_yaw= as read from the settings file: the yaw as it was left
