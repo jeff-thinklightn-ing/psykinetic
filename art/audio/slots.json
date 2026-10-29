@@ -178,6 +178,23 @@
 			"volume_db": -2.0,
 			"uses": "a blow parried with a weapon; Client3D._on_guarded (SoundKit.block)"
 		},
+		"sfx.parry_clash": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "blade meeting blade in a parry: a bright, short steel clang, no thump, gone within 0.4 s with no lasting ring above 4 kHz (732); at the contact point on the meet tick (combat's en garde)",
+			"fallback": "sfx.block_weapon"
+		},
+		"sfx.parry_scrape": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "a blade sliding along a blade as a low parry turns a thrust aside, under the clash a tick after it (732; combat's en garde); no fallback, so it is silent untaken"
+		},
 		"sfx.bow_draw": {
 			"category": "combat",
 			"type": "oneshot",

@@ -35013,3 +35013,35 @@ anim_rig_test _test_beckon: the picks by guide_wait and hands; each clip,
 man and woman, about 0.9 s, the hand open to him out, above the head and
 scooping in twice, the arm clear of the trunk and the head. Client only,
 protocol unchanged (it reads companions' rev-41 field), no new class_name.
+## 732. Parry sounds for blade on blade: sfx.parry_clash and sfx.parry_scrape; sfx.block_weapon re-cut under full scale
+
+Combat (2026-10-29): en garde v2 (the coordinator approved it) makes a parry a visible
+blade-on-blade meet with a spark at the contact point, and asked whether sfx.block_weapon is
+sharp enough for sword on sword. It isn't. Its one take (freesound 733887, "Sword Impact") opens
+with a 65 Hz thump under an 8 to 9.7 kHz ring, reads as a heavy blow stopped, plays the same
+every time, and peaked at +2.6 dBFS. The coordinator approved two slots, my picks landed for
+Jeff to judge in the prototype, with one rule after 728's chime: each clash gone within about
+0.4 s, with no sustained partial above about 4 kHz.
+
+- sfx.parry_clash: a bright, short steel clang with no thump, placed at the contact point on
+  the meet tick, with sfx.block_weapon as its fallback. Three CC0 takes from JohnBuhr's sword
+  clashes (freesound 326795, 326861, 326804), each cut to 0.4 s with a 0.1 s fade. Measured:
+  the whole take is 30 dB down by 0.15 to 0.25 s, the band above 4 kHz by 0.13 to 0.25 s, and
+  nothing above 4 kHz sounds on past that. The sources with a 5.3 kHz line still at -31 to
+  -37 dB a third of a second in (326837, 326838, 326848, 326850) were left out.
+- sfx.parry_scrape: a blade sliding along a blade, under the clash a tick after it, only on a
+  low parry that turns a thrust aside (combat's call). No fallback: silent until it has takes.
+  Three CC0 takes, each the slide alone, faded out before the source's ring: magnuswaker's
+  metal scrape (530075, 0.6 s), AuDRoger's sword slides (471147, 0.3 s; 471148, 0.2 s), at
+  -4 dBFS since Vorbis overshot a -1 dBFS target on the noisy slides by up to 3 dB. At -6 dB in
+  the slot, under the clash.
+- sfx.block_weapon keeps its recording, re-cut to peak at -4 dBFS before encoding (-0.6 dBFS
+  as encoded; the source is clipped, so a -1 target came out at +2.3). It stays the parry
+  for every guard that isn't en garde's meet.
+- tools/sound_take.ps1 -FadeOut s: a one-shot cut out of a longer sound (-Length) fades to
+  nothing over its last s seconds, so a take can end before the source's ring.
+- Only the slots and takes are on main; combat-engarde fires them (Jeff's prototype build),
+  `sfx.play("sfx.parry_clash", contact)` and the scrape a tick later. Listening files:
+  C:/dev/review/sound/parry. sound_kit_test checks the slots, their takes and fallbacks.
+
+Client only; protocol unchanged; no new class_name.

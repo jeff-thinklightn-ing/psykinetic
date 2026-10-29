@@ -136,6 +136,14 @@ func _test_noises_are_the_sims() -> void:
 			"the sword's hit: three freesound impacts with an onset (the slash swish gone)")
 	_check(SoundKit.block("shield") == "sfx.block_shield" and SoundKit.block("sword") == "sfx.block_weapon" and SoundKit.block("") == "sfx.block_weapon",
 			"a guard: a shield's knock, else a parry")
+	_check(SoundKit.positional("sfx.parry_clash") and SoundKit.takes("sfx.parry_clash").size() == 3
+			and str(SoundKit.spec("sfx.parry_clash").get("fallback", "")) == "sfx.block_weapon"
+			and SoundKit.positional("sfx.parry_scrape") and SoundKit.takes("sfx.parry_scrape").size() == 3
+			and not SoundKit.spec("sfx.parry_scrape").has("fallback"),
+			"blade meeting blade (732): a placed clash, three takes, the parry's as fallback; a scrape under it, silent untaken")
+	_check(SoundKit.takes("sfx.block_weapon").size() == 1
+			and str(SoundKit.takes("sfx.block_weapon")[0].get("original", "")).begins_with("freesound 733887"),
+			"the parry's take: one, the same recording, re-cut under full scale (732)")
 	_check(SoundKit.swing("giant_axe") == "sfx.swing_heavy" and SoundKit.swing("sword") == "sfx.swing" and SoundKit.swing("") == "sfx.swing"
 			and SoundKit.swing("bow") == "sfx.swing", "a two-handed weapon swings heavy; a bow is no club")
 	# 662: a blade drawn and sheathed, any other piece taken up and stowed; every slot real.

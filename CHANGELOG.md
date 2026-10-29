@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Sound: parrying blade on blade gets a bright, short clang of its own (three takes), and a low parry that turns a thrust aside a blade scrape under it, for en garde (732); the ordinary parry sound no longer clips.
 - A guiding companion beckons you on (708 amended): when she stops at a corner, a door or an exit to wait for you, she turns and waves you after her with an open hand.
 - A lob is drawn steep and in form (677 amended (2)): the bow aimed about 70 degrees up for every volley, the back leaning and the shoulders, bow arm and drawing arm one straight line, the drawing elbow behind the arrow and the nock near the eye; a flat shot stands the same way.
 - The bow's lob is now a volley (677 amended (2)): three arrows rain into a circle around where you aimed, each for half a shot, the first knocking down; the circle is tighter the longer you draw. Step out of the circle when you hear the whistle.

@@ -694,7 +694,7 @@
 				"file": "sfx.block_weapon.ogg",
 				"from": "freesound",
 				"original": "freesound 733887: Sword Impact",
-				"sha256": "ab27cb96ee4866ba85aafc7b452828fc35e6c9fe451fe7fbd91d382fccf19c53",
+				"sha256": "4f42e165e135c133d449e40a1d77d993afd466d1edb35667c3f7b7455c869d7d",
 				"by": "velcronator",
 				"url": "https://freesound.org/people/velcronator/sounds/733887/",
 				"license": "CC0 1.0"
@@ -1680,6 +1680,64 @@
 				"sha256": "37b641c47cb3b88bc0c69d628848513ca11e75e682a0b3762aa87a179409ff6e",
 				"by": "deleted_user_2104797",
 				"url": "https://freesound.org/people/deleted_user_2104797/sounds/346695/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.parry_clash": [
+			{
+				"file": "sfx.parry_clash.ogg",
+				"from": "freesound",
+				"original": "freesound 326795: Sword_Clash (46).wav (from 0 s for 0.4 s)",
+				"sha256": "5c3e862f67a8cef5b00e577b5fc1c1b137e3ce8426ca35085a620bba25a4bd43",
+				"by": "JohnBuhr",
+				"url": "https://freesound.org/people/JohnBuhr/sounds/326795/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.parry_clash.2.ogg",
+				"from": "freesound",
+				"original": "freesound 326861: Sword_Clash (53).wav (from 0 s for 0.4 s)",
+				"sha256": "01885a5ed18eea474e81fabd9aed01f8355a6d21ee7aa7727e3da4651ecb1832",
+				"by": "JohnBuhr",
+				"url": "https://freesound.org/people/JohnBuhr/sounds/326861/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.parry_clash.3.ogg",
+				"from": "freesound",
+				"original": "freesound 326804: Sword_Clash (30).wav (from 0 s for 0.4 s)",
+				"sha256": "e5765ccbe5a98c4baf56fc4cdde6817cd51abd3b2bac9821129b9e89d5f3020f",
+				"by": "JohnBuhr",
+				"url": "https://freesound.org/people/JohnBuhr/sounds/326804/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.parry_scrape": [
+			{
+				"file": "sfx.parry_scrape.ogg",
+				"from": "freesound",
+				"original": "freesound 530075: Metal Scrape (from 0.05 s for 0.6 s)",
+				"sha256": "cd47332d9acb80a2fd0191c55cceeda77e99271094d598bff87825f3476cf3ee",
+				"by": "magnuswaker",
+				"url": "https://freesound.org/people/magnuswaker/sounds/530075/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.parry_scrape.2.ogg",
+				"from": "freesound",
+				"original": "freesound 471147: Sword slide.wav (from 0 s for 0.3 s)",
+				"sha256": "fef1396d4a3eea78cf29c92dc968444cbd4af4762df4894876ad2db90c17dcf2",
+				"by": "AuDRoger",
+				"url": "https://freesound.org/people/AuDRoger/sounds/471147/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.parry_scrape.3.ogg",
+				"from": "freesound",
+				"original": "freesound 471148: Sword slide 2.wav (from 0 s for 0.2 s)",
+				"sha256": "f657861d87d2b67b5da599fa9fcee67838b4bca316295c1b0068f1569753f863",
+				"by": "AuDRoger",
+				"url": "https://freesound.org/people/AuDRoger/sounds/471148/",
 				"license": "CC0 1.0"
 			}
 		],

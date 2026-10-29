@@ -1,6 +1,6 @@
 # Adds a take to a sound slot from a third-party file (decision 268).
 #   tools\sound_take.ps1 -Slot sfx.door_wood_open -From sonniss-gdc-2024 -Source <file> [-Original <text>]
-#                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>] [-License <name>] [-PeakDb -3]
+#                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>] [-License <name>] [-PeakDb -3] [-FadeOut 0.1]
 #
 # Cuts -Source (any format ffmpeg reads; -Start and -Length in seconds), trims silence off
 # both ends of a one-shot, raises or lowers it to peak at -PeakDb dBFS if given (a quiet source), makes a loop or bed seamless (its end cross-faded into its
@@ -28,6 +28,9 @@ param(
 	[double]$LoopFade = 2.0,
 	# The take's loudest sample at this many dBFS (0 or above: left as the source has it).
 	[double]$PeakDb = 1,
+	# A one-shot cut out of a longer sound (-Length) fades to nothing over its last this many
+	# seconds, so it ends before the source's ring or tail rather than on a step (732).
+	[double]$FadeOut = 0,
 	[string]$Library = $(if ($env:PSYK_SOUND_DIR) { $env:PSYK_SOUND_DIR } else { 'N:\assets\sound' }),
 	[int]$TimeoutSeconds = 10
 )
@@ -104,7 +107,12 @@ $positional = -not ($spec.PSObject.Properties['positional'] -and $spec.positiona
 $ffmpegArgs += @('-ac', $(if ($positional) { '1' } else { '2' }))
 if ($spec.type -eq 'oneshot') {
 	$trim = 'silenceremove=start_periods=1:start_threshold=-50dB'
-	$ffmpegArgs += @('-af', "$trim,areverse,$trim,areverse$gain")
+	$fade = ''
+	if ($FadeOut -gt 0) {
+		if ($Length -le 0) { Fail '-FadeOut needs -Length' }
+		$fade = "afade=t=out:st=$([math]::Max(0.0, $Length - $FadeOut)):d=$FadeOut,"
+	}
+	$ffmpegArgs += @('-af', "$fade$trim,areverse,$trim,areverse$gain")
 } else {
 	# A loop or a bed loops without a seam: its last LoopFade seconds fade out
 	# over its first fading in, and it ends where that overlap began.
