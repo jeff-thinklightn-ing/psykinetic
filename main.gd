@@ -11109,6 +11109,7 @@ func _build_talk() -> void:
 	options_panel = OptionsPanel.new()
 	options_panel.name = "Options"
 	options_panel.visible = false
+	options_panel.dev_keys = func() -> bool: return is_admin or Net.mode == Net.Mode.HOST  # The Testing keys.
 	options_panel.hints_changed.connect(func(shown: bool) -> void:
 		if hint_panel != null:
 			hint_panel.visible = shown)
@@ -17325,12 +17326,11 @@ func _run_test_show(player: Player) -> void:
 					options_panel.toggle()
 				options_panel.toggle_credits()
 			"controls":
-				# The Options scrolled to its Controls section (the key rows).
+				# The Options on its Controls tab (the key rows).
 				if not options_panel.visible:
 					options_panel.toggle()
+				options_panel.show_tab("Controls")
 				options_panel.begin_rebind("open")
-				get_tree().create_timer(0.5).timeout.connect(func() -> void:
-					options_panel._scroll.scroll_vertical = 2400)
 			"offer", "sick":
 				_test_offer_due = true  # Residents come with the town's sync: tried each tick.
 			"downed":

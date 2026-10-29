@@ -34836,3 +34836,23 @@ is needed. The editor and the tests, with no settings file, keep the high
 camera as before, so shots and benches don't move unless they ask for low
 (Net.set_camera_low, as the trailer does). The Options row loses "(trial)".
 ui_test: the four readings. Client only.
+
+## 731. The Options in tabs
+
+Jeff (2026-10-28): "the option menu needs to be better organized and
+decluttered. probably safe to move character customization to a new tab".
+The Options panel's sections become tabs (a TabContainer; add_section(title)
+now makes a tab, show_tab(title) brings one forward): Character (first, as
+before), Display (window, resolution, anti-aliasing, the low-horizon
+camera), Interface (interface and text size, colours, the controls list),
+Sound (the six volumes), Controls (the scheme, then the keys under headings,
+OptionsPanel.KEY_GROUPS: Walking, Actions, Panels, Talk, Other, Testing;
+then Reset keys), Credits (toggle_credits opens its tab). The Testing keys'
+rows (Debug text, Builder mode) show only where Main.dev_keys says: an admin
+(the "admin" flag the server already sends, 672) or a local host; the keys
+themselves work as before. Nothing a player used is dropped; "Reset the
+room" stays (players may reset on the box), pending Jeff. --test-show
+controls opens the Controls tab rather than scrolling. ui_test
+_test_options_tabs: the order, where each control sits, every Keys.WORDS
+action in exactly one group, the Testing rows hidden for a player. Client
+only, protocol unchanged, no new class_name.

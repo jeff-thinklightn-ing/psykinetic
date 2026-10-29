@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_tuning_panel()
 	_test_access()
 	_test_keys()
+	_test_options_tabs()
 	_test_barter()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1575,6 +1576,55 @@ func _test_access() -> void:
 	Net.set_ui_scale(kept[3], false)
 	Net.set_text_scale(kept[4], false)
 	Net.set_colours(kept[5], false)
+
+
+## Jeff (2026-10-28): the Options "better organized and decluttered": a tab
+## per kind, Character first; every key in one group; the Testing keys an
+## admin's or a host's alone.
+func _test_options_tabs() -> void:
+	print("== the Options in tabs ==")
+	var panel: OptionsPanel = _main.options_panel
+	var titles: Array[String] = []
+	for page in panel.tabs.get_children():
+		titles.append(str(page.name))
+	_check(titles == ["Character", "Display", "Interface", "Sound", "Controls", "Credits"] and panel.tab_shown() == "Character",
+		"tabs %s, Character in front" % [titles])
+	var display := panel.tabs.get_node(^"Display")
+	var interface := panel.tabs.get_node(^"Interface")
+	_check(display.is_ancestor_of(panel.choices["camera"]["buttons"]["on"]) and display.is_ancestor_of(panel.resolution)
+			and interface.is_ancestor_of(panel.choices["hints"]["buttons"]["on"]) and interface.is_ancestor_of(panel.choices["colours"]["buttons"]["normal"])
+			and panel.tabs.get_node(^"Sound").is_ancestor_of(panel.sliders["music_volume"])
+			and panel.tabs.get_node(^"Controls").is_ancestor_of(panel.key_buttons["open"]),
+		"the camera and resolution on Display; the sizes, colours and controls list on Interface; the volumes on Sound; the keys on Controls")
+	var grouped: Array[String] = []
+	for group: Array in OptionsPanel.KEY_GROUPS:
+		for action: String in group[1]:
+			grouped.append(action)
+	var missing: Array[String] = []
+	for action: String in Keys.WORDS:
+		if grouped.count(action) != 1:
+			missing.append(action)
+	_check(missing.is_empty() and panel.key_buttons.size() == Keys.WORDS.size(), "every key in exactly one group (off: %s)" % [missing])
+	var was_shown := panel.visible
+	var dev_was: Callable = panel.dev_keys
+	panel.dev_keys = func() -> bool: return false
+	if panel.visible:
+		panel.toggle()
+	panel.toggle()
+	var hidden_for_players := not panel.dev_rows.visible and panel.dev_rows.is_ancestor_of(panel.key_buttons["debug"])
+	panel.toggle()
+	panel.dev_keys = func() -> bool: return true
+	panel.toggle()
+	_check(hidden_for_players and panel.dev_rows.visible, "Debug text and Builder mode: hidden for a player, shown for an admin or a host")
+	panel.show_tab("Controls")
+	var on_controls := panel.tab_shown() == "Controls"
+	panel.toggle_credits()
+	_check(on_controls and panel.tab_shown() == "Credits", "show_tab brings one forward; the credits open their tab")
+	panel.toggle_credits()
+	panel.show_tab("Character")
+	panel.dev_keys = dev_was
+	if panel.visible != was_shown:
+		panel.toggle()
 
 
 func _test_keys() -> void:

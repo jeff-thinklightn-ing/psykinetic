@@ -1,9 +1,14 @@
 class_name OptionsPanel
 extends PanelContainer
-## The game's options, O shows and hides it (Main). One panel with a titled
-## section per kind of option: add one with add_section(title) and put
-## controls in the box it returns, rather than giving each its own key.
-## Sound is the first: a slider (0 to 100%) per volume, applied as it moves
+## The game's options, O shows and hides it (Main). One panel with a tab
+## per kind of option (Jeff, 2026-10-28: "the option menu needs to be better
+## organized and decluttered"): add one with add_section(title) and put
+## controls in the box it returns, rather than giving each its own key;
+## show_tab(title) brings one forward. Character, Display (the window, its
+## size, anti-aliasing, the camera), Interface (sizes, colours, the controls
+## list), Sound, Controls (the scheme, then the keys in KEY_GROUPS, the
+## testing keys an admin's or a host's alone: dev_keys), Credits.
+## Sound: a slider (0 to 100%) per volume, applied as it moves
 ## (Net.set_volume) and written to settings.cfg when let go or when the
 ## panel is hidden. Character (decisions 388, 419, 439): the body the player
 ## wears and their look (build, height, hair and its colour, beard, skin;
@@ -54,6 +59,23 @@ var antialias_buttons: Dictionary[String, Button] = {}
 ## The windowed sizes offered; the window's own size is added when it is none of them.
 const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), Vector2i(1920, 1080),
 	Vector2i(2560, 1440), Vector2i(3440, 1440), Vector2i(3840, 2160)]
+## The Controls tab's key rows under their headings, in order; every
+## Keys.WORDS action in one (ui_test). "Testing" is shown only where
+## dev_keys says so (Main: an admin, or a local host); its keys work anyway.
+const KEY_GROUPS := [
+	["Walking", ["forward", "back", "left", "right"]],
+	["Actions", ["open", "pick_up", "drop", "throw", "stand", "signature", "bandage", "yes", "lantern"]],
+	["Panels", ["pack", "map", "card", "town", "talk_log", "options", "hints"]],
+	["Talk", ["talk", "phrase_1", "phrase_2", "phrase_3", "phrase_4"]],
+	["Other", ["screenshot", "fullscreen", "reset"]],
+	["Testing", ["debug", "builder"]],
+]
+## Whether the Testing keys show (Main sets it); none: hidden.
+var dev_keys: Callable
+## The Testing keys' rows, with their heading.
+var dev_rows: VBoxContainer
+## The tabs, a page per add_section.
+var tabs: TabContainer
 ## A choice row's buttons by its setting ("window", "controls", "hints"): value -> button.
 var choices: Dictionary[String, Dictionary] = {}
 ## The Resolution drop-down.
@@ -93,22 +115,27 @@ func _ready() -> void:
 	title.text = "Options"
 	title.theme_type_variation = &"Title"
 	_column.add_child(title)
+	tabs = TabContainer.new()
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.focus_mode = Control.FOCUS_NONE
+	_column.add_child(tabs)
 	# Who you are first: what a new player sets before anything else.
 	var character := add_section("Character")
 	character.add_child(_character_block())
-	var sound := add_section("Sound")
-	for volume: Array in VOLUMES:
-		sound.add_child(_slider_row(volume[0], volume[1]))
-	var video := add_section("Video")
-	video.add_child(_antialias_row())
+	var video := add_section("Display")
 	video.add_child(_choice_row("Window", "window", [["windowed", "Windowed"], ["fullscreen", "Fullscreen"]],
 		func() -> String: return "fullscreen" if Net.fullscreen else "windowed",
 		func(value: String) -> void: Net.set_fullscreen(value == "fullscreen")))
 	video.add_child(_resolution_row())
-	video.add_child(_choice_row("Interface size", "ui_scale",
+	video.add_child(_antialias_row())
+	video.add_child(_choice_row("Camera: low horizon", "camera", [["off", "Off"], ["on", "On"]],
+		func() -> String: return "on" if Net.camera_low else "off",
+		func(value: String) -> void: Net.set_camera_low(value == "on")))
+	var interface := add_section("Interface")
+	interface.add_child(_choice_row("Interface size", "ui_scale",
 		[["0.80", "Smaller"], ["1.00", "Normal"], ["1.25", "Larger"], ["1.50", "Largest"]],
 		func() -> String: return "%.2f" % Net.ui_scale, func(value: String) -> void: Net.set_ui_scale(value.to_float())))
-	video.add_child(_choice_row("Text size", "text_scale", [["1.00", "Normal"], ["1.25", "Larger"], ["1.50", "Largest"]],
+	interface.add_child(_choice_row("Text size", "text_scale", [["1.00", "Normal"], ["1.25", "Larger"], ["1.50", "Largest"]],
 		func() -> String: return "%.2f" % Net.text_scale, func(value: String) -> void: Net.set_text_scale(value.to_float())))
 	var colours := _choice_row("Colours", "colours", [["normal", "Normal"], ["distinct", "Distinct"]],
 		func() -> String: return Net.colours, Net.set_colours)
@@ -117,20 +144,31 @@ func _ready() -> void:
 	note.theme_type_variation = &"Caption"
 	note.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	colours.add_child(note)
-	video.add_child(colours)
-	video.add_child(_choice_row("Camera: low horizon", "camera", [["off", "Off"], ["on", "On"]],
-		func() -> String: return "on" if Net.camera_low else "off",
-		func(value: String) -> void: Net.set_camera_low(value == "on")))
-	var controls := add_section("Controls")
-	controls.add_child(_choice_row("Move", "controls", [["click", "Click to move"], ["wasd", "WASD and aim"]],
-		func() -> String: return Net.controls, Net.set_controls))
-	controls.add_child(_choice_row("Controls list", "hints", [["on", "Shown"], ["off", "Hidden"]],
+	interface.add_child(colours)
+	interface.add_child(_choice_row("Controls list", "hints", [["on", "Shown"], ["off", "Hidden"]],
 		func() -> String: return "on" if Net.hints else "off",
 		func(value: String) -> void:
 			Net.set_hints(value == "on")
 			hints_changed.emit(value == "on")))
-	for action: String in Keys.WORDS:
-		controls.add_child(_key_row(action))
+	var sound := add_section("Sound")
+	for volume: Array in VOLUMES:
+		sound.add_child(_slider_row(volume[0], volume[1]))
+	var controls := add_section("Controls")
+	controls.add_child(_choice_row("Move", "controls", [["click", "Click to move"], ["wasd", "WASD and aim"]],
+		func() -> String: return Net.controls, Net.set_controls))
+	for group: Array in KEY_GROUPS:
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", UiTheme.constant("unit"))
+		var heading := Label.new()
+		heading.text = group[0]
+		heading.theme_type_variation = &"Caption"
+		box.add_child(heading)
+		for action: String in group[1]:
+			if Keys.WORDS.has(action):
+				box.add_child(_key_row(action))
+		controls.add_child(box)
+		if group[0] == "Testing":
+			dev_rows = box
 	var reset := Button.new()
 	reset.text = "Reset keys"
 	reset.focus_mode = Control.FOCUS_NONE
@@ -169,16 +207,25 @@ func _process(_delta: float) -> void:
 	_scroll.custom_minimum_size.y = minf(_column.get_combined_minimum_size().y, maxf(room, 200.0))
 
 
-## A titled section, its controls to be added to the box returned.
+## A tab titled [param title], its controls to be added to the box returned.
 func add_section(title: String) -> VBoxContainer:
-	var heading := Label.new()
-	heading.text = title
-	heading.theme_type_variation = &"Heading"
-	_column.add_child(heading)
 	var box := VBoxContainer.new()
+	box.name = title
 	box.add_theme_constant_override("separation", UiTheme.constant("unit"))
-	_column.add_child(box)
+	tabs.add_child(box)
 	return box
+
+
+## The tab titled [param title] brought forward (none such: unchanged).
+func show_tab(title: String) -> void:
+	var page := tabs.get_node_or_null(NodePath(title))
+	if page != null:
+		tabs.current_tab = page.get_index()
+
+
+## The tab in front's title.
+func tab_shown() -> String:
+	return str(tabs.get_current_tab_control().name)
 
 
 ## Shown or hidden; hiding writes the volumes if a slider moved.
@@ -196,6 +243,8 @@ func toggle() -> void:
 			for value: String in choices[key]["buttons"]:
 				(choices[key]["buttons"][value] as Button).set_pressed_no_signal(value == current)
 		_show_resolution()
+		if dev_rows != null:
+			dev_rows.visible = dev_keys.is_valid() and bool(dev_keys.call())
 	elif _unsaved:
 		_unsaved = false
 		Net.save_view_settings()
@@ -484,6 +533,7 @@ func _credits_section(section: VBoxContainer) -> void:
 
 ## Shows or hides the full credits list.
 func toggle_credits() -> void:
+	show_tab("Credits")
 	_fill_credits()
 	credits_box.visible = not credits_box.visible
 	credits_button.text = "Hide credits" if credits_box.visible else "Show all credits"
