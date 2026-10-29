@@ -3620,32 +3620,45 @@ func _test_relic() -> void:
 		if kind == "speech":
 			spoken.append(str(data.get("text", "")))
 	Net.message_received.connect(heard)
-	var slot := player.slot_items.find(uid)
-	_main._on_command(player, "transfer", {"from": str(player.get_path()), "from_slot": slot, "to": str(aldous.get_path()), "to_slot": 0})
+	var record: PlayerRecord = _main._records.get(pid)
+	var barrow_was: Dictionary = record.barrow.duplicate(true) if record != null else {}
+	var deals := Economy.deals(_main._field_rules())
+	var give := func() -> void:
+		_main._on_command(player, "transfer", {"from": str(player.get_path()), "from_slot": player.slot_items.find(uid), "to": str(aldous.get_path()), "to_slot": 0})
+	if record != null:
+		record.barrow = {}  # Never blessed (or a quest reset): no room on any amulet.
+	give.call()
+	_check(player.slot_items.has(uid) and spoken.size() == 1 and spoken[0].contains("no blessing") and spoken[0].contains("Sir Ewald"),
+		"unblessed: he gives it back and says why, nothing used up (%s)" % [spoken])
+	if record != null and not deals.is_empty():
+		record.barrow = {"best": str(deals[0].get("name", "")), "containers": []}  # Blessed once: room on the amulet.
+	spoken.clear()
+	give.call()
 	_check(not player.slot_items.has(uid) and not aldous.slot_items.has(uid), "put in his hands: taken, past the soulbound rule, held by nobody")
-	_check(spoken.size() == 1 and spoken[0].contains("Sir Ewald"), "he thanks them by the knight's name (%s)" % [spoken])
+	var held := World.totem_charges(World.totem_of(pid))
+	_check(spoken.size() == 1 and spoken[0].contains("Sir Ewald") and held > 0 and spoken[0].contains("it holds %d now" % held),
+		"he thanks them by the knight's name and says the charge (%s)" % [spoken])
 	_check(Standing.score(Townsfolk.card_of(World.production, priest), pid) == score + Standing.setting("relic"), "his regard rises by \"relic\"")
 	var facts: Array = Townsfolk.card_of(World.production, priest).get("facts", []).map(func(f: Dictionary) -> String: return str(f["text"]))
 	_check(facts.any(func(f: String) -> bool: return f.contains("Sir Ewald") and not f.contains(pid)), "his card keeps it, the player by name, never the id")
 	_check(Offers.of(priest, pid).all(func(o: Dictionary) -> bool: return str(o["kind"]) != Offers.RELIC), "no offer left once it is given")
-	_check(spoken.size() == 1 and spoken[0].contains("no more"), "unblessed (no room on the amulet): the knight rests, no charge said")
-	var record: PlayerRecord = _main._records.get(pid)
-	var barrow_was: Dictionary = record.barrow.duplicate(true) if record != null else {}
-	var deals := Economy.deals(_main._field_rules())
-	if record != null and not deals.is_empty():
-		record.barrow = {"best": str(deals[0].get("name", "")), "containers": []}  # Blessed once: room on the amulet.
 	uid = mint.call()
 	offers = Offers.of(priest, pid).filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.RELIC)
 	spoken.clear()
 	if not offers.is_empty():
 		_main._accept_offer(player, str(offers[0]["id"]), 0)
-	var held := World.totem_charges(World.totem_of(pid))
-	_check(not player.slot_items.has(uid) and spoken.size() == 1 and held > 0 and spoken[0].contains("it holds %d now" % held),
-		"the panel's offer does the same, and a blessed player's amulet is charged and said (%s)" % [spoken])
+	_check(not player.slot_items.has(uid) and spoken.size() == 1 and World.totem_charges(World.totem_of(pid)) > held,
+		"the panel's offer does the same (%s)" % [spoken])
+	if record != null:
+		World.totem_add(World.totem_of(pid), 1000, Economy.barrow_capacity(record.barrow, _main._field_rules()))  # Full.
+	uid = mint.call()
+	spoken.clear()
+	_check(not _main._relic_returned(player, aldous, uid) and player.slot_items.has(uid) and spoken.size() == 1 and spoken[0].contains("holds all"),
+		"a full amulet: given back, kept for later (%s)" % [spoken])
+	World.consume(player, uid, "the test")
 	if record != null:
 		record.barrow = barrow_was
 	uid = mint.call()
-	slot = player.slot_items.find(uid)
 	var smith: Resident = null
 	for body: GridEntity in World.townsfolk():
 		if body is Resident and body != aldous and "priest" not in World.production.worker((body as Resident).worker_id).get("trades", []):

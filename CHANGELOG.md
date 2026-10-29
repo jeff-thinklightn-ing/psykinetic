@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Aldous hands a knight's remains back when your Encolpion Amulet can't take the blessing (714 amended, npc's side): a full amulet, or one never blessed (after a quest reset), keeps the relic for later instead of losing it, and he says why.
 
 ## v0.1.192
 

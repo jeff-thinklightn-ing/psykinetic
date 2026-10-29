@@ -14088,7 +14088,8 @@ func _relic_handed(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnt
 ## [param uid] (decision 714, npc's side): read (World.relic_of) before it
 ## ends, consumed off them (World.consume), and only then their amulet
 ## charged by its tier (dungeon's charge_from_relic, which mints one for a
-## player with none). He thanks them by the knight's name and the charge;
+## player with none), only when the amulet has room (else he gives it back
+## and says why: full, or never blessed). He thanks them by the knight's name and the charge;
 ## his card keeps it (the player through Offers.name_of) and his standing
 ## rises ("relic"). False, nothing done, when the body is no priest, is out
 ## of hearing, or they do not hold it.
@@ -14098,16 +14099,26 @@ func _relic_returned(player: Player, body: Resident, uid: int) -> bool:
 	if "priest" not in World.production.worker(body.worker_id).get("trades", []) or World.distance(body.tile, player.tile) > HEARING_RANGE:
 		return false
 	var relic := World.relic_of(uid)
-	if relic.is_empty() or not World.consume(player, uid, "laid on the altar"):
+	if relic.is_empty():
 		return false
 	var knight := str(relic.get("knight", "the knight"))
+	# Room first (714 amended, npc's side; dungeon's note): a full amulet, or one never blessed (a quest
+	# reset clears the barrow's best), would take nothing, so he gives the relic back with why.
+	var record: PlayerRecord = _records.get(player.player_id)
+	var capacity := Economy.barrow_capacity(record.barrow, _field_rules()) if record != null else 0
+	if capacity - World.totem_charges(World.totem_of(player.player_id)) <= 0:
+		_say_plain(body, body.person, ("Your amulet holds all the blessing it can. Keep %s safe, and bring the remains to me when it has room." % knight) if capacity > 0
+			else ("You carry no blessing from below yet. Keep %s safe until you have stood before what waits there, then bring the remains to me." % knight))
+		return false
+	if not World.consume(player, uid, "laid on the altar"):
+		return false
 	var added := charge_from_relic(player, int(relic.get("tier", 0)))
 	var held := World.totem_charges(World.totem_of(player.player_id))
 	var who := Offers.name_of(Offers.ctx, player.player_id)
 	Offers._regard(World.production, body.worker_id, player.player_id, Standing.setting("relic"), "brought home the remains of %s" % knight)
 	Townsfolk.learn(World.production, body.worker_id, "%s brought the remains of %s up from the barrow, and you laid them on the altar." % [who, knight])
 	var thanks := "%s is home at last. Bless you." % knight
-	var charge := ("The blessing is on your amulet: it holds %d now." % held) if added > 0 else "The knight rests now, though your amulet takes no more of the blessing."
+	var charge := "The blessing is on your amulet: it holds %d now." % held
 	_say_plain(body, body.person, thanks + " " + charge)
 	print("[relic] the remains of %s laid on the altar in %s, %d charge(s) added" % [knight, body.town, added])
 	return true

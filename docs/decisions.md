@@ -35328,3 +35328,21 @@ hands", so armour and the new pack slots 7 to 10 were said to be held. Now
 it reads the pack by Items.is_pack, the hands as RIGHT_HAND and LEFT_HAND,
 and her armour as worn ("You wear leather armour."). companion_test
 _test_carried_slots. Server only, protocol unchanged, no new class_name.
+
+## 714 amended, npc's side: the relic given back when the amulet has no room
+
+Dungeon's note, once a draugr win gives a relic and an uncharged amulet
+(38c25fe4): a quest reset clears the barrow's best, so a player can hold an
+old relic with no room on any amulet, and charge_from_relic then takes
+nothing. Consuming first lost that relic. Main._relic_returned now reads the
+room before World.consume: Economy.barrow_capacity(record.barrow,
+_field_rules()) less the amulet's charges. With none he keeps nothing and
+says why, with no model asked: a full amulet ("Your amulet holds all the
+blessing it can. Keep <knight> safe, and bring the remains to me when it has
+room.") or one never blessed ("You carry no blessing from below yet. Keep
+<knight> safe until you have stood before what waits there, then bring the
+remains to me."). The relic stays in their slots and the offer stays in his
+panel. With room the order is as before (relic_of, consume, charge), and
+the old "takes no more" line is gone. resident_test _test_relic: unblessed
+and full each keep the relic with their line; blessed is charged and said.
+Server only; protocol unchanged.
