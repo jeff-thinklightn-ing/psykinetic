@@ -1681,6 +1681,40 @@ func _test_totem() -> void:
 	_check(World.consume(host, relic, "laid on the altar") and host.slots[other] == "" and not World.items.has(relic),
 			"consume: out of the pack past the soulbound rule, ended")
 	_check(World.relic_of(9999999).is_empty() and World.mint_relic("x", 1, null) == 0, "no relic: {}; no finder: none minted")
+	# into_pack (714, dungeon's side (2)): a full pack gives up its last plain
+	# thing, never a bound one; a pack all bound, the new one at their feet.
+	var pack := Items.PACK_SLOTS.filter(func(i: int) -> bool: return i < host.slots.size())
+	var before_slots := host.slots.duplicate()
+	var before_uids := World.slot_uids(host)
+	var full_slots := host.slots.duplicate()
+	var full_uids := World.slot_uids(host)
+	var bound: Array[int] = []
+	for at: int in pack:
+		var each := World.mint_relic("Ser Aldric", 0, host)
+		bound.append(each)
+		full_slots[at] = World.RELIC
+		full_uids[at] = each
+	var plain := World.items.mint("bandaging_kit", "made")
+	full_slots[pack[0]] = "bandaging_kit"
+	full_uids[pack[0]] = plain
+	World.set_slots(host, full_slots, full_uids)
+	var into := World.mint_relic("Ser Aldric", 1, host)
+	_check(World.into_pack(host, into) == pack[0] and World.slot_uid(host, pack[0]) == into
+			and pack.slice(1).all(func(at: int) -> bool: return World.soulbound(World.slot_uid(host, at))),
+			"a full pack: the one plain thing goes to the ground for it, no bound thing moved")
+	var spare := World.mint_relic("Ser Aldric", 2, host)
+	_check(World.into_pack(host, spare) == -1 and not Array(World.slot_uids(host)).has(spare) and World.items.has(spare) and World.soulbound(spare),
+			"a pack all bound: -1, the new one put down at their feet, still bound")
+	for each in bound + [into]:
+		if not World.consume(host, each, "test") and World.items.has(each):
+			World.items.end(each, "test")  # The first, its slot given to the kit.
+	# What they put down (the kit, the spare relic) taken up and ended.
+	for cell: Vector2i in [host.tile] + World.DIRECTIONS.map(func(d: Vector2i) -> Vector2i: return host.tile + d):
+		var on := Array(World.ground_uids(cell))
+		for index in range(on.size() - 1, -1, -1):
+			if on[index] in [plain, spare]:
+				World.items.end(World.take_from_ground(cell, index), "test")
+	World.set_slots(host, before_slots, before_uids)
 	var sledge := Items.def("tomb_sledge")
 	_check(int(sledge["hands"]) == 2 and float(sledge["weight"]) >= 9.0 and Items.has_tag("tomb_sledge", "trophy") and Items.has_tag("tomb_sledge", "weapon")
 			and not Items.has_tag("tomb_sledge", "soulbound") and Items.stack_of("tomb_sledge") == 1,

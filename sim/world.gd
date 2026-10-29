@@ -3144,14 +3144,28 @@ func mint_totem(player: GridEntity) -> int:
 		return have
 	var uid := mint_bound(TOTEM, holder_key(player), player, player.zone, player.tile)
 	items.set_charges(uid, 0)
+	var slot := into_pack(player, uid)
+	_log("totem: %s's Draugr's Totem in slot %d" % [player.name, slot])
+	return uid
+
+
+## [param uid] put in [param player]'s pack: its first free slot, else the
+## last pack slot holding nothing soulbound, what was there put down at
+## their feet; never a bound thing moved. A pack all bound: [param uid] put
+## down at their feet itself (still bound, theirs alone to take), -1. The
+## slot it went in. Server only: the amulet's (573 amended) and the
+## sepulcher's relic (714, dungeon's side (2)).
+func into_pack(player: GridEntity, uid: int) -> int:
 	var slot := free_pack_slot(player)
 	if slot < 0:
-		var last := Items.PACK_SLOTS.filter(func(i: int) -> bool: return i < player.slots.size())
-		slot = last[last.size() - 1]
+		var pack := Items.PACK_SLOTS.filter(func(i: int) -> bool: return i < player.slots.size())
+		pack.reverse()
+		var plain := pack.filter(func(i: int) -> bool: return not soulbound(slot_uid(player, i)))
+		if plain.is_empty():
+			put_on_ground(uid, player.tile)
+			return -1
+		slot = plain[0]
 		var out := slot_uid(player, slot)
-		if soulbound(out):
-			slot = last[last.size() - 2]
-			out = slot_uid(player, slot)
 		var slots := player.slots.duplicate()
 		var uids := slot_uids(player)
 		slots[slot] = ""
@@ -3159,8 +3173,7 @@ func mint_totem(player: GridEntity) -> int:
 		set_slots(player, slots, uids)
 		put_on_ground(out, player.tile)
 	put_item(player, player, slot, uid)
-	_log("totem: %s's Draugr's Totem in slot %d" % [player.name, slot])
-	return uid
+	return slot
 
 
 ## The slot notes of whoever carries [param uid] said again: its charges

@@ -1904,12 +1904,15 @@ func _test_field_return() -> void:
 	_check(_main._downed(owner, null, &"attack") == 10 * World.TICK_RATE and _main._downed(pet, null, &"attack") == 0,
 		"unblessed: the player lies their last moments (Mortally Wounded), she falls as ever")
 	_put(pet, owner.tile + Vector2i(1, 0))
-	_check(_main.barrow_won([id], "easy") == 1 and "draugr" in record.marks and World.totem_charges(World.totem_of(id)) == 5 and record.barrow.get("best") == "easy",
-		"the draugr laid to rest at the easy deal: the player marked, 5 charges (%s)" % [record.barrow])
+	# 714: the win gives the amulet uncharged; a relic on the altar charges it.
+	_check(_main.barrow_won([id], "easy") == 1 and "draugr" in record.marks and World.totem_charges(World.totem_of(id)) == 0 and record.barrow.get("best") == "easy"
+		and _main.charge_from_relic(owner, 0) == 5 and World.totem_charges(World.totem_of(id)) == 5,
+		"the draugr laid to rest at the easy deal: the player marked, the amulet uncharged; an easy relic's 5 charges (%s)" % [record.barrow])
 	_check(not World.carries_bound(owner, "barrow_half", whose) and not World.carries_bound(pet, "return_token", whose)
 		and "draugr" in record.companion.get("marks", []), "no device minted (573); the mark to her, beside them")
 	_check(pet.grown.facts.any(func(fact: Dictionary) -> bool: return "laid the draugr to rest" in str(fact.get("text", ""))), "and it is a fact of hers")
 	_main.barrow_won([id], "easy")
+	_main.charge_from_relic(owner, 0)
 	_check(World.totem_charges(World.totem_of(id)) == 10 and owner.charges == 10 and owner.charge_room == 25 and World.soulbound(World.totem_of(id)),
 		"laid to rest again: the charges add up, and the player carries the count and the room (%d of %d)" % [owner.charges, owner.charge_room])
 	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))

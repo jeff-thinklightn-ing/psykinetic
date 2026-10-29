@@ -35296,3 +35296,26 @@ opened count rises (Main._watch_locker, five times a second). ui_test
 _test_inventory_panel: the 4 x 2 grid and the gear beside, the chest's 48
 and its button, each double-click's command. Client only; rides 722's
 revision, no new class_name of ui's.
+
+## 714, dungeon's side (3): the win's amulet uncharged, the sepulcher's relic
+
+Design 6 and 7 (temple_undercroft_design.md): the amulet works as the totem did, but the charges
+come from the relic on the altar, not the win.
+- `Main.barrow_won` blesses as before (the mark, best and containers by Economy.barrow_won, the
+  companion's mark and fact) and gives no charges: a winner without an amulet takes it uncharged
+  (World.mint_totem), said "The draugr yields. <name> is blessed and takes up the Encolpion Amulet,
+  uncharged."; one who has it, "is blessed", or "stands over him again" on a later win.
+- The knight's sepulcher: each winner takes a relic of this generation's knight (barrow_knight) at
+  the deal's tier (its place among Economy.deals) by World.mint_relic, straight into their pack
+  (items' advice: a relic left in the Hall chest could go with a regeneration, and a bound one in a
+  shared chest needs a soulbound exception), with the plaque said: "Here rest the holy remains of
+  <knight>, knight of Theus, until the altar calls them home." (Main.SEPULCHER_PLAQUE, lore's,
+  Jeff passed). No relic before barrow_deep's first generation (no knight). One relic per win.
+  The Hall chest keeps its armour roll (fallen_grave) as before.
+- `World.into_pack(player, uid) -> slot` (items agreed): mint_totem's placing, now shared: the
+  first free pack slot, else the last one holding nothing soulbound (its thing put down at their
+  feet); a pack all bound puts the new one down at their feet, still bound, and gives -1. No bound
+  thing is ever moved.
+level_test (the uncharged win, the relic and plaque, its charges on the altar as the old amounts),
+companion_test, items_test (a full pack, a pack all bound). Server only, protocol unchanged, no new
+class_name.

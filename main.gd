@@ -7588,16 +7588,22 @@ func _field_rules() -> Dictionary:
 
 ## Server: the draugr laid to rest (enemy-ai's call through World.bless,
 ## decisions 544 and 573): each player of [param player_ids] standing alive
-## is blessed if not yet (marked BLESSED, for good) and takes the charges of
-## [param deal] (easy, normal or hard: economy's return.field deals) up to
-## their capacity onto their Draugr's Totem (573 amended: World.mint_totem
-## at the first win, World.totem_add; over it, lost and said; the record
-## keeps best and containers, Economy.barrow_won raising best); their
-## companion, standing alive in the same zone and not downed, is blessed
-## too, with the fact and the bond. Nothing is minted (573: the charges are
-## a count on the record, no item). How many players were blessed.
+## is blessed if not yet (marked BLESSED, for good); the record keeps best
+## and containers (Economy.barrow_won raising best by [param deal]: easy,
+## normal or hard, economy's return.field deals). Since 714 (dungeon's side
+## (2); Jeff: "the amulet gets charged by aldous when you return to him with
+## the relic") the win gives no charges: each winner without one takes the
+## Encolpion Amulet uncharged (World.mint_totem), and from the knight's
+## sepulcher a relic of this generation's knight (barrow_knight) at the
+## deal's tier, bound to them, into their pack (World.into_pack), the
+## plaque said; Aldous lays it on the altar for the charges
+## (charge_from_relic). Their companion, standing alive in the same zone
+## and not downed, is blessed too, with the fact and the bond. How many
+## players were blessed.
 func barrow_won(player_ids: Array, deal: String) -> int:
 	var field := _field_rules()
+	var tier := Economy.deals(field).map(func(each: Dictionary) -> String: return str(each["name"])).find(deal)
+	var knight := barrow_knight()
 	var blessed := 0
 	for each: Variant in player_ids:
 		var id := str(each)
@@ -7608,21 +7614,24 @@ func barrow_won(player_ids: Array, deal: String) -> int:
 		var first := not BLESSED in record.marks
 		var won: Dictionary = Economy.barrow_won(record.barrow, deal, field)
 		record.barrow = won["barrow"]
-		# The Draugr's Totem holds the charges (573 amended, items' side): the
-		# record keeps best and containers alone.
 		record.barrow.erase("tokens")
-		var uid := World.mint_totem(player)
-		var given := Economy.field_tokens(deal, field)
-		var took := World.totem_add(uid, given, Economy.barrow_capacity(record.barrow, field))
+		var minted := World.totem_of(id) == 0
+		World.mint_totem(player)
 		_sync_charges(record)
 		blessed += 1
-		var line := "The draugr yields. %s %stakes %d charges (%d of %d)." % [record.name, "is blessed and " if first else "",
-			took, World.totem_charges(uid), Economy.barrow_capacity(record.barrow, field)]
-		if given - took > 0:
-			line += " The dead's gift spills: %d more than they can hold." % (given - took)
+		var line := "The draugr yields. %s %s." % [record.name,
+			("is blessed and takes up the %s, uncharged" % Items.name_of(World.TOTEM)) if minted else ("is blessed" if first else "stands over him again")]
 		party_log.add(line)
+		if tier >= 0 and not knight.is_empty():
+			World.into_pack(player, World.mint_relic(knight, tier, player))
+			party_log.add(SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name)
 		grant_capability(BLESSED, [id])  # The mark, hers too (decision 576's catalog).
 	return blessed
+
+
+## The knight's sepulcher's plaque (714, lore's line, Jeff passed), said
+## as a winner takes the relic: %s the knight.
+const SEPULCHER_PLAQUE := "Here rest the holy remains of %s, knight of Theus, until the altar calls them home."
 
 
 ## The level the holy knights lie in (714): its generation names the one.

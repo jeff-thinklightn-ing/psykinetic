@@ -1903,7 +1903,7 @@ func _test_temple_stair() -> void:
 ## the deal's charges up to the capacity, the spill said, the count on the
 ## player, a zone's sum, a record from before migrated.
 func _test_barrow_won() -> void:
-	print("\n== the barrow's charges (573, 573 amended): a win's charges onto the Draugr's Totem, the capacity, the zone's sum ==")
+	print("\n== the barrow's charges (573, 573 amended; 714): the win's amulet uncharged and the sepulcher's relic, its charges on the altar, the capacity, the zone's sum ==")
 	_main.load_map("test_link_s")
 	var player := _player()
 	var id: String = _main._peer_ids[Net.local_id]
@@ -1915,27 +1915,40 @@ func _test_barrow_won() -> void:
 		World.items.set_charges(had, 0)
 	_main._sync_charges(record)
 	_check(player.charges == 0 and player.charge_room == 0 and _main.charges_in_zone("test_link_s") == 0, "unblessed: no charges, no room, none in the zone")
+	# 714, dungeon's side (2): the win gives the amulet uncharged and, from
+	# the sepulcher, a relic of the generation's knight at the deal's tier;
+	# the charges come when Aldous lays it on the altar (charge_from_relic).
+	var kept: Variant = _main._regen.get("barrow_deep")
+	_main._regen["barrow_deep"] = {"generation": 2, "at_step": 0}
+	var knight: String = _main.barrow_knight()
+	var relics := func() -> Array:
+		return Array(World.slot_uids(player)).filter(func(each: int) -> bool: return World.relic_of(each).get("knight") == knight)
+	var relics_before: int = relics.call().size()
 	_check(_main.barrow_won([id], "normal") == 1 and record.barrow == {"best": "normal", "containers": []} and "draugr" in record.marks,
 		"laid to rest at the normal deal: blessed, best normal, no count on the record (%s)" % [record.barrow])
 	var uid := World.totem_of(id)
-	_check(uid != 0 and World.soulbound(uid) and World.totem_charges(uid) == 10 and player.slots.has(World.TOTEM),
-		"the amulet is minted into their pack, bound for life, holding the deal's 10 charges")
-	_check(_main.party_log.last(1) == ["The draugr yields. %s is blessed and takes 10 charges (10 of 50)." % record.name],
-		"said with the count and the room (%s)" % [_main.party_log.last(1)])
-	_check(player.charges == 10 and player.charge_room == 50 and _main.charges_in_zone("test_link_s") == 10 and _main.charges_in_zone("wilds") == 0,
-		"the player carries 10 of 50; the zone's sum is 10, another zone's 0")
+	var won: Array = relics.call()
+	_check(uid != 0 and World.soulbound(uid) and World.totem_charges(uid) == 0 and player.slots.has(World.TOTEM) and player.charges == 0 and player.charge_room == 50,
+		"the amulet is minted into their pack, bound for life, uncharged: the win gives no charges (0 of 50)")
+	_check(not knight.is_empty() and won.size() == relics_before + 1 and World.relic_of(won[-1]) == {"knight": knight, "tier": 1} and World.soulbound(won[-1]),
+		"from the sepulcher, the holy remains of %s at the normal deal's tier, bound to the winner, in their pack (%s)" % [knight, World.relic_of(won[-1]) if not won.is_empty() else {}])
+	_check(_main.party_log.last(2) == ["The draugr yields. %s is blessed and takes up the %s, uncharged." % [record.name, Items.name_of(World.TOTEM)],
+			Main.SEPULCHER_PLAQUE % knight + " %s takes the holy remains, for the altar." % record.name],
+		"the win and the plaque said (%s)" % [_main.party_log.last(2)])
+	_check(_main.charge_from_relic(player, 1) == 10 and player.charges == 10 and _main.charges_in_zone("test_link_s") == 10 and _main.charges_in_zone("wilds") == 0,
+		"the relic on the altar: the deal's 10 charges, 10 of 50; the zone's sum is 10, another zone's 0")
 	_main.barrow_won([id], "easy")
-	_check(World.totem_charges(uid) == 15 and World.totem_of(id) == uid and record.barrow["best"] == "normal"
-		and _main.party_log.last(1)[0].begins_with("The draugr yields. %s takes 5 charges" % record.name),
-		"an easier deal adds its 5 to the same totem, never lowers best, and blesses nobody twice")
+	_check(World.totem_of(id) == uid and World.totem_charges(uid) == 10 and record.barrow["best"] == "normal"
+		and _main.party_log.last(2)[0] == "The draugr yields. %s stands over him again." % record.name and World.relic_of(relics.call()[-1])["tier"] == 0,
+		"won again at an easier deal: the same amulet, no charges, best kept, an easy relic (%s)" % [_main.party_log.last(2)])
+	_check(_main.charge_from_relic(player, 0) == 5 and World.totem_charges(uid) == 15, "its relic adds its 5")
 	World.items.set_charges(uid, 45)
-	_main.barrow_won([id], "easy")
-	_check(World.totem_charges(uid) == 50 and _main.party_log.last(1)[0].ends_with("takes 5 charges (50 of 50)."), "at the room's edge what fits is taken (%s)" % [_main.party_log.last(1)])
-	_main.barrow_won([id], "easy")
-	_check(World.totem_charges(uid) == 50 and _main.party_log.last(1)[0].ends_with("The dead's gift spills: 5 more than they can hold."),
+	_check(_main.charge_from_relic(player, 0) == 5 and World.totem_charges(uid) == 50, "at the room's edge what fits is taken")
+	_check(_main.charge_from_relic(player, 0) == 0 and World.totem_charges(uid) == 50 and _main.party_log.last(1) == ["The relic's gift spills: 5 more than %s can hold." % record.name],
 		"full: the gift spills and is said (%s)" % [_main.party_log.last(1)])
 	_main.barrow_won([id], "hard")
-	_check(World.totem_charges(uid) == 65 and record.barrow["best"] == "hard" and player.charge_room == 75, "the hard deal raises best and the room to 75: 65 of 75")
+	_check(_main.charge_from_relic(player, 2) == 15 and World.totem_charges(uid) == 65 and record.barrow["best"] == "hard" and player.charge_room == 75,
+		"the hard deal raises best and the room to 75; its relic's 15: 65 of 75")
 	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())).merged({"player_id": id}))
 	_check(saved.barrow == record.barrow, "best and containers are kept through a save and a load (%s)" % [saved.barrow])
 	# A record from before 573 amended: its count moves onto the totem on join (items' Main.migrate_totem).
@@ -1971,7 +1984,6 @@ func _test_barrow_won() -> void:
 	_main.reset_barrow(id)
 	# 714 (1): the generation's knight, lore's fourteen, drawn by its seed.
 	var knights: Array = Regen.config_of("barrow_deep").get("knights", [])
-	var kept: Variant = _main._regen.get("barrow_deep")
 	_main._regen.erase("barrow_deep")
 	_check(knights.size() == 14 and _main.barrow_knight() == "", "before barrow_deep's first generation, no knight; lore's fourteen listed")
 	var named: Array[String] = []
