@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The lob's volley drawn (677 amended (2)): the arrow shoots up fast and fades out high, a red circle marks where the volley falls until the last arrow is down, and each of the three arrows rains down steeply onto its own spot with a thud.
 - Sound: parrying blade on blade gets a bright, short clang of its own (three takes), and a low parry that turns a thrust aside a blade scrape under it, for en garde (732); the ordinary parry sound no longer clips.
 - A guiding companion beckons you on (708 amended): when she stops at a corner, a door or an exit to wait for you, she turns and waves you after her with an open hand.
 - A lob is drawn steep and in form (677 amended (2)): the bow aimed about 70 degrees up for every volley, the back leaning and the shoulders, bow arm and drawing arm one straight line, the drawing elbow behind the arrow and the nock near the eye; a flat shot stands the same way.

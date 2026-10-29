@@ -869,19 +869,58 @@ func _test_bow_sounds() -> void:
 		var lob_unheard := _rig.sfx.unheard.size()
 		var lob_sounds := func() -> Array:
 			return _rig.sfx.played.slice(lob_played).map(func(entry: Array) -> String: return entry[0]) + _rig.sfx.unheard.slice(lob_unheard)
-		player._world_lobbed(open, 6, 1.0, PackedVector2Array([Vector2(open), Vector2(open), Vector2(open)]))
+		# 677 amended (2), ui's side: a volley of three. The loose goes up fast at
+		# LOB_PITCH and fades; the circle shows till the last is down; each falls
+		# steeply onto its point at its tick, with its thud.
+		var falls := PackedVector2Array([Vector2(open) + Vector2(0.3, -0.2), Vector2(open) + Vector2(-0.3, 0.3), Vector2(open)])
+		var ticks := 6
+		var volley_before := _rig.find_children("VolleyArrow*", "", false, false)
+		player._world_lobbed(open, ticks, 1.0, falls)
+		var start := Time.get_ticks_msec()
 		_check(lob_sounds.call().has("sfx.bow_loose") and lob_sounds.call().has("sfx.arrow_lob_rise") and not lob_sounds.call().has("sfx.arrow_lob_fall"),
 				"a lob loosed: the twang and its whoosh up, its whistle not yet (%s)" % [lob_sounds.call()])
-		await get_tree().create_timer(0.3).timeout
-		_check(lob_sounds.call().count("sfx.arrow_lob_fall") == 1 and not lob_sounds.call().has("sfx.arrow_land"),
-				"its last %.1f s: the falling whistle, once, before it lands (%s)" % [Client3D.LOB_WARN_SECONDS, lob_sounds.call()])
 		var lofted := _rig.get_tree().root.find_child("LobArrow", true, false) as Node3D
-		var ground := _rig._tile_position(open)
-		_check(lofted != null and lofted.position.y > maxf(tip.y, ground.y), "a lob's arrow climbs above the bow and the ground it falls to (%s)" % [lofted.position if lofted != null else null])
-		await get_tree().create_timer(0.5).timeout
-		_check(lofted != null and is_instance_valid(lofted) and lofted.position.distance_to(ground) < 0.3 and lofted.transform.basis.y.normalized().y < -0.3,
-				"and comes down into the cell aimed at, nose down")
-		_check(lob_sounds.call().count("sfx.arrow_lob_fall") == 1 and lob_sounds.call().has("sfx.arrow_land"), "and thuds in (%s)" % [lob_sounds.call()])
+		var ring := _rig.find_child("VolleyRing", false, false) as MeshInstance3D
+		var volley := _rig.find_children("VolleyArrow*", "", false, false).filter(func(arrow: Node) -> bool: return not arrow in volley_before)
+		_check(ring != null and ring.material_override.albedo_color.is_equal_approx(Color(UiTheme.color("alarm"), 0.85)),
+				"the volley's circle on the ground round the aimed cell, in the alarm colour")
+		_check(volley.size() == 3 and volley.all(func(arrow: Node3D) -> bool: return not arrow.visible), "three arrows to fall, none shown yet (%d)" % volley.size())
+		var high := tip.y
+		var faded := 0.0
+		var lands: Array[float] = []
+		var whistles_at_first := -1
+		var ring_at_last := false
+		var landed_at: Array[Vector3] = []
+		while Time.get_ticks_msec() - start < 1400:
+			await get_tree().process_frame
+			var now := (Time.get_ticks_msec() - start) / 1000.0
+			if is_instance_valid(lofted):
+				high = maxf(high, lofted.position.y)
+				var meshes := ([lofted] if lofted is GeometryInstance3D else []) + lofted.find_children("*", "GeometryInstance3D", true, false)
+				faded = maxf(faded, (meshes[0] as GeometryInstance3D).transparency if not meshes.is_empty() else 0.0)
+			while lands.size() < lob_sounds.call().count("sfx.arrow_land"):
+				lands.append(now)
+				if lands.size() == 1:
+					whistles_at_first = lob_sounds.call().count("sfx.arrow_lob_fall")
+					_check(not is_instance_valid(lofted), "the loosed arrow gone before the first falls")
+				var fallen: Node3D = volley[lands.size() - 1] if lands.size() <= volley.size() else null
+				landed_at.append(fallen.position if fallen != null and is_instance_valid(fallen) else Vector3.INF)
+				_check(fallen != null and is_instance_valid(fallen) and fallen.visible and fallen.transform.basis.y.normalized().y < -0.8,
+						"fall %d down steeply, nose first" % lands.size())
+				if lands.size() == falls.size():
+					ring_at_last = is_instance_valid(ring)
+		_check(high > tip.y + 4.0 and faded > 0.8, "the loosed arrow went up fast (%.1f m over the bow) and faded out (%.2f)" % [high - tip.y, faded])
+		_check(whistles_at_first == 1, "the falling whistle once, before the first lands (%d)" % whistles_at_first)
+		var flight := float(ticks) / World.TICK_RATE
+		var on_time := lands.size() == 3
+		for i in lands.size():
+			on_time = on_time and absf(lands[i] - (flight + float(i) / World.TICK_RATE)) < 0.1
+		_check(on_time, "each fall thuds in at its tick, %.1f s apart (%s)" % [1.0 / World.TICK_RATE, lands])
+		var on_point := landed_at.size() == 3
+		for i in landed_at.size():
+			on_point = on_point and Vector2(landed_at[i].x, landed_at[i].z).distance_to(falls[i]) < 0.2
+		_check(on_point, "each on its own point (%s, %s)" % [landed_at, falls])
+		_check(ring_at_last and not is_instance_valid(ring), "the circle shown till the last is down, then gone")
 	if wall.x >= 0:
 		arrows_before = _shot_arrows()
 		player._world_shot(Vector2(wall) + Vector2(wall - player.tile).normalized() * 0.5, &"stone")

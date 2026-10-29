@@ -1439,6 +1439,15 @@ const LOB_LINE := 0.05
 const LOB_PIECES := 32
 const LOB_RING_MIN := 0.35
 const LOB_CLOSED := Color(0.82, 0.26, 0.2)
+## The volley (677 amended (2), _on_lobbed): the loosed arrow rises
+## VOLLEY_RISE metres in VOLLEY_RISE_SECONDS, fading; each fall drops from
+## VOLLEY_FALL_HEIGHT over VOLLEY_FALL_SECONDS; the circle stays
+## VOLLEY_RING_AFTER past the last.
+const VOLLEY_RISE := 9.0
+const VOLLEY_RISE_SECONDS := 0.35
+const VOLLEY_FALL_HEIGHT := 6.0
+const VOLLEY_FALL_SECONDS := 0.25
+const VOLLEY_RING_AFTER := 0.2
 const ARROW_GLANCE := 0.5
 const ARROW_GLANCE_UP := 0.3
 const ARROW_GLANCE_TURN := 2.2
@@ -16475,12 +16484,17 @@ static func lob_heading(from: Vector3, to: Vector3, t: float, apex := 0.25) -> V
 
 
 ## A lob (World.try_lob, decision 677) loosed by the body [param id] to come
-## down on [param to] in [param ticks]: the bow's twang, and its arrow flies
-## World.lob_point's arc from the bow there, to stand in the ground nose
-## first (a body struck there is heard by its hurt); into water it's gone.
-## 677 amended (2): the volley's circle and falls are ui's to draw; till
-## then the arrow flies to the centre as before.
-func _on_lobbed(to: Vector2i, ticks: int, _radius: float, _falls: PackedVector2Array, id: int) -> void:
+## down round [param to] (677 amended (2), ui's side; Jeff: "the arrow
+## goes up, gives a small telegraph circle and 3 arrows randomly hit within
+## that"; "it just appears to go up, fade, then a arrow rains down"): the
+## bow's twang, its arrow shot up fast at LOB_PITCH that fades out high
+## (_loose_up); the circle [param radius] round [param to] on the ground
+## (_volley_ring) till the last fall; and each of [param falls] (cell
+## points) rains down steeply onto its point at tick [param ticks] + i
+## (_volley_fall), standing in the ground nose first with its thud (a body
+## struck there is heard by its hurt; into water it's gone). The falling
+## whistle LOB_WARN_SECONDS before the first, from the centre.
+func _on_lobbed(to: Vector2i, ticks: int, radius: float, falls: PackedVector2Array, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null or puppet.get_parent() == null:
 		return
@@ -16489,31 +16503,92 @@ func _on_lobbed(to: Vector2i, ticks: int, _radius: float, _falls: PackedVector2A
 	var shooter := instance_from_id(id) as GridEntity
 	var from := _bow_tip(puppet)
 	var ground := _tile_position(to)
-	var apex := float(Items.verb_of(World.drawn_with(shooter)).get("lob_apex", 0.25)) if shooter != null else 0.25
 	_stop_creak(puppet)
 	sfx.play("sfx.bow_loose", from)
 	sfx.play("sfx.arrow_lob_rise", from)  # Up it goes.
 	var flight := maxf(0.05, float(ticks) / World.TICK_RATE)
-	var water := World.is_water(to)
 	# Its last LOB_WARN_SECONDS a falling whistle from where it will land, so a
 	# body there hears it coming and can step out (decision 677).
 	_play_later("sfx.arrow_lob_fall", ground, maxf(flight - LOB_WARN_SECONDS, 0.0))
-	get_tree().create_timer(flight).timeout.connect(func() -> void:
-		if is_instance_valid(sfx) and sfx.is_inside_tree() and World.get_entity_at(to) == null:
-			sfx.play("sfx.arrow_water" if water else "sfx.arrow_land", ground))
-	_whistle(from, ground, flight)
+	var way := Vector2(ground.x - from.x, ground.z - from.z)
+	way = way.normalized() if way.length() > 0.01 else Vector2(0.0, 1.0)
+	_loose_up(shooter, puppet.get_parent(), from, way, flight)
+	if falls.is_empty():
+		falls = PackedVector2Array([Vector2(to)])
+	var last := flight + float(falls.size() - 1) / World.TICK_RATE
+	_volley_ring(to, radius, last)
+	for i in falls.size():
+		_volley_fall(shooter, falls[i], way, flight + float(i) / World.TICK_RATE)
+
+
+## The lob's arrow loosed (677 amended (2)): from [param from] up at
+## LOB_PITCH along [param way] (grid x, y), VOLLEY_RISE metres in
+## VOLLEY_RISE_SECONDS (less for a short [param flight]), fading out over
+## its second half; under [param parent].
+func _loose_up(shooter: GridEntity, parent: Node, from: Vector3, way: Vector2, flight: float) -> void:
 	var arrow := _flying_arrow(shooter)
 	arrow.name = "LobArrow"
-	puppet.get_parent().add_child(arrow, true)
+	parent.add_child(arrow, true)
 	_fly_arrow(arrow)
-	_head_arrow(arrow, from, lob_heading(from, ground, 0.0, apex))
+	var pitch := deg_to_rad(LOB_PITCH)
+	var up := Vector3(way.x * cos(pitch), sin(pitch), way.y * cos(pitch))
+	var seconds := minf(VOLLEY_RISE_SECONDS, flight * 0.6)
+	_head_arrow(arrow, from, up)
 	var tween := create_tween()
-	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, World.lob_point(from, ground, t, apex), lob_heading(from, ground, t, apex)),
-		0.0, 1.0, flight)
-	tween.tween_callback(_rest_arrow.bind(arrow))
+	tween.tween_method(func(t: float) -> void:
+		_head_arrow(arrow, from + up * VOLLEY_RISE * t, up)
+		if is_instance_valid(arrow):
+			_set_transparency(arrow, clampf(t * 2.0 - 1.0, 0.0, 1.0)), 0.0, 1.0, seconds)
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(arrow):
+			arrow.queue_free())
+
+
+## The volley's circle (677 amended (2)): [param radius] (VOLLEY_RING_MIN at
+## least) round [param cell] on the ground in the alarm colour, from now
+## till [param seconds] on, when the last arrow is down.
+func _volley_ring(cell: Vector2i, radius: float, seconds: float) -> void:
+	var base := _height_in(cell, Vector2(cell))
+	var ring := _make_flat(_ground_arc_mesh(Vector2(cell), maxf(radius, LOB_RING_MIN), AIM_LINE, 0.0, PI, base),
+		Color(UiTheme.color("alarm"), 0.85))
+	ring.name = "VolleyRing"
+	ring.position = Vector3(cell.x, base + ON_FLOOR * 2.0, cell.y)
+	add_child(ring, true)
+	get_tree().create_timer(seconds + VOLLEY_RING_AFTER).timeout.connect(func() -> void:
+		if is_instance_valid(ring):
+			ring.queue_free())
+
+
+## One of the volley's arrows (677 amended (2)): it rains down steeply
+## (LOB_PITCH, from the archer's side, [param way]) onto [param point]
+## (cell units) over VOLLEY_FALL_SECONDS, landing [param at] seconds from
+## now, and stands there nose first with its thud (none on a body: its hurt
+## is heard), or splashes into water and is gone.
+func _volley_fall(shooter: GridEntity, point: Vector2, way: Vector2, at: float) -> void:
+	var ground := Vector3(point.x, _ground_height(point), point.y)
+	var pitch := deg_to_rad(LOB_PITCH)
+	var down := Vector3(way.x * cos(pitch), -sin(pitch), way.y * cos(pitch))
+	var top := ground - down * (VOLLEY_FALL_HEIGHT / sin(pitch))
+	var cell := Vector2i(point.round())
+	var water := World.is_water(cell)
+	var arrow := _flying_arrow(shooter)
+	arrow.name = "VolleyArrow"
+	arrow.visible = false
+	add_child(arrow, true)
+	_fly_arrow(arrow)
+	_head_arrow(arrow, top, down)
+	var tween := create_tween()
+	tween.tween_interval(maxf(at - VOLLEY_FALL_SECONDS, 0.0))
+	tween.tween_callback(func() -> void:
+		if is_instance_valid(arrow):
+			arrow.visible = true)
+	tween.tween_method(func(t: float) -> void: _head_arrow(arrow, top.lerp(ground, t), down), 0.0, 1.0, minf(VOLLEY_FALL_SECONDS, at))
+	tween.tween_callback(func() -> void:
+		_rest_arrow(arrow)
+		if is_instance_valid(sfx) and sfx.is_inside_tree() and World.get_entity_at(cell) == null:
+			sfx.play("sfx.arrow_water" if water else "sfx.arrow_land", ground))
 	if not water:
-		var nose := lob_heading(from, ground, 1.0, apex)
-		tween.tween_callback(func() -> void: _head_arrow(arrow, ground + nose.normalized() * ARROW_BURY, nose))
+		tween.tween_callback(func() -> void: _head_arrow(arrow, ground + down.normalized() * ARROW_BURY, down))
 		tween.tween_interval(SHOT_STUCK_SECONDS)
 	tween.tween_callback(func() -> void:
 		if is_instance_valid(arrow):

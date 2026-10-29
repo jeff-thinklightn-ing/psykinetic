@@ -35045,3 +35045,32 @@ Jeff to judge in the prototype, with one rule after 728's chime: each clash gone
   C:/dev/review/sound/parry. sound_kit_test checks the slots, their takes and fallbacks.
 
 Client only; protocol unchanged; no new class_name.
+## 677 amended (2), ui's side: the volley drawn
+
+Jeff: "the arrow still shoots off fast -- it just appears to go up, fade,
+then a arrow rains down in the shot was aimed". Client3D._on_lobbed draws
+combat's volley (to, ticks, radius, falls) in three parts:
+
+- The loose (_loose_up): the twang and the whoosh as before, and the arrow
+  leaves the bow at pc-character's LOB_PITCH (read, never copied) along the
+  way to the aimed cell, VOLLEY_RISE (9 m) in VOLLEY_RISE_SECONDS (0.35 s,
+  less for a short flight), fading out over its second half
+  (_set_transparency), then gone. It no longer flies the whole arc.
+- The circle (_volley_ring): lob_aim's ground ring (_ground_arc_mesh) of
+  radius (LOB_RING_MIN at least) round the aimed cell in UiTheme "alarm",
+  from the loose till the last fall is down (ticks + falls - 1) and
+  VOLLEY_RING_AFTER (0.2 s) on, then freed. The falling whistle stays where
+  it was, LOB_WARN_SECONDS before the first, from the centre.
+- Each fall (_volley_fall): an arrow hidden till VOLLEY_FALL_SECONDS
+  (0.25 s) before tick ticks + i, then down at LOB_PITCH from the archer's
+  side, VOLLEY_FALL_HEIGHT (6 m) onto its point, and stands in the ground
+  nose first SHOT_STUCK_SECONDS with sfx.arrow_land (sfx.arrow_water into
+  water, gone after); none on a body (its hurt is heard). No falls (an old
+  server) is one at the centre.
+
+view_test: a volley of three: the loosed arrow up more than 4 m over the
+bow and faded past 0.8, gone before the first fall; the circle in alarm,
+shown at the last fall, gone after; each fall at its tick (within 0.1 s),
+on its own point, steep and nose first, the thud counted per fall, the
+whistle once before the first. Client only, rides rev 41 (no wire
+change of its own), no new class_name.
