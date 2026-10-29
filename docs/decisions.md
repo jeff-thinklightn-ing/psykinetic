@@ -34870,9 +34870,15 @@ revert commit and a full landing first.
   `origin/main`'s, which is true when run from a checkout at the tag. Its ssh line now does
   `git checkout -q main` before the pull, so the next deploy without `-Ref` ends the rollback.
   `deploy.sh` alone, off `main`, refuses with that advice instead of checking out under itself.
-- It is staged as ever. stage.sh, the tag's own, runs the old build on a copy of the live world
-  on the box, so a world the old build can't read fails the stage and leaves the live server
-  untouched. `sudo psykinetic-backup` comes first (the host's allowlist).
+- It is staged as ever, with the tag's own stage.sh. That stage can't read the live snapshot
+  (`/var/lib/psykinetic` is the service's, and the ssh user can't read it), so it stages a fresh world. That
+  shows the old build starts and takes a player, not that it reads today's world. The live boot
+  shows that: its "loaded N entities" must equal the newer build's last "saved N level
+  entities". `sudo psykinetic-backup` comes first (the host's allowlist), and is the way back if not.
+- Drilled 2026-10-29 01:40, with 0 players and a backup first: `-Now -Ref v0.1.190` took the box
+  v0.1.191 to v0.1.190 (stage passed; live boot loaded 102 entities, the v0.1.191 server's
+  last save 102; ERROR 0; free walk, regenerate on, raids off). Then a plain `-Now` deploy went
+  to main at b27e4a73, with the box's repo back on main and the same checks.
 - It only goes back within one PROTOCOL_REVISION. Clients update forward only, and those on a
   newer protocol can't join an older server, so a protocol cut is undone by reverting it on
   `main` and cutting a newer release. Rolling back past a world-format change (722's

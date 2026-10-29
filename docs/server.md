@@ -134,9 +134,10 @@ since an unpublished one leaves them nothing to update to); runs
 exits non-zero if staging or the deploy fails.
 
 A rollback (decision 730): `tools\deploy_box.ps1 -Now -Ref v0.1.190` builds that
-release's tag on the box instead of `main`, staged like any deploy, so a
-world the old build can't read stops it before the live server is touched.
-Run `sudo psykinetic-backup` first. The box's repo is left on the tag, and the
+release's tag on the box instead of `main`, staged like any deploy. The stage
+uses a fresh world (the ssh user can't read the live snapshot), so check the
+live boot: its `loaded N entities` must match the newer build's last `saved N
+level entities`. Run `sudo psykinetic-backup` first; it is the way back. The box's repo is left on the tag, and the
 next deploy without `-Ref` puts it back on `main` (`deploy.sh` alone refuses
 to run off `main`). It only goes back within one `PROTOCOL_REVISION`: clients
 that updated to a newer protocol can't join an older one, so a protocol
