@@ -13993,13 +13993,12 @@ func _visitor_of(worker_id: String) -> Dictionary:
 	return {}
 
 
-## What a pedlar asks for [param item]: economy's own sum in
-## Economy.visitor_sale (its value times merchant.sell, at least 1), so
-## the panel's price is the one taken. Offers' ctx "visitor_price".
+## What a pedlar asks for [param item]: Economy.visitor_price, the price
+## visitor_sale takes. Offers' ctx "visitor_price".
 func _visitor_price(item: String) -> Variant:
 	if World.economy == null:
 		return null
-	return maxi(roundi(World.economy.value_of(item) * float(World.economy.rules.get("merchant", {}).get("sell", 1.15))), 1)
+	return World.economy.visitor_price(item)
 
 
 ## A visitor came to [param town] (Towns.visitor_came): what they carry to

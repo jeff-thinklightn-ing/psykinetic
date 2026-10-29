@@ -1292,12 +1292,18 @@ func visitor_arrives(town: String, entry: Dictionary) -> String:
 	return ", ".join(did)
 
 
+## What a pedlar asks for one [param item] (711): its value x merchant.sell,
+## 1 at least; the price visitor_sale takes and the wares panel shows.
+func visitor_price(item: String) -> int:
+	return maxi(roundi(value_of(item) * float(rules.get("merchant", {}).get("sell", 1.15))), 1)
+
+
 ## Player [param player_id] buys one [param item] from pedlar [param entry]
 ## in [param town] (711; Towns.visitor_sell): its value x merchant.sell, the
 ## town's sale tax on it to the treasury, the rest away with the pedlar.
 ## {ok, say, gold (paid)}.
 func visitor_sale(town: String, entry: Dictionary, player_id: String, item: String) -> Dictionary:
-	var cost := maxi(roundi(value_of(item) * float(rules.get("merchant", {}).get("sell", 1.15))), 1)
+	var cost := visitor_price(item)
 	if gold(player_id) < cost:
 		return {"ok": false, "say": "That's %d gold, friend." % cost, "gold": 0}
 	add_gold(player_id, -cost, "%s from %s the pedlar" % [item, entry.get("name", "")])

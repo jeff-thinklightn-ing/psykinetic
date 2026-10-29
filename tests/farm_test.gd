@@ -593,7 +593,7 @@ func _test_visitors() -> void:
 	economy.add_gold("p1", 100, "test")
 	gold = work.stockpile.count(TOWN, "gold")
 	var sold := towns.visitor_sell(str(here[0]["id"]), "p1", item)
-	_check(bool(sold["ok"]) and economy.gold("p1") == 100 - int(sold["gold"]) and int(sold["gold"]) > 0, "a player buys %s for %d" % [item, int(sold["gold"])])
+	_check(bool(sold["ok"]) and int(sold["gold"]) == economy.visitor_price(item) and economy.gold("p1") == 100 - int(sold["gold"]) and int(sold["gold"]) > 0, "a player buys %s for %d" % [item, int(sold["gold"])])
 	_check(work.stockpile.count(TOWN, "gold") - gold == Economy.taxed(int(sold["gold"]), Economy.goods_class(item), rules)[0], "the town's tax on it")
 	_check(int(towns.visitors(TOWN)[0]["stock"].get(item, 0)) == int(stock[item]) - 1, "one off the stock")
 	_check(not bool(towns.visitor_sell(str(here[0]["id"]), "p2", item)["ok"]) and economy.gold("p2") == 0, "no gold, no sale")

@@ -35410,3 +35410,10 @@ flies its rolled angle to the step's reach and strikes the first body
 (the spread is an angle). The lob's circle by the aim's share of the reach is
 combat's side (World.lob_circle_at). ui_test _test_aim. Client only, protocol
 unchanged, no new class_name.
+## 711, economy's side (2): one pedlar's price
+
+Economy.visitor_price(item) (its value x merchant.sell, 1 at least) is the
+price visitor_sale takes; npc's wares panel (Main._visitor_price) reads it
+instead of its own copy of the sum, so the two can't drift. farm_test: the
+sale takes visitor_price. No change in play: no CHANGELOG bullet. Server
+only, protocol unchanged, no new class_name.
