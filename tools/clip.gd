@@ -1599,7 +1599,7 @@ func _on_tick(tick: int) -> void:
 			for entity in World.monsters():
 				if str(entity.spawn_spec.get("kind", "")) == step[1]:
 					if World.distance(_player.tile, entity.tile) > 1:
-						World.order_move(_player, entity.tile - Vector2i(signi(entity.tile.x - _player.tile.x), 0))
+						_main._move_click(_player, entity.tile - Vector2i(signi(entity.tile.x - _player.tile.x), 0), false)  # Its free body's route (703).
 						return
 		"item_pick":
 			# The first monster takes up a weapon beside it, when there is one.

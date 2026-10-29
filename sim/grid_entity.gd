@@ -56,16 +56,6 @@ enum Order { NONE, ATTACK, SHOVE, SWING, SIGNATURE }
 
 ## The only state sent over the network, besides World's tick.
 const REPLICATED: Array[String] = ["tile", "hp", "facing", "stamina", "protected", "winded"]
-## Reconciliation: a misprediction this far off or less is blended away over
-## RECONCILE_BLEND_TICKS and the walk goes on; anything further ends the
-## walk and slides there from where it is drawn, RECOVER_TICKS_PER_TILE a
-## tile of the way, between RECONCILE_BLEND_TICKS and RECOVER_MAX_TICKS
-## (decision 339); only TELEPORT_TILES or more is snapped.
-const SNAP_TILES := 2
-const RECONCILE_BLEND_TICKS := 2.0
-const RECOVER_TICKS_PER_TILE := 0.75
-const RECOVER_MAX_TICKS := 4.0
-const TELEPORT_TILES := 8
 ## A mirror's slide that starts late (its turn came after the one before
 ## ended, or a burst arrived) is drawn up to this many times faster until
 ## it is back on time (_catch_up, decision 350).
@@ -161,7 +151,7 @@ var step_until := -100000.0
 ## decision 344).
 var last_step_tick := -100000
 ## The body's centre in cell units, Vector2(tile) the cell's centre
-## (decision 688): a free body's own (World.free_walk, World._free_glide),
+## (decision 688): a free body's own (a player's, World._free_glide),
 ## anyone else's its cell's centre. Any change of tile but a free body's
 ## own claim puts it there (_world_set_tile): a push, a lunge snaps it.
 var free_pos := Vector2.ZERO
@@ -304,11 +294,6 @@ var next_move_tick := 0.0
 var next_attack_tick := 0
 ## Set by World when a collision stuns this entity. Server only.
 var stunned_until_tick := 0
-var has_move_order := false
-var move_order := Vector2i.ZERO
-## Tiles to walk through, in order, before pathing to move_order: the steps
-## the ordering client was already showing. Server only.
-var move_via: Array[Vector2i] = []
 ## Where the local client points the body while it stands still (WASD:
 ## the cursor), in grid units from its tile; ZERO for none. Display only.
 var aim := Vector2.ZERO
@@ -364,14 +349,8 @@ var _guess_confirmed := Vector2i(-9999, -9999)
 ## The local player, on a client: the tick before which it is taken to be
 ## still cooling down from its last shove, for guessing (World._predict_shove).
 var _guessed_ready_tick := 0
-## The local player, on a client: when (display clock) a walk of its own was
-## last shown. The server is a step behind the screen, so a shove soon after
-## waits there for that step to end (see World._predict_shove).
-var _walk_shown_at := -INF
 ## True on a client once this mirror is registered with World.
 var _mirroring := false
-## Set only on the client that controls this entity. See MovePrediction.
-var _prediction: MovePrediction
 
 # Feedback visuals live on the Sprite child, never on this node's position.
 var _sprite: Node2D
@@ -557,12 +536,6 @@ func _display_caught_up() -> void:
 
 func _process(delta: float) -> void:
 	var wanted := Vector2(facing)
-	if _prediction != null and _prediction.advance(delta):
-		# Not a correction but silence: the server is not doing this walk.
-		_prediction.give_up()
-		_mispredicted("no confirmation from the server")
-	elif _prediction != null and _prediction.take_route_changed():
-		_resend_walk()  # Planned again on the way: the server walks the new plan.
 	if spawned:
 		var free_at := _free_shown()
 		if not free_at.is_empty():
@@ -579,12 +552,6 @@ func _process(delta: float) -> void:
 				wanted = going
 			elif aim != Vector2.ZERO:
 				wanted = aim
-		elif _prediction != null and _prediction.is_active():
-			# The local player's own walking: shown ahead of the server.
-			position = _prediction.position()
-			_walk_shown_at = World.tick + World.tick_alpha
-			if _prediction.facing() != Vector2i.ZERO:
-				wanted = _prediction.shown_direction()  # 655: along its bend.
 		else:
 			# Mirrors are drawn slightly in the past, so a tile change is
 			# always known before its slide has to start.
@@ -799,7 +766,6 @@ func _world_place(new_id: int, at: Vector2i) -> void:
 	stunned_until_tick = 0
 	next_move_tick = 0
 	next_attack_tick = 0
-	has_move_order = false
 	action_order = Order.NONE
 	action_target = null
 	spawned = true
@@ -1088,14 +1054,6 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 		push["from"] = old
 		_show_push(push)
 		return
-	if _prediction != null and _prediction.is_active():
-		if _prediction.reconcile(tile):
-			# Already on screen: the prediction showed this step.
-			_mirror_rest()
-		else:
-			# Somewhere the prediction did not go (blocked, re-pathed, pushed).
-			_mispredicted("the server moved it elsewhere")
-		return
 	# Interpolate: slide from the old tile, starting when the display clock
 	# reaches the tick this arrived in. Until then the slide before it plays
 	# out; replacing it here would cut every step short and jump to its end.
@@ -1139,176 +1097,16 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 	_slides.append({"from": old, "to": tile, "tick": start, "duration": duration})
 
 
-## True while this client is showing its own walk ahead of the server.
-func predicting() -> bool:
-	return _prediction != null and _prediction.is_active()
-
-
-## Turns on prediction of this entity's own walking. Only meaningful on the
-## client that controls it; everywhere else it does nothing.
-func enable_prediction() -> void:
-	if _mirroring and _prediction == null:
-		_prediction = MovePrediction.new(self)
-
-
-## The local player just ordered a move: start showing it now. Returns the
-## tiles of the steps already on screen that the server has not confirmed,
-## which it must walk first (see World.command_move).
-func predict_move(target: Vector2i) -> Array[Vector2i]:
-	var none: Array[Vector2i] = []
-	if _prediction == null:
-		return none
-	return _prediction.order(target)
-
-
-## WASD: the local player asked for one step that way. Shown at once
-## unless the replicated world refuses it; true if it is shown.
-func predict_step(direction: Vector2i) -> bool:
-	if _prediction == null:
-		return false
-	return _prediction.step(direction)
-
-
-## 655 amended: WASD, each frame: the direction the keys hold now (ZERO
-## for none), so the walk shown bends toward the step that will follow.
-func hint_step(direction: Vector2i) -> void:
-	if _prediction != null:
-		_prediction.hint(direction)
-
-
-## 678: the held walk's straight line ([param origin], [param along] in grid
-## units; INF for none), so the own body is drawn on it, not cell to cell.
-func hint_line(origin: Vector2, along: Vector2) -> void:
-	if _prediction != null:
-		_prediction.hint_line(origin, along)
-
-
-## Whether the local player's walk is ready for its next WASD step: the
-## one on screen is ending. Always true without prediction (the server
-## queues and times the steps itself).
-func ready_for_step() -> bool:
-	return _prediction == null or _prediction.ready_for_step()
-
-
-## 683: the tile of the step on screen now (the one under way), or the
-## entity's own.
-func shown_step_tile() -> Vector2i:
-	if _prediction != null and _prediction.is_active():
-		return _prediction.predicted_tile()
-	return tile
-
-
-## Where the walk on screen ends: the last predicted step's tile, or the
-## entity's own.
-func walk_end() -> Vector2i:
-	if _prediction != null and _prediction.is_active():
-		return _prediction._steps.back().to
-	return tile
-
-
-## 678 amended: the planned steps of the walk on screen not yet begun; 0
-## without prediction.
-func steps_planned() -> int:
-	return _prediction.steps_planned() if _prediction != null else 0
-
-
-## Refusals of this entity's steps the client has heard of (see
-## World.order_step).
-func step_epoch() -> int:
-	return _prediction.epoch if _prediction != null else 0
-
-
-## The local player just ordered an attack or shove on something standing on
-## [param target_tile]: show the walk up to it. The hit itself is not predicted.
-## Closing in on [param target] to strike: shown at once. Returns the steps
-## already under way on screen that the server has not confirmed: it walks
-## them before closing in (World._order_action).
-func predict_approach(target_tile: Vector2i, target: GridEntity = null) -> Array[Vector2i]:
-	var none: Array[Vector2i] = []
-	if _prediction == null:
-		return none
-	_prediction.order(target_tile, false)
-	_prediction.follow(target)
-	return _prediction.in_flight()
-
-
-## Tile the sprite is drawn on, which on the predicting client may be ahead
-## of [member tile].
+## Tile the sprite is drawn on, which for a free body may be ahead of
+## [member tile].
 func shown_tile() -> Vector2i:
 	return Iso.local_to_tile(position)
 
 
-## The server's result wins: snap to its tile and forget the predicted path.
-## The server's result wins. A small error is blended away over
-## RECONCILE_BLEND_TICKS and the path re-planned from the server's tile; a
-## larger one ends the walk and slides there from where the body is drawn
-## (_recover); only TELEPORT_TILES or more is snapped.
-func _mispredicted(reason: String) -> void:
-	var predicted := _prediction.predicted_tile()
-	var error := World.distance(predicted, tile)
-	var off := (Iso.local_to_grid(position) - Vector2(tile)).length()
-	var drawn := Iso.local_to_grid(position)
-	Net.record_mispredict()
-	Net.stats.record_correction(off, error >= TELEPORT_TILES)
-	_mirror_rest()
-	if error >= TELEPORT_TILES:
-		_prediction.clear()
-		Net.record_snap()
-		print("[net] mispredict: %s predicted %s, server has %s, %d tiles off: snapped (%s)" % [
-			name, predicted, tile, error, reason])
-	elif error > SNAP_TILES:
-		_prediction.clear()
-		var ticks := _recover(drawn)
-		print("[net] mispredict: %s predicted %s, server has %s, %d tiles off: walk ended, sliding there over %.1f ticks (%s)" % [
-			name, predicted, tile, error, ticks, reason])
-	else:
-		_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
-		_resend_walk()
-		print("[net] mispredict: %s predicted %s, server has %s: blending (%s), %.2f tiles off" % [
-			name, predicted, tile, reason, off])
-
-
-## A slide from [param drawn] to the tile, at once (on the present clock),
-## its length by how far that is: no snap on a large correction. Returns
-## the slide's ticks.
-func _recover(drawn: Vector2) -> float:
-	var ticks := clampf(drawn.distance_to(Vector2(tile)) * RECOVER_TICKS_PER_TILE, RECONCILE_BLEND_TICKS, RECOVER_MAX_TICKS)
-	_slides.append({"from": tile, "to": tile, "tick": World.tick + World.tick_alpha, "duration": ticks,
-		"present": true, "from_pos": drawn})
-	return ticks
-
-
-## After a correction: the walk re-planned from the server's tile goes to
-## the server as the order, so it walks it rather than a way of its own.
-func _resend_walk() -> void:
-	if _prediction.is_walking_to_target():
-		World.resend_move(self, _prediction.target(), _prediction.unconfirmed())
-
-
-## The server refused a step into [param refused] this tick. Re-plan from
-## its tile now rather than waiting out the deadline. [param epoch] is the
-## server's refusal count for WASD steps.
-func _on_move_refused(refused: Vector2i, epoch: int) -> void:
-	if _prediction == null:
-		return
-	_prediction.epoch = maxi(_prediction.epoch, epoch)
-	if not _prediction.is_active():
-		return
-	Net.record_mispredict()
-	var off := (Iso.local_to_grid(position) - Vector2(tile)).length()
-	Net.stats.record_correction(off, false)
-	_mirror_rest()
-	# A refused step into the destination itself, or a strike's closing in
-	# that the server gave up (World.ORDER_DROPPED): the server has dropped
-	# the order (Player._sim_tick, _pursue_action), so there is nothing left
-	# to predict.
-	_prediction.server_dropped_queue()  # A refused WASD step empties it (decision 543).
-	if refused == _prediction.target() or epoch == World.ORDER_DROPPED:
-		_prediction.give_up()
-	_prediction.rebase(tile, RECONCILE_BLEND_TICKS)
-	_resend_walk()
-	print("[net] mispredict: %s step into %s refused, server has %s: %s, %.2f tiles off" % [
-		name, refused, tile, "re-planned" if _prediction.has_target() else "order given up", off])
+## Whether this is the body this client plays (703: what the own-body
+## prediction once marked).
+func _own_body() -> bool:
+	return owner_peer != 0 and owner_peer == Net.local_id
 
 
 # Cosmetic only: they replay feedback, they carry no sim state.
@@ -1334,7 +1132,7 @@ func _net_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, to: Vecto
 			_take_back_guess()
 		return
 	var push := {"from": from, "to": to, "tick": at_tick, "duration": duration,
-		"present": by_peer == multiplayer.get_unique_id() or _prediction != null}
+		"present": by_peer == multiplayer.get_unique_id() or _own_body()}
 	if tile != to:
 		# The tile comes after: the slide waits for it (_mirror_tile_changed).
 		_pending_push = push
@@ -1357,7 +1155,7 @@ func _net_pushed(tiles: int, lofted: bool, toss: bool, from: Vector2i, to: Vecto
 ## Its word (the push, the tile) confirms it, or puts it where the server
 ## did; none by Net.rtt_ticks() and two ticks more, and it slides back.
 func guess_knock(to: Vector2i, duration: float) -> void:
-	if not _mirroring or _prediction != null or to == tile:
+	if not _mirroring or _own_body() or to == tile:
 		return
 	tossed = false
 	_lofted = false
@@ -1388,9 +1186,6 @@ func _take_back_guess() -> void:
 ## steps before it, already past for the server); any other in its turn on
 ## the display clock, as the server timed it.
 func _show_push(push: Dictionary) -> void:
-	if _prediction != null and _prediction.is_active():
-		# The local player, thrown: no misprediction, just the server's slide.
-		_prediction.clear()
 	var slide := {"from": push["from"], "to": push["to"], "tick": push["tick"], "duration": push["duration"]}
 	if push["present"]:
 		slide["present"] = true

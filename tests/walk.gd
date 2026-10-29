@@ -1,9 +1,9 @@
 extends RefCounted
-## Walks a body to a cell in a test, whichever way World walks it (decision
-## 688): on the grid a step at a time (World.try_move along World.walk_path,
-## when its timer allows), as a free body (World.free_walk) by one tick's
-## input command at a time toward the next cell of that path, slowing onto
-## the cell's centre. World is stepped a tick at a time. Preload it:
+## Walks a body to a cell in a test, the way World walks it (decision 688):
+## a player, a free body (World.free_body), by one tick's input command at a
+## time toward the next cell of World.walk_path, slowing onto the cell's
+## centre; anything else, on the grid, a step at a time (World.try_move,
+## when its timer allows). World is stepped a tick at a time. Preload it:
 ## `const Walk := preload("res://tests/walk.gd")`.
 
 
@@ -24,9 +24,9 @@ static func arrived(entity: GridEntity, cell: Vector2i) -> bool:
 	return entity.tile == cell and (not World.free_body(entity) or entity.free_pos.distance_to(Vector2(cell)) < 0.05)
 
 
-## One tick's walk toward [param cell]: a step on the grid if its timer
-## allows, else a free body's command for a tick toward the path's next
-## cell, at most what reaches that cell's centre.
+## One tick's walk toward [param cell]: a free body's command for a tick
+## toward the path's next cell, at most what reaches that cell's centre;
+## a body on the grid (not a player) a step, if its timer allows.
 static func toward(entity: GridEntity, cell: Vector2i) -> void:
 	var path: Array[Vector2i] = []
 	if entity.tile != cell:

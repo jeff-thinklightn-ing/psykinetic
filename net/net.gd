@@ -464,6 +464,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## {to, ticks, radius, falls}: the circle about the aimed cell and the
 ## points its arrows come down on, one a tick from ticks on. An old client's
 ## RPC no longer matches.
+## 703 step 4 on the same revision: World's request_move, request_step and
+## move_refused RPCs are gone and request_attack / request_shove lose their
+## via list; a player walks only free (an old client's grid input is
+## refused), and the snapshot's free_walk key is no more.
 const PROTOCOL_REVISION := 41
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
@@ -586,14 +590,6 @@ var companions := true
 ## a real level (Monster.idling, Monster.noticing): without it, test_room's
 ## imps hunted net_test's players under load.
 var still_monsters := false
-## Players' bodies move freely (World.free_walk, decision 688) on whoever is
-## the authority: the default (decision 693; Jeff: "it should be the default
-## setting"); --grid-walk for the grid's steps (tests staging steps), and
-## --free-walk to say so. A server's saved switch (the admin's free_walk
-## on|off) rules when neither is given.
-var free_walk := true
-## Whether --free-walk or --grid-walk was given (over the saved switch).
-var free_walk_given := false
 ## --no-player-reset turns this off: any player may rebuild the room with R.
 ## On while the game is only being tested; the console's reset always works.
 var player_reset := true
@@ -822,7 +818,6 @@ var test_latency_kick := false
 ## turn (2 if none), as blows do.
 var test_kicks := 0.0
 var test_kick_speeds: Array[float] = []
-var test_hold_route := false
 var test_hold_angle := 45.0
 var test_hold_far := sqrt(2.0)
 var test_hold_flip := 0.0
@@ -835,7 +830,6 @@ var test_walk_on_wind := false
 ## --test-foe: [monster kind, weapon] each joining player is given, or empty.
 var test_foe: PackedStringArray = []
 
-var mispredicts_total := 0
 ## Tick times, bandwidth, corrections: see NetStats.
 var stats := NetStats.new()
 ## --max-players=<n>: authenticated peers at once (MAX_PLAYERS unless said);
@@ -844,11 +838,6 @@ var max_players := MAX_PLAYERS
 ## Server: what each client is sent, by nearness to its player (Interest).
 var interest := Interest.new()
 var _traffic_at_msec := 0
-var snaps_total := 0
-## Times (msec) of snaps in the last minute.
-var _snap_times: Array[int] = []
-## Times (msec) of mispredictions in the last minute.
-var _mispredict_times: Array[int] = []
 
 
 func _enter_tree() -> void:
@@ -1420,32 +1409,6 @@ func rtt_ms() -> float:
 func rtt_ticks() -> float:
 	# --test-lag stands in for a longer way to the server, so it counts.
 	return minf((rtt_ms() / 1000.0 + test_lag) * World.TICK_RATE, 10.0)
-
-
-func record_mispredict() -> void:
-	mispredicts_total += 1
-	_mispredict_times.append(Time.get_ticks_msec())
-
-
-## Mispredictions in the last 60 seconds.
-func record_snap() -> void:
-	snaps_total += 1
-	_snap_times.append(Time.get_ticks_msec())
-
-
-## Snaps (mispredictions too big to blend) in the last 60 seconds.
-func snaps_per_minute() -> int:
-	var cutoff := Time.get_ticks_msec() - 60000
-	while not _snap_times.is_empty() and _snap_times[0] < cutoff:
-		_snap_times.pop_front()
-	return _snap_times.size()
-
-
-func mispredicts_per_minute() -> int:
-	var cutoff := Time.get_ticks_msec() - 60000
-	while not _mispredict_times.is_empty() and _mispredict_times[0] < cutoff:
-		_mispredict_times.pop_front()
-	return _mispredict_times.size()
 
 
 ## Server: polls the network itself, so that a peer whose ENet link is
@@ -2046,12 +2009,6 @@ func _parse_args() -> void:
 				console = true
 			"--no-companions":
 				companions = false
-			"--free-walk":
-				free_walk = true
-				free_walk_given = true
-			"--grid-walk":
-				free_walk = false
-				free_walk_given = true
 			"--still-monsters":
 				still_monsters = true
 				Monster.idling = false
@@ -2140,9 +2097,7 @@ func _set_option(key: String, value: String) -> void:
 		"--test-hold-near":
 			test_hold_near = maxf(value.get_slice(",", 0).to_float(), 0.0)
 			for part in value.split(",").slice(1):
-				if part == "route":
-					test_hold_route = true
-				elif part.begins_with("angle="):
+				if part.begins_with("angle="):
 					test_hold_angle = part.trim_prefix("angle=").to_float()
 				elif part.begins_with("far="):
 					test_hold_far = part.trim_prefix("far=").to_float()

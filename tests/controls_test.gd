@@ -1,8 +1,7 @@
 extends Node
 ## WASD and the orders behind the hand, against the real room in main.tscn:
 ## the key-to-direction mapping at every camera yaw (checked against a real
-## Camera3D), the server's step queue and its timer, refusals, a move
-## order's via tiles, and the swing. Run it with tests/run.ps1 or
+## Camera3D), a click's free route, the swing and the strikes. Run it with tests/run.ps1 or
 ## tests/run.sh. Prints PASS/FAIL per assertion and quits with exit code 1
 ## if any assertion failed, 0 otherwise.
 
@@ -19,8 +18,6 @@ var _swings: Array[Vector2i] = []
 func _ready() -> void:
 	World.set_process(false)
 	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17788)  # Not 7777: the editor may be hosting there.
 	Client3D.feel_path = ""  # 673 step 2: the defaults, whatever the tuned file holds.
 	_main = preload("res://main.tscn").instantiate()
@@ -28,10 +25,6 @@ func _ready() -> void:
 	World.entity_swung.connect(func(_entity: GridEntity, direction: Vector2i) -> void: _swings.append(direction))
 
 	_test_wasd_mapping()
-	_test_steps_take_the_timer()
-	_test_release_stops()
-	_test_refused_step_and_stale_steps()
-	_test_order_walks_via_first()
 	_test_swing()
 	_test_scheme_default()
 	_test_screen_lean()
@@ -43,7 +36,6 @@ func _ready() -> void:
 	_test_middle_drag_axis()
 	_test_schemes_are_inert_outside()
 	_test_click_uses_the_frame_pick()
-	_test_straight_lines()
 	_test_bow_click_walks()
 	_test_friend_click()
 	_test_peaceable_click()
@@ -109,83 +101,6 @@ func _test_wasd_mapping() -> void:
 	_check(Main.wasd_direction(Vector2.ZERO, 45.0) == Vector2i.ZERO, "no keys: no direction")
 	rig.free()
 	viewport.queue_free()
-
-
-func _test_steps_take_the_timer() -> void:
-	print("\n== WASD steps go at 4 cells a second, one per free tick ==")
-	_kill_monsters()
-	var player := _place_player(Vector2i(11, 3))
-	var start := player.tile
-	# A client sends the next step as the last one ends; here, whenever the
-	# queue is empty.
-	var moved_at: Array[int] = []
-	var at := player.tile
-	for i in 20:
-		if player.queued_steps.is_empty():
-			World.order_step(player, Vector2i(0, 1) if player.tile.y < 6 else Vector2i(-1, 0), player.refusals, true)
-		World.step()
-		if player.tile != at:
-			moved_at.append(World.tick)
-			at = player.tile
-	_check(moved_at.size() == 8, "8 steps in 20 ticks (%d: on ticks %s)" % [moved_at.size(), moved_at])
-	var gaps: Array[int] = []
-	for i in range(1, moved_at.size()):
-		gaps.append(moved_at[i] - moved_at[i - 1])
-	_check(gaps.all(func(gap: int) -> bool: return gap == 2 or gap == 3) and gaps.count(2) >= 3 and gaps.count(3) >= 3,
-			"steps 2 and 3 ticks apart, alternating (%s): 2.5 on average" % [gaps])
-	_check(is_equal_approx(player._move_duration, 2.5), "each drawn over 2.5 ticks (%s)" % player._move_duration)
-	_check(World.distance(start, player.tile) >= 4, "and they went where they were sent (%s -> %s)" % [start, player.tile])
-
-
-func _test_release_stops() -> void:
-	print("\n== letting go stops on the cell being entered ==")
-	var player := _place_player(Vector2i(11, 3))
-	World.order_step(player, Vector2i(0, 1), player.refusals, true)
-	World.step()
-	_check(player.tile == Vector2i(11, 4), "one step taken (%s)" % player.tile)
-	for i in 10:
-		World.step()
-	_check(player.tile == Vector2i(11, 4), "nothing more sent: it stays (%s)" % player.tile)
-
-
-func _test_refused_step_and_stale_steps() -> void:
-	print("\n== a refused step ends the walk; steps sent before the client knew are dropped ==")
-	var player := _place_player(Vector2i(11, 3))
-	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
-		"name": "BlockImp", "tile": Vector2i(11, 4), "props": {"mass": 200.0}}) as Monster
-	imp.sight_range = 0
-	_wait_free(player)
-	var before := player.refusals
-	World.order_step(player, Vector2i(0, 1), player.refusals, true)
-	World.order_step(player, Vector2i(0, 1), player.refusals, true)
-	World.step()
-	_check(player.tile == Vector2i(11, 3), "the step into the imp is refused")
-	_check(player.refusals == before + 1 and player.queued_steps.is_empty(), "the count goes up and the rest of the queue goes")
-	World.order_step(player, Vector2i(1, 0), before, true)
-	_check(player.queued_steps.is_empty(), "a step sent with the old count is dropped")
-	World.order_step(player, Vector2i(1, 0), player.refusals, true)
-	_check(player.queued_steps.size() == 1, "one sent with the new count is queued")
-	World.step()
-	_check(player.tile == Vector2i(12, 3), "and taken (%s)" % player.tile)
-	World.despawn(imp)
-
-
-func _test_order_walks_via_first() -> void:
-	print("\n== a move order walks the steps its client already shows first ==")
-	var player := _place_player(Vector2i(11, 3))
-	# Straight down is the path to (11, 6); the client was showing a step
-	# to (10, 4) when the order went.
-	var via: Array[Vector2i] = [Vector2i(10, 4)]
-	World.order_move(player, Vector2i(11, 6), via)
-	World.step()
-	_check(player.tile == Vector2i(10, 4), "the via tile first (%s)" % player.tile)
-	for i in 12:
-		World.step()
-	_check(player.tile == Vector2i(11, 6), "then on to the target (%s)" % player.tile)
-	_place_player(Vector2i(11, 3))
-	World.order_move(player, Vector2i(11, 6), [Vector2i(11, 3), Vector2i(11, 4)] as Array[Vector2i])
-	World.step()
-	_check(player.tile == Vector2i(11, 4), "a via tile it already stands on is skipped (%s)" % player.tile)
 
 
 func _test_swing() -> void:
@@ -638,13 +553,11 @@ func _test_schemes_are_inert_outside() -> void:
 	var player := _place_player(Vector2i(11, 3))
 	Net.test_walk = [{"keys": "s", "seconds": 5.0}] as Array[Dictionary]
 	_main._walk_index = -1
-	_main._drive_wasd()
-	_check(player.queued_steps.is_empty(), "click: a movement key held sends no step")
+	var own: RefCounted = _main._free_own(player)
+	_check(_main._free_intent(player, own) == Vector2.ZERO, "click: a movement key held walks nowhere")
 	Net.controls = "wasd"
-	_main._drive_wasd()
-	_check(player.queued_steps.size() == 1, "wasd: it does")
+	_check(_main._free_intent(player, own).length() > 0.99, "wasd: it walks")
 	Net.test_walk = [] as Array[Dictionary]
-	player.queued_steps.clear()
 	Net.controls = saved
 	_free_rig(rig)
 
@@ -662,74 +575,12 @@ func _test_click_uses_the_frame_pick() -> void:
 	_main._unhandled_input(click)
 	click.pressed = false
 	_main._unhandled_input(click)
-	_check(player.has_move_order and player.move_order == Vector2i(9, 6),
-			"and the click sends the player there (%s)" % player.move_order)
-	player.has_move_order = false
+	_check(_walking_to(Vector2i(9, 6)),
+			"and the click sends the player there (%s)" % [_walk_end()])
+	_stop_walk()
 	Net.controls = saved
 
 
-
-## Decision 678 (Jeff: "walking still wants to be on a diagonal and it
-## doesn't fit with the new camera"; and "placing the cursor to move on a
-## diagonal 1 square in front of me ... the run camera stutter").
-func _test_straight_lines() -> void:
-	print("\n== 678: a held key walks its exact line; the button held near steers; held far, a new walk a step's time apart ==")
-	var along := Main.wasd_vector(Main.key_vector("w"), 20.0)
-	var at := Vector2i.ZERO
-	var worst := 0.0
-	for i in 10:
-		at += Main.line_steps(at, Vector2.ZERO, along)[0]
-		worst = maxf(worst, absf(along.normalized().cross(Vector2(at))))
-	var turned := rad_to_deg(Vector2(at).angle_to(along))
-	_check(worst <= 0.5 and absf(turned) < 6.0 and Main.wasd_direction(Main.key_vector("w"), 20.0) == Vector2i(-1, -1),
-			"W at a 20 degree yaw: ten steps within half a cell of its line (worst %.2f), %.1f degrees off it at the end, not the diagonal" % [worst, turned])
-	# 678 amended (Jeff on v0.1.177: "i can move cursor behind me and character
-	# keeps going"; "the body doesn't face the direction of travel").
-	_check(Main.held_turns(Vector2.ZERO, Vector2i(6, 0), Vector2i(-6, 0)) and Main.held_turns(Vector2.ZERO, Vector2i(6, 0), Vector2i(3, 5))
-			and not Main.held_turns(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 2)),
-			"a held walk's cell swung behind or 59 degrees round turns it (sent at once); 18 degrees does not")
-	_check(Main.held_replans(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 2), 5) and not Main.held_replans(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 1), 5)
-			and Main.held_replans(Vector2.ZERO, Vector2i(6, 0), Vector2i(6, 1), 2),
-			"planned again when its way drifts 18 degrees, or the plan runs under three steps; not for 9.5 degrees with five left")
-	var line := Main.line_anchor(Vector2(0, 0.4), Vector2.RIGHT, Vector2i(5, 0), Vector2.from_angle(deg_to_rad(5.0)))
-	var anew := Main.line_anchor(Vector2(0, 0.4), Vector2.RIGHT, Vector2i(5, 0), Vector2.from_angle(deg_to_rad(30.0)))
-	_check(line[0].is_equal_approx(Vector2(5, 0.4)) and anew[0] == Vector2(5, 0),
-			"a held way shifted 5 degrees goes on from the walk's point on its line (%s); turned 30, a new line from the walk's cell (%s)" % [line[0], anew[0]])
-	var saved: String = Net.controls
-	Net.controls = "click"
-	var player := _place_player(Vector2i(11, 3))
-	_main._held_target = Vector2i(12, 4)
-	_main._test_holding = true
-	_main._pick_grid = Iso.local_to_grid(player.position) + Vector2(1.0, 1.0)
-	_main._retarget_held()
-	_check(not player.has_move_order and player.queued_steps.size() == 1 and player.queued_steps[0]["direction"] == Vector2i(1, 1),
-			"held a diagonal cell ahead: a step that way, no new walk to a cell (%s)" % [player.queued_steps])
-	player.queued_steps.clear()
-	_main._held_target = Vector2i(11, 3)
-	_main._held_sent_at = 0
-	_main._pick_grid = Vector2(4.1, 3.1)
-	_main._retarget_held()
-	var first := player.move_order
-	_main._pick_grid = Vector2(4.1, 6.1)
-	_main._retarget_held()
-	_check(player.has_move_order and first == Vector2i(4, 3) and player.move_order == first,
-			"held far: a walk there, and the cursor on another cell within a step's time sends none (%s)" % player.move_order)
-	_main._held_sent_at = 0
-	_main._retarget_held()
-	_check(player.move_order == Vector2i(4, 6), "a step's time on, the new cell (%s)" % player.move_order)
-	# 683 (the latency table: let go with Pip in the line, a held walk's
-	# route went on 5.7 cells): a hold that steered, let go, stops at the
-	# step under way; a click let go without steering walks on.
-	_main._test_holding = false
-	_main._retarget_held()
-	_check(_main._held_target == Main.NONE and (not player.has_move_order or player.move_order == player.tile),
-			"let go after steering: the walk ends at the step under way, %s (it was going to (4, 6): %s)" % [player.tile, player.move_order])
-	_main._move_click(player, Vector2i(4, 3))
-	_main._retarget_held()
-	_check(player.has_move_order and player.move_order == Vector2i(4, 3), "a click let go at once still walks to its cell (%s)" % player.move_order)
-	_main._held_target = Main.NONE
-	player.has_move_order = false
-	Net.controls = saved
 
 func _test_bow_click_walks() -> void:
 	print("\n== a bow in hand: a plain left click walks at once; Shift held draws and stands firm, the left release looses, Shift up lets it down (583 amended (2)) ==")
@@ -746,17 +597,17 @@ func _test_bow_click_walks() -> void:
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	_main._unhandled_input(click)
-	_check(_main._stance == "" and player.raised == "" and not _main.aim_drawn and player.has_move_order and player.move_order == Vector2i(9, 6),
-			"a plain press: no draw, the walk at once (%s)" % player.move_order)
+	_check(_main._stance == "" and player.raised == "" and not _main.aim_drawn and _walking_to(Vector2i(9, 6)),
+			"a plain press: no draw, the walk at once (%s)" % [_walk_end()])
 	click.pressed = false
 	_main._unhandled_input(click)
-	player.has_move_order = false
+	_stop_walk()
 	var shift := InputEventMouseButton.new()
 	shift.button_index = MOUSE_BUTTON_LEFT
 	shift.shift_pressed = true
 	shift.pressed = true
 	_main._unhandled_input(shift)
-	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order, "Shift with the press: the bow drawn, no walk, no stand swing")
+	_check(_main._stance == "draw" and player.raised == "draw" and not _walking(), "Shift with the press: the bow drawn, no walk, no stand swing")
 	_main.drive_stand_draw(false, true)
 	_check(_main._stance == "draw" and player.raised == "draw", "Shift up with the left button still down: still drawn (583 amended (2))")
 	var again := InputEventMouseButton.new()
@@ -770,19 +621,16 @@ func _test_bow_click_walks() -> void:
 	_main._unhandled_input(let_go)
 	_check(_main._stance == "" and player.raised == "", "the left release while drawn: loosed (or let down before draw_min), the bow lowered (583 amended (2))")
 	# Shift held, walking: the body stops where it stands and draws.
-	World.order_move(player, Vector2i(5, 3))
-	_check(player.has_move_order, "(walking to 5,3)")
+	_main._move_click(player, Vector2i(5, 3))
+	_check(_walking_to(Vector2i(5, 3)), "(walking to 5,3)")
 	_main.drive_stand_draw(true)
-	_check(_main._stance == "draw" and player.raised == "draw" and not player.has_move_order,
-			"Shift held while walking: the walk dropped, the bow drawn at once")
-	var tile := player.tile
-	World.order_move(player, Vector2i(5, 3))
-	player.next_move_tick = 0
-	var moved := false
-	for direction: Vector2i in World.DIRECTIONS:
-		moved = moved or World.try_move(player, direction)
-	_check(not player.has_move_order and not moved and player.tile == tile,
-			"drawn, the server takes no walk ordered and no step: it stands firm")
+	_check(_main._stance == "draw" and player.raised == "draw" and World.free_held(player),
+			"Shift held while walking: the bow drawn at once, the body held")
+	var at := player.free_pos
+	World.free_input(player, Vector2.LEFT, 0.5)
+	_resolve()
+	_check(player.free_pos.is_equal_approx(at), "drawn, the server takes no walk: it stands firm (%s)" % player.free_pos)
+	_stop_walk()
 	_main.drive_stand_draw(true)
 	_check(_main._stance == "draw", "Shift still held: still drawn")
 	_main.drive_stand_draw(false)
@@ -795,7 +643,7 @@ func _test_bow_click_walks() -> void:
 	right.button_index = MOUSE_BUTTON_RIGHT
 	right.pressed = true
 	_main._unhandled_input(right)
-	_check(_main._stance == "lob" and player.raised == "draw" and player.lobbing and not player.has_move_order, "RMB held with a bow: drawn at the sky, standing firm")
+	_check(_main._stance == "lob" and player.raised == "draw" and player.lobbing and not _walking(), "RMB held with a bow: drawn at the sky, standing firm")
 	_main._unhandled_input(again)
 	_main._unhandled_input(let_go)
 	_main.drive_stand_draw(true)
@@ -807,21 +655,7 @@ func _test_bow_click_walks() -> void:
 	_check(_main._stance == "" and player.raised == "" and not player.lobbing and World._lobs.size() == lobs + 1, "RMB let go: lobbed at the cursor, the stance ended")
 	_main.drive_stand_draw(false)
 	World.fields.outdoor = outdoor_was
-	player.next_move_tick = 0
-	var free_step := false
-	for direction: Vector2i in World.DIRECTIONS:
-		if not free_step and World.is_free(player.tile + direction):
-			free_step = World.try_move(player, direction)
-	_check(free_step, "let down: it walks again")
-	# Queued steps the client showed are refused when the draw stands it firm.
-	player.next_move_tick = World.tick + 100
-	player.queued_steps.append({"direction": Vector2i(1, 0), "predicted": true})
-	var refusals := player.refusals
-	World.try_stance(player, "draw")
-	_check(player.queued_steps.is_empty() and player.refusals == refusals + 1,
-			"steps queued and shown: dropped as the draw begins, the client told (refusals %d -> %d)" % [refusals, player.refusals])
-	World.try_stance(player, "")
-	player.has_move_order = false
+	_check(not World.free_held(player), "let down: it walks again")
 	World.items.end(World.take_item(player, player, Player.RIGHT_HAND), "gone")
 	World.items.end(World.take_item(player, player, Player.LEFT_HAND), "gone")
 	Net.controls = saved
@@ -841,9 +675,8 @@ func _test_friend_click() -> void:
 	_check(World.spawn(body, Vector2i(9, 6)), "(a resident stands at 9,6)")
 	_main._pick_grid = Vector2(9.1, 6.1)
 	_left(false)
-	_check(player.action_order != GridEntity.Order.ATTACK and player.has_move_order
-			and World.distance(player.move_order, body.tile) == 1 and _main._talk_wanted == body,
-			"a plain click walks beside them to talk, no attack (%s)" % player.move_order)
+	_check(player.action_order != GridEntity.Order.ATTACK and _walking_beside(body) and _main._talk_wanted == body,
+			"a plain click walks beside them to talk, no attack (%s)" % [_walk_end()])
 	var hints_were: bool = Net.hints
 	Net.hints = true
 	_check(_main.context_hint_for(body) == "LMB  interact", "the hint says interact with hints=on (560; %s)" % _main.context_hint_for(body))
@@ -852,9 +685,9 @@ func _test_friend_click() -> void:
 			and "Shift held, bow	stand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn" in _main.hint_lines()
 			and "RMB, bow	hold to aim at the sky, let go to lob onto the circle: over walls, knocks down" in _main.hint_lines(),
 			"the controls list: Shift+LMB swings where you stand; with a bow, Shift held stands firm and draws, LMB release looses (583 amended (2)); RMB lobs (677)")
-	player.has_move_order = false
+	_stop_walk()
 	_left(true)
-	_check(player.action_order == GridEntity.Order.SWING and not player.has_move_order and _main._talk_wanted == null,
+	_check(player.action_order == GridEntity.Order.SWING and not _walking() and _main._talk_wanted == null,
 			"Shift+click from afar: a swing where you stand, no walk, no talk")
 	var hp := body.hp
 	_wait_free(player)
@@ -902,9 +735,9 @@ func _test_bubble_click_goes_through() -> void:
 			"(the bubble is under the mouse, and takes no mouse)")
 	_main._pick_grid = Vector2(9.2, 6.1)
 	_left(false)
-	_check(player.has_move_order and player.move_order == Vector2i(9, 6) and not _main._bar.visible and _main._talk_wanted == null,
-			"the ground under the bubble: walked to, no talk bar (%s)" % player.move_order)
-	player.has_move_order = false
+	_check(_walking_to(Vector2i(9, 6)) and not _main._bar.visible and _main._talk_wanted == null,
+			"the ground under the bubble: walked to, no talk bar (%s)" % [_walk_end()])
+	_stop_walk()
 	var occupant := World.get_entity_at(Vector2i(9, 6))
 	if occupant != null:
 		World.despawn(occupant)
@@ -915,7 +748,7 @@ func _test_bubble_click_goes_through() -> void:
 	_left(false)
 	_check(player.action_order == GridEntity.Order.ATTACK and not _main._bar.visible, "a monster under it: attacked")
 	player.action_order = GridEntity.Order.NONE
-	player.has_move_order = false
+	_stop_walk()
 	World.despawn(foe)
 	foe.queue_free()
 	World.despawn(speaker)
@@ -943,10 +776,9 @@ func _test_peaceable_click() -> void:
 	_check(World.spawn(talker, Vector2i(9, 6)), "(a talking monster at peace stands at 9,6)")
 	_main._pick_grid = Vector2(9.1, 6.1)
 	_left(false)
-	_check(player.action_order != GridEntity.Order.ATTACK and player.has_move_order
-			and World.distance(player.move_order, talker.tile) == 1 and _main._talk_wanted == talker,
-			"a plain click walks beside it to talk, no attack (%s)" % player.move_order)
-	player.has_move_order = false
+	_check(player.action_order != GridEntity.Order.ATTACK and _walking_beside(talker) and _main._talk_wanted == talker,
+			"a plain click walks beside it to talk, no attack (%s)" % [_walk_end()])
+	_stop_walk()
 	_main._talk_wanted = null
 	_left(true)
 	_check(player.action_order == GridEntity.Order.SWING and _main._talk_wanted == null, "Shift+click: a swing where you stand, deliberate")
@@ -955,13 +787,13 @@ func _test_peaceable_click() -> void:
 	_left(false)
 	_check(player.action_order == GridEntity.Order.ATTACK and _main._talk_wanted == null, "at war (peaceable false): a plain click attacks as ever")
 	player.action_order = GridEntity.Order.NONE
-	player.has_move_order = false
+	_stop_walk()
 	talker.talks = false
 	talker.peaceable = true
 	_left(false)
 	_check(player.action_order == GridEntity.Order.ATTACK, "a monster that does not talk: a click attacks, whatever its flag")
 	player.action_order = GridEntity.Order.NONE
-	player.has_move_order = false
+	_stop_walk()
 	World.despawn(talker)
 	talker.queue_free()
 	Net.controls = saved
@@ -1083,7 +915,7 @@ func _test_cursor_bandage() -> void:
 	_press(KEY_B)
 	_main._pick_grid = Vector2(12.0, 3.0)
 	_left(false)
-	_check(player.action_order == GridEntity.Order.NONE and not player.has_move_order and _main._cursor_item.is_empty(),
+	_check(player.action_order == GridEntity.Order.NONE and not _walking() and _main._cursor_item.is_empty(),
 			"a click on a monster with the bandage on the cursor: no attack, no walk; the cursor emptied")
 	_kill_monsters()
 	player.hp = player.max_hp - 5
@@ -1195,6 +1027,7 @@ func _test_free_pull() -> void:
 	print("
 == a route's string pulled: straight at the farthest cell in clear line ==")
 	var player := _place_player(Vector2i(4, 3))
+	_free_start(player)
 	var path: Array = []
 	for cell: Vector2i in World.walk_path(Vector2i(4, 3), Vector2i(9, 3), player):
 		path.append(cell)
@@ -1210,7 +1043,7 @@ func _test_free_chase() -> void:
 	print("
 == a click on an imp with a free body: walked to it, then struck ==")
 	var player := _place_player(Vector2i(4, 3))
-	World.set_free_walk(true)
+	_free_start(player)
 	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
 		"name": "ChaseImp", "tile": Vector2i(9, 3), "props": {"mass": 40.0}}) as Monster
 	imp.sight_range = 0
@@ -1238,7 +1071,6 @@ func _test_free_chase() -> void:
 	_main._move_click(player, Vector2i(4, 3))
 	_check(_main._free["chase"] == null, "a click elsewhere: the chase given up")
 	World.despawn(imp)
-	World.set_free_walk(false)
 	player.free_view = null
 
 
@@ -1252,7 +1084,7 @@ func _test_guide_route() -> void:
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(4, 3))
-	World.set_free_walk(true)
+	_free_start(player)
 	var stops := {"n": 0}
 	var on_command := func(_entity: GridEntity, command_name: String, args: Dictionary) -> void:
 		if command_name == "guide" and args.get("stop") == "moved":
@@ -1279,7 +1111,6 @@ func _test_guide_route() -> void:
 	_main._on_message("world", {"full": false, "guide_route": {"companion": "Pip", "zone": zone, "path": []}})
 	_check(not _main._free.get("guided", false) and (_main._free["path"] as Array).is_empty(), "an empty path: her lead over, nothing left to walk")
 	World.command_received.disconnect(on_command)
-	World.set_free_walk(false)
 	player.free_view = null
 	Net.controls = saved
 
@@ -1295,7 +1126,7 @@ func _test_free_click() -> void:
 	var saved: String = Net.controls
 	Net.controls = "click"
 	var player := _place_player(Vector2i(4, 3))
-	World.set_free_walk(true)
+	_free_start(player)
 	_main._test_holding = true
 	_main._move_click(player, Vector2i(9, 6))
 	_free_frames(player, 3)
@@ -1323,7 +1154,6 @@ func _test_free_click() -> void:
 	_check(stopped_at.distance_to(was) < 0.15 and own.shown(player).distance_to(stopped_at) < 0.01,
 			"a click on its own cell mid-walk: stopped where it stood (from %s: went on %.2f, then %.3f)" % [
 			was, stopped_at.distance_to(was), own.shown(player).distance_to(stopped_at)])
-	World.set_free_walk(false)
 	player.free_view = null
 	Net.controls = saved
 
@@ -1343,8 +1173,7 @@ func _free_frames(player: Player, frames: int, cell := Main.NONE) -> bool:
 
 func _place_player(tile: Vector2i) -> Player:
 	var player := _player()
-	player.queued_steps.clear()
-	player.has_move_order = false
+	_stop_walk()
 	player.action_order = GridEntity.Order.NONE
 	if player.tile != tile:
 		var occupant := World.get_entity_at(tile)
@@ -1353,6 +1182,41 @@ func _place_player(tile: Vector2i) -> Player:
 		World._relocate(player, tile)
 	_wait_free(player)
 	return player
+
+
+## 703: a click's walk is the own body's free route (Main._free["path"]).
+func _walking() -> bool:
+	return not (_main._free["path"] as Array).is_empty()
+
+
+## The cell the route ends on, NONE for none.
+func _walk_end() -> Vector2i:
+	var path: Array = _main._free["path"]
+	return path.back() if not path.is_empty() else Main.NONE
+
+
+func _walking_to(cell: Vector2i) -> bool:
+	return _walk_end() == cell
+
+
+## Walking to a cell beside [param body].
+func _walking_beside(body: GridEntity) -> bool:
+	return _walking() and World.distance(_walk_end(), body.tile) == 1
+
+
+func _stop_walk() -> void:
+	_main._free["path"] = []
+
+
+## The body set off from its cell's centre, nothing pending (as the old
+## free_walk switch's turning on did, 689).
+func _free_start(player: Player) -> void:
+	World.free_drop(player)
+	player.free_pos = Vector2(player.tile)
+	player.free_way = Vector2.ZERO
+	player.free_seen = -1
+	player.free_acked = -1
+	player.pack_free()
 
 
 func _wait_free(entity: GridEntity) -> void:

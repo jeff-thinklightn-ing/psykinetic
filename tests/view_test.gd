@@ -13,9 +13,6 @@ var _rig: Client3D
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17791)  # Not 7777 (the editor may be hosting there), nor any other test's or eval's.
 	Client3D.feel_path = ""  # 673 step 2: the defaults, whatever the tuned file holds.
 	_main = preload("res://main.tscn").instantiate()
@@ -6548,8 +6545,9 @@ func _outlined(puppet: Node3D) -> int:
 func _place(entity: GridEntity, tile: Vector2i) -> void:
 	World._relocate(entity, tile)
 	if entity is Player:
-		entity.queued_steps.clear()
-		entity.has_move_order = false
+		# A free body (703): its view starts again where it is put, no route left.
+		entity.free_view = null
+		_main._free["path"] = []
 
 
 func _test_humans() -> void:

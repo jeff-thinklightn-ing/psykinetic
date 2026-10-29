@@ -17,11 +17,11 @@ var _failures := 0
 var _main: Node
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17793)
 	Net.companions = false
 	Net.state_path = preload("res://tests/test_ports.gd").scratch_path("chest_test_world.json")
@@ -219,11 +219,11 @@ func _test_click_from_afar() -> void:
 	World._relocate(host, Vector2i(6, 1))
 	_main._open_pack(host, chest)
 	await get_tree().process_frame
-	_check(panel.other == null and host.has_move_order, "not beside it: not open, walking (to %s)" % host.move_order)
-	for i in 40:
-		World.step()
-		if World.can_melee(host.tile, chest.tile):
-			break
+	var route: Array = _main._free["path"]
+	_check(panel.other == null and not route.is_empty() and _main._pack_wanted == chest,
+		"not beside it: not open, a route set (to %s)" % [route.back() if not route.is_empty() else null])
+	if not route.is_empty():
+		Walk.to(host, route.back(), 240)  # Its free body walked there, as Main's drive would (703).
 	await get_tree().process_frame
 	_check(World.can_melee(host.tile, chest.tile) and panel.other == chest, "beside it at %s: open" % host.tile)
 	World._relocate(host, Vector2i(6, 1))

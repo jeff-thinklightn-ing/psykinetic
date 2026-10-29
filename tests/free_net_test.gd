@@ -49,9 +49,7 @@ func _ready() -> void:
 	_test_kick_under_lag()
 	_test_companion_on_a_client()
 	_test_rebuilt_body()
-	_test_switch()
 	_test_resend()
-	World.free_walk = false
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -304,18 +302,6 @@ func _test_rebuilt_body() -> void:
 	_check(own.held_by_server(player), "a push's hold a few ticks on: held")
 	own.hold_until = World.tick + FreeNet.HOLD_MAX_TICKS + 5000
 	_check(not own.held_by_server(player), "a hold far past any (a clock begun again): not held")
-	var logged := World.logged
-	World._grid_order_for_free(player)
-	World._grid_order_for_free(player)
-	_check(World.logged == logged + 1, "grid orders for a free body: logged once (%d)" % (World.logged - logged))
-	# The admin's switch outlives a restart (the box came back off twice).
-	var path := preload("res://tests/test_ports.gd").scratch_path("free_walk_state.json")
-	for saved: bool in [true, false]:
-		Snapshot.save(path, {}, [], {"steps": 0, "free_walk": saved})
-		_check(Snapshot.load(path).get("free_walk") == saved, "free_walk saved %s: loaded %s" % [saved, Snapshot.load(path).get("free_walk")])
-	Snapshot.save(path, {}, [], {"steps": 0})
-	_check(Snapshot.load(path).get("free_walk") == null, "never saved: none (the default rules)")
-	DirAccess.remove_absolute(path)
 
 
 func _test_companion_on_a_client() -> void:
@@ -333,21 +319,6 @@ func _test_companion_on_a_client() -> void:
 	pet.keeper_peer = player.owner_peer + 1
 	glided = World.free_glide(player, Vector2(1, 2), Vector2.RIGHT, 10.0)
 	_check((glided[0] as Vector2).x < 2.25, "another's companion stops it (%s)" % glided[0])
-
-
-func _test_switch() -> void:
-	print("\n== the admin's switch: off puts each body on its cell, on starts it there ==")
-	var player := _build(OPEN, Vector2i(2, 2))
-	for i in 3:
-		World.free_input(player, Vector2(1, 0.3), World.TICK_DT)
-		World.step()
-		player.pack_free()
-	_check(not player.free_state.is_empty(), "walking free: its state on the wire")
-	World.set_free_walk(false)
-	_check(player.free_state.is_empty() and player.free_pos == Vector2(player.tile), "off: on its cell %s, the wire empty" % player.tile)
-	_check(World.get_entity_at(player.tile) == player, "(the cell its own)")
-	World.set_free_walk(true)
-	_check(not player.free_state.is_empty() and player.free_pos == Vector2(player.tile), "on again: from its cell's centre")
 
 
 ## A body standing still has its state written again (689 amended (2),
@@ -404,7 +375,6 @@ func _packet(commands: Array) -> PackedByteArray:
 
 func _build(rows: Array[String], at: Vector2i) -> Player:
 	World.reset()
-	World.free_walk = true
 	if _room != null:
 		_room.free()
 	_room = Node2D.new()

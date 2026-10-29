@@ -8,6 +8,7 @@ extends Node
 ## who held it takes it back after rescue.restock_days, not with a player
 ## in it, remembered across a restart; then it does. Run it with tests/run.ps1 or tests/run.sh.
 
+const Walk := preload("res://tests/walk.gd")
 const IMP_SLOT := 4  # Imp2 at (2, 6) in the test room.
 const CAMP_CELL := Vector2i(2, 6)
 
@@ -18,9 +19,6 @@ var _camp := ""
 
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17858)
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
@@ -61,8 +59,8 @@ func _test_holds() -> void:
 
 func _test_clock_restarts() -> void:
 	print("\n== stepping out starts the clock again ==")
-	var player := _player()
 	_kill_monsters()
+	var player := _standing_player()
 	_walk_to(player, CAMP_CELL + Vector2i(1, 0))
 	_step(_main.CAMP_FALL_TICKS - 30)
 	_walk_to(player, CAMP_CELL + Vector2i(8, 0))
@@ -133,6 +131,21 @@ func _test_retaken() -> void:
 	_check(_slot_entity(IMP_SLOT) is Monster, "the goblins hold it again: the imp comes back")
 
 
+## The player on their feet: one beaten down by the camp's monsters while
+## it held (five on a free body standing still) bleeds out and is back.
+func _standing_player() -> Player:
+	var player := _player()
+	if player != null and not World.is_downed(player):
+		return player
+	if player != null:
+		World.damage(player, player.hp, null, &"bled")
+	for i in _main.RESPAWN_TICKS * 4:
+		World.step()
+		if _player() != null and _player() != player:
+			break
+	return _player()
+
+
 func _step(ticks: int) -> void:
 	for i in ticks:
 		World.step()
@@ -169,11 +182,7 @@ func _kill_monsters() -> void:
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
-	World.order_move(entity, tile)
-	for i in 120:
-		if entity.tile == tile:
-			return
-		World.step()
+	Walk.to(entity, tile, 240)  # A free body (703): its commands, a tick at a time.
 
 
 func _check(ok: bool, label: String) -> void:

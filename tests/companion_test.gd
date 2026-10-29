@@ -3359,7 +3359,6 @@ func _test_heel_keeps_clear() -> void:
 	_settle(pet)
 	var owner_was := owner.tile
 	var pet_was := pet.tile
-	var refusals_were := owner.refusals
 	var count := {"swaps": 0, "fresh": 0, "backs": 0}  # (A lambda takes ints by value.)
 	var moves: Array[Vector2i] = []
 	var at := {"owner": owner.tile, "pet": pet.tile, "tick": -100}  # Kept the one dictionary: the lambda holds it.
@@ -3410,10 +3409,9 @@ func _test_heel_keeps_clear() -> void:
 			for i in 12:
 				World.step()
 				watch.call()
-	var refused := owner.refusals - refusals_were
-	print("  (stop dead and turn back, twenty runs: %d swaps, %d into a cell she had just taken, %d steps back, %d refusals of his steps; her step gaps %s)" % [count["swaps"], count["fresh"], count["backs"], refused, gaps])
+	print("  (stop dead and turn back, twenty runs: %d swaps, %d into a cell she had just taken, %d steps back; her step gaps %s)" % [count["swaps"], count["fresh"], count["backs"], gaps])
 	_check(count["fresh"] == 0 and count["backs"] == 0, "she never steps into the cell he walks into: no swap into it, no step back (%d, %d)" % [count["fresh"], count["backs"]])
-	_check(refused == 0, "and none of his held steps is refused (%d)" % refused)
+	# (A free body's steps are never refused, 703: no grid steps to count.)
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
@@ -3582,8 +3580,6 @@ func _test_spear_reach() -> void:
 func _test_reset_free() -> void:
 	print("\n== a free player resets the room with her along: she heels his new body (the barrow's reset) ==")
 	_kill_monsters()
-	var free_was := World.free_walk
-	World.set_free_walk(true)
 	var before := _player()
 	var pet := _companion()
 	_settle(pet)
@@ -3594,7 +3590,6 @@ func _test_reset_free() -> void:
 	_check(pet != null and pet.keeper == owner and pet.keeper_peer == owner.owner_peer and World.distance(pet.tile, owner.tile) <= 2,
 		"she is his again, beside him (at %s, he %s)" % [pet.tile if pet != null else Vector2i(-1, -1), owner.tile])
 	if pet == null or owner == null:
-		World.set_free_walk(free_was)
 		return
 	var start := owner.tile
 	var goal := _far_cell(start, 5, 8)
@@ -3605,7 +3600,6 @@ func _test_reset_free() -> void:
 		most = maxi(most, World.distance(pet.tile, owner.tile))
 	_check(walked and pet.current_intent == Companion.Intent.FOLLOW and World.distance(pet.tile, owner.tile) <= Heel.STOP + 1,
 		"he walks off: she follows the new body to his heel (he %s to %s, she %s)" % [start, owner.tile, pet.tile])
-	World.set_free_walk(free_was)
 
 
 func _test_look_asked() -> void:
@@ -3674,8 +3668,6 @@ func _test_guide_free() -> void:
 	var owner := _player()
 	var pet := _companion()
 	_settle(pet)
-	var free_was := World.free_walk
-	World.set_free_walk(true)
 	var burnt := {"ticks": 0}  # Ticks she or they stood in fire (707). (A lambda takes ints by value.)
 	var kept_bond: Variant = _bond_as(6)  # Devoted: only devoted leads (decision 621).
 	var routes: Array[Array] = []
@@ -3776,7 +3768,6 @@ func _test_guide_free() -> void:
 	pet.said.disconnect(heard)
 	_main._world_news.send = send_was
 	_bond_as(0, kept_bond)
-	World.set_free_walk(free_was)
 
 
 func _test_heel_free_leader() -> void:
@@ -3787,8 +3778,6 @@ func _test_heel_free_leader() -> void:
 	_settle(pet)
 	var owner_was := owner.tile
 	var pet_was := pet.tile
-	var free_was := World.free_walk
-	World.free_walk = true
 	var count := {"bumps": 0, "backs": 0, "in_way": 0, "ticks": 0, "far": 0, "most": 0}  # (A lambda takes ints by value.)
 	var bumped := func(mover: GridEntity, occupant: GridEntity, _direction: Vector2i) -> void:
 		if mover == owner and occupant == pet:
@@ -3846,7 +3835,6 @@ func _test_heel_free_leader() -> void:
 		for i in 16:
 			hold.call(Vector2.ZERO)
 	World.entity_bumped.disconnect(bumped)
-	World.set_free_walk(free_was)
 	print("  (six runs, %d ticks: %d bumps of his into her, %d steps back, %d ticks in the cells he was about to cross, %d ticks more than %d away, %d at most)" % [
 		count["ticks"], count["bumps"], count["backs"], count["in_way"], count["far"], Heel.STOP + 1, count["most"]])
 	_check(count["bumps"] == 0 and count["backs"] == 0, "she is never in his way when he gets there, and never steps straight back (%d, %d)" % [count["bumps"], count["backs"]])
@@ -5575,11 +5563,7 @@ func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
 	if entity is Player:
 		Walk.to(entity, tile, 120)  # A player walks free (703): its commands, as a client's.
 		return
-	World.order_move(entity, tile)
-	for i in 120:
-		if entity.tile == tile:
-			return
-		World.step()
+	Walk.to(entity, tile, 120)  # Anything else on the grid, a step at a time.
 
 
 ## The next cell of a guide route ([x, y] cells, 695) for [param body] to

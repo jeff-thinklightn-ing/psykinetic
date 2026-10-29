@@ -30,7 +30,7 @@ func _ready() -> void:
 	World.entity_pushed.connect(func(entity: GridEntity, _by: GridEntity, _direction: Vector2i, tiles: int, impact: int, stopped_by: String) -> void:
 		_pushes.append({"entity": entity, "tiles": tiles, "impact": impact, "stopped_by": stopped_by}))
 	_register_maps()
-	_check(World.free_walk, "free walk is on: every player's walk below is a free body's (6b)")
+	_check(_player() == null or World.free_body(_player()), "a player is a free body: every player's walk below is one (6b, 703)")
 
 	_test_test_room_unchanged()
 	_test_every_level()
@@ -2120,7 +2120,7 @@ func _test_hidden_niche() -> void:
 		if door.open:
 			break
 	World.link_bumped.disconnect(on_bump)
-	_check(World.free_walk and taken.is_empty() and door.open and player.tile == Vector2i(6, 1) and World.zone.name == "lt_niche",
+	_check(World.free_body(player) and taken.is_empty() and door.open and player.tile == Vector2i(6, 1) and World.zone.name == "lt_niche",
 		"pressed with free walk on: the slab found, the stair behind it not taken through it (%s, %s)" % [taken, player.tile])
 	_check(door.open and door.lock.is_empty(), "the press found it again")
 	_hold_free(player, Vector2(0, 0), Main.NICHE_FOUND_HOLD)
@@ -2572,9 +2572,6 @@ func _put(entity: GridEntity, tile: Vector2i) -> void:
 	if occupant != null:
 		World.despawn(occupant)
 	World._relocate(entity, tile)
-	if entity is Player:
-		entity.queued_steps.clear()
-		entity.has_move_order = false
 
 
 ## Steps the world until [param entity] may move again.

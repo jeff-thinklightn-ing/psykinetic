@@ -1152,13 +1152,10 @@ func _test_wind_up() -> void:
 	wound.clear()
 	World.command_attack(host, imp)
 	_steps(1)
-	var was_free := World.free_walk
-	World.free_walk = true  # A free move straight away (703: the player's grid orders are going; 392 amended).
-	World.free_input(host, Vector2(-d).normalized(), 1.0)
+	World.free_input(host, Vector2(-d).normalized(), 1.0)  # A free move straight away (392 amended).
 	_steps(1)
 	_check(World.winding(host).is_empty() and wound == [8, 0], "a free move away gives it up; the views told (0 ticks) (%s)" % [wound])
 	World.free_drop(host)
-	World.free_walk = was_free
 	hp = imp.hp
 	_steps(10)
 	_check(imp.hp == hp, "and nothing is struck")
@@ -2700,8 +2697,6 @@ func _test_bandage_reach() -> void:
 	_check(host.mending == 0 and pet.mending == 0, "case: E held on her out of reach: not you instead, not her (the server's line says why)")
 	# Banked free steps dropped as it starts.
 	settle.call()
-	var was_free := World.free_walk
-	World.free_walk = true
 	World.free_input(host, Vector2(1, 0), 1.0)
 	World.free_input(host, Vector2(1, 0), 1.0)
 	var queued := host.free_inputs.size()
@@ -2709,7 +2704,6 @@ func _test_bandage_reach() -> void:
 			"case: free walk, %d steps banked: dropped as the bandage starts" % queued)
 	_steps(2)
 	_check(host.mending == 1 and host.tending == String(host.name), "case: and it is still running two ticks on (not broken by a banked step)")
-	World.free_walk = was_free
 	settle.call()
 	host.hp = host.max_hp
 	pet.hp = pet.max_hp

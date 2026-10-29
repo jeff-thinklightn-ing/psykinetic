@@ -28,6 +28,9 @@ var _room: Node2D
 var _damage_log: Array[Dictionary] = []
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
 func _ready() -> void:
 	World.set_process(false)
 	World.entity_damaged.connect(_on_entity_damaged)
@@ -595,11 +598,7 @@ func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
 			World.free_input(entity, (Vector2(tile) - entity.free_pos).normalized(), World.TICK_DT)
 			World.step()
 		return
-	World.order_move(entity, tile)
-	for i in 40:
-		if entity.tile == tile:
-			return
-		World.step()
+	Walk.to(entity, tile, 40)  # A monster on the grid.
 
 
 func _damage(entity: GridEntity, cause: StringName) -> int:

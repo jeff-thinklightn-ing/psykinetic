@@ -21,11 +21,11 @@ var _failures := 0
 var _main: Node
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17862)
 	Monster.idling = false
 	_main = preload("res://main.tscn").instantiate()
@@ -138,9 +138,7 @@ func _test_walk_and_follow() -> void:
 	_main.load_map("st_stream")
 	var player := _player()
 	World._relocate(player, Vector2i(5, 2))
-	World.order_move(player, Vector2i(10, 2))
-	for i in 40:
-		World.step()
+	Walk.to(player, Vector2i(10, 2), 80)  # A free body (703).
 	_check(player.tile == Vector2i(10, 2), "a player walks through the ford (%s)" % player.tile)
 	World._relocate(player, Vector2i(4, 6))
 	var pet := _companion()
@@ -150,9 +148,7 @@ func _test_walk_and_follow() -> void:
 	World._relocate(pet, _main._nearest_free(Vector2i(3, 6)))
 	for i in 10:
 		World.step()
-	World.order_move(player, Vector2i(12, 6))
-	for i in 80:
-		World.step()
+	Walk.to(player, Vector2i(12, 6), 160)
 	_check(player.tile == Vector2i(12, 6), "they walk over the bridge (%s)" % player.tile)
 	_check(pet.tile.x > 7, "their companion follows across, not stalled at the bank (%s)" % pet.tile)
 

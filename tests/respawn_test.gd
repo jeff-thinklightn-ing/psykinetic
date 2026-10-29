@@ -10,11 +10,11 @@ var _failures := 0
 var _main: Node
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17782)  # Not 7777: the editor may be hosting there.
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
@@ -66,9 +66,7 @@ func _test_respawn_waits_for_time_and_distance() -> void:
 	# One of them came back just now: the stagger (decision 382) would hold
 	# the imp RESPAWN_STAGGER_TICKS more. This checks the distance alone.
 	_main._respawned_at.clear()
-	World.order_move(player, Vector2i(9, 6))
-	World.step()
-	World.step()  # move_ticks: the step lands on the second tick.
+	Walk.step(player, Vector2i(1, 0))  # Its free body onto (9, 6): the cell held as it crosses.
 	_check(player.tile == Vector2i(9, 6), "player is 7 tiles from the spawn tile (at %s)" % player.tile)
 	var back := _slot_entity(4)
 	_check(back is Monster and back.start_tile == spawn_tile, "the imp respawned on its spawn tile that same tick")
@@ -341,11 +339,7 @@ func _kill_monsters(keep := -1) -> void:
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
-	World.order_move(entity, tile)
-	for i in 120:
-		if entity.tile == tile:
-			return
-		World.step()
+	Walk.to(entity, tile, 240)  # A free body (703): its commands, a tick at a time.
 
 
 ## Shoves, waiting out the cooldown and the mid-step rule first.

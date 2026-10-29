@@ -8,11 +8,11 @@ var _failures := 0
 var _main: Node
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
 func _ready() -> void:
 	World.set_process(false)
-	# The grid's steps: free walk is the default (decision 693).
-	Net.free_walk = false
-	World.free_walk = false
 	Net.port = preload("res://tests/test_ports.gd").of(17787)  # Not 7777: the editor may be hosting there.
 	Net.companions = false  # A companion would pick fights with the test's imps.
 	_main = preload("res://main.tscn").instantiate()
@@ -91,8 +91,7 @@ func _test_spawn_grace() -> void:
 
 	World.protect(player, _main.SPAWN_GRACE_TICKS)
 	_check(player.protected, "protected again")
-	World.order_move(player, player.tile + Vector2i(0, 1))
-	World.step()
+	Walk.step(player, Vector2i(0, 1))  # A free body's walk onto the next cell (703): its claim ends it.
 	_check(not player.protected, "moving ends the grace at once")
 
 	World.protect(player, _main.SPAWN_GRACE_TICKS)
@@ -141,11 +140,7 @@ func _kill_monsters() -> void:
 
 
 func _walk_to(entity: GridEntity, tile: Vector2i) -> void:
-	World.order_move(entity, tile)
-	for i in 120:
-		if entity.tile == tile:
-			return
-		World.step()
+	Walk.to(entity, tile, 240)  # A free body (703): its commands, a tick at a time.
 
 
 func _check(ok: bool, label: String) -> void:

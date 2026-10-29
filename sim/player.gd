@@ -1,14 +1,11 @@
 class_name Player
 extends GridEntity
-## Carries out orders set through World.order_move / order_step /
-## order_attack / order_shove / order_swing / order_signature.
-## An action order (attack, shove) walks up to its target if it is out of
-## reach, fires once when in reach and off cooldown, and clears; a swing
-## fires where the player stands. A move order walks the tiles it came with
-## first (move_via: the steps its client already shows), then re-paths every
-## step so it reacts to things moving; stepping into the ordered tile pushes
-## whatever is on it, if World allows. WASD steps (queued_steps) are taken
-## one per free tick, in order, and win over everything else.
+## A free body (decision 688; since 703 the only way a player walks): its
+## client's input commands move it (World.free_input, tend_free_body). It
+## carries out the action orders set through World.order_attack /
+## order_shove / order_swing / order_signature: an attack or a shove fires
+## once in reach and off cooldown, its client closing in (697), and clears;
+## a swing fires where the player stands.
 
 ## Slots a player has for things (Items): the pack, two hands
 ## (Items.RIGHT_HAND, LEFT_HAND) and the armour worn (Items.ARMOUR; decision
@@ -23,17 +20,10 @@ const LANTERN := 0.9
 ## chase to bring it into reach before it is given up (4 s).
 const FREE_CHASE_TICKS := 4 * World.TICK_RATE
 
-## WASD steps waiting for the movement timer: {direction, predicted}.
 ## The armour it wears (decision 622): the Items id in its armour slot
 ## (Items.ARMOUR), "" for none. Replicated, for the views' covering (read
 ## Items.armour_of); written only by World as its slots change.
 var worn := ""
-var queued_steps: Array[Dictionary] = []
-## How many of this player's predicted WASD steps have been refused. A
-## step its client sent before hearing of the latest refusal carries an
-## older count and is dropped (see World.order_step): the client had
-## already given that walk up.
-var refusals := 0
 ## Server: a free body's input commands waiting (World.free_input, decision
 ## 688): {intent, ticks}, applied in order against free_bank.
 var free_inputs: Array[Dictionary] = []
@@ -150,8 +140,6 @@ func _free_pushed(tiles: int) -> void:
 ## player's replay told what the server applied, another's mirror given a
 ## sample; empty, the view dropped (back on the grid).
 func _free_heard() -> void:
-	if is_local() and not Net.is_authority():
-		World.free_walk = not free_state.is_empty()  # A client's own rules follow its body.
 	if free_state.is_empty():
 		free_view = null
 		return
@@ -220,92 +208,11 @@ func toggle_lantern() -> void:
 	emit_light = 0.0 if emit_light > 0.0 else LANTERN
 
 func _sim_tick() -> void:
-	if World.free_body(self):
-		# A free body (decision 688): its commands, not steps or routes.
-		queued_steps.clear()
-		has_move_order = false
-		World.tend_free_body(self)
-		pack_free()
-		if action_order != Order.NONE:
-			_pursue_action()
-		return
-	if not queued_steps.is_empty():
-		_take_queued_step()
-		return
+	# A free body (decision 688): its commands, not steps or routes.
+	World.tend_free_body(self)
+	pack_free()
 	if action_order != Order.NONE:
-		# The steps the client was showing when it sent the strike first.
-		if not move_via.is_empty() and World.tick >= next_move_tick and _walk_via():
-			return
 		_pursue_action()
-		return
-
-	if not has_move_order or World.tick < next_move_tick:
-		return
-	if _walk_via():
-		return
-	if tile == move_order:
-		has_move_order = false
-		return
-	var path := World.walk_path(tile, move_order)  # 678: straight where a line can go.
-	if path.is_empty():
-		has_move_order = false
-	elif not World.try_move(self, path[0] - tile):
-		# Someone took that tile first this tick. If it was the destination
-		# itself the contest is decided: give up. Otherwise keep the order and
-		# path around it next tick. Either way the client re-plans now.
-		if path[0] == move_order:
-			has_move_order = false
-		World.report_move_refused(self, path[0])
-
-
-## The next WASD step, when the timer allows. A refused step that the
-## client was showing ends the walk: the rest of the queue is dropped and
-## the client is told, with the new refusal count.
-func _take_queued_step() -> void:
-	if World.tick < next_move_tick:
-		return
-	var step: Dictionary = queued_steps.pop_front()
-	var direction: Vector2i = step["direction"]
-	if World.try_move(self, direction):
-		return
-	if step["predicted"]:
-		refusals += 1
-		queued_steps.clear()
-		World.report_move_refused(self, tile + direction, refusals)
-
-
-## One step through the order's via tiles, if any are left. Tiles already
-## behind the player are dropped; a via tile that is no longer one step
-## away (the player was pushed) drops them all, and so does a way of the
-## server's own to the destination World.DETOUR_STEPS shorter than the rest
-## of them (a passage that was taken when the client planned round it has
-## cleared):
-## the server's own way is walked then, as before there were via tiles.
-## True if a step was tried.
-func _walk_via() -> bool:
-	var reached := move_via.find(tile)
-	if reached != -1:
-		move_via = move_via.slice(reached + 1)
-	if move_via.is_empty():
-		return false
-	var next: Vector2i = move_via[0]
-	if World.distance(tile, next) != 1:
-		move_via.clear()
-		return false
-	if has_move_order and move_via.back() == move_order:
-		var own := World.walk_path(tile, move_order)
-		if not own.is_empty() and own.size() + World.DETOUR_STEPS <= move_via.size():
-			move_via.clear()
-			return false
-	move_via.pop_front()
-	if not World.try_move(self, next - tile):
-		move_via.clear()
-		# Into the destination itself: decided, as in _sim_tick (refused once,
-		# not again next tick by the path round it).
-		if has_move_order and next == move_order:
-			has_move_order = false
-		World.report_move_refused(self, next)
-	return true
 
 
 func _pursue_action() -> void:
@@ -352,25 +259,10 @@ func _pursue_action() -> void:
 		else:
 			World.try_shove(self, target, direction)
 		return
-	# A free body (688) closes in by its own commands, its client chasing
-	# (697): the order held till in reach, given up after FREE_CHASE_TICKS;
-	# a grid step would snap it from centre to centre (the chop Jeff saw).
-	if World.free_body(self):
-		if World.tick - action_tick > FREE_CHASE_TICKS:
-			_clear_action()
-		return
-	# Out of reach: close in, re-pathing each step in case the target moves.
-	# No way, or the step taken first: the order is dropped, and the client
-	# told at once, or it walks on showing the approach till it gives up
-	# waiting and is pulled back.
-	if World.tick < next_move_tick:
-		return
-	var path := World.find_path(tile, action_target.tile, true)
-	if path.is_empty():
-		World.report_move_refused(self, action_target.tile, World.ORDER_DROPPED)
-		_clear_action()
-	elif not World.try_move(self, path[0] - tile):
-		World.report_move_refused(self, path[0], World.ORDER_DROPPED)
+	# Out of reach: a free body (688) closes in by its own commands, its
+	# client chasing (697): the order held till in reach, given up after
+	# FREE_CHASE_TICKS.
+	if World.tick - action_tick > FREE_CHASE_TICKS:
 		_clear_action()
 
 

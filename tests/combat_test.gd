@@ -362,7 +362,6 @@ func _test_lob_aim_on_client() -> void:
 == a client's own free body aims from its view, not its stale free_pos (677 amended) ==")
 	var e := _build(["############", "#P.........#", "#..........#", "############"])
 	var host: Player = e["P"][0]
-	World.free_walk = true
 	host.tile = Vector2i(7, 2)  # Replicated there; free_pos left at the join cell (1, 1). Lob and shot aim both start at shot_origin.
 	host.free_pos = Vector2(1, 1)
 	host.pack_free()  # Its state, as the server sends it: a client's free body is one with its state (693).
@@ -396,7 +395,6 @@ func _test_body_reach() -> void:
 		var e := _build(_room_with(each[0], Vector2i(5, 2)))
 		var host: Player = e["P"][0]
 		var foe: GridEntity = e["m"][0]
-		World.free_walk = true
 		host.free_pos = each[1]
 		var both := World.in_reach(host, foe) and World.in_reach(foe, host)
 		var neither := not World.in_reach(host, foe) and not World.in_reach(foe, host)
@@ -405,7 +403,6 @@ func _test_body_reach() -> void:
 	var e := _build(["#######", "#...P##", "#...#m#", "#######"])
 	var host: Player = e["P"][0]
 	var foe: GridEntity = e["m"][0]
-	World.free_walk = true
 	host.free_pos = Vector2(4.2, 1.2)
 	_check(not World.in_reach(host, foe) and not World.in_reach(foe, host), "a wall's corner between, 1.13 apart: no blow either way")
 	# A wind-up stepped out of before it lands misses; stood in, it strikes.
@@ -414,7 +411,6 @@ func _test_body_reach() -> void:
 		host = e["P"][0]
 		foe = e["m"][0]
 		_boss(foe)
-		World.free_walk = true
 		host.free_pos = Vector2(3.75, 2.0)
 		var hp := host.hp
 		_check(World.try_wind_up(foe, host), "(%s) the axe wound up at 1.25" % ("steps out" if steps_out else "stands"))
@@ -429,7 +425,6 @@ func _test_body_reach() -> void:
 	host = e["P"][0]
 	foe = e["m"][0]
 	_give(host, "spear")
-	World.free_walk = true
 	host.free_pos = Vector2(2.7, 2.0)
 	_check(World.in_reach(host, foe), "a spear at 2.3 straight: in reach")
 	host.free_pos = Vector2(3.0, 2.9)
@@ -437,14 +432,12 @@ func _test_body_reach() -> void:
 	e = _build(["##########", "#........#", "#..P.mm..#", "#........#", "##########"])
 	host = e["P"][0]
 	_give(host, "spear")
-	World.free_walk = true
 	host.free_pos = Vector2(3.3, 2.0)
 	_check(not World.in_reach(host, e["m"][1]), "a body on the spear's line: refused")
 	# Where to stand: strike_cells against a free body at the back of its cell.
 	e = _build(["##########", "#........#", "#...P..m.#", "#........#", "##########"])
 	host = e["P"][0]
 	foe = e["m"][0]
-	World.free_walk = true
 	host.free_pos = Vector2(3.45, 2.0)
 	var cells := World.strike_cells(foe, host)
 	_check(Vector2i(5, 2) not in cells and Vector2i(4, 1) in cells and Vector2i(4, 3) in cells and Vector2i(4, 2) not in cells,
@@ -503,7 +496,6 @@ func _test_free_wind_up_given_up() -> void:
 func _test_sword_lead() -> void:
 	print("\n== the sword's lead: 2 ticks inside its 7, never crushing, slack past reach, not walked off (338 amended) ==")
 	var e := _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])
-	World.free_walk = true
 	var host: Player = e["P"][0]
 	var foe: Player = e["P"][1]
 	_give(host, "sword")
@@ -544,7 +536,6 @@ func _test_sword_lead() -> void:
 			[1.1, Vector2(1, 0), true, "straight back from 1.1: struck"],
 			[0.9, Vector2(-0.7, 0.7), true, "the striker's own keys back and aside: kept, and struck"]]:
 		e = _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])
-		World.free_walk = true
 		host = e["P"][0]
 		foe = e["P"][1]
 		_give(host, "sword")
@@ -583,7 +574,6 @@ func _test_free_chase() -> void:
 	var host: Player = e["P"][0]
 	var foe: GridEntity = e["m"][0]
 	foe.stunned_until_tick = 1 << 30  # Stands still: the test walks only the player.
-	World.free_walk = true
 	host.free_pos = Vector2(host.tile)
 	var hp := foe.hp
 	World.order_attack(host, foe)
@@ -612,7 +602,6 @@ func _test_free_blows() -> void:
 	var e := _build(["############", "#P.........#", "#.........m#", "############"])
 	var host: GridEntity = e["P"][0]
 	var foe: GridEntity = e["m"][0]
-	World.free_walk = true
 	host.free_pos = Vector2(host.tile)
 	_check(World.free_body(host) and not World.free_body(foe), "(free_walk: the player a free body, the monster on its cells)")
 	for i in 3:

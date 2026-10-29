@@ -233,9 +233,6 @@ func _place(entity: GridEntity, tile: Vector2i) -> void:
 	if occupant != null:
 		World._relocate(occupant, _main._nearest_free(tile + Vector2i(0, 3)))
 	World._relocate(entity, tile)
-	if entity is Player and "queued_steps" in entity:  # A grid walk's leftovers; gone with 703's step 4 (the free body).
-		entity.queued_steps.clear()
-		entity.has_move_order = false
 
 
 func _player() -> Player:

@@ -268,20 +268,6 @@ const TALL_GRASS_COVER := 0.7
 const TALL_GRASS_TICK_SCALE := 1.25
 const TRAMPLE_MASS := 40.0
 const TRAMPLE_DAYS := 2.0
-## WASD steps queued on the server for one player at most; more are
-## dropped (the client never sends more than one ahead).
-const MAX_QUEUED_STEPS := 3
-## A move order's via tiles (the walk the client shows) kept at most; the
-## rest of the way the server plans itself.
-const MAX_VIA_STEPS := 64
-## How many steps shorter a way found now must be than the rest of a walk
-## being shown (or walked from the client's via tiles) to replace it: a
-## detour round a passage that has since cleared, not the step or two that
-## monsters moving about gain or lose every tick.
-const DETOUR_STEPS := 3
-## report_move_refused's epoch for a refusal that dropped the order (a
-## strike closing in that cannot): the client stops predicting it.
-const ORDER_DROPPED := -1
 # Path costs are integers proportional to ticks. The +1 only breaks ties in
 # favour of straight lines; fire is a detour worth five steps.
 ## What the terrain lets a walker who opens doors do across one step (see
@@ -466,8 +452,9 @@ const CLANK_WALK_TICKS := 2.5
 const CLANK_MAX := 19
 ## Free movement (decision 688; Jeff's pick 3 of free-movement.md): a
 ## player's body has a centre of its own (GridEntity.free_pos) and moves any
-## way at once, the world staying on cells. Off, the grid's steps as ever.
-var free_walk := false
+## way at once, the world staying on cells; since 703 the only way a player
+## walks (free_body). Monsters, animals, residents and companions keep the
+## grid.
 ## A free body is a circle of this radius, in cells, against cell edges
 ## and others' cells (688).
 const FREE_RADIUS := 0.3
@@ -4310,7 +4297,6 @@ func _ready() -> void:
 	entity_pushed.connect(_on_pushed_for_stockpile)
 	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
 	load_physics_rules(FileAccess.get_file_as_string(PHYSICS_RULES))
-	free_walk = Net.free_walk  # On unless --grid-walk (688, 693).
 	load_combat_rules(FileAccess.get_file_as_string(COMBAT_RULES))
 
 
@@ -5525,25 +5511,13 @@ func try_stance(by: GridEntity, kind: String, lob := false) -> bool:
 
 
 ## [param by] stopped where it stands (583 amended; Jeff: "the point of
-## shift is to stand firm and start nocking"): a walk ordered, its via
-## tiles and an attack walked to dropped, and a player's queued steps; a
-## step the client was already showing is refused to it, so its view comes
-## back to the cell it stands in.
+## shift is to stand firm and start nocking"): a free body's walk halted,
+## an attack walked to dropped.
 func stand_firm(by: GridEntity) -> void:
 	if free_body(by):
 		halt(by, tick)  # A free body's walk stops where it is (688).
-	by.has_move_order = false
-	by.move_via.clear()
 	by.action_order = GridEntity.Order.NONE
 	by.action_target = null
-	if by is Player and not (by as Player).queued_steps.is_empty():
-		var player := by as Player
-		var shown := player.queued_steps.any(func(step: Dictionary) -> bool: return bool(step["predicted"]))
-		var first: Vector2i = player.queued_steps[0]["direction"]
-		player.queued_steps.clear()
-		if shown:
-			player.refusals += 1
-			report_move_refused(player, player.tile + first, player.refusals)
 
 
 ## How far [param entity]'s bow is drawn, 0 to 1: nothing until its verb's
@@ -6826,8 +6800,8 @@ func winding(entity: GridEntity) -> Dictionary:
 ## 392; the player's attack with such a weapon, Player._pursue_action, and
 ## any monster's AI): windup_ticks from now it is struck (_tend_wind_ups),
 ## breaking any guard it meets at full weight, if the target is still in
-## reach; else it whiffs. Until then a move order or a step (order_move,
-## order_step), a stun, a knockdown or being moved off its cell gives it up
+## reach; else it whiffs. Until then a walk away (a free body's intent off
+## its way, _free_give_up_wind_up), a stun, a knockdown or being moved off its cell gives it up
 ## (cancel_wind_up); after, nothing does. The views wind up with it
 ## (GridEntity.winding). False, nothing begun, if it cannot strike now.
 func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
@@ -7058,46 +7032,6 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 			drop_gold(zone.name, at, gold)
 
 
-## Player intent: walk to [param target], by way of [param via] first
-## (the steps the ordering client is already showing). Server only; input
-## code on any peer goes through command_move().
-func order_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i] = []) -> void:
-	if not Net.is_authority():
-		return
-	if not entity.spawned or entity.raised == "draw":
-		return  # A drawn bow stands firm (583 amended): no walk ordered while it is drawn.
-	cancel_wind_up(entity)  # A move order gives a wind-up up (decision 392).
-	entity.move_order = target
-	entity.has_move_order = true
-	entity.move_via = via.slice(0, MAX_VIA_STEPS)
-	if entity is Player:
-		(entity as Player).queued_steps.clear()
-	entity.action_order = GridEntity.Order.NONE
-	entity.action_target = null
-
-
-## Player intent (WASD): one step in [param direction], taken when the
-## movement timer allows, after any already queued. [param epoch] is the
-## client's count of refusals seen: a step sent before the client heard of
-## the latest refusal is stale and dropped (see Player.step_epoch). A
-## [param predicted] step is one the client is showing; only those are
-## reported back when refused.
-func order_step(entity: GridEntity, direction: Vector2i, epoch: int, predicted: bool) -> void:
-	if not Net.is_authority():
-		return
-	if not entity.spawned or direction not in DIRECTIONS or not entity is Player:
-		return
-	var player := entity as Player
-	if epoch != player.refusals or player.queued_steps.size() >= MAX_QUEUED_STEPS:
-		return
-	cancel_wind_up(player)  # A step gives a wind-up up (decision 392).
-	player.has_move_order = false
-	player.move_via.clear()
-	player.action_order = GridEntity.Order.NONE
-	player.action_target = null
-	player.queued_steps.append({"direction": direction, "predicted": predicted})
-
-
 ## Player intent: swing toward [param direction] where it stands (decision
 ## 593's stand-and-swing; the WASD scheme's click), at the next free tick:
 ## whatever stands in its way then (stand_target) takes the blow, else it is
@@ -7110,7 +7044,6 @@ func order_swing(entity: GridEntity, direction: Vector2i) -> void:
 	entity.action_order = GridEntity.Order.SWING
 	entity.action_target = null
 	entity.action_direction = direction
-	entity.has_move_order = false
 
 
 ## Player intent (decision 593: Ctrl and a click): [param entity]'s
@@ -7158,30 +7091,27 @@ func stand_target(entity: GridEntity, direction: Vector2i) -> GridEntity:
 
 
 ## Player intent: attack [param target] on the entity's next free tick.
-func order_attack(entity: GridEntity, target: GridEntity, via: Array[Vector2i] = []) -> void:
+func order_attack(entity: GridEntity, target: GridEntity) -> void:
 	if not Net.is_authority():
 		return
-	_order_action(entity, GridEntity.Order.ATTACK, target, Vector2i.ZERO, via)
+	_order_action(entity, GridEntity.Order.ATTACK, target, Vector2i.ZERO)
 
 
 ## Player intent: shove [param target] on the entity's next free tick.
 ## With a [param direction] it is a toss: the target goes that way instead of
 ## straight away from the entity.
-func order_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO,
-		via: Array[Vector2i] = []) -> void:
+func order_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
 	if not Net.is_authority():
 		return
 	if direction != Vector2i.ZERO and direction not in DIRECTIONS:
 		return
-	_order_action(entity, GridEntity.Order.SHOVE, target, direction, via)
+	_order_action(entity, GridEntity.Order.SHOVE, target, direction)
 
 
-## [param via]: the steps the client was already showing when it sent the
-## order (a walk under way); they are walked first, as for a move order
-## (Player._sim_tick), or the client would be pulled back off a step it
-## showed while the server struck from where it stood.
+## A strike's order set: a free body's client closes in (697); a body on the
+## grid walks up to it (Player._pursue_action).
 func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEntity,
-		direction: Vector2i, via: Array[Vector2i] = []) -> void:
+		direction: Vector2i) -> void:
 	if not Net.is_authority():
 		return
 	if not entity.spawned or not target.spawned or entity == target:
@@ -7192,8 +7122,6 @@ func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEnti
 	entity.action_target = target
 	entity.action_direction = direction
 	entity.action_tick = tick
-	entity.has_move_order = false
-	entity.move_via = via.slice(0, MAX_QUEUED_STEPS)
 
 
 # --- Input from any peer ------------------------------------------------------
@@ -7201,44 +7129,21 @@ func _order_action(entity: GridEntity, order: GridEntity.Order, target: GridEnti
 # on a client it is an RPC to the server, which checks that the sender owns the
 # entity before calling the same order_*. Clients never call try_*.
 
-func command_move(entity: GridEntity, target: Vector2i) -> void:
-	if Net.is_authority():
-		order_move(entity, target)
-	else:
-		# Shown at once on this client; the server still decides what happens.
-		# The steps already on screen go with it: the server walks those first
-		# (see Player.move_via), or a new order arriving before the server
-		# has taken a step the client shows would set off from the tile
-		# before it and go another way.
-		var via := entity.predict_move(target)
-		_to_server(&"request_move", [entity.get_path(), target, via])
-
-
-## Client: the walk its prediction re-planned after a correction, sent
-## again as the order, so the server goes that way too and not round the
-## monsters a way of its own (see MovePrediction.order).
-func resend_move(entity: GridEntity, target: Vector2i, via: Array[Vector2i]) -> void:
-	if not Net.is_authority():
-		_to_server(&"request_move", [entity.get_path(), target, via])
-
-
 func command_attack(entity: GridEntity, target: GridEntity) -> void:
 	if Net.is_authority():
 		order_attack(entity, target)
 	else:
-		var via := entity.predict_approach(target.tile, target)
 		_note_strike_sent(entity)
-		_to_server(&"request_attack", [entity.get_path(), target.get_path(), via])
+		_to_server(&"request_attack", [entity.get_path(), target.get_path()])
 
 
 func command_shove(entity: GridEntity, target: GridEntity, direction := Vector2i.ZERO) -> void:
 	if Net.is_authority():
 		order_shove(entity, target, direction)
 	else:
-		var via := entity.predict_approach(target.tile, target)
 		_predict_shove(entity, target, direction)
 		_note_strike_sent(entity)
-		_to_server(&"request_shove", [entity.get_path(), target.get_path(), direction, via])
+		_to_server(&"request_shove", [entity.get_path(), target.get_path(), direction])
 
 
 ## Client: a plain shove the server will take at once (the shover standing,
@@ -7251,8 +7156,7 @@ func _predict_shove(entity: GridEntity, target: GridEntity, direction: Vector2i)
 	if direction != Vector2i.ZERO and direction != aim:
 		return  # A toss: not guessed.
 	var now := tick + tick_alpha
-	if not can_melee(entity.tile, target.tile) or entity.predicting() \
-			or now - entity._walk_shown_at < Net.rtt_ticks() + 1.0 \
+	if not can_melee(entity.tile, target.tile) \
 			or now < entity._reel_until or tick < entity._guessed_ready_tick:
 		return
 	entity._guessed_ready_tick = tick + entity.attack_ticks
@@ -7265,7 +7169,7 @@ func _predict_shove(entity: GridEntity, target: GridEntity, direction: Vector2i)
 ## over and a round trip has passed; until it has cooled down from that, no
 ## shove is guessed (it would wait on the server, and the guess be taken back).
 func _note_strike_sent(entity: GridEntity) -> void:
-	var later := float(entity.attack_ticks) + Net.rtt_ticks() + (entity.move_ticks if entity.predicting() else 0.0)
+	var later := float(entity.attack_ticks) + Net.rtt_ticks()
 	entity._guessed_ready_tick = maxi(entity._guessed_ready_tick, tick + ceili(later))
 
 
@@ -7296,64 +7200,12 @@ func predict_push_end(mover: GridEntity, body: GridEntity, direction: Vector2i) 
 	return at
 
 
-## WASD: one step in [param direction]. On a client it is predicted when
-## nothing in the replicated world refuses it, and sent either way, so a
-## step into someone who will not move still reaches the server (a bump).
-func command_step(entity: GridEntity, direction: Vector2i) -> void:
-	if Net.is_authority():
-		order_step(entity, direction, (entity as Player).refusals, false)
-	else:
-		var predicted := entity.predict_step(direction)
-		_to_server(&"request_step", [entity.get_path(), direction, entity.step_epoch(), predicted])
-
-
 ## Sends [param method] to the server, after Net.test_lag seconds when that
 ## test hook is set (to stand in for a long way to the server).
 func _to_server(method: StringName, args: Array) -> void:
 	if Net.test_lag > 0.0:
 		await get_tree().create_timer(Net.test_lag).timeout
 	callv("rpc_id", [1, method] + args)
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func request_move(entity_path: NodePath, target: Vector2i, via: Array) -> void:
-	if not Net.is_authority():
-		return
-	Net.test_note_order(multiplayer.get_remote_sender_id(), tick)
-	var entity := _entity_owned_by_sender(entity_path)
-	if entity == null:
-		return
-	_grid_order_for_free(entity)
-	var tiles: Array[Vector2i] = []
-	for at: Variant in via:
-		if at is Vector2i:
-			tiles.append(at)
-	var was := enter_named(entity.zone)
-	order_move(entity, target, tiles)
-	enter(was)
-
-
-@rpc("any_peer", "call_remote", "reliable")
-func request_step(entity_path: NodePath, direction: Vector2i, epoch: int, predicted: bool) -> void:
-	if not Net.is_authority():
-		return
-	Net.test_note_order(multiplayer.get_remote_sender_id(), tick)
-	var entity := _entity_owned_by_sender(entity_path)
-	if entity != null:
-		_grid_order_for_free(entity)
-		var was := enter_named(entity.zone)
-		order_step(entity, direction, epoch, predicted)
-		enter(was)
-
-
-## A grid order (a step or a walk) from the client of a body walking free
-## (689 amended (4)): its client is not driving it free (Jeff's freeze after
-## a room reset: nothing it sent moved the body). The free body clears such
-## orders each tick; logged once a body, so the box shows it.
-func _grid_order_for_free(entity: GridEntity) -> void:
-	if free_body(entity) and not entity.has_meta(&"grid_order_logged"):
-		entity.set_meta(&"grid_order_logged", true)
-		_log("grid orders from %s's client while it walks free (peer %d): its client is not driving it free" % [entity.name, entity.owner_peer])
 
 
 ## A free body's input commands from its client (decision 689;
@@ -7429,80 +7281,28 @@ func take_free(player: Player, commands: Array[Dictionary]) -> void:
 		free_input(player, intent.limit_length(1.0), float(command["ticks"]) / TICK_RATE, seq)
 
 
-## Turns free movement on or off for every player, at once (decision 689;
-## the admin's "free_walk on|off"): off, each body is put on the cell it
-## holds (a free body always holds its own) and walks the grid; on, each
-## starts at its cell's centre. What clients see follows Player.free_state.
-func set_free_walk(on: bool) -> void:
-	if free_walk == on:
-		return
-	free_walk = on
-	var zone_was := zone
-	for each: Zone in zones.values() if not zones.is_empty() else [zone]:
-		enter(each)
-		for entity in get_entities():
-			if entity is Player:
-				var player := entity as Player
-				free_drop(player)
-				player.free_pos = Vector2(player.tile)
-				player.free_way = Vector2.ZERO
-				player.free_seen = -1
-				player.free_acked = -1
-				player.free_used = 0.0
-				player.pack_free()
-	enter(zone_was)
-
-
 @rpc("any_peer", "call_remote", "reliable")
-func request_attack(entity_path: NodePath, target_path: NodePath, via: Array) -> void:
+func request_attack(entity_path: NodePath, target_path: NodePath) -> void:
 	if not Net.is_authority():
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
 	if entity != null and target != null and target.zone == entity.zone:
 		var was := enter_named(entity.zone)
-		order_attack(entity, target, _tiles(via))
+		order_attack(entity, target)
 		enter(was)
 
 
 @rpc("any_peer", "call_remote", "reliable")
-func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vector2i, via: Array) -> void:
+func request_shove(entity_path: NodePath, target_path: NodePath, direction: Vector2i) -> void:
 	if not Net.is_authority():
 		return
 	var entity := _entity_owned_by_sender(entity_path)
 	var target := _entity_at_path(target_path)
 	if entity != null and target != null and target.zone == entity.zone:
 		var was := enter_named(entity.zone)
-		order_shove(entity, target, direction, _tiles(via))
+		order_shove(entity, target, direction)
 		enter(was)
-
-
-## The tiles of an order's via list as sent (anything else in it dropped).
-static func _tiles(via: Array) -> Array[Vector2i]:
-	var tiles: Array[Vector2i] = []
-	for at: Variant in via:
-		if at is Vector2i:
-			tiles.append(at)
-	return tiles
-
-
-## Server: a player's step into [param tile] was refused this tick (someone
-## else got there first). Its client re-plans at once instead of waiting
-## for a position that is not going to change. [param epoch] is the
-## player's refusal count after this one (see order_step).
-func report_move_refused(entity: GridEntity, tile: Vector2i, epoch := 0) -> void:
-	if not Net.is_authority():
-		return
-	if entity.owner_peer != 0 and entity.owner_peer != Net.local_id \
-			and entity.owner_peer in Net.sendable_peers():
-		move_refused.rpc_id(entity.owner_peer, entity.get_path(), tile, epoch)
-
-
-@rpc("authority", "call_remote", "reliable")
-func move_refused(entity_path: NodePath, tile: Vector2i, epoch: int) -> void:
-	var entity := get_node_or_null(entity_path) as GridEntity
-	if entity != null:
-		entity._on_move_refused(tile, epoch)
 
 
 ## Any other player command, from input code on any peer. On the server it
@@ -8590,10 +8390,8 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 ## A player's step into their own companion's cell (the swap rule; ui's
 ## trace: held-key corrections beside her were steps the server took late,
 ## waiting on her make_way or bump): they change places on this tick, the
-## step on its own clock from [param start], so it lands when the client's
-## prediction (MovePrediction._blocked: her cell open) showed it. Only their
-## own companion, alive, not downed, lying or stunned, each of which his
-## client sees (MovePrediction._swaps_with); dodging or fighting she swaps
+## step on its own clock from [param start]. Only their own companion,
+## alive, not downed, lying or stunned; dodging or fighting she swaps
 ## all the same (679 amended: her intent is the server's alone, and a
 ## refusal the client cannot foresee snaps his own body back; a wind-up she
 ## began is given up, moved off its cell, and a blow lands from where she
@@ -8667,13 +8465,13 @@ func shot_origin(entity: GridEntity) -> Vector2:
 
 
 ## Whether [param entity] moves as a free body (decision 688): a player,
-## while free_walk is on.
+## always since 703.
 func free_body(entity: GridEntity) -> bool:
 	if not Net.is_authority():
 		# A client's rules follow each body (decision 693): free while the
 		# server sends its free state, whatever a client starts with.
 		return entity is Player and not (entity as Player).free_state.is_empty()
-	return free_walk and entity is Player
+	return entity is Player
 
 
 ## Queues one input command for [param entity]'s free body (688): its

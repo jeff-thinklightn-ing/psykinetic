@@ -1,6 +1,6 @@
 extends Node
-## The free body (decision 688; Jeff's pick 3 of free-movement.md): with
-## World.free_walk on, a player's body has a centre of its own
+## The free body (decision 688; Jeff's pick 3 of free-movement.md; since 703
+## the only way a player walks): a player's body has a centre of its own
 ## (GridEntity.free_pos) and moves any way at once, a circle of
 ## World.FREE_RADIUS against cell edges and others' cells, holding the cell
 ## its centre is in. Small rooms in the double-resolution map format, World
@@ -63,7 +63,6 @@ func _ready() -> void:
 	World.set_process(false)
 	World.entity_bumped.connect(func(_mover: GridEntity, _occupant: GridEntity, _direction: Vector2i) -> void: _bumps += 1)
 
-	_test_flag_off()
 	_test_speed()
 	_test_claim()
 	_test_bank()
@@ -92,22 +91,10 @@ func _ready() -> void:
 	_test_free_dodge()
 	_test_free_chase()
 	_test_free_kite()
-	World.free_walk = false
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
-
-
-func _test_flag_off() -> void:
-	print("\n== the flag off: a player walks the grid's steps, free_input does nothing ==")
-	var player := _build(OPEN, Vector2i(1, 2))
-	World.free_walk = false
-	_check(not World.free_body(player), "a player is no free body with free_walk off")
-	World.free_input(player, Vector2(1, 0), 1.0)
-	_check(player.free_inputs.is_empty(), "free_input queues nothing")
-	_check(World.try_move(player, Vector2i(1, 0)) and player.tile == Vector2i(2, 2) and player.free_pos == Vector2(2, 2),
-			"a step east: at (2, 2), its centre with it (%s)" % player.free_pos)
 
 
 func _test_speed() -> void:
@@ -318,16 +305,12 @@ func _test_kick() -> void:
 		World.step()
 	_hold(player, Vector2(-1, 0), 3)
 	_check(player.free_pos.x < end.x - 1.0, "steered again after (%s)" % player.free_pos)
-	# The grid's cells, from a cell's centre: the same as a free body's.
-	var cells := []
-	for free in [false, true]:
-		var body := _build(OPEN, Vector2i(1, 2))
-		World.free_walk = free
-		var pusher := _spawn("res://sim/monster.gd", "Dummy", Vector2i(0, 0))
-		World._push(pusher, body, Vector2(1, 0), 2.0)
-		cells.append(body.tile)
-	World.free_walk = true
-	_check(cells[0] == cells[1], "from a cell's centre, east at 2: the grid's %s, the free body's %s" % cells)
+	# From a cell's centre, east at 2: the cells the grid's push reckons
+	# (703: with no grid body left to compare, the push's own count).
+	var body := _build(OPEN, Vector2i(1, 2))
+	var pusher := _spawn("res://sim/monster.gd", "Dummy", Vector2i(0, 0))
+	World._push(pusher, body, Vector2(1, 0), 2.0)
+	_check(body.tile.x > 1 and body.tile.y == 2, "from a cell's centre, east at 2: pushed east to %s" % body.tile)
 
 
 func _test_kick_wall() -> void:
@@ -418,7 +401,6 @@ func press_into(player: Player) -> void:
 func _test_kick_fall() -> void:
 	print("\n== a free body pushed off a ledge falls ==")
 	World.reset()
-	World.free_walk = true
 	if _room != null:
 		_room.free()
 	_room = Node2D.new()
@@ -470,13 +452,11 @@ func _test_press_niche() -> void:
 	_check(pressed.is_empty() and player.tile.x >= 2, "brushing east along the wall over the niches: nothing pressed (at %s)" % player.free_pos)
 	World.niche_pressed.disconnect(on_press)
 	var grid := _build(WALLED, Vector2i(2, 1))
-	World.free_walk = false
 	World.niche_edges[key] = "hidden"
 	World.niche_pressed.connect(on_press)
 	World.try_move(grid, Vector2i(0, 1))
 	_check(pressed.size() == 1 and pressed[0][1] == key, "on the grid a refused step presses it as ever")
 	World.niche_pressed.disconnect(on_press)
-	World.free_walk = true
 
 
 func _test_press_edge() -> void:
@@ -642,16 +622,14 @@ func _test_acks() -> void:
 
 
 func _test_walk_helper() -> void:
-	print("\n== the walk-to test helper, either way ==")
-	for free: bool in [false, true]:
-		var player := _build(WALLED, Vector2i(0, 0))
-		World.free_walk = free
-		var started := World.tick
-		_check(Walk.to(player, Vector2i(2, 2)) and Walk.arrived(player, Vector2i(2, 2)),
-				"%s: from (0, 0) round the wall to (2, 2) in %d ticks" % ["free" if free else "grid", World.tick - started])
+	print("\n== the walk-to test helper ==")
+	var player := _build(WALLED, Vector2i(0, 0))
+	var started := World.tick
+	_check(Walk.to(player, Vector2i(2, 2)) and Walk.arrived(player, Vector2i(2, 2)),
+			"from (0, 0) round the wall to (2, 2) in %d ticks" % (World.tick - started))
 
 
-## A room from [param rows] with a player at [param at], free_walk on.
+## A room from [param rows] with a player at [param at].
 ## Open ground [param w] x [param h] in the double-resolution format.
 static func _open(w: int, h: int) -> Array[String]:
 	var rows: Array[String] = []
@@ -843,7 +821,6 @@ func _sturdy(player: Player) -> Player:
 
 func _build(rows: Array[String], at: Vector2i) -> Player:
 	World.reset()
-	World.free_walk = true
 	if _room != null:
 		_room.free()
 	_room = Node2D.new()

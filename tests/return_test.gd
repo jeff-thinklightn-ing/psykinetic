@@ -23,6 +23,19 @@ var _said: Array[String] = []
 var _main: Node
 
 
+const Walk := preload("res://tests/walk.gd")
+
+
+## Walks [param player]'s free body to [param cell] (703), the world
+## stepped [param ticks] in all, as the grid walk's order and wait did: the
+## hut's keeper comes in that time.
+func _walk_ticks(player: Player, cell: Vector2i, ticks: int) -> void:
+	var start := World.tick
+	Walk.to(player, cell, ticks)
+	while World.tick - start < ticks:
+		World.step()
+
+
 func _ready() -> void:
 	World.set_process(false)
 	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("return_test/no_overlay/")
@@ -197,9 +210,7 @@ func _test_main() -> void:
 	World.holdings._places.erase(far)
 	World.holdings._holder.erase(far)
 	var player := _player()
-	World.order_move(player, Vector2i(12, 6))
-	for i in 60:
-		World.step()
+	_walk_ticks(player, Vector2i(12, 6), 60)
 	_kill_monsters()
 	# The healer's care (584 amended): his hut brings back only a player in it.
 	var me := _player().player_id
@@ -283,9 +294,7 @@ func _test_main() -> void:
 		and not Array(_player().slots).has("antlers") and (store.is_empty() or World.stockpile.item_ids(store).count("antlers") == 5),
 		"the fifth: in his care, the five antlers in his hut's store (%s)" % [store])
 	_check(_main.grant_care(me, id, "quest") and _main.care_via(me, id) == "quest" and not _main.grant_care(me, id, "antlers"), "his errand done after: the way in is the errand's; nothing replaces it")
-	World.order_move(_player(), Vector2i(12, 6))
-	for i in 60:
-		World.step()
+	_walk_ticks(_player(), Vector2i(12, 6), 60)
 	_kill_monsters()
 	_kill(_player())
 	_check(_player() == null, "the player died")

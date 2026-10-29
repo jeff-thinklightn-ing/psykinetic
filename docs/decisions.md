@@ -35074,3 +35074,38 @@ shown at the last fall, gone after; each fall at its tick (within 0.1 s),
 on its own point, steep and nose first, the thud counted per fall, the
 whistle once before the first. Client only, rides rev 41 (no wire
 change of its own), no new class_name.
+## 703, step 4 (ui): the player's grid path removed
+
+The removal 703 planned, on release's rev-41 ping (PROTOCOL_REVISION 41,
+opened by 708 amended; no bump of its own). A player walks only free; the
+grid's own-body machinery is gone:
+- The client's grid input: Main's held, steered and line steps (_drive_wasd,
+  _send_held_step, _line_step, line_steps, line_anchor, _retarget_held,
+  _let_go_held, held_turns, held_replans and their constants). A click is
+  the own body's free route (_free_route); before the server's first free
+  state of the body (FreeNet.Own), input does nothing.
+- MovePrediction (net/prediction.gd) and GridEntity's own-body prediction
+  (predict_move, predict_step, predict_approach, hint_step, hint_line,
+  walk_end, ready_for_step, the misprediction blend and _on_move_refused);
+  what marked the own body is _own_body(). Net's mispredict and snap counts
+  and the debug overlay's lines for them, and net_test's "snaps=0" check.
+- World's grid orders for players: order_move, order_step, command_move,
+  command_step, resend_move, the request_move, request_step and
+  move_refused RPCs, report_move_refused, _grid_order_for_free and the
+  queue's constants; request_attack and request_shove lose their via list.
+  Player's queued_steps, refusals and grid walk (_take_queued_step,
+  _walk_via, the out-of-reach grid approach); GridEntity's has_move_order,
+  move_order, move_via.
+- The switches: World.free_walk and set_free_walk, Net.free_walk,
+  --free-walk and --grid-walk, the admin's "free_walk" command, the
+  snapshot's "free_walk" key (an old file's is ignored), --test-hold-near's
+  "route".
+World.free_body is a player, always, on the server; a client's still
+follows Player.free_state. Monsters, animals, residents and companions
+keep the grid (try_move, Walk's grid branch); a free player still holds a
+cell. Tests: prediction_test goes with its subject; mirror_test,
+controls_test, relief_test, free_walk_test and free_net_test drop their
+grid cases or read the free route (controls_test's _walking_to);
+the 693 pins and grid moves in camp_fall, chest, respawn, spawn, stream,
+view, return, push, companion, combat, items and level tests walk free
+(Walk.to). Protocol changed (rides rev 41), no new class_name.

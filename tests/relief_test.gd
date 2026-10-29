@@ -233,11 +233,6 @@ func _test_walk() -> void:
 	# client predicting from where it stands drifted from the server, the
 	# wilds town's rubber banding).
 	_check(is_equal_approx(World.step_ticks(player, Vector2i(1, 0), Vector2i(5, 3)), up), "a step from another cell is paced by that cell's slope")
-	World._relocate(player, Vector2i(RIDGE - 1, 3))
-	var shown := MovePrediction.new(player)
-	_check(shown.step(Vector2i(1, 0)) and shown.step(Vector2i(1, 0)), "two WASD steps shown, up to the ridge and over")
-	_check(is_equal_approx(shown._steps[0].duration, up) and is_equal_approx(shown._steps[1].duration, down),
-		"the first paced up, the second down from the ridge, as the server will take them (%.2f, %.2f)" % [shown._steps[0].duration, shown._steps[1].duration])
 	_check(World._terrain_blocks_step(Vector2i(13, 9), Vector2i(1, 0)) and World._terrain_blocks_step(Vector2i(14, 9), Vector2i(-1, 0)),
 		"the plateau's cliff stops a step up and off")
 	var imp: Monster = _main._spawn({"script": Level.MONSTER, "shape": "capsule", "name": "Faller", "tile": Vector2i(14, 9), "props": {"sight_range": 0, "max_hp": 50}})

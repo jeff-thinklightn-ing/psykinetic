@@ -133,7 +133,6 @@ if ($Phase -eq '12') {
 	Wait-Log 'server' 'joined as Player1 '
 	Start-Client 'client2' ($good + @('--test-move=-2,0', '--test-contest=9,1,70'))
 	Wait-Any 'reached the contested tile \(9, 1\)' @('client1', 'client2')
-	Wait-Any 'mispredict: Player\d+ step into \(9, 1\) refused' @('client1', 'client2')
 	# A third client with the wrong token must be rejected and never get a player.
 	Start-Client 'client3' @('--client', '--address=127.0.0.1', '--token=wrong-secret', '--test-move=0,1')
 	# A fourth joins with no mode argument, from a settings file like an exported
@@ -370,11 +369,10 @@ Assert ($contestMoves.Count -eq 1) "exactly one player took the contested tile (
 $display = @($clientLogs | Select-String '\[test\] display: ' | ForEach-Object { $_.Line })
 $onServerTile = @($display | Where-Object { $_ -match 'server_tile=(\([^)]*\)) shown_tile=\1 ' })
 Assert ($display.Count -eq 2 -and $onServerTile.Count -eq 2) "both clients end up showing their player on the server's tile"
-$winner = @($display | Where-Object { $_ -match 'server_tile=\(9, 1\) .*mispredicts=0' })
-$loser = @($display | Where-Object { $_ -notmatch 'server_tile=\(9, 1\)' -and $_ -match 'mispredicts=1' })
-Assert ($winner.Count -eq 1) 'the winner is on (9, 1) with no mispredictions'
-Assert ($loser.Count -eq 1) 'the loser is not on (9, 1) and counted exactly one misprediction'
-Assert (@($clientLogs | Select-String 'mispredict: Player\d+ step into \(9, 1\) refused').Count -eq 1) 'the loser was told its step into (9, 1) was refused and re-planned'
+$winner = @($display | Where-Object { $_ -match 'server_tile=\(9, 1\) ' })
+$loser = @($display | Where-Object { $_ -match 'server_tile=\((8|9|10), (0|1|2)\) ' -and $_ -notmatch 'server_tile=\(9, 1\) ' })
+Assert ($winner.Count -eq 1) 'the winner is on (9, 1)'
+Assert ($loser.Count -eq 1) 'the loser stopped beside it (703: no grid misprediction to count)'
 Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) joined as Player3 at ').Count -eq 1) 'phase 1: Casey joined as Player3'
 Assert (@($serverLog | Select-String '\[net\] Casey \(c0ffee00\) left').Count -eq 1) 'phase 1: her leaving was logged with her name and id'
 Assert (@($server2Log | Select-String '\[state\] loaded 10 entities and 3 player records').Count -eq 1) 'phase 2: the restarted server loads three player records'
@@ -387,13 +385,12 @@ Assert (@($server2Log | Select-String '\[net\] rejected peer \d+ from \S+ \(alre
 Assert (@($clientELog | Select-String '\[net\] already connected').Count -eq 1) 'phase 2: and told so'
 Assert (@($clientFLog | Select-String '\[test\] Player\d+ arrived') | Measure-Object).Count -eq 1 -and (@($clientGLog | Select-String '\[test\] Player\d+ arrived') | Measure-Object).Count -eq 1 -and $true 'phase 3: both reached their ends of the passage'
 Assert (@($server3Log | Select-String '\[net\] peer \d+ is v0\.0\.2, the server v[0-9.]+: the same protocol').Count -eq 1) 'phase 3: Fay is another build with the same protocol, and the server let her play'
-$fay = @($clientFLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
-$gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\).*snaps=(\d+)')
+$fay = @($clientFLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\)')
+$gus = @($clientGLog | Select-String '\[test\] display: .*server_tile=\((\d+), (\d+)\)')
 Assert ($fay.Count -eq 1 -and $fay[0].Line -match 'server_tile=\(12, 12\)') "phase 3: Fay crossed to (12, 12) ($($fay | ForEach-Object { $_.Line }))"
 Assert ($gus.Count -eq 1 -and $gus[0].Line -match 'server_tile=\(5, 12\)') "phase 3: Gus crossed to (5, 12) ($($gus | ForEach-Object { $_.Line }))"
 Assert ((@($clientFLog + $clientGLog | Select-String '\[free\] (Fay|Gus|Player[0-9]+) steps right .* round (Fay|Gus|Player[0-9]+)').Count -ge 1) -and (@($clientFLog + $clientGLog | Select-String 'route given up').Count -eq 0)) 'phase 3: head-on, one stepped to its right and neither gave up (724)'
 Assert (@($clientFLog | Select-String '\[update\] the server runs v[0-9.]+, newer than this v0\.0\.2: launch\.bat updates it').Count -eq 1 -and @($clientGLog | Select-String '\[update\]').Count -eq 0) 'phase 3: Fay is told once that a newer game is out; Gus, the same build, is not'
-Assert ($fay.Count -eq 1 -and $gus.Count -eq 1 -and $fay[0].Matches[0].Groups[3].Value -eq '0' -and $gus[0].Matches[0].Groups[3].Value -eq '0') 'phase 3: neither client snapped more than 2 tiles'
 # Hal's walk goes on till the reset: on a slow machine it pushes the crate
 # again before Ivy's reset arrives (two pushes, perf's landing 2026-10-27),
 # so one push or more, the first before the reset.
