@@ -34856,3 +34856,30 @@ controls opens the Controls tab rather than scrolling. ui_test
 _test_options_tabs: the order, where each control sits, every Keys.WORDS
 action in exactly one group, the Testing rows hidden for a player. Client
 only, protocol unchanged, no new class_name.
+## 730. A rollback deploys a release tag: deploy_box -Ref, within one protocol
+
+The coordinator (2026-10-28): run the rev-41 rollback drill before the 703 step 4 cut. The
+drill found no way back. `deploy.sh` always pulled `main`, so undoing a bad server meant a
+revert commit and a full landing first.
+
+- `server/deploy.sh --ref=vX.Y.Z` builds that release's tag instead of `main`. It fetches the
+  tags and checks the tag out detached. A checkout replaces the script while sh is reading it
+  (the never-edit-a-running-script trap), so a rollback first re-runs itself from a temp copy,
+  which it unlinks once open. The tag check takes only `v`, digits and dots.
+- `tools/deploy_box.ps1 -Ref vX.Y.Z` passes it on and prints the tag's protocol in place of
+  `origin/main`'s, which is true when run from a checkout at the tag. Its ssh line now does
+  `git checkout -q main` before the pull, so the next deploy without `-Ref` ends the rollback.
+  `deploy.sh` alone, off `main`, refuses with that advice instead of checking out under itself.
+- It is staged as ever. stage.sh, the tag's own, runs the old build on a copy of the live world
+  on the box, so a world the old build can't read fails the stage and leaves the live server
+  untouched. `sudo psykinetic-backup` comes first (the host's allowlist).
+- It only goes back within one PROTOCOL_REVISION. Clients update forward only, and those on a
+  newer protocol can't join an older server, so a protocol cut is undone by reverting it on
+  `main` and cutting a newer release. Rolling back past a world-format change (722's
+  inventory, say) drops what the old build doesn't know. The way back is then the
+  pre-cut backup, which only Jeff can restore.
+- deploy.sh's header now names the host's allowlist (`/etc/sudoers.d/jequig-allowlist`) in
+  place of the retired psykinetic-deploy file, and docs/server.md says the same. No sudo
+  line changed.
+
+Tooling only; protocol unchanged; no new class_name.

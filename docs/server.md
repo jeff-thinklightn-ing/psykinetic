@@ -133,6 +133,15 @@ since an unpublished one leaves them nothing to update to); runs
 `deploy.sh --staged` over ssh; and prints what the box runs afterwards. It
 exits non-zero if staging or the deploy fails.
 
+A rollback (decision 730): `tools\deploy_box.ps1 -Now -Ref v0.1.190` builds that
+release's tag on the box instead of `main`, staged like any deploy, so a
+world the old build can't read stops it before the live server is touched.
+Run `sudo psykinetic-backup` first. The box's repo is left on the tag, and the
+next deploy without `-Ref` puts it back on `main` (`deploy.sh` alone refuses
+to run off `main`). It only goes back within one `PROTOCOL_REVISION`: clients
+that updated to a newer protocol can't join an older one, so a protocol
+cut is undone by reverting on `main` and cutting a newer release.
+
 From the dev machine, `tools\ship.ps1` runs it over ssh as its last step
 (`$env:PSYKINETIC_BOX`, default `jequig@100.78.120.114`), streams its
 output, then runs `admin.sh players` to show the server is up; `-NoDeploy`
@@ -172,7 +181,9 @@ kept.
 
 The sudo commands `deploy.sh` runs: `install` (three times),
 `systemctl restart psykinetic`, `systemctl status psykinetic` — exactly the
-ones `/etc/sudoers.d/psykinetic-deploy` allows without a password. The
+ones the host's allowlist (`/etc/sudoers.d/jequig-allowlist`, since
+2026-10-28) runs without a password, beside `psykinetic-backup` (a saved copy of
+`/var/lib/psykinetic`) and a few status reads. Any other sudo needs Jeff. The
 countdown needs no sudo: `admin.sh` and `systemctl is-active`.
 
 `PSYKINETIC_REPO` overrides the repo location.

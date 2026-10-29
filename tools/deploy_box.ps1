@@ -17,7 +17,18 @@
 #    line that installs it (deploy.sh cannot)
 # Exits non-zero if staging or the deploy fails; the running server is then
 # untouched (a failed stage) or restarted as it was.
-param([switch]$Now)
+#
+# A rollback (decision 730): -Ref v0.1.190 builds that release's tag instead of
+# main, staged as ever (stage.sh tries the old build on a copy of the live
+# world, so a save it can't read stops it). Run it from a checkout at that tag
+# for a true protocol line. The next deploy without -Ref puts the box back on
+# main. Only within one PROTOCOL_REVISION: players who updated past it can't
+# join an older protocol, so a protocol cut is undone by a revert and a newer cut.
+param([switch]$Now, [string]$Ref = '')
+if ($Ref -and $Ref -notmatch '^v\d+\.\d+\.\d+$') {
+	Write-Output "deploy_box: FAILED: -Ref takes a release tag, vX.Y.Z (got '$Ref')"
+	exit 1
+}
 $ErrorActionPreference = 'Continue'
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
@@ -37,10 +48,18 @@ $ssh = @('-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', $box)
 git -C $root fetch -q origin
 $head = (git -C $root rev-parse HEAD).Trim()
 $main = (git -C $root rev-parse origin/main).Trim()
+$target = 'origin/main'
+if ($Ref) {
+	git -C $root fetch -q --tags origin
+	$main = (git -C $root rev-parse "refs/tags/$Ref^{commit}" 2>$null)
+	if ($LASTEXITCODE -ne 0 -or -not $main) { Fail "no tag $Ref" }
+	$main = $main.Trim()
+	$target = $Ref
+}
 $ours = & $godot --log-file (Get-GodotLog 'deploy_protocol') --headless --path $root -- --print-protocol 2>$null | Select-String '^PROTOCOL' | Select-Object -First 1
 $running = (ssh @ssh '~/psykinetic/server/admin.sh version' 2>&1 | ForEach-Object { "$_" }) -join ' '
 Write-Output "box runs:     $running"
-Write-Output "origin/main:  $(if ($ours) { $ours.Line -replace '^PROTOCOL ', '' } else { 'unknown (no --print-protocol)' })$(if ($head -ne $main) { ' (this checkout is not at origin/main; the box builds origin/main)' })"
+Write-Output "$(($target + ':').PadRight(14))$(if ($ours) { $ours.Line -replace '^PROTOCOL ', '' } else { 'unknown (no --print-protocol)' })$(if ($head -ne $main) { " (this checkout is not at $target; the box builds $target)" })"
 if ($ours -and $running -match 'protocol ([0-9a-f]+)') {
 	$theirs = $Matches[1]
 	$new = ($ours.Line -split ' ')[-1]
@@ -60,9 +79,11 @@ if ($ours -and $running -match 'protocol ([0-9a-f]+)') {
 }
 
 # --- 2. deploy, staged ---------------------------------------------------------------
-$flags = '--staged' + $(if ($Now) { ' --now' } else { '' })
+$flags = '--staged' + $(if ($Now) { ' --now' } else { '' }) + $(if ($Ref) { " --ref=$Ref" } else { '' })
 Write-Output "--- deploying on $box ($flags)"
-ssh @ssh "cd ~/psykinetic && git clean -f -- '*.uid' '*.import' && git pull --ff-only && ~/psykinetic/server/deploy.sh $flags" 2>&1 | ForEach-Object { "$_" }
+# Main's deploy.sh runs either way (a rollback's copies itself before it checks out the
+# tag); checking out main first also ends an earlier rollback.
+ssh @ssh "cd ~/psykinetic && git clean -f -- '*.uid' '*.import' && git checkout -q main && git pull --ff-only && ~/psykinetic/server/deploy.sh $flags" 2>&1 | ForEach-Object { "$_" }
 if ($LASTEXITCODE -ne 0) { Fail "deploy.sh $flags on $box exited $LASTEXITCODE" }
 
 # --- 3. what runs now ----------------------------------------------------------------
