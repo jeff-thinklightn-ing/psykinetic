@@ -35161,3 +35161,35 @@ view_test _test_turf_house; level_test (the forest's healer's hut is the turf ho
 Server and client both change (the server lays the bank and the furnishings), so the server needs a redeploy
 with the next cut. Protocol: rides revision 41 (release), a line under its comment in net/net.gd. Like 550's
 solid slots, a client without it would walk the bank and draw the old walls. No new class_name.
+## 715. A building carries a level link: the temple's way down goes where the temple goes
+
+Dungeon's 714 (Jeff: "the temple has its own underground area ... the temple always has the
+underground even if it moves"). The wilds' stair down to barrow_deep was a fixed link at
+(217, 193), behind the temple. If the town moved, the way down stayed behind.
+
+- **The field:** a building entry's `"level_link": {cell, to_map, to_spawn, sealed, cue,
+  variant}`.
+  - The cell is in the building's frame (front +y), turned with its facing as a kind's doors
+    are, so the editor's moves and turns carry it with the building.
+  - Named `level_link`, not `link` (dungeon's ask): a building's "link" already means its town
+    record.
+- **The parse:** Level.parse (`_building_links`, after the buildings and the solid cells) adds
+  it to the level's links with no marker.
+  - The link carries `"building"`: the building's code, else its slot. Dungeon finds the
+    temple's link by `to_map` plus that key: an index shifts when buildings are added, a code
+    doesn't.
+  - Links_at (571) and ways_out (702) are worked out after it, so it is kept clear and
+    counted like any link. Its cue and variant come from the field (link_cues).
+- **Refused with a warning and left out:** a cell not on floor inside the building; its door or
+  the front cell before it (a kind's door edges too); a cell where a link already is; no cell
+  or no to_map.
+- **The wilds:** the temple (T1) carries the stair down in its north-west back corner,
+  (216, 195): to_map barrow_deep, to_spawn from_temple, sealed draugr, as before. The fixed
+  (217, 193) link and its marker are gone (that cell is grass again).
+  - The spawn point from_barrow_shortcut (217, 192) stays for now. Dungeon's side resolves
+    barrow_deep's way up to the temple's link, at load and after a town move.
+
+level_test `_test_building_level_link` (the four facings, the refusals, the wilds' temple); the
+wilds' cue check moves to (216, 195). Server and client both read the level (an older client
+draws the slab at the old cell); no message or replicated value changes, so the protocol is
+unchanged. No new class_name.

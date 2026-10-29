@@ -88,15 +88,6 @@
 		},
 		{
 			"at": [
-				217,
-				193
-			],
-			"to_map": "barrow_deep",
-			"to_spawn": "from_temple",
-			"sealed": "draugr"
-		},
-		{
-			"at": [
 				16,
 				236
 			],
@@ -332,7 +323,16 @@
 				1.0
 			],
 			"use": "temple",
-			"town": "store"
+			"town": "store",
+			"level_link": {
+				"cell": [
+					0,
+					0
+				],
+				"to_map": "barrow_deep",
+				"to_spawn": "from_temple",
+				"sealed": "draugr"
+			}
 		},
 		{
 			"slot": "building.turf_house",

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The wilds: the temple's sealed stair down to the Ossuary is now inside the temple, in its north-west back corner, and moves with it if the town ever moves (715).
 - The healer's huts in the wilds and the forest are now turf houses you can walk into: an oval house dug into an earth bank, a pot brewing over the hearth, a bed and a shelf of herbs inside; turf on stone in the wilds, bark and bent poles in the forest. Smoke rises and the pot's fire burns while the healer is there and awake (718).
 - The lob's volley drawn (677 amended (2)): the arrow shoots up fast and fades out high, a red circle marks where the volley falls until the last arrow is down, and each of the three arrows rains down steeply onto its own spot with a thud.
 - Sound: parrying blade on blade gets a bright, short clang of its own (three takes), and a low parry that turns a thrust aside a blade scrape under it, for en garde (732); the ordinary parry sound no longer clips.

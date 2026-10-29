@@ -367,6 +367,13 @@ All of it is optional.
   console's `mark <player> <mark>` or `-<mark>`), else "The way is sealed."
   once a stand; their companion goes with them; to the world map and routes
   it is closed. The barrow's shortcut from the temple is sealed `draugr`.
+  A building may carry a link instead (decision 715), so it goes where the
+  building goes: its entry's `"level_link": {"cell": [x, y], "to_map",
+  "to_spawn", "sealed", "cue", "variant"}`, the cell in the building's
+  frame (front +y, turned with its facing as a kind's doors are), on floor
+  inside it and not its door or front, with no marker. The link carries
+  `"building"`, the building's code (else its slot). The wilds' temple
+  carries the stair down to the Ossuary in its north-west back corner.
 - `walls` and `floors`: the wall and floor sets the map is drawn in
   (art-kit's `wall.<set>.*` and `floor.<set>`: castle, wood, stone, cave;
   castle if not given or not a set). The floor set is drawn on the map's

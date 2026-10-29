@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_kinds()
 	_test_canopy()
 	_test_building_links()
+	_test_building_level_link()
 	_test_place_towns()
 	_test_regenerate_mark()
 	_test_town_walls()
@@ -362,8 +363,8 @@ func _test_link_cues() -> void:
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
 	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
 			"the barrow's depths: the Ossuary's stair up to the shallower, the sealed shortcut behind the throne its slab (666)")
-	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(217, 193)).get("cue") == "sealed",
-			"the mound's door is its own cue; the sealed shortcut its slab")
+	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(216, 195)).get("cue") == "sealed",
+			"the mound's door is its own cue; the sealed shortcut (in the temple since 715) its slab")
 	var wilds := Level.load_level("wilds")
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
 			"each link carries its cue for the big map")
@@ -1582,6 +1583,49 @@ func _test_place_towns() -> void:
 	_check(places["hunt"]["kind"] == "hunting_ground" and not places["hunt"].has("town")
 		and warnings.size() == 1 and "works for town \"wood\": no stockpile place" in warnings[0], "a town that is no stockpile: said, none (%s)" % [warnings])
 	_check(places["pit"]["kind"] == "quarry" and not places["pit"].has("town"), "a quarry, working for none")
+
+
+## A building carries a level link (decision 715: the temple's way down goes
+## where the temple goes): its cell in the building's frame turned with its
+## facing, no marker, its code on it, kept clear and cued as any link; one
+## off its inside, on its door or front, or with no to_map, said and left
+## out. The wilds' temple carries the stair down to the Ossuary.
+func _test_building_level_link() -> void:
+	print("\n== a building's level link (715) ==")
+	var rows: Array[String] = []
+	for y in 2 * 14 - 1:
+		rows.append(".".repeat(2 * 14 - 1))
+	var layout := Level.image_from_rows(rows, {Vector2i(1, 1): "start"})
+	var parse_with := func(facing: Array, given: Dictionary) -> Dictionary:
+		var config := {"outdoor": true, "buildings": [{"slot": "building.temple", "at": [3, 3], "facing": facing, "level_link": given}]}
+		return Level.parse(layout, null, config)
+	var said := func(level: Dictionary) -> Array:
+		return level["warnings"].filter(func(w: String) -> bool: return "level_link" in w)
+	var down := {"cell": [0, 0], "to_map": "barrow_deep", "to_spawn": "from_temple", "sealed": "draugr"}
+	var level: Dictionary = parse_with.call([0, 1], down)
+	var link: Dictionary = level["links"][0] if level["links"].size() == 1 else {}
+	_check(link.get("tile") == Vector2i(3, 3) and link.get("to_map") == "barrow_deep" and link.get("to_spawn") == "from_temple" and link.get("sealed") == "draugr"
+		and link.get("building") == level["buildings"][0]["code"] and Vector2i(3, 3) in level["terrain"]["links_at"] and level["terrain"]["ways_out"].is_empty()
+		and said.call(level).is_empty(), "facing south, its back-left cell is the link, no marker, the temple's code on it (%s %s)" % [link, said.call(level)])
+	var cue: Array = level["terrain"]["link_cues"].filter(func(c: Dictionary) -> bool: return c["tile"] == Vector2i(3, 3))
+	_check(cue.size() == 1 and cue[0]["cue"] == "sealed", "it is cued as a sealed way (%s)" % [cue])
+	# The temple is 4 x 6: its frame's (0, 0) turned with it, as a kind's doors are.
+	var turned := {[0, -1]: Vector2i(6, 8), [1, 0]: Vector2i(3, 6), [-1, 0]: Vector2i(8, 3)}
+	for facing: Array in turned:
+		var links: Array = parse_with.call(facing, down)["links"]
+		_check(links.size() == 1 and links[0]["tile"] == turned[facing], "facing %s it is at %s (%s)" % [facing, turned[facing], links])
+	# Its door (front row's middle, (4, 8)) and the front before it; outside; no to_map.
+	for bad: Dictionary in [{"cell": [1, 5], "to_map": "x"}, {"cell": [1, 6], "to_map": "x"}, {"cell": [9, 0], "to_map": "x"}, {"cell": [1, 1]}]:
+		var refused: Dictionary = parse_with.call([0, 1], bad)
+		_check(refused["links"].is_empty() and refused["terrain"]["links_at"].is_empty() and said.call(refused).size() == 1,
+			"%s: said and left out (%s)" % [bad, said.call(refused)])
+	var wilds := Level.load_level("wilds")
+	var temple: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.temple")
+	var stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow_deep")
+	_check(temple.size() == 1 and stair.size() == 1 and stair[0]["tile"] == (temple[0]["rect"] as Rect2i).position and stair[0]["building"] == temple[0]["code"]
+		and stair[0]["sealed"] == "draugr" and stair[0]["to_spawn"] == "from_temple" and not Vector2i(217, 193) in wilds["terrain"]["links_at"]
+		and wilds["warnings"].filter(func(w: String) -> bool: return "link" in w).is_empty(),
+		"the wilds' temple carries the sealed stair down in its north-west back corner; the old one behind it is gone (%s)" % [stair])
 
 
 func _test_building_links() -> void:

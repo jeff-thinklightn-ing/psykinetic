@@ -806,6 +806,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["buildings"] = buildings_from(config, level["terrain"], warnings)
 	_lay_bridges(level)
 	_lay_solid(level)
+	_building_links(level, config, warnings)
 	level["terrain"]["link_cues"] = link_cues(level, config)
 	var derived := _lay_curves(level["terrain"], config, warnings)
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
@@ -1019,12 +1020,6 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["starts"] = starts
 	level["spawn_points"] = spawn_points
 	level["links"] = links
-	# Where they are, for the terrain's readers (World keeps them clear, 571).
-	level["terrain"]["links_at"] = links.map(func(link: Dictionary) -> Vector2i: return link["tile"])
-	# A dungeon's (level.json "depth") ways out, for a routed band to run for
-	# (decision 702): none hidden, closed or sealed. Elsewhere, none.
-	level["terrain"]["ways_out"] = links.filter(func(link: Dictionary) -> bool:
-		return int(config.get("depth", 0)) > 0 and not link["hidden"] and not link["closed"] 				and str(link["sealed"]).is_empty()).map(func(link: Dictionary) -> Vector2i: return link["tile"])
 	level["centre"] = centre if centre != null else starts[0] if not starts.is_empty() else Vector2i.ZERO
 	level["display_name"] = str(config.get("name", ""))
 
@@ -1458,6 +1453,8 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		if entry.has("kind"):
 			_kind_of(building, entry)
 		_link(building, entry, config, linked, warnings)
+		if entry.has("level_link"):
+			building["level_link"] = entry["level_link"]
 		out.append(building)
 	return out
 
@@ -2022,7 +2019,8 @@ static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary
 			entries[_tile(entry.get("at"))] = entry
 	for link: Dictionary in level["links"]:
 		var at: Vector2i = link["tile"]
-		var entry: Dictionary = entries.get(at, {})
+		# A building's link (715) carries its own cue and variant.
+		var entry: Dictionary = entries.get(at, link if link.has("building") else {})
 		var far := template_config(str(link["to_map"]))
 		var cue := "none"
 		if str(entry.get("cue", "")) in CUES:
@@ -2088,6 +2086,57 @@ static func solid_door_of(building: Dictionary) -> Vector2i:
 ## A solid building's door (decision 550): the front row's middle.
 static func solid_door(rect: Rect2i, facing: Vector2i) -> Vector2i:
 	return front_cell(rect, facing) - facing
+
+
+## The level links [param level]'s buildings carry (decision 715: the
+## temple's way down goes where the temple goes) added to its "links", with
+## no marker, then where all its links are for the terrain's readers. A
+## building entry's "level_link" {cell (in its frame, front +y, turned with
+## its facing as a kind's doors are), to_map, to_spawn, sealed, cue,
+## variant}; the link's "building" is the building's code, else its slot,
+## for the far side to find it by. One not on floor inside the building, or
+## on its door or front, is said in [param warnings] and left out.
+static func _building_links(level: Dictionary, config: Dictionary, warnings: Array[String]) -> void:
+	var links: Array[Dictionary] = level["links"]
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	for building: Dictionary in level["buildings"]:
+		var given: Variant = building.get("level_link")
+		if given == null:
+			continue
+		var rect: Rect2i = building["rect"]
+		var facing: Vector2i = building["facing"]
+		var local: Variant = _tile(given.get("cell") if given is Dictionary else null)
+		if local == null or str(given.get("to_map", "")).is_empty():
+			warnings.append("the %s at %s has a level_link with no \"cell\": [x, y] or no \"to_map\": left out" % [building["slot"], rect.position])
+			continue
+		var frame := rect.size if facing.y != 0 else Vector2i(rect.size.y, rect.size.x)
+		var at: Vector2i = rect.position + _turned(local, frame, facing)
+		var by_door: Array[Vector2i] = [front_cell(rect, facing), solid_door(rect, facing)]
+		for key: Vector3i in entrances(building):
+			by_door.append_array(Terrain.edge_cells(key))
+		var inside := (building["blocks"] as Array).any(func(block: Rect2i) -> bool: return block.has_point(at))
+		if not inside or not floor.has(at) or at in by_door:
+			warnings.append("the %s at %s has its level_link at %s, %s: left out" % [building["slot"], rect.position, at,
+					"on its door or front" if at in by_door else "not floor inside it"])
+			continue
+		if links.any(func(link: Dictionary) -> bool: return link["tile"] == at):
+			warnings.append("the %s at %s has its level_link at %s, where a link already is: left out" % [building["slot"], rect.position, at])
+			continue
+		var code := str(building.get("code", ""))
+		links.append({"tile": at, "to_map": str(given["to_map"]), "to_spawn": str(given.get("to_spawn", "")),
+				"one_way": bool(given.get("one_way", false)), "closed": bool(given.get("closed", false)),
+				"sealed": str(given.get("sealed", "")), "hidden": bool(given.get("hidden", false)),
+				"building": code if not code.is_empty() else str(building["slot"]),
+				"cue": str(given.get("cue", "")), "variant": maxi(1, int(given.get("variant", 1)))})
+	# Where they are, for the terrain's readers (World keeps them clear, 571).
+	level["terrain"]["links_at"] = links.map(func(link: Dictionary) -> Vector2i: return link["tile"])
+	# A dungeon's (level.json "depth") ways out, for a routed band to run for
+	# (decision 702): none hidden, closed or sealed. Elsewhere, none.
+	level["terrain"]["ways_out"] = links.filter(func(link: Dictionary) -> bool:
+		return int(config.get("depth", 0)) > 0 and not link["hidden"] and not link["closed"] \
+				and str(link["sealed"]).is_empty()).map(func(link: Dictionary) -> Vector2i: return link["tile"])
 
 
 ## The solid buildings in [param level] (SOLID, decision 550) laid into its
