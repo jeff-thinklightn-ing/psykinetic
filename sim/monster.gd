@@ -483,6 +483,10 @@ var dread_flee_below := DREAD_FLEE_BELOW
 var flee_below := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 ## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
 var picks_up := false
+## Its kind's "lifts": the heaviest thing (kg, Items.weight_of) it takes up
+## (the band, 714: a plain robber leaves the Tomb Sledge lie); no
+## limit when its row names none.
+var lifts := INF
 ## Its kind's "bound" (decision 702): of its level, never leaving it (the
 ## undead of a barrow); one not bound, routed indoors, runs for a way out.
 var bound := false
@@ -581,6 +585,7 @@ func _ready() -> void:
 		opens_doors = bool(opens) if opens != null else bool(row.get("opens_doors", true))
 		door_force = int(row.get("door_force", 1))
 		picks_up = bool(row.get("picks_up", false))
+		lifts = float(row["lifts"]) if row.get("lifts") != null else INF
 		bound = bool(row.get("bound", false))
 		fearless = bool(row.get("fearless", false))
 		never_lies = bool(row.get("never_lies", false))
@@ -1858,6 +1863,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"yields": (row.get("yields", []) as Array).duplicate(true) if row.get("yields") is Array else [],
 			"wields": (row["wields"] as Dictionary).duplicate() if row.get("wields") is Dictionary else {},
 			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
+			"lifts": row.get("lifts"),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
 			"never_lies": bool(row.get("never_lies", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},

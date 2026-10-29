@@ -35346,3 +35346,47 @@ panel. With room the order is as before (relic_of, consume, charge), and
 the old "takes no more" line is gone. resident_test _test_relic: unblessed
 and full each keep the relic with their line; blessed is charged and said.
 Server only; protocol unchanged.
+## 714, enemy-ai's side: the barrow's band, the Tomb Sledge, the draugr's anger
+
+The mound-breakers, every barrow robber a named one (716): nine rows in
+levels/named_enemies.json, lore's names as Jeff passed them: Brand the Ox
+(the big one), Crake, Mott, Nabb, Wicket, Fenn, Rook, Sedge, Tull, each with
+its own rise_days (2 to 4 days). Dungeon puts "named": <id> on its barrow
+robbers and counts those standing for its gate.
+
+Brand is a new kind, robber_brute (monsters.json): HEAVY, drawn as a tall,
+heavy-built person, 20 hp, a hammer for his kind's weapon (the maul; no maul
+row exists), in the robbers' faction and economy's robber kinds (his purse
+share). His strength is fixed in his row (hp 1.4, damage 1.3, speed 0.9).
+
+The Tomb Sledge (items' row, tags weapon and trophy) is a trophy, the
+exception to 716's kept weapon (the coordinator's ruling (a)): a named row's
+"trophy" is made for its hand when it comes into the world while one is due
+to be won; struck down by a player (or a companion, for its keeper) while
+holding it, it falls with the rest of what it carried, not kept. Felled by
+anyone else it is kept and comes back with him. Risen while none is due, he
+has his kept weapon or his kind's (the hammer). Whether one is due is decided
+in one place, Main.trophy_due(player_id, named_id, trophy), with
+Main.trophy_taken recording a win (World.trophy_due / trophy_taken, set by
+Main; without Main, once ever): once per generation of the level he stands
+in (his record's "level", "trophy_won" the generation won in). Jeff's open
+pick (decisions/barrow-reset.md) may make it once a real day per player; that
+is a change to those two functions only.
+
+A monster kind's "lifts" (kg): the heaviest weapon it takes up from the
+ground (World._weapon_index against Items.weight_of; none named, no limit).
+A robber lifts 4, the brute 12: a plain robber leaves the 9 kg Sledge where
+it lies. Items asked that the rule be the body's, not a row tag.
+
+The draugr's anger (Jeff's words): "Thieves in my barrow, thieves in my
+hall. You are all the same to me." (Draugr.ANGER), said once a fight, as he
+first takes up one (a pact's or a struck one's); his fight's end (_restore)
+lets him say it again next time. His spin's comment says the whole disc now
+(603 amended (7)).
+
+monster_test _test_band: Brand with the Sledge; struck down by a player it
+lies on the ground and is not due again this generation; a bare robber
+cannot lift it, a bare brute can; risen in the same generation, the hammer,
+kept and back with him; a new generation, a new Sledge; felled by no player,
+kept and back. _test_draugr: his anger once as he takes up the fight, once
+more in the next. Server only, protocol unchanged, no new class_name.

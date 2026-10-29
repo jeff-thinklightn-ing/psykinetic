@@ -93,6 +93,7 @@ func _ready() -> void:
 	_test_strike_cells()
 	_test_rout_way_out()
 	_test_named()
+	_test_band()
 	_test_wild_scent()
 	_test_wild_boar()
 	_test_wild_wolf()
@@ -2115,6 +2116,81 @@ func _test_named() -> void:
 	NamedEnemy.reset_for_test()
 	World.steps = 0
 
+## One of the band (714) at [param at]: its kind's spawn, armed as a
+## level's (Level.arm), named [param id].
+func _band_one(id: String, kind: String, at: Vector2i) -> Monster:
+	var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+	spec["name"] = "Band%s%d" % [id.capitalize(), World.tick]
+	spec["tile"] = at
+	spec["named"] = id
+	Level.arm(spec)
+	var one := EntityFactory.build(spec) as Monster
+	_room.add_child(one)
+	World.spawn(one, at)
+	return one
+
+
+func _test_band() -> void:
+	print("\n== the barrow's band (714): Brand the Ox wields the Tomb Sledge, dropped once a generation; a maul (the hammer) till the next; a plain robber cannot lift it ==")
+	_build(["###########", "#.........#", "#.........#", "###########"], {}, {}, "mt_band")
+	var host := Main.new()
+	host._regen = {"mt_band": {"generation": 1}}
+	World.trophy_due = host.trophy_due
+	World.trophy_taken = host.trophy_taken
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+	player.player_id = "p1"
+	_room.add_child(player)
+	World.spawn(player, Vector2i(1, 1))
+	var brand := _band_one("brand", "robber_brute", Vector2i(5, 1))
+	var sledge := World.slot_uid(brand, Items.RIGHT_HAND)
+	_check(str(brand.spawn_spec.get("label")) == "Brand the Ox" and brand.tactic == Monster.Tactic.HEAVY and World.wielded(brand) == "tomb_sledge"
+			and World.holder_key(brand) == "named:brand", "Brand the Ox, a heavy, the Tomb Sledge in his hands (%s)" % World.wielded(brand))
+	var crake := _band_one("crake", "robber", Vector2i(8, 2))
+	_check(str(crake.spawn_spec.get("label")) == "Crake" and World.wielded(crake) == "dagger", "Crake, a plain robber with his dagger")
+	World.damage(brand, 999, player)
+	var cell := World.NO_CELL
+	for at: Vector2i in World.zone.ground:
+		if sledge in World.ground_uids(at):
+			cell = at
+	_check(not brand.spawned and cell != World.NO_CELL, "struck down by a player, the Sledge falls where he fell, not kept (%s)" % World.items.at_of(sledge))
+	_check(int(World.named_record("brand").get("trophy_won", -1)) == 1 and not host.trophy_due("p1", "brand", "tomb_sledge"),
+			"won this generation: not due again till the next")
+	for kind: String in ["robber", "robber_brute"]:
+		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)  # Unarmed: both hands free.
+		spec["name"] = "Bare" + kind.capitalize().replace(" ", "")
+		spec["tile"] = cell + Vector2i(0, 1) if World.is_free(cell + Vector2i(0, 1)) else cell + Vector2i(0, -1)
+		var one := EntityFactory.build(spec) as Monster
+		_room.add_child(one)
+		World.spawn(one, spec["tile"])
+		_check(World.weapon_near(one) == (World.NO_CELL if kind == "robber" else cell),
+				"beside the Sledge, hands free: a %s %s lift it (lifts %.0f kg, it %.0f)" % [kind, "cannot" if kind == "robber" else "can", one.lifts, Items.weight_of("tomb_sledge")])
+		World.despawn(one)
+	var record := World.named_record("brand")
+	World.steps = int(record["returns_at"])
+	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
+	_check(World.wielded(brand) == "hammer", "risen in the same generation: his maul (the hammer), not a second Sledge (%s)" % World.wielded(brand))
+	var maul := World.slot_uid(brand, Items.RIGHT_HAND)
+	World.damage(brand, 999, player)
+	_check(World.items.at_of(maul) == NamedEnemy.KEPT % "brand", "his maul kept for him, as any named one's (716)")
+	World.steps = int(World.named_record("brand")["returns_at"])
+	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
+	_check(World.slot_uid(brand, Items.RIGHT_HAND) == maul, "and back in his hands when he rises")
+	World.damage(brand, 999, player)
+	host._regen["mt_band"]["generation"] = 2
+	World.steps = int(World.named_record("brand")["returns_at"])
+	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
+	var second := World.slot_uid(brand, Items.RIGHT_HAND)
+	_check(World.wielded(brand) == "tomb_sledge" and second != sledge, "the barrow made anew: a Sledge is his again, to be won once more")
+	World.damage(brand, 999, null)
+	_check(World.items.at_of(second) == NamedEnemy.KEPT % "brand", "felled by no player: the Sledge kept for him, not dropped")
+	World.steps = int(World.named_record("brand")["returns_at"])
+	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
+	_check(World.slot_uid(brand, Items.RIGHT_HAND) == second, "and he rises with that same Sledge")
+	World.trophy_due = Callable()
+	World.trophy_taken = Callable()
+	host.free()
+	World.steps = 0
+
 
 func _test_wild_scent() -> void:
 	print("
@@ -2994,6 +3070,7 @@ func _test_draugr() -> void:
 			fought = true
 			break
 	_check(fought, "he fights his challenger")
+	_check(said.count(Draugr.ANGER) == 1, "taking up the fight he says his anger, once (%s)" % [said])
 	World.knock_down(draugr, player, 10)
 	_check(not World.is_down(draugr) and draugr.down_until <= World.tick and World.is_stunned(draugr),
 		"knocked down, he only staggers: never on the floor (573 amended (4))")
@@ -3047,6 +3124,7 @@ func _test_draugr() -> void:
 	World.step()
 	_check(short["ok"] and World.gold_of("p1") == gold_was - 19 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30,
 		"19 gold, under the least deal: he keeps it and attacks, at his own level")
+	_check(said.count(Draugr.ANGER) == 2, "a new fight: his anger once more (%d)" % said.count(Draugr.ANGER))
 	World.damage(draugr, 999, player)
 	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.AT_REST and draugr.hp == 30 and said.back() == Draugr.RESPECT
 		and doors.back() == true and skeleton.laid,

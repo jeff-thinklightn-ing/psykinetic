@@ -3437,6 +3437,24 @@ func generation_of(level_name: String) -> int:
 	return int(_regen.get(level_name, {}).get("generation", 0))
 
 
+## Whether named one [param named_id]'s [param trophy] (the Tomb Sledge) is
+## due to [param player_id] ("" for anyone: is it out to be won). The one
+## place it is decided (the coordinator, 714): once per generation
+## of the level the named one stands in (its record's "level"), kept on its
+## record as "trophy_won"; player_id unread till Jeff's pick
+## (decisions/barrow-reset.md) says whether it is once a day per player.
+func trophy_due(_player_id: String, named_id: String, _trophy: String) -> bool:
+	var record := World.named_record(named_id)
+	return not record.has("trophy_won") or int(record["trophy_won"]) != generation_of(str(record.get("level", "")))
+
+
+## Named one [param named_id]'s [param trophy] won by [param player_id]
+## (World._named_fell): not due again this generation (trophy_due).
+func trophy_taken(_player_id: String, named_id: String, _trophy: String) -> void:
+	if World.named.has(named_id):
+		World.named[named_id]["trophy_won"] = generation_of(str(World.named[named_id].get("level", "")))
+
+
 ## Server, on the slow world tick: a regenerating level that is due, its
 ## zone not awake, is made on _maker while the game goes on, and applied
 ## on a later slow tick (decision 684): one level at a time, the next
@@ -4088,6 +4106,8 @@ func _boot() -> void:
 	World.charges_in = charges_in_zone  # His level at a pact's start (573).
 	World.paid_deal = paid_deal_of  # A payer's deal kept till won (548 amended).
 	World.deal_paid = set_deal_paid
+	World.trophy_due = trophy_due  # A named one's trophy (the band, 714).
+	World.trophy_taken = trophy_taken
 	# The wildlife's herds (decision 367): counts on the world tick, bodies
 	# near someone through the far tier's keepers.
 	World.herds = Herds.new(snapshot.get("herds", {}), Herds.areas_of(world_map), {}, World.steps_now, World.holdings)

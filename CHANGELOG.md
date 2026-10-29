@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Aldous hands a knight's remains back when your Encolpion Amulet can't take the blessing (714 amended, npc's side): a full amulet, or one never blessed (after a quest reset), keeps the relic for later instead of losing it, and he says why.
 
+- The draugr speaks his anger as a fight begins (714): "Thieves in my barrow, thieves in my hall. You are all the same to me."
 ## v0.1.192
 
 - What goes over the network changes, so v0.1.191 and older can't join the server: update through the launcher first.

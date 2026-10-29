@@ -37,7 +37,7 @@
 	"robbers": {
 		"name": "the mound-breakers",
 		"colour": "#7a5a3a",
-		"monsters": ["robber"],
+		"monsters": ["robber", "robber_brute"],
 		"hostile_to": ["dead", "town"],
 		"on_sight": ["dead", "town"],
 		"holds": false

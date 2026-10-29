@@ -690,6 +690,12 @@ var dead_rest: Dictionary[String, Dictionary] = {}
 ## npc's card, memories and track on them). Kept through a room reset
 ## (Main's) and saved.
 var named: Dictionary[String, Dictionary] = {}
+## Main's (714): whether a named one's trophy is due,
+## (player_id, named_id, trophy) -> bool, player_id "" for "is it out to be
+## won"; and its record of one won, (player_id, named_id, trophy). Unset,
+## World's own: once ever (_trophy_due).
+var trophy_due: Callable
+var trophy_taken: Callable
 ## A roof of [param level] was damaged or mended (Main tells the peers).
 signal roof_changed(level: String)
 ## A client's: each town's buildings as the server told ("town"), for
@@ -2552,12 +2558,14 @@ func weapon_near(monster: GridEntity) -> Vector2i:
 
 
 ## The first weapon in the pile on [param cell] that [param monster] has a
-## free hand for, by its index there; -1 for none.
+## free hand for and lifts (its kind's "lifts"), by its index there; -1 for none.
 func _weapon_index(monster: GridEntity, cell: Vector2i) -> int:
 	var ids := ground_at(cell)
 	var uids := ground_uids(cell)
+	var lifts: float = (monster as Monster).lifts if monster is Monster else INF
 	for i in ids.size():
-		if not Items.verb_of(ids[i]).is_empty() and _free_hand(monster, ids[i]) >= 0 and not axe_bound(uids[i]):
+		if not Items.verb_of(ids[i]).is_empty() and _free_hand(monster, ids[i]) >= 0 and not axe_bound(uids[i]) \
+				and Items.weight_of(ids[i]) <= lifts:
 			return i
 	return -1
 
@@ -3279,9 +3287,18 @@ func _named_fight(target: GridEntity, source: GridEntity) -> void:
 
 
 ## [param monster] (a named one) dies: its weapon kept for its next life,
-## its record dead till NamedEnemy.rise_steps on, killed_by told.
+## its record dead till NamedEnemy.rise_steps on, killed_by told. Its
+## trophy (its row's "trophy", 714), struck down by a player for
+## whom it is due (trophy_due), is not kept: it falls with the rest of it.
 func _named_fell(monster: Monster, by: GridEntity) -> void:
-	_keep_named_weapon(monster)
+	var trophy := str(NamedEnemy.def(monster.named_id).get("trophy", ""))
+	var player_id := _trophy_winner(by)
+	if not trophy.is_empty() and monster.slots.size() > Items.RIGHT_HAND and monster.slots[Items.RIGHT_HAND] == trophy \
+			and not player_id.is_empty() and _trophy_due(player_id, monster.named_id, trophy):
+		_trophy_taken(player_id, monster.named_id, trophy)
+		print("[named] %s's %s falls for %s" % [monster.named_id, trophy, player_id])
+	else:
+		_keep_named_weapon(monster)
 	var record := named_enter(monster.named_id, str(monster.spawn_spec.get("kind", "")))
 	record["alive"] = false
 	record["returns_at"] = steps + NamedEnemy.rise_steps(monster.named_id)
@@ -3308,22 +3325,35 @@ func _keep_named_weapon(monster: Monster) -> void:
 
 ## [param monster] (a named one) in the world: up again if it was dead (rose
 ## told), its kept weapon back in its right hand in place of what its spawn
-## gave it.
+## gave it. Its trophy (its row's "trophy", 714), when due to be
+## won (trophy_due with no player), is made for its hand instead, unless
+## the one it kept is the trophy; else it has its kept one, or its kind's.
 func _named_arrived(monster: Monster) -> void:
 	var record := named_enter(monster.named_id, str(monster.spawn_spec.get("kind", "")))
+	record["level"] = zone.name
 	if not bool(record.get("alive", true)):
 		record["alive"] = true
 		record["lives"] = int(record.get("lives", 1)) + 1
 		print("[named] %s rose, life %d" % [record["name"], record["lives"]])
 		named_event.emit(monster.named_id, "rose", "")
-	var uid := int(record.get("weapon_uid", 0))
-	if uid == 0 or not items.has(uid) or items.at_of(uid) != NamedEnemy.KEPT % monster.named_id \
-			or monster.slots.size() <= Items.RIGHT_HAND:
+	if monster.slots.size() <= Items.RIGHT_HAND:
 		return
+	var uid := int(record.get("weapon_uid", 0))
+	var kept := uid != 0 and items.has(uid) and items.at_of(uid) == NamedEnemy.KEPT % monster.named_id
+	var trophy := str(NamedEnemy.def(monster.named_id).get("trophy", ""))
+	if not trophy.is_empty() and not (kept and items.id_of(uid) == trophy) and _trophy_due("", monster.named_id, trophy):
+		_named_hand(monster, items.mint(trophy, "stocked", _label_of(monster), zone.name, monster.tile), "its trophy in its hand")
+	elif kept:
+		_named_hand(monster, uid, "its named holder's own came back")
+
+
+## [param uid] in [param monster]'s right hand, what its spawn gave it there
+## ended ([param why]).
+func _named_hand(monster: Monster, uid: int, why: String) -> void:
 	_fit_uids(monster)
 	var given := monster.slot_items[Items.RIGHT_HAND]
-	if given != 0 and items.has(given):
-		items.end(given, "lost", "its named holder's own came back", zone.name, monster.tile)
+	if given != 0 and given != uid and items.has(given):
+		items.end(given, "lost", why, zone.name, monster.tile)
 	var slots := monster.slots.duplicate()
 	var uids := monster.slot_items.duplicate()
 	slots[Items.RIGHT_HAND] = items.id_of(uid)
@@ -3333,6 +3363,37 @@ func _named_arrived(monster: Monster) -> void:
 	var carrier := _carrier_of(monster)
 	items.place(uid, holder_key(monster), carrier[0], carrier[1])
 	_slots_changed(monster)
+
+
+## The player a named one's trophy falls for when [param by] strikes it
+## down: a player, or a companion's keeper; "" for anyone else.
+func _trophy_winner(by: GridEntity) -> String:
+	if not is_instance_valid(by):
+		return ""
+	if by is Player:
+		return str((by as Player).player_id)
+	if by is Companion and is_instance_valid((by as Companion).keeper) and (by as Companion).keeper is Player:
+		return str(((by as Companion).keeper as Player).player_id)
+	return ""
+
+
+## Whether [param named_id]'s [param trophy] is due to [param player_id]
+## ("" for anyone: is it out to be won), by Main.trophy_due (714:
+## once per barrow generation; Jeff's pick may make it once a day per
+## player there, nowhere else). Without Main, once ever.
+func _trophy_due(player_id: String, named_id: String, trophy: String) -> bool:
+	if trophy_due.is_valid():
+		return bool(trophy_due.call(player_id, named_id, trophy))
+	return not named_record(named_id).has("trophy_won")
+
+
+## [param named_id]'s [param trophy] won by [param player_id]: Main's
+## trophy_taken keeps it; without Main, its record does.
+func _trophy_taken(player_id: String, named_id: String, trophy: String) -> void:
+	if trophy_taken.is_valid():
+		trophy_taken.call(player_id, named_id, trophy)
+	elif named.has(named_id):
+		named[named_id]["trophy_won"] = 0
 
 
 ## [param entity] did a deed of [param kind] (Items.DEEDS) with the thing

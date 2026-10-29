@@ -61,6 +61,9 @@ const ASKED := "Why have you entered my Hall, %s?"
 const WORDS := "Return the gold your people stole from this place, when you do that you may leave."
 const WON := "...you have honored the pact, I shall give you the power to cheat death"
 const RESPECT := "...warrior, you have my respect."
+## Said as he first takes up a fight, once a fight (the band, 714;
+## Jeff's words): the robbers broke his barrow, and the living are all one to him.
+const ANGER := "Thieves in my barrow, thieves in my hall. You are all the same to me."
 ## Ticks between his question and his asking (a pause).
 const ASK_DELAY_TICKS := 30
 ## His Hall waits for the first one's companion (573 amended; Jeff: "door
@@ -160,6 +163,8 @@ var _fist_seen := -1
 var _struck_at: Array[int] = []
 var _asking := ""
 var _ask_at := -1
+## Whether he has said ANGER this fight (_restore clears it).
+var _angered := false
 ## The tick the first one came into his lair while the Hall waits for
 ## their companion (-1: not waiting), and each companion's cells from his
 ## lair over the last COMING_TICKS (instance id -> {tick: cells}).
@@ -243,6 +248,9 @@ func _sim_tick() -> void:
 		_stay_gone()  # At rest he is gone till his rest runs out (573 amended (4)).
 		return
 	super()
+	if target != null and not _angered and state != State.AT_REST:
+		_angered = true
+		said.emit(ANGER)
 
 
 func _world_tick(seconds: float) -> void:
@@ -323,7 +331,7 @@ func _special_tick() -> bool:
 	backing_off = false
 	var winded := bool(World.call("is_winded", self))
 	var toward: Vector2i = World.call("melee_way", self, target) if World.free_body(target) else Senses.way_toward(tile, target.tile)  # A free body by its centre (699).
-	World.face(self, toward)  # His sweep's gap behind him, away from his target.
+	World.face(self, toward)  # Toward his target (his spin strikes the whole disc: 603 amended (7)).
 	var foes := 0
 	for each: Variant in World.call("spin_targets", self):
 		if each is GridEntity and each != self and (each is Player or each is Companion) and not _is_dead(each):
@@ -810,6 +818,7 @@ func _restore() -> void:
 	hp = max_hp
 	attack_damage = _base_damage
 	target = null
+	_angered = false
 	alert = Alert.IDLE
 	_returning = true
 	for raised_one in _retinue:

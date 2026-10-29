@@ -206,7 +206,7 @@ func _test_robbers_band() -> void:
 == the grave robbers' purse (580, economy's side) ==")
 	var robbers: Dictionary = Production.read_rules(Economy.PATH)["robbers"]
 	_check(float(robbers["altar_share"]) == 0.5 and float(robbers["thief_cut"]) == 0.25 and int(robbers["most"]) == 40
-		and robbers["kinds"] == ["robber"] and robbers["barrow"] == "barrow", "the rules are economy.json's (%s)" % [robbers])
+		and robbers["kinds"] == ["robber", "robber_brute"] and robbers["barrow"] == "barrow", "the rules are economy.json's (%s)" % [robbers])
 	var rules := RULES.duplicate(true)
 	rules["robbers"] = robbers
 	_now = 0
