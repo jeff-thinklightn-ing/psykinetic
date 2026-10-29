@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions: what she says she carries counts all 8 pack slots, and her armour is worn, not held (722, companions' side).
 - The draugr's win no longer charges the amulet: each winner takes up the Encolpion Amulet uncharged (if they have none) and, from the knight's sepulcher, the holy remains of this generation's knight into their pack; give them to Aldous at the temple and he charges the amulet with the deal's charges.
 - Umbrage: a locker stands in the square by the depot and the shop, against the temple's west wall; E on it opens your own chest (722).
 - Inventory: your pack shows as a 4 x 2 grid beside your hands and armour; double-click a thing to equip it, or with your chest open to deposit or take it back; your chest's 48 slots have a "Deposit unequipped" button; E on a town's locker opens your own chest (722).

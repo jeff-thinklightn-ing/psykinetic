@@ -124,6 +124,7 @@ func _ready() -> void:
 	_test_firing_cone()
 	_test_bandage_words()
 	_test_held_for_bandage()
+	_test_carried_slots()
 	_test_tends_unasked()
 	_test_drinks_a_remedy()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
@@ -3231,6 +3232,26 @@ func _test_follow_without_backsteps() -> void:
 ## Bandaged by her player, she holds her cell (decision 713, items' reach;
 ## Jeff's bandage-kneel): sent off mid-bandage, she stays till it is done,
 ## then goes.
+func _test_carried_slots() -> void:
+	print("
+== what she carries reads the pack of 8, her hands and her armour (722) ==")
+	var pet := _companion()
+	var was: Array = pet.slots.duplicate()
+	var slots: Array[String] = []
+	slots.resize(Items.CARRIED)
+	slots.fill("")
+	slots[0] = "ration"
+	slots[10] = "bandaging_kit"
+	slots[Items.RIGHT_HAND] = "dagger"
+	slots[Items.ARMOUR] = "leather_armour"
+	World.set_slots(pet, slots)
+	var said := pet.carried()
+	_check(Items.name_of("bandaging_kit") in said.get_slice("In your hands", 0) and "In your hands: a %s." % Items.name_of("dagger") in said
+		and "You wear %s." % Items.name_of("leather_armour") in said and not "a %s" % Items.name_of("leather_armour") in said,
+		"slot 10 in her pack, the dagger in her hands, the armour worn, not held (%s)" % said)
+	World.set_slots(pet, was)
+
+
 func _test_held_for_bandage() -> void:
 	print("
 == bandaged by her player, she holds still till it is done (713) ==")

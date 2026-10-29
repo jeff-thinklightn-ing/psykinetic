@@ -35319,3 +35319,12 @@ come from the relic on the altar, not the win.
 level_test (the uncharged win, the relic and plaque, its charges on the altar as the old amounts),
 companion_test, items_test (a full pack, a pack all bound). Server only, protocol unchanged, no new
 class_name.
+## 722, companions' side: what she carries reads the pack of 8
+
+722 made a carrier's pack Items.PACK_SLOTS (0-3 and 7-10), with the hands at
+4 and 5 and the armour at 6. Companion.carried(), the sentence her voice is
+told about what she carries, read every slot from Items.PACK up as "in your
+hands", so armour and the new pack slots 7 to 10 were said to be held. Now
+it reads the pack by Items.is_pack, the hands as RIGHT_HAND and LEFT_HAND,
+and her armour as worn ("You wear leather armour."). companion_test
+_test_carried_slots. Server only, protocol unchanged, no new class_name.

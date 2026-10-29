@@ -971,16 +971,23 @@ func knowledge_of(kinds: Array[String]) -> String:
 	return " ".join(sentences)
 
 
-## What she carries, in a sentence: her lantern, what is in her hands and
-## what is in her pack.
+## What she carries, in a sentence: her lantern, what is in her hands, what
+## she wears and what is in her pack (722: the pack is Items.PACK_SLOTS).
 func carried() -> String:
 	var items: Array[String] = []
 	var held: Array[String] = []
+	var worn := ""
 	for i in slots.size():
-		if not slots[i].is_empty():
-			(held if i >= Items.PACK else items).append("a " + Items.name_of(slots[i]))
+		if slots[i].is_empty():
+			continue
+		if Items.is_pack(i):
+			items.append("a " + Items.name_of(slots[i]))
+		elif i == Items.RIGHT_HAND or i == Items.LEFT_HAND:
+			held.append("a " + Items.name_of(slots[i]))
+		elif i == Items.ARMOUR:
+			worn = " You wear %s." % Items.name_of(slots[i])
 	var pack := "nothing" if items.is_empty() else ", ".join(items)
-	var hands := "" if held.is_empty() else " In your hands: %s." % " and ".join(held)
+	var hands := ("" if held.is_empty() else " In your hands: %s." % " and ".join(held)) + worn
 	if emit_light > 0.0:
 		return "You carry a lantern, and in your pack %s.%s" % [pack, hands]
 	return "In your pack you carry %s.%s" % [pack, hands]
