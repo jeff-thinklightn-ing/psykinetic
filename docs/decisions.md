@@ -35441,4 +35441,16 @@ combat_test _test_lob: the whole circle at the first step's full reach and
 past it, 1.0 and 1.5 at 2 and 3 cells, never under lob_volley_min. The
 radius already goes over the wire (lobbed), so a client before this draws
 its own circle; the falls are the server's. Protocol unchanged, no new
+
+## 629 amended (2), ui's side: his refusal, and how to strike him
+
+Jeff was trapped in the barrow: a plain click on the draugr only talks, and
+nothing said how to strike him. Dungeon's side offers every player a refusal
+(Jeff: "just put the word refuse"; id "deal:<id>:refuse", cost 0, last among his deals, first when the purse is
+short of the least sum); sent as offered, it provokes him. DealPanel shows
+his deal's buttons as before plus one NO_WORDS ("Refuse") button for
+it, enabled whatever the purse, sending gold 0; it alone when he
+offers nothing else (its words shown). first_deal skips it (is_no,
+no_deal). Under the purse line the window says STRIKE_WORDS ("Shift+click:
+strike"). ui_test _test_deal_window. Client only, protocol unchanged, no new
 class_name.

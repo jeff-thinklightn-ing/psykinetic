@@ -843,6 +843,30 @@ func _test_deal_window() -> void:
 	sent.clear()
 	(free_buttons[0] as Button).pressed.emit()
 	_check(sent == [["deal:7:again", 0]], "and it offers the deal's id with gold 0 (%s)" % [sent])
+	# His "no" (dungeon's; Jeff trapped in the barrow, a plain click only talking): a button after his deal's, or alone.
+	var no: Dictionary = {"id": "deal:7:refuse", "kind": "deal", "title": "Refuse", "words": "Refuse him, and he fights you for it.",
+		"what": {"steps": []}, "accept": "take", "cost": 0}
+	panel.show_deals("the draugr", [offers[0], no], 20, 0)
+	var with_no := panel._buttons.get_children()
+	_check(with_no.size() == 4 and (with_no[3] as Button).text == DealPanel.NO_WORDS and not with_no[3].disabled
+			and panel._words.text == "Return the gold." and panel._strike.text == "Shift+click: strike" and panel._strike.visible,
+		"his no: one more button after the sums, enabled, the deal's words kept; the strike line shown (%d buttons)" % with_no.size())
+	sent.clear()
+	(with_no[3] as Button).pressed.emit()
+	_check(sent == [["deal:7:refuse", 0]], "the no offers its id with gold 0 (%s)" % [sent])
+	panel.show_deals("the draugr", [no, offers[0]], 2, 0)
+	var poor := panel._buttons.get_children()
+	_check(poor.size() == 4 and (poor[3] as Button).text == DealPanel.NO_WORDS and poor[0].disabled and not poor[3].disabled,
+		"a poor purse, the no first: the sums still shown, disabled, the no beside them")
+	panel.show_deals("the draugr", [no], 2, 0)
+	var alone := panel._buttons.get_children()
+	_check(alone.size() == 1 and (alone[0] as Button).text == DealPanel.NO_WORDS and not alone[0].disabled
+			and panel._words.text == "Refuse him, and he fights you for it.",
+		"the no alone: its words, one button")
+	panel.show_deals("the draugr", [again[0], no], 0, 0)
+	var again_no := panel._buttons.get_children()
+	_check(again_no.size() == 2 and (again_no[0] as Button).text == "Face him again" and (again_no[1] as Button).text == DealPanel.NO_WORDS,
+		"paid once: Face him again, then the no")
 	panel.show_deals("the draugr", [], 20, 0)
 	_check(not panel.visible and panel.entity_id == 0, "empty offers (a pact on): closed")
 	_main.escape()
