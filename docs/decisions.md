@@ -35663,3 +35663,31 @@ resident_test `_test_hut_ruin`: standing and disrepair bring them back at
 the hut, a ruin elsewhere with the care kept, the line, no care offered at
 a ruin, nobody seated at 5 days empty and a new keeper at vacant_days.
 Server only; protocol unchanged.
+## 736. A starter weapon vendor, outside the town's economy
+
+Jeff: "add a vendor with the base weapons for 1g each, bow, arrow, sword,
+shield, hammer etc." Approved by the coordinator as designed: a starter and
+testing stall in Umbrage whose wares never run out. That makes things from
+nothing, against "everything is gathered and someone is paid", so it is
+kept wholly outside the towns: no store stock, no treasury, no tax, no
+wages, nothing counted toward a town's wants or prices.
+
+Economy's side (the lead). economy.json "vendor" (items' wares: sword,
+dagger, knife, spear, hammer, battle axe, bow, a bundle of arrows, shield,
+buckler): towns ["wilds/store"] (Umbrage's store, where npc stands its
+keeper), name "Rolf" (a draft), price 1. Economy.vendor_sale(player_id,
+item) -> {ok, say, gold, count}: one of the wares at vendor.price from the
+player's purse; the gold leaves the world (a sink: the player's gold is
+lost only by spending it). npc's side mints the wares into hands and marks
+each starter (items' World.mark_starter).
+No buyer takes starter gear back, or a sword bought for 1 would sell to the
+store for ~10: World._sell (a thing put on a shop counter) and
+World.try_barter (a shop's or a maker's barter) refuse a starter uid with
+World.STARTER_REFUSED, "starter gear: no one will buy it". The thief's
+fence (461) deals in raw resources only, never a uid, so it needs nothing.
+It can still be used, worn out or given away.
+economy_test: arrows for 1 gold, a bundle, nothing to the treasury; not one
+of its wares and no gold refused; a starter sword at the counter refused.
+Server only, protocol unchanged, no new class_name. npc's side (the keeper
+and the wares panel) and buildings' side (the stall in Umbrage's square)
+follow as "736, npc's side" and "736, buildings' side".

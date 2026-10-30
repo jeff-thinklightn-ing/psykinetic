@@ -1292,6 +1292,28 @@ func visitor_arrives(town: String, entry: Dictionary) -> String:
 	return ", ".join(did)
 
 
+## The starter vendor's sale (736; Jeff: "a vendor with the base weapons
+## for 1g each"): [param item] one of rules' vendor.wares, at vendor.price,
+## from [param player_id]'s purse. Outside every town: no stock, no
+## treasury, no tax; the gold leaves the world. The caller mints the wares
+## and marks them starter (World.mark_starter), which no buyer takes back.
+## {ok, say, gold (paid), count (how many one purchase gives)}.
+func vendor_sale(player_id: String, item: String) -> Dictionary:
+	var rule: Dictionary = rules.get("vendor", {})
+	var line: Dictionary = {}
+	for each: Variant in rule.get("wares", []):
+		if each is Dictionary and str(each.get("item", "")) == item:
+			line = each
+	if line.is_empty():
+		return {"ok": false, "say": "I've none of that.", "gold": 0, "count": 0}
+	var cost := maxi(int(rule.get("price", 1)), 0)
+	if gold(player_id) < cost:
+		return {"ok": false, "say": "That's %d gold, friend." % cost, "gold": 0, "count": 0}
+	if cost > 0:
+		add_gold(player_id, -cost, "a starter %s" % item)
+	return {"ok": true, "say": "Yours. Mind, no one will buy it off you.", "gold": cost, "count": maxi(int(line.get("count", 1)), 1)}
+
+
 ## What a pedlar asks for one [param item] (711): its value x merchant.sell,
 ## 1 at least; the price visitor_sale takes and the wares panel shows.
 func visitor_price(item: String) -> int:

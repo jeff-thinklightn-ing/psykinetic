@@ -4280,6 +4280,10 @@ func show_held(counter: GridEntity, by: GridEntity) -> void:
 		_slots_changed(counter)
 
 
+## Why a shop or a maker won't take starter gear (736).
+const STARTER_REFUSED := "starter gear: no one will buy it"
+
+
 ## A player [param by] puts [param from]'s [param from_slot] into shop
 ## counter [param shop]: the town buys it (Economy.sell) if it will, a raw
 ## banked as its yield, gear into the shop to sell on; refused (false,
@@ -4292,6 +4296,9 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 	var who := (by as Player).player_id
 	var item := from.slots[from_slot]
 	var uid := slot_uid(from, from_slot)
+	if is_starter(uid):  # The starter vendor's (736): no one buys it back.
+		traded.emit(by, shop, STARTER_REFUSED)
+		return false
 	var deal := economy.sell(who, place, item, items.is_grave(uid), -1, fence_state(shop))  # Grave goods: the fence's, by night (586).
 	if not deal["ok"]:
 		_log("shop: %s refused %s at %s: %s" % [by.name, item, place, deal["why"]])
@@ -4389,6 +4396,8 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 		var slot := slot_of_unit(by, uid)  # A unit of a stack too (decision 619).
 		if uid == 0 or slot < 0 or uid in handing:
 			return "that is no longer in your pack"
+		if is_starter(uid):  # The starter vendor's (736), to a shop or a maker alike.
+			return STARTER_REFUSED
 		handing.append(uid)
 		from_slots.append(slot)
 		gives.append({"id": by.slots[slot], "fenced": items.is_grave(uid)})

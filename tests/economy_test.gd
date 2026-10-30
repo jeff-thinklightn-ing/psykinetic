@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_buying()
 	_test_selling()
 	_test_barter()
+	_test_vendor()
 	_test_maker_barter()
 	_test_barrow_charges()
 	_test_robbers_band()
@@ -134,6 +135,24 @@ func _test_selling() -> void:
 	economy.stockpile.take(TOWN, "gold", 65, "test")
 	_check(economy.stockpile.count(TOWN, "gold") == 26 and economy.refuses(TOWN, "ore_sack") == "the town can't pay for it now",
 		"26 gold, a floor of 20: it can't pay 9 for ore")
+
+
+## The starter vendor (736): one of the wares at vendor.price from the
+## purse, the gold to nobody (no treasury), how many one buys; refused
+## without the gold or for what it doesn't sell.
+func _test_vendor() -> void:
+	print("
+== the starter vendor: 1 gold, to nobody ==")
+	var economy := _fresh()
+	economy.rules = economy.rules.duplicate(true)
+	economy.rules["vendor"] = Production.read_rules()["vendor"]
+	economy.add_gold("p1", 3, "test")
+	var treasury := economy.stockpile.count(TOWN, "gold")
+	var sale := economy.vendor_sale("p1", "arrows")
+	_check(sale["ok"] and int(sale["gold"]) == 1 and int(sale["count"]) == 1 and economy.gold("p1") == 2
+		and economy.stockpile.count(TOWN, "gold") == treasury, "arrows for 1 gold, a bundle, no treasury's (%s)" % [sale])
+	_check(not economy.vendor_sale("p1", "crown")["ok"] and economy.gold("p1") == 2, "not one of its wares: refused")
+	_check(not economy.vendor_sale("p2", "sword")["ok"] and economy.gold("p2") == 0, "no gold: refused")
 
 
 func _test_barter() -> void:
@@ -441,6 +460,13 @@ func _test_in_town() -> void:
 func _test_barter_in_town(host: Player, counter: Chest) -> void:
 	print("
 == in a town: barter at the counter ==")
+	World.take_item(host, host, 1)
+	# Starter gear (736): no counter takes it back.
+	var starter := World.items.mint("sword", "made", "test")
+	World.mark_starter(starter)
+	World.put_item(host, host, 1, starter)
+	World.command(host, "trade", {"shop": str(counter.get_path()), "give": [starter], "take": [], "gold": 0})
+	_check(_main.barter_data.get("why") == World.STARTER_REFUSED and host.slots[1] == "sword", "starter gear: refused (%s)" % _main.barter_data.get("why"))
 	World.take_item(host, host, 1)
 	var kit := World.items.mint("bandaging_kit", "made", "test")
 	World.stockpile.stock_shop(STORE, kit, "Wren", "wren")
