@@ -6,9 +6,12 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+## v0.1.192
+
+- What goes over the network changes, so v0.1.191 and older can't join the server: update through the launcher first.
 - Ground: grass draws a fine lawn of blade strokes over a mottled green (Jeff's pick from art-gen's procedural redo) in place of its plain procedural colour; three more variants (a second lawn, two meadows) are in the kit for terrain to use.
 - Ground: stone floors draw flat grey flagstones on dark joints (Jeff's pick, ground.stone c1) in place of their plain procedural colour.
-
 - Companions: what she says she carries counts all 8 pack slots, and her armour is worn, not held (722, companions' side).
 - The draugr's win no longer charges the amulet: each winner takes up the Encolpion Amulet uncharged (if they have none) and, from the knight's sepulcher, the holy remains of this generation's knight into their pack; give them to Aldous at the temple and he charges the amulet with the deal's charges.
 - Umbrage: a locker stands in the square by the depot and the shop, against the temple's west wall; E on it opens your own chest (722).
