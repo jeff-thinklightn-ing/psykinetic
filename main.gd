@@ -6490,6 +6490,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.played.connect(_bond_played.bind(pet))
 	pet.on_road = _on_road
 	pet.in_town = func(cell: Vector2i) -> bool: return not _town_ground(World.zone.name, cell).is_empty()
+	pet.held_camp = func(cell: Vector2i) -> bool: return not held_camp(cell).is_empty()  # 738 amended.
 	if int(record.companion.get("hp", 0)) > 0:
 		World.restore(pet, int(record.companion["hp"]), int(record.companion.get("stamina", pet.max_stamina)), pet.facing)
 	_companions[record.player_id] = pet

@@ -644,6 +644,9 @@ static var tends_unasked := true
 ## town; unset, never.
 var on_road := Callable()
 var in_town := Callable()
+## Main's (738 amended, on 739): whether a cell lies in a camp a player
+## holds (occupied and cleared, so it does not refill); unset, never.
+var held_camp := Callable()
 ## What _watch_deeds counts toward each deed (decision 621).
 var _deeds := {"day": -1, "walked": 0, "on_road": 0, "road_done": false, "fire": 0, "town": 0, "heavy": 0,
 	"warned_heavy": false, "mule_spent": false, "asked_rest": false, "last": Vector2i(-99999, -99999)}
@@ -1574,11 +1577,18 @@ func _keep_watch() -> void:
 
 
 ## Whether she may rest or sleep here (decision 738, Jeff: a camp is "not a
-## safe place bc the goblins respawn"): she and her player both on town
-## ground (Main's in_town: a town store's ground or a town's named room).
-## Never a camp, a dungeon or the wilds, however quiet they look now.
+## safe place bc the goblins respawn"): she and her player both on safe
+## ground (_safe_at). Never a dungeon or the wilds, however quiet they look.
 func safe_to_rest() -> bool:
-	return in_town.is_valid() and _alive(keeper) and bool(in_town.call(tile)) and bool(in_town.call(keeper.tile))
+	return _alive(keeper) and _safe_at(tile) and _safe_at(keeper.tile)
+
+
+## Whether [param cell] is safe ground: town ground (Main's in_town: a town
+## store's ground or a town's named room), or a camp a player holds (738
+## amended: 739's held camp, occupied and cleared, refills no monster; Jeff:
+## "that would be fine if occupancy blocks campfire respawns").
+func _safe_at(cell: Vector2i) -> bool:
+	return in_town.is_valid() and bool(in_town.call(cell)) or held_camp.is_valid() and bool(held_camp.call(cell))
 
 
 ## Bandaged (decision 621): her ask to rest first is met.

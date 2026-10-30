@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions: a camp you have cleared and stand in counts as safe too, so she may ask to rest there; a camp that can refill never does (738 amended).
 - Sound: refuse the draugr and he laughs, low and dry, as he comes at you (735, sound's side; three laughs, picked at random).
 - Starter weapons cost 1 gold each from a vendor by Umbrage's store, and no shop or maker will buy starter gear back (736, economy's side; the vendor himself follows).
 

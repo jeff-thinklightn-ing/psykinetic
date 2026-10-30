@@ -1611,6 +1611,14 @@ func _test_game_and_watch() -> void:
 	pet.in_town = func(_cell: Vector2i) -> bool: return in_town["on"]
 	_say_to(pet, owner, "Let's play knucklebones.")
 	_check(pet._game.is_empty(), "by a fire out of town (a camp): no game")
+	var held_was: Callable = pet.held_camp
+	var held := {"on": false}
+	pet.held_camp = func(_cell: Vector2i) -> bool: return held["on"]
+	held["on"] = true
+	var safe_held := pet.safe_to_rest()
+	held["on"] = false
+	_check(held_was.is_valid() and safe_held and not pet.safe_to_rest(),
+		"a camp a player holds (739: occupied, cleared, no refill) is safe ground; one not held is not (738 amended)")
 	var mind_was: CompanionMind = pet.mind
 	var counting := CountingMind.new()
 	pet.mind = counting
@@ -1686,6 +1694,7 @@ func _test_game_and_watch() -> void:
 	World._fire.erase(fire)
 	pet.mind = mind_was
 	pet.in_town = town_was
+	pet.held_camp = held_was
 	pet._town_since = -1
 	pet._in_town = false
 	pet.deed.disconnect(on_deed)

@@ -35721,3 +35721,16 @@ under 0.5 s.
   fallback. Listening files: C:/dev/review/sound/draugr_laugh.
 
 Client only; protocol unchanged; no new class_name.
+## 738 amended: a held camp is safe ground too
+
+Enemy-ai's 739 (Jeff: "that would be fine if occupancy blocks campfire
+respawns") stops an occupied camp refilling, and gives Main.held_camp(cell):
+the camp's place id when a player holds it (occupied and cleared of its
+holder's living monsters), else "". The coordinator approved extending 738's
+rule: Companion._safe_at(cell) is town ground (in_town) or a held camp (a new
+per-companion hook, held_camp, set by Main beside in_town), and
+safe_to_rest() needs both her cell and her player's. So she may ask to sleep,
+or play knucklebones, by the fire of a camp they have cleared and stand in,
+but never one that can refill. The town-only deeds (leisure) are unchanged.
+companion_test: a held camp is safe ground, one not held is not. Server only,
+protocol unchanged, no new class_name.
