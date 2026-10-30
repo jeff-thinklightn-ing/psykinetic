@@ -8,7 +8,7 @@ extends Monster
 ## it is on give him half his most again (living_came). Beaten, he yields (at
 ## 1 hp, never dies) and the players in his lair are blessed (World.bless,
 ## Main's barrow_won, 544 and 573); then he rests, and the barrow's dead lie still, till he rises
-## again (RISE_DAYS). Per challenger: he rises from his rest for each new
+## again (rise_s). Per challenger: he rises from his rest for each new
 ## pact, and his rest runs on. Server only; to a client he is a monster.
 ##
 ## Seated (awake, the curse on) he fights nobody unless struck. The first
@@ -46,8 +46,10 @@ const MOST_MORE_RISEN := 3
 const RETINUE_REACH := 3
 ## The living come in while a pact is on: this much of his most back.
 const LIVING_HEAL := 0.5
-## Game days he rests once laid to rest (a rules number, Jeff's to move).
-const RISE_DAYS := 3
+## Real seconds he rests once laid to rest (714 amended (2); Jeff, no
+## scarcity in the barrow: 300, were 3 game days; F7's draugr.rise_s).
+static var rise_s := 300.0
+const RISE_S_SPAN := [30.0, 3600.0]
 ## How near a player comes before he speaks first (cells, in his lair).
 const HEARING_TILES := 5
 ## A player this far off has left: he speaks to them again when they come back.
@@ -807,7 +809,7 @@ func _yield() -> void:
 		print("[draugr] %s: respect (unpaid, beaten)" % (zone if zone != "" else World.zone.name))
 		said.emit(RESPECT)
 	if rests_until <= World.steps:
-		rests_until = World.steps + RISE_DAYS * DayNight.day_steps
+		rests_until = World.steps + rest_steps()
 		_keep_prop("rests_until", rests_until)
 	if rests_until > World.steps:
 		_vanish()
@@ -928,8 +930,33 @@ func resting() -> bool:
 ## What a click or E on him hears while he rests (573 amended (3)): his
 ## rest's days left, at least one.
 func rest_words() -> String:
-	var days := maxi(1, ceili(float(rests_until - World.steps) / maxf(DayNight.day_steps, 1.0)))
-	return "He rests. Come back in %d day%s." % [days, "" if days == 1 else "s"]
+	var left := float(rests_until - World.steps)
+	if left >= DayNight.day_steps:
+		var days := ceili(left / maxf(DayNight.day_steps, 1.0))
+		return "He rests. Come back in %d day%s." % [days, "" if days == 1 else "s"]
+	var minutes := maxi(1, ceili(left / (60.0 * World.TICK_RATE)))
+	return "He rests. Come back in %d minute%s." % [minutes, "" if minutes == 1 else "s"]
+
+
+## His rest once laid to rest, in world steps (rise_s).
+static func rest_steps() -> int:
+	return roundi(rise_s * World.TICK_RATE)
+
+
+## The tuning panel's source "draugr" (714 amended (2)): draugr.rise_s.
+static func tuning_value(path: String) -> Variant:
+	return rise_s if path == "draugr.rise_s" else null
+
+
+static func set_tuning_value(path: String, value: Variant) -> bool:
+	if path != "draugr.rise_s" or not (value is int or value is float):
+		return false
+	rise_s = clampf(float(value), RISE_S_SPAN[0], RISE_S_SPAN[1])
+	return true
+
+
+static func tuning_fields() -> Array:
+	return [{"path": "draugr.rise_s", "group": "Draugr", "min": RISE_S_SPAN[0], "max": RISE_S_SPAN[1], "owner": "enemy-ai", "takes": "rest"}]
 
 
 ## His rest over: the curse renews, and the dead rise.

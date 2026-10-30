@@ -35970,3 +35970,29 @@ by the server. Server only, protocol unchanged, no new class_name.
 level_test _test_camp_chest: the rule and the placed chest, no level
 warning; searched, 25 gold and nothing in its slots; again at once, empty;
 five minutes on, 25 more. The barrow's entity count (now 5) updated.
+
+## 714 amended (2), enemy-ai's side: the barrow on a 5-minute clock
+
+Jeff picked no scarcity in the barrow: things come back on a 5-minute timer
+(the coordinator; dungeon does the robbers' slots and the chest). On
+enemy-ai's side three timers become real seconds, each an F7 field:
+- The Tomb Sledge is due again NamedEnemy.trophy_s (300) seconds of the
+  world clock after it is won, for anyone: Main.trophy_due /
+  trophy_taken, the one place it is decided, now keep the step it was won
+  on ("trophy_won") instead of the barrow's generation. F7 named.trophy_s.
+- A named row may give "rise_s" (real seconds dead, 30 to 3600) in place of
+  rise_days; the band's nine rows rise 300 s after they fall
+  (NamedEnemy.rise_steps; F7 named.<id>.rise_s).
+- The draugr rests Draugr.rise_s (300) seconds once laid to rest, not 3 game
+  days (Draugr.rest_steps; F7 draugr.rise_s, a new tuning source "draugr").
+  His rest words count minutes under a day ("He rests. Come back in 5
+  minutes.").
+With the Sledge's wait equal to his rise, Brand comes back with a new
+Sledge each time a player beats him; the hammer is his only when the wait
+is longer.
+
+monster_test _test_band: won now, not due, he rises 5 minutes on; with
+trophy_s 900, the hammer on his first two risings, then a Sledge; felled by
+no player, kept; at 300 s, back with a new Sledge. _test_draugr: his rest is
+rest_steps, and he says 5 minutes. Server only, protocol unchanged, no new
+class_name.

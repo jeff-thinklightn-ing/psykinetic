@@ -19,6 +19,12 @@ const STRENGTH_SPANS := {"hp": [0.8, 1.6], "damage": [0.8, 1.6], "speed": [0.85,
 ## Its days dead before it rises (the world clock's days), and the panel's span.
 const RISE_DAYS := 3.0
 const RISE_DAYS_SPAN := [0.5, 10.0]
+## A row's "rise_s" in place of rise_days: real seconds dead (714 amended (2);
+## Jeff, no scarcity in the barrow: its band back in 5 minutes), and its span.
+const RISE_S_SPAN := [30.0, 3600.0]
+## Seconds after its trophy is won before it is due again (714 amended (2):
+## the Tomb Sledge back in 5 minutes; F7's named.trophy_s).
+static var trophy_s := 300.0
 ## Where its weapon is kept while it is dead or away (ItemBook's place).
 const KEPT := "named:%s/kept"
 
@@ -54,6 +60,8 @@ static func def(id: String) -> Dictionary:
 
 ## How many world steps [param id] lies dead before it rises.
 static func rise_steps(id: String) -> int:
+	if def(id).has("rise_s"):
+		return roundi(clampf(float(def(id)["rise_s"]), RISE_S_SPAN[0], RISE_S_SPAN[1]) * World.TICK_RATE)
 	var days := clampf(float(def(id).get("rise_days", RISE_DAYS)), RISE_DAYS_SPAN[0], RISE_DAYS_SPAN[1])
 	return roundi(days * DayNight.day_steps)
 
@@ -88,26 +96,46 @@ static func strengthen(monster: Monster, record: Dictionary) -> void:
 	monster.move_ticks = monster.move_ticks / maxf(float(strength.get("speed", 1.0)), 0.01)
 
 
-## The tuning panel's source "named" (decision 716): named.<id>.rise_days.
+## The tuning panel's source "named" (decision 716): named.<id>.rise_days,
+## or named.<id>.rise_s for a row timed in seconds (714 amended (2)); and
+## named.trophy_s.
 static func tuning_value(path: String) -> Variant:
+	if path == "named.trophy_s":
+		return trophy_s
 	var parts := path.split(".")
-	if parts.size() != 3 or parts[0] != "named" or parts[2] != "rise_days" or def(parts[1]).is_empty():
+	if parts.size() != 3 or parts[0] != "named" or def(parts[1]).is_empty():
 		return null
-	return float(def(parts[1]).get("rise_days", RISE_DAYS))
+	if parts[2] == "rise_s" and def(parts[1]).has("rise_s"):
+		return float(def(parts[1])["rise_s"])
+	if parts[2] == "rise_days" and not def(parts[1]).has("rise_s"):
+		return float(def(parts[1]).get("rise_days", RISE_DAYS))
+	return null
 
 
 static func set_tuning_value(path: String, value: Variant) -> bool:
 	if tuning_value(path) == null or not (value is int or value is float):
 		return false
-	defs()[path.get_slice(".", 1)]["rise_days"] = clampf(float(value), RISE_DAYS_SPAN[0], RISE_DAYS_SPAN[1])
+	if path == "named.trophy_s":
+		trophy_s = clampf(float(value), RISE_S_SPAN[0], RISE_S_SPAN[1])
+	elif path.ends_with(".rise_s"):
+		defs()[path.get_slice(".", 1)]["rise_s"] = clampf(float(value), RISE_S_SPAN[0], RISE_S_SPAN[1])
+	else:
+		defs()[path.get_slice(".", 1)]["rise_days"] = clampf(float(value), RISE_DAYS_SPAN[0], RISE_DAYS_SPAN[1])
 	return true
 
 
-## The panel's rows: each named one's days dead, enemy-ai's, taken at its next death.
+## The panel's rows: each named one's time dead, enemy-ai's, taken at its
+## next death; and the trophy's wait, taken at its next win.
 static func tuning_fields() -> Array:
-	var out := []
+	var out := [{"path": "named.trophy_s", "group": "Named enemies", "min": RISE_S_SPAN[0], "max": RISE_S_SPAN[1],
+		"owner": "enemy-ai", "takes": "win"}]
 	for id: String in defs():
-		if not id.begins_with("_"):
+		if id.begins_with("_"):
+			continue
+		if def(id).has("rise_s"):
+			out.append({"path": "named.%s.rise_s" % id, "group": "Named enemies", "min": RISE_S_SPAN[0],
+				"max": RISE_S_SPAN[1], "owner": "enemy-ai", "takes": "death"})
+		else:
 			out.append({"path": "named.%s.rise_days" % id, "group": "Named enemies", "min": RISE_DAYS_SPAN[0],
 				"max": RISE_DAYS_SPAN[1], "owner": "enemy-ai", "takes": "death"})
 	return out

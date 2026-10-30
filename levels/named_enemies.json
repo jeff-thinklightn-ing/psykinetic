@@ -1,15 +1,15 @@
 {
-	"_about": "Named enemies (decision 716): a level entity's \"named\": <id> spawns that one. Each: name, kind, rise_days (world-clock days dead before it rises; F7), strength {hp, damage, speed} (multipliers, fixed for life; left out: rolled once by its id). trophy: an item id it holds while one is due to be won (Main.trophy_due: once per generation of its level), dropped where it falls and not kept (714); else its kept weapon, or its kind's. The barrow's band, the mound-breakers (714; lore's names, Jeff passed): dungeon puts \"named\": <id> on its robbers.",
+	"_about": "Named enemies (decision 716): a level entity's \"named\": <id> spawns that one. Each: name, kind, rise_days (world-clock days dead before it rises; F7) or rise_s (real seconds: the barrow's band, 300, 714 amended (2)), strength {hp, damage, speed} (multipliers, fixed for life; left out: rolled once by its id). trophy: an item id it holds while one is due to be won (Main.trophy_due: once per generation of its level), dropped where it falls and not kept (714); else its kept weapon, or its kind's. The barrow's band, the mound-breakers (714; lore's names, Jeff passed): dungeon puts \"named\": <id> on its robbers.",
 	"named": {
-		"brand": {"name": "Brand the Ox", "kind": "robber_brute", "rise_days": 3.0, "strength": {"hp": 1.4, "damage": 1.3, "speed": 0.9}, "trophy": "tomb_sledge"},
-		"crake": {"name": "Crake", "kind": "robber", "rise_days": 2.0},
-		"mott": {"name": "Mott", "kind": "robber", "rise_days": 3.0},
-		"nabb": {"name": "Nabb", "kind": "robber", "rise_days": 2.5},
-		"wicket": {"name": "Wicket", "kind": "robber", "rise_days": 2.0},
-		"fenn": {"name": "Fenn", "kind": "robber", "rise_days": 3.5},
-		"rook": {"name": "Rook", "kind": "robber", "rise_days": 4.0},
-		"sedge": {"name": "Sedge", "kind": "robber", "rise_days": 2.5},
-		"tull": {"name": "Tull", "kind": "robber", "rise_days": 3.0}
+		"brand": {"name": "Brand the Ox", "kind": "robber_brute", "rise_s": 300, "strength": {"hp": 1.4, "damage": 1.3, "speed": 0.9}, "trophy": "tomb_sledge"},
+		"crake": {"name": "Crake", "kind": "robber", "rise_s": 300},
+		"mott": {"name": "Mott", "kind": "robber", "rise_s": 300},
+		"nabb": {"name": "Nabb", "kind": "robber", "rise_s": 300},
+		"wicket": {"name": "Wicket", "kind": "robber", "rise_s": 300},
+		"fenn": {"name": "Fenn", "kind": "robber", "rise_s": 300},
+		"rook": {"name": "Rook", "kind": "robber", "rise_s": 300},
+		"sedge": {"name": "Sedge", "kind": "robber", "rise_s": 300},
+		"tull": {"name": "Tull", "kind": "robber", "rise_s": 300}
 	},
 	"lines": {
 		"_about": "npc's (decision 716, npc's side): what a named one says on meeting a player, by its word for them (NamedMind.ENEMY: stranger, known, foe, bane = they put it down twice, prey = it put them down twice), fled_from when their last meeting was their running; rose is the towns' news of its rising (%s its name; a hail tells it after \"I heard today that\"); speaks lists the kinds that talk, the rest get an emote in the party log. One picked per player per life.",

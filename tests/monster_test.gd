@@ -2132,10 +2132,10 @@ func _band_one(id: String, kind: String, at: Vector2i) -> Monster:
 
 
 func _test_band() -> void:
-	print("\n== the barrow's band (714): Brand the Ox wields the Tomb Sledge, dropped once a generation; a maul (the hammer) till the next; a plain robber cannot lift it ==")
+	print("\n== the barrow's band (714): Brand the Ox wields the Tomb Sledge, due again 5 minutes after it is won (714 amended (2)); a maul (the hammer) till then; a plain robber cannot lift it ==")
 	_build(["###########", "#.........#", "#.........#", "###########"], {}, {}, "mt_band")
 	var host := Main.new()
-	host._regen = {"mt_band": {"generation": 1}}
+	var trophy_was := NamedEnemy.trophy_s
 	World.trophy_due = host.trophy_due
 	World.trophy_taken = host.trophy_taken
 	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
@@ -2154,8 +2154,9 @@ func _test_band() -> void:
 		if sledge in World.ground_uids(at):
 			cell = at
 	_check(not brand.spawned and cell != World.NO_CELL, "struck down by a player, the Sledge falls where he fell, not kept (%s)" % World.items.at_of(sledge))
-	_check(int(World.named_record("brand").get("trophy_won", -1)) == 1 and not host.trophy_due("p1", "brand", "tomb_sledge"),
-			"won this generation: not due again till the next")
+	_check(int(World.named_record("brand").get("trophy_won", -1)) == World.steps and not host.trophy_due("p1", "brand", "tomb_sledge")
+			and int(World.named_record("brand")["returns_at"]) - World.steps == roundi(300 * World.TICK_RATE),
+			"won now: not due again yet, and he rises 5 minutes on (rise_s 300)")
 	for kind: String in ["robber", "robber_brute"]:
 		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)  # Unarmed: both hands free.
 		spec["name"] = "Bare" + kind.capitalize().replace(" ", "")
@@ -2166,10 +2167,11 @@ func _test_band() -> void:
 		_check(World.weapon_near(one) == (World.NO_CELL if kind == "robber" else cell),
 				"beside the Sledge, hands free: a %s %s lift it (lifts %.0f kg, it %.0f)" % [kind, "cannot" if kind == "robber" else "can", one.lifts, Items.weight_of("tomb_sledge")])
 		World.despawn(one)
+	NamedEnemy.trophy_s = 900.0  # Three of his risings, to see him rise twice without it.
 	var record := World.named_record("brand")
 	World.steps = int(record["returns_at"])
 	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
-	_check(World.wielded(brand) == "hammer", "risen in the same generation: his maul (the hammer), not a second Sledge (%s)" % World.wielded(brand))
+	_check(World.wielded(brand) == "hammer", "risen before it is due: his maul (the hammer), not a second Sledge (%s)" % World.wielded(brand))
 	var maul := World.slot_uid(brand, Items.RIGHT_HAND)
 	World.damage(brand, 999, player)
 	_check(World.items.at_of(maul) == NamedEnemy.KEPT % "brand", "his maul kept for him, as any named one's (716)")
@@ -2177,16 +2179,21 @@ func _test_band() -> void:
 	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
 	_check(World.slot_uid(brand, Items.RIGHT_HAND) == maul, "and back in his hands when he rises")
 	World.damage(brand, 999, player)
-	host._regen["mt_band"]["generation"] = 2
 	World.steps = int(World.named_record("brand")["returns_at"])
 	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
 	var second := World.slot_uid(brand, Items.RIGHT_HAND)
-	_check(World.wielded(brand) == "tomb_sledge" and second != sledge, "the barrow made anew: a Sledge is his again, to be won once more")
+	_check(World.wielded(brand) == "tomb_sledge" and second != sledge, "trophy_s past since it was won: a Sledge is his again, to be won once more")
 	World.damage(brand, 999, null)
 	_check(World.items.at_of(second) == NamedEnemy.KEPT % "brand", "felled by no player: the Sledge kept for him, not dropped")
 	World.steps = int(World.named_record("brand")["returns_at"])
 	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
 	_check(World.slot_uid(brand, Items.RIGHT_HAND) == second, "and he rises with that same Sledge")
+	World.damage(brand, 999, player)
+	NamedEnemy.trophy_s = trophy_was
+	World.steps = int(World.named_record("brand")["returns_at"])
+	brand = _band_one("brand", "robber_brute", Vector2i(5, 1))
+	_check(World.wielded(brand) == "tomb_sledge" and World.slot_uid(brand, Items.RIGHT_HAND) != second,
+			"as set (300 s, his rise's own): won, he is back in 5 minutes with a new Sledge")
 	World.trophy_due = Callable()
 	World.trophy_taken = Callable()
 	host.free()
@@ -3139,16 +3146,16 @@ func _test_draugr() -> void:
 	_check(draugr.spawned and draugr.hp == draugr.max_hp and draugr.max_hp == 30 and draugr.blessed_last == ["p1"],
 		"beaten, he yields, never dies: the players in his lair are blessed (%s)" % [draugr.blessed_last])
 	_check(said.back() == Draugr.WON and doors.back() == true and not draugr.hall_shut, "\"%s\", and his Hall opens" % said.back())
-	_check(draugr.state == Draugr.State.AT_REST and draugr.rests_until == World.steps + Draugr.RISE_DAYS * DayNight.day_steps
+	_check(draugr.state == Draugr.State.AT_REST and draugr.rests_until == World.steps + Draugr.rest_steps()
 		and draugr.spawn_spec["props"].get("rests_until") == draugr.rests_until and not World.is_down(draugr),
-		"and rests three days, standing (573 amended (3): never lying), kept in his props")
+		"and rests rise_s (300 s, 714 amended (2)), standing (573 amended (3): never lying), kept in his props")
 	_check(draugr.gone and not draugr.holds_cell and draugr.pile_at == fell and draugr.tile == draugr.home
 		and World.get_entity_at(draugr.home) != draugr and World.get_entity_at(fell) != draugr and not World.can_target(player, draugr)
 		and draugr.pile_facing in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]
 		and draugr.spawn_spec["props"].get("pile") == [fell.x, fell.y],
 		"beaten, he is gone (573 amended (4)): his remains where he fell (%s, facing %s), he at his seat holding no cell, struck by nothing" % [draugr.pile_at, draugr.pile_facing])
 	_check(Main.talk_cell(draugr) == fell, "the one who would talk to him talks at his remains")
-	_check(draugr.peaceable and draugr.resting() and draugr.offers_for("p1").is_empty() and draugr.rest_words() == "He rests. Come back in 3 days.",
+	_check(draugr.peaceable and draugr.resting() and draugr.offers_for("p1").is_empty() and draugr.rest_words() == "He rests. Come back in 5 minutes.",
 		"at rest a click talks, he offers nothing, and the one who asks hears how long (%s)" % draugr.rest_words())
 	_check(spawned.all(func(r: GridEntity) -> bool: return not r.spawned) and skeleton.laid, "his risen gone, the barrow's dead lie still")
 	var resting_till := draugr.rests_until

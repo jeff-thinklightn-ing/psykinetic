@@ -2074,6 +2074,7 @@ func _show_3d() -> void:
 		Tuning.register_source("companions", CompanionCard.tuning_value, CompanionCard.set_tuning_value, CompanionCard.tuning_fields)  # 706: her holds.
 		Tuning.register_source("named", NamedEnemy.tuning_value, NamedEnemy.set_tuning_value, NamedEnemy.tuning_fields)  # 716: days dead.
 		Tuning.register_source("din", World.din_value, World.set_din_value, World.din_fields)  # 740: wildlife's distance.
+		Tuning.register_source("draugr", Draugr.tuning_value, Draugr.set_tuning_value, Draugr.tuning_fields)  # 714 amended (2): his rest.
 
 
 # --- WASD ---------------------------------------------------------------------------
@@ -3460,20 +3461,22 @@ func generation_of(level_name: String) -> int:
 
 ## Whether named one [param named_id]'s [param trophy] (the Tomb Sledge) is
 ## due to [param player_id] ("" for anyone: is it out to be won). The one
-## place it is decided (the coordinator, 714): once per generation
-## of the level the named one stands in (its record's "level"), kept on its
-## record as "trophy_won"; player_id unread till Jeff's pick
-## (decisions/barrow-reset.md) says whether it is once a day per player.
+## place it is decided (the coordinator, 714): since 714 amended (2) (Jeff:
+## no scarcity in the barrow), NamedEnemy.trophy_s (300) of the world clock
+## after it was last won (its record's "trophy_won", the step), for anyone.
 func trophy_due(_player_id: String, named_id: String, _trophy: String) -> bool:
 	var record := World.named_record(named_id)
-	return not record.has("trophy_won") or int(record["trophy_won"]) != generation_of(str(record.get("level", "")))
+	if not record.has("trophy_won"):
+		return true
+	var won := int(record["trophy_won"])
+	return World.steps < won or World.steps - won >= roundi(NamedEnemy.trophy_s * World.TICK_RATE)
 
 
 ## Named one [param named_id]'s [param trophy] won by [param player_id]
-## (World._named_fell): not due again this generation (trophy_due).
+## (World._named_fell): not due again for NamedEnemy.trophy_s (trophy_due).
 func trophy_taken(_player_id: String, named_id: String, _trophy: String) -> void:
 	if World.named.has(named_id):
-		World.named[named_id]["trophy_won"] = generation_of(str(World.named[named_id].get("level", "")))
+		World.named[named_id]["trophy_won"] = World.steps
 
 
 ## Server, on the slow world tick: a regenerating level that is due, its
