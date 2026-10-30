@@ -384,6 +384,31 @@
 			"uses": "a pair of bare rafters (decision 566, art-kit's side; buildings' stage set): one A-pair a metre along the main block's ridge at the RAFTERS stage, modelled for a 4 m span rising 2 m, its origin at the apex; the composer scales x by span / 4 and y by rise / 2",
 			"grey": [{"at": [0, -1.085, 0.036], "size": [4.51, 2.34, 0.218]}]
 		},
+		"roof.ridge_beam": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "edge",
+			"size": [0.158, 0.221, 1.02],
+			"middle": [0, 0, 0.5],
+			"base": -0.171,
+			"budget": 120,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-29", "notes": "C:/dev/review/building_kits/make_stage.py ridge_beam: a hewn 0.14 x 0.2 beam, chamfered, adze flats along its top, sawn ends, a peg proud of its top at z 0.5 where the bay's rafter pair lands; 72 tris"},
+			"uses": "the ridge beam at the RAFTERS stage (734, art-kit's side; the chapel's part list, shared by every set), replacing 566's plain RAFTER timber: one per bay, 1 m along the ridge, its origin the -z end on the ridge line (+y up), its top 0.03 over it, in the crotch where roof.rafters' pairs cross",
+			"grey": [{"at": [0, -0.06, 0.5], "size": [0.158, 0.221, 1.02]}]
+		},
+		"roof.rafters_broken": {
+			"category": "roofs",
+			"type": "mesh",
+			"kind": "edge",
+			"variants": 3,
+			"size": [4.51, 2.34, 0.218],
+			"middle": [0, 0, 0.036],
+			"base": -2.256,
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-29", "notes": "C:/dev/review/building_kits/make_stage.py rafters_broken(_2, _3): roof.rafters' pair weathered after the roof went, one rafter whole to the apex, the other snapped with pale splinters: (1) its upper half still pegged at the apex lap and swung down, the collar tie hanging from one peg; (2) its upper part gone, half the collar broken off; (3) its upper part slid off the apex and wedged on the collar; 176 to 232 tris"},
+			"uses": "a ruin's broken rafters (734, art-kit's side; the chapel's part list, shared by every set): roof.rafters' frame, one pair a metre along the ridge, modelled for a 4 m span rising 2 m, its origin at the apex; the composer scales x by span / 4 and y by rise / 2 and picks a variant per bay",
+			"grey": [{"at": [0, -1.085, 0.036], "size": [4.51, 2.34, 0.218]}]
+		},
 		"roof.thatch.ridge": {
 			"category": "roofs",
 			"type": "mesh",
