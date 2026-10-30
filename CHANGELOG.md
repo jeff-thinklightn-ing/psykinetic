@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The temple is now a stone chapel (Jeff's pick c2): pale coursed walls with buttresses and tall lancet windows, a slate roof with ridge, eaves, verges and stone crosses, a rose window over the door and a round window at the back, a bell tower with its bell on the ridge, and steps at the door; built in stages with its own footings, ruined walls, broken lancets, fallen slates and rubble as it decays (art for 734).
 - Aldous now names the Mound-breakers when he tells of the grave robbers digging for the holy knights' bones (714, lore's crypt.robbers_dig).
 - The Robbers' Camp in the barrow has a chest (742): open it for 25 gold straight to your purse, refilled for you every 5 minutes.
 - Options, Credits: the music is credited first, "Music: psykinetic-theme1 by Jeff, made with Spitfire Audio BBC Symphony Orchestra Discover".
