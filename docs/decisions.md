@@ -36259,3 +36259,13 @@ uniforms, which change as the weather eases, cost a radiance refresh a frame
   minutes: no change to the sky's process mode or radiance size.
 
 Tools only (no game code); protocol unchanged; no new class_name.
+## 743, lore's side: Cravenhold
+
+Jeff (lands-map.md, 2026-10-27): "Orc Stronghold would be outside the forest, a land where the
+trees have been stripped, we'll call Cravenhold". Lore's place entry cravenhold (regions.json, in
+the Blood Rot's land, holding the orcs) with one agreed fact in his words, cravenhold.orcs
+(common, in the Woodlands). Where it lies comes from maps' world_plane place "stronghold" (743),
+never from lore. On the same sheet he answered A1: "The whole land has its own name, it TBD
+though, each map will be named first"; lore keeps "the Blood Rot's land" until he names it.
+Data and docs only, protocol unchanged.
+

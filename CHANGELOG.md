@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk know of Cravenhold, the orc stronghold outside the forest, in a land where the trees have been stripped.
 - The lands are laid out as Jeff picked (layout A): Umbrage lies south of the wilds on the same river (its road leaves the wilds' south edge), the forest is west of the wilds and the hills east (743).
 - Townsfolk have heard that the secret way down to the Ossuary is found only once the Mound-breakers have been put down.
 - The barrow's robbers are now Brand the Ox and his eight named mound-breakers, spread through its rooms (714): the hidden niche in the First Hall stays shut, and no draft is felt, until you have felled each of them once.

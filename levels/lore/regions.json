@@ -247,6 +247,39 @@
 			]
 		},
 		{
+			"id": "cravenhold",
+			"type": "place",
+			"name": "Cravenhold",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The orc stronghold, outside the forest, in a land where the trees have been stripped (Jeff, 2026-10-27; maps' world_plane place \"stronghold\").",
+			"place_kind": "fort",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				},
+				{
+					"to": "orcs",
+					"kind": "holds"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "cravenhold.orcs",
+					"text": "Cravenhold is the orc stronghold, outside the forest, in a land where the trees have been stripped.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
 			"id": "castle",
 			"type": "place",
 			"name": "the castle",
