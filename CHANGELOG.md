@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Bow: the aim follows your mouse out from the archer, down to point blank; the marker, arc and cone sit where you point, and stay steady close in (677).
 - Aldous hands a knight's remains back when your Encolpion Amulet can't take the blessing (714 amended, npc's side): a full amulet, or one never blessed (after a quest reset), keeps the relic for later instead of losing it, and he says why.
 
 - The draugr speaks his anger as a fight begins (714): "Thieves in my barrow, thieves in my hall. You are all the same to me."

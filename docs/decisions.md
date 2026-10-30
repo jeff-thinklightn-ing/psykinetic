@@ -35390,3 +35390,23 @@ cannot lift it, a bare brute can; risen in the same generation, the hammer,
 kept and back with him; a new generation, a new Sledge; felled by no player,
 kept and back. _test_draugr: his anger once as he takes up the fight, once
 more in the next. Server only, protocol unchanged, no new class_name.
+## 677 amended (3), ui's side: the flat shot aimed to the mouse's distance
+
+Jeff on v0.1.192: "allow the arrow to be aimed point blank based on distance
+mouse is away from the player ... with short range shots the cone moves around
+wildly due to the large arc radius". The drawn bow's marker, arc and cone of
+flight were always drawn at the step's reach (5 to 15 cells), the angle read
+from the archer to the mouse: with the mouse near the archer a small move
+swung a wedge up to 15 cells long. Now (Main.aimed_distance) they reach the
+mouse's distance, at least AIM_POINT_BLANK (1.5 cells, past the shot's origin
+at a free body's centre) and at most the step's reach; within AIM_STEADY
+(0.75 cells) the angle holds, and a draw begun there takes the archer's
+facing. The pips show the strength at that distance (damage_for). The
+camera's lead and widening keep to the step's reach, so the view does not
+breathe with the mouse. No range steps: continuous with the dead zone is
+steady, and snapping would make the marker jump. The shot is unchanged: it
+flies its rolled angle to the step's reach and strikes the first body
+(World.shoot), so the cone drawn to the aimed distance is the real one there
+(the spread is an angle). The lob's circle by the aim's share of the reach is
+combat's side (World.lob_circle_at). ui_test _test_aim. Client only, protocol
+unchanged, no new class_name.

@@ -664,6 +664,9 @@ func _test_aim() -> void:
 	_check(Main.aim_pips(bow, 0, 5) == 2 and Main.aim_pips(bow, 1, 7) == 3 and Main.aim_pips(bow, 2, 9) == 4 and Main.aim_pips(bow, 3, 11) == 4
 			and Main.aim_pips(bow, 4, 13) == 3 and Main.aim_pips(bow, 5, 15) == 2 and Main.aim_pips(bow, -1, 5) == 0 and Main.aim_pips({}, 2, 9) == 0,
 		"pips: the shot's strength at the aim's reach (decision 669): 2, 3, 4 drawing up, 4, 3, 2 in the bands (669 amended); none before the draw counts or without a bow")
+	_check(Main.aimed_distance(3.2, 9) == 3.2 and Main.aimed_distance(0.4, 9) == Main.AIM_POINT_BLANK and Main.aimed_distance(20.0, 9) == 9.0
+			and Main.aimed_distance(5.0, 0) == 0.0 and Main.aimed_distance(0.2, 1) == 1.0,
+		"the aim reaches the mouse's distance (Jeff, v0.1.192: point blank): at least AIM_POINT_BLANK, at most the step's reach, none before the draw")
 	_check(Main.aim_fade(0) == 0.0 and absf(Main.aim_fade(100) - 0.5) < 0.001 and Main.aim_fade(400) == 1.0, "the arc fades in over its first fifth of a second")
 	# The cone of flight (combat's design, ui's side): the far end's points and the eased half-angle.
 	var ends := Client3D.cone_points(origin, 0.0, 5.0, deg_to_rad(25.0))

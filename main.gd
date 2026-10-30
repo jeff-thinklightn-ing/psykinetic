@@ -2257,11 +2257,13 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	var toward_point := _aim_fixed if is_finite(_aim_fixed.x) else _mouse_grid()
 	if is_nan(toward_point.x):
 		return
+	var toward := toward_point - origin
 	if not aim_drawn:
 		aim_drawn = true
 		_show_cursor(false)
-	var toward := toward_point - origin
-	if toward.length() > 0.05:
+		if toward.length() <= AIM_STEADY and player.facing != Vector2i.ZERO:
+			aim_angle = Vector2(player.facing).angle()  # No last angle yet: the archer's facing.
+	if toward.length() > AIM_STEADY:
 		aim_angle = toward.angle()
 	var radius := range_now(player)
 	if radius <= 0:
@@ -2269,16 +2271,31 @@ func _update_aim(player: Player, drawing: bool) -> void:
 	elif _aim_since == 0:
 		_aim_since = Time.get_ticks_msec()
 	var alpha := aim_fade(Time.get_ticks_msec() - _aim_since) if _aim_since > 0 else 0.0
-	var point := aim_point(origin, aim_angle, float(radius))
+	var aimed := aimed_distance(toward.length(), radius)
+	var point := aim_point(origin, aim_angle, aimed)
 	_aim_mark_cell = Vector2i(point.round())
-	var pips := aim_pips(Items.verb_of(World.drawn_with(player)), World.draw_step(player), radius)
+	var pips := aim_pips(Items.verb_of(World.drawn_with(player)), World.draw_step(player), roundi(aimed))
 	if _client3d != null:
-		_client3d.aim_arc(origin, aim_angle, float(radius), alpha, pips, radius > 0, spread_now(player),
+		_client3d.aim_arc(origin, aim_angle, aimed, alpha, pips, radius > 0, spread_now(player),
 				float(World.full_range_of(player)))
 		_client3d.aim_lead(Vector2.from_angle(aim_angle), true)  # 617: the view leads toward the aim while drawn.
 		_client3d.aim_reach(float(radius), Vector2.from_angle(aim_angle))  # 669: and widens to keep the reach on screen.
 	else:
-		_update_aim_line(origin, float(radius), alpha)
+		_update_aim_line(origin, aimed, alpha)
+
+
+## The aim drawn at the mouse's distance (Jeff, v0.1.192: "allow the arrow
+## to be aimed point blank based on distance mouse is away from the
+## player"): the marker, arc and cone reach [param away] cells, at least
+## AIM_POINT_BLANK, at most the step's [param reach]; none before the draw
+## counts. Within AIM_STEADY of the archer the angle holds. The shot itself
+## still flies the step's reach (World.shoot); the camera keeps to it too.
+const AIM_POINT_BLANK := 1.5
+const AIM_STEADY := 0.75
+static func aimed_distance(away: float, reach: int) -> float:
+	if reach <= 0:
+		return 0.0
+	return clampf(away, minf(AIM_POINT_BLANK, float(reach)), float(reach))
 
 
 ## The current range step in cells: items' World.range_of by name (0 before
