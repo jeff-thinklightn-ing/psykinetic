@@ -4065,6 +4065,8 @@ func _boot() -> void:
 	if not World.towns.visitor_came.is_connected(_on_visitor_came):
 		World.towns.visitor_came.connect(_on_visitor_came)  # Visitors' news and bodies (711, npc's side).
 		World.towns.visitor_left.connect(_on_visitor_left)
+	if not World.towns.hut_changed.is_connected(_on_hut_changed):
+		World.towns.hut_changed.connect(_on_hut_changed)  # A healer's hut fallen to ruin, or mended (733, npc's side).
 	_make_lawspeaker()
 	# Residents' trade (decision 353): the inn's bed while it stands, and
 	# players in a town's zone told how many it feeds.
@@ -9354,6 +9356,7 @@ func _offers_context() -> Dictionary:
 		# The medicine man's care (584 amended): economy's rule, retainer and record; the town his hut serves; his brew handed over.
 		"care_hut": func(worker_id: String) -> String: return _care_hut_of(worker_id),
 		"care_rule": func(place_id: String) -> Dictionary: return care_rule(place_id),
+		"hut_ruined": _hut_ruined,
 		"retain": func(player_id: String, healer_id: String, pay: String) -> Dictionary: return _retain_care(player_id, healer_id, pay),
 		"grant_care": func(player_id: String, place_id: String, how: String) -> void: grant_care(player_id, place_id, how),
 		"in_care": func(player_id: String, place_id: String) -> bool: return in_care(player_id, place_id),
@@ -14744,7 +14747,11 @@ func _seat_healers() -> void:
 		var ids := World.holdings.all_places()
 		ids.sort()
 		for id: String in ids:
-			if World.holdings.place(id).get("kind") != kind or not World.production.workshop(id).is_empty():
+			if World.holdings.place(id).get("kind") != kind:
+				continue
+			var shop := World.production.workshop(id)
+			# Kept (by one fallen too: the return brings him back, 396), or empty but not yet long enough (733).
+			if not shop.is_empty() and (not str(shop.get("worker", "")).is_empty() or not _vacancy_run(id)):
 				continue
 			var who := "%s:%s" % [trade, id]
 			# A name no other of the trade has (641: two huts, two healers).
@@ -14757,9 +14764,44 @@ func _seat_healers() -> void:
 					name = pick
 					break
 			World.production.add_worker(who, name, [trade], id, "wilds")
-			World.production.add_workshop(id, trade, id)
+			if shop.is_empty():
+				World.production.add_workshop(id, trade, id)
 			World.production.assign(id, who)
 			print("[return] %s the %s keeps %s" % [name, trade.replace("_", " "), id])
+
+
+## Whether healer's hut [param place_id] has stood empty healers.vacant_days
+## (733: economy's Towns.hut empty_since, the day nobody has kept it since):
+## only then does a new keeper come. False with no record or none empty.
+func _vacancy_run(place_id: String) -> bool:
+	if World.towns == null or not World.towns.has_method("hut"):
+		return false
+	var hut: Dictionary = World.towns.hut(place_id)
+	if not hut.has("empty_since"):
+		return false
+	var days := int(World.production.rules.get("healers", {}).get("vacant_days", 21))
+	return World.towns.now() / maxi(DayNight.day_steps, 1) - int(hut["empty_since"]) >= days
+
+
+## Whether healer's hut [param place_id] is a ruin (733, economy's
+## Towns.hut): no return point and no care there until it is mended;
+## disrepair still is both. False for any other place.
+func _hut_ruined(place_id: String) -> bool:
+	return World.towns != null and World.towns.has_method("hut") and str(World.towns.hut(place_id).get("state", "")) == Towns.RUIN
+
+
+## Server: healer's hut [param place_id] changed (Towns.hut_changed, 733):
+## fallen to a ruin, each player in its care who is here is told where they
+## will wake now (their care kept for the hut mended).
+func _on_hut_changed(place_id: String) -> void:
+	if not _hut_ruined(place_id) or World.production == null:
+		return
+	var keeper := str(World.production.worker(str(World.production.workshop(place_id).get("worker", ""))).get("name", ""))
+	var line := "%s has fallen in; until it stands again you will wake at the temple, or wherever is nearest." % (
+		"%s's hut" % keeper if not keeper.is_empty() else "The healer's hut")
+	for player_id: String in _records:
+		if in_care(player_id, place_id) and _peer_of(player_id) != 0:
+			Net.broadcast_to([_peer_of(player_id)], "party", {"from": "", "text": line})
 
 
 ## What workshop [param workshop_id] makes (Production.workshop_makes,
@@ -14840,12 +14882,12 @@ func _return_place(cell: Vector2i, player_id := "") -> Dictionary:
 	var record: PlayerRecord = _records.get(player_id) if not player_id.is_empty() else null
 	if record != null and not record.care.is_empty():
 		for id: String in ranked:
-			if record.care.has(id):
+			if record.care.has(id) and not _hut_ruined(id):
 				var shop := _return_workshop(id)
 				if not shop.is_empty() and World.production.manned(shop):
 					return {"place": id, "workshop": shop}
 		for id: String in record.care:
-			if not World.holdings.place(id).is_empty():
+			if not World.holdings.place(id).is_empty() and not _hut_ruined(id):
 				var shop := _return_workshop(id)
 				if not shop.is_empty() and World.production.manned(shop):
 					return {"place": id, "workshop": shop}
@@ -14854,6 +14896,8 @@ func _return_place(cell: Vector2i, player_id := "") -> Dictionary:
 		var shop := _return_workshop(id)
 		if not player_id.is_empty() and World.holdings.place(id).get("kind") == "healers_hut" and not in_care(player_id, id):
 			continue  # A healer's hut brings back only a player in its care (584 amended).
+		if _hut_ruined(id):
+			continue  # A ruin is no return point; disrepair still is (733, npc's side).
 		if not shop.is_empty() and World.production.manned(shop):
 			return {"place": id, "workshop": shop}
 	return {}
@@ -15019,6 +15063,7 @@ func _on_world_ticked(tick: int) -> void:
 			_gather_herbs()  # The medicine man takes herbs on his way (decision 502, npc's side).
 			_alms_runs_tick()  # Pip's run with the alms (decision 546, npc's side).
 			_crypt_asks_tick()  # Aldous's commissions met at the altar or the pack (part 3).
+			_seat_healers()  # An empty healer's hut given a new keeper once healers.vacant_days have run (733, npc's side).
 		if tick % HAIL_CHECK_TICKS == 0:
 			_hails_tick()  # Residents speaking unprompted (decision 554).
 		if tick % WORK_CHECK_TICKS == 0:

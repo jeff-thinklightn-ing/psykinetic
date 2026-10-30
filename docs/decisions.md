@@ -35623,3 +35623,43 @@ it is occupied, their wait restarting; left, not back at once; nobody in it,
 not held. The retake case now runs its imp's wait out first (it restarted
 while the player stood in the camp). Server only, protocol unchanged, no
 new class_name.
+
+## 733, npc's side: who keeps a healer's hut, and a ruin
+
+Economy keeps each hut's state (Towns.hut: standing, disrepair, ruin;
+empty_since while nobody keeps it), its decline and its mend; buildings
+draws it. npc's side:
+
+- **Keeping.** Towns.hut_keeper stays unset: economy's default (the hut's
+  workshop worker, alive, not away, not held) is npc's rule too. A fallen
+  healer stays away and comes back by the return (396; the coordinator: no
+  permanent townsfolk deaths without Jeff), so his hut decays only once a
+  keeper is truly gone (the old-age and leaving step after this one).
+- **A new keeper.** `_seat_healers` runs on the world tick as well as at
+  boot. A hut with no workshop is seated as before; one whose workshop has
+  no worker is seated only once `_vacancy_run`: the day less
+  Towns.hut's empty_since reaches economy.json healers.vacant_days (21,
+  more than decline's unkept 14, so an empty hut is seen to decay first).
+  The workshop is kept; the new healer gets a name no other of the trade
+  has.
+- **A ruin is no return point; disrepair still is.** `Main._hut_ruined(id)`
+  (Towns.hut's state is ruin) skips the hut in all three of
+  `_return_place`'s loops: the in-care ranked one, the in-care anywhere
+  one, and the general ranking. A player in its care falls through to the
+  nearest manned place (the temple, as a rule). Their care record is kept,
+  so the hut mended is theirs again.
+- **Told.** On Towns.hut_changed to a ruin, each player in its care who is
+  here hears, once, as a party line: "<Healer>'s hut has fallen in; until
+  it stands again you will wake at the temple, or wherever is nearest." One
+  away hears it in where they wake.
+- **No care at a ruin.** Offers' care offers (ctx "hut_ruined") close
+  while the hut is a ruin: he mends it first.
+- **The mend.** Economy's repair is a build job of his own workshop
+  (hut_repair:<place>); his body's work and home are the hut already, so
+  he is seen at it with no new doing and no protocol change. His work
+  words name it "a repair of your hut", never the place id.
+
+resident_test `_test_hut_ruin`: standing and disrepair bring them back at
+the hut, a ruin elsewhere with the care kept, the line, no care offered at
+a ruin, nobody seated at 5 days empty and a new keeper at vacant_days.
+Server only; protocol unchanged.

@@ -683,6 +683,8 @@ static func _care_offers(worker_id: String, who: Dictionary, town: String, playe
 	var rule: Variant = _call(given, "care_rule", [hut]) if not hut.is_empty() else null
 	if _trade_of(who) != "medicine_man" or not rule is Dictionary or player_id.is_empty():
 		return out
+	if _call(given, "hut_ruined", [hut]) == true:
+		return out  # No care at a ruin: he mends it first (733, npc's side).
 	var production: Production = given.get("production")
 	var words: Dictionary = settings().get("care", {})
 	var via := _via(player_id, hut, given)

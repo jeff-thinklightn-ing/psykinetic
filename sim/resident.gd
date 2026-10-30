@@ -993,7 +993,9 @@ func work_words() -> String:
 	if job.is_empty():
 		return "Your workshop is idle: you are making nothing now."
 	var what := str(job.get("recipe", "")).replace("_", " ")
-	if str(job.get("kind", "")) == "build":
+	if str(job.get("recipe", "")).begins_with(Towns.HUT_REPAIR):
+		what = "repair of your hut"  # Its mend (733): words, never the place id.
+	elif str(job.get("kind", "")) == "build":
 		what = "the town's " + what.trim_prefix("build:").trim_prefix(Towns.REPAIR)
 	var made: Array = []
 	var resources: Dictionary = job.get("resources", {})

@@ -82,6 +82,7 @@ func _ready() -> void:
 	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
 	_test_visitors()  # After them: its syncs step the world.
 	_test_relic()  # 714: the knight's remains to Aldous.
+	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 
@@ -3581,6 +3582,59 @@ func _test_named_enemy() -> void:
 ## wares are offers, bought through economy and minted into the hands;
 ## typed words never reach one; going on, the body walks to the road's edge
 ## and is gone.
+func _test_hut_ruin() -> void:
+	print("
+== a healer's hut fallen to ruin: no return there, no care, those in its care told; an empty hut kept again after vacant_days (733, npc's side) ==")
+	var hut: String = _main._healers_hut_of(STORE)
+	var player := _player()
+	if hut.is_empty() or player == null or World.towns == null or not World.towns.has_method("hut"):
+		_check(true, "(no test hut, player or Towns.hut: skipped)")
+		return
+	var pid := Net.player_id
+	var oren_id := "medicine_man:" + hut
+	if World.production.workshop(hut).is_empty():
+		World.production.add_workshop(hut, "medicine_man", hut)
+	World.production.assign(hut, oren_id)
+	World.production.set_away(oren_id, false)
+	var record: PlayerRecord = _main._records.get(pid)
+	var care_was: Dictionary = record.care.duplicate(true)
+	record.care[hut] = "quest"
+	var cell: Vector2i = World.holdings.place(hut).get("cell", Vector2i.ZERO)
+	var huts_was: Dictionary = World.towns._huts.duplicate(true)
+	World.towns._huts[hut] = {"state": Towns.STANDING, "level": 1, "job": 0}
+	var care_offers := func() -> int:
+		return Offers.of(oren_id, "p-not-in-care").filter(func(o: Dictionary) -> bool: return str(o["kind"]) == Offers.CARE or str(o["id"]).contains(Offers.CARE_HERBS)).size()
+	var standing_care: int = care_offers.call()
+	_check(str(_main._return_place(cell, pid).get("place", "")) == hut, "standing, in its care: they wake at the hut")
+	World.towns._huts[hut]["state"] = Towns.DISREPAIR
+	_check(str(_main._return_place(cell, pid).get("place", "")) == hut, "in disrepair: still the hut")
+	var told: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	World.towns._huts[hut]["state"] = Towns.RUIN
+	World.towns._huts[hut]["level"] = 0
+	_main._on_hut_changed(hut)
+	Net.message_received.disconnect(heard)
+	_check(told.size() == 1 and told[0].begins_with("Oren's hut has fallen in") and not told[0].contains(hut), "those in its care told where they will wake (%s)" % [told])
+	var elsewhere := str(_main._return_place(cell, pid).get("place", ""))
+	_check(elsewhere != hut, "a ruin: they wake elsewhere (%s; the test town has no temple)" % elsewhere)
+	_check(record.care.has(hut), "their care kept for the hut mended")
+	_check(care_offers.call() == 0 and standing_care > 0, "no care offered at a ruin, to one not yet in it (%d while it stood)" % standing_care)
+	World.production.remove_worker(oren_id)
+	var day := World.towns.now() / maxi(DayNight.day_steps, 1)
+	World.towns._huts[hut]["empty_since"] = day - 5
+	_main._seat_healers()
+	_check(str(World.production.workshop(hut).get("worker", "")).is_empty(), "empty 5 days: nobody comes yet")
+	World.towns._huts[hut]["empty_since"] = day - int(World.production.rules.get("healers", {}).get("vacant_days", 21))
+	_main._seat_healers()
+	var keeper := str(World.production.workshop(hut).get("worker", ""))
+	_check(keeper == oren_id and not World.production.worker(keeper).is_empty(), "empty vacant_days: a new keeper (%s)" % World.production.worker(keeper).get("name", ""))
+	World.towns._huts = huts_was
+	record.care = care_was
+
+
 func _test_relic() -> void:
 	print("
 == a knight's remains given to the priest: laid on the altar, the amulet charged, thanked by name (714, npc's side) ==")

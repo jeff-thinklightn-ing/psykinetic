@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- A healer's hut fallen to ruin (733, npc's side) brings nobody back: those in its care are told they will wake at the temple or wherever is nearest, and keep their care for when he has mended it; he offers no care at a ruin, while one in disrepair still serves; a hut left empty 21 days gets a new healer.
 - A camp you stand in no longer refills (739): while a player or their companion is at a camp its dead monsters stay down, and their wait starts over when the last one leaves.
 
 - The draugr can always be refused (735, Jeff's words): his panel offers "Refuse", and he answers "Then I'll take it from you by force!" and attacks; with too little gold for his pact you can now fight your way out instead of being shut in his Hall. His least pact is 10 gold, not 20.
