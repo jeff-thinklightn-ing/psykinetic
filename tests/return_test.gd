@@ -216,6 +216,15 @@ func _test_main() -> void:
 	var me := _player().player_id
 	_check(_main._return_place(_player().tile, me).get("place", "") != id and _main._return_place(_player().tile).get("place", "") == id,
 		"not in his care: his hut is passed over for a player, not for others")
+	# A ruined hut (733): passed over for a fallen companion too (companions' line).
+	var hut_was: Variant = World.towns._huts.get(id)
+	World.towns._huts[id] = {"state": Towns.RUIN, "level": 0, "job": 0}
+	_check(_main._return_place(_player().tile).get("place", "") != id, "a ruin: a fallen companion is never brought back there (%s)" % [_main._return_place(_player().tile)])
+	if hut_was == null:
+		World.towns._huts.erase(id)
+	else:
+		World.towns._huts[id] = hut_was
+	_check(_main._return_place(_player().tile).get("place", "") == id, "(mended again: the hut, for her)")
 	var rule: Dictionary = _main.care_rule(id)
 	_check(rule == {"retainer": 10, "herbs": 5, "antlers": 5, "sick": 0, "word_days": 0}, "a hut out in the land: 10 gold, 5 herbs or 5 antlers, no kin errand (%s)" % [rule])
 	var healer: Resident = null
