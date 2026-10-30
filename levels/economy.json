@@ -77,6 +77,8 @@
 		"markets": {"market:castle": {"wants": {"leather": 1.6, "cloth": 1.5, "meat": 1.2, "hide": 1.0, "food": 1.0, "wood": 0.8},
 			"sells": ["ore", "cloth", "wood", "food", "wine", "spice"]}}},
 	"luxury": {"above": 60, "span": 100, "stock": 3, "carry": 0.1, "markup": 1.5, "trade": "merchant", "kept": ["jewellery"]},
+	"healers": {"_": "Decision 733 (Jeff: the turf hut \"decays when nobody lives in it, and the healer rebuilds it with supplies\"): a healer's hut nobody keeps decline.unkept_days days falls into disrepair, a level a season after to a ruin, never gone; its keeper mends it, buying repair's needs for its state from the hut's town's store, steps of his work. vacant_days: how long an empty hut waits for a new keeper (npc seats them, from Towns.hut's empty_since).",
+		"vacant_days": 21, "repair": {"disrepair": {"needs": {"wood": 4}, "steps": 1500}, "ruin": {"needs": {"wood": 8, "cloth": 2}, "steps": 3000}}},
 	"visitors": {"_": "Decision 711 (Jeff: strangers come and go, bringing news and trade, the town never growing by them): once a day a town with people and fewer than most visitors gets one at chance, staying days (a range); a kind by weight among those whose needs building stands. inn: gold spent at the inn where one stands; raws: the store's spare (over comfort) bought, buys at most, at the store's price; offering: gold to the temple's alms; wares (items' list): lines a pedlar draws draw (a range) of, never one a trade of the town's makes (unless). Their gold comes from outside and leaves with them.",
 		"chance": 0.35, "most": 2, "days": [1, 3],
 		"kinds": {

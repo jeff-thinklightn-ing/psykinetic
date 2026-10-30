@@ -35486,3 +35486,39 @@ material.roof.slate exists the roof is covered in KIND_ROOF but takes slate's pr
 view_test _test_chapel (stand-in slots: bays, holes, gable windows, belfry, buttresses and
 lancets, covering half, damaged within disrepair). Client only, protocol unchanged, no new
 class_name.
+
+## 733. A healer's hut decays empty and its healer mends it
+
+Jeff, on the turf hut: "it decays when nobody lives in it, and the healer
+rebuilds it with supplies". Agreed by buildings, npc and economy, approved
+by the coordinator (vacant_days 21, so an empty hut visibly decays before a
+newcomer comes).
+
+Economy's side. A map's healer's hut (a Holdings place of kind
+healers_hut, maps' 372) is no town and its healer no resident: his own
+workshop at the place, outside any town's purse (Main._seat_healers). So
+Towns keeps each hut's record by its place id, beside the herders and
+saved with them ("huts" in the snapshot): {state (standing, disrepair,
+ruin), level, job, empty_since, decay, ruin}. Towns' own healers_hut
+building (649, which care_rule reads) is untouched.
+- Once a day (_huts_turn), who keeps it: Towns.hut_keeper if set, else its
+  workshop's worker while alive, not away and not held at a camp. Nobody
+  keeping it, empty_since is set (the day), cleared when kept again.
+- Empty decline.unkept_days (14) days, it falls into disrepair; in disrepair
+  it loses a level a season, at none a ruin. A hut's ruin is never gone.
+- Kept again, out of repair: its keeper buys healers.repair's needs for its
+  state (disrepair wood 4; ruin wood 8, cloth 2) from the store of the town
+  of the hut's area, else the nearest town (Main._hut_town), only when the
+  store holds them all, at the price any maker pays for materials
+  (Economy.buy_materials, his purse or the bank), and they go to the hut's
+  own store. Then a "build" job of his own workshop, recipe
+  "hut_repair:<place id>" (healers.repair.<state>.steps of his work); done,
+  standing again (a ruin at level 1).
+- Read by others: Towns.hut(place_id) -> {state, level, empty_since while
+  empty} ({} for no record); signal hut_changed(place_id). npc seats a new
+  keeper healers.vacant_days (21) after empty_since and skips a ruin as a
+  place the fallen come back at; buildings draws the states.
+larder_test: kept, standing; empty 14 days, disrepair; a season on, a ruin,
+never gone; no supplies, nothing ordered; supplies bought from the town and
+the mend ordered; the keeper works it himself; standing again; the save.
+Server only, protocol unchanged, no new class_name.

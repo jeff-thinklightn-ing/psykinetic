@@ -137,6 +137,20 @@ var placed := Callable()
 ## A herder's fold changed its count (640): [param place_id]'s sheep, for
 ## the "folds" message the views draw it by.
 signal folds_changed(place_id: String)
+## Healer's hut [param place_id]'s state changed (733): Towns.hut.
+signal hut_changed(place_id: String)
+## (place_id) -> String: who keeps healer's hut [param place_id] (733), ""
+## for nobody. Unset: its workshop's worker, while alive, not away and not
+## held at a camp.
+var hut_keeper := Callable()
+## (hut_id, keeper_id, needs) -> bool: the keeper buys a mend's supplies
+## from the store of the hut's town, brought to the hut (733; Main, through
+## Economy.hut_supplies). Nothing bought, no mend, while unset.
+var hut_supplies := Callable()
+## Healer's huts (733): Holdings place id -> {state (STANDING, DISREPAIR,
+## RUIN), level, job, empty_since, decay, ruin (days)}. Saved beside the
+## towns (huts_to_dict).
+var _huts: Dictionary = {}
 ## A visitor came to [param town] or left it (711): its Towns.visitors
 ## entry by [param id], for npc's bodies.
 signal visitor_came(town: String, id: String)
@@ -560,6 +574,7 @@ func settle_companion(companion_id: String, new_id: String) -> bool:
 func tick() -> void:
 	_stock_camps()
 	_herders_turn()
+	_huts_turn()
 	var towns: Array[String] = []
 	towns.assign(_towns.keys().filter(is_town))
 	towns.sort()
@@ -904,6 +919,9 @@ func _spread(town: String) -> void:
 ## Production.on_built: [param kind] in [param town] is up a level and
 ## standing; its trade's workshop opens and waiting residents are seated.
 func _built(town: String, kind: String) -> void:
+	if kind.begins_with(HUT_REPAIR):
+		_hut_mended(kind.trim_prefix(HUT_REPAIR))
+		return
 	var record := _town(town)
 	if kind.begins_with(ROOF):
 		var index := int(kind.trim_prefix(ROOF))
@@ -2823,6 +2841,138 @@ func _free_name(town: String, names: Array, pick: int) -> String:
 
 func _seated(who: String) -> bool:
 	return production.workshop_of(who) != ""
+
+
+# --- Healer's huts (decision 733) ------------------------------------------------------
+
+## The job recipe of a hut's mend: HUT_REPAIR + its place id.
+const HUT_REPAIR := "hut_repair:"
+
+
+## Healer's hut [param place_id] (733): {state, level, empty_since (the day
+## nobody has kept it since, while nobody does)}; {} for a place with no
+## record.
+func hut(place_id: String) -> Dictionary:
+	if not _huts.has(place_id):
+		return {}
+	var entry: Dictionary = _huts[place_id]
+	var out := {"state": str(entry["state"]), "level": int(entry["level"])}
+	if entry.has("empty_since"):
+		out["empty_since"] = int(entry["empty_since"])
+	return out
+
+
+func huts_to_dict() -> Dictionary:
+	return _huts.duplicate(true)
+
+
+## huts_to_dict's [param saved] over what is here.
+func huts_from_dict(saved: Dictionary) -> void:
+	for id: Variant in saved:
+		var each: Variant = saved[id]
+		if not each is Dictionary or not str(each.get("state", "")) in [STANDING, DISREPAIR, RUIN]:
+			continue
+		var entry := {"state": str(each["state"]), "level": maxi(int(each.get("level", 1)), 0), "job": int(each.get("job", 0))}
+		for key: String in ["empty_since", "decay", "ruin"]:
+			if each.has(key):
+				entry[key] = int(each[key])
+		_huts[str(id)] = entry
+
+
+## Who keeps hut [param id]: hut_keeper's, else its workshop's worker while
+## alive, not away and not held; "" for nobody.
+func _keeper_of(id: String) -> String:
+	if hut_keeper.is_valid():
+		return str(hut_keeper.call(id))
+	var who := str(production.workshop(id).get("worker", ""))
+	var worker := production.worker(who)
+	if who.is_empty() or worker.is_empty() or bool(worker.get("away", false)):
+		return ""
+	for town: String in _towns:
+		for held: Dictionary in _towns[town].get("captives", []):
+			if str(held["id"]) == who:
+				return ""
+	return who
+
+
+## Once a day, each healer's hut (733; Jeff: "it decays when nobody lives in
+## it, and the healer rebuilds it with supplies"): nobody keeping it
+## decline.unkept_days days running, it falls into disrepair; in disrepair
+## it loses a level a season, at none a ruin, never gone (it can always be
+## built again). Kept again, its keeper mends it: healers.repair's supplies
+## for its state bought from the hut's town (hut_supplies), then a "build"
+## job of his own workshop; standing again when it is done. Who comes to
+## keep an empty hut is npc's (after healers.vacant_days, from
+## empty_since).
+func _huts_turn() -> void:
+	var rule: Dictionary = rules.get("healers", {})
+	if rule.is_empty() or production.holdings == null:
+		return
+	var day := now() / maxi(DayNight.day_steps, 1)
+	var season := maxi(Season.season_days, 1)
+	var unkept := int(rules.get("decline", {}).get("unkept_days", 14))
+	var ids := production.holdings.all_places()
+	ids.sort()
+	for id: String in ids:
+		if str(production.holdings.place(id).get("kind", "")) != "healers_hut":
+			continue
+		if not _huts.has(id):
+			_huts[id] = {"state": STANDING, "level": 1, "job": 0}
+		var entry: Dictionary = _huts[id]
+		if int(entry.get("turn", -1)) == day:
+			continue
+		entry["turn"] = day
+		if int(entry["job"]) != 0 and production.job(int(entry["job"])).is_empty():
+			entry["job"] = 0  # A mend given up: free to be ordered again.
+		var keeper := _keeper_of(id)
+		if keeper.is_empty():
+			entry["empty_since"] = int(entry.get("empty_since", day))
+		else:
+			entry.erase("empty_since")
+		var was := "%s/%d" % [entry["state"], entry["level"]]
+		if entry["state"] == STANDING and keeper.is_empty() and day - int(entry["empty_since"]) >= unkept:
+			entry["state"] = DISREPAIR
+			entry["decay"] = day
+			print("[towns] the healer's hut %s, empty %d days, has fallen into disrepair, step %d" % [id, day - int(entry["empty_since"]), now()])
+		elif entry["state"] == DISREPAIR and int(entry["job"]) == 0 and day - int(entry.get("decay", day)) >= season:
+			entry["decay"] = day
+			entry["level"] = int(entry["level"]) - 1
+			if int(entry["level"]) <= 0:
+				entry["state"] = RUIN
+				entry["ruin"] = day
+				entry.erase("decay")
+				print("[towns] the healer's hut %s is a ruin, step %d" % [id, now()])
+		if entry["state"] != STANDING and not keeper.is_empty() and int(entry["job"]) == 0:
+			_hut_mend(id, entry, keeper, rule)
+		if "%s/%d" % [entry["state"], entry["level"]] != was:
+			hut_changed.emit(id)
+
+
+## Keeper [param keeper] of hut [param id] buys its mend's supplies and
+## orders the mend of his own workshop: healers.repair.disrepair or .ruin
+## ({needs, steps}). Nothing if the supplies can't be had yet.
+func _hut_mend(id: String, entry: Dictionary, keeper: String, rule: Dictionary) -> void:
+	var mend: Dictionary = rule.get("repair", {}).get("ruin" if entry["state"] == RUIN else "disrepair", {})
+	var needs: Dictionary = mend.get("needs", {})
+	if not hut_supplies.is_valid() or not bool(hut_supplies.call(id, keeper, needs)):
+		return
+	var trade := str(production.worker(keeper).get("trades", ["medicine_man"])[0])
+	entry["job"] = production.order_build(id, HUT_REPAIR + id, trade, needs, int(mend.get("steps", 1500)))
+	print("[towns] %s sets about mending the healer's hut %s (%s), step %d" % [production.worker(keeper).get("name", keeper), id, entry["state"], now()])
+
+
+## Hut [param id]'s mend done: standing again, a ruin at level 1.
+func _hut_mended(id: String) -> void:
+	if not _huts.has(id):
+		return
+	var entry: Dictionary = _huts[id]
+	entry["state"] = STANDING
+	entry["level"] = maxi(int(entry["level"]), 1)
+	entry["job"] = 0
+	entry.erase("decay")
+	entry.erase("ruin")
+	print("[towns] the healer's hut %s is mended, step %d" % [id, now()])
+	hut_changed.emit(id)
 
 
 # --- Visitors (decision 711) -----------------------------------------------------------

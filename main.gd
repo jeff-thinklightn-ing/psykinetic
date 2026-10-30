@@ -3927,6 +3927,7 @@ func _boot() -> void:
 	# How each town grows: its experience, residents and buildings.
 	World.towns = Towns.new(snapshot.get("towns", {}), World.production)
 	World.towns.herders_from_dict(snapshot.get("herders", {}))  # The hill herders (640).
+	World.towns.huts_from_dict(snapshot.get("huts", {}))  # The healers' huts (733).
 	# The forest felled and growing back, as the snapshot left it (591).
 	World.clearing = Clearing.new(snapshot.get("clearing", {}), snapshot.get("plots", {}))
 	World.clearing.changed.connect(_on_clearing_changed)
@@ -4074,6 +4075,9 @@ func _boot() -> void:
 	# The hill herders' droves, bought by the town (640).
 	World.towns.drove = World.economy.buy_drove
 	World.towns.visitor_arrives = World.economy.visitor_arrives  # Visitors (711).
+	World.towns.hut_supplies = func(hut_id: String, keeper: String, needs: Dictionary) -> bool:  # 733.
+		var town := _hut_town(hut_id)
+		return not town.is_empty() and World.economy.hut_supplies(town, hut_id, keeper, needs)
 	World.towns.visitor_sale = World.economy.visitor_sale
 	# Each healer's hut its own potions (641).
 	World.production.workshop_makes = _workshop_makes
@@ -5520,6 +5524,7 @@ func _save_state(wait := true) -> void:
 		"production": World.production.to_dict() if World.production != null else {},
 		"towns": World.towns.to_dict() if World.towns != null else {},
 		"herders": World.towns.herders_to_dict() if World.towns != null else {},
+		"huts": World.towns.huts_to_dict() if World.towns != null else {},
 		"clearing": World.clearing.to_dict() if World.clearing != null else {},
 		"plots": World.clearing.plots_to_dict() if World.clearing != null else {},
 		"roofs": World.roofs_damaged.keys(),
@@ -9572,6 +9577,23 @@ func _write_settled_card(id: String, entry: Dictionary) -> void:
 	if not str(entry.get("fact", "")).is_empty():
 		ResidentCard.add_fact(card, World.production.now(), str(entry["fact"]))
 	World.production.set_card(id, card)
+
+
+## The town healer's hut [param hut_id] buys its mend's supplies of
+## (733): the town of the hut's own area, else the nearest town; "" for none.
+func _hut_town(hut_id: String) -> String:
+	if World.holdings == null or World.towns == null:
+		return ""
+	var place := World.holdings.place(hut_id)
+	var towns := World.towns.to_dict()
+	for id: String in World.holdings.places_in(str(place.get("area", ""))):
+		if towns.has(id) and World.holdings.place(id).get("kind") == Stockpile.KIND:
+			return id
+	var kinds: Array[String] = [Stockpile.KIND]
+	for id: String in World.holdings.ranked(kinds, str(place.get("area", "")), place.get("cell", Vector2i.ZERO)):
+		if towns.has(id):
+			return id
+	return ""
 
 
 ## The healer's hut place of [param town]'s zone (maps' 372), "" for none.

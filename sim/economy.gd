@@ -2334,6 +2334,22 @@ func buy_materials(town: String, id: String, needs: Dictionary) -> bool:
 	stockpile.deposit(town, "gold", cost, "materials:%s" % id, "%s bought %s for %d gold" % [production.worker(id)["name"], needs, cost])
 	return true
 
+## A healer's hut's keeper [param keeper] buys a mend's supplies
+## [param needs] from [param town]'s store (733): only when the store holds
+## them all, paid as any maker's materials (buy_materials), then taken to
+## hut [param hut_id]'s own store, where the mend takes them. Whether.
+func hut_supplies(town: String, hut_id: String, keeper: String, needs: Dictionary) -> bool:
+	for what: String in needs:
+		if not stockpile.has(town, what, int(needs[what])):
+			return false
+	if not buy_materials(town, keeper, needs):
+		return false
+	for what: String in needs:
+		stockpile.take(town, what, int(needs[what]), "to the healer's hut %s" % hut_id)
+		stockpile.deposit(hut_id, what, int(needs[what]), keeper, "a mend's supplies from %s" % town)
+	return true
+
+
 # --- The thief's fence (npc's thief, decision 461) --------------------------------
 
 ## A lifted [param what] (a resource) fenced through merchant
