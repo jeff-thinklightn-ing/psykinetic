@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Aldous now names the Mound-breakers when he tells of the grave robbers digging for the holy knights' bones (714, lore's crypt.robbers_dig).
 - The Robbers' Camp in the barrow has a chest (742): open it for 25 gold straight to your purse, refilled for you every 5 minutes.
 - Options, Credits: the music is credited first, "Music: psykinetic-theme1 by Jeff, made with Spitfire Audio BBC Symphony Orchestra Discover".
 - Rolf stands by Umbrage's store all day (736, npc's side): talk to him for the base weapons, arrows and shields at 1 gold each; what he sells goes straight into your hands, marked starter gear that no shop or maker will buy back.
