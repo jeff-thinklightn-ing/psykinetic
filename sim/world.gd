@@ -2900,8 +2900,8 @@ func stacks_onto(first: int, uid: int, more := 1, room := true) -> bool:
 	if id != items.id_of(uid) or Items.stack_of(id) <= 1:
 		return false
 	if not _plain(first) or not _plain(uid) or items.style_of(first) != items.style_of(uid) \
-			or items.grave_of(first) != items.grave_of(uid):
-		return false
+			or items.grave_of(first) != items.grave_of(uid) or items.is_starter(first) != items.is_starter(uid):
+		return false  # Starter gear (736) stacks only with its own kind, so a stack is all one or the other.
 	return not room or 1 + items.stack_of(first).size() + more <= Items.stack_of(id)
 
 
@@ -3533,7 +3533,7 @@ func _show_notes(entity: GridEntity) -> void:
 			# side), not said in the note. The tally (decision 415) and the
 			# story (decision 421), each on a line of its own under the
 			# thing's name, found by its first word.
-			for line in [kills_line(entity.slot_items[slot]), story_line(entity.slot_items[slot])]:
+			for line in [kills_line(entity.slot_items[slot]), story_line(entity.slot_items[slot]), starter_line(entity.slot_items[slot])]:
 				if not line.is_empty():
 					names[slot] = "%s\n%s" % [names[slot] if not names[slot].is_empty() else Items.name_of(entity.slots[slot]), line]
 			any = any or not names[slot].is_empty()
@@ -3589,6 +3589,12 @@ func kills_line(uid: int) -> String:
 		total += int(felled[kind])
 		parts.append("%d %s" % [felled[kind], kind if int(felled[kind]) == 1 else _plural(kind)])
 	return "felled %d: %s" % [total, ", ".join(parts)]
+
+
+## [param uid]'s starter line, as its slot's note shows it on a line of its
+## own (decision 736): "starter gear: no one will buy it"; "" for anything else.
+func starter_line(uid: int) -> String:
+	return "starter gear: no one will buy it" if items.is_starter(uid) else ""
 
 
 ## [param uid]'s story, as its slot's note shows it (decision 421, for
@@ -5369,6 +5375,22 @@ func free_slot_for(entity: GridEntity, id: String) -> int:
 		if entity.slots[slot].is_empty():
 			return slot
 	return -1
+
+
+## [param uid] and every unit of its stack marked starter gear (decision
+## 736: what a town's starter vendor sells). Server only.
+func mark_starter(uid: int) -> void:
+	if not Net.is_authority() or not items.has(uid):
+		return
+	items.mark_starter(uid)
+	for unit in items.stack_of(uid):
+		items.mark_starter(unit)
+
+
+## Whether [param uid] (a slot's, its whole stack alike) is starter gear
+## (decision 736): sell, barter, buy-backs and the fence refuse it.
+func is_starter(uid: int) -> bool:
+	return items.is_starter(uid)
 
 
 ## [param player_id]'s own chest (Locker, decision 722) where it stands

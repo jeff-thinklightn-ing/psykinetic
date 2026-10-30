@@ -485,6 +485,19 @@ func mark_relic(uid: int, knight: String, tier: int) -> void:
 		_book[uid]["relic"] = {"knight": knight, "tier": tier}
 
 
+## Whether [param uid] is starter gear (decision 736: bought of a town's
+## starter vendor; no one buys it back).
+func is_starter(uid: int) -> bool:
+	return _book.has(uid) and _book[uid].get("starter", false) == true
+
+
+## [param uid] marked starter gear for life (decision 736): a move, a split
+## from its stack and wear keep it, since each unit is its own uid.
+func mark_starter(uid: int) -> void:
+	if _book.has(uid):
+		_book[uid]["starter"] = true
+
+
 ## [param uid]'s charges set to [param amount] (at least 0).
 func set_charges(uid: int, amount: int) -> void:
 	if _book.has(uid):
@@ -649,6 +662,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["stack"] = entry["stack"].map(func(each: Variant) -> int: return int(each))  # Decision 619.
 			if entry.get("charges") is float or entry.get("charges") is int:
 				items._book[int(key)]["charges"] = maxi(int(entry["charges"]), 0)  # Decision 573 amended.
+			if entry.get("starter") == true:
+				items._book[int(key)]["starter"] = true  # Decision 736.
 			if entry.get("relic") is Dictionary and entry["relic"].get("knight") is String:
 				items._book[int(key)]["relic"] = {"knight": entry["relic"]["knight"], "tier": int(entry["relic"].get("tier", 0))}  # Decision 714.
 			if entry.get("bane") is String and not entry["bane"].is_empty():

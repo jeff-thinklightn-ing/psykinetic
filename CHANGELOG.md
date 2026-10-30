@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Starter gear (736, items' side): what a town's starter vendor sells is marked for life (its tooltip says "starter gear: no one will buy it"), never stacks with other gear, and keeps the mark when split, worn or saved; the vendor's list is the base weapons.
 - A healer's hut nobody lives in falls into disrepair after a fortnight and to a ruin a season later; when a healer keeps it again he buys wood (and cloth for a ruin) from the town's store and mends it himself (733, economy's side).
 
 - Temple: drawn as a chapel, piece by piece as art-kit's chapel parts arrive: a slate roof laid and broken by the bay with a flared eave, a rose window on the front gable and an oculus on the back, a belfry on the ridge, buttresses with tall lancets between them, steps and the pointed-arch double door; a temple going up gets its front half roofed first (734).

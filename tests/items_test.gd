@@ -77,6 +77,7 @@ func _ready() -> void:
 	_test_remedy_heal()  # After the timed checks: its 400 ticks would shift them.
 	_test_bandage_reach()  # So too its ticks.
 	_test_inventory()
+	_test_starter_gear()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -2866,6 +2867,49 @@ func _clear(entity: GridEntity) -> void:
 		for uid in World.slot_units(entity, slot):
 			World.items.end(uid, "gone")
 	World.set_slots(entity, [])
+
+
+
+## The starter vendor's gear (decision 736, items' side): the wares list,
+## and a mark on each unit that moves, splits and saves with it.
+func _test_starter_gear() -> void:
+	print("\n== starter gear: the vendor's wares and the mark that no one buys (decision 736) ==")
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
+	var wares: Array = data.get("vendor", {}).get("wares", []) if data is Dictionary else []
+	var base := wares.size() >= 8
+	for ware: Dictionary in wares:
+		var id := str(ware.get("item", ""))
+		base = base and Items.exists(id) and int(ware.get("count", 0)) >= 1 and not Items.has_tag(id, "trophy") and not Items.has_tag(id, "soulbound")
+	_check(base, "case: the vendor's wares are the base weapons, each a real item, none a trophy or bound")
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	var empty: Array = []
+	empty.resize(Items.CARRIED)
+	empty.fill("")
+	World.set_slots(host, empty)
+	var plain := _give(host, "ore_sack", 0)
+	var starter := World.items.mint("ore_sack", "built")
+	World.mark_starter(starter)
+	_check(World.is_starter(starter) and not World.is_starter(plain), "case: marked: starter gear; another of its kind not")
+	_check(not World.stacks_onto(plain, starter) and not World.stacks_onto(starter, plain), "case: starter and plain never stack together")
+	var starter2 := World.items.mint("ore_sack", "built")
+	World.mark_starter(starter2)
+	_check(World.stacks_onto(starter, starter2), "case: two starters stack")
+	World.put_item(host, host, 1, starter)
+	World.put_item(host, host, 1, starter2)
+	_check(World.slot_count(host, 1) == 2, "(the starter stack of two)")
+	var out := World.take_units(host, [starter2] as Array[int])
+	_check(out.size() == 1 and World.is_starter(out[0]) and World.is_starter(World.slot_uid(host, 1)), "case: split from its stack, each unit still starter gear")
+	World.items.set_condition(starter, 3)
+	_check(World.is_starter(starter), "case: worn, still starter gear")
+	_check(World.starter_line(starter) == "starter gear: no one will buy it" and World.starter_line(plain) == ""
+			and "\nstarter gear: no one will buy it" in host.slot_notes[1], "case: its slot's note has the line, on a line of its own")
+	var back := ItemBook.from_dict(World.items.to_dict().duplicate(true))
+	_check(back.is_starter(starter) and back.is_starter(starter2) and not back.is_starter(plain), "case: saved and read back, the mark kept")
+	for uid in [plain, starter, starter2]:
+		World.items.end(uid, "gone")
+	World.set_slots(host, had_slots, had_uids)
 
 
 func _steps(count: int) -> void:

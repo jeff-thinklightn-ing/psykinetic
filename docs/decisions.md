@@ -35522,3 +35522,20 @@ larder_test: kept, standing; empty 14 days, disrepair; a season on, a ruin,
 never gone; no supplies, nothing ordered; supplies bought from the town and
 the mend ordered; the keeper works it himself; standing again; the save.
 Server only, protocol unchanged, no new class_name.
+## 736, items' side: the starter vendor's wares and the starter mark
+
+Economy's starter vendor (736) sells the base weapons at a token price, and
+what it sells must never be sold back for gold. Items' side:
+levels/economy.json "vendor" {town, price, wares: [{item, count}]} lists the
+base weapons (sword, dagger, knife, spear, hammer, battle axe, bow, arrows as
+one bundle, shield, buckler; no trophy or bound thing); economy fills the town
+and its note. The mark: ItemBook.is_starter(uid) / mark_starter(uid), the
+entry's "starter" saved with the book; World.mark_starter(uid) marks a uid and
+every unit of its stack, World.is_starter(uid) asks. Each unit is its own uid,
+so a move, a split and wear keep it; World.stacks_onto never joins a starter
+unit to a plain one, so a stack is all starter or none, and its head answers
+for it. World.starter_line gives "starter gear: no one will buy it", a line of
+its own in the slot's note (the tooltip), beside the tally and the story. Economy's side refuses starter uids in sell, barter,
+makers' buy-backs and the fence. items_test _test_starter_gear. Server only,
+protocol unchanged (the note rides the existing slot_notes), no new
+class_name.
