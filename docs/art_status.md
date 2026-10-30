@@ -99,7 +99,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `door.trapdoor` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `floor.castle` | 1 | art-gen | own | 2026-10-18 |
 | `floor.cave` | 1 | art-gen | own | 2026-10-18 |
-| `floor.chapel` | 1 | art-gen, re-graded by art-kit | own | 2026-10-29 |
+| `floor.chapel` | 1 | art-gen, procedural (no model) | own | 2026-10-29 |
 | `floor.stone` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `floor.wood` | 1 | art-gen, re-graded by art-kit | own | 2026-10-19 |
 | `frame.cruck` | 1 | art-kit, by hand | own | 2026-10-18 |
