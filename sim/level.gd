@@ -1455,6 +1455,9 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		_link(building, entry, config, linked, warnings)
 		if entry.has("level_link"):
 			building["level_link"] = entry["level_link"]
+		# A player's house (737): labelled "Your house" to every viewer.
+		if bool(entry.get("home", false)):
+			building["home"] = true
 		out.append(building)
 	return out
 

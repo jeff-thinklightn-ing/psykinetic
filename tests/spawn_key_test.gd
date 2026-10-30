@@ -43,6 +43,7 @@ func _run() -> void:
 	_test_stock_tops_up_once(path, saved)
 	_test_became(path, saved)
 	_test_a_moved_marker(path, saved)
+	_test_a_moved_locker(path, saved)
 	DirAccess.remove_absolute(path)
 	Net.state_path = ""
 	Level.unregister(LEVEL)
@@ -274,3 +275,22 @@ func _test_a_moved_marker(path: String, data: Dictionary) -> void:
 	var crate: Variant = at.get(Vector2i(12, 4))
 	_check(crate is Pushable and not crate.spawn_spec.has("spawn_key") and at.get(Vector2i(15, 2)) is Pushable,
 			"a marker moved past the reach: the saved one as saved, a new one on the marker (%s)" % [_names(at)])
+
+
+## A town's locker whose marker moved past the reach (737: Umbrage's into
+## the player's house): its saved chest dropped, not a stray locker beside
+## the new one; the load says how many, with no error.
+func _test_a_moved_locker(path: String, data: Dictionary) -> void:
+	print("\n== a locker's marker moved far: its saved chest dropped, not a stray (737) ==")
+	var moved: Dictionary = data.duplicate(true)
+	for entry: Dictionary in moved["zones"][LEVEL]["entities"]:
+		if str(entry.get("spawn_key", "")) == "6,2":
+			entry["props"] = JSON.from_native({"locker": true})
+	_write(path, moved)
+	_register(false, Vector2i(-1, -1), [], {}, {Vector2i(6, 2): Vector2i(14, 3)})
+	_main._load_level(LEVEL)
+	_main._start_level(true)
+	var at := _by_tile()
+	var chests := at.values().filter(func(entity: GridEntity) -> bool: return entity is Chest)
+	_check(chests.size() == 1 and at.get(Vector2i(14, 3)) is Chest and not at.has(Vector2i(6, 4)),
+			"one chest, the new one on its marker; the saved locker not spawned where it was left (%s)" % [_names(at)])

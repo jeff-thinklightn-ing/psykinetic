@@ -1630,19 +1630,23 @@ func _test_building_level_link() -> void:
 		"the wilds' temple carries the sealed stair down in its north-west back corner; the old one behind it is gone (%s)" % [stair])
 
 
-## Umbrage's locker (722): one chest prop {"locker": true} in the square by
-## the depot and the shop, its back to the temple's west wall, the cell
-## before it open floor.
+## Umbrage's locker (722): one chest prop {"locker": true}, since 737 in
+## the player's house, its back to the house's south wall, the cell before
+## it open floor.
 func _test_umbrage_locker() -> void:
-	print("\n== Umbrage's locker (722) ==")
+	print("\n== Umbrage's locker (722), in the player's house (737) ==")
 	var wilds := Level.load_level("wilds")
 	var lockers: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return bool((spec.get("props", {}) as Dictionary).get("locker", false)))
-	var at := Vector2i(215, 199)
+	var at := Vector2i(195, 220)
 	_check(lockers.size() == 1 and lockers[0]["tile"] == at
-		and wilds["terrain"]["edges"].get(Terrain.edge_key(at, Vector2i(1, 0))) == Terrain.Edge.WALL
-		and wilds["terrain"]["floor"].has(at + Vector2i(-1, 0)) and not wilds["terrain"]["edges"].has(Terrain.edge_key(at, Vector2i(-1, 0)))
-		and wilds["entities"].all(func(spec: Dictionary) -> bool: return spec["tile"] != at + Vector2i(-1, 0)),
-		"one locker, at (215, 199), its back to the temple's wall, the cell before it clear floor (%s)" % [lockers])
+		and wilds["terrain"]["edges"].get(Terrain.edge_key(at, Vector2i(0, 1))) == Terrain.Edge.WALL
+		and wilds["terrain"]["floor"].has(at + Vector2i(0, -1)) and not wilds["terrain"]["edges"].has(Terrain.edge_key(at, Vector2i(0, -1)))
+		and wilds["entities"].all(func(spec: Dictionary) -> bool: return spec["tile"] != at + Vector2i(0, -1)),
+		"one locker, at (195, 220), its back to the house's south wall, the cell before it clear floor (%s)" % [lockers])
+	var homes: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building.get("home", false))
+	_check(homes.size() == 1 and (homes[0]["rect"] as Rect2i) == Rect2i(194, 215, 4, 6) and Level.building_cells(homes[0]).has(at)
+		and str(homes[0].get("use", "")).is_empty(),
+		"one house marked the player's (737), the free house at (194, 215), the locker inside it (%d)" % homes.size())
 
 
 func _test_building_links() -> void:

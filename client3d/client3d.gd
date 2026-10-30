@@ -2234,6 +2234,8 @@ var _kinds_texture: ImageTexture
 ## roof hidden as the local player is inside}; which building each
 ## footprint cell is in; the roofs off now and when each was last wanted off.
 var _buildings: Array[Dictionary] = []
+## The player's houses' labels (737), each shown only near (_show_home_labels).
+var _home_labels: Array[Label3D] = []
 ## The laid plots drawn (591 amended (step 2)), by their rect's corner:
 ## what _sync_plots adds or drops.
 var _plots_drawn: Dictionary[Vector2i, bool] = {}
@@ -4027,6 +4029,13 @@ const BUILDER_AREA := Color(0.45, 0.8, 1.0, 0.9)
 ## A building's code label: the area frame's blue, a little paler, this
 ## high over its ground and this many times a name's size.
 const BUILDING_CODE := Color(0.75, 0.92, 1.0)
+## A player's house (737): its label's words and colour, how far over its
+## ground it floats, and within how many metres of it a player of this
+## client sees it.
+const HOME_WORDS := "Your house"
+const HOME_COLOUR := Color(1.0, 0.9, 0.62)
+const HOME_HEIGHT := 5.6
+const HOME_NEAR := 10.0
 const CODE_HEIGHT := 4.5
 const CODE_SCALE := 2.5
 ## A new level's outline, beyond the map's edge.
@@ -4162,6 +4171,29 @@ func show_building_codes(on: bool) -> void:
 		label.pixel_size = LABEL_SIZE * CODE_SCALE
 		label.position = Vector3(middle.x, _elevation(rect.position) + CODE_HEIGHT, middle.y)
 		_code_labels.add_child(label)
+
+
+## A player's house's label (737): HOME_WORDS over its middle to every
+## viewer, each their own (it is one building every player shares), shown
+## only near it (_show_home_labels).
+func _add_home_label(building: Dictionary) -> void:
+	var rect: Rect2i = building["rect"]
+	var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
+	var label := _label("Home_%d_%d" % [rect.position.x, rect.position.y], HOME_WORDS, HOME_COLOUR, 0.0)
+	label.position = Vector3(middle.x, _elevation(rect.position) + HOME_HEIGHT, middle.y)
+	label.visible = false
+	_room.add_child(label)
+	_home_labels.append(label)
+
+
+## Each house's label shown while one of [param points] (this client's
+## player and companion) is within HOME_NEAR of it, along the ground.
+func _show_home_labels(points: Array[Vector3]) -> void:
+	for label in _home_labels:
+		if not is_instance_valid(label) or not label.is_inside_tree():
+			continue
+		var at := Vector2(label.global_position.x, label.global_position.z)
+		label.visible = points.any(func(point: Vector3) -> bool: return Vector2(point.x, point.z).distance_to(at) <= HOME_NEAR)
 
 
 func clear_builder() -> void:
@@ -4912,6 +4944,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_grown_trunks.clear()
 	_glimpses.clear()
 	_buildings.clear()
+	_home_labels.clear()
 	_building_at.clear()
 	_stand_at.clear()
 	_roofs_off.clear()
@@ -5619,6 +5652,8 @@ func _add_buildings() -> void:
 	for building: Dictionary in _drawn_buildings():
 		if building.get("plot", false):
 			_plots_drawn[(building["rect"] as Rect2i).position] = true
+		if building.get("home", false):
+			_add_home_label(building)
 		if building.has("kind"):
 			_add_kind(building)
 			continue
@@ -12955,6 +12990,7 @@ func _update_fade(force := false) -> void:
 	if not _occluders_built:
 		_index_occluders()
 	var points := _focus_points()
+	_show_home_labels(points)
 	var roofs_changed := _update_roofs(points)
 	var toward := _camera.global_transform.basis.z
 	var fought := points + _fight_points(points)

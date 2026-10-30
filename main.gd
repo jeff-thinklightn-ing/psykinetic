@@ -4970,8 +4970,15 @@ func _spawn_saved(section: Dictionary) -> bool:
 		_saved_keys[str(respawn.get("spawn_key", ""))] = true
 	_saved_keys.erase("")
 	_adopted = 0
+	var lockers_dropped := 0
 	for entry: Dictionary in saved:
 		var spec := _level_spec_for(entry["spec"])
+		# A town's locker whose marker moved away (737: Umbrage's into the
+		# player's house) is the level's, never a stray: its slots are each
+		# player's record's, so it is dropped, not spawned as saved.
+		if not spec.has("spawn_key") and spec.get("props") is Dictionary and bool((spec["props"] as Dictionary).get("locker", false)):
+			lockers_dropped += 1
+			continue
 		var entity := _spawn(spec)
 		if entity == null:
 			continue
@@ -4983,6 +4990,8 @@ func _spawn_saved(section: Dictionary) -> bool:
 	if _adopted > 0:
 		# For release, counts only (decision 610): moved markers found.
 		print("[state] %s: %d saved level entities found their moved markers" % [World.zone.name, _adopted])
+	if lockers_dropped > 0:
+		print("[state] %s: %d town lockers whose marker moved dropped" % [World.zone.name, lockers_dropped])
 	# Slots with no entity and a saved timer are dead: pick their timers up.
 	for respawn: Dictionary in section.get("respawns", []):
 		var dead := _slot_for(int(respawn["spawn"]), str(respawn.get("spawn_key", "")))

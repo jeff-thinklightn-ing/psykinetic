@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage: the free house south-west of the square is now your house, labelled "Your house" when you're near, and your private chest (the town locker) has moved inside it, against the back wall (737).
 - Townsfolk know the barrow is an ancient burial mound joined to the Ossuary beneath the temple, where the draugr keeps Aldous from the holy knights' relics, angry at the grave robbers who break walls with the Tomb Sledge to reach them.
 - With the low camera on, the dark band under the skyline is gone: the forest runs on into the haze to a soft ridge, and far meadows past the scattered grass show patches and speckle rather than plain green (623).
 - Deer and other wild animals keep away from towns, fires and fighting (740): they no longer graze around a town, and one that wanders into the noise walks back out of it; wolves still come for you.

@@ -2021,6 +2021,7 @@ func _test_kinds() -> void:
 	_test_chimney_smoke()
 	_test_turf_house()
 	_test_chapel()
+	_test_home_label()
 	_test_inside_is_his()
 
 
@@ -2671,6 +2672,30 @@ func _test_chapel() -> void:
 		slots.erase(slot)
 	BuildingComposer.forget()
 	ArtKit.forget()
+
+
+## The player's house (737): one label, "Your house", over it to every
+## viewer, seen only near it.
+func _test_home_label() -> void:
+	print("\n== the player's house: labelled theirs, seen near (737) ==")
+	var level := _kinds_level([["building_house_small", Vector2i(2, 2), false]])
+	(level["terrain"]["buildings"][0] as Dictionary)["home"] = true
+	_rig.rebuild(level["terrain"], Vector2i(4, 12))
+	var labels := _rig._home_labels
+	_check(labels.size() == 1 and labels[0].text == Client3D.HOME_WORDS and labels[0].text == "Your house",
+			"one label over the house, \"Your house\" (%d)" % labels.size())
+	if labels.size() != 1:
+		return
+	var at := labels[0].global_position
+	var near: Array[Vector3] = [Vector3(at.x + 3.0, 0.0, at.z + 4.0)]
+	var far: Array[Vector3] = [Vector3(at.x + Client3D.HOME_NEAR + 2.0, 0.0, at.z)]
+	_rig._show_home_labels(far)
+	var hidden_far := not labels[0].visible
+	_rig._show_home_labels(near)
+	_check(hidden_far and labels[0].visible and at.y > 4.0, "hidden from afar, shown near, over the roof (%.1f)" % at.y)
+	(level["terrain"]["buildings"][0] as Dictionary).erase("home")
+	_rig.rebuild(level["terrain"], Vector2i(4, 12))
+	_check(_rig._home_labels.is_empty(), "a house not marked the player's: no label")
 
 
 ## Inside is the player's own place, not his companion's (671 amended (3);

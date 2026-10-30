@@ -374,6 +374,10 @@ All of it is optional.
   inside it and not its door or front, with no marker. The link carries
   `"building"`, the building's code (else its slot). The wilds' temple
   carries the stair down to the Ossuary in its north-west back corner.
+  A building entry's `"home": true` (decision 737) makes it the player's
+  house: every client labels it "Your house" while its player is near
+  (Client3D), though it is one building all players share. Umbrage's free
+  house at (194, 215) is one, with the town's locker inside.
 - `walls` and `floors`: the wall and floor sets the map is drawn in
   (art-kit's `wall.<set>.*` and `floor.<set>`: castle, wood, stone, cave;
   castle if not given or not a set). The floor set is drawn on the map's

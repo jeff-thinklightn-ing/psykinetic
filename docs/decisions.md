@@ -35883,3 +35883,28 @@ names it), and two more agreed facts, crypt.robbers_dig (the robbers dig for the
 sell on the black market) and crypt.tomb_sledge (the heavy hammer only the biggest robber can
 carry, and its broken walls and smashed tombs); crypt.draugr_angry gives the why. Data and docs only, protocol unchanged.
 
+## 737: the player's house
+
+Jeff: "add a house with a chest in it, the chest needs to be coded as private for each player -
+the house can be the same it just says its that players to them, but others can utilize the same
+house." One shared building, labelled as theirs to each viewer; the chest is 722's Locker,
+already private per player.
+- A building entry's `"home": true` (Level.buildings_from carries it, as `level_link`). Umbrage's
+  free building.house at (194, 215), facing north (no use, no town record), is the one.
+- Client3D draws a Label3D "Your house" (HOME_WORDS) HOME_HEIGHT over its middle, in the name
+  tags' style, shown only while this client's player or companion is within HOME_NEAR (10 m) of
+  it (_show_home_labels, each frame with the fade). Every viewer sees the same words. "<name>'s
+  house" would need the name looked up and reads the same to its owner.
+- The wilds' locker moves from the square (215, 199) to (195, 220), its back to the house's south
+  wall, the cell before it clear floor; one locker, not two (the coordinator). Its marker repainted.
+- Its spawn key moves past 610's reach (2 cells), so a saved snapshot's locker at "215,199" finds
+  no marker and would have come back as saved: a stray second locker in the square. Main's zone
+  load now drops a saved level entity whose marker is gone and whose props carry `locker`: its
+  slots live in each player's record, so nothing is lost. It prints one line, "[state] <zone>: N
+  town lockers whose marker moved dropped", and no error.
+- The house's inside is already its own room (its outline and cells), so a later step can show
+  only the viewer inside a home without touching the level. The companion still calls it "the
+  house".
+level_test _test_umbrage_locker (the house, the locker in it), spawn_key_test
+_test_a_moved_locker, view_test _test_home_label. Client and server read the level; server
+change in Main's load; protocol unchanged, no new class_name.
