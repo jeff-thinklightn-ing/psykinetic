@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_castle_halls()
 	_test_tower()
 	_test_two_cell()
+	_test_set_in_rock()
 	_test_sheet()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -643,6 +644,42 @@ func _test_two_cell() -> void:
 		_check(pinched.is_empty(), "%s: every floor cell outside the anchors in a clear 2 x 2 (%d pinched: %s; %d against the tower's outline)" % [name, pinched.size(), pinched.slice(0, 6), walled])
 		_check(lone.is_empty(), "%s: every door two edges wide (%d doors, %d lone: %s)" % [name, doors, lone.size(), lone.slice(0, 6)])
 		_check(lit.is_empty(), "%s: no torch on a door's cell or in its line (%s)" % [name, lit.slice(0, 6)])
+
+
+## Jeff: "barrows still had some odd shaped rooms like a single file
+## hallway around a room with a door": the barrow's niche, walled but for
+## its mouth (east) in its template ("a niche in the wall"), stays set in
+## the rock: no floor in the ring round it but at its mouth, which the way
+## reaches, any generation.
+func _test_set_in_rock() -> void:
+	print("
+== a walled anchor stays set in the rock ==")
+	var rect := Rect2i()
+	for anchor: Dictionary in Regen.config_of("lab_barrow")["anchors"]:
+		if str(anchor.get("name", "")) == "niche":
+			var given: Variant = anchor["rect"]
+			rect = given if given is Rect2i else Rect2i(int(given[0]), int(given[1]), int(given[2]), int(given[3]))
+	_check(rect.has_area(), "the sample barrow has its niche anchor (%s)" % rect)
+	var ringed: Array[String] = []
+	var inside := 0
+	for generation in range(1, TWO_CELL_SEEDS + 1):
+		var made := Regen.generate("lab_barrow", generation)
+		if made.is_empty():
+			ringed.append("g%d: not made" % generation)
+			continue
+		var map := LevelMap.from_image(made["layout"], made["config"])
+		var mouth := 0
+		for cell in Level.rect_cells(rect.grow(1)):
+			if rect.has_point(cell):
+				inside += 1 if map.walkable(cell) else 0
+			elif cell.x == rect.end.x and cell.y >= rect.position.y and cell.y < rect.end.y:
+				mouth += 1 if map.walkable(cell) else 0
+			elif map.walkable(cell):
+				ringed.append("g%d %s" % [generation, cell])
+		if mouth != rect.size.y:
+			ringed.append("g%d: its mouth shut (%d open)" % [generation, mouth])
+	_check(ringed.is_empty() and inside == 4 * TWO_CELL_SEEDS,
+		"%d generations: the niche's four cells kept, its mouth on the way, no floor round it else (%d: %s)" % [TWO_CELL_SEEDS, ringed.size(), ringed.slice(0, 8)])
 
 
 func _test_sheet() -> void:

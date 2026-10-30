@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The barrow's niche sits in the wall again (741): the next generation carves no single-file passage round it, only up to its mouth.
 
 - Companions: a camp you have cleared and stand in counts as safe too, so she may ask to rest there; a camp that can refill never does (738 amended).
 - Sound: refuse the draugr and he laughs, low and dry, as he comes at you (735, sound's side; three laughs, picked at random).

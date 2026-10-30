@@ -119,7 +119,7 @@ const NICHE_SLAB := 0.2
 static func generate(template: LevelMap, config: Dictionary, seed: int) -> LevelMap:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed
-	var anchors: Array = config.get("anchors", [])
+	var anchors := _set_in_rock(template, config.get("anchors", []))
 	var style := str(config.get("style", "dwarven"))
 	var old := style == "old"
 	var map := template.copy()
@@ -184,6 +184,52 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
 	map.extras["paths"] = paths
 	return map
+
+
+## [param anchors] as the carving sees them: beside a niche-sized anchor
+## (NICHE_MOST cells a side at most: the barrow's niche, "a niche in the
+## wall", the lost runner's place), each cell of its ring not on an open
+## side (a side whose edges are all walled) stays rock, a 1 x 1 anchor of
+## the template's rock, so no way is carved round it and it stays set in the
+## rock with only its mouth on the way (Jeff: "barrows still had some odd
+## shaped rooms like a single file hallway around a room with a door"). The
+## level's own anchors (Regen's) are as they were.
+static func _set_in_rock(template: LevelMap, anchors: Array) -> Array:
+	var out: Array = anchors.duplicate()
+	for anchor: Variant in anchors:
+		if not anchor is Dictionary:
+			continue
+		var rect: Rect2i = anchor["rect"]
+		if rect.size.x > NICHE_MOST or rect.size.y > NICHE_MOST:
+			continue
+		var open := _open_sides(template, rect)
+		for cell in Level.rect_cells(rect.grow(1)):
+			if rect.has_point(cell):
+				continue
+			var side := Vector2i(signi(cell.x - clampi(cell.x, rect.position.x, rect.end.x - 1)),
+				signi(cell.y - clampi(cell.y, rect.position.y, rect.end.y - 1)))
+			if (side.x == 0 or side.y == 0) and open.has(side):
+				continue  # Its mouth: the way comes up to it.
+			out.append({"rect": Rect2i(cell, Vector2i.ONE), "name": ""})
+	return out
+
+
+## How many cells a side an anchor is at most to be set in the rock
+## (_set_in_rock): a niche, never a hall.
+const NICHE_MOST := 2
+
+
+## The sides of [param rect] (unit steps) where any walkable cell of it on
+## [param template] faces out through an edge that is not a wall.
+static func _open_sides(template: LevelMap, rect: Rect2i) -> Dictionary:
+	var open := {}
+	for cell in Level.rect_cells(rect):
+		if not template.walkable(cell):
+			continue
+		for direction in DIRECTIONS:
+			if not rect.has_point(cell + direction) and template.edge(Terrain.edge_key(cell, direction)) != "wall":
+				open[direction] = true
+	return open
 
 
 ## The cells inside a tower's outline (659) for a level [param size] cells:

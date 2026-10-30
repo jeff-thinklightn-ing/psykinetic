@@ -35734,3 +35734,29 @@ or play knucklebones, by the fire of a camp they have cleared and stand in,
 but never one that can refill. The town-only deeds (leisure) are unchanged.
 companion_test: a held camp is safe ground, one not held is not. Server only,
 protocol unchanged, no new class_name.
+
+## 741: a niche-sized anchor stays set in the rock
+
+Jeff on v0.1.192: "barrows still had some odd shaped rooms like a single
+file hallway around a room with a door". The barrow's "niche" anchor (2 x
+2, the lost runner's place, "a niche in the wall": walled on three sides,
+its mouth east) was kept as the template has it, but the ways were carved
+round it (path_around, the brush, the widening and 725's clearing), so it
+stood free in the floor with a cell of way beside its walls; the anchor
+excused it from the two-cell check (Tools.pinches).
+
+Labyrinth.generate now carves against _set_in_rock(template, anchors):
+beside an anchor of NICHE_MOST (2) cells a side at most, each cell of its
+ring not on an open side (_open_sides: a side some cell faces out of
+through an edge that is not a wall) is added as a 1 x 1 anchor of the
+template's rock, so nothing is carved there and only its mouth meets the
+way. Larger anchors (halls, rooms) are as before. The level's own anchors
+(Regen's, kept things, Holdings' places) are unchanged; generation runs on
+the authority alone, so it reaches the box server only, the barrow's next
+generation.
+
+labyrinth_test _test_set_in_rock: 20 generations of lab_barrow, the
+niche's four cells kept, its mouth cells floor, no floor round it else; the
+two-cell checks (725) hold. Sheets: C:/dev/review/genfix/ring_before_* and
+ring_after_barrow_g1..3, ring_niche_before_after_g1. Server only, protocol
+unchanged, no new class_name.
