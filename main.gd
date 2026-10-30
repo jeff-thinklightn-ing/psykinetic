@@ -15634,6 +15634,9 @@ func search(player: Player, chest: Chest) -> bool:
 	var tell := func(text: String) -> void:
 		if player.owner_peer != 0:
 			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text})
+	var camp: Dictionary = _camp_rules()
+	if not camp.is_empty() and chest.cache == str(camp.get("cache", "")):
+		return _search_camp(player, chest, camp, tell)
 	if chest.cache in record.caches:
 		tell.call("Nothing more here.")
 		return false
@@ -15655,6 +15658,38 @@ func search(player: Player, chest: Chest) -> bool:
 	print("[cache] %s searched %s at %s: %s" % [player.name, chest.cache, place, ", ".join(words)])
 	tell.call("You find in %s: %s." % [place, ", ".join(words)] if not words.is_empty() else "Nothing here.")
 	return not found.is_empty()
+
+
+## The robbers' camp chest's rules (742): economy.json "robbers" "camp",
+## {cache, gold, every_s}; {} without them.
+func _camp_rules() -> Dictionary:
+	var rules: Variant = Production.read_rules().get("robbers", {}).get("camp", {})
+	return rules if rules is Dictionary else {}
+
+
+## The World.tick each player last took the camp chest's gold (742), by
+## player id: not saved (a restart fills it again for everyone).
+var _camp_taken: Dictionary[String, int] = {}
+
+
+## [param player] searches the robbers' camp chest [param chest] (742; Jeff:
+## "have them respawn on a 5 min timer"): camp's gold straight into their
+## purse (World.add_gold), once each camp's every_s real seconds per player;
+## sooner, it is empty, and they are told how long. True if gold was found.
+func _search_camp(player: Player, chest: Chest, camp: Dictionary, tell: Callable) -> bool:
+	var id := str(player.player_id)
+	var every := int(camp.get("every_s", 300)) * World.TICK_RATE
+	if _camp_taken.has(id) and World.tick - _camp_taken[id] < every:
+		var left := ceili(float(every - (World.tick - _camp_taken[id])) / World.TICK_RATE / 60.0)
+		tell.call("Empty. The robbers will fill it again (about %d min)." % maxi(left, 1))
+		return false
+	var gold := int(camp.get("gold", 25))
+	_camp_taken[id] = World.tick
+	World.add_gold(id, gold, "the robbers' camp chest")
+	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
+	print("[cache] %s took %d gold from %s" % [player.name, gold, place])
+	tell.call("You find %d gold in %s." % [gold, place])
+	return true
 
 
 ## Opens [param target]'s row (a chest, or a companion's pack), with its sound.

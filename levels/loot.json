@@ -14,6 +14,7 @@
 			{"item": "bow", "chance": 0.2},
 			{"item": "arrows", "chance": 0.2}
 		],
+		"robbers_camp": [],
 		"farmstead_cache": [
 			{"item": "bandaging_kit", "count": [2, 2]},
 			{"item": "knife"},

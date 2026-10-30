@@ -35936,3 +35936,37 @@ resident_test `_test_vendor`: his body by the store and no worker, the
 greeting, typed words skipping him, every ware at the price, no gold
 meaning nothing given, a purchase paid with the sword in hand marked
 starter, and no body outside vendor.towns. Server only; protocol unchanged.
+
+## 742: the robbers' camp chest, gold every five minutes
+
+Jeff on barrow-reset.md: "none, have it spawn more often, its exposition -
+it doesnt impact balance - have them respawn on a 5 min timer - the game is
+in pre-alpha, there doesn't need to be enforce scarcity". The coordinator's
+reading: the barrow's contents come back on a 5-minute real timer, the
+layout keeps its every_days.
+
+The barrow's camp (anchor "camp") holds the Robbers' chest at (14, 43):
+levels/barrow/level.json's entity and a chest marker in its layout, props
+{"cache": "robbers_camp", "cache_place": "the robbers' chest"}, a cache
+(599) whose table, levels/loot.json "robbers_camp", is empty. economy.json
+"robbers" "camp" {cache, gold 25, every_s 300}, one tuning value each.
+Main.search hands a search on that cache to _search_camp: the gold straight
+into the opener's purse (World.add_gold, "the robbers' camp chest"; Jeff:
+gold to the count, not a pack slot), once per player every every_s real
+seconds (Main._camp_taken, World.tick; not saved, so a restart fills it for
+all); sooner, "Empty. The robbers will fill it again (about N min)." Its
+slots stay empty; PlayerRecord.caches is not written.
+
+Already so, nothing changed: the robbers respawn at 300 s (barrow
+respawn_s); every draugr win gives the knight's relic and the amulet to
+one without (barrow_won); the knight stays per generation. Enemy-ai's: the
+named band's rise, the Sledge's trophy_due and the draugr's rest
+(RISE_DAYS) to five minutes.
+
+A v0.1.192 client draws the camp chest from the server's snapshot (its
+props with it) without the new level.json: the barrow is generated and sent
+by the server. Server only, protocol unchanged, no new class_name.
+
+level_test _test_camp_chest: the rule and the placed chest, no level
+warning; searched, 25 gold and nothing in its slots; again at once, empty;
+five minutes on, 25 more. The barrow's entity count (now 5) updated.

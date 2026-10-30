@@ -64,6 +64,7 @@ func _ready() -> void:
 	await _test_hall_door()
 	await _test_hidden_niche()
 	_test_double_doors()
+	_test_camp_chest()
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
@@ -2315,8 +2316,9 @@ func _test_barrow_level() -> void:
 			if kind == "skeleton_guard" and marked:
 				guards_marked += 1
 	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1
-		and barrow["places"].has("niche") and barrow["entities"].size() == 4 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
-		"the altar with its two guards, Pip's niche and the Runner's pack on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
+		and kinds.get("robbers' chest", 0) == 1
+		and barrow["places"].has("niche") and barrow["entities"].size() == 5 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
+		"the altar with its two guards, Pip's niche, the Runner's pack and the robbers' chest (742) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
 	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
 	_check(barrow["links"].size() == 2 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
@@ -2678,6 +2680,57 @@ func _walk_free(player: Player, to: Vector2i) -> void:
 				break
 			World.free_input(player, way.normalized() if way.length() > 0.4 else way / 0.4, World.TICK_DT)
 			World.step()
+
+
+## 742 (Jeff: "have them respawn on a 5 min timer - the game is in
+## pre-alpha, there doesn't need to be enforce scarcity"): the barrow's camp
+## holds the robbers' chest, a cache whose search puts economy's camp gold
+## into the purse, once per player each every_s; sooner, empty.
+func _test_camp_chest() -> void:
+	print("
+== the robbers' camp chest (742) ==")
+	var camp: Dictionary = _main._camp_rules()
+	var barrow := Level.load_level("barrow")
+	var placed := (barrow.get("entities", []) as Array).filter(func(spec: Dictionary) -> bool:
+		return spec.get("tile") == Vector2i(14, 43) and spec.get("props", {}).get("cache") == "robbers_camp")
+	_check(int(camp.get("gold", 0)) == 25 and int(camp.get("every_s", 0)) == 300 and camp.get("cache") == "robbers_camp" and placed.size() == 1
+		and not (barrow.get("warnings", []) as Array).any(func(w: String) -> bool: return "robbers_camp" in w),
+		"economy's camp rule (25 gold, 300 s) and the chest in the barrow's camp, its table known (%s)" % [camp])
+	var player := _player()
+	if player == null:
+		_check(false, "a player to search with")
+		return
+	var beside := Vector2i(-1, -1)
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_free(player.tile + step):
+			beside = player.tile + step
+			break
+	if beside == Vector2i(-1, -1):
+		print("  (no free cell beside the player: skipped)")
+		return
+	var chest := _main._spawn({"script": Level.CHEST, "shape": "cube", "name": "CampChestTest", "tile": beside,
+		"props": {"cache": "robbers_camp", "cache_place": "the robbers' chest"}}) as Chest
+	if chest == null:
+		_check(false, "a camp chest spawned beside the player")
+		return
+	var id := str(player.player_id)
+	var had_taken: Variant = _main._camp_taken.get(id)
+	_main._camp_taken.erase(id)
+	var gold_was := World.gold_of(id)
+	var first: bool = _main.search(player, chest)
+	var after_first := World.gold_of(id)
+	var again: bool = _main.search(player, chest)
+	_check(first and after_first == gold_was + 25 and not again and World.gold_of(id) == after_first
+		and (chest.slots as Array).all(func(each: Variant) -> bool: return str(each).is_empty() or int(each) == 0),
+		"searched: 25 gold to the purse, nothing in its slots; at once again, empty (%d -> %d -> %d)" % [gold_was, after_first, World.gold_of(id)])
+	_main._camp_taken[id] -= 300 * World.TICK_RATE
+	_check(_main.search(player, chest) and World.gold_of(id) == after_first + 25, "five minutes on, full again: 25 more")
+	World.add_gold(id, gold_was - World.gold_of(id), "test")
+	if had_taken == null:
+		_main._camp_taken.erase(id)
+	else:
+		_main._camp_taken[id] = had_taken
+	World.despawn(chest)
 
 
 func _player() -> Player:

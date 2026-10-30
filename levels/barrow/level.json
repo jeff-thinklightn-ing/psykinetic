@@ -232,6 +232,17 @@
 					""
 				]
 			}
+		},
+		{
+			"at": [
+				14,
+				43
+			],
+			"name": "Robbers' chest",
+			"props": {
+				"cache": "robbers_camp",
+				"cache_place": "the robbers' chest"
+			}
 		}
 	],
 	"regenerate": {
