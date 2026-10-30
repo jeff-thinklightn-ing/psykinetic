@@ -144,6 +144,16 @@ func _test_noises_are_the_sims() -> void:
 	_check(SoundKit.takes("sfx.block_weapon").size() == 1
 			and str(SoundKit.takes("sfx.block_weapon")[0].get("original", "")).begins_with("freesound 733887"),
 			"the parry's take: one, the same recording, re-cut under full scale (732)")
+	var draugr := Draugr.new()
+	var other := Monster.new()
+	_check(SoundKit.speech(draugr, Draugr.REFUSED) == "voice.draugr_laugh" and SoundKit.speech(draugr, Draugr.WON) == ""
+			and SoundKit.speech(other, Draugr.REFUSED) == "" and SoundKit.speech(null, Draugr.REFUSED) == "",
+			"the draugr laughs on his refusal line alone; anyone else's speech is silent (735)")
+	draugr.free()
+	other.free()
+	_check(SoundKit.positional("voice.draugr_laugh") and SoundKit.takes("voice.draugr_laugh").size() == 3
+			and not SoundKit.spec("voice.draugr_laugh").has("fallback"),
+			"his laugh: placed at him, three takes, silent untaken (735)")
 	_check(SoundKit.swing("giant_axe") == "sfx.swing_heavy" and SoundKit.swing("sword") == "sfx.swing" and SoundKit.swing("") == "sfx.swing"
 			and SoundKit.swing("bow") == "sfx.swing", "a two-handed weapon swings heavy; a bow is no club")
 	# 662: a blade drawn and sheathed, any other piece taken up and stowed; every slot real.

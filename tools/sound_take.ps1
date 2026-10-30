@@ -1,6 +1,6 @@
 # Adds a take to a sound slot from a third-party file (decision 268).
 #   tools\sound_take.ps1 -Slot sfx.door_wood_open -From sonniss-gdc-2024 -Source <file> [-Original <text>]
-#                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>] [-License <name>] [-PeakDb -3] [-FadeOut 0.1]
+#                        [-Start 1.2] [-Length 0.8] [-By <author>] [-Url <page>] [-License <name>] [-PeakDb -3] [-FadeOut 0.1] [-Rate 0.9]
 #
 # Cuts -Source (any format ffmpeg reads; -Start and -Length in seconds), trims silence off
 # both ends of a one-shot, raises or lowers it to peak at -PeakDb dBFS if given (a quiet source), makes a loop or bed seamless (its end cross-faded into its
@@ -31,6 +31,9 @@ param(
 	# A one-shot cut out of a longer sound (-Length) fades to nothing over its last this many
 	# seconds, so it ends before the source's ring or tail rather than on a step (732).
 	[double]$FadeOut = 0,
+	# Played at this share of its speed, slower and lower together (0.9: a tenth slower and
+	# about two semitones down), for a voice that shouldn't read as a plain man's (735).
+	[double]$Rate = 1,
 	[string]$Library = $(if ($env:PSYK_SOUND_DIR) { $env:PSYK_SOUND_DIR } else { 'N:\assets\sound' }),
 	[int]$TimeoutSeconds = 10
 )
@@ -82,10 +85,18 @@ if (Test-Path -LiteralPath $out) { Fail "$out is there already but takes.json do
 New-Item -ItemType Directory -Force $folder | Out-Null
 
 # Cut, trim, encode.
+$slow = ''
+if ($Rate -ne 1) {
+	if ($Rate -le 0) { Fail '-Rate must be above 0' }
+	if ($spec.type -ne 'oneshot') { Fail '-Rate is for a one-shot' }
+	$hz = [double](& ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 $Source)
+	$slow = "asetrate=$([math]::Round($hz * $Rate)),aresample=44100,"
+}
 $ffmpegArgs = @('-loglevel', 'error', '-y')
 if ($Start -ge 0) { $ffmpegArgs += @('-ss', "$Start") }
 $ffmpegArgs += @('-i', $Source)
-if ($Length -gt 0) { $ffmpegArgs += @('-t', "$Length") }
+# The output's length: slowed (-Rate), the cut lasts longer.
+if ($Length -gt 0) { $ffmpegArgs += @('-t', "$($Length / $Rate)") }
 # A gain to peak at -PeakDb: the cut's loudest sample measured first.
 $gain = ''
 if ($PeakDb -lt 0) {
@@ -112,7 +123,7 @@ if ($spec.type -eq 'oneshot') {
 		if ($Length -le 0) { Fail '-FadeOut needs -Length' }
 		$fade = "afade=t=out:st=$([math]::Max(0.0, $Length - $FadeOut)):d=$FadeOut,"
 	}
-	$ffmpegArgs += @('-af', "$fade$trim,areverse,$trim,areverse$gain")
+	$ffmpegArgs += @('-af', "$fade$slow$trim,areverse,$trim,areverse$gain")
 } else {
 	# A loop or a bed loops without a seam: its last LoopFade seconds fade out
 	# over its first fading in, and it ends where that overlap began.
@@ -137,6 +148,7 @@ if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $out)) { Fail "ffmpeg c
 $hash = (Get-FileHash -LiteralPath $out -Algorithm SHA256).Hash.ToLower()
 if (-not $Original) { $Original = Split-Path $Source -Leaf }
 if ($Start -ge 0 -or $Length -gt 0) { $Original += " (from $([math]::Max($Start, 0)) s$(if ($Length -gt 0) { " for $Length s" }))" }
+if ($Rate -ne 1) { $Original += " at $Rate speed" }
 
 $godot = if ($env:GODOT_PATH) { $env:GODOT_PATH } else { 'godot' }
 if ($godot -match '\.exe$' -and $godot -notmatch '_console\.exe$') {

@@ -1174,6 +1174,14 @@
 			"volume_db": 0.0,
 			"uses": "a female last breath, bleeding out (628); a female-bodied player's or companion's fall while downed, in place of the cry (Client3D._fall)"
 		},
+		"voice.draugr_laugh": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "the draugr's low, dry laugh as he attacks on a refusal (735; Jeff: he \"laughs as he attacks you\"), at his body when his speech is Draugr.REFUSED; 1 to 2 s, no ring, a tail under 0.5 s; no fallback, so it is silent untaken"
+		},
 		"ui.click": {
 			"category": "ui",
 			"type": "oneshot",

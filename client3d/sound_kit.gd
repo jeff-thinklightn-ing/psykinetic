@@ -366,6 +366,14 @@ static func voice(entity: Object, what: String, body := &"") -> String:
 	return ""
 
 
+## The slot a line of speech (the "speech" message) sounds as it is shown, ""
+## for none: the draugr laughs as he turns on a refusal (735; Jeff: he "laughs
+## as he attacks you"). The line is his own constant, so the server and this
+## build agree; an older server's reworded line just goes unlaughed.
+static func speech(entity: Object, text: String) -> String:
+	return "voice.draugr_laugh" if entity is Draugr and text == Draugr.REFUSED else ""
+
+
 ## A cry (Monster.cried) -> the part of its slot's name after the creature;
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}

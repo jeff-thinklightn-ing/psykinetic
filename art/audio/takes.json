@@ -2033,6 +2033,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"voice.draugr_laugh": [
+			{
+				"file": "voice.draugr_laugh.ogg",
+				"from": "freesound",
+				"original": "freesound 400503: EvilManLaugh.wav (from 1.8 s for 1.75 s) at 0.9 speed",
+				"sha256": "05b7e65a040f530c84e9707b83fa595edc8fc6c0244424c7d30b2c60e2a2f2fc",
+				"by": "bbakersvoice",
+				"url": "https://freesound.org/people/bbakersvoice/sounds/400503/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.draugr_laugh.2.ogg",
+				"from": "freesound",
+				"original": "freesound 362330: Evil Laugh (from 0.6 s for 1.7 s) at 0.9 speed",
+				"sha256": "80e19abcdf09617cd4f8b0701085336b8592060d72ed1a770d87f186735eed00",
+				"by": "balloonhead",
+				"url": "https://freesound.org/people/balloonhead/sounds/362330/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.draugr_laugh.3.ogg",
+				"from": "freesound",
+				"original": "freesound 500028: Monster Laughing (from 0.1 s for 1.6 s) at 0.9 speed",
+				"sha256": "9e55a55d4471b083ff073c9c35d91acfdf25f16263bf984f6414e12ef5f960be",
+				"by": "danlucaz",
+				"url": "https://freesound.org/people/danlucaz/sounds/500028/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.effort_hurt_female": [
 			{
 				"file": "voice.effort_hurt_female.ogg",

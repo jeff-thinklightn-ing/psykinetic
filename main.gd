@@ -11920,6 +11920,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
 		if entity != null:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
+			var said := SoundKit.speech(entity, str(data.get("text", "")))
+			if said != "" and _client3d != null:
+				_client3d.play_at(said, entity)  # The draugr's laugh as he turns on you (735).
 	if kind == "offers":
 		_on_offers_message(data)
 		return

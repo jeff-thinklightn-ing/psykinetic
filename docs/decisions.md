@@ -35691,3 +35691,33 @@ of its wares and no gold refused; a starter sword at the counter refused.
 Server only, protocol unchanged, no new class_name. npc's side (the keeper
 and the wares panel) and buildings' side (the stall in Umbrage's square)
 follow as "736, npc's side" and "736, buildings' side".
+
+## 735, sound's side: the draugr laughs as he attacks on a refusal (voice.draugr_laugh)
+
+Jeff: the draugr "laughs as he attacks you" when you refuse him. The coordinator approved a
+slot, my picks landed for Jeff to judge in play: 1 to 2 s, low and undead, no high ring, a tail
+under 0.5 s.
+
+- The cue rides the "speech" message, no protocol change. No sim event reaches the client
+  (World.noise is the server's hearing), and a new message for one laugh would bump the
+  protocol. His refusal is already broadcast as speech (Main._say_plain: the entity's path and
+  the text), so the client laughs when it shows that line: SoundKit.speech(entity, text) gives
+  voice.draugr_laugh for a Draugr whose text is Draugr.REFUSED, "" for anything else, and
+  Main's "speech" branch plays it at his drawn body (Client3D.play_at). Both sides read the same
+  constant, so a rewording moves them together; an older client, or a server from before the
+  line, just doesn't laugh.
+- voice.draugr_laugh: a positional one-shot on the voice bus, no fallback (silent untaken).
+  Three CC0 Freesound takes, each the laugh alone with a fade over its last 0.15 to 0.2 s, at
+  0.9 speed (a tenth slower and about two semitones lower) so it isn't a plain man's:
+  bbakersvoice's EvilManLaugh (400503, four slow "ha"s), balloonhead's Evil Laugh (362330, a
+  rhythmic cackle), danlucaz's Monster Laughing (500028, a rolling laugh). Measured: 1.7 to
+  1.9 s, voiced at about 80 to 95 Hz, peaks -4.1 to -0.5 dBFS, under 0.5% of the energy above
+  4 kHz and no line there lasting; all three are dry recordings, so the tail is the fade.
+  Left out: AquantiuM's (659228, a reverb tail of about 2 s) and the higher voices (AgentA1cr's
+  559107, about 270 Hz; the goblin and imp laughs).
+- tools/sound_take.ps1 -Rate r: a one-shot played at r of its speed (slower and lower), its
+  -Length still the source's seconds; the take's "original" says the speed.
+- sound_kit_test: the refusal line alone laughs, only a draugr's; the slot's takes and no
+  fallback. Listening files: C:/dev/review/sound/draugr_laugh.
+
+Client only; protocol unchanged; no new class_name.
