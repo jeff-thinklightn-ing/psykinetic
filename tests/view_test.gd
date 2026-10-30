@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_draw_pull()
 	_test_low_scatter()
 	_test_horizon()
+	_test_sky()
 	await _test_far_restart()
 	await _test_low_pick()
 	await _test_reach_ease()
@@ -5003,6 +5004,63 @@ func _test_outdoor() -> void:
 ## at its inner edge and up to the treetops and a ridge beyond, shown only
 ## while the camera is low; the ground's far meadow on with it; off, both
 ## gone; under stone, no skirt.
+## The sky (decision 744): the sun's disc where DayNight has the sun (not
+## the shadows' lifted light), the moon opposite with its phase, the stars
+## by night only and none in fog, and the cloud layer under the weather's
+## cloud, drifting as the shadows do.
+func _test_sky() -> void:
+	print("\n== the sky: sun, moon, stars, clouds ==")
+	var hour_was := DayNight.hour(DayNight.now())
+	var weather_was: Dictionary = World.fields.weather.duplicate()
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var sky: ShaderMaterial = _rig._sky_material
+	_check(sky != null, "outdoors the sky is the sky shader")
+	if sky == null:
+		return
+	var show := func(hour: float, kind: String) -> void:
+		DayNight.set_hour(hour)
+		World.fields.weather = Weather.KINDS[kind].duplicate()
+		World.fields.weather["wind_dir"] = Vector2.RIGHT
+		World.fields.weather["snow"] = 0.0
+		_rig._weather_view.weather = World.fields.weather.duplicate()
+		_rig._sky_step = -1
+		_rig._update_sky(0.0)
+	show.call(12.0, "clear")
+	var toward: Vector3 = sky.get_shader_parameter("sun_direction")
+	var fraction := float(_rig._sky_step) / Client3D.SKY_STEPS
+	_check(sky.shader == Client3D.SKY_SHADER and toward.is_equal_approx(_rig._level_direction(DayNight.sun_at(fraction)).normalized())
+			and toward.y > 0.5 and (sky.get_shader_parameter("sun_color") as Color).a > 0.99,
+			"noon: the sun's disc high, where DayNight has it, shown (%.2f up)" % toward.y)
+	_check(float(sky.get_shader_parameter("stars")) == 0.0 and (sky.get_shader_parameter("moon_direction") as Vector3).is_equal_approx(-toward)
+			and float(sky.get_shader_parameter("cloud_cover")) == 0.0,
+			"no stars by day; the moon opposite the sun; a clear sky has no clouds")
+	show.call(0.0, "clear")
+	_check(float(sky.get_shader_parameter("stars")) > 0.99 and (sky.get_shader_parameter("sun_color") as Color).a == 0.0
+			and (sky.get_shader_parameter("moon_color") as Color).a > 0.9,
+			"midnight: the stars out, the sun down, the moon up")
+	show.call(0.0, "fog")
+	_check(float(sky.get_shader_parameter("stars")) < 0.2 and (sky.get_shader_parameter("moon_color") as Color).a < 0.2,
+			"in fog the stars and the moon are hidden")
+	show.call(12.0, "storm")
+	var dark: Color = sky.get_shader_parameter("cloud_color")
+	show.call(12.0, "overcast")
+	var grey: Color = sky.get_shader_parameter("cloud_color")
+	_check(is_equal_approx(float(sky.get_shader_parameter("cloud_cover")), Weather.KINDS["overcast"]["cloud"]) and dark.v < grey.v
+			and (sky.get_shader_parameter("cloud_drift") as Vector2) == _rig._weather_view.drift()
+			and sky.get_shader_parameter("cloud_noise") == _rig._weather_view.sky_noise(),
+			"the clouds as the weather's cloud, darker in a storm, drifting with the shadows, from the shadows' noise")
+	var day := float(DayNight.day_steps)
+	_check(is_equal_approx(Client3D.moon_phase(0.0), Client3D.MOON_START) and is_zero_approx(Client3D.moon_phase(day * Client3D.MOON_DAYS * 0.5))
+			and is_equal_approx(Client3D.moon_phase(day * Client3D.MOON_DAYS), Client3D.MOON_START),
+			"a new world's moon full, new half of MOON_DAYS on, full again after MOON_DAYS")
+	DayNight.set_hour(hour_was)
+	World.fields.weather = weather_was
+	_rig._weather_view.weather = weather_was.duplicate()
+	_rig._sky_step = -1
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 func _test_horizon() -> void:
 	print("\n== the horizon under the low camera: the forest's skirt, the far meadow ==")
 	var low_was := Net.camera_low
@@ -5034,14 +5092,16 @@ func _test_horizon() -> void:
 	_check(is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 1.0)
 			and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_from")), _rig.scatter_reach_low - Client3D.FAR_MEADOW_FADE * 0.5),
 			"the far meadow on, from the scatter's reach")
-	var sky: ProceduralSkyMaterial = _rig._sky_material
-	_check(sky != null and sky.ground_horizon_color == sky.sky_horizon_color and sky.ground_bottom_color == Client3D.FOREST_FLOOR
-			and is_equal_approx(sky.ground_curve, Client3D.LOW_SKY_GROUND_CURVE),
+	var sky: ShaderMaterial = _rig._sky_material
+	_check(sky != null and sky.get_shader_parameter("ground_horizon_color") == sky.get_shader_parameter("sky_horizon_color")
+			and sky.get_shader_parameter("sky_horizon_color") == _rig._sky_horizon and sky.get_shader_parameter("ground_bottom_color") == Client3D.FOREST_FLOOR
+			and is_equal_approx(float(sky.get_shader_parameter("ground_curve")), Client3D.LOW_SKY_GROUND_CURVE),
 			"the sky just below the horizon the haze's colour (no forest floor band under the skyline), the rest the forest floor")
 	Net.set_camera_low(false, false)
 	_rig._apply_camera_mode()
 	_check(skirt != null and not skirt.visible and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 0.0)
-			and sky.ground_horizon_color == Client3D.FOREST_FLOOR.lightened(0.2) and is_equal_approx(sky.ground_curve, Client3D.SKY_GROUND_CURVE),
+			and sky.get_shader_parameter("ground_horizon_color") == Client3D.FOREST_FLOOR.lightened(0.2)
+			and is_equal_approx(float(sky.get_shader_parameter("ground_curve")), Client3D.SKY_GROUND_CURVE),
 			"the camera high: the skirt hidden, the far meadow off, the sky's ground the forest floor's again")
 	Net.set_camera_low(true, false)
 	var barrow := Level.load_level("barrow")

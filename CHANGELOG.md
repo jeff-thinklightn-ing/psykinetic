@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The sky has a sun, a moon that waxes and wanes over eight days, stars at night and clouds that follow the weather: see them along the top of the view at sunrise and sunset, and in the water's reflections (744).
 - Townsfolk have heard that the Mound-breakers stash their take in a chest at their camp, and that whoever refuses the draugr's bargain must fight him for it.
 - Rolf stands behind the counter of his market stall once Umbrage's stall is up, and by the store until then (736, npc's side).
 - The barrow comes back in 5 minutes (714 amended (2)): the named robbers rise 5 minutes after they fall, Brand the Ox has a new Tomb Sledge 5 minutes after one is won, and the draugr rests 5 minutes, not 3 days, once beaten.

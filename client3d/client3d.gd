@@ -465,7 +465,7 @@ const LOW_FAR := 300.0
 const LOW_FOG := 0.012
 const LOW_AERIAL := 0.6
 ## How far below the horizon the sky's ground stays the haze's colour under
-## the low camera (ProceduralSkyMaterial.ground_curve): the sliver past
+## the low camera (the sky shader's ground_curve, as ProceduralSky's): the sliver past
 ## LOW_FAR, a few degrees, about 70% haze; the rest the forest floor, so the
 ## reflections it lights stay as with the camera high (SKY_GROUND_CURVE,
 ## Godot's default).
@@ -528,6 +528,7 @@ const RIDGE_PITCH_MAX := 70.0
 ## (sight.gdshaderinc), eased in and out over this long (s), as a wall fades.
 const SIGHT_EASE := 0.25
 const CLIFF_SHADER := preload("res://client3d/cliff.gdshader")
+const SKY_SHADER := preload("res://client3d/sky.gdshader")
 ## Picking on the drawn ground: how far apart (m, across) the ray is tried.
 const PICK_STEP := 0.2
 const CAMERA_DISTANCE := 40.0
@@ -732,6 +733,26 @@ const FOG_HEIGHT := 2.5
 const FOG_HEIGHT_DENSITY := 0.22
 ## Under this height (degrees) the light is the moon's, opposite the sun.
 const MOON_BELOW := -1.0
+## The sky's bodies (decision 744, sky.gdshader): the sun's disc and glow
+## (radians: the disc about twice the true sun's, so it reads at the
+## horizon), the moon's disc and colour, and its phase's round in game days
+## (MOON_DAYS, the coordinator's call); the stars' brightness at full night.
+const SUN_DISC := 0.02
+const SUN_GLOW := 0.4
+const MOON_DISC := 0.03
+const MOON_COLOUR := Color(0.85, 0.88, 1.0)
+const MOON_DAYS := 8.0
+## Where in its round the moon stands at world step 0: full, so a new
+## world's first night has a moon to see.
+const MOON_START := 0.5
+const STARS := 1.0
+## The sky's cloud layer: the shadows' noise (WeatherView.sky_noise) over
+## SKY_CLOUD_SCALE of their period (at the shadows' own period a cloud
+## overhead would be a few metres across), SKY_CLOUD_HEIGHT up, drifting as
+## they do; rain darkens it by SKY_CLOUD_RAIN.
+const SKY_CLOUD_SCALE := 4.0
+const SKY_CLOUD_HEIGHT := 120.0
+const SKY_CLOUD_RAIN := 0.45
 ## Shadows are cast from a sun lifted toward the zenith (shadow_elevation):
 ## from SHADOW_LOW (degrees) at the horizon, so even the first and last
 ## hour's are under one and a half times what casts them, to SHADOW_HIGH
@@ -2018,7 +2039,10 @@ var _lamp_lights: Array[Array] = []
 var _fire_time := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
-var _sky_material: ProceduralSkyMaterial
+var _sky_material: ShaderMaterial
+## The sky's horizon colour as last set (the haze's under the low camera):
+## the sky shader's, the ground's sliver under it and the far landmarks' fade.
+var _sky_horizon := SKY_HORIZON
 var _sky_step := -1
 ## The sky's look at that step (sky_look), before the weather; the light
 ## by day there (0..1); the weather drawn (decision 309).
@@ -2510,9 +2534,16 @@ func _apply_sky() -> void:
 	_set_sky_floor(0.0)
 	_weather_view.set_outdoor(_outdoor)
 	if _outdoor:
-		_sky_material = ProceduralSkyMaterial.new()
-		_sky_material.ground_horizon_color = FOREST_FLOOR.lightened(0.2)
-		_sky_material.ground_bottom_color = FOREST_FLOOR
+		_sky_material = ShaderMaterial.new()
+		_sky_material.shader = SKY_SHADER
+		_sky_material.set_shader_parameter("ground_horizon_color", FOREST_FLOOR.lightened(0.2))
+		_sky_material.set_shader_parameter("ground_bottom_color", FOREST_FLOOR)
+		_sky_material.set_shader_parameter("cloud_noise", _weather_view.sky_noise())
+		_sky_material.set_shader_parameter("cloud_period", WeatherView.CLOUD_PERIOD * SKY_CLOUD_SCALE)
+		_sky_material.set_shader_parameter("cloud_height", SKY_CLOUD_HEIGHT)
+		_sky_material.set_shader_parameter("sun_size", SUN_DISC)
+		_sky_material.set_shader_parameter("sun_glow", SUN_GLOW)
+		_sky_material.set_shader_parameter("moon_size", MOON_DISC)
 		var sky := Sky.new()
 		sky.sky_material = _sky_material
 		_environment.sky = sky
@@ -2646,16 +2677,18 @@ func _update_sky(delta: float) -> void:
 	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather),
 			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)
 	_look["weather_fog"] = look["fog"]
-	_sky_material.sky_top_color = look["top"]
-	_sky_material.sky_horizon_color = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
+	_sky_horizon = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
+	_sky_material.set_shader_parameter("sky_top_color", look["top"])
+	_sky_material.set_shader_parameter("sky_horizon_color", _sky_horizon)
 	# Under the low camera the sky shows below the horizon past LOW_FAR, and
 	# the fog never reaches it: the haze's colour there, not the forest floor's
 	# band under the skyline (623, terrain's side). Only that sliver: the ground
 	# half turns back to the forest floor within LOW_SKY_GROUND_CURVE, as the
 	# sky's lower half lights everything's reflections, and all of it hazed
 	# washed the land out.
-	_sky_material.ground_horizon_color = _sky_material.sky_horizon_color if _low else FOREST_FLOOR.lightened(0.2)
-	_sky_material.ground_curve = LOW_SKY_GROUND_CURVE if _low else SKY_GROUND_CURVE
+	_sky_material.set_shader_parameter("ground_horizon_color", _sky_horizon if _low else FOREST_FLOOR.lightened(0.2))
+	_sky_material.set_shader_parameter("ground_curve", LOW_SKY_GROUND_CURVE if _low else SKY_GROUND_CURVE)
+	_set_sky_bodies(look)
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
 	_environment.fog_light_color = look["fog"]
@@ -2673,6 +2706,48 @@ func _update_sky(delta: float) -> void:
 	var roof := DayNight.NIGHT + (day - DayNight.NIGHT) * share * (1.0 - World.fields.canopy_shade)
 	var lit := bool(_terrain.get("daylight", false))
 	_set_sky_floor(floor_brightness(light) if lit else 0.0, floor_brightness(roof) if lit else 0.0)
+
+
+## The sun, the moon, the stars and the clouds on the sky (decision 744),
+## from the clock's step and the weather drawn, with the [param look] as
+## weathered: the sun where it stands (not the shadows' lifted light), the
+## moon opposite with its phase (moon_phase) lit on the side the sun set
+## while it waxes, where it will rise as it wanes; both and the stars faded
+## by day and in fog. The clouds' layer follows the weather's cloud.
+func _set_sky_bodies(look: Dictionary) -> void:
+	var weather := _weather_view.weather
+	var fog := float(weather.get("fog", 0.0))
+	var fraction := float(_sky_step) / SKY_STEPS
+	var toward_sun := _level_direction(DayNight.sun_at(fraction)).normalized()
+	var clear := 1.0 - fog
+	_sky_material.set_shader_parameter("sun_direction", toward_sun)
+	var sun_colour: Color = look["light"]
+	sun_colour.a = smoothstep(-0.02, 0.02, toward_sun.y) * clear
+	_sky_material.set_shader_parameter("sun_color", sun_colour)
+	var phase := moon_phase(DayNight.now())
+	var toward_moon := -toward_sun
+	var west := _level_direction(Vector3(-1.0, 0.0, 0.0))
+	var lit := (west - toward_moon * west.dot(toward_moon)).normalized()
+	_sky_material.set_shader_parameter("moon_direction", toward_moon)
+	_sky_material.set_shader_parameter("moon_lit", lit if phase < 0.5 else -lit)
+	_sky_material.set_shader_parameter("moon_terminator", cos(phase * TAU))
+	var moon := MOON_COLOUR
+	moon.a = (1.0 - 0.8 * _look_daylight) * clear * smoothstep(-0.02, 0.02, toward_moon.y)
+	_sky_material.set_shader_parameter("moon_color", moon)
+	_sky_material.set_shader_parameter("stars", STARS * (1.0 - smoothstep(0.0, 0.3, _look_daylight)) * clear)
+	var rain := maxf(float(weather.get("rain", 0.0)), float(weather.get("snow", 0.0)) * 0.3)
+	var cloud := (look["top"] as Color).lerp(Color.WHITE, 0.55 * _look_daylight).lerp(look["fog"], 0.25) * (1.0 - SKY_CLOUD_RAIN * rain)
+	cloud.a = 1.0
+	_sky_material.set_shader_parameter("cloud_color", cloud)
+	_sky_material.set_shader_parameter("cloud_cover", float(weather.get("cloud", 0.0)))
+	_sky_material.set_shader_parameter("cloud_drift", _weather_view.drift())
+
+
+## The moon's phase at world step [param steps] (decision 744): 0 new, 0.5
+## full, from MOON_START at step 0, round again every MOON_DAYS game days;
+## the same on every client.
+static func moon_phase(steps: float) -> float:
+	return fposmod(MOON_START + steps / float(DayNight.day_steps) / MOON_DAYS, 1.0)
 
 
 ## The haze's density (623, environment's side): the look's own [param base]

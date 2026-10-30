@@ -36018,3 +36018,19 @@ Mound-breakers stash their take in a chest at their camp, dungeon's 742) and cry
 from you by force!"). Rumours, true, in the Woodlands, so Aldous's secret budget is untouched.
 Data and docs only, protocol unchanged.
 
+## 744: the sky: sun, moon, stars and clouds
+
+Jeff, on the horizon fix: "later add sky box for clouds, sun, moon etc." Designed by environment and approved by the coordinator (2026-10-29), after terrain's horizon (623, terrain's side, 6136f107) settled the seam.
+
+- Outdoors the sky is a shader (client3d/sky.gdshader) in place of ProceduralSkyMaterial. Its gradient is ProceduralSky's own (sky top and horizon, sky_curve 0.15, the ground's horizon and bottom and ground_curve), set where the look update set the material before, so sky_look, weathered_look and hazed_horizon are unchanged, and so is terrain's sliver under the horizon (LOW_SKY_GROUND_CURVE 0.14, SKY_GROUND_CURVE 0.02).
+- Client3D._sky_horizon holds the horizon colour as last set (hazed_horizon under the low camera, the look's in ortho): the sky's, the ground sliver's and the far landmarks' haze (650, terrain's side) all read it, so they cannot drift apart.
+- On it (_set_sky_bodies, each sky step and while the weather eases):
+  - The sun's disc (SUN_DISC, about twice the true sun so it reads at the horizon) and glow (SUN_GLOW, wider near the horizon) where DayNight has the sun, not where the shadows' lifted light is; the look's light colour, gone in fog.
+  - The moon opposite the sun, as the night light already is (MOON_BELOW), with a phase: moon_phase(steps), round every MOON_DAYS (8 game days, the coordinator's call), full at world step 0 (MOON_START) so a new world's first night has one. The lit side faces where the sun set while it waxes, where it will rise as it wanes. Look only: the sim's night light does not follow the phase (that is parked: it touches sight and stealth; until Jeff asks).
+  - Stars: one at most per cell of a grid of directions, by a hash, at STARS by night, none by day or in fog; left out of the radiance pass.
+  - A cloud layer: the shadows' own noise (WeatherView.sky_noise: the decal's seamless Perlin before its cut) over SKY_CLOUD_SCALE (4) times the shadows' period, SKY_CLOUD_HEIGHT (120 m) over the camera, cut by the weather's cloud, darker in rain (SKY_CLOUD_RAIN), drifting with the shadows (WeatherView.drift), thinning into the horizon colour far off and lit toward the sun.
+- Where it shows: the low camera's top is about 3 degrees over the horizon (pitch 22, fov 50) and no camera looks up, so the sky is a band at the top of the screen (the sun and moon at rising and setting, cloud banks) and, in either camera, in the water's reflections, which read the sky's radiance. A cloud dome mesh (the first design) would have been past LOW_FAR and out of the reflections; the coordinator approved the clouds in the shader instead. More sky on screen would be a camera change, Jeff's to ask.
+- Nothing reads TIME: the sky redraws (and its radiance refreshes) only when its uniforms change, on the cadence ProceduralSky's colours already had; the drift is pushed with them, so the clouds move on in the sky steps (a game minute).
+- Frame cost: perf's numbers, low camera and ortho on the wilds, under the bench lock: (to follow before landing).
+
+view_test _test_sky: at noon the sun's disc where DayNight has it, shown, no stars, the moon opposite, no clouds in clear air; at midnight the stars out, the sun down, the moon up; in fog the stars and moon hidden; the cloud cover the weather's, darker in a storm than overcast, drifting with the shadows from the shadows' noise; moon_phase full at step 0, new half of MOON_DAYS on, full again after MOON_DAYS. _test_horizon reads the shader's parameters. Client only, protocol unchanged, no new class_name.

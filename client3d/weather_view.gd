@@ -176,6 +176,8 @@ var _ahead := Vector2(0.0, -1.0)
 var _fog_planes: Array[PlaneMesh] = []
 var _cloud_tile: Image
 var _cloud_textures: Dictionary[int, ImageTexture] = {}
+## The sky's clouds' noise (sky_noise), built once.
+var _sky_noise: ImageTexture
 
 
 func _ready() -> void:
@@ -495,6 +497,33 @@ func _cloud_texture(tiles: int) -> ImageTexture:
 	return _cloud_textures[tiles]
 
 
+## The clouds' noise for the sky's cloud layer (decision 744): the shadows'
+## own (_build_clouds' seamless Perlin, same seed and frequency), its value
+## in R before the shadows' cut, so the sky cuts it by the cover; mipmapped,
+## as the layer is seen far off and flat near the horizon.
+func sky_noise() -> ImageTexture:
+	if _sky_noise == null:
+		var image := _cloud_noise().get_seamless_image(128, 128)
+		image.convert(Image.FORMAT_RGBA8)
+		image.generate_mipmaps()
+		_sky_noise = ImageTexture.create_from_image(image)
+	return _sky_noise
+
+
+## How far the clouds and fog have drifted (m, world xz), the shadows'.
+func drift() -> Vector2:
+	return _drift
+
+
+static func _cloud_noise() -> FastNoiseLite:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.frequency = 0.02
+	noise.fractal_octaves = 3
+	noise.seed = 7
+	return noise
+
+
 ## Where the cloud decal's middle goes for the view's [param target]
 ## (world xz) with the clouds [param drift]ed (m): on the drift's own grid
 ## of CLOUD_PERIOD, the grid point nearest the target, so the target is
@@ -505,13 +534,8 @@ static func cloud_middle(target: Vector2, drift: Vector2) -> Vector2:
 
 
 func _build_clouds() -> void:
-	var noise := FastNoiseLite.new()
-	noise.noise_type = FastNoiseLite.TYPE_PERLIN
-	noise.frequency = 0.02
-	noise.fractal_octaves = 3
-	noise.seed = 7
 	var size := 128
-	var tile := noise.get_seamless_image(size, size)
+	var tile := _cloud_noise().get_seamless_image(size, size)
 	_cloud_tile = Image.create(size, size, false, Image.FORMAT_RGBA8)
 	for y in size:
 		for x in size:
