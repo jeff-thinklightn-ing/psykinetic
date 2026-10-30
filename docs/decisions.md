@@ -36333,3 +36333,31 @@ view_test _test_far_landmarks checks:
 - none with the camera high, no far castle from the wilds or inside the
   castle (the tower from both), none under stone.
 Client only, protocol unchanged, no new class_name.
+
+## 746. A curve by a cell twice: each pass searched
+
+Maps found it with 745 (the foothills): view_test's "wilds: the land's side
+and the forest's by the curve" read 1.05 at (243.5, 126.7), where the edge
+runs through. The lookups for the forest edge (575), the ledges (585),
+roads and open waters (559), and so 650's levels, stamp each cell with a
+curve's nearest sample (Client3D._stamp_near) and search CURVE_SEARCH
+samples either side of it. Where a curve comes by a cell twice, far apart
+along it, only the nearer pass was searched. The wilds' outline goes round
+the hills' glimpse and back along its lane, so a point beside one side of
+the lane read the other side's distance. Which side won turned on how long
+the loop was, so any change to a joined glimpse could trip it.
+- _stamp_near(..., passes): each unbroken run of samples reaching a cell is
+  a pass, and each pass's nearest sample goes into the cell's also list
+  beside the kept one. Every lookup already searches each entry and takes
+  the nearest (_edge_segments, _ledge_near, _near_on), so a point now finds
+  whichever pass is truly nearest.
+- Off for closed waters, whose lookup searches the whole curve anyway.
+- A cell reached by one pass is stamped as before.
+view_test _test_curve_passes: a thin closed lane whose two long sides pass
+one cell about 80 samples apart. A point 0.15 off the near side reads 0.15
+(0.95, the far side, with passes off). With it, view_test's 650 far checks
+follow the live plane and links, not names: from the wilds, the castle and
+the foothills (once maps lands it), the far castle is drawn exactly where
+the castle isn't this level or one it links to, and then at its plane spot
+(maps: 745 reaches the castle through the foothills). Client only,
+protocol unchanged, no new class_name.

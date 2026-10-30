@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_ledge_curves()
 	_test_damp_look()
 	_test_forest_edge()
+	_test_curve_passes()
 	_test_clearing()
 	_test_dais()
 	_test_dark_set()
@@ -3817,6 +3818,41 @@ func _test_streams() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
+## A curve that passes a cell twice (maps' 745: the wilds' outline round
+## the hills' glimpse and back along its lane): a long thin closed outline,
+## its two long sides about 80 samples apart along it; the cell midway
+## between them is nearest the top side, yet a point in it (0.15 off the
+## bottom side, inside the cell) reads the bottom's distance, not the top's.
+func _test_curve_passes() -> void:
+	print("
+== a curve by a cell twice: each pass searched ==")
+	var points := PackedVector2Array()
+	var corners: Array[Vector2] = [Vector2(0, -0.6), Vector2(40, -0.6), Vector2(40, 0.5), Vector2(0, 0.5)]
+	for side in 4:
+		var from := corners[side]
+		var to := corners[(side + 1) % 4]
+		var steps := maxi(1, ceili(from.distance_to(to) / 0.5))
+		for i in steps:
+			points.append(from.lerp(to, i / float(steps)))
+	var widths := PackedFloat32Array()
+	widths.resize(points.size())
+	var curve := {"points": points, "widths": widths}
+	var kept := [_rig._edge_curves.duplicate(), _rig._edge_near_sample.duplicate(), _rig._edge_near_also.duplicate(), _rig._edge_kept.duplicate()]
+	_rig._edge_curves.assign([{"curve": curve}])
+	_rig._edge_near_sample.clear()
+	_rig._edge_near_also.clear()
+	_rig._edge_kept.clear()
+	_rig._stamp_near(curve, true, 0, _rig._edge_near_sample, _rig._edge_near_also)
+	var nearest: Vector2i = _rig._edge_near_sample.get(Vector2i(20, 0), Vector2i(-1, -1))
+	var reads := absf(_rig._edge_signed(Vector2(20, -0.45)))
+	_check(nearest.y >= 0 and points[nearest.y].y > 0.0 and is_equal_approx(snappedf(reads, 0.001), 0.15),
+			"the cell's nearest sample on the far side (%s), yet a point of it beside the near side reads 0.15 (%.3f)" % [points[nearest.y] if nearest.y >= 0 else Vector2.INF, reads])
+	_rig._edge_curves.assign(kept[0])
+	_rig._edge_near_sample.assign(kept[1])
+	_rig._edge_near_also.assign(kept[2])
+	_rig._edge_kept.assign(kept[3])
+
+
 ## The water's edge unsquared (decision 553): the shore field rounds a
 ## pond's corners (a lone cell a disc) yet keeps to its cells, the hills'
 ## shore cells drawn finer and meeting the ground round them, a level
@@ -5220,15 +5256,31 @@ func _test_far_landmarks() -> void:
 	_rig._apply_camera_mode()
 	_check(not root.visible, "the camera high: none drawn")
 	Net.set_camera_low(true, false)
-	var wilds := Level.load_level("wilds")
-	_rig.rebuild(wilds["terrain"], wilds["centre"])
-	_check(_rig._far_root != null and _rig._far_root.get_node_or_null("Far_castle") == null and _rig._far_root.get_node_or_null("Far_tower_over_the_mine") != null,
-			"from the wilds, which links to the castle, no far castle; the tower far off")
-	Net.set_camera_low(true, false)
-	var castle := Level.load_level("castle")
-	_rig.rebuild(castle["terrain"], castle["centre"])
-	_check(_rig._far_root != null and _rig._far_root.get_node_or_null("Far_castle") == null and _rig._far_root.get_node_or_null("Far_tower_over_the_mine") != null,
-			"inside the castle no far castle; the tower still far off")
+	# By the live plane and links, not by name (maps' layout steps move both:
+	# 745 has the castle reached through the foothills): the far castle drawn
+	# exactly where the castle isn't this level or one it links to, and then
+	# at its plane spot; the tower far off from each.
+	var world := WorldMap.build()
+	var plane_castle: Dictionary = {}
+	for mark: Dictionary in plane["landmarks"]:
+		if mark["id"] == "castle":
+			plane_castle = mark
+	for level_name: String in ["wilds", "castle", "foothills"]:
+		if not Level.names().has(level_name) or not plane["zones"].has(level_name):
+			continue
+		var level := Level.load_level(level_name)
+		_rig.rebuild(level["terrain"], level["centre"])
+		var by := level_name == "castle" or world.ways_from(level_name).any(func(way: Dictionary) -> bool: return way["to"] == "castle")
+		var far_castle: Node3D = _rig._far_root.get_node_or_null("Far_castle") if _rig._far_root != null else null
+		var spot_ok := true
+		if far_castle != null:
+			var zone: Dictionary = plane["zones"][level_name]
+			var expected := Vector3((plane_castle["at"] as Vector2i).x - (zone["origin"] as Vector2i).x, float(plane_castle["base"]) - float(zone["height"]),
+					(plane_castle["at"] as Vector2i).y - (zone["origin"] as Vector2i).y)
+			spot_ok = _rig._far_marks.any(func(mark: Dictionary) -> bool: return mark["node"] == far_castle and (mark["at"] as Vector3).is_equal_approx(expected))
+		_check(_rig._far_root != null and (far_castle == null) == by and spot_ok and _rig._far_root.get_node_or_null("Far_tower_over_the_mine") != null,
+				"from the %s: the far castle %s; the tower far off" % [level_name,
+				"left to the real one (it is the castle or links to it)" if by else "drawn at its plane spot"])
 	var barrow := Level.load_level("barrow")
 	_rig.rebuild(barrow["terrain"], barrow["centre"])
 	_check(_rig._far_root == null, "under stone none")
