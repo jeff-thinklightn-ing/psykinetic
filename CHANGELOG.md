@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Ground: stone floors draw flat grey flagstones on dark joints (Jeff's pick, ground.stone c1) in place of their plain procedural colour.
 
 - Companions: what she says she carries counts all 8 pack slots, and her armour is worn, not held (722, companions' side).
 - The draugr's win no longer charges the amulet: each winner takes up the Encolpion Amulet uncharged (if they have none) and, from the knight's sepulcher, the holy remains of this generation's knight into their pack; give them to Aldous at the temple and he charges the amulet with the deal's charges.

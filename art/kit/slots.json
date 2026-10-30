@@ -3391,6 +3391,7 @@
 		"ground.stone": {
 			"category": "ground",
 			"type": "texture",
+			"source": {"by": "art-gen", "tool": "Qwen-Image-2512", "license": "own", "date": "2026-10-29", "notes": "N:/assets/candidates/ground.stone/notes.md (Jeff, 2026-10-29, to art-gen: \"ground.stone c1 is approved\"): c1 (seed 1898557135), flat-shaded flagstones of mixed sizes in muted greys on dark joints, 1328 px taken down to the slot's 512"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on stone floors; procedural colour while empty"
