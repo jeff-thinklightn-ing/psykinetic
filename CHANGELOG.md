@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Options, Credits: the music is credited first, "Music: psykinetic-theme1 by Jeff, made with Spitfire Audio BBC Symphony Orchestra Discover".
 - Rolf stands by Umbrage's store all day (736, npc's side): talk to him for the base weapons, arrows and shields at 1 gold each; what he sells goes straight into your hands, marked starter gear that no shop or maker will buy back.
 - Umbrage: the free house south-west of the square is now your house, labelled "Your house" when you're near, and your private chest (the town locker) has moved inside it, against the back wall (737).
 - Townsfolk know the barrow is an ancient burial mound joined to the Ossuary beneath the temple, where the draugr keeps Aldous from the holy knights' relics, angry at the grave robbers who break walls with the Tomb Sledge to reach them.

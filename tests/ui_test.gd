@@ -486,6 +486,9 @@ func _test_talk_no_panel() -> void:
 	var fonts := UiTheme.credits()
 	_check(fonts["entries"].size() == 2 and UiTheme.credits in OptionsPanel.credit_providers(),
 		"the fonts' credit (Alegreya, Alegreya Sans, OFL) is one of the Credits' providers")
+	_check(OptionsPanel.credit_providers()[0] == OptionsPanel.music_credits
+			and str(OptionsPanel.music_credits()["summary"]) == "Music: psykinetic-theme1 by Jeff, made with Spitfire Audio BBC Symphony Orchestra Discover",
+		"the Credits open on the music: Jeff's theme, made with BBC Symphony Orchestra Discover")
 
 
 func _test_sim_reads() -> void:

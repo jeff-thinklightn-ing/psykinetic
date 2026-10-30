@@ -187,7 +187,16 @@ func _ready() -> void:
 ## fonts' and the animations' can join here. THIRD_PARTY.md (in the zip)
 ## has everything.
 static func credit_providers() -> Array[Callable]:
-	return [SoundKit.credits, ArtKit.credits, UiTheme.credits]
+	return [music_credits, SoundKit.credits, ArtKit.credits, UiTheme.credits]
+
+
+## The music's credit: Jeff's title theme (music.title), played on Spitfire
+## Audio's BBC Symphony Orchestra Discover (THIRD_PARTY.md's row; its EULA
+## asks no credit, Jeff gives it).
+static func music_credits() -> Dictionary:
+	return {"summary": "Music: psykinetic-theme1 by Jeff, made with Spitfire Audio BBC Symphony Orchestra Discover",
+		"entries": [{"title": "psykinetic-theme1", "by": "Jeff",
+			"license": "Made with Spitfire Audio BBC Symphony Orchestra Discover", "url": ""}]}
 
 
 ## The Credits section's full list (a plain ScrollContainer, which the
