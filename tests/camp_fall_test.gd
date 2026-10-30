@@ -28,6 +28,7 @@ func _ready() -> void:
 	_test_falls()
 	_test_stays_cleared()
 	_test_retaken()
+	_test_occupied()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -127,8 +128,41 @@ func _test_retaken() -> void:
 	_walk_to(player, Vector2i(12, 1))
 	_main._arrived_at.clear()
 	_main._respawned_at.clear()
+	for slot: int in _main._dead_since:
+		_main._dead_since[slot] = World.tick - _main.RESPAWN_DELAY_TICKS  # Its wait (739: restarted while the player stood in it) run out.
 	_step(_main.RESPAWN_STAGGER_TICKS * 4)
 	_check(_slot_entity(IMP_SLOT) is Monster, "the goblins hold it again: the imp comes back")
+
+
+## Decision 739 (Jeff: "occupancy blocks campfire respawns"): with a player
+## in it (its radius and CAMP_OCCUPIED_MARGIN), a camp's dead never come
+## back and their wait starts over; leaving, the full wait runs from then.
+## Main.held_camp: occupied and cleared.
+func _test_occupied() -> void:
+	print("
+== occupied, a camp's dead stay down; cleared and occupied, it is held (739) ==")
+	var player := _standing_player()
+	_walk_to(player, CAMP_CELL + Vector2i(1, 0))
+	_check(_main.held_camp(CAMP_CELL) == "" or _monsters() == 0, "its monsters about: not held (%s)" % _main.held_camp(CAMP_CELL))
+	_kill_monsters()
+	player = _standing_player()
+	_walk_to(player, CAMP_CELL + Vector2i(1, 0))
+	_check(_main.held_camp(CAMP_CELL) == _camp and _main.held_camp(CAMP_CELL + Vector2i(9, 0)) == "",
+			"cleared with a player in it: held; a cell outside it is not")
+	for slot: int in _main._dead_since:
+		_main._dead_since[slot] = World.tick - _main.RESPAWN_DELAY_TICKS
+	_main._respawned_at.clear()
+	_main._arrived_at.clear()
+	_step(_main.RESPAWN_STAGGER_TICKS * 3)
+	_check(_slot_entity(IMP_SLOT) == null and _main._dead_since.has(IMP_SLOT) and World.tick - int(_main._dead_since[IMP_SLOT]) <= _main.RESPAWN_STAGGER_TICKS,
+			"long past its wait, the imp stays down while the camp is occupied, its wait starting over (%d ticks)" % (World.tick - int(_main._dead_since.get(IMP_SLOT, 0))))
+	_walk_to(player, Vector2i(12, 1))
+	var left := World.tick
+	_main._respawned_at.clear()
+	_step(_main.RESPAWN_STAGGER_TICKS + 1)
+	_check(_slot_entity(IMP_SLOT) == null and int(_main._dead_since.get(IMP_SLOT, 0)) >= left - _main.RESPAWN_STAGGER_TICKS,
+			"left, it is not back at once: its full wait runs from when they left")
+	_check(_main.held_camp(CAMP_CELL) == "", "nobody in it: not held")
 
 
 ## The player on their feet: one beaten down by the camp's monsters while

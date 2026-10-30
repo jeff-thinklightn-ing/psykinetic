@@ -35599,3 +35599,27 @@ monster_test: the deals' steps [10, 50, 100] and the refusal after; paid
 once, [again, refuse]; with no gold the refusal first and the panel's deal,
 taken: provoked, REFUSED, no ANGER, no gold; 9 gold, under the least deal,
 he keeps it and attacks. economy_test: under 10 no deal, 10 buys easy.
+## 739. An occupied camp does not refill; a cleared one a player holds is safe ground
+
+Jeff: "that would be fine if occupancy blocks campfire respawns". A camp (a
+Holdings place of kind "camp") is occupied while a player, or a player's
+companion, stands within its radius and CAMP_OCCUPIED_MARGIN (4) more
+cells, about a screen from its fire (Main._occupied_camps). While it is,
+no dead slot whose spawn tile lies in its radius comes back
+(_check_respawns), and each one's dead-since is set to now. So when the last
+one leaves, the slot's full respawn wait runs from then, not what was left
+of it: stepping out a moment brings nothing straight back. 429's fall (cleared and
+held 10 s, the camp falls to nobody and stays empty till restocked) is
+unchanged; this covers the time before it falls, and any camp, held or not.
+
+Main.held_camp(cell): the place id of the camp the cell lies in when it is
+occupied and cleared, no living monster of its holder's side spawned in it
+or standing within its radius and the margin; "" otherwise. Companions'
+rest (738) takes it as safe ground beside town ground.
+
+camp_fall_test: with its imp alive, not held; cleared with a player in it,
+held, and a cell outside not; long past their wait, its dead stay down while
+it is occupied, their wait restarting; left, not back at once; nobody in it,
+not held. The retake case now runs its imp's wait out first (it restarted
+while the player stood in the camp). Server only, protocol unchanged, no
+new class_name.

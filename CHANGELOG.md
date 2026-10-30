@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- A camp you stand in no longer refills (739): while a player or their companion is at a camp its dead monsters stay down, and their wait starts over when the last one leaves.
 
 - The draugr can always be refused (735, Jeff's words): his panel offers "Refuse", and he answers "Then I'll take it from you by force!" and attacks; with too little gold for his pact you can now fight your way out instead of being shut in his Hall. His least pact is 10 gold, not 20.
 - Companions: she asks to sleep or play knucklebones only in a town, never at a camp, in the wilds or a dungeon; her asks to rest and keep watch are her own words, not a fixed line, and come far less often (738).

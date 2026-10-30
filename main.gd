@@ -182,6 +182,9 @@ const RESPAWN_STAGGER_TICKS := 60
 ## player joins or comes into the zone, nothing comes back within this many
 ## tiles of them, nor in their line of sight.
 const RESPAWN_JOIN_DISTANCE := 12
+## Decision 739: a camp is occupied while a player or theirs stands within
+## its radius and this many cells more (about a screen from its fire).
+const CAMP_OCCUPIED_MARGIN := 4
 const RESPAWN_ARRIVAL_TICKS := 600
 ## A camp falls (decision 429) when for CAMP_FALL_TICKS (10 s) no living
 ## monster of its holder's side stands within its radius + CAMP_DEFEND_MARGIN
@@ -5405,11 +5408,15 @@ func _check_respawns(tick: int, force := false) -> int:
 	if not force and _respawned_at.has(zone_name) and tick - _respawned_at[zone_name] < RESPAWN_STAGGER_TICKS:
 		return 0
 	var due: Array[Array] = []  # [steps from the nearest player, slot, spec]
+	var occupied := _occupied_camps()
 	for slot: int in _dead_since.keys():
-		if not force and tick - _dead_since[slot] < _respawn_delay(slot):
-			continue
 		var spec := _slot_spec(slot)
 		var tile: Vector2i = spec["tile"]
+		if not force and _in_camp(tile, occupied):
+			_dead_since[slot] = tick  # Decision 739: its wait starts again once they leave.
+			continue
+		if not force and tick - _dead_since[slot] < _respawn_delay(slot):
+			continue
 		if not World.is_free(tile) or not _camp_lets_back(spec) or not World.named_may_rise(spec):
 			continue
 		var away := _nearest_player(tile, tick)
@@ -12628,6 +12635,60 @@ func _player_in(camp: Dictionary) -> bool:
 static func _within(tile: Vector2i, centre: Vector2i, radius: int) -> bool:
 	var d := tile - centre
 	return d.x * d.x + d.y * d.y <= radius * radius
+
+
+## Decision 739 (Jeff: "that would be fine if occupancy blocks campfire
+## respawns"): the camps of the zone World is in that a player or a
+## player's companion stands at, within its radius and CAMP_OCCUPIED_MARGIN
+## more; their place ids.
+func _occupied_camps() -> Array[String]:
+	var out: Array[String] = []
+	if World.holdings == null or World.zone == null:
+		return out
+	for id in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(id)
+		if place.get("kind") != "camp":
+			continue
+		for entity in World.sought():
+			if entity.spawned and entity.hp > 0 and (entity is Player or entity is Companion and (entity as Companion).keeper != null) 					and _within(entity.tile, place["cell"], int(place["radius"]) + CAMP_OCCUPIED_MARGIN):
+				out.append(id)
+				break
+	return out
+
+
+## Whether [param tile] lies in one of [param camps] (place ids).
+func _in_camp(tile: Vector2i, camps: Array[String]) -> bool:
+	for id in camps:
+		var place := World.holdings.place(id)
+		if _within(tile, place["cell"], int(place["radius"])):
+			return true
+	return false
+
+
+## Decision 739: the camp [param cell] lies in that a player holds: occupied
+## (_occupied_camps) and cleared, no living monster of its holder's side
+## of it (spawned in it, or standing within its radius and
+## CAMP_OCCUPIED_MARGIN); its place id, "" for none. Companions' rest (738)
+## takes it as safe ground.
+func held_camp(cell: Vector2i) -> String:
+	if World.holdings == null or World.zone == null:
+		return ""
+	var factions := World.holdings.factions
+	for id in _occupied_camps():
+		var place := World.holdings.place(id)
+		if not _within(cell, place["cell"], int(place["radius"])):
+			continue
+		var holder := World.holdings.holder(id)
+		var cleared := true
+		for each in World.monsters():
+			var home: Vector2i = (each as Monster).home if each is Monster else each.tile
+			if each.spawned and each.hp > 0 and (_within(home, place["cell"], int(place["radius"]))
+					or _within(each.tile, place["cell"], int(place["radius"]) + CAMP_OCCUPIED_MARGIN)) 					and holder != Factions.NOBODY and factions.same_side(factions.of_kind(str(each.spawn_spec.get("kind", ""))), holder):
+				cleared = false
+				break
+		if cleared:
+			return id
+	return ""
 
 
 ## Whether the monster of [param spec] may come back where it lay: not in
