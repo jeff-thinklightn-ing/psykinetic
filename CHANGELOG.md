@@ -7,10 +7,12 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.193
+
+- What goes over the network changes, so v0.1.192 and older can't join the server: update through the launcher first.
 - The foothills: a new land north of the wilds, rising in two escarpments toward the mountain, with the river coming down it (and over a small falls) and the north road climbing to the castle, which now lies beyond them (745).
 - Fixed a fault in where the ground's edges fall (the forest edge, ledges, roads and streams): where one of them doubles back past a spot, the ground there could take the far side's shape (746).
 - With the low camera on, the castle and the dark tower over the mine stand on the horizon where they lie in the lands, fading into the haze with distance and shifting as you walk; plain stand-in shapes for now, until their art is made (650).
-
 - Townsfolk know of Cravenhold, the orc stronghold outside the forest, in a land where the trees have been stripped.
 - The lands are laid out as Jeff picked (layout A): Umbrage lies south of the wilds on the same river (its road leaves the wilds' south edge), the forest is west of the wilds and the hills east (743).
 - Townsfolk have heard that the secret way down to the Ossuary is found only once the Mound-breakers have been put down.
@@ -21,7 +23,6 @@ notes (decision 324).
 - Townsfolk have heard that the Mound-breakers stash their take in a chest at their camp, and that whoever refuses the draugr's bargain must fight him for it.
 - Rolf stands behind the counter of his market stall once Umbrage's stall is up, and by the store until then (736, npc's side).
 - The barrow comes back in 5 minutes (714 amended (2)): the named robbers rise 5 minutes after they fall, Brand the Ox has a new Tomb Sledge 5 minutes after one is won, and the draugr rests 5 minutes, not 3 days, once beaten.
-
 - The temple is now a stone chapel (Jeff's pick c2): pale coursed walls with buttresses and tall lancet windows, a slate roof with ridge, eaves, verges and stone crosses, a rose window over the door and a round window at the back, a bell tower with its bell on the ridge, and steps at the door; built in stages with its own footings, ruined walls, broken lancets, fallen slates and rubble as it decays (art for 734).
 - Aldous now names the Mound-breakers when he tells of the grave robbers digging for the holy knights' bones (714, lore's crypt.robbers_dig).
 - The Robbers' Camp in the barrow has a chest (742): open it for 25 gold straight to your purse, refilled for you every 5 minutes.
@@ -32,26 +33,22 @@ notes (decision 324).
 - With the low camera on, the dark band under the skyline is gone: the forest runs on into the haze to a soft ridge, and far meadows past the scattered grass show patches and speckle rather than plain green (623).
 - Deer and other wild animals keep away from towns, fires and fighting (740): they no longer graze around a town, and one that wanders into the noise walks back out of it; wolves still come for you.
 - The barrow's niche sits in the wall again (741): the next generation carves no single-file passage round it, only up to its mouth.
-
 - Companions: a camp you have cleared and stand in counts as safe too, so she may ask to rest there; a camp that can refill never does (738 amended).
 - Sound: refuse the draugr and he laughs, low and dry, as he comes at you (735, sound's side; three laughs, picked at random).
 - Starter weapons cost 1 gold each from a vendor by Umbrage's store, and no shop or maker will buy starter gear back (736, economy's side; the vendor himself follows).
-
 - A healer's hut fallen to ruin (733, npc's side) brings nobody back: those in its care are told they will wake at the temple or wherever is nearest, and keep their care for when he has mended it; he offers no care at a ruin, while one in disrepair still serves; a hut left empty 21 days gets a new healer.
 - A camp you stand in no longer refills (739): while a player or their companion is at a camp its dead monsters stay down, and their wait starts over when the last one leaves.
-
 - The draugr can always be refused (735, Jeff's words): his panel offers "Refuse", and he answers "Then I'll take it from you by force!" and attacks; with too little gold for his pact you can now fight your way out instead of being shut in his Hall. His least pact is 10 gold, not 20.
 - Companions: she asks to sleep or play knucklebones only in a town, never at a camp, in the wilds or a dungeon; her asks to rest and keep watch are her own words, not a fixed line, and come far less often (738).
 - Starter gear (736, items' side): what a town's starter vendor sells is marked for life (its tooltip says "starter gear: no one will buy it"), never stacks with other gear, and keeps the mark when split, worn or saved; the vendor's list is the base weapons.
 - A healer's hut nobody lives in falls into disrepair after a fortnight and to a ruin a season later; when a healer keeps it again he buys wood (and cloth for a ruin) from the town's store and mends it himself (733, economy's side).
-
 - Temple: drawn as a chapel, piece by piece as art-kit's chapel parts arrive: a slate roof laid and broken by the bay with a flared eave, a rose window on the front gable and an oculus on the back, a belfry on the ridge, buttresses with tall lancets between them, steps and the pointed-arch double door; a temple going up gets its front half roofed first (734).
 - The draugr: his deal window has a "Refuse" button that starts the fight, and says Shift+click strikes him (no more being stuck talking).
 - Bow: a lob aimed close comes down in a smaller circle, shrinking with the distance aimed (a full-reach lob's circle is unchanged), and the circle drawn while aiming matches where the arrows can fall (677 amended (3), combat's side).
 - Bow: the aim follows your mouse out from the archer, down to point blank; the marker, arc and cone sit where you point, and stay steady close in (677).
 - Aldous hands a knight's remains back when your Encolpion Amulet can't take the blessing (714 amended, npc's side): a full amulet, or one never blessed (after a quest reset), keeps the relic for later instead of losing it, and he says why.
-
 - The draugr speaks his anger as a fight begins (714): "Thieves in my barrow, thieves in my hall. You are all the same to me."
+
 ## v0.1.192
 
 - What goes over the network changes, so v0.1.191 and older can't join the server: update through the launcher first.
