@@ -35760,3 +35760,31 @@ niche's four cells kept, its mouth cells floor, no floor round it else; the
 two-cell checks (725) hold. Sheets: C:/dev/review/genfix/ring_before_* and
 ring_after_barrow_g1..3, ring_niche_before_after_g1. Server only, protocol
 unchanged, no new class_name.
+## 740. Wildlife keeps away from the din: towns, fires, fights
+
+Jeff: "animals should keep distance from noise and fire. for example deer
+should hear the towns noise radius and not cluster around the town."
+World.din_at(cell, predator, players) gives the nearest din source covering
+a cell, {from, radius, kind}, from each zone's list, made again once a
+second (World._din_sources, kept per zone):
+- a town (a stockpile place): town_base 8 cells + town_per_resident 0.5 a
+  resident (Towns.residents), at most town_most 20;
+- a fire cell (World.is_fire; one source to the cells within 3): fire 6;
+- a fight heard (World.noise of kind fight) within fight_seconds 30: fight 10;
+- a player: player 4.
+The radii are F7 fields (the "din" source: din.*).
+
+Prey (and game) wander to no cell in a din (Monster._wander_goal's
+_shuns; Animal's). One grazing in a town's, a fire's or a fight's walks
+out at its idle pace, not fleeing (Animal._leave_din: home set to a spot
+past the edge, away from the source: World.out_of_din). A player's din keeps
+only its wandering and making off them, since it flees a player it sees by
+sight. Herds make no body in a din: its body and home go to a spot out of it, or
+stay where they were when none is near. A predator (the wolf) heeds towns and
+fires only: it hunts players and comes to fights.
+
+monster_test _test_din: a town's base radius with nobody living there; a
+doe grazing in it walks out and grazes past its edge, never fleeing; a
+player's din keeps prey off but not a wolf, who heeds a town's; a fight's
+din, gone after fight_seconds; a fire's, heeded by both. Server only,
+protocol unchanged, no new class_name.

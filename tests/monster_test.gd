@@ -95,6 +95,7 @@ func _ready() -> void:
 	_test_named()
 	_test_band()
 	_test_wild_scent()
+	_test_din()
 	_test_wild_boar()
 	_test_wild_wolf()
 	_test_wild_remains()
@@ -2190,6 +2191,64 @@ func _test_band() -> void:
 	World.trophy_taken = Callable()
 	host.free()
 	World.steps = 0
+
+
+func _test_din() -> void:
+	print("
+== wildlife keeps out of the din: a town's, a fire's, a fight's; a doe walks out, a wolf heeds a player's none (740) ==")
+	Monster.idling = true
+	var rows: Array[String] = ["#".repeat(32)]
+	for y in 11:
+		rows.append("#" + ".".repeat(30) + "#")
+	rows.append("#".repeat(32))
+	var town_at := Vector2i(5, 6)
+	var cells: Array[String] = []
+	for y in 2 * rows.size() - 1:
+		cells.append(".".repeat(2 * 32 - 1))
+	Level.register("mt_din", Level.image_from_rows(cells), null, {"outdoor": true, "places": {
+		"square": {"at": [town_at.x, town_at.y], "kind": "stockpile", "holder": "town", "radius": 2, "worth": 0}}})
+	_build(rows, {}, {}, "mt_din")
+	var was_holdings := World.holdings
+	var was_towns := World.towns
+	var names: Array[String] = ["mt_din"]
+	World.holdings = Holdings.new(WorldMap.build(names), Factions.read(), {})
+	World.towns = null
+	World._din_tick = -1000000
+	var town := World.din_at(town_at + Vector2i(3, 0))
+	_check(town.get("kind") == "town" and is_equal_approx(float(town["radius"]), float(World.din_rules["town_base"]))
+			and World.din_at(Vector2i(25, 6)).is_empty(), "a town's din: its base radius with nobody living there (%s)" % [town])
+	var doe := EntityFactory.build(SPECS["d"].merged({"name": "TownDoe", "props": Level.MONSTER_TYPES["deer"], "tile": town_at + Vector2i(3, 1)})) as Animal
+	_room.add_child(doe)
+	World.spawn(doe, doe.spawn_spec["tile"])
+	doe.sight_range = 0
+	var ran := false
+	for i in 400:
+		World.step()
+		ran = ran or doe.alert == Monster.Alert.FLEEING
+	var off := Vector2(doe.tile - town_at).length()
+	_check(off > float(World.din_rules["town_base"]) and not ran,
+			"a doe grazing in it walks out and grazes past its edge, never running (%.1f off)" % off)
+	var hunter := EntityFactory.build(SPECS["P"].merged({"name": "Hunter"})) as Player
+	_room.add_child(hunter)
+	World.spawn(hunter, Vector2i(25, 3))
+	World._din_tick = -1000000
+	_check(World.din_at(Vector2i(26, 3)).get("kind") == "player" and World.din_at(Vector2i(26, 3), true).is_empty()
+			and World.din_at(town_at + Vector2i(3, 0), true).get("kind") == "town",
+			"a player's din keeps prey off; a wolf heeds it not, but heeds a town's")
+	World.noise(Vector2i(20, 9), 10, &"fight")
+	World._din_tick = -1000000
+	_check(World.din_at(Vector2i(22, 9)).get("kind") == "fight", "a fight's din where it was heard")
+	World.tick += roundi(float(World.din_rules["fight_seconds"]) * World.TICK_RATE) + 1
+	World._din_tick = -1000000
+	_check(World.din_at(Vector2i(22, 9)).get("kind") != "fight", "gone once fight_seconds have passed")
+	World._fire[Vector2i(28, 10)] = true
+	World._din_tick = -1000000
+	_check(World.din_at(Vector2i(26, 10)).get("kind") == "fire" and World.din_at(Vector2i(26, 10), true).get("kind") == "fire",
+			"a fire's din, heeded by prey and wolf alike")
+	World._fire.erase(Vector2i(28, 10))
+	World.holdings = was_holdings
+	World.towns = was_towns
+	World._din_tick = -1000000
 
 
 func _test_wild_scent() -> void:

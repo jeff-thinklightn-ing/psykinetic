@@ -698,6 +698,13 @@ func _make_body(each: Dictionary) -> bool:
 	var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
 	if spec.is_empty():
 		return false
+	# Decision 740: never made in a din (a town's, a fire's...); out of it, it grazes there.
+	var predator := str(Monster.kinds().get(kind, {}).get("role", "")) == "predator"
+	var din := World.din_at(tile, predator)
+	var out := World.out_of_din(tile, din, predator) if not din.is_empty() else World.NO_CELL
+	if out != World.NO_CELL:
+		home = out
+		tile = out
 	spec["name"] = name
 	spec["tile"] = tile
 	spec["home"] = home

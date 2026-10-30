@@ -589,6 +589,18 @@ var companion_freed: Callable
 var _carried_lights_key := Vector2i(-1, -1)
 var _carried_lights: Array[GridEntity] = []
 var _fire: Dictionary[Vector2i, bool] = {}
+## Decision 740 (Jeff: "animals should keep distance from noise and fire ...
+## deer should hear the towns noise radius and not cluster around the
+## town"): the din wildlife keeps out of, each source's radius in cells (a
+## town's its base and per resident, at most town_most; F7's "din.*").
+## Fights are heard for fight_seconds.
+var din_rules := {"town_base": 8.0, "town_per_resident": 0.5, "town_most": 20.0, "fire": 6.0, "fight": 10.0,
+	"fight_seconds": 30.0, "player": 4.0}
+var _fights: Array[Array] = []  # [zone name, cell, tick]
+var _din: Array[Dictionary] = []
+var _din_tick := -1000000
+## Each zone's din and the tick it was made, so zones stepped in turn keep theirs.
+var _din_made: Dictionary[String, Array] = {}
 ## Heights (cell -> 1..6 levels; 0 is absent), stairs (cell -> the way it
 ## climbs: to the orthogonal neighbour one level up) and water (not walkable,
 ## not a wall). See Level.
@@ -1675,6 +1687,9 @@ func reset() -> void:
 		return
 	for id: int in _telegraphs.keys():
 		end_telegraph(id, false)  # Decision 602: none outlives the room.
+	_fights.clear()  # Decision 740: its din goes with it.
+	_din_made.clear()
+	_din_tick = -1000000
 	raids.hand_back(zone.name)  # Its raiders go with the room: back to maps.
 	for entity in _entities:
 		if is_instance_valid(entity) and entity.owner_peer == 0 and entity.keeper_peer == 0:
@@ -2010,6 +2025,10 @@ func carried_lights() -> Array[GridEntity]:
 func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = null) -> void:
 	if not Net.is_authority() or radius <= 0:
 		return
+	if kind == &"fight" and zone != null:
+		_fights.append([zone.name, at, tick])  # Decision 740: wildlife keeps off it a while.
+		if _fights.size() > 64:
+			_fights.pop_front()
 	if kind != &"speech":
 		# Rain and wind cover it (Weather); speech is chat between players
 		# too, and keeps its reach.
@@ -9501,6 +9520,103 @@ func is_free(at: Vector2i) -> bool:
 
 func is_fire(at: Vector2i) -> bool:
 	return _fire.has(at)
+
+
+# --- Din: what wildlife keeps away from (decision 740) -------------------------------
+
+## The din source covering [param cell] nearest it, {from, radius, kind}
+## ("town", "fire", "fight", "player"), {} for none. A [param predator]
+## heeds towns and fires only: it hunts the rest. Without [param players],
+## a player's own is not counted (an animal near one flees it by sight).
+func din_at(cell: Vector2i, predator := false, players := true) -> Dictionary:
+	_din_sources()
+	var best := {}
+	var best_d := INF
+	for each in _din:
+		if predator and each["kind"] in ["fight", "player"] or not players and each["kind"] == "player":
+			continue
+		var d := Vector2(cell - (each["from"] as Vector2i)).length()
+		if d <= float(each["radius"]) and d < best_d:
+			best = each
+			best_d = d
+	return best
+
+
+## A cell out of [param din] (din_at's) away from its source, past its edge,
+## walkable, free and in no din; NO_CELL if none near.
+func out_of_din(cell: Vector2i, din: Dictionary, predator := false) -> Vector2i:
+	var from: Vector2i = din["from"]
+	var way := Vector2(cell - from)
+	if way.length() < 0.5:
+		way = Vector2(1, 0)
+	var aim := from + Vector2i((way.normalized() * (float(din["radius"]) + 2.0)).round())
+	for reach in 4:
+		for dy in range(-reach, reach + 1):
+			for dx in range(-reach, reach + 1):
+				if maxi(absi(dx), absi(dy)) != reach:
+					continue
+				var at := aim + Vector2i(dx, dy)
+				if is_walkable(at) and is_free(at) and not is_fire(at) and din_at(at, predator).is_empty():
+					return at
+	return NO_CELL
+
+
+## The zone's din sources, made again once a second: each town (a
+## stockpile place, its residents), each fire cell (one source to the cells
+## within 3 of it), each fight heard lately, each player.
+func _din_sources() -> void:
+	if zone == null:
+		return
+	var made: Array = _din_made.get(zone.name, [])
+	if not made.is_empty() and _din_tick > -1000000 and tick >= int(made[0]) and tick - int(made[0]) < TICK_RATE:
+		_din = made[1]
+		return
+	_din_tick = tick
+	_din = []
+	_din_made[zone.name] = [tick, _din]
+	if holdings != null:
+		for id in holdings.places_in(zone.name):
+			var place := holdings.place(id)
+			if str(place.get("kind", "")) != "stockpile":
+				continue
+			var people := towns.residents(id).size() if towns != null else 0
+			var radius := minf(float(din_rules["town_base"]) + people * float(din_rules["town_per_resident"]), float(din_rules["town_most"]))
+			_din.append({"from": place["cell"], "radius": radius, "kind": "town"})
+	var fires: Array[Vector2i] = []
+	for cell: Vector2i in _fire:
+		if fires.any(func(f: Vector2i) -> bool: return maxi(absi(f.x - cell.x), absi(f.y - cell.y)) <= 3):
+			continue
+		fires.append(cell)
+		_din.append({"from": cell, "radius": float(din_rules["fire"]), "kind": "fire"})
+	var heard := roundi(float(din_rules["fight_seconds"]) * TICK_RATE)
+	_fights = _fights.filter(func(f: Array) -> bool: return tick - int(f[2]) <= heard and tick >= int(f[2]))
+	for each: Array in _fights:
+		if each[0] == zone.name:
+			_din.append({"from": each[1], "radius": float(din_rules["fight"]), "kind": "fight"})
+	for entity in sought():
+		if entity is Player and entity.spawned:
+			_din.append({"from": entity.tile, "radius": float(din_rules["player"]), "kind": "player"})
+
+
+## F7's din radii (673's panel; decision 740).
+func din_value(path: String) -> Variant:
+	var key := path.trim_prefix("din.")
+	return float(din_rules[key]) if path.begins_with("din.") and din_rules.has(key) else null
+
+
+func set_din_value(path: String, value: Variant) -> bool:
+	if din_value(path) == null or not (value is int or value is float):
+		return false
+	din_rules[path.trim_prefix("din.")] = maxf(0.0, float(value))
+	_din_tick = -1000000  # Every zone's made again.
+	return true
+
+
+func din_fields() -> Array:
+	var out := []
+	for key: String in din_rules:
+		out.append({"path": "din." + key, "group": "Wildlife din", "min": 0.0, "max": 60.0, "owner": "enemy-ai", "takes": "now"})
+	return out
 
 
 func get_entity_at(at: Vector2i) -> GridEntity:

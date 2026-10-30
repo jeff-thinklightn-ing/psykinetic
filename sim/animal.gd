@@ -137,9 +137,30 @@ func _graze_tick() -> void:
 		pose = Pose.STAND
 		return
 	alert = Alert.IDLE
+	_leave_din()
 	_idle_tick()
 	var standing := World.tick < _idle_until or _idle_goal == NO_TILE
 	pose = Pose.SIT if standing and idle != Idle.NONE else Pose.STAND
+
+
+## Decision 740: grazing in a din (World.din_at: a town's, a fire's, a
+## fight's; a predator heeds towns and fires only; a player it flees by
+## sight), it makes a spot out of it its home and walks there, not running.
+func _leave_din() -> void:
+	if _returning:
+		return
+	var din := World.din_at(tile, role == Role.PREDATOR, false)
+	if din.is_empty():
+		return
+	var out := World.out_of_din(tile, din, role == Role.PREDATOR)
+	if out != NO_TILE:
+		home = out
+		_returning = true
+
+
+## It keeps its wandering out of the din (740).
+func _shuns(at: Vector2i) -> bool:
+	return not World.din_at(at, role == Role.PREDATOR).is_empty()
 
 
 ## Its looking: the nearest player or companion it sees, glimpses or

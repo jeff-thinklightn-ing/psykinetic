@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Deer and other wild animals keep away from towns, fires and fighting (740): they no longer graze around a town, and one that wanders into the noise walks back out of it; wolves still come for you.
 - The barrow's niche sits in the wall again (741): the next generation carves no single-file passage round it, only up to its mouth.
 
 - Companions: a camp you have cleared and stand in counts as safe too, so she may ask to rest there; a camp that can refill never does (738 amended).

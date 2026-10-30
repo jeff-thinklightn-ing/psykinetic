@@ -2679,7 +2679,7 @@ func _wander_goal() -> Vector2i:
 	for i in 12:
 		var at := home + Vector2i(_idle_rng.randi_range(-wander_radius, wander_radius),
 				_idle_rng.randi_range(-wander_radius, wander_radius))
-		if at == tile or not World.is_walkable(at) or not World.is_free(at) or World.is_fire(at):
+		if at == tile or not World.is_walkable(at) or not World.is_free(at) or World.is_fire(at) or _shuns(at):
 			continue
 		if _straight(tile, at, wander_radius * 2 + 2):
 			_idle_path.clear()  # It walks there straight (_idle_step).
@@ -2693,6 +2693,12 @@ func _wander_goal() -> Vector2i:
 			_idle_path_to = at
 			return at
 	return NO_TILE
+
+
+## Whether it keeps off [param at] when it wanders (Animal's: the din,
+## decision 740). Never, for a monster.
+func _shuns(_at: Vector2i) -> bool:
+	return false
 
 
 ## The step from [param from] toward [param to] that goes straight at it, or

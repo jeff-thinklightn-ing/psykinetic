@@ -2073,6 +2073,7 @@ func _show_3d() -> void:
 		Tuning.register_source("effects", Items.effect_value, Items.set_effect_value, Items.effect_fields)  # 682: the remedy's heal.
 		Tuning.register_source("companions", CompanionCard.tuning_value, CompanionCard.set_tuning_value, CompanionCard.tuning_fields)  # 706: her holds.
 		Tuning.register_source("named", NamedEnemy.tuning_value, NamedEnemy.set_tuning_value, NamedEnemy.tuning_fields)  # 716: days dead.
+		Tuning.register_source("din", World.din_value, World.set_din_value, World.din_fields)  # 740: wildlife's distance.
 
 
 # --- WASD ---------------------------------------------------------------------------
