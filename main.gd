@@ -9165,8 +9165,8 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 	for entity: GridEntity in World.townsfolk():
 		var body := entity as Resident
 		var d := World.distance(body.tile, player.tile)
-		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE or body.worker_id.begins_with(Offers.VISITOR):
-			continue  # A visitor answers a click, not the mind (711, npc's side).
+		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE or body.worker_id.begins_with(Offers.VISITOR) or body.worker_id.begins_with(Offers.VENDOR):
+			continue  # A visitor (711) or the stall's keeper (736) answers a click, not the mind.
 		if not body.person.is_empty() and Companion._named(line, body.person):
 			return body
 		if d <= RESIDENT_EARSHOT and (nearest == null or d < World.distance(nearest.tile, player.tile)):
@@ -9251,6 +9251,8 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
 	elif not str(result.get("ware", "")).is_empty():
 		_visitor_sells(player, body, str(result["ware"]))
+	elif not str(result.get("starter", "")).is_empty():
+		_vendor_sells(player, body, str(result["starter"]))
 	elif int(result.get("relic", 0)) > 0:
 		_relic_returned(player, body, int(result["relic"]))
 	elif int(result.get("buy", 0)) > 0:
@@ -9329,6 +9331,7 @@ func _offers_context() -> Dictionary:
 		"set_memory": _set_town_memory,
 		"visitor": _visitor_of,
 		"visitor_price": _visitor_price,
+		"vendor": func() -> Dictionary: return World.economy.rules.get("vendor", {}) if World.economy != null else {},
 		"relics": _relics_held,
 		"barrow_knight": barrow_knight,
 		"lawspeaker": func(town: String) -> Dictionary: return World.towns.lawspeaker(town) if World.towns != null and World.towns.has_method("lawspeaker") else _lawspeaker_records.get(town, {}).duplicate(true),
@@ -10291,7 +10294,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	# rest from their card (made now if need be, 398).
 	var record: PlayerRecord = _records.get(str(each.get("player", "")))
 	var look := CompanionCard.look_of(record.companion.get("traits", {}), record.player_id) \
-			if record != null and not record.companion.is_empty() else ResidentCard.look_spec(Townsfolk.card_of(World.production, who), trade, str(each.get("type", "")))
+			if record != null and not record.companion.is_empty() else ResidentCard.look_spec(Townsfolk.card_of(World.production, who), str(each.get("look_trade", trade)), str(each.get("type", "")))
 	# A companion resting is named by her player's index, as their own body
 	# is, never their id (691): the name and its path go to every client.
 	var node_name := ("Resident_companion_%d" % record.index) if record != null and who.begins_with(Townsfolk.COMPANION) else ("Resident_" + who).validate_node_name()
@@ -13374,13 +13377,15 @@ func _retain_care(player_id: String, healer_id: String, pay: String) -> Dictiona
 ## Server: a made thing [param item_id] from [param from_name] into
 ## [param player_id]'s free hand or pack, else on the ground at their feet
 ## (the medicine man's brew, 584 amended). False if they are not here.
-func _hand_item(player_id: String, item_id: String, from_name: String) -> bool:
+func _hand_item(player_id: String, item_id: String, from_name: String, starter := false) -> bool:
 	if not Net.is_authority() or World.items == null or player_id.is_empty():
 		return false
 	for entity in World.get_entities():
 		if not (entity is Player and entity.spawned and (entity as Player).player_id == player_id):
 			continue
 		var uid := World.items.mint(item_id, "made", from_name, World.zone.name, entity.tile)
+		if starter:
+			World.mark_starter(uid)  # Before it finds a stack (736): marked alone, never the stack it joins.
 		var slot := World.room_for(entity, uid)  # Onto a stack of its kind first (decision 619).
 		if slot < 0 or not World.put_item(entity, entity, slot, uid):
 			World.put_on_ground(uid, entity.tile)
@@ -13998,6 +14003,12 @@ func _greeted(player: Player, body: Resident) -> void:
 	if body.worker_id.begins_with(Offers.VISITOR):
 		_visitor_greeted(player, body, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
 		return
+	if body.worker_id.begins_with(Offers.VENDOR):
+		body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
+		var greetings: Array = Townsfolk.rules().get("visitors", {}).get("greetings", {}).get("vendor", ["Blades for the road, one gold apiece. Take your pick."])
+		if not greetings.is_empty():
+			_resident_says(body, str(greetings[absi(hash(body.worker_id + player.player_id)) % greetings.size()]), "", player)  # 736.
+		return
 	var busy := false
 	for each: Dictionary in _resident_asks:
 		if int(each["body"]) == body.get_instance_id():
@@ -14155,6 +14166,12 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 	var no_homes: Array[Rect2i] = []
 	var base := _resident_places(area, place, "", no_homes, 0)
 	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	# The starter stall's keeper (736): by the store of each of vendor.towns, all day, every day, until
+	# buildings' stall gives him a place of his own; a plain townsman in an armourer's apron.
+	var vendor: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
+	if place_id in vendor.get("towns", []):
+		out.append({"key": Offers.VENDOR + place_id, "name": str(vendor.get("name", "Rolf")), "trade": "", "player": "",
+			"town": place_id, "look_trade": "smith", "places": _visitor_places(Rect2i(store - Vector2i(2, 2), Vector2i(5, 5)))})
 	for entry: Dictionary in World.towns.visitors(place_id):
 		var kind := str(entry.get("kind", ""))
 		var spot: Rect2i = base.get("inn", base["square"])
@@ -14327,6 +14344,21 @@ func _visitor_sells(player: Player, body: Resident, item: String) -> void:
 	var done := World.towns.visitor_sell(body.worker_id.trim_prefix(Offers.VISITOR), player.player_id, item)
 	if bool(done.get("ok", false)):
 		_hand_item(player.player_id, item, body.person)
+	var say := str(done.get("say", ""))
+	if not say.is_empty():
+		_resident_says(body, say, "", player)
+
+
+## [param player] bought [param item] at the starter stall of [param body]
+## (736): economy takes the gold (Economy.vendor_sale), npc mints its count
+## into their hands, each marked starter; the keeper says how it went.
+func _vendor_sells(player: Player, body: Resident, item: String) -> void:
+	if World.economy == null or not World.economy.has_method("vendor_sale"):
+		return
+	var done: Dictionary = World.economy.vendor_sale(player.player_id, item)
+	if bool(done.get("ok", false)):
+		for i in maxi(int(done.get("count", 1)), 1):
+			_hand_item(player.player_id, item, body.person, true)
 	var say := str(done.get("say", ""))
 	if not say.is_empty():
 		_resident_says(body, say, "", player)

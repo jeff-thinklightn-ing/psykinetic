@@ -35908,3 +35908,31 @@ already private per player.
 level_test _test_umbrage_locker (the house, the locker in it), spawn_key_test
 _test_a_moved_locker, view_test _test_home_label. Client and server read the level; server
 change in Main's load; protocol unchanged, no new class_name.
+## 736, npc's side: Rolf, the starter stall's keeper
+
+Items marks starter uids (World.mark_starter, is_starter) and economy sells
+them (Economy.vendor_sale, economy.json vendor: towns, name, price,
+wares). npc's side is the keeper and his panel:
+
+- **His body.** "vendor:" + the town store (Offers.VENDOR), with no worker
+  and no card, as a visitor (711). `_visitors_wanted` adds him for each
+  store in vendor.towns (Umbrage's "wilds/store" now), all day and every
+  day, in the store's 5x5 like a pedlar, until buildings' stall gives him
+  a place of his own. His look is a plain townsman in an armourer's apron:
+  the spawn's new "look_trade" ("smith") feeds ResidentCard.look_spec
+  without giving him a trade, so nothing of a smith's work or words is his.
+  His name is the rule's ("Rolf").
+- **His words.** A click is a greeting from townsfolk.json
+  visitors.greetings.vendor; typed words skip him, as they skip visitors.
+- **His wares.** Offers.VENDOR_WARES: one line for each of vendor.wares
+  ("A sword, 1 gold", "Arrows, 1 gold"), at vendor.price, never running out.
+  It is the same offer shape the pedlar's panel uses, so no new field goes
+  to the client. Accepted, Main `_vendor_sells` asks Economy.vendor_sale;
+  on ok it mints its count into the hands (`_hand_item`'s new starter
+  flag), each marked starter before it finds a stack, so a stack it joins
+  is never marked through it. He says economy's line either way.
+
+resident_test `_test_vendor`: his body by the store and no worker, the
+greeting, typed words skipping him, every ware at the price, no gold
+meaning nothing given, a purchase paid with the sword in hand marked
+starter, and no body outside vendor.towns. Server only; protocol unchanged.

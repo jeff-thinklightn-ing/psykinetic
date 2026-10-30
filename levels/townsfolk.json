@@ -44,6 +44,7 @@
 	"visitors": {
 		"_about": "npc's side of visitors (decision 711, npc's side): what a stranger passing through says when clicked. greetings by kind (traveller, pedlar, pilgrim), %s where they come from; road: their news when the towns have none to carry, %s again where they come from; leaving: said once they are on their way out. Each player gets one piece of their news a visit.",
 		"greetings": {
+			"vendor": ["Blades for the road, one gold apiece. Take your pick.", "Starting out? A gold buys you something to swing.", "One gold each, and never sold dear. What'll it be?"],
 			"traveller": ["Just passing through, from %s.", "Long road from %s. Is the inn any good?"],
 			"pedlar": ["Fine things from %s, if you've the coin.", "Come and look. All the way from %s."],
 			"pilgrim": ["Peace on you. I've walked from %s to pray here.", "The gods keep you. I came from %s."]

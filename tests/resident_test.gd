@@ -82,6 +82,7 @@ func _ready() -> void:
 	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
 	_test_visitors()  # After them: its syncs step the world.
 	_test_relic()  # 714: the knight's remains to Aldous.
+	_test_vendor()  # 736: the starter stall.
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
@@ -3582,6 +3583,62 @@ func _test_named_enemy() -> void:
 ## wares are offers, bought through economy and minted into the hands;
 ## typed words never reach one; going on, the body walks to the road's edge
 ## and is gone.
+func _test_vendor() -> void:
+	print("
+== the starter stall: Rolf by the store, a greeting, the base weapons at 1 gold, minted and marked starter (736, npc's side) ==")
+	var player := _player()
+	if player == null or World.economy == null or not World.economy.has_method("vendor_sale") or World.economy.rules.get("vendor", {}).is_empty():
+		_check(true, "(no player or economy's vendor: skipped)")
+		return
+	var pid := Net.player_id
+	var rule: Dictionary = World.economy.rules["vendor"]
+	var towns_was: Array = (rule.get("towns", []) as Array).duplicate()
+	rule["towns"] = [STORE]  # The test town in place of Umbrage's store.
+	_sync()
+	var rolf := _body(Offers.VENDOR + STORE)
+	_check(rolf != null and rolf.person == str(rule.get("name", "")) and World.production.worker(rolf.worker_id).is_empty(), "a body by the store, named by the rule, no worker")
+	if rolf == null:
+		rule["towns"] = towns_was
+		return
+	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+	_check(rolf.places.get("work", Rect2i()).has_point(store), "he keeps to the store (%s)" % [rolf.places.get("work")])
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	_put(player, _main._nearest_free(rolf.tile + Vector2i(1, 0)))
+	_main._resident_fight_at.clear()
+	_main._greet_at.clear()
+	_main._greeted(player, rolf)
+	_check(spoken.size() == 1, "a greeting (%s)" % [spoken])
+	_check(_main._resident_addressed(player, "hello there", null) != rolf, "typed words never reach him")
+	var offers := Offers.of(rolf.worker_id, pid)
+	_check(offers.size() == (rule.get("wares", []) as Array).size() and offers.all(func(o: Dictionary) -> bool: return int(o["cost"]) == int(rule.get("price", 1)) and str(o["kind"]) == Offers.VENDOR_WARES),
+		"every ware at the rule's price (%s)" % [offers.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	var sword := offers.filter(func(o: Dictionary) -> bool: return str(o["what"].get("item", "")) == "sword")
+	World.economy.add_gold(pid, -World.economy.gold(pid), "the test")
+	spoken.clear()
+	if not sword.is_empty():
+		_main._accept_offer(player, str(sword[0]["id"]), 0)
+	_check(not player.slots.has("sword") and spoken.size() == 1 and spoken[0].contains("gold"), "no gold: nothing given, he says the price (%s)" % [spoken])
+	World.economy.add_gold(pid, 5, "the test")
+	for slot in player.slots.size():
+		if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
+			World.items.place(World._take_out(player, slot), "the test")  # Room in the hands for what he sells.
+	spoken.clear()
+	if not sword.is_empty():
+		_main._accept_offer(player, str(sword[0]["id"]), 0)
+	var at := player.slots.find("sword")
+	_check(World.economy.gold(pid) == 5 - int(rule.get("price", 1)) and at >= 0 and World.is_starter(World.slot_uid(player, at)),
+		"bought: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
+	_check(spoken.size() == 1, "he says so (%s)" % [spoken])
+	Net.message_received.disconnect(heard)
+	rule["towns"] = towns_was
+	_sync()
+	_check(_body(Offers.VENDOR + STORE) == null, "not among the rule's towns: no body")
+
+
 func _test_hut_ruin() -> void:
 	print("
 == a healer's hut fallen to ruin: no return there, no care, those in its care told; an empty hut kept again after vacant_days (733, npc's side) ==")

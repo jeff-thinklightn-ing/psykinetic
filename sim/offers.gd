@@ -82,6 +82,11 @@ const BUY := "buy"
 ## no worker, no card. A pedlar's things are WARES, sold by WARES.
 const VISITOR := "visitor:"
 const WARES := "wares"
+## The starter stall's keeper (decision 736): "vendor:" + the town store he
+## stands by, no worker, no card. His wares are VENDOR_WARES, sold by Main
+## through Economy.vendor_sale, minted and marked starter.
+const VENDOR := "vendor:"
+const VENDOR_WARES := "vendor_wares"
 const TAKE := "take"
 const LEND := "lend"
 const CARRY := "carry"
@@ -202,6 +207,8 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 	var production: Production = given.get("production")
 	if worker_id.begins_with(VISITOR):
 		return _visitor_offers(worker_id, given)
+	if worker_id.begins_with(VENDOR):
+		return _vendor_offers(worker_id, given)
 	if production == null or worker_id.begins_with(Townsfolk.COMPANION):
 		return out
 	var who := production.worker(worker_id)
@@ -347,6 +354,27 @@ static func _relic_offers(worker_id: String, who: Dictionary, card: Dictionary, 
 		var knight := str(relic.get("knight", "the knight"))
 		out.append(_offer(worker_id, RELIC, str(uid), "Give %s the remains of %s" % [_them(card), knight],
 			"%s's remains, brought up from the barrow, for the altar." % knight, {"uid": uid, "knight": knight}, RELIC))
+	return out
+
+
+## The starter stall's wares (decision 736): one line for each of
+## economy.json vendor.wares (ctx "vendor": the rule), at vendor.price,
+## never running out; "Arrows, 1 gold".
+static func _vendor_offers(worker_id: String, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var rule: Variant = _call(given, "vendor")
+	if not rule is Dictionary:
+		return out
+	var price := int(rule.get("price", 1))
+	var catalog: Variant = _call(given, "catalog")
+	for line: Variant in rule.get("wares", []):
+		var item := str(line.get("item", "")) if line is Dictionary else ""
+		if item.is_empty():
+			continue
+		var name := str(catalog.get(item, {}).get("name", item.replace("_", " "))) if catalog is Dictionary else item.replace("_", " ")
+		var thing := name if item == "arrows" or name.ends_with("s") else Companion._a(name)
+		out.append(_offer(worker_id, VENDOR_WARES, item, "%s, %d gold" % [_upper_first(thing), price],
+			"%s for %d gold, for the road. Mind, no one will buy it back off you." % [_upper_first(thing), price], {"item": item, "price": price}, VENDOR_WARES, price))
 	return out
 
 
@@ -923,6 +951,9 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		RELIC:
 			out["relic"] = int(offer["what"].get("uid", 0))  # Laid on the altar by Main (_relic_returned), 714.
 			out["ok"] = int(out["relic"]) > 0
+		VENDOR_WARES:
+			out["starter"] = str(offer["what"].get("item", ""))  # Sold by Main (Economy.vendor_sale), 736.
+			out["ok"] = not out["starter"].is_empty()
 		WARES:
 			out["ware"] = str(offer["what"].get("item", ""))  # Sold by Main (Towns.visitor_sell), 711.
 			out["ok"] = not out["ware"].is_empty()
