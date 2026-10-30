@@ -1308,6 +1308,22 @@
 				{"at": [0, 0.79, 0], "size": [1.94, 1.58, 0.7]}
 			]
 		},
+		"building.market_stall": {
+			"category": "buildings",
+			"type": "mesh",
+			"kind": "cell",
+			"footprint": [2, 1],
+			"size": [2, 2.4, 1.2],
+			"budget": 800,
+			"source": {"by": "art-gen, fitted by art-kit", "tool": "Qwen-Image-2512, TRELLIS.2, blender", "license": "own", "date": "2026-10-29", "notes": "prop.market_stall's mesh as a building (its own blend copied; N:/assets/candidates/prop.market_stall/notes.md, the note's c7): its awning in banner red and cloth, counter and posts on row 2"},
+			"uses": "736's stall, economy's 1g starter weapon vendor (coordinator-approved; buildings' ask): 2 x 1 cells, long side along x, the counter at the front (+z), the awning over it, 0.1 over the cell's depth front and back; buildings places it in Umbrage's square, a solid building like building.weapon_rack",
+			"grey": [
+				{"at": [0, 0.5, 0.3], "size": [2, 1, 0.6]},
+				{"at": [0, 2.3, 0], "size": [2, 0.2, 1.2]},
+				{"at": [-0.95, 1.2, -0.55], "size": [0.1, 2.4, 0.1]},
+				{"at": [0.95, 1.2, -0.55], "size": [0.1, 2.4, 0.1]}
+			]
+		},
 		"prop.fallen_guard": {
 			"category": "props",
 			"type": "mesh",
