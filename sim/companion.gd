@@ -688,6 +688,11 @@ var _dodge_from := ""
 ## A fight since she last slept, and the day she last asked for a watch.
 var _hard_day := false
 var _watch_day := -1
+## Decision 738: whether she and her player are on town ground together, the
+## tick they came onto it, and when her voice last asked to rest (-1 never).
+var _in_town := false
+var _town_since := -1
+var _rest_asked_at := -1
 ## Her player's standing plain order (decision 616): "wait" or "rest", else
 ## "". Calm does not undo it; "follow" or another order does.
 var order := ""
@@ -1338,8 +1343,10 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				done = "%s asked you to play knucklebones, but there is fighting near: after it." % keeper_name()
 			elif not _game.is_empty():
 				done = "You are playing knucklebones with %s already." % keeper_name()
-			elif not (_fire_near(tile, int(rules.get("fire_cells", 2))) and _alive(keeper) and _fire_near(keeper.tile, int(rules.get("fire_cells", 2)))):
-				done = "%s asked you to play knucklebones, but you play by a camp fire, sitting together, not here." % keeper_name()
+			elif not safe_to_rest():
+				done = "%s asked you to play knucklebones, but you only sit down to play somewhere safe, in a town, not out here." % keeper_name()
+			elif not (_fire_near(tile, int(rules.get("fire_cells", 2))) and _fire_near(keeper.tile, int(rules.get("fire_cells", 2)))):
+				done = "%s asked you to play knucklebones, but you play by a fire, sitting together, not here." % keeper_name()
 			else:
 				_game = {"round": 0, "at": World.tick + int(rules.get("round_ticks", 60)), "hers": 0, "theirs": 0}
 				done = "You sit down by the fire with %s for a game of knucklebones, best of three." % keeper_name()
@@ -1427,10 +1434,14 @@ func _watch_deeds() -> void:
 	var low := hp < max_hp * float(rules.get("low_hp", 0.334))
 	if not low:
 		_deeds["asked_rest"] = false
-	elif not fight and not _deeds["asked_rest"]:
+	elif not fight and not _deeds["asked_rest"] and (_rest_asked_at < 0
+			or World.tick - _rest_asked_at >= int(rules.get("rest_ask_ticks", 6000))):
 		_deeds["asked_rest"] = true
+		_rest_asked_at = World.tick
 		_engaged.clear()
-		_say(str(rules.get("rest_ask", "I need to rest before the next fight.")), true)
+		# Her own words, not a fixed line (738): the facts, then the ask.
+		_ask_voice(("You are badly hurt (%d of %d), and the fight is over for now. You'd like to rest before the next one: "
+			+ "tell %s so in your own words, plainly.") % [hp, max_hp, keeper_name()], "", true)
 
 
 ## companion_traits "bond" [param key] ("game", "sleep"; decision 621).
@@ -1491,7 +1502,7 @@ func _sleep() -> void:
 	_hard_day = false
 	_serial += 1
 	_set_stance(Stance.HOLD, _serial, "order")
-	_narrate("You lie down by the fire to sleep, while %s keeps watch." % keeper_name())
+	_narrate("You lie down to sleep, while %s keeps watch." % keeper_name())
 	_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": "keep watch", "outcome": "sleeps", "note": ""})
 
 
@@ -1508,13 +1519,19 @@ func _keep_watch() -> void:
 	var near := int(rules.get("near", 4))
 	if in_fight():
 		_hard_day = true
+	if World.tick % DEED_EVERY == 0:
+		if not safe_to_rest():
+			_in_town = false
+		elif not _in_town:
+			_in_town = true
+			_town_since = World.tick
 	if order == "watch":
 		if not _alive(keeper) or World.distance(tile, keeper.tile) > near:
 			_sleeping["left"] = true
 		var woke := ""
 		if in_fight():
 			if _sleeping.get("left", false):
-				_say(str(rules.get("left_line", "You left me sleeping alone?")), true)
+				_ask_voice("You woke to monsters near, and %s had gone off and left you sleeping alone. Say how you take it, in your own words." % keeper_name(), "", true)
 				deed.emit("left_alone", "left you sleeping alone")
 			woke = "You wake: monsters came near."
 		elif World.tick >= int(_sleeping.get("until", 0)):
@@ -1544,11 +1561,24 @@ func _keep_watch() -> void:
 		return
 	var day := Townsfolk.day_of(World.steps)
 	var reach := int(rules.get("fire_cells", 2))
-	if _watch_day != day and (_hard_day or hp < max_hp * float(rules.get("hard_hp", 0.7))) \
-			and _fire_near(tile, reach) and _fire_near(keeper.tile, reach):
+	if (_watch_day < 0 or day - _watch_day >= int(rules.get("ask_days", 2))) \
+			and (_hard_day or hp < max_hp * float(rules.get("hard_hp", 0.7))) and safe_to_rest() and _in_town \
+			and World.tick - _town_since >= int(rules.get("ask_after_ticks", 3000)):
 		_watch_day = day
 		_sleeping = {"asked_at": World.tick, "their_tile": keeper.tile}
-		_say(str(rules.get("ask", "Will you keep watch while I sleep?")), true)
+		# Her own words, not a fixed line (738): where she is, why, then the ask.
+		_ask_voice(("You are worn out after a hard day (%s), here in %s%s, and nothing hostile is near. You'd like to sleep "
+			+ "a while if %s keeps watch over you: ask them, in your own words.") % [
+				"you fought today" if _hard_day else "%d of %d" % [hp, max_hp], _place_words(),
+				", by the fire" if _fire_near(tile, reach) else "", keeper_name()], "", true)
+
+
+## Whether she may rest or sleep here (decision 738, Jeff: a camp is "not a
+## safe place bc the goblins respawn"): she and her player both on town
+## ground (Main's in_town: a town store's ground or a town's named room).
+## Never a camp, a dungeon or the wilds, however quiet they look now.
+func safe_to_rest() -> bool:
+	return in_town.is_valid() and _alive(keeper) and bool(in_town.call(tile)) and bool(in_town.call(keeper.tile))
 
 
 ## Bandaged (decision 621): her ask to rest first is met.

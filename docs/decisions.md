@@ -35539,3 +35539,36 @@ its own in the slot's note (the tooltip), beside the tally and the story. Econom
 makers' buy-backs and the fence. items_test _test_starter_gear. Server only,
 protocol unchanged (the note rides the existing slot_notes), no new
 class_name.
+
+## 738. She rests only where it's safe, in her own words
+
+Jeff: "companions keep talking about sleeping at the goblin camp outside
+town, 'watch me while I rest' i think thats scripted not natural generative
+text. happens a lot. its not a safe place bc the goblins respawn." He was
+right on both counts. The keep-watch ask (621) was a fixed line
+(companion_traits bond.sleep.ask), and so were "I need to rest before the
+next fight." (bond.watch.rest_ask) and "You left me sleeping alone?". Her
+only test for a place was a fire within 2 cells of her and her player with
+nothing hostile in sight just then, so a cleared camp's campfire passed.
+It fired once a game day (90 real minutes) after any fight, and the rest
+ask had no cooldown. Coordinator-approved:
+- **Safe ground only:** Companion.safe_to_rest() is true when she and her
+  player both stand on town ground (Main's in_town hook,
+  Main._town_ground: a town store's ground or a town's named room, so the
+  inn, houses, temple and square). Never a camp, a dungeon or the wilds,
+  even beside her player, since monsters roam and respawn there. She asks
+  to sleep only there, and a fire is no longer needed (one nearby is a fact
+  for her voice). Knucklebones (asked) is town-only too, still by a fire.
+- **Her own words:** the sleep ask, the rest ask and the woken-alone line
+  are voice triggers (_ask_voice, always) carrying the facts: a hard day
+  (fought today, or her hp), the place, the fire, her player's name. The
+  fixed strings are removed from companion_traits.json. The yes/no answer
+  handling (621) is unchanged.
+- **Less often:** the sleep ask at most once each bond.sleep.ask_days (2
+  game days, 3 real hours) and not within ask_after_ticks (3000, 5 min) of
+  their coming onto town ground together; the rest ask at most once each
+  bond.watch.rest_ask_ticks (6000, 10 min). Drafts in the rules file.
+companion_test: by a camp's fire after a hard day, no game and no ask; just
+come into town, not yet; in town, one voiced ask with the facts and no
+fixed line; not again the same day; the rest ask voiced and cooled down;
+woken alone, voiced. Server only, protocol unchanged, no new class_name.

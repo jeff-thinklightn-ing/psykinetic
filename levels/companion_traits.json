@@ -93,9 +93,9 @@
 		"drops": {"kept_from": -1, "left_alone": -1, "let_bleed": -2, "grave": -1, "warned": -1, "harsh": -1, "mule": -1, "pressed": -1},
 		"harsh_a_day": 2,
 		"game": {"fire_cells": 2, "round_ticks": 60, "best_of": 3, "rounds_most": 9},
-		"sleep": {"hard_hp": 0.7, "fire_cells": 2, "near": 4, "answer_ticks": 200, "sleep_ticks": 1200, "ask": "Will you keep watch while I sleep?", "left_line": "You left me sleeping alone?"},
+		"sleep": {"hard_hp": 0.7, "fire_cells": 2, "near": 4, "answer_ticks": 200, "sleep_ticks": 1200, "ask_days": 2, "ask_after_ticks": 3000, "_note": "Decision 738: asked only on town ground, in her own words (no fixed line), at most once each ask_days game days and not within ask_after_ticks of coming into town."},
 		"watch": {"near": 4, "road_cells": 300, "road_share": 0.6, "fire_cells": 2, "fire_ticks": 1800, "town_ticks": 6000,
-			"heavy_share": 0.75, "heavy_cells": 400, "heavy_warn": "This pack is breaking my back.", "low_hp": 0.334, "rest_ask": "I need to rest before the next fight."}
+			"heavy_share": 0.75, "heavy_cells": 400, "heavy_warn": "This pack is breaking my back.", "low_hp": 0.334, "rest_ask_ticks": 6000}
 	},
 	"leaving": {
 		"_note": "Decision 581 (Jeff: 'companion keeps their blessings and abilities but goes back to their home town to live and work their vocation ... would never become an enemy'): at the bottom step (apart) she leaves her player, at the next calm moment; on the last straw (its deed, when her bond is at or below its step) too, even dead, when she is next back. She walks to the zone's nearest way out for at most walk_s, gone there or once out of their sight, and lives in her home town as a resident. Drafts for Jeff.",

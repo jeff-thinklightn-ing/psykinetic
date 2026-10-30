@@ -1531,9 +1531,24 @@ func _test_deeds() -> void:
 	_check(seen.count("mule") == 1, "and then a drop, once until she rests (%s)" % [seen])
 	World.set_slots(pet, slots_were)
 	# Pressed on hurt: she asks to rest; a new fight then costs her.
+	var mind_was: CompanionMind = pet.mind
+	var counting := CountingMind.new()
+	pet.mind = counting
+	pet._rest_asked_at = -1
 	pet.hp = maxi(1, int(pet.max_hp * 0.2))
 	tick_on.call()
-	_check(str(watch["rest_ask"]) in spoken, "badly hurt, out of a fight: she asks to rest (%s)" % [spoken])
+	var rest_asks := counting.triggers("voice").filter(func(t: String) -> bool: return "rest before the next one" in t)
+	_check(rest_asks.size() == 1 and pet._deeds["asked_rest"], "badly hurt, out of a fight: her voice is asked to say she needs rest, no fixed line (738) (%s)" % [rest_asks])
+	pet.hp = pet.max_hp
+	tick_on.call()
+	pet.hp = maxi(1, int(pet.max_hp * 0.2))
+	tick_on.call()
+	_check(counting.triggers("voice").filter(func(t: String) -> bool: return "rest before the next one" in t).size() == 1,
+		"hurt again soon after: not asked again within rest_ask_ticks")
+	pet._rest_asked_at = World.tick - int(watch["rest_ask_ticks"])
+	pet._deeds["asked_rest"] = false
+	tick_on.call()
+	pet.mind = mind_was
 	var ambush := _spawn_imp(_free_tile_between(pet, 2, 3))
 	ambush.acts = false
 	ambush.target = owner
@@ -1588,11 +1603,35 @@ func _test_game_and_watch() -> void:
 	if not pet._fire_near(pet.tile, int(game["fire_cells"])) and not pet._fire_near(owner.tile, int(game["fire_cells"])):
 		_say_to(pet, owner, "Let's play knucklebones.")
 		_check(pet._game.is_empty(), "no fire: no game")
-	# By the fire: best of three, the tally kept, a deed.
+	# By a fire out of town (a camp's): no game, no sleep (738, Jeff: a camp is "not a safe place").
 	var fire := Vector2i(10, 7)
 	World._fire[fire] = true
+	var town_was: Callable = pet.in_town
+	var in_town := {"on": false}
+	pet.in_town = func(_cell: Vector2i) -> bool: return in_town["on"]
 	_say_to(pet, owner, "Let's play knucklebones.")
-	_check(not pet._game.is_empty(), "by a fire together: the game starts")
+	_check(pet._game.is_empty(), "by a fire out of town (a camp): no game")
+	var mind_was: CompanionMind = pet.mind
+	var counting := CountingMind.new()
+	pet.mind = counting
+	_kill_monsters()
+	pet._watch_day = -1
+	pet._hard_day = true
+	pet.hp = int(pet.max_hp * 0.5)
+	for i in Companion.DEED_EVERY * 3:
+		World.step()
+	_check(not pet._sleeping.has("asked_at") and counting.triggers("voice").filter(func(t: String) -> bool: return "keeps watch" in t).is_empty(),
+		"a hard day by a camp's fire: she never asks to sleep there (%s)" % [counting.triggers("voice")])
+	in_town["on"] = true
+	for i in Companion.DEED_EVERY * 3:
+		World.step()
+	_check(not pet._sleeping.has("asked_at"), "just come into town: not yet (ask_after_ticks)")
+	pet._town_since = World.tick - int(sleep["ask_after_ticks"])
+	pet._hard_day = false
+	pet.hp = pet.max_hp
+	# In town by the fire: best of three, the tally kept, a deed.
+	_say_to(pet, owner, "Let's play knucklebones.")
+	_check(not pet._game.is_empty(), "in town, by a fire together: the game starts")
 	for i in int(game["round_ticks"]) * int(game["rounds_most"]) + 2:
 		World.step()
 		if pet._game.is_empty():
@@ -1609,7 +1648,9 @@ func _test_game_and_watch() -> void:
 	pet.hp = int(pet.max_hp * 0.5)
 	for i in Companion.DEED_EVERY:
 		World.step()
-	_check(str(sleep["ask"]) in spoken and pet._sleeping.has("asked_at"), "a hard day, by the fire: she asks her player to keep watch (%s)" % [spoken])
+	var sleep_asks := counting.triggers("voice").filter(func(t: String) -> bool: return "keeps watch" in t)
+	_check(sleep_asks.size() == 1 and pet._sleeping.has("asked_at") and "you fought today" in str(sleep_asks[0]),
+		"a hard day, in town: her voice is asked, with the facts, to ask her player to keep watch; no fixed line (738) (%s)" % [sleep_asks])
 	_say_to(pet, owner, "Yes, get some sleep.")
 	World.step()
 	_check(pet.order == "watch" and pet.current_intent == Companion.Intent.SLEEP and pet.asleep,
@@ -1619,6 +1660,10 @@ func _test_game_and_watch() -> void:
 	_check(not pet.asleep, "woken: no longer asleep")
 	_check(pet.order == "" and pet.hp == pet.max_hp and "watched" in seen and Standing.score(record.companion, id) == 1,
 		"slept out with her player by: whole, and they kept watch, trust (hp %d, %s, %d)" % [pet.hp, seen, Standing.score(record.companion, id)])
+	pet._hard_day = true
+	for i in Companion.DEED_EVERY * 2:
+		World.step()
+	_check(not pet._sleeping.has("asked_at"), "another hard day the same day: not asked again (ask_days)")
 	# Left sleeping, and something comes.
 	_kill_monsters()
 	pet._watch_day = -1
@@ -1634,10 +1679,15 @@ func _test_game_and_watch() -> void:
 	imp.acts = false
 	World.step()
 	World.step()
-	_check(str(sleep["left_line"]) in spoken and "left_alone" in seen and pet.order == "", "her player gone and something came: she wakes, says so, and it costs her (%s)" % [seen])
+	_check(counting.triggers("voice").any(func(t: String) -> bool: return "left you sleeping alone" in t) and "left_alone" in seen and pet.order == "",
+		"her player gone and something came: she wakes, says so in her own words, and it costs her (%s)" % [seen])
 	_check(not pet.asleep, "woken by the fight: no longer asleep")
 	World.despawn(imp)
 	World._fire.erase(fire)
+	pet.mind = mind_was
+	pet.in_town = town_was
+	pet._town_since = -1
+	pet._in_town = false
 	pet.deed.disconnect(on_deed)
 	pet.said.disconnect(on_said)
 	pet._hard_day = false
