@@ -36010,3 +36010,11 @@ buildings' landing, and a second town's stall needs only its place.
 
 resident_test _test_vendor: a stall place of the test town puts him behind
 it; none, by the store. Server only, protocol unchanged, no new class_name.
+## 742, lore's side: the robbers' chest and the refused bargain
+
+Two facts follow what the game now shows (agreed, being in the game): crypt.robbers_chest (the
+Mound-breakers stash their take in a chest at their camp, dungeon's 742) and crypt.draugr_refused
+(whoever refuses the draugr's bargain must fight him, dungeon's 735 and Jeff's "Then I'll take it
+from you by force!"). Rumours, true, in the Woodlands, so Aldous's secret budget is untouched.
+Data and docs only, protocol unchanged.
+

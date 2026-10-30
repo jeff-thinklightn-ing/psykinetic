@@ -231,6 +231,20 @@
 					"status": "agreed"
 				},
 				{
+					"id": "crypt.draugr_refused",
+					"text": "Whoever refuses the draugr's bargain must fight him for it.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"return"
+					],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
 					"id": "crypt.hall_door",
 					"text": "The door of the Hall of Fallen Souls closes behind whoever enters, and opens again for gold returned or for his defeat.",
 					"known": "secret",
@@ -330,6 +344,18 @@
 					],
 					"tags": [],
 					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.robbers_chest",
+					"text": "The Mound-breakers stash their take in a chest at their camp in the barrow.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
 					"status": "agreed"
 				},
 				{
