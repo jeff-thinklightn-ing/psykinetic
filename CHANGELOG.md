@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Ground: grass draws a fine lawn of blade strokes over a mottled green (Jeff's pick from art-gen's procedural redo) in place of its plain procedural colour; three more variants (a second lawn, two meadows) are in the kit for terrain to use.
 - Ground: stone floors draw flat grey flagstones on dark joints (Jeff's pick, ground.stone c1) in place of their plain procedural colour.
 
 - Companions: what she says she carries counts all 8 pack slots, and her armour is worn, not held (722, companions' side).

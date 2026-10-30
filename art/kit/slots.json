@@ -3376,6 +3376,8 @@
 		"ground.grass": {
 			"category": "ground",
 			"type": "texture",
+			"variants": 4,
+			"source": {"by": "art-gen, procedural (no model)", "tool": "numpy, Pillow (art-gen grass_tile.py)", "license": "own", "date": "2026-10-29", "notes": "N:/assets/candidates/ground.grass/procedural.json (Jeff, 2026-10-29: \"grass redo is good\"; his \"none of those are style matches\" put the c1-c6 polygons aside): p1 and p2 lawn, p3 and p4 meadow, blade strokes over a mottled undercoat with sparse dry blades, the mean pinned to row 4's #5d7742, 512 px for 4 m, seamless by construction; the variants are <slot>.png, .2.png to .4.png (ArtKit.texture(slot, variant))"},
 			"tile_m": 4.0,
 			"pixels": 512,
 			"uses": "terrain's ground shader on grass: blended, lit and noised there; procedural colour while empty"
