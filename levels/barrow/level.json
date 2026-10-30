@@ -308,12 +308,32 @@
 		},
 		"loops": 0.15,
 		"monsters": {
-			"robber": 4
+			"robber": 8,
+			"robber_brute": 1
 		},
 		"near": {
-			"robber": "altar"
+			"robber_brute": "camp"
 		},
-		"chests": 3
+		"chests": 3,
+		"band": {
+			"_": "714, dungeon's side (4): the mound-breakers (enemy-ai's named band, 716): each kind's markers, in cell order, are these named ones (Regen.band_of).",
+			"robber_brute": [
+				"brand"
+			],
+			"robber": [
+				"crake",
+				"mott",
+				"nabb",
+				"wicket",
+				"fenn",
+				"rook",
+				"sedge",
+				"tull"
+			]
+		},
+		"apart": {
+			"robber": 8
+		}
 	},
 	"rooms": {
 		"entrance": {
@@ -348,7 +368,8 @@
 		"monster_skeleton": "#d8d0b0",
 		"monster_skeleton_guard": "#988c64",
 		"monster_robber": "#8a5a2a",
-		"monster_draugr": "#5a4636"
+		"monster_draugr": "#5a4636",
+		"monster_robber_brute": "#6e4420"
 	},
 	"respawn_s": {
 		"robber": 300,

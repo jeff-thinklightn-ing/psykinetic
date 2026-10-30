@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's robbers are now Brand the Ox and his eight named mound-breakers, spread through its rooms (714): the hidden niche in the First Hall stays shut, and no draft is felt, until you have felled each of them once.
 - Healers' turf huts now show their state: a hut left empty falls into disrepair with a holed roof, a ruin shows broken walls and a cold, tipped pot with no smoke, and a mended hut stands again (733).
 - Umbrage: a weapon stall now stands in the square, south of the shop, with its counter facing you. Its seller will stand behind it (736).
 - The sky has a sun, a moon that waxes and wanes over eight days, stars at night and clouds that follow the weather: see them along the top of the view at sunrise and sunset, and in the water's reflections (744).

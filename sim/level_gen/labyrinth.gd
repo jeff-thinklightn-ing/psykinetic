@@ -1072,9 +1072,10 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 					var rect: Rect2i = anchor["rect"]
 					spots = _nearest_first(rect.position + rect.size / 2, spots)
 		var count := int(counts[kind])
+		var apart := int((config.get("apart", {}) as Dictionary).get(kind, 0)) if config.get("apart") is Dictionary else 0
 		if barrow and not sent and int(depth.get("fixed_band", -1)) < 0:
-			count -= _lay_by_band(map, anchors, "monster_" + kind, count, spots, depth)
-		_lay(map, anchors, "monster_" + kind, count, spots)
+			count -= _lay_by_band(map, anchors, "monster_" + kind, count, spots, depth, apart)
+		_lay(map, anchors, "monster_" + kind, count, spots, apart)
 
 
 ## Whether [param cell] is open floor (631 amended, dungeon's side): floor
@@ -1096,17 +1097,29 @@ static func _open_floor(map: LevelMap, cell: Vector2i) -> bool:
 
 ## [param count] markers [param marker] on the first free floor cells of
 ## [param spots] (in their order), none beside an anchor; how many were laid.
-static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i]) -> int:
+## With [param apart] (the block's "apart": {kind: cells}; 714, dungeon's
+## side (4), the coordinator: the band spread over the rooms), no marker
+## within that many cells (Chebyshev) of another of its kind while any
+## spot further off is left; then the nearer ones, as before.
+static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], apart := 0) -> int:
 	if count <= 0 or not map.colours.has(marker):
 		return 0
 	var laid := 0
-	for cell in spots:
-		if laid >= count:
-			return laid
-		if map.cell(cell) != FLOOR or _beside_anchor(anchors, cell):
-			continue
-		map.set_cell(cell, marker)
-		laid += 1
+	var placed: Array[Vector2i] = []
+	for cell: Vector2i in map.cells:
+		if map.cells[cell] == marker:
+			placed.append(cell)
+	for gap in ([apart, 0] if apart > 0 else [0]):
+		for cell in spots:
+			if laid >= count:
+				return laid
+			if map.cell(cell) != FLOOR or _beside_anchor(anchors, cell):
+				continue
+			if gap > 0 and placed.any(func(other: Vector2i) -> bool: return maxi(absi(other.x - cell.x), absi(other.y - cell.y)) < gap):
+				continue
+			map.set_cell(cell, marker)
+			placed.append(cell)
+			laid += 1
 	return laid
 
 
@@ -1115,7 +1128,7 @@ static func _lay(map: LevelMap, anchors: Array, marker: String, count: int, spot
 ## deeper bands taking the odd ones, each band's [param spots] deepest
 ## first; how many were laid (a band short of free cells lays fewer, and
 ## the caller lays the rest deepest first).
-static func _lay_by_band(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], depth: Dictionary) -> int:
+static func _lay_by_band(map: LevelMap, anchors: Array, marker: String, count: int, spots: Array[Vector2i], depth: Dictionary, apart := 0) -> int:
 	var by_band: Array[Array] = [[], [], []]
 	for cell in spots:
 		by_band[_band_of(depth, cell)].append(cell)
@@ -1124,5 +1137,5 @@ static func _lay_by_band(map: LevelMap, anchors: Array, marker: String, count: i
 		var share := count / 3 + (1 if band >= 3 - count % 3 else 0)
 		var cells: Array[Vector2i] = []
 		cells.assign(by_band[band])
-		laid += _lay(map, anchors, marker, share, _deepest_first(depth, cells))
+		laid += _lay(map, anchors, marker, share, _deepest_first(depth, cells), apart)
 	return laid

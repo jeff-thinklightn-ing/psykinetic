@@ -137,7 +137,7 @@ const BARROW_ROOMS := {
 	"camp": {"name": "The Robbers' Camp", "rect": [6, 42, 10, 8]}}
 const DEEP_ROOMS := {"entrance": {"name": "The Charnel Vault", "rect": [46, 1, 8, 6]},  # 714: lore's name, Jeff passed.
 		"lair": {"name": "The Hall of Fallen Souls", "rect": [34, 56, 32, 22]}}
-const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636"}
+const BARROW_LEGEND := {"monster_skeleton": "#d8d0b0", "monster_skeleton_guard": "#988c64", "monster_robber": "#8a5a2a", "monster_draugr": "#5a4636", "monster_robber_brute": "#6e4420"}
 ## The Dwarven Halls under the castle (613, dungeon's side; Jeff: the smith
 ## sought a great dwarven forge deep below, his guards were ambushed, he is
 ## held there forging goblin weapons): one level in the dwarven style, three
@@ -374,7 +374,9 @@ static func sample_barrow() -> Dictionary:
 			{"at": [BARROW_PACK.x, BARROW_PACK.y], "name": "Runner's pack", "props": {"grave": false, "slots": ["", "", "", ""]}}],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 1, "ways": 5, "every_days": 3, "anchors": BARROW_ANCHORS,
 			"entrance": "entrance", "rooms": {"count": [8, 11], "size": [[8, 7], [14, 11]]}, "loops": 0.15,
-			"monsters": {"robber": 4}, "near": {"robber": "altar"}, "chests": 3},
+			"monsters": {"robber": 8, "robber_brute": 1}, "near": {"robber_brute": "camp"}, "apart": {"robber": 8}, "chests": 3,
+			# 714, dungeon's side (4): enemy-ai's named band, spread over the rooms, Brand by the camp.
+			"band": {"robber_brute": ["brand"], "robber": ["crake", "mott", "nabb", "wicket", "fenn", "rook", "sedge", "tull"]}},
 		"rooms": BARROW_ROOMS,  # The rooms named on entering them (666; ui's 665 cards; lore's words).
 		"legend": BARROW_LEGEND, "respawn_s": {"robber": 300, "skeleton_guard": 600}}
 	return {"layout": layout, "config": config}

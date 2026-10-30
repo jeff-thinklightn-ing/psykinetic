@@ -63,8 +63,10 @@ func _ready() -> void:
 	_test_barrow_won()
 	await _test_hall_door()
 	await _test_hidden_niche()
+	await _test_robbers_latch()
 	_test_double_doors()
 	_test_camp_chest()
+	_test_band()
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
@@ -2120,6 +2122,94 @@ func _register_pair(level_name: String, generated: bool) -> void:
 	Level.register(level_name, Level.image_from_rows(rows, {Vector2i(5, 4): "start"}), null, config)
 
 
+## The robbers' clear (714, dungeon's side (4)): in the robbers' barrow the
+## hidden niche gives and its draft is felt only once none of them stands,
+## dead or fled; the first time, it latches for the generation (saved), and
+## robbers come back do not undo it.
+func _test_robbers_latch() -> void:
+	print("
+== the robbers' clear (714): the hidden way only once the band is down, latched for the generation ==")
+	if World.economy == null:
+		_check(false, "no economy to read the robbers from")
+		return
+	var rules: Dictionary = World.economy.rules.get("robbers", {}).duplicate(true)
+	World.economy.rules["robbers"] = rules.merged({"barrow": "lt_niche"}, true)
+	_register_niche("lt_niche")
+	_main.load_map("lt_niche")
+	var kept: Variant = _main._regen.get("lt_niche")
+	_main._regen["lt_niche"] = {"generation": 1, "at_step": 0}
+	var player := _player()
+	var key := Terrain.edge_key(Vector2i(6, 1), Vector2i(0, -1))
+	var door := World.door_on(key)
+	var spawn_robber := func(at: Vector2i) -> GridEntity:
+		return _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber", "name": "Robber%d" % at.x, "tile": _main._nearest_free(at)})
+	var robber: GridEntity = spawn_robber.call(Vector2i(1, 4))
+	_check(robber != null and not _main.robbers_cleared("lt_niche") and _main.robbers_cleared("test_room"),
+		"a robber stands in their barrow: not cleared; another level has none to clear")
+	var heard: Array[String] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			heard.append(str(data.get("text", "")))
+	Net.message_received.connect(hear)
+	_main._tell_draft(player, Vector2i(3, 3))
+	_put(player, Vector2i(6, 1))
+	for i in 6:
+		_hold_free(player, Vector2(0, -1), 1)
+	_check(not door.open and door.lock == Main.HIDDEN_LOCK and _main.party_log.last(1) == ["Only the dead lie here."]
+		and not heard.any(func(text: String) -> bool: return "draft" in text),
+		"with one up, the hidden niche is any niche: shut, \"Only the dead lie here.\", no draft (%s)" % [_main.party_log.last(1)])
+	World.damage(robber, 999)
+	_check(bool(_main._regen["lt_niche"].get("robbers_down", false)) and _main.robbers_cleared("lt_niche"),
+		"the last one falls: the clear latches for the generation (%s)" % [_main._regen["lt_niche"]])
+	var back: GridEntity = spawn_robber.call(Vector2i(2, 4))
+	_check(back != null and _main.robbers_cleared("lt_niche") and Regen.states_from(JSON.parse_string(JSON.stringify(_main._regen)))["lt_niche"].get("robbers_down") == true,
+		"one come back after does not undo it, and a save keeps it")
+	_main._draft_told.erase("%s@lt_niche" % player.player_id)  # _test_hidden_niche's, told already this generation.
+	_main._tell_draft(player, Vector2i(3, 3))
+	_check(heard.has("You feel a cool draft coming from one of the niches."), "now the draft is felt (%s)" % [heard])
+	_put(player, Vector2i(6, 1))
+	for i in 10:
+		_hold_free(player, Vector2(0, -1), 1)
+		if door.open:
+			break
+	_check(door.open, "and the hidden niche gives")
+	# Fled out (702: despawned at a way out) counts as down too.
+	_main._regen["lt_niche"] = {"generation": 2, "at_step": 0}
+	_check(not _main.robbers_cleared("lt_niche"), "a new generation: the one come back stands, not cleared")
+	World.despawn(back)
+	_check(bool(_main._regen["lt_niche"].get("robbers_down", false)), "he gets away out of the barrow: down, latched")
+	# The coordinator (714 (4)): with a 5-minute rise, each of the band fallen
+	# once this generation is clear, though one has risen again.
+	_check(_main.band_ids("barrow") == ["brand", "crake", "mott", "nabb", "wicket", "fenn", "rook", "sedge", "tull"],
+		"the barrow's band, Brand and the eight (%s)" % [_main.band_ids("barrow")])
+	_main._regen["lt_niche"] = {"generation": 3, "at_step": 0}
+	var named_one := func(id: String, at: Vector2i) -> Monster:
+		var monster := spawn_robber.call(at) as Monster
+		if monster != null:
+			monster.named_id = id
+		return monster
+	var t1: Monster = named_one.call("t1", Vector2i(1, 4))
+	var t2: Monster = named_one.call("t2", Vector2i(3, 4))
+	World.damage(t1, 999)
+	var risen: Monster = named_one.call("t1", Vector2i(1, 4))
+	_check(_main._regen["lt_niche"].get("robbers_fallen", []) == ["t1"] and not _main._band_fallen("lt_niche", ["t1", "t2"])
+		and not bool(_main._regen["lt_niche"].get("robbers_down", false)),
+		"one of two fallen, risen again: kept as fallen, not yet clear (%s)" % [_main._regen["lt_niche"]])
+	World.damage(t2, 999)
+	_check(_main._band_fallen("lt_niche", ["t1", "t2"]) and risen != null and risen.hp > 0
+		and (Regen.states_from(JSON.parse_string(JSON.stringify(_main._regen)))["lt_niche"].get("robbers_fallen", []) as Array) == ["t1", "t2"],
+		"the other falls: each fallen once though the first stands again, and the fallen saved (%s)" % [_main._regen["lt_niche"]])
+	World.despawn(risen)
+	Net.message_received.disconnect(hear)
+	World.economy.rules["robbers"] = rules
+	if kept == null:
+		_main._regen.erase("lt_niche")
+	else:
+		_main._regen["lt_niche"] = kept
+	_main.load_map("test_room")
+	Level.unregister("lt_niche")
+
+
 ## The generated halls' doors two edges wide (725): the pair side by side
 ## swings as one (World.door_partner, the client's Level.door_pairs), the
 ## lone third its own; a level that does not regenerate keeps 403's rule,
@@ -2691,6 +2781,33 @@ func _walk_free(player: Player, to: Vector2i) -> void:
 				break
 			World.free_input(player, way.normalized() if way.length() > 0.4 else way / 0.4, World.TICK_DT)
 			World.step()
+
+
+## 714, dungeon's side (4): the barrow's robbers are enemy-ai's named band
+## (716): each generation lays Brand the Ox (robber_brute) and the eight,
+## each spawn named (Regen.band_of, Level.parse's "named").
+func _test_band() -> void:
+	print("
+== the barrow's named band (714 (4)) ==")
+	var want := ["brand", "crake", "fenn", "mott", "nabb", "rook", "sedge", "tull", "wicket"]
+	var wrong: Array[String] = []
+	for generation in range(1, 6):
+		var made := Regen.generate("barrow", generation)
+		if made.is_empty():
+			wrong.append("g%d: not made" % generation)
+			continue
+		var level := Level.parse(made["layout"], made["height"], made["config"])
+		var named := {}
+		for spec: Dictionary in level["entities"]:
+			if spec.has("named"):
+				named[str(spec["named"])] = str(spec.get("kind", ""))
+		var ids: Array = named.keys()
+		ids.sort()
+		if ids != want or named.get("brand") != "robber_brute" or named.values().count("robber") != 8:
+			wrong.append("g%d: %s" % [generation, named])
+		if (level["warnings"] as Array).any(func(w: String) -> bool: return "names an entity" in w):
+			wrong.append("g%d warned: %s" % [generation, level["warnings"]])
+	_check(wrong.is_empty(), "five generations: the nine named, Brand the brute and eight robbers, each a spawn (%s)" % [wrong])
 
 
 ## 742 (Jeff: "have them respawn on a 5 min timer - the game is in

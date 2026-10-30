@@ -118,7 +118,8 @@ static func due(state: Dictionary, config: Dictionary, steps: int) -> bool:
 	return steps - int(state.get("at_step", 0)) >= int(config["every_days"]) * DayNight.day_steps
 
 
-## The saved "regen" section ({area: {generation, at_step}}) read back;
+## The saved "regen" section ({area: {generation, at_step, robbers_down
+## if latched, robbers_fallen: the band's ids fallen this generation}}) read back;
 ## entries that make no sense are dropped.
 static func states_from(saved: Variant) -> Dictionary:
 	var out := {}
@@ -127,6 +128,10 @@ static func states_from(saved: Variant) -> Dictionary:
 			var entry: Variant = saved[area]
 			if entry is Dictionary:
 				out[str(area)] = {"generation": maxi(int(entry.get("generation", 0)), 0), "at_step": maxi(int(entry.get("at_step", 0)), 0)}
+				if bool(entry.get("robbers_down", false)):
+					out[str(area)]["robbers_down"] = true  # 714: the robbers' clear, latched for the generation.
+				if entry.get("robbers_fallen") is Array:
+					out[str(area)]["robbers_fallen"] = (entry["robbers_fallen"] as Array).map(func(id: Variant) -> String: return str(id))
 	return out
 
 
@@ -137,6 +142,32 @@ static func states_from(saved: Variant) -> Dictionary:
 ## template or generator (said in a warning): the caller keeps the last map.
 static func generate(level_name: String, generation: int) -> Dictionary:
 	return generate_prepared(prepare(level_name), generation)
+
+
+## The regenerate block's named band (714, dungeon's side (4); enemy-ai's
+## mound-breakers, 716): {kind: [named id, ...]}; each kind's monster
+## markers on [param map], in cell order, given the next id as a level
+## entity entry {at, named} (Level.parse puts it on the spawn), the rest
+## left plain. [] without a band.
+static func band_of(map: LevelMap, config: Dictionary) -> Array:
+	var out: Array = []
+	var band: Variant = config.get("band", {})
+	if not band is Dictionary:
+		return out
+	for kind: Variant in band:
+		var ids: Variant = band[kind]
+		if not ids is Array or str(kind).begins_with("_"):
+			continue
+		var cells: Array = map.cells.keys()
+		cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or a.y == b.y and a.x < b.x)
+		var at := 0
+		for cell: Vector2i in cells:
+			if at >= (ids as Array).size():
+				break
+			if map.cells[cell] == "monster_" + str(kind):
+				out.append({"at": [cell.x, cell.y], "named": str(ids[at])})
+				at += 1
+	return out
 
 
 ## What generate needs that only the main thread may make (decision 684):
@@ -204,6 +235,7 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		elif barrow and layer == 2:
 			generated["niches"] = niches_of(map, anchors, seed)
 		generated["graves"] = graves_of(map, config, generated["niches"] if layer == 2 else []) if layer != 1 else []
+		generated["entities"] = (generated.get("entities", []) as Array) + band_of(map, config)
 		# Moss and webs (647): the template's own kept inside the anchors
 		# (generated_config), the rest rolled over the generation.
 		if barrow:

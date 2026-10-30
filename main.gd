@@ -1100,6 +1100,8 @@ func _go_online() -> void:
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_died.connect(_robber_fell)  # The grave robbers' gold (580, economy's side).
+		World.entity_died.connect(func(entity: GridEntity, _cause: StringName) -> void: _robber_gone(entity))  # 714: the robbers' clear.
+		World.entity_despawned.connect(_robber_gone)
 		World.entity_taken.connect(_on_entity_taken)
 		World.telegraph_started.connect(_tell_telegraph)  # Decision 602.
 		World.telegraph_ended_in.connect(_tell_telegraph_ended)
@@ -3610,7 +3612,9 @@ func _apply_generation(level_name: String, config: Dictionary, generation: int, 
 	print("[regen] %s: generation %d (seed %d, %d of %d tries, every %d days)" % [level_name, generation, made["seed"], made["tries"],
 		Regen.TRIES, config["every_days"]])
 	if World.zones.has(level_name):
+		_rebuilding = true  # Its bodies cleared for the new floor: no robber's clear latched by that (714).
 		_rebuild_regenerated(level_name, made["anchors"])
+		_rebuilding = false
 	# Places outside the anchors are gone: from the holdings, and from the
 	# maps of those who knew them, sent their world over again.
 	_world_map = WorldMap.build()
@@ -8105,7 +8109,7 @@ func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 		return
 	var peer: int = entity.owner_peer
 	var door := World.door_on(key)
-	if World.niche_edges.get(key, "") == "hidden" and door != null and door.lock == HIDDEN_LOCK:
+	if World.niche_edges.get(key, "") == "hidden" and door != null and door.lock == HIDDEN_LOCK and robbers_cleared(World.zone.name):
 		_told_niche.erase(peer)
 		World.hold_door(door, false, HIDDEN_LOCK)
 		door.open = true
@@ -8146,14 +8150,104 @@ func _tell_draft(player: Player, to: Vector2i) -> void:
 	if rect == Rect2i() or not rect.has_point(to):
 		return
 	var niche := World.hidden_niche()
-	if niche.is_empty() or niche["open"]:
-		return
+	if niche.is_empty() or niche["open"] or not robbers_cleared(World.zone.name):
+		return  # 714: the draft is felt once the robbers are down, the clue with the clear.
 	var key := "%s@%s" % [id, World.zone.name]
 	var generation := generation_of(World.zone.name)
 	if _draft_told.get(key, -1) == generation:
 		return
 	_draft_told[key] = generation
 	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You feel a cool draft coming from one of the niches."})
+
+
+## Whether the robbers of [param zone_name] are down (714, dungeon's side
+## (4); Jeff: "they have to either be dead or escaped"): its hidden niche
+## gives, and its draft is felt, only then. The robbers are economy's
+## (return.robbers: their kinds, the barrow they dig in, the named band
+## and the brute among them as kinds); any other zone has none to clear.
+## Down is none of them standing in the zone, the dead and the fled
+## despawned, or every one of its named band (its regenerate "band") fallen
+## or fled at least once this generation (the coordinator: with a 5-minute
+## rise, a careful lone player still clears them all); the first time it
+## is so (here, or a robber falling or leaving, _robber_gone) it latches for
+## the zone's generation, kept with its regen state (saved, "robbers_down";
+## the fallen as "robbers_fallen"), never checked live again.
+func robbers_cleared(zone_name: String) -> bool:
+	if World.economy == null:
+		return true
+	var rule: Dictionary = World.economy.rules.get("robbers", {})
+	if zone_name != str(rule.get("barrow", "")):
+		return true
+	var state: Dictionary = _regen.get(zone_name, {})
+	if bool(state.get("robbers_down", false)):
+		return true
+	if _robbers_standing(zone_name, null) > 0 and not _band_fallen(zone_name):
+		return false
+	if not state.is_empty():
+		state["robbers_down"] = true
+		print("[level] the robbers of %s are down: its hidden way can be found this generation" % zone_name)
+	return true
+
+
+## How many of economy's robbers stand in [param zone_name] (alive,
+## spawned), [param leaving] not counted (one falling or fleeing out).
+func _robbers_standing(zone_name: String, leaving: GridEntity) -> int:
+	var kinds: Array = World.economy.rules.get("robbers", {}).get("kinds", [])
+	return World.get_entities().filter(func(each: GridEntity) -> bool:
+		return (each != leaving and each is Monster and each.spawned and each.hp > 0 and each.zone == zone_name
+			and str(each.spawn_spec.get("kind", "")) in kinds)).size()
+
+
+## [param zone_name]'s named band: its regenerate block's "band" ids, every
+## kind's; [] with none.
+func band_ids(zone_name: String) -> Array:
+	var band: Variant = Regen.config_of(zone_name).get("band", {})
+	var ids: Array = []
+	if band is Dictionary:
+		for kind: Variant in band:
+			if not str(kind).begins_with("_") and band[kind] is Array:
+				ids.append_array((band[kind] as Array).map(func(id: Variant) -> String: return str(id)))
+	return ids
+
+
+## Whether every one of [param zone_name]'s band (band_ids, or [param
+## given]) has fallen or fled there this generation (its regen state's
+## "robbers_fallen"); false with no band.
+func _band_fallen(zone_name: String, given: Array = []) -> bool:
+	var ids := given if not given.is_empty() else band_ids(zone_name)
+	if ids.is_empty():
+		return false
+	var fallen: Array = _regen.get(zone_name, {}).get("robbers_fallen", [])
+	return ids.all(func(id: Variant) -> bool: return str(id) in fallen)
+
+
+## A regenerated zone being laid again (_apply_generation): its despawns
+## are no robbers' going.
+var _rebuilding := false
+
+
+## A robber fallen or gone out of the barrow (702's fleeing out): if none
+## of them stands now, the clear latches (robbers_cleared).
+func _robber_gone(entity: GridEntity) -> void:
+	if not entity is Monster or World.economy == null or _travelling or _rebuilding:
+		return
+	var rule: Dictionary = World.economy.rules.get("robbers", {})
+	var kinds: Array = rule.get("kinds", [])
+	if entity.zone != str(rule.get("barrow", "")) or str(entity.spawn_spec.get("kind", "")) not in kinds:
+		return
+	var state: Dictionary = _regen.get(entity.zone, {})
+	if state.is_empty() or bool(state.get("robbers_down", false)):
+		return
+	var named := (entity as Monster).named_id
+	if not named.is_empty():
+		var fallen: Array = state.get("robbers_fallen", [])
+		if not named in fallen:
+			fallen.append(named)
+		state["robbers_fallen"] = fallen
+	if _robbers_standing(entity.zone, entity) > 0 and not _band_fallen(entity.zone):
+		return
+	state["robbers_down"] = true
+	print("[level] the robbers of %s are down: its hidden way can be found this generation" % entity.zone)
 
 
 ## A player come up into [param zone_name] by its "from_below" spawn point

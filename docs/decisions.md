@@ -36126,3 +36126,50 @@ view_test _test_turf_house (its id, disrepair, ruin and mended by
 set_huts); resident_test _test_hut_ruin (the "huts" message told the ruin,
 Main.hut_states). A new message kind: PROTOCOL_REVISION 42, shared with
 736's stall (release). No new class_name.
+## 714, dungeon's side (4): the robbers' latch, and the band seated in the barrow
+
+Jeff (714): the hidden way is found once the robbers "have to either be dead
+or escaped". Main.robbers_cleared(zone): in economy's robbers barrow
+(return.robbers.barrow), the hidden niche gives (_on_niche_pressed; else
+"Only the dead lie here.") and its draft is felt (_tell_draft) only once
+the robbers are down; any other zone has none to clear. Down is none of
+economy's robber kinds standing in the zone (the dead and the fled
+despawned), or every one of its named band fallen or fled at least once
+this generation (the coordinator: with a 5-minute rise a careful lone
+player still clears them all; _band_fallen over band_ids, the fallen kept
+as the regen state's "robbers_fallen"). The first time it is so (asked, or
+a robber falling or leaving: _robber_gone on World.entity_died and
+entity_despawned, not while travelling or while a generation is laid,
+_rebuilding) it latches for the generation as the regen state's
+"robbers_down"; both are saved (Regen.states_from) and go with the next
+generation.
+
+The band (enemy-ai's 716 and 714): the barrow's regenerate block lays
+monsters {"robber": 8, "robber_brute": 1}, Brand sent near the camp
+("near"), the eight laid "apart" (a new block key: no marker within 8
+cells of another of its kind while a spot further off is left, then the
+nearer ones; Labyrinth._lay), so a lone player never meets the nine at
+once (the coordinator); the old "near the altar" for robbers is dropped.
+A new "band" key, {kind: [named ids]}, gives each generation's markers of
+that kind, in cell order, the next id as a level entity entry {at, named}
+(Regen.band_of), which Level.parse puts on the spawn: brand for the
+robber_brute, crake, mott, nabb, wicket, fenn, rook, sedge and tull. The
+legend gains monster_robber_brute. Enemy-ai's rows rise 5 real minutes
+after they fall (714 amended (2)). plan_sheet's sample barrow follows.
+
+A live barrow saved before this keeps its generation: its layout is the
+overlay's files (Regen.write) and its bodies the snapshot's, so the box's
+barrow comes up with its 4 unnamed robbers and the next due generation
+lays the nine. Checked locally (release's ask): a world saved by
+origin/main after a forced barrow generation, loaded by this branch; the
+lines are in the landing message. Server only, protocol unchanged, no new
+class_name; it rides v0.1.193 (the box held for 737).
+
+level_test _test_robbers_latch: one standing, the niche shut, no draft;
+the last falls, latched; one come back does not undo it; saved; the draft
+felt and the niche gives; a new generation and a robber fleeing out
+latches; the band's ids; one of two named fallen and risen, not yet; the
+other falls, clear, and the fallen saved. _test_band: five generations of
+the barrow, the nine named, Brand the brute. labyrinth_test: the band laid,
+the eight spread (at most four by the altar or within six cells of one
+another), Brand nearer the camp than the floor's mean.

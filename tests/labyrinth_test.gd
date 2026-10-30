@@ -51,7 +51,7 @@ func _test_block() -> void:
 		and read["loops"] == 0.2 and read["chests"] == 3 and read["crates"] == 4 and read["monsters"] == {"imp": 6, "brute": 2, "sneak": 2}
 		and warnings.is_empty(), "style, rooms, loops, chests and crates come through beside the rest (%s)" % [read.keys()])
 	_check(Regen.marked("lab_dwarven") and Regen.config_of("lab_dwarven")["anchors"].size() == 4, "the sample halls regenerate, four anchors")
-	_check(Regen.config_of("lab_barrow")["anchors"].size() == 4 and Regen.config_of("lab_barrow")["near"] == {"robber": "altar"} and Regen.config_of("lab_barrow_deep")["anchors"].size() == 2 and Regen.config_of("lab_barrow_deep")["near"] == {"skeleton_guard": "lair"}, "the sample barrow's two depths regenerate: four anchors, then two (580, 666), the robbers sent near the altar and the grave guards near the Hall")
+	_check(Regen.config_of("lab_barrow")["anchors"].size() == 4 and Regen.config_of("lab_barrow")["near"] == {"robber_brute": "camp"} and Regen.config_of("lab_barrow_deep")["anchors"].size() == 2 and Regen.config_of("lab_barrow_deep")["near"] == {"skeleton_guard": "lair"}, "the sample barrow's two depths regenerate: four anchors, then two (580, 666), Brand sent near the robbers' camp (714 (4)) and the grave guards near the Hall")
 
 
 func _test_style(style: String) -> void:
@@ -179,21 +179,34 @@ func _test_barrow() -> void:
 	var kinds := _kinds(level)
 	_check(doors >= 4 and level["terrain"]["torches"].size() >= 8,
 		"layer 1 is all shallow: the town's tombs have doors and the ways their torches (%d doors, %d torches)" % [doors, level["terrain"]["torches"].size()])
-	_check(kinds.get("robber", 0) == 4 and kinds.get("chest", 0) == 3 and kinds.get("altar", 0) == 1 and kinds.get("skeleton_guard", 0) == 2
+	_check(kinds.get("robber", 0) == 8 and kinds.get("robber_brute", 0) == 1 and kinds.get("chest", 0) == 3 and kinds.get("altar", 0) == 1 and kinds.get("skeleton_guard", 0) == 2
 		and kinds.get("runner's pack", 0) == 1 and kinds.get("skeleton", 0) == 0,
-		"four robbers and three chests laid; the altar, its two guards and the Runner's pack kept; no dead walk (%s)" % [kinds])
+		"the band laid, eight robbers and Brand (714 (4)), and three chests; the altar, its two guards and the Runner's pack kept; no dead walk (%s)" % [kinds])
 	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
 		"layer 1's robbers stand on open floor in both generations, floor all round and no wall edge (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
+	# The coordinator (714 (4)): spread over the rooms, so a lone player
+	# never meets the nine at once; Brand by the camp.
 	var altar := Sheet.BARROW_ALTAR
-	var robber_to_altar := 0.0
-	var all_to_altar := 0.0
+	var camp := Vector2i(11, 46)
+	var near_altar := 0
+	var brand_to_camp := 0.0
+	var all_to_camp := 0.0
+	var spots: Array[Vector2i] = []
 	for spec: Dictionary in level["entities"]:
 		if str(spec.get("kind", "")) == "robber":
-			robber_to_altar += absi(spec["tile"].x - altar.x) + absi(spec["tile"].y - altar.y)
+			spots.append(spec["tile"])
+			if absi(spec["tile"].x - altar.x) + absi(spec["tile"].y - altar.y) <= 10:
+				near_altar += 1
+		elif str(spec.get("kind", "")) == "robber_brute":
+			brand_to_camp = absi(spec["tile"].x - camp.x) + absi(spec["tile"].y - camp.y)
 	for cell in floor_cells:
-		all_to_altar += absi(cell.x - altar.x) + absi(cell.y - altar.y)
-	_check(kinds.get("robber", 0) == 4 and robber_to_altar / 4.0 < all_to_altar / floor_cells.size(),
-		"the robbers, sent near the altar, stand closer to it than the floor's mean (%.1f against %.1f)" % [robber_to_altar / 4.0, all_to_altar / floor_cells.size()])
+		all_to_camp += absi(cell.x - camp.x) + absi(cell.y - camp.y)
+	var packed := 0
+	for each in spots:
+		packed = maxi(packed, spots.filter(func(other: Vector2i) -> bool: return absi(other.x - each.x) + absi(other.y - each.y) <= 6).size())
+	_check(spots.size() == 8 and near_altar <= 4 and packed <= 4 and brand_to_camp < all_to_camp / floor_cells.size(),
+		"the eight spread, at most four by the altar or within six cells of one another, and Brand nearer the camp than the floor's mean (%d by the altar, %d packed, Brand %.1f against %.1f)"
+		% [near_altar, packed, brand_to_camp, all_to_camp / floor_cells.size()])
 	_check(config.get("graves", []).is_empty(), "layer 1 lists no graves: no dead walk it")
 	# The hidden door (608): one of the first hall's 14 niches, picked with
 	# the seed, its alcove carved behind a door edge with the stair in it.
