@@ -2019,6 +2019,7 @@ func _test_kinds() -> void:
 	_test_inside()
 	_test_chimney_smoke()
 	_test_turf_house()
+	_test_chapel()
 	_test_inside_is_his()
 
 
@@ -2582,6 +2583,93 @@ func _test_inside() -> void:
 			"its roof back, whole, after FADE_HOLD")
 	_rig.inside_changed.disconnect(listen)
 	_rig.town_states.erase("inside_town")
+
+
+## The temple's chapel kit (734), with stand-in slots in art-kit's names:
+## its slate laid and cut by the bay, its rose on the front gable and its
+## oculus on the back, its belfry on the ridge by the front, buttresses
+## and lancets along its long sides, steps at its door; without the art,
+## one sheet and stone walls as before.
+func _test_chapel() -> void:
+	print("\n== the temple's chapel kit: bays, gables, belfry, buttresses (734) ==")
+	var slots := ArtKit.slots()
+	var edge := {"category": "roofs", "kind": "edge", "size": [0.3, 0.2, 1]}
+	var stand_ins := {
+		"roof.slate.profile": {"category": "roofs", "type": "profile", "kind": "cell", "size": [1, 0.9, 1],
+			"rise": 1.2, "bellcast": 0.15, "bellcast_reach": 0.6, "bay": 1.0},
+		"material.wall.chapel": {"category": "materials", "kind": "material", "size": [1, 1, 1]},
+		"roof.slate.ridge": edge, "roof.slate.eave": edge, "roof.slate.verge": edge, "roof.slate.end": edge, "roof.slate.hole": edge,
+		"wall.chapel.profile": {"category": "walls", "type": "profile", "kind": "edge", "size": [0.5, 4.5, 1], "windows": "between_buttresses"},
+		"wall.chapel.buttress_tall": {"category": "walls", "kind": "edge", "size": [0.8, 4.5, 0.6]},
+		"gable.chapel.rose": {"category": "walls", "kind": "edge", "size": [0.3, 1.4, 1.4]},
+		"gable.chapel.oculus": {"category": "walls", "kind": "edge", "size": [0.3, 0.8, 0.8]},
+		"belfry.chapel": {"category": "roofs", "kind": "cell", "size": [1.6, 3.5, 1.6]},
+		"steps.chapel": {"category": "props", "kind": "edge", "size": [1.2, 0.4, 2.4]},
+	}
+	var level := _kinds_level([["building_temple_small", Vector2i(2, 2), false]])
+	var temple: Dictionary = level["buildings"][0]
+	BuildingComposer.forget()
+	var plain := BuildingComposer.compose(temple, Client3D.KIND_ROOF)
+	_check(plain.find_child("Slopes", true, false) != null and plain.find_child("Belfry", true, false) == null
+			and not BuildingComposer.bayed(plain) and Client3D._known_set("chapel") == "stone",
+			"without the chapel's art: one sheet, no belfry, stone walls")
+	plain.free()
+	for slot: String in stand_ins:
+		slots[slot] = stand_ins[slot]
+	BuildingComposer.forget()
+	var node := BuildingComposer.compose(temple, Client3D.KIND_ROOF)
+	var frame := func(piece: Node) -> Transform3D:
+		var out := Transform3D.IDENTITY
+		while piece != node:
+			out = (piece as Node3D).transform * out
+			piece = piece.get_parent()
+		return out
+	var sheets := node.find_children("Slopes_*", "MeshInstance3D", true, false)
+	var holes := node.find_children("Hole_*", "", true, false)
+	var ridges := node.find_children("Ridge_*", "", true, false)
+	_check(BuildingComposer.bayed(node) and sheets.size() >= 10 and ridges.size() == sheets.size() and holes.size() == sheets.size() * 2
+			and holes.all(func(hole: Node3D) -> bool: return not hole.visible),
+			"its slate a sheet a bay, a ridge piece each, their holes hidden (%d, %d, %d)" % [sheets.size(), ridges.size(), holes.size()])
+	var rose := node.find_child("Rose", true, false)
+	var oculus := node.find_child("Oculus", true, false)
+	var belfry := node.find_child("Belfry", true, false)
+	var middle := (Vector2((temple["rect"] as Rect2i).size) - Vector2.ONE) * 0.5
+	_check(rose != null and oculus != null and frame.call(rose).origin.z > middle.y + 4.0 and frame.call(oculus).origin.z < middle.y - 4.0
+			and (frame.call(rose).basis.x as Vector3).z > 0.9 and (frame.call(oculus).basis.x as Vector3).z < -0.9,
+			"its rose on its front gable, its oculus on its back, each facing out")
+	_check(belfry != null and frame.call(belfry).origin.z > middle.y + 2.0 and frame.call(belfry).origin.y > float(temple["eaves"]) + 2.0,
+			"its belfry on its ridge, toward its front (%s)" % [frame.call(belfry).origin if belfry != null else null])
+	var buttresses := node.get_node("parts").get_children().filter(func(each: Node) -> bool: return each.name.begins_with("Buttress"))
+	var lancets := BuildingComposer.windows(temple, {})
+	_check(buttresses.size() == 8 and lancets.size() == 8 and node.find_child("Steps", true, false) != null,
+			"four buttresses and four lancets along each long side, steps at its door (%d, %d)" % [buttresses.size(), lancets.size()])
+	var shown := func() -> Array: return sheets.filter(func(sheet: Node3D) -> bool: return sheet.visible)
+	BuildingComposer.show_bays(temple, node, "half")
+	var front: Array = shown.call()
+	var nearest_bare := INF
+	for sheet: Node3D in sheets:
+		if not sheet.visible:
+			nearest_bare = minf(nearest_bare, frame.call(sheet).origin.z + float(sheet.get_aabb().get_center().z))
+	_check(front.size() == ceili(sheets.size() * 0.5) and front.all(func(sheet: Node3D) -> bool:
+			return frame.call(sheet).origin.z + sheet.get_aabb().get_center().z > nearest_bare),
+			"covering: its front half's slate on, the back bare (%d of %d)" % [front.size(), sheets.size()])
+	var cut_of := func() -> Array:
+		return sheets.filter(func(sheet: Node3D) -> bool: return not sheet.visible).map(func(sheet: Node3D) -> int: return sheet.get_meta(BuildingComposer.BAY))
+	BuildingComposer.show_bays(temple, node, "damaged")
+	var damaged: Array = cut_of.call()
+	var open_holes := holes.filter(func(hole: Node3D) -> bool: return hole.visible).size()
+	BuildingComposer.show_bays(temple, node, "disrepair")
+	var worn: Array = cut_of.call()
+	_check(damaged.size() in [2, 3] and open_holes == damaged.size() * 2 and worn.size() in [5, 6]
+			and damaged.all(func(bay: int) -> bool: return bay in worn),
+			"damaged: 2-3 bays holed; in disrepair 5-6, the damaged among them (%s, %s)" % [damaged, worn])
+	BuildingComposer.show_bays(temple, node, "whole")
+	_check(shown.call().size() == sheets.size() and holes.all(func(hole: Node3D) -> bool: return not hole.visible), "whole again")
+	node.free()
+	for slot: String in stand_ins:
+		slots.erase(slot)
+	BuildingComposer.forget()
+	ArtKit.forget()
 
 
 ## Inside is the player's own place, not his companion's (671 amended (3);

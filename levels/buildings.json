@@ -52,7 +52,7 @@
 		"watchtower": {"stage": "town", "plot": "S", "words": "a watchtower", "wall_set": "wood", "floor_set": "wood", "storeys": 3, "sizes": {
 			"small": {"blocks": [[0, 0, 5, 5, "main"]], "doors": [[2, 4, "S"]]},
 			"large": {"blocks": [[0, 0, 6, 6, "main"]], "doors": [[2, 5, "S"]]}}},
-		"temple": {"stage": "hamlet", "plot": "M", "words": "the temple", "wall_set": "stone", "floor_set": "stone", "eaves": 4.5, "place": "temple", "sizes": {
+		"temple": {"stage": "hamlet", "plot": "M", "roof_set": "slate", "words": "the temple", "wall_set": "chapel", "floor_set": "stone", "eaves": 4.5, "place": "temple", "sizes": {
 			"small": {"blocks": [[0, 0, 6, 10, "main"]], "doors": [[2, 9, "S"], [3, 9, "S"]]},
 			"large": {"blocks": [[0, 0, 8, 12, "main"]], "doors": [[3, 11, "S"], [4, 11, "S"]]}}},
 		"healers_hut": {"stage": "hamlet", "plot": "M", "words": "the healer's hut", "wall_set": "wood", "floor_set": "wood", "roof": "round", "place": "healers_hut", "sizes": {

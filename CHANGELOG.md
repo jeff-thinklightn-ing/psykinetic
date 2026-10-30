@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Temple: drawn as a chapel, piece by piece as art-kit's chapel parts arrive: a slate roof laid and broken by the bay with a flared eave, a rose window on the front gable and an oculus on the back, a belfry on the ridge, buttresses with tall lancets between them, steps and the pointed-arch double door; a temple going up gets its front half roofed first (734).
 - The draugr: his deal window has a "Refuse" button that starts the fight, and says Shift+click strikes him (no more being stuck talking).
 - Bow: a lob aimed close comes down in a smaller circle, shrinking with the distance aimed (a full-reach lob's circle is unchanged), and the circle drawn while aiming matches where the arrows can fall (677 amended (3), combat's side).
 - Bow: the aim follows your mouse out from the archer, down to point blank; the marker, arc and cone sit where you point, and stay steady close in (677).

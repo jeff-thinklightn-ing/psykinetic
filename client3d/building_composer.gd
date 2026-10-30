@@ -24,6 +24,10 @@ extends RefCounted
 ## A roof's rise over its half-span, its overhang and its sag over its
 ## length, each seeded between these.
 const RISE := Vector2(0.75, 1.1)
+## A profile's own rise strays this far either way (734).
+const RISE_SPREAD := 0.05
+## A bellcast's reach past the walls when its profile says none (734).
+const BELLCAST_REACH := 0.6
 const REACH := Vector2(0.3, 0.5)
 ## A block's overhang strays this far either way from its roof set's
 ## (roof.<set>.profile's "overhang"; REACH's middle without one).
@@ -49,6 +53,25 @@ const CHIMNEYS := {"house": 0.7, "l_house": 0.7, "house_leanto": 0.6, "house_win
 const CHIMNEY := Vector3(0.75, 0.9, 0.65)
 ## A chimney's meta: where its smoke rises from (its top, in its frame).
 const SMOKE_AT := &"smoke_at"
+## A bayed roof's (734) pieces: each slope sheet, ridge, eave and hole's
+## bay (meta BAY), a hole's mark (HOLE), its slopes' bays' ridge middles
+## (BAY_MIDDLES, on the node _slopes makes), its height Callable (HEIGHT)
+## and [rise, length, thickness] (SPAN) there too.
+const BAY := &"bay"
+const HOLE := &"hole"
+const BAY_MIDDLES := &"bay_middles"
+const HEIGHT := &"height"
+const SPAN := &"span"
+## A bayed roof's cut bays (734): damaged DAMAGED_BAYS of them, in
+## disrepair DISREPAIR_BAYS (the damaged ones among them), each one more
+## at times by its seed; show_bays' stream (_stream's salt).
+const DAMAGED_BAYS := 2
+const DISREPAIR_BAYS := 5
+const BAY_SALT := 7341
+## A gable's window (734) this far up its gable; a belfry this far in from
+## its front wall.
+const GABLE_WINDOW_UP := 0.4
+const BELFRY_IN := 1.0
 ## The uses whose slot building (art with no chimney of its own) is given
 ## one (slot_chimney): a fire's trades.
 const SLOT_HEARTHS: Array[String] = ["forge", "kitchen"]
@@ -170,25 +193,57 @@ static func _stream(building: Dictionary, salt: int) -> RandomNumberGenerator:
 
 
 ## The main block's roof's rise over its eaves, as _block_roof draws it
-## (its stream: the reach, then the rise).
+## (its stream: the reach, then the rise; its kind's roof set's profile).
 static func _main_rise(building: Dictionary) -> float:
 	var blocks: Array = building["blocks"]
 	var main: Rect2i = blocks[_main_of(blocks)]
 	var rng := _stream(building, _main_of(blocks))
 	rng.randf()  # Its reach.
-	return float(mini(main.size.x, main.size.y)) * 0.5 * rng.randf_range(RISE.x, RISE.y)
+	var profile := _profile(_set_of(building, covered_in(building)))
+	return float(mini(main.size.x, main.size.y)) * 0.5 * _rise_draw(profile, rng)
 
 
 ## [param roof_set]'s profile (roof.<set>.profile: its thickness and
-## overhang), else THICK and REACH's middle.
+## overhang, else THICK and REACH's middle; decision 734: its "rise" over
+## the half-span, 0 for the seeded RISE; its "bellcast", how far its last
+## "bellcast_reach" metres past the walls kick up flatter, 0 for none; its
+## "bay", the length its cover is laid and broken in, 0 for one sheet).
 static func _profile(roof_set: String) -> Dictionary:
-	var out := {"thickness": THICK, "overhang": (REACH.x + REACH.y) * 0.5}
+	var out := {"thickness": THICK, "overhang": (REACH.x + REACH.y) * 0.5, "rise": 0.0, "bellcast": 0.0, "bellcast_reach": BELLCAST_REACH,
+		"bay": 0.0}
 	var slot := "roof.%s.profile" % roof_set
 	if ArtKit.has(slot):
 		var spec := ArtKit.spec(slot)
 		for key: String in out:
 			out[key] = float(spec.get(key, out[key]))
 	return out
+
+
+## The roof set whose profile and edge pieces [param building] takes:
+## [param roof_set], the one it is covered in, unless that stands in for
+## its kind's own ("roof_set") whose material art-kit has not made but
+## whose profile it has (734: the temple's slate before its slates).
+static func _set_of(building: Dictionary, roof_set: String) -> String:
+	var named := str(building.get("roof_set", ""))
+	if named.is_empty() or ArtKit.has("material.roof." + named) or not ArtKit.has("roof.%s.profile" % named):
+		return roof_set
+	return named
+
+
+## The roof set Client3D covers [param building] in (_add_kind): its
+## kind's own where art-kit has its material, else KIND_ROOF.
+static func covered_in(building: Dictionary) -> String:
+	var named := str(building.get("roof_set", ""))
+	return named if not named.is_empty() and ArtKit.has("material.roof." + named) else Client3D.KIND_ROOF
+
+
+## A gable's rise over its half-span, drawn from [param rng] (one draw):
+## the profile's own "rise", a little either way, else RISE's range.
+static func _rise_draw(profile: Dictionary, rng: RandomNumberGenerator) -> float:
+	var rise := float(profile.get("rise", 0.0))
+	if rise > 0.0:
+		return rng.randf_range(rise - RISE_SPREAD, rise + RISE_SPREAD)
+	return rng.randf_range(RISE.x, RISE.y)
 
 
 ## The index of [param blocks]' largest (the first of the largest).
@@ -223,15 +278,22 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 		roof.rotation = Vector3(rng.randf_range(-TILT, TILT), 0.0, rng.randf_range(-TILT, TILT))
 		out.add_child(roof)
 		var material := Client3D._roof_material(roof_set)
-		var gable := Client3D._wall_material(str(building.get("wall_set", Client3D.DEFAULT_SET))).duplicate() as StandardMaterial3D
+		var gable := Client3D._wall_material(Client3D._known_set(str(building.get("wall_set", Client3D.DEFAULT_SET)))).duplicate() as StandardMaterial3D
 		gable.cull_mode = BaseMaterial3D.CULL_DISABLED
 		if str(building.get("roof", "gable")) == "round":
 			roof.add_child(_cone(Vector2(rect.size), eaves, rng, material))
 		else:
+			var trim_set := _set_of(building, roof_set)
 			for index in blocks.size():
-				var piece := _block_roof(building, index, material, gable, _profile(roof_set), roof_set == "thatch")
+				var piece := _block_roof(building, index, material, gable, _profile(trim_set), trim_set)
 				piece.name = "Roof_%d" % index
 				roof.add_child(piece)
+			_gable_windows(building, roof)
+			_belfry(building, roof)
+			# Its slopes' height is a lambda, which a packed look can't keep.
+			for node: Node in roof.find_children("*", "Node3D", true, false):
+				if node.has_meta(HEIGHT):
+					node.remove_meta(HEIGHT)
 	var odds := float(CHIMNEYS.get(str(building["kind"]), 0.0)) * (0.6 if ruined else 1.0)
 	if rng.randf() < odds and str(building.get("roof", "gable")) != "round" and str(building.get("roof", "")) != Level.ROOFLESS:
 		parts.add_child(_chimney(building, main, rect, eaves, rng))
@@ -243,6 +305,9 @@ static func _build(building: Dictionary, roof_set: String) -> Node3D:
 		var cruck := cruck_of(building, rng.randf() < 0.5)
 		if cruck != null:
 			parts.add_child(cruck)
+	if not ruined:
+		_buttresses(building, parts)
+		_steps(building, parts)
 	return out
 
 
@@ -268,6 +333,9 @@ static func windows(building: Dictionary, edges: Dictionary) -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	if building.get("ruined", false):
 		return out
+	var bays := _wall_bays(building)
+	if not bays.is_empty():
+		return bays["windows"]  # A chapel's lancets (734), between its buttresses.
 	var outline := Level.building_outline(building)
 	var wall := func(key: Vector3i) -> bool: return key in outline and edges.get(key) == Terrain.Edge.WALL
 	for key in outline:
@@ -278,6 +346,196 @@ static func windows(building: Dictionary, edges: Dictionary) -> Array[Vector3i]:
 		if roll < WINDOW_ODDS:
 			out.append(key)
 	return out
+
+
+## [param building]'s wall set's profile (wall.<set>.profile), {} without.
+static func _wall_profile(building: Dictionary) -> Dictionary:
+	var slot := "wall.%s.profile" % str(building.get("wall_set", ""))
+	return ArtKit.spec(slot) if ArtKit.has(slot) else {}
+
+
+## A buttressed wall set's (734: its profile's "windows" is
+## "between_buttresses") bays along [param building]'s main block's long
+## sides: "buttresses", [vertex middle, outward side] at every second
+## vertex along each side (none at a corner, nor by a door), and
+## "windows", the edge between each two (none at a side's ends, nor by a
+## door); {} for any other set.
+static func _wall_bays(building: Dictionary) -> Dictionary:
+	if str(_wall_profile(building).get("windows", "")) != "between_buttresses":
+		return {}
+	var blocks: Array = building["blocks"]
+	var main: Rect2i = blocks[_main_of(blocks)]
+	var rect: Rect2i = building["rect"]
+	var along_x := main.size.x > main.size.y
+	var doors: Array = building.get("doors", [])
+	var box := Rect2(Vector2(main.position) - Vector2(0.5, 0.5), Vector2(main.size))
+	# Each long side's edges in order along it: [where along, key, middle].
+	var sides: Dictionary[Vector2i, Array] = {}
+	for key in Level.building_outline(building):
+		var edge := _edge_out(building, key)
+		var middle: Vector2 = Vector2(rect.position) + edge[0]
+		var out: Vector2i = edge[1]
+		if (out.y if along_x else out.x) == 0:
+			continue
+		var line := middle.y if along_x else middle.x
+		var place := middle.x if along_x else middle.y
+		var on_line := is_equal_approx(line, box.position.y if along_x else box.position.x) \
+				or is_equal_approx(line, box.end.y if along_x else box.end.x)
+		var within := place > (box.position.x if along_x else box.position.y) and place < (box.end.x if along_x else box.end.y)
+		if not on_line or not within:
+			continue
+		if not sides.has(out):
+			sides[out] = []
+		sides[out].append([place, key, edge[0]])
+	var buttresses: Array = []
+	var windows: Array[Vector3i] = []
+	for out: Vector2i in sides:
+		var run: Array = sides[out]
+		run.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
+		var door := func(i: int) -> bool: return i >= 0 and i < run.size() and doors.has(run[i][1])
+		for i in range(1, run.size()):
+			if i % 2 == 0 and not door.call(i - 1) and not door.call(i):
+				buttresses.append([((run[i - 1][2] as Vector2) + (run[i][2] as Vector2)) * 0.5, out])
+		for i in range(1, run.size() - 1):
+			if i % 2 == 1 and not door.call(i - 1) and not door.call(i) and not door.call(i + 1):
+				windows.append(run[i][1])
+	return {"buttresses": buttresses, "windows": windows}
+
+
+## A buttressed set's buttresses (734: wall.<set>.buttress_tall) in
+## [param parts], its +x out from the wall; none without the slot.
+static func _buttresses(building: Dictionary, parts: Node3D) -> void:
+	var slot := "wall.%s.buttress_tall" % str(building.get("wall_set", ""))
+	var bays := _wall_bays(building)
+	if bays.is_empty() or not ArtKit.has(slot):
+		return
+	for index in (bays["buttresses"] as Array).size():
+		var entry: Array = bays["buttresses"][index]
+		var piece := _edge_piece(slot, entry[0], entry[1])
+		piece.name = "Buttress_%d" % index
+		parts.add_child(piece)
+
+
+## Its wall set's steps (734: steps.<set>, a chapel's) before
+## [param building]'s front doors, out from their middle; none without.
+static func _steps(building: Dictionary, parts: Node3D) -> void:
+	var slot := "steps.%s" % str(building.get("wall_set", ""))
+	if not ArtKit.has(slot):
+		return
+	var facing: Vector2i = building["facing"]
+	var middle := Vector2.ZERO
+	var count := 0
+	for key: Vector3i in building.get("doors", []):
+		var edge := _edge_out(building, key)
+		if edge[1] == facing:
+			middle += edge[0]
+			count += 1
+	if count == 0:
+		return
+	var piece := _edge_piece(slot, middle / count, facing)
+	piece.name = "Steps"
+	parts.add_child(piece)
+
+
+## The main block's gable roof's slopes (_slopes' node, with its HEIGHT and
+## SPAN) under [param roof], and the sign of its z toward
+## [param building]'s front; [] for a round, lean-to or missing one.
+static func _main_slopes(building: Dictionary, roof: Node3D) -> Array:
+	var holder := roof.get_node_or_null("Roof_%d" % _main_of(building["blocks"])) as Node3D
+	if holder == null or holder.get_child_count() == 0 or not holder.get_child(0).has_meta(SPAN):
+		return []
+	var facing: Vector2i = building["facing"]
+	var front := holder.basis.inverse() * Vector3(facing.x, 0.0, facing.y)
+	return [holder.get_child(0), signf(front.z) if absf(front.z) > 0.5 else 1.0]
+
+
+## Its wall set's gable windows (734): gable.<set>.rose on its main roof's
+## front gable, gable.<set>.oculus on its back, each centred
+## GABLE_WINDOW_UP of the way up its gable, its +x outward; in the roof, so
+## it hides and fades with it. A slot art-kit has not got is left out.
+static func _gable_windows(building: Dictionary, roof: Node3D) -> void:
+	var found := _main_slopes(building, roof)
+	if found.is_empty():
+		return
+	var slopes: Node3D = found[0]
+	var span: Vector3 = slopes.get_meta(SPAN)
+	for pair: Array in [["rose", float(found[1])], ["oculus", -float(found[1])]]:
+		var slot := "gable.%s.%s" % [building.get("wall_set", ""), pair[0]]
+		if not ArtKit.has(slot):
+			continue
+		var piece := ArtKit.instance(slot)
+		piece.name = str(pair[0]).capitalize()
+		piece.position = Vector3(0.0, span.x * GABLE_WINDOW_UP, float(pair[1]) * span.y * 0.5)
+		piece.rotation.y = -float(pair[1]) * PI * 0.5
+		slopes.add_child(piece)
+
+
+## Its wall set's belfry (734: belfry.<set>) on its main roof's ridge,
+## BELFRY_IN from its front wall, its foot's middle on the ridge, facing
+## its front; in the roof. None without the slot.
+static func _belfry(building: Dictionary, roof: Node3D) -> void:
+	var slot := "belfry.%s" % str(building.get("wall_set", ""))
+	var found := _main_slopes(building, roof)
+	if found.is_empty() or not ArtKit.has(slot):
+		return
+	var slopes: Node3D = found[0]
+	var span: Vector3 = slopes.get_meta(SPAN)
+	var z := float(found[1]) * (span.y * 0.5 - BELFRY_IN)
+	var piece := ArtKit.instance(slot)
+	piece.name = "Belfry"
+	piece.position = Vector3(0.0, float((slopes.get_meta(HEIGHT) as Callable).call(0.0, z)) + span.z, z)
+	piece.rotation.y = -float(found[1]) * PI * 0.5
+	slopes.add_child(piece)
+
+
+## Whether [param composed] has a bayed roof (734): one cut by bay.
+static func bayed(composed: Node3D) -> bool:
+	return not _bayed_slopes(composed).is_empty()
+
+
+static func _bayed_slopes(composed: Node3D) -> Array[Node]:
+	return composed.find_children("*", "Node3D", true, false).filter(func(node: Node) -> bool: return node.has_meta(BAY_MIDDLES))
+
+
+## [param composed]'s bayed roofs (734) covered as [param cover] says:
+## "whole"; "half", only the bays nearer [param building]'s front on (its
+## covering stage), the rest bare; "damaged" or "disrepair", its seed's
+## DAMAGED_BAYS or DISREPAIR_BAYS (one more at times) cut, each a hole
+## (roof.<set>.hole) where art-kit has one, else open; disrepair's cut
+## bays always the damaged ones and more.
+static func show_bays(building: Dictionary, composed: Node3D, cover: String) -> void:
+	var facing := Vector3(float((building["facing"] as Vector2i).x), 0.0, float((building["facing"] as Vector2i).y))
+	for slopes: Node3D in _bayed_slopes(composed):
+		var middles: Array = slopes.get_meta(BAY_MIDDLES)
+		var frame := Transform3D.IDENTITY
+		var node: Node = slopes
+		while node != composed and node is Node3D:
+			frame = (node as Node3D).transform * frame
+			node = node.get_parent()
+		var order: Array = range(middles.size())
+		order.sort_custom(func(a: int, b: int) -> bool:
+			return (frame * (middles[a] as Vector3)).dot(facing) > (frame * (middles[b] as Vector3)).dot(facing))
+		var bare: Array = []
+		var cut: Array = []
+		if cover == "half":
+			bare = order.slice(ceili(middles.size() * 0.5))
+		elif cover == "damaged" or cover == "disrepair":
+			var rng := _stream(building, BAY_SALT)
+			var shuffled: Array = range(middles.size())
+			for i in range(shuffled.size() - 1, 0, -1):
+				var j := rng.randi_range(0, i)
+				var swap: int = shuffled[i]
+				shuffled[i] = shuffled[j]
+				shuffled[j] = swap
+			var some := DAMAGED_BAYS + rng.randi_range(0, 1)
+			var more := DISREPAIR_BAYS + rng.randi_range(0, 1)
+			cut = shuffled.slice(0, mini(some if cover == "damaged" else more, middles.size()))
+		var pieces: Array[Node] = slopes.find_children("*", "Node3D", true, false)
+		for piece: Node in pieces:
+			if not piece.has_meta(BAY):
+				continue
+			var k: int = piece.get_meta(BAY)
+			(piece as Node3D).visible = not bare.has(k) and cut.has(k) == piece.has_meta(HOLE)
 
 
 ## [param key]'s middle in [param building]'s frame and its outward side
@@ -336,7 +594,7 @@ static func cruck_of(building: Dictionary, far: bool) -> Node3D:
 ## Block [param index]'s roof by its role, placed in the building's frame
 ## (its box's top-left cell's middle at the origin), from its own stream.
 static func _block_roof(building: Dictionary, index: int, material: Material, gable: Material, profile: Dictionary,
-		trim := false) -> Node3D:
+		trim_set := "") -> Node3D:
 	var blocks: Array = building["blocks"]
 	var block: Rect2i = blocks[index]
 	var rect: Rect2i = building["rect"]
@@ -358,14 +616,14 @@ static func _block_roof(building: Dictionary, index: int, material: Material, ga
 		var along := float(block.size.y if leans.x != 0 else block.size.x)
 		var low := at
 		var rise := maxf(eaves - LEAN_TUCK - low, 0.3)
-		holder.add_child(_slopes(across, along, rise, reach, rng.randf_range(SAG.x, SAG.y) * along, true, thick, material, gable, trim))
+		holder.add_child(_slopes(across, along, rise, reach, rng.randf_range(SAG.x, SAG.y) * along, true, thick, material, gable, trim_set, profile))
 		holder.position = Vector3(middle.x, low, middle.y)
 		holder.rotation.y = {Vector2i(1, 0): 0.0, Vector2i(-1, 0): PI, Vector2i(0, 1): -PI * 0.5, Vector2i(0, -1): PI * 0.5}[leans]
 	else:
 		var along_x := block.size.x > block.size.y
 		var span := Vector2(block.size.y, block.size.x) if along_x else Vector2(block.size)
-		var rise := span.x * 0.5 * rng.randf_range(RISE.x, RISE.y)
-		holder.add_child(_slopes(span.x, span.y, rise, reach, rng.randf_range(SAG.x, SAG.y) * span.y, false, thick, material, gable, trim))
+		var rise := span.x * 0.5 * _rise_draw(profile, rng)
+		holder.add_child(_slopes(span.x, span.y, rise, reach, rng.randf_range(SAG.x, SAG.y) * span.y, false, thick, material, gable, trim_set, profile))
 		holder.position = Vector3(middle.x, at, middle.y)
 		holder.rotation.y = PI * 0.5 if along_x else 0.0
 	holder.position += Vector3(rng.randf_range(-SHIFT, SHIFT), 0.0, rng.randf_range(-SHIFT, SHIFT))
@@ -398,40 +656,70 @@ static func _leans_on(block: Rect2i, blocks: Array) -> Vector2i:
 ## low eave at -x to its high side at +x; reaching [param reach] past the
 ## walls each way, the ridge sagging [param sag] in the middle of its
 ## length (the eaves do not), a top [param thick] above its underside; and its
-## ends closed down to the eaves in [param gable]. A thatch roof's
-## ([param trim]) ridge and eaves dressed in art-kit's rolls (_trims).
+## ends closed down to the eaves in [param gable]. Its [param profile]'s
+## bellcast (decision 734) kicks its low edges up flatter past the walls.
+## Its roof set's ([param trim_set]) edge pieces laid along it (_trims).
 static func _slopes(across: float, along: float, rise: float, reach: float, sag: float, mono: bool, thick: float,
-		material: Material, gable: Material, trim := false) -> Node3D:
+		material: Material, gable: Material, trim_set := "", profile := {}) -> Node3D:
 	var half := across * 0.5
+	var edge := half + reach
 	var length := along + reach * 2.0
+	# The bellcast: none on the walls' line, its full lift at the eave.
+	var cast := float(profile.get("bellcast", 0.0))
+	var cast_from := maxf(half, edge - float(profile.get("bellcast_reach", BELLCAST_REACH)))
 	var height := func(x: float, z: float) -> float:
 		var h := rise * (x + half) / across if mono else rise * (1.0 - absf(x) / half)
 		var t := clampf(h / rise, 0.0, 1.0)
 		var u := 2.0 * z / length
-		return h - sag * (1.0 - u * u) * t
-	var xs: Array[float] = [-half - reach, half + reach]
+		var out := h - sag * (1.0 - u * u) * t
+		var low := -x if mono else absf(x)
+		if cast > 0.0 and low > cast_from and edge > cast_from:
+			out += cast * pow((low - cast_from) / (edge - cast_from), 2.0)
+		return out
+	var xs: Array[float] = [-edge, edge]
 	if not mono:
 		xs.insert(1, 0.0)
-	var tool := SurfaceTool.new()
-	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for i in xs.size() - 1:
-		for j in STEPS:
-			var z0 := -length * 0.5 + length * j / STEPS
-			var z1 := -length * 0.5 + length * (j + 1) / STEPS
-			for lift in [thick, 0.0]:
-				var corners := [Vector3(xs[i], height.call(xs[i], z0) + lift, z0), Vector3(xs[i], height.call(xs[i], z1) + lift, z1),
-					Vector3(xs[i + 1], height.call(xs[i + 1], z1) + lift, z1), Vector3(xs[i + 1], height.call(xs[i + 1], z0) + lift, z0)]
-				for k in [0, 1, 2, 0, 2, 3]:
-					var corner: Vector3 = corners[k]
-					tool.set_uv(Vector2(corner.z + length * 0.5, absf(corner.x)) / 2.0)
-					tool.add_vertex(corner)
-	tool.generate_normals()
+	if cast > 0.0 and edge > cast_from:
+		# Its curve's own points, so the kick bends.
+		for low: float in [cast_from, (cast_from + edge) * 0.5]:
+			xs.append(-low)
+			if not mono:
+				xs.append(low)
+		xs.sort()
 	var out := Node3D.new()
-	var slopes := MeshInstance3D.new()
-	slopes.name = "Slopes"
-	slopes.mesh = tool.commit()
-	slopes.material_override = material
-	out.add_child(slopes)
+	out.set_meta(HEIGHT, height)
+	out.set_meta(SPAN, Vector3(rise, along, thick))
+	# A bayed cover (734): a sheet a bay, each its own to cut (show_bays).
+	var bay := float(profile.get("bay", 0.0))
+	var bays := maxi(ceili(length / bay - 0.01), 1) if bay > 0.0 else 1
+	var middles: Array[Vector3] = []
+	for b in bays:
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var steps := STEPS if bays == 1 else maxi(ceili(float(STEPS) / bays), 1)
+		for i in xs.size() - 1:
+			for j in steps:
+				var z0 := -length * 0.5 + length * (b * steps + j) / (bays * steps)
+				var z1 := -length * 0.5 + length * (b * steps + j + 1) / (bays * steps)
+				for lift in [thick, 0.0]:
+					var corners := [Vector3(xs[i], height.call(xs[i], z0) + lift, z0), Vector3(xs[i], height.call(xs[i], z1) + lift, z1),
+						Vector3(xs[i + 1], height.call(xs[i + 1], z1) + lift, z1), Vector3(xs[i + 1], height.call(xs[i + 1], z0) + lift, z0)]
+					for k in [0, 1, 2, 0, 2, 3]:
+						var corner: Vector3 = corners[k]
+						tool.set_uv(Vector2(corner.z + length * 0.5, absf(corner.x)) / 2.0)
+						tool.add_vertex(corner)
+		tool.generate_normals()
+		var slopes := MeshInstance3D.new()
+		slopes.name = "Slopes" if bays == 1 else "Slopes_%d" % b
+		slopes.mesh = tool.commit()
+		slopes.material_override = material
+		out.add_child(slopes)
+		if bays > 1:
+			var z := -length * 0.5 + length * (b + 0.5) / bays
+			middles.append(Vector3(0.0, float(height.call(0.0, z)), z))
+			slopes.set_meta(BAY, b)
+	if bays > 1:
+		out.set_meta(BAY_MIDDLES, middles)
 	var ends := SurfaceTool.new()
 	ends.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for z in [-along * 0.5, along * 0.5]:
@@ -446,42 +734,112 @@ static func _slopes(across: float, along: float, rise: float, reach: float, sag:
 	gables.mesh = ends.commit()
 	gables.material_override = gable
 	out.add_child(gables)
-	if trim:
-		out.add_child(_trims(height, half + reach, length, rise / across if mono else rise / half, mono, thick))
+	if trim_set == "thatch" or bays > 1:  # Thatch's rolls, a bayed set's pieces (734); shingle's are slot roofs'.
+		var trims := _trims(trim_set, height, edge, length, rise / across if mono else rise / half, mono, thick, bays)
+		if trims.get_child_count() > 0:
+			out.add_child(trims)
+		else:
+			trims.free()
 	return out
 
 
-## A thatch roof's trims (489 amended, art-kit's pieces): roof.thatch.ridge
-## along a gable's ridge and roof.thatch.eave along each low eave (a
-## lean-to's high side meets its wall and has none), one a metre over
-## [param length], on the top of the thatch ([param thick] above
-## [param height]'s underside), the ridge's pieces pitched to its sag, the
-## eaves' turned outward and laid down the slope ([param pitch] its fall a
-## metre). Slots art-kit has not got are left out.
-static func _trims(height: Callable, edge: float, length: float, pitch: float, mono: bool, thick: float) -> Node3D:
+## A roof's edge pieces (489 amended; decision 734 for every set), art-kit's
+## roof.<set>.ridge along a gable's ridge, roof.<set>.eave along each low
+## eave (a lean-to's high side meets its wall and has none), one a metre
+## over [param length]; roof.<set>.verge up each end's slope edges, one a
+## metre along the slope (the last shortened), its +x out past the end;
+## roof.<set>.end on each end of a gable's ridge. All on the top of the
+## cover ([param thick] above [param height]'s underside), the ridge's
+## pitched to its sag, the eaves' turned outward and laid down the slope
+## ([param pitch] its fall a metre). Thatch's rolls have their origin in
+## their middle; every other set's at their -z end (art-kit's rule).
+## Slots art-kit has not got are left out.
+static func _trims(roof_set: String, height: Callable, edge: float, length: float, pitch: float, mono: bool, thick: float,
+		bays := 1) -> Node3D:
 	var out := Node3D.new()
 	out.name = "Trim"
-	var count := maxi(ceili(length), 1)
+	var centred := roof_set == "thatch"
+	var slot := func(piece: String) -> String: return "roof.%s.%s" % [roof_set, piece]
+	var bayed := bays > 1
+	var count := bays if bayed else maxi(ceili(length), 1)
 	var step := length / count
 	var sides: Array[float] = [-1.0]
 	if not mono:
 		sides.append(1.0)
 	for k in count:
-		var z := -length * 0.5 + step * (k + 0.5)
-		if not mono and ArtKit.has("roof.thatch.ridge"):
-			var ridge := ArtKit.instance("roof.thatch.ridge")
+		var z := -length * 0.5 + step * (k + (0.5 if centred else 0.0))
+		if not mono and ArtKit.has(slot.call("ridge")):
+			var ridge := ArtKit.instance(slot.call("ridge"))
+			ridge.name = "Ridge_%d" % k
 			var fall := (float(height.call(0.0, z + 0.05)) - float(height.call(0.0, z - 0.05))) / 0.1
 			ridge.position = Vector3(0.0, float(height.call(0.0, z)) + thick, z)
 			ridge.rotation.x = -atan(fall)
+			if bayed:
+				ridge.set_meta(BAY, k)
 			out.add_child(ridge)
-		if ArtKit.has("roof.thatch.eave"):
+		if ArtKit.has(slot.call("eave")):
 			for side in sides:
-				var eave := ArtKit.instance("roof.thatch.eave")
+				var eave := ArtKit.instance(slot.call("eave"))
+				eave.name = "Eave_%d_%d" % [k, side]
 				eave.position = Vector3(side * edge, float(height.call(side * edge, z)) + thick, z)
-				# Its +x out past the eave, its -x up the slope under the thatch.
+				# Its +x out past the eave, its -x up the slope under the cover.
 				eave.rotation = Vector3(0.0, 0.0 if side > 0.0 else PI, -atan(pitch))
+				if bayed:
+					eave.set_meta(BAY, k)
 				out.add_child(eave)
+		if bayed and ArtKit.has(slot.call("hole")):
+			# A bay's hole, hidden till its bay is cut (show_bays): laid in
+			# the middle of each slope, its +y off the slope.
+			for side in sides:
+				var x := side * edge * 0.5 if not mono else 0.0
+				var lean := Vector3(-pitch * side if not mono else -pitch, 1.0, 0.0)
+				var hole := _laid(ArtKit.instance(slot.call("hole")), Vector3(x, float(height.call(x, z)) + thick, z),
+						Vector3(x, float(height.call(x, z + step)) + thick, z + step), Vector3(side, 0.0, 0.0), false, lean)
+				hole.name = "Hole_%d_%d" % [k, side]
+				hole.set_meta(BAY, k)
+				hole.set_meta(HOLE, true)
+				hole.visible = false
+				out.add_child(hole)
+	for end: float in [-1.0, 1.0]:
+		var z := end * length * 0.5
+		if ArtKit.has(slot.call("verge")):
+			# Each slope's edge, from its eave up: a gable's two, a lean-to's one.
+			var runs: Array = [[-edge, 0.0], [edge, 0.0]] if not mono else [[-edge, edge]]
+			for run: Array in runs:
+				var pieces := maxi(ceili(absf(float(run[1]) - float(run[0])) / cos(atan(pitch))), 1)
+				for i in pieces:
+					var x0: float = lerpf(run[0], run[1], float(i) / pieces)
+					var x1: float = lerpf(run[0], run[1], float(i + 1) / pieces)
+					var verge := _laid(ArtKit.instance(slot.call("verge")),
+							Vector3(x0, float(height.call(x0, z)) + thick, z), Vector3(x1, float(height.call(x1, z)) + thick, z),
+							Vector3(0.0, 0.0, end), centred)
+					verge.name = "Verge_%d_%d_%d" % [end, run[0], i]
+					out.add_child(verge)
+		if not mono and ArtKit.has(slot.call("end")):
+			var cap := ArtKit.instance(slot.call("end"))
+			cap.name = "End_%d" % end
+			cap.position = Vector3(0.0, float(height.call(0.0, z)) + thick, z)
+			cap.rotation.y = 0.0 if end > 0.0 else PI
+			out.add_child(cap)
 	return out
+
+
+## [param piece] (1 m along its z) laid from [param a] to [param b],
+## stretched to fit: its +x toward [param outward], its +y off the line
+## toward [param up], its origin at its -z end (in its middle when
+## [param centred]).
+static func _laid(piece: Node3D, a: Vector3, b: Vector3, outward: Vector3, centred: bool, up := Vector3.UP) -> Node3D:
+	var z := (b - a).normalized()
+	var y := (up - z * up.dot(z)).normalized()
+	var x := y.cross(z)
+	if x.dot(outward) < 0.0:
+		var swap := a
+		a = b
+		b = swap
+		z = -z
+		x = -x
+	piece.transform = Transform3D(Basis(x, y, z) * Basis.from_scale(Vector3(1.0, 1.0, a.distance_to(b))), (a + b) * 0.5 if centred else a)
+	return piece
 
 
 ## A round kind's roof: a cone of FACETS faces over its box (its blocks'

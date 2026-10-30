@@ -35453,4 +35453,36 @@ it, enabled whatever the purse, sending gold 0; it alone when he
 offers nothing else (its words shown). first_deal skips it (is_no,
 no_deal). Under the purse line the window says STRIKE_WORDS ("Shift+click:
 strike"). ui_test _test_deal_window. Client only, protocol unchanged, no new
+## 734: the temple's staged kit, composer half
+
+The temple kind becomes a chapel: wall_set "chapel", roof_set "slate" in levels/buildings.json,
+door.double variant 4 (Client3D.DOOR_VARIANTS by set). It lands before its art: every piece is
+art-kit's slot and is left out until the slot exists, so the chapel shows up piece by piece.
+Until wall.chapel.profile exists the walls draw stone (Client3D.SET_STAND_INS); until
+material.roof.slate exists the roof is covered in KIND_ROOF but takes slate's profile and pieces
+(BuildingComposer._set_of, covered_in, shared by Client3D._add_kind and _main_rise).
+- A roof profile (roof.<set>.profile) may now say `rise` (over the half-span, drawn ±0.05 from
+  the block's stream in RISE's place), `bellcast` and `bellcast_reach` (default 0.6: the last
+  metres to the eave lift by bellcast × (1 - d/reach)², d from the eave; none on the walls' line)
+  and `bay` (metres). A bayed set's slopes are one sheet a bay (Slopes_k), and its edge pieces
+  roof.<set>.ridge, eave (one a bay, origin at the -z end on the slope's top line, +y off it),
+  verge (up each end's slopes, a metre at a time, +x out past the end), end (each ridge end) and
+  a hidden hole per slope per bay are laid by _trims, which thatch's rolls keep using as before.
+  Shingle's ridge and end slots are the slot roofs' and are not laid on kinds.
+- The gable triangles stay the composer's, in the wall set's material; gable.<set>.rose on the
+  main block's front gable and gable.<set>.oculus on its back sit centred, 0.4 of the way up.
+  belfry.<set> sits on the ridge 1 m in from the front wall, origin at its foot's middle at ridge
+  height. All three are in the roof node, so they hide and fade with it.
+- A wall profile with "windows": "between_buttresses" gets wall.<set>.buttress_tall at every
+  second vertex along the main block's long sides (no corner, none by a door, in parts) and its
+  windows (BuildingComposer.windows) the edges between them, drawn as wall.<set>.window_tall
+  (Client3D, any height) where art-kit has it. steps.<set> stand before the front doors.
+- Stages and decline cut by the bay (BuildingComposer.show_bays, Client3D._cover_bays): at
+  COVERING the front half of the bays is on and the back bare; damaged cuts 2 or 3 bays by its
+  seed (each a roof.<set>.hole, else open), disrepair 5 or 6 that always include the damaged
+  ones; a bayed roof no longer sags. A ruin's roof goes as before.
+- Not yet: the lancets broken in decline (1, then 3), belfry_ruin, roof.<set>.broken at a cut's
+  edge, roof.ridge_beam at RAFTERS, a gable material of its own; each waits for its art.
+view_test _test_chapel (stand-in slots: bays, holes, gable windows, belfry, buttresses and
+lancets, covering half, damaged within disrepair). Client only, protocol unchanged, no new
 class_name.

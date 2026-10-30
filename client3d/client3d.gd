@@ -140,6 +140,9 @@ const WALL_TILE := 2.0
 ## The set a map's walls and floors are in when level.json names none, or
 ## names one art-kit has not (decision 285).
 const DEFAULT_SET := "castle"
+## A wall set's stand-in until art-kit has its profile (734: the temple's
+## chapel set is stone till then).
+const SET_STAND_INS := {"chapel": "stone"}
 ## Each set's wall stone until material.wall.<set> has a texture: a palette
 ## swatch, and its courses (_stone_courses): rows a tile, and the blocks'
 ## shortest and longest, as a share of the tile (wood's are planks).
@@ -421,7 +424,7 @@ const DOOR_FRAME := ^"Door/Body"
 const DOOR_LEAF := ^"Door/leaf"
 ## A door's variant by its wall's set (659 amended): the dark tower's doors
 ## in its blue-black; any other set's variant 1.
-const DOOR_VARIANTS := {"dark": 2}
+const DOOR_VARIANTS := {"dark": 2, "chapel": 4}
 ## A generated barrow's door.double (725): art-kit's crypt door, variant 3.
 const CRYPT_DOUBLE_VARIANT := 3
 ## Near pieces blend only their nearest surface: every near piece's depth
@@ -5681,8 +5684,9 @@ func _building_sets(building: Dictionary) -> void:
 					_plinths[key] = true
 		# A kind's windows (489 amended), its wood walls of a storey's height:
 		# art-kit's window there, turned so its shutters open outward.
-		if building.has("kind") and wall_set == "wood" and key in windows \
-				and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH:
+		# A chapel's lancets (734) are its own height.
+		if building.has("kind") and key in windows and (wall_set == "wood" and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH
+				or ArtKit.has("wall.%s.window_tall" % wall_set)):
 			_set_wall_state(key, "window")
 			_window_code[key] = [awake_town(building, str(_terrain.get("level", ""))), str(building.get("code", "")), true]
 			var sides := Terrain.edge_cells(key)
@@ -5769,9 +5773,7 @@ func _add_kind(building: Dictionary) -> void:
 	# L's notch leaves outside it.
 	var base := _elevation(cells[0])
 	var eaves := float(building["eaves"])
-	var named := str(building.get("roof_set", ""))
-	var roof_set := named if not named.is_empty() and ArtKit.has("material.roof." + named) else KIND_ROOF
-	var node := BuildingComposer.compose(building, roof_set)
+	var node := BuildingComposer.compose(building, BuildingComposer.covered_in(building))
 	node.name = "Building_%d_%d" % [rect.position.x, rect.position.y]
 	node.position = Vector3(rect.position.x, base, rect.position.y)
 	_room.add_child(node)
@@ -5784,7 +5786,7 @@ func _add_kind(building: Dictionary) -> void:
 		"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
 		"open_air": false, "crop": "", "inside": inside, "outline": Level.building_outline(building),
 		"kind": building, "stage": BuildingComposer.STANDING, "scaffold": false, "heights": {}, "windows": [],
-		"plot": building.get("plot", false), "code": str(building.get("code", ""))})
+		"plot": building.get("plot", false), "code": str(building.get("code", "")), "bayed": BuildingComposer.bayed(node)})
 	# Its walls as built (566): what a stage cuts down and puts back.
 	for key: Vector3i in _buildings[index]["outline"]:
 		_buildings[index]["heights"][key] = _height_of(key)
@@ -6177,6 +6179,8 @@ func _show_damage(building: Dictionary, damaged: bool) -> void:
 			whole.visible = not damaged
 		broken.visible = damaged
 		building["roof"] = broken if damaged else whole
+	elif whole != null and building.get("bayed", false):
+		_cover_bays(building)  # Its bays cut, not sagging (734).
 	elif whole != null:
 		whole.transform = building["roof_at"] * (_kind_sag(building) if building.has("kind") else ROOF_SAG) if damaged else building["roof_at"]
 	var heaps := node.find_child("state_damaged", true, false) as Node3D
@@ -6461,6 +6465,7 @@ func _show_stage(building: Dictionary, at: int, scaffold: bool) -> void:
 	var parts: Node3D = node.get_node_or_null("parts")
 	if parts != null:
 		parts.visible = at == BuildingComposer.STANDING
+	_cover_bays(building)
 	if at == was or at == BuildingComposer.STANDING and was == BuildingComposer.STANDING:
 		return
 	var fraction := BuildingComposer.wall_fraction(at)
@@ -6490,6 +6495,19 @@ func _show_stage(building: Dictionary, at: int, scaffold: bool) -> void:
 				if _doorways.has(key):
 					(_doorways[key] as Node3D).visible = fraction >= 1.0
 	rebuild_walls(building["outline"])
+
+
+## A kind [param building]'s bayed roof (734, BuildingComposer.show_bays)
+## covered as its stage and state say: half at its covering stage, else
+## cut as its record's damage or disrepair has it, else whole.
+func _cover_bays(building: Dictionary) -> void:
+	if not building.get("bayed", false):
+		return
+	var state := Towns.STANDING
+	if not str(building["use"]).is_empty():
+		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+	var cover := "half" if int(building["stage"]) == BuildingComposer.COVERING else "disrepair" if state == Towns.DISREPAIR else "damaged" if state == Towns.DAMAGED else "whole"
+	BuildingComposer.show_bays(building["kind"], building["node"], cover)
 
 
 ## Whether wall edge [param key] stands unbuilt (566): on a plot ("plot")
@@ -11781,7 +11799,10 @@ func _floor_set(cell: Vector2i, kind: String) -> String:
 ## [param set_name] if art-kit has the set (its wall.<set>.profile), else
 ## DEFAULT_SET.
 static func _known_set(set_name: String) -> String:
-	return set_name if ArtKit.has("wall.%s.profile" % set_name) else DEFAULT_SET
+	if ArtKit.has("wall.%s.profile" % set_name):
+		return set_name
+	var stand_in := str(SET_STAND_INS.get(set_name, ""))
+	return stand_in if not stand_in.is_empty() and ArtKit.has("wall.%s.profile" % stand_in) else DEFAULT_SET
 
 
 ## Where an edge is along its line: its z for an east edge, its x for a
@@ -11842,7 +11863,7 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		elif states[k] == WALL_TOPLESS and _wall_states.has(run[k]):
 			piece = "wall.%s.straight_ruined" % set_name
 		elif states[k] == WALL_WHOLE and _wall_states.get(run[k]) == "window":
-			piece = "wall.%s.window" % set_name
+			piece = "wall.%s.window_tall" % set_name if ArtKit.has("wall.%s.window_tall" % set_name) else "wall.%s.window" % set_name
 		elif states[k] == WALL_WHOLE and _niche_at.has(run[k]) and str(_niche_at[run[k]]["kind"]) != "hidden":
 			piece = NICHE_PIECE % _niche_at[run[k]]["kind"]
 		if piece != "" and ArtKit.has(piece) and ArtKit.filled_by(piece) != "placeholder":
