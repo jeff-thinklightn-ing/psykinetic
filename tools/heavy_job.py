@@ -157,6 +157,9 @@ HUNG_CPU = 0.03
 HUNG_SECONDS = 10 * 60
 ## Exit code of a run its wrapper stopped as over its limit or hung.
 STOPPED_CODE = 5
+## A job going past one it conflicts with (backfill, 394 amended (18))
+## counts on its longest recorded run times this.
+BACKFILL_MARGIN = 1.25
 ## The kinds and their first estimates (GB), before any is measured;
 ## max_minutes: the limit before the kind has recorded runs.
 KINDS = {
@@ -293,7 +296,7 @@ def out_of_reach(job, running, free_ram_gb, free_commit_gb=None):
     return free_commit_gb is not None and free_commit_gb + back < commit_of(job) + COMMIT_MARGIN_GB
 
 
-def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None):
+def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=None, now=None, length_s=None):
     """Whether [job] may start though [ahead] (the rows queued before it)
     came first: none, or each is out of reach (out_of_reach: a 29 GB mesh
     job on a machine with 32 GB free held ten landings behind it), or waits
@@ -301,15 +304,91 @@ def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None):
     beside one) and [job] is of another kind that neither excludes. A wait
     for memory the queue will give back, or for the running count, is first
     come first served for everyone: a big job is not starved; once in reach
-    it holds those behind it again."""
+    it holds those behind it again. With [table] (the kinds), [now] and
+    [length_s] (backfill_length), it may also go past one it conflicts with
+    when it ends first (backfill)."""
+    return passes(job, ahead, running, free_ram_gb, free_commit_gb, table, now, length_s)[0]
+
+
+def passes(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=None, now=None, length_s=None):
+    """may_pass's answer as (ok, past, why): past, the rows [job] goes past by
+    backfill, each with "due", when its blockers should end; why, when it
+    may not, what backfill would have needed ("" if backfill never applied)."""
+    past = []
     for other in ahead:
         if free_ram_gb is not None and out_of_reach(other, running, free_ram_gb, free_commit_gb):
             continue
         if not kind_blocked(other, running):
-            return False
-        if other.get("kind") == job.get("kind") or other.get("kind") in job.get("excludes", [])                 or job.get("kind") in other.get("excludes", []):
-            return False
-    return True
+            return False, [], ""
+        if other.get("kind") == job.get("kind"):
+            return False, [], ""
+        if conflicts(job, other):
+            ok, due, why = may_backfill(other, running, table, now, length_s)
+            if not ok:
+                return False, [], why
+            past.append(dict(other, due=due))
+    return True, past, ""
+
+
+def conflicts(job, other):
+    """Whether either of [job] and [other] excludes the other's kind."""
+    return other.get("kind") in job.get("excludes", []) or job.get("kind") in other.get("excludes", [])
+
+
+def median_s(runs):
+    runs = sorted(runs)
+    middle = len(runs) // 2
+    return runs[middle] if len(runs) % 2 else (runs[middle - 1] + runs[middle]) / 2.0
+
+
+def backfill_length(row, expect_minutes=None):
+    """How long a job of [row] is counted on to run when it goes past
+    another (backfill): its --expect, else its kind's longest recorded run
+    times BACKFILL_MARGIN; None (never goes past) with neither."""
+    if expect_minutes is not None:
+        return expect_minutes * 60.0
+    runs = row.get("runs_s", [])
+    return max(runs) * BACKFILL_MARGIN if runs else None
+
+
+def blockers(job, running):
+    """The running jobs that keep [job] out by kind: those it excludes or
+    that exclude it, and its own kind's once at its cap."""
+    found = [each for each in running if conflicts(job, each)]
+    cap = job.get("max_running")
+    same = [each for each in running if each.get("kind") == job.get("kind")]
+    if cap is not None and len(same) >= cap:
+        found += same
+    return found
+
+
+def may_backfill(head, running, table, now, length_s):
+    """Whether a job [length_s] long may start ahead of [head], which it
+    conflicts with (394 amended (18)): [head] waits on kind alone and its
+    blockers should end (each one's start plus its estimate's median run,
+    from [table]) after the job would. A blocker with no runs recorded or
+    past its median has no known end: nobody goes past. (ok, due, why):
+    due, when the blockers should all have ended."""
+    if table is None or now is None:
+        return False, None, ""
+    if length_s is None:
+        return False, None, "going past it needs runs of this kind recorded"
+    ends = []
+    for each in blockers(head, running):
+        runs = table.get(each.get("estimate", each.get("kind")), {}).get("runs_s", [])
+        if not runs or each.get("started") is None:
+            return False, None, "going past it needs the %s's runs recorded" % each.get("kind")
+        end = each["started"] + median_s(runs)
+        if end <= now:
+            return False, None, "the %s running is past its usual length, its end unknown" % each.get("kind")
+        ends.append(end)
+    if not ends:
+        return False, None, ""
+    due = max(ends)
+    if now + length_s > due:
+        return False, None, "going past it needs %.0f s, the %s is due in %.0f s" % (
+            length_s, "/".join(sorted(set(each.get("kind") for each in blockers(head, running)))), due - now)
+    return True, due, ""
 
 
 def may_step_aside(job, behind):
@@ -364,11 +443,9 @@ def limit_seconds(row, expect_minutes=None):
         return expect_minutes * 60.0
     if row.get("fixed_limit") and row.get("max_minutes") is not None:
         return row["max_minutes"] * 60.0  # A soak: its length is its own --days.
-    runs = sorted(row.get("runs_s", []))
+    runs = row.get("runs_s", [])
     if runs:
-        middle = len(runs) // 2
-        median = runs[middle] if len(runs) % 2 else (runs[middle - 1] + runs[middle]) / 2.0
-        return max(OVERRUN_FLOOR_SECONDS, OVERRUN_FACTOR * median)
+        return max(OVERRUN_FLOOR_SECONDS, OVERRUN_FACTOR * median_s(runs))
     if row.get("max_minutes") is not None:
         return row["max_minutes"] * 60.0
     return None
@@ -841,10 +918,11 @@ def log(event, tree, kind, detail=""):
 
 # --- Commands -----------------------------------------------------------------
 
-def wait_turn(tree, kind, pid, watched):
+def wait_turn(tree, kind, pid, watched, expect_minutes=None):
     """Queues, waits to be at the head with room, then moves to running.
     Returns the running entry's file name and the kind whose estimate it
-    holds: [kind], or its lean variant (goes_lean)."""
+    holds: [kind], or its lean variant (goes_lean). [expect_minutes]: how
+    long it says it runs, counted on if it goes past another (backfill)."""
     row = dict(kinds()[kind], kind=kind)
     estimate = kind
     total = total_ram_gb()
@@ -863,6 +941,9 @@ def wait_turn(tree, kind, pid, watched):
             "waiter": os.getpid(), "waiter_since": started_at(os.getpid()), "queued": queued})
     said = 0.0
     long_logged = False
+    # Since when only backfilled jobs have kept this one out (394 amended
+    # (18)): its wait from then is the backfill's cost, logged as late.
+    held_by_backfill = None
     while True:
         with StateLock():
             queue = _entries("queue")
@@ -876,7 +957,7 @@ def wait_turn(tree, kind, pid, watched):
                 raise SystemExit(3)
             place = next((i for i, each in enumerate(queue) if each["file"] == ticket), 0) + 1
             table = kinds()
-            ahead = [queued_row(table, each, row) for each in queue[:place - 1]]
+            ahead = [dict(queued_row(table, each, row), tree=each["tree"]) for each in queue[:place - 1]]
             # First in the queue, or every job before it waits on its own
             # kind alone (may_pass): an import is not held behind a suite
             # waiting for a suite.
@@ -893,8 +974,15 @@ def wait_turn(tree, kind, pid, watched):
                     time.time() - queued, free_ram, estimate, row["ram_gb"]))
                 print("heavy_job: %s %s out of reach (memory held outside the gate): runs lean, as %s (%.1f + %.0f GB)" % (
                     tree, kind, estimate, row["ram_gb"], MARGIN_GB), file=sys.stderr)
-            head = may_pass(row, ahead, running, free_ram, free_commit)
+            now = time.time()
+            head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now,
+                backfill_length(row, expect_minutes))
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
+            stuck = blockers(row, running)
+            if stuck and all(each.get("backfill") for each in stuck):
+                held_by_backfill = held_by_backfill or now
+            elif stuck:
+                held_by_backfill = None
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
                 behind = [queued_row(table, each, row) for each in queue[place:]]
@@ -917,12 +1005,26 @@ def wait_turn(tree, kind, pid, watched):
                 first_gpu = gpu_gb()[0] if first_row["gpu"] else None
                 _, first_why = decide(first_row, running, True, free_ram, first_gpu, free_commit)
                 why = "the head, %s %s, waits on: %s" % (first["tree"], first["kind"], first_why or "its next look")
+                if past_why:
+                    why += "; %s" % past_why
             if ok:
                 _retried(os.remove, _path("queue", ticket))
                 name = "%s-%s-%s.json" % (tree, kind, pid or os.getpid())
-                _write(_path("running", name), {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
+                entry = {"tree": tree, "kind": kind, "pid": pid, "pid_since": started_at(pid), "queued": queued,
                     "started": time.time(), "ram_gb": row["ram_gb"], "commit_gb": commit_of(row), "gpu": row["gpu"], "using_gb": 0.0,
-                    "using_commit_gb": 0.0, "watched": watched, "estimate": estimate})
+                    "using_commit_gb": 0.0, "watched": watched, "estimate": estimate}
+                if past:
+                    # Gone past these by backfill (394 amended (18)): due
+                    # to end before their blockers do.
+                    entry["backfill"] = {"past": ", ".join("%s %s" % (each["tree"], each["kind"]) for each in past),
+                        "due": min(each["due"] for each in past)}
+                    log("backfill", tree, kind, "past %s, waiting on %s due in %.0f s; expects %.0f s" % (
+                        entry["backfill"]["past"], "/".join(sorted(set(each.get("kind") for each in stuck_of(past, running)))),
+                        entry["backfill"]["due"] - now, backfill_length(row, expect_minutes)))
+                if held_by_backfill is not None and now - held_by_backfill >= POLL_SECONDS:
+                    log("backfill_late", tree, kind, "waited %.0f s after its blockers ended, on jobs that went past it" % (
+                        now - held_by_backfill))
+                _write(_path("running", name), entry)
                 waited = time.time() - queued
                 lean = ", lean" if estimate != kind else ""
                 log("start", tree, kind, ("waited %.0f s" % waited if waited >= POLL_SECONDS else "") + lean)
@@ -938,6 +1040,14 @@ def wait_turn(tree, kind, pid, watched):
             long_logged = True
             log("waiting", tree, kind, "%.0f s, %s of %d: %s" % (waited, _ordinal(place), len(queue), why))
         time.sleep(POLL_SECONDS)
+
+
+def stuck_of(past, running):
+    """The running jobs that kept the rows in [past] out."""
+    found = []
+    for each in past:
+        found += [job for job in blockers(each, running) if job not in found]
+    return found
 
 
 def _ordinal(n):
@@ -999,7 +1109,7 @@ def run(tree, kind, command, expect_minutes=None):
             name = adopted
             print("heavy_job: %s %s inside this tree's take, measured as a run" % (tree, kind), file=sys.stderr)
         else:
-            name, estimate = wait_turn(tree, kind, os.getpid(), True)
+            name, estimate = wait_turn(tree, kind, os.getpid(), True, expect_minutes)
         started = time.time()
         row = kinds()[kind] if estimate == kind else (lean_row(kinds(), kind) or kinds()[kind])
         # A soak below normal priority, and what it starts with it (Windows
@@ -1193,10 +1303,13 @@ def status():
             flag = "  HUNG? (cpu %.0f%% the last %.0f min)" % (share * 100, HUNG_SECONDS / 60)
         elif held >= LONG_HOLD_SECONDS:
             flag = "  LONG: held %.0f min, is it stuck?" % (held / 60)
+        backfill = entry.get("backfill")
         print("running %s %s, %s, using %.1f of %.1f GB%s%s" % (entry["tree"], entry["kind"],
             "held %.0f of %.0f min" % (held / 60, limit / 60) if limit is not None else "%.0f s" % held,
             entry.get("using_gb", 0.0), entry["ram_gb"], ("" if entry.get("watched") else " (taken)")
-            + (" (lean)" if entry.get("estimate", entry["kind"]) != entry["kind"] else ""), flag))
+            + (" (lean)" if entry.get("estimate", entry["kind"]) != entry["kind"] else "")
+            + (" (went past %s, due by %s)" % (backfill["past"], time.strftime("%H:%M", time.localtime(backfill["due"])))
+                if backfill else ""), flag))
     for place, entry in enumerate(queue, 1):
         print("queued %s %s, %.0f s (%s)%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
             ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else ""))
@@ -1232,6 +1345,9 @@ def summary(day):
             detail = detail.split("; backtrace:")[0]  # The whole one stays in the log.
         print("%s %s %s %s: %s" % (when[11:16], tree, kind, event if event in SUMMARY_EVENTS else "waited", detail))
     counts = ["%d %s" % (sum(1 for each in lines if each[1] == event), event) for event in ("overrun", "hung", "launch")]
+    late = [float(re.match(r"waited (\d+)", each[4]).group(1)) for each in lines
+        if each[1] == "backfill_late" and re.match(r"waited (\d+)", each[4])]
+    counts.append("%d backfill, %d late (%.0f s in all)" % (sum(1 for each in lines if each[1] == "backfill"), len(late), sum(late)))
     print("%s: %s" % (day, ", ".join(counts)))
     # Launch crashes by their top frame (530 amended): the same frame again
     # and again is an engine or asset bug to chase, not the machine.
@@ -1247,7 +1363,7 @@ def summary(day):
 
 
 ## The log's events the daily summary lists.
-SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch")
+SUMMARY_EVENTS = ("stopped", "waiting", "long", "overrun", "hung", "launch", "backfill", "backfill_late")
 ## What a script outside the gate may log with `note` (decision 530: a test
 ## scene that died at launch, before any of its own code ran).
 NOTE_EVENTS = ("launch",)

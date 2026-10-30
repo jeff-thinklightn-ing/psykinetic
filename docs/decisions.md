@@ -9078,6 +9078,49 @@ at once, not three; never with a bench either way; a kinds.json from before
 it still keeps a bench from one; and it runs below normal priority.
 
 
+Amended an eighteenth time (2026-10-30, the coordinator; perf's proposal):
+a queued job may go past one it conflicts with when it ends first
+(backfill). On 10-30 environment's bench headed the queue, waiting on a
+suite; a bench excludes scenes, so eight scenes queued behind it for 10 to
+20 minutes, though each could have run beside the suite and been done
+before it ended.
+- The rule (`passes`, `may_backfill`): job J may go past an earlier job H
+  that it excludes or that excludes it (never one of its own kind) only
+  when H waits on kind alone (`kind_blocked`); H waiting on memory or on
+  the running count lets nobody past, first come as before. H's blockers
+  (`blockers`: the running jobs of kinds it conflicts with, and its own
+  kind's at its cap) must each have a known end, its start plus the median
+  of its estimate's recorded runs (a lean suite's from the lean runs); one
+  with no runs, or already past its median, has none, and nobody goes past.
+  J counts on its `--expect`, else its kind's longest recorded run times
+  BACKFILL_MARGIN (1.25) (`backfill_length`; a kind with no runs never goes
+  past), and starts only if it should end by the blockers' latest end. It
+  still passes `decide` as before.
+- The safety case (release): a backfilled job that overruns, or a suite that
+  ends early, holds H back; H never starts beside it (a bench beside a scene
+  would measure the scene). J is not stopped at its due time: a scene cut
+  short is a failed check that is run again, which costs more than the
+  wait. The delay is bounded by J's own limit and hung check. It is measured:
+  when H starts after waiting with only backfilled jobs in its way, its wait
+  from the moment its own blockers ended is logged as `backfill_late`. If
+  those add up, the margin goes up or the rule tightens.
+- Shown: a running backfilled job in `status` as "(went past <tree> <kind>,
+  due by HH:MM)"; a queued job that may not go past says what it would need
+  ("going past it needs 88 s, the suite is due in 41 s"); the log's
+  `backfill` ("past environment bench, waiting on suite due in 312 s;
+  expects 88 s") and `backfill_late`; the daily summary lists both and
+  counts "N backfill, M late (S s in all)".
+heavy_job_test: a scene goes past a bench whose suite is due later and starts
+beside the suite; not when it would run past the suite's end, once the suite
+is past its median, when the suite or the scene has no runs, nor when the
+bench waits on memory or the count, nor past its own kind; a suite behind a
+bench waiting on a soak still waits; an out-of-reach head is passed as
+before. Through a real queue: a scene runs at once past a queued bench and
+the log says so; status shows it; a bench held by a backfilled scene after
+the suite has gone logs its wait as late, and the summary counts both. The
+stall shapes' tests (a nested take, a head out of reach, a dead waiter)
+pass unchanged.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

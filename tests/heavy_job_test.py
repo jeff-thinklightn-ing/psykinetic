@@ -217,6 +217,48 @@ with gate.StateLock():
 check("soak" in gate.kinds()["bench"]["excludes"], "a kinds.json from before the soak still keeps a bench from one")
 check("scene" in gate.kinds()["bench"]["excludes"], "and from a scene")
 os.remove(gate._path("kinds.json"))
+
+print("== going past a bench that waits on a suite (backfill, 394 amended (18)) ==")
+runs = {"suite": dict(table["suite"], runs_s=[450.0, 500.0, 460.0]), "suite_lean3": dict(table["suite_lean3"], runs_s=[1000.0]),
+    "scene": dict(table["scene"], runs_s=[40.0, 70.0, 10.0]), "bench": dict(table["bench"], runs_s=[300.0])}
+backfill_runs = runs
+now = 10000.0
+bench_queued = dict(table["bench"], kind="bench", tree="environment")
+suite_at = lambda started, **more: dict(running(6, 6), kind="suite", started=started, **more)
+scene_long = gate.backfill_length(runs["scene"])
+check(scene_long == 87.5, "a scene counts on its longest run times 1.25: %s s" % scene_long)
+check(gate.backfill_length(runs["scene"], expect_minutes=3) == 180.0, "or its --expect")
+check(gate.backfill_length(dict(table["scene"], runs_s=[])) is None, "no runs recorded: none")
+check(not gate.may_pass(scene_row, [bench_queued], [suite_at(now - 100)]),
+    "without the kinds and the clock, the old rule: a scene never goes past a bench")
+ok, past, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
+check(ok and past and past[0]["due"] == now - 100 + 460.0, "a scene goes past a bench whose suite is due in 360 s")
+check(gate.decide(scene_row, [suite_at(now - 100)], ok, 60.0, None)[0], "and starts beside the suite")
+ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 400)], 60.0, None, runs, now, scene_long)
+check(not ok and "due in 60 s" in why, "not when it would still run as the suite ends (%s)" % why)
+ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 470)], 60.0, None, runs, now, scene_long)
+check(not ok and "past its usual length" in why, "nor once the suite is past its median (%s)" % why)
+ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 100)], 60.0, None, {"scene": runs["scene"]}, now, scene_long)
+check(not ok and "runs recorded" in why, "nor when the suite has no runs recorded (%s)" % why)
+ok, _, why = gate.passes(scene_row, [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, None)
+check(not ok, "nor a kind with no runs of its own")
+ok, past, _ = gate.passes(scene_row, [bench_queued], [suite_at(now - 300, estimate="suite_lean3")], 60.0, None, runs, now, scene_long)
+check(ok and past[0]["due"] == now + 700.0, "a lean suite's end from the lean runs")
+# The bench waits on memory, not kind: first come first served still.
+ok, _, _ = gate.passes(scene_row, [bench_queued], [], 60.0, None, runs, now, scene_long)
+check(not ok, "a bench waiting on memory or the count lets nobody past")
+check(not gate.passes(dict(table["bench"], kind="bench"), [bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, 10.0)[0],
+    "nor its own kind")
+soak_at = dict(running(2, 2), kind="soak", started=now - 100)
+ok, _, why = gate.passes(dict(table["suite"], kind="suite"), [bench_queued], [soak_at], 60.0, None, runs, now,
+    gate.backfill_length(runs["suite"]))
+check(not ok, "a suite behind a bench waiting on a soak (no soak runs) still waits (%s)" % why)
+mesh_head = dict(table["trellis_mesh"], kind="trellis_mesh", ram_gb=1e12)
+ok, _, _ = gate.passes(scene_row, [mesh_head, bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
+check(ok, "an out-of-reach head ahead is passed as before, the bench by backfill")
+check(gate.blockers(dict(table["bench"], kind="bench"), [suite_at(now), dict(running(1, 1), kind="godot_import")]) == [suite_at(now)],
+    "a bench's blockers: the suite, not an import")
+
 if os.name == "nt":
     probe = "import ctypes; k = ctypes.windll.kernel32; k.GetCurrentProcess.restype = ctypes.c_void_p; " \
         "raise SystemExit(0 if k.GetPriorityClass(ctypes.c_void_p(k.GetCurrentProcess())) == 0x4000 else 1)"
@@ -557,6 +599,53 @@ check(gate.shell_code(2304) == 137 and gate.shell_code(15 << 8) == 143, "a signa
 check(all(gate.shell_code(c) != 0 for c in (256, 512, -1073741510, -1)), "any other out of range: never 0")
 code = gate.run("killed", "suite", [sys.executable, "-c", "import sys; sys.exit(2304)"])
 check(code == 137, "run hands on 137 for a child that exited 2304 (%s)" % code)
+
+print("== backfill through the queue (394 amended (18)) ==")
+import subprocess
+real_poll, gate.POLL_SECONDS = gate.POLL_SECONDS, 0.1
+real_total, gate.total_ram_gb = gate.total_ram_gb, lambda: None
+gate._write(gate._path("kinds.json"), backfill_runs)
+for folder in ("queue", "running"):
+    for each in gate._entries(folder):
+        os.remove(gate._path(folder, each["file"]))
+# A suite's take running 100 s, a bench queued behind it by a live waiter.
+gate._write(gate._path("running", "land-suite-%d.json" % os.getpid()), {"tree": "land", "kind": "suite", "pid": os.getpid(),
+    "pid_since": gate.started_at(os.getpid()), "started": time.time() - 100, "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
+    "watched": False})
+gate._write(gate._path("queue", "%019d-environment-1.json" % time.time_ns()), {"tree": "environment", "kind": "bench", "pid": None,
+    "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
+started = time.time()
+code = gate.run("ui", "scene", [sys.executable, "-c", "pass"])
+check(code == 0 and time.time() - started < 30, "a scene runs at once past the bench (%.0f s)" % (time.time() - started))
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tbackfill\tui\tscene\tpast environment bench, waiting on suite due in " in text, "the log says so")
+for each in gate._entries("queue"):
+    os.remove(gate._path("queue", each["file"]))
+os.remove(gate._path("running", "land-suite-%d.json" % os.getpid()))
+# A backfilled scene still running when the suite has gone: the bench's wait
+# from then is logged as late.
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(6)"])
+gate._write(gate._path("running", "ui-scene-%d.json" % child.pid), {"tree": "ui", "kind": "scene", "pid": child.pid,
+    "pid_since": gate.started_at(child.pid), "started": time.time(), "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
+    "watched": False, "backfill": {"past": "environment bench", "due": time.time() - 1}})
+shown = io.StringIO()
+with contextlib.redirect_stdout(shown):
+    gate.status()
+check("(went past environment bench, due by " in shown.getvalue(), "status shows it: %s" % shown.getvalue().splitlines()[1:2])
+gate.take("environment", "bench", os.getpid())
+child.wait()
+gate.release("environment", "bench")
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tbackfill_late\tenvironment\tbench\twaited " in text, "the bench's wait on it logged as late")
+shown = io.StringIO()
+with contextlib.redirect_stdout(shown):
+    gate.summary(datetime.date.today().isoformat())
+check("1 backfill, 1 late (" in shown.getvalue(), "the summary counts both: %s" % shown.getvalue().splitlines()[-1])
+gate.POLL_SECONDS = real_poll
+gate.total_ram_gb = real_total
+os.remove(gate._path("kinds.json"))
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
