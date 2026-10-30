@@ -2610,16 +2610,23 @@ func _test_chapel() -> void:
 	}
 	var level := _kinds_level([["building_temple_small", Vector2i(2, 2), false]])
 	var temple: Dictionary = level["buildings"][0]
+	# Without the art: art-kit's own chapel and slate slots set aside.
+	var kit := {}
+	for slot: String in slots.keys():
+		if ".chapel" in slot or ".slate" in slot:
+			kit[slot] = slots[slot]
+			slots.erase(slot)
 	BuildingComposer.forget()
-	var plain := BuildingComposer.compose(temple, Client3D.KIND_ROOF)
+	var plain := BuildingComposer.compose(temple, BuildingComposer.covered_in(temple))
 	_check(plain.find_child("Slopes", true, false) != null and plain.find_child("Belfry", true, false) == null
 			and not BuildingComposer.bayed(plain) and Client3D._known_set("chapel") == "stone",
 			"without the chapel's art: one sheet, no belfry, stone walls")
 	plain.free()
+	slots.merge(kit)
 	for slot: String in stand_ins:
 		slots[slot] = stand_ins[slot]
 	BuildingComposer.forget()
-	var node := BuildingComposer.compose(temple, Client3D.KIND_ROOF)
+	var node := BuildingComposer.compose(temple, BuildingComposer.covered_in(temple))
 	var frame := func(piece: Node) -> Transform3D:
 		var out := Transform3D.IDENTITY
 		while piece != node:
