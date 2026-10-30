@@ -35996,3 +35996,17 @@ trophy_s 900, the hammer on his first two risings, then a Sledge; felled by
 no player, kept; at 300 s, back with a new Sledge. _test_draugr: his rest is
 rest_steps, and he says 5 minutes. Server only, protocol unchanged, no new
 class_name.
+
+## 736 amended, npc's side: Rolf behind his stall's counter
+
+Buildings' side of 736 places building.market_stall in Umbrage's square
+with a place of a new kind, "stall" ("weapon_stall", its cell behind the
+counter, radius 1, town "store"; Holdings keeps the town as the full id).
+Rolf now stands there: Main._vendor_spot finds, among his store's area's
+places, the first (by id) of kind "stall" whose town is his store, and
+gives him the square of its radius about its cell for all his places; with
+none he keeps to the store's 5x5 as before. So it works on either side of
+buildings' landing, and a second town's stall needs only its place.
+
+resident_test _test_vendor: a stall place of the test town puts him behind
+it; none, by the store. Server only, protocol unchanged, no new class_name.

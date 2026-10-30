@@ -14169,12 +14169,12 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 	var no_homes: Array[Rect2i] = []
 	var base := _resident_places(area, place, "", no_homes, 0)
 	var store: Vector2i = place.get("cell", Vector2i.ZERO)
-	# The starter stall's keeper (736): by the store of each of vendor.towns, all day, every day, until
-	# buildings' stall gives him a place of his own; a plain townsman in an armourer's apron.
+	# The starter stall's keeper (736): behind the counter of his store's stall (_vendor_spot), else by
+	# the store, all day, every day; a plain townsman in an armourer's apron.
 	var vendor: Dictionary = World.economy.rules.get("vendor", {}) if World.economy != null else {}
 	if place_id in vendor.get("towns", []):
 		out.append({"key": Offers.VENDOR + place_id, "name": str(vendor.get("name", "Rolf")), "trade": "", "player": "",
-			"town": place_id, "look_trade": "smith", "places": _visitor_places(Rect2i(store - Vector2i(2, 2), Vector2i(5, 5)))})
+			"town": place_id, "look_trade": "smith", "places": _visitor_places(_vendor_spot(place_id, store))})
 	for entry: Dictionary in World.towns.visitors(place_id):
 		var kind := str(entry.get("kind", ""))
 		var spot: Rect2i = base.get("inn", base["square"])
@@ -14198,6 +14198,19 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 		out.append({"key": key, "name": str(going["name"]), "trade": "", "player": "", "town": place_id,
 			"places": _visitor_places(Rect2i(going["edge"], Vector2i.ONE))})
 	return out
+
+
+## Where the starter stall's keeper of [param place_id] stands (736): within
+## its radius of the cell of a "stall" place of his town (buildings' "weapon_stall",
+## behind the counter), the first by id; none, the store's 5x5 at [param store].
+func _vendor_spot(place_id: String, store: Vector2i) -> Rect2i:
+	var town := World.holdings.place(place_id)
+	for id: String in World.holdings.places_in(str(town.get("area", ""))):
+		var stall := World.holdings.place(id)
+		if str(stall.get("kind", "")) == "stall" and str(stall.get("town", "")) in [place_id, str(town.get("key", ""))]:
+			var radius := maxi(int(stall.get("radius", 1)), 0)
+			return Rect2i(Vector2i(stall["cell"]) - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
+	return Rect2i(store - Vector2i(2, 2), Vector2i(5, 5))
 
 
 ## Every place of a routine at [param spot]: a visitor keeps to it all day.

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Rolf stands behind the counter of his market stall once Umbrage's stall is up, and by the store until then (736, npc's side).
 - The barrow comes back in 5 minutes (714 amended (2)): the named robbers rise 5 minutes after they fall, Brand the Ox has a new Tomb Sledge 5 minutes after one is won, and the draugr rests 5 minutes, not 3 days, once beaten.
 
 - The temple is now a stone chapel (Jeff's pick c2): pale coursed walls with buttresses and tall lancet windows, a slate roof with ridge, eaves, verges and stone crosses, a rose window over the door and a round window at the back, a bell tower with its bell on the ridge, and steps at the door; built in stages with its own footings, ruined walls, broken lancets, fallen slates and rubble as it decays (art for 734).

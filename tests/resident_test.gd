@@ -3602,6 +3602,16 @@ func _test_vendor() -> void:
 		return
 	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
 	_check(rolf.places.get("work", Rect2i()).has_point(store), "he keeps to the store (%s)" % [rolf.places.get("work")])
+	# Buildings' stall (a "stall" place of his town): he stands behind its counter instead.
+	var town := World.holdings.place(STORE)
+	var stall_id := "%s/test_stall" % town.get("area", "")
+	var stall_cell := store + Vector2i(4, 1)
+	World.holdings._places[stall_id] = {"id": stall_id, "area": town.get("area", ""), "key": "test_stall", "cell": stall_cell, "name": "a stall",
+		"kind": "stall", "radius": 1, "worth": 0, "start": "", "town": STORE}
+	var spot: Rect2i = _main._vendor_spot(STORE, store)
+	World.holdings._places.erase(stall_id)
+	_check(spot == Rect2i(stall_cell - Vector2i.ONE, Vector2i(3, 3)), "a stall of his town: behind its counter (%s)" % [spot])
+	_check(_main._vendor_spot(STORE, store) == Rect2i(store - Vector2i(2, 2), Vector2i(5, 5)), "no stall: by the store")
 	var spoken: Array[String] = []
 	var heard := func(kind: String, data: Dictionary) -> void:
 		if kind == "speech":
