@@ -36173,3 +36173,10 @@ other falls, clear, and the fallen saved. _test_band: five generations of
 the barrow, the nine named, Brand the brute. labyrinth_test: the band laid,
 the eight spread (at most four by the altar or within six cells of one
 another), Brand nearer the camp than the floor's mean.
+## 714 amended, lore's side: the way below once the band is down
+
+crypt.way_below (rumour, true, in the Woodlands): the secret way down to the Ossuary is found
+only once the Mound-breakers have been put down. Jeff: "you clear the robbers, then you find the
+secret access to the temple ossuary and hall"; dungeon's 714 (4) shuts the niche until each of
+the nine has been felled once that generation. Data and docs only, protocol unchanged.
+
