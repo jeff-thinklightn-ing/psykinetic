@@ -105,7 +105,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "other"]
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,
 ## one place a story, its key the story's tag) is: the where-word economy
 ## and npc say it by.
@@ -130,7 +130,8 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2),
 	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
 	"building.throne": Vector2i(1, 1), "building.dark_pillar": Vector2i(1, 1), "building.hatch_sealed": Vector2i(1, 1),
-	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1), "building.turf_house": Vector2i(7, 5)}
+	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1), "building.turf_house": Vector2i(7, 5),
+	"building.market_stall": Vector2i(2, 1)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -175,19 +176,19 @@ const FOLD_REACH := 6
 const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar"]
+	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
 ## crypt's burial table and pillars, the rock blocks they were; 613 amended:
 ## the Dwarven Halls' great forge the smith stands before and the goblins'
 ## weapon rack, so no fight stands a body in the blades; 659 amended: the
-## dark tower's pillar): every cell of
+## dark tower's pillar; 736: Umbrage's weapon stall, its seller behind it): every cell of
 ## theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar"]
+	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,

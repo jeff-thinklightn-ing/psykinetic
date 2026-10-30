@@ -517,6 +517,9 @@ var town_awake := {}
 ## Holdings place id -> the sheep its fold holds, as the server last told
 ## (economy's "folds" message, 640), for the beasts the view draws there.
 var fold_counts := {}
+## Healer's hut place id -> {state, level} as the server last told (the
+## "huts" message, 733), for the view's turf huts.
+var hut_states := {}
 ## The telegraphs showing on this client (decision 602): id -> their data.
 var telegraphs := {}
 ## Each level's damaged roofs (their indices) as this client was last told
@@ -5910,10 +5913,26 @@ func _send_towns(peer: int, zone_name: String) -> void:
 	var folds := World.towns.folds(zone_name)
 	if not folds.is_empty():
 		Net.message_to(peer, "folds", {"counts": folds})
+	var huts := huts_of(zone_name)
+	if not huts.is_empty():
+		Net.message_to(peer, "huts", {"states": huts})
 	for town: String in World.towns.to_dict():
 		if town.begins_with(zone_name + "/"):
 			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
 				"stage": World.towns.stage(town)})
+
+
+## Server: the healer's huts of [param area] with a record (Towns.hut,
+## 733): place id -> {state, level}; every area's for "".
+func huts_of(area: String) -> Dictionary:
+	var out := {}
+	if World.towns == null or not World.towns.has_method("huts_to_dict"):
+		return out
+	for id: String in World.towns.huts_to_dict():
+		if area.is_empty() or id.begins_with(area + "/"):
+			var hut: Dictionary = World.towns.hut(id)
+			out[id] = {"state": hut["state"], "level": hut["level"]}
+	return out
 
 
 ## The view's buildings drawn as their towns have them: the server's own
@@ -5927,6 +5946,9 @@ func _show_towns() -> void:
 			town_states[town] = World.towns.buildings_of(town)
 	for town: String in town_states:
 		_client3d.set_town(town, town_states[town])
+	if Net.is_authority() and World.towns != null:
+		hut_states = huts_of("")
+	_client3d.set_huts(hut_states)
 	var level := str(_terrain.get("level", ""))
 	if Net.is_authority() and not level.is_empty():
 		_client3d.set_roofs(level, World.damaged_roofs(level))
@@ -11814,6 +11836,13 @@ func _on_message(kind: String, data: Dictionary) -> void:
 				fold_counts[str(id)] = int(counts[id])
 			_show_folds()
 		return
+	if kind == "huts":
+		var states: Variant = data.get("states", {})
+		if states is Dictionary:
+			hut_states.merge(states, true)
+			if _client3d != null:
+				_client3d.set_huts(states)
+		return
 	if kind == "town":
 		var town := str(data.get("town", ""))
 		var buildings: Variant = data.get("buildings", {})
@@ -14856,6 +14885,7 @@ func _hut_ruined(place_id: String) -> bool:
 ## fallen to a ruin, each player in its care who is here is told where they
 ## will wake now (their care kept for the hut mended).
 func _on_hut_changed(place_id: String) -> void:
+	Net.broadcast("huts", {"states": huts_of(place_id.get_slice("/", 0))})  # Every peer's view (733).
 	if not _hut_ruined(place_id) or World.production == null:
 		return
 	var keeper := str(World.production.worker(str(World.production.workshop(place_id).get("worker", ""))).get("name", ""))

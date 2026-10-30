@@ -542,6 +542,17 @@
 				1
 			],
 			"variant": 2
+		},
+		{
+			"slot": "building.market_stall",
+			"at": [
+				212,
+				202
+			],
+			"facing": [
+				0,
+				-1
+			]
 		}
 	],
 	"became": {
@@ -557,6 +568,18 @@
 			"radius": 4.0,
 			"holder": "town",
 			"name": "the town's store"
+		},
+		"weapon_stall": {
+			"at": [
+				212,
+				203
+			],
+			"kind": "stall",
+			"holder": "town",
+			"town": "store",
+			"radius": 1,
+			"worth": 0,
+			"name": "the weapon stall"
 		},
 		"woodlot": {
 			"at": [

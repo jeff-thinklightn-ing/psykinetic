@@ -2326,6 +2326,9 @@ var _floor_lookup: Dictionary[Vector2i, bool] = {}
 var _inside_rect := Rect2i()
 ## Town id -> {kind: {state, level}}, as Main was told (set_town).
 var town_states := {}
+## Healer's hut place id -> {state, level}, as Main was told (set_huts,
+## the "huts" message, 733): a turf hut's own state, over its town's.
+var hut_states := {}
 ## Level -> its damaged roofs' indices, as Main was told (set_roofs,
 ## decision 383).
 var roof_states := {}
@@ -5767,7 +5770,8 @@ func _add_buildings() -> void:
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
-			"open_air": slot in Level.OPEN_AIR, "crop": "", "code": str(building.get("code", ""))})
+			"open_air": slot in Level.OPEN_AIR, "crop": "", "code": str(building.get("code", "")),
+			"hut": hut_id(building, str(_terrain.get("level", "")))})
 		# A banked one's inside (718) is its block, not its plot: its ring
 		# is its bank, its walls round the block.
 		var inner: Rect2i = building.get("blocks", [rect])[0]
@@ -6250,9 +6254,7 @@ func set_town(town: String, buildings: Dictionary) -> void:
 func _show_state(building: Dictionary) -> void:
 	if building.get("dropped", false):
 		return  # A dropped plot (649): no more of its town's looks.
-	var state := Towns.STANDING
-	if not str(building["use"]).is_empty():
-		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+	var state := _state_of(building)
 	if building.get("open_air", false):
 		_show_crop(building)
 	var damaged := state == Towns.DAMAGED or state == Towns.DISREPAIR
@@ -6276,6 +6278,37 @@ func _show_state(building: Dictionary) -> void:
 	_show_smoke(building)
 
 
+## [param building]'s state: a healer's hut's own (hut_states, 733) when
+## told, else its town's record of its use, else standing.
+func _state_of(building: Dictionary) -> String:
+	var hut := str(building.get("hut", ""))
+	if not hut.is_empty() and hut_states.has(hut):
+		return str(hut_states[hut].get("state", Towns.STANDING))
+	if str(building["use"]).is_empty():
+		return Towns.STANDING
+	return str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+
+
+## Healer's huts' states (733, the "huts" message: place id -> {state,
+## level}) over those known; each hut drawn so (_show_state: in disrepair
+## its holed roof, a ruin its broken walls and cold pot, no smoke).
+func set_huts(states: Dictionary) -> void:
+	hut_states.merge(states, true)
+	for building in _buildings:
+		if states.has(str(building.get("hut", ""))):
+			_show_state(building)
+
+
+## The Holdings place id of a healer's hut [param building] on level
+## [param level_name] ("<level>/healers_hut@x,y", Level.building_places'
+## key on its front cell), "" for any other building.
+static func hut_id(building: Dictionary, level_name: String) -> String:
+	if str(Level.BUILDING_PLACES.get(str(building.get("slot", "")), building.get("place", ""))) != "healers_hut":
+		return ""
+	var cell: Vector2i = building.get("front", Level.front_cell(building["rect"], building["facing"]))
+	return "%s/healers_hut@%d,%d" % [level_name, cell.x, cell.y]
+
+
 ## [param building]'s chimney smoke (Flames.chimney_smoke), if it has a
 ## chimney (its composer's, slot_chimney's, or art_dress's): drawn as
 ## _show_smoke says.
@@ -6296,9 +6329,7 @@ func _show_smoke(building: Dictionary) -> void:
 	var hearth: Node3D = building.get("hearth")
 	if (smoke == null or not is_instance_valid(smoke)) and hearth == null:
 		return
-	var state := Towns.STANDING
-	if not str(building["use"]).is_empty():
-		state = str(town_states.get(building["town_id"], {}).get(building["use"], {}).get("state", Towns.STANDING))
+	var state := _state_of(building)
 	var lit := smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
 		not building.has("kind") or int(building["stage"]) == BuildingComposer.STANDING)
 	if smoke != null and is_instance_valid(smoke):

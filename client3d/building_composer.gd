@@ -72,6 +72,9 @@ const BAY_SALT := 7341
 ## its front wall.
 const GABLE_WINDOW_UP := 0.4
 const BELFRY_IN := 1.0
+## The belfry piece's broken state (art-kit's belfry.<set>: base, belfry, cap,
+## belfry_ruin), hidden while the building stands.
+const BELFRY_RUIN := "belfry_ruin"
 ## The uses whose slot building (art with no chimney of its own) is given
 ## one (slot_chimney): a fire's trades.
 const SLOT_HEARTHS: Array[String] = ["forge", "kitchen"]
@@ -485,6 +488,9 @@ static func _belfry(building: Dictionary, roof: Node3D) -> void:
 	piece.name = "Belfry"
 	piece.position = Vector3(0.0, float((slopes.get_meta(HEIGHT) as Callable).call(0.0, z)) + span.z, z)
 	piece.rotation.y = -float(found[1]) * PI * 0.5
+	var broken := piece.find_child(BELFRY_RUIN, true, false) as Node3D
+	if broken != null:
+		broken.visible = false  # Its broken state (art-kit's glb draws it): hidden while it stands.
 	slopes.add_child(piece)
 
 

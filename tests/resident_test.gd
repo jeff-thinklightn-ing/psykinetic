@@ -3676,15 +3676,20 @@ func _test_hut_ruin() -> void:
 	World.towns._huts[hut]["state"] = Towns.DISREPAIR
 	_check(str(_main._return_place(cell, pid).get("place", "")) == hut, "in disrepair: still the hut")
 	var told: Array[String] = []
+	var views := {}
 	var heard := func(kind: String, data: Dictionary) -> void:
 		if kind == "party":
 			told.append(str(data.get("text", "")))
+		if kind == "huts":
+			views.merge(data.get("states", {}), true)  # 733, buildings' side: every view told.
 	Net.message_received.connect(heard)
 	World.towns._huts[hut]["state"] = Towns.RUIN
 	World.towns._huts[hut]["level"] = 0
 	_main._on_hut_changed(hut)
 	Net.message_received.disconnect(heard)
 	_check(told.size() == 1 and told[0].begins_with("Oren's hut has fallen in") and not told[0].contains(hut), "those in its care told where they will wake (%s)" % [told])
+	_check(views.get(hut, {}) == {"state": Towns.RUIN, "level": 0} and _main.hut_states.get(hut, {}).get("state") == Towns.RUIN,
+		"every view told the hut a ruin by its place id, the \"huts\" message (%s)" % [views])
 	var elsewhere := str(_main._return_place(cell, pid).get("place", ""))
 	_check(elsewhere != hut, "a ruin: they wake elsewhere (%s; the test town has no temple)" % elsewhere)
 	_check(record.care.has(hut), "their care kept for the hut mended")
@@ -3700,6 +3705,9 @@ func _test_hut_ruin() -> void:
 	_check(keeper == oren_id and not World.production.worker(keeper).is_empty(), "empty vacant_days: a new keeper (%s)" % World.production.worker(keeper).get("name", ""))
 	World.towns._huts = huts_was
 	record.care = care_was
+	_main.hut_states.erase(hut)
+	if _main._client3d != null:
+		_main._client3d.hut_states.erase(hut)
 
 
 func _test_relic() -> void:

@@ -477,11 +477,18 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## "opened" (SUBCLASS_REPLICATED) cues a player's own chest; the "equip",
 ## "locker", "deposit", "withdraw" and "deposit_all" commands. An old client
 ## draws 7 and never sends them.
-const PROTOCOL_REVISION := 41
+## 42 (733, buildings' side): the "huts" message {states: {place id: {state,
+## level}}}, the healer's huts' states (Towns.hut) to every view, on arrival
+## (Main._send_towns) and on Towns.hut_changed; an old client draws every hut
+## standing.
+## 42 (736, buildings' side): building.market_stall is solid and doorless
+## (Level.SOLID, DOORLESS) and "stall" a place kind (Level.PLACE_KINDS); an
+## old client walks through Umbrage's weapon stall.
+const PROTOCOL_REVISION := 42
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
+const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"

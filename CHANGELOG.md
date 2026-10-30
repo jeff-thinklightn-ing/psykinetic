@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Healers' turf huts now show their state: a hut left empty falls into disrepair with a holed roof, a ruin shows broken walls and a cold, tipped pot with no smoke, and a mended hut stands again (733).
+- Umbrage: a weapon stall now stands in the square, south of the shop, with its counter facing you. Its seller will stand behind it (736).
 - The sky has a sun, a moon that waxes and wanes over eight days, stars at night and clouds that follow the weather: see them along the top of the view at sunrise and sunset, and in the water's reflections (744).
 - Townsfolk have heard that the Mound-breakers stash their take in a chest at their camp, and that whoever refuses the draugr's bargain must fight him for it.
 - Rolf stands behind the counter of his market stall once Umbrage's stall is up, and by the store until then (736, npc's side).

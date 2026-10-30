@@ -1648,6 +1648,17 @@ func _test_umbrage_locker() -> void:
 	_check(homes.size() == 1 and (homes[0]["rect"] as Rect2i) == Rect2i(194, 215, 4, 6) and Level.building_cells(homes[0]).has(at)
 		and str(homes[0].get("use", "")).is_empty(),
 		"one house marked the player's (737), the free house at (194, 215), the locker inside it (%d)" % homes.size())
+	# 736: the weapon stall, solid and doorless, faces the square; its seller stands behind it.
+	var stalls: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.market_stall")
+	var place: Dictionary = wilds["places"].get("weapon_stall", {})
+	_check(stalls.size() == 1 and stalls[0]["rect"] == Rect2i(212, 202, 2, 1) and stalls[0]["facing"] == Vector2i(0, -1)
+		and not wilds["terrain"]["floor"].has(Vector2i(212, 202)) and not wilds["terrain"]["floor"].has(Vector2i(213, 202))
+		and wilds["terrain"]["solid"].has(Vector2i(212, 202)) and wilds["terrain"]["floor"].has(Vector2i(212, 201)) and wilds["terrain"]["floor"].has(Vector2i(213, 201)),
+		"one weapon stall at (212, 202), 2 x 1 facing north, solid, the square's side before it floor (%s)" % [stalls])
+	_check(place.get("cell") == Vector2i(212, 203) and place.get("kind") == "stall" and place.get("radius") == 1 and place.get("worth") == 0
+		and place.get("town") == "store" and wilds["terrain"]["floor"].has(Vector2i(212, 203)) and wilds["terrain"]["floor"].has(Vector2i(213, 203))
+		and wilds["entities"].all(func(spec: Dictionary) -> bool: return not Rect2i(212, 201, 2, 3).has_point(spec["tile"])),
+		"the place weapon_stall, a stall worth nothing, at (212, 203) behind it on floor, no marker in or about it (%s)" % [place])
 
 
 func _test_building_links() -> void:

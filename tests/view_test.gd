@@ -2519,6 +2519,20 @@ func _test_turf_house() -> void:
 	_check(quarters.all(func(q: Array) -> bool: return (q[0] as Node3D).visible) and not (node.get_node(BuildingComposer.WALLS_RUIN) as Node3D).visible
 			and not (node.get_node(BuildingComposer.RUIN_POT) as Node3D).visible and parts.visible and smoke.visible and hearth.visible
 			and (node.get_node("roof") as Node3D).visible, "built again: standing, furnished, its fire lit")
+	# 733: the hut's own state, told by its place id ("huts"), over its town's.
+	var hut := "%s/healers_hut@6,7" % str(terrain.get("level", ""))
+	_check(house.get("hut") == hut, "its hut id is its place's, on its front cell (%s)" % [house.get("hut")])
+	_rig.set_huts({hut: {"state": Towns.DISREPAIR, "level": 1}})
+	_check((node.get_node("roof_damaged") as Node3D).visible and not (node.get_node("roof") as Node3D).visible and smoke.visible,
+			"told in disrepair by its place id: its holed roof, its keeper's fire still lit")
+	_rig.set_huts({hut: {"state": Towns.RUIN, "level": 0}})
+	_check(quarters.all(func(q: Array) -> bool: return not (q[0] as Node3D).visible) and (node.get_node(BuildingComposer.WALLS_RUIN) as Node3D).visible
+			and (node.get_node(BuildingComposer.RUIN_POT) as Node3D).visible and not smoke.is_visible_in_tree() and not hearth.visible,
+			"told a ruin: its broken walls, its pot tipped and cold, no smoke")
+	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1}})
+	_check(quarters.all(func(q: Array) -> bool: return (q[0] as Node3D).visible) and smoke.visible and hearth.visible
+			and (node.get_node("roof") as Node3D).visible, "told mended: standing, its fire lit again")
+	_rig.hut_states.clear()
 	_rig.set_awake("turf_town", {})
 	_rig.town_states.erase("turf_town")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)

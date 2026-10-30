@@ -392,7 +392,8 @@ All of it is optional.
   key: `{"goblin_camp": {"at": [200, 40], "kind": "camp", "radius": 12,
   "worth": 2, "holder": "goblins", "name": "the goblin camp"}}`. `kind` is
   camp, keep, farm, gate, mine, stockpile (where the town banks what is
-  brought home: see The stockpile), woodlot, hunting_ground, quarry or
+  brought home: see The stockpile), woodlot, hunting_ground, quarry,
+  stall (736: a starter vendor's stand, worth 0, outside the towns) or
   other; `radius` defaults to 8 cells, `worth` to 1, `holder` (who holds it
   at the start) to nobody. `town` (decision 517), if given, is the key of
   the stockpile place on this map whose town works it (a woodlot its

@@ -36034,3 +36034,52 @@ Jeff, on the horizon fix: "later add sky box for clouds, sun, moon etc." Designe
 - Frame cost (perf, 2026-10-30: the wilds at noon, a 12-tile walk, 1600 x 900 off-screen, three interleaved rounds of 20 s, eea8789f's parent against it; ms, before to after): low camera clear CPU 1.53 to 1.57, GPU median 1.87 to 1.97, GPU p95 1.96 to 2.07; low camera overcast GPU 1.90 to 1.99, p95 1.98 to 2.09; ortho clear GPU 0.41 to 0.47, p95 0.46 to 0.53; ortho overcast GPU 0.43 to 0.49, p95 0.48 to 0.55. About +0.1 ms GPU under the low camera and +0.06 in ortho; the cloud layer adds nothing measurable (overcast minus clear the same before and after). No radiance spike in steady state (the five slowest frames within 0.3 ms of the median, as before); a sky step or a weather change during the frames was not crossed, so the refresh's own cost is unmeasured (its cadence is ProceduralSky's, unchanged). Sky.process_mode and radiance_size are left at Godot's defaults.
 
 view_test _test_sky: at noon the sun's disc where DayNight has it, shown, no stars, the moon opposite, no clouds in clear air; at midnight the stars out, the sun down, the moon up; in fog the stars and moon hidden; the cloud cover the weather's, darker in a storm than overcast, drifting with the shadows from the shadows' noise; moon_phase full at step 0, new half of MOON_DAYS on, full again after MOON_DAYS. _test_horizon reads the shader's parameters. Client only, protocol unchanged, no new class_name.
+
+## 736, buildings' side: the weapon stall in Umbrage's square
+
+The coordinator approved the stall for economy's starter vendor (736): art-kit's
+building.market_stall (2 x 1, its counter and awning at the front) stands in
+the wilds at (212, 202) facing north, its counter to the square, a cell south
+of the shop's and depot's row. It is a building slot (Level.BUILDINGS, 2 x 1),
+solid and doorless as 613 amended's weapon rack is (Level.SOLID, DOORLESS):
+both cells are out of the floor and in terrain "solid", nobody walks into the
+blades or the counter, and the square's side before it (y 201) stays floor.
+- The place "weapon_stall" (level.json): at (212, 203), the cell behind the
+  counter where its seller stands, kind "stall" (a new Level.PLACE_KINDS
+  word), holder "town", town "store", radius 1, "the weapon stall". Its
+  worth is 0: 736 keeps the vendor out of the towns, so the stall adds
+  nothing to the town's holdings. npc's Rolf stands in the store's 5 x 5
+  until the stall lands; npc moves him to the place, and economy's sale is
+  unchanged (it reads vendor.towns, not the place).
+- Nothing moves: no marker stands in or around the stall (x 212-213, y
+  201-203), and (212, 203) and (213, 203) are floor.
+level_test _test_umbrage_locker: the stall's rect, facing, solid cells and the
+floor before it; the place, its kind, worth and cell, nothing in or around it.
+A client without the stall walks through its cells, so it shares
+PROTOCOL_REVISION 42 with 733's hut views (release: one bump, one cut). No new
+class_name.
+
+## 733, buildings' side: the healer's huts drawn as they stand
+
+Economy's Towns.hut(place_id) ({state standing, disrepair or ruin, level};
+{} drawn standing) and its hut_changed signal reach every view. The new
+"huts" message {states: {place id: {state, level}}}: Main.huts_of(area)
+(every hut of the area with a record), sent to a peer arriving in a zone
+(_send_towns, beside "folds") and broadcast on Towns.hut_changed (the area's,
+in _on_hut_changed before npc's ruin line). A client keeps them in
+Main.hut_states and Client3D.set_huts merges them.
+- Client3D keys a turf hut (any building whose BUILDING_PLACES kind is
+  healers_hut) by its Holdings place id, hut_id: "<level>/healers_hut@x,y",
+  Level.building_places' key on its front cell. _state_of(building) reads
+  hut_states first, then its town's record of its use, else standing, for
+  _show_state and _show_smoke alike, so 718's drawing does the rest: in
+  disrepair its holed dome (roof_disrepair) and its keeper's fire still lit;
+  a ruin its broken walls (walls_ruin), its pot tipped and cold, no roof,
+  bed, shelf, smoke or fire; mended, all of it back.
+- No message for a hut with no record: it stands. A client that left the
+  zone keeps what it was told, keyed by place id, so nothing goes stale on
+  the way back (the arrival sends the area's again).
+view_test _test_turf_house (its id, disrepair, ruin and mended by
+set_huts); resident_test _test_hut_ruin (the "huts" message told the ruin,
+Main.hut_states). A new message kind: PROTOCOL_REVISION 42, shared with
+736's stall (release). No new class_name.
