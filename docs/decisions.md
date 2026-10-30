@@ -35417,3 +35417,28 @@ price visitor_sale takes; npc's wares panel (Main._visitor_price) reads it
 instead of its own copy of the sum, so the two can't drift. farm_test: the
 sale takes visitor_price. No change in play: no CHANGELOG bullet. Server
 only, protocol unchanged, no new class_name.
+## 677 amended (3), combat's side: a near lob's circle shrinks with its distance
+
+Jeff, on v0.1.192: "allow the arrow to be aimed point blank based on distance
+mouse is away from the player... with short range shots the cone moves
+around wildly due to the large arc radius". ui's side draws the flat shot to
+the mouse's distance. The lob's circle came from the draw's step alone, so
+a 2-cell lob at the first step was rolled in a 2.5-cell circle. The
+coordinator approved:
+
+- World.lob_circle_at(entity, cell): lob_radius (the step's lob_circle)
+  times the aim's share of the reach drawn (lob_aim's distance from
+  shot_origin over range_of, at most 1), at least lob_volley_min; -1 as
+  lob_radius. At full reach the circle is as before; nearer it shrinks in
+  proportion, the same angular rule as the flat shot's cone. A loose at
+  the first step still costs its wide circle at range.
+- try_lob rolls the volley's falls in it (the aimed cell is the one loose
+  already carries). Main._show_lob draws the same circle, so the drawn
+  ring now includes the lob_volley_min floor the server always applied (a
+  full draw's ring shows 1.0, not 0.5).
+
+combat_test _test_lob: the whole circle at the first step's full reach and
+past it, 1.0 and 1.5 at 2 and 3 cells, never under lob_volley_min. The
+radius already goes over the wire (lobbed), so a client before this draws
+its own circle; the falls are the server's. Protocol unchanged, no new
+class_name.

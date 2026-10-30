@@ -1840,7 +1840,7 @@ func _raise_lob(player: Player) -> void:
 
 ## The lob's aim each frame while [param player] lobs (decision 677): the
 ## brass arc from its nocked arrow to the cell under the cursor drawn in to
-## its reach (World.lob_aim), the ring of its circle (lob_radius), red where
+## its reach (World.lob_aim), the ring of its circle (lob_circle_at), red where
 ## it cannot come down (lob_open); hidden otherwise.
 func _show_lob(player: Player, lobbing: bool) -> void:
 	if _client3d == null:
@@ -1849,7 +1849,7 @@ func _show_lob(player: Player, lobbing: bool) -> void:
 		_client3d.lob_aim(Vector3.ZERO, Vector2i.ZERO, 0.0, false, 0.0, false)
 		return
 	var cell := World.lob_aim(player, _mouse_tile())
-	var radius := World.lob_radius(player)
+	var radius := World.lob_circle_at(player, _mouse_tile())
 	var puppet: Node3D = _client3d._puppets.get(player.get_instance_id())
 	var from: Vector3 = _client3d._bow_tip(puppet) if puppet != null else Vector3(player.tile.x, 1.1, player.tile.y)
 	var apex := float(Items.verb_of(World.drawn_with(player)).get("lob_apex", 0.25))

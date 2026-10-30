@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Bow: a lob aimed close comes down in a smaller circle, shrinking with the distance aimed (a full-reach lob's circle is unchanged), and the circle drawn while aiming matches where the arrows can fall (677 amended (3), combat's side).
 - Bow: the aim follows your mouse out from the archer, down to point blank; the marker, arc and cone sit where you point, and stay steady close in (677).
 - Aldous hands a knight's remains back when your Encolpion Amulet can't take the blessing (714 amended, npc's side): a full amulet, or one never blessed (after a quest reset), keeps the relic for later instead of losing it, and he says why.
 

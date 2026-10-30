@@ -5864,6 +5864,21 @@ func lob_radius(entity: GridEntity) -> float:
 	return float(circle[mini(step, circle.size() - 1)])
 
 
+## The radius in cells of the circle [param entity]'s lob aimed at [param
+## cell] comes down in (677 amended (3); Jeff: "with short range shots the
+## cone moves around wildly"): lob_radius scaled by the aim's share of the
+## reach drawn (lob_aim over range_of), so a near lob's circle is as narrow
+## for its distance as a far one's, at least lob_volley_min; -1 as
+## lob_radius. The server rolls the falls in it and the aim draws it.
+func lob_circle_at(entity: GridEntity, cell: Vector2i) -> float:
+	var radius := lob_radius(entity)
+	var reach := range_of(entity)
+	if radius < 0.0 or reach <= 0:
+		return radius
+	var share := minf(1.0, Vector2(lob_aim(entity, cell)).distance_to(shot_origin(entity)) / float(reach))
+	return maxf(float(Items.verb_of(drawn_with(entity)).get("lob_volley_min", 1.0)), radius * share)
+
+
 ## The cell [param entity]'s lob aimed at [param cell] is aimed at (decision
 ## 677): that cell, drawn in along the line to the reach drawn so far
 ## (range_of); its own cell before the first step.
@@ -5906,7 +5921,7 @@ var _lobs: Array[Dictionary] = []
 
 ## [param by] lets its lobbed bow go (decision 677; Jeff: "right click hold
 ## and release to fire"): aimed at [param cell] (lob_aim), it comes down in
-## a cell rolled in its circle (lob_radius; the aim if that one is closed),
+## a cell rolled in its circle (lob_circle_at; the aim if that one is closed),
 ## lob_ticks later, when whoever stands there is struck (_tend_lobs). Its
 ## loose costs lob_cost stamina. Before the first step, or with the aim
 ## not open to the sky (lob_open), nothing, the arrow kept. The stance
@@ -5917,12 +5932,11 @@ func try_lob(by: GridEntity, cell: Vector2i) -> bool:
 	var verb := Items.verb_of(drawn_with(by))
 	var step := draw_step(by)
 	var aimed := lob_aim(by, cell)
-	var radius := lob_radius(by)
+	var radius := lob_circle_at(by, cell)
 	by.raised = ""
 	by.lobbing = false
 	if step < 0 or verb.is_empty() or aimed == by.tile or not lob_open(aimed):
 		return false
-	radius = maxf(radius, float(verb.get("lob_volley_min", 1.0)))
 	var falls := volley_falls(aimed, radius, int(verb.get("lob_volley", 3)),
 			hash("lob/%d/%s/%d" % [shot_salt, by.name, tick]))
 	if by.max_stamina > 0 and by.pays_swings:

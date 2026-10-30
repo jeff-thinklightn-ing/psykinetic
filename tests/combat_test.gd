@@ -668,6 +668,14 @@ func _test_lob() -> void:
 			"full draw: 1 cell, and aimed past the reach it is drawn in to 9 cells (%s)" % World.lob_aim(host, Vector2i(19, 1)))
 	host.raised_tick = World.tick - 40
 	_check(is_equal_approx(World.lob_radius(host), 0.5), "held on: half a cell")
+	# 677 amended (3): the circle by the aim's share of the reach.
+	host.raised_tick = World.tick - 5
+	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(6, 1)), 2.5) and is_equal_approx(World.lob_circle_at(host, Vector2i(19, 1)), 2.5),
+			"a first step's lob at its full reach (5 cells), or past it: the whole circle, 2.5")
+	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(3, 1)), 1.0) and is_equal_approx(World.lob_circle_at(host, Vector2i(4, 1)), 1.5),
+			"nearer, the circle shrinks with the distance: 2 cells off 1.0 (lob_volley_min), 3 off 1.5")
+	host.raised_tick = World.tick - 40
+	_check(is_equal_approx(World.lob_circle_at(host, Vector2i(3, 1)), 1.0), "held on and near: never under lob_volley_min")
 	var landed := []
 	var on_landed := func(by: GridEntity, cell: Vector2i, hit: GridEntity) -> void: landed.append([cell, hit])
 	World.lob_landed.connect(on_landed)
