@@ -2884,11 +2884,11 @@ func _test_draugr_paid() -> void:
 	_move_to(player, Vector2i(11, 2))
 	World.step()
 	var offers := draugr.offers_for("p1")
-	_check(draugr.state == Draugr.State.SEATED and book.has("p1|mt_paidlair") and offers.size() == 1
-		and offers[0]["id"] == "deal:%d:again" % draugr.id and offers[0]["cost"] == 0 and offers[0]["what"]["level"] == "normal"
+	_check(draugr.state == Draugr.State.SEATED and book.has("p1|mt_paidlair") and offers.size() == 2
+		and offers[1]["id"] == "deal:%d:refuse" % draugr.id and offers[0]["id"] == "deal:%d:again" % draugr.id and offers[0]["cost"] == 0 and offers[0]["what"]["level"] == "normal"
 		and offers[0]["words"] == Draugr.AGAIN_WORDS,
 		"the pact lost, the gold forfeit: his deal kept, and to the payer he offers the fight again, no gold (%s)" % [offers])
-	_check(draugr.offers_for("p2")[0]["cost"] == 20, "to one who never paid, his gold deal as ever")
+	_check(draugr.offers_for("p2")[0]["cost"] == 10, "to one who never paid, his gold deal as ever")
 	var gold_was := World.gold_of("p1")
 	var twice := draugr.accept_offer(player, {"id": "deal:%d" % draugr.id}, 50)
 	_check(not twice["ok"] and World.gold_of("p1") == gold_was and draugr.state == Draugr.State.SEATED,
@@ -3023,8 +3023,9 @@ func _test_draugr() -> void:
 	var doors: Array = []
 	draugr.hall_door.connect(func(open: bool) -> void: doors.append(open))
 	var offers := draugr.offers_for("p1")
-	_check(draugr.talks and offers.size() == 1 and offers[0]["kind"] == "deal" and offers[0]["cost"] == 20
-		and offers[0]["what"]["most"] == 100 and offers[0]["what"]["steps"] == [20, 50, 100], "he talks, and offers a pact at the deals' steps (%s)" % [offers])
+	_check(draugr.talks and offers.size() == 2 and offers[0]["kind"] == "deal" and offers[0]["cost"] == 10
+		and offers[0]["what"]["most"] == 100 and offers[0]["what"]["steps"] == [10, 50, 100] and offers[1]["id"] == "deal:%d:refuse" % draugr.id,
+		"he talks, and offers a pact at the deals' steps (Jeff: the least 10 gold), and the refusal after (%s)" % [offers])
 	World.step()
 	_check(spoken.is_empty(), "outside his lair he says nothing")
 	_move_to(player, Vector2i(7, 2))
@@ -3119,11 +3120,32 @@ func _test_draugr() -> void:
 	_move_to(player, Vector2i(7, 2))
 	for i in Draugr.ASK_DELAY_TICKS + 2:
 		World.step()
-	var gold_was := World.gold_of("p1")
-	var short := draugr.accept_offer(player, draugr.offers_for("p1")[0], 19)
+	# Jeff on v0.1.192 ("got stuck in draugr room because i dont have gold
+	# and can't attack him"; "instead of no just put the word "refuse""):
+	# under the least deal, the refusal is his first deal, free, and taking
+	# it provokes him as a strike does, with his line, not ANGER.
+	var held_gold := World.gold_of("p1")
+	World.add_gold("p1", -held_gold, "test")
+	var poor := draugr.offers_for("p1")
+	_check(poor.size() == 2 and poor[0]["id"] == "deal:%d:refuse" % draugr.id and int(poor[0]["cost"]) == 0 and (poor[0]["what"]["steps"] as Array).is_empty()
+		and poor[0]["title"] == "Refuse" and int(poor[1]["cost"]) == 10 and DealPanel.no_deal(poor) == poor[0]
+		and DealPanel.first_deal(poor) == poor[1],
+		"no gold: his first deal is the free refusal (what an older panel shows), the panel's Refuse, his gold deal after (%s)" % [poor.map(func(o: Dictionary) -> String: return str(o["id"]))])
+	var anger_was := said.count(Draugr.ANGER)
+	var drawn := draugr.accept_offer(player, poor[0], 0)
 	World.step()
-	_check(short["ok"] and World.gold_of("p1") == gold_was - 19 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30,
-		"19 gold, under the least deal: he keeps it and attacks, at his own level")
+	_check(drawn["ok"] and draugr.target == player and draugr._provoked == player and not draugr.peaceable and World.gold_of("p1") == 0
+		and said.back() == Draugr.REFUSED and said.count(Draugr.ANGER) == anger_was,
+		"refused: \"Then I'll take it from you by force!\", and he fights them, no gold paid, no ANGER after (%s, %s)" % [drawn, said.slice(-2)])
+	draugr._provoked = null
+	draugr.target = null
+	draugr._angered = false
+	World.add_gold("p1", held_gold, "test")
+	var gold_was := World.gold_of("p1")
+	var short := draugr.accept_offer(player, draugr.offers_for("p1")[0], 9)
+	World.step()
+	_check(short["ok"] and World.gold_of("p1") == gold_was - 9 and draugr.state == Draugr.State.SEATED and draugr.target == player and draugr.max_hp == 30,
+		"9 gold, under the least deal (10): he keeps it and attacks, at his own level")
 	_check(said.count(Draugr.ANGER) == 2, "a new fight: his anger once more (%d)" % said.count(Draugr.ANGER))
 	World.damage(draugr, 999, player)
 	_check(draugr.blessed_last.is_empty() and draugr.state == Draugr.State.AT_REST and draugr.hp == 30 and said.back() == Draugr.RESPECT
@@ -3138,7 +3160,7 @@ func _test_draugr() -> void:
 	draugr.hp = draugr.max_hp
 	draugr.living_came(player)
 	_check(draugr.hp == 30, "seated, the living's coming gives him nothing")
-	_check(Draugr.deal_for(500)["name"] == "hard" and Draugr.deal_for(99)["name"] == "normal" and Draugr.deal_for(20)["name"] == "easy" and Draugr.deal_for(19).is_empty(),
+	_check(Draugr.deal_for(500)["name"] == "hard" and Draugr.deal_for(99)["name"] == "normal" and Draugr.deal_for(10)["name"] == "easy" and Draugr.deal_for(9).is_empty(),
 		"a hundred or more, hard; between steps, the lower")
 	# Put back from the level's table (a room reset, a restart, a regeneration: its props never had his
 	# rest), he rests on by World.dead_rest, which Main saves (573 amended (3)).

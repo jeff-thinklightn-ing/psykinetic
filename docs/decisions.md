@@ -35572,3 +35572,30 @@ companion_test: by a camp's fire after a hard day, no game and no ask; just
 come into town, not yet; in town, one voiced ask with the facts and no
 fixed line; not again the same day; the rest ask voiced and cooled down;
 woken alone, voiced. Server only, protocol unchanged, no new class_name.
+## 735: the draugr can always be refused; his least deal is 10 gold
+
+Jeff on v0.1.192: "got stuck in draugr room because i dont have gold and
+can't attack him". The cause: a plain click on the seated draugr talks
+(648), his panel offered only gold, and only Shift+click strikes him, which
+nothing said; his Hall holds while anyone living is in it (573 amended).
+Jeff's fix, verbatim: "make it start at 10 gold, because at this stage
+theres not much gold. instead of no just put the word "refuse" and Draugr
+says "Then I'll take it from you by force!" and laughs as he attacks you."
+
+His least deal (Draugr.DEALS and economy.json return.field.deals) is 10
+gold for the same 5 charges; 50 and 100 unchanged; "under the least deal"
+now means under 10. Draugr.offers_for always carries a free deal, id
+"deal:<id>:refuse", title "Refuse" (REFUSE_TITLE), cost 0, no steps: last of
+his offers (after the gold deal, or "again" for one who paid), but first
+when the purse is under the least deal, since today's DealPanel shows only
+the first deal. accept_offer on it provokes him as a strike does (his own
+level; beaten, his respect, the Hall opened), says REFUSED aloud, and marks
+him angered so his ANGER line is not said over it. ui's next client draws a
+Refuse button beside the gold steps; sound's laugh hangs on the REFUSED
+line. A rules number and a deal added to an existing message: server only,
+protocol unchanged, no new class_name.
+
+monster_test: the deals' steps [10, 50, 100] and the refusal after; paid
+once, [again, refuse]; with no gold the refusal first and the panel's deal,
+taken: provoked, REFUSED, no ANGER, no gold; 9 gold, under the least deal,
+he keeps it and attacks. economy_test: under 10 no deal, 10 buys easy.

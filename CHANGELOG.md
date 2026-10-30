@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr can always be refused (735, Jeff's words): his panel offers "Refuse", and he answers "Then I'll take it from you by force!" and attacks; with too little gold for his pact you can now fight your way out instead of being shut in his Hall. His least pact is 10 gold, not 20.
 - Companions: she asks to sleep or play knucklebones only in a town, never at a camp, in the wilds or a dungeon; her asks to rest and keep watch are her own words, not a fixed line, and come far less often (738).
 - Starter gear (736, items' side): what a town's starter vendor sells is marked for life (its tooltip says "starter gear: no one will buy it"), never stacks with other gear, and keeps the mark when split, worn or saved; the vendor's list is the base weapons.
 - A healer's hut nobody lives in falls into disrepair after a fortnight and to a ruin a season later; when a healer keeps it again he buys wood (and cloth for a ruin) from the town's store and mends it himself (733, economy's side).

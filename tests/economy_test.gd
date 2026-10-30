@@ -239,9 +239,9 @@ func _test_robbers_band() -> void:
 func _test_barrow_charges() -> void:
 	print("== the draugr's deals and a player's charges (573, economy's side) ==")
 	var field: Dictionary = Production.read_rules()["return"]["field"]
-	_check(Economy.deal_for(19, field).is_empty(), "under 20 gold: no deal")
-	_check(Economy.deal_for(20, field).get("name") == "easy" and Economy.deal_for(99, field).get("name") == "normal"
-		and Economy.deal_for(500, field).get("name") == "hard", "20 buys easy, 99 normal, 500 hard: the highest step reached")
+	_check(Economy.deal_for(9, field).is_empty(), "under 10 gold (Jeff: \"make it start at 10 gold\"): no deal")
+	_check(Economy.deal_for(10, field).get("name") == "easy" and Economy.deal_for(99, field).get("name") == "normal"
+		and Economy.deal_for(500, field).get("name") == "hard", "10 buys easy, 99 normal, 500 hard: the highest step reached")
 	_check(Economy.field_tokens("easy", field) == 5 and Economy.field_tokens("normal", field) == 10 and Economy.field_tokens("hard", field) == 15,
 		"charges by deal: 5, 10, 15")
 	_check(Economy.field_tokens("normal", {"uses": {"normal": 7}}) == 7, "before the deals, the rules' uses read")

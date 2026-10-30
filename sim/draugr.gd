@@ -2,7 +2,7 @@ class_name Draugr
 extends Monster
 ## The barrow's draugr (decision 548; Jeff's docs/lore/crypt.md, the
 ## coordinator's rulings): he talks first, and for gold offers a pact, a
-## fight in his lair at the deal the gold buys (573: 20, 50 or 100 gold for
+## fight in his lair at the deal the gold buys (573: 10, 50 or 100 gold for
 ## 5, 10 or 15 charges), his level that deal's and one more for each charge
 ## the players in his zone hold when it begins; the living coming in while
 ## it is on give him half his most again (living_came). Beaten, he yields (at
@@ -29,7 +29,7 @@ enum State { SEATED, PACT, AT_REST }
 ## The deals when economy.json gives none (return.field.deals, 573): the
 ## gold a step costs and the charges it gives, the highest step the gold
 ## reaches taken; their names are Main's barrow_won's.
-const DEALS: Array[Dictionary] = [{"name": "easy", "gold": 20, "charges": 5},
+const DEALS: Array[Dictionary] = [{"name": "easy", "gold": 10, "charges": 5},
 	{"name": "normal", "gold": 50, "charges": 10}, {"name": "hard", "gold": 100, "charges": 15}]
 ## His hp and blows at each deal, times his kind's (the dead he raises
 ## beside him: his waves, DEFAULT_WAVES).
@@ -114,6 +114,17 @@ const TITLE := "Face the draugr"
 ## once you get unlimited attempts"): the offer's title and his words.
 const AGAIN_TITLE := "Face the draugr again"
 const AGAIN_WORDS := "Your gold is paid. Come, then."
+## The refusal, always offered (Jeff on v0.1.192: "got stuck in draugr
+## room because i dont have gold and can't attack him", then "instead of
+## no just put the word "refuse""): a free deal whose one button provokes
+## him, as striking him (Shift and a click) does: he says REFUSED and
+## laughs, fights at his own level, and beaten gives his respect and the
+## Hall opens (573 amended). First of his offers when the purse is under
+## his least deal (today's panel shows the first deal), else last.
+const REFUSE_TITLE := "Refuse"
+const REFUSE_WORDS := "Refuse him, and he fights you for it."
+## His words on being refused (Jeff's own).
+const REFUSED := "Then I'll take it from you by force!"
 
 var state := State.SEATED
 ## At rest he is gone (573 amended (4); Jeff: "he is otherworldly, he
@@ -467,17 +478,25 @@ func offers_for(player_id: String) -> Array[Dictionary]:
 		return out  # A pact is on (theirs or another's): no more words.
 	if state == State.AT_REST:
 		return out  # At rest no pact is bought (573 amended (3)); a click hears rest_words.
+	var refuse := {"id": "deal:%d:refuse" % id, "kind": "deal", "title": REFUSE_TITLE, "words": REFUSE_WORDS,
+		"what": {"level": "refuse", "steps": []}, "accept": "take", "cost": 0}
 	var paid := _paid(player_id)
 	if not paid.is_empty():
 		# Paid once (548 amended): the fight again at the level paid for, no gold; no gold
 		# deal while it stands, so none pays twice.
 		out.append({"id": "deal:%d:again" % id, "kind": "deal", "title": AGAIN_TITLE, "words": AGAIN_WORDS,
 			"what": {"level": str(paid["level"]), "steps": []}, "accept": "take", "cost": 0})
+		out.append(refuse)
 		return out
 	var steps: Array = deals().map(func(each: Dictionary) -> int: return int(each["gold"]))
+	var poor := World.gold_of(player_id) < int(steps[0])
+	if poor:
+		out.append(refuse)  # Too little for the least deal: the refusal first, the deal the panel shows.
 	out.append({"id": "deal:%d" % id, "kind": "deal", "title": TITLE, "words": WORDS,
 		"what": {"offering": steps[0], "least": steps[0], "most": steps[-1], "steps": steps},
 		"accept": "give", "cost": steps[0]})
+	if not poor:
+		out.append(refuse)
 	return out
 
 
@@ -492,6 +511,14 @@ func accept_offer(player: Player, offer: Dictionary, gold: int) -> Dictionary:
 		return {"ok": false, "say": "", "line": rest_words()}
 	if not str(offer.get("id", "")).begins_with("deal:"):
 		return {"ok": false, "say": "", "line": ""}
+	if str(offer.get("id", "")).ends_with(":refuse"):
+		# Refused: provoked, as a strike would; beaten, his respect, the Hall opened. His line, not ANGER.
+		_provoked = player
+		target = player
+		peaceable = false  # The same tick, for the client (648).
+		_angered = true
+		said.emit(REFUSED)
+		return {"ok": true, "say": "", "line": "%s refuses the draugr. He laughs, and rises to strike." % player.name}
 	var paid := _paid(player.player_id)
 	if str(offer.get("id", "")).ends_with(":again"):
 		if paid.is_empty() or not SCALE.has(str(paid.get("level", ""))):

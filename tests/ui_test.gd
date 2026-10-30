@@ -895,8 +895,8 @@ func _test_deal_window() -> void:
 	_main.gold = least
 	_check(_main.talks_peaceably(draugr), "seated, the draugr talks peaceably (npc's 648)")
 	_main._open_talk(draugr)
-	_check(panel.visible and panel.entity_id == draugr.get_instance_id() and panel._buttons.get_child_count() == Draugr.deals().size()
-			and not (panel._buttons.get_child(0) as Button).disabled and (panel._buttons.get_child_count() < 2 or (panel._buttons.get_child(1) as Button).disabled),
+	_check(panel.visible and panel.entity_id == draugr.get_instance_id() and panel._buttons.get_child_count() == Draugr.deals().size() + 1
+			and (panel._buttons.get_child(Draugr.deals().size()) as Button).text == DealPanel.NO_WORDS and not (panel._buttons.get_child(0) as Button).disabled and (panel._buttons.get_child_count() < 2 or (panel._buttons.get_child(1) as Button).disabled),
 		"E on him: his offers open the window on him, a button a deal, the least one enabled for a purse of %d (%s)" % [least, panel.visible])
 	(panel._buttons.get_child(0) as Button).pressed.emit()
 	_main._update_deal()
