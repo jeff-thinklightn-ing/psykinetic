@@ -88,7 +88,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `creature.wolf` | 1 | Quaternius (mesh, rig and clips), pc-character (fitted to the slot, recoloured onto the palette) | CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Wolf, docs/licenses/quaternius-cc0_2026-10-15.txt) | 2026-10-17 |
 | `dais.edge` | 1 | art-kit, by hand | own | 2026-10-22 |
 | `dais.steps` | 1 | art-kit, by hand | own | 2026-10-22 |
-| `door.double` | 3 | art-gen, fitted by art-kit | own | 2026-10-18 |
+| `door.double` | 4 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `door.gate` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `door.portcullis` | 1 | art-gen, fitted by art-kit | own | 2026-10-18 |
 | `door.single` | 2 | art-kit | own | 2026-10-17 |
