@@ -3819,38 +3819,42 @@ func _test_streams() -> void:
 
 
 ## A curve that passes a cell twice (maps' 745: the wilds' outline round
-## the hills' glimpse and back along its lane): a long thin closed outline,
-## its two long sides about 80 samples apart along it; the cell midway
-## between them is nearest the top side, yet a point in it (0.15 off the
-## bottom side, inside the cell) reads the bottom's distance, not the top's.
+## the hills' glimpse and back along its lane), each pass's nearest sample
+## searched: a long thin closed outline, its two long sides about 80
+## samples apart along it, the cell midway between them nearest the top
+## side, yet a point in it (0.15 off the bottom side, inside the cell)
+## reads the bottom's distance, not the top's; and the same by the lane's
+## end, where the curve round the end stays within reach of the cell, so
+## both sides are one unbroken run, their nearest about 30 samples apart.
 func _test_curve_passes() -> void:
-	print("
-== a curve by a cell twice: each pass searched ==")
-	var points := PackedVector2Array()
-	var corners: Array[Vector2] = [Vector2(0, -0.6), Vector2(40, -0.6), Vector2(40, 0.5), Vector2(0, 0.5)]
-	for side in 4:
-		var from := corners[side]
-		var to := corners[(side + 1) % 4]
-		var steps := maxi(1, ceili(from.distance_to(to) / 0.5))
-		for i in steps:
-			points.append(from.lerp(to, i / float(steps)))
-	var widths := PackedFloat32Array()
-	widths.resize(points.size())
-	var curve := {"points": points, "widths": widths}
-	var kept := [_rig._edge_curves.duplicate(), _rig._edge_near_sample.duplicate(), _rig._edge_near_also.duplicate(), _rig._edge_kept.duplicate()]
-	_rig._edge_curves.assign([{"curve": curve}])
-	_rig._edge_near_sample.clear()
-	_rig._edge_near_also.clear()
-	_rig._edge_kept.clear()
-	_rig._stamp_near(curve, true, 0, _rig._edge_near_sample, _rig._edge_near_also)
-	var nearest: Vector2i = _rig._edge_near_sample.get(Vector2i(20, 0), Vector2i(-1, -1))
-	var reads := absf(_rig._edge_signed(Vector2(20, -0.45)))
-	_check(nearest.y >= 0 and points[nearest.y].y > 0.0 and is_equal_approx(snappedf(reads, 0.001), 0.15),
-			"the cell's nearest sample on the far side (%s), yet a point of it beside the near side reads 0.15 (%.3f)" % [points[nearest.y] if nearest.y >= 0 else Vector2.INF, reads])
-	_rig._edge_curves.assign(kept[0])
-	_rig._edge_near_sample.assign(kept[1])
-	_rig._edge_near_also.assign(kept[2])
-	_rig._edge_kept.assign(kept[3])
+	print("\n== a curve by a cell twice: each pass searched ==")
+	for case: Array in [[0.5, Vector2i(20, 0), "two runs"], [0.1, Vector2i(39, 0), "one run round the lane's end"]]:
+		var points := PackedVector2Array()
+		var corners: Array[Vector2] = [Vector2(0, -0.6), Vector2(40, -0.6), Vector2(40, 0.5), Vector2(0, 0.5)]
+		for side in 4:
+			var from := corners[side]
+			var to := corners[(side + 1) % 4]
+			var steps := maxi(1, ceili(from.distance_to(to) / float(case[0])))
+			for i in steps:
+				points.append(from.lerp(to, i / float(steps)))
+		var widths := PackedFloat32Array()
+		widths.resize(points.size())
+		var curve := {"points": points, "widths": widths}
+		var kept := [_rig._edge_curves.duplicate(), _rig._edge_near_sample.duplicate(), _rig._edge_near_also.duplicate(), _rig._edge_kept.duplicate()]
+		_rig._edge_curves.assign([{"curve": curve}])
+		_rig._edge_near_sample.clear()
+		_rig._edge_near_also.clear()
+		_rig._edge_kept.clear()
+		_rig._stamp_near(curve, true, 0, _rig._edge_near_sample, _rig._edge_near_also)
+		var cell: Vector2i = case[1]
+		var nearest: Vector2i = _rig._edge_near_sample.get(cell, Vector2i(-1, -1))
+		var reads := absf(_rig._edge_signed(Vector2(cell.x, -0.45)))
+		_check(nearest.y >= 0 and points[nearest.y].y > 0.0 and is_equal_approx(snappedf(reads, 0.001), 0.15),
+				"%s: the cell's nearest sample on the far side (%s), yet a point of it beside the near side reads 0.15 (%.3f)" % [case[2], points[nearest.y] if nearest.y >= 0 else Vector2.INF, reads])
+		_rig._edge_curves.assign(kept[0])
+		_rig._edge_near_sample.assign(kept[1])
+		_rig._edge_near_also.assign(kept[2])
+		_rig._edge_kept.assign(kept[3])
 
 
 ## The water's edge unsquared (decision 553): the shore field rounds a

@@ -9612,19 +9612,22 @@ func _curve_near(point: Vector2, kept: Dictionary = _curve_kept) -> Vector3:
 ## cell another curve already reaches gets it in [param also] instead
 ## (where curves meet, _near_on takes their union). With [param passes],
 ## a curve that comes by a cell more than once (a bend back, an outline
-## round a glimpse and back along its lane) stamps each pass's nearest
-## sample too, in [param also] (decision 746): a lookup searches only CURVE_SEARCH round
-## each, and from the nearest pass's sample alone a point nearer the other
-## pass read the far side's distance (maps' 745 foothills, the wilds' east
-## lane). Off for a lookup that searches the whole curve (a closed water).
+## round a glimpse and back along its lane, a hairpin all within reach)
+## stamps each pass's nearest sample too, in [param also] (decision 746):
+## every sample where its gap to the cell stops falling and starts rising.
+## A lookup searches only CURVE_SEARCH round each, and from the nearest
+## pass's sample alone a point nearer another pass read that one's
+## distance (maps' 745 foothills, the wilds' east lane: one unbroken run
+## round a hairpin, its two nearest 14 samples apart). Off for a lookup
+## that searches the whole curve (a closed water).
 func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary, also: Dictionary, passes := true) -> void:
 	var points: PackedVector2Array = curve["points"]
 	var widths: PackedFloat32Array = curve["widths"]
 	var gaps: Dictionary[Vector2i, float] = {}
 	var nearest: Dictionary[Vector2i, int] = {}
-	# Each cell's passes, by the samples reaching it in an unbroken run:
-	# [its nearest sample, that gap, the run's last sample].
-	var runs: Dictionary[Vector2i, Array] = {}
+	# Each cell's walk along the curve: [the last sample reaching it, its
+	# gap, whether the gap was falling, the passes' nearest samples so far].
+	var walks: Dictionary[Vector2i, Array] = {}
 	for k in points.size():
 		var reach := (widths[k] * 0.5 if not closed else 0.0) + CURVE_REACH
 		var point := points[k]
@@ -9646,24 +9649,39 @@ func _stamp_near(curve: Dictionary, closed: bool, index: int, into: Dictionary, 
 				if gap < gaps.get(cell, INF):
 					gaps[cell] = gap
 					nearest[cell] = k
-				if passes:
-					var cell_runs: Array = runs.get_or_add(cell, [])
-					var run: Array = cell_runs.back() if not cell_runs.is_empty() else []
-					if run.is_empty() or k - int(run[2]) > 1:
-						cell_runs.append([k, gap, k])
-					else:
-						run[2] = k
-						if gap < float(run[1]):
-							run[0] = k
-							run[1] = gap
+				if not passes:
+					continue
+				var walk: Array = walks.get(cell, [])
+				if walk.is_empty():
+					walks[cell] = [k, gap, true, []]
+					continue
+				if k - int(walk[0]) > 1:
+					# A new run: the last one ended (falling, at its nearest).
+					if walk[2]:
+						(walk[3] as Array).append(walk[0])
+					walk[2] = true
+				elif gap > float(walk[1]):
+					if walk[2]:
+						(walk[3] as Array).append(walk[0])
+					walk[2] = false
+				elif gap < float(walk[1]):
+					walk[2] = true
+				walk[0] = k
+				walk[1] = gap
 	for cell: Vector2i in nearest:
 		if into.has(cell):
 			(also.get_or_add(cell, []) as Array).append(Vector2i(index, nearest[cell]))
 		else:
 			into[cell] = Vector2i(index, nearest[cell])
-		for run: Array in runs.get(cell, []):
-			if int(run[0]) != nearest[cell]:
-				(also.get_or_add(cell, []) as Array).append(Vector2i(index, int(run[0])))
+		var walk: Array = walks.get(cell, [])
+		if walk.is_empty():
+			continue
+		var lows: Array = walk[3]
+		if walk[2]:
+			lows.append(walk[0])
+		for k: int in lows:
+			if k != nearest[cell]:
+				(also.get_or_add(cell, []) as Array).append(Vector2i(index, k))
 
 
 ## _curve_near over [param curves] (each {curve, closed}) by their

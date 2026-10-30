@@ -36361,3 +36361,21 @@ the foothills (once maps lands it), the far castle is drawn exactly where
 the castle isn't this level or one it links to, and then at its plane spot
 (maps: 745 reaches the castle through the foothills). Client only,
 protocol unchanged, no new class_name.
+
+## 746 amended: each pass's nearest, inside a run too
+
+746 split a cell's samples into passes by unbroken runs. Maps' 745 still
+failed the wilds' edge check at (243.5, 126.7). There the outline makes a
+hairpin so thin that both sides stay within reach of cell (243, 127) the
+whole way round, so they make one run (samples 1798 to 1835). It has two
+nearest points, 1809 at 0.49 and 1823 at 0.50, and the point's own segment
+is 1824, 15 samples from the one kept.
+- _stamp_near now stamps every sample where a cell's gap stops falling and
+  starts rising, as it walks the curve: inside a run, and at a run's end
+  while still falling. 746's runs are the case where that falls at a run's
+  edge.
+- view_test _test_curve_passes gains a second case, a thin closed lane
+  sampled every 0.1, read by its end: one run round the end, both sides'
+  nearest about 30 samples apart. It reads 0.15 (0.95 with 746's runs).
+Checked on maps' 745 tree: the wilds' edge and the far checks pass. Client
+only, protocol unchanged, no new class_name.
