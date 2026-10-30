@@ -36180,3 +36180,44 @@ only once the Mound-breakers have been put down. Jeff: "you clear the robbers, t
 secret access to the temple ossuary and hall"; dungeon's 714 (4) shuts the niche until each of
 the nine has been felled once that generation. Data and docs only, protocol unchanged.
 
+## 743. Layout A, step 1: the world plane and the links
+
+Jeff picked the whole land's layout A (C:/dev/review/decisions/lands-layout.md: "A is closest,
+but what makes the most sense for continuity is fine"): the sea west, the forest west of the
+wilds and the hills east (swapped, both to be rebuilt bigger), the foothills north in the
+castle's place with a new castle off them, Umbrage downstream on the wilds' river, Cravenhold
+(the orc stronghold, its trees stripped) north of the forest. The plan, approved by the
+coordinator: C:/dev/review/lands/plan_a.md. Step 1 moves the built levels on the plane and their
+links; no new land.
+
+- **World plane:** Umbrage (held) at (78, 256), due south of the wilds: the wilds' river
+  leaves its south edge at x 118, Umbrage's own river's line at its x 40, one river. The hills
+  at (256, 90), east; the forest at (-96, 84), west. Heights from the links' grounds (held
+  -2.73, hills -2.43, forest 5.34). The stronghold place is Cravenhold, north of the forest; the
+  falls move above the wilds, where the river enters it; the Woodlands rect follows.
+- **The wilds:** its west link (14, 128) leads to the forest and its east link (239, 128) to
+  the hills (cells kept; the arrivals' names swap). Its link to Umbrage moves from the west edge
+  (16, 236) to the south edge (130, 244), arrival (130, 242), and a fourth road arm runs from
+  the crossroads south to it, east of the river, round the solid ground at about y 190 and 232.
+  The link and its arrival stand on a levelled pad (x 129..131, y 241..245, 2.45 m): the
+  slope squeezed to one point there and stretched over the four cells round it, no new cliff.
+- **Umbrage (make_held):** its link moves to the north edge (LINK_COL 52, the wilds' WILDS_COL
+  130 less its origin), and a lane (NORTH_LANE) is kept clear down the river's east bank to the
+  bridge road; the gate road runs from the link down the lane and over the bridge to the Old
+  Tower, and a core road from the bridge to the store's pad. The east neck clearing stays (no
+  floor lost: 7537 cells to 8207). make_held no longer writes the wilds; it checks the wilds'
+  link is on WILDS_COL and prints the plane's height.
+- **The hills:** the link moves from the east edge to the west edge (7, 38), the road's west
+  end extended to it; the starts with it. Its east road now ends at the old link's cell (the
+  way on east to the canyons, later).
+- **The forest:** the wilds' link at the east edge (89, 44) (the old stronghold link's cell),
+  the stronghold's (Cravenhold's, closed) at the north edge (40, 6); the starts with them.
+- make_hills and make_forest are stale until 743's step 3 rebuilds both bigger (a rerun writes
+  the old links): edit those levels by hand till then.
+
+Saved state: no level entity's marker moves (each level's entity cells are the same before and
+after), so no keyed entity is orphaned; floor counts: wilds 49129, hills 6477, forest 6137,
+castle 748 unchanged; held 7537 to 8207 (the lane). Removed link cells become plain floor; no
+floor cell becomes wall or void. level_test's Umbrage check: its north edge to the wilds' south
+edge, a road at both ends. A client cut with the server redeployed (clients draw their own
+level files); protocol unchanged; no new class_name.

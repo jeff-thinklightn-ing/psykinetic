@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The lands are laid out as Jeff picked (layout A): Umbrage lies south of the wilds on the same river (its road leaves the wilds' south edge), the forest is west of the wilds and the hills east (743).
 - Townsfolk have heard that the secret way down to the Ossuary is found only once the Mound-breakers have been put down.
 - The barrow's robbers are now Brand the Ox and his eight named mound-breakers, spread through its rooms (714): the hidden niche in the First Hall stays shut, and no draft is felt, until you have felled each of them once.
 - Healers' turf huts now show their state: a hut left empty falls into disrepair with a holed roof, a ruin shows broken walls and a cold, tipped pot with no smoke, and a mended hut stands again (733).

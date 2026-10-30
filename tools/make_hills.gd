@@ -2,6 +2,10 @@ extends Node
 ## Writes levels/hills, a showcase of the ground's relief (decision 525;
 ## before it, of whole levels: 358), and its link from the wilds' west edge:
 ##   Godot --headless --path . res://tools/make_hills.tscn
+## Stale since decision 743 (layout A: the hills east of the wilds, their
+## link moved by hand to the west edge at (7, 38), the bridge (505 amended
+## (2)) by hand): a rerun writes the old east-edge link. The hills are
+## rebuilt bigger in 743's step 3; until then edit levels/hills by hand.
 ## (a scene, not a --script run: saving parses the level, which needs the
 ## autoloads).
 ##

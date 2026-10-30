@@ -3,9 +3,9 @@
 	"zones": {
 		"wilds": {"origin": [0, 0], "height": 0.0},
 		"castle": {"origin": [112, -24], "height": 5.19},
-		"hills": {"origin": [-96, 58], "height": -3.3},
-		"forest": {"origin": [256, 80], "height": 6.08},
-		"held": {"origin": [-192, 156], "height": 0.22}
+		"hills": {"origin": [256, 90], "height": -2.43},
+		"forest": {"origin": [-96, 84], "height": 5.34},
+		"held": {"origin": [78, 256], "height": -2.73}
 	},
 	"landmarks": [
 		{"id": "castle", "slot": "far.castle", "at": [128, -12], "base": 5.19, "facing": [0, 1]},
@@ -14,12 +14,12 @@
 	"places": [
 		{"id": "mine", "name": "the mine", "rect": [528, 568, 64, 64], "status": "agreed", "kind": "mine", "about": "The old mine at the heart of the Blood Rot's land; the Blood Rot live in and around it. Under the tower landmark. At a distance from the town (lore); where, a draft."},
 		{"id": "dead_land", "name": "the dead land", "rect": [440, 480, 240, 240], "status": "draft", "kind": "ring", "about": "Round the mine nothing lives: no crops, no beasts. Agreed as lore; its radius (120 here) a draft. Toward the town, fields and forest come back."},
-		{"id": "stronghold", "name": "the stronghold", "rect": [352, 92, 96, 64], "status": "draft", "kind": "hold", "about": "What the forest's closed east link (forest (89, 44)) leads to. Unnamed: what it is, is Jeff's (lore's options E1)."},
+		{"id": "stronghold", "name": "Cravenhold", "rect": [-160, -60, 160, 140], "status": "draft", "kind": "hold", "about": "The orc stronghold (Jeff, 2026-10-27: \"outside the forest, a land where the trees have been stripped, we'll call Cravenhold\"): north of the forest, between it and the foothills; what the forest's closed north link (forest (40, 6)) leads to (decision 743, layout A)."},
 		{"id": "mountain", "name": "the mountain", "rect": [40, -220, 200, 150], "status": "draft", "kind": "mountain", "about": "Behind the castle as seen from the town (Jeff's \"perhaps\"): beyond the castle, away from the wilds."},
-		{"id": "falls", "name": "the falls", "rect": [-180, 104, 24, 24], "status": "draft", "kind": "falls", "about": "Where the river comes down over cliffs (Jeff's barrow sketch), above Umbrage: its river enters Umbrage's map (held) at its north edge at about world (-152, 156). The fisherman's far bank is upriver."}
+		{"id": "falls", "name": "the falls", "rect": [50, -40, 24, 24], "status": "draft", "kind": "falls", "about": "Where the river comes down over cliffs (Jeff's barrow sketch), above the wilds: it enters the wilds' north edge at about world (62, 0) and runs on south into Umbrage's map (held), the same water (decision 743, layout A). The fisherman's far bank is upriver."}
 	],
 	"regions": [
 		{"id": "blood_rots_land", "name": "the Blood Rot's land", "rect": [-200, -230, 900, 960], "status": "agreed", "about": "The whole region (lore). Its own name is Jeff's open A1."},
-		{"id": "woodlands", "name": "the Woodlands", "rect": [-192, 0, 544, 348], "status": "draft", "about": "Where Umbrage sits (Jeff: \"Held sit in the Woodlands\", before he named the town Umbrage; draft until his wording check): Umbrage's map (held), the wilds, the hills and the forest."}
+		{"id": "woodlands", "name": "the Woodlands", "rect": [-96, 0, 448, 448], "status": "draft", "about": "Where Umbrage sits (Jeff: \"Held sit in the Woodlands\", before he named the town Umbrage; draft until his wording check): the wilds, Umbrage's map (held) south of it on the river, the forest west and the hills east (decision 743, layout A)."}
 	]
 }

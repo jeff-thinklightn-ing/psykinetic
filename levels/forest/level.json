@@ -103,50 +103,50 @@
 		}
 	],
 	"centre": [
-		8,
-		48
+		87,
+		44
 	],
 	"starts": [
 		[
-			9,
-			47
+			86,
+			43
 		],
 		[
-			9,
-			49
+			86,
+			45
 		],
 		[
-			9,
+			86,
+			42
+		],
+		[
+			86,
 			46
-		],
-		[
-			9,
-			50
 		]
 	],
 	"spawn_points": {
 		"from_wilds": [
-			8,
-			48
-		],
-		"from_stronghold": [
 			87,
 			44
+		],
+		"from_stronghold": [
+			40,
+			8
 		]
 	},
 	"links": [
 		{
 			"at": [
-				6,
-				48
+				89,
+				44
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_forest"
 		},
 		{
 			"at": [
-				89,
-				44
+				40,
+				6
 			],
 			"to_map": "stronghold",
 			"to_spawn": "from_forest",

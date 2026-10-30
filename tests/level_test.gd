@@ -767,9 +767,19 @@ func _test_held() -> void:
 		"the wilds' town ground is named Umbrage while the town stands there (665's rooms; the store, the woodlot, the town's buildings), the standing stones not (%s: %s)"
 			% [town_cells, town_cells.map(func(cell: Vector2i) -> String: return Level.room_at(wilds, cell))])
 	var back: Array = wilds["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "held")
-	_check(to_wilds.size() == 1 and (to_wilds[0]["tile"] as Vector2i).x == 191 and back.size() == 1 and (back[0]["tile"] as Vector2i).x <= 20
+	_check(to_wilds.size() == 1 and (to_wilds[0]["tile"] as Vector2i).y == 0 and back.size() == 1 and (back[0]["tile"] as Vector2i).y >= 236
 			and level["spawn_points"].has("from_wilds") and wilds["spawn_points"].has("from_held"),
-		"its east edge links to the wilds' west edge and back (%s, %s)" % [to_wilds.map(func(link: Dictionary) -> Vector2i: return link["tile"]), back.map(func(link: Dictionary) -> Vector2i: return link["tile"])])
+		"its north edge links to the wilds' south edge and back, Umbrage downstream (743) (%s, %s)" % [to_wilds.map(func(link: Dictionary) -> Vector2i: return link["tile"]), back.map(func(link: Dictionary) -> Vector2i: return link["tile"])])
+	var road_cells := {}
+	for road: Dictionary in level["terrain"].get("roads", []):
+		road_cells.merge(Curves.cells(road["curve"], false))
+	var wilds_roads := {}
+	for road: Dictionary in wilds["terrain"].get("roads", []):
+		wilds_roads.merge(Curves.cells(road["curve"], false))
+	var arrival: Vector2i = level["spawn_points"].get("from_wilds", Vector2i(-1, -1))
+	var wilds_arrival: Vector2i = wilds["spawn_points"].get("from_held", Vector2i(-1, -1))
+	_check(road_cells.has(arrival) and wilds_roads.has(wilds_arrival),
+		"a road meets both ends of the link: Umbrage's gate road at %s, the wilds' south arm at %s (743)" % [arrival, wilds_arrival])
 	var fort: Dictionary = level["places"].get("old_tower", {})
 	_check(fort.get("kind") == "fort" and not fort.has("town"), "the Old Tower's place: a fort, working for no town yet (%s)" % [fort])
 	var kinds: Array = level["buildings"].filter(func(building: Dictionary) -> bool: return building.has("kind"))

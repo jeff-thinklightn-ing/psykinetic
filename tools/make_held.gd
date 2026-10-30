@@ -17,10 +17,11 @@ extends Node
 ## - the town's core, cleared ground (rough at its edge) with the store's
 ##   cell reserved (STORE, a levelled pad, nothing on it): no houses, the
 ##   town's settlement is laid there when the town moves (651's step 2);
-## - farms and pasture east of it, cleared grass, and the gate road on east
-##   to the wilds' link at the east edge (LINK_ROW: Held lies west of the
-##   wilds on the world plane, under the hills, so the link is where the
-##   wilds' west edge still has land);
+## - farms and pasture east of it, cleared grass;
+## - the gate road north up the river's east bank (a lane, NORTH_LANE) to the
+##   wilds' link at the north edge (LINK_COL: Held lies due south of the
+##   wilds on the world plane, the wilds' river running on into its own,
+##   decision 743), a road from the bridge into the core;
 ## - a fishing spot's clearing by the bridge road, south of it.
 ## Nothing lives here yet: the town, its people, the barrow and Snagfin stay
 ## in the wilds until step 2. The same seed makes the same map.
@@ -29,11 +30,15 @@ const SIZE := Vector2i(192, 192)
 const SEED := 651
 const FOLDER := "res://levels/held/"
 const WILDS := "res://levels/wilds/"
-## The wilds' row its end of the link is on (the land's first cell from the
-## west edge, the arrival two cells in), and Held's: WILDS_ROW less Held's
-## origin's row on the world plane (levels/world_plane.json, -192 x 156).
-const WILDS_ROW := 236
-const LINK_ROW := 80
+## The wilds' column its end of the link is on (its south edge, laid by
+## hand in the wilds), and Held's: WILDS_COL less Held's origin's column on
+## the world plane (levels/world_plane.json, 78 x 256; decision 743).
+const WILDS_COL := 130
+const LINK_COL := 52
+## The lane kept clear through the forest from the link south down the
+## river's east bank to the bridge road's row, this many cells either side
+## of LINK_COL (wavering by RIVER_BANKS_WAVER).
+const NORTH_LANE := 4.0
 ## The river's line, north to south.
 const RIVER: Array[Vector2i] = [Vector2i(40, 0), Vector2i(37, 48), Vector2i(41, 96), Vector2i(38, 144), Vector2i(40, 191)]
 ## Land kept either side of the river's line through the forest, wavering
@@ -84,7 +89,8 @@ func _ready() -> void:
 	for y in SIZE.y:
 		for x in SIZE.x:
 			var at := Vector2i(x, y)
-			if _in_clearing(Vector2(at), waver) or absf(x - _river_x(y)) <= RIVER_BANKS + RIVER_BANKS_WAVER * banks.get_noise_2d(x, y):
+			if _in_clearing(Vector2(at), waver) or absf(x - _river_x(y)) <= RIVER_BANKS + RIVER_BANKS_WAVER * banks.get_noise_2d(x, y) \
+					or (y <= BRIDGE_ROW and absf(x - LINK_COL) <= NORTH_LANE + RIVER_BANKS_WAVER * banks.get_noise_2d(x, y)):
 				map.set_cell(at, "grass")
 	var arrival := _link()
 	var fort_pad := Rect2i(FORT - Vector2i.ONE, Vector2i(19, 19))
@@ -93,7 +99,7 @@ func _ready() -> void:
 		"base": 6.0, "amplitude": 1.2, "scale": 80.0, "octaves": 2, "tilt": Vector2.ZERO,
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [RIVER], "valley_depth": 2.0, "valley_floor": 6.0, "valley_fall": 1.5, "valley_width": 24.0, "kinds": true, "min_flow": 30,
-		"keep_flat": [Rect2i(arrival - Vector2i(3, 3), Vector2i(5, 7)), fort_pad, store_pad],
+		"keep_flat": [Rect2i(arrival - Vector2i(3, 3), Vector2i(7, 5)), fort_pad, store_pad],
 		"streams": 0, "keep_clear": {},
 		"rivers": [{"line": RIVER, "wavelength": 30.0, "amplitude": 3.0, "width": [1.8, 3.0], "seed": 0}]})
 	map.relief = PackedFloat32Array()
@@ -296,8 +302,9 @@ func _stamp_fort() -> void:
 
 
 ## The roads (563), dirt, as curves (Relief.road): the gate road from the
-## link's arrival over the bridge to the Old Tower's gate; the ford path
-## from its breach over the ford to the core.
+## link's arrival down the lane and over the bridge to the Old Tower's gate;
+## the ford path from its breach over the ford to the core; the core road
+## from the bridge's east end to the store's pad.
 func _roads(arrival: Vector2i) -> void:
 	var bridge: Dictionary = config["buildings"][0]
 	var west := Vector2i(int(bridge["at"][0]), int(bridge["at"][1]))
@@ -312,7 +319,8 @@ func _roads(arrival: Vector2i) -> void:
 	var roads := []
 	var plans: Array[Array] = [
 		[arrival, [west + Vector2i(length, 0), west - Vector2i(1, 0)], FORT_GATE, crossings],
-		[FORT_BREACH, [ford[0] - Vector2i(1, 0), ford[-1] + Vector2i(1, 0)] if not ford.is_empty() else [], CORE_NW, {}]]
+		[FORT_BREACH, [ford[0] - Vector2i(1, 0), ford[-1] + Vector2i(1, 0)] if not ford.is_empty() else [], CORE_NW, {}],
+		[west + Vector2i(length + 3, 0), [], STORE - Vector2i(STORE_PAD + 1, 0), {}]]
 	for plan in plans:
 		var laid := Relief.road(map, plan[0], plan[1], plan[2], ROAD_WIDTH, plan[3])
 		if laid.is_empty():
@@ -334,26 +342,26 @@ func _ford_cells() -> Array[Vector2i]:
 	return out
 
 
-## The land's outermost cell on LINK_ROW at the east edge.
+## The land's outermost cell on LINK_COL at the north edge.
 func _link_cell() -> Vector2i:
-	var link := Vector2i(SIZE.x - 1, LINK_ROW)
+	var link := Vector2i(LINK_COL, 0)
 	while map.cell(link) in ["void", ""]:
-		link.x -= 1
+		link.y += 1
 	return link
 
 
-## The link to the wilds on the east edge at LINK_ROW, its arrival two
+## The link to the wilds on the north edge at LINK_COL, its arrival two
 ## cells in, the starts round that; the arrival.
 func _link() -> Vector2i:
 	var link := _link_cell()
-	var arrival := link - Vector2i(2, 0)
+	var arrival := link + Vector2i(0, 2)
 	for cell in _disc(arrival, 3.0):
 		if map.cell(cell) == "void":
 			map.set_cell(cell, "grass")
 	map.set_cell(link, "link")
 	var starts := []
-	for dy in [-1, 1, -2, 2]:
-		var start := arrival + Vector2i(-1, dy)
+	for dx in [-1, 1, -2, 2]:
+		var start := arrival + Vector2i(dx, 1)
 		map.set_cell(start, "start")
 		starts.append([start.x, start.y])
 	config["centre"] = [arrival.x, arrival.y]
@@ -364,39 +372,22 @@ func _link() -> Vector2i:
 	return arrival
 
 
-## The wilds' end: a link cell on WILDS_ROW's first land cell from the west
-## and its "from_held" arrival two cells in, written into the layout's
-## pixel and level.json's text (the rest of the wilds as it is: it is
-## hand-edited, and saving it whole would trace it again), once. Says the
-## height the world plane wants for Held (the wilds' ground at its link
-## less Held's at [param held_ground]'s link).
+## The wilds' end: its link to Held on its south edge at WILDS_COL (laid by
+## hand in the wilds, decision 743: its layout and level.json are
+## hand-edited, and saving them whole would trace them again), checked here,
+## not written. Says the height the world plane wants for Held (the wilds'
+## ground at its link less Held's at [param held_ground]'s link).
 func _link_wilds(held_ground: float) -> void:
 	var doc := MapDoc.open(WILDS)
-	var at := Vector2i(0, WILDS_ROW)
-	while doc.map.cell(at) == "void":
-		at.x += 1
-	var arrival := at + Vector2i(2, 0)
+	var at := Vector2i(-1, -1)
+	for link: Dictionary in doc.config.get("links", []):
+		if str(link.get("to_map", "")) == "held":
+			at = Vector2i(int(link["at"][0]), int(link["at"][1]))
+	if at.x != WILDS_COL:
+		push_error("[held] wilds: its link to Held is at %s, not on column %d" % [at, WILDS_COL])
+		return
 	print("[held] world plane: held's height %.2f (the wilds' ground %.2f at %s, Held's %.2f)" % [
 		doc.map.relief_at(at) - held_ground, doc.map.relief_at(at), at, held_ground])
-	var path := ProjectSettings.globalize_path(WILDS + "level.json")
-	var text := FileAccess.get_file_as_string(path)
-	if text.contains("\"to_map\": \"held\""):
-		print("[held] wilds: its link is there already, at %s" % [at])
-		return
-	var link := {"at": [at.x, at.y], "to_map": "held", "to_spawn": "from_wilds"}
-	var links_at := text.find("\t\"links\": [")
-	var links_close := text.find("\n\t]", links_at)
-	text = text.substr(0, links_close) + ",\n\t\t" + JSON.stringify(link, "\t", false).replace("\n", "\n\t\t") + text.substr(links_close)
-	var points_at := text.find("\t\"spawn_points\": {")
-	var points_close := text.find("\n\t}", points_at)
-	text = text.substr(0, points_close) + ",\n\t\t\"from_held\": " + JSON.stringify([arrival.x, arrival.y], "\t", false).replace("\n", "\n\t\t") + text.substr(points_close)
-	var file := FileAccess.open(path, FileAccess.WRITE)
-	file.store_string(text)
-	file.close()
-	var image := Image.load_from_file(ProjectSettings.globalize_path(WILDS + "layout.png"))
-	image.set_pixel(at.x * 2, at.y * 2, Color(str(Level.LEGEND["link"])))
-	image.save_png(ProjectSettings.globalize_path(WILDS + "layout.png"))
-	print("[held] wilds: link at %s, arrival %s" % [at, arrival])
 
 
 func _disc(centre: Vector2i, radius: float) -> Array[Vector2i]:

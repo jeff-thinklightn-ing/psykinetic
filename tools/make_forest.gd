@@ -2,6 +2,11 @@ extends Node
 ## Writes levels/forest, the way to the elven stronghold (decision 464), and
 ## its link from the wilds' east edge:
 ##   Godot --headless --path . res://tools/make_forest.tscn
+## Stale since decision 743 (layout A: the forest west of the wilds, its
+## links moved by hand: the wilds' at the east edge (89, 44), the
+## stronghold's, Cravenhold's, at the north edge (40, 6)): a rerun writes the
+## old links. The forest is rebuilt bigger in 743's step 3; until then edit
+## levels/forest by hand.
 ## (a scene, not a --script run: saving parses the level, which needs the
 ## autoloads).
 ##
