@@ -85,7 +85,8 @@ var _main: Node
 var bench_state := ""
 ## --off=a,b: in the frames, pieces of the view left out, to see what each
 ## costs: shadows (the near lights' shadows), border (terrain's band round
-## an outdoor map), glimpse (the level past a way out), minimap.
+## an outdoor map), glimpse (the level past a way out), far (the low
+## camera's far landmarks, 650), minimap.
 var off: Array[String] = []
 
 
@@ -346,6 +347,9 @@ func _frames() -> void:
 	if view != null and off.has("glimpse"):
 		for glimpse: Node3D in view._glimpses:
 			glimpse.visible = false
+	if view != null and off.has("far") and view._far_root != null:
+		view._far_root.visible = false
+		view._far_marks.clear()  # Nor placed each frame.
 	if off.has("minimap") and _main.minimap != null:
 		_main.minimap.visible = false
 		_main.minimap.set_process(false)

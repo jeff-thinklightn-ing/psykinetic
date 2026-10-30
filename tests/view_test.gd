@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_low_scatter()
 	_test_horizon()
 	_test_sky()
+	_test_far_landmarks()
 	await _test_far_restart()
 	await _test_low_pick()
 	await _test_reach_ease()
@@ -5121,6 +5122,116 @@ func _test_horizon() -> void:
 	var barrow := Level.load_level("barrow")
 	_rig.rebuild(barrow["terrain"], barrow["centre"])
 	_check(_rig._skirt == null and _rig._room.get_node_or_null("Skirt") == null, "under stone no skirt")
+	Net.set_camera_low(low_was, false)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Far landmarks under the low camera (650, terrain's side): from the hills
+## the castle and the tower over the mine, each at its true place on maps'
+## world plane or pulled in along its line to FAR_DRAW and scaled by as
+## much (the same on screen), shifting as the camera moves, hazed toward
+## the sky's horizon by their true distance; none with the camera high,
+## none under stone, none on a cell the view draws itself (the castle from
+## inside the castle).
+func _test_far_landmarks() -> void:
+	print("\n== far landmarks under the low camera (650, terrain's side) ==")
+	var plane := Level.world_plane()
+	var castle_mark: Dictionary = {}
+	for mark: Dictionary in Client3D.far_landmarks(plane, "wilds", {}):
+		if mark["id"] == "castle":
+			castle_mark = mark
+	var wilds_zone: Dictionary = plane["zones"]["wilds"]
+	var castle_at := Vector2i(128, -12)
+	var castle_base := 0.0
+	for mark: Dictionary in plane["landmarks"]:
+		if mark["id"] == "castle":
+			castle_at = mark["at"]
+			castle_base = mark["base"]
+	_check(not castle_mark.is_empty() and (castle_mark["at"] as Vector3).is_equal_approx(Vector3(castle_at.x - wilds_zone["origin"].x,
+			castle_base - float(wilds_zone["height"]), castle_at.y - wilds_zone["origin"].y)),
+			"from the wilds the castle at its world cell less the wilds' origin, its base less the wilds' height")
+	_check(Client3D.far_landmarks(plane, "barrow", {}).is_empty(), "a level with no place on the plane has none")
+	var drawn := {Vector2i(castle_at - (wilds_zone["origin"] as Vector2i)): true}
+	_check(Client3D.far_landmarks(plane, "wilds", drawn).all(func(mark: Dictionary) -> bool: return mark["id"] != "castle"),
+			"a landmark on a cell the view draws itself is left to it")
+	var castle_size: Vector2i = WorldMap.build().areas["castle"]["size"]
+	_check(Client3D.far_landmarks(plane, "wilds", {}, {"castle": castle_size}).all(func(mark: Dictionary) -> bool: return mark["id"] != "castle"),
+			"nor one in a level this one links to (the castle from the wilds)")
+	_check(is_equal_approx(Client3D.far_shrink(Vector3(0, 10, 0), Vector3(100, 0, 0), 20.0, 45.0), 1.0)
+			and is_equal_approx(Client3D.far_shrink(Vector3(0, 10, 0), Vector3(100, 0, 0), 20.0, 0.0), 0.5),
+			"far_shrink: whole when it fits under the top, else down to the room there is")
+	var low_was := Net.camera_low
+	Net.set_camera_low(true, false)
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	_rig._place_camera()
+	var root: Node3D = _rig._far_root
+	var ids: Array = _rig._far_marks.map(func(mark: Dictionary) -> String: return String((mark["node"] as Node).name))
+	_check(root != null and root.visible and root.get_parent() == _rig._room and ids.has("Far_castle") and ids.has("Far_tower_over_the_mine"),
+			"from the hills, low: the castle and the tower over the mine (%s)" % [ids])
+	var eye: Vector3 = _rig._camera.position
+	var forward: Vector3 = -_rig._camera.global_transform.basis.z
+	var top_edge: float = rad_to_deg(asin(forward.y)) + _rig._camera.fov * 0.5
+	var placed := true
+	var shares := {}
+	for mark: Dictionary in _rig._far_marks:
+		var node: Node3D = mark["node"]
+		var at: Vector3 = mark["at"]
+		var distance := eye.distance_to(at)
+		var drawn_at := eye.distance_to(node.position)
+		placed = placed and (node.position - eye).normalized().is_equal_approx((at - eye).normalized())
+		var shrink := Client3D.far_shrink(eye, at, mark["height"], top_edge - Client3D.FAR_TOP_MARGIN)
+		placed = placed and is_equal_approx(drawn_at, minf(distance, Client3D.FAR_DRAW)) and is_equal_approx(node.scale.x, drawn_at / distance * shrink)
+		# Its top no higher than the frame's top edge, less the margin.
+		var top := at + Vector3.UP * float(mark["height"]) * shrink
+		var rise := rad_to_deg(atan2(top.y - eye.y, Vector2(top.x - eye.x, top.z - eye.z).length()))
+		placed = placed and (rise <= top_edge - Client3D.FAR_TOP_MARGIN + 0.01 or is_equal_approx(shrink, Client3D.FAR_SHRINK_MOST))
+		var geometry: GeometryInstance3D = mark["meshes"][0]
+		shares[String(node.name)] = float(geometry.get_instance_shader_parameter("haze_share"))
+		placed = placed and geometry.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and geometry.material_override == _rig._far_material
+	_check(placed, "each on its true line from the camera, no further than FAR_DRAW and scaled by as much, shrunk to keep its top in frame (top edge %.1f degrees); no shadows" % top_edge)
+	# More sky on screen: nearer true size, with no code change.
+	var fov_was: float = _rig._camera.fov
+	var tower: Dictionary = {}
+	for mark: Dictionary in _rig._far_marks:
+		if String((mark["node"] as Node).name) == "Far_tower_over_the_mine":
+			tower = mark
+	var small: float = (tower["node"] as Node3D).scale.x if not tower.is_empty() else 0.0
+	_rig._camera.fov = 100.0
+	_rig._place_far_landmarks()
+	var grown: float = (tower["node"] as Node3D).scale.x if not tower.is_empty() else 0.0
+	_rig._camera.fov = fov_was
+	_rig._place_far_landmarks()
+	_check(not tower.is_empty() and grown > small * 1.5, "with more sky on screen the tower is drawn nearer its true size (%.3f to %.3f)" % [small, grown])
+	_check(shares.get("Far_tower_over_the_mine", 0.0) > shares.get("Far_castle", 1.0) and shares.get("Far_tower_over_the_mine", 1.0) <= Client3D.FAR_HAZE_MOST,
+			"the far tower more hazed than the castle (%s)" % [shares])
+	_check(_rig._far_material.get_shader_parameter("haze") == _rig._sky_horizon and _rig._sky_material.get_shader_parameter("sky_horizon_color") == _rig._sky_horizon,
+			"their haze the sky's horizon colour")
+	# The camera moved sideways: the castle seen along another line.
+	var castle_node: Node3D = root.get_node_or_null("Far_castle")
+	var before := (castle_node.position - eye).normalized() if castle_node != null else Vector3.ZERO
+	var target_was: Vector3 = _rig._camera_target
+	_rig._camera_target += Vector3(40, 0, 0)
+	_rig._place_camera()
+	var after := (castle_node.position - _rig._camera.position).normalized() if castle_node != null else Vector3.ZERO
+	_check(castle_node != null and before.angle_to(after) > deg_to_rad(1.0), "walked 40 m the castle shifts against the sky (%.1f degrees)" % rad_to_deg(before.angle_to(after)))
+	_rig._camera_target = target_was
+	Net.set_camera_low(false, false)
+	_rig._apply_camera_mode()
+	_check(not root.visible, "the camera high: none drawn")
+	Net.set_camera_low(true, false)
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	_check(_rig._far_root != null and _rig._far_root.get_node_or_null("Far_castle") == null and _rig._far_root.get_node_or_null("Far_tower_over_the_mine") != null,
+			"from the wilds, which links to the castle, no far castle; the tower far off")
+	Net.set_camera_low(true, false)
+	var castle := Level.load_level("castle")
+	_rig.rebuild(castle["terrain"], castle["centre"])
+	_check(_rig._far_root != null and _rig._far_root.get_node_or_null("Far_castle") == null and _rig._far_root.get_node_or_null("Far_tower_over_the_mine") != null,
+			"inside the castle no far castle; the tower still far off")
+	var barrow := Level.load_level("barrow")
+	_rig.rebuild(barrow["terrain"], barrow["centre"])
+	_check(_rig._far_root == null, "under stone none")
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 

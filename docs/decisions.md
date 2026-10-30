@@ -36269,3 +36269,67 @@ never from lore. On the same sheet he answered A1: "The whole land has its own n
 though, each map will be named first"; lore keeps "the Blood Rot's land" until he names it.
 Data and docs only, protocol unchanged.
 
+## 650, terrain's side: far landmarks under the low camera
+
+Jeff: "now we can have the castle show on the horizon, perhaps under a
+mountain. the dark elven tower standing off in the distance". Maps' world
+plane (650, 650 amended) says where; this draws it. The coordinator
+approved the design: stand-ins land first, and art-kit makes the far
+pieces after Jeff has seen them in play.
+- Which: Client3D.far_landmarks(plane, level, drawn). Level.world_plane()
+  is read at each build, with nothing cached, so when maps moves a
+  landmark (layout A's steps) the next build shows it moved. A level with
+  no origin on the plane (indoors, a test room) has none. A landmark on a
+  cell the view draws itself, its land or a glimpse (_wooded), is left to
+  it, and so is one inside this level or a level it links to
+  (WorldMap.ways_from, read at each build, so maps' layout steps move it):
+  the glimpse and the crossing show those. The first stills drew the castle
+  from the wilds' north half at about 80 m, full size beside the real
+  castle's glimpse. So the castle shows from the hills and Umbrage, not from
+  the wilds or the castle; the tower from all of them.
+- Where: its world cell less the level's origin, and its base less the
+  level's height, so it lines up across zones and shifts against the land
+  as the camera moves. One further than FAR_DRAW (270, inside LOW_FAR) is
+  drawn at FAR_DRAW along its line from the camera and scaled by FAR_DRAW
+  over its distance (_place_far_landmarks, each camera placing): the same
+  on screen, with no second camera or viewport. The tower over the mine is
+  about 800 m from the wilds.
+- Size: the low camera shows little sky (LOW_PITCH 22 down, LOW_FOV 50:
+  the frame's top edge about 3 degrees above level), and at true size the
+  tower (about 6 degrees tall from the wilds) poked only its base into the
+  top edge. Each landmark is shrunk about its foot (far_shrink, never under
+  FAR_SHRINK_MOST 0.05) till its top stands FAR_TOP_MARGIN (0.5) degrees
+  under the top edge as the live camera has it, its fov and tilt each
+  placing; it keeps its true bearing and foot. More sky on screen (Jeff is
+  asked) brings them back toward true size with no code change (the
+  coordinator's ruling).
+- Haze: client3d/far.gdshader, unshaded with the fog off (the fog would
+  haze it by where it is drawn, not where it stands). Its own share of the
+  sky's horizon colour by its true distance: FAR_HAZE_MOST (0.85) of
+  1 - exp(-distance / FAR_HAZE_SPAN (450)). Its body is lit from above and
+  one side, dimmed to FAR_NIGHT_LIGHT at night. The colour is
+  Client3D._sky_horizon, which environment's sky (744) sets once in the
+  look update (hazed_horizon under the low camera, the look's horizon in
+  ortho): the sky shader and the landmarks take the same colour, as agreed
+  with environment.
+- When: under the low camera only, outdoors, made on its first need and
+  hidden with the camera high, as the skirt is. No shadows.
+- What: art-kit's far piece when its slot (far.castle, far.tower) is
+  filled, drawn in the far material. Until then FAR_STAND_INS, plain
+  blocks: a walled castle with four towers and a keep, and a tall dark
+  tower with a spire.
+Stills from the wilds and the hills, noon and dusk, off-screen through
+Main's own view: C:/dev/review/lands/far_landmarks.
+view_test _test_far_landmarks checks:
+- the plane's cells and heights carried over;
+- none for a level off the plane, none on a drawn cell, none in a linked
+  level; far_shrink whole when it fits, else to the room there is;
+- from the hills the castle and the tower, each on its true line from the
+  camera, no further than FAR_DRAW and scaled by as much, its top under
+  the frame's top edge, no shadows; with a wider fov the tower nearer its
+  true size;
+- the tower hazed more than the castle, their haze the sky's horizon;
+- the castle shifting as the camera moves 40 m;
+- none with the camera high, no far castle from the wilds or inside the
+  castle (the tower from both), none under stone.
+Client only, protocol unchanged, no new class_name.

@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- With the low camera on, the castle and the dark tower over the mine stand on the horizon where they lie in the lands, fading into the haze with distance and shifting as you walk; plain stand-in shapes for now, until their art is made (650).
 
 - Townsfolk know of Cravenhold, the orc stronghold outside the forest, in a land where the trees have been stripped.
 - The lands are laid out as Jeff picked (layout A): Umbrage lies south of the wilds on the same river (its road leaves the wilds' south edge), the forest is west of the wilds and the hills east (743).

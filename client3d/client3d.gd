@@ -511,6 +511,55 @@ const SKIRT_ROWS: PackedFloat32Array = [-3.0, -1.0, 1.0, 3.0, 5.0, 8.0, 12.0, 17
 const SKIRT_GREEN := Color("2e4a2a")
 const SKIRT_DARK := Color("1b2d1c")
 const FAR_MEADOW_FADE := 8.0
+## Far landmarks under the low camera (650, terrain's side): each landmark on
+## maps' world plane (Level.world_plane, read at each build, so a moved one
+## moves) stands at its true place from this level's origin and height. One
+## further than FAR_DRAW (inside LOW_FAR) is drawn at FAR_DRAW along its line
+## from the camera, scaled by FAR_DRAW over its distance: the same on screen,
+## and it still shifts against the land as the camera moves. The fog off on
+## it (far.gdshader), its own haze toward the sky's horizon by its true
+## distance: FAR_HAZE_MOST of it, 1 - exp(-distance / FAR_HAZE_SPAN). A
+## landmark on a cell this view draws (its land or a glimpse), or in this
+## level or one it links to (WorldMap.ways_from, read at each build: the
+## glimpse and the crossing show those), is left to them. The low camera
+## shows little sky, so each is scaled down about its foot till its top
+## stands FAR_TOP_MARGIN degrees under the frame's top edge as the live
+## camera has it (its fov and tilt): more sky on screen, nearer true size.
+## Until art-kit fills a far.* slot, FAR_STAND_INS: blocks [shape, bottom
+## centre, size], a "box" (width, height, depth) or a "cone" (bottom radius,
+## height, top radius), front +z, in a body colour.
+const FAR_DRAW := 270.0
+const FAR_HAZE_SPAN := 450.0
+const FAR_HAZE_MOST := 0.85
+const FAR_TOP_MARGIN := 0.5
+## The least share of its true size a landmark is shrunk to.
+const FAR_SHRINK_MOST := 0.05
+## Its body's light at night, of the day's (the haze carries the night's dark).
+const FAR_NIGHT_LIGHT := 0.18
+const FAR_SHADER := preload("res://client3d/far.gdshader")
+const FAR_STAND_INS := {
+	"far.castle": {"body": Color("6e6b64"), "blocks": [
+		["box", Vector3(0, 0, 19), Vector3(40, 9, 2)],
+		["box", Vector3(0, 0, -19), Vector3(40, 9, 2)],
+		["box", Vector3(19, 0, 0), Vector3(2, 9, 40)],
+		["box", Vector3(-19, 0, 0), Vector3(2, 9, 40)],
+		["box", Vector3(0, 0, 19), Vector3(10, 12, 5)],
+		["cone", Vector3(19, 0, 19), Vector3(3.2, 15, 3.2)],
+		["cone", Vector3(-19, 0, 19), Vector3(3.2, 15, 3.2)],
+		["cone", Vector3(19, 0, -19), Vector3(3.2, 15, 3.2)],
+		["cone", Vector3(-19, 0, -19), Vector3(3.2, 15, 3.2)],
+		["cone", Vector3(19, 15, 19), Vector3(3.8, 5, 0)],
+		["cone", Vector3(-19, 15, 19), Vector3(3.8, 5, 0)],
+		["cone", Vector3(19, 15, -19), Vector3(3.8, 5, 0)],
+		["cone", Vector3(-19, 15, -19), Vector3(3.8, 5, 0)],
+		["box", Vector3(0, 0, -4), Vector3(14, 22, 14)],
+	]},
+	"far.tower": {"body": Color("2b2632"), "blocks": [
+		["cone", Vector3(0, 0, 0), Vector3(6, 70, 4)],
+		["cone", Vector3(0, 64, 0), Vector3(5.5, 4, 5.5)],
+		["cone", Vector3(0, 68, 0), Vector3(5, 18, 0)],
+	]},
+}
 ## Over hills (decision 525): how far back toward the camera the ground is
 ## looked at, how far under the line to the player (aimed RIDGE_AIM over
 ## their feet) it must stay, and how fast (degrees a second) the pitch
@@ -2249,6 +2298,12 @@ var _grown_back: Dictionary[Vector2i, bool] = {}
 var _scatter_nodes: Dictionary[Vector2i, Array] = {}
 ## The low camera's forest skirt (623, terrain's side), once made this build.
 var _skirt: MeshInstance3D
+## The low camera's far landmarks (650, terrain's side), once made this
+## build: their node, and each {node, meshes, at (its true place), height}.
+var _far_root: Node3D
+var _far_marks: Array[Dictionary] = []
+## Their one material, its haze the sky's horizon (_sky_horizon).
+var _far_material: ShaderMaterial
 ## The ground's kinds texture (a texel a cell) and its image, so one cell's
 ## kind changes alone.
 var _kinds_image: Image
@@ -2683,6 +2738,9 @@ func _update_sky(delta: float) -> void:
 	_sky_horizon = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
 	_sky_material.set_shader_parameter("sky_top_color", look["top"])
 	_sky_material.set_shader_parameter("sky_horizon_color", _sky_horizon)
+	if _far_material != null:
+		_far_material.set_shader_parameter("haze", _sky_horizon)
+		_far_material.set_shader_parameter("light", lerpf(FAR_NIGHT_LIGHT, 1.0, _look_daylight))
 	# Under the low camera the sky shows below the horizon past LOW_FAR, and
 	# the fog never reaches it: the haze's colour there, not the forest floor's
 	# band under the skyline (623, terrain's side). Only that sliver: the ground
@@ -2980,6 +3038,11 @@ func _apply_camera_mode() -> void:
 		_add_skirt()
 	if _skirt != null:
 		_skirt.visible = low
+	# The far landmarks (650, terrain's side), the same way.
+	if low and _far_root == null and _room != null:
+		_add_far_landmarks()
+	if _far_root != null:
+		_far_root.visible = low
 	if _ground_look != null:
 		_ground_look.set_shader_parameter("far_meadow", 1.0 if low else 0.0)
 		_ground_look.set_shader_parameter("far_from", scatter_reach_low - FAR_MEADOW_FADE * 0.5)
@@ -3051,6 +3114,8 @@ func _place_camera() -> void:
 	_camera.look_at(_camera_target, Vector3.UP)
 	if _low and _ground_look != null:
 		_ground_look.set_shader_parameter("far_centre", Vector2(_camera_target.x, _camera_target.z))
+	if _low and _far_root != null:
+		_place_far_landmarks()
 	if _listener != null:
 		# On the ground under the camera's aim (less any pan: the ears stay
 		# with the player), turned as the camera is, so left and right in
@@ -5016,6 +5081,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_saplings.clear()
 	_clearing_props.clear()
 	_skirt = null
+	_far_root = null
+	_far_marks.clear()
 	_scatter_nodes.clear()
 	_border = null
 	_grown = null
@@ -7156,6 +7223,143 @@ func _add_skirt() -> void:
 	_skirt.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_skirt.material_override = season_material(material, true, false)
 	_room.add_child(_skirt)
+
+
+## The far landmarks this view draws (650, terrain's side), from [param
+## plane] (Level.world_plane) for [param level]: each {id, slot, at (its
+## true place: the cell from the level's origin, its base less the level's
+## height), turn (radians about up, its front +z toward its facing)}. None
+## for a level with no place on the plane; none on a cell in [param drawn]
+## (the land and glimpses this view draws itself), nor in a level of
+## [param near] ({level: its size}: this one and those it links to).
+static func far_landmarks(plane: Dictionary, level: String, drawn: Dictionary, near := {}) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var zone: Variant = plane.get("zones", {}).get(level)
+	if zone == null:
+		return out
+	for mark: Dictionary in plane.get("landmarks", []):
+		var cell: Vector2i = (mark["at"] as Vector2i) - (zone["origin"] as Vector2i)
+		if drawn.has(cell):
+			continue
+		var in_near := false
+		for other: String in near:
+			var other_zone: Variant = plane["zones"].get(other)
+			if other_zone != null and Rect2i(other_zone["origin"], near[other]).has_point(mark["at"]):
+				in_near = true
+		if in_near:
+			continue
+		var facing := Vector2(mark["facing"] as Vector2i)
+		out.append({"id": mark["id"], "slot": mark["slot"],
+			"at": Vector3(cell.x, float(mark["base"]) - float(zone["height"]), cell.y),
+			"turn": atan2(facing.x, facing.y)})
+	return out
+
+
+## The far landmarks made (650, terrain's side): each art-kit's far piece
+## when its slot is filled, else its stand-in (far_stand_in), every mesh in
+## the one far material; no shadows. Placed at once, then as the camera is.
+func _add_far_landmarks() -> void:
+	_far_root = Node3D.new()
+	_far_root.name = "FarLandmarks"
+	_room.add_child(_far_root)
+	if _far_material == null:
+		_far_material = ShaderMaterial.new()
+		_far_material.shader = FAR_SHADER
+	_far_material.set_shader_parameter("haze", _sky_horizon)
+	_far_material.set_shader_parameter("light", lerpf(FAR_NIGHT_LIGHT, 1.0, _look_daylight))
+	var level := str(_terrain.get("level", ""))
+	var world := WorldMap.build()
+	var near := {}
+	if world.areas.has(level):
+		near[level] = world.areas[level]["size"]
+		for way: Dictionary in world.ways_from(level):
+			if world.areas.has(way["to"]):
+				near[way["to"]] = world.areas[way["to"]]["size"]
+	for mark: Dictionary in far_landmarks(Level.world_plane(), level, _wooded, near):
+		var slot := str(mark["slot"])
+		var node: Node3D
+		if ArtKit.has(slot):
+			node = ArtKit.instance(slot)
+		else:
+			var stand_in := MeshInstance3D.new()
+			stand_in.mesh = far_stand_in(slot)
+			node = stand_in
+		node.name = "Far_%s" % mark["id"]
+		node.rotation.y = mark["turn"]
+		_far_root.add_child(node)
+		var meshes: Array[GeometryInstance3D] = []
+		for found: Node in [node] + node.find_children("*", "GeometryInstance3D", true, false):
+			if found is GeometryInstance3D:
+				var geometry := found as GeometryInstance3D
+				geometry.material_override = _far_material
+				geometry.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				geometry.set_instance_shader_parameter("body", FAR_STAND_INS.get(slot, FAR_STAND_INS["far.tower"])["body"])
+				meshes.append(geometry)
+		var top := 0.0
+		for geometry: GeometryInstance3D in meshes:
+			top = maxf(top, geometry.get_aabb().end.y)
+		_far_marks.append({"node": node, "meshes": meshes, "at": mark["at"], "height": top})
+	if _camera != null:
+		_place_far_landmarks()
+
+
+## Each far landmark where it stands, or pulled in to FAR_DRAW along its
+## line from the camera and scaled by as much, so it looks the same; shrunk
+## about its foot to keep its top in frame (far_shrink, to the live
+## camera's top edge); its haze by its true distance.
+func _place_far_landmarks() -> void:
+	var eye := _camera.position
+	var forward := -_camera.global_transform.basis.z
+	var top_edge := rad_to_deg(asin(clampf(forward.y, -1.0, 1.0))) + _camera.fov * 0.5
+	for mark: Dictionary in _far_marks:
+		var at: Vector3 = mark["at"]
+		var distance := eye.distance_to(at)
+		var pull := minf(1.0, FAR_DRAW / maxf(distance, 0.001))
+		var node: Node3D = mark["node"]
+		node.position = eye + (at - eye) * pull
+		node.scale = Vector3.ONE * pull * far_shrink(eye, at, mark["height"], top_edge - FAR_TOP_MARGIN)
+		var share := FAR_HAZE_MOST * (1.0 - exp(-distance / FAR_HAZE_SPAN))
+		for geometry: GeometryInstance3D in mark["meshes"]:
+			geometry.set_instance_shader_parameter("haze_share", share)
+
+
+## The share of its true size a landmark [param height] tall, its foot at
+## [param at], is drawn at, seen from [param eye], so its top stands no
+## higher than [param most] degrees above level: 1 when it fits, never
+## under FAR_SHRINK_MOST.
+static func far_shrink(eye: Vector3, at: Vector3, height: float, most: float) -> float:
+	if height <= 0.0:
+		return 1.0
+	var across := Vector2(at.x - eye.x, at.z - eye.z).length()
+	var room := across * tan(deg_to_rad(clampf(most, -80.0, 80.0))) + eye.y - at.y
+	return clampf(room / height, FAR_SHRINK_MOST, 1.0)
+
+
+## [param slot]'s stand-in (FAR_STAND_INS; a tower's for a slot it lacks):
+## its blocks in one mesh, front +z, bottom at 0.
+static func far_stand_in(slot: String) -> ArrayMesh:
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for block: Array in FAR_STAND_INS.get(slot, FAR_STAND_INS["far.tower"])["blocks"]:
+		var size: Vector3 = block[2]
+		var part: PrimitiveMesh
+		var height: float
+		if block[0] == "box":
+			var box := BoxMesh.new()
+			box.size = size
+			part = box
+			height = size.y
+		else:
+			var cone := CylinderMesh.new()
+			cone.bottom_radius = size.x
+			cone.height = size.y
+			cone.top_radius = size.z
+			cone.radial_segments = 10
+			cone.rings = 1
+			part = cone
+			height = size.y
+		tool.append_from(part, 0, Transform3D(Basis.IDENTITY, (block[1] as Vector3) + Vector3.UP * height * 0.5))
+	return tool.commit()
 
 
 ## Scatter: grass tufts, flowers, small stones and roots on the ground,
