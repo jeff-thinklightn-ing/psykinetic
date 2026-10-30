@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The foothills: a new land north of the wilds, rising in two escarpments toward the mountain, with the river coming down it (and over a small falls) and the north road climbing to the castle, which now lies beyond them (745).
 - Fixed a fault in where the ground's edges fall (the forest edge, ledges, roads and streams): where one of them doubles back past a spot, the ground there could take the far side's shape (746).
 - With the low camera on, the castle and the dark tower over the mine stand on the horizon where they lie in the lands, fading into the haze with distance and shifting as you walk; plain stand-in shapes for now, until their art is made (650).
 

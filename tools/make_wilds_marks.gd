@@ -73,7 +73,7 @@ const FORD_FREE := 4
 ## The roads (569): each from its link's spawn point to its end beside the
 ## waystone (its cell is solid), and its width.
 const ROADS := [
-	{"from": "from_castle", "to": Vector2i(128, 125)},
+	{"from": "from_foothills", "to": Vector2i(128, 125)},
 	{"from": "from_hills", "to": Vector2i(125, 128)},
 	{"from": "from_forest", "to": Vector2i(131, 128)},
 ]

@@ -27,7 +27,7 @@
 		]
 	],
 	"spawn_points": {
-		"from_castle": [
+		"from_foothills": [
 			128.0,
 			22.0
 		],
@@ -58,7 +58,7 @@
 				128.0,
 				20.0
 			],
-			"to_map": "castle",
+			"to_map": "foothills",
 			"to_spawn": "from_wilds",
 			"variant": 2
 		},

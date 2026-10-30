@@ -363,7 +363,7 @@ func _test_link_cues() -> void:
 		return {}
 	var castle_way: Dictionary = cue_of.call("wilds", Vector2i(128, 20))
 	_check(castle_way.get("cue") == "arch" and castle_way.get("facing") == Vector2i(0, -1) and castle_way.get("variant") == 2,
-			"the wilds' way to the castle: a stone arch facing north, out to it (%s)" % [castle_way])
+			"the wilds' way north (the castle's till 745, the foothills' since): a stone arch facing north, out to it (%s)" % [castle_way])
 	var gate: Dictionary = cue_of.call("castle", Vector2i(16, 23))
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
 	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
@@ -982,6 +982,14 @@ func _test_world_plane() -> void:
 		ids[mark["id"]] = true
 	_check(ids.has("castle") and ids.has("tower_over_the_mine") and ids.size() == plane["landmarks"].size(),
 		"the castle and the tower over the mine are landmarks, each its own id (%s)" % [ids.keys()])
+	# 745: the castle is reached through the foothills, so the wilds no longer
+	# link to it and see it as a far landmark; till step 5 builds the new
+	# castle, the far castle stands on the castle level's own place, at its
+	# height, never where the castle stood before it moved.
+	var far_castle: Array = plane["landmarks"].filter(func(mark: Dictionary) -> bool: return mark["id"] == "castle")
+	_check(rects.has("castle") and far_castle.size() == 1 and (rects["castle"] as Rect2i).has_point(far_castle[0]["at"])
+			and absf(float(far_castle[0]["base"]) - float(zones["castle"]["height"])) <= 0.05,
+		"the far castle stands on the castle's own place on the plane, at its height (745; %s, the castle at %s)" % [far_castle, rects.get("castle")])
 	# 650 amended: the places no level holds yet and the named lands, each
 	# its own id, agreed or a draft; no place on a built level's ground.
 	var listed: Array = plane["places"] + plane["regions"]
@@ -2709,9 +2717,9 @@ func _test_castle() -> void:
 			"levels/castle is \"The Castle\" and loads cleanly (%s)" % [castle.get("warnings", "missing")])
 	_check(load("res://levels/castle/layout.png") is Image, "its layout.png is imported as an Image")
 	_check(castle["links"].size() == 3 and str(castle["links"].slice(0, 2)) == str([{"tile": Vector2i(27, 12), "to_map": "test_room", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "none"},
-			{"tile": Vector2i(16, 23), "to_map": "wilds", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "waystones"}])
+			{"tile": Vector2i(16, 23), "to_map": "foothills", "to_spawn": "from_castle", "one_way": false, "closed": false, "sealed": "", "hidden": false, "cue": "waystones"}])
 			and castle["links"][2]["tile"] == Vector2i(11, 18) and castle["links"][2]["to_map"] == "castle_halls" and castle["links"][2]["to_spawn"] == "from_castle",
-			"its link at (27, 12) goes to the test room, at the foot of its road to the wilds, and from the guardroom down to the Dwarven Halls (613) (%s)" % [castle["links"]])
+			"its link at (27, 12) goes to the test room, at the foot of its road to the foothills (the wilds till 745), and from the guardroom down to the Dwarven Halls (613) (%s)" % [castle["links"]])
 	var room := Level.load_level("test_room")
 	var back: Array = (room["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "castle")
 	_check(back.size() == 1 and back[0]["tile"] == Vector2i(30, 34) and back[0]["to_spawn"] == "from_test_room",

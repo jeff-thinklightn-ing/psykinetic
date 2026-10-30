@@ -175,9 +175,10 @@ func _test_ways_out() -> void:
 	_check(placed == Vector2i(0, -4), "its arrival lies across from our marker, 3 cells past our land (%s)" % placed)
 	var meant: Dictionary = out.filter(func(way: Dictionary) -> bool: return way["to_map"] == "wm_b")[0]
 	_check(meant["one_way"], "a one-way link says so")
-	var real := WorldMap.build(["wilds", "castle"])
-	var to_castle: Array = real.ways_out("wilds", 3).filter(func(way: Dictionary) -> bool: return way["to_map"] == "castle")
-	_check(to_castle.size() == 1 and to_castle[0]["out"] == Vector2i(0, -1), "the wilds' way to the castle points north")
+	var real := WorldMap.build(["wilds", "foothills"])
+	# Since 745 the wilds' north link leads to the foothills, not the castle.
+	var to_castle: Array = real.ways_out("wilds", 3).filter(func(way: Dictionary) -> bool: return way["to_map"] == "foothills")
+	_check(to_castle.size() == 1 and to_castle[0]["out"] == Vector2i(0, -1), "the wilds' way to the foothills points north (745)")
 	if to_castle.size() == 1:
 		var spawn := Vector2i((to_castle[0]["to_ours"] as Transform2D) * Vector2(to_castle[0]["to_cell"]))
 		var marker: Vector2i = to_castle[0]["from_cell"]
@@ -185,10 +186,10 @@ func _test_ways_out() -> void:
 		var floor_cells: Dictionary = real.areas["wilds"]["floor"]
 		while floor_cells.has(land + Vector2i(0, -1)):
 			land += Vector2i(0, -1)
-		var castle_size: Vector2i = real.areas["castle"]["size"]
+		var castle_size: Vector2i = real.areas["foothills"]["size"]
 		var bottom := Vector2i((to_castle[0]["to_ours"] as Transform2D) * Vector2(0, castle_size.y - 1)).y
 		_check(spawn.x == marker.x and bottom == land.y - 4,
-			"the castle lies 3 cells past where the wilds' land ends going north from the link, its arrival across from it (land ends at row %d, its south row at %d, arrival %s)" % [land.y, bottom, spawn])
+			"the foothills lie 3 cells past where the wilds' land ends going north from the link, its arrival across from it (land ends at row %d, its south row at %d, arrival %s)" % [land.y, bottom, spawn])
 
 
 func _test_crossing() -> void:
@@ -703,11 +704,11 @@ func _test_level_routes() -> void:
 	print("    the wilds, 12 cells: one flood %.0f ms, twelve A* %.0f ms" % [flood_ms, (Time.get_ticks_usec() - astar_started) / 1000.0])
 	_check(same, "on the wilds A* finds the flood's steps (decision 503)")
 	var query := Time.get_ticks_usec()
-	var legs := routes.route("test_room", room["starts"][0], "wilds", wilds["spawn_points"]["from_castle"])
+	var legs := routes.route("test_room", room["starts"][0], "wilds", wilds["spawn_points"]["from_foothills"])
 	print("    test_room to wilds: %.0f ms, %s" % [(Time.get_ticks_usec() - query) / 1000.0,
 		" / ".join(legs.map(func(leg: Dictionary) -> String: return "%s %s->%s %.1f" % [leg["area"], leg["from"], leg["to"], leg["steps"]]))])
-	_check(legs.map(func(leg: Dictionary) -> String: return leg["area"]) == ["test_room", "castle", "wilds"],
-		"the test room's start to the wilds goes through the castle")
+	_check(legs.map(func(leg: Dictionary) -> String: return leg["area"]) == ["test_room", "castle", "foothills", "wilds"],
+		"the test room's start to the wilds goes through the castle and the foothills (745)")
 	# Deep into the wilds: its last leg comes from the fields, not a walk.
 	var far := Vector2i.ZERO
 	for cell: Vector2i in wilds["floor"]:
@@ -717,7 +718,7 @@ func _test_level_routes() -> void:
 	legs = routes.route("test_room", room["starts"][0], "wilds", far)
 	var ms := (Time.get_ticks_usec() - query) / 1000.0
 	print("    test_room to the wilds' far side %s: %.0f ms, %s steps" % [far, ms, legs.map(func(leg: Dictionary) -> float: return leg["steps"])])
-	_check(legs.size() == 3 and ms < 50.0, "to the wilds' far side, with the fields: %.0f ms" % ms)
+	_check(legs.size() == 4 and ms < 50.0, "to the wilds' far side, with the fields, through the castle and the foothills (745): %.0f ms" % ms)
 
 
 ## [param values] as an Array[String], to compare typed arrays with.

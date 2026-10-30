@@ -36379,3 +36379,48 @@ is 1824, 15 samples from the one kept.
   nearest about 30 samples apart. It reads 0.15 (0.95 with 746's runs).
 Checked on maps' 745 tree: the wilds' edge and the far checks pass. Client
 only, protocol unchanged, no new class_name.
+## 745. Layout A, step 2: the foothills
+
+Layout A's second step (plan C:/dev/review/lands/plan_a.md, coordinator-approved: "the
+foothills from existing pieces. Terrain, the river, the north road and links only"): a new
+outdoor level, levels/foothills ("The Foothills"), between the wilds' north edge and the castle,
+proving a new land end to end. tools/make_foothills.gd writes it (seed 745); it writes only
+levels/foothills, and the links and the world plane are edited by hand.
+
+- **Where:** 256 x 96 cells at world (0, -96), the wilds' width, its south edge on the wilds'
+  north edge and its west edge on Cravenhold's east (layout A's adjustment 4). Height 0.11
+  (its south link's ground 5.08 against the wilds' 5.19).
+- **Its ground, from the hills' pieces:** an uneven forest border; the land leaning north (0.07
+  m a cell) and two south-facing escarpments across it (Relief.lay "escarpments"): the low one
+  the map's width, 4 m, the high one east of the river, 3 m, each zigzagging, with a way up
+  where the road climbs and one more to the east. Ground 4.3 to 13.2 m. Grass, dirt by slope,
+  and small clumps of trees (void) off the road, the river and the faces.
+- **The river** comes in at the north edge and runs down a valley in the west to the south edge
+  at x 62, where the wilds' river enters the wilds' north edge: one water. Where it crosses the
+  low escarpment it drops 0.9 m into a pool (570), at about local (65, 63): the falls lore
+  named above the wilds. A level holds it now, so the falls place leaves world_plane.json's
+  places (a place there is one no level holds yet; level_test keeps them off built levels).
+- **The north road** runs from the wilds' link (south edge, x 128) up both escarpments' ways to
+  the castle's link (north edge, x 128): one dirt road (Relief.road).
+- **Links:** south (128, 95) to the wilds' from_foothills, the wilds' (128, 20) cell kept; north
+  (128, 0) to the castle's from_foothills, the castle's (16, 23) cell kept. Arrivals two cells
+  in (from_wilds, from_castle), the starts on a levelled pad by the south one. The wilds' and the
+  castle's arrivals were from_castle and from_wilds; renamed from_foothills (a player record
+  keeps its cell, not a spawn name, and an unknown name falls back to the first start).
+- **The castle** stands in for the new castle off the foothills' north edge (layout A, step 5):
+  origin (112, -120), height 11.77 (the foothills' north link's ground 11.66 + 0.11); the far
+  castle landmark moves with it to (128, -108), base 11.77. The mountain's draft rect shrinks to
+  y -220..-120 so it stays off the castle.
+- The faces' wander seed is the first (of WANDER_SEEDS) whose traced ledges keep within 0.42 of
+  the cliff edges: a near-level face's long run then a one-cell jog pulls a ledge's curve past
+  level_test's 0.45, so the faces zigzag and the generator measures before it keeps one.
+
+No monsters, people, quests, buildings or landmarks of its own; its far-landmark line (the tower
+from there) is terrain's and comes with terrain's far layer. Its region is the hills'
+("town_lands") until environment gives the north its cooler climate. Saved state: the foothills
+are new (no saved entities); no other level's floor or entity cells change (wilds 49129, castle
+748); only the wilds' north link's and the castle's south link's targets and two arrival names.
+Tests: level_test (the castle's link to the foothills), relief_test (the wilds' road from
+from_foothills), world_map_test (the wilds' way north to the foothills; the test room to the wilds
+through the castle and the foothills). A client cut with the server redeployed; protocol
+unchanged; no new class_name.

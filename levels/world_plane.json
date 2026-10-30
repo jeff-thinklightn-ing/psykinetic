@@ -2,21 +2,21 @@
 	"_about": "Decision 650, the world plane: every outdoor level laid on one flat world of cells (a cell a metre), so what lies beyond a level's edge stands where it is from every level and shifts against the land as you walk. zones: each outdoor level's origin (the world cell of its cell (0, 0)) and height (metres added to its own ground to put it on the world's: the levels' grounds were made apart, so a link's two ends meet in height too). Indoor levels (barrows, lair, rooms) have none. landmarks: what is seen far off (terrain's far layer, 650 terrain's side): id, slot (art-kit's far piece), at (a world cell), base (the world height in metres it stands on) and facing (its front's way, north up). The tower over the mine stands where the mine is laid, though no level holds it yet; a mountain behind the castle comes later as one more entry. 650 amended (Jeff: \"draw out a map of the lands ... consistent across trees\"): this file is the one truth of where everything in the region lies. A tree that places anything outdoors adds it here; lore's directions and distances follow it, never the other way; terrain's far landmarks, the big map's known world and the sought ones' where read it. places: what lore names that no level holds yet; regions: the named lands; each {id, name, rect [x, y, w, h] on the plane, status agreed|draft, about}. tools/lands_map.py draws it all to C:/dev/review/lands/lands.png: run it after any change here.",
 	"zones": {
 		"wilds": {"origin": [0, 0], "height": 0.0},
-		"castle": {"origin": [112, -24], "height": 5.19},
+		"castle": {"origin": [112, -120], "height": 11.77},
+		"foothills": {"origin": [0, -96], "height": 0.11},
 		"hills": {"origin": [256, 90], "height": -2.43},
 		"forest": {"origin": [-96, 84], "height": 5.34},
 		"held": {"origin": [78, 256], "height": -2.73}
 	},
 	"landmarks": [
-		{"id": "castle", "slot": "far.castle", "at": [128, -12], "base": 5.19, "facing": [0, 1]},
+		{"id": "castle", "slot": "far.castle", "at": [128, -108], "base": 11.77, "facing": [0, 1]},
 		{"id": "tower_over_the_mine", "slot": "far.tower", "at": [560, 600], "base": 5.0, "facing": [-1, 0]}
 	],
 	"places": [
 		{"id": "mine", "name": "the mine", "rect": [528, 568, 64, 64], "status": "agreed", "kind": "mine", "about": "The old mine at the heart of the Blood Rot's land; the Blood Rot live in and around it. Under the tower landmark. At a distance from the town (lore); where, a draft."},
 		{"id": "dead_land", "name": "the dead land", "rect": [440, 480, 240, 240], "status": "draft", "kind": "ring", "about": "Round the mine nothing lives: no crops, no beasts. Agreed as lore; its radius (120 here) a draft. Toward the town, fields and forest come back."},
 		{"id": "stronghold", "name": "Cravenhold", "rect": [-160, -60, 160, 140], "status": "draft", "kind": "hold", "about": "The orc stronghold (Jeff, 2026-10-27: \"outside the forest, a land where the trees have been stripped, we'll call Cravenhold\"): north of the forest, between it and the foothills; what the forest's closed north link (forest (40, 6)) leads to (decision 743, layout A)."},
-		{"id": "mountain", "name": "the mountain", "rect": [40, -220, 200, 150], "status": "draft", "kind": "mountain", "about": "Behind the castle as seen from the town (Jeff's \"perhaps\"): beyond the castle, away from the wilds."},
-		{"id": "falls", "name": "the falls", "rect": [50, -40, 24, 24], "status": "draft", "kind": "falls", "about": "Where the river comes down over cliffs (Jeff's barrow sketch), above the wilds: it enters the wilds' north edge at about world (62, 0) and runs on south into Umbrage's map (held), the same water (decision 743, layout A). The fisherman's far bank is upriver."}
+		{"id": "mountain", "name": "the mountain", "rect": [40, -220, 200, 100], "status": "draft", "kind": "mountain", "about": "Behind the castle as seen from the town (Jeff's \"perhaps\"): beyond the castle and the foothills, away from the wilds; the foothills' river comes down from it (decision 745)."}
 	],
 	"regions": [
 		{"id": "blood_rots_land", "name": "the Blood Rot's land", "rect": [-200, -230, 900, 960], "status": "agreed", "about": "The whole region (lore). Its own name is Jeff's open A1."},

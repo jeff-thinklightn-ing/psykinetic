@@ -739,7 +739,7 @@ func _test_wilds() -> void:
 	var reached := PackedFloat32Array()
 	reached.resize(size.x * size.y)
 	reached.fill(-1.0)
-	WorldRoutes._flood(area, level["spawn_points"]["from_castle"], {}, reached)
+	WorldRoutes._flood(area, level["spawn_points"]["from_foothills"], {}, reached)
 	var unreached := floor.keys().filter(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] < 0.0)
 	# The layout's own islands (cells the forest closes in) are as they were.
 	var flat := area.duplicate()
@@ -749,7 +749,7 @@ func _test_wilds() -> void:
 	var reached_flat := PackedFloat32Array()
 	reached_flat.resize(size.x * size.y)
 	reached_flat.fill(-1.0)
-	WorldRoutes._flood(flat, level["spawn_points"]["from_castle"], {}, reached_flat)
+	WorldRoutes._flood(flat, level["spawn_points"]["from_foothills"], {}, reached_flat)
 	var cut_off := unreached.filter(func(cell: Vector2i) -> bool: return reached_flat[cell.y * size.x + cell.x] >= 0.0)
 	_check(cut_off.is_empty(), "the relief cuts nothing off: every floor cell walked to on flat ground still is (%d not: %s)" % [cut_off.size(), cut_off.slice(0, 5)])
 	var spots: Array[Vector2i] = []
@@ -819,9 +819,9 @@ func _test_wilds() -> void:
 	var dirt := roads.all(func(road: Dictionary) -> bool:
 		return Curves.cells(road["curve"], false).keys().all(func(cell: Vector2i) -> bool:
 			return not floor.has(cell) or terrain["kinds"].get(cell, "") == "dirt"))
-	_check(roads.size() == 4 and starts_at.has(level["spawn_points"]["from_castle"]) and starts_at.has(level["spawn_points"]["from_hills"])
+	_check(roads.size() == 4 and starts_at.has(level["spawn_points"]["from_foothills"]) and starts_at.has(level["spawn_points"]["from_hills"])
 		and starts_at.has(level["spawn_points"]["from_forest"]) and ends_at.has(level["spawn_points"]["from_held"]) and over_bridge and dirt,
-		"four dirt roads: from the castle's, the forest's and the hills' links, the forest road over the bridge, and south to Umbrage's (569, 743; from %s, to %s)" % [starts_at, ends_at])
+		"four dirt roads: from the foothills' (the castle's till 745), the forest's and the hills' links, the forest road over the bridge, and south to Umbrage's (569, 743; from %s, to %s)" % [starts_at, ends_at])
 
 
 ## A bridge's deck kept out of the relief (505 amended): under each of the

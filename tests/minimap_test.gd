@@ -60,11 +60,11 @@ func _test_picture() -> void:
 	map.rebuild(wilds)
 	print("    the wilds (%s cells) drawn in %.1f ms" % [wilds["size"], (Time.get_ticks_usec() - started) / 1000.0])
 	_check(map.image.get_size() == Vector2i(wilds["size"]) and map.places.any(func(place: Dictionary) -> bool: return place["kind"] == "stockpile")
-		and map.ways_out.any(func(way: Dictionary) -> bool: return way["label"] == "castle"),
-		"the wilds: the town's store and the way to the castle are on it")
-	var castle_ways := map.ways_out.filter(func(way: Dictionary) -> bool: return way["label"] == "castle")
+		and map.ways_out.any(func(way: Dictionary) -> bool: return way["label"] == "foothills"),
+		"the wilds: the town's store and the way north (to the foothills since 745) are on it")
+	var castle_ways := map.ways_out.filter(func(way: Dictionary) -> bool: return way["label"] == "foothills")
 	_check(castle_ways.size() == 1 and castle_ways[0]["cue"] == "arch" and castle_ways[0]["facing"] == Vector2i(0, -1),
-		"the wilds' castle link is an arch facing north on the big map (589; %s)" % [castle_ways])
+		"the wilds' north link (the castle's till 745, the foothills' since) is an arch facing north on the big map (589; %s)" % [castle_ways])
 	map.queue_free()
 
 

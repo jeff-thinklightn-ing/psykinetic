@@ -5003,17 +5003,18 @@ func _test_outdoor() -> void:
 		var ends: Array[Vector2i] = [Vector2i(middle.x, low.y - out), Vector2i(middle.x, high.y + out), Vector2i(low.x - out, middle.y), Vector2i(high.x + out, middle.y)]
 		_check(ends.all(func(cell: Vector2i) -> bool: return canopy.has(cell)),
 				"reaching %d cells out every way, past what the view and its pan see" % out)
-		# The castle's way to the wilds (327): past its south edge, three
-		# rows of trees with a lane through them, then the wilds' road.
-		_check(_rig._glimpses.size() == 1 and _rig._glimpse_plans[0]["to"] == "wilds",
-				"a glimpse of the wilds past the castle's way there, none of the test room's dungeon (%s)" % [_rig._glimpse_plans.map(func(plan: Dictionary) -> String: return plan["to"])])
+		# The castle's way south (327; to the wilds till 745, the foothills since):
+		# past its south edge, three rows of trees with a lane through them, then
+		# the foothills' road.
+		_check(_rig._glimpses.size() == 1 and _rig._glimpse_plans[0]["to"] == "foothills",
+				"a glimpse of the foothills past the castle's way there, none of the test room's dungeon (%s)" % [_rig._glimpse_plans.map(func(plan: Dictionary) -> String: return plan["to"])])
 		if _rig._glimpses.size() == 1:
 			var plan: Dictionary = _rig._glimpse_plans[0]
 			var cells: Dictionary = plan["cells"]
 			var on_land := cells.keys().filter(func(cell: Vector2i) -> bool: return land.has(cell)).size()
 			var lane := [Vector2i(16, 24), Vector2i(16, 25), Vector2i(16, 26), Vector2i(15, 25), Vector2i(17, 25)]
-			_check(on_land == 0 and lane.all(func(cell: Vector2i) -> bool: return cells.has(cell)) and cells.has(Vector2i(16, 33)),
-					"none of it on our land; a lane from the link through the trees; the wilds' from_castle (128, 22) across from our link, at (16, 33)")
+			_check(on_land == 0 and lane.all(func(cell: Vector2i) -> bool: return cells.has(cell)) and cells.has(Vector2i(16, 29)),
+					"none of it on our land; a lane from the link through the trees; the foothills' from_castle (128, 2) across from our link, at (16, 29)")
 			var wooded := cells.keys().filter(func(cell: Vector2i) -> bool: return _rig._trees.has(cell)).size()
 			var near_tree := func(at: Vector2) -> bool:
 				return _rig._trees.values().any(func(tree: Node3D) -> bool: return Vector2(tree.position.x, tree.position.z).distance_to(at) < 1.6)
