@@ -36234,3 +36234,28 @@ and _release_zones (the stop) pass it; each runs once a run (_released).
 The first save's line is unchanged. state_test: the first run's final save
 said once, its 10 level entities keyed. Server only, protocol unchanged, no
 new class_name, no CHANGELOG bullet (nothing a player sees).
+
+## 744 amended, perf's side: the sky's radiance through a weather's ease
+
+744's numbers held the weather fixed, so they could not say whether the sky's
+uniforms, which change as the weather eases, cost a radiance refresh a frame
+(environment's question; INCREMENTAL or a 128 radiance were its fallbacks).
+
+- map_bench `--weather-at=KIND@S` turns every region's weather to KIND S
+  seconds into the frames (Weather.set_override, as an admin would). Its
+  frames also print each frame's render medians (CPU, GPU), the GPU's 95th
+  and its five slowest GPU frames with when they came, and over a run of
+  30 s or more the GPU's median each 10 s.
+- The run (main at 02a84ca0, wilds, noon, low camera, a 12-tile walk,
+  1600x900, off-screen; 200 s of frames, clear, turned to storm at 20 s,
+  against clear all through; two rounds, which agreed to 0.01 ms): the GPU
+  median each 10 s was 1.92 ms in the control throughout. With the storm it
+  was 1.92 before the turn, 2.01-2.04 through the ease (20 to about 120 s),
+  and 1.96-1.98 once it was in. So the storm itself, its rain and clouds,
+  costs about +0.05 ms, and the ease about +0.05 ms more while it lasts. No
+  spike: the slowest GPU frames were 2.31-2.35 ms against the control's
+  2.22-2.28, none at the turn. CPU medians 1.45 against 1.44-1.46.
+- So the refresh as the weather eases is about 0.05 ms a frame for two
+  minutes: no change to the sky's process mode or radiance size.
+
+Tools only (no game code); protocol unchanged; no new class_name.

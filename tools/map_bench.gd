@@ -35,6 +35,10 @@ extends Node
 ## round the view built.
 ## --season=NAME starts the year in that season (Season.NAMES).
 ## --hour=H starts the clock at that hour (0..24: 12 noon).
+## --weather-at=KIND@S turns every region's weather to KIND S seconds into
+## the frames, to time the ease (the sky's radiance, decision 744); run
+## --seconds long enough for the change (Weather's change, about a tenth of
+## a spell).
 ## --weather=KIND starts every region in that weather (Weather; rain's
 ## drops and fog's layers drawn, outdoors).
 ## --off=shadows,border,glimpse,minimap leaves those pieces of the view out
@@ -70,6 +74,9 @@ var shot_zoom := 0.0
 var shot_yaw := NAN
 var low := false
 var scatter_reach := 0.0
+## --weather-at: the kind, and when in the frames ("" once done).
+var weather_at := ""
+var weather_at_s := 0.0
 const WALK_STEP := 0.3
 var _main: Node
 
@@ -114,6 +121,9 @@ func _ready() -> void:
 			"low": low = pair[1] != "0"
 			"scatter-reach": scatter_reach = pair[1].to_float()
 			"hour": Net.start_hour = fposmod(pair[1].to_float(), 24.0)
+			"weather-at":
+				weather_at = pair[1].get_slice("@", 0).to_lower()
+				weather_at_s = pair[1].get_slice("@", 1).to_float()
 	if low:
 		Net.set_camera_low(true, false)
 	var windowed := DisplayServer.get_name() != "headless"
@@ -385,6 +395,10 @@ func _frames() -> void:
 	# of a frame is the scripts and the engine's own nodes.
 	var render_cpu := 0.0
 	var render_gpu := 0.0
+	# Each frame's: the medians and the GPU's 95th, and its slowest frames
+	# with when they came, to find a refresh (the sky's radiance).
+	var cpu_frames: Array[float] = []
+	var gpu_frames: Array[Vector2] = []
 	var map_draws: int = _main.minimap.draws if _main.minimap != null else 0
 	var map_usec: int = _main.minimap.draw_usec if _main.minimap != null else 0
 	var started := Time.get_ticks_usec()
@@ -421,6 +435,12 @@ func _frames() -> void:
 		render_cpu += RenderingServer.viewport_get_measured_render_time_cpu(viewport) \
 				+ RenderingServer.get_frame_setup_time_cpu()
 		render_gpu += RenderingServer.viewport_get_measured_render_time_gpu(viewport)
+		cpu_frames.append(RenderingServer.viewport_get_measured_render_time_cpu(viewport) + RenderingServer.get_frame_setup_time_cpu())
+		gpu_frames.append(Vector2(RenderingServer.viewport_get_measured_render_time_gpu(viewport), (now - started) / 1000000.0))
+		if weather_at != "" and (now - started) / 1000000.0 >= weather_at_s:
+			print("BENCH weather to %s at %.1f s" % [weather_at, (now - started) / 1000000.0])
+			Weather.set_override("all", weather_at, 600.0)
+			weather_at = ""
 	var elapsed := (Time.get_ticks_usec() - started) / 1000000.0
 	print("BENCH frames: %.1f fps avg, worst frame %.1f ms, draw calls up to %d, objects in frame %d, video memory %.0f MB" % [
 		frames / elapsed, worst, draws,
@@ -428,6 +448,33 @@ func _frames() -> void:
 		Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0])
 	print("BENCH a frame: rendering %.1f ms on the CPU, %.1f ms on the GPU (averages; the rest is scripts and nodes)" % [
 		render_cpu / frames, render_gpu / frames])
+	if frames > 0:
+		cpu_frames.sort()
+		var gpu_sorted: Array[float] = []
+		for each in gpu_frames:
+			gpu_sorted.append(each.x)
+		gpu_sorted.sort()
+		gpu_frames.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.x > b.x)
+		var slowest: Array[String] = []
+		for each in gpu_frames.slice(0, 5):
+			slowest.append("%.2f ms at %.1f s" % [each.x, each.y])
+		print("BENCH rendering a frame: median %.2f ms on the CPU, %.2f ms on the GPU, GPU 95th %.2f ms; slowest on the GPU: %s" % [
+			cpu_frames[cpu_frames.size() / 2], gpu_sorted[gpu_sorted.size() / 2], gpu_sorted[int(gpu_sorted.size() * 0.95)],
+			", ".join(slowest)])
+		if seconds >= 30.0:
+			# Over a long run (a weather's ease), the GPU's median each 10 s.
+			var buckets := {}
+			for each in gpu_frames:
+				var bucket := int(each.y / 10.0)
+				if not buckets.has(bucket):
+					buckets[bucket] = []
+				buckets[bucket].append(each.x)
+			var medians: Array[String] = []
+			for bucket: int in range(int(ceil(seconds / 10.0))):
+				var times: Array = buckets.get(bucket, [])
+				times.sort()
+				medians.append("%.2f" % times[times.size() / 2] if not times.is_empty() else "-")
+			print("BENCH GPU median each 10 s: %s" % " ".join(medians))
 	if _main.minimap != null and _main.minimap.visible:
 		var drawn: int = _main.minimap.draws - map_draws
 		print("BENCH minimap: drawn %d times in %d frames, %.3f ms a draw, %.3f ms a frame" % [drawn, frames,
