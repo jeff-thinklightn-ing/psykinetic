@@ -53,6 +53,7 @@ check "$crate_tile" 1 "snapshot has Crate1 at [7, 2]"
 check "$(count '"script": "res://sim/player.gd"' "$STATE")" 0 "players are not among the entities"
 check "$(count '"player_id": "dev-host"' "$STATE")" 1 "snapshot holds the dev host's player record"
 check "$(count '"script": "res://sim/(monster|pushable|cargo|chest).gd"' "$STATE")" 10 "snapshot holds the 10 level entities"
+check "$(count '\[state\] final save: 10 level entities, 10 keyed' "$DIR/first.log")" 1 "the stop's final save is said once, its 10 level entities by their keys (433 amended)"
 
 # 2. Restart: entities come from the snapshot, so Crate1 is still at (7, 2).
 run_host second --test-exit-after=2

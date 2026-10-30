@@ -36221,3 +36221,16 @@ castle 748 unchanged; held 7537 to 8207 (the lane). Removed link cells become pl
 floor cell becomes wall or void. level_test's Umbrage check: its north edge to the wilds' south
 edge, a road at both ends. A client cut with the server redeployed (clients draw their own
 level files); protocol unchanged; no new class_name.
+
+## 433 amended: the stop's final save is said too
+
+Release's rollback and compatibility check (730) compares one run's last
+save against the next run's load, but "[state] saved N level entities, M
+keyed" is said once a run, at its first save (Main._keys_said), which can
+come before every zone is open (a 10 against a 26 in 714 (4)'s check).
+_save_state(wait, final) now also says "[state] final save: N level
+entities, M keyed" when final: the clean shutdown, the console's restart
+and _release_zones (the stop) pass it; each runs once a run (_released).
+The first save's line is unchanged. state_test: the first run's final save
+said once, its 10 level entities keyed. Server only, protocol unchanged, no
+new class_name, no CHANGELOG bullet (nothing a player sees).

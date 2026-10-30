@@ -5510,7 +5510,7 @@ var _keys_said := false
 
 ## The snapshot, written before this returns; with [param wait] false (the
 ## periodic one), written on _saver while the game goes on.
-func _save_state(wait := true) -> void:
+func _save_state(wait := true, final := false) -> void:
 	if not Net.is_authority() or Net.state_path == "":
 		return
 	if not wait and _saver != null and _saver.is_alive():
@@ -5547,6 +5547,10 @@ func _save_state(wait := true) -> void:
 		# level entities by their keys, told without reading it.
 		_keys_said = true
 		print("[state] saved %d level entities, %d keyed" % [level_held, keyed])
+	if final:
+		# The stop's last save too (433 amended, release's 730 check: one run's
+		# last save against the next run's load).
+		print("[state] final save: %d level entities, %d keyed" % [level_held, keyed])
 	var data := Snapshot.data_of(zones, records, {"steps": World.steps,
 		"holdings": World.holdings.to_dict() if World.holdings != null else {},
 		"stockpile": World.stockpile.to_dict() if World.stockpile != null else {},
@@ -5695,7 +5699,7 @@ func _exit_tree() -> void:
 	# kept before the zones were let go (_release_zones), which an empty world
 	# saved now would overwrite.
 	if not _released:
-		_save_state()
+		_save_state(true, true)
 	# A periodic snapshot still being written finishes first (decision 360).
 	_finish_saving()
 	# A generation being made is let go, written nowhere (decision 684).
@@ -16476,7 +16480,7 @@ func _count_down_restart() -> void:
 	_restart_at = -1
 	print("[admin] restarting%s: saving, letting %d players go, exiting %d" % [
 		" (%s)" % _restart_why if not _restart_why.is_empty() else "", _players.size(), _restart_exit])
-	_save_state()
+	_save_state(true, true)
 	# Each client is let go, so it hears at once rather than when it times
 	# out, and reconnects; the disconnects go out before the server quits,
 	# and nobody new comes in meanwhile (a reconnect would find it going).
@@ -18422,7 +18426,7 @@ func _notification(what: int) -> void:
 func _release_zones() -> void:
 	if _released:
 		return
-	_save_state()
+	_save_state(true, true)
 	_released = true
 	# Nothing runs from here (the sim, a host's views): they would reach for
 	# what is about to be freed.
