@@ -36575,6 +36575,13 @@ zoom in closer and tilt up a little more might be okay". The coordinator approve
 - **A click on the sky** under the low camera, once the flatter view shows more of it, lands at
   the NEAR_TILES edge in the cursor's direction (Client3D.sky_grid), where it used to hit nothing.
 
+- **Tall props fade on the line** (the coordinator, after the near stills showed Rolf's market
+  stall hiding the player whole at 12°): the placed pieces with no walls that stand over about
+  1.5 m, buildings' list as Level.FADES_ON_LINE (the stall, the well, cairns, standing stones,
+  waystones, the great tree, the tower ruin, the mound, the pillars, the forge, the weapon rack,
+  the throne; not the woodpile, the tables or chairs, nor the turf hut, whose walls fade as a
+  house's), join _occluders as trees do.
+
 Environment's sky and terrain's far landmarks read the live camera and needed no change for this
 (their notes: fog layers near the eye, weather haze close in, cloud tiling and the far meadow's fade
 line follow on their sides). Perf benches the nearest before it lands. Stills in

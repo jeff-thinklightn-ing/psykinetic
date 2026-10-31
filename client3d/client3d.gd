@@ -5971,7 +5971,7 @@ func _add_buildings() -> void:
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
-			"open_air": slot in Level.OPEN_AIR, "crop": "", "code": str(building.get("code", "")),
+			"open_air": slot in Level.OPEN_AIR, "fades": slot in Level.FADES_ON_LINE, "crop": "", "code": str(building.get("code", "")),
 			"hut": hut_id(building, str(_terrain.get("level", "")))})
 		# A banked one's inside (718) is its block, not its plot: its ring
 		# is its bank, its walls round the block.
@@ -13899,6 +13899,10 @@ func _index_occluders() -> void:
 		# An art-walled one's wall quarters (718) fade as walls do.
 		for quarter: Array in building.get("quarters", []):
 			_occluders.append([quarter[0], _bounds(quarter[0]), false, [quarter[0]]])
+		# A tall piece with no walls (a stall, a well, a standing stone) as a
+		# tree does (623 amended (2)).
+		if building.get("fades", false):
+			_occluders.append([building["node"], _bounds(building["node"]), true, [building["node"]]])
 	_occluder_chunks.clear()
 	_occluder_top = 0.0
 	for index in _occluders.size():

@@ -163,6 +163,14 @@ const ON_WATER: Array[String] = ["building.well"]
 ## floor cell with a piece on it, no wall round it; so is the dark tower's
 ## sealed hatch (659 amended), laid over the mine's sealed link.
 const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne", "building.hatch_sealed"]
+## The placed pieces with no walls of their own that stand taller than a
+## player's middle (about 1.5 m, by art-kit's drawn heights): on the line
+## from the camera to the player they fade as trees do (623 amended (2):
+## the low camera nearer and flatter, Rolf's stall hid the player whole).
+## Buildings' list; the low ones (a woodpile, a table, a chair) stay.
+const FADES_ON_LINE: Array[String] = ["building.market_stall", "building.well", "building.cairn", "building.standing_stone",
+	"building.waystone", "building.great_tree", "building.tower_ruin", "building.mound", "building.crypt_pillar",
+	"building.dark_pillar", "building.dwarven_forge", "building.weapon_rack", "building.throne"]
 ## A herder's fold (640), and how far from its holding's place cell it may
 ## stand (fold_near).
 const FOLD := "building.fold"

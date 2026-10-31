@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Camera: a market stall, a well, a standing stone or another tall piece between the camera and you turns see-through, as trees and walls do (623 amended (2)).
 - Camera: the wheel zooms in about twice as close outdoors, and the view tilts flatter as you zoom in (22° far out down to 12° nearest), showing more sky and horizon; a click on the sky walks you that way (623 amended (2)).
 - Quests: the fallen knight's quest shows as a list under the map, each robber checked off in green as you fell him, and "Return to the fallen knight." once all nine are down; his window's button reads his own words ("Prove your strength"), with no gold or strike line (747, ui's side).
 - The Mound-breakers' key now looks like a key: a small black-iron key with a ring bow and a toothed bit, in the pack, in hand and on the ground (art for 742 amended).

@@ -5334,6 +5334,20 @@ func _test_low_camera() -> void:
 	_check(_rig.within_near(near) == near and is_equal_approx(held.distance_to(aim), World.NEAR_TILES)
 			and is_equal_approx((held - aim).angle(), (far_off - aim).angle()),
 			"a far click lands NEAR_TILES out along its line; a near one where it is")
+	# 623 amended (2): a tall piece with no walls (Level.FADES_ON_LINE) fades on the line as a tree does.
+	var stall := MeshInstance3D.new()
+	stall.mesh = BoxMesh.new()
+	_rig._room.add_child(stall)
+	_rig._buildings.append({"rect": Rect2i(0, 0, 1, 1), "node": stall, "roof": null, "off": false, "fades": "building.market_stall" in Level.FADES_ON_LINE})
+	_rig._index_occluders()
+	_check(_rig._occluders.any(func(entry: Array) -> bool: return entry[0] == stall) and "building.woodpile" not in Level.FADES_ON_LINE,
+			"a market stall is one of the pieces that fade on the line to the player; a woodpile is not")
+	_rig._buildings.pop_back()
+	_rig._index_occluders()
+	_rig._hid_at.erase(stall)
+	_rig._faded.erase(stall)
+	_rig._fade_key = ""
+	stall.queue_free()
 	var sky: Vector2 = _rig.sky_grid(Vector3(0.6, 0.3, 0.8))
 	_check(is_equal_approx(sky.distance_to(aim), World.NEAR_TILES) and is_equal_approx((sky - aim).angle(), Vector2(0.6, 0.8).angle())
 			and is_nan(_rig.sky_grid(Vector3.UP).x),
