@@ -1730,13 +1730,23 @@ signal room_built
 var _build_generation := 0
 ## The grown trees' data, read in _phase_land, built in _phase_grown.
 var _grown_data := {}
-## Decision 660 step 2: the ground's fields on a worker (WorkerThreadPool's
-## task id, -1 none), its result; the ground's and cliffs' chunks still to
-## build after the card lifts ([member ground_filling] till the last), each
+## Decision 660 step 2: the ground's fields, and before them the curves
+## (_phase_edges_over_frames), on a worker (WorkerThreadPool's task id, -1
+## none), its result; the ground's and cliffs' chunks still to build after
+## the card lifts ([member ground_filling] till the last), each
 ## a [kind, chunk] job, kind "ground" or "cliff"; their shared starts; the
 ## chunks drawn, by chunk; rooms of earlier builds, freed a slice a frame.
 var _fields_task := -1
 var _fields_result := {}
+## The waters' and roads' near maps the edge's worker stamped for this
+## build's ground (_stamps_of), each taken once; {} stamped on the main thread.
+var _stamped := {}
+## Kept fields waiting their frame to be laid (_phase_ground_over_frames).
+var _fields_held := false
+## The curves' workers (_start_curves: a group task's id, -1 none) and
+## their results, one each.
+var _curves_task := -1
+var _curves_result: Array[Dictionary] = []
 var ground_filling := false
 ## Told when a crossing's ground and cliffs are all built (decision 660).
 signal room_filled
@@ -5038,6 +5048,7 @@ func _stair(cell: Vector2i) -> Vector2i:
 func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> void:
 	_build_generation += 1
 	_end_fields_task()
+	_stamped = {}
 	_shades_seeded = false
 	_fill_jobs.clear()
 	_fill_ground = {}
@@ -5144,12 +5155,17 @@ func _build_room_over_frames(generation: int) -> void:
 		if phase == _phase_ground:
 			if not await _phase_ground_over_frames(generation):
 				return
+		elif phase == _phase_edges:
+			if not await _phase_edges_over_frames(generation):
+				return
 		elif phase == _add_cliffs:
 			_fill_cliffs = _cliffs_start()
 			for chunk: Vector2i in _fill_cliffs["chunks"]:
 				_fill_jobs.append(["cliff", chunk])
 		else:
 			phase.call()
+			if phase == _phase_land:
+				_start_curves()
 		await get_tree().process_frame
 		if generation != _build_generation or not is_inside_tree():
 			return
@@ -5190,10 +5206,23 @@ func _phase_ground_over_frames(generation: int) -> bool:
 			return false
 		fields = result["fields"]
 		_keep_fields(key, fields)
+	else:
+		# Kept: the input and the fields' laying are a frame apart, as when
+		# the worker comes between (the terrain they read waits the frame).
+		_fields_held = true
+		await get_tree().process_frame
+		if generation != _build_generation or not is_inside_tree():
+			return false
+		_fields_held = false
 	_apply_ground_fields(fields)
 	fields_done.emit()
 	_fill_ground = _ground_meshes_start(fields)
-	_seed_shades()  # After the start, which makes the indoor shade image.
+	# The shades a frame on (80 ms on the wilds); after the start, which
+	# makes the indoor shade image.
+	await get_tree().process_frame
+	if generation != _build_generation or not is_inside_tree():
+		return false
+	_seed_shades()
 	for chunk: Vector2i in fields["chunks"]:
 		_fill_jobs.append(["ground", chunk])
 	ground_filling = true  # The shade waits from here: the lights' phase asks for it.
@@ -5259,15 +5288,20 @@ static func _fields_copy(fields: Dictionary) -> Dictionary:
 ## Waits for a running fields task (a rebuild, the view leaving): it reads
 ## the members the next build remakes.
 func _end_fields_task() -> void:
+	_fields_held = false
+	if _curves_task != -1:
+		WorkerThreadPool.wait_for_group_task_completion(_curves_task)
+		_curves_task = -1
 	if _fields_task != -1:
 		WorkerThreadPool.wait_for_task_completion(_fields_task)
 		_fields_task = -1
 
 
-## Whether the ground's fields are being worked out on a worker: the terrain
-## they read waits (Main holds a clearing till fields_done).
+## Whether the curves or the ground's fields are being worked out on a
+## worker, or kept fields wait a frame to be laid: the terrain they read
+## waits (Main holds a clearing till fields_done).
 func fields_running() -> bool:
-	return _fields_task != -1
+	return _fields_task != -1 or _curves_task != -1 or _fields_held
 
 
 func _exit_tree() -> void:
@@ -5604,6 +5638,74 @@ func _phase_reach() -> void:
 ## The forest's edge as curves, then what reads the land's whole.
 func _phase_edges() -> void:
 	_read_edges()
+	_edges_read()
+
+
+## Over frames (decision 660), from the land's phase on: on two workers
+## while the reach's phase and the frames go round, the edge's curves round
+## the wooded land, and the waters' and roads' near maps for the ground's
+## phase (_stamped); each into its own of [member _curves_result].
+func _start_curves() -> void:
+	var wooded := _wooded if _outdoor else {}
+	var waters: Array = [] if _glimpse else _terrain.get("waters", [])
+	var roads: Array = [] if _glimpse else _terrain.get("roads", [])
+	var results: Array[Dictionary] = [{}, {}]
+	_curves_result = results
+	var work := func(i: int) -> void:
+		if i == 0:
+			results[0]["edges"] = _edges_of(wooded) if not wooded.is_empty() else {}
+		else:
+			results[1]["stamps"] = _stamps_of(waters, roads)
+	_curves_task = WorkerThreadPool.add_group_task(work, 2, 2, true, "curves")
+
+
+## _phase_edges over frames: the curves _start_curves began, waited for while
+## the frames go round. False when a newer rebuild took over.
+func _phase_edges_over_frames(generation: int) -> bool:
+	var task := _curves_task
+	while _curves_task == task and not WorkerThreadPool.is_group_task_completed(task):
+		await get_tree().process_frame
+	if _curves_task != task:
+		return false  # A newer rebuild waited for it and took over.
+	WorkerThreadPool.wait_for_group_task_completion(task)
+	_curves_task = -1
+	if generation != _build_generation or not is_inside_tree():
+		return false
+	_set_edges(_curves_result[0]["edges"] if _edges_wanted() else {})
+	_stamped = _curves_result[1]["stamps"]
+	_curves_result = []
+	_edges_read()
+	return true
+
+
+## The waters' and roads' near maps, stamped as _read_curves and _read_roads
+## stamp them (each curve of two points or more, in order): {waters: [near,
+## also], roads: [near, also]}. Reads nothing but its arguments (a worker's).
+func _stamps_of(waters: Array, roads: Array) -> Dictionary:
+	var water_near: Dictionary[Vector2i, Vector2i] = {}
+	var water_also: Dictionary[Vector2i, Array] = {}
+	var index := 0
+	for water: Dictionary in waters:
+		var curve: Dictionary = water["curve"]
+		if (curve["points"] as PackedVector2Array).size() < 2:
+			continue
+		var closed := bool(water.get("closed", false))
+		_stamp_near(curve, closed, index, water_near, water_also, not closed)
+		index += 1
+	var road_near: Dictionary[Vector2i, Vector2i] = {}
+	var road_also: Dictionary[Vector2i, Array] = {}
+	index = 0
+	for road: Dictionary in roads:
+		var curve: Dictionary = road["curve"]
+		if (curve["points"] as PackedVector2Array).size() < 2:
+			continue
+		_stamp_near(curve, false, index, road_near, road_also)
+		index += 1
+	return {"waters": [water_near, water_also], "roads": [road_near, road_also]}
+
+
+## What reads the land's whole, once the edge is read.
+func _edges_read() -> void:
 	_read_field()
 	_sight_key = Vector4.INF  # A new ground: ask again whether it hides the player.
 	_bed_levels.clear()
@@ -9540,6 +9642,8 @@ func _read_curves() -> void:
 	_curve_kept.clear()
 	if _glimpse:
 		return
+	var stamped: Array = _stamped.get("waters", [])
+	_stamped.erase("waters")
 	for w in (_terrain.get("waters", []) as Array).size():
 		var water: Dictionary = _terrain["waters"][w]
 		var curve: Dictionary = water["curve"]
@@ -9553,8 +9657,12 @@ func _read_curves() -> void:
 			# lays them: a stream stops at the river).
 			if (_grounds.has(cell) or _terrain_water_has(cell)) and not _curve_cells.has(cell):
 				_curve_cells[cell] = w
-		_stamp_near(curve, closed, _curve_waters.size(), _curve_near_sample, _curve_near_also, not closed)
+		if stamped.is_empty():
+			_stamp_near(curve, closed, _curve_waters.size(), _curve_near_sample, _curve_near_also, not closed)
 		_curve_waters.append({"curve": curve, "closed": closed, "profile": PackedFloat32Array(), "shoal": PackedFloat32Array()})
+	if not stamped.is_empty():
+		_curve_near_sample = stamped[0]
+		_curve_near_also = stamped[1]
 	# Ponds inside their closed curve: every cell inside reads its curve too.
 	for w in _curve_waters.size():
 		if not _curve_waters[w]["closed"]:
@@ -10029,13 +10137,35 @@ func _build_curve_ribbon(w: int) -> void:
 ## Traced here: an authored forest's shape would be maps' "forests" curves
 ## in level.json later, read here the same way.
 func _read_edges() -> void:
-	_edge_curves.clear()
-	_edge_near_sample.clear()
-	_edge_near_also.clear()
+	_set_edges(_edges_of(_wooded) if _edges_wanted() else {})
+
+
+## Whether this build's forest has an edge to read.
+func _edges_wanted() -> bool:
+	return _outdoor and not _wooded.is_empty() and not _forest_distance.is_empty()
+
+
+## The edge's curves and the cells near them, from _edges_of; {} none.
+func _set_edges(edges: Dictionary) -> void:
 	_edge_kept.clear()
-	if not _outdoor or _wooded.is_empty() or _forest_distance.is_empty():
+	if edges.is_empty():
+		_edge_curves.clear()
+		_edge_near_sample.clear()
+		_edge_near_also.clear()
 		return
-	for loop: PackedVector2Array in _outline_loops(_wooded):
+	_edge_curves = edges["curves"]
+	_edge_near_sample = edges["near"]
+	_edge_near_also = edges["also"]
+
+
+## The forest's edge round [param wooded] as curves, and the cells near them
+## (_stamp_near's): {curves, near, also}. Reads nothing but its argument, so
+## under the card it runs on a worker (decision 660; 250 ms on the wilds).
+func _edges_of(wooded: Dictionary) -> Dictionary:
+	var curves: Array[Dictionary] = []
+	var near: Dictionary[Vector2i, Vector2i] = {}
+	var also: Dictionary[Vector2i, Array] = {}
+	for loop: PackedVector2Array in _outline_loops(wooded):
 		var simple := _simplify_loop(loop, EDGE_SIMPLIFY)
 		if simple.size() < 3:
 			continue
@@ -10058,8 +10188,9 @@ func _read_edges() -> void:
 		var curve := Curves.sample(moved, widths, true)
 		if (curve["points"] as PackedVector2Array).size() < 3:
 			continue
-		_stamp_near(curve, true, _edge_curves.size(), _edge_near_sample, _edge_near_also)
-		_edge_curves.append({"curve": curve, "closed": true})
+		_stamp_near(curve, true, curves.size(), near, also)
+		curves.append({"curve": curve, "closed": true})
+	return {"curves": curves, "near": near, "also": also}
 
 
 ## A cell's four sides, and the corner each starts at (from its middle),
@@ -10718,6 +10849,8 @@ func _read_roads() -> void:
 	_road_kept.clear()
 	if _glimpse:
 		return
+	var stamped: Array = _stamped.get("roads", [])
+	_stamped.erase("roads")
 	for road: Dictionary in _terrain.get("roads", []):
 		var curve: Dictionary = road["curve"]
 		if (curve["points"] as PackedVector2Array).size() < 2:
@@ -10725,8 +10858,12 @@ func _read_roads() -> void:
 		var index := _road_curves.size()
 		for cell: Vector2i in Curves.cells(curve, false):
 			_road_cells[cell] = index
-		_stamp_near(curve, false, index, _road_near_sample, _road_near_also)
+		if stamped.is_empty():
+			_stamp_near(curve, false, index, _road_near_sample, _road_near_also)
 		_road_curves.append({"curve": curve, "closed": false, "kind": str(road.get("kind", "dirt"))})
+	if not stamped.is_empty():
+		_road_near_sample = stamped[0]
+		_road_near_also = stamped[1]
 
 
 ## Where [param point] is to the nearest road's curve (563, terrain's side):

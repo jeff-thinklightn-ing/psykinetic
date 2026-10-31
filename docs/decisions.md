@@ -36506,3 +36506,34 @@ key's lock, locked without it, Brand's key, opened and used up, again
 empty with a key kept, saved. The key's art slot item.camp_key is a placeholder
 (art/kit/slots_items.json, status, docs/art_status.md regenerated);
 record_keys_test samples barrow_task.
+## 660 amended (4): the curves on workers under the card
+
+Perf's queue after 660 amended (3): the card's slow phases. Timed a phase
+at a time on the wilds (headless, repeat crossings), the worst frame under
+the card was 300-380 ms: the forest edge's curves (_read_edges, 250 ms,
+since 746's passes made _stamp_near dearer), then a frame holding the
+ground's input (the waters' and roads' near maps, 110 ms of 180) with the
+kept fields laid and the shades seeded (85 ms).
+- _start_curves, right after the land's phase: two workers (one group
+  task) work out the edge round the wooded land (_edges_of) and the
+  waters' and roads' near maps (_stamps_of), while the reach's phase and
+  the frames go round. Both read only what they are given (the wooded set
+  is new each build, never changed after; the terrain's curves are only
+  read) and write into their own result. The edge's phase waits for them
+  (_phase_edges_over_frames) and lays the edge; _read_curves and
+  _read_roads take the stamps (_stamped, each once) instead of stamping,
+  same curves in the same order, so the maps are the same.
+- The ground's phase: kept fields are laid a frame after the input, as
+  new ones are a worker's wait after; the shades are seeded a frame after
+  the meshes' start.
+- fields_running() is true through the curves' workers and the kept
+  fields' frame, so Main holds a clearing till fields_done as before; a
+  rebuild waits for the workers (_end_fields_task).
+- Built at once (setup, tests) nothing changes.
+The edges', waters', roads', ledges', border's and room's hashes (perf's
+probe) equal main's on the wilds, hills, held and foothills, and an
+over-frames build's equal the at-once build's. Worst frame under the card
+(headless, 3 rounds, main -> this): wilds 253-342 -> 120-122 ms, held
+115-124 -> 78-79, hills 79-85 -> 62-64; the card lifts as before, within
+noise. view_test passes. Client only, protocol unchanged, no new
+class_name.
