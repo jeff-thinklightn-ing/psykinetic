@@ -298,8 +298,8 @@ func _test_wheel_zoom() -> void:
 	_check(is_equal_approx(rig.zoom, Client3D.ZOOM_MAX) and is_equal_approx(Net.camera_zoom, Client3D.ZOOM_MAX) and is_equal_approx(rig.yaw, yaw)
 			and is_equal_approx(rig.pitch, pitch), "%s: a middle click leaves the zoom (and all else) as it was" % Net.controls)
 	_check(is_equal_approx(Net.saved_zoom("1.05", -1.0), 1.05) and is_equal_approx(Net.saved_zoom("2", -1.0), Client3D.ZOOM_MAX)
-			and is_equal_approx(Net.saved_zoom("0.6", -1.0), 0.6) and is_equal_approx(Net.saved_zoom("0.3", -1.0), Client3D.ZOOM_MIN) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
-			"a saved zoom loads held to 0.5..1.1; none keeps 1x")
+			and is_equal_approx(Net.saved_zoom("0.6", -1.0), 0.6) and is_equal_approx(Net.saved_zoom("0.3", -1.0), Client3D.LOW_ZOOM_MIN) and is_equal_approx(Net.saved_zoom("0.45", -1.0), 0.45) and is_equal_approx(Net.saved_zoom("", 1.0), 1.0),
+			"a saved zoom loads held to the low camera's nearest (0.4)..1.1; none keeps 1x")
 	Net.camera_zoom = 1.25
 	var again := _rig()
 	_free_rig(again)

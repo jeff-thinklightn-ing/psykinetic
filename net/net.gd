@@ -1244,7 +1244,7 @@ static func saved_yaw(text: String, otherwise: float) -> float:
 static func saved_zoom(text: String, otherwise: float) -> float:
 	if not text.strip_edges().is_valid_float():
 		return otherwise
-	return clampf(text.to_float(), Client3D.ZOOM_MIN, Client3D.ZOOM_MAX)
+	return clampf(text.to_float(), minf(Client3D.ZOOM_MIN, Client3D.LOW_ZOOM_MIN), Client3D.ZOOM_MAX)
 
 
 ## F11: borderless fullscreen at the monitor's native size, or back to the

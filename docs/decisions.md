@@ -36558,3 +36558,25 @@ green checks, a 'return to the fallen knight' line when ready".
 
 Tests: ui_test _test_quest_tracker, _test_deal_window. Client only; reads what rev 43 replicates, no protocol change of
 its own; new class_name QuestPanel.
+## 623 amended (2): the low camera nearer, and flatter as it nears
+
+Jeff on the low camera (by way of the coordinator, 2026-10-30): "for camera i actually want to
+zoom in closer and tilt up a little more might be okay". The coordinator approved the numbers.
+
+- **Nearer:** LOW_ZOOM_MIN 0.8 to 0.4, so the nearest is 8 units off with the player about a fifth
+  of the screen's height. A saved zoom now loads down to it (Net.saved_zoom), and the ortho camera
+  still holds its own ZOOM_MIN 0.5 (_apply_camera_mode).
+- **Flatter as it nears:** the low camera's normal pitch follows the eased wheel zoom
+  (Client3D.low_pitch_at): LOW_PITCH_NEAR 12° at LOW_ZOOM_MIN, LOW_PITCH 22° at ZOOM_MAX, straight
+  between (about 20.6° at the default 1.0, 17° at 0.6). _apply_size sets it while the camera rests
+  at the normal pitch; an ease under way reaches the live rest_pitch. Overhead (W), indoors,
+  the pitch peek, the aim and telegraph lifts and the ridge rule (525, still the higher of the two)
+  are as before.
+- **A click on the sky** under the low camera, once the flatter view shows more of it, lands at
+  the NEAR_TILES edge in the cursor's direction (Client3D.sky_grid), where it used to hit nothing.
+
+Environment's sky and terrain's far landmarks read the live camera and needed no change for this
+(their notes: fog layers near the eye, weather haze close in, cloud tiling and the far meadow's fade
+line follow on their sides). Perf benches the nearest before it lands. Stills in
+C:/dev/review/camera/. Tests: view_test _test_low_camera, controls_test (the saved zoom). Client
+only; protocol unchanged; no new class_name.

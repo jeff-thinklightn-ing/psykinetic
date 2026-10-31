@@ -5310,13 +5310,13 @@ func _test_low_camera() -> void:
 	_rig.rebuild(terrain, castle["centre"])
 	_check(_rig.low_camera() and _rig._camera.projection == Camera3D.PROJECTION_PERSPECTIVE
 			and is_equal_approx(_rig._camera.fov, Client3D.LOW_FOV) and is_equal_approx(_rig._camera.far, Client3D.LOW_FAR)
-			and is_equal_approx(_rig.pitch, Client3D.LOW_PITCH),
-			"the castle outdoors: perspective, LOW_FOV, LOW_FAR, LOW_PITCH (%s %.0f %.0f %.0f)" % [_rig._camera.projection, _rig._camera.fov, _rig._camera.far, _rig.pitch])
+			and is_equal_approx(_rig.pitch, Client3D.low_pitch_at(_rig.zoom)),
+			"the castle outdoors: perspective, LOW_FOV, LOW_FAR, the wheel's low pitch (%s %.0f %.0f %.0f)" % [_rig._camera.projection, _rig._camera.fov, _rig._camera.far, _rig.pitch])
 	_rig._ridge_pitch = 0.0  # The castle's ridge rule (525) lifts it otherwise; the flat's numbers here.
 	var offset: Vector3 = _rig._camera_offset()
 	_check(is_equal_approx(offset.length(), Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE)
-			and is_equal_approx(rad_to_deg(asin(offset.normalized().y)), Client3D.LOW_PITCH),
-			"half the distance off, LOW_PITCH above the ground (%.1f, %.1f)" % [offset.length(), rad_to_deg(asin(offset.normalized().y))])
+			and is_equal_approx(rad_to_deg(asin(offset.normalized().y)), Client3D.low_pitch_at(1.0)),
+			"half the distance off, the wheel's low pitch above the ground (%.1f, %.1f)" % [offset.length(), rad_to_deg(asin(offset.normalized().y))])
 	var look_fog: float = _rig.canopied_look(_rig.weathered_look(_rig.seasoned_look(_rig._look, Season.at(World.fields.region, DayNight.now())), _rig._weather_view.weather),
 			_rig._canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)["fog_density"]
 	_check(is_equal_approx(_rig._environment.fog_density, look_fog + Client3D.LOW_FOG)
@@ -5334,6 +5334,10 @@ func _test_low_camera() -> void:
 	_check(_rig.within_near(near) == near and is_equal_approx(held.distance_to(aim), World.NEAR_TILES)
 			and is_equal_approx((held - aim).angle(), (far_off - aim).angle()),
 			"a far click lands NEAR_TILES out along its line; a near one where it is")
+	var sky: Vector2 = _rig.sky_grid(Vector3(0.6, 0.3, 0.8))
+	_check(is_equal_approx(sky.distance_to(aim), World.NEAR_TILES) and is_equal_approx((sky - aim).angle(), Vector2(0.6, 0.8).angle())
+			and is_nan(_rig.sky_grid(Vector3.UP).x),
+			"a click on the sky lands at the NEAR_TILES edge the cursor's way (623 amended (2))")
 	# The bodies' slides under the low camera, and a body back from far off
 	# (623's hotfix, v0.1.169: the far block's restart lines had slipped
 	# under the low camera's, so a near body was caught up to its tile
@@ -5365,6 +5369,17 @@ func _test_low_camera() -> void:
 	_rig._apply_size()
 	var zoomed: Vector3 = _rig._camera_offset()
 	_check(is_equal_approx(zoomed.length(), Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * 0.9), "the wheel moves the camera nearer, not the (unused) ortho size")
+	# 623 amended (2): nearer is flatter, LOW_PITCH_NEAR at the nearest, LOW_PITCH at the farthest.
+	_rig.zoom = Client3D.LOW_ZOOM_MIN
+	_rig._apply_size()
+	var near_pitch: float = _rig.pitch
+	var near_off: float = _rig._camera_offset().length()
+	_rig.zoom = Client3D.ZOOM_MAX
+	_rig._apply_size()
+	_check(is_equal_approx(near_pitch, Client3D.LOW_PITCH_NEAR) and is_equal_approx(_rig.pitch, Client3D.LOW_PITCH)
+			and is_equal_approx(near_off, Client3D.CAMERA_DISTANCE * Client3D.LOW_DISTANCE_SHARE * Client3D.LOW_ZOOM_MIN)
+			and Client3D.low_pitch_at(0.6) > Client3D.LOW_PITCH_NEAR and Client3D.low_pitch_at(0.6) < Client3D.LOW_PITCH,
+			"the wheel tilts the low camera: %.0f° at %.1f units, %.0f° at the farthest (623 amended (2))" % [near_pitch, near_off, _rig.pitch])
 	_rig.zoom = 1.0
 	_rig._apply_size()
 	var height := _rig.get_viewport().get_visible_rect().size.y
@@ -5381,7 +5396,17 @@ func _test_low_camera() -> void:
 	_check(is_equal_approx(_rig.pitch, Client3D.OVERHEAD_PITCH), "W under the low camera: overhead too (671; %.0f)" % _rig.pitch)
 	_rig.set_overhead(false)
 	_rig._ease_tilt(10.0)
-	_check(is_equal_approx(_rig.pitch, Client3D.LOW_PITCH), "and S, back to LOW_PITCH (%.0f)" % _rig.pitch)
+	_check(is_equal_approx(_rig.pitch, Client3D.low_pitch_at(_rig.zoom)), "and S, back to the wheel's low pitch (%.0f)" % _rig.pitch)
+	_rig.zoom = Client3D.LOW_ZOOM_MIN
+	_rig._apply_size()
+	_check(is_equal_approx(_rig.pitch, Client3D.LOW_PITCH_NEAR), "and the wheel tilts it again from there (%.0f)" % _rig.pitch)
+	_rig.set_overhead(true)
+	_rig._ease_tilt(10.0)
+	_rig.zoom = 1.0
+	_rig._apply_size()
+	_check(is_equal_approx(_rig.pitch, Client3D.OVERHEAD_PITCH), "overhead, the wheel leaves the pitch be (%.0f)" % _rig.pitch)
+	_rig.set_overhead(false)
+	_rig._ease_tilt(10.0)
 	_rig.indoor_view = true
 	_rig.inside_changed.emit(true, Rect2i(0, 0, 4, 4))
 	_rig._ease_tilt(1.0)

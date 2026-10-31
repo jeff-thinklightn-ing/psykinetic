@@ -459,6 +459,10 @@ const CAMERA_PITCH := 50.0
 ## past it lands at its edge on the way (within_near), the view's reach for
 ## shadows and puppets is held to it.
 const LOW_PITCH := 22.0
+## 623 amended (2) (Jeff: "zoom in closer and tilt up a little more"): the
+## low camera's pitch follows the wheel, LOW_PITCH at ZOOM_MAX down to
+## LOW_PITCH_NEAR at LOW_ZOOM_MIN, so close in it sees more sky (low_pitch_at).
+const LOW_PITCH_NEAR := 12.0
 const LOW_FOV := 50.0
 const LOW_DISTANCE_SHARE := 0.5
 const LOW_FAR := 300.0
@@ -594,9 +598,11 @@ const ORBIT_STEP := 45.0
 const ZOOM_STEP := 1.1
 ## 671 amended (Jeff: "zoom in a little more onto my character while in the
 ## clearings"): 0.5, from 0.8. The low camera's wheel moves the camera
-## itself nearer, so it keeps LOW_ZOOM_MIN, short of the trees and walls.
+## itself nearer, so it keeps LOW_ZOOM_MIN, short of the trees and walls
+## (0.4 since 623 amended (2): 8 units off, the player a fifth of the
+## screen's height; from 0.8).
 const ZOOM_MIN := 0.5
-const LOW_ZOOM_MIN := 0.8
+const LOW_ZOOM_MIN := 0.4
 ## ZOOM_MAX keeps the view's widest reach (_view_reach: about 19 to 22
 ## tiles, wide screens and a peek the most) within World.NEAR_TILES, so what
 ## is on screen thinks every tick (decision 238).
@@ -2523,7 +2529,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 		Net.camera_low_changed.connect(_on_camera_low_changed)
 	if not inside_changed.is_connected(_on_inside_changed):
 		inside_changed.connect(_on_inside_changed)
-	zoom = clampf(Net.camera_zoom, ZOOM_MIN, ZOOM_MAX)
+	zoom = clampf(Net.camera_zoom, minf(ZOOM_MIN, LOW_ZOOM_MIN), ZOOM_MAX)  # _apply_camera_mode holds it to the camera's own.
 	_zoom_to = zoom
 	_apply_size()
 	_place_camera()
@@ -3009,9 +3015,16 @@ func _update_indoors() -> void:
 			_ease_pitch(inside_ease_seconds)
 
 
-## The normal pitch: LOW_PITCH under the low camera, CAMERA_PITCH else.
+## The normal pitch: under the low camera the wheel's (low_pitch_at),
+## CAMERA_PITCH else.
 func normal_pitch() -> float:
-	return LOW_PITCH if _low else CAMERA_PITCH
+	return low_pitch_at(zoom) if _low else CAMERA_PITCH
+
+
+## The low camera's pitch at wheel zoom [param at] (623 amended (2)):
+## LOW_PITCH_NEAR at LOW_ZOOM_MIN to LOW_PITCH at ZOOM_MAX, straight between.
+static func low_pitch_at(at: float) -> float:
+	return lerpf(LOW_PITCH_NEAR, LOW_PITCH, clampf((at - LOW_ZOOM_MIN) / (ZOOM_MAX - LOW_ZOOM_MIN), 0.0, 1.0))
 
 
 ## The camera's distance from its target: CAMERA_DISTANCE; under the low
@@ -3034,6 +3047,9 @@ func _apply_camera_mode() -> void:
 	if low and _zoom_to < LOW_ZOOM_MIN:
 		zoom = LOW_ZOOM_MIN  # The low camera keeps its own nearest (671 amended).
 		_zoom_to = LOW_ZOOM_MIN
+	elif not low and _zoom_to < ZOOM_MIN:
+		zoom = ZOOM_MIN  # The ortho view's nearest; the low camera's is nearer (623 amended (2)).
+		_zoom_to = ZOOM_MIN
 	if low:
 		_camera.projection = Camera3D.PROJECTION_PERSPECTIVE
 		_camera.fov = LOW_FOV
@@ -3262,6 +3278,11 @@ func _local_player() -> Player:
 func _apply_size() -> void:
 	_camera.size = CAMERA_SIZE * _size_factor()
 	if _low:
+		# The wheel tilts it too (623 amended (2)), when it rests at the
+		# normal pitch: not mid-ease (that eases to the live rest_pitch), in
+		# a peek, overhead or tipped indoors.
+		if not _peeking and _peek <= 0.0 and _tilt_t >= 1.0 and rest_pitch() == normal_pitch():
+			pitch = normal_pitch()
 		_place_camera()  # The wheel, a peek and the pull-back move the camera instead.
 
 
@@ -3662,7 +3683,18 @@ func mouse_grid() -> Vector2:
 	var hit := _mouse_ground()
 	if _low and not is_nan(hit.x):
 		return within_near(hit)
+	if _low:
+		return sky_grid(_mouse_ray()[1])
 	return hit
+
+
+## A click on the sky, the cursor's ray going [param toward] (623 amended
+## (2)): the NEAR_TILES edge that way from the camera's aim; NaN straight up.
+func sky_grid(toward: Vector3) -> Vector2:
+	var flat := Vector2(toward.x, toward.z)
+	if flat.length() < 0.0001:
+		return Vector2(NAN, NAN)
+	return within_near(Vector2(_camera_target.x, _camera_target.z) + flat.normalized() * (World.NEAR_TILES + 1.0))
 
 
 func _mouse_ground() -> Vector2:
