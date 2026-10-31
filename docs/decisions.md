@@ -36683,3 +36683,6 @@ passes godot_log_check. A 6 s clip recorded off-screen through clip.sh has
 60 distinct frames of 60 (an off-screen window has kept its first frame
 before).
 Tools only, protocol unchanged, no new class_name.
+## 744 amended, environment's side: the sky's clouds in fog
+
+The closer camera's shots (623 amended (2), environment's side; C:/dev/review/camera_weather) showed fog at 08:00 with crisp clouds over it in a blue sky while the sun, moon and stars hid. Approved by the coordinator (2026-10-31). In fog the clouds' colour is drawn toward the fog's and their cover thinned, both by SKY_CLOUD_FOG (0.85) at full fog (Client3D._set_sky_bodies): the weather's fog kind (0.9 fog, 0.5 cloud) leaves 0.12 of cover, in the fog's colour. view_test _test_sky: in fog the sky's clouds thin. Client only, protocol unchanged, no new class_name.

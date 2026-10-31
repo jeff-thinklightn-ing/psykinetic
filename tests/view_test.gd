@@ -5099,6 +5099,10 @@ func _test_sky() -> void:
 	show.call(0.0, "fog")
 	_check(float(sky.get_shader_parameter("stars")) < 0.2 and (sky.get_shader_parameter("moon_color") as Color).a < 0.2,
 			"in fog the stars and the moon are hidden")
+	show.call(12.0, "fog")
+	var foggy := float(sky.get_shader_parameter("cloud_cover"))
+	_check(foggy < float(Weather.KINDS["fog"]["cloud"]) * 0.5 or is_zero_approx(float(Weather.KINDS["fog"]["cloud"])),
+			"in fog the sky's clouds thin (%.2f of the weather's %.2f)" % [foggy, float(Weather.KINDS["fog"]["cloud"])])
 	show.call(12.0, "storm")
 	var dark: Color = sky.get_shader_parameter("cloud_color")
 	show.call(12.0, "overcast")

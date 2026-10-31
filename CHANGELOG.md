@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In fog the clouds in the sky fade into the fog instead of standing out crisp over it (744 amended, environment's side).
 - With the low camera zoomed right in, ground fog stays under the camera instead of hanging overhead, rain and fog no longer thicken as you zoom closer, and the clouds in the sky no longer repeat in a pattern (623 amended (2), environment's side).
 - Camera: a market stall, a well, a standing stone or another tall piece between the camera and you turns see-through, as trees and walls do (623 amended (2)).
 - Camera: under the low camera, tree crowns right beside the camera are hidden; they no longer show as pale ghostly peaks against the sky (623 amended (2)).

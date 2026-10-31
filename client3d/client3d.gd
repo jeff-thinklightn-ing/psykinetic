@@ -814,6 +814,10 @@ const STARS := 1.0
 ## they do; rain darkens it by SKY_CLOUD_RAIN.
 const SKY_CLOUD_SCALE := 4.0
 const SKY_CLOUD_HEIGHT := 120.0
+## In fog the sky's clouds fade into the fog's colour and thin, by
+## SKY_CLOUD_FOG at full fog, as the sun, moon and stars hide (744 amended,
+## environment's side): fog does not show a sky of crisp clouds over it.
+const SKY_CLOUD_FOG := 0.85
 const SKY_CLOUD_RAIN := 0.45
 ## Shadows are cast from a sun lifted toward the zenith (shadow_elevation):
 ## from SHADOW_LOW (degrees) at the horizon, so even the first and last
@@ -2833,9 +2837,10 @@ func _set_sky_bodies(look: Dictionary) -> void:
 	_sky_material.set_shader_parameter("stars", STARS * (1.0 - smoothstep(0.0, 0.3, _look_daylight)) * clear)
 	var rain := maxf(float(weather.get("rain", 0.0)), float(weather.get("snow", 0.0)) * 0.3)
 	var cloud := (look["top"] as Color).lerp(Color.WHITE, 0.55 * _look_daylight).lerp(look["fog"], 0.25) * (1.0 - SKY_CLOUD_RAIN * rain)
+	cloud = cloud.lerp(look["fog"], SKY_CLOUD_FOG * fog)
 	cloud.a = 1.0
 	_sky_material.set_shader_parameter("cloud_color", cloud)
-	_sky_material.set_shader_parameter("cloud_cover", float(weather.get("cloud", 0.0)))
+	_sky_material.set_shader_parameter("cloud_cover", float(weather.get("cloud", 0.0)) * (1.0 - SKY_CLOUD_FOG * fog))
 	_sky_material.set_shader_parameter("cloud_drift", _weather_view.drift())
 
 
