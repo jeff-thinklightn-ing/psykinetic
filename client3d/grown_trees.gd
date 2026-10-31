@@ -78,6 +78,7 @@ var _colours: Dictionary = {}
 var _material: ShaderMaterial
 var _see: ShaderMaterial
 var _see_colour: ShaderMaterial
+var _close := 0.0
 var _see_depth: ShaderMaterial
 var _shadow: StandardMaterial3D
 var _focus_chunk := Vector2i(1 << 30, 0)
@@ -270,6 +271,16 @@ func set_see(middle: float, force := false) -> void:
 	if wider:
 		for chunk: Vector2i in chunks:
 			_dress(chunk)
+
+
+## Under the low camera the see-through within [param metres] of the
+## camera fades on to Client3D.NEAR_CLOSE_ALPHA (623 amended (2)); 0 off.
+func set_close(metres: float) -> void:
+	if _see_colour == null or metres == _close:
+		return
+	_close = metres
+	_see_colour.set_shader_parameter("near_close", metres)
+	_see_colour.set_shader_parameter("near_close_alpha", Client3D.NEAR_CLOSE_ALPHA)
 
 
 ## [param chunk]'s pieces drawn with the see-through's passes if its middle

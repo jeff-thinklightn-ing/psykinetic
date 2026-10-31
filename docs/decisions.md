@@ -36582,6 +36582,12 @@ zoom in closer and tilt up a little more might be okay". The coordinator approve
   the throne; not the woodpile, the tables or chairs, nor the turf hut, whose walls fade as a
   house's), join _occluders as trees do.
 
+- **Nearer the camera, fainter** (the coordinator): under the low camera a faded tree or tall
+  piece within NEAR_CLOSE 4 m of the camera fades on to NEAR_CLOSE_ALPHA 0.1 (its meshes'
+  transparency over the NEAR_ALPHA copy; _close_pieces, _set_close), and a grown forest's
+  see-through likewise (season.gdshaderinc's near_close, GrownTrees.set_close), so crowns beside a
+  low camera do not spread over the view.
+
 Environment's sky and terrain's far landmarks read the live camera and needed no change for this
 (their notes: fog layers near the eye, weather haze close in, cloud tiling and the far meadow's fade
 line follow on their sides). Perf benches the nearest before it lands. Stills in

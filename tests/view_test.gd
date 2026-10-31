@@ -5342,10 +5342,22 @@ func _test_low_camera() -> void:
 	_rig._index_occluders()
 	_check(_rig._occluders.any(func(entry: Array) -> bool: return entry[0] == stall) and "building.woodpile" not in Level.FADES_ON_LINE,
 			"a market stall is one of the pieces that fade on the line to the player; a woodpile is not")
+	var faded_stall: Dictionary[Node3D, bool] = {stall: true}
+	var far_off_camera: bool = _rig._close_pieces(faded_stall).is_empty()
+	stall.global_position = _rig._camera.global_position + Vector3(2.0, -1.0, 0.0)
+	_rig._index_occluders()
+	var close: Dictionary = _rig._close_pieces(faded_stall)
+	_rig._set_close(stall, true)
+	var thinned := stall.transparency
+	_rig._set_close(stall, false)
+	_check(far_off_camera and close.has(stall) and is_equal_approx(thinned, 1.0 - Client3D.NEAR_CLOSE_ALPHA / Client3D.NEAR_ALPHA)
+			and is_zero_approx(stall.transparency),
+			"faded within NEAR_CLOSE of the low camera, it fades on to NEAR_CLOSE_ALPHA, and back (623 amended (2); %.2f)" % thinned)
 	_rig._buildings.pop_back()
 	_rig._index_occluders()
 	_rig._hid_at.erase(stall)
 	_rig._faded.erase(stall)
+	_rig._faded_close.erase(stall)
 	_rig._fade_key = ""
 	stall.queue_free()
 	var sky: Vector2 = _rig.sky_grid(Vector3(0.6, 0.3, 0.8))

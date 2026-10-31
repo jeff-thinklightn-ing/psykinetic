@@ -14,6 +14,12 @@ uniform bool vertex_srgb = true;
 uniform bool leaf = false;
 uniform float roughness = 0.9;
 uniform float alpha = 1.0;
+// SEE_THROUGH under the low camera (623 amended (2)): within near_close
+// metres of the camera, faded on to near_close_alpha (Client3D's
+// NEAR_CLOSE, NEAR_CLOSE_ALPHA), so the crowns beside a low camera are no
+// pale ghosts over the view; off at 0.
+uniform float near_close = 0.0;
+uniform float near_close_alpha = 0.1;
 // A ground texture tiled in world metres (a floor plane of any size: the
 // needles' floor, decision 423), world_tile metres a tile; off at 0.
 uniform sampler2D tile_texture : source_color, filter_linear_mipmap, repeat_enable;
@@ -103,6 +109,10 @@ void fragment() {
 	ALPHA = alpha;
 #endif
 #ifdef SEE_THROUGH
-	ALPHA = mix(1.0, alpha, see);
+	float faded = alpha;
+	if (near_close > 0.0) {
+		faded = mix(near_close_alpha, alpha, smoothstep(near_close * 0.75, near_close, distance(see_world, CAMERA_POSITION_WORLD)));
+	}
+	ALPHA = mix(1.0, faded, see);
 #endif
 }

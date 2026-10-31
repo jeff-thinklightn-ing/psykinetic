@@ -406,6 +406,13 @@ const STONE := Color("ebb48e")
 ## The 2D floor tile's colour (the box floor).
 const FLOOR := Color("4b7164")
 const NEAR_ALPHA := 0.3
+## Under the low camera a faded tree or tall piece (_occluders' tree kind)
+## within NEAR_CLOSE of the camera fades further, to NEAR_CLOSE_ALPHA, by
+## its meshes' own transparency over the see-through copy (623 amended (2):
+## the camera nearer and lower looks up into the crowns beside it, which at
+## NEAR_ALPHA spread over the view as pale ghosts).
+const NEAR_CLOSE := 4.0
+const NEAR_CLOSE_ALPHA := 0.1
 ## A near piece's mesh keeps its own material override under this meta
 ## while it is see-through.
 const OPAQUE_META := &"opaque_material"
@@ -2424,6 +2431,10 @@ var _faded: Dictionary[Node3D, bool] = {}
 var _hiding: Dictionary[Node3D, bool] = {}
 var _hid_at: Dictionary[Node3D, float] = {}
 var _fade_key := ""
+## The faded pieces within NEAR_CLOSE of the low camera (NEAR_CLOSE_ALPHA).
+var _faded_close: Dictionary[Node3D, bool] = {}
+## Each fading piece's entry in _occluders (_close_pieces).
+var _occluder_of: Dictionary[Node3D, int] = {}
 ## Seconds of frames drawn, for FADE_HOLD.
 var _fade_clock := 0.0
 
@@ -5146,6 +5157,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_occluders.clear()
 	_occluders_built = false
 	_faded.clear()
+	_faded_close.clear()
+	_occluder_of.clear()
 	_hiding.clear()
 	_hid_at.clear()
 	_fade_key = ""
@@ -13528,15 +13541,18 @@ func _update_fade(force := false) -> void:
 			now[piece] = true
 		else:
 			_hid_at.erase(piece)
-	if not force and not roofs_changed and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)):
+	var close := _close_pieces(now)
+	if not force and not roofs_changed and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)) 			and close.size() == _faded_close.size() and close.keys().all(func(piece: Node3D) -> bool: return _faded_close.has(piece)):
 		return
 	for entry in _occluders:
 		var piece: Node3D = entry[0]
 		var fade := now.has(piece)
-		if fade == _faded.has(piece) and not force:
-			continue
-		_set_near(piece, fade)
+		if fade != _faded.has(piece) or force:
+			_set_near(piece, fade)
+		if entry[2] and (close.has(piece) != _faded_close.has(piece) or force):
+			_set_close(piece, close.has(piece))
 	_faded = now
+	_faded_close = close
 	# A roof off draws nothing but its shadow, so the inside stays shaded.
 	for building in _buildings:
 		var roof: Node3D = building["roof"]
@@ -13546,6 +13562,31 @@ func _update_fade(force := false) -> void:
 		for node in _descendants(roof):
 			if node is GeometryInstance3D:
 				node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY
+
+
+## Of [param faded], the trees and tall pieces within NEAR_CLOSE of the
+## low camera (none under the ortho one).
+func _close_pieces(faded: Dictionary[Node3D, bool]) -> Dictionary[Node3D, bool]:
+	var out: Dictionary[Node3D, bool] = {}
+	if not _low or faded.is_empty():
+		return out
+	var eye := _camera.global_position
+	for piece: Node3D in faded:
+		var index: int = _occluder_of.get(piece, -1)
+		if index < 0 or not _occluders[index][2]:
+			continue
+		var bounds: AABB = _occluders[index][1]
+		if eye.clamp(bounds.position, bounds.end).distance_to(eye) <= NEAR_CLOSE:
+			out[piece] = true
+	return out
+
+
+## [param piece] faded on to NEAR_CLOSE_ALPHA ([param close]) or back to
+## NEAR_ALPHA: its meshes' transparency over the see-through copy.
+func _set_close(piece: Node3D, close: bool) -> void:
+	for node in _descendants(piece):
+		if node is GeometryInstance3D:
+			(node as GeometryInstance3D).transparency = 1.0 - NEAR_CLOSE_ALPHA / NEAR_ALPHA if close else 0.0
 
 
 ## The walls of the buildings [param points] are inside that face the
@@ -13815,6 +13856,7 @@ func _update_grown() -> void:
 		return
 	if _camera != null:
 		_grown.set_see(Net.see_through * _camera.size * 0.5)
+		_grown.set_close(NEAR_CLOSE if _low else 0.0)
 	var points := _focus_points()
 	_grown.set_focus(_room.to_local(points[0]) if not points.is_empty() else _camera_target, _camera_target)
 
@@ -13904,9 +13946,11 @@ func _index_occluders() -> void:
 		if building.get("fades", false):
 			_occluders.append([building["node"], _bounds(building["node"]), true, [building["node"]]])
 	_occluder_chunks.clear()
+	_occluder_of.clear()
 	_occluder_top = 0.0
 	for index in _occluders.size():
 		var bounds: AABB = _occluders[index][1]
+		_occluder_of[_occluders[index][0]] = index
 		_occluder_top = maxf(_occluder_top, bounds.end.y)
 		for x in range(floori(bounds.position.x / FADE_CHUNK), floori(bounds.end.x / FADE_CHUNK) + 1):
 			for z in range(floori(bounds.position.z / FADE_CHUNK), floori(bounds.end.z / FADE_CHUNK) + 1):
