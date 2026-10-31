@@ -36537,3 +36537,24 @@ over-frames build's equal the at-once build's. Worst frame under the card
 115-124 -> 78-79, hills 79-85 -> 62-64; the card lifts as before, within
 noise. view_test passes. Client only, protocol unchanged, no new
 class_name.
+
+## 747, ui's side: the quest tracker
+
+Dungeon's fallen knight's quest (747) puts the local player's quest on Player.quest ({} for none,
+else {title, giver, items: [{name, done}], ready}, replicated, rev 43). The coordinator: "nine names,
+green checks, a 'return to the fallen knight' line when ready".
+
+- **QuestPanel** (render/quest_panel.gd, a new class_name): a small card on the HUD at the right,
+  under the corner map (the hints have the top left), placed as the minimap scales. Its heading is
+  the quest's title, then one line a thing to do, a done one ticked (a drawn mark: the fonts have no ✓) in the theme's green
+  (friend), an open one a dot; once ready, "Return to <giver>." in brass.
+  Hidden with no quest. It reads Main's local player's quest each frame and redraws only when it
+  changes; nothing is sent.
+- **His offers in the deal window:** the knight's steps (ask, not yet, turn in) come as "deal"
+  offers with what.level "quest" and cost 0, which the window would have shown as the draugr's free
+  deal ("Face him again", a purse line, "Shift+click: strike"). DealPanel.is_quest: such a step is
+  one button with its own title (AstralKnight's ASK_TITLE and the rest), sending gold 0, with no
+  purse line and no strike line (he cannot be struck).
+
+Tests: ui_test _test_quest_tracker, _test_deal_window. Client only; reads what rev 43 replicates, no protocol change of
+its own; new class_name QuestPanel.

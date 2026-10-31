@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Quests: the fallen knight's quest shows as a list under the map, each robber checked off in green as you fell him, and "Return to the fallen knight." once all nine are down; his window's button reads his own words ("Prove your strength"), with no gold or strike line (747, ui's side).
 - The Mound-breakers' key now looks like a key: a small black-iron key with a ring bow and a toothed bit, in the pack, in hand and on the ground (art for 742 amended).
 
 - Crossing into a zone: the hitch behind the arrival card is shorter (the wilds' worst frame about 120 ms, was 300); the forest's edge and the water and road curves are worked out off the main thread.

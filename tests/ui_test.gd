@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_world_map()
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
 	await _test_deal_window()
+	await _test_quest_tracker()
 	_test_door_note()
 	_test_arrival_card()
 	_test_room_names()
@@ -805,6 +806,40 @@ func _test_down_screen() -> void:
 
 ## The town status sheet (624, ui's side): the words from today's keys, N
 ## and the map's row, Esc, economy's rows by key.
+## The quest tracker (747, ui's side): Player.quest as nine names, the done
+## ones checked in green, the way back once ready; hidden with no quest.
+func _test_quest_tracker() -> void:
+	print("== the quest tracker (747, ui's side): Player.quest's things, checked as done, the way back when ready ==")
+	var panel: QuestPanel = _main.quest_panel
+	_check(panel != null and panel.get_parent() == _main.get_node("HUD") and not panel.visible, "the tracker is on the HUD, hidden with no quest")
+	var own: Player = _main._local_player()
+	var was: Dictionary = own.quest
+	var items: Array = []
+	for i in 9:
+		items.append({"name": "Robber %d" % i, "done": i < 3})
+	own.quest = {"title": "Clear the barrow", "giver": "the fallen knight", "items": items, "ready": false}
+	await get_tree().process_frame
+	var rows := panel.rows()
+	_check(panel.visible and panel._title.text == "Clear the barrow" and rows.size() == 9
+			and rows[0][1].text == "Robber 0" and rows[0][0].done and rows[3][1].text == "Robber 3" and not rows[3][0].done
+			and rows[0][1].get_theme_color("font_color") == UiTheme.color("friend") and not panel._return.visible,
+			"the quest shown: its title, nine names, three checked in green, no way back yet")
+	for item: Dictionary in items:
+		item["done"] = true
+	own.quest = {"title": "Clear the barrow", "giver": "the fallen knight", "items": items, "ready": true}
+	await get_tree().process_frame
+	_check(panel.rows().all(func(row: Array) -> bool: return row[0].done)
+			and panel._return.visible and panel._return.text == "Return to the fallen knight.",
+			"all done: every name checked, \"Return to the fallen knight.\"")
+	var right := panel.get_viewport_rect().size.x
+	_check(panel.position.x + panel.size.x <= right and panel.position.y >= Minimap.CORNER_TOP + Minimap.CORNER_SIZE,
+			"it sits at the right, under the corner map (%s)" % panel.position)
+	own.quest = {}
+	await get_tree().process_frame
+	_check(not panel.visible, "the quest over: the tracker hides")
+	own.quest = was
+
+
 ## A talking monster's deals as buttons (629, ui's side).
 func _test_deal_window() -> void:
 	print("== a talking monster's deals as buttons (629, ui's side): E greets him, his offers open the window, a button sends the offer ==")
@@ -870,6 +905,18 @@ func _test_deal_window() -> void:
 	var again_no := panel._buttons.get_children()
 	_check(again_no.size() == 2 and (again_no[0] as Button).text == "Face him again" and (again_no[1] as Button).text == DealPanel.NO_WORDS,
 		"paid once: Face him again, then the no")
+	# 747, ui's side: the fallen knight's quest step, as AstralKnight.offers_for gives it.
+	var ask := {"id": "quest:9:ask", "kind": "deal", "title": AstralKnight.ASK_TITLE, "words": AstralKnight.ASK_WORDS,
+		"what": {"level": "quest", "steps": []}, "accept": "take", "cost": 0}
+	sent.clear()
+	panel.show_deals("the fallen knight", [ask], 0, 0)
+	var quest_buttons := panel._buttons.get_children()
+	(quest_buttons[0] as Button).pressed.emit()
+	_check(DealPanel.is_quest(ask) and quest_buttons.size() == 1 and (quest_buttons[0] as Button).text == AstralKnight.ASK_TITLE
+			and not quest_buttons[0].disabled and not panel._purse.visible and not panel._strike.visible and sent == [["quest:9:ask", 0]],
+		"the fallen knight's ask: one button, its title, no gold and no strike line, sending gold 0 (%s)" % [sent])
+	panel.show_deals("the draugr", [again[0], no], 0, 0)
+	_check(panel._purse.visible and panel._strike.visible, "the draugr again: the purse and strike lines back")
 	panel.show_deals("the draugr", [], 20, 0)
 	_check(not panel.visible and panel.entity_id == 0, "empty offers (a pact on): closed")
 	_main.escape()

@@ -700,6 +700,8 @@ var counter_panel: CounterPanel
 var pack_panel: PackPanel
 ## The map of the zone you are in: a corner one always, the big one on M (decision 321).
 var minimap: Minimap
+## The quest tracker (747, ui's side): the local player's Player.quest.
+var quest_panel: QuestPanel
 ## Items' icons for the pack panel (none drawn headless).
 var item_icons: ItemIcons
 ## An open shop's goods, and the player's gold over the pack (ShopPanel).
@@ -11278,6 +11280,11 @@ func _build_talk() -> void:
 	add_child(item_icons)
 	pack_panel.icons = item_icons
 	$HUD.add_child(pack_panel)
+	quest_panel = QuestPanel.new()
+	quest_panel.quest_of = func() -> Dictionary:
+		var own := _local_player()
+		return own.quest if own != null else {}
+	$HUD.add_child(quest_panel)
 	minimap = Minimap.new()
 	minimap.name = "Minimap"
 	minimap.marks = _minimap_marks

@@ -21,6 +21,9 @@ extends PanelContainer
 ## NO_WORDS, after the deal's, enabled whatever the purse, sending gold 0;
 ## alone when he offers nothing else a purse covers. The window says how
 ## to strike him (STRIKE_WORDS).
+## A quest's step (747, ui's side: the fallen knight's ask, not yet or
+## turn-in; what.level "quest", cost 0) is one button with its own title,
+## sending gold 0, with no purse line and no strike line.
 
 ## A button pressed: the deal's id and the gold it offers.
 signal offered(id: String, gold: int)
@@ -101,7 +104,10 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 		child.queue_free()
 	for step in steps_of(deal):
 		var button := Button.new()
-		button.text = (NO_WORDS if is_no(deal) else AGAIN_WORDS) if step == 0 else step_words(step)
+		if is_quest(deal):
+			button.text = str(deal.get("title", AGAIN_WORDS))
+		else:
+			button.text = (NO_WORDS if is_no(deal) else AGAIN_WORDS) if step == 0 else step_words(step)
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(_pressed.bind(str(deal.get("id", "")), step))
 		_buttons.add_child(button)
@@ -112,6 +118,9 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 		button.pressed.connect(_pressed.bind(str(refuse.get("id", "")), 0))
 		_buttons.add_child(button)
 	set_purse(gold)
+	# A quest's step (747) asks no gold, and he cannot be struck.
+	_purse.visible = not is_quest(deal)
+	_strike.visible = not is_quest(deal)
 	visible = true
 
 
@@ -158,6 +167,13 @@ static func no_deal(offers: Array) -> Dictionary:
 ## Whether [param deal] is his refusal: its id ends ":refuse".
 static func is_no(deal: Dictionary) -> bool:
 	return str(deal.get("id", "")).ends_with(":refuse")
+
+
+## Whether [param deal] is a quest's step (747, the fallen knight's: what.level
+## "quest", no gold): one button, its title, sending gold 0.
+static func is_quest(deal: Dictionary) -> bool:
+	var what: Variant = deal.get("what", {})
+	return what is Dictionary and str(what.get("level", "")) == "quest"
 
 
 ## [param deal]'s sums of gold, least first: its what.steps, else its cost;
