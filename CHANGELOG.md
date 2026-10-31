@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.194
+
+- What goes over the network changes, so v0.1.193 and older can't join the server: update through the launcher first.
 - In fog the clouds in the sky fade into the fog instead of standing out crisp over it (744 amended, environment's side).
 - With the low camera zoomed right in, ground fog stays under the camera instead of hanging overhead, rain and fog no longer thicken as you zoom closer, and the clouds in the sky no longer repeat in a pattern (623 amended (2), environment's side).
 - Camera: a market stall, a well, a standing stone or another tall piece between the camera and you turns see-through, as trees and walls do (623 amended (2)).
@@ -14,11 +17,11 @@ notes (decision 324).
 - Camera: the wheel zooms in about twice as close outdoors, and the view tilts flatter as you zoom in (22° far out down to 12° nearest), showing more sky and horizon; a click on the sky walks you that way (623 amended (2)).
 - Quests: the fallen knight's quest shows as a list under the map, each robber checked off in green as you fell him, and "Return to the fallen knight." once all nine are down; his window's button reads his own words ("Prove your strength"), with no gold or strike line (747, ui's side).
 - The Mound-breakers' key now looks like a key: a small black-iron key with a ring bow and a toothed bit, in the pack, in hand and on the ground (art for 742 amended).
-
 - Crossing into a zone: the hitch behind the arrival card is shorter (the wilds' worst frame about 120 ms, was 300); the forest's edge and the water and road curves are worked out off the main thread.
 - A fallen knight's ghost now waits in the barrow's Altar Room (747): he asks you to prove your strength by stopping the nine Mound-breakers, and a tracker checks off each one you or your companion kill; turn it in and he reveals the hidden way down to the Ossuary, which now opens only for those he has shown it to.
 - The fallen knight is drawn as a see-through ghost keeping a still vigil in the Altar Room, head bowed and a hand on his hilt (747).
 - The Robbers' Camp chest is locked (742): Brand the Ox drops its key to whoever fells him, and it opens once per player for 25 gold.
+
 ## v0.1.193
 
 - What goes over the network changes, so v0.1.192 and older can't join the server: update through the launcher first.
