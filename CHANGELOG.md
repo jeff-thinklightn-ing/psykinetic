@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The Mound-breakers' key now looks like a key: a small black-iron key with a ring bow and a toothed bit, in the pack, in hand and on the ground (art for 742 amended).
 
 - Crossing into a zone: the hitch behind the arrival card is shorter (the wilds' worst frame about 120 ms, was 300); the forest's edge and the water and road curves are worked out off the main thread.
 - A fallen knight's ghost now waits in the barrow's Altar Room (747): he asks you to prove your strength by stopping the nine Mound-breakers, and a tracker checks off each one you or your companion kill; turn it in and he reveals the hidden way down to the Ossuary, which now opens only for those he has shown it to.
