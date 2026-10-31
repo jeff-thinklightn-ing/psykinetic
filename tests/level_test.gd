@@ -2943,6 +2943,10 @@ func _test_barrow_quest() -> void:
 	var ids := func() -> Array: return knight.offers_for(id).map(func(offer: Dictionary) -> String: return str(offer["id"]).get_slice(":", 2))
 	_check(_main.barrow_quest_of(id) == "ask" and ids.call() == ["ask"] and player.quest.is_empty() and not _main.way_revealed(id, "barrow"),
 		"a stranger: his ask, no quest yet, the way not revealed (%s)" % [ids.call()])
+	var sir: String = _main.barrow_knight()
+	var asked := str(knight.offers_for(id)[0].get("words", ""))
+	_check(asked == (AstralKnight.ASK_UNNAMED if sir.is_empty() else AstralKnight.ASK_WORDS % sir),
+		"his ask names him, the generation's sepulcher knight (747 amended (2)): %s" % asked.get_slice(",", 0))
 	var slay := func(named: String, by: GridEntity) -> void:
 		var robber := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber", "name": "QuestRobber%d" % World.tick,
 			"tile": _main._nearest_free(player.tile + Vector2i(0, 2))}) as Monster

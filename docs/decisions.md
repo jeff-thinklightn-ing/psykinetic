@@ -36486,6 +36486,18 @@ _test_band (the knight in five generations), the barrow's first layer
 count, _test_hidden_niche (the lock kept) and _test_robbers_latch (the
 draft only with the flag).
 
+747 amended (2), dungeon's side (2026-10-31): his lines and the camp
+chest's are lore's, Jeff approved ("approve knight dialogue",
+decisions/knight-lines.md), in place of the placeholders. He is the
+generation's sepulcher knight: AstralKnight.ask_words names him
+(ASK_WORDS' %s is Main.barrow_knight, through Offers.ctx, as Aldous's
+relic line reads it), ASK_UNNAMED before barrow_deep's first generation.
+Not yet, the player's turn-in, the reveal (the niche, the Ossuary, the Hall
+of Fallen Souls, his remains to Aldous) and after; Main.CAMP_LOCKED and
+CAMP_EMPTY (742 amended). NOT_YET_TITLE kept, TURN_IN_TITLE "The robbers
+are put down" to match. level_test _test_barrow_quest checks the ask names
+him. Server only, protocol unchanged, no new class_name.
+
 ## 742 amended: the camp chest locked, Brand's key, once per player
 
 Jeff: "and the chest only opens with a key from the boss and only hold gold

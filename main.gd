@@ -15967,9 +15967,9 @@ func _camp_rules() -> Dictionary:
 	return rules if rules is Dictionary else {}
 
 
-## The camp chest's lines (742 amended; lore drafts them for Jeff).
-const CAMP_LOCKED := "Locked. Brand the Ox carries its key."
-const CAMP_EMPTY := "Empty. You have taken what the robbers hid here."
+## The camp chest's lines (742 amended; lore's, Jeff approved 2026-10-31).
+const CAMP_LOCKED := "Locked fast. The big one, Brand the Ox, wears its key."
+const CAMP_EMPTY := "Empty. You have taken what the Mound-breakers hid here."
 
 
 ## [param player] searches the robbers' camp chest [param chest] (742

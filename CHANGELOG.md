@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- The fallen knight in the barrow now speaks in his own words and names himself: he is that cycle's knight whose remains the draugr holds, and he asks you to bring them to Aldous. The robbers' camp chest has new lines too.
+
 ## v0.1.194
 
 - What goes over the network changes, so v0.1.193 and older can't join the server: update through the launcher first.
