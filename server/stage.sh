@@ -93,13 +93,14 @@ PINNED="$REPO/net/dtls/pinned.crt"
 BOX_CRT=/etc/psykinetic/dtls.crt
 test -s "$PINNED" || fail "the build pins no certificate ($PINNED)"
 test -r "$BOX_CRT" || fail "no $BOX_CRT on the box: run server/install_dtls.sh (sudo) first"
-box_fp="$(openssl x509 -in "$BOX_CRT" -noout -fingerprint -sha256)"
+box_fp="$(openssl x509 -in "$BOX_CRT" -noout -fingerprint -sha256 2>/dev/null)"
 pinned_fps="$(awk -v dir="$STAGE" '/BEGIN CERTIFICATE/ {n++} n {print > (dir "/pinned" n ".crt")}' "$PINNED"
-	for crt in "$STAGE"/pinned*.crt; do openssl x509 -in "$crt" -noout -fingerprint -sha256; done)"
-printf '%s\n' "$pinned_fps" | grep -qxF "$box_fp" || fail "the box's DTLS certificate is not one the build pins (net/dtls/pinned.crt): players could not join"
-echo "stage: dtls: the box's certificate is pinned"
+	for crt in "$STAGE"/pinned*.crt; do openssl x509 -in "$crt" -noout -fingerprint -sha256 2>/dev/null; done)"
+# The fingerprints stay in variables: only whether they match is said.
+[ -n "$box_fp" ] && printf '%s\n' "$pinned_fps" | grep -qxF "$box_fp" || fail "dtls: pin doesn't match (the box's certificate is not in net/dtls/pinned.crt): players could not join"
+echo "stage: dtls: pin matches"
 openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 1 \
-	-subj /CN=psykinetic -keyout "$STAGE/dtls.key" -out "$STAGE/dtls.crt" >"$STAGE/openssl.log" 2>&1 \
+	-subj /CN=psykinetic -keyout "$STAGE/dtls.key" -out "$STAGE/dtls.crt" >/dev/null 2>&1 \
 	|| fail "openssl could not make the staged DTLS key"
 
 # 2. The new build on staging ports, with copies of the live world.
@@ -108,8 +109,9 @@ GAME_DATA="$STAGE/home/.local/share/godot/app_userdata/Psykinetic"
 mkdir -p "$GAME_DATA"
 cp -r "$LIVE_LEVELS" "$GAME_DATA/" 2>/dev/null || true
 TOKEN="stage-$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
-HOME="$STAGE/home" APPDATA="$STAGE/home" $SERVER_CMD --headless --server "--port=$PORT" "--admin-port=$ADMIN" "--status-port=$((PORT + 2))" \
-	"--state=$STAGE/world.json" "--token=$TOKEN" "--mind-log=$STAGE/mind.log" \
+# The token in the environment, never on argv (/proc/<pid>/cmdline; 690).
+PSYKINETIC_TOKEN="$TOKEN" HOME="$STAGE/home" APPDATA="$STAGE/home" $SERVER_CMD --headless --server "--port=$PORT" "--admin-port=$ADMIN" "--status-port=$((PORT + 2))" \
+	"--state=$STAGE/world.json" "--mind-log=$STAGE/mind.log" \
 	"--transcripts=$STAGE/transcripts" "--dtls-key=$STAGE/dtls.key" "--dtls-cert=$STAGE/dtls.crt" \
 	--test-exit-after=120 </dev/null >"$STAGE/server.log" 2>&1 &
 SERVER=$!
@@ -118,8 +120,8 @@ wait_for "$STAGE/server.log" "console on 127.0.0.1:$ADMIN" 10 || fail "the stage
 grep -qF "[net] DTLS on the game port" "$STAGE/server.log" || fail "the staged server is not under DTLS"
 
 # 3. A client joins, walks and reports.
-HOME="$STAGE/client" APPDATA="$STAGE/client" "$GODOT" --headless --path "$REPO" --client --address=127.0.0.1 "--port=$PORT" \
-	"--token=$TOKEN" --dtls=on "--dtls-trust=$STAGE/dtls.crt" --name=Stager --player-id=57a6e000-0000-4000-8000-000000000057 --test-move=0,1 \
+PSYKINETIC_TOKEN="$TOKEN" HOME="$STAGE/client" APPDATA="$STAGE/client" "$GODOT" --headless --path "$REPO" --client --address=127.0.0.1 "--port=$PORT" \
+	--dtls=on "--dtls-trust=$STAGE/dtls.crt" --name=Stager --player-id=57a6e000-0000-4000-8000-000000000057 --test-move=0,1 \
 	"--test-exit-on=$STAGE/client.done" --test-exit-after=90 </dev/null >"$STAGE/client.log" 2>&1 &
 CLIENT=$!
 wait_for "$STAGE/server.log" 'Stager \(57a6e000\) joined as Player' 60 || fail "the client was not given a player"
