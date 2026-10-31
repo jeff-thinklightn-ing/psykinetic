@@ -197,6 +197,25 @@
 			"type": "mesh",
 			"uses": "leather buckler (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.camp_key": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.12,
+				0.04,
+				0.03
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Mound-breakers' key (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.cloth_bolt": {
 			"budget": 500,
 			"category": "items",

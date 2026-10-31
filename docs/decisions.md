@@ -36424,3 +36424,85 @@ Tests: level_test (the castle's link to the foothills), relief_test (the wilds' 
 from_foothills), world_map_test (the wilds' way north to the foothills; the test room to the wilds
 through the castle and the foothills). A client cut with the server redeployed; protocol
 unchanged; no new class_name.
+
+## 747: the fallen knight's quest, and the way below revealed
+
+Jeff: "lets do a smaller encounter with a astral projection of a fallen
+knight in the altar room that gives the quest and tells you once you
+complete it hell reveal the way to the ossuary, he says he needs help but
+first prove your strength and stop the grave robbers and ill then give
+access to the crypt.. indtead of druagr giving the quest, then once thats
+done he tells you of the hall of fallen"; before it, "a quest progress
+list that tracks how many of the robbers have been slain ... checks each
+one with a green check box ... completion is a flag for each player".
+Coordinator-approved: own and own companion's kills only, none before the
+taking, a friend at your heel getting through the niche.
+
+The knight is AstralKnight (new class_name; extends Monster), kind
+"astral_knight" in monsters.json, a level entity of the barrow's Altar
+Room below the altar (38, 32: the legend's monster_astral_knight, kept by
+each generation with the altar anchor). He stands (no _sim_tick), talks
+as the draugr does (talks, peaceable, offers_for and accept_offer: Main's
+talking-monster path and ui's window) and is never hurt: his body is
+stone, not flesh (World.damage's is_breakable). Greeted with nothing to
+offer, he tells the way again (rest_words). The ghost look is the client's,
+keyed on the kind. The draugr is unchanged: his deals and Refuse.
+
+Where a player stands is Main.barrow_quest_of (World.barrow_quest): "" done,
+else "ask", "open" or "ready". His offer is that step's: quest:N:ask
+("Prove your strength"), quest:N:not_yet, quest:N:turn_in; none when done.
+Taking and turning in go through Main.barrow_quest_step
+(World.barrow_quest_step). The progress is PlayerRecord.barrow_task {taken,
+slain: [named ids]}, saved; a record from before 747 has none and loads as
+no quest. The quest's band is band_ids of economy's robbers barrow (714
+(4)'s nine). A named one felled (World.entity_died, _quest_credit) goes
+once on the list of the player who struck it last (Monster.struck_by), or
+of the keeper of the companion who did (_slayer_id), once the quest is
+taken; a rise or a new generation does not undo it. The tracker is
+Player.quest (replicated): {} or {title, giver ("the fallen knight"),
+items: [{name (NamedEnemy's), done}], ready}, refreshed on the join, the
+taking, each kill and the turn-in (Main._sync_quest); ui draws it.
+
+The turn-in sets the record's mark Main.QUEST_DONE ("barrow_quest"), the
+flag, and he says the reveal (the niche in the First Hall, the Hall of the
+Fallen below). Main.way_revealed(player id, zone): in economy's robbers
+barrow, the flag; elsewhere anyone's. The hidden niche gives
+(_on_niche_pressed) and its draft is felt (_tell_draft) only to a player
+it is revealed to, and for good; found, the door opens with its lock kept,
+so shut again it gives to no one else, and one following through while it
+stands open gets in. This replaces 714 (4)'s robbers latch as the niche's
+gate; the latch is still kept with the regen state. reset_barrow (quests
+reset all) clears the flag and the task.
+
+His lines (Prove your strength, not yet, the reveal, done) are
+placeholders in AstralKnight till lore's drafts are Jeff's; lore may make
+him the generation's sepulcher knight.
+
+Protocol revision 43: the new replicated Player.quest and the knight's
+offer ids. level_test _test_barrow_quest (him below the altar, unhurt, the
+ask, none before the taking, twice once, another's kill, saved and an old
+record, no early turn-in, all nine, the turn-in and the way, the reset),
+_test_band (the knight in five generations), the barrow's first layer
+count, _test_hidden_niche (the lock kept) and _test_robbers_latch (the
+draft only with the flag).
+
+## 742 amended: the camp chest locked, Brand's key, once per player
+
+Jeff: "and the chest only opens with a key from the boss and only hold gold
+once per player" (the boss: Brand the Ox, Jeff confirmed). economy.json
+robbers camp is {cache, gold 25, lock "robbers_camp"} (every_s gone). Each
+time Brand (Main.CAMP_KEY_FROM) falls, his slayer (_slayer_id: the player
+who struck him last, or the companion's keeper) gets a new camp_key
+(items.json: "Mound-breakers' key", "opens": "robbers_camp", one a slot) in
+their pack, at their feet when it is full (World.into_pack). Main._search_camp:
+opened before by this player (their record's caches, saved), "Empty. You
+have taken what the robbers hid here."; without a thing that opens its
+lock, "Locked. Brand the Ox carries its key."; else the key is used up and
+the gold goes to the purse, once for good. The unsaved _camp_taken is gone,
+so an opening under 742 is not counted: every player gets one. The lines
+are lore's to redraft. The key row is in the client's catalog: it rides
+the client cut with 747. level_test _test_camp_chest: the rule and the
+key's lock, locked without it, Brand's key, opened and used up, again
+empty with a key kept, saved. The key's art slot item.camp_key is a placeholder
+(art/kit/slots_items.json, status, docs/art_status.md regenerated);
+record_keys_test samples barrow_task.

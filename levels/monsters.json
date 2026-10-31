@@ -144,6 +144,11 @@
 		"aim_spread": 10,
 		"aim_hold_max": 25
 	},
+	"astral_knight": {"_": "747: the fallen knight's astral projection in the barrow's Altar Room; he gives the knight's quest and is never hurt (AstralKnight). The ghost look is keyed on this kind.",
+		"label": "Fallen knight", "script": "res://sim/astral_knight.gd",
+		"body": {"mass": 80.0, "move_ticks": 4.0, "max_hp": 10, "attack_damage": 0, "sight_range": 5},
+		"tactic": "plain", "idle": "guard", "opens_doors": false, "door_force": 0, "leash": 0,
+		"temperament": {"bold": 0, "cautious": 0, "cowardly": 0}, "fearless": true},
 	"draugr": {
 		"bound": true,
 		"label": "Draugr",

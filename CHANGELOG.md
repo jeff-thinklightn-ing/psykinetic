@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A fallen knight's ghost now waits in the barrow's Altar Room (747): he asks you to prove your strength by stopping the nine Mound-breakers, and a tracker checks off each one you or your companion kill; turn it in and he reveals the hidden way down to the Ossuary, which now opens only for those he has shown it to.
+- The Robbers' Camp chest is locked (742): Brand the Ox drops its key to whoever fells him, and it opens once per player for 25 gold.
 ## v0.1.193
 
 - What goes over the network changes, so v0.1.192 and older can't join the server: update through the launcher first.

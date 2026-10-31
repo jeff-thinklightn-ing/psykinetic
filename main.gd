@@ -1101,6 +1101,7 @@ func _go_online() -> void:
 		World.entity_died.connect(_on_entity_died)
 		World.entity_died.connect(_robber_fell)  # The grave robbers' gold (580, economy's side).
 		World.entity_died.connect(func(entity: GridEntity, _cause: StringName) -> void: _robber_gone(entity))  # 714: the robbers' clear.
+		World.entity_died.connect(_quest_credit)  # 747: a named robber felled, on its slayer's list.
 		World.entity_despawned.connect(_robber_gone)
 		World.entity_taken.connect(_on_entity_taken)
 		World.telegraph_started.connect(_tell_telegraph)  # Decision 602.
@@ -4143,6 +4144,8 @@ func _boot() -> void:
 	World.charges_in = charges_in_zone  # His level at a pact's start (573).
 	World.paid_deal = paid_deal_of  # A payer's deal kept till won (548 amended).
 	World.deal_paid = set_deal_paid
+	World.barrow_quest = barrow_quest_of  # 747: his barrow quest before his deals.
+	World.barrow_quest_step = barrow_quest_step
 	World.trophy_due = trophy_due  # A named one's trophy (the band, 714).
 	World.trophy_taken = trophy_taken
 	# The wildlife's herds (decision 367): counts on the world tick, bodies
@@ -5821,6 +5824,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	_peer_ids[peer] = id
 	migrate_totem(record)  # A count from before 573 amended onto the totem (items').
 	_sync_charges(record)
+	_sync_quest(record)
 	_living_came(player)
 	_fell_at.erase(peer)
 	print("[net] %s (%s) joined as %s at %s%s" % [
@@ -7991,6 +7995,10 @@ func reset_barrow(id: String) -> Array[String]:
 	if not record.barrow.is_empty():
 		record.barrow = {}
 		cleared.append("the deal won")
+	if mark_player(id, QUEST_DONE, false) or not record.barrow_task.is_empty():
+		record.barrow_task = {}
+		cleared.append("the fallen knight's quest")
+	_sync_quest(record)
 	var totem := World.totem_of(id)
 	if totem != 0 and World.totem_charges(totem) > 0:
 		World.items.set_charges(totem, 0)
@@ -8002,6 +8010,133 @@ func reset_barrow(id: String) -> Array[String]:
 		cleared.append("the draft felt")
 	_sync_charges(record)
 	return cleared
+
+
+# --- The fallen knight's quest (747) -------------------------------------------
+
+## The mark a player who turned in the fallen knight's quest carries: the
+## hidden way below is revealed to them for good (way_revealed; Jeff:
+## "completion is a flag for each player").
+const QUEST_DONE := "barrow_quest"
+const QUEST_TITLE := "Clear the barrow"
+const QUEST_GIVER := "the fallen knight"
+
+
+## Where [param player_id] stands in the fallen knight's quest
+## (World.barrow_quest, AstralKnight's): "" when done (or no record), else
+## "ask" (not taken), "open" or "ready" (every one of the band slain).
+func barrow_quest_of(player_id: String) -> String:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null or QUEST_DONE in record.marks:
+		return ""
+	if not bool(record.barrow_task.get("taken", false)):
+		return "ask"
+	return "ready" if _quest_left(record).is_empty() else "open"
+
+
+## The band's ids [param record]'s player has yet to slay.
+func _quest_left(record: PlayerRecord) -> Array:
+	var slain: Array = record.barrow_task.get("slain", [])
+	return _quest_band().filter(func(id: String) -> bool: return id not in slain)
+
+
+## The quest's band: the robbers' barrow's (band_ids of economy's robbers barrow).
+func _quest_band() -> Array:
+	if World.economy == null:
+		return []
+	return band_ids(str(World.economy.rules.get("robbers", {}).get("barrow", "")))
+
+
+## [param player_id]'s quest step (World.barrow_quest_step): "take" from
+## "ask" (the list starts empty: kills count from the taking), "turn_in"
+## from "ready" (the mark set, the task cleared). Whether it was taken.
+func barrow_quest_step(player_id: String, step: String) -> bool:
+	var record: PlayerRecord = _records.get(player_id)
+	var at := barrow_quest_of(player_id)
+	if record == null:
+		return false
+	if step == "take" and at == "ask":
+		record.barrow_task = {"taken": true, "slain": []}
+	elif step == "turn_in" and at == "ready":
+		mark_player(player_id, QUEST_DONE)
+		record.barrow_task = {}
+	else:
+		return false
+	_sync_quest(record)
+	return true
+
+
+## A named robber of the band felled (World.entity_died): on its slayer's
+## list once, the slayer the player who struck it last, or the keeper of
+## the companion who did (own and own companion's kills only); only once
+## the quest is taken. Brand's slayer gets his key too (742 amended).
+func _quest_credit(entity: GridEntity, _cause: StringName) -> void:
+	if not entity is Monster or (entity as Monster).named_id.is_empty():
+		return
+	var named := (entity as Monster).named_id
+	if named not in _quest_band():
+		return
+	var id := _slayer_id(entity as Monster)
+	if named == CAMP_KEY_FROM:
+		_give_camp_key(id, entity.tile)
+	var record: PlayerRecord = _records.get(id)
+	if record == null or barrow_quest_of(id) == "" or not bool(record.barrow_task.get("taken", false)):
+		return
+	var slain: Array = record.barrow_task.get("slain", [])
+	if named in slain:
+		return
+	slain.append(named)
+	record.barrow_task["slain"] = slain
+	_sync_quest(record)
+
+
+## The player id of who felled [param monster]: the player who struck it
+## last, or the keeper of the companion who did; "" for anyone else.
+func _slayer_id(monster: Monster) -> String:
+	var by: GridEntity = monster.struck_by
+	if by is Player and is_instance_valid(by):
+		return str(_peer_ids.get(by.owner_peer, Net.player_id if by.owner_peer == Net.local_id else ""))
+	if by is Companion and is_instance_valid(by):
+		return (by as Companion).keeper_id
+	return ""
+
+
+## The named one whose slayer gets the camp chest's key (742 amended; Jeff:
+## "the chest only opens with a key from the boss": Brand the Ox) and the key.
+const CAMP_KEY_FROM := "brand"
+const CAMP_KEY := "camp_key"
+
+
+## [param player_id]'s player, here, given the camp chest's key (CAMP_KEY,
+## minted where Brand fell, [param at]) in their pack (World.into_pack: at
+## their feet when it is full); nothing for no player here.
+func _give_camp_key(player_id: String, at: Vector2i) -> void:
+	var player: Player = _players.get(_peer_of(player_id))
+	if player_id.is_empty() or not is_instance_valid(player) or player.zone != World.zone.name:
+		return
+	var uid := World.items.mint(CAMP_KEY, "looted", "Brand the Ox", World.zone.name, at)
+	if World.into_pack(player, uid) >= 0:
+		party_log.add("%s takes the key from Brand's belt." % _display_name(player))
+	else:
+		party_log.add("Brand's key falls at %s's feet." % _display_name(player))
+
+
+## [param record]'s player, if in the game, given the quest they are on
+## (Player.quest, replicated, ui's tracker): {} when none is taken or it
+## is done.
+func _sync_quest(record: PlayerRecord) -> void:
+	var player: Player = _players.get(_peer_of(record.player_id))
+	if not is_instance_valid(player):
+		return
+	var quest := {}
+	if bool(record.barrow_task.get("taken", false)) and barrow_quest_of(record.player_id) != "":
+		var slain: Array = record.barrow_task.get("slain", [])
+		var items: Array = []
+		for id: String in _quest_band():
+			items.append({"name": str(NamedEnemy.def(id).get("name", id.capitalize())), "done": id in slain})
+		quest = {"title": QUEST_TITLE, "giver": QUEST_GIVER, "items": items, "ready": _quest_left(record).is_empty()}
+	if player.quest != quest:
+		player.quest = quest
 
 
 ## [param record]'s player, if in the game, told its charges and the most it
@@ -8105,18 +8240,20 @@ func hall_lair_rect(zone_name: String) -> Rect2i:
 
 ## Server: [param entity] pressed on a burial niche's edge (World.niche_pressed,
 ## 608: a step into it that the wall or the shut door refused). A player
-## on the hidden niche with its door still locked finds it: the lock
-## lifted, the door opened and said; any other niche, or the found door
-## shut again, "Only the dead lie here." once a stand (_told_niche).
+## on the hidden niche with its door still locked finds it, once the way
+## is revealed to them (747, way_revealed: the fallen knight's quest done):
+## the door opened and said, its lock kept, so it gives to them alone (and
+## to whoever follows them through while it stands open); any other niche,
+## or the way not theirs yet, "Only the dead lie here." once a stand
+## (_told_niche).
 func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 	if not entity is Player:
 		return
 	var peer: int = entity.owner_peer
 	var door := World.door_on(key)
-	if World.niche_edges.get(key, "") == "hidden" and door != null and door.lock == HIDDEN_LOCK and robbers_cleared(World.zone.name):
+	if World.niche_edges.get(key, "") == "hidden" and door != null and door.lock == HIDDEN_LOCK and not door.open 			and way_revealed(str(_peer_ids.get(peer, Net.player_id if peer == Net.local_id else "")), World.zone.name):
 		_told_niche.erase(peer)
-		World.hold_door(door, false, HIDDEN_LOCK)
-		door.open = true
+		door.open = true  # Its lock kept (747): shut again, it gives only to those it is revealed to.
 		World.halt(entity, World.tick + NICHE_FOUND_HOLD)
 		party_log.add("The slab swings aside: a stair goes down into the dark.")
 		print("[level] %s found the hidden door at %s in %s" % [_display_name(entity), Terrain.edge_cells(key)[0], World.zone.name])
@@ -8154,14 +8291,26 @@ func _tell_draft(player: Player, to: Vector2i) -> void:
 	if rect == Rect2i() or not rect.has_point(to):
 		return
 	var niche := World.hidden_niche()
-	if niche.is_empty() or niche["open"] or not robbers_cleared(World.zone.name):
-		return  # 714: the draft is felt once the robbers are down, the clue with the clear.
+	if niche.is_empty() or niche["open"] or not way_revealed(id, World.zone.name):
+		return  # 747: the draft is felt once the fallen knight has revealed the way.
 	var key := "%s@%s" % [id, World.zone.name]
 	var generation := generation_of(World.zone.name)
 	if _draft_told.get(key, -1) == generation:
 		return
 	_draft_told[key] = generation
 	Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You feel a cool draft coming from one of the niches."})
+
+
+## Whether the hidden way in [param zone_name] is revealed to [param
+## player_id] (747; Jeff: "stop the grave robbers and ill then give access
+## to the crypt"): in economy's robbers barrow only once they have turned
+## in the fallen knight's quest (the mark QUEST_DONE, kept for good); any
+## other zone's way is anyone's to find.
+func way_revealed(player_id: String, zone_name: String) -> bool:
+	if World.economy == null or zone_name != str(World.economy.rules.get("robbers", {}).get("barrow", "")):
+		return true
+	var record: PlayerRecord = _records.get(player_id)
+	return record != null and QUEST_DONE in record.marks
 
 
 ## Whether the robbers of [param zone_name] are down (714, dungeon's side
@@ -15804,35 +15953,51 @@ func search(player: Player, chest: Chest) -> bool:
 	return not found.is_empty()
 
 
-## The robbers' camp chest's rules (742): economy.json "robbers" "camp",
-## {cache, gold, every_s}; {} without them.
+## The robbers' camp chest's rules (742, amended): economy.json "robbers"
+## "camp", {cache, gold, lock}; {} without them.
 func _camp_rules() -> Dictionary:
 	var rules: Variant = Production.read_rules().get("robbers", {}).get("camp", {})
 	return rules if rules is Dictionary else {}
 
 
-## The World.tick each player last took the camp chest's gold (742), by
-## player id: not saved (a restart fills it again for everyone).
-var _camp_taken: Dictionary[String, int] = {}
+## The camp chest's lines (742 amended; lore drafts them for Jeff).
+const CAMP_LOCKED := "Locked. Brand the Ox carries its key."
+const CAMP_EMPTY := "Empty. You have taken what the robbers hid here."
 
 
-## [param player] searches the robbers' camp chest [param chest] (742; Jeff:
-## "have them respawn on a 5 min timer"): camp's gold straight into their
-## purse (World.add_gold), once each camp's every_s real seconds per player;
-## sooner, it is empty, and they are told how long. True if gold was found.
+## [param player] searches the robbers' camp chest [param chest] (742
+## amended; Jeff: "the chest only opens with a key from the boss and only
+## hold gold once per player"): once per player for good (their record's
+## caches, as any cache), and only with the key (a thing whose catalog
+## "opens" is camp's lock: Brand's, _give_camp_key), which it uses up;
+## camp's gold goes straight into their purse (World.add_gold). Without the
+## key it is locked; taken once, empty. True if gold was found.
 func _search_camp(player: Player, chest: Chest, camp: Dictionary, tell: Callable) -> bool:
 	var id := str(player.player_id)
-	var every := int(camp.get("every_s", 300)) * World.TICK_RATE
-	if _camp_taken.has(id) and World.tick - _camp_taken[id] < every:
-		var left := ceili(float(every - (World.tick - _camp_taken[id])) / World.TICK_RATE / 60.0)
-		tell.call("Empty. The robbers will fill it again (about %d min)." % maxi(left, 1))
+	var record: PlayerRecord = _records.get(id)
+	if chest.cache in record.caches:
+		tell.call(CAMP_EMPTY)
 		return false
+	var lock := str(camp.get("lock", "robbers_camp"))
+	var slot := -1
+	for i in player.slots.size():
+		if not player.slots[i].is_empty() and Items.opens_of(player.slots[i]) == lock:
+			slot = i
+			break
+	if slot < 0:
+		tell.call(CAMP_LOCKED)
+		return false
+	var slots := player.slots.duplicate()
+	var uids := World.slot_uids(player)
+	slots[slot] = ""
+	uids[slot] = 0
+	World.set_slots(player, slots, uids)  # The key used up in the lock.
+	record.caches.append(chest.cache)
 	var gold := int(camp.get("gold", 25))
-	_camp_taken[id] = World.tick
 	World.add_gold(id, gold, "the robbers' camp chest")
 	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
-	print("[cache] %s took %d gold from %s" % [player.name, gold, place])
-	tell.call("You find %d gold in %s." % [gold, place])
+	print("[cache] %s opened %s with Brand's key: %d gold" % [player.name, place, gold])
+	tell.call("Brand's key turns in the lock. You find %d gold in %s." % [gold, place])
 	return true
 
 

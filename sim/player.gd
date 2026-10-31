@@ -77,6 +77,10 @@ var led_to := ""
 ## the server sets both from their record; the client's pack line reads them.
 var charges := 0
 var charge_room := 0
+## The quest they are on (747, ui's tracker): {} for none, else {title,
+## giver, items: [{name, done}], ready}; the server sets it from their
+## record (Main._sync_quest).
+var quest: Dictionary = {}
 ## Mortally Wounded (Jeff's down screen): the heart while downed, in beats a
 ## minute (field rules' heart.beats: 120, 80, 40), 0 when not downed;
 ## replicated for the heartbeat and the hold's read. Server only: whether
@@ -124,6 +128,7 @@ func _init() -> void:
 	replicate("led_to")
 	replicate("charges")  # Decision 573: the resurrection charges, and the most they may hold.
 	replicate("charge_room")
+	replicate("quest")  # 747: the fallen knight's quest, for the tracker.
 	replicate("heart")  # Mortally Wounded: the heart while downed.
 	replicate("free_state")  # Decision 689: its free body's centre.
 

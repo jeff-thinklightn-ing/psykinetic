@@ -72,6 +72,11 @@ var care: Dictionary = {}
 ## Kept when the pact is lost, erased when he yields; the draugr reads and
 ## writes it through World.paid_deal and World.deal_paid (Main's).
 var paid_deals: Dictionary = {}
+## The fallen knight's quest (747; Jeff: "stop the grave robbers and ill
+## then give access to the crypt"): {taken (bool), slain (the named band's
+## ids this player has felled, each once)}; {} before any.
+## Turned in, it is the record's mark Main.QUEST_DONE and this is cleared.
+var barrow_task: Dictionary = {}
 ## The levels a paid deal may name (Draugr.SCALE's).
 const PAID_LEVELS: Array[String] = ["easy", "normal", "hard"]
 ## The tally toward that care (584 amended (2); the pack holds four and
@@ -131,6 +136,7 @@ func to_dict() -> Dictionary:
 		"care": care.duplicate(),
 		"care_given": care_given.duplicate(true),
 		"paid_deals": paid_deals.duplicate(true),
+		"barrow_task": barrow_task.duplicate(true),
 		"caches": caches.duplicate(),
 		"locker": {"slots": Array(locker_slots), "items": Array(locker_items)} if locker_slots.count("") < locker_slots.size() else {},
 		"former": former.duplicate(true),
@@ -183,6 +189,11 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 			var deal: Variant = paid[zone_name]
 			if deal is Dictionary and str(deal.get("level", "")) in PAID_LEVELS:
 				record.paid_deals[str(zone_name)] = {"level": str(deal["level"]), "paid_step": int(deal.get("paid_step", 0))}
+	var task: Variant = entry.get("barrow_task", {})  # A record from before 747 has none: no quest.
+	if task is Dictionary and not (task as Dictionary).is_empty():
+		var slain: Variant = task.get("slain", [])
+		record.barrow_task = {"taken": bool(task.get("taken", false)),
+			"slain": (slain as Array).map(func(id: Variant) -> String: return str(id)) if slain is Array else []}
 	var tallies: Variant = entry.get("care_given", {})
 	if tallies is Dictionary:
 		for place: Variant in tallies:

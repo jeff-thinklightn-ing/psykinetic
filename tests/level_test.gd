@@ -67,6 +67,7 @@ func _ready() -> void:
 	_test_double_doors()
 	_test_camp_chest()
 	_test_band()
+	_test_barrow_quest()
 	_test_decor()
 	_test_barrow_level()
 	_test_castle_halls_level()
@@ -2184,7 +2185,11 @@ func _test_robbers_latch() -> void:
 		"one come back after does not undo it, and a save keeps it")
 	_main._draft_told.erase("%s@lt_niche" % player.player_id)  # _test_hidden_niche's, told already this generation.
 	_main._tell_draft(player, Vector2i(3, 3))
-	_check(heard.has("You feel a cool draft coming from one of the niches."), "now the draft is felt (%s)" % [heard])
+	_check(not heard.has("You feel a cool draft coming from one of the niches.") and not _main.way_revealed(player.player_id, "lt_niche"),
+		"cleared, but the way is not revealed to them (747: the fallen knight's quest not done): no draft (%s)" % [heard])
+	_main.mark_player(player.player_id, Main.QUEST_DONE)
+	_main._tell_draft(player, Vector2i(3, 3))
+	_check(heard.has("You feel a cool draft coming from one of the niches."), "his quest done: now the draft is felt (%s)" % [heard])
 	_put(player, Vector2i(6, 1))
 	for i in 10:
 		_hold_free(player, Vector2(0, -1), 1)
@@ -2218,6 +2223,7 @@ func _test_robbers_latch() -> void:
 		and (Regen.states_from(JSON.parse_string(JSON.stringify(_main._regen)))["lt_niche"].get("robbers_fallen", []) as Array) == ["t1", "t2"],
 		"the other falls: each fallen once though the first stands again, and the fallen saved (%s)" % [_main._regen["lt_niche"]])
 	World.despawn(risen)
+	_main.mark_player(player.player_id, Main.QUEST_DONE, false)
 	Net.message_received.disconnect(hear)
 	World.economy.rules["robbers"] = rules
 	if kept == null:
@@ -2333,9 +2339,9 @@ func _test_hidden_niche() -> void:
 		_hold_free(player, Vector2(0, -1), 1)
 		if door.open:
 			break
-	_check(player.tile == Vector2i(6, 1) and door.open and door.lock.is_empty()
+	_check(player.tile == Vector2i(6, 1) and door.open and door.lock == "hidden_niche"
 		and _main.party_log.last(1) == ["The slab swings aside: a stair goes down into the dark."],
-		"pressing into the hidden niche finds it: the lock lifted, the door open, and said (%s)" % [_main.party_log.last(1)])
+		"pressing into the hidden niche finds it: the door open, its lock kept (747: shut, it gives only to those it is revealed to), and said (%s)" % [_main.party_log.last(1)])
 	_check(World.hidden_niche()["open"], "the marker says open")
 	# 608 amended (2): the finder stands while the slab gives way, pressing
 	# on or not; the stair behind is not taken through the shut slab.
@@ -2363,7 +2369,7 @@ func _test_hidden_niche() -> void:
 	World.link_bumped.disconnect(on_bump)
 	_check(World.free_body(player) and taken.is_empty() and door.open and player.tile == Vector2i(6, 1) and World.zone.name == "lt_niche",
 		"pressed with free walk on: the slab found, the stair behind it not taken through it (%s, %s)" % [taken, player.tile])
-	_check(door.open and door.lock.is_empty(), "the press found it again")
+	_check(door.open and door.lock == "hidden_niche", "the press found it again")
 	_hold_free(player, Vector2(0, 0), Main.NICHE_FOUND_HOLD)
 	# 608 amended: found, no draft, not even in a new generation; laid again
 	# with the door shut, it is felt again.
@@ -2435,9 +2441,9 @@ func _test_barrow_level() -> void:
 			if kind == "skeleton_guard" and marked:
 				guards_marked += 1
 	_check(kinds.get("skeleton_guard", 0) == 2 and kinds.get("draugr", 0) == 1 and kinds.get("altar", 0) == 1 and kinds.get("runner's pack", 0) == 1
-		and kinds.get("robbers' chest", 0) == 1
-		and barrow["places"].has("niche") and barrow["entities"].size() == 5 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
-		"the altar with its two guards, Pip's niche, the Runner's pack and the robbers' chest (742) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
+		and kinds.get("robbers' chest", 0) == 1 and kinds.get("astral_knight", 0) == 1
+		and barrow["places"].has("niche") and barrow["entities"].size() == 6 and deep["entities"].size() == 2 and kinds.get("chest", 0) == 1,
+		"the altar with its two guards and the fallen knight (747), Pip's niche, the Runner's pack and the robbers' chest (742) on the first layer, the draugr in his hall in the Ossuary and its chest by the throne (%s)" % [kinds])
 	_check(grave_marked.get("Altar", false) and grave_marked.get("Draugr", false) and not grave_marked.get("Runner's pack", true) and guards_marked == 2,
 		"grave_goods marks the altar, the guards and the draugr as grave goods, the runner's pack exempt (%s)" % [grave_marked])
 	_check(barrow["links"].size() == 2 and barrow["links"][0]["to_map"] == "wilds" and barrow["links"][1]["to_map"] == "barrow_deep" and barrow["links"][1]["to_spawn"] == "from_above"
@@ -2823,25 +2829,30 @@ func _test_band() -> void:
 		ids.sort()
 		if ids != want or named.get("brand") != "robber_brute" or named.values().count("robber") != 8:
 			wrong.append("g%d: %s" % [generation, named])
+		var knights := (level["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "astral_knight")
+		if knights.size() != 1:
+			wrong.append("g%d: %d fallen knights" % [generation, knights.size()])  # 747: he stays in the Altar Room.
 		if (level["warnings"] as Array).any(func(w: String) -> bool: return "names an entity" in w):
 			wrong.append("g%d warned: %s" % [generation, level["warnings"]])
-	_check(wrong.is_empty(), "five generations: the nine named, Brand the brute and eight robbers, each a spawn (%s)" % [wrong])
+	_check(wrong.is_empty(), "five generations: the nine named, Brand the brute and eight robbers, each a spawn, and the fallen knight (%s)" % [wrong])
 
 
-## 742 (Jeff: "have them respawn on a 5 min timer - the game is in
-## pre-alpha, there doesn't need to be enforce scarcity"): the barrow's camp
-## holds the robbers' chest, a cache whose search puts economy's camp gold
-## into the purse, once per player each every_s; sooner, empty.
+## 742, amended (Jeff: "the chest only opens with a key from the boss and
+## only hold gold once per player"): the barrow's camp holds the robbers'
+## chest; it opens only with Brand's key (given to his slayer, used up),
+## puts economy's camp gold into the purse once per player for good, then
+## is empty.
 func _test_camp_chest() -> void:
 	print("
-== the robbers' camp chest (742) ==")
+== the robbers' camp chest (742 amended): Brand's key, once per player ==")
 	var camp: Dictionary = _main._camp_rules()
 	var barrow := Level.load_level("barrow")
 	var placed := (barrow.get("entities", []) as Array).filter(func(spec: Dictionary) -> bool:
 		return spec.get("tile") == Vector2i(14, 43) and spec.get("props", {}).get("cache") == "robbers_camp")
-	_check(int(camp.get("gold", 0)) == 25 and int(camp.get("every_s", 0)) == 300 and camp.get("cache") == "robbers_camp" and placed.size() == 1
+	_check(int(camp.get("gold", 0)) == 25 and camp.get("lock") == "robbers_camp" and camp.get("cache") == "robbers_camp" and placed.size() == 1
+		and Items.opens_of(Main.CAMP_KEY) == "robbers_camp"
 		and not (barrow.get("warnings", []) as Array).any(func(w: String) -> bool: return "robbers_camp" in w),
-		"economy's camp rule (25 gold, 300 s) and the chest in the barrow's camp, its table known (%s)" % [camp])
+		"economy's camp rule (25 gold, Brand's key's lock), the key opens it, and the chest in the barrow's camp (%s)" % [camp])
 	var player := _player()
 	if player == null:
 		_check(false, "a player to search with")
@@ -2860,23 +2871,128 @@ func _test_camp_chest() -> void:
 		_check(false, "a camp chest spawned beside the player")
 		return
 	var id := str(player.player_id)
-	var had_taken: Variant = _main._camp_taken.get(id)
-	_main._camp_taken.erase(id)
+	var record: PlayerRecord = _main._records.get(id)
+	var caches_were := record.caches.duplicate()
+	record.caches.erase("robbers_camp")
 	var gold_was := World.gold_of(id)
+	_check(not _main.search(player, chest) and World.gold_of(id) == gold_was, "no key: locked, no gold (742 amended)")
+	# Brand felled by them: his key in their pack.
+	var brand := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber_brute", "name": "KeyBrand%d" % World.tick,
+		"tile": _main._nearest_free(player.tile + Vector2i(0, 2))}) as Monster
+	brand.named_id = Main.CAMP_KEY_FROM
+	brand.note_struck(player)
+	World.damage(brand, 9999)
+	var keys := func() -> int: return Array(player.slots).count(Main.CAMP_KEY)
+	_check(keys.call() == 1, "Brand felled by them: his key in their pack (%s)" % [player.slots])
 	var first: bool = _main.search(player, chest)
 	var after_first := World.gold_of(id)
-	var again: bool = _main.search(player, chest)
-	_check(first and after_first == gold_was + 25 and not again and World.gold_of(id) == after_first
-		and (chest.slots as Array).all(func(each: Variant) -> bool: return str(each).is_empty() or int(each) == 0),
-		"searched: 25 gold to the purse, nothing in its slots; at once again, empty (%d -> %d -> %d)" % [gold_was, after_first, World.gold_of(id)])
-	_main._camp_taken[id] -= 300 * World.TICK_RATE
-	_check(_main.search(player, chest) and World.gold_of(id) == after_first + 25, "five minutes on, full again: 25 more")
+	_check(first and after_first == gold_was + 25 and keys.call() == 0 and "robbers_camp" in record.caches,
+		"opened with his key: 25 gold to the purse, the key used up (%d -> %d)" % [gold_was, after_first])
+	var brand2 := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber_brute", "name": "KeyBrand%d" % World.tick,
+		"tile": _main._nearest_free(player.tile + Vector2i(0, 2))}) as Monster
+	brand2.named_id = Main.CAMP_KEY_FROM
+	brand2.note_struck(player)
+	World.damage(brand2, 9999)
+	_check(not _main.search(player, chest) and World.gold_of(id) == after_first and keys.call() == 1,
+		"once per player for good: with another key, empty, the key kept")
+	var rec2 := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check("robbers_camp" in rec2.caches, "the opening is saved with their record")
+	for slot in player.slots.size():
+		if player.slots[slot] == Main.CAMP_KEY:
+			var slots := player.slots.duplicate()
+			var uids := World.slot_uids(player)
+			slots[slot] = ""
+			uids[slot] = 0
+			World.set_slots(player, slots, uids)
 	World.add_gold(id, gold_was - World.gold_of(id), "test")
-	if had_taken == null:
-		_main._camp_taken.erase(id)
-	else:
-		_main._camp_taken[id] = had_taken
+	record.caches.assign(caches_were)
 	World.despawn(chest)
+
+
+## The fallen knight's quest (747; Jeff: "a astral projection of a fallen
+## knight in the altar room that gives the quest ... stop the grave robbers
+## and ill then give access to the crypt"): he stands in the barrow's Altar
+## Room and is never hurt; his ask, the nine named robbers on the taker's
+## list once each (own and own companion's kills, none before the taking),
+## the turn-in sets the flag and reveals the way; an old record loads as no
+## quest; the reset clears it.
+func _test_barrow_quest() -> void:
+	print("
+== the fallen knight's quest (747): his ask, the nine on the list, the turn-in, the way revealed ==")
+	var barrow := Level.load_level("barrow")
+	var knights := (barrow.get("entities", []) as Array).filter(func(spec: Dictionary) -> bool: return spec.get("kind") == "astral_knight")
+	_check(knights.size() == 1 and knights[0]["script"] == "res://sim/astral_knight.gd" and knights[0]["tile"] == Vector2i(38, 32),
+		"the barrow's Altar Room has the fallen knight, below the altar (%s)" % [knights.map(func(k: Dictionary) -> Variant: return k.get("tile"))])
+	var player := _player()
+	var id := player.player_id
+	var record: PlayerRecord = _main._records.get(id)
+	if record == null:
+		_check(false, "no record for the test player")
+		return
+	var kept := {"marks": record.marks.duplicate(), "task": record.barrow_task.duplicate(true)}
+	_main.mark_player(id, Main.QUEST_DONE, false)
+	record.barrow_task = {}
+	_main._sync_quest(record)
+	var band: Array = _main.band_ids("barrow")
+	var knight := _main._spawn({"script": "res://sim/astral_knight.gd", "shape": "capsule", "kind": "astral_knight", "name": "QuestKnight%d" % World.tick,
+		"tile": _main._nearest_free(player.tile + Vector2i(2, 0)), "props": Level.MONSTER_TYPES["astral_knight"].duplicate()}) as AstralKnight
+	var hp := knight.hp
+	World.damage(knight, 50, player)
+	_check(knight.spawned and knight.hp == hp and knight.talks and knight.peaceable and _main.talks_peaceably(knight),
+		"he talks peaceably and a blow passes through him (%d -> %d)" % [hp, knight.hp])
+	var ids := func() -> Array: return knight.offers_for(id).map(func(offer: Dictionary) -> String: return str(offer["id"]).get_slice(":", 2))
+	_check(_main.barrow_quest_of(id) == "ask" and ids.call() == ["ask"] and player.quest.is_empty() and not _main.way_revealed(id, "barrow"),
+		"a stranger: his ask, no quest yet, the way not revealed (%s)" % [ids.call()])
+	var slay := func(named: String, by: GridEntity) -> void:
+		var robber := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber", "name": "QuestRobber%d" % World.tick,
+			"tile": _main._nearest_free(player.tile + Vector2i(0, 2))}) as Monster
+		robber.named_id = named
+		if by != null:
+			robber.note_struck(by)
+		World.damage(robber, 999)
+	slay.call(band[1], player)
+	_check(record.barrow_task.is_empty(), "%s felled before the taking: not counted" % band[1])
+	var took: Dictionary = knight.accept_offer(player, {"id": "quest:%d:ask" % knight.id}, 0)
+	var items: Array = player.quest.get("items", [])
+	_check(took["ok"] and _main.barrow_quest_of(id) == "open" and ids.call() == ["not_yet"]
+		and player.quest.get("title") == Main.QUEST_TITLE and player.quest.get("giver") == "the fallen knight" and items.size() == 9
+		and items[0] == {"name": "Brand the Ox", "done": false} and not bool(player.quest.get("ready", true)),
+		"taken: open, \"not yet\"; the tracker's nine, none done (%s)" % [player.quest])
+	slay.call(band[1], player)
+	slay.call(band[1], player)
+	_check(record.barrow_task.get("slain") == [band[1]] and (player.quest["items"] as Array)[1]["done"] == true,
+		"%s felled twice (risen): on the list once, checked (%s)" % [band[1], record.barrow_task])
+	slay.call(band[2], null)
+	_check(not (band[2] in record.barrow_task.get("slain", [])), "a kill not theirs is not on their list")
+	var old := record.to_dict()
+	old.erase("barrow_task")
+	_check(PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict()))).barrow_task == record.barrow_task
+		and PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(old))).barrow_task.is_empty(),
+		"saved and loaded the same; a record saved before 747 loads as no quest")
+	_check(not knight.accept_offer(player, {"id": "quest:%d:turn_in" % knight.id}, 0)["ok"], "no turn-in before all nine")
+	for named: String in band:
+		if named != band[1]:
+			slay.call(named, player)
+	_check(_main.barrow_quest_of(id) == "ready" and ids.call() == ["turn_in"] and bool(player.quest.get("ready", false))
+		and (player.quest["items"] as Array).all(func(item: Dictionary) -> bool: return item["done"]),
+		"all nine: ready, the turn-in, every box checked")
+	var turned: Dictionary = knight.accept_offer(player, {"id": "quest:%d:turn_in" % knight.id}, 0)
+	_check(turned["ok"] and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty()
+		and _main.barrow_quest_of(id) == "" and ids.call().is_empty() and _main.way_revealed(id, "barrow"),
+		"turned in: the flag set, the tracker gone, nothing more offered, the way revealed to them")
+	_check(_main.reset_barrow(id).has("the fallen knight's quest") and _main.barrow_quest_of(id) == "ask" and not _main.way_revealed(id, "barrow"),
+		"the reset (quests reset all's reset_barrow): the flag cleared, his ask again")
+	World.despawn(knight)
+	for slot in player.slots.size():
+		if player.slots[slot] == Main.CAMP_KEY:  # Brand's, from the nine.
+			var slots := player.slots.duplicate()
+			var uids := World.slot_uids(player)
+			slots[slot] = ""
+			uids[slot] = 0
+			World.set_slots(player, slots, uids)
+	record.marks.assign(kept["marks"])
+	record.barrow_task = kept["task"]
+	_main._sync_quest(record)
 
 
 func _player() -> Player:

@@ -369,7 +369,8 @@
 		"monster_skeleton_guard": "#988c64",
 		"monster_robber": "#8a5a2a",
 		"monster_draugr": "#5a4636",
-		"monster_robber_brute": "#6e4420"
+		"monster_robber_brute": "#6e4420",
+		"monster_astral_knight": "#c8d8f0"
 	},
 	"respawn_s": {
 		"robber": 300,
