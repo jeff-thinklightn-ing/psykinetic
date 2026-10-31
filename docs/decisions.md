@@ -36643,3 +36643,33 @@ ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening
 - The sky's clouds (744): at 3 degrees the layer is some 2 km out and faded, at 7 to 13 degrees 500 to 1000 m out in full view, where its noise's 144 m tiling would repeat six times across the band. The shader samples the noise again, 2.37 times broader and turned, mixed in at 0.4, so the tiles do not line up. One more texture fetch (744's clouds measured nothing).
 
 weather_test _test_low_view: zoomed nearer than the rest the storm's haze no thicker, further out thinner; the eye well over the fog every layer shows; 1.7 m up the low layer whole, the middle fading, the top gone; back in ortho all shown. Shots at 22 and 12 degrees in clear, rain, fog and overcast in C:/dev/review/camera_weather. Client only, protocol unchanged, no new class_name.
+
+## 664 amended (2): a windowed Godot off the screen, checked
+
+The coordinator, 2026-10-31: terrain's windowed runs flashed onto Jeff's
+screen at 00:02. Their --position came after the first "--", where the
+engine leaves an option to the game, so the window opened where Windows put
+it. The rule (CLAUDE.md, "A shot run ... puts its window off-screen") was
+there; nothing checked it.
+- heavy_job run refuses a command line whose Godot (its own word, or under
+  timeout) is windowed, with no --headless before the first "--" after the
+  exe, unless --position and --audio-driver both come before it
+  (unseen_problem). Exit 2 before queueing, saying what is missing, whether
+  it came after the "--", and what to add: --position 4000,4000
+  --audio-driver Dummy right after the exe. heavy_job run --visible lets a
+  run through when Jeff asks to see it. A script the gate runs (bash x.sh)
+  is not looked into.
+- godot_log_check (land.sh's) reads the repo's launch lines for it too: a
+  windowed one names --position ("on screen (--headless or --position
+  4000,4000)"). clip.sh now opens at CLIP_POSITION (4000,4000 unless set)
+  and terrain_shots.ps1 at -Position (4000,4000); they were the two
+  windowed launchers with none. map_bench and the shot scenes are started
+  by the sessions' own lines, which the gate now reads.
+heavy_job_test: a headless line and map_bench as perf's benches start it
+pass; --position after the "--" is refused naming it and the fix; a bare
+windowed exe by a Windows path names both; a script passes; main refuses
+with exit 2 and takes --visible. Every launcher in tests/ and tools/
+passes godot_log_check. A 6 s clip recorded off-screen through clip.sh has
+60 distinct frames of 60 (an off-screen window has kept its first frame
+before).
+Tools only, protocol unchanged, no new class_name.

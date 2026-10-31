@@ -218,6 +218,24 @@ check("soak" in gate.kinds()["bench"]["excludes"], "a kinds.json from before the
 check("scene" in gate.kinds()["bench"]["excludes"], "and from a scene")
 os.remove(gate._path("kinds.json"))
 
+print("== a windowed Godot off-screen and silent, or refused (664 amended (2)) ==")
+G = "/c/Users/jequi/Godot/Godot_v4.7.2-stable_win64.exe"
+check(gate.unseen_problem(["/usr/bin/timeout", "900", G + "_console.exe", "--headless", "--path", ".", "--scene", "x.tscn"]) is None,
+    "a headless one passes")
+check(gate.unseen_problem(["/usr/bin/timeout", "400", G, "--log-file", "a.log", "--audio-driver", "Dummy", "--position", "4000,4000",
+    "--path", ".", "--scene", "res://tools/map_bench.tscn", "--", "--map=wilds"]) is None, "map_bench as perf's benches start it passes")
+why = gate.unseen_problem([G, "--audio-driver", "Dummy", "--path", ".", "--", "--position", "4000,4000", "--map=wilds"])
+check(why is not None and "--position" in why and "after it" in why and gate.OFF_SCREEN in why,
+    "--position after the first -- (terrain's, 00:02) is refused, saying what to add: %s" % why)
+why = gate.unseen_problem(["C:\\Users\\jequi\\Godot\\Godot_v4.7.2-stable_win64.exe", "--path", "."])
+check(why is not None and "--position or --audio-driver" in why, "a bare windowed one, a Windows path: both named (%s)" % why)
+check(gate.unseen_problem(["bash", "tools/clip.sh", "x", "out"]) is None, "a script is not looked into (godot_log_check reads the repo's)")
+check(gate.unseen_problem(["python", "-B", "tools/x.py", "--", "godot"]) is not None, "a Godot anywhere in the line is read")
+code = gate.main(["run", "perf", "scene", "--", G, "--path", "."])
+check(code == 2, "heavy_job run refuses it before queueing (exit %s)" % code)
+code = gate.main(["run", "perf", "scene", "--visible", "--", sys.executable, "-c", "pass"])
+check(code == 0, "--visible is taken as an option (exit %s)" % code)
+
 print("== going past a bench that waits on a suite (backfill, 394 amended (18)) ==")
 runs = {"suite": dict(table["suite"], runs_s=[450.0, 500.0, 460.0]), "suite_lean3": dict(table["suite_lean3"], runs_s=[1000.0]),
     "scene": dict(table["scene"], runs_s=[40.0, 70.0, 10.0]), "bench": dict(table["bench"], runs_s=[300.0])}

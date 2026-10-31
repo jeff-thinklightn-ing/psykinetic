@@ -12,6 +12,10 @@ play music on his speakers. --headless already means --audio-driver Dummy; a
 windowed run (a clip, a shot) passes --audio-driver Dummy itself. Sound's own
 capture runs name a real driver (--audio-driver WASAPI), which also passes.
 
+And off the screen (664 amended (2)): a windowed launch passes --position
+(4000,4000 unless the person running it asks to see it), or it opens on
+Jeff's screen while he works.
+
   python -B tools/godot_log_check.py      prints each line missing either, exit 1
 """
 import pathlib
@@ -42,7 +46,8 @@ def missing(path: pathlib.Path) -> list[str]:
 		if "--version" in line:
 			continue
 		lacks = [why for why, ok in (("no --log-file", "--log-file" in near),
-				("not silent (--headless or --audio-driver Dummy)", "--headless" in near or "--audio-driver" in near)) if not ok]
+				("not silent (--headless or --audio-driver Dummy)", "--headless" in near or "--audio-driver" in near),
+				("on screen (--headless or --position 4000,4000)", "--headless" in near or "--position" in near)) if not ok]
 		if lacks:
 			found.append("%s:%d: %s: %s" % (path.relative_to(ROOT).as_posix(), i + 1, ", ".join(lacks), line.strip()))
 	return found
@@ -57,7 +62,7 @@ def main() -> int:
 	for line in found:
 		print(line)
 	if found:
-		print("godot_log_check: %d Godot launch(es) without --log-file or silence (decision 664: give each its own log in build/logs; 664 amended: --headless or --audio-driver Dummy)" % len(found))
+		print("godot_log_check: %d Godot launch(es) without --log-file, silence or off-screen (decision 664: give each its own log in build/logs; 664 amended: --headless or --audio-driver Dummy; (2): --headless or --position 4000,4000)" % len(found))
 		return 1
 	return 0
 

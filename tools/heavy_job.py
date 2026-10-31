@@ -82,9 +82,11 @@ them elsewhere, as the test does): running/ and queue/ hold a file a job,
 kinds.json the estimates and caps (edit a kind's max_running there to
 tune it), heavy_jobs.log a line an event (`summary`).
 
-  heavy_job.py run <tree> <kind> [--expect MIN] -- <command...>
+  heavy_job.py run <tree> <kind> [--expect MIN] [--visible] -- <command...>
                                                    wait, run, release; the command's exit code (5: stopped,
-                                                   over its limit or hung; a long soak passes --expect MIN)
+                                                   over its limit or hung; a long soak passes --expect MIN);
+                                                   a windowed Godot in <command> runs off-screen and silent
+                                                   unless --visible (664 amended (2))
   heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap);
                                                    N a Windows process id (Git Bash: $(cat /proc/$$/winpid))
   heavy_job.py release <tree> <kind>               give back what take held
@@ -1092,6 +1094,35 @@ def _outer_run():
     return None
 
 
+# 664 amended (2): a windowed Godot opened on Jeff's screen (terrain's shots,
+# 2026-10-31 00:02: --position came after the first "--", where the engine
+# leaves it to the game). The options the engine reads are those before it.
+OFF_SCREEN = "--position 4000,4000 --audio-driver Dummy"
+
+
+def unseen_problem(command):
+    """Why a Godot started straight from [command] (its own words, or under
+    timeout) would show on the screen or play aloud: None when it is
+    headless, or its engine options (before the first "--" after it) carry
+    --position and --audio-driver. A script it runs is not looked into."""
+    for i, word in enumerate(command):
+        if not re.match(r"godot", os.path.basename(word.replace("\\", "/")), re.I):
+            continue
+        rest = command[i + 1:]
+        engine = rest[:rest.index("--")] if "--" in rest else rest
+        names = [option.split("=", 1)[0] for option in engine]
+        if "--headless" in names:
+            return None
+        lacks = [option for option in ("--position", "--audio-driver") if option not in names]
+        if not lacks:
+            return None
+        after = [option for option in lacks if option in [o.split("=", 1)[0] for o in rest]]
+        return "a windowed Godot without %s before the first \"--\"%s: add %s right after the Godot exe " \
+            "(or pass heavy_job run --visible when Jeff asks to see it)" % (" or ".join(lacks),
+            " (%s after it, where the engine ignores it)" % " and ".join(after) if after else "", OFF_SCREEN)
+    return None
+
+
 def run(tree, kind, command, expect_minutes=None):
     # A gated run inside another (frame_budget.ps1 under a bench script run
     # through the gate) would queue behind its own parent forever: the outer
@@ -1394,12 +1425,20 @@ def main(args):
             return 2
         options = args[3:args.index("--")]
         expect = None
+        visible = "--visible" in options
+        if visible:
+            options.remove("--visible")
         if options:
             if options[0] != "--expect" or len(options) != 2:
-                print("heavy_job: run <tree> <kind> [--expect MIN] -- <command...>", file=sys.stderr)
+                print("heavy_job: run <tree> <kind> [--expect MIN] [--visible] -- <command...>", file=sys.stderr)
                 return 2
             expect = float(options[1])
-        return run(args[1], args[2], args[args.index("--") + 1:], expect)
+        command = args[args.index("--") + 1:]
+        problem = None if visible else unseen_problem(command)
+        if problem is not None:
+            print("heavy_job: not run: %s (664 amended (2))" % problem, file=sys.stderr)
+            return 2
+        return run(args[1], args[2], command, expect)
     if command == "take":
         pid = int(args[args.index("--pid") + 1]) if "--pid" in args else None
         return take(args[1], args[2], pid)

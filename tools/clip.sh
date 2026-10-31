@@ -34,7 +34,8 @@ FRAMES="$(mktemp -d)"
 trap 'rm -rf "$FRAMES"' EXIT  # Frames are big: gone however this ends.
 mkdir -p "$FRAMES/appdata" "$(dirname "$OUT")"
 export APPDATA="$(cygpath -w "$FRAMES/appdata" 2>/dev/null || echo "$FRAMES/appdata")"
-"$GODOT" --log-file "$(godot_log clip)" --audio-driver Dummy --path . --resolution 1280x720 --write-movie "$FRAMES/frame.png" --fixed-fps "$FPS" --quit-after $((MAX * FPS)) \
+# Off Jeff's screen (664 amended (2)): CLIP_POSITION=0,0 when he asks to watch.
+"$GODOT" --log-file "$(godot_log clip)" --audio-driver Dummy --position "${CLIP_POSITION:-4000,4000}" --path . --resolution 1280x720 --write-movie "$FRAMES/frame.png" --fixed-fps "$FPS" --quit-after $((MAX * FPS)) \
 	--scene res://tools/clip.tscn -- "--scenario=$SCENARIO" "--clip-max-seconds=$MAX" "${EXTRA[@]}" </dev/null 2>&1 | grep "^\[clip\]\|ERROR" >"$OUT.log"
 # The movie maker writes the game's sound beside the frames (frame.wav): the
 # mp4 carries it (the gif can't).

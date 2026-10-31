@@ -5,13 +5,15 @@
 # settings file.
 #   tools/terrain_shots.ps1 -Out <dir> [-Tag before] [-Maps castle,wilds,sample] [-Seconds 8] [-Yaw 0]
 #     [-Extra "--test-move=4,5"]   more arguments for the game (e.g. walk somewhere first)
+#     [-Position 4000,4000]        the window's place: off Jeff's screen unless he asks to see (664 amended (2))
 param(
 	[Parameter(Mandatory = $true)][string]$Out,
 	[string]$Tag = "shot",
 	[string[]]$Maps = @("castle", "wilds", "sample"),
 	[int]$Seconds = 8,
 	[int]$Yaw = 0,
-	[string[]]$Extra = @()
+	[string[]]$Extra = @(),
+	[string]$Position = "4000,4000"
 )
 $ErrorActionPreference = "Stop"
 if (-not $env:GODOT_PATH) { throw "GODOT_PATH is not set" }
@@ -29,7 +31,7 @@ $port = 7700 + $offset
 foreach ($map in $Maps) {
 	$png = Join-Path (Resolve-Path $Out) "$map-$Tag.png"
 	$env:APPDATA = $appdata
-	& $env:GODOT_PATH --log-file (Get-GodotLog "terrain_shots_$map") --audio-driver Dummy --path $root --host --map=$map --port=$port --no-companions `
+	& $env:GODOT_PATH --log-file (Get-GodotLog "terrain_shots_$map") --audio-driver Dummy --position $Position --path $root --host --map=$map --port=$port --no-companions `
 		--settings=$settings --test-yaw=$Yaw --test-exit-after=$Seconds --screenshot=$png @Extra | Out-Null
 	Write-Output $png
 }
