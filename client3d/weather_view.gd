@@ -67,6 +67,12 @@ const LOW_DROPS := 1.5
 const LOW_FOG_WIDE := 3.0
 const LOW_FOG_AHEAD := 0.75
 const LOW_CLOUD_TILES := 9
+## Under the low camera zoomed in (623 amended (2), environment's side) the
+## eye is barely over the fog's layers (1.7 m at 8 off and 12 degrees): a
+## layer fades out as the eye comes within FOG_EYE_CLEAR (m) above it and is
+## gone at or over the eye, so the fog lies under the camera, never a
+## ceiling over it or a stripe seen edge on.
+const FOG_EYE_CLEAR := 1.0
 ## What drifts fog and clouds even in still air (m/s).
 const CALM_DRIFT := 0.4
 
@@ -81,6 +87,8 @@ uniform float layer = 0.0;
 // Faded to the rim under the low camera (rim 1), whole in ortho (0).
 uniform float rim = 0.0;
 uniform float half_size = 36.0;
+// How much of the layer shows for the eye's height over it (fog_eye_fade).
+uniform float shown = 1.0;
 
 varying vec3 world;
 varying vec2 local;
@@ -120,7 +128,7 @@ void fragment() {
 	float edge = mix(0.85, 0.15, amount);
 	ALBEDO = colour;
 	ALPHA = smoothstep(edge, edge + 0.25, wisp) * amount * 0.45;
-	ALPHA *= 1.0 - rim * smoothstep(0.6, 1.0, length(local) / half_size);
+	ALPHA *= (1.0 - rim * smoothstep(0.6, 1.0, length(local) / half_size)) * shown;
 }
 """
 
@@ -240,6 +248,12 @@ func set_view(is_low: bool, camera: Vector3, ahead: Vector2) -> void:
 	_clouds.size = Vector3(CLOUD_PERIOD * tiles, 40.0, CLOUD_PERIOD * tiles)
 
 
+## How much of a fog layer shows with the eye [param clearance] (m) over it
+## under the low camera: none at or under it, all from FOG_EYE_CLEAR up.
+static func fog_eye_fade(clearance: float) -> float:
+	return smoothstep(0.0, FOG_EYE_CLEAR, clearance)
+
+
 ## The season's land for terrain and scatter (Season.at's green, turn and
 ## snow), outdoors only.
 func set_season(season: Dictionary) -> void:
@@ -320,8 +334,11 @@ func place(target: Vector3, delta: float, fog_colour: Color, daylight: float, to
 	if low:
 		middle_at += Vector3(_ahead.x, 0.0, _ahead.y) * FOG_SIZE * LOW_FOG_AHEAD
 	for i in _fog.size():
-		_fog[i].visible = fog > 0.02
-		_fog[i].global_position = Vector3(middle_at.x, target.y + FOG_LAYERS[i], middle_at.z)
+		var height := target.y + FOG_LAYERS[i]
+		var shown := fog_eye_fade(_camera_at.y - height) if low else 1.0
+		_fog[i].visible = fog > 0.02 and shown > 0.01
+		_fog[i].global_position = Vector3(middle_at.x, height, middle_at.z)
+		_fog_material[i].set_shader_parameter("shown", shown)
 		_fog_material[i].set_shader_parameter("amount", fog)
 		_fog_material[i].set_shader_parameter("drift", _drift)
 		_fog_material[i].set_shader_parameter("colour", fog_colour)

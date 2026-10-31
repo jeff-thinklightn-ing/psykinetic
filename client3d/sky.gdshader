@@ -28,7 +28,8 @@ uniform vec3 moon_lit = vec3(1.0, 0.0, 0.0);
 uniform float moon_terminator = -1.0;
 uniform float stars = 0.0;
 
-// The clouds: the cover's noise (R, tiled), the period it tiles over and
+// The clouds: the cover's noise (R, tiled; sampled twice, the second
+// broader and turned, so the tiles don't line up), the period it tiles over and
 // the layer's height (m), the drift (m, the shadows' own), the cover
 // (0..1), their colour and how far the sun's colour lights their edges.
 uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable;
@@ -93,7 +94,11 @@ void sky() {
 		// at their edges toward the sun.
 		if (cloud_cover > 0.001) {
 			vec2 at = POSITION.xz + eye.xz * cloud_height / max(eye.y, 0.01);
-			float n = texture(cloud_noise, (at - cloud_drift) / cloud_period).r;
+			// A second look at the noise, broader and turned, so its tiling
+		// does not repeat across the band the near low camera shows.
+		vec2 drifted = at - cloud_drift;
+		vec2 turned = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * drifted;
+		float n = mix(texture(cloud_noise, drifted / cloud_period).r, texture(cloud_noise, turned / (cloud_period * 2.37)).r, 0.4);
 			float low = 1.0 - 1.1 * cloud_cover;
 			float cover = smoothstep(low, low + 0.17, n);
 			float far = smoothstep(0.0, 0.12, eye.y);

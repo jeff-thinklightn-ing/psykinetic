@@ -217,6 +217,8 @@ func _test_low_view() -> void:
 	# Through the weather's share alone, the aim as far off as ortho's.
 	_check(is_equal_approx((low - base - Client3D.LOW_FOG) * near, weather * Client3D.CAMERA_DISTANCE),
 			"under the low camera the storm's haze to the aim reads as ortho's (%.4f over %.0f, %.4f over %.0f)" % [low - base - Client3D.LOW_FOG, near, weather, Client3D.CAMERA_DISTANCE])
+	_check(is_equal_approx(Client3D.hazed_density(base, weather, true, 8.0), low) and Client3D.hazed_density(base, weather, true, near * 2.0) < low,
+			"zoomed in nearer than the rest, the storm's haze no thicker; further out, thinner")
 	var clear := Client3D.weathered_look(noon, Weather.KINDS["clear"])
 	_check(is_equal_approx(Client3D.hazed_density(clear["fog_density"], clear["fog_weather"], true, near), float(clear["fog_density"]) + Client3D.LOW_FOG),
 			"clear air: only the low camera's own haze added")
@@ -248,13 +250,21 @@ func _test_low_view() -> void:
 	_check(plane.x >= ortho_size.x * WeatherView.LOW_FOG_WIDE - 0.01 and fog_at.z < target.z - 10.0
 			and view._fog_material[0].get_shader_parameter("rim") == 1.0,
 			"the fog's layers %.0f m wide, ahead of the aim, faded to their rims" % plane.x)
+	_check(range(3).all(func(i: int) -> bool: return view._fog[i].visible and float(view._fog_material[i].get_shader_parameter("shown")) == 1.0),
+			"the eye well over the fog: every layer shows")
+	view.set_view(true, Vector3(100.0, 1.7, 120.0), Vector2(0.0, -1.0))
+	view.place(target, 0.1, Color.GRAY, 1.0, func(way: Vector3) -> Vector3: return way)
+	var shown: Array = range(3).map(func(i: int) -> float: return float(view._fog_material[i].get_shader_parameter("shown")) if view._fog[i].visible else 0.0)
+	_check(shown[0] == 1.0 and shown[1] > 0.5 and shown[1] < 1.0 and shown[2] == 0.0 and not view._fog[2].visible,
+			"the eye 1.7 m up: the low layer whole, the middle fading, the one over the eye gone (%s)" % [shown])
 	_check(view._clouds.size.x == WeatherView.CLOUD_PERIOD * WeatherView.LOW_CLOUD_TILES and (view._clouds.texture_albedo as ImageTexture).get_width() == 128 * WeatherView.LOW_CLOUD_TILES,
 			"the clouds' decal %.0f m wide" % view._clouds.size.x)
 	view.set_view(false, Vector3(100.0, 30.0, 130.0), Vector2(-0.7, -0.7))
 	view.place(target, 0.1, Color.GRAY, 1.0, func(way: Vector3) -> Vector3: return way)
 	_check(view._rain_process.emission_box_extents == ortho_box and rain.amount == ortho_drops and rain.global_basis.is_equal_approx(Basis.IDENTITY)
 			and (view._fog[0].mesh as PlaneMesh).size == ortho_size and view._fog_material[0].get_shader_parameter("rim") == 0.0
-			and view._fog[0].global_position.x == target.x and view._clouds.size == ortho_clouds and view._roofs.follow_camera_enabled,
+			and view._fog[0].global_position.x == target.x and view._clouds.size == ortho_clouds and view._roofs.follow_camera_enabled
+			and view._fog[2].visible and float(view._fog_material[2].get_shader_parameter("shown")) == 1.0,
 			"back in ortho, all as it was")
 	view.free()
 

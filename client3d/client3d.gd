@@ -2851,10 +2851,13 @@ static func moon_phase(steps: float) -> float:
 ## tuned for a camera CAMERA_DISTANCE off); under the [param low] camera
 ## [param distance] off, the weather's share scaled so the aim reads as in
 ## ortho (a storm then hides the hills) and LOW_FOG over it. Ortho: as ever.
+## Zoomed in nearer than the low camera's rest (CAMERA_DISTANCE *
+## LOW_DISTANCE_SHARE) the share stays the rest's (623 amended (2),
+## environment's side): coming closer never thickens the weather.
 static func hazed_density(base: float, weather: float, low: bool, distance: float) -> float:
 	if not low:
 		return base + weather
-	return base + weather * CAMERA_DISTANCE / maxf(distance, 1.0) + LOW_FOG
+	return base + weather * CAMERA_DISTANCE / maxf(distance, CAMERA_DISTANCE * LOW_DISTANCE_SHARE) + LOW_FOG
 
 
 ## The sky's horizon under the low camera (623, environment's side): the

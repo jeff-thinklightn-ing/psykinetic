@@ -36628,3 +36628,12 @@ side weights it and draws him.
 anim_rig_test _test_knight_vigil: the clip loops; his model stands it,
 has no fidgets and casts no shadow. Client only, protocol unchanged, no
 new class_name.
+## 623 amended (2), environment's side: the weather under the closer camera
+
+ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.
+
+- The fog's layers (WeatherView, FOG_LAYERS 0.35, 1.0, 1.9 m over the aim) with the eye 8 sin 12 = 1.7 m up: the top one would be a ceiling seen from below, the middle a stripe edge on. Under the low camera each layer fades out as the eye comes within FOG_EYE_CLEAR (1 m) over it (WeatherView.fog_eye_fade, the shader's `shown`) and is hidden at or above the eye: the fog lies under the camera. ui keeps its curve (no camera height floor); ortho as ever.
+- The haze (Client3D.hazed_density): the weather's share, scaled by CAMERA_DISTANCE over the camera's distance so the aim reads as in ortho, would have been 5 times ortho's at 8 off (2 at the rest), blanking the ground 30 to 40 m out in rain or fog as one zoomed in. The distance is taken no nearer than the rest's (CAMERA_DISTANCE * LOW_DISTANCE_SHARE): coming closer never thickens the weather. LOW_FOG unchanged.
+- The sky's clouds (744): at 3 degrees the layer is some 2 km out and faded, at 7 to 13 degrees 500 to 1000 m out in full view, where its noise's 144 m tiling would repeat six times across the band. The shader samples the noise again, 2.37 times broader and turned, mixed in at 0.4, so the tiles do not line up. One more texture fetch (744's clouds measured nothing).
+
+weather_test _test_low_view: zoomed nearer than the rest the storm's haze no thicker, further out thinner; the eye well over the fog every layer shows; 1.7 m up the low layer whole, the middle fading, the top gone; back in ortho all shown. Shots at 22 and 12 degrees in clear, rain, fog and overcast in C:/dev/review/camera_weather. Client only, protocol unchanged, no new class_name.
