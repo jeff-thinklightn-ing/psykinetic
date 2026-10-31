@@ -36537,6 +36537,12 @@ over-frames build's equal the at-once build's. Worst frame under the card
 115-124 -> 78-79, hills 79-85 -> 62-64; the card lifts as before, within
 noise. view_test passes. Client only, protocol unchanged, no new
 class_name.
+Fixed before it shipped (pc-character, 2026-10-30): indoors, _start_curves'
+wooded set was typed from _wooded, so its empty {} was a script error, no
+worker started and the room never drew (the barrow black but the HUD). It
+is untyped now, _wooded only outdoors; with no workers started the edge's
+phase reads the edge at once. view_test's _test_indoor_phased_build builds
+the barrow over frames against at once (it fails without the fix).
 
 ## 747, ui's side: the quest tracker
 

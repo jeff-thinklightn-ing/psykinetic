@@ -134,6 +134,7 @@ func _ready() -> void:
 	_test_breakable_hooked_once()
 	await _test_phased_build()
 	await _test_kept_fields()
+	await _test_indoor_phased_build()
 	await _test_creature_puppets()
 	_test_piles()
 	_test_heard_as_monsters_hear()
@@ -8537,6 +8538,33 @@ func _test_phased_build() -> void:
 	_check(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT) == orphans,
 			"no orphan nodes left by the stopped build (%d, %d)" % [Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), orphans])
 	_rig.room_built.disconnect(count_built)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## 660 amended (4): an indoor zone built over frames (no wooded land, no
+## edge) is the room built at once. The curves' start once took the indoor
+## case's empty set as a script error and the barrow never drew (black but
+## the HUD, pc-character, 2026-10-30).
+func _test_indoor_phased_build() -> void:
+	print("
+== an indoor zone built over frames is the room built at once ==")
+	var barrow := Level.load_level("barrow")
+	var terrain: Dictionary = barrow["terrain"]
+	var drawn := func() -> int:
+		return _rig._room.find_children("*", "", true, false).filter(
+				func(node: Node) -> bool: return not String(node.name).begins_with("Scatter_")).size()
+	_rig.rebuild(terrain, barrow["centre"])
+	await _frames(Client3D.WARM_FRAMES + 2)
+	var at_once: int = drawn.call()
+	_rig.rebuild(terrain, barrow["centre"], true)
+	var frames := 0
+	while (_rig.building_room or _rig.ground_filling) and frames < 400:
+		await get_tree().process_frame
+		frames += 1
+	await _frames(Client3D.WARM_FRAMES + 2)
+	_check(not _rig._outdoor and not _rig.building_room and not _rig.ground_filling and _rig._curves_task == -1,
+			"the barrow built over %d frames, then whole" % frames)
+	_check(at_once > 0 and drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

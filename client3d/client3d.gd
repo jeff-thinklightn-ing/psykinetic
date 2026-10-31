@@ -5702,7 +5702,11 @@ func _phase_edges() -> void:
 ## the wooded land, and the waters' and roads' near maps for the ground's
 ## phase (_stamped); each into its own of [member _curves_result].
 func _start_curves() -> void:
-	var wooded := _wooded if _outdoor else {}
+	# Untyped: indoors none (a typed var took {} as an error, and the room
+	# never drew: 660 amended (4)'s indoor zones).
+	var wooded: Dictionary = {}
+	if _outdoor:
+		wooded = _wooded
 	var waters: Array = [] if _glimpse else _terrain.get("waters", [])
 	var roads: Array = [] if _glimpse else _terrain.get("roads", [])
 	var results: Array[Dictionary] = [{}, {}]
@@ -5719,6 +5723,9 @@ func _start_curves() -> void:
 ## the frames go round. False when a newer rebuild took over.
 func _phase_edges_over_frames(generation: int) -> bool:
 	var task := _curves_task
+	if task == -1:
+		_phase_edges()  # The workers never started: here, at once.
+		return true
 	while _curves_task == task and not WorkerThreadPool.is_group_task_completed(task):
 		await get_tree().process_frame
 	if _curves_task != task:
