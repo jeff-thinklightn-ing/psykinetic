@@ -30,6 +30,7 @@ func _ready() -> void:
 	await _test_work_clear()
 	await _test_armed_fidgets()
 	await _test_beckon()
+	_test_knight_vigil()
 	await _test_rests()
 	_test_warm_painted()
 	await _test_upper()
@@ -1063,6 +1064,26 @@ func _test_warm_painted() -> void:
 const BECKON_SCOOP := 0.1
 const BECKON_PALM := 25.0
 const BECKON_OPEN := 20.0
+## The fallen knight (747, pc-character's side): his model stands his vigil, looping, never
+## fidgeting, on a body that casts no shadow.
+func _test_knight_vigil() -> void:
+	print("== the fallen knight's vigil ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	_check(lib.has_animation(Client3D.KNIGHT_VIGIL) and lib.get_animation(Client3D.KNIGHT_VIGIL).loop_mode != Animation.LOOP_NONE,
+		"his vigil is in the clips, looping")
+	var model: Dictionary = Client3D.MODELS["astral_knight"]
+	var puppet := Node3D.new()
+	add_child(puppet)
+	puppet.add_child(Client3D._make_model(model, puppet))
+	var rig := puppet.get_meta("rig") as AnimRig
+	var shadows := puppet.find_children("*", "MeshInstance3D", true, false).filter(
+		func(mesh: MeshInstance3D) -> bool: return mesh.visible and mesh.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF)
+	_check(rig.base_clip() == Client3D.KNIGHT_VIGIL and Client3D._idle_clip(puppet) == Client3D.KNIGHT_VIGIL
+		and (puppet.get_meta("fidgets") as Dictionary).is_empty() and shadows.is_empty(),
+		"his model stands it (%s), never fidgets, and casts no shadow (%d casting)" % [rig.base_clip(), shadows.size()])
+	puppet.free()
+
+
 func _test_beckon() -> void:
 	print("== the guide's beckon ==")
 	var lib := load(CLIPS) as AnimationLibrary

@@ -998,7 +998,9 @@ const KOBOLD_GAITS: Array[Array] = [[CLIP_WALK, 0.39], ["Jog_Short", 1.63], ["Sp
 ## (helm, mail and shield), the human gaits and sockets, fidgets of their own;
 ## the draugr creature.draugr, the human skeleton scaled DRAUGR_SCALE (its
 ## gaits and sockets so too); the ghost creature.ghost, the skeleton under a
-## translucent shroud that casts no shadow (GHOST_MATERIAL).
+## translucent shroud that casts no shadow (GHOST_MATERIAL); the fallen knight
+## (747, astral_knight) creature.astral_knight, all of him in the ghost's
+## material, keeping his vigil (KNIGHT_VIGIL) and never fidgeting.
 const MODELS := {
 	"imp": {"scene": "res://art/models/characters/goblin.glb", "clips": "res://art/models/animations/goblin.res", "height": 1.2,
 		"faces": PI * 0.5, "moves": HUMANOID_MOVES, "sockets": GOBLIN_SOCKETS, "goblin": true},
@@ -1022,7 +1024,13 @@ const MODELS := {
 	"ghost": {"scene": "res://art/kit/creatures/creature.ghost/creature.ghost.glb",
 		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
 		"gaits": HUMAN_GAITS, "fidgets": DEAD_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS},
+	"astral_knight": {"scene": "res://art/kit/creatures/creature.astral_knight/creature.astral_knight.glb",
+		"clips": "res://art/models/animations/goblin.res", "height": 1.75, "faces": PI * 0.5, "by_mass": false,
+		"gaits": HUMAN_GAITS, "fidgets": {}, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS, "idle": KNIGHT_VIGIL},
 }
+## The fallen knight's stance (humanoid_clips.py): head bowed, a hand on the
+## hilt at his hip, a slow breath.
+const KNIGHT_VIGIL := "Knight_Vigil"
 ## A model's surface in this material (art-kit's ghost's shroud) is see-through
 ## and casts no shadow (the coordinator's ruling): its mesh's shadow is off.
 const GHOST_MATERIAL := "ghost"
@@ -15021,9 +15029,11 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 	puppet.set_meta("backpedal", float(model.get("backpedal", ArtKit.feel("client3d.backpedal_clip_speed", BACKPEDAL_CLIP_SPEED))))
 	puppet.set_meta("fidgets", model.get("fidgets", FIDGETS))
 	puppet.set_meta("moves", model.get("moves", {}))
+	if model.has("idle"):
+		puppet.set_meta("idle", str(model["idle"]))
 	var rig := AnimRig.make(scene, load(model["clips"]) as AnimationLibrary, ArtKit.feel("client3d.clip_blend", CLIP_BLEND), true,
 			puppet.get_meta("rng") if puppet.has_meta("rng") else null)
-	rig.loop(CLIP_IDLE)
+	rig.loop(_idle_clip(puppet))
 	if model.has("sockets"):
 		_attach_sockets(scene, model["sockets"], float(puppet.get_meta("model_scale", 1.0)), puppet)
 		_wear_hat(scene, puppet)
@@ -16622,13 +16632,13 @@ static func _bone_axis(along: Vector3) -> SkeletonModifier3D.BoneAxis:
 	return SkeletonModifier3D.BONE_AXIS_PLUS_Z if plus else SkeletonModifier3D.BONE_AXIS_MINUS_Z
 
 
-## Standing: tired when hurt or winded, else idle.
+## Standing: tired when hurt or winded, else idle (a model's own, its "idle").
 static func _idle_clip(puppet: Node3D) -> String:
 	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
 	if entity != null and entity.max_hp > 0 and (float(entity.hp) / entity.max_hp < TIRED_BELOW
 			or entity.max_stamina > 0 and entity.stamina_fraction() < GridEntity.WINDED_BELOW):
 		return CLIP_TIRED
-	return CLIP_IDLE
+	return str(puppet.get_meta("idle", CLIP_IDLE))
 
 
 ## A model's clip for what it is doing: a one-off (an attack, a flinch, a

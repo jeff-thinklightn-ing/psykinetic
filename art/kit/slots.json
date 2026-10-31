@@ -3596,6 +3596,134 @@
 				}
 			]
 		},
+		"creature.astral_knight": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [
+				1.62,
+				1.78,
+				0.57
+			],
+			"tolerance": 0.15,
+			"materials": 2,
+			"clip_library": "res://art/models/animations/goblin.res",
+			"budget": 3000,
+			"source": {
+				"by": "art-kit (mesh and paint, by hand), pc-character (rig)",
+				"tool": "blender (art-kit's build; pc-character's rig tools)",
+				"license": "own (mesh and paint); CC0 1.0 (the UAL skeleton and clips, Quaternius)",
+				"date": "2026-10-30",
+				"notes": "C:/dev/review/barrow_bodies/make_astral_knight.py: a whole knight on the human Armature, every surface the kit's \"ghost\" material (translucent, alpha 0.5, emission 0.6, two-sided; casts no shadow in the game): armour with pointed sabatons, a great helm with an eye slit, a surcoat skirted above the knee (weighted as the body), a plain ring device on the chest (lore's sign to come), a cloak behind clear of the legs, a sword sheathed at the left hip (the vigil's hand on its grip); 1,914 tris"
+			},
+			"uses": "the fallen knight's astral projection in the barrow's Altar Room (decision 747; dungeon's astral_knight kind), standing his vigil and talking: skinned on the UAL skeleton, the human clip library (his vigil pc-character's, Knight_Vigil); all of him in the material \"ghost\", no shadow; front +z, origin between its feet, T-pose rest",
+			"clips": [
+				{
+					"name": "idle",
+					"names": [
+						"idle",
+						"idle_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "walk",
+					"names": [
+						"walk",
+						"walk_loop"
+					],
+					"required": true
+				},
+				{
+					"name": "run",
+					"names": [
+						"jog_fwd",
+						"sprint",
+						"jog_fwd_loop",
+						"sprint_loop",
+						"run"
+					],
+					"required": true
+				},
+				{
+					"name": "attack",
+					"names": [
+						"axe_overhead",
+						"sword_attack",
+						"punch_cross",
+						"punch_jab",
+						"attack"
+					],
+					"required": true
+				},
+				{
+					"name": "hit",
+					"names": [
+						"hit_chest",
+						"hit_head",
+						"hit"
+					],
+					"fallback": "a flinch tween"
+				},
+				{
+					"name": "death",
+					"names": [
+						"death01",
+						"death02",
+						"death"
+					],
+					"required": true
+				}
+			],
+			"grey": [
+				{
+					"at": [
+						0,
+						1.441,
+						0
+					],
+					"size": [
+						1.62,
+						0.146,
+						0.146
+					]
+				},
+				{
+					"at": [
+						0,
+						0.473,
+						0
+					],
+					"size": [
+						0.428,
+						0.946,
+						0.255
+					]
+				},
+				{
+					"at": [
+						0,
+						1.192,
+						0
+					],
+					"size": [
+						0.446,
+						0.582,
+						0.57
+					]
+				},
+				{
+					"at": [
+						0,
+						1.643,
+						0
+					],
+					"size": [
+						0.242, 0.273, 0.255
+					]
+				}
+			]
+		},
 		"creature.orc": {
 			"category": "creatures",
 			"type": "mesh",

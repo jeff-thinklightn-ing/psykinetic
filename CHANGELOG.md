@@ -14,6 +14,7 @@ notes (decision 324).
 
 - Crossing into a zone: the hitch behind the arrival card is shorter (the wilds' worst frame about 120 ms, was 300); the forest's edge and the water and road curves are worked out off the main thread.
 - A fallen knight's ghost now waits in the barrow's Altar Room (747): he asks you to prove your strength by stopping the nine Mound-breakers, and a tracker checks off each one you or your companion kill; turn it in and he reveals the hidden way down to the Ossuary, which now opens only for those he has shown it to.
+- The fallen knight is drawn as a see-through ghost keeping a still vigil in the Altar Room, head bowed and a hand on his hilt (747).
 - The Robbers' Camp chest is locked (742): Brand the Ox drops its key to whoever fells him, and it opens once per player for 25 gold.
 ## v0.1.193
 

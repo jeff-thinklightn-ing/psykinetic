@@ -590,6 +590,14 @@ def slash(way: float) -> list:
 	return [(t, P("Sword_Idle", 0.0, pose, move=step)) for t, pose, step in zip(SLASH_KEYS, poses, steps)]
 CLIPS["Sword_Slash_F"] = {"keys": slash(1.0)}
 CLIPS["Sword_Slash_B"] = {"keys": slash(-1.0)}
+# The fallen knight's vigil (747; his astral projection stands still in the barrow's Altar Room and
+# talks): head bowed, his right hand across to rest on the hilt at his left hip, the left on the
+# scabbard below it, a slow breath (the chest and shoulders up and back), 4 s.
+VIGIL = right_arm(0.12, -0.3, -0.42, (-1.0, 0.3, -0.3)) + left_arm(0.02, 0.04, -0.48, (1.0, 0.3, -0.5)) + [
+	("neck_01", LIFT, -10.0), ("Head", LIFT, -12.0), ("spine_03", LIFT, -2.0)]
+VIGIL_IN = [("spine_03", LIFT, 3.0), ("neck_01", LIFT, 2.0)] + both("clavicle", LIFT, 4.0, mirror=False)
+CLIPS["Knight_Vigil_Loop"] = {"loop": True, "keys": [
+	(t, P("Idle_Loop", 0.0, VIGIL + (VIGIL_IN if breath else []))) for t, breath in ((0.0, 0), (2.0, 1), (4.0, 0))]}
 CLIPS["Axe_Overhead"] = {"keys": [
 	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
 	(0.3, P("Idle_Loop", 0.0, AXE_UP)),

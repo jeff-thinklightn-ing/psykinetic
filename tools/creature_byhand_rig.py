@@ -44,7 +44,7 @@ def world_fix(o):
 
 # The parts' bones, before they are unparented.
 parts = {o.name: o.parent_bone if o.parent_type == "BONE" else o["bone"] for o in bpy.data.objects
-	if o.type == "MESH" and o.parent == arm and (o.parent_type == "BONE" or "bone" in o)}
+	if o.type == "MESH" and o.parent == arm and o.name != "Body" and (o.parent_type == "BONE" or "bone" in o)}
 print("byhand: parts", parts)
 for o in [o for o in bpy.data.objects if o.type == "MESH" and o not in (ref,)]:
 	world_fix(o)

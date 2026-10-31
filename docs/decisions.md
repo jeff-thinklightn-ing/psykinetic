@@ -36593,3 +36593,38 @@ Environment's sky and terrain's far landmarks read the live camera and needed no
 line follow on their sides). Perf benches the nearest before it lands. Stills in
 C:/dev/review/camera/. Tests: view_test _test_low_camera, controls_test (the saved zoom). Client
 only; protocol unchanged; no new class_name.
+
+## 747, pc-character's side: the fallen knight drawn
+
+Dungeon's side (747) puts the fallen knight, monster kind astral_knight,
+in the barrow's Altar Room, standing still and talking; his ghost look is
+the client's, keyed on the kind. Split with art-kit as the barrow's dead
+were (582; the coordinator approved): art-kit models his own body by hand
+(creature.astral_knight: great helm, mail and plate, a red-cross surcoat,
+a cloak, a sword at the hip, all in the kit's ghost material), and this
+side weights it and draws him.
+
+- creature.astral_knight (art/kit/creatures): art-kit's .blend
+  (C:/dev/review/barrow_bodies/astral_knight.blend, make_astral_knight.py;
+  1,914 tris) rigged by tools/creature_byhand_rig.py as the barrow's dead
+  were: the Body weighted from human_m's by nearest face, the surcoat
+  ("~surcoat", skirted above the knee) so too, the helm, the chest's
+  device, the cloak and the sheathed sword rigid on their "bone"
+  property's bones. The rig tool no longer takes the Body itself for a
+  rigid part when it carries a "bone" property (art-kit's hint). Its slot
+  entry is in art/kit/slots.json beside creature.ghost's.
+- Client3D.MODELS["astral_knight"]: that body, all of it in the kit's
+  ghost material (GHOST_MATERIAL: no shadow), the human gaits and sockets,
+  and no fidgets: he keeps still.
+- A model may name its own standing clip ("idle"): _make_model keeps it
+  on the puppet, and _idle_clip stands it (still tired when hurt or
+  winded, as any model). Fidgets come only from the plain Idle, so a
+  model with its own idle never fidgets.
+- Knight_Vigil (tools/humanoid_clips.py, on Idle_Loop, 4 s loop,
+  Client3D.KNIGHT_VIGIL): head bowed, his right hand across to rest on the
+  hilt at his left hip and the left on the scabbard below it, a slow
+  breath. Addressed, he talks with Idle_Talking as any talker.
+
+anim_rig_test _test_knight_vigil: the clip loops; his model stands it,
+has no fidgets and casts no shadow. Client only, protocol unchanged, no
+new class_name.
