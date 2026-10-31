@@ -17,6 +17,15 @@ WorkingDirectory=/opt/psykinetic
 # The server reads the token from the environment; it is never on the command
 # line, where any local process could read it (decision 690).
 EnvironmentFile=/etc/psykinetic/env
+# 717: the token and the game port's DTLS key and certificate, made once by
+# server/install_dtls.sh (sudo), handed over as systemd credentials: the
+# service reads them from $CREDENTIALS_DIRECTORY, never from /etc/psykinetic
+# (the hardening drop-in hides it). A missing file fails the start, so this
+# unit goes in only after install_dtls.sh has run. The token credential wins
+# over env's PSYKINETIC_TOKEN; a server from before 717 ignores all three.
+LoadCredential=token:/etc/psykinetic/token
+LoadCredential=dtls.key:/etc/psykinetic/dtls.key
+LoadCredential=dtls.crt:/etc/psykinetic/dtls.crt
 # The Dedicated Server export strips visuals but is not headless by itself.
 # --admin-port is the console: server/admin.sh talks to it on localhost.
 # --status-port answers clients' status queries over UDP (decision 431): the
