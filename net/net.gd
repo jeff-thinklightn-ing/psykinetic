@@ -489,7 +489,16 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## the fallen knight (AstralKnight, kind astral_knight) offers quest:N:ask,
 ## :not_yet and :turn_in; an old client shows no tracker and draws him as a
 ## plain monster.
-const PROTOCOL_REVISION := 43
+## 44 (717): the game port under DTLS (the server's key and certificate from
+## its systemd credentials, the client pinning net/dtls/pinned.crt); an old
+## client's plain packets never complete a handshake, so it cannot join and
+## its update comes through the status port, which stays plain.
+const PROTOCOL_REVISION := 44
+## The certificate a client pins (717): the box's, from install_dtls.sh's
+## print, with the next one beside it during a rotation. The name it is
+## checked against (its CN).
+const DTLS_PINNED := "res://net/dtls/pinned.crt"
+const DTLS_HOST := "psykinetic"
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
@@ -622,6 +631,19 @@ var token := ""
 ## Where the token came from: "credential", "env", "flag", or "" (none),
 ## said once as a server starts ("[net] token from ..."), never the token.
 var token_source := ""
+## DTLS on the game port (717). The client: "auto" (the default) for a
+## remote server, plain to this machine's own (loopback: the tests, a local
+## server); "on" or "off" from --dtls. The server: on when it has a key and
+## certificate (dtls_server_options), plain otherwise, said once.
+var dtls := "auto"
+## Tests: the PEM bundle a client trusts instead of DTLS_PINNED
+## (--dtls-trust), and a server's key and certificate files instead of its
+## credentials (--dtls-key, --dtls-cert). The client always pins (protocol_test).
+var dtls_trust := ""
+var dtls_key := ""
+var dtls_cert := ""
+## Whether this connection is under DTLS (the connect screen's words).
+var dtls_used := false
 ## Who this client says it is. From settings.cfg, --player-id/--name, or
 ## for a project host the dev id.
 var player_id := ""
@@ -1895,7 +1917,7 @@ func start() -> void:
 		return
 	var peer := ENetMultiplayerPeer.new()
 	if mode == Mode.CLIENT:
-		var error := peer.create_client(address, port)
+		var error := _create_client(peer)
 		if error != OK:
 			push_error("[net] cannot connect to %s:%d (%s)" % [address, port, error_string(error)])
 			return
@@ -1930,6 +1952,9 @@ func start() -> void:
 				# Single-player must keep working when the port is taken.
 				print("[net] port %d unavailable (%s); running offline" % [port, error_string(error)])
 			return
+		if mode == Mode.SERVER and not _setup_dtls_server(peer):
+			get_tree().quit(1)
+			return
 		print("[net] %s listening on port %d%s" % [
 			"server" if mode == Mode.SERVER else "host", port,
 			", token required" if token != "" else ", no token: open to anyone"])
@@ -1950,7 +1975,7 @@ func start() -> void:
 func reconnect() -> bool:
 	shutdown()
 	var peer := ENetMultiplayerPeer.new()
-	var error := peer.create_client(address, port)
+	var error := _create_client(peer)
 	if error != OK:
 		print("[net] cannot connect to %s:%d (%s)" % [address, port, error_string(error)])
 		return false
@@ -1958,6 +1983,96 @@ func reconnect() -> bool:
 	local_id = multiplayer.get_unique_id()
 	online = true
 	return true
+
+
+## The client's ENet peer made toward address:port, under DTLS when
+## wants_dtls says (the pinned bundle, or --dtls-trust's, trusted for
+## DTLS_HOST). A DTLS connection with no bundle to trust is not begun:
+## never a silent fall back to plain.
+func _create_client(peer: ENetMultiplayerPeer) -> Error:
+	var error := peer.create_client(address, port)
+	dtls_used = false
+	if error != OK or not wants_dtls(dtls, address):
+		return error
+	var options := dtls_client_options(dtls_trust if dtls_trust != "" else DTLS_PINNED)
+	if options == null:
+		peer.close()
+		push_error("[net] no certificate to trust for an encrypted connection (%s)" % (dtls_trust if dtls_trust != "" else DTLS_PINNED))
+		return ERR_UNCONFIGURED
+	error = peer.host.dtls_client_setup(DTLS_HOST, options)
+	if error != OK:
+		peer.close()
+		return error
+	dtls_used = true
+	print("[net] encrypted (DTLS)")
+	return OK
+
+
+## The server's DTLS from its key and certificate (dtls_server_options):
+## on, said once; none, plain, said once; a key or certificate there but
+## unreadable, or a setup that fails, refuses to run (false).
+func _setup_dtls_server(peer: ENetMultiplayerPeer) -> bool:
+	var files := dtls_server_files(dtls_key, dtls_cert, OS.get_environment("CREDENTIALS_DIRECTORY"))
+	if files.is_empty():
+		print("[net] no DTLS key: the game port is plain")
+		return true
+	var options := dtls_server_options(files[0], files[1])
+	if options == null:
+		push_error("[net] the DTLS key or certificate could not be read: refusing to run")
+		return false
+	var error := peer.host.dtls_server_setup(options)
+	if error != OK:
+		push_error("[net] DTLS setup failed (%s): refusing to run" % error_string(error))
+		return false
+	dtls_used = true
+	print("[net] DTLS on the game port")
+	return true
+
+
+## Whether a client under --dtls [param setting] connects to [param at]
+## under DTLS: "on" always, "off" never, "auto" unless [param at] is this
+## machine (a loopback address or localhost).
+static func wants_dtls(setting: String, at: String) -> bool:
+	if setting == "on":
+		return true
+	if setting == "off":
+		return false
+	return not (at == "localhost" or at.begins_with("127.") or at == "::1")
+
+
+## The server's key and certificate paths: --dtls-key and --dtls-cert when
+## both given, else [param credentials]' dtls.key and dtls.crt (the unit's
+## LoadCredential) when both are there; [] for none.
+static func dtls_server_files(key: String, cert: String, credentials: String) -> Array[String]:
+	if key != "" and cert != "":
+		return [key, cert]
+	if credentials != "" and FileAccess.file_exists(credentials.path_join("dtls.key")) and FileAccess.file_exists(credentials.path_join("dtls.crt")):
+		return [credentials.path_join("dtls.key"), credentials.path_join("dtls.crt")]
+	return []
+
+
+## TLSOptions.server from [param key_path] and [param cert_path] (PEM), or
+## null if either does not load.
+static func dtls_server_options(key_path: String, cert_path: String) -> TLSOptions:
+	if not FileAccess.file_exists(key_path) or not FileAccess.file_exists(cert_path):
+		return null
+	var key := CryptoKey.new()
+	var cert := X509Certificate.new()
+	if key.load(key_path) != OK or cert.load(cert_path) != OK:
+		return null
+	return TLSOptions.server(key, cert)
+
+
+## TLSOptions.client trusting the PEM bundle at [param bundle_path] (one or
+## two certificates: the one in use and the next), or null if it does not
+## load. Pinned, never unsafe.
+static func dtls_client_options(bundle_path: String) -> TLSOptions:
+	if not FileAccess.file_exists(bundle_path):
+		return null
+	var chain := X509Certificate.new()
+	if chain.load(bundle_path) != OK:
+		return null
+	return TLSOptions.client(chain)
 
 
 func _on_connected_to_server() -> void:
@@ -2062,7 +2177,7 @@ func _parse_args() -> void:
 				builder_stub = true
 			"--lawspeaker-players":
 				lawspeaker_players = true
-			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
+			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--dtls", "--dtls-trust", "--dtls-key", "--dtls-cert", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
@@ -2089,6 +2204,14 @@ func _set_option(key: String, value: String) -> void:
 		"--token":
 			token = value
 			token_source = "flag"
+		"--dtls":
+			dtls = value
+		"--dtls-trust":
+			dtls_trust = value
+		"--dtls-key":
+			dtls_key = value
+		"--dtls-cert":
+			dtls_cert = value
 		"--settings":
 			_settings_override = value
 		"--renderer":

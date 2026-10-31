@@ -73,8 +73,22 @@ started=$(date +%s)
 # boot. The server stops when the client is done (--test-exit-on), bounded
 # by --test-exit-after.
 STOP="$DIR/stop"
-APPDATA="$(cygpath -w "$DIR/appdata")" timeout 180 "$BIN/server.console.exe" --headless --server --bind=127.0.0.1 "--port=$PORT" "--admin-port=$ADMIN" \
-	"--status-port=$STATUS" "--state=$(cygpath -w "$DIR/world.json")" --token=boottest "--test-exit-on=$(cygpath -w "$STOP")" --test-exit-after=150 \
+# Its credentials as the box's unit hands them over (717: LoadCredential into
+# $CREDENTIALS_DIRECTORY): the DTLS key and certificate made by
+# server/install_dtls.sh's own openssl line (EC P-256, CN psykinetic), and
+# the token. The client pins that certificate (--dtls-trust, as the release
+# build pins net/dtls/pinned.crt) and joins encrypted (--dtls=on: loopback
+# is plain by default).
+CREDS="$DIR/credentials"
+mkdir -p "$CREDS"
+# In the folder, with Git's bash not turning "/CN=psykinetic" into a Windows
+# path (MSYS2_ARG_CONV_EXCL), so the line is the box's own.
+(cd "$CREDS" && MSYS2_ARG_CONV_EXCL='*' openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 \
+	-subj /CN=psykinetic -keyout dtls.key -out dtls.crt) >"$DIR/openssl.log" 2>&1 \
+	|| fail "openssl could not make the DTLS key and certificate"
+printf '%s' boottest >"$CREDS/token"
+CREDENTIALS_DIRECTORY="$(cygpath -w "$CREDS")" APPDATA="$(cygpath -w "$DIR/appdata")" timeout 180 "$BIN/server.console.exe" --headless --server --bind=127.0.0.1 "--port=$PORT" "--admin-port=$ADMIN" \
+	"--status-port=$STATUS" "--state=$(cygpath -w "$DIR/world.json")" "--test-exit-on=$(cygpath -w "$STOP")" --test-exit-after=150 \
 	</dev/null >"$DIR/server.log" 2>&1 &
 server=$!
 for _ in $(seq 1 480); do
@@ -85,7 +99,7 @@ done
 # Where it listens, while it runs: 127.0.0.1, not every address.
 netstat -an -p UDP 2>/dev/null | grep -E "[:.]($PORT|$STATUS)[[:space:]]" >"$DIR/bound.txt"
 APPDATA="$(cygpath -w "$DIR/appdata")" timeout 60 "$GODOT" --log-file "$(godot_log server_boot_client)" --headless --path . --client --address=127.0.0.1 "--port=$PORT" --token=boottest \
-	--name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 --test-exit-after=25 </dev/null >"$DIR/client.log" 2>&1 &
+	--dtls=on "--dtls-trust=$(cygpath -w "$CREDS/dtls.crt")" --name=BootTest --player-id=b0070000-0000-4000-8000-000000000001 --test-exit-after=25 </dev/null >"$DIR/client.log" 2>&1 &
 client=$!
 wait "$client"
 touch "$STOP"
@@ -100,6 +114,10 @@ grep -q "joined as" "$DIR/server.log" || fail "no client joined the exported ser
 grep -q "answering status on UDP $STATUS" "$DIR/server.log" || fail "the server did not answer status on UDP $STATUS (--status-port)"
 grep -q "127.0.0.1:$STATUS" "$DIR/bound.txt" || fail "the server's status port UDP $STATUS was not bound on 127.0.0.1"
 echo "PASS  a client joined it"
+grep -q "\[net\] token from credential" "$DIR/server.log" || fail "the server did not take its token from the credential"
+grep -q "\[net\] DTLS on the game port" "$DIR/server.log" || fail "the server did not put its game port under DTLS from its credentials"
+grep -q "\[net\] encrypted (DTLS)" "$DIR/client.log" || fail "the client did not connect encrypted"
+echo "PASS  its token and DTLS key from its credentials, the client joined encrypted (717)"
 grep -q "127.0.0.1:$PORT" "$DIR/bound.txt" || fail "the server's UDP $PORT was not seen on 127.0.0.1 ($(tr -s ' ' <"$DIR/bound.txt" | head -2))"
 grep -q "0.0.0.0:\($PORT\|$STATUS\)\|\*:\($PORT\|$STATUS\)\|\[::\]:\($PORT\|$STATUS\)" "$DIR/bound.txt" && fail "the server listens on every address on UDP $PORT or $STATUS, not 127.0.0.1 alone"
 echo "PASS  it listened on 127.0.0.1 alone"

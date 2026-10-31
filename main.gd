@@ -1160,9 +1160,19 @@ func _go_online() -> void:
 		World.mirror_terrain(_terrain)
 		multiplayer.server_disconnected.connect(_on_server_disconnected)
 		multiplayer.connection_failed.connect(
-				func() -> void: _connect_status("the server at %s:%d did not answer" % [Net.address, Net.port], true))
+				func() -> void: _connect_status(Main.failed_words(Net.address, Net.port, Net.dtls_used), true))
 		Net.join_rejected.connect(_on_join_rejected)
 	Net.message_received.connect(_on_message)
+
+
+## The connect screen's words for a connection that failed: under DTLS (717)
+## a refused handshake (a certificate this build does not pin, an old
+## server) looks the same as no answer, so both are said; never a fall back
+## to plain.
+static func failed_words(at: String, on_port: int, encrypted: bool) -> String:
+	if encrypted:
+		return "the server at %s:%d did not answer, or refused this build's encrypted connection (an update may be due)" % [at, on_port]
+	return "the server at %s:%d did not answer" % [at, on_port]
 
 
 ## Main processes after everything else (process_priority, set in

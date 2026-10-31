@@ -25,6 +25,7 @@ func _ready() -> void:
 	_test_token_from_env()
 	_test_token_credential()
 	_test_no_unsafe_tls()
+	await _test_dtls()
 	_test_token_lockout()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -234,6 +235,89 @@ func _test_no_unsafe_tls() -> void:
 		if "client" + "_unsafe" in text:
 			found.append(path)
 	_check(found.is_empty(), "no TLSOptions.client_unsafe in main.gd or net/ (%s)" % ", ".join(found))
+
+
+## 717 (rev 44): the game port under DTLS. Which connections are encrypted,
+## where a server's key and certificate come from, the options made from
+## them, and a handshake in this process: a server with a self-signed
+## certificate (CN psykinetic, RSA: Crypto has no generate_ecdsa; the box's
+## EC key is server_boot_test's), a client pinning a two-certificate bundle
+## that holds it, a packet each way. The refusals (a wrong pin, a plain
+## client) print engine errors, so they are server_boot_test's to show, not
+## a suite scene's.
+func _test_dtls() -> void:
+	print("
+== DTLS on the game port (717) ==")
+	_check(Net.wants_dtls("auto", "203.0.113.5") and Net.wants_dtls("auto", "box.example")
+			and not Net.wants_dtls("auto", "127.0.0.1") and not Net.wants_dtls("auto", "localhost") and not Net.wants_dtls("auto", "::1")
+			and Net.wants_dtls("on", "127.0.0.1") and not Net.wants_dtls("off", "203.0.113.5"),
+			"auto: encrypted to a remote server, plain to this machine's own; on and off as said")
+	var dir: String = preload("res://tests/test_ports.gd").scratch("protocol_test_dtls/")
+	DirAccess.make_dir_recursive_absolute(dir)
+	var path := ProjectSettings.globalize_path(dir)
+	var crypto := Crypto.new()
+	var key := crypto.generate_rsa(2048)
+	var cert := crypto.generate_self_signed_certificate(key, "CN=psykinetic,O=test,C=IE")
+	var other_key := crypto.generate_rsa(2048)
+	var other := crypto.generate_self_signed_certificate(other_key, "CN=psykinetic,O=next,C=IE")
+	key.save(path.path_join("dtls.key"))
+	cert.save(path.path_join("dtls.crt"))
+	other.save(path.path_join("next.crt"))
+	var bundle := FileAccess.open(path.path_join("bundle.crt"), FileAccess.WRITE)
+	bundle.store_string(FileAccess.get_file_as_string(path.path_join("next.crt")) + FileAccess.get_file_as_string(path.path_join("dtls.crt")))
+	bundle.close()
+	_check(Net.dtls_server_files("/k", "/c", path) == ["/k", "/c"]
+			and Net.dtls_server_files("", "", path) == [path.path_join("dtls.key"), path.path_join("dtls.crt")]
+			and Net.dtls_server_files("", "", path.path_join("none")).is_empty() and Net.dtls_server_files("", "", "").is_empty(),
+			"a server's key and certificate: the flags, else its credentials' dtls.key and dtls.crt, else none (plain)")
+	_check(Net.dtls_server_options(path.path_join("dtls.key"), path.path_join("dtls.crt")) != null
+			and Net.dtls_server_options(path.path_join("none.key"), path.path_join("dtls.crt")) == null
+			and Net.dtls_client_options(path.path_join("bundle.crt")) != null and Net.dtls_client_options(path.path_join("none.crt")) == null,
+			"the options load from the files; a missing file gives none (no silent plain)")
+	# A build that encrypts must carry the box's certificate, or no player can join:
+	# the guard that keeps 717 off main until install_dtls.sh's print is pinned.
+	_check(Net.dtls_client_options(Net.DTLS_PINNED) != null,
+			"the pinned bundle is there and loads (%s, from the box's install_dtls.sh print)" % Net.DTLS_PINNED)
+	# The handshake in this process: ENet hosts on loopback, the server's port this scene's own.
+	var at: int = preload("res://tests/test_ports.gd").of(17924)
+	var server := ENetConnection.new()
+	var client := ENetConnection.new()
+	var made := server.create_host_bound("127.0.0.1", at, 4) == OK and client.create_host(1) == OK
+	made = made and server.dtls_server_setup(Net.dtls_server_options(path.path_join("dtls.key"), path.path_join("dtls.crt"))) == OK
+	made = made and client.dtls_client_setup(Net.DTLS_HOST, Net.dtls_client_options(path.path_join("bundle.crt"))) == OK
+	var link := client.connect_to_host("127.0.0.1", at, 1) if made else null
+	var joined := false
+	var heard := ""
+	var answered := ""
+	var server_peer: ENetPacketPeer = null
+	for i in 400:
+		if link == null:
+			break
+		for host: ENetConnection in [server, client]:
+			var event := host.service(5)
+			if event[0] == ENetConnection.EVENT_CONNECT and host == server:
+				server_peer = event[1]
+				joined = true
+				server_peer.send(0, "from the server".to_utf8_buffer(), ENetPacketPeer.FLAG_RELIABLE)
+			elif event[0] == ENetConnection.EVENT_CONNECT and host == client:
+				link.send(0, "from the client".to_utf8_buffer(), ENetPacketPeer.FLAG_RELIABLE)
+			elif event[0] == ENetConnection.EVENT_RECEIVE:
+				var said: String = (event[1] as ENetPacketPeer).get_packet().get_string_from_utf8()
+				if host == server:
+					heard = said
+				else:
+					answered = said
+		if heard != "" and answered != "":
+			break
+		await get_tree().process_frame
+	_check(made and joined and heard == "from the client" and answered == "from the server",
+			"a handshake on loopback: the server's certificate one of the client's two pinned, a packet each way (%s, %s, %s)" % [made, heard, answered])
+	if link != null:
+		link.peer_disconnect_now()
+	client.destroy()
+	server.destroy()
+	for name: String in ["dtls.key", "dtls.crt", "next.crt", "bundle.crt"]:
+		DirAccess.remove_absolute(path.path_join(name))
 
 
 func _scripts_in(dir: String) -> Array[String]:
