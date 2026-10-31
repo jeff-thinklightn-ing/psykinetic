@@ -593,7 +593,7 @@ CLIPS["Sword_Slash_B"] = {"keys": slash(-1.0)}
 # The fallen knight's vigil (747; his astral projection stands still in the barrow's Altar Room and
 # talks): head bowed, his right hand across to rest on the hilt at his left hip, the left on the
 # scabbard below it, a slow breath (the chest and shoulders up and back), 4 s.
-VIGIL = right_arm(0.12, -0.3, -0.42, (-1.0, 0.3, -0.3)) + left_arm(0.02, 0.04, -0.48, (1.0, 0.3, -0.5)) + [
+VIGIL = right_arm(0.22, -0.38, -0.36, (-1.0, 0.3, -0.3)) + left_arm(0.02, 0.04, -0.48, (1.0, 0.3, -0.5)) + [
 	("neck_01", LIFT, -10.0), ("Head", LIFT, -12.0), ("spine_03", LIFT, -2.0)]
 VIGIL_IN = [("spine_03", LIFT, 3.0), ("neck_01", LIFT, 2.0)] + both("clavicle", LIFT, 4.0, mirror=False)
 CLIPS["Knight_Vigil_Loop"] = {"loop": True, "keys": [

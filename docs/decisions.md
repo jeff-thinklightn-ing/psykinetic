@@ -36616,7 +36616,7 @@ Dungeon's side (747) puts the fallen knight, monster kind astral_knight,
 in the barrow's Altar Room, standing still and talking; his ghost look is
 the client's, keyed on the kind. Split with art-kit as the barrow's dead
 were (582; the coordinator approved): art-kit models his own body by hand
-(creature.astral_knight: great helm, mail and plate, a red-cross surcoat,
+(creature.astral_knight: great helm, mail and plate, a surcoat with a ring device,
 a cloak, a sword at the hip, all in the kit's ghost material), and this
 side weights it and draws him.
 
@@ -36644,6 +36644,12 @@ side weights it and draws him.
 anim_rig_test _test_knight_vigil: the clip loops; his model stands it,
 has no fidgets and casts no shadow. Client only, protocol unchanged, no
 new class_name.
+
+Fixed before it shipped: the vigil's right hand, measured on the body, sat
+some 10 cm low and inside his hip, short of the grip; VIGIL's right arm now
+reaches 0.22 across, 0.38 down and 0.36 ahead, the wrist at the grip
+(0.19, 1.02, 0.08 against the hips' 0.01, 0.84, -0.08). Seen in game in the
+barrow (C:/dev/review/knight_barrow.png).
 ## 623 amended (2), environment's side: the weather under the closer camera
 
 ui's 623 amended (2) brings the low camera's wheel in to 8 units off, flattening from 22 degrees at the far end to 12 at the nearest, up to about 27% of the screen sky. Three things of the weather's assumed the camera high and far; the split agreed with ui, approved by the coordinator (2026-10-30). Client only.
