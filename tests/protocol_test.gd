@@ -278,6 +278,8 @@ func _test_dtls() -> void:
 	# the guard that keeps 717 off main until install_dtls.sh's print is pinned.
 	_check(Net.dtls_client_options(Net.DTLS_PINNED) != null,
 			"the pinned bundle is there and loads (%s, from the box's install_dtls.sh print)" % Net.DTLS_PINNED)
+	_check(not ("PRIVATE" + " KEY") in FileAccess.get_file_as_string(Net.DTLS_PINNED),
+			"the pinned bundle holds certificates only, never a private key")
 	# The handshake in this process: ENet hosts on loopback, the server's port this scene's own.
 	var at: int = preload("res://tests/test_ports.gd").of(17924)
 	var server := ENetConnection.new()
