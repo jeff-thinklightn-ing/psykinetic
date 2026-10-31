@@ -36594,6 +36594,16 @@ zoom in closer and tilt up a little more might be okay". The coordinator approve
   see-through likewise (season.gdshaderinc's near_close, GrownTrees.set_close), so crowns beside a
   low camera do not spread over the view.
 
+- **Fix, the pale peaks** (before the cut): a season tree's see-through copy is its season
+  shader, and GeometryInstance3D.transparency never reached it, so a crown within NEAR_CLOSE
+  stayed at NEAR_ALPHA: under a held low camera (zoom 0.6, 17°) three crowns 3.5 to 4.9 m from the
+  eye drew as pale faceted "peaks" against the sky (terrain's probes ruled out its skirt and
+  landmarks; a fade-off probe showed the crowns). Now such a piece is hidden (_set_close: its
+  meshes' visible), and shown again as it leaves NEAR_CLOSE or the fade; the grown forest's shader
+  fade is unchanged. Stills C:/dev/review/camera/13-16 (before, the fade-off probe, after at 0.6
+  and 0.4); 17-19, terrain's river banks at 12°: the ridge rule keeps the eye above the rise.
+  view_test _test_low_camera.
+
 Environment's sky and terrain's far landmarks read the live camera and needed no change for this
 (their notes: fog layers near the eye, weather haze close in, cloud tiling and the far meadow's fade
 line follow on their sides). Perf benches the nearest before it lands. Stills in

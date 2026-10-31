@@ -407,10 +407,10 @@ const STONE := Color("ebb48e")
 const FLOOR := Color("4b7164")
 const NEAR_ALPHA := 0.3
 ## Under the low camera a faded tree or tall piece (_occluders' tree kind)
-## within NEAR_CLOSE of the camera fades further, to NEAR_CLOSE_ALPHA, by
-## its meshes' own transparency over the see-through copy (623 amended (2):
-## the camera nearer and lower looks up into the crowns beside it, which at
-## NEAR_ALPHA spread over the view as pale ghosts).
+## within NEAR_CLOSE of the camera is hidden (623 amended (2): the camera
+## nearer and lower looks up into the crowns beside it, which at NEAR_ALPHA
+## spread over the view as pale ghosts, the "pale peaks"); a grown forest's
+## see-through fades them on to NEAR_CLOSE_ALPHA in its shader.
 const NEAR_CLOSE := 4.0
 const NEAR_CLOSE_ALPHA := 0.1
 ## A near piece's mesh keeps its own material override under this meta
@@ -13599,12 +13599,14 @@ func _close_pieces(faded: Dictionary[Node3D, bool]) -> Dictionary[Node3D, bool]:
 	return out
 
 
-## [param piece] faded on to NEAR_CLOSE_ALPHA ([param close]) or back to
-## NEAR_ALPHA: its meshes' transparency over the see-through copy.
+## [param piece] hidden ([param close]) or back to its see-through copy.
+## Not a lower alpha: a season tree's see-through is its season shader,
+## which GeometryInstance3D.transparency never reached, so a crown beside
+## the eye stayed at NEAR_ALPHA, a pale fogged peak against the sky.
 func _set_close(piece: Node3D, close: bool) -> void:
 	for node in _descendants(piece):
 		if node is GeometryInstance3D:
-			(node as GeometryInstance3D).transparency = 1.0 - NEAR_CLOSE_ALPHA / NEAR_ALPHA if close else 0.0
+			(node as GeometryInstance3D).visible = not close
 
 
 ## The walls of the buildings [param points] are inside that face the

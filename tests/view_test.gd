@@ -5349,11 +5349,10 @@ func _test_low_camera() -> void:
 	_rig._index_occluders()
 	var close: Dictionary = _rig._close_pieces(faded_stall)
 	_rig._set_close(stall, true)
-	var thinned := stall.transparency
+	var hidden := not stall.visible
 	_rig._set_close(stall, false)
-	_check(far_off_camera and close.has(stall) and is_equal_approx(thinned, 1.0 - Client3D.NEAR_CLOSE_ALPHA / Client3D.NEAR_ALPHA)
-			and is_zero_approx(stall.transparency),
-			"faded within NEAR_CLOSE of the low camera, it fades on to NEAR_CLOSE_ALPHA, and back (623 amended (2); %.2f)" % thinned)
+	_check(far_off_camera and close.has(stall) and hidden and stall.visible,
+			"faded within NEAR_CLOSE of the low camera, it is hidden (a season tree's see-through shader takes no transparency: the pale peaks), and back (623 amended (2))")
 	_rig._buildings.pop_back()
 	_rig._index_occluders()
 	_rig._hid_at.erase(stall)

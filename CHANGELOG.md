@@ -9,6 +9,7 @@ notes (decision 324).
 
 - With the low camera zoomed right in, ground fog stays under the camera instead of hanging overhead, rain and fog no longer thicken as you zoom closer, and the clouds in the sky no longer repeat in a pattern (623 amended (2), environment's side).
 - Camera: a market stall, a well, a standing stone or another tall piece between the camera and you turns see-through, as trees and walls do (623 amended (2)).
+- Camera: under the low camera, tree crowns right beside the camera are hidden; they no longer show as pale ghostly peaks against the sky (623 amended (2)).
 - Camera: the wheel zooms in about twice as close outdoors, and the view tilts flatter as you zoom in (22° far out down to 12° nearest), showing more sky and horizon; a click on the sky walks you that way (623 amended (2)).
 - Quests: the fallen knight's quest shows as a list under the map, each robber checked off in green as you fell him, and "Return to the fallen knight." once all nine are down; his window's button reads his own words ("Prove your strength"), with no gold or strike line (747, ui's side).
 - The Mound-breakers' key now looks like a key: a small black-iron key with a ring bow and a toothed bit, in the pack, in hand and on the ground (art for 742 amended).
