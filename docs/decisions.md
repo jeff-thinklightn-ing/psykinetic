@@ -36497,6 +36497,14 @@ of Fallen Souls, his remains to Aldous) and after; Main.CAMP_LOCKED and
 CAMP_EMPTY (742 amended). NOT_YET_TITLE kept, TURN_IN_TITLE "The robbers
 are put down" to match. level_test _test_barrow_quest checks the ask names
 him. Server only, protocol unchanged, no new class_name.
+Amended (2026-10-31, lore): Jeff approved lore's lines ("approve knight dialogue",
+C:/dev/review/decisions/knight-lines.md): the knight is the generation's sepulcher knight
+(barrow_knight() fills his name), "the Hall of Fallen Souls" kept; the final text, the camp
+chest's two lines with it, recorded agreed in docs/lore/crypt.md and handed to dungeon for
+AstralKnight and Main.CAMP_*. Two facts follow (rumours, true, in the Woodlands):
+crypt.knight_spirit (a fallen holy knight's spirit keeps watch in the Altar Room, his bones held
+by the draugr) and crypt.camp_key (Brand the Ox carries the key to the band's chest). Data and
+docs only, protocol unchanged.
 
 ## 742 amended: the camp chest locked, Brand's key, once per player
 

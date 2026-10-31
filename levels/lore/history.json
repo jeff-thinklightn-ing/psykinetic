@@ -359,6 +359,32 @@
 					"status": "agreed"
 				},
 				{
+					"id": "crypt.camp_key",
+					"text": "Brand the Ox, the biggest of the Mound-breakers, carries the key to their chest.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "crypt.knight_spirit",
+					"text": "The spirit of a fallen holy knight of Theus keeps watch in the barrow's Altar Room; his bones lie beneath the temple, held by the draugr.",
+					"known": "rumour",
+					"true": true,
+					"where": [
+						"town_lands"
+					],
+					"tags": [
+						"return"
+					],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
 					"id": "crypt.way_below",
 					"text": "The secret way down to the Ossuary is found only once the Mound-breakers have been put down.",
 					"known": "rumour",

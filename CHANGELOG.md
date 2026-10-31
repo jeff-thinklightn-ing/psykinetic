@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk have heard of the fallen knight's spirit in the barrow's Altar Room, whose bones the draugr holds, and that Brand the Ox carries the key to the Mound-breakers' chest.
 - The fallen knight in the barrow now speaks in his own words and names himself: he is that cycle's knight whose remains the draugr holds, and he asks you to bring them to Aldous. The robbers' camp chest has new lines too.
 
 ## v0.1.194

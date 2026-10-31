@@ -500,6 +500,31 @@ angered by the robbers, the knight's remains charging the amulet.
 - Facts (decision 714, lore's side): crypt.ossuary names the Ossuary; crypt.robbers_dig and
   crypt.tomb_sledge (his words, rumours, true); crypt.draugr_angry gives the why.
 
+
+### The fallen knight in the Altar Room (747; Jeff, 2026-10-31: "approve knight dialogue")
+
+Jeff moved the barrow's quest from the draugr to a fallen knight's astral projection in the
+Altar Room ("a astral projection of a fallen knight in the altar room that gives the quest ...
+prove your strength and stop the grave robbers and ill then give access to the crypt"). He
+approved lore's lines (C:/dev/review/decisions/knight-lines.md) as drafted: **agreed**. He is the
+generation's sepulcher knight, so [name] is that cycle's knight; "the Hall of Fallen Souls" stays.
+
+- Ask ("Prove your strength"): "I am [name], a knight of Theus, and my bones lie beneath the
+  temple, held by the draugr. The Mound-breakers dig for them, to sell them. Put down every one
+  of them, and prove your strength. Then I will show you the way below."
+- Not yet: "Some of the Mound-breakers still dig. Put them all down, then come back to me."
+- Turning it in: "The Mound-breakers are put down."
+- The reveal: "Then you are strong enough. In the First Hall, the niche that breathes cold air
+  hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen
+  Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let
+  me rest."
+- After: "The way below is open to you. My remains wait in the Hall of Fallen Souls."
+- The camp chest, locked: "Locked fast. The big one, Brand the Ox, wears its key."
+- The camp chest, empty: "Empty. You have taken what the Mound-breakers hid here."
+- Facts: crypt.knight_spirit (his words: the spirit, his bones held by the draugr) and
+  crypt.camp_key (in the game: Brand carries the chest's key). The draugr asks nothing of the
+  robbers now; his own lines are unchanged.
+
 ---
 
 ## Log
@@ -555,3 +580,4 @@ angered by the robbers, the knight's remains charging the amulet.
 - 2026-10-27: Jeff answered barrow-sepulcher.md: the barrow an ancient mound, the temple's own underground (Ossuary, Hall) joined to it, the amulet replacing the deal, a different holy knight's relic each time; lore's names, knights and lines drafted for dungeon's temple_undercroft design.
 - 2026-10-27: Jeff on the wording: the Ossuary, named grave robbers digging for the holy relics to sell, the Tomb Sledge and its broken walls; facts in 714.
 - 2026-10-27: Jeff passed all the names and lines ("ok, all the names and lines pass"); the Mound-breakers named in crypt.robbers_dig.
+- 2026-10-31: Jeff approved the fallen knight's lines (747); he is the sepulcher knight; facts crypt.knight_spirit, crypt.camp_key.
