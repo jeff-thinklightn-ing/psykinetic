@@ -6,26 +6,25 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+## v0.1.196
+
+- What goes over the network changes, so v0.1.195 and older can't join the server: update through the launcher first.
 - Click to walk: your character no longer paces back and forth between two spots when your companion stands beside your route; you walk on past her (724 amended).
 - Giant axe and battle axe: your sweep no longer knocks down your own companion, a resident or another player standing beside your target (343 amended).
-
 - The draugr's heavy axe blow has weight: he stands planted for a moment after it lands or misses (750), a beat to step in.
 - Giant axe and battle axe: after a swing lands or misses, the wielder stands planted for half a second as the weight carries through (750, combat's side (2)).
 - Sleepers lie more on their side, their face turned up off the mat instead of into it (751).
-
 - Outdoors: no more ledge along the sides of the land seen past a way out; the ground at the edge now meets it (753).
 - Sleeping townsfolk no longer look dead: they lie curled on their side on their bed or bedroll, breathing slowly, lie down at bedtime and get up when they wake; companions asleep by the fire lie down and get up the same way (751).
 - Being brought back from near death in another zone (out of the barrow) no longer prints an engine error on your game (587 amended).
-
 - Tools: playtest tours (754): `sh tools/tour.sh <tour>` plays a real client against a local server as a player would (clicks, walks, talks, buys, fights, crosses links) and reports what a player would notice in build/tours/<tour>/report.md; the first tours are smoke and barrow (Jeff's barrow route: Rolf, a sleeper, the knight's quest, the companion, the band's names and the tracker).
 - Monsters are called by name in talk windows and the log: the fallen knight by his own name, the draugr as the draugr, others by their kind ("the grave robber"), never as "AstralKnight1" or "Draugr1" (752, dungeon's side).
 - Townsfolk asleep out of doors lie on a bedroll, and those in a house lie up on their bed rather than through it (751, npc's side (3)).
 - The land past a way out now meets the ground at your feet: from the foothills' north road the castle stands level beyond the trees instead of at the foot of a sheer cliff, and the wilds past its south road likewise (327 amended).
-
 - Gold: the gold beside your pack, and Rolf's and a pedlar's buttons, now follow your purse whenever it changes (a quest's reward, the dole, a sale), not only after a shop window; with gold in hand Rolf's buttons work (736 amended (3)).
 - Townsfolk sleep in the beds of their house or the inn, one each, head to the bed's head; a house takes in only as many as it has beds, the rest bed down outside, and nobody is given your house in Umbrage (751, npc's side (4)).
 - Townsfolk with no roof to sleep under (visitors, Rolf and the like) now bed down by the town's fire, else beside the inn or temple, else by the store, each in a spot of their own (751, npc's side (2)).
-
 - The Tomb Sledge swings with weight: a slow heave back over the shoulder, a pause, a fast fall into the floor, the head held down, then dragged back up; it, the giant axe and the battle axe are held up the haft rather than at its very end, the upper hand sliding down on the fall (750).
 - The barrow's robbers carry their names to your screen, and Brand the Ox and the draugr are marked as bosses (752; ui draws them).
 - Monsters: a named robber's name shows on his nameplate and when you target him; a boss (Brand the Ox, the draugr) has a brass nameplate with a skull, and a bar at the top of the screen with his name and health while he's near (752, ui's side).
