@@ -34747,6 +34747,21 @@ Without 724 it fails every time; with it one steps right ("[free] ... steps
 right ... round ...") and neither gives up. NET_TEST_GROUPS runs some of
 net_test.sh's groups by hand. Client only (and the server's test hook),
 protocol unchanged, no new class_name.
+
+724 amended (physics; playtest's headless barrow tour, via the coordinator):
+a click route paced between two cells for 30 to 90 s, (66, 24) and (67, 24)
+with his companion at (66, 23), and again at (12, 39) and (13, 39), the
+server taking every move, about 1.5 a second, until a click went elsewhere.
+Main._free_body_ahead counted his own companion as a body in the way, so a
+stand against her stepped him aside and planned round her as a wall; she,
+following, stood beside the new way, and the next step aside came back. His
+free body passes through her (688: only the claim of her cell waits), so she
+is in nobody's way: _free_body_ahead skips World._own_companion_of(entity,
+player). Others, players and creatures, block as before. controls_test
+_test_free_route_own_companion: a second stood against her keeps the route
+(without the guard: "steps right from (5, 3) to (5, 4) round Garrow"), and
+a route through her cell walks on to its end. Client only, protocol
+unchanged, no new class_name.
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 
 Jeff: "theres this annoying ringing that starts with the map, it happens a lot

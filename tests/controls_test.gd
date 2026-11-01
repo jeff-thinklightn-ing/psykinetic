@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_guide_route()
 	_test_free_pull()
 	_test_free_chase()
+	_test_free_route_own_companion()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1034,6 +1035,64 @@ func _test_free_pull() -> void:
 	var cells := path.size()
 	_main._free_pull(player, path, Vector2(4.4, 3.3))
 	_check(cells >= 5 and path.size() == 1 and path[0] == Vector2i(9, 3), "from off its centre: straight at (9, 3) (%d cells to %s)" % [cells, path])
+
+
+## A click route with his own companion standing on it (playtest's barrow
+## tour: 724's step aside took her for a body in the way, walled her, planned
+## back, and he paced between two cells for 30 to 90 s): his body passes
+## through her (688), so the route walks on through, never stepping aside or
+## back.
+func _test_free_route_own_companion() -> void:
+	print("\n== a click route through his own companion: walked on through, no step aside ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(4, 3))
+	_free_start(player)
+	for cell in [Vector2i(6, 3), Vector2i(8, 3)]:
+		var occupant := World.get_entity_at(cell)
+		if occupant != null:
+			World.despawn(occupant)
+	var pet := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Garrow", "props": {"max_hp": 10}}) as Companion
+	pet.acts = false
+	add_child(pet)
+	World.spawn(pet, Vector2i(6, 3))
+	pet.keeper = player
+	_check(_main._free_body_ahead(player, Vector2(5.4, 3), Vector2(1, 0)) == null, "she is no body in his way")
+	# Stood against her a second, the route's next cell hers (planned before
+	# she stepped onto it, as following him she does): 724's count never
+	# starts, so no step aside, no plan round her, no giving up.
+	var path: Array = [Vector2i(6, 3), Vector2i(7, 3), Vector2i(8, 3)]
+	var planned := path.duplicate()
+	_main._free["path"] = path
+	var changed := 0
+	for i in World.TICK_RATE:
+		World.tick += 1
+		if _main._free_blocked(player, Vector2(5.4, 3), Vector2(0.6, 0), _main._free["path"]):
+			changed += 1
+	_check(changed == 0 and _main._free["path"] == planned and not _main._free.has("blocked_since"),
+			"a second still against her: the route %s kept, never stepped aside or given up (%d changes)" % [_main._free["path"], changed])
+	# And walked: on through her to (8, 3), never stepping back past her.
+	_place_player(Vector2i(4, 3))
+	_free_start(player)
+	path = [Vector2i(5, 3), Vector2i(6, 3), Vector2i(7, 3), Vector2i(8, 3)]
+	_main._free["path"] = path
+	var xs: Array[float] = []
+	for i in 40:
+		_free_frames(player, 6)
+		xs.append(player.free_pos.x)
+		if player.tile == Vector2i(8, 3) and not _walking():
+			break
+	var back := 0
+	for i in range(1, xs.size()):
+		if xs[i] < xs[i - 1] - 0.01 and xs[i - 1] < 7.5:  # Not the end's settle on (8, 3).
+			back += 1
+	_check(player.tile == Vector2i(8, 3) and not _walking() and back == 0 and not _main._free.get("sidestepped", false),
+			"a route through her at (6, 3) walked to (8, 3), never a step back nor aside (%d; at %s)" % [back, player.free_pos])
+	_stop_walk()
+	World.despawn(pet)
+	pet.queue_free()
+	player.free_view = null
+	Net.controls = saved
 
 
 ## A click on a creature with a free body (697, ui's side; Jeff: "quite

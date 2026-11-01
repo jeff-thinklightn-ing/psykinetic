@@ -2694,12 +2694,15 @@ static func _free_stands(entity: GridEntity) -> Vector2:
 
 ## 724: the body (not [param player]) against [param at] ahead along
 ## [param heading]: its centre (_free_stands) within two FREE_RADIUS and a
-## little, less than 60 degrees off the way.
+## little, less than 60 degrees off the way. Never his own companion: his
+## body passes through her (688), so she blocks nothing (playtest's barrow
+## tour: she followed beside the route, each step aside walled her and
+## planned back, and he paced between two cells for 30 to 90 s).
 func _free_body_ahead(player: Player, at: Vector2, heading: Vector2) -> GridEntity:
 	var best: GridEntity = null
 	var nearest := World.FREE_RADIUS * 2.0 + 0.2
 	for entity in World.get_entities():
-		if entity == player or not is_instance_valid(entity) or not entity.spawned:
+		if entity == player or not is_instance_valid(entity) or not entity.spawned or World._own_companion_of(entity, player):
 			continue
 		var off := _free_stands(entity) - at
 		if off.length() < nearest and off.length() > 0.001 and off.normalized().dot(heading) > 0.5:
