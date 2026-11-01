@@ -8899,6 +8899,9 @@ func _sync_residents() -> void:
 					"places": {"work": ground if fold_place else hut, "home": hut, "square": ground}}
 				if hut.size != Vector2i.ZERO:
 					wanted[who]["places"]["bed"] = hut  # His hut's roof (751).
+					var hut_bed := _bed_in(area, hut, 0)
+					if not hut_bed.is_empty():
+						wanted[who]["places"]["bed_at"] = hut_bed  # Its bed (751, npc's side (4)).
 		# The herder on his drove (640, npc's side): away from his fold with his sheep until the record's "back",
 		# he stands at the buyer's store square (the record's "buyer" when economy keeps it, else Towns.drove_town
 		# now) while a player is near that town, as its folk do; home again, the fold's body as above.
@@ -10635,22 +10638,55 @@ func _spawn_resident(each: Dictionary) -> Resident:
 
 ## [param area]'s homes for the town at [param place]: its huts and houses
 ## linked to nothing within HOME_TILES of the store, nearest first, each
-## as many times as it has room (HOME_ROOM): a list of insides (Rect2i).
+## as many times as it has room: its beds (buildings' building["beds"],
+## decision 751), else HOME_ROOM: a list of insides (Rect2i). The player's
+## house ("home": true, 737) is no townsman's (751, npc's side (4)).
 func _homes(area: Dictionary, place: Dictionary) -> Array[Rect2i]:
 	var store: Vector2i = place.get("cell", Vector2i.ZERO)
 	var found: Array[Dictionary] = []
 	for building: Dictionary in area.get("buildings", []):
 		var rect: Rect2i = building["rect"]
-		if str(building.get("use", "")).is_empty() and HOME_ROOM.has(building["slot"]) \
+		if str(building.get("use", "")).is_empty() and HOME_ROOM.has(building["slot"]) and not bool(building.get("home", false)) \
 				and World.distance(rect.get_center(), store) <= HOME_TILES:
 			found.append(building)
 	found.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 		return World.distance((a["rect"] as Rect2i).get_center(), store) < World.distance((b["rect"] as Rect2i).get_center(), store))
 	var out: Array[Rect2i] = []
 	for building in found:
-		for i in int(HOME_ROOM[building["slot"]]):
+		var beds: Array = building.get("beds", [])
+		for i in beds.size() if not beds.is_empty() else int(HOME_ROOM[building["slot"]]):
 			out.append(building["rect"])
 	return out
+
+
+## The [param nth] bed of [param area]'s building whose inside is [param rect]
+## (decision 751, npc's side (4)): {cell, head} where its sleeper lies (the
+## bed's head cell, the head that way; a "solid" bed, the turf house's
+## furnished one, the walkable cell beside its head instead), {} for none.
+func _bed_in(area: Dictionary, rect: Rect2i, nth: int) -> Dictionary:
+	for building: Dictionary in area.get("buildings", []):
+		if building.get("rect") != rect:
+			continue
+		var beds: Array = building.get("beds", [])
+		if nth < 0 or nth >= beds.size() or not beds[nth] is Dictionary:
+			return {}
+		var bed: Dictionary = beds[nth]
+		var cells: Array = bed.get("cells", [])
+		if cells.is_empty():
+			return {}
+		var head: Vector2i = bed.get("head", Vector2i.ZERO)
+		var cell: Vector2i = cells[0]
+		if bool(bed.get("solid", false)):
+			var beside := Resident.NO_CELL
+			for step: Vector2i in [Vector2i(head.y, head.x), Vector2i(-head.y, -head.x), -head]:
+				if World.is_walkable(cell + step):
+					beside = cell + step
+					break
+			if beside == Resident.NO_CELL:
+				return {}
+			cell = beside
+		return {"cell": cell, "head": head}
+	return {}
 
 
 ## Where a resident of [param trade] (the [param index]th of its town:
@@ -10679,9 +10715,18 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 	var home := homes[index] if index < homes.size() else (inn if inn.size != Vector2i.ZERO else work)
 	var out := {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
 		"square": square}
-	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, no bed, up all night.
+	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, a bedroll outside
+	# (npc's side (2)). A house's or the inn's own bed where buildings lists them (npc's side (4)): the nth
+	# sleeper there its nth bed, one with none left beds down outside.
 	if index < homes.size() or (inn.size != Vector2i.ZERO and home == inn) or (home == work and work_roofed and work.size != Vector2i.ZERO):
-		out["bed"] = home
+		var nth := homes.slice(0, index).count(home) if index < homes.size() else index - homes.size()
+		var listed := _bed_in(area, home, 0)
+		var bed := _bed_in(area, home, nth)
+		if not bed.is_empty():
+			out["bed"] = home
+			out["bed_at"] = bed
+		elif listed.is_empty():
+			out["bed"] = home  # No beds listed there: phase 1's corner.
 	# The routine's other places (decision 404): the inn when linked and
 	# standing, the temple and the well by their slots (no "use" or town of
 	# their own yet, buildings' word), the nearest within HOME_TILES of the

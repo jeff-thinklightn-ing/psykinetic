@@ -3160,6 +3160,25 @@ func _test_asleep(mara: Resident, home: Rect2i) -> void:
 	World._fire.erase(fire)
 	_main._sleep_spots.clear()
 	_check(near, "a fire in town: two or three cells off it, never beside it (%s by %s)" % [by_fire, fire])
+	# Buildings' beds (751, npc's side (4)): a house's room is its beds, each sleeper on their own; never the player's house.
+	var store: Vector2i = World.holdings.place(STORE).get("cell", Vector2i.ZERO)
+	var hut := Rect2i(store + Vector2i(1, 1), Vector2i(3, 3))
+	var theirs := Rect2i(store + Vector2i(-4, 1), Vector2i(3, 3))
+	var head_cell := hut.position
+	var made := {"buildings": [
+		{"rect": hut, "slot": "building.hut", "use": "", "beds": [{"cells": [head_cell, head_cell + Vector2i(0, 1)], "head": Vector2i(0, -1), "prop": "prop.bed_straw"}]},
+		{"rect": theirs, "slot": "building.house", "use": "", "home": true, "beds": [{"cells": [theirs.position, theirs.position + Vector2i(1, 0)], "head": Vector2i(-1, 0)}]}]}
+	var made_homes: Array[Rect2i] = _main._homes(made, place)
+	_check(made_homes.size() == 1 and made_homes[0] == hut, "one bed, room for one; the player's house no townsman's (%s)" % [made_homes])
+	var first: Dictionary = _main._resident_places(made, place, "", made_homes, 0)
+	var second: Dictionary = _main._resident_places(made, place, "", made_homes, 1)
+	_check(first.get("bed") == hut and first.get("bed_at", {}).get("cell") == head_cell and first.get("bed_at", {}).get("head") == Vector2i(0, -1),
+		"the first lies on the bed's head cell, its head the bed's way (%s)" % [first.get("bed_at")])
+	_check(not second.has("bed"), "the second has no bed there: a bedroll outside (%s)" % [second])
+	(made["buildings"][0]["beds"][0] as Dictionary)["solid"] = true
+	var solid: Dictionary = _main._bed_in(made, hut, 0)
+	_check(solid.get("cell", head_cell) != head_cell and World.distance(solid.get("cell", head_cell), head_cell) == 1,
+		"a solid bed (the turf house's): beside its head, not on it (%s)" % [solid])
 	var player := _player()
 	if player == null:
 		_check(true, "(no player: the click and the wake skipped)")

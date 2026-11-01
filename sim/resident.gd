@@ -496,7 +496,7 @@ func _pick_goal() -> void:
 		_goal = task["cell"]  # At the work the sim says (566): the woodlot's spot, the build's cells, the store with the log.
 		return
 	if doing == Doing.HOME and sleeps_now():
-		_goal = bed_cell(places["bed"], places.get("square", Rect2i()))
+		_goal = _bed()
 		return
 	if area.size == Vector2i.ZERO:
 		_goal = tile
@@ -740,14 +740,14 @@ func _show_work() -> void:
 			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) else ""
 		return
 	if doing == Doing.HOME and sleeps_now():
-		var home: Rect2i = places["bed"]
-		var bed := bed_cell(home, places.get("square", Rect2i()))
+		var bed := _bed()
+		var head := _head()
 		if _goal != bed:
 			_aim(bed)
 		if tile == bed:
-			if facing != head_of(home, bed):
-				World.face(self, head_of(home, bed))
-			activity = "sleep" if facing == head_of(home, bed) else ""
+			if facing != head:
+				World.face(self, head)
+			activity = "sleep" if facing == head else ""
 		else:
 			activity = ""
 		return
@@ -775,6 +775,24 @@ func _toward(cell: Vector2i) -> Vector2i:
 func sleeps_now() -> bool:
 	return asleep_now() and places.get("bed") is Rect2i and (places["bed"] as Rect2i).size != Vector2i.ZERO \
 		and DayNight.now() >= _woken_until
+
+
+## Where it lies (decision 751): its bed's cell (Main's places["bed_at"],
+## buildings' bed, npc's side (4)), else the corner rule in places["bed"].
+func _bed() -> Vector2i:
+	var at: Variant = places.get("bed_at")
+	if at is Dictionary and (at as Dictionary).get("cell") is Vector2i:
+		return at["cell"]
+	return bed_cell(places["bed"], places.get("square", Rect2i()))
+
+
+## The way its head points in bed: the bed's own (places["bed_at"]), else
+## along the room's long side into the corner.
+func _head() -> Vector2i:
+	var at: Variant = places.get("bed_at")
+	if at is Dictionary and (at as Dictionary).get("head") is Vector2i and at["head"] != Vector2i.ZERO:
+		return at["head"]
+	return head_of(places["bed"], _bed())
 
 
 ## Whether it lies asleep in its bed now (decision 751): silent, no talk.

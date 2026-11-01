@@ -37062,3 +37062,20 @@ toward the midline, so the left arm reaches its hold throughout); done, back at 
 up at its grip. anim_rig_test _test_sledge: the clip's length, contact
 and strike entry. Strip: C:/dev/review/sledge_swing.png. Client only,
 protocol unchanged, no new class_name.
+
+751, npc's side (4) (release's label): sleepers on buildings' beds
+(e229a361, building["beds"] = [{cells: [head, foot], head, prop}, "solid"
+on the turf house's). A dwelling's room is its beds: Main._homes gives a
+building one place per listed bed (HOME_ROOM only for a building with none
+listed; a 3x3 hut now houses one), and skips the player's house ("home":
+true, 737; buildings agreed). The nth sleeper of a house, or the nth of
+those falling to the inn, gets that building's nth bed as places["bed_at"]
+{cell, head} (Main._bed_in): they lie on its head cell facing its head
+(Resident._bed, _head). On a "solid" bed they lie on the walkable cell
+beside its head. A building with beds listed but none left gives no bed,
+and the sleeper beds down outside, (2)'s. One with none listed keeps
+phase 1's corner. The herder sleeps in his hut's bed. resident_test
+_test_asleep, on a made-up area: a hut with one bed houses one and the
+player's house none; the first lies on the head cell, its head the bed's
+way; the second has no bed there; a solid bed puts its sleeper beside it.
+Server only, protocol unchanged.
