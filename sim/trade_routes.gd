@@ -464,4 +464,13 @@ func from_dict(saved: Dictionary) -> void:
 			if caravan is Dictionary and caravan.has("route") and caravan.has("from") and caravan.has("to"):
 				var restored: Dictionary = (caravan as Dictionary).duplicate(true)
 				restored["walked"] = float(restored.get("walked", 0.0))
+				# An older save's shape (758, economy's side: restarts now restore the routes): every key a raid
+				# or a loss reads, there, of its kind.
+				var cargo: Variant = restored.get("cargo", {})
+				cargo = cargo if cargo is Dictionary else {}
+				restored["cargo"] = {"items": cargo.get("items", []) if cargo.get("items") is Array else [],
+					"goods": cargo.get("goods", {}) if cargo.get("goods") is Dictionary else {},
+					"members": cargo.get("members", []) if cargo.get("members") is Array else []}
+				restored["id"] = str(id)
+				restored["town"] = str(restored.get("town", ""))
 				caravans[id] = restored

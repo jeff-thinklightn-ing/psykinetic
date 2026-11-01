@@ -2489,6 +2489,10 @@ func _test_loot() -> void:
 	print("
 == loot: tables as data, named by a level for a chest or a monster; a monster drops what it carried (decision 330) ==")
 	_check(Items.has_loot("supplies") and Items.has_loot("armoury") and Items.has_loot("pockets"), "levels/loot.json: %s" % [Items.loot_tables().keys()])
+	# The Dwarven Halls' chests (decision 757): every row a catalog thing, no armour (622: the crypt's alone).
+	var hoard: Array = Items.loot_tables().get("dwarven_hoard", [])
+	_check(hoard.size() == 6 and hoard.all(func(row: Dictionary) -> bool: return Items.exists(str(row["item"])) and not Items.has_tag(str(row["item"]), "armour")),
+			"dwarven_hoard: six rows, all known, none armour (%s)" % [hoard])
 	var read := Items.read_loot('{"tables": {"t": [{"item": "no_such"}, {"item": "dagger", "count": [3], "chance": 4}, {"item": "ration", "count": [2, 1]}]}}')
 	_check(read["t"] == [{"item": "dagger", "count": [1, 1], "chance": 1.0}, {"item": "ration", "count": [2, 2], "chance": 1.0}],
 			"an unknown thing left out; a bad count [1, 1], most never under least; a chance kept to 0 to 1 (%s)" % [read["t"]])

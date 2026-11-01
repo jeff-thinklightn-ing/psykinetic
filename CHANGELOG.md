@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The Dwarven Halls' chests now hold dwarven goods: ore, nails, axe heads, picks, war hammers and now and then a silver ring, which any shop will buy (757).
 - Wording: giving gold to someone who can't take it says "You can give gold only to a fellow traveller or to the one who goes with you."; the HUD's "Following ..." line takes a colon (748 amended (2)).
 - Tools: tools/voice_check.py reports fixed lines that break the voice guide (exclamation marks, modern and game words, dashes), by speaker; report only (748 amended).
 

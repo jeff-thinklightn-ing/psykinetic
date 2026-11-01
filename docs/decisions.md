@@ -37570,3 +37570,40 @@ update notices, the voice model's prompts) and the world's own senses ("a game o
 apart and never reworded without asking him. Exit 0 always; not in land.sh. Its first report: 27
 lines, one of them Jeff's (the draugr's "by force!").
 Tools only, protocol unchanged, no new class_name.
+
+## 757. The Dwarven Halls' chests: dwarven_hoard
+
+castle_halls' three chests (its template's "chests": 3, decision 649's note: "the chests' loot the
+default table until economy's dwarven_hoard row"). The coordinator approved it, with one correction
+before landing: no armour. 622 keeps the crypt's grave goods "the only way mail enters the world"
+and plate a forge-gated make or a deep chest's rare find, and level_test pins that the crypt's
+tables alone give armour.
+
+- levels/loot.json "dwarven_hoard", rows as every table's {item, count, chance}: ore_sack 0.4
+  (1..2), nails 0.3 (1..3), axe_head 0.25, pick 0.2, hammer 0.15, silver_ring 0.15. The halls'
+  goods are dwarven work and the raws a town's smith wants, so a hoard brought home feeds a forge.
+- What it is worth: about 15 gold of goods a chest on average (at Economy.value_of), 45 for the
+  three each time the halls are laid again (every 3 game days). The Ossuary's chests carry about
+  12 and 18 in grave goods only the fence takes. The halls' goods are not grave goods: a shop
+  buys them as anything else, its gold out of the town's treasury and its makers' purses, so
+  the hoard adds things to the world, not coin.
+- Dungeon names it in castle_halls' template ("loot": {"chest": "dwarven_hoard"}), its own one-line
+  landing after this.
+- battle_axe values at 1 gold (no "value", no "made"); items has it, and it joins the hoard once
+  priced.
+
+items_test _test_loot: the table's six rows, all known, none armour. Server only, data only,
+protocol unchanged, no new class_name.
+
+## 758, economy's side: an older save's caravans
+
+Builder's 758 has Snapshot.load hand "trade" to TradeRoutes.new again, so a restart restores the
+caravans on their way (before, every restart came up with none, while Economy kept its own
+records of them). A caravan mid-route walks on from where it was: its way is made again from its
+two ends, and one whose way is gone is lost "no way", as a closed way's is. A route whose town
+changed has nothing kept by town, only ends. What could not cope was an older shape:
+TradeRoutes.from_dict kept any record with route, from and to, and a raid or a loss then read
+cargo.goods, cargo.members, cargo.items and town. from_dict now fills each, of its kind (empty
+when absent), and the record's id from its key. trade_routes_test _test_saved: an old record with
+no cargo and no town, restored whole and struck on the way with nothing to take, arrives. Server
+only, protocol unchanged, no new class_name.

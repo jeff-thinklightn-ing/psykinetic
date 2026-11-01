@@ -237,6 +237,15 @@ func _test_saved() -> void:
 	_tick(_trade.eta(ROUTE))
 	_check(_events.size() == 1 and _events[0][0] == "arrived", "and arrives (%s)" % [_kinds()])
 	_holdings.take(CAMP, "goblins")
+	# An older save's caravan (758, economy's side): no cargo, no town, struck on the way all the same.
+	var old := {"caravans": {"caravan:old": {"route": ROUTE, "from": TOWN, "to": str(_trade.route(ROUTE)["to"]), "walked": 0}}}
+	_fresh(JSON.parse_string(JSON.stringify(old)))
+	var kept: Dictionary = _trade.caravans.get("caravan:old", {})
+	_check(kept.get("cargo") == {"items": [], "goods": {}, "members": []} and kept.get("town") == "" and kept.get("id") == "caravan:old",
+		"an old shape restored whole: an empty cargo, its id (%s)" % [kept])
+	_tick(_trade.eta(ROUTE))
+	_check(_kinds() == ["arrived"], "struck with nothing to take, it walks on and arrives (%s)" % [_kinds()])
+	_events.clear()
 
 
 func _test_shown() -> void:
