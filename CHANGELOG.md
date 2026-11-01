@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Giant axe and battle axe: after a swing lands or misses, the wielder stands planted for half a second as the weight carries through (750, combat's side (2)).
 - Sleepers lie more on their side, their face turned up off the mat instead of into it (751).
 
 - Outdoors: no more ledge along the sides of the land seen past a way out; the ground at the edge now meets it (753).

@@ -535,8 +535,12 @@ func _test_sledge_recover() -> void:
 	World._tend_wind_ups()
 	World._resolve_hits()
 	_check(lifter.free_halt_until >= landed + 8 and World.free_held(lifter), "held at least 8 ticks after it lands (until %d, landed %d)" % [lifter.free_halt_until, landed])
-	World.set_slots(lifter, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
-	_check(World.recover_ticks(lifter) == 0, "a giant axe: no recover of its own")
+	# 750, combat's side (2): the heavy axes' sweep, wound up 8, planted 5.
+	for axe: String in ["giant_axe", "battle_axe"]:
+		World.set_slots(lifter, Items.tidy(["", "", "", "", axe, ""], Items.CARRIED))
+		_check(World.windup_ticks(lifter) == 8 and World.recover_ticks(lifter) == 5, "a %s: wound up 8, planted 5 after (%d, %d)" % [axe, World.windup_ticks(lifter), World.recover_ticks(lifter)])
+	World.set_slots(lifter, Items.tidy(["", "", "", "", "pick", ""], Items.CARRIED))
+	_check(World.windup_ticks(lifter) == 4 and World.recover_ticks(lifter) == 0, "a pick: wound up, no recover of its own")
 
 
 ## The sword's lead (338 amended; the coordinator: "a 2-tick server

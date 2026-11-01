@@ -36970,6 +36970,18 @@ monster_test and items_test pass. No wire change (the wind-up's ticks
 already go over), protocol unchanged, no new class_name.
 ## 749. Spawn safety: the nearest safe cell first
 
+750, combat's side (2). The heavy axes too. The coordinator: Jeff's
+principle applies to every heavy weapon. The giant axe and the battle axe
+keep their 8-tick wind-up (the sledge's 9 stays the slowest) and get
+recover 5 (0.5 s): a sweep's weight carries through rather than burying
+the head, so a shorter beat than the sledge's 8. pc-character's Axe_Sweep
+(a coil past the right hip, the hang as the tell, a flat sweep right to
+left at waist height over the arc's three cells, contact 0.8 s dead ahead,
+the follow-through, back to guard by 1.3 s) times its recovery to
+recover_ticks. The draugr strikes with his own battle_axe row
+(monsters.json), so his recover is enemy-ai's: 3. combat_test: both axes
+8 and 5, a pick no recover. items.json, so it rides a cut.
+
 Jeff, v0.1.194: "when exiting the barrows after the quest is complete - the game placed me by
 the foothills zone line in the wilds". The box's journal (release): the mound's link took him
 to wilds/from_barrow (170, 179) as it should, then spawn safety (Main._join_player) found a
