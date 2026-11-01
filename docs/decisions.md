@@ -37789,3 +37789,11 @@ after the lift). The same output: edge_probe on wilds, hills, held and
 foothills hashes the band's vertex and normal arrays, its vertex heights and
 cells, the room, edges, waters, roads, ledges and border equal to main's.
 Client only, protocol unchanged, no new class_name.
+758 amended, the restored keys counted at boot: so release can show from the box's journal that a restart kept the state (the coordinator's ask),
+Main._boot prints Snapshot.restored_line after a good load: "[state] restored: K keys; named n,
+placed_captives n, ..., trampled n", K the top-level keys the load gave back and one count for each
+of the thirteen (Snapshot.RESTORED, the list zone_test's guard now uses). Counts only, never a
+name or an id: "clearing" counts felled cells and "plots" laid plots over every zone, "trampled"
+its cells, the rest their entries. zone_test _test_restart checks the line after its save (one
+plot, one told crypt, one placed captive, no names). Server only, protocol unchanged, no new
+class_name.

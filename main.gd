@@ -3931,6 +3931,8 @@ func default_zone() -> String:
 func _boot() -> void:
 	Net.interest.reset()
 	var snapshot := Snapshot.load(Net.state_path) if Net.state_path != "" else {"ok": false, "zones": {}, "players": [], "steps": 0}
+	if snapshot.get("ok", false):
+		print(Snapshot.restored_line(snapshot))  # Counts only, for the box's journal (758 amended).
 	# The world's clock goes on from where it stopped: the world waits while
 	# the server is down.
 	World.steps = snapshot.get("steps", 0)

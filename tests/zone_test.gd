@@ -9,8 +9,7 @@ extends Node
 const BO := 2
 const BO_ID := "b0b0b0b0-0000-4000-8000-0000000000b0"
 ## The keys Snapshot.load's whitelist dropped on every restart till 758.
-const DROPPED_ONCE := ["named", "placed_captives", "sought_bands", "alms_runs", "crypt_told", "runner_out",
-	"clearing", "plots", "herders", "huts", "raid_groups", "trade", "trampled"]
+const DROPPED_ONCE := Snapshot.RESTORED
 
 var _failures := 0
 var _main: Node
@@ -214,6 +213,11 @@ func _test_restart() -> void:
 	_check(dropped.is_empty(), "every key the save writes, the load gives back (758; dropped: %s)" % [dropped])
 	_check(DROPPED_ONCE.all(func(key: String) -> bool: return saved.has(key) and snapshot.get(key) == saved[key]),
 		"the thirteen keys a whitelist dropped come back as saved")
+	# The boot line (758 amended): counts only, never a name or an id.
+	var line := Snapshot.restored_line(snapshot)
+	_check(line.begins_with("[state] restored: %d keys; named " % (snapshot.size() - 1)) and "plots 1," in line
+		and "crypt_told 1," in line and "placed_captives 1," in line and "probe" not in line,
+		"the boot line counts what came back, no names (%s)" % line)
 	var zones: Dictionary = snapshot["zones"]
 	_check(snapshot["ok"] and zones.has("test_room") and zones.has("sample"), "the snapshot holds both zones (%s)" % [zones.keys()])
 	var where := {}

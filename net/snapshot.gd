@@ -229,6 +229,37 @@ static func load(path: String) -> Dictionary:
 	return out
 
 
+## The keys a whitelist in load dropped on every restart till 758, in the order
+## restored_line names them.
+const RESTORED := ["named", "placed_captives", "sought_bands", "alms_runs", "crypt_told", "runner_out",
+	"clearing", "plots", "herders", "huts", "raid_groups", "trade", "trampled"]
+
+
+## The boot line for a loaded [param snapshot] (758 amended): how many top-level
+## keys came back and how much each of RESTORED holds, counts only (never a
+## name or an id), so a restart that kept the state shows in the box's journal.
+## "clearing" and "plots" count the cells and plots in every zone, "trampled"
+## its cells; the rest their entries.
+static func restored_line(snapshot: Dictionary) -> String:
+	var counts: Array[String] = []
+	for key: String in RESTORED:
+		counts.append("%s %d" % [key, _count(key, snapshot.get(key))])
+	return "[state] restored: %d keys; %s" % [snapshot.keys().filter(func(key: Variant) -> bool: return key != "ok").size(), ", ".join(counts)]
+
+
+static func _count(key: String, value: Variant) -> int:
+	if value is not Dictionary and value is not Array:
+		return 0
+	if key not in ["clearing", "plots", "trampled"] or value is not Dictionary:
+		return value.size()
+	var total := 0
+	for zone: Variant in value:
+		var inner: Variant = value[zone]
+		if inner is Dictionary or inner is Array:
+			total += floori(inner.size() / 3.0) if key == "trampled" else inner.size()
+	return total
+
+
 ## One zone's {tick, entities, respawns} as read.
 static func _parse_zone(raw: Dictionary) -> Dictionary:
 	var entities: Array[Dictionary] = []
