@@ -4129,6 +4129,28 @@ func _test_forest_floor_whole() -> void:
 						rise = high - band
 						rise_at = vertex
 		_check(met > 0 and steps.is_empty(), "%s: the band on the ground's corner wherever they meet (%d corners, the ground's own steps above it up to %.2f m at %s; off: %s)" % [name, met, rise, rise_at, steps.slice(0, 3)])
+		# A glimpse's sides (327 amended draws it flat at its arrival's level,
+		# raised to us): our ground's corners touching it on its height.
+		var off_glimpse: Array = []
+		var glimpse_corners := 0
+		for plan: Dictionary in _rig._glimpse_plans:
+			for g: Vector2i in plan["cells"]:
+				for c in 4:
+					var vertex: Vector2i = g + Client3D.GROUND_CORNERS[c]
+					var low := INF
+					for k in 4:
+						var beside: Vector2i = vertex - Client3D.GROUND_CORNERS[k]
+						if _rig._glimpse_ground.has(beside):
+							low = minf(low, _rig._glimpse_ground[beside])
+					for k in 4:
+						var ours: Vector2i = vertex - Client3D.GROUND_CORNERS[k]
+						if not covered.has(ours) or _rig._glimpse_ground.has(ours):
+							continue
+						glimpse_corners += 1
+						var drawn: float = _rig._corner_heights(ours)[k]
+						if absf(drawn - low) > BAND_SEAM:
+							off_glimpse.append([ours, snappedf(drawn, 0.01), snappedf(low, 0.01)])
+		_check(off_glimpse.is_empty(), "%s: our ground meets each glimpse's sides within %.2f m (%d corners; off: %s)" % [name, BAND_SEAM, glimpse_corners, off_glimpse.slice(0, 3)])
 		var sunk: Array = []
 		var stands := 0
 		for stand: Node3D in _rig._room.find_children("Stand_*", "", false, false):

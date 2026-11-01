@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Outdoors: no more ledge along the sides of the land seen past a way out; the ground at the edge now meets it (753).
 - Sleeping townsfolk no longer look dead: they lie curled on their side on their bed or bedroll, breathing slowly, lie down at bedtime and get up when they wake; companions asleep by the fire lie down and get up the same way (751).
 - Being brought back from near death in another zone (out of the barrow) no longer prints an engine error on your game (587 amended).
 

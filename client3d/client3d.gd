@@ -3837,8 +3837,26 @@ func _corner_heights(cell: Vector2i) -> PackedFloat32Array:
 ## [param cell]'s corners worked out: a stream bed's under a bridge, a
 ## ramp's, else the relief's (Relief.corner_heights: each the mean of the
 ## cells joined to it walkably, per side of a cliff), else its whole level
-## flat.
+## flat. A corner touching a glimpse's cell takes its drawn height (the
+## lowest, if several; 753, on maps' 327 amended), so our ring meets the glimpse, flat at
+## its arrival's level, with no step along its sides.
 func _ground_corners(cell: Vector2i, kept: Dictionary = _curve_kept) -> PackedFloat32Array:
+	var own := _ground_corners_own(cell, kept)
+	if _glimpse_ground.is_empty():
+		return own
+	for c in 4:
+		var vertex := cell + GROUND_CORNERS[c]
+		var low := INF
+		for k in 4:
+			var other := vertex - GROUND_CORNERS[k]
+			if _glimpse_ground.has(other):
+				low = minf(low, _glimpse_ground[other])
+		if low < INF:
+			own[c] = low
+	return own
+
+
+func _ground_corners_own(cell: Vector2i, kept: Dictionary) -> PackedFloat32Array:
 	if _relief_given and (_wet.has(cell) or _bed_levels.has(cell)):
 		# Under the water's surface (decision 525): each corner the water's
 		# bed there (_shore_bed); the mesh sinks those with water all round.

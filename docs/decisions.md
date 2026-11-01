@@ -37037,6 +37037,18 @@ Measured: forest cells beside drawn ground with a drop over 0.5 m, wilds 1,595 t
 8ad5a8d3): median 1.29/1.32/1.28 ms before, 1.29/1.27/1.28 ms after, draw calls 223 both; no
 measurable cost. Stills: C:/dev/review/lands/holes (before/after-umbrage-near, zoom 0.4).
 
+753, terrain's side (2) (release's label; the coordinator's yes), on maps' 327 amended (6cb06edc): a
+glimpse past a way out is drawn flat at its arrival's level plus the raise, but our ground's corners
+beside its sides followed our own relief, so a step stood along every glimpse's sides (to 1.43 m
+from the wilds past the foothills' link). _ground_corners is now a wrapper over the old body
+(_ground_corners_own): a corner whose vertex a glimpse cell shares takes that glimpse cell's drawn
+height (_glimpse_ground; the lowest, if several); skipped with no glimpses. view_test
+_test_forest_floor_whole: our ground meets each glimpse's sides within 0.05 m, every corner, every
+outdoor level with a relief (wilds 2,642 corners, foothills 938). Measured (terrain_shot --gaps,
+drawn corners over 0.05 m off a glimpse's): foothills 312 + 156, wilds 320 + 933 + 393 + 475, worst
+1.43 m, to 0 on all; castle 0 both. Stills C:/dev/review/lands/seams: the seam sits behind the edge
+trees, no visible change from the wilds' north link.
+
 Client only, protocol unchanged, no new class_name.
 
 ## 752: a named one's name and a boss's marker go to clients
