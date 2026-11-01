@@ -2330,6 +2330,10 @@ var _grown_trunks: Dictionary[Vector2i, bool] = {}
 ## cells the forest grows round (the land and the glimpses); whether this
 ## view is a glimpse (built only: no camera, puppets, picks or light).
 var _glimpse_plans: Array[Dictionary] = []
+## Each glimpse cell's ground as drawn (metres: its whole level, lifted by
+## its plan's "raise"), so the forest and the border round a glimpse stand
+## on it (327 amended); empty with no glimpse.
+var _glimpse_ground: Dictionary[Vector2i, float] = {}
 var _glimpses: Array[Client3D] = []
 var _wooded: Dictionary[Vector2i, bool] = {}
 var _glimpse := false
@@ -3812,6 +3816,8 @@ func _height_in(cell: Vector2i, point: Vector2) -> float:
 ## forest past its edge) the nearest cell's on it (753: at 0 a raised map's
 ## edge stood over a pit).
 func _elevation(cell: Vector2i) -> float:
+	if not _glimpse_ground.is_empty() and _glimpse_ground.has(cell):
+		return _glimpse_ground[cell]  # A glimpse's cell: its ground as drawn (327 amended).
 	if _relief.is_empty():
 		return _height(cell) * LEVEL_RISE
 	if not Relief.on_map(_relief_size, cell):
@@ -5689,6 +5695,7 @@ func _phase_land() -> void:
 		_land[cell] = true
 		_solid_cells[cell] = true
 	_glimpse_plans.clear()
+	_glimpse_ground.clear()
 	if _outdoor:
 		_glimpse_plans = _plan_glimpses()
 	_wooded = _land
@@ -5793,6 +5800,7 @@ func _stamps_of(waters: Array, roads: Array) -> Dictionary:
 ## What reads the land's whole, once the edge is read.
 func _edges_read() -> void:
 	_read_field()
+	_raise_glimpses()
 	_sight_key = Vector4.INF  # A new ground: ask again whether it hides the player.
 	_bed_levels.clear()
 	_corners.clear()
@@ -8189,7 +8197,7 @@ func _measure_forest() -> Dictionary[Vector2i, int]:
 ## The glimpses past this level's ways out (WorldMap.ways_out, maps'
 ## decision 325), each as _add_glimpse draws it: the target level's cells
 ## within GLIMPSE_DEPTH of the side it shows us, moved into our cells, none
-## on our land; its heights lifted so the way's two ends stand level. An
+## on our land; a link's flat at its arrival's level, lifted (327 amended) so the way's two ends meet. An
 ## edge's target is placed as crossing it arrives; a link's land GLIMPSE_GAP
 ## cells past where our land ends along the way (ways_out places their map
 ## there; a map with void round its land, as the wilds is, is slid in to
@@ -8237,11 +8245,11 @@ static func _glimpse_level(level_name: String) -> Dictionary:
 func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size: Vector2i) -> Dictionary:
 	var away: Vector2i = way["out"]
 	var shift := Vector2i((way["to_ours"] as Transform2D).origin.round())
-	var lift := 0
 	var margin := 0
 	var lane: Array[Vector2i] = []
 	var lane_kind := "grass"
 	var lane_height := 0
+	var meet := World.NO_CELL
 	if way["kind"] == "link":
 		var marker: Vector2i = way["from_cell"]
 		var edge := marker
@@ -8264,9 +8272,15 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 				Vector2i(-1, 0): to_size.x - arrive.x, Vector2i(1, 0): arrive.x + 1}.get(away, 0)
 		margin = to_their_edge - (back + 1)
 		shift -= away * margin
-		lift = _height(marker) - int(terrain.get("heights", {}).get(arrive, 0))
+		# Flat at their arrival's level, its lane too, and the glimpse lifted
+		# by a raise in metres to meet our ground (327 amended): lifted in
+		# whole levels and clamped to Level.MAX_HEIGHT, a glimpse past a way
+		# out high on our relief (the foothills' north link, level 23) stood
+		# at 6, its lane a cliff above it; its own levels unclamped, with no
+		# relief to smooth them, would stand in half-metre terraces.
 		lane_kind = str(_terrain.get("kinds", {}).get(marker, "grass"))
-		lane_height = _height(marker)
+		lane_height = int(terrain.get("heights", {}).get(arrive, 0))
+		meet = edge - away
 		var across := Vector2i(absi(away.y), absi(away.x))
 		for k in GLIMPSE_GAP:
 			for w in range(-GLIMPSE_LANE, GLIMPSE_LANE + 1):
@@ -8297,8 +8311,8 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 			cells[ours] = true
 			if theirs.has(cell):
 				kinds[ours] = theirs[cell]
-			heights[ours] = clampi(int(terrain.get("heights", {}).get(cell, 0)) + lift, 0, Level.MAX_HEIGHT)
-			if terrain.get("stairs", {}).has(cell):
+			heights[ours] = lane_height if way["kind"] == "link" else int(terrain.get("heights", {}).get(cell, 0))
+			if way["kind"] != "link" and terrain.get("stairs", {}).has(cell):  # Flat: no stair climbs.
 				stairs[ours] = terrain["stairs"][cell]
 	for cell in lane:
 		if cells.has(cell):
@@ -8332,7 +8346,13 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		var rect := Rect2i((roof["rect"] as Rect2i).position + shift, (roof["rect"] as Rect2i).size)
 		if Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return cells.has(cell)):
 			roofs.append({"rect": rect, "set": roof["set"], "ridge": roof["ridge"]})
-	return {"to": str(way["to_map"]), "cells": cells, "terrain": {
+	var raised := {}
+	if meet != World.NO_CELL:
+		# Where it meets our ground (327 amended): our last land cell along
+		# the way, the lane's far end, and their arrival as drawn here.
+		raised = {"meet": meet, "level": lane_height, "lane_end": meet + away * GLIMPSE_GAP,
+				"arrive": (way["to_cell"] as Vector2i) + shift}
+	return {"to": str(way["to_map"]), "cells": cells, "raised": raised, "terrain": {
 		"floor": floor_cells, "water": water, "kinds": kinds, "heights": heights, "stairs": stairs, "edges": edges,
 		"fire": [], "torches": [], "lanterns": [], "buildings": buildings, "roofs": roofs, "outdoor": true, "zone": "outdoors",
 		"walls": terrain.get("walls", DEFAULT_SET), "floors": terrain.get("floors", DEFAULT_SET), "border": "none"}}
@@ -8348,6 +8368,27 @@ func _near_land(cell: Vector2i, reach: int) -> bool:
 	return false
 
 
+## Each link's glimpse lifted to meet our ground (327 amended; Jeff, after
+## 745: "the castle zone after foothills ... falls down a steep cliff"): a
+## link's glimpse is drawn flat at its arrival's whole level, its lane too,
+## and lifted by its plan's "raise": our ground at its meeting cell (our last
+## land cell along the way) less the lane's level, in metres, so the way's
+## two ends meet however high our relief stands there. Its cells' drawn
+## heights go in _glimpse_ground for the forest round it. Once our relief
+## is read (_edges_read).
+func _raise_glimpses() -> void:
+	_glimpse_ground.clear()
+	for plan: Dictionary in _glimpse_plans:
+		var raised: Dictionary = plan.get("raised", {})
+		if raised.is_empty():
+			continue
+		var raise := _elevation(raised["meet"]) - int(raised["level"]) * LEVEL_RISE
+		plan["raise"] = raise
+		var heights: Dictionary = plan["terrain"]["heights"]
+		for cell: Vector2i in plan["cells"]:
+			_glimpse_ground[cell] = int(heights.get(cell, 0)) * LEVEL_RISE + raise
+
+
 ## A glimpse drawn: a view of its own under the room, built from the plan's
 ## terrain and nothing else (its ground, water, ledges, walls and doors,
 ## shut, and its buildings, roofed; no forest, which ours grows round it;
@@ -8360,6 +8401,7 @@ func _add_glimpse(plan: Dictionary) -> void:
 	_room.add_child(view)
 	# (After it is in the tree: being ready turns _process on.)
 	view.set_process(false)
+	view.position.y = float(plan.get("raise", 0.0))
 	view._draw_glimpse(plan["terrain"])
 	view._set_sky_floor(_sky_floor)
 	_glimpses.append(view)

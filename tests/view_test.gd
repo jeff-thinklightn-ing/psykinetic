@@ -146,6 +146,7 @@ func _ready() -> void:
 	_test_level_music()
 	_test_room_music()
 	_test_options_panel()
+	_test_glimpses_meet()
 
 	# Every sound stopped and let go before quitting: the audio server lets
 	# a stopped sound's stream go a mix or two later, and one still held at
@@ -1241,6 +1242,53 @@ func _test_player_death() -> void:
 	_check(is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_equal_approx(_rig._camera.size, size),
 			"colour and size as they were (%.2f, %.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
 
+
+## Every way's glimpse meets our ground (327 amended; Jeff, after 745: "the
+## castle zone after foothills looks crazy since it falls down a steep cliff
+## to the castle between zones"): on every outdoor level of the world plane,
+## each link's glimpse, at the lane's first cell and at its own land's
+## arrival past the lane's far end, stands within GLIMPSE_MEET of our drawn
+## ground at our last land cell along the way, and so does the ground the
+## room keeps for those cells (the forest round it stands there).
+const GLIMPSE_MEET := 0.3
+
+
+func _test_glimpses_meet() -> void:
+	print("\n== every glimpse meets our ground at its way, within %.1f m (327 amended) ==" % GLIMPSE_MEET)
+	var zones: Array = (Level.world_plane().get("zones", {}) as Dictionary).keys()
+	zones.sort()
+	for zone: String in zones:
+		if not Level.exists(zone):
+			continue
+		var level := Level.load_level(zone)
+		_rig.rebuild(level["terrain"], level["centre"])
+		var misses: Array[String] = []
+		var measured := 0
+		for i in _rig._glimpse_plans.size():
+			var plan: Dictionary = _rig._glimpse_plans[i]
+			var raised: Dictionary = plan.get("raised", {})
+			if raised.is_empty() or i >= _rig._glimpses.size():
+				continue
+			var view: Client3D = _rig._glimpses[i]
+			var meet: Vector2i = raised["meet"]
+			var lane_end: Vector2i = raised["lane_end"]
+			var first := meet + (lane_end - meet) / Client3D.GLIMPSE_GAP
+			var ours: float = _rig._height_in(meet, Vector2(meet))
+			var spots := {"the way": first}
+			if (plan["cells"] as Dictionary).has(raised["arrive"]):
+				spots["their arrival"] = raised["arrive"]
+			for what: String in spots:
+				var cell: Vector2i = spots[what]
+				measured += 1
+				var drawn: float = view.position.y + view._height_in(cell, Vector2(cell))
+				if absf(drawn - ours) > GLIMPSE_MEET:
+					misses.append("%s's %s at %s: %.2f, ours %.2f" % [plan["to"], what, cell, drawn, ours])
+				if absf(_rig._elevation(cell) - drawn) > GLIMPSE_MEET:
+					misses.append("%s's %s at %s kept at %.2f for the forest, drawn %.2f" % [plan["to"], what, cell, _rig._elevation(cell), drawn])
+		# Every link's glimpse measured (a plan with no "raised" would pass unmeasured).
+		_check(misses.is_empty() and measured >= 2 * _rig._glimpses.size(),
+				"%s: its %d glimpses meet our ground (%d spots; %s)" % [zone, _rig._glimpses.size(), measured, "; ".join(misses) if not misses.is_empty() else "all within"])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 ## The ground's fields apart from the members (660 step 2 A): _ground_fields
 ## writes none (what it makes it returns, put in place by

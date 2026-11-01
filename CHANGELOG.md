@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The land past a way out now meets the ground at your feet: from the foothills' north road the castle stands level beyond the trees instead of at the foot of a sheer cliff, and the wilds past its south road likewise (327 amended).
 
 - Gold: the gold beside your pack, and Rolf's and a pedlar's buttons, now follow your purse whenever it changes (a quest's reward, the dole, a sale), not only after a shop window; with gold in hand Rolf's buttons work (736 amended (3)).
 - Townsfolk sleep in the beds of their house or the inn, one each, head to the bed's head; a house takes in only as many as it has beds, the rest bed down outside, and nobody is given your house in Umbrage (751, npc's side (4)).

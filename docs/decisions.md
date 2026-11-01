@@ -6122,6 +6122,29 @@ wilds' first read 55 ms more), the wilds' within the spread, frames as
 before. Rejected: drawing it from WorldMap's areas, which keep no ground
 kinds or water; and making its cells walkable void with a rule that they
 are not, which every path and pick would have to know.
+
+**327 amended: a glimpse meets our ground.** Jeff, after 745: "the castle zone after foothills
+looks crazy since it falls down a steep cliff to the castle between zones (due to elevation
+shift)". The plane was right (each link's two sides within 0.05, level_test's); the glimpse was
+not. It was drawn at its whole levels lifted by ours at the marker less theirs at the arrival,
+clamped to Level.MAX_HEIGHT (6): the foothills' north link stands at level 23 (11.66 m) on its
+relief, so the castle's glimpse stood at 6 (3 m) with its lane at 23 over it, a cliff, and the
+wilds' past its south link likewise; before 743/745 every outdoor level stood near level 0 and
+nothing showed it. Now a link's glimpse is drawn flat at its arrival's whole level, its lane too,
+with no stair, and its view lifted by its plan's "raise", metres: our ground at our last land
+cell along the way less that level (Client3D._raise_glimpses, once our relief is read). Flat,
+since a glimpse has no relief of its own (terrain's later item): its levels unclamped stood in
+half-metre terraces, and their cliffs slowed the castle's build enough that its border's
+canopy came late at once and view_test's phased check saw 60 chunks between the two builds.
+Each glimpse cell's drawn height is kept in _glimpse_ground, which Client3D._elevation reads
+first (one has(), skipped with no glimpse), so the border round it (_edge_elevations) stands
+on it; the forest in the gap between our edge and the glimpse stands on our edge's relief
+(753, terrain's). view_test _test_glimpses_meet: on every outdoor level of the plane, every
+link's glimpse at the lane's first cell and at its own arrival within 0.3 m of our drawn ground
+at the meeting cell, and the room's kept height for those cells the same (each glimpse
+measured, so a plan with nothing to measure fails). Stills: C:/dev/review/lands/seam
+(before/after, the foothills' north and south links). Client only, protocol unchanged, no new
+class_name.
 ## 328. Raid groups travel the world map; camps make a town's threat; off until switched on
 
 Jeff: raids are "real raiders on the world tick": a group sets out from a
