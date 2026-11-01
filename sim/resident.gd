@@ -501,10 +501,12 @@ func _pick_goal() -> void:
 	if area.size == Vector2i.ZERO:
 		_goal = tile
 		return
-	if area.has_point(tile) and not (doing == Doing.SQUARE and _goal != NO_CELL):
+	# In the temple (734 amended (4)): off its doors, its counter and its respawn (Main's "temple_keep").
+	var keep: Array = places.get("temple_keep", []) if area == places.get("temple") else []
+	if area.has_point(tile) and not keep.has(tile) and not (doing == Doing.SQUARE and _goal != NO_CELL):
 		_goal = tile
 	else:
-		_goal = _free_cell(area)
+		_goal = _free_cell(area, keep)
 	if doing == Doing.SQUARE:
 		_wander_at = World.tick + WANDER_TICKS + (id * 7) % 40
 
@@ -528,12 +530,12 @@ func _round_stop() -> Dictionary:
 
 ## A free cell of [param area], from a start its id and the tick choose;
 ## where it stands if none.
-func _free_cell(area: Rect2i) -> Vector2i:
+func _free_cell(area: Rect2i, keep: Array = []) -> Vector2i:
 	var count := area.size.x * area.size.y
 	var start := absi(id * 31 + World.tick) % count
 	for i in count:
 		var at := area.position + Vector2i((start + i) % count % area.size.x, (start + i) % count / area.size.x)
-		if at != tile and World.is_free(at):
+		if at != tile and World.is_free(at) and not keep.has(at):
 			return at
 	return tile
 

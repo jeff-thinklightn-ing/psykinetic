@@ -3141,6 +3141,29 @@ func _test_asleep(mara: Resident, home: Rect2i) -> void:
 	var with_chapel := {"buildings": [{"rect": chapel, "slot": "", "kind": "temple", "use": "temple", "place": "temple", "town": STORE}]}
 	var priest: Dictionary = _main._resident_places(with_chapel, place, "priest", no_homes, 0)
 	_check(priest.get("temple") == chapel and priest.get("work") == chapel, "a chapel kind: the priest works there, and the routine visits it (%s)" % [priest])
+	# Visitors walk in (734 amended (4)): a floor cell inside, off the door's cells, the counter's and the respawn's.
+	var door := Vector2i(chapel.position.x + 1, chapel.end.y - 1)
+	var doored := {"buildings": [{"rect": chapel, "slot": "", "kind": "temple", "use": "temple", "place": "temple", "town": STORE,
+		"doors": [Vector3i(door.x, door.y, Terrain.SOUTH)], "open": []}]}
+	_main._temple_keeps.clear()
+	var visitor: Dictionary = _main._resident_places(doored, place, "", no_homes, 0)
+	var keep: Array = visitor.get("temple_keep", [])
+	_check(visitor.get("temple") == chapel and keep.has(door) and keep.has(door + Vector2i(0, 1)) and keep.has(door + Vector2i(0, -1))
+		and not keep.has(chapel.position), "the door's cells and those about it kept clear, the far corner not (%d kept)" % keep.size())
+	var was_places := mara.places.duplicate()
+	var was_doing: int = mara.doing
+	var picked: Array[Vector2i] = []
+	mara.places = visitor
+	mara.doing = Resident.Doing.TEMPLE
+	for i in 12:
+		World.tick += 7
+		mara._pick_goal()
+		picked.append(mara._goal)
+	mara.places = was_places
+	mara.doing = was_doing
+	_main._temple_keeps.clear()
+	_check(picked.all(func(cell: Vector2i) -> bool: return cell == mara.tile or (chapel.has_point(cell) and not keep.has(cell))),
+		"a visit's goal: inside the chapel, never by its door (%s)" % [picked])
 	# The roofless bedded down (751, npc's side (2)): a 1x2 each, out of every building, apart; by the fire when there is one.
 	var square: Rect2i = roofless.get("square", Rect2i())
 	var wanted := {"rs-roofless-a": {"town": STORE, "places": {"home": square, "square": square}},

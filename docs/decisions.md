@@ -35696,6 +35696,21 @@ building with slot "" is roofed by its kind (it read none before).
 _sleep_spot already took use "temple". resident_test _test_asleep: the slot
 and the kind both temples, a house and a well neither; a chapel kind the
 priest's work and the routine's temple. Server only, protocol unchanged.
+
+734 amended (4) (release's label; the coordinator's ask after buildings'
+chapel, (2)): townsfolk visiting the temple walk in. They had stood at its
+place cell, the step outside the door (temple@217,201), so nobody went in.
+A visit or the priest's work in places["temple"] now picks a free floor
+cell inside its rect off Main's places["temple_keep"] (Main._temple_keep):
+each door's or open edge's two cells, each counter in the rect, and the
+temple's place cell, with the cells about each. So a player coming back
+from death at the place cell, or through the door, is never blocked, and
+nobody stands at the counter. The place cell stays the respawn and the
+door's key. One standing on a kept cell walks off it. Kept per zone and
+rect for TEMPLE_KEEP_TICKS (600), so a counter spawned after the first look
+is caught. resident_test _test_asleep: a chapel with a door, its door's
+cells kept, the far corner not; a visit's goals inside and off them.
+Server only, protocol unchanged.
 734 amended (3), art-gen's notes against c2 (buildings): the bays are 3 m, as c2 has them.
 wall.<set>.buttress_tall stands at every third vertex along the main block's long sides (no
 corner, none by a door), and a lancet on the middle edge of each three-edge bay between them, so

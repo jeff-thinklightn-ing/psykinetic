@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Townsfolk visiting the temple now go inside and stand on its floor, clear of the doors, the counter and the respawn spot (734 amended (4)).
 - The Dwarven Halls' chests can now also hold a battle axe, which any shop will buy (757 amended).
 
 - Tools: new playtest tours for restart memory, the axe sweep and the slung bow, and Umbrage's chapel; tour runs keep to their own data folder (754 amended (5)).

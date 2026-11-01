@@ -75,6 +75,10 @@ const SLEEP_WAKE_RANGE := 6
 const SLEEP_FIRE_REACH := 4
 ## The roofless's sleep spots by body key (751, npc's side (2)), kept while good.
 var _sleep_spots := {}
+## A temple's cells its visitors keep off (734 amended (4), _temple_keep),
+## by zone and rect: {at: World.tick, cells}, looked again after TEMPLE_KEEP_TICKS.
+var _temple_keeps := {}
+const TEMPLE_KEEP_TICKS := 600
 ## How long a talk walk waits to arrive before it is forgotten.
 const TALK_WAIT_MSEC := 15000
 const RESIDENT_ASK_TICKS := 150
@@ -10767,15 +10771,19 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		out["inn"] = inn
 	for want: Array in [["temple", "building.temple"], ["well", "building.well"]]:
 		var best := Rect2i()
+		var best_building := {}
 		for building: Dictionary in area.get("buildings", []):
 			var rect: Rect2i = building.get("rect", Rect2i())
 			var fits: bool = _is_temple(building) if want[0] == "temple" else str(building.get("slot", "")) == want[1]
 			if fits and World.distance(rect.get_center(), store) <= HOME_TILES \
 					and (best.size == Vector2i.ZERO or World.distance(rect.get_center(), store) < World.distance(best.get_center(), store)):
 				best = rect
+				best_building = building
 		if best.size != Vector2i.ZERO:
 			# A 1x1 on water (the well) is stood beside, not in.
 			out[want[0]] = best if want[0] != "well" else best.grow(1)
+			if want[0] == "temple":
+				out["temple_keep"] = _temple_keep(best_building, best)
 	if trade == "priest" and out.has("temple"):
 		out["work"] = out["temple"]
 	return out
@@ -10897,6 +10905,40 @@ func _take_spot(spot: Rect2i, taken: Dictionary) -> void:
 func _roofed(building: Dictionary) -> bool:
 	var kind := str(building.get("kind", "")) if not str(building.get("kind", "")).is_empty() else str(building.get("slot", "")).trim_prefix("building.")
 	return Level.kinds().has(kind) and str(Level.kinds()[kind].get("roof", "")) != "none"
+
+
+## The cells of temple [param building] (over [param rect]) its visitors
+## keep off (734 amended (4)): each door's or open edge's two cells and
+## those about them, each counter's in the rect and those about it, and the
+## temple's place cell (the respawn, beside the door) with those about it,
+## so one coming back from death or through the door is never blocked.
+func _temple_keep(building: Dictionary, rect: Rect2i) -> Array[Vector2i]:
+	var key := "%s|%s" % [World.zone.name if World.zone != null else "", rect]
+	var kept: Dictionary = _temple_keeps.get(key, {})
+	if not kept.is_empty() and World.tick - int(kept["at"]) < TEMPLE_KEEP_TICKS:
+		return kept["cells"]
+	var near: Array[Vector2i] = []
+	for edge: Variant in Level.entrances(building):
+		if edge is Vector3i:
+			near.append_array(Terrain.edge_cells(edge))
+	for entity: GridEntity in World.get_entities():
+		if entity is Chest and rect.has_point(entity.tile) and not World.counter_kind(entity).is_empty():
+			near.append(entity.tile)
+	if World.holdings != null and World.zone != null:
+		for id: String in World.holdings.all_places():
+			var place := World.holdings.place(id)
+			if place.get("kind") == "temple" and str(place.get("area", "")) == World.zone.name and place.get("cell") is Vector2i \
+					and rect.grow(1).has_point(place["cell"]):
+				near.append(place["cell"])
+	var cells: Array[Vector2i] = []
+	for at: Vector2i in near:
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				var cell := at + Vector2i(dx, dy)
+				if not cells.has(cell):
+					cells.append(cell)
+	_temple_keeps[key] = {"at": World.tick, "cells": cells}
+	return cells
 
 
 ## Whether [param building] is a town's temple (decision 404; the chapel
