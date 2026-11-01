@@ -3072,6 +3072,8 @@ func _test_draugr() -> void:
 		"a draugr marker spawns a Draugr (his kind's script)")
 	_check(draugr.boss and draugr.given_name == "" and not skeleton.boss and skeleton.given_name == "",
 		"752: the draugr a boss by his kind, no name given; a skeleton neither")
+	_check(int(draugr.blows.get("battle_axe", {}).get("recover", 0)) == 3,
+		"his plain heavy blow with his axe plants him 3 ticks after it (750's recover, through World.blow_verb)")
 	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
 	player.player_id = "p1"
 	_room.add_child(player)

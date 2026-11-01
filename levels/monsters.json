@@ -167,7 +167,7 @@
 		"keeps_room": true,
 		"wields": {"right": "battle_axe"},
 		"yields": [{"item": "battle_axe"}],
-		"blows": {"battle_axe": {"kind": "knockback", "force": 1.0, "damage": 1.6, "speed": 2.2, "windup": 8,
+		"blows": {"battle_axe": {"kind": "knockback", "force": 1.0, "damage": 1.6, "speed": 2.2, "windup": 8, "recover": 3,
 			"says": "his plain blow, a heavy strike: the knockdown is his spin's (603 amended; a draft for Jeff)"}},
 		"swing_stamina": true,
 		"stamina_regen_every": 7,

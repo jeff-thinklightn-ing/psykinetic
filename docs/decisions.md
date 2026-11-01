@@ -36968,6 +36968,14 @@ combat_test _test_sledge_recover: 9 and 8 for Brand, planted after a hit
 and after a whiff, a player's held at least 8, a giant axe no recover.
 monster_test and items_test pass. No wire change (the wind-up's ticks
 already go over), protocol unchanged, no new class_name.
+
+750, enemy-ai's side: the draugr is planted too. His own blow is his kind's
+battle_axe row in monsters.json, not the axe's item verb, so it takes 750's
+"recover": 3 (0.3 s) there. That is shorter than a player's axe (5, combat's
+side (2)): he is the boss and his stamina already gates the spin, but a
+player gets a beat to step into after his plain strike. The spin is
+unchanged. monster_test _test_draugr checks his row's recover. Server only,
+protocol unchanged, no new class_name.
 ## 749. Spawn safety: the nearest safe cell first
 
 750, combat's side (2). The heavy axes too. The coordinator: Jeff's

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The draugr's heavy axe blow has weight: he stands planted for a moment after it lands or misses (750), a beat to step in.
 - Giant axe and battle axe: after a swing lands or misses, the wielder stands planted for half a second as the weight carries through (750, combat's side (2)).
 - Sleepers lie more on their side, their face turned up off the mat instead of into it (751).
 
