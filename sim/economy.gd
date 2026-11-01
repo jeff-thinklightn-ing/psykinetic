@@ -886,6 +886,19 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 			break
 	if not store.is_empty() and stockpile.has(town, store):
 		var cost := _folk_price(raw_price(town, store), id, "")
+		# One the town owes eats on that debt (353 amended (3); the coordinator: "the honest version of the
+		# meal"), before borrowing from it: the store's food at its price, taken off what it owes them. No
+		# gold moves; the debt is settled in food, not dropped, and the dole stays for one it owes nothing.
+		var owed := int(production.worker(id).get("owed", 0))
+		if cost > 0 and int(who["purse"]) < cost and owed >= cost:
+			production.set_owed(id, owed - cost)
+			if owed - cost <= 0:
+				_owed_what.erase(id)
+			stockpile.take(town, store, 1, "folk:%s" % id)
+			stockpile.note(town, store, cost, "owed:%s" % id, "%s ate %s from the store against what the town owed them (%d gold, %d still owed)" % [who["name"], store, cost, owed - cost])
+			production.note_meal(id, "store")
+			production.note_trade(id, "ate %s from the store on what the town owed" % store, cost, TREASURY)
+			return
 		if _afford(id, town, cost):
 			production.spend(id, cost, "%s from the store" % store)
 			stockpile.take(town, store, 1, "folk:%s" % id)

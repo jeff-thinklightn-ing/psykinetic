@@ -7188,6 +7188,24 @@ own 18000 to test the meal's mechanics before the day's rent.
 Amended (the next balance run, 2026-10-17): folk.rich_above 40 -> 25,
 so a maker's purse comes back out sooner as meals and services.
 
+353 amended (3), economy's side: one the town owes eats on that debt (the tune note's "Known"
+early dole; the coordinator: "the honest version of the meal"). Economy._eat paid for the store's
+food from the purse, then a loan from the town's bank (354), else the dole. It never counted what
+the town owes the resident: the worker "owed" of 498 (deliveries the treasury could not pay) and
+528's wage floor. So a resident the town owed 20 gold borrowed from it at interest, reached the
+bank's cap and was fed as a gift while the debt stood whole. Now the order is purse, then what the
+town owes them (the store's food at its price, taken off "owed"; no gold moves, the ledger line
+"owed:<id>"), then the bank, then the dole. The debt is settled in food, never dropped; the dole
+stays for one the town owes nothing.
+- The soak (tools/town_balance, 30 days, the wilds town, no players; the tool gains --every and an
+  owed column): dole meals 8 before, 6 after, none hungry either way; owed at day 15 223 before,
+  214 after, day 30 42 and 35; the treasury at gold_floor (5) throughout both. What is left of
+  the dole falls to residents the town owes nothing whose loans reach the cap; the treasury at its
+  floor, with the makers holding most of the town's 150 gold, is the strain the early weeks show.
+- folk_test: owed 20 with an empty purse and bank, a hauler eats the store's food on the debt,
+  owed down by its price, no gold moved, nothing of his the dole.
+Server only, protocol unchanged, no new class_name.
+
 ## 352. The far tier hands over to records: far monsters stop being nodes
 
 Roadmap: "the far tier hands over to the world tick, not to a stop".

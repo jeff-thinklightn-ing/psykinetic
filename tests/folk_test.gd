@@ -293,6 +293,20 @@ func _test_bank() -> void:
 	_economy.tick()
 	_check(_work.worker("h2")["fed"] == "dole" and float(_work.worker("h2")["loan"]) == 0.0 and _stock.count(TOWN, "gold") == 0,
 		"an empty bank lends nothing: the dole")
+	# One the town owes eats on that debt instead (353 amended (3)).
+	_work.add_worker("h3", "Nix", ["hauler"], TOWN)
+	_work.set_owed("h3", 20)
+	var food_before := _stock.count(TOWN, "food")
+	_economy.tick()
+	_now = every * 2
+	_economy.tick()
+	var nix := _work.worker("h3")
+	var ate := _stock.ledger(TOWN).filter(func(line: Dictionary) -> bool: return line["by"] == "owed:h3")
+	var meal_price := int(ate[0]["count"]) if not ate.is_empty() else 0
+	_check(nix["fed"] == "store" and int(nix["purse"]) == 0 and meal_price > 0 and int(nix["owed"]) == 20 - meal_price and _stock.count(TOWN, "gold") == 0,
+		"owed 20 with an empty purse and bank: Nix eats the store's food on the debt, owed down by its price, no gold moved (owed %d, price %d)" % [nix["owed"], meal_price])
+	_check(_stock.count(TOWN, "food") < food_before and not _stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "dole:h3"),
+		"the food leaves the store as before, and nothing of his is the dole")
 
 
 ## Companions' Hearsay's fields on a resident (decision 378): a mind

@@ -9,7 +9,8 @@ extends Node
 ## LEDGER_SIZE lines); the residents at the end. For the
 ## coordinator's balance runs (decisions 354, 449, 461): no state written,
 ## nothing in the shared user:// (Level.overlay_dir a private folder).
-##   godot --headless --path <repo> res://tools/town_balance.tscn -- --days=90 [--thief=hand_1] [--merchant=hand_2] [--no-field]
+##   godot --headless --path <repo> res://tools/town_balance.tscn -- --days=90 [--thief=hand_1] [--merchant=hand_2] [--no-field] [--every=7]
+## (--every: a line every that many days, 7 unless given; "owed" is what the town owes its people.)
 ## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> soak -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
 
 const TOWN := "wilds/store"
@@ -19,6 +20,7 @@ const FOLK := [["smith_1", "Odo", "smith"], ["cook_1", "Mags", "cook"], ["carp_1
 	["hand_1", "Ash", "hauler"], ["hand_2", "Bea", "hauler"]]
 
 var _now := 0
+var _every := 7
 
 
 func _ready() -> void:
@@ -29,6 +31,8 @@ func _ready() -> void:
 	var merchant := ""
 	var field := true
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--every="):
+			_every = maxi(int(arg.trim_prefix("--every=")), 1)
 		if arg.begins_with("--days="):
 			days = maxi(int(arg.trim_prefix("--days=")), 1)
 		elif arg.begins_with("--thief="):
@@ -108,7 +112,7 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 				if fed in meals and not meals.has(key):
 					meals[key] = true
 					meals[fed] += 1
-		if (day + 1) % 7 == 0 or day == 0 or day + 1 == days:
+		if (day + 1) % _every == 0 or day == 0 or day + 1 == days:
 			_line(day + 1, towns, work, stock, meals)
 	print("residents at the end:")
 	for id in work.worker_ids(TOWN):
@@ -119,16 +123,18 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 func _line(day: int, towns: Towns, work: Production, stock: Stockpile, meals: Dictionary) -> void:
 	var purses := {}
 	var loans := 0
+	var owed := 0
 	var gold := stock.count(TOWN, "gold")
 	for id in work.worker_ids(TOWN):
 		var w := work.worker(id)
 		purses["%s %s" % [w["trades"][0], w["name"]]] = int(w["purse"])
 		loans += roundi(float(w["loan"]))
+		owed += int(w.get("owed", 0))
 		gold += int(w["purse"])
 	var told := towns.log_of(TOWN).map(func(line: Dictionary) -> String: return str(line["what"]))
 	var ledger := stock.ledger(TOWN).map(func(line: Dictionary) -> String: return "%s %s" % [line.get("by", ""), line.get("from", "")])
-	print("day %2d %-6s | treasury %3d | all gold %d | loans %3d | meals: bought %d store %d dole %d hungry %d | food %d | lifted %d fenced %d caught %d | %s"
-		% [day, Season.name_at(_now), stock.count(TOWN, "gold"), gold, loans, meals["bought"], meals["store"], meals["dole"], meals["hungry"],
+	print("day %2d %-6s | treasury %3d | all gold %d | loans %3d | owed %3d | meals: bought %d store %d dole %d hungry %d | food %d | lifted %d fenced %d caught %d | %s"
+		% [day, Season.name_at(_now), stock.count(TOWN, "gold"), gold, loans, owed, meals["bought"], meals["store"], meals["dole"], meals["hungry"],
 		stock.count(TOWN, "food"), ledger.filter(func(l: String) -> bool: return l.begins_with("lifted:") or l.begins_with("missing") or l.contains(" missing")).size(),
 		ledger.filter(func(l: String) -> bool: return l.ends_with(" a dealer")).size(),
 		ledger.filter(func(l: String) -> bool: return l.begins_with("returned")).size(), purses])

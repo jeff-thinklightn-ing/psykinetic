@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A townsperson the town owes money now eats from the store against that debt, instead of borrowing from the town or being fed as charity (353 amended (3)).
 - 280 amended, items: the battle axe sells for its worth (20 gold, not 1), as do the tomb sledge (18), bandaging kits (5) and arrow bundles (5; flame and barbed 8); pedlars may carry bandaging kits and flame or barbed arrows. Catalog rows only: client and server.
 - The chapel's walls have a buttress every three metres with a lancet window between each pair; a chapel in disrepair shows broken rafters under its holed roof and a broken belfry with no bell, and a standing one has a bell in its tower (734 amended (3)).
 - A server restart keeps what it used to lose: players' plots, the felled forest, named enemies, the hill herders and healers' huts, captives, raids, trade and trampled ground come back as they were saved (758).
