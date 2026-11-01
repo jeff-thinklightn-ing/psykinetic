@@ -2096,6 +2096,10 @@ func _test_named() -> void:
 	_check(not World.named_may_rise(spec), "it does not rise at once")
 	World.steps = int(record["returns_at"])
 	_check(World.named_may_rise(spec), "it may rise when its day is past")
+	var due_was := int(record["returns_at"])
+	record["returns_at"] = World.steps + NamedEnemy.rise_steps("test_named") + 100
+	_check(World.named_may_rise(spec), "saved under a longer rise than its own now (758): it waits no longer than its rise")
+	record["returns_at"] = due_was
 	var strength: Dictionary = record["strength"].duplicate()
 	for life in 10:
 		var back := EntityFactory.build(spec.duplicate(true)) as Monster

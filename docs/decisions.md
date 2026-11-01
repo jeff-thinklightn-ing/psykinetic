@@ -37638,3 +37638,20 @@ cargo.goods, cargo.members, cargo.items and town. from_dict now fills each, of i
 when absent), and the record's id from its key. trade_routes_test _test_saved: an old record with
 no cargo and no town, restored whole and struck on the way with nothing to take, arrives. Server
 only, protocol unchanged, no new class_name.
+## 758. Snapshot.load restores every saved key (builder's side above)
+
+758, enemy-ai's side: the readers of two keys a restart now brings back,
+hardened before the data returns (builder asked, release: land first).
+- "named" (716): a record saved dead rises when steps reach its returns_at,
+  as before, but World.named_may_rise now also lets it rise once returns_at
+  is further off than its rise is now (NamedEnemy.rise_steps): one that fell
+  under a longer rise (the old 3 game days, an F7 change) waits no longer
+  than today's timer. A kept weapon whose uid is gone was already checked.
+- "raid_groups" (328): WorldRaids.from_dict lets go a saved group that is
+  not a Dictionary or lacks a key its tick reads with [] (SAVED_KEYS:
+  faction, from, town, strength, carries, state, area), printing it. A
+  group mid-raid goes back as before; one whose camp or town is gone after
+  a regen has no way on and breaks up, as before.
+monster_test (the named one), raid_groups_test _test_saved. Server only,
+protocol unchanged, no new class_name, no CHANGELOG bullet (unseen unless a
+save was broken).

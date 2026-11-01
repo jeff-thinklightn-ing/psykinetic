@@ -278,6 +278,12 @@ func _test_saved() -> void:
 	_fresh(JSON.parse_string(JSON.stringify(saved)))
 	_check(_groups.on and _groups.groups.has(id), "raids are still on and the group still out")
 	_check(_groups.groups.get(id, {}).get("state") == WorldRaids.OUT, "one in play when saved (raiders are not) goes on from where it was")
+	var broken: Dictionary = JSON.parse_string(JSON.stringify(_groups.to_dict()))
+	(broken["groups"] as Dictionary)["old"] = {"faction": "goblins", "state": WorldRaids.OUT}
+	(broken["groups"] as Dictionary)["junk"] = 3
+	_fresh(broken)
+	_check(_groups.groups.has(id) and not _groups.groups.has("old") and not _groups.groups.has("junk"),
+		"a saved group in an older shape, or not a group at all, is let go; the whole one goes on (758)")
 
 
 func _test_in_play() -> void:

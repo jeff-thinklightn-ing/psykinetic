@@ -3295,12 +3295,15 @@ func set_named_record(id: String, record: Dictionary) -> void:
 
 ## Whether a level slot's spawn [param spec] may spawn now: a named one
 ## alive, or its days dead past (NamedEnemy.rise_steps from its death). Any
-## other spawn may.
+## other spawn may. A record saved under a longer rise (an older rise_days,
+## an F7 change, a box restart restoring it: 758) waits no longer than its
+## rise is now.
 func named_may_rise(spec: Dictionary) -> bool:
 	var id := str(spec.get("named", ""))
 	if id.is_empty() or not named.has(id) or bool(named[id].get("alive", true)):
 		return true
-	return steps >= int(named[id].get("returns_at", 0))
+	var returns_at := int(named[id].get("returns_at", 0))
+	return steps >= returns_at or returns_at - steps > NamedEnemy.rise_steps(id)
 
 
 ## [param monster] (a named one) has [param kind] (named_event's) with

@@ -468,12 +468,20 @@ func to_dict() -> Dictionary:
 
 ## A group in play when it was saved (raiders are not) goes on from where it
 ## was last seen.
+## What a saved group must hold to go on (the keys read with []).
+const SAVED_KEYS: Array[String] = ["faction", "from", "town", "strength", "carries", "state", "area"]
+
+
 func from_dict(saved: Dictionary) -> void:
 	groups.clear()
 	_legs.clear()
 	var saved_groups: Variant = saved.get("groups", {})
 	if saved_groups is Dictionary:
 		for id: String in saved_groups:
+			# A group saved in an older shape, or broken, is let go (758: a restart now restores them).
+			if not saved_groups[id] is Dictionary or not SAVED_KEYS.all(func(key: String) -> bool: return (saved_groups[id] as Dictionary).has(key)):
+				print("[raids] saved group %s is not whole: let go" % id)
+				continue
 			var group: Dictionary = (saved_groups[id] as Dictionary).duplicate(true)
 			var cell: Variant = group.get("cell", [0, 0])
 			group["cell"] = Vector2i(int(cell[0]), int(cell[1])) if cell is Array and cell.size() == 2 else Vector2i.ZERO
