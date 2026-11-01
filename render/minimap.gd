@@ -109,7 +109,7 @@ func _ready() -> void:
 	world_button.name = "WorldMapButton"
 	world_button.text = WORLD_WORDS
 	world_button.focus_mode = Control.FOCUS_NONE
-	world_button.add_theme_font_size_override("font_size", UiTheme.size("small"))
+	world_button.add_theme_font_size_override("font_size", UiTheme.size("body"))  # Legible at 900 lines (the coordinator, 752).
 	world_button.pressed.connect(func() -> void: world_asked.emit())
 	add_child(world_button)
 

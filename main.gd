@@ -712,6 +712,8 @@ var pack_panel: PackPanel
 var minimap: Minimap
 ## The quest tracker (747, ui's side): the local player's Player.quest.
 var quest_panel: QuestPanel
+## A boss in sight, his name and hp at the top centre (752, ui's side).
+var boss_bar: BossBar
 ## Items' icons for the pack panel (none drawn headless).
 var item_icons: ItemIcons
 ## An open shop's goods, and the player's gold over the pack (ShopPanel).
@@ -11434,6 +11436,9 @@ func _build_talk() -> void:
 	add_child(item_icons)
 	pack_panel.icons = item_icons
 	$HUD.add_child(pack_panel)
+	boss_bar = BossBar.new()
+	boss_bar.boss_of = boss_in_sight
+	$HUD.add_child(boss_bar)
 	quest_panel = QuestPanel.new()
 	quest_panel.quest_of = func() -> Dictionary:
 		var own := _local_player()
@@ -11800,6 +11805,22 @@ func _on_offers_message(data: Dictionary) -> void:
 			deal_panel.show_wares(str(data.get("speaker", "")), data["offers"], gold, who.get_instance_id())
 		elif deal_panel.visible and deal_panel.entity_id == who.get_instance_id():
 			deal_panel.close()
+
+
+## The boss the HUD's bar shows (752, ui's side): the nearest spawned,
+## living boss (Monster.boss) in the local player's zone within
+## BossBar.SIGHT tiles; null for none.
+func boss_in_sight() -> GridEntity:
+	var player := _local_player()
+	if player == null:
+		return null
+	var best: GridEntity = null
+	for entity in World.monsters():
+		if entity.spawned and entity.hp > 0 and entity.zone == player.zone and BossBar.is_boss(entity):
+			var d := World.distance(entity.tile, player.tile)
+			if d <= BossBar.SIGHT and (best == null or d < World.distance(best.tile, player.tile)):
+				best = entity
+	return best
 
 
 ## Whether [param entity] is a talking monster at peace (629, ui's side):
@@ -12517,6 +12538,8 @@ func _display_name(entity: GridEntity) -> String:
 			return record.name
 	if entity is Resident and not entity.label.is_empty():
 		return entity.label
+	if not BossBar.given_name_of(entity).is_empty():
+		return BossBar.given_name_of(entity)  # A named one's own name (752, ui's side): "Crake".
 	return String(entity.name)
 
 

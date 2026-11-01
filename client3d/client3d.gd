@@ -1374,6 +1374,10 @@ const LABEL_SIZE := 0.004
 ## fight.
 const NAME_TILES := 8.0
 const LABEL_FONT_SIZE := 64
+## A boss's nameplate (752, ui's side): brass, a skull this many world units
+## square over its name.
+static var BOSS_NAME: Color = UiTheme.color("brass_bright")
+const BOSS_MARK := 0.32
 const SPEECH := Color(1, 0.95, 0.6)
 const HOVER := Color(1, 1, 1, 0.35)
 ## The monster a click would attack (the one under the cursor) is
@@ -2113,6 +2117,8 @@ var bandaging: Bandaging
 ## for their crackle (Ambience).
 var torch_cells: Array[Vector2i] = []
 var _hp_bar_shader: Shader
+## The boss's skull for nameplates (752, ui's side), made once.
+var _boss_mark: ImageTexture
 var _terrain: Dictionary = {}
 var _sun: DirectionalLight3D
 var _outdoor := false
@@ -14349,6 +14355,7 @@ func _sync_puppets() -> void:
 			if lantern != null and lantern.visible != (entity.emit_light > 0.0):
 				lantern.visible = entity.emit_light > 0.0  # Covered (L).
 		elif entity is Monster:
+			_sync_named(entity as Monster, puppet)
 			_sync_alert(entity as Monster, puppet)
 			_sync_chatter(entity as Monster, puppet)
 		_sync_down(entity, puppet)
@@ -14731,7 +14738,7 @@ func _sync_ailments(entity: GridEntity, puppet: Node3D) -> void:
 	var label := puppet.get_node_or_null("Name") as Label3D
 	if label == null:
 		return
-	var tint := AIL_BURN if entity.ailments.has("burn") else AIL_BLEED if entity.ailments.has("bleed") else Color.WHITE
+	var tint := AIL_BURN if entity.ailments.has("burn") else AIL_BLEED if entity.ailments.has("bleed") else puppet.get_meta("name_tint", Color.WHITE) as Color
 	if label.modulate != tint:
 		label.modulate = tint
 
@@ -14772,6 +14779,45 @@ func name_shown(entity: GridEntity, puppet: Node3D, now: int) -> bool:
 		if now - _combat_at.get(entity.get_instance_id(), -100000) < COMBAT_SECONDS * 1000.0:
 			return true
 	return false
+
+
+## A named one's own name and a boss's look on its nameplate (752, ui's
+## side; enemy-ai's replicated Monster.given_name and Monster.boss, which
+## may come after the puppet): the caption is its name ("Crake"), and a
+## boss's is brass with a skull over it (BossBar.skull_texture, BOSS_MARK
+## world units square). Redone only when either changes.
+func _sync_named(monster: Monster, puppet: Node3D) -> void:
+	var given := BossBar.given_name_of(monster)
+	var boss := BossBar.is_boss(monster)
+	var key := "%s|%s" % [given, boss]
+	if str(puppet.get_meta("named", "|false")) == key:
+		return
+	puppet.set_meta("named", key)
+	var label := puppet.get_node_or_null("Name") as Label3D
+	if label == null:
+		return
+	var caption := given if not given.is_empty() else (monster.label if not monster.label.is_empty() else String(monster.name))
+	puppet.set_meta("caption", caption)
+	label.text = caption
+	puppet.remove_meta("alert")  # Its alert's mark put back after the new name (_sync_alert).
+	puppet.set_meta("name_tint", BOSS_NAME if boss else Color.WHITE)
+	var mark := label.get_node_or_null("BossMark") as Sprite3D
+	if boss and mark == null:
+		mark = Sprite3D.new()
+		mark.name = "BossMark"
+		if _boss_mark == null:
+			_boss_mark = BossBar.skull_texture(64, Color.WHITE)
+		mark.texture = _boss_mark
+		mark.pixel_size = BOSS_MARK / 64.0
+		mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		mark.no_depth_test = true
+		mark.modulate = BOSS_NAME
+		mark.render_priority = label.render_priority
+		mark.position.y = BOSS_MARK * 1.3  # Clear of the caption under it (the coordinator, on the still).
+		label.add_child(mark)
+	elif not boss and mark != null:
+		label.remove_child(mark)
+		mark.queue_free()
 
 
 func _sync_alert(monster: Monster, puppet: Node3D) -> void:

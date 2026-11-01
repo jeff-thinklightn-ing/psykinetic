@@ -9,6 +9,7 @@ notes (decision 324).
 - Townsfolk with no roof to sleep under (visitors, Rolf and the like) now bed down by the town's fire, else beside the inn or temple, else by the store, each in a spot of their own (751, npc's side (2)).
 
 - The barrow's robbers carry their names to your screen, and Brand the Ox and the draugr are marked as bosses (752; ui draws them).
+- Monsters: a named robber's name shows on his nameplate and when you target him; a boss (Brand the Ox, the draugr) has a brass nameplate with a skull, and a bar at the top of the screen with his name and health while he's near (752, ui's side).
 - Outdoors: no more holes in the ground between the trees at the forest's edge (by Umbrage, along raised map edges): the forest floor and the pine stands now follow the land's height (753).
 - Leaving the barrow with a monster near the mound puts you at the nearest safe spot by it, not back at the wilds' far start by the foothills; the same for every arrival, respawn and revival with a monster close (749).
 - Brand the Ox: the Tomb Sledge winds up longer (0.9 s) and, once it lands or misses, he stands planted for 0.8 s with its head in the ground: step out of reach while he heaves, then hit him as he drags it back up (750, combat's side).

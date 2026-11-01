@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _test_world_map()
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
 	await _test_deal_window()
+	await _test_boss_marks()
 	await _test_quest_tracker()
 	_test_door_note()
 	_test_arrival_card()
@@ -841,6 +842,67 @@ func _test_quest_tracker() -> void:
 
 
 ## A talking monster's deals as buttons (629, ui's side).
+
+func _test_boss_marks() -> void:
+	print("== 752, ui's side: a named one's name on its plate and target, a boss's skull and bar ==")
+	var bar: BossBar = _main.boss_bar
+	_check(bar != null and bar.get_parent() == _main.get_node("HUD") and not bar.visible, "the boss bar is in the HUD, hidden with no boss in sight")
+	_check(BossBar.given_name_of(null) == "" and not BossBar.is_boss(null), "nobody: no name, no boss")
+	var player: GridEntity = _main._local_player()
+	if player == null:
+		print("  (no local player on the host: the live path skipped)")
+		return
+	var beside := Vector2i(-1, -1)
+	for near: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if World.is_walkable(player.tile + near) and World.get_entity_at(player.tile + near) == null:
+			beside = player.tile + near
+			break
+	if beside.x < 0:
+		print("  (no free cell beside the player: the live path skipped)")
+		return
+	var robber: Monster = _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "BossRobber", "tile": beside}) as Monster
+	if robber == null:
+		_check(false, "a monster spawned beside the player")
+		return
+	_check(_main._display_name(robber) == "BossRobber" and _main.boss_in_sight() == null, "one known by its kind: its own node name, and no boss")
+	robber.given_name = "Crake"
+	_check(_main._display_name(robber) == "Crake" and BossBar.given_name_of(robber) == "Crake" and _main.boss_in_sight() == null,
+		"a named robber: his name for the target, and he is no boss")
+	var client := Client3D.new()  # Never in the tree: _sync_named reads only the puppet.
+	var puppet := Node3D.new()
+	var plate := Label3D.new()
+	plate.name = "Name"
+	puppet.add_child(plate)
+	client._sync_named(robber, puppet)
+	_check(plate.text == "Crake" and plate.get_node_or_null("BossMark") == null and puppet.get_meta("name_tint") == Color.WHITE,
+		"his nameplate reads Crake, plain white, no skull")
+	robber.given_name = "Brand the Ox"
+	robber.boss = true
+	client._sync_named(robber, puppet)
+	var mark := plate.get_node_or_null("BossMark") as Sprite3D
+	_check(plate.text == "Brand the Ox" and mark != null and mark.texture != null and mark.no_depth_test and puppet.get_meta("name_tint") == Client3D.BOSS_NAME,
+		"the boss's nameplate: his name in brass with the skull over it")
+	_check(_main.boss_in_sight() == robber, "beside the player, he is the boss in sight")
+	await get_tree().process_frame
+	_check(bar.visible and bar.boss == robber and bar._title.text == "Brand the Ox" and is_equal_approx(bar.share(), 1.0)
+		and bar.bar_rect().size.x > 0.0 and absf(bar.bar_rect().get_center().x - bar.get_viewport_rect().size.x / 2.0) < 1.0,
+		"the bar shows at the top centre, his name over it, full (%s, %s)" % [bar.visible, bar.share()])
+	robber.hp = maxi(1, int(robber.max_hp / 2))
+	_check(absf(bar.share() - float(robber.hp) / float(robber.max_hp)) < 0.001, "hurt, the bar falls with his hp")
+	robber.boss = false
+	client._sync_named(robber, puppet)
+	_check(plate.get_node_or_null("BossMark") == null and _main.boss_in_sight() == null, "no longer a boss: the skull goes, and the bar's boss")
+	await get_tree().process_frame
+	_check(not bar.visible, "the bar hides with no boss in sight")
+	robber.boss = true
+	robber.hp = 0
+	_check(_main.boss_in_sight() == null, "a fallen boss is not in sight")
+	puppet.free()
+	client.free()
+	World.despawn(robber)
+	await get_tree().process_frame
+
+
 func _test_deal_window() -> void:
 	print("== a talking monster's deals as buttons (629, ui's side): E greets him, his offers open the window, a button sends the offer ==")
 	var offers: Array = [{"id": "deal:7", "kind": "deal", "title": "Face the draugr", "words": "Return the gold.",

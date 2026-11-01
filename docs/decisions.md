@@ -37002,3 +37002,19 @@ bedroll is (3), on the client. resident_test _test_asleep: two roofless
 each get a 1x2, apart and out of every building, while the housed keep
 their house; the spot is kept from sync to sync; with a fire in town, two
 or three cells off it. Server only, protocol unchanged.
+752, ui's side: the client draws both fields (the coordinator's pick A).
+- The name: a monster's nameplate reads its given_name (Client3D._sync_named),
+  and so does the target and every place Main._display_name names it ("Crake").
+  The read is BossBar.given_name_of, "" for none.
+- A boss's plate: his name in brass ("brass_bright"; its ailment tint falls
+  back to that), with a drawn skull over it (BossBar.skull_texture, a Sprite3D
+  "BossMark", billboarded, never hidden by walls).
+- The bar: BossBar (new class_name) at the HUD's top centre, with the skull, his
+  name in the Heading type, and a long hp bar in "alarm" under it. It shows
+  while a boss (BossBar.is_boss, keyed on the flag, never on a kind) is spawned,
+  alive, in the local player's zone and within SIGHT (14) tiles: the nearest
+  such, Main.boss_in_sight. No new words: the bar shows his own name only.
+Folded in from the still (the coordinator): the skull raised clear of the caption, and
+445 amended's "World map" button set in the body size, legible at 900 lines.
+ui_test _test_boss_marks. Still: C:/dev/review/boss/brand-plate-and-bar.png.
+Client only, under rev 44 (b16a7a9da620); a new class_name, BossBar.
