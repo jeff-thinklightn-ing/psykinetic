@@ -327,10 +327,11 @@
 			"home": true
 		},
 		{
-			"slot": "building.temple",
+			"kind": "temple",
+			"size": "small",
 			"at": [
-				216.0,
-				195.0
+				215.0,
+				191.0
 			],
 			"facing": [
 				0.0,

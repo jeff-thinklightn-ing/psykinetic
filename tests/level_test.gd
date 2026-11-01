@@ -372,8 +372,8 @@ func _test_link_cues() -> void:
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
 	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
 			"the barrow's depths: the Ossuary's stair up to the shallower, the sealed shortcut behind the throne its slab (666)")
-	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(216, 195)).get("cue") == "sealed",
-			"the mound's door is its own cue; the sealed shortcut (in the temple since 715) its slab")
+	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(215, 191)).get("cue") == "sealed",
+			"the mound's door is its own cue; the sealed shortcut (in the temple since 715, its back corner since 734 amended (2)) its slab")
 	var wilds := Level.load_level("wilds")
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
 			"each link carries its cue for the big map")
@@ -1656,12 +1656,25 @@ func _test_building_level_link() -> void:
 		_check(refused["links"].is_empty() and refused["terrain"]["links_at"].is_empty() and said.call(refused).size() == 1,
 			"%s: said and left out (%s)" % [bad, said.call(refused)])
 	var wilds := Level.load_level("wilds")
-	var temple: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.temple")
+	var temple: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b.get("kind", "") == "temple")
 	var stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow_deep")
 	_check(temple.size() == 1 and stair.size() == 1 and stair[0]["tile"] == (temple[0]["rect"] as Rect2i).position and stair[0]["building"] == temple[0]["code"]
 		and stair[0]["sealed"] == "draugr" and stair[0]["to_spawn"] == "from_temple" and not Vector2i(217, 193) in wilds["terrain"]["links_at"]
 		and wilds["warnings"].filter(func(w: String) -> bool: return "link" in w).is_empty(),
 		"the wilds' temple carries the sealed stair down in its north-west back corner; the old one behind it is gone (%s)" % [stair])
+	# 734 amended (2): Umbrage's temple is the chapel, the temple kind, its
+	# doors, front, counter and the shortcut's landing as they were.
+	if temple.size() == 1:
+		var chapel: Dictionary = temple[0]
+		var floor_cells: Array = wilds["terrain"]["floor"]
+		var counter: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return bool(spec.get("props", {}).get("temple", false)))
+		var landing: Vector2i = Vector2i(wilds["spawn_points"]["from_barrow_shortcut"]) if wilds["spawn_points"].get("from_barrow_shortcut") is Vector2i else Vector2i(-1, -1)
+		var temple_said: Array = wilds["warnings"].filter(func(w: String) -> bool: return "temple" in w)
+		_check(chapel["rect"] == Rect2i(215, 191, 6, 10) and chapel["size"] == "small" and chapel["place"] == "temple" and chapel["use"] == "temple"
+			and chapel["doors"] == [Vector3i(217, 200, Terrain.SOUTH), Vector3i(218, 200, Terrain.SOUTH)] and chapel["front"] == Vector2i(217, 201)
+			and wilds["places"].has("temple@217,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
+			and (chapel["rect"] as Rect2i).has_point(landing) and floor_cells.has(landing) and temple_said.is_empty(),
+			"Umbrage's temple is the chapel: 6 x 10, doors (217, 200) and (218, 200), its place at the front, the counter and the shortcut's landing inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
 
 
 ## Umbrage's locker (722): one chest prop {"locker": true}, since 737 in
@@ -1719,7 +1732,7 @@ func _test_beds() -> void:
 	var turf: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.turf_house")
 	_check(homes.size() == 1 and (homes[0].get("beds", []) as Array).size() == 3 and huts.size() == 2
 		and huts.all(func(hut: Dictionary) -> bool: return (hut.get("beds", []) as Array).size() == 1)
-		and forge.size() == 1 and not forge[0].has("beds") and by_slot.get("building.temple", 0) == 0
+		and forge.size() == 1 and not forge[0].has("beds") and wilds["buildings"].all(func(b: Dictionary) -> bool: return b.get("use", "") != "temple" or not b.has("beds"))
 		and turf.size() == 1 and (turf[0]["beds"] as Array).size() == 1 and bool(turf[0]["beds"][0]["solid"]),
 		"Umbrage: three beds in the player's house, one in each 3 x 3 hut, none in the forge or the temple, the turf hut its own (%s)" % [listed])
 	_check(wrong.is_empty(), "Umbrage's beds on floor, off the locker and every entity, two-cell ways kept (%s)" % [wrong])

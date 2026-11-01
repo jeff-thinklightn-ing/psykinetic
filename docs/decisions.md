@@ -35711,6 +35711,20 @@ content (no composer piece). view_test _test_chapel: six and six, none by the do
 leaning, broken rafters in disrepair only, the bell gone then hung, a ridge beam a metre. Client
 only, protocol unchanged, no new class_name.
 
+734 amended (2), Umbrage's temple is the chapel (the coordinator's approval): the wilds' slot
+building.temple becomes {"kind": "temple", "size": "small"} at (215, 191) facing south, 6 x 10 over
+215-220 x 191-200, keeping its "use": "temple", "town": "store" and level_link. The doors stay at
+(217, 200) and (218, 200), so its front and its respawn place (temple@217,201) and its code (T) are
+as they were; the counter (217, 195) and the shortcut's landing (217, 192) are inside, and the stair
+down moves to its north-west back corner (215, 191). The layout's outline is repainted, the old
+plinth's north edge row inside it dropped; relief rows 191-192 under it come down to the plinth's
+height. Readers of the slot follow the place: Music.temple_nearness takes a building whose place is
+"temple"; npc's Main._is_temple matches use or place (734 amended, c055db7d). A kind's own floor
+cells take only the indoor scatter (no tufts through the chapel's stone). There is no altar yet
+(no slot); the coordinator queues one with the barrow lore. level_test (the chapel's rect, doors,
+front, counter and landing; the sealed slab's cue at its corner). Client and server read levels/,
+so it rides a cut; protocol unchanged, no new class_name.
+
 ## 733. A healer's hut decays empty and its healer mends it
 
 Jeff, on the turf hut: "it decays when nobody lives in it, and the healer

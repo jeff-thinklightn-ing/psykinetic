@@ -369,11 +369,12 @@ static func _config_of(level_name: String) -> Dictionary:
 
 
 ## 0..1: how near [param cell] is to a temple among [param buildings]
-## (the terrain's: slot building.temple, rect).
+## (the terrain's: slot building.temple or a kind whose place is "temple",
+## the chapel since 734 amended (2); rect).
 static func temple_nearness(buildings: Array, cell: Vector2i) -> float:
 	var nearest := INF
 	for building: Dictionary in buildings:
-		if str(building.get("slot", "")) != "building.temple" or not building.get("rect") is Rect2i:
+		if (str(building.get("slot", "")) != "building.temple" and str(building.get("place", "")) != "temple") or not building.get("rect") is Rect2i:
 			continue
 		var rect: Rect2i = building["rect"]
 		var dx := maxi(0, maxi(rect.position.x - cell.x, cell.x - rect.end.x + 1))
