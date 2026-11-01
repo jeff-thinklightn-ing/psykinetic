@@ -1300,6 +1300,11 @@ const TREE_LEAN := 0.1
 const TREE_NUDGE := 0.42
 const FOREST_CLUMP := 6.0
 const FOREST_GROUND := 3
+## The forest floor on the relief past those rings (_add_forest_band): a
+## mesh this many cells square; [member _band_cells] its cells.
+const FOREST_BAND_CHUNK := 32
+var _band_cells: Dictionary[Vector2i, bool] = {}
+var _band_vertices: Dictionary[Vector2i, float] = {}
 ## The art slots made once before a room is built (_warm_art).
 const WARM_CATEGORIES: Array[String] = ["walls", "doors", "trees", "rocks", "buildings"]
 ## Saplings: how often an edge cell has one besides its tree, and their
@@ -3795,10 +3800,14 @@ func _height_in(cell: Vector2i, point: Vector2) -> float:
 
 
 ## [param cell]'s ground in metres at its middle (decision 525): its
-## elevation in the relief, else its whole level.
+## elevation in the relief, else its whole level; off a relief's map (the
+## forest past its edge) the nearest cell's on it (753: at 0 a raised map's
+## edge stood over a pit).
 func _elevation(cell: Vector2i) -> float:
-	if _relief.is_empty() or not Relief.on_map(_relief_size, cell):
+	if _relief.is_empty():
 		return _height(cell) * LEVEL_RISE
+	if not Relief.on_map(_relief_size, cell):
+		return _band_height(cell)
 	return Relief.at(_relief, _relief_size, cell)
 
 
@@ -3853,7 +3862,8 @@ func _ground_corners(cell: Vector2i, kept: Dictionary = _curve_kept) -> PackedFl
 	if _ramp_heights.has(cell):
 		return _ramp_heights[cell]
 	if _relief.is_empty() or not Relief.on_map(_relief_size, cell):
-		var flat := _height(cell) * LEVEL_RISE
+		# Off a relief's map, the nearest cell's on it (_elevation, 753).
+		var flat := _elevation(cell)
 		return PackedFloat32Array([flat, flat, flat, flat])
 	return Relief.corner_heights(_relief, _relief_size, cell)
 
@@ -7350,6 +7360,98 @@ func _add_forest_edge() -> void:
 		forest_floor.material_override = season_material(material, false, false)
 	forest_floor.position = Vector3((low.x + high.x) * 0.5, -FOREST_FLOOR_DEPTH, (low.y + high.y) * 0.5)
 	_room.add_child(forest_floor)
+	_add_forest_band(forest_floor.material_override)
+
+
+## The forest floor on the land's relief (decision 753): past the rings the
+## ground runs into (_ground_input's ground_ring), out to FOREST_REACH, each
+## void cell a quad at its relief corners (off the map, the nearest cell's
+## on it, flat), in the forest floor's material, a mesh a FOREST_BAND_CHUNK;
+## the flat ForestFloor stays under it. Without it a raised map's forest
+## past the first ring stood over the plane at -FOREST_FLOOR_DEPTH, a pit
+## between the edge's trees (Jeff on v0.1.194: "a hole in the map"). None
+## on a map with no relief, whose ground stands on the plane's level.
+func _add_forest_band(material: Material) -> void:
+	_band_cells.clear()
+	_band_vertices.clear()
+	if _relief.is_empty() or _relief_size == Vector2i.ZERO:
+		return
+	var ring := PineStands.FROM - 1 if PineStands.drawn() else FOREST_GROUND
+	var ground: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in _ground_cells:
+		ground[cell] = true
+	_band_vertices.clear()
+	var chunks: Dictionary[Vector2i, Array] = {}
+	for cell: Vector2i in _forest_distance:
+		if _forest_distance[cell] <= ring or _wooded.has(cell) or ground.has(cell):
+			continue
+		_band_cells[cell] = true
+		var key := Vector2i(floori(cell.x / float(FOREST_BAND_CHUNK)), floori(cell.y / float(FOREST_BAND_CHUNK)))
+		if not chunks.has(key):
+			chunks[key] = []
+		chunks[key].append(cell)
+	for key: Vector2i in chunks:
+		# (Packed arrays are values: built here, then given to the mesh.)
+		var points := PackedVector3Array()
+		var normals := PackedVector3Array()
+		for cell: Vector2i in chunks[key]:
+			var h := PackedFloat32Array()
+			for corner: Vector2i in GROUND_CORNERS:
+				h.append(_band_vertex(cell + corner, ground))
+			# GROUND_CORNERS' order: (0,0), (1,0), (0,1), (1,1), each at the
+			# cell's corner (its middle the cell's coordinates).
+			var p := [Vector3(cell.x - 0.5, h[0], cell.y - 0.5), Vector3(cell.x + 0.5, h[1], cell.y - 0.5),
+					Vector3(cell.x - 0.5, h[2], cell.y + 0.5), Vector3(cell.x + 0.5, h[3], cell.y + 0.5)]
+			# Godot's front faces wind clockwise seen from the front (above).
+			for triangle: Array in [[0, 1, 2], [1, 3, 2]]:
+				var a: Vector3 = p[triangle[0]]
+				var b: Vector3 = p[triangle[1]]
+				var c: Vector3 = p[triangle[2]]
+				var normal := (c - a).cross(b - a).normalized()
+				points.append_array([a, b, c])
+				normals.append_array([normal, normal, normal])
+		var arrays := []
+		arrays.resize(Mesh.ARRAY_MAX)
+		arrays[Mesh.ARRAY_VERTEX] = points
+		arrays[Mesh.ARRAY_NORMAL] = normals
+		var mesh := ArrayMesh.new()
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+		var band := MeshInstance3D.new()
+		band.name = "ForestBand_%d_%d" % [key.x, key.y]
+		band.mesh = mesh
+		band.material_override = material
+		band.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_room.add_child(band)
+
+
+## The band's height at ground corner [param vertex] (one a vertex, so no
+## slit opens between its quads, even across a cliff in the relief): where
+## the ground's cells ([param ground]) meet it, their drawn corner there,
+## the lowest if they differ, so the band meets the ground with no step;
+## else the mean of the four cells' round it (_band_height). Kept in
+## [member _band_vertices].
+func _band_vertex(vertex: Vector2i, ground: Dictionary[Vector2i, bool]) -> float:
+	if _band_vertices.has(vertex):
+		return _band_vertices[vertex]
+	var low := INF
+	var sum := 0.0
+	for c in 4:
+		# The cell round the vertex whose corner c it is.
+		var other := vertex - GROUND_CORNERS[c]
+		if ground.has(other):
+			low = minf(low, _corner_heights(other)[c])
+		sum += _band_height(other)
+	var height := low if low < INF else sum * 0.25
+	_band_vertices[vertex] = height
+	return height
+
+
+## The forest floor's height (m) at [param cell]: its relief, or off the
+## map the nearest cell's on it; 0 with no relief.
+func _band_height(cell: Vector2i) -> float:
+	if _relief.is_empty() or _relief_size == Vector2i.ZERO:
+		return 0.0
+	return Relief.at(_relief, _relief_size, cell.clamp(Vector2i.ZERO, _relief_size - Vector2i.ONE))
 
 
 ## The low camera's skirt (623, terrain's side): round the forest's bounds
@@ -8364,11 +8466,18 @@ func _add_stands(distance: Dictionary[Vector2i, int], stood: Dictionary[Vector2i
 		for at in PineStands.FOOTPRINT:
 			stood[corner + at] = true
 		var variant: int = stand["variant"]
+		# On the land's relief, its footprint's lowest (decision 753): at y 0
+		# a raised map's stands stood sunk under the forest floor.
+		var placed := PineStands.transform_of(stand)
+		var foot := INF
+		for at in PineStands.FOOTPRINT:
+			foot = minf(foot, _band_height(corner + at))
+		placed.origin.y = foot
 		if int(stand["near"]) <= PineStands.NEAR:
 			var piece := Node3D.new()
 			piece.name = "Stand_%d_%d" % [corner.x, corner.y]
 			piece.set_meta(&"slot", PineStands.SLOT)
-			piece.transform = PineStands.transform_of(stand)
+			piece.transform = placed
 			var drawn := MeshInstance3D.new()
 			drawn.mesh = PineStands.mesh(variant)
 			piece.add_child(drawn)
@@ -8378,7 +8487,7 @@ func _add_stands(distance: Dictionary[Vector2i, int], stood: Dictionary[Vector2i
 		var key := Vector3i(floori(corner.x / float(PineStands.CHUNK)), floori(corner.y / float(PineStands.CHUNK)), variant)
 		if not far.has(key):
 			far[key] = []
-		far[key].append(PineStands.transform_of(stand))
+		far[key].append(placed)
 	for key: Vector3i in far:
 		var multimesh := MultiMesh.new()
 		multimesh.transform_format = MultiMesh.TRANSFORM_3D

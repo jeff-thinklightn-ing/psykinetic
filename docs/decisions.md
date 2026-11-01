@@ -36932,3 +36932,41 @@ before it. Approved by the coordinator (2026-10-31).
   (the respawn's walk filled it to PartyLog.MAX_LINES, so a size taken before read nothing).
 
 Server only, protocol unchanged, no new class_name.
+
+## 753: the forest floored on the land's relief
+
+Jeff on v0.1.194: "same graphical glitch is happening around map edges and for example in between
+a cluster of trees near umbrage, in between the trees a hole in the map". With the pine stands
+drawn (369) the ground ran one ring into the forest (PineStands.FROM - 1); past it the floor was
+the flat ForestFloor plane at -FOREST_FLOOR_DEPTH and the stands stood at y 0
+(PineStands.transform_of), while the edge trees and the void cells' relief follow the land (525).
+On a raised map every stretch of forest from ring 2 out was a pit between the edge trees: on the
+wilds 1,595 such cells over 0.5 m deep, 6.7 m south of Umbrage at (225,239), 10.3 m at (165,42).
+The canopy hid it until the nearer, flatter low camera (623 amended (2): zoom 0.4, 12 degrees).
+Not 660 amended (4)'s workers, nor 623 amended (2)'s near fade.
+
+- Client3D._add_forest_band: every forest cell past the ground's rings out to FOREST_REACH (not
+  wooded, not ground) a quad, one height a vertex (_band_vertex, kept in _band_vertices) so no slit
+  opens between quads even across a cliff in the relief: where ground cells meet the vertex, their
+  drawn corner there (the lowest if they differ: a higher one is the ground's own step), so the band
+  meets the ground with no step; else the mean of _band_height round it (the relief; off the map,
+  the nearest on-map cell's). In ForestFloor's material, a mesh a FOREST_BAND_CHUNK (32) cells, no
+  shadows; the flat plane stays under it. None on a map with no relief, whose ground stands on the
+  plane's level.
+- _add_stands: a stand stands on its footprint's lowest _band_height.
+- TerrainBorder._cell_canopy: the canopy's inner lip sinks below its land's height, not below 0.
+- Off a relief's map (the forest past a map's edge), _elevation and _ground_corners' fallback give
+  the nearest on-map cell's relief (_band_height), not 0: the foothills' first ring by its north
+  link stood 11.66 m under its land. Maps' glimpse lift (its own decision) reads its glimpse cells
+  before this.
+- view_test _test_forest_floor_whole, every outdoor level with a relief: every land cell and forest
+  cell out to FOREST_REACH has the ground or the band under it; the band drawn, two triangles a
+  cell; the band on the ground's corner wherever they meet (BAND_SEAM 0.05); every stand on the
+  relief.
+
+Measured: forest cells beside drawn ground with a drop over 0.5 m, wilds 1,595 to 0, foothills to
+0. Frames (map_bench, wilds by Umbrage (226,234), low camera, yaw 135, 20 s, interleaved x3, base
+8ad5a8d3): median 1.29/1.32/1.28 ms before, 1.29/1.27/1.28 ms after, draw calls 223 both; no
+measurable cost. Stills: C:/dev/review/lands/holes (before/after-umbrage-near, zoom 0.4).
+
+Client only, protocol unchanged, no new class_name.

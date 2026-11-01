@@ -161,7 +161,7 @@ func _work(land: Dictionary[Vector2i, bool], heights: Dictionary, rise: float, c
 
 
 ## One cell of canopy into [param into]: its corners at crown height (down
-## to [param sunk] where a corner is nearer the land than START), two flat
+## to [param sunk] below its land where a corner is nearer the land than START), two flat
 ## facets, each a foliage swatch by the crowns, darker in a hollow and
 ## further off.
 static func _cell_canopy(into: Array, cell: Vector2i, distance: Dictionary[Vector2i, int], base: Dictionary[Vector2i, float], colours: Array[Color], sunk: float) -> void:
@@ -184,7 +184,10 @@ static func _cell_canopy(into: Array, cell: Vector2i, distance: Dictionary[Vecto
 		var roll := Client3D._field(place, CROWN_SIZE, 60) * 0.7 + Client3D._field(place, CROWN_SIZE * 0.45, 61) * 0.3
 		var up := clampf((near - (START - 1)) / 2.0, 0.0, 1.0)
 		var top := ground + CROWN + (roll - 0.5) * 2.0 * CROWN_ROLL + (Client3D._roll(at, 63) - 0.5) * 2.0 * CROWN_PEAK
-		corners.append(Vector3(place.x, lerpf(sunk, top, up), place.y))
+		# Its lip under the forest floor where the land stands (decision 753):
+		# sunk below the land's height, not below 0, which on a raised map
+		# left the canopy rising out of a pit.
+		corners.append(Vector3(place.x, lerpf(ground + sunk, top, up), place.y))
 		rolls.append(roll)
 	var far := clampf(float(distance.get(cell, REACH) - START) / float(REACH - START), 0.0, 1.0)
 	for triangle: Array in [[0, 2, 1], [1, 2, 3]]:

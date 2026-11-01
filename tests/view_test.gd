@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_ledge_curves()
 	_test_damp_look()
 	_test_forest_edge()
+	_test_forest_floor_whole()
 	_test_curve_passes()
 	_test_clearing()
 	_test_dais()
@@ -3978,6 +3979,83 @@ func _test_forest_edge() -> void:
 						astray_scatter += 1
 		_check(by_edge > 0 and astray_scatter == 0,
 				"%s: the scatter by the edge on its own side of the curve, the roots within %.1f of it (%d by it; astray: %d)" % [name, Client3D.EDGE_ROOTS, by_edge, astray_scatter])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## No hole in the ground (decision 753; Jeff on v0.1.194: "in between the
+## trees a hole in the map"): on every outdoor level with a relief, every
+## land cell and every forest cell out to FOREST_REACH has the ground or
+## the forest band under it; where the band meets the ground their shared
+## corners stand within BAND_SEAM; and every stand stands on the band, not
+## at 0 under it.
+func _test_forest_floor_whole() -> void:
+	print("\n== no hole in the ground: the land and its forest floored whole, the band on the relief ==")
+	const BAND_SEAM := 0.05
+	var tried := 0
+	for name: String in Level.names():
+		var level := Level.load_level(name)
+		var terrain: Dictionary = level["terrain"]
+		if not bool(terrain.get("outdoor", false)) or not terrain.has("relief"):
+			continue
+		tried += 1
+		_rig.rebuild(terrain, level["centre"])
+		var covered: Dictionary = {}
+		for cell: Vector2i in _rig._ground_cells:
+			covered[cell] = true
+		var bare: Array[Vector2i] = []
+		for cell: Vector2i in _rig._land:
+			if not covered.has(cell):
+				bare.append(cell)
+		for cell: Vector2i in _rig._forest_distance:
+			if _rig._forest_distance[cell] >= 1 and not _rig._wooded.has(cell) and not covered.has(cell) and not _rig._band_cells.has(cell):
+				bare.append(cell)
+		_check(not _rig._band_cells.is_empty() and bare.is_empty(),
+				"%s: every land cell and forest cell out to %d floored (%d ground, %d band; bare: %s)" % [name, Client3D.FOREST_REACH, covered.size(), _rig._band_cells.size(), bare.slice(0, 4)])
+		# Where the band meets the ground: at each shared corner, the band on
+		# the ground's lowest corner there (a higher one is the ground's own
+		# cliff); each band corner one vertex, so no slit between its quads.
+		# Drawn: the band's meshes hold its cells' two triangles each.
+		var vertices := 0
+		for band: MeshInstance3D in _rig._room.find_children("ForestBand_*", "MeshInstance3D", false, false):
+			if band.mesh != null and (band.mesh as ArrayMesh).get_surface_count() > 0:
+				vertices += ((band.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+		_check(vertices == _rig._band_cells.size() * 6, "%s: the band drawn, two triangles a cell (%d vertices for %d cells)" % [name, vertices, _rig._band_cells.size()])
+		var steps: Array = []
+		var met := 0
+		var rise := 0.0
+		var rise_at := Vector2i.ZERO
+		for cell: Vector2i in _rig._band_cells:
+			for c in 4:
+				var vertex: Vector2i = cell + Client3D.GROUND_CORNERS[c]
+				var band: float = _rig._band_vertices.get(vertex, NAN)
+				var low := INF
+				var high := -INF
+				for k in 4:
+					var other: Vector2i = vertex - Client3D.GROUND_CORNERS[k]
+					if covered.has(other):
+						var drawn: float = _rig._corner_heights(other)[k]
+						low = minf(low, drawn)
+						high = maxf(high, drawn)
+				if is_nan(band) or low < INF and absf(band - low) > BAND_SEAM:
+					steps.append([vertex, band, low])
+				elif low < INF:
+					met += 1
+					if high - band > rise:
+						rise = high - band
+						rise_at = vertex
+		_check(met > 0 and steps.is_empty(), "%s: the band on the ground's corner wherever they meet (%d corners, the ground's own steps above it up to %.2f m at %s; off: %s)" % [name, met, rise, rise_at, steps.slice(0, 3)])
+		var sunk: Array = []
+		var stands := 0
+		for stand: Node3D in _rig._room.find_children("Stand_*", "", false, false):
+			stands += 1
+			var corner := Vector2i(str(stand.name).get_slice("_", 1).to_int(), str(stand.name).get_slice("_", 2).to_int())
+			var foot := INF
+			for at in PineStands.FOOTPRINT:
+				foot = minf(foot, _rig._band_height(corner + at))
+			if absf(stand.position.y - foot) > 0.01:
+				sunk.append([corner, snappedf(stand.position.y, 0.01), snappedf(foot, 0.01)])
+		_check(sunk.is_empty(), "%s: every stand on the forest floor's relief, its footprint's lowest (%d stands; off: %s)" % [name, stands, sunk.slice(0, 3)])
+	_check(tried >= 2, "%d outdoor levels with a relief tried" % tried)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
