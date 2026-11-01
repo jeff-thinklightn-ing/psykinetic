@@ -387,6 +387,11 @@ const STANCE_WORDS: Array[String] = [
 	"getting away from the monsters, to safety",
 ]
 
+## Each stance as a course she took, for "from ... to ..." in the voice's
+## ask (voice, 748 amended (3): the voice never sees the stance names).
+const COURSE_WORDS: Array[String] = ["keeping close", "holding your ground", "pressing the attack", "keeping guard",
+	"falling back"]
+
 ## Emitted with a line she says, once the rate limit and the echo check pass.
 signal said(text: String)
 ## A deed of her player's that moves her bond, seen by her (decision 621):
@@ -2008,7 +2013,7 @@ func _watch() -> void:
 			threshold = true
 			_fight_notable = true
 			var mine := whose == "hp_band"
-			var event := "%s %s" % ["Your HP" if mine else "%s's HP" % keeper_name(), _hp_change(_seen[whose], now[whose])]
+			var event := strength_words(now[whose], "" if mine else keeper_name())
 			var body: GridEntity = self if mine else keeper
 			var told := "%s %s now" % ["You are" if mine else "%s is" % keeper_name(), health_words(body)]
 			if mine and now[whose] == HP_THRESHOLDS.size():
@@ -2016,9 +2021,9 @@ func _watch() -> void:
 			if now[whose] == HP_THRESHOLDS.size() and not standing_instruction().is_empty():
 				# Either of them badly hurt: what was asked no longer binds her.
 				_narrate("%s, and what %s asked of you no longer binds you." % [told, keeper_name()])
-				events.append("%s, so %s's instruction no longer holds." % [event, keeper_name()])
+				events.append("%s, so what %s asked of you no longer holds." % [event, keeper_name()])
 				_lapsed_from = stance_name()
-				_lapse_why = "your HP is low" if mine else "%s's HP is low" % keeper_name()
+				_lapse_why = "you are badly hurt" if mine else "%s is badly hurt" % keeper_name()
 				_instruction = ""
 				lapsing = true
 			else:
@@ -2226,8 +2231,8 @@ func _explain_lapse() -> void:
 	if stance_name() != was:
 		var now_words := STANCE_WORDS[stance] % keeper_name() if "%s" in STANCE_WORDS[stance] else STANCE_WORDS[stance]
 		_narrate("You have changed what you are doing: you are %s now. Tell %s why." % [now_words, keeper_name()])
-		_ask_voice("%s, so %s's instruction no longer holds, and you changed course: from %s to %s. Say why, briefly." % [
-			_lapse_why[0].to_upper() + _lapse_why.substr(1), keeper_name(), was, stance_name()], "", true)
+		_ask_voice("%s, so what %s asked of you no longer holds, and you changed course: from %s to %s. Say why, briefly." % [
+			_lapse_why[0].to_upper() + _lapse_why.substr(1), keeper_name(), course_words(was), course_words(stance_name())], "", true)
 
 
 ## Whether [param entity] is her foe (decision 332): a monster, but of the
@@ -2461,14 +2466,20 @@ static func _hp_band(entity: GridEntity) -> int:
 	return band
 
 
-## "fell below 30%" / "rose above 50%", from HP_THRESHOLDS bands.
-static func _hp_change(before: int, now: int) -> String:
-	return "%s %s" % ["fell below" if now > before else "rose above", _threshold_crossed(before, now)]
+## [param name] (a STANCE_NAMES entry) as COURSE_WORDS says it.
+static func course_words(name: String) -> String:
+	var at := STANCE_NAMES.find(name)
+	return COURSE_WORDS[at] if at >= 0 else "following"
 
-
-static func _threshold_crossed(before: int, now: int) -> String:
-	var threshold: float = HP_THRESHOLDS[maxi(before, now) - 1]
-	return "%d%%" % roundi(threshold * 100.0)
+## The HP_THRESHOLDS band [param band] fallen into, in words (voice, 748
+## amended (3): no number or percent she might say back): hers with no
+## [param who], else [param who]'s.
+static func strength_words(band: int, who := "") -> String:
+	var subject := "You are" if who.is_empty() else "%s is" % who
+	var whose := "your" if who.is_empty() else "their"
+	if band >= HP_THRESHOLDS.size():
+		return "%s near the end of %s strength" % [subject, whose]
+	return "%s down to half %s strength" % [subject, whose]
 
 
 # --- Asking -------------------------------------------------------------------
@@ -3042,7 +3053,7 @@ func where_words(full := true) -> String:
 		"cave":
 			return "You are in a cave; outside it is %s." % hour
 		"dungeon":
-			return "You are in a dungeon, under the ground; above it is %s." % hour
+			return "You are below ground, in old stone halls; above them is %s." % hour
 		_:
 			return "You are indoors; outside it is %s." % hour
 
@@ -3064,7 +3075,7 @@ func _where_briefly() -> String:
 		"cave":
 			return "You are in a cave."
 		"dungeon":
-			return "You are in a dungeon, under the ground."
+			return "You are below ground, in old stone halls."
 		_:
 			return "You are indoors."
 
@@ -5546,7 +5557,7 @@ func situation_text() -> String:
 	var sentences: Array[String] = []
 	var count := NUMBERS[mini(next_to_her, NUMBERS.size() - 1)]
 	sentences.append("%s monster%s next to you." % [count, " is" if next_to_her == 1 else "s are"])
-	sentences.append("You have %d of %d HP." % [hp, max_hp])
+	sentences.append("Your health is %d of %d." % [hp, max_hp])
 	var her_danger := _in_danger(self)
 	var their_danger := false
 	var who := keeper_name()
@@ -5555,7 +5566,7 @@ func situation_text() -> String:
 		hurt.append("You are badly hurt, but nothing is near you.")
 	if _alive(keeper):
 		var distance := World.distance(tile, keeper.tile)
-		sentences.append("%s is %s with %d of %d HP." % [who,
+		sentences.append("%s is %s, health %d of %d." % [who,
 			"next to you" if distance <= 1 else "%d cells away" % distance, keeper.hp, keeper.max_hp])
 		their_danger = _in_danger(keeper)
 		if _badly_hurt(keeper):

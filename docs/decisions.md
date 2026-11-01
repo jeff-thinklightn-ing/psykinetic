@@ -36967,6 +36967,18 @@ companion; not townsfolk): "You can give gold only to a fellow traveller or to t
 with you." (voice's short form, for a HUD line). led_words, system text, takes the house colon for
 its dash: "Following %s: move to take the lead" and "Following %s to %s: ...". ui_test's
 led_words check follows. Protocol unchanged, no new class_name.
+748 amended (3), companions' side (2026-11-01): voice's check of the companion's prompt (the
+model can say back what it is told). Where she is below ground: "You are below ground, in old
+stone halls; above them is %s." (where_words; _where_briefly the same without the hour), no
+"dungeon". Her health: the stance situation keeps its numbers for her judgement, named health
+("Your health is 3 of 20.", "X is next to you, health 2 of 20.", situation_text); a threshold
+fallen past is Companion.strength_words, no number or percent ("You are down to half your
+strength.", "X is near the end of their strength."), and a lapse "so what X asked of you no
+longer holds", its reason "you are badly hurt". The voice's ask after a lapse names courses,
+not stance names (COURSE_WORDS through course_words: "from keeping close to keeping guard").
+Wording voice's (voice-5b); the coordinator passed it on the tests alone (same numbers, words
+only). companion_test's situation, threshold and lapse lines updated. Server only, protocol
+unchanged, no new class_name.
 ## 751, art-kit's side: the bedroll
 
 Jeff's note that townsfolk shouldn't sleep on bare ground (the coordinator's ask, 2026-10-31; npc's 751

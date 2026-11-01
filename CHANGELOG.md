@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Companions: what she is told of where she is and how hurt you both are uses plain words (no "dungeon", no "HP", no percentages, no stance names), so she doesn't say them back (748 amended (3)).
 - Townsfolk keep finding the temple, and Aldous keeps working there, when a town's temple is built from a building kind (734 amended).
 
 - Tools: the playtest folk tour checks that sleeping townsfolk don't trade (754 amended (4)).

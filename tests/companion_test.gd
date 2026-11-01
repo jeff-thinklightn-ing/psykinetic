@@ -2606,7 +2606,7 @@ func _test_situation() -> void:
 	b.name = "SituationImpB"
 	pet.hp = 3
 	owner.hp = 2
-	var expected := "Two monsters are next to you. You have 3 of 20 HP. Player is next to you with 2 of 20 HP. You are both in danger."
+	var expected := "Two monsters are next to you. Your health is 3 of 20. Player is next to you, health 2 of 20. You are both in danger."
 	_check(pet.situation_text() == expected, pet.situation_text())
 	_check(pet.stance_prompt().begins_with(pet.identity() + "\n" + expected + "\n") and not "{" in pet.stance_prompt(),
 			"the hands' ask: who she is, then the situation, in plain words")
@@ -2614,7 +2614,7 @@ func _test_situation() -> void:
 	World.despawn(b)
 	pet.hp = pet.max_hp
 	owner.hp = owner.max_hp
-	_check(pet.situation_text() == "No monsters are next to you. You have 20 of 20 HP. Player is next to you with 20 of 20 HP. Neither of you is in danger.",
+	_check(pet.situation_text() == "No monsters are next to you. Your health is 20 of 20. Player is next to you, health 20 of 20. Neither of you is in danger.",
 			pet.situation_text())
 
 
@@ -4222,7 +4222,7 @@ func _test_stance_events() -> void:
 	mind.clear()
 	owner.hp = 9
 	World.step()
-	_check(mind.triggers("stance") == ["Player's HP fell below 50%."] and mind.triggers("voice") == ["Player's HP fell below 50%."],
+	_check(mind.triggers("stance") == ["Player is down to half their strength."] and mind.triggers("voice") == ["Player is down to half their strength."],
 			"Player below half: the hands and the voice (%s / %s)" % [mind.triggers("stance"), mind.triggers("voice")])
 	mind.clear()
 	pet.note_death("Sneak")
@@ -4241,7 +4241,7 @@ func _test_stance_events() -> void:
 	_check(mind.stance_asks.is_empty(), "a new monster next to them, just after the instruction: not asked")
 	owner.hp = 5
 	World.step()
-	_check(mind.triggers("stance") == ["Player's HP fell below 30%, so Player's instruction no longer holds."],
+	_check(mind.triggers("stance") == ["Player is near the end of their strength, so what Player asked of you no longer holds."],
 			"but an hp threshold is, and below 30%% the instruction lapses (%s)" % [mind.triggers("stance")])
 	_check(pet.standing_instruction().is_empty(), "it is gone")
 	World.despawn(imp)
@@ -4457,7 +4457,7 @@ func _test_lapse() -> void:
 	World.step()
 	pet.said.disconnect(listen)
 	_check(pet.standing_instruction().is_empty() and pet.stance == Companion.Stance.GUARD, "the instruction lapses; she re-decides: GUARD")
-	_check(mind.voice_asks.size() == 1 and "you changed course: from STAY_CLOSE to GUARD" in str(mind.voice_asks[0]["trigger"]),
+	_check(mind.voice_asks.size() == 1 and "you changed course: from keeping close to keeping guard" in str(mind.voice_asks[0]["trigger"]),
 			"her voice is asked to say why (%s)" % [mind.triggers("voice")])
 	_check(heard == ["You're hurt. I'm coming in."], "and it is said whatever the rate limit (%s)" % [heard])
 	mind.clear()
@@ -4503,7 +4503,7 @@ func _test_danger_words() -> void:
 	_put(owner, Vector2i(9, 6))
 	_put(pet, Vector2i(10, 6))
 	pet.hp = 3
-	_check(pet.situation_text() == "No monsters are next to you. You have 3 of 20 HP. Player is next to you with 20 of 20 HP. You are badly hurt, but nothing is near you.",
+	_check(pet.situation_text() == "No monsters are next to you. Your health is 3 of 20. Player is next to you, health 20 of 20. You are badly hurt, but nothing is near you.",
 			pet.situation_text())
 	pet.hp = pet.max_hp
 	owner.hp = 5
@@ -4533,7 +4533,7 @@ func _test_her_own_lapse() -> void:
 	mind.clear()
 	pet.hp = 5
 	World.step()
-	_check(mind.triggers("stance") == ["Your HP fell below 30%, so Player's instruction no longer holds."] and pet.standing_instruction().is_empty(),
+	_check(mind.triggers("stance") == ["You are near the end of your strength, so what Player asked of you no longer holds."] and pet.standing_instruction().is_empty(),
 			"her own HP: the instruction lapses (%s)" % [mind.triggers("stance")])
 	World.despawn(foe)
 	pet.hp = pet.max_hp
