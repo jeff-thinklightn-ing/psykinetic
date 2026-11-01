@@ -37173,6 +37173,17 @@ before it. Approved by the coordinator (2026-10-31).
 
 Server only, protocol unchanged, no new class_name.
 
+749 amended (dungeon's; the coordinator's approval, maps agreed): spawn safety counts only monsters
+that are not peaceable (Main._unsafe_near: spawned, a Monster, peaceable false), in
+_nearest_hostile_distance and _safe_tile_near alike, so _safest_start_tile agrees. Playtest's
+barrow tour: down the temple's shortcut one came out at barrow_deep (55, 76), not from_temple
+(49, 76), the Hall's draugr seated or at rest at (49, 75) counted as a threat beside it; the
+shortcut opens only once he is laid to rest. A peaceable monster attacks nobody till provoked,
+and provoked one turns peaceable false the same tick (Draugr._sim_tick), counting at once.
+level_test _test_barrow_exits: by from_temple, the draugr peaceable, the arrival stays on
+from_temple; made not peaceable, it is moved past SPAWN_SAFE_DISTANCE. Server only, protocol
+unchanged, no new class_name.
+
 ## 753: the forest floored on the land's relief
 
 Jeff on v0.1.194: "same graphical glitch is happening around map edges and for example in between

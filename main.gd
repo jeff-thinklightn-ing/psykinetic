@@ -12965,11 +12965,19 @@ func _narrate_damage(entity: GridEntity, amount: int, source: GridEntity, cause:
 				party_log.add("%s hit %s for %d." % [_display_name(source), _display_name(entity), amount])
 
 
+## Whether [param entity] counts for spawn safety (749): a spawned monster
+## that is not peaceable (749 amended: the Hall's draugr seated or at rest
+## beside barrow_deep's from_temple pushed every arrival down the temple's
+## shortcut six cells off). Provoked, one turns peaceable false the same tick.
+static func _unsafe_near(entity: GridEntity) -> bool:
+	return entity is Monster and entity.spawned and not (entity as Monster).peaceable
+
+
 ## Distance from [param tile] to the nearest monster, or a large number.
 func _nearest_hostile_distance(tile: Vector2i) -> int:
 	var nearest := 999
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned:
+		if _unsafe_near(entity):
 			nearest = mini(nearest, World.distance(tile, entity.tile))
 	return nearest
 
@@ -12981,7 +12989,7 @@ func _nearest_hostile_distance(tile: Vector2i) -> int:
 func _safe_tile_near(from: Vector2i) -> Vector2i:
 	var monsters: Array[Vector2i] = []
 	for entity in World.get_entities():
-		if entity is Monster and entity.spawned:
+		if _unsafe_near(entity):
 			monsters.append(entity.tile)
 	var safe := func(cell: Vector2i) -> bool:
 		for at: Vector2i in monsters:

@@ -2901,6 +2901,24 @@ func _test_barrow_exits() -> void:
 		var at: Vector2i = player.tile if player != null else World.NO_CELL
 		_check(linked and _main.map_name == way[2] and player != null and World.distance(at, way[3]) <= way[4],
 			"%s's way out at %s lands in %s within %d of %s (%s, at %s)" % [way[0], way[1], way[2], way[4], way[3], _main.map_name, at])
+	# 749 amended: down the temple's shortcut one comes out at from_temple,
+	# before the Hall's throne, his draugr peaceable beside it; spawn safety
+	# counts only monsters that are not peaceable, so a provoked one still
+	# moves the arrival off.
+	_main.load_map("test_room")
+	_main.travel(Net.local_id, "barrow_deep", "from_temple")
+	var from_temple: Vector2i = _main.level["spawn_points"]["from_temple"]
+	var seated: Array = World.get_entities().filter(func(e: GridEntity) -> bool: return e is Draugr and e.spawned)
+	var came := _player()
+	_check(seated.size() == 1 and (seated[0] as Draugr).peaceable and World.distance(seated[0].tile, from_temple) <= 1
+		and came != null and came.tile == from_temple,
+		"down the temple's shortcut, the draugr peaceable beside it: one arrives on from_temple %s (at %s)" % [from_temple, came.tile if came != null else World.NO_CELL])
+	if seated.size() == 1:
+		(seated[0] as Draugr).peaceable = false  # As provoked, the same tick (Draugr._sim_tick).
+		_main.travel(Net.local_id, "barrow_deep", "from_temple")
+		came = _player()
+		_check(came != null and came.tile != from_temple and World.distance(came.tile, seated[0].tile) > Main.SPAWN_SAFE_DISTANCE,
+			"the draugr provoked, spawn safety still moves the arrival off (at %s)" % [came.tile if came != null else World.NO_CELL])
 	_main.mark_player(id, "draugr", false)
 	_main.load_map("test_room")
 	Level.overlay_dir = overlay
