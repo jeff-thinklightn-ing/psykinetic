@@ -36970,3 +36970,17 @@ Measured: forest cells beside drawn ground with a drop over 0.5 m, wilds 1,595 t
 measurable cost. Stills: C:/dev/review/lands/holes (before/after-umbrage-near, zoom 0.4).
 
 Client only, protocol unchanged, no new class_name.
+
+## 752: a named one's name and a boss's marker go to clients
+
+ui's ask, from Jeff's barrow notes: the barrow's robbers' names weren't seen
+(Monster._be_named wrote only spawn_spec["label"], kept on the server), and
+the boss had no marker. Monster gains two replicated fields (enemy-ai's,
+716's code; SUBCLASS_REPLICATED, PROTOCOL_REVISION 44):
+- given_name: a named one's name, set in _be_named from its record ("" for a
+  monster known by its kind). The label item history uses stays as it was.
+- boss: true for a named row's "boss" (brand, Brand the Ox) or a monsters.json
+  kind's "boss" (the draugr, the barrow's top fight: the coordinator). The
+  fallen knight is none.
+ui draws the name and the marker. An old client draws neither, so the cut
+carrying it is forced. monster_test _test_band and _test_draugr check them.

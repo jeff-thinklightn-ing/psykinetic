@@ -495,6 +495,12 @@ var bound := false
 ## "kind/player id" (World.named_note says each once a life).
 var named_id := ""
 var named_noted := {}
+## What a client shows over it (ui's ask, Jeff's barrow notes: the robbers'
+## names unseen, the boss unmarked; decision 752): its named one's name, ""
+## for one known by its kind, and whether it is a boss (its named row's or
+## its kind's "boss": Brand, the draugr). Both replicated.
+var given_name := ""
+var boss := false
 var _pick_look_tick := -100000
 var _idle_path_to := NO_TILE
 ## How often it thinks (World.Tier), and the tick that was worked out (-1:
@@ -566,6 +572,9 @@ func _init() -> void:
 	replicate("raised_tick")
 	# What its hands hold (decision 483): drawn, and its bow when drawn.
 	replicate("hands")
+	# Its name and boss marker over it (a named one's).
+	replicate("given_name")
+	replicate("boss")
 
 
 func _ready() -> void:
@@ -646,11 +655,14 @@ func _settle_idle() -> void:
 ## A named one (decision 716): its record (made at its first spawn), its
 ## name over it, and its numbers times its fixed strength.
 func _be_named() -> void:
+	boss = bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("boss", false))
 	named_id = str(spawn_spec.get("named", ""))
 	if named_id.is_empty():
 		return
 	var record := World.named_enter(named_id, str(spawn_spec.get("kind", "")))
 	spawn_spec["label"] = str(record["name"])
+	given_name = str(record["name"])
+	boss = boss or bool(NamedEnemy.def(named_id).get("boss", false))
 	NamedEnemy.strengthen(self, record)
 	_pace = move_ticks
 
@@ -1865,7 +1877,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
 			"lifts": row.get("lifts"),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
-			"never_lies": bool(row.get("never_lies", false)),
+			"never_lies": bool(row.get("never_lies", false)), "boss": bool(row.get("boss", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
 			"call": int(row.get("call", Senses.NOISE_CALL)),

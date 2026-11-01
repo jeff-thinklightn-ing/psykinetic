@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The barrow's robbers carry their names to your screen, and Brand the Ox and the draugr are marked as bosses (752; ui draws them).
 - Outdoors: no more holes in the ground between the trees at the forest's edge (by Umbrage, along raised map edges): the forest floor and the pine stands now follow the land's height (753).
 - Leaving the barrow with a monster near the mound puts you at the nearest safe spot by it, not back at the wilds' far start by the foothills; the same for every arrival, respawn and revival with a monster close (749).
 - Brand the Ox: the Tomb Sledge winds up longer (0.9 s) and, once it lands or misses, he stands planted for 0.8 s with its head in the ground: step out of reach while he heaves, then hit him as he drags it back up (750, combat's side).

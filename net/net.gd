@@ -489,13 +489,17 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## the fallen knight (AstralKnight, kind astral_knight) offers quest:N:ask,
 ## :not_yet and :turn_in; an old client shows no tracker and draws him as a
 ## plain monster.
-const PROTOCOL_REVISION := 43
+## 44 (752): Monster.given_name and Monster.boss (SUBCLASS_REPLICATED), a
+## named one's name ("" for one known by its kind) and whether it is a boss
+## (Brand by his named row, the draugr by his kind), for ui's name and boss
+## marker over it; an old client draws neither.
+const PROTOCOL_REVISION := 44
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)

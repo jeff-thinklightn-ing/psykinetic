@@ -151,6 +151,7 @@
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 0}, "fearless": true},
 	"draugr": {
 		"bound": true,
+		"boss": true,
 		"label": "Draugr",
 		"script": "res://sim/draugr.gd",
 		"never_lies": true,

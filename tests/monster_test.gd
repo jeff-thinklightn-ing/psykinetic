@@ -2148,6 +2148,9 @@ func _test_band() -> void:
 			and World.holder_key(brand) == "named:brand", "Brand the Ox, a heavy, the Tomb Sledge in his hands (%s)" % World.wielded(brand))
 	var crake := _band_one("crake", "robber", Vector2i(8, 2))
 	_check(str(crake.spawn_spec.get("label")) == "Crake" and World.wielded(crake) == "dagger", "Crake, a plain robber with his dagger")
+	_check(brand.given_name == "Brand the Ox" and brand.boss and crake.given_name == "Crake" and not crake.boss
+			and brand.sync.replication_config.has_property(NodePath(".:given_name")) and brand.sync.replication_config.has_property(NodePath(".:boss")),
+			"752: their names shown over them, Brand a boss, Crake not, both replicated (%s %s, %s %s)" % [brand.given_name, brand.boss, crake.given_name, crake.boss])
 	World.damage(brand, 999, player)
 	var cell := World.NO_CELL
 	for at: Vector2i in World.zone.ground:
@@ -3067,6 +3070,8 @@ func _test_draugr() -> void:
 	var skeleton: Monster = e["k"][0]
 	_check(draugr != null and Level._spec_for("monster_draugr", Level.MONSTER_TYPES)["script"] == "res://sim/draugr.gd",
 		"a draugr marker spawns a Draugr (his kind's script)")
+	_check(draugr.boss and draugr.given_name == "" and not skeleton.boss and skeleton.given_name == "",
+		"752: the draugr a boss by his kind, no name given; a skeleton neither")
 	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
 	player.player_id = "p1"
 	_room.add_child(player)
