@@ -22,6 +22,8 @@ var _started_msec := 0
 ## What the client heard said: {"speaker", "text", "entity" (its path),
 ## "msec"}, from the "speech" messages, as the bubbles show them.
 var heard: Array[Dictionary] = []
+var told: Array[Dictionary] = []
+var _clicked_frame := 0
 ## Blows the client saw: {"who" (the body's instance id), "label", "at", "toward" (the cell
 ## the swing points at), "kind" ("swung" or "struck"), "msec"}.
 var blows: Array[Dictionary] = []
@@ -41,6 +43,16 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		heard.append({"speaker": str(data.get("speaker", "")), "text": str(data.get("text", "")),
 			"entity": str(data.get("entity", "")), "msec": Time.get_ticks_msec()})
 		log_line("heard %s: \"%s\"" % [data.get("speaker", ""), str(data.get("text", "")).left(160)])
+	elif kind == "party":
+		told.append({"from": str(data.get("from", "")), "text": str(data.get("text", "")), "msec": Time.get_ticks_msec()})
+		log_line("told (%s): \"%s\"" % [data.get("from", ""), str(data.get("text", "")).left(160)])
+
+
+## Lines told to me alone (party messages) since [param since_msec] that
+## hold [param words].
+func told_since(since_msec: int, words := "") -> Array[Dictionary]:
+	return told.filter(func(line: Dictionary) -> bool:
+		return line["msec"] >= since_msec and (words.is_empty() or words.to_lower() in String(line["text"]).to_lower()))
 
 
 ## Each frame: every body the client knows of is watched for its swings
@@ -59,6 +71,10 @@ func _process(_delta: float) -> void:
 			if is_instance_valid(entity):
 				blows.append({"who": id, "label": label(entity), "at": entity.tile, "toward": entity.tile,
 					"kind": "struck", "amount": amount, "cause": String(cause), "msec": Time.get_ticks_msec()}))
+		entity.winding.connect(func(direction: Vector2i, ticks: int) -> void:
+			if is_instance_valid(entity):
+				blows.append({"who": id, "label": label(entity), "at": entity.tile, "toward": entity.tile + direction,
+					"kind": "winding", "ticks": ticks, "msec": Time.get_ticks_msec()}))
 
 
 ## The swings seen since [param since_msec] by [param who] that point at
@@ -214,6 +230,7 @@ func _collect_buttons(node: Node, out: Array[Dictionary]) -> void:
 ## A click at [param at] with [param button] (left by default): Main's own
 ## click handler, with the cell under the cursor set to [param at].
 func click(at: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
+	_clicked_frame = Engine.get_process_frames()
 	for pressed: bool in [true, false]:
 		main._pick_grid = Vector2(at)
 		var event := InputEventMouseButton.new()
@@ -226,6 +243,21 @@ func click(at: Vector2i, button := MOUSE_BUTTON_LEFT) -> void:
 
 ## A tap of [param keycode] with the cursor over [param at] (if given):
 ## Main's own key handler.
+## A tap of E on [param door]: Main's own press and release, the door under
+## the cursor set as its pixel pick would (headless has no cursor: the one
+## step skipped, as click's cell).
+func tap_e_door(door: Door) -> void:
+	main._press_e()
+	main._e_door = door
+	await frames(1)
+	main._release_e()
+
+
+## Frames since the last click (a re-click's pace).
+func frames_since_click() -> int:
+	return Engine.get_process_frames() - _clicked_frame
+
+
 func key(keycode: Key, at := Vector2i(-1, -1)) -> void:
 	for pressed: bool in [true, false]:
 		if at != Vector2i(-1, -1):
@@ -273,6 +305,18 @@ func walk_to(at: Vector2i, near := 0, seconds := 60.0) -> bool:
 			log_line("  stalled at %s (hp %s): route %d cells, the click's %d; beside me: %s" % [cell(),
 				player.get("hp") if player != null else "-", World.walk_path(cell(), at, player).size(),
 				(main._free.get("path", []) as Array).size(), ", ".join(beside)])
+			var doors_near: Array = World.get_doors().filter(func(d: Door) -> bool: return World.distance(Vector2i(d.key.x, d.key.y), cell()) <= 2) \
+				.map(func(d: Door) -> String: return "%s %s%s" % [d.key, "open" if d.open else "shut", (" lock " + d.lock) if not d.lock.is_empty() else ""])
+			if not doors_near.is_empty():
+				log_line("    doors within 2: %s" % ", ".join(doors_near))
+			# A shut door beside me: opened as a player does, E with it under the cursor.
+			for door: Door in World.get_doors():
+				var spot := Vector2i(door.key.x, door.key.y)
+				if not door.open and World.distance(spot, cell()) <= 1:
+					log_line("  a shut door at %s (lock \"%s\"): E" % [door.key, door.lock])
+					await tap_e_door(door)
+					await seconds(1.0)
+					break
 			await click(at)
 	return me() != null and World.distance(cell(), at) <= near
 
@@ -471,6 +515,32 @@ func failures() -> int:
 		if line["ok"] == false:
 			count += 1
 	return count
+
+
+## A still of what the window shows, saved as <out>/<name>.png, the camera
+## turned to [param yaw] degrees (NAN keeps it) and low or high. Only with a
+## window (tour.sh --offscreen); headless it logs and returns "". The view is
+## forced to draw first: an off-screen window may not present its frames.
+func still(name: String, yaw := NAN, low := true) -> String:
+	if DisplayServer.get_name() == "headless":
+		log_line("still %s: skipped (headless)" % name)
+		return ""
+	Net.set_camera_low(low, false)
+	main._pick_grid = Vector2(-1000, -1000)  # No hover label over the shot.
+	var view: Node = main.get("_client3d")
+	if view != null and not is_nan(yaw):
+		view.set("yaw", yaw)
+		view.set("_yaw_step", yaw)
+	await seconds(2.0)
+	RenderingServer.force_draw()
+	await RenderingServer.frame_post_draw
+	var image := get_viewport().get_texture().get_image()
+	var path := out_dir.path_join("%s.png" % name)
+	var error := image.save_png(path) if image != null and not image.is_empty() else ERR_UNAVAILABLE
+	var player := me()
+	log_line("still %s: %s (at %s in %s, hour %.1f, yaw %s, %s)" % [name, path if error == OK else "FAILED %d" % error,
+		cell(), zone(), DayNight.hour(DayNight.now()), yaw, "low" if low else "high"])
+	return path if error == OK else ""
 
 
 func write_report(tour_name: String) -> void:

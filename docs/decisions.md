@@ -37327,6 +37327,20 @@ on Rolf's missing buy buttons and the missing names and marker; on main it found
 node name in his window and talk lines, and the client's purse never following the server's.
 
 Tests and a tool only, protocol unchanged, no new class_name.
+
+754 amended (2026-11-01): more tours, and each run kept. cut (a coming cut's lines a bot can
+check: the world map, the purse, sleepers, the ways out), seams and stills (off-screen stills at
+road seams, the forest edge and the huts' beds, by bot.still(): the hover label hidden, the
+camera set, a drawn frame saved; headless skips them), axes and draugr (combat's timings from
+the client's own winding and swung events; --test-foe's foe, since 9e6bfb2e armed by its kind's
+row). The barrow tour walks the purse's real path: Brand's key, the camp chest's gold, the turn-in
+with every name ticked (the console's respawn and a sweep bring back any who got away by the door,
+702), the knight's reveal, out by the mound and Rolf's wares bought with it. The bot opens a shut
+door as a player does (E on it) and logs the doors by a stall. tools/tour.sh: TOUR_MINUTES sets
+the tour's watchdog and both runs' limits after it (the barrow tour takes about 25 minutes); each
+run's report and logs are copied to build/tours/kept/<tour>_<stamp> (ignored, the newest 30,
+without the world file) so an owner can match a stall to its lines later. A tour holds only the
+local test player, never a box name or id.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping

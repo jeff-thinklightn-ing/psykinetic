@@ -9,6 +9,10 @@
 # nothing touches the shared user:// folder or the box.
 # Exit: the client's (0 every check passed, 1 one failed, 2 never joined).
 set -u
+TOUR_SERVER_ARGS="${TOUR_SERVER_ARGS:-}"
+# TOUR_MINUTES: the tour's own watchdog (tour.gd), the client's and server's limits after it.
+TOUR_MINUTES="${TOUR_MINUTES:-20}"
+CLIENT_SECONDS=$((TOUR_MINUTES * 60 + 250))
 cd "$(dirname "$0")/.."
 TOUR="${1:-smoke}"
 VIEW="${2:-}"
@@ -53,11 +57,14 @@ WIN_DIR="$(cygpath -w "$(pwd)/$DIR")"
 APPDATA_DIR="$(cygpath -w "$(pwd)/$DIR/appdata")"
 STOP="$DIR/stop"
 
+# TOUR_SERVER_ARGS: more flags for the server, word-split (e.g.
+# --test-foe=draugr,giant_axe: that weapon in hand, that monster beside).
+# shellcheck disable=SC2086
 # --regenerate as the box runs (server/psykinetic.service): the shifting
 # levels laid when due; without it a fresh barrow is its rooms, unjoined.
-APPDATA="$APPDATA_DIR" /usr/bin/timeout 2400 "$GODOT" --log-file "$(godot_log "tour_${TOUR}_server")" --headless --audio-driver Dummy --path . --server --regenerate --bind=127.0.0.1 \
+APPDATA="$APPDATA_DIR" /usr/bin/timeout $((CLIENT_SECONDS + 900)) "$GODOT" --log-file "$(godot_log "tour_${TOUR}_server")" --headless --audio-driver Dummy --path . --server --regenerate --bind=127.0.0.1 \
 	"--port=$PORT" "--admin-port=$ADMIN" "--state=$WIN_DIR\\world.json" "--token=$TOKEN" \
-	"--test-exit-on=$WIN_DIR\\stop" --test-exit-after=2300 \
+	"--test-exit-on=$WIN_DIR\\stop" "--test-exit-after=$((CLIENT_SECONDS + 800))" $TOUR_SERVER_ARGS \
 	</dev/null >"$DIR/server.log" 2>&1 &
 server=$!
 for _ in $(seq 1 960); do
@@ -78,14 +85,20 @@ else
 	DISPLAY_ARGS="--headless --audio-driver Dummy"
 fi
 # shellcheck disable=SC2086
-APPDATA="$APPDATA_DIR" /usr/bin/timeout 1500 "$GODOT" --log-file "$(godot_log "tour_${TOUR}_client")" $DISPLAY_ARGS --path . --scene res://tests/tour/tour.tscn -- \
+APPDATA="$APPDATA_DIR" /usr/bin/timeout $((CLIENT_SECONDS + 50)) "$GODOT" --log-file "$(godot_log "tour_${TOUR}_client")" $DISPLAY_ARGS --path . --scene res://tests/tour/tour.tscn -- \
 	--client --address=127.0.0.1 "--port=$PORT" "--token=$TOKEN" --name=Tourbot "--player-id=$PLAYER" \
-	"--tour=$TOUR" "--tour-admin=$ADMIN" "--tour-out=$WIN_DIR" --test-exit-after=1450 \
+	"--tour=$TOUR" "--tour-admin=$ADMIN" "--tour-out=$WIN_DIR" "--tour-minutes=$TOUR_MINUTES" "--test-exit-after=$CLIENT_SECONDS" \
 	</dev/null >"$DIR/client.log" 2>&1
 code=$?
 touch "$STOP"
 wait "$server"
 grep -E "^\[tour\]|^RESULT" "$DIR/client.log"
 grep -E "ERROR|SCRIPT ERROR" "$DIR/client.log" | head -20
-echo "tour $TOUR: exit $code; report $DIR/report.md"
+# Each run kept (coordinator, 11-01: owners match a stall to its logs later):
+# build/tours/kept/<tour>_<stamp>, without the temp APPDATA; the newest 30.
+KEPT="build/tours/kept/${TOUR}_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$KEPT"
+find "$DIR" -maxdepth 1 -type f ! -name "world.json*" -exec cp {} "$KEPT/" \;
+ls -1d build/tours/kept/*/ 2>/dev/null | sort | head -n -30 | xargs -r rm -rf
+echo "tour $TOUR: exit $code; report $DIR/report.md; kept in $KEPT"
 exit "$code"
