@@ -42,7 +42,7 @@ if ($Preview) {
 . (Join-Path $PSScriptRoot '..\tests\godot_log.ps1')  # Its logs in build/logs (decision 664).
 Push-Location (Split-Path $PSScriptRoot -Parent)
 try {
-	& $godot --log-file (Get-GodotLog 'perception_eval') --headless --path . --scene tests/perception_eval.tscn -- @evalArgs
+	& $godot --log-file (Get-GodotLog 'perception_eval') --headless --audio-driver Dummy --path . --scene tests/perception_eval.tscn -- --run-marker=perception_eval @evalArgs
 	$code = $LASTEXITCODE
 } finally {
 	Pop-Location
