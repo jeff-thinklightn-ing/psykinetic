@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_knight_vigil()
 	_test_sledge()
 	_test_sleep_clips()
+	_test_axe_sweep()
 	await _test_rests()
 	_test_warm_painted()
 	await _test_upper()
@@ -1095,6 +1096,17 @@ func _test_sledge() -> void:
 	_check(lib.has_animation("Sledge_Attack") and absf(lib.get_animation("Sledge_Attack").length - 1.7) < 0.02
 		and strikes == [["Sledge_Attack", 0.9]] and "tomb_sledge" in Client3D.WOUND_STRIKES,
 		"Sledge_Attack is 1.7 s, its contact at 0.9, the sledge's wound-up blow (%s)" % [strikes])
+
+
+## The heavy axes' sweep: Axe_Sweep at combat's times (1.3 s, contact 0.8), each axe's wound-up blow.
+func _test_axe_sweep() -> void:
+	print("== the heavy axes' sweep ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var axes := ["giant_axe", "battle_axe"].filter(func(id: String) -> bool:
+		return Client3D.HUMANOID_MOVES["strikes"].get(id, []) == [["Axe_Sweep", 0.8]] and id in Client3D.WOUND_STRIKES)
+	_check(lib.has_animation("Axe_Sweep") and absf(lib.get_animation("Axe_Sweep").length - 1.3) < 0.02
+		and lib.get_animation("Axe_Sweep").loop_mode == Animation.LOOP_NONE and axes.size() == 2,
+		"Axe_Sweep is 1.3 s, its contact at 0.8, both heavy axes' wound-up blow (%s)" % [axes])
 
 
 ## The sleeper's clips (751): the curl loops, its breath plainly seen; the lie-down and the get-up

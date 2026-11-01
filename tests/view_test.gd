@@ -7917,7 +7917,7 @@ func _test_two_hands() -> void:
 	_rig._process(0.0)
 	# A one-handed weapon never swings a two-handed clip (the war hammer did: its left hand came up
 	# beside the haft holding nothing).
-	var two_handed_clips := ["Axe_Overhead", "Sledge_Attack"]
+	var two_handed_clips := ["Axe_Overhead", "Sledge_Attack", "Axe_Sweep"]
 	var one_handed := (Client3D.HUMANOID_MOVES["strikes"] as Dictionary).keys().filter(func(id: String) -> bool:
 		return Items.exists(id) and int(Items.def(id).get("hands", 1)) < 2 and (Client3D.HUMANOID_MOVES["strikes"][id] as Array).any(
 				func(strike: Array) -> bool: return strike[0] in two_handed_clips))

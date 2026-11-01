@@ -158,7 +158,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -666,6 +666,49 @@ CLIPS["Sledge_Attack"] = {"keys": [
 	(1.3, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.11))),
 	(1.5, P("Idle_Loop", 0.0, SLEDGE_RISING, move=(0.0, -0.05, -0.03))),
 	(1.7, P("Idle_Loop", 0.0, SLEDGE_READY)),
+]}
+# The heavy axes' sweep (combat's times, the sim's 8-tick wind-up, contact 0.8; giant_axe and battle_axe,
+# lighter than the sledge, the weight carried through, not buried): coiled back low past the right hip,
+# the trunk turned away, the weight back (0 to 0.4 s); hung there, nearly still, the tell (to 0.55); swept
+# flat across the front at the waist, right to left, gathering speed, most of it in the last 0.12 s
+# (to 0.8, the contact dead ahead, the head mid-arc: the blow strikes the cell ahead and both diagonals);
+# carried on past to the left, the trunk wound round, half a step on (to 1.05); drawn back up to the
+# guard (1.3). The edge leads the head along the arc.
+def sweep(right: tuple, haft: tuple, edge: tuple, grip: float, trunk: list = (), poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4))) -> list:
+	return chop(right, haft, edge, poles, grip=grip) + list(trunk)
+
+
+# The left hand slides down the haft toward the right for the swing (Client3D's REACH_SLIDES, GREAT_GRIP - grip),
+# and back up to grip_2 for the guard.
+# The legs and hips carry it (the coordinator: "the sweep reads as arms only"): coiled, the hips turned
+# away and the weight sunk on the bent back (right) knee; through the sweep a step onto the lead (left)
+# foot, the hips driving round ahead of the shoulders; carried a touch past balance, then recovered. The
+# feet stay planted where they don't step (each thigh turned back against the pelvis); the shoulders'
+# whole turn is the pelvis's and the spine's together, kept so the left hand reaches the haft.
+SWEEP_COIL = sweep((0.04, -0.02, -0.44), (-0.62, 0.72, 0.3), (0.0, -1.0, 0.0), 0.2, [("pelvis", TURN, -18.0),
+	("thigh_l", TURN, 18.0), ("thigh_r", TURN, 18.0), ("thigh_r", LIFT, 12.0), ("calf_r", LIFT, -18.0), ("thigh_l", LIFT, -4.0),
+	("spine_01", TURN, -8.0), ("spine_02", TURN, -10.0), ("spine_03", TURN, -6.0), ("Head", TURN, 28.0), ("spine_02", LIFT, -4.0)])
+SWEEP_HANG = sweep((0.02, -0.01, -0.43), (-0.66, 0.68, 0.3), (0.0, -1.0, 0.0), 0.2, [("pelvis", TURN, -19.0),
+	("thigh_l", TURN, 19.0), ("thigh_r", TURN, 19.0), ("thigh_r", LIFT, 14.0), ("calf_r", LIFT, -20.0), ("thigh_l", LIFT, -4.0),
+	("spine_01", TURN, -8.0), ("spine_02", TURN, -11.0), ("spine_03", TURN, -7.0), ("Head", TURN, 32.0), ("spine_02", LIFT, -4.0)])
+SWEEP_OUT = sweep((0.2, -0.04, -0.4), (0.0, 1.0, 0.1), (0.0, -1.0, 0.0), 0.1, [("pelvis", TURN, 6.0),
+	("thigh_r", TURN, -6.0), ("thigh_l", LIFT, 20.0), ("calf_l", LIFT, -28.0), ("thigh_r", LIFT, 4.0), ("calf_r", LIFT, -8.0),
+	("spine_01", TURN, -11.0), ("spine_02", TURN, -11.0), ("Head", TURN, 10.0)])
+SWEEP_HIT = sweep((0.24, -0.2, -0.34), (1.0, 0.05, 0.05), (1.0, 0.0, 0.0), 0.12, [("pelvis", TURN, 18.0),
+	("thigh_r", TURN, -18.0), ("thigh_l", TURN, -10.0), ("thigh_l", LIFT, 24.0), ("calf_l", LIFT, -14.0), ("thigh_r", LIFT, -10.0),
+	("spine_01", TURN, -8.0), ("spine_02", TURN, -8.0), ("spine_02", LIFT, -6.0), ("Head", TURN, -14.0)])
+SWEEP_PAST = sweep((0.12, -0.36, -0.3), (0.15, -0.95, 0.2), (0.0, 1.0, 0.0), 0.15, [("pelvis", TURN, 26.0),
+	("thigh_r", TURN, -26.0), ("thigh_l", TURN, -14.0), ("thigh_l", LIFT, 28.0), ("calf_l", LIFT, -24.0), ("thigh_r", LIFT, -16.0),
+	("spine_01", TURN, 4.0), ("spine_02", TURN, 4.0), ("spine_03", TURN, 4.0), ("spine_01", LIFT, -6.0), ("spine_02", LIFT, -8.0),
+	("Head", TURN, -28.0)])
+CLIPS["Axe_Sweep"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, AXE_READY)),
+	(0.4, P("Idle_Loop", 0.0, SWEEP_COIL, move=(0.0, 0.07, -0.04))),
+	(0.55, P("Idle_Loop", 0.0, SWEEP_HANG, move=(0.0, 0.075, -0.045))),
+	(0.68, P("Idle_Loop", 0.0, SWEEP_OUT, move=(0.0, 0.0, -0.03))),
+	(0.8, P("Idle_Loop", 0.0, SWEEP_HIT, move=(0.0, -0.12, -0.06))),
+	(1.05, P("Idle_Loop", 0.0, SWEEP_PAST, move=(0.0, -0.2, -0.08))),
+	(1.3, P("Idle_Loop", 0.0, AXE_READY)),
 ]}
 # Sawing at the woodpile: bent over the log, the left hand pressing it down ahead to the left,
 # the saw in the right hand pushed and drawn ahead and down, the blade sloping into the cut, the

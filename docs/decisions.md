@@ -37265,6 +37265,27 @@ changes (the puppet's "bedroll" key). view_test _test_bedroll_drawn: out
 of doors, the bedroll one back with its head the facing's way and the body
 0.09 up; up, the bedroll gone and the height 0; on a bed's head cell, no
 bedroll and the bed's 0.37. Client only, protocol unchanged.
+
+750 amended, pc-character's side (2026-11-01): the heavy axes' sweep. The
+giant axe and the battle axe swing Axe_Sweep (humanoid_clips' SWEEP_*), a
+wound-up blow (WOUND_STRIKES, strikes [["Axe_Sweep", 0.8]]) at combat's
+times: 1.3 s, coiled back low past the right hip with the trunk turned away
+(to 0.4), hung (to 0.55), swept flat across the front at the waist right to
+left, most of it in the last 0.12 s, the head ahead at the contact (0.8; the
+blow strikes the cell ahead and both diagonals), carried past to the left
+half a step on (to 1.05), back up to the guard (1.3); its recovery combat's
+World.recover_ticks (5 for both, afa5828d; the draugr's own row 3,
+enemy-ai's 949f0dce). The left hand slides down the haft toward
+the right for the swing and back up to grip_2 (REACH_SLIDES "Axe_Sweep"),
+never more than 0.10 m off it (build/sweep/measure.gd). The pick keeps
+Axe_Overhead. anim_rig_test _test_axe_sweep; view_test's two-handed clips
+include it. The legs and hips carry it (the coordinator: "reads as arms only"): coiled,
+the hips turned away and the weight sunk on the bent back knee; a step onto
+the lead foot through the sweep, the hips driving round ahead of the
+shoulders; carried a touch past balance, then gathered back; the feet planted
+where they don't step. Strip C:/dev/review/axe_sweep.png. Client only, protocol
+unchanged, no new class_name.
+
 ## 755. The world as it lies on the plane, for the world map
 
 ui's world map overhaul (Jeff: the world map "is buggy and not useful yet, it needs an

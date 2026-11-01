@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The great axe and battle axe swing with a sweep: coiled back low by the hip, a pause, then a fast flat sweep across the front, carried through (750).
 - A sleeper's lower arm lies on their bedroll, tucked before the chest, not reaching past its edge (751).
 - Tools: more playtest tours (tools/tour.sh): cut, seams, stills, axes and draugr; the barrow tour now walks Brand's key, the camp chest's gold, the turn-in and out to Rolf; each run's logs kept in build/tours/kept (754 amended).
 - Click to walk: a route that turns round the end of a wall through a door no longer gets stuck pressing the wall and pacing between two spots; you go through the door (724 amended (2)).

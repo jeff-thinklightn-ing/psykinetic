@@ -925,7 +925,9 @@ const HUMANOID_MOVES := {
 		"": [["Punch_Jab", 0.17], ["Punch_Cross", 0.21]],
 		# Forehand and backhand, each back to a guard (338 amended, pc-character's side); alternate.
 		"sword": [["Sword_Slash_F", 0.21], ["Sword_Slash_B", 0.21]],
-		"giant_axe": [["Axe_Overhead", 0.42]],
+		# Coiled back, hung, swept flat across the front, carried past (the sim's wind-up and recovery).
+		"giant_axe": [["Axe_Sweep", 0.8]],
+		"battle_axe": [["Axe_Sweep", 0.8]],
 		# Heaved, hung, let fall into the ground, held down and dragged back up (the sim's wind-up and recovery).
 		"tomb_sledge": [["Sledge_Attack", 0.9]],
 		"hammer": [["Mace_Overhead", 0.42]],  # One-handed: Axe_Overhead's left hand would grip nothing.
@@ -1126,7 +1128,7 @@ const CLIP_HEAVY_CONTACT := 0.45
 ## Weapons whose wind-up plays their own strike instead (_strike, its lead
 ## stretched over the wind-up): the sword's short one (338 amended: the
 ## slash itself seen, not only its reset).
-const WOUND_STRIKES := ["sword", "tomb_sledge"]
+const WOUND_STRIKES := ["sword", "tomb_sledge", "giant_axe", "battle_axe"]
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
 const CLIP_JOG := "Jog_Fwd"
@@ -15506,8 +15508,10 @@ static func _sync_reach(reach: HandReach, sockets: Dictionary, ids: Array) -> vo
 ## piece by [[seconds into the clip, metres], ...] (linear between) while the
 ## strike plays. The Tomb Sledge's (Jeff: "move like it has mass"), as
 ## Sledge_Attack authors its left hand (humanoid_clips' SLEDGE_*: GREAT_GRIP
-## up from the right, down to 0.12 at the contact).
-const REACH_SLIDES := {"Sledge_Attack": [[0.0, 0.0], [0.2, 0.05], [0.45, 0.07], [0.6, 0.07], [0.75, 0.13], [0.84, 0.25],
+## up from the right, down to 0.12 at the contact). The heavy axes' sweep likewise (humanoid_clips'
+## SWEEP_*: down to 0.2 for the coil, 0.1 to 0.12 across the front, back up for the guard).
+const REACH_SLIDES := {"Axe_Sweep": [[0.0, 0.0], [0.4, 0.25], [0.55, 0.25], [0.68, 0.35], [0.8, 0.33], [1.05, 0.3], [1.2, 0.2], [1.3, 0.0]],
+	"Sledge_Attack": [[0.0, 0.0], [0.2, 0.05], [0.45, 0.07], [0.6, 0.07], [0.75, 0.13], [0.84, 0.25],
 	[0.9, 0.33], [1.3, 0.33], [1.5, 0.2], [1.7, 0.0]]}
 static func _slide_reach(puppet: Node3D) -> void:
 	if not puppet.has_meta("reach") or not puppet.has_meta("rig"):
