@@ -36506,6 +36506,26 @@ crypt.knight_spirit (a fallen holy knight's spirit keeps watch in the Altar Room
 by the draugr) and crypt.camp_key (Brand the Ox carries the key to the band's chest). Data and
 docs only, protocol unchanged.
 
+747 amended (3), companions' side (2026-10-31): Jeff, on v0.1.194: "wren
+aggros against the fallen knight and starts punching him". The knight
+talks, so her foe test asked his threatens, and Monster.threatens says yes
+to a player. Companion.peaceful_talker(entity): a monster that talks and is
+peaceable now (Monster.peaceable, the server's, replicated; the same test as
+Main.talks_peaceably). It is the fallen knight always (AstralKnight sets
+both in _ready) and the draugr while seated or at rest (he drops peaceable
+the tick he is provoked or a pact begins, and is her foe again then).
+Companion.harmless is true for one and _threatens false, so no pick of hers
+takes him: her foe (_hostile), guard, nearest and adjacent picks, the danger
+scans beside a cell, Pip's lead's "danger" stop (Guide.step through
+_threatens), and residents' hiding (Resident._look reads harmless). The
+player's click already talks to a peaceable talker (Main.talks_on_click), aim
+and lob are pointed by hand, and monsters take no monster for a target.
+companion_test _test_fallen_knight: she beside him, ten ticks, never his
+foe nor swinging (she attacked without the fix). Dungeon's AstralKnight.threatens
+override (747 amended (4)) closes the source for other askers; this skip also
+covers the seated draugr. Server only, protocol
+unchanged, no new class_name.
+
 ## 742 amended: the camp chest locked, Brand's key, once per player
 
 Jeff: "and the chest only opens with a key from the boss and only hold gold

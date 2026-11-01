@@ -2243,8 +2243,12 @@ func _hostile(entity: GridEntity) -> bool:
 
 
 ## Wild prey, or game going for no one (decision 332): no foe to her, nor
-## danger, unless she is set on it.
+## danger, unless she is set on it. Nor a monster that talks and is
+## peaceable now (peaceful_talker): the fallen knight always, the draugr
+## while seated or at rest.
 static func harmless(entity: GridEntity) -> bool:
+	if peaceful_talker(entity):
+		return true
 	var animal := entity as Animal
 	if animal == null:
 		return false
@@ -2254,6 +2258,15 @@ static func harmless(entity: GridEntity) -> bool:
 		Animal.Role.GAME:
 			return not (animal.target is Player or animal.target is Companion)
 	return true
+
+
+## A monster that talks and is peaceable now (Monster.peaceable, the
+## server's; Main.talks_peaceably): the fallen knight (747, never hostile)
+## or the draugr seated or at rest. Never her foe, nor a danger to a lead
+## (Jeff, v0.1.194: "wren aggros against the fallen knight").
+static func peaceful_talker(entity: GridEntity) -> bool:
+	var monster := entity as Monster
+	return monster != null and monster.talks and monster.peaceable
 
 
 ## The wild animal "Get them!" means, with nothing hostile in sight: the
@@ -4596,6 +4609,8 @@ func _guide_ends(why: String) -> void:
 ## Whether [param entity] would fight her or her player (enemy-ai's
 ## Monster.threatens where it is; else a monster she counts hostile).
 func _threatens(entity: GridEntity) -> bool:
+	if peaceful_talker(entity):
+		return false
 	if entity.has_method("threatens"):
 		return bool(entity.call("threatens", keeper)) or bool(entity.call("threatens", self))
 	return _hostile(entity)

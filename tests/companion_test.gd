@@ -107,6 +107,7 @@ func _ready() -> void:
 	_test_knows_level()
 	_test_wild()
 	_test_seated_boss()
+	_test_fallen_knight()
 	_test_follow_without_backsteps()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
@@ -3129,6 +3130,29 @@ func _test_seated_boss() -> void:
 	draugr.rests_until = World.steps + 100000
 	_check(not pet._hostile(draugr), "at rest: let be")
 	World.despawn(draugr)
+	_kill_monsters()
+	_settle(pet)
+
+
+func _test_fallen_knight() -> void:
+	print("
+== the fallen knight beside her she never takes for a foe (Jeff, v0.1.194: \"wren aggros against the fallen knight\") ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var at := _free_tile_between(pet, 1, 2)
+	var knight := _main._spawn({"script": "res://sim/astral_knight.gd", "shape": "capsule", "name": "TestKnight%d" % World.tick,
+		"tile": at, "props": Level.MONSTER_TYPES["astral_knight"].duplicate()}) as AstralKnight
+	_check(knight != null and knight.talks and knight.peaceable, "the fallen knight beside her, talking and peaceable")
+	_check(Companion.harmless(knight) and not pet._hostile(knight) and not pet._threatens(knight),
+		"no foe of hers, nor a threat to a lead, whatever his threatens says (%s)" % knight.threatens(owner))
+	_check(pet._guard_target() != knight and pet._nearest_hostile(Companion.SIGHT_RANGE) != knight and pet._adjacent_hostile() != knight,
+		"no pick of hers takes him")
+	for i in 10:
+		World.step()
+	_check(pet.intent_target != knight and not pet.in_fight(), "ten ticks beside him: she does not swing at him (%s)" % pet.intent_name())
+	World.despawn(knight)
 	_kill_monsters()
 	_settle(pet)
 
