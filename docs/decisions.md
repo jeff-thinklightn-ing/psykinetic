@@ -11541,6 +11541,19 @@ the levels (no two boxes overlap), the player's area, the factions' look,
 maps' state read, Esc and M's order. `--test-show=world` opens it. Shots
 in docs/ui/shots/step5/.
 
+445 amended: its own page, out of M's cycle (Jeff, 2026-10-31: "it doesn't
+need to be after maps anyway it should be its own page if anything or a
+small button under the map"; the coordinator's step 1, the overhaul to
+follow once he has seen a design). M opens and closes the zone's big map
+only (Main.press_m; an open world map gives way to it). The world map
+opens and closes from a small "World map" button under the corner map
+(Minimap.world_button, signal world_asked, hidden while the big map is
+open) or its own key, J (Keys "world_map", rebindable, "The world map" in
+the Controls, "J  world map" in the controls list); Main.toggle_world_map
+closes the zone's big map first. QuestPanel sits under the button
+(Minimap.WORLD_ROW). Words checked by voice. ui_test _test_world_map and
+_test_keys. Client only, protocol unchanged, no new class_name.
+
 ## 451. Attach points: what a hand holds is drawn in it
 
 Roadmap #244: people and goblins hold what is in their hands. Each humanoid

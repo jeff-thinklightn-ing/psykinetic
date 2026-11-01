@@ -92,12 +92,42 @@ var _marks_hash := 0
 static var _palette: Image
 
 
+## The world map's button under the corner map (Jeff: "it should be its own
+## page if anything or a small button under the map"): pressed, world_asked.
+signal world_asked
+## The button's words, and the height of its row under the corner map (at
+## 1080 lines; QuestPanel sits under it).
+const WORLD_WORDS := "World map"
+const WORLD_ROW := 36.0
+var world_button: Button
+
+
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	set_anchors_preset(Control.PRESET_FULL_RECT)
+	world_button = Button.new()
+	world_button.name = "WorldMapButton"
+	world_button.text = WORLD_WORDS
+	world_button.focus_mode = Control.FOCUS_NONE
+	world_button.add_theme_font_size_override("font_size", UiTheme.size("small"))
+	world_button.pressed.connect(func() -> void: world_asked.emit())
+	add_child(world_button)
+
+
+## The button under the corner map, its right edge on the map's; hidden
+## while the big map is open (the corner is not drawn then).
+func _place_button() -> void:
+	if world_button == null:
+		return
+	world_button.visible = not big
+	var k := ui_scale()
+	var screen := get_viewport_rect().size
+	world_button.size = world_button.get_combined_minimum_size()
+	world_button.position = Vector2(screen.x - world_button.size.x - CORNER_MARGIN * k, (CORNER_TOP + CORNER_SIZE + 6.0) * k)
 
 
 func _process(_delta: float) -> void:
+	_place_button()
 	if texture == null or not is_visible_in_tree():
 		return
 	var all: Array = marks.call()

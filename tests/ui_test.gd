@@ -36,7 +36,7 @@ func _ready() -> void:
 	_test_down_screen()
 	_test_card_page()
 	_test_counter_panel()
-	_test_world_map()
+	await _test_world_map()
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
 	await _test_deal_window()
 	await _test_quest_tracker()
@@ -1585,9 +1585,29 @@ func _test_world_map() -> void:
 	_main.press_m()
 	_check(_main.minimap.big and not panel.visible, "M: the zone's big map")
 	_main.press_m()
-	_check(not _main.minimap.big and panel.visible, "M again: the world map in its place")
+	_check(not _main.minimap.big and not panel.visible, "M again: closed, the world map not in its cycle")
+	# Its own page (Jeff): the button under the corner map, or its key.
+	var button: Button = _main.minimap.world_button
+	await get_tree().process_frame
+	var k: float = _main.minimap.ui_scale()
+	var screen: Vector2 = _main.minimap.get_viewport_rect().size
+	_check(button != null and button.visible and button.text == Minimap.WORLD_WORDS
+			and button.position.y >= (Minimap.CORNER_TOP + Minimap.CORNER_SIZE) * k and button.position.x + button.size.x <= screen.x,
+		"a world map button under the corner map (%s)" % [button.position if button != null else "none"])
+	_check(_main.quest_panel.position.y >= button.position.y + button.size.y, "the quest card under the button")
+	button.pressed.emit()
+	_check(panel.visible and not _main.minimap.big, "the button: the world map")
+	button.pressed.emit()
+	_check(not panel.visible, "the button again: closed")
 	_main.press_m()
-	_check(not panel.visible and not _main.minimap.big, "M again: closed")
+	_main.toggle_world_map()
+	_check(panel.visible and not _main.minimap.big, "its key over the zone's big map: the world map in its place")
+	_main.press_m()
+	_check(not panel.visible and _main.minimap.big, "M over the world map: the zone's map")
+	_main.press_m()
+	await get_tree().process_frame
+	_check(not _main.minimap.big and button.visible, "closed: the button back")
+	_check(Keys.DEFAULTS["world_map"] == KEY_J and Keys.WORDS.has("world_map"), "its key, J, among the Controls")
 
 
 func _test_access() -> void:
@@ -1755,7 +1775,7 @@ func _test_keys() -> void:
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K, "phrase_1": KEY_1, "phrase_2": KEY_2,
 		"phrase_3": KEY_3, "phrase_4": KEY_4, "stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
-		"card": KEY_C, "town": KEY_N}
+		"card": KEY_C, "town": KEY_N, "world_map": KEY_J}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])

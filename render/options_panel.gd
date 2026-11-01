@@ -65,7 +65,7 @@ const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), 
 const KEY_GROUPS := [
 	["Walking", ["forward", "back", "left", "right"]],
 	["Actions", ["open", "pick_up", "drop", "throw", "stand", "signature", "bandage", "yes", "lantern"]],
-	["Panels", ["pack", "map", "card", "town", "talk_log", "options", "hints"]],
+	["Panels", ["pack", "map", "world_map", "card", "town", "talk_log", "options", "hints"]],
 	["Talk", ["talk", "phrase_1", "phrase_2", "phrase_3", "phrase_4"]],
 	["Other", ["screenshot", "fullscreen", "reset"]],
 	["Testing", ["debug", "builder"]],

@@ -62,13 +62,14 @@ func _process(_delta: float) -> void:
 		show_quest(now)
 
 
-## Under the corner map (Minimap's CORNER_TOP and CORNER_SIZE, scaled as it is
-## for screens over BASE_HEIGHT lines), its right edge on the map's.
+## Under the corner map and its world map button (Minimap's CORNER_TOP,
+## CORNER_SIZE and WORLD_ROW, scaled as it is for screens over BASE_HEIGHT
+## lines), its right edge on the map's.
 func _place() -> void:
 	var screen := get_viewport_rect().size
 	var k := maxf(1.0, screen.y / Minimap.BASE_HEIGHT)
 	position = Vector2(screen.x - size.x - Minimap.CORNER_MARGIN * k,
-			(Minimap.CORNER_TOP + Minimap.CORNER_SIZE + 16.0) * k)
+			(Minimap.CORNER_TOP + Minimap.CORNER_SIZE + Minimap.WORLD_ROW + 16.0) * k)
 
 
 ## [param given] drawn (Player.quest's shape), or the card hidden for {}.

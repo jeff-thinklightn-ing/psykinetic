@@ -1345,6 +1345,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		press_m()
 		get_viewport().set_input_as_handled()
 		return
+	if Keys.pressed(event, "world_map"):
+		toggle_world_map()
+		get_viewport().set_input_as_handled()
+		return
 	if key != null and key.pressed and not key.echo and minimap != null and key.keycode == KEY_ESCAPE and minimap.big:
 		minimap.toggle()
 		get_viewport().set_input_as_handled()
@@ -11288,6 +11292,7 @@ func _build_talk() -> void:
 	minimap = Minimap.new()
 	minimap.name = "Minimap"
 	minimap.marks = _minimap_marks
+	minimap.world_asked.connect(toggle_world_map)  # The world map's button under the corner map.
 	$HUD.add_child(minimap)
 	if not level.is_empty():
 		_door_marks_at = -1  # A new level: its doors.
@@ -15544,7 +15549,7 @@ func hint_lines() -> Array[String]:
 		"%s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat)" % Keys.name_of("bandage"),
 		"%s hold\tbandage an ally beside you, else yourself" % Keys.name_of("open"),
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
-		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tlantern" % Keys.name_of("lantern"),
+		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tworld map" % Keys.name_of("world_map"), "%s\tlantern" % Keys.name_of("lantern"),
 		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"),
 		"%s\tscreenshot, saved under %s" % [Keys.name_of("screenshot"), ProjectSettings.globalize_path(str(screenshot_folder()[0]))],
 		"%s\tsay yes to an offer that stands (or type it)" % Keys.name_of("yes"), "%s\thide these" % Keys.name_of("hints")])
@@ -15553,15 +15558,27 @@ func hint_lines() -> Array[String]:
 	return lines
 
 
-## M: the zone's big map; M again, the world map in its place; M again, closed.
+## M: the zone's big map, and M again closes it (Jeff: the world map is its
+## own page, not after the zone's; it opens from the button under the
+## corner map or its own key, toggle_world_map). An open world map gives
+## way to the zone's.
 func press_m() -> void:
 	if world_map_panel != null and world_map_panel.visible:
 		world_map_panel.close()
-	elif minimap.big:
+	minimap.toggle()
+
+
+## The world map's button under the corner map, or its key: open (the
+## zone's big map closed first), or closed when open.
+func toggle_world_map() -> void:
+	if world_map_panel == null:
+		return
+	if world_map_panel.visible:
+		world_map_panel.close()
+		return
+	if minimap != null and minimap.big:
 		minimap.toggle()
-		open_world_map()
-	else:
-		minimap.toggle()
+	open_world_map()
 
 
 ## The world map opened on the player's area, with this zone's party and

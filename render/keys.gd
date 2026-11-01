@@ -22,6 +22,7 @@ const DEFAULTS := {
 	"stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
 	"card": KEY_C,
 	"town": KEY_N,
+	"world_map": KEY_J,
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
@@ -37,6 +38,7 @@ const WORDS := {
 	"yes": "Say yes to an offer that stands",
 	"card": "Your companion's card",
 	"town": "The town sheet",
+	"world_map": "The world map",
 }
 ## Enter's other key counts as Enter.
 const ALIASES := {KEY_ENTER: [KEY_KP_ENTER]}
