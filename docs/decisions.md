@@ -4432,6 +4432,17 @@ to that player's peer. A protocol change (MESSAGE_KINDS). The client's
 ShopPanel (render/shop_panel.gd) shows the gold over the pack and the
 open shop's goods beside it, in PackPanel's look.
 
+280 amended (2026-11-01, items; economy found it): a row with no "value",
+no "made" and no "yield" fell through Economy.value_of to 1 gold, so a
+shop paid about 1 for the battle axe (603's row, the draugr's own). Values
+now: battle_axe 20 (above giant_axe's make, 17), tomb_sledge 18,
+bandaging_kit 5, arrows 5, flame_arrows 8, barbed_arrows 8. The pedlar
+(711) gains wares lines for bandaging kits and flame and barbed arrows
+(those two unless the town has a fletcher), as economy asked when these
+got values. items_test _test_priced fails any sellable row that falls
+through again; tokens, relics, keys and soulbound things are never sold
+and may.
+
 ## 277. Saplings at the forest's edge
 
 The forest's first ring is a tree on every void cell beside the land (so

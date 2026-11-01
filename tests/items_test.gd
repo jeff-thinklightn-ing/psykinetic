@@ -78,6 +78,7 @@ func _ready() -> void:
 	_test_bandage_reach()  # So too its ticks.
 	_test_inventory()
 	_test_starter_gear()
+	_test_priced()
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
@@ -410,7 +411,7 @@ func _test_use() -> void:
 	print("\n== using things: a key by carrying it, a purse opened into gold; thuds ==")
 	var host := _player(Net.local_id)
 	Items.add_for_test({"id": "test_key", "name": "cellar key", "weight": 0.1, "opens": "cellar", "value": 3})
-	_check(Items.opens_of("test_key") == "cellar" and Items.value_of("test_key") == 3 and Items.value_of(KIT) == 0,
+	_check(Items.opens_of("test_key") == "cellar" and Items.value_of("test_key") == 3 and Items.value_of("ore_sack") == 0,
 			"the catalog says what a key opens and what a thing is worth")
 	_check(Items.read('{"items": [{"id": "x", "value": -2}]}')["x"]["value"] == 0, "a value under 0 is none")
 	_check(not World.has_key(host, "cellar"), "no key: the cellar stays locked to the host")
@@ -2872,6 +2873,25 @@ func _clear(entity: GridEntity) -> void:
 			World.items.end(uid, "gone")
 	World.set_slots(entity, [])
 
+
+
+## Every row a shop could pay for has a worth of its own (a "value", or
+## a "made" or "yield" Economy.value_of prices): none falls through to 1
+## gold (the battle axe did). Tokens, relics, keys and bound things are
+## never sold, so they may.
+func _test_priced() -> void:
+	print("\n== priced: no sellable row falls through to 1 gold ==")
+	var unpriced: Array[String] = []
+	for id: String in Items.ids():
+		if Items.has_tag(id, "token") or Items.has_tag(id, "relic") or Items.has_tag(id, "key") or Items.has_tag(id, "soulbound"):
+			continue
+		var row := Items.def(id)
+		var made: Variant = row.get("made", {})
+		var yields: Variant = row.get("yield", {})
+		if Items.value_of(id) <= 0 and not (made is Dictionary and not made.is_empty()) and not (yields is Dictionary and not yields.is_empty()):
+			unpriced.append(id)
+	_check(unpriced.is_empty(), "case: every sellable row has a value, a made or a yield (unpriced: %s)" % ", ".join(unpriced))
+	_check(Items.value_of("battle_axe") >= 17, "case: the battle axe is worth at least the giant axe's make")
 
 
 ## The starter vendor's gear (decision 736, items' side): the wares list,

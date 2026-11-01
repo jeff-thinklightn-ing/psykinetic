@@ -404,16 +404,20 @@ func _test_in_town() -> void:
 	World.stockpile.stock_shop(STORE, kit, "Wren", "wren")
 	World._relocate(host, Vector2i(5, 3))
 	_main.open_other(counter)
-	_check(_main.shop_panel.shop == counter and _main.shop_panel.rows_shown() == ["bandaging kit 1 gold"],
-		"opened, the panel shows the kit at 1 gold (%s)" % [_main.shop_panel.rows_shown()])
+	var price := World.economy.value_of("bandaging_kit")  # 280 amended: the kit is worth 5; the town's need sets the price.
+	var rows: Array = _main.shop_panel.rows_shown()
+	if rows.size() == 1 and str(rows[0]).begins_with("bandaging kit ") and str(rows[0]).ends_with(" gold"):
+		price = int(str(rows[0]).trim_prefix("bandaging kit ").trim_suffix(" gold"))
+	_check(_main.shop_panel.shop == counter and rows.size() == 1 and price >= 1 and price < 10,
+		"opened, the panel shows the kit at %d gold (%s)" % [price, rows])
 	_check(_main.shop_panel.gold_shown() == "0 gold", "and the host's gold: none")
 	_main._buy(counter, kit)
-	_check(_main.shop_panel.why_shown() == "not enough gold (1)" and host.slots[0] == "", "Buy with no gold: refused, said why")
+	_check(_main.shop_panel.why_shown() == "not enough gold (%d)" % price and host.slots[0] == "", "Buy with no gold: refused, said why")
 	World.add_gold(me, 10, "purse")
 	_check(_main.gold == 10 and _main.shop_panel.gold_shown() == "10 gold", "a purse opened: the client shows 10 gold")
 	_main._buy(counter, kit)
-	_check(host.slots[0] == "bandaging_kit" and World.slot_uid(host, 0) == kit and _main.gold == 9,
-		"bought: the kit in the host's pack, 9 gold left (%s, %d)" % [Array(host.slots), _main.gold])
+	_check(host.slots[0] == "bandaging_kit" and World.slot_uid(host, 0) == kit and _main.gold == 10 - price,
+		"bought: the kit in the host's pack, %d gold left (%s, %d)" % [10 - price, Array(host.slots), _main.gold])
 	_check(_main.shop_panel.rows_shown().is_empty() and _main.shop_panel.why_shown() == "", "the panel: nothing left for sale")
 	var ore := World.items.mint("ore_sack", "found", "test")
 	World.put_item(host, host, 1, ore)
@@ -421,8 +425,8 @@ func _test_in_town() -> void:
 	_main._send_shop(host, counter)
 	_check(_main.shop_panel._offer_label.text.contains("sack of ore 9 gold"), "the town would pay 9 for the sack of ore (%s)" % _main.shop_panel._offer_label.text)
 	_check(World.try_transfer(host, host, 1, counter, 0), "the host puts the sack in the counter: sold")
-	_check(host.slots[1] == "" and counter.slots[0] == "" and World.stockpile.count(STORE, "ore") == 5 and _main.gold == 18,
-		"the slot empty, the counter keeps nothing, 5 ore banked, 18 gold (%d)" % _main.gold)
+	_check(host.slots[1] == "" and counter.slots[0] == "" and World.stockpile.count(STORE, "ore") == 5 and _main.gold == 19 - price,
+		"the slot empty, the counter keeps nothing, 5 ore banked, %d gold (%d)" % [19 - price, _main.gold])
 	var herbs := World.items.mint("herbs", "found", "test")  # 601 amended: no coin purse to refuse now.
 	World.put_item(host, host, 1, herbs)
 	_check(not World.try_transfer(host, host, 1, counter, 0) and host.slots[1] == "herbs"
