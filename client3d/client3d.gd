@@ -14389,6 +14389,7 @@ func _sync_puppets() -> void:
 		_sync_worn(entity, puppet)
 		if entity is Resident:
 			_sync_addressing(entity as Resident, puppet)
+			_sync_bedroll(entity as Resident, puppet)
 			_sync_work(entity as Resident, puppet)
 		elif entity is Player or entity is Companion:
 			_sync_work(entity, puppet)  # Its bandaging (the kneel); a companion's sleep.
@@ -16783,6 +16784,57 @@ static func stand_offset(slot: String, rect: Rect2i, yaw: float, cell: Vector2i)
 	var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
 	var point := Basis(Vector3.UP, yaw) * Vector3(float(stand[0]), float(stand[1]), float(stand[2]))
 	return Vector3(middle.x - cell.x, 0.0, middle.y - cell.y) + point
+
+
+## A townsman asleep (decision 751, npc's side (3)): out of doors (its cell in
+## no drawn building) on prop.bedroll, laid from its cell one back, its head
+## (the prop's -z) the facing's way, as a house's beds are (add_beds); on a
+## drawn bed's head cell, that bed. The puppet's "bed_height" is what the
+## body lies on (LIE_HEIGHT, art-kit's measures; pc-character's _lay lifts it),
+## 0 when up or on the floor. Kept as the puppet's "bedroll" key while the
+## same: its cell and facing.
+const BEDROLL := "prop.bedroll"
+const LIE_HEIGHT := {"prop.bed": 0.37, "prop.bed_straw": 0.37, "prop.bedroll": 0.09}
+func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
+	var want := "%s|%s" % [body.tile, body.facing] if body.activity == "sleep" else ""
+	if want == str(puppet.get_meta("bedroll", "")):
+		return
+	puppet.set_meta("bedroll", want)
+	var old := puppet.get_node_or_null("Bedroll")
+	if old != null:
+		puppet.remove_child(old)
+		old.queue_free()
+	var height := 0.0
+	if not want.is_empty():
+		var bed := _bed_under(body.tile)
+		if bed.is_empty() and not _indoors(body.tile) and ArtKit.has(BEDROLL):
+			var way := Vector2(body.facing)
+			var piece := ArtKit.instance(BEDROLL)
+			piece.name = "Bedroll"
+			piece.transform = Transform3D(Basis(Vector3.UP, atan2(-way.x, -way.y)), Vector3(-way.x, 0.0, -way.y) * 0.5)
+			puppet.add_child(piece)
+			height = float(LIE_HEIGHT[BEDROLL])
+		elif not bed.is_empty() and not bool(bed.get("solid", false)):
+			height = float(LIE_HEIGHT.get(str(bed.get("prop", "")), 0.0))
+	puppet.set_meta("bed_height", height)
+
+
+## The drawn bed whose head cell is [param cell] ({} for none).
+func _bed_under(cell: Vector2i) -> Dictionary:
+	for building: Variant in _drawn_buildings():
+		if building is Dictionary:
+			for bed: Variant in (building as Dictionary).get("beds", []):
+				if bed is Dictionary and not (bed["cells"] as Array).is_empty() and (bed["cells"] as Array)[0] == cell:
+					return bed
+	return {}
+
+
+## Whether [param cell] lies in a drawn building's rect.
+func _indoors(cell: Vector2i) -> bool:
+	for building: Variant in _drawn_buildings():
+		if building is Dictionary and (building as Dictionary).get("rect") is Rect2i and ((building as Dictionary)["rect"] as Rect2i).has_point(cell):
+			return true
+	return false
 
 
 ## A sleeper lies on its bed cell (566): the Lie clip falls back from the feet,

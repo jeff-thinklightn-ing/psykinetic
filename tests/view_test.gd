@@ -2521,6 +2521,42 @@ func _test_beds_drawn() -> void:
 	_check(straw != null and placed.origin.is_equal_approx(Vector3(2, 0, 3.5)) and (-placed.basis.z).is_equal_approx(Vector3(0, 0, 1)),
 		"a turned slot hut's straw bed: its parts made, the bed where the map has it (%s)" % [placed])
 	slot.free()
+	_test_bedroll_drawn()
+
+
+## 751, npc's side (3): a townsman asleep out of doors lies on prop.bedroll; on a bed's head cell, the bed's height.
+func _test_bedroll_drawn() -> void:
+	print("\n== a townsman asleep out of doors on a bedroll, its head the facing's way; on a bed, its height (751, npc's side (3)) ==")
+	var resident := Resident.new()
+	resident.name = "BedrollTestResident"
+	var puppet := Node3D.new()
+	resident.tile = Vector2i(-500, -500)
+	resident.facing = Vector2i(1, 0)
+	resident.activity = "sleep"
+	_rig._sync_bedroll(resident, puppet)
+	var roll := puppet.get_node_or_null("Bedroll") as Node3D
+	_check(roll != null and roll.position.is_equal_approx(Vector3(-0.5, 0, 0)) and (-roll.basis.z).is_equal_approx(Vector3(1, 0, 0))
+		and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.09),
+		"out of doors: the bedroll from its cell one back, its head the facing's way, the body 0.09 up (%s)" % [roll.transform if roll != null else null])
+	resident.activity = ""
+	_rig._sync_bedroll(resident, puppet)
+	_check(puppet.get_node_or_null("Bedroll") == null and float(puppet.get_meta("bed_height", 1.0)) == 0.0, "up: the bedroll gone, the height 0")
+	var plots: Array = _rig._terrain.get("plot_buildings", [])
+	var had := _rig._terrain.has("plot_buildings")
+	var house := {"rect": Rect2i(-600, -600, 3, 3), "beds": [{"cells": [Vector2i(-600, -600), Vector2i(-600, -599)], "head": Vector2i(0, -1), "prop": "prop.bed"}]}
+	_rig._terrain["plot_buildings"] = plots + [house]
+	resident.tile = Vector2i(-600, -600)
+	resident.facing = Vector2i(0, -1)
+	resident.activity = "sleep"
+	_rig._sync_bedroll(resident, puppet)
+	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
+		"on a bed's head cell: no bedroll, the bed's height (%s)" % [puppet.get_meta("bed_height", 0.0)])
+	if had:
+		_rig._terrain["plot_buildings"] = plots
+	else:
+		_rig._terrain.erase("plot_buildings")
+	puppet.free()
+	resident.free()
 
 
 func _test_turf_house() -> void:

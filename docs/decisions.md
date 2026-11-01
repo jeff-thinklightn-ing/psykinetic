@@ -37125,3 +37125,20 @@ _test_asleep, on a made-up area: a hut with one bed houses one and the
 player's house none; the first lies on the head cell, its head the bed's
 way; the second has no bed there; a solid bed puts its sleeper beside it.
 Server only, protocol unchanged.
+
+751, npc's side (3) (release's label; the coordinator's word that npc does
+the Client3D lines): the bedroll drawn. Client3D._sync_bedroll, on each
+Resident's puppet: while its activity is "sleep" with its cell in no drawn
+building (_indoors) and on no bed's head cell (_bed_under), art-kit's
+prop.bedroll is the puppet's child "Bedroll". It is laid from its cell one
+back (centred half a cell behind it), its head (the prop's -z) the facing's
+way, as add_beds lays a house's beds. No new entity, nothing on the wire: a
+v0.1.195 client shows the sleeper on bare ground, as before. The puppet's
+"bed_height" is what the body lies on, for pc-character's _lay to lift it
+(their side of 751): LIE_HEIGHT, art-kit's measures (prop.bedroll 0.09,
+prop.bed and prop.bed_straw 0.37); 0 when up, on the floor, or beside a
+solid bed. It is redone only when the cell, the facing or the activity
+changes (the puppet's "bedroll" key). view_test _test_bedroll_drawn: out
+of doors, the bedroll one back with its head the facing's way and the body
+0.09 up; up, the bedroll gone and the height 0; on a bed's head cell, no
+bedroll and the bed's 0.37. Client only, protocol unchanged.

@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Townsfolk asleep out of doors lie on a bedroll, and those in a house lie up on their bed rather than through it (751, npc's side (3)).
 - The land past a way out now meets the ground at your feet: from the foothills' north road the castle stands level beyond the trees instead of at the foot of a sheer cliff, and the wilds past its south road likewise (327 amended).
 
 - Gold: the gold beside your pack, and Rolf's and a pedlar's buttons, now follow your purse whenever it changes (a quest's reward, the dole, a sale), not only after a shop window; with gold in hand Rolf's buttons work (736 amended (3)).
