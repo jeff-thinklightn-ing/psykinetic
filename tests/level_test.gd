@@ -473,6 +473,15 @@ func _test_clearing() -> void:
 			"grown back: trunks again, the level's own; the built-over one stays felled (%s)" % [left])
 	var again := Clearing.new(clearing.to_dict())
 	_check(again.felled == clearing.felled, "kept in the snapshot and read back the same (%s)" % [clearing.to_dict()])
+	# A save restored on a level changed since (758, terrain's find): a cell no
+	# trunk now (grass, past the edge) is dropped; a trunk, or the level's own floor (1), stays.
+	var restored := Clearing.new({"clearing_grove": {"10,5": [1, 0], "6,6": [1, 0], "30,5": [1, 0], "5,6": [0, 0, 1]}})
+	var fresh: Dictionary = Level.load_level("clearing_grove")["terrain"]
+	restored.apply("clearing_grove", fresh)
+	var kept: Array = restored.felled["clearing_grove"].keys()
+	kept.sort()
+	_check(kept == [Vector2i(5, 6), Vector2i(10, 5)] and not Vector2i(30, 5) in fresh["floor"] and fresh["clearing"].size() == 2,
+		"restored on a changed level: the trunk and the level's own floor stay, grass and a cell past the edge go (%s)" % [kept])
 	Level.unregister("clearing_grove")
 
 

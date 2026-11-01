@@ -151,7 +151,10 @@ static func _write(path: String, text: String) -> bool:
 ## "towns" how each grows (Towns.to_dict; {} before it), "roofs" the
 ## damaged roofs (World.roofs_damaged's keys; [] before them), "economy"
 ## the players' gold (Economy.to_dict; {} before it), and "herds" the
-## wildlife (Herds.to_dict; {} before it). Entries that make
+## wildlife (Herds.to_dict; {} before it). Every other key at the file's
+## top level comes back as written (decision 758): what Main.data_of saves,
+## its _boot reads, each reader checking its value's type; a whitelist here
+## dropped thirteen of them on every restart. Entries that make
 ## no sense are skipped with a warning rather than failing the whole load.
 static func load(path: String) -> Dictionary:
 	var nothing := {"ok": false, "zones": {}, "players": [], "steps": 0}
@@ -207,7 +210,7 @@ static func load(path: String) -> Dictionary:
 	var herds: Variant = data.get("herds", {})
 	var sky: Variant = data.get("sky", {})
 	var regen: Variant = data.get("regen", {})
-	return {"ok": true, "zones": zones, "players": players,
+	var out := {"ok": true, "zones": zones, "players": players,
 		"regen": regen if regen is Dictionary else {},
 		"steps": maxi(int(steps), 0) if steps is float or steps is int else 0,
 		"holdings": holdings if holdings is Dictionary else {},
@@ -219,6 +222,11 @@ static func load(path: String) -> Dictionary:
 		"economy": economy if economy is Dictionary else {},
 		"herds": herds if herds is Dictionary else {},
 		"sky": sky if sky is Dictionary else {}}
+	# The rest as saved (758): the world's other keys, their readers in Main._boot.
+	for key: Variant in data if data.get("version") == VERSION else {}:
+		if not out.has(key) and key != "version":
+			out[key] = data[key]
+	return out
 
 
 ## One zone's {tick, entities, respawns} as read.

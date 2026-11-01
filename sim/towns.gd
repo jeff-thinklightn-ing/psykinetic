@@ -2874,7 +2874,7 @@ func huts_from_dict(saved: Dictionary) -> void:
 		if not each is Dictionary or not str(each.get("state", "")) in [STANDING, DISREPAIR, RUIN]:
 			continue
 		var entry := {"state": str(each["state"]), "level": maxi(int(each.get("level", 1)), 0), "job": int(each.get("job", 0))}
-		for key: String in ["empty_since", "decay", "ruin"]:
+		for key: String in ["empty_since", "decay", "ruin", "turn"]:  # "turn" the day last stepped (758: twice a day after a restart without it).
 			if each.has(key):
 				entry[key] = int(each[key])
 		_huts[str(id)] = entry

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A server restart keeps what it used to lose: players' plots, the felled forest, named enemies, the hill herders and healers' huts, captives, raids, trade and trampled ground come back as they were saved (758).
 - Companions: what she is told of where she is and how hurt you both are uses plain words (no "dungeon", no "HP", no percentages, no stance names), so she doesn't say them back (748 amended (3)).
 - Townsfolk keep finding the temple, and Aldous keeps working there, when a town's temple is built from a building kind (734 amended).
 

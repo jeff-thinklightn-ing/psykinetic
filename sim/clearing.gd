@@ -170,6 +170,7 @@ func today() -> int:
 ## (cell -> stage) for the views. Main applies it before World loads the
 ## terrain.
 func apply(zone: String, terrain: Dictionary) -> void:
+	_drop_stale(zone)
 	var stages: Dictionary[Vector2i, String] = {}
 	var cells: Array[Vector2i] = []
 	for cell: Vector2i in felled.get(zone, {}):
@@ -186,6 +187,32 @@ func apply(zone: String, terrain: Dictionary) -> void:
 	terrain["clearing"] = stages
 	Level.relay_outline(terrain, cells)
 	lay_plots(terrain, plots_of(zone), size_of)
+
+
+## Drops [param zone]'s felled cells that are no trunk in its level as it now
+## stands (758, terrain's find: a save now restored, the level changed since):
+## outside the map or within EDGE of its edge, the level's floor, water or
+## built over, by the test fell uses. A trunk kept (649) and a cell of the
+## level's own floor (its entry's third field 1) stay. A zone with no level
+## here is left as it is.
+func _drop_stale(zone: String) -> void:
+	var cells: Dictionary = felled.get(zone, {})
+	if cells.is_empty() or not Level.exists(zone):
+		return
+	var base := _base_of(zone)
+	var size: Vector2i = base["size"]
+	var stale: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		var entry: Array = cells[cell]
+		if _kept(zone, cell) or entry.size() > 2 and int(entry[2]) == 1:
+			continue
+		if cell.x < EDGE or cell.y < EDGE or cell.x >= size.x - EDGE or cell.y >= size.y - EDGE \
+				or base["floor"].has(cell) or base["water"].has(cell) or base["built"].has(cell):
+			stale.append(cell)
+	for cell in stale:
+		cells.erase(cell)
+	if not stale.is_empty():
+		print("[clearing] %s: %d felled cells no trunk in the level now, dropped" % [zone, stale.size()])
 
 
 ## [param cells] ([[x, y, stage]], a "clearing" message's or the server's

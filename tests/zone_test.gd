@@ -8,6 +8,9 @@ extends Node
 
 const BO := 2
 const BO_ID := "b0b0b0b0-0000-4000-8000-0000000000b0"
+## The keys Snapshot.load's whitelist dropped on every restart till 758.
+const DROPPED_ONCE := ["named", "placed_captives", "sought_bands", "alms_runs", "crypt_told", "runner_out",
+	"clearing", "plots", "herders", "huts", "raid_groups", "trade", "trampled"]
 
 var _failures := 0
 var _main: Node
@@ -200,8 +203,17 @@ func _test_empty_zone_sleeps() -> void:
 func _test_restart() -> void:
 	print("\n== a restart puts both players back in their own zones, the world's clock where it stopped ==")
 	var clock := World.steps
+	# Something in the keys a whitelist once dropped (758): a laid plot, a told crypt, a placed captive.
+	World.clearing.lay_plot("test_room", "store", "forge", Rect2i(2, 2, 7, 7), Vector2i(0, 1))
+	_main._crypt_told = {"probe": true}
+	_main._placed_captives = {"probe_camp": true}
 	_main._save_state()
 	var snapshot := Snapshot.load(Net.state_path)
+	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
+	var dropped: Array = saved.keys().filter(func(key: String) -> bool: return key != "version" and not snapshot.has(key))
+	_check(dropped.is_empty(), "every key the save writes, the load gives back (758; dropped: %s)" % [dropped])
+	_check(DROPPED_ONCE.all(func(key: String) -> bool: return saved.has(key) and snapshot.get(key) == saved[key]),
+		"the thirteen keys a whitelist dropped come back as saved")
 	var zones: Dictionary = snapshot["zones"]
 	_check(snapshot["ok"] and zones.has("test_room") and zones.has("sample"), "the snapshot holds both zones (%s)" % [zones.keys()])
 	var where := {}
@@ -226,6 +238,13 @@ func _test_restart() -> void:
 	_main._admit(BO, BO_ID, "Bo")
 	var bo := _player(BO)
 	_check(bo != null and bo.zone == "sample", "Bo comes back in the sample (%s)" % [bo.zone if bo else "-"])
+	# Saved, booted, saved again: each of those keys as it was (758).
+	_check(World.clearing.plots_of("test_room").size() == 1 and _main._crypt_told == {"probe": true} and _main._placed_captives == {"probe_camp": true},
+		"the plot, the told crypt and the placed captive are back after the restart")
+	_main._save_state()
+	var again: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
+	var changed: Array = DROPPED_ONCE.filter(func(key: String) -> bool: return again.get(key) != saved[key])
+	_check(changed.is_empty(), "and saved again as they were (changed: %s)" % [changed.map(func(key: String) -> String: return "%s %s -> %s" % [key, saved[key], again.get(key)])])
 
 
 ## A player who leaves while World is in another zone, comes back and goes

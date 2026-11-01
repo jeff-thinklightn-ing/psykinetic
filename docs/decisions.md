@@ -37626,19 +37626,40 @@ tables alone give armour.
 items_test _test_loot: the table's six rows, all known, none armour. Server only, data only,
 protocol unchanged, no new class_name.
 
-## 758, economy's side: an older save's caravans
+## 758. A world save's every key survives a load
 
-Builder's 758 has Snapshot.load hand "trade" to TradeRoutes.new again, so a restart restores the
-caravans on their way (before, every restart came up with none, while Economy kept its own
-records of them). A caravan mid-route walks on from where it was: its way is made again from its
-two ends, and one whose way is gone is lost "no way", as a closed way's is. A route whose town
-changed has nothing kept by town, only ends. What could not cope was an older shape:
-TradeRoutes.from_dict kept any record with route, from and to, and a raid or a loss then read
-cargo.goods, cargo.members, cargo.items and town. from_dict now fills each, of its kind (empty
-when absent), and the record's id from its key. trade_routes_test _test_saved: an old record with
-no cargo and no town, restored whole and struck on the way with nothing to take, arrives. Server
-only, protocol unchanged, no new class_name.
-## 758. Snapshot.load restores every saved key (builder's side above)
+Maps found that Snapshot.load returned only the keys it listed, so thirteen
+keys Main.data_of saves and Main._boot reads never came back: named,
+placed_captives, sought_bands, alms_runs, crypt_told, runner_out, clearing,
+plots, herders, huts, raid_groups, trade, trampled. Every box restart wiped
+players' plots, the felled clearing (591), named enemies, herders, huts,
+captives and the rest. The world save's counterpart of 687 (a companion's
+saved keys survive a load, record_keys_test its guard).
+- Snapshot.load keeps its typed keys as before, then passes every other
+  top-level key of a current-version file through as written (not
+  "version"). Each reader in Main._boot checks its value's type, as all of
+  them already did.
+- The guard, zone_test _test_restart, on a real Main's save: every key in
+  the written file is in what load returns (a whitelist fails it), and the
+  thirteen come back equal to the file. A laid plot, a told crypt and a
+  placed captive are back after the restart, and the thirteen are saved
+  again as they were.
+- Saved felled cells now come back, so Clearing.apply first drops those no
+  trunk in the zone's level as it now stands (terrain's find; maps asked it
+  folded in here): outside the map or within EDGE of its edge, the level's
+  floor, water or built over, by fell's test. A trunk kept (649) and a cell
+  of the level's own floor (third field 1) stay. Without it a saved cell
+  now a road had its kind overwritten, one now water was both, and one past
+  a rebuilt map's edge an island of ground. A remade zone's clearing and
+  plots are dropped whole by maps' 756 (Clearing.drop_zone). level_test
+  _test_clearing: restored on a changed level.
+- The guard's save-boot-save found Towns.huts_from_dict (733) dropping a
+  hut's "turn", the day it last stepped, so a restart stepped its decay
+  twice that day: kept now.
+- The owners were asked to confirm their readers cope with a real saved
+  value (the landing message lists who did).
+Server only: it changes what a restart restores. Protocol unchanged, no new
+class_name.
 
 758, enemy-ai's side: the readers of two keys a restart now brings back,
 hardened before the data returns (builder asked, release: land first).
@@ -37655,3 +37676,16 @@ hardened before the data returns (builder asked, release: land first).
 monster_test (the named one), raid_groups_test _test_saved. Server only,
 protocol unchanged, no new class_name, no CHANGELOG bullet (unseen unless a
 save was broken).
+
+## 758, economy's side: an older save's caravans
+
+Builder's 758 has Snapshot.load hand "trade" to TradeRoutes.new again, so a restart restores the
+caravans on their way (before, every restart came up with none, while Economy kept its own
+records of them). A caravan mid-route walks on from where it was: its way is made again from its
+two ends, and one whose way is gone is lost "no way", as a closed way's is. A route whose town
+changed has nothing kept by town, only ends. What could not cope was an older shape:
+TradeRoutes.from_dict kept any record with route, from and to, and a raid or a loss then read
+cargo.goods, cargo.members, cargo.items and town. from_dict now fills each, of its kind (empty
+when absent), and the record's id from its key. trade_routes_test _test_saved: an old record with
+no cargo and no town, restored whole and struck on the way with nothing to take, arrives. Server
+only, protocol unchanged, no new class_name.
