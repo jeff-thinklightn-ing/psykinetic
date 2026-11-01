@@ -37838,3 +37838,24 @@ name or an id: "clearing" counts felled cells and "plots" laid plots over every 
 its cells, the rest their entries. zone_test _test_restart checks the line after its save (one
 plot, one told crypt, one placed captive, no names). Server only, protocol unchanged, no new
 class_name.
+
+## 759. The healer's old age
+
+The coordinator's ask, npc leading, approved: a hut's healer leaves his hut in old age. Nobody dies
+and there is no heir; only healers age. Then 733 runs as it stands: the hut kept by nobody falls
+into disrepair, and after healers.vacant_days a newcomer is seated and mends it.
+
+759, economy's side: the rules and the money.
+- levels/economy.json healers.old_age {days 160, spread 80, first_from 20, first_to 160}, beside
+  vacant_days, read by npc: each term days +- spread/2 game days (120 to 200, about 7.5 to 12.5 real
+  days on the box), staggered by the place id; a healer already seated gets a first term of 20 to
+  160 days from the boot it lands on.
+- His leaving is Production.remove_worker (501's path). It frees his workshop, and a job he was
+  working goes back to queued there for the newcomer, a hut_repair (733) with it: Towns' hut record
+  is keyed by place, the mend by workshop. His purse leaves with him, as a death's does.
+- A debt is never written off: he does not leave while his "loan" (to a bank) or his "owed" (a
+  town's to him) is above 0, as he waits out a working job. remove_worker would drop both.
+- The newcomer reuses the worker id "medicine_man:<place id>"; what is keyed by the old man's id
+  (his card, players' standing, transcripts) is cleared on his leaving, npc's side. Care a player
+  paid for stays with the hut (733): no refund.
+Server only, data only, protocol unchanged, no new class_name.
