@@ -974,6 +974,9 @@ static func _sockets(hand: float, hip: float, back: float, chest: float) -> Dict
 		"arm_l": ["LeftLowerArm", Transform3D(Basis(Vector3(0, 0, 1), Vector3(0, 1, 0), Vector3(-1, 0, 0)), Vector3.ZERO)],
 		# Between the shoulder blades, a stowed thing's length up and over the right shoulder.
 		"back": ["UpperChest", Transform3D(Basis(Vector3(0, 0, -1), PI * 0.2), Vector3(0.0, chest, -back))],
+		# The upper chest's and the hips' own frames, the slung bow's and the quiver's (662 amended (d)).
+		"sling": ["UpperChest", Transform3D.IDENTITY],
+		"sling_hip": ["Hips", Transform3D.IDENTITY],
 		# The right hip, a hung thing's length down (the lantern; the left is the sheath's, 662 (c)).
 		"belt_r": ["Hips", Transform3D(Basis(Vector3(0, 0, 1), PI), Vector3(-hip, 0.0, 0.0))],
 		# The left hip, in a sheath's frame (art-kit's gear.scabbard and gear.sheath): +y up the
@@ -15398,16 +15401,14 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 		ids[0] = ""
 	if quiver != str(puppet.get_meta("quiver", "")):
 		puppet.set_meta("quiver", quiver)
-		var back := sockets.get("back") as Node3D
-		if back != null:
-			var old := back.get_node_or_null("Quiver")
-			if old != null:
-				back.remove_child(old)
-				old.queue_free()
-			if quiver != "" and ArtKit.has(QUIVER):
-				var piece := ArtKit.instance(QUIVER, int(ARROW_VARIANTS[quiver]))
-				piece.name = "Quiver"
-				back.add_child(piece)
+		var old := _quiver_of(sockets)
+		if old != null:
+			old.get_parent().remove_child(old)
+			old.queue_free()
+		if quiver != "" and ArtKit.has(QUIVER):
+			var piece := ArtKit.instance(QUIVER, int(ARROW_VARIANTS[quiver]))
+			piece.name = "Quiver"
+			_wear_quiver(sockets, piece)
 	var changed := false
 	for hand in 2:
 		var id: String = ids[hand]
@@ -15415,7 +15416,7 @@ func _sync_held(entity: GridEntity, puppet: Node3D) -> void:
 			continue
 		held[hand] = id
 		changed = true
-		if hand == 1 and sockets.has("back"):
+		if hand == 1:
 			_let_go_stowed(sockets)
 		_hold(sockets, hand, id, work)
 	if changed:
@@ -15707,6 +15708,8 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	_sky_bow(entity, puppet, rig, moves, want, now)
 	if want == "stowed" or state == "stowed":
 		_stow_bow(sockets, want == "stowed")
+	else:
+		_aim_sling(sockets)  # The quiver kept on the back, the bow in hand.
 	if want == "sheathed" or (state == "sheathed" and want != "drawing"):
 		_sheathe(sockets, want == "sheathed")
 	if _put_away(sockets) != away:  # Heard as the blade (else the shield) changes place.
@@ -15821,50 +15824,487 @@ static func _stow_slot_known() -> bool:
 	return bool(_has_stow_slot)
 
 
-## A bow on the back out of a fight (662 amended (d); Jeff: "have it on the
-## back so that the bow curve faces the body, it lies under the quiver in the
-## same direction"): on the quiver's "back" socket, along it, under it. Two
-## faces for Jeff to pick between (bow_back_face): "A" the string to the body,
-## the bow's back out, its limbs wrapping the body; "B" the bow's back to the
-## body (lower on it, its upper limb clear of the neck through the jog), its
-## limbs and string out. Either way the quiver is laid out over the bow, so
-## the two never cross. Each is [the bow's place in the socket, the quiver's
-## offset over it], measured on the man as built: his back at the socket's
-## z 0, the bow's grip 0.047 m deep before its back, its tips and string 0.205
-## behind it (build/bowback/profile.gd); clear of the five builds through the
-## gaits and standing, and of each other (anim_rig_test).
-const BOW_BACK := {
-	"A": [Transform3D(Basis(Vector3.UP, PI), Vector3(0.0, -0.1, -0.217)), Vector3(0.0, 0.0, -0.278)],
-	"B": [Transform3D(Basis.IDENTITY, Vector3(0.0, -0.2, -0.1)), Vector3(0.0, 0.0, -0.315)]}
-static var bow_back_face := "A"
+## A bow slung on the back out of a fight, and an archer's quiver (662 amended
+## (d); Jeff's pick, "bow back 1", of build/bowpick's sheet: "quiver and bow
+## wood need to be against back. the string could be over the front of
+## chest"): slung across the body, the bow's back out and its belly to the
+## body, its wood up the back from the left hip past the right shoulder, the
+## string over that shoulder and down the chest to the left hip; the quiver
+## flat on the back beside the wood toward the neck, its mouth at the right
+## shoulder, whether the bow is slung or in hand. tools/sling_fit.gd fits both
+## on the man's and the woman's body standing and writes SLING_FIT: each
+## piece's place on UpperChest (the "sling" socket) and, per slice of its
+## length, its gap to the skin at the base shape and each shape key's change
+## to it. A body's build (its keys, rounded to SLING_STEP) gives each slice's
+## gap; the piece is pushed in until its nearest is SLING_CLEAR off the skin,
+## and its meshes bent in along their length by the rest, so the wood and the
+## quiver lie on the back (sling_fit; the bent meshes cached by build and
+## mesh, at most SLING_CACHE_MAX). Slung, the bow is
+## turned each frame about its top contact so its foot contact rides out with
+## the hip ("sling_hip", Hips) where it would push into it, never in (_aim_sling),
+## its own straight string hidden, and the string drawn as rods: from the top
+## nock round the shoulder, taut over the chest (the front's upper hull along
+## the line), to the left hip's front, round it and down the thigh (riding the
+## hips), to the bottom nock. A body the table doesn't
+## know (a goblin's) keeps the bow and quiver on the "back" socket as before
+## (BOW_BACK_PLAIN: the bow's place, the quiver's offset over it).
+const SLING_FIT := "res://client3d/sling.json"
+const SLING_CLEAR := 0.004
+const SLING_STEP := 0.1
+const SLING_CACHE_MAX := 64
+## A slice whose skin is farther than this past the piece's nearest is off the body's edge
+## and hangs straight (sling_fit). 0.12: the man's quiver top over his shoulder blade (8.3 cm)
+## still bends in; its foot, past his waist with only the thigh 20 cm behind, does not.
+const SLING_BEND_REACH := 0.12
+## How far out from a slice the skin under it is looked for (_sling_lie): a
+## slice that deep in is still found.
+const SLING_BACK := 0.1
+const SLING_STRING_RADIUS := 0.004
+const SLING_STRING_LIFT := 0.006
+const BOW_IN := Vector3(0, 0, -1)
+const QUIVER_IN := Vector3(0, 0, 1)
+const BOW_BACK_PLAIN := [Transform3D(Basis(Vector3.UP, PI), Vector3(0.0, -0.1, -0.217)), Vector3(0.0, 0.0, -0.278)]
+static var _sling_table: Variant = null
+static var _sling_bent := {}
+static var _sling_rod: CylinderMesh = null
+
+
+static func _sling_fits() -> Dictionary:
+	if _sling_table == null:
+		_sling_table = {}
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(SLING_FIT)) if FileAccess.file_exists(SLING_FIT) else null
+		if parsed is Dictionary:
+			_sling_table = parsed
+	return _sling_table
+
+
+static func _sling_v(a: Array) -> Vector3:
+	return Vector3(float(a[0]), float(a[1]), float(a[2]))
+
+
+static func _sling_xf(a: Array) -> Transform3D:
+	return Transform3D(Basis(_sling_v(a.slice(0, 3)), _sling_v(a.slice(3, 6)), _sling_v(a.slice(6, 9))), _sling_v(a.slice(9, 12)))
+
+
+## A point of the table at a build: its base ("") plus each key's change times its weight.
+static func _sling_point(values: Dictionary, weights: Dictionary) -> Vector3:
+	var v := _sling_v(values[""])
+	for key: String in weights:
+		if values.has(key):
+			v += _sling_v(values[key]) * float(weights[key])
+	return v
+
+
+## Points of the table at a build, as _sling_point, each.
+static func _sling_points(values: Dictionary, weights: Dictionary) -> PackedVector3Array:
+	var out := PackedVector3Array()
+	for i in (values[""] as Array).size():
+		var v := _sling_v(values[""][i])
+		for key: String in weights:
+			if values.has(key):
+				v += _sling_v(values[key][i]) * float(weights[key])
+		out.append(v)
+	return out
+
+
+## A list of the table at a build, as _sling_point (a null base, off the body: INF).
+static func _sling_list(values: Dictionary, weights: Dictionary) -> PackedFloat32Array:
+	var base: Array = values[""]
+	var out := PackedFloat32Array()
+	for i in base.size():
+		if base[i] == null:
+			out.append(INF)
+			continue
+		var g := float(base[i])
+		for key: String in weights:
+			if values.has(key):
+				g += float(values[key][i]) * float(weights[key])
+		out.append(g)
+	return out
+
+
+## The fit of the slung bow and the quiver for the body [param sockets] are
+## on, at its build (worked out once, kept on the "sling" socket): {} for a
+## body SLING_FIT doesn't know. "bow" and "quiver" their places in the sling
+## socket, "bow_bend"/"quiver_bend" each slice's [ys, moves in],
+## "bow_points"/"quiver_points" each slice's point as bent and
+## "bow_near"/"quiver_near" the skin vertices it may meet, "skin" those
+## vertices on their bones at the build (_sling_skin), "string" the chest's points (round the shoulder and down the
+## front), "hip_hips" the hip's (its front and round it) on sling_hip, "key"
+## the build's cache key. Places are the model's (scaled by
+## it); the pieces keep their size.
+static func sling_fit(sockets: Dictionary) -> Dictionary:
+	var sling := sockets.get("sling") as Node3D
+	if sling == null or not sockets.has("sling_hip"):
+		return {}
+	if sling.has_meta("fit"):
+		return sling.get_meta("fit")
+	var skeleton := sling.get_parent().get_parent() as Skeleton3D
+	var root := skeleton.owner if skeleton != null else null
+	var entry: Dictionary = _sling_fits().get(root.scene_file_path if root != null else "", {})
+	if entry.is_empty():
+		return {}
+	var body := skeleton.find_child("Body", true, false) as MeshInstance3D
+	var weights := {}
+	var key := root.scene_file_path
+	if body != null and body.mesh is ArrayMesh:
+		var shapes := body.mesh as ArrayMesh
+		for k in shapes.get_blend_shape_count():
+			var w := snappedf(body.get_blend_shape_value(k), SLING_STEP)
+			if w != 0.0:
+				weights[String(shapes.get_blend_shape_name(k))] = w
+				key += " %s=%.1f" % [shapes.get_blend_shape_name(k), w]
+	var s := 1.0 / maxf(sling.scale.x, 0.0001)
+	var fit := {"key": key}
+	for piece: String in ["bow", "quiver"]:
+		var gaps := _sling_list(entry[piece + "_gap"], weights)
+		var least := INF
+		for g in gaps:
+			least = minf(least, g)
+		# A slice whose skin is past SLING_BEND_REACH beyond the nearest is off the body's edge:
+		# it hangs on straight, not curled round the side to it.
+		for i in gaps.size():
+			if gaps[i] - least > SLING_BEND_REACH:
+				gaps[i] = INF
+		if least == INF:
+			least = SLING_CLEAR
+		var at := _sling_xf(entry[piece])
+		var inward := (at.basis * (BOW_IN if piece == "bow" else QUIVER_IN)).normalized()
+		at.origin = (at.origin + inward * (least - SLING_CLEAR)) * s
+		var ys := PackedFloat32Array()
+		var moves := PackedFloat32Array()
+		for i in gaps.size():
+			if gaps[i] < INF:
+				ys.append(float(entry[piece + "_y"][i]))
+				moves.append((gaps[i] - least) * s)
+		fit[piece] = at
+		fit[piece + "_bend"] = [ys, moves]
+		# Each slice's point (bent in as worn) and the skin it may meet (_sling_lie).
+		var points := PackedVector3Array()
+		var near: Array[PackedInt32Array] = []
+		for i in (entry[piece + "_pts"] as Array).size():
+			if gaps[i] == INF:
+				continue  # Over nothing standing, or past the body's edge.
+			var v := _sling_v(entry[piece + "_pts"][i])
+			points.append(v + (BOW_IN if piece == "bow" else QUIVER_IN) * _sling_move_at(fit[piece + "_bend"], v.y))
+			near.append(PackedInt32Array(entry[piece + "_near"][i]))
+		fit[piece + "_points"] = points
+		fit[piece + "_near"] = near
+	# The skin those slices may meet, at this build, on its bones (_sling_skin).
+	var proxy: Dictionary = entry["proxy"]
+	var bone_of := PackedInt32Array()
+	var weight_of := PackedFloat32Array()
+	var place_of := PackedVector3Array()
+	var starts := PackedInt32Array([0])
+	for point: Dictionary in proxy["points"]:
+		var v := _sling_v(point["v"])
+		for shape_key: String in point["keys"]:
+			if weights.has(shape_key):
+				v += _sling_v(point["keys"][shape_key]) * float(weights[shape_key])
+		for one: Array in point["skin"]:
+			var id := skeleton.find_bone(str(one[0]))
+			if id < 0:
+				continue
+			bone_of.append(id)
+			weight_of.append(float(one[1]))
+			place_of.append(_sling_xf(proxy["binds"][one[0]]) * v)
+		starts.append(bone_of.size())
+	fit["skin"] = [bone_of, weight_of, place_of, starts]
+	fit["skin_tris"] = PackedInt32Array(entry["proxy_tris"])
+	var hips_from_chest := _sling_xf(entry["hips_from_chest"])
+	hips_from_chest.origin *= s
+	# The string over the chest: the shoulder's top, taut over the front, to the hip.
+	var front := _sling_v(entry["front"])
+	var up := _sling_v(entry["up"])
+	var shoulder := _sling_point(entry["shoulder"], weights) * s + up * SLING_STRING_LIFT
+	var hip := _sling_point(entry["hip"], weights) * s + front * SLING_STRING_LIFT
+	var offsets := _sling_list(entry["string"], weights)
+	var length := maxf(shoulder.distance_to(hip), 0.0001)
+	var hull: Array[Vector2] = []
+	for i in offsets.size():
+		var p := Vector2(length * i / float(offsets.size() - 1), offsets[i] * s + SLING_STRING_LIFT)
+		while hull.size() >= 2 and (hull[-1] - hull[-2]).cross(p - hull[-2]) >= 0.0:
+			hull.pop_back()
+		hull.append(p)
+	var over := _sling_points(entry["over"], weights)
+	var string := PackedVector3Array([over[0] * s, shoulder, over[1] * s])
+	for i in range(1, hull.size() - 1):
+		string.append(shoulder.lerp(hip, hull[i].x / length) + front * hull[i].y)
+	fit["string"] = string
+	var round := PackedVector3Array([hips_from_chest * hip])
+	for p in _sling_points(entry["round"], weights):
+		round.append(hips_from_chest * (p * s))
+	fit["hip_hips"] = round
+	sling.set_meta("fit", fit)
+	return fit
+
+
+static func _sling_move_at(bend: Array, y: float) -> float:
+	var ys: PackedFloat32Array = bend[0]
+	var moves: PackedFloat32Array = bend[1]
+	if ys.is_empty():
+		return 0.0
+	if y <= ys[0]:
+		return moves[0]
+	for i in range(1, ys.size()):
+		if y <= ys[i]:
+			return lerpf(moves[i - 1], moves[i], (y - ys[i - 1]) / maxf(ys[i] - ys[i - 1], 0.0001))
+	return moves[-1]
+
+
+## [param node]'s place in [param piece]'s frame (through the nodes between).
+static func _relative(piece: Node3D, node: Node3D) -> Transform3D:
+	var t := Transform3D.IDENTITY
+	var at: Node = node
+	while at != piece and at is Node3D:
+		t = (at as Node3D).transform * t
+		at = at.get_parent()
+	return t
+
+
+## [param piece]'s meshes (but [param skip]'s) bent in along [param inward] by
+## [param bend] at each point's height (its own frame), the plain ones kept to
+## put back (_sling_plain); the bent copies shared by build and mesh.
+static func _sling_bend(piece: Node3D, inward: Vector3, bend: Array, key: String, skip: String) -> void:
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		if (skip != "" and mesh.name.contains(skip)) or not mesh.mesh is ArrayMesh:
+			continue
+		var plain := mesh.get_meta("plain", mesh.mesh) as ArrayMesh
+		mesh.set_meta("plain", plain)
+		var to_piece := _relative(piece, mesh)
+		var cache_key := "%s %d %s" % [key, plain.get_instance_id(), to_piece]
+		if not _sling_bent.has(cache_key):
+			if _sling_bent.size() >= SLING_CACHE_MAX:
+				_sling_bent.clear()
+			var from_piece := to_piece.affine_inverse()
+			var bent := ArrayMesh.new()
+			for s in plain.get_surface_count():
+				var arrays := plain.surface_get_arrays(s)
+				var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				for i in verts.size():
+					var p := to_piece * verts[i]
+					verts[i] = from_piece * (p + inward * _sling_move_at(bend, p.y))
+				arrays[Mesh.ARRAY_VERTEX] = verts
+				bent.add_surface_from_arrays(plain.surface_get_primitive_type(s), arrays)
+				bent.surface_set_material(s, plain.surface_get_material(s))
+			_sling_bent[cache_key] = bent
+		mesh.mesh = _sling_bent[cache_key]
+
+
+## [param piece]'s meshes as they were before _sling_bend.
+static func _sling_plain(piece: Node3D) -> void:
+	for mesh: MeshInstance3D in piece.find_children("*", "MeshInstance3D", true, false):
+		if mesh.has_meta("plain"):
+			mesh.mesh = mesh.get_meta("plain")
+			mesh.remove_meta("plain")
+
+
+## A quiver [param piece] worn (_sync_held): laid on the back by the sling's
+## fit, or on the "back" socket where the body has none.
+static func _wear_quiver(sockets: Dictionary, piece: Node3D) -> void:
+	var fit := sling_fit(sockets)
+	if fit.is_empty():
+		var back := sockets.get("back") as Node3D
+		if back != null:
+			back.add_child(piece)
+			if back.has_node("StowedBow"):
+				piece.position = BOW_BACK_PLAIN[1]
+		return
+	(sockets["sling"] as Node3D).add_child(piece)
+	piece.transform = fit["quiver"]
+	_sling_bend(piece, QUIVER_IN, fit["quiver_bend"], fit["key"], "")
+
+
+## The quiver worn, wherever it is (or null).
+static func _quiver_of(sockets: Dictionary) -> Node3D:
+	for name: String in ["sling", "back"]:
+		var on := sockets.get(name) as Node3D
+		if on != null and on.has_node("Quiver"):
+			return on.get_node("Quiver") as Node3D
+	return null
+
+
 static func _stow_bow(sockets: Dictionary, stowed: bool) -> void:
 	var hand := sockets.get("hand_l") as Node3D
-	var back := sockets.get("back") as Node3D
-	if hand == null or back == null:
+	var fit := sling_fit(sockets)
+	var on := (sockets.get("back") if fit.is_empty() else sockets.get("sling")) as Node3D
+	if hand == null or on == null:
 		return
-	var face: Array = BOW_BACK[bow_back_face]
-	var from := hand if stowed else back
+	var from := hand if stowed else on
 	var bow := from.get_node_or_null("Held" if stowed else "StowedBow") as Node3D
 	if bow != null:
 		from.remove_child(bow)
 		bow.name = "StowedBow" if stowed else "Held"
-		bow.transform = face[0] if stowed else Transform3D.IDENTITY
-		(back if stowed else hand).add_child(bow)
-	var quiver := back.get_node_or_null("Quiver") as Node3D
-	if quiver != null:
-		quiver.position = face[1] if back.has_node("StowedBow") else Vector3.ZERO
+		(on if stowed else hand).add_child(bow)
+		if fit.is_empty():
+			bow.transform = BOW_BACK_PLAIN[0] if stowed else Transform3D.IDENTITY
+		elif stowed:
+			bow.transform = fit["bow"]
+			_sling_bend(bow, BOW_IN, fit["bow_bend"], fit["key"], "string")
+		else:
+			bow.transform = Transform3D.IDENTITY
+			_sling_plain(bow)
+		for string: MeshInstance3D in bow.find_children("*string*", "MeshInstance3D", true, false):
+			string.visible = fit.is_empty() or not stowed
+	if not fit.is_empty():
+		var rods := on.get_node_or_null("SlingString")
+		if rods != null and not on.has_node("StowedBow"):
+			on.remove_child(rods)
+			rods.queue_free()
+		elif rods == null and on.has_node("StowedBow"):
+			_string_rods(on, on.get_node("StowedBow") as Node3D)
+		_aim_sling(sockets)
+	var quiver := _quiver_of(sockets)
+	if quiver != null and fit.is_empty():
+		quiver.position = BOW_BACK_PLAIN[1] if on.has_node("StowedBow") else Vector3.ZERO
+
+
+## The rods the slung string is drawn with, in the bow's own string's
+## material; its nocks (the string's ends, in the bow's frame) kept on them.
+static func _string_rods(sling: Node3D, bow: Node3D) -> void:
+	if _sling_rod == null:
+		_sling_rod = CylinderMesh.new()
+		_sling_rod.top_radius = SLING_STRING_RADIUS
+		_sling_rod.bottom_radius = SLING_STRING_RADIUS
+		_sling_rod.height = 1.0
+		_sling_rod.radial_segments = 5
+		_sling_rod.rings = 1
+	var rods := Node3D.new()
+	rods.name = "SlingString"
+	var material: Material = null
+	var nocks := [Vector3(0.0, 0.6, -0.2), Vector3(0.0, -0.56, -0.2)]
+	for string: MeshInstance3D in bow.find_children("*string*", "MeshInstance3D", true, false):
+		material = string.get_active_material(0)
+		var box := _relative(bow, string) * string.get_aabb()
+		var mid := box.get_center()
+		nocks = [Vector3(mid.x, box.end.y, mid.z), Vector3(mid.x, box.position.y, mid.z)]
+	rods.set_meta("nocks", nocks)
+	var fit: Dictionary = sling.get_meta("fit")
+	for i in (fit["string"] as PackedVector3Array).size() + (fit["hip_hips"] as PackedVector3Array).size() + 1:
+		var rod := MeshInstance3D.new()
+		rod.mesh = _sling_rod
+		if material != null:
+			rod.material_override = material
+		rods.add_child(rod)
+	sling.add_child(rods)
+
+
+## The slung bow and the quiver kept on the back as the body moves (each
+## frame the quiver is worn or the bow slung): each piece tilted along its
+## length and moved in or out to follow its slices' skin points (_sling_hug);
+## and the string's rods laid along its path.
+static func _aim_sling(sockets: Dictionary) -> void:
+	var sling := sockets.get("sling") as Node3D
+	if sling == null or not sling.has_meta("fit") or not sling.is_inside_tree():
+		return
+	var fit: Dictionary = sling.get_meta("fit")
+	var skeleton := sling.get_parent().get_parent() as Skeleton3D
+	var quiver := _quiver_of(sockets)
+	var worn := quiver != null and quiver.get_parent() == sling
+	if not worn and not sling.has_node("StowedBow"):
+		return
+	var skin := _sling_skin(fit["skin"], skeleton, sling.global_transform.affine_inverse() * skeleton.global_transform)
+	if worn:
+		quiver.transform = _sling_lie(fit["quiver"], fit["quiver_points"], fit["quiver_near"], QUIVER_IN, skin, fit["skin_tris"])
+	if not sling.has_node("StowedBow"):
+		return
+	var bow := sling.get_node("StowedBow") as Node3D
+	bow.transform = _sling_lie(fit["bow"], fit["bow_points"], fit["bow_near"], BOW_IN, skin, fit["skin_tris"])
+	var to_hips := sling.global_transform.affine_inverse() * (sockets["sling_hip"] as Node3D).global_transform
+	var rods := sling.get_node_or_null("SlingString") as Node3D
+	if rods == null:
+		return
+	var nocks: Array = rods.get_meta("nocks")
+	var path := PackedVector3Array([bow.transform * (nocks[0] as Vector3)])
+	path.append_array(fit["string"])
+	for p: Vector3 in fit["hip_hips"]:
+		path.append(to_hips * p)
+	path.append(bow.transform * (nocks[1] as Vector3))
+	for i in mini(rods.get_child_count(), path.size() - 1):
+		var along := path[i + 1] - path[i]
+		var dir := along.normalized()
+		var side := dir.cross(Vector3.FORWARD if absf(dir.dot(Vector3.FORWARD)) < 0.9 else Vector3.RIGHT).normalized()
+		(rods.get_child(i) as Node3D).transform = Transform3D(Basis(side, along, side.cross(dir)), (path[i] + path[i + 1]) * 0.5)
+
+
+## The skin [param proxy] (sling_fit's "skin") as the body stands now, in
+## the sling's frame ([param to_sling] from the skeleton's).
+static func _sling_skin(proxy: Array, skeleton: Skeleton3D, to_sling: Transform3D) -> PackedVector3Array:
+	var bone_of: PackedInt32Array = proxy[0]
+	var weight_of: PackedFloat32Array = proxy[1]
+	var place_of: PackedVector3Array = proxy[2]
+	var starts: PackedInt32Array = proxy[3]
+	var poses := {}
+	var out := PackedVector3Array()
+	out.resize(starts.size() - 1)
+	for i in starts.size() - 1:
+		var at := Vector3.ZERO
+		for k in range(starts[i], starts[i + 1]):
+			if not poses.has(bone_of[k]):
+				poses[bone_of[k]] = skeleton.get_bone_global_pose(bone_of[k])
+			at += (poses[bone_of[k]] as Transform3D) * place_of[k] * weight_of[k]
+		out[i] = to_sling * at
+	return out
+
+
+## [param at] (a piece's place standing) tilted along its length and moved
+## along [param inward] by the line that best lays each slice SLING_CLEAR off
+## the skin now under it (its [param near] triangles of [param skin], met
+## along its inward line from SLING_BACK out), then out until none is nearer:
+## it rides the back, never into it. A slice over nothing is left out.
+static func _sling_lie(at: Transform3D, points: PackedVector3Array, near: Array[PackedInt32Array], inward: Vector3, skin: PackedVector3Array, tris: PackedInt32Array) -> Transform3D:
+	var into := (at.basis * inward).normalized()
+	var along := at.basis.y.normalized()
+	var ys := PackedFloat32Array()
+	var want := PackedFloat32Array()
+	for i in points.size():
+		var p := at * points[i]
+		var from := p - into * SLING_BACK
+		var least := INF
+		for t in near[i]:
+			var hit: Variant = Geometry3D.ray_intersects_triangle(from, into, skin[tris[t * 3]], skin[tris[t * 3 + 1]], skin[tris[t * 3 + 2]])
+			if hit != null:
+				least = minf(least, from.distance_to(hit) - SLING_BACK)
+		if least < INF:
+			ys.append((p - at.origin).dot(along))
+			want.append(least - SLING_CLEAR)
+	if ys.size() < 2:
+		return at
+	# Least squares: in by shift + tilt * y.
+	var n := float(ys.size())
+	var sy := 0.0
+	var sw := 0.0
+	var syy := 0.0
+	var syw := 0.0
+	for i in ys.size():
+		sy += ys[i]
+		sw += want[i]
+		syy += ys[i] * ys[i]
+		syw += ys[i] * want[i]
+	var spread := n * syy - sy * sy
+	var tilt := (n * syw - sy * sw) / spread if absf(spread) > 1e-8 else 0.0
+	var shift := (sw - tilt * sy) / n
+	var over := -INF
+	for i in ys.size():
+		over = maxf(over, shift + tilt * ys[i] - want[i])
+	shift -= over
+	var turn := Basis(along.cross(into).normalized(), atan(tilt))
+	return Transform3D(turn, at.origin - turn * at.origin + into * shift) * at
 
 
 ## The bow or the shield on the back let go with the left hand's thing (_sync_held).
 static func _let_go_stowed(sockets: Dictionary) -> void:
-	var back := sockets["back"] as Node3D
-	for name in ["StowedBow", "StowedShield"]:
-		var piece := back.get_node_or_null(name)
-		if piece != null:
-			back.remove_child(piece)
-			piece.queue_free()
-	var quiver := back.get_node_or_null("Quiver") as Node3D
-	if quiver != null:
+	for socket: String in ["back", "sling"]:
+		var on := sockets.get(socket) as Node3D
+		if on == null:
+			continue
+		for name in ["StowedBow", "StowedShield", "SlingString"]:
+			var piece := on.get_node_or_null(name)
+			if piece != null:
+				on.remove_child(piece)
+				piece.queue_free()
+	var quiver := _quiver_of(sockets)
+	if quiver != null and quiver.get_parent() == sockets.get("back"):
 		quiver.position = Vector3.ZERO
 
 

@@ -555,11 +555,26 @@ func _test_sky_bow() -> void:
 	rig.get_parent().queue_free()
 
 
-## The bow on the back (662 amended (d)), each face: clear of the body through
-## the gaits and standing, five builds, and through none of the quiver's box
-## laid over it.
+## The bow slung and the quiver (662 amended (d), Jeff's "bow back 1"), as Client3D wears them
+## by tools/sling_fit's table, on the five builds: standing, every slice of the wood and the quiver
+## over the body (but the farthest, the bow's arrow shelf) from SLING_IN inside the skin to
+## SLING_OFF off it; walking, none deeper than SLING_WALK_DEEP nor farther off than
+## SLING_WALK_LIFT; jogging and sprinting (the bow aimed by _aim_sling) none deeper than
+## SLING_RUN_DEEP, the bow no farther off than SLING_RUN_LIFT; the string's path out of the body
+## standing, the bow's own hidden; the bow through none of the quiver.
+const SlingFit := preload("res://tools/sling_fit.gd")
+const SLING_IN := 0.01
+const SLING_OFF := 0.02
+const SLING_WALK_DEEP := 0.02
+## Walking, the bow's foot lifts off the hip with the stride: up to about 5 cm, as Jeff's pick
+## sheet for option 1 said (C:/dev/review/rest662/bow_pick.png).
+const SLING_WALK_LIFT := 0.05
+## How far past the last bent slice's y a measured slice still counts (_lying): half a slice.
+const SLING_END_SLACK := 0.02
+const SLING_RUN_DEEP := 0.05
+const SLING_RUN_LIFT := 0.1
 func _test_bow_back() -> void:
-	print("== the bow on the back: clear of the body and the quiver ==")
+	print("== the bow slung and the quiver on the back ==")
 	var lib := load(CLIPS) as AnimationLibrary
 	var builds := [["man", "res://art/models/characters/human_m.glb", {}],
 		["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
@@ -568,58 +583,120 @@ func _test_bow_back() -> void:
 		["woman", "res://art/models/characters/human_f.glb", {}]]
 	var poses := [["stand", "Idle", 1], ["walk", Client3D.HUMAN_GAITS[0][0], 1], ["walk", Client3D.HUMAN_GAITS[0][0], 2],
 		["jog", JOG, 1], ["jog", JOG, 2], ["sprint", SPRINT, 1], ["sprint", SPRINT, 2]]
-	var found: Array[String] = []
+	var off: Array[String] = []
+	var moving: Array[String] = []
+	var strung: Array[String] = []
 	var crossed: Array[String] = []
-	var face_was := Client3D.bow_back_face
-	for face: String in Client3D.BOW_BACK:
-		Client3D.bow_back_face = face
-		for build: Array in builds:
-			for pose: Array in poses:
-				var model := (load(build[1]) as PackedScene).instantiate() as Node3D
-				add_child(model)
-				for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
-					for key: String in build[2]:
-						var i := mesh.find_blend_shape_by_name(key)
-						if i >= 0:
-							mesh.set_blend_shape_value(i, build[2][key])
-				var holder := Node3D.new()
-				Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
-				var sockets: Dictionary = holder.get_meta("sockets")
-				var bow := ArtKit.instance("item.bow")
-				bow.name = "Held"
-				(sockets["hand_l"] as Node3D).add_child(bow)
-				var quiver := ArtKit.instance(Client3D.QUIVER, 1)
-				quiver.name = "Quiver"
-				(sockets["back"] as Node3D).add_child(quiver)
-				Client3D._stow_bow(sockets, true)
-				var rng := RandomNumberGenerator.new()
-				rng.seed = int(pose[2])
-				var rig := AnimRig.make(model, lib, 0.0, true, rng)
-				rig.loop(pose[1], 0.0)
-				for i in 3:
-					await get_tree().process_frame
-				var parts := _skinned_parts(model)
-				var trunk: Array = parts["trunk"]
-				var points := _points(bow) + _points(quiver)
-				var inside := _inside(points, trunk[0] + parts["head"][0], trunk[1] + parts["head"][1])
-				if inside > 0 or bow.get_parent() != sockets["back"]:
-					var of_bow := _inside(_points(bow), trunk[0] + parts["head"][0], trunk[1] + parts["head"][1])
-					found.append("%s %s %s: bow %d, quiver %d" % [face, build[0], pose[0], of_bow, inside - of_bow])
-				if build[0] == "man" and pose[0] == "stand":
-					# In the back socket's frame: no point of the bow in the quiver's box.
-					var back := (sockets["back"] as Node3D).global_transform.affine_inverse()
-					var box := _box(back * _points(quiver)).grow(-0.005)
-					var through := 0
-					for p in back * _points(bow):
-						if box.has_point(p):
-							through += 1
-					if through > 0:
-						crossed.append("%s %d" % [face, through])
-				model.queue_free()
-				holder.queue_free()
-	Client3D.bow_back_face = face_was
-	_check(found.is_empty(), "the bow and quiver on the back clear of the body, both faces, five builds, the gaits (%s)" % ", ".join(found))
-	_check(crossed.is_empty(), "the bow through none of the quiver laid over it (%s)" % ", ".join(crossed))
+	for build: Array in builds:
+		for pose: Array in poses:
+			var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+			add_child(model)
+			for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+				for key: String in build[2]:
+					var i := mesh.find_blend_shape_by_name(key)
+					if i >= 0:
+						mesh.set_blend_shape_value(i, build[2][key])
+			var holder := Node3D.new()
+			Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+			var sockets: Dictionary = holder.get_meta("sockets")
+			var bow := ArtKit.instance("item.bow")
+			bow.name = "Held"
+			(sockets["hand_l"] as Node3D).add_child(bow)
+			var quiver := ArtKit.instance(Client3D.QUIVER, 1)
+			quiver.name = "Quiver"
+			Client3D._wear_quiver(sockets, quiver)
+			Client3D._stow_bow(sockets, true)
+			var rng := RandomNumberGenerator.new()
+			rng.seed = int(pose[2])
+			var rig := AnimRig.make(model, lib, 0.0, true, rng)
+			rig.base_at(pose[1], 0.0 if int(pose[2]) == 1 else 0.3 * rig.length(pose[1]))
+			for i in 3:
+				await get_tree().process_frame
+			Client3D._aim_sling(sockets)
+			var surf := SlingFit.surface(model)
+			var spans := []
+			var fit: Dictionary = (sockets["sling"] as Node3D).get_meta("fit", {})
+			for piece: Array in [[bow, Client3D.BOW_IN, "string", "bow"], [quiver, Client3D.QUIVER_IN, "", "quiver"]]:
+				var node := piece[0] as Node3D
+				var points := SlingFit.facing(node, piece[1], piece[2])
+				spans.append(_lying(SlingFit.gaps(surf, points, piece[1], node.global_basis.orthonormalized(), node.global_position), points, fit.get(piece[3] + "_bend", [])))
+			var said := "%s %s: bow %.1f to %.1f cm (%d), quiver %.1f to %.1f cm (%d)" % [build[0], pose[0],
+				spans[0][0] * 100.0, spans[0][1] * 100.0, spans[0][2], spans[1][0] * 100.0, spans[1][1] * 100.0, spans[1][2]]
+			if bow.get_parent() != sockets["sling"] or quiver.get_parent() != sockets["sling"] or int(spans[0][2]) < 4 or int(spans[1][2]) < 4:
+				off.append(said + " (not slung)")
+			elif pose[0] == "stand":
+				if float(spans[0][0]) < -SLING_IN or float(spans[1][0]) < -SLING_IN or float(spans[0][1]) > SLING_OFF or float(spans[1][1]) > SLING_OFF:
+					off.append(said)
+				var rods := (sockets["sling"] as Node3D).get_node("SlingString") as Node3D
+				var sk := model.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
+				var across := sk.global_basis * (sk.get_bone_global_pose(sk.find_bone("LeftUpperArm")).origin - sk.get_bone_global_pose(sk.find_bone("RightUpperArm")).origin)
+				across.y = 0.0
+				var front := across.normalized().cross(Vector3.UP).normalized()
+				var inside: Array[String] = []
+				for r in rods.get_child_count():
+					for t: float in [-0.5, -0.25, 0.0, 0.25, 0.5]:
+						var g := SlingFit.gap(surf, (rods.get_child(r) as Node3D).global_transform * Vector3(0.0, t, 0.0), -front)
+						if g < -0.003:
+							inside.append("rod %d at %.2f %.1f cm" % [r, t, g * 100.0])
+				var shown := 0
+				for own: MeshInstance3D in bow.find_children("*string*", "MeshInstance3D", true, false):
+					shown += 1 if own.visible else 0
+				if not inside.is_empty() or shown > 0 or rods.get_child_count() < 3:
+					strung.append("%s: inside %s of %d rods, its own shown %d" % [build[0], inside, rods.get_child_count(), shown])
+				# The quiver's round body, its box's ellipse along its length, 1 cm in (2 cm short
+				# of each end, rounded narrower than the box).
+				var box := _box(quiver.global_transform.affine_inverse() * _points(quiver))
+				var mid := box.get_center()
+				var half := Vector2(box.size.x * 0.5 - 0.01, box.size.z * 0.5 - 0.01)
+				var through := PackedVector3Array()
+				for p in quiver.global_transform.affine_inverse() * _points(bow):
+					if p.y > box.position.y + 0.02 and p.y < box.end.y - 0.02 and Vector2((p.x - mid.x) / half.x, (p.z - mid.z) / half.y).length() < 1.0:
+						through.append(p)
+				if not through.is_empty():
+					crossed.append("%s %d, %s in the quiver's frame %s" % [build[0], through.size(), through[0], box])
+			else:
+				var deep := SLING_WALK_DEEP if pose[0] == "walk" else SLING_RUN_DEEP
+				var lift := SLING_WALK_LIFT if pose[0] == "walk" else SLING_RUN_LIFT
+				# Running, the quiver's foot swings off the back (the woman's, past her flank,
+				# 18 cm): only its depth is held.
+				if float(spans[0][0]) < -deep or float(spans[1][0]) < -deep or float(spans[0][1]) > lift or (pose[0] == "walk" and float(spans[1][1]) > lift):
+					moving.append(said)
+			if OS.get_environment("SLING_PRINT") != "":
+				print("  ", said)
+			model.queue_free()
+			holder.queue_free()
+	_check(off.is_empty(), "standing, the slung bow's wood and the quiver on the back within %.1f cm of the skin, five builds (%s)" % [SLING_OFF * 100.0, ", ".join(off)])
+	_check(moving.is_empty(), "walking, none deeper than %.1f cm nor off by more than %.1f; jogging and sprinting, %.1f and the bow %.1f (%s)" % [SLING_WALK_DEEP * 100.0, SLING_WALK_LIFT * 100.0, SLING_RUN_DEEP * 100.0, SLING_RUN_LIFT * 100.0, ", ".join(moving)])
+	_check(strung.is_empty(), "the string drawn over the chest, out of the body, the bow's own hidden (%s)" % ", ".join(strung))
+	_check(crossed.is_empty(), "the bow through none of the quiver beside it (%s)" % ", ".join(crossed))
+
+
+## [least, most, count] of a piece's finite slice gaps, the most leaving out the one farthest:
+## the bow's arrow shelf, cut into the grip, stands off the back by its own depth.
+## The slices past either end of those Client3D.sling_fit bent onto the skin (bend: its
+## [ys, moves]) are past the body's edge, hanging straight (the man's quiver foot past his
+## waist, only the thigh 20 cm behind it), and are left out; none between them ever is.
+static func _lying(gaps: PackedFloat32Array, points: PackedVector3Array = PackedVector3Array(), bend: Array = []) -> Array:
+	var lo := -INF
+	var hi := INF
+	if bend.size() == 2 and (bend[0] as PackedFloat32Array).size() > 0:
+		var ys := bend[0] as PackedFloat32Array
+		lo = ys[0]
+		hi = ys[0]
+		for y in ys:
+			lo = minf(lo, y)
+			hi = maxf(hi, y)
+		lo -= SLING_END_SLACK
+		hi += SLING_END_SLACK
+	var seen: Array[float] = []
+	for i in gaps.size():
+		var g := gaps[i]
+		if g < INF and (points.is_empty() or (points[i].y >= lo and points[i].y <= hi)):
+			seen.append(g)
+	seen.sort()
+	if seen.is_empty():
+		return [INF, -INF, 0]
+	return [seen[0], seen[maxi(seen.size() - 2, 0)], seen.size()]
 
 
 ## The blades sheathed at the hip and the shields on the back (662 (c)), as Client3D._hold and

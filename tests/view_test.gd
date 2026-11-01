@@ -8029,15 +8029,24 @@ func _test_bow_back() -> void:
 	var sockets: Dictionary = puppet.get_meta("sockets")
 	var rig := puppet.get_meta("rig") as AnimRig
 	var hand := sockets["hand_l"] as Node3D
-	var back := sockets["back"] as Node3D
+	var back := sockets["sling"] as Node3D
+	var fit := Client3D.sling_fit(sockets)
+	_check(not fit.is_empty() and Client3D._quiver_of(sockets).get_parent() == back, "a human's quiver on the sling, the bow in hand or not")
 	_check(hand.has_node("Held") and puppet.get_meta("bow_state") == "idle", "just taken up: the bow in hand (%s)" % puppet.get_meta("bow_state"))
 	puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
 	_rig._combat_at.erase(id)
 	_rig._process(0.0)
 	var quiver := back.get_node("Quiver") as Node3D
 	_check(not hand.has_node("Held") and back.has_node("StowedBow") and rig.upper_clip() == "",
-		"calm a while: the bow on the back, the hands free (%s)" % rig.upper_clip())
-	_check(quiver.position.is_equal_approx(Client3D.BOW_BACK[Client3D.bow_back_face][1]), "the quiver laid over it")
+		"calm a while: the bow slung, the hands free (%s)" % rig.upper_clip())
+	var own_shown := func() -> int:
+		var shown := 0
+		var bow_now := (back.get_node_or_null("StowedBow") if back.has_node("StowedBow") else hand.get_node_or_null("Held")) as Node3D
+		for string: MeshInstance3D in bow_now.find_children("*string*", "MeshInstance3D", true, false):
+			shown += 1 if string.visible else 0
+		return shown
+	_check(back.has_node("SlingString") and own_shown.call() == 0 and quiver.position.distance_to((fit["quiver"] as Transform3D).origin) < 0.1,
+		"slung: its string drawn over the chest, its own hidden, the quiver on the back as fitted (within 10 cm, riding the body: a draw pulls the right shoulder back under its mouth)")
 	_check(Client3D.in_hand(puppet) == ["", ""] and Client3D.fidget_with("Fidget_Shoulders", Client3D.in_hand(puppet)),
 		"both hands empty to the fidgets (the arrows in the quiver): every fidget again")
 	rig.loop(str((puppet.get_meta("gaits") as Array)[1][0]))
@@ -8047,8 +8056,10 @@ func _test_bow_back() -> void:
 	player.raised = "draw"
 	player.raised_tick = World.tick
 	_rig._process(0.0)
-	_check(hand.has_node("Held") and not back.has_node("StowedBow") and rig.upper_clip() == "Bow_Draw" and quiver.position == Vector3.ZERO,
+	_check(hand.has_node("Held") and not back.has_node("StowedBow") and rig.upper_clip() == "Bow_Draw",
 		"a draw: in hand at once, drawing (%s)" % rig.upper_clip())
+	_check(not back.has_node("SlingString") and own_shown.call() > 0 and quiver.get_parent() == back and quiver.position.distance_to((fit["quiver"] as Transform3D).origin) < 0.1,
+		"in hand: the drawn string gone, its own shown, the quiver kept on the sling as fitted (%s, %d shown, %.3f off)" % [back.has_node("SlingString"), own_shown.call(), quiver.position.distance_to((fit["quiver"] as Transform3D).origin)])
 	player.raised = ""
 	_rig._process(0.0)
 	_check(hand.has_node("Held"), "let go: still in hand, roused")
@@ -8065,7 +8076,8 @@ func _test_bow_back() -> void:
 	slots[Items.RIGHT_HAND] = ""
 	player.slots = slots
 	_rig._process(0.0)
-	_check(not back.has_node("StowedBow") and back.get_node_or_null("Quiver") == null, "put away while on the back: gone from the back, and the quiver with it")
+	_check(not back.has_node("StowedBow") and not back.has_node("SlingString") and Client3D._quiver_of(sockets) == null,
+		"put away while slung: gone from the back, its string and the quiver with it")
 	player.slots = was
 	_rig._process(0.0)
 
@@ -8180,7 +8192,7 @@ func _test_bow() -> void:
 	var rig := puppet.get_meta("rig") as AnimRig
 	var bow := (sockets["hand_l"] as Node3D).get_node_or_null("Held")
 	var bundle := (sockets["hand_r"] as Node3D).get_node_or_null("Held")
-	var quiver := (sockets["back"] as Node3D).get_node_or_null("Quiver")
+	var quiver := Client3D._quiver_of(sockets)
 	_check(bow != null and Client3D.held_ids(player) == ["arrows", "bow"],
 			"a bow in the right hand's slot is drawn in the left")
 	_check(bundle == null and quiver != null, "its arrows not in the right hand but in a quiver on the back (462 amended (3))")

@@ -29825,6 +29825,9 @@ draw, staying in hand when the draw is let go, calm again on the back, in hand o
 and gone from the back when unequipped. Walking in a fight is as before (462 amended (3)); the bow
 turned curve up in the hand is held unless Jeff asks for it. Client only, protocol unchanged, no
 new class_name.
+
+The placement (BOW_BACK, faces A and B) is replaced by "662 (d) amended: the bow slung" below;
+the calm rule, the hands and the moments above stand.
 ## 662, sound's side: drawing and stowing heard
 
 pc-character's held-weapon rest poses (Jeff: held weapons rest properly, a sword sheathed)
@@ -37440,3 +37443,68 @@ and 0.21 m before the tile, inside the pillow end (+0.46), below and clear of
 the face (measured, build/sleep/measure.gd). Nothing else moves; the
 coordinator passed it without another still. Client only, protocol
 unchanged, no new class_name.
+## 662 (d) amended: the bow slung
+
+Amends 662 amended (d) (the bow on the back). Jeff picked 1 on build/bowpick's sheet (C:/dev/review/rest662/bow_pick.png; "bow back 1"; before
+it: "quiver and bow wood need to be against back. the string could be over the front of chest"):
+slung across the body, the wood on the back from the left hip to the right shoulder, the string
+over the right shoulder and down the chest to the left hip, the quiver flat beside the wood with
+its mouth at the right shoulder. Archery, so through the hold; the coordinator approved the design.
+It replaces 662 amended (d)'s placement (BOW_BACK, bow_back_face); when it is slung is as there.
+
+- **The fit, offline:** tools/sling_fit.gd (run headless, `--scene res://tools/sling_fit.tscn`)
+  stands the man and the woman (Idle at 0), lays each piece on the skin (rolled and pitched about
+  its line until the gap along it is least, then pushed in to SLING_CLEAR 4 mm off), and writes
+  client3d/sling.json: each piece's place on UpperChest, its gap per 5 cm slice at the base shape
+  and each shape key's change (shape keys are linear, so a build's gaps are the base plus the
+  weighted changes), the bow's top and foot contacts, Hips from UpperChest, and the string's path
+  points (the shoulder, the chest's front along the line, the hip, round the hip and down the
+  thigh toward the bottom nock), each with its key changes. Exported (export_presets
+  `client3d/*.json`).
+- **Per-build bend, not art-kit's worn variants:** the bodies are continuous (five shape keys),
+  so a fixed set of shaped variants would fit some builds and float or sink on others; the table
+  bends the one bow and quiver per body at no art cost, and the same table serves new pieces.
+- **Worn:** `Client3D.sling_fit` reads the body's keys rounded to SLING_STEP 0.1, works out the
+  gaps, pushes each piece in until its nearest slice is SLING_CLEAR off, and bends each mesh in
+  along its length by the rest (`_sling_bend`); a body the table doesn't know (a goblin) keeps the
+  "back" socket (BOW_BACK_PLAIN). New sockets "sling" (UpperChest) and "sling_hip" (Hips). The
+  quiver goes on the sling whether the bow is slung or in hand (`_wear_quiver`, `_quiver_of`).
+- **The cache (the coordinator's guard):** bent meshes are kept by the rounded build key, the
+  plain mesh and its place in the piece, at most SLING_CACHE_MAX 64, cleared when full. One bent
+  copy is the bow's wood (356 vertices, 19 KB of arrays) and the quiver (648, 35 KB): about 54 KB on
+  the CPU and as much again on the GPU, about 110 KB a build. Archers of one rounded build share
+  one copy; a town of 20 archers of different builds holds about 2 MB, and the cap holds the worst
+  to 64 meshes, about 3.5 MB.
+- **Riding the hip:** each frame slung, `_aim_sling` turns the bow about its top contact so its foot
+  goes out with the hip where the hip would push into it (the leg swung back), never in after it.
+  Riding the hip both ways sank the wood up to 9 cm into the back at a jog, where the pelvis turns
+  under the chest; on the chest alone the foot lifts in a jog and sprint (up to about 9 cm, a
+  bounce) and stays within 2 cm walking. The quiver keeps to the chest: riding the hip or the
+  spine sank it deeper.
+- **The string:** the bow's own straight string is hidden while slung, and drawn as rods (one
+  shared CylinderMesh, radius SLING_STRING_RADIUS 4 mm, in the string's material): from the top nock
+  over the shoulder, taut over the chest (the front's upper hull along the line, SLING_STRING_LIFT
+  6 mm off), to the left hip's front, round it and down the thigh (those riding Hips), to the bottom
+  nock. Taken back up, the rods go and the own string shows.
+- **Riding the skin each frame:** standing bends alone let the pieces float or sink as the back
+  moves. Each frame slung, both pieces are laid again on the skin under them as it stands now
+  (`_sling_skin`, a proxy of the back's triangles skinned on their bones at the build;
+  `_sling_lie`, a tilt along the length and a move along the inward line that lays each slice
+  SLING_CLEAR off, then out till none is nearer), riding the back, never into it.
+- **Past the body's edge, straight:** a slice whose skin is more than SLING_BEND_REACH 12 cm past
+  the piece's nearest is off the body's edge and hangs straight, not curled round the side to
+  whatever lies behind (the man's quiver foot runs past his waist with only his thigh 20 cm
+  behind it). 12 cm, not 8: at 8 the man's quiver top, 8.3 cm over his shoulder blade, also hung
+  straight and stood 8 cm off. The test leaves out the slices past either end of those bent.
+- **Measured** (anim_rig_test `_test_bow_back`, five builds): standing, every slice over the body
+  within 1 cm in and 2 cm off (but the farthest, the bow's arrow shelf cut into the grip, 6.6 cm);
+  the quiver within 0.4 to 0.8 cm on all five; walking, none deeper than 2 cm nor off by more
+  than 5 (the bow's foot lifting with the stride to 4.6 cm on the man, as the pick sheet said);
+  jogging and sprinting, none deeper than
+  5 cm, the bow off by no more than 10. The quiver's foot swings off the back running (the woman's,
+  hanging past her flank, up to 18 cm), so only its depth is held there; its worst is the man's
+  sprint, 4 cm in at its foot. The string standing out of the body; the bow through none of the
+  quiver's round body (2 cm short of each end). view_test `_test_bow_back`: the quiver on the sling,
+  the string drawn slung and gone in hand, the own string hidden and shown, all gone unequipped.
+
+Client only, protocol unchanged, no new class_name.
