@@ -37291,3 +37291,20 @@ and turned round; first seen already down; falling asleep lies down; woken
 gets up, still turned till it stands. anim_rig_test _test_sleep_clips.
 Strip: C:/dev/review/sleep_strip.png (from above and from the game's camera). Client only, protocol unchanged, no
 new class_name.
+
+## 751, pc-character's side (2): the sleeper more on its side, the face up
+
+The coordinator, on the landed curl from the game's camera: "still reads as
+face-down ... the head buried in the forearm, the chest more prone than
+side-on". Measured on the clip (build/sleep/measure.gd), the head faced
+along the body past the crown, Death01's lolled-back head kept under the
+roll, and the lower forearm crossed up in front of it. Now SIDE_SLEEP's roll
+from lying on the back is 72 degrees, not 90, so the chest faces about 45
+degrees up (was 27); the head is turned 45 degrees back toward the front and
+rolled 10 more up, so the face points up and a little forward (its front
+about 68 degrees up), resting on the lower arm's shoulder; the lower forearm
+lies on the bed in front of the face, toward the pillow end. The curl, the
+breath and the lie-down and get-up are as they were (SIDE_HALF shares the
+pose). Stills: C:/dev/review/sleep_strip.png (the game's camera there sits
+at the sleeper's back) and C:/dev/review/sleep_front.png (from the front
+side). Client only, protocol unchanged, no new class_name.

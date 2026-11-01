@@ -72,11 +72,11 @@ HOLD = [("upperarm_l", LIFT, 40.0), ("lowerarm_l", LIFT, 45.0), ("upperarm_l", T
 
 # Lying on the left side from Death01's lying on the back (head +Y, feet -Y): the pelvis
 # rolled about the body's length so the front faces +X, then each part in those same axes.
-SIDE_SLEEP = [("pelvis", TILT, 90.0), ("spine_01", TURN, 10.0), ("spine_02", TURN, 14.0), ("spine_02", TILT, -14.0),
-	("spine_03", TILT, -8.0), ("Head", TURN, 10.0), ("Head", TILT, -22.0),
+SIDE_SLEEP = [("pelvis", TILT, 72.0), ("spine_01", TURN, 10.0), ("spine_02", TURN, 14.0), ("spine_02", TILT, -14.0),
+	("spine_03", TILT, -8.0), ("Head", TURN, -45.0), ("Head", TILT, -32.0),
 	("thigh_l", Vector((0.95, -0.3, -0.05)), AIM), ("calf_l", Vector((-0.6, -0.8, -0.03)), AIM),
 	("thigh_r", Vector((0.95, -0.22, -0.15)), AIM), ("calf_r", Vector((-0.55, -0.83, -0.1)), AIM),
-	("upperarm_l", Vector((1.0, 0.2, 0.0)), AIM), ("lowerarm_l", Vector((-0.83, 0.55, 0.0)), AIM),
+	("upperarm_l", Vector((0.6, 0.8, 0.0)), AIM), ("lowerarm_l", Vector((0.95, 0.15, 0.0)), AIM),
 	("upperarm_r", Vector((0.85, -0.3, -0.25)), AIM), ("lowerarm_r", Vector((0.45, -0.8, -0.4)), AIM)]
 SIDE_LIFT = (0.0, 0.0, 0.15)
 # Half rolled onto the side, already curled: between sitting and the curl (no sprawl on the way).
