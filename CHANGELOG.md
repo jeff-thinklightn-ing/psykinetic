@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Townsfolk with no roof to sleep under (visitors, Rolf and the like) now bed down by the town's fire, else beside the inn or temple, else by the store, each in a spot of their own (751, npc's side (2)).
 
+- The Tomb Sledge swings with weight: a slow heave back over the shoulder, a pause, a fast fall into the floor, the head held down, then dragged back up; it, the giant axe and the battle axe are held up the haft rather than at its very end, the upper hand sliding down on the fall (750).
 - The barrow's robbers carry their names to your screen, and Brand the Ox and the draugr are marked as bosses (752; ui draws them).
 - Monsters: a named robber's name shows on his nameplate and when you target him; a boss (Brand the Ox, the draugr) has a brass nameplate with a skull, and a bar at the top of the screen with his name and health while he's near (752, ui's side).
 - Outdoors: no more holes in the ground between the trees at the forest's edge (by Umbrage, along raised map edges): the forest floor and the pine stands now follow the land's height (753).

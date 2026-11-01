@@ -31,6 +31,7 @@ func _ready() -> void:
 	await _test_armed_fidgets()
 	await _test_beckon()
 	_test_knight_vigil()
+	_test_sledge()
 	await _test_rests()
 	_test_warm_painted()
 	await _test_upper()
@@ -1084,6 +1085,17 @@ func _test_knight_vigil() -> void:
 	puppet.free()
 
 
+## The Tomb Sledge's blow (750, pc-character's side): authored at combat's times, so it plays at
+## speed 1 against the sim's wind-up (0.9 s) and recovery (0.8 s), a wound-up blow.
+func _test_sledge() -> void:
+	print("== the Tomb Sledge's blow ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var strikes: Array = Client3D.HUMANOID_MOVES["strikes"].get("tomb_sledge", [])
+	_check(lib.has_animation("Sledge_Attack") and absf(lib.get_animation("Sledge_Attack").length - 1.7) < 0.02
+		and strikes == [["Sledge_Attack", 0.9]] and "tomb_sledge" in Client3D.WOUND_STRIKES,
+		"Sledge_Attack is 1.7 s, its contact at 0.9, the sledge's wound-up blow (%s)" % [strikes])
+
+
 func _test_beckon() -> void:
 	print("== the guide's beckon ==")
 	var lib := load(CLIPS) as AnimationLibrary
@@ -1275,7 +1287,7 @@ func _test_rests() -> void:
 			if Client3D._edge_first(kind):
 				piece.basis = Client3D.HELD_EDGE_TURN
 			(sockets["hand_r"] as Node3D).add_child(piece)
-			Client3D._slide_held(sockets, float(rest.get("grip", 0.0)))
+			Client3D._slide_held(sockets, float(rest.get("grip", 0.0)), true)
 			var rig := AnimRig.make(model, lib, 0.0, true, null)
 			rig.loop("Idle", 0.0, 0.0, true)
 			var worst := ""

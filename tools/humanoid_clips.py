@@ -134,7 +134,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -605,6 +605,43 @@ CLIPS["Axe_Overhead"] = {"keys": [
 	(0.48, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
 	(0.62, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
 	(1.0, P("Idle_Loop", 0.0, AXE_READY)),
+]}
+# The Tomb Sledge's blow, with weight (Jeff: "it also needs to move like it has mass, slow at
+# first, then faster with inertia"; combat's times, the sim's wind-up and recovery, so it plays at
+# speed 1): heaved up slowly over the right shoulder, the weight back (0 to 0.45 s); hung there,
+# nearly still, the tell (to 0.6); fallen, gathering speed, most of the way in the last 0.15 s, the
+# trunk folding and the hips driving (to 0.9, the contact), the head into the ground before him; held
+# down there, carried a little on (to 1.3); dragged back up to the guard (1.7). The right hand low on
+# the haft (Client3D holds the sledge 0.12 m up from its butt), the left SLEDGE_GRIP up it, sliding
+# down to meet the right on the fall (Client3D's HandReach follows it, SLEDGE_SLIDE).
+def sledge(right: tuple, haft: tuple, grip: float, trunk: list = (), poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4))) -> list:
+	return chop(right, haft, (0.0, -1.0, 0.0) if haft[2] > 0.3 else (0.0, 0.0, -1.0), poles, grip=grip) + list(trunk)
+
+
+SLEDGE_GRIP = GREAT_GRIP
+SLEDGE_READY = sledge((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), SLEDGE_GRIP)
+SLEDGE_LIFTING = sledge((0.2, -0.2, -0.12), (0.1, -0.1, 1.0), 0.4, [("spine_02", LIFT, 5.0), ("spine_03", LIFT, 2.0)])
+SLEDGE_UP = sledge((0.08, -0.14, 0.1), (-0.8, 0.3, 0.55), 0.38, [("spine_02", LIFT, 12.0), ("spine_03", LIFT, 6.0),
+	("spine_02", TURN, -10.0)])
+SLEDGE_HANG = sledge((0.07, -0.14, 0.12), (-0.85, 0.3, 0.5), 0.38, [("spine_02", LIFT, 13.0), ("spine_03", LIFT, 7.0),
+	("spine_02", TURN, -11.0)])
+SLEDGE_HIGH = sledge((0.16, -0.24, 0.12), (0.15, 0.1, 1.0), 0.32, [("spine_02", LIFT, 6.0)])
+SLEDGE_FALLING = sledge((0.28, -0.3, -0.06), (0.9, 0.0, 0.3), 0.2, [("spine_01", LIFT, -6.0), ("spine_02", LIFT, -4.0)])
+SLEDGE_DOWN = sledge((0.24, -0.32, -0.34), (0.6, -0.05, -0.75), 0.12, [("spine_01", LIFT, -18.0), ("spine_02", LIFT, -12.0),
+	("Head", LIFT, 14.0), ("thigh_l", LIFT, 10.0), ("calf_l", LIFT, -14.0), ("thigh_r", LIFT, 6.0), ("calf_r", LIFT, -10.0)])
+SLEDGE_RISING = sledge((0.26, -0.26, -0.14), (0.85, -0.2, 0.3), 0.25, [("spine_01", LIFT, -6.0), ("spine_02", LIFT, -4.0)])
+CLIPS["Sledge_Attack"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, SLEDGE_READY)),
+	(0.2, P("Idle_Loop", 0.0, SLEDGE_LIFTING, move=(0.0, 0.01, 0.0))),
+	(0.45, P("Idle_Loop", 0.0, SLEDGE_UP, move=(0.0, 0.04, 0.0))),
+	(0.6, P("Idle_Loop", 0.0, SLEDGE_HANG, move=(0.0, 0.045, 0.0))),
+	(0.75, P("Idle_Loop", 0.0, SLEDGE_HIGH, move=(0.0, 0.02, 0.0))),
+	(0.84, P("Idle_Loop", 0.0, SLEDGE_FALLING, move=(0.0, -0.04, -0.03))),
+	(0.9, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.1, -0.11))),
+	(1.05, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.11))),
+	(1.3, P("Idle_Loop", 0.0, SLEDGE_DOWN, move=(0.0, -0.13, -0.11))),
+	(1.5, P("Idle_Loop", 0.0, SLEDGE_RISING, move=(0.0, -0.05, -0.03))),
+	(1.7, P("Idle_Loop", 0.0, SLEDGE_READY)),
 ]}
 # Sawing at the woodpile: bent over the log, the left hand pressing it down ahead to the left,
 # the saw in the right hand pushed and drawn ahead and down, the blade sloping into the cut, the

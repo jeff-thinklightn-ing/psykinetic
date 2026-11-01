@@ -926,6 +926,8 @@ const HUMANOID_MOVES := {
 		# Forehand and backhand, each back to a guard (338 amended, pc-character's side); alternate.
 		"sword": [["Sword_Slash_F", 0.21], ["Sword_Slash_B", 0.21]],
 		"giant_axe": [["Axe_Overhead", 0.42]],
+		# Heaved, hung, let fall into the ground, held down and dragged back up (the sim's wind-up and recovery).
+		"tomb_sledge": [["Sledge_Attack", 0.9]],
 		"hammer": [["Mace_Overhead", 0.42]],  # One-handed: Axe_Overhead's left hand would grip nothing.
 		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
 		"dagger": [["Dagger_Stab", 0.17]],
@@ -1122,7 +1124,7 @@ const CLIP_HEAVY_CONTACT := 0.45
 ## Weapons whose wind-up plays their own strike instead (_strike, its lead
 ## stretched over the wind-up): the sword's short one (338 amended: the
 ## slash itself seen, not only its reset).
-const WOUND_STRIKES := ["sword"]
+const WOUND_STRIKES := ["sword", "tomb_sledge"]
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
 const CLIP_JOG := "Jog_Fwd"
@@ -14341,6 +14343,7 @@ func _sync_puppets() -> void:
 			if not is_equal_approx(facing.rotation.y, yaw):
 				facing.rotation.y = yaw
 		_sync_held(entity, puppet)
+		_slide_reach(puppet)
 		_sync_worn(entity, puppet)
 		if entity is Resident:
 			_sync_addressing(entity as Resident, puppet)
@@ -15392,9 +15395,24 @@ static func _hold(sockets: Dictionary, hand: int, id: String, work := {}) -> voi
 			thing.basis = Basis(Vector3.UP, PI * 0.5)
 		elif not own and _edge_first(id):
 			thing.basis = HELD_EDGE_TURN
+		if not own:
+			_grip_at(thing, art)
 		if own and hand == 0:
 			_grip(thing, work)
 		socket.add_child(thing)
+
+
+## A held piece in the hand at its own grip (its slot's "grip" socket: up its
+## length from its origin, art_style), not at its origin: the Tomb Sledge's
+## rear hand off the butt (Jeff: "it shouldn't be held at the very end of the
+## shaft thats not how hammers work"). Kept on it ("grip") for _slide_held
+## and _sync_reach.
+static func _grip_at(thing: Node3D, art: String) -> void:
+	var at: Variant = ArtKit.spec(art).get("sockets", {}).get("grip")
+	var grip := Vector3(at[0], at[1], at[2]) if at is Array and (at as Array).size() == 3 else Vector3.ZERO
+	if grip != Vector3.ZERO:
+		thing.set_meta("grip", grip)
+		thing.position -= thing.basis * grip
 
 
 ## The left hand brought to the right hand's piece's second grip (HandReach;
@@ -15412,10 +15430,47 @@ static func _sync_reach(reach: HandReach, sockets: Dictionary, ids: Array) -> vo
 	var second: Variant = null
 	if held != null and str(ids[1]) == "" and id != "" and not id.begins_with(ART_ID) and int(Items.def(id).get("hands", 1)) == 2:
 		second = ArtKit.spec(str(Items.def(id).get("art", "item." + id))).get("sockets", {}).get("grip_2")
-	if second is Array and (second as Array).size() == 3 and Vector3(second[0], second[1], second[2]).length() <= REACH_SPAN:
+	var grip: Vector3 = held.get_meta("grip", Vector3.ZERO) if held != null else Vector3.ZERO
+	if second is Array and (second as Array).size() == 3 and (Vector3(second[0], second[1], second[2]) - grip).length() <= REACH_SPAN:
 		reach.reach(true, held.transform, Vector3(second[0], second[1], second[2]))
+		reach.set_meta("second", reach.grip)
 	else:
 		reach.reach(false)
+
+
+## A two-handed blow whose lead hand slides down the haft toward the rear one
+## as it falls, and back up after: HandReach's second grip moved down the
+## piece by [[seconds into the clip, metres], ...] (linear between) while the
+## strike plays. The Tomb Sledge's (Jeff: "move like it has mass"), as
+## Sledge_Attack authors its left hand (humanoid_clips' SLEDGE_*: GREAT_GRIP
+## up from the right, down to 0.12 at the contact).
+const REACH_SLIDES := {"Sledge_Attack": [[0.0, 0.0], [0.2, 0.05], [0.45, 0.07], [0.6, 0.07], [0.75, 0.13], [0.84, 0.25],
+	[0.9, 0.33], [1.3, 0.33], [1.5, 0.2], [1.7, 0.0]]}
+static func _slide_reach(puppet: Node3D) -> void:
+	if not puppet.has_meta("reach") or not puppet.has_meta("rig"):
+		return
+	var reach := puppet.get_meta("reach") as HandReach
+	if not reach.active or not reach.has_meta("second"):
+		return
+	var rig := puppet.get_meta("rig") as AnimRig
+	var slide: Array = REACH_SLIDES.get(rig.playing(), []) if rig.striking() else []
+	var at: Vector3 = reach.get_meta("second")
+	if not slide.is_empty():
+		at += Vector3.DOWN * _keyed(slide, rig.position())
+	if not at.is_equal_approx(reach.grip):
+		reach.grip = at
+
+
+## [param keys] ([[x, y], ...], x rising) at [param x], linear between, held past either end.
+static func _keyed(keys: Array, x: float) -> float:
+	if x <= float(keys[0][0]):
+		return float(keys[0][1])
+	for i in range(1, keys.size()):
+		if x <= float(keys[i][0]):
+			var a: Array = keys[i - 1]
+			var b: Array = keys[i]
+			return lerpf(float(a[1]), float(b[1]), (x - float(a[0])) / maxf(float(b[0]) - float(a[0]), 0.0001))
+	return float(keys[-1][1])
 
 
 ## The armour [param entity] wears (items' 622; a player's and a
@@ -15550,7 +15605,7 @@ func _sync_bow(entity: GridEntity, puppet: Node3D) -> void:
 	want = _sheathing(entity, puppet, rig, sockets, ids, want, state, now)
 	if not rest.is_empty():
 		want = "rest"
-		_slide_held(sockets, float(rest.get("grip", 0.0)))
+		_slide_held(sockets, float(rest.get("grip", 0.0)), true)
 		if puppet.has_meta("reach") and (puppet.get_meta("reach") as HandReach).active:
 			(puppet.get_meta("reach") as HandReach).reach(false)
 	elif state == "rest":
@@ -15672,10 +15727,11 @@ func _roused(entity: GridEntity, puppet: Node3D, now: int) -> bool:
 
 ## The right hand's piece slid [param grip] up in the hand along its length
 ## (0: as it is held).
-static func _slide_held(sockets: Dictionary, grip: float) -> void:
+static func _slide_held(sockets: Dictionary, grip: float, rest := false) -> void:
 	var held := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
 	if held != null:
-		var at := held.basis * Vector3(0.0, -grip, 0.0)
+		# A rest's slide from the piece's origin (the rests were so authored), else from its own grip.
+		var at := held.basis * (Vector3(0.0, -grip, 0.0) - (Vector3.ZERO if rest else held.get_meta("grip", Vector3.ZERO) as Vector3))
 		if not held.position.is_equal_approx(at):
 			held.position = at
 
@@ -17102,7 +17158,12 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0) 
 	var between := World.attack_ticks_of(swinger) * World.TICK_DT if swinger != null else 1.0
 	var rig := puppet.get_meta("rig") as AnimRig
 	puppet.set_meta("fidgeting", false)
-	var seconds := rig.strike(clip, contact, lands_in, maxf(between - AnimRig.lead_of(contact, lands_in), 0.2))
+	var recover := maxf(between - AnimRig.lead_of(contact, lands_in), 0.2)
+	# A blow with a recovery of its own (combat's World.recover_ticks): the drag back up ends as the swinger is free.
+	var own_recover := World.recover_ticks(swinger) if swinger != null else 0
+	if own_recover > 0:
+		recover = own_recover * World.TICK_DT
+	var seconds := rig.strike(clip, contact, lands_in, recover)
 	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(seconds * 1000.0))
 	return true
 

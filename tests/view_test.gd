@@ -7730,9 +7730,37 @@ func _test_two_hands() -> void:
 				var skeleton := puppet.find_children("*", "Skeleton3D", true, false)[0] as Skeleton3D
 				var neck := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone("Neck")).origin
 				_check(left.global_position.y < neck.y - 0.05, "standing ready: the left hand %.2f m below the neck" % (neck.y - left.global_position.y))
+	# The Tomb Sledge (750, pc-character's side; Jeff: "it shouldn't be held at the very end of the
+	# shaft"): the right hand at its grip, 0.12 m up from the butt, the left on grip_2; struck, the left
+	# hand slides down the haft toward the right as it falls (REACH_SLIDES), and is on it there.
+	slots[Items.RIGHT_HAND] = "tomb_sledge"
+	player.slots = slots
+	_rig._process(0.0)
+	var sledge := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+	var hand := (sockets["hand_r"] as Node3D).global_position
+	var up := (hand - sledge.global_position).dot(sledge.global_basis.y.normalized())
+	_check(absf(up - 0.12) < 0.005 and reach != null and reach.active and is_equal_approx(reach.grip.y, 0.57),
+		"the sledge in hand %.2f m up from its butt, the left hand on its grip_2 at %.2f" % [up, reach.grip.y if reach != null else -1.0])
+	if reach != null:
+		rig.strike("Sledge_Attack", 0.9, 0.9, 0.8)
+		var slid := 0.0
+		var worst := 0.0
+		var started := Time.get_ticks_msec()
+		while Time.get_ticks_msec() - started < 2200:
+			_rig._process(0.0)
+			var grip := reach.grip
+			await get_tree().process_frame
+			slid = maxf(slid, 0.57 - grip.y)
+			worst = maxf(worst, (sockets["hand_l"] as Node3D).global_position.distance_to(sledge.global_transform * grip))
+		_check(slid > 0.3 and worst < 0.1, "struck: the left hand slid %.2f m down the haft toward the right, never more than %.3f m off it" % [slid, worst])
+		_rig._process(0.0)
+		_check(not rig.striking() and is_equal_approx(reach.grip.y, 0.57), "the blow done: back at grip_2 (%.2f)" % reach.grip.y)
+	slots[Items.RIGHT_HAND] = "giant_axe"
+	player.slots = slots
+	_rig._process(0.0)
 	# A one-handed weapon never swings a two-handed clip (the war hammer did: its left hand came up
 	# beside the haft holding nothing).
-	var two_handed_clips := ["Axe_Overhead"]
+	var two_handed_clips := ["Axe_Overhead", "Sledge_Attack"]
 	var one_handed := (Client3D.HUMANOID_MOVES["strikes"] as Dictionary).keys().filter(func(id: String) -> bool:
 		return Items.exists(id) and int(Items.def(id).get("hands", 1)) < 2 and (Client3D.HUMANOID_MOVES["strikes"][id] as Array).any(
 				func(strike: Array) -> bool: return strike[0] in two_handed_clips))
@@ -7801,7 +7829,8 @@ func _test_rest() -> void:
 			_check(not reach.active, "the axe at rest: the left hand let go of grip_2")
 			_rig._combat_at[id] = Time.get_ticks_msec()
 			_rig._process(0.0)
-			_check(rig.upper_clip() == "Axe_Ready" and reach.active and held.position == Vector3.ZERO, "a blow seen near it: taken up, ready, both hands on it (%s)" % rig.upper_clip())
+			_check(rig.upper_clip() == "Axe_Ready" and reach.active and held.position.is_equal_approx(held.basis * -(held.get_meta("grip") as Vector3)),
+				"a blow seen near it: taken up, ready, both hands on it, at its grip (%s)" % rig.upper_clip())
 			_rig._combat_at.erase(id)
 			puppet.set_meta("roused_at", Time.get_ticks_msec() - 60000)
 			_rig._process(0.0)

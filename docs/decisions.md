@@ -37018,3 +37018,47 @@ Folded in from the still (the coordinator): the skull raised clear of the captio
 445 amended's "World map" button set in the body size, legible at 900 lines.
 ui_test _test_boss_marks. Still: C:/dev/review/boss/brand-plate-and-bar.png.
 Client only, under rev 44 (b16a7a9da620); a new class_name, BossBar.
+## 750, pc-character's side: the Tomb Sledge held and swung with weight
+
+Jeff, on Brand the Ox's sledge: "it shouldn't be held at the very end of
+the shaft thats not how hammers work, it also needs to move like it has
+mass, slow at first, then faster with inertia". Combat's side times the
+blow (a 0.9 s wind-up, a 0.8 s recovery, World.recover_ticks); this side
+holds it and draws the blow at those times, agreed with combat and the
+coordinator.
+
+- A held piece sits in the hand at its own grip: its slot's "grip" socket
+  (up its length from its origin, art_style), which Client3D ignored, so
+  every piece was held at its origin, a haft at its butt
+  (Client3D._grip_at, the piece's "grip" meta). The Tomb Sledge's grip is
+  0.12 m up from its butt, its grip_2 0.45 above that (0.57); the giant
+  axe's and the battle axe's likewise (all three in slots.json's
+  overrides: slots_items.json is generated from the catalog). A rest's
+  slide is still from the origin, as the rests were authored
+  (_slide_held's rest); HandReach's span is measured from the grip.
+- Sledge_Attack (tools/humanoid_clips.py, 1.7 s, at the sim's times so it
+  plays at speed 1 and keeps its ease): heaved up slowly over the right
+  shoulder, the weight back (to 0.45 s); hung there nearly still, the tell
+  (to 0.6); fallen, gathering speed, most of the way in the last 0.15 s,
+  the trunk folding and the hips driving (to 0.9, the contact, the head
+  into the ground before him); held down and carried a little on (to 1.3);
+  dragged back up to the guard (1.7). The left hand GREAT_GRIP up the haft
+  from the right, sliding down to 0.12 from it on the fall and back up
+  after: HandReach's second grip moved down the piece by REACH_SLIDES
+  while the strike plays (Client3D._slide_reach), so the hand stays on the
+  haft.
+- The sledge's blow is a wound-up strike (WOUND_STRIKES, strikes
+  "tomb_sledge": Sledge_Attack, contact 0.9): its lead played over the
+  sim's wind-up, its after-contact over World.recover_ticks (combat's
+  side) when above 0 (else, as before, the time to the next blow less the
+  lead). The
+  axes keep their blows for now (combat: theirs are sweeps, a clip of
+  their own later).
+
+view_test _test_two_hands: the sledge held 0.12 m up from its butt, the
+left hand on grip_2; struck, the left hand slides 0.33 m down toward the
+right and stays on the haft (never 0.1 m off: the right wrist is held in
+toward the midline, so the left arm reaches its hold throughout); done, back at grip_2; _test_rest's axe taken
+up at its grip. anim_rig_test _test_sledge: the clip's length, contact
+and strike entry. Strip: C:/dev/review/sledge_swing.png. Client only,
+protocol unchanged, no new class_name.
