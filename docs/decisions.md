@@ -37691,6 +37691,10 @@ tables alone give armour.
 - battle_axe values at 1 gold (no "value", no "made"); items has it, and it joins the hoard once
   priced.
 
+757 amended: items priced the battle axe at 20 (280 amended, ed135f9b), so it joins the
+hoard at chance 0.1, as approved: about 17 gold of goods a chest on average, 51 a laying. items_test
+_test_loot counts seven rows. Server only, data only, protocol unchanged.
+
 items_test _test_loot: the table's six rows, all known, none armour. Server only, data only,
 protocol unchanged, no new class_name.
 

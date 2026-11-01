@@ -34,7 +34,8 @@
 			{"item": "axe_head", "chance": 0.25},
 			{"item": "pick", "chance": 0.2},
 			{"item": "hammer", "chance": 0.15},
-			{"item": "silver_ring", "chance": 0.15}
+			{"item": "silver_ring", "chance": 0.15},
+			{"item": "battle_axe", "chance": 0.1}
 		],
 		"fallen_grave": [
 			{"item": "plate_armour", "chance": 0.05},

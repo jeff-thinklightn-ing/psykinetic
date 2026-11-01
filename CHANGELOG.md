@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- The Dwarven Halls' chests can now also hold a battle axe, which any shop will buy (757 amended).
 
 - Umbrage's temple is now a stone chapel with a bell tower, larger inside, its door where it was; no grass grows through any building's floor (734 amended (2)).
 - Coming down the temple's shortcut you arrive before the Hall's throne, not six steps off to the side; a peaceable monster no longer pushes an arrival away (749 amended).
