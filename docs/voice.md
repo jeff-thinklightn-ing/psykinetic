@@ -73,6 +73,11 @@ Each has its own register. Keep them apart.
    world's words. Examples: "Prove your strength" [Jeff], "Face the draugr", "Take the
    offering down", "Clear the camp", "Bring the medicine man" [in game]. The window's body
    is the asker's own speech.
+   **Names in narration** (agreed with dungeon, 2026-10-31): a creature with no given name
+   has two forms. In a sentence it is lower case with "the" ("Wren hits the draugr", "the
+   grave robber"). As a label (a window title, the talk log's speaker) it is capitalised
+   ("The draugr"), and so is a line that opens with it ("The draugr hits you."). Given names
+   (Brand the Ox, Sir Edric the Steadfast) stay as they are in both.
 4. **System text** (hints, server notices, settings): out of the world, so plain
    instructions that may name keys and clicks ("Click a townsperson to interact, or press
    %s" [in game]). Never mixed into speech or narration. Keep it short and calm, no jokes.
@@ -91,7 +96,8 @@ the draugr; a different knight each cycle.
   Souls).
 - Never: thanks effusively, jokes, swears, explains how his spirit works.
 - Address: "you"; names himself once ("I am [name], a knight of Theus"). No title for the
-  player.
+  player. His name carries its title, as lore's list of the fourteen has it: "Sir Edric the
+  Steadfast" [Jeff]; with no name yet he is "the fallen knight".
 - Oaths and greetings: none in the approved lines. **[draft]** "Theus keep you" as a parting,
   only if lore agrees the faithful say it.
 - Examples [Jeff]:
@@ -199,7 +205,8 @@ quiet. His speech is generated from his card; these are the style words for his 
 - **[draft]** Eager, a little too sure of himself, quick to speak of knights and courage;
   goes quiet and short when the barrow or the offering comes up ("I keep what I see to
   myself." is the shape of it, from the resident prompt's KEPT_LINE).
-- **[draft]** Uses "sir" for no one (nobody is knighted); speaks of Theus with a young
+- **[draft]** Says "Sir" only of the old knights, by name, as the barrow's list has them
+  ("Sir Edric the Steadfast" [Jeff]): nobody living is knighted. Speaks of Theus with a young
   believer's plainness.
 - Never: tells the temple's secret, names the old gods.
 

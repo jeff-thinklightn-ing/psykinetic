@@ -6,7 +6,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2090)
+## Lines in the code (2093)
 
 ### companions (Pip, Wren, Nix) (457)
 
@@ -731,14 +731,14 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | #8a6a3a | `client3d/client3d.gd:208`  |
 |  | #5f8a8c | `client3d/client3d.gd:210`  |
 |  | #2f4f5c | `client3d/client3d.gd:210`  |
-|  | depth_draw_never; | `client3d/client3d.gd:2507` setup() |
-|  | depth_draw_never, depth_test_disabled; | `client3d/client3d.gd:2507` setup() |
-|  | shader_type spatial; | `client3d/client3d.gd:5023` _marking_shader() |
-|  | shader_type spatial; | `client3d/client3d.gd:5025` _marking_shader() |
-|  | %s\|%s\|%d | `client3d/client3d.gd:5313` _fields_key() |
-|  | %s/healers_hut@%d,%d | `client3d/client3d.gd:6546` hut_id() |
-|  | %s %s %s | `client3d/client3d.gd:13554` _update_fade() |
-|  | headwear=none apron=no garb=none | `client3d/client3d.gd:16941` look_for() |
+|  | depth_draw_never; | `client3d/client3d.gd:2518` setup() |
+|  | depth_draw_never, depth_test_disabled; | `client3d/client3d.gd:2518` setup() |
+|  | shader_type spatial; | `client3d/client3d.gd:5039` _marking_shader() |
+|  | shader_type spatial; | `client3d/client3d.gd:5041` _marking_shader() |
+|  | %s\|%s\|%d | `client3d/client3d.gd:5329` _fields_key() |
+|  | %s/healers_hut@%d,%d | `client3d/client3d.gd:6593` hut_id() |
+|  | %s %s %s | `client3d/client3d.gd:13700` _update_fade() |
+|  | headwear=none apron=no garb=none | `client3d/client3d.gd:17127` look_for() |
 |  | could not copy %s | `client3d/lab_drop.gd:105` poll() |
 |  | %s changed: waiting for the machine (gate), then importing | `client3d/lab_drop.gd:115` poll() |
 |  | %s: export as .glb (File > Export > glTF Binary) | `client3d/lab_drop.gd:143` _files() |
@@ -796,24 +796,24 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the session's budget is spent | `net/claude_mind.gd:143` voice() |
 |  | content-type: application/json | `net/claude_mind.gd:155` voice() |
 |  | you joined from elsewhere | `net/net.gd:161` JOINED_ELSEWHERE |
-|  | address=%s port=%d token=%s player_id=%s name=%s | `net/net.gd:1383` save_settings() |
-|  | window_width=%d window_height=%d window_mode=%s camera_yaw=%d camera_zoom=%.3f | `net/net.gd:1384` save_settings() |
-|  | phrase%d=%s | `net/net.gd:1392` save_settings() |
-|  | hinted_talk=on | `net/net.gd:1396` save_settings() |
-|  | client v%s protocol %s, server v%s protocol %s | `net/net.gd:1556` authenticate() |
-|  | client out of date | `net/net.gd:1559` authenticate() |
-|  | server out of date | `net/net.gd:1561` authenticate() |
-|  | build mismatch: this client and the server are different builds of v%s | `net/net.gd:1564` authenticate() |
-|  | bad player id | `net/net.gd:1569` authenticate() |
-|  | reserved player id | `net/net.gd:1571` authenticate() |
-|  | too many wrong tokens: try again later | `net/net.gd:1626` _on_peer_connected() |
-|  | nothing sent in %d s | `net/net.gd:1636` _on_auth_timeout() |
-|  | for %d players | `net/net.gd:1664` test_holds() |
-|  | at tick %d for %d orders | `net/net.gd:1668` test_holds() |
-|  | token credential empty | `net/net.gd:1910` start() |
-|  | PSYKINETIC_TOKEN empty | `net/net.gd:1910` start() |
-|  | the token credential, PSYKINETIC_TOKEN or --token=<string> | `net/net.gd:1911` start() |
-|  | , no token: open to anyone | `net/net.gd:1935` start() |
+|  | address=%s port=%d token=%s player_id=%s name=%s | `net/net.gd:1387` save_settings() |
+|  | window_width=%d window_height=%d window_mode=%s camera_yaw=%d camera_zoom=%.3f | `net/net.gd:1388` save_settings() |
+|  | phrase%d=%s | `net/net.gd:1396` save_settings() |
+|  | hinted_talk=on | `net/net.gd:1400` save_settings() |
+|  | client v%s protocol %s, server v%s protocol %s | `net/net.gd:1560` authenticate() |
+|  | client out of date | `net/net.gd:1563` authenticate() |
+|  | server out of date | `net/net.gd:1565` authenticate() |
+|  | build mismatch: this client and the server are different builds of v%s | `net/net.gd:1568` authenticate() |
+|  | bad player id | `net/net.gd:1573` authenticate() |
+|  | reserved player id | `net/net.gd:1575` authenticate() |
+|  | too many wrong tokens: try again later | `net/net.gd:1630` _on_peer_connected() |
+|  | nothing sent in %d s | `net/net.gd:1640` _on_auth_timeout() |
+|  | for %d players | `net/net.gd:1668` test_holds() |
+|  | at tick %d for %d orders | `net/net.gd:1672` test_holds() |
+|  | token credential empty | `net/net.gd:1914` start() |
+|  | PSYKINETIC_TOKEN empty | `net/net.gd:1914` start() |
+|  | the token credential, PSYKINETIC_TOKEN or --token=<string> | `net/net.gd:1915` start() |
+|  | , no token: open to anyone | `net/net.gd:1939` start() |
 |  | no ticks in the last minute | `net/net_stats.gd:85` server_text() |
 |  | tick avg %.2f ms, worst %.2f ms (tick %d) over %d ticks; frame worst %.1f ms; sent %.1f KB/s, received %.1f KB/s | `net/net_stats.gd:101` server_text() |
 |  | corrections %d/min (%d snapped), worst %.2f tiles (ever %.2f) | `net/net_stats.gd:128` client_text() |
@@ -1021,11 +1021,11 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | has a condition | `sim/items.gd:255` stack_problem() |
 |  | is a %s | `sim/items.gd:258` stack_problem() |
 |  | is used to %s | `sim/items.gd:260` stack_problem() |
-|  | %s (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground | `sim/items.gd:942` art_slots() |
-|  | gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there | `sim/items.gd:955` art_slots() |
-|  | Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand. | `sim/items.gd:956` art_slots() |
-|  | no ground at %s | `sim/monster.gd:1678` yielded() |
-|  | %s's blow with %s | `sim/monster.gd:1904` _blows() |
+|  | %s (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground | `sim/items.gd:944` art_slots() |
+|  | gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there | `sim/items.gd:957` art_slots() |
+|  | Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand. | `sim/items.gd:958` art_slots() |
+|  | no ground at %s | `sim/monster.gd:1690` yielded() |
+|  | %s's blow with %s | `sim/monster.gd:1916` _blows() |
 |  | a loan from the town | `sim/production.gd:113` NOT_EARNED |
 |  | what the town owed | `sim/production.gd:113` NOT_EARNED |
 |  | the town's founding gold | `sim/production.gd:113` NOT_EARNED |
@@ -1269,21 +1269,21 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s@%d,%d | `sim/world.gd:5465` put_on_ground() |
 |  | into gold (601 amended) | `sim/world.gd:6670` _purses_migrated() |
 |  | a coin purse | `sim/world.gd:6673` _purses_migrated() |
-|  | not its body: %s | `sim/world.gd:7479` free_from() |
-|  | a packet of %d bytes | `sim/world.gd:7483` free_from() |
-|  | nothing (force spent) | `sim/world.gd:7895` _push() |
-|  | nothing (too heavy to lift overhead) | `sim/world.gd:7903` _push() |
-|  | nothing (no room to land) | `sim/world.gd:7906` _push() |
-|  | a fall of %d | `sim/world.gd:7981` _push() |
-|  | (%s takes %d, goes on at %.2f) | `sim/world.gd:8046` _push() |
-|  | nothing (the lunge's length) | `sim/world.gd:8294` _lunge_cell() |
-|  | a braced spear | `sim/world.gd:8312` _lunge_cell() |
-|  | a cell held (%s) | `sim/world.gd:8324` _lunge_cell() |
-|  | nothing (it arrived) | `sim/world.gd:8376` _lunge_cell() |
-|  | at %s by %s | `sim/world.gd:8502` hurl() |
-|  | nothing (walked into) | `sim/world.gd:8638` _shift() |
-|  | nothing (force spent) | `sim/world.gd:9126` _free_slide() |
-|  | a fall of %d | `sim/world.gd:9183` _free_slide() |
+|  | not its body: %s | `sim/world.gd:7496` free_from() |
+|  | a packet of %d bytes | `sim/world.gd:7500` free_from() |
+|  | nothing (force spent) | `sim/world.gd:7912` _push() |
+|  | nothing (too heavy to lift overhead) | `sim/world.gd:7920` _push() |
+|  | nothing (no room to land) | `sim/world.gd:7923` _push() |
+|  | a fall of %d | `sim/world.gd:7998` _push() |
+|  | (%s takes %d, goes on at %.2f) | `sim/world.gd:8063` _push() |
+|  | nothing (the lunge's length) | `sim/world.gd:8311` _lunge_cell() |
+|  | a braced spear | `sim/world.gd:8329` _lunge_cell() |
+|  | a cell held (%s) | `sim/world.gd:8341` _lunge_cell() |
+|  | nothing (it arrived) | `sim/world.gd:8393` _lunge_cell() |
+|  | at %s by %s | `sim/world.gd:8519` hurl() |
+|  | nothing (walked into) | `sim/world.gd:8655` _shift() |
+|  | nothing (force spent) | `sim/world.gd:9143` _free_slide() |
+|  | a fall of %d | `sim/world.gd:9200` _free_slide() |
 |  | world_map.json: the start zone %s is not a level | `sim/world_map.gd:418` problems() |
 |  | no player start | `sim/world_map.gd:419` problems() |
 |  | %s: it is the start zone (world_map.json) but has no starts | `sim/world_map.gd:421` problems() |
@@ -1327,95 +1327,95 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | being walked home, following at heel | `sim/resident.gd:27`  |
 |  | sick in your bed at home | `sim/resident.gd:28`  |
 |  | at a sick neighbour's bedside, seeing to them | `sim/resident.gd:28`  |
-|  | ^[Yy]ou (nods?\|shrugs?\|sighs?\|smiles?\|grins?\|frowns?\|glances?\|leans?\|pauses?\|turns?\|straightens?\|wipes?\|scratch(es)?\|rubs?\|chuckles?\|laughs?\|exhales?\|blinks?\|squints?\|gestures?\|folds?\|tilts?\|shakes?\|raises?\|lowers?\|waves?\|clears?\|sets? down\|lifts?\|snorts?\|coughs?\|winces?\|shifts?\|stares?\|spits?\|purses?\|looks? (up\|down\|over\|around\|away\|out\|back\|aside))\\b\|\\byour (voice\|eyes\|hands?\|face\|gaze\|brow\|jaw\|shoulders)\\b | `sim/resident.gd:142` NARRATION |
-|  | \\b(walk\|go\|goe\|give\|take\|hand\|step\|leave\|sit\|stand\|pick\|put\|pour\|open\|close\|fetch\|come\|run\|move\|cross\|carry\|bring\|follow\|lead\|think\|wonder\|decide\|remember\|consider\|plan\|hope\|wish)(s\|es\|ing)?\\b | `sim/resident.gd:144` NOT_DONE |
-|  | [A-Z][\\w'-]* | `sim/resident.gd:168` spoken() |
-|  | (\\s+says)?\\s*:\\s*"? | `sim/resident.gd:169` spoken() |
-|  | ["“]([^"”]*[A-Za-z][^"”]*)["”] | `sim/resident.gd:180` spoken() |
-|  | ^(his\|her\|their) voice\\b | `sim/resident.gd:206` aside_of() |
-|  | \\b[Yy]our\\b | `sim/resident.gd:241` _third_person() |
-|  | ^(?:you )?([a-z]+)(.*)$ | `sim/resident.gd:251` _participle() |
-|  | Of the world, say only what is written above as what you know; what is only said, say as said, never as certain; of anything else, say you cannot speak to it. | `sim/resident.gd:293` sentences() |
-|  | Of the world, say only what is written above: what you have heard, say as heard, naming who told you. | `sim/resident.gd:294` sentences() |
-|  | You may embellish what you know, in your own way. | `sim/resident.gd:295` sentences() |
-|  | Never make up more than you know; anything else you don't know, so say so rather than guess. | `sim/resident.gd:296` sentences() |
-|  | You may lie about yourself, as yourself would: where you were, what you did, what you own. Never put a deed or a word on a named neighbour that is not written above. | `sim/resident.gd:297` sentences() |
-|  | Never say what you believe is false. | `sim/resident.gd:298` sentences() |
-|  | What is written above is what you know; anything else you don't know, so say so rather than guess. | `sim/resident.gd:299` sentences() |
-|  | %s says to you: "%s" | `sim/resident.gd:542` voice_ask() |
-|  | %s spoke to %s. | `sim/resident.gd:543` voice_ask() |
-|  | %s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say only what the thought holds: add no place, cause, name or detail it does not give, for nothing else is true. Ask nothing of them you would not ask to their face. | `sim/resident.gd:557` HAIL_USER |
-|  | %s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say what the thought holds, in your own colour: you may add one small everyday detail of your own things (a broken wheel, a barrel, the mud on your boots), but invent no person, no place, no building, no name, no price, no weather, no cause, and cast no doubt on the thought; name nobody it does not, for nothing else is true. Ask nothing of them you would not ask to their face. | `sim/resident.gd:560` HAIL_USER_LIVELY |
-|  | %s is a stranger to you; you greet them as the town does a newcomer. | `sim/resident.gd:564` system_for() |
-|  | You have met %s before; you greet them as one you know. | `sim/resident.gd:565` system_for() |
-|  | You trust %s; you greet them warmly. | `sim/resident.gd:566` system_for() |
-|  | %s wronged you once; you greet them coolly, and say so without a quarrel. | `sim/resident.gd:567` system_for() |
-|  | %s: %s, %s to %s. | `sim/resident.gd:579` hail_ask() |
-|  | You have a plea to make: %s | `sim/resident.gd:630` hail_cue() |
-|  | I heard today that %s | `sim/resident.gd:646` hail_cue() |
-|  | I heard the lawspeaker rule today that %s%s | `sim/resident.gd:649` hail_cue() |
-|  | What is it? | `sim/resident.gd:821` greet_word() |
-|  | %s lives and works in the town. | `sim/resident.gd:835` card_words() |
-|  | %s is a %s, and keeps it hidden. | `sim/resident.gd:837` card_words() |
-|  | It is %s%s. | `sim/resident.gd:854` facts_now() |
-|  | You are %s. | `sim/resident.gd:855` facts_now() |
-|  | in the town | `sim/resident.gd:855` facts_now() |
-|  | You are sick with %s and have kept to your bed %s. | `sim/resident.gd:860` facts_now() |
-|  | since this morning | `sim/resident.gd:860` facts_now() |
-|  | for %d day%s | `sim/resident.gd:860` facts_now() |
-|  | %s saw to you today, and you expect to be on your feet tomorrow. | `sim/resident.gd:862` facts_now() |
-|  | Nobody has seen to you yet. You would be glad of the medicine man, or of being walked to the healer's hut, or of a remedy. | `sim/resident.gd:864` facts_now() |
-|  | You are on your way to %s's bedside, to see to %s. | `sim/resident.gd:866` facts_now() |
-|  | %s found you %s and is leading you to %s, whose people sent word for a %s; you will live and work there as its %s, and you follow close. | `sim/resident.gd:873` facts_now() |
-|  | You set out for %s, whose people sent word for a %s, and lost your way %s. You have not been there yet and know nobody in it. You would follow whoever speaks to you, and ask nothing else. | `sim/resident.gd:875` facts_now() |
-|  | You are held %s by the %s and made to work for them. You will follow nobody while one of them can see you, and you say so plainly; when none of them watches, a word from whoever speaks to you and you go. You set out for %s, whose people sent word for a %s, and have never been there. | `sim/resident.gd:877` facts_now() |
-|  | The town lies to the %s. | `sim/resident.gd:884` facts_now() |
-|  | The town lies to the %s. | `sim/resident.gd:884` facts_now() |
-|  | You lost your way beyond the walls; %s is walking you home and you follow close.%s | `sim/resident.gd:886` facts_now() |
-|  | You lost your way beyond the walls and have not been home.%s You would be glad to be walked home: you follow whoever speaks to you. | `sim/resident.gd:888` facts_now() |
-|  | You are the town's lawspeaker: you keep what the town remembers and hold it straight. Lore is fact; what the town remembers is memory; one person's talk is talk. | `sim/resident.gd:892` facts_now() |
-|  | %s, the town's scholar, keeps the chronicle: what is set down there the town remembers; send a doubter to %s. | `sim/resident.gd:895` facts_now() |
-|  | You keep the town's chronicle: what the lawspeaker set down, what the town proposed to the lore-keepers, and the disputes before him. When asked what is true, say what is set down and no more. | `sim/resident.gd:898` facts_now() |
-|  | You proposed to the lore-keepers that %s: it is %s. | `sim/resident.gd:905` facts_now() |
-|  | You stand at %s's door. | `sim/resident.gd:908` facts_now() |
-|  | A dispute is before you: %s, says %s.%s | `sim/resident.gd:913` facts_now() |
-|  | %s laid it before you. | `sim/resident.gd:915` facts_now() |
-|  | What you know of the world: %s | `sim/resident.gd:926` facts_now() |
-|  | This is the first time %s has spoken to you. | `sim/resident.gd:956` facts_now() |
-|  | You have been carried off by raiders %s, and brought home. | `sim/resident.gd:964` facts_now() |
-|  | more than twice | `sim/resident.gd:964` facts_now() |
-|  | The town is short of %s. | `sim/resident.gd:969` facts_now() |
-|  | The town is short of nothing it needs. | `sim/resident.gd:969` facts_now() |
-|  | The town's shop has %s. | `sim/resident.gd:980` facts_now() |
-|  | The town's shop has nothing for sale. | `sim/resident.gd:980` facts_now() |
-|  | You have no trade to work at. | `sim/resident.gd:988` work_words() |
-|  | You have no workshop to work in yet: the town has no building for your trade. | `sim/resident.gd:991` work_words() |
-|  | Your workshop is idle: you are making nothing now. | `sim/resident.gd:994` work_words() |
-|  | repair of your hut | `sim/resident.gd:997` work_words() |
-|  | Your next work is %s, waiting for its materials. | `sim/resident.gd:1006` work_words() |
-|  | Your next work is %s%s, not yet begun. | `sim/resident.gd:1008` work_words() |
-|  | under half done | `sim/resident.gd:1010` work_words() |
-|  | over half done | `sim/resident.gd:1010` work_words() |
-|  | You are making %s%s: it is %s. | `sim/resident.gd:1011` work_words() |
-|  | You have had nothing to eat since yesterday or before. | `sim/resident.gd:1030` means_words() |
-|  | You went without at your last meal: there was nothing you could eat. | `sim/resident.gd:1032` means_words() |
-|  | At your last meal the town fed you for nothing: you could not pay. | `sim/resident.gd:1034` means_words() |
-|  | You owe the town %d gold. | `sim/resident.gd:1037` means_words() |
-|  | You are working off your debt to the town, hauling for it, and cannot borrow more. | `sim/resident.gd:1039` means_words() |
-|  | %s of the town's folk ate from the town's dole or went hungry at their last meal. | `sim/resident.gd:1045` means_words() |
-|  | , a day or more ago | `sim/resident.gd:1057` _trade_words() |
-|  | for %d gold | `sim/resident.gd:1058` _trade_words() |
-|  | You last %s%s%s%s. | `sim/resident.gd:1061` _trade_words() |
-|  | You last %s%s%s%s. | `sim/resident.gd:1064` _trade_words() |
-|  | You were last paid %d gold by %s for %s%s. | `sim/resident.gd:1066` _trade_words() |
-|  | You last paid %s %d gold for %s%s. | `sim/resident.gd:1067` _trade_words() |
-|  | The knight whose sepulcher lies open below now is %s. | `sim/resident.gd:1121` relic_line() |
-|  | Holy knights of the temple lie in the old barrow under the town, and the Mound-breakers, the grave robbers there, dig for their bones to sell.%s | `sim/resident.gd:1122` relic_line() |
-|  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd:1123` relic_line() |
-|  | one who has no amulet is given one. | `sim/resident.gd:1124` relic_line() |
-|  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd:1127` KEPT_LINE |
-|  | It is said that %s | `sim/resident.gd:1186` world_facts() |
-|  | %s and %s | `sim/resident.gd:1224` _listed() |
+|  | ^[Yy]ou (nods?\|shrugs?\|sighs?\|smiles?\|grins?\|frowns?\|glances?\|leans?\|pauses?\|turns?\|straightens?\|wipes?\|scratch(es)?\|rubs?\|chuckles?\|laughs?\|exhales?\|blinks?\|squints?\|gestures?\|folds?\|tilts?\|shakes?\|raises?\|lowers?\|waves?\|clears?\|sets? down\|lifts?\|snorts?\|coughs?\|winces?\|shifts?\|stares?\|spits?\|purses?\|looks? (up\|down\|over\|around\|away\|out\|back\|aside))\\b\|\\byour (voice\|eyes\|hands?\|face\|gaze\|brow\|jaw\|shoulders)\\b | `sim/resident.gd:145` NARRATION |
+|  | \\b(walk\|go\|goe\|give\|take\|hand\|step\|leave\|sit\|stand\|pick\|put\|pour\|open\|close\|fetch\|come\|run\|move\|cross\|carry\|bring\|follow\|lead\|think\|wonder\|decide\|remember\|consider\|plan\|hope\|wish)(s\|es\|ing)?\\b | `sim/resident.gd:147` NOT_DONE |
+|  | [A-Z][\\w'-]* | `sim/resident.gd:171` spoken() |
+|  | (\\s+says)?\\s*:\\s*"? | `sim/resident.gd:172` spoken() |
+|  | ["“]([^"”]*[A-Za-z][^"”]*)["”] | `sim/resident.gd:183` spoken() |
+|  | ^(his\|her\|their) voice\\b | `sim/resident.gd:209` aside_of() |
+|  | \\b[Yy]our\\b | `sim/resident.gd:244` _third_person() |
+|  | ^(?:you )?([a-z]+)(.*)$ | `sim/resident.gd:254` _participle() |
+|  | Of the world, say only what is written above as what you know; what is only said, say as said, never as certain; of anything else, say you cannot speak to it. | `sim/resident.gd:296` sentences() |
+|  | Of the world, say only what is written above: what you have heard, say as heard, naming who told you. | `sim/resident.gd:297` sentences() |
+|  | You may embellish what you know, in your own way. | `sim/resident.gd:298` sentences() |
+|  | Never make up more than you know; anything else you don't know, so say so rather than guess. | `sim/resident.gd:299` sentences() |
+|  | You may lie about yourself, as yourself would: where you were, what you did, what you own. Never put a deed or a word on a named neighbour that is not written above. | `sim/resident.gd:300` sentences() |
+|  | Never say what you believe is false. | `sim/resident.gd:301` sentences() |
+|  | What is written above is what you know; anything else you don't know, so say so rather than guess. | `sim/resident.gd:302` sentences() |
+|  | %s says to you: "%s" | `sim/resident.gd:545` voice_ask() |
+|  | %s spoke to %s. | `sim/resident.gd:546` voice_ask() |
+|  | %s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say only what the thought holds: add no place, cause, name or detail it does not give, for nothing else is true. Ask nothing of them you would not ask to their face. | `sim/resident.gd:560` HAIL_USER |
+|  | %s comes within speaking distance of you. One thing is on your mind: %s Say one line to them about it, unprompted, as yourself and in your own words, not the words above. Say what the thought holds, in your own colour: you may add one small everyday detail of your own things (a broken wheel, a barrel, the mud on your boots), but invent no person, no place, no building, no name, no price, no weather, no cause, and cast no doubt on the thought; name nobody it does not, for nothing else is true. Ask nothing of them you would not ask to their face. | `sim/resident.gd:563` HAIL_USER_LIVELY |
+|  | %s is a stranger to you; you greet them as the town does a newcomer. | `sim/resident.gd:567` system_for() |
+|  | You have met %s before; you greet them as one you know. | `sim/resident.gd:568` system_for() |
+|  | You trust %s; you greet them warmly. | `sim/resident.gd:569` system_for() |
+|  | %s wronged you once; you greet them coolly, and say so without a quarrel. | `sim/resident.gd:570` system_for() |
+|  | %s: %s, %s to %s. | `sim/resident.gd:582` hail_ask() |
+|  | You have a plea to make: %s | `sim/resident.gd:633` hail_cue() |
+|  | I heard today that %s | `sim/resident.gd:649` hail_cue() |
+|  | I heard the lawspeaker rule today that %s%s | `sim/resident.gd:652` hail_cue() |
+|  | What is it? | `sim/resident.gd:847` greet_word() |
+|  | %s lives and works in the town. | `sim/resident.gd:861` card_words() |
+|  | %s is a %s, and keeps it hidden. | `sim/resident.gd:863` card_words() |
+|  | It is %s%s. | `sim/resident.gd:880` facts_now() |
+|  | You are %s. | `sim/resident.gd:881` facts_now() |
+|  | in the town | `sim/resident.gd:881` facts_now() |
+|  | You are sick with %s and have kept to your bed %s. | `sim/resident.gd:886` facts_now() |
+|  | since this morning | `sim/resident.gd:886` facts_now() |
+|  | for %d day%s | `sim/resident.gd:886` facts_now() |
+|  | %s saw to you today, and you expect to be on your feet tomorrow. | `sim/resident.gd:888` facts_now() |
+|  | Nobody has seen to you yet. You would be glad of the medicine man, or of being walked to the healer's hut, or of a remedy. | `sim/resident.gd:890` facts_now() |
+|  | You are on your way to %s's bedside, to see to %s. | `sim/resident.gd:892` facts_now() |
+|  | %s found you %s and is leading you to %s, whose people sent word for a %s; you will live and work there as its %s, and you follow close. | `sim/resident.gd:899` facts_now() |
+|  | You set out for %s, whose people sent word for a %s, and lost your way %s. You have not been there yet and know nobody in it. You would follow whoever speaks to you, and ask nothing else. | `sim/resident.gd:901` facts_now() |
+|  | You are held %s by the %s and made to work for them. You will follow nobody while one of them can see you, and you say so plainly; when none of them watches, a word from whoever speaks to you and you go. You set out for %s, whose people sent word for a %s, and have never been there. | `sim/resident.gd:903` facts_now() |
+|  | The town lies to the %s. | `sim/resident.gd:910` facts_now() |
+|  | The town lies to the %s. | `sim/resident.gd:910` facts_now() |
+|  | You lost your way beyond the walls; %s is walking you home and you follow close.%s | `sim/resident.gd:912` facts_now() |
+|  | You lost your way beyond the walls and have not been home.%s You would be glad to be walked home: you follow whoever speaks to you. | `sim/resident.gd:914` facts_now() |
+|  | You are the town's lawspeaker: you keep what the town remembers and hold it straight. Lore is fact; what the town remembers is memory; one person's talk is talk. | `sim/resident.gd:918` facts_now() |
+|  | %s, the town's scholar, keeps the chronicle: what is set down there the town remembers; send a doubter to %s. | `sim/resident.gd:921` facts_now() |
+|  | You keep the town's chronicle: what the lawspeaker set down, what the town proposed to the lore-keepers, and the disputes before him. When asked what is true, say what is set down and no more. | `sim/resident.gd:924` facts_now() |
+|  | You proposed to the lore-keepers that %s: it is %s. | `sim/resident.gd:931` facts_now() |
+|  | You stand at %s's door. | `sim/resident.gd:934` facts_now() |
+|  | A dispute is before you: %s, says %s.%s | `sim/resident.gd:939` facts_now() |
+|  | %s laid it before you. | `sim/resident.gd:941` facts_now() |
+|  | What you know of the world: %s | `sim/resident.gd:952` facts_now() |
+|  | This is the first time %s has spoken to you. | `sim/resident.gd:982` facts_now() |
+|  | You have been carried off by raiders %s, and brought home. | `sim/resident.gd:990` facts_now() |
+|  | more than twice | `sim/resident.gd:990` facts_now() |
+|  | The town is short of %s. | `sim/resident.gd:995` facts_now() |
+|  | The town is short of nothing it needs. | `sim/resident.gd:995` facts_now() |
+|  | The town's shop has %s. | `sim/resident.gd:1006` facts_now() |
+|  | The town's shop has nothing for sale. | `sim/resident.gd:1006` facts_now() |
+|  | You have no trade to work at. | `sim/resident.gd:1014` work_words() |
+|  | You have no workshop to work in yet: the town has no building for your trade. | `sim/resident.gd:1017` work_words() |
+|  | Your workshop is idle: you are making nothing now. | `sim/resident.gd:1020` work_words() |
+|  | repair of your hut | `sim/resident.gd:1023` work_words() |
+|  | Your next work is %s, waiting for its materials. | `sim/resident.gd:1032` work_words() |
+|  | Your next work is %s%s, not yet begun. | `sim/resident.gd:1034` work_words() |
+|  | under half done | `sim/resident.gd:1036` work_words() |
+|  | over half done | `sim/resident.gd:1036` work_words() |
+|  | You are making %s%s: it is %s. | `sim/resident.gd:1037` work_words() |
+|  | You have had nothing to eat since yesterday or before. | `sim/resident.gd:1056` means_words() |
+|  | You went without at your last meal: there was nothing you could eat. | `sim/resident.gd:1058` means_words() |
+|  | At your last meal the town fed you for nothing: you could not pay. | `sim/resident.gd:1060` means_words() |
+|  | You owe the town %d gold. | `sim/resident.gd:1063` means_words() |
+|  | You are working off your debt to the town, hauling for it, and cannot borrow more. | `sim/resident.gd:1065` means_words() |
+|  | %s of the town's folk ate from the town's dole or went hungry at their last meal. | `sim/resident.gd:1071` means_words() |
+|  | , a day or more ago | `sim/resident.gd:1083` _trade_words() |
+|  | for %d gold | `sim/resident.gd:1084` _trade_words() |
+|  | You last %s%s%s%s. | `sim/resident.gd:1087` _trade_words() |
+|  | You last %s%s%s%s. | `sim/resident.gd:1090` _trade_words() |
+|  | You were last paid %d gold by %s for %s%s. | `sim/resident.gd:1092` _trade_words() |
+|  | You last paid %s %d gold for %s%s. | `sim/resident.gd:1093` _trade_words() |
+|  | The knight whose sepulcher lies open below now is %s. | `sim/resident.gd:1147` relic_line() |
+|  | Holy knights of the temple lie in the old barrow under the town, and the Mound-breakers, the grave robbers there, dig for their bones to sell.%s | `sim/resident.gd:1148` relic_line() |
+|  | Whoever brings a knight's remains back to you, you lay them on the altar, and the blessing charges that one's Encolpion Amulet; | `sim/resident.gd:1149` relic_line() |
+|  | one who has no amulet is given one. | `sim/resident.gd:1150` relic_line() |
+|  | Some of what you see in your work you keep to yourself, as you are paid to: if asked about it, say only that you keep what you see to yourself, and say no more of it. | `sim/resident.gd:1153` KEPT_LINE |
+|  | It is said that %s | `sim/resident.gd:1212` world_facts() |
+|  | %s and %s | `sim/resident.gd:1250` _listed() |
 
 ### residents (card) (25)
 
@@ -1447,7 +1447,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s is %s's %s. | `sim/resident_card.gd:252` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd:258` grudge_fact() |
 
-### server and windows (552)
+### server and windows (555)
 
 | | Line | Where |
 |---|---|---|
@@ -1455,554 +1455,557 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s keeps her distance | `main.gd:46` BOND_WORDS |
 |  | %s hangs back | `main.gd:46` BOND_WORDS |
 |  | %s walks apart | `main.gd:46` BOND_WORDS |
-|  | Go on... without me. | `main.gd:123` COMPANION_DEATH_LINES |
-|  | Tell them I tried. | `main.gd:123` COMPANION_DEATH_LINES |
-|  | Yes to what? Name your gold. | `main.gd:342` YES_TO_WHAT |
-|  | There is nothing between us to say yes to. | `main.gd:343` NOTHING_STANDS |
-|  | The axe will not leave his hall. | `main.gd:465` BOUND_AXE_WORDS |
-|  | time x%s | `main.gd:838` tuning_key() |
-|  | paused: "." steps one tick | `main.gd:840` tuning_key() |
-|  | zone reset %s | `main.gd:890` _reset_hall() |
-|  | connecting to %s:%d | `main.gd:934` _play() |
-|  | %d player%s | `main.gd:997` server_status_words() |
-|  | not taking players now | `main.gd:999` server_status_words() |
-|  | out of date: updates when you join | `main.gd:1001` server_status_words() |
-|  | connecting to %s:%d | `main.gd:1029` _retry_connect() |
-|  | could not start a connection to %s:%d | `main.gd:1032` _retry_connect() |
-|  | connecting to %s:%d | `main.gd:1059` _on_setup_submitted() |
-|  | the server at %s:%d did not answer | `main.gd:1163` _go_online() |
-|  | %s pick up %s | `main.gd:1300` _process() |
-|  | %s pick up %s | `main.gd:1316` _process() |
-|  | Wares, if you have coin. | `main.gd:1665` _greet_sample() |
-|  | usage: reload <zone> \| reload all (zones: %s) | `main.gd:3755` _reload_command() |
-|  | no open zone's level changed on disk (%d open) | `main.gd:3765` _reload_command() |
-|  | zone %s is not open (zones: %s); it reads its level when it opens | `main.gd:3767` _reload_command() |
-|  | zone %s has no level on disk any more; left as it is | `main.gd:3769` _reload_command() |
-|  | %s reloaded from %s, %d players there kept | `main.gd:3774` _reload_command() |
-|  | %s gave %d gold toward the %s | `main.gd:4137` _boot() |
-|  | move <player> <x> <y> [zone], or move <player> <building code> [zone]: the player by name as "players" lists them | `main.gd:4453` _move_command() |
-|  | move: no player %s online | `main.gd:4464` _move_command() |
-|  | move: %d players online are called %s; not moved | `main.gd:4466` _move_command() |
-|  | move: no zone %s | `main.gd:4471` _move_command() |
-|  | move: no building %s in %s | `main.gd:4480` _move_command() |
-|  | move: %s is off %s's map (%d x %d) | `main.gd:4483` _move_command() |
-|  | move: nothing walkable within %d of %s in %s; not moved | `main.gd:4486` _move_command() |
-|  | move: %s could not go to %s | `main.gd:4489` _move_command() |
-|  | You find yourself in %s. | `main.gd:4493` _move_command() |
-|  | moved %s to %s in %s%s | `main.gd:4495` _move_command() |
-|  | (nearest walkable to %s) | `main.gd:4495` _move_command() |
-|  | mark <player> <mark> \| mark <player> -<mark>: the player by name as "players" lists them; a mark is one word | `main.gd:4533` _mark_command() |
-|  | mark: no player %s online | `main.gd:4545` _mark_command() |
-|  | mark: %d players online are called %s; not marked | `main.gd:4547` _mark_command() |
-|  | mark: a mark is one word of letters, digits and underscores (%s) | `main.gd:4551` _mark_command() |
-|  | %s %s %s already | `main.gd:4554` _mark_command() |
-|  | %s %s %s; marks: %s | `main.gd:4556` _mark_command() |
-|  | %s stays in %s, working as its %s. Come back and %s will travel with you again. | `main.gd:4606` travel() |
-|  | %s went to %s. | `main.gd:4633` travel() |
-| L | The stair down is barred from below. | `main.gd:4738` SEALED_LINES |
-|  | The way on is closed. | `main.gd:4749` _take_link() |
-|  | The way is sealed. | `main.gd:4755` _take_link() |
-|  | usage: weather [%s\|auto\|reload] [<minutes>] [<region>\|all] | `main.gd:5641` _weather_command() |
-|  | no climate for region %s (regions: %s) | `main.gd:5646` _weather_command() |
-|  | %s (%s): %s | `main.gd:5656` _weather_command() |
-|  | %s, cloud %.2f rain %.2f fog %.2f wind %.2f | `main.gd:5657` _weather_command() |
-|  | .join(lines) if not lines.is_empty() else | `main.gd:5660` _weather_command() |
-|  | usage: hour <0..24> \| day_minutes <minutes> | `main.gd:5667` _sky_command() |
-|  | hour %.2f, a day takes %.1f minutes, daylight %.2f | `main.gd:5676` _sky_command() |
-|  | usage: season <%s> \| season_days <n> | `main.gd:5686` _season_command() |
-|  | usage: season <%s> \| season_days <n> | `main.gd:5690` _season_command() |
-|  | %s (year %.3f), a season takes %d days, cold %.2f, snow cover %.2f | `main.gd:5698` _season_command() |
-|  | The ways have shifted since you were last here. | `main.gd:5838` _join_player() |
-|  | Nobody in town is on the dole now. | `main.gd:5910` _on_dole_changed() |
-|  | %d in town %s on the dole (fed by the town, or hungry): its kitchen works for food first. | `main.gd:5911` _on_dole_changed() |
-|  | someone was hurt | `main.gd:6000` _tell_bandage_broke() |
-|  | a monster came near | `main.gd:6001` _tell_bandage_broke() |
-|  | Your bandaging broke off: %s. | `main.gd:6003` _tell_bandage_broke() |
-|  | You can't bandage %s: come within two steps of them, nothing between. | `main.gd:6007` BANDAGE_REFUSED |
-|  | You can't bandage %s: there's no wound to bind. | `main.gd:6007` BANDAGE_REFUSED |
-|  | You can't bandage %s: the wound is bound already. | `main.gd:6008` _tell_bandage_broke() |
-|  | You can't bandage %s: your hands are busy. | `main.gd:6008` _tell_bandage_broke() |
-|  | You can't bandage %s: you have no bandaging kit. | `main.gd:6009` _tell_bandage_broke() |
-|  | You can't bandage %s: give it a breath after that blow. | `main.gd:6009` _tell_bandage_broke() |
-|  | You can't bandage %s: a monster is too near. | `main.gd:6010` _tell_bandage_broke() |
-|  | he keeps no hut | `main.gd:6196` retain() |
-|  | too far away | `main.gd:6198` retain() |
-|  | already in his care | `main.gd:6200` retain() |
-|  | he takes gold, herbs or antlers | `main.gd:6202` retain() |
-|  | not enough gold (%d) | `main.gd:6204` retain() |
-|  | no %s in your pack | `main.gd:6210` retain() |
-|  | the healer's retainer | `main.gd:6215` retain() |
-|  | That's %d. %d more and you're in my care. | `main.gd:6228` retain() |
-|  | %s takes you into his care. | `main.gd:6231` retain() |
-|  | a reforge that could not be done | `main.gd:6266` _on_counter_work_done() |
-|  | %s was carried off by raiders and is held by them still. | `main.gd:6346` _companion_whereabouts() |
-|  | %s went home to %s. Ask %s there to travel with you again. | `main.gd:6348` _companion_whereabouts() |
-|  | %s left you and lives in %s now. | `main.gd:6350` _companion_whereabouts() |
-|  | sick in %s bed | `main.gd:6358` _companion_whereabouts() |
-|  | %s is %s in %s, not with you. Go to %s and %s will travel with you again. | `main.gd:6359` _companion_whereabouts() |
-|  | %s leaves her work in the town and goes with %s. | `main.gd:6414` _join_companion() |
-|  | %s is sick with %s, and goes with %s all the same. | `main.gd:6417` _join_companion() |
-|  | , and can lead them there | `main.gd:6591` _roads_words() |
-|  | You know the way to %s, having been there with %s%s. %s | `main.gd:6592` _roads_words() |
-|  | (?i)\\b(to\|towards?)\\b | `main.gd:6646` _guide_said() |
-|  | %s asks you to lead them somewhere you have not been with them: you do not know the way there. | `main.gd:6649` _guide_said() |
-|  | %s asks you to lead them to %s, and you are there already. | `main.gd:6652` _guide_said() |
-|  | you will not lead them anywhere now: you are unhappy with them | `main.gd:6676` _start_guide() |
-|  | you follow them, and do not trust yourself to take the lead yet | `main.gd:6677` _start_guide() |
-|  | %s asked you to lead them to %s, but %s. | `main.gd:6678` _start_guide() |
-|  | %s won't lead the way. | `main.gd:6679` _start_guide() |
-|  | %s asks you again to lead them to %s; you refused earlier today and still will not: it isn't safe: %s. | `main.gd:6684` _start_guide() |
-|  | %s asked you to lead them to %s, but you will not go: it isn't safe: %s.%s Tell them so. | `main.gd:6690` _start_guide() |
-|  | %s won't lead the way to %s: it isn't safe. | `main.gd:6692` _start_guide() |
-|  | %s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again. | `main.gd:6706` _start_guide() |
-|  | %s leads the way to %s. | `main.gd:6707` _start_guide() |
-|  | %s has brought %s to %s. | `main.gd:6765` _guide_done() |
-|  | You have led %s to %s, as they asked. | `main.gd:6768` _guide_done() |
-|  | %s stops leading the way: %s. | `main.gd:6770` _guide_done() |
-|  | You stopped leading %s to %s: %s. | `main.gd:6771` _guide_done() |
-|  | You would lead them as far as %s, and no further. | `main.gd:6846` _as_far_words() |
-|  | %s stops leading the way to %s: it isn't safe. | `main.gd:6864` _guide_check() |
-|  | You stopped leading %s to %s: it isn't safe: %s.%s | `main.gd:6865` _guide_check() |
-|  | The dead bar the way. | `main.gd:6947` DEAD_LINE |
-|  | %s asked you to go home for a while, and you part as friends: you go home to %s, and will travel with them again when they ask. | `main.gd:7014` _begin_leaving() |
-|  | %s goes home to %s; you part as friends. | `main.gd:7015` _begin_leaving() |
-|  | You are leaving %s for good, and going home to %s: they %s. | `main.gd:7017` _begin_leaving() |
-|  | %s leaves you, and goes home to %s. | `main.gd:7018` _begin_leaving() |
-|  | %s leaves you %s. | `main.gd:7047` _return_gear() |
-|  | %s is glad to travel with %s again. | `main.gd:7153` _recruit_said() |
-|  | %s came to your town and asked you to travel with them again, and you were glad to. | `main.gd:7157` _recruit_said() |
-|  | asked you back | `main.gd:7169` _recruit_said() |
-|  | %s agrees to travel with %s again. | `main.gd:7176` _recruit_said() |
-|  | %s asked you to travel with them again, and you agreed. You left them once because they %s; you have not forgotten it. | `main.gd:7180` _recruit_said() |
-|  | {player} asked you to travel with them, and you would rather not. | `main.gd:7273` _resident_recruit_said() |
-|  | asked you to travel with them | `main.gd:7305` _resident_recruit_said() |
-|  | %s leaves %s work in the town and goes with %s. | `main.gd:7321` _resident_recruit_said() |
-|  | %s asked you to travel with them, and you agreed: you left your work in the town to go with them. | `main.gd:7326` _resident_recruit_said() |
-|  | one of its people | `main.gd:7336` _trade_words() |
-|  | what the town owed: her own purse, carried from where she rested | `main.gd:7394` _hand_companion_over() |
-|  | travelled with you | `main.gd:7398` _hand_companion_over() |
-|  | (another of her name lives in every town: someone else now, not to be asked back) | `main.gd:7416` _hand_companion_over() |
-| L | You left %s because they %s. | `main.gd:7559` _favour_words() |
-|  | are spoken well of in your town | `main.gd:7598` _favour_tick() |
-|  | The draugr yields. %s %s. | `main.gd:7723` barrow_won() |
-|  | is blessed and takes up the %s, uncharged | `main.gd:7724` barrow_won() |
-|  | stands over him again | `main.gd:7724` barrow_won() |
-|  | %s takes the holy remains, for the altar. | `main.gd:7728` barrow_won() |
-| L | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd:7735` SEPULCHER_PLAQUE |
-|  | The relic's gift spills: %d more than %s can hold. | `main.gd:7781` charge_from_relic() |
-| L | the draugr's blessing | `main.gd:7996` reset_barrow() |
-|  | the deal won | `main.gd:7999` reset_barrow() |
-|  | the fallen knight's quest | `main.gd:8002` reset_barrow() |
-|  | the totem's charges | `main.gd:8007` reset_barrow() |
-|  | the draft felt | `main.gd:8012` reset_barrow() |
-|  | Clear the barrow | `main.gd:8023` QUEST_TITLE |
-| L | the fallen knight | `main.gd:8024` QUEST_GIVER |
-| L | Brand the Ox | `main.gd:8119` _give_camp_key() |
-|  | %s takes the key from Brand's belt. | `main.gd:8121` _give_camp_key() |
-|  | Brand's key falls at %s's feet. | `main.gd:8123` _give_camp_key() |
-|  | The hall's door shuts behind you. | `main.gd:8185` _hold_hall_door() |
-|  | The hall's door opens. | `main.gd:8185` _hold_hall_door() |
-|  | The slab swings aside: a stair goes down into the dark. | `main.gd:8260` _on_niche_pressed() |
-|  | Only the dead lie here. | `main.gd:8265` _on_niche_pressed() |
-|  | You feel a cool draft coming from one of the niches. | `main.gd:8303` _tell_draft() |
-|  | The slab swings aside from behind. | `main.gd:8416` _reveal_from_below() |
-|  | %s is mortally wounded. | `main.gd:8484` _on_downed() |
-|  | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd:8486` _on_downed() |
-|  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd:8494` _on_downed() |
-|  | You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back. | `main.gd:8495` _on_downed() |
-|  | All have fallen. | `main.gd:8579` _all_fallen_tick() |
-|  | You hold no charge. The draugr gives more. | `main.gd:8598` _start_channel() |
-|  | Not while they're fighting near. | `main.gd:8603` _start_channel() |
-|  | %s kneels beside %s. | `main.gd:8614` _on_channel() |
-|  | %s's return of %s is broken. | `main.gd:8616` _on_channel() |
-|  | %s brought %s back (%d charges left). | `main.gd:8625` _on_channel() |
-|  | %s was carried off by raiders. | `main.gd:8726` _on_entity_taken() |
-|  | Raiders beat %s down and carried them off. | `main.gd:8729` _on_entity_taken() |
-|  | Raiders beat %s down and carried them off. | `main.gd:8746` _resident_taken() |
-|  | %s was beaten down and carried off by raiders in %s. | `main.gd:8762` _companion_taken_in_town() |
-|  | Raiders carried %s off from %s. | `main.gd:8767` _companion_taken_in_town() |
-|  | %s found you %s and is leading you to %s. | `main.gd:9151` _sought_spoken() |
-|  | %s brought you to %s, where you live and work now. | `main.gd:9169` _sought_home() |
-|  | I am the %s you sent for. | `main.gd:9173` _sought_home() |
-|  | We have no %s. Word is %s the %s was seen %s. | `main.gd:9215` _sought_words() |
-|  | %s the %s is found %s and is being led here. | `main.gd:9217` _sought_words() |
-|  | Away %s. Back when I can. | `main.gd:9247` _sought_notes() |
-|  | %s the %s has gone off, %s they say. | `main.gd:9305` _rumour_for() |
-|  | %s must stand at the town's counter to buy. | `main.gd:9535` _accept_offer() |
-|  | [reads the chronicle: %d lines] | `main.gd:9556` _read_page() |
-|  | In %s, %s. | `main.gd:9619` _offers_context() |
-|  | a gift from %s | `main.gd:9766` _on_handed() |
-|  | a gift from %s | `main.gd:9784` _favour_given() |
-|  | brought you %s | `main.gd:9788` _favour_given() |
-|  | %s gives %s %s. | `main.gd:9789` _favour_given() |
-| L | the medicine man | `main.gd:9947` _visits_due() |
-|  | gathered by the medicine man | `main.gd:10029` _take_herbs() |
-|  | %s by %s | `main.gd:10034` _take_herbs() |
-|  | It is your own deed %s sings of. | `main.gd:10082` _sung() |
-|  | %s the %s | `main.gd:10111` _write_proposed() |
-|  | did a job for your town | `main.gd:10133` _on_commission_done() |
-|  | %s's card, from the facts | `main.gd:10158` _write_resident_card() |
-|  | waited too long for the mind | `main.gd:10210` _resident_voices() |
-|  | What you know of the world: | `main.gd:10313` _send_claims() |
-|  | who travels with %s | `main.gd:10319` _send_claims() |
-|  | %s said: "%s"%s | `main.gd:10537` _resident_answered() |
-|  | companion let go by the raiders | `main.gd:10699` companion_let_go() |
-|  | a raid group's captive | `main.gd:10702` companion_let_go() |
-|  | a camp's captive | `main.gd:10704` companion_let_go() |
-|  | carried you out of the raiders' camp | `main.gd:10721` companion_freed() |
-|  | %s was freed from the raiders%s. | `main.gd:10734` companion_freed() |
-|  | and brought to | `main.gd:10734` companion_freed() |
-|  | %s is free%s. | `main.gd:10739` companion_freed() |
-|  | and waits in | `main.gd:10739` companion_freed() |
-|  | %s stays in the town and works as its %s. | `main.gd:10884` _stay_in_town() |
-|  | %s goes back to the town to rest. | `main.gd:10914` _rest_in_town() |
-|  | (off: the key was refused) | `main.gd:10929` _mind_claude() |
-|  | spent this session: | `main.gd:10930` _mind_claude() |
-|  | usage: mind claude [<name>\|all haiku\|sonnet\|off] | `main.gd:10933` _mind_claude() |
-|  | no ANTHROPIC_API_KEY in this process's environment: set it where the server runs, never in a file of the game's | `main.gd:10936` _mind_claude() |
-|  | no companion named %s | `main.gd:10955` _mind_claude() |
-|  | %s: voice %s | `main.gd:10956` _mind_claude() |
-|  | on her own mind | `main.gd:10956` _mind_claude() |
-|  | The door is shut. | `main.gd:11113` _on_command() |
-|  | too far away | `main.gd:11140` _on_command() |
-|  | too far from the counter | `main.gd:11145` _on_command() |
-|  | %s reset the room. | `main.gd:11180` _on_command() |
-|  | builder mode is off on this server | `main.gd:11186` _on_command() |
-|  | say it aloud (Tab: party; Enter sends, Esc cancels) | `main.gd:11366` _build_talk() |
-|  | %s and %d more | `main.gd:11491` pile_words() |
-|  | %d gold and %s | `main.gd:11495` pile_words() |
-|  | %s open your chest | `main.gd:11507` context_hint_for() |
-|  | %s open the shop | `main.gd:11508` context_hint_for() |
-|  | %s open or close | `main.gd:11512` context_hint_for() |
-|  | LMB talk E her pack | `main.gd:11514` context_hint_for() |
-|  | LMB interact in bed with %s | `main.gd:11519` context_hint_for() |
-|  | %s hold draw LMB loose | `main.gd:11521` context_hint_for() |
-|  | LMB talk E hold bandage | `main.gd:11523` context_hint_for() |
-|  | wait a moment before saying more | `main.gd:11594` _send_chat() |
-|  | %s is bringing you back to %s%s | `main.gd:11747` return_words() |
-| L | the healer's hut | `main.gd:11754` return_place_words() |
-|  | a holy place | `main.gd:11757` return_place_words() |
-|  | %s brought you back from near death | `main.gd:11794` return_shown() |
-|  | all have fallen: all come back in %d s | `main.gd:11797` return_shown() |
-|  | You are down: %d s | `main.gd:11804` downed_words() |
-|  | bringing %s back: %d s | `main.gd:11809` channel_words() |
-|  | %s said: "%s" | `main.gd:11898` _on_entity_died() |
-|  | %s bumped into %s. | `main.gd:11917` _on_bumped() |
-|  | %s bumped into %s. | `main.gd:11929` _make_way() |
-|  | %s %s%s: "%s" | `main.gd:11972` _player_said() |
-|  | %s said: "%s" | `main.gd:12062` _on_companion_said() |
-|  | A newer game, v%s, is out: start the game again with launch.bat to update. | `main.gd:12188` _on_message() |
-|  | They are too far away. | `main.gd:12251` give_gold() |
-|  | You can only give gold to another player or your own companion. | `main.gd:12259` give_gold() |
-|  | They are too far away. | `main.gd:12261` give_gold() |
-|  | Say how much. | `main.gd:12263` give_gold() |
-|  | %s %d gold. | `main.gd:12266` give_gold() |
-|  | She has only | `main.gd:12266` give_gold() |
-|  | You have only | `main.gd:12266` give_gold() |
-|  | No gold changes hands. | `main.gd:12272` give_gold() |
-|  | %s takes %d gold from %s. | `main.gd:12274` give_gold() |
-|  | %s gives %s %d gold. | `main.gd:12274` give_gold() |
-|  | you don't know that town | `main.gd:12290` ask_town_sheet() |
-|  | %s shoved %s | `main.gd:12363` _narrate_push() |
-|  | %s's charge breaks on %s's spear. | `main.gd:12375` _narrate_brace() |
-|  | %s's %s is %s now. | `main.gd:12380` _narrate_named() |
-|  | %s is named for %s now, after long use. | `main.gd:12390` _card_named() |
-|  | %s kept %s from her. | `main.gd:12400` _card_kept() |
-|  | kept %s from you | `main.gd:12401` _card_kept() |
-|  | %s came back to %s. | `main.gd:12403` _card_kept() |
-|  | shared food with you | `main.gd:12413` _card_given() |
-|  | made you carry grave goods | `main.gd:12420` _card_given() |
-|  | %s gave %s %s. | `main.gd:12428` _card_given() |
-|  | gave you %s | `main.gd:12430` _card_given() |
-|  | %s gave %s %s%s. | `main.gd:12433` _card_given() |
-|  | , the thing named for her | `main.gd:12433` _card_given() |
-|  | %s just %s. | `main.gd:12460` _bond() |
-|  | kept you company for days | `main.gd:12527` _tend_bonds() |
-|  | tended your wounds when you were badly hurt | `main.gd:12535` _bond_bandaged() |
-|  | bandaged your wounds | `main.gd:12537` _bond_bandaged() |
-|  | fell with you at their side | `main.gd:12549` _bond_stood_by() |
-|  | is %s-bane now | `main.gd:12560` _card_grew() |
-|  | holds a grudge against %s | `main.gd:12560` _card_grew() |
-|  | has had its vengeance on %s | `main.gd:12561` _card_grew() |
-|  | %s fell, and was brought back at %s%s. | `main.gd:12569` return_fact() |
-|  | %s has felled so many %s it is their bane. | `main.gd:12580` _narrate_grew() |
-|  | %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd:12582` _narrate_grew() |
-|  | %s has had its vengeance on %s. | `main.gd:12584` _narrate_grew() |
-|  | %s has seen enough use to grow: it counts what it fells now. | `main.gd:12586` _narrate_grew() |
-|  | %s keeps %s from %s. | `main.gd:12595` _narrate_kept() |
-|  | %s is back with %s. | `main.gd:12597` _narrate_kept() |
-|  | %s takes up %s and puts down %s. | `main.gd:12603` _narrate_swap() |
-|  | Your arms give out. | `main.gd:12610` _tell_arms_gave() |
-|  | %s knocks %s down. | `main.gd:12615` _narrate_down() |
-|  | %s bashes %s's guard open. | `main.gd:12621` _narrate_bash() |
-|  | %s shoves %s with a shield. | `main.gd:12623` _narrate_bash() |
-|  | %s breaks %s's guard. | `main.gd:12629` _narrate_guard() |
-|  | %s takes %s's blow on the guard. | `main.gd:12631` _narrate_guard() |
-|  | %s burned for %d. | `main.gd:12639` _narrate_damage() |
-|  | %s took %d from the impact. | `main.gd:12641` _narrate_damage() |
-|  | %s bled for %d. | `main.gd:12643` _narrate_damage() |
-|  | %s shot %s for %d. | `main.gd:12646` _narrate_damage() |
-|  | %s hit %s for %d. | `main.gd:12649` _narrate_damage() |
-|  | %s's camp%s falls. | `main.gd:12880` _check_camps() |
-|  | cleared %s with you | `main.gd:13069` _bond_cleared() |
-|  | freed this whole place of its camps with you | `main.gd:13071` _bond_cleared() |
-|  | won a fight beside you | `main.gd:13113` _bond_won() |
-|  | spoke harshly to you | `main.gd:13131` _bond_felt() |
-|  | said sorry for their harsh words | `main.gd:13135` _bond_felt() |
-|  | %s %s at knucklebones (%d games to %d). | `main.gd:13148` _bond_played() |
-|  | played knucklebones with you | `main.gd:13149` _bond_played() |
-|  | left you to fall alone | `main.gd:13174` _bond_left_down() |
-|  | let you bleed out | `main.gd:13186` _bond_fell() |
-|  | left you to fall alone | `main.gd:13188` _bond_fell() |
-|  | ignored your warning and took you there | `main.gd:13215` _bond_warned() |
-|  | %s said: "%s" | `main.gd:13310` _say_plain() |
-|  | You have but %d gold. | `main.gd:13433` _monster_accepts() |
-|  | Blades for the road, one gold apiece. Take your pick. | `main.gd:14294` _greeted() |
-|  | %s said: "%s"%s | `main.gd:14340` _resident_says() |
-|  | In %s, %s. | `main.gd:14438` _visitor_news() |
-|  | Your amulet holds all the blessing it can. Keep %s safe, and bring the remains to me when it has room. | `main.gd:14562` _relic_returned() |
-|  | You carry no blessing from below yet. Keep %s safe until you have stood before what waits there, then bring the remains to me. | `main.gd:14563` _relic_returned() |
-|  | laid on the altar | `main.gd:14565` _relic_returned() |
-|  | brought home the remains of %s | `main.gd:14570` _relic_returned() |
-|  | %s brought the remains of %s up from the barrow, and you laid them on the altar. | `main.gd:14571` _relic_returned() |
-|  | %s is home at last. Bless you. | `main.gd:14572` _relic_returned() |
-|  | The blessing is on your amulet: it holds %d now. | `main.gd:14573` _relic_returned() |
-|  | hails and greetings | `main.gd:14796` quests_forget() |
-|  | %d refusal%s to travel | `main.gd:14798` quests_forget() |
-|  | standing with %d resident%s | `main.gd:14800` quests_forget() |
-|  | memories of %d named enem%s | `main.gd:14802` quests_forget() |
-|  | %s has not been seen since morning. | `main.gd:14861` _alms_runs_tick() |
-|  | lost below with %d gold | `main.gd:14862` _alms_runs_tick() |
-|  | %s was lost below the barrow, saw the draugr bargain for gold, and lived. | `main.gd:14931` _runner_found() |
-|  | %s came up from the barrow, found by %s, and would not say what he saw. | `main.gd:14934` _runner_found() |
-|  | %s finds %s in a niche in the wall, shaking; he makes his way up. | `main.gd:14935` _runner_found() |
-|  | You find %s in a niche in the wall, shaking. He will not say what he saw, and makes his way up. | `main.gd:14936` _runner_found() |
-|  | found by %s | `main.gd:14937` _runner_found() |
-|  | ^an? (.+?)'s (son\|daughter\|brother\|sister\|father\|mother\|cousin)$ | `main.gd:14944` HOLD_WORDS |
-|  | sister or brother | `main.gd:15051` _place_captive() |
-|  | parent and child | `main.gd:15051` _place_captive() |
-|  | , %s of %s | `main.gd:15072` _place_captive() |
-|  | %s has fallen in; until it stands again you will wake at the temple, or wherever is nearest. | `main.gd:15146` _on_hut_changed() |
-| L | The healer's hut | `main.gd:15147` _on_hut_changed() |
-| L | the healer's hut | `main.gd:15311` _on_returned() |
-|  | a holy place | `main.gd:15312` _on_returned() |
-|  | %s brought you back from near death | `main.gd:15343` _on_returned() |
-|  | %s is brought back at %s by %s | `main.gd:15344` _on_returned() |
-|  | , for an offering of %d gold | `main.gd:15345` _on_returned() |
-|  | %s is brought back at %s by %s%s. | `main.gd:15368` _on_returned() |
-|  | , for an offering of %d gold | `main.gd:15369` _on_returned() |
-|  | retire and recall | `main.gd:15442` _on_world_ticked() |
-|  | %s %s %ds | `main.gd:15458` _on_world_ticked() |
-|  | hidden in the grass | `main.gd:15466` _on_world_ticked() |
-|  | LMB\tattack (far: walk); a friend: talk | `main.gd:15519` hint_lines() |
-|  | %s+LMB\tswing where you stand | `main.gd:15519` hint_lines() |
-|  | RMB\toff hand; empty: grab (drag to toss) | `main.gd:15520` hint_lines() |
-|  | MMB drag\tturn, look up / down | `main.gd:15522` hint_lines() |
-|  | Ctrl+MMB drag\tpan (springs back) | `main.gd:15522` hint_lines() |
-|  | Wheel\tzoom (MMB click: 1x) | `main.gd:15522` hint_lines() |
-|  | LMB\tmove / attack (hold to steer); a friend: talk | `main.gd:15524` hint_lines() |
-|  | %s+LMB\tswing where you stand | `main.gd:15524` hint_lines() |
-|  | RMB\toff hand; empty: shove (drag to toss) | `main.gd:15525` hint_lines() |
-|  | %s / %s\toverhead / normal view | `main.gd:15527` hint_lines() |
-|  | %s / %s\tturn | `main.gd:15528` hint_lines() |
-|  | MMB drag\tturn, look up / down | `main.gd:15528` hint_lines() |
-|  | Ctrl+MMB drag\tpan (springs back) | `main.gd:15528` hint_lines() |
-|  | %s\t%s | `main.gd:15530` hint_lines() |
-|  | %s+LMB\tyour weapon's own move (a shield bashes) | `main.gd:15531` hint_lines() |
-|  | RMB, shield\tblock toward the cursor while held | `main.gd:15531` hint_lines() |
-|  | %s held, bow\tstand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn | `main.gd:15532` hint_lines() |
-|  | RMB, bow\thold to aim at the sky, let go to lob onto the circle: over walls, knocks down | `main.gd:15533` hint_lines() |
-|  | %s\topen a chest, crate, cart, door; your companion's pack | `main.gd:15534` hint_lines() |
-|  | %s\tyour pack | `main.gd:15534` hint_lines() |
-|  | %s\tyour companion's card | `main.gd:15535` hint_lines() |
-|  | %s\tthe town sheet | `main.gd:15536` hint_lines() |
-|  | %s\tpick up | `main.gd:15537` hint_lines() |
-|  | %s\tput down (hand, else pack) | `main.gd:15537` hint_lines() |
-|  | %s\tthrow at the cursor | `main.gd:15537` hint_lines() |
-|  | %s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat) | `main.gd:15538` hint_lines() |
-|  | %s hold\tbandage an ally beside you, else yourself | `main.gd:15539` hint_lines() |
-|  | RMB in pack\tuse it (eat, open a purse, bandage) | `main.gd:15540` hint_lines() |
-|  | %s\ttalk (/w whisper) | `main.gd:15541` hint_lines() |
-|  | %s\ttalk log | `main.gd:15541` hint_lines() |
-|  | %s\treset the room | `main.gd:15542` hint_lines() |
-|  | %s\tscreenshot, saved under %s | `main.gd:15543` hint_lines() |
-|  | %s\tsay yes to an offer that stands (or type it) | `main.gd:15544` hint_lines() |
-|  | %s\thide these | `main.gd:15544` hint_lines() |
-|  | %s\tbuilder mode | `main.gd:15546` hint_lines() |
-|  | Following %s - move to take the lead | `main.gd:15617` led_words() |
-|  | Following %s to %s - move to take the lead | `main.gd:15618` led_words() |
-|  | Nothing more here. | `main.gd:15941` search() |
-|  | You find in %s: %s. | `main.gd:15959` search() |
-| L | Locked fast. The big one, Brand the Ox, wears its key. | `main.gd:15971` CAMP_LOCKED |
-| L | Empty. You have taken what the Mound-breakers hid here. | `main.gd:15972` CAMP_EMPTY |
-|  | the robbers' camp chest | `main.gd:16004` _search_camp() |
-|  | Brand's key turns in the lock. You find %d gold in %s. | `main.gd:16007` _search_camp() |
-|  | Picked up %d gold. | `main.gd:16186` _item_command() |
-|  | into gold (601 amended) | `main.gd:16222` _restore_ground() |
-|  | %s@%d,%d | `main.gd:16228` _restore_ground() |
-|  | no room in your %s | `main.gd:16332` _move_slot() |
-|  | your chest is full | `main.gd:16360` deposit_all() |
-|  | %s tick %d peer id: %d | `main.gd:16442` _debug_text() |
-|  | stamina: %d / %d | `main.gd:16446` _debug_text() |
-|  | yaw: %.1f deg pitch: %.1f deg zoom: %.2fx | `main.gd:16450` _debug_text() |
-|  | azimuth: %.1f deg | `main.gd:16452` _debug_text() |
-|  | camera facing: %s | `main.gd:16453` _debug_text() |
-|  | rtt: %d ms | `main.gd:16456` _debug_text() |
-|  | worst correction: %.2f tiles this minute (%.2f ever) | `main.gd:16457` _debug_text() |
-|  | display delay: %d ms | `main.gd:16459` _debug_text() |
-|  | build: v%s %s%s | `main.gd:16460` _debug_text() |
-|  | , server v%s | `main.gd:16461` _debug_text() |
-|  | rtt: n/a (this peer is the authority) | `main.gd:16463` _debug_text() |
-|  | mispredicts: n/a (nothing is predicted here) | `main.gd:16464` _debug_text() |
-|  | the server still holds your last connection; trying again | `main.gd:16480` _on_join_rejected() |
-|  | client out of date | `main.gd:16485` _on_join_rejected() |
-|  | server out of date | `main.gd:16496` _on_join_rejected() |
-|  | the server is out of date: it runs v%s, this is v%s. It will be updated soon; try again later. | `main.gd:16497` _on_join_rejected() |
-|  | fetching the server's v%s | `main.gd:16511` _download_update() |
-|  | updating to the server's v%s: the game closes and starts again | `main.gd:16529` _download_update() |
-|  | this game is out of date: the server runs v%s, this is v%s%s. Run launch.bat to update. | `main.gd:16539` _update_failed() |
-|  | the server did not let you in: check the token | `main.gd:16549` _on_server_disconnected() |
-|  | the server is restarting; trying again | `main.gd:16565` _reconnect() |
-|  | the server is restarting; trying again (%d) | `main.gd:16569` _reconnect() |
-|  | the server is gone | `main.gd:16575` _reconnect() |
-|  | no restart is due | `main.gd:16616` _restart_command() |
-|  | The restart is off. | `main.gd:16618` _restart_command() |
-|  | Restarting in %d s%s; you'll be reconnected. | `main.gd:16634` _restart_command() |
-|  | restarting in %d s%s, %d connected, then exiting %d%s (restart cancel to call it off) | `main.gd:16635` _restart_command() |
-|  | : down until started | `main.gd:16637` _restart_command() |
-|  | Restarting in %d s. | `main.gd:16649` _count_down_restart() |
-|  | regenerate now: the server's alone | `main.gd:16676` _regenerate_now() |
-|  | regenerate now: %s is no shifting level (%s) | `main.gd:16678` _regenerate_now() |
-|  | regenerate now: refused in a test run on the shared overlay | `main.gd:16680` _regenerate_now() |
-|  | regenerate now: %s is awake, someone is in it; again when it sleeps | `main.gd:16683` _regenerate_now() |
-|  | regenerate now: %s laid again, generation %d | `main.gd:16685` _regenerate_now() |
-|  | regenerate now: %s could not be laid (%d tries, or its overlay copy is edited) | `main.gd:16686` _regenerate_now() |
-|  | regenerate %s: %s | `main.gd:16697` _regenerate_command() |
-|  | the shifting levels are laid again when due | `main.gd:16697` _regenerate_command() |
-|  | the shifting levels stay as they are | `main.gd:16697` _regenerate_command() |
-|  | %s: generation %d, every %d days | `main.gd:16700` _regenerate_command() |
-|  | no raid groups here | `main.gd:16707` _raids_command() |
-|  | raids %s: %s | `main.gd:16710` _raids_command() |
-|  | camps send groups at their towns | `main.gd:16710` _raids_command() |
-|  | nothing is sent and nothing moves | `main.gd:16710` _raids_command() |
-|  | no camp %s, no town %s, or no way between | `main.gd:16713` _raids_command() |
-|  | raids %s; %d camps, %d groups out | `main.gd:16714` _raids_command() |
-|  | %s %s, %s at %s %s, strength %.1f, carries %s | `main.gd:16716` _raids_command() |
-|  | companion facts <player> \| companion forget <player> <id> | `main.gd:16797` _companion_command() |
-|  | no companion for %s | `main.gd:16803` _companion_command() |
-|  | %s has no fact %s | `main.gd:16809` _companion_command() |
-|  | %s: %s forgotten | `main.gd:16815` _companion_command() |
-|  | %s (%s) %s | `main.gd:16818` _companion_command() |
-|  | %s (believes) %s | `main.gd:16820` _companion_command() |
-|  | %s: %d facts, %d beliefs %s | `main.gd:16821` _companion_command() |
-|  | go <zone> [player] | `main.gd:16908` _go_command() |
-|  | go <zone> <player>: from the console, name the player | `main.gd:16916` _go_command() |
-|  | quests reset [all\|<giver>] [player] | `main.gd:16926` _quests_command() |
-|  | quests reset [all\|<giver>] <player>: from the console, name the player | `main.gd:16936` _quests_command() |
-|  | quests reset: no record for that player | `main.gd:16941` _quests_command() |
-|  | quests reset: no quest giver %s in %s | `main.gd:16949` _quests_command() |
-|  | quests reset: %d in %s are called %s; not reset | `main.gd:16951` _quests_command() |
-|  | %s: %s's quests reset (%s) | `main.gd:16954` _quests_command() |
-|  | nothing was held | `main.gd:16954` _quests_command() |
-|  | the standing offer | `main.gd:16997` _quests_reset_giver() |
-|  | %d quest givers | `main.gd:17033` _quests_reset_all() |
-|  | the standing offer | `main.gd:17037` _quests_reset_all() |
-|  | the draugr's paid deals | `main.gd:17047` _quests_reset_all() |
-|  | the draugr's asking and pact | `main.gd:17060` _quests_reset_all() |
-|  | the healer's care | `main.gd:17067` _quests_reset_all() |
-|  | %s: quests reset (%s) | `main.gd:17070` _quests_reset_all() |
-|  | nothing was held | `main.gd:17070` _quests_reset_all() |
-|  | players: who is on, where, their hp | `main.gd:17123` _resend_offers() |
-|  | zones: each loaded zone, awake or asleep, and who is in it | `main.gd:17124` _resend_offers() |
-|  | go <zone> [player]: you (or that player) and the companion to that zone's start | `main.gd:17125` _resend_offers() |
-|  | quests reset [all\|<giver>] [player]: your quests (or that player's) undone, all or one quest giver's here | `main.gd:17126` _resend_offers() |
-|  | zone reset <name>: that zone rebuilt from its map | `main.gd:17127` _resend_offers() |
-|  | zone move <player> <zone>: that player and their companion to that zone's start | `main.gd:17128` _resend_offers() |
-|  | gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said) | `main.gd:17129` _resend_offers() |
-|  | move <player> <x> <y> [zone] \| move <player> <building code> [zone]: a player to a cell | `main.gd:17130` _resend_offers() |
-|  | mark <player> <mark>\|-<mark>: a mark on a player, or one taken off | `main.gd:17131` _resend_offers() |
-|  | reset: this room rebuilt from its map | `main.gd:17132` _resend_offers() |
-|  | respawn: every zone's dead brought back now | `main.gd:17133` _resend_offers() |
-|  | regenerate [on\|off\|now <level>]: the levels' regeneration | `main.gd:17134` _resend_offers() |
-|  | reload <zone>\|all: a zone's map read again | `main.gd:17135` _resend_offers() |
-|  | raids [on\|off\|send <camp> <town>]: the raids | `main.gd:17136` _resend_offers() |
-|  | hour [<h>] \| day_minutes [<m>]: the time of day, the day's length | `main.gd:17137` _resend_offers() |
-|  | season [<name>] \| season_days [<n>]: the season, its length | `main.gd:17138` _resend_offers() |
-|  | weather [<kind>\|auto\|reload] [<minutes>] [<region>\|all]: the weather | `main.gd:17139` _resend_offers() |
-|  | companions \| companion facts <player> \| companion forget <player> <id>: the companions | `main.gd:17140` _resend_offers() |
-|  | mind scripted\|ollama \| mind log on\|off \| mind last <name>: the residents' minds | `main.gd:17141` _resend_offers() |
-|  | perception list\|grid\|both: what the minds are told | `main.gd:17142` _resend_offers() |
-|  | transcript <name> [<date>]: a mind's talk | `main.gd:17143` _resend_offers() |
-|  | builder \| builder export \| builder drop <name>: builder mode | `main.gd:17144` _resend_offers() |
-|  | map: the map's name | `main.gd:17145` _resend_offers() |
-|  | net: the server's traffic and each peer's round trip | `main.gd:17146` _resend_offers() |
-|  | save: the world saved now | `main.gd:17147` _resend_offers() |
-|  | version: the build and its protocol | `main.gd:17148` _resend_offers() |
-|  | restart\|stop [<seconds>] [<why>] \| restart cancel: a restart, or calling it off | `main.gd:17149` _resend_offers() |
-|  | help: these lines | `main.gd:17150` _resend_offers() |
-|  | not the authority | `main.gd:17158` admin_command() |
-|  | map load is now zone reset <name>; zones: %s | `main.gd:17164` admin_command() |
-|  | builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); edited levels: %s | `main.gd:17184` admin_command() |
-|  | %s rebuilt from the map; %d player records kept; %s | `main.gd:17188` admin_command() |
-|  | no dead companions to bring back | `main.gd:17189` admin_command() |
-|  | companions brought back: %s | `main.gd:17190` admin_command() |
-|  | %s %s (%s) peer %d in %s at %s hp %d/%d | `main.gd:17207` admin_command() |
-|  | %d connected %s | `main.gd:17210` admin_command() |
-|  | no --state file to save to | `main.gd:17217` admin_command() |
-|  | saved %s at tick %d | `main.gd:17219` admin_command() |
-|  | %s, with %s (%s) in %s at %s hp %d/%d stance %s intent %s%s mind %s, stance set by %s | `main.gd:17229` admin_command() |
-|  | %d companions %s | `main.gd:17233` admin_command() |
-|  | mind log %s (%s) | `main.gd:17238` admin_command() |
-|  | no file: --mind-log | `main.gd:17239` admin_command() |
-|  | no decision of %s's logged yet (companions: %s) | `main.gd:17243` admin_command() |
-|  | usage: mind scripted\|ollama \| mind claude [<name>\|all haiku\|sonnet\|off] \| mind log on\|off \| mind last <name> (now %s) | `main.gd:17248` admin_command() |
-|  | no --llm-model configured | `main.gd:17250` admin_command() |
-|  | companion minds: %s | `main.gd:17259` admin_command() |
-|  | usage: perception list\|grid\|both (now %s) | `main.gd:17263` admin_command() |
-|  | usage: transcript <name> [<YYYY-MM-DD>] \| transcript rebuild | `main.gd:17268` admin_command() |
-|  | no mind log to rebuild from | `main.gd:17271` admin_command() |
-|  | v%s protocol %s | `main.gd:17280` admin_command() |
-|  | %s rtt %d ms | `main.gd:17295` admin_command() |
-|  | unknown command %s (try help) | `main.gd:17301` admin_command() |
-|  | usage: gold <player or id prefix> <amount> [why] | `main.gd:17309` _gold_command() |
-|  | gold: the amount must be above 0 (gold is only ever given here) | `main.gd:17312` _gold_command() |
-|  | gold: no economy | `main.gd:17314` _gold_command() |
-|  | gold: %d players' ids start %s; give more of it | `main.gd:17321` _gold_command() |
-|  | no player %s | `main.gd:17323` _gold_command() |
-|  | %s: %d gold given (%s), %d now | `main.gd:17328` _gold_command() |
-|  | %s: %s, tick %d, %d entities, %s | `main.gd:17341` _zones_text() |
-|  | %d zones %s | `main.gd:17343` _zones_text() |
-|  | no map %s in %s | `main.gd:17352` _zone_command() |
-|  | zone %s %s: %d cells, %d entities | `main.gd:17357` _zone_command() |
-|  | no map %s in %s | `main.gd:17365` _zone_command() |
-|  | could not move %s to %s | `main.gd:17372` _zone_command() |
-|  | %s moved to %s | `main.gd:17373` _zone_command() |
-|  | no player %s online | `main.gd:17374` _zone_command() |
-|  | usage: zone reset <name> \| zone move <player> <zone> | `main.gd:17375` _zone_command() |
-|  | Click a townsperson to interact, or press %s | `main.gd:17452` _first_talk_hint() |
-|  | (%s can't be written, so the game's own folder) | `main.gd:17487` screenshot_folder() |
-|  | screenshot saved: %s | `main.gd:17520` screenshot_words() |
-|  | (%s can't be written, so the game's own folder) | `main.gd:17541` take_screenshot() |
-|  | screenshot not saved (%s) | `main.gd:17549` take_screenshot() |
-|  | Screenshots go to %s. Set screenshot_dir= in settings.cfg to send them elsewhere. | `main.gd:17551` take_screenshot() |
-|  | what do you sell? | `main.gd:17628` _run_test_offer() |
-|  | any work for me? | `main.gd:17628` _run_test_offer() |
-|  | (a test offer) Bring Bram home | `main.gd:17630` _run_test_offer() |
-|  | (a test line) The door's barred from the other side. | `main.gd:17681` _run_test_show() |
-|  | (a test line) I've been meaning to thank you for the food you brought. | `main.gd:17682` _run_test_show() |
-|  | his voice steady despite the rain | `main.gd:17682` _run_test_show() |
-|  | (a test line) hold here | `main.gd:17683` _run_test_show() |
-|  | (a test line) anyone near the well? | `main.gd:17684` _run_test_show() |
-|  | (a test line) Stay close, the gate's watched. | `main.gd:17692` _run_test_show() |
-|  | the town lacks 2 ore | `main.gd:17702` _run_test_show() |
-|  | you left her to fall alone | `main.gd:17757` _run_test_show() |
-| L | the draugr's blessing | `main.gd:17769` _run_test_show() |
-|  | 3 in town are on the dole (fed by the town, or hungry): its kitchen works for food first. | `main.gd:17773` _run_test_show() |
-|  | the server at 100.64.0.5:7777 did not answer | `main.gd:17874` _run_test_show() |
-|  | ; went on %.2f cells | `main.gd:18297` _lat_report() |
-|  | nothing in sight | `main.gd:18344` _lat_turn_done() |
-|  | nothing in sight | `main.gd:18390` _run_test_chase() |
-|  | %d ms at %s | `main.gd:18526` _report_walk() |
+|  | Go on... without me. | `main.gd:130` COMPANION_DEATH_LINES |
+|  | Tell them I tried. | `main.gd:130` COMPANION_DEATH_LINES |
+|  | Yes to what? Name your gold. | `main.gd:352` YES_TO_WHAT |
+|  | There is nothing between us to say yes to. | `main.gd:353` NOTHING_STANDS |
+|  | The axe will not leave his hall. | `main.gd:475` BOUND_AXE_WORDS |
+|  | time x%s | `main.gd:850` tuning_key() |
+|  | paused: "." steps one tick | `main.gd:852` tuning_key() |
+|  | zone reset %s | `main.gd:902` _reset_hall() |
+|  | connecting to %s:%d | `main.gd:946` _play() |
+|  | %d player%s | `main.gd:1009` server_status_words() |
+|  | not taking players now | `main.gd:1011` server_status_words() |
+|  | out of date: updates when you join | `main.gd:1013` server_status_words() |
+|  | connecting to %s:%d | `main.gd:1041` _retry_connect() |
+|  | could not start a connection to %s:%d | `main.gd:1044` _retry_connect() |
+|  | connecting to %s:%d | `main.gd:1071` _on_setup_submitted() |
+|  | the server at %s:%d did not answer | `main.gd:1177` _go_online() |
+|  | %s pick up %s | `main.gd:1314` _process() |
+|  | %s pick up %s | `main.gd:1330` _process() |
+|  | Wares, if you have coin. | `main.gd:1683` _greet_sample() |
+|  | usage: reload <zone> \| reload all (zones: %s) | `main.gd:3773` _reload_command() |
+|  | no open zone's level changed on disk (%d open) | `main.gd:3783` _reload_command() |
+|  | zone %s is not open (zones: %s); it reads its level when it opens | `main.gd:3785` _reload_command() |
+|  | zone %s has no level on disk any more; left as it is | `main.gd:3787` _reload_command() |
+|  | %s reloaded from %s, %d players there kept | `main.gd:3792` _reload_command() |
+|  | %s gave %d gold toward the %s | `main.gd:4155` _boot() |
+|  | move <player> <x> <y> [zone], or move <player> <building code> [zone]: the player by name as "players" lists them | `main.gd:4471` _move_command() |
+|  | move: no player %s online | `main.gd:4482` _move_command() |
+|  | move: %d players online are called %s; not moved | `main.gd:4484` _move_command() |
+|  | move: no zone %s | `main.gd:4489` _move_command() |
+|  | move: no building %s in %s | `main.gd:4498` _move_command() |
+|  | move: %s is off %s's map (%d x %d) | `main.gd:4501` _move_command() |
+|  | move: nothing walkable within %d of %s in %s; not moved | `main.gd:4504` _move_command() |
+|  | move: %s could not go to %s | `main.gd:4507` _move_command() |
+|  | You find yourself in %s. | `main.gd:4511` _move_command() |
+|  | moved %s to %s in %s%s | `main.gd:4513` _move_command() |
+|  | (nearest walkable to %s) | `main.gd:4513` _move_command() |
+|  | mark <player> <mark> \| mark <player> -<mark>: the player by name as "players" lists them; a mark is one word | `main.gd:4551` _mark_command() |
+|  | mark: no player %s online | `main.gd:4563` _mark_command() |
+|  | mark: %d players online are called %s; not marked | `main.gd:4565` _mark_command() |
+|  | mark: a mark is one word of letters, digits and underscores (%s) | `main.gd:4569` _mark_command() |
+|  | %s %s %s already | `main.gd:4572` _mark_command() |
+|  | %s %s %s; marks: %s | `main.gd:4574` _mark_command() |
+|  | %s stays in %s, working as its %s. Come back and %s will travel with you again. | `main.gd:4624` travel() |
+|  | %s went to %s. | `main.gd:4651` travel() |
+| L | The stair down is barred from below. | `main.gd:4756` SEALED_LINES |
+|  | The way on is closed. | `main.gd:4767` _take_link() |
+|  | The way is sealed. | `main.gd:4773` _take_link() |
+|  | usage: weather [%s\|auto\|reload] [<minutes>] [<region>\|all] | `main.gd:5659` _weather_command() |
+|  | no climate for region %s (regions: %s) | `main.gd:5664` _weather_command() |
+|  | %s (%s): %s | `main.gd:5674` _weather_command() |
+|  | %s, cloud %.2f rain %.2f fog %.2f wind %.2f | `main.gd:5675` _weather_command() |
+|  | .join(lines) if not lines.is_empty() else | `main.gd:5678` _weather_command() |
+|  | usage: hour <0..24> \| day_minutes <minutes> | `main.gd:5685` _sky_command() |
+|  | hour %.2f, a day takes %.1f minutes, daylight %.2f | `main.gd:5694` _sky_command() |
+|  | usage: season <%s> \| season_days <n> | `main.gd:5704` _season_command() |
+|  | usage: season <%s> \| season_days <n> | `main.gd:5708` _season_command() |
+|  | %s (year %.3f), a season takes %d days, cold %.2f, snow cover %.2f | `main.gd:5716` _season_command() |
+|  | The ways have shifted since you were last here. | `main.gd:5865` _join_player() |
+|  | Nobody in town is on the dole now. | `main.gd:5937` _on_dole_changed() |
+|  | %d in town %s on the dole (fed by the town, or hungry): its kitchen works for food first. | `main.gd:5938` _on_dole_changed() |
+|  | someone was hurt | `main.gd:6027` _tell_bandage_broke() |
+|  | a monster came near | `main.gd:6028` _tell_bandage_broke() |
+|  | Your bandaging broke off: %s. | `main.gd:6030` _tell_bandage_broke() |
+|  | You can't bandage %s: come within two steps of them, nothing between. | `main.gd:6034` BANDAGE_REFUSED |
+|  | You can't bandage %s: there's no wound to bind. | `main.gd:6034` BANDAGE_REFUSED |
+|  | You can't bandage %s: the wound is bound already. | `main.gd:6035` _tell_bandage_broke() |
+|  | You can't bandage %s: your hands are busy. | `main.gd:6035` _tell_bandage_broke() |
+|  | You can't bandage %s: you have no bandaging kit. | `main.gd:6036` _tell_bandage_broke() |
+|  | You can't bandage %s: give it a breath after that blow. | `main.gd:6036` _tell_bandage_broke() |
+|  | You can't bandage %s: a monster is too near. | `main.gd:6037` _tell_bandage_broke() |
+|  | he keeps no hut | `main.gd:6223` retain() |
+|  | too far away | `main.gd:6225` retain() |
+|  | already in his care | `main.gd:6227` retain() |
+|  | he takes gold, herbs or antlers | `main.gd:6229` retain() |
+|  | not enough gold (%d) | `main.gd:6231` retain() |
+|  | no %s in your pack | `main.gd:6237` retain() |
+|  | the healer's retainer | `main.gd:6242` retain() |
+|  | That's %d. %d more and you're in my care. | `main.gd:6255` retain() |
+|  | %s takes you into his care. | `main.gd:6258` retain() |
+|  | a reforge that could not be done | `main.gd:6293` _on_counter_work_done() |
+|  | %s was carried off by raiders and is held by them still. | `main.gd:6373` _companion_whereabouts() |
+|  | %s went home to %s. Ask %s there to travel with you again. | `main.gd:6375` _companion_whereabouts() |
+|  | %s left you and lives in %s now. | `main.gd:6377` _companion_whereabouts() |
+|  | sick in %s bed | `main.gd:6385` _companion_whereabouts() |
+|  | %s is %s in %s, not with you. Go to %s and %s will travel with you again. | `main.gd:6386` _companion_whereabouts() |
+|  | %s leaves her work in the town and goes with %s. | `main.gd:6441` _join_companion() |
+|  | %s is sick with %s, and goes with %s all the same. | `main.gd:6444` _join_companion() |
+|  | , and can lead them there | `main.gd:6618` _roads_words() |
+|  | You know the way to %s, having been there with %s%s. %s | `main.gd:6619` _roads_words() |
+|  | (?i)\\b(to\|towards?)\\b | `main.gd:6673` _guide_said() |
+|  | %s asks you to lead them somewhere you have not been with them: you do not know the way there. | `main.gd:6676` _guide_said() |
+|  | %s asks you to lead them to %s, and you are there already. | `main.gd:6679` _guide_said() |
+|  | you will not lead them anywhere now: you are unhappy with them | `main.gd:6703` _start_guide() |
+|  | you follow them, and do not trust yourself to take the lead yet | `main.gd:6704` _start_guide() |
+|  | %s asked you to lead them to %s, but %s. | `main.gd:6705` _start_guide() |
+|  | %s won't lead the way. | `main.gd:6706` _start_guide() |
+|  | %s asks you again to lead them to %s; you refused earlier today and still will not: it isn't safe: %s. | `main.gd:6711` _start_guide() |
+|  | %s asked you to lead them to %s, but you will not go: it isn't safe: %s.%s Tell them so. | `main.gd:6717` _start_guide() |
+|  | %s won't lead the way to %s: it isn't safe. | `main.gd:6719` _start_guide() |
+|  | %s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again. | `main.gd:6733` _start_guide() |
+|  | %s leads the way to %s. | `main.gd:6734` _start_guide() |
+|  | %s has brought %s to %s. | `main.gd:6792` _guide_done() |
+|  | You have led %s to %s, as they asked. | `main.gd:6795` _guide_done() |
+|  | %s stops leading the way: %s. | `main.gd:6797` _guide_done() |
+|  | You stopped leading %s to %s: %s. | `main.gd:6798` _guide_done() |
+|  | You would lead them as far as %s, and no further. | `main.gd:6873` _as_far_words() |
+|  | %s stops leading the way to %s: it isn't safe. | `main.gd:6891` _guide_check() |
+|  | You stopped leading %s to %s: it isn't safe: %s.%s | `main.gd:6892` _guide_check() |
+|  | The dead bar the way. | `main.gd:6974` DEAD_LINE |
+|  | %s asked you to go home for a while, and you part as friends: you go home to %s, and will travel with them again when they ask. | `main.gd:7041` _begin_leaving() |
+|  | %s goes home to %s; you part as friends. | `main.gd:7042` _begin_leaving() |
+|  | You are leaving %s for good, and going home to %s: they %s. | `main.gd:7044` _begin_leaving() |
+|  | %s leaves you, and goes home to %s. | `main.gd:7045` _begin_leaving() |
+|  | %s leaves you %s. | `main.gd:7074` _return_gear() |
+|  | %s is glad to travel with %s again. | `main.gd:7180` _recruit_said() |
+|  | %s came to your town and asked you to travel with them again, and you were glad to. | `main.gd:7184` _recruit_said() |
+|  | asked you back | `main.gd:7196` _recruit_said() |
+|  | %s agrees to travel with %s again. | `main.gd:7203` _recruit_said() |
+|  | %s asked you to travel with them again, and you agreed. You left them once because they %s; you have not forgotten it. | `main.gd:7207` _recruit_said() |
+|  | {player} asked you to travel with them, and you would rather not. | `main.gd:7300` _resident_recruit_said() |
+|  | asked you to travel with them | `main.gd:7332` _resident_recruit_said() |
+|  | %s leaves %s work in the town and goes with %s. | `main.gd:7348` _resident_recruit_said() |
+|  | %s asked you to travel with them, and you agreed: you left your work in the town to go with them. | `main.gd:7353` _resident_recruit_said() |
+|  | one of its people | `main.gd:7363` _trade_words() |
+|  | what the town owed: her own purse, carried from where she rested | `main.gd:7421` _hand_companion_over() |
+|  | travelled with you | `main.gd:7425` _hand_companion_over() |
+|  | (another of her name lives in every town: someone else now, not to be asked back) | `main.gd:7443` _hand_companion_over() |
+| L | You left %s because they %s. | `main.gd:7586` _favour_words() |
+|  | are spoken well of in your town | `main.gd:7625` _favour_tick() |
+|  | The draugr yields. %s %s. | `main.gd:7750` barrow_won() |
+|  | is blessed and takes up the %s, uncharged | `main.gd:7751` barrow_won() |
+|  | stands over him again | `main.gd:7751` barrow_won() |
+|  | %s takes the holy remains, for the altar. | `main.gd:7755` barrow_won() |
+| L | Here rest the holy remains of %s, knight of Theus, until the altar calls them home. | `main.gd:7762` SEPULCHER_PLAQUE |
+|  | The relic's gift spills: %d more than %s can hold. | `main.gd:7808` charge_from_relic() |
+| L | the draugr's blessing | `main.gd:8023` reset_barrow() |
+|  | the deal won | `main.gd:8026` reset_barrow() |
+|  | the fallen knight's quest | `main.gd:8029` reset_barrow() |
+|  | the totem's charges | `main.gd:8034` reset_barrow() |
+|  | the draft felt | `main.gd:8039` reset_barrow() |
+|  | Clear the barrow | `main.gd:8050` QUEST_TITLE |
+| L | the fallen knight | `main.gd:8051` QUEST_GIVER |
+| L | Brand the Ox | `main.gd:8146` _give_camp_key() |
+|  | %s takes the key from Brand's belt. | `main.gd:8148` _give_camp_key() |
+|  | Brand's key falls at %s's feet. | `main.gd:8150` _give_camp_key() |
+|  | The hall's door shuts behind you. | `main.gd:8212` _hold_hall_door() |
+|  | The hall's door opens. | `main.gd:8212` _hold_hall_door() |
+|  | The slab swings aside: a stair goes down into the dark. | `main.gd:8287` _on_niche_pressed() |
+|  | Only the dead lie here. | `main.gd:8292` _on_niche_pressed() |
+|  | You feel a cool draft coming from one of the niches. | `main.gd:8330` _tell_draft() |
+|  | The slab swings aside from behind. | `main.gd:8443` _reveal_from_below() |
+|  | %s is mortally wounded. | `main.gd:8511` _on_downed() |
+|  | %s is down. A blessed hand beside them can bring them back within %d seconds. | `main.gd:8513` _on_downed() |
+|  | You are mortally wounded. Hold Slow Heart to wait for a blessed hand, or bleed out to be brought back. | `main.gd:8521` _on_downed() |
+|  | You are mortally wounded, and nobody can bring you back here. Bleed out to be brought back. | `main.gd:8522` _on_downed() |
+|  | All have fallen. | `main.gd:8606` _all_fallen_tick() |
+|  | You hold no charge. The draugr gives more. | `main.gd:8625` _start_channel() |
+|  | Not while they're fighting near. | `main.gd:8630` _start_channel() |
+|  | %s kneels beside %s. | `main.gd:8641` _on_channel() |
+|  | %s's return of %s is broken. | `main.gd:8643` _on_channel() |
+|  | %s brought %s back (%d charges left). | `main.gd:8652` _on_channel() |
+|  | %s was carried off by raiders. | `main.gd:8753` _on_entity_taken() |
+|  | Raiders beat %s down and carried them off. | `main.gd:8756` _on_entity_taken() |
+|  | Raiders beat %s down and carried them off. | `main.gd:8773` _resident_taken() |
+|  | %s was beaten down and carried off by raiders in %s. | `main.gd:8789` _companion_taken_in_town() |
+|  | Raiders carried %s off from %s. | `main.gd:8794` _companion_taken_in_town() |
+|  | %s found you %s and is leading you to %s. | `main.gd:9182` _sought_spoken() |
+|  | %s brought you to %s, where you live and work now. | `main.gd:9200` _sought_home() |
+|  | I am the %s you sent for. | `main.gd:9204` _sought_home() |
+|  | We have no %s. Word is %s the %s was seen %s. | `main.gd:9246` _sought_words() |
+|  | %s the %s is found %s and is being led here. | `main.gd:9248` _sought_words() |
+|  | Away %s. Back when I can. | `main.gd:9278` _sought_notes() |
+|  | %s the %s has gone off, %s they say. | `main.gd:9336` _rumour_for() |
+|  | %s must stand at the town's counter to buy. | `main.gd:9568` _accept_offer() |
+|  | [reads the chronicle: %d lines] | `main.gd:9589` _read_page() |
+|  | In %s, %s. | `main.gd:9652` _offers_context() |
+|  | a gift from %s | `main.gd:9799` _on_handed() |
+|  | a gift from %s | `main.gd:9817` _favour_given() |
+|  | brought you %s | `main.gd:9821` _favour_given() |
+|  | %s gives %s %s. | `main.gd:9822` _favour_given() |
+| L | the medicine man | `main.gd:9980` _visits_due() |
+|  | gathered by the medicine man | `main.gd:10062` _take_herbs() |
+|  | %s by %s | `main.gd:10067` _take_herbs() |
+|  | It is your own deed %s sings of. | `main.gd:10115` _sung() |
+|  | %s the %s | `main.gd:10144` _write_proposed() |
+|  | did a job for your town | `main.gd:10166` _on_commission_done() |
+|  | %s's card, from the facts | `main.gd:10191` _write_resident_card() |
+|  | waited too long for the mind | `main.gd:10243` _resident_voices() |
+|  | What you know of the world: | `main.gd:10346` _send_claims() |
+|  | who travels with %s | `main.gd:10352` _send_claims() |
+|  | %s said: "%s"%s | `main.gd:10570` _resident_answered() |
+|  | companion let go by the raiders | `main.gd:10855` companion_let_go() |
+|  | a raid group's captive | `main.gd:10858` companion_let_go() |
+|  | a camp's captive | `main.gd:10860` companion_let_go() |
+|  | carried you out of the raiders' camp | `main.gd:10877` companion_freed() |
+|  | %s was freed from the raiders%s. | `main.gd:10890` companion_freed() |
+|  | and brought to | `main.gd:10890` companion_freed() |
+|  | %s is free%s. | `main.gd:10895` companion_freed() |
+|  | and waits in | `main.gd:10895` companion_freed() |
+|  | %s stays in the town and works as its %s. | `main.gd:11040` _stay_in_town() |
+|  | %s goes back to the town to rest. | `main.gd:11070` _rest_in_town() |
+|  | (off: the key was refused) | `main.gd:11085` _mind_claude() |
+|  | spent this session: | `main.gd:11086` _mind_claude() |
+|  | usage: mind claude [<name>\|all haiku\|sonnet\|off] | `main.gd:11089` _mind_claude() |
+|  | no ANTHROPIC_API_KEY in this process's environment: set it where the server runs, never in a file of the game's | `main.gd:11092` _mind_claude() |
+|  | no companion named %s | `main.gd:11111` _mind_claude() |
+|  | %s: voice %s | `main.gd:11112` _mind_claude() |
+|  | on her own mind | `main.gd:11112` _mind_claude() |
+|  | The door is shut. | `main.gd:11269` _on_command() |
+|  | too far away | `main.gd:11296` _on_command() |
+|  | too far from the counter | `main.gd:11301` _on_command() |
+|  | %s reset the room. | `main.gd:11336` _on_command() |
+|  | builder mode is off on this server | `main.gd:11342` _on_command() |
+|  | say it aloud (Tab: party; Enter sends, Esc cancels) | `main.gd:11526` _build_talk() |
+|  | %s and %d more | `main.gd:11651` pile_words() |
+|  | %d gold and %s | `main.gd:11655` pile_words() |
+|  | %s open your chest | `main.gd:11667` context_hint_for() |
+|  | %s open the shop | `main.gd:11668` context_hint_for() |
+|  | %s open or close | `main.gd:11672` context_hint_for() |
+|  | LMB talk E her pack | `main.gd:11674` context_hint_for() |
+|  | LMB interact in bed with %s | `main.gd:11679` context_hint_for() |
+|  | %s hold draw LMB loose | `main.gd:11681` context_hint_for() |
+|  | LMB talk E hold bandage | `main.gd:11683` context_hint_for() |
+|  | wait a moment before saying more | `main.gd:11754` _send_chat() |
+|  | %s is bringing you back to %s%s | `main.gd:11929` return_words() |
+| L | the healer's hut | `main.gd:11936` return_place_words() |
+|  | a holy place | `main.gd:11939` return_place_words() |
+|  | %s brought you back from near death | `main.gd:11976` return_shown() |
+|  | all have fallen: all come back in %d s | `main.gd:11979` return_shown() |
+|  | You are down: %d s | `main.gd:11986` downed_words() |
+|  | bringing %s back: %d s | `main.gd:11991` channel_words() |
+|  | %s said: "%s" | `main.gd:12080` _on_entity_died() |
+|  | %s bumped into %s. | `main.gd:12099` _on_bumped() |
+|  | %s bumped into %s. | `main.gd:12111` _make_way() |
+|  | %s %s%s: "%s" | `main.gd:12154` _player_said() |
+|  | %s said: "%s" | `main.gd:12244` _on_companion_said() |
+|  | A newer game, v%s, is out: start the game again with launch.bat to update. | `main.gd:12370` _on_message() |
+|  | They are too far away. | `main.gd:12433` give_gold() |
+|  | You can only give gold to another player or your own companion. | `main.gd:12441` give_gold() |
+|  | They are too far away. | `main.gd:12443` give_gold() |
+|  | Say how much. | `main.gd:12445` give_gold() |
+|  | %s %d gold. | `main.gd:12448` give_gold() |
+|  | She has only | `main.gd:12448` give_gold() |
+|  | You have only | `main.gd:12448` give_gold() |
+|  | No gold changes hands. | `main.gd:12454` give_gold() |
+|  | %s takes %d gold from %s. | `main.gd:12456` give_gold() |
+|  | %s gives %s %d gold. | `main.gd:12456` give_gold() |
+|  | you don't know that town | `main.gd:12472` ask_town_sheet() |
+|  | %s shoved %s | `main.gd:12547` _narrate_push() |
+|  | %s's charge breaks on %s's spear. | `main.gd:12559` _narrate_brace() |
+|  | %s's %s is %s now. | `main.gd:12564` _narrate_named() |
+|  | %s is named for %s now, after long use. | `main.gd:12574` _card_named() |
+|  | %s kept %s from her. | `main.gd:12584` _card_kept() |
+|  | kept %s from you | `main.gd:12585` _card_kept() |
+|  | %s came back to %s. | `main.gd:12587` _card_kept() |
+|  | shared food with you | `main.gd:12597` _card_given() |
+|  | made you carry grave goods | `main.gd:12604` _card_given() |
+|  | %s gave %s %s. | `main.gd:12612` _card_given() |
+|  | gave you %s | `main.gd:12614` _card_given() |
+|  | %s gave %s %s%s. | `main.gd:12617` _card_given() |
+|  | , the thing named for her | `main.gd:12617` _card_given() |
+|  | %s just %s. | `main.gd:12644` _bond() |
+|  | kept you company for days | `main.gd:12711` _tend_bonds() |
+|  | tended your wounds when you were badly hurt | `main.gd:12719` _bond_bandaged() |
+|  | bandaged your wounds | `main.gd:12721` _bond_bandaged() |
+|  | fell with you at their side | `main.gd:12733` _bond_stood_by() |
+|  | is %s-bane now | `main.gd:12744` _card_grew() |
+|  | holds a grudge against %s | `main.gd:12744` _card_grew() |
+|  | has had its vengeance on %s | `main.gd:12745` _card_grew() |
+|  | %s fell, and was brought back at %s%s. | `main.gd:12753` return_fact() |
+|  | %s has felled so many %s it is their bane. | `main.gd:12764` _narrate_grew() |
+|  | %s has seen its bearers hurt by %s enough: it holds a grudge against them. | `main.gd:12766` _narrate_grew() |
+|  | %s has had its vengeance on %s. | `main.gd:12768` _narrate_grew() |
+|  | %s has seen enough use to grow: it counts what it fells now. | `main.gd:12770` _narrate_grew() |
+|  | %s keeps %s from %s. | `main.gd:12779` _narrate_kept() |
+|  | %s is back with %s. | `main.gd:12781` _narrate_kept() |
+|  | %s takes up %s and puts down %s. | `main.gd:12787` _narrate_swap() |
+|  | Your arms give out. | `main.gd:12794` _tell_arms_gave() |
+|  | %s knocks %s down. | `main.gd:12799` _narrate_down() |
+|  | %s bashes %s's guard open. | `main.gd:12805` _narrate_bash() |
+|  | %s shoves %s with a shield. | `main.gd:12807` _narrate_bash() |
+|  | %s breaks %s's guard. | `main.gd:12813` _narrate_guard() |
+|  | %s takes %s's blow on the guard. | `main.gd:12815` _narrate_guard() |
+|  | %s burned for %d. | `main.gd:12823` _narrate_damage() |
+|  | %s took %d from the impact. | `main.gd:12825` _narrate_damage() |
+|  | %s bled for %d. | `main.gd:12827` _narrate_damage() |
+|  | %s shot %s for %d. | `main.gd:12830` _narrate_damage() |
+|  | %s hit %s for %d. | `main.gd:12833` _narrate_damage() |
+|  | %s's camp%s falls. | `main.gd:13096` _check_camps() |
+|  | cleared %s with you | `main.gd:13285` _bond_cleared() |
+|  | freed this whole place of its camps with you | `main.gd:13287` _bond_cleared() |
+|  | won a fight beside you | `main.gd:13329` _bond_won() |
+|  | spoke harshly to you | `main.gd:13347` _bond_felt() |
+|  | said sorry for their harsh words | `main.gd:13351` _bond_felt() |
+|  | %s %s at knucklebones (%d games to %d). | `main.gd:13364` _bond_played() |
+|  | played knucklebones with you | `main.gd:13365` _bond_played() |
+|  | left you to fall alone | `main.gd:13390` _bond_left_down() |
+|  | let you bleed out | `main.gd:13402` _bond_fell() |
+|  | left you to fall alone | `main.gd:13404` _bond_fell() |
+|  | ignored your warning and took you there | `main.gd:13431` _bond_warned() |
+|  | %s said: "%s" | `main.gd:13526` _say_plain() |
+|  | You have but %d gold. | `main.gd:13649` _monster_accepts() |
+|  | Blades for the road, one gold apiece. Take your pick. | `main.gd:14516` _greeted() |
+|  | %s said: "%s"%s | `main.gd:14562` _resident_says() |
+|  | %s is asleep. | `main.gd:14576` _asleep_told() |
+|  | %s is asleep. | `main.gd:14578` _asleep_told() |
+|  | In %s, %s. | `main.gd:14679` _visitor_news() |
+|  | Your amulet holds all the blessing it can. Keep %s safe, and bring the remains to me when it has room. | `main.gd:14803` _relic_returned() |
+|  | You carry no blessing from below yet. Keep %s safe until you have stood before what waits there, then bring the remains to me. | `main.gd:14804` _relic_returned() |
+|  | laid on the altar | `main.gd:14806` _relic_returned() |
+|  | brought home the remains of %s | `main.gd:14811` _relic_returned() |
+|  | %s brought the remains of %s up from the barrow, and you laid them on the altar. | `main.gd:14812` _relic_returned() |
+|  | %s is home at last. Bless you. | `main.gd:14813` _relic_returned() |
+|  | The blessing is on your amulet: it holds %d now. | `main.gd:14814` _relic_returned() |
+|  | hails and greetings | `main.gd:15037` quests_forget() |
+|  | %d refusal%s to travel | `main.gd:15039` quests_forget() |
+|  | standing with %d resident%s | `main.gd:15041` quests_forget() |
+|  | memories of %d named enem%s | `main.gd:15043` quests_forget() |
+|  | %s has not been seen since morning. | `main.gd:15102` _alms_runs_tick() |
+|  | lost below with %d gold | `main.gd:15103` _alms_runs_tick() |
+|  | %s was lost below the barrow, saw the draugr bargain for gold, and lived. | `main.gd:15172` _runner_found() |
+|  | %s came up from the barrow, found by %s, and would not say what he saw. | `main.gd:15175` _runner_found() |
+|  | %s finds %s in a niche in the wall, shaking; he makes his way up. | `main.gd:15176` _runner_found() |
+|  | You find %s in a niche in the wall, shaking. He will not say what he saw, and makes his way up. | `main.gd:15177` _runner_found() |
+|  | found by %s | `main.gd:15178` _runner_found() |
+|  | ^an? (.+?)'s (son\|daughter\|brother\|sister\|father\|mother\|cousin)$ | `main.gd:15185` HOLD_WORDS |
+|  | sister or brother | `main.gd:15292` _place_captive() |
+|  | parent and child | `main.gd:15292` _place_captive() |
+|  | , %s of %s | `main.gd:15313` _place_captive() |
+|  | %s has fallen in; until it stands again you will wake at the temple, or wherever is nearest. | `main.gd:15387` _on_hut_changed() |
+| L | The healer's hut | `main.gd:15388` _on_hut_changed() |
+| L | the healer's hut | `main.gd:15552` _on_returned() |
+|  | a holy place | `main.gd:15553` _on_returned() |
+|  | %s brought you back from near death | `main.gd:15584` _on_returned() |
+|  | %s is brought back at %s by %s | `main.gd:15585` _on_returned() |
+|  | , for an offering of %d gold | `main.gd:15586` _on_returned() |
+|  | %s is brought back at %s by %s%s. | `main.gd:15609` _on_returned() |
+|  | , for an offering of %d gold | `main.gd:15610` _on_returned() |
+|  | retire and recall | `main.gd:15683` _on_world_ticked() |
+|  | %s %s %ds | `main.gd:15699` _on_world_ticked() |
+|  | hidden in the grass | `main.gd:15707` _on_world_ticked() |
+|  | LMB\tattack (far: walk); a friend: talk | `main.gd:15760` hint_lines() |
+|  | %s+LMB\tswing where you stand | `main.gd:15760` hint_lines() |
+|  | RMB\toff hand; empty: grab (drag to toss) | `main.gd:15761` hint_lines() |
+|  | MMB drag\tturn, look up / down | `main.gd:15763` hint_lines() |
+|  | Ctrl+MMB drag\tpan (springs back) | `main.gd:15763` hint_lines() |
+|  | Wheel\tzoom (MMB click: 1x) | `main.gd:15763` hint_lines() |
+|  | LMB\tmove / attack (hold to steer); a friend: talk | `main.gd:15765` hint_lines() |
+|  | %s+LMB\tswing where you stand | `main.gd:15765` hint_lines() |
+|  | RMB\toff hand; empty: shove (drag to toss) | `main.gd:15766` hint_lines() |
+|  | %s / %s\toverhead / normal view | `main.gd:15768` hint_lines() |
+|  | %s / %s\tturn | `main.gd:15769` hint_lines() |
+|  | MMB drag\tturn, look up / down | `main.gd:15769` hint_lines() |
+|  | Ctrl+MMB drag\tpan (springs back) | `main.gd:15769` hint_lines() |
+|  | %s\t%s | `main.gd:15771` hint_lines() |
+|  | %s+LMB\tyour weapon's own move (a shield bashes) | `main.gd:15772` hint_lines() |
+|  | RMB, shield\tblock toward the cursor while held | `main.gd:15772` hint_lines() |
+|  | %s held, bow\tstand firm and draw: LMB release looses, let go lowers it (arrow kept), walk keys turn | `main.gd:15773` hint_lines() |
+|  | RMB, bow\thold to aim at the sky, let go to lob onto the circle: over walls, knocks down | `main.gd:15774` hint_lines() |
+|  | %s\topen a chest, crate, cart, door; your companion's pack | `main.gd:15775` hint_lines() |
+|  | %s\tyour pack | `main.gd:15775` hint_lines() |
+|  | %s\tyour companion's card | `main.gd:15776` hint_lines() |
+|  | %s\tthe town sheet | `main.gd:15777` hint_lines() |
+|  | %s\tpick up | `main.gd:15778` hint_lines() |
+|  | %s\tput down (hand, else pack) | `main.gd:15778` hint_lines() |
+|  | %s\tthrow at the cursor | `main.gd:15778` hint_lines() |
+|  | %s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat) | `main.gd:15779` hint_lines() |
+|  | %s hold\tbandage an ally beside you, else yourself | `main.gd:15780` hint_lines() |
+|  | RMB in pack\tuse it (eat, open a purse, bandage) | `main.gd:15781` hint_lines() |
+|  | %s\ttalk (/w whisper) | `main.gd:15782` hint_lines() |
+|  | %s\ttalk log | `main.gd:15782` hint_lines() |
+|  | %s\tworld map | `main.gd:15782` hint_lines() |
+|  | %s\treset the room | `main.gd:15783` hint_lines() |
+|  | %s\tscreenshot, saved under %s | `main.gd:15784` hint_lines() |
+|  | %s\tsay yes to an offer that stands (or type it) | `main.gd:15785` hint_lines() |
+|  | %s\thide these | `main.gd:15785` hint_lines() |
+|  | %s\tbuilder mode | `main.gd:15787` hint_lines() |
+|  | Following %s - move to take the lead | `main.gd:15870` led_words() |
+|  | Following %s to %s - move to take the lead | `main.gd:15871` led_words() |
+|  | Nothing more here. | `main.gd:16194` search() |
+|  | You find in %s: %s. | `main.gd:16212` search() |
+| L | Locked fast. The big one, Brand the Ox, wears its key. | `main.gd:16224` CAMP_LOCKED |
+| L | Empty. You have taken what the Mound-breakers hid here. | `main.gd:16225` CAMP_EMPTY |
+|  | the robbers' camp chest | `main.gd:16257` _search_camp() |
+|  | Brand's key turns in the lock. You find %d gold in %s. | `main.gd:16260` _search_camp() |
+|  | Picked up %d gold. | `main.gd:16439` _item_command() |
+|  | into gold (601 amended) | `main.gd:16475` _restore_ground() |
+|  | %s@%d,%d | `main.gd:16481` _restore_ground() |
+|  | no room in your %s | `main.gd:16585` _move_slot() |
+|  | your chest is full | `main.gd:16613` deposit_all() |
+|  | %s tick %d peer id: %d | `main.gd:16695` _debug_text() |
+|  | stamina: %d / %d | `main.gd:16699` _debug_text() |
+|  | yaw: %.1f deg pitch: %.1f deg zoom: %.2fx | `main.gd:16703` _debug_text() |
+|  | azimuth: %.1f deg | `main.gd:16705` _debug_text() |
+|  | camera facing: %s | `main.gd:16706` _debug_text() |
+|  | rtt: %d ms | `main.gd:16709` _debug_text() |
+|  | worst correction: %.2f tiles this minute (%.2f ever) | `main.gd:16710` _debug_text() |
+|  | display delay: %d ms | `main.gd:16712` _debug_text() |
+|  | build: v%s %s%s | `main.gd:16713` _debug_text() |
+|  | , server v%s | `main.gd:16714` _debug_text() |
+|  | rtt: n/a (this peer is the authority) | `main.gd:16716` _debug_text() |
+|  | mispredicts: n/a (nothing is predicted here) | `main.gd:16717` _debug_text() |
+|  | the server still holds your last connection; trying again | `main.gd:16733` _on_join_rejected() |
+|  | client out of date | `main.gd:16738` _on_join_rejected() |
+|  | server out of date | `main.gd:16749` _on_join_rejected() |
+|  | the server is out of date: it runs v%s, this is v%s. It will be updated soon; try again later. | `main.gd:16750` _on_join_rejected() |
+|  | fetching the server's v%s | `main.gd:16764` _download_update() |
+|  | updating to the server's v%s: the game closes and starts again | `main.gd:16782` _download_update() |
+|  | this game is out of date: the server runs v%s, this is v%s%s. Run launch.bat to update. | `main.gd:16792` _update_failed() |
+|  | the server did not let you in: check the token | `main.gd:16802` _on_server_disconnected() |
+|  | the server is restarting; trying again | `main.gd:16818` _reconnect() |
+|  | the server is restarting; trying again (%d) | `main.gd:16822` _reconnect() |
+|  | the server is gone | `main.gd:16828` _reconnect() |
+|  | no restart is due | `main.gd:16869` _restart_command() |
+|  | The restart is off. | `main.gd:16871` _restart_command() |
+|  | Restarting in %d s%s; you'll be reconnected. | `main.gd:16887` _restart_command() |
+|  | restarting in %d s%s, %d connected, then exiting %d%s (restart cancel to call it off) | `main.gd:16888` _restart_command() |
+|  | : down until started | `main.gd:16890` _restart_command() |
+|  | Restarting in %d s. | `main.gd:16902` _count_down_restart() |
+|  | regenerate now: the server's alone | `main.gd:16929` _regenerate_now() |
+|  | regenerate now: %s is no shifting level (%s) | `main.gd:16931` _regenerate_now() |
+|  | regenerate now: refused in a test run on the shared overlay | `main.gd:16933` _regenerate_now() |
+|  | regenerate now: %s is awake, someone is in it; again when it sleeps | `main.gd:16936` _regenerate_now() |
+|  | regenerate now: %s laid again, generation %d | `main.gd:16938` _regenerate_now() |
+|  | regenerate now: %s could not be laid (%d tries, or its overlay copy is edited) | `main.gd:16939` _regenerate_now() |
+|  | regenerate %s: %s | `main.gd:16950` _regenerate_command() |
+|  | the shifting levels are laid again when due | `main.gd:16950` _regenerate_command() |
+|  | the shifting levels stay as they are | `main.gd:16950` _regenerate_command() |
+|  | %s: generation %d, every %d days | `main.gd:16953` _regenerate_command() |
+|  | no raid groups here | `main.gd:16960` _raids_command() |
+|  | raids %s: %s | `main.gd:16963` _raids_command() |
+|  | camps send groups at their towns | `main.gd:16963` _raids_command() |
+|  | nothing is sent and nothing moves | `main.gd:16963` _raids_command() |
+|  | no camp %s, no town %s, or no way between | `main.gd:16966` _raids_command() |
+|  | raids %s; %d camps, %d groups out | `main.gd:16967` _raids_command() |
+|  | %s %s, %s at %s %s, strength %.1f, carries %s | `main.gd:16969` _raids_command() |
+|  | companion facts <player> \| companion forget <player> <id> | `main.gd:17050` _companion_command() |
+|  | no companion for %s | `main.gd:17056` _companion_command() |
+|  | %s has no fact %s | `main.gd:17062` _companion_command() |
+|  | %s: %s forgotten | `main.gd:17068` _companion_command() |
+|  | %s (%s) %s | `main.gd:17071` _companion_command() |
+|  | %s (believes) %s | `main.gd:17073` _companion_command() |
+|  | %s: %d facts, %d beliefs %s | `main.gd:17074` _companion_command() |
+|  | go <zone> [player] | `main.gd:17161` _go_command() |
+|  | go <zone> <player>: from the console, name the player | `main.gd:17169` _go_command() |
+|  | quests reset [all\|<giver>] [player] | `main.gd:17179` _quests_command() |
+|  | quests reset [all\|<giver>] <player>: from the console, name the player | `main.gd:17189` _quests_command() |
+|  | quests reset: no record for that player | `main.gd:17194` _quests_command() |
+|  | quests reset: no quest giver %s in %s | `main.gd:17202` _quests_command() |
+|  | quests reset: %d in %s are called %s; not reset | `main.gd:17204` _quests_command() |
+|  | %s: %s's quests reset (%s) | `main.gd:17207` _quests_command() |
+|  | nothing was held | `main.gd:17207` _quests_command() |
+|  | the standing offer | `main.gd:17250` _quests_reset_giver() |
+|  | %d quest givers | `main.gd:17286` _quests_reset_all() |
+|  | the standing offer | `main.gd:17290` _quests_reset_all() |
+|  | the draugr's paid deals | `main.gd:17300` _quests_reset_all() |
+|  | the draugr's asking and pact | `main.gd:17313` _quests_reset_all() |
+|  | the healer's care | `main.gd:17320` _quests_reset_all() |
+|  | %s: quests reset (%s) | `main.gd:17323` _quests_reset_all() |
+|  | nothing was held | `main.gd:17323` _quests_reset_all() |
+|  | players: who is on, where, their hp | `main.gd:17376` _resend_offers() |
+|  | zones: each loaded zone, awake or asleep, and who is in it | `main.gd:17377` _resend_offers() |
+|  | go <zone> [player]: you (or that player) and the companion to that zone's start | `main.gd:17378` _resend_offers() |
+|  | quests reset [all\|<giver>] [player]: your quests (or that player's) undone, all or one quest giver's here | `main.gd:17379` _resend_offers() |
+|  | zone reset <name>: that zone rebuilt from its map | `main.gd:17380` _resend_offers() |
+|  | zone move <player> <zone>: that player and their companion to that zone's start | `main.gd:17381` _resend_offers() |
+|  | gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said) | `main.gd:17382` _resend_offers() |
+|  | move <player> <x> <y> [zone] \| move <player> <building code> [zone]: a player to a cell | `main.gd:17383` _resend_offers() |
+|  | mark <player> <mark>\|-<mark>: a mark on a player, or one taken off | `main.gd:17384` _resend_offers() |
+|  | reset: this room rebuilt from its map | `main.gd:17385` _resend_offers() |
+|  | respawn: every zone's dead brought back now | `main.gd:17386` _resend_offers() |
+|  | regenerate [on\|off\|now <level>]: the levels' regeneration | `main.gd:17387` _resend_offers() |
+|  | reload <zone>\|all: a zone's map read again | `main.gd:17388` _resend_offers() |
+|  | raids [on\|off\|send <camp> <town>]: the raids | `main.gd:17389` _resend_offers() |
+|  | hour [<h>] \| day_minutes [<m>]: the time of day, the day's length | `main.gd:17390` _resend_offers() |
+|  | season [<name>] \| season_days [<n>]: the season, its length | `main.gd:17391` _resend_offers() |
+|  | weather [<kind>\|auto\|reload] [<minutes>] [<region>\|all]: the weather | `main.gd:17392` _resend_offers() |
+|  | companions \| companion facts <player> \| companion forget <player> <id>: the companions | `main.gd:17393` _resend_offers() |
+|  | mind scripted\|ollama \| mind log on\|off \| mind last <name>: the residents' minds | `main.gd:17394` _resend_offers() |
+|  | perception list\|grid\|both: what the minds are told | `main.gd:17395` _resend_offers() |
+|  | transcript <name> [<date>]: a mind's talk | `main.gd:17396` _resend_offers() |
+|  | builder \| builder export \| builder drop <name>: builder mode | `main.gd:17397` _resend_offers() |
+|  | map: the map's name | `main.gd:17398` _resend_offers() |
+|  | net: the server's traffic and each peer's round trip | `main.gd:17399` _resend_offers() |
+|  | save: the world saved now | `main.gd:17400` _resend_offers() |
+|  | version: the build and its protocol | `main.gd:17401` _resend_offers() |
+|  | restart\|stop [<seconds>] [<why>] \| restart cancel: a restart, or calling it off | `main.gd:17402` _resend_offers() |
+|  | help: these lines | `main.gd:17403` _resend_offers() |
+|  | not the authority | `main.gd:17411` admin_command() |
+|  | map load is now zone reset <name>; zones: %s | `main.gd:17417` admin_command() |
+|  | builder mode is off (no ANTHROPIC_API_KEY, no --builder-stub); edited levels: %s | `main.gd:17437` admin_command() |
+|  | %s rebuilt from the map; %d player records kept; %s | `main.gd:17441` admin_command() |
+|  | no dead companions to bring back | `main.gd:17442` admin_command() |
+|  | companions brought back: %s | `main.gd:17443` admin_command() |
+|  | %s %s (%s) peer %d in %s at %s hp %d/%d | `main.gd:17460` admin_command() |
+|  | %d connected %s | `main.gd:17463` admin_command() |
+|  | no --state file to save to | `main.gd:17470` admin_command() |
+|  | saved %s at tick %d | `main.gd:17472` admin_command() |
+|  | %s, with %s (%s) in %s at %s hp %d/%d stance %s intent %s%s mind %s, stance set by %s | `main.gd:17482` admin_command() |
+|  | %d companions %s | `main.gd:17486` admin_command() |
+|  | mind log %s (%s) | `main.gd:17491` admin_command() |
+|  | no file: --mind-log | `main.gd:17492` admin_command() |
+|  | no decision of %s's logged yet (companions: %s) | `main.gd:17496` admin_command() |
+|  | usage: mind scripted\|ollama \| mind claude [<name>\|all haiku\|sonnet\|off] \| mind log on\|off \| mind last <name> (now %s) | `main.gd:17501` admin_command() |
+|  | no --llm-model configured | `main.gd:17503` admin_command() |
+|  | companion minds: %s | `main.gd:17512` admin_command() |
+|  | usage: perception list\|grid\|both (now %s) | `main.gd:17516` admin_command() |
+|  | usage: transcript <name> [<YYYY-MM-DD>] \| transcript rebuild | `main.gd:17521` admin_command() |
+|  | no mind log to rebuild from | `main.gd:17524` admin_command() |
+|  | v%s protocol %s | `main.gd:17533` admin_command() |
+|  | %s rtt %d ms | `main.gd:17548` admin_command() |
+|  | unknown command %s (try help) | `main.gd:17554` admin_command() |
+|  | usage: gold <player or id prefix> <amount> [why] | `main.gd:17562` _gold_command() |
+|  | gold: the amount must be above 0 (gold is only ever given here) | `main.gd:17565` _gold_command() |
+|  | gold: no economy | `main.gd:17567` _gold_command() |
+|  | gold: %d players' ids start %s; give more of it | `main.gd:17574` _gold_command() |
+|  | no player %s | `main.gd:17576` _gold_command() |
+|  | %s: %d gold given (%s), %d now | `main.gd:17581` _gold_command() |
+|  | %s: %s, tick %d, %d entities, %s | `main.gd:17594` _zones_text() |
+|  | %d zones %s | `main.gd:17596` _zones_text() |
+|  | no map %s in %s | `main.gd:17605` _zone_command() |
+|  | zone %s %s: %d cells, %d entities | `main.gd:17610` _zone_command() |
+|  | no map %s in %s | `main.gd:17618` _zone_command() |
+|  | could not move %s to %s | `main.gd:17625` _zone_command() |
+|  | %s moved to %s | `main.gd:17626` _zone_command() |
+|  | no player %s online | `main.gd:17627` _zone_command() |
+|  | usage: zone reset <name> \| zone move <player> <zone> | `main.gd:17628` _zone_command() |
+|  | Click a townsperson to interact, or press %s | `main.gd:17705` _first_talk_hint() |
+|  | (%s can't be written, so the game's own folder) | `main.gd:17740` screenshot_folder() |
+|  | screenshot saved: %s | `main.gd:17773` screenshot_words() |
+|  | (%s can't be written, so the game's own folder) | `main.gd:17794` take_screenshot() |
+|  | screenshot not saved (%s) | `main.gd:17802` take_screenshot() |
+|  | Screenshots go to %s. Set screenshot_dir= in settings.cfg to send them elsewhere. | `main.gd:17804` take_screenshot() |
+|  | what do you sell? | `main.gd:17881` _run_test_offer() |
+|  | any work for me? | `main.gd:17881` _run_test_offer() |
+|  | (a test offer) Bring Bram home | `main.gd:17883` _run_test_offer() |
+|  | (a test line) The door's barred from the other side. | `main.gd:17934` _run_test_show() |
+|  | (a test line) I've been meaning to thank you for the food you brought. | `main.gd:17935` _run_test_show() |
+|  | his voice steady despite the rain | `main.gd:17935` _run_test_show() |
+|  | (a test line) hold here | `main.gd:17936` _run_test_show() |
+|  | (a test line) anyone near the well? | `main.gd:17937` _run_test_show() |
+|  | (a test line) Stay close, the gate's watched. | `main.gd:17945` _run_test_show() |
+|  | the town lacks 2 ore | `main.gd:17955` _run_test_show() |
+|  | you left her to fall alone | `main.gd:18010` _run_test_show() |
+| L | the draugr's blessing | `main.gd:18022` _run_test_show() |
+|  | 3 in town are on the dole (fed by the town, or hungry): its kitchen works for food first. | `main.gd:18026` _run_test_show() |
+|  | the server at 100.64.0.5:7777 did not answer | `main.gd:18127` _run_test_show() |
+|  | ; went on %.2f cells | `main.gd:18550` _lat_report() |
+|  | nothing in sight | `main.gd:18597` _lat_turn_done() |
+|  | nothing in sight | `main.gd:18643` _run_test_chase() |
+|  | %d ms at %s | `main.gd:18779` _report_walk() |
 
 ### the draugr (19)
 
@@ -2183,7 +2186,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | borrowed from the town's coffer | `sim/townsfolk.gd:1867` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd:1868` _loan() |
 
-## Lines in the data (459)
+## Lines in the data (460)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -2458,10 +2461,11 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (31)
+### levels/townsfolk.json (32)
 
 | | Line | Key |
 |---|---|---|
+|  | %s sleeps and does not stir. | `asleep[2]` |
 |  | You're in my care; fall where you will, I'll see to you. | `greet.care` |
 |  | Good to see you. | `greet.standing.trusted` |
 |  | Herbs, if you have any; the town is short of them. | `greet.trades.medicine_man[1]` |
