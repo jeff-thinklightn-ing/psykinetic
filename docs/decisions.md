@@ -6134,8 +6134,10 @@ nothing showed it. Now a link's glimpse is drawn flat at its arrival's whole lev
 with no stair, and its view lifted by its plan's "raise", metres: our ground at our last land
 cell along the way less that level (Client3D._raise_glimpses, once our relief is read). Flat,
 since a glimpse has no relief of its own (terrain's later item): its levels unclamped stood in
-half-metre terraces, and their cliffs slowed the castle's build enough that its border's
-canopy came late at once and view_test's phased check saw 60 chunks between the two builds.
+half-metre terraces, and with them view_test's phased check saw the castle's border canopy
+differ between the two builds, 60 chunks at once against none (seen with the terraces, gone
+flat; the cause not found: the at-once build waits on the border's worker, and no error was
+logged).
 Each glimpse cell's drawn height is kept in _glimpse_ground, which Client3D._elevation reads
 first (one has(), skipped with no glimpse), so the border round it (_edge_elevations) stands
 on it; the forest in the gap between our edge and the glimpse stands on our edge's relief
@@ -37159,3 +37161,28 @@ changes (the puppet's "bedroll" key). view_test _test_bedroll_drawn: out
 of doors, the bedroll one back with its head the facing's way and the body
 0.09 up; up, the bedroll gone and the height 0; on a bed's head cell, no
 bedroll and the bed's 0.37. Client only, protocol unchanged.
+## 755. The world as it lies on the plane, for the world map
+
+ui's world map overhaul (Jeff: the world map "is buggy and not useful yet, it needs an
+overhaul"; ui's design C:/dev/review/worldmap/design.md, to the coordinator for Jeff) draws the
+lands where the world plane (650) puts them, not as boxes laid out from the start zone, which
+since 743 came out in a row. It reads one call on the map ui already builds:
+WorldMap.plane_layout() (Level.world_plane() unless given one).
+
+- **zones:** each level the plane places and the map holds: rect (origin and the level's
+  size, a cell a metre), height (metres), display_name. They meet edge to edge where their
+  links do (level_test's).
+- **doors:** each level the plane does not place but a link reaches from one it does, through
+  any levels between: [{zone, cell, at (the world cell), via (the levels between, outermost
+  first), hidden, closed}]. The barrow at the wilds' mound (170, 180); the Ossuary by the barrow
+  (via it, hidden: the niche) and by the temple's stair (sealed); the castle halls in the
+  castle (123, -102); the barrow again through the temple's stair and the Ossuary. No door
+  through a level already on the way, none into a placed level, none for a dev level (673);
+  a level no link reaches from the plane (made in code) has none. The test room is the castle's
+  door (27, 12) as the levels hold it: the page leaves it out by name (ui's side).
+- **landmarks, places, regions:** as Level.world_plane reads them, each place and region with
+  its status, "agreed" or "draft" (drawn rough), and the plane's warnings.
+
+world_map_test _test_plane_layout. The page itself is "755, ui's side". Also here, 327
+amended's entry: the phased-canopy difference with terraced glimpses is said as seen, its
+cause not found. Client-readable data, protocol unchanged, no new class_name.

@@ -378,6 +378,57 @@ func ways_from(area_name: String) -> Array[Dictionary]:
 	return out
 
 
+## The world as it lies on maps' world plane (decision 755; ui's world map,
+## 755 ui's side, draws from it): {zones: {level: {rect: Rect2i (its world
+## cells: origin and size, a cell a metre), height (metres), display_name}}
+## for each level the plane places and this map holds; doors: {level:
+## [{zone, cell (in the zone), at (its world cell), via (the levels between,
+## outermost first), hidden, closed}]} for each level the plane does not
+## place but a way reaches from one it does, through any number of levels
+## between (the barrow at the wilds' mound; the Ossuary below it by the
+## barrow, hidden, and by the temple's stair, sealed); a dev level (673) and
+## a level no way reaches from the plane (one made in code) have none;
+## landmarks, places and regions as Level.world_plane reads them, each place
+## and region with its status ("agreed", or "draft": a rough mark); and its
+## warnings}. [param plane] Level.world_plane() unless given.
+func plane_layout(plane: Dictionary = {}) -> Dictionary:
+	if plane.is_empty():
+		plane = Level.world_plane()
+	var zones := {}
+	var on_plane: Dictionary = plane.get("zones", {})
+	for level_name: String in on_plane:
+		if areas.has(level_name):
+			zones[level_name] = {"rect": Rect2i(on_plane[level_name]["origin"], areas[level_name]["size"]),
+				"height": float(on_plane[level_name]["height"]), "display_name": str(areas[level_name]["display_name"])}
+	var doors := {}
+	var queue: Array[String] = []
+	var add_door := func(to: String, door: Dictionary) -> void:
+		if not areas.has(to) or zones.has(to) or to in Level.DEV_LEVELS or to in door["via"]:
+			return
+		var known: Array = doors.get(to, [])
+		for each: Dictionary in known:
+			if each["zone"] == door["zone"] and each["cell"] == door["cell"] and each["via"] == door["via"]:
+				return
+		known.append(door)
+		doors[to] = known
+		queue.append(to)
+	for way: Dictionary in ways:
+		if way["kind"] == "link" and zones.has(way["from"]):
+			var origin: Vector2i = (zones[way["from"]]["rect"] as Rect2i).position
+			add_door.call(str(way["to"]), {"zone": way["from"], "cell": way["at"], "at": origin + (way["at"] as Vector2i),
+				"via": [], "hidden": bool(way.get("hidden", false)), "closed": bool(way.get("closed", false))})
+	while not queue.is_empty():
+		var inside := queue.pop_front() as String
+		for way: Dictionary in ways_from(inside):
+			if way["kind"] != "link":
+				continue
+			for door: Dictionary in (doors[inside] as Array).duplicate():
+				var via: Array = (door["via"] as Array) + [inside]
+				add_door.call(str(way["to"]), {"zone": door["zone"], "cell": door["cell"], "at": door["at"], "via": via,
+					"hidden": bool(door["hidden"]) or bool(way.get("hidden", false)), "closed": bool(door["closed"]) or bool(way.get("closed", false))})
+	return {"zones": zones, "doors": doors, "landmarks": plane.get("landmarks", []), "places": plane.get("places", []),
+		"regions": plane.get("regions", []), "warnings": plane.get("warnings", [])}
+
 ## The ways into [param area_name].
 func ways_into(area_name: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

@@ -20,6 +20,7 @@ func _ready() -> void:
 	_test_roofs_and_region()
 	_test_crossing()
 	_test_levels()
+	_test_plane_layout()
 	_test_join()
 	_test_places()
 	_test_holdings()
@@ -227,6 +228,47 @@ func _test_levels() -> void:
 	_check(world_map.reachable(Level.DEFAULT_MAP).size() == names.size() - dev.size(),
 		"every level is reachable from %s, but the dev levels (%s), which none reach (decision 673)" % [Level.DEFAULT_MAP, dev])
 
+
+
+## The world as it lies on the plane (decision 755, for ui's world map):
+## each placed level's world rect and height, each level below reached from
+## one at its door, the plane's marks with their status.
+func _test_plane_layout() -> void:
+	print("plane_layout (755)")
+	var layout := WorldMap.build().plane_layout()
+	var zones: Dictionary = layout["zones"]
+	var rect := func(level_name: String) -> Rect2i:
+		return zones[level_name]["rect"] if zones.has(level_name) else Rect2i()
+	_check(rect.call("wilds") == Rect2i(0, 0, 256, 256) and rect.call("foothills") == Rect2i(0, -96, 256, 96)
+		and rect.call("castle").position == Vector2i(112, -120) and rect.call("castle").end.y == -96
+		and is_equal_approx(float(zones.get("castle", {}).get("height", 0.0)), 11.77) and str(zones.get("wilds", {}).get("display_name", "")) == "The Wilds",
+		"each placed level's world rect, height and name: the wilds at (0, 0), the foothills above it, the castle on the foothills' north edge (%s)" % [zones.keys()])
+	_check(rect.call("foothills").end.y == rect.call("wilds").position.y and rect.call("castle").end.y == rect.call("foothills").position.y,
+		"the lands meet edge to edge (the foothills' south on the wilds' north, the castle's south on the foothills' north)")
+	var doors: Dictionary = layout["doors"]
+	var door_at := func(level_name: String, zone: String, cell: Vector2i, via: Array) -> Dictionary:
+		for door: Dictionary in doors.get(level_name, []):
+			if door["zone"] == zone and door["cell"] == cell and door["via"] == via:
+				return door
+		return {}
+	var mound: Dictionary = door_at.call("barrow", "wilds", Vector2i(170, 180), [])
+	_check(not mound.is_empty() and mound["at"] == Vector2i(170, 180) and not mound["hidden"],
+		"the barrow's door: the wilds' mound at (170, 180), on the plane there, in sight (%s)" % [doors.get("barrow")])
+	var below: Dictionary = door_at.call("barrow_deep", "wilds", Vector2i(170, 180), ["barrow"])
+	var stair: Dictionary = {}
+	for door: Dictionary in doors.get("barrow_deep", []):
+		if door["zone"] == "wilds" and (door["via"] as Array).is_empty():
+			stair = door
+	_check(not below.is_empty() and below["hidden"] and not stair.is_empty() and stair["closed"],
+		"the Ossuary: by the barrow from the mound, hidden (the niche), and by the temple's stair, sealed (%s)" % [doors.get("barrow_deep")])
+	var halls: Dictionary = door_at.call("castle_halls", "castle", Vector2i(11, 18), [])
+	_check(not halls.is_empty() and halls["at"] == Vector2i(123, -102), "the castle halls' door in the castle, at (123, -102) on the plane (%s)" % [doors.get("castle_halls")])
+	_check(not doors.has("practice") and not zones.has("practice") and not doors.keys().any(func(level_name: String) -> bool: return zones.has(level_name)),
+		"no dev level (673), and no placed level among the doors")
+	var places: Array = layout["places"]
+	_check(layout["landmarks"].size() >= 2 and not places.is_empty() and places.all(func(place: Dictionary) -> bool: return place["status"] in Level.PLANE_STATUSES)
+		and not (layout["regions"] as Array).is_empty() and (layout["warnings"] as Array).is_empty(),
+		"the plane's landmarks, places and regions, each place with its status; no warning")
 
 ## h_land: 20 x 10 cells of floor, (5, 8) void; its places: a goblin camp
 ## (15, 5) r 3 worth 2, a town farm (3, 5) r 2, a ford nobody holds (9, 5)
