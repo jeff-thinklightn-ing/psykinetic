@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Companions: your companion no longer attacks the fallen knight in the barrow's Altar Room, nor the draugr while he sits or rests (747 amended (3)).
 
+- Townsfolk near the fallen knight no longer act as if a fight is on: he is never counted as a threat.
 - Townsfolk have heard of the fallen knight's spirit in the barrow's Altar Room, whose bones the draugr holds, and that Brand the Ox carries the key to the Mound-breakers' chest.
 - The fallen knight in the barrow now speaks in his own words and names himself: he is that cycle's knight whose remains the draugr holds, and he asks you to bring them to Aldous. The robbers' camp chest has new lines too.
 

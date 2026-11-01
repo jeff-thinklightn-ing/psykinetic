@@ -36497,6 +36497,16 @@ of Fallen Souls, his remains to Aldous) and after; Main.CAMP_LOCKED and
 CAMP_EMPTY (742 amended). NOT_YET_TITLE kept, TURN_IN_TITLE "The robbers
 are put down" to match. level_test _test_barrow_quest checks the ask names
 him. Server only, protocol unchanged, no new class_name.
+
+747 amended (4), dungeon's side (2026-10-31): he threatens nobody.
+Companions found he inherited Monster.threatens, true for a player, so
+Main._fight_near (a resident's line held back near a fight) and any other
+asker read him as a threat; AstralKnight.threatens now returns false. The
+companion's own skip of a talking, peaceable monster (Companion.peaceful_talker,
+747 amended (3)) is companions'; this is the source, for every other
+caller. level_test _test_barrow_quest checks it. Server only, protocol
+unchanged, no new class_name.
+
 Amended (2026-10-31, lore): Jeff approved lore's lines ("approve knight dialogue",
 C:/dev/review/decisions/knight-lines.md): the knight is the generation's sepulcher knight
 (barrow_knight() fills his name), "the Hall of Fallen Souls" kept; the final text, the camp

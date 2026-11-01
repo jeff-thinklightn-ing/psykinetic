@@ -2938,8 +2938,8 @@ func _test_barrow_quest() -> void:
 		"tile": _main._nearest_free(player.tile + Vector2i(2, 0)), "props": Level.MONSTER_TYPES["astral_knight"].duplicate()}) as AstralKnight
 	var hp := knight.hp
 	World.damage(knight, 50, player)
-	_check(knight.spawned and knight.hp == hp and knight.talks and knight.peaceable and _main.talks_peaceably(knight),
-		"he talks peaceably and a blow passes through him (%d -> %d)" % [hp, knight.hp])
+	_check(knight.spawned and knight.hp == hp and knight.talks and knight.peaceable and _main.talks_peaceably(knight) and not knight.threatens(player),
+		"he talks peaceably, threatens nobody, and a blow passes through him (%d -> %d)" % [hp, knight.hp])
 	var ids := func() -> Array: return knight.offers_for(id).map(func(offer: Dictionary) -> String: return str(offer["id"]).get_slice(":", 2))
 	_check(_main.barrow_quest_of(id) == "ask" and ids.call() == ["ask"] and player.quest.is_empty() and not _main.way_revealed(id, "barrow"),
 		"a stranger: his ask, no quest yet, the way not revealed (%s)" % [ids.call()])

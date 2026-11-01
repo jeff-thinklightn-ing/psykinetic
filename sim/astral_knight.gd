@@ -39,6 +39,12 @@ func _sim_tick() -> void:
 	pass
 
 
+## Never a threat to anyone (companions: Main._fight_near and Pip's
+## "danger" asked Monster.threatens, which reads a player as threatened).
+func threatens(_entity: GridEntity) -> bool:
+	return false
+
+
 ## [param player_id]'s offers: his quest's step (the ask, not yet or the
 ## turn-in), one offer a step; once it is done, none (a greeting hears DONE).
 func offers_for(player_id: String) -> Array[Dictionary]:
