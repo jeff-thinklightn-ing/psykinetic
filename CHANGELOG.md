@@ -7,30 +7,29 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.197
+
 - A townsperson the town owes money now eats from the store against that debt, instead of borrowing from the town or being fed as charity (353 amended (3)).
 - 280 amended, items: the battle axe sells for its worth (20 gold, not 1), as do the tomb sledge (18), bandaging kits (5) and arrow bundles (5; flame and barbed 8); pedlars may carry bandaging kits and flame or barbed arrows. Catalog rows only: client and server.
 - The chapel's walls have a buttress every three metres with a lancet window between each pair; a chapel in disrepair shows broken rafters under its holed roof and a broken belfry with no bell, and a standing one has a bell in its tower (734 amended (3)).
 - A server restart keeps what it used to lose: players' plots, the felled forest, named enemies, the hill herders and healers' huts, captives, raids, trade and trampled ground come back as they were saved (758).
 - Companions: what she is told of where she is and how hurt you both are uses plain words (no "dungeon", no "HP", no percentages, no stance names), so she doesn't say them back (748 amended (3)).
 - Townsfolk keep finding the temple, and Aldous keeps working there, when a town's temple is built from a building kind (734 amended).
-
 - Tools: the playtest folk tour checks that sleeping townsfolk don't trade (754 amended (4)).
 - The Dwarven Halls' chests now hold dwarven goods: ore, nails, axe heads, picks, war hammers and now and then a silver ring, which any shop will buy (757).
 - Wording: giving gold to someone who can't take it says "You can give gold only to a fellow traveller or to the one who goes with you."; the HUD's "Following ..." line takes a colon (748 amended (2)).
 - Tools: tools/voice_check.py reports fixed lines that break the voice guide (exclamation marks, modern and game words, dashes), by speaker; report only (748 amended).
-
 - A townsman asleep no longer offers Barter, and a barter with one gets "<Name> is asleep." rather than his window (751 amended (2)).
 - Tools: a playtest tour talks to every townsperson by day and at night, and the seam check now follows maps' ruling (754 amended (3)).
-
 - A town's log now speaks in its own words: buildings rise and fall by stages ("the town raises its forge to the second stage"), with no levels, experience or game words (748 amended (4), economy's side; voice's wording).
 - No lone brick wall beside the foothills' roads at the zone edges: the castle's and the wilds' outer walls are no longer drawn in the view past each road (327 amended (2)).
 - Tools: playtest tours watch the walk for pacing on the spot, stand at every link between zones, and check the ground meets across each zone seam (tools/tour.sh edges; 754 amended (2)).
-
 - A bow out of a fight is slung across the back from the left hip to the right shoulder, its wood lying against the back whatever your build, the string over the right shoulder and down the chest, the quiver flat beside it with its mouth at the shoulder.
 - The great axe and battle axe swing with a sweep: coiled back low by the hip, a pause, then a fast flat sweep across the front, carried through (750).
 - A sleeper's lower arm lies on their bedroll, tucked before the chest, not reaching past its edge (751).
 - Tools: more playtest tours (tools/tour.sh): cut, seams, stills, axes and draugr; the barrow tour now walks Brand's key, the camp chest's gold, the turn-in and out to Rolf; each run's logs kept in build/tours/kept (754 amended).
 - Click to walk: a route that turns round the end of a wall through a door no longer gets stuck pressing the wall and pacing between two spots; you go through the door (724 amended (2)).
+
 ## v0.1.196
 
 - What goes over the network changes, so v0.1.195 and older can't join the server: update through the launcher first.
