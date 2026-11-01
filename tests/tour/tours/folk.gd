@@ -98,14 +98,27 @@ func _talk_to(bot: Node, person: GridEntity, hour: int) -> void:
 		bot.expect(not told.is_empty(), "%s, asleep, is said to sleep when clicked" % name,
 			"told: %s" % [bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]).left(60))])
 		bot.expect(heard.is_empty(), "%s, asleep, says nothing" % name, "heard %s" % [heard])
-		if "Barter" in buttons:
-			# Asleep yet the bar offers Barter: pressed, what opens is logged.
-			var was: int = bot.now_msec()
-			bot.press("barter")
-			await bot.seconds(2.0)
-			bot.log_line("  %s asleep, Barter pressed: buttons %s; told %s" % [name,
-				bot.buttons().map(func(b: Dictionary) -> String: return str(b["text"])).slice(0, 8),
-				bot.told_since(was).map(func(l: Dictionary) -> String: return str(l["text"]).left(60))])
+		# Sleepers don't trade (the coordinator's ruling, 11-01; npc's to fix, the
+		# server refusing too): no Barter on the bar, and an order sent anyway
+		# (as Main's Barter sends it) refused.
+		bot.expect(not "Barter" in buttons, "%s, asleep, offers no Barter (sleepers don't trade)" % name, "buttons %s" % [buttons])
+		if trade == "merchant" or trade in Items.TRADES:
+			bot.main.barter_data = {}
+			var args := {"resident": str(person.get_path())}
+			if trade == "merchant":
+				var counter: GridEntity = bot.main._shop_counter_near(person)
+				args = {"shop": str(counter.get_path())} if counter != null else {}
+				if counter != null:
+					await bot.walk_to(counter.tile, 1, 30.0)  # At the counter: a refusal for the reach is no answer.
+			if not args.is_empty():
+				World.command(bot.me(), "barter", args)
+				await bot.until(func() -> bool: return not (bot.main.barter_data as Dictionary).is_empty(), 4.0)
+				var data: Dictionary = bot.main.barter_data
+				var why := str(data.get("why", ""))
+				bot.expect(not data.is_empty() and not why.is_empty() and not "too far" in why, "a barter order sent to %s asleep, from the counter, is refused" % name,
+					"the server's answer: why \"%s\", %d goods" % [data.get("why", ""), (data.get("goods", []) as Array).size()] if not data.is_empty() else "no answer")
+			if bot.main.barter_panel != null and bot.main.barter_panel.visible:
+				bot.main.barter_panel.hide()
 	else:
 		bot.expect(not buttons.is_empty() or not heard.is_empty(), "%s answers a click (the talk bar or a greeting)" % name,
 			"no buttons, nothing heard; activity %s" % person.get("activity"))

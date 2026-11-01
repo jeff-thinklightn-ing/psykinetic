@@ -37430,6 +37430,11 @@ lane_walls re-shoots the foothills' two road seams (327 amended's lone glimpse w
 talks to every townsperson in Umbrage by day and at night, walking the town's spots: awake, the
 talk bar or a greeting, a merchant or maker's (Main._barters) with a way to wares; asleep, told
 they sleep and silent; never a raw node name shown; a table of who was met.
+
+754 amended (4) (2026-11-01): sleepers don't trade (the coordinator's ruling; npc's to fix, the
+server refusing too). The folk tour pins it: at night a sleeping merchant or maker's bar offers
+no Barter, and a barter order sent anyway, as Main's Barter sends it and from the shop's counter
+(a refusal for the reach is not counted), is refused. Both fail on main until the fix lands.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping
