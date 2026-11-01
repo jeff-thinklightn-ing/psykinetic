@@ -37739,3 +37739,24 @@ cargo.goods, cargo.members, cargo.items and town. from_dict now fills each, of i
 when absent), and the record's id from its key. trade_routes_test _test_saved: an old record with
 no cargo and no town, restored whole and struck on the way with nothing to take, arrives. Server
 only, protocol unchanged, no new class_name.
+## 660 amended (5): the forest band a phase of its own under the card
+
+After 753 (terrain's forest floor on the relief, _add_forest_band: the wilds'
+9,713 void cells past the ground's rings, a quad each), the arrival card's
+forest-edge phase built the band beside the edge's trees in one frame: about
+190 ms on the wilds (headless, 3 rounds), undoing 660 amended (4)'s 300 to 120.
+Timed apart: the edge trees 70-95 ms, the band 82.
+- The band's meshes are sized once and written by index, each cell's four
+  corners read straight into its two triangles (it built two small arrays a
+  triangle and appended them), and _band_vertex reads the relief itself, not
+  through _band_height (40,000 calls). 82 to about 40 ms.
+- The band is a phase of its own, _phase_forest_band, after
+  _phase_forest_edge: _add_forest_edge keeps the floor's material
+  (_band_material) for it. The at-once build runs the same phases, so both
+  build the same room.
+The card's worst frame on the wilds back to 120-155 ms (the edge's frame now
+about 90; what is left is the edges' and ground's apply and the first frame
+after the lift). The same output: edge_probe on wilds, hills, held and
+foothills hashes the band's vertex and normal arrays, its vertex heights and
+cells, the room, edges, waters, roads, ledges and border equal to main's.
+Client only, protocol unchanged, no new class_name.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Crossing into a zone with a forest round it: the hitch behind the arrival card is short again (the wilds' worst frame about 130 ms, was 190 in v0.1.196; 660 amended (5)).
 ## v0.1.197
 
 - A townsperson the town owes money now eats from the store against that debt, instead of borrowing from the town or being fed as charity (353 amended (3)).

@@ -1314,6 +1314,8 @@ const FOREST_GROUND := 3
 const FOREST_BAND_CHUNK := 32
 var _band_cells: Dictionary[Vector2i, bool] = {}
 var _band_vertices: Dictionary[Vector2i, float] = {}
+## The forest floor's material, from _add_forest_edge to _phase_forest_band.
+var _band_material: Material
 ## The art slots made once before a room is built (_warm_art).
 const WARM_CATEGORIES: Array[String] = ["walls", "doors", "trees", "rocks", "buildings"]
 ## Saplings: how often an edge cell has one besides its tree, and their
@@ -5651,7 +5653,7 @@ func _descendants(node: Node) -> Array[Node]:
 ## _build_room, a frame apart by _build_room_over_frames.
 func _room_phases() -> Array[Callable]:
 	return [_phase_sets, _phase_land, _phase_reach, _phase_edges, _phase_ground, _build_water, _add_cliffs, _phase_lights,
-		_add_walls, _add_decor, _phase_stands, _phase_forest, _phase_forest_edge, _phase_grown, _phase_border, _phase_glimpses,
+		_add_walls, _add_decor, _phase_stands, _phase_forest, _phase_forest_edge, _phase_forest_band, _phase_grown, _phase_border, _phase_glimpses,
 		_add_buildings, _phase_roofs, _phase_doors]
 
 
@@ -5869,11 +5871,22 @@ func _phase_forest() -> void:
 
 
 func _phase_forest_edge() -> void:
+	_band_material = null
 	if not _outdoor:
 		return
 	_add_forest_edge()
 	for cell: Vector2i in _clearing:
 		_dress_clearing(cell)
+
+
+## The forest floor's band on the relief (753) in the floor's material, a
+## phase of its own: beside the edge's trees it made the arrival card's
+## longest frame (the wilds' 9,700 cells, 660).
+func _phase_forest_band() -> void:
+	if _band_material == null:
+		return
+	_add_forest_band(_band_material)
+	_band_material = null
 
 
 func _phase_grown() -> void:
@@ -7401,7 +7414,7 @@ func _add_forest_edge() -> void:
 		forest_floor.material_override = season_material(material, false, false)
 	forest_floor.position = Vector3((low.x + high.x) * 0.5, -FOREST_FLOOR_DEPTH, (low.y + high.y) * 0.5)
 	_room.add_child(forest_floor)
-	_add_forest_band(forest_floor.material_override)
+	_band_material = forest_floor.material_override  # The band's, the next phase (_phase_forest_band).
 
 
 ## The forest floor on the land's relief (decision 753): past the rings the
@@ -7433,24 +7446,39 @@ func _add_forest_band(material: Material) -> void:
 		chunks[key].append(cell)
 	for key: Vector2i in chunks:
 		# (Packed arrays are values: built here, then given to the mesh.)
+		# Sized once and written by index: about 10,000 cells on the wilds
+		# under the arrival card (660; appending small arrays cost half the
+		# phase).
+		var cells: Array = chunks[key]
 		var points := PackedVector3Array()
 		var normals := PackedVector3Array()
-		for cell: Vector2i in chunks[key]:
-			var h := PackedFloat32Array()
-			for corner: Vector2i in GROUND_CORNERS:
-				h.append(_band_vertex(cell + corner, ground))
-			# GROUND_CORNERS' order: (0,0), (1,0), (0,1), (1,1), each at the
-			# cell's corner (its middle the cell's coordinates).
-			var p := [Vector3(cell.x - 0.5, h[0], cell.y - 0.5), Vector3(cell.x + 0.5, h[1], cell.y - 0.5),
-					Vector3(cell.x - 0.5, h[2], cell.y + 0.5), Vector3(cell.x + 0.5, h[3], cell.y + 0.5)]
-			# Godot's front faces wind clockwise seen from the front (above).
-			for triangle: Array in [[0, 1, 2], [1, 3, 2]]:
-				var a: Vector3 = p[triangle[0]]
-				var b: Vector3 = p[triangle[1]]
-				var c: Vector3 = p[triangle[2]]
-				var normal := (c - a).cross(b - a).normalized()
-				points.append_array([a, b, c])
-				normals.append_array([normal, normal, normal])
+		points.resize(cells.size() * 6)
+		normals.resize(cells.size() * 6)
+		var i := 0
+		for cell: Vector2i in cells:
+			# Each at the cell's corner (its middle the cell's coordinates), in
+			# GROUND_CORNERS' order: (0,0), (1,0), (0,1), (1,1).
+			var p0 := Vector3(cell.x - 0.5, _band_vertex(cell, ground), cell.y - 0.5)
+			var p1 := Vector3(cell.x + 0.5, _band_vertex(cell + Vector2i(1, 0), ground), cell.y - 0.5)
+			var p2 := Vector3(cell.x - 0.5, _band_vertex(cell + Vector2i(0, 1), ground), cell.y + 0.5)
+			var p3 := Vector3(cell.x + 0.5, _band_vertex(cell + Vector2i(1, 1), ground), cell.y + 0.5)
+			# Godot's front faces wind clockwise seen from the front (above):
+			# (0, 1, 2) and (1, 3, 2).
+			var n := (p2 - p0).cross(p1 - p0).normalized()
+			points[i] = p0
+			points[i + 1] = p1
+			points[i + 2] = p2
+			normals[i] = n
+			normals[i + 1] = n
+			normals[i + 2] = n
+			n = (p2 - p1).cross(p3 - p1).normalized()
+			points[i + 3] = p1
+			points[i + 4] = p3
+			points[i + 5] = p2
+			normals[i + 3] = n
+			normals[i + 4] = n
+			normals[i + 5] = n
+			i += 6
 		var arrays := []
 		arrays.resize(Mesh.ARRAY_MAX)
 		arrays[Mesh.ARRAY_VERTEX] = points
@@ -7476,12 +7504,15 @@ func _band_vertex(vertex: Vector2i, ground: Dictionary[Vector2i, bool]) -> float
 		return _band_vertices[vertex]
 	var low := INF
 	var sum := 0.0
+	var top := _relief_size - Vector2i.ONE
 	for c in 4:
 		# The cell round the vertex whose corner c it is.
 		var other := vertex - GROUND_CORNERS[c]
 		if ground.has(other):
 			low = minf(low, _corner_heights(other)[c])
-		sum += _band_height(other)
+		# _band_height, read here (40,000 calls on the wilds under the card).
+		var on := other.clamp(Vector2i.ZERO, top)
+		sum += _relief[on.y * _relief_size.x + on.x]
 	var height := low if low < INF else sum * 0.25
 	_band_vertices[vertex] = height
 	return height
