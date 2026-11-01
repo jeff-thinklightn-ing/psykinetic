@@ -24,6 +24,8 @@ which worktree owns each step, and the design rules not to break without asking 
   commit; tell it when you land (commit, protocol change, new `class_name`).
 - A design question goes to the coordinator first; once approved, get its decision number
   from release.
+- New player-facing lines (dialogue, windows, signs, barks) go to the `voice` worktree session
+  for wording before they land (Jeff, 2026-10-31); facts in them still go to `lore`.
 
 ## Landing work
 
