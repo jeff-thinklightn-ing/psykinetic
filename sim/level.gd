@@ -149,6 +149,19 @@ const ART_WALLED: Array[String] = ["building.turf_house"]
 ## tripod) and its bed, two cells along x; its shelf hangs on the wall and
 ## takes none.
 const FURNISHED := {"building.turf_house": [Vector2i(2, 0), Vector2i(-2, -1), Vector2i(-1, -1)]}
+## The turf house's bed among them (FURNISHED's second and third, its head
+## the first of the two: art-kit's socket turned head -x).
+const FURNISHED_BED := {"building.turf_house": [1, 2]}
+## The dwellings' beds (751, buildings' side; Jeff: townsfolk don't sleep on the
+## ground): slot or kind -> [the bed's prop slot, how many in a small one,
+## how many in a large]. A slot building's only while it has no use (a
+## house that is a forge sleeps nobody). As many as fit (beds_in): a 3 x 3
+## hut keeps its two-wide ways with one.
+const BEDS := {"building.hut": ["prop.bed_straw", 2, 2], "building.house": ["prop.bed", 3, 3],
+	"hut": ["prop.bed_straw", 2, 2], "round_hut": ["prop.bed_straw", 2, 2], "cottage": ["prop.bed", 2, 3],
+	"house": ["prop.bed", 3, 3], "house_leanto": ["prop.bed", 3, 4], "house_wing": ["prop.bed", 3, 4],
+	"l_house": ["prop.bed", 4, 4], "two_storey": ["prop.bed", 4, 4], "longhouse": ["prop.bed_straw", 6, 8],
+	"inn": ["prop.bed", 6, 8]}
 ## The slots drawn in their land's look (718): level.json's "land", else
 ## the level's name -> the variant; a land not named here is 1.
 const LAND_VARIANTS := {"building.turf_house": {"wilds": 1, "forest": 2}}
@@ -825,6 +838,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	_check_water(level["terrain"], warnings)
 	level["terrain"]["ledges"] = _ledges(level["terrain"], config, warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
+	_beds_round(level)
 	_clear_tall_grass(level, warnings)
 	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
@@ -1467,6 +1481,9 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		# A player's house (737): labelled "Your house" to every viewer.
 		if bool(entry.get("home", false)):
 			building["home"] = true
+		var beds := beds_in(building, terrain)
+		if not beds.is_empty():
+			building["beds"] = beds
 		out.append(building)
 	return out
 
@@ -2192,6 +2209,160 @@ static func banked_cells(building: Dictionary) -> Array[Vector2i]:
 		# Its own x east when it faces south (art-kit's +x), its y to its front.
 		out.append(middle + Vector2i(facing.y, -facing.x) * at.x + facing * at.y)
 	return out
+
+
+## [param building]'s beds (751, buildings' side), [{cells: [head, foot], head:
+## the way its head points (a sleeper's facing), prop: its slot}], or []:
+## a dwelling's (BEDS: by kind, else by slot when it has no use; none in a
+## ruin), as many of its count as fit (_bed_fits), each its head against a
+## wall, the farthest from its ways in first; the turf house's its
+## FURNISHED bed ("solid": its cells are out of the floor). The others'
+## cells stay floor: a sleeper lies on its head cell. [param blocked]: the
+## cells something already stands on (the level's entities: a locker), no
+## bed there and none walked through.
+static func beds_in(building: Dictionary, terrain: Dictionary, blocked: Dictionary = {}) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var slot := str(building.get("slot", ""))
+	if FURNISHED_BED.has(slot):
+		var laid := banked_cells(building)
+		var furnished: Array = FURNISHED.get(slot, [])
+		var at: Array[Vector2i] = []
+		for i: int in FURNISHED_BED[slot]:
+			at.append(laid[laid.size() - furnished.size() + i])
+		out.append({"cells": at, "head": at[0] - at[1], "prop": "prop.bed_straw", "solid": true})
+		return out
+	var key := str(building["kind"]) if building.has("kind") else slot
+	if not BEDS.has(key) or bool(building.get("ruined", false)):
+		return out
+	if not building.has("kind") and not str(building.get("use", "")).is_empty():
+		return out
+	var count := int(BEDS[key][2] if str(building.get("size", KIND_SIZE)) == "large" else BEDS[key][1])
+	var cells := building_cells(building)
+	var inside: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		inside[cell] = true
+	var edges: Dictionary = terrain.get("edges", {})
+	var walled := func(cell: Vector2i, way: Vector2i) -> bool:
+		return not inside.has(cell + way) or edges.get(Terrain.edge_key(cell, way), Terrain.Edge.OPEN) == Terrain.Edge.WALL
+	# Its ways in: a kind's doors and open edges, a slot's doors on the map.
+	var ways: Array = entrances(building) if building.has("kind") else blocks_outline(cells).filter(func(edge: Vector3i) -> bool:
+		return edges.get(edge, Terrain.Edge.OPEN) == Terrain.Edge.DOOR)
+	if ways.is_empty():
+		return out
+	# Off the door line: no bed on a line in from a door, nor beside its cell.
+	var kept: Dictionary[Vector2i, bool] = {}
+	var doors: Array[Vector2i] = []
+	for edge: Vector3i in ways:
+		var sides := Terrain.edge_cells(edge)
+		var cell: Vector2i = sides[0] if inside.has(sides[0]) else sides[1]
+		var inward: Vector2i = cell - (sides[1] if cell == sides[0] else sides[0])
+		doors.append(cell)
+		var across := Vector2i(inward.y, inward.x)
+		kept[cell + across] = true
+		kept[cell - across] = true
+		while inside.has(cell):
+			kept[cell] = true
+			cell += inward
+	var choices: Array[Array] = []  # [score, head, way]
+	for head in cells:
+		for way: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			var foot := head - way
+			if not inside.has(foot) or kept.has(head) or kept.has(foot) or not walled.call(head, way) or walled.call(foot, way):
+				continue
+			var far := 1 << 20
+			for door in doors:
+				far = mini(far, mini(absi(head.x - door.x) + absi(head.y - door.y), absi(foot.x - door.x) + absi(foot.y - door.y)))
+			var side := Vector2i(way.y, way.x)
+			var along: bool = walled.call(head, side) or walled.call(head, -side) or walled.call(foot, side) or walled.call(foot, -side)
+			choices.append([far * 2 + (1 if along else 0), head, way])
+	choices.sort_custom(func(a: Array, b: Array) -> bool:
+		if a[0] != b[0]:
+			return a[0] > b[0]
+		var p: Vector2i = a[1]
+		var q: Vector2i = b[1]
+		return p.y < q.y if p.y != q.y else (p.x < q.x if p.x != q.x else (a[2] as Vector2i) < (b[2] as Vector2i)))
+	var taken: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		if blocked.has(cell):
+			taken[cell] = true
+	var before := _bed_runs(cells, taken, walled)
+	for choice in choices:
+		if out.size() >= count:
+			break
+		var head: Vector2i = choice[1]
+		var foot: Vector2i = head - (choice[2] as Vector2i)
+		if taken.has(head) or taken.has(foot):
+			continue
+		taken[head] = true
+		taken[foot] = true
+		if _bed_fits(cells, taken, walled, doors[0], before):
+			out.append({"cells": [head, foot] as Array[Vector2i], "head": choice[2], "prop": str(BEDS[key][0])})
+		else:
+			taken.erase(head)
+			taken.erase(foot)
+	return out
+
+
+## [param level]'s dwellings' beds laid again round its entities (beds_in's
+## blocked: buildings_from knew none), where any stands inside one.
+static func _beds_round(level: Dictionary) -> void:
+	var blocked: Dictionary[Vector2i, bool] = {}
+	for spec: Dictionary in level.get("entities", []):
+		if spec.get("tile") is Vector2i:
+			blocked[spec["tile"]] = true
+	for link: Dictionary in level.get("links", []):
+		blocked[link["tile"]] = true
+	for start: Variant in level.get("starts", []):
+		if start is Vector2i:
+			blocked[start] = true
+	for building: Dictionary in level["buildings"]:
+		if not building.has("beds") or not building_cells(building).any(func(cell: Vector2i) -> bool: return blocked.has(cell)):
+			continue
+		var beds := beds_in(building, level["terrain"], blocked)
+		if beds.is_empty():
+			building.erase("beds")
+		else:
+			building["beds"] = beds
+
+
+## The single-width runs (narrow_runs_by) of [param cells] less
+## [param taken] (beds), [param walled] its walls.
+static func _bed_runs(cells: Array[Vector2i], taken: Dictionary, walled: Callable) -> Dictionary[Vector2i, int]:
+	var free := cells.filter(func(cell: Vector2i) -> bool: return not taken.has(cell))
+	var open := func(cell: Vector2i, way: Vector2i) -> bool:
+		return not walled.call(cell, way) and not taken.has(cell + way)
+	var typed: Array[Vector2i] = []
+	typed.assign(free)
+	return narrow_runs_by(typed, open)
+
+
+## Whether the beds [param taken] leave [param cells] walkable as a
+## room should be (612's two-cell ways, decision 612): the floor left all
+## one from [param door]'s cell, every bed beside some of it, and no
+## single-width run that was not in [param before].
+static func _bed_fits(cells: Array[Vector2i], taken: Dictionary, walled: Callable, door: Vector2i, before: Dictionary) -> bool:
+	if taken.has(door):
+		return false
+	var ways: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]
+	var reached: Dictionary[Vector2i, bool] = {door: true}
+	var queue: Array[Vector2i] = [door]
+	while not queue.is_empty():
+		var cell: Vector2i = queue.pop_back()
+		for way in ways:
+			var next := cell + way
+			if not walled.call(cell, way) and not taken.has(next) and not reached.has(next):
+				reached[next] = true
+				queue.append(next)
+	for cell in cells:
+		if taken.has(cell):
+			if not ways.any(func(way: Vector2i) -> bool: return reached.has(cell + way) and not walled.call(cell, way)):
+				return false
+		elif not reached.has(cell):
+			return false
+	for cell: Vector2i in _bed_runs(cells, taken, walled):
+		if not before.has(cell):
+			return false
+	return true
 
 
 ## [param slot]'s variant in [param land] (LAND_VARIANTS, 718): 1 where

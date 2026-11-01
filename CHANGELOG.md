@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Umbrage's houses and huts now have beds: three in your house, a straw bed in each hut, and beds in every house and inn a town builds (751).
 - Maps: M now opens and closes only the zone's map; the world map has its own small "World map" button under the corner map, and its own key, J (445 amended).
 
 ## v0.1.195

@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_building_links()
 	_test_building_level_link()
 	_test_umbrage_locker()
+	_test_beds()
 	_test_place_towns()
 	_test_regenerate_mark()
 	_test_town_walls()
@@ -1655,6 +1656,117 @@ func _test_building_level_link() -> void:
 ## Umbrage's locker (722): one chest prop {"locker": true}, since 737 in
 ## the player's house, its back to the house's south wall, the cell before
 ## it open floor.
+func _test_beds() -> void:
+	print("
+== the dwellings' beds (751, buildings' side) ==")
+	var cells: Array[Vector2i] = []
+	for y in 40:
+		for x in 40:
+			cells.append(Vector2i(x, y))
+	var open_ground := {"floor": cells, "edges": {}, "heights": {}, "water": []}
+	var short: Array[String] = []
+	var bad: Array[String] = []
+	for kind: String in Level.BEDS:
+		if kind.begins_with("building."):
+			continue
+		for size: String in ["small", "large"]:
+			for facing: Array in [[0, 1], [0, -1], [1, 0], [-1, 0]]:
+				var warnings: Array[String] = []
+				var built := Level.buildings_from({"buildings": [{"kind": kind, "size": size, "at": [5, 5], "facing": facing}]}, open_ground, warnings)
+				var building: Dictionary = built[0]
+				var beds: Array = building.get("beds", [])
+				if beds.size() != int(Level.BEDS[kind][2 if size == "large" else 1]):
+					short.append("%s %s %s: %d" % [kind, size, facing, beds.size()])
+				var why := _beds_wrong(building, beds, {})
+				if not why.is_empty():
+					bad.append("%s %s %s: %s" % [kind, size, facing, why])
+	_check(short.is_empty(), "every kind's beds all fit, small and large, every facing (%s)" % [short])
+	_check(bad.is_empty(), "each bed inside, its head on a wall, off the door line, the floor left one with two-cell ways (%s)" % [bad])
+	var ruin := Level.buildings_from({"buildings": [{"kind": "house", "at": [5, 5], "facing": [0, 1], "ruined": true}]}, open_ground, [] as Array[String])
+	_check(not ruin[0].has("beds"), "a ruin has no beds")
+	var wilds := Level.load_level("wilds")
+	var blocked := {}
+	for spec: Dictionary in wilds["entities"]:
+		blocked[spec["tile"]] = true
+	var listed: Array[String] = []
+	var wrong: Array[String] = []
+	var by_slot := {}
+	for building: Dictionary in wilds["buildings"]:
+		var beds: Array = building.get("beds", [])
+		listed.append("%s %s %s: %d" % [building["slot"], (building["rect"] as Rect2i).position, building.get("use", ""), beds.size()])
+		by_slot[building["slot"]] = int(by_slot.get(building["slot"], 0)) + (1 if not beds.is_empty() else 0)
+		var why := _beds_wrong(building, beds, blocked, wilds["terrain"]["edges"]) if not beds.is_empty() and not building["slot"] in Level.ART_WALLED else ""
+		if not why.is_empty():
+			wrong.append("%s: %s" % [building["rect"], why])
+		for bed: Dictionary in beds:
+			for cell: Vector2i in bed["cells"]:
+				if bool(bed.get("solid", false)) == wilds["terrain"]["floor"].has(cell):
+					wrong.append("%s: bed cell %s %s" % [building["rect"], cell, "floor" if bed.get("solid", false) else "not floor"])
+	var homes: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building.get("home", false))
+	var huts: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.hut")
+	var forge: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building.get("use", "") == "forge")
+	var turf: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.turf_house")
+	_check(homes.size() == 1 and (homes[0].get("beds", []) as Array).size() == 3 and huts.size() == 2
+		and huts.all(func(hut: Dictionary) -> bool: return (hut.get("beds", []) as Array).size() == 1)
+		and forge.size() == 1 and not forge[0].has("beds") and by_slot.get("building.temple", 0) == 0
+		and turf.size() == 1 and (turf[0]["beds"] as Array).size() == 1 and bool(turf[0]["beds"][0]["solid"]),
+		"Umbrage: three beds in the player's house, one in each 3 x 3 hut, none in the forge or the temple, the turf hut its own (%s)" % [listed])
+	_check(wrong.is_empty(), "Umbrage's beds on floor, off the locker and every entity, two-cell ways kept (%s)" % [wrong])
+
+
+## Why [param beds] in [param building] break its rules, "" if none: each
+## inside, its two cells side by side, its head cell on a wall the way it
+## points, not on a line in from a door nor beside a door's cell, no two on
+## a cell nor on [param blocked]; the floor left all one, no single-width run.
+func _beds_wrong(building: Dictionary, beds: Array, blocked: Dictionary, edges: Dictionary = {}) -> String:
+	var inside := {}
+	for cell in Level.building_cells(building):
+		inside[cell] = true
+	var line := {}
+	for edge: Vector3i in Level.entrances(building) if building.has("kind") else Level.building_outline(building).filter(func(key: Vector3i) -> bool:
+			return edges.get(key) == Terrain.Edge.DOOR):
+		var sides := Terrain.edge_cells(edge)
+		var cell: Vector2i = sides[0] if inside.has(sides[0]) else sides[1]
+		var inward: Vector2i = cell - (sides[1] if cell == sides[0] else sides[0])
+		line[cell + Vector2i(inward.y, inward.x)] = true
+		line[cell - Vector2i(inward.y, inward.x)] = true
+		while inside.has(cell):
+			line[cell] = true
+			cell += inward
+	var taken := {}
+	for cell: Vector2i in blocked:
+		if inside.has(cell):
+			taken[cell] = true
+	for bed: Dictionary in beds:
+		var head: Vector2i = bed["cells"][0]
+		var foot: Vector2i = bed["cells"][1]
+		if head - foot != bed["head"] or inside.has(head + bed["head"]) or not inside.has(head) or not inside.has(foot):
+			return "a bed not lying head to wall inside (%s)" % [bed]
+		if line.has(head) or line.has(foot) or taken.has(head) or taken.has(foot):
+			return "a bed on the door line, another bed or an entity (%s)" % [bed]
+		taken[head] = true
+		taken[foot] = true
+	var free: Array[Vector2i] = []
+	for cell: Vector2i in inside:
+		if not taken.has(cell):
+			free.append(cell)
+	var open := func(cell: Vector2i, way: Vector2i) -> bool: return inside.has(cell + way) and not taken.has(cell + way)
+	var runs := Level.narrow_runs_by(free, open)
+	if not runs.is_empty():
+		return "single-width runs %s" % [runs.keys()]
+	var reached := {free[0]: true}
+	var queue: Array[Vector2i] = [free[0]]
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_back()
+		for way: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+			if open.call(at, way) and not reached.has(at + way):
+				reached[at + way] = true
+				queue.append(at + way)
+	if reached.size() != free.size():
+		return "the floor left in pieces"
+	return ""
+
+
 func _test_umbrage_locker() -> void:
 	print("\n== Umbrage's locker (722), in the player's house (737) ==")
 	var wilds := Level.load_level("wilds")

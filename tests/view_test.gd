@@ -2024,6 +2024,7 @@ func _test_kinds() -> void:
 	_test_inside()
 	_test_chimney_smoke()
 	_test_turf_house()
+	_test_beds_drawn()
 	_test_chapel()
 	_test_home_label()
 	_test_inside_is_his()
@@ -2430,6 +2431,49 @@ func _test_chimney_smoke() -> void:
 ## the camera's side faded while you are inside, its pot, bed and shelf at
 ## their sockets, its pot's fire and chimney smoke while someone is awake
 ## inside, its disrepair and ruin its slot's own looks.
+func _test_beds_drawn() -> void:
+	print("
+== the dwellings' beds drawn (751, buildings' side) ==")
+	var cells: Array[Vector2i] = []
+	for y in 30:
+		for x in 30:
+			cells.append(Vector2i(x, y))
+	var warnings: Array[String] = []
+	var built := Level.buildings_from({"buildings": [{"kind": "house", "at": [5, 5], "facing": [0, 1]}]}, {"floor": cells, "edges": {}, "heights": {}, "water": []}, warnings)
+	var house: Dictionary = built[0]
+	var node := BuildingComposer.compose(house, BuildingComposer.covered_in(house))
+	node.position = Vector3(5, 0.5, 5)
+	Client3D.add_beds(node, house, 0.5)
+	var beds: Array = house["beds"]
+	var wrong: Array[String] = []
+	for index in beds.size():
+		var piece := node.get_node_or_null("parts/Bed_%d" % index) as Node3D
+		var bed: Dictionary = beds[index]
+		var middle := (Vector2(bed["cells"][0]) + Vector2(bed["cells"][1])) * 0.5
+		if piece == null:
+			wrong.append("no Bed_%d" % index)
+			continue
+		var at := node.transform * piece.transform
+		var way: Vector2i = bed["head"]
+		var head := -at.basis.z
+		if not at.origin.is_equal_approx(Vector3(middle.x, 0.5, middle.y)) or not head.is_equal_approx(Vector3(way.x, 0, way.y)):
+			wrong.append("Bed_%d at %s head %s, wanted %s head %s" % [index, at.origin, head, middle, way])
+	_check(beds.size() == 3 and wrong.is_empty() and str(beds[0]["prop"]) == "prop.bed",
+		"a house's three beds in its parts, each on the middle of its cells at its floor, its head (-z) the bed's way (%s)" % [wrong])
+	node.free()
+	var hut := {"slot": "building.hut", "rect": Rect2i(2, 2, 3, 3), "facing": Vector2i(0, -1),
+		"beds": [{"cells": [Vector2i(2, 4), Vector2i(2, 3)], "head": Vector2i(0, 1), "prop": "prop.bed_straw"}]}
+	var slot := Node3D.new()
+	slot.position = Vector3(3, 0, 3)
+	slot.rotation.y = atan2(0.0, -1.0)
+	Client3D.add_beds(slot, hut, 0.0)
+	var straw := slot.get_node_or_null("parts/Bed_0") as Node3D
+	var placed := slot.transform * straw.transform if straw != null else Transform3D()
+	_check(straw != null and placed.origin.is_equal_approx(Vector3(2, 0, 3.5)) and (-placed.basis.z).is_equal_approx(Vector3(0, 0, 1)),
+		"a turned slot hut's straw bed: its parts made, the bed where the map has it (%s)" % [placed])
+	slot.free()
+
+
 func _test_turf_house() -> void:
 	print("\n== the healer's turf house: banked plot, art walls, furnishings, its fire and its ruin (718) ==")
 	var map := LevelMap.new(Vector2i(16, 12))

@@ -6003,6 +6003,7 @@ func _add_buildings() -> void:
 			parts.add_child(chimney)
 			node.add_child(parts)
 		_room.add_child(node)
+		add_beds(node, building, _elevation(rect.position))
 		var index := _buildings.size()
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
@@ -6037,6 +6038,35 @@ func _add_buildings() -> void:
 		_room.add_child(keep_dry)
 		for cell in Level.rect_cells(inner):
 			_building_at[cell] = index
+
+
+## [param building]'s beds (Level.beds_in, 751, buildings' side) under
+## [param node]'s "parts" (made if it has none: a ruin or an unfinished
+## build hides them), each its prop on the middle of its two cells at
+## [param ground] (the building's ground), its head (art-kit's -z) the
+## bed's way; the turf house's own (solid) is art_dress's.
+static func add_beds(node: Node3D, building: Dictionary, ground: float) -> void:
+	var beds: Array = building.get("beds", [])
+	if beds.is_empty():
+		return
+	var parts := node.get_node_or_null("parts") as Node3D
+	if parts == null:
+		parts = Node3D.new()
+		parts.name = "parts"
+		node.add_child(parts)
+	var to_node := node.transform.affine_inverse()
+	for index in beds.size():
+		var bed: Dictionary = beds[index]
+		var prop := str(bed.get("prop", ""))
+		if bool(bed.get("solid", false)) or not ArtKit.has(prop):
+			continue
+		var cells: Array = bed["cells"]
+		var middle := (Vector2(cells[0]) + Vector2(cells[1])) * 0.5
+		var way: Vector2i = bed["head"]
+		var piece := ArtKit.instance(prop)
+		piece.name = "Bed_%d" % index
+		piece.transform = to_node * Transform3D(Basis(Vector3.UP, atan2(-float(way.x), -float(way.y))), Vector3(middle.x, ground, middle.y))
+		parts.add_child(piece)
 
 
 ## The buildings drawn: the level's, and its towns' laid plots' (591
@@ -6181,6 +6211,7 @@ func _add_kind(building: Dictionary) -> void:
 	node.name = "Building_%d_%d" % [rect.position.x, rect.position.y]
 	node.position = Vector3(rect.position.x, base, rect.position.y)
 	_room.add_child(node)
+	add_beds(node, building, base)
 	var roof: Node3D = node.get_node_or_null("roof")
 	var inside: Dictionary[Vector2i, bool] = {}
 	for cell in cells:
