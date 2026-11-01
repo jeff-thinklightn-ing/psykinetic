@@ -11,6 +11,7 @@ notes (decision 324).
 - A townsman asleep no longer offers Barter, and a barter with one gets "<Name> is asleep." rather than his window (751 amended (2)).
 - Tools: a playtest tour talks to every townsperson by day and at night, and the seam check now follows maps' ruling (754 amended (3)).
 
+- A town's log now speaks in its own words: buildings rise and fall by stages ("the town raises its forge to the second stage"), with no levels, experience or game words (748 amended (4), economy's side; voice's wording).
 - No lone brick wall beside the foothills' roads at the zone edges: the castle's and the wilds' outer walls are no longer drawn in the view past each road (327 amended (2)).
 - Tools: playtest tours watch the walk for pacing on the spot, stand at every link between zones, and check the ground meets across each zone seam (tools/tour.sh edges; 754 amended (2)).
 

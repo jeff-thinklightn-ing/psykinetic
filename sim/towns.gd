@@ -391,7 +391,7 @@ func note_rescue(town: String, who_id: String, name: String, trade: String, orig
 		# A companion (decision 314): Main frees her into this town, a
 		# resident working her trade till her player comes.
 		record["captives"].erase(held[0])
-		_note(town, "%s, a companion taken by %s, is rescued and home" % [held[0]["name"], faction_name(str(held[0]["by"]))])
+		_note(town, "%s, taken by %s, is rescued and home" % [held[0]["name"], faction_name(str(held[0]["by"]))])
 		add_xp(town, int(rules.get("xp", {}).get("rescue", 10)), "%s rescued" % held[0]["name"])
 		if companion_freed.is_valid():
 			companion_freed.call(who_id.trim_prefix("companion:"), town)
@@ -500,7 +500,7 @@ func note_companion_in(town: String, companion_name: String, trade: String, play
 	production.set_away(who, false)
 	if who not in record["residents"]:
 		record["residents"].append(who)
-		_note(town, "%s, a companion, stays and works as a %s" % [companion_name, trade])
+		_note(town, "%s comes to stay, and works as a %s" % [companion_name, trade])
 	_seat(town)
 
 
@@ -752,7 +752,7 @@ func unlock(town: String, kind: String) -> bool:
 		cells.assign(where.get("cells", []))
 		if not cells.is_empty():
 			reclaimed.emit(town, kind, str(where.get("zone", "")), cells)
-	_note(town, "%d experience spent on a %s, level %d" % [price, kind, level])
+	_note(town, ("the town sets about building a %s" % _said(kind)) if level <= 1 else "the town raises its %s to the %s stage" % [_said(kind), _stage(level)])
 	building_changed.emit(town, kind)
 	var by := str(spec.get("built_by", ""))
 	if by.is_empty():
@@ -794,7 +794,7 @@ func seed_from(world_map: WorldMap) -> Array[String]:
 			if record["buildings"].has(kind) or kind in record.get("gone", []):
 				continue
 			record["buildings"][kind] = {"kind": kind, "level": 1, "state": STANDING, "since": now(), "job": 0}
-			_note(town, "the %s stands, level 1, as the map has it" % kind)
+			_note(town, "the %s stands, as it was built" % _said(kind))
 			building_changed.emit(town, kind)
 			_seat(town)
 			out.append("%s/%s" % [town, kind])
@@ -934,7 +934,7 @@ func _built(town: String, kind: String) -> void:
 			repaired["state"] = STANDING
 			repaired["since"] = now()
 			repaired["job"] = 0
-			_note(town, "the %s is repaired, level %d" % [repaired["kind"], repaired["level"]])
+			_note(town, "the %s is repaired, at its %s stage" % [_said(str(repaired["kind"])), _stage(int(repaired["level"]))])
 			building_changed.emit(town, str(repaired["kind"]))
 			_seat(town)
 		return
@@ -944,7 +944,7 @@ func _built(town: String, kind: String) -> void:
 	entry["since"] = now()
 	entry["job"] = 0
 	record["buildings"][kind] = entry
-	_note(town, "the %s stands, level %d" % [kind, entry["level"]])
+	_note(town, "the %s stands at its %s stage" % [_said(kind), _stage(int(entry["level"]))])
 	building_changed.emit(town, kind)
 	_seat(town)
 
@@ -2293,7 +2293,7 @@ func _neglect_turn(town: String, rule: Dictionary, day: int) -> void:
 				entry.erase("decay")
 				_note(town, "the %s is a ruin" % kind)
 			else:
-				_note(town, "the %s, in disrepair, is down to level %d" % [kind, entry["level"]])
+				_note(town, "the %s, in disrepair, crumbles back to its %s stage" % [_said(kind), _stage(int(entry["level"]))])
 			building_changed.emit(town, kind)
 			continue
 		var trade := str(kinds.get(kind, {}).get("trade", ""))
@@ -2635,7 +2635,8 @@ func carried_home(town: String, group_id: String, faction: String, captives: Arr
 		var her_name := str(her.get("name", who))
 		_town(town)["captives"].append({"id": who, "name": her_name, "trade": str(her.get("trade", "")), "origin": who,
 			"purse": 0, "taken_at": now(), "by": faction, "held_by": holder})
-		_note(town, "%s, a companion, is held by %s (%s)" % [her_name, faction_name(faction), group_id])
+		_note(town, "%s is held by %s" % [her_name, faction_name(faction)])
+		print("[towns] raid group %s holds a companion of %s at %s" % [group_id, town, holder])  # The group's id for the log, not the town's voice.
 		out.append(who)
 	return out
 
@@ -3093,6 +3094,18 @@ func _visitors_turn(town: String) -> void:
 	var did := str(visitor_arrives.call(town, entry)) if visitor_arrives.is_valid() else ""
 	_note(town, "%s the %s from %s comes to %s%s" % [entry["name"], kind, entry["from"], town, ": " + did if not did.is_empty() else ""])
 	visitor_came.emit(town, str(entry["id"]))
+
+
+## A building kind as the town says it (748 amended (4)): "healers_hut" -> "healers hut".
+static func _said(kind: String) -> String:
+	return kind.replace("_", " ")
+
+
+## A building's level as the town says it (748 amended (4); voice: no game
+## words in the town's voice): 1 -> "first", 2 -> "second", ...
+static func _stage(level: int) -> String:
+	var words := ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
+	return words[level - 1] if level >= 1 and level <= words.size() else "%dth" % level
 
 
 func _note(town: String, what: String) -> void:

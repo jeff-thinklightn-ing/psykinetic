@@ -36936,6 +36936,17 @@ him.
   it. A heuristic list for review, not a test; re-run it, don't edit the page.
 - A word checker (modern and game words in fixed lines) waits until Jeff has seen the guide.
 Docs and a tool only, protocol unchanged, no new class_name.
+
+748 amended (4), economy's side: the town's log in its own words (voice's check: no game words,
+"level", "experience" or "companion", in what the town says; the wording voice's, the stage word
+economy's). Towns' notes say a building's level as its stage (Towns._stage: "first", "second",
+...) and its kind with spaces (Towns._said): "the town sets about building a forge" for a first
+build and "the town raises its forge to the second stage" after, no experience count (the sheet
+keeps the figures); "the forge stands, as it was built" for a building the map lays; "repaired, at
+its second stage"; "stands at its second stage"; "in disrepair, crumbles back to its first stage".
+A companion is named without the word: "taken by ..., is rescued and home", "comes to stay, and
+works as a smith", "is held by ...", the raid group's id now only in the server log.
+Server only, wording only, protocol unchanged, no new class_name.
 ## 751, art-kit's side: the bedroll
 
 Jeff's note that townsfolk shouldn't sleep on bare ground (the coordinator's ask, 2026-10-31; npc's 751
