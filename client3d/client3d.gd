@@ -8339,18 +8339,25 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 			heights[ours] = lane_height if way["kind"] == "link" else int(terrain.get("heights", {}).get(cell, 0))
 			if way["kind"] != "link" and terrain.get("stairs", {}).has(cell):  # Flat: no stair climbs.
 				stairs[ours] = terrain["stairs"][cell]
+	# Their own cells, before the lane's: an edge of theirs is drawn only
+	# between two of them. Their map's outer wall (the castle's south row)
+	# has the lane on its far side, and kept, it stood as a lone wall
+	# beside the road (the seam tour, 2026-11-01).
+	var their_cells := cells.duplicate()
+	var lane_only: Array[Vector2i] = []
 	for cell in lane:
 		if cells.has(cell):
 			continue
 		floor_cells.append(cell)
 		cells[cell] = true
+		lane_only.append(cell)
 		kinds[cell] = lane_kind
 		heights[cell] = lane_height
 	var edges := {}
 	for key: Vector3i in terrain.get("edges", {}):
 		var ours := Vector3i(key.x + shift.x, key.y + shift.y, key.z)
 		var sides := Terrain.edge_cells(ours)
-		if cells.has(sides[0]) and cells.has(sides[1]):
+		if their_cells.has(sides[0]) and their_cells.has(sides[1]):
 			edges[ours] = terrain["edges"][key]
 	# Its buildings wholly in the glimpse, as built (no town's state: it
 	# is drawn only).
@@ -8377,7 +8384,7 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		# the way, the lane's far end, and their arrival as drawn here.
 		raised = {"meet": meet, "level": lane_height, "lane_end": meet + away * GLIMPSE_GAP,
 				"arrive": (way["to_cell"] as Vector2i) + shift}
-	return {"to": str(way["to_map"]), "cells": cells, "raised": raised, "terrain": {
+	return {"to": str(way["to_map"]), "cells": cells, "lane": lane_only, "raised": raised, "terrain": {
 		"floor": floor_cells, "water": water, "kinds": kinds, "heights": heights, "stairs": stairs, "edges": edges,
 		"fire": [], "torches": [], "lanterns": [], "buildings": buildings, "roofs": roofs, "outdoor": true, "zone": "outdoors",
 		"walls": terrain.get("walls", DEFAULT_SET), "floors": terrain.get("floors", DEFAULT_SET), "border": "none"}}

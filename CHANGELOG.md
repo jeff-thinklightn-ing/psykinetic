@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- No lone brick wall beside the foothills' roads at the zone edges: the castle's and the wilds' outer walls are no longer drawn in the view past each road (327 amended (2)).
 - Tools: playtest tours watch the walk for pacing on the spot, stand at every link between zones, and check the ground meets across each zone seam (tools/tour.sh edges; 754 amended (2)).
 
 - A bow out of a fight is slung across the back from the left hip to the right shoulder, its wood lying against the back whatever your build, the string over the right shoulder and down the chest, the quiver flat beside it with its mouth at the shoulder.

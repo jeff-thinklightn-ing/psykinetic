@@ -6147,6 +6147,17 @@ at the meeting cell, and the room's kept height for those cells the same (each g
 measured, so a plan with nothing to measure fails). Stills: C:/dev/review/lands/seam
 (before/after, the foothills' north and south links). Client only, protocol unchanged, no new
 class_name.
+
+**327 amended (2): no wall of theirs on the lane.** Playtest's seam tour (2026-11-01) saw a lone
+brick wall, two cells long and a storey high, beside the foothills' north road and its south
+road. It was the neighbour's outer wall: the castle's south row (and the wilds' likewise) has a
+wall edge whose far side is off its map, an outline edge it never draws. In the glimpse, the
+lane's cells lay on that far side, so the edge had a glimpse cell on both sides and was kept.
+_glimpse_plan now keeps an edge of theirs only between two of their own cells (as taken in,
+before the lane's), and the plan lists its "lane". view_test _test_glimpses_meet: on every
+outdoor level of the plane, no glimpse edge touches its lane. Their walls inside the glimpse
+stay (the castle's gatehouse, drawn without its building, which is only drawn when wholly in
+it: as built). Client only, protocol unchanged, no new class_name.
 ## 328. Raid groups travel the world map; camps make a town's threat; off until switched on
 
 Jeff: raids are "real raiders on the world tick": a group sets out from a

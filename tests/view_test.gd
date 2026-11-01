@@ -1289,6 +1289,22 @@ func _test_glimpses_meet() -> void:
 		# Every link's glimpse measured (a plan with no "raised" would pass unmeasured).
 		_check(misses.is_empty() and measured >= 2 * _rig._glimpses.size(),
 				"%s: its %d glimpses meet our ground (%d spots; %s)" % [zone, _rig._glimpses.size(), measured, "; ".join(misses) if not misses.is_empty() else "all within"])
+		# No wall of theirs on the lane (the seam tour, 2026-11-01: the
+		# castle's outer wall, the lane past it, stood as a lone wall by the
+		# foothills' north road, the wilds' likewise by its south road).
+		var on_lane: Array[String] = []
+		var lanes := 0
+		for plan: Dictionary in _rig._glimpse_plans:
+			var lane := {}
+			for cell: Vector2i in plan.get("lane", []):
+				lane[cell] = true
+			lanes += lane.size()
+			for key: Vector3i in plan["terrain"]["edges"]:
+				var sides := Terrain.edge_cells(key)
+				if lane.has(sides[0]) or lane.has(sides[1]):
+					on_lane.append("%s's %s" % [plan["to"], key])
+		_check(on_lane.is_empty() and (lanes > 0 or _rig._glimpses.is_empty()),
+				"%s: no glimpse's wall stands on its lane (%d lane cells; %s)" % [zone, lanes, ", ".join(on_lane) if not on_lane.is_empty() else "none"])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 ## The ground's fields apart from the members (660 step 2 A): _ground_fields
