@@ -4,7 +4,8 @@ Status: **draft for Jeff** (decision 748). How the world's people say things: wo
 register, dialect and rhythm of every line a player reads. What is *true* (history, places,
 names, who knows what) is lore's (`docs/lore/`); a line that adds or changes a fact goes to
 lore first. Every fixed line now in the game is listed in `docs/voice_inventory.md`
-(`python -B tools/voice_inventory.py` regenerates it).
+(`python -B tools/voice_inventory.py` regenerates it), and `python -B tools/voice_check.py`
+reports the ones that break the rules below (report only).
 
 Marks used below:
 

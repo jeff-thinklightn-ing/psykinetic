@@ -37541,3 +37541,15 @@ It replaces 662 amended (d)'s placement (BOW_BACK, bow_back_face); when it is sl
   the string drawn slung and gone in hand, the own string hidden and shown, all gone unequipped.
 
 Client only, protocol unchanged, no new class_name.
+
+## 748 amended: the voice check, report only
+
+The coordinator, 2026-11-01, while Jeff has the guide: build the word checker now, as a report
+that never fails a landing. tools/voice_check.py reads the lines voice_inventory finds and lists,
+by speaker, those with an exclamation mark, a modern word, a game word in the world's mouth (level,
+quest, loot, player, companion, HP...) or a dash, skipping system text (hints, admin commands,
+update notices, the voice model's prompts) and the world's own senses ("a game of knucklebones",
+"cool air"). Jeff's lines (quoted in lore's pages, or marked [Jeff] in docs/voice.md) are listed
+apart and never reworded without asking him. Exit 0 always; not in land.sh. Its first report: 27
+lines, one of them Jeff's (the draugr's "by force!").
+Tools only, protocol unchanged, no new class_name.
