@@ -16,9 +16,10 @@ extends RefCounted
 const OUTDOOR := ["wilds", "foothills", "castle", "hills", "forest", "held"]
 ## The most two touching cells either side of a seam may differ (metres): a
 ## walkable step's rise (Relief's WALK_RISE is per cell; a seam is one cell).
-## Asserted only within LINK_REACH of a link's crossing (the coordinator,
-## 11-01: edges nobody crosses may only differ in walk data, maps to rule);
-## the rest of each seam is reported, its cells in the CSV.
+## Asserted within LINK_REACH of a link's crossing and where both cells are
+## walkable (maps' ruling, 11-01: the rest is forest band or off-land rows,
+## never crossed, the neighbour's relief never drawn beside ours); the rest
+## of each seam is reported, its cells in the CSV.
 const EDGE_RISE := 1.0
 const LINK_REACH := 3
 const YAWS := [0.0, 90.0, 180.0, 270.0]
@@ -106,7 +107,7 @@ func _measure_edges(bot: Node, zone_name: String) -> void:
 			for out: Vector2i in outs:
 				var cell := Vector2i(x, y)
 				_edges["%s|%s" % [origin + cell, out]] = {"zone": zone_name, "cell": cell, "world": origin + cell, "out": out,
-					"height": base + World.elevation_at(cell)}
+					"height": base + World.elevation_at(cell), "walk": World.is_walkable(cell)}
 				count += 1
 	bot.log_line("edges: %s measured, %d edge cells, size %s, origin %s, base %.2f m" % [zone_name, count, size, origin, base])
 
@@ -139,7 +140,9 @@ func _compare_edges(bot: Node) -> void:
 			seam["over"] += 1
 			var world: Vector2i = a["world"]
 			if crossings.any(func(c: Vector2i) -> bool: return World.distance(c, world) <= LINK_REACH):
-				seam["at_link"] = seam.get("at_link", []) + ["%s %.2f m" % [world, rise]]
+				seam["at_link"] = seam.get("at_link", []) + ["link %s %.2f m" % [world, rise]]
+			elif bool(a["walk"]) and bool(back["walk"]):
+				seam["at_link"] = seam.get("at_link", []) + ["walkable %s %.2f m" % [world, rise]]
 		if rise > float(seam["worst"]):
 			seam["worst"] = rise
 			seam["at"] = [a["zone"], a["cell"], back["zone"], back["cell"]]
@@ -161,7 +164,7 @@ func _compare_edges(bot: Node) -> void:
 		bot.log_line("seam %s report: %d cells along it, %d over %.1f m; the worst %.2f m at %s (heights %s)" % [pair.replace("|", "-"),
 			seam["count"], seam["over"], EDGE_RISE, seam["worst"], seam["at"], seam["heights"]])
 		var at_link: Array = seam.get("at_link", [])
-		bot.expect(at_link.is_empty(), "the ground meets across the %s seam at its links (within %.1f m, %d cells either way)" % [pair.replace("|", "-"), EDGE_RISE, LINK_REACH],
+		bot.expect(at_link.is_empty(), "the ground meets across the %s seam at its links (%d cells either way) and wherever both sides are walkable (within %.1f m)" % [pair.replace("|", "-"), LINK_REACH, EDGE_RISE],
 			"over at a link: %s" % [at_link])
 
 

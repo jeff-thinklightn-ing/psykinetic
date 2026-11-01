@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Tools: a playtest tour talks to every townsperson by day and at night, and the seam check now follows maps' ruling (754 amended (3)).
 
 - No lone brick wall beside the foothills' roads at the zone edges: the castle's and the wilds' outer walls are no longer drawn in the view past each road (327 amended (2)).
 - Tools: playtest tours watch the walk for pacing on the spot, stand at every link between zones, and check the ground meets across each zone seam (tools/tour.sh edges; 754 amended (2)).

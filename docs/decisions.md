@@ -37391,6 +37391,14 @@ nobody crosses may only differ in walk data, maps to rule), each seam's cells wr
 seam_<a>_<b>.csv beside the report. The edges tour is that measurement
 alone, headless, in about two minutes. The barrow tour's boss timing pairs a wind-up only with
 its own blow.
+
+754 amended (3) (2026-11-01): maps' ruling on the seams (every cell over 1 m is unwalkable on
+both sides, the links meet within 0.05 m, held's -2.73 m base is right): the edge check fails
+only within 3 cells of a link's crossing or where both cells are walkable, and reports the rest.
+lane_walls re-shoots the foothills' two road seams (327 amended's lone glimpse walls). folk
+talks to every townsperson in Umbrage by day and at night, walking the town's spots: awake, the
+talk bar or a greeting, a merchant or maker's (Main._barters) with a way to wares; asleep, told
+they sleep and silent; never a raw node name shown; a table of who was met.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping
