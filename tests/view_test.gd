@@ -4563,19 +4563,24 @@ func _test_ledge_curves() -> void:
 		var stretches := 0
 		var faced := 0
 		var unmet := []
-		for ledge: Dictionary in _rig._ledge_curves:
+		for index in _rig._ledge_curves.size():
+			var ledge: Dictionary = _rig._ledge_curves[index]
 			var points: PackedVector2Array = ledge["curve"]["points"]
 			for k in range(0, points.size(), 4):
-				var high := _rig._ledge_ground(points[k], true)
-				var low := _rig._ledge_ground(points[k], false)
+				# An open curve's end can stop on another ledge (756's terraced
+				# taper), where the ground either side is the two ledges' both.
+				if not bool(ledge["closed"]) and (k == 0 or k == points.size() - 1):
+					continue
+				var high := _rig._ledge_ground(points[k], true, index)
+				var low := _rig._ledge_ground(points[k], false, index)
 				if high - low <= Relief.EPSILON:
 					continue
 				stretches += 1
 				# The drawn ground just past the curve either side meets it.
 				var t: Vector2 = (ledge["curve"]["tangents"] as PackedVector2Array)[k]
 				var up := Vector2(-t.y, t.x) * float(ledge["up"])
-				var above := _rig._ledge_ground(points[k] + up * 0.02, true)
-				var below := _rig._ledge_ground(points[k] - up * 0.02, false)
+				var above := _rig._ledge_ground(points[k] + up * 0.02, true, index)
+				var below := _rig._ledge_ground(points[k] - up * 0.02, false, index)
 				if absf(above - high) > 0.05 or absf(below - low) > 0.05:
 					unmet.append(points[k])
 				faced += 1

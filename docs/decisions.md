@@ -23476,6 +23476,21 @@ alternated twice against the withdrawal (eb6cce15): rebuild hills 966/914
 ms before, 989/942 after (about +25 ms); the wilds 3869/3488 before,
 3578/3531 after (noise); frame medians 0.93 to 1.14 ms either way. Client
 only, protocol unchanged (maps' 585 opens 32), no new class_name.
+
+585 amended (release's label), for maps' 756 (the hills at 224): the plateau's
+south end there tapers in steps, a ledge along each row, one cell apart, so
+every cell's middle was as near the next ledge as its own, and
+_ledge_ground, which sorted the cells round a point by the nearest ledge's
+side, read the wrong side's ground: faces up to 0.88 m off the ground there
+(a rock shard stood out of the dirt where the plateau's ledges meet).
+_ledge_ground now takes the ledge and sorts each cell by that ledge's curve
+(_ledge_near's "only"); _add_ledge_faces and _ledge_covers pass theirs.
+view_test's face check passes the ledge and skips an open curve's end
+samples, where one ledge stops on another and the ground either side is
+both's. On 756's hills: 4 unmet points (worst 0.88 m) to 0; the wilds 0
+either way. Stills C:/dev/review/lands/ledge_taper (before/after taper-0,
+-90, -180). Client only, protocol unchanged, no new class_name.
+
 ## 616. Plain orders, read with no model (the hands' reader)
 
 Jeff (the Dire play test; his "wow" moments were Nix bandaging when told and

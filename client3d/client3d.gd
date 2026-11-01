@@ -10806,14 +10806,17 @@ func _read_ledges() -> void:
 
 ## Where [param point] is to the nearest ledge's curve near it (585): x how
 ## far past it on its high side (negative on its low side), y which ledge,
-## z the sample index (fractional) along it; y -1 with none near.
-func _ledge_near(point: Vector2) -> Vector3:
+## z the sample index (fractional) along it; y -1 with none near. With
+## [param only], that ledge's curve alone (y -1 if it isn't near).
+func _ledge_near(point: Vector2, only := -1) -> Vector3:
 	var cell := Vector2i(roundi(point.x), roundi(point.y))
 	if not _ledge_near_sample.has(cell):
 		return Vector3(0.0, -1.0, 0.0)
 	var best := INF
 	var out := Vector3(0.0, -1.0, 0.0)
 	for near: Vector2i in [_ledge_near_sample[cell]] + _ledge_near_also.get(cell, []):
+		if only >= 0 and near.x != only:
+			continue
 		var ledge: Dictionary = _ledge_curves[near.x]
 		var points: PackedVector2Array = ledge["curve"]["points"]
 		var closed: bool = ledge["closed"]
@@ -10953,10 +10956,11 @@ func _cell_plane(cell: Vector2i, point: Vector2) -> float:
 	return lerpf(lerpf(h[0], h[1], at.x), lerpf(h[2], h[3], at.x), at.y)
 
 
-## The ground on the high or low side ([param high]) of the ledge near
-## [param point] (585): the plane of the cell there on that side, else the
-## one beside it on that side nearest.
-func _ledge_ground(point: Vector2, high: bool) -> float:
+## The ground on the high or low side ([param high]) of ledge [param ledge]
+## at [param point] (585): the plane of the nearest cell on that side of
+## that ledge's own curve (756: where ledges run a cell apart, a terraced
+## taper, a cell's middle is as near the next ledge as this one).
+func _ledge_ground(point: Vector2, high: bool, ledge: int) -> float:
 	var cell := Vector2i(roundi(point.x), roundi(point.y))
 	var best := cell
 	var gap := INF
@@ -10965,7 +10969,7 @@ func _ledge_ground(point: Vector2, high: bool) -> float:
 			var near := cell + Vector2i(x, y)
 			if not _corners.has(near):
 				continue
-			var at := _ledge_near(Vector2(near))
+			var at := _ledge_near(Vector2(near), ledge)
 			if at.y < 0.0 or (at.x > 0.0) != high:
 				continue
 			var d := Vector2(near).distance_to(point)
@@ -10994,7 +10998,7 @@ func _ledge_covers(cell: Vector2i, next: Vector2i) -> bool:
 		return false
 	var points: PackedVector2Array = _ledge_curves[int(at.y)]["curve"]["points"]
 	var on := points[clampi(roundi(at.z), 0, points.size() - 1)]
-	var drop := _ledge_ground(on, true) - _ledge_ground(on, false)
+	var drop := _ledge_ground(on, true, int(at.y)) - _ledge_ground(on, false, int(at.y))
 	return drop >= absf(_elevation(cell) - _elevation(next)) * 0.5
 
 
@@ -11003,7 +11007,8 @@ func _ledge_covers(cell: Vector2i, next: Vector2i) -> bool:
 ## there down to the low side's, facing the low side; nothing where they
 ## meet (a taper's end, a slope).
 func _add_ledge_faces(faces: Dictionary) -> void:
-	for ledge: Dictionary in _ledge_curves:
+	for index in _ledge_curves.size():
+		var ledge: Dictionary = _ledge_curves[index]
 		var points: PackedVector2Array = ledge["curve"]["points"]
 		var tangents: PackedVector2Array = ledge["curve"]["tangents"]
 		var up := float(ledge["up"])
@@ -11011,8 +11016,8 @@ func _add_ledge_faces(faces: Dictionary) -> void:
 		var tops := PackedFloat32Array()
 		var feet := PackedFloat32Array()
 		for point in points:
-			tops.append(_ledge_ground(point, true))
-			feet.append(_ledge_ground(point, false))
+			tops.append(_ledge_ground(point, true, index))
+			feet.append(_ledge_ground(point, false, index))
 		for k in count:
 			var j := (k + 1) % points.size()
 			var top := Vector2(tops[k], tops[j])

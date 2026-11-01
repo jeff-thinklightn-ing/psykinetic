@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Hills: rock faces on stepped slopes stand on the ground they divide, with no shard of rock sticking out where two ledges meet (585 amended).
 
 - Tests: a test scene launched without `--run-marker` can no longer write levels into the shared user:// overlay; it says so in an ERROR line instead (199 amended).
 - Townsfolk visiting the temple now go inside and stand on its floor, clear of the doors, the counter and the respawn spot (734 amended (4)).
