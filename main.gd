@@ -18833,15 +18833,22 @@ func _run_test_die_travel(tick: int) -> void:
 
 
 ## --test-foe: [param player] given the weapon in hand and the monster 3
-## cells east (392 amended's wind-up on a real client).
+## cells east (392 amended's wind-up on a real client), made and armed as a
+## level's (392 amended (3): playtest's draugr fought bare-handed).
 func _test_foe(player: Player) -> void:
 	if Net.test_foe.size() != 2:
 		return
 	World.set_slots(player, Items.tidy(["", "", "", "", Net.test_foe[1], ""], Items.CARRIED))
-	var foe := _spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": Net.test_foe[0], "name": "Foe",
-		"tile": _nearest_free(player.tile + Vector2i(3, 0))})
-	print("[test] foe %s at %s, %s in hand at %s" % [Net.test_foe[0], foe.tile if foe != null else Vector2i.ZERO,
-			Net.test_foe[1], player.tile])
+	var spec := Level._spec_for("monster_" + Net.test_foe[0], Level.MONSTER_TYPES)
+	if spec.is_empty():
+		spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": Net.test_foe[0]}
+	spec["name"] = "Foe"
+	spec["tile"] = _nearest_free(player.tile + Vector2i(3, 0))
+	Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
+	var foe := _spawn(spec)
+	print("[test] foe %s at %s (wields %s, wind-up %d, recover %d), %s in hand at %s" % [Net.test_foe[0],
+			foe.tile if foe != null else Vector2i.ZERO, World.wielded(foe) if foe != null else "", World.windup_ticks(foe),
+			World.recover_ticks(foe), Net.test_foe[1], player.tile])
 
 
 ## --test-walk-on-wind: true once the local player's own wind-up has begun;

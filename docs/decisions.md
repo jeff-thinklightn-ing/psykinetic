@@ -9641,6 +9641,16 @@ the moved RPC. Rejected: hold to wind and release to strike (a new message,
 and clicks walk up and strike today); a wind-up on every weapon (the quick
 ones are quick); the brute's blow made unblockable (enemy-ai's and Jeff's).
 
+392 amended (3): the test foe is armed. Combat's real-client harness
+(--test-foe, tools/net_wind.sh, a9a5402d; 392 amended (2)) spawned its
+monster bare-handed, so playtest's test draugr wound up by the HEAVY
+tactic's own 6 ticks, not his battle axe's 8 with 750's recover 3.
+Main._test_foe now makes the foe from its kind's level spec
+(Level._spec_for, its kind's script) and arms it as a raid's monster is
+(Level.arm, decision 481), and its line names what it wields, its wind-up
+and its recover ("wields battle_axe, wind-up 8, recover 3" for the
+draugr). Test servers only; no game, wire or class_name change.
+
 ## 390. One rig plays a model's clips: an AnimationTree each, in layers (combat animation, phase A)
 
 Roadmap step 3. Every model's clips play through an AnimRig
