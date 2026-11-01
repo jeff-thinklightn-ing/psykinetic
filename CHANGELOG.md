@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Townsfolk with no roof to sleep under (visitors, Rolf and the like) now bed down by the town's fire, else beside the inn or temple, else by the store, each in a spot of their own (751, npc's side (2)).
 
 - The barrow's robbers carry their names to your screen, and Brand the Ox and the draugr are marked as bosses (752; ui draws them).
 - Outdoors: no more holes in the ground between the trees at the forest's edge (by Umbrage, along raised map edges): the forest floor and the pine stands now follow the land's height (753).

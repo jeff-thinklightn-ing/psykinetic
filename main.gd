@@ -70,6 +70,11 @@ const RESIDENT_EARSHOT := 2
 const TALK_REACH := RESIDENT_EARSHOT
 ## How near a hit or a death wakes a sleeping townsman (decision 751).
 const SLEEP_WAKE_RANGE := 6
+## How far past a town's radius its fire is looked for, for the roofless's
+## sleep spots (751, npc's side (2)).
+const SLEEP_FIRE_REACH := 4
+## The roofless's sleep spots by body key (751, npc's side (2)), kept while good.
+var _sleep_spots := {}
 ## How long a talk walk waits to arrive before it is forgotten.
 const TALK_WAIT_MSEC := 15000
 const RESIDENT_ASK_TICKS := 150
@@ -8949,6 +8954,7 @@ func _sync_residents() -> void:
 		if wanted.size() >= RESIDENTS_MAX:
 			break
 		wanted[str(each["key"])] = each
+	_bed_down_roofless(wanted, area)
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
@@ -10693,6 +10699,116 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 	if trade == "priest" and out.has("temple"):
 		out["work"] = out["temple"]
 	return out
+
+
+## The roofless of [param wanted] bedded down (decision 751, npc's side (2)):
+## each entry with no "bed" (a visitor, a buyer, the stall's keeper, one with
+## no house or inn) gets a sleep spot (_sleep_spot) as its "bed", a 1x2 its
+## bedroll lies on, kept per body while it stays good; one per body, by key.
+func _bed_down_roofless(wanted: Dictionary, area: Dictionary) -> void:
+	if area.is_empty():
+		return
+	var keys: Array = wanted.keys()
+	keys.sort()
+	var taken := {}
+	for key: String in keys:
+		var spot: Variant = _sleep_spots.get(key)
+		if spot is Rect2i and wanted[key].get("places", {}).get("bed") == null:
+			if _sleep_spot_good(spot, area, taken):
+				_take_spot(spot, taken)
+			else:
+				_sleep_spots.erase(key)
+	for key: String in keys:
+		var places: Variant = wanted[key].get("places")
+		if not places is Dictionary or (places as Dictionary).has("bed") or (places as Dictionary).has("strayed") 				or str(wanted[key].get("town", "")).is_empty():
+			continue
+		var spot: Variant = _sleep_spots.get(key)
+		if not spot is Rect2i:
+			spot = _sleep_spot(str(wanted[key]["town"]), area, taken)
+			if (spot as Rect2i).size == Vector2i.ZERO:
+				continue
+			_sleep_spots[key] = spot
+			_take_spot(spot, taken)
+		places["bed"] = spot
+
+
+## A free sleep spot for the roofless of town [param place_id] in [param area]
+## (decision 751, npc's side (2)): a 1x2 (either way) of walkable cells
+## outside every building and clear of [param taken], nearest first to the
+## town's fire (a fire cell within its radius + SLEEP_FIRE_REACH of the store,
+## the spot two or three cells off it, never on or beside a burning cell),
+## else along the inn's or the temple's wall on the side away from the
+## square, else by the store; Rect2i() for none.
+func _sleep_spot(place_id: String, area: Dictionary, taken: Dictionary) -> Rect2i:
+	var place := World.holdings.place(place_id)
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	var reach := int(place.get("radius", 4)) + SLEEP_FIRE_REACH
+	var fires: Array[Vector2i] = []
+	for y in range(store.y - reach, store.y + reach + 1):
+		for x in range(store.x - reach, store.x + reach + 1):
+			if World.is_fire(Vector2i(x, y)):
+				fires.append(Vector2i(x, y))
+	for fire: Vector2i in fires:
+		var best := _spot_near(fire, 2, 3, area, taken)
+		if best.size != Vector2i.ZERO:
+			return best
+	var key := str(place.get("key", ""))
+	for use: String in ["inn", "temple"]:
+		for building: Dictionary in area.get("buildings", []):
+			var rect: Rect2i = building.get("rect", Rect2i())
+			if rect.size == Vector2i.ZERO or (str(building.get("use", "")) != use and str(building.get("slot", "")) != "building." + use):
+				continue
+			if str(building.get("town", key)) != key or World.distance(rect.get_center(), store) > HOME_TILES:
+				continue
+			var away := rect.get_center() + (rect.get_center() - store).sign() * (maxi(rect.size.x, rect.size.y) / 2 + 1)
+			var best := _spot_near(away, 0, 2, area, taken)
+			if best.size != Vector2i.ZERO:
+				return best
+	return _spot_near(store, 2, 4, area, taken)
+
+
+## The 1x2 nearest [param at] whose cells lie from [param near] to [param far]
+## cells off it and are each good (_sleep_spot_good); Rect2i() for none.
+func _spot_near(at: Vector2i, near: int, far: int, area: Dictionary, taken: Dictionary) -> Rect2i:
+	var best := Rect2i()
+	var best_d := 1000000
+	for y in range(at.y - far, at.y + far + 1):
+		for x in range(at.x - far, at.x + far + 1):
+			var cell := Vector2i(x, y)
+			for along: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				var other := cell + along
+				if World.distance(cell, at) < near or World.distance(other, at) < near or World.distance(other, at) > far:
+					continue
+				var spot := Rect2i(cell, Vector2i.ONE + along)
+				var d := (cell - at).length_squared() + (other - at).length_squared()
+				if d < best_d and _sleep_spot_good(spot, area, taken):
+					best = spot
+					best_d = d
+	return best
+
+
+## Whether every cell of [param spot] is walkable ground outside every
+## building of [param area], not taken, and neither on nor beside fire.
+func _sleep_spot_good(spot: Rect2i, area: Dictionary, taken: Dictionary) -> bool:
+	for y in range(spot.position.y, spot.end.y):
+		for x in range(spot.position.x, spot.end.x):
+			var cell := Vector2i(x, y)
+			if taken.has(cell) or not World.is_walkable(cell):
+				return false
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					if World.is_fire(cell + Vector2i(dx, dy)):
+						return false
+			for building: Dictionary in area.get("buildings", []):
+				if (building.get("rect", Rect2i()) as Rect2i).grow(1).has_point(cell):
+					return false
+	return true
+
+
+func _take_spot(spot: Rect2i, taken: Dictionary) -> void:
+	for y in range(spot.position.y, spot.end.y):
+		for x in range(spot.position.x, spot.end.x):
+			taken[Vector2i(x, y)] = true
 
 
 ## Whether [param building] (an area's) has a roof to sleep under (decision

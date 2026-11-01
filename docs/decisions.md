@@ -36984,3 +36984,21 @@ the boss had no marker. Monster gains two replicated fields (enemy-ai's,
   fallen knight is none.
 ui draws the name and the marker. An old client draws neither, so the cut
 carrying it is forced. monster_test _test_band and _test_draugr check them.
+
+751, npc's side (2) (release's label; the coordinator's yes): the roofless
+sleep on a bedroll instead of staying up. Main._bed_down_roofless gives
+each _sync_residents entry with no "bed" (and not strayed) a sleep spot as
+its bed: a 1x2 of walkable cells outside every building (and a cell clear
+of its walls, so no door is blocked), not another's, neither on nor beside
+a burning cell (Main._sleep_spot). Nearest first: two or three cells off
+the town's fire (a fire cell within its radius + SLEEP_FIRE_REACH, 4, of
+the store), else beside the inn or the temple on the side away from the
+square, else two to four cells off the store. Keys are taken in order, and
+a spot is kept per body (Main._sleep_spots) while it stays good. The bed
+walk and the head's facing are phase 1's (Resident.bed_cell, head_of: the
+body on the spot's end cell, its head that way, the bedroll running back
+one cell), and so are the silence, the line and the waking. Drawing the
+bedroll is (3), on the client. resident_test _test_asleep: two roofless
+each get a 1x2, apart and out of every building, while the housed keep
+their house; the spot is kept from sync to sync; with a fire in town, two
+or three cells off it. Server only, protocol unchanged.

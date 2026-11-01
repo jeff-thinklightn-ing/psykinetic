@@ -3130,6 +3130,36 @@ func _test_asleep(mara: Resident, home: Rect2i) -> void:
 	_check(not roofless.has("bed") or roofless["bed"] == roofless.get("inn"), "no house of their own: the inn or no bed at all (%s)" % [roofless])
 	_check(_main._roofed({"slot": "building.house"}) and not _main._roofed({"slot": "building.well"}) and not _main._roofed({"slot": "building.market_stall"}),
 		"a house has a roof; a well and a stall have none")
+	# The roofless bedded down (751, npc's side (2)): a 1x2 each, out of every building, apart; by the fire when there is one.
+	var square: Rect2i = roofless.get("square", Rect2i())
+	var wanted := {"rs-roofless-a": {"town": STORE, "places": {"home": square, "square": square}},
+		"rs-roofless-b": {"town": STORE, "places": {"home": square, "square": square}},
+		"rs-housed": {"town": STORE, "places": {"home": home, "square": square, "bed": home}}}
+	_main._sleep_spots.clear()
+	_main._bed_down_roofless(wanted, area)
+	var a: Variant = wanted["rs-roofless-a"]["places"].get("bed")
+	var b: Variant = wanted["rs-roofless-b"]["places"].get("bed")
+	var apart := a is Rect2i and b is Rect2i and not (a as Rect2i).intersects(b as Rect2i)
+	var clear := func(spot: Variant) -> bool:
+		return spot is Rect2i and (spot as Rect2i).get_area() == 2 and area.get("buildings", []).all(func(building: Dictionary) -> bool:
+			return not (building.get("rect", Rect2i()) as Rect2i).intersects(spot as Rect2i))
+	_check(apart and clear.call(a) and clear.call(b) and wanted["rs-housed"]["places"]["bed"] == home,
+		"the roofless: a 1x2 each, apart, out of every building; the housed keep their house (%s, %s)" % [a, b])
+	_main._bed_down_roofless(wanted, area)
+	_check(wanted["rs-roofless-a"]["places"].get("bed") == a, "the same spot kept from sync to sync")
+	var fire: Vector2i = _main._nearest_free(World.holdings.place(STORE).get("cell", Vector2i.ZERO) + Vector2i(0, 3))
+	World._fire[fire] = true
+	_main._sleep_spots.clear()
+	var lit := {"rs-roofless-a": {"town": STORE, "places": {"home": square, "square": square}}}
+	_main._bed_down_roofless(lit, area)
+	var by_fire: Variant = lit["rs-roofless-a"]["places"].get("bed")
+	var near := by_fire is Rect2i
+	if near:
+		for cell: Vector2i in [(by_fire as Rect2i).position, (by_fire as Rect2i).end - Vector2i.ONE]:
+			near = near and World.distance(cell, fire) >= 2 and World.distance(cell, fire) <= 3
+	World._fire.erase(fire)
+	_main._sleep_spots.clear()
+	_check(near, "a fire in town: two or three cells off it, never beside it (%s by %s)" % [by_fire, fire])
 	var player := _player()
 	if player == null:
 		_check(true, "(no player: the click and the wake skipped)")
