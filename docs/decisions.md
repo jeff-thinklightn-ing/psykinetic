@@ -37243,3 +37243,39 @@ on Rolf's missing buy buttons and the missing names and marker; on main it found
 node name in his window and talk lines, and the client's purse never following the server's.
 
 Tests and a tool only, protocol unchanged, no new class_name.
+## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
+
+Jeff: sleeping townsfolk "look like they are dead, we need a sleeping
+animation". npc leads where and when they sleep and draws the bedroll or
+bed under them (751, npc's side: the puppet's "bed_height", 0.09 on a
+bedroll, 0.37 on a bed, 0 else); this side draws the sleeper, agreed with
+npc and the coordinator.
+
+- A resident's "sleep" (ACTIVITIES) is the side curl companions sleep in by
+  the fire (Sleep_Side: on the left side, knees drawn up, the head on the
+  left forearm), not the knocked-down Lie (Death01's sprawl on the back).
+  Curled clearly (the coordinator, on the first strip: "nearly straight, legs
+  out ... half face-down"): measured on the clip, the hips bent about 70 degrees
+  and the knees about 110, the knees 0.4 m forward of the hips, the feet drawn
+  back under them; the chest faces front and a little up, the top arm forward
+  over the chest, the head on the lower forearm.
+  Its breath is slower and plain to see: 2 s in, the chest swelling and the
+  shoulders rising, the head nodding with it, 3 s out (5 s; SLEEP_IN).
+- Laid as npc lays a bed: its head toward the facing, at the tile's forward
+  end, its middle SLEEP_MIDDLE (0.81 m) back from the tile's centre, so it
+  lies along the bed or bedroll running a cell back; lifted by the
+  puppet's "bed_height" (_lay).
+- Lain down to and got up from (an ACTIVITIES "down", the sleeper's and the
+  companion's): Sleep_Down from standing to a crouch, sat, half rolled
+  already curled, the curl (1.8 s); Sleep_Up the other way (1.7 s).
+  _lying_down plays the lie-down once as the work begins, the work's clip
+  looped after; as it ends the get-up, the body still turned as it lay
+  ("rising_until", _lay) till it stands. A body first seen asleep is already
+  down (_sync_work's "laid"). Played in the lying frame: the sleeper stands
+  with its back to where its head will lie and lies back onto it.
+
+view_test _test_sleeper: the sleep work, laid back and up on its bedroll
+and turned round; first seen already down; falling asleep lies down; woken
+gets up, still turned till it stands. anim_rig_test _test_sleep_clips.
+Strip: C:/dev/review/sleep_strip.png (from above and from the game's camera). Client only, protocol unchanged, no
+new class_name.

@@ -72,12 +72,16 @@ HOLD = [("upperarm_l", LIFT, 40.0), ("lowerarm_l", LIFT, 45.0), ("upperarm_l", T
 
 # Lying on the left side from Death01's lying on the back (head +Y, feet -Y): the pelvis
 # rolled about the body's length so the front faces +X, then each part in those same axes.
-SIDE_SLEEP = [("pelvis", TILT, 90.0), ("spine_02", TURN, 8.0), ("Head", TURN, 12.0),
-	("thigh_l", Vector((0.75, -0.65, -0.12)), AIM), ("calf_l", Vector((-0.45, -0.9, -0.05)), AIM),
-	("thigh_r", Vector((0.85, -0.5, -0.2)), AIM), ("calf_r", Vector((-0.35, -0.9, -0.15)), AIM),
+SIDE_SLEEP = [("pelvis", TILT, 90.0), ("spine_01", TURN, 10.0), ("spine_02", TURN, 14.0), ("spine_02", TILT, -14.0),
+	("spine_03", TILT, -8.0), ("Head", TURN, 10.0), ("Head", TILT, -22.0),
+	("thigh_l", Vector((0.95, -0.3, -0.05)), AIM), ("calf_l", Vector((-0.6, -0.8, -0.03)), AIM),
+	("thigh_r", Vector((0.95, -0.22, -0.15)), AIM), ("calf_r", Vector((-0.55, -0.83, -0.1)), AIM),
 	("upperarm_l", Vector((1.0, 0.2, 0.0)), AIM), ("lowerarm_l", Vector((-0.83, 0.55, 0.0)), AIM),
-	("upperarm_r", Vector((0.6, -0.2, -0.8)), AIM), ("lowerarm_r", Vector((1.0, 0.1, -0.3)), AIM)]
+	("upperarm_r", Vector((0.85, -0.3, -0.25)), AIM), ("lowerarm_r", Vector((0.45, -0.8, -0.4)), AIM)]
 SIDE_LIFT = (0.0, 0.0, 0.15)
+# Half rolled onto the side, already curled: between sitting and the curl (no sprawl on the way).
+SIDE_HALF = [("pelvis", TILT, 45.0)] + SIDE_SLEEP[1:]
+SLEEP_IN = [("spine_02", TURN, 6.0), ("spine_03", TURN, 4.0), ("Head", LIFT, 3.0)] + both("clavicle", LIFT, 4.0, mirror=False)
 
 CLIPS = {
 	"Block_Idle_Loop": {"loop": True, "keys": [
@@ -94,11 +98,31 @@ CLIPS = {
 	]},
 	# Asleep on her side (621 amended: a companion asleep by the fire): Death01's lying, rolled
 	# onto the left side, front to its left (+X), knees drawn up, the left forearm under the
-	# head, the right arm over in front; a slow breath (4 s), the chest swelling forward.
+	# head, the right arm over in front; a slow breath, plainly seen (751: townsfolk asleep "look
+	# like they are dead"): 2 s in, the chest swelling forward and the shoulders rising, the head
+	# nodding with it; 3 s out (5 s).
 	"Sleep_Side_Loop": {"loop": True, "keys": [
 		(0.0, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
-		(2.0, P("Death01", 2.4, SIDE_SLEEP + [("spine_02", TURN, 3.0), ("spine_03", TURN, 2.0)], move=SIDE_LIFT)),
-		(4.0, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
+		(2.0, P("Death01", 2.4, SIDE_SLEEP + SLEEP_IN, move=SIDE_LIFT)),
+		(5.0, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
+	]},
+	# Lying down to sleep (751), Get_Up the other way: from standing, down to a crouch, sat, then
+	# back and over onto the side, curled; and up again from the curl (Sleep_Up). Played in the
+	# lying body's frame (Client3D._lay turns a lying model round): the sleeper stands with its back
+	# to where its head will lie and lies back onto it.
+	"Sleep_Down": {"keys": [
+		(0.0, P("Idle_Loop", 0.0)),
+		(0.5, P("Crouch_Idle_Loop", 0.0)),
+		(1.0, P("GroundSit_Idle_Loop", 0.0)),
+		(1.4, P("Death01", 2.4, SIDE_HALF, move=(0.0, 0.0, 0.12))),
+		(1.8, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
+	]},
+	"Sleep_Up": {"keys": [
+		(0.0, P("Death01", 2.4, SIDE_SLEEP, move=SIDE_LIFT)),
+		(0.4, P("Death01", 2.4, SIDE_HALF, move=(0.0, 0.0, 0.12))),
+		(0.8, P("GroundSit_Idle_Loop", 0.0)),
+		(1.25, P("Crouch_Idle_Loop", 0.0)),
+		(1.7, P("Idle_Loop", 0.0)),
 	]},
 	"Get_Up": {"keys": [
 		(0.0, P("Death01", 2.4)),

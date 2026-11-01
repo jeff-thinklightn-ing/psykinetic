@@ -119,6 +119,7 @@ func _ready() -> void:
 	_test_standing_turn()
 	_test_visible_work()
 	_test_head_socket()
+	_test_sleeper()
 	await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 	await _test_rest()
 	_test_bow_back()
@@ -7634,12 +7635,19 @@ func _test_visible_work() -> void:
 			"shear": ["Fixing_Kneeling", "art:tool.shears", ""]},
 			"stalking with a bow, carrying game and a sack, hoeing, herding, shearing: each its clip and pieces (%s)" % works)
 	show.call("sleep")
+	var lain_down := rig.base_clip()
+	puppet.set_meta("busy_until", 0)  # The lie-down (751) done.
+	show.call("sleep")
 	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
 	var body := puppet.get_node("Body") as Node3D
 	var model := body.get_node("Model") as Node3D
-	_check(rig.base_clip() == "Lie" and body.position.distance_to(Vector3(-Client3D.LIE_MIDDLE * float(puppet.get_meta("model_scale", 1.0)), 0, 0)) < 0.001
+	_check(lain_down == "Sleep_Down" and rig.base_clip() == "Sleep_Side"
+			and body.position.distance_to(Vector3(-Client3D.SLEEP_MIDDLE * float(puppet.get_meta("model_scale", 1.0)), 0, 0)) < 0.001
 			and is_equal_approx(wrapf(model.rotation.y - float(puppet.get_meta("faces")), 0.0, TAU), PI),
-			"asleep: lying (%s), turned to put the head the way it faces, on its cell (%s)" % [rig.base_clip(), body.position])
+			"asleep: lain down to (%s), curled (%s), turned to put the head the way it faces, along its bed (%s)" % [lain_down, rig.base_clip(), body.position])
+	show.call("dig_for_treasure")
+	puppet.set_meta("busy_until", 0)  # Got up (751).
+	puppet.set_meta("rising_until", 0)
 	show.call("dig_for_treasure")
 	_rig._lay(puppet, puppet.get_node("Body"), 0.0)
 	_check(rig.upper_clip() == "" and (sockets["shoulder"] as Node3D).get_node_or_null("Load") == null and body.position == Vector3.ZERO
@@ -7771,6 +7779,49 @@ func _test_attach_points() -> void:
 	_check(held != null and held.get_node_or_null("Held") != null, "a goblin's dagger is in its hand")
 	World.despawn(imp)
 	_rig._process(0.0)
+
+
+## A sleeper (751, pc-character's side; Jeff: sleeping townsfolk "look like they are dead"): a
+## resident's "sleep" is the side curl (Sleep_Side), laid with its head toward the facing and its
+## middle SLEEP_MIDDLE back, up on its bed's height (npc's bed_height); lain down to once, already
+## down when first seen, and got up from when it ends, still turned as it lay till it stands.
+func _test_sleeper() -> void:
+	print("
+== a sleeper: curled on its side, on its bed, lain down to and got up from ==")
+	var work: Dictionary = Client3D.ACTIVITIES["sleep"]
+	_check(str(work["clip"]) == "Sleep_Side" and str(work["down"]) == "Sleep_Down" and bool(work["lying"])
+		and Client3D.ACTIVITIES["sleep_side"].get("down") == "Sleep_Down", "asleep: the side curl, lain down to (%s)" % [work])
+	var puppet := Node3D.new()
+	var body := Node3D.new()
+	body.name = "Body"
+	puppet.add_child(body)
+	var model := (load(Client3D.HUMAN["scene"]) as PackedScene).instantiate() as Node3D
+	model.name = "Model"
+	body.add_child(model)
+	add_child(puppet)
+	puppet.set_meta("faces", 0.0)
+	puppet.set_meta("work", "sleep")
+	puppet.set_meta("bed_height", 0.09)
+	_rig._lay(puppet, body, 0.0)
+	_check(body.position.is_equal_approx(Vector3(-Client3D.SLEEP_MIDDLE, 0.09, 0.0)) and is_equal_approx(model.rotation.y, PI),
+		"laid on its bedroll, its middle %.2f back, %.2f up, turned round (%s, %.2f)" % [Client3D.SLEEP_MIDDLE, 0.09, body.position, model.rotation.y])
+	var rig := AnimRig.make(model, load("res://art/models/animations/goblin.res") as AnimationLibrary, 0.0, true, null)
+	rig.loop("Idle", 0.0)
+	var now := Time.get_ticks_msec()
+	var first := _rig._lying_down(puppet, rig, work, 0.0, now, 1.0)
+	_check(not first and bool(puppet.get_meta("laid")), "first seen asleep: already down, no lying down")
+	puppet.set_meta("laid", false)
+	var down := _rig._lying_down(puppet, rig, work, 0.0, now, 1.0)
+	_check(down and rig.base_clip() == "Sleep_Down", "falling asleep: lies down (%s)" % rig.base_clip())
+	var up := _rig._lying_down(puppet, rig, {}, 0.0, now, 1.0)
+	_check(up and rig.base_clip() == "Sleep_Up" and int(puppet.get_meta("rising_until")) > now, "woken: gets up (%s)" % rig.base_clip())
+	puppet.set_meta("work", "")
+	_rig._lay(puppet, body, 0.0)
+	_check(is_equal_approx(model.rotation.y, PI), "and is still turned as it lay while it gets up")
+	puppet.set_meta("rising_until", 0)
+	_rig._lay(puppet, body, 0.0)
+	_check(is_zero_approx(model.rotation.y) and body.position == Vector3.ZERO, "stood: as it stands (%s)" % body.position)
+	puppet.free()
 
 
 ## A two-handed piece (451 amended (2), step 4; Jeff: the great axe "held sideways by player and
@@ -9087,6 +9138,9 @@ func _test_asleep() -> void:
 		return yaw
 	her.asleep = true
 	var yaw: float = draw.call()
+	_check(rig.base_clip() == "Sleep_Down", "falling asleep: she lies down first (751) (%s)" % rig.base_clip())
+	puppet.set_meta("busy_until", 0)  # The lie-down done.
+	yaw = draw.call()
 	# Her front: the model's +X (Sleep_Side lies on her left side, her front where her left hand was), flat.
 	var front := model.global_transform.basis.x
 	front = Vector3(front.x, 0.0, front.z).normalized()
@@ -9095,10 +9149,14 @@ func _test_asleep() -> void:
 			"asleep: Sleep_Side, as her work (%s, %s)" % [rig.base_clip(), puppet.get_meta("work", "")])
 	_check(front.dot(to_fire) > 0.99, "her front to the fire a cell off diagonally (%s, %s; yaw %.2f)" % [front, to_fire, yaw])
 	var clip := rig.player.get_animation(rig._name("Sleep_Side")) if rig.has("Sleep_Side") else null
-	_check(clip != null and absf(clip.length - 4.0) < 0.05 and clip.loop_mode != Animation.LOOP_NONE, "the breath slow: a 4 s loop")
+	_check(clip != null and absf(clip.length - 5.0) < 0.05 and clip.loop_mode != Animation.LOOP_NONE, "the breath slow: a 5 s loop")
 	World._fire.erase(fire)
 	_check(is_equal_approx(Client3D._sleeping_yaw(her, 0.5), 0.5), "no fire near: her own facing")
 	her.asleep = false
+	draw.call()
+	_check(rig.base_clip() == Client3D.CLIP_SLEEP_UP, "woken: she gets up (751) (%s)" % rig.base_clip())
+	puppet.set_meta("busy_until", 0)  # The get-up done.
+	puppet.set_meta("rising_until", 0)
 	draw.call()
 	_check(rig.base_clip() != "Sleep_Side" and str(puppet.get_meta("work", "")) == "" and body.position == Vector3.ZERO
 			and is_equal_approx(model.rotation.y, float(puppet.get_meta("faces"))), "awake: standing again (%s)" % rig.base_clip())

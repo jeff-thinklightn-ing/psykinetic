@@ -1109,6 +1109,8 @@ static var _session_seed := randi()
 const CLIP_TIRED := "Idle_Tired"
 ## Sitting (Monster.Pose.SIT, at a gathering): down, sat, and up again.
 const CLIP_SIT_DOWN := "GroundSit_Enter"
+## Up again from a work lain down to (an ACTIVITIES "down", 751): played as it ends.
+const CLIP_SLEEP_UP := "Sleep_Up"
 const CLIP_SITTING := "GroundSit_Idle"
 const CLIP_SIT_UP := "GroundSit_Exit"
 const FIDGET_SECONDS_MIN := 6.0
@@ -14380,7 +14382,7 @@ func _sync_puppets() -> void:
 		var facing := puppet.get_node_or_null("Facing") as Node3D
 		# (Angles kept as float32: compared near enough, not ==.)
 		if facing != null:
-			if not entity is Monster and work_word(entity) != "sleep_side":  # Asleep, laid down at once.
+			if not entity is Monster and not work_word(entity) in ["sleep_side", "sleep"]:  # Asleep, laid down at once.
 				yaw = _standing_turn(puppet, facing.rotation.y, yaw)
 			if not is_equal_approx(facing.rotation.y, yaw):
 				facing.rotation.y = yaw
@@ -16562,7 +16564,10 @@ const ACTIVITIES := {
 	"saw": {"clip": "Saw", "right": "tool.saw"},
 	"hammer": {"clip": "Hammer", "right": "tool.hammer"},
 	"carry_log": {"upper": "Carry_Shoulder", "shoulder": "carry.log"},
-	"sleep": {"clip": "Lie", "lying": true},
+	# Asleep (751; Jeff: sleeping townsfolk "look like they are dead"): curled on
+	# the side with a slow breath, as a companion sleeps, lain down to and got up
+	# from (Sleep_Down, CLIP_SLEEP_UP), on its bed or bedroll (_lay's bed_height).
+	"sleep": {"clip": "Sleep_Side", "lying": true, "down": "Sleep_Down"},
 	# The bandage kneel (Jeff: "a kneeling next to the target animation"): a
 	# player's or a companion's while it tends (GridEntity.tending), turned to
 	# the patient and leant toward it this far (metres), hands at its work.
@@ -16570,7 +16575,7 @@ const ACTIVITIES := {
 	# A companion asleep on the night watch (621 amended, Companion.asleep): on
 	# her side, knees drawn up, a slow breath (humanoid_clips' Sleep_Side_Loop),
 	# her front to the fire (_sleeping_yaw).
-	"sleep_side": {"clip": "Sleep_Side", "lying": true},
+	"sleep_side": {"clip": "Sleep_Side", "lying": true, "down": "Sleep_Down"},
 	# Townsfolk at work (566 amended, pc-character's side; npc's words, the
 	# coordinator's approval): a hunter crouched with a bow, not drawn (stalk);
 	# game and sacks carried on the shoulder; a hoe's strokes, walking a row too
@@ -16652,6 +16657,8 @@ static func _sleeping_yaw(entity: GridEntity, yaw: float) -> float:
 func _sync_work(entity: GridEntity, puppet: Node3D) -> void:
 	var work := work_of(entity)
 	puppet.set_meta("work", work_word(entity) if not work.is_empty() else "")
+	if not puppet.has_meta("laid"):
+		puppet.set_meta("laid", work.has("down"))  # First seen asleep: already down (_lying_down).
 	if not puppet.has_meta("rig"):
 		return
 	var rig := puppet.get_meta("rig") as AnimRig
@@ -16846,16 +16853,23 @@ func _indoors(cell: Vector2i) -> bool:
 ## stand point (_stand_at: the draugr on his throne, 580 step 3), the body
 ## stands there, until step 4's seated idle replaces it.
 const LIE_MIDDLE := 0.46
+## A sleeper curled on its side (751) lies farther back: its head at the
+## tile's forward end, its middle half a cell behind the tile, on the bed or
+## bedroll there (npc's: the bed's head cell is the tile, the facing the way
+## the head points); measured on the strip (build/sleep/strip.gd).
+const SLEEP_MIDDLE := 0.81
 func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) -> void:
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
-	var lying := bool(work.get("lying", false))
+	var lying := bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0))
 	var offset: Vector3 = _stand_at.get(cell, Vector3.ZERO)
 	if work.has("toward") and float(puppet.get_meta("speed", 0.0)) <= WALKING:
 		# Leant in to its work (the bandage kneel), only while it is still: walking, as it stands.
 		offset += Vector3(cos(yaw), 0.0, -sin(yaw)) * float(work["toward"]) * float(puppet.get_meta("model_scale", 1.0))
 	if lying:
 		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
-		offset = -ahead * LIE_MIDDLE * float(puppet.get_meta("model_scale", 1.0))
+		offset = -ahead * (SLEEP_MIDDLE if work.has("down") else LIE_MIDDLE) * float(puppet.get_meta("model_scale", 1.0))
+		# On a bed or bedroll drawn under it (npc's and buildings' side, 751): its height.
+		offset.y = float(puppet.get_meta("bed_height", 0.0))
 	if body.position != offset:
 		body.position = offset
 	var model := body.get_node_or_null("Model") as Node3D
@@ -17041,6 +17055,8 @@ func _animate(puppet: Node3D) -> void:
 			_play_fidget(puppet, rig, CLIP_SIT_UP, now, tempo)
 			puppet.set_meta("seated", false)
 			return
+	if _lying_down(puppet, rig, work, speed, now, tempo):
+		return
 	if speed > WALKING:
 		var gaits := paced(puppet.get_meta("gaits", GAITS))
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
@@ -17076,6 +17092,29 @@ func _animate(puppet: Node3D) -> void:
 			_play_fidget(puppet, rig, fidget, now, tempo)
 			return
 	rig.loop(idle, tempo)
+
+
+## A work lain down to (its "down", 751: a sleeper) is lain down to once, its
+## clip looped after; ended, its body gets up again (CLIP_SLEEP_UP), still
+## turned as it lay till it stands (_lay's "rising_until"). A body first seen
+## at it is already down. True while one of them plays this frame.
+func _lying_down(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, now: int, tempo: float) -> bool:
+	if not puppet.has_meta("laid"):
+		puppet.set_meta("laid", work.has("down"))
+		return false
+	var laid: bool = puppet.get_meta("laid")
+	if work.has("down") and not laid and speed <= WALKING and rig.has(str(work["down"])):
+		puppet.set_meta("laid", true)
+		puppet.set_meta("busy_until", now + int(rig.once(str(work["down"]), tempo) * 1000.0))
+		return true
+	if laid and not work.has("down"):
+		puppet.set_meta("laid", false)
+		if rig.has(CLIP_SLEEP_UP):
+			var until := now + int(rig.once(CLIP_SLEEP_UP, tempo) * 1000.0)
+			puppet.set_meta("busy_until", until)
+			puppet.set_meta("rising_until", until)
+			return true
+	return false
 
 
 ## [param clip] once through from its start, at [param tempo], blended in,

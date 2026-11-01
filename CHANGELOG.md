@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Sleeping townsfolk no longer look dead: they lie curled on their side on their bed or bedroll, breathing slowly, lie down at bedtime and get up when they wake; companions asleep by the fire lie down and get up the same way (751).
 - Being brought back from near death in another zone (out of the barrow) no longer prints an engine error on your game (587 amended).
 
 - Tools: playtest tours (754): `sh tools/tour.sh <tour>` plays a real client against a local server as a player would (clicks, walks, talks, buys, fights, crosses links) and reports what a player would notice in build/tours/<tour>/report.md; the first tours are smoke and barrow (Jeff's barrow route: Rolf, a sleeper, the knight's quest, the companion, the band's names and the tracker).

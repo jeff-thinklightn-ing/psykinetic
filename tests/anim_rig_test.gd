@@ -32,6 +32,7 @@ func _ready() -> void:
 	await _test_beckon()
 	_test_knight_vigil()
 	_test_sledge()
+	_test_sleep_clips()
 	await _test_rests()
 	_test_warm_painted()
 	await _test_upper()
@@ -1094,6 +1095,16 @@ func _test_sledge() -> void:
 	_check(lib.has_animation("Sledge_Attack") and absf(lib.get_animation("Sledge_Attack").length - 1.7) < 0.02
 		and strikes == [["Sledge_Attack", 0.9]] and "tomb_sledge" in Client3D.WOUND_STRIKES,
 		"Sledge_Attack is 1.7 s, its contact at 0.9, the sledge's wound-up blow (%s)" % [strikes])
+
+
+## The sleeper's clips (751): the curl loops, its breath plainly seen; the lie-down and the get-up
+## each end where the other starts (the curl, standing).
+func _test_sleep_clips() -> void:
+	print("== asleep: the curl, lying down and getting up ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var ok := ["Sleep_Side", "Sleep_Down", "Sleep_Up"].all(func(c: String) -> bool: return lib.has_animation(c))
+	_check(ok and lib.get_animation("Sleep_Side").loop_mode != Animation.LOOP_NONE and lib.get_animation("Sleep_Down").loop_mode == Animation.LOOP_NONE
+		and absf(lib.get_animation("Sleep_Side").length - 5.0) < 0.05, "the curl loops over 5 s; lying down and getting up play once")
 
 
 func _test_beckon() -> void:
