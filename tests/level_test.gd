@@ -76,6 +76,8 @@ func _ready() -> void:
 	await _test_edge_links()
 	_test_console()
 	await _test_castle()
+	await _test_barrow_exits()
+	await _test_spawn_near()
 
 	_main.load_map(Level.DEFAULT_MAP)
 	print("")
@@ -2826,6 +2828,89 @@ func _test_edge_links() -> void:
 	var back := _player()
 	_check(_main.map_name == "test_edge_w" and back != null and back.tile == Vector2i(3, 2),
 		"back west from row 4, past test_edge_w's last row: its east edge's last cell, (3, 2) (%s)" % [back.tile if back else "none"])
+
+
+## Every way out of the barrow lands at its own door (Jeff, v0.1.194: "when
+## exiting the barrows after the quest is complete - the game placed me by
+## the foothills zone line in the wilds"): each real link taken by the
+## server's own handler (Main._take_link), the arrival read off the player.
+## The mound's door to the wilds at the mound, the Ossuary's shortcut and the
+## temple's stair by the temple, the niche and the stair between the depths
+## at their feet. A private overlay: a depth laid on opening is never written
+## to the shared one.
+func _test_barrow_exits() -> void:
+	print("
+== the barrow's ways out: each lands at its own mound, temple or stair foot ==")
+	var overlay := Level.overlay_dir
+	Level.overlay_dir = preload("res://tests/test_ports.gd").scratch("level_test/barrow_exits/")
+	var id: String = _main._peer_ids[Net.local_id]
+	_main.mark_player(id, "draugr")  # The shortcut and the temple's stair open to the blessed.
+	var wilds := Level.load_level("wilds")
+	var temple_stair := Main.building_link_back(wilds, "barrow_deep")
+	# [from level, link cell, to level, where it should land, within].
+	var ways: Array = [
+		["barrow", Vector2i(40, 1), "wilds", wilds["spawn_points"]["from_barrow"], 1],
+		["barrow", Vector2i(52, 16), "barrow_deep", Vector2i(49, 2), 1],
+		["barrow_deep", Vector2i(49, 1), "barrow", Vector2i(51, 16), 1],
+		["barrow_deep", Vector2i(49, 77), "wilds", temple_stair, 1],
+	]
+	for way: Array in ways:
+		_main.load_map("test_room")
+		_main.travel(Net.local_id, way[0], "")
+		await get_tree().process_frame
+		var player := _player()
+		var linked := false
+		for link: Dictionary in _main.level.get("links", []):
+			linked = linked or link["tile"] == way[1] and link["to_map"] == way[2]
+		_main._take_link(player, way[1])
+		await get_tree().process_frame
+		await get_tree().process_frame
+		player = _player()
+		var at: Vector2i = player.tile if player != null else World.NO_CELL
+		_check(linked and _main.map_name == way[2] and player != null and World.distance(at, way[3]) <= way[4],
+			"%s's way out at %s lands in %s within %d of %s (%s, at %s)" % [way[0], way[1], way[2], way[4], way[3], _main.map_name, at])
+	_main.mark_player(id, "draugr", false)
+	_main.load_map("test_room")
+	Level.overlay_dir = overlay
+
+
+## Spawn safety's nearest safe cell (decision 749; Jeff, v0.1.194:
+## a monster 4 from the mound's arrival sent him to the wilds' farthest
+## start, by the foothills line): an arrival with a monster within
+## SPAWN_SAFE_DISTANCE lands on the nearest safe cell reachable from it;
+## the zone's safest start only when there is none on its own side of a wall.
+func _test_spawn_near() -> void:
+	print("
+== spawn safety (749): the nearest safe cell from the arrival, the safest start only when none ==")
+	# 40 x 9 cells, a wall down the east side of x 9, the start far east.
+	var walls: Array[Vector3i] = []
+	for y in 9:
+		walls.append(Vector3i(9, y, Terrain.EAST))
+	var cases := {
+		"lt_spawn_open": {"monster": Vector2i(4, 1), "door": Vector2i(4, 4), "walls": [] as Array[Vector3i]},
+		"lt_spawn_walled": {"monster": Vector2i(5, 4), "door": Vector2i(2, 4), "walls": walls},
+	}
+	for name: String in cases:
+		var case: Dictionary = cases[name]
+		var rows := _rows(0, 39, 0, 8, case["walls"])
+		Level.register(name, Level.image_from_rows(rows, {Vector2i(36, 4): "start", case["monster"]: "monster_brute"}), null,
+			{"spawn_points": {"door": [case["door"].x, case["door"].y]}})
+		_main.load_map("test_room")
+		_main.travel(Net.local_id, name, "door")
+		await get_tree().process_frame
+		var player := _player()
+		var at: Vector2i = player.tile if player != null else World.NO_CELL
+		var monster: Vector2i = case["monster"]
+		if name == "lt_spawn_open":
+			_check(_main.map_name == name and World.distance(at, case["door"]) <= _main.SPAWN_NEAR_TILES and World.distance(at, monster) > _main.SPAWN_SAFE_DISTANCE
+				and at != Vector2i(36, 4),
+				"a monster 3 from the arrival %s: the nearest safe cell, not the far start (at %s)" % [case["door"], at])
+			_check(World.distance(at, case["door"]) == 3, "the nearest: 3 cells off, the first out of its reach (at %s)" % [at])
+		else:
+			_check(_main.map_name == name and at == Vector2i(36, 4),
+				"every cell on the arrival's side of the wall within reach of the monster: never across the wall, the safest start (at %s)" % [at])
+		_main.load_map("test_room")
+		Level.unregister(name)
 
 
 func _test_castle() -> void:

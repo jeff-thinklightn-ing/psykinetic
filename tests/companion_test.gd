@@ -482,7 +482,8 @@ func _test_old_record_gets_a_companion() -> void:
 			"beside the owner, and alive in the record again")
 
 	# The owner was last seen among the imps' spawn tiles: a rebuilt room puts
-	# the owner on a safe start tile, and the companion must come too.
+	# the owner on the nearest safe cell (749; a safe start tile before it),
+	# and the companion must come too.
 	_kill_monsters()
 	_walk_to(_player(), Vector2i(4, 6))
 	var last_seen: Vector2i = _player().tile
@@ -491,7 +492,8 @@ func _test_old_record_gets_a_companion() -> void:
 	var reply: String = _main.admin_command("reset")
 	_check("companions brought back: %s" % record.companion["name"] in reply, "'reset' says who it brought back (%s)" % reply)
 	pet = _companion()
-	_check(_player().tile in _main.player_starts and _player().tile != last_seen, "the owner is put on a start tile, away from the imps (at %s)" % _player().tile)
+	_check(_player().tile != last_seen and _main._nearest_hostile_distance(_player().tile) > _main.SPAWN_SAFE_DISTANCE,
+			"the owner is put away from the imps, on the nearest safe cell (at %s)" % _player().tile)
 	_check(pet != null and World.distance(pet.tile, _player().tile) == 1, "and the companion is beside the owner, not left by the imps (at %s)" % [pet.tile if pet else Vector2i(-1, -1)])
 	reply = _main.admin_command("reset")
 	_check("no dead companions" in reply, "a reset with none dead says so (%s)" % reply)

@@ -137,6 +137,9 @@ var returns := true
 ## (a start tile, a town) is put beside them (decision 705).
 const REJOIN_NEAR := 8
 const SPAWN_SAFE_DISTANCE := 5
+## How far from an unsafe arrival spawn safety looks for a safe cell
+## before the zone's safest start (decision 749).
+const SPAWN_NEAR_TILES := 16
 ## Ticks a newly spawned player is ignored by monsters, unless it moves or
 ## attacks first.
 const SPAWN_GRACE_TICKS := 30
@@ -5804,10 +5807,19 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	var intended := tile
 	var threat := _nearest_hostile_distance(intended)
 	if threat <= SPAWN_SAFE_DISTANCE and not (back and _reloading):
-		tile = _safest_start_tile(intended)
-		print("[spawn] %s: hostile %d tiles from the %s tile %s; using start tile %s, %d from the nearest hostile" % [
-			player_name, threat, "saved" if back else "start", intended, tile, _nearest_hostile_distance(tile)])
-		back = false
+		# The nearest safe cell reachable from the arrival first (decision
+		# 749): the zone's farthest start put one leaving the barrow
+		# by the foothills line, a map away (Jeff, v0.1.194).
+		var near := _safe_tile_near(intended)
+		if near != World.NO_CELL:
+			tile = near
+			print("[spawn] %s: hostile %d tiles from the %s tile %s; using the nearest safe tile %s, %d from the nearest hostile" % [
+				player_name, threat, "saved" if back else "start", intended, tile, _nearest_hostile_distance(tile)])
+		else:
+			tile = _safest_start_tile(intended)
+			print("[spawn] %s: hostile %d tiles from the %s tile %s; none safe within %d; using start tile %s, %d from the nearest hostile" % [
+				player_name, threat, "saved" if back else "start", intended, SPAWN_NEAR_TILES, tile, _nearest_hostile_distance(tile)])
+			back = false
 	else:
 		print("[spawn] %s: %s tile %s, no hostile within %d" % [
 			player_name, "saved" if back else "start", tile, SPAWN_SAFE_DISTANCE])
@@ -12689,6 +12701,38 @@ func _nearest_hostile_distance(tile: Vector2i) -> int:
 		if entity is Monster and entity.spawned:
 			nearest = mini(nearest, World.distance(tile, entity.tile))
 	return nearest
+
+
+## The nearest free, unburning cell to [param from] with no monster within
+## SPAWN_SAFE_DISTANCE, flooded over walkable ground through open edges (so
+## reachable from it, never across a river or a wall) out to
+## SPAWN_NEAR_TILES (decision 749); World.NO_CELL if there is none.
+func _safe_tile_near(from: Vector2i) -> Vector2i:
+	var monsters: Array[Vector2i] = []
+	for entity in World.get_entities():
+		if entity is Monster and entity.spawned:
+			monsters.append(entity.tile)
+	var safe := func(cell: Vector2i) -> bool:
+		for at: Vector2i in monsters:
+			if World.distance(cell, at) <= SPAWN_SAFE_DISTANCE:
+				return false
+		return true
+	var queue: Array[Vector2i] = [from]
+	var seen: Dictionary[Vector2i, bool] = {from: true}
+	var head := 0
+	while head < queue.size():
+		var cell: Vector2i = queue[head]
+		head += 1
+		if World.is_free(cell) and not World.is_burning(cell) and safe.call(cell):
+			return cell
+		for direction: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP]:  # Orthogonal: edge_blocks reads those.
+			var next := cell + direction
+			if seen.has(next) or World.distance(next, from) > SPAWN_NEAR_TILES:
+				continue
+			seen[next] = true
+			if World.is_walkable(next) and not World.edge_blocks(cell, direction):
+				queue.append(next)
+	return World.NO_CELL
 
 
 ## The free start tile farthest from every monster; [param fallback] if no

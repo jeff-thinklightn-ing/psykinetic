@@ -40,9 +40,10 @@ func _test_reconnect_avoids_hostiles() -> void:
 	var imp := _spawn_imp(saved + Vector2i(2, 0))
 	_join()
 	var player := _player()
-	# Of the start tiles, (12, 1) is the first that is 5 from an imp at (8, 6).
-	_check(player.tile == Vector2i(12, 1), "hostile 2 tiles from the saved tile: put on the farthest start tile (at %s)" % player.tile)
-	_check(World.distance(player.tile, imp.tile) == 5, "which is 5 from the hostile (%d)" % World.distance(player.tile, imp.tile))
+	# The nearest cell out of reach of an imp at (8, 6), along the ground
+	# from the saved tile (decision 749; before it, the farthest start tile).
+	_check(player.tile == Vector2i(2, 6), "hostile 2 tiles from the saved tile: put on the nearest safe cell, not a start tile (at %s)" % player.tile)
+	_check(World.distance(player.tile, imp.tile) == _main.SPAWN_SAFE_DISTANCE + 1, "which is just out of the hostile's reach (%d)" % World.distance(player.tile, imp.tile))
 	World.damage(imp, 999)
 
 	_walk_to(player, saved)
@@ -63,14 +64,16 @@ func _test_respawn_avoids_hostiles() -> void:
 	for i in _main.RESPAWN_TICKS + 1:
 		World.step()
 	var player := _player()
-	# (11, 2), the usual first start tile, is 1 from the imp; (10, 1) is 2.
-	_check(player != null and player.tile == Vector2i(10, 1), "respawned on the start tile farthest from the hostile (at %s)" % (player.tile if player else Vector2i(-1, -1)))
+	# (11, 2), the usual first start tile, is 1 from the imp: the nearest
+	# safe cell from it along the ground (749), 6 from the imp.
+	_check(player != null and player.tile == Vector2i(6, 2), "respawned on the nearest safe cell to the start tile (at %s)" % (player.tile if player else Vector2i(-1, -1)))
 	_check(player != null and player.hp == player.max_hp, "at full hp")
 	World.damage(imp, 999)
 
 
 func _test_spawn_grace() -> void:
 	print("\n== spawn grace: monsters ignore a fresh spawn for 30 ticks, or until it acts ==")
+	_walk_to(_player(), Vector2i(10, 1))  # Where its imps have room (the respawn put it there before 749).
 	_rejoin()
 	var player := _player()
 	_check(player.protected, "a newly spawned player is protected")

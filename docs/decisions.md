@@ -36900,3 +36900,35 @@ combat_test _test_sledge_recover: 9 and 8 for Brand, planted after a hit
 and after a whiff, a player's held at least 8, a giant axe no recover.
 monster_test and items_test pass. No wire change (the wind-up's ticks
 already go over), protocol unchanged, no new class_name.
+## 749. Spawn safety: the nearest safe cell first
+
+Jeff, v0.1.194: "when exiting the barrows after the quest is complete - the game placed me by
+the foothills zone line in the wilds". The box's journal (release): the mound's link took him
+to wilds/from_barrow (170, 179) as it should, then spawn safety (Main._join_player) found a
+monster 4 tiles off (SPAWN_SAFE_DISTANCE 5; the wilds woke after 20 minutes asleep) and put him
+on the zone's start farthest from every monster, the layout's start marker at (126, 22) on the
+foothills line, a map away. Not 745's rename: the same would have put him by the castle link
+before it. Approved by the coordinator (2026-10-31).
+
+- **The search:** an arrival whose cell has a monster within SPAWN_SAFE_DISTANCE now takes
+  the nearest free, unburning cell with none (Main._safe_tile_near): a flood from the
+  intended cell over walkable ground through open edges, orthogonal steps (World.edge_blocks
+  reads those), so the cell is reachable from the arrival and never across a river or a wall,
+  out to SPAWN_NEAR_TILES (16). Only when there is none does the zone's safest start take
+  him, as before.
+- **Every arrival through spawn safety:** a link or an edge crossing, coming back, a
+  respawn, a revival: they all pass _join_player's one check. The companion's own check
+  (beside her owner) is unchanged.
+- **The [spawn] line** says which: "using the nearest safe tile (x, y)", or "none safe within
+  16; using start tile (x, y)".
+- **Tests:** level_test _test_spawn_near (a monster 3 from the arrival: the cell 3 off, just
+  out of its reach, not the far start; every cell on the arrival's side of a wall in reach: the
+  start beyond it, never a cell across the wall) and _test_barrow_exits, the guard the bug
+  asked for: each of the barrow's four ways out (the mound's door, the First Hall's niche, the
+  Ossuary's stair up, its draugr shortcut) taken through Main._take_link lands at its own
+  door, mound, stair foot or temple. spawn_test's two fallbacks now read the nearest safe
+  cell, (2, 6) and (6, 2), not a start; zone_test's and companion_test's arrivals by a monster
+  take the nearest safe cell too; respawn_test's closed-link lines are read off the log's end
+  (the respawn's walk filled it to PartyLog.MAX_LINES, so a size taken before read nothing).
+
+Server only, protocol unchanged, no new class_name.

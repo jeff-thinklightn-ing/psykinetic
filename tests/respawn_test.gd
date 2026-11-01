@@ -313,13 +313,14 @@ func _test_closed_link() -> void:
 	_main.level["links"].append({"tile": at, "to_map": "nowhere_yet", "to_spawn": "", "one_way": false, "closed": true})
 	var zone: String = World.zone.name
 	_kill_monsters()  # Nobody to crowd the steps on and off.
-	var before: int = _main.party_log.size()
+	# Counted from the end: the log keeps PartyLog.MAX_LINES, so a full one
+	# never grows and a size taken before reads nothing new.
 	_walk_to(player, at)
 	World.step()
 	_walk_to(player, at + Vector2i(1, 0))
 	_walk_to(player, at)
 	World.step()
-	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - before)
+	var lines: Array[String] = _main.party_log.last(8)
 	_check(player.tile == at and World.zone.name == zone and is_instance_valid(player) and player.spawned,
 		"stepping on it goes nowhere (at %s in %s)" % [player.tile, World.zone.name])
 	_check(lines.count("The way on is closed.") == 2, "and says the way on is closed, once each time stepped on (%s)" % [lines])

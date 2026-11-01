@@ -65,8 +65,10 @@ func _test_one_takes_a_link() -> void:
 	_check(moved != null and moved.zone == "sample" and _main._records[BO_ID].zone == "sample",
 		"Bo is in the sample zone, and his record says so")
 	var starts: Array = Level.load_level("sample")["starts"]
-	_check(moved != null and (World.distance(moved.tile, Vector2i(13, 5)) <= 1 or moved.tile in starts),
-		"at its spawn point, path_end, or (a brute is near it) a safe start (%s)" % [moved.tile if moved else "-"])
+	# A brute near path_end: the nearest safe cell within SPAWN_NEAR_TILES of it (749), else a start.
+	_check(moved != null and (World.distance(moved.tile, Vector2i(13, 5)) <= 1 or moved.tile in starts
+			or World.distance(moved.tile, Vector2i(13, 5)) <= _main.SPAWN_NEAR_TILES and _main._nearest_hostile_distance(moved.tile) > _main.SPAWN_SAFE_DISTANCE),
+		"at its spawn point, path_end, or (a brute is near it) the nearest safe cell or a safe start (%s)" % [moved.tile if moved else "-"])
 	var still := _player(Net.local_id)
 	_check(still == host and still.zone == "test_room" and still.tile == host_tile, "the host did not move: %s at %s" % [still.zone, still.tile])
 	_check(World.zone.name == "test_room" and _main.map_name == "test_room", "and the host's view is still the test room")

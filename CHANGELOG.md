@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Leaving the barrow with a monster near the mound puts you at the nearest safe spot by it, not back at the wilds' far start by the foothills; the same for every arrival, respawn and revival with a monster close (749).
 - Brand the Ox: the Tomb Sledge winds up longer (0.9 s) and, once it lands or misses, he stands planted for 0.8 s with its head in the ground: step out of reach while he heaves, then hit him as he drags it back up (750, combat's side).
 - Townsfolk sleep only under a roof (their house, the inn or a roofed workplace), and those with none stay up instead of lying on the ground; a sleeper says nothing, clicking one tells you they are asleep without waking them, and a fight within 6 cells gets them up (751, npc's side).
 - Umbrage's houses and huts now have beds: three in your house, a straw bed in each hut, and beds in every house and inn a town builds (751).
