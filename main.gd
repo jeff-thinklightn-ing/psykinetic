@@ -2778,7 +2778,12 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 ## held steer goes straight at the cursor), not cell centre to centre: a
 ## new click mid-walk heads its way at once instead of angling to the next
 ## centre first (765 ms to settle on the new way, the grid 150). Else a cell
-## passed by on the way to the next is not gone back for.
+## passed by on the way to the next is not gone back for, when the way on
+## to the next is clear from the cell the body is in (724 amended (2);
+## playtest's barrow tour: a route turning round a wall's end through a
+## door, (15, 27) to (15, 28) to (14, 28), dropped (15, 28) a cell short of
+## (14, 28), the body pressed the wall between, and each re-click planned
+## it back: it stepped between (14, 27) and (15, 27) for a minute).
 func _free_pull(player: Player, path: Array, at: Vector2) -> void:
 	var from := World.free_cell(player, at)
 	for k in range(mini(path.size() - 1, FREE_PULL_CELLS), 0, -1):
@@ -2786,7 +2791,9 @@ func _free_pull(player: Player, path: Array, at: Vector2) -> void:
 			for i in k:
 				path.pop_front()
 			return
-	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])):
+	var here := Vector2i(at.round())
+	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])) \
+			and World._line_clear(here, path[1], path[1], player):
 		path.pop_front()
 
 

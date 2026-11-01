@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Click to walk: a route that turns round the end of a wall through a door no longer gets stuck pressing the wall and pacing between two spots; you go through the door (724 amended (2)).
 ## v0.1.196
 
 - What goes over the network changes, so v0.1.195 and older can't join the server: update through the launcher first.

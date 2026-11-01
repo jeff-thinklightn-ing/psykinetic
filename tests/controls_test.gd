@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_free_pull()
 	_test_free_chase()
 	_test_free_route_own_companion()
+	_test_free_pull_round_a_wall()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1035,6 +1036,47 @@ func _test_free_pull() -> void:
 	var cells := path.size()
 	_main._free_pull(player, path, Vector2(4.4, 3.3))
 	_check(cells >= 5 and path.size() == 1 and path[0] == Vector2i(9, 3), "from off its centre: straight at (9, 3) (%d cells to %s)" % [cells, path])
+
+
+## A route turning round a wall's end through a door (724 amended (2);
+## playtest's barrow tour, (15, 27) to (15, 28) to (14, 28): the door's cell
+## dropped as passed by a cell short of the next, the body pressed the wall
+## between and every re-click planned it back, between (14, 27) and (15, 27)
+## for a minute). The test room's west door is south of (4, 12), walled
+## beside south of (3, 12): the same turn mirrored.
+func _test_free_pull_round_a_wall() -> void:
+	print("\n== a route round a wall's end through a door: its door cell kept, walked through ==")
+	var saved: String = Net.controls
+	Net.controls = "click"
+	var player := _place_player(Vector2i(4, 12))
+	_free_start(player)
+	var door := World.door_across(Vector2i(4, 12), Vector2i(0, 1))
+	World._set_door(door, false, player)
+	var path: Array = [Vector2i(4, 13), Vector2i(3, 13)]
+	_main._free_pull(player, path, Vector2(3.6, 12.25))
+	_check(path.size() == 2 and path[0] == Vector2i(4, 13),
+			"a cell short of (3, 13), the wall between: the door's cell (4, 13) kept (%s)" % [path])
+	_place_player(Vector2i(3, 11))
+	_free_start(player)
+	World._set_door(door, false, player)
+	path = []
+	for cell: Vector2i in World.walk_path(player.tile, Vector2i(3, 13), player):
+		path.append(cell)
+	var planned := path.duplicate()
+	_main._free["path"] = path
+	var cells: Array[Vector2i] = [player.tile]
+	for i in 60:
+		_free_frames(player, 6)
+		if player.tile != cells.back():
+			cells.append(player.tile)
+		if player.tile == Vector2i(3, 13) and not _walking():
+			break
+	_check(player.tile == Vector2i(3, 13) and door.is_open() and not _walking(),
+			"route %s from (3, 11): the door opened, at (3, 13) by %s" % [planned, cells])
+	_stop_walk()
+	World._set_door(door, false, player)
+	player.free_view = null
+	Net.controls = saved
 
 
 ## A click route with his own companion standing on it (playtest's barrow

@@ -34762,6 +34762,22 @@ _test_free_route_own_companion: a second stood against her keeps the route
 (without the guard: "steps right from (5, 3) to (5, 4) round Garrow"), and
 a route through her cell walks on to its end. Client only, protocol
 unchanged, no new class_name.
+
+724 amended (2) (physics; playtest's barrow tour, via the coordinator; not
+724's own rule, the pre-724 run shows it too): fighting Robber3, clicked every
+1.5 s, the player stepped between (14, 27) and (15, 27) 33 times in a minute,
+the door on (15, 27)'s south edge shut throughout. The route went (15, 27),
+through that door to (15, 28), then west to (14, 28): round the end of the
+wall on (14, 27)'s south edge. Traced on the client: a cell short of (14, 28)
+Main._free_pull's last step dropped (15, 28) as passed by (the body within a
+cell of the next), with the wall between, so the body steered south-west
+into the wall, slid to (14, 27) and pressed it; the next click planned from
+there by (15, 27) again. That drop now needs the way on clear
+(World._line_clear) from the cell the body is in, as the pull's own step
+does. controls_test _test_free_pull_round_a_wall (the test room's west door,
+the same turn mirrored): at (3.6, 12.25) the door's cell (4, 13) is kept
+(without the guard dropped), and a route from (3, 11) opens the door and
+reaches (3, 13). Client only, protocol unchanged, no new class_name.
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 
 Jeff: "theres this annoying ringing that starts with the map, it happens a lot
