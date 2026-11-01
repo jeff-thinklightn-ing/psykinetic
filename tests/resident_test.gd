@@ -3201,6 +3201,25 @@ func _test_asleep(mara: Resident, home: Rect2i) -> void:
 	_check(mara.sleeping() and mara.addressing.is_empty(), "she does not stir")
 	_check(_main._resident_addressed(player, "Mara, wake up", null) != mara, "typed words go unheard")
 	_check(not _main._hail_able(mara) and _main._resident_quiet(mara, player), "no hail, nothing said")
+	# A sleeper doesn't trade (751 amended (2)): no Barter on the bar, and the server refuses the order.
+	var was_trade := mara.trade
+	mara.trade = str(Items.TRADES[0])
+	_check(not _main._barters(mara), "asleep: no Barter offered (a %s)" % mara.trade)
+	mara.trade = was_trade
+	var bartered: Array[Dictionary] = []
+	var sent := func(kind: String, data: Dictionary) -> void:
+		if kind == "barter":
+			bartered.append(data)
+	Net.message_received.connect(sent)
+	told.clear()
+	_main._on_command(player, "barter", {"resident": str(mara.get_path())})
+	_main._on_command(player, "trade", {"resident": str(mara.get_path()), "give": [], "take": [], "gold": 0})
+	Net.message_received.disconnect(sent)
+	if World.production != null and not World.production.worker(mara.worker_id).is_empty():
+		_check(bartered.is_empty() and told.size() == 2 and lines.any(func(line: Variant) -> bool: return told[0] == str(line) % "Mara"),
+			"a barter or a trade with her asleep: no window, \"Mara is asleep.\" (%s / %s)" % [told, bartered])
+	else:
+		_check(bartered.is_empty(), "(she is no maker here: no barter sent) (%s)" % [bartered])
 	_main._wake_near(mara.tile + Vector2i(3, 0))
 	_check(not mara.sleeping() and mara.activity != "sleep", "a fight three cells off: she is up")
 	for i in 20:

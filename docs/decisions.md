@@ -37280,6 +37280,20 @@ of doors, the bedroll one back with its head the facing's way and the body
 0.09 up; up, the bedroll gone and the height 0; on a bed's head cell, no
 bedroll and the bed's 0.37. Client only, protocol unchanged.
 
+751 amended (2) (release's label; the coordinator's ruling, from playtest's
+folk tour: Snagfin asleep at 23:00 still offered Barter, and pressing it
+opened his window, while Rolf's wares hid): a sleeper doesn't trade.
+Main._barters is false for a body seen asleep (Main._asleep_seen: its
+replicated activity "sleep", so a joined client reads it as the server
+does), so the talk bar shows Talk only, and a Barter already up hides when
+its person falls asleep (_update_bar). A press that still reaches
+_open_barter_with sends "greet" in place of "barter", and the server answers
+it as a click on a sleeper: the "asleep" line, with no window. The server
+refuses a "barter" or "trade" order with a sleeping maker ({resident},
+Resident.sleeping()) with the same line (_asleep_told) and sends no
+"barter". The words are 751's, unchanged. resident_test _test_asleep. Server
+and client together, protocol unchanged.
+
 750 amended, pc-character's side (2026-11-01): the heavy axes' sweep. The
 giant axe and the battle axe swing Axe_Sweep (humanoid_clips' SWEEP_*), a
 wound-up blow (WOUND_STRIKES, strikes [["Axe_Sweep", 0.8]]) at combat's

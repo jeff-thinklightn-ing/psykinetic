@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- A townsman asleep no longer offers Barter, and a barter with one gets "<Name> is asleep." rather than his window (751 amended (2)).
 - Tools: a playtest tour talks to every townsperson by day and at night, and the seam check now follows maps' ruling (754 amended (3)).
 
 - No lone brick wall beside the foothills' roads at the zone edges: the castle's and the wilds' outer walls are no longer drawn in the view past each road (327 amended (2)).

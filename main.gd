@@ -1737,6 +1737,8 @@ func _update_bar() -> void:
 	if player != null and World.distance(player.tile, _bar_for.tile) > HEARING_RANGE:
 		_close_bar()
 		return
+	if _bar_barter.visible and _asleep_seen(_bar_for):
+		_bar_barter.visible = false  # Fallen asleep with the bar up (751 amended (2)).
 	var rect := bubbles.rect_of(_bar_for.get_instance_id())
 	if rect.size.y <= 0.0:
 		var at: Variant = _bubble_anchor(_bar_for.get_instance_id())
@@ -1764,8 +1766,10 @@ func _bar_talk_pressed() -> void:
 ## Whether [param resident] has a barter to offer: the merchant fronts the
 ## town's shop (560, a counter near), a maker trades their own make in
 ## person (562; economy's rule: a trade in Items.TRADES, the medicine man
-## too).
+## too). Never one asleep (751 amended (2)): a sleeper doesn't trade.
 func _barters(resident: GridEntity) -> bool:
+	if _asleep_seen(resident):
+		return false
 	var trade := str(resident.get("trade")) if resident.get("trade") != null else ""
 	if trade == "merchant":
 		return _shop_counter_near(resident) != null
@@ -1784,6 +1788,10 @@ func _bar_barter_pressed() -> void:
 
 func _open_barter_with(resident: GridEntity) -> void:
 	var player := _local_player()
+	if player != null and _asleep_seen(resident):
+		# Asleep (751 amended (2)): no window; the server's "<Name> is asleep." as a click gives.
+		World.command(player, "greet", {"resident": str(resident.get_path())})
+		return
 	if player == null or barter_panel == null or not _barters(resident):
 		return
 	var person := str(resident.get("person")) if resident.get("person") != null else ""
@@ -1794,6 +1802,12 @@ func _open_barter_with(resident: GridEntity) -> void:
 	else:
 		barter_panel.open(resident, person)
 		World.command(player, "barter", {"resident": str(resident.get_path())})
+
+
+## Whether [param body] is seen asleep (751): its replicated activity, so
+## a joined client reads it as the server does.
+static func _asleep_seen(body: GridEntity) -> bool:
+	return body != null and is_instance_valid(body) and str(body.get("activity")) == "sleep"
 
 
 ## The shop counter nearest [param near] in this zone (a Chest that is a
@@ -11351,6 +11365,9 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		if args.has("resident"):
 			var body := get_node_or_null(NodePath(str(args.get("resident", "")))) as Resident
 			if body == null or World.production == null or World.production.worker(body.worker_id).is_empty():
+				return
+			if body.sleeping():
+				_asleep_told(entity as Player, body)  # A sleeper doesn't trade (751 amended (2)).
 				return
 			maker = body.worker_id
 			shop = body
