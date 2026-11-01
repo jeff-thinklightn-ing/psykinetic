@@ -7,11 +7,12 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.195
+
 - Townsfolk with no roof get a bedroll: a hide, a wool pad, a blanket and a rolled cloak for a pillow, laid by town fires and under shelters (art for 751).
 - Townsfolk: Rolf's stall and a pedlar's wares have buttons now: greet them and each ware is a button with its price, enabled while your purse covers it; press one to buy (736 amended (2)).
 - Tools: docs/voice.md, the voice guide for how the world's people speak, and tools/voice_inventory.py, which lists every fixed line in the game in docs/voice_inventory.md (748).
 - Companions: your companion no longer attacks the fallen knight in the barrow's Altar Room, nor the draugr while he sits or rests (747 amended (3)).
-
 - Townsfolk near the fallen knight no longer act as if a fight is on: he is never counted as a threat.
 - Townsfolk have heard of the fallen knight's spirit in the barrow's Altar Room, whose bones the draugr holds, and that Brand the Ox carries the key to the Mound-breakers' chest.
 - The fallen knight in the barrow now speaks in his own words and names himself: he is that cycle's knight whose remains the draugr holds, and he asks you to bring them to Aldous. The robbers' camp chest has new lines too.
