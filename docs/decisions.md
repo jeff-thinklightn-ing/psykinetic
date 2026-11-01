@@ -36789,3 +36789,12 @@ him.
   it. A heuristic list for review, not a test; re-run it, don't edit the page.
 - A word checker (modern and game words in fixed lines) waits until Jeff has seen the guide.
 Docs and a tool only, protocol unchanged, no new class_name.
+## 751, art-kit's side: the bedroll
+
+Jeff's note that townsfolk shouldn't sleep on bare ground (the coordinator's ask, 2026-10-31; npc's 751
+lays them asleep). prop.bedroll is a cell prop on 1 x 2 cells along z, its head toward -z as prop.bed's,
+lying flat (0.19 m at the pillow): a rough hide on the ground, a wool pad, a blanket over its lower part
+with its top turned back, and a rolled cloak tied as a pillow. 296 tris, palette only, a grey box. npc
+places it by town fires and under shelters for residents with no roof; whether it blocks is the placer's
+choice. Made by hand in the kit (C:/dev/review/bedroll/make_bedroll.py), own art. Art only, protocol
+unchanged, no new class_name.

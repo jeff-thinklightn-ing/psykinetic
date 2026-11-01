@@ -1852,6 +1852,7 @@
 			"uses": "the healer's brewing pot over the hearth (718, art-kit's side): building.turf_house's hearth socket, 1 cell, blocking; its fire at the flame socket as prop.campfire's. Variant 2: tipped over and cold, in the ruined house",
 			"grey": [{"at": [0, 0.665, 0], "size": [1.0, 1.33, 1.0]}]
 		},
+		"prop.bedroll": {"category": "props", "type": "mesh", "kind": "cell", "size": [0.892, 0.194, 1.923], "budget": 400, "source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-31", "notes": "C:/dev/review/bedroll/make_bedroll.py: a rough hide spread on the ground, a grey-fawn wool pad, a blue-grey blanket over its lower part with its top turned back, a brown cloak rolled and tied with two thongs for a pillow; 296 tris"}, "uses": "a bedroll for townsfolk with no roof (the coordinator, from Jeff's note that they shouldn't sleep on bare ground): 1 x 2 cells along z, its head toward -z as prop.bed's, lying flat (0.19 m at the pillow); npc lays it by town fires and under shelters", "grey": [{"at": [0, 0.097, 0], "size": [0.892, 0.194, 1.923]}]},
 		"prop.bed_straw": {
 			"category": "props",
 			"type": "mesh",
