@@ -864,7 +864,7 @@ func _test_boss_marks() -> void:
 	if robber == null:
 		_check(false, "a monster spawned beside the player")
 		return
-	_check(_main._display_name(robber) == "BossRobber" and _main.boss_in_sight() == null, "one known by its kind: its own node name, and no boss")
+	_check(_main._display_name(robber) == "the creature" and _main.boss_in_sight() == null, "one of no kind: \"the creature\", never its node name (752, dungeon's side), and no boss")
 	robber.given_name = "Crake"
 	_check(_main._display_name(robber) == "Crake" and BossBar.given_name_of(robber) == "Crake" and _main.boss_in_sight() == null,
 		"a named robber: his name for the target, and he is no boss")

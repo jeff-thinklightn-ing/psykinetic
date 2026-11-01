@@ -3106,6 +3106,32 @@ func _test_camp_chest() -> void:
 	World.despawn(chest)
 
 
+## 752, dungeon's side (the playtest's "AstralKnight1"): a monster is never
+## called by its node name. [param knight] is the fallen knight, spawned.
+func _test_monster_names(knight: AstralKnight) -> void:
+	var node_name := RegEx.create_from_string("^[A-Za-z_]+\\d+$")
+	var sir: String = _main.barrow_knight()
+	var robber := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber", "name": "NameRobber%d" % World.tick,
+		"tile": _main._nearest_free(knight.tile + Vector2i(0, 2))}) as Monster
+	var words := []
+	for monster: Monster in [knight, robber]:
+		words.append(_main._display_name(monster))
+		words.append(_main._speaker_name(monster))
+	_check(words.all(func(word: String) -> bool: return node_name.search(word) == null and not word.is_empty()),
+		"no node name for a monster, in a sentence or as a speaker: %s" % [words])
+	_check(_main._display_name(knight) == (sir if not sir.is_empty() else Main.KNIGHT_UNNAMED)
+		and _main._speaker_name(knight) == Main.capital_first(sir if not sir.is_empty() else Main.KNIGHT_UNNAMED),
+		"the knight is the generation's sepulcher knight (%s)" % _main._speaker_name(knight))
+	_check(_main._display_name(robber) == "the grave robber" and _main._speaker_name(robber) == "The grave robber",
+		"an unnamed robber: \"the grave robber\", \"The grave robber\" as a speaker")
+	robber.given_name = "Crake"
+	_check(_main._display_name(robber) == "Crake" and _main._speaker_name(robber) == "Crake", "a named one by its given name (752)")
+	var log := PartyLog.new()
+	log.add("the draugr hits you.")
+	_check(log.last(1) == ["The draugr hits you."], "a party-log line opening on a monster's name has its capital")
+	World.despawn(robber)
+
+
 ## The fallen knight's quest (747; Jeff: "a astral projection of a fallen
 ## knight in the altar room that gives the quest ... stop the grave robbers
 ## and ill then give access to the crypt"): he stands in the barrow's Altar
@@ -3140,6 +3166,7 @@ func _test_barrow_quest() -> void:
 	var ids := func() -> Array: return knight.offers_for(id).map(func(offer: Dictionary) -> String: return str(offer["id"]).get_slice(":", 2))
 	_check(_main.barrow_quest_of(id) == "ask" and ids.call() == ["ask"] and player.quest.is_empty() and not _main.way_revealed(id, "barrow"),
 		"a stranger: his ask, no quest yet, the way not revealed (%s)" % [ids.call()])
+	_test_monster_names(knight)
 	var sir: String = _main.barrow_knight()
 	var asked := str(knight.offers_for(id)[0].get("words", ""))
 	_check(asked == (AstralKnight.ASK_UNNAMED if sir.is_empty() else AstralKnight.ASK_WORDS % sir),

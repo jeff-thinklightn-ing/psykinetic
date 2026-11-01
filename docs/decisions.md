@@ -37031,6 +37031,23 @@ the boss had no marker. Monster gains two replicated fields (enemy-ai's,
 ui draws the name and the marker. An old client draws neither, so the cut
 carrying it is forced. monster_test _test_band and _test_draugr check them.
 
+752, dungeon's side (the playtest's catch: the fallen knight's window and
+talk lines read "AstralKnight1", the draugr's "Draugr1"): a monster is
+never called by its node name. Main._display_name of a Monster is
+Main.monster_name, the in-sentence form (voice's wording): its given_name
+first; the fallen knight as the generation's sepulcher knight
+(barrow_knight, lore's list, e.g. "Sir Edric the Steadfast") or "the fallen
+knight" with none yet; the draugr as "the draugr"; any other as "the" and
+its kind's monsters.json label in lower case ("the grave robber"). A
+window title and the talk log's speaker take monster_label, the same with
+its first letter capital (Main._speaker_name: _send_monster_offers,
+_monster_greeted, _monster_said, _monster_accepts, his said lines). A
+party-log line opening on "the " is kept with its capital (PartyLog.add).
+Proper names stay as they are. level_test _test_monster_names: no node
+name for a monster in either form, the knight, an unnamed robber, a named
+one, the log's capital. Server only (the names travel as strings),
+protocol unchanged, no new class_name.
+
 751, npc's side (2) (release's label; the coordinator's yes): the roofless
 sleep on a bedroll instead of staying up. Main._bed_down_roofless gives
 each _sync_residents entry with no "bed" (and not strayed) a sleep spot as

@@ -12589,9 +12589,53 @@ func _display_name(entity: GridEntity) -> String:
 			return record.name
 	if entity is Resident and not entity.label.is_empty():
 		return entity.label
-	if not BossBar.given_name_of(entity).is_empty():
-		return BossBar.given_name_of(entity)  # A named one's own name (752, ui's side): "Crake".
+	if entity is Monster:
+		return monster_name(entity as Monster)
 	return String(entity.name)
+
+
+## A speaker's name in a window or the talk log (752, dungeon's side): a
+## monster's label form (monster_label), anyone else's display name.
+func _speaker_name(entity: GridEntity) -> String:
+	return monster_label(entity as Monster) if entity is Monster else _display_name(entity)
+
+
+## The words for the fallen knight with no knight named yet, and the
+## draugr (752, dungeon's side; voice's wording: lower case in a sentence).
+const KNIGHT_UNNAMED := "the fallen knight"
+const DRAUGR_NAME := "the draugr"
+
+
+## What [param monster] is called in a sentence (752, dungeon's side; the
+## playtest's "AstralKnight1"): never its node name. Its given name (752)
+## first; the fallen knight as the generation's sepulcher knight
+## (barrow_knight) or KNIGHT_UNNAMED; the draugr as DRAUGR_NAME; else "the"
+## and its kind's label (monsters.json) in lower case. Proper names stay as
+## they are; monster_label is the form for a window title or a speaker.
+func monster_name(monster: Monster) -> String:
+	if not monster.given_name.is_empty():
+		return monster.given_name
+	var kind := str(monster.spawn_spec.get("kind", ""))
+	if monster is AstralKnight or kind == "astral_knight":
+		var knight := barrow_knight()
+		return knight if not knight.is_empty() else KNIGHT_UNNAMED
+	if monster is Draugr or kind == "draugr":
+		return DRAUGR_NAME
+	var label := str(Monster.kinds().get(kind, {}).get("label", ""))
+	if label.is_empty() and not kind.is_empty():
+		label = kind.replace("_", " ")
+	return "the " + (label.to_lower() if not label.is_empty() else "creature")
+
+
+## [param monster]'s name as a label (a window title, the talk log's
+## speaker): monster_name with its first letter capital ("The draugr").
+func monster_label(monster: Monster) -> String:
+	return capital_first(monster_name(monster))
+
+
+## [param text] with its first letter capital, the rest as it is.
+static func capital_first(text: String) -> String:
+	return text if text.is_empty() else text.left(1).to_upper() + text.substr(1)
 
 
 func _narrate_push(entity: GridEntity, by: GridEntity, _direction: Vector2i, tiles: int, impact: int, stopped_by: String) -> void:
@@ -13643,7 +13687,7 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 	if monster == null or player == null or not monster.has_method("offers_for"):
 		return false
 	var key := String(monster.get_path())
-	var name := _display_name(monster)
+	var name := _speaker_name(monster)
 	var player_id := player.player_id
 	var ask := Offers.ask_kind(line)
 	var amount := Offers.amount_said(line)
@@ -13692,7 +13736,7 @@ func _monster_said(monster: GridEntity, player: Player, line: String) -> bool:
 ## accept_offer, his reply spoken, his line logged, nothing standing on ok,
 ## and his offers sent again.
 func _monster_accepts(monster: GridEntity, player: Player, offer: Dictionary, gold: int) -> void:
-	var name := _display_name(monster)
+	var name := _speaker_name(monster)
 	var player_id := player.player_id
 	if Offers.free_deal(offer):
 		gold = 0  # Paid for already (548 amended): no purse asked, nothing taken, whatever sum was said.
@@ -13722,7 +13766,7 @@ func _monster_greeted(player: Player, monster: GridEntity) -> void:
 			or World.distance(talk_cell(monster), player.tile) > HEARING_RANGE:
 		return
 	var key := String(monster.get_path())
-	var name := _display_name(monster)
+	var name := _speaker_name(monster)
 	var offers: Array = monster.offers_for(player.player_id)
 	Transcript.record(name, _display_name(player), "[greets]")
 	if offers.is_empty():
@@ -13744,7 +13788,7 @@ func _monster_greeted(player: Player, monster: GridEntity) -> void:
 func _send_monster_offers(monster: GridEntity, player_id: String, peer: int) -> void:
 	if monster == null or not is_instance_valid(monster) or player_id.is_empty() or peer < 0 or not monster.has_method("offers_for"):
 		return
-	var data := {"entity": String(monster.get_path()), "speaker": _display_name(monster), "offers": monster.offers_for(player_id)}
+	var data := {"entity": String(monster.get_path()), "speaker": _speaker_name(monster), "offers": monster.offers_for(player_id)}
 	var standing := _standing_for(player_id, String(monster.get_path()))
 	if not standing.is_empty():
 		data["standing"] = {"id": standing["id"], "title": standing["title"]}
@@ -13772,7 +13816,7 @@ func _hook_talker(monster: GridEntity) -> void:
 		# His unasked lines (573 amended: why one entered, the win, his respect).
 		monster.connect("said", func(text: String) -> void:
 			if is_instance_valid(monster) and monster.spawned:
-				_say_plain(monster, _display_name(monster), text))
+				_say_plain(monster, _speaker_name(monster), text))
 
 
 func _on_offer_spoken(monster: GridEntity, player_id: String, offer: Dictionary) -> void:
@@ -13780,7 +13824,7 @@ func _on_offer_spoken(monster: GridEntity, player_id: String, offer: Dictionary)
 		return
 	for player: Player in _players.values():
 		if is_instance_valid(player) and player.player_id == player_id and player.zone == monster.zone:
-			_speak_offer(monster, String(monster.get_path()), _display_name(monster), player, offer)
+			_speak_offer(monster, String(monster.get_path()), _speaker_name(monster), player, offer)
 			return
 
 

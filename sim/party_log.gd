@@ -10,7 +10,11 @@ const MAX_LINES := 200
 var _lines: Array[String] = []
 
 
+## A sentence opening on a monster's in-sentence name ("the draugr hits
+## you", 752, dungeon's side) is kept with its first letter capital.
 func add(sentence: String) -> void:
+	if sentence.begins_with("the "):
+		sentence = "T" + sentence.substr(1)
 	_lines.append(sentence)
 	if _lines.size() > MAX_LINES:
 		_lines.pop_front()
