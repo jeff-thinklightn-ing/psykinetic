@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Being brought back from near death in another zone (out of the barrow) no longer prints an engine error on your game (587 amended).
 
+- Tools: playtest tours (754): `sh tools/tour.sh <tour>` plays a real client against a local server as a player would (clicks, walks, talks, buys, fights, crosses links) and reports what a player would notice in build/tours/<tour>/report.md; the first tours are smoke and barrow (Jeff's barrow route: Rolf, a sleeper, the knight's quest, the companion, the band's names and the tracker).
 - Monsters are called by name in talk windows and the log: the fallen knight by his own name, the draugr as the draugr, others by their kind ("the grave robber"), never as "AstralKnight1" or "Draugr1" (752, dungeon's side).
 - Townsfolk asleep out of doors lie on a bedroll, and those in a house lie up on their bed rather than through it (751, npc's side (3)).
 - The land past a way out now meets the ground at your feet: from the foothills' north road the castle stands level beyond the trees instead of at the foot of a sheer cliff, and the wilds past its south road likewise (327 amended).

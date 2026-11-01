@@ -25,3 +25,4 @@ dungeon 3600
 combat 3800
 physics 4000
 voice 4200
+playtest 4400

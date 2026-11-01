@@ -37206,3 +37206,40 @@ WorldMap.plane_layout() (Level.world_plane() unless given one).
 world_map_test _test_plane_layout. The page itself is "755, ui's side". Also here, 327
 amended's entry: the phased-canopy difference with terraced glimpses is said as seen, its
 cause not found. Client-readable data, protocol unchanged, no new class_name.
+## 754: playtest tours, a player at a real client
+
+Jeff (2026-10-31): "is there anyway you could test for bugs yourself in game? -- i'm finding a
+lot of things that are "off" i want to be able to focus on game feel". Each of that evening's
+bugs passed its tree's own tests; they were found by playing. The coordinator approved the
+playtest session's step 1.
+
+A tour is tests/tour/tours/<name>.gd, played by tools/tour.sh: a local headless --server on the
+world's own levels, with --regenerate as the box runs (without it a fresh barrow is its rooms,
+unjoined), and one client that joins it as a local test player (never the box, never a real id).
+The client is the game's own Main at /root/Main, where the server's is (replication finds nodes
+by path), made by tests/tour/tour.tscn. tests/tour/bot.gd plays it through the client's own paths:
+- a click is Main._unhandled_input with the cell under the cursor (_pick_grid) set, so the pixel
+  pick is the only step skipped (a headless window has no cursor, and a windowed tour must never
+  move Jeff's), as --test-click already does; a key is the same handler's key event;
+- walk_to clicks a cell and waits (a link crossed ends it), fight clicks a foe again while it
+  stands, guard fights what comes while it waits, press emits a visible button's own pressed;
+- what it reads is what a player sees: the local player, the bodies the client knows, every
+  visible button and text, the "speech" messages heard, each body's swung and struck signals.
+Setup a player could not do (gold, the hour) goes through the server's admin console and is
+named as setup in the report. Checks are PASS/FAIL lines in build/tours/<name>/report.md with
+the server's and client's logs beside it; exit 0 all passed, 1 one failed, 2 never joined.
+
+Tours run outside land.sh (the coordinator: before cuts and on demand; a short smoke tour in the
+landing may come once one is stable and under a minute), through the gate as `scene`. Everything
+they write is under build/tours/<name>/, the APPDATA both run under included, so the shared
+user:// overlay is never touched. Ports: the tour's base 17800 plus the checkout's offset
+(playtest 4400), its admin console the next.
+
+The first tours: smoke (join, the console, a click walks) and barrow (Jeff's route on v0.1.194:
+Rolf's wares, a sleeper at night, the barrow's link and arrival, the fallen knight's window and
+quest, the companion never his foe, the band's names and the boss's marker, the band fought with
+the tracker ticking, going down and walking back). Before rebasing onto 752 and 8ad5a8d3 it failed
+on Rolf's missing buy buttons and the missing names and marker; on main it found the knight's
+node name in his window and talk lines, and the client's purse never following the server's.
+
+Tests and a tool only, protocol unchanged, no new class_name.
