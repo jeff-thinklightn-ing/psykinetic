@@ -51,12 +51,33 @@ static func config_of(level_name: String) -> Dictionary:
 ## scene): with the shared overlay (Level.OVERLAY) a test never writes a
 ## generation there (decision 542; CLAUDE.md: tests never write levels to
 ## user://). A test that wants generations points Level.overlay_dir at its
-## own scratch folder, as regen_test does.
+## own scratch folder, as regen_test does. A scene under tests/ is one with
+## or without the marker (199 amended: a solo level_test without it wrote a
+## barrow into the shared overlay, and every tree's level_test failed on it),
+## and without it says so once, an ERROR, so the run that left it off fails.
 static func in_test_run() -> bool:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--run-marker="):
 			return true
+	if is_test_scene(OS.get_cmdline_args()):
+		if not _unmarked_said:
+			_unmarked_said = true
+			push_error("[regen] a scene under tests/ runs without --run-marker: the shared overlay is not written (199 amended); launch it as tests/run.sh does")
+		return true
 	return false
+
+
+## Whether [param args] (a command line's) launch a scene under tests/.
+static func is_test_scene(args: PackedStringArray) -> bool:
+	for arg in args:
+		var path := arg.replace("\\", "/").trim_prefix("res://")
+		if path.begins_with("tests/") and path.ends_with(".tscn"):
+			return true
+	return false
+
+
+## Whether in_test_run has said its ERROR for a tests/ scene with no marker.
+static var _unmarked_said := false
 
 
 ## Whether this run may write the overlay it reads: no test run (tests/run.sh's

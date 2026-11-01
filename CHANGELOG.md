@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tests: a test scene launched without `--run-marker` can no longer write levels into the shared user:// overlay; it says so in an ERROR line instead (199 amended).
 - Townsfolk visiting the temple now go inside and stand on its floor, clear of the doors, the counter and the respawn spot (734 amended (4)).
 - The Dwarven Halls' chests can now also hold a battle axe, which any shop will buy (757 amended).
 

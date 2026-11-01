@@ -2305,6 +2305,22 @@ into the install directory (replaced by every deploy, and the service may
 not write there), and keeping the edits as a list of changes replayed on
 the pck's level (a replay breaks as soon as the level in the repo moves on).
 
+Amended (2026-11-01): a scene under tests/ never writes the shared overlay,
+whatever its flags. `Regen.in_test_run()` was true only with tests/run.sh's
+`--run-marker`. A solo level_test launched without it (maps, 13:01) ran its
+regenerate checks as a real server, and wrote a barrow into the shared
+`user://levels/`. Every tree's level_test then failed four barrow checks
+until it was moved aside. Now a scene launched from tests/
+(`Regen.is_test_scene` over the command line) is a test run too.
+`overlay_safe` and `may_write` already gate every generation and
+`regenerate now` on it. Without the marker, such a run says so once as an
+ERROR, so land.sh, and anyone reading the log, finds the run that left it
+off. Rejected: silently pointing `Level.overlay_dir` at a scratch folder
+(the missing marker stays hidden, and other checks that rely on it go
+unnoticed), and making each test set its own overlay folder (every new
+test would have to remember to). level_test checks `is_test_scene` on a
+tests/ scene, a Windows path, a tool's scene and a server line.
+
 ## 200. An edited level is sent to clients: the "terrain" message
 
 Terrain was never sent over the network: every peer reads a level from its

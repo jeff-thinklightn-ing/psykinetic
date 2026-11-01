@@ -2706,6 +2706,9 @@ func _test_barrow_level() -> void:
 	_check(_main.admin_command("regenerate on") == "regenerate on: the shifting levels are laid again when due" and Net.regenerate, "the console switches it on")
 	_check(Regen.in_test_run() and not Regen.may_write() and not _main._regenerate_if_due("barrow") and not Level.overlaid("barrow"),
 		"and even on, a test run on the shared overlay writes nothing there")
+	_check(Regen.is_test_scene(PackedStringArray(["--headless", "--scene", "tests/level_test.tscn"])) and Regen.is_test_scene(PackedStringArray(["res://tests" + char(92) + "x.tscn"]))
+		and not Regen.is_test_scene(PackedStringArray(["--scene", "tools/make_hills.tscn"])) and not Regen.is_test_scene(PackedStringArray(["--server", "--regenerate"])),
+		"a scene under tests/ is a test run without the marker too (199 amended); a tool's scene or the server is not")
 	var listed: String = _main.admin_command("regenerate")
 	_check(listed.begins_with("regenerate on") and "barrow: generation 0, every 3 days" in listed and "barrow_deep: generation 0, every 3 days" in listed
 		and not "barrow_lair" in listed, "the console lists both depths, the retired one not (%s)" % listed.replace("\n", "; "))
