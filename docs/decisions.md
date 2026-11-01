@@ -36869,3 +36869,34 @@ roofed and a well or a stall not; a click gets one narrated line from the
 table and no word, and she does not stir; typed words, hails and speech are
 held; a fight three cells off wakes her, and she stays up. Server only,
 protocol unchanged, no new class_name.
+## 750, combat's side. The Tomb Sledge swings like it has mass
+
+Jeff: Brand's Tomb Sledge should "move like it has mass, slow at first,
+then faster with inertia". It had no clip of its own: Brand played the
+generic Sword_Attack squeezed linearly into a 6-tick wind-up, so it read as
+a quick sword cut. Agreed with pc-character and approved by the coordinator:
+
+- The sledge's verb: windup 6 -> 9 ticks (0.9 s, the longest heavy blow;
+  the giant axe and the draugr's are 8). Stepping out of reach in time
+  still makes it strike the air.
+- A new verb key, recover (Items.COMMON, 0 by default): the ticks a
+  wound-up blow leaves its wielder planted after it lands or strikes the
+  air, the head in the ground (_tend_wind_ups sets next_move_tick, and
+  halts a free body). The sledge's is 8 (0.8 s): the player's opening.
+  World.recover_ticks(entity) gives it (0 for a lead or no windup), and
+  the views time the swing's drag back up to it.
+- Brand's time between blows is unchanged (attack_ticks 14 x speed 2.2,
+  about 3.1 s), so his damage over a fight is too.
+- A player who carries it off gets the same 9-tick wind-up and clip. A
+  free body already stands till its next blow after any blow (688; about
+  1.1 s with the sledge), which covers the 8, so the player's hold is not
+  lengthened: heavy, still playable.
+- pc-character's side: Sledge_Attack authored at these times (a slow heave,
+  the hang at the top as the tell 0.3 s before the hit, an accelerating
+  fall, contact low at 0.9 s, held down, dragged up by 1.7), the art's grip
+  honoured, tomb_sledge in Client3D.WOUND_STRIKES.
+
+combat_test _test_sledge_recover: 9 and 8 for Brand, planted after a hit
+and after a whiff, a player's held at least 8, a giant axe no recover.
+monster_test and items_test pass. No wire change (the wind-up's ticks
+already go over), protocol unchanged, no new class_name.

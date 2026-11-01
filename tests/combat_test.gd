@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_free_chase()
 	_test_body_reach()
 	_test_free_wind_up_given_up()
+	_test_sledge_recover()
 	_test_sword_lead()
 	_test_lob_aim_on_client()
 	_test_armour()
@@ -485,6 +486,57 @@ func _test_free_wind_up_given_up() -> void:
 		else:
 			_check(not kept and foe.hp == hp and host.free_pos.distance_to(from) > 0.2,
 					"%s: given up, nothing struck, and it walks (%s -> %s)" % [each[2], from, host.free_pos])
+
+
+## The Tomb Sledge (decision 750; Jeff: "move like it has mass, slow at
+## first, then faster with inertia"): wound up 9 ticks; after it lands, or
+## strikes the air, its wielder stands planted recover (8) ticks; a
+## player who carries it off is held at least as long (688 holds a free
+## body till its next blow already).
+func _test_sledge_recover() -> void:
+	print("\n== the Tomb Sledge: wound up 9 ticks, planted 8 after (decision 750) ==")
+	var e := _build(["#########", "#.......#", "#..Pm...#", "#.......#", "#########"])
+	var host: Player = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	foe.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)  # Hands to hold it, as Brand's.
+	World.set_slots(foe, Items.tidy(["", "", "", "", "tomb_sledge", ""], Items.CARRIED))
+	_check(World.windup_ticks(foe) == 9 and World.recover_ticks(foe) == 8, "Brand's sledge: wound up 9, planted 8 (%d, %d)" % [World.windup_ticks(foe), World.recover_ticks(foe)])
+	host.free_pos = Vector2(3.0, 2.0)
+	foe.next_attack_tick = 0
+	foe.next_move_tick = 0
+	var hp := host.hp
+	_check(World.try_wind_up(foe, host), "wound up at the player beside him")
+	World.tick = int(foe.wind_up["lands"])
+	var landed := World.tick
+	World._tend_wind_ups()
+	World._resolve_hits()
+	_check(host.hp < hp and foe.next_move_tick >= landed + 8 and foe.next_move_tick < landed + 9,
+			"it lands, and he can't step for 8 ticks (%d -> %d, steps from %.0f, landed %d)" % [hp, host.hp, foe.next_move_tick, landed])
+	foe.next_attack_tick = 0
+	foe.next_move_tick = 0
+	World.tick += 1
+	_check(World.try_wind_up(foe, host), "again")
+	host.free_pos = Vector2(1.2, 2.0)
+	World.tick = int(foe.wind_up["lands"])
+	landed = World.tick
+	World._tend_wind_ups()
+	_check(foe.next_move_tick >= landed + 8, "stepped out of reach: it strikes the air, and he stands planted all the same")
+	# A player who carries it off.
+	var e2 := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
+	var lifter: Player = e2["P"][0]
+	var dummy: GridEntity = e2["m"][0]
+	World.set_slots(lifter, Items.tidy(["", "", "", "", "tomb_sledge", ""], Items.CARRIED))
+	lifter.free_pos = Vector2(4.2, 2.0)
+	lifter.next_attack_tick = 0
+	lifter.next_move_tick = 0
+	_check(World.windup_ticks(lifter) == 9 and World.recover_ticks(lifter) == 8 and World.try_wind_up(lifter, dummy), "a player's Tomb Sledge: wound up 9 ticks")
+	World.tick = int(lifter.wind_up["lands"])
+	landed = World.tick
+	World._tend_wind_ups()
+	World._resolve_hits()
+	_check(lifter.free_halt_until >= landed + 8 and World.free_held(lifter), "held at least 8 ticks after it lands (until %d, landed %d)" % [lifter.free_halt_until, landed])
+	World.set_slots(lifter, Items.tidy(["", "", "", "", "giant_axe", ""], Items.CARRIED))
+	_check(World.recover_ticks(lifter) == 0, "a giant axe: no recover of its own")
 
 
 ## The sword's lead (338 amended; the coordinator: "a 2-tick server

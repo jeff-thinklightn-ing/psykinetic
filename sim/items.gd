@@ -604,8 +604,10 @@ const VERBS := {
 ## quicker), damage and force (multiples of the wielder's blow); windup, the
 ## ticks a blow is wound up before it is struck (decision 392; 0, none);
 ## lead, a light weapon's short wind-up inside its own cycle, never crushing
-## (338 amended: the sword's 2; World.try_wind_up).
-const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0, "lead": 0}
+## (338 amended: the sword's 2; World.try_wind_up); recover, the ticks a
+## wound-up blow leaves its wielder planted after it lands or whiffs
+## (decision 750: the Tomb Sledge's head in the ground; World.recover_ticks).
+const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0, "lead": 0, "recover": 0}
 
 
 ## [param verb] as the catalog gives it, every number filled in from its

@@ -7042,6 +7042,18 @@ func windup_ticks(entity: GridEntity) -> int:
 	return heavy if heavy > 0 else int(verb.get("lead", 0))
 
 
+## The ticks [param entity] stands planted after its wound-up heavy blow
+## lands or whiffs (decision 750; Jeff: the Tomb Sledge should "move like it
+## has mass"): its verb's recover; 0 for none, or for a lead. A free body
+## already stands till its next blow after any blow (688), so for a player
+## it is a floor, not more. The views time the swing's recovery to it.
+func recover_ticks(entity: GridEntity) -> int:
+	if not is_instance_valid(entity):
+		return 0
+	var verb := blow_verb(entity)
+	return int(verb.get("recover", 0)) if int(verb.get("windup", 0)) > 0 else 0
+
+
 ## The blow [param entity] is winding up (try_wind_up): {target, lands,
 ## direction, from}; {} for none.
 func winding(entity: GridEntity) -> Dictionary:
@@ -7126,6 +7138,11 @@ func _tend_wind_ups() -> void:
 		else:
 			try_swing(entity, direction, true)
 			_log("windup: %s at %s strikes the air" % [entity.name, entity.tile])
+		var recover := recover_ticks(entity)
+		if not lead and recover > 0:
+			# 750: the head in the ground; it stands planted, the striker's opening.
+			entity.next_move_tick = maxf(entity.next_move_tick, tick + recover)
+			_halt_for_blow(entity, tick + recover)
 		if lead:
 			# Its next blow attack_ticks_of after this one began, not after it landed.
 			entity.next_attack_tick = mini(entity.next_attack_tick, began + attack_ticks_of(entity))
