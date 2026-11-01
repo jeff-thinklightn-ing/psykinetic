@@ -11639,6 +11639,12 @@ func _on_offers_message(data: Dictionary) -> void:
 			deal_panel.show_deals(str(data.get("speaker", "")), data["offers"], gold, who.get_instance_id())
 		else:
 			deal_panel.close()
+	elif who is Resident and deal_panel != null:
+		# A townsperson's wares (the Rolf fix): Rolf's starter stall (736), a pedlar's pack (711).
+		if not DealPanel.wares_of(data.get("offers", []) if data.get("offers") is Array else []).is_empty():
+			deal_panel.show_wares(str(data.get("speaker", "")), data["offers"], gold, who.get_instance_id())
+		elif deal_panel.visible and deal_panel.entity_id == who.get_instance_id():
+			deal_panel.close()
 
 
 ## Whether [param entity] is a talking monster at peace (629, ui's side):
@@ -11680,7 +11686,7 @@ func _update_deal() -> void:
 		return
 	var who := instance_from_id(deal_panel.entity_id) as GridEntity
 	var player := _local_player()
-	if who == null or not is_instance_valid(who) or not who.spawned or not talks_peaceably(who) \
+	if who == null or not is_instance_valid(who) or not who.spawned or not (who is Resident or talks_peaceably(who)) \
 			or player == null or World.distance(player.tile, talk_cell(who)) > HEARING_RANGE:
 		deal_panel.close()
 	elif deal_panel.purse != gold:

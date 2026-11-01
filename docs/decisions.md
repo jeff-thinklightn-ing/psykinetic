@@ -35735,6 +35735,32 @@ Server only, protocol unchanged, no new class_name. npc's side (the keeper
 and the wares panel) and buildings' side (the stall in Umbrage's square)
 follow as "736, npc's side" and "736, buildings' side".
 
+736 amended (2), ui's side: the wares as buttons. Jeff on v0.1.194: Rolf
+"advertises but doesn't have a trade button". No client path ever took a
+resident's wares: a Resident's "offers" message only filled the pack's
+Promised line and the standing title (536, ui's side), typed words skip
+visitors and the keeper (711, 736 npc's side), and resident_test bought by
+calling Main._accept_offer on the server. Approved by the coordinator:
+a Resident's "offers" holding wares (DealPanel.is_ware: accept
+Offers.VENDOR_WARES, the keeper's, or Offers.WARES, a pedlar's; not an
+open one) opens the deal window (DealPanel.show_wares): their name, one
+button a ware with the offer's title ("A sword, 1 gold"), each enabled
+while the local purse covers its cost, sending the existing "offer"
+command {id, gold: its cost} (Economy.vendor_sale takes the rule's price
+whatever is sent; a short purse is still answered in his words). The
+purse line, in voice's words: "You have 5 gold.", short "You have 3 gold;
+nothing here costs less than 5.", empty "You have no gold; nothing here
+costs less than 1."; no strike line. The buttons wrap (an HFlowContainer:
+the stall has ten). Main._update_deal watches a resident as it watches a
+peaceable talking monster (gone or out of hearing closes it); Esc closes
+it; his offers sent again after a sale redraw it. Starter gear keeps its
+"starter gear: no one will buy it" tip (items'). resident_test
+_test_vendor_buttons drives the client path: his greeting, the window
+with a button a ware, disabled with no gold, a press with 5 gold, the
+sword in hand marked starter and the price paid. ui_test passes. Client
+only (the server's offer handling is unchanged), protocol unchanged, no
+new class_name.
+
 ## 735, sound's side: the draugr laughs as he attacks on a refusal (voice.draugr_laugh)
 
 Jeff: the draugr "laughs as he attacks you" when you refuse him. The coordinator approved a
