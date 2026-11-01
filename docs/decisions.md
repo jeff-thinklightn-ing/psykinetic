@@ -6781,6 +6781,17 @@ body over and stands it up when it wears off; the combat animation step
 can give it a proper fall). World.knocked_down feeds the party log ("X
 knocks Y down."). Protocol: a new replicated property changes the
 fingerprint.
+
+343 amended: the arc spares friends. Playtest's axes tour (754): every
+player's giant-axe or battle-axe blow at the draugr also knocked down the
+player's own companion beside them. The arc's side cells checked only
+can_target, which lets a player strike any server-owned body. Now a side
+cell is skipped where World.spares(attacker, other) holds, the rule a
+player's arrow keeps (decision 456): a player's or companion's sweep never
+takes a resident, a companion or a player beside its target. The aimed
+target stays decision 454's (a plain click never attacks a friend); a
+monster's arc is unchanged and takes everyone. combat_test
+_test_arc_spares_friends. Sim only, protocol unchanged.
 ## 341. A monster with a bow in its hands stands off and shoots
 
 A monster wielding a bow (decision 338's "wields", World.off_hand "draw")

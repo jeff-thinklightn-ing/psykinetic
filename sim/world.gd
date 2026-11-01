@@ -7801,14 +7801,15 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	_hits[-1].pierce = verb.get("kind") in ["backstab", "reach"]
 	if down > 0 and way in DIRECTIONS:
 		# A giant axe's arc (decision 343): the cells either side of the
-		# one struck, a step of 45 degrees each, take the same blow.
+		# one struck, a step of 45 degrees each, take the same blow; a
+		# friend there is spared as an arrow spares it (343 amended, 456).
 		for turn in range(1, int(verb["arc"]) + 1):
 			for side in [-1, 1]:
 				var side_way := Vector2(way).rotated(side * turn * PI / 4.0)
 				var cell := attacker.tile + Vector2i(clampi(roundi(side_way.x), -1, 1), clampi(roundi(side_way.y), -1, 1))
 				var other: GridEntity = _occupancy.get(cell)
 				if other != null and other != target and other != attacker and other.spawned \
-						and can_target(attacker, other) and can_melee(attacker.tile, cell):
+						and can_target(attacker, other) and not spares(attacker, other) and can_melee(attacker.tile, cell):
 					_queue_hit(attacker, other, cell - attacker.tile, cell - attacker.tile, hit_damage, force, raw_force, false, down)
 					_hits[-1].deed = deed
 	return true

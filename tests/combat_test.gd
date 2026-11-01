@@ -35,6 +35,7 @@ func _ready() -> void:
 	_test_telegraph_outline()
 	_test_telegraph_ground()
 	_test_telegraph_lifecycle()
+	_test_arc_spares_friends()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1113,6 +1114,39 @@ func _test_spin_throws() -> void:
 					"%d left" % side.hp if side.spawned and side.hp > 0 else "killed"])
 	_check(cells["plate_armour"][1] < World.knockback_min_force and cells["plate_armour"][1] < cells[""][1] and cells["plate_armour"][0] >= 1,
 			"in plate, heavier: under the floor, slower, yet thrown (%.3f, %d cells; bare %.3f, %d)" % [cells["plate_armour"][1], cells["plate_armour"][0], cells[""][1], cells[""][0]])
+
+
+## The axe's arc (343 amended; playtest: a player's giant axe knocked down
+## their own companion beside them): a player's sweep spares a friend in a
+## side cell as its arrow would (World.spares, 456) and still takes a
+## monster there; a monster's sweep takes everyone.
+func _test_arc_spares_friends() -> void:
+	print("\n== the axe's arc spares a friend beside you, as an arrow does (343 amended) ==")
+	var e := _build(["#######", "#...P.#", "#..Pm.#", "#...m.#", "#######"])
+	var friend: Player = e["P"][0]  # (4,1), beside the one struck.
+	var host: Player = e["P"][1]  # (3,2).
+	var aimed: GridEntity = e["m"][0]  # (4,2), ahead.
+	var other: GridEntity = e["m"][1]  # (4,3), beside on the other side.
+	_give(host, "giant_axe")
+	host.free_pos = Vector2(3.0, 2.0)
+	host.next_attack_tick = 0
+	host.next_move_tick = 0
+	_check(World.try_wind_up(host, aimed), "the giant axe wound up at the one ahead")
+	World.tick = int(host.wind_up["lands"])
+	World._tend_wind_ups()
+	World._resolve_hits()
+	_check(World.is_down(aimed) and World.is_down(other) and not World.is_down(friend),
+			"the one struck and the monster beside it knocked down, the player beside it spared (%s, %s, %s)" % [World.is_down(aimed), World.is_down(other), World.is_down(friend)])
+	var e2 := _build(["#######", "#.P...#", "#.Pm..#", "#.P...#", "#######"])
+	var boss: GridEntity = e2["m"][0]  # (3,2), facing west.
+	_boss(boss)
+	boss.next_attack_tick = 0
+	boss.next_move_tick = 0
+	_check(World.try_wind_up(boss, e2["P"][1]), "a monster's giant axe wound up at the player ahead")
+	World.tick = int(boss.wind_up["lands"])
+	World._tend_wind_ups()
+	World._resolve_hits()
+	_check(World.is_down(e2["P"][0]) and World.is_down(e2["P"][1]) and World.is_down(e2["P"][2]), "a monster's sweep: all three players knocked down")
 
 
 func _test_spin() -> void:
