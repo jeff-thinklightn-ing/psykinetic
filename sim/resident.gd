@@ -115,6 +115,9 @@ const ADDRESS_REACH := 2
 ## the production tick already does.
 var activity := ""
 var task := {}
+## Woken in the night (decision 751): DayNight steps until which the sleep
+## hours do not hold for it (a fight near or a hit), -1 for none.
+var _woken_until := -1.0
 var _listened := -1
 
 
@@ -492,8 +495,8 @@ func _pick_goal() -> void:
 	if doing == Doing.WORK and not task.is_empty():
 		_goal = task["cell"]  # At the work the sim says (566): the woodlot's spot, the build's cells, the store with the log.
 		return
-	if doing == Doing.HOME and asleep_now() and places.get("home") is Rect2i and (places["home"] as Rect2i).size != Vector2i.ZERO:
-		_goal = bed_cell(places["home"], places.get("square", Rect2i()))
+	if doing == Doing.HOME and sleeps_now():
+		_goal = bed_cell(places["bed"], places.get("square", Rect2i()))
 		return
 	if area.size == Vector2i.ZERO:
 		_goal = tile
@@ -736,8 +739,8 @@ func _show_work() -> void:
 		else:
 			activity = str(task.get("kind", "")) if bool(task.get("walking", false)) else ""
 		return
-	if doing == Doing.HOME and asleep_now() and places.get("home") is Rect2i and (places["home"] as Rect2i).size != Vector2i.ZERO:
-		var home: Rect2i = places["home"]
+	if doing == Doing.HOME and sleeps_now():
+		var home: Rect2i = places["bed"]
 		var bed := bed_cell(home, places.get("square", Rect2i()))
 		if _goal != bed:
 			_aim(bed)
@@ -764,6 +767,29 @@ func _toward(cell: Vector2i) -> Vector2i:
 	if d == Vector2i.ZERO:
 		return facing
 	return Vector2i(signi(d.x), signi(d.y)) if absi(d.x) == absi(d.y) else (Vector2i(signi(d.x), 0) if absi(d.x) > absi(d.y) else Vector2i(0, signi(d.y)))
+
+
+## Whether this body goes to bed now (decision 751): the sleep hours, a bed
+## under a roof (Main's places["bed"]: its house, else the inn, else a roofed
+## workplace; none, it stays up), and not woken this hour.
+func sleeps_now() -> bool:
+	return asleep_now() and places.get("bed") is Rect2i and (places["bed"] as Rect2i).size != Vector2i.ZERO \
+		and DayNight.now() >= _woken_until
+
+
+## Whether it lies asleep in its bed now (decision 751): silent, no talk.
+func sleeping() -> bool:
+	return activity == "sleep" and sleeps_now()
+
+
+## Woken (decision 751): up for the rest of the game hour, out of bed.
+func wake() -> void:
+	if not asleep_now():
+		return
+	_woken_until = DayNight.now() + maxi(DayNight.day_steps, 24) / 24.0
+	if activity == "sleep":
+		activity = ""
+		_pick_goal()
 
 
 ## Whether the sleep hours (residents.json "sleep": from, to) hold now.

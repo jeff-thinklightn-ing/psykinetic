@@ -68,6 +68,8 @@ const RESIDENT_SYNC_TICKS := 30
 const RESIDENT_EARSHOT := 2
 ## How near a friend a left click walks before talk opens (decision 454).
 const TALK_REACH := RESIDENT_EARSHOT
+## How near a hit or a death wakes a sleeping townsman (decision 751).
+const SLEEP_WAKE_RANGE := 6
 ## How long a talk walk waits to arrive before it is forgotten.
 const TALK_WAIT_MSEC := 15000
 const RESIDENT_ASK_TICKS := 150
@@ -1102,6 +1104,8 @@ func _go_online() -> void:
 		World.entity_bumped.connect(_on_bumped)
 		World.entity_died.connect(_on_entity_died)
 		World.entity_died.connect(_robber_fell)  # The grave robbers' gold (580, economy's side).
+		World.entity_died.connect(func(entity: GridEntity, _cause: StringName) -> void: _wake_near(entity.tile))  # 751.
+		World.entity_damaged.connect(func(entity: GridEntity, _amount: int, _source: GridEntity, _cause: StringName) -> void: _wake_near(entity.tile, entity))  # 751.
 		World.entity_died.connect(func(entity: GridEntity, _cause: StringName) -> void: _robber_gone(entity))  # 714: the robbers' clear.
 		World.entity_died.connect(_quest_credit)  # 747: a named robber felled, on its slayer's list.
 		World.entity_despawned.connect(_robber_gone)
@@ -8817,6 +8821,7 @@ func _sync_residents() -> void:
 						var home_at: Variant = settled[each["key"]].get("home")
 						if home_at is Array and home_at.size() == 2:
 							each["places"]["home"] = Rect2i(Vector2i(int(home_at[0]) - 1, int(home_at[1]) - 1), Vector2i(3, 3))
+							each["places"].erase("bed")  # A stall has no roof to sleep under (751).
 						var store: Vector2i = place.get("cell", Vector2i.ZERO)
 						each["places"]["work"] = Rect2i(store - Vector2i(1, 1), Vector2i(3, 3))
 						each["kind"] = str(settled[each["key"]].get("kind", ""))
@@ -8873,6 +8878,8 @@ func _sync_residents() -> void:
 					"trade": str(trades[0]) if not trades.is_empty() else "", "player": "", "town": place_id,
 					"type": str(World.production.worker(who).get("type", "")),
 					"places": {"work": ground if fold_place else hut, "home": hut, "square": ground}}
+				if hut.size != Vector2i.ZERO:
+					wanted[who]["places"]["bed"] = hut  # His hut's roof (751).
 		# The herder on his drove (640, npc's side): away from his fold with his sheep until the record's "back",
 		# he stands at the buyer's store square (the record's "buyer" when economy keeps it, else Towns.drove_town
 		# now) while a player is near that town, as its folk do; home again, the fold's body as above.
@@ -9445,6 +9452,8 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 		var d := World.distance(body.tile, player.tile)
 		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE or body.worker_id.begins_with(Offers.VISITOR) or body.worker_id.begins_with(Offers.VENDOR):
 			continue  # A visitor (711) or the stall's keeper (736) answers a click, not the mind.
+		if body.sleeping():
+			continue  # Asleep (751): typed words go unheard.
 		if not body.person.is_empty() and Companion._named(line, body.person):
 			return body
 		if d <= RESIDENT_EARSHOT and (nearest == null or d < World.distance(nearest.tile, player.tile)):
@@ -9492,7 +9501,7 @@ func _ask_resident(body: Resident, speaker: String, line: String, player: Player
 ## [param body] offers them now ("offers" {entity, speaker, offers}; decision
 ## 435): with each answer, when the panel opens, after an accept.
 func _send_offers(body: Resident, player_id: String, peer: int) -> void:
-	if body == null or not is_instance_valid(body) or player_id.is_empty() or peer < 0 or not body.player_id.is_empty():
+	if body == null or not is_instance_valid(body) or player_id.is_empty() or peer < 0 or not body.player_id.is_empty() or body.sleeping():
 		return
 	var data := {"entity": String(body.get_path()), "speaker": body.person, "offers": Offers.of(body.worker_id, player_id)}
 	var standing := _standing_for(player_id, body.worker_id)
@@ -10636,6 +10645,7 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 	var square := Rect2i(store - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
 	var kind := World.towns.kind_for(trade) if not trade.is_empty() else ""
 	var work := Rect2i()
+	var work_roofed := false
 	var inn := Rect2i()
 	for building: Dictionary in area.get("buildings", []):
 		if str(building.get("town", "")) != key:
@@ -10643,11 +10653,15 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		var standing := str(World.towns.building(str(place.get("id", "")), str(building["use"])).get("state", "")) == Towns.STANDING
 		if standing and building["use"] == kind:
 			work = building["rect"]
+			work_roofed = _roofed(building)
 		elif standing and building["use"] == "inn":
 			inn = building["rect"]
 	var home := homes[index] if index < homes.size() else (inn if inn.size != Vector2i.ZERO else work)
 	var out := {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
 		"square": square}
+	# Sleep under a roof only (decision 751): a house, the inn, a roofed workplace; none, no bed, up all night.
+	if index < homes.size() or (inn.size != Vector2i.ZERO and home == inn) or (home == work and work_roofed and work.size != Vector2i.ZERO):
+		out["bed"] = home
 	# The routine's other places (decision 404): the inn when linked and
 	# standing, the temple and the well by their slots (no "use" or town of
 	# their own yet, buildings' word), the nearest within HOME_TILES of the
@@ -10667,6 +10681,14 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 	if trade == "priest" and out.has("temple"):
 		out["work"] = out["temple"]
 	return out
+
+
+## Whether [param building] (an area's) has a roof to sleep under (decision
+## 751): its kind in levels/buildings.json, roofed unless "roof": "none";
+## a piece with no kind (a well, a stall, a stone) none.
+func _roofed(building: Dictionary) -> bool:
+	var kind := str(building.get("slot", "")).trim_prefix("building.")
+	return Level.kinds().has(kind) and str(Level.kinds()[kind].get("roof", "")) != "none"
 
 
 ## The companion of player [param player_id] is held by raid group
@@ -13762,7 +13784,7 @@ func _hails_tick() -> void:
 ## companion resting in town, who speaks for herself).
 func _hail_able(body: Resident) -> bool:
 	return body != null and is_instance_valid(body) and body.spawned and not body.strayed and body.escort_of.is_empty() and body.card.is_empty() \
-			and body.doing not in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.STRAYED, Resident.Doing.ESCORT]
+			and body.doing not in [Resident.Doing.HIDE, Resident.Doing.BED, Resident.Doing.STRAYED, Resident.Doing.ESCORT] and not body.sleeping()
 
 
 ## Whether [param body] holds its tongue now (675, npc's side): a hostile
@@ -13770,6 +13792,8 @@ func _hail_able(body: Resident) -> bool:
 ## null for none), or within Companion.QUIET_AFTER ticks of one. A fight
 ## just begun drops its ask still waiting for the mind.
 func _resident_quiet(body: Resident, player: GridEntity = null) -> bool:
+	if body != null and is_instance_valid(body) and body.sleeping():
+		return true  # Asleep in bed, nothing said (decision 751).
 	if not Companion.hold_tongue or body == null or not is_instance_valid(body):
 		return false
 	var last := int(_resident_fight_at.get(body.worker_id, -100000))
@@ -14293,6 +14317,10 @@ func _greeted(player: Player, body: Resident) -> void:
 		if not body.addressing.is_empty():
 			body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))  # Turned to them again, nothing new said.
 		return
+	if body.sleeping():
+		_greet_at[key] = now_msec
+		_asleep_told(player, body)  # No word, no waking (751): the player is told.
+		return
 	if _resident_quiet(body, player):
 		_held_tongue("greet")  # No word, no turning to them near a fight (675, npc's side).
 		return
@@ -14358,6 +14386,25 @@ func _resident_says(body: Resident, line: String, aside: String, player: Player)
 ## Why [param player] hears no hail now (decision 554): led by a companion,
 ## a blow given or taken within hail.quiet_seconds, a resident's answer to
 ## them within the minute (a talk), or a hail within hail.minute_seconds.
+## [param player] clicked [param body] asleep in its bed (decision 751):
+## one narrated line to them alone (townsfolk.json "asleep", voice's words,
+## picked by the body's id), and the sleeper does not stir.
+func _asleep_told(player: Player, body: Resident) -> void:
+	var lines: Array = Townsfolk.rules().get("asleep", ["%s is asleep."])
+	var who := body.person if not body.person.is_empty() else "The %s" % (body.trade if not body.trade.is_empty() else "sleeper")
+	var line := str(lines[absi(hash(body.worker_id)) % lines.size()]) if not lines.is_empty() else "%s is asleep."
+	Net.broadcast_to([player.owner_peer], "party", {"from": "", "text": line % who if line.contains("%s") else line})
+
+
+## Woken (decision 751): a sleeper hit, or a hit or a death within
+## SLEEP_WAKE_RANGE of it, gets up for the rest of the hour.
+func _wake_near(at: Vector2i, hit: GridEntity = null) -> void:
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body.spawned and (body == hit or World.distance(body.tile, at) <= SLEEP_WAKE_RANGE):
+			body.wake()
+
+
 func _hail_blocked(player: Player, now_msec: int, rules: Dictionary) -> bool:
 	var pid := player.player_id
 	if _guides.has(pid):

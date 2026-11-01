@@ -3117,6 +3117,50 @@ func _test_names_never_ids() -> void:
 	_main._records.erase(unknown)
 
 
+## Asleep (decision 751), from _test_visible_work with [param mara] lying in
+## her bed at 23:00: a roof to sleep under, silent, the line on a click,
+## woken by a fight near; and one with no roof has no bed.
+func _test_asleep(mara: Resident, home: Rect2i) -> void:
+	print("\n== asleep: only under a roof, silent, \"<Name> is asleep.\" on a click, woken by a fight near (decision 751, npc's side) ==")
+	_check(mara.places.get("bed") == home and mara.sleeping(), "her house is her bed, and she sleeps (%s)" % [mara.places.get("bed")])
+	var area: Dictionary = _main._world_map.areas.get(World.zone.name, {})
+	var place: Dictionary = World.holdings.place(STORE)
+	var no_homes: Array[Rect2i] = []
+	var roofless: Dictionary = _main._resident_places(area, place, "", no_homes, 0)
+	_check(not roofless.has("bed") or roofless["bed"] == roofless.get("inn"), "no house of their own: the inn or no bed at all (%s)" % [roofless])
+	_check(_main._roofed({"slot": "building.house"}) and not _main._roofed({"slot": "building.well"}) and not _main._roofed({"slot": "building.market_stall"}),
+		"a house has a roof; a well and a stall have none")
+	var player := _player()
+	if player == null:
+		_check(true, "(no player: the click and the wake skipped)")
+		return
+	var told: Array[String] = []
+	var spoken: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+		elif kind == "speech":
+			spoken.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	_put(player, _main._nearest_free(mara.tile + Vector2i(1, 0)))
+	_main._resident_fight_at.clear()
+	_main._greet_at.clear()
+	_main._greeted(player, mara)
+	var lines: Array = Townsfolk.rules().get("asleep", [])
+	_check(told.size() == 1 and lines.any(func(line: Variant) -> bool: return told[0] == str(line) % "Mara") and spoken.is_empty(),
+		"a click: one narrated line, no word from her (%s / %s)" % [told, spoken])
+	_check(mara.sleeping() and mara.addressing.is_empty(), "she does not stir")
+	_check(_main._resident_addressed(player, "Mara, wake up", null) != mara, "typed words go unheard")
+	_check(not _main._hail_able(mara) and _main._resident_quiet(mara, player), "no hail, nothing said")
+	_main._wake_near(mara.tile + Vector2i(3, 0))
+	_check(not mara.sleeping() and mara.activity != "sleep", "a fight three cells off: she is up")
+	for i in 20:
+		World.step()
+	_check(mara.activity != "sleep" and not mara.sleeps_now(), "and stays up for the hour")
+	Net.message_received.disconnect(heard)
+	mara._woken_until = -1.0
+
+
 func _test_visible_work() -> void:
 	print("\n== seen at their work: the bed at night, a task walked to and shown, the woodcutter's trip, the carpenter's cells, the lamp (decision 566, npc's side) ==")
 	for body: GridEntity in World.townsfolk().duplicate():
@@ -3170,6 +3214,7 @@ func _test_visible_work() -> void:
 	_main._awake_tick()
 	_check(code.is_empty() or World.towns.awake_of(town_id).get(code) == false,
 		"told under its town %s: %s" % [town_id, World.towns.awake_of(town_id)])
+	_test_asleep(mara, home)
 	DayNight.set_hour(8.0)
 	for i in Resident.FAR_EVERY + 2:
 		World.step()

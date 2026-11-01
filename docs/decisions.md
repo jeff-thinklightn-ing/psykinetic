@@ -36824,3 +36824,48 @@ Jeff: townsfolk shouldn't sleep on the ground; npc's 751 (townsfolk asleep) need
 - The server and the client both compute the beds from the level data (and Level.plot_building for a town's plots). No message changes and no replicated value changes; the protocol is measured unchanged.
 
 level_test _test_beds: every kind's beds all fit, small and large, every facing; each bed inside, head on a wall, off the door line, the floor left whole with two-cell ways; a ruin has none; Umbrage has three in the player's house (off the locker), one in each hut, none in the forge or the temple, and the turf hut's own, solid. view_test _test_beds_drawn: a house's three beds in its parts where the map has them, heads the bed's way; a turned slot hut's straw bed placed right. No new class_name.
+## 751. Townsfolk asleep: under a roof, silent, woken by a fight
+
+Jeff (2026-10-31): "towns people should not sleep on the ground, also they
+look like they are dead, we need a sleeping animation - and they shouldnt
+speak when asleep." The coordinator approved npc's design; this is phase 1,
+npc's side. Later phases: "751, buildings' side" (a bed piece in each house
+and the inn at a "bed" socket, whose cell npc's bed_cell will then read in
+place of the corner rule), "751, art-kit's side" (prop.bedroll, laid by the
+town's fire or under a shelter for those with no roof) and "751,
+pc-character's side" (the sleeping clip in place of "Lie": a curled-up pose
+with breathing). The activity value stays "sleep", so the protocol is
+unchanged.
+
+Where: sleep is under a roof only. Main gives a body places["bed"] when its
+home is a house of its own (_homes), the inn, or a workplace whose building
+kind in levels/buildings.json has a roof (Main._roofed: roofed unless
+"roof": "none"; a piece with no kind, a well or a stall, has none). The
+herder's hut is his bed too. A visitor, a market buyer, Rolf, Snagfin at
+his stall, and a resident whose home fell back to the square have no bed,
+and stay up all night at their home place (the square) instead of lying on
+bare ground. Their bedroll comes with art-kit's side.
+Resident.sleeps_now() is the sleep hours, a bed, and not woken;
+Resident.sleeping() means lying in it now (activity "sleep").
+
+Silent: Main._resident_quiet (675's gate for every word a resident says:
+the mind's answers, greetings, gossip, hails, plain lines) is true for a
+sleeper. A sleeper is never hailable, typed words skip them
+(_resident_addressed), and no offers are sent. A click or E (Main._greeted)
+gives the clicker alone one narrated party line, from townsfolk.json
+"asleep" picked by the body's id (voice's words: "<Name> is asleep." /
+"<Name> sleeps on." / "<Name> sleeps and does not stir."; "The <trade>"
+when there is no name). It does not wake them.
+
+Woken: any hit (World.entity_damaged) on a sleeper or within
+SLEEP_WAKE_RANGE (6) cells of one, or a death within it, gets them up for
+the rest of a game hour (Resident.wake: _woken_until in DayNight steps).
+They then act as by day (hide when hurt, speak as usual), and go back to
+bed after the hour if it is still night.
+
+resident_test _test_asleep (from _test_visible_work, Mara in bed at 23:00):
+her house is her bed; one with no house has the inn or no bed; a house is
+roofed and a well or a stall not; a click gets one narrated line from the
+table and no word, and she does not stir; typed words, hails and speech are
+held; a fight three cells off wakes her, and she stays up. Server only,
+protocol unchanged, no new class_name.
