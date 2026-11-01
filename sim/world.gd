@@ -773,8 +773,13 @@ var trade: TradeRoutes = null
 ## server only, null on a client.
 var richness: WorldRichness = null
 ## Server: prices, players' gold and trade with the town (Economy); made by
-## Main at boot, from the snapshot. Null on a client.
-var economy: Economy = null
+## Main at boot, from the snapshot. Null on a client. Its every purse
+## change is gold_changed (Economy.purse_changed).
+var economy: Economy = null:
+	set(value):
+		economy = value
+		if value != null and not value.purse_changed.is_connected(_on_purse_changed):
+			value.purse_changed.connect(_on_purse_changed)
 ## Server: raid groups in played zones as real monsters (Raids, decision
 ## 313); maps hands them over (enter) and takes them back.
 var raids := Raids.new()
@@ -3955,9 +3960,11 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 func add_gold(player_id: String, amount: int, why := "") -> int:
 	if economy == null or player_id.is_empty():
 		return 0
-	var now_gold := economy.add_gold(player_id, amount, why)
-	gold_changed.emit(player_id, now_gold)
-	return now_gold
+	return economy.add_gold(player_id, amount, why)  # gold_changed by Economy.purse_changed.
+
+
+func _on_purse_changed(player_id: String, gold: int) -> void:
+	gold_changed.emit(player_id, gold)
 
 
 ## [param from_id] gives [param to_id] [param amount] gold (614,
@@ -3965,11 +3972,7 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 func give_gold(from_id: String, to_id: String, amount: int, from_name := "", to_name := "") -> int:
 	if economy == null:
 		return 0
-	var given := economy.give_gold(from_id, to_id, amount, from_name, to_name)
-	if given > 0:
-		gold_changed.emit(from_id, economy.gold(from_id))
-		gold_changed.emit(to_id, economy.gold(to_id))
-	return given
+	return economy.give_gold(from_id, to_id, amount, from_name, to_name)  # gold_changed for both by Economy.purse_changed.
 
 
 ## Player [param player_id]'s gold (0 on a client).
@@ -4177,7 +4180,6 @@ func counter_order(by: GridEntity, counter: GridEntity, slot: int, effect: Strin
 		counter.zone, counter.tile)
 	_log("forge: %s handed in %s at %s to become %s for %d gold" % [by.name, id, town, to_id, fee])
 	_slots_changed(by)
-	gold_changed.emit(who, economy.gold(who))
 	return ""
 
 
@@ -4257,7 +4259,6 @@ func _hand_to_priest(by: GridEntity, from: GridEntity, from_slot: int, counter: 
 	items.note(uid, "handed in", "at %s's temple by %s, %d gold offered" % [town, _label_of(by), offering], counter.zone, counter.tile)
 	_log("temple: %s handed in %s at %s for %d gold" % [by.name, item, town, offering])
 	_slots_changed(from)
-	gold_changed.emit(who, economy.gold(who))
 	traded.emit(by, counter, "")
 	return true
 
@@ -4331,7 +4332,6 @@ func _sell(by: GridEntity, from: GridEntity, from_slot: int, shop: GridEntity) -
 		traded.emit(by, shop, str(deal["why"]))
 		return false
 	_sold(by, from, from_slot, uid, place, who, int(deal["paid"]), shop)
-	gold_changed.emit(who, economy.gold(who))
 	traded.emit(by, shop, "")
 	return true
 
@@ -4387,7 +4387,6 @@ func try_buy(by: GridEntity, shop: GridEntity, uid: int) -> bool:
 		return false
 	put_item(by, by, slot, uid)
 	_log("shop: %s bought %s at %s for %d gold" % [by.name, id, place, deal["price"]])
-	gold_changed.emit(who, economy.gold(who))
 	traded.emit(by, shop, "")
 	return true
 
@@ -4478,7 +4477,6 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 				into = room_for(by, int(take[i]))  # The stack it was to join was given away whole.
 			put_item(by, by, into, int(take[i]))
 			_log("shop: %s bought %s at %s for %d gold" % [by.name, deal["id"], place, deal["price"]])
-	gold_changed.emit(who, economy.gold(who))
 	return ""
 
 

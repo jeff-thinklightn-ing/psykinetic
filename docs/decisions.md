@@ -35774,6 +35774,29 @@ sword in hand marked starter and the price paid. ui_test passes. Client
 only (the server's offer handling is unchanged), protocol unchanged, no
 new class_name.
 
+736 amended (3), ui's side: the client's purse follows the server's on every
+change. Playtest on v0.1.195: Rolf's buttons stayed grey for a player with
+gold. The server told a client its gold ("shop" {gold}, Main._on_gold_changed)
+only on World.gold_changed, which only World.add_gold, give_gold and its shop,
+forge and temple paths emitted. Every change made straight through
+Economy.add_gold was silent: a quest's reward (Main._give_gold), the vendor's
+and the pedlar's sales, banked goods' owed gold, commissions, debts paid, gifts
+toward the town. So Main.gold kept what the last shop window or the join had
+said, and DealPanel enabled against it. resident_test set Main.gold by hand
+and couldn't see it.
+- Economy.add_gold, the one place a player's purse is written, emits
+  purse_changed(player_id, gold) on every call. World's economy setter connects
+  it to gold_changed. World's own emits after an Economy call are gone, and so
+  is Main's owed_paid relay, so a change is told once.
+- Main.gold is a setter that also sets the HUD's gold line (ShopPanel.gold).
+  The line, the deal window and the barter window read one value.
+resident_test _test_vendor_buttons no longer sets the client's purse: the
+server empties it, then pays 3 by a quest's path and 2 by a chest's, and the
+client's purse and the HUD's line say 5, the buttons enable, and a press buys
+with the purse following the price down. economy agreed (no soak counts
+gold_changed). Server and client: the "shop" message is unchanged, protocol
+unchanged (b16a7a9da620), no new class_name.
+
 ## 735, sound's side: the draugr laughs as he attacks on a refusal (voice.draugr_laugh)
 
 Jeff: the draugr "laughs as he attacks you" when you refuse him. The coordinator approved a

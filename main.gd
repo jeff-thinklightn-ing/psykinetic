@@ -722,8 +722,14 @@ var shop_panel: ShopPanel
 var barter_panel: BarterPanel
 ## The menus' sounds (UiSounds).
 var ui_sounds: UiSounds
-## The local player's gold, as the server last said ("shop" messages).
-var gold := 0
+## The local player's gold, as the server last said: "shop" {gold}, sent on
+## every change of their purse (World.gold_changed), and the barter and
+## counter windows' own. The HUD's gold line beside the pack shows it.
+var gold := 0:
+	set(value):
+		gold = value
+		if shop_panel != null:
+			shop_panel.gold = value
 ## The last "counter" message, for ui's counter screen (decision 438).
 var counter_data := {}
 signal counter_told(data: Dictionary)
@@ -4105,7 +4111,7 @@ func _boot() -> void:
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
 		return World.towns.building(town, kind).get("state") == Towns.STANDING
 	World.economy.dole_changed.connect(_on_dole_changed)
-	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void: World.gold_changed.emit(player_id, gold))
+	# owed_paid's gold reaches the client by Economy.purse_changed, as every purse change does.
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
 	World.economy.before_harvest = World.towns.before_harvest

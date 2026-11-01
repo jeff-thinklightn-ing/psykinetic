@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Gold: the gold beside your pack, and Rolf's and a pedlar's buttons, now follow your purse whenever it changes (a quest's reward, the dole, a sale), not only after a shop window; with gold in hand Rolf's buttons work (736 amended (3)).
 - Townsfolk sleep in the beds of their house or the inn, one each, head to the bed's head; a house takes in only as many as it has beds, the rest bed down outside, and nobody is given your house in Umbrage (751, npc's side (4)).
 - Townsfolk with no roof to sleep under (visitors, Rolf and the like) now bed down by the town's fire, else beside the inn or temple, else by the store, each in a spot of their own (751, npc's side (2)).
 

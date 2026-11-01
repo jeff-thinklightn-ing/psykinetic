@@ -3762,7 +3762,7 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 		if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
 			World.items.place(World._take_out(player, slot), "the test")  # Empty hands again.
 	World.economy.add_gold(pid, -World.economy.gold(pid), "the test")
-	_main.gold = World.economy.gold(pid)
+	_check(_main.gold == 0, "emptied on the server, the client's purse follows (%d)" % _main.gold)
 	panel.close()
 	_main._greet_at.clear()
 	_main._greeted(player, rolf)  # A click on him: his greeting, then his "offers" to this peer.
@@ -3783,13 +3783,15 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 		"no gold: every button disabled, the purse line naming the cheapest (%s)" % panel._purse.text)
 	if sword_at < 0:
 		return
-	World.economy.add_gold(pid, 5, "the test")
-	_main.gold = World.economy.gold(pid)  # A client's purse comes by "shop" {gold}; this host has no peer entry for it.
+	# Playtest on v0.1.195: gold from a quest, the dole or a chest never reached the client, so the buttons stayed grey.
+	_main._give_gold(pid, 3, "a quest's reward (the test)")  # Economy.add_gold, as a quest's reward is paid.
+	World.add_gold(pid, 2, "a coin purse")  # A chest's purse, World's way.
 	_main._update_deal()
-	_check(_main.gold == 5 and not (buttons[sword_at] as Button).disabled, "5 gold (the client's purse %d): the buttons enabled" % _main.gold)
+	_check(_main.gold == 5 and _main.shop_panel.gold_shown() == "5 gold" and not (buttons[sword_at] as Button).disabled,
+		"5 gold from a quest and a chest, on the server: the client's purse and the HUD's line say 5 (%d, %s), and the buttons enable" % [_main.gold, _main.shop_panel.gold_shown()])
 	(buttons[sword_at] as Button).pressed.emit()  # Main._offer_deal: the "offer" command.
 	var at := player.slots.find("sword")
-	_check(World.economy.gold(pid) == 5 - price and at >= 0 and World.is_starter(World.slot_uid(player, at)),
+	_check(World.economy.gold(pid) == 5 - price and _main.gold == 5 - price and at >= 0 and World.is_starter(World.slot_uid(player, at)),
 		"the button bought it: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
 	_check(panel.visible and panel.entity_id == rolf.get_instance_id() and panel._buttons.get_child_count() >= count,
 		"his offers sent again: the window stays open on him")

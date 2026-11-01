@@ -29,6 +29,11 @@ signal dole_changed(town: String, count: int)
 ## A player was paid gold the town owed them for goods they banked
 ## (decision 498), off any request of theirs: World tells their client.
 signal owed_paid(player_id: String, gold: int)
+## A purse changed, whatever moved it (a sale, a quest's reward, the dole, a
+## commission, a starter ware...): World relays it as gold_changed, so the
+## owner's client is told every time (ui, playtest on v0.1.195: Rolf's
+## buttons stayed grey for a player with gold).
+signal purse_changed(player_id: String, gold: int)
 ## Player [param player_id] gave [param gold] toward [param town]'s
 ## [param kind] (decision 499): Main thanks them in town experience
 ## ([param xp]).
@@ -232,6 +237,7 @@ func add_gold(player_id: String, amount: int, why := "") -> int:
 	_log[player_id] = lines
 	print("[economy] %s %s %d gold (%s): %d now, step %d" % [player_id, "got" if now_gold >= had else "spent",
 		absi(now_gold - had), why if why != "" else "no reason said", now_gold, now()])
+	purse_changed.emit(player_id, now_gold)
 	return now_gold
 
 
