@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Tools: docs/voice.md, the voice guide for how the world's people speak, and tools/voice_inventory.py, which lists every fixed line in the game in docs/voice_inventory.md (748).
 - Companions: your companion no longer attacks the fallen knight in the barrow's Altar Room, nor the draugr while he sits or rests (747 amended (3)).
 
 - Townsfolk near the fallen knight no longer act as if a fight is on: he is never counted as a threat.

@@ -36742,3 +36742,24 @@ Tools only, protocol unchanged, no new class_name.
 ## 744 amended, environment's side: the sky's clouds in fog
 
 The closer camera's shots (623 amended (2), environment's side; C:/dev/review/camera_weather) showed fog at 08:00 with crisp clouds over it in a blue sky while the sun, moon and stars hid. Approved by the coordinator (2026-10-31). In fog the clouds' colour is drawn toward the fog's and their cover thinned, both by SKY_CLOUD_FOG (0.85) at full fog (Client3D._set_sky_bodies): the weather's fog kind (0.9 fog, 0.5 cloud) leaves 0.12 of cover, in the fog's colour. view_test _test_sky: in fog the sky's clouds thin. Client only, protocol unchanged, no new class_name.
+
+## 748: voice owns how lines are said; docs/voice.md is the guide
+
+Jeff, 2026-10-31: "i suggest a language and dialect subagent for writing dialogue and keeping
+everything consistent in style, lore still had control over the story and history aspect";
+"yes to the voice and dialect session". The voice tree (worktree voice, test ports 4200) owns the
+wording, register, dialect and rhythm of every player-facing line: speech, narration, window
+titles and the style words in the companions' and residents' prompts. Lore keeps what is true; a
+line that adds or changes a fact goes to lore first. Each tree keeps its own code and data and the
+last word on length and fit on its screen; voice sends wording or lands text-only changes with the
+owner's yes. Lines Jeff wrote or passed word for word are his and are never reworded without asking
+him.
+- docs/voice.md, the guide (draft for Jeff): the world's register after lore's Gísla saga tone, the
+  four kinds of text (speech, narration, window titles, system text), and a section per speaker
+  (the fallen knight, Aldous, the draugr, the Mound-breakers, townsfolk by trade, Rolf, visitors,
+  Pip, Wren and Nix), each quoting approved lines and marking voice's guesses [draft].
+- tools/voice_inventory.py writes docs/voice_inventory.md: every fixed line found in the game's
+  scripts and levels/ data, with its speaker by file, where it lives, and whether lore's pages quote
+  it. A heuristic list for review, not a test; re-run it, don't edit the page.
+- A word checker (modern and game words in fixed lines) waits until Jeff has seen the guide.
+Docs and a tool only, protocol unchanged, no new class_name.
