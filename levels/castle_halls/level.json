@@ -2,6 +2,9 @@
 	"name": "The Dwarven Halls",
 	"outdoor": false,
 	"depth": 1,
+	"loot": {
+		"chest": "dwarven_hoard"
+	},
 	"walls": "stone",
 	"floors": "stone",
 	"buildings": [

@@ -2808,6 +2808,29 @@ func _test_castle_halls_level() -> void:
 		"three of the smith's guards lie in the ambush, each with a facing, so all read as fallen from the usual camera: one on his side facing the cart, one face down running north, one face down toward the west wall (%s)" % [guards])
 	_check(halls["entities"].size() == 5 and halls["links"][0]["cue"] == "up" and down[0]["cue"] == "down",
 		"the template's five markers alone stand in the halls (the cart, two crates, two chests); the stairs cue up and down (%d, %s, %s)" % [halls["entities"].size(), halls["links"][0]["cue"], down[0]["cue"]])
+	# 757, dungeon's side: every plain chest in the halls, the template's and
+	# each generation's, rolls economy's dwarven_hoard (no armour: 622).
+	var hoard: Array = (Items.loot_tables().get("dwarven_hoard", []) as Array).map(func(row: Dictionary) -> String: return str(row["item"]))
+	var chests_seen := 0
+	var stocked := 0
+	var strays: Array = []
+	for generation in range(1, 7):
+		var laid := Regen.generate("castle_halls", generation)
+		var parsed := Level.parse(laid["layout"], laid["height"], laid["config"])
+		for spec: Dictionary in parsed["entities"]:
+			var props: Dictionary = spec.get("props", {})
+			if str(spec.get("script", "")) != Level.CHEST or props.get("depot", false) or props.get("shop", false) or props.has("cache"):
+				continue
+			chests_seen += 1
+			var goods: Array = (props.get("slots", []) as Array).filter(func(id: String) -> bool: return not id.is_empty())
+			if not goods.is_empty():
+				stocked += 1
+			for id: String in goods:
+				if id not in hoard or Items.has_tag(id, "armour"):
+					strays.append(id)
+	_check(Level.template_config("castle_halls").get("loot", {}).get("chest", "") == "dwarven_hoard" and not hoard.is_empty()
+		and chests_seen >= 6 * 5 and stocked > 0 and strays.is_empty(),
+		"the halls' chests roll dwarven_hoard, every generation's and the template's, no armour (%d chests, %d stocked, strays %s)" % [chests_seen, stocked, strays])
 
 
 func _test_edge_links() -> void:

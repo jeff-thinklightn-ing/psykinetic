@@ -37690,6 +37690,13 @@ hardened before the data returns (builder asked, release: land first).
 monster_test (the named one), raid_groups_test _test_saved. Server only,
 protocol unchanged, no new class_name, no CHANGELOG bullet (unseen unless a
 save was broken).
+757, dungeon's side: castle_halls' level.json takes "loot": {"chest": "dwarven_hoard"}, so every
+plain chest in the halls (each generation's three and the template's two at the forge) rolls the
+hoard through Level._stock (330); depots, shops and caches keep their own, monsters carry as
+before. No regenerate on deploy: the halls are laid again every 3 game days from the deployed
+template, so the box's chests take the table at the first relay after the release. level_test
+_test_castle_halls_level: six generations' plain chests, every good from the hoard, none armour.
+Server only, data only, protocol unchanged, no new class_name.
 
 ## 758, economy's side: an older save's caravans
 
