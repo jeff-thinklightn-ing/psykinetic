@@ -60,6 +60,9 @@ const SMOKE_AT := &"smoke_at"
 const BAY := &"bay"
 const HOLE := &"hole"
 const BAY_MIDDLES := &"bay_middles"
+## A cut bay's broken rafters (734 amended (3): roof.rafters_broken),
+## shown only in disrepair.
+const RUIN_ONLY := &"ruin_only"
 const HEIGHT := &"height"
 const SPAN := &"span"
 ## A bayed roof's cut bays (734): damaged DAMAGED_BAYS of them, in
@@ -73,8 +76,12 @@ const BAY_SALT := 7341
 const GABLE_WINDOW_UP := 0.4
 const BELFRY_IN := 1.0
 ## The belfry piece's broken state (art-kit's belfry.<set>: base, belfry, cap,
-## belfry_ruin), hidden while the building stands.
+## belfry_ruin), hidden but in disrepair, when its belfry, cap and bell
+## are (734 amended (3)).
 const BELFRY_RUIN := "belfry_ruin"
+const BELFRY_WHOLE: Array[String] = ["belfry", "cap"]
+## The bell (734 amended (3)) hung at its belfry's "bell" socket.
+const BELL := "prop.bell"
 ## The uses whose slot building (art with no chimney of its own) is given
 ## one (slot_chimney): a fire's trades.
 const SLOT_HEARTHS: Array[String] = ["forge", "kitchen"]
@@ -359,10 +366,11 @@ static func _wall_profile(building: Dictionary) -> Dictionary:
 
 ## A buttressed wall set's (734: its profile's "windows" is
 ## "between_buttresses") bays along [param building]'s main block's long
-## sides: "buttresses", [vertex middle, outward side] at every second
+## sides: "buttresses", [vertex middle, outward side] at every third
 ## vertex along each side (none at a corner, nor by a door), and
-## "windows", the edge between each two (none at a side's ends, nor by a
-## door); {} for any other set.
+## "windows", the middle edge of each three-edge bay between them (none
+## at a side's ends, nor by a door; 734 amended (3), art-gen: bays of 3 m,
+## as c2); {} for any other set.
 static func _wall_bays(building: Dictionary) -> Dictionary:
 	if str(_wall_profile(building).get("windows", "")) != "between_buttresses":
 		return {}
@@ -397,10 +405,10 @@ static func _wall_bays(building: Dictionary) -> Dictionary:
 		run.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
 		var door := func(i: int) -> bool: return i >= 0 and i < run.size() and doors.has(run[i][1])
 		for i in range(1, run.size()):
-			if i % 2 == 0 and not door.call(i - 1) and not door.call(i):
+			if i % 3 == 0 and not door.call(i - 1) and not door.call(i):
 				buttresses.append([((run[i - 1][2] as Vector2) + (run[i][2] as Vector2)) * 0.5, out])
 		for i in range(1, run.size() - 1):
-			if i % 2 == 1 and not door.call(i - 1) and not door.call(i) and not door.call(i + 1):
+			if i % 3 == 1 and not door.call(i - 1) and not door.call(i) and not door.call(i + 1):
 				windows.append(run[i][1])
 	return {"buttresses": buttresses, "windows": windows}
 
@@ -491,6 +499,12 @@ static func _belfry(building: Dictionary, roof: Node3D) -> void:
 	var broken := piece.find_child(BELFRY_RUIN, true, false) as Node3D
 	if broken != null:
 		broken.visible = false  # Its broken state (art-kit's glb draws it): hidden while it stands.
+	var socket: Variant = ArtKit.spec(slot).get("sockets", {}).get("bell")
+	if socket is Array and ArtKit.has(BELL):
+		var bell := ArtKit.instance(BELL)
+		bell.name = "Bell"
+		bell.position = Vector3(float(socket[0]), float(socket[1]), float(socket[2]))
+		piece.add_child(bell)
 	slopes.add_child(piece)
 
 
@@ -541,7 +555,19 @@ static func show_bays(building: Dictionary, composed: Node3D, cover: String) -> 
 			if not piece.has_meta(BAY):
 				continue
 			var k: int = piece.get_meta(BAY)
-			(piece as Node3D).visible = not bare.has(k) and cut.has(k) == piece.has_meta(HOLE)
+			(piece as Node3D).visible = not bare.has(k) and cut.has(k) == piece.has_meta(HOLE) 					and (cover == "disrepair" or not piece.has_meta(RUIN_ONLY))
+	show_belfry(composed, cover == "disrepair")
+
+
+## [param composed]'s belfry (734 amended (3)) broken when [param ruin]
+## (its belfry_ruin shown, its belfry, cap and bell hidden), else whole.
+static func show_belfry(composed: Node3D, ruin: bool) -> void:
+	for belfry: Node in composed.find_children("Belfry", "Node3D", true, false):
+		for part: Node in belfry.find_children("*", "Node3D", true, false):
+			if part.name == BELFRY_RUIN:
+				(part as Node3D).visible = ruin
+			elif str(part.name) in BELFRY_WHOLE or part.name == &"Bell":
+				(part as Node3D).visible = not ruin
 
 
 ## [param key]'s middle in [param building]'s frame and its outward side
@@ -788,8 +814,12 @@ static func _trims(roof_set: String, height: Callable, edge: float, length: floa
 				var eave := ArtKit.instance(slot.call("eave"))
 				eave.name = "Eave_%d_%d" % [k, side]
 				eave.position = Vector3(side * edge, float(height.call(side * edge, z)) + thick, z)
-				# Its +x out past the eave, its -x up the slope under the cover.
-				eave.rotation = Vector3(0.0, 0.0 if side > 0.0 else PI, -atan(pitch))
+				# Its +x out past the eave, its -x up the slope under the
+				# cover, at the slope's own fall there (a sag's too; 734
+				# amended (3)).
+				var inward := side * (edge - 0.1)
+				var local := (float(height.call(inward, z)) - float(height.call(side * edge, z))) / 0.1
+				eave.rotation = Vector3(0.0, 0.0 if side > 0.0 else PI, -atan(local))
 				if bayed:
 					eave.set_meta(BAY, k)
 				out.add_child(eave)
@@ -798,7 +828,8 @@ static func _trims(roof_set: String, height: Callable, edge: float, length: floa
 			# the middle of each slope, its +y off the slope.
 			for side in sides:
 				var x := side * edge * 0.5 if not mono else 0.0
-				var lean := Vector3(-pitch * side if not mono else -pitch, 1.0, 0.0)
+				# Its +y the slope's normal: a gable's falls outward each side (734 amended (3)).
+				var lean := Vector3(pitch * side if not mono else -pitch, 1.0, 0.0)
 				var hole := _laid(ArtKit.instance(slot.call("hole")), Vector3(x, float(height.call(x, z)) + thick, z),
 						Vector3(x, float(height.call(x, z + step)) + thick, z + step), Vector3(side, 0.0, 0.0), false, lean)
 				hole.name = "Hole_%d_%d" % [k, side]
@@ -806,6 +837,22 @@ static func _trims(roof_set: String, height: Callable, edge: float, length: floa
 				hole.set_meta(HOLE, true)
 				hole.visible = false
 				out.add_child(hole)
+		if bayed and not mono and ArtKit.has("roof.rafters_broken"):
+			# A cut bay's rafters in disrepair (734 amended (3)), a pair a
+			# metre, each its variant by place; stretched as _rafters'.
+			var rise := float(height.call(0.0, z + step * 0.5)) - float(height.call(edge, z + step * 0.5))
+			var pairs := maxi(roundi(step), 1)
+			for j in pairs:
+				var at := z + step * (j + 0.5) / pairs
+				var pair := ArtKit.instance("roof.rafters_broken", 1 + (k * pairs + j) % maxi(ArtKit.variant_count("roof.rafters_broken"), 1))
+				pair.name = "Rafters_broken_%d_%d" % [k, j]
+				pair.position = Vector3(0.0, float(height.call(0.0, at)), at)
+				pair.scale = Vector3(edge * 2.0 / 4.0, maxf(rise, 0.1) / 2.0, 1.0)
+				pair.set_meta(BAY, k)
+				pair.set_meta(HOLE, true)
+				pair.set_meta(RUIN_ONLY, true)
+				pair.visible = false
+				out.add_child(pair)
 	for end: float in [-1.0, 1.0]:
 		var z := end * length * 0.5
 		if ArtKit.has(slot.call("verge")):
@@ -1287,6 +1334,14 @@ static func _rafters(building: Dictionary, wood: Material) -> Node3D:
 	var slope := sqrt(span * span * 0.25 + rise * rise)
 	for k in count:
 		var z := -length * 0.5 + (k + 0.5) * length / count
+		if ArtKit.has("roof.ridge_beam"):
+			# Its ridge beam (734 amended (3)), a metre a bay, its -z end at
+			# the bay's start, in the crotch where the pair crosses.
+			var beam := ArtKit.instance("roof.ridge_beam")
+			beam.name = "Ridge_beam_%d" % k
+			beam.position = Vector3(0.0, rise, z - length / count * 0.5)
+			beam.scale.z = length / count
+			out.add_child(beam)
 		if ArtKit.has("roof.rafters"):
 			var pair := ArtKit.instance("roof.rafters")
 			pair.position = Vector3(0.0, rise, z)

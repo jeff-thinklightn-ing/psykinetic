@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The chapel's walls have a buttress every three metres with a lancet window between each pair; a chapel in disrepair shows broken rafters under its holed roof and a broken belfry with no bell, and a standing one has a bell in its tower (734 amended (3)).
 - A server restart keeps what it used to lose: players' plots, the felled forest, named enemies, the hill herders and healers' huts, captives, raids, trade and trampled ground come back as they were saved (758).
 - Companions: what she is told of where she is and how hurt you both are uses plain words (no "dungeon", no "HP", no percentages, no stance names), so she doesn't say them back (748 amended (3)).
 - Townsfolk keep finding the temple, and Aldous keeps working there, when a town's temple is built from a building kind (734 amended).

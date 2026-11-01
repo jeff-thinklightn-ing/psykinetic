@@ -35667,6 +35667,20 @@ building with slot "" is roofed by its kind (it read none before).
 _sleep_spot already took use "temple". resident_test _test_asleep: the slot
 and the kind both temples, a house and a well neither; a chapel kind the
 priest's work and the routine's temple. Server only, protocol unchanged.
+734 amended (3), art-gen's notes against c2 (buildings): the bays are 3 m, as c2 has them.
+wall.<set>.buttress_tall stands at every third vertex along the main block's long sides (no
+corner, none by a door), and a lancet on the middle edge of each three-edge bay between them, so
+the small temple's long sides have three of each. A gable's bay holes lean off their own slope
+(their +y the slope's normal, pitch × side). Each eave piece lies at the slope's own fall at its
+edge (a bellcast's too), not the block's pitch. belfry.<set>'s "bell" socket holds prop.bell. In
+disrepair its belfry_ruin shows and its belfry, cap and bell hide (BuildingComposer.show_belfry,
+from show_bays); otherwise the reverse. Under each bay cut in disrepair a roof.rafters_broken pair
+a metre shows, its variant by place, stretched as roof.rafters. At RAFTERS a roof.ridge_beam a
+bay lies in the pairs' crotch, for every set. The gable keeps the wall set's material, which is
+material.wall.chapel's texture already, so it needs no gable_material. prop.brazier stays level
+content (no composer piece). view_test _test_chapel: six and six, none by the door, holes
+leaning, broken rafters in disrepair only, the bell gone then hung, a ridge beam a metre. Client
+only, protocol unchanged, no new class_name.
 
 ## 733. A healer's hut decays empty and its healer mends it
 

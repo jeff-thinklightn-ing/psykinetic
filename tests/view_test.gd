@@ -2769,7 +2769,10 @@ func _test_chapel() -> void:
 		"wall.chapel.buttress_tall": {"category": "walls", "kind": "edge", "size": [0.8, 4.5, 0.6]},
 		"gable.chapel.rose": {"category": "walls", "kind": "edge", "size": [0.3, 1.4, 1.4]},
 		"gable.chapel.oculus": {"category": "walls", "kind": "edge", "size": [0.3, 0.8, 0.8]},
-		"belfry.chapel": {"category": "roofs", "kind": "cell", "size": [1.6, 3.5, 1.6]},
+		"belfry.chapel": {"category": "roofs", "kind": "cell", "size": [1.6, 3.5, 1.6], "sockets": {"bell": [0, 2.96, 0]}},
+		"prop.bell": {"category": "props", "kind": "cell", "size": [0.8, 0.8, 0.8]},
+		"roof.rafters_broken": {"category": "roofs", "kind": "edge", "size": [4.5, 2.3, 0.2], "variants": 3},
+		"roof.ridge_beam": {"category": "roofs", "kind": "edge", "size": [0.16, 0.22, 1.0]},
 		"steps.chapel": {"category": "props", "kind": "edge", "size": [1.2, 0.4, 2.4]},
 	}
 	var level := _kinds_level([["building_temple_small", Vector2i(2, 2), false]])
@@ -2814,8 +2817,19 @@ func _test_chapel() -> void:
 			"its belfry on its ridge, toward its front (%s)" % [frame.call(belfry).origin if belfry != null else null])
 	var buttresses := node.get_node("parts").get_children().filter(func(each: Node) -> bool: return each.name.begins_with("Buttress"))
 	var lancets := BuildingComposer.windows(temple, {})
-	_check(buttresses.size() == 8 and lancets.size() == 8 and node.find_child("Steps", true, false) != null,
-			"four buttresses and four lancets along each long side, steps at its door (%d, %d)" % [buttresses.size(), lancets.size()])
+	var door_at := Vector2.ZERO
+	for key: Vector3i in temple["doors"]:
+		door_at += (BuildingComposer._edge_out(temple, key)[0] as Vector2) / (temple["doors"] as Array).size()
+	var by_door := buttresses.filter(func(each: Node3D) -> bool: return Vector2(each.position.x, each.position.z).distance_to(door_at) < 2.0)
+	_check(buttresses.size() == 6 and lancets.size() == 6 and by_door.is_empty() and node.find_child("Steps", true, false) != null,
+			"734 amended (3): three buttresses and three lancets along each long side, a bay of three between, none by the door; steps at its door (%d, %d, %d)"
+			% [buttresses.size(), lancets.size(), by_door.size()])
+	# Each slope's hole leans off its own slope (734 amended (3)).
+	var leaning := holes.filter(func(hole: Node3D) -> bool:
+		var side := 1.0 if str(hole.name).ends_with("_1") else -1.0
+		return hole.transform.basis.y.x * side > 0.0 and hole.transform.basis.y.y > 0.0)  # In its slopes' frame, x across.
+	var bell := node.find_child("Bell", true, false) as Node3D
+	var broken := node.find_children("Rafters_broken_*", "", true, false)
 	var shown := func() -> Array: return sheets.filter(func(sheet: Node3D) -> bool: return sheet.visible)
 	BuildingComposer.show_bays(temple, node, "half")
 	var front: Array = shown.call()
@@ -2831,13 +2845,23 @@ func _test_chapel() -> void:
 	BuildingComposer.show_bays(temple, node, "damaged")
 	var damaged: Array = cut_of.call()
 	var open_holes := holes.filter(func(hole: Node3D) -> bool: return hole.visible).size()
+	var broken_damaged := broken.filter(func(pair: Node3D) -> bool: return pair.visible).size()
 	BuildingComposer.show_bays(temple, node, "disrepair")
 	var worn: Array = cut_of.call()
+	var broken_worn := broken.filter(func(pair: Node3D) -> bool: return pair.visible).size()
+	var bell_worn := bell != null and bell.visible
 	_check(damaged.size() in [2, 3] and open_holes == damaged.size() * 2 and worn.size() in [5, 6]
 			and damaged.all(func(bay: int) -> bool: return bay in worn),
 			"damaged: 2-3 bays holed; in disrepair 5-6, the damaged among them (%s, %s)" % [damaged, worn])
+	_check(broken.size() == sheets.size() and broken_damaged == 0 and broken_worn == worn.size() and bell != null and not bell_worn,
+			"734 amended (3): broken rafters under each bay cut in disrepair only, its bell gone (%d, %d, %d)" % [broken.size(), broken_damaged, broken_worn])
 	BuildingComposer.show_bays(temple, node, "whole")
-	_check(shown.call().size() == sheets.size() and holes.all(func(hole: Node3D) -> bool: return not hole.visible), "whole again")
+	_check(shown.call().size() == sheets.size() and holes.all(func(hole: Node3D) -> bool: return not hole.visible) and bell.visible, "whole again, its bell hung")
+	_check(leaning.size() == holes.size(), "734 amended (3): each hole leans off its own slope (%d of %d)" % [leaning.size(), holes.size()])
+	var site := BuildingComposer.site(temple, BuildingComposer.RAFTERS, false)
+	var beams := site.find_children("Ridge_beam_*", "", true, false)
+	_check(beams.size() == maxi((temple["rect"] as Rect2i).size.y, (temple["rect"] as Rect2i).size.x), "734 amended (3): a ridge beam a metre at its rafters (%d)" % beams.size())
+	site.free()
 	node.free()
 	for slot: String in stand_ins:
 		slots.erase(slot)
