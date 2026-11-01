@@ -55,9 +55,28 @@ func told_since(since_msec: int, words := "") -> Array[Dictionary]:
 		return line["msec"] >= since_msec and (words.is_empty() or words.to_lower() in String(line["text"]).to_lower()))
 
 
-## Each frame: every body the client knows of is watched for its swings
-## and the blows it takes.
+## My own steps back and forth between two cells (724 amended: the free
+## walk once turned back at a companion, then at a wall's end, every step):
+## the longest run of such flips this tour, its cells and when.
+var flips := {"run": 0, "most": 0, "cells": [], "msec": 0}
+var _steps: Array[Vector2i] = []
+
+
+## Each frame: my cell watched for flips, and every body the client knows of
+## for its swings and the blows it takes.
 func _process(_delta: float) -> void:
+	if me() != null and (_steps.is_empty() or _steps[-1] != cell()):
+		_steps.append(cell())
+		if _steps.size() > 3:
+			_steps.pop_front()
+		if _steps.size() == 3 and _steps[0] == _steps[2]:
+			flips["run"] += 1
+			if flips["run"] > flips["most"]:
+				flips["most"] = flips["run"]
+				flips["cells"] = [_steps[1], _steps[2]]
+				flips["msec"] = Time.get_ticks_msec()
+		else:
+			flips["run"] = 0
 	for entity: GridEntity in World.get_entities():
 		var id := entity.get_instance_id()
 		if _watched.has(id):
@@ -524,6 +543,11 @@ func failures() -> int:
 func still(name: String, yaw := NAN, low := true) -> String:
 	if DisplayServer.get_name() == "headless":
 		log_line("still %s: skipped (headless)" % name)
+		return ""
+	# Down, the view is the dying screen's, not the place's (the castle's
+	# dusk stills, 11-01): not taken, and a failure, so a sheet is never read
+	# off a dying screen.
+	if not expect(me() != null and int(me().hp) > 0, "standing for still %s" % name, "hp %s" % (me().get("hp") if me() != null else "-")):
 		return ""
 	Net.set_camera_low(low, false)
 	main._pick_grid = Vector2(-1000, -1000)  # No hover label over the shot.

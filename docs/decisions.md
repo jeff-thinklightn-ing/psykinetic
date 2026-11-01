@@ -37362,6 +37362,21 @@ the tour's watchdog and both runs' limits after it (the barrow tour takes about 
 run's report and logs are copied to build/tours/kept/<tour>_<stamp> (ignored, the newest 30,
 without the world file) so an owner can match a stall to its lines later. A tour holds only the
 local test player, never a box name or id.
+
+754 amended (2) (2026-11-01): the walk watched, every link, and the ground across the seams
+asserted. The bot counts its own steps back and forth between two cells over a whole tour; the
+barrow tour fails at 6 in a row (724 amended and amended (2) cleared the 33 to 39 seen at a
+companion and at a wall's end), and walks the wall's end by the (15, 27) door when this
+generation has it, its side door shut first. A still is not taken while the bot is down (the
+castle's dusk set once showed the dying screen). The seam tour stands at every link of the
+plane's outdoor levels (their level.json links), each zone entered afresh for each hour, and
+measures each level's edges on the world plane (the plane's height for the level plus
+World.elevation_at); where two levels touch, the ground either side is compared, asserted within
+1 m only within 3 cells of a link's crossing and reported along the rest (the coordinator: edges
+nobody crosses may only differ in walk data, maps to rule), each seam's cells written to
+seam_<a>_<b>.csv beside the report. The edges tour is that measurement
+alone, headless, in about two minutes. The barrow tour's boss timing pairs a wind-up only with
+its own blow.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping

@@ -28,9 +28,13 @@ func run(bot: Node) -> void:
 	await _knight(bot)
 	await _names(bot)
 	await _fights(bot)
+	await _wall_turn(bot)  # The band down: the camp's way quiet.
 	await _chest(bot)
 	await _turn_in(bot)
 	await _out_to_rolf(bot)
+	# 724 amended: no walk this tour stepped back and forth on the spot.
+	bot.expect(int(bot.flips["most"]) < 6, "no walk paced back and forth between two cells (6 flips or more)",
+		"the longest run %d flips between %s at %.1f s" % [bot.flips["most"], bot.flips["cells"], int(bot.flips["msec"]) / 1000.0])
 
 
 ## Rolf the vendor (736): talked to, his window has buttons that buy.
@@ -186,6 +190,44 @@ func _fights(bot: Node, minutes := 12.0) -> void:
 		_sledge(bot, bosses[id], id, since)
 
 
+## The turn round a wall's end to a shut door (724 amended (2), physics'
+## fix for the 11-01 stall: from (8, 25) toward the robbers past the door
+## south of (15, 27) the body paced (15, 27)-(14, 27) for a minute). The
+## barrow is regenerated: only when those doors are there; (16, 26)'s shut
+## first so the route goes the wall's way. Arrives with the door opened as a
+## player does (E at a stall), and no flips on the way.
+const WALL_TURN_FROM := Vector2i(8, 25)
+const WALL_TURN_DOOR := Vector3i(15, 27, 1)
+const WALL_TURN_SIDE := Vector3i(16, 26, 0)
+
+
+func _wall_turn(bot: Node) -> void:
+	var door: Door = World.door_on(WALL_TURN_DOOR)
+	if door == null:
+		bot.log_line("wall turn: no door at %s in this generation; skipped" % WALL_TURN_DOOR)
+		return
+	var side: Door = World.door_on(WALL_TURN_SIDE)
+	if side != null and side.open:
+		await bot.walk_to(Vector2i(WALL_TURN_SIDE.x, WALL_TURN_SIDE.y), 0, 60.0)
+		await bot.tap_e_door(side)
+		await bot.seconds(1.0)
+		bot.log_line("wall turn: the side door %s shut first: %s" % [WALL_TURN_SIDE, not side.open])
+	if door.open:
+		await bot.walk_to(Vector2i(WALL_TURN_DOOR.x, WALL_TURN_DOOR.y), 0, 60.0)
+		await bot.tap_e_door(door)
+		await bot.seconds(1.0)
+	await bot.walk_to(WALL_TURN_FROM, 1, 60.0)
+	var before: int = bot.flips["most"]
+	bot.flips["most"] = 0
+	var goal := Vector2i(WALL_TURN_DOOR.x, WALL_TURN_DOOR.y + 2)
+	bot.log_line("wall turn: %s -> %s, the door %s %s" % [bot.cell(), goal, WALL_TURN_DOOR, "open" if door.open else "shut"])
+	var got: bool = await bot.walk_to(goal, 1, 60.0)
+	var most: int = bot.flips["most"]
+	bot.flips["most"] = maxi(before, most)
+	bot.expect(got and most < 6, "round the wall's end and through the shut door at %s without pacing" % WALL_TURN_DOOR,
+		"arrived %s at %s; the longest flip run %d between %s" % [got, bot.cell(), most, bot.flips["cells"]])
+
+
 ## Brand's keys in my pack.
 func _keys(bot: Node) -> int:
 	return (Array(bot.me().get("slots")) if bot.me() != null else []).count("camp_key")
@@ -291,6 +333,12 @@ func _sledge(bot: Node, given: String, boss_id: int, since: int) -> void:
 	for wind: Dictionary in winds:
 		var next_swing: Array = his.filter(func(b: Dictionary) -> bool: return b["kind"] == "swung" and b["msec"] >= wind["msec"])
 		if next_swing.is_empty():
+			continue
+		# Another winding before that blow (one of 0 ticks: given up; or a new
+		# one, the blow between unseen): that blow is not this wind-up's.
+		var between: Array = his.filter(func(b: Dictionary) -> bool:
+			return b["kind"] == "winding" and b["msec"] > wind["msec"] and b["msec"] <= next_swing[0]["msec"])
+		if not between.is_empty():
 			continue
 		gaps.append(int(next_swing[0]["msec"]) - int(wind["msec"]))
 		var next_wind: Array = his.filter(func(b: Dictionary) -> bool: return b["kind"] == "winding" and b["msec"] > next_swing[0]["msec"])

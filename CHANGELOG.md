@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Tools: playtest tours watch the walk for pacing on the spot, stand at every link between zones, and check the ground meets across each zone seam (tools/tour.sh edges; 754 amended (2)).
 
 - The great axe and battle axe swing with a sweep: coiled back low by the hip, a pause, then a fast flat sweep across the front, carried through (750).
 - A sleeper's lower arm lies on their bedroll, tucked before the chest, not reaching past its edge (751).
