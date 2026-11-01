@@ -15751,6 +15751,7 @@ func _on_world_ticked(tick: int) -> void:
 		if tick % WORK_CHECK_TICKS == 0:
 			_visible_work_tick()  # The bodies at the work the sim does (decision 566).
 		_respawn_due_players(tick)
+		_run_test_die_travel(tick)
 		_tend_hearts()  # Mortally Wounded: the downed's hearts, and all of them fallen.
 		_all_fallen_tick()
 		_leaving_tick()  # A companion leaving her player (decision 581).
@@ -18812,6 +18813,23 @@ func _measure_smoothness(delta: float) -> void:
 	if _client3d != null:
 		aim = Vector2(_client3d._camera_target.x, _client3d._camera_target.z)
 	_smooth_meter.sample(player, aim, delta)
+
+
+## --test-die-travel=<tick>,<zone> (server): at that tick the first player
+## dies and is brought back in <zone> in the same frame, as the at-once
+## return from near death does (587; playtest: the client's ERROR for its
+## old body's despawn, sent after the new zone's map).
+func _run_test_die_travel(tick: int) -> void:
+	if Net.test_die_travel.size() != 2 or tick < Net.test_die_travel[0].to_int() or _players.is_empty():
+		return
+	var to := Net.test_die_travel[1]
+	Net.test_die_travel = PackedStringArray()
+	var peer: int = _players.keys()[0]
+	var player: Player = _players[peer]
+	var who := String(player.name)
+	World.despawn(player)  # Its death: _on_entity_despawned.
+	travel(peer, to)
+	print("[test] %s died and was brought back in %s" % [who, to])
 
 
 ## --test-foe: [param player] given the weapon in hand and the monster 3

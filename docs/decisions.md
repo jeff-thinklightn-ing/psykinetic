@@ -23530,6 +23530,26 @@ healers_hut, 0, near_death} and is back at the hut, at full hp, on the
 next step; the party line names Ned; tell_all_fallen says 20. Server
 and client (the message's keys); no new class_name.
 
+587 amended (ui; playtest, a revival from the barrow): the client printed
+an engine ERROR each time, 'Condition "!pinfo.recv_nodes.has(net_id)" is
+true. Returning: ERR_UNAUTHORIZED' (on_despawn_receive). The death's
+World.despawn frees the body at the frame's end, and its despawn packet went
+out then; the at-once return runs travel() in that same frame, and the new
+zone's "map" went first. On "map" the client frees the old zone's entities,
+so the late despawn named a node it no longer had. (The server's "rejected
+order" for the old body is the client's orders in flight before it heard:
+dropped and logged, as ever.)
+- World keeps the entities despawned this frame and not yet freed
+  (_freeing, until their tree_exited), and update_visibility hides those of
+  the zone a peer leaves at once, as it does the zone's own: the despawn
+  goes before the map.
+- A server test flag, --test-die-travel=<tick>,<zone> (Main._run_test_die_travel):
+  at that tick the first player dies and is brought back in that zone in the
+  same frame. net_test phase 4b drives a real client through it (Vale, from
+  test_room to sample) and checks it printed no ERROR. Before the fix it
+  printed the playtest's line; after, none.
+Server only (the flag aside), protocol unchanged, no new class_name.
+
 
 ## 584 amended: the healer's care, economy's side
 

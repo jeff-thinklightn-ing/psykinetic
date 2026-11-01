@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Being brought back from near death in another zone (out of the barrow) no longer prints an engine error on your game (587 amended).
 
 - Monsters are called by name in talk windows and the log: the fallen knight by his own name, the draugr as the draugr, others by their kind ("the grave robber"), never as "AstralKnight1" or "Draugr1" (752, dungeon's side).
 - Townsfolk asleep out of doors lie on a bedroll, and those in a house lie up on their bed rather than through it (751, npc's side (3)).

@@ -230,6 +230,16 @@ phase_4() {
 	wait_for server4 '\[world\] Ivy reset the room'
 	wait_for server4 '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' 4
 	finish
+	# Phase 4b: a player dies and is brought back in another zone in the same
+	# frame, as the at-once return from near death does (587). Her client must
+	# have her old body's despawn before the new zone's map (playtest: an
+	# ERR_UNAUTHORIZED a revival from the barrow; its .err is checked below).
+	server server8 --server --still-monsters --no-companions "--token=$TOKEN" --test-wait-players=1 --test-die-travel=40,sample
+	wait_for server8 'listening on port'
+	client clientV $GOOD --name=Vale
+	wait_for server8 '\[test\] Player[0-9]+ died and was brought back in sample'
+	wait_for clientV '\[zone\] now in sample'
+	finish
 }
 
 phase_5() {
@@ -364,6 +374,8 @@ check "$(count '\[net\] (Hal|Ivy) \([a-z0-9-]+\) joined as Player' "$LOGS/server
 # Hal stood on the crate's spawn tile, so he is put on the nearest free one.
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\) Player2=' "$LOGS/clientI.log")" 1 "phase 4: Ivy sees Crate1 back at (8, 2), Hal beside it and herself"
 check "$(count '\[test\] tiles: .*Crate1=\(8, 2\).*Player1=\(9, 2\)' "$LOGS/clientH.log")" 1 "phase 4: Hal, who did not ask, sees the same room"
+check "$(count '\[zone\] Vale went from test_room to sample' "$LOGS/server8.log")$(count '\[zone\] now in sample' "$LOGS/clientV.log")" 11 "phase 4b: Vale died and was brought back in another zone, her client there"
+check "$(count 'ERROR' "$LOGS/clientV.err")$(count 'ERROR' "$LOGS/clientV.log")" 00 "phase 4b: her client printed no ERROR (its old body gone before the new map)"
 check "$(count 'restarting in 3 s \(a test\), 1 connected' "$LOGS/admin.txt")" 1 "phase 5: the console says the restart is due"
 check "$(count "\\[party\\] Server: Restarting in 3 s \\(a test\\); you'll be reconnected\\." "$LOGS/clientR.log")$(count '\[party\] Server:' "$LOGS/clientR.log")" 11 "phase 5: Rex is told once (a countdown of 3 s has no later warnings)"
 check "$(count '\[admin\] restarting \(a test\): saving, letting 1 players go, exiting 75' "$LOGS/server5.log")" 1 "phase 5: the server saves and lets him go"

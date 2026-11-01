@@ -107,6 +107,7 @@ extends Node
 ##   --test-exit-on=<path>        quit once that file exists (a client in the game sees 20 more ticks first)
 ##   --test-wait-players=<n>      server: the sim waits until n players are in (60 s at most)
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
+##   --test-die-travel=<t>,<zone> server: at tick t the first player dies and is brought back in zone, in one frame (the at-once return, 587)
 ##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
@@ -766,6 +767,8 @@ var test_move := Vector2i.ZERO
 var test_contest_tile := Vector2i.ZERO
 var test_contest_tick := 0
 var test_reset_tick := 0
+## --test-die-travel=<tick>,<zone> (server): Main._run_test_die_travel.
+var test_die_travel: PackedStringArray = []
 ## --test-builder=<x>,<y>,<w>,<h>:<request>: once the local player is in,
 ## builder mode asks that for that area (for screenshots of the ghost).
 var test_builder := ""
@@ -2069,7 +2072,7 @@ func _parse_args() -> void:
 			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
 					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
-					"--test-move", "--test-contest", "--test-reset", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
+					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
 					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks":
 				if not has_value and i + 1 < args.size():
@@ -2227,6 +2230,8 @@ func _set_option(key: String, value: String) -> void:
 				test_contest_tick = parts[2].to_int()
 		"--test-reset":
 			test_reset_tick = value.to_int()
+		"--test-die-travel":
+			test_die_travel = value.split(",")
 		"--test-builder":
 			test_builder = value
 		"--test-exit-after":

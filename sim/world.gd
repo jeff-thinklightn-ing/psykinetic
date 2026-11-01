@@ -775,6 +775,11 @@ var richness: WorldRichness = null
 ## Server: prices, players' gold and trade with the town (Economy); made by
 ## Main at boot, from the snapshot. Null on a client. Its every purse
 ## change is gold_changed (Economy.purse_changed).
+## Entities despawned this frame, still in the tree till its end (queue_free):
+## a peer leaving their zone is shown these gone at once (update_visibility;
+## a revival from the barrow: the client's ERR_UNAUTHORIZED for its old body's
+## despawn, which came after the new zone's map had cleared it).
+var _freeing: Array[GridEntity] = []
 var economy: Economy = null:
 	set(value):
 		economy = value
@@ -1683,6 +1688,11 @@ func update_visibility(peer: int, zone_name: String) -> void:
 	var doors: Dictionary[Vector3i, Door] = _doors if each == zone else each.doors
 	for entity in entities:
 		if is_instance_valid(entity) and entity.sync != null:
+			entity.sync.update_visibility(peer)
+	# Despawned this frame and not yet freed: hidden now, so a peer leaving
+	# the zone has its despawn before the new zone's map, not after it.
+	for entity in _freeing:
+		if is_instance_valid(entity) and entity.zone == zone_name and entity.sync != null and entity.is_inside_tree():
 			entity.sync.update_visibility(peer)
 	for door: Door in doors.values():
 		if is_instance_valid(door) and door.sync != null:
@@ -6726,7 +6736,14 @@ func despawn(entity: GridEntity) -> void:
 	zone.comings += 1
 	entity._world_remove()
 	entity_despawned.emit(entity)
+	if entity.sync != null and entity.is_inside_tree() and not _freeing.has(entity):
+		_freeing.append(entity)
+		entity.tree_exited.connect(_freed.bind(entity), CONNECT_ONE_SHOT)
 	entity.queue_free()
+
+
+func _freed(entity: GridEntity) -> void:
+	_freeing.erase(entity)
 
 
 ## [param entity] leaving the world, before it is freed (decision 572
