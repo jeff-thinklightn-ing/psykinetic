@@ -37394,3 +37394,13 @@ breath and the lie-down and get-up are as they were (SIDE_HALF shares the
 pose). Stills: C:/dev/review/sleep_strip.png (the game's camera there sits
 at the sleeper's back) and C:/dev/review/sleep_front.png (from the front
 side). Client only, protocol unchanged, no new class_name.
+
+751 amended, pc-character's side (2026-11-01): the sleeper's lower forearm tucked
+onto the bed. From the face-side still of 751 (2) (C:/dev/review/sleep_front.png): the
+lower forearm, laid before the face toward the pillow end, reached past the
+bedroll's long edge. It now lies bent back before the chest (SIDE_SLEEP's
+lowerarm_l), the wrist 0.27 m before the spine (the bedroll's edge 0.45)
+and 0.21 m before the tile, inside the pillow end (+0.46), below and clear of
+the face (measured, build/sleep/measure.gd). Nothing else moves; the
+coordinator passed it without another still. Client only, protocol
+unchanged, no new class_name.

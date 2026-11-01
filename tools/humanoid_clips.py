@@ -76,7 +76,7 @@ SIDE_SLEEP = [("pelvis", TILT, 72.0), ("spine_01", TURN, 10.0), ("spine_02", TUR
 	("spine_03", TILT, -8.0), ("Head", TURN, -45.0), ("Head", TILT, -32.0),
 	("thigh_l", Vector((0.95, -0.3, -0.05)), AIM), ("calf_l", Vector((-0.6, -0.8, -0.03)), AIM),
 	("thigh_r", Vector((0.95, -0.22, -0.15)), AIM), ("calf_r", Vector((-0.55, -0.83, -0.1)), AIM),
-	("upperarm_l", Vector((0.6, 0.8, 0.0)), AIM), ("lowerarm_l", Vector((0.95, 0.15, 0.0)), AIM),
+	("upperarm_l", Vector((0.6, 0.8, 0.0)), AIM), ("lowerarm_l", Vector((0.45, -0.9, 0.0)), AIM),
 	("upperarm_r", Vector((0.85, -0.3, -0.25)), AIM), ("lowerarm_r", Vector((0.45, -0.8, -0.4)), AIM)]
 SIDE_LIFT = (0.0, 0.0, 0.15)
 # Half rolled onto the side, already curled: between sitting and the curl (no sprawl on the way).
