@@ -12516,7 +12516,7 @@ func give_gold(player: Player, args: Dictionary) -> int:
 		other_id = str(_peer_ids.get(other.owner_peer, ""))
 		other_name = _display_name(other)
 	else:
-		why = "You can only give gold to another player or your own companion."
+		why = "You can give gold only to a fellow traveller or to the one who goes with you."
 	if why.is_empty() and other_id.is_empty():
 		why = "They are too far away."
 	if why.is_empty() and amount < 1:
@@ -15990,8 +15990,8 @@ static func led_to_of(player: Player) -> String:
 ## wire says, and how to take the lead back (any step or order does).
 static func led_words(name: String, place: String) -> String:
 	if place.is_empty():
-		return "Following %s - move to take the lead" % name
-	return "Following %s to %s - move to take the lead" % [name, place]
+		return "Following %s: move to take the lead" % name
+	return "Following %s to %s: move to take the lead" % [name, place]
 
 
 ## Her bond's step, watched for a drop (555, ui's side; companions'

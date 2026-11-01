@@ -36947,6 +36947,12 @@ its second stage"; "stands at its second stage"; "in disrepair, crumbles back to
 A companion is named without the word: "taken by ..., is rescued and home", "comes to stay, and
 works as a smith", "is held by ...", the raid group's id now only in the server log.
 Server only, wording only, protocol unchanged, no new class_name.
+748 amended (2), ui's side: two of voice's wording fixes from its check (the words are voice's).
+main.gd give_gold's refusal drops the game words and keeps the rule (another player, or your own
+companion; not townsfolk): "You can give gold only to a fellow traveller or to the one who goes
+with you." (voice's short form, for a HUD line). led_words, system text, takes the house colon for
+its dash: "Following %s: move to take the lead" and "Following %s to %s: ...". ui_test's
+led_words check follows. Protocol unchanged, no new class_name.
 ## 751, art-kit's side: the bedroll
 
 Jeff's note that townsfolk shouldn't sleep on bare ground (the coordinator's ask, 2026-10-31; npc's 751

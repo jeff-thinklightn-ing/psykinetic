@@ -1625,8 +1625,8 @@ func _test_world_map() -> void:
 		"what she knows the way to, from world_state's guide")
 	_check(WorldMapPanel.knows_words("Wren") == "Wren knows the way" and WorldMapPanel.ask_words("Wren").begins_with("ask Wren to lead you there")
 		and WorldMapPanel.leads_words("Wren") == "> Wren leads you here", "the mark's words, the ask box's, the led row's")
-	_check(Main.led_words("Wren", "the Barrow") == "Following Wren to the Barrow - move to take the lead"
-		and Main.led_words("Wren", "") == "Following Wren - move to take the lead", "the HUD's words while led, with and without the place")
+	_check(Main.led_words("Wren", "the Barrow") == "Following Wren to the Barrow: move to take the lead"
+		and Main.led_words("Wren", "") == "Following Wren: move to take the lead", "the HUD's words while led, with and without the place")
 	_check(panel.place_words("castle") == str(panel.world.areas["castle"].get("display_name", "castle"))
 		and panel.place_words("nowhere/x") == "nowhere/x" and panel.place_words("") == "", "a place or area's shown name from the map")
 	var asked: Array = []
