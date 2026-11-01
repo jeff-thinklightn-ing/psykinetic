@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - The Dwarven Halls' chests can now also hold a battle axe, which any shop will buy (757 amended).
 
+- Tools: new playtest tours for restart memory, the axe sweep and the slung bow, and Umbrage's chapel; tour runs keep to their own data folder (754 amended (5)).
 - Umbrage's temple is now a stone chapel with a bell tower, larger inside, its door where it was; no grass grows through any building's floor (734 amended (2)).
 - Coming down the temple's shortcut you arrive before the Hall's throne, not six steps off to the side; a peaceable monster no longer pushes an arrival away (749 amended).
 - Crossing into a zone with a forest round it: the hitch behind the arrival card is short again (the wilds' worst frame about 130 ms, was 190 in v0.1.196; 660 amended (5)).

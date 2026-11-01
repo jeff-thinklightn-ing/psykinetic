@@ -37529,6 +37529,32 @@ they sleep and silent; never a raw node name shown; a table of who was met.
 server refusing too). The folk tour pins it: at night a sleeping merchant or maker's bar offers
 no Barter, and a barter order sent anyway, as Main's Barter sends it and from the shop's counter
 (a refusal for the reach is not counted), is refused. Both fail on main until the fix lands.
+
+754 amended (5) (2026-11-01): the folk tour follows the coordinator's ruling that a shop's counter
+stays open at night: a barter with the sleeping person is refused with the asleep line, and the
+counter answers as it did at noon. It also watches Umbrage's chapel (the coordinator's, after
+buildings' 734 amended (2) and npc's 734 amended (4)): from 9:00 a townsperson, not the priest, stands
+inside more than a cell from its doors, its counter and the visit's front cell (217, 201), and at
+noon the priest works inside, off those same cells. New tours, each run under tools/tour.sh:
+- restart, 758's check. tour.sh's TOUR_PHASES runs the server and the client that many times on
+  one save, stopping the server between. A fresh world's towns fell and lay nothing for days, so
+  phase 1 picks a real trunk by Umbrage and a clear 4x4 of its floor from the local level, as
+  Clearing reads it, and writes them to seed.json in the server's save shape. tour.sh lays
+  seed.json into the run's own world.json, and phase 2's fresh client must be told both. The seed
+  is made by the tour from the repo's levels, never from the box (release's condition). On a tree
+  before 40ecbfcd it fails: the server saves clearing and plots back empty.
+- kit, read off the drawn body, off-screen. Under --test-foe=draugr,giant_axe each blow's clip
+  must be Axe_Sweep, about 1.3 s (750 amended). Under --test-foe=rat,bow, the bow not drawn must
+  lie on the sling (662 (d) amended).
+- chapel, buildings' 734 amended (2): Aldous at work in the temple; townsfolk in it; the shortcut
+  sealed by the draugr refused without his mark and taken both ways with it (the mark given by the
+  console); a fallen player brought back by the temple's door. TOUR_ONLY=respawn falls to the test
+  foe.
+The barrow tour's TOUR_ONLY=wall plays the wall turn alone.
+Every Godot tour.sh starts, its parse checks too, runs with APPDATA in the checkout's own
+build/tours/<tour>/appdata, and tour.sh refuses to start on any other folder. A barrow level
+reached the shared overlay on 11-01 (not a tour's, but the parse checks ran without APPDATA). Tests
+and tools only, protocol unchanged, no new class_name.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping

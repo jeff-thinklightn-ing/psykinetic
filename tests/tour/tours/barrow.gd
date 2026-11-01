@@ -22,6 +22,11 @@ var _chest_gold := 0
 
 
 func run(bot: Node) -> void:
+	if OS.get_environment("TOUR_ONLY") == "wall":  # A cut's line: the wall turn alone.
+		await _to_barrow(bot)
+		await _wall_turn(bot)
+		bot.expect(int(bot.flips["most"]) < 6, "no long walk-flip in the run (longest %d)" % int(bot.flips["most"]))
+		return
 	await _rolf(bot)
 	await _sleepers(bot)
 	await _to_barrow(bot)
