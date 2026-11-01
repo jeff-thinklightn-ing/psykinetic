@@ -35654,6 +35654,20 @@ view_test _test_chapel (stand-in slots: bays, holes, gable windows, belfry, butt
 lancets, covering half, damaged within disrepair). Client only, protocol unchanged, no new
 class_name.
 
+734 amended (release's label; npc's, landed ahead of buildings' Umbrage
+chapel, which arrives as the temple kind: slot "", kind "temple", use
+"temple", place "temple"): townsfolk find the temple by its kind too.
+Main._resident_places found a town's temple (the priest's work, everyone's
+temple stop, decision 404) by slot "building.temple" only, so with the
+chapel Aldous would have lost his work and kept to the square. It now takes
+Main._is_temple: use "temple", place "temple", or a slot that
+Level.BUILDING_PLACES maps to "temple" (today's slot). The well keeps its
+slot. Main._roofed reads a kind's own "kind" before the slot, so a kind
+building with slot "" is roofed by its kind (it read none before).
+_sleep_spot already took use "temple". resident_test _test_asleep: the slot
+and the kind both temples, a house and a well neither; a chapel kind the
+priest's work and the routine's temple. Server only, protocol unchanged.
+
 ## 733. A healer's hut decays empty and its healer mends it
 
 Jeff, on the turf hut: "it decays when nobody lives in it, and the healer

@@ -3130,6 +3130,17 @@ func _test_asleep(mara: Resident, home: Rect2i) -> void:
 	_check(not roofless.has("bed") or roofless["bed"] == roofless.get("inn"), "no house of their own: the inn or no bed at all (%s)" % [roofless])
 	_check(_main._roofed({"slot": "building.house"}) and not _main._roofed({"slot": "building.well"}) and not _main._roofed({"slot": "building.market_stall"}),
 		"a house has a roof; a well and a stall have none")
+	if Level.kinds().has("temple"):
+		_check(_main._roofed({"slot": "", "kind": "temple"}) == (str(Level.kinds()["temple"].get("roof", "")) != "none"), "a kind's roof read by its kind (slot \"\")")
+	# The temple found by slot or by kind (the chapel amendment): Aldous's work either way.
+	_check(_main._is_temple({"slot": "building.temple"}) and _main._is_temple({"slot": "", "kind": "temple", "use": "temple", "place": "temple"})
+		and _main._is_temple({"slot": "", "place": "temple"}) and not _main._is_temple({"slot": "building.house", "use": ""}) and not _main._is_temple({"slot": "building.well"}),
+		"a temple: building.temple's slot, or a kind with use or place \"temple\"; never a house or a well")
+	var store_cell: Vector2i = place.get("cell", Vector2i.ZERO)
+	var chapel := Rect2i(store_cell + Vector2i(2, -6), Vector2i(4, 6))
+	var with_chapel := {"buildings": [{"rect": chapel, "slot": "", "kind": "temple", "use": "temple", "place": "temple", "town": STORE}]}
+	var priest: Dictionary = _main._resident_places(with_chapel, place, "priest", no_homes, 0)
+	_check(priest.get("temple") == chapel and priest.get("work") == chapel, "a chapel kind: the priest works there, and the routine visits it (%s)" % [priest])
 	# The roofless bedded down (751, npc's side (2)): a 1x2 each, out of every building, apart; by the fire when there is one.
 	var square: Rect2i = roofless.get("square", Rect2i())
 	var wanted := {"rs-roofless-a": {"town": STORE, "places": {"home": square, "square": square}},

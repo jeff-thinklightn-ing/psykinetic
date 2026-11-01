@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Townsfolk keep finding the temple, and Aldous keeps working there, when a town's temple is built from a building kind (734 amended).
 
 - Tools: the playtest folk tour checks that sleeping townsfolk don't trade (754 amended (4)).
 - The Dwarven Halls' chests now hold dwarven goods: ore, nails, axe heads, picks, war hammers and now and then a silver ring, which any shop will buy (757).

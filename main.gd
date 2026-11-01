@@ -10758,16 +10758,17 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		elif listed.is_empty():
 			out["bed"] = home  # No beds listed there: phase 1's corner.
 	# The routine's other places (decision 404): the inn when linked and
-	# standing, the temple and the well by their slots (no "use" or town of
-	# their own yet, buildings' word), the nearest within HOME_TILES of the
-	# store; a place the town lacks stays out, and the body keeps to the square.
+	# standing, the temple (_is_temple: a slot's or a kind's) and the well by
+	# its slot, the nearest within HOME_TILES of the store; a place the town
+	# lacks stays out, and the body keeps to the square.
 	if inn.size != Vector2i.ZERO:
 		out["inn"] = inn
 	for want: Array in [["temple", "building.temple"], ["well", "building.well"]]:
 		var best := Rect2i()
 		for building: Dictionary in area.get("buildings", []):
 			var rect: Rect2i = building.get("rect", Rect2i())
-			if str(building.get("slot", "")) == want[1] and World.distance(rect.get_center(), store) <= HOME_TILES \
+			var fits: bool = _is_temple(building) if want[0] == "temple" else str(building.get("slot", "")) == want[1]
+			if fits and World.distance(rect.get_center(), store) <= HOME_TILES \
 					and (best.size == Vector2i.ZERO or World.distance(rect.get_center(), store) < World.distance(best.get_center(), store)):
 				best = rect
 		if best.size != Vector2i.ZERO:
@@ -10892,8 +10893,17 @@ func _take_spot(spot: Rect2i, taken: Dictionary) -> void:
 ## 751): its kind in levels/buildings.json, roofed unless "roof": "none";
 ## a piece with no kind (a well, a stall, a stone) none.
 func _roofed(building: Dictionary) -> bool:
-	var kind := str(building.get("slot", "")).trim_prefix("building.")
+	var kind := str(building.get("kind", "")) if not str(building.get("kind", "")).is_empty() else str(building.get("slot", "")).trim_prefix("building.")
 	return Level.kinds().has(kind) and str(Level.kinds()[kind].get("roof", "")) != "none"
+
+
+## Whether [param building] is a town's temple (decision 404; the chapel
+## amendment): today's slot (Level.BUILDING_PLACES maps it to "temple"), or a
+## kind whose place or use is "temple" (buildings' Umbrage chapel: slot "",
+## kind "temple", use "temple", place "temple").
+static func _is_temple(building: Dictionary) -> bool:
+	return str(building.get("use", "")) == "temple" or str(building.get("place", "")) == "temple" \
+		or str(Level.BUILDING_PLACES.get(str(building.get("slot", "")), "")) == "temple"
 
 
 ## The companion of player [param player_id] is held by raid group
