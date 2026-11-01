@@ -6186,7 +6186,8 @@ func _building_sets(building: Dictionary) -> void:
 		if building.has("kind") and key in windows and (wall_set == "wood" and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH
 				or ArtKit.has("wall.%s.window_tall" % wall_set)):
 			_set_wall_state(key, "window")
-			_window_code[key] = [awake_town(building, str(_terrain.get("level", ""))), str(building.get("code", "")), true]
+			_window_code[key] = [awake_town(building, str(_terrain.get("level", ""))), str(building.get("code", "")), true,
+				hut_id(building, str(_terrain.get("level", "")))]
 			var sides := Terrain.edge_cells(key)
 			# A run's +x is east for an east edge, north (its first cell) for a south one.
 			var outside_first := not cells.has(sides[0])
@@ -6629,6 +6630,15 @@ func set_huts(states: Dictionary) -> void:
 	for building in _buildings:
 		if states.has(str(building.get("hut", ""))):
 			_show_state(building)
+	_update_lamps()  # An emptied hut's windows go dark (759).
+
+
+## Whether the healer's hut [param hut] (its place id, hut_id) was told
+## empty (the "huts" message's "empty", the healer's old age: its keeper
+## gone; 759): no smoke, a cold pot, dark windows. Absent is false: as
+## before.
+func hut_empty(hut: String) -> bool:
+	return not hut.is_empty() and bool(hut_states.get(hut, {}).get("empty", false))
 
 
 ## The Holdings place id of a healer's hut [param building] on level
@@ -6655,14 +6665,14 @@ func _add_smoke(building: Dictionary) -> void:
 ## Whether [param building]'s chimney smokes: its fire in use, someone
 ## awake inside (_awake, the "town" message's "awake": npc's bodies), the
 ## building standing, built (a kind at its last stage) or damaged, never
-## in decline or a ruin.
+## in decline or a ruin, nor a healer's hut told empty (hut_empty, 759).
 func _show_smoke(building: Dictionary) -> void:
 	var smoke: Node3D = building.get("smoke")
 	var hearth: Node3D = building.get("hearth")
 	if (smoke == null or not is_instance_valid(smoke)) and hearth == null:
 		return
 	var state := _state_of(building)
-	var lit := smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
+	var lit := not hut_empty(str(building.get("hut", ""))) and smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
 		not building.has("kind") or int(building["stage"]) == BuildingComposer.STANDING)
 	if smoke != null and is_instance_valid(smoke):
 		smoke.visible = lit
@@ -7119,9 +7129,9 @@ func _update_lamps() -> void:
 
 
 ## Whether a window of _window_code row [param row] is lit: its building
-## standing, then as lamp_lit says.
+## standing and not a hut told empty (hut_empty), then as lamp_lit says.
 func _window_lit(row: Array, hour: float, sun: float) -> bool:
-	return bool(row[2]) and lamp_lit(_awake.get(row[0], {}), str(row[1]), hour, sun)
+	return bool(row[2]) and not hut_empty(str(row[3])) and lamp_lit(_awake.get(row[0], {}), str(row[1]), hour, sun)
 
 
 ## Whether a window of building [param code] is lit (566): only with the

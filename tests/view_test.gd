@@ -2681,6 +2681,13 @@ func _test_turf_house() -> void:
 	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1}})
 	_check(quarters.all(func(q: Array) -> bool: return (q[0] as Node3D).visible) and smoke.visible and hearth.visible
 			and (node.get_node("roof") as Node3D).visible, "told mended: standing, its fire lit again")
+	# 759: its keeper gone in old age, the hut told empty: cold and dark, standing.
+	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1, "empty": true}})
+	var window := ["turf_town", "T1", true, hut]
+	_check(not smoke.visible and not hearth.visible and quarters.all(func(q: Array) -> bool: return (q[0] as Node3D).visible)
+			and not _rig._window_lit(window, 21.0, -0.5), "told empty, the healer still said awake: no smoke, the pot cold, a window dark; it stands")
+	_rig.set_huts({hut: {"state": Towns.STANDING, "level": 1}})
+	_check(smoke.visible and hearth.visible and _rig._window_lit(window, 21.0, -0.5), "no longer empty: its fire lit and smoking, a window lit")
 	_rig.hut_states.clear()
 	_rig.set_awake("turf_town", {})
 	_rig.town_states.erase("turf_town")

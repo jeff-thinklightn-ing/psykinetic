@@ -37938,3 +37938,14 @@ class_name.
   (his card, players' standing, transcripts) is cleared on his leaving, npc's side. Care a player
   paid for stays with the hut (733): no refund.
 Server only, data only, protocol unchanged, no new class_name.
+
+759, buildings' side: the empty hut is cold and dark.
+- Client3D.hut_empty(hut): the "huts" message's "empty" for the hut's place id (hut_states), absent
+  false, so a server not saying it draws as before (why it needs no revision).
+- _show_smoke: a hut told empty has no chimney smoke and its pot's fire out, whoever is awake in
+  its rect (a visitor, a guest, a companion); it still stands whole, its looks by its state.
+- _window_lit: an empty hut's windows stay dark (lamp_lit would otherwise fall back to the hour,
+  nobody seen inside); each _window_code row carries its hut id; set_huts refreshes the lamps.
+- No new art, place, kind or level content: "empty" is nobody home, not a ruin.
+view_test _test_turf_house: told empty (the healer still said awake), no smoke, the pot cold, a
+window dark, standing; told not empty, all back. Client only, protocol unchanged, no new class_name.
