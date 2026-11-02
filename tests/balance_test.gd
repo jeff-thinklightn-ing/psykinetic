@@ -189,6 +189,21 @@ func _test_meat() -> void:
 	quest = _balance.quest(FOLD)
 	_check(_balance.lying("meadow") == 0 and int(quest["left"]) == 3, "a day on the rest has rotted: three left lying (%d)" % int(quest["left"]))
 	_check(int(quest["left_by"].get("Bo", 0)) == 2 and int(quest["left_by"].get("Cy", 0)) == 1, "the ledger: Bo left two, Cy one (%s)" % [quest["left_by"]])
+	# A kill's hide and antlers, taken up and put down again where they lay
+	# (playtest's off run): never meat, never left lying.
+	_ids[201] = "hide"
+	_ids[202] = "antlers"
+	_ids[203] = "meat"
+	_balance.cell_changed("meadow", cell, PackedInt32Array([201, 202, 203]), {201: "Bo", 202: "Bo", 203: "Bo"})
+	_balance.cell_changed("meadow", cell, PackedInt32Array([201, 202]))
+	_balance.cell_changed("meadow", cell, PackedInt32Array())
+	_balance.cell_changed("meadow", cell, PackedInt32Array([201, 202]), {201: "Bo", 202: "Bo"})
+	_check(_balance.lying("meadow") == 0, "a hide and antlers put down again lie, but not as meat (%d)" % _balance.lying("meadow"))
+	_balance.banked(203, "Bo")
+	_days(1.0)
+	quest = _balance.quest(FOLD)
+	_check(not quest.is_empty() and int(quest.get("left", 0)) == 3 and int(quest.get("home", 0)) == 2,
+		"a day on, they count for nothing: left %d, home %d" % [int(quest.get("left", -1)), int(quest.get("home", -1))])
 
 
 func _test_balanced() -> void:

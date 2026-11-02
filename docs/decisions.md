@@ -38550,6 +38550,18 @@ of %s hold; the wolves have drawn off." / "The flocks of %s are lost." / "The fl
 to the wolves, and they are coming to the town by night." The names come after "of" because
 joined names read badly with a possessive. Lore: the night threat matches 762. Data only; no
 bullet (no level keeps the balance).
+761 amended (4) (release's label; the coordinator approved): each piece of meat that goes off the
+ledger as left lying is logged. Playtest's off2 run was judged badly with "left 22, home 67", and the
+tour took the 22 for the hides and antlers it put down again. They were real meat: the run's end
+held 22 carcasses' hides on the hills, the tour had reached 18 (all 67 cuts taken up were banked),
+and the meat of the 4 never found (deer gone down and bled out away from the shot) and a few cuts
+past the tour's sweep rotted or were eaten. Only item ids in the balance's "meat" rule ever lie on
+the ledger. A wounded deer that bleeds out unfound and feeds the wolves is as meant: the blood trail
+(764) is there to find it (the coordinator). Balance._gone prints "[balance] left lying in <area>
+at <cell>: <item id> <why>, put down by someone|nobody's": place ids, cells and item ids only, never
+who (the ledger keeps that). balance_test _test_meat: a hide and antlers taken up and put down again
+never count, and a day on, left and home are unchanged. Server only; protocol unchanged; no new
+class_name; no bullet.
 
 ## 763. Safe paths: each level's roads and tracks, for what keeps off them
 

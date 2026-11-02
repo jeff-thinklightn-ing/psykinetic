@@ -281,6 +281,9 @@ func eat(uid: int) -> bool:
 func _gone(uid: int, why: String) -> void:
 	var row: Dictionary = _lying[uid]
 	_lying.erase(uid)
+	# Place ids and kinds only, never who (release's rule): the ledger says who.
+	print("[balance] left lying in %s at %s: %s %s, %s" % [row["area"], row["cell"], _id(uid), why,
+		"put down by someone" if not str(row["by"]).is_empty() else "nobody's"])
 	if remove.is_valid():
 		remove.call(str(row["area"]), row["cell"], uid, why)
 	for fold: String in _quests:
