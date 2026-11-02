@@ -1882,6 +1882,25 @@ func _test_roof_damage() -> void:
 	World.towns_seen["roof_fixture/square"] = {"forge": {"state": Towns.BUILDING, "level": 0, "walls": true}}
 	World.open_roofs("roof_fixture")
 	_check(outline.all(func(key: Vector3i) -> bool: return zone.edges.get(key) == Terrain.Edge.WALL), "walls up: they stand again")
+	# 383 amended: the heat and light worked out again only on a change. A
+	# house's lamp (Towns.set_awake) sent the town again every time a
+	# resident went in or out, and the whole map's floor was shaded again.
+	var was := World.enter(zone)
+	var changes := {"n": 0}
+	var counted := func() -> void: changes["n"] += 1
+	World.fields_changed_signal.connect(counted)
+	World.open_roofs("roof_fixture")
+	World.open_roofs("roof_fixture")
+	var unchanged: int = changes["n"]
+	World.towns_seen["roof_fixture/square"] = {"forge": {"state": Towns.DAMAGED, "level": 1, "walls": true}}
+	World.open_roofs("roof_fixture")
+	var damaged: int = changes["n"]
+	World.towns_seen["roof_fixture/square"] = {"forge": {"state": Towns.BUILDING, "level": 0, "walls": true}}
+	World.open_roofs("roof_fixture")
+	World.fields_changed_signal.disconnect(counted)
+	World.enter(was)
+	_check(unchanged == 0 and damaged == 1 and changes["n"] == 2,
+		"383 amended: the town told again with nothing open or down changed leaves the fields be (%d); damaged, then mended, each works them out again (%d, %d)" % [unchanged, damaged, changes["n"]])
 	World._walls_down.erase("roof_fixture")
 	World.towns = towns
 	World.towns_seen.erase("roof_fixture/square")

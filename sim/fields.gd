@@ -342,15 +342,16 @@ func canopy_at(cell: Vector2i) -> float:
 ## Whether the weather reaches [param cell]: outdoors, not under a roof.
 ## The roofed cells open to the sky now: [param cells] (a damaged roof's,
 ## Level.broken_cells), the rest roofed again. Light and heat are worked out
-## again if any changed.
-func set_open(cells: Dictionary[Vector2i, bool]) -> void:
+## again if any changed; true then.
+func set_open(cells: Dictionary[Vector2i, bool]) -> bool:
 	var roofed := _roofed_whole.duplicate()
 	for cell in cells:
 		roofed.erase(cell)
 	if roofed == _roofed:
-		return
+		return false
 	_roofed = roofed
 	mark_dirty()
+	return true
 
 
 func under_sky(cell: Vector2i) -> bool:

@@ -1464,7 +1464,11 @@ func _fields_of(level: String) -> Fields:
 ## Opens to the sky what is broken over [param level]'s cells: its damaged
 ## roofs', and its damaged town buildings' (Towns, decision 297), a third
 ## of each (Level.broken_cells). On a damage or mend, a town's change, and
-## its terrain read.
+## its terrain read. The heat and light are worked out again only if what
+## is open or which walls are down changed: a town's change is most often a
+## house's lamp (Towns.set_awake, a resident going in or out), and the whole
+## map's floor shaded again for nothing was the wilds' 100-150 ms frame every
+## 20 s (383 amended).
 func open_roofs(level: String) -> void:
 	var fields_of := _fields_of(level)
 	if fields_of == null or fields_of.level != level:
@@ -1479,10 +1483,10 @@ func open_roofs(level: String) -> void:
 		if str(told.get(building["use"], {}).get("state", "")) == Towns.DAMAGED:
 			for cell in Level.broken_cells(building["rect"]):
 				open[cell] = true
-	fields_of.set_open(open)
-	if fields_of == fields:
+	var opened := fields_of.set_open(open)
+	var walls := _open_walls(level, fields_of)
+	if (opened or walls) and fields_of == fields:
 		fields_changed()
-	_open_walls(level, fields_of)
 
 
 ## A town's plot laid on loaded [param level] (591 step 2): its kind's
@@ -1548,7 +1552,7 @@ func unplot(level: String, rect: Rect2i) -> void:
 ## Towns, a client the "town" message's "walls" (World.towns_seen), so its
 ## prediction walks the same; with no word, the walls stand. On a town's
 ## change and its terrain read, beside open_roofs.
-func _open_walls(level: String, fields_of: Fields) -> void:
+func _open_walls(level: String, fields_of: Fields) -> bool:
 	var zone_of: Zone = zones.get(level)
 	var edges: Dictionary = _edges if fields_of == fields else (zone_of.edges if zone_of != null else {})
 	var down: Dictionary = _walls_down.get_or_add(level, {})
@@ -1571,7 +1575,7 @@ func _open_walls(level: String, fields_of: Fields) -> void:
 			edges.erase(key)
 			changed = true
 	if not changed:
-		return
+		return false
 	# The paths' step cache read the old edges.
 	if fields_of == fields:
 		_grid_rect = Rect2i()
@@ -1579,6 +1583,7 @@ func _open_walls(level: String, fields_of: Fields) -> void:
 	elif zone_of != null:
 		zone_of.grid_rect = Rect2i()
 		zone_of.grid_steps = PackedByteArray()
+	return true
 
 
 ## Works on [param to] from now on: its state swapped into World's fields,

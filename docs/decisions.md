@@ -8302,6 +8302,25 @@ beside its lore region (`"region"`, for environment's storms, which roll
 on every level with roofs, open or not). World reads a level that is not
 open from there (`WorldMap.build([level])`, its parse kept by its digest),
 so the two never disagree.
+
+383 amended (perf, 2026-11-01): `open_roofs` works the heat and light out
+again only when what is open or which walls are down changed
+(`Fields.set_open` and `World._open_walls` say whether they did). It
+called `fields_changed()` every time, and a town's change is most often a
+house's lamp: `Towns.set_awake`, a resident going in or out, sends the
+"town" message, and `open_roofs` ran on the server and again on the host's
+client. With the whole map marked dirty, the view's `_shade_floor` shaded
+every ground cell again at the end of the frame: the wilds' 100-150 ms
+frame every 20 s or so in map_bench (1.5 s and 21.5 s into its walk),
+with either camera. Found as 469 finds a slow tick: a frame split by
+stamps (process, the deferred calls, timers, the draw; the same on D3D12,
+Vulkan and the render on the main thread), then marks queued between
+World's and Main's parts, down to `_visible_work_tick`'s `_awake_tick`.
+After: the wilds' longest frame over the 30 s walk 18-21 ms (two runs;
+before 110-158 ms twice a run). view_test `_test_roof_damage`: the town
+told again with nothing changed leaves the fields be; damaged, then
+mended, each works them out again. Sim and client with the same code,
+protocol unchanged, no new class_name.
 ## 362. Seasons are a function of the world clock, like the hour and the weather
 
 Season (sim/season.gd) works the year out from World.steps alone. The
