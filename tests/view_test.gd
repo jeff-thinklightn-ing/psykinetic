@@ -2720,11 +2720,11 @@ func _test_turf_house() -> void:
 			for item: Array in plan[kind]:
 				if Client3D.SCATTER_INDOORS.has(kind):
 					continue
-				if _rig._building_at.get(item[0], -1) == _rig._buildings.find(house):
-					inside_tufts += 1
+				if (house["rect"] as Rect2i).has_point(item[0]):
+					inside_tufts += 1  # Its block and its bank's ring, inside its walls' art (734 amended (6)).
 				else:
 					outside_tufts += 1
-	_check(inside_tufts == 0 and outside_tufts > 0, "no tufts or flowers on its floor, its grass round it (%d inside, %d outside)" % [inside_tufts, outside_tufts])
+	_check(inside_tufts == 0 and outside_tufts > 0, "no tufts or flowers on its plot (its floor, its walls' ring), its grass round it (%d on it, %d round it)" % [inside_tufts, outside_tufts])
 	var parts := node.get_node_or_null("parts") as Node3D
 	var names := ["Hearth", "Bed", "Shelf"].filter(func(name: String) -> bool: return parts != null and parts.get_node_or_null(name) != null)
 	_check(names.size() == 3 and is_equal_approx((parts.get_node("Bed") as Node3D).rotation.y, PI / 2.0),

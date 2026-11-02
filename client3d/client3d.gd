@@ -2420,6 +2420,10 @@ const RUIN_SPILL_OUT := 0.35
 ## A ruin's wall edges (649): no post stands for them.
 var _ruin_edges: Dictionary[Vector3i, bool] = {}
 var _building_at: Dictionary[Vector2i, int] = {}
+## A banked building's whole plot (718: its bank and walls over the ring
+## round its block): no outdoor scatter there, as on a floor (734 amended
+## (6): tufts at the turf house's walls, inside their art).
+var _banked_plot: Dictionary[Vector2i, bool] = {}
 ## Where a body stands on a cell whose piece has a stand point (580 step 3:
 ## the throne's "stand", [x, y up, z] in the piece's frame, turned by its
 ## yaw): the offset from the cell's middle; a cell not in it, its middle.
@@ -5212,6 +5216,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_buildings.clear()
 	_home_labels.clear()
 	_building_at.clear()
+	_banked_plot.clear()
 	_stand_at.clear()
 	_roofs_off.clear()
 	_enclosed_dirty = true
@@ -6083,6 +6088,8 @@ func _add_buildings() -> void:
 				inside[cell] = true
 			_buildings[index]["inside"] = inside
 			_buildings[index]["outline"] = Level.building_outline(building)
+			for cell in Level.rect_cells(rect):
+				_banked_plot[cell] = true
 		if slot in Level.ART_WALLED:
 			_buildings[index]["hearth"] = hearth
 			_buildings[index]["quarters"] = BuildingComposer.quarters(node)
@@ -7950,8 +7957,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 				salt += 10
 				if not _outdoor and not SCATTER_INDOORS.has(kind) and _ground_kinds.get(cell, "") != "grass":
 					continue  # No live plants on a floor under stone.
-				if (_floor_sets.has(cell) or _building_at.has(cell)) and not SCATTER_INDOORS.has(kind):
-					continue  # Nor on any building's floor, outdoors too (734 amended (2) and (5): the chapel's tufts, Hob's hut's).
+				if (_floor_sets.has(cell) or _building_at.has(cell) or _banked_plot.has(cell)) and not SCATTER_INDOORS.has(kind):
+					continue  # Nor on any building's floor, outdoors too (734 amended (2), (5) and (6): the chapel's tufts, Hob's hut's).
 				var count := floori(offered[kind] + _roll(cell, 100 + salt))
 				for n in count:
 					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)

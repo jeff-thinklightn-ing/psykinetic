@@ -35836,6 +35836,12 @@ cell inside a building (_building_at: a slot building's inner cells, a kind's, a
 outdoors too. view_test _test_turf_house: none on its floor, its grass round it (2 before, 0 after).
 No CHANGELOG bullet of its own ((2)'s says no grass grows through any building's floor). Client
 only, protocol unchanged, no new class_name.
+734 amended (6), a banked building's whole plot (the after still of (5)): a turf house's inside
+cells are its block, but its art walls stand round it over the bank's ring, so tufts on the ring's
+cells still showed inside the walls. Client3D._banked_plot holds every cell of a banked (718)
+building's plot, and _scatter_plan gives it only the indoor scatter, as a floor (the bank's mesh
+covers the ring; the approach, outside the plot, keeps its grass). view_test _test_turf_house counts
+the whole plot. Client only, protocol unchanged, no new class_name.
 
 ## 733. A healer's hut decays empty and its healer mends it
 
