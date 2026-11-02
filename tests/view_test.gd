@@ -157,6 +157,7 @@ func _ready() -> void:
 		await _test_kept_fields()
 		await _test_indoor_phased_build()
 		await _test_creature_puppets()
+		await _test_creature_down()
 		_test_piles()
 		_test_heard_as_monsters_hear()
 		_test_ambience_runs()
@@ -9322,6 +9323,89 @@ func _test_creature_puppets() -> void:
 	_check(not rig.striking(), "a wind-up given up stops it")
 	_check(view.die() > 0.0 and rig.playing() == view.clips["death"], "dying plays its death")
 	World.despawn(boar)
+	await _frames(2)
+
+
+## A deer down (764, pc-character's side; enemy-ai's Monster.Pose.DOWN): lain on its belly over
+## its idle (creature_life.gd: the legs folded under, the body lowered to the ground, the neck
+## up), eased down and up; no flinch lying; killed lying it unfolds as its death plays; first seen
+## down it lies at once. The stag, boar and rabbit fold by the same table.
+func _test_creature_down() -> void:
+	print("
+== a deer down lies on its belly, alive (764, pc-character's side) ==")
+	_check(Monster.Pose.DOWN == 2, "Monster.Pose.DOWN is 2, as enemy-ai's 764 amended sends it (%d)" % Monster.Pose.DOWN)
+	for kind: String in ["stag", "boar", "rabbit", "deer"]:
+		var animal := _spawn_imp(Vector2i(9, 4), kind)
+		await _frames(2)
+		_rig._process(0.0)
+		var puppet: Node3D = _rig._puppets.get(animal.get_instance_id())
+		var view := puppet.get_meta("creature_view", null) as CreatureView if puppet != null else null
+		if view == null or view.rig == null or view._life == null:
+			_check(false, "a %s drawn by its CreatureView with a life on its skeleton" % kind)
+			World.despawn(animal)
+			continue
+		var life := view._life
+		var skeleton := life.get_skeleton()
+		var fronts := life.legs.filter(func(leg: Dictionary) -> bool: return leg["front"]).size()
+		var height := ArtKit.size("creature." + kind).y
+		_check(life.legs.size() == 4 and fronts == 2 and not life.necks.is_empty() and life.drop.length() > 0.0,
+				"%s: four legs (two front), a neck, lowered lying (%d legs, %d front, %d necks, root %s)" % [
+					kind, life.legs.size(), fronts, life.necks.size(), skeleton.get_bone_name(life.root)])
+		# The folded pose, measured: the trunk's underside on the ground, each lower leg along it,
+		# the neck up.
+		var meshes := skeleton.find_children("*", "MeshInstance3D", false, false)
+		var to_art := life.to_art
+		skeleton.reset_bone_poses()
+		var standing := life._lowest(skeleton, meshes[0], to_art)
+		life.lie(skeleton, 1.0, -1000.0)
+		var lying := life._lowest(skeleton, meshes[0], to_art, life.trunk_skip(skeleton)) - life.TRUNK_CLEAR
+		var flat := true
+		for leg: Dictionary in life.legs:
+			flat = flat and absf(skeleton.get_bone_global_pose(leg["bones"][-1]).basis.y.normalized().dot(life.up)) < 0.45
+		var neck_up := skeleton.get_bone_global_pose(life.necks[0]).basis.y.normalized().dot(life.up)
+		skeleton.reset_bone_poses()
+		_check(absf(lying - standing) < 0.03 * height + 0.01 and flat and neck_up > 0.6,
+				"%s lying: its trunk's underside on the ground (standing's lowest %.3f, the trunk's lying %.3f), each lower leg along the ground, the neck up (%.2f)" % [
+					kind, standing, lying, neck_up])
+		if kind != "deer":
+			World.despawn(animal)
+			await _frames(2)
+			continue
+		var rig := view.rig
+		view.frame(puppet, animal)
+		_check(rig.playing() == view.clips["idle"] and life.weight == 0.0, "standing: idle, not lying")
+		animal.pose = Monster.Pose.DOWN
+		view.frame(puppet, animal)
+		_check(rig.base_clip() == view.clips["idle"] and life.weight < 0.05, "down: lying down begun over its idle (%.2f)" % life.weight)
+		var tipped := (puppet.get_node("Body/Pose") as Node3D).transform
+		view.hit()
+		_check((puppet.get_node("Body/Pose") as Node3D).transform.is_equal_approx(tipped) and not rig.busy(), "a blow lying: no flinch, no hit clip")
+		view._down_ms -= int(CreatureView.DOWN_SECONDS * 1000.0) + 50
+		view.frame(puppet, animal)
+		_check(is_equal_approx(life.weight, 1.0), "lain after %.1f s" % CreatureView.DOWN_SECONDS)
+		animal.pose = Monster.Pose.STAND
+		view.frame(puppet, animal)
+		_check(life.weight > 0.95, "up again: getting up from lying (%.2f)" % life.weight)
+		view._down_ms -= int(CreatureView.UP_SECONDS * 1000.0) + 50
+		view.frame(puppet, animal)
+		_check(life.weight == 0.0 and rig.playing() == view.clips["idle"], "stood after %.1f s: idle" % CreatureView.UP_SECONDS)
+		animal.pose = Monster.Pose.DOWN
+		view.frame(puppet, animal)
+		view._down_ms -= 5000
+		view.frame(puppet, animal)
+		_check(view.die() > 0.0 and rig.playing() == view.clips["death"] and life.weight > 0.9, "killed lying: its death plays as it unfolds")
+		await get_tree().create_timer(CreatureView.DIE_UNFOLD_SECONDS + 0.1).timeout
+		_check(life.weight == 0.0, "dead: unfolded, still")
+		World.despawn(animal)
+		await _frames(2)
+	var seen_down := _spawn_imp(Vector2i(9, 4), "deer")
+	seen_down.pose = Monster.Pose.DOWN
+	await _frames(2)
+	_rig._process(0.0)
+	var seen: Node3D = _rig._puppets.get(seen_down.get_instance_id())
+	var seen_view := seen.get_meta("creature_view", null) as CreatureView if seen != null else null
+	_check(seen_view != null and is_equal_approx(seen_view._life.weight, 1.0), "first seen down: lying at once")
+	World.despawn(seen_down)
 	await _frames(2)
 
 

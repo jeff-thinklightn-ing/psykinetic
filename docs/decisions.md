@@ -38681,3 +38681,33 @@ every 2 s while one fades; otherwise drawn only when a mark comes or goes. view_
 (specks on the cell's ground, none on water, redder and bigger on dirt, half seen half way through its fade, gone when told,
 another level's kept undrawn, one past its time dropped). Client only; protocol unchanged; no new
 class_name; no bullet (764 amended's names the trail).
+764 amended (2) (release's label; pc-character's side of phase 2, after enemy-ai's "764
+amended"): a deer down drawn lying on its belly, alive. Phase 2 sets a deer hurt past its sprint to
+Monster.Pose.DOWN (2) while it lies, to be finished; CreatureView draws it (the animal puppets
+are pc-character's, 359/390). A pose, not a flag: DOWN shuts out SIT (the graze) and rides the
+pose already replicated. The coordinator's ruling on the look (after a first sheet with the death
+clip held, which read dead): a wounded animal down lies on its belly, legs folded under, chest up,
+head up on its neck, now and then lowering it; only the dead lie flat on their side.
+
+- **The pose, made on the rig:** no animal art has a lying clip, so client3d/creature_life.gd (a
+  SkeletonModifier3D on the art's skeleton; no class_name, CreatureView preloads it) folds it over
+  the idle that keeps playing. Every bone is aimed in the body's own directions (its forward from
+  the root to the head, the art's up, its side), found from the rest, so one table serves every
+  four-legged rig: a front leg's lower bone back under the chest, the one above forward and down;
+  a hind leg's lower bone forward under the belly, the shank back along the ground, the thigh
+  forward and down; each splayed a little outward. The neck aimed up and forward. Where a hoof
+  hangs in a branch off the rig's root (the deer and stag's IK bones, FF/FFB) the branch is
+  carried with the leg's last bone as it sat at rest. The root lowered till the trunk's underside
+  (the skinned points whose main bone is not a leg's, a hoof's, the neck's or the tail's, nor off
+  the root) is 2 cm off the ground, measured once per mesh folded (the deer 0.54 m).
+- **Alive over it:** a breath every 1.4 s swells the flank (the middle chest bone scaled up to 6%
+  along the up); the head lowered for 2.4 s every 3 to 7 s; an ear flicked every 1.2 to 3.5 s.
+- **Down and up:** lain down over DOWN_SECONDS (0.8), got up over UP_SECONDS (0.7), the fold's
+  weight eased; first seen down (joining, coming into view) it lies at once.
+- **A blow lying:** no flinch or hit clip. **Killed lying:** its death clip plays as the fold
+  eases off over 0.35 s, so it rolls onto its side and is still.
+
+The deer, stag, boar and rabbit all fold (view_test _test_creature_down: four legs, two front, a
+neck, the trunk on the ground, each lower leg along it, the neck up; the deer's down, up, blow,
+death and first sight). Stills C:/dev/review/deer764/deer_down.png. Client only; DOWN's value is
+enemy-ai's wire change (rev 45), and without it this side draws nothing new. No new class_name.

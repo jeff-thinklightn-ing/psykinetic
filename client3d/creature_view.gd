@@ -48,6 +48,14 @@ const FALLBACKS := {"graze": "idle", "feed": "graze", "trot": "walk", "charge": 
 	"howl": "idle", "sit": "idle", "lie": "idle"}
 ## The slot clips that loop; the rest (attack, hit, death) play once.
 const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze", "feed", "alert", "howl", "sit", "lie"]
+## Monster.Pose.DOWN (enemy-ai's 764: a deer hurt past its sprint, lying a while, to be
+## finished): drawn lying on its belly, alive (creature_life.gd, over its idle), lain down over
+## DOWN_SECONDS, got up over UP_SECONDS; first seen down it lies at once; dying it unfolds over
+## DIE_UNFOLD_SECONDS as its death plays, to lie on its side as the dead do.
+const DOWN_SECONDS := 0.8
+const UP_SECONDS := 0.7
+const DIE_UNFOLD_SECONDS := 0.35
+const Life := preload("res://client3d/creature_life.gd")
 ## Played with the head up when it stands in for these.
 const HEAD_UP_FOR: Array[String] = ["alert", "howl"]
 
@@ -68,6 +76,10 @@ var _head_up := false
 var _last_at := Vector3.INF
 var _last_ms := 0
 var _speed := 0.0
+var _down := false
+var _down_ms := 0  # When it went down (or got up): the fall's, the rise's start.
+var _framed := false  # Drawn once: a body first seen down lies at once.
+var _life: Life
 
 
 ## For [param art] (an instance of [param creature_slot]) under
@@ -105,6 +117,12 @@ func _init(creature_slot: String, art: Node3D, pose: Node3D) -> void:
 	var idle := resolve("idle")
 	if idle != "":
 		rig.loop(idle)
+	var skeletons := art.find_children("*", "Skeleton3D", true, false)
+	if not skeletons.is_empty():
+		_life = Life.new()
+		_life.name = "Life"
+		(skeletons[0] as Skeleton3D).add_child(_life)
+		_life.setup(skeletons[0] as Skeleton3D, art, rng.seed)
 
 
 ## Each slot clip (the manifest's "clips": {name, names}) to the first of
@@ -151,6 +169,8 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		_speed = lerpf(_speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
 	_last_at = puppet.position
 	_last_ms = now
+	if _lying(monster, now):
+		return
 	if now < _busy_until:
 		return
 	var alert := monster.alert if monster != null else Monster.Alert.IDLE
@@ -170,6 +190,27 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		clip = "alert"
 	_set_head_up(clip in HEAD_UP_FOR and not clips.has(clip))
 	_loop(clip, scale)
+
+
+## Whether [param monster] is drawn down (Pose DOWN) or still getting up this frame: on its
+## pose's change it lies down or gets up (the life's weight eased), its idle under it.
+func _lying(monster: Monster, now: int) -> bool:
+	if _life == null or _life.root < 0:
+		return false
+	var down := monster != null and monster.pose == Monster.Pose.DOWN
+	var first := not _framed
+	_framed = true
+	if down != _down:
+		_down = down
+		_down_ms = now - (int(DOWN_SECONDS * 1000.0) if down and first else 0)
+		rig.cancel_strike()
+		_busy_until = 0
+		_set_head_up(false)
+		_loop("idle", 1.0)
+	var t := float(now - _down_ms) / 1000.0
+	var amount := clampf(t / DOWN_SECONDS, 0.0, 1.0) if _down else 1.0 - clampf(t / UP_SECONDS, 0.0, 1.0)
+	_life.weight = smoothstep(0.0, 1.0, amount)
+	return amount > 0.0
 
 
 ## Plays [param clip] (a slot clip, through its fallbacks) looping at
@@ -243,9 +284,10 @@ func bolt() -> void:
 	_bolt_until = Time.get_ticks_msec() + int(BOLT_SECONDS * 1000.0)
 
 
-## A blow taken: its hit clip, else a flinch (tipped and pushed back).
+## A blow taken: its hit clip, else a flinch (tipped and pushed back); none lying down (it
+## would half stand).
 func hit() -> void:
-	if _dead:
+	if _dead or _down or (_life != null and _life.weight > 0.0):
 		return
 	if clips.has("hit"):
 		# Not under a blow (it would play unseen, then show held as the blow
@@ -268,6 +310,10 @@ func hit() -> void:
 func die() -> float:
 	if rig == null or resolve("death") == "":
 		return 0.0
+	if _life != null and _life.weight > 0.0:
+		# Killed lying: it unfolds as its death plays, to lie on its side, still.
+		create_tween().tween_property(_life, "weight", 0.0, DIE_UNFOLD_SECONDS)
+	_down = false
 	rig.cancel_strike()
 	var seconds := rig.once(resolve("death"))
 	_dead = true
