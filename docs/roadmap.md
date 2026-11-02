@@ -199,6 +199,8 @@ Jeff: "keeping it on the radar before we get too deep. i had this really interes
   worked off as town labour), pays official jobs only (guards, haulers) and town-ordered
   work; makers earn from what they sell. Gold is personal; rent (1 a day) and upkeep are
   the sinks; gold is never created, only moved.
+- **Safe paths, things to do near them** (Jeff, 2026-11-01: "zones need to have safe paths with activities not too far off the paths"): each land has safe paths (its road and side paths, kept clear of dens, camps and the night's dangers), and every place worth going to (a den, a ruin, a farm, a camp, a refuge) sits a short walk off a path, never deep in a trackless middle; the thick wild between paths stays.
+- **Things happen for a reason** (Jeff, 2026-11-01, the balance quest, `C:/dev/review/decisions/keep-the-balance.md`): danger in the land comes from causes a player can read and change (meat left lying draws wolves, an unheld road is robbed), not spawn timers; a quest can fail critically through a sloppy job; a threat in town sends vendors indoors and shuts their shops until it is cleared.
 - **The long game is the world**, not the character: town grows with rescued people, enemies hold and retake ground, companions remember.
 - **Companion prompts say what's true and what to do, never what to say.**
 - **Licensing:** no assets with non-commercial or regional restrictions; record every third-party asset/tool/model in `THIRD_PARTY.md` with a `source` per asset.
