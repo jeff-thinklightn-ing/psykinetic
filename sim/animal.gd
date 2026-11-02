@@ -157,6 +157,8 @@ var _wary_until := -1
 var _down_until := -1
 var _startle_until := -1
 var _bled_tick := -1
+## The last cell it bled on (World.mark_blood), NO_TILE for none.
+var _blood_at := NO_TILE
 
 
 func _ready() -> void:
@@ -618,6 +620,9 @@ func wounded() -> bool:
 ## Wounded under half, prey bleeds a little now and then, never to death
 ## (764): left to run, it tires on.
 func _bleed() -> void:
+	if role == Role.PREY and wounded() and tile != _blood_at:
+		_blood_at = tile
+		World.mark_blood(tile)  # Its trail (764): terrain draws it.
 	if role != Role.PREY or not wounded() or hp <= 1:
 		_bled_tick = World.tick
 		return

@@ -4443,6 +4443,10 @@ func _test_deer_hunted() -> void:
 		World.step()
 	_check(doe.alert == Monster.Alert.FLEEING and is_equal_approx(doe.move_ticks, pace * Animal.WOUNDED_TROT),
 			"wounded, after her burst she trots slower (%.2f a cell)" % doe.move_ticks)
+	var trail := World.blood_cells(World.fields.level)
+	var fresh := trail.size() >= 3 and trail[2] > 200 and trail[2] <= int(ceil(World.BLOOD_DAYS * DayNight.day_steps / World.TICK_RATE))
+	_check(trail.size() / 3 >= 5 and fresh, "and leaves a trail of blood behind her (%d cells, %d s left on one)" % [trail.size() / 3, trail[2] if trail.size() >= 3 else -1])
+	World.blood.clear()
 	# Bleeding, never to death.
 	pair = setup.call(6, Vector2i(30, 3), Vector2i(2, 1))
 	doe = pair[0]

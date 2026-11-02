@@ -637,6 +637,15 @@ var _cover_rect := Rect2i()
 ## in its zone ("grass"). _trampled_here is this zone's level's.
 var trampled: Dictionary[String, Dictionary] = {}
 var _trampled_here: Dictionary = {}
+## Blood on the ground (decision 764): level -> {cell: the world step it
+## fades}, left by wounded game (Animal), outdoors only, BLOOD_DAYS each.
+## Saved in the snapshot; the server's, told to the clients in its zone
+## ("blood": terrain draws it).
+var blood: Dictionary[String, Dictionary] = {}
+const BLOOD_DAYS := 1.0 / 24.0
+## Blood of [param level] marked ([param add]: [x, y, seconds left, ...]) or
+## faded ([param gone]: [x, y, ...]).
+signal blood_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array)
 ## Tall grass of [param level] was trampled ([param flat]) or stood again
 ## ([param stood]), flat [x, y, ...]; on a client, also after a full
 ## "grass" message (both empty): terrain redraws the trodden path.
@@ -1066,6 +1075,7 @@ func world_tick(slice := -1) -> void:
 		t = part("clearing", t)
 	if slice <= 0:
 		_regrow()  # Trampled tall grass stands again (decision 508).
+		_fade_blood()  # Blood on the ground fades (764).
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())
@@ -9469,6 +9479,70 @@ func _regrow() -> void:
 				stood.append_array([cell.x, cell.y])
 		if not stood.is_empty():
 			grass_changed.emit(level, PackedInt32Array(), stood)
+
+
+## Blood on [param cell] of the level World is in (decision 764; outdoors
+## only): it fades BLOOD_DAYS on; marked again, its time starts over.
+func mark_blood(cell: Vector2i) -> void:
+	if not fields.outdoor:
+		return
+	if not blood.has(fields.level):
+		blood[fields.level] = {}
+	var until := steps + int(BLOOD_DAYS * maxi(DayNight.day_steps, 1))
+	blood[fields.level][cell] = until
+	blood_changed.emit(fields.level, PackedInt32Array([cell.x, cell.y, _blood_left(until)]), PackedInt32Array())
+
+
+## The whole seconds before a mark fading at step [param until] goes.
+func _blood_left(until: int) -> int:
+	return maxi(0, ceili(float(until - steps) / TICK_RATE))
+
+
+## The world tick's: blood whose time has come is gone, in every level.
+func _fade_blood() -> void:
+	for level: String in blood:
+		var cells: Dictionary = blood[level]
+		var gone := PackedInt32Array()
+		for cell: Vector2i in cells.keys():
+			if int(cells[cell]) <= steps:
+				cells.erase(cell)
+				gone.append_array([cell.x, cell.y])
+		if not gone.is_empty():
+			blood_changed.emit(level, PackedInt32Array(), gone)
+
+
+## [param level]'s blood, [x, y, seconds left, ...] (the "blood" message).
+func blood_cells(level: String) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var cells: Dictionary = blood.get(level, {})
+	for cell: Vector2i in cells:
+		if int(cells[cell]) > steps:
+			out.append_array([cell.x, cell.y, _blood_left(int(cells[cell]))])
+	return out
+
+
+## The snapshot's: level -> [x, y, the step it fades, ...].
+func blood_to_dict() -> Dictionary:
+	var out := {}
+	for level: String in blood:
+		var flat: Array = []
+		for cell: Vector2i in blood[level]:
+			flat.append_array([cell.x, cell.y, int(blood[level][cell])])
+		if not flat.is_empty():
+			out[level] = flat
+	return out
+
+
+func blood_from_dict(data: Dictionary) -> void:
+	blood.clear()
+	for level: Variant in data:
+		var flat: Variant = data[level]
+		if not flat is Array:
+			continue
+		var cells := {}
+		for i in range(0, (flat as Array).size() - 2, 3):
+			cells[Vector2i(int(flat[i]), int(flat[i + 1]))] = int(flat[i + 2])
+		blood[str(level)] = cells
 
 
 ## [param level]'s trampled cells, flat [x, y, ...] (the "grass" message).
