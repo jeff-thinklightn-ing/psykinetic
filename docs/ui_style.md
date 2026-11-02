@@ -35,7 +35,7 @@ Licence 1.1; `art/fonts/`, recorded in THIRD_PARTY.md):
 | **Alegreya** (serif) | titles, headings, names (people, places, named things), speech bubbles, the map's labels: what the world says |
 | **Alegreya Sans** | everything else: body text, control labels, hints, the HUD line, chat, numbers |
 
-Why: a calligraphic serif reads at small sizes, suits the saga tone (grim, fated, loyal)
+Why: a calligraphic serif reads at small sizes, suits the game's tone (grim, fated, loyal)
 without looking like a scroll, and its angular strokes sit with the faceted art; its
 matched sans keeps the controls plain. Bold for a name that must be found (the compass's N,
 a speaker), never for whole sentences. No italics, no small caps, no third face.

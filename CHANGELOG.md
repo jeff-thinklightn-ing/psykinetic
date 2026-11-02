@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The fallen knight can be talked to after his quest: his window shows his last words with a Farewell button (747 amended (5), ui's side).
 ## v0.1.198
 
 - Deer can be hunted on foot: a deer sprints then slows to a trot, a wounded one tires and bleeds until it goes down, and creeping up slowly from behind (your companion creeps with you) lets you reach it and fell it with one blow; a hit deer runs far, and a herd that sees one killed stays wary and moves off (764).

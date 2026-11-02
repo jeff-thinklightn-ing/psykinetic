@@ -977,6 +977,18 @@ func _test_deal_window() -> void:
 	_check(DealPanel.is_quest(ask) and quest_buttons.size() == 1 and (quest_buttons[0] as Button).text == AstralKnight.ASK_TITLE
 			and not quest_buttons[0].disabled and not panel._purse.visible and not panel._strike.visible and sent == [["quest:9:ask", 0]],
 		"the fallen knight's ask: one button, its title, no gold and no strike line, sending gold 0 (%s)" % [sent])
+	# 747 amended (5), ui's side: the fallen knight once his quest is done, words only.
+	var done := {"id": "quest:9:done", "kind": "deal", "title": "", "words": AstralKnight.DONE,
+		"what": {"level": "quest", "steps": []}, "accept": DealPanel.WORDS_ONLY, "cost": 0}
+	sent.clear()
+	panel.show_deals("the fallen knight", [done], 0, 7)
+	var done_buttons := panel._buttons.get_children()
+	_check(panel.visible and panel._title.text == "the fallen knight" and panel._words.text == AstralKnight.DONE
+			and done_buttons.size() == 1 and (done_buttons[0] as Button).text == DealPanel.FAREWELL_WORDS
+			and not panel._purse.visible and not panel._strike.visible,
+		"his quest done: his words in his name, one Farewell, no purse or strike line")
+	(done_buttons[0] as Button).pressed.emit()
+	_check(not panel.visible and panel.entity_id == 0 and sent.is_empty(), "Farewell closes the window and sends nothing (%s)" % [sent])
 	panel.show_deals("the draugr", [again[0], no], 0, 0)
 	_check(panel._purse.visible and panel._strike.visible, "the draugr again: the purse and strike lines back")
 	panel.show_deals("the draugr", [], 20, 0)

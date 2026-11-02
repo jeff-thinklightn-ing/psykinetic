@@ -36898,6 +36898,17 @@ override (747 amended (4)) closes the source for other askers; this skip also
 covers the seated draugr. Server only, protocol
 unchanged, no new class_name.
 
+747 amended (5), ui's side: the fallen knight's window once his quest is done (Jeff: "fallen
+knight was not interactable"; show_deals closed on his empty offers). Dungeon's greet then sends
+one offer, quest:<id>:done, title "", his DONE words, what {level quest, steps []}, accept "none".
+DealPanel.WORDS_ONLY ("none"): first_deal skips such an offer (its cost 0 would give it the one
+step 0, an empty-titled button; dungeon's catch), and show_deals, with no deal and no refusal,
+shows the first words-only offer: his words in his name and one button, FAREWELL_WORDS
+("Farewell", voice's word), that closes the window here and sends nothing; no purse or strike
+line. Landed before dungeon's side, so a client that draws "none" is out before any server sends
+it. ui_test _test_deal_window. Client only, protocol unchanged (dungeon's side takes rev 45), no
+new class_name.
+
 ## 742 amended: the camp chest locked, Brand's key, once per player
 
 Jeff: "and the chest only opens with a key from the boss and only hold gold

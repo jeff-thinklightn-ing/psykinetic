@@ -31,6 +31,11 @@ extends PanelContainer
 ## sending its id with that cost; the purse line names the cheapest when
 ## short, and there is no strike line. Before this, no client path took
 ## a resident's wares at all (typed words skip visitors).
+## Words only (747 amended (5), ui's side: the fallen knight once his quest is
+## done; Jeff: "fallen knight was not interactable"): an offer whose accept is
+## WORDS_ONLY ("none"), shown when he offers no deal and no refusal, is his
+## words in his name and one button, FAREWELL_WORDS, that closes the window
+## here and sends nothing; no purse line and no strike line.
 
 ## A button pressed: the deal's id and the gold it offers.
 signal offered(id: String, gold: int)
@@ -42,6 +47,10 @@ const AGAIN_WORDS := "Face him again"
 const NO_WORDS := "Refuse"
 ## How to strike a talking monster, under his deals.
 const STRIKE_WORDS := "Shift+click: strike"
+## A words-only offer's accept (747 amended (5)): nothing to take.
+const WORDS_ONLY := "none"
+## A words-only window's one button (voice's word): it closes, sending nothing.
+const FAREWELL_WORDS := "Farewell"
 
 ## The talking monster shown (his instance id), 0 for none.
 var entity_id := 0
@@ -105,6 +114,8 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 		deal = refuse
 		refuse = {}
 	if deal.is_empty():
+		deal = words_only(offers)
+	if deal.is_empty():
 		close()
 		return
 	entity_id = id
@@ -113,7 +124,7 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 	for child in _buttons.get_children():
 		_buttons.remove_child(child)
 		child.queue_free()
-	for step in steps_of(deal):
+	for step in [] if is_words_only(deal) else steps_of(deal):  # Words only: Farewell alone.
 		var button := Button.new()
 		if is_quest(deal):
 			button.text = str(deal.get("title", AGAIN_WORDS))
@@ -122,6 +133,12 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 		button.focus_mode = Control.FOCUS_NONE
 		button.pressed.connect(_pressed.bind(str(deal.get("id", "")), step))
 		_buttons.add_child(button)
+	if is_words_only(deal):
+		var farewell := Button.new()
+		farewell.text = FAREWELL_WORDS
+		farewell.focus_mode = Control.FOCUS_NONE
+		farewell.pressed.connect(close)  # Here only: nothing is sent.
+		_buttons.add_child(farewell)
 	if not refuse.is_empty():
 		var button := Button.new()
 		button.text = NO_WORDS
@@ -129,9 +146,9 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 		button.pressed.connect(_pressed.bind(str(refuse.get("id", "")), 0))
 		_buttons.add_child(button)
 	set_purse(gold)
-	# A quest's step (747) asks no gold, and he cannot be struck.
-	_purse.visible = not is_quest(deal)
-	_strike.visible = not is_quest(deal)
+	# A quest's step (747) and words only ask no gold, and he cannot be struck.
+	_purse.visible = not is_quest(deal) and not is_words_only(deal)
+	_strike.visible = not is_quest(deal) and not is_words_only(deal)
 	_words.visible = true
 	visible = true
 
@@ -199,11 +216,11 @@ func _pressed(id: String, gold: int) -> void:
 	offered.emit(id, gold)
 
 
-## The first of [param offers] that is a deal with steps and not his
-## refusal, else {}.
+## The first of [param offers] that is a deal with steps and neither his
+## refusal nor words only (a cost-0 offer has the one step 0), else {}.
 static func first_deal(offers: Array) -> Dictionary:
 	for each: Variant in offers:
-		if each is Dictionary and not is_no(each) and not steps_of(each).is_empty():
+		if each is Dictionary and not is_no(each) and not is_words_only(each) and not steps_of(each).is_empty():
 			return each
 	return {}
 
@@ -214,6 +231,19 @@ static func no_deal(offers: Array) -> Dictionary:
 		if each is Dictionary and is_no(each):
 			return each
 	return {}
+
+
+## The first of [param offers] that is words only (is_words_only), else {}.
+static func words_only(offers: Array) -> Dictionary:
+	for each: Variant in offers:
+		if each is Dictionary and is_words_only(each):
+			return each
+	return {}
+
+
+## Whether [param deal] is words only: its accept WORDS_ONLY (747 amended (5)).
+static func is_words_only(deal: Dictionary) -> bool:
+	return str(deal.get("accept", "")) == WORDS_ONLY
 
 
 ## Whether [param deal] is his refusal: its id ends ":refuse".
