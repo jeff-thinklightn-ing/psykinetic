@@ -109,6 +109,7 @@ extends Node
 ##   --test-hold=<tick>,<n>       server: the sim waits at that tick until n peers have ordered (20 s at most)
 ##   --test-die-travel=<t>,<zone> server: at tick t the first player dies and is brought back in zone, in one frame (the at-once return, 587)
 ##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
+##   --test-temple-day            server, tests only (with --run-marker): today is everyone's temple day (404 amended; playtest's tours)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
 ##   --menu                       start at the main menu, as an exported client does (for screenshots)
@@ -584,6 +585,10 @@ var builders: PackedStringArray = []
 ## player; empty, none. Logged as a count only, never an id.
 var admins: PackedStringArray = []
 var builder_stub := false
+## --test-temple-day (404 amended): today everyone's temple day, for
+## playtest's tours; honoured only beside --run-marker (Main._test_temple_day),
+## else one ERROR and ignored, so a stray flag on the box is loud.
+var test_temple_day := false
 ## The lawspeaker (decision 448), server only: --lawspeaker=<haiku|sonnet|opus|off>
 ## (or PSYKINETIC_LAWSPEAKER) turns his daily rulings on through the Claude
 ## API (ANTHROPIC_API_KEY, as the builder); off by default, and the box stays
@@ -2067,6 +2072,8 @@ func _parse_args() -> void:
 				world_map = true
 			"--builder-stub":
 				builder_stub = true
+			"--test-temple-day":
+				test_temple_day = true
 			"--lawspeaker-players":
 				lawspeaker_players = true
 			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \

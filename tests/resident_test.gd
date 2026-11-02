@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_bodies_in_town()
 	_test_healer_at_hut()
 	_test_healer_age()
+	_test_temple_day_flag()
 	_test_herder()
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
@@ -769,6 +770,25 @@ func _test_healer_age() -> void:
 	World.holdings._holder.erase(HUT)
 	World.holdings._strength.erase(HUT)
 	World.holdings._since.erase(HUT)
+
+
+## --test-temple-day (404 amended): today everyone's temple day at its
+## hour, off again after; Main honours it only beside --run-marker.
+func _test_temple_day_flag() -> void:
+	print("\n== --test-temple-day: today is everyone's temple day, tests only (404 amended) ==")
+	var temple: Dictionary = Townsfolk.days().get("temple", {})
+	var hour := float(temple.get("from", 9)) + 0.25
+	var every := int(temple.get("every_days", 0))
+	var ids := ["rs-a", "rs-b", "rs-c", "rs-d", "rs-e", "rs-f", "rs-g", "rs-h", "rs-i", "rs-j"]
+	var at := func() -> Array: return ids.map(func(id: String) -> String: return Townsfolk.whereabouts("cook", hour + Townsfolk.offset_of(id), "", "", id, 3))
+	var before: Array = at.call()
+	Townsfolk.test_temple_day = true
+	var all: Array = at.call()
+	Townsfolk.test_temple_day = false
+	_check(every <= 1 or before.count("temple") < ids.size(), "(not everyone's temple day by the clock: %s)" % [before])
+	_check(all.all(func(where: String) -> bool: return where == "temple"), "the flag: everyone at the temple at its hour (%s)" % [all])
+	_check(at.call() == before, "off again: as the clock has it")
+	_check(not Net.test_temple_day and not Townsfolk.test_temple_day, "(no flag on this run's command line: nothing honoured)")
 
 
 ## The hill herder (640, npc's side): a body at his fold by day and his hut

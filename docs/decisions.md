@@ -10139,6 +10139,21 @@ rain for the building; a slot match is enough); shifting whole stints by
 the season (gaps and overlaps at the seams; edges shift by their hour
 instead); the priest or the medicine man as Towns residents (economy seats
 them; the sync reads the record's town either way).
+
+404 amended (release's label; the coordinator, for playtest's tours: a
+person's temple day comes once in temple.every_days, by their id, so a tour
+can't wait for one): a test-only server flag, --test-temple-day (Net), makes
+today everyone's temple day (Townsfolk.test_temple_day, read by
+whereabouts; the hour is as ever). Main._test_temple_day honours it only
+when --run-marker is on the command line, as 199 amended guards the shared
+overlay. Without the marker it says one ERROR and is ignored, so a stray
+flag on the box is loud rather than silent. Chosen over a console "day"
+command, which would move World.steps on a live server. server_boot_test
+boots the box's command line with the flag and passes only if it is
+refused with its ERROR and never honoured. resident_test
+_test_temple_day_flag: everyone at the temple at its hour with it, as the
+clock has it without. Server only, protocol unchanged. No CHANGELOG bullet
+(release).
 ## 410. A hungry camp raids sooner, and for food
 
 Jeff's raids are "food and people only" and "real raiders on the world

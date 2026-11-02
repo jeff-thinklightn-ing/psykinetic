@@ -74,7 +74,7 @@ started=$(date +%s)
 # by --test-exit-after.
 STOP="$DIR/stop"
 APPDATA="$(cygpath -w "$DIR/appdata")" timeout 180 "$BIN/server.console.exe" --headless --server --bind=127.0.0.1 "--port=$PORT" "--admin-port=$ADMIN" \
-	"--status-port=$STATUS" "--state=$(cygpath -w "$DIR/world.json")" --token=boottest "--test-exit-on=$(cygpath -w "$STOP")" --test-exit-after=150 \
+	"--status-port=$STATUS" "--state=$(cygpath -w "$DIR/world.json")" --token=boottest "--test-exit-on=$(cygpath -w "$STOP")" --test-exit-after=150 --test-temple-day \
 	</dev/null >"$DIR/server.log" 2>&1 &
 server=$!
 for _ in $(seq 1 480); do
@@ -103,7 +103,12 @@ echo "PASS  a client joined it"
 grep -q "127.0.0.1:$PORT" "$DIR/bound.txt" || fail "the server's UDP $PORT was not seen on 127.0.0.1 ($(tr -s ' ' <"$DIR/bound.txt" | head -2))"
 grep -q "0.0.0.0:\($PORT\|$STATUS\)\|\*:\($PORT\|$STATUS\)\|\[::\]:\($PORT\|$STATUS\)" "$DIR/bound.txt" && fail "the server listens on every address on UDP $PORT or $STATUS, not 127.0.0.1 alone"
 echo "PASS  it listened on 127.0.0.1 alone"
-errors="$(grep -h -E "SCRIPT ERROR|^ERROR:" "$DIR/export.log" "$DIR/server.log")"
+# A test-only flag on the box's command line (no --run-marker) is refused,
+# loudly (404 amended: --test-temple-day): its one ERROR, and never honoured.
+grep -q "ERROR: \[test\] --test-temple-day without --run-marker: ignored" "$DIR/server.log" || fail "--test-temple-day without --run-marker was not refused with its ERROR"
+grep -q "today is everyone's temple day" "$DIR/server.log" && fail "--test-temple-day took effect on the box's command line"
+echo "PASS  --test-temple-day without --run-marker: refused, with its one ERROR"
+errors="$(grep -h -E "SCRIPT ERROR|^ERROR:" "$DIR/export.log" "$DIR/server.log" | grep -v "^ERROR: \[test\] --test-temple-day without --run-marker")"
 [ -z "$errors" ] || { echo "$errors" | head -20; fail "errors in the export or the exported server's log"; }
 echo "PASS  no errors in the export or the server's log"
 echo

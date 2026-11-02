@@ -4203,6 +4203,7 @@ func _boot() -> void:
 	if not World.production.work_done.is_connected(_on_counter_work_done):
 		World.production.work_done.connect(_on_counter_work_done)
 	_seat_healers()
+	_test_temple_day()
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
 	World.bless = barrow_won  # The draugr laid to rest (decisions 548, 573).
@@ -15682,6 +15683,21 @@ func _send_huts_empty() -> void:
 			areas[id.get_slice("/", 0)] = true
 	for area: String in areas:
 		Net.broadcast("huts", {"states": huts_of(area)})
+
+
+## --test-temple-day (404 amended; the coordinator, for playtest's tours: a
+## person's temple day comes once in every_days, by their id): today is
+## everyone's, honoured only beside --run-marker (as 199 amended guards the
+## overlay); without it one ERROR and ignored, so it never takes on the box.
+func _test_temple_day() -> void:
+	if not Net.test_temple_day:
+		return
+	var marked := Array(OS.get_cmdline_args() + OS.get_cmdline_user_args()).any(func(arg: String) -> bool: return arg.begins_with("--run-marker="))
+	if not marked:
+		push_error("[test] --test-temple-day without --run-marker: ignored (404 amended: a test-only flag, never the box's)")
+		return
+	Townsfolk.test_temple_day = true
+	print("[test] --test-temple-day: today is everyone's temple day (test-only, 404 amended)")
 
 
 ## Whether healer's hut [param place_id] has stood empty healers.vacant_days

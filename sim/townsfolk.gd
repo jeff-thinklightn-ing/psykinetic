@@ -1936,6 +1936,9 @@ static func use_days(given: Dictionary) -> void:
 ## listed), their edges moved by [param season]; else the square. The hour
 ## is read on the resident's own clock, ahead of or behind the town's by
 ## their offset (offset_hours at most, by the id).
+## Today everyone's temple day (404 amended: --test-temple-day beside
+## --run-marker, Main._test_temple_day; playtest's tours), the hour as ever.
+static var test_temple_day := false
 static func whereabouts(trade: String, hour: float, season := "", type := "", worker_id := "", day := -1, mood := "") -> String:
 	var table := days()
 	var at := fposmod(hour - offset_of(worker_id), 24.0)
@@ -1943,7 +1946,7 @@ static func whereabouts(trade: String, hour: float, season := "", type := "", wo
 		return str(table.get("mood", {}).get("apart_at", "temple"))  # Kept apart from her player, she sits alone (555, npc's side).
 	var temple: Dictionary = table.get("temple", {})
 	var every := int(temple.get("every_days", 0))
-	if day >= 0 and every > 0 and (day + absi(hash("temple:" + worker_id))) % every == 0 \
+	if day >= 0 and every > 0 and (test_temple_day or (day + absi(hash("temple:" + worker_id))) % every == 0) \
 			and _within(at, float(temple.get("from", 9)), float(temple.get("to", 10))):
 		return "temple"
 	for stint: Variant in table.get("types", {}).get(type, []):
