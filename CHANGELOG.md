@@ -7,7 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
-- Deer can be hunted on foot: a deer sprints then slows to a trot, a wounded one tires and bleeds until it goes down, and creeping up slowly from behind lets you reach it before it bolts; a hit deer runs far, and a herd that sees one killed stays wary and moves off (764).
+- Deer can be hunted on foot: a deer sprints then slows to a trot, a wounded one tires and bleeds until it goes down, and creeping up slowly from behind (your companion creeps with you) lets you reach it and fell it with one blow; a hit deer runs far, and a herd that sees one killed stays wary and moves off (764).
 - Wolves no longer make their dens near roads and dirt tracks: a pack lives at least 8 steps off any path, and one too close moves away within a day (763).
 - Wolves or raiders in a town send its folk indoors and shut its shops until they are gone; the guard turns out (762).
 - Old, stooped townsfolk lie flat on their bed asleep instead of hunched above it; the stoop comes back when they get up (751).

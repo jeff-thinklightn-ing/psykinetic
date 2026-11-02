@@ -38563,6 +38563,13 @@ but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim onl
   is not. Found at its side unawares (NOTICE_ALWAYS, not struck, not already wary), prey stands
   startled STARTLE_TICKS (5) before it bolts: the time for one blow. Scent (downwind, 316) and
   cover (508) work as before.
+- A surprise blow fells game (playtest's melee stalk: 0 kills in 10; twice beside a deer unheard,
+  the blow landed for a spear's 2 and it was gone): struck unawares (grazing, or startled) from
+  within SURPRISE_REACH (2), a kind whose monsters.json row says "felled_by_surprise" (deer, stag,
+  rabbit; not the boar, who turns and fights) goes down at once for DOWN_TICKS, to be finished.
+- A stalker's companion stalks with him: game judges a companion's step by her keeper's step_gap
+  while she is within STALK_WITH_TILES (8) of him (Animal._walker_of). Companions: Heel already
+  trails him a cell back and never overtakes, so nothing more is needed there.
 - A kill seen (the coordinator, after playtest's bow run: 3 arrows a doe, about 30 s a deer, "too
   easy"; aim for a deer every couple of minutes): when prey dies, its herd within WARY_REACH (24)
   is alarmed (Animal.alarm): wary WARY_TICKS (3000, 5 min; Animal.wary, by the clock): it sees
@@ -38575,7 +38582,8 @@ Phase 2 (approved in principle; rides v0.1.199's revision 45): a drawn blood tra
 deer's cells and a lying pose for one down (pc-character's), as "764 amended" or a tree's side.
 Phase 3 later: companions driving deer.
 monster_test _test_deer_hunted (the burst and trot, a wounded rest, the bleed never to death, down
-and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard, struck a long burst, a herd wary after a kill and calm again, a cornered
+and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard, struck a long burst, felled by a blow unawares (a boar not), a companion judged by her keeper,
+a herd wary after a kill and calm again, a cornered
 one away along the wall),
 _test_clank (a slow step unheeded, a hurried one turns it). Server only; protocol unchanged; no
 new class_name.

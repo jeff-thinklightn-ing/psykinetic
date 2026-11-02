@@ -98,6 +98,12 @@ const DOWN_BELOW := 0.25
 const DOWN_TICKS := 600
 const STALK_STEP_TICKS := 6
 const STARTLE_TICKS := 5
+## A blow from this near (cells) on game unawares fells a "felled_by_surprise"
+## kind (764): a melee blow, a spear's reach.
+const SURPRISE_REACH := 2
+## A companion's step is judged by her keeper's within this many cells
+## (764): she stalks with a stalking player.
+const STALK_WITH_TILES := 8
 ## Decision 761 (enemy-ai's side): a predator smells meat lying so far
 ## (cells), and eats it head down for so long (ticks) once beside it.
 const SMELL_TILES := 12
@@ -305,7 +311,7 @@ func _noise_threat() -> void:
 			continue  # Its own, or its herd's.
 		var predator: bool = is_instance_valid(source) and source is Animal and (source as Animal).role == Role.PREDATOR
 		if noise["kind"] == &"step" and not predator and is_instance_valid(source) and not source is Animal \
-				and (source as GridEntity).step_gap > STALK_STEP_TICKS and not wary():
+				and _walker_of(source as GridEntity).step_gap > STALK_STEP_TICKS and not wary():
 			continue  # A stalk (764): a slow step, not close on the last, goes unheeded.
 		if noise["kind"] == &"step" and not predator:
 			var way := Senses.way_toward(tile, noise["at"])
@@ -530,10 +536,34 @@ func _flee(threat: Vector2i, routs := true) -> void:
 
 
 ## Struck, prey bolts long (764): a missed or wounding shot costs a chase.
+## Struck unawares (grazing, or startled) from within SURPRISE_REACH, a kind
+## whose row says "felled_by_surprise" (deer, stag, rabbit; not the boar,
+## who turns and fights) goes down at once, to be finished.
 func note_struck(by: GridEntity) -> void:
+	var unaware := (alert == Alert.IDLE or World.tick < _startle_until) and World.tick >= _down_until
 	super(by)
-	if role == Role.PREY and World.tick >= _down_until:
+	if role != Role.PREY:
+		return
+	if unaware and is_instance_valid(by) and World.distance(tile, by.tile) <= SURPRISE_REACH \
+			and bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("felled_by_surprise", false)):
+		_startle_until = -1
+		_burst_until = -1
+		_down_until = World.tick + DOWN_TICKS
+		alert = Alert.IDLE
+		pose = Pose.SIT
+		return
+	if World.tick >= _down_until:
 		_burst_until = World.tick + STRUCK_BURST_TICKS * (2 if wary() else 1)
+
+
+## Whose pace a step of [param stepper] is judged by (764): a companion
+## near her keeper stalks with him (his), else its own.
+func _walker_of(stepper: GridEntity) -> GridEntity:
+	if stepper is Companion:
+		var keeper := (stepper as Companion).keeper
+		if is_instance_valid(keeper) and World.distance(stepper.tile, keeper.tile) <= STALK_WITH_TILES:
+			return keeper
+	return stepper
 
 
 ## Whether a kill of its herd still has it wary (764): till its time,
