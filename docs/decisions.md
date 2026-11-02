@@ -37573,6 +37573,24 @@ PersonLook's "stooped" (Posture_Stooped at full weight) stays on while he
 lies. pc-character's follow-up fades a posture off while lying. Client only,
 protocol unchanged.
 
+751 amended (5) (release's label; the coordinator's approval, pc-character's
+follow-up to (4)): a person's posture fades off while it lies. A PersonLook's
+posture (the old's "stooped", a "slouching": Client3D.POSTURES, an additive
+on its AnimRig at full weight) is a standing body's bend. Added to the side
+curl it bent the trunk up off the bed with the legs still on it:
+build/sleep/fit.gd, the curl skinned on human_m, has the trunk's lowest at
+-0.003 m and the leg's at +0.025 bare, and the trunk at +0.072 with
+Posture_Stooped added (Hob on the turf bed measured +0.073). Client3D keeps
+the posture's pose as the puppet's "posture"; _posture_lying, called by _lay
+with its lying flag (asleep or any lying activity, lying down, and rising
+until rising_until), eases the posture's weight to 0 lying and back to 1
+standing over POSTURE_FADE (0.6 s, under the 1.8 s lie-down and 1.7 s
+get-up); first seen lying, it is off at once. view_test
+_test_sleeper_posture: off at once first seen asleep, half back at half the
+fade, all back after it, off again lain down. Every stooped or slouching
+sleeper, on a bed or a bedroll; only what _lay counts as lying, so nothing
+else changes. Client only, protocol unchanged, no new class_name.
+
 750 amended, pc-character's side (2026-11-01): the heavy axes' sweep. The
 giant axe and the battle axe swing Axe_Sweep (humanoid_clips' SWEEP_*), a
 wound-up blow (WOUND_STRIKES, strikes [["Axe_Sweep", 0.8]]) at combat's

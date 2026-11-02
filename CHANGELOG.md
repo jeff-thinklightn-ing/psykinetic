@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Old, stooped townsfolk lie flat on their bed asleep instead of hunched above it; the stoop comes back when they get up (751).
 - A sleeper beside a hut's built-in bed is drawn lying on the bed itself, head on the pillow (751).
 
 - The forest is much bigger (224 by 224, was 96): a dozen clearings, a winding path from the wilds to the closed way north with side paths, the refuges and the healer's turf house where it stood (760).

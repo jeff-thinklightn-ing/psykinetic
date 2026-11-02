@@ -15377,7 +15377,9 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 		# (A painted ally's mesh stands in its concept's stance already: no second hunch.)
 		var posture := str(POSTURES.get((puppet.get_meta("look") as PersonLook).posture, ""))
 		if posture != "" and rig.has(posture):
-			rig.posture((load(model["clips"]) as AnimationLibrary).get_animation(posture), 1.0)
+			var pose := (load(model["clips"]) as AnimationLibrary).get_animation(posture)
+			rig.posture(pose, 1.0)
+			puppet.set_meta("posture", pose)  # Faded off lying (_posture_lying).
 	puppet.set_meta("rig", rig)
 	return body
 
@@ -17438,6 +17440,7 @@ const SLEEP_ASIDE := 0.11
 func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) -> void:
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
 	var lying := bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0))
+	_posture_lying(puppet, lying)
 	var offset: Vector3 = _stand_at.get(cell, Vector3.ZERO)
 	if work.has("toward") and float(puppet.get_meta("speed", 0.0)) <= WALKING:
 		# Leant in to its work (the bandage kneel), only while it is still: walking, as it stands.
@@ -17464,6 +17467,29 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 	var want := float(puppet.get_meta("faces")) + (PI if lying else 0.0)
 	if not is_equal_approx(model.rotation.y, want):
 		model.rotation.y = want
+
+
+
+## A person's posture (the old's stoop, a slouch: POSTURES, added on its AnimRig) is a
+## standing body's: added to a sleeper's curl it lifted the trunk 7 cm off the bed, the legs
+## on it (751 amended (5); Hob, the healer, stooped with age). Lying, lying down and rising
+## ([param lying], _lay's), it fades off over POSTURE_FADE; standing, back on. Seen first
+## lying, it is off at once.
+const POSTURE_FADE := 0.6
+func _posture_lying(puppet: Node3D, lying: bool) -> void:
+	if not puppet.has_meta("posture"):
+		return
+	var now := Time.get_ticks_msec()
+	var want := 0.0 if lying else 1.0
+	var weight := want
+	if puppet.has_meta("posture_ms"):
+		var step := float(now - int(puppet.get_meta("posture_ms"))) / 1000.0 / POSTURE_FADE
+		weight = move_toward(float(puppet.get_meta("posture_weight", 1.0)), want, step)
+	puppet.set_meta("posture_ms", now)
+	if puppet.has_meta("posture_weight") and is_equal_approx(float(puppet.get_meta("posture_weight")), weight):
+		return
+	puppet.set_meta("posture_weight", weight)
+	(puppet.get_meta("rig") as AnimRig).posture(puppet.get_meta("posture") as Animation, weight)
 
 
 ## While the local player draws (decision 583), its body turns to ui's aim,

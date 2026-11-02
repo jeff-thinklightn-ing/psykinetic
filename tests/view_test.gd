@@ -8012,6 +8012,44 @@ func _test_sleeper() -> void:
 	_rig._lay(puppet, body, 0.0)
 	_check(is_zero_approx(model.rotation.y) and body.position == Vector3.ZERO, "stood: as it stands (%s)" % body.position)
 	puppet.free()
+	_test_sleeper_posture()
+
+
+## 751 amended (5): a stooped person's posture is off while it lies (it lifted the curl's
+## trunk 7 cm off the bed) and fades back on over POSTURE_FADE when it stands.
+func _test_sleeper_posture() -> void:
+	var lib := load("res://art/models/animations/goblin.res") as AnimationLibrary
+	var puppet := Node3D.new()
+	var body := Node3D.new()
+	body.name = "Body"
+	puppet.add_child(body)
+	var model := (load(Client3D.HUMAN["scene"]) as PackedScene).instantiate() as Node3D
+	model.name = "Model"
+	body.add_child(model)
+	add_child(puppet)
+	var rig := AnimRig.make(model, lib, 0.0, true, null)
+	rig.loop("Idle", 0.0)
+	var stoop := lib.get_animation(str(Client3D.POSTURES["stooped"]))
+	rig.posture(stoop, 1.0)
+	puppet.set_meta("rig", rig)
+	puppet.set_meta("posture", stoop)
+	puppet.set_meta("faces", 0.0)
+	puppet.set_meta("work", "sleep")
+	var amount := func() -> float: return float(rig.tree.get("parameters/posture/add_amount"))
+	_rig._lay(puppet, body, 0.0)
+	_check(is_zero_approx(amount.call()), "a stooped sleeper, first seen asleep: its stoop off at once (%.2f)" % amount.call())
+	puppet.set_meta("work", "")
+	puppet.set_meta("posture_ms", Time.get_ticks_msec() - int(Client3D.POSTURE_FADE * 500.0))
+	_rig._lay(puppet, body, 0.0)
+	_check(absf(amount.call() - 0.5) < 0.1, "stood up: the stoop half back after half of POSTURE_FADE (%.2f)" % amount.call())
+	puppet.set_meta("posture_ms", Time.get_ticks_msec() - int(Client3D.POSTURE_FADE * 1000.0))
+	_rig._lay(puppet, body, 0.0)
+	_check(is_equal_approx(amount.call(), 1.0), "and all back after it (%.2f)" % amount.call())
+	puppet.set_meta("work", "sleep")
+	puppet.set_meta("posture_ms", Time.get_ticks_msec() - int(Client3D.POSTURE_FADE * 1000.0))
+	_rig._lay(puppet, body, 0.0)
+	_check(is_zero_approx(amount.call()), "lain down again: off (%.2f)" % amount.call())
+	puppet.free()
 
 
 ## A two-handed piece (451 amended (2), step 4; Jeff: the great axe "held sideways by player and
