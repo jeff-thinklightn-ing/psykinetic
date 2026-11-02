@@ -22,6 +22,19 @@ extends Monster
 ## Idling it wanders about its home, the herd's ground; standing between
 ## strolls it grazes (Pose.SIT, which a view of an animal plays as its
 ## graze), seeing GRAZE_SIGHT less far with its head down.
+##
+## Keeping the balance (decision 761, enemy-ai's side), in an area whose
+## level's herds say "balance" (World.balance governs it; test levels only),
+## a predator with nobody to fight has errands (_errand_step), before its
+## prey: meat lying within SMELL_TILES (Balance.meat_near) it goes to and
+## eats (Balance.eat; head down EAT_TICKS, a howl when it finds it); hungry
+## (its group's Herds.fed under HUNGRY_FED) it is bold, keeps out of no din,
+## and at night goes to a fold within FOLD_TILES and takes one sheep
+## (Balance.take_sheep), once a night, then back to its den. A town's
+## wolves of a night (town_wolf: Main._town_wolves makes them while the
+## town has the threat) go to its store, take one thing (Balance.night_take:
+## food and livestock, never gold), and go back; they never hunt people or
+## game, and one killed is one fewer to come (Balance.town_wolf_killed).
 
 enum Role { PREY, GAME, PREDATOR }
 const ROLES := {"prey": Role.PREY, "game": Role.GAME, "predator": Role.PREDATOR}
@@ -53,6 +66,17 @@ const UNSEEN_TILES := 8
 ## A step heard (not its herd's, nor a predator's): it stops, head up,
 ## turned to it, for so long (ticks), and sees as far as it can.
 const ALERT_TICKS := 40
+## Decision 761 (enemy-ai's side): a predator smells meat lying so far
+## (cells), and eats it head down for so long (ticks) once beside it.
+const SMELL_TILES := 12
+const EAT_TICKS := 30
+## Fed under this much (Herds.fed, 0..1) it is hungry: bold, heedless of a
+## din, and at night after the fold.
+const HUNGRY_FED := 0.5
+## A hungry predator goes to a fold this near (cells) at night.
+const FOLD_TILES := 40
+## A town's wolf takes from the store this near its cell.
+const STORE_REACH := 2
 
 var role := Role.PREY
 ## The kinds a predator hunts.
@@ -72,6 +96,21 @@ var _heads_up_until := -1
 ## Its wander radius as its spawn spec or kind gave it (a predator's by
 ## night is twice it; by day DEN_RADIUS).
 var _roam := WANDER_RADIUS
+## Decision 761: the town whose nights it comes to (Main._town_wolves; a
+## spawn prop, so kept in a save), "" for a wild one.
+var town_wolf := ""
+## Its town's store cell, [x, y] (a spawn prop too).
+var town_store: Array = []
+## Its errand (761): {kind: meat, fold or town, cell, reach, and uid or
+## fold}; {} for none.
+var _errand := {}
+var _errand_tick := -1
+var _eat_until := -1
+## Hungry (761): its group fed under HUNGRY_FED. Settled with its boldness.
+var _hungry := false
+var _night := false
+## When it last took a sheep or a town's thing (World's steps), -1 never.
+var _took_at := -1
 
 
 func _ready() -> void:
@@ -96,6 +135,8 @@ func _sim_tick() -> void:
 		return
 	if role == Role.PREDATOR:
 		_settle_bold()
+		if _errand_step():
+			return
 		super()
 		return
 	# Struck, a boar turns and charges though it was running (an arrow from
@@ -158,8 +199,11 @@ func _leave_din() -> void:
 		_returning = true
 
 
-## It keeps its wandering out of the din (740).
+## It keeps its wandering out of the din (740); a hungry predator, or a
+## town's wolf, does not (761).
 func _shuns(at: Vector2i) -> bool:
+	if role == Role.PREDATOR and (_hungry or not town_wolf.is_empty()):
+		return false
 	return not World.din_at(at, role == Role.PREDATOR).is_empty()
 
 
@@ -225,6 +269,8 @@ func _nearest_visible_target() -> GridEntity:
 		Role.PREY:
 			return null
 	var player: GridEntity = super() if _bold or World.tick - hurt_tick < CHARGE_TICKS else null
+	if not town_wolf.is_empty():
+		return player  # A town's wolf hunts nothing: it fights back only when hurt (761).
 	if _look_tick < 0 or World.tick - _look_tick >= PREY_LOOK_TICKS or (_prey != null and not is_instance_valid(_prey)):
 		_look_tick = World.tick
 		_prey = _sees_prey()
@@ -267,7 +313,10 @@ func _settle_bold() -> void:
 			if entity != self and entity is Animal and (entity as Animal).herd == herd \
 					and World.distance(tile, entity.tile) <= PACK_TILES:
 				pack += 1
-	_bold = night or pack >= PACK_BOLD
+	_night = night
+	_hungry = town_wolf.is_empty() and _governed() and World.herds != null \
+			and World.herds.fed(str(spawn_spec.get("group", ""))) < HUNGRY_FED
+	_bold = (night or pack >= PACK_BOLD or _hungry) and town_wolf.is_empty()  # A town's wolf never goes at people (761).
 	wander_radius = _roam * 2 if night else DEN_RADIUS  # Out by night, at its den by day.
 	temper = Temper.BOLD if _bold else Temper.CAUTIOUS
 	var bonus := NIGHT_SIGHT if night else 0
@@ -281,7 +330,102 @@ func remains() -> Array[int]:
 	var group := str(spawn_spec.get("group", ""))
 	if not group.is_empty() and World.herds != null:
 		World.herds.killed(group, str(spawn_spec.get("kind", "")))
+	if not town_wolf.is_empty() and World.balance != null:
+		World.balance.town_wolf_killed(town_wolf)  # One fewer to come (761).
 	return super()
+
+
+# --- Keeping the balance (decision 761, enemy-ai's side) --------------------------
+
+## Whether World.balance governs the zone it is in.
+func _governed() -> bool:
+	return World.balance != null and World.zone != null and World.balance.governs(World.zone.name)
+
+
+## A predator's errand this tick (meat, a fold, a town's store), when it has
+## nobody to fight, isn't running and isn't struck: true while it is on one
+## (it walks or eats; Monster's tick is not run), false to go on as ever. A
+## bold one's quarry in sight ends it, looked for as often as the errand is
+## chosen (PREY_LOOK_TICKS).
+func _errand_step() -> bool:
+	if World.balance == null or (town_wolf.is_empty() and not _governed()) or target != null \
+			or alert == Alert.FLEEING or alert == Alert.FIGHTING or _struck_by() != null or World.is_stunned(self):
+		_errand = {}
+		return false
+	if World.tick < _eat_until:
+		pose = Pose.SIT  # Head down at the meat (a view plays it as the graze).
+		return true
+	if _errand_tick < 0 or World.tick - _errand_tick >= PREY_LOOK_TICKS:
+		_errand_tick = World.tick
+		if (_bold or World.tick - hurt_tick < CHARGE_TICKS) and super._nearest_visible_target() != null:
+			_errand = {}
+			return false  # A quarry in sight: Monster's fight.
+		var was := str(_errand.get("kind", ""))
+		_errand = _pick_errand()
+		if str(_errand.get("kind", "")) == "meat" and was != "meat":
+			_cry(&"call", call_reach)  # The howl over meat found: its pack hears it.
+	if _errand.is_empty():
+		return false
+	var at: Vector2i = _errand["cell"]
+	if World.distance(tile, at) <= int(_errand["reach"]):
+		_do_errand()
+		return true
+	pose = Pose.STAND
+	alert = Alert.IDLE
+	if World.tick < next_move_tick:
+		return true
+	move_ticks = _pace
+	if not _idle_step(at):
+		_errand = {}  # No way there now: looked at again in a moment.
+		return false
+	return true
+
+
+## What it goes to now: a town's wolf its town's store (until it took);
+## else meat lying it smells, nearest; else, hungry at night and not yet
+## this night, the nearest fold with sheep within FOLD_TILES. {} for none.
+func _pick_errand() -> Dictionary:
+	if not town_wolf.is_empty():
+		var store: Variant = Snapshot.vector(town_store)
+		if _took_at >= 0 or store == null or World.balance.threat(town_wolf).is_empty():
+			return {}
+		return {"kind": "town", "cell": store, "reach": STORE_REACH}
+	var area := World.zone.name
+	var meat := World.balance.meat_near(area, tile, SMELL_TILES)
+	if not meat.is_empty():
+		return {"kind": "meat", "cell": meat[0]["cell"], "uid": int(meat[0]["uid"]), "reach": 1}
+	if not (_night and _hungry) or (_took_at >= 0 and World.steps_now() - _took_at < maxi(DayNight.day_steps, 1) / 2):
+		return {}
+	var best := {}
+	for fold in World.balance.folds_in(area):
+		var d := World.distance(tile, fold["cell"])
+		if int(fold["sheep"]) > 0 and d <= FOLD_TILES and (best.is_empty() or d < World.distance(tile, best["cell"])):
+			best = {"kind": "fold", "cell": fold["cell"], "fold": str(fold["id"]), "reach": int(fold["reach"])}
+	return best
+
+
+## There: eats the meat, takes a sheep or the town's thing (then home).
+func _do_errand() -> void:
+	match str(_errand["kind"]):
+		"meat":
+			if World.balance.eat(int(_errand["uid"])):
+				var way := Senses.way_toward(tile, _errand["cell"])
+				if way != Vector2i.ZERO:
+					World.face(self, way)
+				_eat_until = World.tick + EAT_TICKS
+				pose = Pose.SIT
+		"fold":
+			if World.balance.take_sheep(str(_errand["fold"])):
+				print("[balance] a wolf took a sheep from a fold")
+			_took_at = World.steps_now()
+			_returning = true
+		"town":
+			var took := World.balance.night_take(town_wolf)
+			print("[balance] a wolf in a town's night took %s" % (took if not took.is_empty() else "nothing"))
+			_took_at = World.steps_now()
+			_returning = true
+	_errand = {}
+	_errand_tick = -1
 
 
 ## Fleeing: one of a herd's group first tries the steps away from its

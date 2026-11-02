@@ -242,6 +242,11 @@ const RECALL_NOW_TILES := 44
 const RECALL_JOIN_NOW_TILES := 12
 const RETIRE_AFTER_TICKS := 300
 const RETIRE_EVERY_TICKS := 10
+## Decision 761 (enemy-ai's side): a town's wolves of a night are looked
+## after so often (ticks; _town_wolves), made about TOWN_WOLF_OFF cells off
+## its store, out of every player's sight.
+const TOWN_WOLVES_TICKS := 50
+const TOWN_WOLF_OFF := 24
 const RETIRE_BUDGET_USEC := 2000
 const RECALL_BUDGET_USEC := 4000
 
@@ -5247,6 +5252,8 @@ func _recall_due() -> void:
 func _retirable(monster: Monster, near: Array[Vector2i]) -> bool:
 	if not monster.spawned or monster.raid != "" or monster.owner_peer != 0 or monster.keeper_peer != 0:
 		return false
+	if monster is Animal and not (monster as Animal).town_wolf.is_empty():
+		return false  # A town's wolf of a night is gone at dawn, never kept (761).
 	if monster.far_since < 0 or World.tick - monster.far_since < RETIRE_AFTER_TICKS:
 		return false
 	if monster.target != null or monster.alert != Monster.Alert.IDLE or monster._returning or World.is_stunned(monster):
@@ -6067,6 +6074,66 @@ func _make_balance(saved: Dictionary) -> void:
 		var place := World.holdings.place(town) if World.holdings != null else {}
 		return not _players_in(str(place.get("area", town.get_slice("/", 0)))).is_empty()
 	World.balance.fold_changed.connect(_on_folds_changed)
+
+
+## Server, the zone World is in: a town's wolves of a night (decision 761,
+## enemy-ai's side). While a town of it has the wolves' threat
+## (Balance.threat), at night, with a player in the zone, Balance.wolves_at
+## of them are made once a night, TOWN_WOLF_OFF cells off its store and out
+## of every player's sight, none of a herd (town_wolf, Animal's errand: to
+## the store, one thing taken, back). At day, or the threat over, the ones
+## left go (not a death). Nobody there, the far tier's take is Balance's
+## (watched).
+var _town_wolves_made := {}
+
+
+func _town_wolves() -> void:
+	if World.balance == null or World.zone == null or World.holdings == null:
+		return
+	var night := World.fields.outdoor and DayNight.daylight(DayNight.now()) < Animal.NIGHT_LIGHT
+	var live := {}
+	for entity: GridEntity in World.monsters().duplicate():
+		var wolf := entity as Animal
+		if wolf == null or wolf.town_wolf.is_empty() or not wolf.spawned:
+			continue
+		if not night or World.balance.threat(wolf.town_wolf).is_empty():
+			_despawn_kept(wolf)  # Dawn, or the town's threat over: it goes, unseen.
+			continue
+		live[wolf.town_wolf] = int(live.get(wolf.town_wolf, 0)) + 1
+	var area := World.zone.name
+	if not night or _players_in(area).is_empty():
+		return
+	var players: Array[Vector2i] = []
+	for player: Player in _players.values():
+		if is_instance_valid(player) and player.spawned and player.zone == area:
+			players.append(player.tile)
+	var steps := World.steps_now()
+	for town: String in World.holdings.places_in(area):
+		if World.balance.threat(town) != "wolves":
+			continue
+		if _town_wolves_made.has(town) and steps - int(_town_wolves_made[town]) < maxi(DayNight.day_steps, 1) / 2:
+			continue  # Made this night already: the ones killed stay killed.
+		_town_wolves_made[town] = steps
+		var store: Vector2i = World.holdings.place(town).get("cell", Vector2i.ZERO)
+		var draw := RandomNumberGenerator.new()
+		draw.seed = hash([town, steps])
+		var made := 0
+		for i in maxi(World.balance.wolves_at(town) - int(live.get(town, 0)), 0):
+			var angle := draw.randf() * TAU
+			var near := store + Vector2i(roundi(cos(angle) * TOWN_WOLF_OFF), roundi(sin(angle) * TOWN_WOLF_OFF))
+			var at := Animal.unseen_cell(near, 6, players, draw)
+			if at == World.NO_CELL:
+				continue
+			var spec := Level._spec_for("monster_wolf", Level.MONSTER_TYPES)
+			if spec.is_empty():
+				return
+			spec["name"] = "town_wolf_%d_%d" % [steps, i]
+			spec["tile"] = at
+			spec["home"] = at
+			spec["props"] = {"town_wolf": town, "town_store": [store.x, store.y]}
+			if _spawn(spec) != null:
+				made += 1
+		print("[balance] %d wolves come to a town in the night" % made)
 
 
 ## Server: a herder's fold changed (Towns.folds_changed, 640): every peer
@@ -16318,6 +16385,8 @@ func _on_world_ticked(tick: int) -> void:
 		if tick % World.WORLD_TICK_STEPS == 0 and World.zone == World.home():
 			_tend_bonds()
 		_recall_due()
+		if tick % TOWN_WOLVES_TICKS == 0:
+			_town_wolves()  # A town's wolves of a night (761, enemy-ai's side).
 		if tick % RETIRE_EVERY_TICKS == 0:
 			_retire_and_recall()
 		t = World.part("retire and recall", t)

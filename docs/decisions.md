@@ -38411,3 +38411,25 @@ Deer, rabbits and boar may still graze on a road. herds_test: a road and a track
 area, no den seeded within 8, the edges 5, 6 and 8 off, an old den moved off in a day, an area with
 no paths unchanged, and the hills' paths read from the real level. Server only; protocol unchanged;
 no new class_name; a CHANGELOG bullet (dens move in the real levels).
+761, enemy-ai's side (sim/animal.gd, Main._town_wolves; the coordinator approved): in an area the
+balance governs, a predator with nobody to fight has errands (Animal._errand_step), chosen every
+PREY_LOOK_TICKS before its prey; a bold one's quarry in sight ends the errand for Monster's fight.
+- Meat: meat lying within SMELL_TILES (12, Balance.meat_near) it walks to; beside it, it eats it
+  (Balance.eat) head down EAT_TICKS (30), with a howl (its "call") when it first finds it.
+- Hunger: its group's Herds.fed under HUNGRY_FED (0.5) makes it hungry: bold (it stands against a
+  player as at night), heedless of a town's or a fire's din (740's _shuns), and at night it goes to
+  the nearest fold with sheep within FOLD_TILES (40) and, within the fold's reach, takes one
+  (Balance.take_sheep), once a night (half a day's steps), then back to its den. A fed one lets the
+  fold be. Sheep stay economy's count: no sheep bodies.
+- A town's wolves of a night (Main._town_wolves, every TOWN_WOLVES_TICKS (50) in the zone World is
+  in): while a town there has the "wolves" threat, at night, with a player in the zone, the
+  Balance.wolves_at of them not already about are made once a night TOWN_WOLF_OFF (24) cells off its
+  store, out of every player's sight, of no herd (spawn props town_wolf and town_store, so a save
+  keeps them). Each goes to the store, takes one thing (Balance.night_take), and goes back; it hunts
+  no people and no game, fighting only when hurt. Killed, it calls Balance.town_wolf_killed. At dawn,
+  or the threat over, those left go (not a death); they are never kept as far records (_retirable).
+  Nobody there, Balance's far-tier take stands (watched).
+monster_test _test_balance_wolves: the meat smelt 10 off and eaten; fed, the fold let be; hungry,
+bold and one sheep a night; a town's wolf at the store takes one thing past a player it lets be, and
+killed is one fewer to come. Server only (the props reach clients in the spawn spec, unused there);
+protocol unchanged; no new class_name.

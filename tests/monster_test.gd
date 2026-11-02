@@ -124,6 +124,7 @@ func _ready() -> void:
 	_test_threatens()
 	_test_quieter()
 	_test_wolf_pack_bold()
+	_test_balance_wolves()
 	_test_archer()
 	_test_archer_hold()
 	_test_worn_bundles()
@@ -4294,6 +4295,101 @@ func _test_barrow_layers() -> void:
 	Level.unregister("mt_dark")
 	e = _build(dark_rows, {}, {}, "mt_plain")
 	_check(e["k"][0].idle == Monster.Idle.HOMEWARD and not e["k"][0].senses.dark_sight, "elsewhere the dead walk home to their graves, and need light")
+
+
+## Decision 761, enemy-ai's side, in a room whose herds say "balance": a
+## wolf smells meat lying and eats it (Balance.eat); a fed one lets the fold
+## be at night, a hungry one (Herds.fed) is bold and takes one sheep a night
+## (Balance.take_sheep); a town's wolf goes to the store and takes one
+## thing (night_take), never goes at people, and killed is one fewer to come.
+func _test_balance_wolves() -> void:
+	print("\n== keeping the balance (761, enemy-ai's side): meat, the fold, the town's night ==")
+	Monster.idling = true
+	var rows: Array[String] = ["######################", "#....................#", "#.w..................#",
+		"#....................#", "#....................#", "#....................#", "######################"]
+	var e := _build(rows)
+	var wolf: Animal = e["w"][0]
+	_outdoors("clear")
+	DayNight.set_hour(12.0)
+	var area := World.zone.name
+	var open := {}
+	for y in rows.size():
+		for x in rows[y].length():
+			if rows[y][x] != "#":
+				open[Vector2i(x, y)] = true
+	var stock := Stockpile.new({}, World.steps_now)
+	var herds := Herds.new({}, {area: {"floor": open, "outdoor": true, "herds": {"balance": true}}}, {}, World.steps_now)
+	herds.camps = func() -> Array: return []
+	var balance := Balance.new({}, herds, stock, {}, World.steps_now)
+	herds.balance = balance
+	balance.id_of = func(_uid: int) -> String: return "meat"
+	var removed: Array[int] = []
+	balance.remove = func(_area: String, _cell: Vector2i, uid: int, _why: String) -> bool:
+		removed.append(uid)
+		return true
+	var fold_at := Vector2i(18, 4)
+	balance.folds = func() -> Array: return [{"id": "t/fold", "area": area, "cell": fold_at, "town": "t/town", "farmer": "Asa"}]
+	World.herds = herds
+	World.balance = balance
+	# Meat lying 10 cells off, by day: it goes and eats.
+	balance.cell_changed(area, Vector2i(12, 2), PackedInt32Array([901]), {901: "Asa"})
+	var ate := false
+	for i in 300:
+		World.step()
+		if 901 in removed:
+			ate = true
+			break
+	_check(ate and balance.lying(area) == 0 and World.distance(wolf.tile, Vector2i(12, 2)) <= 1,
+			"it smells the meat 10 off and eats it where it lies (at %s)" % wolf.tile)
+	# The fold, at night: fed, it lets it be; hungry, one sheep, once a night.
+	var pack := herds._add_group(area, "wolf", wolf.tile, 1.0)
+	wolf.spawn_spec["group"] = str(pack["id"])
+	stock.deposit("t/fold", "sheep", 5, "Asa", "a test flock")
+	DayNight.set_hour(0.0)
+	for i in 200:
+		World.step()
+	_check(stock.count("t/fold", "sheep") == 5 and not wolf._hungry, "fed, at night it lets the fold be")
+	herds._pack_fed["%s/wolf" % area] = 0.2
+	var took := false
+	for i in 400:
+		World.step()
+		if stock.count("t/fold", "sheep") < 5:
+			took = true
+			break
+	_check(took and wolf._hungry and wolf._bold, "hungry it is bold, and takes a sheep from the fold at night")
+	for i in 300:
+		World.step()
+	_check(stock.count("t/fold", "sheep") == 4, "one a night: %d left" % stock.count("t/fold", "sheep"))
+	# A town's wolf of a night.
+	e = _build(["######################", "#....................#", "#.w..................#",
+		"#....................#", "#.......P............#", "#....................#", "######################"])
+	World.herds = herds
+	World.balance = balance
+	var town_wolf: Animal = e["w"][0]
+	var player: GridEntity = e["P"][0]
+	town_wolf.town_wolf = "t/town"
+	town_wolf.town_store = [18, 2]
+	_outdoors("clear")
+	DayNight.set_hour(0.0)
+	balance._threats["t/town"] = {"kind": "wolves", "left": 2, "nights": 3}
+	stock.deposit("t/town", "meat", 3, "Asa", "a test store")
+	var taken := false
+	var went_at := false
+	for i in 400:
+		World.step()
+		went_at = went_at or town_wolf.target == player or town_wolf.threatens(player)
+		if stock.count("t/town", "meat") < 3:
+			taken = true
+			break
+	_check(taken and stock.count("t/town", "meat") == 2 and not went_at,
+			"a town's wolf goes to the store and takes one thing, past a player it lets be")
+	town_wolf.remains()
+	_check(balance.wolves_at("t/town") == 1, "killed, it is one fewer to come")
+	herds.balance = null
+	World.herds = null
+	World.balance = null
+	DayNight.reset()
+	_indoors()
 
 
 func _test_wolf_pack_bold() -> void:
