@@ -2604,6 +2604,51 @@ func _test_bedroll_drawn() -> void:
 	_rig._sync_bedroll(resident, puppet)
 	_check(puppet.get_node_or_null("Bedroll") == null and is_equal_approx(float(puppet.get_meta("bed_height", 0.0)), 0.37),
 		"on a bed's head cell: no bedroll, the bed's height (%s)" % [puppet.get_meta("bed_height", 0.0)])
+	_check(not puppet.has_meta("lie_at"), "(a plain bed: no lie_at)")
+	# A furnished (solid) bed (751 amended (4)): the sleeper beside its head, drawn on it, its head on the pillow end.
+	var turf_rect := Rect2i(-700, -700, 7, 5)
+	var solid_head := Vector2i(-697, -698)
+	var turf := {"rect": turf_rect, "slot": "building.turf_house",
+		"beds": [{"cells": [solid_head, solid_head + Vector2i(1, 0)], "head": Vector2i(-1, 0), "prop": "prop.bed_straw", "solid": true}]}
+	var turf_node := Node3D.new()
+	turf_node.position = Vector3(-697.0, 0.25, -698.0)
+	var turf_parts := Node3D.new()
+	turf_parts.name = "parts"
+	turf_node.add_child(turf_parts)
+	var straw := Node3D.new()
+	straw.name = "Bed"
+	straw.position = Vector3(0.5, 0.0, 0.0)
+	straw.rotation.y = PI / 2.0  # Its head (-z) to -x, as art_dress turns it.
+	turf_parts.add_child(straw)
+	_rig._terrain["plot_buildings"] = plots + [turf]
+	_rig._buildings.append({"rect": turf_rect, "node": turf_node})
+	resident.tile = solid_head + Vector2i(0, 1)
+	resident.facing = Vector2i(-1, 0)
+	resident.activity = ""
+	_rig._sync_bedroll(resident, puppet)
+	resident.activity = "sleep"
+	_rig._sync_bedroll(resident, puppet)
+	var ground := _rig._ground_height(Vector2(resident.tile))
+	var pillow: Variant = puppet.get_meta("lie_at", null)
+	_check(puppet.get_node_or_null("Bedroll") == null and pillow is Vector2 and (pillow as Vector2).distance_to(Vector2(0.5 - 0.9, -1.0)) < 0.001
+		and absf(float(puppet.get_meta("bed_height", 0.0)) - (0.25 + 0.37 - ground)) < 0.001,
+		"beside a furnished bed: no bedroll; its pillow end from his cell, its top's height (%s, %s)" % [pillow, puppet.get_meta("bed_height", 0.0)])
+	var lay_body := Node3D.new()
+	puppet.add_child(lay_body)
+	var lay_model := Node3D.new()
+	lay_model.name = "Model"
+	lay_body.add_child(lay_model)
+	puppet.set_meta("work", "sleep")
+	puppet.set_meta("faces", 0.0)
+	_rig._lay(puppet, lay_body, PI)  # Facing -x.
+	_check(lay_body.position.distance_to(Vector3(0.5 - 0.9 + Client3D.SLEEP_HEAD_BACK, float(puppet.get_meta("bed_height")), -1.0 + Client3D.SLEEP_ASIDE)) < 0.001,
+		"laid on it: the root SLEEP_HEAD_BACK behind the pillow end, SLEEP_ASIDE aside, at its top (%s)" % [lay_body.position])
+	puppet.remove_meta("work")
+	resident.activity = ""
+	_rig._sync_bedroll(resident, puppet)
+	_check(not puppet.has_meta("lie_at"), "up: lie_at gone")
+	_rig._buildings.pop_back()
+	turf_node.free()
 	if had:
 		_rig._terrain["plot_buildings"] = plots
 	else:
@@ -7787,7 +7832,7 @@ func _test_visible_work() -> void:
 	var body := puppet.get_node("Body") as Node3D
 	var model := body.get_node("Model") as Node3D
 	_check(lain_down == "Sleep_Down" and rig.base_clip() == "Sleep_Side"
-			and body.position.distance_to(Vector3(-Client3D.SLEEP_MIDDLE * float(puppet.get_meta("model_scale", 1.0)), 0, 0)) < 0.001
+			and body.position.distance_to(Vector3(-Client3D.SLEEP_MIDDLE, 0, -Client3D.SLEEP_ASIDE) * float(puppet.get_meta("model_scale", 1.0))) < 0.001
 			and is_equal_approx(wrapf(model.rotation.y - float(puppet.get_meta("faces")), 0.0, TAU), PI),
 			"asleep: lain down to (%s), curled (%s), turned to put the head the way it faces, along its bed (%s)" % [lain_down, rig.base_clip(), body.position])
 	show.call("dig_for_treasure")
@@ -7948,8 +7993,8 @@ func _test_sleeper() -> void:
 	puppet.set_meta("work", "sleep")
 	puppet.set_meta("bed_height", 0.09)
 	_rig._lay(puppet, body, 0.0)
-	_check(body.position.is_equal_approx(Vector3(-Client3D.SLEEP_MIDDLE, 0.09, 0.0)) and is_equal_approx(model.rotation.y, PI),
-		"laid on its bedroll, its middle %.2f back, %.2f up, turned round (%s, %.2f)" % [Client3D.SLEEP_MIDDLE, 0.09, body.position, model.rotation.y])
+	_check(body.position.distance_to(Vector3(-Client3D.SLEEP_MIDDLE, 0.09, -Client3D.SLEEP_ASIDE)) < 0.001 and is_equal_approx(model.rotation.y, PI),
+		"laid on its bedroll, its middle %.2f back, %.2f aside, %.2f up, turned round (%s, %.2f)" % [Client3D.SLEEP_MIDDLE, Client3D.SLEEP_ASIDE, 0.09, body.position, model.rotation.y])
 	var rig := AnimRig.make(model, load("res://art/models/animations/goblin.res") as AnimationLibrary, 0.0, true, null)
 	rig.loop("Idle", 0.0)
 	var now := Time.get_ticks_msec()

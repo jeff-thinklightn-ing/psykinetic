@@ -37532,6 +37532,41 @@ BUILDING_PLACES maps to healers_hut, or a kind, place or use
 before. With no such building it is the 3x3 as before. resident_test, in
 751 npc's side (4)'s checks. Server only, protocol unchanged.
 
+751 amended (4) (release's label; the coordinator's rule, from the same
+playtest: Jeff expects Hob "on his own bed", not beside it): a sleeper whose
+bed is a furnished solid bed is drawn lying on it, at its top, while the sim
+keeps him on the walkable cell beside its head (npc's side (4)), for every
+solid bed (today the turf house's). Client3D._furnished_bed_lie finds the
+solid bed whose head cell is next to the sleeper's cell and the bed
+art_dress drew for it (the building's parts/Bed, prop.bed_straw, its head
+art-kit's -z). It gives the bed's pillow end (its -z end, half its art-kit
+length out, on its centre line), from the cell's ground point, in the
+puppet's frame (unrotated, unscaled), and the bed's top (the Bed node's y
+plus LIE_HEIGHT, 0.37) over that ground. _sync_bedroll keeps them as the
+puppet's "lie_at" and "bed_height" (no bedroll), cleared on every change.
+The split with pc-character: _lay, for a lying clip with "down" (the side
+curl) while "lie_at" is set, puts the root SLEEP_HEAD_BACK (SLEEP_MIDDLE +
+0.46: the root behind the pillow end, as on the bedroll, scaled by
+model_scale) behind the pillow end, so the head lies on the pillow
+whatever the bed's length. Lying down and getting up use that offset as
+the bedroll's does. And for every side curl, on a bed or a bedroll alike
+(pc-character's, from build/sleep/fit.gd: the curl reaches 0.50 m before
+the root, the knees, and 0.27 behind, the back), the body slides back
+SLEEP_ASIDE (0.11, by model_scale) toward its back, so it lies across the
+bed's middle and its knees no longer overhang the edge. view_test
+_test_bedroll_drawn: beside a furnished bed, no bedroll, the pillow end and
+the top's height; laid on it, the root SLEEP_HEAD_BACK behind the pillow
+end and SLEEP_ASIDE aside; up, cleared. _test_sleeper and the bedroll
+check take the slide. A face-side still from a local tour on the wilds
+(C:/dev/review/lands/solid_bed) was checked by the coordinator and
+pc-character. Measured there on the skinned body: the head on the pillow
+end, every part inside the bed's footprint (the knees 7 cm in from the
+edge, the back 14 cm), the leg on the straw. The trunk rides 7 cm over it:
+not the placement (every node a pure yaw) but Hob's posture. He is old, and
+PersonLook's "stooped" (Posture_Stooped at full weight) stays on while he
+lies. pc-character's follow-up fades a posture off while lying. Client only,
+protocol unchanged.
+
 750 amended, pc-character's side (2026-11-01): the heavy axes' sweep. The
 giant axe and the battle axe swing Axe_Sweep (humanoid_clips' SWEEP_*), a
 wound-up blow (WOUND_STRIKES, strikes [["Axe_Sweep", 0.8]]) at combat's

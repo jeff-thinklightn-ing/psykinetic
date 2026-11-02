@@ -17328,10 +17328,16 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 	if old != null:
 		puppet.remove_child(old)
 		old.queue_free()
+	puppet.remove_meta("lie_at")
 	var height := 0.0
 	if not want.is_empty():
 		var bed := _bed_under(body.tile)
-		if bed.is_empty() and not _indoors(body.tile) and ArtKit.has(BEDROLL):
+		var furnished := _furnished_bed_lie(body.tile) if bed.is_empty() else {}
+		if not furnished.is_empty():
+			# Beside a furnished (solid) bed (751 amended (4)): drawn on it, its head on the pillow.
+			puppet.set_meta("lie_at", furnished["at"])
+			height = float(furnished["height"])
+		elif bed.is_empty() and not _indoors(body.tile) and ArtKit.has(BEDROLL):
 			var way := Vector2(body.facing)
 			var piece := ArtKit.instance(BEDROLL)
 			piece.name = "Bedroll"
@@ -17341,6 +17347,44 @@ func _sync_bedroll(body: Resident, puppet: Node3D) -> void:
 		elif not bed.is_empty() and not bool(bed.get("solid", false)):
 			height = float(LIE_HEIGHT.get(str(bed.get("prop", "")), 0.0))
 	puppet.set_meta("bed_height", height)
+
+
+## A sleeper on [param cell] beside a drawn furnished bed (751 amended (4);
+## the coordinator, from Jeff's playtest: "hob was sleeping on a bedroll
+## instead of his own bed"): the turf house's bed is "solid" (Level's
+## FURNISHED_BED, its cells out of the floor), so the sim lays its sleeper on
+## the walkable cell beside its head (Main._bed_in), and the client draws him
+## on the bed itself. {at: the bed's head end (its pillow edge, on its centre
+## line) from [param cell]'s ground point, in the puppet's frame (x, z), as
+## _lay's offset is; height: the bed's top (LIE_HEIGHT) over that ground},
+## from the bed art_dress drew (the building's parts/Bed, prop.bed_straw, its
+## head art-kit's -z); {} for none beside, or none drawn.
+func _furnished_bed_lie(cell: Vector2i) -> Dictionary:
+	for building: Variant in _drawn_buildings():
+		if not building is Dictionary:
+			continue
+		for bed: Variant in (building as Dictionary).get("beds", []):
+			if not bed is Dictionary or not bool((bed as Dictionary).get("solid", false)) or ((bed as Dictionary).get("cells", []) as Array).is_empty():
+				continue
+			var head_cell: Vector2i = (bed as Dictionary)["cells"][0]
+			if absi(head_cell.x - cell.x) + absi(head_cell.y - cell.y) != 1:
+				continue
+			for drawn: Dictionary in _buildings:
+				var node: Variant = drawn.get("node")
+				if not (drawn.get("rect", Rect2i()) as Rect2i).has_point(head_cell) or not is_instance_valid(node):
+					continue
+				var piece := (node as Node3D).get_node_or_null("parts/Bed") as Node3D
+				if piece == null:
+					continue
+				var parts := piece.get_parent() as Node3D
+				var placed := (node as Node3D).transform * parts.transform * piece.transform
+				var prop := str((bed as Dictionary).get("prop", "prop.bed_straw"))
+				var size: Array = ArtKit.spec(prop).get("size", [0.85, 0.5, 1.8]) if ArtKit.has(prop) else [0.85, 0.5, 1.8]
+				var head := placed * Vector3(0.0, 0.0, -float(size[2]) * 0.5)
+				var ground := Vector3(cell.x, _ground_height(Vector2(cell)), cell.y)
+				return {"at": Vector2(head.x - ground.x, head.z - ground.z),
+					"height": placed.origin.y + float(LIE_HEIGHT.get(prop, 0.37)) - ground.y}
+	return {}
 
 
 ## The drawn bed whose head cell is [param cell] ({} for none).
@@ -17375,6 +17419,15 @@ const LIE_MIDDLE := 0.46
 ## bedroll there (npc's: the bed's head cell is the tile, the facing the way
 ## the head points); measured on the strip (build/sleep/strip.gd).
 const SLEEP_MIDDLE := 0.81
+## On a furnished bed (751 amended (4); pc-character's measure): the curled
+## body's root this far behind the pillow end (the bedroll's pillow end is
+## 0.46 ahead of the tile, the root SLEEP_MIDDLE behind it), so the head lies
+## on the pillow whatever the bed's length; _furnished_bed_lie's "at" is the
+## pillow end.
+const SLEEP_HEAD_BACK := SLEEP_MIDDLE + 0.46
+## The curl reaches 0.50 m before the root (the knees) and 0.27 behind (the back): slid back by
+## half the difference so it lies across the bed's middle (build/sleep/fit.gd, 751 amended (4)).
+const SLEEP_ASIDE := 0.11
 func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) -> void:
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
 	var lying := bool(work.get("lying", false)) or Time.get_ticks_msec() < int(puppet.get_meta("rising_until", 0))
@@ -17385,6 +17438,13 @@ func _lay(puppet: Node3D, body: Node3D, yaw: float, cell := Vector2i(-1, -1)) ->
 	if lying:
 		var ahead := Vector3(cos(yaw), 0.0, -sin(yaw))
 		offset = -ahead * (SLEEP_MIDDLE if work.has("down") else LIE_MIDDLE) * float(puppet.get_meta("model_scale", 1.0))
+		if work.has("down") and puppet.has_meta("lie_at"):
+			# On a furnished bed beside its cell (751 amended (4)): the head on its pillow end.
+			var pillow: Vector2 = puppet.get_meta("lie_at")
+			offset = Vector3(pillow.x, 0.0, pillow.y) - ahead * SLEEP_HEAD_BACK * float(puppet.get_meta("model_scale", 1.0))
+		if work.has("down"):
+			# Across the bed's or bedroll's middle, its knees not over the edge (SLEEP_ASIDE).
+			offset -= Vector3(-ahead.z, 0.0, ahead.x) * SLEEP_ASIDE * float(puppet.get_meta("model_scale", 1.0))
 		# On a bed or bedroll drawn under it (npc's and buildings' side, 751): its height.
 		offset.y = float(puppet.get_meta("bed_height", 0.0))
 	if body.position != offset:
