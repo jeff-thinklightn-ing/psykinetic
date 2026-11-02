@@ -1301,6 +1301,35 @@ func _test_forest() -> void:
 	var east: Vector2i = links[1]["tile"]
 	var path := World.find_path(player.tile, east)
 	_check(not path.is_empty(), "a way from the way in to the way on (%d steps)" % path.size())
+	# Safe paths, places near them (760; Jeff: "zones need to have safe paths with activities
+	# not too far off the paths"): every refuge and clearing within 20 cells' walk of a path.
+	var floor := {}
+	for cell: Vector2i in forest["terrain"]["floor"]:
+		floor[cell] = true
+	var off := {}
+	var todo: Array[Vector2i] = []
+	for cell: Vector2i in forest["terrain"]["kinds"]:
+		if forest["terrain"]["kinds"][cell] == "dirt" and floor.has(cell):
+			off[cell] = 0
+			todo.append(cell)
+	var head := 0
+	while head < todo.size():
+		var at := todo[head]
+		head += 1
+		for step: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			if floor.has(at + step) and not off.has(at + step):
+				off[at + step] = off[at] + 1
+				todo.append(at + step)
+	var far := []
+	for key: String in forest["places"]:
+		var place: Dictionary = forest["places"][key]
+		if place["kind"] == "refuge" and int(off.get(place["cell"], 999)) > 20:
+			far.append([key, off.get(place["cell"], "unreached")])
+	for clearing: Dictionary in forest.get("clearings", []):
+		var centre := Vector2i(int(clearing["centre"][0]), int(clearing["centre"][1]))
+		if int(off.get(centre, 999)) > 20:
+			far.append([centre, off.get(centre, "unreached")])
+	_check(not todo.is_empty() and far.is_empty(), "every refuge and clearing within 20 cells' walk of a path (%d path cells; too far: %s)" % [off.values().count(0), far])
 	_check(_main.load_map("test_room"), "back to the test room")
 	var sample := Level.load_level("sample")
 	var bridges: Array = sample["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == Level.BRIDGE)

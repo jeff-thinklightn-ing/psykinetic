@@ -95,6 +95,7 @@ data.pop("remade", None)
 json.dump(data, open(path, "w", encoding="utf-8"), indent="\t")
 PY
 run_host remade --test-exit-after=2
+check "$(count '\[level\] remade forest \(760\): 0 players moved' "$DIR/remade.log")" 1 "the forest, remade too, with nobody there"
 check "$(count '\[level\] remade hills \(756\): 1 players moved; dropped 1 entities, 1 herd groups, 0 plots, 1 felled cells' "$DIR/remade.log")" 1 "a save on the hills' old grid: its player moved, its entity and herd dropped, said once by count (756)"
 check "$(count 'joined as Player1 at \(7, 112\) \(back\)' "$DIR/remade.log")" 1 "the host comes back at the hills' arrival from the wilds"
 check "$(sed -n '/"remade": {/,/}/p' "$STATE" | grep -c '"hills": 756' || true)" 1 "the save keeps the remake as done"
@@ -102,6 +103,33 @@ check "$(count 'old-hills-deer' "$STATE")" 0 "the old grid's herd is gone from t
 run_host remade_again --test-exit-after=2
 check "$(count '\[level\] remade' "$DIR/remade_again.log")" 0 "the next boot moves nothing"
 check "$(count 'joined as Player1 at \(7, 112\) \(back\)' "$DIR/remade_again.log")" 1 "and the host is where it was left, in the hills"
+
+# 2d. The forest remade (decision 760) the same way, the hills' remake
+# already done in the save: only the forest is moved off, once.
+python -B - "$STATE" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+room = data["zones"]["test_room"]
+crate = [e for e in room["entities"] if e.get("name") == "Crate1"][0]
+data["zones"]["forest"] = {"tick": 0, "entities": [crate], "respawns": [], "ground": [], "records": []}
+for record in data["players"]:
+    if record["player_id"] == "dev-host":
+        record["zone"] = "forest"
+        record["tile"] = [46, 34]
+herds = data.setdefault("herds", {})
+herds.setdefault("groups", {})["old-forest-deer"] = {"species": "deer", "area": "forest", "home": [46, 34], "count": 3.0, "out": 0, "made": 0}
+herds["seeded"] = sorted(set(herds.get("seeded", [])) | {"forest"})
+data.setdefault("clearing", {})["forest"] = {"46,34": [1, 0]}
+data.setdefault("remade", {}).pop("forest", None)
+json.dump(data, open(path, "w", encoding="utf-8"), indent="\t")
+PY
+run_host forest_remade --test-exit-after=2
+check "$(count '\[level\] remade forest \(760\): 1 players moved; dropped 1 entities, 1 herd groups, 0 plots, 1 felled cells' "$DIR/forest_remade.log")" 1 "a save on the forest's old grid: its player moved, its entity and herd dropped, said once by count (760)"
+check "$(count '\[level\] remade hills' "$DIR/forest_remade.log")" 0 "the hills, remade already, left be"
+check "$(count 'joined as Player1 at \(220, 48\) \(back\)' "$DIR/forest_remade.log")" 1 "the host comes back at the forest's arrival from the wilds"
+check "$(sed -n '/"remade": {/,/}/p' "$STATE" | grep -c '"forest": 760' || true)" 1 "the save keeps the forest's remake as done"
+check "$(count 'old-forest-deer' "$STATE")" 0 "the forest's old herd is gone from the save"
 
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 echo 'this is not json' >"$STATE"

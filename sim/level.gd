@@ -62,7 +62,7 @@ const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vecto
 ## its players to the level's own arrival, its zone's saved section, its
 ## generation and its herds dropped (laid and seeded again from the level).
 ## A new remake of one bumps its number.
-const REMADE: Dictionary[String, int] = {"hills": 756}
+const REMADE: Dictionary[String, int] = {"hills": 756, "forest": 760}
 ## Grey per height level in height.png.
 const GREY_PER_LEVEL := 40
 const MAX_HEIGHT := 6

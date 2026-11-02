@@ -9,38 +9,94 @@
 	"clearings": [
 		{
 			"centre": [
-				14,
+				206,
 				48
-			],
-			"radius": 7
-		},
-		{
-			"centre": [
-				46,
-				34
 			],
 			"radius": 8
 		},
 		{
 			"centre": [
-				40,
-				72
+				168,
+				18
+			],
+			"radius": 7
+		},
+		{
+			"centre": [
+				45,
+				32
+			],
+			"radius": 10
+		},
+		{
+			"centre": [
+				176,
+				74
+			],
+			"radius": 9
+		},
+		{
+			"centre": [
+				118,
+				102
+			],
+			"radius": 10
+		},
+		{
+			"centre": [
+				64,
+				70
+			],
+			"radius": 7
+		},
+		{
+			"centre": [
+				112,
+				40
+			],
+			"radius": 7
+		},
+		{
+			"centre": [
+				82,
+				150
+			],
+			"radius": 8
+		},
+		{
+			"centre": [
+				150,
+				166
+			],
+			"radius": 7
+		},
+		{
+			"centre": [
+				192,
+				140
 			],
 			"radius": 6
 		},
 		{
 			"centre": [
-				80,
-				44
+				34,
+				188
 			],
-			"radius": 7
+			"radius": 5
+		},
+		{
+			"centre": [
+				118,
+				200
+			],
+			"radius": 5
 		}
 	],
 	"places": {
 		"hunters_lean_to": {
 			"at": [
-				42,
-				72
+				84,
+				152
 			],
 			"kind": "refuge",
 			"where": "forest",
@@ -49,8 +105,8 @@
 		},
 		"woodcutters_lean_to": {
 			"at": [
-				75,
-				15
+				34,
+				189
 			],
 			"kind": "refuge",
 			"where": "forest",
@@ -59,8 +115,8 @@
 		},
 		"thick_wood": {
 			"at": [
-				25,
-				66
+				82,
+				124
 			],
 			"kind": "refuge",
 			"where": "forest",
@@ -69,8 +125,8 @@
 		},
 		"boar_path": {
 			"at": [
-				44,
-				60
+				100,
+				126
 			],
 			"kind": "refuge",
 			"where": "forest",
@@ -79,8 +135,8 @@
 		},
 		"fletchers_tree": {
 			"at": [
-				80,
-				40
+				202,
+				42
 			],
 			"kind": "refuge",
 			"where": "forest",
@@ -102,59 +158,59 @@
 			"code": "H1"
 		}
 	],
+	"building_codes": {
+		"H": 1
+	},
 	"centre": [
-		87,
-		44
+		220,
+		48
 	],
 	"starts": [
 		[
-			86,
-			43
+			219,
+			47
 		],
 		[
-			86,
-			45
+			219,
+			49
 		],
 		[
-			86,
-			42
-		],
-		[
-			86,
+			219,
 			46
+		],
+		[
+			219,
+			50
 		]
 	],
 	"spawn_points": {
 		"from_wilds": [
-			87,
-			44
+			220,
+			48
 		],
 		"from_stronghold": [
-			40,
-			8
+			168,
+			7
 		]
 	},
 	"links": [
 		{
 			"at": [
-				89,
-				44
+				222,
+				48
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_forest"
 		},
 		{
 			"at": [
-				40,
-				6
+				168,
+				5
 			],
 			"to_map": "stronghold",
 			"to_spawn": "from_forest",
 			"closed": true
 		}
 	],
-	"entities": [],
-	"building_codes": {
-		"H": 1
-	}
+	"entities": []
 }

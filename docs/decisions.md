@@ -38127,3 +38127,54 @@ land's edge again and again), and its road-edge samples, like its middles, only 
 
 Ships with a cut (the level files change; clients read them), the server redeployed; protocol
 unchanged; no new class_name.
+
+## 760. Layout A, step 3: the forest rebuilt bigger
+
+Layout A's third step, the forest after the hills (756; design C:/dev/review/lands/step3.md,
+coordinator-approved). tools/make_forest.gd is current again (since 743 a rerun wrote the old
+west/east links) and writes the forest at the new size; the world plane is edited by hand.
+
+- **Where:** 224 x 224 cells at world (-224, 80) (was 96 x 96 at (-96, 84)): west of the wilds,
+  its east edge on the wilds' west edge, its north edge under Cravenhold's draft. The Woodlands'
+  draft rect grows west to cover it (-224, 0, 704, 448).
+- **Ways:** the link back to the wilds on the east edge at (222, 48) (world row 128, across from
+  the wilds' (14, 128), which keeps its cell and from_forest), the way in cut 7 cells wide
+  through the border band to it, arrivals two cells in, the starts beside them. The way on to the
+  stronghold, Cravenhold, on the north edge at (168, 5) (world column -56, where it was), still
+  closed.
+- **Its ground, the same pieces, more of them:** an uneven border band; 12 clearings (by the way
+  in, by the way on, the healer's, a crossing in the middle, the rest through the wood, a few
+  small ones deep in it); the main path 2 wide from the way in to the way on, winding (each path
+  swings up to 7 cells off its line in bends about 26 long, by its own noise, eased to nothing at
+  its ends; the old one was one sine), and side paths from it to the other clearings, all dirt on
+  grass (forest_grow.py stands trees on grass only).
+- **Places kept by name:** the five refuges (613 amended) at new cells: the hunters' lean-to in a
+  south-west clearing, the woodcutters' deep in the south-west, the thickest trees in a thick
+  stand 17 cells off the paths south-west of the middle, the boar path by the path south from the middle, the fletcher's tree by the
+  way in. The healer's turf house (718) stays where it stood, at (42, 27) facing south: the
+  generator copies its cells and walls from the level as it is (11 x 10 round it), so its place
+  key, forest/healers_hut@45,31 (Level.building_places, on its front cell), and its keeper, his
+  term (759) and the hut's town record keep their ids, as 718 kept them; its clearing (radius 10)
+  and a side path reach its front.
+- **Trunks:** grown again by terrain over this layout (tools/forest_grow.py, 100 years, seed 1:
+  4576 trees, none on a path or inside a clearing's radius + 1); the generator, run again, makes
+  each tree of 3 m or more a void cell (ForestPack.from_trees, 466): 4429 trunks. Then it closes
+  floor not walked to from the arrival (4-way) back into the border's wood, said by count: 9
+  single cells in the band's ragged edge. 40122 floor cells (was 6137).
+- **The middle crossing** (the coordinator: a six-way star read as drawn): the five paths into
+  the middle clearing join a short track across it, each at its own cell 2 to 5 apart. No water:
+  plan A gives the forest none.
+- **Safe paths, places near them** (Jeff: "zones need to have safe paths with activities not too
+  far off the paths"): every clearing lies on a path, and every refuge within 20 cells' walk of
+  one (0 to 17); the trackless thick wood is the space between.
+
+**A server's state on the old grid:** Level.REMADE {"forest": 760} beside the hills' (756's
+Main._move_off_remade): one count-only line, "[level] remade forest (760): N players moved;
+dropped E entities, G herd groups, P plots, F felled cells". Plots are dropped, not moved (the
+coordinator). state_test 2d: the save (the hills' remake already done) edited to hold the host,
+a crate, a deer herd and a felled cell in the forest on the old grid; the host comes back at the
+forest's arrival (220, 48), the rest dropped, the hills left be, the remake kept; 2c now also
+sees the forest remade with nobody there.
+
+Ships with a cut (the level files change; clients read them), the server redeployed; protocol
+unchanged; no new class_name.

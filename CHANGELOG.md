@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The forest is much bigger (224 by 224, was 96): a dozen clearings, a winding path from the wilds to the closed way north with side paths, the refuges and the healer's turf house where it stood (760).
 - Tools: the playtest tours talk to the fallen knight at every step of his quest and after a restart, and check who sleeps in a bed at night (754 amended (7)).
 - The healer in the wilds sleeps in his hut again, not on a bedroll at his door (751).
 - Tools: the forest grower keeps each tree on the cell it grew in, so none is written onto a path beside it (467 amended).
