@@ -1079,16 +1079,22 @@ func _test_balance_herder(grim: Resident, fold: String) -> void:
 	greet.call()
 	_check(said.call("days_last"), "the last day (%s)" % [told])
 	# Judged balanced: the party line to the area, his ending once, thanks to one who brought meat home.
+	# Two more pieces brought home, and no talk before the judging: settled at the judging all the same.
+	World.balance._quests[fold]["home_by"] = {name: 3}
 	_main._balance_keep()
 	World.balance._quests.erase(fold)
 	told.clear()
 	_main._on_balance_judged(fold, "balanced")
 	var party := str(rules.get("party", {}).get("balanced", "")) % "Grim"
 	_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "party" and each["text"] == party), "the players in the area read it (%s)" % [told])
+	card = Townsfolk.card_of(World.production, grim.worker_id)
+	var judged_at := int(card.get("standing", {}).get(player.player_id, {}).get("score", 0))
+	_check(judged_at == after + 2 + Main.BALANCE_THANKS and not said.call("balanced"),
+		"settled at the judging without a talk: +2 brought home and the thanks (%d -> %d), his words wait" % [after, judged_at])
 	greet.call()
 	card = Townsfolk.card_of(World.production, grim.worker_id)
-	_check(said.call("balanced") and int(card.get("standing", {}).get(player.player_id, {}).get("score", 0)) == after + Main.BALANCE_THANKS,
-		"his thanks, and standing for the meat brought home (%s)" % [told])
+	_check(said.call("balanced") and int(card.get("standing", {}).get(player.player_id, {}).get("score", 0)) == judged_at,
+		"his thanks in words at the next talk, and no more standing: no double thanks, no double count (%s)" % [told])
 	greet.call()
 	_check(not said.call("balanced"), "told once")
 	# A new ask, heard on a click first: no hail after it.

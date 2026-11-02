@@ -6151,6 +6151,7 @@ func _on_balance_judged(fold_id: String, outcome: String) -> void:
 	_balance_ends[fold_id] = {"outcome": outcome, "at": day, "until": day + int(World.balance.rules.get("rest_days", 4)),
 		"quest": _balance_seen.get(fold_id, World.balance.quest(fold_id)), "few": bool(World.balance.regrowing(fold_id).get("few", false))}
 	_balance_seen.erase(fold_id)
+	_balance_settle_all(fold_id, _balance_ends[fold_id]["quest"], outcome)
 	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder")) if World.production != null else "herder"
 	var who := str(World.production.worker("%s:%s" % [trade, fold_id]).get("name", "")) if World.production != null else ""
 	var line := str(Townsfolk.rules().get("balance", {}).get("party", {}).get(outcome, ""))
@@ -6241,26 +6242,85 @@ func _balance_card(body: Resident, card: Dictionary, player_id: String, mine: Di
 ## [param player]'s standing with the herder moved by what [param quest]
 ## counts against their name since last settled in [param mine]: +1 a piece
 ## brought home (BALANCE_HOME_MOST at most), -1 a piece left lying.
-func _balance_settle(card: Dictionary, player: Player, quest: Dictionary, mine: Dictionary, fold := "") -> void:
+func _balance_settle(card: Dictionary, player_id: String, label: String, quest: Dictionary, mine: Dictionary, fold := "") -> void:
 	if quest.is_empty():
 		return
 	if int(mine.get("from", -1)) != int(quest.get("from", -1)):
 		mine["from"] = int(quest.get("from", -1))
 		mine["left"] = 0
 		mine["home"] = 0
-	var name := World._label_of(player)
-	var left := int(quest.get("left_by", {}).get(name, 0))
-	var home := mini(int(quest.get("home_by", {}).get(name, 0)), BALANCE_HOME_MOST)
+	var left := int(quest.get("left_by", {}).get(label, 0))
+	var home := mini(int(quest.get("home_by", {}).get(label, 0)), BALANCE_HOME_MOST)
 	var gained := home - int(mine.get("home", 0))
 	var lost := left - int(mine.get("left", 0))
 	if gained > 0:
-		Standing.bump(card, player.player_id, gained, "meat brought home off his hill", World.production.now())
+		Standing.bump(card, player_id, gained, "meat brought home off his hill", World.production.now())
 		print("[regard] fold %s herder +%d: meat brought home" % [fold, gained])
 	if lost > 0:
-		Standing.bump(card, player.player_id, -lost, "meat left lying on his hill", World.production.now())
+		Standing.bump(card, player_id, -lost, "meat left lying on his hill", World.production.now())
 		print("[regard] fold %s herder -%d: meat left lying" % [fold, lost])
 	mine["left"] = left
 	mine["home"] = home
+
+
+## [param player_id]'s thanks for a balanced ending of [param quest] they
+## brought meat home in (labelled [param label]), once a quest (mine's
+## "thanked" = its "from").
+func _balance_thank(card: Dictionary, player_id: String, label: String, quest: Dictionary, mine: Dictionary, fold := "") -> void:
+	if int(quest.get("home_by", {}).get(label, 0)) <= 0 or int(mine.get("thanked", -1)) == int(quest.get("from", -1)):
+		return
+	mine["thanked"] = int(quest.get("from", -1))
+	Standing.bump(card, player_id, BALANCE_THANKS, "kept the wolves off his flock", World.production.now())
+	print("[regard] fold %s herder +%d: thanks, balanced" % [fold, BALANCE_THANKS])
+
+
+## The player id whose label (World._label_of: their name) is [param label]:
+## the one saved record or spawned player so named, "" for none or for two.
+func _balance_player_id(label: String) -> String:
+	var ids: Array[String] = []
+	for id: String in _records:
+		if _records[id].name == label:
+			ids.append(id)
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if is_instance_valid(player) and not player.player_id.is_empty() and World._label_of(player) == label and player.player_id not in ids:
+			ids.append(player.player_id)
+	return ids[0] if ids.size() == 1 else ""
+
+
+## At judging, every player in [param quest]'s ledger is settled on the
+## herder's card whether or not they come back to him (the coordinator, after
+## playtest's run): what they brought home and left lying, and the thanks for
+## a balanced ending. His words wait for their next talk, which settles 0 more.
+## A label not to one player (two of the name) is left to that talk.
+func _balance_settle_all(fold: String, quest: Dictionary, outcome: String) -> void:
+	if quest.is_empty() or World.production == null:
+		return
+	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder"))
+	var worker := "%s:%s" % [trade, fold]
+	var card := Townsfolk.card_of(World.production, worker)
+	if card.is_empty():
+		return
+	var labels: Array = (quest.get("home_by", {}) as Dictionary).keys()
+	for label: Variant in quest.get("left_by", {}):
+		if label not in labels:
+			labels.append(label)
+	labels.sort()
+	var all: Dictionary = card.get("balance", {})
+	var settled := 0
+	for label: Variant in labels:
+		var player_id := _balance_player_id(str(label))
+		if player_id.is_empty():
+			continue
+		var mine: Dictionary = all.get(player_id, {})
+		_balance_settle(card, player_id, str(label), quest, mine, fold)
+		if outcome == "balanced":
+			_balance_thank(card, player_id, str(label), quest, mine, fold)
+		all[player_id] = mine
+		settled += 1
+	card["balance"] = all
+	World.production.set_card(worker, card)
+	print("[regard] fold %s judged %s: %d of %d players settled" % [fold, outcome, settled, labels.size()])
 
 
 ## The herder [param body]'s talk of his fold's quest to [param player] who
@@ -6284,10 +6344,9 @@ func _balance_words(body: Resident, player: Player) -> bool:
 	if not end.is_empty() and int(mine.get("told", -1)) != int(end["at"]):
 		var ended: Dictionary = end["quest"]
 		if not card.is_empty():
-			_balance_settle(card, player, ended, mine, fold)
-			if str(end["outcome"]) == "balanced" and int(ended.get("home_by", {}).get(World._label_of(player), 0)) > 0:
-				Standing.bump(card, player.player_id, BALANCE_THANKS, "kept the wolves off his flock", World.production.now())
-				print("[regard] fold %s herder +%d: thanks, balanced" % [fold, BALANCE_THANKS])
+			_balance_settle(card, player.player_id, World._label_of(player), ended, mine, fold)
+			if str(end["outcome"]) == "balanced":
+				_balance_thank(card, player.player_id, World._label_of(player), ended, mine, fold)
 		mine["told"] = int(end["at"])
 		var key := str(end["outcome"])
 		if key == "balanced" and bool(end.get("few", false)) and not _balance_line("balanced_few", body, player).is_empty():
@@ -6296,7 +6355,7 @@ func _balance_words(body: Resident, player: Player) -> bool:
 	elif not quest.is_empty():
 		mine["hailed"] = int(quest.get("from", -1))  # Heard the ask: no hail after it.
 		if not card.is_empty():
-			_balance_settle(card, player, quest, mine, fold)
+			_balance_settle(card, player.player_id, World._label_of(player), quest, mine, fold)
 		var left_lying := int(quest.get("left_by", {}).get(World._label_of(player), 0))
 		said.append(_balance_line("grudge" if left_lying >= BALANCE_GRUDGE_LEFT else "ask", body, player))
 		var sheep := World.stockpile.count(fold, "sheep") if World.stockpile != null else 0

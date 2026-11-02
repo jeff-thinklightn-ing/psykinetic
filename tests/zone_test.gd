@@ -209,8 +209,22 @@ func _test_restart() -> void:
 	World.towns.raise_threat("test_room/probe_town", "wolves", "probe")  # A threat in town, held (762).
 	var blood := {"test_room": [3, 4, clock + 1000]}  # A wounded beast's trail, fading at its step (764 amended).
 	World.blood_from_dict(blood)
+	# The balance (761): a fold regrowing and a quest open, by value through the save and the load.
+	_check(World.balance != null, "(the world keeps a balance)")
+	if World.balance != null:
+		World.balance._regrow["probe_fold"] = {"to": 5, "few": true}
+		World.balance._quests["probe_fold"] = {"area": "test_room", "town": "", "from": 3, "until": 7, "flock": 4, "wolves": 2.5, "deer": 20.0,
+			"lost": 1, "left": 1, "home": 2, "left_by": {"probe_a": 1}, "home_by": {"probe_b": 2}}
 	_main._save_state()
 	var snapshot := Snapshot.load(Net.state_path)
+	if World.balance != null:
+		var back := Balance.new(snapshot.get("balance", {}))
+		var quest := back.quest("probe_fold")
+		_check(back.regrowing("probe_fold") == {"to": 5, "few": true} and int(quest.get("flock", 0)) == 4 and int(quest.get("home", 0)) == 2
+			and int(quest.get("home_by", {}).get("probe_b", 0)) == 2 and int(quest.get("left_by", {}).get("probe_a", 0)) == 1,
+			"the balance comes back by value: a regrowing fold, an open quest and its ledger (761; %s, %s)" % [back.regrowing("probe_fold"), quest])
+		World.balance._regrow.erase("probe_fold")
+		World.balance._quests.erase("probe_fold")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
 	var dropped: Array = saved.keys().filter(func(key: String) -> bool: return key != "version" and not snapshot.has(key))
 	_check(dropped.is_empty(), "every key the save writes, the load gives back (758; dropped: %s)" % [dropped])

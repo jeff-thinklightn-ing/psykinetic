@@ -38742,3 +38742,18 @@ enemy-ai's wire change (rev 45), and without it this side draws nothing new. No 
   at -10 dBFS for -4. It only ever erred quieter, never clipped.
 sound_kit_test (the kinds that cry, the slots' reach and takes). Client only; protocol
 unchanged; no new class_name.
+761 amended (release's label; the coordinator's call after playtest's balanced run; npc handed over its herder
+code): regard is settled at judging. Before, a player's standing with the herder moved only when
+they next clicked him, so one who hunted and never came back before the next ask lost what they
+had earned. Main._balance_settle_all runs from _on_balance_judged and settles every label in the
+quest's ledger (home_by and left_by) on the herder's card: +1 a piece brought home (3 at most), -1
+a piece left lying, and on a balanced ending BALANCE_THANKS to each who brought meat home. A label
+resolves to a player id through _records, which holds every saved player (offline ones too since
+it loads from the snapshot), or through a spawned player. A name held by two players is left to
+the talk-time settle. One card read and one write. His words still wait for the next talk, which
+settles 0 more (mine's home and left by the quest's "from", and "thanked"). _balance_settle takes
+a player id and label, not a Player; _balance_thank is new. Log: "[regard] fold <place id> judged
+<outcome>: N of M players settled", place ids and numbers only. zone_test _test_restart (release's
+ask): a regrowing fold and an open quest with its ledger come back by value through _save_state
+and Snapshot.load. resident_test: settled at the judging without a talk, then no double thanks or
+count. Server only; protocol unchanged; no new class_name; no bullet.
