@@ -154,9 +154,19 @@ func steers(area: String, species: String) -> bool:
 	return species == _predator() and governs(area)
 
 
-## [param area]'s wolves' breeding, times carrion_breed while meat lies there.
+## [param area]'s wolves' breeding: wolf_breed times their species' own (so
+## they follow the deer within days), times carrion_breed while meat lies there.
 func breed_factor(area: String) -> float:
-	return float(rules.get("carrion_breed", 2.0)) if lying(area) > 0 else 1.0
+	return float(rules.get("wolf_breed", 1.0)) * (float(rules.get("carrion_breed", 2.0)) if lying(area) > 0 else 1.0)
+
+
+## The wolves [param area] keeps without troubling a fold: calm_deer of the
+## deer its ground keeps, in wolves (wolf_per_deer), so an area with more
+## deer is calm with more; calm_wolves where calm_deer is not given.
+func calm(area: String) -> float:
+	if not rules.has("calm_deer") or herds == null:
+		return float(rules.get("calm_wolves", 3.0))
+	return float(rules["calm_deer"]) * herds.capacity(area, _prey()) / maxf(float(rules.get("wolf_per_deer", 8.0)), 0.001)
 
 
 ## How hungry [param area]'s wolves are, 0..1 (0 with none).
@@ -337,7 +347,7 @@ func tick() -> void:
 			if _bodies_out(area):
 				continue  # The bodies take what they take (enemy-ai's side).
 			var wolves := herds.total(area, _predator())
-			var a_day := maxf(wolves - float(rules.get("calm_wolves", 3.0)), 0.0) * float(rules.get("sheep_base", 0.17)) 				+ wolves * float(rules.get("sheep_hungry", 0.6)) * hunger(area)
+			var a_day := maxf(wolves - calm(area), 0.0) * float(rules.get("sheep_base", 0.17)) 				+ wolves * float(rules.get("sheep_hungry", 0.6)) * hunger(area)
 			_pressure[fold["id"]] = float(_pressure.get(fold["id"], 0.0)) + a_day * days
 	var day := steps / day_steps
 	if day != _day:
@@ -389,6 +399,23 @@ func _daily() -> void:
 		elif _quests.has(id) and _day >= int(_quests[id]["until"]):
 			_judge(fold)
 	_town_nights()
+
+
+## Fold [param fold_id]'s quest asked now (the console's "balance ask": tours
+## and tests), not waiting on its losses or its rest: "" when asked, else why
+## not.
+func ask_now(fold_id: String) -> String:
+	if _quests.has(fold_id):
+		return "already asked"
+	for fold in folds_in():
+		if str(fold["id"]) == fold_id:
+			if _day < 0:
+				_day = now() / maxi(DayNight.day_steps, 1)
+				_at = now()
+			_rest.erase(fold_id)
+			_ask(fold)
+			return ""
+	return "no fold %s where the balance is kept" % fold_id
 
 
 func _ask(fold: Dictionary) -> void:

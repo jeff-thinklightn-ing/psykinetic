@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_bodies_out()
 	_test_fed()
 	_test_saved()
+	_test_ask_now()
 	_herds.balance = null  # The two hold each other: let them go.
 	get_tree().quit(1 if _failures > 0 else 0)
 
@@ -147,7 +148,8 @@ func _test_capacity() -> void:
 	_balance.cell_changed("meadow", AT, PackedInt32Array([9001, 9002, 9003]))
 	_check(_balance.lying("meadow") == 2, "two meat lying, the hide not counted (%d)" % _balance.lying("meadow"))
 	_check(is_equal_approx(_herds.capacity("meadow", "wolf"), 6.5), "and they hold half a wolf more (%.2f)" % _herds.capacity("meadow", "wolf"))
-	_check(_balance.breed_factor("meadow") == 2.0, "and the wolves breed twice as fast")
+	var breed := float(_balance.rules.get("wolf_breed", 1.0))
+	_check(is_equal_approx(_balance.breed_factor("meadow"), breed * 2.0), "and the wolves breed twice as fast (%.1f)" % _balance.breed_factor("meadow"))
 	_check(not _balance.steers("fields", "wolf") and _herds.capacity("fields", "wolf") > 0.0 			and not is_equal_approx(_herds.capacity("fields", "wolf"), _herds.total("fields", "deer") / 8.0),
 		"an area that doesn't keep it holds wolves by its ground, as ever")
 	_balance.cell_changed("fields", AT, PackedInt32Array([9001]))
@@ -164,7 +166,7 @@ func _test_meat() -> void:
 	print("\n== meat lying: taken up, brought home, eaten, rotted; who left it ==")
 	_fresh()
 	_start(0.8)
-	_days(6.0)
+	_until(func() -> bool: return not _asked.is_empty(), 6)
 	_check(_asked.size() == 1, "six wolves on plenty of deer take sheep, and the fold asks (%d sheep left)" % _stock.count(FOLD, "sheep"))
 	var cell := AT + Vector2i(3, 0)
 	for uid in [101, 102, 103, 104]:
@@ -193,10 +195,12 @@ func _test_balanced() -> void:
 	var room := _start(0.85)
 	_check(_until(func() -> bool: return not _asked.is_empty(), 10), "the fold asks (day %d)" % (_now / DAY))
 	var sheep := _stock.count(FOLD, "sheep")
-	_put("meadow", "deer", room * 0.55)
+	_put("meadow", "deer", room * 0.45)
 	_check(_until(func() -> bool: return not _judged.is_empty(), 6), "judged at the deadline")
 	_check(_judged.size() == 1 and _judged[0][1] == "balanced", "balanced (%s; wolves %.1f, deer %.1f of %.1f)" % [_judged, _herds.total("meadow", "wolf"), _herds.total("meadow", "deer"), room])
-	_check(_stock.count(FOLD, "sheep") >= sheep + 1, "lambs to the fold (%d from %d)" % [_stock.count(FOLD, "sheep"), sheep])
+	var most := int(_balance.rules.get("judge", {}).get("lost_most", 1))
+	_check(_stock.count(FOLD, "sheep") >= sheep - most + int(_balance.rules.get("thrive", {}).get("lambs", 2)),
+		"lambs to the fold, past the few lost (%d from %d)" % [_stock.count(FOLD, "sheep"), sheep])
 	_check(_stock.count(TOWN, "wool") == 4 and _stock.count(TOWN, "meat") == 5, "wool and meat to the town (%d, %d)" % [_stock.count(TOWN, "wool"), _stock.count(TOWN, "meat")])
 	_check(_balance.quest(FOLD).is_empty() and _threats.is_empty(), "the quest is done, and no threat")
 
@@ -282,6 +286,20 @@ func _test_fed() -> void:
 	_put("meadow", "wolf", 6.0)
 	_days(2.5)
 	_check(_herds.fed(wolves) < 0.1, "no deer, no rabbits: unfed (%.2f)" % _herds.fed(wolves))
+
+
+## Asked now (the console's "balance ask": tours and tests): a calm fold's
+## quest opens at once, once; no such fold, why not.
+func _test_ask_now() -> void:
+	print("== asked now ==")
+	_fresh()
+	_start(0.3)
+	_days(1.0)
+	_check(_asked.is_empty(), "a calm fold has not asked")
+	_check(_balance.ask_now(FOLD) == "" and _asked == [FOLD] and not _balance.quest(FOLD).is_empty(), "asked now (%s)" % [_asked])
+	_check(_balance.ask_now(FOLD) == "already asked" and _asked.size() == 1, "once")
+	_check(not _balance.ask_now("nowhere").is_empty(), "no such fold: why not")
+	_check(_balance.calm("meadow") > 0.0 and _balance.calm("fields") > 0.0, "the calm wolves, by the deer room (%.1f)" % _balance.calm("meadow"))
 
 
 func _test_saved() -> void:

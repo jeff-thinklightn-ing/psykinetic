@@ -142,12 +142,12 @@
 			"wolf": {"size": [2, 3], "mix": {"wolf": 1}, "density": 0.15, "breed": 0.02, "roam": 20, "keep_off": 30, "path_keep_off": 8, "prey": ["rabbit", "deer"], "eats": 0.1}
 		}
 	},
-	"balance": {"_": "Decision 761 (Jeff: keep the balance, phase 1; test levels only, an area whose level's herds say balance): wolves the area holds are its deer / wolf_per_deer plus meat lying / meat_per_wolf, past it they leave (leave of the excess a day), under it they breed times carrion_breed while meat lies; meat rots after rot_days; hunger 1 - (deer + lying / meat_per_deer) / (wolves x deer_each); a fold loses (wolves - calm_wolves) x sheep_base + wolves x sheep_hungry x hunger sheep a day; ask.lost sheep in ask.days asks; judged deadline_days on (judge); thrive, back, rest_days and town_wolves as in sim/balance.gd. Drafts, Jeff's to move.",
+	"balance": {"_": "Decision 761 (Jeff: keep the balance, phase 1; test levels only, an area whose level's herds say balance): wolves the area holds are its deer / wolf_per_deer plus meat lying / meat_per_wolf, past it they leave (leave of the excess a day), under it they breed wolf_breed times their own (following the deer within days), times carrion_breed while meat lies; meat rots after rot_days; hunger 1 - (deer + lying / meat_per_deer) / (wolves x deer_each); a fold loses (wolves - calm) x sheep_base (calm: calm_deer of the deer the ground keeps, in wolves; else calm_wolves) + wolves x sheep_hungry x hunger sheep a day; ask.lost sheep in ask.days asks; judged deadline_days on (judge); thrive, back, rest_days and town_wolves as in sim/balance.gd. Drafts, Jeff's to move.",
 		"prey": "deer", "predator": "wolf", "meat": ["meat"], "fold_reach": 4,
-		"wolf_per_deer": 8, "meat_per_wolf": 4, "meat_per_deer": 4, "deer_each": 3, "leave": 1.0, "carrion_breed": 2.0, "rot_days": 1,
-		"calm_wolves": 3, "sheep_base": 0.17, "sheep_hungry": 0.6,
+		"wolf_per_deer": 8, "meat_per_wolf": 4, "meat_per_deer": 4, "deer_each": 3, "leave": 1.0, "wolf_breed": 40, "carrion_breed": 2.0, "rot_days": 1,
+		"calm_wolves": 3, "calm_deer": 0.45, "sheep_base": 1.0, "sheep_hungry": 0.6,
 		"ask": {"lost": 2, "days": 4}, "deadline_days": 4, "rest_days": 4,
-		"judge": {"lost_most": 1, "left_most": 3, "deer_low": 0.5, "deer_high": 0.9, "bad_wolves": 1.5, "bad_left": 12},
+		"judge": {"lost_most": 3, "left_most": 3, "deer_low": 0.35, "deer_high": 0.55, "bad_wolves": 1.5, "bad_left": 12},
 		"thrive": {"lambs": 2, "wool": 4, "meat": 3},
 		"back": {"days": 5, "sheep": 3},
 		"town_wolves": {"count": 3, "nights": 3, "takes": ["meat", "sheep", "food"]}},

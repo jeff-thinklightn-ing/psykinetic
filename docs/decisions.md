@@ -38505,3 +38505,31 @@ snags.
 herds_test _test_short_days (5 ticks a day, 100 a tick: the last area seeded by day 21) and
 _test_seed_now; farm_test (no butchery: the fold answers to the town). Server only; protocol
 unchanged; no new class_name; no bullet.
+
+761, economy's side (3) (release's label; the coordinator's ask, from playtest's arithmetic): the quest retuned to
+what one player can do. Before it, on the hills' ground, about 32 of room 64 deer were seeded with
+2 wolves, which bred at 2% a day. The wolves stayed under calm_wolves and far under what the deer
+could feed, so the fold never lost a sheep and never asked. Thinning the deer couldn't move the
+wolves either, and "balanced" needed 15 or more deer and 60-75 meat. Rules numbers
+(levels/economy.json "balance"), with two knobs that read them:
+- wolf_breed 40: in an area that keeps the balance, wolves breed 40 times their species' own
+  (Balance.breed_factor). They follow what the deer hold within days, so taking deer takes wolves
+  away within a day (leave 1.0).
+- calm_deer 0.45: the wolves a fold can bear are 0.45 of the deer room, in wolves
+  (Balance.calm(area); calm_wolves stays as the fallback). An area with more deer bears more
+  wolves, and deer x2 doesn't swamp the fold. sheep_base 1.0 a wolf past calm.
+- judge: lost_most 3 (the nights before a player can act cost sheep), deer_low 0.35 and
+  deer_high 0.55 of the room. The deer are seeded at half the room and rise, so the band sits
+  just under where the ask comes.
+tools/balance_table (a day-by-day sim on a real area's ground: the herds seeded as the game seeds
+them, the balance on, one fold, a player who takes N deer over the quest's first two days and
+brings all the meat home). The hills: the fold asks on day 7. Taking 0 deer is off (the wolves
+rise and the deer pass the band). 4 deer (about 15 meat and 4 hides, 4 pack slots, one trip) and
+8 deer (about 30 meat and 8 hides, 8 slots, one or two trips) are balanced. 15 deer is off
+(deer under the band). With deer x2 it takes about 15. "badly" is unchanged: 12 meat (3 deer)
+left lying.
+Tours and tests: Balance.ask_now(fold) and the console's "balance [ask <fold>]". It shows each
+keeping area's deer and wolves against their room and calm, the meat lying, and each fold's sheep,
+quest and outcome if judged now. balance_test retuned (the band at 0.45, lambs past the few lost)
+plus _test_ask_now. No level keeps the balance yet (761), so no player sees it: no bullet. Server
+only; protocol unchanged; no new class_name.

@@ -18299,6 +18299,7 @@ const CONSOLE_HELP: Array[String] = [
 	"zone move <player> <zone>: that player and their companion to that zone's start",
 	"gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said)",
 	"herds [seed <area>|all]: each area's game, seeded or its ground still building; or seeded now",
+	"balance [ask <fold>]: the keep-the-balance areas' deer, wolves and folds, each quest and its outcome if judged now; or a fold's quest asked now",
 	"move <player> <x> <y> [zone] | move <player> <building code> [zone]: a player to a cell",
 	"mark <player> <mark>|-<mark>: a mark on a player, or one taken off",
 	"reset: this room rebuilt from its map",
@@ -18470,6 +18471,8 @@ func admin_command(line: String, caller: Player = null) -> String:
 			return _gold_command(words)
 		"herds":
 			return _herds_command(words)
+		"balance":
+			return _balance_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
@@ -18505,6 +18508,42 @@ func _herds_command(words: PackedStringArray) -> String:
 		lines.append("%s: %s, %d groups%s" % [area, "seeded" if each["seeded"] else "not seeded",
 			World.herds.groups_in(area).size(), going])
 	return "\n".join(lines) if not lines.is_empty() else "herds: no areas"
+
+
+## "balance [ask <fold>]" (761): each area that keeps the balance, its deer
+## and the room for them, its wolves and the room for them, the meat lying,
+## and each fold: its sheep, its quest (days left, lost, left, home) and the
+## outcome were it judged now; with ask, that fold's quest asked now (tours
+## and tests). Counts only.
+func _balance_command(words: PackedStringArray) -> String:
+	var balance: Balance = World.balance
+	if balance == null or World.herds == null:
+		return "balance: none"
+	if words.size() >= 2 and words[1].to_lower() == "ask":
+		if words.size() < 3:
+			return "usage: balance ask <fold>"
+		var why := balance.ask_now(words[2])
+		return "%s: asked now" % words[2] if why.is_empty() else "%s: %s" % [words[2], why]
+	var names: Array = World.herds.areas.keys().filter(func(area: String) -> bool: return balance.governs(area))
+	names.sort()
+	if names.is_empty():
+		return "balance: no area keeps it"
+	var day := balance.now() / maxi(DayNight.day_steps, 1)
+	var lines: Array[String] = []
+	for area: String in names:
+		lines.append("%s: deer %.0f of room %.0f, wolves %.1f of room %.1f (calm %.1f), meat lying %d, hunger %.2f" % [area,
+			World.herds.total(area, "deer"), World.herds.capacity(area, "deer"), World.herds.total(area, "wolf"),
+			World.herds.capacity(area, "wolf"), balance.calm(area), balance.lying(area), balance.hunger(area)])
+		for fold: Dictionary in balance.folds_in(area):
+			var id := str(fold["id"])
+			var quest := balance.quest(id)
+			var state := "no quest"
+			if not quest.is_empty():
+				state = "quest: %d days left, wolves at the ask %.1f, lost %d, left lying %d, home %d; %s if judged now" % [
+					int(quest["until"]) - day, float(quest["wolves"]), int(quest["lost"]), int(quest["left"]), int(quest["home"]),
+					balance.outcome(id)]
+			lines.append("  fold %s (town %s): %d sheep, %s" % [id, str(fold.get("town", "")), int(fold["sheep"]), state])
+	return "\n".join(lines)
 
 
 ## "gold <player or id prefix> <amount> [why]" (decision 709): the admin gives
