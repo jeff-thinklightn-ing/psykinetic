@@ -38561,7 +38561,9 @@ but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim onl
   (6) of its previous step into a cell (GridEntity.step_gap, stamped by World._stepped_off; server
   only, not replicated). One walking on is heard as before; one tapping forward a cell at a time
   is not. Found at its side unawares (NOTICE_ALWAYS, not struck, not already wary), prey stands
-  startled STARTLE_TICKS (5) before it bolts: the time for one blow. Scent (downwind, 316) and
+  startled STARTLE_TICKS (12; was 5, too short for a spear click to land: playtest) before it
+  bolts: the time for one blow. Each blow on a felled_by_surprise kind logs "[hunt] <it> struck
+  from <d>: <grazing|startled|alert...>, felled|not felled" (no player names). Scent (downwind, 316) and
   cover (508) work as before.
 - A surprise blow fells game (playtest's melee stalk: 0 kills in 10; twice beside a deer unheard,
   the blow landed for a spear's 2 and it was gone): struck unawares (grazing, or startled) from

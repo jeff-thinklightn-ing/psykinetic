@@ -97,7 +97,7 @@ const BLEED_TICKS := 100
 const DOWN_BELOW := 0.25
 const DOWN_TICKS := 600
 const STALK_STEP_TICKS := 6
-const STARTLE_TICKS := 5
+const STARTLE_TICKS := 12
 ## A blow from this near (cells) on game unawares fells a "felled_by_surprise"
 ## kind (764): a melee blow, a spear's reach.
 const SURPRISE_REACH := 2
@@ -547,13 +547,19 @@ func _flee(threat: Vector2i, routs := true) -> void:
 ## whose row says "felled_by_surprise" (deer, stag, rabbit; not the boar,
 ## who turns and fights) goes down at once, to be finished.
 func note_struck(by: GridEntity) -> void:
-	var unaware := (alert == Alert.IDLE or World.tick < _startle_until) and World.tick >= _down_until
+	var startled := World.tick < _startle_until
+	var unaware := (alert == Alert.IDLE or startled) and World.tick >= _down_until
 	super(by)
 	if role != Role.PREY:
 		return
 	_alarm_herd()  # Its cry, struck: its herd within hearing is wary (764).
-	if unaware and is_instance_valid(by) and World.distance(tile, by.tile) <= SURPRISE_REACH \
-			and bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("felled_by_surprise", false)):
+	var fells := bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("felled_by_surprise", false))
+	var d := World.distance(tile, by.tile) if is_instance_valid(by) else -1
+	if fells:
+		print("[hunt] %s struck from %d: %s, %s" % [name, d, "startled" if startled else ("grazing" if alert == Alert.IDLE else
+				("down" if World.tick < _down_until else Alert.keys()[alert].to_lower())),
+				"felled" if unaware and d >= 0 and d <= SURPRISE_REACH else "not felled"])
+	if unaware and fells and d >= 0 and d <= SURPRISE_REACH:
 		_startle_until = -1
 		_burst_until = -1
 		_down_until = World.tick + DOWN_TICKS
