@@ -38644,3 +38644,15 @@ new class_name.
 balance_test _test_balanced (regrows a lamb a day to 8) and _test_balanced_few (a pair at once,
 the regrowth survives a save and load, a lamb a day). Server only; protocol unchanged; no new
 class_name; no bullet (no level keeps the balance).
+
+764 amended (release's label; rides revision 45 beside 747 amended (5), no bump of its own):
+- Monster.Pose.DOWN (2): a deer down (after a burst while low, felled unawares, or a blow that
+  leaves it under DOWN_BELOW) lies DOWN, not SIT, so pc-character draws it on its belly, head up
+  and breathing; a dead one lies on its side as before. It stands again when DOWN_TICKS end.
+- Blood on the ground (World.blood): a wounded beast (Animal._bleed, under half) marks each new
+  cell it reaches; a mark lasts BLOOD_DAYS (1/24 of a game day, about 4 real minutes) and fades.
+  It is saved with the world (blood_to_dict / blood_from_dict), and Main sends the "blood"
+  message {level, add: [x, y, seconds left, ...], gone: [x, y, ...]} on World.blood_changed and
+  {full: true} on arrival. Terrain draws the specks (764, terrain's side).
+monster_test _test_deer_hunted (a wounded doe leaves 5 or more fresh marks). Protocol: revision
+45 (net.gd's 45 line); no new class_name.

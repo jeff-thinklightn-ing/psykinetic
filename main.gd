@@ -4043,6 +4043,10 @@ func _boot() -> void:
 	World.trampled_from_dict(snapshot["trampled"] if snapshot.get("trampled") is Dictionary else {})
 	if not World.grass_changed.is_connected(_on_grass_changed):
 		World.grass_changed.connect(_on_grass_changed)
+	# Blood on the ground, left by wounded game (decision 764).
+	World.blood_from_dict(snapshot["blood"] if snapshot.get("blood") is Dictionary else {})
+	if not World.blood_changed.is_connected(_on_blood_changed):
+		World.blood_changed.connect(_on_blood_changed)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -4537,6 +4541,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	_send_towns(peer, zone_name)
 	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
 	Net.message_to(peer, "grass", {"level": zone_name, "full": true, "flat": World.trampled_cells(zone_name)})
+	Net.message_to(peer, "blood", {"level": zone_name, "full": true, "add": World.blood_cells(zone_name), "gone": PackedInt32Array()})
 	World.update_visibility(peer, zone_name)
 
 
@@ -5685,6 +5690,7 @@ func _save_state(wait := true, final := false) -> void:
 		"plots": World.clearing.plots_to_dict() if World.clearing != null else {},
 		"roofs": World.roofs_damaged.keys(),
 		"trampled": World.trampled_to_dict(),
+		"blood": World.blood_to_dict(),  # Decision 764.
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"placed_captives": _placed_captives.duplicate(true),
@@ -6018,6 +6024,16 @@ func _on_telegraph(data: Dictionary) -> void:
 	elif telegraphs.has(id):
 		telegraphs.erase(id)
 		telegraph_ended.emit(id, bool(data.get("landed", false)))
+
+
+## Server: blood on [param level]'s ground was marked or faded
+## (World.blood_changed, decision 764): the players in its zone are told
+## ("blood" {level, add: [x, y, seconds left, ...], gone: [x, y, ...]};
+## on joining, "full" with every live mark). Terrain draws it.
+func _on_blood_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array) -> void:
+	var peers := World.peers_in(level)
+	if not peers.is_empty():
+		Net.broadcast_to(peers, "blood", {"level": level, "add": add, "gone": gone})
 
 
 ## Server: tall grass of [param level] was trampled or stood again

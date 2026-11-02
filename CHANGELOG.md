@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- A badly hurt deer lies down on its belly, head up and breathing, and gets up again if left (only a dead one lies on its side), and a wounded animal leaves a trail of blood on the ground that fades after a few minutes (764 amended).
 
 - The fallen knight can be talked to after his quest: his window shows his last words with a Farewell button (747 amended (5), ui's side).
 ## v0.1.198

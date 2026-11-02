@@ -157,6 +157,8 @@ var _wary_until := -1
 var _down_until := -1
 var _startle_until := -1
 var _bled_tick := -1
+## The last cell it bled on (World.mark_blood), NO_TILE for none.
+var _blood_at := NO_TILE
 
 
 func _ready() -> void:
@@ -569,7 +571,7 @@ func note_struck(by: GridEntity) -> void:
 		_burst_until = -1
 		_down_until = World.tick + DOWN_TICKS
 		alert = Alert.IDLE
-		pose = Pose.SIT
+		pose = Pose.DOWN
 		return
 	_burst_until = World.tick + STRUCK_BURST_TICKS * (2 if wary() else 1)
 
@@ -618,6 +620,9 @@ func wounded() -> bool:
 ## Wounded under half, prey bleeds a little now and then, never to death
 ## (764): left to run, it tires on.
 func _bleed() -> void:
+	if role == Role.PREY and wounded() and tile != _blood_at:
+		_blood_at = tile
+		World.mark_blood(tile)  # Its trail (764): terrain draws it.
 	if role != Role.PREY or not wounded() or hp <= 1:
 		_bled_tick = World.tick
 		return
@@ -626,11 +631,11 @@ func _bleed() -> void:
 		hp -= 1
 
 
-## Down (764): still, head low, not running from anyone; struck, it stays
-## down; its time out, it gets up, wary.
+## Down (764): lying (Pose.DOWN), not running from anyone; struck, it
+## stays down; its time out, it gets up, wary.
 func _lie_down_tick() -> void:
 	target = null
-	pose = Pose.SIT
+	pose = Pose.DOWN
 	if World.tick + 1 >= _down_until:
 		_down_until = -1
 		alert = Alert.SUSPICIOUS
@@ -649,7 +654,7 @@ func _flight_paced() -> bool:
 		_burst_until = -1
 		_down_until = World.tick + DOWN_TICKS
 		alert = Alert.IDLE
-		pose = Pose.SIT
+		pose = Pose.DOWN
 		return false
 	move_ticks = pace * (WOUNDED_TROT if wounded() else 1.0)
 	return true
