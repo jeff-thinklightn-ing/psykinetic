@@ -206,6 +206,7 @@ func _test_restart() -> void:
 	World.clearing.lay_plot("test_room", "store", "forge", Rect2i(2, 2, 7, 7), Vector2i(0, 1))
 	_main._crypt_told = {"probe": true}
 	_main._placed_captives = {"probe_camp": true}
+	World.towns.raise_threat("test_room/probe_town", "wolves", "probe")  # A threat in town, held (762).
 	_main._save_state()
 	var snapshot := Snapshot.load(Net.state_path)
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
@@ -245,6 +246,9 @@ func _test_restart() -> void:
 	# Saved, booted, saved again: each of those keys as it was (758).
 	_check(World.clearing.plots_of("test_room").size() == 1 and _main._crypt_told == {"probe": true} and _main._placed_captives == {"probe_camp": true},
 		"the plot, the told crypt and the placed captive are back after the restart")
+	_check(World.towns.threatened("test_room/probe_town") == "wolves" and World.towns.threat_of_town("test_room/probe_town").get("held") == ["probe"],
+		"a town's threat survives the restart, held as it was (762; %s)" % [World.towns.threat_of_town("test_room/probe_town")])
+	World.towns.lift_threat("test_room/probe_town")
 	_main._save_state()
 	var again: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
 	var changed: Array = DROPPED_ONCE.filter(func(key: String) -> bool: return again.get(key) != saved[key])

@@ -83,6 +83,10 @@ var _healer_terms := {}
 var _huts_empty := {}
 ## How near a player keeps a healer from leaving: he goes unseen (759).
 const HEALER_UNSEEN := 16
+## Threat in town (decision 762): a hostile within a town's radius + this
+## raises it; it lifts THREAT_CLEAR_HOURS game hours after the last was seen.
+const THREAT_REACH := 4
+const THREAT_CLEAR_HOURS := 1.0
 ## A temple's cells its visitors keep off (734 amended (4), _temple_keep),
 ## by zone and rect: {at: World.tick, cells}, looked again after TEMPLE_KEEP_TICKS.
 var _temple_keeps := {}
@@ -539,6 +543,9 @@ var town_states := {}
 ## Town id -> {map building code: awake} as the server last told ("town"
 ## "awake", decision 566), for the window light; the view's set_awake.
 var town_awake := {}
+## Town id -> the threat over it as the server last told ("town" "threat",
+## decision 762; absent, none): the bar's Barter reads it (_threat_near).
+var town_threats := {}
 ## Holdings place id -> the sheep its fold holds, as the server last told
 ## (economy's "folds" message, 640), for the beasts the view draws there.
 var fold_counts := {}
@@ -1752,8 +1759,8 @@ func _update_bar() -> void:
 	if player != null and World.distance(player.tile, _bar_for.tile) > HEARING_RANGE:
 		_close_bar()
 		return
-	if _bar_barter.visible and _asleep_seen(_bar_for):
-		_bar_barter.visible = false  # Fallen asleep with the bar up (751 amended (2)).
+	if _bar_barter.visible and (_asleep_seen(_bar_for) or not _threat_near(_bar_for.tile).is_empty()):
+		_bar_barter.visible = false  # Fallen asleep with the bar up (751 amended (2)), or a threat come (762).
 	var rect := bubbles.rect_of(_bar_for.get_instance_id())
 	if rect.size.y <= 0.0:
 		var at: Variant = _bubble_anchor(_bar_for.get_instance_id())
@@ -1783,8 +1790,8 @@ func _bar_talk_pressed() -> void:
 ## person (562; economy's rule: a trade in Items.TRADES, the medicine man
 ## too). Never one asleep (751 amended (2)): a sleeper doesn't trade.
 func _barters(resident: GridEntity) -> bool:
-	if _asleep_seen(resident):
-		return false
+	if _asleep_seen(resident) or not _threat_near(resident.tile).is_empty():
+		return false  # Asleep (751 amended (2)), or its town under a threat (762).
 	var trade := str(resident.get("trade")) if resident.get("trade") != null else ""
 	if trade == "merchant":
 		return _shop_counter_near(resident) != null
@@ -5965,8 +5972,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 ## repaired (Towns.building_changed): every peer, and this one, is told the
 ## town's buildings ("town" {town, buildings}).
 func _on_town_building_changed(town: String, _kind: String) -> void:
-	Net.broadcast("town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
-		"stage": World.towns.stage(town)})
+	Net.broadcast("town", _town_message(town))
 	World.open_roofs(town.get_slice("/", 0))
 
 
@@ -6083,8 +6089,19 @@ func _send_towns(peer: int, zone_name: String) -> void:
 		Net.message_to(peer, "huts", {"states": huts})
 	for town: String in World.towns.to_dict():
 		if town.begins_with(zone_name + "/"):
-			Net.message_to(peer, "town", {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
-				"stage": World.towns.stage(town)})
+			Net.message_to(peer, "town", _town_message(town))
+
+
+## The "town" message for [param town]: its buildings, awake, stage, and
+## (762) "threat", the kind over it, only while there is one (an ignorable
+## field: an old client shows Barter, the server refuses it).
+func _town_message(town: String) -> Dictionary:
+	var out := {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
+		"stage": World.towns.stage(town)}
+	var threat := World.towns.threatened(town)
+	if not threat.is_empty():
+		out["threat"] = threat
+	return out
 
 
 ## Server: the healer's huts of [param area] with a record (Towns.hut,
@@ -8931,6 +8948,8 @@ func _companion_taken_in_town(body: Resident, by: String) -> void:
 func _sync_residents() -> void:
 	if World.towns == null or World.production == null or World.holdings == null or _world_map == null:
 		return
+	_threats_seen()
+	_threats_lift()
 	var area: Dictionary = _world_map.areas.get(World.zone.name, {})
 	var wanted := {}
 	if not area.is_empty():
@@ -9077,6 +9096,7 @@ func _sync_residents() -> void:
 			break
 		wanted[str(each["key"])] = each
 	_bed_down_roofless(wanted, area)
+	_shelter_all(wanted, area)
 	var have := {}
 	for entity: GridEntity in World.townsfolk().duplicate():
 		var body := entity as Resident
@@ -9111,7 +9131,161 @@ func _sync_residents() -> void:
 	for who: String in wanted:
 		if not have.has(who):
 			_spawn_resident(wanted[who])
+	for entity: GridEntity in World.townsfolk():
+		(entity as Resident).sheltering = not World.towns.threatened((entity as Resident).town).is_empty()  # 762.
 	_notes_tick()
+
+
+## Threat in town (decision 762), seen in the zone World is in: a hostile
+## body (a monster not Companion.harmless) within a town's radius +
+## THREAT_REACH of its store, a predator (the wolves) "wolves", game never,
+## and any other monster "raid"; and
+## a raid group PRESENT for a town here, "raid". Each raises the town's
+## threat, or keeps it up (Towns.raise_threat).
+func _threats_seen() -> void:
+	for place_id: String in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(place_id)
+		if place.get("kind") != "stockpile":
+			continue
+		var store: Vector2i = place.get("cell", Vector2i.ZERO)
+		var reach := int(place.get("radius", 4)) + THREAT_REACH
+		var kind := ""
+		for monster: GridEntity in World.monsters():
+			if not monster.spawned or monster.hp <= 0 or Companion.harmless(monster) or World.distance(monster.tile, store) > reach:
+				continue
+			if monster is Animal and (monster as Animal).role != Animal.Role.PREDATOR:
+				continue  # Game turned on a player (a boar) is no threat to the town.
+			kind = "wolves" if monster is Animal else "raid"
+			if kind == "raid":
+				break
+		if not kind.is_empty():
+			_raise_threat(place_id, kind)
+	if World.raid_groups != null:
+		for id: String in World.raid_groups.groups:
+			var group: Dictionary = World.raid_groups.groups[id]
+			var town := str(group.get("town", ""))
+			if str(group.get("state", "")) == WorldRaids.PRESENT and str(World.holdings.place(town).get("area", "")) == World.zone.name:
+				_raise_threat(town, "raid")
+
+
+## [param town]'s threat raised or kept up (762); every peer told when it
+## comes ("town" "threat").
+func _raise_threat(town: String, kind: String, holder := "") -> void:
+	var before := World.towns.threatened(town)
+	World.towns.raise_threat(town, kind, holder)
+	if World.towns.threatened(town) != before:
+		_on_town_building_changed(town, "")
+
+
+## The threats unseen for THREAT_CLEAR_HOURS lifted (762): every peer told,
+## its folk out again, the first of them up and about saying so.
+func _threats_lift() -> void:
+	var clear := maxi(int(float(DayNight.day_steps) * THREAT_CLEAR_HOURS / 24.0), 1)
+	for each: Dictionary in World.towns.lift_stale(clear):
+		_on_town_building_changed(str(each["town"]), "")
+		_all_clear(str(each["town"]), str(each["kind"]))
+
+
+## The all-clear (762): the first of [param town]'s bodies here, awake and
+## not on the road, says townsfolk.json threat.all_clear for [param kind];
+## its folk stop sheltering at once.
+func _all_clear(town: String, kind: String) -> void:
+	var lines: Array = Townsfolk.rules().get("threat", {}).get("all_clear", {}).get(kind, [])
+	var said := false
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body.town != town:
+			continue
+		body.sheltering = false
+		if said or lines.is_empty() or not body.spawned or body.sleeping() or body.strayed or not body.escort_of.is_empty():
+			continue
+		said = true
+		var line := str(lines[absi(hash(body.worker_id + town)) % lines.size()])
+		party_log.add("%s said: \"%s\"" % [body.person, line])
+		Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": ""})
+
+
+## Each of [param wanted]'s shelter for a threat (762): "bed_roofed", whether
+## its bed is a building's (a house, the inn, a roofed workplace, a hut: it
+## sleeps on through a threat), and "shelter", where it hides: the priest
+## his temple; its roofed bed's building; else the town's (_town_shelter);
+## else its home.
+func _shelter_all(wanted: Dictionary, area: Dictionary) -> void:
+	for key: String in wanted:
+		var each: Dictionary = wanted[key]
+		var places: Variant = each.get("places")
+		if not places is Dictionary or (places as Dictionary).has("strayed"):
+			continue
+		var bed: Variant = places.get("bed")
+		var roofed := false
+		if bed is Rect2i:
+			for building: Dictionary in area.get("buildings", []):
+				if building.get("rect") == bed:
+					roofed = true
+					break
+		places["bed_roofed"] = roofed
+		if str(each.get("trade", "")) == "priest" and places.get("temple") is Rect2i:
+			places["shelter"] = places["temple"]
+		elif roofed:
+			places["shelter"] = bed
+		else:
+			var shelter := _town_shelter(area, str(each.get("town", "")))
+			places["shelter"] = shelter if shelter.size != Vector2i.ZERO else places.get("home", places.get("square", Rect2i()))
+
+
+## A roof in town [param place_id] for one with none of its own (762): its
+## standing inn, else its temple, else the nearest roofed building of the
+## town (_roofed) within HOME_TILES of the store; Rect2i() for none.
+func _town_shelter(area: Dictionary, place_id: String) -> Rect2i:
+	var place := World.holdings.place(place_id)
+	if place.is_empty():
+		return Rect2i()
+	var key := str(place.get("key", ""))
+	var store: Vector2i = place.get("cell", Vector2i.ZERO)
+	var best := Rect2i()
+	var best_rank := 1000000
+	for building: Dictionary in area.get("buildings", []):
+		var rect: Rect2i = building.get("rect", Rect2i())
+		if rect.size == Vector2i.ZERO or World.distance(rect.get_center(), store) > HOME_TILES:
+			continue
+		if not str(building.get("town", key)) in [key, ""]:
+			continue
+		var tier := 2
+		if str(building.get("use", "")) == "inn" or str(building.get("slot", "")) == "building.inn":
+			tier = 0
+		elif _is_temple(building):
+			tier = 1
+		elif not _roofed(building):
+			continue
+		var rank := tier * 10000 + World.distance(rect.get_center(), store)
+		if rank < best_rank:
+			best = rect
+			best_rank = rank
+	return best
+
+
+## The threat over the town whose ground [param cell] is in (762): a town
+## of this zone whose store is within HOME_TILES; "" for none. The server
+## reads Towns, a joined client what it was told (town_threats).
+func _threat_near(cell: Vector2i) -> String:
+	if World.holdings == null or World.zone == null:
+		return ""
+	for place_id: String in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(place_id)
+		if place.get("kind") != "stockpile" or World.distance(cell, place.get("cell", Vector2i.ZERO)) > HOME_TILES:
+			continue
+		var kind := World.towns.threatened(place_id) if World.towns != null else str(town_threats.get(place_id, ""))
+		if not kind.is_empty():
+			return kind
+	return ""
+
+
+## A shop shut by a threat (762): [param player] told townsfolk.json
+## threat.refused for [param kind], [param who] the one who won't open.
+func _threat_told(player: Player, who: String, kind: String) -> void:
+	var lines: Array = Townsfolk.rules().get("threat", {}).get("refused", {}).get(kind, ["%s will not open up now."])
+	var line := str(lines[absi(hash(who)) % lines.size()]) if not lines.is_empty() else "%s will not open up now."
+	Net.broadcast_to([player.owner_peer], "party", {"from": "", "text": line % who if line.contains("%s") else line})
 
 
 ## The sought wanted in this zone (decision 613, npc's side): _sync_residents'
@@ -11531,12 +11705,20 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			if body.sleeping():
 				_asleep_told(entity as Player, body)  # A sleeper doesn't trade (751 amended (2)).
 				return
+			var threat := World.towns.threatened(body.town) if World.towns != null else ""
+			if not threat.is_empty():
+				_threat_told(entity as Player, body.person if not body.person.is_empty() else "The %s" % body.trade, threat)  # Shut (762).
+				return
 			maker = body.worker_id
 			shop = body
 			why = "" if World.reaches(entity, body) else "too far away"
 		else:
 			shop = get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
 			if shop == null:
+				return
+			var shut := World.towns.threatened(World.counter_place(shop)) if World.towns != null else ""
+			if not shut.is_empty():
+				_threat_told(entity as Player, "The shopkeeper", shut)  # Shut (762).
 				return
 			why = "" if _barter_reach(entity, shop) else "too far from the counter"
 		if command_name == "trade" and why.is_empty():
@@ -11548,6 +11730,11 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		# A temple's or a shop's counter's work (decision 438): look, order, collect.
 		var counter := get_node_or_null(NodePath(str(args.get("counter", "")))) as GridEntity
 		if counter == null or not World.reaches(entity, counter) or World.counter_kind(counter).is_empty():
+			return
+		# A shop's counter shut by a threat (762); the temple's never: its work, revival and return go on.
+		var shut := World.towns.threatened(World.counter_place(counter)) if World.towns != null and World.counter_kind(counter) == "shop" else ""
+		if not shut.is_empty():
+			_threat_told(entity as Player, "The shopkeeper", shut)
 			return
 		var why := ""
 		match str(args.get("do", "look")):
@@ -12534,6 +12721,11 @@ func _on_message(kind: String, data: Dictionary) -> void:
 				_client3d.set_town(town, buildings)
 		if not town.is_empty() and data.has("stage"):
 			town_stages[town] = str(data["stage"])  # 591; the sheet's heading (624).
+		if not town.is_empty():
+			if str(data.get("threat", "")).is_empty():
+				town_threats.erase(town)
+			else:
+				town_threats[town] = str(data["threat"])  # 762: its shops shut.
 		_refresh_town()
 		return
 	if kind == "town_sheet":
@@ -14795,6 +14987,13 @@ func _greeted(player: Player, body: Resident) -> void:
 	if body.sleeping():
 		_greet_at[key] = now_msec
 		_asleep_told(player, body)  # No word, no waking (751): the player is told.
+		return
+	var threat := World.towns.threatened(body.town) if World.towns != null else ""
+	if not threat.is_empty() and body.doing == Resident.Doing.HIDE:
+		_greet_at[key] = now_msec
+		var shelter_lines: Array = Townsfolk.rules().get("threat", {}).get("sheltering", {}).get(threat, [])
+		if not shelter_lines.is_empty():
+			_resident_says(body, str(shelter_lines[absi(hash(body.worker_id + player.player_id)) % shelter_lines.size()]), "", player)  # 762.
 		return
 	if _resident_quiet(body, player):
 		_held_tongue("greet")  # No word, no turning to them near a fight (675, npc's side).

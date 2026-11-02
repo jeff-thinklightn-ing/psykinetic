@@ -38334,3 +38334,67 @@ against it; this gives the game the same paths at run time.
   forest 2155, foothills 225, held 426).
 
 Server side; protocol unchanged; no new class_name; no level changes; no CHANGELOG bullet.
+
+## 762. Threat in town
+
+Jeff (11-01, on the balance quest): "they might cause vendors to hide in buildings instead of
+their shops - until the threat is cleared." The coordinator made it a general state any danger
+can raise: wolves at the quest's "badly off" ending, a raid, a wolf wandering in. Release gave
+it its own number (economy's 761 cites it). npc's.
+
+- The state: Towns keeps it in the town's record as "threat": {kind ("wolves" or "raid"), since,
+  seen, held}, so it rides the "towns" snapshot key. Towns.from_dict restores it, and a raised
+  threat survives a restart; it lifts by its clear time after the boot as before (zone_test
+  _test_restart). Towns.threatened, threat_of_town, raise_threat (a raid outranks wolves; a
+  holder, say economy's ending, holds it up until release_threat), lift_stale and lift_threat.
+  The server log counts it: "[towns] <town>: threat raised (<kind>)" and "lifted".
+- Raised, each resident sync of the zone World is in (Main._threats_seen):
+  - by a hostile body within a town's radius + THREAT_REACH (4) of its store: a monster not
+    Companion.harmless. A predator (the wolves) is "wolves", any other monster "raid", and game
+    turned on a player (a boar) never counts. One wolf inside the walls is enough (the
+    coordinator).
+  - by a WorldRaids group PRESENT for a town of this zone ("raid");
+  - by another system calling Towns.raise_threat (economy's balance ending).
+- Lifted (Main._threats_lift) once it is held by nobody and nothing has been seen for
+  THREAT_CLEAR_HOURS (1 game hour), so a passing wolf doesn't shut the town for long. The first
+  of the town's bodies here, awake and in town, says townsfolk.json threat.all_clear, and its
+  folk come out at once.
+- While it holds:
+  - Each body of the town shelters (Resident.sheltering, set each sync): Doing.HIDE at places'
+    "shelter" (Main._shelter_all). That is its bed's building when the bed is under a roof (a
+    house, the inn, a roofed workplace: "bed_roofed"); the priest's, his temple; else the
+    town's (_town_shelter): its inn, else its temple, else its nearest roofed building within
+    HOME_TILES; else its home. Bedroll folk, visitors and the stall's keeper go to the town's.
+  - One abed under a roof sleeps on (the coordinator: don't wake and move them).
+  - A trade whose job is the fight (Resident.FIGHTERS: the guard) turns out to the square
+    instead, for a threat and for a raider it sees itself.
+  - The shops are shut. Main._barters is false for a body in a threatened town's ground
+    (_threat_near: the server reads Towns, a joined client its "town" message), so the bar
+    hides Barter, and a Barter already up hides. The server refuses a "barter" or "trade"
+    with a maker of that town, or at its shop's counter, and a shop counter's "counter" work,
+    with townsfolk.json threat.refused as a party line. No window opens.
+  - The temple is never shut: its counter's work, Aldous's revival and the return of the fallen
+    go on (return_test: wolves in town, the temple still manned and still the return place).
+  - Talk: a click on one sheltering gets townsfolk.json threat.sheltering, spoken.
+  - The lines are voice's (2026-11-01), three each for wolves and raid. No party line for the
+    threat itself in phase 1 (the coordinator): the shut shops and the hidden folk are the sign.
+- The wire: the "town" message (Main._town_message, both senders) carries "threat", the kind,
+  only while there is one, and it is sent whenever one comes or goes. This is an ignorable field
+  (named in net.gd's comment block): an old client shows Barter and the server refuses it with
+  the line, as 751 amended (2)'s sleeper. So no PROTOCOL_REVISION (release confirmed). Main
+  keeps what it was told in town_threats.
+- Not in phase 1: towns' trade off-zone pausing. Economy reads Towns.threatened when it wants
+  it.
+
+resident_test _test_threat (last in its order: its rescued guard and lit house would move the
+hail and lamp checks):
+- a raider inside the reach raises a raid threat, and the "town" message carries it;
+- Bram shelters in his house, and the guard turns out to the square;
+- no Barter, a barter refused with the line, a click gets the sheltering line;
+- with the raider gone it holds a while, then lifts unseen with the all-clear and a "town"
+  message without it, and Barter is back;
+- a holder keeps it up unseen until it lets go;
+- at night, abed in his house, Bram sleeps on through wolves;
+- it is in the towns' record the snapshot saves.
+zone_test _test_restart: a held threat survives the restart. return_test: the temple under a
+threat. Server and client, protocol unchanged, no new class_name.

@@ -200,6 +200,10 @@ func now() -> int:
 	return int(clock.call()) if clock.is_valid() else 0
 
 
+## The kinds of threat a town can be under (decision 762).
+const THREAT_KINDS: Array[String] = ["wolves", "raid"]
+
+
 # --- Reading -------------------------------------------------------------------------
 
 ## Experience [param town] has to spend.
@@ -3116,6 +3120,71 @@ func _note(town: String, what: String) -> void:
 	print("[towns] %s: %s, step %d" % [town, what, now()])
 
 
+## Threat in town (decision 762): the kind a threat over [param town] is
+## ("wolves" or "raid"), "" for none. While it holds its folk shelter
+## indoors and its shops are shut (Main).
+func threatened(town: String) -> String:
+	return str(_towns.get(town, {}).get("threat", {}).get("kind", ""))
+
+
+## [param town]'s threat (762): {kind, since, seen, held: [who holds it]},
+## {} for none.
+func threat_of_town(town: String) -> Dictionary:
+	return (_towns.get(town, {}).get("threat", {}) as Dictionary).duplicate(true)
+
+
+## A threat over [param town] seen now (762): raised if there was none (true
+## then), else its "seen" now; a raid outranks wolves. [param holder] (say
+## economy's balance ending) holds it up until release_threat, whatever is
+## seen.
+func raise_threat(town: String, kind: String, holder := "") -> bool:
+	if town.is_empty() or kind not in THREAT_KINDS:
+		return false
+	var record := _town(town)
+	var threat: Dictionary = record.get("threat", {})
+	var raised := threat.is_empty()
+	if raised:
+		threat = {"kind": kind, "since": now(), "seen": now(), "held": []}
+	threat["seen"] = now()
+	if kind == "raid":
+		threat["kind"] = "raid"
+	if not holder.is_empty() and holder not in threat["held"]:
+		(threat["held"] as Array).append(holder)
+	record["threat"] = threat
+	if raised:
+		print("[towns] %s: threat raised (%s), step %d" % [town, kind, now()])
+	return raised
+
+
+## [param holder] no longer holds [param town]'s threat up (762); it lifts
+## once nothing has been seen for the clear time.
+func release_threat(town: String, holder: String) -> void:
+	var threat: Dictionary = _towns.get(town, {}).get("threat", {})
+	if not threat.is_empty():
+		(threat["held"] as Array).erase(holder)
+
+
+## Every threat held by nobody and unseen for [param clear_steps] lifted
+## (762): [{town, kind}] of those lifted.
+func lift_stale(clear_steps: int) -> Array[Dictionary]:
+	var lifted: Array[Dictionary] = []
+	for town: String in _towns:
+		var threat: Dictionary = _towns[town].get("threat", {})
+		if threat.is_empty() or not (threat.get("held", []) as Array).is_empty() or now() - int(threat.get("seen", 0)) < clear_steps:
+			continue
+		lifted.append({"town": town, "kind": str(threat.get("kind", ""))})
+	for each: Dictionary in lifted:
+		lift_threat(each["town"])
+	return lifted
+
+
+## [param town]'s threat gone at once (762; a test, an admin).
+func lift_threat(town: String) -> void:
+	if _towns.has(town) and _towns[town].has("threat"):
+		_towns[town].erase("threat")
+		print("[towns] %s: threat lifted, step %d" % [town, now()])
+
+
 func _town(town: String) -> Dictionary:
 	if not _towns.has(town):
 		_towns[town] = {"xp": 0, "spent": 0, "residents": [], "buildings": {}, "objectives": [], "captives": [], "taken": {}, "log": [], "founded": false, "to_spread": 0}
@@ -3164,6 +3233,13 @@ func from_dict(saved: Dictionary) -> void:
 		# Its harvests in (652); a town founded before has had its first.
 		record["harvests"] = maxi(int(entry.get("harvests", 1 if record["founded"] else 0)), 0)
 		record["to_spread"] = maxi(int(entry.get("to_spread", 0)), 0)
+		# A threat over it (762) survives a restart; it lifts by its clear time as before.
+		var threat: Variant = entry.get("threat")
+		if threat is Dictionary and str((threat as Dictionary).get("kind", "")) in THREAT_KINDS:
+			var held: Array = []
+			for who: Variant in (threat as Dictionary).get("held", []):
+				held.append(str(who))
+			record["threat"] = {"kind": str(threat["kind"]), "since": int(threat.get("since", 0)), "seen": int(threat.get("seen", 0)), "held": held}
 		record["spent"] = clampi(int(entry.get("spent", 0)), 0, record["xp"])
 		for who: Variant in entry.get("residents", []):
 			if not production.worker(str(who)).is_empty():

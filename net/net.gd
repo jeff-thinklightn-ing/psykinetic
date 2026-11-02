@@ -495,6 +495,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## named one's name ("" for one known by its kind) and whether it is a boss
 ## (Brand by his named row, the draugr by his kind), for ui's name and boss
 ## marker over it; an old client draws neither.
+## Ignorable additions, no bump: the "huts" message's "empty" (759), and the
+## "town" message's "threat" (762: the kind over a town, absent for none; an
+## old client shows Barter and the server refuses it with a line).
 const PROTOCOL_REVISION := 44
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

@@ -264,6 +264,15 @@ func _test_main() -> void:
 	_check(_main._return_place(_player().tile, me).get("place", "") == id, "in his care: his hut first, over the nearer temple")
 	World.production.set_away(keeper, true)
 	_check(_main._return_place(_player().tile, me).get("place", "") == temple, "his hut unmanned: the nearest manned place, the temple, as before")
+	# A threat over the town (762) shuts shops, never the temple: the fallen still come back there.
+	var threatened: Array[String] = [temple]
+	threatened.append_array(World.holdings.places_in(World.zone.name))
+	for town: String in threatened:
+		World.towns.raise_threat(town, "wolves")
+	_check(_main._return_place(_player().tile, me).get("place", "") == temple and World.production.manned(temple),
+		"wolves in town (762): the temple still manned, the fallen still brought back there")
+	for town: String in threatened:
+		World.towns.lift_threat(town)
 	var far_hut := "elsewhere/healers_hut@2,2"
 	World.holdings._places[far_hut] = {"id": far_hut, "area": "elsewhere", "key": "healers_hut@2,2", "cell": Vector2i(2, 2), "name": "a far_hut hut",
 		"kind": "healers_hut", "radius": 2, "worth": 0, "start": Factions.NOBODY}

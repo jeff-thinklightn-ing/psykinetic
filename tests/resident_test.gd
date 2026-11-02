@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
+	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -770,6 +771,107 @@ func _test_healer_age() -> void:
 	World.holdings._holder.erase(HUT)
 	World.holdings._strength.erase(HUT)
 	World.holdings._since.erase(HUT)
+
+
+## Threat in town (decision 762): a raider inside the town's reach raises
+## it; its folk shelter (the guard turns out), Barter is off and refused,
+## a click gets the sheltering line; a sleeper abed under a roof sleeps on;
+## unseen for the clear time it lifts with an all-clear; a holder keeps it
+## up until it lets go; the "town" message carries it.
+func _test_threat() -> void:
+	print("\n== threat in town: folk shelter, shops shut, a guard turns out, the all-clear (decision 762) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.towns.lift_threat(STORE)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-bram", "Bram", "smith")
+	World.production.set_away("rs-bram", false)
+	World.towns.note_rescue(STORE, "rs-gunn", "Gunn", "guard")
+	_sync()
+	var bram := _body("rs-bram")
+	var gunn := _body("rs-gunn")
+	_check(bram != null and gunn != null, "(Bram the smith and Gunn the guard have bodies)")
+	if bram == null or gunn == null:
+		return
+	_check(_main._barters(bram), "(no threat: Bram barters)")
+	var hut := Rect2i(9, 5, 3, 3)
+	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RsThreat%d" % World.tick,
+		"tile": _main._nearest_free(Vector2i(2, 7)), "props": {"sight_range": 0}}) as Monster
+	var told: Array[Dictionary] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind in ["town", "party", "speech", "barter"]:
+			told.append({"kind": kind, "data": data})
+	Net.message_received.connect(heard)
+	_sync()
+	_check(World.towns.threatened(STORE) == "raid", "a raider inside the town's reach: a raid threat (%s)" % [World.towns.threat_of_town(STORE)])
+	_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "town" and each["data"].get("town") == STORE and each["data"].get("threat") == "raid"),
+		"every peer told: the \"town\" message carries \"threat\"")
+	_check(bram.sheltering and bram.places.get("shelter") == hut and bool(bram.places.get("bed_roofed", false)), "Bram shelters, his shelter his house (%s)" % [bram.places.get("shelter")])
+	_step_until(func() -> bool: return bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile) and gunn.doing == Resident.Doing.SQUARE, 150)
+	_check(bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), "and goes indoors (at %s)" % [bram.tile])
+	_check(gunn.doing == Resident.Doing.SQUARE, "the guard turns out to the square, not indoors (%s)" % [gunn.doing])
+	_check(not _main._barters(bram), "no Barter on the bar while it holds")
+	var player := _player()
+	if player != null:
+		_put(player, _main._nearest_free(bram.tile + Vector2i(1, 0)))
+		told.clear()
+		_main._on_command(player, "barter", {"resident": str(bram.get_path())})
+		var refused: Array = Townsfolk.rules().get("threat", {}).get("refused", {}).get("raid", [])
+		_check(not told.any(func(each: Dictionary) -> bool: return each["kind"] == "barter")
+			and told.any(func(each: Dictionary) -> bool: return each["kind"] == "party" and refused.any(func(line: Variant) -> bool: return each["data"]["text"] == str(line) % "Bram")),
+			"a barter with him refused, the refusal line, no window (%s)" % [told])
+		told.clear()
+		_main._resident_fight_at.clear()
+		_main._greet_at.clear()
+		_main._greeted(player, bram)
+		var sheltering: Array = Townsfolk.rules().get("threat", {}).get("sheltering", {}).get("raid", [])
+		_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "speech" and str(each["data"]["text"]) in sheltering.map(func(line: Variant) -> String: return str(line))),
+			"a click: his sheltering line (%s)" % [told])
+	World.despawn(raider)
+	# Unseen for the clear time: lifted, the folk out, one of them says so.
+	var clear := maxi(int(float(DayNight.day_steps) * Main.THREAT_CLEAR_HOURS / 24.0), 1)
+	_main._sync_residents()
+	_check(World.towns.threatened(STORE) == "raid", "the raider gone: it holds a while yet")
+	World.towns._towns[STORE]["threat"]["seen"] = World.towns.now() - clear - 1
+	told.clear()
+	_main._sync_residents()
+	var all_clear: Array = Townsfolk.rules().get("threat", {}).get("all_clear", {}).get("raid", [])
+	_check(World.towns.threatened(STORE).is_empty() and not bram.sheltering and not gunn.sheltering, "unseen for %d steps: lifted, nobody sheltering" % clear)
+	_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "speech" and str(each["data"]["text"]) in all_clear.map(func(line: Variant) -> String: return str(line)))
+		and told.any(func(each: Dictionary) -> bool: return each["kind"] == "town" and each["data"].get("town") == STORE and not each["data"].has("threat")),
+		"the all-clear said, and every peer told it is gone (%s)" % [told])
+	_check(_main._barters(bram), "Barter again")
+	# Held up by another (economy's balance ending): it holds unseen until let go.
+	_main._raise_threat(STORE, "wolves", "rs-pack")
+	World.towns._towns[STORE]["threat"]["seen"] = World.towns.now() - clear - 1
+	_main._sync_residents()
+	_check(World.towns.threatened(STORE) == "wolves", "held up by its holder: it stays, unseen")
+	World.towns.release_threat(STORE, "rs-pack")
+	_main._sync_residents()
+	_check(World.towns.threatened(STORE).is_empty(), "let go, unseen: lifted")
+	# Night: one abed under his roof sleeps on through it.
+	DayNight.set_hour(1.0)
+	World.towns.lift_threat(STORE)
+	bram._hide_until = -1  # His own hide from the raider seen (HIDE_TICKS) over.
+	_sync()
+	_step_until(func() -> bool: return bram.activity == "sleep", 400)
+	for i in 6:
+		World.step()
+	_main._raise_threat(STORE, "wolves")
+	_sync()
+	for i in 10:
+		World.step()
+	_check(bram.sleeping() and bram.doing == Resident.Doing.HOME, "wolves at night: Bram, abed in his house, sleeps on (%s, %s)" % [bram.doing, bram.activity])
+	_check(World.towns.to_dict()[STORE].get("threat", {}).get("kind") == "wolves", "in the towns' record the snapshot saves")
+	Net.message_received.disconnect(heard)
+	World.towns.lift_threat(STORE)
+	World.production.set_away("rs-gunn", true)
+	World.production.set_away("rs-bram", true)
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(12.0)
 
 
 ## --test-temple-day (404 amended): today everyone's temple day at its

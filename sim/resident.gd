@@ -97,6 +97,12 @@ var _goal := NO_CELL
 var _route: Array[Vector2i] = []
 var _stuck := 0
 var _hide_until := -1
+## Its town is under a threat (decision 762; Main sets it each sync): it
+## shelters (Doing.HIDE at places' "shelter"), unless asleep in a bed under a
+## roof, or its trade is the fight (FIGHTERS), which turns out to the square.
+var sheltering := false
+## The trades whose job is the fight (762): they turn out, never hide.
+const FIGHTERS: Array[String] = ["guard"]
 var _wander_at := -1
 ## Addressing a player who clicked them (decision 560, npc's side): the
 ## addressed body's node path, replicated for the look and the talking
@@ -392,7 +398,12 @@ func _sim_tick() -> void:
 		_look()  # Not while at work or asleep (566): the work sets the facing.
 	if World.tick - hurt_tick <= 1:
 		_hide_until = World.tick + HIDE_TICKS
-	var now := Doing.HIDE if World.tick < _hide_until else (Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id))
+	var hidden := World.tick < _hide_until
+	var now := Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id)
+	if trade in FIGHTERS and (hidden or sheltering):
+		now = Doing.SQUARE  # The fight is its job (762): it turns out.
+	elif hidden or (sheltering and not (now == Doing.HOME and sleeps_now() and bool(places.get("bed_roofed", false)))):
+		now = Doing.HIDE  # Abed under a roof, it sleeps on (762).
 	if now != doing or _goal == NO_CELL:
 		doing = now
 		_pick_goal()
@@ -490,6 +501,8 @@ func _pick_goal() -> void:
 	_route.clear()
 	_stuck = 0
 	var area: Rect2i = places.get(PLACE_OF[doing], places.get("square", Rect2i())) if doing != Doing.ROUNDS else _round_area()
+	if doing == Doing.HIDE:
+		area = places.get("shelter", places.get("home", places.get("square", Rect2i())))  # Its shelter (762), else home.
 	if doing == Doing.VISIT and visit.get("rect") is Rect2i:
 		area = visit["rect"]
 	if doing == Doing.WORK and not task.is_empty():
