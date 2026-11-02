@@ -4239,6 +4239,7 @@ func _boot() -> void:
 			return cell
 		draw.seed = hash(cell)
 		return _free_cell_near(cell, reach, draw)
+	_make_balance(snapshot.get("balance", {}))
 	# Herbs and the like laid wild near the towns (decision 502).
 	World.forage = Forage.new(world_map, World.holdings, {}, World.steps_now)
 	World.keepers.erase(_herds_kept)
@@ -5680,6 +5681,7 @@ func _save_state(wait := true, final := false) -> void:
 		"runner_out": _runner_out.duplicate(true),
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"herds": World.herds.to_dict() if World.herds != null else {},
+		"balance": World.balance.to_dict() if World.balance != null else {},  # Decision 761.
 		"items": World.items.to_dict(),
 		"regen": _regen,
 		"named": World.named,  # Decision 716: the named enemies' records.
@@ -6023,6 +6025,42 @@ func _on_dole_changed(town: String, count: int) -> void:
 	var text := "Nobody in town is on the dole now." if count == 0 \
 			else "%d in town %s on the dole (fed by the town, or hungry): its kitchen works for food first." % [count, "is" if count == 1 else "are"]
 	Net.broadcast_to(peers, "party", {"from": "Town", "text": text})
+
+
+## Server: keep the balance (decision 761, phase 1: only areas whose level's
+## herds say "balance", test levels): made beside the herds, which ask it of
+## their wolves. Its folds are the herders' (640), each with the town its
+## drove sells to and its herder's name; meat it takes off the ground ends
+## there; a town is watched while a player is in its area; a fold's count
+## changed is told as the herders' is.
+func _make_balance(saved: Dictionary) -> void:
+	World.balance = Balance.new(saved, World.herds, World.stockpile, {}, World.steps_now)
+	World.herds.balance = World.balance
+	World.balance.folds = func() -> Array:
+		var out := []
+		if World.towns == null or World.holdings == null:
+			return out
+		var trade := str(World.towns.rules.get("herder", {}).get("trade", "herder"))
+		for id: String in World.towns.folds():
+			var place := World.holdings.place(id)
+			out.append({"id": id, "area": str(place.get("area", "")), "cell": place.get("cell", Vector2i.ZERO),
+				"town": World.towns.drove_town(id), "farmer": str(World.production.worker("%s:%s" % [trade, id]).get("name", ""))})
+		return out
+	World.balance.remove = func(area: String, cell: Vector2i, uid: int, why: String) -> bool:
+		var there: Zone = World.zones.get(area)
+		if there == null:
+			return false
+		var was := World.enter(there)
+		var index := World.ground_uids(cell).find(uid)
+		var taken := World.take_from_ground(cell, index) if index >= 0 else 0
+		if taken != 0:
+			World.items.end(taken, why, "", area, cell)
+		World.enter(was)
+		return taken != 0
+	World.balance.watched = func(town: String) -> bool:
+		var place := World.holdings.place(town) if World.holdings != null else {}
+		return not _players_in(str(place.get("area", town.get_slice("/", 0)))).is_empty()
+	World.balance.fold_changed.connect(_on_folds_changed)
 
 
 ## Server: a herder's fold changed (Towns.folds_changed, 640): every peer

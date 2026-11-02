@@ -88,6 +88,19 @@ var _budget: Dictionary = {}
 ## Camp id -> {want, got} today; and got / want over the last whole day.
 var _fed_today: Dictionary = {}
 var _fed: Dictionary = {}
+## The keep-the-balance areas' steer (decision 761): their wolves' capacity
+## and breeding; null, none. Held weakly: the Balance holds these herds
+## (World keeps it), and the two holding each other leaked them at exit.
+var balance: Balance:
+	get:
+		return _balance_ref.get_ref() as Balance if _balance_ref != null else null
+	set(value):
+		_balance_ref = weakref(value) if value != null else null
+var _balance_ref: WeakRef = null
+## "<area>/<species>" -> {want, got} of a predator's eating today, and got /
+## want over the last whole day (fed).
+var _pack_today: Dictionary = {}
+var _pack_fed: Dictionary = {}
 
 
 func _init(saved := {}, with_areas := {}, with_rules := {}, with_clock := Callable(), with_holdings: Holdings = null) -> void:
@@ -157,6 +170,8 @@ func total(area: String, species: String) -> float:
 
 ## How many of [param species] [param area]'s ground keeps.
 func capacity(area: String, species: String) -> float:
+	if balance != null and balance.steers(area, species):
+		return balance.wolf_capacity(area)  # Decision 761: the deer and the meat lying.
 	return float(_ground_of(area)["total"]) * float(_species(species).get("density", 0.0)) / 1000.0 * multiplier(area, species)
 
 
@@ -359,6 +374,10 @@ func _breed(area: String, species: String, days: float) -> void:
 	if groups.is_empty() or have <= 0.0:
 		return
 	var grow := float(_species(species).get("breed", 0.0)) * have * (1.0 - have / cap if cap > 0.0 else -1.0) * days
+	if balance != null and balance.steers(area, species):
+		# Decision 761: past what the deer and the meat hold they leave; under
+		# it they breed, the faster while meat lies about.
+		grow = -float(balance.rules.get("leave", 0.5)) * (have - cap) * days if have > cap 			else grow * balance.breed_factor(area)
 	var kept := 0.0
 	for each in groups:
 		kept += float(each["count"])
@@ -377,13 +396,18 @@ func _hunt(area: String, species: String, days: float) -> void:
 		return
 	var wanted := hunters * float(rule.get("eats", 0.0)) * days
 	var hunger := wanted
+	var pack: Dictionary = _pack_today.get("%s/%s" % [area, species], {"want": 0.0, "got": 0.0})
+	_pack_today["%s/%s" % [area, species]] = pack
+	pack["want"] = float(pack["want"]) + wanted
 	for prey: Variant in rule.get("prey", []):
 		for each in groups_in(area, str(prey)):
 			if hunger <= 0.0:
+				pack["got"] = float(pack["got"]) + wanted
 				return
 			var eaten := minf(float(each["count"]), hunger)
 			each["count"] = float(each["count"]) - eaten
 			hunger -= eaten
+	pack["got"] = float(pack["got"]) + wanted - maxf(hunger, 0.0)
 	# Less than half their hunger met: they starve by the shortfall.
 	if wanted > 0.0 and hunger > wanted * 0.5:
 		var lost := float(rules.get("starve", 0.1)) * (hunger / wanted) * hunters * days
@@ -420,6 +444,11 @@ func _new_budgets() -> void:
 		var day: Dictionary = _fed_today[id]
 		_fed[id] = clampf(float(day["got"]) / float(day["want"]), 0.0, 1.0) if float(day["want"]) > 0.0 else 1.0
 	_fed_today.clear()
+	_pack_fed.clear()
+	for key: String in _pack_today:
+		var day: Dictionary = _pack_today[key]
+		_pack_fed[key] = clampf(float(day["got"]) / float(day["want"]), 0.0, 1.0) if float(day["want"]) > 0.0 else 1.0
+	_pack_today.clear()
 
 
 ## [param area]'s [param species] groups with something to spare, nearest
@@ -467,6 +496,16 @@ func _camps_eat(days: float) -> void:
 		day["want"] = float(day["want"]) + want
 		day["got"] = float(day["got"]) + got
 		_fed_today[camp["id"]] = day
+
+
+## How well group [param id]'s kind ate in its area over the last whole day,
+## 0..1 (decision 761, for enemy-ai: a hungry pack is bold); 1 for a group
+## that hunts nothing, or before a day has passed.
+func fed(id: String) -> float:
+	var each := group(id)
+	if each.is_empty():
+		return 1.0
+	return float(_pack_fed.get("%s/%s" % [each["area"], each["species"]], 1.0))
 
 
 ## How well camp [param id] ate over the last whole day, 0..1 (1 before a

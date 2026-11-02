@@ -758,6 +758,10 @@ var _counter_why := ""
 ## Server: the wildlife's herds (Herds, decision 367), moved on by the
 ## world tick's first slice; made by Main at boot. Null on a client.
 var herds: Herds = null
+## Server: keep the balance (Balance, decision 761): the deer, the wolves,
+## the folds and the meat lying in the areas that keep it, moved on after
+## the herds; made by Main at boot. Null on a client.
+var balance: Balance = null
 ## Server: what grows wild to be gathered (Forage, decision 502: herbs),
 ## laid by the world tick's first slice; made by Main at boot. Null on a
 ## client.
@@ -1051,6 +1055,9 @@ func world_tick(slice := -1) -> void:
 	if herds != null and slice <= 0:
 		herds.tick()
 		t = part("herds", t)
+	if balance != null and slice <= 0:
+		balance.tick()
+		t = part("balance", t)
 	if forage != null and slice <= 0:
 		forage.tick()
 		t = part("forage", t)
@@ -3969,6 +3976,8 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 			add_gold(player_id, paid, "banked %s" % [yields])
 	for what: String in yields:
 		stockpile.deposit(place, what, int(yields[what]), who, from, by_id)
+	if balance != null:
+		balance.banked(uid, who)  # Meat brought home (761).
 	items.end(uid, "banked", "%s by %s" % [place, who], at_zone, tile)
 
 
@@ -4506,6 +4515,7 @@ var _put_down_by: Dictionary[int, String] = {}
 func _ready() -> void:
 	key_check = holds_key
 	ground_changed.connect(_on_ground_for_stockpile)
+	ground_changed.connect(_on_ground_for_balance)
 	entity_moved.connect(_on_moved_for_stockpile)
 	entity_pushed.connect(_on_pushed_for_stockpile)
 	entity_despawned.connect(func(entity: GridEntity) -> void: _pushed_by.erase(entity))
@@ -5242,6 +5252,21 @@ func _on_ground_for_stockpile(zone_name: String, cell: Vector2i, _thrown_from: V
 	if not Net.is_authority() or stockpile == null or Stockpile.place_at(holdings, zone_name, cell).is_empty():
 		return
 	_bank_ground.call_deferred(zone_name, cell)
+
+
+## What lies on [param cell] of [param zone_name] changed: the meat lying
+## there, for keep the balance (decision 761), with who put each down.
+func _on_ground_for_balance(zone_name: String, cell: Vector2i, _thrown_from: Vector2i) -> void:
+	if balance == null or not Net.is_authority() or not balance.governs(zone_name):
+		return
+	var there: Zone = zones.get(zone_name, zone if zone.name == zone_name else null)
+	if there == null:
+		return
+	var uids: PackedInt32Array = there.ground.get(cell, PackedInt32Array())
+	var by := {}
+	for uid in uids:
+		by[uid] = _put_down_by.get(uid, "")
+	balance.cell_changed(zone_name, cell, uids, by)
 
 
 ## Banks everything on [param cell] of [param zone_name], if it still lies
@@ -7319,6 +7344,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		var at := target.tile
 		despawn(target)
 		for uid in spilt:
+			if is_instance_valid(source) and target is Animal:
+				_put_down_by[uid] = _label_of(source)  # Who left a kill's remains (761).
 			put_on_ground(uid, at)
 		if gold > 0:
 			drop_gold(zone.name, at, gold)

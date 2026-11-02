@@ -38220,3 +38220,71 @@ sees the forest remade with nobody there.
 
 Ships with a cut (the level files change; clients read them), the server redeployed; protocol
 unchanged; no new class_name.
+## 761. Keep the balance (phase 1): deer, wolves, a fold and the meat left lying
+
+Jeff (11-01, chat): "farms have needs, like wolves are stealing sheep, and wolves population is
+attracted to deer. so a quest could be to thin the deer population and make sure to bring the meat
+back to town because they'll make it worse. quests might have the ability to critically fail ...
+maybe the quests are zone wide and its a 'keep the balance' on a timer". His answers to the sketch
+(C:/dev/review/decisions/keep-the-balance.md): "shared by the zone, flock comes back, yes wolves to
+town, they might cause vendors to hide in buildings instead of their shops - until the threat is
+cleared." The coordinator approved phase 1 as sketched: one farm, one area's counts, one quest, built
+and tested in a test level only; nothing in a real level until Jeff asks. Economy leads; enemy-ai,
+npc (the farmer's hooks; the "threat in town" state, vendors sheltering indoors and their shops shut
+till it's cleared, is its own decision, 762, since raids raise it too: Towns.raise_threat) and voice (every line a player sees) add their sides under this
+heading. Crows over carrion wait for phase 2 (a new thing drawn: a protocol change).
+
+What economy built (sim/balance.gd, class_name Balance; World.balance, server only, made by Main
+beside the herds, Main._make_balance; saved as the snapshot's "balance"; rules levels/economy.json
+"balance", drafts, Jeff's to move):
+
+- Only an area whose level's "herds" says "balance": true keeps it (Balance.governs). No real level
+  does; every other area's herds run as before.
+- Wolves follow the deer: Herds.capacity asks Balance.wolf_capacity for such an area's wolves, its
+  deer / wolf_per_deer (8) plus the meat lying / meat_per_wolf (4). Past it they leave, leave (1)
+  of the excess a day; under it they breed as ever, times carrion_breed (2) while meat lies there
+  (Herds._breed).
+- Meat lying: every "meat" thing on such an area's ground, from when it lands (World.ground_changed
+  -> Balance.cell_changed, with who put it down: World._put_down_by, which a kill's remains now carry
+  as the killer's label) until it is taken up, eaten by a wolf (Balance.eat, enemy-ai) or rots after
+  rot_days (1). One eaten or rotted was left lying; the quest's ledger counts it and who left it. Meat
+  that lay there and is banked at a store (World._bank_thing -> Balance.banked) is brought home, and
+  the ledger counts who brought it. Items are physical: Balance tracks the things by uid, and takes a
+  rotted or eaten one off the ground and ends it (Main's remove).
+- Hunger: 1 - (deer + lying / meat_per_deer) / (wolves x deer_each (3)). A fold (a herder's holding,
+  640: its "sheep" in the stockpile) loses (wolves - calm_wolves (3)) x sheep_base (0.17) + wolves x
+  sheep_hungry (0.6) x hunger sheep a day, whole ones at the day's turn: many wolves take some, hungry
+  ones far more, so thinning the deer too far costs the flock (the coordinator's "it cuts both
+  ways"). Not while any of the area's wolves are out as bodies: then enemy-ai's bodies take sheep
+  through Balance.take_sheep, and no night is counted twice (Herds' rule for herds with bodies out,
+  407). A fold's count changed is told by the herders' "folds" message.
+- The quest, one per fold, shared by everyone in the area: once the fold has lost ask.lost (2) sheep
+  within ask.days (4) it is asked (signal asked: npc's farmer). It is judged deadline_days (4) on
+  (signal judged):
+  - balanced: wolves no more than at the ask, deer within judge.deer_low..deer_high (0.5..0.9) of
+    what the ground keeps, at most lost_most (1) sheep lost and left_most (3) meat left lying. The
+    farm thrives: thrive.lambs (2) lambs to the fold, thrive.wool (4) wool and thrive.meat (3) meat
+    to the town the fold sells to (Towns.drove_town).
+  - badly: wolves judge.bad_wolves (1.5) x those at the ask or more, or bad_left (12) meat left lying
+    or more: the flock is lost, and town_wolves.count (3) wolves come to that town at night
+    (Balance.threat(town) "wolves", signal threat_changed, which 762's Towns.raise_threat takes up).
+  - off: anything else (thinned too far, sheep lost): the flock is lost.
+  A lost flock comes back (Jeff): back.sheep (3) back.days (5) later. A fold rests rest_days (4)
+  after a judgement before it asks again.
+- The town's nights: enemy-ai's wolf bodies at the store take Balance.night_take(town), the first of
+  town_wolves.takes (meat, sheep, food) the store has, never gold or people (Jeff's raid rule), and a
+  killed one calls Balance.town_wolf_killed; the last killed clears the threat. With no player in the
+  town's area, each day's turn the wolves left take one thing each; after town_wolves.nights (3) they
+  go back and the threat clears.
+- Herds.fed(group) (enemy-ai's ask): its area's kind's last whole day eaten / wanted, 1 for a kind that
+  hunts nothing, an unknown group or before a day, from the hunger record Herds._hunt now keeps.
+- Logs count only ("[balance] wolves took N sheep from a fold", "a fold's quest is judged off: lost
+  N, left N, home N"): no names, no ids.
+
+tests/balance_test (a made-up area that keeps the balance beside one that doesn't, the real rules):
+capacity and leaving, meat lying (taken up, brought home, eaten, rotted, who left it), balanced,
+off (and the flock coming back), badly (the town's wolves, killed or their nights passed, never
+gold), no sheep counted while wolves are out as bodies, Herds.fed, saved and loaded.
+
+Server only; no player sees it in a real level (no bullet); protocol unchanged; new class_name
+Balance.
