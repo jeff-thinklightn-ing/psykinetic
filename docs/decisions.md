@@ -38773,3 +38773,10 @@ the herders together ("A, B and C"; townsfolk balance "party_zone" when more tha
 second joins, both are judged badly at once, one zone ending, one pack on the first fold's town,
 each fold loses its own sheep. resident_test calls the zone handler for the party line. Server
 only; protocol unchanged; no new class_name; no bullet.
+
+761 amended (3) (release's label; voice's words): townsfolk.json balance "party_zone", the one party line when a
+zone with more than one herder's fold ends (761 amended (2)), %s the herders together: "The flocks
+of %s hold; the wolves have drawn off." / "The flocks of %s are lost." / "The flocks of %s are lost
+to the wolves, and they are coming to the town by night." The names come after "of" because
+joined names read badly with a possessive. Lore: the night threat matches 762. Data only; no
+bullet (no level keeps the balance).
