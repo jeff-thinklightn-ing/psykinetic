@@ -37611,6 +37611,17 @@ shoulders; carried a touch past balance, then gathered back; the feet planted
 where they don't step. Strip C:/dev/review/axe_sweep.png. Client only, protocol
 unchanged, no new class_name.
 
+750 amended (2) (release's label; a flake in combat's and enemy-ai's landings, 2026-11-01):
+view_test _test_rest's "a blow seen near it: taken up, ready" failed under a loaded suite with
+no upper clip. At rest the left hand is off the haft, so the two-hander's no-fidget rule is off
+and a fidget may start (its fidget_at a wall-clock time, sooner reached the slower the suite
+runs); the rouse's one _process then runs _sync_bow before _animate cuts the fidget, so its
+base clip is the fidget, not Idle, and the ready stance waits a frame. In play that frame is
+not seen, so the client keeps it; the test holds fidgets off for its rest frames (fidget_at
+put off, any playing one ended, back after) and checks it stands at Idle before the rouse.
+Reproduced with fidget_at 0 (Fidget_LookBack, the same empty clip). Test only, protocol
+unchanged, no new class_name, no CHANGELOG bullet.
+
 ## 755. The world as it lies on the plane, for the world map
 
 ui's world map overhaul (Jeff: the world map "is buggy and not useful yet, it needs an

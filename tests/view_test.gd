@@ -8165,6 +8165,12 @@ func _test_rest() -> void:
 		puppet.set_meta("roused_at", now - 60000)
 		puppet.set_meta("stood_at", now - 60000)
 		_rig._combat_at.erase(id)
+		# No fidget meanwhile: at rest the left hand is off the haft, so one may start (the
+		# wall clock past its fidget_at under a loaded suite), and the rouse below sees its base
+		# clip, not Idle, so no ready stance till the next frame (the flake, 750 amended (2)).
+		puppet.set_meta("fidget_at", now + 600000)
+		puppet.set_meta("fidgeting", false)  # Nor one still playing: Idle from the next frame.
+		puppet.set_meta("busy_until", 0)
 		for i in 4:
 			_rig._process(0.0)
 			await get_tree().process_frame
@@ -8189,7 +8195,7 @@ func _test_rest() -> void:
 			_check(low > 0.05, "%s hung: its head off the ground (%.2f m)" % [kind, low])
 		if kind == "giant_axe":
 			var reach := puppet.get_meta("reach") as HandReach
-			_check(not reach.active, "the axe at rest: the left hand let go of grip_2")
+			_check(not reach.active and rig.base_clip() == Client3D.CLIP_IDLE, "the axe at rest: the left hand let go of grip_2, standing idle (%s)" % rig.base_clip())
 			_rig._combat_at[id] = Time.get_ticks_msec()
 			_rig._process(0.0)
 			_check(rig.upper_clip() == "Axe_Ready" and reach.active and held.position.is_equal_approx(held.basis * -(held.get_meta("grip") as Vector3)),
@@ -8213,6 +8219,7 @@ func _test_rest() -> void:
 			imp.alert = Monster.Alert.IDLE  # (Its puppet outlives it a frame.)
 			World.despawn(imp)
 			puppet.set_meta("roused_look_at", 0)  # Looked for again at once: nothing hunting now.
+	(_rig._puppets[id] as Node3D).set_meta("fidget_at", Time.get_ticks_msec())  # Fidgets as before.
 	player.slots = was
 	_rig._process(0.0)
 
