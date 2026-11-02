@@ -129,8 +129,8 @@ fields and the overrun castle, find him held in the keep, bring him home.
 - **Rescue:** the smith becomes the first town resident and reworks weapons.
 - **Companions:** react to the raid, the captive, and what's found.
 - **World primer** (now the `lore` worktree, docs/lore/primer.md): a page on the town, goblins and land so companions talk like they live
-  there — to write with Dire. Tone reference: *Gísla saga* (grim, fated, loyal; named
-  weapons and grudges).
+  there — to write with Dire. Tone inspired by *Gísla saga* (grim, fated, loyal; named
+  weapons and grudges), as inspiration, not a rule: "this is our own world now" (Jeff, 2026-11-01).
 
 The wilds town is named Held (Jeff, 2026-10-18: "town named Held").
 
@@ -243,7 +243,7 @@ but hasn't committed to; confirm before building them.
 
 ### Companions
 - **Card system:** random trait tables (birthplace, religion, parentage, profession, hobby, food preference, and so on) rolled at creation; one model call writes the card; a "how we met" field. *Idea from the saga:* good and bad omens/dreams.
-- **World primer:** now the `lore` worktree (tone: *Gísla saga*).
+- **World primer:** now the `lore` worktree (tone inspired by *Gísla saga*; Jeff, 2026-11-01: "we're not literally staying in norse saga here. that was good inspiration but this is our own world now", so names and words needn't be saga ones).
 - **Claude voice option** *(experiment)*: let a companion's voice run on the Claude API (Haiku/Sonnet) with fallback to the box's 14B; compare transcripts and cost. The `--voice-url` setting for a bigger local model already exists.
 - **Promises match actions:** doors are real (in `companions`); "I'll check the chest" can stay roleplay.
 
