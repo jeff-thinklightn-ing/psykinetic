@@ -109,6 +109,7 @@ func _ready() -> void:
 	_test_seated_boss()
 	_test_fallen_knight()
 	_test_follow_without_backsteps()
+	_test_follow_a_creep()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -3217,6 +3218,61 @@ func _test_firing_cone() -> void:
 	World.step()
 	_check(pet._danger.is_empty(), "the bow lowered: nothing to keep out of")
 	World.set_slots(owner, kept)
+	_settle(pet)
+
+
+func _test_follow_a_creep() -> void:
+	print("
+== a creeping player: she drops behind and keeps his pace, never ahead toward what he stalks (764) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	_put(owner, Vector2i(2, 2))
+	_put(pet, Vector2i(2, 4))
+	for i in 20:
+		World.step()
+	# Row 2 east, a cell at a time, standing STALK_STEP_TICKS + 3 between: a stalk.
+	var crates := {}
+	for x in range(3, 11):
+		var there := World.get_entity_at(Vector2i(x, 2))
+		if there != null and there.pushable:
+			crates[there] = there.tile
+			World._relocate(there, _main._nearest_free(Vector2i(4, 9)))
+	var quarry := Vector2i(14, 2)  # Where the deer he stalks would stand.
+	var ahead := 0
+	var nearer := 0
+	var farthest := 0
+	var gaps: Array[int] = []
+	for x in range(3, 11):
+		var next := Vector2i(x, 2)
+		var walked := 0
+		while not Walk.arrived(owner, next) and walked < 60:
+			Walk.toward(owner, next)
+			World.step()
+			walked += 1
+			ahead += 1 if pet.tile.x > owner.tile.x else 0
+			nearer += 1 if World.distance(pet.tile, quarry) < World.distance(owner.tile, quarry) else 0
+		World.face(owner, Vector2i(1, 0))
+		for i in Animal.STALK_STEP_TICKS + 3:
+			World.step()
+			if pet.tile.x > owner.tile.x:
+				ahead += 1
+			if World.distance(pet.tile, quarry) < World.distance(owner.tile, quarry):
+				nearer += 1
+			farthest = maxi(farthest, World.distance(pet.tile, owner.tile))
+		gaps.append(owner.step_gap)
+	for crate: GridEntity in crates:
+		_put(crate, crates[crate])
+	_check(owner.tile == Vector2i(10, 2) and gaps.slice(1).all(func(gap: int) -> bool: return gap > Animal.STALK_STEP_TICKS),
+		"he crept the row, every step a stalk's (gaps %s)" % [gaps])
+	_check(ahead == 0 and nearer == 0, "she was never ahead of him, nor nearer what he stalks (%d ticks ahead, %d nearer)" % [ahead, nearer])
+	_check(farthest <= Heel.START + 1 and World.distance(pet.tile, owner.tile) <= Heel.STOP and pet.tile.x < owner.tile.x,
+		"she kept with him, a step or two behind (farthest %d, at the end %s to his %s)" % [farthest, pet.tile, owner.tile])
+	_put(owner, owner_was)
+	_put(pet, pet_was)
 	_settle(pet)
 
 
