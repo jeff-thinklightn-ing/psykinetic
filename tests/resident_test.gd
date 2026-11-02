@@ -1085,6 +1085,7 @@ func _test_balance_herder(grim: Resident, fold: String) -> void:
 	World.balance._quests.erase(fold)
 	told.clear()
 	_main._on_balance_judged(fold, "balanced")
+	_main._on_balance_zone_judged(str(World.holdings.place(fold).get("area", "")), "balanced", [fold])
 	var party := str(rules.get("party", {}).get("balanced", "")) % "Grim"
 	_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "party" and each["text"] == party), "the players in the area read it (%s)" % [told])
 	card = Townsfolk.card_of(World.production, grim.worker_id)

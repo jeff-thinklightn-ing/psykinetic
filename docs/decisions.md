@@ -38757,3 +38757,19 @@ a player id and label, not a Player; _balance_thank is new. Log: "[regard] fold 
 ask): a regrowing fold and an open quest with its ledger come back by value through _save_state
 and Snapshot.load. resident_test: settled at the judging without a talk, then no double thanks or
 count. Server only; protocol unchanged; no new class_name; no bullet.
+
+761 amended (2) (release's label; the coordinator's call after playtest's badly run: two folds in one zone,
+lost on the same meat, sent two packs of 3 to the town and printed two party lines): a zone ends as
+one. The balance is shared by the zone (Jeff), so a fold that asks while another quest in its area
+is open joins it: the same deadline, and the same wolves and deer at the start (the ledger is
+already shared). When the deadline comes, Balance._judge_zone judges the area's quests together,
+and the worst of their outcomes (balanced < off < badly) goes to all of them. Each fold keeps or
+loses its own sheep (_judge(fold, result): regrowth or loss, and the town's share for each). A
+"badly" ending sends one pack, town_wolves.count strong, to the first fold's town by id. The new
+signal Balance.zone_judged(area, outcome, fold_ids) fires once. Main._on_balance_zone_judged takes
+the party line from _on_balance_judged: one line to the players in the area, naming the herder or
+the herders together ("A, B and C"; townsfolk balance "party_zone" when more than one, else
+"party"). Each herder still tells his own ending. balance_test _test_zone: both folds ask, the
+second joins, both are judged badly at once, one zone ending, one pack on the first fold's town,
+each fold loses its own sheep. resident_test calls the zone handler for the party line. Server
+only; protocol unchanged; no new class_name; no bullet.

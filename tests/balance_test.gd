@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_balanced_few()
 	_test_off()
 	_test_badly()
+	_test_zone()
 	_test_bodies_out()
 	_test_fed()
 	_test_saved()
@@ -280,6 +281,36 @@ func _test_badly() -> void:
 	var food := _stock.count(TOWN, "food") + _stock.count(TOWN, "meat")
 	_days(3.0)
 	_check(_balance.threat(TOWN) == "" and _stock.count(TOWN, "food") + _stock.count(TOWN, "meat") < food, "unmet, they eat into the store and go back after their nights (%d -> %d)" % [food, _stock.count(TOWN, "food") + _stock.count(TOWN, "meat")])
+
+
+func _test_zone() -> void:
+	print("\n== two folds in one zone: the second joins the first's quest; one ending, one pack (761 amended) ==")
+	_fresh()
+	const FOLD2 := "meadow/fold2"
+	const TOWN2 := "meadow/town2"
+	_balance.folds = func() -> Array:
+		return [{"id": FOLD, "area": "meadow", "cell": AT, "town": TOWN, "farmer": "Asa"},
+			{"id": FOLD2, "area": "meadow", "cell": AT + Vector2i(20, 0), "town": TOWN2, "farmer": "Sigrun"}]
+	_stock.deposit(FOLD2, "sheep", 4, "Sigrun", "a drove of their own")
+	var zones: Array = []
+	_balance.zone_judged.connect(func(area: String, result: String, ids: Array) -> void: zones.append([area, result, ids]))
+	_start(0.85)
+	_until(func() -> bool: return _asked.size() >= 2, 10)
+	_check(_asked.size() == 2, "both folds ask (%s)" % [_asked])
+	var one := _balance.quest(FOLD)
+	var two := _balance.quest(FOLD2)
+	_check(int(one["until"]) == int(two["until"]) and float(one["wolves"]) == float(two["wolves"]), "the later joins the first: one deadline, one start (%s, %s)" % [one["until"], two["until"]])
+	var uids := PackedInt32Array()
+	for i in 14:
+		_ids[700 + i] = "meat"
+		uids.append(700 + i)
+	_balance.cell_changed("meadow", AT + Vector2i(10, 10), uids, {})
+	_until(func() -> bool: return not _judged.is_empty(), 6)
+	_check(_judged.size() == 2 and _judged.all(func(each: Array) -> bool: return each[1] == "badly"), "both judged badly at once (%s)" % [_judged])
+	_check(zones.size() == 1 and zones[0] == ["meadow", "badly", [FOLD, FOLD2]], "one zone ending (%s)" % [zones])
+	_check(_threats.size() == 1 and _threats[0] == [TOWN, "wolves", true], "one pack, on the first fold's town (%s)" % [_threats])
+	_check(_balance.threat(TOWN2) == "", "none on the second's")
+	_check(_stock.count(FOLD, "sheep") == 0 and _stock.count(FOLD2, "sheep") == 0, "each fold loses its own sheep")
 
 
 func _test_bodies_out() -> void:

@@ -6095,6 +6095,7 @@ func _make_balance(saved: Dictionary) -> void:
 	World.balance.fold_changed.connect(_on_folds_changed)
 	World.balance.threat_changed.connect(_on_balance_threat)
 	World.balance.judged.connect(_on_balance_judged)
+	World.balance.zone_judged.connect(_on_balance_zone_judged)
 
 
 ## Server: the balance quest's town wolves come or go (761, npc's side): the
@@ -6152,10 +6153,25 @@ func _on_balance_judged(fold_id: String, outcome: String) -> void:
 		"quest": _balance_seen.get(fold_id, World.balance.quest(fold_id)), "few": bool(World.balance.regrowing(fold_id).get("few", false))}
 	_balance_seen.erase(fold_id)
 	_balance_settle_all(fold_id, _balance_ends[fold_id]["quest"], outcome)
+
+
+## Server: [param area]'s quests judged together [param outcome] (761 amended:
+## one ending a zone): one party line to the players in the area, naming its
+## herder, or its herders together (townsfolk balance "party_zone").
+func _on_balance_zone_judged(area: String, outcome: String, fold_ids: Array) -> void:
 	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder")) if World.production != null else "herder"
-	var who := str(World.production.worker("%s:%s" % [trade, fold_id]).get("name", "")) if World.production != null else ""
-	var line := str(Townsfolk.rules().get("balance", {}).get("party", {}).get(outcome, ""))
-	var area := str(World.holdings.place(fold_id).get("area", "")) if World.holdings != null else ""
+	var names: Array[String] = []
+	for fold_id: Variant in fold_ids:
+		var name := str(World.production.worker("%s:%s" % [trade, str(fold_id)]).get("name", "")) if World.production != null else ""
+		if not name.is_empty():
+			names.append(name)
+	var said: Dictionary = Townsfolk.rules().get("balance", {})
+	var line := str(said.get("party", {}).get(outcome, ""))
+	var who := names[0] if not names.is_empty() else ""
+	if names.size() > 1:
+		who = "%s and %s" % [", ".join(PackedStringArray(names.slice(0, names.size() - 1))), names[-1]]
+		if not str(said.get("party_zone", {}).get(outcome, "")).is_empty():
+			line = str(said["party_zone"][outcome])
 	if who.is_empty() or line.is_empty() or area.is_empty():
 		return
 	var peers: Array[int] = []

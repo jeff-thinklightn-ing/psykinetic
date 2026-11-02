@@ -44,6 +44,12 @@ extends RefCounted
 ## - "off": anything else: the flock is lost.
 ## A lost flock comes back (Jeff): back.sheep sheep back.days later. A fold
 ## rests rest_days after a judgement before it asks again.
+## The zone is one (761 amended, the coordinator: the balance is shared by the
+## zone): a fold asking while another of its area's quests is open joins it
+## (its deadline and its wolves and deer at the start), and the area's quests
+## are judged together, the worst of their outcomes for all. Each fold keeps
+## or loses its own sheep; a "badly" sends one pack, to the first fold's town
+## (by id); zone_judged once.
 ##
 ## The town's nights of wolves: threat(town) "wolves" while any are left;
 ## enemy-ai's bodies call town_wolf_killed, and one at the store takes
@@ -53,6 +59,10 @@ extends RefCounted
 
 signal asked(fold_id: String)
 signal judged(fold_id: String, outcome: String)
+## The zone's ending, once for all its folds judged together (the balance is
+## shared by the zone: one outcome, one pack on one town; Main's one party
+## line). [param fold_ids] sorted.
+signal zone_judged(area: String, outcome: String, fold_ids: Array)
 signal threat_changed(town: String, kind: String, on: bool)
 ## A fold's sheep changed (wolves, a judgement, the flock come back).
 signal fold_changed(fold_id: String)
@@ -411,7 +421,7 @@ func _daily() -> void:
 		if not _quests.has(id) and recent.size() >= int(ask.get("lost", 2)) and _day >= int(_rest.get(id, -1)):
 			_ask(fold)
 		elif _quests.has(id) and _day >= int(_quests[id]["until"]):
-			_judge(fold)
+			_judge_zone(str(fold["area"]))
 	_town_nights()
 
 
@@ -440,6 +450,15 @@ func _ask(fold: Dictionary) -> void:
 	_quests[id] = {"area": area, "town": str(fold.get("town", "")), "from": _day, "flock": flock,
 		"until": _day + int(rules.get("deadline_days", 4)), "wolves": herds.total(area, _predator()),
 		"deer": herds.total(area, _prey()), "lost": 0, "left": 0, "home": 0, "left_by": {}, "home_by": {}}
+	# Another of the area's quests open: this one joins it, the zone's one quest.
+	for other: String in _quests:
+		var each: Dictionary = _quests[other]
+		if other != id and str(each["area"]) == area:
+			for key in ["from", "until", "wolves", "deer", "left", "home"]:
+				_quests[id][key] = each[key]
+			_quests[id]["left_by"] = (each["left_by"] as Dictionary).duplicate()
+			_quests[id]["home_by"] = (each["home_by"] as Dictionary).duplicate()
+			break
 	print("[balance] a fold asks: %d wolves, %d deer" % [roundi(herds.total(area, _predator())), roundi(herds.total(area, _prey()))])
 	asked.emit(id)
 
@@ -469,10 +488,41 @@ func outcome(fold_id: String) -> String:
 	return "off"
 
 
-func _judge(fold: Dictionary) -> void:
+## [param area]'s open quests judged together: the worst outcome of them all
+## for each, one pack for a "badly", zone_judged once.
+func _judge_zone(area: String) -> void:
+	var worst := ["balanced", "off", "badly"]
+	var result := "balanced"
+	var ids: Array = []
+	for id: String in _quests:
+		if str(_quests[id]["area"]) == area:
+			ids.append(id)
+			var one := outcome(id)
+			if worst.find(one) > worst.find(result):
+				result = one
+	ids.sort()
+	var by_id := {}
+	for fold in folds_in(area):
+		by_id[str(fold["id"])] = fold
+	var pack := ""
+	for id: String in ids:
+		var fold: Dictionary = by_id.get(id, {"id": id, "area": area})
+		var town := _judge(fold, result)
+		if pack.is_empty():
+			pack = town
+	if result == "badly" and not pack.is_empty():
+		var rule: Dictionary = rules.get("town_wolves", {})
+		_threats[pack] = {"kind": "wolves", "left": int(rule.get("count", 3)), "nights": int(rule.get("nights", 3))}
+		threat_changed.emit(pack, "wolves", true)
+	if not ids.is_empty():
+		zone_judged.emit(area, result, ids)
+
+
+## Fold [param fold]'s quest ended [param result] (its zone's): its sheep
+## kept or lost, the town's share. Its town, for the zone's pack.
+func _judge(fold: Dictionary, result: String) -> String:
 	var id := str(fold["id"])
 	var each: Dictionary = _quests[id]
-	var result := outcome(id)
 	var town := str(each["town"])
 	if town.is_empty():
 		town = str(fold.get("town", ""))  # Asked before the fold had a town (an old save): its town now.
@@ -495,15 +545,12 @@ func _judge(fold: Dictionary) -> void:
 		if left > 0:
 			stockpile.take(id, "sheep", left, "the flock lost to the wolves")
 		_back[id] = _day + int(rules.get("back", {}).get("days", 5))
-	if result == "badly" and not town.is_empty():
-		var rule: Dictionary = rules.get("town_wolves", {})
-		_threats[town] = {"kind": "wolves", "left": int(rule.get("count", 3)), "nights": int(rule.get("nights", 3))}
-		threat_changed.emit(town, "wolves", true)
 	print("[balance] a fold's quest is judged %s: lost %d, left %d, home %d" % [result, int(each["lost"]), int(each["left"]), int(each["home"])])
 	_quests.erase(id)
 	_rest[id] = _day + int(rules.get("rest_days", 4))
 	fold_changed.emit(id)
 	judged.emit(id, result)
+	return town
 
 
 func _town_nights() -> void:
