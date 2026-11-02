@@ -38332,6 +38332,33 @@ and the threat lifts once unseen for THREAT_CLEAR_HOURS as any other. Both are s
 keeps them together. resident_test _test_threat: the signal raises it, it holds unseen, and lifts
 once let go. Server only, no bullet, protocol unchanged, no new class_name.
 
+761, npc's side (2) (release's label; the coordinator approved npc's design): the fold's herder talks
+of the quest. It is shared by the zone and accepted by nobody, so he only talks. Main's balance
+herder functions:
+- The hail (_balance_hail, ahead of the mind's hail in _hails_tick): once a day to a player within
+  TALK_REACH while his fold's quest is open.
+- A click (_balance_words, from _greeted's herder branch, in place of the mind's hail): the ask, or
+  the grudge to a player whose name Balance counts BALANCE_GRUDGE_LEFT (2) or more meat left lying
+  against. Then his flock: flock_some, the fold's sheep of the sheep plus those lost since the ask,
+  in words (count_words); flock_half when half or more are gone. Then the days to the judgement:
+  days ("three days"), or days_last on the last.
+- Standing (443's Standing.bump on his card), settled when he speaks to that player: +1 a piece
+  brought home (at most BALANCE_HOME_MOST, 3, a quest), -1 a piece left lying. His card's
+  "balance" keeps what was settled, and the day hailed and told, by player id. The names stay in
+  Balance's game state (its put-down labels); nothing logs them.
+- The ending (Balance.judged): balanced, off or badly, said once to each player who clicks him
+  until the fold may ask again (rest_days). A balanced ending gives BALANCE_THANKS (2) to each who
+  brought meat home. The party line by ending goes to the players then in the area, with his name.
+  Balance drops a quest as it judges it, so Main keeps each quest's last copy on the world tick
+  (_balance_keep) for the ending's counts. The endings are in memory only: a restart before one is
+  told loses its words, never the quest's outcome.
+- The lines are voice's (2026-11-01), townsfolk.json "balance". The "off" line says "a few days",
+  as the flock comes back after five (the coordinator). The facts are economy's quest; no lore rows.
+resident_test _test_balance_herder (inside _test_herder): the hail once a day; the ask with eight of
+twelve and three days; the grudge and standing (-1 net, settled once); the last day; judged balanced:
+the party line, the thanks and standing, told once. Server only, test level only (no bullet),
+protocol unchanged, no new class_name.
+
 ## 763. Safe paths: each level's roads and tracks, for what keeps off them
 
 Jeff (2026-11-01, roadmap "How it plays"): "zones need to have safe paths with activities not too

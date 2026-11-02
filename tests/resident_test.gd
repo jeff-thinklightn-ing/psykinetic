@@ -965,6 +965,7 @@ func _test_herder() -> void:
 	town_record["sought"]["rs-hilde"]["freed_by"] = "p1"
 	_check(_main._shelter_words(place).is_empty(), "being led home: no word")
 	town_record["sought"].erase("rs-hilde")
+	_test_balance_herder(grim, place)
 	# His drove: away until the record's back, the buyer's butchery standing: a body at the buyer's square.
 	DayNight.set_hour(12.0)
 	World.towns._town(STORE)["buildings"]["butchery"] = {"kind": "butchery", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
@@ -988,6 +989,90 @@ func _test_herder() -> void:
 	World.towns._herders.erase(place)
 	World.towns._town(STORE)["buildings"].erase("butchery")
 	_sync()
+
+
+## The balance quest's herder (761, npc's side (2)): his hail once a day, the
+## ask with his flock and the days in words, the grudge and his standing by
+## what Balance counts against the player's name, the ending once, the party
+## line to the area.
+func _test_balance_herder(grim: Resident, fold: String) -> void:
+	print("
+== the balance quest's herder: hail, ask, flock and days, grudge, standing, the ending (761, npc's side (2)) ==")
+	var player := _player()
+	_check(World.balance != null and player != null, "(a balance and a player)")
+	if World.balance == null or player == null:
+		return
+	DayNight.set_hour(12.0)
+	_step_until(func() -> bool: return grim.doing == Resident.Doing.WORK and not grim.sleeping(), 120)
+	var rules: Dictionary = Townsfolk.rules().get("balance", {})
+	var day: int = _main._balance_day()
+	var sheep := World.stockpile.count(fold, "sheep")
+	if sheep < 8:
+		World.stockpile.deposit(fold, "sheep", 8 - sheep, "test", "test")
+	elif sheep > 8:
+		World.stockpile.take(fold, "sheep", sheep - 8, "test")
+	var name: String = World._label_of(player)
+	World.balance._quests[fold] = {"area": TOWN, "town": STORE, "from": day, "until": day + 3, "wolves": 5.0, "deer": 10.0,
+		"lost": 4, "left": 0, "home": 0, "left_by": {}, "home_by": {}}
+	var told: Array[Dictionary] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind in ["speech", "party"]:
+			told.append({"kind": kind, "text": str(data.get("text", ""))})
+	Net.message_received.connect(heard)
+	var said := func(key: String) -> bool:
+		var lines: Array = rules.get(key, [])
+		return told.any(func(each: Dictionary) -> bool: return each["kind"] == "speech" and lines.any(func(line: Variant) -> bool:
+			return each["text"] == str(line) or (str(line).contains("{") and each["text"].begins_with(str(line).get_slice("{", 0)))))
+	var greet := func() -> void:
+		told.clear()
+		_main._greet_at.clear()
+		_main._resident_asks = _main._resident_asks.filter(func(each: Dictionary) -> bool: return int(each["body"]) != grim.get_instance_id())
+		_main._greeted(player, grim)
+	_put(player, _main._nearest_free(grim.tile + Vector2i(1, 0)))
+	# The hail: once a day.
+	told.clear()
+	_check(_main._balance_hail(grim, player, Townsfolk.day_of(World.production.now())) and said.call("hail"), "his hail while the quest is open (%s)" % [told])
+	_check(not _main._balance_hail(grim, player, Townsfolk.day_of(World.production.now())), "once a day")
+	# A click: the ask, his flock, the days.
+	greet.call()
+	_check(said.call("ask"), "a click: the ask (%s)" % [told])
+	_check(told.any(func(each: Dictionary) -> bool: return each["text"].contains("eight") and each["text"].contains("twelve")), "his flock in words: eight of twelve (%s)" % [told])
+	_check(told.any(func(each: Dictionary) -> bool: return each["text"].contains("three days")), "the days left in words (%s)" % [told])
+	# Meat left lying against the player's name: the grudge, and standing down; brought home, up.
+	var card := Townsfolk.card_of(World.production, grim.worker_id)
+	var before := int(card.get("standing", {}).get(player.player_id, {}).get("score", 0))
+	World.balance._quests[fold]["left_by"] = {name: 2}
+	World.balance._quests[fold]["home_by"] = {name: 1}
+	greet.call()
+	_check(said.call("grudge") and not said.call("ask"), "meat left lying: the grudge in place of the ask (%s)" % [told])
+	card = Townsfolk.card_of(World.production, grim.worker_id)
+	var after := int(card.get("standing", {}).get(player.player_id, {}).get("score", 0))
+	_check(after == before - 1, "standing: +1 brought home, -2 left lying (%d -> %d)" % [before, after])
+	greet.call()
+	card = Townsfolk.card_of(World.production, grim.worker_id)
+	_check(int(card.get("standing", {}).get(player.player_id, {}).get("score", 0)) == after, "settled once, not again")
+	# The last day.
+	World.balance._quests[fold]["until"] = day + 1
+	greet.call()
+	_check(said.call("days_last"), "the last day (%s)" % [told])
+	# Judged balanced: the party line to the area, his ending once, thanks to one who brought meat home.
+	_main._balance_keep()
+	World.balance._quests.erase(fold)
+	told.clear()
+	_main._on_balance_judged(fold, "balanced")
+	var party := str(rules.get("party", {}).get("balanced", "")) % "Grim"
+	_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "party" and each["text"] == party), "the players in the area read it (%s)" % [told])
+	greet.call()
+	card = Townsfolk.card_of(World.production, grim.worker_id)
+	_check(said.call("balanced") and int(card.get("standing", {}).get(player.player_id, {}).get("score", 0)) == after + Main.BALANCE_THANKS,
+		"his thanks, and standing for the meat brought home (%s)" % [told])
+	greet.call()
+	_check(not said.call("balanced"), "told once")
+	Net.message_received.disconnect(heard)
+	_main._balance_ends.erase(fold)
+	card = Townsfolk.card_of(World.production, grim.worker_id)
+	card.erase("balance")
+	World.production.set_card(grim.worker_id, card)
 
 
 ## Snagfin (decision 471): a settled resident of another kind, with a stall

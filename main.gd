@@ -6075,6 +6075,7 @@ func _make_balance(saved: Dictionary) -> void:
 		return not _players_in(str(place.get("area", town.get_slice("/", 0)))).is_empty()
 	World.balance.fold_changed.connect(_on_folds_changed)
 	World.balance.threat_changed.connect(_on_balance_threat)
+	World.balance.judged.connect(_on_balance_judged)
 
 
 ## Server: the balance quest's town wolves come or go (761, npc's side): the
@@ -6087,6 +6088,191 @@ func _on_balance_threat(town: String, kind: String, on: bool) -> void:
 		_raise_threat(town, kind, BALANCE_HOLDER)
 	else:
 		World.towns.release_threat(town, BALANCE_HOLDER)
+
+
+# --- The balance quest's herder (761, npc's side (2)) -------------------------
+## The fold's herder talks of the quest Balance keeps (shared by the zone,
+## accepted by nobody): a hail once a day to a player near, the ask with his
+## flock and the days left on a click, a grudge to one who has left meat
+## lying, the ending once to each after the judgement. A player's standing
+## with him moves by what Balance counts against their name (the put-down
+## label), settled when he next speaks to them; his card keeps what was
+## settled by player id (card "balance"). townsfolk.json "balance": voice's.
+
+## Meat left lying in a quest, by one player, before he holds it against them.
+const BALANCE_GRUDGE_LEFT := 2
+## Meat brought home counted for standing, at most, in one quest.
+const BALANCE_HOME_MOST := 3
+## Standing for a balanced ending, to each who brought meat home.
+const BALANCE_THANKS := 2
+const COUNT_WORDS := ["no", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+	"thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"]
+
+## Fold id -> its quest's last copy (Balance drops it when it judges).
+var _balance_seen: Dictionary = {}
+## Fold id -> {outcome, at, until (Balance days), quest}: the ending he tells.
+var _balance_ends: Dictionary = {}
+
+
+func _balance_day() -> int:
+	return int(World.balance.now() / maxi(DayNight.day_steps, 1)) if World.balance != null else 0
+
+
+## Server, on the world tick: each quest's copy kept for its ending.
+func _balance_keep() -> void:
+	if World.balance == null:
+		return
+	_balance_seen = World.balance.quests()
+
+
+## Server: fold [param fold_id]'s quest judged [param outcome]: the herder
+## tells it until the fold may ask again; the players in its area read it.
+func _on_balance_judged(fold_id: String, outcome: String) -> void:
+	var day := _balance_day()
+	_balance_ends[fold_id] = {"outcome": outcome, "at": day, "until": day + int(World.balance.rules.get("rest_days", 4)),
+		"quest": _balance_seen.get(fold_id, World.balance.quest(fold_id))}
+	_balance_seen.erase(fold_id)
+	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder")) if World.production != null else "herder"
+	var who := str(World.production.worker("%s:%s" % [trade, fold_id]).get("name", "")) if World.production != null else ""
+	var line := str(Townsfolk.rules().get("balance", {}).get("party", {}).get(outcome, ""))
+	var area := str(World.holdings.place(fold_id).get("area", "")) if World.holdings != null else ""
+	if who.is_empty() or line.is_empty() or area.is_empty():
+		return
+	var peers: Array[int] = []
+	for player_id: String in _players_in(area):
+		var peer := Net.local_id if player_id == Net.player_id else _peer_of(player_id)
+		if peer != 0 and peer not in peers:
+			peers.append(peer)
+	if not peers.is_empty():
+		Net.broadcast_to(peers, "party", {"from": "", "text": line % who if line.contains("%s") else line})
+
+
+## The fold [param body] herds, "" for one not a herder.
+func _balance_fold(body: Resident) -> String:
+	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder"))
+	return body.worker_id.trim_prefix(trade + ":") if body.worker_id.begins_with(trade + ":") else ""
+
+
+## [param count] in words ("eleven"), digits past twenty.
+static func count_words(count: int) -> String:
+	return COUNT_WORDS[count] if count >= 0 and count < COUNT_WORDS.size() else str(count)
+
+
+## One of townsfolk.json balance's [param key] lines, picked for the pair today.
+func _balance_line(key: String, body: Resident, player: Player) -> String:
+	var lines: Array = Townsfolk.rules().get("balance", {}).get(key, [])
+	if lines.is_empty():
+		return ""
+	return str(lines[absi(hash(body.worker_id + player.player_id + key + str(_balance_day()))) % lines.size()])
+
+
+## The herder [param body]'s hail to [param player] (on [param day]): once a
+## day while his fold's quest is open. True when said.
+func _balance_hail(body: Resident, player: Player, day: int) -> bool:
+	if World.balance == null:
+		return false
+	var fold := _balance_fold(body)
+	if fold.is_empty() or World.balance.quest(fold).is_empty():
+		return false
+	var card := Townsfolk.card_of(World.production, body.worker_id)
+	if card.is_empty():
+		return false
+	var mine: Dictionary = card.get("balance", {}).get(player.player_id, {})
+	if int(mine.get("hailed", -1)) == day:
+		return false
+	var line := _balance_line("hail", body, player)
+	if line.is_empty():
+		return false
+	mine["hailed"] = day
+	_balance_card(body, card, player.player_id, mine)
+	body.address(player, int(float(Townsfolk.rules().get("greet", {}).get("stop_seconds", 8)) * World.TICK_RATE))
+	_resident_says(body, line, "", player)
+	return true
+
+
+## [param mine] kept on [param body]'s card for [param player_id].
+func _balance_card(body: Resident, card: Dictionary, player_id: String, mine: Dictionary) -> void:
+	var all: Dictionary = card.get("balance", {})
+	all[player_id] = mine
+	card["balance"] = all
+	World.production.set_card(body.worker_id, card)
+
+
+## [param player]'s standing with the herder moved by what [param quest]
+## counts against their name since last settled in [param mine]: +1 a piece
+## brought home (BALANCE_HOME_MOST at most), -1 a piece left lying.
+func _balance_settle(card: Dictionary, player: Player, quest: Dictionary, mine: Dictionary) -> void:
+	if quest.is_empty():
+		return
+	if int(mine.get("from", -1)) != int(quest.get("from", -1)):
+		mine["from"] = int(quest.get("from", -1))
+		mine["left"] = 0
+		mine["home"] = 0
+	var name := World._label_of(player)
+	var left := int(quest.get("left_by", {}).get(name, 0))
+	var home := mini(int(quest.get("home_by", {}).get(name, 0)), BALANCE_HOME_MOST)
+	var gained := home - int(mine.get("home", 0))
+	var lost := left - int(mine.get("left", 0))
+	if gained > 0:
+		Standing.bump(card, player.player_id, gained, "meat brought home off his hill", World.production.now())
+	if lost > 0:
+		Standing.bump(card, player.player_id, -lost, "meat left lying on his hill", World.production.now())
+	mine["left"] = left
+	mine["home"] = home
+
+
+## The herder [param body]'s talk of his fold's quest to [param player] who
+## clicked him: the ending once, else while it is open the ask (or the
+## grudge), his flock and the days left. True when he said any of it.
+func _balance_words(body: Resident, player: Player) -> bool:
+	if World.balance == null:
+		return false
+	var fold := _balance_fold(body)
+	if fold.is_empty():
+		return false
+	var card := Townsfolk.card_of(World.production, body.worker_id)
+	var mine: Dictionary = card.get("balance", {}).get(player.player_id, {})
+	var day := _balance_day()
+	var end: Dictionary = _balance_ends.get(fold, {})
+	if not end.is_empty() and day >= int(end["until"]):
+		_balance_ends.erase(fold)
+		end = {}
+	var quest := World.balance.quest(fold)
+	var said: Array[String] = []
+	if not end.is_empty() and int(mine.get("told", -1)) != int(end["at"]):
+		var ended: Dictionary = end["quest"]
+		if not card.is_empty():
+			_balance_settle(card, player, ended, mine)
+			if str(end["outcome"]) == "balanced" and int(ended.get("home_by", {}).get(World._label_of(player), 0)) > 0:
+				Standing.bump(card, player.player_id, BALANCE_THANKS, "kept the wolves off his flock", World.production.now())
+		mine["told"] = int(end["at"])
+		said.append(_balance_line(str(end["outcome"]), body, player))
+	elif not quest.is_empty():
+		if not card.is_empty():
+			_balance_settle(card, player, quest, mine)
+		var left_lying := int(quest.get("left_by", {}).get(World._label_of(player), 0))
+		said.append(_balance_line("grudge" if left_lying >= BALANCE_GRUDGE_LEFT else "ask", body, player))
+		var sheep := World.stockpile.count(fold, "sheep") if World.stockpile != null else 0
+		var had := sheep + int(quest.get("lost", 0))
+		if had > sheep:
+			if sheep * 2 <= had:
+				said.append(_balance_line("flock_half", body, player))
+			else:
+				said.append(_balance_line("flock_some", body, player).replace("{had}", count_words(had)).replace("{left}", count_words(sheep)))
+		var days := int(quest.get("until", day)) - day
+		if days <= 1:
+			said.append(_balance_line("days_last", body, player))
+		else:
+			said.append(_balance_line("days", body, player).replace("{days}", "%s days" % count_words(days)))
+	else:
+		return false
+	if not card.is_empty():
+		_balance_card(body, card, player.player_id, mine)
+	body.address(player, int(float(Townsfolk.rules().get("greet", {}).get("stop_seconds", 8)) * World.TICK_RATE))
+	for line in said:
+		if not line.is_empty():
+			_resident_says(body, line, "", player)
+	return true
 
 
 ## Server, the zone World is in: a town's wolves of a night (decision 761,
@@ -14524,6 +14710,8 @@ func _hails_tick() -> void:
 				continue
 			if _resident_quiet(body, player):
 				continue  # No hail near a fight (675, npc's side).
+			if _balance_hail(body, player, day):
+				return  # The herder's word of the wolves, once a day (761, npc's side (2)).
 			if _hail_now(body, player, rules, now_msec, now, day, sky):
 				return
 
@@ -15117,6 +15305,8 @@ func _greeted(player: Player, body: Resident) -> void:
 		var shelter := _shelter_words(str(World.production.worker(body.worker_id).get("town", "")))
 		if not shelter.is_empty():
 			_resident_says(body, shelter, "", player)  # A sought one sheltering at his fold (640, npc's side).
+		if _balance_words(body, player):
+			return  # The balance quest's talk (761, npc's side (2)).
 	_hail_now(body, player, Townsfolk.rules().get("hail", {}), now_msec, now, day, _sky_now(), true)
 
 
@@ -16372,6 +16562,7 @@ func _on_world_ticked(tick: int) -> void:
 			_crypt_asks_tick()  # Aldous's commissions met at the altar or the pack (part 3).
 			_seat_healers()  # An empty healer's hut given a new keeper once healers.vacant_days have run (733, npc's side).
 			_healers_age()  # A healer's term run out: he leaves, unseen (decision 759).
+			_balance_keep()  # The balance quests' last copies, for their endings (761, npc's side (2)).
 		if tick % HAIL_CHECK_TICKS == 0:
 			_hails_tick()  # Residents speaking unprompted (decision 554).
 		if tick % WORK_CHECK_TICKS == 0:
