@@ -38406,6 +38406,137 @@ time a player comes within HEARING_RANGE, once per player per ask: his card's "h
 a player 3 cells off with the mind busy is hailed, once an ask; a new ask heard on a click is not
 hailed after it. Server only, test level only (no bullet), protocol unchanged, no new class_name.
 
+761, enemy-ai's side (sim/animal.gd, Main._town_wolves; the coordinator approved): in an area the
+balance governs, a predator with nobody to fight has errands (Animal._errand_step), chosen every
+PREY_LOOK_TICKS before its prey; a bold one's quarry in sight ends the errand for Monster's fight.
+- Meat: meat lying within SMELL_TILES (12, Balance.meat_near) it walks to; beside it, it eats it
+  (Balance.eat) head down EAT_TICKS (30), with a howl (its "call") when it first finds it.
+- Hunger: its group's Herds.fed under HUNGRY_FED (0.5) makes it hungry: bold (it stands against a
+  player as at night), heedless of a town's or a fire's din (740's _shuns), and at night it goes to
+  the nearest fold with sheep within FOLD_TILES (40) and, within the fold's reach, takes one
+  (Balance.take_sheep), once a night (half a day's steps), then back to its den. A fed one lets the
+  fold be. Sheep stay economy's count: no sheep bodies.
+- A town's wolves of a night (Main._town_wolves, every TOWN_WOLVES_TICKS (50) in the zone World is
+  in): while a town there has the "wolves" threat, at night, with a player in the zone, the
+  Balance.wolves_at of them not already about are made once a night TOWN_WOLF_OFF (24) cells off its
+  store, out of every player's sight, of no herd (spawn props town_wolf and town_store, so a save
+  keeps them). Each goes to the store, takes one thing (Balance.night_take), and goes back; it hunts
+  no people and no game, fighting only when hurt. Killed, it calls Balance.town_wolf_killed. At dawn,
+  or the threat over, those left go (not a death); they are never kept as far records (_retirable).
+  Nobody there, Balance's far-tier take stands (watched).
+monster_test _test_balance_wolves: the meat smelt 10 off and eaten; fed, the fold let be; hungry,
+bold and one sheep a night; a town's wolf at the store takes one thing past a player it lets be, and
+killed is one fewer to come. Server only (the props reach clients in the spawn spec, unused there);
+protocol unchanged; no new class_name.
+
+761, economy's side (2) (release's label; the coordinator's ask, from playtest's balance tour): two
+snags.
+- The herds' ground build (469) started every area again on each new day, sampling and weighing
+  thrown away, and went through areas by name. On days too short to build them all, the last areas
+  (the hills) were never seeded. Now the day's turn starts a build only for an area with none
+  going, and builds go first queued, first built (Herds._building's "queued"), so a build is never
+  restarted and every area is reached. The box already seeds every outdoor area (its journal's
+  "seeded" lines name all six), so players see nothing new: no bullet. Herds.seed_now(area) builds
+  an area's ground at once and seeds it if it never was. Herds.progress() gives each area's seeded,
+  built and how far its build is. The console's "herds [seed <area>|all]" shows and uses them, so a
+  tour or test needn't wait on the ticks' share.
+- A fold's town was Towns.drove_town, a town with a standing butchery. A world with none gave the
+  quest no town, and a "badly" ending sent its wolves nowhere. Towns.fold_town(id, routes) is the
+  drove's town, else the nearest town store (Holdings.ranked over the raid routes; with none, the
+  fold's own area by the crow), else the first town by id. Main's folds use it. A quest asked with
+  no town (an old save) takes the fold's town when it is judged.
+herds_test _test_short_days (5 ticks a day, 100 a tick: the last area seeded by day 21) and
+_test_seed_now; farm_test (no butchery: the fold answers to the town). Server only; protocol
+unchanged; no new class_name; no bullet.
+
+761, economy's side (3) (release's label; the coordinator's ask, from playtest's arithmetic): the quest retuned to
+what one player can do. Before it, on the hills' ground, about 32 of room 64 deer were seeded with
+2 wolves, which bred at 2% a day. The wolves stayed under calm_wolves and far under what the deer
+could feed, so the fold never lost a sheep and never asked. Thinning the deer couldn't move the
+wolves either, and "balanced" needed 15 or more deer and 60-75 meat. Rules numbers
+(levels/economy.json "balance"), with two knobs that read them:
+- wolf_breed 40: in an area that keeps the balance, wolves breed 40 times their species' own
+  (Balance.breed_factor). They follow what the deer hold within days, so taking deer takes wolves
+  away within a day (leave 1.0).
+- calm_deer 0.45: the wolves a fold can bear are 0.45 of the deer room, in wolves
+  (Balance.calm(area); calm_wolves stays as the fallback). An area with more deer bears more
+  wolves, and deer x2 doesn't swamp the fold. sheep_base 1.0 a wolf past calm.
+- judge: lost_most 3 (the nights before a player can act cost sheep), deer_low 0.35 and
+  deer_high 0.55 of the room. The deer are seeded at half the room and rise, so the band sits
+  just under where the ask comes.
+tools/balance_table (a day-by-day sim on a real area's ground: the herds seeded as the game seeds
+them, the balance on, one fold, a player who takes N deer over the quest's first two days and
+brings all the meat home). The hills: the fold asks on day 7. Taking 0 deer is off (the wolves
+rise and the deer pass the band). 4 deer (about 15 meat and 4 hides, 4 pack slots, one trip) and
+8 deer (about 30 meat and 8 hides, 8 slots, one or two trips) are balanced. 15 deer is off
+(deer under the band). With deer x2 it takes about 15. "badly" is unchanged: 12 meat (3 deer)
+left lying.
+Tours and tests: Balance.ask_now(fold) and the console's "balance [ask <fold>]". It shows each
+keeping area's deer and wolves against their room and calm, the meat lying, and each fold's sheep,
+quest and outcome if judged now. balance_test retuned (the band at 0.45, lambs past the few lost)
+plus _test_ask_now. No level keeps the balance yet (761), so no player sees it: no bullet. Server
+only; protocol unchanged; no new class_name.
+
+761, economy's side (4) (release's label; the coordinator's calls on playtest's balanced run):
+- A balanced fold regrows (Jeff: "flock comes back"). With 2 sheep or fewer left at judging it
+  gets a breeding pair at once (balance.regrow.floor, ewes from town). Then a lamb a day
+  (regrow.a_day) brings it back to its flock before the wolves: the sheep at the ask plus those
+  lost just before it, plus thrive.lambs, regrow.most (8) at most. This replaces the 2 lambs at
+  once. A new ask stops the regrowth. Balance.regrowing(fold) gives {to, few}, and it is saved.
+  A fold down to few gets the herder's townsfolk "balanced_few" lines (voice's words) instead of
+  "balanced".
+- Regard is readable: "[regard] fold <place id> herder +N|-N: <why>" when standing moves
+  (Main._balance_settle and the thanks). The console's "balance" status counts the players who
+  brought meat home and who left it lying, and shows "regrowing to N". Place ids and numbers only,
+  never a player's name or id.
+- rest_days 4 -> 12. tools/balance_table --cycle=<days> runs a settled zone. With rest 4 an
+  untended fold asked every 8 days (deadline plus rest, 12 real hours). With rest 12 the hills ask
+  every 16 days untended (24 real hours at a 90-minute day). One player taking 8-10 deer at each
+  ask gets asks every 16-20 days, and every ending is balanced. The deer regrow during the rest,
+  so after the first round 8 or so deer are needed (6 slipped to off by the fourth round).
+balance_test _test_balanced (regrows a lamb a day to 8) and _test_balanced_few (a pair at once,
+the regrowth survives a save and load, a lamb a day). Server only; protocol unchanged; no new
+class_name; no bullet (no level keeps the balance).
+
+761 amended (release's label; the coordinator's call after playtest's balanced run; npc handed over its herder
+code): regard is settled at judging. Before, a player's standing with the herder moved only when
+they next clicked him, so one who hunted and never came back before the next ask lost what they
+had earned. Main._balance_settle_all runs from _on_balance_judged and settles every label in the
+quest's ledger (home_by and left_by) on the herder's card: +1 a piece brought home (3 at most), -1
+a piece left lying, and on a balanced ending BALANCE_THANKS to each who brought meat home. A label
+resolves to a player id through _records, which holds every saved player (offline ones too since
+it loads from the snapshot), or through a spawned player. A name held by two players is left to
+the talk-time settle. One card read and one write. His words still wait for the next talk, which
+settles 0 more (mine's home and left by the quest's "from", and "thanked"). _balance_settle takes
+a player id and label, not a Player; _balance_thank is new. Log: "[regard] fold <place id> judged
+<outcome>: N of M players settled", place ids and numbers only. zone_test _test_restart (release's
+ask): a regrowing fold and an open quest with its ledger come back by value through _save_state
+and Snapshot.load. resident_test: settled at the judging without a talk, then no double thanks or
+count. Server only; protocol unchanged; no new class_name; no bullet.
+
+761 amended (2) (release's label; the coordinator's call after playtest's badly run: two folds in one zone,
+lost on the same meat, sent two packs of 3 to the town and printed two party lines): a zone ends as
+one. The balance is shared by the zone (Jeff), so a fold that asks while another quest in its area
+is open joins it: the same deadline, and the same wolves and deer at the start (the ledger is
+already shared). When the deadline comes, Balance._judge_zone judges the area's quests together,
+and the worst of their outcomes (balanced < off < badly) goes to all of them. Each fold keeps or
+loses its own sheep (_judge(fold, result): regrowth or loss, and the town's share for each). A
+"badly" ending sends one pack, town_wolves.count strong, to the first fold's town by id. The new
+signal Balance.zone_judged(area, outcome, fold_ids) fires once. Main._on_balance_zone_judged takes
+the party line from _on_balance_judged: one line to the players in the area, naming the herder or
+the herders together ("A, B and C"; townsfolk balance "party_zone" when more than one, else
+"party"). Each herder still tells his own ending. balance_test _test_zone: both folds ask, the
+second joins, both are judged badly at once, one zone ending, one pack on the first fold's town,
+each fold loses its own sheep. resident_test calls the zone handler for the party line. Server
+only; protocol unchanged; no new class_name; no bullet.
+
+761 amended (3) (release's label; voice's words): townsfolk.json balance "party_zone", the one party line when a
+zone with more than one herder's fold ends (761 amended (2)), %s the herders together: "The flocks
+of %s hold; the wolves have drawn off." / "The flocks of %s are lost." / "The flocks of %s are lost
+to the wolves, and they are coming to the town by night." The names come after "of" because
+joined names read badly with a possessive. Lore: the night threat matches 762. Data only; no
+bullet (no level keeps the balance).
+
 ## 763. Safe paths: each level's roads and tracks, for what keeps off them
 
 Jeff (2026-11-01, roadmap "How it plays"): "zones need to have safe paths with activities not too
@@ -38427,6 +38558,19 @@ against it; this gives the game the same paths at run time.
   forest 2155, foothills 225, held 426).
 
 Server side; protocol unchanged; no new class_name; no level changes; no CHANGELOG bullet.
+
+763, economy's side: wolf dens off the safe paths.
+Jeff's safe-paths rule applied to the herds (the coordinator's ask): a predator's home sits at least
+its species' path_keep_off cells (Chebyshev; the wolf's 8, levels/economy.json herds.species) off
+every cell of its area's roads and dirt tracks, beside 397's keep_off from places and link pads.
+Herds.areas_of carries each area's "safe_paths" (WorldMap's, above) and Herds.may_home checks the
+square about the cell against that set, so a long road costs no more than a short one. Seeding never
+homes a pack there, and a den from before (an old save's) fails may_home and moves on the next day's
+roam (Herds._daily rehomes it), so the box's packs step back from the paths the day after a deploy.
+Deer, rabbits and boar may still graze on a road. herds_test: a road and a track across a made-up
+area, no den seeded within 8, the edges 5, 6 and 8 off, an old den moved off in a day, an area with
+no paths unchanged, and the hills' paths read from the real level. Server only; protocol unchanged;
+no new class_name; a CHANGELOG bullet (dens move in the real levels).
 
 ## 762. Threat in town
 
@@ -38512,89 +38656,7 @@ failure was the tour's roof test: Snagfin and Rolf stood inside the chapel (215.
 town shelter, but the tour read only level.json's freestanding roofs. resident_test _test_threat: Bram put
 out of doors at bedtime in the wolves shelters, then sleeps once under his roof. Server only, protocol
 unchanged, no new class_name.
-## 763, economy's side: wolf dens off the safe paths
 
-Jeff's safe-paths rule applied to the herds (the coordinator's ask): a predator's home sits at least
-its species' path_keep_off cells (Chebyshev; the wolf's 8, levels/economy.json herds.species) off
-every cell of its area's roads and dirt tracks, beside 397's keep_off from places and link pads.
-Herds.areas_of carries each area's "safe_paths" (WorldMap's, above) and Herds.may_home checks the
-square about the cell against that set, so a long road costs no more than a short one. Seeding never
-homes a pack there, and a den from before (an old save's) fails may_home and moves on the next day's
-roam (Herds._daily rehomes it), so the box's packs step back from the paths the day after a deploy.
-Deer, rabbits and boar may still graze on a road. herds_test: a road and a track across a made-up
-area, no den seeded within 8, the edges 5, 6 and 8 off, an old den moved off in a day, an area with
-no paths unchanged, and the hills' paths read from the real level. Server only; protocol unchanged;
-no new class_name; a CHANGELOG bullet (dens move in the real levels).
-761, enemy-ai's side (sim/animal.gd, Main._town_wolves; the coordinator approved): in an area the
-balance governs, a predator with nobody to fight has errands (Animal._errand_step), chosen every
-PREY_LOOK_TICKS before its prey; a bold one's quarry in sight ends the errand for Monster's fight.
-- Meat: meat lying within SMELL_TILES (12, Balance.meat_near) it walks to; beside it, it eats it
-  (Balance.eat) head down EAT_TICKS (30), with a howl (its "call") when it first finds it.
-- Hunger: its group's Herds.fed under HUNGRY_FED (0.5) makes it hungry: bold (it stands against a
-  player as at night), heedless of a town's or a fire's din (740's _shuns), and at night it goes to
-  the nearest fold with sheep within FOLD_TILES (40) and, within the fold's reach, takes one
-  (Balance.take_sheep), once a night (half a day's steps), then back to its den. A fed one lets the
-  fold be. Sheep stay economy's count: no sheep bodies.
-- A town's wolves of a night (Main._town_wolves, every TOWN_WOLVES_TICKS (50) in the zone World is
-  in): while a town there has the "wolves" threat, at night, with a player in the zone, the
-  Balance.wolves_at of them not already about are made once a night TOWN_WOLF_OFF (24) cells off its
-  store, out of every player's sight, of no herd (spawn props town_wolf and town_store, so a save
-  keeps them). Each goes to the store, takes one thing (Balance.night_take), and goes back; it hunts
-  no people and no game, fighting only when hurt. Killed, it calls Balance.town_wolf_killed. At dawn,
-  or the threat over, those left go (not a death); they are never kept as far records (_retirable).
-  Nobody there, Balance's far-tier take stands (watched).
-monster_test _test_balance_wolves: the meat smelt 10 off and eaten; fed, the fold let be; hungry,
-bold and one sheep a night; a town's wolf at the store takes one thing past a player it lets be, and
-killed is one fewer to come. Server only (the props reach clients in the spawn spec, unused there);
-protocol unchanged; no new class_name.
-
-761, economy's side (2) (release's label; the coordinator's ask, from playtest's balance tour): two
-snags.
-- The herds' ground build (469) started every area again on each new day, sampling and weighing
-  thrown away, and went through areas by name. On days too short to build them all, the last areas
-  (the hills) were never seeded. Now the day's turn starts a build only for an area with none
-  going, and builds go first queued, first built (Herds._building's "queued"), so a build is never
-  restarted and every area is reached. The box already seeds every outdoor area (its journal's
-  "seeded" lines name all six), so players see nothing new: no bullet. Herds.seed_now(area) builds
-  an area's ground at once and seeds it if it never was. Herds.progress() gives each area's seeded,
-  built and how far its build is. The console's "herds [seed <area>|all]" shows and uses them, so a
-  tour or test needn't wait on the ticks' share.
-- A fold's town was Towns.drove_town, a town with a standing butchery. A world with none gave the
-  quest no town, and a "badly" ending sent its wolves nowhere. Towns.fold_town(id, routes) is the
-  drove's town, else the nearest town store (Holdings.ranked over the raid routes; with none, the
-  fold's own area by the crow), else the first town by id. Main's folds use it. A quest asked with
-  no town (an old save) takes the fold's town when it is judged.
-herds_test _test_short_days (5 ticks a day, 100 a tick: the last area seeded by day 21) and
-_test_seed_now; farm_test (no butchery: the fold answers to the town). Server only; protocol
-unchanged; no new class_name; no bullet.
-
-761, economy's side (3) (release's label; the coordinator's ask, from playtest's arithmetic): the quest retuned to
-what one player can do. Before it, on the hills' ground, about 32 of room 64 deer were seeded with
-2 wolves, which bred at 2% a day. The wolves stayed under calm_wolves and far under what the deer
-could feed, so the fold never lost a sheep and never asked. Thinning the deer couldn't move the
-wolves either, and "balanced" needed 15 or more deer and 60-75 meat. Rules numbers
-(levels/economy.json "balance"), with two knobs that read them:
-- wolf_breed 40: in an area that keeps the balance, wolves breed 40 times their species' own
-  (Balance.breed_factor). They follow what the deer hold within days, so taking deer takes wolves
-  away within a day (leave 1.0).
-- calm_deer 0.45: the wolves a fold can bear are 0.45 of the deer room, in wolves
-  (Balance.calm(area); calm_wolves stays as the fallback). An area with more deer bears more
-  wolves, and deer x2 doesn't swamp the fold. sheep_base 1.0 a wolf past calm.
-- judge: lost_most 3 (the nights before a player can act cost sheep), deer_low 0.35 and
-  deer_high 0.55 of the room. The deer are seeded at half the room and rise, so the band sits
-  just under where the ask comes.
-tools/balance_table (a day-by-day sim on a real area's ground: the herds seeded as the game seeds
-them, the balance on, one fold, a player who takes N deer over the quest's first two days and
-brings all the meat home). The hills: the fold asks on day 7. Taking 0 deer is off (the wolves
-rise and the deer pass the band). 4 deer (about 15 meat and 4 hides, 4 pack slots, one trip) and
-8 deer (about 30 meat and 8 hides, 8 slots, one or two trips) are balanced. 15 deer is off
-(deer under the band). With deer x2 it takes about 15. "badly" is unchanged: 12 meat (3 deer)
-left lying.
-Tours and tests: Balance.ask_now(fold) and the console's "balance [ask <fold>]". It shows each
-keeping area's deer and wolves against their room and calm, the meat lying, and each fold's sheep,
-quest and outcome if judged now. balance_test retuned (the band at 0.45, lambs past the few lost)
-plus _test_ask_now. No level keeps the balance yet (761), so no player sees it: no bullet. Server
-only; protocol unchanged; no new class_name.
 ## 764. Hunting a deer: burst then trot, the wounded tire and go down, a slow stalk
 
 Playtest (11-01): with fists and a spear, 24 tries killed no deer, and a deer at 2 hp outran a
@@ -38644,27 +38706,6 @@ a herd wary after a kill and calm again, a cornered
 one away along the wall),
 _test_clank (a slow step unheeded, a hurried one turns it). Server only; protocol unchanged; no
 new class_name.
-
-761, economy's side (4) (release's label; the coordinator's calls on playtest's balanced run):
-- A balanced fold regrows (Jeff: "flock comes back"). With 2 sheep or fewer left at judging it
-  gets a breeding pair at once (balance.regrow.floor, ewes from town). Then a lamb a day
-  (regrow.a_day) brings it back to its flock before the wolves: the sheep at the ask plus those
-  lost just before it, plus thrive.lambs, regrow.most (8) at most. This replaces the 2 lambs at
-  once. A new ask stops the regrowth. Balance.regrowing(fold) gives {to, few}, and it is saved.
-  A fold down to few gets the herder's townsfolk "balanced_few" lines (voice's words) instead of
-  "balanced".
-- Regard is readable: "[regard] fold <place id> herder +N|-N: <why>" when standing moves
-  (Main._balance_settle and the thanks). The console's "balance" status counts the players who
-  brought meat home and who left it lying, and shows "regrowing to N". Place ids and numbers only,
-  never a player's name or id.
-- rest_days 4 -> 12. tools/balance_table --cycle=<days> runs a settled zone. With rest 4 an
-  untended fold asked every 8 days (deadline plus rest, 12 real hours). With rest 12 the hills ask
-  every 16 days untended (24 real hours at a 90-minute day). One player taking 8-10 deer at each
-  ask gets asks every 16-20 days, and every ending is balanced. The deer regrow during the rest,
-  so after the first round 8 or so deer are needed (6 slipped to off by the fourth round).
-balance_test _test_balanced (regrows a lamb a day to 8) and _test_balanced_few (a pair at once,
-the regrowth survives a save and load, a lamb a day). Server only; protocol unchanged; no new
-class_name; no bullet (no level keeps the balance).
 
 764 amended (release's label; rides revision 45 beside 747 amended (5), no bump of its own):
 - Monster.Pose.DOWN (2): a deer down (after a burst while low, felled unawares, or a blow that
@@ -38742,41 +38783,3 @@ enemy-ai's wire change (rev 45), and without it this side draws nothing new. No 
   at -10 dBFS for -4. It only ever erred quieter, never clipped.
 sound_kit_test (the kinds that cry, the slots' reach and takes). Client only; protocol
 unchanged; no new class_name.
-761 amended (release's label; the coordinator's call after playtest's balanced run; npc handed over its herder
-code): regard is settled at judging. Before, a player's standing with the herder moved only when
-they next clicked him, so one who hunted and never came back before the next ask lost what they
-had earned. Main._balance_settle_all runs from _on_balance_judged and settles every label in the
-quest's ledger (home_by and left_by) on the herder's card: +1 a piece brought home (3 at most), -1
-a piece left lying, and on a balanced ending BALANCE_THANKS to each who brought meat home. A label
-resolves to a player id through _records, which holds every saved player (offline ones too since
-it loads from the snapshot), or through a spawned player. A name held by two players is left to
-the talk-time settle. One card read and one write. His words still wait for the next talk, which
-settles 0 more (mine's home and left by the quest's "from", and "thanked"). _balance_settle takes
-a player id and label, not a Player; _balance_thank is new. Log: "[regard] fold <place id> judged
-<outcome>: N of M players settled", place ids and numbers only. zone_test _test_restart (release's
-ask): a regrowing fold and an open quest with its ledger come back by value through _save_state
-and Snapshot.load. resident_test: settled at the judging without a talk, then no double thanks or
-count. Server only; protocol unchanged; no new class_name; no bullet.
-
-761 amended (2) (release's label; the coordinator's call after playtest's badly run: two folds in one zone,
-lost on the same meat, sent two packs of 3 to the town and printed two party lines): a zone ends as
-one. The balance is shared by the zone (Jeff), so a fold that asks while another quest in its area
-is open joins it: the same deadline, and the same wolves and deer at the start (the ledger is
-already shared). When the deadline comes, Balance._judge_zone judges the area's quests together,
-and the worst of their outcomes (balanced < off < badly) goes to all of them. Each fold keeps or
-loses its own sheep (_judge(fold, result): regrowth or loss, and the town's share for each). A
-"badly" ending sends one pack, town_wolves.count strong, to the first fold's town by id. The new
-signal Balance.zone_judged(area, outcome, fold_ids) fires once. Main._on_balance_zone_judged takes
-the party line from _on_balance_judged: one line to the players in the area, naming the herder or
-the herders together ("A, B and C"; townsfolk balance "party_zone" when more than one, else
-"party"). Each herder still tells his own ending. balance_test _test_zone: both folds ask, the
-second joins, both are judged badly at once, one zone ending, one pack on the first fold's town,
-each fold loses its own sheep. resident_test calls the zone handler for the party line. Server
-only; protocol unchanged; no new class_name; no bullet.
-
-761 amended (3) (release's label; voice's words): townsfolk.json balance "party_zone", the one party line when a
-zone with more than one herder's fold ends (761 amended (2)), %s the herders together: "The flocks
-of %s hold; the wolves have drawn off." / "The flocks of %s are lost." / "The flocks of %s are lost
-to the wolves, and they are coming to the town by night." The names come after "of" because
-joined names read badly with a possessive. Lore: the night threat matches 762. Data only; no
-bullet (no level keeps the balance).
