@@ -19,9 +19,28 @@ const TOWN_SQUARE := Vector2i(212, 205)
 
 var _boss_bar_checked := false
 var _chest_gold := 0
+var _phase := 1
 
 
 func run(bot: Node) -> void:
+	for arg: String in OS.get_cmdline_user_args():
+		if arg.begins_with("--tour-phase="):
+			_phase = int(arg.trim_prefix("--tour-phase="))
+	if _phase > 1:  # After a server restart (TOUR_PHASES=2): the knight talked to again.
+		await _after_restart(bot)
+		return
+	if OS.get_environment("TOUR_ONLY") == "knight":  # His talk before and during the quest, then saved.
+		await _to_barrow(bot)
+		await _knight(bot)
+		# Handed in, as a player who did it on 194-196 is (its mark, Main.QUEST_DONE,
+		# set by the console: the band not fought here), then talked to.
+		bot.log_line("setup: %s" % await bot.admin("mark Tourbot barrow_quest"))
+		await bot.seconds(2.0)
+		bot.press("close")
+		await _talk_knight(bot, "after the quest (its mark set)", "", AstralKnight.DONE, true)
+		bot.press("close")
+		await _keep_knight(bot, true)
+		return
 	if OS.get_environment("TOUR_ONLY") == "wall":  # A cut's line: the wall turn alone.
 		await _to_barrow(bot)
 		await _wall_turn(bot)
@@ -36,6 +55,7 @@ func run(bot: Node) -> void:
 	await _wall_turn(bot)  # The band down: the camp's way quiet.
 	await _chest(bot)
 	await _turn_in(bot)
+	await _keep_knight(bot)
 	await _out_to_rolf(bot)
 	# 724 amended: no walk this tour stepped back and forth on the spot.
 	bot.expect(int(bot.flips["most"]) < 6, "no walk paced back and forth between two cells (6 flips or more)",
@@ -122,15 +142,18 @@ func _knight(bot: Node) -> void:
 		bot.log_line("door %s open %s lock \"%s\" hp %d" % [door.key, door.open, door.lock, door.hp])
 	var got_there: bool = await bot.walk_to(knight.tile, 2, 120.0)
 	bot.expect(got_there, "I can walk to the knight", "at %s" % bot.cell())
-	await bot.click(knight.tile)
-	await bot.seconds(2.0)
-	_list_buttons(bot, "after clicking the knight")
+	await _talk_knight(bot, "before the quest", AstralKnight.ASK_TITLE)
 	_names_read(bot, "the knight's window and his words")
 	var took: bool = bot.press("Prove")
 	bot.expect(took, "the knight's window offers his quest")
 	await bot.seconds(2.0)
 	var quest: Dictionary = bot.me().get("quest") if bot.me() != null else {}
 	bot.expect(not quest.is_empty(), "the quest tracker has his quest", str(quest).left(300))
+	bot.press("close")
+	await bot.seconds(1.0)
+	await _talk_knight(bot, "during the quest", AstralKnight.NOT_YET_TITLE, AstralKnight.NOT_YET)
+	bot.press("close")
+	await bot.seconds(1.0)
 	# The companion beside him for a while: never his foe (Jeff, v0.1.194:
 	# "wren aggros against the fallen knight and starts punching him").
 	var friend: GridEntity = bot.companion()
@@ -480,12 +503,7 @@ func _turn_in(bot: Node) -> void:
 	# offer): his window closed, then he is talked to again.
 	bot.press("close")
 	await bot.seconds(1.0)
-	await bot.click(knight.tile)
-	await bot.seconds(3.0)
-	var closing: Array = bot.told_since(since, "way below is open") + bot.heard.filter(func(line: Dictionary) -> bool:
-		return line["msec"] >= since and "way below is open" in str(line["text"]))
-	bot.expect(not closing.is_empty(), "talked to again, the knight's closing words: the way below is open",
-		"told since: %s" % [bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]).left(80))])
+	await _talk_knight(bot, "after the quest", "", AstralKnight.DONE, true)
 	bot.press("close")
 	bot.log_line("purse %d -> %d at the turn-in" % [before, int(bot.main.gold)])
 
@@ -608,3 +626,84 @@ func _out_to_rolf(bot: Node) -> void:
 	var enabled: Array = buys.filter(func(b: Dictionary) -> bool: return not b["disabled"])
 	bot.expect(not enabled.is_empty(), "with the chest's gold (purse %d), Rolf's wares can be bought" % int(bot.main.gold),
 		"%d of %d ware buttons on" % [enabled.size(), buys.size()])
+
+
+## A click on the fallen knight opens his talk (Jeff on v0.1.197: "the fallen
+## knight wasn't interactable"), [param when] in his quest: walked to as a
+## player does, the client takes the click as talk, not a blow
+## (Main.talks_on_click: a peaceable talking monster, his "peaceable" the
+## server's, replicated), and he answers within 6 s: his window's button
+## holding [param title] (his offer for the step), or his [param words] told
+## or said. What was up and what was heard logged either way.
+func _talk_knight(bot: Node, when: String, title: String, words := "", window := false) -> bool:
+	var knight: GridEntity = bot.find("AstralKnight")
+	if not bot.expect(knight != null, "%s: the fallen knight is there to talk to" % when, "in %s at %s" % [bot.zone(), bot.cell()]):
+		return false
+	if World.distance(bot.cell(), knight.tile) > 2:
+		await bot.walk_to(knight.tile, 2, 90.0)
+	var on_click: bool = bot.main.talks_on_click(knight)
+	bot.log_line("%s: the knight at %s, talks %s, peaceable %s; a click talks: %s" % [when, knight.tile,
+		knight.get("talks"), knight.get("peaceable"), on_click])
+	var since: int = bot.now_msec()
+	var said_words := words.left(24)
+	await bot.click(knight.tile)
+	var answered := func() -> bool:
+		var shown: bool = not title.is_empty() and bot.buttons().any(func(b: Dictionary) -> bool: return title.to_lower() in str(b["text"]).to_lower())
+		var said: bool = not said_words.is_empty() and (not bot.told_since(since, said_words).is_empty() or bot.heard.any(func(l: Dictionary) -> bool:
+			return l["msec"] >= since and said_words in str(l["text"])))
+		if window:  # His window up with his words in it (dungeon, 11-01: a chat line alone is no talk).
+			var panel: Control = bot.main.deal_panel
+			return panel != null and panel.is_visible_in_tree() and said_words in " ".join(bot.texts(panel))
+		return shown or said
+	var ok: bool = await bot.until(answered, 6.0)
+	if bot.main.deal_panel != null:
+		bot.log_line("%s: his window %s; it reads %s" % [when, "up" if bot.main.deal_panel.is_visible_in_tree() else "not up",
+			bot.texts(bot.main.deal_panel).map(func(t: String) -> String: return t.left(60))])
+	_list_buttons(bot, "the knight clicked, %s" % when)
+	bot.expect(on_click, "%s: a click on the fallen knight is talk, not a blow" % when,
+		"talks %s, peaceable %s" % [knight.get("talks"), knight.get("peaceable")])
+	bot.expect(ok, "%s: clicked, the fallen knight answers (%s%s)" % [when, title if not title.is_empty() else words.left(40), ", in his window" if window else ""],
+		"buttons %s; told %s; heard %s" % [bot.buttons().map(func(b: Dictionary) -> String: return str(b["text"])),
+			bot.told_since(since).map(func(l: Dictionary) -> String: return str(l["text"]).left(60)),
+			bot.heard.filter(func(l: Dictionary) -> bool: return l["msec"] >= since).map(func(l: Dictionary) -> String: return str(l["text"]).left(60))])
+	return ok
+
+
+## Where the knight's quest stood, kept for a phase after a server restart
+## (TOUR_PHASES=2): "open" (taken, not ready), "ready", "done" (handed in),
+## or "ask"; the world saved.
+func _keep_knight(bot: Node, marked := false) -> void:
+	var quest: Dictionary = bot.me().get("quest") if bot.me() != null else {}
+	var step := "ask"
+	if marked:
+		step = "done"
+	elif not quest.is_empty():
+		step = "ready" if bool(quest.get("ready", false)) else "open"
+	elif not bot.told.filter(func(l: Dictionary) -> bool: return "proven their strength" in str(l["text"])).is_empty() \
+			or not bot.heard.filter(func(l: Dictionary) -> bool: return "breathes cold air" in str(l["text"])).is_empty():
+		step = "done"
+	var file := FileAccess.open(bot.out_dir.path_join("knight_phase1.json"), FileAccess.WRITE)
+	file.store_string(JSON.stringify({"step": step}))
+	file.close()
+	bot.log_line("the knight's quest kept as %s; save: %s" % [step, await bot.admin("save")])
+
+
+## After the restart: back to the knight (into the barrow if not woken
+## there), his talk as the quest stood before it.
+func _after_restart(bot: Node) -> void:
+	var kept: Variant = JSON.parse_string(FileAccess.get_file_as_string(bot.out_dir.path_join("knight_phase1.json")))
+	var step := str((kept as Dictionary).get("step", "")) if kept is Dictionary else ""
+	await bot.settled()
+	bot.log_line("after the restart: the quest stood %s; woke in %s at %s" % [step, bot.zone(), bot.cell()])
+	if not bot.expect(not step.is_empty(), "phase 1 kept where the knight's quest stood"):
+		return
+	if bot.zone() != "barrow":
+		await _to_barrow(bot)
+	var quest: Dictionary = bot.me().get("quest") if bot.me() != null else {}
+	if step in ["open", "ready"]:
+		bot.expect(not quest.is_empty(), "after the restart the quest is still on my tracker", str(quest).left(200))
+	var by_step := {"ask": [AstralKnight.ASK_TITLE, ""], "open": [AstralKnight.NOT_YET_TITLE, AstralKnight.NOT_YET],
+		"ready": [AstralKnight.TURN_IN_TITLE, ""], "done": ["", AstralKnight.DONE]}
+	var want: Array = by_step.get(step, ["", ""])
+	await _talk_knight(bot, "after a server restart (the quest %s)" % step, want[0], want[1], step == "done")
+	bot.press("close")

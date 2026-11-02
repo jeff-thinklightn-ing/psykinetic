@@ -37684,6 +37684,22 @@ tells the tour), the chapel is watched from 9:00 at a normal clock and a visitor
 more than a cell from its doors, its counter and the respawn cell. Without the flag the tour only
 reports who came. The priest is checked at noon to work inside, off those cells. The chapel tour's
 TOUR_ONLY=shortcut plays the sealed way alone. Tests only, protocol unchanged, no new class_name.
+
+754 amended (7) (2026-11-01): two checks for what Jeff found on v0.1.197 that the tours missed.
+The barrow tour talks to the fallen knight before his quest, during it, after it, and after a server
+restart (TOUR_PHASES=2; phase 1 keeps where the quest stood): walked to and left-clicked, the click
+must be talk (Main.talks_on_click) and he must answer within 6 s, his offer's button or his words.
+After the quest the answer must be his window (Main.deal_panel up, his DONE words in it), not a chat
+line. TOUR_ONLY=knight plays it in a minute, the quest's mark (barrow_quest) set from the console.
+On main the after-quest click is expected to fail until dungeon's 747 amended (5) (rev 45, after
+the 11-02 cut): offers_for returns nothing once the mark is set, and the window never opens. The
+folk tour at night (TOUR_ONLY=beds alone; it reads the drawn view, so it runs --offscreen) walks
+Umbrage and on to the wilds' healer's hut (the turf house at 149,232) and logs each sleeper and
+what it lies on: a drawn bed (on it, or beside a solid one), a bedroll, or bare floor or ground;
+and the dwelling beds, who lies in each. Who owns a bed is the server's and never told to a client,
+so a player's reading is judged: a townsperson with a trade is not on a bedroll or the ground while
+a dwelling bed stands free, and the healer sleeps in his hut's bed. It failed on Hob before npc's
+89f15f57 and passes after. Tests only, protocol unchanged, no new class_name.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping
