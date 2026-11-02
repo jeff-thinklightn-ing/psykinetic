@@ -5760,6 +5760,20 @@ Pack (CC0; its own License.txt still to be read before use), the boar is
 an art-gen mesh on the Quaternius Pig's rig and clips (pc-character), and
 the rabbit an art-gen mesh on a small rig of pc-character's. A pack's flat
 materials move onto palette swatches when its art drops in, as any piece's.
+
+319 amended (release's label; the coordinator's catch in 764 amended (2)'s stills): the
+rabbit's belly and tail in the hide cream. tools/rabbit_rig.py coloured creature.rabbit's belly
+and tail with palette row 7 col 7 (244,239,230), the accent white; lit face-on it clips to pure
+white, and the TRELLIS mesh's belly edge runs triangle by triangle, so a dead rabbit, its
+underside to the sun, showed bright white shards along its flank (measured, not the death clip:
+9 of 1150 triangles stretched past x2 at its end, the winding sound). Its 666 belly and tail
+UVs move to row 5 col 0 (194,184,160), the hide cream the deer's and stag's bellies use: still a
+pale belly on a standing rabbit, its brightest lit pixel 216 lying dead (was 255). Moved in
+creature.rabbit.blend and re-exported (tools/blender/export_slot.py); mesh, rig and clips
+unchanged; rabbit_rig.py's default belly and tail now 5,0. Only the rabbit's UVs move: the
+other palette slots on 7,7 (the sheep's wool, antlers, tusks, meat, the hat, the amulet, the
+bandaging kit, the flower) keep it. Before and after: C:/dev/review/rabbit/belly_options.png.
+
 ## 313. Raids are real monsters in a played zone, handed back to maps when it sleeps
 
 maps moves raid groups on the world tick (WorldRaids). When a group's

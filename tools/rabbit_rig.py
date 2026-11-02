@@ -26,7 +26,8 @@
 #
 # Colours (--colours): regions body, belly (faces looking down, under the body's middle,
 # and the chin), tail (the tail bone's length off the rump, near the middle), ear_tips (the top quarter of the ears);
-# default body=5,2 belly=7,7 tail=7,7 ear_tips=5,6.
+# default body=5,2 belly=5,0 tail=5,0 ear_tips=5,6 (the belly and tail the hide cream, as the
+# deer's and stag's: 7,7's accent white clipped to pure white in sun, 319 amended).
 import math
 import os
 import sys
@@ -42,7 +43,7 @@ from creature_rig import args, bounds, decimate, load_mesh, points, stand, tris 
 FPS = 24
 ## How much of the height counts as touching the ground.
 GROUND_BAND = 0.05
-DEFAULT_COLOURS = {"body": (5, 2), "belly": (7, 7), "tail": (7, 7), "ear_tips": (5, 6)}
+DEFAULT_COLOURS = {"body": (5, 2), "belly": (5, 0), "tail": (5, 0), "ear_tips": (5, 6)}
 
 
 def side_of(pts: list, left: bool) -> list:
