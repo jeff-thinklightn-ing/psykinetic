@@ -8108,14 +8108,30 @@ func _test_two_hands() -> void:
 		rig.strike("Sledge_Attack", 0.9, 0.9, 0.8)
 		var slid := 0.0
 		var worst := 0.0
-		var started := Time.get_ticks_msec()
-		while Time.get_ticks_msec() - started < 2200:
+		# Scrubbed, not waited on (750 amended (3)): the strike held at each time in turn, its slide
+		# and its pose at the same moment. On the wall clock a slow frame under a loaded suite let the
+		# pose run on past the grip read before it (0.139 m off once).
+		rig._contact_msec = -1
+		rig._strike_msec = Time.get_ticks_msec() + 600000
+		rig._set_action_speed(0.0)
+		var length := rig.length("Sledge_Attack")
+		for step in int(length / 0.05) + 1:
+			rig.tree.set("parameters/action_seek/seek_request", minf(step * 0.05, length))
+			rig._apply()
 			_rig._process(0.0)
 			var grip := reach.grip
 			await get_tree().process_frame
 			slid = maxf(slid, 0.57 - grip.y)
 			worst = maxf(worst, (sockets["hand_l"] as Node3D).global_position.distance_to(sledge.global_transform * grip))
 		_check(slid > 0.3 and worst < 0.1, "struck: the left hand slid %.2f m down the haft toward the right, never more than %.3f m off it" % [slid, worst])
+		# Ended as a strike ends: its clip run out at speed again (a cancel left at speed 0 never
+		# fades, and the rests after it stood on it).
+		rig._set_action_speed(1.0)
+		rig.tree.set("parameters/action_seek/seek_request", length)
+		rig._apply()
+		rig._strike_msec = 0
+		for i in 4:
+			await get_tree().process_frame
 		_rig._process(0.0)
 		_check(not rig.striking() and is_equal_approx(reach.grip.y, 0.57), "the blow done: back at grip_2 (%.2f)" % reach.grip.y)
 	slots[Items.RIGHT_HAND] = "giant_axe"

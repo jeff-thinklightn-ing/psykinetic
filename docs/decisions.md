@@ -37622,6 +37622,15 @@ put off, any playing one ended, back after) and checks it stands at Idle before 
 Reproduced with fidget_at 0 (Fidget_LookBack, the same empty clip). Test only, protocol
 unchanged, no new class_name, no CHANGELOG bullet.
 
+750 amended (3) (release's label; seen once on pc-character's machine under load, 2026-11-02):
+view_test _test_two_hands's "struck: the left hand slid ... never more than 0.10 m off it" read
+the sledge's slid grip, then waited a frame on the wall clock to measure the hand, and a slow frame
+let the pose run on past that grip mid-slide (0.139 m off once, 0.088 on the rerun). It now
+scrubs the strike: held (no contact switch, its end put off, speed 0), seeked to each 0.05 s of
+Sledge_Attack in turn, the grip and the hand read at the same moment, then run out to its end
+at speed (a cancel left at speed 0 never faded, and the rests after it stood on it).
+The 0.10 m limit kept. Test only, protocol unchanged, no new class_name, no CHANGELOG bullet.
+
 ## 755. The world as it lies on the plane, for the world map
 
 ui's world map overhaul (Jeff: the world map "is buggy and not useful yet, it needs an
