@@ -8959,16 +8959,7 @@ func _sync_residents() -> void:
 			if (place.get("kind") != "healers_hut" and not fold_place) or not _town_near(place_id, place):
 				continue
 			var cell: Vector2i = place.get("cell", Vector2i.ZERO)
-			var hut := Rect2i(cell - Vector2i.ONE, Vector2i(3, 3))
-			# His hut: the building.hut beside the place (maps' 640: hills/herders_hut, hill_shieling), or one named
-			# after the key; the healer's, its own slot.
-			var slots: Array[String] = ["building.healers_hut"]
-			if fold_place:
-				slots = ["building.hut", "building." + str(place.get("key", ""))]
-			for building: Dictionary in area.get("buildings", []):
-				var rect: Rect2i = building.get("rect", Rect2i())
-				if str(building.get("slot", "")) in slots and rect.grow(1).has_point(cell):
-					hut = rect
+			var hut := _hut_at(area, place, fold_place)
 			var radius := int(place.get("radius", 2)) if fold_place else 2
 			var ground := Rect2i(cell - Vector2i(radius, radius), Vector2i(radius * 2 + 1, radius * 2 + 1))
 			if fold_place:
@@ -10991,6 +10982,33 @@ func _temple_keep(building: Dictionary, rect: Rect2i) -> Array[Vector2i]:
 					cells.append(cell)
 	_temple_keeps[key] = {"at": World.tick, "cells": cells}
 	return cells
+
+
+## The hut of healer's or herder's place [param place] in [param area]
+## (decisions 404, 640): the building beside the place's cell (its front)
+## that is his hut, its rect; none, the 3x3 round the cell. The herder's: a
+## building.hut, or one named after the key (maps' 640). The healer's: any
+## building that makes a healer's hut (_is_healers_hut; 751 amended: the
+## wilds' turf house, where the slot-only match missed it and its keeper
+## slept on a bedroll at its door).
+static func _hut_at(area: Dictionary, place: Dictionary, fold_place: bool) -> Rect2i:
+	var cell: Vector2i = place.get("cell", Vector2i.ZERO)
+	var slots: Array[String] = ["building.hut", "building." + str(place.get("key", ""))]
+	for building: Dictionary in area.get("buildings", []):
+		var rect: Rect2i = building.get("rect", Rect2i())
+		var his: bool = str(building.get("slot", "")) in slots if fold_place else _is_healers_hut(building)
+		if his and rect.size != Vector2i.ZERO and rect.grow(1).has_point(cell):
+			return rect
+	return Rect2i(cell - Vector2i.ONE, Vector2i(3, 3))
+
+
+## Whether [param building] is a healer's hut (751 amended): a slot
+## Level.BUILDING_PLACES makes one (building.healers_hut, the turf house),
+## or a kind whose place or use is "healers_hut".
+static func _is_healers_hut(building: Dictionary) -> bool:
+	return str(building.get("use", "")) == "healers_hut" or str(building.get("place", "")) == "healers_hut" \
+		or str(building.get("kind", "")) == "healers_hut" \
+		or str(Level.BUILDING_PLACES.get(str(building.get("slot", "")), "")) == "healers_hut"
 
 
 ## Whether [param building] is a town's temple (decision 404; the chapel

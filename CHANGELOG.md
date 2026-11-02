@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- The healer in the wilds sleeps in his hut again, not on a bedroll at his door (751).
 - Tools: the forest grower keeps each tree on the cell it grew in, so none is written onto a path beside it (467 amended).
 
 - The hills are much bigger (224 by 224, was 96): two valleys with their winding rivers, the plateau and its waterfall, escarpments, the road from the wilds over a bridge and a ford to the plateau's way up, four fords, the herders' holdings and the hill cave (756).

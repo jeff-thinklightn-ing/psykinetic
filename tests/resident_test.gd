@@ -3319,6 +3319,17 @@ func _test_asleep(mara: Resident, home: Rect2i) -> void:
 	var solid: Dictionary = _main._bed_in(made, hut, 0)
 	_check(solid.get("cell", head_cell) != head_cell and World.distance(solid.get("cell", head_cell), head_cell) == 1,
 		"a solid bed (the turf house's): beside its head, not on it (%s)" % [solid])
+	# The healer's hut a turf house (751 amended; Jeff's playtest: the wilds' keeper slept on a bedroll at its door):
+	# his hut is the turf house, not the 3x3 round its front cell; a herder's place doesn't take it.
+	var turf := Rect2i(store + Vector2i(-3, 5), Vector2i(7, 5))
+	var front := Level.front_cell(turf, Vector2i(0, -1))
+	var with_turf := {"buildings": [{"rect": turf, "slot": "building.turf_house", "use": "", "facing": Vector2i(0, -1)}]}
+	var healer_place := {"key": "healers_hut@%d,%d" % [front.x, front.y], "cell": front, "kind": "healers_hut"}
+	_check(_main._hut_at(with_turf, healer_place, false) == turf, "the healer's turf house is his hut (%s, the front %s)" % [_main._hut_at(with_turf, healer_place, false), front])
+	_check(_main._hut_at(with_turf, healer_place, true) == Rect2i(front - Vector2i.ONE, Vector2i(3, 3)), "a herder's place never takes a turf house")
+	_check(_main._hut_at({"buildings": []}, healer_place, false) == Rect2i(front - Vector2i.ONE, Vector2i(3, 3)), "no hut: the 3x3 round the place, as before")
+	_check(_main._is_healers_hut({"slot": "building.healers_hut"}) and _main._is_healers_hut({"slot": "", "kind": "healers_hut"})
+		and not _main._is_healers_hut({"slot": "building.hut"}), "a healer's hut by slot or kind, a plain hut not")
 	var player := _player()
 	if player == null:
 		_check(true, "(no player: the click and the wake skipped)")

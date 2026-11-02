@@ -37510,6 +37510,21 @@ Resident.sleeping()) with the same line (_asleep_told) and sends no
 "barter". The words are 751's, unchanged. resident_test _test_asleep. Server
 and client together, protocol unchanged.
 
+751 amended (3) (release's label; the coordinator's approval, from Jeff's
+playtest on v0.1.197: "hob was sleeping on a bedroll instead of his own
+bed"): Hob is the wilds' medicine man, and the wilds' healer's hut is a
+building.turf_house. Main's resident sync found a healer's hut by slot
+building.healers_hut only, so a turf house (a healer's hut by
+Level.BUILDING_PLACES) was never his hut. His hut fell back to the 3x3
+round the place's cell, which is the cell outside its door, so no bed was
+found there and he slept out of doors on a bedroll. The forest's turf house
+was the same. Main._hut_at now picks the building beside the place: for a
+healer, any building Main._is_healers_hut says is one (a slot
+BUILDING_PLACES maps to healers_hut, or a kind, place or use
+"healers_hut"), as _is_temple does for temples; the herder's match is as
+before. With no such building it is the 3x3 as before. resident_test, in
+751 npc's side (4)'s checks. Server only, protocol unchanged.
+
 750 amended, pc-character's side (2026-11-01): the heavy axes' sweep. The
 giant axe and the battle axe swing Axe_Sweep (humanoid_clips' SWEEP_*), a
 wound-up blow (WOUND_STRIKES, strikes [["Axe_Sweep", 0.8]]) at combat's
