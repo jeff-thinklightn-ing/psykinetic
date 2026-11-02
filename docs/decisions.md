@@ -38600,3 +38600,24 @@ a herd wary after a kill and calm again, a cornered
 one away along the wall),
 _test_clank (a slow step unheeded, a hurried one turns it). Server only; protocol unchanged; no
 new class_name.
+
+761, economy's side (4) (release's label; the coordinator's calls on playtest's balanced run):
+- A balanced fold regrows (Jeff: "flock comes back"). With 2 sheep or fewer left at judging it
+  gets a breeding pair at once (balance.regrow.floor, ewes from town). Then a lamb a day
+  (regrow.a_day) brings it back to its flock before the wolves: the sheep at the ask plus those
+  lost just before it, plus thrive.lambs, regrow.most (8) at most. This replaces the 2 lambs at
+  once. A new ask stops the regrowth. Balance.regrowing(fold) gives {to, few}, and it is saved.
+  A fold down to few gets the herder's townsfolk "balanced_few" lines (voice's words) instead of
+  "balanced".
+- Regard is readable: "[regard] fold <place id> herder +N|-N: <why>" when standing moves
+  (Main._balance_settle and the thanks). The console's "balance" status counts the players who
+  brought meat home and who left it lying, and shows "regrowing to N". Place ids and numbers only,
+  never a player's name or id.
+- rest_days 4 -> 12. tools/balance_table --cycle=<days> runs a settled zone. With rest 4 an
+  untended fold asked every 8 days (deadline plus rest, 12 real hours). With rest 12 the hills ask
+  every 16 days untended (24 real hours at a 90-minute day). One player taking 8-10 deer at each
+  ask gets asks every 16-20 days, and every ending is balanced. The deer regrow during the rest,
+  so after the first round 8 or so deer are needed (6 slipped to off by the fourth round).
+balance_test _test_balanced (regrows a lamb a day to 8) and _test_balanced_few (a pair at once,
+the regrowth survives a save and load, a lamb a day). Server only; protocol unchanged; no new
+class_name; no bullet (no level keeps the balance).

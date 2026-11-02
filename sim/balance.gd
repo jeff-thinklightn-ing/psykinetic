@@ -33,8 +33,11 @@ extends RefCounted
 ## the area, judged deadline_days on (judged):
 ## - "balanced": wolves no more than at the start, deer within deer_low ..
 ##   deer_high of what the ground keeps, at most lost_most sheep lost and
-##   left_most meat left lying: thrive.lambs lambs to the fold, thrive.wool
-##   wool and thrive.meat meat to the fold's town's store.
+##   left_most meat left lying: the fold regrows (Jeff: "flock comes back"),
+##   at once to regrow.floor if fewer (a breeding pair kept, ewes from town),
+##   then regrow.a_day a day to its flock before the wolves (at the ask, with
+##   the sheep it had lost then) plus thrive.lambs, regrow.most at most;
+##   thrive.wool wool and thrive.meat meat to the fold's town's store.
 ## - "badly": wolves bad_wolves x the start or more, or bad_left meat left
 ##   lying or more: the flock is lost and town_wolves.count wolves come to
 ##   the town at night (threat_changed: npc's "threat in town").
@@ -84,6 +87,8 @@ var _pressure: Dictionary = {}
 var _back: Dictionary = {}
 ## Fold id -> the day it may ask again.
 var _rest: Dictionary = {}
+## Fold id -> its regrowth after a balanced ending: {to, few}.
+var _regrow: Dictionary = {}
 ## Town -> {kind, left, nights}.
 var _threats: Dictionary = {}
 var _at := -1
@@ -393,6 +398,15 @@ func _daily() -> void:
 			var rule: Dictionary = rules.get("back", {})
 			stockpile.deposit(id, "sheep", int(rule.get("sheep", 3)), str(fold.get("farmer", "")), "a flock again")
 			fold_changed.emit(id)
+		# A balanced fold regrows.
+		if _regrow.has(id):
+			var a_day := int(rules.get("regrow", {}).get("a_day", 1))
+			var short := int(_regrow[id]["to"]) - stockpile.count(id, "sheep")
+			if short > 0:
+				stockpile.deposit(id, "sheep", mini(short, a_day), str(fold.get("farmer", "")), "lambs, the flock regrowing")
+				fold_changed.emit(id)
+			if short <= a_day:
+				_regrow.erase(id)
 		# The ask.
 		if not _quests.has(id) and recent.size() >= int(ask.get("lost", 2)) and _day >= int(_rest.get(id, -1)):
 			_ask(fold)
@@ -421,11 +435,20 @@ func ask_now(fold_id: String) -> String:
 func _ask(fold: Dictionary) -> void:
 	var id := str(fold["id"])
 	var area := str(fold["area"])
-	_quests[id] = {"area": area, "town": str(fold.get("town", "")), "from": _day,
+	_regrow.erase(id)  # The wolves are back at it.
+	var flock := (stockpile.count(id, "sheep") if stockpile != null else 0) + (_lost.get(id, []) as Array).size()
+	_quests[id] = {"area": area, "town": str(fold.get("town", "")), "from": _day, "flock": flock,
 		"until": _day + int(rules.get("deadline_days", 4)), "wolves": herds.total(area, _predator()),
 		"deer": herds.total(area, _prey()), "lost": 0, "left": 0, "home": 0, "left_by": {}, "home_by": {}}
 	print("[balance] a fold asks: %d wolves, %d deer" % [roundi(herds.total(area, _predator())), roundi(herds.total(area, _prey()))])
 	asked.emit(id)
+
+
+## Fold [param fold_id]'s regrowth after a balanced ending, {} for none:
+## {to: the sheep it regrows to, few: whether it was down to regrow.floor or
+## fewer when judged (npc: the herder's "balanced_few" words)}.
+func regrowing(fold_id: String) -> Dictionary:
+	return _regrow.get(fold_id, {}).duplicate()
 
 
 ## The outcome of fold [param fold_id]'s quest were it judged now.
@@ -456,7 +479,13 @@ func _judge(fold: Dictionary) -> void:
 	var farmer := str(fold.get("farmer", ""))
 	if result == "balanced":
 		var thrive: Dictionary = rules.get("thrive", {})
-		stockpile.deposit(id, "sheep", int(thrive.get("lambs", 2)), farmer, "lambs, the wolves kept off")
+		var rule: Dictionary = rules.get("regrow", {})
+		var sheep := stockpile.count(id, "sheep")
+		var floor_of := int(rule.get("floor", 2))
+		if sheep < floor_of:
+			stockpile.deposit(id, "sheep", floor_of - sheep, farmer, "a breeding pair kept, ewes from town")
+		var to := mini(maxi(int(each.get("flock", sheep)), sheep) + int(thrive.get("lambs", 2)), int(rule.get("most", 8)))
+		_regrow[id] = {"to": maxi(to, floor_of), "few": sheep <= floor_of}
 		if not town.is_empty():
 			for what in ["wool", "meat"]:
 				if int(thrive.get(what, 0)) > 0:
@@ -505,7 +534,7 @@ func to_dict() -> Dictionary:
 	for uid: int in _carried:
 		carried[str(uid)] = _carried[uid].duplicate()
 	return {"lying": lying, "carried": carried, "quests": _quests.duplicate(true), "lost": _lost.duplicate(true),
-		"pressure": _pressure.duplicate(), "back": _back.duplicate(), "rest": _rest.duplicate(),
+		"pressure": _pressure.duplicate(), "back": _back.duplicate(), "rest": _rest.duplicate(), "regrow": _regrow.duplicate(true),
 		"threats": _threats.duplicate(true), "at": _at, "day": _day}
 
 
@@ -536,10 +565,15 @@ func from_dict(saved: Dictionary) -> void:
 		_back[str(key)] = int(saved["back"][key])
 	for key: Variant in saved.get("rest", {}):
 		_rest[str(key)] = int(saved["rest"][key])
+	var regrow: Variant = saved.get("regrow", {})
+	if regrow is Dictionary:
+		for key: Variant in regrow:
+			if regrow[key] is Dictionary:
+				_regrow[str(key)] = {"to": int(regrow[key].get("to", 0)), "few": bool(regrow[key].get("few", false))}
 	# Saved JSON gives numbers back as floats; the quests' counts are whole.
 	for id: String in _quests:
 		var each: Dictionary = _quests[id]
-		for key in ["from", "until", "lost", "left", "home"]:
+		for key in ["from", "until", "lost", "left", "home", "flock"]:
 			each[key] = int(each.get(key, 0))
 		for key in ["left_by", "home_by"]:
 			if not each.get(key) is Dictionary:

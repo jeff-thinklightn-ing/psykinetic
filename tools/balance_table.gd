@@ -10,6 +10,9 @@ extends Node
 ## godot --headless --audio-driver Dummy --path . --scene tools/balance_table.tscn -- --run-marker=<n>
 ##   [--area=hills] [--fold=hill_shieling] [--takes=0,4,8,15] [--rules=<json of balance rules over the real ones>]
 ##   [--deer=<times the level's deer>] [--days=<days before the player starts, if the fold never asks>]
+##   [--cycle=<days>: a settled zone over that many days instead, each N its own run: the player takes N
+##    deer at every ask, the fold keeps what Balance leaves it (its regrowth, its flock come back) and the
+##    herder's keep of 2; prints each ask's day, its ending and the days between asks]
 
 const TICKS_A_DAY := 10
 
@@ -44,6 +47,11 @@ func _ready() -> void:
 	var place: Dictionary = map.areas[area].get("places", {}).get(fold_place, {})
 	var cell: Vector2i = place.get("cell", Vector2i.ZERO)
 	print("balance table: %s, fold %s at %s, rules %s" % [area, fold_place, cell, JSON.stringify(rules)])
+	if args.has("cycle"):
+		for n: String in takes:
+			_cycle(area, cell, areas, holdings, richness, rules, int(n), int(args["cycle"]))
+		get_tree().quit(0)
+		return
 	for n: String in takes:
 		_run(area, cell, areas, holdings, richness, rules, int(n), int(args.get("days", 10)))
 	get_tree().quit(0)
@@ -103,6 +111,55 @@ func _run(area: String, cell: Vector2i, areas: Dictionary, holdings: Holdings, r
 			herds.total(area, "wolf"), herds.capacity(area, "wolf"), balance.hunger(area), 6 - stock.count("fold", "sheep") if str(said["judged"]).is_empty() else -1, state])
 		if not str(said["judged"]).is_empty():
 			break
+	herds.balance = null
+
+
+func _cycle(area: String, cell: Vector2i, areas: Dictionary, holdings: Holdings, richness: WorldRichness, rules: Dictionary, take: int, days: int) -> void:
+	var day_steps := maxi(DayNight.day_steps, 1)
+	_now = 0
+	var herds := Herds.new({}, areas, {}, func() -> int: return _now, holdings)
+	herds.richness = richness.richness
+	herds.camps = func() -> Array: return []
+	var stock := Stockpile.new({}, func() -> int: return _now)
+	var balance := Balance.new({}, herds, stock, rules, func() -> int: return _now)
+	herds.balance = balance
+	balance.id_of = func(_uid: int) -> String: return "meat"
+	balance.folds = func() -> Array: return [{"id": "fold", "area": area, "cell": cell, "town": "town", "farmer": "herder"}]
+	var asks: Array[int] = []
+	var ends: Array[String] = []
+	balance.asked.connect(func(_id: String) -> void: asks.append(_day))
+	balance.judged.connect(func(_id: String, result: String) -> void: ends.append(result))
+	herds.seed_now(area)
+	herds.tick()
+	balance.tick()
+	stock.deposit("fold", "sheep", 4, "herder", "start")
+	var left := 0
+	var start := -1
+	for day in days:
+		_day = day
+		if stock.count("fold", "sheep") < 2:
+			stock.deposit("fold", "sheep", 2 - stock.count("fold", "sheep"), "herder", "keep")
+		if not asks.is_empty() and asks[-1] == day - 1 and start != asks[-1]:
+			start = asks[-1]
+			left = take
+		if left > 0:
+			var today := mini(ceili(take / 2.0), left)
+			_take_deer(herds, area, today)
+			left -= today
+		for i in TICKS_A_DAY:
+			_now += day_steps / TICKS_A_DAY
+			herds.tick()
+			balance.tick()
+	var gaps: Array[int] = []
+	for i in range(1, asks.size()):
+		gaps.append(asks[i] - asks[i - 1])
+	var mean := 0.0
+	for gap in gaps:
+		mean += gap
+	mean = mean / gaps.size() if not gaps.is_empty() else 0.0
+	print("cycle %s, N=%d over %d days: asks on days %s, endings %s, gaps %s (mean %.1f days = %.1f real hours at %d min a day); at the end deer %.0f of %.0f, wolves %.1f" % [
+		area, take, days, asks, ends, gaps, mean, mean * day_steps / 36000.0, day_steps / 600,
+		herds.total(area, "deer"), herds.capacity(area, "deer"), herds.total(area, "wolf")])
 	herds.balance = null
 
 

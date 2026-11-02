@@ -6132,7 +6132,7 @@ func _balance_keep() -> void:
 func _on_balance_judged(fold_id: String, outcome: String) -> void:
 	var day := _balance_day()
 	_balance_ends[fold_id] = {"outcome": outcome, "at": day, "until": day + int(World.balance.rules.get("rest_days", 4)),
-		"quest": _balance_seen.get(fold_id, World.balance.quest(fold_id))}
+		"quest": _balance_seen.get(fold_id, World.balance.quest(fold_id)), "few": bool(World.balance.regrowing(fold_id).get("few", false))}
 	_balance_seen.erase(fold_id)
 	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder")) if World.production != null else "herder"
 	var who := str(World.production.worker("%s:%s" % [trade, fold_id]).get("name", "")) if World.production != null else ""
@@ -6224,7 +6224,7 @@ func _balance_card(body: Resident, card: Dictionary, player_id: String, mine: Di
 ## [param player]'s standing with the herder moved by what [param quest]
 ## counts against their name since last settled in [param mine]: +1 a piece
 ## brought home (BALANCE_HOME_MOST at most), -1 a piece left lying.
-func _balance_settle(card: Dictionary, player: Player, quest: Dictionary, mine: Dictionary) -> void:
+func _balance_settle(card: Dictionary, player: Player, quest: Dictionary, mine: Dictionary, fold := "") -> void:
 	if quest.is_empty():
 		return
 	if int(mine.get("from", -1)) != int(quest.get("from", -1)):
@@ -6238,8 +6238,10 @@ func _balance_settle(card: Dictionary, player: Player, quest: Dictionary, mine: 
 	var lost := left - int(mine.get("left", 0))
 	if gained > 0:
 		Standing.bump(card, player.player_id, gained, "meat brought home off his hill", World.production.now())
+		print("[regard] fold %s herder +%d: meat brought home" % [fold, gained])
 	if lost > 0:
 		Standing.bump(card, player.player_id, -lost, "meat left lying on his hill", World.production.now())
+		print("[regard] fold %s herder -%d: meat left lying" % [fold, lost])
 	mine["left"] = left
 	mine["home"] = home
 
@@ -6265,15 +6267,19 @@ func _balance_words(body: Resident, player: Player) -> bool:
 	if not end.is_empty() and int(mine.get("told", -1)) != int(end["at"]):
 		var ended: Dictionary = end["quest"]
 		if not card.is_empty():
-			_balance_settle(card, player, ended, mine)
+			_balance_settle(card, player, ended, mine, fold)
 			if str(end["outcome"]) == "balanced" and int(ended.get("home_by", {}).get(World._label_of(player), 0)) > 0:
 				Standing.bump(card, player.player_id, BALANCE_THANKS, "kept the wolves off his flock", World.production.now())
+				print("[regard] fold %s herder +%d: thanks, balanced" % [fold, BALANCE_THANKS])
 		mine["told"] = int(end["at"])
-		said.append(_balance_line(str(end["outcome"]), body, player))
+		var key := str(end["outcome"])
+		if key == "balanced" and bool(end.get("few", false)) and not _balance_line("balanced_few", body, player).is_empty():
+			key = "balanced_few"  # Down to a pair or none: it regrows, but from few.
+		said.append(_balance_line(key, body, player))
 	elif not quest.is_empty():
 		mine["hailed"] = int(quest.get("from", -1))  # Heard the ask: no hail after it.
 		if not card.is_empty():
-			_balance_settle(card, player, quest, mine)
+			_balance_settle(card, player, quest, mine, fold)
 		var left_lying := int(quest.get("left_by", {}).get(World._label_of(player), 0))
 		said.append(_balance_line("grudge" if left_lying >= BALANCE_GRUDGE_LEFT else "ask", body, player))
 		var sheep := World.stockpile.count(fold, "sheep") if World.stockpile != null else 0
@@ -18563,6 +18569,11 @@ func _balance_command(words: PackedStringArray) -> String:
 				state = "quest: %d days left, wolves at the ask %.1f, lost %d, left lying %d, home %d; %s if judged now" % [
 					int(quest["until"]) - day, float(quest["wolves"]), int(quest["lost"]), int(quest["left"]), int(quest["home"]),
 					balance.outcome(id)]
+			if not quest.is_empty():
+				state += "; by players: %d brought meat home, %d left it lying" % [(quest["home_by"] as Dictionary).size(), (quest["left_by"] as Dictionary).size()]
+			var regrow := balance.regrowing(id)
+			if not regrow.is_empty():
+				state += "; regrowing to %d" % int(regrow["to"])
 			lines.append("  fold %s (town %s): %d sheep, %s" % [id, str(fold.get("town", "")), int(fold["sheep"]), state])
 	return "\n".join(lines)
 

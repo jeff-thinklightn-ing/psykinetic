@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_capacity()
 	_test_meat()
 	_test_balanced()
+	_test_balanced_few()
 	_test_off()
 	_test_badly()
 	_test_bodies_out()
@@ -198,11 +199,36 @@ func _test_balanced() -> void:
 	_put("meadow", "deer", room * 0.45)
 	_check(_until(func() -> bool: return not _judged.is_empty(), 6), "judged at the deadline")
 	_check(_judged.size() == 1 and _judged[0][1] == "balanced", "balanced (%s; wolves %.1f, deer %.1f of %.1f)" % [_judged, _herds.total("meadow", "wolf"), _herds.total("meadow", "deer"), room])
-	var most := int(_balance.rules.get("judge", {}).get("lost_most", 1))
-	_check(_stock.count(FOLD, "sheep") >= sheep - most + int(_balance.rules.get("thrive", {}).get("lambs", 2)),
-		"lambs to the fold, past the few lost (%d from %d)" % [_stock.count(FOLD, "sheep"), sheep])
+	var regrow := _balance.regrowing(FOLD)
+	var lambs := int(_balance.rules.get("thrive", {}).get("lambs", 2))
+	_check(not regrow.is_empty() and int(regrow["to"]) == mini(8 + lambs, 8) and not bool(regrow["few"]),
+		"the fold regrows to its flock before the wolves and lambs (%s; %d at the ask)" % [regrow, sheep])
+	_put("meadow", "wolf", 0.0)
+	_check(_until(func() -> bool: return _balance.regrowing(FOLD).is_empty(), 10) and _stock.count(FOLD, "sheep") == int(regrow["to"]),
+		"a lamb a day, back to %d (%d)" % [int(regrow["to"]), _stock.count(FOLD, "sheep")])
 	_check(_stock.count(TOWN, "wool") == 4 and _stock.count(TOWN, "meat") == 5, "wool and meat to the town (%d, %d)" % [_stock.count(TOWN, "wool"), _stock.count(TOWN, "meat")])
 	_check(_balance.quest(FOLD).is_empty() and _threats.is_empty(), "the quest is done, and no threat")
+
+
+func _test_balanced_few() -> void:
+	print("\n== balanced with the fold emptied: a breeding pair at once, then it regrows ==")
+	_fresh()
+	var room := _start(0.85)
+	_until(func() -> bool: return not _asked.is_empty(), 10)
+	_put("meadow", "deer", room * 0.45)
+	_until(func() -> bool: return int(_balance.quest(FOLD).get("until", 0)) - _now / DAY <= 1, 6)
+	_stock.take(FOLD, "sheep", _stock.count(FOLD, "sheep"), "test: gone")
+	_check(_until(func() -> bool: return not _judged.is_empty(), 6) and _judged[0][1] == "balanced", "balanced (%s)" % [_judged])
+	var regrow := _balance.regrowing(FOLD)
+	_check(_stock.count(FOLD, "sheep") >= 2 and bool(regrow.get("few", false)), "a pair at once, from few (%d, %s)" % [_stock.count(FOLD, "sheep"), regrow])
+	_check(int(regrow.get("to", 0)) == 8, "regrows to its flock before the wolves (%s)" % [regrow])
+	var saved := _balance.to_dict()
+	var again := Balance.new(JSON.parse_string(JSON.stringify(saved)), _herds, _stock, {}, func() -> int: return _now)
+	_check(again.regrowing(FOLD) == regrow, "the regrowth is saved (%s)" % [again.regrowing(FOLD)])
+	_put("meadow", "wolf", 0.0)
+	var at := _stock.count(FOLD, "sheep")
+	_days(1.0)
+	_check(_stock.count(FOLD, "sheep") == at + 1, "a lamb a day (%d to %d)" % [at, _stock.count(FOLD, "sheep")])
 
 
 func _test_off() -> void:
