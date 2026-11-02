@@ -1878,6 +1878,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"lifts": row.get("lifts"),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
 			"never_lies": bool(row.get("never_lies", false)), "boss": bool(row.get("boss", false)),
+			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
 			"call": int(row.get("call", Senses.NOISE_CALL)),

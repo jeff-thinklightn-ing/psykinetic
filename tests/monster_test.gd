@@ -4522,6 +4522,40 @@ func _test_deer_hunted() -> void:
 	for i in Animal.WARY_TICKS:
 		World.step()
 	_check(not sister.wary(), "in time, calm again")
+	# A blow on her unawares, from her side: felled, to be finished; from
+	# afar, or on a boar, not.
+	pair = setup.call(14, Vector2i(20, 3), Vector2i(19, 3))
+	doe = pair[0]
+	hunter = pair[1]
+	World.damage(doe, 2, hunter)
+	for i in 30:
+		World.step()
+	_check(World.tick < doe._down_until and doe.tile == Vector2i(20, 3) and doe.hp == 12,
+			"struck unawares from her side, she is felled where she stood, to be finished")
+	var boar := EntityFactory.build(SPECS["o"].merged({"name": "Boar", "props": Level.MONSTER_TYPES["boar"]})) as Animal
+	_room.add_child(boar)
+	World.spawn(boar, Vector2i(30, 3))
+	World.step()
+	var boar_hunter := EntityFactory.build(SPECS["P"].merged({"name": "Hunter2"})) as GridEntity
+	_room.add_child(boar_hunter)
+	World.spawn(boar_hunter, Vector2i(31, 3))
+	World.damage(boar, 2, boar_hunter)
+	World.step()
+	_check(boar._down_until < 0 and not bool(Monster.kinds()["boar"]["felled_by_surprise"]), "a boar so struck is not felled: it turns on them")
+	# Her companion stalks with a stalking player.
+	pair = setup.call(14, Vector2i(20, 3), Vector2i(14, 3))
+	doe = pair[0]
+	hunter = pair[1]
+	var rhea := Companion.new()
+	rhea.keeper = hunter
+	rhea.tile = Vector2i(13, 3)
+	rhea.step_gap = 3  # Walking at her own pace...
+	hunter.step_gap = Animal.STALK_STEP_TICKS + 4  # ...behind a creeping keeper.
+	var judged := doe._walker_of(rhea)
+	hunter.step_gap = 3
+	_check(judged == hunter and doe._walker_of(rhea).step_gap <= Animal.STALK_STEP_TICKS,
+			"a companion's step is judged by her keeper's pace: she stalks with him")
+	rhea.free()
 	# Cornered: along the wall, not standing (playtest's doe stood 4 minutes).
 	pair = setup.call(14, Vector2i(1, 1), Vector2i(2, 2))
 	doe = pair[0]

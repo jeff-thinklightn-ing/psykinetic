@@ -45,21 +45,21 @@
 		"aim_hold_max": 20
 	},
 	"rabbit": {
-		"side": "wild", "role": "prey", "herd": "rabbit", "label": "Wild rabbit", "art": "creature.rabbit",
+		"side": "wild", "role": "prey", "felled_by_surprise": true, "herd": "rabbit", "label": "Wild rabbit", "art": "creature.rabbit",
 		"body": {"mass": 3.0, "max_hp": 3, "move_ticks": 2.5, "attack_damage": 0, "sight_range": 7},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 20,
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 1},
 		"drops": [{"item": "meat", "count": [1, 1]}, {"item": "hide", "count": [1, 1]}]
 	},
 	"deer": {
-		"side": "wild", "role": "prey", "herd": "deer", "label": "Wild doe", "art": "creature.deer",
+		"side": "wild", "role": "prey", "felled_by_surprise": true, "herd": "deer", "label": "Wild doe", "art": "creature.deer",
 		"body": {"mass": 60.0, "max_hp": 14, "move_ticks": 2.5, "attack_damage": 0, "sight_range": 9},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 20,
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 1},
 		"drops": [{"item": "meat", "count": [3, 4]}, {"item": "hide", "count": [1, 1]}]
 	},
 	"stag": {
-		"side": "wild", "role": "prey", "herd": "deer", "label": "Wild stag", "art": "creature.stag",
+		"side": "wild", "role": "prey", "felled_by_surprise": true, "herd": "deer", "label": "Wild stag", "art": "creature.stag",
 		"body": {"mass": 90.0, "max_hp": 20, "move_ticks": 2.6, "attack_damage": 0, "sight_range": 9},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 20,
 		"temperament": {"bold": 0, "cautious": 0, "cowardly": 1},
