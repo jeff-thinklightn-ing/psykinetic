@@ -38571,8 +38571,9 @@ but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim onl
   while she is within STALK_WITH_TILES (8) of him (Animal._walker_of). Companions: Heel already
   trails him a cell back and never overtakes, so nothing more is needed there.
 - A kill seen (the coordinator, after playtest's bow run: 3 arrows a doe, about 30 s a deer, "too
-  easy"; aim for a deer every couple of minutes): when prey dies, its herd within WARY_REACH (24)
-  is alarmed (Animal.alarm): wary WARY_TICKS (3000, 5 min; Animal.wary, by the clock): it sees
+  easy"; aim for a deer every couple of minutes): when prey dies, or is struck and cries out, its
+  herd within WARY_REACH (40; was 24 until the bow re-run's 48 s a deer: a hunted ground goes
+  quiet and the hunter roams) is alarmed (Animal.alarm): wary WARY_TICKS (3000, 5 min; Animal.wary, by the clock): it sees
   WARY_SIGHT (3) farther, heeds every step (no stalk), bolts twice as long, and its home moves
   MOVE_OFF (30) cells away from the kill; it runs at once. Deer hp and arrow damage unchanged.
 - Cornered prey slips along the wall (Animal._flee_goal): with no cell straight away from the

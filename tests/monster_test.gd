@@ -4522,6 +4522,17 @@ func _test_deer_hunted() -> void:
 	for i in Animal.WARY_TICKS:
 		World.step()
 	_check(not sister.wary(), "in time, calm again")
+	# One struck crying out: her herd 35 off is wary too.
+	pair = setup.call(14, Vector2i(5, 3), Vector2i(1, 1))
+	doe = pair[0]
+	hunter = pair[1]
+	var far_sister := EntityFactory.build(SPECS["d"].merged({"name": "FarSister", "props": Level.MONSTER_TYPES["deer"]})) as Animal
+	_room.add_child(far_sister)
+	World.spawn(far_sister, Vector2i(40, 3))
+	World.step()
+	World.damage(doe, 2, hunter)
+	World.step()
+	_check(far_sister.wary() and Animal.WARY_REACH == 40, "a deer struck cries out: her herd %d cells off is wary" % World.distance(doe.tile, far_sister.tile))
 	# A blow on her unawares, from her side: felled, to be finished; from
 	# afar, or on a boar, not.
 	pair = setup.call(14, Vector2i(20, 3), Vector2i(19, 3))

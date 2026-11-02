@@ -16,7 +16,7 @@ extends Monster
 ##   half it bleeds (BLEED_TICKS, never to death) and trots WOUNDED_TROT
 ##   slower; under DOWN_BELOW of its hp, after a burst it goes down
 ##   (DOWN_TICKS: still, not running) and can be finished. A kill seen or
-##   heard (within WARY_REACH) leaves its herd wary WARY_TICKS: it sees
+##   heard, or one struck crying out (within WARY_REACH), leaves its herd wary WARY_TICKS: it sees
 ##   WARY_SIGHT farther, heeds every step, bolts twice as long, and moves
 ##   its home MOVE_OFF away. A player's step it heeds only hurried (its step_gap within
 ##   STALK_STEP_TICKS: a slow stalk behind it goes unheard), and one it finds at its side
@@ -91,7 +91,7 @@ const STRUCK_BURST_TICKS := 60
 const WOUNDED_TROT := 1.25
 const WARY_TICKS := 3000
 const WARY_SIGHT := 3
-const WARY_REACH := 24
+const WARY_REACH := 40
 const MOVE_OFF := 30
 const BLEED_TICKS := 100
 const DOWN_BELOW := 0.25
@@ -427,11 +427,17 @@ func remains() -> Array[int]:
 	if not town_wolf.is_empty() and World.balance != null:
 		World.balance.town_wolf_killed(town_wolf)  # One fewer to come (761).
 	if role == Role.PREY:
-		for entity in World.monsters():
-			if entity != self and entity is Animal and (entity as Animal).herd == herd \
-					and World.distance(tile, entity.tile) <= WARY_REACH:
-				(entity as Animal).alarm(tile)  # Its herd saw it fall (764).
+		_alarm_herd()  # Its herd saw it fall (764).
 	return super()
+
+
+## Its herd within WARY_REACH, but itself, alarmed at where it is (764):
+## a kill, or its cry struck, heard; a hunted ground goes quiet.
+func _alarm_herd() -> void:
+	for entity in World.monsters():
+		if entity != self and entity is Animal and (entity as Animal).herd == herd \
+				and World.distance(tile, entity.tile) <= WARY_REACH:
+			(entity as Animal).alarm(tile)
 
 
 # --- Keeping the balance (decision 761, enemy-ai's side) --------------------------
@@ -535,7 +541,8 @@ func _flee(threat: Vector2i, routs := true) -> void:
 		_burst_until = maxi(_burst_until, World.tick + BURST_TICKS * (2 if wary() else 1))
 
 
-## Struck, prey bolts long (764): a missed or wounding shot costs a chase.
+## Struck, prey bolts long (764): a missed or wounding shot costs a chase;
+## its cry alarms its herd within WARY_REACH.
 ## Struck unawares (grazing, or startled) from within SURPRISE_REACH, a kind
 ## whose row says "felled_by_surprise" (deer, stag, rabbit; not the boar,
 ## who turns and fights) goes down at once, to be finished.
@@ -544,6 +551,7 @@ func note_struck(by: GridEntity) -> void:
 	super(by)
 	if role != Role.PREY:
 		return
+	_alarm_herd()  # Its cry, struck: its herd within hearing is wary (764).
 	if unaware and is_instance_valid(by) and World.distance(tile, by.tile) <= SURPRISE_REACH \
 			and bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("felled_by_surprise", false)):
 		_startle_until = -1
