@@ -4432,6 +4432,39 @@ func try_buy(by: GridEntity, shop: GridEntity, uid: int) -> bool:
 	return true
 
 
+## How near a player stands to deal with a townsperson in person (762
+## amended (3)): a step past the talk reach, as the body may move once the
+## window is up.
+const PERSON_REACH := 3
+
+## Whether [param by] can deal in person with townsperson [param body]
+## (562, 562 amended (5)): both spawned in one zone, the body alive, within
+## PERSON_REACH and in sight. Not reaches(): that is for slots, never a
+## resident's.
+func in_person(by: GridEntity, body: GridEntity) -> bool:
+	return is_instance_valid(body) and is_instance_valid(by) and body.spawned and by.spawned and body.zone == by.zone \
+		and body.hp > 0 and distance(by.tile, body.tile) <= PERSON_REACH and has_line_of_sight(by.tile, body.tile)
+
+
+## Whether [param by] can barter at shop counter [param shop] (decision
+## 560): within reach of the counter, or in person (in_person) with a
+## merchant of its town (a resident of the merchant trade or type) who
+## fronts it.
+func barter_reach(by: GridEntity, shop: GridEntity) -> bool:
+	if reaches(by, shop):
+		return true
+	var place := shop_place(shop)
+	if place.is_empty() or production == null:
+		return false
+	for entity: GridEntity in townsfolk():
+		if not entity is Resident or (entity as Resident).town != place or not in_person(by, entity):
+			continue
+		var who := production.worker((entity as Resident).worker_id)
+		if "merchant" in who.get("trades", []) or str(who.get("type", "")) == "merchant":
+			return true
+	return false
+
+
 ## Player [param by], within reach of shop counter [param shop], barters
 ## (decision 560): their things [param give] (uids in their slots) to the
 ## town, [param take] (uids off its shelf) from it, each at the price the
@@ -4447,7 +4480,7 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 	if not Net.is_authority():
 		return "not here"
 	var place := shop_place(shop) if maker.is_empty() 			else str(production.worker(maker).get("town", "")) if production != null else ""
-	if not by is Player or (by as Player).player_id.is_empty() or place.is_empty() or economy == null 			or not reaches(by, shop):
+	if not by is Player or (by as Player).player_id.is_empty() or place.is_empty() or economy == null 			or not (barter_reach(by, shop) if maker.is_empty() else in_person(by, shop)):
 		return "no shop the town holds here" if maker.is_empty() else "nobody to trade with here"
 	if give.is_empty() and take.is_empty():
 		return "nothing to trade"

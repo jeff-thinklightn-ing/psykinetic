@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hob and the other makers sell in person again: Barter with them no longer answers "too far away" when you stand beside them (562 amended (5)).
 - A dead rabbit's belly no longer shows as bright white shards: its belly and tail are a pale cream, like the deer's (319 amended).
 - Struck game cries out: a deer barks or bleats, a stag bellows and a rabbit squeals when hit and not killed (764 amended (4)).
 - A vendor sheltering from wolves or raiders no longer offers Barter on a joined game, the outpost's too: his line is enough (762 amended).

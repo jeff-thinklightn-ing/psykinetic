@@ -24629,6 +24629,19 @@ ui lands the joined-client check beside it (net_test: a resident spawned
 on the host reaches the client with trade and person; ui_test _barters on
 such a body). resident_test and protocol_test alone here. Wire change;
 no new class_name.
+
+562 amended (5) (Jeff, playing v0.1.198: "hobs store doesn't sell potions it says "too far""; the
+coordinator approved; release's label): no maker had ever sold in person. Since 562 the server
+checked a "barter" or "trade" with {resident}, and World.try_barter with a maker, by
+World.reaches(player, body). That is the pack and chest check, and it is false for any townsperson,
+so the answer was "too far away" at every distance; with Main._barter_reach's merchant who fronts
+the counter, the same. Now World.in_person(by, body) (both spawned in one zone, the body alive,
+within World.PERSON_REACH 3, a step past the talk reach as the body may move, and in sight) is the
+in-person reach, and World.barter_reach(by, shop) (the counter, or a fronting merchant in person;
+Main._barter_reach moved here) is the counter's. Main's barter and trade, its retain (the healer's
+retainer), and try_barter (a counter by barter_reach, a maker in person) use them. resident_test
+_test_threat: a barter with Bram the smith 2 and 3 cells off answers, and a trade reaches him;
+6 off is "too far away". Server only, protocol unchanged, no new class_name.
 ## 584 amended (2): the care counted a handful at a time
 
 Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4

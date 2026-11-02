@@ -6752,7 +6752,7 @@ func retain(player: Player, args: Dictionary) -> String:
 	var rule := care_rule(hut) if not hut.is_empty() else {}
 	if hut.is_empty():
 		why = "he keeps no hut"
-	elif body.zone != player.zone or World.distance(player.tile, body.tile) > World.COMPANION_REACH:
+	elif not World.in_person(player, body):
 		why = "too far away"
 	elif in_care(me, hut):
 		why = "already in his care"
@@ -6789,24 +6789,6 @@ func retain(player: Player, args: Dictionary) -> String:
 			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "%s takes you into his care." % name})
 	_send_barter(player, body, why, body.worker_id)
 	return pay if why.is_empty() and met else ""
-
-
-## Server: whether [param player] can barter at [param shop] (decision
-## 560): within reach of the counter, or of a merchant of its town (a
-## resident of the merchant trade or type) who fronts it.
-func _barter_reach(player: GridEntity, shop: GridEntity) -> bool:
-	if World.reaches(player, shop):
-		return true
-	var place := World.shop_place(shop)
-	if place.is_empty() or World.production == null:
-		return false
-	for entity: GridEntity in World.townsfolk():
-		if not entity is Resident or (entity as Resident).town != place or not World.reaches(player, entity):
-			continue
-		var who := World.production.worker((entity as Resident).worker_id)
-		if "merchant" in who.get("trades", []) or str(who.get("type", "")) == "merchant":
-			return true
-	return false
 
 
 ## Server: [param player]'s client is sent counter [param counter]'s work
@@ -12120,7 +12102,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 				return
 			maker = body.worker_id
 			shop = body
-			why = "" if World.reaches(entity, body) else "too far away"
+			why = "" if World.in_person(entity, body) else "too far away"  # In person (562 amended (5)): reaches() is slots'.
 		else:
 			shop = get_node_or_null(NodePath(str(args.get("shop", "")))) as GridEntity
 			if shop == null:
@@ -12129,7 +12111,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			if not shut.is_empty():
 				_threat_told(entity as Player, "The shopkeeper", shut)  # Shut (762).
 				return
-			why = "" if _barter_reach(entity, shop) else "too far from the counter"
+			why = "" if World.barter_reach(entity, shop) else "too far from the counter"
 		if command_name == "trade" and why.is_empty():
 			var give: Variant = args.get("give", [])
 			var take: Variant = args.get("take", [])

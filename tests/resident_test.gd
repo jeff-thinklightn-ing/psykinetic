@@ -796,6 +796,24 @@ func _test_threat() -> void:
 	if bram == null or gunn == null:
 		return
 	_check(_main._barters(bram), "(no threat: Bram barters)")
+	# In person (562 amended (5); Jeff: Hob's potions "too far"): World.reaches is a pack's, never a resident's.
+	var dealer := _player()
+	if dealer != null:
+		var answers: Array[Dictionary] = []
+		var answered := func(kind: String, data: Dictionary) -> void:
+			if kind == "barter":
+				answers.append(data)
+		Net.message_received.connect(answered)
+		for each: Array in [[1, ""], [3, ""], [6, "too far away"]]:
+			_put(dealer, _main._nearest_free(bram.tile + Vector2i(int(each[0]), 0)))
+			var off := World.distance(dealer.tile, bram.tile)
+			var want: String = each[1] if off <= World.PERSON_REACH else "too far away"
+			answers.clear()
+			_main._on_command(dealer, "barter", {"resident": str(bram.get_path())})
+			_check(answers.size() == 1 and str(answers[0].get("why")) == want, "a barter with Bram %d off: why \"%s\" (%s)" % [off, want, answers])
+			if off <= World.PERSON_REACH:
+				_check(World.try_barter(dealer, bram, [], [], 0, bram.worker_id) == "nothing to trade", "and a trade reaches him (not \"nobody to trade with here\")")
+		Net.message_received.disconnect(answered)
 	var hut := Rect2i(9, 5, 3, 3)
 	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RsThreat%d" % World.tick,
 		"tile": _main._nearest_free(Vector2i(2, 7)), "props": {"sight_range": 0}}) as Monster
