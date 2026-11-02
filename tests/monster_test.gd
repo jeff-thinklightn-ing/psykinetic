@@ -4435,19 +4435,14 @@ func _test_deer_hunted() -> void:
 	for i in Animal.BURST_TICKS + 1:
 		World.step()
 	_check(doe.alert == Monster.Alert.FLEEING and is_equal_approx(doe.move_ticks, pace), "then trots at her pace (%.2f)" % doe.move_ticks)
-	# Wounded: a burst at her pace, then a rest.
+	# Wounded: after her burst, a slower trot.
 	pair = setup.call(6, Vector2i(10, 3), Vector2i(4, 3))
 	doe = pair[0]
 	doe._flee(Vector2i(4, 3))
 	for i in Animal.BURST_TICKS + 2:
 		World.step()
-	var rested_at := doe.tile
-	for i in Animal.REST_TICKS - 4:
-		World.step()
-	var rested := doe.tile == rested_at
-	for i in 12:
-		World.step()
-	_check(rested and doe.tile != rested_at and doe.tile.x > 12, "wounded, she stops to rest after a burst, then runs on")
+	_check(doe.alert == Monster.Alert.FLEEING and is_equal_approx(doe.move_ticks, pace * Animal.WOUNDED_TROT),
+			"wounded, after her burst she trots slower (%.2f a cell)" % doe.move_ticks)
 	# Bleeding, never to death.
 	pair = setup.call(6, Vector2i(30, 3), Vector2i(2, 1))
 	doe = pair[0]
@@ -4501,6 +4496,32 @@ func _test_deer_hunted() -> void:
 			heeded = heeded or doe.alert != Monster.Alert.IDLE
 		World.try_move(hunter, Vector2i(1, 0))
 	_check(heeded and hunter.tile.x < 19, "walked up on, she hears it first (at %d)" % hunter.tile.x)
+	# Struck: a long burst (a wounding shot costs a chase).
+	pair = setup.call(14, Vector2i(10, 3), Vector2i(4, 3))
+	doe = pair[0]
+	hunter = pair[1]
+	World.damage(doe, 6, hunter)
+	for i in Animal.BURST_TICKS + 5:
+		World.step()
+	_check(doe.alert == Monster.Alert.FLEEING and World.tick < doe._burst_until and is_equal_approx(doe.move_ticks, pace * Animal.BURST_PACE),
+			"struck, she bolts in a long burst (still at %.2f a cell after %d ticks)" % [doe.move_ticks, Animal.BURST_TICKS + 5])
+	# A kill seen: the herd wary, every step heeded, home moved off.
+	pair = setup.call(14, Vector2i(20, 3), Vector2i(2, 3))
+	doe = pair[0]
+	var sister := EntityFactory.build(SPECS["d"].merged({"name": "Sister", "props": Level.MONSTER_TYPES["deer"]})) as Animal
+	_room.add_child(sister)
+	World.spawn(sister, Vector2i(24, 3))
+	World.step()
+	var sight := sister.sight_range
+	var home_was := sister.home
+	doe.remains()
+	World.step()
+	_check(sister._wary_until > World.tick and sister.sight_range == sight + Animal.WARY_SIGHT and sister.alert == Monster.Alert.FLEEING
+			and (home_was == Monster.NO_TILE or World.distance(sister.home, Vector2i(20, 3)) > World.distance(home_was, Vector2i(20, 3))),
+			"her herd saw the kill: wary, sees %d farther, runs, and moves its home off" % Animal.WARY_SIGHT)
+	for i in Animal.WARY_TICKS:
+		World.step()
+	_check(not sister.wary(), "in time, calm again")
 	# Cornered: along the wall, not standing (playtest's doe stood 4 minutes).
 	pair = setup.call(14, Vector2i(1, 1), Vector2i(2, 2))
 	doe = pair[0]
