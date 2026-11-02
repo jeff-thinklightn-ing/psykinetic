@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- A healer grows old and leaves his hut in time: it stands empty, its chimney goes cold, and after a while a newcomer comes and mends it (759).
 - Hills: rock faces on stepped slopes stand on the ground they divide, with no shard of rock sticking out where two ledges meet (585 amended).
 
 - Tests: a test scene launched without `--run-marker` can no longer write levels into the shared user:// overlay; it says so in an ERROR line instead (199 amended).

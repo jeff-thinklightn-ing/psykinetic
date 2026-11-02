@@ -75,6 +75,14 @@ const SLEEP_WAKE_RANGE := 6
 const SLEEP_FIRE_REACH := 4
 ## The roofless's sleep spots by body key (751, npc's side (2)), kept while good.
 var _sleep_spots := {}
+## Each healer's hut's keeper's term (decision 759, saved "healer_terms"):
+## place id -> {who, name, from, until (game days), had: [every name that
+## kept it]}; after he leaves, {had, left, name} until a newcomer.
+var _healer_terms := {}
+## Whether each hut was last sent "empty" (759; the "huts" message's flag).
+var _huts_empty := {}
+## How near a player keeps a healer from leaving: he goes unseen (759).
+const HEALER_UNSEEN := 16
 ## A temple's cells its visitors keep off (734 amended (4), _temple_keep),
 ## by zone and rect: {at: World.tick, cells}, looked again after TEMPLE_KEEP_TICKS.
 var _temple_keeps := {}
@@ -3956,6 +3964,7 @@ func _boot() -> void:
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
 	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
+	_healer_terms = snapshot.get("healer_terms", {}).duplicate(true) if snapshot.get("healer_terms") is Dictionary else {}
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
 	_crypt_told = snapshot.get("crypt_told", {}).duplicate(true) if snapshot.get("crypt_told") is Dictionary else {}
 	_runner_out = snapshot.get("runner_out", {}).duplicate(true) if snapshot.get("runner_out") is Dictionary else {}
@@ -5625,6 +5634,7 @@ func _save_state(wait := true, final := false) -> void:
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"placed_captives": _placed_captives.duplicate(true),
 		"sought_bands": _sought_bands.duplicate(true),
+		"healer_terms": _healer_terms.duplicate(true),
 		"alms_runs": _alms_runs.duplicate(true),
 		"crypt_told": _crypt_told.duplicate(true),
 		"runner_out": _runner_out.duplicate(true),
@@ -6009,6 +6019,8 @@ func huts_of(area: String) -> Dictionary:
 		if area.is_empty() or id.begins_with(area + "/"):
 			var hut: Dictionary = World.towns.hut(id)
 			out[id] = {"state": hut["state"], "level": hut["level"]}
+			if _hut_empty(id):
+				out[id]["empty"] = true  # Nobody keeps it (759): no smoke, a cold pot, dark windows (buildings'); absent, as before.
 	return out
 
 
@@ -15528,16 +15540,148 @@ func _seat_healers() -> void:
 			var taken: Array = World.production.worker_ids().map(func(other: String) -> String:
 				return str(World.production.worker(other).get("name", "")) if trade in World.production.worker(other).get("trades", []) else "")
 			var name := trade.capitalize()
+			var had: Array = _healer_terms.get(id, {}).get("had", [])  # Never one who kept it before (759).
 			for k in names.size():
 				var pick := str(names[(absi(hash(id)) + k) % names.size()])
-				if pick not in taken:
+				if pick not in taken and pick not in had:
 					name = pick
 					break
 			World.production.add_worker(who, name, [trade], id, "wilds")
 			if shop.is_empty():
 				World.production.add_workshop(id, trade, id)
 			World.production.assign(id, who)
+			_begin_term(id, who, false)
 			print("[return] %s the %s keeps %s" % [name, trade.replace("_", " "), id])
+
+
+## A healer's old age (decision 759; the coordinator, so that a hut ever
+## stands empty for 733 to run): each hut's keeper keeps it for a term, then
+## leaves, unseen, with a word the nearest town learns and a line to a player
+## in its care. Once a world tick: a keeper with no term (one seated before
+## 759, or by another path) gets one; one whose term has run leaves when he
+## may (_healer_may_leave). Then each hut's "empty" sent when it changed.
+func _healers_age() -> void:
+	if World.holdings == null or World.production == null or not Net.is_authority():
+		return
+	var today := _healer_day()
+	var ids := World.holdings.all_places()
+	ids.sort()
+	for id: String in ids:
+		if World.holdings.place(id).get("kind") != "healers_hut":
+			continue
+		var who := str(World.production.workshop(id).get("worker", ""))
+		if who.is_empty() or World.production.worker(who).is_empty():
+			continue
+		var term: Dictionary = _healer_terms.get(id, {})
+		if str(term.get("who", "")) != who:
+			_begin_term(id, who, true)
+		elif today >= int(term.get("until", 0)) and _healer_may_leave(id, who):
+			_healer_leaves(id, who)
+	_send_huts_empty()
+
+
+## The world's day, as 733 counts a hut's (Towns.now() over the day's steps).
+func _healer_day() -> int:
+	return World.towns.now() / maxi(DayNight.day_steps, 1) if World.towns != null else 0
+
+
+## Healer [param who]'s term at hut [param place_id] begins today (759):
+## healers.old_age.days ± spread / 2 game days, staggered by the hut and how
+## many have kept it; [param first] (one seated before 759) first_from to
+## first_to days, by the hut, so the huts already kept fall empty over the
+## first real weeks, not at once.
+func _begin_term(place_id: String, who: String, first: bool) -> void:
+	var rule: Dictionary = World.production.rules.get("healers", {}).get("old_age", {})
+	var had: Array = (_healer_terms.get(place_id, {}).get("had", []) as Array).duplicate()
+	var name := str(World.production.worker(who).get("name", ""))
+	if not name.is_empty() and not had.has(name):
+		had.append(name)
+	var days := 0
+	if first:
+		var low := int(rule.get("first_from", 20))
+		days = low + absi(hash(place_id)) % (maxi(int(rule.get("first_to", 160)), low) - low + 1)
+	else:
+		var spread := maxi(int(rule.get("spread", 80)), 0)
+		days = maxi(int(rule.get("days", 160)) - spread / 2 + absi(hash("%s:%d" % [place_id, had.size()])) % (spread + 1), 1)
+	var today := _healer_day()
+	_healer_terms[place_id] = {"who": who, "name": name, "from": today, "until": today + days, "had": had}
+
+
+## Whether healer [param who] may leave hut [param place_id] now (759): he
+## keeps it (not away, sick or held), owes and is owed nothing (economy:
+## a debt is never written off), has no job working at his workshop (a mend,
+## a revival), and no player is within HEALER_UNSEEN of the hut.
+func _healer_may_leave(place_id: String, who: String) -> bool:
+	var worker := World.production.worker(who)
+	if bool(worker.get("away", false)) or Townsfolk.is_sick(World.production, who):
+		return false
+	if World.towns != null and World.towns.has_method("_keeper_of") and World.towns._keeper_of(place_id) != who:
+		return false  # Held at a camp, or not keeping it for another reason.
+	if float(worker.get("loan", 0.0)) > 0.0 or int(worker.get("owed", 0)) > 0:
+		return false
+	for job_id: int in World.production.jobs():
+		var job := World.production.job(job_id)
+		if str(job.get("worker", "")) == who and str(job.get("state", "")) == "working":
+			return false
+	var place := World.holdings.place(place_id)
+	for player: Variant in _players.values():
+		if is_instance_valid(player) and (player as Player).spawned and (player as Player).zone == str(place.get("area", "")) \
+				and World.distance((player as Player).tile, place.get("cell", Vector2i.ZERO)) <= HEALER_UNSEEN:
+			return false
+	return true
+
+
+## Healer [param who] leaves hut [param place_id] for good (759): out of the
+## world by economy's Production.remove_worker (his purse with him; a job
+## queued stays for the next; his card, and players' standing on it, gone),
+## a standing offer of his forgotten, the nearest town's people told
+## (townsfolk.json healer_left.heard), each player in the hut's care who is
+## here told (healer_left.told; their care stays with the hut, 733). The hut
+## stands empty: economy's next day marks it, and 733 runs.
+func _healer_leaves(place_id: String, who: String) -> void:
+	var name := str(World.production.worker(who).get("name", ""))
+	var town := _hut_town(place_id)
+	var lines: Dictionary = Townsfolk.rules().get("healer_left", {})
+	World.production.remove_worker(who)
+	for player_id: Variant in _standing.keys():
+		if _standing[player_id] is Dictionary and str((_standing[player_id] as Dictionary).get("worker", "")) == who:
+			_standing.erase(player_id)
+	var heard := str(lines.get("heard", ""))
+	if not town.is_empty() and heard.contains("%s") and World.towns != null:
+		for resident: String in World.towns.residents(town):
+			Townsfolk.learn(World.production, resident, heard % name)
+	var told := str(lines.get("told", ""))
+	if told.contains("%s"):
+		for player_id: String in _records:
+			if in_care(player_id, place_id) and _peer_of(player_id) != 0:
+				Net.broadcast_to([_peer_of(player_id)], "party", {"from": "", "text": told % name})
+	var term: Dictionary = _healer_terms.get(place_id, {})
+	_healer_terms[place_id] = {"had": term.get("had", [name]), "left": _healer_day(), "name": name}
+	MindLog.record({"kind": "healer", "companion": name, "mind": "resident", "say": "left %s in old age" % place_id, "outcome": "left"})
+	print("[return] %s the medicine man leaves %s in old age, step %d" % [name, place_id, World.steps])
+
+
+## Whether healer's hut [param place_id] stands empty (759): economy's
+## record says so (empty_since), or nobody keeps its workshop.
+func _hut_empty(place_id: String) -> bool:
+	if World.towns != null and World.towns.has_method("hut") and World.towns.hut(place_id).has("empty_since"):
+		return true
+	return World.production != null and str(World.production.workshop(place_id).get("worker", "")).is_empty()
+
+
+## Each hut's "empty" sent to every peer when it changed (759): economy's
+## day marks a hut empty without a hut_changed.
+func _send_huts_empty() -> void:
+	if World.towns == null or not World.towns.has_method("huts_to_dict"):
+		return
+	var areas := {}
+	for id: String in World.towns.huts_to_dict():
+		var empty := _hut_empty(id)
+		if bool(_huts_empty.get(id, false)) != empty:
+			_huts_empty[id] = empty
+			areas[id.get_slice("/", 0)] = true
+	for area: String in areas:
+		Net.broadcast("huts", {"states": huts_of(area)})
 
 
 ## Whether healer's hut [param place_id] has stood empty healers.vacant_days
@@ -15835,6 +15979,7 @@ func _on_world_ticked(tick: int) -> void:
 			_alms_runs_tick()  # Pip's run with the alms (decision 546, npc's side).
 			_crypt_asks_tick()  # Aldous's commissions met at the altar or the pack (part 3).
 			_seat_healers()  # An empty healer's hut given a new keeper once healers.vacant_days have run (733, npc's side).
+			_healers_age()  # A healer's term run out: he leaves, unseen (decision 759).
 		if tick % HAIL_CHECK_TICKS == 0:
 			_hails_tick()  # Residents speaking unprompted (decision 554).
 		if tick % WORK_CHECK_TICKS == 0:

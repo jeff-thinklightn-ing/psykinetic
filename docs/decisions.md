@@ -37876,6 +37876,54 @@ The coordinator's ask, npc leading, approved: a hut's healer leaves his hut in o
 and there is no heir; only healers age. Then 733 runs as it stands: the hut kept by nobody falls
 into disrepair, and after healers.vacant_days a newcomer is seated and mends it.
 
+npc's part, the main body (release: npc leads). Old age is only the way a
+hut ever stands empty, so 733's decay and newcomer can run (Jeff's ask: "it
+decays when nobody lives in it, and the healer rebuilds it with supplies",
+and "smoke from chimney if occupied").
+- The term (Main._begin_term, kept in Main._healer_terms and saved in the
+  snapshot as "healer_terms": place id -> {who, name, from, until, had}). A
+  newcomer seated by _seat_healers keeps the hut for economy's
+  healers.old_age days +- spread/2 game days, staggered by hash(place id and
+  how many have kept it). A keeper with no term (one seated before 759) gets
+  first_from..first_to days from that boot, staggered by the place, so the
+  huts already kept fall empty over the first real weeks, not at once.
+- Leaving (Main._healers_age, once each world tick after _seat_healers).
+  Once the term has run, he leaves when _healer_may_leave allows it:
+  - he keeps the hut (Towns._keeper_of is him: not away, sick or held);
+  - he owes and is owed nothing (economy's condition);
+  - no job of his is working (a mend, a revival);
+  - no player is within HEALER_UNSEEN (16) of the hut, so he goes unseen
+    and his body is simply gone the next time.
+  Then (_healer_leaves):
+  - Production.remove_worker takes him out, with his card and the standing
+    players had on it, and the newcomer starts fresh under the same id;
+  - a standing offer of his is forgotten (Main._standing);
+  - the residents of the hut's town (_hut_town) learn townsfolk.json
+    healer_left.heard;
+  - each player in the hut's care who is here gets healer_left.told as a
+    party line (voice's words, lore's fine);
+  - the server log and MindLog note it.
+  The term keeps only "had", so _seat_healers never seats a name that kept
+  the hut before. After that, 733 runs: economy's day marks the hut
+  empty_since, and so on.
+- "empty" (Main._hut_empty: economy's empty_since, or nobody in the
+  workshop): true on that hut's dict in the "huts" message (Main.huts_of),
+  absent otherwise. Main._send_huts_empty broadcasts a hut's area whenever
+  the flag changes, since economy's day sets empty_since without a
+  hut_changed. No PROTOCOL_REVISION: by net.gd's rule a field older peers
+  ignore, whose absence means today's look (the hut smokes), is cosmetic.
+  Buildings' side draws it.
+resident_test _test_healer_age:
+- a first term in range;
+- he waits beside a player, and while owed;
+- he leaves; the town hears; a player in care is told;
+- the hut is "empty";
+- at vacant_days a newcomer, never the same name, on a term of
+  days +- spread/2;
+- "empty" goes once he keeps it.
+Server (and the ignorable "empty" field), protocol unchanged, no new
+class_name.
+
 759, economy's side: the rules and the money.
 - levels/economy.json healers.old_age {days 160, spread 80, first_from 20, first_to 160}, beside
   vacant_days, read by npc: each term days +- spread/2 game days (120 to 200, about 7.5 to 12.5 real

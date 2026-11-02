@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_taken_by_raiders()
 	_test_bodies_in_town()
 	_test_healer_at_hut()
+	_test_healer_age()
 	_test_herder()
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
@@ -683,6 +684,91 @@ func _test_healer_at_hut() -> void:
 	_check(_body("medicine_man:" + hut_place) != null, "back, his body again")
 	World.production.set_away("medicine_man:" + hut_place, true)
 	_sync()
+
+
+## A healer's old age (decision 759): a term, staggered; at its end he
+## leaves unseen, owing nothing, his work done; the nearest town hears, a
+## player in the hut's care is told; the hut "empty"; a newcomer of another
+## name after vacant_days, with a term of his own.
+func _test_healer_age() -> void:
+	print("\n== a healer's old age: a term, then he leaves unseen; a newcomer of another name (decision 759) ==")
+	const HUT := TOWN + "/healers_hut@2,12"
+	World.holdings._places[HUT] = {"id": HUT, "area": TOWN, "key": "healers_hut@2,12", "cell": Vector2i(2, 12), "name": "the healer's hut",
+		"kind": "healers_hut", "radius": 1, "worth": 0, "start": Factions.NOBODY}
+	World.holdings._holder[HUT] = Factions.NOBODY
+	World.holdings._strength[HUT] = 0
+	World.holdings._since[HUT] = World.holdings.now()
+	var who := "medicine_man:" + HUT
+	World.production.add_worker(who, "Wenna", ["medicine_man"], HUT, "wilds")
+	World.production.add_workshop(HUT, "medicine_man", HUT)
+	World.production.assign(HUT, who)
+	World.towns._huts[HUT] = {"state": Towns.STANDING, "level": 1, "job": 0}
+	var rule: Dictionary = World.production.rules.get("healers", {}).get("old_age", {})
+	var today: int = _main._healer_day()
+	_main._healer_terms.erase(HUT)
+	_main._healers_age()
+	var term: Dictionary = _main._healer_terms.get(HUT, {})
+	var lead := int(term.get("until", 0)) - today
+	_check(str(term.get("who", "")) == who and lead >= int(rule.get("first_from", 20)) and lead <= int(rule.get("first_to", 160)) and term.get("had", []) == ["Wenna"],
+		"one seated before 759: a first term of first_from to first_to days (%s)" % [term])
+	_check(not _main.huts_of(TOWN).get(HUT, {}).has("empty"), "kept: no \"empty\" on the hut")
+	var player := _player()
+	term["until"] = today
+	if player != null:
+		_put(player, _main._nearest_free(Vector2i(2, 12) + Vector2i(1, 0)))
+		_main._healers_age()
+		_check(not World.production.worker(who).is_empty(), "his term run, a player beside the hut: he waits, unseen")
+		player.zone = "rs_elsewhere"  # Out of sight: the test town is smaller than HEALER_UNSEEN.
+	World.production._workers[who]["owed"] = 3
+	_main._healers_age()
+	_check(not World.production.worker(who).is_empty(), "owed by a town: he waits (a debt never written off)")
+	World.production._workers[who]["owed"] = 0
+	var told: Array[String] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "party":
+			told.append(str(data.get("text", "")))
+	Net.message_received.connect(heard)
+	var player_id: String = player.player_id if player != null else ""
+	var record: PlayerRecord = _main._records.get(player_id)
+	if record != null:
+		record.care[HUT] = true
+	var town: String = _main._hut_town(HUT)
+	var far: bool = player == null or player.zone != TOWN
+	_main._healers_age()
+	Net.message_received.disconnect(heard)
+	if record != null:
+		record.care.erase(HUT)
+	if player != null:
+		player.zone = TOWN
+	var lines: Dictionary = Townsfolk.rules().get("healer_left", {})
+	_check(far and World.production.worker(who).is_empty() and str(World.production.workshop(HUT).get("worker", "x")).is_empty(),
+		"nobody near, nothing owed: Wenna leaves; the workshop stands empty")
+	var learned: bool = town.is_empty() or World.towns.residents(town).any(func(id: String) -> bool:
+		return Townsfolk.card_of(World.production, id).get("facts", []).any(func(fact: Dictionary) -> bool:
+			return str(fact.get("text", "")) == str(lines.get("heard", "")) % "Wenna"))
+	_check(learned, "the nearest town's people heard (%s)" % town)
+	_check(record == null or _main._peer_of(player_id) == 0 or told.has(str(lines.get("told", "")) % "Wenna"), "the player in the hut's care told (%s)" % [told])
+	_check(bool(_main.huts_of(TOWN).get(HUT, {}).get("empty", false)), "the hut is \"empty\" in the huts message")
+	World.towns._huts[HUT]["empty_since"] = today - int(World.production.rules.get("healers", {}).get("vacant_days", 21))
+	_main._seat_healers()
+	var next := str(World.production.workshop(HUT).get("worker", ""))
+	var newcomer := str(World.production.worker(next).get("name", ""))
+	term = _main._healer_terms.get(HUT, {})
+	lead = int(term.get("until", 0)) - today
+	var spread := int(rule.get("spread", 80))
+	_check(not next.is_empty() and not newcomer.is_empty() and newcomer != "Wenna" and term.get("had", []).has("Wenna") and term.get("had", []).has(newcomer),
+		"vacant_days on: a newcomer, never Wenna again (%s)" % newcomer)
+	_check(lead >= int(rule.get("days", 160)) - spread / 2 and lead <= int(rule.get("days", 160)) + spread / 2, "his own term: days ± spread / 2 (%d)" % lead)
+	World.towns._huts[HUT].erase("empty_since")
+	_check(not _main.huts_of(TOWN).get(HUT, {}).has("empty"), "kept again: \"empty\" gone")
+	World.production.remove_worker(next)
+	World.towns._huts.erase(HUT)
+	_main._healer_terms.erase(HUT)
+	_main._huts_empty.erase(HUT)
+	World.holdings._places.erase(HUT)
+	World.holdings._holder.erase(HUT)
+	World.holdings._strength.erase(HUT)
+	World.holdings._since.erase(HUT)
 
 
 ## The hill herder (640, npc's side): a body at his fold by day and his hut
