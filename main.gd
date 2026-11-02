@@ -9620,12 +9620,13 @@ func _sync_bands() -> void:
 			if id.is_empty() or place_id.is_empty() or not str(entry.get("freed_by", "")).is_empty() 					or str(entry.get("holder", "")).is_empty():
 				continue  # Not placed, led home, or lost (no holder): no band.
 			seen[id] = true
-			var band: Dictionary = _sought_bands.get(id, {})
+			var saved: Variant = _sought_bands.get(id, {})
+			var band: Dictionary = saved if saved is Dictionary else {}  # A save's odd entry stood again, never a crash.
 			if str(band.get("place", "")) != place_id:
 				band = {"place": place_id, "stood": false}
 				_sought_bands[id] = band
 			var refuge := World.holdings.place(place_id)
-			if bool(band["stood"]) or refuge.is_empty() or str(refuge.get("area", "")) != World.zone.name:
+			if bool(band.get("stood", false)) or refuge.is_empty() or str(refuge.get("area", "")) != World.zone.name:
 				continue
 			var made := _stand_band(id, band_of(rule, entry), refuge)
 			band["stood"] = true

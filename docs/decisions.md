@@ -38045,6 +38045,12 @@ name or an id: "clearing" counts felled cells and "plots" laid plots over every 
 its cells, the rest their entries. zone_test _test_restart checks the line after its save (one
 plot, one told crypt, one placed captive, no names). Server only, protocol unchanged, no new
 class_name.
+758 amended (2), npc's reader of "sought_bands" hardened (release's label; the coordinator's queue): as
+enemy-ai's side did for named and raid_groups, Main._sync_bands (613: the sought's bands) reads each
+saved band softly. A band without "stood" is stood again, topped up from the living guards it counts
+(never doubled). An entry that is not a Dictionary is replaced by a fresh one for the placing, not a
+crash. resident_test: both, in the sought bands' checks. Server only, protocol unchanged, no new
+class_name, no bullet.
 
 ## 759. The healer's old age
 

@@ -1293,6 +1293,13 @@ func _test_sought_band() -> void:
 	World.despawn(band[0])
 	_main._sync_bands()
 	_check(_band("rs-band").size() == 3, "one killed stays dead while the placing holds")
+	_main._sought_bands["rs-band"] = {"place": NICHE}  # A save's entry without "stood": no crash, stood again (topped up).
+	_main._sync_bands()
+	_check(bool(_main._sought_bands["rs-band"].get("stood", false)) and _band("rs-band").size() == 4, "a saved band without \"stood\": stood again, topped up, no crash")
+	_main._sought_bands["rs-band"] = "odd"
+	_main._sync_bands()
+	_check(_main._sought_bands["rs-band"] is Dictionary and _band("rs-band").size() == 4, "an odd saved entry: replaced, never doubled")
+	World.despawn(_band("rs-band")[0])
 	World.towns.sought_lost("rs-band")
 	_main._sync_bands()
 	_check(not _main._sought_bands.has("rs-band"), "lost: the placing forgotten")
