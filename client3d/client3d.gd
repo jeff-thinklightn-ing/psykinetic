@@ -2615,6 +2615,7 @@ func _process(delta: float) -> void:
 	_update_shadows()
 	_update_sky(delta)
 	_grow_scatter()
+	_update_blood()
 	_drop_departed()
 	_update_mourning(delta)
 	_flicker_fires(delta)
@@ -5934,9 +5935,12 @@ func _phase_doors() -> void:
 		World.door_shown.connect(_on_door_shown)
 	if not World.grass_changed.is_connected(_on_grass_changed):
 		World.grass_changed.connect(_on_grass_changed)
+	if not World.blood_changed.is_connected(_on_blood_changed):
+		World.blood_changed.connect(_on_blood_changed)
 	for door in World.get_doors():
 		_doors_due[door.key] = true
 	_show_piles()
+	_draw_blood()
 
 
 ## The walls, doorways and posts of the terrain's edges; none along an
@@ -14719,6 +14723,152 @@ func _on_grass_changed(_level: String, flat: PackedInt32Array, stood: PackedInt3
 	for cell: Vector2i in _flattened.keys():
 		if now - _flattened[cell] >= FLATTENED_MS:
 			_flattened.erase(cell)
+
+
+## A wounded animal's blood (764, terrain's side): each level's marked cells,
+## level -> {cell: the msec it fades out at}, from World.blood_changed.
+var _blood: Dictionary = {}
+## The drawn specks of the zone's level (one MultiMesh), and when they next
+## need drawing again (a mark fading a step, or going); 0 for none due.
+var _blood_drawn: MultiMeshInstance3D
+var _blood_due := 0
+## Each drawn speck's place and colour, its fade the alpha (a headless
+## MultiMesh keeps neither, so tests read them here).
+var _blood_specks: Array[Transform3D] = []
+var _blood_shades: Array[Color] = []
+static var _blood_mesh: Mesh
+static var _blood_material: StandardMaterial3D
+## Specks a marked cell shows, at least and at most (seeded by the cell).
+const BLOOD_SPECKS := Vector2i(3, 6)
+## A mark fades out over its last BLOOD_FADE_MS; redrawn every
+## BLOOD_STEP_MS while fading.
+const BLOOD_FADE_MS := 80000
+const BLOOD_STEP_MS := 2000
+const BLOOD_COLOR := Color(0.24, 0.015, 0.01)
+## On brown ground (dirt, the forest floor, a road) darker red would
+## vanish: redder, and a little bigger.
+const BLOOD_ON_BROWN := Color(0.46, 0.02, 0.015)
+const BLOOD_BROWN_GROW := 1.35
+const BLOOD_BROWN: Array[String] = ["dirt", "forest"]
+
+
+## Blood marked or gone on [param level] (764): [param add] flat [x, y,
+## seconds left, ...], [param gone] flat [x, y, ...]; [param full] sets the
+## level's whole list (a zone joined). Drawn at once if it is this zone's.
+func _on_blood_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array, full := false) -> void:
+	var now := Time.get_ticks_msec()
+	if full or not _blood.has(level):
+		_blood[level] = {}
+	var marks: Dictionary = _blood[level]
+	for i in range(0, add.size() - 2, 3):
+		marks[Vector2i(add[i], add[i + 1])] = now + add[i + 2] * 1000
+	for i in range(0, gone.size() - 1, 2):
+		marks.erase(Vector2i(gone[i], gone[i + 1]))
+	if marks.is_empty():
+		_blood.erase(level)
+	if World.zone != null and level == World.zone.name:
+		_draw_blood()
+
+
+## Redrawn when a fading mark's step is due (from _process).
+func _update_blood() -> void:
+	if _blood_due != 0 and Time.get_ticks_msec() >= _blood_due:
+		_draw_blood()
+
+
+## The zone's blood as dark specks on the ground: a few to a cell, seeded
+## by the cell, lying on its slope, fading out over their last BLOOD_FADE_MS;
+## none on water, none indoors. Marks past their time are dropped here too.
+func _draw_blood() -> void:
+	_blood_due = 0
+	var now := Time.get_ticks_msec()
+	var level := World.zone.name if World.zone != null else ""
+	var marks: Dictionary = _blood.get(level, {})
+	for cell: Vector2i in marks.keys():
+		if int(marks[cell]) <= now:
+			marks.erase(cell)
+	if marks.is_empty():
+		_blood.erase(level)
+	var specks: Array[Transform3D] = []
+	var shades: Array[Color] = []
+	if _outdoor and _room != null:
+		for cell: Vector2i in marks:
+			if _terrain_water_has(cell):
+				continue
+			var left: int = int(marks[cell]) - now
+			var alpha := clampf(float(left) / BLOOD_FADE_MS, 0.0, 1.0)
+			if left < BLOOD_FADE_MS:
+				var step := now + mini(BLOOD_STEP_MS, left)
+				_blood_due = step if _blood_due == 0 else mini(_blood_due, step)
+			else:
+				var start := now + left - BLOOD_FADE_MS
+				_blood_due = start if _blood_due == 0 else mini(_blood_due, start)
+			var brown_cell: bool = _ground_kinds.get(cell, "") in BLOOD_BROWN
+			var rng := RandomNumberGenerator.new()
+			rng.seed = hash(cell)
+			for _k in rng.randi_range(BLOOD_SPECKS.x, BLOOD_SPECKS.y):
+				var at := Vector2(cell) + Vector2(rng.randf_range(-0.4, 0.4), rng.randf_range(-0.4, 0.4))
+				var brown := brown_cell or not _road_curves.is_empty() and _road_near(at).x > 0.0
+				var tint := BLOOD_ON_BROWN if brown else BLOOD_COLOR
+				var size := rng.randf_range(0.05, 0.16) * (BLOOD_BROWN_GROW if brown else 1.0)
+				var y := _height_in(cell, at)
+				var dx := _height_in(cell, at + Vector2(0.05, 0.0)) - y
+				var dz := _height_in(cell, at + Vector2(0.0, 0.05)) - y
+				var up := Vector3(-dx, 0.05, -dz).normalized()
+				var spin := Basis(Vector3.UP, rng.randf() * TAU)
+				var tilt := Basis(Quaternion(Vector3.UP, up))
+				var shape := Basis.from_scale(Vector3(size * rng.randf_range(1.0, 1.8), 1.0, size))
+				specks.append(Transform3D(tilt * spin * shape, Vector3(at.x, y + 0.015, at.y)))
+				shades.append(Color(tint, alpha * rng.randf_range(0.75, 1.0)))
+	if specks.is_empty():
+		_blood_specks = []
+		_blood_shades = []
+		if is_instance_valid(_blood_drawn):
+			_blood_drawn.queue_free()
+		_blood_drawn = null
+		return
+	if not is_instance_valid(_blood_drawn) or _blood_drawn.get_parent() != _room:
+		_blood_drawn = MultiMeshInstance3D.new()
+		_blood_drawn.name = "Blood"
+		_blood_drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_blood_drawn.material_override = _blood_look()
+		_room.add_child(_blood_drawn)
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.mesh = _blood_speck()
+	multimesh.instance_count = specks.size()
+	for i in specks.size():
+		multimesh.set_instance_transform(i, specks[i])
+		multimesh.set_instance_color(i, shades[i])
+	_blood_drawn.multimesh = multimesh
+	_blood_specks = specks
+	_blood_shades = shades
+
+
+## A speck: a flat six-sided disc a metre across (scaled down per speck).
+static func _blood_speck() -> Mesh:
+	if _blood_mesh == null:
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.5
+		disc.bottom_radius = 0.5
+		disc.height = 0.004
+		disc.radial_segments = 6
+		disc.rings = 1
+		disc.cap_bottom = false
+		_blood_mesh = disc
+	return _blood_mesh
+
+
+## Wet and dark, its colour and fade each speck's own.
+static func _blood_look() -> StandardMaterial3D:
+	if _blood_material == null:
+		_blood_material = StandardMaterial3D.new()
+		_blood_material.vertex_color_use_as_albedo = true
+		_blood_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_blood_material.roughness = 0.35
+		_blood_material.albedo_color = Color.WHITE
+	return _blood_material
 
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own

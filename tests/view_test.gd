@@ -103,6 +103,7 @@ func _ready() -> void:
 		_test_water()
 		_test_streams()
 		_test_tall_grass()
+		_test_blood()
 		_test_rocks()
 		_test_niches()
 		_test_fire()
@@ -4021,6 +4022,66 @@ func _test_tall_grass() -> void:
 	World._trampled_here.merge(was)
 	_check(flat == 0.0 and stood == 1.0 and full == 0.0, "trampled laid flat, stood again, and a full set read again (%.0f, %.0f, %.0f)" % [flat, stood, full])
 	_rig._flattened.clear()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A wounded animal's blood (764, terrain's side): a few dark specks to a
+## marked cell, on its ground, none on water, fading out over their last
+## BLOOD_FADE_MS, gone when told, only the zone's own level drawn.
+func _test_blood() -> void:
+	print("
+== blood: specks on the ground, fading, none on water ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	_rig.rebuild(terrain, sample["centre"])
+	var level: String = World.zone.name
+	var land := Vector2i(-1, -1)
+	var wet := Vector2i(-1, -1)
+	for cell: Vector2i in terrain["floor"]:
+		if _rig._terrain_water_has(cell):
+			wet = cell if wet.x < 0 else wet
+		elif land.x < 0 and not _rig._terrain_water_has(cell + Vector2i(1, 0)):
+			land = cell
+	for cell: Vector2i in terrain.get("water", []):
+		wet = cell if wet.x < 0 else wet
+	_check(_rig._outdoor and land.x >= 0 and wet.x >= 0, "the sample, outdoors, has land and water (%s, %s)" % [land, wet])
+	_rig._on_blood_changed(level, PackedInt32Array([land.x, land.y, 200, wet.x, wet.y, 200]), PackedInt32Array(), true)
+	var drawn: MultiMeshInstance3D = _rig._blood_drawn
+	var count := drawn.multimesh.instance_count if drawn != null else 0
+	count = count if count == _rig._blood_specks.size() else -1
+	var far := 0.0
+	var off := 0.0
+	for i in count:
+		var at: Vector3 = _rig._blood_specks[i].origin
+		far = maxf(far, Vector2(at.x - land.x, at.z - land.y).length())
+		off = maxf(off, absf(at.y - 0.015 - _rig._height_in(land, Vector2(at.x, at.z))))
+	_check(count >= Client3D.BLOOD_SPECKS.x and count <= Client3D.BLOOD_SPECKS.y and far < 0.6 and off < 0.001,
+			"a few specks on the land cell, on its ground, none on the water (%d, %.2f m out, %.3f m off)" % [count, far, off])
+	_check(not _rig._blood_shades.is_empty() and _rig._blood_shades.all(func(c: Color) -> bool: return c.a >= 0.74), "fresh, not faded (%s)" % [_rig._blood_shades.map(func(c: Color) -> float: return snappedf(c.a, 0.01))])
+	var had_kind: String = _rig._ground_kinds.get(land, "")
+	_rig._ground_kinds[land] = "grass"
+	_rig._draw_blood()
+	var on_grass: Color = _rig._blood_shades[0] if not _rig._blood_shades.is_empty() else Color.BLACK
+	_rig._ground_kinds[land] = "dirt"
+	_rig._draw_blood()
+	var on_dirt: Color = _rig._blood_shades[0] if not _rig._blood_shades.is_empty() else Color.BLACK
+	var wide := _rig._blood_specks[0].basis.get_scale().z if not _rig._blood_specks.is_empty() else 0.0
+	_rig._ground_kinds[land] = "grass"
+	_rig._draw_blood()
+	var narrow := _rig._blood_specks[0].basis.get_scale().z if not _rig._blood_specks.is_empty() else 0.0
+	_rig._ground_kinds[land] = had_kind
+	_check(on_dirt.r > on_grass.r * 1.5 and wide > narrow * 1.2, "redder and bigger on dirt, to be seen there (%.2f vs %.2f red, %.3f vs %.3f m)" % [on_dirt.r, on_grass.r, wide, narrow])
+	_rig._on_blood_changed(level, PackedInt32Array([land.x, land.y, Client3D.BLOOD_FADE_MS / 2000]), PackedInt32Array())
+	_check(not _rig._blood_shades.is_empty() and _rig._blood_shades.all(func(c: Color) -> bool: return c.a > 0.3 and c.a < 0.55) and _rig._blood_due > 0,
+			"half way through its fade, half seen, and a redraw due (%s)" % [_rig._blood_shades.map(func(c: Color) -> float: return snappedf(c.a, 0.01))])
+	_rig._on_blood_changed(level, PackedInt32Array(), PackedInt32Array([land.x, land.y, wet.x, wet.y]))
+	_check(_rig._blood_drawn == null and _rig._blood_shades.is_empty() and not _rig._blood.has(level), "gone when told")
+	_rig._on_blood_changed("elsewhere", PackedInt32Array([land.x, land.y, 200]), PackedInt32Array(), true)
+	_check(_rig._blood_drawn == null and _rig._blood.has("elsewhere"), "another level's kept, not drawn")
+	_rig._on_blood_changed(level, PackedInt32Array([land.x, land.y, 0]), PackedInt32Array(), true)
+	_check(_rig._blood_drawn == null and not _rig._blood.has(level), "one past its time dropped")
+	_rig._blood.clear()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

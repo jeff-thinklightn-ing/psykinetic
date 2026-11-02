@@ -38668,3 +38668,16 @@ class_name; no bullet (no level keeps the balance).
   {full: true} on arrival. Terrain draws the specks (764, terrain's side).
 monster_test _test_deer_hunted (a wounded doe leaves 5 or more fresh marks). Protocol: revision
 45 (net.gd's 45 line); no new class_name.
+
+764 amended (3) (release's label; the coordinator's ask): the blood drawn (terrain's side). Client3D keeps
+each level's marks, cell to the time it fades out (World.blood_changed on the host, the "blood"
+message on a peer through Main._on_message, "full" setting the whole list on a zone joined), and
+drops a mark past its own time without waiting for "gone". The zone's marks are one MultiMesh
+of small flat six-sided specks, 3 to 6 to a cell seeded by the cell (they never shimmer), each
+tilted to its ground's slope 1.5 cm over it, dark red and wet; on brown ground (dirt, the forest
+floor, a road's width) redder and a third bigger, where dark red vanished (the coordinator, on the stills). None on
+water (the level's water, fords and bridges), none indoors. A mark fades out over its last 80 s (BLOOD_FADE_MS), redrawn
+every 2 s while one fades; otherwise drawn only when a mark comes or goes. view_test _test_blood
+(specks on the cell's ground, none on water, redder and bigger on dirt, half seen half way through its fade, gone when told,
+another level's kept undrawn, one past its time dropped). Client only; protocol unchanged; no new
+class_name; no bullet (764 amended's names the trail).

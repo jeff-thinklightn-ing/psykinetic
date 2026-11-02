@@ -13073,6 +13073,14 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		if not Net.is_authority() and not str(data.get("level", "")).is_empty():
 			World.grass_told(str(data["level"]), data)
 		return
+	if kind == "blood":
+		# A wounded animal's blood (764): the host's view hears World.blood_changed.
+		if not Net.is_authority() and _client3d != null and not str(data.get("level", "")).is_empty():
+			var add: Variant = data.get("add", PackedInt32Array())
+			var gone: Variant = data.get("gone", PackedInt32Array())
+			_client3d._on_blood_changed(str(data["level"]), PackedInt32Array(add) if add is Array or add is PackedInt32Array else PackedInt32Array(),
+					PackedInt32Array(gone) if gone is Array or gone is PackedInt32Array else PackedInt32Array(), bool(data.get("full", false)))
+		return
 	if kind == "roofs":
 		var level := str(data.get("level", ""))
 		var damaged: Variant = data.get("damaged", [])
