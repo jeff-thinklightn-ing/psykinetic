@@ -5102,6 +5102,22 @@ medians of three under the bench lock: the suite alone 47 s (from 150), and
 of process starts on Windows); a whole landing 111 s (from 290), net_test
 now its long pole (decision 279 runs its phases at once).
 
+**Amended (2026-11-01): view_test in two scenes.** view_test had grown to some 230 s in a
+suite, and maps' 756 (the hills at 224 x 224, about five times the cells) took it past the
+300 s per-scene limit in its landing: killed in its last section, nothing failed. The time is
+the view's rebuilds of the world plane's big outdoor levels (measured: the hills at 224 3.1 s a
+rebuild, the wilds 3.7, the foothills 2.0, the test room 0.5; loading a level about 0.1 s),
+some 25 of them, each section going back to the test room after; sharing one build between
+sections would rework about 15 of them, and the forest at 224 (760) adds as much again. So
+tests/view_land_test.tscn runs the sections that build those levels (relief, the forest's edge
+and floor, ledges, shore, roads, the hills, sky, horizon, far landmarks, the arc on sloped
+ground, sight, curves, ground fields, glimpses: view_test.gd's _land() list, in their order),
+and view_test the rest; view_land_test.gd extends view_test.gd with its own base port
+(_base_port(), of(17722)) and _land() true, and test_ports.gd's scratch() already keeps each
+scene's folder apart. The suite starts both with the slowest first, side by side. Solo on
+main before 756: view_land_test 92 s, view_test 86 s (one scene, 210 s on 756's hills);
+suite_test passes. Tests only.
+
 ## 299. A server goes cleanly: zones' entities are freed before their spawners leave, and the stdin thread is stopped and joined
 
 The box's first staged deploy (decision 242) refused v0.1.141: its staged
