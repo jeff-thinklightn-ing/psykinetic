@@ -5774,6 +5774,21 @@ unchanged; rabbit_rig.py's default belly and tail now 5,0. Only the rabbit's UVs
 other palette slots on 7,7 (the sheep's wool, antlers, tusks, meat, the hat, the amulet, the
 bandaging kit, the flower) keep it. Before and after: C:/dev/review/rabbit/belly_options.png.
 
+319 amended (2) (release's label; the coordinator's ask after the rabbit's): the sheep's wool no
+longer clips to white in noon sun. It was never on palette 7,7 as the note above has it: the ewe and
+the ram carry their own baked paint (creature.sheep's ewe_clean_paint, wool (220,208,177); .2's
+ram_clean_paint, (211,194,156)). Under Client3D's noon look (ambient 0.6 white, DAY_SUN 1.1, no
+tonemap) a face turned to the sun clips above about sRGB 201 red, 204 green, 210 blue, so a lit
+fleece went to pure white, and the dead ewe showed a hard white fringe at the neck. Both paints'
+wool texels (pale and unsaturated: brightest channel 150 or more, saturation under 0.33) go x0.8 in
+linear light, capped at sRGB 204; horns, face and legs keep theirs. Off-screen stills at noon,
+clipped pixels standing/dead: ewe 4519/10490 to 1351/3353, ram 2345/5715 to 293/221; what is left
+is the face's and horns' red channel. Mesh, skin and the 13 clips unchanged (glb structure diffed);
+exported with creature_rig.py's glTF flags, which keep the paint embedded (export_slot.py drops
+images). Before and after: C:/dev/review/sheep/wool_compare.png. The rest of the kit above that
+line (7,7 and 8,0's bone white, 3,0, ground.sand) is listed for environment's tonemap trial, not
+repainted.
+
 ## 313. Raids are real monsters in a played zone, handed back to maps when it sleeps
 
 maps moves raid groups on the world tick (WorldRaids). When a group's
