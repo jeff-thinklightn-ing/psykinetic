@@ -207,6 +207,8 @@ func _test_restart() -> void:
 	_main._crypt_told = {"probe": true}
 	_main._placed_captives = {"probe_camp": true}
 	World.towns.raise_threat("test_room/probe_town", "wolves", "probe")  # A threat in town, held (762).
+	var blood := {"test_room": [3, 4, clock + 1000]}  # A wounded beast's trail, fading at its step (764 amended).
+	World.blood_from_dict(blood)
 	_main._save_state()
 	var snapshot := Snapshot.load(Net.state_path)
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
@@ -232,6 +234,7 @@ func _test_restart() -> void:
 	_main.free()
 	World.clear_zones()
 	World.steps = 0
+	World.blood.clear()
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
 	await get_tree().process_frame
@@ -248,7 +251,9 @@ func _test_restart() -> void:
 		"the plot, the told crypt and the placed captive are back after the restart")
 	_check(World.towns.threatened("test_room/probe_town") == "wolves" and World.towns.threat_of_town("test_room/probe_town").get("held") == ["probe"],
 		"a town's threat survives the restart, held as it was (762; %s)" % [World.towns.threat_of_town("test_room/probe_town")])
+	_check(World.blood_to_dict() == blood, "blood on the ground comes back, fading at the same step (764 amended; %s)" % [World.blood_to_dict()])
 	World.towns.lift_threat("test_room/probe_town")
+	World.blood.clear()
 	_main._save_state()
 	var again: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(Net.state_path))
 	var changed: Array = DROPPED_ONCE.filter(func(key: String) -> bool: return again.get(key) != saved[key])
