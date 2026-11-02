@@ -18,8 +18,12 @@ Marks used below:
 
 ## 1. The world's register
 
-Lore's tone is *Gísla saga*: plain, grave, few words (`docs/lore/style.md`). For speech that
-means:
+The register is plain, grave, few words (`docs/lore/style.md`). The sagas (*Gísla saga*) were
+its inspiration, not a rule: this is the game's own world (Jeff, 2026-11-01: "we're not
+literally staying in norse saga here. that was good inspiration but this is our own world
+now"). So voice never pushes a name or word toward Norse, and never rejects one for not being
+a saga word: druid, templar and ranger are fine [Jeff]. What the register asks is below. For
+speech that means:
 
 - **Short sentences, whole sentences.** One thought each. Two or three sentences make a long
   speech; only a quest-giver's reveal runs longer, and it is still a chain of plain ones.
@@ -82,6 +86,12 @@ Each has its own register. Keep them apart.
 4. **System text** (hints, server notices, settings): out of the world, so plain
    instructions that may name keys and clicks ("Click a townsperson to interact, or press
    %s" [in game]). Never mixed into speech or narration. Keep it short and calm, no jokes.
+
+**No explaining glosses** (Jeff, 2026-11-01, on the player card mocks: "less explanation like
+where it says "what you give and to whom" is a AI giveaway"). Shown text never explains
+itself: no subtitle under a heading, no "X: what it means" line, no legend for what is plain
+to see. Labels and names carry it. A heading "Charitance" stands alone, without "what you
+give and to whom" under it. This holds for all four kinds above, system text included.
 
 ## 3. Fixed speakers
 
@@ -221,12 +231,12 @@ register, not a dialect.
   they do, never the world's game words (the companions' VOICE_RULES already say this).
 - The card's speech words are the dialect: "short, whole sentences", "a dry, wry way",
   "a blunt way, with no softening" [in game]. **[draft]** add "few words, and plain ones" to
-  the shared world text so every card leans the saga way.
+  the shared world text so every card leans toward the plain register.
 - Fixed lines spoken without the model are plain and practical [in game, drafts for Jeff]:
   "Not here. Not with them this close." "Give it a breath. We're still bleeding from that."
   "My hands are full."
 - **[draft]** The falling companion's last words ("Go on... without me.", "Tell them I
-  tried." [in game]) are closer to film than saga; a plainer set is a later review item.
+  tried." [in game]) are closer to film than to the plain register; a plainer set is a later review item.
 
 ## 5. How the review works
 

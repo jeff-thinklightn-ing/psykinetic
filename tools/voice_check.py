@@ -5,7 +5,10 @@ levels/ data) and flags, by speaker:
   - an exclamation mark,
   - a modern word (okay, guys, awesome, ...),
   - a game word in the world's mouth (level, quest, spawn, loot, player, ...),
-  - a dash in place of the house colon or semicolon.
+  - a dash in place of the house colon or semicolon,
+  - an explaining gloss: a caption that says what a label means ("what you give and to
+    whom", "Trust: how much they rely on you", "This shows ..."); Jeff, 2026-11-01. Checked
+    in system text too, since hints and window captions are shown; not in model prompts.
 Jeff's lines (quoted in lore's pages, or marked [Jeff] in docs/voice.md) are listed apart, never
 to be reworded without asking him. System text (hints, admin commands, prompts
 to the voice model) is skipped as best a heuristic can; a stray one is noise.
@@ -42,6 +45,16 @@ CHECK_SKIP_FILES = {"entities/entity_factory.gd", "sim/curves.gd", "sim/relief.g
 # Data keys that are prompts or rules, not lines.
 DATA_SKIP = re.compile(r"(summary|words|voice|look_words|asks\.|kinds\[|_about)", re.I)
 
+# Model prompts are never shown, so even the gloss check skips them.
+PROMPT_CONTEXT = re.compile(r"(prompt|system_for|VOICE_|_RULES|ORDER_|_ask\(|facts_now|sentences|"
+                            r"hail_ask|card_words|plain_card|_errand_verbs|STANCE|situation)", re.I)
+GLOSS = [
+    re.compile(r"^(what|how|who|whom|where|which|when) (you|they|we|it|he|she|your|the)\b", re.I),
+    re.compile(r"^[A-Z][\w' -]{0,30}: (what|how|who|where|which|the (amount|number|measure)|a measure)\b"),
+    re.compile(r"\b(this|it|these) (shows?|means|tells you|lists?|measures?)\b", re.I),
+    re.compile(r"\b(shows|tells you) (how|what|who|where|which)\b", re.I),
+]
+
 WORD_RE = {w: re.compile(r"\b%s\b" % re.escape(w), re.I) for w in MODERN + GAME}
 
 
@@ -61,6 +74,15 @@ def problems(text):
     if re.search(r"\s[-\u2013\u2014]\s|\u2014", text):
         out.append("dash")
     return out
+
+
+# Captions live in the windows and the HUD; elsewhere a "what you..." is a prompt fragment.
+GLOSS_DIRS = {"client", "client3d"}
+GLOSS_KEYS = re.compile(r"(caption|subtitle|legend|desc|blurb|hint|label|title)", re.I)
+
+
+def gloss(text):
+    return any(g.search(text) for g in GLOSS)
 
 
 def looks_like_code(text):
@@ -93,9 +115,14 @@ def collect():
         if rel in CHECK_SKIP_FILES:
             continue
         for f, line, ctx, text in inv.scan_gd(rel):
-            if SYSTEM_CONTEXT.search(ctx) or SYSTEM_TEXT.search(text) or looks_like_code(text):
+            if looks_like_code(text):
                 continue
-            p = problems(text)
+            system = SYSTEM_CONTEXT.search(ctx) or SYSTEM_TEXT.search(text)
+            if system and PROMPT_CONTEXT.search(ctx):
+                continue
+            p = [] if system else problems(text)
+            if rel.split("/")[0] in GLOSS_DIRS and gloss(text):
+                p.append("gloss")
             if p:
                 spk = inv.SPEAKER_BY_FILE.get(rel, "server and windows" if rel == "main.gd" else "other (" + rel.split("/")[0] + ")")
                 found.append((spk, "%s:%d %s" % (f, line, ctx), text, p, is_jeff(text, lore, jeff)))
@@ -112,6 +139,8 @@ def collect():
             if DATA_SKIP.search(path) or looks_like_code(text):
                 continue
             p = problems(text)
+            if GLOSS_KEYS.search(path) and gloss(text):
+                p.append("gloss")
             if p:
                 found.append((rel, path, text, p, is_jeff(text, lore, jeff)))
     return found
