@@ -14,7 +14,9 @@ data is wrong and gets fixed. Nothing else is confirmed until Jeff says so.
 
 ## Tone
 
-*Gísla saga* is the reference: feuds that outlive the people who started them,
+*Gísla saga* is the inspiration, not a rule: this is our own world (Jeff, 2026-11-01:
+"we're not literally staying in norse saga here. that was good inspiration but this is our
+own world now"). From it: feuds that outlive the people who started them,
 outlaws, named weapons, grudges, omens and dreams, and loyalty that holds when it
 costs everything. Dark like *Diablo* 1, but restrained in how it is shown:
 terrible things are stated plainly and found as aftermath, never depicted. People

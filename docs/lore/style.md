@@ -11,8 +11,10 @@ rules once it is answered. Until then:
   modern words (no "okay", "team", "stress"), no game words (levels, spawns, XP,
   players, nor "game" even for hunted beasts) inside the world's facts. Nor "companion" or "owner": those who travel
   with the town's people go out with them by choice, and a fact says so.
-- Tone after *Gísla saga*: understated, fated, loyal. Say what happened and leave
-  the feeling to the reader.
+- Tone inspired by *Gísla saga*: understated, fated, loyal. Say what happened and leave
+  the feeling to the reader. The saga is inspiration, not a rule: this is our own world,
+  and names need no saga roots (Jeff, 2026-11-01: "we're not literally staying in norse
+  saga here. that was good inspiration but this is our own world now").
 - Dark like *Diablo* 1, restrained in the showing (Jeff): terrible things are
   stated plainly and found as aftermath (what is left lying around), never
   depicted as scenes. Changed and wrong, not gory.
