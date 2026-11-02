@@ -3330,8 +3330,15 @@ func _test_barrow_quest() -> void:
 		"all nine: ready, the turn-in, every box checked")
 	var turned: Dictionary = knight.accept_offer(player, {"id": "quest:%d:turn_in" % knight.id}, 0)
 	_check(turned["ok"] and Main.QUEST_DONE in record.marks and record.barrow_task.is_empty() and player.quest.is_empty()
-		and _main.barrow_quest_of(id) == "" and ids.call().is_empty() and _main.way_revealed(id, "barrow"),
-		"turned in: the flag set, the tracker gone, nothing more offered, the way revealed to them")
+		and _main.barrow_quest_of(id) == "" and ids.call() == ["done"] and _main.way_revealed(id, "barrow"),
+		"turned in: the flag set, the tracker gone, the way revealed to them, only his closing words offered")
+	# 747 amended (5) (Jeff on v0.1.197: "fallen knight was not interactable"): done, a click
+	# still opens his window: DONE alone, accept "none", no gold; no record, nothing.
+	var closing: Array = knight.offers_for(id)
+	_check(closing.size() == 1 and closing[0]["words"] == AstralKnight.DONE and closing[0]["accept"] == AstralKnight.WORDS_ONLY
+		and str(closing[0]["title"]).is_empty() and int(closing[0]["cost"]) == 0 and DealPanel.is_quest(closing[0])
+		and knight.offers_for("no-such-player").is_empty(),
+		"done, his window still opens: his closing words alone, accept \"none\" (%s)" % [closing])
 	_check(_main.reset_barrow(id).has("the fallen knight's quest") and _main.barrow_quest_of(id) == "ask" and not _main.way_revealed(id, "barrow"),
 		"the reset (quests reset all's reset_barrow): the flag cleared, his ask again")
 	World.despawn(knight)

@@ -23,6 +23,9 @@ const TURN_IN_TITLE := "The robbers are put down"
 const TURN_IN_WORDS := "The Mound-breakers are put down."
 const REVEALED := "Then you are strong enough. In the First Hall, the niche that breathes cold air hides the way down to the Ossuary; it will open for you now. Beyond it lies the Hall of Fallen Souls, where the draugr keeps my remains. Bring them to Aldous, at the temple's altar, and let me rest."
 const DONE := "The way below is open to you. My remains wait in the Hall of Fallen Souls."
+## A quest offer's accept that takes nothing (747 amended (5)): his words
+## alone, ui's window closing on its one button.
+const WORDS_ONLY := "none"
 
 
 func _ready() -> void:
@@ -46,14 +49,20 @@ func threatens(_entity: GridEntity) -> bool:
 
 
 ## [param player_id]'s offers: his quest's step (the ask, not yet or the
-## turn-in), one offer a step; once it is done, none (a greeting hears DONE).
+## turn-in), one offer a step; once it is done, his closing words alone
+## (747 amended (5); Jeff on v0.1.197: "fallen knight was not interactable":
+## a click opened nothing, DONE only a "Server:" line in the chat), accept
+## WORDS_ONLY: ui's window shows them with one button that closes it.
 func offers_for(player_id: String) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
-	var step: Array = {"ask": [":ask", ASK_TITLE, ask_words()], "open": [":not_yet", NOT_YET_TITLE, NOT_YET],
-		"ready": [":turn_in", TURN_IN_TITLE, TURN_IN_WORDS]}.get(_quest(player_id), [])
+	var at := _quest(player_id)
+	var step: Array = {"ask": [":ask", ASK_TITLE, ask_words(), "take"], "open": [":not_yet", NOT_YET_TITLE, NOT_YET, "take"],
+		"ready": [":turn_in", TURN_IN_TITLE, TURN_IN_WORDS, "take"]}.get(at, [])
+	if step.is_empty() and at.is_empty() and _quest_known(player_id):
+		step = [":done", "", DONE, WORDS_ONLY]
 	if not step.is_empty():
 		out.append({"id": "quest:%d%s" % [id, step[0]], "kind": "deal", "title": step[1], "words": step[2],
-			"what": {"level": "quest", "steps": []}, "accept": "take", "cost": 0})
+			"what": {"level": "quest", "steps": []}, "accept": step[3], "cost": 0})
 	return out
 
 
@@ -94,6 +103,13 @@ func _quest(player_id: String) -> String:
 	if not hook is Callable or not (hook as Callable).is_valid() or player_id.is_empty():
 		return ""
 	return str((hook as Callable).call(player_id))
+
+
+## Whether Main keeps a quest for [param player_id] (its hook set and a
+## record): "" from _quest then means done, not unknown.
+func _quest_known(player_id: String) -> bool:
+	var hook: Variant = World.get("barrow_quest_known")
+	return hook is Callable and (hook as Callable).is_valid() and not player_id.is_empty() and bool((hook as Callable).call(player_id))
 
 
 func _quest_step(player_id: String, step: String) -> bool:

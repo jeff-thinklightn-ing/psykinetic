@@ -498,7 +498,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## Ignorable additions, no bump: the "huts" message's "empty" (759), and the
 ## "town" message's "threat" (762: the kind over a town, absent for none; an
 ## old client shows Barter and the server refuses it with a line).
-const PROTOCOL_REVISION := 44
+## 45 (747 amended (5)): the fallen knight's quest done, his "offers" carry
+## quest:N:done, his closing words alone, accept "none" (a new meaning):
+## ui's window shows the words and one closing button; an old client would
+## draw an empty quest button.
+const PROTOCOL_REVISION := 45
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

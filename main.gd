@@ -4227,6 +4227,7 @@ func _boot() -> void:
 	World.paid_deal = paid_deal_of  # A payer's deal kept till won (548 amended).
 	World.deal_paid = set_deal_paid
 	World.barrow_quest = barrow_quest_of  # 747: his barrow quest before his deals.
+	World.barrow_quest_known = barrow_quest_known  # 747 amended (5): done, not unknown.
 	World.barrow_quest_step = barrow_quest_step
 	World.trophy_due = trophy_due  # A named one's trophy (the band, 714).
 	World.trophy_taken = trophy_taken
@@ -8513,6 +8514,12 @@ func _quest_band() -> Array:
 	if World.economy == null:
 		return []
 	return band_ids(str(World.economy.rules.get("robbers", {}).get("barrow", "")))
+
+
+## Whether [param player_id] has a record here (World.barrow_quest_known):
+## barrow_quest_of's "" is then the quest done (747 amended (5)).
+func barrow_quest_known(player_id: String) -> bool:
+	return _records.has(player_id)
 
 
 ## [param player_id]'s quest step (World.barrow_quest_step): "take" from

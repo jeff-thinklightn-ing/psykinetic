@@ -584,6 +584,10 @@ var barrow_quest: Callable
 ## (player id, step "take" | "turn_in") -> bool, the step taken; Main's
 ## barrow_quest_step. Unset, false.
 var barrow_quest_step: Callable
+## (player id) -> whether Main keeps a record for them, so barrow_quest's
+## "" reads as done, not unknown (747 amended (5)); Main's
+## barrow_quest_known. Unset, false.
+var barrow_quest_known: Callable
 ## Puts an entity of a spec ({kind, name, tile, props, idle...}) into the
 ## zone World is in, as a level's are (Main's _spawn); null if it cannot.
 ## Unset (a test that builds its own), nothing is spawned.

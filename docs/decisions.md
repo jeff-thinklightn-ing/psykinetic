@@ -36908,6 +36908,18 @@ shows the first words-only offer: his words in his name and one button, FAREWELL
 line. Landed before dungeon's side, so a client that draws "none" is out before any server sends
 it. ui_test _test_deal_window. Client only, protocol unchanged (dungeon's side takes rev 45), no
 new class_name.
+747 amended (5), dungeon's side (2026-11-01; Jeff on v0.1.197: "fallen knight was not
+interactable"; the coordinator's approval, voice's wording): his quest done, a click opened
+nothing. AstralKnight.offers_for gave none, Main._monster_greeted sent DONE as a "Server:" party
+line and an empty "offers", and ui's DealPanel closes on none; every playtest tour plays a fresh
+character, so none met it. Now a player with a record (World.barrow_quest_known, Main's
+barrow_quest_known) whose quest is done is offered quest:N:done, title "", words DONE, accept
+"none" (AstralKnight.WORDS_ONLY), cost 0: the greet speaks it in his name and ui's window shows
+his words with one button, "Farewell" (voice), that closes it and sends nothing (ui's side).
+A "yes" said to it still gets DONE again (accept_offer: done). PROTOCOL_REVISION 45: accept
+"none" is a new meaning an old client draws as an empty quest button; it lands with ui's side
+and forces its cut. level_test _test_barrow_quest: after the turn-in his one offer is the
+closing words, accept "none"; a player with no record gets none.
 
 ## 742 amended: the camp chest locked, Brand's key, once per player
 
