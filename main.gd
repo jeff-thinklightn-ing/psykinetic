@@ -6168,24 +6168,45 @@ func _balance_line(key: String, body: Resident, player: Player) -> String:
 	return str(lines[absi(hash(body.worker_id + player.player_id + key + str(_balance_day()))) % lines.size()])
 
 
-## The herder [param body]'s hail to [param player] (on [param day]): once a
-## day while his fold's quest is open. True when said.
-func _balance_hail(body: Resident, player: Player, day: int) -> bool:
+## Server, every HAIL_CHECK_TICKS (761, npc's side (2) amended: playtest's
+## run, a player 3 cells off never hailed): each herder out and about with
+## his fold's quest open hails the first time a player comes within
+## HEARING_RANGE, once a player an ask; not held behind the mind's asks.
+func _balance_hails() -> void:
+	if World.balance == null or World.production == null or World.balance.quests().is_empty():
+		return
+	for entity in World.townsfolk():
+		var body := entity as Resident
+		if not _hail_able(body) or _balance_fold(body).is_empty():
+			continue
+		for other in World.get_entities():
+			var player := other as Player
+			if player == null or not player.spawned or player.player_id.is_empty() or World.distance(player.tile, body.tile) > HEARING_RANGE:
+				continue
+			if not _resident_quiet(body, player):
+				_balance_hail(body, player)
+
+
+## The herder [param body]'s hail to [param player]: once for each ask of
+## his fold (by the quest's "from"), and none once a click has heard the ask.
+## True when said.
+func _balance_hail(body: Resident, player: Player) -> bool:
 	if World.balance == null:
 		return false
 	var fold := _balance_fold(body)
-	if fold.is_empty() or World.balance.quest(fold).is_empty():
+	var quest := World.balance.quest(fold) if not fold.is_empty() else {}
+	if quest.is_empty():
 		return false
 	var card := Townsfolk.card_of(World.production, body.worker_id)
 	if card.is_empty():
 		return false
 	var mine: Dictionary = card.get("balance", {}).get(player.player_id, {})
-	if int(mine.get("hailed", -1)) == day:
+	if int(mine.get("hailed", -1)) == int(quest.get("from", -1)):
 		return false
 	var line := _balance_line("hail", body, player)
 	if line.is_empty():
 		return false
-	mine["hailed"] = day
+	mine["hailed"] = int(quest.get("from", -1))
 	_balance_card(body, card, player.player_id, mine)
 	body.address(player, int(float(Townsfolk.rules().get("greet", {}).get("stop_seconds", 8)) * World.TICK_RATE))
 	_resident_says(body, line, "", player)
@@ -6250,6 +6271,7 @@ func _balance_words(body: Resident, player: Player) -> bool:
 		mine["told"] = int(end["at"])
 		said.append(_balance_line(str(end["outcome"]), body, player))
 	elif not quest.is_empty():
+		mine["hailed"] = int(quest.get("from", -1))  # Heard the ask: no hail after it.
 		if not card.is_empty():
 			_balance_settle(card, player, quest, mine)
 		var left_lying := int(quest.get("left_by", {}).get(World._label_of(player), 0))
@@ -14697,6 +14719,7 @@ func _hails_tick() -> void:
 	var rules: Dictionary = Townsfolk.rules().get("hail", {})
 	if not bool(rules.get("on", true)):
 		return
+	_balance_hails()  # The herder's word of the wolves, ahead of the mind's hails (761, npc's side (2)).
 	if not _resident_asks.is_empty() or not _resident_out.is_empty() or _mind_last_ticks > int(rules.get("slow_ticks", 50)):
 		return
 	var now_msec := Time.get_ticks_msec()
@@ -14713,8 +14736,6 @@ func _hails_tick() -> void:
 				continue
 			if _resident_quiet(body, player):
 				continue  # No hail near a fight (675, npc's side).
-			if _balance_hail(body, player, day):
-				return  # The herder's word of the wolves, once a day (761, npc's side (2)).
 			if _hail_now(body, player, rules, now_msec, now, day, sky):
 				return
 

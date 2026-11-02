@@ -1028,11 +1028,18 @@ func _test_balance_herder(grim: Resident, fold: String) -> void:
 		_main._greet_at.clear()
 		_main._resident_asks = _main._resident_asks.filter(func(each: Dictionary) -> bool: return int(each["body"]) != grim.get_instance_id())
 		_main._greeted(player, grim)
-	_put(player, _main._nearest_free(grim.tile + Vector2i(1, 0)))
-	# The hail: once a day.
+	# The hail: the first time a player comes within hearing, 3 cells off (playtest's run), ahead of the mind; once an ask.
+	_put(player, _main._nearest_free(grim.tile + Vector2i(3, 0)))
+	var asks_were: Array = _main._resident_asks.duplicate()
+	_main._resident_asks.append({"body": 0, "ask": {}, "at": World.tick, "player": "", "peer": 0})  # The mind busy.
 	told.clear()
-	_check(_main._balance_hail(grim, player, Townsfolk.day_of(World.production.now())) and said.call("hail"), "his hail while the quest is open (%s)" % [told])
-	_check(not _main._balance_hail(grim, player, Townsfolk.day_of(World.production.now())), "once a day")
+	_main._hails_tick()
+	_check(World.distance(player.tile, grim.tile) > Main.TALK_REACH and said.call("hail"), "a player %d cells off, the mind busy: his hail (%s)" % [World.distance(player.tile, grim.tile), told])
+	_main._resident_asks = asks_were
+	told.clear()
+	_main._hails_tick()
+	_check(not said.call("hail") and not _main._balance_hail(grim, player), "once an ask")
+	_put(player, _main._nearest_free(grim.tile + Vector2i(1, 0)))
 	# A click: the ask, his flock, the days.
 	greet.call()
 	_check(said.call("ask"), "a click: the ask (%s)" % [told])
@@ -1051,6 +1058,7 @@ func _test_balance_herder(grim: Resident, fold: String) -> void:
 	greet.call()
 	card = Townsfolk.card_of(World.production, grim.worker_id)
 	_check(int(card.get("standing", {}).get(player.player_id, {}).get("score", 0)) == after, "settled once, not again")
+	_check(not _main._balance_hail(grim, player), "(still no hail)")
 	# The last day.
 	World.balance._quests[fold]["until"] = day + 1
 	greet.call()
@@ -1068,6 +1076,12 @@ func _test_balance_herder(grim: Resident, fold: String) -> void:
 		"his thanks, and standing for the meat brought home (%s)" % [told])
 	greet.call()
 	_check(not said.call("balanced"), "told once")
+	# A new ask, heard on a click first: no hail after it.
+	World.balance._quests[fold] = {"area": TOWN, "town": STORE, "from": day + 5, "until": day + 8, "wolves": 5.0, "deer": 10.0,
+		"lost": 0, "left": 0, "home": 0, "left_by": {}, "home_by": {}}
+	greet.call()
+	_check(said.call("ask") and not _main._balance_hail(grim, player), "a new ask heard on a click: no hail after it (%s)" % [told])
+	World.balance._quests.erase(fold)
 	Net.message_received.disconnect(heard)
 	_main._balance_ends.erase(fold)
 	card = Townsfolk.card_of(World.production, grim.worker_id)

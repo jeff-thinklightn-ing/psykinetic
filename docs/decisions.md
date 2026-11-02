@@ -38374,6 +38374,15 @@ twelve and three days; the grudge and standing (-1 net, settled once); the last 
 the party line, the thanks and standing, told once. Server only, test level only (no bullet),
 protocol unchanged, no new class_name.
 
+761, npc's side (3) (release's label; the coordinator's ask, from playtest's balance run: Sigrun never
+hailed a player standing 3 cells off for a whole game day): the herder's hail had TALK_REACH (earshot,
+2) and waited behind the mind's guards in _hails_tick. Now Main._balance_hails runs first in
+_hails_tick, ahead of those guards. A herder out and about with his fold's quest open hails the first
+time a player comes within HEARING_RANGE, once per player per ask: his card's "hailed" is the quest's
+"from", no longer the day. A click that hears the ask sets it, so no hail comes after. resident_test:
+a player 3 cells off with the mind busy is hailed, once an ask; a new ask heard on a click is not
+hailed after it. Server only, test level only (no bullet), protocol unchanged, no new class_name.
+
 ## 763. Safe paths: each level's roads and tracks, for what keeps off them
 
 Jeff (2026-11-01, roadmap "How it plays"): "zones need to have safe paths with activities not too
