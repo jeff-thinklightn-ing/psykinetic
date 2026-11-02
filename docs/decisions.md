@@ -6160,6 +6160,33 @@ smooths its ticks). Nothing here is in the sim or on the wire.
   materials, which would need the same vertex code (agreed with terrain).
 - `--weather=<kind>` (and map_bench's) starts every region already in a
   weather, for clips, shots and benches.
+
+309 amended: the ground fog without squares or cuts. Jeff, playing v0.1.198:
+"fog is seen in exact squares and can be seen transecting pc bodies". The
+fog's three flat layers (FOG_LAYERS) are depth-tested, so each drew a hard
+line where it crossed a body, a wall or a gate post. Where the hills'
+faceted, cell-shaped ground rose through a layer it drew angular,
+cell-edged patches. The coordinator approved the fix (2026-11-02):
+
+- A depth fade: the fog shader reads the depth texture, puts the opaque
+  surface behind each fragment back in the world and thins the layer over
+  its last FOG_SOFT (0.35 m) of height above it. The fade is measured
+  upright, not along the view, so a low camera's shallow look (where 0.9 m
+  of depth is about 0.2 m of wall) does not squeeze the blend into a line.
+  At 0.35 m the low layer stays whole over flat ground.
+- The noise: a sin-free hash (a sin hash loses its precision far from the
+  origin), each octave turned against the last, the whole turned off the
+  world's axes and domain-warped, so no patch lines up with the cells.
+- Cost (map_bench, the forest, fog at 08:00, low camera, a 12-tile walk,
+  1600x900 off-screen, 60 s, HEAD against the change alternating, two
+  rounds): GPU median 2.05 and 2.05 ms against 2.00 and 2.01, frame median
+  2.81 against 2.80 and 2.81, CPU unchanged.
+
+weather_test _test_low_view: every layer has the fade at FOG_SOFT, and the
+shader reads the depth texture and has no sin hash. Stills before and after
+(the wilds and the hills, near and far): C:/dev/review/fog_soft. Client
+only, protocol unchanged, no new class_name.
+
 ## 327. A glimpse of the level past a way out
 
 Jeff: "maybe the castle gets a little area where you can see it just beyond

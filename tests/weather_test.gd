@@ -257,6 +257,10 @@ func _test_low_view() -> void:
 	var shown: Array = range(3).map(func(i: int) -> float: return float(view._fog_material[i].get_shader_parameter("shown")) if view._fog[i].visible else 0.0)
 	_check(shown[0] == 1.0 and shown[1] > 0.5 and shown[1] < 1.0 and shown[2] == 0.0 and not view._fog[2].visible,
 			"the eye 1.7 m up: the low layer whole, the middle fading, the one over the eye gone (%s)" % [shown])
+	var code := WeatherView.FOG_SHADER
+	_check(range(3).all(func(i: int) -> bool: return float(view._fog_material[i].get_shader_parameter("soft")) == WeatherView.FOG_SOFT)
+			and WeatherView.FOG_SOFT > 0.0 and code.contains("hint_depth_texture") and not code.contains("sin("),
+			"the fog thins against what stands in it (depth fade over %.2f m of height) and its noise has no sin hash" % WeatherView.FOG_SOFT)
 	_check(view._clouds.size.x == WeatherView.CLOUD_PERIOD * WeatherView.LOW_CLOUD_TILES and (view._clouds.texture_albedo as ImageTexture).get_width() == 128 * WeatherView.LOW_CLOUD_TILES,
 			"the clouds' decal %.0f m wide" % view._clouds.size.x)
 	view.set_view(false, Vector3(100.0, 30.0, 130.0), Vector2(-0.7, -0.7))

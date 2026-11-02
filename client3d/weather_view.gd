@@ -73,6 +73,12 @@ const LOW_CLOUD_TILES := 9
 ## gone at or over the eye, so the fog lies under the camera, never a
 ## ceiling over it or a stripe seen edge on.
 const FOG_EYE_CLEAR := 1.0
+## Where a fog layer meets a body, a wall or a slope it thins to nothing
+## over the last FOG_SOFT (m) of height above what stands behind it (the
+## shader's depth fade, measured upright so a low camera's shallow look
+## does not squeeze it), so it never draws a hard line across a body. The
+## low layer (0.35 m) stays whole over flat ground.
+const FOG_SOFT := 0.35
 ## What drifts fog and clouds even in still air (m/s).
 const CALM_DRIFT := 0.4
 
@@ -89,12 +95,18 @@ uniform float rim = 0.0;
 uniform float half_size = 36.0;
 // How much of the layer shows for the eye's height over it (fog_eye_fade).
 uniform float shown = 1.0;
+// The height (m) over which the layer thins to nothing against what is behind it.
+uniform float soft = 0.35;
+uniform sampler2D depth_texture : hint_depth_texture, repeat_disable, filter_nearest;
 
 varying vec3 world;
 varying vec2 local;
 
+// No sin: a sin hash loses its precision far from the origin.
 float hash(vec2 p) {
-	return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return fract((p3.x + p3.y) * p3.z);
 }
 
 float noise(vec2 p) {
@@ -110,7 +122,8 @@ float fbm(vec2 p) {
 	float weight = 0.5;
 	for (int i = 0; i < 4; i++) {
 		total += weight * noise(p);
-		p = p * 2.03 + vec2(17.0, 9.0);
+		// Each octave turned against the last, so no lattice lines up.
+		p = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8)) * p * 2.03 + vec2(17.0, 9.0);
 		weight *= 0.5;
 	}
 	return total;
@@ -122,13 +135,23 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 p = (world.xz - drift) * 0.09 + vec2(layer * 3.7, layer * 1.3);
-	float wisp = fbm(p + vec2(TIME * 0.02, -TIME * 0.015));
+	// Turned off the world's axes and warped, so no patch is square.
+	vec2 p = mat2(vec2(0.88, 0.47), vec2(-0.47, 0.88)) * (world.xz - drift) * 0.09 + vec2(layer * 3.7, layer * 1.3);
+	p += vec2(TIME * 0.02, -TIME * 0.015);
+	vec2 warp = vec2(noise(p * 0.7 + vec2(5.2, 1.3)), noise(p * 0.7 + vec2(8.3, 2.8))) - 0.5;
+	float wisp = fbm(p + 1.6 * warp);
 	// Thin fog shows as wisps; thick fills the layer.
 	float edge = mix(0.85, 0.15, amount);
 	ALBEDO = colour;
-	ALPHA = smoothstep(edge, edge + 0.25, wisp) * amount * 0.45;
+	ALPHA = smoothstep(edge, edge + 0.3, wisp) * amount * 0.45;
 	ALPHA *= (1.0 - rim * smoothstep(0.6, 1.0, length(local) / half_size)) * shown;
+	// Thinned where anything stands close behind the layer: no hard line
+	// across a body, a wall or a slope.
+	float depth = texture(depth_texture, SCREEN_UV).r;
+	vec4 behind = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, depth, 1.0);
+	behind.xyz /= behind.w;
+	float under = world.y - (INV_VIEW_MATRIX * vec4(behind.xyz, 1.0)).y;
+	ALPHA *= smoothstep(0.0, soft, under);
 }
 """
 
@@ -488,6 +511,7 @@ func _build_fog() -> void:
 		material.shader = shader
 		material.set_shader_parameter("layer", float(i))
 		material.set_shader_parameter("half_size", FOG_SIZE * 0.5)
+		material.set_shader_parameter("soft", FOG_SOFT)
 		var layer := MeshInstance3D.new()
 		layer.name = "Fog%d" % i
 		layer.mesh = plane
