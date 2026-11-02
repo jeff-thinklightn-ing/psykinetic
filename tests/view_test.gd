@@ -2665,6 +2665,21 @@ func _test_turf_house() -> void:
 	_check(drawn.is_empty(), "none of the map's walls or doorway drawn round it: its slot's own walls (%s)" % [drawn])
 	_check(_rig._building_at.has(Vector2i(6, 5)) and not _rig._building_at.has(Vector2i(3, 3)) and not _rig._building_at.has(Vector2i(6, 7)),
 			"its inside the block (its roof off there), not its bank or approach")
+	# The coordinator's find (Hob's hut): a slot building's floor takes only
+	# the indoor scatter, as a kind's does (734 amended (2)); grass outside.
+	var inside_tufts := 0
+	var outside_tufts := 0
+	for chunk: Vector2i in _rig._scatter_chunks:
+		var plan := _rig._scatter_plan(chunk)
+		for kind: String in plan:
+			for item: Array in plan[kind]:
+				if Client3D.SCATTER_INDOORS.has(kind):
+					continue
+				if _rig._building_at.get(item[0], -1) == _rig._buildings.find(house):
+					inside_tufts += 1
+				else:
+					outside_tufts += 1
+	_check(inside_tufts == 0 and outside_tufts > 0, "no tufts or flowers on its floor, its grass round it (%d inside, %d outside)" % [inside_tufts, outside_tufts])
 	var parts := node.get_node_or_null("parts") as Node3D
 	var names := ["Hearth", "Bed", "Shelf"].filter(func(name: String) -> bool: return parts != null and parts.get_node_or_null(name) != null)
 	_check(names.size() == 3 and is_equal_approx((parts.get_node("Bed") as Node3D).rotation.y, PI / 2.0),

@@ -35829,6 +35829,13 @@ cells take only the indoor scatter (no tufts through the chapel's stone). There 
 (no slot); the coordinator queues one with the barrow lore. level_test (the chapel's rect, doors,
 front, counter and landing; the sealed slab's cue at its corner). Client and server read levels/,
 so it rides a cut; protocol unchanged, no new class_name.
+734 amended (5), every building's floor (the coordinator's find, npc's still of Hob's hut): (2)'s
+scatter skip read only a kind's floor cells, so a slot building's (the turf houses) still grew
+grass tufts through its floor. Client3D._scatter_plan now skips all but the indoor scatter on any
+cell inside a building (_building_at: a slot building's inner cells, a kind's, a painted roof's),
+outdoors too. view_test _test_turf_house: none on its floor, its grass round it (2 before, 0 after).
+No CHANGELOG bullet of its own ((2)'s says no grass grows through any building's floor). Client
+only, protocol unchanged, no new class_name.
 
 ## 733. A healer's hut decays empty and its healer mends it
 

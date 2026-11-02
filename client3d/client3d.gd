@@ -7950,8 +7950,8 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 				salt += 10
 				if not _outdoor and not SCATTER_INDOORS.has(kind) and _ground_kinds.get(cell, "") != "grass":
 					continue  # No live plants on a floor under stone.
-				if _floor_sets.has(cell) and not SCATTER_INDOORS.has(kind):
-					continue  # Nor on a kind's own floor, outdoors too (734 amended (2): tufts in the chapel).
+				if (_floor_sets.has(cell) or _building_at.has(cell)) and not SCATTER_INDOORS.has(kind):
+					continue  # Nor on any building's floor, outdoors too (734 amended (2) and (5): the chapel's tufts, Hob's hut's).
 				var count := floori(offered[kind] + _roll(cell, 100 + salt))
 				for n in count:
 					var at := Vector2(cell) + Vector2(_roll(cell, 101 + salt + n * 7), _roll(cell, 102 + salt + n * 7)) - Vector2(0.5, 0.5)
