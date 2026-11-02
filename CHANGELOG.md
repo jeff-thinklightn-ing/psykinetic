@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Tools: the forest grower keeps each tree on the cell it grew in, so none is written onto a path beside it (467 amended).
 
 - The hills are much bigger (224 by 224, was 96): two valleys with their winding rivers, the plateau and its waterfall, escarpments, the road from the wilds over a bridge and a ford to the plateau's way up, four fords, the herders' holdings and the hill cave (756).
 - Tests: view_test's sections on the big outdoor levels run as a scene of their own, view_land_test, beside it in the suite, so neither nears the per-scene time limit (278 amended).

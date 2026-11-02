@@ -296,7 +296,9 @@ class Stand:
                 else:
                     dead.append([y] + branch)
             out.append({
-                "at": [round(float(self.tx[t]), 2), round(float(self.tz[t]), 2)],
+                # Rounded within its own cell: 75.999 as 76.0 would stand it on the next
+                # cell, read by floor (ForestPack.from_trees), maybe a path's.
+                "at": [_in_cell(self.tx[t]), _in_cell(self.tz[t])],
                 "height": round(float(self.th[t]), 2),
                 "radius": round(float(self.tr[t]), 3),
                 "lean": [round(float(v), 3) for v in self.lean[t]],
@@ -337,6 +339,11 @@ def standin(size, seed):
         keep |= d <= c["radius"] + 0.9
     keep[0, :] = keep[-1, :] = keep[:, 0] = keep[:, -1] = True
     return ~keep, path, clearings
+
+
+def _in_cell(v):
+    """v to 2 places, never past its own cell's far edge."""
+    return round(min(float(v), math.floor(float(v)) + 0.99), 2)
 
 
 def from_level(folder):

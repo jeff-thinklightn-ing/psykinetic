@@ -12693,6 +12693,15 @@ crowns it never reaches); full pads for every chunk (2.5 M triangles,
 tests/farm_test (the look through a year with a late storm: bare, sown,
 growing, flattened, ripe, bare; each change told once); protocol_test.
 
+467 amended (release's label): tools/forest_grow.py wrote a tree's "at" rounded to
+2 places, so one at 75.999 was written 76.0 and ForestPack.from_trees, which
+floors it, stood it on the next cell: on maps' 224 forest (step 3, 174119b0)
+one trunk on a path cell. Each coordinate is now kept inside its own cell
+(_in_cell: at most the cell + 0.99); the same run moves 37 trees 0.01 m and
+no tree stands off the cells it may (grass, off the paths and clearings).
+Grown before the fix: levels/forest/trees.json as of 6a0c9057 (464's layout,
+740 trees). Offline tool only, protocol unchanged, no new class_name.
+
 ## 461, economy's side (npc's thief: Jeff, "thieves could be the answer to balancing the economy")
 
 The hooks npc's thief calls; numbers are npc's (townsfolk.json "thief").
