@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_taken()
 	_test_multiplier()
 	_test_no_wolves()
+	_test_path_dens()
 	_test_spread()
 	for body in _bodies:
 		body.free()
@@ -357,6 +358,42 @@ func _test_no_wolves() -> void:
 	var wilds := Herds.areas_of(WorldMap.build(["wilds"] as Array[String]))
 	_check(float(wilds.get("wilds", {}).get("herds", {}).get("wolf", 1.0)) == 0.0 and not wilds.get("wilds", {}).get("peopled", []).is_empty(),
 		"the wilds' own level keeps no wolves, its places and pads read (%d)" % wilds.get("wilds", {}).get("peopled", []).size())
+
+
+## Jeff's safe paths (763, economy's side): no wolf den within the rule's
+## path_keep_off of a road or dirt track (an area's "safe_paths", maps'
+## Level.safe_paths), seeded or roamed; deer anywhere; a level's own read.
+func _test_path_dens() -> void:
+	print("
+== no wolf den near a road or a track (763) ==")
+	var wolf: Dictionary = _rules["species"]["wolf"]
+	_check(int(wolf.get("path_keep_off", 0)) == 8, "wolves keep 8 cells off the paths (%s)" % [wolf])
+	var paths := {}
+	for x in SIZE:
+		paths[Vector2i(x, 100)] = true  # A road straight across.
+	for y in SIZE:
+		paths[Vector2i(60, y)] = true  # A track up and down.
+	var areas := _areas.duplicate(true)
+	areas["fields"]["safe_paths"] = paths
+	var near_path := func(each: Dictionary) -> bool:
+		var home: Vector2i = each["home"]
+		return absi(home.y - 100) < 8 or absi(home.x - 60) < 8
+	_now = 0
+	var fresh := Herds.new({}, areas, _rules, func() -> int: return _now)
+	_tick(fresh)
+	var dens := fresh.groups_in("fields", "wolf")
+	_check(not dens.is_empty() and not dens.any(near_path), "seeded: %d packs, none within 8 of the road or the track" % dens.size())
+	_check(not fresh.may_home("fields", "wolf", Vector2i(120, 105)) and not fresh.may_home("fields", "wolf", Vector2i(66, 20))
+		and fresh.may_home("fields", "wolf", Vector2i(120, 108)) and fresh.may_home("fields", "deer", Vector2i(120, 100)),
+		"no den 5 off the road or 6 off the track, one 8 off; deer on the road")
+	_check(fresh.may_home("meadow", "wolf", Vector2i(120, 105)), "an area with no paths keeps them anywhere")
+	dens[0]["home"] = Vector2i(120, 102)  # An old den too near, from before the rule.
+	_now = DAY
+	_tick(fresh)
+	_check(not fresh.groups_in("fields", "wolf").any(near_path), "a day's roaming moves a den off the road")
+	var hills := Herds.areas_of(WorldMap.build(["hills"] as Array[String]))
+	_check(not (hills.get("hills", {}).get("safe_paths", {}) as Dictionary).is_empty(),
+		"the hills' roads and tracks read (%d cells)" % (hills.get("hills", {}).get("safe_paths", {}) as Dictionary).size())
 
 
 func _spawn(spec: Dictionary) -> Object:

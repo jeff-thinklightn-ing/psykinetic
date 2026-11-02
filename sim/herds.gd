@@ -125,8 +125,9 @@ static func areas_of(world_map: WorldMap) -> Dictionary:
 		for link: Variant in area.get("links", []):
 			if link is Dictionary and link.get("tile") is Vector2i:
 				peopled.append(link["tile"])
+		# Its roads and dirt tracks (763: maps' Level.safe_paths, a set of cells).
 		out[name] = {"floor": area["floor"], "outdoor": world_map.is_outdoor(name), "herds": area.get("herds", {}),
-			"peopled": peopled}
+			"peopled": peopled, "safe_paths": area.get("safe_paths", {})}
 	return out
 
 
@@ -190,17 +191,26 @@ func barred(area: String, species: String) -> bool:
 
 
 ## Whether [param species] may make its home at [param cell] of [param area]
-## (397 amended): not barred there, and at least its rule's keep_off cells
-## (Chebyshev) from every place and link pad of the area.
+## (397 amended): not barred there, at least its rule's keep_off cells
+## (Chebyshev) from every place and link pad of the area, and (763,
+## economy's side: Jeff's safe paths) at least its path_keep_off cells from
+## every cell of the area's roads and dirt tracks (its "safe_paths").
 func may_home(area: String, species: String, cell: Vector2i) -> bool:
 	if barred(area, species):
 		return false
 	var keep_off := int(_species(species).get("keep_off", 0))
-	if keep_off <= 0:
-		return true
-	for at: Vector2i in areas.get(area, {}).get("peopled", []):
-		if maxi(absi(at.x - cell.x), absi(at.y - cell.y)) < keep_off:
-			return false
+	if keep_off > 0:
+		for at: Vector2i in areas.get(area, {}).get("peopled", []):
+			if maxi(absi(at.x - cell.x), absi(at.y - cell.y)) < keep_off:
+				return false
+	var path_off := int(_species(species).get("path_keep_off", 0))
+	var paths: Dictionary = areas.get(area, {}).get("safe_paths", {})
+	if path_off > 0 and not paths.is_empty():
+		# The square about the cell against the set: cheap beside a long road.
+		for dy in range(-path_off + 1, path_off):
+			for dx in range(-path_off + 1, path_off):
+				if paths.has(cell + Vector2i(dx, dy)):
+					return false
 	return true
 
 

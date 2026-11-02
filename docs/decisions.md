@@ -38398,3 +38398,16 @@ hail and lamp checks):
 - it is in the towns' record the snapshot saves.
 zone_test _test_restart: a held threat survives the restart. return_test: the temple under a
 threat. Server and client, protocol unchanged, no new class_name.
+## 763, economy's side: wolf dens off the safe paths
+
+Jeff's safe-paths rule applied to the herds (the coordinator's ask): a predator's home sits at least
+its species' path_keep_off cells (Chebyshev; the wolf's 8, levels/economy.json herds.species) off
+every cell of its area's roads and dirt tracks, beside 397's keep_off from places and link pads.
+Herds.areas_of carries each area's "safe_paths" (WorldMap's, above) and Herds.may_home checks the
+square about the cell against that set, so a long road costs no more than a short one. Seeding never
+homes a pack there, and a den from before (an old save's) fails may_home and moves on the next day's
+roam (Herds._daily rehomes it), so the box's packs step back from the paths the day after a deploy.
+Deer, rabbits and boar may still graze on a road. herds_test: a road and a track across a made-up
+area, no den seeded within 8, the edges 5, 6 and 8 off, an old den moved off in a day, an area with
+no paths unchanged, and the hills' paths read from the real level. Server only; protocol unchanged;
+no new class_name; a CHANGELOG bullet (dens move in the real levels).

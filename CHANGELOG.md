@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wolves no longer make their dens near roads and dirt tracks: a pack lives at least 8 steps off any path, and one too close moves away within a day (763).
 - Wolves or raiders in a town send its folk indoors and shut its shops until they are gone; the guard turns out (762).
 - Old, stooped townsfolk lie flat on their bed asleep instead of hunched above it; the stoop comes back when they get up (751).
 - A sleeper beside a hut's built-in bed is drawn lying on the bed itself, head on the pillow (751).
