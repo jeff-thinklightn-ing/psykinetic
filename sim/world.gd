@@ -6976,6 +6976,8 @@ func _step_refused(entity: GridEntity, direction: Vector2i) -> void:
 ## clank heard.
 func _stepped_off(entity: GridEntity, left: Vector2i, duration: float) -> void:
 	_trample(entity, left)
+	entity.step_gap = tick - entity._cell_step_tick  # A stalk's slow steps (764).
+	entity._cell_step_tick = tick
 	if entity.shelter_lead == null or not is_sheltered(entity):
 		entity.protected = false  # Moving ends spawn grace (a companion's shelter: her player's act does, 661).
 	if entity is Player or entity is Companion:

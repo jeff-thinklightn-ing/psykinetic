@@ -38542,3 +38542,30 @@ keeping area's deer and wolves against their room and calm, the meat lying, and 
 quest and outcome if judged now. balance_test retuned (the band at 0.45, lambs past the few lost)
 plus _test_ask_now. No level keeps the balance yet (761), so no player sees it: no bullet. Server
 only; protocol unchanged; no new class_name.
+## 764. Hunting a deer: burst then trot, the wounded tire and go down, a slow stalk
+
+Playtest (11-01): with fists and a spear, 24 tries killed no deer, and a deer at 2 hp outran a
+150-cell chase. Prey ran at a player's exact pace, kept fleeing while anyone was within 4, and heard
+a player's step within 3 cells and turned to it. The coordinator ruled: hunting leads with the bow,
+but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim only (sim/animal.gd):
+- Flight is a burst, then a trot: prey bolts at BURST_PACE (0.75) x its pace for BURST_TICKS (30,
+  about 14 cells), then trots at its pace. One left behind falls out of FLEE_NEAR_TILES and it
+  settles as before (a look about, then back).
+- Wounded under half its hp (Animal.wounded) it tires: bursts at its pace, then stands REST_TICKS
+  (20) before the next; and it bleeds 1 hp every BLEED_TICKS (100), never under 1 (no deer dies
+  off-screen of a scratch). Under DOWN_BELOW (a quarter) of its hp, after a burst it goes down for
+  DOWN_TICKS (600): still, head low (Pose.SIT until phase 2's lying pose), running from nobody, and
+  struck it stays down; left be, it gets up wary.
+- A slow stalk: a player's (or companion's) step is heeded only hurried, within STALK_STEP_TICKS
+  (6) of its previous step into a cell (GridEntity.step_gap, stamped by World._stepped_off; server
+  only, not replicated). One walking on is heard as before; one tapping forward a cell at a time
+  is not. Found at its side unawares (NOTICE_ALWAYS, not struck, not already wary), prey stands
+  startled STARTLE_TICKS (5) before it bolts: the time for one blow. Scent (downwind, 316) and
+  cover (508) work as before.
+Phase 2 (approved in principle; rides v0.1.199's revision 45): a drawn blood trail from a wounded
+deer's cells and a lying pose for one down (pc-character's), as "764 amended" or a tree's side.
+Phase 3 later: companions driving deer.
+monster_test _test_deer_hunted (the burst and trot, a wounded rest, the bleed never to death, down
+and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard),
+_test_clank (a slow step unheeded, a hurried one turns it). Server only; protocol unchanged; no
+new class_name.

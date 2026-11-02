@@ -125,6 +125,7 @@ func _ready() -> void:
 	_test_quieter()
 	_test_wolf_pack_bold()
 	_test_balance_wolves()
+	_test_deer_hunted()
 	_test_archer()
 	_test_archer_hold()
 	_test_worn_bundles()
@@ -1843,6 +1844,11 @@ func _test_clank() -> void:
 	var player: GridEntity = e["P"][0]
 	rabbit.sight_range = 0  # Sees nothing: ears only.
 	var off := rabbit.tile + Vector2i(-6, 0)
+	player.step_gap = Animal.STALK_STEP_TICKS + 1  # A stalk's slow step (764): unheeded.
+	World.noise(off, 6, &"step", player)
+	World.step()
+	_check(rabbit.alert == Monster.Alert.IDLE, "a slow step 6 off (a stalk): unheeded (764)")
+	player.step_gap = 3  # Walking on: hurried.
 	World.noise(off, 6, &"step", player)
 	World.step()
 	_check(rabbit.alert == Monster.Alert.SUSPICIOUS and rabbit.facing == Vector2i(-1, 0),
@@ -4390,6 +4396,114 @@ func _test_balance_wolves() -> void:
 	World.balance = null
 	DayNight.reset()
 	_indoors()
+
+
+## Decision 764: a deer bolts in a burst, then trots; wounded it bleeds
+## (never to death) and rests after each burst; low, it goes down and can
+## be finished, and gets up in time; a slow stalk from behind goes unheard
+## to its side, where it startles a moment before it bolts; a hurried
+## approach is heard.
+func _test_deer_hunted() -> void:
+	print("\n== hunting a deer (764): burst then trot, wounded it tires and goes down, a stalk ==")
+	Monster.idling = false
+	var rows: Array[String] = ["##############################################"]
+	for y in 5:
+		rows.append("#............................................#")
+	rows.append("##############################################")
+	var setup := func(hp: int, doe_at: Vector2i, hunter_at: Vector2i) -> Array:
+		_build(rows)
+		var doe := EntityFactory.build(SPECS["d"].merged({"name": "Doe", "props": Level.MONSTER_TYPES["deer"]})) as Animal
+		_room.add_child(doe)
+		World.spawn(doe, doe_at)
+		var hunter := EntityFactory.build(SPECS["P"].merged({"name": "Hunter"})) as GridEntity
+		_room.add_child(hunter)
+		World.spawn(hunter, hunter_at)
+		_outdoors("clear")
+		World.fields.weather["wind"] = 0.0  # No scent: sight and hearing only.
+		DayNight.set_hour(12.0)
+		World.face(doe, Vector2i(1, 0))  # Looking away from the hunter (west of her).
+		doe.hp = hp
+		World.step()
+		return [doe, hunter]
+	# The burst, then the trot.
+	var pair: Array = setup.call(14, Vector2i(10, 3), Vector2i(4, 3))
+	var doe: Animal = pair[0]
+	var pace := doe._pace
+	doe._flee(Vector2i(4, 3))
+	World.step()
+	_check(is_equal_approx(doe.move_ticks, pace * Animal.BURST_PACE), "she bolts in a burst (%.2f a cell)" % doe.move_ticks)
+	for i in Animal.BURST_TICKS + 1:
+		World.step()
+	_check(doe.alert == Monster.Alert.FLEEING and is_equal_approx(doe.move_ticks, pace), "then trots at her pace (%.2f)" % doe.move_ticks)
+	# Wounded: a burst at her pace, then a rest.
+	pair = setup.call(6, Vector2i(10, 3), Vector2i(4, 3))
+	doe = pair[0]
+	doe._flee(Vector2i(4, 3))
+	for i in Animal.BURST_TICKS + 2:
+		World.step()
+	var rested_at := doe.tile
+	for i in Animal.REST_TICKS - 4:
+		World.step()
+	var rested := doe.tile == rested_at
+	for i in 12:
+		World.step()
+	_check(rested and doe.tile != rested_at and doe.tile.x > 12, "wounded, she stops to rest after a burst, then runs on")
+	# Bleeding, never to death.
+	pair = setup.call(6, Vector2i(30, 3), Vector2i(2, 1))
+	doe = pair[0]
+	for i in Animal.BLEED_TICKS + 2:
+		World.step()
+	var bled := doe.hp
+	doe.hp = 1
+	for i in Animal.BLEED_TICKS * 2 + 2:
+		World.step()
+	_check(bled == 5 and doe.hp == 1 and doe.spawned, "wounded, she bleeds (6 to %d), never to death (%d)" % [bled, doe.hp])
+	# Low: down after her burst, finishable; up in time.
+	pair = setup.call(3, Vector2i(10, 3), Vector2i(4, 3))
+	doe = pair[0]
+	doe._flee(Vector2i(4, 3))
+	for i in Animal.BURST_TICKS + 3:
+		World.step()
+	var down_at := doe.tile
+	var hunter: GridEntity = pair[1]
+	for i in 60:
+		World.step()
+	_check(World.tick < doe._down_until and doe.tile == down_at and doe.pose == Monster.Pose.SIT,
+			"low, she goes down after her burst and stays down")
+	for i in Animal.DOWN_TICKS:
+		World.step()
+	_check(doe._down_until < 0, "left be, she gets up in time")
+	# A slow stalk from behind: unheard to her side, a start, then she bolts.
+	pair = setup.call(14, Vector2i(20, 3), Vector2i(14, 3))
+	doe = pair[0]
+	hunter = pair[1]
+	var heeded := false
+	while hunter.tile.x < 19:
+		for i in Animal.STALK_STEP_TICKS + 2:
+			World.step()
+			heeded = heeded or doe.alert != Monster.Alert.IDLE
+		World.try_move(hunter, Vector2i(1, 0))
+	World.step()
+	World.step()
+	var startled := doe.alert == Monster.Alert.SUSPICIOUS and doe.tile == Vector2i(20, 3)
+	for i in Animal.STARTLE_TICKS + 3:
+		World.step()
+	_check(not heeded and startled and doe.alert == Monster.Alert.FLEEING,
+			"stalked slowly from behind she hears nothing; at her side she starts, then bolts (%s)" % Monster.Alert.keys()[doe.alert])
+	# Hurried: heard.
+	pair = setup.call(14, Vector2i(20, 3), Vector2i(14, 3))
+	doe = pair[0]
+	hunter = pair[1]
+	heeded = false
+	while hunter.tile.x < 19 and not heeded:
+		for i in 3:
+			World.step()
+			heeded = heeded or doe.alert != Monster.Alert.IDLE
+		World.try_move(hunter, Vector2i(1, 0))
+	_check(heeded and hunter.tile.x < 19, "walked up on, she hears it first (at %d)" % hunter.tile.x)
+	DayNight.reset()
+	_indoors()
+	Monster.idling = true
 
 
 func _test_wolf_pack_bold() -> void:
