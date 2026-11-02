@@ -38550,10 +38550,11 @@ a player's step within 3 cells and turned to it. The coordinator ruled: hunting 
 but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim only (sim/animal.gd):
 - Flight is a burst, then a trot: prey bolts at BURST_PACE (0.75) x its pace for BURST_TICKS (30,
   about 14 cells), then trots at its pace. One left behind falls out of FLEE_NEAR_TILES and it
-  settles as before (a look about, then back).
-- Wounded under half its hp (Animal.wounded) it tires: bursts at its pace, then stands REST_TICKS
-  (20) before the next; and it bleeds 1 hp every BLEED_TICKS (100), never under 1 (no deer dies
-  off-screen of a scratch). Under DOWN_BELOW (a quarter) of its hp, after a burst it goes down for
+  settles as before (a look about, then back). Struck (note_struck), it bolts STRUCK_BURST_TICKS
+  (60, about 29 cells): a missed or wounding shot costs a chase.
+- Wounded under half its hp (Animal.wounded) it tires: after its burst it trots at WOUNDED_TROT
+  (1.25) x its pace, slower than a player; and it bleeds 1 hp every BLEED_TICKS (100), never under
+  1 (no deer dies off-screen of a scratch). Under DOWN_BELOW (a quarter) of its hp, after a burst it goes down for
   DOWN_TICKS (600): still, head low (Pose.SIT until phase 2's lying pose), running from nobody, and
   struck it stays down; left be, it gets up wary.
 - A slow stalk: a player's (or companion's) step is heeded only hurried, within STALK_STEP_TICKS
@@ -38562,6 +38563,11 @@ but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim onl
   is not. Found at its side unawares (NOTICE_ALWAYS, not struck, not already wary), prey stands
   startled STARTLE_TICKS (5) before it bolts: the time for one blow. Scent (downwind, 316) and
   cover (508) work as before.
+- A kill seen (the coordinator, after playtest's bow run: 3 arrows a doe, about 30 s a deer, "too
+  easy"; aim for a deer every couple of minutes): when prey dies, its herd within WARY_REACH (24)
+  is alarmed (Animal.alarm): wary WARY_TICKS (3000, 5 min; Animal.wary, by the clock): it sees
+  WARY_SIGHT (3) farther, heeds every step (no stalk), bolts twice as long, and its home moves
+  MOVE_OFF (30) cells away from the kill; it runs at once. Deer hp and arrow damage unchanged.
 - Cornered prey slips along the wall (Animal._flee_goal): with no cell straight away from the
   threat, the free cell of a few every way round that keeps it farthest off, never nearer (a doe
   in a map corner had stood 4 minutes a cell from playtest's hunter). A boar's stays Monster's.
@@ -38569,6 +38575,7 @@ Phase 2 (approved in principle; rides v0.1.199's revision 45): a drawn blood tra
 deer's cells and a lying pose for one down (pc-character's), as "764 amended" or a tree's side.
 Phase 3 later: companions driving deer.
 monster_test _test_deer_hunted (the burst and trot, a wounded rest, the bleed never to death, down
-and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard, a cornered one away along the wall),
+and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard, struck a long burst, a herd wary after a kill and calm again, a cornered
+one away along the wall),
 _test_clank (a slow step unheeded, a hurried one turns it). Server only; protocol unchanged; no
 new class_name.

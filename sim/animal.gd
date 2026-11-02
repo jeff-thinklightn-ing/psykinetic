@@ -11,12 +11,14 @@ extends Monster
 ## - prey (rabbit, deer, stag): anyone it notices, or a noise not its
 ##   herd's, and it bolts (FLEEING), and its bolting (a rout, a cry) sends
 ##   the herd after it; it never fights. Hunted (decision 764): it bolts in
-##   a burst (BURST_PACE for BURST_TICKS), then trots at its pace, so one
-##   left behind is shaken off; wounded under half it bleeds (BLEED_TICKS,
-##   never to death) and runs in bursts at its pace with a rest
-##   (REST_TICKS) after each; under DOWN_BELOW of its hp, after a burst it
-##   goes down (DOWN_TICKS: still, head low, not running) and can be
-##   finished. A player's step it heeds only hurried (its step_gap within
+##   a burst (BURST_PACE for BURST_TICKS; struck, STRUCK_BURST_TICKS), then
+##   trots at its pace, so one left behind is shaken off; wounded under
+##   half it bleeds (BLEED_TICKS, never to death) and trots WOUNDED_TROT
+##   slower; under DOWN_BELOW of its hp, after a burst it goes down
+##   (DOWN_TICKS: still, not running) and can be finished. A kill seen or
+##   heard (within WARY_REACH) leaves its herd wary WARY_TICKS: it sees
+##   WARY_SIGHT farther, heeds every step, bolts twice as long, and moves
+##   its home MOVE_OFF away. A player's step it heeds only hurried (its step_gap within
 ##   STALK_STEP_TICKS: a slow stalk behind it goes unheard), and one it finds at its side
 ##   unawares startles it STARTLE_TICKS before it bolts: a blow's time.
 ## - game (boar): bolts as prey does, but struck (running or not), or cornered with the
@@ -75,15 +77,22 @@ const UNSEEN_TILES := 8
 ## turned to it, for so long (ticks), and sees as far as it can.
 const ALERT_TICKS := 40
 ## Decision 764 (hunting; drafts): prey bolts at BURST_PACE x its pace for
-## BURST_TICKS, then trots at its pace. Wounded under half its hp, it bursts
-## at its pace and rests REST_TICKS after each, and bleeds 1 hp every
-## BLEED_TICKS (never under 1); under DOWN_BELOW of its hp, after a burst it
-## goes down for DOWN_TICKS. A player's step within STALK_STEP_TICKS of its
+## BURST_TICKS (struck, STRUCK_BURST_TICKS), then trots at its pace.
+## Wounded under half its hp, it trots at WOUNDED_TROT x its pace and bleeds
+## 1 hp every BLEED_TICKS (never under 1); under DOWN_BELOW of its hp, after
+## a burst it goes down for DOWN_TICKS. A kill of its herd within
+## WARY_REACH: wary WARY_TICKS (WARY_SIGHT farther, every step heeded,
+## bursts twice as long), its home moved MOVE_OFF away from the kill. A player's step within STALK_STEP_TICKS of its
 ## last (GridEntity.step_gap) is hurried (heeded); slower, a stalk (not). Found
 ## at its side unawares, it stands startled STARTLE_TICKS, then bolts.
 const BURST_PACE := 0.75
 const BURST_TICKS := 30
-const REST_TICKS := 20
+const STRUCK_BURST_TICKS := 60
+const WOUNDED_TROT := 1.25
+const WARY_TICKS := 3000
+const WARY_SIGHT := 3
+const WARY_REACH := 24
+const MOVE_OFF := 30
 const BLEED_TICKS := 100
 const DOWN_BELOW := 0.25
 const DOWN_TICKS := 600
@@ -134,10 +143,11 @@ var _hungry := false
 var _night := false
 ## When it last took a sheep or a town's thing (World's steps), -1 never.
 var _took_at := -1
-## Decision 764: its flight's burst ends (ticks); resting till; down till;
+## Decision 764: its flight's burst ends (ticks); down till;
 ## startled till; its last bleed.
 var _burst_until := -1
-var _rest_until := -1
+## Wary after a kill of its herd till then (764), -1 not.
+var _wary_until := -1
 var _down_until := -1
 var _startle_until := -1
 var _bled_tick := -1
@@ -170,6 +180,9 @@ func _sim_tick() -> void:
 		super()
 		return
 	_bleed()
+	if _wary_until >= 0 and World.tick >= _wary_until:
+		_wary_until = -1
+		sight_range -= WARY_SIGHT
 	if World.tick < _down_until:
 		_lie_down_tick()
 		return
@@ -292,7 +305,7 @@ func _noise_threat() -> void:
 			continue  # Its own, or its herd's.
 		var predator: bool = is_instance_valid(source) and source is Animal and (source as Animal).role == Role.PREDATOR
 		if noise["kind"] == &"step" and not predator and is_instance_valid(source) and not source is Animal \
-				and (source as GridEntity).step_gap > STALK_STEP_TICKS:
+				and (source as GridEntity).step_gap > STALK_STEP_TICKS and not wary():
 			continue  # A stalk (764): a slow step, not close on the last, goes unheeded.
 		if noise["kind"] == &"step" and not predator:
 			var way := Senses.way_toward(tile, noise["at"])
@@ -407,6 +420,11 @@ func remains() -> Array[int]:
 		World.herds.killed(group, str(spawn_spec.get("kind", "")))
 	if not town_wolf.is_empty() and World.balance != null:
 		World.balance.town_wolf_killed(town_wolf)  # One fewer to come (761).
+	if role == Role.PREY:
+		for entity in World.monsters():
+			if entity != self and entity is Animal and (entity as Animal).herd == herd \
+					and World.distance(tile, entity.tile) <= WARY_REACH:
+				(entity as Animal).alarm(tile)  # Its herd saw it fall (764).
 	return super()
 
 
@@ -508,8 +526,40 @@ func _flee(threat: Vector2i, routs := true) -> void:
 	var was := alert
 	super(threat, routs)
 	if role == Role.PREY and was != Alert.FLEEING:
-		_burst_until = World.tick + BURST_TICKS
-		_rest_until = -1
+		_burst_until = maxi(_burst_until, World.tick + BURST_TICKS * (2 if wary() else 1))
+
+
+## Struck, prey bolts long (764): a missed or wounding shot costs a chase.
+func note_struck(by: GridEntity) -> void:
+	super(by)
+	if role == Role.PREY and World.tick >= _down_until:
+		_burst_until = World.tick + STRUCK_BURST_TICKS * (2 if wary() else 1)
+
+
+## Whether a kill of its herd still has it wary (764): till its time,
+## ticking or not (its sight's bonus goes at its next tick).
+func wary() -> bool:
+	return World.tick < _wary_until
+
+
+## A kill of its herd seen or heard at [param at] (764): wary WARY_TICKS,
+## its home moved MOVE_OFF away from it, and off it runs.
+func alarm(at: Vector2i) -> void:
+	if _wary_until < 0:
+		sight_range += WARY_SIGHT
+	_wary_until = World.tick + WARY_TICKS
+	var away := Vector2i(signi(home.x - at.x), signi(home.y - at.y)) if home != NO_TILE else Vector2i.ZERO
+	if away == Vector2i.ZERO:
+		away = Vector2i(signi(tile.x - at.x), signi(tile.y - at.y))
+	if away != Vector2i.ZERO:
+		var from := home if home != NO_TILE else tile
+		for n in range(MOVE_OFF, 7, -1):
+			var to := from + away * n
+			if World.is_walkable(to):
+				home = to
+				break
+	if World.tick >= _down_until and alert != Alert.FLEEING:
+		_flee(at)
 
 
 ## Whether it is wounded under half its hp (764).
@@ -539,29 +589,21 @@ func _lie_down_tick() -> void:
 		pose = Pose.STAND
 
 
-## Its pace in flight (764): a burst, then a trot at its pace; wounded,
-## bursts at its pace with a rest after each, and down after one once low.
+## Its pace in flight (764): a burst, then a trot at its pace (wounded,
+## WOUNDED_TROT slower); low, down after its burst.
 ## Whether it moves this tick.
 func _flight_paced() -> bool:
 	var pace := _pace
 	if World.tick < _burst_until:
-		move_ticks = pace * (1.0 if wounded() else BURST_PACE)
+		move_ticks = pace * BURST_PACE
 		return true
-	if not wounded():
-		move_ticks = pace
-		return true
-	if _burst_until >= 0 and _rest_until < _burst_until:
-		if float(hp) < float(max_hp) * DOWN_BELOW:
-			_down_until = World.tick + DOWN_TICKS
-			alert = Alert.IDLE
-			pose = Pose.SIT
-			return false
-		_rest_until = World.tick + REST_TICKS
-	if World.tick < _rest_until:
-		pose = Pose.STAND
+	if _burst_until >= 0 and float(hp) < float(max_hp) * DOWN_BELOW:
+		_burst_until = -1
+		_down_until = World.tick + DOWN_TICKS
+		alert = Alert.IDLE
+		pose = Pose.SIT
 		return false
-	_burst_until = World.tick + BURST_TICKS
-	move_ticks = pace
+	move_ticks = pace * (WOUNDED_TROT if wounded() else 1.0)
 	return true
 
 
