@@ -150,6 +150,10 @@ var step_until := -100000.0
 ## as a free body (688): a spear is braced standing still (World.braced,
 ## decision 344).
 var last_step_tick := -100000
+## Server: ticks between its last two steps into a cell (World._stepped_off;
+## decision 764: a stalk's slow steps go unheeded by game), large before any.
+var step_gap := 1000000
+var _cell_step_tick := -1000000
 ## The body's centre in cell units, Vector2(tile) the cell's centre
 ## (decision 688): a free body's own (a player's, World._free_glide),
 ## anyone else's its cell's centre. Any change of tile but a free body's
