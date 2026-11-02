@@ -548,26 +548,30 @@ func _flee(threat: Vector2i, routs := true) -> void:
 ## who turns and fights) goes down at once, to be finished.
 func note_struck(by: GridEntity) -> void:
 	var startled := World.tick < _startle_until
-	var unaware := (alert == Alert.IDLE or startled) and World.tick >= _down_until
+	var down := World.tick < _down_until
+	var unaware := (alert == Alert.IDLE or startled) and not down
 	super(by)
 	if role != Role.PREY:
 		return
 	_alarm_herd()  # Its cry, struck: its herd within hearing is wary (764).
 	var fells := bool(kinds().get(str(spawn_spec.get("kind", "")), {}).get("felled_by_surprise", false))
 	var d := World.distance(tile, by.tile) if is_instance_valid(by) else -1
+	var surprised := unaware and fells and d >= 0 and d <= SURPRISE_REACH
+	var low := hp > 0 and float(hp) < float(max_hp) * DOWN_BELOW  # Struck low: down now, not another burst.
 	if fells:
-		print("[hunt] %s struck from %d: %s, %s" % [name, d, "startled" if startled else ("grazing" if alert == Alert.IDLE else
-				("down" if World.tick < _down_until else Alert.keys()[alert].to_lower())),
-				"felled" if unaware and d >= 0 and d <= SURPRISE_REACH else "not felled"])
-	if unaware and fells and d >= 0 and d <= SURPRISE_REACH:
+		var state: String = "down" if down else ("startled" if startled else ("grazing" if alert == Alert.IDLE else Alert.keys()[alert].to_lower()))
+		print("[hunt] %s struck from %d: %s, %s" % [name, d, state,
+				"down already" if down else ("felled" if surprised else ("down, low" if low else "not felled"))])
+	if down:
+		return  # It stays down.
+	if surprised or low:
 		_startle_until = -1
 		_burst_until = -1
 		_down_until = World.tick + DOWN_TICKS
 		alert = Alert.IDLE
 		pose = Pose.SIT
 		return
-	if World.tick >= _down_until:
-		_burst_until = World.tick + STRUCK_BURST_TICKS * (2 if wary() else 1)
+	_burst_until = World.tick + STRUCK_BURST_TICKS * (2 if wary() else 1)
 
 
 ## Whose pace a step of [param stepper] is judged by (764): a companion
