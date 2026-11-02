@@ -22,6 +22,9 @@ const AMONG_THE_DEAD := Vector2i(49, 40)
 
 
 func run(bot: Node) -> void:
+	if OS.get_environment("TOUR_ONLY") == "shortcut":  # The sealed way alone, both ways.
+		await _shortcut(bot)
+		return
 	if OS.get_environment("TOUR_ONLY") == "respawn":  # Run with TOUR_SERVER_ARGS="--test-foe=draugr,stick".
 		await _fall_to_foe(bot)
 		await _brought_back(bot)

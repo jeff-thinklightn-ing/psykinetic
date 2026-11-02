@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Tools: the playtest folk tour checks chapel visits on a temple day and the priest's place in the chapel (754 amended (6)).
 - In a town, no more hitch every 20 seconds or so when someone goes in or out of a house: the light on the ground is no longer worked out again for the whole zone each time a lamp changes (383 amended).
 - A healer grows old and leaves his hut in time: it stands empty, its chimney goes cold, and after a while a newcomer comes and mends it (759).
 - Hills: rock faces on stepped slopes stand on the ground they divide, with no shard of rock sticking out where two ledges meet (585 amended).

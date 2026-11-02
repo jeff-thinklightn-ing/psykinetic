@@ -37635,6 +37635,15 @@ Every Godot tour.sh starts, its parse checks too, runs with APPDATA in the check
 build/tours/<tour>/appdata, and tour.sh refuses to start on any other folder. A barrow level
 reached the shared overlay on 11-01 (not a tour's, but the parse checks ran without APPDATA). Tests
 and tools only, protocol unchanged, no new class_name.
+
+754 amended (6) (2026-11-01): the folk tour's chapel visit is judged only on a temple day. A
+person visits once every 7 days by their id (404), so one morning held nobody's visit about two
+times in three, and the console's hour leaves the day alone. Under npc's --test-temple-day (404
+amended; the server line takes it with a --run-marker, through TOUR_SERVER_ARGS, and TOUR_TEMPLE_DAY=1
+tells the tour), the chapel is watched from 9:00 at a normal clock and a visitor is expected inside,
+more than a cell from its doors, its counter and the respawn cell. Without the flag the tour only
+reports who came. The priest is checked at noon to work inside, off those cells. The chapel tour's
+TOUR_ONLY=shortcut plays the sealed way alone. Tests only, protocol unchanged, no new class_name.
 ## 751, pc-character's side: sleepers curled on their side, lain down to and got up from
 
 Jeff: sleeping townsfolk "look like they are dead, we need a sleeping

@@ -166,9 +166,14 @@ func _talk_to(bot: Node, person: GridEntity, hour: int) -> void:
 func _chapel_visit(bot: Node) -> void:
 	await bot.admin("hour 9")
 	await bot.walk_to(Vector2i(217, 198), 1, 120.0)
-	await bot.admin("day_minutes 12")
+	# With npc's --test-temple-day (TOUR_TEMPLE_DAY=1 and TOUR_SERVER_ARGS
+	# carrying the flag): today is everyone's temple day, watched 9:00 to about
+	# 10:45 (each one's own clock, +-0.75 h) at a normal clock, and judged.
+	var judged := OS.get_environment("TOUR_TEMPLE_DAY") == "1"
+	if not judged:
+		await bot.admin("day_minutes 12")
 	var inside := {}
-	var end: int = bot.now_msec() + 240000
+	var end: int = bot.now_msec() + (420000 if judged else 240000)
 	while bot.now_msec() < end and inside.is_empty():
 		for body: GridEntity in bot.seen(""):
 			if body is Resident and str(body.get("trade")) != "priest" and CHAPEL.has_point(body.tile) 					and CHAPEL_KEEP_OFF.all(func(c: Vector2i) -> bool: return World.distance(c, body.tile) > 1):
@@ -190,5 +195,11 @@ func _chapel_visit(bot: Node) -> void:
 		await bot.seconds(5.0)  # Settled at his spot.
 		bot.expect(CHAPEL.has_point(priest.tile) and CHAPEL_KEEP_OFF.all(func(c: Vector2i) -> bool: return World.distance(c, priest.tile) > 1),
 			"%s works in the chapel off its doors, its counter and the respawn cell" % _who(priest), "at %s" % priest.tile)
-	bot.expect(not inside.is_empty(), "a townsperson comes into the chapel at a visiting hour (beyond its doors and counter)",
-		"none in 4 minutes from 9:00 (about 8 game hours)")
+	# Reported, not judged: a visit comes on a person's temple day (residents.json
+	# "temple", every 7 days by their id), which the tour can't choose yet (asked
+	# 11-01 for a test hook); one morning has about a 63% chance of nobody's.
+	if judged:
+		bot.expect(not inside.is_empty(), "on a temple day a townsperson comes into the chapel (beyond its doors and counter)",
+			"%s" % (inside if not inside.is_empty() else "none from 9:00 to about 10:45"))
+	else:
+		bot.log_line("chapel visitors from 9:00 (not judged without --test-temple-day): %s" % (inside if not inside.is_empty() else "none"))
