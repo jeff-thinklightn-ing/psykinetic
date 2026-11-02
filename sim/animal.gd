@@ -304,6 +304,29 @@ func _noise_threat() -> void:
 		return
 
 
+## Where prey runs (764; playtest: a doe stood 4 minutes in a corner a cell
+## from a hunter): Monster's goal straight away; with none there, along the
+## wall, the free cell of a few every way round that keeps it farthest
+## from the threat, never nearer it than it stands. A boar's is Monster's
+## (cornered, it charges).
+func _flee_goal() -> Vector2i:
+	var goal := super()
+	if role != Role.PREY or (goal != NO_TILE and goal != tile):
+		return goal
+	var best := NO_TILE
+	var best_d := World.distance(tile, _flee_from)
+	for way: Vector2i in AROUND:
+		for n in range(flee_tiles, 0, -1):
+			var at := tile + way * n
+			var d := World.distance(at, _flee_from)
+			if d >= best_d and World.is_walkable(at) and World.is_free(at):
+				if d > best_d or best == NO_TILE:
+					best = at
+					best_d = d
+				break
+	return best
+
+
 ## Whether it has nowhere to run from [param threat] (Monster's flee goal
 ## finds no tile away).
 func _cornered(threat: Vector2i) -> bool:
