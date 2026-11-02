@@ -7,32 +7,31 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.198
+
 - Deer can be hunted on foot: a deer sprints then slows to a trot, a wounded one tires and bleeds until it goes down, and creeping up slowly from behind (your companion creeps with you) lets you reach it and fell it with one blow; a hit deer runs far, and a herd that sees one killed stays wary and moves off (764).
 - Wolves no longer make their dens near roads and dirt tracks: a pack lives at least 8 steps off any path, and one too close moves away within a day (763).
 - Wolves or raiders in a town send its folk indoors and shut its shops until they are gone; the guard turns out (762).
 - Old, stooped townsfolk lie flat on their bed asleep instead of hunched above it; the stoop comes back when they get up (751).
 - A sleeper beside a hut's built-in bed is drawn lying on the bed itself, head on the pillow (751).
-
 - The forest is much bigger (224 by 224, was 96): a dozen clearings, a winding path from the wilds to the closed way north with side paths, the refuges and the healer's turf house where it stood (760).
 - Tools: the playtest tours talk to the fallen knight at every step of his quest and after a restart, and check who sleeps in a bed at night (754 amended (7)).
 - The healer in the wilds sleeps in his hut again, not on a bedroll at his door (751).
 - Tools: the forest grower keeps each tree on the cell it grew in, so none is written onto a path beside it (467 amended).
-
 - The hills are much bigger (224 by 224, was 96): two valleys with their winding rivers, the plateau and its waterfall, escarpments, the road from the wilds over a bridge and a ford to the plateau's way up, four fords, the herders' holdings and the hill cave (756).
 - Tests: view_test's sections on the big outdoor levels run as a scene of their own, view_land_test, beside it in the suite, so neither nears the per-scene time limit (278 amended).
 - Tools: the playtest folk tour checks chapel visits on a temple day and the priest's place in the chapel (754 amended (6)).
 - In a town, no more hitch every 20 seconds or so when someone goes in or out of a house: the light on the ground is no longer worked out again for the whole zone each time a lamp changes (383 amended).
 - A healer grows old and leaves his hut in time: it stands empty, its chimney goes cold, and after a while a newcomer comes and mends it (759).
 - Hills: rock faces on stepped slopes stand on the ground they divide, with no shard of rock sticking out where two ledges meet (585 amended).
-
 - Tests: a test scene launched without `--run-marker` can no longer write levels into the shared user:// overlay; it says so in an ERROR line instead (199 amended).
 - Townsfolk visiting the temple now go inside and stand on its floor, clear of the doors, the counter and the respawn spot (734 amended (4)).
 - The Dwarven Halls' chests can now also hold a battle axe, which any shop will buy (757 amended).
-
 - Tools: new playtest tours for restart memory, the axe sweep and the slung bow, and Umbrage's chapel; tour runs keep to their own data folder (754 amended (5)).
 - Umbrage's temple is now a stone chapel with a bell tower, larger inside, its door where it was; no grass grows through any building's floor (734 amended (2)).
 - Coming down the temple's shortcut you arrive before the Hall's throne, not six steps off to the side; a peaceable monster no longer pushes an arrival away (749 amended).
 - Crossing into a zone with a forest round it: the hitch behind the arrival card is short again (the wilds' worst frame about 130 ms, was 190 in v0.1.196; 660 amended (5)).
+
 ## v0.1.197
 
 - A townsperson the town owes money now eats from the store against that debt, instead of borrowing from the town or being fed as charity (353 amended (3)).
