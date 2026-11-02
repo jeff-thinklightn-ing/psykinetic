@@ -99,7 +99,9 @@ var _stuck := 0
 var _hide_until := -1
 ## Its town is under a threat (decision 762; Main sets it each sync): it
 ## shelters (Doing.HIDE at places' "shelter"), unless asleep in a bed under a
-## roof, or its trade is the fight (FIGHTERS), which turns out to the square.
+## roof and already inside that building (bedtime never walks it out of its
+## shelter across town: 762 amended), or its trade is the fight (FIGHTERS),
+## which turns out to the square.
 var sheltering := false
 ## The trades whose job is the fight (762): they turn out, never hide.
 const FIGHTERS: Array[String] = ["guard"]
@@ -404,8 +406,9 @@ func _sim_tick() -> void:
 	var now := Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id)
 	if trade in FIGHTERS and (hidden or sheltering):
 		now = Doing.SQUARE  # The fight is its job (762): it turns out.
-	elif hidden or (sheltering and not (now == Doing.HOME and sleeps_now() and bool(places.get("bed_roofed", false)))):
-		now = Doing.HIDE  # Abed under a roof, it sleeps on (762).
+	elif hidden or (sheltering and not (now == Doing.HOME and sleeps_now() and bool(places.get("bed_roofed", false)) \
+			and (places["bed"] as Rect2i).has_point(tile))):
+		now = Doing.HIDE  # Abed under a roof, it sleeps on (762); not yet under it, it keeps to its shelter (762 amended).
 	if now != doing or _goal == NO_CELL:
 		doing = now
 		_pick_goal()

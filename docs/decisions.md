@@ -38503,6 +38503,15 @@ says the town is under threat, and his sheltering line on a click is enough. It 
 threatened, not that the body is indoors (the guard who turns out has it too): never draw by it.
 resident_test _test_threat: with no holdings, as a joined client, his flag alone hides Barter.
 Server and client; the protocol rides revision 45 (unshipped), its hash moved; no new class_name.
+762 amended (2) (playtest's balance_end_badly, through the coordinator; release's label): bedtime no
+longer walks a sheltering body across town. "Abed under a roof sleeps on" held as soon as it was its
+bedtime, so at about 22:00 Aldous left the chapel (his shelter) for his hut through the wolves.
+Now one sleeps on only when it is already inside its bed's building (places "bed"); outside, it keeps
+to its shelter (Doing.HIDE), and sleeps once it is under its own roof. That run's "vendors indoors"
+failure was the tour's roof test: Snagfin and Rolf stood inside the chapel (215..220, 191..200), Umbrage's
+town shelter, but the tour read only level.json's freestanding roofs. resident_test _test_threat: Bram put
+out of doors at bedtime in the wolves shelters, then sleeps once under his roof. Server only, protocol
+unchanged, no new class_name.
 ## 763, economy's side: wolf dens off the safe paths
 
 Jeff's safe-paths rule applied to the herds (the coordinator's ask): a predator's home sits at least

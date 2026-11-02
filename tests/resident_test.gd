@@ -882,6 +882,16 @@ func _test_threat() -> void:
 		World.step()
 	_check(bram.sleeping() and bram.doing == Resident.Doing.HOME, "wolves at night: Bram, abed in his house, sleeps on (%s, %s)" % [bram.doing, bram.activity])
 	_check(World.towns.to_dict()[STORE].get("threat", {}).get("kind") == "wolves", "in the towns' record the snapshot saves")
+	# Bedtime out of doors (762 amended; playtest: Aldous walked from the chapel to his hut through the wolves):
+	# one not yet under his bed's roof keeps to his shelter, and sleeps once he is in it.
+	var out: Vector2i = _main._nearest_free(Vector2i(hut.position.x - 4, hut.position.y + 1))
+	_put(bram, out)
+	bram.activity = ""
+	World.step()
+	_check(not hut.has_point(bram.tile) and bram.doing == Resident.Doing.HIDE and bram.places.get("shelter") is Rect2i,
+		"put out of doors at bedtime in the wolves: he shelters, not a sleeper's walk home (%s at %s)" % [bram.doing, bram.tile])
+	_step_until(func() -> bool: return bram.sleeping(), 400)
+	_check(bram.sleeping() and hut.has_point(bram.tile), "and sleeps once under his roof (%s at %s)" % [bram.activity, bram.tile])
 	Net.message_received.disconnect(heard)
 	World.towns.lift_threat(STORE)
 	World.production.set_away("rs-gunn", true)
