@@ -37,6 +37,10 @@ const FAR_TILES := 30
 const FAR_EVERY := 20
 ## A step blocked so many times, and it looks for a new way.
 const STUCK_TRIES := 3
+## No way to its goal, it chooses again after so many ticks, plus up to
+## PATH_RETRY_SPREAD by its id, so a crowd at one door doesn't move as one (762 amended (3)).
+const PATH_RETRY_TICKS := 40
+const PATH_RETRY_SPREAD := 20
 const NO_CELL := Vector2i(-99999, -99999)
 const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home",
 	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds", Doing.STRAYED: "strayed", Doing.ESCORT: "strayed",
@@ -106,6 +110,8 @@ var sheltering := false
 ## The trades whose job is the fight (762): they turn out, never hide.
 const FIGHTERS: Array[String] = ["guard"]
 var _wander_at := -1
+## When it chooses again after finding no way to its goal; -1 for none (762 amended (3)).
+var _retry_at := -1
 ## Addressing a player who clicked them (decision 560, npc's side): the
 ## addressed body's node path, replicated for the look and the talking
 ## clip (pc-character's), "" when none; they stand facing them until
@@ -414,6 +420,8 @@ func _sim_tick() -> void:
 		_pick_goal()
 	elif doing == Doing.SQUARE and tile == _goal and World.tick >= _wander_at:
 		_pick_goal()
+	elif _retry_at >= 0 and World.tick >= _retry_at:
+		_pick_goal()  # Its way was shut (a body in the door, its cell taken): it tries again (762 amended (3)).
 	_show_work()
 	if far:
 		if tile != _goal:
@@ -504,6 +512,7 @@ func _look() -> void:
 ## the place; with no such place, the square's.
 func _pick_goal() -> void:
 	_route.clear()
+	_retry_at = -1
 	_stuck = 0
 	var area: Rect2i = places.get(PLACE_OF[doing], places.get("square", Rect2i())) if doing != Doing.ROUNDS else _round_area()
 	if doing == Doing.HIDE:
@@ -1296,7 +1305,8 @@ func _step() -> void:
 	if _route.is_empty():
 		_route = World.find_path(tile, _goal, false)
 		if _route.is_empty():
-			_goal = tile  # No way there now: it waits, and chooses again later.
+			_goal = tile  # No way there now: it waits, and chooses again later (762 amended (3): whatever it is doing).
+			_retry_at = World.tick + PATH_RETRY_TICKS + absi(id) % (PATH_RETRY_SPREAD + 1)
 			return
 	if World.try_move(self, _route[0] - tile):
 		_route.pop_front()

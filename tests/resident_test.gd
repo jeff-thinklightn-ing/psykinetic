@@ -910,6 +910,30 @@ func _test_threat() -> void:
 		"put out of doors at bedtime in the wolves: he shelters, not a sleeper's walk home (%s at %s)" % [bram.doing, bram.tile])
 	_step_until(func() -> bool: return bram.sleeping(), 400)
 	_check(bram.sleeping() and hut.has_point(bram.tile), "and sleeps once under his roof (%s at %s)" % [bram.activity, bram.tile])
+	# No way to his goal (762 amended (3); playtest: Aldous stood 40 s by the chapel, its door held): he tries again.
+	_put(bram, out)
+	bram.activity = ""
+	if dealer != null:
+		_put(dealer, _main._nearest_free(out + Vector2i(0, 3)))  # Near: the walk by steps, not the far one.
+	World.step()
+	var shut := Resident.NO_CELL
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var c := out + Vector2i(dx, dy)
+			if shut == Resident.NO_CELL and not World.is_walkable(c):
+				shut = c
+	_check(shut != Resident.NO_CELL and bram.doing == Resident.Doing.HIDE, "(out again in the wolves, sheltering; a cell no way leads to: %s)" % shut)
+	bram._goal = shut
+	bram._route.clear()
+	World.step()
+	World.step()
+	var stood := bram.tile
+	_check(bram._goal == stood and bram._retry_at > World.tick, "his way shut: he waits where he is, for now (%s, retry at %d, tick %d)" % [bram.tile, bram._retry_at, World.tick])
+	for i in Resident.PATH_RETRY_TICKS - 5:
+		World.step()
+	_check(bram.tile == stood, "for a while (%s)" % bram.tile)
+	_step_until(func() -> bool: return bram.sleeping(), 400)
+	_check(bram.sleeping() and hut.has_point(bram.tile), "then chooses again and reaches his roof (%s at %s)" % [bram.activity, bram.tile])
 	Net.message_received.disconnect(heard)
 	World.towns.lift_threat(STORE)
 	World.production.set_away("rs-gunn", true)

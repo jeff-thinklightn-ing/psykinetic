@@ -38737,6 +38737,18 @@ failure was the tour's roof test: Snagfin and Rolf stood inside the chapel (215.
 town shelter, but the tour read only level.json's freestanding roofs. resident_test _test_threat: Bram put
 out of doors at bedtime in the wolves shelters, then sleeps once under his roof. Server only, protocol
 unchanged, no new class_name.
+762 amended (3) (playtest's balance_end_badly 3, through the coordinator; release's label): a body with no
+way to its goal tries again. Aldous, awake in a held wolves threat, stood 40 s and more at (211, 198), four
+cells from the chapel he shelters in; Rolf stood just inside its west door. Resident._step, when
+World.find_path to its goal comes back empty (its cell taken since it chose it, or a body in the door), set
+its goal to where it stood, "chooses again later", but it chose again only when what it was doing changed,
+and a held threat holds Doing.HIDE: he stood until the threat lifted. Now a failed path sets _retry_at,
+PATH_RETRY_TICKS (40) plus up to PATH_RETRY_SPREAD (20) by its id, so a crowd at one door doesn't move as
+one (the coordinator's ask); at it the body picks its goal again (_pick_goal clears it). It covers every
+activity, not only the shelter: work, home, the square, a visit, the rounds. resident_test _test_threat:
+Bram out of doors in the wolves, his goal a cell no way leads to, waits where he is, then chooses again and
+reaches his roof (without the retry he stood there for good); its daily routines pass with it. Server only,
+protocol unchanged, no new class_name.
 
 ## 764. Hunting a deer: burst then trot, the wounded tire and go down, a slow stalk
 
