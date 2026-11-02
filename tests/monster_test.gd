@@ -4553,6 +4553,15 @@ func _test_deer_hunted() -> void:
 	World.damage(boar, 2, boar_hunter)
 	World.step()
 	_check(boar._down_until < 0 and not bool(Monster.kinds()["boar"]["felled_by_surprise"]), "a boar so struck is not felled: it turns on them")
+	# Chased and struck low, she goes down then, not after another burst.
+	pair = setup.call(5, Vector2i(20, 3), Vector2i(17, 3))
+	doe = pair[0]
+	hunter = pair[1]
+	doe._flee(hunter.tile)
+	World.step()
+	World.damage(doe, 2, hunter)
+	World.step()
+	_check(World.tick < doe._down_until and doe.hp == 3, "fleeing and struck low (3 of 14), she goes down at once")
 	# Her companion stalks with a stalking player.
 	pair = setup.call(14, Vector2i(20, 3), Vector2i(14, 3))
 	doe = pair[0]

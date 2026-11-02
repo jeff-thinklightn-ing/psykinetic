@@ -38520,7 +38520,8 @@ but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim onl
   (1.25) x its pace, slower than a player; and it bleeds 1 hp every BLEED_TICKS (100), never under
   1 (no deer dies off-screen of a scratch). Under DOWN_BELOW (a quarter) of its hp, after a burst it goes down for
   DOWN_TICKS (600): still, head low (Pose.SIT until phase 2's lying pose), running from nobody, and
-  struck it stays down; left be, it gets up wary.
+  struck it stays down; left be, it gets up wary. A blow that leaves it under DOWN_BELOW downs it
+  at once (playtest: a deer chased with blows to 1 hp kept fleeing, each blow restarting its burst).
 - A slow stalk: a player's (or companion's) step is heeded only hurried, within STALK_STEP_TICKS
   (6) of its previous step into a cell (GridEntity.step_gap, stamped by World._stepped_off; server
   only, not replicated). One walking on is heard as before; one tapping forward a cell at a time
