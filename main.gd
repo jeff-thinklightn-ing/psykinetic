@@ -6074,6 +6074,19 @@ func _make_balance(saved: Dictionary) -> void:
 		var place := World.holdings.place(town) if World.holdings != null else {}
 		return not _players_in(str(place.get("area", town.get_slice("/", 0)))).is_empty()
 	World.balance.fold_changed.connect(_on_folds_changed)
+	World.balance.threat_changed.connect(_on_balance_threat)
+
+
+## Server: the balance quest's town wolves come or go (761, npc's side): the
+## town's threat (762) raised and held by "balance" while they are about, let
+## go when the last is killed or their nights run out (then it lifts unseen).
+func _on_balance_threat(town: String, kind: String, on: bool) -> void:
+	if World.towns == null:
+		return
+	if on:
+		_raise_threat(town, kind, BALANCE_HOLDER)
+	else:
+		World.towns.release_threat(town, BALANCE_HOLDER)
 
 
 ## Server, the zone World is in: a town's wolves of a night (decision 761,
@@ -9237,6 +9250,8 @@ func _threats_seen() -> void:
 
 ## [param town]'s threat raised or kept up (762); every peer told when it
 ## comes ("town" "threat").
+const BALANCE_HOLDER := "balance"
+
 func _raise_threat(town: String, kind: String, holder := "") -> void:
 	var before := World.towns.threatened(town)
 	World.towns.raise_threat(town, kind, holder)

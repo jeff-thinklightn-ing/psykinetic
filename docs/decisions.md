@@ -38313,6 +38313,14 @@ gold), no sheep counted while wolves are out as bodies, Herds.fed, saved and loa
 Server only; no player sees it in a real level (no bullet); protocol unchanged; new class_name
 Balance.
 
+761, npc's side (release's label; economy's and the coordinator's OK): the quest's town wolves hold
+the town's threat (762). Main._make_balance connects Balance.threat_changed to
+Main._on_balance_threat: on, Main._raise_threat(town, kind, "balance") (762: raised, every peer told);
+off (the last town wolf killed, or their nights run out), Towns.release_threat(town, "balance") (762),
+and the threat lifts once unseen for THREAT_CLEAR_HOURS as any other. Both are saved, so a restart
+keeps them together. resident_test _test_threat: the signal raises it, it holds unseen, and lifts
+once let go. Server only, no bullet, protocol unchanged, no new class_name.
+
 ## 763. Safe paths: each level's roads and tracks, for what keeps off them
 
 Jeff (2026-11-01, roadmap "How it plays"): "zones need to have safe paths with activities not too

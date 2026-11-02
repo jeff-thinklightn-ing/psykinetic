@@ -851,6 +851,18 @@ func _test_threat() -> void:
 	World.towns.release_threat(STORE, "rs-pack")
 	_main._sync_residents()
 	_check(World.towns.threatened(STORE).is_empty(), "let go, unseen: lifted")
+	# The balance quest's town wolves (761, npc's side): Balance.threat_changed holds it up.
+	if World.balance != null:
+		World.balance.threat_changed.emit(STORE, "wolves", true)
+		_check(World.towns.threatened(STORE) == "wolves", "the balance's wolves at the town: a wolves threat")
+		World.towns._towns[STORE]["threat"]["seen"] = World.towns.now() - clear - 1
+		_main._sync_residents()
+		_check(World.towns.threatened(STORE) == "wolves", "held by the balance: it stays, unseen")
+		World.balance.threat_changed.emit(STORE, "wolves", false)
+		_main._sync_residents()
+		_check(World.towns.threatened(STORE).is_empty(), "the balance's wolves gone: lifted")
+	else:
+		_check(false, "(World.balance made at boot)")
 	# Night: one abed under his roof sleeps on through it.
 	DayNight.set_hour(1.0)
 	World.towns.lift_threat(STORE)
