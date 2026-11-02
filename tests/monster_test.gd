@@ -4501,6 +4501,15 @@ func _test_deer_hunted() -> void:
 			heeded = heeded or doe.alert != Monster.Alert.IDLE
 		World.try_move(hunter, Vector2i(1, 0))
 	_check(heeded and hunter.tile.x < 19, "walked up on, she hears it first (at %d)" % hunter.tile.x)
+	# Cornered: along the wall, not standing (playtest's doe stood 4 minutes).
+	pair = setup.call(14, Vector2i(1, 1), Vector2i(2, 2))
+	doe = pair[0]
+	hunter = pair[1]
+	var far := World.distance(doe.tile, hunter.tile)
+	for i in 40:
+		World.step()
+		far = maxi(far, World.distance(doe.tile, hunter.tile))
+	_check(far >= 4, "in a corner, the hunter at her side, she slips along the wall and away (%d off at most)" % far)
 	DayNight.reset()
 	_indoors()
 	Monster.idling = true

@@ -38562,10 +38562,13 @@ but a careful player can take a deer (drafts). Phase 1, enemy-ai, server sim onl
   is not. Found at its side unawares (NOTICE_ALWAYS, not struck, not already wary), prey stands
   startled STARTLE_TICKS (5) before it bolts: the time for one blow. Scent (downwind, 316) and
   cover (508) work as before.
+- Cornered prey slips along the wall (Animal._flee_goal): with no cell straight away from the
+  threat, the free cell of a few every way round that keeps it farthest off, never nearer (a doe
+  in a map corner had stood 4 minutes a cell from playtest's hunter). A boar's stays Monster's.
 Phase 2 (approved in principle; rides v0.1.199's revision 45): a drawn blood trail from a wounded
 deer's cells and a lying pose for one down (pc-character's), as "764 amended" or a tree's side.
 Phase 3 later: companions driving deer.
 monster_test _test_deer_hunted (the burst and trot, a wounded rest, the bleed never to death, down
-and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard),
+and up again, a slow stalk unheard to her side then the start and the bolt, a hurried one heard, a cornered one away along the wall),
 _test_clank (a slow step unheeded, a hurried one turns it). Server only; protocol unchanged; no
 new class_name.
