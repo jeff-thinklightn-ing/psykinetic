@@ -323,6 +323,8 @@ func _init() -> void:
 	# the card and the hail read person; set on the server after the spawn, so on change carries them.
 	replicate("trade")
 	replicate("person")
+	# Its town under a threat (762 amended, ui's side): the talk bar offers no Barter (Main._sheltering_seen).
+	replicate("sheltering")
 	move_ticks = 3.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 

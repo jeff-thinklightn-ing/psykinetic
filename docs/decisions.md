@@ -38491,6 +38491,18 @@ hail and lamp checks):
 - it is in the towns' record the snapshot saves.
 zone_test _test_restart: a held threat survives the restart. return_test: the temple under a
 threat. Server and client, protocol unchanged, no new class_name.
+
+762 amended (ui; playtest during a wolf threat: Snagfin's talk bar offered Barter, and the click
+was refused "stays behind a barred door"). The bar's Barter was hidden by _threat_near, which reads
+World.holdings, and only the server builds those (Main._boot): on a joined client it was always
+"", and an outpost's counter away from its store (Snagfin's fort) is outside HOME_TILES anyway.
+Resident.sheltering, which Main already sets each sync from the resident's own town, is now
+replicated (npc's resident.gd, with their leave; SUBCLASS_REPLICATED). Main._sheltering_seen reads it,
+with _threat_near kept for the server, in _barters and _update_bar: no Barter while the server
+says the town is under threat, and his sheltering line on a click is enough. It means the town is
+threatened, not that the body is indoors (the guard who turns out has it too): never draw by it.
+resident_test _test_threat: with no holdings, as a joined client, his flag alone hides Barter.
+Server and client; the protocol rides revision 45 (unshipped), its hash moved; no new class_name.
 ## 763, economy's side: wolf dens off the safe paths
 
 Jeff's safe-paths rule applied to the herds (the coordinator's ask): a predator's home sits at least

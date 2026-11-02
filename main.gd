@@ -1764,7 +1764,7 @@ func _update_bar() -> void:
 	if player != null and World.distance(player.tile, _bar_for.tile) > HEARING_RANGE:
 		_close_bar()
 		return
-	if _bar_barter.visible and (_asleep_seen(_bar_for) or not _threat_near(_bar_for.tile).is_empty()):
+	if _bar_barter.visible and (_asleep_seen(_bar_for) or _sheltering_seen(_bar_for)):
 		_bar_barter.visible = false  # Fallen asleep with the bar up (751 amended (2)), or a threat come (762).
 	var rect := bubbles.rect_of(_bar_for.get_instance_id())
 	if rect.size.y <= 0.0:
@@ -1795,7 +1795,7 @@ func _bar_talk_pressed() -> void:
 ## person (562; economy's rule: a trade in Items.TRADES, the medicine man
 ## too). Never one asleep (751 amended (2)): a sleeper doesn't trade.
 func _barters(resident: GridEntity) -> bool:
-	if _asleep_seen(resident) or not _threat_near(resident.tile).is_empty():
+	if _asleep_seen(resident) or _sheltering_seen(resident):
 		return false  # Asleep (751 amended (2)), or its town under a threat (762).
 	var trade := str(resident.get("trade")) if resident.get("trade") != null else ""
 	if trade == "merchant":
@@ -9583,6 +9583,18 @@ func _town_shelter(area: Dictionary, place_id: String) -> Rect2i:
 			best = rect
 			best_rank = rank
 	return best
+
+
+## Whether [param resident]'s town is under a threat (762 amended, ui's side;
+## playtest: Snagfin's bar offered Barter in a wolf threat and the click was
+## refused): the server's own flag, Resident.sheltering (Main sets it each sync
+## from the resident's own town, replicated), so a joined client, which has no
+## holdings for _threat_near, and an outpost's counter away from its store see
+## it too; on the server _threat_near as well.
+func _sheltering_seen(resident: GridEntity) -> bool:
+	if resident is Resident and (resident as Resident).sheltering:
+		return true
+	return not _threat_near(resident.tile).is_empty()
 
 
 ## The threat over the town whose ground [param cell] is in (762): a town

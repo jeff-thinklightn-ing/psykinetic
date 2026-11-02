@@ -813,6 +813,11 @@ func _test_threat() -> void:
 	_check(bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), "and goes indoors (at %s)" % [bram.tile])
 	_check(gunn.doing == Resident.Doing.SQUARE, "the guard turns out to the square, not indoors (%s)" % [gunn.doing])
 	_check(not _main._barters(bram), "no Barter on the bar while it holds")
+	# 762 amended, ui's side: a joined client has no holdings; the replicated flag alone hides Barter.
+	var holdings := World.holdings
+	World.holdings = null
+	_check(_main._threat_near(bram.tile).is_empty() and not _main._barters(bram), "as a joined client sees it (no holdings): his sheltering alone, no Barter")
+	World.holdings = holdings
 	var player := _player()
 	if player != null:
 		_put(player, _main._nearest_free(bram.tile + Vector2i(1, 0)))

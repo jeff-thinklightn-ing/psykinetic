@@ -507,13 +507,15 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## [x, y, seconds left, ...], gone: [x, y, ...], full}, a wounded beast's
 ## trail (World.blood), on arrival and on World.blood_changed; an old
 ## client draws a downed deer standing and no blood.
+## 45 (762 amended): Resident.sheltering (SUBCLASS_REPLICATED), its town under
+## a threat: the talk bar offers no Barter on a joined client (it had no holdings).
 const PROTOCOL_REVISION := 45
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
