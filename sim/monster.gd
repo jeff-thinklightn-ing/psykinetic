@@ -269,8 +269,10 @@ const IDLE_SEARCH_TILES := 400
 ## is not about home (and looking for it was most of a monster's first
 ## turn near a player).
 const ABOUT_SEARCH_PER_TILE := 2
-## How it is standing, for the views: SIT at a gathering.
-enum Pose { STAND, SIT }
+## How it is standing, for the views: SIT at a gathering (an animal's
+## graze); DOWN an animal lying hurt (decision 764: a wounded deer down, to
+## be finished; a view lays it on its side). Replicated as `pose`.
+enum Pose { STAND, SIT, DOWN }
 ## The eight ways round, clockwise from north (for glances).
 const AROUND: Array[Vector2i] = [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1),
 	Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)]

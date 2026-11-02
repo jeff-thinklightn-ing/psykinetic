@@ -4463,11 +4463,11 @@ func _test_deer_hunted() -> void:
 	var hunter: GridEntity = pair[1]
 	for i in 60:
 		World.step()
-	_check(World.tick < doe._down_until and doe.tile == down_at and doe.pose == Monster.Pose.SIT,
+	_check(World.tick < doe._down_until and doe.tile == down_at and doe.pose == Monster.Pose.DOWN,
 			"low, she goes down after her burst and stays down")
 	for i in Animal.DOWN_TICKS:
 		World.step()
-	_check(doe._down_until < 0, "left be, she gets up in time")
+	_check(doe._down_until < 0 and doe.pose != Monster.Pose.DOWN, "left be, she gets up in time")
 	# A slow stalk from behind: unheard to her side, a start, then she bolts.
 	pair = setup.call(14, Vector2i(20, 3), Vector2i(14, 3))
 	doe = pair[0]
