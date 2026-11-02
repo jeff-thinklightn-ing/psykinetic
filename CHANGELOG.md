@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Struck game cries out: a deer barks or bleats, a stag bellows and a rabbit squeals when hit and not killed (764 amended (4)).
 - A vendor sheltering from wolves or raiders no longer offers Barter on a joined game, the outpost's too: his line is enough (762 amended).
 - A badly hurt deer lies down on its belly, head up and breathing, and gets up again if left (only a dead one lies on its side), and a wounded animal leaves a trail of blood on the ground that fades after a few minutes (764 amended).
 

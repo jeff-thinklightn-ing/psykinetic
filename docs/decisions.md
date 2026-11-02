@@ -38711,3 +38711,25 @@ The deer, stag, boar and rabbit all fold (view_test _test_creature_down: four le
 neck, the trunk on the ground, each lower leg along it, the neck up; the deer's down, up, blow,
 death and first sight). Stills C:/dev/review/deer764/deer_down.png. Client only; DOWN's value is
 enemy-ai's wire change (rev 45), and without it this side draws nothing new. No new class_name.
+764 amended (4) (release's label; the coordinator's ask, the hook agreed with enemy-ai):
+- Game cries out when struck and not killed: a doe barks or bleats (sfx.deer_struck), a stag
+  bellows (sfx.stag_struck, its own; it falls back to the doe's), a rabbit squeals
+  (sfx.rabbit_struck). The cry is client-only, from Client3D._pain, which every blow already
+  reaches (the struck news; an arrow's as it arrives). Its trigger is an Animal whose kind has a
+  "sfx.<kind>_struck" slot (SoundKit.struck) and hp above 0; a kill sounds its _death slot
+  instead. A deer felled or struck while down cries on each blow. The boar keeps its charge
+  squeal and the wolf none. The herd's alarm stays the sim's (Animal._alarm_herd, a reach check),
+  so there is no cry kind, no message and no protocol change. The slots are placed and heard 24
+  cells, past a bow's reach, and are not a monster's noise.
+- An arrow striking game already sounds (sfx.arrow_hit_flesh, Client3D._on_struck, cause shot).
+- Takes from Freesound. The doe has two real barks (569926, Spamanator, CC0) and two bleat calls
+  (696776 and 696775, ferventtorpor, CC0). The stag has two red deer roars (104580 and 104581,
+  dobroide, CC BY 4.0). Freesound holds no rabbit scream under CC0 or CC BY, so the rabbit has
+  two rodent squeals slowed to 0.85 for a larger animal (288941, toefur, CC0) and a guinea pig's
+  squeal (815837, TheKingOfGeeks360, CC0). Peaks are about -4 dBFS.
+- tools/sound_take.ps1's -PeakDb measurement now trims the cut inside the filter
+  (atrim=duration), not with an output -t. astats saw whole decoded packets past a short cut's
+  end, so a louder peak just after it left the take quieter than asked: a 0.45 s bleat came out
+  at -10 dBFS for -4. It only ever erred quieter, never clipped.
+sound_kit_test (the kinds that cry, the slots' reach and takes). Client only; protocol
+unchanged; no new class_name.

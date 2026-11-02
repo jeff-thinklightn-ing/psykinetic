@@ -396,6 +396,16 @@ static func cry(creature: String, cry_kind: String) -> String:
 	return slot if has(slot) else ""
 
 
+## The slot [param creature] (a monster's kind) cries with, struck and not
+## killed (764): a doe's bleat, a stag's own bellow, a rabbit's squeal; ""
+## for a kind with none (a boar charges instead, a wolf fights).
+static func struck(creature: String) -> String:
+	for kind: String in [creature, creature_slot_name(creature)]:
+		if has("sfx.%s_struck" % kind):
+			return "sfx.%s_struck" % kind
+	return ""
+
+
 ## The slot for a [param creature] (a monster's kind) dying: its own, else
 ## the goblin's.
 static func death(creature: String) -> String:

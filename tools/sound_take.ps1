@@ -103,11 +103,14 @@ if ($PeakDb -lt 0) {
 	$measure = @('-hide_banner', '-nostats')
 	if ($Start -ge 0) { $measure += @('-ss', "$Start") }
 	$measure += @('-i', $Source)
-	if ($Length -gt 0) { $measure += @('-t', "$Length") }
+	# The cut trimmed in the filter, not by -t: astats sees whole decoded packets
+	# before an output -t trims them, so a short cut was measured up to a packet
+	# past its end, a louder peak there leaving the take quieter than asked (764).
+	$window = if ($Length -gt 0) { "atrim=duration=$Length," } else { '' }
 	$ErrorActionPreference = 'Continue'
 	# astats, not volumedetect: volumedetect reads at 16 bits, so a float
 	# source over full scale measured 0 dB and its take kept the overshoot.
-	$report = (& ffmpeg @measure -af astats=measure_perchannel=none -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
+	$report = (& ffmpeg @measure -af "${window}astats=measure_perchannel=none" -f null - 2>&1 | ForEach-Object { "$_" }) -join "`n"
 	$ErrorActionPreference = 'Stop'
 	if ($report -notmatch 'Peak level dB: (-?[\d.]+)') { Fail "couldn't measure $Source's peak" }
 	$gain = ",volume=$($PeakDb - [double]$Matches[1])dB"

@@ -120,6 +120,14 @@ func _test_noises_are_the_sims() -> void:
 			"cries by kind: a wolf's call a howl, a goblin's its alert, a stag bolts as a deer, a boar charges")
 	_check(SoundKit.cry("deer", "suspicious") == "sfx.deer_snort" and SoundKit.cry("stag", "suspicious") == "sfx.deer_snort"
 			and SoundKit.cry("imp", "suspicious") == "", "a deer or stag snorts as its head comes up; a goblin says nothing")
+	_check(SoundKit.struck("deer") == "sfx.deer_struck" and SoundKit.struck("stag") == "sfx.stag_struck"
+			and SoundKit.struck("rabbit") == "sfx.rabbit_struck" and SoundKit.struck("boar") == ""
+			and SoundKit.struck("wolf") == "" and SoundKit.struck("imp") == "",
+			"game struck cries out (764): a doe, a stag its own, a rabbit; a boar, a wolf and a goblin not")
+	for slot: String in ["sfx.deer_struck", "sfx.stag_struck", "sfx.rabbit_struck"]:
+		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and SoundKit.reach(slot) > shot
+				and SoundKit.takes(slot).size() >= 2,
+				"%s: placed, heard past a bow's reach (%d cells), not a monster's noise, takes of its own" % [slot, SoundKit.reach(slot)])
 	_check(SoundKit.reach("sfx.boar_charge") == Animal.NOISE_CHARGE and SoundKit.reach("sfx.wolf_howl") == Senses.NOISE_CALL,
 			"a charge carries Animal.NOISE_CHARGE, a howl the call's")
 	_check(SoundKit.death("rabbit") == "sfx.rabbit_death" and SoundKit.death("stag") == "sfx.deer_death" and SoundKit.death("brute") == "sfx.goblin_death",

@@ -988,6 +988,44 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.deer_struck": [
+			{
+				"file": "sfx.deer_struck.ogg",
+				"from": "freesound",
+				"original": "freesound 569926: Deer barking.m4a (from 3 s for 0.75 s)",
+				"sha256": "5b4f10b9ac2e1c313f8ce8b24f8bcd439e8c12cb29ff1424835110f163a8860f",
+				"by": "Spamanator",
+				"url": "https://freesound.org/people/Spamanator/sounds/569926/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_struck.2.ogg",
+				"from": "freesound",
+				"original": "freesound 569926: Deer barking.m4a (from 8.6 s for 0.75 s)",
+				"sha256": "d30f8864d9e342b397a00a2b6eb5937375a592bba590644ae2ef6b05aef616ba",
+				"by": "Spamanator",
+				"url": "https://freesound.org/people/Spamanator/sounds/569926/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_struck.3.ogg",
+				"from": "freesound",
+				"original": "freesound 696776: Deer_Bark_5_s (from 0.16 s for 0.45 s)",
+				"sha256": "054a1c1a23c78ca68fedb0a12f67aa7ad112c982d7f3a410e123393213e2697f",
+				"by": "ferventtorpor",
+				"url": "https://freesound.org/people/ferventtorpor/sounds/696776/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.deer_struck.4.ogg",
+				"from": "freesound",
+				"original": "freesound 696775: Deer Call_2_s (from 0 s for 0.44 s)",
+				"sha256": "b81ff74fc822756bb54c0ce409db11f099de91c82ed8988f2261f19b4860adf1",
+				"by": "ferventtorpor",
+				"url": "https://freesound.org/people/ferventtorpor/sounds/696775/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.door_wood_bar": [
 			{
 				"file": "sfx.door_wood_bar.ogg",
@@ -1781,6 +1819,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.rabbit_struck": [
+			{
+				"file": "sfx.rabbit_struck.ogg",
+				"from": "freesound",
+				"original": "freesound 288941: rat-squeak.wav (from 0.27 s for 0.4 s) at 0.85 speed",
+				"sha256": "a5efbc95bb6cb41dda855722ad13781c2da40758b14bb8f572b5f9cb281b5e60",
+				"by": "toefur",
+				"url": "https://freesound.org/people/toefur/sounds/288941/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.rabbit_struck.2.ogg",
+				"from": "freesound",
+				"original": "freesound 288941: rat-squeak.wav (from 0.76 s for 0.46 s) at 0.85 speed",
+				"sha256": "998c45e40825e3b6922787e3f1286e8a0d5367d78dec4e90df3b04526f6ba42b",
+				"by": "toefur",
+				"url": "https://freesound.org/people/toefur/sounds/288941/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.rabbit_struck.3.ogg",
+				"from": "freesound",
+				"original": "freesound 815837: Rodents - American Guinea Pig, Squealing, Close Perspective (from 0.55 s for 0.6 s)",
+				"sha256": "1d562846aa16fb83708152f7a8e94920f1fb8083d1ed096c54cdd7a11d513ed8",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/815837/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.slab_grind": [
 			{
 				"file": "sfx.slab_grind.ogg",
@@ -1819,6 +1886,26 @@
 				"by": "genel",
 				"url": "https://freesound.org/people/genel/sounds/482953/",
 				"license": "CC0 1.0"
+			}
+		],
+		"sfx.stag_struck": [
+			{
+				"file": "sfx.stag_struck.ogg",
+				"from": "freesound",
+				"original": "freesound 104580: 201009.deer.roar.01.wav (from 1.15 s for 1.6 s)",
+				"sha256": "cf7efbe1bb784c8d06a8bbce15f4ccec0962d63198f716759fbde3b1d097247f",
+				"by": "dobroide",
+				"url": "https://freesound.org/people/dobroide/sounds/104580/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.stag_struck.2.ogg",
+				"from": "freesound",
+				"original": "freesound 104581: 201009.deer.roar.02.wav (from 0.88 s for 1.6 s)",
+				"sha256": "00fe45be62bd7b773127a94c4bfeb69d074223a0932e5a9d43ecf44a836bd1cd",
+				"by": "dobroide",
+				"url": "https://freesound.org/people/dobroide/sounds/104581/",
+				"license": "CC BY 4.0"
 			}
 		],
 		"sfx.swing": [

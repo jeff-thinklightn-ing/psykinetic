@@ -1065,6 +1065,34 @@
 			"uses": "a wolf killed (Client3D._fall)",
 			"fallback": "sfx.knockback_body_soft"
 		},
+		"sfx.deer_struck": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 24,
+			"volume_db": 0.0,
+			"uses": "a doe struck and not killed: a bleat or bark, heard past a bow's reach (764; Client3D._pain)"
+		},
+		"sfx.stag_struck": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 24,
+			"volume_db": 0.0,
+			"uses": "a stag struck and not killed: a deep bellow, heard past a bow's reach (764; Client3D._pain)",
+			"fallback": "sfx.deer_struck"
+		},
+		"sfx.rabbit_struck": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 24,
+			"volume_db": 0.0,
+			"uses": "a rabbit struck and not killed: a squeal, heard past a bow's reach (764; Client3D._pain)"
+		},
 		"sfx.footstep_hooves": {
 			"category": "movement",
 			"type": "oneshot",

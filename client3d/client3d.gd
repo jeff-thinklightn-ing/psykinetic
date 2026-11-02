@@ -15255,6 +15255,13 @@ func _pain(struck: GridEntity, puppet: Node3D) -> void:
 		sfx.play(voice, puppet.position + Vector3.UP * 1.5)
 		return
 	var creature := str(puppet.get_meta("creature", ""))
+	if struck is Animal and struck.hp > 0:
+		# Game cries out struck (764): a doe's bleat, a stag's bellow, a rabbit's
+		# squeal; its herd is alarmed in the sim. A kill sounds its death instead.
+		var cry := SoundKit.struck(creature)
+		if cry != "":
+			sfx.play(cry, puppet.position + Vector3.UP * 0.8)
+		return
 	if struck is Monster and not struck is Animal and creature in SoundKit.GOBLINS and randi() % PAIN_EVERY == 0:
 		sfx.play("sfx.goblin_pain", puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
 
