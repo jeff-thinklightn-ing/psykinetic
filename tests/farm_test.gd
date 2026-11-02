@@ -903,6 +903,8 @@ func _test_herders() -> void:
 		"a herder at the hut, with 4 sheep of his own; outside any town's purse (%s)" % [work.worker(who)])
 	tick_to.call(_now + int(rule["every"]) * day + World.WORLD_TICK_STEPS)
 	_check(sold.is_empty() and stock.count(HUT, "sheep") == 4, "no town with a butchery: no drove")
+	_check(towns.drove_town(HUT) == "" and towns.fold_town(HUT) == STORE,
+		"no butchery: the fold still answers to the nearest town (761's wolves) (%s)" % towns.fold_town(HUT))
 	towns._town(STORE)["buildings"]["butchery"] = {"kind": "butchery", "level": 1, "state": Towns.STANDING, "since": _now, "job": 0}
 	_check(towns.drove_town(HUT) == STORE, "the town with a butchery buys")
 	pays[0] = 1

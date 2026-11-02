@@ -56,6 +56,8 @@ func _ready() -> void:
 	_test_no_wolves()
 	_test_path_dens()
 	_test_spread()
+	_test_short_days()
+	_test_seed_now()
 	for body in _bodies:
 		body.free()
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -84,6 +86,49 @@ func _test_spread() -> void:
 	_now = DAY
 	herds.tick()
 	_check(herds._building.has("meadow") and herds._ground.has("meadow") and herds.capacity("meadow", "deer") > 0.0, "a new day's ground built beside the last")
+
+
+## Days too short to build every area's ground in one (playtest's tour,
+## the coordinator's ask): a build the day's turn finds going goes on,
+## first queued first, so the last area by name is still seeded.
+func _test_short_days() -> void:
+	print("\n== short days: a ground's build goes on over the day's turn ==")
+	_now = 0
+	var rules := _rules.duplicate(true)
+	rules["ground_per_tick"] = 100
+	var herds := _herds(rules)
+	var per_day := 5
+	var days := 0
+	while days < 60 and not herds.progress()["meadow"]["seeded"]:
+		for each in per_day:
+			_now = days * DAY + each * (DAY / per_day)
+			herds.tick()
+		days += 1
+	var state := herds.progress()
+	_check(state["meadow"]["seeded"] and state["fields"]["seeded"] and herds.groups_in("meadow").size() > 0,
+		"the last area seeded at %d ticks a day, by day %d" % [per_day, days])
+	_check(not state["cave"]["seeded"] or herds.groups_in("cave").is_empty(), "the cave still keeps none")
+	var going: Dictionary = herds.progress()["fields"]
+	_check(going.has("building") and float(going["building"]) <= 1.0, "progress says how far a build is (%s)" % [going])
+
+
+## Seeded now (the console's "herds seed", tours, tests): the ground built at
+## once and the groups made; once only; an indoor area none.
+func _test_seed_now() -> void:
+	print("\n== seeded now, not on the ticks' share ==")
+	_now = 0
+	var herds := _herds()
+	_check(not herds.progress()["meadow"]["seeded"], "not seeded before a tick")
+	var made := herds.seed_now("meadow")
+	_check(made > 0 and made == herds.groups_in("meadow").size() and herds.progress()["meadow"]["seeded"],
+		"meadow seeded now: %d groups" % made)
+	_check(herds.seed_now("meadow") == 0 and herds.groups_in("meadow").size() == made, "seeded once only")
+	_check(herds.seed_now("cave") == 0 and herds.groups_in("cave").is_empty(), "the cave keeps none")
+	_check(herds.seed_now("nowhere") == 0, "no such area: nothing")
+	var count := _sum(herds, "meadow")
+	_tick(herds)
+	_check(is_equal_approx(_sum(herds, "meadow"), count) and herds.progress()["fields"]["seeded"],
+		"the ticks after seed the rest and leave meadow as it was")
 
 
 func _herds(rules := _rules, saved := {}) -> Herds:

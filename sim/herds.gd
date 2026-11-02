@@ -80,8 +80,10 @@ var _ground: Dictionary = {}
 ## Area -> its sampled floor cells, sorted (the floor never changes).
 var _samples: Dictionary = {}
 ## Area -> the ground being built: {keys (the floor's, while sampling),
-## key_at, at (the next sample to weigh), out}.
+## key_at, at (the next sample to weigh), out, queued (its place in line)}.
 var _building: Dictionary = {}
+## The next build's place in line: builds go first come, first built.
+var _queued := 0
 ## Area -> what camps and hunters may still take from it today (take_share
 ## of its spare at the day's start).
 var _budget: Dictionary = {}
@@ -263,8 +265,9 @@ func _ground_of(area: String) -> Dictionary:
 
 ## Starts [param area]'s ground again, the one it has kept meanwhile.
 func _rebuild(area: String) -> void:
-	_building[area] = {"keys": [], "key_at": 0, "at": 0,
+	_building[area] = {"keys": [], "key_at": 0, "at": 0, "queued": _queued,
 		"out": {"cells": [] as Array[Vector2i], "weights": [] as Array[float], "total": 0.0}}
+	_queued += 1
 
 
 ## Builds [param area]'s ground by up to [param budget] samples weighed
@@ -314,13 +317,17 @@ func _build_ground(area: String, budget: int) -> bool:
 	return true
 
 
-## Each area's ground built on by this tick's share, areas in order: a
-## floor still to sample takes the tick; an area is seeded when its first
-## ground is done.
+## Each area's ground built on by this tick's share, first queued first
+## (a build the day's turn found going keeps its place and its work, so a
+## short day never starves the last areas): a floor still to sample takes
+## the tick; an area is seeded when its first ground is done.
 func _build_grounds() -> void:
 	var left := maxi(int(rules.get("ground_per_tick", DEFAULT_GROUND_PER_TICK)), 1)
 	var building: Array = _building.keys()
-	building.sort()
+	building.sort_custom(func(a: String, b: String) -> bool:
+		var at_a := int(_building[a].get("queued", 0))
+		var at_b := int(_building[b].get("queued", 0))
+		return at_a < at_b or at_a == at_b and a < b)
 	for area: String in building:
 		var sampled := _samples.has(area)
 		var from := int(_building[area]["at"])
@@ -346,8 +353,11 @@ func tick() -> void:
 	var day := steps / day_steps
 	if day != _day:
 		_day = day
-		for area: String in areas:
-			_rebuild(area)  # Holdings move: the ground again, once a day.
+		var names: Array = areas.keys()
+		names.sort()
+		for area: String in names:
+			if not _building.has(area):
+				_rebuild(area)  # Holdings move: the ground again, once a day; one going goes on.
 		_daily(day)
 		_new_budgets()
 	_build_grounds()
@@ -547,6 +557,33 @@ func hunt_one(area: String, near: Vector2i) -> String:
 	each["made"] = int(each["made"]) + 1
 	_budget[area] = float(_budget[area]) - 1.0
 	return _kind_for(best, "%s_%d" % [each["id"], int(each["made"])])
+
+
+## [param area]'s ground built now and, if it never was, its first groups
+## (the console's "herds seed", tours and tests: not waiting on the ticks'
+## share). The groups seeded now; 0 if it was seeded before or keeps none.
+func seed_now(area: String) -> int:
+	if not areas.has(area) or _seeded.has(area):
+		return 0
+	_seed(area)  # Its ground built at once (_ground_of) if none was yet.
+	return groups_in(area).size()
+
+
+## Each area: whether it is seeded, and how far its ground's build is (the
+## console's "herds"): area -> {seeded, built (a first ground done),
+## building (0..1 of the build going, -1 for none)}.
+func progress() -> Dictionary:
+	var out := {}
+	for area: String in areas:
+		var share := -1.0
+		if _building.has(area):
+			var build: Dictionary = _building[area]
+			if _samples.has(area):
+				share = float(build["at"]) / maxf(float(_samples[area].size()), 1.0)
+			else:
+				share = 0.0
+		out[area] = {"seeded": _seeded.has(area), "built": _ground.has(area), "building": share}
+	return out
 
 
 ## [param area] given its first groups: each species to seed of its

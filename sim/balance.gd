@@ -424,6 +424,8 @@ func _judge(fold: Dictionary) -> void:
 	var each: Dictionary = _quests[id]
 	var result := outcome(id)
 	var town := str(each["town"])
+	if town.is_empty():
+		town = str(fold.get("town", ""))  # Asked before the fold had a town (an old save): its town now.
 	var farmer := str(fold.get("farmer", ""))
 	if result == "balanced":
 		var thrive: Dictionary = rules.get("thrive", {})

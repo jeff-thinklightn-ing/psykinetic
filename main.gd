@@ -6054,10 +6054,12 @@ func _make_balance(saved: Dictionary) -> void:
 		if World.towns == null or World.holdings == null:
 			return out
 		var trade := str(World.towns.rules.get("herder", {}).get("trade", "herder"))
+		# Its drove's town, else the nearest (a world with no butchery yet still has one).
+		var routes: WorldRoutes = World.raid_groups.routes if World.raid_groups != null else null
 		for id: String in World.towns.folds():
 			var place := World.holdings.place(id)
 			out.append({"id": id, "area": str(place.get("area", "")), "cell": place.get("cell", Vector2i.ZERO),
-				"town": World.towns.drove_town(id), "farmer": str(World.production.worker("%s:%s" % [trade, id]).get("name", ""))})
+				"town": World.towns.fold_town(id, routes), "farmer": str(World.production.worker("%s:%s" % [trade, id]).get("name", ""))})
 		return out
 	World.balance.remove = func(area: String, cell: Vector2i, uid: int, why: String) -> bool:
 		var there: Zone = World.zones.get(area)
@@ -18296,6 +18298,7 @@ const CONSOLE_HELP: Array[String] = [
 	"zone reset <name>: that zone rebuilt from its map",
 	"zone move <player> <zone>: that player and their companion to that zone's start",
 	"gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said)",
+	"herds [seed <area>|all]: each area's game, seeded or its ground still building; or seeded now",
 	"move <player> <x> <y> [zone] | move <player> <building code> [zone]: a player to a cell",
 	"mark <player> <mark>|-<mark>: a mark on a player, or one taken off",
 	"reset: this room rebuilt from its map",
@@ -18465,9 +18468,43 @@ func admin_command(line: String, caller: Player = null) -> String:
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"gold":
 			return _gold_command(words)
+		"herds":
+			return _herds_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
+
+
+## "herds [seed <area>|all]": each area's game, seeded or how far its ground's
+## build is; with seed, an area (or every one) seeded now, its ground built at
+## once (tours and tests: the ticks' share takes a long while over every area).
+func _herds_command(words: PackedStringArray) -> String:
+	if World.herds == null:
+		return "herds: none"
+	var state := World.herds.progress()
+	var names: Array = state.keys()
+	names.sort()
+	if words.size() >= 2 and words[1].to_lower() == "seed":
+		if words.size() < 3:
+			return "usage: herds seed <area>|all"
+		var wanted: Array = names if words[2].to_lower() == "all" else [words[2]]
+		var done: Array[String] = []
+		for area: String in wanted:
+			if not state.has(area):
+				done.append("no area %s" % area)
+			elif bool(state[area]["seeded"]):
+				done.append("%s: seeded before" % area)
+			else:
+				done.append("%s: seeded now, %d groups" % [area, World.herds.seed_now(area)])
+		return "\n".join(done)
+	var lines: Array[String] = []
+	for area: String in names:
+		var each: Dictionary = state[area]
+		var building := float(each["building"])
+		var going := " (ground %d%% built)" % roundi(building * 100.0) if building >= 0.0 else ""
+		lines.append("%s: %s, %d groups%s" % [area, "seeded" if each["seeded"] else "not seeded",
+			World.herds.groups_in(area).size(), going])
+	return "\n".join(lines) if not lines.is_empty() else "herds: no areas"
 
 
 ## "gold <player or id prefix> <amount> [why]" (decision 709): the admin gives

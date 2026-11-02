@@ -38485,3 +38485,23 @@ monster_test _test_balance_wolves: the meat smelt 10 off and eaten; fed, the fol
 bold and one sheep a night; a town's wolf at the store takes one thing past a player it lets be, and
 killed is one fewer to come. Server only (the props reach clients in the spawn spec, unused there);
 protocol unchanged; no new class_name.
+
+761, economy's side (2) (release's label; the coordinator's ask, from playtest's balance tour): two
+snags.
+- The herds' ground build (469) started every area again on each new day, sampling and weighing
+  thrown away, and went through areas by name. On days too short to build them all, the last areas
+  (the hills) were never seeded. Now the day's turn starts a build only for an area with none
+  going, and builds go first queued, first built (Herds._building's "queued"), so a build is never
+  restarted and every area is reached. The box already seeds every outdoor area (its journal's
+  "seeded" lines name all six), so players see nothing new: no bullet. Herds.seed_now(area) builds
+  an area's ground at once and seeds it if it never was. Herds.progress() gives each area's seeded,
+  built and how far its build is. The console's "herds [seed <area>|all]" shows and uses them, so a
+  tour or test needn't wait on the ticks' share.
+- A fold's town was Towns.drove_town, a town with a standing butchery. A world with none gave the
+  quest no town, and a "badly" ending sent its wolves nowhere. Towns.fold_town(id, routes) is the
+  drove's town, else the nearest town store (Holdings.ranked over the raid routes; with none, the
+  fold's own area by the crow), else the first town by id. Main's folds use it. A quest asked with
+  no town (an old save) takes the fold's town when it is judged.
+herds_test _test_short_days (5 ticks a day, 100 a tick: the last area seeded by day 21) and
+_test_seed_now; farm_test (no butchery: the fold answers to the town). Server only; protocol
+unchanged; no new class_name; no bullet.

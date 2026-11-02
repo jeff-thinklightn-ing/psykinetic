@@ -1463,6 +1463,25 @@ func drove_town(id: String) -> String:
 	return str(towns[0]) if not towns.is_empty() else ""
 
 
+## The town herder place [param id] answers to (decision 761: the keep-the-
+## balance quest's town, the one its wolves come to): its drove's
+## (drove_town), else the town store nearest it ([param routes] as
+## Holdings.nearest walks them; none, its own area's by the crow), else the
+## first town by id; "" only in a world with no town.
+func fold_town(id: String, routes: WorldRoutes = null) -> String:
+	var town := drove_town(id)
+	if not town.is_empty() or production.holdings == null:
+		return town
+	var place := production.holdings.place(id)
+	for near: String in production.holdings.ranked(["stockpile"] as Array[String], str(place.get("area", "")),
+			place.get("cell", Vector2i.ZERO), routes):
+		if is_town(near):
+			return near
+	var ids: Array = _towns.keys().filter(func(each: String) -> bool: return each != id and is_town(each))
+	ids.sort()
+	return str(ids[0]) if not ids.is_empty() else ""
+
+
 ## The herders' folds in [param area_name] (every area: ""): place id ->
 ## its sheep at home (640, the "folds" message).
 func folds(area_name := "") -> Dictionary:
