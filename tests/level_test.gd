@@ -220,6 +220,7 @@ func _test_every_level() -> void:
 	_test_herders()
 	_test_forest_healer()
 	_test_world_plane()
+	_test_safe_paths()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -943,6 +944,30 @@ func _test_forest_healer() -> void:
 	var into := World.find_path(front, inside, true)
 	_check(not path.is_empty() and not into.is_empty(), "its door walked to from the start (%d steps) and in (%d)" % [path.size(), into.size()])
 	_main.load_map("test_room")
+
+
+func _test_safe_paths() -> void:
+	print("
+== safe paths (763, Level.safe_paths): roads and dirt tracks, not patches or banks ==")
+	var areas := WorldMap.build().areas
+	var counts := {}
+	for land: String in ["wilds", "hills", "forest", "foothills", "held"]:
+		counts[land] = (areas[land].get("safe_paths", {}) as Dictionary).size()
+	var wilds: Dictionary = areas["wilds"]["safe_paths"]
+	var hills: Dictionary = areas["hills"]["safe_paths"]
+	var forest := Level.load_level("forest")
+	var dirt := 0
+	var floor := {}
+	for cell: Vector2i in forest["terrain"]["floor"]:
+		floor[cell] = true
+	for cell: Vector2i in forest["terrain"]["kinds"]:
+		if forest["terrain"]["kinds"][cell] == "dirt" and floor.has(cell):
+			dirt += 1
+	_check(wilds.has(Vector2i(185, 95)) and not wilds.has(Vector2i(13, 227)) and wilds.size() > 1400,
+		"the wilds: a track's cell a path, a cleared patch's not (%s)" % [counts])
+	_check(not hills.has(Vector2i(91, 149)) and hills.size() >= 431 and hills.size() < 480,
+		"the hills: the road, not the river's dirt bank (%d)" % hills.size())
+	_check(counts["forest"] == dirt, "the forest, no road curves: all its dirt on its floor (%d of %d)" % [counts["forest"], dirt])
 
 
 func _test_world_plane() -> void:

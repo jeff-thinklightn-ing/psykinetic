@@ -38288,3 +38288,25 @@ gold), no sheep counted while wolves are out as bodies, Herds.fed, saved and loa
 
 Server only; no player sees it in a real level (no bullet); protocol unchanged; new class_name
 Balance.
+
+## 763. Safe paths: each level's roads and tracks, for what keeps off them
+
+Jeff (2026-11-01, roadmap "How it plays"): "zones need to have safe paths with activities not too
+far off the paths". maps' audit (C:/dev/review/lands/safe_paths, report only) measured every land
+against it; this gives the game the same paths at run time.
+
+- **Level.safe_paths(terrain)**, from a parsed level: its road curves' cells on its floor, and
+  the layout's dirt tracks. A track is dirt a 3 x 3 opening takes away (thin, so not a cleared
+  patch), not within 2 cells of anything not floor (so not a river's or a pool's dirt bank), in
+  8-connected runs of Level.TRACK_RUN (40) cells or more. A level with no road curves (the
+  forest, its paths laid as dirt) has all its dirt for paths.
+- **WorldMap** keeps each area's as areas[area]["safe_paths"] (Dictionary[Vector2i, bool]),
+  made once when the area is parsed (its digest cache, 303). Regen-laid levels keep their own
+  extras "paths" (not merged; nothing outdoors).
+- **Who reads it:** economy's Herds keeps a den's home 8 cells off them (its side, citing this).
+  Later, what should sit near them (the audit's 25-cell walk) can be checked from the same cells.
+- level_test: the wilds' tracks in and its cleared patches out, the hills' road without its
+  river's dirt banks, the forest's dirt whole; counts as the audit's (wilds 1490, hills 432,
+  forest 2155, foothills 225, held 426).
+
+Server side; protocol unchanged; no new class_name; no level changes; no CHANGELOG bullet.

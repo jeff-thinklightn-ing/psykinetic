@@ -62,6 +62,8 @@ const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vecto
 ## its players to the level's own arrival, its zone's saved section, its
 ## generation and its herds dropped (laid and seeded again from the level).
 ## A new remake of one bumps its number.
+## A dirt track this many cells long or more is a safe path (safe_paths).
+const TRACK_RUN := 40
 const REMADE: Dictionary[String, int] = {"hills": 756, "forest": 760}
 ## Grey per height level in height.png.
 const GREY_PER_LEVEL := 40
@@ -1298,6 +1300,76 @@ static func markets_from(config: Dictionary, warnings: Array[String]) -> Diction
 			warnings.append("the market %s has no \"at\" cell" % [key])
 			continue
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", "the %s market" % key))}
+	return out
+
+
+## A level's safe paths (decision 763; Jeff: "zones need to have safe paths with
+## activities not too far off the paths"; maps' audit, C:/dev/review/lands/
+## safe_paths): its road curves' cells on its floor, and the layout's dirt
+## tracks: dirt a 3 x 3 opening takes away (thin, not a cleared patch), not
+## within 2 cells of anything not floor (a river's or pool's bank), in
+## 8-connected runs of TRACK_RUN cells or more. A level with no road curves
+## (the forest) has its dirt for paths. For what keeps off them (economy's
+## dens) and what should sit near them. From a parsed level's [param terrain].
+static func safe_paths(terrain: Dictionary) -> Dictionary[Vector2i, bool]:
+	var floor: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var out: Dictionary[Vector2i, bool] = {}
+	var roads: Array = terrain.get("roads", [])
+	for road: Dictionary in roads:
+		for cell: Vector2i in Curves.cells(road["curve"], false):
+			if floor.has(cell):
+				out[cell] = true
+	var dirt: Dictionary[Vector2i, bool] = {}
+	var kinds: Dictionary = terrain["kinds"]
+	for cell: Vector2i in kinds:
+		if kinds[cell] == "dirt" and floor.has(cell):
+			dirt[cell] = true
+	if roads.is_empty():
+		out.merge(dirt)
+		return out
+	var opened: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in dirt:
+		var whole := true
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				if not dirt.has(cell + Vector2i(dx, dy)):
+					whole = false
+		if whole:
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					opened[cell + Vector2i(dx, dy)] = true
+	var thin: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in dirt:
+		if opened.has(cell):
+			continue
+		var bank := false
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				if not floor.has(cell + Vector2i(dx, dy)):
+					bank = true
+		if not bank:
+			thin[cell] = true
+	var seen: Dictionary[Vector2i, bool] = {}
+	for start: Vector2i in thin:
+		if seen.has(start):
+			continue
+		seen[start] = true
+		var run: Array[Vector2i] = [start]
+		var head := 0
+		while head < run.size():
+			var at := run[head]
+			head += 1
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					var next := at + Vector2i(dx, dy)
+					if thin.has(next) and not seen.has(next):
+						seen[next] = true
+						run.append(next)
+		if run.size() >= TRACK_RUN:
+			for cell in run:
+				out[cell] = true
 	return out
 
 

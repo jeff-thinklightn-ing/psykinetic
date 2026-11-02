@@ -113,6 +113,8 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"places": level["places"], "buildings": level["buildings"], "markets": level["markets"],
 		# Fords (decision 505): floor, a step into one costing FORD_COST.
 		"fords": _set_of(level["terrain"].get("fords", [])),
+		# Its safe paths (Level.safe_paths, decision 763): what dens keep off.
+		"safe_paths": Level.safe_paths(level["terrain"]),
 		# Its roofs (decision 383: damage_roof's index is into this) and
 		# its lore region (its weather), for what works on every level.
 		"roofs": level["roofs"], "region": level["terrain"]["region"],
