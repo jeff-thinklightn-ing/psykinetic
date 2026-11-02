@@ -264,6 +264,9 @@ var _regen: Dictionary = {}
 ## A level-placed captive (decision 518): camp place id -> the worker ids it
 ## holds from the level, placed once; saved ("placed_captives").
 var _placed_captives: Dictionary = {}
+## Each remade level (Level.REMADE, decision 756) whose old-grid state is
+## moved already, with the decision it was moved for; saved ("remade").
+var _remade: Dictionary = {}
 ## The sought's bands (613, enemy-ai's side): sought id -> {place (the place
 ## it was placed at), stood (its band stood there for that placing)}; saved
 ## ("sought_bands"), so a band killed is not stood again on a restart.
@@ -3963,6 +3966,7 @@ func _boot() -> void:
 				World.named[str(id)] = (named[id] as Dictionary).duplicate(true)
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
+	_remade = snapshot.get("remade", {}).duplicate(true) if snapshot.get("remade") is Dictionary else {}
 	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
 	_healer_terms = snapshot.get("healer_terms", {}).duplicate(true) if snapshot.get("healer_terms") is Dictionary else {}
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
@@ -4257,6 +4261,7 @@ func _boot() -> void:
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
 	_move_off_retired(snapshot)
+	_move_off_remade(snapshot)
 	var saved: Dictionary = snapshot["zones"]
 	var restored := 0
 	for zone_name: String in saved:
@@ -4284,6 +4289,39 @@ func _boot() -> void:
 	World.enter(World.zones[default_zone()])
 	if Net.mode != Net.Mode.SERVER:
 		_admit(Net.local_id, Net.player_id, Net.player_name)
+
+
+## A remade level's state saved on its old grid (Level.REMADE, decision
+## 756), once for each remake: its players moved to its own arrival (its
+## centre; spawn safety, 749, keeps them off a hostile), their companions'
+## cells cleared; the snapshot's section for it, its generation, its herds
+## and its felled cells and plots (Clearing.drop_zone) dropped, so its level entities are laid and its game seeded again
+## on the new ground. A new world has nothing to move: marked done. One
+## count-only line each, for release to grep.
+func _move_off_remade(snapshot: Dictionary) -> void:
+	for level_name: String in Level.REMADE:
+		var made := Level.REMADE[level_name]
+		if int(_remade.get(level_name, 0)) == made:
+			continue
+		_remade[level_name] = made
+		if not snapshot.get("ok", false) or not Level.exists(level_name):
+			continue
+		var arrival: Vector2i = Level.load_level(level_name)["centre"]
+		var moved := 0
+		for record: PlayerRecord in _records.values():
+			if record.zone == level_name:
+				record.tile = arrival
+				record.companion["tile"] = null
+				moved += 1
+		var entities := 0
+		if snapshot.get("zones") is Dictionary and snapshot["zones"].has(level_name):
+			entities = (snapshot["zones"][level_name].get("entities", []) as Array).size()
+			snapshot["zones"].erase(level_name)
+		_regen.erase(level_name)
+		var groups := World.herds.drop_area(level_name) if World.herds != null else 0
+		# Its felled cells and plots, in the old grid's cells (591; terrain's catch).
+		var cleared: Dictionary = World.clearing.drop_zone(level_name) if World.clearing != null else {"cells": 0, "plots": 0}
+		print("[level] remade %s (%d): %d players moved; dropped %d entities, %d herd groups, %d plots, %d felled cells" % [level_name, made, moved, entities, groups, cleared["plots"], cleared["cells"]])
 
 
 ## The players saved in a retired level (Level.RETIRED, 666) moved to its
@@ -5634,6 +5672,7 @@ func _save_state(wait := true, final := false) -> void:
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"placed_captives": _placed_captives.duplicate(true),
+		"remade": _remade.duplicate(),
 		"sought_bands": _sought_bands.duplicate(true),
 		"healer_terms": _healer_terms.duplicate(true),
 		"alms_runs": _alms_runs.duplicate(true),

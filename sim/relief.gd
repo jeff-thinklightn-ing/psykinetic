@@ -348,7 +348,12 @@ const KIND_WANDER := 0.04
 ##   each width (1 or 2) cells wide; min_flow (area / 60): the fewest cells
 ##   that drain into a stream's source;
 ## - rivers: [{line: [Vector2i, ...], wavelength (18), amplitude (6), width
-##   (2, or [least, most]), seed (0: added to the lay's, for other loops)}] (decision 559): a stream laid as a curve, not
+##   (2, or [least, most]), seed (0: added to the lay's, for other loops),
+##   loop_vary (0.4), swing_vary (0.12), swing_reach (1.0), ease (0) (756:
+##   how far its loops' length and swing wander, the swing's wander's
+##   length in wavelengths: more of both gives straight reaches and tight
+##   loops; and its swing eased in over that many wavelengths at either
+##   end, 0 half a loop)}] (decision 559): a stream laid as a curve, not
 ##   found: control points along a meander about line (a curve through its
 ##   points, source first), swinging amplitude cells either way of it once
 ##   every wavelength cells, both wandering by the seed so no two loops are
@@ -1040,7 +1045,9 @@ static func river_curve(river: Dictionary, river_seed: int) -> Dictionary:
 	if line.size() < 2:
 		return {}
 	var wavelength := maxf(4.0, float(river.get("wavelength", 18.0)))
-	var swing := _meander(line, wavelength, maxf(0.0, float(river.get("amplitude", 6.0))), river_seed)
+	var swing := _meander(line, wavelength, maxf(0.0, float(river.get("amplitude", 6.0))), river_seed,
+		float(river.get("loop_vary", 0.4)), float(river.get("swing_vary", 0.12)), float(river.get("swing_reach", 1.0)),
+		float(river.get("ease", 0.0)))
 	var wide: Variant = river.get("width", 2.0)
 	var least := clampf(float(wide[0]) if wide is Array else float(wide), 1.0, 3.5)
 	var most := clampf(float(wide[1]) if wide is Array else float(wide), least, 3.5)
@@ -1161,8 +1168,15 @@ static func _river_run(points: PackedVector2Array, widths: PackedFloat32Array, h
 ## cells either side, both wandering by [param meander_seed] (the loops 0.6
 ## to 1.4 as long, the swing 0.83 to 1.07 of its own); the swing eased in
 ## over half a wavelength at either end and any drift off the line steered
-## back slowly, so it leaves and reaches the line's ends.
-static func _meander(line: Array, wavelength: float, amplitude: float, meander_seed: int) -> PackedVector2Array:
+## back slowly, so it leaves and reaches the line's ends. [param loop_vary]
+## and [param swing_vary] widen those wanders (756: the loops 1 -/+ loop_vary
+## as long, the swing 0.95 -/+ swing_vary of its own, never under none: a
+## straight reach), the swing's over [param swing_reach] times as long a
+## stretch, and [param ease] above 0 eases the swing in over that many
+## wavelengths (a short loop by a source turned it hard at once); the
+## defaults lay every river as before.
+static func _meander(line: Array, wavelength: float, amplitude: float, meander_seed: int,
+		loop_vary := 0.4, swing_vary := 0.12, swing_reach := 1.0, ease_over := 0.0) -> PackedVector2Array:
 	var given := PackedVector2Array()
 	for point: Variant in line:
 		given.append(Vector2(point))
@@ -1202,9 +1216,9 @@ static func _meander(line: Array, wavelength: float, amplitude: float, meander_s
 		var index := clampi(roundi(u / Curves.SPACING), 0, along.size() - 1)
 		var way := ways[index]
 		var lateral := (at - along[index]).dot(Vector2(-way.y, way.x))
-		var long := wavelength * (1.0 + 0.4 * wander.get_noise_1d(u))
-		var own := minf(2.3, swing * (0.95 + 0.12 * wander.get_noise_1d(u + 1000.0)))
-		var ease := smoothstep(0.0, long / 2.0, minf(u, length - u))
+		var long := wavelength * (1.0 + loop_vary * wander.get_noise_1d(u))
+		var own := clampf(swing * (0.95 + swing_vary * wander.get_noise_1d(u / swing_reach + 1000.0)), 0.0, 2.3)
+		var ease := smoothstep(0.0, long / 2.0 if ease_over <= 0.0 else wavelength * ease_over, minf(u, length - u))
 		drift = lerpf(drift, lateral, step / long)
 		var heading := way.angle() + own * ease * sin(phase) - clampf(0.1 * drift, -0.4, 0.4)
 		var moved := Vector2.from_angle(heading) * step

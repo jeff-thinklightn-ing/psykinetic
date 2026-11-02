@@ -56,6 +56,13 @@ const DEFAULT_MAP := "test_room"
 ## player saved there lands at. An overlay copy of one is ignored, and the
 ## snapshot's state for it dropped (Main._boot, each with a count-only line).
 const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vector2i(49, 2)]}
+## Levels made again on a new grid (decision 756: layout A's step 3, the
+## hills rebuilt bigger), each with the decision that remade it: a server's
+## state saved on the old grid is moved once, in code (Main._move_off_remade):
+## its players to the level's own arrival, its zone's saved section, its
+## generation and its herds dropped (laid and seeded again from the level).
+## A new remake of one bumps its number.
+const REMADE: Dictionary[String, int] = {"hills": 756}
 ## Grey per height level in height.png.
 const GREY_PER_LEVEL := 40
 const MAX_HEIGHT := 6

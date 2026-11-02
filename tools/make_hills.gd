@@ -1,19 +1,21 @@
 extends Node
 ## Writes levels/hills, a showcase of the ground's relief (decision 525;
-## before it, of whole levels: 358), and its link from the wilds' west edge:
+## before it, of whole levels: 358), and its link from the wilds' east edge:
 ##   Godot --headless --path . res://tools/make_hills.tscn
-## Stale since decision 743 (layout A: the hills east of the wilds, their
-## link moved by hand to the west edge at (7, 38), the bridge (505 amended
-## (2)) by hand): a rerun writes the old east-edge link. The hills are
-## rebuilt bigger in 743's step 3; until then edit levels/hills by hand.
+## Rebuilt bigger in layout A's step 3 (decision 756; Jeff: "hills and forest
+## both bigger than the demos"): 224 x 224 east of the wilds (world (256,
+## 16), in world_plane.json, edited by hand), the link on its west edge
+## across from the wilds' (239, 128).
 ## (a scene, not a --script run: saving parses the level, which needs the
 ## autoloads).
 ##
-## 96 x 96 cells under the sky, its edge an uneven band of forest, its
+## 224 x 224 cells under the sky, its edge an uneven band of forest, its
 ## ground in metres (relief.png, laid by Relief.lay):
-## - a valley winding north to south down the middle, its floor falling to
-##   the south, its river (2 to 3 wide) looping across the valley's floor
-##   (Relief.lay "rivers", decision 559), crossed by a ford and a bridge;
+## - two valleys winding north to south, west of the middle and east of
+##   it, their floors falling to the south, each with its river (2 to 3
+##   wide) looping across its floor (Relief.lay "rivers", decision 559):
+##   the west one crossed by a ford and by the road's bridge, the east one
+##   by a ford;
 ## - hills rolling 2 m either way over 70 cells, and two escarpments
 ##   (Relief.lay "escarpments", 525 amended (2); Jeff: "big ledge with
 ##   slope looks quite good"): to the west one running north to south, a
@@ -31,7 +33,9 @@ extends Node
 ##   face is the rock);
 ## - a low stone wall on the valley floor below the cliff, which the plateau
 ##   sees over; a few boulders and crates by the rim to push off;
-## - starts on a levelled pad by the link to the wilds (east edge);
+## - starts on a levelled pad by the link to the wilds (west edge), the
+##   road from it down through the west escarpment's way, over the bridge
+##   and on east toward the east valley's ford;
 ## - the faces (the escarpments', the plateau's cliff) along curves that
 ##   wander WANDER cells either way of their lines, and level.json's
 ##   "ledges" traced from them (decision 585: MapDoc.save traces them).
@@ -40,75 +44,118 @@ extends Node
 ## No monsters, no buildings but the bridge and the herders'. The same seed
 ## makes the same map.
 
-const SIZE := Vector2i(96, 96)
+const SIZE := Vector2i(224, 224)
 const SEED := 525
 const FOLDER := "res://levels/hills/"
 const WILDS := "res://levels/wilds/"
-## The wilds' end of the link (maps-80): the land's first cell on row 128,
-## its arrival two cells in.
-const WILDS_LINK := Vector2i(14, 128)
-const WILDS_ARRIVAL := Vector2i(16, 128)
-## The link's row on this map's east edge.
-const LINK_ROW := 70
-## The plateau: its cliff face at this column, north of row FOOT; how far
-## in from the face its top is rock; how high it stands.
-const CLIFF_X := 62
-const FOOT := 46
+## The wilds' end of the link (maps-80; 743: its east edge): the land's last
+## cell on row 128, its arrival two cells in.
+const WILDS_LINK := Vector2i(239, 128)
+const WILDS_ARRIVAL := Vector2i(237, 128)
+## The link's row on this map's west edge (world row 128: the hills' origin
+## is at world y 16).
+const LINK_ROW := 112
+## The plateau: its cliff face at this column, north of row FOOT, PLATEAU_WIDE
+## across; how far in from the face its top is rock; how high it stands
+## (the 96-cell hills' plateau, 106 cells east).
+const CLIFF_X := 168
+const PLATEAU_WIDE := 56
+const FOOT := 72
 const RIM := 4
 const PLATEAU_HEIGHT := 6.0
 ## The ground's middle height, and how it leans (metres a cell, north up).
 const BASE := 8.0
 const TILT := Vector2.ZERO
-## The valley's line.
-const VALLEY: Array[Vector2i] = [Vector2i(46, 0), Vector2i(42, 30), Vector2i(50, 60), Vector2i(44, 95)]
+## The valleys' lines, west and east of the middle.
+const VALLEY: Array[Vector2i] = [Vector2i(80, 0), Vector2i(72, 60), Vector2i(86, 130), Vector2i(76, 223)]
+## The east one, its plateau and fall are the 96-cell hills' (525, 570) moved
+## 106 cells east, as they were measured to work: the valley's held floor
+## near the cliff's foot where the fall comes off it (ground left between
+## the two is eased up toward the fall's lip and the face sinks to a step).
+const EAST_VALLEY: Array[Vector2i] = [Vector2i(152, 0), Vector2i(148, 30), Vector2i(153, 60), Vector2i(150, 95), Vector2i(140, 150), Vector2i(148, 223)]
 ## The escarpments: their lines, which way their faces look, how high.
-const WEST_SCARP: Array[Vector2i] = [Vector2i(30, 4), Vector2i(27, 36), Vector2i(32, 66)]
-const SOUTH_SCARP: Array[Vector2i] = [Vector2i(50, 57), Vector2i(87, 65)]
+const WEST_SCARP: Array[Vector2i] = [Vector2i(42, 10), Vector2i(36, 80), Vector2i(44, 150), Vector2i(38, 214)]
+const SOUTH_SCARP: Array[Vector2i] = [Vector2i(156, 124), Vector2i(212, 136)]
+## Between the valleys, to the south: a third, facing north as the south one.
+const MID_SCARP: Array[Vector2i] = [Vector2i(92, 162), Vector2i(132, 172)]
 const SCARP_HEIGHT := 3.0
 ## How far the escarpments' and the plateau's faces wander either way of
 ## their lines (585: smooth, off the cells' lines).
 const WANDER := 1.5
-## The plateau's face's wander's seed (added to SEED's), and where it is
-## still: the fall's lip, so the fall lands below its line, its pool whole.
-const PLATEAU_WANDER_SEED := 0
-const FALL_LIP := Vector2i(62, 21)
-## The escarpments' wander's seed (added to SEED's).
-const SCARP_WANDER_SEED := 0
-## Where along the west escarpment its way up is (the road goes up it).
-const WEST_WAY := 0.55
-## The road: its width, and how far west past the way it runs.
-const ROAD_WIDTH := 2.0
-const ROAD_END_WEST := 14
-## The river down the valley (Relief.lay "rivers", decision 559; Jeff: "a
-## meandering stream not a straight line"): its loops' length and swing
-## either way, in cells, and its width, wandering between the two.
-const RIVER_WAVELENGTH := 26.0
-const RIVER_AMPLITUDE := 7.0
+## Where the plateau's face is still: the fall's lip, so the fall lands
+## below its line, its pool whole.
+const FALL_LIP := Vector2i(168, 15)
+## The faces' wander seeds (added to SEED's) tried in turn, each with the
+## west river's loop seeds (added to RIVER_SEED's): the first pair whose
+## traced ledges keep within LEDGE_FIT of the cliff edges (level_test's
+## bound is 0.45: 745's lesson) and whose every floor cell is walked to from
+## the link is kept.
+const WANDER_SEEDS: Array[int] = [0, 1, 2, 3, 4, 5]
+const WEST_RIVER_SEEDS: Array[int] = [1, 2, 3]
+const LEDGE_FIT := 0.42
+## The most floor cells left cut off that are laid as scree (the slots the
+## rivers' kept banks and the plateau's foot leave); more is a seed's miss.
+const SCREE_MOST := 12
+## Where along the west escarpment its way up is (the road goes up it):
+## about row LINK_ROW.
+const WEST_WAY := 0.5
+## The road: its width, and where it ends past the bridge and the east
+## valley's ford (the coordinator, 11-01: "it stops dead ... have it lead
+## somewhere"): at the foot of the plateau's south spur, the way up (the
+## open cell nearest).
+## A little over the bridge's two rows: laid along its second row, a road
+## exactly 2 wide leaves the first row's cells on its edge, not on it
+## (Curves.cells takes a cell nearer than half the width).
+const ROAD_WIDTH := 2.2
+const ROAD_END := Vector2i(176, 88)
+## The rivers down the valleys (Relief.lay "rivers", decision 559; Jeff: "a
+## meandering stream not a straight line"): their width, wandering
+## between the two.
 const RIVER_WIDTH: Array[float] = [1.6, 3.2]
-## The valley's floor either side of its line, held as laid, the river's
+## Their loops' length and swing either way, in cells, and how unevenly (Relief's loop_vary, swing_vary, swing_reach; the
+## coordinator, 11-01: like sine waves, "the same size at the same spacing
+## all the way down"): straight reaches and tight loops, the swing's wander
+## a few loops long, eased in over a whole loop by the map's edge; the east
+## river's loops shorter and its own, so the two don't mirror.
+const WEST_RIVER := {"wavelength": 30.0, "amplitude": 7.5, "loop_vary": 0.5, "swing_vary": 0.75, "swing_reach": 3.0, "ease": 1.0}
+const EAST_RIVER := {"wavelength": 22.0, "amplitude": 5.5, "loop_vary": 0.5, "swing_vary": 0.7, "swing_reach": 2.5, "ease": 1.0}
+## A valley's floor either side of its line, held as laid, the river's
 ## loops on it (wider reaches into the escarpments' feet and flattens their
 ## faces).
 const RIVER_FLOOR := 9.0
 ## The fall's stream (570): off the plateau's top west over its cliff (6 m)
-## into a pool at its foot, then down to the river, its line ending in the
-## river's water (so the way on from it is the river's).
-const FALL_STREAM: Array[Vector2i] = [Vector2i(84, 12), Vector2i(74, 16), Vector2i(66, 19), Vector2i(59, 21), Vector2i(53, 22)]
-## Its loops' seed (added to SEED's): the one whose loops keep clear of the
-## south escarpment's foot.
+## into a pool at its foot, then down to the east valley's river, its line
+## ending in the river's water (so the way on from it is the river's).
+## Its head well inside the plateau, so its top joins round it (a head by
+## the map's edge fenced the strip north of it off).
+const FALL_STREAM: Array[Vector2i] = [Vector2i(200, 17), Vector2i(188, 14), Vector2i(176, 15), Vector2i(160, 15), Vector2i(151, 16)]
+## The rivers' loops' seeds (added to SEED's): the east one's the 96-cell
+## hills' river's, so its loops lie as they did and the fall's stream ends in
+## its water (a stream ending on dry ground left its banks standing over the
+## valley's flank, the face sunk to a step: measured); the west one's that
+## plus each of WEST_RIVER_SEEDS in turn.
 const RIVER_SEED := 5
-## The rows the ford and the bridge cross the stream nearest to (the
-## nearest it runs through, the bridge at least 7 rows from the ford).
-const FORD_ROW := 38
-const BRIDGE_ROW := 78
-## The ford's banks are walked to over this many rows either side of it
+## The rows the fords and the bridge cross their streams nearest to (the
+## nearest each runs through, the bridge at least 7 rows from the west
+## ford), each within its valley's columns (x from, x to).
+const FORD_ROW := 60
+const BRIDGE_ROW := 112
+const EAST_FORD_ROW := 112
+## And one in the north, into the low ground between the east river, the
+## cliff and the fall's stream, closed in on its other sides (the fall's
+## ford comes out on its south bank's foot, under the river's raised bank).
+const EAST_NORTH_FORD_ROW := 8
+const WEST_COLUMNS := Vector2i(50, 112)
+const EAST_COLUMNS := Vector2i(118, 166)
+## The fords' banks are walked to over this many rows either side of them
 ## (the stream's banks further off kept as laid).
 const FORD_FREE := 4
 ## The low wall: its column (the edge east of it) and rows.
-const WALL_X := 55
+const WALL_X := 161
 const WALL_ROWS := Vector2i(34, 42)
 ## The sought's refuges here (613 amended: one place a story, its key the
 ## story's tag), each {at, name}.
-const REFUGES := {"hill_cave": {"at": Vector2i(23, 56), "name": "a hill cave"}}
+const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave"}}
 ## The herders' holdings (640, maps' side; Jeff: "herders exist as people"):
 ## refuges economy's herder.places names, each a building.fold (6 x 6, its
 ## gate the front row's middle two edges, open) whose gate looks across a
@@ -116,21 +163,56 @@ const REFUGES := {"hill_cave": {"at": Vector2i(23, 56), "name": "a hill cave"}}
 ## place's cell the way's cell before the door. Each {key, name, fold (its
 ## rect), gate (the way it opens)}.
 const HERDERS: Array[Dictionary] = [
-	{"key": "herders_hut", "name": "the herder's hut", "fold": Rect2i(11, 18, 6, 6), "gate": Vector2i(0, 1)},
-	{"key": "hill_shieling", "name": "a shieling high on the hill", "fold": Rect2i(68, 23, 6, 6), "gate": Vector2i(1, 0)}]
+	{"key": "herders_hut", "name": "the herder's hut", "fold": Rect2i(16, 44, 6, 6), "gate": Vector2i(0, 1)},
+	{"key": "hill_shieling", "name": "a shieling high on the hill", "fold": Rect2i(186, 40, 6, 6), "gate": Vector2i(1, 0)}]
 ## The way between a fold's gate and its hut's door, in cells.
 const HERDER_WAY := 2
 
+const CONFIG := {"name": "The Hills", "outdoor": true, "zone": "outdoors", "region": "town_lands", "border": "forest", "walls": "stone", "floors": "cave"}
 var map := LevelMap.new(SIZE)
-var config := {"name": "The Hills", "outdoor": true, "zone": "outdoors", "region": "town_lands", "border": "forest", "walls": "stone", "floors": "cave"}
+var config: Dictionary = {}
 var entries: Array = []
 ## The ford's row, once laid (the bridge keeps away from it).
 var _ford_row := -100
+## The east valley's ford (EAST_FORD_ROW), once laid: the road crosses it.
+var _east_ford: Array[Vector2i] = []
 ## The escarpments' faces as laid (edge keys), kept by the ford's limiting.
 var _faces: Dictionary = {}
+## What a build failed to lay (a ford, the road): a seed's miss.
+var _missed: Array[String] = []
 
 
 func _ready() -> void:
+	for wander_seed in WANDER_SEEDS:
+		for river_seed in WEST_RIVER_SEEDS:
+			_build(wander_seed, river_seed)
+			var cut := _cut_off()
+			if not cut.is_empty() and cut.size() <= SCREE_MOST:
+				# One-cell slots left under a raised bank or a face's foot,
+				# walled in: scree, no floor.
+				for at: Vector2i in cut:
+					map.set_cell(at, "rock")
+				print("[hills] scree in the cut-off slots %s" % [cut])
+				_save()
+				cut = _cut_off()
+			var miss := _ledge_miss()
+			print("[hills] wander seed %d, west river seed %d: ledges within %.2f of the cliff edges, %d floor cells cut off %s" % [wander_seed, river_seed, miss, cut.size(), _span(cut)])
+			if miss <= LEDGE_FIT and cut.is_empty() and _missed.is_empty():
+				_link_wilds()
+				get_tree().quit()
+				return
+	push_error("[hills] no seeds fit; the last kept")
+	get_tree().quit()
+
+
+func _build(wander_seed: int, river_seed: int) -> void:
+	map = LevelMap.new(SIZE)
+	config = CONFIG.duplicate(true)
+	entries = []
+	_ford_row = -100
+	_east_ford = []
+	_faces = {}
+	_missed = []
 	var edge := _noise(SEED, 0.05)
 	# The land: in from the border by 3 to 9 cells, unevenly; grass and dirt.
 	for y in SIZE.y:
@@ -139,18 +221,21 @@ func _ready() -> void:
 			if inward > 3 + 6.0 * (edge.get_noise_2d(x, y) * 0.5 + 0.5):
 				map.set_cell(Vector2i(x, y), "grass")
 	var arrival := _link()
+	var east_river := EAST_RIVER.merged({"line": EAST_VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED})
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
-		"base": BASE, "amplitude": 2.0, "scale": 70.0, "octaves": 2, "tilt": TILT,
+		"base": BASE, "amplitude": 2.0, "scale": 110.0, "octaves": 2, "tilt": TILT,
 		"escarpments": [
-			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [WEST_WAY], "wander": WANDER, "wander_seed": SCARP_WANDER_SEED},
-			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3], "wander": WANDER, "wander_seed": SCARP_WANDER_SEED}],
+			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [WEST_WAY], "wander": WANDER, "wander_seed": wander_seed},
+			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3], "wander": WANDER, "wander_seed": wander_seed},
+			{"line": MID_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.5], "wander": WANDER, "wander_seed": wander_seed}],
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
-		"valleys": [VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
-		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, SIZE.x - CLIFF_X, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": WANDER, "wander_seed": PLATEAU_WANDER_SEED, "still": [FALL_LIP]}],
+		"valleys": [VALLEY, EAST_VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
+		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, PLATEAU_WIDE, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": 0.0, "still": [FALL_LIP]}],
 		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads(),
 		"streams": 0, "keep_clear": {},
-		"rivers": [{"line": VALLEY, "wavelength": RIVER_WAVELENGTH, "amplitude": RIVER_AMPLITUDE, "width": RIVER_WIDTH, "seed": RIVER_SEED},
-			{"line": FALL_STREAM, "wavelength": 14.0, "amplitude": 2.0, "width": [1.4, 2.2]}]})
+		"rivers": [WEST_RIVER.merged({"line": VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED + river_seed}),
+			east_river,
+			{"line": _fall_line(east_river), "wavelength": 14.0, "amplitude": 2.0, "width": [1.4, 2.2]}]})
 	map.relief = PackedFloat32Array()
 	map.relief.resize(SIZE.x * SIZE.y)
 	var filled := PackedByteArray()
@@ -171,9 +256,11 @@ func _ready() -> void:
 		if laid["cells"][at] == "water":
 			water[at] = true
 	_faces = laid["faces"]
-	if laid["streams"].size() > 1:
-		_fall_ford(laid["streams"][1], water)
-	_ford(water)
+	if laid["streams"].size() > 2:
+		_fall_ford(laid["streams"][2], water)
+	_ford(water, FORD_ROW, WEST_COLUMNS)
+	_ford(water, EAST_FORD_ROW, EAST_COLUMNS)
+	_ford(water, EAST_NORTH_FORD_ROW, EAST_COLUMNS)
 	_bridge(water)
 	_rock()
 	_knoll()
@@ -186,6 +273,28 @@ func _ready() -> void:
 	for at in [Vector2i(CLIFF_X + 1, 34), Vector2i(CLIFF_X + 1, 36)]:
 		map.set_cell(at, "crate")
 	_soften()
+	_save()
+
+
+## The fall's stream's line: FALL_STREAM, its last point moved onto the east
+## river's curve where that runs nearest its row (Relief.lay lays the east
+## river second: its seed SEED + 10 + 1 + its own), so the stream ends in the
+## river's water however the river loops.
+func _fall_line(east_river: Dictionary) -> Array[Vector2i]:
+	var line: Array[Vector2i] = FALL_STREAM.duplicate()
+	var curve := Relief.river_curve(east_river, SEED + 10 + 1 + int(east_river["seed"]))
+	var end := line[-1]
+	var best := INF
+	for point: Vector2 in curve["points"]:
+		var d := absf(point.y - float(end.y)) + 0.25 * absf(point.x - float(end.x))
+		if point.x < float(line[-2].x) - 2.0 and d < best:
+			best = d
+			line[-1] = Vector2i(point.round())
+	return line
+
+
+## The level written (its relief from the map's) and its cliffs said.
+func _save() -> void:
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
 	doc.config = config
@@ -199,26 +308,100 @@ func _ready() -> void:
 		if FileAccess.file_exists(FOLDER + old):
 			DirAccess.remove_absolute(ProjectSettings.globalize_path(FOLDER + old))
 	_say_cliffs()
-	_link_wilds()
-	get_tree().quit()
 
 
-## The ford: the stream's cells on the row nearest FORD_ROW it crosses,
-## its banks set a walk over its water and the ground round them brought
-## down to them (Relief._limit), the stream's other banks kept.
-func _ford(water: Dictionary) -> void:
-	var across := _crossing(water, FORD_ROW, true)
+## How far the saved level's ledges stray from its cliff edges, or its cliff
+## edges from its ledges, at worst: level_test's measure (the walked and wet
+## cells as Level loads them, a cliff between two of a kind).
+func _ledge_miss() -> float:
+	var terrain: Dictionary = Level.load_level("hills")["terrain"]
+	var wet := {}
+	var ground := {}
+	for cell: Vector2i in terrain["floor"]:
+		ground[cell] = true
+	for key in ["water", "fords", "bridged"]:
+		for cell: Vector2i in terrain.get(key, []):
+			ground[cell] = true
+			wet[cell] = true
+	var edges: Array = []
+	for cell: Vector2i in ground:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+			var next := cell + step
+			if ground.has(next) and wet.has(cell) == wet.has(next) and Relief.cliff_between(
+					Relief.at(terrain["relief"], terrain["relief_size"], cell), Relief.at(terrain["relief"], terrain["relief_size"], next)):
+				var corner := Vector2(cell) + Vector2(0.5, 0.5)
+				edges.append([corner - Vector2(0, 1) if step.x == 1 else corner - Vector2(1, 0), corner])
+	var worst := 0.0
+	for ledge: Dictionary in terrain["ledges"]:
+		for point: Vector2 in ledge["curve"]["points"]:
+			var near := INF
+			for edge: Array in edges:
+				near = minf(near, point.distance_to(Geometry2D.get_closest_point_to_segment(point, edge[0], edge[1])))
+			worst = maxf(worst, near)
+	for edge: Array in edges:
+		var middle: Vector2 = (edge[0] + edge[1]) / 2.0
+		var near := INF
+		for ledge: Dictionary in terrain["ledges"]:
+			var points: PackedVector2Array = ledge["curve"]["points"]
+			for i in range(1, points.size()):
+				near = minf(near, middle.distance_to(Geometry2D.get_closest_point_to_segment(middle, points[i - 1], points[i])))
+		worst = maxf(worst, near)
+	return worst
+
+
+## Where [param cells] lie: their bounding box, or "" for none.
+static func _span(cells: Array) -> String:
+	if cells.is_empty():
+		return ""
+	var low: Vector2i = cells[0]
+	var high: Vector2i = cells[0]
+	for cell: Vector2i in cells:
+		low = low.min(cell)
+		high = high.max(cell)
+	return "(%s to %s)" % [low, high]
+
+
+## The saved level's floor cells not walked to from the link's arrival:
+## relief_test's measure (WorldRoutes' flood over its relief, edges and
+## stairs).
+func _cut_off() -> Array:
+	var level := Level.load_level("hills")
+	var terrain: Dictionary = level["terrain"]
+	var size: Vector2i = terrain["relief_size"]
+	var floor: Dictionary = {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var area := {"relief": Level.walk_relief(terrain), "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
+	var reached := PackedFloat32Array()
+	reached.resize(size.x * size.y)
+	reached.fill(-1.0)
+	WorldRoutes._flood(area, level["spawn_points"]["from_wilds"], {}, reached)
+	return floor.keys().filter(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] < 0.0)
+
+
+## A ford: the stream's cells on the row nearest [param row] it crosses
+## within [param columns] (x from, x to: one valley's), its banks set a walk
+## over its water and the ground round them brought down to them
+## (Relief._limit), the stream's other banks kept.
+func _ford(water: Dictionary, row: int, columns: Vector2i) -> void:
+	var across := _crossing(water, row, columns, true)
 	if across.is_empty():
+		_missed.append("no ford near row")
+		push_error("[hills] no ford near row %d" % row)
 		return
 	for at in across:
 		map.set_cell(at, "ford")
-	_ford_row = across[0].y
+	if columns == WEST_COLUMNS:
+		_ford_row = across[0].y
+	if row == EAST_FORD_ROW and columns == EAST_COLUMNS:
+		_east_ford = across
+	print("[hills] a ford at %s" % [across])
 	var surface := map.relief_at(across[0])
 	var heights := {}
 	var fixed := {}
 	var wet := {}
 	# The plateau's top: its north-east corner stands on it.
-	var top := map.relief_at(Vector2i(SIZE.x - 8, 4))
+	var top := map.relief_at(Vector2i(CLIFF_X + PLATEAU_WIDE - 8, 4))
 	for at: Vector2i in map.cells:
 		if map.walkable(at) or map.cell(at) == "water":
 			heights[at] = map.relief_at(at)
@@ -231,7 +414,7 @@ func _ford(water: Dictionary) -> void:
 		if map.cell(at) == "water":
 			wet[at] = true
 		for step: Vector2i in Relief.FOUR:
-			if heights.has(at + step) and not water.has(at + step) and absi(at.y - across[0].y) > FORD_FREE:
+			if heights.has(at + step) and not water.has(at + step) and (absi(at.y - across[0].y) > FORD_FREE or absi(at.x - across[0].x) > 12):
 				fixed[at + step] = true
 	for bank: Vector2i in [across[0] - Vector2i(1, 0), across[across.size() - 1] + Vector2i(1, 0)]:
 		heights[bank] = surface + 0.3
@@ -280,39 +463,63 @@ func _fall_ford(path: Array, water: Dictionary) -> void:
 			map.set_relief(at, heights[at])
 		print("[hills] the fall's stream forded at %s" % [across])
 		return
+	_missed.append("no ford over the fall's stream")
 	push_error("[hills] no ford over the fall's stream")
 
 
 ## The bridge over the stream on the row nearest BRIDGE_ROW: its banks
 ## levelled at the higher of them (a bridge's banks are of one height).
 func _bridge(water: Dictionary) -> void:
-	var across := _crossing(water, BRIDGE_ROW)
+	var across := _crossing(water, BRIDGE_ROW, WEST_COLUMNS, false, 2)
 	if across.is_empty():
 		return
 	var west := across[0]
 	var east := across[across.size() - 1]
-	var banks: Array[Vector2i] = [west - Vector2i(1, 0), east + Vector2i(1, 0)]
-	var top := maxf(map.relief_at(banks[0]), map.relief_at(banks[1]))
+	var banks: Array[Vector2i] = [west - Vector2i(1, 0), east + Vector2i(1, 0), west + Vector2i(-1, 1), east + Vector2i(1, 1)]
+	var top := maxf(maxf(map.relief_at(banks[0]), map.relief_at(banks[1])), maxf(map.relief_at(banks[2]), map.relief_at(banks[3])))
 	for bank in banks:
 		map.set_relief(bank, top)
-	config["buildings"] = [{"slot": "bridge", "at": [west.x, west.y], "facing": [1, 0], "length": across.size()}]
+	config["buildings"] = [{"slot": "bridge", "at": [west.x, west.y], "facing": [1, 0], "length": across.size(), "width": 2}]
 
 
 ## The water cells of the row nearest [param row] that the stream crosses
-## with water only, west to east (where it runs [param straight] and
-## level, for a ford).
-func _crossing(water: Dictionary, row: int, straight := false) -> Array[Vector2i]:
+## within [param columns] (x from, x to) with water only, west to east
+## (where it runs [param straight] and level, for a ford), the same cells
+## water on the [param rows] - 1 rows south of it too (a 2-wide bridge's).
+func _crossing(water: Dictionary, row: int, columns: Vector2i, straight := false, rows := 1) -> Array[Vector2i]:
 	for offset in range(0, SIZE.y):
 		for y in [row + offset, row - offset]:
-			if absi(y - _ford_row) <= 6:
+			if absi(y - _ford_row) <= 6 and columns == WEST_COLUMNS:
 				continue
 			var cells: Array[Vector2i] = []
-			for x in SIZE.x:
+			for x in range(columns.x, columns.y + 1):
 				if water.has(Vector2i(x, y)) and map.cell(Vector2i(x, y)) == "water":
 					cells.append(Vector2i(x, y))
-			if cells.size() >= 1 and cells.size() <= 3 and cells[cells.size() - 1].x - cells[0].x == cells.size() - 1 					and (not straight or _straight(water, cells)):
+			if cells.size() >= 1 and cells.size() <= 3 and cells[cells.size() - 1].x - cells[0].x == cells.size() - 1 					and (not straight or _straight(water, cells)) and _wide(water, cells, rows):
 				return cells
 	return []
+
+
+## Whether [param cells] are water on the [param rows] - 1 rows south of
+## them too, and only them on each such row of the crossing's span.
+func _wide(water: Dictionary, cells: Array[Vector2i], rows: int) -> bool:
+	for k in range(1, rows):
+		for cell in cells:
+			if not water.has(cell + Vector2i(0, k)) or map.cell(cell + Vector2i(0, k)) != "water":
+				return false
+		for side: Vector2i in [cells[0] - Vector2i(1, -k), cells[-1] + Vector2i(1, k)]:
+			if water.has(side):
+				return false
+	if rows < 2:
+		return true
+	# A bridge's: its ends dry a row past it either way and two cells out, so
+	# the road comes onto it at its full width (a river bending under one end
+	# narrowed it off the bridge's corner: measured).
+	for k in range(-1, rows + 1):
+		for out in [1, 2]:
+			if water.has(cells[0] + Vector2i(-out, k)) or water.has(cells[-1] + Vector2i(out, k)):
+				return false
+	return true
 
 
 ## Whether the stream runs straight through [param cells] (water on the
@@ -343,16 +550,17 @@ func _rock() -> void:
 func _knoll() -> void:
 	var top := Vector2i(-1, -1)
 	for at: Vector2i in map.cells:
-		if at.x < 36 and map.cell(at) in ["grass", "dirt"] and (top.x < 0 or map.relief_at(at) > map.relief_at(top)):
+		if at.x < 36 and at.y > 60 and at.y < 160 and map.cell(at) in ["grass", "dirt"] and (top.x < 0 or map.relief_at(at) > map.relief_at(top)):
 			top = at
 	for cell in _disc(top, 2.2):
 		if map.cell(cell) in ["grass", "dirt"]:
 			map.set_cell(cell, "void")
 
 
-## The road (decision 563): dirt, from the link's arrival west over the
-## bridge and up through the west escarpment's way to ROAD_END_WEST cells
-## past it, laid as a curve (Relief.road), its cells bare dirt.
+## The road (decision 563): dirt, from the link's arrival east down through
+## the west escarpment's way, over the bridge, through the east valley's
+## ford and on to the spur's foot (ROAD_END), laid as a curve (Relief.road),
+## its cells bare dirt (the ford's kept).
 func _road(arrival: Vector2i) -> void:
 	if not config.has("buildings"):
 		return
@@ -361,13 +569,27 @@ func _road(arrival: Vector2i) -> void:
 	var length := int(bridge["length"])
 	var crossings := {}
 	for i in length:
-		crossings[west + Vector2i(i, 0)] = true
-	var way := _along(WEST_SCARP, WEST_WAY)
-	var beyond := Vector2i(roundi(way.x) - ROAD_END_WEST, roundi(way.y))
-	while not map.walkable(beyond) and beyond.x < roundi(way.x):
-		beyond.x += 1
-	var laid := Relief.road(map, arrival, [west + Vector2i(length, 0), west - Vector2i(1, 0)], beyond, ROAD_WIDTH, crossings)
+		for row in int(bridge.get("width", 1)):
+			crossings[west + Vector2i(i, row)] = true
+	# A road ROAD_WIDTH wide laid through the second row covers both (make_held's, 505 amended (2)).
+	west += Vector2i(0, int(bridge.get("width", 1)) - 1)
+	var via: Array = [west - Vector2i(1, 0), west + Vector2i(length, 0)]
+	if not _east_ford.is_empty():
+		for at in _east_ford:
+			crossings[at] = true
+		via.append(_east_ford[0] - Vector2i(1, 0))
+		via.append(_east_ford[-1] + Vector2i(1, 0))
+	var beyond := ROAD_END
+	var best := INF
+	for y in range(ROAD_END.y - 8, ROAD_END.y + 9):
+		for x in range(ROAD_END.x - 8, ROAD_END.x + 9):
+			var at := Vector2i(x, y)
+			if map.walkable(at) and map.cell(at) != "water" and Vector2(at).distance_to(Vector2(ROAD_END)) < best:
+				best = Vector2(at).distance_to(Vector2(ROAD_END))
+				beyond = at
+	var laid := Relief.road(map, arrival, via, beyond, ROAD_WIDTH, crossings)
 	if laid.is_empty():
+		_missed.append("no way for the road")
 		push_error("[hills] no way for the road")
 		return
 	for cell: Vector2i in laid["cells"]:
@@ -476,20 +698,20 @@ func _say_cliffs() -> void:
 		"" if strays.is_empty() else " (east or south of %s)" % [strays.slice(0, 6)]])
 
 
-## The link to the wilds on the east edge at LINK_ROW, its arrival two
+## The link to the wilds on the west edge at LINK_ROW, its arrival two
 ## cells in, the starts round that; the arrival.
 func _link() -> Vector2i:
-	var link := Vector2i(SIZE.x - 1, LINK_ROW)
+	var link := Vector2i(0, LINK_ROW)
 	while map.cell(link) == "void":
-		link.x -= 1
-	var arrival := link - Vector2i(2, 0)
+		link.x += 1
+	var arrival := link + Vector2i(2, 0)
 	for cell in _disc(arrival, 3.0):
 		if map.cell(cell) == "void":
 			map.set_cell(cell, "grass")
 	map.set_cell(link, "link")
 	var starts := []
 	for dy in [-1, 1, -2, 2]:
-		var start := arrival + Vector2i(-1, dy)
+		var start := arrival + Vector2i(1, dy)
 		map.set_cell(start, "start")
 		starts.append([start.x, start.y])
 	config["centre"] = [arrival.x, arrival.y]

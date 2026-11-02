@@ -131,6 +131,18 @@ func to_dict() -> Dictionary:
 	return out
 
 
+## Everything kept for [param zone] gone: its felled, built over and given
+## back cells and its plots (decision 756: a level remade on a new grid, its
+## cells the old one's); how many went: {cells (felled, built over, given
+## back), plots (a town's builds: told apart, release's count for Jeff)}.
+func drop_zone(zone: String) -> Dictionary:
+	var gone := {"cells": (felled.get(zone, {}) as Dictionary).size() + (built_over.get(zone, {}) as Dictionary).size()
+		+ (given_back.get(zone, {}) as Dictionary).size(), "plots": (plots.get(zone, []) as Array).size()}
+	for each: Dictionary in [felled, built_over, given_back, _base, _plot_cells, plots]:
+		each.erase(zone)
+	return gone
+
+
 ## Every zone with felled, built or given back cells.
 func _zones() -> Array:
 	var zones := {}

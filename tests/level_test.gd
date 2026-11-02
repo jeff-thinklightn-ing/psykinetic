@@ -1144,8 +1144,10 @@ func _test_hills() -> void:
 == levels/hills: relief to walk, fall from and see over ==")
 	_check(_main.load_map("hills") and World.outdoor and World.has_relief(), "hills loads, outdoors, its ground in metres")
 	var player := _player()
-	var plateau := Vector2i(72, 30)
-	var foot := Vector2i(58, 30)
+	# 756: the plateau east of column 168, its face straight from the fall to
+	# its spur; the valley's flank below it.
+	var plateau := Vector2i(180, 44)
+	var foot := Vector2i(160, 44)
 	_check(World.elevation_at(plateau) - World.elevation_at(foot) > 4.0, "the plateau stands over the valley (%.1f m over %.1f)" % [World.elevation_at(plateau), World.elevation_at(foot)])
 	var path := World.find_path(player.tile, plateau)
 	_check(not path.is_empty(),
@@ -1154,10 +1156,10 @@ func _test_hills() -> void:
 	_check(player.tile == plateau, "the bot walks up there, round by the spur (%s)" % player.tile)
 	_walk_free(player, foot)
 	_check(player.tile == foot, "and back down to the valley (%s)" % player.tile)
-	# The rim on row 38: the face wanders (585), so the first cell east of the
+	# The rim on row 38, over the low wall: the first cell east of the
 	# valley standing well over the one west of it.
-	var rim := Vector2i(62, 38)
-	for x in range(58, 70):
+	var rim := Vector2i(168, 38)
+	for x in range(160, 174):
 		if World.elevation_at(Vector2i(x, 38)) - World.elevation_at(Vector2i(x - 1, 38)) > 2.0:
 			rim = Vector2i(x, 38)
 			break
@@ -1170,19 +1172,21 @@ func _test_hills() -> void:
 	_check(imp.tile.x < rim.x and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * Relief.levels(drop),
 			"pushed off the face: it falls %.1f m, %d levels, for %d (%s, %s)" % [drop, Relief.levels(drop), hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
 	World.despawn(imp)
-	_check(World.has_line_of_sight(Vector2i(63, 37), Vector2i(53, 38)), "from the plateau's rim the valley beyond the low wall is seen")
-	# Where the ridge bends east (rows 30-38, 84-90) there is ground behind
-	# its crest: some of it hidden from the valley floor.
+	_check(World.has_line_of_sight(rim + Vector2i(1, -1), Vector2i(156, 38)), "from the plateau's rim the valley beyond the low wall is seen")
+	# Along the west escarpment (756: its face near columns 36 to 44) there
+	# is ground behind its crest: some of it hidden from the valley floor.
 	var hidden := []
-	for row in range(30, 39) + range(84, 91):
+	for row in range(20, 200, 6):
+		if not World.is_walkable(Vector2i(56, row)):
+			continue
 		var crest := Vector2i(-1, row)
-		for x in range(0, 36):
+		for x in range(0, 46):
 			var cell := Vector2i(x, row)
 			if World.is_walkable(cell) and (crest.x < 0 or World.elevation_at(cell) > World.elevation_at(crest)):
 				crest = cell
 		for x in range(0, crest.x - 1):
 			var behind := Vector2i(x, row)
-			if World.is_walkable(behind) and not World.has_line_of_sight(Vector2i(46, row), behind):
+			if World.is_walkable(behind) and not World.has_line_of_sight(Vector2i(56, row), behind):
 				hidden.append(behind)
 	_check(hidden.size() >= 1, "the ridge hides ground behind its crest from the valley floor (%d cells)" % hidden.size())
 

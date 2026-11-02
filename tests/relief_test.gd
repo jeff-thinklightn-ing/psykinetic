@@ -639,15 +639,16 @@ func _test_hills() -> void:
 	for cell: Vector2i in floor:
 		for step: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
 			if floor.has(cell + step) and Relief.cliff_between(Relief.at(field, size, cell), Relief.at(field, size, cell + step)):
-				# The plateau's west face wanders over columns 61 to 64 (585).
-				if step == Vector2i(1, 0) and cell.x >= 60 and cell.x <= 65 and cell.y < 46:
+				# The plateau's west face, straight at column 168 north of its
+				# foot (756).
+				if step == Vector2i(1, 0) and cell.x >= 166 and cell.x <= 168 and cell.y < 72:
 					face += 1
 				else:
 					off_face += 1
 	_check(face >= 30 and off_face >= 60, "the plateau's west face and the escarpments' (%d and %d edges)" % [face, off_face])
 	var west := []
-	for y in range(8, 30):
-		for x in range(20, 40):
+	for y in range(10, 210):
+		for x in range(30, 50):
 			var drop := Relief.at(field, size, Vector2i(x, y)) - Relief.at(field, size, Vector2i(x + 1, y))
 			if floor.has(Vector2i(x, y)) and floor.has(Vector2i(x + 1, y)) and drop > Relief.WALK_RISE:
 				west.append(drop)
@@ -661,21 +662,24 @@ func _test_hills() -> void:
 	_check(_corners_agree(terrain).is_empty(), "walkably joined cells agree on every corner they share (%s)" % [_corners_agree(terrain)])
 	_check(highest - lowest > 8.0, "hills and valleys: %.1f m between the lowest and the highest" % (highest - lowest))
 	var kinds := {}
+	var stone: Array[Vector2i] = []
 	for cell: Vector2i in terrain["kinds"]:
 		# A ford's footing is the ground beside it, stone mid-river (559).
 		if not terrain["fords"].has(cell):
 			kinds[terrain["kinds"][cell]] = int(kinds.get(terrain["kinds"][cell], 0)) + 1
+			if terrain["kinds"][cell] == "stone":
+				stone.append(cell)
 	_check(kinds.get("stone", 0) == 0 and kinds.get("grass", 0) > 3000 and kinds.get("dirt", 0) > 500,
-		"its ground by slope: grass, bare dirt on the steep bands, crests and banks, no stone (paving) on its slopes (%s)" % [kinds])
+		"its ground by slope: grass, bare dirt on the steep bands, crests and banks, no stone (paving) on its slopes (%s; stone at %s)" % [kinds, stone.slice(0, 5)])
 	var course: Array = terrain["streams"][0]["path"]
 	var columns := course.map(func(cell: Vector2i) -> int: return cell.x)
 	_check(course.size() > 120 and columns.max() - columns.min() >= 16,
 		"the river loops down the valley's length (%d cells, columns %d to %d; 559)" % [course.size(), columns.min(), columns.max()])
-	_check(terrain["streams"].size() == 2 and not terrain["fords"].is_empty() and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
-		"its river and the fall's stream, a ford and a bridge")
+	_check(terrain["streams"].size() == 3 and terrain["fords"].size() >= 8 and level["buildings"].any(func(b: Dictionary) -> bool: return b["slot"] == "bridge"),
+		"its two valleys' rivers and the fall's stream, fords and a bridge (756; %d ford cells)" % terrain["fords"].size())
 	# The fall (570): the stream off the plateau drops its face's height
 	# between two cells of its path, into a 3 x 3 pool.
-	var fall_path: Array = terrain["streams"][1]["path"] if terrain["streams"].size() == 2 else []
+	var fall_path: Array = terrain["streams"][2]["path"] if terrain["streams"].size() == 3 else []
 	var fall := Vector2i(-1, -1)
 	var drop := 0.0
 	for i in range(1, fall_path.size()):
@@ -702,14 +706,21 @@ func _test_hills() -> void:
 	var roads: Array = terrain["roads"]
 	var road_cells := Curves.cells(roads[0]["curve"], false) if roads.size() == 1 else {} as Dictionary[Vector2i, int]
 	var road_points: PackedVector2Array = roads[0]["points"] if roads.size() == 1 else PackedVector2Array()
-	var bridge_cell: Vector2i = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "bridge")[0]["rect"].position
-	_check(roads.size() == 1 and roads[0]["kind"] == "dirt" and road_cells.has(bridge_cell) and road_points[-1].x < 20.0
-		and road_cells.keys().all(func(cell: Vector2i) -> bool: return terrain["kinds"].get(cell, "dirt") == "dirt"),
-		"a dirt road from the link over the bridge and up through the west way (563; %d cells)" % road_cells.size())
-	var top := Vector2i(80, 20)
+	# Over its deck (any of its cells: the road narrows to the deck's rows where they end in water).
+	var deck: Rect2i = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "bridge")[0]["rect"]
+	var on_deck := road_cells.keys().any(func(cell: Vector2i) -> bool: return deck.has_point(cell))
+	# Through the east valley's ford to the spur's foot: dirt but where it fords.
+	var forded := road_cells.keys().filter(func(cell: Vector2i) -> bool: return terrain["fords"].has(cell))
+	_check(roads.size() == 1 and roads[0]["kind"] == "dirt" and on_deck and road_points[0].x < 20.0 and road_points[-1].x > 160.0
+		and not forded.is_empty()
+		and road_cells.keys().all(func(cell: Vector2i) -> bool: return wet.has(cell) or terrain["fords"].has(cell) or terrain["kinds"].get(cell, "dirt") == "dirt"),
+		"a dirt road from the link through the west escarpment's way, over the bridge, through the east ford and on to the spur (563, 756; %d cells, %d forded; on the bridge %s, from x %.1f to %.1f; not dirt %s)" % [road_cells.size(), forded.size(),
+			on_deck, road_points[0].x if not road_points.is_empty() else -1.0, road_points[-1].x if not road_points.is_empty() else -1.0,
+			road_cells.keys().filter(func(cell: Vector2i) -> bool: return not wet.has(cell) and not terrain["fords"].has(cell) and terrain["kinds"].get(cell, "dirt") != "dirt").map(func(cell: Vector2i) -> Array: return [cell, terrain["kinds"][cell]]).slice(0, 4)])
+	var top := Vector2i(196, 20)
 	var steps := WorldRoutes._steps_between(area, level["spawn_points"]["from_wilds"], top)
 	_check(floor.has(top) and steps > 0.0, "the plateau's top is walked to from the link, round by its spur (%.0f steps)" % steps)
-	var foot := Vector2i(58, 30)
+	var foot := Vector2i(160, 44)
 	_check(floor.has(foot) and Relief.at(field, size, top) - Relief.at(field, size, foot) > 4.0, "it stands over the valley at its face")
 
 

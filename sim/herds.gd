@@ -818,6 +818,21 @@ func to_dict() -> Dictionary:
 
 ## to_dict's [param saved] over what is here; a group that makes no sense
 ## is left out with a word.
+## Every group of [param area] gone and the area seeded again on the tick
+## that next sees it (decision 756: a level remade on a new grid, its homes
+## cells of the old one); how many groups went.
+func drop_area(area: String) -> int:
+	var gone: Array[String] = []
+	for id: String in _groups:
+		if str(_groups[id]["area"]) == area:
+			gone.append(id)
+	for id in gone:
+		_groups.erase(id)
+		_fed.erase(id)
+	_seeded.erase(area)
+	return gone.size()
+
+
 func from_dict(saved: Dictionary) -> void:
 	_next = maxi(int(saved.get("next", 1)), 1)
 	_at = int(saved.get("at", -1))

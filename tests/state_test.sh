@@ -71,6 +71,38 @@ run_host put --test-chest=put --test-exit-after=4
 run_host after_put --test-exit-after=2
 check "$(count 'slots: Chest1=\[bandaging_kit\] Player1=\[\]$' "$DIR/after_put.log")" 1 "put back, it is in the chest after a restart"
 
+# 2c. A remade level (decision 756): a save on the hills' old grid, its
+# player, a level entity and a herd there; the first boot moves the player
+# to the hills' arrival, drops the rest and saves "remade"; the next does
+# nothing. The save is the real one, edited: the host and a crate in the
+# hills, and a deer herd at a home of the old grid.
+python -B - "$STATE" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+room = data["zones"]["test_room"]
+crate = [e for e in room["entities"] if e.get("name") == "Crate1"][0]
+data["zones"]["hills"] = {"tick": 0, "entities": [crate], "respawns": [], "ground": [], "records": []}
+for record in data["players"]:
+    if record["player_id"] == "dev-host":
+        record["zone"] = "hills"
+        record["tile"] = [80, 30]
+herds = data.setdefault("herds", {})
+herds.setdefault("groups", {})["old-hills-deer"] = {"species": "deer", "area": "hills", "home": [80, 30], "count": 4.0, "out": 0, "made": 0}
+herds["seeded"] = sorted(set(herds.get("seeded", [])) | {"hills"})
+data.setdefault("clearing", {})["hills"] = {"80,30": [1, 0]}
+data.pop("remade", None)
+json.dump(data, open(path, "w", encoding="utf-8"), indent="\t")
+PY
+run_host remade --test-exit-after=2
+check "$(count '\[level\] remade hills \(756\): 1 players moved; dropped 1 entities, 1 herd groups, 0 plots, 1 felled cells' "$DIR/remade.log")" 1 "a save on the hills' old grid: its player moved, its entity and herd dropped, said once by count (756)"
+check "$(count 'joined as Player1 at \(7, 112\) \(back\)' "$DIR/remade.log")" 1 "the host comes back at the hills' arrival from the wilds"
+check "$(sed -n '/"remade": {/,/}/p' "$STATE" | grep -c '"hills": 756' || true)" 1 "the save keeps the remake as done"
+check "$(count 'old-hills-deer' "$STATE")" 0 "the old grid's herd is gone from the save"
+run_host remade_again --test-exit-after=2
+check "$(count '\[level\] remade' "$DIR/remade_again.log")" 0 "the next boot moves nothing"
+check "$(count 'joined as Player1 at \(7, 112\) \(back\)' "$DIR/remade_again.log")" 1 "and the host is where it was left, in the hills"
+
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 echo 'this is not json' >"$STATE"
 run_host third --test-exit-after=2

@@ -3398,9 +3398,10 @@ func _test_sight() -> void:
 	_rig.rebuild(hills["terrain"], hills["centre"])
 	var had_yaw := _rig.yaw
 	_rig.yaw = 45.0  # The camera east of its aim: the plateau's side.
-	var foot := Vector2i(59, 20)
+	# 756: the plateau's face at column 168; open ground by the west link.
+	var foot := Vector2i(167, 44)
 	var at := Vector3(foot.x, _rig._ground_height(Vector2(foot)), foot.y)
-	var valley := Vector3(48.0, _rig._ground_height(Vector2(48.0, 72.0)), 72.0)
+	var valley := Vector3(24.0, _rig._ground_height(Vector2(24.0, 112.0)), 112.0)
 	var under := _rig.hidden_by_ground(at, Client3D.CAMERA_PITCH)
 	var lifted := _rig.hidden_by_ground(at, Client3D.RIDGE_PITCH_MAX)
 	var open := _rig.hidden_by_ground(valley, Client3D.CAMERA_PITCH)
@@ -3535,7 +3536,11 @@ func _test_relief() -> void:
 	const FALL_STEP := 0.6
 	var stepped: Dictionary = hills["terrain"].duplicate(true)
 	var step_index := stream_path.size() / 2
-	while step_index > 1 and (stepped.get("bridged", []) as Array).any(func(cell: Vector2i) -> bool: return (cell - (stream_path[step_index] as Vector2i)).length() < 4.0):
+	# Where it heads down its valley (756: a loop running across it would
+	# cross the lowered land's edge again and again).
+	var down := Vector2((stream_path[-1] as Vector2i) - (stream_path[0] as Vector2i)).normalized()
+	while step_index > 1 and ((stepped.get("bridged", []) as Array).any(func(cell: Vector2i) -> bool: return (cell - (stream_path[step_index] as Vector2i)).length() < 4.0)
+			or Vector2((stream_path[step_index] as Vector2i) - (stream_path[step_index - 1] as Vector2i)).dot(down) < 0.9):
 		step_index -= 1
 	var step_at: Vector2i = stream_path[step_index]
 	var way: Vector2i = step_at - (stream_path[step_index - 1] as Vector2i)
@@ -3632,12 +3637,7 @@ func _test_relief() -> void:
 	for mist: GPUParticles3D in _rig._mists:
 		var near_foot := _rig._fall_feet.any(func(foot: Dictionary) -> bool: return (foot["at"] as Vector3).distance_to(mist.position) < 0.5)
 		misty = misty and mist.amount <= Client3D.MIST_PUFFS and near_foot and mist.is_inside_tree()
-	var sample_level := Level.load_level("sample")
-	_rig.rebuild(sample_level["terrain"], sample_level["centre"])
-	var none_without := _rig._mists.is_empty()
-	_rig.rebuild(hills["terrain"], hills["centre"])
-	_check(misty and none_without, "mist at each tall fall's foot, %d puffs at most (%d curtains, %d mists), none without a fall (%s)" % [Client3D.MIST_PUFFS, curtains, _rig._mists.size(), none_without])
-	_rig.rebuild(hills["terrain"], hills["centre"])
+	var mists := _rig._mists.size()
 	# Its banks: within a walk of the water a grassy slope into it, no face;
 	# a face only where the land stands a cliff over it.
 	var faces: Dictionary = {}
@@ -3698,6 +3698,9 @@ func _test_relief() -> void:
 	# The castle: no relief.png, its ground exactly its whole levels.
 	var castle := Level.load_level("castle")
 	_rig.rebuild(castle["terrain"], castle["centre"])
+	# The hills' mists gone with them: the castle has no fall.
+	var none_without := _rig._mists.is_empty()
+	_check(misty and none_without, "mist at each tall fall's foot, %d puffs at most (%d curtains, %d mists), none without a fall (%s)" % [Client3D.MIST_PUFFS, curtains, mists, none_without])
 	var off := []
 	for cell: Vector2i in _rig._corners:
 		if _rig._ramp_heights.has(cell) or _rig._bed_levels.has(cell):
@@ -4940,11 +4943,27 @@ static func _ribbon_report(rig: Client3D, down: Vector2) -> Dictionary:
 		for colour: Color in colours:
 			if down != Vector2.ZERO and Vector2(colour.r * 2.0 - 1.0, colour.g * 2.0 - 1.0).dot(down) < 0.0:
 				against += 1
+	# Each triangle filed under the cells its box spans, so a cell's middle
+	# is tried against the few near it (756: the 224 hills' rivers made every
+	# cell against every triangle seconds of the suite's limit).
+	var near: Dictionary[Vector2i, Array] = {}
+	for flat: PackedVector2Array in triangles:
+		var low := Vector2i(floori(minf(flat[0].x, minf(flat[1].x, flat[2].x))), floori(minf(flat[0].y, minf(flat[1].y, flat[2].y))))
+		var high := Vector2i(ceili(maxf(flat[0].x, maxf(flat[1].x, flat[2].x))), ceili(maxf(flat[0].y, maxf(flat[1].y, flat[2].y))))
+		for y in range(low.y, high.y + 1):
+			for x in range(low.x, high.x + 1):
+				if not near.has(Vector2i(x, y)):
+					near[Vector2i(x, y)] = []
+				near[Vector2i(x, y)].append(flat)
 	var uncovered := []
 	for cell: Vector2i in rig._stream_cells:
 		var middle := Vector2(cell)
-		if not triangles.any(func(flat: PackedVector2Array) -> bool:
-				return Geometry2D.point_is_inside_triangle(middle, flat[0], flat[1], flat[2])):
+		var inside := false
+		for flat: PackedVector2Array in near.get(cell, []):
+			if Geometry2D.point_is_inside_triangle(middle, flat[0], flat[1], flat[2]):
+				inside = true
+				break
+		if not inside:
 			uncovered.append(cell)
 	return {"uncovered": uncovered, "against": against}
 
@@ -4998,7 +5017,8 @@ func _test_roads() -> void:
 					wrong.append(points[k])
 				for side: float in [-1.0, 1.0]:
 					var edge := points[k] + normal * side * widths[k] * 0.5
-					if absf(_rig._road_near(edge).x) < 0.02 and absf(_rig.road_at(edge) - 0.5) > 0.13:
+					# On ground (a bridge's deck is no ground cell, as its middle's skipped above).
+					if _rig._grounds.has(Vector2i(edge.round())) and absf(_rig._road_near(edge).x) < 0.02 and absf(_rig.road_at(edge) - 0.5) > 0.13:
 						off_edge.append(edge)
 					var past := points[k] + normal * side * (widths[k] * 0.5 + 0.6)
 					if _rig._road_near(past).x < -0.5 and _rig.road_at(past) > 0.5:

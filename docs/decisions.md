@@ -38008,3 +38008,82 @@ Server only, data only, protocol unchanged, no new class_name.
 - No new art, place, kind or level content: "empty" is nobody home, not a ruin.
 view_test _test_turf_house: told empty (the healer still said awake), no smoke, the pot cold, a
 window dark, standing; told not empty, all back. Client only, protocol unchanged, no new class_name.
+## 756. Layout A, step 3: the hills rebuilt bigger
+
+Layout A's third step (plan C:/dev/review/lands/plan_a.md; design C:/dev/review/lands/step3.md,
+coordinator-approved; Jeff: "hills and forest both bigger than the demos"), the hills first (the
+forest comes under its own number). tools/make_hills.gd is current again (since 743 a rerun wrote
+the old east-edge link) and writes the hills at the new size; the world plane is edited by hand.
+
+- **Where:** 224 x 224 cells at world (256, 16) (was 96 x 96 at (256, 90)): east of the wilds,
+  off Umbrage (from y 256) and the dead land. Height -1.06: its link's ground 7.14 against the
+  wilds' 6.08 at (239, 128). The Woodlands' draft rect grows east to cover it (-96, 0, 576, 448).
+- **Its ground, the same pieces, more of them:** an uneven forest border; two valleys north to
+  south, each with its looping river (Relief.lay "rivers"), looped unevenly (the coordinator,
+  from the sheet: "like perfect sine waves ... read as machine-made"): a river's new loop_vary,
+  swing_vary and swing_reach widen how far its loops' length and swing wander and stretch the
+  swing's wander over a few loops, so it runs in straight reaches and tight loops, and its ease
+  eases the swing in over a whole loop at its ends (a short loop by a source turned it at once
+  and left a cell its ribbon missed); the west river long-looped, the east one shorter, so they
+  don't mirror (the defaults lay every other river as before). The fall's stream ends where the
+  east river's curve (Relief.river_curve) runs nearest its row, however it loops, and the east
+  valley's line keeps 3 cells off the plateau's foot at row 60 (a loop against the foot left cliff
+  steps there and slots for scree); the west escarpment facing east, its
+  way up where the road climbs; the plateau in the north-east (columns 168 to the edge, rows to
+  72), about 7.5 m over the flat ground at its foot, its rim bare dirt, its spur south the way up,
+  its fall's stream (570) rising well inside it, over the cliff at row 15 into a pool and on over
+  flat ground to the east valley's river, forded below the cliff; two escarpments facing north,
+  south of the plateau and between the valleys; the low wall below the cliff, boulders and crates
+  by the rim; the knoll crowned with trees west of the west escarpment.
+- **What the bigger ground taught (measured):** the plateau's face is straight (no wander): a
+  long wandering face left traced ledges up to 0.70 off its cliff edges (level_test's bound is
+  0.45). The east river keeps the 96-cell river's loop seed, and the fall comes off the cliff
+  where the valley's floor runs flat to its foot: a fall's stream crossing the valley's flank
+  kept its banks high and left a 10 to 12 m wedge below the lip, the face sunk to a 1 to 2 m step
+  with one-cell slots under it cut off. A stream rising by the map's edge fenced the plateau's
+  strip north of it off. A bridge's ends must be dry a row past it and two cells out (_wide), or
+  the road narrows off its corner.
+- **The generator checks itself:** it tries the escarpments' wander seeds with the west river's
+  loop seeds in turn and keeps the first pair whose traced ledges sit within 0.42 of the cliff
+  edges, whose every floor cell is walked to from the link (relief_test's flood) and which laid
+  every ford and the road; up to 12 cut-off cells left in slots would be laid as scree (rock, no
+  floor), more is a miss. The kept pair: 0 and 1.
+- **Ways:** the link on the west edge at (5, 112) (world row 128, across from the wilds'
+  (239, 128), which keeps its cell and from_hills), arrivals two cells in, the starts on a
+  levelled pad. The road (dirt, Relief.road) from the arrival east down through the west
+  escarpment's way, over the bridge (2 wide, 505 amended (2): _crossing now finds a crossing with
+  water on both its rows) on the west valley's river, through the east valley's mid-way ford and
+  on to the foot of the plateau's south spur, the way up (it had ended at nothing past the
+  bridge, the coordinator's catch); 2.2 wide, a little over the bridge's two rows (laid along its
+  second row, a road exactly 2 wide left the first row's end cells on its edge: Curves.cells takes
+  a cell nearer than half the width). Fords: one
+  over the west river, two over the east one (mid-way, and in the north into the low ground
+  between the river, the cliff and the fall's stream, otherwise closed in), and one over the
+  fall's stream (_ford by a row and a valley's columns).
+- **Places kept by name:** the hill cave (a refuge), the herder's hut and the shieling high on
+  the hill (640: each a fold and a hut on a levelled pad, the shieling on the plateau's top, clear
+of the fall's stream).
+
+**A server's state on the old grid (Level.REMADE).** The box keeps, per cell, the hills' level
+entities (4) and herds (7 groups), and players' records by zone (release, from journal lines
+only). Level.REMADE {"hills": 756} names a level made again on a new grid with the decision that
+remade it. On the first boot that sees it, Main._move_off_remade moves each player record in that
+zone to the level's own arrival (its centre; 749 keeps them off a hostile) and clears their
+companions' cells, drops the snapshot's section for the zone (its level entities laid again from
+the level), its generation, its herds (Herds.drop_area: its groups gone, the area seeded again
+on the new ground) and its felled cells and plots (Clearing.drop_zone, 591's, in the old grid's
+cells: terrain's catch), and keeps the remake as done in the snapshot ("remade", read by
+Snapshot.load, which passes every key since 758), so a second boot does nothing. One count-only line: "[level] remade hills (756):
+N players moved; dropped E entities, G herd groups, P plots, F felled cells" (plots, a town's
+builds, counted apart for Jeff) (release greps it once after the deploy,
+and its absence after a restart). A new world just marks it done. state_test 2c: the real save
+edited to hold the host, a crate, a deer herd and a felled cell in the hills on the old grid; the
+host comes back at the hills' arrival, the rest dropped ("1 felled cells"), the remake kept, and
+the next boot moves nothing. level_test, relief_test and view_test's hills checks moved to the
+new ground (the face at column 168, the west escarpment near 36 to 44, three streams, the road
+ending east, at the spur, across a ford and over the bridge's deck); view_test's curtain step is
+taken where the west river heads down its valley (a loop running across it cut the lowered
+land's edge again and again), and its road-edge samples, like its middles, only over ground).
+
+Ships with a cut (the level files change; clients read them), the server redeployed; protocol
+unchanged; no new class_name.

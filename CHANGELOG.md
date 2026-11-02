@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The hills are much bigger (224 by 224, was 96): two valleys with their winding rivers, the plateau and its waterfall, escarpments, the road from the wilds over a bridge and a ford to the plateau's way up, four fords, the herders' holdings and the hill cave (756).
 - Tests: view_test's sections on the big outdoor levels run as a scene of their own, view_land_test, beside it in the suite, so neither nears the per-scene time limit (278 amended).
 - Tools: the playtest folk tour checks chapel visits on a temple day and the priest's place in the chapel (754 amended (6)).
 - In a town, no more hitch every 20 seconds or so when someone goes in or out of a house: the light on the ground is no longer worked out again for the whole zone each time a lamp changes (383 amended).

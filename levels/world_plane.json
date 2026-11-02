@@ -4,7 +4,7 @@
 		"wilds": {"origin": [0, 0], "height": 0.0},
 		"castle": {"origin": [112, -120], "height": 11.77},
 		"foothills": {"origin": [0, -96], "height": 0.11},
-		"hills": {"origin": [256, 90], "height": -2.43},
+		"hills": {"origin": [256, 16], "height": -1.06},
 		"forest": {"origin": [-96, 84], "height": 5.34},
 		"held": {"origin": [78, 256], "height": -2.73}
 	},
@@ -20,6 +20,6 @@
 	],
 	"regions": [
 		{"id": "blood_rots_land", "name": "the Blood Rot's land", "rect": [-200, -230, 900, 960], "status": "agreed", "about": "The whole region (lore). Its own name is Jeff's open A1."},
-		{"id": "woodlands", "name": "the Woodlands", "rect": [-96, 0, 448, 448], "status": "draft", "about": "Where Umbrage sits (Jeff: \"Held sit in the Woodlands\", before he named the town Umbrage; draft until his wording check): the wilds, Umbrage's map (held) south of it on the river, the forest west and the hills east (decision 743, layout A)."}
+		{"id": "woodlands", "name": "the Woodlands", "rect": [-96, 0, 576, 448], "status": "draft", "about": "Where Umbrage sits (Jeff: \"Held sit in the Woodlands\", before he named the town Umbrage; draft until his wording check): the wilds, Umbrage's map (held) south of it on the river, the forest west and the hills east (decision 743, layout A)."}
 	]
 }
