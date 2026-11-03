@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://ccyjlrytfkhhi"
+path="res://.godot/imported/layout.png-e4cafac4cfb57cf450b3cfbe187282f2.image"
+
+[deps]
+
+source_file="res://levels/mine_look/layout.png"
+dest_files=["res://.godot/imported/layout.png-e4cafac4cfb57cf450b3cfbe187282f2.image"]
+
+[params]
+

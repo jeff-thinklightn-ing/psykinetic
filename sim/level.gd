@@ -75,6 +75,7 @@ const ANIMAL := "res://sim/animal.gd"
 const PUSHABLE := "res://sim/pushable.gd"
 const CHEST := "res://sim/chest.gd"
 const CARGO := "res://sim/cargo.gd"
+const SEAM_SCRIPT := "res://sim/seam.gd"
 
 ## The default legend: a meaning per colour (hex, RGB). level.json "legend"
 ## overrides or adds ({"wall": "#402a20", "monster_wraith": "#c0c0ff"}).
@@ -100,13 +101,14 @@ const LEGEND := {
 	"boulder": "#5a5a78",
 	"cart": "#7a3cb4",
 	"chest": "#8c4a1c",
+	"seam": "#b87333",
 	"torch": "#ffe000",
 	"lantern": "#fff0b0",
 	"lamp_cold": "#40e0d0",
 	"link": "#ff00ff",
 }
 const GROUNDS: Array[String] = ["stone", "grass", "dirt"]
-const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "torch", "lantern", "lamp_cold", "link"]
+const MARKERS: Array[String] = ["start", "crate", "boulder", "cart", "chest", "seam", "torch", "lantern", "lamp_cold", "link"]
 ## level.json "north": which way in layout.png is north.
 ## Map edges a level can have a neighbour across (level.json "neighbours"),
 ## each the way off the map it is.
@@ -293,6 +295,9 @@ const BOULDER := {"script": PUSHABLE, "shape": "sphere", "tint": Color(0.55, 0.5
 const CART := {"script": CARGO, "shape": "slab", "tint": Color(0.55, 0.4, 0.25), "art": "prop.cart", "props": {"mass": 60.0, "capacity": 8}}
 ## Empty; level.json's props say what is in it ({"slots": ["bandaging_kit"]}).
 const CHEST_SPEC := {"script": CHEST, "shape": "cube", "tint": Color(0.5, 0.28, 0.12), "art": "prop.chest"}
+## An ore seam (decision 769); level.json's props may give its
+## full_sacks, max_hp (the blows a sack takes) and refill_days.
+const SEAM_SPEC := {"script": SEAM_SCRIPT, "shape": "cube", "tint": Color(0.72, 0.45, 0.2), "art": "rock.seam", "label": Seam.LABEL}
 ## The idle modes level.json may give a monster (Monster.IDLE_MODES).
 const IDLE_MODES: Array[String] = ["guard", "wander", "patrol", "gather", "none"]
 ## An entity entry of only these keys leaves the spawn order as it was.
@@ -474,8 +479,9 @@ static func world_cell(plane: Dictionary, level_name: String, cell: Vector2i) ->
 ## overlay (a level made in the game is only there), sorted.
 ## Levels for development, which no way in the world reaches and none must
 ## (decision 673: the practice hall, Net.PRACTICE_MAP, hosted on its own):
-## WorldMap's reach checks leave them out.
-const DEV_LEVELS: Array[String] = ["practice"]
+## WorldMap's reach checks leave them out. mine_look (769) is the mine's
+## look test, reached by --map=mine_look.
+const DEV_LEVELS: Array[String] = ["practice", "mine_look"]
 
 
 static func names() -> Array[String]:
@@ -946,7 +952,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 				warnings.append("an entity in level.json has no \"at\": [x, y]")
 				continue
 			if not by_tile.has(at) or not _spawns(str(by_tile[at]["marker"])):
-				warnings.append("level.json names an entity at %s, where there is no crate, boulder, cart, chest or monster" % at)
+				warnings.append("level.json names an entity at %s, where there is no crate, boulder, cart, chest, seam or monster" % at)
 				continue
 			# An entry that only says how a monster faces and idles (as the
 			# editor writes them) does not move it up the order: its name and
@@ -1767,7 +1773,14 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"web_niche": {"sits": "niche", "variants": 2},
 	"fallen_guard": {"sits": "flat", "variants": 2, "faced": true},
 	"grave_fence": {"sits": "edge", "variants": 3},
-	"rune_strip": {"sits": "wall", "variants": 2}}
+	"rune_strip": {"sits": "wall", "variants": 2},
+	# The mine's (decision 769): an arch or a beam spans a way from wall to
+	# wall ("span"), art-kit's piece by the width it spans; track a cell a
+	# piece, faced the way it runs; a lamp hung on a wall.
+	"mine_arch": {"sits": "span", "variants": 1, "slot": "mine.arch_%d", "widths": [3, 5]},
+	"mine_beam": {"sits": "span", "variants": 1, "slot": "mine.beam_8", "widths": [3, 10]},
+	"mine_track": {"sits": "flat", "variants": 3, "faced": true, "slots": ["mine.track", "mine.track_bend", "mine.track_end"]},
+	"mine_lamp": {"sits": "wall", "variants": 1}}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],
@@ -1776,10 +1789,14 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 ## or a side for a faced one, the way its front turns; a side for a wall or
 ## edge piece, the edge it lies along, and for a web_niche, the niche's own
 ## step onto its wall; a diagonal for a web_corner, the corner whose two
-## walls meet there; kind one of DECOR_KINDS, variant 1 up to the kind's
+## walls meet there; for a span (769, the mine's arches and beams), the
+## step across the way from the wall (x, y) stands against, to the wall
+## facing it, the cells between all floor and their count in the kind's
+## "widths"; kind one of DECOR_KINDS, variant 1 up to the kind's
 ## count; as [{cell, out: the step as given, edge: the Terrain edge key (a
-## wall, edge and niche piece only), kind, variant}] for terrain to draw
-## art-kit's prop.<kind> on. One that is no floor, whose step fits not its
+## wall, edge and niche piece only), width (a span's cells), kind, variant}]
+## for terrain to draw art-kit's prop.<kind> on (or the kind's "slot", by
+## its width, or its "slots", by its variant). One that is no floor, whose step fits not its
 ## kind, whose strip lies on no wall, whose corner lacks a wall, or whose
 ## web hangs on no open niche of kind "a" or "c" (never the hidden door's,
 ## nor a sealed one: variant 2) is said in [param warnings] and left out,
@@ -1831,6 +1848,15 @@ static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[
 			"niche":
 				piece["edge"] = Terrain.edge_key(cell, way) if side else Vector3i.ZERO
 				fits = side and open_niches.has(piece["edge"])
+			"span":
+				var widths: Array = DECOR_KINDS[kind]["widths"]
+				var width := 1
+				var far := cell
+				while side and not walled.call(far, way) and floor.has(far + way) and width <= int(widths[1]):
+					far += way
+					width += 1
+				fits = side and walled.call(cell, -way) and walled.call(far, way) and width >= int(widths[0]) and width <= int(widths[1])
+				piece["width"] = width
 		if not fits:
 			warnings.append("decor %d at %s (step %s) fits no %s there: left out" % [index, cell, way, kind])
 			continue
@@ -3216,7 +3242,7 @@ static func outline(rect: Rect2i) -> Array[Vector3i]:
 
 
 static func _spawns(marker: String) -> bool:
-	return marker in ["crate", "boulder", "cart", "chest"] or marker.begins_with("monster_")
+	return marker in ["crate", "boulder", "cart", "chest", "seam"] or marker.begins_with("monster_")
 
 
 static func _base_name(marker: String) -> String:
@@ -3235,6 +3261,8 @@ static func _spec_for(marker: String, monster_types: Dictionary) -> Dictionary:
 			return CART.duplicate(true)
 		"chest":
 			return CHEST_SPEC.duplicate(true)
+		"seam":
+			return SEAM_SPEC.duplicate(true)
 	var type := marker.trim_prefix("monster_")
 	if not monster_types.has(type):
 		return {}

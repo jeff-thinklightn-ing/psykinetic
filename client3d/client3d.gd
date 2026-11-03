@@ -1968,6 +1968,8 @@ var _door_hinges: Dictionary[Vector3i, Array] = {}
 var _door_states: Dictionary[Vector3i, Array] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
+## A spent seam's height, of its whole (_sync_seam).
+const SEAM_RUBBLE_HEIGHT := 0.35
 ## The draugr's remains while he is gone at rest (573 amended (4)): his
 ## entity id -> art-kit's REMAINS_PROP at his pile_at (_sync_remains).
 var _remains: Dictionary[int, Node3D] = {}
@@ -11829,13 +11831,15 @@ func _read_niches() -> void:
 func _add_decor() -> void:
 	for entry: Dictionary in _terrain.get("decor", []):
 		var kind := str(entry["kind"])
-		var slot := DECOR_SLOT % kind
+		var slot := decor_slot(entry)
 		if not _deadwood_drawn(slot):
 			continue
 		var cell: Vector2i = entry["cell"]
 		var out: Vector2i = entry["out"]
-		# A variant art-kit has not made yet is its first (variant_count).
-		var piece := ArtKit.instance(slot, clampi(int(entry.get("variant", 1)), 1, maxi(1, ArtKit.variant_count(slot))))
+		# A variant art-kit has not made yet is its first (variant_count);
+		# one named by its variant (the mine's track, 769) is its own piece.
+		var variant := 1 if Level.DECOR_KINDS.get(kind, {}).has("slots") else int(entry.get("variant", 1))
+		var piece := ArtKit.instance(slot, clampi(variant, 1, maxi(1, ArtKit.variant_count(slot))))
 		piece.name = "Decor_%d_%d_%s_%d_%d" % [cell.x, cell.y, kind, out.x, out.y]
 		var at := Vector2(cell)
 		match str(Level.DECOR_KINDS.get(kind, {}).get("sits", "edge")):
@@ -11845,6 +11849,11 @@ func _add_decor() -> void:
 				piece.rotation.y = _roll(cell, 70) * TAU if out == Vector2i.ZERO else atan2(float(out.x), float(out.y))
 			"corner":
 				piece.rotation.y = _yaw_of(Vector2(out)) - _yaw_of(Vector2(DECOR_CORNER))
+			"span":
+				# Across the way (769): its middle between the walls it
+				# stands on, +x along the step from the first to the other.
+				at += Vector2(out) * (int(entry.get("width", 1)) - 1) * 0.5
+				piece.rotation.y = _yaw_of(Vector2(out))
 			_:
 				# On its edge (a wall's foot, a niche's mouth, or any edge out
 				# of doors, 658), the cell on +x: +x along -out, z along the edge.
@@ -11852,6 +11861,21 @@ func _add_decor() -> void:
 				piece.rotation.y = _yaw_of(-Vector2(out))
 		piece.position = Vector3(at.x, _height_in(cell, at), at.y)
 		_room.add_child(piece)
+
+
+## The art-kit slot a decor entry is drawn as: its kind's "slots" by its
+## variant, its "slot" by a span's width (the mine's, 769), else
+## DECOR_SLOT's prop.<kind>.
+static func decor_slot(entry: Dictionary) -> String:
+	var kind := str(entry["kind"])
+	var row: Dictionary = Level.DECOR_KINDS.get(kind, {})
+	if row.has("slots"):
+		var slots: Array = row["slots"]
+		return str(slots[clampi(int(entry.get("variant", 1)), 1, slots.size()) - 1])
+	if row.has("slot"):
+		var named := str(row["slot"])
+		return named % int(entry.get("width", 0)) if "%d" in named else named
+	return DECOR_SLOT % kind
 
 
 ## The turn about y that takes +x to [param way] (x, z on the ground).
@@ -14458,6 +14482,8 @@ func _sync_puppets() -> void:
 			continue
 		if _remains.has(id):
 			_drop_remains(id)  # Back: his remains go as he eases in.
+		if entity is Seam:
+			_sync_seam(puppet, entity as Seam)
 		if _low or puppet.has_meta("reach_in"):
 			# The low camera sees past World.NEAR_TILES: a body out there is
 			# not drawn (it would stand still, unthinking, 238); one crossing
@@ -14522,6 +14548,14 @@ func _sync_puppets() -> void:
 	for id in _puppets.keys():
 		if not seen.has(id):
 			_entity_went(id)
+
+
+## A seam worked out (decision 769) is drawn as its rubble: low
+## and dark, till it fills again.
+func _sync_seam(puppet: Node3D, seam: Seam) -> void:
+	var want := Vector3(1.0, SEAM_RUBBLE_HEIGHT, 1.0) if seam.spent else Vector3.ONE
+	if puppet.scale != want:
+		puppet.scale = want
 
 
 ## Gone at rest (573 amended (4)): the draugr's remains (art-kit's one-cell

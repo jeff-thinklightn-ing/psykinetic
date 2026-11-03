@@ -28,6 +28,11 @@ signal entity_pushed(entity: GridEntity, by: GridEntity, direction: Vector2i, ti
 ## moved, distance, cells, stopped_by, impact_damage, struck, knocked_down
 ## and speed, for combat's hit-stop, sound and stagger. Server only.
 signal blow_resolved(source: GridEntity, target: GridEntity, result: Dictionary)
+## A seam struck with a tool (decision 769): [param uid] the sack
+## it gave, 0 for a blow that only wore it. Server only.
+signal seam_mined(seam: Seam, by: GridEntity, uid: int)
+## A seam struck with no tool, or spent: the blow rang off it. Server only.
+signal seam_rang(seam: Seam, by: GridEntity)
 ## A lunge resolved (lunge, decision 596): [param result]'s cells, stopped_by,
 ## struck and impact_damage. Server only.
 signal lunge_resolved(entity: GridEntity, result: Dictionary)
@@ -7582,6 +7587,9 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		cause: StringName = &"attack") -> void:
 	if not Net.is_authority():
 		return
+	if target is Seam:
+		_strike_seam(target as Seam, source, cause)
+		return
 	if not target.spawned or amount <= 0 or not target.is_breakable():
 		return
 	if not target.holds_cell:
@@ -7640,6 +7648,72 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 			put_on_ground(uid, at)
 		if gold > 0:
 			drop_gold(zone.name, at, gold)
+
+
+## A blow on [param seam] by [param source] (decision 769): with a
+## tool (Seam.bites) it takes one of the seam's hp whatever the blow's
+## damage; at none a sack of ore (Seam.ORE) is minted at the miner's feet
+## and the seam is whole again, or spent with its last. Without one, or on
+## rubble, the blow rings off it. Either is heard as a fight is.
+func _strike_seam(seam: Seam, source: GridEntity, cause: StringName) -> void:
+	if cause != &"attack" or not is_instance_valid(source) or not seam.spawned:
+		return
+	noise(seam.tile, Senses.NOISE_FIGHT, &"fight", source)
+	if seam.spent or not Seam.bites(wielded(source)):
+		_log("seam: %s's blow rings off %s" % [source.name, seam.name])
+		seam_rang.emit(seam, source)
+		return
+	seam.hp = maxi(seam.hp - 1, 0)
+	seam.hurt_tick = tick
+	seam._world_damaged(1, cause)
+	var uid := 0
+	if seam.hp == 0:
+		uid = items.mint(Seam.ORE, "mined", _label_of(source), seam.zone, seam.tile)
+		put_on_ground(uid, source.tile)
+		seam.sacks -= 1
+		if seam.spent:
+			seam.spent_at = steps
+		else:
+			seam.hp = seam.max_hp
+		seam.keep()
+		_log("seam: %s mines a sack from %s, %d left" % [source.name, seam.name, seam.sacks])
+	seam_mined.emit(seam, source, uid)
+
+
+## Every spent seam in every zone whose refill_days have passed full again
+## (decision 769; Main, each world tick). The count filled.
+func refill_seams() -> int:
+	if not Net.is_authority():
+		return 0
+	var filled := 0
+	var lists: Array = [_entities]  # The zone entered, registered or not (a test's room).
+	for each: Zone in zones.values():
+		if not is_same(each.entities, _entities):
+			lists.append(each.entities)
+	for list: Array in lists:
+		for entity: GridEntity in list:
+			var seam := entity as Seam
+			if seam == null or not seam.spent or seam.spent_at < 0:
+				continue
+			if steps - seam.spent_at < roundi(seam.refill_days * DayNight.day_steps):
+				continue
+			seam.sacks = seam.full_sacks
+			seam.spent_at = -1
+			seam.hp = seam.max_hp
+			seam.keep()
+			filled += 1
+	return filled
+
+
+## Whether [param cell] of the zone entered is a recess (decision
+## 769, the two-cell passages rule): a seam stands only where one
+## side of four opens, so its rubble never narrows a way.
+func in_recess(cell: Vector2i) -> bool:
+	var open := 0
+	for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+		if not _terrain_blocks_step(cell, way, true):
+			open += 1
+	return open == 1
 
 
 ## Player intent: swing toward [param direction] where it stands (decision

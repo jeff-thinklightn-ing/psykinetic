@@ -3,28 +3,33 @@ extends Node
 ## its relief as it is (Level.ledges_of), again each run:
 ##   Godot --headless --path . res://tools/trace_ledges.tscn
 ## (a scene, not a --script run: parsing the level needs the autoloads).
-## For a level made by hand (the sample's outcrop); make_hills and
+## For a level made by hand (the sample's outcrop), or by a python tool
+## (make_mine_look, 769: run this after it); make_hills and
 ## make_wilds_marks write their own, and MapDoc.save writes them when the
 ## relief changes. The key is written into the file's text, the rest of it
 ## as it was.
 
-const FOLDERS := ["res://levels/sample/"]
+const FOLDERS := ["res://levels/sample/", "res://levels/mine_look/"]
 
 
 func _ready() -> void:
 	for folder: String in FOLDERS:
 		var doc := MapDoc.open(folder)
 		var map := doc.map
-		if not map.has_relief():
+		# No relief.png: the relief its height.png gives, as Level loads it
+		# (769's mine_look: its shaft's rim).
+		var loaded := Level.load_level(folder.trim_prefix(Level.DIR).trim_suffix("/"))
+		if not map.has_relief() and not loaded.get("terrain", {}).has("relief"):
 			print("[ledges] %s has no relief: left" % folder)
 			continue
-		var level := Level.parse(map.to_image(), null, doc.config, map.to_relief_image())
+		var level := Level.parse(map.to_image(), null, doc.config, map.to_relief_image()) if map.has_relief() else loaded
 		var ledges := Level.ledges_of(level["terrain"])
 		_drop_key(folder, "ledges")
 		if not ledges.is_empty():
 			_write_key(folder, "ledges", ledges)
 		doc.config["ledges"] = ledges
-		var again := Level.parse(map.to_image(), null, doc.config, map.to_relief_image())
+		var again := Level.parse(map.to_image(), null, doc.config, map.to_relief_image()) if map.has_relief() \
+				else Level.load_level(folder.trim_prefix(Level.DIR).trim_suffix("/"))
 		print("[ledges] %s: %d ledges; %s" % [folder, ledges.size(), "nothing said" if again["warnings"].is_empty() else "; ".join(again["warnings"])])
 	get_tree().quit()
 

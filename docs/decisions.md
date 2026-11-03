@@ -39421,3 +39421,68 @@ monster_test _test_great_bear (asleep by day, sleeps on with a hunter 4 off, wok
 roar, the swipe's tell then its blow and push, a knockdown breaking a tell, the slam's ring of 8 with
 two beside it, the charge's tell, a dodged charge leaving it winded, breaking off off its ground).
 Server only; protocol unchanged; new class_name GreatBear; no bullet (no level has one).
+## 769. The mine: ore seams, and its look (phase 1)
+
+Jeff (2026-11-02): "theres a mine entrance in the hills and its overrun, its the source of ore
+for the town, but its a mixture of clearing mobs, and mining. having the companion hold a pick
+axe could have them automatically mine for you so it doesn't feel like work to the player"; and
+later, "i'm starting to turn sour on the crypt look of halls surrounding by black nothingness
+... for the mines it needs irregular walls, shafts that npcs can be knocked down, wood
+arch/rafters, ore deposits, mine carts and tracks.. wide tunnels that interconnect and twist and
+turn ... the mine end rooms would say the same just how you get there would shift". The
+coordinator's phasing: (1) seams and mining, and the look test; (2) the generator for shifting
+tunnels with fixed end rooms; (3) overrun, rotating occupiers, claiming, miners, camps outside
+and the retake (the holdings' fallen-camp path, 429). Its place kind will be "workings", never
+"mine": WorldRichness thins life round a place of kind "mine" (the Blood Rot's mine in the dead
+land), and the hills' herds would die round it.
+
+Step 1, the seam:
+- Seam (sim/seam.gd, class_name Seam): a GridEntity that never moves or acts. It holds its
+  cell, stone, mass 100,000 (no push moves it), not breakable. A level places one with the
+  "seam" marker (legend #b87333; Level.SEAM_SPEC, art slot rock.seam); level.json's props may
+  give full_sacks (3), max_hp (the blows a sack takes, 7) and refill_days (3 game days).
+- Mining is attacking it. World.damage hands a blow on a seam to _strike_seam: with a tool in
+  the right hand (Seam.bites: an item tagged "tool", the pick) it takes one hp, whatever the
+  blow's damage. At none an ore_sack is minted ("mined") at the miner's feet and the seam is
+  whole again, or spent with its last sack. A sword, a bare hand, or any blow on rubble rings
+  off it (World.seam_rang). Both are heard as a fight. World.seam_mined(seam, by, uid) gives
+  the sack.
+- Spent, it is rubble that still holds its cell (Seam.spent, replicated; the client draws it at
+  0.35 of its height till art-kit's rock.seam_spent comes). Its label is voice's: "Ore seam",
+  then "Worked-out seam". World.refill_seams, each world tick (Main), fills every seam spent
+  refill_days ago again.
+- Its state (sacks, spent_at) is written into its spawn spec's props as it changes
+  (Seam.keep), so the snapshot keeps it as it keeps any level entity.
+- A seam stands in a recess, a floor cell with one open side of four (World.in_recess), so
+  neither it nor its rubble ever narrows a passage (two-cell passages). Levels are checked for
+  it in their tests; spawning does not enforce it.
+- In WASD a click swings at what you face (593), so a player mines with no new control. Step 2
+  (companions' side, an amendment here): a companion holding a pick mines a seam near her
+  player while nothing hostile is in sight.
+
+Phase 1, the look test:
+- levels/mine_look, laid by tools/make_mine_look.py (seed 769) and linked to nothing (run with
+  --map=mine_look). It is 48 x 36: an entrance chamber by the west edge (the edge still); two
+  tunnels that twist and loop through a cross tunnel to an 8-wide chamber; the north tunnel
+  narrows to 3 by a shaft (a pit 3 levels down: a foe knocked off the drop falls, 592); the
+  south tunnel widens to 5 along a run of track with a cart. It has 8 seams in recesses.
+- It is a dev level (Level.DEV_LEVELS, beside practice, 673): no way reaches it, and WorldMap's
+  reach checks leave it out. Its pngs import as Images, as every level's. Its "ledges" (585, the
+  shaft's rim) come from tools/trace_ledges, which now traces a level whose relief is only its
+  height.png (no relief.png) from Level.load_level; run it after make_mine_look.py.
+- Every cell not dug is void. Its level.json "mass": "rock" (terrain's side) has the view draw
+  rough rock over the void and out past the map's edge instead of black. Walls "cave" (286),
+  floors "cave".
+- Decor kinds for the mine (Level.DECOR_KINDS), art-kit's pieces:
+  - "mine_arch" and "mine_beam" sit a new "span", across a way from a wall to the wall facing
+    it, every cell between floor and their count in the kind's widths. They are drawn as the
+    kind's "slot" by that width (mine.arch_3/4/5, mine.beam_8), centred between the walls.
+  - "mine_track" is flat and faced, its "slots" by variant (mine.track, mine.track_bend,
+    mine.track_end).
+  - "mine_lamp" hangs on a wall (prop.mine_lamp).
+  Client3D.decor_slot names the slot; any other kind is prop.<kind> as before.
+
+mine_test: the marker and props, the recess, a bare hand and a sword ringing off, a pick's
+blows and sacks, rubble, the labels, a save's entry and the refill; mine_look parsing with no
+warnings, its seams in recesses, its decor placed and its slots. PROTOCOL CHANGE (Seam's
+replicated "spent", a new spawned class); new class_name Seam.

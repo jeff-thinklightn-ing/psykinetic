@@ -5716,6 +5716,7 @@ func _on_world_stepped() -> void:
 		# The clients' clocks, kept from drifting off the world's.
 		Net.broadcast("sky", sky_message())
 		_regenerate_due()
+		World.refill_seams()  # Decision 769.
 	if Net.is_authority() and World.steps % HALL_SEAL_EVERY == 0:
 		for zone_name: String in _hall_seals:
 			if _hall_seals[zone_name]:
