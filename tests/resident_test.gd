@@ -1601,10 +1601,14 @@ func _test_herbs() -> void:
 		var had := World.stockpile.count(hut, "herbs")
 		_check(not World.ground_at(laid).has("herbs") and had >= 1 and not World.items.has(uid), "on the world tick he takes them into his own hut's store, unpaid (%d herbs)" % had)
 		_check(World.stockpile.count(STORE, "herbs") == town_had, "the town's store neither holds nor paid for them")
+		# His day's gather full (healer.herbs_a_day, 3 since the coordinator's 11-02 call): the next pile waits.
+		var a_day := int(Townsfolk.rules().get("healer", {}).get("herbs_a_day", 1))
+		_check(a_day == 3, "he gathers three a day (%d)" % a_day)
+		_main._herbs_gathered["medicine_man:" + hut] = {"day": Townsfolk.day_of(World.steps), "count": a_day}
 		var second := World.items.mint("herbs", "grew", "the test", oren.zone, oren.tile)
 		var again := World.put_on_ground(second, oren.tile + Vector2i(2, 0))
 		_main._gather_herbs()
-		_check(again != World.NO_CELL and World.ground_at(again).has("herbs") and World.stockpile.count(hut, "herbs") == had, "a day's gather once: the second pile waits for tomorrow")
+		_check(again != World.NO_CELL and World.ground_at(again).has("herbs") and World.stockpile.count(hut, "herbs") == had, "a day's gather done: the next pile waits for tomorrow")
 		# Without a body: the next day, at the hut, once the hour has come.
 		World.production.set_away("medicine_man:" + hut, true)
 		_sync()

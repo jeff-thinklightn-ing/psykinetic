@@ -449,6 +449,7 @@ func _test_in_town() -> void:
 	await _test_give_in_town(host)
 	_test_town_sheet(host)
 	_test_drove()
+	_test_makers_command()
 	remove_child(_main)
 	_main.free()
 	World.clear_zones()
@@ -658,3 +659,27 @@ func _test_give_in_town(host: Player) -> void:
 	_check(_main.give_gold(host, {"from": str(bo.get_path()), "amount": 1}) == 0, "never taken from another player")
 	World._relocate(bo, Vector2i(5 + World.COMPANION_REACH + 2, 3))
 	_check(_main.give_gold(host, {"to": str(bo.get_path()), "amount": 1}) == 0 and World.gold_of(bo.player_id) == bo_had + 7, "nor out of reach")
+
+
+## The console's "makers" (the coordinator's ask, after Hob's empty shelf):
+## a maker's trade and town, their own make on the shelf counted, never a
+## name; one with nothing says so; a smith's sword is not the medicine man's.
+func _test_makers_command() -> void:
+	print("\n== the console's makers: each maker's own goods on the shelf, by count, no names ==")
+	var maker := "medicine_man:%s" % STORE
+	var line := "medicine_man at %s" % STORE
+	_check(World.production.add_worker(maker, "Probewort", ["medicine_man"], STORE, "test"), "(a medicine man in the town)")
+	var empty: String = _main._makers_command(PackedStringArray(["makers", "medicine_man"]))
+	_check("%s: nothing on the shelf" % line in empty and not "Probewort" in empty, "none made yet: nothing on the shelf (%s)" % empty)
+	var potions := [World.items.mint("remedy", "made", "test"), World.items.mint("remedy", "made", "test")]
+	for uid: int in potions:
+		World.stockpile.stock_shop(STORE, uid, "Probewort", maker)
+	var full: String = _main._makers_command(PackedStringArray(["makers"]))
+	_check("%s: remedy x2" % line in full and not "Probewort" in full, "two remedies of his own, counted, his name kept out (%s)" % full)
+	var town_line := Array(full.split("\n")).filter(func(each: String) -> bool: return each.begins_with("%s: shelf " % STORE))
+	_check(town_line.size() == 1 and "remedy x2" in town_line[0] and "; store " in town_line[0], "the town's line: its whole shelf and its store's raws (%s)" % [town_line])
+	_check(_main._makers_command(PackedStringArray(["makers", "no_such_trade"])) == "no makers matching no_such_trade", "a filter matching none says so")
+	for uid: int in potions:
+		World.stockpile.take_from_shop(STORE, uid, "test")
+		World.items.end(uid, "gone")
+	World.production.remove_worker(maker)

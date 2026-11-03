@@ -78,9 +78,9 @@ func _test_lay() -> void:
 	_check(_count() == int(rule["per_day"]), "per_day of them lie in %s (%d)" % [AREA, _count()])
 	var huts := World.forage.huts_in(AREA, rule["hut"])
 	var hut_herbs := found.keys().filter(func(cell: Vector2i) -> bool: return World.forage.near_hut(AREA, Forage.HERBS, cell))
-	_check(huts.size() == 1 and hut_herbs.size() == 1 and huts.all(func(hut: Vector2i) -> bool:
+	_check(huts.size() == 1 and hut_herbs.size() == int(rule["hut"]["per_day"]) and int(rule["hut"]["per_day"]) == 3 and huts.all(func(hut: Vector2i) -> bool:
 		return hut_herbs.all(func(cell: Vector2i) -> bool: return Vector2(cell - hut).length() > 2.0 and Vector2(cell - hut).length() <= 12.0)),
-		"the healer's hut grows its own (562 amended): one, 2 to 12 cells from it (%s, %s)" % [huts, hut_herbs])
+		"the healer's hut grows its own (562 amended): three a day (the coordinator, 11-02), 2 to 12 cells from it (%s, %s)" % [huts, hut_herbs])
 	for cell: Vector2i in hut_herbs:
 		found.erase(cell)
 	var towns := World.forage.towns_in(AREA)

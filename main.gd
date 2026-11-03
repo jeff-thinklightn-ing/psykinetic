@@ -10667,7 +10667,7 @@ func _visits_due() -> void:
 
 ## How far the medicine man reaches for herbs on his way (decision 502, npc's
 ## side): cells from where his body stands, each world tick.
-const HERB_REACH := 6
+const HERB_REACH := 12
 
 
 ## Server, on the world tick: a medicine man gathers herbs (decision 502,
@@ -18427,6 +18427,7 @@ const CONSOLE_HELP: Array[String] = [
 	"gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said)",
 	"herds [seed <area>|all]: each area's game, seeded or its ground still building; or seeded now",
 	"balance [ask <fold>]: the keep-the-balance areas' deer, wolves and folds, each quest and its outcome if judged now; or a fold's quest asked now",
+	"makers [<town or trade>]: each maker's trade, place and the goods of their own make on their town's shelf, by count (no names)",
 	"move <player> <x> <y> [zone] | move <player> <building code> [zone]: a player to a cell",
 	"mark <player> <mark>|-<mark>: a mark on a player, or one taken off",
 	"reset: this room rebuilt from its map",
@@ -18600,9 +18601,69 @@ func admin_command(line: String, caller: Player = null) -> String:
 			return _herds_command(words)
 		"balance":
 			return _balance_command(words)
+		"makers":
+			return _makers_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
+
+
+## "makers [<filter>]" (562 amended (7)): town by town, one line a worker
+## (a companion's left out): their trade and town, never the worker id
+## (which may hold a name), "away" or "sick" when so, and for a making
+## trade (Production.items_catalog's "made" by) the goods of their own make
+## on their town's shelf (Economy.maker_goods) by count, or "nothing on the
+## shelf"; then the town's whole shelf by item and its store's raws. The
+## filter keeps the towns or trades that hold it.
+func _makers_command(words: PackedStringArray) -> String:
+	if World.production == null or World.economy == null or World.stockpile == null:
+		return "no production here (the server keeps it)"
+	var trades := {}
+	var catalog := Production.items_catalog()
+	for id: String in catalog:
+		trades[str(catalog[id]["made"].get("by", ""))] = true
+	var by_town := {}
+	for worker_id: String in World.production.worker_ids():
+		var worker := World.production.worker(worker_id)
+		var town := str(worker.get("town", ""))
+		var list: Array = worker.get("trades", [])
+		var trade := ", ".join(PackedStringArray(list.map(func(each: Variant) -> String: return str(each))))
+		var at := "%s at %s" % [trade, town]
+		if worker_id.begins_with(Townsfolk.COMPANION) or words.size() > 1 and not words[1] in at:
+			continue
+		var state := (", away" if bool(worker.get("away", false)) else "") + (", sick" if Townsfolk.is_sick(World.production, worker_id) else "")
+		var shelf := "makes nothing"
+		if list.any(func(each: Variant) -> bool: return trades.has(str(each))):
+			shelf = _counted(World.economy.maker_goods(worker_id).map(func(each: Dictionary) -> String: return str(each["id"])))
+			if shelf.is_empty():
+				shelf = "nothing on the shelf"
+		if not by_town.has(town):
+			by_town[town] = []
+		by_town[town].append("  %s%s: %s" % [at, state, shelf])
+	var lines: Array[String] = []
+	var towns: Array = by_town.keys()
+	towns.sort()
+	for town: String in towns:
+		var raws: Array[String] = []
+		for what: String in Stockpile.RESOURCES:
+			if what != "gold" and World.stockpile.count(town, what) > 0:
+				raws.append("%s %d" % [what, World.stockpile.count(town, what)])
+		var shelf := _counted(Array(World.stockpile.shop(town)).map(func(uid: Variant) -> String: return World.stockpile.book.id_of(int(uid))))
+		lines.append("%s: shelf %s; store %s" % [town, shelf if not shelf.is_empty() else "empty", ", ".join(raws) if not raws.is_empty() else "no raws"])
+		lines.append_array(by_town[town])
+	return "\n".join(lines) if not lines.is_empty() else "no makers%s" % (" matching %s" % words[1] if words.size() > 1 else "")
+
+
+## [param ids] counted, "id xN" sorted, joined; "" for none.
+static func _counted(ids: Array) -> String:
+	var counts := {}
+	for id: Variant in ids:
+		counts[str(id)] = int(counts.get(str(id), 0)) + 1
+	var out: Array[String] = []
+	for id: String in counts:
+		out.append("%s x%d" % [id, counts[id]])
+	out.sort()
+	return ", ".join(out)
 
 
 ## "herds [seed <area>|all]": each area's game, seeded or how far its ground's

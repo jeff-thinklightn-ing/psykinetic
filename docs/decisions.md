@@ -24684,6 +24684,24 @@ Main._barter_reach moved here) is the counter's. Main's barter and trade, its re
 retainer), and try_barter (a counter by barter_reach, a maker in person) use them. resident_test
 _test_threat: a barter with Bram the smith 2 and 3 cells off answers, and a trade reaches him;
 6 off is "too far away". Server only, protocol unchanged, no new class_name.
+562 amended (7) (release's label; the coordinator's calls after the box's "nothing made" and Hob's
+empty barter): a console readout of the makers, and a healer who rarely stands with an empty shelf.
+What the box showed (release's journal counts, names left out): the healer's hut at wilds made 3
+remedies and 3 stamina potions on 10-25 and 10-26, its recipes' stock of 3 each, and nothing after.
+The shelf was full, and the barter that would have emptied it answered "too far away" (562 amended
+(5)), so he never brewed again. The towns' other makers made nothing because no raws reached their
+stores: in two days only rent gold and 3 herbs were banked. The town never grows on its own, so a town
+of keepers has no gatherers (a question for Jeff). Nothing in production's path uses World.reaches.
+(1) Console "makers [<filter>]": town by town, the town's whole shelf by item and its store's raws,
+then one line a worker, "<trade> at <place>", ", away" or ", sick" when so, and for a making trade the
+goods of their own make on the shelf by count, or "nothing on the shelf". Never a worker id, which may
+hold a name; a companion is left out. The filter keeps the towns or trades that hold it.
+(2) The medicine man gathers healer.herbs_a_day 3 herbs a game day (was 1), within Main.HERB_REACH 12
+cells (was 6: forage's hut reach), and forage's herbs.hut grows 3 a day up to 6 lying (was 1 up to 3),
+so there are herbs to gather. Herbs players sell him still go to his brewing (maker_buys). npc's
+healer rule, edited here with npc's leave. economy_test _test_makers_command; resident_test
+_test_herbs (the day's cap from the rule); forage_test _test_lay (three a day round the hut). Server
+only, protocol unchanged, no new class_name.
 ## 584 amended (2): the care counted a handful at a time
 
 Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4

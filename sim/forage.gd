@@ -21,7 +21,7 @@ extends RefCounted
 ##
 ## A healer's hut (the item's "hut": its place kinds) grows its own (the
 ## coordinator's ruling, 2026-10-22: the medicine man gathers within
-## HERB_REACH 6 of his hut, so herbs must grow near it): per_day up to most
+## HERB_REACH 12 of his hut, so herbs must grow near it): per_day up to most
 ## lying within its reach, outside its own small ring, wherever the towns'
 ## rings fall; a hut is no town's centre.
 ##
