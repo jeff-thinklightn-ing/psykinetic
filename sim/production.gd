@@ -1209,7 +1209,9 @@ func signals_of(town: String, cat: Dictionary) -> Dictionary:
 		short["food"] = 1.0
 	var full := true
 	for what: String in rules.get("comfort", {}):
-		if stockpile.count(town, what) < comfort(town, what):
+		# Meat and hides the counter buys up to comfort (652 amended (3)), but
+		# a town without a hunter still has its surplus work.
+		if what not in rules.get("comfort_not_full", []) and stockpile.count(town, what) < comfort(town, what):
 			full = false
 	var lines := stockpile.ledger(town).filter(func(line: Dictionary) -> bool: return int(line["step"]) >= at - window).size()
 	lines += _jobs.values().filter(func(each: Dictionary) -> bool: return each["town"] == town).size()

@@ -28755,6 +28755,14 @@ Soaks (38 days, one player, the default world):
 - At per_head_day 1 with the reserve, the cook made 25 rations in 38 days, against 192 without it. Strain held at 0 till day 24. Newcomers (11 at the founding count, 15 by day 37) still ate the larder by day 25, and the town fell for a tick on day 34.
 - The coordinator's call: per_head_day stays 1.5 ("people come"), with the reserve. Stocked 210 + 368 = 578. No hunger day and no fall through day 38, a village on day 30. Roots dug on day 35 (60 food) with about 20 food left in the store by the ledger (579 banked, 559 meals). A thin margin. The coordinator's call: founding.margin_days 3 (a draft on the tune line), three days' more food for the founding heads, for a wetter year or a mouth more; checked to day 38 before landing.
 
+## 652 amended (3). Meat and hides have a comfort, so the counter buys them
+
+Release's label; the coordinator's call after playtest's store tour (765): on day 1 a player's natural haul, a cut of meat or a hide, sold at the depot (bank_sale pays any raw) but not over the counter, whose barter buys only what the town is short of (Economy.refuses: short_of over comfort or the gear wants). Meat and hides had no comfort, so the counter answered "the town has enough of that". One rule per store now:
+- economy.json comfort gains meat 20 and hide 10. The counter buys them up to those, at a price scaled by the shortage (raw_price), as it does ore or wood; the depot's price follows the same shortage.
+- comfort_not_full ["meat", "hide"]: Production.signals_of's "full" (the SURPLUS tier, the makers' shop goods and reworks) leaves them out, so a town with no hunter still has its surplus work.
+- Visitors buying raws above comfort and a caravan's keep read the same comfort; a store over 20 meat sells its spare as before.
+economy_test _test_counter_raws (economy.json's own rules). Server only, protocol unchanged.
+
 ## 661. Arrival shelter: no harm while a zone's view builds
 
 Perf found that every zone crossing freezes the client while it builds the 3D view, about 4 s

@@ -45,6 +45,7 @@ func _ready() -> void:
 	_test_prices()
 	_test_buying()
 	_test_selling()
+	_test_counter_raws()
 	_test_barter()
 	_test_vendor()
 	_test_maker_barter()
@@ -117,6 +118,34 @@ func _test_buying() -> void:
 	_check(economy.stockpile.count(TOWN, "gold") == 129 and economy.gold("p1") == 12,
 		"a crown no resident made (the town bought it): all 20 to the treasury")
 	_check(economy.add_gold("p1", -50, "a test") == 0, "gold never goes below none")
+
+
+## The counter buys meat and hides as the depot banks them, up to their
+## comfort (652 amended (3), economy.json's own rules); a town short of
+## them still counts its store full for its surplus work.
+func _test_counter_raws() -> void:
+	print("\n== the counter buys meat and hides, up to comfort ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var rules := Production.read_rules(Economy.PATH)
+	var cat := {"meat": {"id": "meat", "tags": ["resource"], "yield": {"meat": 1}},
+		"hide": {"id": "hide", "tags": ["resource"], "yield": {"hide": 1}}}
+	var catalog := func() -> Dictionary: return cat
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	stock.deposit(TOWN, "gold", 500, "test")
+	var work := Production.new({}, stock, null, clock, rules, catalog)
+	var economy := Economy.new({}, stock, work, clock, rules, catalog)
+	var raws := economy.buys(TOWN, ["meat", "hide"])
+	_check(raws.has("meat") and int(raws["meat"]["up_to"]) == 20 and raws.has("hide") and int(raws["hide"]["up_to"]) == 10,
+		"none in store: the counter buys meat up to 20, hides up to 10 (%s)" % [raws])
+	stock.deposit(TOWN, "meat", 20, "test")
+	_check(economy.refuses(TOWN, "meat") == "the town has enough of that" and economy.refuses(TOWN, "hide").is_empty(),
+		"20 meat in store: no more meat; a hide still")
+	for what: String in rules["comfort"]:
+		if what not in ["meat", "hide"]:
+			stock.deposit(TOWN, what, maxi(work.comfort(TOWN, what) - stock.count(TOWN, what), 0), "test")
+	stock.take(TOWN, "meat", 20, "test")
+	_check(work.signals_of(TOWN, cat)["full"], "every other raw at comfort, no meat or hides: the store still counts full (its surplus work goes on)")
 
 
 func _test_selling() -> void:
