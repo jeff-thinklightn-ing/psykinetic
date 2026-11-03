@@ -207,6 +207,7 @@ func _test_restart() -> void:
 	_main._crypt_told = {"probe": true}
 	_main._placed_captives = {"probe_camp": true}
 	World.towns.raise_threat("test_room/probe_town", "wolves", "probe")  # A threat in town, held (762).
+	World.towns._town("test_room/probe_town")["gatherers_seated"] = true  # Its gatherers seated once (767).
 	var blood := {"test_room": [3, 4, clock + 1000]}  # A wounded beast's trail, fading at its step (764 amended).
 	World.blood_from_dict(blood)
 	# The balance (761): a fold regrowing and a quest open, by value through the save and the load.
@@ -266,6 +267,8 @@ func _test_restart() -> void:
 	_check(World.towns.threatened("test_room/probe_town") == "wolves" and World.towns.threat_of_town("test_room/probe_town").get("held") == ["probe"],
 		"a town's threat survives the restart, held as it was (762; %s)" % [World.towns.threat_of_town("test_room/probe_town")])
 	_check(World.blood_to_dict() == blood, "blood on the ground comes back, fading at the same step (764 amended; %s)" % [World.blood_to_dict()])
+	_check(World.towns._town("test_room/probe_town").get("gatherers_seated") == true and World.towns.seat_gatherers("test_room/probe_town").is_empty(),
+		"a town's gatherers seated once survive the restart: no second woodcutter (767)")
 	World.towns.lift_threat("test_room/probe_town")
 	World.blood.clear()
 	_main._save_state()

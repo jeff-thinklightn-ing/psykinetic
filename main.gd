@@ -4223,6 +4223,7 @@ func _boot() -> void:
 	if not World.production.work_done.is_connected(_on_counter_work_done):
 		World.production.work_done.connect(_on_counter_work_done)
 	_seat_healers()
+	_seat_gatherers()
 	_test_temple_day()
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
@@ -4272,7 +4273,10 @@ func _boot() -> void:
 	World.production.hunt = func(town: String) -> String:
 		var place := World.holdings.place(town)
 		var cell: Vector2i = place.get("cell", Vector2i.ZERO)
-		return World.herds.hunt_one(str(place.get("area", town.get_slice("/", 0))), cell) if World.herds != null else ""
+		var area := str(place.get("area", town.get_slice("/", 0)))
+		if World.balance != null and World.balance.governs(area):
+			return ""  # The folds' meadows are the balance's: no town hunter takes there (767, the coordinator).
+		return World.herds.hunt_one(area, cell) if World.herds != null else ""
 	# A beaten raid's companion captives come back (decision 314).
 	World.companion_freed = companion_freed
 	_records.clear()
@@ -16257,6 +16261,20 @@ func _place_captive(camp_id: String, holder: String, hold: Dictionary, index: in
 
 
 # --- The fallen brought back (decision 396) -----------------------------------------
+
+## Every town's gatherers (767): each store place the town holds seats its
+## woodcutter and hunter once (Towns.seat_gatherers); a place held by
+## another faction now waits for a later boot. Name-free boot lines.
+func _seat_gatherers() -> void:
+	if World.holdings == null or World.towns == null:
+		return
+	for place_id: String in World.holdings.all_places():
+		if World.holdings.place(place_id).get("kind") != "stockpile" or World.holdings.holder(place_id) != "town":
+			continue
+		var seated := World.towns.seat_gatherers(place_id)
+		if not seated.is_empty():
+			print("[towns] %s seats its gatherers: %s" % [place_id, ", ".join(seated)])
+
 
 ## Each healer's hut (a Holdings place of kind healers_hut, maps' 372) given
 ## its medicine man if it has none: a workshop of the place's own, a worker

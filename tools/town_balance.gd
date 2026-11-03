@@ -11,6 +11,9 @@ extends Node
 ## nothing in the shared user:// (Level.overlay_dir a private folder).
 ##   godot --headless --path <repo> res://tools/town_balance.tscn -- --days=90 [--thief=hand_1] [--merchant=hand_2] [--no-field] [--every=7]
 ## (--every: a line every that many days, 7 unless given; "owed" is what the town owes its people.)
+## --gatherers: the town's gatherers seated as the box seats them (767, Towns.seat_gatherers);
+## --folk=<trade,trade|none>: only those of the nine (767's soak: "none" for gatherers alone).
+## Each line then ends with the store's raws and the shelf's goods by id.
 ## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> soak -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
 
 const TOWN := "wilds/store"
@@ -21,6 +24,8 @@ const FOLK := [["smith_1", "Odo", "smith"], ["cook_1", "Mags", "cook"], ["carp_1
 
 var _now := 0
 var _every := 7
+var _gatherers := false
+var _folk: Array = []  # [] for all of FOLK.
 
 
 func _ready() -> void:
@@ -39,6 +44,10 @@ func _ready() -> void:
 			thief = arg.trim_prefix("--thief=")
 		elif arg.begins_with("--merchant="):
 			merchant = arg.trim_prefix("--merchant=")
+		elif arg == "--gatherers":
+			_gatherers = true
+		elif arg.begins_with("--folk="):
+			_folk = Array(arg.trim_prefix("--folk=").split(","))
 		elif arg == "--no-field":
 			field = false
 	DayNight.day_steps = DAY
@@ -81,9 +90,11 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	if field:
 		towns._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	for each in FOLK:
-		if each[2] == "farmer" and not field:
+		if each[2] == "farmer" and not field or not _folk.is_empty() and each[2] not in _folk:
 			continue
 		towns.note_rescue(TOWN, each[0], each[1], each[2])
+	if _gatherers:
+		print("gatherers seated: %s" % [towns.seat_gatherers(TOWN)])
 	if not thief.is_empty():
 		if work.worker(thief).is_empty():
 			print("no resident %s to make a thief" % thief)
@@ -138,3 +149,9 @@ func _line(day: int, towns: Towns, work: Production, stock: Stockpile, meals: Di
 		stock.count(TOWN, "food"), ledger.filter(func(l: String) -> bool: return l.begins_with("lifted:") or l.begins_with("missing") or l.contains(" missing")).size(),
 		ledger.filter(func(l: String) -> bool: return l.ends_with(" a dealer")).size(),
 		ledger.filter(func(l: String) -> bool: return l.begins_with("returned")).size(), purses])
+	var shelf := {}
+	for uid in stock.shop(TOWN):
+		var id := stock.book.id_of(uid)
+		shelf[id] = int(shelf.get(id, 0)) + 1
+	print("        raws: wood %d meat %d hide %d leather %d food %d | shelf %s"
+		% [stock.count(TOWN, "wood"), stock.count(TOWN, "meat"), stock.count(TOWN, "hide"), stock.count(TOWN, "leather"), stock.count(TOWN, "food"), shelf])

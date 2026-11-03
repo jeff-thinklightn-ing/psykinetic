@@ -39044,3 +39044,31 @@ cooling, the idle fade, the four effects and the damage unchanged, a
 monster unaffected, a full draw let go); record_keys_test (the field
 through a save, and a record from before 766 or with nonsense in it).
 PROTOCOL_REVISION 45 -> 46; no new class_name.
+## 767. Every town's gatherers: a woodcutter and a hunter, seated once
+
+Jeff: "yes add gatherers to each town" (decisions/town-gatherers.md); the coordinator approved the
+design. The box's towns made nothing since 10-31: no raws reached their stores, since a woodcutter
+comes only by rescue (613) and a hunter has no newcomer path at all.
+- Towns.seat_gatherers(town): once ever (the town record's "gatherers_seated", saved and loaded),
+  one of each of economy.json's gatherers trades the town has none of (a sought one counts):
+  woodcutter and hunter. Moved in as "growth", named from the trade's names (else rescue.names, so
+  no new names for lore), seated, and said in the town's log in voice's words: "%s the woodcutter
+  comes to keep the town in wood", "%s the hunter comes to keep the town in meat and hides".
+- Main._seat_gatherers at boot, after the healers: every stockpile place the town faction holds.
+  So the box's towns get theirs on the next boot and a fresh world has them from day 1; a place
+  held by another faction waits for a later boot. Boot line "[towns] <place id> seats its
+  gatherers: <trades>", no names.
+- Both work by today's rules, unchanged: the woodcutter every 3000 steps, needing no woodshed
+  (the log still says he waits for one); the hunter every 3000 steps, each deer taken from his
+  area's herd budget (Herds.hunt_one). The coordinator: no town hunter takes in an area the
+  balance governs (Balance.governs, the folds' meadows), so Main's hunt callable returns nothing
+  there.
+- The soak (tools/town_balance.gd gains --gatherers and --folk=<trades|none>; each line then shows
+  the store's raws and shelf): the wilds town, 14 game days, no field, no players. Wood 18 -> 53
+  (about 2.5 a day after his woodlot walk), meat 0 -> 9 and hides 0 -> 8. With a tanner and a cook
+  as well: meat 17, hides 14, and the makers finished nothing. The tanner waits for a tannery only
+  a carpenter builds; the cook is held off the store's food by the founding larder in a town with
+  no crop (652 amended (2)). The town paid the gatherers for every delivery and owed its people
+  60-76 by day 14 with no sales. Those are the coordinator's to rule on separately.
+farm_test _test_gatherers; zone_test _test_restart (the mark survives a restart: no second
+woodcutter). Server only; protocol unchanged; no new class_name.

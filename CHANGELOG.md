@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Every town now has a woodcutter and a hunter of its own, who keep its store in wood, meat and hides (767).
 - A town's store counter now buys cuts of meat and raw hides when the town is short of them, as its depot does (652 amended (3)).
 - Weapon memory (sword and bow): the more you fight with a sword or shoot a bow, the smoother it handles: a practised sword recovers a little quicker and parries a little wider, a practised bow draws quicker and steadier; it cools as you use other weapons and comes back faster than it first grew (766).
 

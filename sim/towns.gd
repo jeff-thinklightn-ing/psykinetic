@@ -2464,6 +2464,36 @@ func next_stage(town: String) -> Dictionary:
 	return {"stage": names[at + 1], "needs": stage_short(town, stages[at + 1])}
 
 
+## [param town]'s gatherers (767, Jeff: "yes add gatherers to each town"):
+## once ever, one of each of rules' gatherers trades it has none of (a
+## sought one counts), moved in and seated, named from the trade's names
+## (else rescue.names), said in its log. The trades seated; [] once it has
+## been done (the mark is saved, so a restart seats nobody twice).
+func seat_gatherers(town: String) -> Array[String]:
+	var out: Array[String] = []
+	var record := _town(town)
+	if bool(record.get("gatherers_seated", false)):
+		return out
+	record["gatherers_seated"] = true
+	var rule: Dictionary = rules.get("gatherers", {})
+	var trades: Array = rule.keys().filter(func(key: Variant) -> bool: return not str(key).begins_with("_"))
+	trades.sort()
+	for trade: String in trades:
+		if _has_trade(town, trade):
+			continue
+		var names: Array = rules.get(trade, {}).get("names", rules.get("rescue", {}).get("names", ["Bran"]))
+		var name := _free_name(town, names, absi(hash("%s/%s/gather" % [town, trade])))
+		var id := "%s_%s_gatherer" % [trade, town.replace("/", "_")]
+		if not production.add_worker(id, name, [trade], town, "growth"):
+			continue
+		record["residents"].append(id)
+		_note(town, str(rule[trade]) % name)
+		out.append(trade)
+	if not out.is_empty():
+		_seat(town)
+	return out
+
+
 ## A town with a building waiting on wood and no woodcutter gets one, a
 ## newcomer, once it has waited woodcutter.growth_days (a rescue may bring
 ## one first), as a field gets its farmer (449).
@@ -3372,6 +3402,8 @@ func from_dict(saved: Dictionary) -> void:
 		if entry.has("woodcutter_wanted"):
 			record["woodcutter_wanted"] = int(entry["woodcutter_wanted"])
 		record["woodcutters_came"] = maxi(int(entry.get("woodcutters_came", 0)), 0)
+		if bool(entry.get("gatherers_seated", false)):
+			record["gatherers_seated"] = true  # Seated once (767): never again after a restart.
 		var flock_saved: Variant = entry.get("flock", {})
 		if flock_saved is Dictionary and not flock_saved.is_empty():
 			record["flock"] = {"count": maxf(float(flock_saved.get("count", 0.0)), 0.0), "season": str(flock_saved.get("season", "")),

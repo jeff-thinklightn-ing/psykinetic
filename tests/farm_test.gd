@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_farmer_comes()
 	_test_look()
 	_test_woodcutter()
+	_test_gatherers()
 	_test_felling()
 	_test_stages()
 	_test_decline()
@@ -248,6 +249,30 @@ func _test_woodcutter() -> void:
 	_check(cutters.size() == 1 and bare.production.worker(cutters[0])["origin"] == "growth", "a woodcutter comes (%s)" % [cutters])
 	_year(bare, 3)
 	_check(bare.residents(TOWN).filter(func(id: String) -> bool: return "woodcutter" in bare.production.worker(id)["trades"]).size() == 1, "and only one")
+
+
+## Every town's gatherers (767): a woodcutter and a hunter seated once,
+## only of a trade it lacks, said in its log in voice's words; the woodcutter
+## cuts with no woodshed; never twice.
+func _test_gatherers() -> void:
+	print("\n== every town's gatherers, seated once (767) ==")
+	var rule: Dictionary = _rules["gatherers"]
+	var towns := _towns(1, false)
+	var seated := towns.seat_gatherers(TOWN)
+	var of := func(trade: String) -> Array: return towns.residents(TOWN).filter(func(id: String) -> bool: return trade in towns.production.worker(id)["trades"])
+	_check(seated == ["hunter", "woodcutter"] and of.call("hunter").size() == 1 and of.call("woodcutter").size() == 1, "a woodcutter and a hunter move in (%s)" % [seated])
+	var said := func(line: String) -> bool:
+		return towns.log_of(TOWN).any(func(each: Dictionary) -> bool: return str(each["what"]).ends_with(line.trim_prefix("%s")))
+	_check(said.call(str(rule["woodcutter"])) and said.call(str(rule["hunter"])), "each said in the town's log, voice's words")
+	_check(towns.seat_gatherers(TOWN).is_empty() and towns.residents(TOWN).size() == 2, "a second time: nobody")
+	_year(towns, 1)
+	_check(towns.production.stockpile.count(TOWN, "wood") > 0, "the woodcutter cuts with no woodshed: %d wood a day" % towns.production.stockpile.count(TOWN, "wood"))
+	var kept := _towns(1, false)
+	kept.note_rescue(TOWN, "w1", "Bran", "woodcutter")
+	_check(kept.seat_gatherers(TOWN) == ["hunter"], "a town with its woodcutter: only a hunter")
+	var saved := _towns(1, false)
+	saved.from_dict(towns.to_dict())
+	_check(saved.seat_gatherers(TOWN).is_empty(), "saved and loaded: never seated twice")
 
 
 ## The forest real (591, economy's side): a cut takes its trees from maps'
