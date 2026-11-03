@@ -39072,3 +39072,20 @@ comes only by rescue (613) and a hunter has no newcomer path at all.
   60-76 by day 14 with no sales. Those are the coordinator's to rule on separately.
 farm_test _test_gatherers; zone_test _test_restart (the mark survives a restart: no second
 woodcutter). Server only; protocol unchanged; no new class_name.
+
+767, economy's side (2) (release's label; the coordinator's ruling on the soak above): so the makers
+finish, and gold comes back without players.
+- (a) The gatherers include a carpenter (a town needs a builder; Jeff's yes covers it), said as
+  "%s the carpenter comes to raise the town's sheds and workshops" (voice).
+- (b) A roast is meat alone (items.json made.from {"meat": 1}; items agreed), so the founding
+  larder, which guards food only, never keeps the cook from roasting. Its value falls from about 4
+  to 3, still over a ration's 2.
+- (c) The pedlar (711) also buys spare meat and hides, over 652 amended (3)'s comfort, within his 4.
+- tools/town_balance wires the visitors as Main does.
+The re-soak, 14 game days, no field, no players: the cook roasted every cut the hunter brought (14
+and more, the shelf at its cap as they sold); the carpenter built the tannery by about day 4; the
+tanner made 2 leather and stopped, with nothing calling for more (770 gives leather a comfort).
+The treasury still sat at its floor, owing its people 56-72: a town's gold comes in from players
+and, from 770, the market's trader. farm_test _test_gatherers (three, the carpenter's line) and
+_test_visitors (the spare meat bought); larder_test _test_larder_reserve (a roast under the
+larder). Server only; protocol unchanged; no new class_name.

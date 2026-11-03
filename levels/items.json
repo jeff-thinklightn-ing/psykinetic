@@ -62,7 +62,7 @@
 		{"id": "roast", "name": "roast meat", "short": "Roast", "color": "8c4a2c",
 			"kind": "held", "size": [0.2, 0.1, 0.15], "weight": 0.8, "hands": 1, "stack": 5,
 			"tags": ["food"], "use": "eat", "effects": [{"kind": "mass", "amount": 15, "ticks": 2400}],
-			"made": {"by": "cook", "from": {"meat": 1, "food": 1}, "steps": 900, "first": true}},
+			"made": {"by": "cook", "from": {"meat": 1}, "steps": 900, "first": true}},
 		{"id": "knife", "name": "knife", "short": "Knife", "color": "b8bcc4",
 			"art": "item.knife", "kind": "held", "size": [0.04, 0.25, 0.02], "weight": 0.3, "hands": 1,
 			"tags": ["weapon", "tool"], "made": {"by": "smith", "from": {"ore": 1}, "steps": 1200}},

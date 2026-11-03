@@ -70,6 +70,7 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	work.deliver = economy.deliver
 	work.buy_materials = economy.buy_materials
 	economy.shortfall = towns.shortfall
+	towns.visitor_arrives = economy.visitor_arrives  # Visitors (711), as Main wires them.
 	work.build_lacks = func(town: String) -> Dictionary: return towns.shortfall(town).get("needs", {})
 	work.town_pays = economy.owe_or_pay
 	work.settle_fund = economy.settle_fund

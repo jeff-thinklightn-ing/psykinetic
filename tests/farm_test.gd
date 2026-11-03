@@ -260,16 +260,17 @@ func _test_gatherers() -> void:
 	var towns := _towns(1, false)
 	var seated := towns.seat_gatherers(TOWN)
 	var of := func(trade: String) -> Array: return towns.residents(TOWN).filter(func(id: String) -> bool: return trade in towns.production.worker(id)["trades"])
-	_check(seated == ["hunter", "woodcutter"] and of.call("hunter").size() == 1 and of.call("woodcutter").size() == 1, "a woodcutter and a hunter move in (%s)" % [seated])
+	_check(seated == ["carpenter", "hunter", "woodcutter"] and of.call("hunter").size() == 1 and of.call("woodcutter").size() == 1 and of.call("carpenter").size() == 1,
+		"a woodcutter, a hunter and a carpenter move in (%s)" % [seated])
 	var said := func(line: String) -> bool:
 		return towns.log_of(TOWN).any(func(each: Dictionary) -> bool: return str(each["what"]).ends_with(line.trim_prefix("%s")))
-	_check(said.call(str(rule["woodcutter"])) and said.call(str(rule["hunter"])), "each said in the town's log, voice's words")
-	_check(towns.seat_gatherers(TOWN).is_empty() and towns.residents(TOWN).size() == 2, "a second time: nobody")
+	_check(said.call(str(rule["woodcutter"])) and said.call(str(rule["hunter"])) and said.call(str(rule["carpenter"])), "each said in the town's log, voice's words")
+	_check(towns.seat_gatherers(TOWN).is_empty() and towns.residents(TOWN).size() == 3, "a second time: nobody")
 	_year(towns, 1)
 	_check(towns.production.stockpile.count(TOWN, "wood") > 0, "the woodcutter cuts with no woodshed: %d wood a day" % towns.production.stockpile.count(TOWN, "wood"))
 	var kept := _towns(1, false)
 	kept.note_rescue(TOWN, "w1", "Bran", "woodcutter")
-	_check(kept.seat_gatherers(TOWN) == ["hunter"], "a town with its woodcutter: only a hunter")
+	_check(kept.seat_gatherers(TOWN) == ["carpenter", "hunter"], "a town with its woodcutter: no second one")
 	var saved := _towns(1, false)
 	saved.from_dict(towns.to_dict())
 	_check(saved.seat_gatherers(TOWN).is_empty(), "saved and loaded: never seated twice")
@@ -603,6 +604,7 @@ func _test_visitors() -> void:
 	towns.visitor_left.connect(func(_town: String, _id: String) -> void: seen["left"] += 1)
 	var folk := towns.residents(TOWN).size()
 	work.stockpile.deposit(TOWN, "wood", work.comfort(TOWN, "wood") + 3, "test")
+	work.stockpile.deposit(TOWN, "meat", work.comfort(TOWN, "meat") + 1, "test")  # Spare meat too (767 amended).
 	var gold := work.stockpile.count(TOWN, "gold")
 	_now = 2 * DAY
 	towns._visitors_turn(TOWN)
@@ -614,6 +616,7 @@ func _test_visitors() -> void:
 	_check(not stock.is_empty() and not stock.has("silver_ring"), "wares, none the smith makes (%s)" % [stock])
 	_check(work.stockpile.count(TOWN, "wood") == work.comfort(TOWN, "wood") and work.stockpile.count(TOWN, "gold") > gold,
 		"the spare wood bought into the treasury (%d gold)" % (work.stockpile.count(TOWN, "gold") - gold))
+	_check(work.stockpile.count(TOWN, "meat") == work.comfort(TOWN, "meat"), "and the spare meat, up to his four (767 amended)")
 	var item: String = stock.keys()[0]
 	economy.add_gold("p1", 100, "test")
 	gold = work.stockpile.count(TOWN, "gold")

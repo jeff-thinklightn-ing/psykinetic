@@ -17,7 +17,8 @@
 	"hunter": {"trade": "hunter", "every": 3000},
 	"gatherers": {"_": "Decision 767 (Jeff: \"yes add gatherers to each town\"): each town seated once with one of each trade it has none of, named from the trade's names (else rescue.names), its line in the town's log (voice's words).",
 		"woodcutter": "%s the woodcutter comes to keep the town in wood",
-		"hunter": "%s the hunter comes to keep the town in meat and hides"},
+		"hunter": "%s the hunter comes to keep the town in meat and hides",
+		"carpenter": "%s the carpenter comes to raise the town's sheds and workshops"},
 	"sites": {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground", "farmer": "farm", "fisherman": "fishing"}, "steps_per_cell": 4, "work_steps": 120, "other_area": 3000},
 	"woodcutter": {"trade": "woodcutter", "every": 3000, "wood": 2, "per_level": 1, "wood_per_tree": 2, "deadwood": 1, "growth_days": 2,
 		"names": ["Bran", "Alder", "Rowan", "Hazel", "Ash", "Birk"]},
@@ -88,7 +89,7 @@
 		"chance": 0.35, "most": 2, "days": [1, 3],
 		"kinds": {
 			"traveller": {"weight": 3, "inn": [2, 6], "names": ["Hale", "Oswin", "Maud", "Tamsin", "Garrick", "Edda"]},
-			"pedlar": {"weight": 2, "raws": ["ore", "wood", "cloth"], "buys": 4, "draw": [3, 5], "names": ["Jory", "Bess", "Wat", "Nell"],
+			"pedlar": {"weight": 2, "raws": ["ore", "wood", "cloth", "meat", "hide"], "buys": 4, "draw": [3, 5], "names": ["Jory", "Bess", "Wat", "Nell"],
 				"wares": [{"item": "spice", "count": 2, "weight": 3}, {"item": "wine", "count": 2, "weight": 2},
 					{"item": "silver_ring", "count": 1, "weight": 1, "unless": "smith"}, {"item": "remedy", "count": 2, "weight": 2, "unless": "medicine_man"},
 					{"item": "tusks", "count": 1, "weight": 1}, {"item": "buckler", "count": 1, "weight": 1, "unless": "tanner"},

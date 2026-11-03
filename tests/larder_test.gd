@@ -120,6 +120,9 @@ func _test_larder_reserve() -> void:
 	work.add_workshop(TOWN + ":kitchen", "cook", TOWN)
 	work.assign(TOWN + ":kitchen", "c1")
 	_check(_started(work, 4000).is_empty() and work.stockpile.count(TOWN, "food") == 10, "the store at its larder: no ration made from it")
+	work.stockpile.deposit(TOWN, "meat", 1)
+	_check(_started(work, 4000) == ["roast"] and work.stockpile.count(TOWN, "food") == 10 and work.stockpile.count(TOWN, "meat") == 0,
+		"a roast is meat alone: roasted, the larder untouched (767 amended)")
 	larder[0] = 0
 	_check("ration" in _started(work, 4000), "nothing kept: rations again")
 	var towns := Towns.new({}, Production.new({}, Stockpile.new({}, func() -> int: return _now, ItemBook.new(func() -> int: return _now)), null, func() -> int: return _now, _rules), _rules, func() -> int: return _now)
