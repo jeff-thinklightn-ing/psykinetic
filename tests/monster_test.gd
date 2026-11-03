@@ -20,10 +20,11 @@ const SPECS := {
 	"g": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "skeleton_guard"},
 	"x": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber"},
 	"u": {"script": "res://sim/draugr.gd", "shape": "capsule", "kind": "draugr"},
+	"B": {"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear"},
 }
 const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
 	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer", "k": "Skeleton", "g": "Guard",
-	"x": "Robber", "u": "Draugr"}
+	"x": "Robber", "u": "Draugr", "B": "Bear"}
 
 var _failures := 0
 var _room: Node2D
@@ -81,6 +82,7 @@ func _ready() -> void:
 	_test_call_and_rout()
 	_test_raid_march()
 	_test_raid_beaten()
+	_test_great_bear()
 	_test_raid_takes()
 	_test_noticing()
 	_test_wild_kinds()
@@ -1640,6 +1642,130 @@ func _test_raid_beaten() -> void:
 	raids.enter({"id": "g3", "faction": "goblins", "strength": 2.0, "town": "t"}, World.zone.name, Vector2i(2, 2))
 	raids.hand_back(World.zone.name)
 	_check(left == ["g3"] and raids.ids().is_empty(), "its zone asleep, a group goes back to maps")
+
+
+## The great bear (decision 780): its den at (4, 3), a long room.
+func _test_great_bear() -> void:
+	print("\n== the great bear: asleep by day at its den, woken by a blow; swipe, slam and charge on their tells; a broken tell; off its ground it breaks off ==")
+	Monster.idling = true
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 5:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	var row := rows[3]
+	rows[3] = row.substr(0, 4) + "B" + row.substr(5)
+	var e := _build(rows)
+	var bear: GreatBear = e["B"][0]
+	var cries: Array[StringName] = []
+	bear.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	for i in 5:
+		World.step()
+	_check(bear.asleep and bear.pose == Monster.Pose.SIT and bear.den == Vector2i(4, 3), "by day, nobody about: it sleeps at its den")
+	var hunter := EntityFactory.build(SPECS["P"].merged({"name": "BearHunter"})) as GridEntity
+	_room.add_child(hunter)
+	World.spawn(hunter, Vector2i(8, 3))
+	for i in 10:
+		World.step()
+	_check(bear.asleep, "a hunter 4 off: it sleeps on (it sees %d asleep)" % GreatBear.SLEEP_SIGHT)
+	World.despawn(hunter)
+	World.spawn(hunter, Vector2i(5, 3))
+	World.damage(bear, 3, hunter)
+	World.step()
+	_check(not bear.asleep and &"roar" in cries, "struck asleep, it wakes with a roar (%s)" % [cries])
+	bear._next_charge = World.tick + 100000  # Its charge waits for its own check below.
+	# The swipe: a cone, then the blow and the push.
+	var tells := func(kind: String) -> Array:
+		return World.telegraphs().values().filter(func(t: Dictionary) -> bool: return t["kind"] == kind and t["source"] == str(bear.get_path()))
+	var swiped := false
+	for i in 10:
+		World.step()
+		if not tells.call("swipe").is_empty():
+			swiped = true
+			break
+	_check(swiped and &"swipe" in cries, "the hunter beside it: a swipe's tell first (a cone), and its growl")
+	var before := hunter.hp
+	for i in GreatBear.SWIPE["windup"] + 1:
+		World.step()
+	_check(hunter.hp == before - int(GreatBear.SWIPE["damage"]) and World.distance(hunter.tile, bear.tile) >= 2,
+			"then the swipe lands: %d hp and swept back (%d off)" % [before - hunter.hp, World.distance(hunter.tile, bear.tile)])
+	# A tell broken: knocked down mid-tell, the move is lost.
+	World.despawn(hunter)
+	World.spawn(hunter, bear.tile + Vector2i(1, 0))
+	bear._next_swipe = 0
+	for i in 10:
+		World.step()
+		if not tells.call("swipe").is_empty():
+			break
+	before = hunter.hp
+	World.knock_down(bear, hunter, 8)
+	bear._next_swipe = World.tick + 100000  # No second swipe in the window.
+	for i in GreatBear.SWIPE["windup"] + 10:  # Down 8: its tell ends unlanded when it rises.
+		World.step()
+	_check(hunter.hp == before and tells.call("swipe").is_empty(), "knocked down mid-tell: the swipe is broken off, no blow")
+	bear._next_swipe = World.tick + 100000
+	for i in 30:
+		World.step()
+		if bear._move.is_empty():
+			break
+	# The slam: two beside it.
+	var second := EntityFactory.build(SPECS["P"].merged({"name": "BearHunter2"})) as GridEntity
+	_room.add_child(second)
+	World.despawn(hunter)
+	World.spawn(hunter, bear.tile + Vector2i(1, 0))
+	World.spawn(second, bear.tile + Vector2i(0, 1) if World.is_free(bear.tile + Vector2i(0, 1)) else bear.tile + Vector2i(0, -1))
+	bear._next_slam = 0
+	bear._next_swipe = World.tick + 1000
+	var slammed := false
+	for i in 20:
+		World.step()
+		if not tells.call("slam").is_empty():
+			slammed = true
+			break
+	var slam_cells: Array = tells.call("slam")[0]["cells"] if slammed else []
+	_check(slammed and slam_cells.size() == 8, "two beside it: it rears, a ring's tell round it (%d cells)" % slam_cells.size())
+	var hp_before := [hunter.hp, second.hp]
+	for i in GreatBear.SLAM["windup"] + 1:
+		World.step()
+	_check(hunter.hp < hp_before[0] and second.hp < hp_before[1] and World.is_down(hunter) and World.is_down(second),
+			"the slam: both struck and knocked down")
+	World.despawn(second)
+	for i in 30:
+		World.step()
+	# The charge: a foe 5 off on a line, then the rush.
+	bear._next_swipe = World.tick + 1000
+	bear._next_slam = World.tick + 1000
+	bear._next_charge = 0
+	World.despawn(hunter)
+	World.spawn(hunter, bear.tile + Vector2i(5, 0))
+	var charged := false
+	for i in 20:
+		World.step()
+		if not tells.call("charge").is_empty():
+			charged = true
+			break
+	_check(charged, "a foe 5 off: the charge's tell, a line to them")
+	# Stepped off the line before it runs: the charge meets nobody; winded.
+	var off := hunter.tile + Vector2i(0, 2) if World.is_free(hunter.tile + Vector2i(0, 2)) else hunter.tile + Vector2i(0, -2)
+	World.despawn(hunter)
+	World.spawn(hunter, off)
+	before = hunter.hp
+	var winded := false
+	for i in 60:
+		World.step()
+		if World.is_winded(bear):
+			winded = true
+			break
+	_check(winded and hunter.hp == before, "dodged, the charge runs past and leaves it winded: the opening")
+	# Off its ground: it breaks off and goes home.
+	for i in 40:
+		World.step()
+	bear.den = Vector2i(-200, 3)
+	for i in 5:
+		World.step()
+	_check(bear.target == null, "its foe off its ground (its den far off): it breaks off")
+	World.despawn(hunter)
+	DayNight.set_hour(12.0)
 
 
 func _test_raid_takes() -> void:

@@ -39387,3 +39387,37 @@ relief_test _test_hills (the fall's pool still deep; streams as fords), level_te
 (the low wall's sight check now over open valley). Level data and the generator only; protocol
 unchanged (fords are on the wire since 505; a client and server must have the same level, so it
 ships with a cut); no new class_name.
+## 780. Apex creatures: beasts a new player goes round, or a party takes (the great bear first)
+
+Jeff: "I think what zones are missing also is challenging monsters or even animals that lower level
+players might avoid or need to team up for", and "examples could be werewolf or vampire at night.
+During the day, a mountain lion or Alpha Wolf." The coordinator's roster, by time of day so the lands
+change at dusk. By day: the great bear and the boar king (forest), the old wolf leading a pack and the
+hill cat, an ambusher (hills). By night: a cursed wolf-man, a blood-drinker by the Old Tower that
+running water and fire hold off, and the hollow stag. Lore says how each came to be before any is
+built; a resident who is a foe needs its own design with npc first. Each is read before it is
+fought: its roar heard far off, prey fleeing its ground, its tracks, its kills, its size, rumours.
+Each keeps a territory and never hunts a player off it. One fresh player loses; two or three, or one
+veteran, win in 60-90 s by reading its tells. A kill is a deed: a trophy, a token, a push on the webs.
+
+The pilot is the great bear (GreatBear, an Animal predator; kind great_bear, art creature.great_bear,
+creature.boar until its body lands), on test levels only:
+- Its den is its home; its ground is TERRITORY_TILES (25) about it. It goes for a player or companion
+  there, or one who struck it, and gives a foe up (BREAK_OFF_TICKS) off its ground or after
+  CALM_TICKS (20 s) with no blow. By day it goes home and sleeps (SIT, sight 2), healing 1 hp every
+  5 s, the only place it heals; a blow or a foe beside it wakes it. By night it roams and hunts deer.
+- It roars (cry "roar", reach 50) on waking, at dusk, at a fight's start and at half hp.
+- Its moves, each a World.telegraph tell (combat's shapes; a cry of the move's name at its start for
+  sound's growl), standing while it winds up, never a blow without a tell: swipe (cone 2, 60 either
+  side; 0.6 s; 7 damage, World.sweep at impulse 140, two cells back); slam (ring 1.5, every cell
+  beside it; 1.2 s, with two or more beside it; 9 damage, pushed, knocked down 1.5 s); charge (line 6
+  at a foe 3 or more off; a 0.8 s roar, then World.rush with a 140 blow and 8 damage on the body met;
+  meeting nobody it is winded, stamina 0, the opening).
+- Stunned or knocked down since a tell began, the move is lost, its telegraph ended unlanded (read
+  from stunned_until_tick and down_until, since its tick does not run while it is down).
+- Mass 300 (physics' 592 needs no rule: shoves and blows barely move it); 90 hp; numbers are drafts
+  for playtest's one-bot and two-bot runs. Every move and break-off logs "[apex]", no player's name.
+monster_test _test_great_bear (asleep by day, sleeps on with a hunter 4 off, woken by a blow with a
+roar, the swipe's tell then its blow and push, a knockdown breaking a tell, the slam's ring of 8 with
+two beside it, the charge's tell, a dodged charge leaving it winded, breaking off off its ground).
+Server only; protocol unchanged; new class_name GreatBear; no bullet (no level has one).
