@@ -4317,11 +4317,14 @@ func counter_view(by: GridEntity, counter: GridEntity, why := "") -> Dictionary:
 			var entry: Dictionary = out["jobs"].back()
 			entry["why"] = _reforge_refusal(by, uid, town, workshop, cost, price)
 			entry["ok"] = str(entry["why"]).is_empty()
+	var held: Array[int] = towns.held(town, owner) if towns != null else ([] as Array[int])
 	for id in production.jobs():
 		var job := production.job(id)
 		if job.get("kind") == "work" and str(job.get("for", "")) == owner and job.get("town") == town:
 			var left := maxi(int(job["needed"]) - int(job["worked"]), 0)
 			var worked_on: int = job["uids"][0] if not (job["uids"] as Array).is_empty() else 0
+			if worked_on in held:
+				continue  # Done and held: it waits, it isn't worked on (ui's note).
 			out["working"].append({"uid": worked_on, "id": items.id_of(worked_on), "effect": job["effect"], "to_id": job["to_id"],
 				"left": left, "left_seconds": roundi(left * TICK_DT)})
 	if towns != null:
@@ -4389,7 +4392,8 @@ func counter_order(by: GridEntity, counter: GridEntity, slot: int, effect: Strin
 
 
 ## Player [param by] collects [param uid], held for them at
-## [param counter]'s town, into their first free slot: "" if they did,
+## [param counter]'s town, into a free hand that may hold it (the left for
+## a shield; 438 amended), else their first free slot: "" if they did,
 ## else why not.
 func counter_collect(by: GridEntity, counter: GridEntity, uid: int) -> String:
 	if not Net.is_authority() or not reaches(by, counter) or towns == null:
@@ -4399,10 +4403,24 @@ func counter_collect(by: GridEntity, counter: GridEntity, uid: int) -> String:
 	if uid not in towns.held(town, owner):
 		return "that waits for someone else"
 	var slots := by.slots.duplicate()
-	var free := -1
+	# A free hand first, as the thing was most likely handed in from one
+	# (a blessed sword back in the hand; a shield the left), then the pack.
+	var order: Array[int] = []
+	var id := items.id_of(uid)
+	if has_hands(by) and slots.size() >= Items.HANDED:
+		if Items.has_tag(id, "shield"):
+			order.append(Items.LEFT_HAND)
+		else:
+			var hand := _free_hand(by, id)
+			if hand >= 0:
+				order.append(hand)
 	for i in slots.size():
+		if i not in order:
+			order.append(i)
+	var free := -1
+	for i in order:
 		if str(slots[i]).is_empty():
-			slots[i] = items.id_of(uid)
+			slots[i] = id
 			if hands_allow(by, slots):
 				free = i
 				break

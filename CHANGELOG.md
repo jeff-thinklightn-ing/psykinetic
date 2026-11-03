@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Counters: what you collect goes back into your hand when it's free (a shield to the left), and a finished job no longer shows as still being worked (438 amended).
 - F now sweeps up everything lying near you, each thing flying in from where it lay (773, ui's side).
 ## v0.1.200
 

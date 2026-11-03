@@ -11052,6 +11052,16 @@ counter's view; at a shop counter an unnamed dagger refused with why, the
 fee refused, a target it can't become refused, the order taken and paid,
 being worked on with seconds left, reforged on the same uid with its name,
 waiting, collected, nothing waiting); protocol_test.
+
+438 amended (release's label; playtest's temple run, ui's note): two counter fixes. A blessed
+sword handed in from the right hand came back into pack slot 0, the first free slot; and once a
+job was done, counter_view listed its thing in both "working" (the work job still open for a
+tick) and "waiting" (already held for its owner). World.counter_collect now tries a free hand
+first, the one World._free_hand picks for the thing (the left for a shield), then every slot
+in order as before, still under hands_allow; a thing that can't be held goes to the pack.
+counter_view leaves out of "working" a thing already held for its owner (Towns.held), so it
+shows once, waiting. blessing_test _test_reforge (not listed as worked on once held; collected
+into the free right hand). Server only, protocol unchanged, no new class_name.
 ## 429. A cleared camp falls
 
 Nothing in play called Holdings.take, so a camp never changed hands and

@@ -159,7 +159,17 @@ func _test_reforge() -> void:
 	_check(World.items.id_of(uid) == to_id and not World.items.name_of(uid).is_empty(), "reforged on the same uid, its name kept (%s)" % World.items.id_of(uid))
 	view = World.counter_view(player, counter)
 	_check(view["waiting"].size() == 1 and view["waiting"][0]["uid"] == uid, "waiting for them")
-	_check(World.counter_collect(player, counter, uid) == "" and uid in Array(player.slot_items), "collected into their slots")
+	_check(not view["working"].any(func(each: Dictionary) -> bool: return each["uid"] == uid),
+		"held for them, so no longer listed as worked on (438 amended; %s)" % [view["working"]])
+	var hands := player.slots.duplicate()
+	var hand_uids := player.slot_items.duplicate()
+	for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		hands[hand] = ""
+		hand_uids[hand] = 0
+	player.slots = hands
+	player.slot_items = hand_uids
+	_check(World.counter_collect(player, counter, uid) == "" and World.slot_uid(player, Items.RIGHT_HAND) == uid,
+		"collected back into the free right hand (438 amended; at %d)" % Array(player.slot_items).find(uid))
 	_check(World.counter_view(player, counter)["waiting"].is_empty(), "nothing waiting now")
 
 
