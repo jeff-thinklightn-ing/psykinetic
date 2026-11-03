@@ -129,7 +129,8 @@ static func areas_of(world_map: WorldMap) -> Dictionary:
 				peopled.append(link["tile"])
 		# Its roads and dirt tracks (763: maps' Level.safe_paths, a set of cells).
 		out[name] = {"floor": area["floor"], "outdoor": world_map.is_outdoor(name), "herds": area.get("herds", {}),
-			"peopled": peopled, "safe_paths": area.get("safe_paths", {})}
+			"peopled": peopled, "safe_paths": area.get("safe_paths", {}),
+			"fords": area.get("fords", {})}  # Walkable water (505, maps' 776): never a home.
 	return out
 
 
@@ -200,6 +201,8 @@ func barred(area: String, species: String) -> bool:
 func may_home(area: String, species: String, cell: Vector2i) -> bool:
 	if barred(area, species):
 		return false
+	if areas.get(area, {}).get("fords", {}).has(cell):
+		return false  # A ford is walked through, never lived on (maps' 776).
 	var keep_off := int(_species(species).get("keep_off", 0))
 	if keep_off > 0:
 		for at: Vector2i in areas.get(area, {}).get("peopled", []):
@@ -287,7 +290,7 @@ func _build_ground(area: String, budget: int) -> bool:
 		var to := mini(keys.size(), from + maxi(FLOOR_PER_TICK * budget / DEFAULT_GROUND_PER_TICK, 1))
 		for index in range(from, to):
 			var cell: Vector2i = keys[index]
-			if cell.x % sample == 0 and cell.y % sample == 0:
+			if cell.x % sample == 0 and cell.y % sample == 0 and not areas.get(area, {}).get("fords", {}).has(cell):
 				build["found"].append(cell)
 		build["key_at"] = to
 		if to < keys.size():

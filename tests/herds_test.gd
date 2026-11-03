@@ -55,6 +55,7 @@ func _ready() -> void:
 	_test_multiplier()
 	_test_no_wolves()
 	_test_path_dens()
+	_test_ford_homes()
 	_test_spread()
 	_test_short_days()
 	_test_seed_now()
@@ -439,6 +440,30 @@ func _test_path_dens() -> void:
 	var hills := Herds.areas_of(WorldMap.build(["hills"] as Array[String]))
 	_check(not (hills.get("hills", {}).get("safe_paths", {}) as Dictionary).is_empty(),
 		"the hills' roads and tracks read (%d cells)" % (hills.get("hills", {}).get("safe_paths", {}) as Dictionary).size())
+
+
+## A ford is walked through, never lived on (776, economy's side): an
+## area's "fords" (505; maps' 776 makes the hills' streams fords) are no
+## home for any kind, seeded or roamed; the hills' own fords read.
+func _test_ford_homes() -> void:
+	print("\n== no herd home on a ford (776) ==")
+	var fords := {}
+	for x in SIZE:
+		for y in range(96, 104):
+			fords[Vector2i(x, y)] = true  # A waded stream straight across.
+	var areas := _areas.duplicate(true)
+	areas["fields"]["fords"] = fords
+	_now = 0
+	var fresh := Herds.new({}, areas, _rules, func() -> int: return _now)
+	_tick(fresh)
+	var all: Array = fresh.groups_in("fields", "wolf") + fresh.groups_in("fields", "deer")
+	_check(not all.is_empty() and not all.any(func(each: Dictionary) -> bool: return fords.has(each["home"])),
+		"seeded: %d herds, none homed on the stream" % all.size())
+	_check(not fresh.may_home("fields", "deer", Vector2i(140, 100)) and not fresh.may_home("fields", "wolf", Vector2i(140, 100))
+		and fresh.may_home("fields", "deer", Vector2i(140, 110)), "no home on a ford for deer or wolf; beside it, yes")
+	var hills := Herds.areas_of(WorldMap.build(["hills"] as Array[String]))
+	_check(not (hills.get("hills", {}).get("fords", {}) as Dictionary).is_empty(),
+		"the hills' fords read (%d cells)" % (hills.get("hills", {}).get("fords", {}) as Dictionary).size())
 
 
 func _spawn(spec: Dictionary) -> Object:

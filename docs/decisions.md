@@ -39552,3 +39552,12 @@ in 780, enemy-ai's side (2)); and a lone traveller does well to go round it. Dra
 wording check. The night ones (the wolfskin, the pale lord, the hollow stag), the troll, the old
 wolf and the hill cat wait on Jeff (C:/dev/review/decisions/apex-creatures.md). Data only; protocol
 unchanged; no new class_name; no bullet (no level has one).
+
+776, economy's side (release's label; maps' 776, as economy said it would be kept): a ford is walked
+through, never lived on. Herds sample an area's floor for homes, and a ford is floor, so a herd could
+be seeded or roam onto a stream; the old fords of 505 could already take one. Herds.areas_of carries
+the area's "fords" (WorldMap's set); sampling for homes skips them, and may_home refuses a ford for
+every kind, so a home already standing on one moves off at the next roam, as a den near a path does
+(763). herds_test _test_ford_homes (a stream of fords across the fields: none homed on it, a home
+beside it allowed; the hills' fords read). Server only, protocol unchanged, no new class_name, no
+bullet.
