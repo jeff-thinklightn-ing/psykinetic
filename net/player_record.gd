@@ -95,6 +95,9 @@ var locker_items := PackedInt32Array()
 ## town (686): {"companion": her record as she was, "worker": the town's
 ## worker id she is now}, newest first, a few at most.
 var former: Array = []
+## Weapon memory (decision 766): {art: {m, peak, quiet}}, World.set_arts's
+## shape; an older record has none, a fresh player's.
+var arts: Dictionary = {}
 
 
 ## Copies the live state off the player's entity.
@@ -107,6 +110,8 @@ func remember(entity: GridEntity) -> void:
 	facing = entity.facing
 	slots = entity.slots.duplicate()
 	slot_items = World.slot_uids(entity)
+	if entity is Player:
+		arts = (entity as Player).arts.duplicate(true)
 	last_seen = int(Time.get_unix_time_from_system())
 
 
@@ -140,6 +145,7 @@ func to_dict() -> Dictionary:
 		"caches": caches.duplicate(),
 		"locker": {"slots": Array(locker_slots), "items": Array(locker_items)} if locker_slots.count("") < locker_slots.size() else {},
 		"former": former.duplicate(true),
+		"arts": arts.duplicate(true),
 	}
 
 
@@ -167,6 +173,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.zone = str(entry.get("zone", ""))
 	record.slots = Items.tidy(entry.get("slots", []), Player.SLOTS)
 	record.slot_items = _uids(entry.get("items", []))
+	record.arts = World.tidy_arts(entry.get("arts", {}))  # Before 766: none, a fresh player's.
 	record.known_areas = _strings(entry.get("known_areas", []))
 	record.known_places = _strings(entry.get("known_places", []))
 	record.marks = _strings(entry.get("marks", []))

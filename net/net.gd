@@ -509,13 +509,16 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## client draws a downed deer standing and no blood.
 ## 45 (762 amended): Resident.sheltering (SUBCLASS_REPLICATED), its town under
 ## a threat: the talk bar offers no Barter on a joined client (it had no holdings).
+## 45 (766): Player.art_feel (SUBCLASS_REPLICATED), weapon memory's felt value
+## per art ({"swordplay": m, "bow": m}, 0..1): the sword's cycle and parry arc,
+## the bow's draw and cone scale by it; an old client predicts them unpractised.
 const PROTOCOL_REVISION := 45
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "asleep", "body", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "body", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "down_until", "downed_until", "emit_light", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
@@ -876,6 +879,8 @@ var test_walk: Array[Dictionary] = []
 var test_walk_on_wind := false
 ## --test-foe: [monster kind, weapon] each joining player is given, or empty.
 var test_foe: PackedStringArray = []
+## --test-arts: {art: memory} each joining player starts with (766), or empty.
+var test_arts: Dictionary = {}
 
 ## Tick times, bandwidth, corrections: see NetStats.
 var stats := NetStats.new()
@@ -2160,6 +2165,12 @@ func _set_option(key: String, value: String) -> void:
 					test_walk.append({"keys": pieces[0].to_lower(), "seconds": pieces[1].to_float()})
 		"--test-foe":
 			test_foe = value.split(",")
+		"--test-arts":
+			test_arts.clear()
+			for part in value.split(","):
+				var pieces := part.split(":")
+				if pieces.size() == 2 and pieces[1].is_valid_float():
+					test_arts[pieces[0].strip_edges()] = clampf(pieces[1].to_float(), 0.0, 1.0)
 		"--player-id":
 			player_id = value.strip_edges()
 		"--name":

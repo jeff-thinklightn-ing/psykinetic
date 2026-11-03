@@ -1226,6 +1226,7 @@ func _step_zone() -> void:
 	_tend_wounds()
 	_tend_downed()
 	_fade_buffs()
+	_tend_arts()  # Weapon memory's quiet time and fade (decision 766).
 	t = part("stamina, wounds, buffs", t)
 	var timed := _parts_total()
 	ticked.emit(tick)
@@ -2718,10 +2719,154 @@ func blow_verb(attacker: GridEntity) -> Dictionary:
 	return {} if verb.get("kind") == "ranged" else verb
 
 
+## Weapon memory (decision 766; Jeff's words in the advancement page's
+## "Weapon memory"): each weapon art a player practises fills with use and
+## cools as they take up another, felt in the weapon's handling, never in
+## its damage. Swordplay fills from sword blows landed on monsters and
+## blows parried on the sword; the bow from full draws let go and arrows
+## that hit a monster (the arena's dummy, never_dies, at half). A deed adds
+## ART_RATE times its worth times what is left to the art's cap, three times
+## that below the art's peak (it comes back faster than it first grew).
+## Each deed also cools every other art quiet for its grace (20 minutes
+## online) by ART_COOL of what it added; any art quiet past its grace fades
+## by ART_IDLE a minute of play besides (a player crafting all evening
+## barely loses any). Offline nothing moves.
+const ARTS := {"sword": "swordplay", "bow": "bow"}
+const ART_RATE := 0.01
+const ART_REGROW := 3.0
+const ART_COOL := 1.0 / 3.0
+const ART_IDLE := 0.001
+const ART_GRACE_MIN := 20.0
+const ART_DEED_BLOW := 1.0
+const ART_DEED_PARRY := 1.5
+const ART_DEED_LOOSE := 0.5
+const ART_DEED_HIT := 1.0
+## Their full effects, at a memory of 1: the sword's time between blows
+## 15% shorter and its parry arc 15 degrees wider either side; the bow drawn
+## 15% quicker and its cone 25% narrower at every hold.
+const ART_SWORD_RECOVER := 0.15
+const ART_SWORD_ARC := PI / 12.0
+const ART_BOW_DRAW := 0.15
+const ART_BOW_STEADY := 0.25
+
+
+## The shape of [param entity]'s [param art] (766): {cap: the most it fills
+## to, fade: the multiple of its cooling and fading, grace_min: the minutes
+## online it stays warm unused}. The same for everyone until ways exist;
+## a way (a ranger's bow) raises its cap and slows its fade here.
+func art_shape(_entity: GridEntity, _art: String) -> Dictionary:
+	return {"cap": 1.0, "fade": 1.0, "grace_min": ART_GRACE_MIN}
+
+
+## What [param entity]'s [param art] feels like now, 0..1 (766): a player's
+## replicated art_feel; 0 for anyone else.
+func art_feel(entity: GridEntity, art: String) -> float:
+	return clampf(float((entity as Player).art_feel.get(art, 0.0)), 0.0, 1.0) if entity is Player else 0.0
+
+
+## A deed's worth against [param target] (766): the arena's dummy, which
+## never dies, half.
+func _art_worth(target: GridEntity) -> float:
+	return 0.5 if target is Monster and (target as Monster).never_dies else 1.0
+
+
+## [param entity] did a deed worth [param deed] in [param art] (766): the
+## art fills toward its cap (three times as fast below its peak), its quiet
+## time starts again, and every other art quiet past its grace cools by
+## ART_COOL of what this one gained. Players only; server only.
+func practise(entity: GridEntity, art: String, deed: float) -> void:
+	if not Net.is_authority() or entity is not Player or deed <= 0.0:
+		return
+	var player := entity as Player
+	var own: Dictionary = player.arts.get(art, {"m": 0.0, "peak": 0.0, "quiet": 0})
+	var shape := art_shape(player, art)
+	var m := float(own["m"])
+	var gain := ART_RATE * deed * maxf(0.0, float(shape["cap"]) - m) * (ART_REGROW if m < float(own["peak"]) else 1.0)
+	own["m"] = minf(float(shape["cap"]), m + gain)
+	own["peak"] = maxf(float(own["peak"]), float(own["m"]))
+	own["quiet"] = 0
+	player.arts[art] = own
+	_art_moved(player, art, m)
+	for other: String in player.arts.keys():
+		if other == art:
+			continue
+		var cold: Dictionary = player.arts[other]
+		var other_shape := art_shape(player, other)
+		if int(cold["quiet"]) < art_grace_ticks(other_shape):
+			continue
+		var was := float(cold["m"])
+		cold["m"] = maxf(0.0, was - gain * ART_COOL * float(other_shape["fade"]))
+		_art_moved(player, other, was)
+
+
+## The ticks an art stays warm unused, by its [param shape] (art_shape).
+func art_grace_ticks(shape: Dictionary) -> int:
+	return roundi(float(shape["grace_min"]) * 60.0 * TICK_RATE)
+
+
+## Each tick, each player's arts grow quieter, and those quiet past their
+## grace fade by ART_IDLE a minute (766). Server only.
+func _tend_arts() -> void:
+	if not Net.is_authority():
+		return
+	for entity in _entities:
+		if entity is not Player or not entity.spawned or (entity as Player).arts.is_empty():
+			continue
+		var player := entity as Player
+		for art: String in player.arts:
+			var own: Dictionary = player.arts[art]
+			own["quiet"] = int(own["quiet"]) + 1
+			var shape := art_shape(player, art)
+			if int(own["quiet"]) > art_grace_ticks(shape) and float(own["m"]) > 0.0:
+				var was := float(own["m"])
+				own["m"] = maxf(0.0, was - was * ART_IDLE * float(shape["fade"]) / (60.0 * TICK_RATE))
+				_art_moved(player, art, was)
+
+
+## [param saved] arts as a record keeps them (766): {art: {m, peak, quiet}},
+## known arts only, each value in range; anything else (an older record's
+## nothing) is {}.
+func tidy_arts(saved: Variant) -> Dictionary:
+	var out := {}
+	if saved is Dictionary:
+		for art: Variant in saved:
+			var own: Variant = saved[art]
+			if str(art) in ARTS.values() and own is Dictionary:
+				var m := clampf(float(own.get("m", 0.0)), 0.0, 1.0)
+				out[str(art)] = {"m": m, "peak": clampf(maxf(m, float(own.get("peak", m))), 0.0, 1.0),
+					"quiet": maxi(0, int(own.get("quiet", 0)))}
+	return out
+
+
+## [param player]'s arts set whole (766), from their record or a test:
+## {art: {m, peak, quiet}}, anything else dropped; art_feel follows.
+func set_arts(player: Player, saved: Variant) -> void:
+	player.arts = tidy_arts(saved)
+	var feel := {}
+	for art: String in player.arts:
+		feel[art] = snappedf(float(player.arts[art]["m"]), 0.01)
+	player.art_feel = feel
+
+
+## [param player]'s [param art] moved from [param was] (766): its felt
+## value replicated when it shows to the hundredth, a log line when it
+## crosses a tenth.
+func _art_moved(player: Player, art: String, was: float) -> void:
+	var m := float(player.arts[art]["m"])
+	var feel := snappedf(m, 0.01)
+	if not is_equal_approx(float(player.art_feel.get(art, -1.0)), feel):
+		var shown := player.art_feel.duplicate()
+		shown[art] = feel
+		player.art_feel = shown  # A new dictionary, so it replicates.
+	if floori(m * 10.0 + 0.0001) != floori(was * 10.0 + 0.0001):
+		print("[arts] %s %s %.3f (peak %.3f)" % [player.name, art, m, float(player.arts[art]["peak"])])
+
+
 ## [param attacker]'s time between blows: its attack_ticks times its
 ## weapon's speed (blow_verb; a dagger quicker, a giant axe slower).
 func attack_ticks_of(attacker: GridEntity) -> int:
-	return maxi(1, roundi(attacker.attack_ticks * float(blow_verb(attacker).get("speed", 1.0))))
+	var quick := 1.0 - ART_SWORD_RECOVER * art_feel(attacker, "swordplay") if wielded(attacker) == "sword" else 1.0  # 766.
+	return maxi(1, roundi(attacker.attack_ticks * float(blow_verb(attacker).get("speed", 1.0)) * quick))
 
 
 ## Whether [param attacker] stands behind [param target]: on the side
@@ -5871,7 +6016,8 @@ func draw_of(entity: GridEntity) -> float:
 ## the bow and its arrows; it took the place of the armour's "draw"): its
 ## ticks' multiple.
 func _draw_quick(entity: GridEntity) -> float:
-	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0)) * arms_load(entity)
+	var practised := 1.0 - ART_BOW_DRAW * art_feel(entity, "bow")  # Weapon memory (766).
+	return float(Items.strength_value(slot_strength(entity, drawn_slot(entity)), "draw", 1.0)) * arms_load(entity) * practised
 
 
 ## The multiple of its bow's draw ticks [param entity] draws in (_draw_quick):
@@ -5969,7 +6115,8 @@ func spread_of(entity: GridEntity) -> float:
 	if verb.is_empty():
 		return -1.0
 	var steady := clampf(buff(entity, "steady"), 0.0, 1.0)
-	return Items.spread_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity))) * (1.0 - steady)
+	var practised := 1.0 - ART_BOW_STEADY * art_feel(entity, "bow")  # Weapon memory (766).
+	return Items.spread_at(verb, float(tick - entity.raised_tick) / maxf(0.01, _draw_quick(entity))) * (1.0 - steady) * practised
 
 
 ## The angle [param by]'s arrow flies at, aimed at [param angle] in a cone
@@ -6001,6 +6148,8 @@ func try_loose(by: GridEntity, angle: float) -> bool:
 	var flown := scatter(by, angle, spread)
 	_log("loose: %s at %.2f rad, flies %.2f (cone %.2f), step %d" % [by.name, angle, flown, spread, step])
 	loosed.emit(by, angle, step)
+	if drawn_with(by) == "bow" and step >= int(Items.verb_of("bow").get("full", 0)):
+		practise(by, "bow", ART_DEED_LOOSE)  # 766: a full draw let go.
 	shoot(by, flown, step, angle)
 	return true
 
@@ -6160,6 +6309,8 @@ func _lob_falls(lob: Dictionary, cell: Vector2i) -> void:
 	var amount := armour_turns(hit, int(lob["amount"]), "deflect_shot")
 	_log("lob: %s's hits %s at %s for %d" % [by.name, hit.name, cell, amount])
 	if amount > 0 and not is_sheltered(hit):
+		if hit is Monster and is_instance_valid(by) and by is Player:
+			practise(by, "bow", ART_DEED_HIT * _art_worth(hit))  # 766.
 		damage(hit, amount, by, &"shot")
 		if hit.is_creature():
 			_credit(by, int(lob["slot"]), "felled" if not _alive(hit) else "shot")
@@ -6213,6 +6364,8 @@ func shoot(by: GridEntity, angle: float, step: int, aimed := NAN) -> GridEntity:
 	if amount > 0 and not is_sheltered(hit):  # (Arriving, 661: no harm, no credit.)
 		var creature := hit.is_creature()
 		var ammo := Items.ammo_of(by.slots[bundle_slot(by)]) if bundle_slot(by) >= 0 else {}
+		if hit is Monster and drawn_with(by) == "bow":
+			practise(by, "bow", ART_DEED_HIT * _art_worth(hit))  # 766.
 		damage(hit, amount, by, &"shot")
 		if creature:
 			_credit(by, drawn_slot(by), "felled" if not _alive(hit) else "shot")
@@ -6243,7 +6396,8 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 	if verb.get("kind") != "block" or target.facing == Vector2i.ZERO:
 		return {}
 	var off := absf((body_centre(source) - body_centre(target)).angle_to(Vector2(target.facing)))  # Centres (699).
-	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 else {}
+	var wider := ART_SWORD_ARC * art_feel(target, "swordplay") if held == "sword" else 0.0  # Swordplay (766).
+	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 + wider else {}
 
 
 ## A blow of [param amount] damage and [param force] (its push before
@@ -6285,6 +6439,8 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	target._world_guarded(false)
 	guard_met.emit(target, source, false)
 	_credit(target, slot, "guarded")
+	if slot == Items.RIGHT_HAND and target.slots[slot] == "sword" and source is Monster:
+		practise(target, "swordplay", ART_DEED_PARRY * _art_worth(source))  # 766.
 	return [maxi(0, amount - ceili(amount * absorb - 0.001)), force * (1.0 - absorb)]
 
 
@@ -7952,6 +8108,8 @@ func _resolve_hits() -> void:
 			hit.damage = armour_turns(hit.target, hit.damage, "deflect_pierce")
 		if hit.damage > 0 and not is_sheltered(hit.target):  # (Arriving, 661: no harm, wear or credit.)
 			var creature := hit.target.is_creature()
+			if hit.target is Monster and not hit.shove and wielded(hit.source) == "sword":
+				practise(hit.source, "swordplay", ART_DEED_BLOW * _art_worth(hit.target))  # 766.
 			damage(hit.target, hit.damage, hit.source, &"attack")
 			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
 				knock_down(hit.target, hit.source, hit.down_ticks)

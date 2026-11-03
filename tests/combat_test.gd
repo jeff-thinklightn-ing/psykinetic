@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_free_wind_up_given_up()
 	_test_sledge_recover()
 	_test_sword_lead()
+	_test_weapon_memory()
 	_test_lob_aim_on_client()
 	_test_armour()
 
@@ -550,6 +551,92 @@ func _test_sledge_recover() -> void:
 ## after it began; no parry while it swings; struck on a target lead_slack
 ## past reach, so a sidestep doesn't slip it, a step straight back from the
 ## edge does; walking keys never give it up, a stun does.
+## Weapon memory (decision 766): swordplay and the bow fill with use, three
+## times as fast back to their peak, cool as another art is used once past
+## their grace, fade slowly idle; felt in the sword's cycle and parry arc
+## and the bow's draw and cone, never its damage.
+func _test_weapon_memory() -> void:
+	print("\n== weapon memory: swordplay and the bow fill with use and cool with another (766) ==")
+	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
+	var host: Player = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	_give(host, "sword")
+	host.free_pos = Vector2(4.2, 2.0)
+	_check(host.arts.is_empty() and World.art_feel(host, "swordplay") == 0.0 and World.attack_ticks_of(host) == 7,
+			"fresh: no arts, a sword blow every 7 ticks")
+	var damage_fresh := _blow_damage(host, foe)
+	_check(float(host.arts.get("swordplay", {}).get("m", 0.0)) > 0.0099 and host.art_feel.get("swordplay", 0.0) == 0.01,
+			"a sword blow landed on a monster: swordplay 0.01 (%s)" % [host.arts])
+	World.set_arts(host, {})
+	for i in 70:
+		World.practise(host, "swordplay", World.ART_DEED_BLOW)
+	var half := float(host.arts["swordplay"]["m"])
+	_check(half > 0.45 and half < 0.55, "70 blows: about half (%.3f)" % half)
+	for i in 160:
+		World.practise(host, "swordplay", World.ART_DEED_BLOW)
+	_check(float(host.arts["swordplay"]["m"]) > 0.88 and float(host.arts["swordplay"]["m"]) < 0.92, "230 blows: about 0.9 (%.3f)" % float(host.arts["swordplay"]["m"]))
+	World.set_arts(host, {"swordplay": {"m": 1.0, "peak": 1.0, "quiet": 0}})
+	_check(World.attack_ticks_of(host) == 6, "swordplay full: a blow every 6, not 7 (%d)" % World.attack_ticks_of(host))
+	_check(_blow_damage(host, foe) == damage_fresh, "and its blow no harder (%d)" % damage_fresh)
+	# The parry arc: a blow from 11 degrees off the facing.
+	host.facing = Vector2i(1, 0)
+	host.free_pos = Vector2(4.0, 2.2)
+	host.next_attack_tick = 0
+	host.raised = ""
+	World.set_arts(host, {})
+	_check(World.guarding(host, foe).is_empty(), "fresh: a blow 11 degrees off straight ahead is not parried")
+	World.set_arts(host, {"swordplay": {"m": 1.0, "peak": 1.0, "quiet": 0}})
+	_check(World.guarding(host, foe).get("kind") == "block", "swordplay full: it is (the arc 15 degrees wider)")
+	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": 0}})
+	_check(World.guarding(host, foe).is_empty(), "swordplay half: 7.5 degrees wider, not yet")
+	_check(foe is Monster and World.art_feel(foe, "swordplay") == 0.0, "a monster has no arts")
+	World.practise(foe, "swordplay", 1.0)
+	_check(World.art_feel(foe, "swordplay") == 0.0, "nor gains them")
+	# Back to the peak faster than it first grew.
+	World.set_arts(host, {"swordplay": {"m": 0.2, "peak": 0.8, "quiet": 0}})
+	World.practise(host, "swordplay", 1.0)
+	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.2 + 0.01 * 0.8 * 3.0), "below its peak: three times the gain (%.4f)" % float(host.arts["swordplay"]["m"]))
+	# Cooling: the bow used, swordplay quiet past its grace cools by a third of the gain.
+	var grace := World.art_grace_ticks(World.art_shape(host, "swordplay"))
+	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": grace - 10}})
+	World.practise(host, "bow", World.ART_DEED_HIT)
+	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.5), "a quick switch to the bow: swordplay still warm, unchanged")
+	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": grace}})
+	World.practise(host, "bow", World.ART_DEED_HIT)
+	var gained := float(host.arts["bow"]["m"])
+	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.5 - gained / 3.0) and is_equal_approx(float(host.arts["swordplay"]["peak"]), 0.5),
+			"past its grace: swordplay cools by a third of the bow's gain, its peak kept (%.4f)" % float(host.arts["swordplay"]["m"]))
+	# The idle fade: a tenth of a percent a minute of play, past the grace.
+	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": grace}})
+	for i in 600:
+		World._tend_arts()
+	_check(absf(float(host.arts["swordplay"]["m"]) - 0.5 * 0.999) < 0.00005, "a minute idle past its grace: 0.1%% faded (%.5f)" % float(host.arts["swordplay"]["m"]))
+	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": 0}})
+	for i in 600:
+		World._tend_arts()
+	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.5) and int(host.arts["swordplay"]["quiet"]) == 600, "within its grace: none")
+	# The bow: drawn quicker, its cone narrower, its damage the same.
+	_clear(host)
+	_give(host, "bow")
+	World.put_item(host, host, Player.LEFT_HAND, World.items.mint("arrows", "built"))
+	World.set_arts(host, {})
+	host.next_attack_tick = 0
+	_check(World.try_stance(host, "draw"), "a bow drawn")
+	host.raised_tick = World.tick - 12
+	var full := World.draw_full_ticks(host)
+	var cone := World.spread_of(host)
+	var strength := World.shot_strength(host, 2, 3)
+	World.set_arts(host, {"bow": {"m": 1.0, "peak": 1.0, "quiet": 0}})
+	_check(is_equal_approx(World.draw_full_ticks(host), maxf(1.0, full * 0.85)), "the bow full: full draw 15%% sooner (%.2f, was %.2f)" % [World.draw_full_ticks(host), full])
+	_check(World.spread_of(host) < cone, "and its cone narrower at the same hold (%.3f, was %.3f)" % [World.spread_of(host), cone])
+	_check(is_equal_approx(World.shot_strength(host, 2, 3), strength), "and a shot no stronger")
+	World.set_arts(host, {})
+	host.raised_tick = World.tick - 30
+	World.try_loose(host, PI)  # Away from the foe: a full draw let go, nothing hit.
+	_check(is_equal_approx(float(host.arts.get("bow", {}).get("m", 0.0)), 0.005), "a full draw let go: the bow 0.005 (%s)" % [host.arts])
+	World.set_arts(host, {})
+
+
 func _test_sword_lead() -> void:
 	print("\n== the sword's lead: 2 ticks inside its 7, never crushing, slack past reach, not walked off (338 amended) ==")
 	var e := _build(["#########", "#.......#", "#.......#", "#..P.P..#", "#.......#", "#.......#", "#########"])

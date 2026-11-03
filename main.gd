@@ -5952,6 +5952,8 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 	player.player_id = id
 	player.body = record.body
 	World.set_slots(player, record.slots, record.slot_items)
+	World.set_arts(player, record.arts)  # Weapon memory (766).
+	_test_arts(player)
 	record.remember(player)
 	record.zone = World.zone.name
 	if not World.peer_zone.has(peer):
@@ -19966,6 +19968,18 @@ func _run_test_die_travel(tick: int) -> void:
 	World.despawn(player)  # Its death: _on_entity_despawned.
 	travel(peer, to)
 	print("[test] %s died and was brought back in %s" % [who, to])
+
+
+## --test-arts (766): [param player]'s arts set as given (swordplay:1,bow:0.5),
+## so playtest can set a practised player beside a fresh one. Test servers.
+func _test_arts(player: Player) -> void:
+	if Net.test_arts.is_empty():
+		return
+	var given := {}
+	for art: String in Net.test_arts:
+		given[art] = {"m": Net.test_arts[art], "peak": Net.test_arts[art], "quiet": 0}
+	World.set_arts(player, given)
+	print("[test] arts %s: %s" % [player.name, player.art_feel])
 
 
 ## --test-foe: [param player] given the weapon in hand and the monster 3

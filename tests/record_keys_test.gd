@@ -55,6 +55,7 @@ func _ready() -> void:
 		"marks": ["draugr"] as Array[String], "barrow": {"best": "hard", "containers": ["c1"]}, "care": {"hut": "gold"},
 		"paid_deals": {"barrow": {"level": "easy", "paid_step": 40}}, "barrow_task": {"taken": true, "slain": ["brand", "crake"]}, "care_given": {"hut": {"herbs": 2}},
 		"caches": ["k1"] as Array[String],
+		"arts": {"swordplay": {"m": 0.42, "peak": 0.5, "quiet": 1200}, "bow": {"m": 0.1, "peak": 0.1, "quiet": 0}},
 		"locker_slots": Items.tidy(["bandaging_kit"], Locker.LOCKER_SLOTS), "locker_items": PackedInt32Array([6]),
 		"former": [{"companion": {"name": "Nix", "card": "", "hp": 0, "stamina": 0, "tile": null, "alive": true, "said": [],
 			"slots": Array(Items.tidy([], Companion.SLOTS)), "items": [], "parted": {"day": 2, "place": "t/store"},
@@ -64,6 +65,7 @@ func _ready() -> void:
 	_test_companion_round_trip()
 	_test_player_round_trip()
 	_test_solo_round_trip()
+	_test_arts_before_766()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -130,6 +132,17 @@ func _test_player_round_trip() -> void:
 		if not _same(back.get(field), _player[field]):
 			lost.append("%s: %s, saved %s" % [field, back.get(field), _player[field]])
 	_check(lost.is_empty(), "every field kept as saved: %s" % [lost])
+
+
+## A record saved before weapon memory (766) has no "arts": it loads as a
+## fresh player's, and nonsense in it is dropped.
+func _test_arts_before_766() -> void:
+	print("\n== a record from before weapon memory loads with fresh arts (766) ==")
+	var old := PlayerRecord.from_dict({"player_id": "p", "tile": [1, 2]})
+	_check(old != null and old.arts.is_empty(), "no arts saved: none (%s)" % [old.arts if old != null else null])
+	var odd := PlayerRecord.from_dict({"player_id": "p", "tile": [1, 2], "arts": {"swordplay": {"m": 4.0}, "juggling": {"m": 0.5}, "bow": 3}})
+	_check(odd != null and odd.arts.keys() == ["swordplay"] and float(odd.arts["swordplay"]["m"]) == 1.0,
+			"an art not known, or not a dictionary, dropped; a memory past 1 held at 1 (%s)" % [odd.arts if odd != null else null])
 
 
 func _test_solo_round_trip() -> void:

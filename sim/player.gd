@@ -91,6 +91,17 @@ var heart_held := false
 var heart_at := 0
 var heart_debt := 0.0
 
+## Weapon memory (decision 766; Jeff: "the more you use a sword, swordplay
+## grows bigger ... a bonus that starts fading as you swap weapon types"):
+## each art's {"m": memory 0..1, "peak": the most it reached, "quiet":
+## online ticks since its last deed}, kept on the record. Server only;
+## World.practise and World._tend_arts keep it.
+var arts: Dictionary = {}
+## What each art's memory feels like now ({art: m}, to 0.01; absent for
+## none), replicated so a client draws the bow's pull and cone, and
+## predicts the sword's cycle, as the server reckons them (World.art_feel).
+var art_feel: Dictionary = {}
+
 
 func _init() -> void:
 	super()
@@ -131,6 +142,7 @@ func _init() -> void:
 	replicate("quest")  # 747: the fallen knight's quest, for the tracker.
 	replicate("heart")  # Mortally Wounded: the heart while downed.
 	replicate("free_state")  # Decision 689: its free body's centre.
+	replicate("art_feel")  # Decision 766: weapon memory's felt bonus.
 
 
 

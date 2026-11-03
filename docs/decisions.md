@@ -38974,3 +38974,56 @@ enemy-ai's wire change (rev 45), and without it this side draws nothing new. No 
   at -10 dBFS for -4. It only ever erred quieter, never clipped.
 sound_kit_test (the kinds that cry, the slots' reach and takes). Client only; protocol
 unchanged; no new class_name.
+
+## 766. Weapon memory: swordplay and the bow
+
+Jeff (11-02, via the coordinator): "have combat prototype weapon memory with
+sword and bow"; his idea in the advancement page's "Weapon memory": "the more
+you use a sword, swordplay grows bigger, but i'd look at it as more of a
+bonus that starts fading as you swap weapon types, being specialized into a
+certain class, like ranger would raise that cap or cause it to fade slower".
+
+Each player keeps a memory per weapon art (Player.arts: {art: {m, peak,
+quiet}}, saved in PlayerRecord's "arts"; a record from before has none, a
+fresh player's). Two arts for now: swordplay (the sword) and the bow
+(World.ARTS).
+
+- What fills it (World.practise; players only, server only): a sword blow
+  landed on a monster (1), a blow parried on the sword from a monster (1.5),
+  a full draw let go (0.5), an arrow or a lob that hits a monster (1). The
+  arena's dummy (never_dies) counts half. Friends never count (only
+  monsters are struck for it).
+- The curve: a deed adds 0.01 times its worth times what is left to the
+  art's cap (1): about 70 blows to half, 230 to 0.9. Below the art's peak
+  it grows three times as fast: it comes back faster than it first grew.
+- The fade (the coordinator's change, from Jeff's "fading as you swap
+  weapon types"): a deed in one art cools every other art left unused past
+  its grace (20 minutes online) by a third of what it added. Besides that,
+  an art quiet past its grace fades 0.1% a minute of play (World._tend_arts:
+  quiet counts online ticks only; offline nothing moves), so an evening of
+  crafting or trading barely costs anything. The peak is kept.
+- The hook for ways: World.art_shape(player, art) gives {cap, fade,
+  grace_min}, the same for everyone until ways exist; a ranger's bow will
+  raise its cap and lower its fade there.
+- What it scales, all small, nothing in damage, felt not shown (at a
+  memory of 1; in proportion below): the sword's time between blows
+  (attack_ticks_of) 15% shorter, 7 ticks to 6; its parry arc (guarding)
+  15 degrees wider either side of straight ahead; the bow's draw
+  (_draw_quick, beside a quick bow and the arms' load, 676) 15% quicker;
+  its cone (spread_of, 620) 25% narrower at every hold. The sword's lead
+  (338 amended), reach, damage and the bow's drain (669) are untouched, so
+  a foe reads a practised swordsman's blow as any other.
+- On the wire: Player.art_feel ({art: m} to the hundredth), replicated, so
+  a client draws the pull and the cone and predicts the sword's cycle as
+  the server does; it is set only when the hundredth changes. Rev 45's
+  note (rides v0.1.199's forced cut).
+- The readout: a log line "[arts] Player<n> swordplay 0.400 (peak 0.400)"
+  when an art crosses a tenth (no name; ui's card comes later). A test
+  server's --test-arts=swordplay:1,bow:0.5 starts each joining player so
+  practised, for playtest's fresh-against-practised run.
+
+combat_test _test_weapon_memory (fill, curve, regrowth, the grace and the
+cooling, the idle fade, the four effects and the damage unchanged, a
+monster unaffected, a full draw let go); record_keys_test (the field
+through a save, and a record from before 766 or with nonsense in it).
+Protocol changes on rev 45; no new class_name.
