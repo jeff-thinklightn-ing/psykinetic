@@ -9304,6 +9304,18 @@ the suite has gone logs its wait as late, and the summary counts both. The
 stall shapes' tests (a nested take, a head out of reach, a dead waiter)
 pass unchanged.
 
+394 amended (19) (perf, 2026-11-02, release's ask): a lean landing runs state_test and
+server_boot_test beside the suite, and net_test after it. On 11-02 every landing ran lean
+(the full suite out of reach at 24-25 GB free), and state_test, whose boots run one after
+another, had grown to ~600 s (756's and 760's remade-level cases). Run after the suite, it
+became the long pole: suite ~800 s, then state_test ~600 beside net_test's serial groups
+~520, 1436-1523 s in the gate. state_test and server_boot_test hold a Godot or two each
+(~0.6 GB), within the lean estimate; net_test's many still wait for the suite. Expected:
+suite ~800 + net_test ~520, about 2 minutes less. tests/land.sh and tests/land.ps1 alike;
+land.ps1 also beats the land lock as land.sh does (667 amended), from a PowerShell job that
+writes "since" each minute while its tree holds the lock and ends with the script or its
+process.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

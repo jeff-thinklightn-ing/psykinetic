@@ -61,14 +61,14 @@ lean=""
 case "${HEAVY_JOB_KIND:-}" in
 suite_lean*)
 	# The gate ran it lean (394 amended (9), (10)): memory was short, fewer
-	# at once, and the other parts after the suite, not beside it.
+	# at once, and net_test after the suite (state_test and server_boot_test beside it, 394 amended (19)).
 	[ "$suite_jobs" -gt 3 ] && suite_jobs=3
 	lean=1
 	;;
 esac
 started=$(date +%s)
 if [ -n "$lean" ]; then
-	echo "landing tests: the suite ($suite_jobs at once, lean), then net_test, state_test and server_boot_test together"
+	echo "landing tests: the suite ($suite_jobs at once, lean) with state_test and server_boot_test beside it, then net_test"
 else
 	echo "landing tests: the suite ($suite_jobs at once), net_test, state_test and server_boot_test together"
 fi
@@ -88,17 +88,25 @@ part changelog_resolve_test python -B tests/changelog_resolve_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
 # launched in the same instant died at launch).
 if [ -n "$lean" ]; then
+	# Lean (394 amended (19)): state_test and server_boot_test, a Godot or two
+	# each, beside the suite; net_test, many at once, after it, its groups one
+	# after another (394 amended (12)). state_test, boots one after another,
+	# had become the longest part after the suite (~600 s, 2026-11-02).
+	part state_test bash tests/state_test.sh &
+	sleep 0.3
+	part server_boot_test bash tests/server_boot_test.sh &
+	sleep 0.3
 	part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh
+	part net_test env NET_TEST_SERIAL=1 bash tests/net_test.sh &
 else
 	part suite env PSYKINETIC_TEST_JOBS="$suite_jobs" bash tests/run.sh &
 	sleep 0.3
+	part net_test bash tests/net_test.sh &
+	sleep 0.3
+	part state_test bash tests/state_test.sh &
+	sleep 0.3
+	part server_boot_test bash tests/server_boot_test.sh &
 fi
-# A lean landing's net_test runs its groups one after another (394 amended (12)).
-part net_test env ${lean:+NET_TEST_SERIAL=1} bash tests/net_test.sh &
-sleep 0.3
-part state_test bash tests/state_test.sh &
-sleep 0.3
-part server_boot_test bash tests/server_boot_test.sh &
 wait
 
 code=0

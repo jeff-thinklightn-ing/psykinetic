@@ -36,10 +36,27 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 	$env:HEAVY_JOB_INSIDE = '1'
 	$result = [IO.Path]::GetTempFileName()
 	$env:LAND_RESULT = $result
+	# While the tests run, a land lock this tree holds is beaten each minute (667
+	# amended, as tests/land.sh does): its "since" moves to now. The job ends
+	# with this script, or by itself once this process is gone.
+	$lock = 'C:\dev\land.lock'
+	$beater = Start-Job -ArgumentList $lock, $tree, $PID -ScriptBlock {
+		param($lock, $tree, $parent)
+		while (Get-Process -Id $parent -ErrorAction SilentlyContinue) {
+			$owner = (Get-Content (Join-Path $lock 'owner') -ErrorAction SilentlyContinue | Select-Object -First 1)
+			if ($owner -eq $tree) {
+				$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+				try { [IO.File]::WriteAllText((Join-Path $lock 'since'), "$now`n") } catch {}  # Released meanwhile.
+			}
+			Start-Sleep -Seconds 60
+		}
+	}
 	try {
 		& python $gate run $tree suite -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
 		$code = $LASTEXITCODE
 	} finally {
+		Stop-Job $beater -ErrorAction SilentlyContinue
+		Remove-Job $beater -Force -ErrorAction SilentlyContinue
 		Remove-Item Env:HEAVY_JOB_INSIDE -ErrorAction SilentlyContinue
 		Remove-Item Env:LAND_RESULT -ErrorAction SilentlyContinue
 	}
@@ -58,7 +75,8 @@ New-Item -ItemType Directory -Force $logs | Out-Null
 
 $suiteJobs = [Math]::Max(2, (Get-TestJobs $root) - 2)
 # The gate ran it lean (394 amended (9), (10)): memory was short, fewer at
-# once, and the other parts after the suite, not beside it.
+# once, and net_test after the suite, not beside it (state_test and
+# server_boot_test beside it since 394 amended (19)).
 $lean = "$env:HEAVY_JOB_KIND" -like 'suite_lean*'
 if ($lean) { $suiteJobs = [Math]::Min($suiteJobs, 3) }
 Write-Output "landing tests: the suite ($suiteJobs at once), net_test, state_test and server_boot_test together"
@@ -73,6 +91,11 @@ $resolveTest = & python -B (Join-Path $root 'tests\changelog_resolve_test.py') 2
 $resolveOk = $LASTEXITCODE -eq 0
 Write-Output "$(if ($resolveOk) { 'PASS' } else { 'FAIL' })  changelog_resolve_test"
 $parts = [ordered]@{ suite = 'run.ps1'; net_test = 'net_test.ps1'; state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1' }
+if ($lean) {
+	# Lean (394 amended (19)): state_test and server_boot_test (a Godot or two
+	# each) beside the suite, net_test (many) after it.
+	$parts = [ordered]@{ state_test = 'state_test.ps1'; server_boot_test = 'server_boot_test.ps1'; suite = 'run.ps1'; net_test = 'net_test.ps1' }
+}
 $running = @{}
 $env:PSYKINETIC_TEST_JOBS = "$suiteJobs"  # Only the suite reads it.
 # A lean landing's net_test runs its groups one after another (394 amended (12)).
