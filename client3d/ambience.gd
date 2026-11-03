@@ -26,6 +26,8 @@ extends Node
 ## the nearest torch within hearing (Sfx.hearing, its slot's range). So
 ## does the barrow's hidden door's draft (amb.draft, 608 amended), from its
 ## edge, a clue for those who stand close, until the door is opened.
+## A camp's fire (777, sound's side: a rest camp's, a raid camp's) is one
+## too: amb.campfire, fuller and heard further, from the nearest heard.
 ## Night's own voices are calls, not beds (Jeff: "no birds at night, maybe
 ## owls bats"): now and then an owl (amb.owl) up in the trees round the
 ## listener, more often under a forest's roof, and bats (amb.bat) overhead
@@ -92,7 +94,8 @@ var targets: Dictionary[String, float] = {}
 var levels: Dictionary[String, float] = {}
 ## Every bed this much quieter (dB): Music's duck under a fight.
 var duck_db := 0.0
-var _torch: AudioStreamPlayer3D
+## A point loop's slot -> its player, at the source heard best (_place_point).
+var points: Dictionary[String, AudioStreamPlayer3D] = {}
 ## The draft through the hidden door (608 amended), while it is heard.
 var _draft: AudioStreamPlayer3D
 ## Stream (its index in the terrain's "streams") -> its held loop, while
@@ -369,34 +372,46 @@ func _place_draft(cell: Vector2i) -> void:
 		_draft.play()
 
 
-## The torch loop at the nearest torch heard from [param cell], else off.
+## The torch loop at the nearest torch heard from [param cell], and the
+## campfire's at the nearest camp's fire (777, sound's side), else off.
 func _place_torch(cell: Vector2i) -> void:
+	_place_point("amb.torch_fire", view.torch_cells, cell)
+	_place_point("amb.campfire", view.campfire_cells(), cell)
+
+
+## [param slot]'s loop at whichever of [param cells] is heard best from
+## [param cell] within its reach (Sfx.hearing), else off.
+func _place_point(slot: String, cells: Array[Vector2i], cell: Vector2i) -> void:
 	var best := {}
 	var best_cell := Vector2i.ZERO
-	for torch: Vector2i in view.torch_cells:
-		if maxi(absi(torch.x - cell.x), absi(torch.y - cell.y)) > SoundKit.reach("amb.torch_fire"):
+	var reach := SoundKit.reach(slot)
+	for at: Vector2i in cells:
+		if maxi(absi(at.x - cell.x), absi(at.y - cell.y)) > reach:
 			continue
-		var heard := Sfx.hearing("amb.torch_fire", torch, cell)
+		var heard := Sfx.hearing(slot, at, cell)
 		if heard.heard and (best.is_empty() or float(heard.db) > float(best.db)):
 			best = heard
-			best_cell = torch
+			best_cell = at
+	var player: AudioStreamPlayer3D = points.get(slot)
 	if best.is_empty():
-		if _torch != null and _torch.playing:
-			_torch.stop()
+		if player != null and player.playing:
+			player.stop()
 		return
-	if _torch == null:
-		var stream := _stream("amb.torch_fire")
+	if player == null:
+		var stream := _stream(slot)
 		if stream == null:
 			return
-		_torch = AudioStreamPlayer3D.new()
-		_torch.stream = stream
-		_torch.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
-		add_child(_torch)
-	_torch.bus = "Ambience" + (Sfx.MUFFLED_SUFFIX if best.muffled else "")
-	_torch.position = view._tile_position(best_cell) + Vector3.UP
-	_torch.volume_db = SoundKit.volume_db("amb.torch_fire") + float(best.db)
-	if not _torch.playing:
-		_torch.play()
+		player = AudioStreamPlayer3D.new()
+		player.name = slot.replace(".", "_")
+		player.stream = stream
+		player.attenuation_model = AudioStreamPlayer3D.ATTENUATION_DISABLED
+		add_child(player)
+		points[slot] = player
+	player.bus = "Ambience" + (Sfx.MUFFLED_SUFFIX if best.muffled else "")
+	player.position = view._tile_position(best_cell) + Vector3.UP
+	player.volume_db = SoundKit.volume_db(slot) + float(best.db)
+	if not player.playing:
+		player.play()
 
 
 func _set_level(bed: String, level: float) -> void:

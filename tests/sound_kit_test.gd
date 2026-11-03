@@ -150,6 +150,11 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.takes("sfx.great_bear_roar").size() >= 2 and SoundKit.takes("sfx.great_bear_growl").size() >= 2,
 			"its roar heard as far as the sim's (%d >= %d cells), a growl as far as a tell (%d), takes of their own"
 			% [SoundKit.reach("sfx.great_bear_roar"), GreatBear.ROAR_REACH, SoundKit.reach("sfx.great_bear_growl")])
+	_check(SoundKit.positional("amb.campfire") and SoundKit.noise("amb.campfire") == "" and SoundKit.reach("amb.campfire") > SoundKit.reach("amb.torch_fire")
+			and SoundKit.reach("amb.campfire") > Main.WARM_REACH and str(SoundKit.spec("amb.campfire").get("fallback", "")) == "amb.torch_fire"
+			and SoundKit.takes("amb.campfire").size() >= 2,
+			"a camp's fire (777): placed, heard further than a torch (%d > %d) and past its warmth, a torch's crackle without its own takes"
+			% [SoundKit.reach("amb.campfire"), SoundKit.reach("amb.torch_fire")])
 	_check(SoundKit.reach("sfx.boar_charge") == Animal.NOISE_CHARGE and SoundKit.reach("sfx.wolf_howl") == Senses.NOISE_CALL,
 			"a charge carries Animal.NOISE_CHARGE, a howl the call's")
 	_check(SoundKit.death("rabbit") == "sfx.rabbit_death" and SoundKit.death("stag") == "sfx.deer_death" and SoundKit.death("brute") == "sfx.goblin_death",

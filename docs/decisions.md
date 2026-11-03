@@ -39880,3 +39880,13 @@ finds its feet; a hard knock goes straight over; a player teeters and is tapped 
 eight levels kills, the kill the shover's; a sword's knockback over eight levels: the sword's
 one deed, felled). No new class_name. No CHANGELOG bullet till a real level has a shaft
 (release); the views' wobble is pc-character's to draw.
+777, sound's side (2026-11-03, sound; the coordinator's 777 check): a camp's fire is heard. A
+camp's fire ring is drawn as prop.campfire by BuildingComposer._camp, not as a fire cell, so it
+never reached Client3D.torch_cells and Ambience played no crackle there, at a rest camp or a raid
+camp (649). Client3D.campfire_cells() gives Level.camp_fire of each camp drawn (a dropped plot's
+left out), and Ambience plays a new loop, amb.campfire, from the nearest heard (Sfx.hearing): a
+fuller crackle than a torch's, heard 8 cells (the torch 4), falling back to amb.torch_fire.
+Ambience's torch loop and the camp's are one way of placing a point loop now (_place_point,
+Ambience.points). No cue for the warmed rest itself: the crackle is the fire's voice. Takes:
+558967 (Nox_Sound), 350757 (aerror), 508110 (ahriik), all CC0. sound_kit_test (the slot),
+view_test (the crackle from the ring; none dropped or out of reach). Client only.

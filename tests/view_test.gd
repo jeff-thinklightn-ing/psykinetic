@@ -293,6 +293,27 @@ func _test_ambience_runs() -> void:
 	_check(_rig.ambience._falls.is_empty() and (falling == null or (falling as Node).is_queued_for_deletion()), "a fall out of reach: none held")
 	_rig.stream_falls = had_falls
 	_rig.ambience._weigh()
+	# A camp's fire (777, sound's side): its crackle from its fire ring
+	# (Level.camp_fire), a raid camp's as a rest camp's; none once dropped
+	# or out of reach.
+	var camp := {"kind": "camp", "rect": Rect2i(listener + Vector2i(1, -2), Vector2i(4, 4)), "facing": Vector2i(0, 1)}
+	var ring := Level.camp_fire(camp)
+	_rig._buildings.append({"rect": camp["rect"], "kind": camp, "plot": true})
+	_check(ring in _rig.campfire_cells(), "a camp's fire among the camp fires (%s)" % [ring])
+	_rig.ambience._weigh()
+	var crackle: AudioStreamPlayer3D = _rig.ambience.points.get("amb.campfire")
+	_check(SoundKit.files("amb.campfire").is_empty() or crackle != null and crackle.playing
+			and crackle.position.distance_to(_rig._tile_position(ring) + Vector3.UP) < 0.01,
+			"by a camp: its fire's crackle from the ring (%s)" % ("held" if crackle != null else "no takes"))
+	_rig.sfx.listener = ring + Vector2i(SoundKit.reach("amb.campfire") + 2, 0)
+	_rig.ambience._weigh()
+	_check(crackle == null or not crackle.playing, "a camp's fire out of reach: no crackle")
+	_rig.sfx.listener = listener
+	_rig._buildings[-1]["dropped"] = true
+	_rig.ambience._weigh()
+	_check(crackle == null or not crackle.playing, "a dropped camp: no crackle")
+	_rig._buildings.pop_back()
+	_rig.ambience._weigh()
 	# The hidden door's draft (608 amended): from its edge's middle while
 	# its Door is shut, none once it opens or from out of reach.
 	var draft_takes := not SoundKit.files("amb.draft").is_empty()

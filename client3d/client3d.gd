@@ -2136,6 +2136,23 @@ var bandaging: Bandaging
 ## The cells fire burns on, torches (_add_torch) and fires (_add_fire),
 ## for their crackle (Ambience).
 var torch_cells: Array[Vector2i] = []
+
+
+## The cells under the camps' fires drawn (decision 777, sound's side: a
+## rest camp's and a raid camp's, 649; Level.camp_fire, where
+## BuildingComposer._camp lays prop.campfire), for their crackle
+## (Ambience, amb.campfire); a dropped plot's left out.
+func campfire_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for entry: Dictionary in _buildings:
+		if entry.get("dropped", false) or not entry.get("kind") is Dictionary:
+			continue
+		var fire := Level.camp_fire(entry["kind"])
+		if fire.x >= 0:
+			out.append(fire)
+	return out
+
+
 var _hp_bar_shader: Shader
 ## The boss's skull for nameplates (752, ui's side), made once.
 var _boss_mark: ImageTexture

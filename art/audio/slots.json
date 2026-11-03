@@ -1623,6 +1623,16 @@
 			"volume_db": -10.0,
 			"uses": "the crackle of a torch or brazier, from where it burns; Ambience, from the nearest torch heard"
 		},
+		"amb.campfire": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 8,
+			"volume_db": -8.0,
+			"uses": "a camp's fire, fuller than a torch: a rest camp's or a raid camp's (777, sound's side); Ambience, from the nearest camp fire heard (Client3D.campfire_cells)",
+			"fallback": "amb.torch_fire"
+		},
 		"amb.owl": {
 			"category": "ambience",
 			"type": "oneshot",
