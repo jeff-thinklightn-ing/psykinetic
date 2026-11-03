@@ -39543,3 +39543,12 @@ letter there, and a wolf is "w". 505's existing fords, on any level,
 get the "%" and the water word too. The text goes only to the model. companion_test
 _test_surroundings (a ford is "%" on her map and in its key, water in her list and sightings).
 Server only, protocol unchanged, no new class_name.
+
+780, lore's side (2026-11-03, lore): levels/lore/creatures.json has the entry great_bear ("great
+bear", draft, tags wildlife and apex), with four common facts: a bear far bigger than any other
+lives in the forest; it keeps a den and the ground around it; it roams and hunts deer by day and
+sleeps in its den by night (the roster's day beast, as the coordinator settled; the code follows
+in 780, enemy-ai's side (2)); and a lone traveller does well to go round it. Draft until Jeff's
+wording check. The night ones (the wolfskin, the pale lord, the hollow stag), the troll, the old
+wolf and the hill cat wait on Jeff (C:/dev/review/decisions/apex-creatures.md). Data only; protocol
+unchanged; no new class_name; no bullet (no level has one).

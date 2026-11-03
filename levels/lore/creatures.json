@@ -220,6 +220,57 @@
 					"source": "game"
 				}
 			]
+		},
+		{
+			"id": "great_bear",
+			"type": "creature",
+			"name": "great bear",
+			"status": "draft",
+			"source": "roadmap",
+			"summary": "A bear far bigger than any other keeps a den and its ground in the forest, roams and hunts deer by day and sleeps in its den by night.",
+			"relations": [],
+			"tags": [
+				"wildlife",
+				"apex"
+			],
+			"facts": [
+				{
+					"id": "great_bear.size",
+					"text": "In the forest lives a bear far bigger than any other.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "great_bear.den",
+					"text": "The great bear keeps a den and the ground around it.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "great_bear.day",
+					"text": "The great bear roams and hunts deer by day, and sleeps in its den by night.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				},
+				{
+					"id": "great_bear.go_round",
+					"text": "A lone traveller does well to go round the great bear.",
+					"known": "common",
+					"where": [],
+					"tags": [
+						"wildlife"
+					]
+				}
+			]
 		}
 	]
 }
