@@ -5873,6 +5873,7 @@ func _join_player(peer: int, id: String, player_name: String, respawn := false, 
 		record.color = PLAYER_TINTS[(record.index - 1) % PLAYER_TINTS.size()]
 		_records[id] = record
 	record.name = player_name
+	MindLog.player_names[player_name] = true  # Kept out of the mind log (781).
 	var asked := Net.asked_body(id)
 	if asked != &"":
 		record.body = asked

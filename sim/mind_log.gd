@@ -25,10 +25,59 @@ static var last: Dictionary[String, Dictionary] = {}
 static var written := 0
 ## Rotate at this size (bytes); a var for the tests.
 static var max_bytes := 5 * 1024 * 1024
+## Every player name seen this run (Main adds each on joining), scrubbed from
+## entries with the live players' own (decision 781).
+static var player_names: Dictionary[String, bool] = {}
 
 
-static func record(entry: Dictionary) -> void:
-	var stamped := entry.duplicate()
+## Decision 781: the log keeps no player names. Every string in [param entry]
+## but its "companion" has [param keeper]'s name (the companion's own player)
+## put as "her player" and any other player's as "a player", whole words
+## only. Only the log is scrubbed: the model's prompt is sent as it was.
+static func scrub(entry: Dictionary, keeper := "") -> Dictionary:
+	var names: Dictionary[String, bool] = player_names.duplicate()
+	if World != null:
+		for entity: GridEntity in World.entities():
+			if entity is Player and not entity.label.is_empty():
+				names[entity.label] = true
+	if not keeper.is_empty():
+		names[keeper] = true
+	var ordered: Array = names.keys().filter(func(each: String) -> bool: return each.strip_edges().length() > 1)
+	ordered.sort_custom(func(a: String, b: String) -> bool: return a.length() > b.length())
+	var out := {}
+	for key: Variant in entry:
+		out[key] = entry[key] if str(key) == "companion" else _scrubbed(entry[key], ordered, keeper)
+	return out
+
+
+static func _scrubbed(value: Variant, names: Array, keeper: String) -> Variant:
+	if value is String or value is StringName:
+		var text := str(value)
+		for each: String in names:
+			if each not in text:
+				continue
+			var pattern := RegEx.create_from_string("(?<![\\w])" + _escaped(each) + "(?![\\w])")
+			text = pattern.sub(text, "her player" if each == keeper else "a player", true)
+		return text
+	if value is Array:
+		return (value as Array).map(func(each: Variant) -> Variant: return _scrubbed(each, names, keeper))
+	if value is Dictionary:
+		var out := {}
+		for key: Variant in value:
+			out[key] = _scrubbed(value[key], names, keeper)
+		return out
+	return value
+
+
+static func _escaped(text: String) -> String:
+	var out := ""
+	for character in text:
+		out += ("\\" + character) if character in ".^$*+?()[]{}|/-\\" else character
+	return out
+
+
+static func record(entry: Dictionary, keeper := "") -> void:
+	var stamped := scrub(entry, keeper)
 	stamped["time"] = Time.get_datetime_string_from_system(true) + "Z"
 	stamped["tick"] = World.tick
 	last[str(entry.get("companion", ""))] = stamped

@@ -111,6 +111,7 @@ func _ready() -> void:
 	_test_follow_without_backsteps()
 	_test_follow_a_creep()
 	_test_one_cell_door()
+	_test_mind_log_no_names()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -3277,6 +3278,31 @@ func _test_follow_a_creep() -> void:
 	_settle(pet)
 
 
+func _test_mind_log_no_names() -> void:
+	print("\n== the mind log keeps no player names; the model's prompt is unchanged (781) ==")
+	var owner := _player()
+	var pet := _companion()
+	var label_was := owner.label
+	owner.label = "Brannoc"
+	MindLog.player_names["Ysolt"] = true
+	var prompt := pet.identity()
+	_check("Brannoc" in prompt, "the model is still told her player's name: %s" % prompt)
+	pet._log({"kind": "stance", "companion": String(pet.name), "mind": "test", "prompt": prompt,
+		"note": "Brannoc's order stands; Ysolt waved", "user": "Brannoc: hi", "say": "Brannocsson and Ysolte are not names here",
+		"lines": ["to Ysolt"]})
+	var entry: Dictionary = MindLog.last[String(pet.name)]
+	var text := JSON.stringify(entry)
+	_check("Brannoc" not in text.replace("Brannocsson", "") and "Ysolt" not in text.replace("Ysolte", ""), "no player name in the entry: %s" % text)
+	_check("travel with her player" in str(entry["prompt"]) and str(entry["note"]) == "her player's order stands; a player waved"
+		and str(entry["lines"][0]) == "to a player", "her own player is \"her player\", any other \"a player\" (%s)" % entry["note"])
+	_check(str(entry["say"]) == "Brannocsson and Ysolte are not names here" and entry["companion"] == String(pet.name),
+		"whole words only, and her own name kept")
+	_check("Brannoc" in pet.identity(), "and the prompt she is sent keeps it")
+	MindLog.player_names.erase("Ysolt")
+	owner.label = label_was
+	pet.keeper_name()
+
+
 func _test_one_cell_door() -> void:
 	print("
 == a hut's one-cell door: she never stops in its gap, and his route passes through her (391 amended) ==")
@@ -4507,8 +4533,8 @@ func _test_owner_speaks() -> void:
 	var lines: Array[String] = _main.party_log.last(_main.party_log.size() - log_size)
 	_check(lines.size() >= 1 and lines[0] == "Player said to %s: \"%s\"" % [pet.name, said], "the party log: %s" % [lines])
 	var entry: Dictionary = MindLog.last[String(pet.name)]
-	_check(entry["kind"] == "voice" and entry["trigger"] == "Player just spoke to you."
-			and (str(entry["prompt"]).ends_with("\nPlayer: " + said) or str(entry["prompt"]).ends_with("user: Player: " + said)),
+	_check(entry["kind"] == "voice" and entry["trigger"] == "her player just spoke to you."
+			and (str(entry["prompt"]).ends_with("\nher player: " + said) or str(entry["prompt"]).ends_with("user: her player: " + said)),
 			"her voice is asked at once, the words as Player's turn (trigger: %s)" % entry["trigger"])
 	_check(pet.stance == Companion.Stance.GUARD, "the words set nothing by themselves (%s)" % pet.stance_name())
 	_check("%s said: \"Hm?\"" % pet.name in lines, "she answers, and that is logged: %s" % [lines])
@@ -4549,7 +4575,7 @@ func _test_voice() -> void:
 	mind.voice_answer = {"say": "Fall back!", "stance": ""}
 	_main._on_command(owner, "say", {"text": "Are you hurt?"})
 	entry = MindLog.last[String(pet.name)]
-	_check(entry["outcome"] == "dropped" and "Player's words" in str(entry["note"]), "saying Player's words back is dropped (%s)" % entry.get("note", ""))
+	_check(entry["outcome"] == "dropped" and "her player's words" in str(entry["note"]), "saying Player's words back is dropped (%s)" % entry.get("note", ""))
 	for i in 21:
 		World.step()
 	mind.voice_answer = {"say": "Behind you!", "stance": ""}

@@ -39640,3 +39640,28 @@ Neither is in any shop's wares. The art slots (art/kit/slots_items.json, status.
 docs/art_status.md) are regenerated; art-kit draws them. enemy-ai's great_bear drops them in
 place of its hide once these are on main. items_test. Server only; protocol unchanged; no new
 class_name; no bullet (no level has a bear).
+## 781. The mind log keeps no player names
+
+Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'
+decisions, one JSON line each, on the box at /var/lib/psykinetic/mind.log) carried players' names.
+Companion notes named her player through keeper_name() ("<name>'s words ask nothing...", "HOLD is
+only by <name>'s word"), the logged prompt held identity()'s "You travel with <name>", and residents'
+lines ("found by <name>") did the same. mind.log never leaves the box. With no names in it, it is
+also safe to grep there.
+
+The rule is applied once, in MindLog.record, so every present and future caller follows it rather
+than each call site. MindLog.scrub(entry, keeper) goes through every string in the entry, nested
+arrays and dictionaries included, except "companion" (her own name). It changes whole words only
+(no letter, digit or underscore on either side), longest names first. The keeper's name (a
+companion's own player, which Companion._log passes as keeper_label) becomes "her player"; any
+other player's name becomes "a player". The names are the live players' labels in the zone, plus
+MindLog.player_names: Main adds each name as a player joins (_join_player), so one who has left is
+still covered. Names of one character are skipped. MindLog.last, the console's "mind last" and
+the tests read the scrubbed entry too.
+
+Only the log is scrubbed: the prompt the model is sent is built and sent as before, its player's
+name included (companion_test checks identity() still names them). companion_test
+_test_mind_log_no_names: a recorded entry with her player's name and another player's name in its
+prompt, note, words and a nested list keeps neither, has "her player" and "a player" in their
+places, leaves a longer word that starts with a name ("Brannocsson") as it was, and keeps her own
+name. No CHANGELOG bullet (logging only). Server only, protocol unchanged, no new class_name.

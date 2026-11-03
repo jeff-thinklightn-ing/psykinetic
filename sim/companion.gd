@@ -4815,7 +4815,8 @@ func _out_of_reach(entity: GridEntity) -> bool:
 func _log(entry: Dictionary) -> void:
 	entry["stance_now"] = stance_name()
 	entry["keeper_distance"] = World.distance(tile, keeper.tile) if _alive(keeper) else -1
-	MindLog.record(entry)
+	keeper_name()  # Refreshes keeper_label from a live keeper.
+	MindLog.record(entry, keeper_label)  # Her player's name kept out (781).
 
 
 ## FOLLOW: still while her player is within FOLLOW_START - 1 cells; once
