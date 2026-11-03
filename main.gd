@@ -6636,6 +6636,23 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 	Net.message_to(player.owner_peer, "barter", data)
 
 
+## Server: maker [param body] with none of his own makes on the shelf says
+## so to [param player] as the barter opens (562 amended (6)): townsfolk.json
+## "empty_shelf", "potions" for a medicine man, "smithed" for a smith, else
+## "default"; one a day by the pair. The window stays (his care, what he buys).
+func _empty_shelf_told(player: Player, body: Resident) -> void:
+	if player == null or body == null or World.economy == null or not World.economy.maker_goods(body.worker_id).is_empty():
+		return
+	var trades: Array = World.production.worker(body.worker_id).get("trades", [])
+	var key := "potions" if "medicine_man" in trades else "smithed" if "smith" in trades else "default"
+	var all: Dictionary = Townsfolk.rules().get("empty_shelf", {})
+	var lines: Array = all.get(key, all.get("default", []))
+	if lines.is_empty():
+		return
+	var line := str(lines[absi(hash("%s|%s|%d" % [body.worker_id, player.player_id, Townsfolk.day_of(DayNight.now())])) % lines.size()])
+	Net.broadcast_to([player.owner_peer], "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": ""})
+
+
 # --- The healer's care (decision 584 amended) ------------------------------------------
 
 ## The healer's hut whose care medicine man [param worker_id] gives (his
@@ -12145,6 +12162,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			var take: Variant = args.get("take", [])
 			why = World.try_barter(entity, shop, give if give is Array else [], take if take is Array else [], int(args.get("gold", 0)), maker)
 		_send_barter(entity as Player, shop, why, maker)
+		if command_name == "barter" and not maker.is_empty() and why.is_empty():
+			_empty_shelf_told(entity as Player, shop as Resident)  # 562 amended (6).
 	elif command_name == "counter" and entity is Player:
 		# A temple's or a shop's counter's work (decision 438): look, order, collect.
 		var counter := get_node_or_null(NodePath(str(args.get("counter", "")))) as GridEntity

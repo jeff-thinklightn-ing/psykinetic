@@ -24762,6 +24762,16 @@ gold; World.try_barter uses it for a maker. No gold made or lost. larder_test _t
 empty purse and hut take two herbs for a remedy; herbs alone, he says so, then his hut's gold pays;
 a town's medicine man never draws the treasury. economy_test (maker_buys up to the shelf's need).
 Server only, protocol unchanged, no new class_name.
+562 amended (6) (the coordinator's ask after playtest's makers run on f8683751: Hob's and Snagfin's barter
+opened in a fresh world with goods []; release's label): a maker with nothing of his own to sell says so.
+On a "barter" with a {resident} maker, in person, Main._empty_shelf_told: when Economy.maker_goods is
+empty he says one of townsfolk.json "empty_shelf" to that player as speech, "potions" for a medicine man,
+"smithed" for a smith, else "default" (voice's words, first person; facts: herbs for potions, iron or ore
+for the smith), one a day by the pair. Not on a "trade" (the window's refresh), not when too far. The
+window still opens: the client opens it itself before the server answers, a medicine man's holds his care
+and what he buys, and ui's 765 store window shows a bare shelf as just his name, so nothing says it twice
+(ui agreed). resident_test _test_threat: Bram the smith, bare, says a smith's line in person, nothing from
+too far. Server only, protocol unchanged, no new class_name.
 ## 584 amended (2): the care counted a handful at a time
 
 Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4

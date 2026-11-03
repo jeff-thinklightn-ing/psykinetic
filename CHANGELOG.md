@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- A maker with nothing to sell says so in his own words when you open Barter (562 amended (6)).
 - Companions: your companion no longer stops in a doorway's one-cell gap, and a click route walks through her instead of finding no way, so she can't shut you inside a hut (391 amended).
 - Hob and the other makers take herbs or materials in trade for their goods, settling only the difference in coin, and say so when they can't pay it (562 amended (9)).
 - The all-clear after a town's threat reaches everyone in town, from the guard nearest you (762 amended (4)).

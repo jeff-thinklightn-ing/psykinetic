@@ -800,17 +800,29 @@ func _test_threat() -> void:
 	var dealer := _player()
 	if dealer != null:
 		var answers: Array[Dictionary] = []
+		var spoken: Array[Dictionary] = []
 		var answered := func(kind: String, data: Dictionary) -> void:
 			if kind == "barter":
 				answers.append(data)
+			elif kind == "speech":
+				spoken.append(data)
+		var smithed: Array = (Townsfolk.rules().get("empty_shelf", {}).get("smithed", []) as Array).map(func(line: Variant) -> String: return str(line))
 		Net.message_received.connect(answered)
 		for each: Array in [[1, ""], [3, ""], [6, "too far away"]]:
 			_put(dealer, _main._nearest_free(bram.tile + Vector2i(int(each[0]), 0)))
 			var off := World.distance(dealer.tile, bram.tile)
 			var want: String = each[1] if off <= World.PERSON_REACH else "too far away"
 			answers.clear()
+			spoken.clear()
 			_main._on_command(dealer, "barter", {"resident": str(bram.get_path())})
 			_check(answers.size() == 1 and str(answers[0].get("why")) == want, "a barter with Bram %d off: why \"%s\" (%s)" % [off, want, answers])
+			# Nothing of his own made (562 amended (6)): he says so, a smith's line; the window comes all the same.
+			var bare: bool = answers.size() == 1 and (answers[0].get("goods", []) as Array).is_empty()
+			if want.is_empty():
+				_check(not bare or (spoken.size() == 1 and str(spoken[0]["speaker"]) == "Bram" and str(spoken[0]["text"]) in smithed),
+					"his shelf bare: he says so, a smith's line (%s)" % [spoken])
+			else:
+				_check(spoken.is_empty(), "too far: no word of his shelf (%s)" % [spoken])
 			if off <= World.PERSON_REACH:
 				_check(World.try_barter(dealer, bram, [], [], 0, bram.worker_id) == "nothing to trade", "and a trade reaches him (not \"nobody to trade with here\")")
 		Net.message_received.disconnect(answered)
