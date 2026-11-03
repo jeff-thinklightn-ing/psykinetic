@@ -17786,7 +17786,7 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 				# Its gold first (601 amended: into the record's, no slot), then a thing.
 				var gold := World.try_pick_up_gold(player, each)
 				if gold > 0:
-					Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "Picked up %d gold." % gold})
+					Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You pick up %d gold." % gold})  # As the sweep says it (voice, 773).
 					return
 				if not World.ground_uids(each).is_empty() and World.try_pick_up(player, each):
 					return

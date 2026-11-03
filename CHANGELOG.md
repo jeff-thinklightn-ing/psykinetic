@@ -10,6 +10,8 @@ notes (decision 324).
 - The hills fill in: dirt tracks from the road to the herders' hut, the cave and the shieling; two roadside camps (by the bridge and under the spur) where resting by the fire heals you once you've been unhurt a few seconds; seven patches of wild things to gather off the paths (777).
 - Counters: what you collect goes back into your hand when it's free (a shield to the left), and a finished job no longer shows as still being worked (438 amended).
 - F now sweeps up everything lying near you, each thing flying in from where it lay (773, ui's side).
+- A weapon's pack square shows a thin bar for how practised you are with it (766 amended (2)).
+
 ## v0.1.200
 
 - What goes over the network changes, so v0.1.199 and older can't join the server: update through the launcher first.

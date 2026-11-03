@@ -39214,6 +39214,16 @@ combat_test _test_arts_marks (told on a change only; the peak to the
 hundredth; fading past the grace, told once; cleared by the next deed).
 Protocol revision 47 (the "arts" kind, shared with others in 47); no
 record change, no new class_name; the bullet comes with ui's bar.
+766 amended (2), ui's side: the practice shows on the pack (the coordinator's
+approval of C:/dev/review/weapon_memory; combat's agreement). A thin bar along
+the bottom of the player's own square holding a weapon with an art (World.ARTS,
+the server's table, so a new art needs no ui change), filled to Player.art_feel,
+shown once the art has any memory; no words (Jeff's rule). PackPanel.PracticeBar;
+PackPanel.art_marks {art: [peak, fading]} draws the peak as a faint notch past the
+fill and dims the fill while the art cools, fed by combat's owner-only "arts"
+message (766 amended) when it lands; until then, the fill alone. The same bars as
+an "Arts" list on the player card come with the card. ui_test _test_practice_bars.
+Client only, protocol unchanged, no new class_name.
 ## 767. Every town's gatherers: a woodcutter and a hunter, seated once
 
 Jeff: "yes add gatherers to each town" (decisions/town-gatherers.md); the coordinator approved the
@@ -39301,6 +39311,9 @@ is ui's); protocol unchanged; no new class_name.
   cell in the answer and so no flight. An empty sweep says and shows nothing.
 - ui_test (_test_sweep_key); controls_test's F now finds the kit in the pack (the sweep fills it
   first), handed back for T. Client only, protocol unchanged, no new class_name.
+
+773 amended: the old single pickup's gold line says "You pick up %d gold.", as the
+sweep says it (voice's overnight check).
 
 ## 765. One store window for every seller
 

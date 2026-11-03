@@ -94,6 +94,10 @@ var selected: Dictionary = {}
 ## of the player's slots, a chip over the square's top-right corner; 0 for
 ## won't buy, the thing dimmed. Empty: no chips.
 var prices: Dictionary = {}
+## Each art's [peak, fading] as combat's owner-only "arts" message last
+## told it (766 amended), {} before it comes: the practice bars' notch and
+## dimming.
+var art_marks: Dictionary = {}
 ## While a store is open (765): the pack shows though hidden (I), the store
 ## window beside it.
 var held_open := false:
@@ -138,6 +142,39 @@ var _last: Dictionary[HBoxContainer, Array] = {}
 
 
 ## One slot's box. Dragged from when it holds something; dropped on always.
+## Weapon memory on a square (766, ui's side; the coordinator's approval of
+## C:/dev/review/weapon_memory): a thin bar along the bottom filled to the
+## art's memory (Player.art_feel, 0..1); its peak a faint notch past the
+## fill and the fill dimmed while the art cools (combat's owner-only "arts"
+## message, 766 amended, when it comes). No words.
+class PracticeBar:
+	extends Control
+	var fill := 0.0
+	var peak := 0.0
+	var fading := false
+
+	func _init() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+		offset_left = 10
+		offset_right = -10
+		offset_top = -18
+		offset_bottom = -9
+		visible = false
+
+	func _draw() -> void:
+		var whole := Rect2(Vector2.ZERO, size)
+		draw_rect(whole, Color(0.1, 0.08, 0.06, 0.85))
+		var inner := whole.grow(-2)
+		if fill > 0.0:
+			var brass := UiTheme.color("brass")
+			draw_rect(Rect2(inner.position, Vector2(inner.size.x * clampf(fill, 0.0, 1.0), inner.size.y)),
+				brass.darkened(0.55) if fading else brass)
+		if peak > fill + 0.01:
+			var x := inner.position.x + inner.size.x * clampf(peak, 0.0, 1.0)
+			draw_line(Vector2(x, -3), Vector2(x, size.y + 1), UiTheme.color("text_dim"), 3.0)
+
+
 class SlotBox:
 	extends Panel
 	var panel: PackPanel
@@ -154,6 +191,8 @@ class SlotBox:
 	var count: Label
 	## What an open store's seller pays for it (765), over the top-right corner.
 	var price: Control
+	## Weapon memory (766, ui's side): the art's practice along its bottom.
+	var practice: PracticeBar
 
 	func _ready() -> void:
 		mouse_entered.connect(func() -> void:
@@ -460,6 +499,9 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	count.visible = false
 	box.count = count
 	box.add_child(count)
+	if mine:
+		box.practice = PracticeBar.new()
+		box.add_child(box.practice)
 	return box
 
 
@@ -477,6 +519,32 @@ func _icon_arrived(_id: String) -> void:
 	_icons_seen += 1
 
 
+## [param box]'s practice bar (766, ui's side): shown on the player's own
+## square holding a weapon with an art (World.ARTS) once that art has any
+## memory; its peak and cooling from art_marks.
+func _show_practice(box: SlotBox, entity: GridEntity, item: String) -> void:
+	var art := str(World.ARTS.get(item, ""))
+	var feel: Dictionary = (entity as Player).art_feel if is_instance_valid(entity) and entity is Player else {}
+	var fill := float(feel.get(art, 0.0)) if not art.is_empty() else 0.0
+	var marks: Variant = art_marks.get(art, [])
+	var peak := float(marks[0]) if marks is Array and (marks as Array).size() >= 2 else fill
+	var fading := bool(marks[1]) if marks is Array and (marks as Array).size() >= 2 else false
+	box.practice.visible = fill > 0.0
+	if box.practice.fill != fill or box.practice.peak != peak or box.practice.fading != fading:
+		box.practice.fill = fill
+		box.practice.peak = peak
+		box.practice.fading = fading
+		box.practice.queue_redraw()
+
+
+## A square's practice as shown (tests): [fill, peak, fading], [] for none.
+func practice_shown(index: int) -> Array:
+	var box := box_in(true, index)
+	if box == null or box.practice == null or not box.practice.visible:
+		return []
+	return [box.practice.fill, box.practice.peak, box.practice.fading]
+
+
 ## Everything the rows are laid out from: whose, shown or not, the icon
 ## source and each entity's slots and notes (copies: they change in place
 ## under replication). Arrays compare by value, so a frame with the same
@@ -492,6 +560,9 @@ func _signature() -> Array:
 			sig.append(entity.slots.duplicate())
 			sig.append(entity.slot_notes.duplicate())
 			sig.append(entity.slot_counts.duplicate())  # The badges (619, ui's side).
+	if who is Player:
+		sig.append((who as Player).art_feel.duplicate())  # The practice bars (766).
+		sig.append(art_marks.duplicate())
 	return sig
 
 
@@ -695,6 +766,8 @@ func _refresh() -> void:
 			box.count.visible = not box.count.text.is_empty()
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
 			_show_price(box, row == _player_row and has and not item.is_empty())
+			if box.practice != null:
+				_show_practice(box, entity if has else null, item)
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
 	var lines := load_lines(player) if is_instance_valid(player) else PackedStringArray()

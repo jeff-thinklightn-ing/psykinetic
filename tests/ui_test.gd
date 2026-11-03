@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_inventory_panel()
 	_test_barter()
 	_test_sweep_key()
+	_test_practice_bars()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2116,3 +2117,36 @@ func _test_sweep_key() -> void:
 	for i in 20:
 		many.append({"uid": i, "id": "knife", "cell": [i, 0]})
 	_check(Client3D.sweep_flights(many).size() == Client3D.SWEEP_FLIGHTS_MOST, "at most %d fly at once" % Client3D.SWEEP_FLIGHTS_MOST)
+
+
+func _test_practice_bars() -> void:
+	print("\n== weapon memory on the pack (766, ui's side): a bar on the weapon's square, its peak a notch, dim while it cools ==")
+	var pack: PackPanel = _main.pack_panel
+	var player: Player = _main._local_player()
+	if pack == null or player == null:
+		print("  (no pack or player in this scene: its checks skipped)")
+		return
+	var slots_was := player.slots.duplicate()
+	var feel_was := player.art_feel.duplicate()
+	var hand: int = Items.RIGHT_HAND
+	var spot: int = Items.PACK_SLOTS[2]
+	var slots := player.slots.duplicate()
+	slots[hand] = "sword"
+	slots[spot] = "bow"
+	slots[Items.PACK_SLOTS[3]] = "dagger"
+	player.slots = slots
+	player.art_feel = {"swordplay": 0.4}
+	pack.art_marks = {}
+	pack._refresh()
+	_check(pack.practice_shown(hand) == [0.4, 0.4, false] and pack.practice_shown(spot).is_empty() and pack.practice_shown(Items.PACK_SLOTS[3]).is_empty(),
+		"the sword's square shows its practice; the unpractised bow and the dagger (no art) none (%s)" % [pack.practice_shown(hand)])
+	pack.art_marks = {"swordplay": [0.75, false], "bow": [0.55, true]}
+	player.art_feel = {"swordplay": 0.4, "bow": 0.55}
+	pack._refresh()
+	_check(pack.practice_shown(hand) == [0.4, 0.75, false] and pack.practice_shown(spot) == [0.55, 0.55, true],
+		"combat's marks: the sword's peak past its fill, the bow cooling (%s, %s)" % [pack.practice_shown(hand), pack.practice_shown(spot)])
+	_check(World.ARTS.get("sword") == "swordplay" and World.ARTS.get("bow") == "bow", "the arts read from World.ARTS, the server's own table")
+	player.slots = slots_was
+	player.art_feel = feel_was
+	pack.art_marks = {}
+	pack._refresh()
