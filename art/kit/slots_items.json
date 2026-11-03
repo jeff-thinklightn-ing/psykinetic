@@ -158,6 +158,49 @@
 			"type": "mesh",
 			"uses": "battle axe (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.bear_claw": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.08,
+				0.03,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "great bear's claw (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.bear_pelt": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				1.6,
+				0.25,
+				0.9
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				],
+				"grip_2": [
+					0,
+					0.15,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "great bear's pelt (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bow": {
 			"budget": 500,
 			"category": "items",

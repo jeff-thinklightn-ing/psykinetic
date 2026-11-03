@@ -39631,3 +39631,12 @@ into paragraphs inside their entries (release). sound_kit_test (the cries by kin
 reach against GreatBear's, the takes) and view_test (_test_far_cry: the roar at its cell, a cry with
 no slot nothing). Client only, protocol unchanged, no new class_name; no bullet, as 780's (no level has a
 bear yet).
+780 amended: the bear's trophies are catalog rows, so its kill can name them (items, 2026-11-03).
+bear_pelt, "great bear's pelt" (Bear pelt): 12 kg, 1.6 x 0.25 x 0.9 m, two hands, tag "trophy",
+value 40; carried or dragged home as any heavy thing is, its weight doing the rest. bear_claw,
+"great bear's claw" (Bear claw): 0.05 kg, stacks of 10, tags "token" and "trophy", value 6, not
+bound, so it can be shown, traded or sold. Neither has a yield: a depot banks them as goods.
+Neither is in any shop's wares. The art slots (art/kit/slots_items.json, status.json,
+docs/art_status.md) are regenerated; art-kit draws them. enemy-ai's great_bear drops them in
+place of its hide once these are on main. items_test. Server only; protocol unchanged; no new
+class_name; no bullet (no level has a bear).
