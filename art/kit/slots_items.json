@@ -201,6 +201,25 @@
 			"type": "mesh",
 			"uses": "great bear's pelt (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.berries": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.1,
+				0.06,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "handful of berries (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bow": {
 			"budget": 500,
 			"category": "items",
@@ -334,6 +353,44 @@
 			},
 			"type": "mesh",
 			"uses": "Encolpion Amulet (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.feathers": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.04,
+				0.25,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bunch of feathers (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.flint": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.1,
+				0.07,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "lump of flint (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.food_sack": {
 			"budget": 500,
@@ -549,6 +606,25 @@
 			"type": "mesh",
 			"uses": "cut of meat (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.mushrooms": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.12,
+				0.07,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "handful of mushrooms (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.nails": {
 			"budget": 500,
 			"category": "items",
@@ -648,6 +724,25 @@
 			},
 			"type": "mesh",
 			"uses": "travel ration (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.reeds": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.15,
+				1.2,
+				0.15
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bundle of reeds (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.remedy": {
 			"budget": 500,

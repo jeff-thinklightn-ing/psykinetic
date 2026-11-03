@@ -39973,3 +39973,12 @@ yet, so the one shadowed pool waits on buildings' square fire. Shots C:/dev/revi
 weather_test _test_night_town (the clusters, the door lantern's place, who carries a lantern, Main's
 night places, the nearest carriers); view_test _test_fire (the outdoor castle's fire: one pool over each
 cluster beside the cells' lights). Client only, protocol unchanged, no new class_name.
+777, items' side (2026-11-03): the forage the hills' patches lay are catalog rows, so they grow
+(maps' patches skipped a kind with no row). berries, "handful of berries", and mushrooms, "handful
+of mushrooms": 0.2 and 0.25 kg, stacks of 10, tags "resource" and "food", yield {food: 1}, value
+1, so a depot banks them as food. flint, "lump of flint" (0.5 kg, stacks of 10), feathers, "bunch
+of feathers" (0.05 kg, stacks of 10) and reeds, "bundle of reeds" (1 kg, 1.2 m long, stacks of
+5): tag "material", value 1, no yield, banked as goods; what they make (arrows, thatch) is later
+work. Each has its size and weight and no use of its own. The art slots are regenerated for
+art-kit. items_test. Server only; protocol unchanged; no new class_name; no bullet (maps' 777
+bullet carries the forage).
