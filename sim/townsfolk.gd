@@ -1964,8 +1964,64 @@ static func whereabouts(trade: String, hour: float, season := "", type := "", wo
 		from = fposmod(from + (morning if from < 12.0 else evening), 24.0)
 		to = fposmod(to + (morning if to < 12.0 else evening), 24.0)
 		if _within(at, from, to):
-			return str(stint.get("at", "square"))
+			var where := str(stint.get("at", "square"))
+			if where == "home" and not worker_id.is_empty() and table.has("night") 					and not asleep_at(worker_id, hour + float(table["night"].get("lead", 0.25))):
+				return night_at(trade, worker_id, day if day < 0 or hour >= 12.0 else day - 1)  # Up the night through (772).
+			return where
 	return "square"
+
+
+## Resident [param worker_id]'s sleep spell (decision 772), (from, to) in
+## hours on the town's clock: residents.json "sleep" spell's length by the
+## id, starting by the id between from and to less that length, so the town
+## is never all abed; from..to for no id (or no spell).
+static func sleep_spell(worker_id: String) -> Vector2:
+	var rule: Dictionary = days().get("sleep", {})
+	var from := float(rule.get("from", 21))
+	var to := float(rule.get("to", 6))
+	var spell: Variant = rule.get("spell", [])
+	if worker_id.is_empty() or not spell is Array or (spell as Array).size() < 2:
+		return Vector2(from, to)
+	var length := lerpf(float(spell[0]), float(spell[1]), _unit("sleep:" + worker_id))
+	var room := maxf(fposmod(to - from, 24.0) - length, 0.0)
+	var start := fposmod(from + _unit("bed:" + worker_id) * room, 24.0)
+	return Vector2(start, fposmod(start + length, 24.0))
+
+
+## A number in 0..1 from [param key], well mixed (772): a string's hash
+## alone moves by one for ids a letter apart (rs-folk01, rs-folk02).
+static func _unit(key: String) -> float:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(key)
+	return rng.randf()
+
+
+## Whether [param hour] falls in [param worker_id]'s sleep spell (772).
+static func asleep_at(worker_id: String, hour: float) -> bool:
+	var spell := sleep_spell(worker_id)
+	return _within(fposmod(hour, 24.0), spell.x, spell.y)
+
+
+## Where one of [param trade] is, up in the night (772): residents.json
+## "night" by trade, else default, one [at, weight] pick a night by the id.
+static func night_at(trade: String, worker_id: String, day: int) -> String:
+	var night: Dictionary = days().get("night", {})
+	var picks: Variant = night.get(trade, night.get("default", []))
+	if not picks is Array or (picks as Array).is_empty():
+		return "home"
+	var total := 0
+	for pick: Variant in picks:
+		total += int(pick[1]) if pick is Array and (pick as Array).size() > 1 else 0
+	if total <= 0:
+		return "home"
+	var roll := mini(int(_unit("night:%s:%d" % [worker_id, day]) * total), total - 1)
+	for pick: Variant in picks:
+		if not pick is Array or (pick as Array).size() < 2:
+			continue
+		roll -= int(pick[1])
+		if roll < 0:
+			return str(pick[0])
+	return "home"
 
 
 ## How far resident [param worker_id]'s own clock runs ahead (+) or behind

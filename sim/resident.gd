@@ -802,7 +802,7 @@ func _toward(cell: Vector2i) -> Vector2i:
 ## under a roof (Main's places["bed"]: its house, else the inn, else a roofed
 ## workplace; none, it stays up), and not woken this hour.
 func sleeps_now() -> bool:
-	return asleep_now() and places.get("bed") is Rect2i and (places["bed"] as Rect2i).size != Vector2i.ZERO \
+	return asleep_now(worker_id) and places.get("bed") is Rect2i and (places["bed"] as Rect2i).size != Vector2i.ZERO \
 		and DayNight.now() >= _woken_until
 
 
@@ -831,7 +831,7 @@ func sleeping() -> bool:
 
 ## Woken (decision 751): up for the rest of the game hour, out of bed.
 func wake() -> void:
-	if not asleep_now():
+	if not asleep_now(worker_id):
 		return
 	_woken_until = DayNight.now() + maxi(DayNight.day_steps, 24) / 24.0
 	if activity == "sleep":
@@ -839,10 +839,10 @@ func wake() -> void:
 		_pick_goal()
 
 
-## Whether the sleep hours (residents.json "sleep": from, to) hold now.
-static func asleep_now() -> bool:
-	var rule: Dictionary = Townsfolk.days().get("sleep", {})
-	return Townsfolk._within(DayNight.hour(DayNight.now()), float(rule.get("from", 21)), float(rule.get("to", 6)))
+## Whether [param of_id]'s sleep spell holds now (772: Townsfolk.sleep_spell;
+## residents.json "sleep" from..to for no id).
+static func asleep_now(of_id := "") -> bool:
+	return Townsfolk.asleep_at(of_id, DayNight.hour(DayNight.now()))
 
 
 ## The bed in [param home]: its walkable corner farthest from the square's

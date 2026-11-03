@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_healer_at_hut()
 	_test_healer_age()
 	_test_temple_day_flag()
+	_test_short_sleep()
 	_test_herder()
 	_test_settled_goblin()
 	_test_lawspeaker_mid_rounds()
@@ -482,7 +483,7 @@ func _test_bodies_in_town() -> void:
 	_check(bram.places["home"] == hut and bram.places["work"] == square, "home the hut; no forge, so he works in the square (%s)" % [bram.places])
 	_step_until(func() -> bool: return bram.doing == Resident.Doing.WORK and square.has_point(bram.tile), 120)
 	_check(bram.doing == Resident.Doing.WORK and square.has_point(bram.tile), "noon: at work (%s, at %s)" % [bram.doing, bram.tile])
-	DayNight.set_hour(23.0)
+	DayNight.set_hour(_spell_hour(bram.worker_id))  # His own sleep spell (772).
 	_step_until(func() -> bool: return bram.doing == Resident.Doing.HOME and hut.has_point(bram.tile), 150)
 	_check(bram.doing == Resident.Doing.HOME and hut.has_point(bram.tile), "night: home in the hut (at %s)" % bram.tile)
 	DayNight.set_hour(19.5)
@@ -674,7 +675,7 @@ func _test_healer_at_hut() -> void:
 	var oren := _body("medicine_man:" + hut_place)
 	_check(oren != null and oren.town == hut_place and oren.trade == "medicine_man" and oren.label == "Oren", "a body at the hut, its town the hut's place")
 	_check(oren != null and oren.doing == Resident.Doing.WORK and World.distance(oren.tile, cell) <= 3, "at midday he is at his work, in or beside the hut (at %s, the front %s)" % [oren.tile if oren != null else Vector2i.ZERO, cell])
-	DayNight.set_hour(23.0)
+	DayNight.set_hour(_spell_hour(oren.worker_id))  # His own sleep spell (772).
 	_step_until(func() -> bool: return oren.doing == Resident.Doing.HOME, 40)
 	_check(oren.doing == Resident.Doing.HOME and World.distance(oren.tile, cell) <= 3, "at night he is at home, which is the hut")
 	DayNight.set_hour(12.0)
@@ -778,6 +779,12 @@ func _test_healer_age() -> void:
 ## a click gets the sheltering line; a sleeper abed under a roof sleeps on;
 ## unseen for the clear time it lifts with an all-clear; a holder keeps it
 ## up until it lets go; the "town" message carries it.
+## The middle of resident [param worker_id]'s sleep spell (772), an hour.
+func _spell_hour(worker_id: String) -> float:
+	var spell := Townsfolk.sleep_spell(worker_id)
+	return fposmod(spell.x + fposmod(spell.y - spell.x, 24.0) / 2.0, 24.0)
+
+
 func _test_threat() -> void:
 	print("\n== threat in town: folk shelter, shops shut, a guard turns out, the all-clear (decision 762) ==")
 	for body: GridEntity in World.townsfolk().duplicate():
@@ -911,8 +918,8 @@ func _test_threat() -> void:
 		_check(World.towns.threatened(STORE).is_empty(), "the balance's wolves gone: lifted")
 	else:
 		_check(false, "(World.balance made at boot)")
-	# Night: one abed under his roof sleeps on through it.
-	DayNight.set_hour(1.0)
+	# Night: one abed under his roof sleeps on through it (his own spell, 772, early in it).
+	DayNight.set_hour(fposmod(Townsfolk.sleep_spell(bram.worker_id).x + 0.1, 24.0))
 	World.towns.lift_threat(STORE)
 	bram._hide_until = -1  # His own hide from the raider seen (HIDE_TICKS) over.
 	_sync()
@@ -970,6 +977,53 @@ func _test_threat() -> void:
 	DayNight.set_hour(12.0)
 
 
+## Short sleep (decision 772; Jeff: "not have npcs sleep the entire night
+## cycle... only sleep for a 5-10 minutes each"): each sleeps one spell by
+## its id; outside it, a home stint is the night's place, never home.
+func _test_short_sleep() -> void:
+	print("
+== short sleep: one spell each, staggered, up the rest of the night (decision 772) ==")
+	var ids: Array[String] = []
+	for i in 12:
+		ids.append("rs-night%02d" % i)
+	var lengths_ok := true
+	var starts := {}
+	for id: String in ids:
+		var spell := Townsfolk.sleep_spell(id)
+		var length := fposmod(spell.y - spell.x, 24.0)
+		lengths_ok = lengths_ok and length >= 1.5 - 0.001 and length <= 2.5 + 0.001 and Townsfolk._within(spell.x, 21.0, 5.5)
+		starts[snappedf(spell.x, 0.5)] = true
+	_check(lengths_ok, "each spell 1.5 to 2.5 hours, begun between 21:00 and 05:30")
+	_check(starts.size() >= 4, "staggered: their starts spread through the night (%d half-hours)" % starts.size())
+	var never_all := true
+	var some_up_each_hour := true
+	for half in 18:
+		var hour := fposmod(21.0 + half * 0.5, 24.0)
+		var abed := ids.filter(func(id: String) -> bool: return Townsfolk.asleep_at(id, hour)).size()
+		never_all = never_all and abed < ids.size()
+		some_up_each_hour = some_up_each_hour and abed <= ids.size() / 2
+	_check(never_all and some_up_each_hour, "the town is never all abed; most are up at any hour")
+	var id := ids[0]
+	var spell := Townsfolk.sleep_spell(id)
+	var mid := fposmod(spell.x + fposmod(spell.y - spell.x, 24.0) / 2.0, 24.0)
+	var asleep_where := Townsfolk.whereabouts("cook", mid, "", "", id, 3)
+	_check(asleep_where == "home", "in her spell: home (%s at %.2f)" % [asleep_where, mid])
+	# Her home stint (19 to 5, the offset aside) outside the spell and its lead: the night's place.
+	var outside: Array = []
+	var awake_hour := 20.0
+	for quarter in 32:
+		var hour := fposmod(20.0 + quarter * 0.25, 24.0)
+		if Townsfolk._within(hour, 20.0, 4.0) and not Townsfolk.asleep_at(id, hour + 0.5) and not Townsfolk.asleep_at(id, hour - 0.25):
+			awake_hour = hour
+			outside.append(Townsfolk.whereabouts("cook", hour, "", "", id, 3))
+	_check(not outside.is_empty() and outside.all(func(where: String) -> bool: return where in ["inn", "square", "temple"] and where == outside[0]),
+		"up in the night: the inn, the square or the chapel, one place the night through (%s)" % [outside])
+	_check(Townsfolk.whereabouts("guard", awake_hour, "", "", "rs-guard", 3) in ["square", "home"]
+		and Townsfolk.whereabouts("priest", fposmod(Townsfolk.sleep_spell("rs-priest").y + 0.5, 24.0), "", "", "rs-priest", 3) in ["temple", "work", "square"],
+		"the guard up on the square, the priest at his chapel")
+	_check(Townsfolk.whereabouts("cook", 1.0, "", "", "", 3) == "home", "(no id: home the night through, as before)")
+
+
 ## --test-temple-day (404 amended): today everyone's temple day at its
 ## hour, off again after; Main honours it only beside --run-marker.
 func _test_temple_day_flag() -> void:
@@ -1020,7 +1074,7 @@ func _test_herder() -> void:
 		"at his fold he herds: a cell of it, facing its middle (%s)" % [herding])
 	_step_until(func() -> bool: return grim.activity == "herd", 400)
 	_check(grim.activity == "herd" and fold.has_point(grim.tile), "shown there (%s at %s)" % [grim.activity, grim.tile])
-	DayNight.set_hour(23.0)
+	DayNight.set_hour(_spell_hour(grim.worker_id))  # His own sleep spell (772).
 	_step_until(func() -> bool: return grim.doing == Resident.Doing.HOME and World.distance(grim.tile, fold_cell) <= 3, 60)
 	_check(grim.doing == Resident.Doing.HOME and World.distance(grim.tile, fold_cell) <= 3, "night: home in the hut (at %s)" % grim.tile)
 	# With maps' buildings (640, maps' side: a building.hut beside the place, a building.fold within FOLD_REACH):
@@ -3718,7 +3772,7 @@ func _test_visible_work() -> void:
 	var mara := _body("rs-mara")
 	_check(mara != null and mara.person == "Mara", "(Mara the cook stands in the town)")
 	var sleep: Dictionary = Townsfolk.days().get("sleep", {})
-	_check(int(sleep.get("from", 0)) == 21 and int(sleep.get("to", 0)) == 6, "residents.json sleep: 21 to 6")
+	_check(int(sleep.get("from", 0)) == 21 and is_equal_approx(float(sleep.get("to", 0)), 5.5) and sleep.get("spell") == [1.5, 2.5], "residents.json sleep: a spell of 1.5 to 2.5 hours, between 21 and 5.5 (772)")
 	_check(not Resident.asleep_now(), "noon: nobody sleeps")
 	# The bed and the head.
 	var home: Rect2i = mara.places.get("home", Rect2i())
@@ -3735,8 +3789,8 @@ func _test_visible_work() -> void:
 	var head := Resident.head_of(home, bed)
 	_check((home.size.x >= home.size.y and head.y == 0 and head.x != 0) or (home.size.x < home.size.y and head.x == 0 and head.y != 0), "the head along the room's long side (%s)" % [head])
 	# Night: she goes to bed and lies down.
-	DayNight.set_hour(23.0)
-	_check(Resident.asleep_now(), "23:00: the sleep hours")
+	DayNight.set_hour(_spell_hour(mara.worker_id))
+	_check(Resident.asleep_now(mara.worker_id), "her own sleep spell (772: %s)" % Townsfolk.sleep_spell(mara.worker_id))
 	for i in 400:
 		World.step()
 		if mara.activity == "sleep":
@@ -3751,7 +3805,15 @@ func _test_visible_work() -> void:
 		if building.get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(bed):
 			code = str(building.get("code", ""))
 			town_id = Client3D.awake_town(building, World.zone.name)
-	_check(code.is_empty() or (awake.has(code) and awake[code] == false), "the lamp: her house is asleep (%s: %s)" % [code, awake])
+	var housed: Array = []  # Who else stands in her house (772: each sleeps in its own spell).
+	var house_rect := Rect2i()
+	for building: Dictionary in _main._world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		if str(building.get("code", "")) == code and building.get("rect") is Rect2i:
+			house_rect = building["rect"]
+	for each: GridEntity in World.townsfolk():
+		if each != mara and each.spawned and each is Resident and house_rect.has_point(each.tile):
+			housed.append("%s %s %s %s" % [(each as Resident).person, (each as Resident).activity, (each as Resident).doing, each.tile])
+	_check(code.is_empty() or (awake.has(code) and awake[code] == false), "the lamp: her house is asleep (%s: %s; others in it: %s)" % [code, awake, housed])
 	# Told under the house's own town, as the "town" message and the view
 	# name it (the lamp's and the chimney's smoke); a home of no town, its
 	# level's.

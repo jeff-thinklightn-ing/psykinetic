@@ -39207,3 +39207,37 @@ barter window), 562, 584 amended, 438, 711 and 736.
 ui_test (_test_barter, _test_counter_panel, the stack hovers) and resident_test
 (_test_vendor_buttons: Rolf's sword bought through Buy, end to end). Client only, protocol
 unchanged; CounterPanel's class_name is gone (no other tree names it); no new class_name.
+## 772. The tavern and the townsfolk's night
+
+Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";
+on 11-02: "build the tavern and night watch", then, in place of a faster night: "what'd id do instead of
+shortening the night is just not have npcs sleep the entire night cycle. they head to the tavern, only
+sleep for a 5-10 minutes each." The coordinator's design, approved: the townsfolk fill the night; the
+tavern (a building with a taverner, open evening into night, food and drink, rumours from the world's
+state, cards and dice later) is its draw. Phases land one at a time; the night watch is 771.
+
+Phase 1, the short sleep (this landing). residents.json "sleep" gains "spell": [1.5, 2.5] and runs from
+21 to 5.5: each body sleeps one spell of 1.5 to 2.5 game hours (about 5.5 to 9.5 real minutes on the
+90-minute day) by its id (hash "sleep:"), starting by its id (hash "bed:") between 21:00 and 05:30 less
+the spell's length (Townsfolk.sleep_spell). Each draw is Townsfolk._unit(key), a RandomNumberGenerator seeded
+by the key's hash: a string's hash alone moves by one for ids a letter apart, and the first try put twelve
+ids' spells in two half-hours (offset_of keeps its own hash, unchanged). Twelve ids: at no half-hour of the night more than half abed,
+never all. Resident.asleep_now(of_id) reads the body's own spell (sleeps_now, wake); one with no id sleeps
+from..to as before. Townsfolk.whereabouts: a stint "home" for one with an id is home only from a quarter
+hour before its spell (residents.json night "lead", 0.25: the walk) to its end; the rest of it is
+residents.json "night" (Townsfolk.night_at): by trade, else default, one [at, weight] pick a night by the
+id (the night's day: an hour before noon counts to the day before, so a body keeps one place past
+midnight). Default: the inn 6, the square 3, the chapel 1; the guard the square; the priest the chapel;
+the medicine man and the herder their work (the hut, the fold). "inn" is the stints' own word: the inn
+where the town has one standing (places "inn"), else the square; the tavern takes it when it lands (772,
+npc's side (n)), and the square's fire (buildings' "square_fire", towns' "fires") when it stands. The bed,
+the lying pose, the lamp and the chimney are as they were, each in its own spell.
+What leaned on a whole night's sleep, checked: shop counters are not tied to a keeper's body and stay open
+(the coordinator's call on Jeff's open question); a maker barters in person wherever he is awake, the
+asleep refusal (751 amended (2)) now rarer; the herder's hail stays once a day, and may come by night;
+under a threat (762) more are up, and keep to their shelter (762 amended (2), (3)); one abed in a roofed
+bed sleeps on; the bedtime walk is each body's own, one at a time through the night; gossip and the bard
+follow them to the inn. resident_test: the night checks (Bram, the healer, the herder, Mara's bed, the
+threat's bedtime) at each body's own spell; _test_short_sleep (lengths, the stagger, home in the spell,
+the night's place outside it, the guard and the priest, no id as before). Server only, protocol
+unchanged, no new class_name.
