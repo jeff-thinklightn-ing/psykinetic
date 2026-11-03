@@ -4120,7 +4120,8 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 ## Banks the instance [param uid] (held by nothing now) at stockpile
 ## [param place], brought [param who] someone from [param from]: a resource
 ## item as its yield (its instance ended, "banked"), gear as itself.
-func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i, by_id := "") -> void:
+func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i, by_id := "",
+		brought_by := "") -> void:
 	var yields := items.yields_of(uid)  # A short one's share (decision 493).
 	if yields.is_empty():
 		stockpile.bank(place, uid, who, from, at_zone, tile, "banked", by_id)
@@ -4136,7 +4137,9 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 	for what: String in yields:
 		stockpile.deposit(place, what, int(yields[what]), who, from, by_id)
 	if balance != null:
-		balance.banked(uid, who)  # Meat brought home (761).
+		# Meat brought home (761), by its bringer's label: the depot's who, or
+		# a counter sale's seller (761 amended (5)), never "sold:<id>".
+		balance.banked(uid, brought_by if not brought_by.is_empty() else who)
 	items.end(uid, "banked", "%s by %s" % [place, who], at_zone, tile)
 
 
@@ -4535,7 +4538,7 @@ func _sold(by: GridEntity, from: GridEntity, from_slot: int, uid: int, place: St
 		items.note(uid, "sold", "to %s by %s for %d gold" % [place, who, paid])
 		stockpile.stock_shop(place, uid, "sold:%s" % who)
 	else:
-		_bank_thing(place, uid, "sold:%s" % who, _label_of(from), shop.zone, shop.tile)
+		_bank_thing(place, uid, "sold:%s" % who, _label_of(from), shop.zone, shop.tile, "", _label_of(by))
 	_log("shop: %s sold %s at %s for %d gold" % [by.name, item, place, paid])
 	_slots_changed(from)
 

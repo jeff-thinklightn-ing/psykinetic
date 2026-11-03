@@ -38714,6 +38714,15 @@ who (the ledger keeps that). balance_test _test_meat: a hide and antlers taken u
 never count, and a day on, left and home are unchanged. Server only; protocol unchanged; no new
 class_name; no bullet.
 
+761 amended (5) (release's label; the coordinator's call after playtest's store tour): meat sold
+at a store's counter is brought home by its seller, as at the depot. A counter sale banks raw goods
+through World._bank_thing with who "sold:<player id>", which Balance.banked took as the bringer, so
+a quest's home_by gained a "sold:<id>" key the herder never reads, and the seller's standing missed
+it. _bank_thing takes brought_by, and World._sold passes the seller's label (World._label_of, the
+form the depot writes): no player name in a new place. resident_test _test_balance_herder: a cut of
+meat lying on the quest's ground, sold at the counter, counts home by the seller's label. Server
+only; protocol unchanged; no new class_name; no bullet while no level keeps the balance.
+
 ## 763. Safe paths: each level's roads and tracks, for what keeps off them
 
 Jeff (2026-11-01, roadmap "How it plays"): "zones need to have safe paths with activities not too

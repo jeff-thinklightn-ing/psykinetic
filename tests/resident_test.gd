@@ -1129,6 +1129,16 @@ func _test_balance_herder(grim: Resident, fold: String) -> void:
 	_check(said.call("ask"), "a click: the ask (%s)" % [told])
 	_check(told.any(func(each: Dictionary) -> bool: return each["text"].contains("eight") and each["text"].contains("twelve")), "his flock in words: eight of twelve (%s)" % [told])
 	_check(told.any(func(each: Dictionary) -> bool: return each["text"].contains("three days")), "the days left in words (%s)" % [told])
+	# Meat sold at a counter is brought home by its seller, as at the depot (761 amended (5)).
+	var meat := World.items.mint("meat", "test")
+	var meat_slot := World.room_for(player, meat)
+	if meat_slot >= 0 and World.put_item(player, player, meat_slot, meat):
+		World.balance._carried[meat] = {"area": TOWN, "by": name}
+		World._sold(player, player, meat_slot, meat, STORE, player.player_id, 0, player)
+		_check(World.balance._quests[fold]["home_by"] == {name: 1} and int(World.balance._quests[fold]["home"]) == 1,
+			"meat sold at the counter: brought home, by the seller's name as at the depot (%s)" % [World.balance._quests[fold]["home_by"]])
+	else:
+		_check(false, "(a cut of meat in the pack)")
 	# Meat left lying against the player's name: the grudge, and standing down; brought home, up.
 	var card := Townsfolk.card_of(World.production, grim.worker_id)
 	var before := int(card.get("standing", {}).get(player.player_id, {}).get("score", 0))
