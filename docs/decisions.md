@@ -23709,6 +23709,23 @@ that never answers covered by her word; a voice answering PRESS to "wait
 here" leaves her waiting. Lines in older tests that are now orders were
 reworded to keep testing the model's path. Server only, protocol unchanged,
 no new class_name.
+
+## 616 amended: her player's order wins over the mind's stance on an event
+
+In playtest's badly run 5, Rhea was told "Wait here." in the wilds (order
+"wait", HOLD). When three wolves came to a town at night, the scripted mind's
+stance answer set GUARD, and she left her post for the wolves 76 cells away.
+The arts tour did the same after a refused draugr challenge. The coordinator's
+ruling: a player's explicit order wins. Companion._take_result now rejects a
+"stance" answer while order is set, logged as "rejected" with "her player's
+order (wait) stands" (no player name in the log). The mind's stance applies
+again once the order ends: she is called back, or it lapses when either of them
+is badly hurt, as before. No scripted override is kept, not even for a
+challenge: holding, she still fights what comes next to her. A check of her
+player's own words (_take_check) is their newer word and is unchanged.
+companion_test (the stance-answer case). Server only, protocol unchanged, no
+new class_name.
+
 ## 586. Snagfin is the only fence, and only by night
 
 Jeff, through the coordinator: "Snagfin could be the only fence, he will

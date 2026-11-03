@@ -4447,6 +4447,16 @@ func _test_stances() -> void:
 	pet._take_result({"kind": "stance", "serial": 999, "answer": {"stance": "STAY_CLOSE"}})
 	_check(pet.stance == Companion.Stance.PRESS and MindLog.last[String(pet.name)]["outcome"] == "superseded",
 			"an older ask's answer, come late, is superseded (%s)" % pet.stance_name())
+	# Her player's order wins over the mind's stance on a threat or a challenge
+	# (playtest: "Wait here.", then wolves came to town and she went 76 cells to them).
+	pet.order = "wait"
+	pet.stance = Companion.Stance.HOLD
+	pet._take_result({"kind": "stance", "serial": 1001, "answer": {"stance": "GUARD"}})
+	_check(pet.stance == Companion.Stance.HOLD and MindLog.last[String(pet.name)]["outcome"] == "rejected",
+			"told to wait, the mind's GUARD is not taken: her player's order stands (%s)" % pet.stance_name())
+	pet.order = ""
+	pet._take_result({"kind": "stance", "serial": 1002, "answer": {"stance": "GUARD"}})
+	_check(pet.stance == Companion.Stance.GUARD, "with no order, it is (%s)" % pet.stance_name())
 	pet._stance_serial = 0
 	pet.stance = Companion.Stance.GUARD
 

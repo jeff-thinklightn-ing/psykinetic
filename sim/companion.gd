@@ -3790,6 +3790,11 @@ func _take_result(result: Dictionary) -> void:
 		elif wanted == Stance.HOLD:
 			entry["outcome"] = "rejected"
 			entry["note"] = "HOLD is only by %s's word; %s stands" % [keeper_name(), stance_name()]
+		elif not order.is_empty():
+			# Her player's order stands till they change it or it lapses (616):
+			# a threat or a challenge never takes her off it.
+			entry["outcome"] = "rejected"
+			entry["note"] = "her player's order (%s) stands; %s stands" % [order, stance_name()]  # No name in the log.
 		elif serial < _stance_serial:
 			entry["outcome"] = "superseded"
 			entry["note"] = "a newer ask's %s stands" % stance_name()
