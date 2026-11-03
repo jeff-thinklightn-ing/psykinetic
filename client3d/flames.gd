@@ -8,8 +8,9 @@ extends RefCounted
 ## steady, as Senses reads it.
 
 ## Each slot's flame, its height (m): a hand for a torch, about a cell wide
-## for a campfire (art-kit's sizes).
-const SIZES := {"prop.torch_post": 0.4, "prop.torch": 0.3, "prop.campfire": 0.9, "prop.forge": 0.45}
+## for a campfire (art-kit's sizes); a brazier's bowl (782's watch posts)
+## between.
+const SIZES := {"prop.torch_post": 0.4, "prop.torch": 0.3, "prop.campfire": 0.9, "prop.forge": 0.45, "prop.brazier": 0.6}
 const DEFAULT_SIZE := 0.3
 ## How far a flame's drawn light swings (a share of its energy): a torch's
 ## calmer than an open fire's.

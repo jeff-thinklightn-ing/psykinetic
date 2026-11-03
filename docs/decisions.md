@@ -39920,3 +39920,56 @@ Ambience's torch loop and the camp's are one way of placing a point loop now (_p
 Ambience.points). No cue for the warmed rest itself: the crackle is the fire's voice. Takes:
 558967 (Nox_Sound), 350757 (aerror), 508110 (ahriik), all CC0. sound_kit_test (the slot),
 view_test (the crackle from the ring; none dropped or out of reach). Client only.
+## 782. The night town's lights
+
+The coordinator (2026-11-03): with the townsfolk up all night (772), the night town should look lived-in,
+with the square's fire casting a warm pool, windows lit where someone is awake, lamps at the store, the
+chapel and the watch posts, and townsfolk walking at night carrying a lantern. Light count watched. Its
+rulings: carried lanterns for walkers only; the lamps' places derived by the client for now (taken from
+buildings' data if its re-lay gives lamp spots); a post's light brighter, a brazier.
+
+- **Windows**: unchanged. 566's glow pane already follows Main._awake_tick's flag per building: lit while
+  anyone inside is awake, dark while all inside sleep and once the house is emptied, so under 772 a house
+  goes dark while its folk are at the inn and in their spell of sleep, and the inn stays lit.
+- **Fire pools**: outdoors, each cluster of touching terrain "fire" cells (Client3D.fire_clusters, side or
+  corner) gets one wide warm light at its middle, POOL_UP (1 m) over it: FIRE_POOL, POOL_ENERGY 1.6 over
+  POOL_RANGE 6.5 m, casting shadows while it reaches the view (_cast_shadows, as the torches), flickering
+  and fading by day as any fire's light (_fire_lights). Each cell's own 2.5 m light stays. Buildings'
+  square fire (772: a place of kind "fire", the pit painted as a terrain fire cell) lights with nothing more.
+- **Door lanterns**: a building holding a shop's or temple's counter (a Chest with props shop or temple)
+  hangs a lantern on its door's wall (Client3D._hang_door_lamps, looked at with the window lights every
+  LAMP_CHECK, since the counters come with the entities after the room): door_lamp_at puts it DOOR_LAMP_UP
+  2.1 m up, DOOR_LAMP_ASIDE 0.8 m along from the door's middle, DOOR_LAMP_OUT 0.45 m proud of the door's
+  edge (the chapel's wall is 0.5 m), on a short arm; Client3D._hanging_lantern (451's) under it; LANTERN at
+  DOOR_LAMP_ENERGY 1.2 over 4.5 m, flickering LANTERN_FLICKER (half a torch's).
+- **Night places** (Main.night_places from level.json "places", handed over on each room built,
+  Client3D.set_night_places): a place of kind "post" (771's watch posts, buildings') gets art-kit's
+  prop.brazier (Flames' flame at its socket, Flames.SIZES 0.6) at its "brazier" cell, else its rect's
+  middle, else its cell, with a bright light so the watch reads from the town (FIRE_POOL, POST_ENERGY 2.2
+  over POST_RANGE 7 m); buildings places no brazier of its own there. The place keyed "store" gets a
+  lantern on a 2 m post at its "lamp" cell, else at its cell + NIGHT_STORE_ASIDE (1, 0.5), left out where a
+  building covers the spot (that store's counter hangs a door lantern instead). Until buildings' plan
+  lands no real level has a post, and Level.places_from keeps no "brazier", "rect" or "lamp" yet: these
+  light as that data arrives.
+- **Carried lanterns**: a townsperson out of doors after sunset (the sun's elevation at or under 0,
+  outdoors), awake, its left hand free, that has walked within CARRIED_HOLD (3 s, over the grid's pauses
+  between steps) carries the hanging lantern from its left hand (pc-character's word: hand_l's socket,
+  CARRIED_HANG 0.12 m under it, kept upright; no pose, the arm hangs and swings; a node of its own,
+  "CarriedLantern", never hand_l's "Held"). Client3D.carries_lantern is the rule. Only the CARRIED_NEAR 4
+  carriers nearest the camera's aim light the ground (nearest_carriers, picked every CARRIED_PICK 0.5 s):
+  CARRIED_ENERGY 1.6 over CARRIED_RANGE 5 m (raised from 1.0 over 4 m after the
+  coordinator saw the shot: a walker's pool barely showed), CARRIED_UP 1.2 m over the lantern; the rest glow and light
+  nothing.
+- **Cost**: the lamps, braziers and carried lights cast no shadows and fade out from NIGHT_FADE 40 m over
+  10 m; the only shadowed light added is one per fire cluster.
+
+Bench (release's check), map_bench on the wilds town (tools/town_state's 12 residents) at 22:00 in
+summer, clear, the low camera on the square (210, 203), 60 s, 1600x900, HEAD and this alternating, two
+rounds: GPU median 1.94 / 1.95 ms before, 1.95 / 1.95 after; frame median 5.12 / 4.93 before, 5.01 /
+5.01 after (99th 8.80 / 8.41, 8.38 / 8.53). In view: the chapel's door lantern, the store's lantern post
+(the wilds' store is an open stall), the carried lights (4 at most); the wilds has no fire by its square
+yet, so the one shadowed pool waits on buildings' square fire. Shots C:/dev/review/night_town.
+
+weather_test _test_night_town (the clusters, the door lantern's place, who carries a lantern, Main's
+night places, the nearest carriers); view_test _test_fire (the outdoor castle's fire: one pool over each
+cluster beside the cells' lights). Client only, protocol unchanged, no new class_name.

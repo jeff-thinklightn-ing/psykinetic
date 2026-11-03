@@ -722,6 +722,47 @@ const LAMP_RANGE := 5.0
 const LAMP_FALLOFF := 0.6
 const LAMP_PULSE_LOW := 0.9
 const LAMP_PERIOD := 4.0
+## The night town (782; townsfolk up all night, 772). A cluster of fire
+## cells outdoors (a town's square fire) casts one wide warm pool:
+## FIRE_POOL, POOL_ENERGY over POOL_RANGE m, POOL_UP m over the pit.
+const FIRE_POOL := Color(1.0, 0.62, 0.32)
+const POOL_ENERGY := 1.6
+const POOL_RANGE := 6.5
+const POOL_UP := 1.0
+## A lantern hung beside the door of a store or a chapel (a building
+## holding a shop's or temple's counter): DOOR_LAMP_UP m up the wall,
+## DOOR_LAMP_ASIDE m along it from the door's middle, DOOR_LAMP_OUT m proud
+## of the door's edge (a chapel's wall is 0.5 m thick); its light. A store
+## with no building round it hangs one on a post, STORE_LAMP_UP m tall.
+const DOOR_LAMP_UP := 2.1
+const DOOR_LAMP_ASIDE := 0.8
+const DOOR_LAMP_OUT := 0.45
+const DOOR_LAMP_ENERGY := 1.2
+const DOOR_LAMP_RANGE := 4.5
+const STORE_LAMP_UP := 2.0
+## A lantern's flicker: half a torch's.
+const LANTERN_FLICKER := 0.04
+## A watch post's brazier (771's posts): art-kit's prop.brazier and a
+## bright light, so the watch reads from the town (the coordinator).
+const POST_BRAZIER := "prop.brazier"
+const POST_ENERGY := 2.2
+const POST_RANGE := 7.0
+## The night town's lamps and braziers cast no shadows and fade out from
+## NIGHT_FADE m from the camera over NIGHT_FADE_LENGTH m.
+const NIGHT_FADE := 40.0
+const NIGHT_FADE_LENGTH := 10.0
+## A townsperson walking out of doors after sunset carries a lantern in
+## the left hand, CARRIED_HANG m under the hand, kept out CARRIED_HOLD s
+## past its last step (the grid's steps pause); the CARRIED_NEAR carriers
+## nearest the camera's aim light the ground (picked every CARRIED_PICK
+## s), CARRIED_ENERGY over CARRIED_RANGE m, CARRIED_UP m over the lantern.
+const CARRIED_HANG := 0.12
+const CARRIED_HOLD := 3.0
+const CARRIED_NEAR := 4
+const CARRIED_PICK := 0.5
+const CARRIED_ENERGY := 1.6
+const CARRIED_RANGE := 5.0
+const CARRIED_UP := 1.2
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
@@ -2169,6 +2210,19 @@ var _fire_lights: Array[Array] = []
 ## The cold lamps' lights (_add_lamp): [light, energy, phase].
 var _lamp_lights: Array[Array] = []
 var _fire_time := 0.0
+## The night town (782): the sun down outdoors (_update_lamps); the door
+## lanterns hung, by their front cell; Main's night places and their
+## node; the walkers' lanterns (entity id -> its lantern), the carried
+## lights and whose lanterns they follow.
+var _night := false
+var _door_lamps: Dictionary[Vector2i, Node3D] = {}
+var _night_posts: Array = []
+var _night_stores: Array = []
+var _night_places: Node3D
+var _carriers: Dictionary = {}
+var _carried_lights: Array[OmniLight3D] = []
+var _carried_by: Array[Node3D] = []
+var _carried_clock := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
 var _sky_material: ShaderMaterial
@@ -2645,6 +2699,7 @@ func _process(delta: float) -> void:
 	_drop_departed()
 	_update_mourning(delta)
 	_flicker_fires(delta)
+	_light_carriers(delta)
 
 
 # --- Rig ---------------------------------------------------------------------
@@ -5394,6 +5449,7 @@ func _phase_ground_over_frames(generation: int) -> bool:
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
 			_add_fire(cell)
+	_add_fire_pools()
 	return true
 
 
@@ -5716,6 +5772,8 @@ func _phase_sets() -> void:
 	_room = Node3D.new()
 	_room.name = "Room"
 	add_child(_room)
+	_door_lamps.clear()  # Hung again in the new room (782).
+	_night_places = null
 	_stone_opaque = _stone(1.0)
 	# The map's sets; a building's walls and inside in its slot's sets
 	# (decision 285): the last map's buildings' out, this one's in, what
@@ -5893,6 +5951,7 @@ func _phase_ground() -> void:
 	for cell: Vector2i in fire:
 		if _grounds.has(cell):
 			_add_fire(cell)
+	_add_fire_pools()
 
 
 func _phase_lights() -> void:
@@ -7179,6 +7238,8 @@ func _update_lamps() -> void:
 	var hour := DayNight.hour(now)
 	var sun := DayNight.elevation(now)
 	_glows = _glows.filter(func(each: Array) -> bool: return is_instance_valid(each[0]))
+	_night = bool(_terrain.get("outdoor", false)) and sun <= 0.0
+	_hang_door_lamps()
 	for each in _glows:
 		(each[0] as Node3D).visible = _window_lit(each[1], hour, sun)
 
@@ -13983,6 +14044,299 @@ func _flicker_fires(delta: float) -> void:
 			light.light_energy = float(fire[1]) * share * Flames.flicker(_fire_time, float(fire[2]), float(fire[3]))
 
 
+# --- The night town (782) --------------------------------------------------------
+
+## The cells of [param cells] in clusters of cells touching (side or
+## corner), each cluster in the order its cells were met.
+static func fire_clusters(cells: Array[Vector2i]) -> Array[Array]:
+	var left: Dictionary[Vector2i, bool] = {}
+	for cell in cells:
+		left[cell] = true
+	var out: Array[Array] = []
+	for start in cells:
+		if not left.has(start):
+			continue
+		left.erase(start)
+		var cluster: Array[Vector2i] = [start]
+		var i := 0
+		while i < cluster.size():
+			var at := cluster[i]
+			i += 1
+			for dx in range(-1, 2):
+				for dy in range(-1, 2):
+					var next := at + Vector2i(dx, dy)
+					if left.has(next):
+						left.erase(next)
+						cluster.append(next)
+		out.append(cluster)
+	return out
+
+
+## Outdoors, one warm pool over each cluster of fire cells drawn (782: a
+## town's square fire reads across the square at night): FIRE_POOL at the
+## cluster's middle, POOL_UP over it, casting shadows while it reaches the
+## view (_cast_shadows), flickering and fading by day as any fire's light.
+## A cell's own light (_add_fire) stays: the pool is the wide light.
+func _add_fire_pools() -> void:
+	if not bool(_terrain.get("outdoor", false)):
+		return
+	var drawn: Array[Vector2i] = []
+	for cell: Vector2i in _terrain["fire"]:
+		if _grounds.has(cell):
+			drawn.append(cell)
+	for cluster: Array in fire_clusters(drawn):
+		var middle := Vector3.ZERO
+		for cell: Vector2i in cluster:
+			middle += _tile_position(cell)
+		middle /= float(cluster.size())
+		var light := OmniLight3D.new()
+		light.name = "FirePool_%d_%d" % [cluster[0].x, cluster[0].y]
+		light.light_color = FIRE_POOL
+		light.light_energy = POOL_ENERGY
+		light.omni_range = POOL_RANGE
+		light.position = middle + Vector3(0.0, POOL_UP, 0.0)
+		_room.add_child(light)
+		_cast_shadows(light)
+		_fire_lights.append([light, POOL_ENERGY, _roll(cluster[0], 148) * TAU, Flames.FIRE_FLICKER])
+
+
+## A shadowless night light (782's lamps and braziers): warm, faded out
+## past NIGHT_FADE m from the camera so a far one costs nothing.
+static func _night_light(color: Color, energy: float, reach: float) -> OmniLight3D:
+	var light := OmniLight3D.new()
+	light.light_color = color
+	light.light_energy = energy
+	light.omni_range = reach
+	light.shadow_enabled = false
+	light.distance_fade_enabled = true
+	light.distance_fade_begin = NIGHT_FADE
+	light.distance_fade_length = NIGHT_FADE_LENGTH
+	return light
+
+
+## The building of [param buildings] whose rect holds [param cell], or {}.
+static func building_holding(buildings: Array, cell: Vector2i) -> Dictionary:
+	for building: Dictionary in buildings:
+		if building.get("rect") is Rect2i and (building["rect"] as Rect2i).has_point(cell) and building.has("facing"):
+			return building
+	return {}
+
+
+## Where a door lantern hangs (782), from the front cell [param front]'s
+## middle [param ground] (its floor's height) and its building's
+## [param facing] (out of the door): on the wall beside the door,
+## DOOR_LAMP_ASIDE along it, DOOR_LAMP_OUT proud of the door's edge (clear
+## of a thick wall), DOOR_LAMP_UP over the ground.
+static func door_lamp_at(ground: Vector3, facing: Vector2i) -> Vector3:
+	var out := Vector3(facing.x, 0.0, facing.y)
+	var along := Vector3(-facing.y, 0.0, facing.x)
+	return ground - out * 0.5 + out * DOOR_LAMP_OUT + along * DOOR_LAMP_ASIDE + Vector3(0.0, DOOR_LAMP_UP, 0.0)
+
+
+## A lantern hung by the door of each building holding a shop's or a
+## temple's counter (782; a Chest with props shop or temple), once a
+## building; looked at with the window lights (LAMP_CHECK), since the
+## counters come with the entities, after the room. Outdoors only.
+func _hang_door_lamps() -> void:
+	if _room == null or not bool(_terrain.get("outdoor", false)):
+		return
+	var buildings := _drawn_buildings()
+	for entity in World.entities():
+		var counter := entity as Chest
+		if counter == null or not counter.spawned or not (counter.shop or counter.temple):
+			continue
+		var building := building_holding(buildings, counter.tile)
+		if building.is_empty():
+			continue
+		var facing: Vector2i = building["facing"]
+		var front: Vector2i = building.get("front", Level.front_cell(building["rect"], facing))
+		if _door_lamps.has(front) and is_instance_valid(_door_lamps[front]):
+			continue
+		_door_lamps[front] = _add_door_lamp(front, facing)
+
+
+## A door lantern (782): a short iron arm out from the wall, the hanging
+## lantern under its end, its warm light at the glow.
+func _add_door_lamp(front: Vector2i, facing: Vector2i) -> Node3D:
+	var lamp := Node3D.new()
+	lamp.name = "DoorLamp_%d_%d" % [front.x, front.y]
+	lamp.position = door_lamp_at(_tile_position(front), facing)
+	lamp.rotation.y = atan2(float(facing.x), float(facing.y))
+	_room.add_child(lamp)
+	var arm := _box(Vector3(0.04, 0.04, DOOR_LAMP_OUT + 0.05), _stone_opaque)
+	arm.position = Vector3(0.0, -0.02, -(DOOR_LAMP_OUT + 0.05) * 0.5)
+	lamp.add_child(arm)
+	var lantern := _hanging_lantern()
+	lantern.position = Vector3(0.0, -0.2, 0.0)
+	lamp.add_child(lantern)
+	var light := _night_light(LANTERN, DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE)
+	light.position = Vector3(0.0, -0.1, 0.0)
+	lamp.add_child(light)
+	_fire_lights.append([light, DOOR_LAMP_ENERGY, _roll(front, 150) * TAU, LANTERN_FLICKER])
+	return lamp
+
+
+## The level's night places from Main (782; level.json "places"): [param
+## posts] the watch posts' brazier cells (771, buildings' "post" places),
+## [param stores] [its place's cell, where its lantern post stands (cells)]
+## for a store with no building round it (one a building covers, at its
+## cell or its post's, is left out: its counter's door lantern). Drawn
+## again whole on each call and after a rebuild (Main._on_room_built).
+func set_night_places(posts: Array, stores: Array) -> void:
+	_night_posts = posts
+	_night_stores = stores
+	_draw_night_places()
+
+
+func _draw_night_places() -> void:
+	if is_instance_valid(_night_places):
+		_night_places.free()
+	_night_places = null
+	_fire_lights = _fire_lights.filter(func(each: Array) -> bool: return is_instance_valid(each[0]))
+	if _room == null or (_night_posts.is_empty() and _night_stores.is_empty()):
+		return
+	_night_places = Node3D.new()
+	_night_places.name = "NightPlaces"
+	_room.add_child(_night_places)
+	for cell: Vector2i in _night_posts:
+		_add_brazier(cell)
+	for store: Array in _night_stores:
+		var at: Vector2 = store[1]
+		if not _building_at.has(store[0]) and not _building_at.has(Vector2i(roundi(at.x), roundi(at.y))):
+			_add_store_lamp(at)
+
+
+## A watch post's brazier (782; 771): art-kit's POST_BRAZIER, its fire at
+## the slot's flame socket (Flames), a bright warm light over it so the
+## watch reads from the town (POST_ENERGY, POST_RANGE, shadowless); a stone
+## stand with the fire on its top until the slot has art.
+func _add_brazier(cell: Vector2i) -> void:
+	var at := _tile_position(cell)
+	var stand: Node3D
+	var flame: Node3D
+	if ArtKit.has(POST_BRAZIER) and ArtKit.filled_by(POST_BRAZIER) != "placeholder":
+		stand = ArtKit.instance(POST_BRAZIER)
+		stand.rotation.y = _roll(cell, 151) * TAU
+		flame = Flames.at_socket(stand, POST_BRAZIER, hash(cell))
+		if flame == null:
+			flame = Flames.light(stand, Vector3(0.0, ArtKit.size(POST_BRAZIER).y, 0.0), Flames.size_of(POST_BRAZIER), hash(cell))
+	else:
+		stand = _box(Vector3(0.5, 0.9, 0.5), _stone_opaque)
+		flame = Flames.light(stand, Vector3(0.0, 0.9, 0.0), Flames.size_of(POST_BRAZIER), hash(cell))
+	stand.name = "Brazier_%d_%d" % [cell.x, cell.y]
+	stand.position = at
+	_night_places.add_child(stand)
+	var light := _night_light(FIRE_POOL, POST_ENERGY, POST_RANGE)
+	light.position = stand.transform * flame.position + Vector3(0.0, Flames.size_of(POST_BRAZIER) * 0.8, 0.0)
+	_night_places.add_child(light)
+	_fire_lights.append([light, POST_ENERGY, _roll(cell, 152) * TAU, Flames.FIRE_FLICKER])
+
+
+## A store's lantern on its own post (782), at [param at] (cells, a
+## point: the post stands where it is given, not in a cell's middle).
+func _add_store_lamp(at: Vector2) -> void:
+	var cell := Vector2i(roundi(at.x), roundi(at.y))
+	var post := _box(Vector3(0.07, STORE_LAMP_UP + 0.1, 0.07), _stone_opaque)
+	post.name = "StoreLamp_%d_%d" % [cell.x, cell.y]
+	post.position = Vector3(at.x, _elevation(cell), at.y)
+	_night_places.add_child(post)
+	var arm := _box(Vector3(0.35, 0.04, 0.04), _stone_opaque)
+	arm.position = Vector3(0.16, STORE_LAMP_UP, 0.0)
+	post.add_child(arm)
+	var lantern := _hanging_lantern()
+	lantern.position = Vector3(0.3, STORE_LAMP_UP - 0.2, 0.0)
+	post.add_child(lantern)
+	var light := _night_light(LANTERN, DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE)
+	light.position = Vector3(0.3, STORE_LAMP_UP - 0.1, 0.0)
+	post.add_child(light)
+	_fire_lights.append([light, DOOR_LAMP_ENERGY, _roll(cell, 153) * TAU, LANTERN_FLICKER])
+
+
+## Whether a townsperson carries a lantern now (782; the coordinator:
+## walkers only): the sun down outdoors ([param night]), awake, out of
+## doors, walked within CARRIED_HOLD s ([param since_walked]), its left
+## hand free ([param left_hand], its "held"'s second).
+static func carries_lantern(night: bool, activity: String, indoors: bool, since_walked: float, left_hand: String) -> bool:
+	return night and activity != "sleep" and not indoors and since_walked < CARRIED_HOLD and left_hand.is_empty()
+
+
+## A townsperson's lantern (782; pc-character's word: the hanging lantern
+## from the left hand, upright whatever the hand's turn, CARRIED_HANG
+## under its socket): shown as carries_lantern says; the walkers kept in
+## _carriers for their lights (_light_carriers).
+func _sync_carried(body: Resident, puppet: Node3D, id: int) -> void:
+	var hand := (puppet.get_meta("sockets", {}) as Dictionary).get("hand_l") as Node3D
+	if hand == null:
+		return
+	var now := Time.get_ticks_msec()
+	if float(puppet.get_meta("speed", 0.0)) > WALKING:
+		puppet.set_meta("walked_ms", now)
+	var since := (now - int(puppet.get_meta("walked_ms", -(1 << 40)))) / 1000.0
+	var held: Array = puppet.get_meta("held", ["", ""])
+	var carries := carries_lantern(_night, body.activity, _building_at.has(body.tile), since, str(held[1]) if held.size() > 1 else "")
+	var lantern := puppet.get_node_or_null("CarriedLantern") as Node3D
+	if carries and lantern == null:
+		lantern = _hanging_lantern()
+		lantern.name = "CarriedLantern"
+		lantern.top_level = true
+		puppet.add_child(lantern)
+	if lantern == null:
+		return
+	if lantern.visible != carries:
+		lantern.visible = carries
+	if carries:
+		lantern.global_basis = Basis()
+		lantern.global_position = hand.global_position + Vector3(0.0, -CARRIED_HANG, 0.0)
+		_carriers[id] = lantern
+	else:
+		_carriers.erase(id)
+
+
+## The carried lanterns' lights (782): CARRIED_NEAR lights, kept on the
+## carriers nearest the camera's aim (picked again every CARRIED_PICK s),
+## CARRIED_UP over the lantern, flickering a little; the rest of the
+## carriers' lanterns glow and light nothing.
+func _light_carriers(delta: float) -> void:
+	if _carried_lights.is_empty():
+		if _carriers.is_empty():
+			return
+		for i in CARRIED_NEAR:
+			var light := _night_light(LANTERN, CARRIED_ENERGY, CARRIED_RANGE)
+			light.name = "CarriedLight%d" % i
+			light.visible = false
+			add_child(light)
+			_carried_lights.append(light)
+	_carried_clock += delta
+	if _carried_clock >= CARRIED_PICK:
+		_carried_clock = 0.0
+		_carried_by = nearest_carriers(_carriers, Vector2(_camera_target.x, _camera_target.z), CARRIED_NEAR)
+	for i in _carried_lights.size():
+		var light := _carried_lights[i]
+		var lantern: Node3D = _carried_by[i] if i < _carried_by.size() else null
+		var lit := lantern != null and is_instance_valid(lantern) and lantern.visible
+		if light.visible != lit:
+			light.visible = lit
+		if lit:
+			light.global_position = lantern.global_position + Vector3(0.0, CARRIED_UP, 0.0)
+			light.light_energy = CARRIED_ENERGY * Flames.flicker(_fire_time, float(i) * 1.7, LANTERN_FLICKER)
+
+
+## The [param most] of [param carriers]' lanterns (id -> Node3D) nearest
+## [param aim] on the ground, nearest first; freed or hidden ones dropped
+## from [param carriers].
+static func nearest_carriers(carriers: Dictionary, aim: Vector2, most: int) -> Array[Node3D]:
+	var out: Array[Node3D] = []
+	for id: int in carriers.keys():
+		var lantern: Node3D = carriers[id]
+		if not is_instance_valid(lantern) or not lantern.visible:
+			carriers.erase(id)
+			continue
+		out.append(lantern)
+	out.sort_custom(func(a: Node3D, b: Node3D) -> bool:
+		return Vector2(a.global_position.x, a.global_position.z).distance_squared_to(aim) < Vector2(b.global_position.x, b.global_position.z).distance_squared_to(aim))
+	return out.slice(0, most)
+
+
 # --- Shadows -------------------------------------------------------------------
 
 ## [param light] casts shadows while it can reach what the camera shows:
@@ -14706,6 +15060,7 @@ func _sync_puppets() -> void:
 		_slide_reach(puppet)
 		_sync_worn(entity, puppet)
 		if entity is Resident:
+			_sync_carried(entity as Resident, puppet, id)
 			_sync_addressing(entity as Resident, puppet)
 			_sync_bedroll(entity as Resident, puppet)
 			_sync_work(entity as Resident, puppet)
@@ -14811,6 +15166,7 @@ func _entity_went(id: int) -> void:
 	if puppet == _outlined:
 		target(null)
 	_combat_at.erase(id)
+	_carriers.erase(id)
 	_last_hp.erase(id)
 	_last_tile.erase(id)
 	_last_step_ms.erase(id)

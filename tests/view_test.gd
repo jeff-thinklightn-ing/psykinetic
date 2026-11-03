@@ -3502,9 +3502,16 @@ func _test_fire() -> void:
 	for i in 5:
 		_rig._flicker_fires(0.05)
 		energies.append((_rig._fire_lights[0][0] as OmniLight3D).light_energy)
-	_check(_rig._fire_lights.size() == torches.size() + fire.filter(func(c: Vector2i) -> bool: return _rig._grounds.has(c)).size()
+	# Outdoors, one pool more for each cluster of fire cells (782).
+	var drawn: Array[Vector2i] = []
+	for each: Vector2i in fire:
+		if _rig._grounds.has(each):
+			drawn.append(each)
+	var pools := Client3D.fire_clusters(drawn).size() if bool(terrain.get("outdoor", false)) else 0
+	_check(_rig._fire_lights.size() == torches.size() + drawn.size() + pools
+			and _rig._room.find_children("FirePool*", "OmniLight3D", false, false).size() == pools
 			and energies.max() != energies.min() and World.light_at(cell) == before,
-			"each fire's drawn light flickers; World's light stays as it was (%s)" % [energies])
+			"each fire's drawn light flickers, a pool over each cluster outdoors (%d); World's light stays as it was (%s)" % [pools, energies])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

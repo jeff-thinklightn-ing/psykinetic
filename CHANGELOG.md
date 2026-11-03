@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- At night a lantern hangs at the chapel door and on a post by the store, and townsfolk out after dark carry one (782).
 - Towns: a town left without its carpenter, hunter or woodcutter gets a new one after a week, and one sent for but never found makes the way in alone (767 amended).
 - A camp's fire crackles now, at the hills' rest camps and at raid camps, heard a few steps off (777, sound's side).
 - Hills: a two-wide bridge's posts stand at its sides, not in the middle of the walkway (505 amended (4)).

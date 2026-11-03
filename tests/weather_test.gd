@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_between()
 	_test_roofs()
 	_test_canopy()
+	_test_night_town()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -425,6 +426,56 @@ func _test_canopy() -> void:
 	shafts.free()
 	Weather.reload()
 	World.steps = 0
+
+
+## The night town (782): fire pools by cluster, door lanterns' place, who
+## carries a lantern, Main's night places, the nearest carriers lit.
+func _test_night_town() -> void:
+	print("
+== the night town ==")
+	var cells: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 1), Vector2i(5, 5), Vector2i(6, 5), Vector2i(9, 0)]
+	var clusters := Client3D.fire_clusters(cells)
+	_check(clusters.size() == 3 and clusters[0].size() == 2 and clusters[1].size() == 2 and clusters[2] == [Vector2i(9, 0)],
+			"fire cells touching (side or corner) make one pool: 5 cells, 3 clusters")
+	var at := Client3D.door_lamp_at(Vector3(10.0, 0.0, 10.0), Vector2i(0, 1))
+	_check(is_equal_approx(at.z, 10.0 - 0.5 + Client3D.DOOR_LAMP_OUT) and is_equal_approx(absf(at.x - 10.0), Client3D.DOOR_LAMP_ASIDE)
+			and is_equal_approx(at.y, Client3D.DOOR_LAMP_UP) and Client3D.DOOR_LAMP_OUT > 0.25,
+			"a door lantern hangs beside the door, %.2f m proud of its edge (clear of the chapel's 0.5 m wall), %.1f m up" % [Client3D.DOOR_LAMP_OUT, Client3D.DOOR_LAMP_UP])
+	var buildings := [{"rect": Rect2i(0, 0, 4, 6), "facing": Vector2i(0, 1)}, {"rect": Rect2i(10, 0, 3, 3), "facing": Vector2i(1, 0)}]
+	_check(Client3D.building_holding(buildings, Vector2i(11, 1)) == buildings[1] and Client3D.building_holding(buildings, Vector2i(7, 1)).is_empty(),
+			"a counter's building is the one whose rect holds it; none in the open")
+	_check(Client3D.carries_lantern(true, "", false, 0.5, ""), "a townsperson walking out of doors at night carries a lantern")
+	_check(not Client3D.carries_lantern(false, "", false, 0.5, ""), "not by day")
+	_check(not Client3D.carries_lantern(true, "", true, 0.5, ""), "not indoors")
+	_check(not Client3D.carries_lantern(true, "sleep", false, 0.5, ""), "not asleep")
+	_check(not Client3D.carries_lantern(true, "", false, Client3D.CARRIED_HOLD + 1.0, ""), "not standing about (walkers only, the coordinator)")
+	_check(not Client3D.carries_lantern(true, "", false, 0.5, "shield"), "not with the left hand full")
+	var places := {"post_a": {"kind": "post", "cell": Vector2i(1, 1), "brazier": [3, 4]},
+		"post_b": {"kind": "post", "cell": Vector2i(1, 1), "rect": Rect2i(10, 10, 3, 3)},
+		"store": {"kind": "stockpile", "cell": Vector2i(5, 5)}, "well": {"kind": "other", "cell": Vector2i(2, 2)}}
+	var night := Main.night_places(places)
+	var posts: Array = night[0]
+	var stores: Array = night[1]
+	_check(posts.size() == 2 and Vector2i(3, 4) in posts and Vector2i(11, 11) in posts,
+			"a post's brazier at its \"brazier\" cell, else its rect's middle")
+	_check(stores.size() == 1 and stores[0][0] == Vector2i(5, 5) and stores[0][1] == Vector2(5, 5) + Main.NIGHT_STORE_ASIDE,
+			"the store's lantern post beside its cell (no \"lamp\" given)")
+	places["store"]["lamp"] = [7, 8]
+	_check((Main.night_places(places)[1] as Array)[0][1] == Vector2(7, 8), "or at its \"lamp\" cell")
+	var carriers := {}
+	var made: Array[Node3D] = []
+	for i in 6:
+		var lantern := Node3D.new()
+		add_child(lantern)
+		lantern.global_position = Vector3(float(i) * 3.0, 0.0, 0.0)
+		lantern.visible = i != 1
+		carriers[i] = lantern
+		made.append(lantern)
+	var near := Client3D.nearest_carriers(carriers, Vector2(0.0, 0.0), Client3D.CARRIED_NEAR)
+	_check(near.size() == Client3D.CARRIED_NEAR and near[0] == carriers[0] and near[1] == carriers[2] and not carriers.has(1),
+			"the %d carriers nearest the camera light the ground, nearest first; a lantern put away drops out" % Client3D.CARRIED_NEAR)
+	for lantern in made:
+		lantern.free()
 
 
 func _check(ok: bool, label: String) -> void:

@@ -7,6 +7,9 @@ extends Node2D
 const FLOOR_SOURCE := 0
 const FIRE_SOURCE := 2
 const DOOR := "res://sim/door.gd"
+## A store's lantern post with no "lamp" cell given (782): this far from
+## its place's cell, cells, off the counters' line.
+const NIGHT_STORE_ASIDE := Vector2(1.0, 0.5)
 ## --test-herds: a set of herds, each about a cell of its own (Main._test_herds).
 const TEST_HERDS := [["deer", "deer", "deer", "deer", "stag"], ["rabbit", "rabbit", "rabbit"], ["boar", "boar"],
 	["wolf", "wolf", "wolf"]]
@@ -3883,6 +3886,45 @@ func _show_folds() -> void:
 		_client3d.set_folds(fold_view())
 
 
+## This level's night places as the view lights them (782): [posts, stores].
+## Posts: each "post" place's (771, buildings') brazier cell ("brazier", else
+## its rect's middle, else its cell). Stores: [the "store" place's cell,
+## where its lantern stands (Vector2, cells): its "lamp" cell, else beside
+## its cell (NIGHT_STORE_ASIDE)]; the view leaves out one a building covers
+## (that store's counter hangs its door lantern instead).
+static func night_places(places: Dictionary) -> Array:
+	var posts: Array = []
+	var stores: Array = []
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if str(place.get("kind", "")) == "post":
+			posts.append(_place_cell(place, "brazier"))
+		elif key == "store":
+			var cell := _place_cell(place, "")
+			stores.append([cell, Vector2(_place_cell(place, "lamp")) if place.has("lamp") else Vector2(cell) + NIGHT_STORE_ASIDE])
+	return [posts, stores]
+
+
+## [param place]'s cell named [param field] ([x, y] or a Vector2i), else
+## its rect's middle, else its cell.
+static func _place_cell(place: Dictionary, field: String) -> Vector2i:
+	var named: Variant = place.get(field) if not field.is_empty() else null
+	if named is Vector2i:
+		return named
+	if named is Array and (named as Array).size() >= 2:
+		return Vector2i(int(named[0]), int(named[1]))
+	if place.get("rect") is Rect2i:
+		var rect: Rect2i = place["rect"]
+		return rect.position + (rect.size - Vector2i.ONE) / 2
+	return place.get("cell", Vector2i.ZERO)
+
+
+func _show_night_places() -> void:
+	if _client3d != null:
+		var night := night_places(level.get("places", {}))
+		_client3d.set_night_places(night[0], night[1])
+
+
 ## Draws the terrain afresh in both views (a map loaded live). A
 ## [param crossing] (the view into another zone) builds the 3D room over
 ## frames behind the arrival card (decision 660); the zone's own terrain
@@ -3904,6 +3946,7 @@ func _repaint(crossing := false) -> void:
 func _on_room_built() -> void:
 	_show_towns()
 	_show_folds()
+	_show_night_places()
 	if arrival_card != null:
 		arrival_card.finish()
 	# The server's arrival shelter ends (combat's 661): the zone by the level
