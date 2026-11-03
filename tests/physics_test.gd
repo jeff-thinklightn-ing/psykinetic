@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_rush_in_its_zone()
 	_test_load()
 	_test_clank()
+	_test_falls()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -690,6 +691,83 @@ func _build(rows: Array[String], mass: float) -> Dictionary:
 				entity.hp = 50
 			out[kind].append(entity)
 	return out
+
+
+## Falls (decision 783): a pit [param levels] deep on x 1..2 of the room
+## just built (rows of [param width]), the rest floor at its rim's height.
+func _sink(width: int, height: int, levels: int) -> void:
+	var field := PackedFloat32Array()
+	field.resize(width * height)
+	for y in height:
+		for x in width:
+			field[y * width + x] = 0.0 if x in [1, 2] else levels * Relief.LEVEL_M
+	World._relief = field
+	World._relief_size = Vector2i(width, height)
+
+
+func _test_falls() -> void:
+	print("\n== falls into a shaft: the lip, damage by depth, a deadly one the shover's kill (decision 783) ==")
+	var rows: Array[String] = ["#########", "#..mP...#", "#########"]
+	var e := _build(rows, 40.0)
+	_sink(9, 3, 2)
+	var player: GridEntity = e["P"][0]
+	var imp: GridEntity = e["m"][0]
+	_check(World.height_step(Vector2i(3, 1), Vector2i(-1, 0)) == 2, "the pit lies two levels down off (3, 1)")
+	World._push(player, imp, Vector2(-1, 0), 1.0)
+	_check(imp.tile == Vector2i(3, 1) and imp.teeter == Vector2i(-1, 0) and imp.hp == 50 and World.is_stunned(imp),
+			"a light shove (1.0, 0.33 left at the rim): it teeters on the rim, unhurt, stunned (%s, %s, %d)" % [imp.tile, imp.teeter, imp.hp])
+	World.step()
+	World.apply_blow(player, imp, {"impulse": 10.0, "direction": Vector2(1, 0)})
+	_check(imp.tile == Vector2i(3, 1) and imp.teeter != Vector2i.ZERO, "a tap away from the drop: still on the rim")
+	World.apply_blow(player, imp, {"impulse": 10.0, "direction": Vector2(-1, 0)})
+	_check(imp.tile == Vector2i(2, 1) and imp.teeter == Vector2i.ZERO and imp.hp == 50 - 6 and World.is_down(imp),
+			"a tap toward it (0.25, under the knockback floor): over, two levels for 6, lying (%s, %d hp)" % [imp.tile, imp.hp])
+
+	e = _build(rows, 40.0)
+	_sink(9, 3, 2)
+	imp = e["m"][0]
+	World._push(e["P"][0], imp, Vector2(-1, 0), 1.0)
+	for i in World.teeter_ticks + 1:
+		World.step()
+	_check(imp.tile == Vector2i(3, 1) and imp.teeter == Vector2i.ZERO and not World.is_stunned(imp),
+			"left alone %d ticks it finds its feet on the rim" % World.teeter_ticks)
+	World._push(e["P"][0], imp, Vector2(-1, 0), 3.0)
+	_check(imp.tile == Vector2i(2, 1) and imp.hp == 50 - 6, "a hard knock (3.0, 2.33 left) goes straight over (%s, %d)" % [imp.tile, imp.hp])
+
+	# A free body (a player) teeters at its circle's edge alike.
+	e = _build(["#########", "#..PP...#", "#########"], 40.0)
+	_sink(9, 3, 2)
+	var them: GridEntity = e["P"][0]
+	World._push(e["P"][1], them, Vector2(-1, 0), 1.0)
+	_check(World.free_body(them) and them.tile == Vector2i(3, 1) and them.teeter == Vector2i(-1, 0),
+			"a player shoved lightly teeters too (%s, %s)" % [them.tile, them.teeter])
+	World.step()
+	World.apply_blow(e["P"][1], them, {"impulse": 10.0, "direction": Vector2(-1, 0)})
+	_check(them.tile == Vector2i(2, 1) and them.teeter == Vector2i.ZERO, "and a tap sends them over (%s)" % [them.tile])
+
+	# Deadly: fall_lethal_levels (8) or more. The shover's kill.
+	e = _build(rows, 40.0)
+	_sink(9, 3, 8)
+	imp = e["m"][0]
+	World._push(e["P"][0], imp, Vector2(-1, 0), 3.0)
+	_check(not World._alive(imp) and (imp as Monster).struck_by == e["P"][0],
+			"eight levels down kills, and the kill is the shover's (struck_by %s)" % [(imp as Monster).struck_by])
+
+	# A sword's blow sending its foe over a deadly drop: one deed, felled
+	# (combat's ask: never the blow's and the kill's both).
+	e = _build(rows, 20.0)
+	_sink(9, 3, 8)
+	player = e["P"][0]
+	imp = e["m"][0]
+	player.set("player_id", "fall_test")
+	_give(player, "sword")
+	var uid: int = player.slot_items[Player.RIGHT_HAND]
+	_blow(player, imp)
+	var deeds := {}
+	for row: Dictionary in World.items._book[uid]["carriers"]:
+		deeds.merge(row["deeds"])
+	_check(not World._alive(imp) and deeds == {"felled": 1},
+			"a sword's knockback over eight levels: dead, and the sword's one deed is felled (%s)" % [deeds])
 
 
 func _give(entity: GridEntity, id: String) -> void:

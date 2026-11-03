@@ -129,6 +129,11 @@ var wind_up := {}
 ## it cannot act and is easily pushed. A creature's replicates, for the
 ## views.
 var down_until := 0
+## Teetering on a rim (World, decision 783): the way the drop lies from its
+## cell, ZERO standing firm. A creature's replicates, for the views' wobble.
+var teeter := Vector2i.ZERO
+## The tick its teeter ends and it finds its feet. Server only.
+var teeter_until := 0
 ## Downed until this tick (World.lay_downed, decision 544): a blessed body
 ## beaten to 0 hp lies at 1, brought back by a channel or dead after. And a
 ## channeler's: the name of the body it is bringing back ("" none) and the

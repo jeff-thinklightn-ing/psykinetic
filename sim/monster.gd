@@ -566,6 +566,7 @@ func _init() -> void:
 	replicate("pose")
 	replicate("alert")
 	replicate("down_until")
+	replicate("teeter")  # Decision 783: a rim's wobble.
 	replicate("ailments")
 	replicate("peaceable")
 	# Its bow drawn, its guard up: the tell a player steps out of the line by

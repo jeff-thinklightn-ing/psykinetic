@@ -21,5 +21,10 @@
 	"load_heavy": 0.3,
 	"load_overloaded": 0.5,
 	"clank_plate": 0.25,
-	"clank_mail": 0.2
+	"clank_mail": 0.2,
+	"teeter_speed": 1.0,
+	"teeter_ticks": 12,
+	"fall_hp_per_level": 3,
+	"fall_lethal_levels": 8,
+	"fall_down_ticks": 20
 }

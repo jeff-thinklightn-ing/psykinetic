@@ -39814,3 +39814,54 @@ level_test _test_fill_hills (a track to each refuge, the two camps and their res
 seven patches, every safe path cell within 60 of something to do, the warmed rest by the fire and
 not once hit or a few cells off), _test_safe_paths (the tracks counted: 703); relief_test (the
 road is the first of four curves); forage_test _test_patches; "forage" is among EditorFields.NOT_OFFERED (laid by the generator). Server and level data; protocol unchanged; no new class_name.
+
+## 783. Falls into shafts: the lip, damage by depth, a deadly fall the shover's kill
+
+Jeff's mine spec ("shafts that npcs can be knocked down"; dungeon's mine_look has a pit three
+levels down, 769), approved by the coordinator, the level below agreed with dungeon. 592's push
+already took a body off a drop to the foot (FALL_IMPACT_PER_LEVEL, 3 a level, and a stun); the
+walk never steps off one (cliff_between). What it lacked: no cheap deaths, a deadly depth, and
+whose kill a fall is.
+
+- The lip. A creature pushed to a rim with less than teeter_speed (1.0) left as it would go
+  over stops on the rim teetering (World._start_teeter): GridEntity.teeter the way the drop
+  lies (a creature's replicates, for the views' wobble), stunned teeter_ticks (12, 1.2 s),
+  unhurt. Any hit on it then with a part toward the drop (a blow or shove however light, under
+  knockback_min_force too; apply_blow; launch: _teeter_struck, beside 604's _rush_struck) sends
+  it over through _push; the push that set it teetering does not count twice in its tick. Left
+  alone, or moved off the rim some other way, it finds its feet (_tend_teeters). A harder knock
+  goes straight over. A free body (688) teeters at its circle's edge alike (_free_slide's
+  "teeter"). Things that are not creatures (crates) fall as before. A player's shove on a player
+  at a rim (1.0, 0.33 left) teeters; a hammer or a great bear's swipe (780's 140 on 80 kg, 1.75)
+  from beside it goes over.
+- The fall (_fall_hurt): fall_hp_per_level (3) a level through World.damage, cause &"impact"
+  as 592's walls, the shover or striker its source; all its hp from fall_lethal_levels (8)
+  down (the arena dummy, never_dies, lives: damage's rule); a creature that lives is knocked
+  down fall_down_ticks (20). The log says where it landed and, dead, that what it carried lies
+  there: at the pit's foot.
+- Whose kill (combat's OK; its kill credit): the fall notes the shover as what struck a
+  monster (note_struck: damage notes only attacks and shots), so its slayer, quests, grudges and
+  loot follow. The gear deed: a weapon
+  blow whose knockback sends its foe to a fall that kills it (or a blow that tips a teetering
+  one) gives the weapon "felled", once, in place of the blow's own deed: _resolve_hits now
+  credits the deed after the push, not before it. A shove gives no deed; weapon memory
+  (practise) counts the blow when it lands, as before, so nothing counts twice. One change this
+  brings beside falls: a blow whose knockback kills its foe against a wall (592's impact) now
+  credits "felled" too, where the blow's deed was credited before the wall's damage.
+- Numbers in levels/physics.json (teeter_speed, teeter_ticks, fall_hp_per_level,
+  fall_lethal_levels, fall_down_ticks).
+- The level below, agreed with dungeon for when phase 2's chambers come (not built now: the
+  first shafts are in-level pits, read from the height): a "shafts" list, each {cells, below:
+  {level, spawn?, cell?, depth?}}, terrain["shafts"] (a regenerated level's own) first, then
+  level.json's; the landing a named spawn point (spawn_points, as links), a cell only in a fixed
+  level, the nearest free cell either way; depth from the height drop when absent. A monster
+  carried across zones is checked with enemy-ai before that is designed; dungeon makes every
+  landing below have a way back up (the coordinator).
+
+Wire: PROTOCOL_REVISION 47 (opened by 766 amended; no second bump): "teeter" replicated (SUBCLASS_REPLICATED) by Player, Companion and
+Monster. tests/physics_test _test_falls (a light shove teeters unhurt and stunned; a tap away
+keeps it, a tap toward it under the knockback floor sends it over for 6, lying; left alone it
+finds its feet; a hard knock goes straight over; a player teeters and is tapped over alike;
+eight levels kills, the kill the shover's; a sword's knockback over eight levels: the sword's
+one deed, felled). No new class_name. No CHANGELOG bullet till a real level has a shaft
+(release); the views' wobble is pc-character's to draw.

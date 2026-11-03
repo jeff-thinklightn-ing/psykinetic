@@ -227,7 +227,8 @@ const FIRE_DAMAGE := 2
 const HEAT_BURN := 9.0
 ## The eight compass points, clockwise from north.
 const COMPASS: Array[String] = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
-## A body pushed off a ledge takes this much impact per level it falls.
+## A body pushed off a ledge takes this much impact per level it falls:
+## fall_hp_per_level's default (decision 783; levels/physics.json's).
 const FALL_IMPACT_PER_LEVEL := 3
 ## Clamp on mover_mass / target_mass when scaling push travel and impact.
 const MASS_RATIO_MIN := 0.5
@@ -435,6 +436,17 @@ var moves := {
 ## A rush (decision 604) ends when the hits on it leave its speed this or
 ## less: a charge this slow is no charge.
 @export var rush_stop_speed := 0.1
+## Falls (decision 783). A creature pushed to a rim with less speed left
+## than teeter_speed as it goes over stops on the rim teetering for
+## teeter_ticks (stunned), any hit toward the drop then sending it over; a
+## harder knock goes straight over. A fall hurts fall_hp_per_level a
+## level, kills from fall_lethal_levels, and lays a creature that lives
+## down for fall_down_ticks.
+@export var teeter_speed := 1.0
+@export var teeter_ticks := 12
+@export var fall_hp_per_level := FALL_IMPACT_PER_LEVEL
+@export var fall_lethal_levels := 8
+@export var fall_down_ticks := 20
 ## A swing's own weight in its impulse (swing_impulse, decision 605): the
 ## thing's kilos times this.
 @export var swing_speed := 20.0
@@ -845,6 +857,9 @@ var _mending: Dictionary[GridEntity, Dictionary] = {}
 const STORY_LONGEST := 80
 ## Whoever is rushing (rush, decision 604): its state, for _tend_rushes.
 var _rushers: Dictionary[GridEntity, Dictionary] = {}
+## Whoever teeters on a rim (decision 783) -> the rim's cell, for
+## _tend_teeters. Untyped: one freed some other way is dropped there.
+var _teetering := {}
 ## Free bodies whose push's slide is being shown (688 amended (2)), for
 ## _tend_free_kicks.
 var _free_kicked: Dictionary[GridEntity, bool] = {}
@@ -1244,6 +1259,7 @@ func _step_zone() -> void:
 	# 5. Bandaging and mending; buffs wearing off.
 	_tend_wounds()
 	_tend_downed()
+	_tend_teeters()  # Found its feet on a rim (783).
 	_fade_buffs()
 	_tend_arts()  # Weapon memory's quiet time and fade (decision 766).
 	t = part("stamina, wounds, buffs", t)
@@ -4807,7 +4823,8 @@ func load_physics_rules(text: String) -> void:
 		if not field in ["shove_scale", "knockback_min_force", "slide_per_speed", "max_travel", "momentum_scale",
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
 				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed", "throw_speed",
-				"load_k", "load_free", "load_heavy", "load_overloaded", "clank_plate", "clank_mail"]:
+				"load_k", "load_free", "load_heavy", "load_overloaded", "clank_plate", "clank_mail",
+				"teeter_speed", "teeter_ticks", "fall_hp_per_level", "fall_lethal_levels", "fall_down_ticks"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -8346,6 +8363,8 @@ func _resolve_hits() -> void:
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
 		if hit.pierce:
 			hit.damage = armour_turns(hit.target, hit.damage, "deflect_pierce")
+		var is_creature := hit.target.is_creature()
+		var landed := hit.damage > 0 and not is_sheltered(hit.target) and is_creature
 		if hit.damage > 0 and not is_sheltered(hit.target):  # (Arriving, 661: no harm, wear or credit.)
 			var creature := hit.target.is_creature()
 			if hit.target is Monster and not hit.shove and wielded(hit.source) == "sword":
@@ -8357,17 +8376,24 @@ func _resolve_hits() -> void:
 				knock_down(hit.target, hit.source, hit.down_ticks)
 			if bool(Items.def(wielded(hit.source)).get("blunt", false)):
 				_wear_bundle(hit.target)
-			if creature and not hit.deed.is_empty():
-				_credit(hit.source, Items.RIGHT_HAND, "felled" if not _alive(hit.target) else hit.deed)
-			if creature and not _alive(hit.target):
-				_felled_with(hit.source, Items.RIGHT_HAND, hit.target)
-			elif creature and holder_grudge(hit.source, kind_of(hit.target)):
+			if creature and _alive(hit.target) and holder_grudge(hit.source, kind_of(hit.target)):
 				_stun_for(hit.target, int(Items.growth()["grudge_stagger"]))  # A grudge's blow (decision 417).
+		var lived := _alive(hit.target)
 		var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)
 		if hit.force > 0.0 and _alive(hit.target):
 			_push(hit.source, hit.target, way, hit.force, hit.push_direction != hit.direction)
 		if _alive(hit.target) and not is_sheltered(hit.target):
-			_rush_struck(hit.target, way.normalized() * hit.raw_force)  # A rush slowed or stopped (604).
+			if not _teeter_struck(hit.target, hit.source, way.normalized() * hit.raw_force):  # Over the rim (783).
+				_rush_struck(hit.target, way.normalized() * hit.raw_force)  # A rush slowed or stopped (604).
+		# The gear's deed once the push is done (783, combat's): a blow whose
+		# knockback sent its foe to a fall that killed it felled it; a shove
+		# has no deed.
+		var killed := not _alive(hit.target)
+		var fell_dead := lived and killed and is_creature and not hit.shove
+		if (landed or fell_dead) and not hit.deed.is_empty():
+			_credit(hit.source, Items.RIGHT_HAND, "felled" if killed else hit.deed)
+		if (landed or fell_dead) and killed:
+			_felled_with(hit.source, Items.RIGHT_HAND, hit.target)
 
 
 ## Force push (decision 592). [param force] is the speed the push gives
@@ -8443,6 +8469,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 					max_tiles = 0
 		var door_hit: Door = null
 		var fall := 0
+		var teeter_way := Vector2i.ZERO  # Stopped on a rim, the drop this way (783).
 		var glance := 0.0
 		var traced := false
 		if free_body(body) and not lofted:
@@ -8455,6 +8482,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 			blocker = slid["blocker"]
 			door_hit = slid["door"]
 			fall = slid["fall"]
+			teeter_way = slid["teeter"]
 			glance = slid["glance"]
 			spent = (u - float(slid["speed"])) * slide_per_speed  # So what is left below is the speed it stopped at.
 			var going: Vector2 = slid["way"]
@@ -8497,6 +8525,13 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 				collided = true
 				stopped_by = blocker.name
 				break
+			if drop > 0 and body.is_creature() and body.teeter == Vector2i.ZERO \
+					and u - (spent + cost) / slide_per_speed < teeter_speed:
+				# Too little speed left to go over (decision 783): on the rim.
+				teeter_way = direction
+				stopped = true
+				stopped_by = "the rim (teetering)"
+				break
 			_relocate(body, next)
 			tiles += 1
 			spent += cost
@@ -8517,7 +8552,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 
 		# Speed spent on travel; what is left is what hits.
 		var remaining := 0.0
-		if stopped and fall == 0:
+		if stopped and fall == 0 and teeter_way == Vector2i.ZERO:  # A rim hurts nothing.
 			remaining = maxf(u - spent / slide_per_speed, 0.0)
 		var impact := 0
 		var passed := 0.0
@@ -8559,14 +8594,14 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 			if door_hit != null:
 				_hit_door(door_hit, impact, mover)
 		if fall > 0 and _alive(body):
-			impact = FALL_IMPACT_PER_LEVEL * fall
-			_stun(body, 0.0)
-			_impact(body, impact, mover, &"stone")
+			impact = _fall_hurt(body, fall, mover)
 		# Running into something stuns, even with no force left to hurt.
 		if collided:
 			_stun(body, remaining)
 		if tiles > 0 and fall == 0:
 			_stun_for(body, push_slide_ticks(tiles) + (knockback_stun_ticks if stagger < 0 else stagger))
+		if teeter_way != Vector2i.ZERO and _alive(body):
+			_start_teeter(body, teeter_way)
 		if blocker != null and not wall_body:
 			_stun(blocker, remaining)
 			note = " (%s takes %d, goes on at %.2f)" % [blocker.name, blocker_impact, passed]
@@ -8609,7 +8644,7 @@ func apply_blow(source: GridEntity, target: GridEntity, blow: Dictionary) -> Dic
 	result["speed"] = way.length()
 	if way.length() >= knockback_min_force or bool(blow.get("no_floor", false)) and way.length() > 0.0:
 		_fill_slide(result, target, _push(source, target, way, way.length(), false, int(blow.get("stagger", -1))))
-	if not is_sheltered(target):
+	if _alive(target) and not is_sheltered(target) and not _teeter_struck(target, source, way):  # Over the rim (783).
 		_rush_struck(target, way)  # A rush slowed or stopped (604).
 	result["knocked_down"] = is_down(target)
 	blow_resolved.emit(source, target, result)
@@ -8633,7 +8668,8 @@ func launch(by: GridEntity, body: GridEntity, toward: Vector2, impulse: float, s
 	result["speed"] = speed
 	var away := Vector2(body.tile - by.tile)
 	_fill_slide(result, body, _push(by, body, toward, speed, toward.normalized().dot(away.normalized()) < 0.99, stagger))
-	_rush_struck(body, toward.normalized() * speed)  # A rush slowed or stopped (604).
+	if _alive(body) and not _teeter_struck(body, by, toward.normalized() * speed):  # Over the rim (783).
+		_rush_struck(body, toward.normalized() * speed)  # A rush slowed or stopped (604).
 	result["knocked_down"] = is_down(body)
 	_log("launch: %s throws %s toward %s at %.2f: %d cells, stopped by %s" % [by.name, body.name, toward, speed,
 			result["distance"], result["stopped_by"]])
@@ -8774,6 +8810,84 @@ func _rush_struck(body: GridEntity, way: Vector2) -> void:
 	else:
 		state["ticks"] = maxf(lunge_ticks_per_cell, 0.1) / float(state["u"])
 		body.step_velocity = Vector2(state["line"]) / (float(state["ticks"]) * float(state["drag"]))
+
+
+## [param body] stops on a rim teetering (decision 783), the drop
+## [param way] from its cell: stunned teeter_ticks, then it finds its feet
+## (_tend_teeters) unless a hit toward the drop sends it over first
+## (_teeter_struck).
+func _start_teeter(body: GridEntity, way: Vector2i) -> void:
+	body.teeter = way
+	body.teeter_until = tick + teeter_ticks
+	_teetering[body] = body.tile
+	_stun_for(body, teeter_ticks)
+	_log("teeter: %s on the rim at %s, the drop %s" % [body.name, body.tile, way])
+
+
+## A hit on [param body] by [param source] (a blow's, shove's or launch's
+## [param way], before the threshold, as _rush_struck's): one teetering
+## (decision 783) with any part of it toward the drop goes over, however
+## light. Whether it went.
+func _teeter_struck(body: GridEntity, source: GridEntity, way: Vector2) -> bool:
+	if body.teeter == Vector2i.ZERO or way.dot(Vector2(body.teeter)) <= 0.0 or not _alive(source):
+		return false
+	if body.teeter_until == tick + teeter_ticks:
+		return false  # The push that set it teetering, this tick: not twice.
+	var toward := body.teeter
+	var next := body.tile + toward
+	if height_step(body.tile, toward) <= 0 or not is_walkable(next) or _occupancy.has(next):
+		_end_teeter(body)  # The drop gone or filled: nothing to go over.
+		return false
+	_log("teeter: %s struck over the rim by %s" % [body.name, source.name])
+	# Through _push, as any push off a ledge: it is still teetering, so it
+	# goes over (its fall ends the teeter, _fall_hurt).
+	_push(source, body, Vector2(toward), maxf(teeter_speed, ground_drag(body.tile, toward) / slide_per_speed + 0.01))
+	return true
+
+
+## [param body] no longer teeters (decision 783): it found its feet, went
+## over, or the rim is gone.
+func _end_teeter(body: GridEntity) -> void:
+	_teetering.erase(body)
+	if is_instance_valid(body):
+		body.teeter = Vector2i.ZERO
+		body.teeter_until = 0
+
+
+## The world tick's (decision 783): a body teetering past its teeter_ticks,
+## or moved off its rim some other way, finds its feet.
+func _tend_teeters() -> void:
+	if _teetering.is_empty():
+		return
+	for body: Variant in _teetering.keys():
+		if not is_instance_valid(body):
+			_teetering.erase(body)
+		elif not _alive(body) or tick >= (body as GridEntity).teeter_until or (body as GridEntity).tile != _teetering[body]:
+			_end_teeter(body as GridEntity)
+
+
+## A fall of [param levels] for [param body], knocked off a ledge by
+## [param source] (decision 783): fall_hp_per_level a level through
+## World.damage (cause &"impact", so a foe it kills is the source's: its
+## slayer, quests, grudges and loot, its drop where it lands), all its hp
+## from fall_lethal_levels (the arena's dummy never dies: damage's rule),
+## and a creature that lives lies down fall_down_ticks. The damage done.
+func _fall_hurt(body: GridEntity, levels: int, source: GridEntity) -> int:
+	_end_teeter(body)
+	var amount := fall_hp_per_level * levels
+	if levels >= fall_lethal_levels:
+		amount = maxi(amount, body.hp)
+	_stun(body, 0.0)
+	var at := body.tile
+	if body is Monster and is_instance_valid(source):
+		(body as Monster).note_struck(source)  # Its slayer the shover's (damage notes only attack and shot).
+	_impact(body, amount, source, &"stone")
+	var alive := _alive(body)
+	if alive and body.is_creature():
+		knock_down(body, source, fall_down_ticks)
+	_log("fall: %s fell %d levels to %s, %d hp%s" % [body.name if is_instance_valid(body) else "?", levels, at, amount,
+			"" if alive else ", dead: what it carried lies there"])
+	return amount
 
 
 ## [param entity]'s rush ends for [param reason]: rush_ended.
@@ -9644,13 +9758,14 @@ func _free_claim(entity: GridEntity, duration: float) -> void:
 ## water at the edge stops it unhurt; a drop it goes off and falls; fire
 ## stops a creature in it. {path (the centres, from its free_pos), cells,
 ## speed (left at the end), stopped, collided, stopped_by, blocker, door,
-## fall, glance (the most speed it lost into a wall it slid along), way
-## (the way it was going at the end)}.
+## fall, teeter (the axis of a rim it stopped on teetering, decision 783;
+## ZERO for none), glance (the most speed it lost into a wall it slid
+## along), way (the way it was going at the end)}.
 func _free_slide(body: GridEntity, way: Vector2, u: float) -> Dictionary:
 	var dir := way.normalized()
 	var out := {"path": PackedVector2Array([body.free_pos]), "cells": 0, "speed": 0.0, "stopped": false,
 		"collided": false, "stopped_by": "nothing (force spent)", "blocker": null, "door": null, "fall": 0,
-		"glance": 0.0, "way": dir}
+		"teeter": Vector2i.ZERO, "glance": 0.0, "way": dir}
 	var speed := u
 	var p := body.free_pos
 	var travelled := 0.0
@@ -9697,6 +9812,13 @@ func _free_slide(body: GridEntity, way: Vector2, u: float) -> Dictionary:
 			out["stopped_by"] = "water"
 			break
 		var drop := height_step(held, axis) if is_walkable(next) else 0
+		if drop > 0 and not edge_blocks(held, axis) and not _occupancy.has(next) \
+				and body.is_creature() and body.teeter == Vector2i.ZERO and speed < teeter_speed:
+			# Too little speed left to go over (decision 783): on the rim.
+			out["teeter"] = axis
+			out["stopped"] = true
+			out["stopped_by"] = "the rim (teetering)"
+			break
 		if drop > 0 and not edge_blocks(held, axis) and not _occupancy.has(next):
 			# Off a ledge: it falls, and the fall is what hurts.
 			body._free_claiming = true

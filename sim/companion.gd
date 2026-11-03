@@ -761,6 +761,7 @@ func _init() -> void:
 	replicate("buffs")
 	replicate("ailments")
 	replicate("down_until")
+	replicate("teeter")  # Decision 783: a rim's wobble.
 	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
 	replicate("channel_of")
 	replicate("tending")

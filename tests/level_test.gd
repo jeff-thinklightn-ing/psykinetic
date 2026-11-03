@@ -1267,7 +1267,10 @@ func _test_hills() -> void:
 	var hp := imp.hp
 	var drop := World.elevation_at(rim) - World.elevation_at(rim - Vector2i(1, 0))
 	World._push(player, imp, Vector2i(-1, 0), 3.0)
-	_check(imp.tile.x < rim.x and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * Relief.levels(drop),
+	# 783: fall_hp_per_level a level, and fall_lethal_levels or more kills outright.
+	var levels := Relief.levels(drop)
+	var owed: int = hp if levels >= World.fall_lethal_levels else World.fall_hp_per_level * levels
+	_check(imp.tile.x < rim.x and hp - imp.hp == owed,
 			"pushed off the face: it falls %.1f m, %d levels, for %d (%s, %s)" % [drop, Relief.levels(drop), hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
 	World.despawn(imp)
 	_check(World.has_line_of_sight(rim + Vector2i(1, -1), Vector2i(156, 38)), "from the plateau's rim the valley below is seen")
