@@ -112,6 +112,7 @@ func _ready() -> void:
 	_test_follow_a_creep()
 	_test_one_cell_door()
 	_test_mind_log_no_names()
+	_test_mines_a_seam()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -3400,6 +3401,115 @@ func _walk_own(owner: Player, cell: Vector2i, most_ticks: int) -> bool:
 			World.free_input(owner, way / maxf(way.length(), speed), World.TICK_DT)
 		World.step()
 	return Walk.arrived(owner, cell)
+
+
+func _test_mines_a_seam() -> void:
+	print("
+== a pick in her hands, a seam near her quiet player: she mines it and pockets the ore (769, companions' side) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var slots_was := pet.slots.duplicate()
+	var taken := {}
+	for slot in pet.slots.size():
+		if not pet.slots[slot].is_empty():
+			taken[slot] = World.take_item(pet, pet, slot)
+	# Her words: "mine" alone is no order; "dig" and "stop mining" are.
+	_check(Companion.order_in("That sword is mine.").is_empty() and Companion.order_in("dig here") == {"verb": "mine", "on": true}
+			and Companion.order_in("mine the seam") == {"verb": "mine", "on": true}
+			and Companion.order_in("stop mining") == {"verb": "mine", "on": false} and Companion.order_in("don't dig") == {"verb": "mine", "on": false},
+			"\"dig\" and \"mine the seam\" are orders, \"stop mining\" and \"don't dig\" end it, \"it is mine\" is none")
+	_put(owner, Vector2i(3, 2))
+	_put(pet, Vector2i(3, 3))
+	var spot := Vector2i(6, 3)
+	if World.get_entity_at(spot) != null:
+		World._relocate(World.get_entity_at(spot), _main._nearest_free(Vector2i(4, 9)))
+	var spec: Dictionary = Level._spec_for("seam", {})
+	spec["name"] = "TestSeam%d" % World.tick
+	spec["tile"] = spot
+	var props: Dictionary = spec.get("props", {})
+	props["full_sacks"] = 2
+	props["max_hp"] = 3
+	spec["props"] = props
+	var seam := _main._spawn(spec) as Seam
+	_check(seam != null and not seam.spent and seam.sacks == 2, "a seam beside her player, two sacks in it")
+	for i in 60:
+		World.step()
+	_check(seam.sacks == 2 and pet.current_intent != Companion.Intent.MINE, "with no pick she leaves it be (%s)" % pet.intent_name())
+	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("pick", "built"))
+	var mined := 0
+	var ticks := 0
+	while not seam.spent and ticks < 900:
+		World.step()
+		ticks += 1
+		mined += 1 if pet.current_intent == Companion.Intent.MINE else 0
+	for i in 20:
+		World.step()
+	var ore := 0
+	for slot: int in Items.PACK_SLOTS:
+		if pet.slots[slot] == Seam.ORE:
+			ore += World.slot_count(pet, slot)
+	var lying := 0
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			lying += Array(World.ground_at(spot + Vector2i(dx, dy))).count(Seam.ORE)
+	_check(seam.spent and ore == 2 and lying == 0, "a pick in hand, she mines it out and the two sacks go into her pack (%d ticks mining, ore %d, %d left lying)" % [mined, ore, lying])
+	_check(pet.current_intent != Companion.Intent.MINE and World.distance(pet.tile, owner.tile) <= Heel.START, "spent, she goes back to her player (%s at %s)" % [pet.intent_name(), pet.tile])
+	# Told to stop: a fresh seam is let be; "dig" and she is at it again.
+	seam.sacks = 2
+	seam.hp = seam.max_hp
+	pet.owner_spoke("Stop digging.")
+	_check(not pet.mining, "\"Stop digging.\" and she stops")
+	for i in 90:
+		World.step()
+	_check(seam.hp == seam.max_hp and seam.sacks == 2 and pet.current_intent != Companion.Intent.MINE, "and leaves the seam whole (%d of %d)" % [seam.hp, seam.max_hp])
+	pet.owner_spoke("Dig.")
+	var at_it := false
+	for i in 90:
+		World.step()
+		at_it = at_it or pet.current_intent == Companion.Intent.MINE
+	_check(pet.mining and at_it, "\"Dig.\" and she is at it again")
+	# A hostile in sight: she drops it at once.
+	_spawn_imp(Vector2i(3, 6))
+	World.step()
+	_check(pet.current_intent != Companion.Intent.MINE, "a monster in sight and she stops mining at once (%s)" % pet.intent_name())
+	_kill_monsters()
+	for i in 10:
+		World.step()
+	# Her player hurt: not while he is under half.
+	var hp_was := owner.hp
+	owner.hp = int(owner.max_hp * 0.4)
+	World.step()
+	_check(pet.current_intent != Companion.Intent.MINE, "her player under half strength: she stops (%s)" % pet.intent_name())
+	owner.hp = hp_was
+	# Her pack full: said once, and she stops.
+	var said_before := pet._said.count(Companion.MINE_FULL_LINE)
+	for slot: int in Items.PACK_SLOTS:
+		while not pet.slots[slot].is_empty():  # take_item takes one of a stack.
+			World.items.end(World.take_item(pet, pet, slot), "gone")
+		World.put_item(pet, pet, slot, World.items.mint("dagger", "built"))
+	seam.sacks = 2
+	seam.hp = seam.max_hp
+	for i in Companion.QUIET_AFTER + 2:
+		World.step()  # Past the fight's quiet (675): a line is said again.
+	for i in 120:
+		World.step()
+	_check(pet._said.count(Companion.MINE_FULL_LINE) - said_before == 1 and pet.current_intent != Companion.Intent.MINE and seam.hp == seam.max_hp,
+			"her pack full: she says so once and stops (%d said, %s)" % [pet._said.count(Companion.MINE_FULL_LINE) - said_before, pet.intent_name()])
+	World.despawn(seam)
+	for slot in pet.slots.size():
+		while not pet.slots[slot].is_empty():
+			World.items.end(World.take_item(pet, pet, slot), "gone")
+	for slot: int in taken:
+		World.put_item(pet, pet, slot, taken[slot])
+	_check(pet.slots == slots_was, "her own things back (%s, was %s)" % [pet.slots, slots_was])
+	pet.mining = true
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
 
 
 func _test_follow_without_backsteps() -> void:

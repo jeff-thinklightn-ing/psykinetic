@@ -39574,6 +39574,35 @@ mine_test: the marker and props, the recess, a bare hand and a sword ringing off
 blows and sacks, rubble, the labels, a save's entry and the refill; mine_look parsing with no
 warnings, its seams in recesses, its decor placed and its slots. PROTOCOL CHANGE (Seam's
 replicated "spent", a new spawned class); new class_name Seam.
+
+## 769 amended (2): she mines a seam near her player (step 2, companions)
+
+Companion.Intent.MINE. She mines when all of these hold: a tool (Seam.bites) is in her hands, she
+is out of a fight with no hostile in sight, her player is up and over HP_THRESHOLDS[0], no order
+is set, and she is on STAY_CLOSE or GUARD. Then, in _choose (after the fight branches, before
+the devoted branch), she takes the nearest unspent seam within MINE_RANGE (4) of her player. She
+keeps it while it is unspent, or while a sack still lies at her feet. In _mine_step she picks up
+an ore sack at her feet (World.try_pick_up: a free hand, else the pack, stacking), otherwise
+strikes the seam (World.try_attack) when in reach, else closes in. Spent, she goes back to FOLLOW.
+A fight, her player hurt, or an order ends it on the next tick, since intents are chosen afresh
+each tick. Intent is not replicated, so the protocol is unchanged.
+
+Plain orders (616's reader): "dig", "mine it", "mine the seam" turn mining on (Companion.mining,
+on by default); "stop digging", "don't mine", "enough mining" turn it off; "it is mine" is no
+order. Voice approved the done narrations ("You will mine any seam near <them> while all is
+quiet, as they asked.", "... asked you to stop mining; you leave the seam be till they ask
+again.", "... asked you to mine, but you have no pick in your hands.").
+
+With no room for ore (no empty pack slot, no ore stack under its size), she says voice's line
+once, "My pack's full of ore. I can't carry more.", until there is room again, and does not mine.
+
+companion_test _test_mines_a_seam: the orders parsed, no pick no mining, a pick and the seam
+mined out with both sacks in her pack, "Stop digging." leaves a fresh seam whole and "Dig."
+starts her again, a monster in sight or her player under half stops her at once, a full pack
+said once and no blow struck. No bullet yet: seams are only in mine_look, a dev level no way
+reaches; dungeon's landing that puts seams in a real level carries the bullet. Server only,
+protocol unchanged, no new class_name.
+
 ## 771. The night watch
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

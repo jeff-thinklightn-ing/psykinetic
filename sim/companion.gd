@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP, DODGE }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP, DODGE, MINE }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP", "DODGE"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP", "DODGE", "MINE"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## The last tick she or her player was in a fight (decision 675).
@@ -109,6 +109,15 @@ const ORDER_WAIT := "\\b(wait|stay(?! (back|close|with|near|by|away|out|clear|be
 const ORDER_REST := "(?<!the )(?<!of )\\b(rest|take a (rest|break|breather|moment|seat)|catch your breath|sit (down|tight)|have a (rest|sit|break|breather)|get some (rest|sleep)|lie down|go to sleep|(take|have) a nap|recover|rest up)\\b(?! of| in peace)"
 const ORDER_CARRY := "\\b(carry|take|hold|keep|stow|pack|have|put)\\b"
 const ORDER_CARRY_THIS := "\\b(carry|hold|keep|stow) (this|these|that|those|it|them)( for (me|a while|now))?\\s*([.!?,]|$)"
+## Her player's word to mine, or to stop (decision 769, companions' side):
+## "dig", "start mining", "mine the seam"; "mine" alone is too often "it's
+## mine" to count.
+const ORDER_MINE := "\\b(dig|digging|mining|mine (it|this|that|the|here|there|for|some|ore|away|on))\\b"
+const ORDER_MINE_STOP := "\\b((stop|quit|leave off|enough|no more|done)( with)?( the)? (mining|digging)|(don'?t|do not|no) (mine|dig)|stop (mine|dig))\\b"
+## A seam this near her player she mines (769).
+const MINE_RANGE := 4
+## The line she says once when her pack is full of ore (769; voice's wording).
+const MINE_FULL_LINE := "My pack's full of ore. I can't carry more."
 const ORDER_PLAY := "\\b(knucklebones|play (a game|dice|bones|a round)|(a|another) game of (bones|dice)|throw the bones)\\b"
 ## Her player's answer when she has asked them to keep watch (decision 621).
 const ORDER_YES := "\\b(yes|yeah|yep|sure|of course|ok|okay|go on|go ahead|i will|i'll watch|i'll keep watch|sleep|get some sleep)\\b"
@@ -704,6 +713,13 @@ var _rest_asked_at := -1
 ## Her player's standing plain order (decision 616): "wait" or "rest", else
 ## "". Calm does not undo it; "follow" or another order does.
 var order := ""
+## Whether she mines a seam near her player while she holds a pick (769):
+## on unless her player told her to stop; "dig" or "mine" turns it on again.
+var mining := true
+## The seam she is mining, null for none; whether she has said her pack is
+## full (said once, till it has room again).
+var _mine_seam: Seam = null
+var _mine_full_said := false
 var _order_tick := -1
 var _ack_due := -1
 var _rest_heal_at := -1
@@ -1115,6 +1131,10 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 				return {"verb": "carry", "item": id}
 		if found.call(ORDER_CARRY_THIS):
 			return {"verb": "carry", "item": ""}
+	if RegEx.create_from_string(ORDER_MINE_STOP).search(said) != null:
+		return {"verb": "mine", "on": false}
+	if found.call(ORDER_MINE):
+		return {"verb": "mine", "on": true}
 	if found.call(ORDER_PLAY):
 		return {"verb": "play"}
 	if found.call(ORDER_REST):
@@ -1345,6 +1365,16 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 			else:
 				_start_errand({"verb": "take", "item": item, "at": keeper.tile, "words": "take the %s from %s to carry" % [Items.name_of(item), keeper_name()]}, _serial)
 				done = "You go to take the %s from %s to carry, as they asked." % [Items.name_of(item), keeper_name()]
+		"mine":
+			mining = bool(read.get("on", true))
+			_mine_full_said = false
+			if not mining:
+				_mine_seam = null
+				done = "%s asked you to stop mining; you leave the seam be till they ask again." % keeper_name()
+			elif not Seam.bites(World.wielded(self)):
+				done = "%s asked you to mine, but you have no pick in your hands." % keeper_name()
+			else:
+				done = "You will mine any seam near %s while all is quiet, as they asked." % keeper_name()
 		"play":
 			var rules := _bond_rules("game")
 			if in_fight():
@@ -3000,6 +3030,8 @@ func doing() -> String:
 			action = "leaping clear of %s" % _dodge_from
 		Intent.ERRAND:
 			action = "on your way to %s" % errand.get("words", "do what you were asked")
+		Intent.MINE:
+			action = "mining the ore seam near %s" % keeper_name()
 		Intent.GUIDE:
 			action = "leading %s to %s" % [keeper_name(), guide.goal.get("name", "where they asked") if guide != null else "where they asked"]
 		_:
@@ -4278,6 +4310,8 @@ func _choose(foe: GridEntity, low: bool) -> void:
 		current_intent = Intent.SLEEP  # Asleep while her player keeps watch (621 amended).
 	elif order == "rest" and foe == null:
 		current_intent = Intent.REST  # Asked to rest (decision 616), awake.
+	elif foe == null and _mine_pick() != null:
+		current_intent = Intent.MINE  # A seam near her quiet player, a pick in hand (769).
 	elif bond_at_least("devoted") and stance != Stance.HOLD and stance != Stance.PULL_BACK and _at_keeper() != null:
 		# Devoted (decision 621, Jeff's "protects you aggressively"): she
 		# goes first at whatever is attacking her player.
@@ -4510,6 +4544,8 @@ func _execute() -> void:
 				World.try_attack(self, intent_target)
 			else:
 				_close_in(intent_target)
+		Intent.MINE:
+			_mine_step()
 		Intent.YIELD:
 			if _yield_tile != NONE and tile != _yield_tile and World.is_free(_yield_tile):
 				_step_toward(_yield_tile, false)
@@ -4772,6 +4808,72 @@ func _find_yield_tile() -> Vector2i:
 ## reach; a reach weapon's line), worked out again once its centre has
 ## moved STRIKE_REPLAN or she has stepped; none to be had, she closes on
 ## it as before (_approach).
+## The seam she mines now (decision 769, companions' side; Jeff: "having
+## the companion hold a pick axe could have them automatically mine for
+## you so it doesn't feel like work"), null for none. She mines while all
+## of these hold: her player has not told her to stop (mining); a tool is
+## in her hands (Seam.bites); she keeps close or guards (never while
+## holding, pressing or pulling back, nor on an order to wait or rest);
+## no hostile within SIGHT_RANGE; her player is up and not under half
+## strength; her pack has room for ore, or ore lies at her feet to take;
+## and a seam not spent stands within MINE_RANGE of her player (the
+## nearest to her, the one she was at kept while it serves).
+func _mine_pick() -> Seam:
+	var seam := _mine_seam
+	_mine_seam = null
+	if not mining or not Seam.bites(World.wielded(self)) or not order.is_empty():
+		return null
+	if stance != Stance.STAY_CLOSE and stance != Stance.GUARD:
+		return null
+	if not _alive(keeper) or World.is_downed(keeper) or keeper.hp < keeper.max_hp * HP_THRESHOLDS[0] or _hostile_within(SIGHT_RANGE):
+		return null
+	if not _mine_room():
+		if not _mine_full_said and _say(MINE_FULL_LINE, true):
+			_mine_full_said = true
+			_narrate("Your pack is full of ore: you stop mining.")
+		return null
+	_mine_full_said = false
+	if seam != null and is_instance_valid(seam) and seam.spawned and Seam.ORE in Array(World.ground_at(tile)):
+		_mine_seam = seam
+		return seam  # Its last sack at her feet, taken up before she goes.
+	if seam == null or not is_instance_valid(seam) or not seam.spawned or seam.spent or seam.zone != zone 			or World.distance(seam.tile, keeper.tile) > MINE_RANGE:
+		seam = null
+		for entity in World.get_entities():
+			var each := entity as Seam
+			if each == null or not each.spawned or each.spent or each.zone != zone or World.distance(each.tile, keeper.tile) > MINE_RANGE:
+				continue
+			if seam == null or World.distance(each.tile, tile) < World.distance(seam.tile, tile):
+				seam = each
+	_mine_seam = seam
+	return seam
+
+
+## Whether she can take a sack of ore (769): ore lying at her feet, or room
+## for one in her pack (a stack of sacks not full, or a free slot).
+func _mine_room() -> bool:
+	if Seam.ORE in Array(World.ground_at(tile)):
+		return true
+	for slot: int in Items.PACK_SLOTS:
+		if slot < slots.size() and (slots[slot].is_empty() or slots[slot] == Seam.ORE and World.slot_count(self, slot) < Items.stack_of(Seam.ORE)):
+			return true
+	return false
+
+
+## A step of her mining (769): a sack of ore at her feet taken up into her
+## pack; else a blow at the seam within reach; else a step toward it.
+func _mine_step() -> void:
+	var at := Array(World.ground_at(tile)).rfind(Seam.ORE)
+	if at >= 0 and World.try_pick_up(self, tile, at):
+		return
+	if _mine_seam == null or not is_instance_valid(_mine_seam):
+		current_intent = Intent.FOLLOW
+		return
+	if World.in_reach(self, _mine_seam):
+		World.try_attack(self, _mine_seam)
+	else:
+		_close_in(_mine_seam)
+
+
 func _close_in(target: GridEntity) -> void:
 	var centre := World.body_centre(target)
 	if _strike_plan.get("target") != target or _strike_plan.get("from") != tile \
