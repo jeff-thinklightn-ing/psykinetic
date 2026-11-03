@@ -6204,7 +6204,13 @@ func _on_balance_threat(town: String, kind: String, on: bool) -> void:
 ## unpaid). At dawn each who stood it is paid economy.json commissions
 ## watch_night from the town's treasury (Economy.pay_commission: what it
 ## has) and the captain thinks the better of them (standing "watch").
-## Phase 1: no waves yet (771, enemy-ai's side; npc's side (2) wires them).
+## The waves (771 amended (3)): a manned post draws its night's wave times
+## (residents.json watch "waves"); at one, with its watcher at it and none
+## of its waves out, World.raids.wave sends 1 + the town's watchers of the
+## post's kinds (else the default's). The first cue tells the watcher and
+## brings the captain to the post; beaten pays commissions watch_wave and
+## the captain's standing "watch_wave"; broken through raises 762's threat,
+## held by "watch:<id>" till it is beaten or fades.
 ## Not saved: a restart ends the night's watch, unpaid.
 
 ## How often the watch is looked at (steps).
@@ -6270,7 +6276,8 @@ func _watch_sign_on(player: Player, body: Resident, post_id: String) -> void:
 	if not _watch.has(town):
 		_watch[town] = {}
 	_watch[town][post_id] = {"player": player.player_id, "name": str(post.get("name", "the post")), "worker": body.worker_id,
-		"zone": body.zone, "rect": post.get("rect", Rect2i()), "stood": 0, "away": 0}
+		"zone": body.zone, "rect": post.get("rect", Rect2i()), "stood": 0, "away": 0,
+		"kinds": post.get("kinds", {}), "times": _wave_times(town, post_id), "sent": 0, "wave": ""}
 	var lines: Array = _watch_rule().get("sign_on", ["Take %s."])
 	_say_plain(body, body.person, str(lines[absi(hash(player.player_id + post_id)) % lines.size()]) % str(post.get("name", "the post")))
 	print("[watch] %s: a post taken" % town)
@@ -6296,6 +6303,8 @@ func _watch_tick(steps: int) -> void:
 			var at: bool = player != null and player.zone == str(entry["zone"]) and (entry["rect"] as Rect2i).grow(reach).has_point(player.tile)
 			var key := "stood" if at else "away"
 			entry[key] = int(entry[key]) + steps
+			if at:
+				_wave_due(town, post, entry, hour)
 			if float(entry["away"]) > grace:
 				_watch_tell(str(entry["player"]), str(rule.get("left", "You left your post; the town owes you nothing for tonight.")))
 				(_watch[town] as Dictionary).erase(post)
@@ -6320,9 +6329,9 @@ func _watch_dawn() -> void:
 				var lines: Array = rule.get("paid", ["The town pays you %d gold for the watch."])
 				line = str(lines[absi(hash(player_id + town)) % lines.size()]) % paid
 			elif paid > 0:
-				line = str(rule.get("short", "The treasury can spare only %d gold of the %d owed for the watch.")) % [paid, owed]
+				line = str(rule.get("short", "First light. The town can pay you only %d of the %d gold owed for the watch.")) % [paid, owed]
 			else:
-				line = str(rule.get("unpaid", "The treasury is empty; the town owes you for the night's watch."))
+				line = str(rule.get("unpaid", "First light. The town has no gold to pay you for the watch."))
 			_watch_tell(player_id, line)
 			var worker := str(entry["worker"])
 			var card := Townsfolk.card_of(World.production, worker) if World.production != null else {}
@@ -6346,6 +6355,193 @@ func _watch_tell(player_id: String, line: String) -> void:
 	var peer := Net.local_id if player_id == Net.player_id else _peer_of(player_id)
 	if peer != 0 and not line.is_empty():
 		Net.broadcast_to([peer], "party", {"from": "", "text": line})
+
+
+# The waves (771 amended (3)).
+
+## How a wave is sent (town, post rect, kind, size) -> id ("" for none):
+## World.raids.wave; a test sets its own.
+var watch_wave := Callable()
+## Wave id -> {town, post, kind, cued}: the waves the watch sent, till each ends.
+var _waves: Dictionary = {}
+## Wave kinds -> 762's threat kinds.
+const WAVE_THREAT := {"wolves": "wolves", "dead": "raid", "raiders": "raid"}
+
+
+func _wave_send(town: String, post: Rect2i, kind: String, size: int) -> String:
+	return World.raids.wave(town, post, kind, size) if World.raids != null else ""
+
+
+static func _wave_rule() -> Dictionary:
+	return _watch_rule().get("waves", {})
+
+
+## Raids' wave signals to the watch, once.
+func _wave_hook() -> void:
+	if World.raids == null:
+		return
+	if not World.raids.wave_coming.is_connected(_on_watch_wave_coming):
+		World.raids.wave_coming.connect(_on_watch_wave_coming)
+		World.raids.wave_beaten.connect(_on_watch_wave_beaten)
+		World.raids.wave_broke.connect(_on_watch_wave_broke)
+		World.raids.wave_faded.connect(_on_watch_wave_faded)
+
+
+## Post [param post_id]'s wave times tonight, hours into the waves' window
+## ("from" to "to"): "per_night" of them at least "gap_hours" apart, drawn
+## by the town, the post and the day.
+func _wave_times(town: String, post_id: String) -> Array[float]:
+	var rule := _wave_rule()
+	var span := fposmod(float(rule.get("to", 4)) - float(rule.get("from", 22)), 24.0)
+	var count := int(rule.get("per_night", 2))
+	var gap := float(rule.get("gap_hours", 1.5))
+	var draw := RandomNumberGenerator.new()
+	draw.seed = hash("wave:%s:%s:%d" % [town, post_id, Townsfolk.day_of(World.steps)])
+	var times: Array[float] = []
+	var at := 0.0
+	for i in count:
+		var room := span - at - gap * (count - 1 - i)
+		if room < 0.0:
+			break
+		at += draw.randf_range(0.0, room)
+		times.append(at)
+		at += gap
+	return times
+
+
+## Post [param post] of [param town], its watcher at it at [param hour]:
+## its next wave sent when its time has come and none of its waves is out.
+func _wave_due(town: String, post: String, entry: Dictionary, hour: float) -> void:
+	var rule := _wave_rule()
+	var times: Array = entry.get("times", [])
+	var sent := int(entry.get("sent", 0))
+	var into := fposmod(hour - float(rule.get("from", 22)), 24.0)
+	var span := fposmod(float(rule.get("to", 4)) - float(rule.get("from", 22)), 24.0)
+	if sent >= times.size() or into > span or into < float(times[sent]) or not str(entry.get("wave", "")).is_empty():
+		return
+	_wave_hook()
+	var weights: Dictionary = entry.get("kinds", {})
+	if weights.is_empty():
+		weights = rule.get("kinds", {"wolves": 1})
+	var kind := _wave_kind(weights, hash("%s:%s:%d:%d" % [town, post, Townsfolk.day_of(World.steps), sent]))
+	var size := 1 + (_watch[town] as Dictionary).size()
+	entry["sent"] = sent + 1
+	var send: Callable = watch_wave if watch_wave.is_valid() else _wave_send
+	var id := str(send.call(town, entry["rect"], kind, size))
+	if id.is_empty():
+		return
+	entry["wave"] = id
+	_waves[id] = {"town": town, "post": post, "kind": kind, "cued": false}
+	print("[watch] %s: a wave of %s on a post" % [town, kind])
+
+
+## A kind drawn from [param weights] ({kind: weight}) by [param key_hash].
+static func _wave_kind(weights: Dictionary, key_hash: int) -> String:
+	var total := 0
+	for each: String in weights:
+		total += maxi(int(weights[each]), 0)
+	if total <= 0:
+		return "wolves"
+	var draw := RandomNumberGenerator.new()
+	draw.seed = key_hash
+	var roll := draw.randi_range(1, total)
+	for each: String in weights:
+		roll -= maxi(int(weights[each]), 0)
+		if roll <= 0:
+			return each
+	return "wolves"
+
+
+## Wave [param id]'s watch entry, {} when its watcher has gone.
+func _wave_entry(id: String) -> Dictionary:
+	var wave: Dictionary = _waves.get(id, {})
+	if wave.is_empty():
+		return {}
+	return (_watch.get(str(wave["town"]), {}) as Dictionary).get(str(wave["post"]), {})
+
+
+## Server: a wave's cue (Raids.wave_coming): on the first, the watcher is
+## told what comes and the captain comes to the post.
+func _on_watch_wave_coming(id: String, _area: String, kind: String, _cell: Vector2i, _post: Vector2i) -> void:
+	if not _waves.has(id) or bool(_waves[id]["cued"]):
+		return
+	_waves[id]["cued"] = true
+	var entry := _wave_entry(id)
+	if entry.is_empty():
+		return
+	var lines: Array = _wave_rule().get("coming", {}).get(kind, [])
+	if not lines.is_empty():
+		_watch_tell(str(entry["player"]), str(lines[absi(hash(id)) % lines.size()]))
+	var captain := _resident_body(str(entry["worker"]))
+	if captain != null:
+		captain.visit = {"rect": entry["rect"], "who": "", "name": str(entry["name"]), "post": true,
+			"until": World.steps + Raids.WAVE_MAX_TICKS}
+
+
+## Server: wave [param id] beaten (Raids.wave_beaten): its watcher, still on
+## the post, paid commissions watch_wave from the treasury and the captain
+## the warmer; its threat let go.
+func _on_watch_wave_beaten(id: String, town: String) -> void:
+	var entry := _wave_entry(id)
+	if not entry.is_empty():
+		var player_id := str(entry["player"])
+		var owed := int(Production.read_rules().get("commissions", {}).get("watch_wave", 5))
+		var paid := 0
+		if World.economy != null and World.economy.has_method("pay_commission"):
+			paid = int(World.economy.pay_commission(player_id, town, owed))
+		var rule := _wave_rule()
+		var key := "beaten" if paid >= owed else "beaten_short" if paid > 0 else "beaten_unpaid"
+		var lines: Array = rule.get(key, [])
+		if not lines.is_empty():
+			var line := str(lines[absi(hash(id + player_id)) % lines.size()])
+			_watch_tell(player_id, line % paid if key == "beaten" else line % [paid, owed] if key == "beaten_short" else line)
+		var worker := str(entry["worker"])
+		var card := Townsfolk.card_of(World.production, worker) if World.production != null else {}
+		if not card.is_empty():
+			Standing.bump(card, player_id, Standing.setting("watch_wave"), "held the post against a wave", World.production.now())
+			World.production.set_card(worker, card)
+	_wave_over(id, town)
+
+
+## Server: wave [param id] broke through to [param town] (Raids.wave_broke):
+## 762's threat, held by the wave till it ends; the watcher told.
+func _on_watch_wave_broke(id: String, town: String) -> void:
+	if not _waves.has(id) or World.towns == null:
+		return
+	_raise_threat(town, str(WAVE_THREAT.get(str(_waves[id]["kind"]), "raid")), "watch:" + id)
+	var entry := _wave_entry(id)
+	if not entry.is_empty():
+		var lines: Array = _wave_rule().get("broke", [])
+		if not lines.is_empty():
+			_watch_tell(str(entry["player"]), str(lines[absi(hash(id)) % lines.size()]))
+	_captain_back(id)
+
+
+## Server: wave [param id] gone with no end (Raids.wave_faded).
+func _on_watch_wave_faded(id: String, town: String) -> void:
+	_wave_over(id, town)
+
+
+## Wave [param id] over: its threat let go, the captain back to his night,
+## the post free for its next.
+func _wave_over(id: String, town: String) -> void:
+	if not _waves.has(id):
+		return
+	if World.towns != null:
+		World.towns.release_threat(town, "watch:" + id)
+	_captain_back(id)
+	var entry := _wave_entry(id)
+	if not entry.is_empty() and str(entry.get("wave", "")) == id:
+		entry["wave"] = ""
+	_waves.erase(id)
+
+
+## The captain who came to wave [param id]'s post goes back to his night.
+func _captain_back(id: String) -> void:
+	var wave: Dictionary = _waves.get(id, {})
+	var captain := _resident_body(_watch_captain(str(wave.get("town", ""))))
+	if captain != null and bool(captain.visit.get("post", false)):
+		captain.visit = {}
 
 
 # --- The balance quest's herder (761, npc's side (2)) -------------------------

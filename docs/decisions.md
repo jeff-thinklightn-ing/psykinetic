@@ -39913,6 +39913,28 @@ spawns and again when its leader is halfway in; Main sends "wave" {kind, cell} t
 within CUE_REACH 64 of the post (771 amended's handler plays it). Never saved: a restart ends a wave.
 monster_test _test_watch_wave. Protocol: the "wave" kind, a "47 (771 amended (2)):" line under rev 47;
 no new class_name; no bullet (no real town has posts yet).
+771 amended (3): the waves, npc's side (the coordinator's design, approved 2026-11-03), on enemy-ai's
+World.raids.wave. Waves come only to a post someone stands. At sign-on the post draws its night's wave
+times (Main._wave_times: residents.json watch "waves" per_night 2, at least gap_hours 1.5 apart, between
+from 22:00 and to 04:00, by the town, the post and the day). Main._wave_due, on the watch tick with the
+watcher at the post: at its next time, with none of its waves out, it sends one (Main.watch_wave, else
+World.raids.wave) of the post's own "kinds" weights (buildings' post data, so "dead" only where a post
+names it, near a barrow or ruin), else waves "kinds" (wolves 3, raiders 1), sized 1 + the town's watchers
+tonight (the coordinator: no guard fights yet, so the watch alone holds it; guards who fight are their
+own step with combat and pc-character). Raids' signals: the first wave_coming tells the watcher "coming"
+by kind and brings the captain to the post (Resident.visit {rect, name, post: true}: seen, no blows;
+his situation says so); wave_broke raises 762's threat (wolves "wolves", dead and raiders "raid") held by
+"watch:<id>", tells the watcher "broke" and sends the captain back (he turns out with the guard);
+wave_beaten pays the watcher still on the post economy.json commissions "watch_wave" (5, economy's
+leave) through Economy.pay_commission ("beaten", "beaten_short" or "beaten_unpaid") and bumps the
+captain's standing "watch_wave" (1); beaten or faded lets the threat go (it lifts unseen as 762's do)
+and frees the post for its next. Phase 1's fallback lines in _watch_dawn now match the data (voice: the
+town keeps no debt). Voice's words (2026-11-03). resident_test _test_watch_waves (the wave stubbed;
+monster_test covers the wave itself): times in the window and spaced, none before the window or with
+the watcher away, sent at its time with its size and kind, one out at a time, the first cue told once
+and the captain at the post, broke's threat and holder, beaten paid and told, the threat let go, the
+captain's regard, the post's own kinds, an empty treasury unpaid, no third wave. Not saved; no bullet
+until a real town has posts. Server only, protocol unchanged, no new class_name.
 
 ## 776, companions' side: she knows a ford for shallow water
 

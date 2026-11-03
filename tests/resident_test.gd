@@ -91,6 +91,7 @@ func _ready() -> void:
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
+	_test_watch_waves()  # 771 amended (3), the same way.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -977,6 +978,132 @@ func _test_threat() -> void:
 		World.despawn(body)
 	DayNight.set_hour(12.0)
 
+
+## The night watch's waves (771 amended (3)): a manned post's wave sent at
+## its time with its watcher there, one out at a time, sized 1 + the
+## watchers, of the post's kinds; the first cue told and the captain at the
+## post; broken through, 762's threat held by the wave; beaten, paid and
+## the captain the warmer, the threat let go. World.raids.wave is stubbed:
+## enemy-ai's monster_test covers the wave itself.
+func _test_watch_waves() -> void:
+	print("\n== the night watch's waves: sent at a manned post, cued, broke, beaten and paid (771 amended (3)) ==")
+	var player := _player()
+	if player == null or World.economy == null:
+		_check(false, "(a player and the economy)")
+		return
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.towns.lift_threat(STORE)
+	DayNight.set_hour(19.0)
+	World.towns.note_rescue(STORE, "rs-gunn", "Gunn", "guard")
+	World.production.set_away("rs-gunn", false)
+	_sync()
+	var gunn := _body("rs-gunn")
+	if gunn == null:
+		_check(false, "(Gunn the guard)")
+		return
+	var post_cell: Vector2i = _main._nearest_free(gunn.tile + Vector2i(8, 0))
+	var post_rect := Rect2i(post_cell - Vector2i.ONE, Vector2i(3, 3))
+	_main.watch_posts[STORE] = [{"id": "rs-post-w", "rect": post_rect, "name": "the wave post"}]
+	var sent: Array[Dictionary] = []
+	_main.watch_wave = func(town: String, post: Rect2i, kind: String, size: int) -> String:
+		sent.append({"town": town, "post": post, "kind": kind, "size": size})
+		return "wave:test:%d" % sent.size()
+	var told: Array[Dictionary] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind in ["party", "speech"]:
+			told.append({"kind": kind, "data": data})
+	Net.message_received.connect(heard)
+	_put(player, _main._nearest_free(gunn.tile + Vector2i(1, 0)))
+	_main._watch_sign_on(player, gunn, "rs-post-w")
+	var rule: Dictionary = Townsfolk.days().get("watch", {}).get("waves", {})
+	var entry: Dictionary = _main._watch.get(STORE, {}).get("rs-post-w", {})
+	var times: Array = entry.get("times", [])
+	var span := fposmod(float(rule.get("to", 4)) - float(rule.get("from", 22)), 24.0)
+	var gap := float(rule.get("gap_hours", 1.5))
+	var spaced := times.size() == int(rule.get("per_night", 2))
+	for i in times.size():
+		spaced = spaced and float(times[i]) >= 0.0 and float(times[i]) <= span and (i == 0 or float(times[i]) - float(times[i - 1]) >= gap - 0.001)
+	_check(spaced, "signed on: the post's wave times tonight, in the window and spaced (%s)" % [times])
+	if times.is_empty():
+		Net.message_received.disconnect(heard)
+		return
+	# Before the window at the post, then its time with the watcher away: nothing sent.
+	_put(player, _main._nearest_free(post_rect.get_center()))
+	DayNight.set_hour(21.5)
+	_main._watch_tick(Main.WATCH_TICKS)
+	var first := fposmod(float(rule.get("from", 22)) + float(times[0]) + 0.05, 24.0)
+	_put(player, _main._nearest_free(gunn.tile + Vector2i(1, 0)))
+	DayNight.set_hour(first)
+	_main._watch_tick(Main.WATCH_TICKS)
+	_check(sent.is_empty(), "before the window, or its watcher away from the post: no wave (%s)" % [sent])
+	_put(player, _main._nearest_free(post_rect.get_center()))
+	_main._watch_tick(Main.WATCH_TICKS)
+	var kinds: Dictionary = rule.get("kinds", {})
+	_check(sent.size() == 1 and str(sent[0]["kind"]) in kinds and int(sent[0]["size"]) == 2 and sent[0]["post"] == post_rect and str(entry.get("wave", "")) == "wave:test:1",
+		"its time, its watcher at it: a wave of the default kinds, 1 + the watcher, on the post (%s)" % [sent])
+	_main._watch_tick(Main.WATCH_TICKS)
+	_check(sent.size() == 1, "one wave out on a post at a time")
+	var id := "wave:test:1"
+	var kind := str(sent[0]["kind"]) if not sent.is_empty() else "wolves"
+	told.clear()
+	World.raids.wave_coming.emit(id, gunn.zone, kind, post_cell + Vector2i(40, 0), post_cell)
+	World.raids.wave_coming.emit(id, gunn.zone, kind, post_cell + Vector2i(20, 0), post_cell)
+	var coming: Array = rule.get("coming", {}).get(kind, [])
+	var cues := 0
+	for each: Dictionary in told:
+		if each["kind"] == "party" and str(each["data"].get("text", "")) in coming:
+			cues += 1
+	_check(cues == 1 and bool(gunn.visit.get("post", false)) and gunn.visit.get("rect") == post_rect,
+		"the first cue told once by kind, and the captain comes to the post (%s; %s)" % [told, gunn.visit])
+	told.clear()
+	World.raids.wave_broke.emit(id, STORE)
+	var threat: Dictionary = World.towns.threat_of_town(STORE)
+	_check(World.towns.threatened(STORE) == str(Main.WAVE_THREAT[kind]) and ("watch:" + id) in threat.get("held", [])
+			and _told_any(told, "party", rule.get("broke", [])) and gunn.visit.is_empty(),
+		"broken through: the town's threat held by the wave, the watcher told, the captain off the post (%s; %s)" % [threat, told])
+	World.economy.stockpile.deposit(STORE, "gold", 100, "test")
+	var gold_before := World.gold_of(player.player_id)
+	var owed := int(Production.read_rules().get("commissions", {}).get("watch_wave", 5))
+	var score_before := Standing.score(Townsfolk.card_of(World.production, "rs-gunn"), player.player_id)
+	told.clear()
+	World.raids.wave_beaten.emit(id, STORE)
+	var beaten: Array = []
+	for line: Variant in rule.get("beaten", []):
+		beaten.append(str(line) % owed)
+	threat = World.towns.threat_of_town(STORE)
+	_check(World.gold_of(player.player_id) - gold_before == owed and _told_any(told, "party", beaten)
+			and not ("watch:" + id) in threat.get("held", []) and str(entry.get("wave", "x")).is_empty(),
+		"beaten: paid %d from the treasury, told, the threat let go, the post free for its next (%s)" % [owed, told])
+	_check(Standing.score(Townsfolk.card_of(World.production, "rs-gunn"), player.player_id) - score_before == Standing.setting("watch_wave"),
+		"and the captain thinks the better of them")
+	# The second wave: of the post's own kinds; beaten with the treasury at its floor, unpaid.
+	entry["kinds"] = {"dead": 1}
+	if times.size() > 1:
+		DayNight.set_hour(fposmod(float(rule.get("from", 22)) + float(times[1]) + 0.05, 24.0))
+		_main._watch_tick(Main.WATCH_TICKS)
+	_check(sent.size() == 2 and str(sent[1]["kind"]) == "dead", "its next time: a wave of the post's own kinds (%s)" % [sent])
+	var all_gold := World.economy.stockpile.count(STORE, "gold")
+	World.economy.stockpile.take(STORE, "gold", all_gold, "test")
+	gold_before = World.gold_of(player.player_id)
+	told.clear()
+	World.raids.wave_beaten.emit("wave:test:2", STORE)
+	_check(World.gold_of(player.player_id) == gold_before and _told_any(told, "party", rule.get("beaten_unpaid", [])),
+		"beaten with an empty treasury: nothing paid, and they are told (%s)" % [told])
+	_main._watch_tick(Main.WATCH_TICKS)
+	_check(sent.size() == 2, "a post's waves done for the night: no third")
+	Net.message_received.disconnect(heard)
+	_main.watch_wave = Callable()
+	_main.watch_posts.erase(STORE)
+	_main._watch.clear()
+	_main._waves.clear()
+	World.towns.lift_threat(STORE)
+	World.production.set_away("rs-gunn", true)
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(12.0)
 
 ## Whether [param told] holds a [param kind] message whose text is one of [param texts].
 func _told_any(told: Array[Dictionary], kind: String, texts: Array) -> bool:

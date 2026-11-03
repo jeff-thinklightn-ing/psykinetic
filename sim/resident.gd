@@ -92,6 +92,7 @@ var escort_of := ""
 var ailing := ""
 var escort_name := ""
 ## The medicine man's visit (decision 501): {"rect": the sick one's home, "who": their id, "until": World.steps}; {} for none.
+## The guard captain's walk to a post a wave is coming at (771 amended (3)): {"rect": the post, "name", "post": true, "until"}.
 var visit: Dictionary = {}
 ## Companions' Heel (decision 485), loaded by path so this script stands
 ## with or without it: without, the lost one waits where they are.
@@ -935,7 +936,9 @@ func facts_now() -> Array[String]:
 			out.append("%s saw to you today, and you expect to be on your feet tomorrow." % sick.get("cured_by", "Someone"))
 		else:
 			out.append("Nobody has seen to you yet. You would be glad of the medicine man, or of being walked to the healer's hut, or of a remedy.")
-	if not visit.is_empty():
+	if bool(visit.get("post", false)):
+		out.append("Something is coming at %s in the dark, and you are going there to stand with the watch." % visit.get("name", "a post"))  # 771 amended (3).
+	elif not visit.is_empty():
 		out.append("You are on your way to %s's bedside, to see to %s." % [visit.get("name", "a neighbour"), visit.get("name", "them")])
 	if not sought.is_empty():
 		# The sought (decision 613, npc's side): who sent for it, where it is and why it follows, or will not yet.
