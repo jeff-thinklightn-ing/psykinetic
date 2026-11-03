@@ -1970,8 +1970,13 @@ var _door_hinges: Dictionary[Vector3i, Array] = {}
 var _door_states: Dictionary[Vector3i, Array] = {}
 ## Entity instance id -> its puppet.
 var _puppets: Dictionary[int, Node3D] = {}
-## A spent seam's height, of its whole (_sync_seam).
+## A spent seam's height, of its whole (_sync_seam), while the kit has no
+## rubble of its own.
 const SEAM_RUBBLE_HEIGHT := 0.35
+## A worked-out seam's rubble (art-kit's, 769).
+const SEAM_SPENT_ART := "rock.seam_spent"
+## How far inside a wall a span's posts stand (769, the beam's), metres.
+const DECOR_POST_INSET := 0.15
 ## The draugr's remains while he is gone at rest (573 amended (4)): his
 ## entity id -> art-kit's REMAINS_PROP at his pile_at (_sync_remains).
 var _remains: Dictionary[int, Node3D] = {}
@@ -11896,6 +11901,7 @@ func _add_decor() -> void:
 		# A variant art-kit has not made yet is its first (variant_count);
 		# one named by its variant (the mine's track, 769) is its own piece.
 		var variant := 1 if Level.DECOR_KINDS.get(kind, {}).has("slots") else int(entry.get("variant", 1))
+		var row: Dictionary = Level.DECOR_KINDS.get(kind, {})
 		var piece := ArtKit.instance(slot, clampi(variant, 1, maxi(1, ArtKit.variant_count(slot))))
 		piece.name = "Decor_%d_%d_%s_%d_%d" % [cell.x, cell.y, kind, out.x, out.y]
 		var at := Vector2(cell)
@@ -11913,11 +11919,24 @@ func _add_decor() -> void:
 				piece.rotation.y = _yaw_of(Vector2(out))
 			_:
 				# On its edge (a wall's foot, a niche's mouth, or any edge out
-				# of doors, 658), the cell on +x: +x along -out, z along the edge.
-				at += Vector2(out) * 0.5
-				piece.rotation.y = _yaw_of(-Vector2(out))
-		piece.position = Vector3(at.x, _height_in(cell, at), at.y)
+				# of doors, 658), the cell on +x: +x along -out, z along the edge;
+				# a "front": "z" piece (the mine's lamp, 769) its +z along -out.
+				at += Vector2(out) * (0.5 - float(row.get("inset", 0.0)))
+				piece.rotation.y = atan2(-float(out.x), -float(out.y)) if row.get("front") == "z" else _yaw_of(-Vector2(out))
+		var base := _height_in(cell, at)
+		piece.position = Vector3(at.x, base + float(row.get("lift", 0.0)), at.y)
 		_room.add_child(piece)
+		# A span's posts (769: the beam's), stood just inside each wall.
+		var posts := str(row.get("posts", ""))
+		if row.get("sits") == "span" and posts != "" and ArtKit.has(posts):
+			var half := int(entry.get("width", 1)) * 0.5 - DECOR_POST_INSET
+			for side: int in [-1, 1]:
+				var post := ArtKit.instance(posts)
+				post.name = "%s_post%d" % [piece.name, side]
+				var spot := at + Vector2(out) * half * side
+				post.position = Vector3(spot.x, base, spot.y)
+				post.rotation.y = piece.rotation.y
+				_room.add_child(post)
 
 
 ## The art-kit slot a decor entry is drawn as: its kind's "slots" by its
@@ -14607,12 +14626,22 @@ func _sync_puppets() -> void:
 			_entity_went(id)
 
 
-## A seam worked out (decision 769) is drawn as its rubble: low
-## and dark, till it fills again.
+## A seam worked out (decision 769) is drawn as its rubble
+## (SEAM_SPENT_ART in place of its face) till it fills again; squat, while
+## the kit has no rubble.
 func _sync_seam(puppet: Node3D, seam: Seam) -> void:
-	var want := Vector3(1.0, SEAM_RUBBLE_HEIGHT, 1.0) if seam.spent else Vector3.ONE
-	if puppet.scale != want:
-		puppet.scale = want
+	if bool(puppet.get_meta("spent", false)) == seam.spent:
+		return
+	puppet.set_meta("spent", seam.spent)
+	var body := puppet.get_node_or_null("Body")
+	var face := art_slot_for(seam)
+	if body != null and face != "" and ArtKit.has(SEAM_SPENT_ART):
+		for child in body.get_children():
+			body.remove_child(child)
+			child.queue_free()
+		body.add_child(ArtKit.instance(SEAM_SPENT_ART if seam.spent else face))
+		return
+	puppet.scale = Vector3(1.0, SEAM_RUBBLE_HEIGHT, 1.0) if seam.spent else Vector3.ONE
 
 
 ## Gone at rest (573 amended (4)): the draugr's remains (art-kit's one-cell
@@ -18282,6 +18311,11 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		var drawn := Node3D.new()
 		drawn.name = "Body"
 		drawn.add_child(ArtKit.instance(art))
+		# Its front (+z) turned the way level.json says (769: the mine's cart
+		# along its track), as the buildings turn theirs.
+		var art_facing: Variant = entity.spawn_spec.get("art_facing")
+		if art_facing is Vector2i:
+			drawn.rotation.y = atan2(float(art_facing.x), float(art_facing.y))
 		puppet.add_child(drawn)
 		var box := BoxShape3D.new()
 		box.size = ArtKit.size(art)

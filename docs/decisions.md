@@ -39665,3 +39665,14 @@ _test_mind_log_no_names: a recorded entry with her player's name and another pla
 prompt, note, words and a nested list keeps neither, has "her player" and "a player" in their
 places, leaves a longer word that starts with a name ("Brannocsson") as it was, and keeps her own
 name. No CHANGELOG bullet (logging only). Server only, protocol unchanged, no new class_name.
+
+769 amended: art-kit's mine pieces (68ba9d44) hung as its notes say (2026-11-03).
+A decor kind may also say how it hangs (Level.DECOR_KINDS): "lift" metres up, "inset" metres back
+from its edge, "front": "z" (a wall piece whose +z faces out of the wall: the lamp, its bracket
+plate behind it, 0.185 inset, 1.6 up), "posts" (a span's slot stood just inside each wall: the
+beam, 2.7 up on mine.post). A spent seam is drawn as rock.seam_spent in place of its face
+(Client3D.SEAM_SPENT_ART; squat as before while the kit lacks it). A level.json entity that is no
+monster may name its "art" and its "facing" (the spawn spec's "art_facing", the view's alone: its
+art's +z turned that way, as buildings are): mine_look's cart is prop.mine_cart along its track.
+make_mine_look.py keeps trace_ledges' ledges when it writes the level again. mine_test checks
+each. Client and level data only; "art_facing" an ignorable spawn key (absent, today's drawing).

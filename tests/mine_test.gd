@@ -148,6 +148,14 @@ func _test_mine_look() -> void:
 	_check(Client3D.decor_slot({"kind": "mine_track", "variant": 3}) == "mine.track_end" and Client3D.decor_slot({"kind": "mine_beam", "width": 8}) == "mine.beam_8"
 			and Client3D.decor_slot({"kind": "moss_strip", "variant": 2}) == "prop.moss_strip", "the slot table: track end, beam, and prop.<kind> as before")
 	_check(Level.template_config("mine_look").get("mass") == "rock", "\"mass\": \"rock\" (terrain's rock mass)")
+	var carts: Array = level["entities"].filter(func(spec: Dictionary) -> bool: return spec.get("art") == "prop.mine_cart")
+	_check(carts.size() == 1 and carts[0].get("art_facing") == Vector2i(1, 0) and not carts[0].has("facing"),
+			"the cart is drawn as prop.mine_cart, its front east along the track, the cart itself unturned (%s)" % [carts])
+	var lamp: Dictionary = Level.DECOR_KINDS["mine_lamp"]
+	var beam: Dictionary = Level.DECOR_KINDS["mine_beam"]
+	_check(lamp.get("front") == "z" and is_equal_approx(float(lamp.get("lift")), 1.6) and is_equal_approx(float(beam.get("lift")), 2.7)
+			and beam.get("posts") == "mine.post", "the lamp hung 1.6 up, its +z out of the wall; the beam 2.7 up on mine.post (art-kit's notes)")
+	_check(Client3D.SEAM_SPENT_ART == "rock.seam_spent", "a spent seam is drawn as rock.seam_spent")
 
 
 ## A room of [param rows]: "#" wall, "." floor, "P" a player, "s" a seam.

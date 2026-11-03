@@ -1004,6 +1004,14 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 					spec["idle"] = idle
 			if entry.get("named") is String and not str(entry["named"]).is_empty():
 				spec["named"] = str(entry["named"])  # Decision 716: this spawn is that named one.
+		else:
+			# A thing's own art (769: the mine's cart, prop.mine_cart) and the
+			# way its front (+z) faces, for the view alone.
+			if entry.get("art") is String and not str(entry["art"]).is_empty():
+				spec["art"] = str(entry["art"])
+			var art_facing: Variant = facing_from(entry.get("facing"))
+			if art_facing != null:
+				spec["art_facing"] = art_facing
 		entities.append(spec)
 	# Starts: level.json's order, then any other start marker by scan.
 	var starts: Array[Vector2i] = []
@@ -1765,7 +1773,11 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 ## "corner" in a cell's corner where two walls meet (a web_corner);
 ## "niche" across an open burial niche's mouth (a web_niche). Decor is
 ## drawn, never solid, never on the wire's meaning: a client without the
-## slot skips the piece.
+## slot skips the piece. The mine's (769) may also say how it is hung:
+## "lift" (metres up), "inset" (metres back from its edge into the cell),
+## "front": "z" (a wall piece whose +z faces out of the wall, the lamp's
+## bracket behind it, not +x), "posts" (a span's slot stood at each end,
+## the beam's).
 const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"moss_patch": {"sits": "flat", "variants": 3, "faced": false},
 	"moss_strip": {"sits": "wall", "variants": 2},
@@ -1778,9 +1790,9 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# wall ("span"), art-kit's piece by the width it spans; track a cell a
 	# piece, faced the way it runs; a lamp hung on a wall.
 	"mine_arch": {"sits": "span", "variants": 1, "slot": "mine.arch_%d", "widths": [3, 5]},
-	"mine_beam": {"sits": "span", "variants": 1, "slot": "mine.beam_8", "widths": [3, 10]},
+	"mine_beam": {"sits": "span", "variants": 1, "slot": "mine.beam_8", "widths": [3, 10], "lift": 2.7, "posts": "mine.post"},
 	"mine_track": {"sits": "flat", "variants": 3, "faced": true, "slots": ["mine.track", "mine.track_bend", "mine.track_end"]},
-	"mine_lamp": {"sits": "wall", "variants": 1}}
+	"mine_lamp": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.185, "lift": 1.6}}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],

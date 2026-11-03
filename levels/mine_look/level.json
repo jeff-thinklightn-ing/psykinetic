@@ -12,6 +12,19 @@
 			18
 		]
 	],
+	"entities": [
+		{
+			"at": [
+				23,
+				28
+			],
+			"art": "prop.mine_cart",
+			"facing": [
+				1,
+				0
+			]
+		}
+	],
 	"decor": [
 		[
 			15,

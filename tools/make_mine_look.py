@@ -233,8 +233,19 @@ def main():
         "mass": "rock",
         "music": "music.barrow",
         "starts": [list(start)],
+        # The cart drawn as the mine's (art-kit's prop.mine_cart), along the
+        # track: its front (+z) east.
+        "entities": [{"at": list(cart), "art": "prop.mine_cart", "facing": [1, 0]}],
         "decor": decor,
     }
+    # The ledges trace_ledges wrote (the shaft's rim) kept: run it again
+    # after a change to the shaft.
+    old_path = os.path.join(OUT, "level.json")
+    if os.path.exists(old_path):
+        with open(old_path, encoding="utf-8") as f:
+            ledges = json.load(f).get("ledges")
+        if ledges:
+            config["ledges"] = ledges
     with open(os.path.join(OUT, "level.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(config, f, indent="\t")
         f.write("\n")
