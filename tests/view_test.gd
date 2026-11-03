@@ -114,6 +114,7 @@ func _ready() -> void:
 		_test_cold_lamp()
 		await _test_wall_runs()
 		_test_cave_walls()
+		_test_mass()
 		_test_scatter()
 		_test_buildings()
 		_test_roofs()
@@ -1753,6 +1754,110 @@ func _test_wall_runs() -> void:
 	_check(faded != null and faded.albedo_color.a < 1.0 and faded.next_pass != null, "a near run is see-through, its depth drawn first")
 	_rig._set_near(run, false)
 	_check((body.material_override as BaseMaterial3D).albedo_color.a == 1.0, "and solid again after")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The rock mass (769, terrain's side): a small indoor level with "mass":
+## "rock", a tunnel bending into a chamber: rock over every void cell and
+## MASS_APRON past the map, none over the open, its edge under the cave
+## walls' ridge, darker away from the open but never black; without the
+## key, or outdoors, none.
+func _test_mass() -> void:
+	print("\n== the rock mass: rock past the walls, lit near, dark far, never black, no edge ==")
+	var map := LevelMap.new(Vector2i(20, 14))
+	var open: Dictionary[Vector2i, bool] = {}
+	for x in range(2, 14):
+		for y in range(5, 8):
+			open[Vector2i(x, y)] = true
+	for x in range(11, 17):
+		for y in range(2, 11):
+			open[Vector2i(x, y)] = true
+	for cell: Vector2i in open:
+		map.set_cell(cell, "stone")
+	var config := {"outdoor": false, "walls": "cave", "floors": "cave", "mass": "rock"}
+	var terrain: Dictionary = Level.parse(map.to_image(), null, config)["terrain"]
+	_check(str(terrain.get("mass", "")) == "rock", "level.json's \"mass\" read into the terrain")
+	_rig.rebuild(terrain, Vector2i(12, 6))
+	var chunks: Array[MeshInstance3D] = []
+	for child in _rig._room.get_children():
+		if str(child.name).begins_with("Mass_"):
+			chunks.append(child as MeshInstance3D)
+	var box: Rect2i = _rig._mass_box
+	_check(not chunks.is_empty() and box.position.x <= -Client3D.MASS_APRON and box.end.x >= 20 + Client3D.MASS_APRON
+			and box.end.y >= 14 + Client3D.MASS_APRON, "drawn in chunks over the map and MASS_APRON past it (%d chunks, %s)" % [chunks.size(), box])
+	var over_open := 0
+	var edge_high := -INF
+	var inside_low := INF
+	var darkest := INF
+	var lightest := 0.0
+	var facets := 0
+	for chunk in chunks:
+		var arrays := (chunk.mesh as ArrayMesh).surface_get_arrays(0)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		for i in range(0, points.size(), 3):
+			facets += 1
+			var middle := (points[i] + points[i + 1] + points[i + 2]) / 3.0
+			if open.has(Vector2i(roundi(middle.x), roundi(middle.z))):
+				over_open += 1
+			darkest = minf(darkest, colours[i].get_luminance())
+			lightest = maxf(lightest, colours[i].get_luminance())
+			for k in 3:
+				var p := points[i + k]
+				# On a wall line: on the edge of an open cell's square.
+				var on_edge := false
+				for dx in [-0.5, 0.5]:
+					for dz in [-0.5, 0.5]:
+						on_edge = on_edge or open.has(Vector2i(roundi(p.x + dx * 0.98), roundi(p.z + dz * 0.98)))
+				if on_edge:
+					edge_high = maxf(edge_high, p.y)
+				elif p.x > 0.0 and p.z > 0.0 and p.x < 19.0 and p.z < 13.0:
+					inside_low = minf(inside_low, p.y)
+	_check(facets > 0 and over_open == 0, "none over the open cells (%d facets, %d over)" % [facets, over_open])
+	_check(edge_high <= Client3D.MASS_EDGE + 0.001 and edge_high < Client3D.CAVE_TOP_LOW,
+			"at the walls under the cave ridge, so the wall is the lip (%.2f m, ridge from %.2f)" % [edge_high, Client3D.CAVE_TOP_LOW])
+	_check(inside_low > Client3D.MASS_EDGE - Client3D.MASS_LUMP.w - 0.01, "a mass, not a floor: no trench behind a wall, no hollow (lowest %.2f m)" % inside_low)
+	_check(darkest > 0.02 and lightest > darkest * 3.0, "darker away from the open, never black (%.3f to %.3f)" % [darkest, lightest])
+	# The walls' lines wander into the rock, never into the walkable: no
+	# point of a wall further into an open cell than CAVE_REACH, some
+	# further into the rock than it.
+	var into_open := 0.0
+	var into_rock := 0.0
+	for child in _rig._room.get_children():
+		if not str(child.name).begins_with("Wall_"):
+			continue
+		var holder := child as Node3D
+		var body := holder.get_node("Body") as MeshInstance3D
+		var points: PackedVector3Array = (body.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		for p in points:
+			var q := holder.transform * p
+			var cell := Vector2i(roundi(q.x), roundi(q.z))
+			var inside := open.has(cell)
+			# How far the point is from the nearest square of the other kind.
+			var nearest := INF
+			for dx in range(-2, 3):
+				for dz in range(-2, 3):
+					var other := cell + Vector2i(dx, dz)
+					if open.has(other) == inside:
+						continue
+					var gap := Vector2(maxf(absf(q.x - other.x) - 0.5, 0.0), maxf(absf(q.z - other.y) - 0.5, 0.0))
+					nearest = minf(nearest, gap.length())
+			if nearest == INF:
+				continue
+			if inside:
+				into_open = maxf(into_open, nearest)
+			else:
+				into_rock = maxf(into_rock, nearest)
+	_check(into_open <= Client3D.CAVE_REACH + 0.001 and into_rock > Client3D.CAVE_REACH + 0.1,
+			"the walls wander into the rock, never the walkable (%.2f m into the open, %.2f into the rock)" % [into_open, into_rock])
+	terrain["mass"] = ""
+	_rig.rebuild(terrain, Vector2i(12, 6))
+	var none := _rig._room.get_children().filter(func(n: Node) -> bool: return str(n.name).begins_with("Mass_")).is_empty()
+	terrain["mass"] = "rock"
+	terrain["outdoor"] = true
+	_rig.rebuild(terrain, Vector2i(12, 6))
+	var none_out := _rig._room.get_children().filter(func(n: Node) -> bool: return str(n.name).begins_with("Mass_")).is_empty()
+	_check(none and none_out, "none without the key, none outdoors")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

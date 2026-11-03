@@ -5794,7 +5794,7 @@ func _descendants(node: Node) -> Array[Node]:
 ## _build_room, a frame apart by _build_room_over_frames.
 func _room_phases() -> Array[Callable]:
 	return [_phase_sets, _phase_land, _phase_reach, _phase_edges, _phase_ground, _build_water, _add_cliffs, _phase_lights,
-		_add_walls, _add_decor, _phase_stands, _phase_forest, _phase_forest_edge, _phase_forest_band, _phase_grown, _phase_border, _phase_glimpses,
+		_add_walls, _add_decor, _phase_stands, _phase_forest, _phase_forest_edge, _phase_forest_band, _phase_grown, _phase_border, _phase_mass, _phase_glimpses,
 		_add_buildings, _phase_roofs, _phase_doors]
 
 
@@ -6052,6 +6052,243 @@ func _phase_border() -> void:
 	_border.name = "Border"
 	_room.add_child(_border)
 	_border.build(_wooded, _edge_elevations(), 1.0, _forest_floor_colour(), FOREST_FLOOR_DEPTH, true, PineStands.drawn())
+
+
+## The rock mass (769, terrain's side): an indoor level whose level.json
+## says "mass": "rock" has rock drawn over every void cell, and past its
+## edge for MASS_APRON cells, instead of the black: a rough faceted top
+## about as high as the cave walls' ridge, lowest at the walls (their ridge
+## is the lip), darker away from the open cells, never black, sinking a
+## little past the map. Chunks of MASS_CHUNK cells, one mesh each.
+const MASS_APRON := 12
+const MASS_CHUNK := 16
+## Its top over the wall's base: at a wall, and fully in (MASS_RISE cells).
+const MASS_EDGE := 2.3
+const MASS_TOP := 3.2
+const MASS_RISE := 3.0
+## Lumps: wide (rising only, so no trench behind a wall) and narrow, their
+## sizes and heights; quiet at a wall.
+const MASS_LUMP := Vector4(1.7, 1.1, 0.6, 0.25)
+## Its shade (a share of the rock's colour): MASS_NEAR at a wall, so its tops
+## never outshine the lit floor and the walls' faces, falling to MASS_DARK
+## MASS_DARK_CELLS from the open.
+const MASS_NEAR := 0.42
+const MASS_DARK := 0.12
+const MASS_DARK_CELLS := 3.5
+## With the mass, a cave wall's line wanders up to MASS_WANDER into the rock
+## (never toward the open, so the walkable half-metre stays), back to its
+## line at a run's ends, where the runs and posts meet.
+const MASS_WANDER := 0.35
+## Past the map, it sinks this much a cell.
+const MASS_SINK := 0.2
+## The mass's lattice: MASS_STEP metres a point.
+const MASS_STEP := 0.5
+## What the mass was drawn over: its box of cells and each cell's distance
+## from the open (cells; 0 open), for tests.
+var _mass_box := Rect2i()
+var _mass_distance := PackedFloat32Array()
+
+
+func _phase_mass() -> void:
+	_mass_box = Rect2i()
+	_mass_distance = PackedFloat32Array()
+	if _outdoor or str(_terrain.get("mass", "")) != "rock" or _land.is_empty():
+		return
+	var low := Vector2i(1 << 30, 1 << 30)
+	var high := -low
+	for cell: Vector2i in _land:
+		low = Vector2i(mini(low.x, cell.x), mini(low.y, cell.y))
+		high = Vector2i(maxi(high.x, cell.x), maxi(high.y, cell.y))
+	var size: Vector2i = _terrain.get("relief_size", Vector2i.ZERO)
+	if size.x > 0 and size.y > 0:
+		low = Vector2i(mini(low.x, 0), mini(low.y, 0))
+		high = Vector2i(maxi(high.x, size.x - 1), maxi(high.y, size.y - 1))
+	var map := Rect2i(low, high - low + Vector2i.ONE)
+	var box := map.grow(MASS_APRON)
+	_mass_box = box
+	var count := box.size.x * box.size.y
+	# Each cell's distance from the open (a chamfer pass each way) and the
+	# ground of the open cell nearest it (its wall's base).
+	var far := PackedFloat32Array()
+	far.resize(count)
+	var base := PackedFloat32Array()
+	base.resize(count)
+	for y in box.size.y:
+		for x in box.size.x:
+			var cell := box.position + Vector2i(x, y)
+			var i := y * box.size.x + x
+			far[i] = 0.0 if _land.has(cell) else INF
+			base[i] = _elevation(cell) if _land.has(cell) else 0.0
+	var steps := [[Vector2i(-1, 0), 1.0], [Vector2i(0, -1), 1.0], [Vector2i(-1, -1), 1.414], [Vector2i(1, -1), 1.414]]
+	for sweep in 2:
+		var sign := 1 if sweep == 0 else -1
+		for yy in box.size.y:
+			var y := yy if sign == 1 else box.size.y - 1 - yy
+			for xx in box.size.x:
+				var x := xx if sign == 1 else box.size.x - 1 - xx
+				var i := y * box.size.x + x
+				for step: Array in steps:
+					var at: Vector2i = Vector2i(x, y) + Vector2i(step[0]) * sign
+					if at.x < 0 or at.y < 0 or at.x >= box.size.x or at.y >= box.size.y:
+						continue
+					var j := at.y * box.size.x + at.x
+					if far[j] + float(step[1]) < far[i]:
+						far[i] = far[j] + float(step[1])
+						base[i] = base[j]
+	_mass_distance = far
+	# The lattice's heights and darkness, shared by every facet on a point.
+	var per := roundi(1.0 / MASS_STEP)
+	var row := box.size.x * per + 1
+	var rows := box.size.y * per + 1
+	var heights := PackedFloat32Array()
+	heights.resize(row * rows)
+	var shades := PackedFloat32Array()
+	shades.resize(row * rows)
+	var corner := Vector2(box.position) - Vector2(0.5, 0.5)
+	var wide := _mass_rolls(box, MASS_LUMP.x, 61)
+	var narrow := _mass_rolls(box, MASS_LUMP.z, 62)
+	for py in rows:
+		for px in row:
+			var point := corner + Vector2(px, py) * MASS_STEP
+			# The cells whose squares hold the point (one, two or four).
+			var d := INF
+			var ground := 0.0
+			var held := 0
+			for cy in range(ceili(point.y + 0.5) - 1, floori(point.y + 0.5) + 1):
+				for cx in range(ceili(point.x + 0.5) - 1, floori(point.x + 0.5) + 1):
+					var lx := cx - box.position.x
+					var ly := cy - box.position.y
+					if lx < 0 or ly < 0 or lx >= box.size.x or ly >= box.size.y:
+						continue
+					var i := ly * box.size.x + lx
+					d = minf(d, far[i])
+					ground += base[i]
+					held += 1
+			ground = ground / maxi(held, 1)
+			d = 0.0 if d == INF else d
+			var out := 0.0
+			if not map.has_point(Vector2i(roundi(point.x), roundi(point.y))):
+				out = maxf(maxf(map.position.x - 0.5 - point.x, point.x - (map.end.x - 0.5)), maxf(map.position.y - 0.5 - point.y, point.y - (map.end.y - 0.5)))
+			var quiet := smoothstep(0.0, 1.0, d)
+			var h := ground + lerpf(MASS_EDGE, MASS_TOP, smoothstep(0.0, MASS_RISE, d)) \
+					+ _mass_noise(wide, point) * MASS_LUMP.y * quiet \
+					+ (_mass_noise(narrow, point) - 0.5) * 2.0 * MASS_LUMP.w * quiet \
+					- out * MASS_SINK
+			heights[py * row + px] = h
+			shades[py * row + px] = lerpf(MASS_NEAR, MASS_DARK, smoothstep(0.0, MASS_DARK_CELLS, d))
+	# The facets: two triangles a lattice square, over void cells only, a
+	# chunk a mesh, its arrays sized once (perf: 35k facets on mine_look).
+	# Each facet faces up, the cliffs' rock in its own shade (one roll a
+	# square: the split and both shades) times its points' darkness.
+	var rock := swatch(CLIFF_ROCK.x, CLIFF_ROCK.y)
+	var across := ceili(float(box.size.x) / MASS_CHUNK)
+	var down := ceili(float(box.size.y) / MASS_CHUNK)
+	for chunk_y in down:
+		for chunk_x in across:
+			var cells: Array[Vector2i] = []
+			for y in range(chunk_y * MASS_CHUNK, mini((chunk_y + 1) * MASS_CHUNK, box.size.y)):
+				for x in range(chunk_x * MASS_CHUNK, mini((chunk_x + 1) * MASS_CHUNK, box.size.x)):
+					if not _land.has(box.position + Vector2i(x, y)):
+						cells.append(Vector2i(x, y))
+			if cells.is_empty():
+				continue
+			var vertices := PackedVector3Array()
+			vertices.resize(cells.size() * per * per * 6)
+			var normals := PackedVector3Array()
+			normals.resize(vertices.size())
+			var colours := PackedColorArray()
+			colours.resize(vertices.size())
+			var k := 0
+			for cell in cells:
+				for sy in per:
+					for sx in per:
+						var px := cell.x * per + sx
+						var py := cell.y * per + sy
+						var i00 := py * row + px
+						var i10 := i00 + 1
+						var i11 := i00 + row + 1
+						var i01 := i00 + row
+						var flat := corner + Vector2(px, py) * MASS_STEP
+						var a := Vector3(flat.x, heights[i00], flat.y)
+						var b := Vector3(flat.x + MASS_STEP, heights[i10], flat.y)
+						var c := Vector3(flat.x + MASS_STEP, heights[i11], flat.y + MASS_STEP)
+						var d := Vector3(flat.x, heights[i01], flat.y + MASS_STEP)
+						var shade := (shades[i00] + shades[i10] + shades[i11] + shades[i01]) * 0.25
+						var r := _roll(Vector2i(px, py), 63)
+						for t in 2:
+							# Split a-c (abc, acd) or b-d (abd, bcd).
+							var p0 := a
+							var p1 := b
+							var p2 := c
+							if r < 0.5:
+								if t == 1:
+									p1 = c
+									p2 = d
+							else:
+								p2 = d
+								if t == 1:
+									p0 = b
+									p1 = c
+							var normal := (p1 - p0).cross(p2 - p0)
+							if normal.y < 0.0:
+								normal = -normal
+								var swap := p1
+								p1 = p2
+								p2 = swap
+							normal = normal.normalized()
+							var own := lerpf(0.8, 1.15, fposmod(r * (17.0 if t == 0 else 131.0), 1.0))
+							var colour := Color(rock * (own * shade), 1.0)
+							vertices[k] = p0
+							vertices[k + 1] = p1
+							vertices[k + 2] = p2
+							normals[k] = normal
+							normals[k + 1] = normal
+							normals[k + 2] = normal
+							colours[k] = colour
+							colours[k + 1] = colour
+							colours[k + 2] = colour
+							k += 3
+			var arrays := []
+			arrays.resize(Mesh.ARRAY_MAX)
+			arrays[Mesh.ARRAY_VERTEX] = vertices
+			arrays[Mesh.ARRAY_NORMAL] = normals
+			arrays[Mesh.ARRAY_COLOR] = colours
+			var array_mesh := ArrayMesh.new()
+			array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			var drawn := MeshInstance3D.new()
+			drawn.name = "Mass_%d_%d" % [chunk_x, chunk_y]
+			drawn.mesh = array_mesh
+			drawn.material_override = _rock_material()
+			# A cap over the void: it never shadows the floor the lamps light.
+			drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			_room.add_child(drawn)
+
+
+## The rolls _mass_noise reads for points over [param box] (cells), its
+## features [param scale] metres apart: [first corner, width, rolls, scale].
+static func _mass_rolls(box: Rect2i, scale: float, salt: int) -> Array:
+	var low := Vector2i(floori((box.position.x - 1.0) / scale), floori((box.position.y - 1.0) / scale))
+	var high := Vector2i(floori((box.end.x + 1.0) / scale) + 1, floori((box.end.y + 1.0) / scale) + 1)
+	var width := high.x - low.x + 1
+	var rolls := PackedFloat32Array()
+	rolls.resize(width * (high.y - low.y + 1))
+	for y in high.y - low.y + 1:
+		for x in width:
+			rolls[y * width + x] = _roll(low + Vector2i(x, y), salt)
+	return [low, width, rolls, scale]
+
+
+## Smooth noise 0..1 at [param point] from [param grid] (_mass_rolls').
+static func _mass_noise(grid: Array, point: Vector2) -> float:
+	var low: Vector2i = grid[0]
+	var width: int = grid[1]
+	var rolls: PackedFloat32Array = grid[2]
+	var at: Vector2 = point / float(grid[3])
+	var cell := Vector2i(floori(at.x), floori(at.y))
+	var f := at - Vector2(cell)
+	f = f * f * (Vector2(3.0, 3.0) - 2.0 * f)
+	var i := (cell.y - low.y) * width + cell.x - low.x
+	return lerpf(lerpf(rolls[i], rolls[i + 1], f.x), lerpf(rolls[i + width], rolls[i + width + 1], f.x), f.y)
 
 
 func _phase_glimpses() -> void:
@@ -13376,6 +13613,7 @@ func _add_cave_run(run: Array[Vector3i], states: PackedInt32Array) -> void:
 	var wall_set := _wall_set(CAVE_SET)
 	var profile: PackedVector2Array = wall_set["points"]
 	var tall: float = wall_set["top"]
+	var wander := not _outdoor and str(_terrain.get("mass", "")) == "rock"
 	# Each column's top and width, and its points: left side up, the ridge,
 	# right side down.
 	var steps := count * CAVE_ALONG
@@ -13393,6 +13631,14 @@ func _add_cave_run(run: Array[Vector3i], states: PackedInt32Array) -> void:
 				WALL_RUBBLE: top = minf(top, lerpf(WALL_RUBBLE_LOW, WALL_RUBBLE_HIGH, _cave_noise(along, seed, 2)))
 				_: top = minf(top, whole)
 		var thick := lerpf(CAVE_THICK_LOW, CAVE_THICK_HIGH, _cave_noise(along, seed, 1))
+		# With the mass, the line wanders into the rock's side (none where
+		# both or neither side is rock), back on its line at the run's ends.
+		var shift := 0.0
+		if wander:
+			var side_a := _cave_rock_side(run[clampi(floori(z - 0.001), 0, count - 1)])
+			var side_b := _cave_rock_side(run[clampi(floori(z + 0.001), 0, count - 1)])
+			if side_a == side_b:
+				shift = side_a * MASS_WANDER * _cave_noise(along, seed, 3) * smoothstep(0.0, 0.75, minf(z, count - z))
 		var column := PackedVector3Array()
 		for side: float in [-1.0, 1.0]:
 			for r in CAVE_ROWS + 1:
@@ -13404,10 +13650,10 @@ func _add_cave_run(run: Array[Vector3i], states: PackedInt32Array) -> void:
 					var bump := _cave_bump(along, y, side, seed)
 					x += bump.x * minf(1.0, y)
 					y += bump.y if row < CAVE_ROWS else 0.0
-				column.append(Vector3(clampf(x, -CAVE_REACH, CAVE_REACH), y, z))
+				column.append(Vector3(clampf(x, -CAVE_REACH, CAVE_REACH) + shift, y, z))
 			if side < 0.0:
 				var ridge := _cave_bump(along, top, 0.0, seed)
-				column.append(Vector3(clampf(ridge.x, -CAVE_REACH, CAVE_REACH), top + CAVE_RIDGE * (0.5 + ridge.y / CAVE_BUMP * 0.5), z))
+				column.append(Vector3(clampf(ridge.x, -CAVE_REACH, CAVE_REACH) + shift, top + CAVE_RIDGE * (0.5 + ridge.y / CAVE_BUMP * 0.5), z))
 		columns.append(column)
 	var mesh := [PackedVector3Array(), PackedVector3Array(), PackedColorArray()]
 	var points := columns[0].size()
@@ -13446,6 +13692,21 @@ func _add_cave_run(run: Array[Vector3i], states: PackedInt32Array) -> void:
 	_room.add_child(holder)
 	for key in run:
 		_walls[key] = holder
+
+
+## Which side of the cave wall at [param key] is rock (not open land), in its
+## run's frame (+1 its +x side, -1 its -x side), or 0 when both or neither are.
+## An east edge's +x is the cell east of it; a south edge's run is turned a
+## quarter, so its +x is the cell north of it (key's own cell).
+func _cave_rock_side(key: Vector3i) -> float:
+	var cell := Vector2i(key.x, key.y)
+	var plus := cell + Vector2i(1, 0) if key.z == Terrain.EAST else cell
+	var minus := cell if key.z == Terrain.EAST else cell + Vector2i(0, 1)
+	var plus_rock := not _land.has(plus)
+	var minus_rock := not _land.has(minus)
+	if plus_rock == minus_rock:
+		return 0.0
+	return 1.0 if plus_rock else -1.0
 
 
 ## A quad a b c d of rock into [param mesh] ([positions, normals, colours]),

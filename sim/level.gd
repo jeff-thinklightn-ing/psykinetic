@@ -833,6 +833,8 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 			"floors": str(config.get("floors", "castle")),
 			# Outdoors, what lies past the forest: "forest", or "none".
 			"border": str(config.get("border", "forest")),
+			# Indoors, what is drawn over the void: "" (black) or "rock" (769).
+			"mass": str(config.get("mass", "")),
 		},
 		"size": cells,
 		"warnings": warnings,

@@ -39761,6 +39761,33 @@ stair run two wide climbs out of its north row east, a level a cell (x 20, 21, 2
 and 6, not 6 and 7: a level-2 stair beside the tunnel's floor would climb two ways (a warning).
 tools/make_mine_look.py lays it (the stair colour); its ledges traced again. mine_test walks
 every cell below the floor back to the start by World's step rule. Level data and a test only.
+769 amended (3), terrain's side: the rock mass. An indoor level whose level.json says "mass":
+"rock" (Level reads it into terrain["mass"]; "" otherwise) has Client3D._phase_mass, after the
+border, draw rock over every void cell and MASS_APRON (12) cells past the map, instead of black.
+A level without the key draws black past its walls, as before; outdoors the key does nothing.
+- Its shape: each cell's distance from the open (a two-pass chamfer from _land) carries the
+  nearest open cell's ground as its base. On a lattice of MASS_STEP (0.5 m) the top stands
+  MASS_EDGE (2.3 m) over that base at a wall, under the cave walls' ridge (CAVE_TOP_LOW 2.4), so
+  the wall is the lip, and rises to MASS_TOP (3.2) over MASS_RISE (3) cells. Lumps are wide
+  (1.7 m apart, rising only, up to 1.1 m, so no trench opens behind a wall) and narrow (0.6 m,
+  0.25 m either way), quiet at the wall. Past the map it sinks MASS_SINK (0.2 m) a cell, so the
+  level's edge shows no cut-off.
+- Its look: the cliffs' rock swatch, faceted, each facet its own shade. Its shade is MASS_NEAR
+  (0.42) at a wall, so the tops never outshine the lit floor and the walls' faces where the
+  lamps are, falling to MASS_DARK (0.12) MASS_DARK_CELLS (3.5) from the open, never black. It
+  casts no shadow: a cap over the void never darkens the floor.
+- With the mass, a cave wall's line wanders up to MASS_WANDER (0.35 m) into the rock, never
+  toward the open (the walkable half-metre stays), back on its line at a run's ends, where the
+  runs and round posts meet (Client3D._cave_rock_side). Walls between two open cells don't move.
+- It is built in chunks of MASS_CHUNK (16) cells, one mesh each, its arrays sized once (perf):
+  on mine_look about 35k triangles in about 20 chunks add about 65 ms to the room build, in a
+  phase of its own under the card; frame times are unchanged (map_bench, mass on and off).
+  Spreading the build over frames is a follow-up if a bigger cave needs it.
+view_test: the key read; chunks over the map and the apron; none over the open; the edge under
+the ridge; no hollow; darker away from the open but never black; the walls wander into the rock,
+never into the walkable; none without the key or outdoors. The level editor's level panel offers
+it (EditorFields, "past its walls": "" or "rock"; 506's every-key check). No bullet while only mine_look sets
+the key; the first real level that does brings one. Protocol unchanged, no new class_name.
 
 ## 771. The night watch
 

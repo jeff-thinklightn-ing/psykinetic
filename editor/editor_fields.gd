@@ -31,6 +31,7 @@ const KINDS := {
 		{"key": "zone", "label": "zone", "type": "enum", "choices": "zones"},
 		{"key": "region", "label": "region (its weather)", "type": "region"},
 		{"key": "border", "label": "past its edge", "type": "enum", "choices": ["forest", "none"]},
+		{"key": "mass", "label": "past its walls", "type": "enum", "choices": ["", "rock"]},
 		{"key": "north", "label": "north is", "type": "enum", "choices": "norths"},
 		{"key": "ambient", "label": "light (no sky)", "type": "float", "min": 0.0, "max": 1.0},
 		{"key": "damp", "label": "too damp to light", "type": "bool"},
