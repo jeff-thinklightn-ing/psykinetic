@@ -12,7 +12,7 @@ extends PanelContainer
 ## words companion_traits.json "focus" gives her own voice, said as "I"). No
 ## numbers anywhere. Her purse
 ## is a row once companions' "companion_gold" {companion, gold} is in the
-## state, absent till then. "How she feels about you": her bond's tier word
+## state, absent till then. "Regard": her bond's tier word
 ## as the party line says it (Companion.bond_step, on her node since 555:
 ## apart, sullen, wary, cooling, fond, close, devoted) and its newest
 ## reason under it (bond_why), the same words the known world shows.
@@ -61,11 +61,11 @@ func _ready() -> void:
 	_alone.text = alone_words()
 	_alone.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_alone)
-	_learned_heading = _heading(column, "What she has learned")
+	_learned_heading = _heading(column, "Learned")
 	_learned = VBoxContainer.new()
 	_learned.add_theme_constant_override("separation", UiTheme.constant("row"))
 	column.add_child(_learned)
-	_bent_heading = _heading(column, "How she fights")
+	_bent_heading = _heading(column, "Fighting")
 	var centre := CenterContainer.new()
 	column.add_child(centre)
 	_chart = FocusChart.new()
@@ -77,7 +77,7 @@ func _ready() -> void:
 	_purse = Label.new()
 	_purse.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_purse)
-	_feels_heading = _heading(column, "How she feels about you")
+	_feels_heading = _heading(column, "Regard")
 	_feels = Label.new()
 	column.add_child(_feels)
 	_feels_why = Label.new()
@@ -143,7 +143,7 @@ func _add_line(into: VBoxContainer, words: String) -> void:
 	into.add_child(line)
 
 
-## The lines under "What she has learned" as shown (tests).
+## The lines under "Learned" as shown (tests).
 func learned_shown() -> PackedStringArray:
 	var out := PackedStringArray()
 	for child in _learned.get_children():

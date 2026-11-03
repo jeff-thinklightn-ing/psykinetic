@@ -1529,7 +1529,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# go, loosed at the cursor (_lower_off_hand); one draw at a time. Right
 	# otherwise: the off hand (decision 329): a shield raised while held;
 	# empty-handed it shoves and tosses (below). Opening and bandaging are
-	# E's (_press_e). Left: a chest is walked to.
+	# E's (_press_e); a left click opens what E opens (779).
 	if World.off_hand(player) == "draw":
 		if click.button_index == MOUSE_BUTTON_RIGHT and _stance.is_empty():
 			_raise_lob(player)
@@ -1554,8 +1554,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_talk_wanted = null
 		_send_at(player, "swing")
 		return
-	if click.button_index == MOUSE_BUTTON_LEFT and target is Chest:
-		_walk_to_chest(player, target)
+	# 779: a left click opens what E opens (a chest, a counter, a depot, a
+	# cart), walking beside it first; never a move or an attack.
+	if click.button_index == MOUSE_BUTTON_LEFT and opens_on_click(target):
+		_open_pack(player, target)
 		return
 	var targetable := target != null and target != player and World.can_target(player, target)
 	# Left on a friend (a resident, a companion, another player) or a
@@ -1586,7 +1588,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 ## A plain left click with a bow in hand: never an attack (Jeff: "mouse to
-## move only"): a chest is walked to, a friend talked to, anything else,
+## move only"): a chest or cart opened (779), a friend talked to, anything else,
 ## a monster as the ground, walked toward; Shift with the button is the
 ## only shot.
 func _click_with_bow(player: Player) -> void:
@@ -1597,8 +1599,8 @@ func _click_with_bow(player: Player) -> void:
 		target = World.get_entity_at(tile)
 	if target == null:
 		target = remains_at(tile)
-	if target is Chest:
-		_walk_to_chest(player, target)
+	if opens_on_click(target):
+		_open_pack(player, target)  # 779: as the plain click without a bow.
 	elif target != null and target != player and talks_on_click(target):
 		_talk_to(player, target)
 	elif Net.controls == "wasd" and not on_sprite:
@@ -17254,13 +17256,11 @@ func _open_pack(player: Player, target: GridEntity) -> void:
 	_pack_wanted = target
 
 
-## A left click on a chest: walk to the nearest free cell beside it.
-func _walk_to_chest(player: Player, chest: GridEntity) -> void:
-	if World.can_melee(player.tile, chest.tile):
-		return
-	var beside := _beside(chest.tile, player.tile)
-	if beside != NONE:
-		_move_click(player, beside)
+## Whether a left click on [param target] opens it (779; Jeff's one click
+## rule, through the coordinator): what E opens as a pack, a chest (a
+## counter, a depot, a cache, a locker's chest) or a cart.
+static func opens_on_click(target: GridEntity) -> bool:
+	return target is Chest or target is Cargo
 
 
 ## The free floor cell next to [param at], reachable from it for a hand

@@ -39288,3 +39288,23 @@ follow them to the inn. resident_test: the night checks (Bram, the healer, the h
 threat's bedtime) at each body's own spell; _test_short_sleep (lengths, the stagger, home in the spell,
 the night's place outside it, the guard and the priest, no id as before). Server only, protocol
 unchanged, no new class_name.
+
+## 779. A left click opens what E opens
+
+A left click on a counter did nothing in the store tour: counters and depots are Chests, and a
+plain left click on a Chest only walked beside it (Main._walk_to_chest), leaving E to open it.
+The coordinator's ruling (Jeff's one-click rule): a left click opens a chest, a counter, a depot
+or a cart, as E does.
+
+- Main.opens_on_click(target) (Chest or Cargo) picks the branch; it runs _open_pack, which walks
+  beside first and opens on arrival (_pack_wanted), and closes it when already open.
+- The branch returns before the talk, move and attack branches, so the click is never also a
+  move or a strike; Shift's stand swing and Ctrl's signature still come first and still strike.
+  With a bow in hand the plain click does the same (_click_with_bow).
+- _walk_to_chest is gone.
+
+The coordinator also asked (voice's check, Jeff's no-gloss rule) that the companion card's
+headings be bare words: "Learned", "Fighting", "Regard".
+
+chest_test (_test_click_from_afar: the rule, no attack order, the walk and the opening) and
+ui_test (the card's headings). Client only, protocol unchanged, no new class_name.

@@ -1496,6 +1496,8 @@ func _test_card_page() -> void:
 	var body_name := String(pet.name) if pet != null else ""
 	_main.world_state = {}
 	_main.toggle_card()
+	_check([page._learned_heading.text, page._bent_heading.text, page._feels_heading.text] == ["Learned", "Fighting", "Regard"],
+		"the card's headings are bare words, no glosses (voice; Jeff's rule)")
 	if pet == null:
 		_check(page.visible and page.title_shown() == "Your companion" and page._alone.visible, "opened with nobody: the page says no one travels with you")
 	else:

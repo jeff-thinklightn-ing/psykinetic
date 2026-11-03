@@ -229,8 +229,13 @@ func _test_click_from_afar() -> void:
 	var panel: PackPanel = _main.pack_panel
 	_main.close_other()
 	World._relocate(host, Vector2i(6, 1))
+	# 779: a left click on a chest, counter, depot or cart opens it (the
+	# click's own branch returns before a move or an attack); a person is not.
+	_check(_main.opens_on_click(chest) and not _main.opens_on_click(host) and not _main.opens_on_click(null),
+		"a left click opens a chest, not a person or bare ground")
 	_main._open_pack(host, chest)
 	await get_tree().process_frame
+	_check(host.action_target != chest, "opening it is no attack")
 	var route: Array = _main._free["path"]
 	_check(panel.other == null and not route.is_empty() and _main._pack_wanted == chest,
 		"not beside it: not open, a route set (to %s)" % [route.back() if not route.is_empty() else null])
