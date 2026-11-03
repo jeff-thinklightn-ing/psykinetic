@@ -39015,8 +39015,8 @@ fresh player's). Two arts for now: swordplay (the sword) and the bow
   a foe reads a practised swordsman's blow as any other.
 - On the wire: Player.art_feel ({art: m} to the hundredth), replicated, so
   a client draws the pull and the cone and predicts the sword's cycle as
-  the server does; it is set only when the hundredth changes. Rev 45's
-  note (rides v0.1.199's forced cut).
+  the server does; it is set only when the hundredth changes. Protocol
+  revision 46 (its own forced cut, after v0.1.199).
 - The readout: a log line "[arts] Player<n> swordplay 0.400 (peak 0.400)"
   when an art crosses a tenth (no name; ui's card comes later). A test
   server's --test-arts=swordplay:1,bow:0.5 starts each joining player so
@@ -39026,4 +39026,4 @@ combat_test _test_weapon_memory (fill, curve, regrowth, the grace and the
 cooling, the idle fade, the four effects and the damage unchanged, a
 monster unaffected, a full draw let go); record_keys_test (the field
 through a save, and a record from before 766 or with nonsense in it).
-Protocol changes on rev 45; no new class_name.
+PROTOCOL_REVISION 45 -> 46; no new class_name.

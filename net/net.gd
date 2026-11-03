@@ -509,10 +509,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## client draws a downed deer standing and no blood.
 ## 45 (762 amended): Resident.sheltering (SUBCLASS_REPLICATED), its town under
 ## a threat: the talk bar offers no Barter on a joined client (it had no holdings).
-## 45 (766): Player.art_feel (SUBCLASS_REPLICATED), weapon memory's felt value
+## 46 (766): Player.art_feel (SUBCLASS_REPLICATED), weapon memory's felt value
 ## per art ({"swordplay": m, "bow": m}, 0..1): the sword's cycle and parry arc,
 ## the bow's draw and cone scale by it; an old client predicts them unpractised.
-const PROTOCOL_REVISION := 45
+const PROTOCOL_REVISION := 46
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
