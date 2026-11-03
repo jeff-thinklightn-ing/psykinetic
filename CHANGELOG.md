@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- 773, items: the server sweeps up everything lying within two cells in sight when the client asks (F's vacuum; ui's key follows): nearest first, gold too, into the pack before the hands, stopping when the pack is full. An old client's F still picks up one thing.
 
 - Umbrage's music fades in more slowly (about 2 seconds) and plays a little softer (668 amended (3)).
 - Every town also gets a carpenter to raise its sheds and workshops, a town's cook roasts from meat alone, and pedlars buy a town's spare meat and hides (767).

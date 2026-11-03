@@ -39106,3 +39106,33 @@ slower and be softer."
 sound_kit_test (own_fade: Umbrage's twice the level fade, out as fast, the barrow's as before;
 softer than the barrow's) and view_test (half its fade-in in it is not yet full; full by the
 end). Client only, protocol unchanged, no new class_name.
+## 773. F sweeps up what lies near
+
+Jeff (through the coordinator): "I want to change F so it just picks up any near items,
+somewhat of a local vacuum effect". ui leads; the server loop landed first, so this heading
+is items'. ui's client side follows as "773, ui's side".
+
+Wire, with no protocol revision (release): a new client's F sends the existing "pick_up"
+command with {near: true}. The server sweeps only then; without it (an old client) it picks
+one thing, or a cell's gold, as before, and an old server ignores "near" and does the same.
+The answer is the existing "party" line to that player, carrying ignorable "taken"
+[{uid, id, cell [x, y]}] (for ui's flights into the hand) and "gold".
+
+World.try_pick_up_near(by, radius = NEAR_REACH 2) takes every ground cell within 2 of the
+player's (Chebyshev, diagonals too) that it can see (has_line_of_sight, never through a
+wall), nearest first (then by squared distance, then by row), each cell's gold and then its
+things top down. A sweep fills the pack first and the hands last (_near_slot: onto a stack
+of its kind, else a free pack slot, else a free hand), so it never puts a stray knife in an
+empty hand. Stacks join as a single pick-up's do (_pick_unit). A held bundle of arrows is
+never swapped (375's swap stays single F's). A boss's bound axe stays (603 amended; "bound",
+and BOUND_AXE_WORDS when nothing else was taken). It stops at the first thing with no room
+("full"). Gold goes into the purse wherever it lies in reach (_take_gold, try_pick_up_gold's
+own after its reach check). Like single F, it takes another player's drop. No mark for things
+set out on purpose: stall wares are in counters, grave goods in chests or props and offerings
+in the temple chest, so the ground holds drops, remains, thrown things and wild herbs. If
+something is ever laid out on the ground on purpose, GroundPile gains a "placed" mark then.
+
+Voice's words: "You pick up a knife." (one thing, named with its article) / "You pick up 3
+things." / "... and 12 gold." / "You pick up 12 gold."; a full pack adds " Your pack is
+full."; an empty sweep says nothing. items_test _test_sweep. Server only (the client's half
+is ui's); protocol unchanged; no new class_name.

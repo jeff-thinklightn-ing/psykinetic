@@ -5590,11 +5590,74 @@ func try_pick_up(by: GridEntity, cell: Vector2i, index := -1) -> bool:
 	return true
 
 
-## [param by] picks up the thing at [param index] on [param cell] into the
-## slot it has room for (room_for): false, nothing moved, if none.
-func _pick_unit(by: GridEntity, cell: Vector2i, index: int) -> bool:
+## How far F's sweep reaches (decision 773): cells this many steps off,
+## diagonals too.
+const NEAR_REACH := 2
+
+
+## [param by] sweeps up what lies near it (decision 773; Jeff: "F just picks
+## up any near items, somewhat of a local vacuum effect"): every cell within
+## [param radius] of its own (Chebyshev) it can see (has_line_of_sight),
+## nearest first; each cell's gold, then its things top down, into the pack
+## first and the hands last (a sweep never puts a stray knife in an empty
+## hand), stacks joining as a single pick-up's do. A boss's bound axe stays
+## (603 amended); a held bundle is never swapped (375). It stops at the
+## first thing with no room. {taken: [{uid, id, cell}], gold, full (a thing
+## left for want of room), bound (a bound axe left)}. Server only.
+func try_pick_up_near(by: GridEntity, radius := NEAR_REACH) -> Dictionary:
+	var out := {"taken": [], "gold": 0, "full": false, "bound": false}
+	if not Net.is_authority() or not _can_handle(by) or zone == null:
+		return out
+	var cells: Array[Vector2i] = []
+	for cell: Vector2i in zone.ground.keys() + zone.ground_gold.keys():
+		var off := cell - by.tile
+		if maxi(absi(off.x), absi(off.y)) <= radius and not cell in cells \
+				and (cell == by.tile or has_line_of_sight(by.tile, cell)):
+			cells.append(cell)
+	var from := by.tile
+	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		var da := maxi(absi(a.x - from.x), absi(a.y - from.y))
+		var db := maxi(absi(b.x - from.x), absi(b.y - from.y))
+		if da != db:
+			return da < db
+		if (a - from).length_squared() != (b - from).length_squared():
+			return (a - from).length_squared() < (b - from).length_squared()
+		return a.y < b.y or a.y == b.y and a.x < b.x)
+	for cell in cells:
+		out["gold"] += _take_gold(by, cell)
+		var index := ground_uids(cell).size() - 1
+		while index >= 0:
+			var uid := ground_uids(cell)[index]
+			if axe_bound(uid):
+				out["bound"] = true
+			elif _near_slot(by, uid) < 0:
+				out["full"] = true
+				return out
+			else:
+				var id := items.id_of(uid)
+				if _pick_unit(by, cell, index, _near_slot(by, uid)):
+					out["taken"].append({"uid": uid, "id": id, "cell": cell})
+			index = mini(index - 1, ground_uids(cell).size() - 1)
+	return out
+
+
+## Where a sweep (773) puts [param uid]: onto a stack of its kind, else the
+## first free pack slot, else a free hand that can hold it; -1 for none.
+func _near_slot(by: GridEntity, uid: int) -> int:
+	for slot: int in ([Items.RIGHT_HAND, Items.LEFT_HAND] + Items.PACK_SLOTS) if has_hands(by) else range(by.slots.size()):
+		if slot < by.slots.size() and stacks_onto(slot_uid(by, slot), uid):
+			return slot
+	var free := free_pack_slot(by) if has_hands(by) else -1
+	return free if free >= 0 else free_slot_for(by, items.id_of(uid))
+
+
+## [param by] picks up the thing at [param index] on [param cell] into
+## [param slot] if given, else the slot it has room for (room_for): false,
+## nothing moved, if none.
+func _pick_unit(by: GridEntity, cell: Vector2i, index: int, slot := -1) -> bool:
 	var uid := ground_uids(cell)[index]
-	var slot := room_for(by, uid)
+	if slot < 0:
+		slot = room_for(by, uid)
 	if slot < 0:
 		return false
 	take_from_ground(cell, index)
@@ -5765,8 +5828,16 @@ func drop_gold(zone_name: String, cell: Vector2i, gold: int) -> Vector2i:
 ## reaches, into its record's gold (add_gold, "picked up"; 601 amended:
 ## no slot). The gold taken, 0 (nothing moves) if it cannot.
 func try_pick_up_gold(by: GridEntity, cell: Vector2i) -> int:
-	if not Net.is_authority() or not by is Player or (by as Player).player_id.is_empty() or economy == null \
-			or not _can_handle(by) or not reaches_cell(by, cell):
+	if not Net.is_authority() or not _can_handle(by) or not reaches_cell(by, cell):
+		return 0
+	return _take_gold(by, cell)
+
+
+## The gold on [param cell] into [param by]'s purse, wherever it is (a
+## sweep's reach, 773, is its caller's to judge): how much; 0 for none, or
+## for anyone but a player.
+func _take_gold(by: GridEntity, cell: Vector2i) -> int:
+	if not by is Player or (by as Player).player_id.is_empty() or economy == null:
 		return 0
 	var gold := int(zone.ground_gold.get(cell, 0))
 	if gold <= 0:

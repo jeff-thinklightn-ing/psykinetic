@@ -17538,6 +17538,29 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 	var held := Player.RIGHT_HAND if not player.slots[Player.RIGHT_HAND].is_empty() else Player.LEFT_HAND
 	match what:
 		"pick_up":
+			if args.get("near") == true:
+				# F's sweep (decision 773): an old client sends no "near" and picks one thing.
+				var swept := World.try_pick_up_near(player)
+				var taken: Array = swept["taken"]
+				var parts := PackedStringArray()  # Voice's words (773).
+				if taken.size() == 1:
+					var word := Items.name_of(str(taken[0]["id"]))
+					parts.append(("an " if word.to_lower()[0] in "aeiou" else "a ") + word)
+				elif taken.size() > 1:
+					parts.append("%d things" % taken.size())
+				if int(swept["gold"]) > 0:
+					parts.append("%d gold" % int(swept["gold"]))
+				var text := ("You pick up " + " and ".join(parts) + ".") if not parts.is_empty() else ""
+				if swept["full"]:
+					text = (text + " " if not text.is_empty() else "") + "Your pack is full."
+				if not text.is_empty():
+					var cells_out: Array = []
+					for each: Dictionary in taken:
+						cells_out.append({"uid": each["uid"], "id": each["id"], "cell": [each["cell"].x, each["cell"].y]})
+					Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text, "taken": cells_out, "gold": int(swept["gold"])})
+				elif swept["bound"]:
+					party_log.add(BOUND_AXE_WORDS)  # 603 amended: his, till the pact is won.
+				return
 			var cells: Array[Vector2i] = []
 			if cell != null:
 				cells.append(cell)

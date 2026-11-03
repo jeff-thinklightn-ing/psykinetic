@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_take_and_put()
 	_test_hands()
 	_test_ground()
+	_test_sweep()
 	_test_throw()
 	_test_containers()
 	_test_bandage()
@@ -267,6 +268,97 @@ func _test_hands() -> void:
 	Items.reset()
 	_check(is_equal_approx(host.mass, base + 8.5), "set down, the weight goes (%.1f)" % host.mass)
 	_check(host.slot_items[Player.RIGHT_HAND] == wood, "the wood in the right hand is the same thing")
+
+
+## F's sweep (decision 773): everything lying within two cells in sight,
+## nearest first, gold too, into the pack before the hands; a bound axe
+## left; it stops when the pack is full.
+func _test_sweep() -> void:
+	print("\n== F's sweep: what lies near, nearest first, into the pack (decision 773) ==")
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	var empty: Array = []
+	empty.resize(Items.CARRIED)
+	empty.fill("")
+	World.set_slots(host, empty)
+	var aside: Dictionary = {}  # What earlier tests left lying near, put back after.
+	for each: Vector2i in World.zone.ground.keys():
+		var off: Vector2i = each - host.tile
+		if maxi(absi(off.x), absi(off.y)) <= 3:
+			var lying: Array[int] = []
+			while not World.ground_uids(each).is_empty():
+				lying.push_front(World.take_from_ground(each, World.ground_uids(each).size() - 1))
+			aside[each] = lying
+	var spots: Array[Vector2i] = []
+	for off: Vector2i in [Vector2i(2, 2), Vector2i(1, 0), Vector2i(0, 2), Vector2i(-2, -1), Vector2i(2, 0), Vector2i(0, -1)]:
+		var at: Vector2i = host.tile + off
+		if World.is_walkable(at) and World.has_line_of_sight(host.tile, at):
+			spots.append(at)
+	_check(spots.size() >= 3, "(three open cells in sight within two: %s)" % [spots])
+	var far := 0
+	var far_at := World.NO_CELL
+	for off: Vector2i in [Vector2i(3, 0), Vector2i(-3, 0), Vector2i(0, 3), Vector2i(0, -3), Vector2i(3, 3)]:
+		if far == 0 and World.is_walkable(host.tile + off) and World.ground_uids(host.tile + off).is_empty():
+			far = World.items.mint("knife", "built")
+			far_at = World.put_on_ground(far, host.tile + off)
+	var put: Dictionary = {}  # uid -> where it lies.
+	for i in spots.size():
+		var uid := World.items.mint("knife" if i % 2 == 0 else "ore_sack", "built")
+		put[uid] = World.put_on_ground(uid, spots[spots.size() - 1 - i])
+	var gold_at := spots[0]
+	World.drop_gold(World.zone.name, gold_at, 7)
+	var gold_was := World.gold_of(host.player_id) if host.player_id != "" else 0
+	var swept := World.try_pick_up_near(host)
+	var taken: Array = swept["taken"]
+	_check(taken.size() == put.size() and not swept["full"], "case: each thing within two cells swept up (%d of %d)" % [taken.size(), put.size()])
+	var ordered := true
+	for i in range(1, taken.size()):
+		var a: Vector2i = taken[i - 1]["cell"] - host.tile
+		var b: Vector2i = taken[i]["cell"] - host.tile
+		ordered = ordered and maxi(absi(a.x), absi(a.y)) <= maxi(absi(b.x), absi(b.y))
+	_check(ordered, "case: nearest first (%s)" % [taken.map(func(t: Dictionary) -> Vector2i: return t["cell"])])
+	_check(host.slots[Items.RIGHT_HAND] == "" and host.slots[Items.LEFT_HAND] == "", "case: into the pack, the hands left free")
+	_check(int(swept["gold"]) == 7 and (host.player_id == "" or World.gold_of(host.player_id) == gold_was + 7), "case: the gold lying there too (%d)" % int(swept["gold"]))
+	_check(far != 0 and World.ground_uids(far_at).has(far), "case: three cells off, left lying (%s)" % [far_at])
+	if far != 0 and World.ground_uids(far_at).has(far):
+		World.items.end(World.take_from_ground(far_at, World.ground_uids(far_at).find(far)), "gone")
+	# A full pack: the sweep stops and says so.
+	var filled := host.slots.duplicate()
+	for slot: int in Items.PACK_SLOTS:
+		if filled[slot].is_empty():
+			_give(host, "knife", slot)
+	var left := World.items.mint("knife", "built")
+	var left_at := World.put_on_ground(left, spots[0])
+	swept = World.try_pick_up_near(host)
+	var in_hand: bool = host.slot_items[Items.RIGHT_HAND] == left or host.slot_items[Items.LEFT_HAND] == left
+	_check(in_hand and (swept["taken"] as Array).size() == 1, "case: the pack full, a free hand takes it last")
+	_end_carried(host)
+	World.set_slots(host, empty)
+	for slot: int in Items.PACK_SLOTS:
+		_give(host, "knife", slot)
+	_give(host, "knife", Items.RIGHT_HAND)
+	_give(host, "knife", Items.LEFT_HAND)
+	left = World.items.mint("knife", "built")
+	left_at = World.put_on_ground(left, spots[0])
+	swept = World.try_pick_up_near(host)
+	_check(swept["full"] and (swept["taken"] as Array).is_empty() and World.ground_uids(left_at).has(left), "case: no room anywhere: nothing taken, full said")
+	World.items.end(World.take_from_ground(left_at, World.ground_uids(left_at).find(left)), "gone")
+	_end_carried(host)
+	World.set_slots(host, had_slots, had_uids)
+	for each: Vector2i in aside:
+		for uid: int in aside[each]:
+			World.put_on_ground(uid, each)
+
+
+
+## Everything [param entity] carries ended, each unit of a stack too.
+func _end_carried(entity: GridEntity) -> void:
+	for uid in World.slot_uids(entity):
+		if uid != 0:
+			for unit in World.items.stack_of(uid):
+				World.items.end(unit, "gone")
+			World.items.end(uid, "gone")
 
 
 func _test_ground() -> void:
