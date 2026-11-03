@@ -398,6 +398,13 @@ static func cry(creature: String, cry_kind: String) -> String:
 	return slot if has(slot) else ""
 
 
+## The slot a night watch's wave announces itself with (771; the "wave"
+## message's kind: "wolves", "dead", "raiders"), "" for a kind this build
+## doesn't know (a newer server's): it comes on unannounced.
+static func wave(kind: String) -> String:
+	return "sfx.wave_%s" % kind if kind != "" and has("sfx.wave_%s" % kind) else ""
+
+
 ## The slot [param creature] (a monster's kind) cries with, struck and not
 ## killed (764): a doe's bleat, a stag's own bellow, a rabbit's squeal; ""
 ## for a kind with none (a boar charges instead, a wolf fights).

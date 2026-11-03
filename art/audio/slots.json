@@ -1065,6 +1065,34 @@
 			"uses": "a wolf killed (Client3D._fall)",
 			"fallback": "sfx.knockback_body_soft"
 		},
+		"sfx.wave_wolves": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 96,
+			"volume_db": 0.0,
+			"uses": "a night watch's wave of wolves coming: a pack howling, from where it is, at its spawn and halfway in (771; the \"wave\" message, Client3D.play_cell)",
+			"fallback": "sfx.wolf_howl"
+		},
+		"sfx.wave_raiders": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 96,
+			"volume_db": 0.0,
+			"uses": "a night watch's wave of robbers coming: a horn, from where it is, at its spawn and halfway in (771; the \"wave\" message, Client3D.play_cell)"
+		},
+		"sfx.wave_dead": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 96,
+			"volume_db": 0.0,
+			"uses": "a night watch's wave of the dead coming: a low moan over rattling bones, from where it is, at its spawn and halfway in (771; the \"wave\" message, Client3D.play_cell)"
+		},
 		"sfx.deer_struck": {
 			"category": "creatures",
 			"type": "oneshot",

@@ -2430,6 +2430,93 @@
 				"url": "https://freesound.org/people/randbsoundbites/sounds/843573/",
 				"license": "CC0 1.0"
 			}
+		],
+		"sfx.wave_dead": [
+			{
+				"file": "sfx.wave_dead.ogg",
+				"from": "freesound",
+				"original": "freesound 315845: Zombie Moan  (from 0.8 s for 4.4 s)",
+				"sha256": "da0b5f2a02aba20d871f2b881dd55e3e7dabb65bca6869791a2da3d248ed0791",
+				"by": "gneube",
+				"url": "https://freesound.org/people/gneube/sounds/315845/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.wave_dead.2.ogg",
+				"from": "freesound",
+				"original": "freesound 463721: Burp Monster Zombie groan moan (from 0.1 s for 2.6 s) at 0.85 speed",
+				"sha256": "c1686a87b6e760a08733558a6742764300b948add640cda81d6204e2e6d245db",
+				"by": "EricsSoundschmiede",
+				"url": "https://freesound.org/people/EricsSoundschmiede/sounds/463721/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wave_dead.3.ogg",
+				"from": "freesound",
+				"original": "freesound 202102: Rattling Bones.wav (from 0.4 s for 3.2 s)",
+				"sha256": "70e47ac53948bf277136a541e91ac6ad207282cf0cc5131235b2668769f105bc",
+				"by": "spookymodem",
+				"url": "https://freesound.org/people/spookymodem/sounds/202102/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.wave_raiders": [
+			{
+				"file": "sfx.wave_raiders.ogg",
+				"from": "freesound",
+				"original": "freesound 148645: hunting-horn-bass.wav (from 0.1 s for 4.5 s)",
+				"sha256": "3468b7756f95302f546801a89f408b98413081f1cb8681891918cc850232b6ad",
+				"by": "nanoPlink",
+				"url": "https://freesound.org/people/nanoPlink/sounds/148645/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wave_raiders.2.ogg",
+				"from": "freesound",
+				"original": "freesound 392180: Battle_horn_1.wav (from 0 s for 4.4 s)",
+				"sha256": "2b7aa3a1fb8d500935bd5b01894e615cedce98f85e62870ffc7aae90c0e9f47a",
+				"by": "kirmm",
+				"url": "https://freesound.org/people/kirmm/sounds/392180/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wave_raiders.3.ogg",
+				"from": "freesound",
+				"original": "freesound 539956: war horn.wav (from 0 s for 4.3 s)",
+				"sha256": "82155c13517b9f39f400c6ac5076df6885b300331b6b4277022259299db2cfd6",
+				"by": "adharca",
+				"url": "https://freesound.org/people/adharca/sounds/539956/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.wave_wolves": [
+			{
+				"file": "sfx.wave_wolves.ogg",
+				"from": "freesound",
+				"original": "freesound 378334: Howling wolves (from 0.3 s for 6.2 s)",
+				"sha256": "3fa20cbddb196f4bd98a000e153c1ab056feeca6e970205692a375d06f7abdfd",
+				"by": "Kingcornz",
+				"url": "https://freesound.org/people/Kingcornz/sounds/378334/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wave_wolves.2.ogg",
+				"from": "freesound",
+				"original": "freesound 753896: Adult and young wolves howling far away (from 0 s for 3.6 s)",
+				"sha256": "f9caf95fa8c4ce316d2c1a985eca506eba482886ac3c919b1381660820beaffd",
+				"by": "Sacha.Julien",
+				"url": "https://freesound.org/people/Sacha.Julien/sounds/753896/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wave_wolves.3.ogg",
+				"from": "freesound",
+				"original": "freesound 398430: Wolf howl (from 0.9 s for 5.5 s)",
+				"sha256": "4b78bae14450801cd3a3527524c87933877a830f44855f5b440df6deffd842ce",
+				"by": "NaturesTemper",
+				"url": "https://freesound.org/people/NaturesTemper/sounds/398430/",
+				"license": "CC0 1.0"
+			}
 		]
 	}
 }

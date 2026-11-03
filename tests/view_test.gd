@@ -1054,6 +1054,10 @@ func _test_far_cry() -> void:
 	before = _rig.sfx.played.size()
 	_check(not _rig.far_cry("great_bear", "hum", Vector2i(30, 30)) and not _rig.far_cry("", "roar", Vector2i(30, 30))
 			and _rig.sfx.played.size() == before, "a cry with no slot: nothing")
+	before = _rig.sfx.played.size()
+	_rig.play_cell("sfx.wave_wolves", Vector2i(40, 12))
+	heard = _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
+	_check(heard == ["sfx.wave_wolves"], "a night watch's wave heard from its cell (771) (%s)" % [heard])
 	_rig.sfx.hear_everything = hear_was
 
 

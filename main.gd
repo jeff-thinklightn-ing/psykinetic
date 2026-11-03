@@ -13473,6 +13473,14 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		if _client3d != null and cell is Array and (cell as Array).size() == 2:
 			_client3d.far_cry(str(data.get("creature", "")), str(data.get("cry", "")), Vector2i(int(cell[0]), int(cell[1])))
 		return
+	if kind == "wave":
+		# A night watch's wave coming in from the wilds (771): its kind's cue from
+		# where it is, at its spawn and again halfway in, so the watch can ready.
+		var cue := SoundKit.wave(str(data.get("kind", "")))
+		var at: Variant = data.get("cell")
+		if cue != "" and _client3d != null and at is Array and (at as Array).size() == 2:
+			_client3d.play_cell(cue, Vector2i(int(at[0]), int(at[1])))
+		return
 	if kind == "notes":
 		_on_notes_message(data)  # 643, ui's side.
 

@@ -130,6 +130,13 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.struck("rabbit") == "sfx.rabbit_struck" and SoundKit.struck("boar") == ""
 			and SoundKit.struck("wolf") == "" and SoundKit.struck("imp") == "",
 			"game struck cries out (764): a doe, a stag its own, a rabbit; a boar, a wolf and a goblin not")
+	_check(SoundKit.wave("wolves") == "sfx.wave_wolves" and SoundKit.wave("dead") == "sfx.wave_dead"
+			and SoundKit.wave("raiders") == "sfx.wave_raiders" and SoundKit.wave("dragons") == "" and SoundKit.wave("") == "",
+			"a night watch's wave announces itself by kind (771); an unknown kind comes unannounced")
+	for slot: String in ["sfx.wave_wolves", "sfx.wave_dead", "sfx.wave_raiders"]:
+		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and SoundKit.reach(slot) >= 80
+				and SoundKit.takes(slot).size() >= 2,
+				"%s: placed, heard %d cells (a wave 40 off behind a palisade, muffled, at half), not a monster's noise, takes of its own" % [slot, SoundKit.reach(slot)])
 	for slot: String in ["sfx.deer_struck", "sfx.stag_struck", "sfx.rabbit_struck"]:
 		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and SoundKit.reach(slot) > shot
 				and SoundKit.takes(slot).size() >= 2,

@@ -39576,6 +39576,21 @@ stood at the post, paid from a funded treasury and told, the captain's regard, l
 empty treasury told and unpaid. No bullet: no real town has posts until buildings' plan lands. Server
 only, protocol unchanged, no new class_name.
 
+771 amended: a wave heard coming (agreed with enemy-ai). The server sends a new message,
+"wave" {kind: wolves | dead | raiders, cell: [x, y]}, to the players on the level within 64 cells of
+the post: once as the wave spawns, and again from its leader's cell halfway in, so the watch hears
+which way it comes and readies. Main's dispatch plays SoundKit.wave(kind) (sfx.wave_<kind>; "" for a
+kind this build doesn't know, which comes on unannounced) at the cell through Client3D.play_cell. The
+slots are placed, no monster's noise, reach 96 cells (a wave 40 off behind a palisade is muffled and
+carries half: 48), 0 dB: sfx.wave_wolves (voice bus, falling back to the wolf's howl): a pack howling,
+freesound 378334 (Kingcornz), 753896 (Sacha.Julien), 398430 (NaturesTemper), all CC0;
+sfx.wave_raiders (sfx bus): a war horn, 148645 (nanoPlink), 392180 (kirmm), 539956 (adharca), all CC0;
+sfx.wave_dead (voice bus): a grave's moan and rattle, 315845 (gneube, CC BY 4.0), 463721
+(EricsSoundschmiede, CC0, at 0.85 speed), 202102 (spookymodem, CC0). This landing is the client's
+handler only; enemy-ai adds "wave" to MESSAGE_KINDS with its send. sound_kit_test (the kinds, an
+unknown one silent; the slots' reach and takes) and view_test (_test_far_cry: a cue at its cell).
+No bullet: no real town has posts yet. Client only, protocol unchanged, no new class_name.
+
 ## 776, companions' side: she knows a ford for shallow water
 
 776 makes the hills' streams fords: floor, so World.is_water is false on them, and a companion's

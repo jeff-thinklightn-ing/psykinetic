@@ -5096,6 +5096,12 @@ stencil_mode write, compare_always, %d;" % OUTLINE_STENCIL)
 ## The toss aim during a right drag: an arrow on the floor from
 ## [param target] the way it will go; hidden for ZERO or no target.
 ## Sound slot [param slot] from where [param entity] is drawn (Sfx).
+## [param slot] played from [param cell], heard from its direction and
+## distance (a night watch's wave coming, 771).
+func play_cell(slot: String, cell: Vector2i) -> void:
+	sfx.play(slot, _tile_position(cell) + Vector3.UP * 1.0)
+
+
 func play_at(slot: String, entity: GridEntity) -> void:
 	var puppet: Node3D = _puppets.get(entity.get_instance_id())
 	sfx.play(slot,(puppet.position if puppet != null else _tile_position(entity.tile)) + Vector3.UP * 0.5)
