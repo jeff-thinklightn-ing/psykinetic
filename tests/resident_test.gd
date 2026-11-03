@@ -4241,15 +4241,16 @@ func _test_vendor() -> void:
 
 ## The Rolf fix, ui's side (Jeff on v0.1.194: Rolf "advertises but doesn't
 ## have a trade button"): the client's whole path, never the server's accept
-## called by hand. His greeting's "offers" message opens Main's DealPanel
-## with a button a ware; with an empty purse they are disabled; with gold,
-## a button's press is Main's "offer" command, and the sword comes into the
-## hands, marked starter, the price taken. Gone out of hearing, it closes.
+## called by hand. His greeting's "offers" message opens the store window
+## (765; DealPanel's buttons before) with a square a ware; picked, the button
+## reads "Buy (1 item)", dim with an empty purse; with gold its press is
+## Main's "offer" command, and the sword comes into the hands, marked
+## starter, the price taken. Esc closes it.
 func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> void:
-	print("== Rolf's wares as buttons (ui's side): the greeting opens them, a button buys, the sword in hand marked starter ==")
-	var panel: DealPanel = _main.deal_panel
+	print("== Rolf's wares in the store window (765, ui's side): the greeting opens them, Buy buys, the sword in hand marked starter ==")
+	var panel: BarterPanel = _main.barter_panel
 	if panel == null:
-		_check(false, "Main has the deal window")
+		_check(false, "Main has the store window")
 		return
 	var pid := Net.player_id
 	var price := int(rule.get("price", 1))
@@ -4262,38 +4263,36 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 	_main._greet_at.clear()
 	_main._greeted(player, rolf)  # A click on him: his greeting, then his "offers" to this peer.
 	var count := (rule.get("wares", []) as Array).size()
-	var buttons := panel._buttons.get_children()
-	_check(panel.visible and panel.entity_id == rolf.get_instance_id() and panel._title.text == rolf.person and buttons.size() == count
-			and not panel._strike.visible,
-		"greeted: his window, his name, a button a ware, no strike line (%d buttons of %d)" % [buttons.size(), count])
-	var sword_at := -1
-	for i in panel.wares.size():
-		if str(panel.wares[i]["what"].get("item", "")) == "sword":
-			sword_at = i
-	_check(sword_at >= 0 and (buttons[sword_at] as Button).text == "A sword, %d gold" % price,
-		"the sword's button says its price (%s)" % [(buttons[sword_at] as Button).text if sword_at >= 0 else "none"])
-	_check(buttons.all(func(b: Node) -> bool: return (b as Button).disabled) and panel._purse.text == "You have no gold; nothing here costs less than %d." % price
-			and DealPanel.wares_purse_words(3, [5, 12]) == "You have 3 gold; nothing here costs less than 5."
-			and DealPanel.wares_purse_words(5, [5, 12]) == "You have 5 gold.",
-		"no gold: every button disabled, the purse line naming the cheapest (%s)" % panel._purse.text)
-	if sword_at < 0:
+	var boxes := panel.boxes_shown()
+	_check(panel.is_open() and panel.with == rolf and panel.title_shown() == rolf.person and boxes.size() == count
+			and boxes.all(func(b: String) -> bool: return b.begins_with("ware ") and b.ends_with("gold %d" % price)),
+		"greeted: the store window on him, his name, a square a ware with its price chip (%d of %d: %s)" % [boxes.size(), count, boxes.slice(0, 2)])
+	var sword := ""
+	for each: Dictionary in panel.wares:
+		if BarterPanel.ware_item(each) == "sword":
+			sword = str(each["id"])
+	_check(not sword.is_empty() and panel.box_words("ware", sword) == Items.name_of("sword"), "the sword's square: its name on hover")
+	if sword.is_empty():
 		return
+	panel.toggle_ware(sword)
+	_check(panel.button_shown() == "Buy (1 item)" and panel._button.disabled and panel.foot_shown() == "You need %d more gold." % price,
+		"picked with no gold: Buy (1 item), dim, the shortfall said (%s; %s)" % [panel.button_shown(), panel.foot_shown()])
 	# Playtest on v0.1.195: gold from a quest, the dole or a chest never reached the client, so the buttons stayed grey.
 	_main._give_gold(pid, 3, "a quest's reward (the test)")  # Economy.add_gold, as a quest's reward is paid.
 	World.add_gold(pid, 2, "a coin purse")  # A chest's purse, World's way.
-	_main._update_deal()
-	_check(_main.gold == 5 and _main.shop_panel.gold_shown() == "5 gold" and not (buttons[sword_at] as Button).disabled,
-		"5 gold from a quest and a chest, on the server: the client's purse and the HUD's line say 5 (%d, %s), and the buttons enable" % [_main.gold, _main.shop_panel.gold_shown()])
-	(buttons[sword_at] as Button).pressed.emit()  # Main._offer_deal: the "offer" command.
+	_main._update_store()
+	_check(_main.gold == 5 and _main.shop_panel.gold_shown() == "5 gold" and not panel._button.disabled and panel.total_shown() == "Total gold %d" % price,
+		"5 gold from a quest and a chest, on the server: the client's purse and the HUD's line say 5 (%d, %s), Buy enables, its Total %s" % [_main.gold, _main.shop_panel.gold_shown(), panel.total_shown()])
+	panel._confirm()  # Main._offer_deal: the "offer" command.
 	var at := player.slots.find("sword")
 	_check(World.economy.gold(pid) == 5 - price and _main.gold == 5 - price and at >= 0 and World.is_starter(World.slot_uid(player, at)),
-		"the button bought it: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
-	_check(panel.visible and panel.entity_id == rolf.get_instance_id() and panel._buttons.get_child_count() >= count,
-		"his offers sent again: the window stays open on him")
-	_main._update_deal()
-	_check(panel.visible, "watched beside him (a resident, not a talking monster): it stays open")
+		"Buy bought it: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
+	_check(panel.is_open() and panel.with == rolf and panel.wares.size() >= count and panel.wares_pick.is_empty(),
+		"his offers sent again: the window stays open on him, nothing picked")
+	_main._update_store()
+	_check(panel.is_open(), "watched beside him: it stays open")
 	_main.escape()
-	_check(not panel.visible and panel.wares.is_empty(), "Esc: closed")
+	_check(not panel.is_open() and panel.wares.is_empty(), "Esc: closed")
 
 
 func _test_hut_ruin() -> void:

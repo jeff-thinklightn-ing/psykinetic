@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=25 format=3]
+[gd_resource type="Theme" load_steps=27 format=3]
 
 ; The shared look of every screen (docs/ui_style.md): the project theme
 ; (project.godot gui/theme/custom), read by code through UiTheme. Every
@@ -87,12 +87,41 @@ corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
 ; A hand's slot: the inset edged in brass, 3 wide.
+; A slot (765: a step lighter than an inset, earth #4a3a25, so a dark blade reads).
+[sub_resource type="StyleBoxFlat" id="slot"]
+content_margin_left = 12.0
+content_margin_top = 8.0
+content_margin_right = 12.0
+content_margin_bottom = 8.0
+bg_color = Color(0.2901960784313726, 0.22745098039215686, 0.1450980392156863, 0.92)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.47843137254901963, 0.43137254901960786, 0.34509803921568627, 0.9)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+; A price chip over a slot's corner (765): the outline's dark, close margins.
+[sub_resource type="StyleBoxFlat" id="chip"]
+content_margin_left = 8.0
+content_margin_top = 2.0
+content_margin_right = 12.0
+content_margin_bottom = 2.0
+bg_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.88)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
 [sub_resource type="StyleBoxFlat" id="hand_slot"]
 content_margin_left = 12.0
 content_margin_top = 8.0
 content_margin_right = 12.0
 content_margin_bottom = 8.0
-bg_color = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
+bg_color = Color(0.2901960784313726, 0.22745098039215686, 0.1450980392156863, 0.92)
 border_width_left = 3
 border_width_top = 3
 border_width_right = 3
@@ -280,6 +309,8 @@ Button/styles/hover = SubResource("button_hover")
 Button/styles/normal = SubResource("button_normal")
 Button/styles/pressed = SubResource("button_pressed")
 Caption/base_type = &"Label"
+Chip/base_type = &"PanelContainer"
+Chip/styles/panel = SubResource("chip")
 Caption/colors/font_color = Color(0.7607843137254902, 0.7215686274509804, 0.6274509803921569, 0.9)
 Caption/font_sizes/font_size = 30
 Deep/base_type = &"PanelContainer"
@@ -307,7 +338,7 @@ Hud/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0
 Hud/constants/outline_size = 8
 Hud/font_sizes/font_size = 44
 Inset/base_type = &"Panel"
-Inset/styles/panel = SubResource("inset")
+Inset/styles/panel = SubResource("slot")
 Label/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
 Label/colors/font_outline_color = Color(0.10196078431372549, 0.0784313725490196, 0.06274509803921569, 0.9)
 LineEdit/colors/caret_color = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
@@ -354,6 +385,7 @@ PopupMenu/styles/panel = SubResource("panel")
 Psykinetic/colors/aloud = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
 Psykinetic/colors/alarm = Color(0.7215686274509804, 0.19607843137254902, 0.16470588235294117, 1)
 Psykinetic/colors/backing = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.86)
+Psykinetic/colors/slot = Color(0.2901960784313726, 0.22745098039215686, 0.1450980392156863, 0.92)
 Psykinetic/colors/backing_deep = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
 Psykinetic/colors/brass = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)
 Psykinetic/colors/brass_bright = Color(1.0, 0.8235294117647058, 0.47843137254901963, 1)
@@ -405,3 +437,5 @@ VScrollBar/styles/scroll = SubResource("scroll_track")
 TooltipLabel/colors/font_color = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
 TooltipLabel/font_sizes/font_size = 30
 TooltipPanel/styles/panel = SubResource("tooltip")
+Tip/base_type = &"PanelContainer"
+Tip/styles/panel = SubResource("tooltip")

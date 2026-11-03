@@ -624,14 +624,10 @@ var _hint_words := ""
 var _place_tile := Vector2i(-100000, -100000)
 var _place_tick := -1
 var _place_words := ""
-## What the counter panel was last placed from (the pack's rect, the shop's box, its own size).
-var _counter_placed_from: Array = []
 ## --test-show=hint: the thing the hint is shown on, as if the cursor were on it.
 var _test_hint_thing: GridEntity
 ## --test-show=herbs: the cell whose pile the hint is shown for (NONE: none).
 var _test_hint_cell := Vector2i(-100000, -100000)
-## --test-show=counter: the pack panel, for the counter screen's sample.
-var _test_counter_shown: Node
 ## The aim ring and outline wear the draw's look (Client3D.draw_look): reset once it ends.
 var _draw_shown := false
 ## The one-time line the first time a townsperson is near (Net.hinted_talk), and when it goes.
@@ -730,8 +726,6 @@ var _note_hover: Label
 const TOWN_SHEET_ASK_MSEC := 5000
 ## Each town's stage as its "town" message last said (591; "" before).
 var town_stages: Dictionary = {}
-## The counter screen beside the pack (CounterPanel; economy's job, 438).
-var counter_panel: CounterPanel
 ## The player's pack, and an open chest or companion's pack (I; a right
 ## click on a chest or your companion).
 var pack_panel: PackPanel
@@ -1296,6 +1290,7 @@ func _process(delta: float) -> void:
 	_update_pack()
 	_update_talk()
 	_update_deal()
+	_update_store()
 	_update_note()
 	_update_room()
 	_update_bar()
@@ -1310,19 +1305,6 @@ func _process(delta: float) -> void:
 			_place_tick = _hud_tick
 			_place_words = place_text(player)
 		compass.place = _place_words
-	if counter_panel != null and pack_panel != null:
-		var at_counter := pack_panel.visible and is_instance_valid(pack_panel.other) \
-				and not World.counter_kind(pack_panel.other).is_empty() or is_instance_valid(_test_counter_shown)
-		counter_panel.visible = at_counter
-		if at_counter:
-			var rect := pack_panel.get_global_rect()
-			var shop_box := shop_panel.box_rect() if shop_panel != null else Rect2()
-			var placed_from := [rect, shop_box, counter_panel.get_combined_minimum_size()]
-			if placed_from != _counter_placed_from:
-				_counter_placed_from = placed_from
-				counter_panel.reset_size()
-				var bottom := shop_box.position.y - ShopPanel.GAP if shop_box.size.y > 0.0 else rect.end.y
-				counter_panel.global_position = Vector2(rect.position.x - counter_panel.size.x - ShopPanel.GAP, bottom - counter_panel.size.y)
 	if _context_hint != null:
 		var at := get_viewport().get_mouse_position()
 		var typing := is_typing()
@@ -6837,25 +6819,16 @@ func _on_counter_work_done(job: Dictionary) -> void:
 				_send_counter(player, entity)
 
 
-## The counter screen fed (economy's "counter" message for the open counter).
+## The store window fed a counter's work (economy's "counter" message for
+## the open counter; 765: the window holds it, CounterPanel's before).
 func _on_counter_told(data: Dictionary) -> void:
-	if counter_panel == null or pack_panel == null or not is_instance_valid(pack_panel.other):
+	if barter_panel == null or pack_panel == null or not is_instance_valid(pack_panel.other):
 		return
 	if str(data.get("counter", "")) != str(pack_panel.other.get_path()):
 		return
-	counter_panel.show_counter(data, slot_title)
-
-
-## What the pack calls the thing in the player's slot [param slot]: the
-## note's head (a named thing's title) or the catalog name.
-func slot_title(slot: int) -> String:
-	var player := _local_player()
-	if player == null or slot < 0 or slot >= player.slots.size():
-		return ""
-	if slot < player.slot_notes.size() and not player.slot_notes[slot].is_empty():
-		var head := player.slot_notes[slot].split("\n", false)[0]
-		return head.substr(0, head.find(",")) if head.contains(",") else head
-	return Items.name_of(player.slots[slot])
+	if not barter_panel.is_open() or barter_panel.with != pack_panel.other:
+		barter_panel.open(pack_panel.other, "")
+	barter_panel.show_counter(data)
 
 
 func _order_at_counter(slot: int, effect: String, to_id: String) -> void:
@@ -12345,6 +12318,9 @@ func _build_talk() -> void:
 	barter_panel.pack = pack_panel
 	barter_panel.trade_asked.connect(_trade)
 	barter_panel.care_asked.connect(_retain)
+	barter_panel.offer_asked.connect(_offer_deal)  # 765: a ware picked and bought (Rolf's stall, a pedlar's).
+	barter_panel.order_asked.connect(_order_at_counter)  # 765: work ordered at a counter.
+	barter_panel.collect_asked.connect(_collect_at_counter)
 	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):
@@ -12407,10 +12383,6 @@ func _build_talk() -> void:
 			_swap_chat_channel()
 			_chat_box.accept_event())
 	talk.set_box(_chat_box)
-	counter_panel = CounterPanel.new()
-	counter_panel.order_pressed.connect(_order_at_counter)
-	counter_panel.collect_pressed.connect(_collect_at_counter)
-	$HUD.add_child(counter_panel)
 	counter_told.connect(_on_counter_told)
 	world_map_panel = WorldMapPanel.new()
 	world_map_panel.guide_asked.connect(_ask_guide)  # The map's "ask her to lead you there" (551).
@@ -12671,10 +12643,11 @@ func _on_offers_message(data: Dictionary) -> void:
 		else:
 			deal_panel.close()
 	elif who is Resident and deal_panel != null:
-		# A townsperson's wares (the Rolf fix): Rolf's starter stall (736), a pedlar's pack (711).
-		if not DealPanel.wares_of(data.get("offers", []) if data.get("offers") is Array else []).is_empty():
-			deal_panel.show_wares(str(data.get("speaker", "")), data["offers"], gold, who.get_instance_id())
-		elif deal_panel.visible and deal_panel.entity_id == who.get_instance_id():
+		# A townsperson's wares (the Rolf fix): Rolf's starter stall (736), a pedlar's pack (711), in the
+		# store window since 765 (none closes it if it shows theirs).
+		if barter_panel != null:
+			barter_panel.show_wares(who, str(data.get("speaker", "")), data.get("offers", []) if data.get("offers") is Array else [], gold)
+		if deal_panel.visible and deal_panel.entity_id == who.get_instance_id():
 			deal_panel.close()
 
 
@@ -12738,6 +12711,20 @@ func _update_deal() -> void:
 		deal_panel.close()
 	elif deal_panel.purse != gold:
 		deal_panel.set_purse(gold)
+
+
+## The store window watched (765): open on a townsperson (a maker, a
+## ware seller), closed once they are gone or out of hearing; a ware
+## seller's purse follows the player's gold.
+func _update_store() -> void:
+	if barter_panel == null or not barter_panel.is_open() or not barter_panel.with is Resident:
+		return
+	var who := barter_panel.with
+	var player := _local_player()
+	if not is_instance_valid(who) or not who.spawned or player == null or World.distance(player.tile, talk_cell(who)) > HEARING_RANGE:
+		barter_panel.close()
+	elif barter_panel.data.is_empty() and barter_panel.purse != gold:
+		barter_panel.set_purse(gold)
 
 
 ## The HUD's words while an offer stands (536, ui's side): how to take it, and what it is.
@@ -17404,7 +17391,9 @@ func open_other(target: GridEntity) -> void:
 		var player := _local_player()
 		if player != null:
 			World.command(player, "barter", {"shop": str(target.get_path())})
-	if counter_panel != null and target != null and not World.counter_kind(target).is_empty():
+	if barter_panel != null and target != null and not World.counter_kind(target).is_empty():
+		if barter_panel.with != target:
+			barter_panel.open(target, "")  # 765: the counter's work in the store window.
 		var player := _local_player()
 		if player != null:
 			World.command(player, "counter", {"counter": str(target.get_path()), "do": "look"})
@@ -19221,16 +19210,15 @@ func _run_test_show(player: Player) -> void:
 			"game_menu":
 				escape()
 			"counter":
-				# The counter screen with sample data in economy's shape (a test's words).
+				# The counter's work in the store window (765) with sample data in economy's shape (a test's words).
 				pack_panel.shown = true
-				_test_counter_shown = pack_panel
-				counter_panel.show_counter({"kind": "temple", "why": "",
+				barter_panel.open(null, "")
+				barter_panel.show_counter({"kind": "temple", "why": "",
 					"jobs": [{"slot": 0, "uid": 1, "id": "dagger", "effect": "bless", "price": 6, "ok": true},
 						{"slot": 1, "uid": 2, "id": "hammer", "effect": "reforge", "to_id": "sword", "price": 12,
 							"materials": {"ore": 2}, "ok": false, "why": "the town lacks 2 ore"}],
 					"working": [{"uid": 3, "id": "bow", "effect": "bless", "left": 900, "left_seconds": 90}],
-					"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]},
-					func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
+					"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]})
 			"shot":
 				get_tree().create_timer(3.0).timeout.connect(take_screenshot)  # The log line and the first-time hint, in the shot.
 			"led", "guide_map":

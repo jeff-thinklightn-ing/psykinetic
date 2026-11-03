@@ -24,13 +24,8 @@ extends PanelContainer
 ## A quest's step (747, ui's side: the fallen knight's ask, not yet or
 ## turn-in; what.level "quest", cost 0) is one button with its own title,
 ## sending gold 0, with no purse line and no strike line.
-## A townsperson's wares (the Rolf fix, ui's side: a Resident's "offers"
-## holding lines whose accept is Offers.VENDOR_WARES, the starter stall's
-## keeper, 736, or Offers.WARES, a pedlar's, 711) are one button a ware,
-## its title ("A sword, 1 gold"), enabled while the purse covers its cost,
-## sending its id with that cost; the purse line names the cheapest when
-## short, and there is no strike line. Before this, no client path took
-## a resident's wares at all (typed words skip visitors).
+## A townsperson's wares (Rolf's stall, a pedlar's) were buttons here until
+## 765: the store window (BarterPanel) shows them now.
 ## Words only (747 amended (5), ui's side: the fallen knight once his quest is
 ## done; Jeff: "fallen knight was not interactable"): an offer whose accept is
 ## WORDS_ONLY ("none"), shown when he offers no deal and no refusal, is his
@@ -58,8 +53,6 @@ var entity_id := 0
 var deal: Dictionary = {}
 ## The purse the buttons were last enabled against.
 var purse := -1
-## The wares shown (a townsperson's, is_ware), [] while a deal is shown.
-var wares: Array[Dictionary] = []
 
 var _title: Label
 var _words: Label
@@ -88,7 +81,7 @@ func _ready() -> void:
 	_words = Label.new()
 	_words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_words)
-	_buttons = HFlowContainer.new()  # A stall's ten wares wrap.
+	_buttons = HFlowContainer.new()
 	_buttons.add_theme_constant_override("h_separation", UiTheme.constant("row"))
 	_buttons.add_theme_constant_override("v_separation", UiTheme.constant("row"))
 	column.add_child(_buttons)
@@ -107,7 +100,6 @@ func _ready() -> void:
 ## purse of [param gold], under [param id] (his instance id): the first
 ## deal with steps is shown, a button a step; none closes the window.
 func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
-	wares = []
 	deal = first_deal(offers)
 	var refuse := no_deal(offers)
 	if deal.is_empty():
@@ -153,48 +145,9 @@ func show_deals(speaker: String, offers: Array, gold: int, id: int) -> void:
 	visible = true
 
 
-## [param speaker]'s wares among [param offers] (wares_of; a Resident's
-## "offers" message) for a purse of [param gold], under [param id] (their
-## instance id): a button a ware; none closes the window.
-func show_wares(speaker: String, offers: Array, gold: int, id: int) -> void:
-	wares = wares_of(offers)
-	deal = {}
-	if wares.is_empty():
-		close()
-		return
-	entity_id = id
-	_title.text = speaker
-	_words.text = ""
-	_words.visible = false
-	for child in _buttons.get_children():
-		_buttons.remove_child(child)
-		child.queue_free()
-	for ware in wares:
-		var button := Button.new()
-		button.text = str(ware.get("title", ""))
-		button.focus_mode = Control.FOCUS_NONE
-		button.pressed.connect(_pressed.bind(str(ware.get("id", "")), int(ware.get("cost", 0))))
-		_buttons.add_child(button)
-	set_purse(gold)
-	_purse.visible = true
-	_strike.visible = false
-	visible = true
-
-
 ## The buttons enabled against [param gold], and the purse line.
 func set_purse(gold: int) -> void:
 	purse = gold
-	if not wares.is_empty():
-		var costs: Array[int] = []
-		var at := 0
-		for child in _buttons.get_children():
-			if child is Button and at < wares.size():
-				child.disabled = int(wares[at].get("cost", 0)) > gold
-				costs.append(int(wares[at].get("cost", 0)))
-			at += 1
-		costs.sort()
-		_purse.text = wares_purse_words(gold, costs)
-		return
 	var steps := steps_of(deal)
 	var i := 0
 	for child in _buttons.get_children():
@@ -208,7 +161,6 @@ func close() -> void:
 	visible = false
 	entity_id = 0
 	deal = {}
-	wares = []
 	purse = -1
 
 
@@ -258,23 +210,6 @@ static func is_quest(deal: Dictionary) -> bool:
 	return what is Dictionary and str(what.get("level", "")) == "quest"
 
 
-## Whether [param offer] is a ware a townsperson sells (its accept the
-## starter stall's Offers.VENDOR_WARES or a pedlar's Offers.WARES).
-static func is_ware(offer: Variant) -> bool:
-	if not offer is Dictionary or str(offer.get("id", "")).is_empty() or bool(offer.get("open", false)):
-		return false
-	return str(offer.get("accept", "")) in [Offers.VENDOR_WARES, Offers.WARES]
-
-
-## The wares among [param offers] (is_ware), in their order.
-static func wares_of(offers: Array) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
-	for each: Variant in offers:
-		if is_ware(each):
-			out.append(each)
-	return out
-
-
 ## [param deal]'s sums of gold, least first: its what.steps, else its cost;
 ## [0] for a free deal (no steps, "cost" given as 0: 548 amended, ui's side).
 static func steps_of(deal: Dictionary) -> Array[int]:
@@ -302,12 +237,3 @@ static func purse_words(gold: int, steps: Array[int]) -> String:
 		return "You have %d gold; he asks %d at the least." % [gold, steps[0]]
 	return "You have %d gold." % gold
 
-
-## The wares' purse line (voice's words): what you have; short of the least
-## of them, what that costs.
-static func wares_purse_words(gold: int, costs: Array[int]) -> String:
-	if not costs.is_empty() and gold < costs[0]:
-		if gold <= 0:
-			return "You have no gold; nothing here costs less than %d." % costs[0]
-		return "You have %d gold; nothing here costs less than %d." % [gold, costs[0]]
-	return "You have %d gold." % gold

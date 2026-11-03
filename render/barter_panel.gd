@@ -1,95 +1,158 @@
 class_name BarterPanel
 extends Control
-## The barter window (decision 560, ui's side; Jeff, 2026-10-21: "the window
-## should show the npc's inventory of goods, next your pack, hovering over
-## an item would show what the npc will pay in gold, or what they'll take in
-## gold... click to select what you want to trade, it would show a sum in
-## the bottom... the button changes to +sword -hide +10g = Confirm"). The
-## merchant's goods as a row of slot boxes in the pack's look, beside the
-## pack; the pack's own boxes are the player's side (PackPanel's select and
-## hover hooks). Hover: "takes 10 gold" over theirs, "pays 20 gold" (or
-## "pays 5 gold, fenced", or "won't buy") over the player's. A click selects
-## on either side, a second unselects; the foot's one button reads the sum
-## from the player's side, "+sword -hide +10g = Confirm", and sends
-## economy's "trade" command (trade_asked; Main sends it). The server
-## prices the trade and answers with the barter message again
-## (show_barter), a refusal's why under the foot in rust (refused: Main's
-## error sound). Economy's wire (560, economy's side; 562: the trade is
-## with a person, "resident" in place of "shop"): "barter" {resident,
-## town, gold, goods: [{uid, id, price}], buys: {id: {gold, up_to}},
-## fenced: {uid: gold}, pack: [{slot, uid, id}], why}; "trade" {resident,
-## give: [uids], take: [uids], gold}. In the shared theme's look (UiTheme,
-## docs/ui_style.md); sizes in the HUD's 3840 x 2160 units.
+## The store window (decision 765; Jeff approved the round-2 mocks,
+## C:/dev/review/store_layout/round2: "the method is select item, then
+## click buy, i'd like the gold and number to be an overlay over the icons,
+## when items are selected it says Buy ("x" items) and hovering over the
+## button shows a Total on a pop-up"). One window beside the pack for every
+## seller, the barter window of 560 grown to hold them all:
+## - a shop's or a maker's goods (economy's "barter" message, 560 and 562),
+##   with what they pay for the player's things as a chip over each pack
+##   square (PackPanel.prices) and the things they won't buy dimmed;
+## - the healer's care (584 amended): Healing, a square for each way to pay
+##   (gold, herbs, antlers), the "retain" command;
+## - a townsperson's wares (Rolf's stall, 736; a pedlar's pack, 711): the
+##   "offers" lines whose accept is a ware, one "offer" command a pick (they
+##   were DealPanel's buttons before 765);
+## - the temple's and the smith's counter (economy's "counter" message, 438;
+##   CounterPanel's rows before 765): the player's own things that can be
+##   worked, each with the work's mark (art-kit's art/ui/marks, 3b0a2f3c),
+##   the work in hand with its time left, and the work ready, a bright frame
+##   that a click collects.
+## Every square in the pack's look, the price a chip over its corner (a coin,
+## or what is paid, and the number); hover: the name alone (Jeff: no
+## explaining captions), voice's words for the services. A click picks a
+## square, a second unpicks it; the one button names what is done and how
+## many (voice's verbs: Buy, Sell or Trade for goods, Pay for Healing, the
+## work's own verb at a counter: "Bless (2 items)"); hovering it shows the
+## Total (a pop-up beside it). A pick of another kind (Healing, or another
+## kind of work) lets the last go. The server prices it all and answers with
+## its message again; a refusal's why under the grid in rust (refused:
+## Main's error sound). Sizes in the HUD's 3840 x 2160 units; the look the
+## shared theme's (UiTheme, docs/ui_style.md).
 
 const GAP := 20
-const ROW_WIDTH := 1100.0
-## The theme's: a price in brass, gold going out and a refusal in rust,
-## the hover's words dim, a selected box's frame in bright brass.
+## Squares a line before the grid wraps.
+const COLUMNS := 6
+## A price chip: its height, and the coin's radius.
+const CHIP_HEIGHT := 40
+const COIN_RADIUS := 11
+## The theme's: a price in brass, a refusal in rust, the hover's words dim,
+## a picked square's frame bright brass.
 static var PRICE: Color = UiTheme.color("brass")
 static var OUT: Color = UiTheme.color("rust")
 static var DIM: Color = UiTheme.color("text_dim")
 static var SELECT: Color = UiTheme.color("brass_bright")
 
-## Confirm: the trade for Main to send ([param gold] signed from the
-## player's side, positive when they receive).
-signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
-## The server refused the trade: [param why].
-signal refused(why: String)
-## The healer's care (economy's healer's care): the player asks to be in
-## [param with]'s care for the message's care.gold (Main sends "retain").
-signal care_asked(with: GridEntity, pay: String)
+## Voice's names for the services, the hover over their squares.
+const SERVICE_NAMES := {"care": "Healing", "bless": "Blessing", "reforge": "Remaking", "mend": "Mending"}
+## Voice's verbs for work ordered at a counter, the button's first word.
+const WORK_VERBS := {"bless": "Bless", "reforge": "Remake", "mend": "Mend"}
+## The counter's title by its kind (CounterPanel's before 765).
+const COUNTER_TITLES := {"temple": "The temple's counter", "shop": "The smith's counter"}
 ## The ways into the healer's care (584 amended; Jeff: 10 gold, 5 herbs or 5
-## antlers handed to him, or his first quest): a button each while its
-## price in the message is above 0.
+## antlers handed to him): a square each while its price is above 0.
 const CARE_PAYS: Array[String] = ["gold", "herbs", "antlers"]
+## A true minus sign for a Trade's Total (voice).
+const MINUS := "\u2212"
+
+## Goods: the trade asked (gold signed from the player's side, positive when
+## they receive).
+signal trade_asked(with: GridEntity, give: Array, take: Array, gold: int)
+## The server refused: [param why].
+signal refused(why: String)
+## Healing: the player asks for [param with]'s care, paid by [param pay].
+signal care_asked(with: GridEntity, pay: String)
+## A ware: its offer id and its cost (Main sends "offer").
+signal offer_asked(id: String, gold: int)
+## Work at a counter: the slot, the effect, the target id ("" but for a reforge).
+signal order_asked(slot: int, effect: String, to_id: String)
+## Work ready at a counter: the thing's uid (Main sends "counter" collect).
+signal collect_asked(uid: int)
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
-## What is traded at or with: the shop's counter (560, a Chest; the town's
-## shop, the merchant's) or a maker in person (562, a Resident; their own
-## make, the message's "resident"); null closed, or a test's sample.
+## What is traded at or with: a shop's counter (560) or a counter (438), a
+## maker in person or a ware seller (562, a Resident); null closed, or a
+## test's sample.
 var with: GridEntity
-## Who fronts it, for the title ("Snagfin's shop", "Oda's goods"); "" for
-## "The shop".
+## Who fronts it, for the title; "" for none.
 var merchant := ""
-## The barter message as last received.
+## The barter message as last received ({} at a counter alone).
 var data: Dictionary = {}
-## Selected: the player's uids to give, the shop's uids to take.
+## The counter message as last received ({} for none).
+var counter: Dictionary = {}
+## The wares shown (a townsperson's offers whose accept is a ware).
+var wares: Array[Dictionary] = []
+## The purse as last told (the message's gold, or Main's).
+var purse := 0
+## Picked: the player's uids to give, the merchant's uids to take, the wares'
+## ids (to their cost), the care's way to pay ("" none), the counter's jobs
+## (by slot) to order.
 var give: Dictionary = {}
 var take: Dictionary = {}
+var wares_pick: Dictionary = {}
+var care_pay := ""
+var jobs_pick: Dictionary = {}
 
 var _open := false
 var _box: PanelContainer
 var _title: Label
-var _goods: HBoxContainer
+var _grid: GridContainer
 var _hover: Label
-var _foot: Label
 var _button: Button
+var _foot: Label
 var _why: Label
+var _total: PanelContainer
+var _total_chip: HBoxContainer
+var _tip: PanelContainer
+var _tip_words: Label
 var _hover_words := ""
-## The healer's care row: the button to pay for it, or the line while held.
-var _care: Dictionary = {}  # pay -> Button
-var _care_held: Label
+var _marks: Dictionary = {}
+## An icon asked for and not drawn yet: the squares are laid out again when
+## it arrives (ItemIcons.icon_ready), as the pack's are.
+var _icons_due := false
 
 
-## One of the merchant's things: a box in the pack's look, clicked to
-## select, hovered for its price.
-class GoodBox:
+## A coin, drawn: a brass disc with a ring, the price chips' mark for gold.
+class Coin:
+	extends Control
+	var radius := COIN_RADIUS
+
+	func _init(r := COIN_RADIUS) -> void:
+		radius = r
+		custom_minimum_size = Vector2.ONE * (2 * r + 2)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func _draw() -> void:
+		var middle := size / 2.0
+		draw_circle(middle, radius, UiTheme.color("brass"))
+		var brass := UiTheme.color("brass")
+		draw_arc(middle, radius, 0.0, TAU, 24, brass.darkened(0.35), 2.0, true)
+		draw_arc(middle, radius * 0.5, 0.0, TAU, 16, brass.lightened(0.3), 2.0, true)
+
+
+## One square: a good, a ware, a way to pay for Healing, a job, the work in
+## hand or ready. Clicked to pick, hovered for its name.
+class StoreBox:
 	extends Panel
 	var window: BarterPanel
-	var uid := 0
-	var id := ""
-	var label: Label
+	## What it is: "good" (key a uid), "ware" (an offer id), "care" (a pay),
+	## "job" (a slot), "working" or "ready" (a uid).
+	var kind := ""
+	var key: Variant
+	var words := ""
 	var icon: TextureRect
+	var chips: VBoxContainer
 
 	func _ready() -> void:
-		mouse_entered.connect(func() -> void: window._hover_theirs(uid))
-		mouse_exited.connect(func() -> void: window._hover_none())
+		mouse_entered.connect(func() -> void: window._show_tip(self))
+		mouse_exited.connect(func() -> void: window._hide_tip())
 
 	func _gui_input(event: InputEvent) -> void:
 		var click := event as InputEventMouseButton
 		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
-			window.toggle_take(uid)
+			window.click_box(kind, key)
 			accept_event()
 
 
@@ -104,26 +167,15 @@ func _ready() -> void:
 	_title = Label.new()
 	_title.theme_type_variation = &"Heading"
 	column.add_child(_title)
-	_goods = HBoxContainer.new()
-	_goods.add_theme_constant_override("separation", UiTheme.constant("slot_gap"))
-	column.add_child(_goods)
-	var care_row := HBoxContainer.new()
-	care_row.add_theme_constant_override("separation", UiTheme.constant("row"))
-	column.add_child(care_row)
-	for pay: String in CARE_PAYS:
-		var button := Button.new()
-		button.focus_mode = Control.FOCUS_NONE
-		button.pressed.connect(_ask_care.bind(pay))
-		care_row.add_child(button)
-		_care[pay] = button
-	_care_held = Label.new()
-	_care_held.theme_type_variation = &"Caption"
-	_care_held.add_theme_color_override("font_color", DIM)
-	column.add_child(_care_held)
+	_grid = GridContainer.new()
+	_grid.columns = COLUMNS
+	_grid.add_theme_constant_override("h_separation", UiTheme.constant("slot_gap"))
+	_grid.add_theme_constant_override("v_separation", UiTheme.constant("slot_gap"))
+	column.add_child(_grid)
 	_hover = Label.new()
 	_hover.theme_type_variation = &"Caption"
 	_hover.add_theme_color_override("font_color", DIM)
-	_hover.custom_minimum_size.x = ROW_WIDTH
+	_hover.visible = false
 	column.add_child(_hover)
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", UiTheme.constant("row"))
@@ -131,6 +183,8 @@ func _ready() -> void:
 	_button = Button.new()
 	_button.focus_mode = Control.FOCUS_NONE
 	_button.pressed.connect(_confirm)
+	_button.mouse_entered.connect(_show_total)
+	_button.mouse_exited.connect(func() -> void: _total.visible = false)
 	foot.add_child(_button)
 	_foot = Label.new()
 	_foot.theme_type_variation = &"Caption"
@@ -138,11 +192,35 @@ func _ready() -> void:
 	_foot.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	foot.add_child(_foot)
 	_why = Label.new()
+	_why.theme_type_variation = &"Caption"
 	_why.add_theme_color_override("font_color", OUT)
 	_why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_why.custom_minimum_size.x = ROW_WIDTH
+	_why.custom_minimum_size.x = 600
 	column.add_child(_why)
 	add_child(_box)
+	# The Total, a pop-up beside the button while the mouse is on it.
+	_total = PanelContainer.new()
+	_total.theme_type_variation = &"Tip"
+	_total.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_total.visible = false
+	var total_row := HBoxContainer.new()
+	total_row.add_theme_constant_override("separation", UiTheme.constant("row"))
+	var total_word := Label.new()
+	total_word.text = "Total"
+	total_row.add_child(total_word)
+	_total_chip = HBoxContainer.new()
+	_total_chip.add_theme_constant_override("separation", 6)
+	total_row.add_child(_total_chip)
+	_total.add_child(total_row)
+	add_child(_total)
+	# The name over a square, a tip beside the cursor.
+	_tip = PanelContainer.new()
+	_tip.theme_type_variation = &"Tip"
+	_tip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_tip.visible = false
+	_tip_words = Label.new()
+	_tip.add_child(_tip_words)
+	add_child(_tip)
 	if pack != null:
 		pack.select_hook = _select_mine
 		pack.hover_hook = _hover_mine
@@ -151,26 +229,55 @@ func _ready() -> void:
 
 ## Opens the window for a trade with [param person] (their name [param
 ## who]); the goods come with the server's barter message (Main sends the
-## "barter" command).
+## "barter" command), a counter's work with its "counter" message.
 func open(person: GridEntity, who := "") -> void:
 	if person != with:
 		data = {}
+		counter = {}
+		wares = []
 	with = person
 	merchant = who
-	give.clear()
-	take.clear()
+	_clear_picks()
 	_open = true
 	_hover_words = ""
 	_rebuild()
 
 
+## Opens the window on [param person]'s wares among [param offers] (wares_of:
+## Rolf's stall, a pedlar's pack), [param gold] in the purse; none closes it
+## if it shows theirs.
+func show_wares(person: GridEntity, who: String, offers: Array, gold: int) -> void:
+	var found := wares_of(offers)
+	if found.is_empty():
+		if _open and with == person and not wares.is_empty():
+			close()
+		return
+	if not _open or with != person:
+		open(person, who)
+	wares = found
+	purse = gold
+	for id: Variant in wares_pick.keys():
+		if ware_entry(str(id)).is_empty():
+			wares_pick.erase(id)
+	_rebuild()
+
+
+## The purse as Main last read it (a ware seller's window, no barter message).
+func set_purse(gold: int) -> void:
+	if gold != purse:
+		purse = gold
+		_rebuild()
+
+
 func close() -> void:
 	_open = false
 	with = null
-	give.clear()
-	take.clear()
+	_clear_picks()
 	data = {}
+	counter = {}
+	wares = []
 	_hover_words = ""
+	_hide_tip()
 	_rebuild()
 
 
@@ -179,22 +286,41 @@ func is_open() -> bool:
 
 
 ## The server's barter message: for the person open (its "resident" path,
-## or 560's "shop" until economy retires it; a sample names neither, tests
-## and shots); a selection of something gone is dropped; a refusal's why
-## shown and said (refused).
+## or 560's "shop"; a sample names neither, tests and shots); a pick of
+## something gone is dropped; a refusal's why shown and said (refused).
 func show_barter(given: Dictionary) -> void:
 	if not _open:
 		return
 	if is_instance_valid(with) and with.is_inside_tree() and not for_path(given, str(with.get_path())):
 		return
 	data = given
+	purse = int(given.get("gold", purse))
 	for uid: Variant in take.keys():
 		if not goods_have(int(uid)):
 			take.erase(uid)
 	for uid: Variant in give.keys():
 		if pack_entry(int(uid)).is_empty():
 			give.erase(uid)
+	if not care_pay.is_empty() and not care_open(care_pay):
+		care_pay = ""
 	var why := str(data.get("why", ""))
+	if not why.is_empty():
+		refused.emit(why)
+	_rebuild()
+
+
+## The counter message (economy's, 438) for the counter open; a pick no
+## longer offered is dropped; a refusal's why shown and said.
+func show_counter(given: Dictionary) -> void:
+	if not _open:
+		return
+	counter = given
+	if given.has("gold"):
+		purse = int(given["gold"])
+	for slot: Variant in jobs_pick.keys():
+		if job_at(int(slot)).is_empty():
+			jobs_pick.erase(slot)
+	var why := str(given.get("why", ""))
 	if not why.is_empty():
 		refused.emit(why)
 	_rebuild()
@@ -210,28 +336,96 @@ static func for_path(given: Dictionary, path: String) -> bool:
 	return named.is_empty() or named == path
 
 
-## The window's title: the shop's at a counter ("Snagfin's shop", "The
-## shop"), a maker's own goods in person ("Oda's goods").
-static func title_words(who: String, in_person: bool) -> String:
-	if in_person:
-		return "%s's goods" % who if not who.is_empty() else "Their goods"
-	return "%s's shop" % who if not who.is_empty() else "The shop"
+## The window's title: the seller's name (765: the name alone); at a
+## counter with nobody named, the counter's ("The temple's counter"); else
+## "The shop".
+static func title_words(who: String, counter_kind := "") -> String:
+	if not who.is_empty():
+		return who
+	return str(COUNTER_TITLES.get(counter_kind, "The shop"))
 
 
-## The words where the goods would be when [param given] has none:
-## "nothing to trade" when they buy nothing either (a maker with a bare
-## shelf who needs nothing now, 562), else "nothing for sale".
+## The words where the squares would be when there are none: "nothing to
+## trade" when they buy nothing either (a maker with a bare shelf who needs
+## nothing now, 562), else "nothing for sale".
 static func empty_words(given: Dictionary) -> String:
 	var buys: Variant = given.get("buys", {})
 	return "nothing for sale" if buys is Dictionary and not buys.is_empty() else "nothing to trade"
 
 
+## "Buy (2 items)": the verb and the count (voice: "item" at one).
+static func button_words(verb: String, count: int, noun := "item") -> String:
+	return "%s (%d %s%s)" % [verb, count, noun, "" if count == 1 else "s"]
+
+
+## Healing's button: "Pay (10 gold)", "Pay (1 herb)", "Pay (3 herbs)", "Pay
+## (1 pair of antlers)" (voice: what is handed over, singular at one; an
+## antlers unit is a pair).
+static func pay_words(pay: String, amount: int) -> String:
+	match pay:
+		"herbs":
+			return "Pay (%d %s)" % [amount, "herb" if amount == 1 else "herbs"]
+		"antlers":
+			return "Pay (%d %s of antlers)" % [amount, "pair" if amount == 1 else "pairs"]
+	return "Pay (%d %s)" % [amount, pay]
+
+
+## The Total's number: plain for Buy and Sell (the button says which way);
+## a Trade's signed, "+20" when the player comes out ahead, "−20" when they
+## pay (voice: a true minus sign).
+static func total_words(amount: int, signed: bool) -> String:
+	if not signed:
+		return str(absi(amount))
+	if amount < 0:
+		return MINUS + str(-amount)
+	return "+%d" % amount
+
+
+## What the foot says when the purse can't cover what is owed (voice):
+## "You need 3 more gold."; "" otherwise.
+static func shortfall_words(gold: int, held: int) -> String:
+	return "You need %d more gold." % (-gold - held) if gold < 0 and -gold > held else ""
+
+
+## The hover's stack words (619, ui's side): "3 of 5 to give" over a stack
+## with some picked, "" over a lone thing or none picked.
+static func stack_words(given: int, count: int) -> String:
+	return "%d of %d to give" % [given, count] if count > 1 and given > 0 else ""
+
+
+## Whether [param offer] is a ware a townsperson sells (its accept the
+## starter stall's Offers.VENDOR_WARES or a pedlar's Offers.WARES).
+static func is_ware(offer: Variant) -> bool:
+	if not offer is Dictionary or str(offer.get("id", "")).is_empty() or bool(offer.get("open", false)):
+		return false
+	return str(offer.get("accept", "")) in [Offers.VENDOR_WARES, Offers.WARES]
+
+
+## The wares among [param offers] (is_ware), in their order.
+static func wares_of(offers: Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for each: Variant in offers:
+		if is_ware(each):
+			out.append(each)
+	return out
+
+
+## A ware's item id (its what.item).
+static func ware_item(offer: Dictionary) -> String:
+	var what: Variant = offer.get("what", {})
+	return str(what.get("item", "")) if what is Dictionary else ""
+
+
+func ware_entry(id: String) -> Dictionary:
+	for each: Dictionary in wares:
+		if str(each.get("id", "")) == id:
+			return each
+	return {}
+
+
 ## Whether the merchant still has [param uid] for sale.
 func goods_have(uid: int) -> bool:
-	for each: Variant in data.get("goods", []):
-		if each is Dictionary and int(each.get("uid", 0)) == uid:
-			return true
-	return false
+	return not goods_entry(uid).is_empty()
 
 
 ## The goods entry for [param uid], {} for none.
@@ -263,19 +457,13 @@ static func stack_units(entry: Dictionary) -> Array:
 	return [int(entry.get("uid", 0))] if entry.has("uid") else []
 
 
-## How many of [param entry]'s units are selected to give.
+## How many of [param entry]'s units are picked to give.
 func given_of(entry: Dictionary) -> int:
 	var n := 0
 	for uid: int in stack_units(entry):
 		if give.has(uid):
 			n += 1
 	return n
-
-
-## The hover's stack words (619, ui's side): "3 of 5 to give" over a stack
-## with some selected, "" over a lone thing or none selected.
-static func stack_words(given: int, count: int) -> String:
-	return "%d of %d to give" % [given, count] if count > 1 and given > 0 else ""
 
 
 ## The player's pack entry at [param slot], {} for an empty one.
@@ -331,57 +519,165 @@ func balance_of(gives: Array, takes: Array) -> int:
 	return sum
 
 
-## The sum's words, Jeff's form: "+sword -hide +10g" (what the player
-## takes with +, what they give with -, the gold they receive or pay);
-## "" for nothing selected.
-static func sum_words(takes: Array, gives: Array, gold: int) -> String:
-	var parts := PackedStringArray()
-	for name: Variant in takes:
-		parts.append("+%s" % name)
-	for name: Variant in gives:
-		parts.append("-%s" % name)
-	if gold != 0 and not parts.is_empty():
-		parts.append("%+dg" % gold)
-	return " ".join(parts)
+## The care the barter message offers ({} for none), and whether [param
+## pay] is a way in now (not held, its price above 0).
+func care() -> Dictionary:
+	return data["care"] if data.get("care") is Dictionary else {}
 
 
-## The hover's words for one of theirs ([param price]) or one of the
-## player's ([param pays], 0 when they won't buy; [param fenced] for the
-## half price of grave goods).
-static func hover_words(theirs: bool, price: int, pays: int, fenced: bool) -> String:
-	if theirs:
-		return "takes %d gold" % price
-	if pays <= 0:
-		return "won't buy"
-	return "pays %d gold, fenced" % pays if fenced else "pays %d gold" % pays
+func care_open(pay: String) -> bool:
+	var offered := care()
+	return not offered.is_empty() and not bool(offered.get("in_care", false)) and int(offered.get(pay, 0)) > 0
 
 
-## The button's words: the sum then "= Confirm"; "Confirm" alone with
-## nothing selected.
-static func button_words(sum: String) -> String:
-	return "%s = Confirm" % sum if not sum.is_empty() else "Confirm"
+## What the player has handed toward [param pay] so far: the care's
+## "given" {herbs, antlers} (npc's, 584 amended (2)); 0 without it.
+static func care_given(offered: Variant, pay: String) -> int:
+	if not offered is Dictionary or not offered.get("given") is Dictionary:
+		return 0
+	return int((offered["given"] as Dictionary).get(pay, 0))
 
 
-## What the foot says under the sum: the shortfall when the purse can't
-## cover the gold owed, else "".
-static func shortfall_words(gold: int, purse: int) -> String:
-	return "you need %d more gold" % (-gold - purse) if gold < 0 and -gold > purse else ""
+## What paying by [param pay] hands over now: the gold whole; herbs or
+## antlers, those held up to what is left to go (instalments, 584 amended (2)).
+func care_hands(pay: String) -> int:
+	var offered := care()
+	var price := int(offered.get(pay, 0))
+	if pay == "gold":
+		return price
+	var held := 0
+	for each: Variant in data.get("pack", []):
+		if each is Dictionary and str(each.get("id", "")) == pay:
+			held += maxi(int(each.get("count", 1)), stack_units(each).size())
+	return mini(held, maxi(price - care_given(offered, pay), 0))
 
 
-## A click on one of the merchant's things: selected or unselected.
+## The counter's job for [param slot], {} for none.
+func job_at(slot: int) -> Dictionary:
+	for each: Variant in counter.get("jobs", []):
+		if each is Dictionary and int(each.get("slot", -1)) == slot:
+			return each
+	return {}
+
+
+## What the picks come to: {verb, count, noun, gold (signed, the player's
+## side), total ([kind, amount] chips), signed (a Trade's), ok}; {} for none.
+func action() -> Dictionary:
+	if not care_pay.is_empty():
+		var hands := care_hands(care_pay)
+		return {"words": pay_words(care_pay, hands), "gold": -hands if care_pay == "gold" else 0,
+			"total": [[care_pay, hands]], "signed": false, "ok": hands > 0}
+	if not jobs_pick.is_empty():
+		var gold := 0
+		var ok := true
+		var effect := ""
+		for slot: Variant in jobs_pick:
+			var job := job_at(int(slot))
+			gold += int(job.get("price", 0))
+			ok = ok and bool(job.get("ok", true))
+			effect = str(job.get("effect", ""))
+		return {"words": button_words(str(WORK_VERBS.get(effect, "Order")), jobs_pick.size()), "gold": -gold,
+			"total": [["gold", gold]], "signed": false, "ok": ok}
+	if not wares_pick.is_empty():
+		var cost := 0
+		for id: Variant in wares_pick:
+			cost += int(wares_pick[id])
+		return {"words": button_words("Buy", wares_pick.size()), "gold": -cost, "total": [["gold", cost]], "signed": false, "ok": true}
+	if give.is_empty() and take.is_empty():
+		return {}
+	var balance := balance_of(give.keys(), take.keys())
+	var verb := "Trade" if not give.is_empty() and not take.is_empty() else "Sell" if take.is_empty() else "Buy"
+	return {"words": button_words(verb, give.size() + take.size()), "gold": balance, "total": [["gold", balance]],
+		"signed": verb == "Trade", "ok": true}
+
+
+## A click on one of the window's squares, by its kind and key.
+func click_box(kind: String, key: Variant) -> void:
+	if not _open:
+		return
+	match kind:
+		"good":
+			toggle_take(int(key))
+		"ware":
+			toggle_ware(str(key))
+		"care":
+			toggle_care(str(key))
+		"job":
+			toggle_job(int(key))
+		"ready":
+			collect_asked.emit(int(key))
+
+
+## A pick of [param group] ("goods", "care", or a work's effect) lets the
+## picks of any other go: one kind of thing is done at a time.
+func _keep_only(group: String) -> void:
+	if group != "goods":
+		give.clear()
+		take.clear()
+		wares_pick.clear()
+	if group != "care":
+		care_pay = ""
+	for slot: Variant in jobs_pick.keys():
+		if str(job_at(int(slot)).get("effect", "")) != group:
+			jobs_pick.erase(slot)
+
+
+func _clear_picks() -> void:
+	give.clear()
+	take.clear()
+	wares_pick.clear()
+	care_pay = ""
+	jobs_pick.clear()
+
+
+## A click on one of the merchant's goods: picked or unpicked.
 func toggle_take(uid: int) -> void:
 	if not _open:
 		return
 	if take.has(uid):
 		take.erase(uid)
 	elif goods_have(uid):
+		_keep_only("goods")
 		take[uid] = true
 	_rebuild()
 
 
-## A click on one of the player's things (by uid): selected to give, or
-## unselected; one the merchant won't buy, or past the town's up_to for its
-## kind, stays unselected and the hover says why.
+func toggle_ware(id: String) -> void:
+	if not _open:
+		return
+	if wares_pick.has(id):
+		wares_pick.erase(id)
+	elif not ware_entry(id).is_empty():
+		_keep_only("goods")
+		wares_pick[id] = int(ware_entry(id).get("cost", 0))
+	_rebuild()
+
+
+func toggle_care(pay: String) -> void:
+	if not _open:
+		return
+	if care_pay == pay:
+		care_pay = ""
+	elif care_open(pay):
+		_keep_only("care")
+		care_pay = pay
+	_rebuild()
+
+
+func toggle_job(slot: int) -> void:
+	if not _open:
+		return
+	if jobs_pick.has(slot):
+		jobs_pick.erase(slot)
+	elif not job_at(slot).is_empty():
+		_keep_only(str(job_at(slot).get("effect", "")))
+		jobs_pick[slot] = true
+	_rebuild()
+
+
+## A click on one of the player's things (by uid): picked to give, or
+## unpicked; one the merchant won't buy, or past the town's up_to for its
+## kind, stays unpicked and the line under the grid says why.
 func toggle_give(uid: int) -> void:
 	if not _open:
 		return
@@ -404,94 +700,13 @@ func toggle_give(uid: int) -> void:
 		_hover_words = "the town has enough of that"
 		_rebuild()
 		return
+	_keep_only("goods")
 	give[uid] = true
 	_rebuild()
 
 
-## The names selected, for the sum's words (tests): the short names in
-## lower case, Jeff's "+sword -hide".
-func gives_shown() -> Array:
-	var out := []
-	for uid: Variant in give:
-		out.append(Items.short_of(str(pack_entry(int(uid)).get("id", ""))).to_lower())
-	return out
-
-
-func takes_shown() -> Array:
-	var out := []
-	for uid: Variant in take:
-		out.append(Items.short_of(str(goods_entry(int(uid)).get("id", ""))).to_lower())
-	return out
-
-
 func button_shown() -> String:
 	return _button.text
-
-
-## The care row's words (economy's healer's care): "Pay 10 to be in his
-## care" to buy it, "In his care" while held; "" when the message has none.
-static func care_words(care: Variant) -> String:
-	if not care is Dictionary:
-		return ""
-	if not bool(care.get("in_care", false)):
-		return "Pay %d to be in his care" % int(care.get("gold", 0))
-	match str(care.get("by", "")):
-		"gold":
-			return "In his care (paid)"
-		"herbs":
-			return "In his care (for the herbs)"
-		"antlers":
-			return "In his care (for the antlers)"
-		"quest":
-			return "In his care (his errand)"
-	return "In his care"
-
-
-## A way in's button words: "Pay 10 gold" for the gold, whole; the herbs
-## and the antlers come in instalments (584 amended (2); Jeff: "you cant
-## hold 5, theres only 4 inventory slots"): "Give herbs (5 to go)", then
-## "Give herbs (2 to go)" once three are handed ([param given], the care's
-## "given" tally for that pay).
-static func care_offer_words(pay: String, price: int, given := 0) -> String:
-	if pay == "gold":
-		return "Pay %d gold" % price
-	return "Give %s (%d to go)" % [pay, maxi(price - given, 0)]
-
-
-## What the player has handed toward [param pay] so far: the care's
-## "given" {herbs, antlers} (npc's, 584 amended (2)); 0 without it.
-static func care_given(care: Variant, pay: String) -> int:
-	if not care is Dictionary or not care.get("given") is Dictionary:
-		return 0
-	return int((care["given"] as Dictionary).get(pay, 0))
-
-
-## Whether the pack can cover a payment of [param pay]: the purse holds
-## [param price] for gold; for herbs or antlers, holding any (the server
-## takes what is held, up to what is left to go: instalments).
-func care_covered(pay: String, price: int) -> bool:
-	if pay == "gold":
-		return int(data.get("gold", 0)) >= price
-	for each: Variant in data.get("pack", []):
-		if each is Dictionary and str(each.get("id", "")) == pay:
-			return true
-	return false
-
-
-## The care row shown (tests): the buttons' words, or the held line.
-func care_shown() -> String:
-	var offers := PackedStringArray()
-	for pay: String in CARE_PAYS:
-		if (_care[pay] as Button).visible:
-			offers.append((_care[pay] as Button).text)
-	if not offers.is_empty():
-		return " / ".join(offers)
-	return _care_held.text if _care_held.visible else ""
-
-
-func _ask_care(pay: String) -> void:
-	if _open and data.get("care") is Dictionary and not bool(data["care"].get("in_care", false)):
-		care_asked.emit(with, pay)
 
 
 func hover_shown() -> String:
@@ -506,22 +721,75 @@ func title_shown() -> String:
 	return _title.text
 
 
-## Confirm: the trade asked of the server, nothing selected does nothing.
+func foot_shown() -> String:
+	return _foot.text if _foot.visible else ""
+
+
+## The Total as the pop-up would show it (tests): its chips' words.
+func total_shown() -> String:
+	var act := action()
+	if act.is_empty():
+		return ""
+	var parts := PackedStringArray()
+	for chip: Array in act["total"]:
+		parts.append("%s %s" % [chip[0], total_words(int(chip[1]), bool(act["signed"]))])
+	return "Total " + ", ".join(parts)
+
+
+## The squares shown (tests): "<kind> <key> <chips>[ picked]" each.
+func boxes_shown() -> Array[String]:
+	var out: Array[String] = []
+	for box: Node in _grid.get_children():
+		if box is StoreBox:
+			var chips := PackedStringArray()
+			for chip: Node in (box as StoreBox).chips.get_children():
+				chips.append(str(chip.get_meta("words", "")))
+			var picked := " picked" if _is_picked(box.kind, box.key) else ""
+			out.append("%s %s %s%s" % [box.kind, box.key, " ".join(chips), picked])
+	return out
+
+
+## The name a square's hover shows (tests and the tip).
+func box_words(kind: String, key: Variant) -> String:
+	for box: Node in _grid.get_children():
+		if box is StoreBox and box.kind == kind and str(box.key) == str(key):
+			return box.words
+	return ""
+
+
+## The picked button pressed: what is asked of the server; nothing picked,
+## or more owed than the purse holds, does nothing.
 func _confirm() -> void:
-	if not _open or (give.is_empty() and take.is_empty()):
+	var act := action()
+	if not _open or act.is_empty() or not bool(act["ok"]) or not shortfall_words(int(act["gold"]), purse).is_empty():
 		return
-	var gives: Array = give.keys()
-	var takes: Array = take.keys()
-	trade_asked.emit(with, gives, takes, balance_of(gives, takes))
+	if not care_pay.is_empty():
+		care_asked.emit(with, care_pay)
+		care_pay = ""
+	elif not jobs_pick.is_empty():
+		for slot: Variant in jobs_pick:
+			var job := job_at(int(slot))
+			order_asked.emit(int(slot), str(job.get("effect", "")), str(job.get("to_id", "")))
+		jobs_pick.clear()
+	elif not wares_pick.is_empty():
+		for id: Variant in wares_pick:
+			offer_asked.emit(str(id), int(wares_pick[id]))
+		wares_pick.clear()
+	else:
+		var gives: Array = give.keys()
+		var takes: Array = take.keys()
+		trade_asked.emit(with, gives, takes, balance_of(gives, takes))
+	_total.visible = false
+	_rebuild()
 
 
 ## PackPanel's select hook: a left click on one of the player's boxes while
-## the window is open selects it (true: the click is taken, no drag). A
-## stack (619, ui's side): a click gives the whole stack, as far as the
-## merchant takes, or unselects it all; a shift-click one more unit, or one
-## fewer when all are given.
+## goods are traded picks it (true: the click is taken, no drag). A stack
+## (619, ui's side): a click gives the whole stack, as far as the merchant
+## takes, or unpicks it all; a shift-click one more unit, or one fewer when
+## all are given.
 func _select_mine(mine: bool, index: int, shift := false) -> bool:
-	if not _open or not mine:
+	if not _open or not mine or data.is_empty():
 		return false
 	var entry := pack_entry_at(index)
 	if entry.is_empty():
@@ -547,142 +815,334 @@ func _select_mine(mine: bool, index: int, shift := false) -> bool:
 		var before := give.size()
 		toggle_give(uid)
 		if give.size() == before:
-			break  # Won't buy, or the town has enough: the hover says.
+			break  # Won't buy, or the town has enough: the line says.
 	return true
 
 
-## PackPanel's hover hook: over one of the player's boxes, what the
-## merchant pays for it.
+## PackPanel's hover hook: over a stack partly picked, how many are given.
 func _hover_mine(mine: bool, index: int) -> void:
 	if not _open:
 		return
-	if not mine or index < 0:
-		_hover_none()
-		return
-	var entry := pack_entry_at(index)
-	if entry.is_empty():
-		_hover_none()
-		return
-	var uid := int(entry.get("uid", 0))
-	_hover_words = hover_words(false, 0, pays_for(uid), is_fenced(uid))
-	var stacked := stack_words(given_of(entry), stack_units(entry).size())
-	if not stacked.is_empty():
-		_hover_words += ", " + stacked
-	_show_words()
-
-
-func _hover_theirs(uid: int) -> void:
-	_hover_words = hover_words(true, int(goods_entry(uid).get("price", 0)), 0, false)
-	_show_words()
-
-
-func _hover_none() -> void:
-	_hover_words = ""
+	var entry := pack_entry_at(index) if mine and index >= 0 else {}
+	_hover_words = stack_words(given_of(entry), stack_units(entry).size()) if not entry.is_empty() else ""
 	_show_words()
 
 
 func _show_words() -> void:
 	if _hover != null:
 		_hover.text = _hover_words
+		_hover.visible = not _hover_words.is_empty()
+
+
+func _is_picked(kind: String, key: Variant) -> bool:
+	match kind:
+		"good":
+			return take.has(int(key))
+		"ware":
+			return wares_pick.has(str(key))
+		"care":
+			return care_pay == str(key)
+		"job":
+			return jobs_pick.has(int(key))
+		"ready":
+			return true  # Its bright frame: a click collects.
+	return false
 
 
 func _rebuild() -> void:
 	if not is_node_ready():
 		return
-	for child: Node in _goods.get_children():
-		_goods.remove_child(child)
+	for child: Node in _grid.get_children():
+		_grid.remove_child(child)
 		child.queue_free()
 	if not _open:
 		if pack != null:
 			pack.set_selected([])
+			pack.set_prices({})
+			pack.held_open = false
 		_box.visible = false
-		for pay: String in CARE_PAYS:
-			(_care[pay] as Button).visible = false
-		_care_held.visible = false
+		_total.visible = false
 		return
-	_title.text = title_words(merchant, with is Resident)
-	var goods: Variant = data.get("goods", [])
-	if goods is Array:
-		for each: Variant in goods:
-			if each is Dictionary:
-				_goods.add_child(_good_box(each))
-	if goods is Array and goods.is_empty():
+	_title.text = title_words(merchant, str(counter.get("kind", "")) if not counter.is_empty() else "")
+	for each: Variant in data.get("goods", []):
+		if each is Dictionary:
+			_add_box("good", int(each.get("uid", 0)), str(each.get("id", "")), "", [["gold", int(each.get("price", 0))]],
+				Items.name_of(str(each.get("id", ""))))
+	for each: Dictionary in wares:
+		var item := ware_item(each)
+		_add_box("ware", str(each.get("id", "")), item, "", [["gold", int(each.get("cost", 0))]], Items.name_of(item))
+	var offered := care()
+	if not offered.is_empty():
+		for pay: String in CARE_PAYS:
+			var price := int(offered.get(pay, 0))
+			if price <= 0:
+				continue
+			var held := bool(offered.get("in_care", false))
+			var box := _add_box("care", pay, "", "care", [] if held else [[pay, maxi(price - care_given(offered, pay), 0)]], SERVICE_NAMES["care"])
+			if held and str(offered.get("by", "")) == pay:
+				box.add_theme_stylebox_override("panel", PackPanel.selected_style())
+			if held or not care_hands(pay) > 0 or pay == "gold" and purse < price:
+				box.modulate.a = 0.5
+	for each: Variant in counter.get("jobs", []):
+		if each is Dictionary:
+			var effect := str(each.get("effect", ""))
+			var pays: Array = [["gold", int(each.get("price", 0))]]
+			var materials: Variant = each.get("materials", {})
+			if materials is Dictionary:
+				for raw: Variant in materials:
+					pays.append([_material_item(str(raw)), int(materials[raw])])
+			var job_box := _add_box("job", int(each.get("slot", -1)), str(each.get("id", "")), effect, pays, str(SERVICE_NAMES.get(effect, effect)),
+				not bool(each.get("ok", true)))
+			job_box.set_meta("why", str(each.get("why", "")))
+	for each: Variant in counter.get("working", []):
+		if each is Dictionary:
+			var item := str(each.get("id", ""))
+			var working := _add_box("working", int(each.get("uid", 0)), item, str(each.get("effect", "")),
+				[["time", time_words(int(each.get("left_seconds", 0)))]], "%s, in hand" % Items.name_of(item).capitalize())
+			working.icon.modulate.a = 0.45
+	for each: Variant in counter.get("waiting", []):
+		if each is Dictionary:
+			var item := str(each.get("id", ""))
+			_add_box("ready", int(each.get("uid", 0)), item, str(each.get("effect", "")), [], "%s, ready" % Items.name_of(item).capitalize())
+	if _grid.get_child_count() == 0:
 		var empty := Label.new()
 		empty.theme_type_variation = &"Caption"
 		empty.add_theme_color_override("font_color", DIM)
 		empty.text = empty_words(data) if not data.is_empty() else "asking..."
-		_goods.add_child(empty)
-	_hover.text = _hover_words
-	var gives: Array = give.keys()
-	var takes: Array = take.keys()
-	var gold := balance_of(gives, takes)
-	var sum := sum_words(takes_shown(), gives_shown(), gold)
-	_button.text = button_words(sum)
-	var short := shortfall_words(gold, int(data.get("gold", 0)))
-	_button.disabled = sum.is_empty() or not short.is_empty()
+		_grid.add_child(empty)
+	_show_words()
+	var act := action()
+	var short := shortfall_words(int(act.get("gold", 0)), purse) if not act.is_empty() else ""
+	var job_why := ""
+	for slot: Variant in jobs_pick:
+		if not bool(job_at(int(slot)).get("ok", true)):
+			job_why = str(job_at(int(slot)).get("why", ""))
+	_button.text = str(act.get("words", "Buy"))
+	_button.disabled = act.is_empty() or not bool(act["ok"]) or not short.is_empty()
 	_foot.text = short
 	_foot.visible = not short.is_empty()
-	var why := str(data.get("why", ""))
+	var why := job_why if not job_why.is_empty() else str(data.get("why", counter.get("why", "")))
 	_why.text = why
 	_why.visible = not why.is_empty()
-	var care: Variant = data.get("care")
-	var held := care is Dictionary and bool(care.get("in_care", false))
-	for pay: String in CARE_PAYS:
-		var button: Button = _care[pay]
-		var price := int(care.get(pay, 0)) if care is Dictionary else 0
-		button.visible = care is Dictionary and not held and price > 0
-		button.text = care_offer_words(pay, price, care_given(care, pay)) if button.visible else ""
-		button.disabled = button.visible and not care_covered(pay, price)
-	_care_held.visible = held
-	_care_held.text = care_words(care) if held else ""
 	if pack != null:
 		var slots := []
 		for uid: Variant in give:
 			slots.append(int(pack_entry(int(uid)).get("slot", -1)))
 		pack.set_selected(slots)
+		var prices := {}
+		for each: Variant in data.get("pack", []):
+			if each is Dictionary:
+				prices[int(each.get("slot", -1))] = pays_for(int(each.get("uid", 0)))
+		pack.set_prices(prices)
+		pack.held_open = true
 	_box.visible = true
 
 
-## One of the merchant's things as a box: its icon and short name, the
-## pack's look, framed when selected.
-func _good_box(each: Dictionary) -> GoodBox:
-	var box := GoodBox.new()
+## A counter's material ("ore") as the item its chip pictures ("ore_sack").
+static func _material_item(raw: String) -> String:
+	for id: String in ["%s_sack" % raw, "%s_bundle" % raw, "%s_bolt" % raw, raw]:
+		if Items.exists(id):
+			return id
+	return raw
+
+
+## The time left on work in hand, short: "2 min", "40 s".
+static func time_words(seconds: int) -> String:
+	if seconds >= 60:
+		return "%d min" % roundi(seconds / 60.0)
+	return "%d s" % maxi(seconds, 1)
+
+
+## One square: [param item]'s icon (or the service's mark alone), the mark
+## of [param service] in its corner over an item, the chips [[kind, amount]]
+## over its bottom-right corner; [param short]: the chips in rust.
+func _add_box(kind: String, key: Variant, item: String, service: String, pays: Array, words: String, short := false) -> StoreBox:
+	var box := StoreBox.new()
 	box.window = self
-	box.uid = int(each.get("uid", 0))
-	box.id = str(each.get("id", ""))
+	box.kind = kind
+	box.key = key
+	box.words = words
 	box.custom_minimum_size = PackPanel.SLOT_SIZE
 	box.theme_type_variation = &"Inset"
-	box.tooltip_text = ""
 	var picture := TextureRect.new()
 	picture.set_anchors_preset(Control.PRESET_FULL_RECT)
-	picture.offset_left = PackPanel.ICON_INSET
-	picture.offset_top = PackPanel.ICON_INSET
-	picture.offset_right = -PackPanel.ICON_INSET
-	picture.offset_bottom = -PackPanel.ICON_INSET
+	for side: String in ["offset_left", "offset_top"]:
+		picture.set(side, PackPanel.ICON_INSET)
+	for side: String in ["offset_right", "offset_bottom"]:
+		picture.set(side, -PackPanel.ICON_INSET)
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	picture.texture = pack.icons.icon(box.id) if pack != null and pack.icons != null else null
+	if item.is_empty():
+		picture.texture = mark_of(service)
+	else:
+		picture.texture = _icon(item)
 	box.add_child(picture)
 	box.icon = picture
-	var label := Label.new()
-	label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM if picture.texture != null else VERTICAL_ALIGNMENT_CENTER
-	# The caption size either way: a name without an icon ("Bandages") must
-	# fit the box on one row, never break mid-word.
-	label.add_theme_font_size_override("font_size", PackPanel.CAPTION_SIZE)
-	label.autowrap_mode = TextServer.AUTOWRAP_OFF if picture.texture != null else TextServer.AUTOWRAP_WORD
-	label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-	label.clip_text = true
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	label.text = Items.short_of(box.id)
-	label.add_theme_color_override("font_color", Items.color_of(box.id))
-	box.add_child(label)
-	box.label = label
-	if take.has(box.uid):
+	if not item.is_empty() and picture.texture == null:
+		var label := Label.new()
+		label.set_anchors_preset(Control.PRESET_FULL_RECT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		label.add_theme_font_size_override("font_size", PackPanel.CAPTION_SIZE)
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		label.text = Items.short_of(item)  # No icon (headless, not drawn yet): the short name.
+		box.add_child(label)
+	if not item.is_empty() and not service.is_empty():
+		var badge := PanelContainer.new()
+		badge.theme_type_variation = &"Chip"
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		badge.offset_right = -4
+		badge.offset_top = 4
+		var mark := TextureRect.new()
+		mark.texture = mark_of(service)
+		mark.custom_minimum_size = Vector2.ONE * 44
+		mark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.add_child(mark)
+		box.add_child(badge)
+	var chips := VBoxContainer.new()
+	chips.add_theme_constant_override("separation", 4)
+	chips.alignment = BoxContainer.ALIGNMENT_END
+	chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chips.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	chips.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	chips.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	chips.offset_right = -5
+	chips.offset_bottom = -5
+	for pay: Array in pays:
+		if str(pay[0]) not in ["gold", "time"]:
+			_icon(str(pay[0]))
+		var chip := make_chip(str(pay[0]), pay[1], pack.icons if pack != null else null, OUT if short else PRICE)
+		chip.size_flags_horizontal = Control.SIZE_SHRINK_END
+		chips.add_child(chip)
+	box.add_child(chips)
+	box.chips = chips
+	if _is_picked(kind, key):
 		box.add_theme_stylebox_override("panel", PackPanel.selected_style())
+	_grid.add_child(box)
 	return box
+
+
+## [param item]'s icon from the pack's ItemIcons, null while it is drawn
+## (the squares laid out again once it is) or headless.
+func _icon(item: String) -> Texture2D:
+	if pack == null or pack.icons == null:
+		return null
+	var picture := pack.icons.icon(item)
+	if picture == null and pack.icons.enabled and not pack.icons.icon_ready.is_connected(_icon_arrived):
+		pack.icons.icon_ready.connect(_icon_arrived)
+	return picture
+
+
+func _icon_arrived(_id: String) -> void:
+	if not _icons_due:
+		_icons_due = true
+		_relay_out.call_deferred()
+
+
+func _relay_out() -> void:
+	_icons_due = false
+	if _open:
+		_rebuild()
+
+
+## A price chip: a dark chip, a coin for gold (or what is paid: herbs'
+## icon, ore's) or nothing for a time, then the number in [param color].
+## Its words ("gold 10") in its "words" meta, for tests.
+static func make_chip(kind: String, amount: Variant, icons: ItemIcons, color: Color = PRICE) -> PanelContainer:
+	var chip := PanelContainer.new()
+	chip.theme_type_variation = &"Chip"
+	chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chip.add_child(row)
+	if kind == "gold":
+		row.add_child(Coin.new())
+	elif kind != "time":
+		var picture := TextureRect.new()
+		picture.custom_minimum_size = Vector2.ONE * 34
+		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		picture.texture = icons.icon(kind) if icons != null else null
+		if picture.texture != null:
+			row.add_child(picture)
+	var number := Label.new()
+	number.theme_type_variation = &"Caption"
+	number.add_theme_color_override("font_color", DIM if kind == "time" else color)
+	number.text = str(amount)
+	if kind not in ["gold", "time"] and row.get_child_count() == 0:
+		number.text = "%s %s" % [amount, Items.short_of(kind).to_lower()]  # No icon (headless, not drawn yet): its name.
+	number.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_child(number)
+	chip.set_meta("words", "%s %s" % [kind, amount])
+	return chip
+
+
+## A service's mark (art-kit's own art, art/ui/marks, 3b0a2f3c): "care",
+## "bless", "reforge", "mend"; null for another.
+func mark_of(service: String) -> Texture2D:
+	if not _marks.has(service):
+		var path := "res://art/ui/marks/mark_%s.png" % service
+		_marks[service] = load(path) if ResourceLoader.exists(path) else null
+	return _marks[service]
+
+
+func _show_tip(box: StoreBox) -> void:
+	if box.words.is_empty():
+		return
+	_tip_words.text = box.words
+	_tip_words.add_theme_color_override("font_color", SELECT if box.kind in ["good", "ware"] else UiTheme.color("text"))
+	_tip.reset_size()
+	var rect := box.get_global_rect()
+	_tip.global_position = Vector2(rect.position.x, rect.position.y - _tip.size.y - 6)
+	_tip.visible = true
+	var why := str(box.get_meta("why", "")) if box.has_meta("why") else ""
+	if not why.is_empty():
+		_hover_words = why
+		_show_words()
+
+
+func _hide_tip() -> void:
+	if _tip != null:
+		_tip.visible = false
+
+
+## The Total pop-up, beside the button while the mouse is on it and
+## something is picked.
+func _show_total() -> void:
+	var act := action()
+	if act.is_empty():
+		return
+	for child: Node in _total_chip.get_children():
+		_total_chip.remove_child(child)
+		child.queue_free()
+	var short := not shortfall_words(int(act["gold"]), purse).is_empty()
+	for pay: Array in act["total"]:
+		var kind := str(pay[0])
+		if kind == "gold":
+			_total_chip.add_child(Coin.new(13))
+		else:
+			var picture := TextureRect.new()
+			picture.custom_minimum_size = Vector2.ONE * 44
+			picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			picture.texture = pack.icons.icon(kind) if pack != null and pack.icons != null else null
+			_total_chip.add_child(picture)
+		var number := Label.new()
+		number.text = total_words(int(pay[1]), bool(act["signed"]))
+		number.add_theme_color_override("font_color", OUT if short else PRICE)
+		_total_chip.add_child(number)
+	_total.reset_size()
+	var rect := _button.get_global_rect()
+	_total.global_position = Vector2(rect.end.x + GAP, rect.position.y + (rect.size.y - _total.size.y) / 2.0)
+	_total.visible = true
 
 
 func _process(_delta: float) -> void:
@@ -699,6 +1159,8 @@ func _place() -> void:
 	var pack_shown := pack != null and pack.visible
 	_box.visible = _open and pack_shown
 	if not _box.visible:
+		_total.visible = false
+		_tip.visible = false
 		return
 	var rect := pack.get_global_rect()
 	_box.reset_size()

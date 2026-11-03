@@ -61,7 +61,8 @@ the theme (type `Psykinetic`) and read by code through `UiTheme.color(name)`.
 | Name | Swatch | Use |
 |------|--------|-----|
 | `backing` | earth darkest `#2c2418` at 0.86 | a panel's fill |
-| `backing_deep` | `#1e1812` (earth darkest, darker) at 0.95 | a slot, a text field: an inset |
+| `backing_deep` | `#1e1812` (earth darkest, darker) at 0.95 | a text field, a deep panel: an inset |
+| `slot` | earth `#4a3a25` at 0.92 | a slot's fill (765: a step lighter than an inset, so a dark blade reads) |
 | `edge` | leather `#7a6e58` at 0.9 | a panel's and a slot's border |
 | `text` | bone `#f4efe6` at 0.95 | words |
 | `text_dim` | cloth `#c2b8a0` at 0.9 | a note, a unit, a disabled control, a time |
@@ -104,7 +105,9 @@ button and slider; decision 395): a panel adds none of its own.
 
 A panel sets no font, size, colour or style of its own: it uses the theme's types (`Label`,
 `Button`, `PanelContainer`...) and its named variations (`Title`, `Heading`, `Caption`,
-`Small`, `Hud`, `Outlined`, `Inset`, `HandSlot`...). A link is a `LinkButton` (brass); a `ScrollContainer` is an inset with a brass scroll bar. Something drawn by hand (the compass, the maps, the speech
+`Small`, `Hud`, `Outlined`, `Inset`, `HandSlot`, `Chip`, `Tip`...). A price over a slot is a `Chip`
+(765: the outline's dark, a coin or what is paid, then the number in brass); a name on hover
+or a store's Total is a `Tip`. A link is a `LinkButton` (brass); a `ScrollContainer` is an inset with a brass scroll bar. Something drawn by hand (the compass, the maps, the speech
 bubbles) reads its colours and fonts from `UiTheme`. A new meaning needs a new named colour
 here first.
 

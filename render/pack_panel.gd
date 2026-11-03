@@ -29,11 +29,10 @@ extends PanelContainer
 static var SLOT_SIZE: Vector2 = Vector2.ONE * UiTheme.constant("slot")
 ## The theme's body size: a name alone in its box, a title.
 static var FONT_SIZE: int = UiTheme.size("body")
-## The theme's caption size: the short name under an icon.
+## The theme's caption size: a chip's number, a store square's name with no icon.
 static var CAPTION_SIZE: int = UiTheme.size("caption")
-## Room round an icon in its box, and under it for the caption.
+## Room round an icon in its box (765: no caption under it; the name on hover).
 const ICON_INSET := 8
-const ICON_CAPTION := 30
 ## A named thing's caption (decision 365): the theme's brass_bright.
 static var NAMED_COLOR: Color = UiTheme.color("brass_bright")
 ## One kept from its namer (World.KEPT_MARK; decision 370): rust.
@@ -91,6 +90,19 @@ var double_click: Callable
 var deposit_all: Callable
 var hover_hook: Callable
 var selected: Dictionary = {}
+## While a store is open (765): what its seller pays for the thing in each
+## of the player's slots, a chip over the square's top-right corner; 0 for
+## won't buy, the thing dimmed. Empty: no chips.
+var prices: Dictionary = {}
+## While a store is open (765): the pack shows though hidden (I), the store
+## window beside it.
+var held_open := false:
+	set(value):
+		if value == held_open:
+			return
+		held_open = value
+		if is_node_ready():
+			_refresh()
 
 var _other_title: Label
 ## The open row's title and, for a companion, her bond's step beside it
@@ -135,8 +147,13 @@ class SlotBox:
 	var icon: TextureRect
 	## The slot's note (World._show_notes), for the tip.
 	var note := ""
+	## A named thing's frame colour (365: brass_bright; kept, rust), clear for a
+	## plain one: the gilding the caption carried before 765.
+	var gild := Color(0, 0, 0, 0)
 	## The stack's count in the corner (619, ui's side): "5", nothing alone.
 	var count: Label
+	## What an open store's seller pays for it (765), over the top-right corner.
+	var price: Control
 
 	func _ready() -> void:
 		mouse_entered.connect(func() -> void:
@@ -414,7 +431,7 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	picture.offset_left = ICON_INSET
 	picture.offset_top = ICON_INSET
 	picture.offset_right = -ICON_INSET
-	picture.offset_bottom = -ICON_CAPTION
+	picture.offset_bottom = -ICON_INSET
 	picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -467,7 +484,7 @@ func _icon_arrived(_id: String) -> void:
 func _signature() -> Array:
 	var who := player if is_instance_valid(player) else null
 	var opened := other if is_instance_valid(other) else null
-	var sig: Array = [who, opened, shown, icons != null, _icons_seen, promised.duplicate(), charges_of(who)]
+	var sig: Array = [who, opened, shown, held_open, prices.duplicate(), icons != null, _icons_seen, promised.duplicate(), charges_of(who)]
 	if who != null:
 		sig.append_array([who.load_arms, who.load_body, World.load_free, World.load_heavy, World.load_overloaded])  # 676: F7's edges, live.
 	for entity in [who, opened]:
@@ -536,17 +553,75 @@ func set_selected(indices: Array) -> void:
 	if _player_row == null:
 		return
 	for box: SlotBox in boxes_of(_player_row):
-		if selected.has(box.index):
-			box.add_theme_stylebox_override("panel", selected_style())
-		else:
-			box.remove_theme_stylebox_override("panel")
+		_frame(box)
+
+
+## [param box]'s frame: picked for a barter, the bright frame; else a named
+## thing's thin gilt (or a kept one's rust, 765: the caption that carried it
+## is gone); else the theme's.
+func _frame(box: SlotBox) -> void:
+	if box.mine and selected.has(box.index):
+		box.add_theme_stylebox_override("panel", selected_style())
+	elif box.gild.a > 0.0:
+		var style := selected_style()
+		style.border_color = box.gild
+		style.set_border_width_all(2)
+		box.add_theme_stylebox_override("panel", style)
+	else:
+		box.remove_theme_stylebox_override("panel")
+
+
+## [param box]'s frame colour as shown (tests): the gilt, clear for none.
+func gild_shown(mine: bool, index: int) -> Color:
+	var box := box_in(mine, index)
+	return box.gild if box != null else Color(0, 0, 0, 0)
+
+
+## An open store's prices for the player's slots (765): [param by_slot]
+## {slot: gold}, 0 for won't buy; {} for none (the store closed).
+func set_prices(by_slot: Dictionary) -> void:
+	if by_slot == prices:
+		return
+	prices = by_slot.duplicate()
+	if is_node_ready():
+		_refresh()
+
+
+## [param box]'s price chip while a store is open and it holds a thing
+## ([param held]): the seller's price over its top-right corner, the thing
+## dimmed when they won't buy it; none otherwise.
+func _show_price(box: SlotBox, held: bool) -> void:
+	var gold := int(prices.get(box.index, -1)) if held and not prices.is_empty() else -1
+	box.icon.modulate.a = 0.4 if gold == 0 else 1.0
+	if box.price != null and (gold <= 0 or str(box.price.get_meta("words", "")) != "gold %d" % gold):
+		box.remove_child(box.price)
+		box.price.queue_free()
+		box.price = null
+	if gold > 0 and box.price == null:
+		var chip := BarterPanel.make_chip("gold", gold, null)
+		chip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		chip.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		chip.offset_right = -5
+		chip.offset_top = 5
+		box.add_child(chip)
+		box.price = chip
+
+
+## The price chips shown over the player's slots (tests): {slot: gold}.
+func prices_shown() -> Dictionary:
+	var out := {}
+	if _player_row != null:
+		for box: SlotBox in boxes_of(_player_row):
+			if box.price != null:
+				out[box.index] = int(str(box.price.get_meta("words", "gold 0")).get_slice(" ", 1))
+	return out
 
 
 ## The frame of a box selected for barter: the inset's backing with a bright
 ## brass border (the theme's colours).
 static func selected_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = UiTheme.color("backing_deep")
+	style.bg_color = UiTheme.color("slot")
 	style.border_color = UiTheme.color("brass_bright")
 	style.set_border_width_all(4)
 	style.set_corner_radius_all(6)
@@ -571,7 +646,7 @@ func mood_hover() -> String:
 func _refresh() -> void:
 	if not is_instance_valid(other):
 		other = null
-	visible = (shown or other != null) and is_instance_valid(player)
+	visible = (shown or other != null or held_open) and is_instance_valid(player)
 	_other_head.visible = other != null
 	_other_title.visible = other != null
 	_other_row.visible = other != null
@@ -612,9 +687,14 @@ func _refresh() -> void:
 			var named := noted and not entity.slot_notes[box.index].begins_with(Items.name_of(item))
 			var kept := named and World.KEPT_MARK in entity.slot_notes[box.index]
 			box.label.add_theme_color_override("font_color", KEPT_COLOR if kept else NAMED_COLOR if named else Items.color_of(item))
+			var gild := KEPT_COLOR if kept else NAMED_COLOR if named else Color(0, 0, 0, 0)
+			if gild != box.gild:
+				box.gild = gild
+				_frame(box)
 			box.count.text = count_words(World.slot_count(entity, box.index)) if has and not item.is_empty() else ""
 			box.count.visible = not box.count.text.is_empty()
 			_show_icon(box, icons.icon(item) if icons != null and not item.is_empty() else null)
+			_show_price(box, row == _player_row and has and not item.is_empty())
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
 	var lines := load_lines(player) if is_instance_valid(player) else PackedStringArray()
@@ -682,12 +762,14 @@ func charges_shown() -> String:
 	return _charges.text if _charges.visible else ""
 
 
-## [param picture] in [param box], its name a caption under it; null: the
-## name alone, in the middle.
+## [param picture] in [param box], filling it, its name on hover alone
+## (765, Jeff: the pack's squares as the store's, no caption); null: the
+## name in the middle (headless, or the icon not drawn yet).
 func _show_icon(box: SlotBox, picture: Texture2D) -> void:
 	if box.icon.texture == picture:
 		return
 	box.icon.texture = picture
+	box.label.visible = picture == null
 	box.label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER if picture == null else VERTICAL_ALIGNMENT_BOTTOM
 	box.label.add_theme_font_size_override("font_size", FONT_SIZE if picture == null else CAPTION_SIZE)
 	box.label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if picture == null else TextServer.AUTOWRAP_OFF

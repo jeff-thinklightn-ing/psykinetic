@@ -39136,3 +39136,61 @@ Voice's words: "You pick up a knife." (one thing, named with its article) / "You
 things." / "... and 12 gold." / "You pick up 12 gold."; a full pack adds " Your pack is
 full."; an empty sweep says nothing. items_test _test_sweep. Server only (the client's half
 is ui's); protocol unchanged; no new class_name.
+## 765. One store window for every seller
+
+Jeff (11-02): "rolf store should have a inventory structure, squares with graphics and price on
+the side ... make all stores use the same layout, i will approve final version." Round 1 put the
+price beside each square and kept 560's "+sword -hide +10g = Confirm" line; round 2 (his words:
+"get rid of the +item -gold line at the bottom it doesn't work as well as hoped. the method is
+select item, then click buy, i'd like the gold and number to be an overlay over the icons, when
+items are selected it says Buy ("x" items) and hovering over the button shows a Total on a
+pop-up") he approved: C:/dev/review/store_layout/round2. ui's side, client only, after 560 (the
+barter window), 562, 584 amended, 438, 711 and 736.
+- BarterPanel is the one store window, beside the pack, the seller's name its title (a counter
+  with nobody named: "The temple's counter", "The smith's counter"; else "The shop"). It holds:
+  a shop's or a maker's goods and the healer's care (the "barter" message); a townsperson's wares,
+  Rolf's stall and a pedlar's pack (the "offers" lines whose accept is a ware: DealPanel's buttons
+  before, which keeps the talking monsters' deals and the quests); a counter's work (the
+  "counter" message: CounterPanel's rows before; CounterPanel and its file are gone).
+- Every square is the pack's (PackPanel.SLOT_SIZE, the theme's Inset), wrapped six to a line. A
+  price is a chip over the square's bottom-right corner (theme type Chip): a drawn coin and the
+  number in brass, or what is paid (herbs', antlers', ore's icon) and the number; rust when it
+  can't be met. The hover is a Tip with the name alone (Jeff's no-captions rule): an item's
+  catalog name; voice's words for the services: Healing, Blessing, Remaking, Mending; "<Item>, in
+  hand" for work in hand, its time left a chip ("2 min"); "<Item>, ready" for work done, framed
+  bright, which a click collects (no button).
+- Healing is a square a way to pay (gold, herbs, antlers, those offered), the chip what is left
+  to go; held, the squares carry no price and the way paid is framed. Work at a counter is the
+  player's own thing's square with the work's mark in its corner (art-kit's own art,
+  art/ui/marks/mark_{care,bless,reforge,mend}.png, 3b0a2f3c; care's mark alone on Healing's).
+- A click picks a square, a second unpicks; the player's own things are picked in the pack as in
+  560 (a stack whole, shift a unit; won't buy and the town has enough said under the grid). One
+  kind of thing at a time: picking Healing or a kind of work lets the other picks go. The button
+  (voice's words) says what is done and how many: "Buy (2 items)" for goods taken, "Sell (1
+  item)" for the player's given, "Trade (3 items)" both; "Pay (10 gold)", "Pay (1 herb)", "Pay (3 herbs)", "Pay
+  (1 pair of antlers)" for Healing (an instalment of what is held; singular at one, an antlers
+  unit a pair); the work's own verb, "Bless (2 items)", "Remake (1
+  item)", "Mend (x items)". Nothing picked: "Buy", dim. Its hover shows the Total beside it: the
+  coin (or herbs) and the sum, a Trade's signed ("+20", "−20" with a true minus). More owed
+  than the purse: the button dim and "You need 3 more gold." under it.
+- The button sends what was sent before: economy's "trade" (give, take, the signed gold), "retain"
+  with the pay, one "offer" a ware picked (DealPanel's per button), one counter "order" a job
+  picked; a click on a ready square the counter "collect".
+- While a store is open the pack shows (PackPanel.held_open) and each of the player's squares
+  carries what this seller pays as a chip over its top-right corner (the stack count and caption
+  keep the bottom; PackPanel.prices); things they won't buy are dimmed. The hover no longer says
+  "pays 20 gold".
+- Slots are a step lighter (the coordinator: dark blades vanished on the dark squares): the
+  theme's new colour slot, earth #4a3a25 at 0.92, fills Inset and HandSlot (and the picked
+  frame); backing_deep stays for text fields and Deep panels. ui_style.md has slot, Chip and Tip.
+- The pack's squares match (Jeff, through the coordinator: "yes make them match"): no name under
+  an icon in any of PackPanel's rows (the player's, a chest's, a depot's, a locker's, a
+  companion's), the icon filling the square, the name on hover (ItemTip) alone; a square with no
+  icon drawn yet (or headless) still shows the name in its middle. A named thing's gilding (365,
+  the caption's brass; a kept one's rust, 370) moved to a thin frame of that colour
+  (SlotBox.gild), apart from the barter pick's thick bright one. chest_test checks the gilt.
+- A townsperson's store window closes once they are gone or out of hearing (Main._update_store),
+  as DealPanel's did; a ware seller's purse follows the player's gold.
+ui_test (_test_barter, _test_counter_panel, the stack hovers) and resident_test
+(_test_vendor_buttons: Rolf's sword bought through Buy, end to end). Client only, protocol
+unchanged; CounterPanel's class_name is gone (no other tree names it); no new class_name.

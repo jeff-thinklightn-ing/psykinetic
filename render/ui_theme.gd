@@ -8,7 +8,7 @@ extends RefCounted
 ## bubbles) reads the theme's named colours, fonts, sizes and constants
 ## from here, so the .tres is the one source of truth.
 ##
-## Colours (type Psykinetic): backing, backing_deep, edge, text, text_dim,
+## Colours (type Psykinetic): backing, backing_deep, slot, edge, text, text_dim,
 ## brass, brass_bright, rust, alarm, party, aloud, friend, water, outline.
 ## Fonts: serif, serif_bold, sans, sans_bold. Sizes: title, heading, hud,
 ## body, caption, small, speech. Constants: unit, pad, row, section, slot,

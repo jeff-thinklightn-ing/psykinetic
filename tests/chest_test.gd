@@ -97,6 +97,18 @@ func _test_there_and_back() -> void:
 	_check(_main.sounds == ["sfx.pack_open %s" % host.name], "and it lands with the pack's leather, once (%s)" % [_main.sounds])
 	await get_tree().process_frame
 	_check(_main.sounds.size() == 1, "once only (%s)" % [_main.sounds])
+	# 765: no caption under an icon; a named thing's gilding moved to its frame.
+	var notes_before := host.slot_notes.duplicate()
+	var notes := PackedStringArray()
+	notes.resize(host.slots.size())
+	notes[0] = "Wren's bandages"
+	host.slot_notes = notes
+	panel._refresh()
+	_check(panel.gild_shown(true, 0) == PackPanel.NAMED_COLOR and panel.gild_shown(false, 0).a == 0.0,
+		"a named thing framed in gilt (the caption's colour before 765), a plain square not")
+	host.slot_notes = notes_before
+	panel._refresh()
+	_check(panel.gild_shown(true, 0).a == 0.0, "named no more, the gilt gone")
 	panel.drop(host, 0, host, 3)
 	_check(Array(host.slots) == ["", "", "", KIT, "", "", "", "", "", "", ""], "moved along the player's own slots (%s)" % [Array(host.slots)])
 	_main.sounds.clear()

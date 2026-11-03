@@ -260,12 +260,12 @@ func _test_stacks_ui() -> void:
 		_check(panel.pack_entry(402).get("slot", -1) == 0 and panel.pack_entry(403).get("slot", -1) == 0, "any unit of the stack finds its entry")
 		_check(panel._select_mine(true, 0, true) and panel.give.keys() == [401], "a shift-click gives one unit")
 		panel._hover_mine(true, 0)
-		_check(panel.hover_shown() == "pays 2 gold, 1 of 3 to give", "the hover: pays 2 gold, 1 of 3 to give (%s)" % panel.hover_shown())
+		_check(panel.hover_shown() == "1 of 3 to give", "the hover: 1 of 3 to give (%s)" % panel.hover_shown())
 		_check(panel._select_mine(true, 0, true) and panel.give.keys() == [401, 402], "another shift-click: two")
 		_check(panel._select_mine(true, 0, true) and panel.give.size() == 3 and panel._select_mine(true, 0, true) and panel.give.keys() == [401, 402],
 			"all three given, a shift-click takes one back")
 		_check(panel._select_mine(true, 0, false) and panel.give.is_empty(), "a plain click on a part-given stack unselects it all")
-		_check(panel._select_mine(true, 0, false) and panel.give.size() == 3 and panel.gives_shown() == ["herbs", "herbs", "herbs"],
+		_check(panel._select_mine(true, 0, false) and panel.give.size() == 3 and panel.give.keys() == [401, 402, 403],
 			"a plain click on an unselected stack gives it whole, a uid per unit")
 		panel.show_barter({"shop": "", "gold": 12, "goods": [], "buys": {"herbs": {"gold": 2, "up_to": 2}}, "fenced": {},
 			"pack": [{"slot": 0, "uid": 401, "id": "herbs", "uids": [401, 402, 403], "count": 3}], "why": ""})
@@ -1567,34 +1567,42 @@ func _test_revive_reads() -> void:
 
 
 func _test_counter_panel() -> void:
-	print("== the counter screen: the work offered, being worked, waiting, refusals ==")
-	var panel: CounterPanel = _main.counter_panel
-	_check(panel != null and not panel.visible, "there, hidden")
-	panel.show_counter({"kind": "temple", "why": "the fee is 6 gold",
+	print("== a counter's work in the store window (438, 765): the work offered, in hand, ready, refusals ==")
+	var panel: BarterPanel = _main.barter_panel
+	panel.open(null, "")
+	panel.show_counter({"kind": "temple", "why": "",
 		"jobs": [{"slot": 0, "uid": 1, "id": "dagger", "effect": "bless", "price": 6, "ok": true},
 			{"slot": 1, "uid": 2, "id": "hammer", "effect": "reforge", "to_id": "sword", "price": 12, "materials": {"ore": 2},
-				"ok": false, "why": "the town lacks 2 ore"}],
+				"ok": false, "why": "the town lacks 2 ore"},
+			{"slot": 2, "uid": 5, "id": "knife", "effect": "bless", "price": 6, "ok": true}],
 		"working": [{"uid": 3, "id": "bow", "effect": "bless", "left": 900, "left_seconds": 90}],
-		"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]},
-		func(slot: int) -> String: return ["Wren's dagger", "hammer"][slot])
-	var rows := panel.rows_shown()
-	_check(rows.size() == 6 and rows[0] == "Wren's dagger: blessed [Order]"
-			and rows[1] == "hammer: reforged into a %s (the town lacks 2 ore)" % Items.name_of("sword")
-			and rows[3].begins_with("%s, being blessed; ready in about 2 minute" % Items.name_of("bow"))
-			and rows[5] == "%s, blessed [Collect]" % Items.name_of("shield"),
-		"a row per job with Order or its why, the work in hand with its time, the waiting with Collect (%s)" % [rows])
-	_check(panel.why_shown() == "the fee is 6 gold", "the last refusal under it all")
+		"waiting": [{"uid": 4, "id": "shield", "effect": "bless"}]})
+	var boxes := panel.boxes_shown()
+	_check(panel.title_shown() == "The temple's counter" and boxes.size() == 5 and boxes[0] == "job 0 gold 6"
+			and boxes[1] == "job 1 gold 12 %s 2" % BarterPanel._material_item("ore") and boxes[3] == "working 3 time 2 min" and boxes[4] == "ready 4  picked",
+		"a square a job with its price (and materials), the work in hand with its time, the ready one framed (%s)" % [boxes])
+	_check(panel.box_words("job", 0) == "Blessing" and panel.box_words("job", 1) == "Remaking"
+		and panel.box_words("working", 3) == "%s, in hand" % Items.name_of("bow").capitalize() and panel.box_words("ready", 4) == "%s, ready" % Items.name_of("shield").capitalize(),
+		"the hovers: the work's name (voice's), the thing in hand, the thing ready")
 	var ordered := []
-	panel.order_pressed.connect(func(slot: int, effect: String, to_id: String) -> void: ordered.assign([slot, effect, to_id]))
-	(panel._jobs.get_child(0).get_node("Button") as Button).pressed.emit()
-	_check(ordered == [0, "bless", ""], "Order: the slot and the effect (%s)" % [ordered])
+	panel.order_asked.connect(func(slot: int, effect: String, to_id: String) -> void: ordered.append([slot, effect, to_id]))
+	panel.toggle_job(0)
+	panel.toggle_job(2)
+	_check(panel.button_shown() == "Bless (2 items)" and panel.total_shown() == "Total gold 12", "two blessings picked: Bless (2 items), Total 12 (%s)" % panel.button_shown())
+	panel.toggle_job(1)
+	_check(panel.jobs_pick.keys() == [1] and panel.button_shown() == "Remake (1 item)" and panel._button.disabled and panel.why_shown() == "the town lacks 2 ore",
+		"another kind of work lets the blessings go; the remaking can't be done: dim, its why under the grid")
+	panel.toggle_job(1)
+	panel.toggle_job(0)
+	panel._confirm()
+	_check(ordered == [[0, "bless", ""]] and panel.jobs_pick.is_empty(), "Bless: the slot and the effect asked (%s)" % [ordered])
 	var collected := [0]
-	panel.collect_pressed.connect(func(uid: int) -> void: collected[0] = uid)
-	(panel._waiting.get_child(1).get_node("Button") as Button).pressed.emit()
-	_check(collected[0] == 4, "Collect: the thing's uid")
-	panel.show_counter({"kind": "shop", "jobs": [], "working": [], "waiting": [], "why": ""}, Callable())
-	_check(panel.rows_shown() == ["Nothing you carry can be worked here."] and panel.why_shown() == "",
-		"nothing to do: said so")
+	panel.collect_asked.connect(func(uid: int) -> void: collected[0] = uid)
+	panel.click_box("ready", 4)
+	_check(collected[0] == 4, "a click on the ready square collects it: the thing's uid")
+	panel.show_counter({"kind": "shop", "jobs": [], "working": [], "waiting": [], "why": ""})
+	_check(panel.boxes_shown().is_empty() and panel.title_shown() == "The smith's counter", "nothing to do: no squares")
+	panel.close()
 
 
 func _test_world_map() -> void:
@@ -1941,17 +1949,17 @@ static func _key_event(keycode: Key, pressed: bool, physical: Key = KEY_NONE) ->
 
 ## 560, ui's side: the click that interacts, the bubble's bar, the barter window.
 func _test_barter() -> void:
-	print("== the resident click and the barter window (560, ui's side) ==")
-	_check(BarterPanel.sum_words(["sword"], ["hide"], 10) == "+sword -hide +10g" and BarterPanel.sum_words([], ["hide"], 20) == "-hide +20g"
-		and BarterPanel.sum_words(["sword"], [], -10) == "+sword -10g" and BarterPanel.sum_words([], [], 0) == "",
-		"the sum's words, Jeff's form: +what you take, -what you give, the gold signed from your side")
-	_check(BarterPanel.button_words("+sword -hide +10g") == "+sword -hide +10g = Confirm" and BarterPanel.button_words("") == "Confirm",
-		"the button reads the sum then = Confirm; Confirm alone with nothing picked")
-	_check(BarterPanel.hover_words(true, 10, 0, false) == "takes 10 gold" and BarterPanel.hover_words(false, 0, 20, false) == "pays 20 gold"
-		and BarterPanel.hover_words(false, 0, 5, true) == "pays 5 gold, fenced" and BarterPanel.hover_words(false, 0, 0, false) == "won't buy",
-		"the hover: takes N gold over theirs; pays N gold, pays N gold fenced, or won't buy over yours")
-	_check(BarterPanel.shortfall_words(-15, 12) == "you need 3 more gold" and BarterPanel.shortfall_words(-5, 12) == "" and BarterPanel.shortfall_words(10, 0) == "",
-		"the shortfall when the purse can't cover what is owed")
+	print("== the resident click and the store window (560, 765, ui's side) ==")
+	_check(BarterPanel.button_words("Buy", 2) == "Buy (2 items)" and BarterPanel.button_words("Sell", 1) == "Sell (1 item)"
+		and BarterPanel.pay_words("herbs", 3) == "Pay (3 herbs)" and BarterPanel.pay_words("herbs", 1) == "Pay (1 herb)" and BarterPanel.pay_words("gold", 10) == "Pay (10 gold)"
+		and BarterPanel.pay_words("antlers", 1) == "Pay (1 pair of antlers)" and BarterPanel.pay_words("antlers", 5) == "Pay (5 pairs of antlers)",
+		"the button's words (voice's): the verb and the count, item at one; Healing's Pay with what is handed")
+	_check(BarterPanel.total_words(-11, false) == "11" and BarterPanel.total_words(20, false) == "20"
+		and BarterPanel.total_words(20, true) == "+20" and BarterPanel.total_words(-4, true) == BarterPanel.MINUS + "4",
+		"the Total: plain for Buy and Sell; a Trade's signed, a true minus when the player pays")
+	_check(BarterPanel.shortfall_words(-15, 12) == "You need 3 more gold." and BarterPanel.shortfall_words(-5, 12) == "" and BarterPanel.shortfall_words(10, 0) == "",
+		"the shortfall when the purse can't cover what is owed (voice's)")
+	_check(BarterPanel.time_words(90) == "2 min" and BarterPanel.time_words(40) == "40 s", "the time left on work in hand, short")
 	var panel: BarterPanel = _main.barter_panel
 	var pack: PackPanel = _main.pack_panel
 	if panel == null or pack == null:
@@ -1968,33 +1976,44 @@ func _test_barter() -> void:
 			{"slot": 3, "uid": 203, "id": "dagger"}, {"slot": 4, "uid": 205, "id": "food_sack"}], "why": ""}
 	panel.open(null, "Snagfin")
 	panel.show_barter(sample)
-	_check(panel.is_open() and panel.title_shown() == "Snagfin's shop" and panel.button_shown() == "Confirm", "opened for the merchant: the title, Confirm alone")
+	_check(panel.is_open() and panel.title_shown() == "Snagfin" and panel.button_shown() == "Buy" and panel._button.disabled,
+		"opened for the merchant: his name the title, Buy dim with nothing picked (%s)" % panel.title_shown())
+	_check(panel.boxes_shown() == ["good 101 gold 10", "good 102 gold 1"] and panel.box_words("good", 101) == Items.name_of("sword"),
+		"his goods as squares, each price a chip over it, the name on hover (%s)" % [panel.boxes_shown()])
+	_check(pack.prices == {0: 20, 1: 6, 2: 20, 3: 3, 4: 0} and pack.held_open,
+		"what he pays for each of the player's things, for the pack's chips (0: won't buy, dimmed); the pack held open (%s)" % [pack.prices])
 	panel.toggle_take(101)
+	_check(panel.button_shown() == "Buy (1 item)" and panel.total_shown() == "Total gold 10" and not panel._button.disabled,
+		"a sword picked: Buy (1 item), its Total 10 (%s, %s)" % [panel.button_shown(), panel.total_shown()])
 	panel.toggle_give(201)
-	_check(panel.button_shown() == "+sword -hide +10g = Confirm" and panel.balance_of([201], [101]) == 10 and pack.selected.has(0),
-		"a sword taken and a hide given: +sword -hide +10g = Confirm, the hide's box framed (%s)" % panel.button_shown())
+	_check(panel.button_shown() == "Trade (2 items)" and panel.balance_of([201], [101]) == 10 and panel.total_shown() == "Total gold +10" and pack.selected.has(0),
+		"a hide given too: Trade (2 items), the Total signed +10, the hide's box framed (%s, %s)" % [panel.button_shown(), panel.total_shown()])
 	panel.toggle_give(204)
 	_check(not panel.give.has(204) and panel.hover_shown() == "the town has enough of that", "a second hide past up_to stays unpicked and says why")
 	_check(panel.pays_for(203) == 3 and panel.is_fenced(203) and panel.pays_for(205) == 0, "grave goods pay the fenced half; a thing the town won't buy pays nothing")
 	panel.toggle_give(205)
 	_check(not panel.give.has(205) and panel.hover_shown() == "won't buy", "won't buy: unpicked, said")
-	panel._hover_mine(true, 3)
-	_check(panel.hover_shown() == "pays 3 gold, fenced", "hover over the grave dagger: pays 3 gold, fenced")
-	panel._hover_theirs(102)
-	_check(panel.hover_shown() == "takes 1 gold", "hover over theirs: takes 1 gold")
-	panel.toggle_take(102)
+	panel.toggle_take(101)
+	_check(panel.button_shown() == "Sell (1 item)" and panel.total_shown() == "Total gold 20", "the sword let go: Sell (1 item), Total 20")
 	panel.toggle_give(201)
-	_check(panel.button_shown() == "+sword +bandages -11g = Confirm" and panel._button.disabled == false, "two taken, nothing given: -11g, within the purse (%s)" % panel.button_shown())
+	panel.toggle_take(101)
+	panel.toggle_take(102)
+	_check(panel.button_shown() == "Buy (2 items)" and panel.total_shown() == "Total gold 11" and not panel._button.disabled,
+		"two picked, nothing given: Buy (2 items), Total 11, within the purse (%s)" % panel.button_shown())
 	panel.show_barter({"shop": "", "gold": 5, "goods": sample["goods"], "buys": sample["buys"], "fenced": {}, "pack": sample["pack"], "why": ""})
-	_check(panel._button.disabled and panel._foot.text == "you need 6 more gold", "the purse down to 5: you need 6 more gold, Confirm dim")
+	_check(panel._button.disabled and panel.foot_shown() == "You need 6 more gold.", "the purse down to 5: You need 6 more gold., Buy dim")
 	panel.toggle_take(102)
 	panel._confirm()
-	_check(asked == [[[], [101], -10]], "Confirm asks the trade: give none, take the sword, -10 (%s)" % [asked])
+	_check(asked.is_empty(), "the sword alone is still more than 5: Buy asks nothing")
+	panel.show_barter(sample)
+	panel._confirm()
+	_check(asked == [[[], [101], -10]], "with 12 again, Buy asks the trade: give none, take the sword, -10 (%s)" % [asked])
 	panel.show_barter({"shop": "", "gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "the prices have moved"})
 	_check(panel.why_shown() == "the prices have moved" and refusals == ["the prices have moved"] and panel.take.is_empty(),
 		"a refusal: why shown and said; a sword no longer on the shelf is dropped from the pick")
 	panel.close()
-	_check(not panel.is_open() and pack.selected.is_empty() and panel.button_shown() == "Confirm", "closed: nothing picked, no frames")
+	_check(not panel.is_open() and pack.selected.is_empty() and pack.prices.is_empty() and not pack.held_open and panel.button_shown() == "Buy",
+		"closed: nothing picked, no frames, no chips, the pack let go")
 	# The bar under a greeting resident's bubble: without a bubble it closes at once.
 	var oda: GridEntity = load(Main.RESIDENT).new()
 	oda.person = "Oda"
@@ -2032,22 +2051,15 @@ func _test_barter() -> void:
 	_check(BarterPanel.for_path({"resident": "/a/b", "shop": ""}, "/a/b") and not BarterPanel.for_path({"resident": "/a/b", "shop": ""}, "/a/c")
 		and BarterPanel.for_path({"shop": "/x"}, "/x") and not BarterPanel.for_path({"shop": "/x"}, "/y") and BarterPanel.for_path({}, "/z"),
 		"a barter message is for its resident, else its shop, else anyone")
-	_check(BarterPanel.title_words("Oda", true) == "Oda's goods" and BarterPanel.title_words("Snagfin", false) == "Snagfin's shop" and BarterPanel.title_words("", false) == "The shop",
-		"the title: a maker's goods in person, the shop at the counter")
+	_check(BarterPanel.title_words("Oda") == "Oda" and BarterPanel.title_words("", "temple") == "The temple's counter" and BarterPanel.title_words("") == "The shop",
+		"the title: the seller's name; a counter's with nobody named; else The shop")
 	_check(BarterPanel.empty_words({"goods": [], "buys": {}}) == "nothing to trade" and BarterPanel.empty_words({"goods": [], "buys": {"herb": {"gold": 2, "up_to": 3}}}) == "nothing for sale",
 		"an empty shelf: nothing to trade, or nothing for sale when they still buy")
 	oda.trade = "cook"
 	panel.open(oda, "Oda")
-	_check(panel.title_shown() == "Oda's goods", "opened with the cook in person: Oda's goods")
+	_check(panel.title_shown() == "Oda", "opened with the cook in person: her name")
 	panel.close()
-	# The healer's care (economy): a service row in the window, "retain" on Confirm.
-	_check(BarterPanel.care_words({"gold": 10, "in_care": true, "by": "herbs"}) == "In his care (for the herbs)"
-		and BarterPanel.care_words({"gold": 10, "in_care": true, "by": "quest"}) == "In his care (his errand)"
-		and BarterPanel.care_words({"gold": 10, "in_care": true}) == "In his care" and BarterPanel.care_words(null) == "",
-		"the care line's words: the way in (584 amended); none without the key")
-	_check(BarterPanel.care_offer_words("gold", 10) == "Pay 10 gold" and BarterPanel.care_offer_words("herbs", 5) == "Give herbs (5 to go)"
-		and BarterPanel.care_offer_words("antlers", 5, 3) == "Give antlers (2 to go)" and BarterPanel.care_offer_words("herbs", 5, 5) == "Give herbs (0 to go)",
-		"the three ways in, as buttons: gold whole, herbs and antlers by instalments with what is left to go (584 amended (2))")
+	# The healer's care (economy): Healing, a square for each way to pay, "retain" on Pay.
 	_check(BarterPanel.care_given({"herbs": 5, "given": {"herbs": 3}}, "herbs") == 3 and BarterPanel.care_given({"herbs": 5, "given": {"herbs": 3}}, "antlers") == 0
 		and BarterPanel.care_given({"herbs": 5}, "herbs") == 0 and BarterPanel.care_given(null, "herbs") == 0,
 		"the tally from care's given, 0 without it (a client before npc's side)")
@@ -2055,22 +2067,26 @@ func _test_barter() -> void:
 	panel.care_asked.connect(func(who: GridEntity, pay: String) -> void: cared.append([who, pay]))
 	oda.trade = "medicine_man"
 	panel.open(oda, "Hob")
-	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [{"slot": 0, "uid": 301, "id": "herbs"}], "why": "",
-		"care": {"gold": 10, "herbs": 5, "antlers": 0, "in_care": false, "by": ""}})
-	_check(panel.care_shown() == "Pay 10 gold / Give herbs (5 to go)" and not panel._care["gold"].disabled and not panel._care["herbs"].disabled
-		and not panel._care["antlers"].visible, "the healer's window offers the ways in: gold within the purse, herbs with one in the pack (an instalment), no antlers offered")
-	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [{"slot": 0, "uid": 301, "id": "herbs"}], "why": "",
+	panel.show_barter({"gold": 12, "goods": [{"uid": 501, "id": "remedy", "price": 4}], "buys": {}, "fenced": {},
+		"pack": [{"slot": 0, "uid": 301, "id": "herbs"}], "why": "", "care": {"gold": 10, "herbs": 5, "antlers": 0, "in_care": false, "by": ""}})
+	_check(panel.boxes_shown() == ["good 501 gold 4", "care gold gold 10", "care herbs herbs 5"] and panel.box_words("care", "herbs") == "Healing",
+		"his remedy, then Healing a square a way to pay with what is left to go, no antlers offered (%s)" % [panel.boxes_shown()])
+	panel.toggle_take(501)
+	panel.toggle_care("herbs")
+	_check(panel.take.is_empty() and panel.care_pay == "herbs" and panel.button_shown() == "Pay (1 herb)" and panel.total_shown() == "Total herbs 1",
+		"Healing picked lets the remedy go; one herb held: Pay (1 herb), an instalment (%s)" % panel.button_shown())
+	panel.show_barter({"gold": 12, "goods": [], "buys": {}, "fenced": {}, "pack": [{"slot": 0, "uid": 301, "id": "herbs", "uids": [301, 302, 303], "count": 3}], "why": "",
 		"care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": false, "by": "", "given": {"herbs": 3, "antlers": 0}}})
-	_check(panel.care_shown() == "Pay 10 gold / Give herbs (2 to go) / Give antlers (5 to go)" and not panel._care["herbs"].disabled and panel._care["antlers"].disabled,
-		"three herbs handed: two to go, the antlers untouched and dim with none in the pack")
-	panel._ask_care("gold")
-	_check(cared == [[oda, "gold"]], "the gold button asks for his care, paid")
+	_check(panel.boxes_shown().has("care herbs herbs 2 picked") and panel.button_shown() == "Pay (2 herbs)",
+		"three herbs handed: two to go, and two of the three held are handed (%s)" % [panel.boxes_shown()])
+	panel._confirm()
+	_check(cared == [[oda, "herbs"]] and panel.care_pay.is_empty(), "Pay asks for his care, by the herbs")
+	panel.toggle_care("gold")
 	panel.show_barter({"gold": 5, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": false, "by": ""}})
-	_check(panel._care["gold"].disabled and panel._care["herbs"].disabled and panel._care["antlers"].disabled, "a short purse and an empty pack: all three dim")
+	_check(panel.button_shown() == "Pay (10 gold)" and panel._button.disabled and panel.foot_shown() == "You need 5 more gold.", "a short purse: Pay dim, the shortfall said")
 	panel.show_barter({"gold": 2, "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": "", "care": {"gold": 10, "herbs": 5, "antlers": 5, "in_care": true, "by": "gold"}})
-	_check(panel.care_shown() == "In his care (paid)" and not panel._care["gold"].visible, "held: In his care (paid), no buttons")
+	_check(panel.care_pay.is_empty() and panel.boxes_shown() == ["care gold ", "care herbs ", "care antlers "], "held: the squares without prices, nothing to pick (%s)" % [panel.boxes_shown()])
 	panel.close()
-	_check(panel.care_shown() == "", "closed: no care row")
 	_main._update_bar()
 	_check(not _main._bar.visible, "no bubble and nobody on screen to sit under: the bar goes")
 	# Jeff on v0.1.165: a click on a player opened the chat window with their name. Now nothing opens.

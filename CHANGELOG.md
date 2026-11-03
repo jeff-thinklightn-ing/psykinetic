@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Every store now uses one window in the pack's squares, for shops, makers, Rolf's stall, pedlars, Hob's Healing and the temple's and smith's counters: each item's picture with its price over the corner, click to pick, then Buy, Sell, Trade, Pay or the work's verb (Bless, Remake, Mend), with the Total on hovering the button; while a store is open your pack shows what that seller pays for each thing, and every square is a shade lighter so dark weapons show; the pack, chests and depots drop the names under the pictures (hover for the name), a named thing's square framed in gilt (765).
 - 773, items: the server sweeps up everything lying within two cells in sight when the client asks (F's vacuum; ui's key follows): nearest first, gold too, into the pack before the hands, stopping when the pack is full. An old client's F still picks up one thing.
 
 - Umbrage's music fades in more slowly (about 2 seconds) and plays a little softer (668 amended (3)).
