@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hob and the other makers take herbs or materials in trade for their goods, settling only the difference in coin, and say so when they can't pay it (562 amended (9)).
 - The all-clear after a town's threat reaches everyone in town, from the guard nearest you (762 amended (4)).
 - A healer gathers more herbs a day, so his shelf of remedies and potions rarely stands empty (562 amended (7)).
 - Townsfolk caught outdoors by a threat no longer stand still a few steps from shelter: one whose way is blocked tries again (762 amended (3)).

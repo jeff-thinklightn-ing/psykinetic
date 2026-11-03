@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_scoundrel_hooks()
 	_test_delivery()
 	_test_hut_account()
+	_test_maker_swap()
 	_test_hut_decay()
 	_test_apprentice()
 	_test_contribute()
@@ -516,6 +517,57 @@ func _test_hut_account() -> void:
 	_check(working.call(HUT + ":hut") and stock.count(HUT, "herbs") == 2 and stock.count(HUT, "gold") == 0,
 		"the hut's remedy started from its own herbs, nothing bought (herbs %d)" % stock.count(HUT, "herbs"))
 	_check(not working.call(TOWN + ":hut") and stock.count(TOWN, "herbs") == 4, "a town's medicine man at his loan cap still can't buy the town's herbs")
+
+
+## A maker's swap settles only the difference (562 amended (9)): a healer
+## with an empty purse takes herbs for a remedy; his hut's gold is his to
+## pay with, a town's treasury never; one who can't pay says so (voice's
+## words); no gold made or lost.
+func _test_maker_swap() -> void:
+	print("\n== a maker's swap: only the difference, his hut's gold his, a town's treasury never ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var no_areas: Array[String] = []
+	var holdings := Holdings.new(WorldMap.build(no_areas), null, {}, clock)
+	const HUT := "lt/healers_hut@1,1"
+	holdings._places[HUT] = {"id": HUT, "area": "lt", "key": "healers_hut@1,1", "cell": Vector2i(1, 1), "name": "the healer's hut",
+		"kind": "healers_hut", "radius": 2, "worth": 0, "start": ""}
+	holdings._places[TOWN] = {"id": TOWN, "area": "lt", "key": "store", "cell": Vector2i(9, 9), "name": "the store",
+		"kind": Stockpile.KIND, "radius": 2, "worth": 0, "start": ""}
+	var work := Production.new({}, stock, holdings, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	work.buy_materials = economy.buy_materials
+	work.add_worker("mm_hut", "Hob", ["medicine_man"], HUT, "test", "steady")
+	work.add_worker("mm_town", "Ned", ["medicine_man"], TOWN, "test", "steady")
+	stock.deposit(TOWN, "gold", 100, "test")
+	var remedy := stock.book.mint("remedy", "made", "Hob")
+	stock.stock_shop(HUT, remedy, "Hob", "mm_hut")
+	economy.add_gold("p1", 10, "test")
+	var total := func() -> int: return economy.gold("p1") + int(work.worker("mm_hut")["purse"]) + stock.count(HUT, "gold") 		+ int(work.worker("mm_town")["purse"]) + stock.count(TOWN, "gold")
+	var before: int = total.call()
+	var herbs := [{"id": "herbs"}, {"id": "herbs"}]
+	var quote := economy.maker_quote("mm_hut", "p1", herbs, [remedy])
+	_check(quote["ok"] and economy.maker_purse("mm_hut") == 0, "an empty purse and an empty hut: two herbs for his remedy still quoted (%s)" % [quote])
+	_check(economy.maker_swap("mm_hut", "p1", ["herbs", "herbs"], quote["gives"], [remedy], quote["takes"]) and remedy not in stock.shop(HUT),
+		"the swap is made, the remedy off his shelf")
+	_check(economy.gold("p1") == 10 + int(quote["balance"]) and total.call() == before,
+		"the player paid or was paid only the difference (%d), no gold made or lost (%d, %d)" % [economy.gold("p1"), before, total.call()])
+	# Herbs alone: his purse and his hut's gold, never the town's treasury.
+	work._workers["mm_hut"]["purse"] = 0
+	stock.take(HUT, "gold", stock.count(HUT, "gold"), "test")
+	var alone := economy.maker_quote("mm_hut", "p1", [{"id": "herbs"}], [])
+	_check(not alone["ok"] and alone["why"] == "Hob has no coin for that today.", "nothing to pay with: he says so (%s)" % alone["why"])
+	stock.deposit(HUT, "gold", 5, "test")
+	alone = economy.maker_quote("mm_hut", "p1", [{"id": "herbs"}], [])
+	var hut_gold := stock.count(HUT, "gold")
+	_check(alone["ok"] and economy.maker_sell("mm_hut", "p1", "herbs", int(alone["gives"][0])) and stock.count(HUT, "gold") == hut_gold - int(alone["gives"][0]),
+		"his hut's gold pays for a herb (%d left)" % stock.count(HUT, "gold"))
+	var treasury := stock.count(TOWN, "gold")
+	var town_alone := economy.maker_quote("mm_town", "p1", [{"id": "herbs"}], [])
+	_check(economy.maker_purse("mm_town") == 0 and not town_alone["ok"] and town_alone["why"] == "Ned has no coin for that today."
+		and not economy.maker_sell("mm_town", "p1", "herbs", 2) and stock.count(TOWN, "gold") == treasury,
+		"a town's medicine man never pays from the town's treasury (%d)" % stock.count(TOWN, "gold"))
 
 
 ## A healer's hut nobody keeps decays and its keeper mends it (733): empty

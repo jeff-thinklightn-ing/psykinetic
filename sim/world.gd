@@ -4535,11 +4535,20 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 		after[slot] = id
 		counts[slot] = maxi(counts[slot], 0) + 1
 		to_slots.append(slot)
+	if not maker.is_empty():
+		# A maker's swap settles as one (562 amended (9)): only the difference in coin.
+		if not economy.maker_swap(maker, who, gives.map(func(each: Dictionary) -> String: return str(each["id"])), quote["gives"], take, quote["takes"]):
+			return "%s has no coin for that today." % production.worker(maker).get("name", "they")
+		for i in from_slots.size():
+			_sold(by, by, from_slots[i], int(give[i]), place, who, int(quote["gives"][i]), shop)
+		for i in take.size():
+			var into := to_slots[i]
+			if not by.slots[into].is_empty() and not stacks_onto(slot_uid(by, into), int(take[i])):
+				into = room_for(by, int(take[i]))
+			put_item(by, by, into, int(take[i]))
+			_log("shop: %s bought %s from %s for %d gold" % [by.name, items.id_of(int(take[i])), place, int(quote["takes"][i])])
+		return ""
 	for i in from_slots.size():
-		if not maker.is_empty():
-			if economy.maker_sell(maker, who, str(gives[i]["id"]), int(quote["gives"][i])):
-				_sold(by, by, from_slots[i], int(give[i]), place, who, int(quote["gives"][i]), shop)
-			continue
 		var deal := economy.sell(who, place, str(gives[i]["id"]), bool(gives[i]["fenced"]), int(quote["gives"][i]))
 		if deal["ok"]:
 			_sold(by, by, from_slots[i], int(give[i]), place, who, int(deal["paid"]), shop)

@@ -308,7 +308,7 @@ func _test_maker_barter() -> void:
 	var economy := Economy.new({}, stock, work, clock, rules, catalog)
 	_check(economy.maker_materials("hob") == {"herbs": 21}, "his shelf's worth of makes: 3 potions of 3 herbs, 6 remedies of 2: 21 herbs (%s)" % [economy.maker_materials("hob")])
 	var buys := economy.maker_buys("hob", ["herbs", "ore_sack", "herbs"])
-	_check(buys == {"herbs": {"gold": 2, "up_to": 5}}, "herbs at 2 (none in store: twice their value), as many as his 10 gold pays: 5; no ore (%s)" % [buys])
+	_check(buys == {"herbs": {"gold": 2, "up_to": 21}}, "herbs at 2 (none in store: twice their value), as many as his shelf needs, whatever his purse (562 amended (9)): 21; no ore (%s)" % [buys])
 	_check(economy.refuses(TOWN, "herbs") == "the medicine man buys herbs" and not economy.offers(TOWN, ["herbs"]).has("herbs")
 		and economy.bank_sale(TOWN, "p1", {"herbs": 3}) == 0, "the town won't buy herbs, nor pay for them banked")
 	var potion := book.mint("a_potion", "made", "Hob")

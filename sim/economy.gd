@@ -578,7 +578,6 @@ func maker_buys(worker_id: String, ids: Array) -> Dictionary:
 	var who := production.worker(worker_id)
 	var town := str(who.get("town", ""))
 	var wants := maker_materials(worker_id, cat)
-	var purse := int(who.get("purse", 0))
 	var out := {}
 	for raw: Variant in ids:
 		var id := str(raw)
@@ -595,9 +594,11 @@ func maker_buys(worker_id: String, ids: Array) -> Dictionary:
 			gold += float(rules.get("value", {}).get(what, 1)) * factor(_short(have, int(wants[what]))) * int(yields[what])
 			most = maxi(most, ceili(float(int(wants[what]) - have) / maxi(int(yields[what]), 1)))
 		var each := maxi(roundi(gold), 1)
-		if gold <= 0.0 or most <= 0 or purse < each:
+		if gold <= 0.0 or most <= 0:
 			continue
-		out[id] = {"gold": each, "up_to": mini(most, purse / each)}
+		# Whatever his purse (562 amended (9)): a swap settles only the
+		# difference, and maker_quote says when he can't pay that.
+		out[id] = {"gold": each, "up_to": most}
 	return out
 
 
@@ -623,9 +624,6 @@ func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Arra
 			return out
 		out["gives"].append(int(offered[id]["gold"]))
 		paid += int(offered[id]["gold"])
-	if paid > int(production.worker(worker_id).get("purse", 0)):
-		out["why"] = "%s can't pay for it now" % production.worker(worker_id).get("name", "they")
-		return out
 	var cost := 0
 	var shelf := stockpile.shop(town)
 	for uid: int in takes:
@@ -638,6 +636,14 @@ func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Arra
 	if gold(player_id) + paid < cost:
 		out["why"] = "not enough gold (%d)" % (cost - paid)
 		return out
+	# He pays for the gives from his purse and his hut's gold, with what the
+	# takes bring him in the same swap (562 amended (9)): only the difference.
+	var brings := 0
+	for i in takes.size():
+		brings += _maker_income(worker_id, int(takes[i]), int(out["takes"][i]))
+	if paid > maker_purse(worker_id) + brings:
+		out["why"] = "%s has no coin for that today." % production.worker(worker_id).get("name", "they")  # voice's words.
+		return out
 	out["balance"] = paid - cost
 	out["ok"] = true
 	return out
@@ -649,10 +655,94 @@ func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Arra
 ## share of what they make of it. The thing is the caller's to bank in the
 ## maker's store. False, nothing paid, if they can't.
 func maker_sell(worker_id: String, player_id: String, id: String, at: int) -> bool:
-	if not production.spend(worker_id, at, "bought %s from a player" % id):
+	if not _maker_pays(worker_id, at, "bought %s from a player" % id):
 		return false
 	add_gold(player_id, at, "sold %s to %s" % [id, production.worker(worker_id).get("name", "")])
 	return true
+
+
+## A maker's swap with [param player_id], priced by maker_quote (562
+## amended (9)): [param gives] the player's things' ids, [param give_prices]
+## what he pays for each; [param takes] uids off his shelf, [param
+## take_prices] each. The takes are sold as ever (Economy._sale: the
+## materials and tax, his labour); the player pays or is paid only the
+## difference; he pays for the gives from his purse, then his hut's gold.
+## All or nothing: false, nothing moved, if either side can't pay. The
+## things are the caller's to move.
+func maker_swap(worker_id: String, player_id: String, gives: Array, give_prices: Array, takes: Array, take_prices: Array) -> bool:
+	var town := str(production.worker(worker_id).get("town", ""))
+	var paid := 0
+	for each: Variant in give_prices:
+		paid += int(each)
+	var cost := 0
+	var brings := 0
+	for i in takes.size():
+		if int(takes[i]) not in stockpile.shop(town):
+			return false
+		cost += int(take_prices[i])
+		brings += _maker_income(worker_id, int(takes[i]), int(take_prices[i]))
+	if gold(player_id) + paid < cost or paid > maker_purse(worker_id) + brings:
+		return false
+	var name := str(production.worker(worker_id).get("name", ""))
+	for i in takes.size():
+		var uid := int(takes[i])
+		var id := stockpile.book.id_of(uid)
+		var maker := stockpile.maker_of(town, uid)
+		stockpile.take_from_shop(town, uid, "sold:%s" % player_id)
+		_sale(town, maker, id, int(take_prices[i]), "sale:%s" % player_id, "sold %s" % id, -1, int(_landed.get(uid, -1)))
+		_landed.erase(uid)
+		stockpile.book.note(uid, "bought", "by %s at %s for %d gold" % [player_id, town, int(take_prices[i])])
+		production.note_sale(town, id, 1)
+	if paid > 0:
+		_maker_pays(worker_id, paid, "bought %s from a player" % ", ".join(PackedStringArray(gives.map(func(id: Variant) -> String: return str(id)))))
+	if paid != cost:
+		add_gold(player_id, paid - cost, "a trade with %s" % name)
+	return true
+
+
+## Whether [param worker_id]'s town is a place of their own (a healer's
+## hut, 641), not a town's store: its gold is their working purse.
+func _own_place(worker_id: String) -> bool:
+	var town := str(production.worker(worker_id).get("town", ""))
+	var place := production.holdings.place(town) if production.holdings != null else {}
+	return not place.is_empty() and str(place.get("kind", "")) != Stockpile.KIND
+
+
+## What maker [param worker_id] can pay with (562 amended (9)): their purse,
+## and their hut's gold; never a town's treasury.
+func maker_purse(worker_id: String) -> int:
+	var purse := int(production.worker(worker_id).get("purse", 0))
+	if _own_place(worker_id):
+		purse += stockpile.count(str(production.worker(worker_id).get("town", "")), "gold")
+	return purse
+
+
+## Pays [param amount] for maker [param worker_id]: their purse first, then
+## their hut's gold. False, nothing paid, if the two can't.
+func _maker_pays(worker_id: String, amount: int, why: String) -> bool:
+	if amount <= 0:
+		return true
+	if maker_purse(worker_id) < amount:
+		return false
+	var from_purse := mini(amount, int(production.worker(worker_id).get("purse", 0)))
+	if from_purse > 0:
+		production.spend(worker_id, from_purse, why)
+	if amount > from_purse:
+		stockpile.take(str(production.worker(worker_id).get("town", "")), "gold", amount - from_purse, "%s (%s)" % [why, production.worker(worker_id).get("name", "")])
+	return true
+
+
+## What selling [param uid] off [param worker_id]'s shelf for [param price]
+## brings them to pay with: all of it at a hut of their own (the materials
+## and tax go to its store, the labour to their purse); in a town, their
+## labour only (Economy._sale's split), none for a gone maker's.
+func _maker_income(worker_id: String, uid: int, price: int) -> int:
+	if _own_place(worker_id):
+		return price
+	var town := str(production.worker(worker_id).get("town", ""))
+	if stockpile.maker_of(town, uid) != worker_id:
+		return 0
+	return price - _to_town(stockpile.book.id_of(uid), price, -1, int(_landed.get(uid, -1)))
 
 
 ## A barter at [param town]'s shop priced (decision 560): [param gives]
@@ -1011,6 +1101,20 @@ func _sale(town: String, maker: String, id: String, cost: int, by: String, why: 
 		stockpile.deposit(town, "gold", to_town, "tax:sale", "%s: materials %d, tax %d" % [why, stuff, split[0]])
 	production.pay(maker, cost - to_town, why)
 	return str(worker["name"])
+
+
+## The town's share of a made thing [param id] sold for [param cost], as
+## _sale splits it: an import's tax on the margin ([param bought_for] at or
+## over 0), else its materials and the sale tax on the price before a
+## merchant's factor ([param base]); never over the cost.
+func _to_town(id: String, cost: int, base := -1, bought_for := -1) -> int:
+	if bought_for >= 0:
+		return mini(Economy.taxed(maxi((base if base >= 0 else cost) - bought_for, 0), goods_class(id), rules)[0], cost)
+	var listed := base if base >= 0 else cost
+	var bought: bool = production.buy_materials.is_valid() and not Items.def(id).get("tags", []).any(func(tag: Variant) -> bool:
+		return str(tag) in rules.get("store", {}).get("town_account", []))
+	var stuff := mini(materials(id), listed) if not bought else 0
+	return mini(stuff + Economy.taxed(listed - stuff, goods_class(id), rules)[0], cost)
 
 
 # --- The town's bank (decision 354) ------------------------------------------------

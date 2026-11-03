@@ -24714,6 +24714,20 @@ proceeds for a gone maker go to the store, as before (Economy._sale: no such wor
 treasury), and a healer's hut's store is his own working purse. Not the box's cause today (one
 keeper, never gone). economy_test: a gone keeper's potion is Hob's to sell, a living Ned's is not.
 Server only, protocol unchanged, no new class_name, no bullet.
+562 amended (9) (release's label; the coordinator's call after playtest's fresh-world stock run; voice's
+words): a maker's swap settles only the difference. A seated healer's purse starts at 0 and he earns
+only from his own sales, and maker_buys dropped anything priced over his purse, so a fresh Hob
+listed no buys and answered "no use for that" to herbs: a player could not stock him. Now maker_buys
+lists what his shelf needs whatever his purse; maker_quote lets him pay for the gives from his purse
+(Economy.maker_purse: his purse, and his hut's store gold when his place is his own, 641, never a
+town's treasury) with what the swap's takes bring him (_maker_income: all of it at his hut, his labour
+share in a town, nothing for a gone maker's thing; _to_town is _sale's split); short of that, "%s has
+no coin for that today." (voice). Economy.maker_swap settles it as one: the takes sold as ever
+(_sale), the player paid or paying only the difference, his share paid from his purse then his hut's
+gold; World.try_barter uses it for a maker. No gold made or lost. larder_test _test_maker_swap: an
+empty purse and hut take two herbs for a remedy; herbs alone, he says so, then his hut's gold pays;
+a town's medicine man never draws the treasury. economy_test (maker_buys up to the shelf's need).
+Server only, protocol unchanged, no new class_name.
 ## 584 amended (2): the care counted a handful at a time
 
 Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4
