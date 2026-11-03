@@ -28735,6 +28735,8 @@ checkout's copy, old or new, judges the same file, as release's freeze loop alre
 writing "since". tests/land.sh's outer gated run beats the land lock for its tree every 60 s
 in a background loop that ends when land.sh does. A killed landing stops beating and goes
 stale 25 minutes after its last beat, as before. The stale line stays at 1500 s.
+tests/land.ps1 beats too, from 1331c425: a PowerShell job writes "since" each minute while its
+tree holds the land lock, and ends with the script or its process (394 amended (19)).
 
 Tools only, protocol unchanged, no new class_name.
 
