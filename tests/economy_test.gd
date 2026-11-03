@@ -721,6 +721,14 @@ func _test_makers_command() -> void:
 	var town_line := Array(full.split("\n")).filter(func(each: String) -> bool: return each.begins_with("%s: shelf " % STORE))
 	_check(town_line.size() == 1 and "remedy x2" in town_line[0] and "; store " in town_line[0], "the town's line: its whole shelf and its store's raws (%s)" % [town_line])
 	_check(_main._makers_command(PackedStringArray(["makers", "no_such_trade"])) == "no makers matching no_such_trade", "a filter matching none says so")
+	# A companion who stays to work for the town (767 amended): listed so, nameless.
+	var stays := Townsfolk.COMPANION + "probe_stays"
+	World.production.add_worker(stays, "Probehild", ["carpenter"], STORE, "test")
+	World.towns._town(STORE)["residents"].append(stays)
+	var with_her: String = _main._makers_command(PackedStringArray(["makers", "carpenter"]))
+	_check("carpenter (a companion) at %s" % STORE in with_her and not "Probehild" in with_her, "a staying companion: '(a companion)', no name (%s)" % with_her)
+	World.towns._town(STORE)["residents"].erase(stays)
+	World.production.remove_worker(stays)
 	for uid: int in potions:
 		World.stockpile.take_from_shop(STORE, uid, "test")
 		World.items.end(uid, "gone")

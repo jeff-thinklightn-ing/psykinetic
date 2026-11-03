@@ -4102,6 +4102,9 @@ func _boot() -> void:
 	# rules carry the stories (sought.trades; economy's to turn on).
 	if World.towns.rules.get("sought", {}).has("trades"):
 		World.towns.place_sought = _place_sought
+		# A town's gatherers re-seated on its turn when lacking (767 amended): as at boot, a store the town holds.
+		World.towns.gatherers_here = func(town: String) -> bool:
+			return World.holdings != null and World.holdings.place(town).get("kind") == "stockpile" and World.holdings.holder(town) == "town"
 	# Wells and roofs (decision 426): a town's are its level's.
 	World.towns.wells = func(town: String) -> int:
 		var area: Dictionary = _world_map.areas.get(town.get_slice("/", 0), {})
@@ -18934,7 +18937,12 @@ func _makers_command(words: PackedStringArray) -> String:
 		var list: Array = worker.get("trades", [])
 		var trade := ", ".join(PackedStringArray(list.map(func(each: Variant) -> String: return str(each))))
 		var at := "%s at %s" % [trade, town]
-		if worker_id.begins_with(Townsfolk.COMPANION) or words.size() > 1 and not words[1] in at:
+		# A companion who stays to work for the town (767 amended) is one of its makers: shown so, nameless.
+		if worker_id.begins_with(Townsfolk.COMPANION):
+			if World.towns == null or worker_id not in World.towns.residents(town):
+				continue
+			at = "%s (a companion) at %s" % [trade, town]
+		if words.size() > 1 and not words[1] in at:
 			continue
 		var state := (", away" if bool(worker.get("away", false)) else "") + (", sick" if Townsfolk.is_sick(World.production, worker_id) else "")
 		var shelf := "makes nothing"

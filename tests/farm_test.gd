@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_look()
 	_test_woodcutter()
 	_test_gatherers()
+	_test_gatherers_lacking()
 	_test_felling()
 	_test_stages()
 	_test_decline()
@@ -274,6 +275,45 @@ func _test_gatherers() -> void:
 	var saved := _towns(1, false)
 	saved.from_dict(towns.to_dict())
 	_check(saved.seat_gatherers(TOWN).is_empty(), "saved and loaded: never seated twice")
+
+
+## A gatherer trade lacking after the first seating (767 amended, the
+## coordinator: a companion called home, a newcomer sought and never found):
+## seated once the town has lacked it for gatherers_days, through a save; a
+## sought one comes in alone after those days, in voice's words.
+func _test_gatherers_lacking() -> void:
+	print("\n== a gatherer trade lacking: seated after its days (767 amended) ==")
+	var days := int(_rules.get("gatherers_days", 0))
+	_check(days == 7, "gatherers_days 7 (economy.json; %d)" % days)
+	var towns := _towns(1, false)
+	towns.gatherers_here = func(_town: String) -> bool: return true
+	towns.tick()
+	_check(not towns._town(TOWN).get("gatherers_seated", false),
+		"never seated: the tick seats nobody (the first seating is Main's, at boot)")
+	towns.seat_gatherers(TOWN)
+	var carpenter: String = towns.residents(TOWN).filter(func(id: String) -> bool: return "carpenter" in towns.production.worker(id)["trades"])[0]
+	towns._town(TOWN)["residents"].erase(carpenter)  # Gone, as a companion called home leaves.
+	towns.production.remove_worker(carpenter)
+	_now += DAY
+	_check(towns.seat_gatherers(TOWN).is_empty() and towns._town(TOWN)["gatherers_lacking"].has("carpenter"), "lacking a day: noted, nobody yet")
+	var saved := _towns(1, false)
+	saved.from_dict(towns.to_dict())
+	_now = DAY + days * DAY
+	_check(saved.seat_gatherers(TOWN) == ["carpenter"] and not saved._town(TOWN)["gatherers_lacking"].has("carpenter"),
+		"lacking %d days, through a save: a carpenter seated" % days)
+	# A sought carpenter: not lacking (the rescue's), then in alone after the days.
+	var sought := _towns(1, false)
+	sought.seat_gatherers(TOWN)
+	var first: String = sought.residents(TOWN).filter(func(id: String) -> bool: return "carpenter" in sought.production.worker(id)["trades"])[0]
+	sought._town(TOWN)["residents"].erase(first)
+	sought.production.remove_worker(first)
+	sought._seek(TOWN, "carpenter:sought", "Wat", "carpenter")
+	_now += (days + 1) * DAY
+	_check(sought.seat_gatherers(TOWN).is_empty(), "sought: no second carpenter seated")
+	sought._sought_turn(TOWN)
+	var came := sought.residents(TOWN).has("carpenter:sought") and sought.sought(TOWN).is_empty() and not Production.off_work(sought.production.worker("carpenter:sought"))
+	_check(came and sought.log_of(TOWN).any(func(line: Dictionary) -> bool: return str(line["what"]) == Towns.OWN_WAY % ["Wat", "carpenter", TOWN]),
+		"unfound %d days: comes in alone, at work, in voice's words" % days)
 
 
 ## The forest real (591, economy's side): a cut takes its trees from maps'

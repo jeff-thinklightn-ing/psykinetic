@@ -115,6 +115,11 @@ var home_of := Callable()
 ## for the variant's place key in the levels now, or "" while it isn't
 ## laid. Unset, a town's newcomers walk in as before.
 var place_sought := Callable()
+## Main's: whether [param town] seats gatherers (767: a stockpile place the
+## town faction holds). Unset, the town turn seats none (tests, tools).
+var gatherers_here := Callable()
+## A sought newcomer nobody found, come in by themselves (767 amended; voice's words).
+const OWN_WAY := "%s the %s, sent for, finds the way to %s alone"
 var wells := Callable()
 ## (town, from, to) -> [{id, strength}]: the storms over the town between
 ## two steps that count (strength at least its climate's storm_min; Main:
@@ -585,6 +590,11 @@ func tick() -> void:
 	for town in towns:
 		_spread(town)
 		_appoint(town)
+		# Only the reseat (767 amended): the first seating stays Main's, at boot.
+		if bool(_towns[town].get("gatherers_seated", false)) and gatherers_here.is_valid() and bool(gatherers_here.call(town)):
+			var seated := seat_gatherers(town)
+			if not seated.is_empty():
+				print("[towns] %s seats its gatherers: %s" % [town, ", ".join(seated)])
 		_water(town)
 		_crop(town)
 		_crop_shown(town)
@@ -1074,10 +1084,11 @@ func _on_work_done(job: Dictionary) -> void:
 	var where := "temple" if job.get("effect") == "bless" else "forge"
 	production.book().place(uid, "%s:%s" % [where, town])
 	production.book().note(uid, "held", "at %s's %s for %s, %s by %s" % [town, where, owner, job.get("effect", ""), job.get("by", "")])
-	var done: String = {"bless": "blessed", "reforge": "reforged"}.get(str(job.get("effect", "")), "worked on")
+	# Voice's words (the store window calls the service "Remaking").
+	var done: String = {"bless": "blessed", "reforge": "remade"}.get(str(job.get("effect", "")), "worked on")
 	if bool(job.get("failed", false)):
-		done = "could not reforge"
-	_note(town, "%s %s a %s, held for its owner" % [job.get("by", "someone"), done, Items.name_of(production.book().id_of(uid))])
+		done = "could not remake"
+	_note(town, "%s %s a %s; it waits to be fetched" % [job.get("by", "someone"), done, Items.name_of(production.book().id_of(uid))])
 
 
 # --- Rescues (decision 428) ---------------------------------------------
@@ -1821,6 +1832,8 @@ func _sought_turn(town: String) -> void:
 			_note(town, "%s has a %s again: the word for one is called off" % [town, trade.replace("_", " ")])
 			sought_changed.emit(town, id)
 			continue
+		if _own_way_in(town, id, entry):
+			continue
 		if not str(entry["place"]).is_empty() or now() < int(entry["next_try"]):
 			continue
 		var story := _story(trade)
@@ -2017,6 +2030,30 @@ func sought_home(id: String) -> bool:
 	_seat(town)
 	_arrived(town, str(entry["trade"]))
 	rescued.emit(town, id, "sought:%s" % entry["place"])
+	sought_changed.emit(town, id)
+	return true
+
+
+## Sought [param id] of a gatherer trade (rules' gatherers, 767) nobody has
+## led home for rules' gatherers_days comes in by themselves (767
+## amended, the coordinator: a quiet server's town isn't stalled for ever):
+## home as sought_home brings them, but no rescue experience and no rescued
+## signal (nobody found them). True if they came.
+func _own_way_in(town: String, id: String, entry: Dictionary) -> bool:
+	var days := float(rules.get("gatherers_days", 0))
+	if days <= 0.0 or not str(entry.get("freed_by", "")).is_empty() or not rules.get("gatherers", {}).has(str(entry["trade"])):
+		return false
+	if now() < int(entry.get("since", 0)) + int(days * maxi(DayNight.day_steps, 1)):
+		return false
+	var record := _town(town)
+	_unhold(town, id)
+	record["sought"].erase(id)
+	production.set_away(id, false)
+	if id not in record["residents"]:
+		record["residents"].append(id)
+	_note(town, OWN_WAY % [entry["name"], str(entry["trade"]).replace("_", " "), town])
+	_seat(town)
+	_arrived(town, str(entry["trade"]))
 	sought_changed.emit(town, id)
 	return true
 
@@ -2472,18 +2509,33 @@ func next_stage(town: String) -> Dictionary:
 func seat_gatherers(town: String) -> Array[String]:
 	var out: Array[String] = []
 	var record := _town(town)
-	if bool(record.get("gatherers_seated", false)):
-		return out
+	# The first time, every trade lacking at once (767); after, one lacking
+	# for rules' gatherers_days (767 amended: a companion called home, a
+	# trade sought and never found) is seated then. A sought one is
+	# _own_way_in's, not counted as lacking.
+	var first := not bool(record.get("gatherers_seated", false))
 	record["gatherers_seated"] = true
+	var lacking: Dictionary = record.get("gatherers_lacking", {})
+	record["gatherers_lacking"] = lacking
+	var wait := int(float(rules.get("gatherers_days", 7)) * maxi(DayNight.day_steps, 1))
 	var rule: Dictionary = rules.get("gatherers", {})
 	var trades: Array = rule.keys().filter(func(key: Variant) -> bool: return not str(key).begins_with("_"))
 	trades.sort()
 	for trade: String in trades:
 		if _has_trade(town, trade):
+			lacking.erase(trade)
 			continue
+		if not first:
+			if not lacking.has(trade):
+				lacking[trade] = now()
+			if now() < int(lacking[trade]) + wait:
+				continue
+		lacking.erase(trade)
 		var names: Array = rules.get(trade, {}).get("names", rules.get("rescue", {}).get("names", ["Bran"]))
 		var name := _free_name(town, names, absi(hash("%s/%s/gather" % [town, trade])))
 		var id := "%s_%s_gatherer" % [trade, town.replace("/", "_")]
+		if not production.worker(id).is_empty():
+			id = "%s_%d" % [id, now()]  # The first one's record still kept (away, say): a new id.
 		if not production.add_worker(id, name, [trade], town, "growth"):
 			continue
 		record["residents"].append(id)
@@ -3403,7 +3455,12 @@ func from_dict(saved: Dictionary) -> void:
 			record["woodcutter_wanted"] = int(entry["woodcutter_wanted"])
 		record["woodcutters_came"] = maxi(int(entry.get("woodcutters_came", 0)), 0)
 		if bool(entry.get("gatherers_seated", false)):
-			record["gatherers_seated"] = true  # Seated once (767): never again after a restart.
+			record["gatherers_seated"] = true  # Seated once (767): never again all at once after a restart.
+		var lacking_saved: Variant = entry.get("gatherers_lacking", {})
+		if lacking_saved is Dictionary and not lacking_saved.is_empty():
+			record["gatherers_lacking"] = {}
+			for trade: Variant in lacking_saved:
+				record["gatherers_lacking"][str(trade)] = int(lacking_saved[trade])
 		var flock_saved: Variant = entry.get("flock", {})
 		if flock_saved is Dictionary and not flock_saved.is_empty():
 			record["flock"] = {"count": maxf(float(flock_saved.get("count", 0.0)), 0.0), "season": str(flock_saved.get("season", "")),

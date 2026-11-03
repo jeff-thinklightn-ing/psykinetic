@@ -19,6 +19,7 @@
 		"woodcutter": "%s the woodcutter comes to keep the town in wood",
 		"hunter": "%s the hunter comes to keep the town in meat and hides",
 		"carpenter": "%s the carpenter comes to raise the town's sheds and workshops"},
+	"gatherers_days": 7,
 	"sites": {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground", "farmer": "farm", "fisherman": "fishing"}, "steps_per_cell": 4, "work_steps": 120, "other_area": 3000},
 	"woodcutter": {"trade": "woodcutter", "every": 3000, "wood": 2, "per_level": 1, "wood_per_tree": 2, "deadwood": 1, "growth_days": 2,
 		"names": ["Bran", "Alder", "Rowan", "Hazel", "Ash", "Birk"]},

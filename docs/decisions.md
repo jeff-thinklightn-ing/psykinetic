@@ -39284,6 +39284,36 @@ The treasury still sat at its floor, owing its people 56-72: a town's gold comes
 and, from 770, the market's trader. farm_test _test_gatherers (three, the carpenter's line) and
 _test_visitors (the spare meat bought); larder_test _test_larder_reserve (a roast under the
 larder). Server only; protocol unchanged; no new class_name.
+
+767 amended (release's label; the coordinator's ruling): a gatherer trade lacking after the
+first seating is seated again. On the box (v0.1.200) wilds/store's boot seated a hunter and a
+woodcutter but no carpenter, and makers listed none. The town's carpenter was a player's
+companion who stayed to work for it: a resident of that trade, so the gatherers rightly skipped
+it, and makers leaves companions out. When that companion is called home, the town lacks a
+carpenter, and the once mark would never seat one; nor would it for a newcomer sought (613
+amended) whom nobody finds.
+- Towns.seat_gatherers still seats every trade lacking at once the first time. After that,
+  record "gatherers_lacking" {trade: since step} (saved) notes when the town first lacks one (no
+  resident, nothing sought), and a trade lacking for economy.json "gatherers_days" (7) is seated
+  then. A second gatherer of a trade takes a new id if the first one's record is still kept.
+  Towns.tick runs it on each town's turn for the towns Main's gatherers_here allows (a store the
+  town faction holds, as at boot), printing the boot line's "[towns] <place> seats its gatherers:
+  <trades>". A town already marked (wilds/store) is covered. The tick only reseats: a town never
+  marked is left to Main's seating at boot (the first landing's tick seated resident_test's
+  towns mid-test).
+- A sought newcomer of a gatherer trade whom no player has led home for gatherers_days comes in
+  alone (Towns._own_way_in, on the sought turn): home as sought_home brings them, without the
+  rescue experience or the rescued signal, said as voice's "%s the %s, sent for, finds the way to
+  %s alone". The coordinator's other half, showing "seeking a carpenter" (768's states) and a
+  rumour toward where they wait (npc's), comes with those.
+- makers lists a companion who stays as one of a town's residents as "<trade> (a companion) at
+  <town>", nameless.
+- Voice's words for the counter's finished work in the town's log (the store window calls the
+  service "Remaking"): "%s blessed a %s; it waits to be fetched", "remade", "could not remake",
+  "worked on"; the name is the resident who did it.
+farm_test _test_gatherers_lacking (the tick seats no town never seated; a day lacking noted; seated at 7 days through a save; a sought
+one not doubled, then in alone); economy_test _test_makers_command (a staying companion).
+Server only; protocol unchanged; no new class_name.
 ## 773. F sweeps up what lies near
 
 Jeff (through the coordinator): "I want to change F so it just picks up any near items,
