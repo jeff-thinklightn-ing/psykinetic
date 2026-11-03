@@ -1120,6 +1120,44 @@
 			"uses": "a step of a wolf's clawed paws (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
+		"sfx.great_bear_roar": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 60,
+			"volume_db": 0.0,
+			"uses": "the great bear's roar (780): waking, at dusk, a fight's start, at half hp; GreatBear.ROAR_REACH 50 in the sim. Monster.cried roar for its viewers, the \"far_cry\" message for the rest (Client3D.far_cry)"
+		},
+		"sfx.great_bear_growl": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 12,
+			"volume_db": -2.0,
+			"uses": "the great bear's growl as it winds up a swipe, a slam or a charge (780; Monster.cried swipe, slam, charge, SoundKit.OWN_CRIES), heard past its tell's reach (GreatBear.TELL_REACH 8)"
+		},
+		"sfx.great_bear_struck": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 24,
+			"volume_db": 0.0,
+			"uses": "the great bear struck and not killed (780; Client3D._pain, SoundKit.struck): its growl until it has a cry of its own",
+			"fallback": "sfx.great_bear_growl"
+		},
+		"sfx.great_bear_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 24,
+			"volume_db": 0.0,
+			"uses": "the great bear killed (780; Client3D._fall, SoundKit.death)",
+			"fallback": "sfx.great_bear_roar"
+		},
 		"sfx.wade_drip": {
 			"category": "movement",
 			"type": "oneshot",

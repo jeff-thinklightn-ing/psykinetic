@@ -15212,6 +15212,28 @@ sides): the officials went unpaid 254 times on both. Giving builds the
 town; it doesn't pay its wages. What brings the makers' gold back to the
 treasury is phase 3's luxury goods and their tax, sold to the rich.
 
+505 amended (3) (release's label): animals splash through water and fords; a body out of the water drips.
+
+The coordinator (2026-11-02): the hills' fordable streams want splashing footsteps for players,
+companions and animals, and a drip or two after leaving the water if cheap. Maps: the streams are
+ordinary 505 fords (World.is_ford, not is_water); the pool under the waterfall stays plain water.
+pc-character: a wade gait, if one comes, keeps the footfall times step_ms expects and leaves
+_step_sound alone; drips on its side are visual only.
+
+- **Splash**: players and companions already splashed in water and fords (505, sound's side).
+  An animal's own feet (SoundKit.FEET: hooves, paws, claws) took over on any ground, so a deer
+  crossed a ford on dry hooves. Now SoundKit.footstep gives water before the feet: an animal in
+  water or a ford splashes by its mass as any body does (a rabbit small, a deer medium, a heavy
+  boar large).
+- **Drip**: a body stepping from a wet cell (Client3D.wades: water or a ford) onto a dry one
+  plays sfx.wade_drip there, and once more WADE_DRIP_SECONDS (0.45 s) on, from the same place.
+  Any creature drips, players, companions and animals alike. The slot is placed, makes no
+  monster's noise (noise null), reaches 3 cells (a step's), at -12 dB. Takes: three CC0 single
+  drops (freesound 273870 beskhu, 51754 erkanozan, 166325 deleted_user_2104797).
+
+sound_kit_test (an animal's splash by size; the drip slot's reach and takes) and view_test
+(_test_wade_drip: out of a ford a drip, dry to dry none). Client only, protocol unchanged, no new
+class_name.
 
 ## 506. The level editor's properties panel
 
@@ -29976,6 +29998,23 @@ weights in place of the dungeon's and under tension. view_test _test_level_music
 barrow it is wanted, eased in within 1 s and playing; gone below, eased out and stopped.
 Client only, protocol unchanged, no new class_name.
 
+668 amended (3) (release's label, after 668 amended (2) below): Umbrage's music comes in slower and softer.
+
+Jeff (2026-11-02, by way of the coordinator): "umbrage music also needs to fade in a little
+slower and be softer."
+
+- **Slower**: a level's or room's own music may name its own fade-in, the slot's "fade_in" in
+  seconds (Music.own_fade). music.umbrage's is 2.0, twice LEVEL_FADE. Leaving still eases out
+  over LEVEL_FADE (1 s), and a slot without "fade_in" eases in over LEVEL_FADE as before (the
+  barrow's).
+- **Softer**: music.umbrage volume_db 0 -> -4. It stays well above the town's ambience: the take
+  is -22 LUFS and amb.town_day -28 LUFS, and the bed plays 12 dB down on its own bus.
+- Other towns: they play the shared ground layers (music.town_base, town_night), which already
+  ease in over FADE_SECONDS (4 s) at -10 dB, so they are unchanged. Only Umbrage has its own cue.
+
+sound_kit_test (own_fade: Umbrage's twice the level fade, out as fast, the barrow's as before;
+softer than the barrow's) and view_test (half its fade-in in it is not yet full; full by the
+end). Client only, protocol unchanged, no new class_name.
 
 ## 668 amended. A room's own music: umbrage-theme in Umbrage
 
@@ -39176,23 +39215,6 @@ The treasury still sat at its floor, owing its people 56-72: a town's gold comes
 and, from 770, the market's trader. farm_test _test_gatherers (three, the carpenter's line) and
 _test_visitors (the spare meat bought); larder_test _test_larder_reserve (a roast under the
 larder). Server only; protocol unchanged; no new class_name.
-## 668 amended (3). Umbrage's music comes in slower and softer
-
-Jeff (2026-11-02, by way of the coordinator): "umbrage music also needs to fade in a little
-slower and be softer."
-
-- **Slower**: a level's or room's own music may name its own fade-in, the slot's "fade_in" in
-  seconds (Music.own_fade). music.umbrage's is 2.0, twice LEVEL_FADE. Leaving still eases out
-  over LEVEL_FADE (1 s), and a slot without "fade_in" eases in over LEVEL_FADE as before (the
-  barrow's).
-- **Softer**: music.umbrage volume_db 0 -> -4. It stays well above the town's ambience: the take
-  is -22 LUFS and amb.town_day -28 LUFS, and the bed plays 12 dB down on its own bus.
-- Other towns: they play the shared ground layers (music.town_base, town_night), which already
-  ease in over FADE_SECONDS (4 s) at -10 dB, so they are unchanged. Only Umbrage has its own cue.
-
-sound_kit_test (own_fade: Umbrage's twice the level fade, out as fast, the barrow's as before;
-softer than the barrow's) and view_test (half its fade-in in it is not yet full; full by the
-end). Client only, protocol unchanged, no new class_name.
 ## 773. F sweeps up what lies near
 
 Jeff (through the coordinator): "I want to change F so it just picks up any near items,
@@ -39336,28 +39358,6 @@ headings be bare words: "Learned", "Fighting", "Regard".
 chest_test (_test_click_from_afar: the rule, no attack order, the walk and the opening) and
 ui_test (the card's headings). Client only, protocol unchanged, no new class_name.
 
-## 505 amended (3). Animals splash through water and fords; a body out of the water drips
-
-The coordinator (2026-11-02): the hills' fordable streams want splashing footsteps for players,
-companions and animals, and a drip or two after leaving the water if cheap. Maps: the streams are
-ordinary 505 fords (World.is_ford, not is_water); the pool under the waterfall stays plain water.
-pc-character: a wade gait, if one comes, keeps the footfall times step_ms expects and leaves
-_step_sound alone; drips on its side are visual only.
-
-- **Splash**: players and companions already splashed in water and fords (505, sound's side).
-  An animal's own feet (SoundKit.FEET: hooves, paws, claws) took over on any ground, so a deer
-  crossed a ford on dry hooves. Now SoundKit.footstep gives water before the feet: an animal in
-  water or a ford splashes by its mass as any body does (a rabbit small, a deer medium, a heavy
-  boar large).
-- **Drip**: a body stepping from a wet cell (Client3D.wades: water or a ford) onto a dry one
-  plays sfx.wade_drip there, and once more WADE_DRIP_SECONDS (0.45 s) on, from the same place.
-  Any creature drips, players, companions and animals alike. The slot is placed, makes no
-  monster's noise (noise null), reaches 3 cells (a step's), at -12 dB. Takes: three CC0 single
-  drops (freesound 273870 beskhu, 51754 erkanozan, 166325 deleted_user_2104797).
-
-sound_kit_test (an animal's splash by size; the drip slot's reach and takes) and view_test
-(_test_wade_drip: out of a ford a drip, dry to dry none). Client only, protocol unchanged, no new
-class_name.
 ## 776. The hills' rivers are streams, waded anywhere
 
 Jeff, 2026-11-02 (through the coordinator): "imo the river is more like a stream and should be
@@ -39561,3 +39561,29 @@ every kind, so a home already standing on one moves off at the next roam, as a d
 (763). herds_test _test_ford_homes (a stream of fords across the fields: none homed on it, a home
 beside it allowed; the hills' fords read). Server only, protocol unchanged, no new class_name, no
 bullet.
+
+780, sound's side (agreed with enemy-ai): the great bear heard.
+
+- **Cries**: Monster._cry's kinds for it are roar (GreatBear.ROAR_REACH 50: waking, dusk, a
+  fight's start, half hp), and swipe, slam and charge (TELL_REACH 8, at each tell's start).
+  SoundKit.OWN_CRIES maps all three tells to sfx.great_bear_growl, so the wind-up is heard as its
+  cone or ring appears; the telegraph itself stays silent. sfx.great_bear_roar reaches 60 cells,
+  past the sim's 50; the growl 12. SoundKit.CREATURE_PITCH great_bear 0.85: deeper than the takes.
+- **Struck and killed**: as an Animal, a blow that doesn't kill plays SoundKit.struck's slot:
+  sfx.great_bear_struck, with no takes yet and falling back to the growl. Killed, its own
+  sfx.great_bear_death (a last heavy breath), never the goblin's death SoundKit.death falls back to.
+- **Out of sight**: Monster.cried reaches only its viewers. A roar meant for players 40-60 cells
+  off comes as a new server message, "far_cry" {creature, cry, cell: [x, y]}, sent to the level's
+  players within the cry's radius who aren't its viewers. Main plays it through Client3D.far_cry
+  (SoundKit.cry for the kind and cry, at the cell, at the kind's pitch; nothing for a cry with no
+  slot). Generic, for any creature. This landing is the client's handler only; enemy-ai adds
+  "far_cry" to MESSAGE_KINDS with the send (protocol rev 46).
+- **Takes**: roar 479825 (craigsmith, CC0, two cuts) and 410343 (waxsocks, CC0); growl 416861 and
+  416862 (tbsounddesigns, CC BY 4.0), 77635 (lendrick, CC0), 763026 (celldroid, CC0); death 416855
+  and 416851 (tbsounddesigns' bear breaths, CC BY 4.0).
+
+The same landing folds 505 amended (3) and 668 amended (3), which had opened headings of their own,
+into paragraphs inside their entries (release). sound_kit_test (the cries by kind, the pitch, the
+reach against GreatBear's, the takes) and view_test (_test_far_cry: the roar at its cell, a cry with
+no slot nothing). Client only, protocol unchanged, no new class_name; no bullet, as 780's (no level has a
+bear yet).

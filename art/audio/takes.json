@@ -1527,6 +1527,93 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.great_bear_death": [
+			{
+				"file": "sfx.great_bear_death.ogg",
+				"from": "freesound",
+				"original": "freesound 416855: BEARBreath_05.wav (from 0 s for 3.5 s)",
+				"sha256": "93bb60c84d82deb5557eb6a485d321226ed087474fe1e03923b36fe850fd43cc",
+				"by": "tbsounddesigns",
+				"url": "https://freesound.org/people/tbsounddesigns/sounds/416855/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.great_bear_death.2.ogg",
+				"from": "freesound",
+				"original": "freesound 416851: BEARBreath_01.wav (from 0 s for 2.4 s)",
+				"sha256": "95043f684373a285a449cbcdc93da0cda2be7cd2f70d7fbc1a953f2eaf187d23",
+				"by": "tbsounddesigns",
+				"url": "https://freesound.org/people/tbsounddesigns/sounds/416851/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.great_bear_growl": [
+			{
+				"file": "sfx.great_bear_growl.ogg",
+				"from": "freesound",
+				"original": "freesound 416861: BEARGrowl_01.wav (from 0.2 s for 2.1 s)",
+				"sha256": "59adf55bef4d54e980561bd0819688f3b24b6e0db9ab749aaacb19594655ff16",
+				"by": "tbsounddesigns",
+				"url": "https://freesound.org/people/tbsounddesigns/sounds/416861/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.great_bear_growl.2.ogg",
+				"from": "freesound",
+				"original": "freesound 77635: growl4.wav (from 0 s for 2.2 s)",
+				"sha256": "1e255a71e9f224a70791b2025ff37259a2fd06e27547f4b2433929bcd63ef09e",
+				"by": "lendrick",
+				"url": "https://freesound.org/people/lendrick/sounds/77635/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.great_bear_growl.3.ogg",
+				"from": "freesound",
+				"original": "freesound 763026: Bear Angry Growl (from 2.9 s for 2 s)",
+				"sha256": "aae75fdc4b58e8c842768b1dbc3bc08e4ed974ab589a9dcbd6bca8ca2b510d85",
+				"by": "celldroid",
+				"url": "https://freesound.org/people/celldroid/sounds/763026/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.great_bear_growl.4.ogg",
+				"from": "freesound",
+				"original": "freesound 416862: BEARGrowl_05.wav (from 0 s for 1.5 s)",
+				"sha256": "b90f3720a6077d60d367362484323847ba36295d7375dd37f671966921b2efa9",
+				"by": "tbsounddesigns",
+				"url": "https://freesound.org/people/tbsounddesigns/sounds/416862/",
+				"license": "CC BY 4.0"
+			}
+		],
+		"sfx.great_bear_roar": [
+			{
+				"file": "sfx.great_bear_roar.ogg",
+				"from": "freesound",
+				"original": "freesound 479825: R19-13-Bear Roaring.wav (from 3.2 s for 2.6 s)",
+				"sha256": "f9add94a84199415c62ee0aa37a7736d2f06523731b0e54073d43b2692e4117b",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/479825/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.great_bear_roar.2.ogg",
+				"from": "freesound",
+				"original": "freesound 479825: R19-13-Bear Roaring.wav (from 6.7 s for 2.4 s)",
+				"sha256": "a0a39900134a4b119a0dafa877d4e78117d6d12b339b24fb3e8fa4adc1f7ca53",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/479825/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.great_bear_roar.3.ogg",
+				"from": "freesound",
+				"original": "freesound 410343: Roar.wav (from 0.4 s for 4 s)",
+				"sha256": "1c61905d4254a8a28959ec49bfe4c4a36439ff7602a7b6bfac78feb7e7fc18eb",
+				"by": "waxsocks",
+				"url": "https://freesound.org/people/waxsocks/sounds/410343/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.heartbeat": [
 			{
 				"file": "sfx.heartbeat.ogg",

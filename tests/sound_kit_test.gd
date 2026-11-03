@@ -134,6 +134,15 @@ func _test_noises_are_the_sims() -> void:
 		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and SoundKit.reach(slot) > shot
 				and SoundKit.takes(slot).size() >= 2,
 				"%s: placed, heard past a bow's reach (%d cells), not a monster's noise, takes of its own" % [slot, SoundKit.reach(slot)])
+	_check(SoundKit.cry("great_bear", "roar") == "sfx.great_bear_roar" and SoundKit.cry("great_bear", "swipe") == "sfx.great_bear_growl"
+			and SoundKit.cry("great_bear", "slam") == "sfx.great_bear_growl" and SoundKit.cry("great_bear", "charge") == "sfx.great_bear_growl"
+			and SoundKit.struck("great_bear") == "sfx.great_bear_struck" and SoundKit.death("great_bear") == "sfx.great_bear_death"
+			and float(SoundKit.CREATURE_PITCH.get("great_bear", 1.0)) < 1.0,
+			"the great bear (780): roars, growls with each tell (swipe, slam, charge), cries struck, dies its own; pitched deep")
+	_check(SoundKit.reach("sfx.great_bear_roar") >= GreatBear.ROAR_REACH and SoundKit.reach("sfx.great_bear_growl") >= GreatBear.TELL_REACH
+			and SoundKit.takes("sfx.great_bear_roar").size() >= 2 and SoundKit.takes("sfx.great_bear_growl").size() >= 2,
+			"its roar heard as far as the sim's (%d >= %d cells), a growl as far as a tell (%d), takes of their own"
+			% [SoundKit.reach("sfx.great_bear_roar"), GreatBear.ROAR_REACH, SoundKit.reach("sfx.great_bear_growl")])
 	_check(SoundKit.reach("sfx.boar_charge") == Animal.NOISE_CHARGE and SoundKit.reach("sfx.wolf_howl") == Senses.NOISE_CALL,
 			"a charge carries Animal.NOISE_CHARGE, a howl the call's")
 	_check(SoundKit.death("rabbit") == "sfx.rabbit_death" and SoundKit.death("stag") == "sfx.deer_death" and SoundKit.death("brute") == "sfx.goblin_death",

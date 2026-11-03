@@ -5094,6 +5094,18 @@ func play_at(slot: String, entity: GridEntity) -> void:
 	sfx.play(slot,(puppet.position if puppet != null else _tile_position(entity.tile)) + Vector3.UP * 0.5)
 
 
+## A cry heard from out of sight (780, the server's "far_cry"): a
+## [param creature] kind's [param cry] (SoundKit.cry), pitched as its own
+## cries are, from [param cell], where the creature is but isn't drawn.
+## False if the kind has no slot for it.
+func far_cry(creature: String, cry: String, cell: Vector2i) -> bool:
+	var slot := SoundKit.cry(creature, cry)
+	if slot == "":
+		return false
+	sfx.play(slot, _tile_position(cell) + Vector3.UP * 1.0, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
+	return true
+
+
 func toss_aim(target: GridEntity, direction: Vector2i) -> void:
 	_toss.visible = direction != Vector2i.ZERO and is_instance_valid(target)
 	if not _toss.visible:

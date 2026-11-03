@@ -267,7 +267,7 @@ static func footstep(ground: String, mass: float, creature := "") -> String:
 ## The monster kinds that are goblins (and one of no kind), whose cries
 ## are the goblin's slots, pitched by size: an imp high, a brute low.
 const GOBLINS := ["", "imp", "brute", "sneak"]
-const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05}
+const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05, "great_bear": 0.85}
 ## The slot a blow lands with, by the weapon [param id] it was struck with
 ## (World.wielded): bare hands a fist's, a blunt weapon (Items' blunt) a
 ## blunt one's, any other weapon a blade's; on flesh, or on metal where the
@@ -378,7 +378,8 @@ static func speech(entity: Object, text: String) -> String:
 ## A cry (Monster.cried) -> the part of its slot's name after the creature;
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
-const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"}}
+const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"},
+		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}}
 ## A kind that sounds as another (a stag as a deer).
 const SOUNDS_AS := {"stag": "deer"}
 

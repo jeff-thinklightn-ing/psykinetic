@@ -13433,6 +13433,13 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "offers":
 		_on_offers_message(data)
 		return
+	if kind == "far_cry":
+		# 780: a creature's cry heard by a player who can't see it (its
+		# viewers hear it through Monster.cried); {creature, cry, cell: [x, y]}.
+		var cell: Variant = data.get("cell")
+		if _client3d != null and cell is Array and (cell as Array).size() == 2:
+			_client3d.far_cry(str(data.get("creature", "")), str(data.get("cry", "")), Vector2i(int(cell[0]), int(cell[1])))
+		return
 	if kind == "notes":
 		_on_notes_message(data)  # 643, ui's side.
 

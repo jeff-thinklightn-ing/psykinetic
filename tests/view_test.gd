@@ -68,6 +68,7 @@ func _ready() -> void:
 		await _test_bow_sounds()
 		await _test_armour_footfalls()
 		_test_wade_drip()
+		_test_far_cry()
 		await _test_monster_death()
 		await _test_companion_death()
 		await _test_down_grey()
@@ -1037,6 +1038,23 @@ func _test_sounds_follow_events() -> void:
 	_check(pitch_light > pitch_heavy, "an imp's swing is higher than a player's (%.2f, %.2f)" % [pitch_light, pitch_heavy])
 	World.despawn(imp)
 	_rig._process(0.0)
+
+
+## 780: a cry from out of sight (the server's "far_cry"): the great bear's
+## roar played at its cell, not at any drawn body; a kind with no slot for
+## the cry plays nothing.
+func _test_far_cry() -> void:
+	print("\n== a cry from out of sight, played where the creature is (780) ==")
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	var before: int = _rig.sfx.played.size()
+	var played: bool = _rig.far_cry("great_bear", "roar", Vector2i(30, 30))
+	var heard: Array = _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
+	_check(played and heard == ["sfx.great_bear_roar"], "the great bear's roar from (30, 30) (%s)" % [heard])
+	before = _rig.sfx.played.size()
+	_check(not _rig.far_cry("great_bear", "hum", Vector2i(30, 30)) and not _rig.far_cry("", "roar", Vector2i(30, 30))
+			and _rig.sfx.played.size() == before, "a cry with no slot: nothing")
+	_rig.sfx.hear_everything = hear_was
 
 
 ## 505 amended (3): a body stepping out of a ford onto dry ground drips (a
