@@ -6690,7 +6690,10 @@ func add_buff(entity: GridEntity, kind: String, amount: float, ticks: int) -> vo
 	now[kind] = [maxf(amount, float(had[0])) if not had.is_empty() else amount,
 		maxi(tick + ticks, int(had[1])) if not had.is_empty() else tick + ticks]
 	if kind == "heal":
-		now[kind].append(tick)  # Its start: the drink's own tick heals nothing (682), whichever runs first.
+		# Its start: the drink's own tick heals nothing (682), whichever runs
+		# first. One renewed keeps the start it had, so a renewal loses no
+		# tick (682 amended: a rest camp's renews every second).
+		now[kind].append(int(had[2]) if had.size() > 2 else tick)
 	entity.buffs = now
 	_buffed[entity] = true
 	if kind == "mass":

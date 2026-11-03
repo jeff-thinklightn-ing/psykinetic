@@ -689,6 +689,29 @@ func _test_remedy_heal() -> void:
 	_check(started and host.mending == 2, "a bandage done beside it: the heal breaks no bandage (started %s %s, mending %d)" % [started, why, host.mending])
 	if kit != 0:
 		World.items.end(World.take_item(host, host, 0), "gone")
+	# Renewed every second (maps' 777 rest camp): it keeps its start, so no
+	# renewal costs a tick: its 200 ticks heal 20 hp, as a single drink's.
+	# Only the hp it gains is counted, a tick at a time: a monster from the
+	# tests before may come near and strike.
+	host.buffs = {}
+	host.mending = 0  # The bandage's, done with: it heals too.
+	World._mending.erase(host)
+	host.hp = host.max_hp - 50
+	World.add_buff(host, "heal", 1.0, 20)
+	var start := int(host.buffs["heal"][2])
+	var renewed_start := true
+	var gained := 0
+	var held := 0
+	while host.buffs.has("heal") and held < 300:
+		if held > 0 and held % World.TICK_RATE == 0 and held < 190:  # Every second, its end then always 20 ticks on.
+			World.add_buff(host, "heal", 1.0, 20)
+			renewed_start = renewed_start and int(host.buffs["heal"][2]) == start
+		var was := host.hp
+		_steps(1)
+		gained += maxi(host.hp - was, 0)
+		held += 1
+	_check(renewed_start and gained == 20 and held == 200,
+			"renewed every second: keeps its start and heals 20 hp in its 200 ticks (start kept %s, %d hp, %d ticks)" % [renewed_start, gained, held])
 	_check(Items.effect_value("effects.remedy.heal.amount") == 1.0 and Items.set_effect_value("effects.remedy.heal.ticks", 100)
 			and Items.def("remedy")["effects"][0]["ticks"] == 100 and not Items.set_effect_value("effects.remedy.heal.amount", -1)
 			and Items.effect_fields().any(func(row: Dictionary) -> bool: return row["path"] == "effects.remedy.heal.amount"),

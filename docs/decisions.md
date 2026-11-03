@@ -31494,6 +31494,15 @@ hp over the buff's whole life of 200 ticks, drunk on a tick ending in 0 and in 5
 well under max_hp, through a hit, capped, ended at death, not
 doubled, a bandage finished beside it, the F7 paths). No new class_name.
 
+682 amended: a renewed heal keeps its start (maps' 777, roadside rest camps, whose warmed
+rest renews "heal" at 1 hp/s every second). add_buff gave every heal it put on a new start
+tick, and _heal_tick heals nothing on that tick, so each renewal of one already on lost a
+tick: a camp's renewals would have healed about 0.95 hp/s. A renewal now keeps the start
+the buff had; only a new one takes the tick. The rate still doesn't stack: two at once keep
+the larger amount and the later end, as before. items_test _test_remedy_heal (renewed
+every second for 20 ticks: the start kept, 20 hp over its 200 ticks). Sim only: the buff's shape is
+unchanged, protocol unchanged, no new class_name.
+
 ## 677, sound's side. The lob heard: up, coming down, and a heavier blow
 
 The coordinator (2026-10-25, Jeff play-testing the bow most): a sound pass on
