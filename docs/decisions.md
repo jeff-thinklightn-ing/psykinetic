@@ -6257,6 +6257,22 @@ before the lane's), and the plan lists its "lane". view_test _test_glimpses_meet
 outdoor level of the plane, no glimpse edge touches its lane. Their walls inside the glimpse
 stay (the castle's gatehouse, drawn without its building, which is only drawn when wholly in
 it: as built). Client only, protocol unchanged, no new class_name.
+
+**327 amended (3) (perf, 2026-11-03): a glimpse's plan reads only its strip.** _plan_glimpses was
+most of the arrival frame (_phase_land, 660): on the wilds 155-170 ms of its 180-200, each link's
+_glimpse_plan reading every floor and water cell of a 224-cell neighbour (forest, hills) with a
+lambda and a 7x7 look round each for our land, and every one of its edges. Now each target
+level's floor, water and land sets and their box are kept (_glimpse_sets, while _glimpse_level
+keeps that terrain); the cells read are only the strip a glimpse can take (less than
+GLIMPSE_DEPTH past the margin deep, a link's GLIMPSE_WIDE either side of its way), row by row;
+the GLIMPSE_GAP keep-off is one grid over that strip (_near_land_grid: the land read once,
+spread along rows then down columns; _near_land is gone); and the edges are each kept cell's east
+and south, not all of theirs. The plans are the same: old against new on every way out of the
+six outdoor levels (a headless check, both in one run), every key equal. Each plan 1-2 ms
+against 4-60 (wilds -> forest 55 to 1.4, forest -> wilds 60 to 2.2); the wilds' four together
+about 133 to 6 ms. A level's sets are built once a session (its first glimpse). WorldMap.build()
+in _plan_glimpses (about 35 ms a crossing) is unchanged. Client only, protocol unchanged, no new
+class_name.
 ## 328. Raid groups travel the world map; camps make a town's threat; off until switched on
 
 Jeff: raids are "real raiders on the world tick": a group sets out from a
@@ -29321,6 +29337,9 @@ Bench (headless, wilds, main and this alternated, three crossings each, twice): 
 crossing's worst frame 428-478 ms to 256-259, its lift unchanged (about 2.0 s, the fields on the
 worker); a crossing again, the lift 1128 to 1026 ms (means), its worst frame 251-287 to 204-241.
 Client only, protocol unchanged, no new class_name.
+
+The land's phase, the arrival's own frame, lost most of its glimpses' plan in 327 amended (3)
+(perf, 2026-11-03): about 130 ms on the wilds.
 
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 

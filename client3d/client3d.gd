@@ -8349,6 +8349,7 @@ static func _glimpse_level(level_name: String) -> Dictionary:
 
 
 func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size: Vector2i) -> Dictionary:
+	var sets := _glimpse_sets(str(way["to_map"]), terrain)
 	var away: Vector2i = way["out"]
 	var shift := Vector2i((way["to_ours"] as Transform2D).origin.round())
 	var margin := 0
@@ -8368,9 +8369,7 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		# ends; their land's edge goes there instead (the wilds' begins 16
 		# rows into its map), their depth counted from it.
 		var arrive: Vector2i = way["to_cell"]
-		var their_land: Dictionary[Vector2i, bool] = {}
-		for cell: Vector2i in terrain.get("floor", []) + terrain.get("water", []):
-			their_land[cell] = true
+		var their_land: Dictionary = sets["land"]
 		var back := 0
 		while their_land.has(arrive - away * (back + 1)) and back < to_size.x + to_size.y:
 			back += 1
@@ -8393,13 +8392,31 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 				var cell := edge + away * k + across * w
 				if not _land.has(cell):
 					lane.append(cell)
-	# How deep a target cell is from the side it shows us (facing -away).
-	var deep := func(cell: Vector2i) -> int:
-		match away:
-			Vector2i(0, -1): return to_size.y - 1 - cell.y
-			Vector2i(0, 1): return cell.y
-			Vector2i(-1, 0): return to_size.x - 1 - cell.x
-			_: return cell.x
+	# Their cells less than GLIMPSE_DEPTH (past the margin) deep from the side
+	# it shows us (facing -away), and a link's no more than GLIMPSE_WIDE
+	# aside from the way: only that strip of their map is read (perf: every
+	# cell of a 224 map read was 40 ms a glimpse, 120 ms of a crossing).
+	var box: Rect2i = sets["box"]
+	var x0 := box.position.x
+	var x1 := box.end.x
+	var y0 := box.position.y
+	var y1 := box.end.y
+	var reach := GLIMPSE_DEPTH + margin
+	match away:
+		Vector2i(0, -1): y0 = maxi(y0, to_size.y - reach)
+		Vector2i(0, 1): y1 = mini(y1, reach)
+		Vector2i(-1, 0): x0 = maxi(x0, to_size.x - reach)
+		_: x1 = mini(x1, reach)
+	if way["kind"] == "link":
+		var from: Vector2i = (way["from_cell"] as Vector2i) - shift
+		if away.x == 0:
+			x0 = maxi(x0, from.x - GLIMPSE_WIDE)
+			x1 = mini(x1, from.x + GLIMPSE_WIDE + 1)
+		else:
+			y0 = maxi(y0, from.y - GLIMPSE_WIDE)
+			y1 = mini(y1, from.y + GLIMPSE_WIDE + 1)
+	var strip := Rect2i(x0, y0, maxi(0, x1 - x0), maxi(0, y1 - y0))
+	var near := _near_land_grid(Rect2i(strip.position + shift, strip.size), GLIMPSE_GAP)
 	var floor_cells: Array[Vector2i] = []
 	var water: Array[Vector2i] = []
 	var kinds := {}
@@ -8407,19 +8424,26 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 	var stairs := {}
 	var cells: Dictionary[Vector2i, bool] = {}
 	var theirs: Dictionary = terrain.get("kinds", {})
+	var their_heights: Dictionary = terrain.get("heights", {})
+	var their_stairs: Dictionary = terrain.get("stairs", {})
+	var link: bool = way["kind"] == "link"
 	for list: String in ["floor", "water"]:
-		for cell: Vector2i in terrain.get(list, []):
-			var ours := cell + shift
-			var aside := ours - (way["from_cell"] as Vector2i) if way["kind"] == "link" else Vector2i.ZERO
-			if deep.call(cell) - margin >= GLIMPSE_DEPTH or absi(aside.x * away.y) + absi(aside.y * away.x) > GLIMPSE_WIDE 					or _near_land(ours, GLIMPSE_GAP):
-				continue
-			(floor_cells if list == "floor" else water).append(ours)
-			cells[ours] = true
-			if theirs.has(cell):
-				kinds[ours] = theirs[cell]
-			heights[ours] = lane_height if way["kind"] == "link" else int(terrain.get("heights", {}).get(cell, 0))
-			if way["kind"] != "link" and terrain.get("stairs", {}).has(cell):  # Flat: no stair climbs.
-				stairs[ours] = terrain["stairs"][cell]
+		var listed: Dictionary = sets[list]
+		var out: Array[Vector2i] = floor_cells if list == "floor" else water
+		for y in range(strip.position.y, strip.end.y):
+			var row := (y - strip.position.y) * strip.size.x - strip.position.x
+			for x in range(strip.position.x, strip.end.x):
+				var cell := Vector2i(x, y)
+				if not listed.has(cell) or near[row + x] != 0:
+					continue
+				var ours := cell + shift
+				out.append(ours)
+				cells[ours] = true
+				if theirs.has(cell):
+					kinds[ours] = theirs[cell]
+				heights[ours] = lane_height if link else int(their_heights.get(cell, 0))
+				if not link and their_stairs.has(cell):  # Flat: no stair climbs.
+					stairs[ours] = their_stairs[cell]
 	# Their own cells, before the lane's: an edge of theirs is drawn only
 	# between two of them. Their map's outer wall (the castle's south row)
 	# has the lane on its far side, and kept, it stood as a lone wall
@@ -8434,12 +8458,15 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		lane_only.append(cell)
 		kinds[cell] = lane_kind
 		heights[cell] = lane_height
+	# Each kept cell's east and south edges, so only the strip's are read.
 	var edges := {}
-	for key: Vector3i in terrain.get("edges", {}):
-		var ours := Vector3i(key.x + shift.x, key.y + shift.y, key.z)
-		var sides := Terrain.edge_cells(ours)
-		if their_cells.has(sides[0]) and their_cells.has(sides[1]):
-			edges[ours] = terrain["edges"][key]
+	var their_edges: Dictionary = terrain.get("edges", {})
+	for ours: Vector2i in their_cells:
+		var cell := ours - shift
+		for side: int in [Terrain.EAST, Terrain.SOUTH]:
+			var key := Vector3i(cell.x, cell.y, side)
+			if their_edges.has(key) and their_cells.has(ours + (Vector2i(1, 0) if side == Terrain.EAST else Vector2i(0, 1))):
+				edges[Vector3i(ours.x, ours.y, side)] = their_edges[key]
 	# Its buildings wholly in the glimpse, as built (no town's state: it
 	# is drawn only).
 	var buildings: Array[Dictionary] = []
@@ -8471,14 +8498,70 @@ func _glimpse_plan(way: Dictionary, terrain: Dictionary, to_size: Vector2i, size
 		"walls": terrain.get("walls", DEFAULT_SET), "floors": terrain.get("floors", DEFAULT_SET), "border": "none"}}
 
 
-## Whether any of our land is within [param reach] cells of [param cell]
-## (eight ways): a glimpse keeps that far off, the trees between.
-func _near_land(cell: Vector2i, reach: int) -> bool:
-	for dy in range(-reach, reach + 1):
-		for dx in range(-reach, reach + 1):
-			if _land.has(cell + Vector2i(dx, dy)):
-				return true
-	return false
+## For each cell of [param box] (ours, row by row), 1 where any of our land
+## is within [param reach] cells of it (eight ways): a glimpse keeps that
+## far off, the trees between. The land read once over the box grown by
+## the reach, then spread along the rows and down the columns.
+func _near_land_grid(box: Rect2i, reach: int) -> PackedByteArray:
+	var out := PackedByteArray()
+	out.resize(box.size.x * box.size.y)
+	if out.is_empty():
+		return out
+	var grown := box.grow(reach)
+	var w := grown.size.x
+	# Per row of the grown box, per column of the box: any land within reach along the row.
+	var rows := PackedByteArray()
+	rows.resize(grown.size.y * box.size.x)
+	var line := PackedInt32Array()
+	line.resize(w + 1)
+	for y in grown.size.y:
+		var sum := 0
+		line[0] = 0
+		for x in w:
+			if _land.has(Vector2i(grown.position.x + x, grown.position.y + y)):
+				sum += 1
+			line[x + 1] = sum
+		for x in box.size.x:
+			# Grown columns x .. x + 2 reach are this box column's window.
+			if line[x + 2 * reach + 1] - line[x] > 0:
+				rows[y * box.size.x + x] = 1
+	for x in box.size.x:
+		for y in box.size.y:
+			for dy in 2 * reach + 1:
+				if rows[(y + dy) * box.size.x + x] != 0:
+					out[y * box.size.x + x] = 1
+					break
+	return out
+
+
+## Level [param level_name]'s [param terrain] as sets for its glimpses: its
+## floor, water and both ("land"), and the box round them; kept while the
+## same terrain is read (_glimpse_level keeps it till its digest changes).
+static var _glimpse_set_cache: Dictionary[String, Array] = {}
+
+
+static func _glimpse_sets(level_name: String, terrain: Dictionary) -> Dictionary:
+	var kept: Array = _glimpse_set_cache.get(level_name, [])
+	if not kept.is_empty() and is_same(kept[0], terrain):
+		return kept[1]
+	var floor_set: Dictionary[Vector2i, bool] = {}
+	var water_set: Dictionary[Vector2i, bool] = {}
+	var land: Dictionary[Vector2i, bool] = {}
+	var box := Rect2i()
+	var first := true
+	for list: String in ["floor", "water"]:
+		var listed := floor_set if list == "floor" else water_set
+		for cell: Vector2i in terrain.get(list, []):
+			listed[cell] = true
+			land[cell] = true
+			if first:
+				box = Rect2i(cell, Vector2i.ONE)
+				first = false
+			else:
+				box = box.merge(Rect2i(cell, Vector2i.ONE))
+	var sets := {"floor": floor_set, "water": water_set, "land": land, "box": box}
+	_glimpse_set_cache[level_name] = [terrain, sets]
+	return sets
 
 
 ## Each link's glimpse lifted to meet our ground (327 amended; Jeff, after
