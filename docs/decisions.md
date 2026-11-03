@@ -39431,6 +39431,27 @@ monster_test _test_great_bear (asleep by day, sleeps on with a hunter 4 off, wok
 roar, the swipe's tell then its blow and push, a knockdown breaking a tell, the slam's ring of 8 with
 two beside it, the charge's tell, a dodged charge leaving it winded, breaking off off its ground).
 Server only; protocol unchanged; new class_name GreatBear; no bullet (no level has one).
+
+780, combat's side. Flanking, a general rule (enemy-ai's ask; the
+coordinator approved with a guard against chaining). A melee blow that
+lands from behind (World.is_behind, centres) on a body showing a
+flank-marked telegraph not yet landed staggers it flank_stagger ticks
+(4, 0.4 s); its mover gives the move up as stunned (the bear's code, and
+_tend_boss_moves for the draugr), so the move is lost. Then it can't be
+flanked again for flank_guard ticks (50, 5 s), so two players can't chain
+it into never acting. Shots and shoves never flank. The mark is on the
+telegraph: World.telegraph(source, kind, shape, ticks, flank := false),
+kept server-side in _telegraphs, not sent (no wire change); the draugr's
+spin, throw and charge pass their combat.json move row's "flank", which
+none has, so he is unchanged. World.flanked(target, source, telegraph_id)
+tells the mover's AI, its sound and companions; a log line names both.
+combat.json flank_stagger and flank_guard. combat_test _test_flank (an
+unmarked move, the front and a shove do nothing; from behind mid-tell, a
+4-tick stagger and the signal; a second inside the guard nothing; past it
+again; a landed tell nothing). Sim only, protocol unchanged, no new
+class_name. No CHANGELOG bullet yet: it comes when the bear is in a real
+level.
+
 ## 769. The mine: ore seams, and its look (phase 1)
 
 Jeff (2026-11-02): "theres a mine entrance in the hills and its overrun, its the source of ore

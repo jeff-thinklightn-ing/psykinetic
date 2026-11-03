@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_telegraph_ground()
 	_test_telegraph_lifecycle()
 	_test_arc_spares_friends()
+	_test_flank()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1234,6 +1235,62 @@ func _test_arc_spares_friends() -> void:
 	World._tend_wind_ups()
 	World._resolve_hits()
 	_check(World.is_down(e2["P"][0]) and World.is_down(e2["P"][1]) and World.is_down(e2["P"][2]), "a monster's sweep: all three players knocked down")
+
+
+## Flanking (780, combat's side): a blow from behind on a body winding a
+## flank-marked move staggers it, the move lost; not from the front, not an
+## unmarked move, not a shove, and not again inside flank_guard.
+func _test_flank() -> void:
+	print("\n== flanking: struck from behind mid-tell, a flank move is lost (780, combat's side) ==")
+	var e := _build(["#########", "#.......#", "#..PmP..#", "#.......#", "#########"])
+	var back: Player = e["P"][0]  # (3,2), behind: the foe faces east.
+	var front: Player = e["P"][1]  # (5,2), ahead.
+	var foe: GridEntity = e["m"][0]
+	foe.facing = Vector2i(1, 0)
+	back.free_pos = Vector2(3.0, 2.0)
+	front.free_pos = Vector2(5.0, 2.0)
+	_check(World.flank_stagger == 4 and World.flank_guard == 50, "combat.json: flank_stagger 4, flank_guard 50")
+	var heard := {}
+	var on_flank := func(target: GridEntity, source: GridEntity, id: int) -> void:
+		heard["n"] = int(heard.get("n", 0)) + 1
+		heard["last"] = [target, source, id]
+	World.flanked.connect(on_flank)
+	var shape := {"kind": "cone", "origin": [foe.tile.x, foe.tile.y], "facing": [1, 0], "length": 2.0, "half_angle": 60.0}
+	var plain := World.telegraph(foe, "swipe", shape, 10)
+	_blow(back, foe)
+	_check(not World.is_stunned(foe) and heard.is_empty(), "an unmarked move: a blow from behind staggers nothing")
+	World.end_telegraph(plain, false)
+	var marked := World.telegraph(foe, "swipe", shape, 10, true)
+	_blow(front, foe)
+	_check(not World.is_stunned(foe) and heard.is_empty(), "a marked move struck from the front: nothing")
+	back.next_attack_tick = 0
+	back.next_move_tick = 0
+	World.try_shove(back, foe)
+	World._resolve_hits()
+	_check(not World.is_stunned(foe) and heard.is_empty(), "nor a shove from behind")
+	_blow(back, foe)
+	_check(World.is_stunned(foe) and foe.stunned_until_tick == World.tick + 4 and int(heard.get("n", 0)) == 1 and heard["last"] == [foe, back, marked],
+			"struck from behind mid-tell: staggered 4 ticks, flanked told (%s)" % [heard])
+	World.end_telegraph(marked, false)
+	foe.stunned_until_tick = 0
+	World.tick += 10
+	var again := World.telegraph(foe, "slam", shape, 10, true)
+	_blow(back, foe)
+	_check(not World.is_stunned(foe) and int(heard["n"]) == 1, "inside flank_guard: a second flank does nothing")
+	World.end_telegraph(again, false)
+	World.tick += 41
+	var late := World.telegraph(foe, "slam", shape, 10, true)
+	_blow(back, foe)
+	_check(World.is_stunned(foe) and int(heard["n"]) == 2, "past flank_guard: flanked again")
+	World.end_telegraph(late, false)
+	foe.stunned_until_tick = 0
+	World.tick += 60
+	var landed := World.telegraph(foe, "slam", shape, 2, true)
+	World.tick += 3
+	_blow(back, foe)
+	_check(not World.is_stunned(foe) and int(heard["n"]) == 2, "its tell over (landed): nothing")
+	World.end_telegraph(landed, false)
+	World.flanked.disconnect(on_flank)
 
 
 func _test_spin() -> void:

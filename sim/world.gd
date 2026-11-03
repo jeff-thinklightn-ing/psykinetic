@@ -127,6 +127,11 @@ signal guard_met(target: GridEntity, source: GridEntity, broken: bool)
 ## [param by] bashed [param target] with its shield (decision 379):
 ## [param opened], the target's guard was up and is open now.
 signal shield_bashed(by: GridEntity, target: GridEntity, opened: bool)
+## [param target], winding a move marked to be flanked (its telegraph's
+## flank), was struck from behind by [param source] and staggered, the move
+## lost (780, combat's side): for the mover's AI, its sound, companions.
+## Server only.
+signal flanked(target: GridEntity, source: GridEntity, telegraph_id: int)
 ## [param target] was knocked down by [param source]'s blow (decision 343).
 signal knocked_down(target: GridEntity, source: GridEntity)
 ## [param holder]'s braced spear stopped [param charger]'s charge (decision
@@ -385,6 +390,12 @@ var melee_reach := 0.9
 ## does (2.0 at 0.9 and 0.5).
 var lead_slack := 0.5
 var winded_regen_delay := 20
+## Flanking (780, combat's side): a body struck from behind while it winds a
+## flank-marked move is staggered this many ticks (its mover gives the move
+## up, stunned), and can't be flanked again for flank_guard ticks after, so
+## two players can't chain it into never acting (the coordinator).
+var flank_stagger := 4
+var flank_guard := 50
 ## A boss's moves (decision 603), by name: "spin", "throw", "charge", each a
 ## Dictionary of its numbers (levels/combat.json's "moves"; drafts for Jeff).
 var moves := {
@@ -4774,7 +4785,7 @@ func load_combat_rules(text: String) -> void:
 					push_warning("World: %s's moves.%s is not a move" % [COMBAT_RULES, move])
 			continue
 		if not key in ["swing_base", "swing_per_kg", "ref_mass", "whiff_scale", "recover_at", "winded_move_scale",
-				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack"]:
+				"winded_blow_scale", "winded_regen_delay", "melee_reach", "lead_slack", "flank_stagger", "flank_guard"]:
 			push_warning("World: %s's %s is not a combat rule" % [COMBAT_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(key, int(given) if get(key) is int else float(given))
@@ -4811,14 +4822,17 @@ func is_winded(entity: GridEntity) -> bool:
 ## from_tick, lands_tick}.
 var _telegraphs: Dictionary[int, Dictionary] = {}
 var _next_telegraph := 1
+## The tick each body flanked can be flanked again from (780).
+var _flank_guard_until: Dictionary = {}
 
 
 ## [param source] shows [param shape] (Telegraph's) on the ground, a
 ## [param kind] ("spin", "throw", "charge": the views' and sounds' word) for
 ## [param ticks] till it lands (decision 602): its id, 0 if the shape does
 ## not read. The blow that follows strikes telegraph_cells(shape), the cells
-## drawn. Server only.
-func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int) -> int:
+## drawn. A [param flank] move may be broken from behind while it shows
+## (780, combat's side: _try_flank); kept here, not sent. Server only.
+func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int, flank := false) -> int:
 	if not Net.is_authority() or not Telegraph.valid(shape) or not is_instance_valid(source):
 		return 0
 	var id := _next_telegraph
@@ -4828,9 +4842,35 @@ func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int) 
 		cells.append([cell.x, cell.y])  # Sent as struck, so a view draws exactly what will hit.
 	var data := {"id": id, "source": str(source.get_path()), "kind": kind, "shape": shape, "cells": cells,
 		"from_tick": tick, "lands_tick": tick + maxi(0, ticks), "zone": source.zone}
-	_telegraphs[id] = {"source": source, "data": data}
+	_telegraphs[id] = {"source": source, "data": data, "flank": flank}
 	telegraph_started.emit(id, data)
 	return id
+
+
+## Flanking (780, combat's side; enemy-ai's apex bear, a general rule): a
+## melee blow from [param source] landing from behind (is_behind) on
+## [param target] while it shows a flank-marked telegraph not yet landed
+## (telegraph's flank: the bear's swipe, slam and charge's roar; the
+## draugr's only where his move's row says "flank") staggers it
+## flank_stagger ticks; its mover gives the move up as stunned. Not again
+## for flank_guard ticks after. Shots and shoves never flank. Server only.
+func _try_flank(source: GridEntity, target: GridEntity) -> bool:
+	if not Net.is_authority() or not is_instance_valid(source) or not _alive(target) \
+			or tick < int(_flank_guard_until.get(target, -1)) or not is_behind(source, target):
+		return false
+	var found := 0
+	for id: int in _telegraphs:
+		var each: Dictionary = _telegraphs[id]
+		if each["source"] == target and bool(each.get("flank", false)) and tick < int(each["data"]["lands_tick"]):
+			found = id
+			break
+	if found == 0:
+		return false
+	_stun_for(target, flank_stagger)
+	_flank_guard_until[target] = tick + flank_guard
+	_log("flank: %s staggers %s, its %s lost" % [source.name, target.name, _telegraphs[found]["data"]["kind"]])
+	flanked.emit(target, source, found)
+	return true
 
 
 ## Telegraph [param id] over: [param landed], its blow struck; false, given
@@ -4915,7 +4955,7 @@ func try_spin(by: GridEntity) -> bool:
 	if not _boss_can_begin(by) or by.stamina < int(move["needs"]):
 		return false
 	var shape := _spin_shape(by)
-	var id := telegraph(by, "spin", shape, int(move["windup"]))
+	var id := telegraph(by, "spin", shape, int(move["windup"]), bool(move.get("flank", false)))
 	_boss_moves[by] = {"move": "spin", "telegraph": id, "lands": tick + int(move["windup"]), "shape": shape, "from": by.tile}
 	by._world_winding(by.facing, int(move["windup"]))
 	by._world_note_exertion(tick)
@@ -4954,7 +4994,7 @@ func try_axe_throw(by: GridEntity, at: Vector2i) -> bool:
 		return false
 	by.stamina = maxi(0, by.stamina - int(move["cost"]))
 	by._world_set_facing(Vector2i(signi(at.x - by.tile.x), signi(at.y - by.tile.y)))
-	var id := telegraph(by, "throw", shape, int(move["windup"]))
+	var id := telegraph(by, "throw", shape, int(move["windup"]), bool(move.get("flank", false)))
 	_boss_moves[by] = {"move": "throw", "telegraph": id, "lands": tick + int(move["windup"]), "shape": shape, "from": by.tile}
 	by._world_winding(by.facing, int(move["windup"]))
 	by._world_note_exertion(tick)
@@ -4998,7 +5038,7 @@ func try_axe_charge(by: GridEntity) -> bool:
 		return true
 	var move: Dictionary = moves["charge"]
 	var shape := Telegraph.line(by.tile, Vector2(cell - by.tile).normalized(), Vector2(cell - by.tile).length())
-	var id := telegraph(by, "charge", shape, int(move["roar"]))
+	var id := telegraph(by, "charge", shape, int(move["roar"]), bool(move.get("flank", false)))
 	_boss_moves[by] = {"move": "charge", "telegraph": id, "lands": tick + int(move["roar"]), "to": cell, "steps": 0,
 		"rushing": false}
 	by._world_note_exertion(tick)
@@ -7080,6 +7120,7 @@ func _freed(entity: GridEntity) -> void:
 ## these each tick crashed the release template (572).
 func _forget_jobs(entity: GridEntity) -> void:
 	_boss_moves.erase(entity)
+	_flank_guard_until.erase(entity)
 	_axes.erase(entity)
 	for id: int in _telegraphs.keys():
 		if _telegraphs[id]["source"] == entity:
@@ -8262,6 +8303,8 @@ func _resolve_hits() -> void:
 			if hit.target is Monster and not hit.shove and wielded(hit.source) == "sword":
 				practise(hit.source, "swordplay", ART_DEED_BLOW * _art_worth(hit.target))  # 766.
 			damage(hit.target, hit.damage, hit.source, &"attack")
+			if not hit.shove:
+				_try_flank(hit.source, hit.target)  # 780, combat's side.
 			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
 				knock_down(hit.target, hit.source, hit.down_ticks)
 			if bool(Items.def(wielded(hit.source)).get("blunt", false)):
