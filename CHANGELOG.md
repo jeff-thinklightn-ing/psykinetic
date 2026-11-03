@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.200
+
+- What goes over the network changes, so v0.1.199 and older can't join the server: update through the launcher first.
 - Companions: your companion knows a ford for shallow water and says so when she talks about what's around her (776, companions' side).
 - Companions: told to wait, your companion stays put when wolves come to town or a foe challenges you, until you call her (616 amended).
 - The hills' rivers are streams now: wade across anywhere (slowly), the bridge and the old fords still the easy ways over; only the pool under the waterfall is deep. The lone wall below the waterfall is gone (776).
@@ -15,7 +18,6 @@ notes (decision 324).
 - Townsfolk no longer sleep the whole night: each turns in for a short while, and the rest of the night they're up in the square, at night work or at the chapel (772).
 - Every store now uses one window in the pack's squares, for shops, makers, Rolf's stall, pedlars, Hob's Healing and the temple's and smith's counters: each item's picture with its price over the corner, click to pick, then Buy, Sell, Trade, Pay or the work's verb (Bless, Remake, Mend), with the Total on hovering the button; while a store is open your pack shows what that seller pays for each thing, and every square is a shade lighter so dark weapons show; the pack, chests and depots drop the names under the pictures (hover for the name), a named thing's square framed in gilt (765).
 - 773, items: the server sweeps up everything lying within two cells in sight when the client asks (F's vacuum; ui's key follows): nearest first, gold too, into the pack before the hands, stopping when the pack is full. An old client's F still picks up one thing.
-
 - Umbrage's music fades in more slowly (about 2 seconds) and plays a little softer (668 amended (3)).
 - Every town also gets a carpenter to raise its sheds and workshops, a town's cook roasts from meat alone, and pedlars buy a town's spare meat and hides (767).
 - Every town now has a woodcutter and a hunter of its own, who keep its store in wood, meat and hides (767).
