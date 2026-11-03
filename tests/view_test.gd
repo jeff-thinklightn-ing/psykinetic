@@ -67,6 +67,7 @@ func _ready() -> void:
 		await _test_sounds_follow_events()
 		await _test_bow_sounds()
 		await _test_armour_footfalls()
+		_test_wade_drip()
 		await _test_monster_death()
 		await _test_companion_death()
 		await _test_down_grey()
@@ -1036,6 +1037,40 @@ func _test_sounds_follow_events() -> void:
 	_check(pitch_light > pitch_heavy, "an imp's swing is higher than a player's (%.2f, %.2f)" % [pitch_light, pitch_heavy])
 	World.despawn(imp)
 	_rig._process(0.0)
+
+
+## 505 amended (3): a body stepping out of a ford onto dry ground drips (a
+## drop now, another WADE_DRIP_SECONDS on); dry ground to dry ground no
+## drip. A ford set on the player's next cell (the splash: sound_kit_test).
+func _test_wade_drip() -> void:
+	print("\n== out of a ford a body drips (505 amended (3)) ==")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id()) if player != null else null
+	if puppet == null:
+		_check(true, "no drawn player: skipped")
+		return
+	var id := player.get_instance_id()
+	var dry := player.tile
+	var ford := dry + Vector2i(1, 0)
+	var other := dry - Vector2i(1, 0)
+	var had_ford := World._fords.has(ford)
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	World._fords[ford] = true
+	var heard := func(from: Vector2i) -> Array:
+		_rig._last_tile[id] = from
+		var before := _rig.sfx.played.size()
+		_rig._step_sound(player, puppet)
+		return _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
+	var drips_was: int = _rig.drips
+	var out_of: Array = heard.call(ford)
+	_check(out_of.has("sfx.wade_drip") and _rig.drips == drips_was + 1, "out of the ford: a drip (%s)" % [out_of])
+	var dry_step: Array = heard.call(other)
+	_check(not dry_step.has("sfx.wade_drip") and _rig.drips == drips_was + 1, "dry ground to dry ground: no drip (%s)" % [dry_step])
+	_rig._last_tile[id] = dry
+	if not had_ford:
+		World._fords.erase(ford)
+	_rig.sfx.hear_everything = hear_was
 
 
 ## 676 1b (Jeff on the first mixes: "the walking ones are approximately

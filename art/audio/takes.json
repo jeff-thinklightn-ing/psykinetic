@@ -1972,6 +1972,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.wade_drip": [
+			{
+				"file": "sfx.wade_drip.ogg",
+				"from": "freesound",
+				"original": "freesound 273870: water drop 1.aif",
+				"sha256": "380e7b0be4d79f4331d64882dc486caa3e7e5234ca5cc3ed0572889dded3aa01",
+				"by": "beskhu",
+				"url": "https://freesound.org/people/beskhu/sounds/273870/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wade_drip.2.ogg",
+				"from": "freesound",
+				"original": "freesound 51754: Water Drip 01.wav",
+				"sha256": "e7ff965225e3de5c61fd90c22abc78326c75b3a0d90748e24f25cb000b1f0cde",
+				"by": "erkanozan",
+				"url": "https://freesound.org/people/erkanozan/sounds/51754/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wade_drip.3.ogg",
+				"from": "freesound",
+				"original": "freesound 166325: Water_drop_9.wav (from 0.15 s for 0.4 s)",
+				"sha256": "a749e8a8814fa313a9f31974cc5290ed965bf827b3cd42d89d25e39b3ef2aa47",
+				"by": "deleted_user_2104797",
+				"url": "https://freesound.org/people/deleted_user_2104797/sounds/166325/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.wolf_death": [
 			{
 				"file": "sfx.wolf_death.ogg",

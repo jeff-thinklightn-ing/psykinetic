@@ -1120,6 +1120,15 @@
 			"uses": "a step of a wolf's clawed paws (Client3D._step_sound, SoundKit.footstep)",
 			"fallback": "sfx.footstep"
 		},
+		"sfx.wade_drip": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 3,
+			"volume_db": -12.0,
+			"uses": "a drop or two off a body stepping out of water or a ford onto dry ground (505 amended (3); Client3D._step_sound: one drop on the step, a second WADE_DRIP_SECONDS later)"
+		},
 		"voice.effort_swing_male": {
 			"category": "voices",
 			"type": "oneshot",

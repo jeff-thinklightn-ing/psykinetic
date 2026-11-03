@@ -14620,16 +14620,34 @@ static func hp_color(share: float) -> Color:
 
 
 ## A footstep when a creature's replicated tile moves on by one.
+## Whether a body on [param tile] wades: water, or a ford (decision 505),
+## which is waded though it isn't deep water.
+static func wades(tile: Vector2i) -> bool:
+	return World.is_water(tile) or World.is_ford(tile)
+
+
+## A body stepping out of the water drips twice, this far apart (505 amended (3)).
+const WADE_DRIP_SECONDS := 0.45
+## How many bodies have dripped out of the water (view_test).
+var drips := 0
+
+
 func _step_sound(entity: GridEntity, puppet: Node3D) -> void:
 	var id := entity.get_instance_id()
 	var last: Vector2i = _last_tile.get(id, entity.tile)
 	_last_tile[id] = entity.tile
 	if entity.is_creature() and last != entity.tile and World.distance(last, entity.tile) == 1:
 		# A ford (decision 505) is waded, though it isn't deep water.
-		var wet := World.is_water(entity.tile) or World.is_ford(entity.tile)
+		var wet := wades(entity.tile)
 		var ground: String = "water" if wet else _ground_kinds.get(entity.tile, "stone")
 		var creature := str(entity.spawn_spec.get("kind", "")) if entity is Monster else ""
 		_step_slot[id] = SoundKit.footstep(ground, entity.mass, creature)
+		if not wet and wades(last):
+			# Out of the water (505 amended (3)): a drop off it now, another a moment on.
+			var at := puppet.position + Vector3.UP * 0.3
+			sfx.play("sfx.wade_drip", at)
+			get_tree().create_timer(WADE_DRIP_SECONDS).timeout.connect(sfx.play.bind("sfx.wade_drip", at))
+			drips += 1
 		# A body already in a gait with footfalls steps on them (_footfall_sounds);
 		# otherwise (standing off, or no feet drawn) the cell's step is the footfall.
 		var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null

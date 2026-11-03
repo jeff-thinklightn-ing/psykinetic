@@ -255,9 +255,10 @@ const FEET := {"deer": "hooves", "stag": "hooves", "boar": "hooves", "rabbit": "
 
 ## The footstep slot for a body of [param mass] on [param ground] (a floor
 ## kind, or "water"); an animal of [param creature] kind (FEET) steps on its
-## own feet, whatever the ground.
+## own feet on any dry ground, and splashes by its mass in water or a ford,
+## as any other body does (505 amended (3)).
 static func footstep(ground: String, mass: float, creature := "") -> String:
-	if FEET.has(creature):
+	if FEET.has(creature) and ground != "water":
 		return "sfx.footstep_%s" % FEET[creature]
 	var size := "small" if mass < STEP_MASS[0] else "medium" if mass < STEP_MASS[1] else "large"
 	return "sfx.footstep_%s_%s" % [ground if ground in STEP_GROUNDS else "stone", size]

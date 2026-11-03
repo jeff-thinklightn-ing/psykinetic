@@ -39308,3 +39308,26 @@ headings be bare words: "Learned", "Fighting", "Regard".
 
 chest_test (_test_click_from_afar: the rule, no attack order, the walk and the opening) and
 ui_test (the card's headings). Client only, protocol unchanged, no new class_name.
+
+## 505 amended (3). Animals splash through water and fords; a body out of the water drips
+
+The coordinator (2026-11-02): the hills' fordable streams want splashing footsteps for players,
+companions and animals, and a drip or two after leaving the water if cheap. Maps: the streams are
+ordinary 505 fords (World.is_ford, not is_water); the pool under the waterfall stays plain water.
+pc-character: a wade gait, if one comes, keeps the footfall times step_ms expects and leaves
+_step_sound alone; drips on its side are visual only.
+
+- **Splash**: players and companions already splashed in water and fords (505, sound's side).
+  An animal's own feet (SoundKit.FEET: hooves, paws, claws) took over on any ground, so a deer
+  crossed a ford on dry hooves. Now SoundKit.footstep gives water before the feet: an animal in
+  water or a ford splashes by its mass as any body does (a rabbit small, a deer medium, a heavy
+  boar large).
+- **Drip**: a body stepping from a wet cell (Client3D.wades: water or a ford) onto a dry one
+  plays sfx.wade_drip there, and once more WADE_DRIP_SECONDS (0.45 s) on, from the same place.
+  Any creature drips, players, companions and animals alike. The slot is placed, makes no
+  monster's noise (noise null), reaches 3 cells (a step's), at -12 dB. Takes: three CC0 single
+  drops (freesound 273870 beskhu, 51754 erkanozan, 166325 deleted_user_2104797).
+
+sound_kit_test (an animal's splash by size; the drip slot's reach and takes) and view_test
+(_test_wade_drip: out of a ford a drip, dry to dry none). Client only, protocol unchanged, no new
+class_name.

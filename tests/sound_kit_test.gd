@@ -115,6 +115,12 @@ func _test_noises_are_the_sims() -> void:
 	_check(SoundKit.footstep("grass", 60.0, "deer") == "sfx.footstep_hooves" and SoundKit.footstep("stone", 30.0, "wolf") == "sfx.footstep_claws"
 			and SoundKit.footstep("dirt", 2.0, "rabbit") == "sfx.footstep_paws" and SoundKit.footstep("dirt", 80.0, "imp") == "sfx.footstep_dirt_medium",
 			"an animal steps on its own feet: hooves, claws, paws; a goblin by the ground")
+	_check(SoundKit.footstep("water", 60.0, "deer") == "sfx.footstep_water_medium" and SoundKit.footstep("water", 2.0, "rabbit") == "sfx.footstep_water_small"
+			and SoundKit.footstep("water", 140.0, "boar") == "sfx.footstep_water_large",
+			"an animal in water or a ford splashes by its size (505 amended (3)): a deer medium, a rabbit small, a heavy boar large")
+	_check(SoundKit.positional("sfx.wade_drip") and SoundKit.noise("sfx.wade_drip") == "" and SoundKit.reach("sfx.wade_drip") <= Senses.NOISE_STEP
+			and SoundKit.takes("sfx.wade_drip").size() >= 2,
+			"a drip off a body out of the water: placed, no monster's noise, heard no further than a step (%d), takes of its own" % SoundKit.reach("sfx.wade_drip"))
 	_check(SoundKit.cry("wolf", "call") == "sfx.wolf_howl" and SoundKit.cry("imp", "call") == "sfx.goblin_alert"
 			and SoundKit.cry("stag", "rout") == "sfx.deer_rout" and SoundKit.cry("boar", "charge") == "sfx.boar_charge",
 			"cries by kind: a wolf's call a howl, a goblin's its alert, a stag bolts as a deer, a boar charges")
