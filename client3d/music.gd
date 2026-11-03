@@ -24,7 +24,8 @@ extends Node
 ## A level's own music (decision 668): a level whose level.json names a music
 ## slot ("music": "music.barrow") plays it, from its start and always, in
 ## place of the zone's ground and melody (the tension layers still rise over
-## it), eased in on arrival and out on leaving over LEVEL_FADE. A named room
+## it), eased in on arrival (over its slot's fade_in if it has one, own_fade)
+## and out on leaving over LEVEL_FADE. A named room
 ## may name one too (668 amended: the wilds' "umbrage" room, Jeff's
 ## umbrage-theme, the town's music wherever it stands): played the same way
 ## while the listener is in the room, over the level's own if it has one.
@@ -118,12 +119,22 @@ func _process(delta: float) -> void:
 		_weigh(_since_weigh)
 		_since_weigh = 0.0
 	var ease := 1.0 - exp(-delta * 3.0 / FADE_SECONDS)
-	var level_ease := 1.0 - exp(-delta * 3.0 / LEVEL_FADE)
 	var duck := STING_DUCK_DB if _sting_player != null and _sting_player.playing else 0.0
 	for layer: String in targets:
-		var level := lerpf(float(levels.get(layer, 0.0)), targets[layer], level_ease if _own_layers.has(layer) else ease)
+		var was := float(levels.get(layer, 0.0))
+		var step := ease
+		if _own_layers.has(layer):
+			step = 1.0 - exp(-delta * 3.0 / own_fade(layer, targets[layer] > was))
+		var level := lerpf(was, targets[layer], step)
 		levels[layer] = level
 		_set_level(layer, level, duck)
+
+
+## Seconds a level's or room's own music [param layer] takes to ease in
+## ([param rising]) or out: in over its slot's "fade_in" if it has one
+## (Umbrage's 2 s; Jeff: "fade in a little slower"), else LEVEL_FADE.
+static func own_fade(layer: String, rising: bool) -> float:
+	return float(SoundKit.spec(layer).get("fade_in", LEVEL_FADE)) if rising else LEVEL_FADE
 
 
 ## Every sound stopped as this goes: a stream still playing at quit is

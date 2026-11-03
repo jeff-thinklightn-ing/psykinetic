@@ -1528,8 +1528,9 @@
 			"type": "bed",
 			"bus": "music",
 			"positional": false,
-			"volume_db": 0.0,
-			"uses": "the town of Umbrage (a room's or a level's \"music\", the wilds' umbrage room for now): played from its start in place of the zone's ground and melody while the player is in it, eased in on entering and out on leaving over 1 s (Music.room_music; decision 668 amended)",
+			"volume_db": -4.0,
+			"fade_in": 2.0,
+			"uses": "the town of Umbrage (a room's or a level's \"music\", the wilds' umbrage room for now): played from its start in place of the zone's ground and melody while the player is in it, eased in on entering over its fade_in (2 s, Jeff: \"fade in a little slower and be softer\") and out on leaving over 1 s (Music.room_music; decision 668 amended)",
 			"source": {
 				"by": "Jeff",
 				"tool": "Ableton Live",

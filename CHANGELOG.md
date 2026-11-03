@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage's music fades in more slowly (about 2 seconds) and plays a little softer (668 amended (3)).
 - Every town also gets a carpenter to raise its sheds and workshops, a town's cook roasts from meat alone, and pedlars buy a town's spare meat and hides (767).
 - Every town now has a woodcutter and a hunter of its own, who keep its store in wood, meat and hides (767).
 - A town's store counter now buys cuts of meat and raw hides when the town is short of them, as its depot does (652 amended (3)).

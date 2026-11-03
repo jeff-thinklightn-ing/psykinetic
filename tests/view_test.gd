@@ -410,10 +410,13 @@ func _test_room_music() -> void:
 	var wanted := float(music.targets.get("music.umbrage", 0.0))
 	_check(wanted >= 0.5 and float(music.targets.get("music.town_base", 0.0)) == 0.0 and float(music.targets.get("music.wilds_base", 0.0)) == 0.0,
 		"in Umbrage: the town's music wanted, the zone's ground out (%.2f)" % wanted)
-	music._process(Music.LEVEL_FADE)
+	var fade_in := Music.own_fade("music.umbrage", true)
+	music._process(fade_in * 0.5)
+	_check(float(music.levels.get("music.umbrage", 0.0)) < 0.9 * wanted, "half its fade-in in, not yet full: it comes in slowly (%.2f of %.2f)" % [float(music.levels.get("music.umbrage", 0.0)), wanted])
+	music._process(fade_in * 0.5)
 	var player: AudioStreamPlayer = music.players.get("music.umbrage")
 	_check(float(music.levels.get("music.umbrage", 0.0)) > 0.9 * wanted and player != null and player.playing,
-		"eased in within %.1f s, playing (%.2f of %.2f)" % [Music.LEVEL_FADE, float(music.levels.get("music.umbrage", 0.0)), wanted])
+		"eased in within %.1f s, playing (%.2f of %.2f)" % [fade_in, float(music.levels.get("music.umbrage", 0.0)), wanted])
 	_rig.sfx.listener = Vector2i(70, 202)
 	music._weigh(0.25)
 	_check(music.targets.get("music.umbrage") == 0.0, "out of the town: wanted at 0, so it eases out")

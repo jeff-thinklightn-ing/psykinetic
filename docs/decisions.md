@@ -39089,3 +39089,20 @@ The treasury still sat at its floor, owing its people 56-72: a town's gold comes
 and, from 770, the market's trader. farm_test _test_gatherers (three, the carpenter's line) and
 _test_visitors (the spare meat bought); larder_test _test_larder_reserve (a roast under the
 larder). Server only; protocol unchanged; no new class_name.
+## 668 amended (3). Umbrage's music comes in slower and softer
+
+Jeff (2026-11-02, by way of the coordinator): "umbrage music also needs to fade in a little
+slower and be softer."
+
+- **Slower**: a level's or room's own music may name its own fade-in, the slot's "fade_in" in
+  seconds (Music.own_fade). music.umbrage's is 2.0, twice LEVEL_FADE. Leaving still eases out
+  over LEVEL_FADE (1 s), and a slot without "fade_in" eases in over LEVEL_FADE as before (the
+  barrow's).
+- **Softer**: music.umbrage volume_db 0 -> -4. It stays well above the town's ambience: the take
+  is -22 LUFS and amb.town_day -28 LUFS, and the bed plays 12 dB down on its own bus.
+- Other towns: they play the shared ground layers (music.town_base, town_night), which already
+  ease in over FADE_SECONDS (4 s) at -10 dB, so they are unchanged. Only Umbrage has its own cue.
+
+sound_kit_test (own_fade: Umbrage's twice the level fade, out as fast, the barrow's as before;
+softer than the barrow's) and view_test (half its fade-in in it is not yet full; full by the
+end). Client only, protocol unchanged, no new class_name.

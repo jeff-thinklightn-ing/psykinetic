@@ -434,6 +434,9 @@ func _test_music() -> void:
 			"the wilds' Umbrage room names the town's music; outside it, and a level without rooms, none")
 	_check(str(SoundKit.files("music.umbrage")[0]).ends_with("music.umbrage/music.umbrage.ogg") and SoundKit.filled_by("music.umbrage") == "own",
 			"music.umbrage plays Jeff's own take")
+	_check(Music.own_fade("music.umbrage", true) == 2.0 * Music.LEVEL_FADE and Music.own_fade("music.umbrage", false) == Music.LEVEL_FADE
+			and Music.own_fade("music.barrow", true) == Music.LEVEL_FADE and SoundKit.volume_db("music.umbrage") < SoundKit.volume_db("music.barrow"),
+			"Umbrage's music comes in over twice the level fade, softer than the barrow's; out as fast; the barrow's as before (Jeff)")
 	var own := Music.weights("dungeon", 1.0, 0.0, false, "music.barrow")
 	_check(own["music.barrow"] == 1.0 and own["music.dungeon_base"] == 0.0 and own["music.melody_dungeon"] == 0.0,
 			"a level's own music, even between phrases, the dungeon's ground and melody out")
