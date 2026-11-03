@@ -24702,6 +24702,18 @@ so there are herbs to gather. Herbs players sell him still go to his brewing (ma
 healer rule, edited here with npc's leave. economy_test _test_makers_command; resident_test
 _test_herbs (the day's cap from the rule); forage_test _test_lay (three a day round the hut). Server
 only, protocol unchanged, no new class_name.
+562 amended (8) (release's label; the coordinator approved): a maker inherits the shelf of a maker
+gone. The shelf keeps each made thing's maker (Stockpile.maker_of), and the barter listed and quoted
+only the maker's own, while the cap on making (Production._serves: shop_cap, or a recipe's "stock")
+counts everything of that kind on the shelf. So when a hut's healer leaves in old age (759) and a
+new one is seated, the old one's potions would fill the new one's cap, unsellable and unseen: an
+empty barter in front of a full shelf. Economy.sells_as_own(worker, town, uid): their own make, or a
+thing their trade makes whose maker is no longer among the town's workers. Never a living maker's of
+the town, nor the town's own stock (no maker). maker_goods and maker_quote use it. The sale's
+proceeds for a gone maker go to the store, as before (Economy._sale: no such worker, all to the
+treasury), and a healer's hut's store is his own working purse. Not the box's cause today (one
+keeper, never gone). economy_test: a gone keeper's potion is Hob's to sell, a living Ned's is not.
+Server only, protocol unchanged, no new class_name, no bullet.
 ## 584 amended (2): the care counted a handful at a time
 
 Jeff, playing v0.1.168 (2026-10-23): "you cant hold 5, theres only 4

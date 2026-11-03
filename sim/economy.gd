@@ -526,16 +526,37 @@ func maker_materials(worker_id: String, cat := {}) -> Dictionary:
 
 
 ## Worker [param worker_id]'s own make on their town's shelf, for the
-## barter window: [{uid, id, price}] by uid, at maker_price.
+## barter window: [{uid, id, price}] by uid, at maker_price; with what
+## they inherited (sells_as_own).
 func maker_goods(worker_id: String) -> Array[Dictionary]:
 	var town := str(production.worker(worker_id).get("town", ""))
 	var cat: Dictionary = catalog.call()
 	var out: Array[Dictionary] = []
 	for each in goods(town):
-		if stockpile.maker_of(town, int(each["uid"])) == worker_id:
+		if sells_as_own(worker_id, town, int(each["uid"]), cat):
 			each["price"] = maker_price(town, int(each["uid"]), cat)
 			out.append(each)
 	return out
+
+
+## Whether maker [param worker_id] sells [param uid] on [param town]'s
+## shelf as their own (562 amended (8)): they made it, or a maker no longer
+## among the town's workers did (a healer gone in old age, 759; one who
+## left), of a thing their own trade makes. Never a living maker's of the
+## town, nor the town's own stock (no maker).
+func sells_as_own(worker_id: String, town: String, uid: int, cat := {}) -> bool:
+	var maker := stockpile.maker_of(town, uid)
+	if maker == worker_id:
+		return true
+	if maker.is_empty():
+		return false
+	var other := production.worker(maker)
+	if not other.is_empty() and str(other.get("town", "")) == town:
+		return false
+	if cat.is_empty():
+		cat = catalog.call()
+	var made_by := str(cat.get(stockpile.book.id_of(uid), {}).get("made", {}).get("by", ""))
+	return not made_by.is_empty() and made_by in production.worker(worker_id).get("trades", [])
 
 
 ## What a maker asks for their own make [param uid] at [param town]: the
@@ -608,7 +629,7 @@ func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Arra
 	var cost := 0
 	var shelf := stockpile.shop(town)
 	for uid: int in takes:
-		if uid not in shelf or takes.count(uid) > 1 or stockpile.maker_of(town, uid) != worker_id:
+		if uid not in shelf or takes.count(uid) > 1 or not sells_as_own(worker_id, town, uid, cat):
 			out["why"] = "that is no longer for sale"
 			return out
 		var each := maker_price(town, uid, cat)

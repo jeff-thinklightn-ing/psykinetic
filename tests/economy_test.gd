@@ -320,6 +320,19 @@ func _test_maker_barter() -> void:
 	var quote := economy.maker_quote("hob", "p1", [{"id": "herbs"}, {"id": "herbs"}], [potion])
 	_check(quote["ok"] and quote["gives"] == [2, 2] and quote["takes"] == [4] and quote["balance"] == 0, "two herbs for a potion: even (%s)" % [quote])
 	_check(economy.maker_quote("hob", "p1", [], [sword])["why"] == "that is no longer for sale", "Bram's sword is not his to sell")
+	# 562 amended (8): a potion left by a keeper no longer here is his to sell; a living one's is not.
+	var left := book.mint("a_potion", "made", "Old Tam")
+	stock.stock_shop(TOWN, left, "Old Tam", "gone_tam")
+	work.add_worker("ned", "Ned", ["medicine_man"], TOWN, "rescued:ned")
+	var neds := book.mint("a_potion", "made", "Ned")
+	stock.stock_shop(TOWN, neds, "Ned", "ned")
+	var hobs: Array = economy.maker_goods("hob").map(func(each: Dictionary) -> int: return int(each["uid"]))
+	_check(left in hobs and potion in hobs and neds not in hobs and sword not in hobs,
+		"a gone keeper's potion is his to sell too; Ned's, a living maker's, is not (%s)" % [hobs])
+	_check(economy.maker_quote("hob", "p1", [], [neds])["why"] == "that is no longer for sale", "nor can he be asked for Ned's")
+	stock.take_from_shop(TOWN, left)
+	stock.take_from_shop(TOWN, neds)
+	work.remove_worker("ned")
 	_check(economy.maker_quote("hob", "p1", [{"id": "ore_sack"}], [])["why"] == "Hob has no use for that", "ore: no use to him")
 	_check(economy.maker_sell("hob", "p1", "herbs", 2) and int(work.worker("hob")["purse"]) == 8 and economy.gold("p1") == 2,
 		"a herb bought from his purse: 8 left him, 2 to the player")
