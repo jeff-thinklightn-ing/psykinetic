@@ -172,7 +172,7 @@ static func set_feel(key: String, value: Variant) -> void:
 const FEEL_RANGES := {"client3d.clip_blend": [0.0, 0.5], "client3d.clip_heavy_contact": [0.2, 0.8],
 	"client3d.backpedal_clip_speed": [1.0, 5.0], "client3d.roll_speed": [0.5, 3.0], "client3d.down_tilt_speed": [1.0, 20.0],
 	"client3d.shot_speed": [10.0, 80.0], "client3d.gait_rate": [0.5, 2.0], "anim_rig.strike_speed_min": [0.1, 1.0],
-	"anim_rig.strike_speed_max": [1.0, 6.0], "art_kit.clip_contact": [0.1, 0.9], "creature_view.speed_min": [0.2, 1.0],
+	"anim_rig.strike_speed_max": [1.0, 6.0], "anim_rig.strike_fade_share": [0.05, 1.0], "art_kit.clip_contact": [0.1, 0.9], "creature_view.speed_min": [0.2, 1.0],
 	"creature_view.speed_max": [1.0, 3.0], "creature_view.charge_speed": [1.0, 3.0], "creature_view.blend": [0.0, 0.5],
 	"client3d.gait.Walk": [0.3, 2.0], "client3d.gait.Jog_Short": [1.5, 6.0], "client3d.gait.Sprint_Short": [2.5, 9.0],
 	"client3d.gait_f.Walk": [0.3, 2.0], "client3d.gait_f.Jog_Short": [1.5, 6.0], "client3d.gait_f.Sprint_Short": [2.5, 9.0]}

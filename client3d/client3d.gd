@@ -19027,6 +19027,12 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0) 
 	var contact := float(choices[names.find(clip)][1])
 	var own := swinger is Player and (swinger as Player).owner_peer == Net.local_id
 	var lands_in := wound if wound > 0.0 else (0.0 if own else STRIKE_LANDS_IN)
+	# A lead weapon's swing at nothing (World.try_swing: no wind-up, nothing in reach) still
+	# takes its lead, as a wound-up blow of it would: at once, the slash's lead ran at the cap
+	# and read as a thrust (338 amended (3)). Its heavy wound-up kin keep their own way.
+	if wound <= 0.0 and weapon in WOUND_STRIKES and swinger != null \
+			and int(World.blow_verb(swinger).get("windup", 0)) <= 0:
+		lands_in = maxf(lands_in, World.windup_ticks(swinger) * World.TICK_DT)
 	var between := World.attack_ticks_of(swinger) * World.TICK_DT if swinger != null else 1.0
 	var rig := puppet.get_meta("rig") as AnimRig
 	puppet.set_meta("fidgeting", false)

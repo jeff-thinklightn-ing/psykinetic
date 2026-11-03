@@ -621,16 +621,42 @@ CLIPS["Spear_Thrust"] = {"keys": [
 # (face) in the body's axes (left +X, ahead -Y, up +Z). About 0.7 s natural, a blow every 7 ticks.
 SWORD_GUARD = one_hand((0.2, 0.12, -0.22), (-0.25, 0.3, 0.92), (0.0, -1.0, 0.3)) + GUARDING_LEFT
 SLASH_KEYS = (0.0, 0.18, 0.27, 0.36, 0.44, 0.7)
+# 338 amended (3) (Jeff on v0.1.198: "it feels like im just punching with a sword in my hand"): the
+# arm alone swung, the trunk square and upright, so the cut read as a thrust from the shoulder. Now
+# the body is in it: the wind-up coils the hips and shoulders away, the blade raised high over the
+# shoulder it starts from; the cut runs high to low on a diagonal across the front, the trunk
+# unwinding through it, leaning in on a half-step lunge; the follow-through carries it low past the
+# far hip, the trunk turned after it; then back to the guard. Same keys, same 0.7 s.
 def slash(way: float) -> list:
-	"""A slash's keys: [way] 1 forehand (right to left), -1 backhand (left to right)."""
-	wind = one_hand((0.06, 0.24 * way, 0.14), (-0.5 * way, 0.2, 0.85), (1.0 * way, -0.3, 0.0)) + GUARDING_LEFT + [
-		("spine_02", TURN, -20.0 * way), ("spine_03", TURN, -8.0 * way)]
-	cut = one_hand((0.46, 0.0, -0.06), (0.4 * way, -0.9, 0.1), (1.0 * way, 0.2, -0.2)) + GUARDING_LEFT + [
-		("spine_02", TURN, 6.0 * way), ("spine_01", LIFT, -6.0)]
-	follow = one_hand((0.3, -0.24 * way, -0.16), (0.9 * way, 0.2, -0.15), (0.2 * way, 1.0, 0.0)) + GUARDING_LEFT + [
-		("spine_02", TURN, 24.0 * way), ("spine_03", TURN, 8.0 * way), ("spine_01", LIFT, -8.0)]
+	"""A slash's keys: [way] 1 forehand (high right to low left), -1 backhand (high left to low right)."""
+	# Kept clear of the wielder (Jeff on the strip: "check for collisions with the body"; anim_rig_test
+	# _test_sword_clear): the wound-up hand out from the head and ahead of it, the blade upright so the
+	# pommel points down, not across the face; the backhand's elbow forward, so its forearm crosses in
+	# front of the face, not through it.
+	if way > 0.0:
+		wind_arm = one_hand((0.2, 0.42, 0.16), (-0.15, 0.45, 0.88), (1.0, -0.3, 0.0))
+	else:  # The backhand winds up over the far (left) shoulder.
+		wind_arm = one_hand((0.46, -0.3, 0.26), (0.3, 0.05, 0.95), (-1.0, -0.3, 0.0), (-0.4, -1.0, -0.6))
+	wind = wind_arm + GUARDING_LEFT + [
+		("spine_01", TURN, -14.0 * way), ("spine_02", TURN, -24.0 * way), ("spine_03", TURN, -10.0 * way),
+		("spine_02", LIFT, 4.0)]
+	if way > 0.0:
+		cut_arm = one_hand((0.56, 0.0, -0.2), (0.5, -0.75, -0.4), (1.0, 0.2, -0.2))
+	else:
+		cut_arm = one_hand((0.62, 0.16, -0.2), (-0.5, -0.75, -0.4), (-1.0, 0.2, -0.2), (-1.0, -0.4, -0.3))
+	cut = cut_arm + GUARDING_LEFT + [
+		("spine_01", TURN, 6.0 * way), ("spine_02", TURN, 10.0 * way), ("spine_01", LIFT, -10.0)]
+	# The forehand's follow-through well out ahead, its forearm off the belly; the backhand's out to
+	# the right, its elbow out and ahead of the flank.
+	if way > 0.0:
+		follow_arm = one_hand((0.46, -0.36, -0.38), (0.85, 0.1, -0.5), (0.2, 1.0, 0.0))
+	else:
+		follow_arm = one_hand((0.44, 0.56, -0.18), (-0.85, 0.1, -0.5), (-0.2, 1.0, 0.0), (-1.0, -0.4, -0.3))
+	follow = follow_arm + GUARDING_LEFT + [
+		("spine_01", TURN, 14.0 * way), ("spine_02", TURN, 26.0 * way), ("spine_03", TURN, 10.0 * way),
+		("spine_01", LIFT, -12.0)]
 	poses = (SWORD_GUARD, wind, cut, follow, follow, SWORD_GUARD)
-	steps = ((0, 0, 0), (0, 0.03, 0), (0, -0.08, -0.02), (0, -0.08, -0.02), (0, -0.08, -0.02), (0, 0, 0))
+	steps = ((0, 0, 0), (0, 0.05, 0), (0, -0.14, -0.04), (0, -0.14, -0.05), (0, -0.12, -0.04), (0, 0, 0))
 	return [(t, P("Sword_Idle", 0.0, pose, move=step)) for t, pose, step in zip(SLASH_KEYS, poses, steps)]
 CLIPS["Sword_Slash_F"] = {"keys": slash(1.0)}
 CLIPS["Sword_Slash_B"] = {"keys": slash(-1.0)}

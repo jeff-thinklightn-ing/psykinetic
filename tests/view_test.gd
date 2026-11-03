@@ -147,6 +147,7 @@ func _ready() -> void:
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_rest()
 		_test_wet()
+		_test_sword_whiff()
 		_test_bow_back()
 		_test_sheathed()
 		_test_goblins_differ()
@@ -8618,6 +8619,37 @@ func _test_wet() -> void:
 	var drips := puppet.get_node_or_null("WetDrips") as CPUParticles3D
 	_check((meshes[0] as MeshInstance3D).material_overlay == null and not puppet.has_meta("wet_material")
 			and (drips == null or not drips.emitting), "dried: no overlay, its material dropped, no drips")
+
+
+## A sword swung at nothing (338 amended (3); Jeff on v0.1.198: "punching with a sword in my
+## hand"): World.try_swing winds nothing up, and the slash's lead ran at the 3x cap; now it takes
+## the sword's lead (windup_ticks, 2), as a blow wound up at someone does: its contact 0.2 s on.
+func _test_sword_whiff() -> void:
+	print("\n== a sword swung at nothing still takes its lead ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	slots[Items.RIGHT_HAND] = "sword"
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	puppet.set_meta("wound_until", 0)
+	var lead := World.windup_ticks(player) * World.TICK_DT
+	_check(is_equal_approx(lead, 0.2), "the sword's lead 2 ticks (%.2f s)" % lead)
+	var now := Time.get_ticks_msec()
+	player.swung.emit(Vector2i(1, 0))
+	var contact_in := (rig.contact_msec - now) / 1000.0
+	_check(rig.striking() and rig.playing().begins_with("Sword_Slash") and absf(contact_in - lead) < 0.03,
+		"swung at nothing: the slash lands its contact over the lead, not hurried to the cap (%s in %.2f s)" % [rig.playing(), contact_in])
+	_check(rig.speed() < 1.2, "its lead near its natural pace (x%.2f)" % rig.speed())
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", 0)
+	player.slots = was
+	_rig._process(0.0)
 
 
 ## Held weapons rest out of a fight (662 (b)): a two-hander calm a while (the times put back,

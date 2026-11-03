@@ -29,6 +29,12 @@ const UPPER_BONES: Array[String] = ["Spine", "Chest", "UpperChest", "Neck", "Hea
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
 const STRIKE_SPEED_MAX := 3.0
+## A strike fades in over at most this share of its lead (the seconds to its
+## contact), never longer than the rig's blend: faded over the whole blend, a
+## lead as short as the sword's (0.2 s) was mostly hidden under the fade, and
+## the slash read as the arm thrust out (Jeff on v0.1.198: "punching with a
+## sword in my hand"; 338 amended (3)).
+const STRIKE_FADE_SHARE := 0.25
 ## Where in a strike its blow lands when its table names no contact: this
 ## far through the clip.
 const CONTACT_DEFAULT := 0.5
@@ -255,6 +261,8 @@ func strike(clip: String, contact: float, lands_in: float, recover: float) -> fl
 	var most := ArtKit.feel("anim_rig.strike_speed_max", STRIKE_SPEED_MAX)
 	var before := clampf(contact / maxf(lands_in, 0.001), least, most)
 	_recover_speed = clampf((length - contact) / maxf(recover, 0.001), least, most)
+	var share := ArtKit.feel("anim_rig.strike_fade_share", STRIKE_FADE_SHARE)
+	(_root.get_node("action") as AnimationNodeOneShot).fadein_time = minf(blend, contact / before * share)
 	(_root.get_node("action_clip") as AnimationNodeAnimation).animation = clip
 	_action_clip = clip
 	_set_action_speed(before)

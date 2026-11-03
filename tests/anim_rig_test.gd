@@ -22,6 +22,8 @@ func _ready() -> void:
 	await _test_one_strike_clip()
 	await _test_spear_jab()
 	await _test_sword_slash()
+	await _test_strike_fade()
+	await _test_sword_clear()
 	await _test_bow_clear()
 	await _test_sky_bow()
 	await _test_bow_back()
@@ -218,6 +220,35 @@ func _test_strike() -> void:
 	rig.get_parent().queue_free()
 
 
+## A strike fades in over a share of its own lead (338 amended (3); Jeff on v0.1.198: "punching
+## with a sword in my hand"): the sword's slash, its 0.2 s lead wound up, over 0.05 s, not the whole
+## blend that hid its wind-up; a long lead (the sledge's) keeps the blend; and the share is feel's.
+func _test_strike_fade() -> void:
+	print("== a strike fades in over a share of its lead ==")
+	var rig := _goblin()
+	rig.loop("Idle")
+	await _frames(3)
+	var action := rig._root.get_node("action") as AnimationNodeOneShot
+	var share := ArtKit.feel("anim_rig.strike_fade_share", AnimRig.STRIKE_FADE_SHARE)
+	_check(is_equal_approx(share, 0.25), "feel.json's share 0.25 (%.2f)" % share)
+	rig.strike("Sword_Slash_F", 0.21, 0.2, 0.5)
+	_check(is_equal_approx(action.fadein_time, 0.05), "the sword's slash, 0.2 s to its contact: faded in over 0.05 s (%.3f)" % action.fadein_time)
+	rig.cancel_strike()
+	rig.strike("Sledge_Attack", 0.9, 0.9, 0.8)
+	_check(is_equal_approx(action.fadein_time, rig.blend), "the sledge's, 0.9 s: over the rig's blend (%.3f)" % action.fadein_time)
+	rig.cancel_strike()
+	rig.strike("Punch_Jab", 0.17, 0.0, 0.6)
+	_check(is_equal_approx(action.fadein_time, 0.17 / AnimRig.STRIKE_SPEED_MAX * 0.25),
+		"a jab at the cap: a quarter of its 0.057 s lead (%.3f)" % action.fadein_time)
+	rig.cancel_strike()
+	ArtKit.set_feel("anim_rig.strike_fade_share", 1.0)
+	rig.strike("Sword_Slash_F", 0.21, 0.2, 0.5)
+	_check(is_equal_approx(action.fadein_time, rig.blend), "the share set to 1 for the run: the blend again (%.3f)" % action.fadein_time)
+	ArtKit.set_feel("anim_rig.strike_fade_share", null)
+	rig.cancel_strike()
+	rig.get_parent().queue_free()
+
+
 ## A body whose strikes for its weapon hold one clip (the kobold's dagger, a
 ## player's spear or pick): every swing that clip, no error. Client3D._pick_clip
 ## once left out the last clip and took a modulo of the none left (terrain,
@@ -363,6 +394,378 @@ func _test_sword_slash() -> void:
 		picked.append(Client3D._pick_clip(puppet, names))
 	puppet.free()
 	_check(picked[0] != picked[1] and picked[1] != picked[2] and picked[2] != picked[3], "a string of blows alternates forehand and backhand (%s)" % [picked])
+
+
+## The sword clear of its wielder (338 amended (3); Jeff on the slash strip: "check for collisions
+## with the body. Those body collisions really break the suspension of disbelief"): on the five
+## builds of _test_bow_clear, bare and in each worn piece (SWORD_WORN, plate's bulk among them),
+## through both slashes and the heavy blow (Client3D.CLIP_HEAVY) at every 1/SWORD_FPS s, the blade
+## (the sword's length past the hand, pommel and blade, every 2 cm: _sword_samples) at least
+## SWORD_CLEAR from the wielder's trunk, head, legs, off arm and sword's upper arm and from the
+## worn piece, never through it, each skinned as posed (_sword_frame); and neither forearm's flesh
+## (its bone's line less SWORD_ARM_RADIUS) more than SWORD_ARM_IN into the rest of the body, the
+## coil and the arm across the face and the flank among them. Near-misses under SWORD_NEAR are
+## printed, not failed. (The first slashes of 338 amended (3) failed it: the pommel into the face
+## in both wind-ups, the backhand's forearm through the chin and its elbow into the flank.)
+const SWORD_CLEAR := 0.03
+const SWORD_NEAR := 0.06
+const SWORD_FPS := 30.0
+const SWORD_ARM_IN := 0.01  # An arm resting on the trunk, its skin pressed in so far, is no clip.
+const SWORD_WORN: Array[String] = ["Armour_Leather", "Armour_Mail", "Armour_Plate", "Armour_Robes", "Cape", "Coat", "Hood"]
+const SWORD_BUILDS := [["man", "res://art/models/characters/human_m.glb", {}],
+	["man heavy", "res://art/models/characters/human_m.glb", {"heavy": 1.0}],
+	["man broad", "res://art/models/characters/human_m.glb", {"heavy": 0.6, "broad": 1.0}],
+	["man lean", "res://art/models/characters/human_m.glb", {"lean": 1.0, "narrow": 1.0}],
+	["woman", "res://art/models/characters/human_f.glb", {}]]
+func _test_sword_clear() -> void:
+	print("== the sword clear of its wielder ==")
+	var lib := load(CLIPS) as AnimationLibrary
+	var clips: Array[String] = []
+	for strike: Array in Client3D.HUMANOID_MOVES["strikes"]["sword"]:
+		clips.append(str(strike[0]))
+	clips.append(Client3D.CLIP_HEAVY)
+	var fails: Array[String] = []
+	var near: Array[String] = []
+	var coiled: Array[String] = []
+	var least := {}  # {clip: [clearance, where]}
+	for build: Array in SWORD_BUILDS:
+		var made := _sword_body(self, build)
+		var model: Node3D = made[0]
+		var rig: AnimRig = made[2]
+		for clip in clips:
+			var t := 0.0
+			var length := lib.get_animation(clip).length
+			while t <= length + 0.001:
+				rig.base_at(clip, t)
+				await _frames(2)
+				var frame := _sword_frame(model, made[1])
+				for target: String in frame["clear"]:
+					var c: Array = frame["clear"][target]
+					var at := "%s%s %s %.2f s: %s %.3f m" % [build[0], "" if target in SWORD_BODY_PARTS else " in " + target.trim_prefix("Armour_").to_lower(),
+						clip, t, target.trim_prefix("Armour_").to_lower(), c[0]]
+					if float(c[0]) < SWORD_CLEAR:
+						fails.append(at)
+					elif float(c[0]) < SWORD_NEAR:
+						near.append(at)
+					if float(c[0]) < float(least.get(clip, [INF])[0]):
+						least[clip] = [c[0], at]
+				var coil: Array = frame["coil"]
+				if float(coil[0]) < -SWORD_ARM_IN or float(coil[1]) < -SWORD_ARM_IN:
+					coiled.append("%s %s %.2f s: off arm %.3f, sword forearm %.3f m" % [build[0], clip, t, coil[0], coil[1]])
+				t += 1.0 / SWORD_FPS
+		model.queue_free()
+		(made[3] as Node3D).free()
+	for clip: String in least:
+		print("  closest in %s: %s" % [clip, least[clip][1]])
+	if not near.is_empty():
+		print("  near-misses (under %.2f m): %d, %s" % [SWORD_NEAR, near.size(), ", ".join(near.slice(0, 12))])
+	_check(fails.is_empty(), "the blade %.2f m or more clear of the body and what it wears, five builds, %d worn pieces, %s (%d: %s)" % [
+		SWORD_CLEAR, SWORD_WORN.size(), ", ".join(clips), fails.size(), ", ".join(fails.slice(0, 16))])
+	_check(coiled.is_empty(), "neither forearm %.2f m or more into the rest of the body through them (%d: %s)" % [SWORD_ARM_IN, coiled.size(), ", ".join(coiled.slice(0, 16))])
+
+
+## A body of [param build] ([name, scene, shape keys]) under [param parent] holding a sword in its
+## right hand as Client3D sockets it: [model, the sword, its AnimRig, the sockets' holder].
+static func _sword_body(parent: Node, build: Array) -> Array:
+	var model := (load(build[1]) as PackedScene).instantiate() as Node3D
+	parent.add_child(model)
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		for key: String in build[2]:
+			var i := mesh.find_blend_shape_by_name(key)
+			if i >= 0:
+				mesh.set_blend_shape_value(i, build[2][key])
+	var holder := Node3D.new()
+	Client3D._attach_sockets(model, Client3D.HUMAN_SOCKETS, 1.0, holder)
+	var sockets: Dictionary = holder.get_meta("sockets")
+	Client3D._hold(sockets, 0, "sword")
+	var sword := (sockets["hand_r"] as Node3D).get_node("Held") as Node3D
+	return [model, sword, AnimRig.make(model, load(CLIPS) as AnimationLibrary, 0.0, true, null), holder]
+
+
+## The parts the blade is kept clear of, by the bone a Body vertex hangs on most; the sword's own
+## forearm, hand and fingers (and what isn't listed) aren't: the grip is in that hand.
+const SWORD_BODY_PARTS := ["trunk", "head", "legs", "off arm", "sword upper arm"]
+static func _sword_part(bone: String) -> String:
+	if bone in TRUNK_BONES or bone == "LeftShoulder" or bone == "RightShoulder":
+		return "trunk"
+	if bone == "Head":
+		return "head"
+	if bone.begins_with("Left") and (bone.contains("Leg") or bone.contains("Foot") or bone.contains("Toes")) \
+			or bone.begins_with("Right") and (bone.contains("Leg") or bone.contains("Foot") or bone.contains("Toes")) or bone.begins_with("ball_leaf"):
+		return "legs"
+	if bone.begins_with("Left") or bone.ends_with("_l"):
+		return "off arm"
+	if bone == "RightUpperArm":
+		return "sword upper arm"
+	return ""
+
+
+## The sword's blade as points: along its length (its +y, _held_ends) every 2 cm, but those within
+## SWORD_GRIP of the hand holding it (the grip and the guard in the fist).
+const SWORD_GRIP := 0.11
+static func _sword_samples(sword: Node3D) -> PackedVector3Array:
+	var ends := _held_ends(sword)
+	var hand := (sword.get_parent() as Node3D).global_position
+	var out := PackedVector3Array()
+	var y: float = ends[0].y
+	while y <= ends[1].y + 0.0001:
+		var p := sword.global_transform * Vector3(0.0, y, 0.0)
+		if p.distance_to(hand) > SWORD_GRIP:
+			out.append(p)
+		y += 0.02
+	return out
+
+
+## One posed frame of [param model] holding [param sword]: {"clear": {target: [the blade's least
+## clearance to it, the sample's index]} for each SWORD_BODY_PARTS part the blade comes within
+## SWORD_REACH of and each SWORD_WORN piece the model has, "coil": [the off forearm's least
+## clearance to the rest of the body, the sword forearm's], "blade": the samples, "body": the
+## Body's points, "fore": the sword forearm's line, "trunk": the trunk's points, "fore_at": the
+## sword forearm's point nearest the body}.
+## The body: the Body's triangles but the sword's forearm, hand and fingers (_sword_part ""). A
+## sample's clearance is its distance to the nearest of them (named by its first corner's part),
+## less than nothing when the sample is inside the body (a ray down from it crosses the body an odd
+## number of times: legs to the soles, the body is closed but where the arm left out joined it).
+## A worn piece is a shell: a sample's clearance its distance to it, less than nothing where the
+## blade between two samples passes through it. An arm is its bone's line (the forearm's to the
+## hand's) every 2 cm, against the body but that whole arm: its clearance the line's least, less
+## SWORD_ARM_RADIUS for the arm's own flesh.
+const SWORD_REACH := 0.2
+const SWORD_ARM_RADIUS := 0.035
+static func _sword_frame(model: Node3D, sword: Node3D) -> Dictionary:
+	var blade := _sword_samples(sword)
+	var body := model.find_child("Body", true, false) as MeshInstance3D
+	var skinned := _skin(body)
+	var points: PackedVector3Array = skinned[0]
+	var bones: PackedStringArray = skinned[2]
+	var tris: PackedInt32Array = skinned[3]
+	var parts := PackedStringArray()
+	for bone in bones:
+		parts.append(_sword_part(bone))
+	var kept := PackedInt32Array()  # The body but the sword's forearm and hand.
+	var but_right := PackedInt32Array()  # The body but the sword arm.
+	var but_left := PackedInt32Array()  # The body but the off arm.
+	for t in range(0, tris.size(), 3):
+		var corner := [tris[t], tris[t + 1], tris[t + 2]]
+		var named := [parts[corner[0]], parts[corner[1]], parts[corner[2]]]
+		if not "" in named:
+			kept.append_array(corner)
+			if not "sword upper arm" in named:
+				but_right.append_array(corner)
+		var left := false
+		for i: int in corner:
+			left = left or _off_arm_bone(bones[i])
+		if not left:
+			but_left.append_array(corner)
+	var clear := {}
+	for k in blade.size():
+		var near := _nearest_triangle(blade[k], points, kept)
+		if near[1] < 0:
+			continue
+		var c: float = float(near[0]) * (-1.0 if _inside_mesh(blade[k], points, kept) else 1.0)
+		var part := parts[kept[near[1]]]
+		if c < float(clear.get(part, [INF])[0]):
+			clear[part] = [c, k]
+	for name in SWORD_WORN:
+		var worn := model.find_child(name, true, false) as MeshInstance3D
+		if worn == null:
+			continue
+		var on := _skin(worn)
+		var shell := PackedInt32Array()
+		var corners: PackedInt32Array = on[3]
+		for t in range(0, corners.size(), 3):
+			if _sword_part(on[2][corners[t]]) != "" and _sword_part(on[2][corners[t + 1]]) != "" and _sword_part(on[2][corners[t + 2]]) != "":
+				shell.append_array([corners[t], corners[t + 1], corners[t + 2]])
+		var best := [SWORD_REACH, -1]
+		for k in blade.size():
+			var near := _nearest_triangle(blade[k], on[0], shell)
+			if near[1] >= 0 and float(near[0]) < float(best[0]):
+				best = [near[0], k]
+			if k > 0 and blade[k].distance_to(blade[k - 1]) < 0.03 and _crosses(blade[k - 1], blade[k], on[0], shell):
+				best = [-0.001, k]
+				break
+		clear[name] = best
+	var skeleton := body.get_parent() as Skeleton3D
+	var lines := []
+	for ends: Array in [["LeftLowerArm", "LeftHand"], ["RightLowerArm", "RightHand"]]:
+		var a := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(ends[0])).origin
+		var b := skeleton.global_transform * skeleton.get_bone_global_pose(skeleton.find_bone(ends[1])).origin
+		var out := PackedVector3Array()
+		var n := maxi(int(a.distance_to(b) / 0.02), 1)
+		for i in n + 1:
+			out.append(a.lerp(b, float(i) / n))
+		lines.append(out)
+	var coil := []
+	var fore_at := Vector3.INF
+	var fore_part := ""
+	for side in 2:
+		var against: PackedInt32Array = but_left if side == 0 else but_right
+		var least := SWORD_REACH
+		for p: Vector3 in lines[side]:
+			var near := _nearest_triangle(p, points, against)
+			if near[1] < 0:
+				continue
+			var c: float = float(near[0]) * (-1.0 if _inside_mesh(p, points, against) else 1.0) - SWORD_ARM_RADIUS
+			if c < least:
+				least = c
+				if side == 1:
+					fore_at = p
+					fore_part = parts[against[near[1]]]
+		coil.append(least)
+	var trunk_points := PackedVector3Array()
+	for i in points.size():
+		if bones[i] in TRUNK_BONES:
+			trunk_points.append(points[i])
+	return {"clear": clear, "blade": blade, "body": points, "coil": coil, "fore": lines[1], "trunk": trunk_points, "fore_at": fore_at,
+		"fore_part": fore_part}
+
+
+## Whether [param bone] is the off (left) arm's, from the upper arm to the fingertips.
+static func _off_arm_bone(bone: String) -> bool:
+	if bone in ["LeftUpperArm", "LeftLowerArm", "LeftHand"]:
+		return true
+	if bone.begins_with("Left"):
+		for finger in ["Thumb", "Index", "Middle", "Ring", "Little"]:
+			if bone.contains(finger):
+				return true
+	return bone.ends_with("_l") and not bone.begins_with("ball")
+
+
+## The nearest of the triangles [param corners] (of [param verts]) to [param p] within SWORD_REACH:
+## [its distance, its first corner's index in corners] ([SWORD_REACH, -1] if none).
+static func _nearest_triangle(p: Vector3, verts: PackedVector3Array, corners: PackedInt32Array) -> Array:
+	var best := [SWORD_REACH, -1]
+	var reach2 := SWORD_REACH * SWORD_REACH
+	for t in range(0, corners.size(), 3):
+		var a := verts[corners[t]]
+		var b := verts[corners[t + 1]]
+		var c := verts[corners[t + 2]]
+		# A triangle past reach on any axis can't be nearer.
+		if minf(a.x, minf(b.x, c.x)) > p.x + SWORD_REACH or maxf(a.x, maxf(b.x, c.x)) < p.x - SWORD_REACH \
+				or minf(a.y, minf(b.y, c.y)) > p.y + SWORD_REACH or maxf(a.y, maxf(b.y, c.y)) < p.y - SWORD_REACH \
+				or minf(a.z, minf(b.z, c.z)) > p.z + SWORD_REACH or maxf(a.z, maxf(b.z, c.z)) < p.z - SWORD_REACH:
+			continue
+		var d := p.distance_squared_to(_closest_on_triangle(p, a, b, c))
+		if d < reach2:
+			reach2 = d
+			best = [sqrt(d), t]
+	return best
+
+
+## Whether a ray straight down from [param p] crosses the triangles [param corners] an odd number of times.
+static func _inside_mesh(p: Vector3, verts: PackedVector3Array, corners: PackedInt32Array) -> bool:
+	var n := 0
+	for t in range(0, corners.size(), 3):
+		var a := verts[corners[t]]
+		var b := verts[corners[t + 1]]
+		var c := verts[corners[t + 2]]
+		if minf(a.x, minf(b.x, c.x)) > p.x or maxf(a.x, maxf(b.x, c.x)) < p.x or minf(a.z, minf(b.z, c.z)) > p.z \
+				or maxf(a.z, maxf(b.z, c.z)) < p.z or minf(a.y, minf(b.y, c.y)) > p.y:
+			continue
+		if Geometry3D.ray_intersects_triangle(p, Vector3.DOWN, a, b, c) != null:
+			n += 1
+	return n % 2 == 1
+
+
+## Whether the segment [param a] to [param b] passes through any of the triangles [param corners].
+static func _crosses(a: Vector3, b: Vector3, verts: PackedVector3Array, corners: PackedInt32Array) -> bool:
+	for t in range(0, corners.size(), 3):
+		if Geometry3D.segment_intersects_triangle(a, b, verts[corners[t]], verts[corners[t + 1]], verts[corners[t + 2]]) != null:
+			return true
+	return false
+
+
+## The point of the triangle [param a], [param b], [param c] nearest [param p] (Ericson, Real-Time
+## Collision Detection, 5.1.5).
+static func _closest_on_triangle(p: Vector3, a: Vector3, b: Vector3, c: Vector3) -> Vector3:
+	var ab := b - a
+	var ac := c - a
+	var ap := p - a
+	var d1 := ab.dot(ap)
+	var d2 := ac.dot(ap)
+	if d1 <= 0.0 and d2 <= 0.0:
+		return a
+	var bp := p - b
+	var d3 := ab.dot(bp)
+	var d4 := ac.dot(bp)
+	if d3 >= 0.0 and d4 <= d3:
+		return b
+	var vc := d1 * d4 - d3 * d2
+	if vc <= 0.0 and d1 >= 0.0 and d3 <= 0.0:
+		return a + ab * (d1 / (d1 - d3))
+	var cp := p - c
+	var d5 := ab.dot(cp)
+	var d6 := ac.dot(cp)
+	if d6 >= 0.0 and d5 <= d6:
+		return c
+	var vb := d5 * d2 - d1 * d6
+	if vb <= 0.0 and d2 >= 0.0 and d6 <= 0.0:
+		return a + ac * (d2 / (d2 - d6))
+	var va := d3 * d6 - d5 * d4
+	if va <= 0.0 and d4 - d3 >= 0.0 and d5 - d6 >= 0.0:
+		return b + (c - b) * ((d4 - d3) / ((d4 - d3) + (d5 - d6)))
+	var denom := 1.0 / (va + vb + vc)
+	return a + ab * (vb * denom) + ac * (vc * denom)
+
+
+## [param mesh] skinned as it stands (as _skinned_parts: by hand, a headless run registers no skin),
+## its shape keys added: [points, normals, the bone each vertex hangs on most, its triangles' corners]. The shaped rest is
+## worked out once a mesh ("shaped" meta: a build's keys are set before the first call).
+static func _skin(mesh: MeshInstance3D) -> Array:
+	var skeleton := mesh.get_parent() as Skeleton3D
+	var arrays := mesh.mesh as ArrayMesh
+	var src := arrays.surface_get_arrays(0)
+	if not mesh.has_meta("shaped"):
+		var verts: PackedVector3Array = (src[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate()
+		var shapes := arrays.surface_get_blend_shape_arrays(0)
+		for k in shapes.size():
+			var weight := mesh.get_blend_shape_value(k)
+			if weight == 0.0:
+				continue
+			var shape: PackedVector3Array = shapes[k][Mesh.ARRAY_VERTEX]
+			for i in verts.size():
+				var delta := shape[i] - (src[Mesh.ARRAY_VERTEX] as PackedVector3Array)[i] if arrays.blend_shape_mode == Mesh.BLEND_SHAPE_MODE_NORMALIZED else shape[i]
+				verts[i] += delta * weight
+		var bones: PackedInt32Array = src[Mesh.ARRAY_BONES]
+		var weights: PackedFloat32Array = src[Mesh.ARRAY_WEIGHTS]
+		var per := bones.size() / verts.size()
+		var named := PackedStringArray()
+		for i in verts.size():
+			var best := 0
+			for k in per:
+				if weights[i * per + k] > weights[i * per + best]:
+					best = k
+			var b := bones[i * per + best]
+			named.append(String(mesh.skin.get_bind_name(b)) if mesh.skin.get_bind_name(b) != &"" else skeleton.get_bone_name(mesh.skin.get_bind_bone(b)))
+		mesh.set_meta("shaped", [verts, named])
+	var shaped: Array = mesh.get_meta("shaped")
+	var verts: PackedVector3Array = shaped[0]
+	var normals: PackedVector3Array = src[Mesh.ARRAY_NORMAL]
+	var bones: PackedInt32Array = src[Mesh.ARRAY_BONES]
+	var weights: PackedFloat32Array = src[Mesh.ARRAY_WEIGHTS]
+	var per := bones.size() / verts.size()
+	var skin := mesh.skin
+	var poses: Array[Transform3D] = []
+	for b in skin.get_bind_count():
+		var bone_index := skin.get_bind_bone(b) if skin.get_bind_name(b) == &"" else skeleton.find_bone(skin.get_bind_name(b))
+		poses.append(skeleton.global_transform * skeleton.get_bone_global_pose(bone_index) * skin.get_bind_pose(b))
+	var points := PackedVector3Array()
+	var turned := PackedVector3Array()
+	points.resize(verts.size())
+	turned.resize(verts.size())
+	for i in verts.size():
+		var p := Vector3.ZERO
+		var n := Vector3.ZERO
+		for k in per:
+			var w := weights[i * per + k]
+			if w <= 0.0:
+				continue
+			var pose := poses[bones[i * per + k]]
+			p += pose * verts[i] * w
+			n += pose.basis * normals[i] * w
+		points[i] = p
+		turned[i] = n.normalized()
+	return [points, turned, shaped[1], src[Mesh.ARRAY_INDEX] as PackedInt32Array]
 
 
 ## The form of a full draw: "bow_t" (degrees the bow arm turns off the shoulder line carried on),

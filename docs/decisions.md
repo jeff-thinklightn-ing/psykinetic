@@ -35099,6 +35099,45 @@ so no player met it.
 monster_test: a cautious shield-bearer against a sword's lead neither
 steps out nor bashes and takes the blow (on main it bashed, 0 blows); the
 heavy cases as before. Server only, protocol unchanged, no new class_name.
+
+338 amended (3) (release's label; pc-character's side, combat's OK on the feel): the slash's
+wind-up seen. Jeff on v0.1.198: "sword animations got changed for the worse. it feels like im just
+punching with a sword in my hand". Nothing that draws the sword changed after 338 amended (the clips
+diffed bone by bone against v0.1.192's goblin.res, the strikes table, the verb, anim_rig, feel.json,
+item.sword); it was how a slash is played. Two causes:
+- A strike faded in over the rig's whole blend (0.15 s) whatever its lead; the sword's lead is 0.2 s
+  (its 2-tick wind-up), so most of the slash's draw-back and the start of its arc were mixed under
+  the stance, and what showed was the arm going out. Now it fades in over STRIKE_FADE_SHARE (0.25,
+  feel's anim_rig.strike_fade_share, range 0.05 to 1) of its lead, never more than the blend: the
+  sword's over 0.05 s, a punch's at the cap over 0.014 s; a lead of 0.6 s or more (the sledge, the
+  axes) keeps the whole blend.
+- A swing at nothing (World.try_swing: nothing in reach) winds nothing up, so the slash's lead ran at
+  the 3x cap (0.07 s) and read as a jab. Client3D._strike now gives a lead weapon's (no windup in its
+  verb: the sword) swing at nothing its lead too (windup_ticks), as a blow wound up at someone has;
+  the sim's timing is unchanged, the heavies keep theirs.
+The blow-to-blow time is unchanged (the recovery is what the lead leaves), so Jeff's "a little too
+fast" stands. anim_rig_test _test_strike_fade, view_test _test_sword_whiff. Strip (v0.1.189's
+Sword_Attack, the slash now at a target and at nothing, fixed): C:/dev/review/sword/strike_then_now.png.
+And the slashes re-authored (humanoid_clips.py slash()): the arm alone had swung, the trunk square,
+so the cut read as a thrust from the shoulder. Now the wind-up coils the hips and shoulders away,
+the blade raised over the shoulder it starts from; the cut runs high to low on a diagonal across
+the front, the trunk unwinding on a half-step lunge; the follow-through carries it past the far
+hip; then back to the guard. Same keys, 0.7 s, contact 0.21 s. Strip: C:/dev/review/sword/slash_fixed.png.
+Then kept clear of the wielder (Jeff on that strip: "check for collisions with the body. Those body
+collisions really break the suspension of disbelief"): anim_rig_test _test_sword_clear, on five
+builds bare and in leather, mail, plate, robes, cape, coat and hood, at every 1/30 s of both slashes
+and the heavy blow, skinned as posed: no sample of the sword past the hand (pommel and blade, every
+2 cm) inside the body (a ray down crosses the closed Body mesh an odd number of times) or within
+SWORD_CLEAR (3 cm) of the trunk, head, legs, off arm or sword's upper arm, nor the blade through a
+worn piece; neither forearm's flesh (its bone's line less 3.5 cm) more than 1 cm into the rest of
+the body. The first slashes failed it (the pommel into the face in both wind-ups, the backhand's
+forearm through the chin, its elbow into the flank); the poses now carry the wound-up hand out and
+ahead of the head with the blade upright, the backhand's elbow forward and its cut and
+follow-through out to the right, the coil, lunge and diagonal kept. Least now 3.2 cm (a hood);
+the blade's path from above and the side: C:/dev/review/sword/blade_path.png (before:
+blade_path_before.png).
+Client only, protocol unchanged, no new class_name.
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,

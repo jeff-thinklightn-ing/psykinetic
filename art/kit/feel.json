@@ -16,6 +16,7 @@
 		"client3d.gait_f.Sprint_Short": 5.27,
 		"anim_rig.strike_speed_min": 0.4,
 		"anim_rig.strike_speed_max": 3.0,
+		"anim_rig.strike_fade_share": 0.25,
 		"art_kit.clip_contact": 0.5,
 		"creature_view.speed_min": 0.6,
 		"creature_view.speed_max": 1.8,
