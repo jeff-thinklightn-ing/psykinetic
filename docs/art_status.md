@@ -36,7 +36,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 |------|----------|----|---------|------|
 | `belfry.chapel` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
 | `bridge.wood.deck` | 2 | art-kit, by hand | own | 2026-10-18 |
-| `bridge.wood.end` | 1 | art-kit, by hand | own | 2026-10-18 |
+| `bridge.wood.end` | 3 | art-kit, by hand | own | 2026-10-18 |
 | `bridge.wood.rail` | 1 | art-kit, by hand | own | 2026-10-18 |
 | `building.broken_table` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `building.burial_table` | 1 | art-kit, by hand | own | 2026-10-22 |

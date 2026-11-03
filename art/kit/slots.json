@@ -2906,7 +2906,7 @@
 			"base": -0.25,
 			"variants": 2,
 			"budget": 300,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "planks of uneven width laid across on two stringers, a little tilted and gapped, one now and then darker; the planks 1.06 across (ends 0.51 to 0.53 out), so the two rows of a 2-wide bridge overlap and show no slit of water (505 amended (2)); row 2's browns; variant 2 has a cross brace underneath; 84 and 96 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "planks of uneven width laid across on two stringers, a little tilted and gapped, one now and then darker; the planks 1.06 across (ends 0.51 to 0.53 out), so the two rows of a 2-wide bridge overlap and show no slit of water (505 amended (2)); row 2's browns; variant 2 has a cross brace underneath; 84 and 96 tris. 2026-11-03 (maps: a seam down a 2-wide deck): variant 2 is now variant 1 mirrored in x with its brace, so plank rows line up across neighbouring cells"},
 			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): one 1 x 1 m plank deck segment, repeated along the bridge's facing (z) and twice side by side for width 2; its origin the cell's centre with the deck's top at y 0, the walking surface at the cell's floor height, its planks and stringers hanging below to -0.25 (\"base\"); 1.04 along z and 1.06 across so neighbours overlap (and cover the joins when ramps come: each segment pitched about x by its cells' slope, capped near 0.3 m a cell); no railings (bridge.wood.rail)"
 		},
 		"bridge.wood.rail": {
@@ -2925,8 +2925,10 @@
 			"size": [1.12, 1.5, 0.42],
 			"base": -0.6,
 			"middle": [0, 0, 0.21],
+			"variants": 3,
+			"tolerance": 0.1,
 			"budget": 300,
-			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a sill beam, a flush threshold plank, two capped end posts and two piles; row 2's browns; 96 tris"},
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-10-18", "notes": "a sill beam, a flush threshold plank, two capped end posts and two piles; row 2's browns; 96 tris. Variants 2 and 3 (maps, 2026-11-03: a 2-wide bridge's four end posts read as a gate across the way out): the same with only the -x post (.2) or only the +x post (.3), for the outer side of each end cell; 84 tris"},
 			"uses": "maps' bridges (decision 505: Level.BRIDGE, {slot \"bridge\", at, facing, length, width 1 or 2}, drawn by terrain): where the deck meets a bank, at each end: its origin the middle of the edge between the last deck cell and the bank, at deck level, the bank toward +z; a sill under the deck's end, a threshold plank flush onto the bank (banks are level, 505), end posts at the sides capping the rails to 0.9 m, piles down to -0.6"
 		},
 		"prop.ladder": {
