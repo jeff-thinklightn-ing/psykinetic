@@ -116,7 +116,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "other"]
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,
 ## one place a story, its key the story's tag) is: the where-word economy
 ## and npc say it by.
@@ -1061,6 +1061,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["places"] = places_from(config, warnings)
 	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
+	level["forage"] = forage_from(config, warnings)
 	level["became"] = became_from(config, warnings)
 	level["entities"] = entities
 	level["starts"] = starts
@@ -1295,6 +1296,56 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			continue
 		out[key]["town"] = town
 	return out
+
+
+## level.json's "forage" (decision 777; Jeff: "various ground items that
+## could be picked up (similar to herbs)"): [{at: [x, y], radius, kinds:
+## [item id, ...], per_day, most}], where wild things grow away from any
+## town, Forage laying them as it lays a town's herbs; as [{cell, radius
+## (cells, at least 1, FORAGE_RADIUS if not said), kinds, per_day
+## (FORAGE_PER_DAY), most (FORAGE_MOST)}]. An entry with no cell or no kinds
+## is said in [param warnings] and left out.
+const FORAGE_RADIUS := 4
+const FORAGE_PER_DAY := 1
+const FORAGE_MOST := 2
+
+
+static func forage_from(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("forage", [])
+	if not listed is Array:
+		warnings.append("\"forage\" in level.json is not a list")
+		return out
+	for index in (listed as Array).size():
+		var entry: Variant = listed[index]
+		var at: Variant = _tile(entry.get("at") if entry is Dictionary else null)
+		var kinds: Variant = entry.get("kinds", []) if entry is Dictionary else null
+		if at == null or not kinds is Array or (kinds as Array).is_empty():
+			warnings.append("forage patch %d has no \"at\" cell or no kinds: left out" % index)
+			continue
+		var ids: Array[String] = []
+		for kind: Variant in kinds:
+			ids.append(str(kind))
+		out.append({"cell": at, "radius": maxi(int(entry.get("radius", FORAGE_RADIUS)), 1), "kinds": ids,
+			"per_day": maxi(int(entry.get("per_day", FORAGE_PER_DAY)), 0), "most": maxi(int(entry.get("most", FORAGE_MOST)), 0)})
+	return out
+
+
+## The cell under a camp's fire ring (decision 777): a building of kind
+## "camp" (649) has its fire CAMP_FIRE_OUT in from its middle toward its
+## front, as BuildingComposer._camp draws prop.campfire there; NO_CELL for
+## any other building. The warmed rest (Main._warm_rests) and the client's
+## drying (pc-character's 775) read it.
+const CAMP_FIRE_OUT := 1.0
+
+
+static func camp_fire(building: Dictionary) -> Vector2i:
+	if str(building.get("kind", "")) != "camp" or not building.has("rect"):
+		return Vector2i(-1, -1)
+	var rect: Rect2i = building["rect"]
+	var facing: Vector2i = building.get("facing", Vector2i(0, 1))
+	var middle := Vector2(rect.size - Vector2i.ONE) * 0.5 + Vector2(facing) * CAMP_FIRE_OUT
+	return rect.position + Vector2i(middle.round())
 
 
 ## level.json's "markets", key -> {key, cell, name}: where trade routes end

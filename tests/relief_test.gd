@@ -723,15 +723,15 @@ func _test_hills() -> void:
 	WorldRoutes._flood(area, level["spawn_points"]["from_wilds"], {}, reached)
 	var unreached := floor.keys().filter(func(cell: Vector2i) -> bool: return reached[cell.y * size.x + cell.x] < 0.0)
 	_check(unreached.is_empty(), "every floor cell is walked to from the link (%d not: %s)" % [unreached.size(), unreached.slice(0, 5)])
-	var roads: Array = terrain["roads"]
-	var road_cells := Curves.cells(roads[0]["curve"], false) if roads.size() == 1 else {} as Dictionary[Vector2i, int]
-	var road_points: PackedVector2Array = roads[0]["points"] if roads.size() == 1 else PackedVector2Array()
+	var roads: Array = terrain["roads"]  # the road first, 777's tracks after it
+	var road_cells: Dictionary = Curves.cells(roads[0]["curve"], false) if roads.size() >= 1 else {}
+	var road_points: PackedVector2Array = roads[0]["points"] if roads.size() >= 1 else PackedVector2Array()
 	# Over its deck (any of its cells: the road narrows to the deck's rows where they end in water).
 	var deck: Rect2i = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "bridge")[0]["rect"]
 	var on_deck := road_cells.keys().any(func(cell: Vector2i) -> bool: return deck.has_point(cell))
 	# Through the east valley's ford to the spur's foot: dirt but where it fords.
 	var forded := road_cells.keys().filter(func(cell: Vector2i) -> bool: return terrain["fords"].has(cell))
-	_check(roads.size() == 1 and roads[0]["kind"] == "dirt" and on_deck and road_points[0].x < 20.0 and road_points[-1].x > 160.0
+	_check(roads.size() == 4 and roads[0]["kind"] == "dirt" and on_deck and road_points[0].x < 20.0 and road_points[-1].x > 160.0
 		and not forded.is_empty()
 		and road_cells.keys().all(func(cell: Vector2i) -> bool: return wet.has(cell) or terrain["fords"].has(cell) or terrain["kinds"].get(cell, "dirt") == "dirt"),
 		"a dirt road from the link through the west escarpment's way, over the bridge, through the east ford and on to the spur (563, 756; %d cells, %d forded; on the bridge %s, from x %.1f to %.1f; not dirt %s)" % [road_cells.size(), forded.size(),

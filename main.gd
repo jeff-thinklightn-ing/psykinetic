@@ -9666,6 +9666,36 @@ func _sync_residents() -> void:
 ## and any other monster "raid"; and
 ## a raid group PRESENT for a town here, "raid". Each raises the town's
 ## threat, or keeps it up (Towns.raise_threat).
+## The warmed rest (decision 777; Jeff: "road side camps to rest at"): a
+## player within WARM_REACH of a camp's fire (Level.camp_fire: a roadside
+## rest camp's, a raid camp's too), unhurt for WARM_UNHIT_TICKS, not downed,
+## gets physics' 682 heal at WARM_HEAL hp a second, renewed each WARM_TICKS
+## for a little longer (so it never lapses between), so it ends a moment
+## after they step away or are hit.
+const WARM_TICKS := World.TICK_RATE
+const WARM_REACH := 2
+const WARM_UNHIT_TICKS := 5 * World.TICK_RATE
+const WARM_HEAL := 1.0
+
+func _warm_rests() -> void:
+	if _world_map == null:
+		return
+	var fires: Array[Vector2i] = []
+	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
+		var fire := Level.camp_fire(building)
+		if fire.x >= 0:
+			fires.append(fire)
+	if fires.is_empty():
+		return
+	for player: Player in _players.values():
+		if not is_instance_valid(player) or not player.spawned or player.zone != World.zone.name or player.hp <= 0 or World.is_downed(player):
+			continue
+		if World.tick - player.hurt_tick < WARM_UNHIT_TICKS:
+			continue
+		if fires.any(func(fire: Vector2i) -> bool: return maxi(absi(fire.x - player.tile.x), absi(fire.y - player.tile.y)) <= WARM_REACH):
+			World.add_buff(player, "heal", WARM_HEAL, WARM_TICKS + 2)
+
+
 func _threats_seen() -> void:
 	for place_id: String in World.holdings.places_in(World.zone.name):
 		var place := World.holdings.place(place_id)
@@ -16950,6 +16980,8 @@ func _on_world_ticked(tick: int) -> void:
 		if tick % RESIDENT_SYNC_TICKS == 0:
 			_sync_residents()
 			_sync_bands()
+		if tick % WARM_TICKS == 0:
+			_warm_rests()  # By a camp's fire (decision 777).
 		t = World.part("residents", t)
 		if tick % World.WORLD_TICK_STEPS == 0 and World.zone == World.home():
 			_tend_bonds()

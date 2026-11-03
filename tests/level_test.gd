@@ -222,6 +222,7 @@ func _test_every_level() -> void:
 	_test_forest_healer()
 	_test_world_plane()
 	_test_safe_paths()
+	_test_fill_hills()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -966,9 +967,80 @@ func _test_safe_paths() -> void:
 			dirt += 1
 	_check(wilds.has(Vector2i(185, 95)) and not wilds.has(Vector2i(13, 227)) and wilds.size() > 1400,
 		"the wilds: a track's cell a path, a cleared patch's not (%s)" % [counts])
-	_check(not hills.has(Vector2i(91, 149)) and hills.size() >= 431 and hills.size() < 480,
-		"the hills: the road, not the river's dirt bank (%d)" % hills.size())
+	_check(not hills.has(Vector2i(91, 149)) and hills.size() >= 690 and hills.size() < 760,
+		"the hills: the road and 777's tracks, not the river's dirt bank (%d)" % hills.size())
 	_check(counts["forest"] == dirt, "the forest, no road curves: all its dirt on its floor (%d of %d)" % [counts["forest"], dirt])
+
+
+## Filling the hills, phase 1 (777): a track from the road to each refuge
+## (its place's cell on a safe path), two rest camps (649's camp kind, a
+## "rest" place at Level.camp_fire), seven forage patches on grass; the do
+## rhythm: every safe path cell within FILL_DO_REACH of something to do (a
+## rest, a refuge, a patch), about 15 s of walking either way; a player by
+## a camp's fire, unhurt a while, is warmed (physics' heal), and not once hit.
+const FILL_DO_REACH := 60
+
+
+func _test_fill_hills() -> void:
+	print("
+== filling the hills (777): tracks, rest camps, forage, the warmed rest ==")
+	var area: Dictionary = WorldMap.build().areas["hills"]
+	var paths: Dictionary = area["safe_paths"]
+	var places: Dictionary = area["places"]
+	var far_refuges := []
+	for key: String in ["herders_hut", "hill_cave", "hill_shieling"]:
+		var at: Vector2i = places[key]["cell"]
+		var near := false
+		for dy in range(-3, 4):
+			for dx in range(-3, 4):
+				near = near or paths.has(at + Vector2i(dx, dy))
+		if not near:
+			far_refuges.append(key)
+	_check(far_refuges.is_empty(), "a track reaches each refuge, its cell within 3 of a safe path (%s)" % [far_refuges])
+	var camps: Array = (area["buildings"] as Array).filter(func(b: Dictionary) -> bool: return str(b.get("kind", "")) == "camp")
+	var rests: Array = places.values().filter(func(p: Dictionary) -> bool: return p["kind"] == "rest")
+	_check(camps.size() == 2 and rests.size() == 2 and camps.all(func(b: Dictionary) -> bool:
+		return rests.any(func(p: Dictionary) -> bool: return p["cell"] == Level.camp_fire(b))),
+		"two rest camps, a rest place at each one's fire (%s)" % [rests.map(func(p: Dictionary) -> Vector2i: return p["cell"])])
+	var patches: Array = area["forage"]
+	var size: Vector2i = area["size"]
+	_check(patches.size() == 7 and patches.all(func(p: Dictionary) -> bool:
+		var c: Vector2i = p["cell"]
+		return area["grass"][c.y * size.x + c.x] == 1 and not p["kinds"].is_empty()), "seven forage patches, each on grass (%d)" % patches.size())
+	var doing: Array[Vector2i] = []
+	for p: Dictionary in places.values():
+		if p["kind"] in ["rest", "refuge"]:
+			doing.append(p["cell"])
+	for p: Dictionary in patches:
+		doing.append(p["cell"])
+	var bare: Array[Vector2i] = []
+	for cell: Vector2i in paths:
+		if not doing.any(func(at: Vector2i) -> bool: return Vector2(cell - at).length() <= FILL_DO_REACH):
+			bare.append(cell)
+	_check(bare.is_empty(), "the rhythm: every safe path cell within %d of something to do (%d of %d not: %s)" % [FILL_DO_REACH, bare.size(), paths.size(), bare.slice(0, 4)])
+	_check(_main.load_map("hills"), "the hills load")
+	var player := _player()
+	var fire := Level.camp_fire(camps[0]) if not camps.is_empty() else Vector2i(-1, -1)
+	var beside := fire
+	for step: Vector2i in [Vector2i(0, -2), Vector2i(0, 2), Vector2i(-2, 0), Vector2i(2, 0), Vector2i(-1, -1), Vector2i(1, 1)]:
+		if World.is_walkable(fire + step):
+			beside = fire + step
+			break
+	_put(player, beside)
+	player.buffs = {}
+	player.hurt_tick = World.tick - _main.WARM_UNHIT_TICKS - 1
+	_main._warm_rests()
+	_check(World.buff(player, "heal") == _main.WARM_HEAL, "by the camp's fire at %s, unhurt: warmed, healing %.1f a second" % [beside, World.buff(player, "heal")])
+	player.buffs = {}
+	player.hurt_tick = World.tick
+	_main._warm_rests()
+	_check(World.buff(player, "heal") == 0.0, "just hit: not warmed")
+	player.hurt_tick = World.tick - _main.WARM_UNHIT_TICKS - 1
+	_put(player, fire + Vector2i(_main.WARM_REACH + 3, 0) if World.is_walkable(fire + Vector2i(_main.WARM_REACH + 3, 0)) else fire - Vector2i(_main.WARM_REACH + 3, 0))
+	_main._warm_rests()
+	_check(World.buff(player, "heal") == 0.0, "a few cells off: not warmed")
+	player.buffs = {}
+	_main.load_map("test_room")
 
 
 func _test_world_plane() -> void:

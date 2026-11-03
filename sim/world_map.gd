@@ -111,6 +111,8 @@ func _parse_area(area_name: String, layout: Image, height: Image, config: Dictio
 		"edges": level["terrain"]["edges"], "heights": level["terrain"]["heights"], "stairs": level["terrain"]["stairs"],
 		"relief": Level.walk_relief(level["terrain"]), "relief_size": level["terrain"]["relief_size"],
 		"places": level["places"], "buildings": level["buildings"], "markets": level["markets"],
+		# Its forage patches (Level.forage_from, decision 777): where wild things grow, no town needed.
+		"forage": level.get("forage", []),
 		# Fords (decision 505): floor, a step into one costing FORD_COST.
 		"fords": _set_of(level["terrain"].get("fords", [])),
 		# Its safe paths (Level.safe_paths, decision 763): what dens keep off.

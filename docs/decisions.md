@@ -39676,3 +39676,50 @@ monster may name its "art" and its "facing" (the spawn spec's "art_facing", the 
 art's +z turned that way, as buildings are): mine_look's cart is prop.mine_cart along its track.
 make_mine_look.py keeps trace_ledges' ledges when it writes the level again. mine_test checks
 each. Client and level data only; "art_facing" an ignorable spawn key (absent, today's drawing).
+
+## 777. Filling the hills, phase 1: tracks, rest camps, forage
+
+Jeff, 2026-11-02: "now that the levels are expanded they feel like a lot of empty space, these
+spaces need flesh on the bones - points of interest, road side camps to rest at, npcs to talk to,
+various ground items that could be picked up (similar to herbs)". The coordinator's plan
+(C:/dev/review/decisions/fill-the-lands.md: five layers, a rhythm) and maps' plan sheet for the
+hills pilot (C:/dev/review/lands/fill_hills: at the game's walk, 4 cells a second, the hills' road
+is 54 s end to end, so the rhythm is measured on the screen: something new every 10 s, something
+to do every 30 s); Jeff: "go ahead with hills plan". This is phase 1, the things to do; 778 is the
+landmarks, the roadside sights and the stories.
+
+- Side tracks (the safe-paths fixes for the hills, 763's audit): tools/make_hills.gd lays three
+  dirt road curves TRACK_WIDTH (1.4) wide by Relief.road (the road's way: walkable, no cliff, no
+  water), from the road cell nearest each junction to the herder's hut's, the hill cave's and the
+  shieling's place cells. Road curves, so each is a safe path (763) and Herds keeps dens off it.
+- Rest camps: two, by the bridge (88, 116) facing the road and under the spur at the road's end
+  (177, 95); each a building {kind "camp", size "small"} (649's kind: roofless, art-kit's
+  prop.campfire and a tent, BuildingComposer._camp; prop.log_seat round the fire when art-kit has
+  it) on a pad Relief.lay levels (keep_flat), and a place {kind "rest", holder nobody} at its fire.
+  "rest" is a new PLACE_KINDS entry, so Holdings never takes it for a raid camp.
+- Level.camp_fire(building): the cell under a camp's fire ring (its middle plus its facing times
+  CAMP_FIRE_OUT, 1, as the composer draws it), NO_CELL for any other building. The warmed rest and
+  pc-character's drying (775, client) read it.
+- The warmed rest: Main._warm_rests each WARM_TICKS (1 s): a player within WARM_REACH (2,
+  Chebyshev) of a camp's fire (a raid camp's too), unhurt for WARM_UNHIT_TICKS (5 s), not downed,
+  gets physics' 682 heal, World.add_buff "heal" WARM_HEAL (1 hp a second) for WARM_TICKS + 2
+  ticks, renewed while they stay; it ends a moment after they step away or are hit (physics'
+  rules; physics fixes a renewal's start tick in its own amendment). A player wet from wading
+  (776) dries about 4x faster near a camp's fire: pc-character's, client side.
+- Forage patches: level.json "forage": [{at, radius, kinds, per_day, most}] (Level.forage_from;
+  radius FORAGE_RADIUS 4, per_day 1, most 2 if not said), carried as WorldMap's area "forage".
+  Forage lays each patch's kinds (Forage._lay_patches) once a game day, per_day of each kind
+  while fewer than its most lie within its radius, on cells where wild things grow (_grows_on:
+  grass under the sky, dry, clear, nobody's), no town needed; their piles are counted apart from a
+  town's (near_patch) and a kind with no rules of its own withers by Forage.DEFAULTS. A kind the
+  catalog lacks is skipped. The hills have seven patches about 12 s of walking apart, alternating
+  sides, 5 to 15 cells off a path (each centred on the grass cell nearest its planned one), their kinds by their ground: reeds by the streams, flint and
+  feathers high up, berries and mushrooms on open ground and the wood's edge, and herbs, which
+  grow there now; items' 777 rows (berries, flint, feathers, mushrooms, reeds) grow as they land.
+- Saves: the grid is the same; the camps' pads only level the ground under them and nothing stood
+  there (no place, no plot), so no remade line.
+
+level_test _test_fill_hills (a track to each refuge, the two camps and their rest places, the
+seven patches, every safe path cell within 60 of something to do, the warmed rest by the fire and
+not once hit or a few cells off), _test_safe_paths (the tracks counted: 703); relief_test (the
+road is the first of four curves); forage_test _test_patches; "forage" is among EditorFields.NOT_OFFERED (laid by the generator). Server and level data; protocol unchanged; no new class_name.

@@ -101,7 +101,66 @@ func daily(day: int) -> void:
 			if Items.exists(id):
 				_wither(area, id)
 				_lay(area, id, day)
+		# The level's own patches (777): their kinds with no rules of their
+		# own wither by DEFAULTS', then each patch lays its kinds.
+		for id: String in patch_kinds(area):
+			if Items.exists(id) and not rules.has(id):
+				_wither(area, id)
+		_lay_patches(area, day)
 	World.enter(was)
+
+
+## The level's forage patches in [param area] (Level.forage_from, decision
+## 777; WorldMap's area "forage"): [{cell, radius, kinds, per_day, most}].
+func patches_in(area: String) -> Array:
+	return world_map.areas.get(area, {}).get("forage", [])
+
+
+## Every kind [param area]'s patches grow.
+func patch_kinds(area: String) -> Array[String]:
+	var out: Array[String] = []
+	for patch: Dictionary in patches_in(area):
+		for id: String in patch["kinds"]:
+			if not id in out:
+				out.append(id)
+	return out
+
+
+## Whether [param cell] of [param area] is within one of its patches that
+## grows [param id] (its piles counted apart from the towns').
+func near_patch(area: String, id: String, cell: Vector2i) -> bool:
+	for patch: Dictionary in patches_in(area):
+		if id in patch["kinds"] and Vector2(cell - (patch["cell"] as Vector2i)).length() <= float(patch["radius"]):
+			return true
+	return false
+
+
+## Each patch of [param area] (777): per kind it grows, up to its per_day a
+## day while fewer than its most of that kind lie within its radius, on a
+## cell within it where wild things grow (_grows_on: grass under the sky,
+## dry, clear, nobody's ground); the day, the patch and the kind seed the
+## draw, so a restart lays the same.
+func _lay_patches(area: String, day: int) -> void:
+	for patch: Dictionary in patches_in(area):
+		var centre: Vector2i = patch["cell"]
+		var radius := int(patch["radius"])
+		for id: String in patch["kinds"]:
+			if not Items.exists(id):
+				continue
+			var found := lying(id)
+			var count := 0
+			for at: Vector2i in found:
+				if Vector2(at - centre).length() <= radius:
+					count += found[at].size()
+			var wanted := mini(int(patch["per_day"]), int(patch["most"]) - count)
+			var draw := RandomNumberGenerator.new()
+			draw.seed = hash("%s/%s/%s/%d/patch" % [area, id, centre, day])
+			for i in wanted:
+				for t in TRIES:
+					var at := centre + Vector2i(draw.randi_range(-radius, radius), draw.randi_range(-radius, radius))
+					if Vector2(at - centre).length() <= radius and _grows_on(area, at):
+						World.put_on_ground(World.items.mint(id, GREW, "wild", area, at), at)
+						break
 
 
 ## The cells of the zone World is in with [param id] lying on them that
@@ -123,7 +182,7 @@ func _grew(uid: int) -> bool:
 
 
 func _wither(area: String, id: String) -> void:
-	var days := float(rules[id]["wither_days"])
+	var days := float(rules.get(id, DEFAULTS)["wither_days"])
 	var found := lying(id)
 	for cell: Vector2i in found:
 		for uid: int in found[cell]:
@@ -139,7 +198,7 @@ func _lay(area: String, id: String, day: int) -> void:
 	var count := 0
 	var found := lying(id)
 	for cell: Vector2i in found:
-		if not near_hut(area, id, cell):  # The huts' own count apart (_lay_huts).
+		if not near_hut(area, id, cell) and not near_patch(area, id, cell):  # The huts' and the patches' own count apart.
 			count += found[cell].size()
 	var wanted := mini(int(rule["per_day"]), int(rule["most"]) - count)
 	if wanted <= 0:

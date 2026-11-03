@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_take()
 	await _test_restart()
 	_test_drawn()
+	_test_patches()
 	get_tree().quit(1 if _failures > 0 else 0)
 
 
@@ -197,6 +198,54 @@ func _test_drawn() -> void:
 	_check(plant in Forage.PLANTS and ArtKit.has(plant), "a pile of herbs stands as %s" % plant)
 	_check(Client3D.growing_slot(PackedStringArray([Forage.HERBS, "wood_bundle"])).is_empty()
 			and Client3D.growing_slot(PackedStringArray()).is_empty(), "with anything else in it, things")
+
+
+## A level's forage patch (777): no town needed; per_day a day of each of
+## its kinds within its radius, up to its most there, counted apart from the
+## town's; a kind with no rules of its own (berries here, added for the
+## test) withers by Forage.DEFAULTS'.
+func _test_patches() -> void:
+	print("
+== a forage patch ==")
+	if not Items.exists("berries"):
+		Items.add_for_test({"id": "berries", "name": "berries", "weight": 0.2, "value": 1})
+	var towns := World.forage.towns_in(AREA)
+	var at := Vector2i(-1, -1)
+	for y in range(20, 200, 4):
+		for x in range(20, 200, 4):
+			var cell := Vector2i(x, y)
+			if at.x < 0 and Vector2(cell - towns[0]).length() > 80.0 and World.forage._grows_on(AREA, cell):
+				var clear := true
+				for dy in range(-3, 4):
+					for dx in range(-3, 4):
+						clear = clear and World.forage._grows_on(AREA, cell + Vector2i(dx, dy))
+				if clear:
+					at = cell
+	var patches: Array = World.forage.world_map.areas[AREA].get("forage", [])
+	World.forage.world_map.areas[AREA]["forage"] = patches
+	var patch := {"cell": at, "radius": 3, "kinds": ["herbs", "berries"], "per_day": 1, "most": 2}
+	patches.append(patch)
+	var in_patch := func(id: String) -> int:
+		var count := 0
+		var found := World.forage.lying(id)
+		for cell: Vector2i in found:
+			if Vector2(cell - at).length() <= 3.0:
+				count += found[cell].size()
+		return count
+	World.forage.daily(200)
+	_check(at.x >= 0 and in_patch.call("herbs") == 1 and in_patch.call("berries") == 1,
+		"a patch at %s, 80+ from any town, grows one of each of its kinds a day (%d herbs, %d berries)" % [at, in_patch.call("herbs"), in_patch.call("berries")])
+	_check(World.forage.near_patch(AREA, "herbs", at) and not World.forage.near_patch(AREA, "herbs", at + Vector2i(10, 0)),
+		"its piles counted apart from the town's")
+	World.forage.daily(201)
+	World.forage.daily(202)
+	_check(in_patch.call("herbs") == 2 and in_patch.call("berries") == 2, "never more than its most there (%d, %d)" % [in_patch.call("herbs"), in_patch.call("berries")])
+	World.steps += DayNight.day_steps * (int(Forage.DEFAULTS["wither_days"]) + 1)
+	World.forage.daily(210)
+	_check(World.forage.lying("berries").keys().all(func(cell: Vector2i) -> bool:
+		return World.items.history(World.forage.lying("berries")[cell][0])["made"] > World.steps - DayNight.day_steps),
+		"a kind with no rules withers by the defaults' days, and the patch grows it again (%d lying)" % in_patch.call("berries"))
+	patches.erase(patch)
 
 
 func _check(ok: bool, what: String) -> void:

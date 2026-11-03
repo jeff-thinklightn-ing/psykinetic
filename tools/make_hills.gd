@@ -160,6 +160,28 @@ const FORD_FREE := 4
 ## down to it, and the ground behind it eased down WADE_RISE a step, over
 ## WADE_RINGS rings at most, where that bank stands under WADE_MOST over its
 ## water (a deeper cutting, a fall's gorge, is left a bank).
+## Filling the hills, phase 1 (777; Jeff: "points of interest, road side
+## camps to rest at ... ground items that could be picked up"; maps' plan,
+## C:/dev/review/lands/fill_hills): side tracks (the safe-paths fixes, dirt
+## road curves TRACK_WIDTH wide) from the road to each refuge, by their
+## places' cells, each from the road cell nearest its junction; two rest
+## camps (649's camp kind, small, on a levelled pad; a "rest" place at its
+## fire); forage patches (level.json "forage") about 12 s of walking apart.
+const TRACK_WIDTH := 1.4
+const TRACKS := [{"to": "herders_hut", "from": Vector2i(20, 112)}, {"to": "hill_cave", "from": Vector2i(50, 111)},
+	{"to": "hill_shieling", "from": ROAD_END}]
+const CAMPS: Array[Dictionary] = [
+	{"key": "bridge_camp", "name": "the camp by the bridge", "at": Vector2i(88, 116), "facing": Vector2i(0, -1)},
+	{"key": "spur_camp", "name": "the camp under the spur", "at": Vector2i(177, 95), "facing": Vector2i(-1, 0)}]
+const CAMP_SIZE := 5
+## Each patch {at, kinds}: its setting's kinds (items' 777 rows; "herbs" grows
+## meanwhile, a kind Items lacks is skipped by Forage).
+const PATCHES: Array[Dictionary] = [
+	{"at": Vector2i(31, 115), "kinds": ["flint", "feathers"]}, {"at": Vector2i(70, 107), "kinds": ["reeds", "herbs"]},
+	{"at": Vector2i(115, 116), "kinds": ["berries", "herbs"]}, {"at": Vector2i(152, 108), "kinds": ["reeds", "herbs"]},
+	{"at": Vector2i(14, 85), "kinds": ["berries", "herbs"]}, {"at": Vector2i(45, 140), "kinds": ["berries", "mushrooms", "herbs"]},
+	{"at": Vector2i(172, 64), "kinds": ["flint", "feathers"]}]
+const PATCH_RADIUS := 4
 const FALL_POOL := 2.5
 const WADE_RISE := 0.42
 const WADE_RINGS := 4
@@ -191,6 +213,8 @@ var _east_ford: Array[Vector2i] = []
 var _faces: Dictionary = {}
 ## What a build failed to lay (a ford, the road): a seed's miss.
 var _missed: Array[String] = []
+## The road's cells, once laid (777: the tracks leave from it).
+var _road_cells: Array[Vector2i] = []
 
 
 func _ready() -> void:
@@ -242,7 +266,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY, EAST_VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, PLATEAU_WIDE, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": 0.0, "still": [FALL_LIP]}],
-		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads(),
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads(),
 		"streams": 0, "keep_clear": {},
 		"rivers": [WEST_RIVER.merged({"line": VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED + river_seed}),
 			east_river,
@@ -277,6 +301,9 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_knoll()
 	_road(arrival)
 	_places()
+	_tracks()
+	_camps()
+	_patches()
 	_wade(laid["falls"])
 	# Boulders and crates by the rim, to push off.
 	for at in [Vector2i(CLIFF_X + 1, 24), Vector2i(CLIFF_X + 2, 40)]:
@@ -603,7 +630,9 @@ func _road(arrival: Vector2i) -> void:
 		_missed.append("no way for the road")
 		push_error("[hills] no way for the road")
 		return
+	_road_cells.clear()
 	for cell: Vector2i in laid["cells"]:
+		_road_cells.append(cell)
 		if map.cell(cell) in ["grass", "dirt"]:
 			map.set_cell(cell, "dirt")
 	config["roads"] = [{"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"}]
@@ -673,6 +702,81 @@ func _places() -> void:
 		var stand := door - gate
 		places[herder["key"]] = {"at": [stand.x, stand.y], "kind": "refuge", "where": "hills", "radius": 3, "name": herder["name"]}
 	config["places"] = places
+
+
+## The side tracks (777): from the road cell nearest each TRACKS "from" to
+## its place's cell, by Relief.road (the road's way: walkable, no cliff, no
+## water, the climb dearer), TRACK_WIDTH wide; their cells dirt, their
+## curves after the road's in config "roads", so each is a safe path (763).
+func _tracks() -> void:
+	if not config.has("roads") or config["roads"].is_empty():
+		return
+	var road_cells: Array[Vector2i] = []
+	for cell: Vector2i in _road_cells:
+		if map.walkable(cell) and map.cell(cell) != "water":
+			road_cells.append(cell)
+	for track: Dictionary in TRACKS:
+		var place: Dictionary = config["places"][track["to"]]
+		var to := Vector2i(int(place["at"][0]), int(place["at"][1]))
+		var from: Vector2i = road_cells[0]
+		for cell in road_cells:
+			if Vector2(cell - track["from"]).length() < Vector2(from - track["from"]).length():
+				from = cell
+		var laid := Relief.road(map, from, [], to, TRACK_WIDTH)
+		if laid.is_empty():
+			_missed.append("no track to %s" % track["to"])
+			push_error("[hills] no track to %s" % track["to"])
+			continue
+		for cell: Vector2i in laid["cells"]:
+			if map.cell(cell) in ["grass", "dirt"]:
+				map.set_cell(cell, "dirt")
+		config["roads"].append({"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"})
+		print("[hills] a track to %s from %s: %d cells" % [track["to"], from, laid["cells"].size()])
+
+
+## The rest camps' pads, levelled by Relief.lay (keep_flat).
+static func _camp_pads() -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for camp in CAMPS:
+		out.append(Rect2i(camp["at"], Vector2i(CAMP_SIZE, CAMP_SIZE)))
+	return out
+
+
+## The rest camps (777): each a building {kind camp, size small} on its pad,
+## and a "rest" place at its fire (Level.camp_fire), held by nobody.
+func _camps() -> void:
+	for camp in CAMPS:
+		var at: Vector2i = camp["at"]
+		var facing: Vector2i = camp["facing"]
+		var building := {"kind": "camp", "size": "small", "at": [at.x, at.y], "facing": [facing.x, facing.y]}
+		config["buildings"].append(building)
+		var fire := Level.camp_fire({"kind": "camp", "rect": Rect2i(at, Vector2i(CAMP_SIZE, CAMP_SIZE)), "facing": facing})
+		config["places"][camp["key"]] = {"at": [fire.x, fire.y], "kind": "rest", "radius": 3, "name": camp["name"]}
+		for cell in _cells_of(Rect2i(at, Vector2i(CAMP_SIZE, CAMP_SIZE))):
+			if map.cell(cell) == "dirt":
+				map.set_cell(cell, "grass")
+
+
+## The forage patches (777): level.json "forage", each PATCH_RADIUS round,
+## its middle the grass cell nearest its planned one (a road, a track or a
+## bank's dirt may have come to lie there).
+func _patches() -> void:
+	var out: Array = []
+	for patch: Dictionary in PATCHES:
+		var at := _nearest_grass(patch["at"])
+		out.append({"at": [at.x, at.y], "radius": PATCH_RADIUS, "kinds": patch["kinds"]})
+	config["forage"] = out
+
+
+func _nearest_grass(from: Vector2i) -> Vector2i:
+	for reach in range(0, PATCH_RADIUS + 1):
+		for y in range(from.y - reach, from.y + reach + 1):
+			for x in range(from.x - reach, from.x + reach + 1):
+				var at := Vector2i(x, y)
+				if maxi(absi(x - from.x), absi(y - from.y)) == reach and map.cell(at) == "grass":
+					return at
+	_missed.append("no grass near the forage patch at %s" % from)
+	return from
 
 
 static func _cells_of(rect: Rect2i) -> Array[Vector2i]:
