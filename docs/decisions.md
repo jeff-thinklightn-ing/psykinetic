@@ -39531,3 +39531,15 @@ resident_test _test_watch: the offer at dusk and not at noon, sign-on and its li
 stood at the post, paid from a funded treasury and told, the captain's regard, left past the grace, an
 empty treasury told and unpaid. No bullet: no real town has posts until buildings' plan lands. Server
 only, protocol unchanged, no new class_name.
+
+## 776, companions' side: she knows a ford for shallow water
+
+776 makes the hills' streams fords: floor, so World.is_water is false on them, and a companion's
+perception read only is_water, so she saw a stream as plain floor. Now Companion.sightings and
+perceived count World.is_ford as "water" too, so she names it water when she talks about what's
+around her. On her perception map (perception_grid) a ford is "%", with the key line "% shallow
+water, wadeable" ("~" stays deep water). The glyph isn't "w" because a monster kind takes its first
+letter there, and a wolf is "w". 505's existing fords, on any level,
+get the "%" and the water word too. The text goes only to the model. companion_test
+_test_surroundings (a ford is "%" on her map and in its key, water in her list and sightings).
+Server only, protocol unchanged, no new class_name.

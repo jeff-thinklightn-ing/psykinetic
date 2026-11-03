@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Companions: your companion knows a ford for shallow water and says so when she talks about what's around her (776, companions' side).
 - Companions: told to wait, your companion stays put when wolves come to town or a foe challenges you, until you call her (616 amended).
 - The hills' rivers are streams now: wade across anywhere (slowly), the bridge and the old fords still the easy ways over; only the pool under the waterfall is deep. The lone wall below the waterfall is gone (776).
 - Animals splash as they wade through water and fords, and anyone stepping out of a stream drips a drop or two (505 amended (3)).

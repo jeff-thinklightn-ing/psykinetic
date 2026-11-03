@@ -4914,6 +4914,13 @@ func _test_surroundings() -> void:
 	World.damage(imp, 999)
 	World.despawn(crate)
 	crate.queue_free()
+	# A ford (776): floor to walk, water to her eyes, "%" on her map.
+	World._fords[Vector2i(8, 8)] = true
+	grid = pet.perception_grid()
+	_check(grid.split("\n")[1 + centre + 1].split(" ")[centre] == "%" and "% shallow water, wadeable" in grid.split("\n")[-1],
+		"a ford is %% on her map, in its key: %s" % grid.split("\n")[1 + centre + 1])
+	_check("- water" in pet.perception_list() and pet.sightings().has("water"), "and water in her list and sightings: %s" % pet.perception_list())
+	World._fords.clear()
 	_put(pet, Vector2i(16, 11))
 	_put(owner, Vector2i(17, 11))
 	_check(pet.perception_list() == "", "nothing worth telling in an empty corner")

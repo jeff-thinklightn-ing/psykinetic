@@ -919,7 +919,7 @@ func sightings() -> Dictionary[String, Dictionary]:
 		var kinds: Array[String] = []
 		if World.is_fire(cell):
 			kinds.append("fire")
-		if World.is_water(cell):
+		if World.is_water(cell) or World.is_ford(cell):  # A ford is floor, but water to her eyes (776).
 			kinds.append("water")
 		if World.stair_at(cell) != Vector2i.ZERO:
 			kinds.append("stair")
@@ -3320,7 +3320,7 @@ func perceived() -> Array[Dictionary]:
 		var kinds: Array[String] = []
 		if World.is_fire(cell):
 			kinds.append("fire")
-		if World.is_water(cell):
+		if World.is_water(cell) or World.is_ford(cell):  # A ford is floor, but water to her eyes (776).
 			kinds.append("water")
 		if World.stair_at(cell) != Vector2i.ZERO:
 			kinds.append("stair")
@@ -3555,7 +3555,7 @@ func perception_grid() -> String:
 			kinds.append(kind)
 	for kind in kinds:
 		key.append("%s %s" % [kind[0], kind])
-	key.append_array(["f fire", "~ water", "# wall" if not World.outdoor else "# wall or forest", "D closed door", "d open door", "c crate or cart", "o boulder", "= chest",
+	key.append_array(["f fire", "~ water", "% shallow water, wadeable", "# wall" if not World.outdoor else "# wall or forest", "D closed door", "d open door", "c crate or cart", "o boulder", "= chest",
 		"^ stair", "v drop to lower ground", ". floor", "? out of sight"])
 	return "A map of what you can see, you at the centre, north at the top, one character a pace:\n%s\nKey: %s." % [
 		"\n".join(rows), ", ".join(key)]
@@ -3567,6 +3567,8 @@ func _ground_glyph(cell: Vector2i) -> String:
 		return "f"
 	if World.is_water(cell):
 		return "~"
+	if World.is_ford(cell):
+		return "%"  # Not a letter: monsters take theirs (a wolf is "w").
 	if not World.is_walkable(cell):
 		return "#"
 	if World.stair_at(cell) != Vector2i.ZERO:
