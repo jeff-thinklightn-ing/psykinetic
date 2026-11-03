@@ -994,7 +994,11 @@ func _test_item_keys() -> void:
 		_press(KEY_G)
 		_check(player.slots[Player.RIGHT_HAND] == "" and World.ground_uids(player.tile).has(uid), "%s: G puts the kit down at the feet" % scheme)
 		_press(KEY_F)
-		_check(player.slot_items[Player.RIGHT_HAND] == uid and World.ground_uids(player.tile).is_empty(), "%s: F picks it up again" % scheme)
+		# F sweeps (773): the pack first, the hands last; back to the hand for T.
+		var at := Array(player.slot_items).find(uid)
+		_check(at >= 0 and World.ground_uids(player.tile).is_empty(), "%s: F picks it up again (slot %d)" % [scheme, at])
+		if at >= 0 and at != Player.RIGHT_HAND:
+			World.try_transfer(player, player, at, player, Player.RIGHT_HAND)
 		var free := Vector2i(-1, -1)
 		for direction: Vector2i in World.DIRECTIONS:
 			var cell := player.tile + direction * 2

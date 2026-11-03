@@ -1301,6 +1301,8 @@ const THROWN_SHOWN_TICKS := 10
 ## plant it was picked from, about this wide.
 const GROWING_WIDE := 0.5
 const THROW_FLIGHT_SECONDS := 0.4
+## The most things F's sweep shows flying in at once (773); the rest just go.
+const SWEEP_FLIGHTS_MOST := 8
 const PILE_RING := Color(0.95, 0.85, 0.55, 0.55)
 ## Trees: lean up to this far (radians), sit up to this far off their
 ## cell's middle, gather in clumps about FOREST_CLUMP cells across; the
@@ -8808,6 +8810,49 @@ func _fly(thing: Node3D, from: Vector3, to: Vector3) -> void:
 		if is_instance_valid(thing):
 			thing.position = from.lerp(to, t) + Vector3.UP * sin(t * PI) * (0.6 + from.distance_to(to) * 0.15),
 		0.0, 1.0, THROW_FLIGHT_SECONDS)
+
+
+## F's sweep (773, ui's side): what [param taken] (the party line's
+## [{uid, id, cell}]) took flies from its cell to [param to], shrinking, then
+## goes; one model per kind per cell, as the heap drew it, at most
+## SWEEP_FLIGHTS_MOST.
+func sweep_in(taken: Array, to: GridEntity) -> void:
+	if _room == null or to == null or not is_instance_valid(to):
+		return
+	var puppet: Node3D = _puppets.get(to.get_instance_id())
+	var end := (puppet.position if is_instance_valid(puppet) else _tile_position(to.tile)) + Vector3.UP * 1.0
+	for flight: Dictionary in sweep_flights(taken):
+		if not ArtKit.has(flight["slot"]):
+			continue
+		var thing := ArtKit.instance(flight["slot"])
+		thing.rotation = Vector3(0.0, 0.0, PI * 0.5)
+		_room.add_child(thing)
+		var from := _tile_position(flight["cell"]) + Vector3.UP * 0.1
+		_fly(thing, from, end)
+		var tween := thing.create_tween()
+		tween.tween_property(thing, "scale", Vector3.ONE * 0.3, THROW_FLIGHT_SECONDS)
+		tween.tween_callback(thing.queue_free)
+
+
+## The flights F's sweep shows for [param taken]: [{slot, cell}], one per
+## kind per cell, in the order taken (nearest first), at most
+## SWEEP_FLIGHTS_MOST (773).
+static func sweep_flights(taken: Array) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var seen := {}
+	for each in taken:
+		if not each is Dictionary or not (each.get("cell") is Array) or (each["cell"] as Array).size() != 2:
+			continue
+		var cell := Vector2i(int(each["cell"][0]), int(each["cell"][1]))
+		var id := str(each.get("id", ""))
+		var slot := str(Items.def(id).get("art", ""))
+		if slot.is_empty() or seen.has([cell, id]):
+			continue
+		seen[[cell, id]] = true
+		out.append({"slot": slot, "cell": cell})
+		if out.size() >= SWEEP_FLIGHTS_MOST:
+			break
+	return out
 
 
 ## A young tree on edge [param cell] (a void cell beside the land), small,

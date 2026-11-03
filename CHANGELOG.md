@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- F now sweeps up everything lying near you, each thing flying in from where it lay (773, ui's side).
 ## v0.1.200
 
 - What goes over the network changes, so v0.1.199 and older can't join the server: update through the launcher first.

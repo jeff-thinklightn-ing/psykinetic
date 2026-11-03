@@ -39245,6 +39245,19 @@ Voice's words: "You pick up a knife." (one thing, named with its article) / "You
 things." / "... and 12 gold." / "You pick up 12 gold."; a full pack adds " Your pack is
 full."; an empty sweep says nothing. items_test _test_sweep. Server only (the client's half
 is ui's); protocol unchanged; no new class_name.
+
+### 773, ui's side
+
+- F sends "pick_up" with "near": true (Main.item_args), the cursor's cell beside it as before;
+  G and T are unchanged.
+- The answer's party line is logged as items' words; its "taken" [{uid, id, cell}] flies in:
+  Client3D.sweep_in instances each kind's art at its cell and flies it (the throw's _fly arc,
+  THROW_FLIGHT_SECONDS) to the player, shrinking, then frees it. Client3D.sweep_flights gives
+  one flight per kind per cell, nearest first, at most SWEEP_FLIGHTS_MOST (8); gold has no
+  cell in the answer and so no flight. An empty sweep says and shows nothing.
+- ui_test (_test_sweep_key); controls_test's F now finds the kit in the pack (the sweep fills it
+  first), handed back for T. Client only, protocol unchanged, no new class_name.
+
 ## 765. One store window for every seller
 
 Jeff (11-02): "rolf store should have a inventory structure, squares with graphics and price on
@@ -39352,8 +39365,8 @@ or a cart, as E does.
   With a bow in hand the plain click does the same (_click_with_bow).
 - _walk_to_chest is gone.
 
-The coordinator also asked (voice's check, Jeff's no-gloss rule) that the companion card's
-headings be bare words: "Learned", "Fighting", "Regard".
+The coordinator also asked (voice's check, Jeff's no-gloss rule; voice's words, the
+coordinator's approval) that the companion card's headings be bare words: "Learned", "Fighting", "Regard".
 
 chest_test (_test_click_from_afar: the rule, no attack order, the walk and the opening) and
 ui_test (the card's headings). Client only, protocol unchanged, no new class_name.

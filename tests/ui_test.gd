@@ -51,6 +51,7 @@ func _ready() -> void:
 	_test_options_tabs()
 	_test_inventory_panel()
 	_test_barter()
+	_test_sweep_key()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2098,3 +2099,20 @@ func _test_barter() -> void:
 		_main._open_talk(own_body)
 		_check(not _main._chat_box.visible, "reaching a player by a click opens no chat window")
 	oda.free()
+
+
+func _test_sweep_key() -> void:
+	print("
+== F sweeps up what lies near (773, ui's side) ==")
+	_check(Main.item_args("pick_up", Vector2i(3, 4)) == {"cell": [3, 4], "near": true} and Main.item_args("pick_up", Main.NONE) == {"near": true},
+		"F asks for a sweep (near), the cursor's cell beside it")
+	_check(Main.item_args("drop", Vector2i(3, 4)) == {} and Main.item_args("throw", Vector2i(3, 4)) == {"cell": [3, 4]}, "G and T unchanged")
+	var taken := [{"uid": 1, "id": "knife", "cell": [2, 2]}, {"uid": 2, "id": "knife", "cell": [2, 2]},
+		{"uid": 3, "id": "knife", "cell": [3, 2]}, {"uid": 4, "id": "no_such_thing", "cell": [3, 3]}, {"uid": 5, "id": "knife"}]
+	var flights := Client3D.sweep_flights(taken)
+	_check(flights.size() == 2 and flights[0] == {"slot": "item.knife", "cell": Vector2i(2, 2)} and flights[1]["cell"] == Vector2i(3, 2),
+		"one flight per kind per cell, none for an unknown thing or no cell (%s)" % [flights])
+	var many := []
+	for i in 20:
+		many.append({"uid": i, "id": "knife", "cell": [i, 0]})
+	_check(Client3D.sweep_flights(many).size() == Client3D.SWEEP_FLIGHTS_MOST, "at most %d fly at once" % Client3D.SWEEP_FLIGHTS_MOST)

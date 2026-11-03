@@ -13419,6 +13419,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			town_notes[zone_name_here()] = str(data.get("text", ""))  # The big map's box, not the log.
 			return
 		talk.add_line(str(data.get("from", "")), str(data.get("text", "")), true, true)
+		if data.get("taken") is Array and _client3d != null and DisplayServer.get_name() != "headless":
+			_client3d.sweep_in(data["taken"], _local_player())  # F's sweep flies in (773).
 		return
 	if kind == "speech":
 		var entity := get_node_or_null(NodePath(str(data.get("entity", "")))) as GridEntity
@@ -17680,16 +17682,23 @@ func use_slot(slot: int) -> void:
 
 ## F, G or T ([param what]: pick_up, drop, throw): a command for the local
 ## player, with the cell under the cursor; the server decides (_item_command).
+## F sweeps up everything near (773, Jeff: "a local vacuum effect").
 func item_key(what: String) -> void:
 	var me := _local_player()
 	if me == null:
 		return
+	World.command(me, what, item_args(what, _mouse_tile()))
+
+
+## What F, G or T sends with the cursor on [param cell] (NONE: off the
+## ground): the cell, but for G; F's "near" (773).
+static func item_args(what: String, cell: Vector2i) -> Dictionary:
 	var args := {}
-	if what != "drop":
-		var cell := _mouse_tile()
-		if cell != NONE:
-			args["cell"] = [cell.x, cell.y]
-	World.command(me, what, args)
+	if what != "drop" and cell != NONE:
+		args["cell"] = [cell.x, cell.y]
+	if what == "pick_up":
+		args["near"] = true
+	return args
 
 
 ## Server: [param player]'s F, G or T. Picking up takes from the cell asked
