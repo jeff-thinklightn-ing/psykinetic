@@ -367,6 +367,8 @@ func _nearest_visible_target() -> GridEntity:
 	var player: GridEntity = super() if _bold or World.tick - hurt_tick < CHARGE_TICKS else null
 	if not town_wolf.is_empty():
 		return player  # A town's wolf hunts nothing: it fights back only when hurt (761).
+	if raid != "":
+		return player  # A wave's wolf is after the watch, not the deer (771).
 	if _look_tick < 0 or World.tick - _look_tick >= PREY_LOOK_TICKS or (_prey != null and not is_instance_valid(_prey)):
 		_look_tick = World.tick
 		_prey = _sees_prey()
@@ -413,6 +415,7 @@ func _settle_bold() -> void:
 	_hungry = town_wolf.is_empty() and _governed() and World.herds != null \
 			and World.herds.fed(str(spawn_spec.get("group", ""))) < HUNGRY_FED
 	_bold = (night or pack >= PACK_BOLD or _hungry) and town_wolf.is_empty()  # A town's wolf never goes at people (761).
+	_bold = _bold or raid != ""  # A night watch's wave goes at the watch (771).
 	wander_radius = _roam * 2 if night else DEN_RADIUS  # Out by night, at its den by day.
 	temper = Temper.BOLD if _bold else Temper.CAUTIOUS
 	var bonus := NIGHT_SIGHT if night else 0

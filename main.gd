@@ -4047,6 +4047,9 @@ func _boot() -> void:
 	World.blood_from_dict(snapshot["blood"] if snapshot.get("blood") is Dictionary else {})
 	if not World.blood_changed.is_connected(_on_blood_changed):
 		World.blood_changed.connect(_on_blood_changed)
+	# A night watch's wave on its way (decision 771): its cue.
+	if not World.raids.wave_coming.is_connected(_on_wave_coming):
+		World.raids.wave_coming.connect(_on_wave_coming)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -6034,6 +6037,17 @@ func _on_blood_changed(level: String, add: PackedInt32Array, gone: PackedInt32Ar
 	var peers := World.peers_in(level)
 	if not peers.is_empty():
 		Net.broadcast_to(peers, "blood", {"level": level, "add": add, "gone": gone})
+
+
+## Server: a night watch's wave of [param kind] is coming in [param area]
+## (Raids.wave_coming, decision 771): the players there within
+## Raids.CUE_REACH of its post hear it from [param cell] ("wave" {kind,
+## cell: [x, y]}; sound plays the kind's howls, horn or moan).
+func _on_wave_coming(_id: String, area: String, kind: String, cell: Vector2i, post: Vector2i) -> void:
+	for peer in World.peers_in(area):
+		var player: Player = _players.get(peer)
+		if is_instance_valid(player) and World.distance(player.tile, post) <= Raids.CUE_REACH:
+			Net.message_to(peer, "wave", {"kind": kind, "cell": [cell.x, cell.y]})
 
 
 ## Server: tall grass of [param level] was trampled or stood again
