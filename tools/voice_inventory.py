@@ -1,6 +1,6 @@
 """Voice inventory: every player-facing fixed line in the game, in one page.
 
-Scans the game's GDScript (sim, net, client, client3d, server, entities, main.gd)
+Scans the game's GDScript (sim, net, client, client3d, render, server, entities, main.gd)
 for string literals that read as words to a player, and the data files under
 levels/ (top-level *.json and levels/lore/*.json) for text values. Writes
 docs/voice_inventory.md: each line with who says it (by file, a best guess),
@@ -23,7 +23,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "voice_inventory.md")
 
-GD_DIRS = ["sim", "net", "client", "client3d", "server", "entities"]
+GD_DIRS = ["sim", "net", "client", "client3d", "render", "server", "entities"]
 GD_FILES = ["main.gd"]
 # Tool and level-check text a player never reads.
 SKIP_FILES = {"sim/level.gd", "client3d/art_check.gd", "client3d/character_lab.gd", "client3d/art_kit.gd"}

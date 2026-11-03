@@ -7,9 +7,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2095)
+## Lines in the code (2323)
 
-### companions (Pip, Wren, Nix) (457)
+### companions (Pip, Wren, Nix) (461)
 
 | | Line | Where |
 |---|---|---|
@@ -64,6 +64,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | going for the nearest monster | `sim/companion.gd`  |
 |  | keeping beside %s and fighting whatever comes at either of you | `sim/companion.gd`  |
 |  | getting away from the monsters, to safety | `sim/companion.gd`  |
+|  | holding your ground | `sim/companion.gd` COURSE_WORDS |
+|  | pressing the attack | `sim/companion.gd` COURSE_WORDS |
 |  | Loyal and cautious. Guards the one she travels with, and says little, in short, plain sentences. | `sim/companion.gd`  |
 |  | the one you travel with | `sim/companion.gd` keeper_name() |
 |  | You are %s. You travel with %s by choice. | `sim/companion.gd` identity() |
@@ -195,9 +197,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s %s now | `sim/companion.gd` _watch() |
 |  | %s was nearly killed in %s. | `sim/companion.gd` _watch() |
 |  | %s, and what %s asked of you no longer binds you. | `sim/companion.gd` _watch() |
-|  | %s, so %s's instruction no longer holds. | `sim/companion.gd` _watch() |
-|  | your HP is low | `sim/companion.gd` _watch() |
-|  | %s's HP is low | `sim/companion.gd` _watch() |
+|  | %s, so what %s asked of you no longer holds. | `sim/companion.gd` _watch() |
+|  | you are badly hurt | `sim/companion.gd` _watch() |
+|  | %s is badly hurt | `sim/companion.gd` _watch() |
 |  | %s has risen again. | `sim/companion.gd` _watch() |
 |  | %s came into sight, %s | `sim/companion.gd` _watch() |
 |  | %s came into sight, the first %s you have seen here. | `sim/companion.gd` _watch() |
@@ -221,12 +223,14 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You heard, out of sight: %s. | `sim/companion.gd` heard_words() |
 |  | from %s: nothing hostile near and nothing asked | `sim/companion.gd` _calm() |
 |  | You have changed what you are doing: you are %s now. Tell %s why. | `sim/companion.gd` _explain_lapse() |
-|  | %s, so %s's instruction no longer holds, and you changed course: from %s to %s. Say why, briefly. | `sim/companion.gd` _explain_lapse() |
+|  | %s, so what %s asked of you no longer holds, and you changed course: from %s to %s. Say why, briefly. | `sim/companion.gd` _explain_lapse() |
 |  | tend your own wounds | `sim/companion.gd` _tend_unasked() |
 |  | tend your player's wounds | `sim/companion.gd` _tend_unasked() |
 |  | Unasked, you set about bandaging %s. | `sim/companion.gd` _tend_unasked() |
 |  | your own wounds | `sim/companion.gd` _tend_unasked() |
 |  | Badly hurt, you drank a healing remedy. | `sim/companion.gd` _drink_if_low() |
+|  | %s near the end of %s strength | `sim/companion.gd` strength_words() |
+|  | %s down to half %s strength | `sim/companion.gd` strength_words() |
 |  | no player within %d cells to hear her | `sim/companion.gd` _ask_voice() |
 |  | her card, from her traits | `sim/companion.gd` write_card() |
 |  | not a card (too short, or speech in it); her %s card stands | `sim/companion.gd` _take_card() |
@@ -271,13 +275,13 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s You are outdoors, under the sky, with forest all around the edge of this place. | `sim/companion.gd` where_words() |
 |  | %s; outside it is %s. | `sim/companion.gd` where_words() |
 |  | You are in a cave; outside it is %s. | `sim/companion.gd` where_words() |
-|  | You are in a dungeon, under the ground; above it is %s. | `sim/companion.gd` where_words() |
+|  | You are below ground, in old stone halls; above them is %s. | `sim/companion.gd` where_words() |
 |  | You are indoors; outside it is %s. | `sim/companion.gd` where_words() |
 |  | A storm is raging. | `sim/companion.gd` _where_briefly() |
 |  | You are under a roof.%s | `sim/companion.gd` _where_briefly() |
 |  | You are outdoors, under the sky, with forest all around the edge of this place.%s | `sim/companion.gd` _where_briefly() |
 |  | You are in a cave. | `sim/companion.gd` _where_briefly() |
-|  | You are in a dungeon, under the ground. | `sim/companion.gd` _where_briefly() |
+|  | You are below ground, in old stone halls. | `sim/companion.gd` _where_briefly() |
 |  | You are indoors. | `sim/companion.gd` _where_briefly() |
 |  | a small hut | `sim/companion.gd` BUILDING_WORDS |
 | L | the healer's hut | `sim/companion.gd` _where_briefly() |
@@ -458,9 +462,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You did not %s: %s. | `sim/companion.gd` _end_errand() |
 |  | %s ×%d, %s ×%d. | `sim/companion.gd` collapse_log() |
 |  | %s monster%s next to you. | `sim/companion.gd` situation_text() |
-|  | You have %d of %d HP. | `sim/companion.gd` situation_text() |
+|  | Your health is %d of %d. | `sim/companion.gd` situation_text() |
 |  | You are badly hurt, but nothing is near you. | `sim/companion.gd` situation_text() |
-|  | %s is %s with %d of %d HP. | `sim/companion.gd` situation_text() |
+|  | %s is %s, health %d of %d. | `sim/companion.gd` situation_text() |
 |  | next to you | `sim/companion.gd` situation_text() |
 |  | %d cells away | `sim/companion.gd` situation_text() |
 |  | %s is badly hurt, but nothing is near %s. | `sim/companion.gd` situation_text() |
@@ -788,7 +792,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | [spawn] %s is not a GridEntity script; using the base class | `entities/entity_factory.gd` script_for() |
 |  | [spawn] unknown shape %s; drawing a capsule | `entities/entity_factory.gd` shape_for() |
 
-### other (net) (55)
+### other (net) (56)
 
 | | Line | Where |
 |---|---|---|
@@ -847,11 +851,197 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | [smooth] %.1f s, %d frames; %s | `net/smooth_meter.gd` report() |
 |  | %s %d back in %d runs, %d tile back, %d after a swap | `net/smooth_meter.gd` bodies_report() |
 |  | [smooth] by body: %s; swaps %d | `net/smooth_meter.gd` bodies_report() |
+|  | [state] restored: %d keys; %s | `net/snapshot.gd` restored_line() |
 
-### other (sim) (461)
+### other (render) (169)
 
 | | Line | Where |
 |---|---|---|
+|  | Reset this room | `render/admin_panel.gd` _ready() |
+|  | Regenerate this level | `render/admin_panel.gd` _ready() |
+|  | Filter the commands | `render/admin_panel.gd` _ready() |
+|  | A command (Enter runs it; Up and Down for the last ones; Esc closes) | `render/admin_panel.gd` _ready() |
+|  | Runs on the server as its console does. Reset and regenerate ask twice. | `render/admin_panel.gd` _ready() |
+|  | [color=#%s]> %s[/color] | `render/admin_panel.gd` run() |
+|  | %s: again to confirm | `render/admin_panel.gd` confirmed() |
+|  | quests reset %s | `render/admin_panel.gd` _reset_quests() |
+|  | Reset this room | `render/admin_panel.gd` _reset_this_room() |
+|  | zone reset %s | `render/admin_panel.gd` _reset_this_room() |
+|  | Regenerate this level | `render/admin_panel.gd` _regenerate_this() |
+|  | regenerate now %s | `render/admin_panel.gd` _regenerate_this() |
+|  | The temple's counter | `render/barter_panel.gd` COUNTER_TITLES |
+|  | The smith's counter | `render/barter_panel.gd` COUNTER_TITLES |
+|  | nothing for sale | `render/barter_panel.gd` empty_words() |
+|  | nothing to trade | `render/barter_panel.gd` empty_words() |
+|  | %s (%d %s%s) | `render/barter_panel.gd` button_words() |
+|  | Pay (%d %s) | `render/barter_panel.gd` pay_words() |
+|  | Pay (%d %s of antlers) | `render/barter_panel.gd` pay_words() |
+|  | Pay (%d %s) | `render/barter_panel.gd` pay_words() |
+|  | You need %d more gold. | `render/barter_panel.gd` shortfall_words() |
+|  | %d of %d to give | `render/barter_panel.gd` stack_words() |
+|  | the town has enough of that | `render/barter_panel.gd` toggle_give() |
+|  | %s %s %s%s | `render/barter_panel.gd` boxes_shown() |
+|  | %s, in hand | `render/barter_panel.gd` _rebuild() |
+|  | What she has learned | `render/card_page.gd` _ready() |
+|  | How she fights | `render/card_page.gd` _ready() |
+|  | How she feels about you | `render/card_page.gd` _ready() |
+|  | I hold %s. | `render/card_page.gd` held_words() |
+|  | I hold %s; %s taught it to me. | `render/card_page.gd` held_words() |
+|  | My purse is empty. | `render/card_page.gd` purse_words() |
+|  | I carry %d gold for you. Only you may take it back. | `render/card_page.gd` purse_words() |
+|  | Nothing yet. Each land we cross will teach me something. | `render/card_page.gd` nothing_learned_words() |
+|  | You have not seen me fight yet. | `render/card_page.gd` unknown_bent_words() |
+|  | No one travels with you. | `render/card_page.gd` alone_words() |
+|  | Join a Psykinetic server | `render/connect_screen.gd` _ready() |
+|  | Ask whoever runs the server for these. They are remembered. | `render/connect_screen.gd` _ready() |
+|  | The address is needed. | `render/connect_screen.gd` _submit() |
+|  | The port must be a number between 1 and 65535. | `render/connect_screen.gd` _submit() |
+|  | The token is needed. | `render/connect_screen.gd` _submit() |
+|  | Face him again | `render/deal_panel.gd` AGAIN_WORDS |
+|  | Shift+click: strike | `render/deal_panel.gd` STRIKE_WORDS |
+|  | You have %d gold; he asks %d at the least. | `render/deal_panel.gd` purse_words() |
+|  | You have %d gold. | `render/deal_panel.gd` purse_words() |
+|  | only the draugr's blessed can hold on | `render/down_screen.gd` UNBLESSED_WHY |
+|  | Slow Heart (Hold) | `render/down_screen.gd` _ready() |
+|  | Bleed Out (Respawn) | `render/down_screen.gd` _ready() |
+|  | all come back in %d s | `render/down_screen.gd` count_words() |
+|  | The world goes on while this is open. | `render/game_menu.gd` _ready() |
+|  | Back to the main menu | `render/game_menu.gd` _ready() |
+|  | [color=#%s]%s[/color] %s | `render/hint_panel.gd` set_lines() |
+|  | blocks blows from ahead | `render/item_tip.gd` VERB_WORDS |
+|  | strikes two cells away | `render/item_tip.gd`  |
+|  | more from behind | `render/item_tip.gd`  |
+| L | %s: kept from the one it is named for | `render/item_tip.gd` lines_for() |
+|  | Walk forward (click scheme: the view overhead) | `render/keys.gd`  |
+|  | Walk back (click scheme: the view back to normal) | `render/keys.gd`  |
+|  | Walk left (click scheme: turn) | `render/keys.gd`  |
+|  | Walk right (click scheme: turn) | `render/keys.gd`  |
+|  | Open a chest or a door; talk to someone | `render/keys.gd`  |
+|  | Pin the talk box | `render/keys.gd`  |
+|  | Reset the room | `render/keys.gd`  |
+|  | The controls list | `render/keys.gd`  |
+|  | Held with a click: swing where you stand, at whatever is there; with a bow, held: stand firm and draw | `render/keys.gd`  |
+|  | Held with a click: your weapon's own move (a shield bashes) | `render/keys.gd`  |
+|  | A bandage on the cursor: click yourself or an ally | `render/keys.gd`  |
+|  | Say yes to an offer that stands | `render/keys.gd`  |
+|  | Your companion's card | `render/keys.gd`  |
+|  | The town sheet | `render/keys.gd`  |
+|  | The world map | `render/keys.gd`  |
+|  | key_%s=%s | `render/keys.gd` lines() |
+|  | A hall of your own to try fights and tune them (F7 the numbers, F8 slower, F9 pause) | `render/main_menu.gd` _ready() |
+|  | a sealed way | `render/minimap.gd` label_of() |
+|  | A note on the door | `render/note_sheet.gd` TITLE |
+|  | Esc puts it back. | `render/note_sheet.gd` _ready() |
+|  | Camera: low horizon | `render/options_panel.gd` _ready() |
+|  | in full from your next start | `render/options_panel.gd` _ready() |
+|  | Click to move | `render/options_panel.gd` _ready() |
+|  | WASD and aim | `render/options_panel.gd` _ready() |
+|  | Music: psykinetic-theme1 by Jeff, made with Spitfire Audio BBC Symphony Orchestra Discover | `render/options_panel.gd` music_credits() |
+|  | Made with Spitfire Audio BBC Symphony Orchestra Discover | `render/options_panel.gd` music_credits() |
+|  | from your next join | `render/options_panel.gd` _character_block() |
+|  | %d x %d | `render/options_panel.gd` _show_resolution() |
+|  | Every asset and its licence: THIRD_PARTY.md, beside the game. | `render/options_panel.gd` _credits_section() |
+|  | Show all credits | `render/options_panel.gd` _credits_section() |
+|  | "%s" by %s | `render/options_panel.gd` _credits_section() |
+|  | Show all credits | `render/options_panel.gd` toggle_credits() |
+|  | press a key | `render/options_panel.gd` begin_rebind() |
+|  | Everything in your pack (not your hands or armour) into your chest | `render/pack_panel.gd` _ready() |
+|  | carrying %s of %s kg: %s | `render/pack_panel.gd` load_lines() |
+|  | slows the draw and the swing | `render/pack_panel.gd` load_lines() |
+|  | slows the walk and the breath | `render/pack_panel.gd` load_lines() |
+|  | %s %s kg | `render/pack_panel.gd` part_words() |
+|  | %s %s kg: %s (+%d%%) | `render/pack_panel.gd` part_words() |
+|  | charges %d of %d | `render/pack_panel.gd` charges_words() |
+|  | Return to %s. | `render/quest_panel.gd` RETURN_WORDS |
+|  | Shop: nothing for sale | `render/shop_panel.gd` _rebuild() |
+|  | %s %d gold | `render/shop_panel.gd` _rebuild() |
+|  | The town pays: %s (put it in the counter) | `render/shop_panel.gd` _rebuild() |
+|  | The town wants nothing you carry. | `render/shop_panel.gd` _rebuild() |
+|  | %s, %s %s | `render/town_sheet.gd` title_words() |
+|  | Held by %s. | `render/town_sheet.gd` held_words() |
+|  | No one is about. | `render/town_sheet.gd` people_words() |
+|  | %d %s: %s. | `render/town_sheet.gd` people_words() |
+|  | You haven't seen who lives here. | `render/town_sheet.gd` away_words() |
+|  | No town is known here. | `render/town_sheet.gd` none_words() |
+|  | %s, being mended | `render/town_sheet.gd` buildings_words() |
+|  | %s, day %d. | `render/town_sheet.gd` when_words() |
+|  | %s is %s. | `render/town_sheet.gd` economy_lines() |
+|  | Treasury: %d gold. | `render/town_sheet.gd` economy_lines() |
+|  | %s the %s | `render/town_sheet.gd` economy_lines() |
+|  | %d fed by the town | `render/town_sheet.gd` economy_lines() |
+|  | %s seeks %s. | `render/town_sheet.gd` economy_lines() |
+|  | To be %s %s: %s. | `render/town_sheet.gd` economy_lines() |
+|  | Strained %d %s of %d | `render/town_sheet.gd` strain_words() |
+|  | Strained %d %s | `render/town_sheet.gd` strain_words() |
+|  | hunger, the store short of food | `render/town_sheet.gd` strain_words() |
+|  | Settling, %d of %d days calm. | `render/town_sheet.gd` strain_words() |
+|  | Settling, %d %s calm. | `render/town_sheet.gd` strain_words() |
+|  | %d more %s | `render/town_sheet.gd` need_words() |
+|  | %d more %s | `render/town_sheet.gd` need_words() |
+|  | the %s standing | `render/town_sheet.gd` need_words() |
+|  | %s and %s | `render/town_sheet.gd` join_and() |
+|  | numbers, comma-separated | `render/tuning_panel.gd` LIST_HINT |
+|  | Changes apply at once and live in this game only; Save keeps them. | `render/tuning_panel.gd` _ready() |
+|  | Filter the fields | `render/tuning_panel.gd` _fields_tab() |
+|  | Copy to review | `render/tuning_panel.gd` _fields_tab() |
+|  | Spawn at a click | `render/tuning_panel.gd` _arena_tab() |
+|  | Dummy at a click | `render/tuning_panel.gd` _arena_tab() |
+|  | Full hp and stamina | `render/tuning_panel.gd` _arena_tab() |
+|  | Reset the hall | `render/tuning_panel.gd` _arena_tab() |
+|  | Time scale (F8) | `render/tuning_panel.gd` _arena_tab() |
+|  | (new spawns only) | `render/tuning_panel.gd` build_rows() |
+|  | %s (%s, %s's) | `render/tuning_panel.gd` _row_for() |
+|  | %s: not taken (%s) | `render/tuning_panel.gd` set_value() |
+|  | %s: "%s" is not %s | `render/tuning_panel.gd` _typed() |
+|  | Every field back to the repo's value. | `render/tuning_panel.gd` reset_all() |
+|  | Nothing changed to save. | `render/tuning_panel.gd` save() |
+|  | Copied for review: %s | `render/tuning_panel.gd` copy_to_review() |
+|  | Nothing saved to copy. | `render/tuning_panel.gd` copy_to_review() |
+|  | Loaded %s: %d fields | `render/tuning_panel.gd` load_save() |
+|  | %s: not a save | `render/tuning_panel.gd` load_save() |
+|  | Click a cell for the %s (Esc to stop). | `render/tuning_panel.gd` pick() |
+|  | %s at %s | `render/tuning_panel.gd` place() |
+|  | No %s at %s. | `render/tuning_panel.gd` place() |
+|  | The arena's spawns gone. | `render/tuning_panel.gd` clear_arena() |
+|  | Could not give %s. | `render/tuning_panel.gd` give() |
+|  | Full hp and stamina. | `render/tuning_panel.gd` full() |
+|  | time x%s%s | `render/tuning_panel.gd` _show_time() |
+|  | [ui cost] no frames | `render/ui_cost.gd` report() |
+|  | %s %.3f ms/frame (%s) | `render/ui_cost.gd` report() |
+|  | %d%% of frames | `render/ui_cost.gd` report() |
+|  | [ui cost] %d frames: %s; all %.3f ms/frame | `render/ui_cost.gd` report() |
+|  | #9c1f5f | `render/ui_theme.gd`  |
+|  | Fonts: Alegreya and Alegreya Sans by Huerta Tipografica (SIL Open Font License 1.1) | `render/ui_theme.gd` credits() |
+|  | Juan Pablo del Peral, Huerta Tipografica | `render/ui_theme.gd` credits() |
+|  | SIL Open Font License 1.1 | `render/ui_theme.gd` credits() |
+|  | Juan Pablo del Peral, Huerta Tipografica | `render/ui_theme.gd` credits() |
+|  | SIL Open Font License 1.1 | `render/ui_theme.gd` credits() |
+|  | %s knows the way | `render/world_map_panel.gd` knows_words() |
+|  | ask %s to lead you there (Enter: yes, Esc: no) | `render/world_map_panel.gd` ask_words() |
+|  | > %s leads you here | `render/world_map_panel.gd` leads_words() |
+|  | the wagon from %s, bound for %s | `render/world_map_panel.gd` caravan_words() |
+|  | , less than a day out | `render/world_map_panel.gd` caravan_words() |
+|  | , a day out | `render/world_map_panel.gd` caravan_words() |
+|  | , %d days out | `render/world_map_panel.gd` caravan_words() |
+|  | The known world | `render/world_map_panel.gd` _draw() |
+|  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
+|  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
+
+### other (sim) (479)
+
+| | Line | Where |
+|---|---|---|
+|  | eaten by wolves | `sim/balance.gd` eat() |
+|  | put down by someone | `sim/balance.gd` _gone() |
+|  | taken by wolves | `sim/balance.gd` take_sheep() |
+|  | taken by wolves in the night | `sim/balance.gd` night_take() |
+|  | taken by wolves in the night | `sim/balance.gd` _daily() |
+|  | a flock again | `sim/balance.gd` _daily() |
+|  | lambs, the flock regrowing | `sim/balance.gd` _daily() |
+|  | no fold %s where the balance is kept | `sim/balance.gd` ask_now() |
+|  | a breeding pair kept, ewes from town | `sim/balance.gd` _judge() |
+|  | from the farm, the wolves kept off | `sim/balance.gd` _judge() |
+|  | the flock lost to the wolves | `sim/balance.gd` _judge() |
 |  | "%s" in level.json is not a list | `sim/curves.gd` parse() |
 |  | %s %d has too few points: left out | `sim/curves.gd` parse() |
 |  | %s %d has a point that is not [x, y, width]: left out | `sim/curves.gd` parse() |
@@ -883,11 +1073,14 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | won't buy that | `sim/economy.gd` fence_refuses() |
 |  | %s has no use for that | `sim/economy.gd` maker_quote() |
 |  | %s has enough of that | `sim/economy.gd` maker_quote() |
-|  | %s can't pay for it now | `sim/economy.gd` maker_quote() |
 |  | that is no longer for sale | `sim/economy.gd` maker_quote() |
 |  | not enough gold (%d) | `sim/economy.gd` maker_quote() |
+|  | %s has no coin for that today. | `sim/economy.gd` maker_quote() |
 |  | bought %s from a player | `sim/economy.gd` maker_sell() |
 |  | sold %s to %s | `sim/economy.gd` maker_sell() |
+|  | by %s at %s for %d gold | `sim/economy.gd` maker_swap() |
+|  | bought %s from a player | `sim/economy.gd` maker_swap() |
+|  | a trade with %s | `sim/economy.gd` maker_swap() |
 |  | the town won't buy that | `sim/economy.gd` barter_quote() |
 |  | the town has enough of that | `sim/economy.gd` barter_quote() |
 |  | that is no longer for sale | `sim/economy.gd` barter_quote() |
@@ -909,6 +1102,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | bought a %s | `sim/economy.gd` _eat() |
 |  | sold a %s | `sim/economy.gd` _eat() |
 |  | %s bought a %s from %s for %d gold | `sim/economy.gd` _eat() |
+|  | %s ate %s from the store against what the town owed them (%d gold, %d still owed) | `sim/economy.gd` _eat() |
+|  | ate %s from the store on what the town owed | `sim/economy.gd` _eat() |
 |  | %s from the store | `sim/economy.gd` _eat() |
 |  | %s bought %s from the store for %d gold | `sim/economy.gd` _eat() |
 |  | bought %s from the store | `sim/economy.gd` _eat() |
@@ -1080,7 +1275,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s by %s | `sim/stockpile.gd` bank() |
 |  | to the shop | `sim/stockpile.gd` stock_shop() |
 |  | +%d experience: %s | `sim/towns.gd` add_xp() |
-|  | %s, a companion taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
+|  | %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
 |  | %s the %s, taken by %s, is rescued and home | `sim/towns.gd` note_rescue() |
 |  | %s the %s, rescued, is a resident | `sim/towns.gd` note_rescue() |
 |  | %d residents, room for %d: the town is crowded | `sim/towns.gd` note_rescue() |
@@ -1089,14 +1284,15 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | what %s left | `sim/towns.gd` died() |
 |  | %s died of %s | `sim/towns.gd` died() |
 |  | %s is found to have lived here all along | `sim/towns.gd` move_in() |
-|  | %s, a companion, stays and works as a %s | `sim/towns.gd` note_companion_in() |
+|  | %s comes to stay, and works as a %s | `sim/towns.gd` note_companion_in() |
 |  | %s goes adventuring; its work waits | `sim/towns.gd` note_companion_out() |
 |  | what the town owed: %s's own purse, settling | `sim/towns.gd` settle_companion() |
 |  | %s settles in the town for good | `sim/towns.gd` settle_companion() |
 |  | %s comes to be the town's %s | `sim/towns.gd` _appoint() |
 |  | %s comes to be the town's %s | `sim/towns.gd` _appoint() |
-|  | %d experience spent on a %s, level %d | `sim/towns.gd` unlock() |
-|  | the %s stands, level 1, as the map has it | `sim/towns.gd` seed_from() |
+|  | the town sets about building a %s | `sim/towns.gd` unlock() |
+|  | the town raises its %s to the %s stage | `sim/towns.gd` unlock() |
+|  | the %s stands, as it was built | `sim/towns.gd` seed_from() |
 |  | %s is a %s, as the map has it | `sim/towns.gd` _seeded_stage() |
 |  | the town's first stores | `sim/towns.gd` _found() |
 |  | the first stores, for its people | `sim/towns.gd` _larder() |
@@ -1104,8 +1300,8 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | its founding gold, %d, spread over %d residents | `sim/towns.gd` _spread() |
 |  | a roof is mended | `sim/towns.gd` _built() |
 |  | a roof the carpenter came to was whole already | `sim/towns.gd` _built() |
-|  | the %s is repaired, level %d | `sim/towns.gd` _built() |
-|  | the %s stands, level %d | `sim/towns.gd` _built() |
+|  | the %s is repaired, at its %s stage | `sim/towns.gd` _built() |
+|  | the %s stands at its %s stage | `sim/towns.gd` _built() |
 |  | %s the %s waits for a %s | `sim/towns.gd` _seat() |
 |  | %s the %s works at %s | `sim/towns.gd` _seat() |
 |  | the %s is to be repaired | `sim/towns.gd` _repair() |
@@ -1151,7 +1347,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the %s's upkeep | `sim/towns.gd` _upkeep_turn() |
 |  | the ruin of the %s is gone; the wild takes the ground back | `sim/towns.gd` _neglect_turn() |
 |  | the %s is a ruin | `sim/towns.gd` _neglect_turn() |
-|  | the %s, in disrepair, is down to level %d | `sim/towns.gd` _neglect_turn() |
+|  | the %s, in disrepair, crumbles back to its %s stage | `sim/towns.gd` _neglect_turn() |
 |  | the %s has fallen into disrepair | `sim/towns.gd` _neglect_turn() |
 |  | %s falls back to a %s: %s | `sim/towns.gd` _strain_turn() |
 |  | too few people (%d of %d) | `sim/towns.gd` _falling() |
@@ -1161,7 +1357,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | the well has water again | `sim/towns.gd` _water() |
 |  | a roof broken by the storm is to be mended (%d wood) | `sim/towns.gd` _roof() |
 |  | the only %s | `sim/towns.gd` sole_needed() |
-|  | %s, a companion, is held by %s (%s) | `sim/towns.gd` carried_home() |
+|  | %s is held by %s | `sim/towns.gd` carried_home() |
 |  | a raid by %s (%.1f) is fought off (defence %.1f) | `sim/towns.gd` raid_arrives() |
 |  | by %s (%s) from %s | `sim/towns.gd` raid_arrives() |
 |  | a raid by %s (%.1f against %.1f) took %s%s%s | `sim/towns.gd` raid_arrives() |
@@ -1265,6 +1461,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | that is no longer in your pack | `sim/world.gd` try_barter() |
 |  | the prices have moved | `sim/world.gd` try_barter() |
 |  | no room to carry it | `sim/world.gd` try_barter() |
+|  | %s has no coin for that today. | `sim/world.gd` try_barter() |
 |  | the ground at %d,%d | `sim/world.gd` _bank_ground() |
 |  | on the ground by %s | `sim/world.gd` _pick_unit() |
 |  | %s@%d,%d | `sim/world.gd` put_on_ground() |
@@ -1449,7 +1646,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s is %s's %s. | `sim/resident_card.gd` kin_facts() |
 |  | %s bears a grudge against %s %s. | `sim/resident_card.gd` grudge_fact() |
 
-### server and windows (556)
+### server and windows (592)
 
 | | Line | Where |
 |---|---|---|
@@ -1517,6 +1714,10 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | The ways have shifted since you were last here. | `main.gd` _join_player() |
 |  | Nobody in town is on the dole now. | `main.gd` _on_dole_changed() |
 |  | %d in town %s on the dole (fed by the town, or hungry): its kitchen works for food first. | `main.gd` _on_dole_changed() |
+|  | %s and %s | `main.gd` _on_balance_zone_judged() |
+|  | meat brought home off his hill | `main.gd` _balance_settle() |
+|  | meat left lying on his hill | `main.gd` _balance_settle() |
+|  | kept the wolves off his flock | `main.gd` _balance_thank() |
 |  | someone was hurt | `main.gd` _tell_bandage_broke() |
 |  | a monster came near | `main.gd` _tell_bandage_broke() |
 |  | Your bandaging broke off: %s. | `main.gd` _tell_bandage_broke() |
@@ -1527,6 +1728,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | You can't bandage %s: you have no bandaging kit. | `main.gd` _tell_bandage_broke() |
 |  | You can't bandage %s: give it a breath after that blow. | `main.gd` _tell_bandage_broke() |
 |  | You can't bandage %s: a monster is too near. | `main.gd` _tell_bandage_broke() |
+|  | %s\|%s\|%d | `main.gd` _empty_shelf_told() |
 |  | he keeps no hut | `main.gd` retain() |
 |  | too far away | `main.gd` retain() |
 |  | already in his care | `main.gd` retain() |
@@ -1623,6 +1825,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | Raiders beat %s down and carried them off. | `main.gd` _resident_taken() |
 |  | %s was beaten down and carried off by raiders in %s. | `main.gd` _companion_taken_in_town() |
 |  | Raiders carried %s off from %s. | `main.gd` _companion_taken_in_town() |
+|  | %s said: "%s" | `main.gd` _all_clear() |
+|  | %s will not open up now. | `main.gd` _threat_told() |
+|  | %s will not open up now. | `main.gd` _threat_told() |
 |  | %s found you %s and is leading you to %s. | `main.gd` _sought_spoken() |
 |  | %s brought you to %s, where you live and work now. | `main.gd` _sought_home() |
 |  | I am the %s you sent for. | `main.gd` _sought_home() |
@@ -1695,7 +1900,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s said: "%s" | `main.gd` _on_companion_said() |
 |  | A newer game, v%s, is out: start the game again with launch.bat to update. | `main.gd` _on_message() |
 |  | They are too far away. | `main.gd` give_gold() |
-|  | You can only give gold to another player or your own companion. | `main.gd` give_gold() |
+|  | You can give gold only to a fellow traveller or to the one who goes with you. | `main.gd` give_gold() |
 |  | They are too far away. | `main.gd` give_gold() |
 |  | Say how much. | `main.gd` give_gold() |
 |  | %s %d gold. | `main.gd` give_gold() |
@@ -1787,6 +1992,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | sister or brother | `main.gd` _place_captive() |
 |  | parent and child | `main.gd` _place_captive() |
 |  | , %s of %s | `main.gd` _place_captive() |
+|  | left %s in old age | `main.gd` _healer_leaves() |
 |  | %s has fallen in; until it stands again you will wake at the temple, or wherever is nearest. | `main.gd` _on_hut_changed() |
 | L | The healer's hut | `main.gd` _on_hut_changed() |
 | L | the healer's hut | `main.gd` _on_returned() |
@@ -1835,14 +2041,16 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | %s\tsay yes to an offer that stands (or type it) | `main.gd` hint_lines() |
 |  | %s\thide these | `main.gd` hint_lines() |
 |  | %s\tbuilder mode | `main.gd` hint_lines() |
-|  | Following %s - move to take the lead | `main.gd` led_words() |
-|  | Following %s to %s - move to take the lead | `main.gd` led_words() |
+|  | Following %s: move to take the lead | `main.gd` led_words() |
+|  | Following %s to %s: move to take the lead | `main.gd` led_words() |
 |  | Nothing more here. | `main.gd` search() |
 |  | You find in %s: %s. | `main.gd` search() |
 | L | Locked fast. The big one, Brand the Ox, wears its key. | `main.gd` CAMP_LOCKED |
 | L | Empty. You have taken what the Mound-breakers hid here. | `main.gd` CAMP_EMPTY |
 |  | the robbers' camp chest | `main.gd` _search_camp() |
 |  | Brand's key turns in the lock. You find %d gold in %s. | `main.gd` _search_camp() |
+|  | You pick up | `main.gd` _item_command() |
+|  | Your pack is full. | `main.gd` _item_command() |
 |  | Picked up %d gold. | `main.gd` _item_command() |
 |  | into gold (601 amended) | `main.gd` _restore_ground() |
 |  | %s@%d,%d | `main.gd` _restore_ground() |
@@ -1925,6 +2133,9 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | zone reset <name>: that zone rebuilt from its map | `main.gd` _resend_offers() |
 |  | zone move <player> <zone>: that player and their companion to that zone's start | `main.gd` _resend_offers() |
 |  | gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said) | `main.gd` _resend_offers() |
+|  | herds [seed <area>\|all]: each area's game, seeded or its ground still building; or seeded now | `main.gd` _resend_offers() |
+|  | balance [ask <fold>]: the keep-the-balance areas' deer, wolves and folds, each quest and its outcome if judged now; or a fold's quest asked now | `main.gd` _resend_offers() |
+|  | makers [<town or trade>]: each maker's trade, place and the goods of their own make on their town's shelf, by count (no names) | `main.gd` _resend_offers() |
 |  | move <player> <x> <y> [zone] \| move <player> <building code> [zone]: a player to a cell | `main.gd` _resend_offers() |
 |  | mark <player> <mark>\|-<mark>: a mark on a player, or one taken off | `main.gd` _resend_offers() |
 |  | reset: this room rebuilt from its map | `main.gd` _resend_offers() |
@@ -1970,6 +2181,28 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | v%s protocol %s | `main.gd` admin_command() |
 |  | %s rtt %d ms | `main.gd` admin_command() |
 |  | unknown command %s (try help) | `main.gd` admin_command() |
+|  | no production here (the server keeps it) | `main.gd` _makers_command() |
+|  | %s at %s | `main.gd` _makers_command() |
+|  | nothing on the shelf | `main.gd` _makers_command() |
+|  | %s%s: %s | `main.gd` _makers_command() |
+|  | %s: shelf %s; store %s | `main.gd` _makers_command() |
+|  | no makers%s | `main.gd` _makers_command() |
+|  | %s x%d | `main.gd` _counted() |
+|  | usage: herds seed <area>\|all | `main.gd` _herds_command() |
+|  | no area %s | `main.gd` _herds_command() |
+|  | %s: seeded before | `main.gd` _herds_command() |
+|  | %s: seeded now, %d groups | `main.gd` _herds_command() |
+|  | (ground %d%% built) | `main.gd` _herds_command() |
+|  | %s: %s, %d groups%s | `main.gd` _herds_command() |
+|  | herds: no areas | `main.gd` _herds_command() |
+|  | usage: balance ask <fold> | `main.gd` _balance_command() |
+|  | %s: asked now | `main.gd` _balance_command() |
+|  | balance: no area keeps it | `main.gd` _balance_command() |
+|  | %s: deer %.0f of room %.0f, wolves %.1f of room %.1f (calm %.1f), meat lying %d, hunger %.2f | `main.gd` _balance_command() |
+|  | quest: %d days left, wolves at the ask %.1f, lost %d, left lying %d, home %d; %s if judged now | `main.gd` _balance_command() |
+|  | ; by players: %d brought meat home, %d left it lying | `main.gd` _balance_command() |
+|  | ; regrowing to %d | `main.gd` _balance_command() |
+|  | fold %s (town %s): %d sheep, %s | `main.gd` _balance_command() |
 |  | usage: gold <player or id prefix> <amount> [why] | `main.gd` _gold_command() |
 |  | gold: the amount must be above 0 (gold is only ever given here) | `main.gd` _gold_command() |
 |  | gold: no economy | `main.gd` _gold_command() |
@@ -2189,7 +2422,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (460)
+## Lines in the data (531)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -2322,11 +2555,14 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | {player} was lost in a forest and {pronoun} knew the way out | `how_we_met[6]` |
 |  | they were hired for the same job and the employer never paid either of them | `how_we_met[7]` |
 
-### levels/economy.json (3)
+### levels/economy.json (6)
 
 | | Line | Key |
 |---|---|---|
 |  | the medicine man buys herbs | `maker_only.herbs` |
+|  | %s the woodcutter comes to keep the town in wood | `gatherers.woodcutter` |
+|  | %s the hunter comes to keep the town in meat and hides | `gatherers.hunter` |
+|  | %s the carpenter comes to raise the town's sheds and workshops | `gatherers.carpenter` |
 |  | a bed at the inn | `folk.needs.bed.what` |
 |  | work on their tools | `folk.needs.tools.what` |
 
@@ -2464,11 +2700,79 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | what do you have | `offers.asks.wares[5]` |
 |  | anything i can do | `offers.asks.work[5]` |
 
-### levels/townsfolk.json (32)
+### levels/townsfolk.json (100)
 
 | | Line | Key |
 |---|---|---|
 |  | %s sleeps and does not stir. | `asleep[2]` |
+|  | You there. The wolves are at my sheep. | `balance.hail[0]` |
+|  | Wolves on the hill again, and my sheep with them. | `balance.hail[1]` |
+|  | Mind yourself up there; the wolves are at my fold. | `balance.hail[2]` |
+|  | Wolves are taking my sheep, and it's the deer that draw them. Thin the deer, and carry the meat down to the town's store. Leave it lying and you'll only bring more wolves. | `balance.ask[0]` |
+|  | The deer bring the wolves, and the wolves take my sheep. Put a few deer down and bring the meat home to the store; meat left on the hill feeds them. | `balance.ask[1]` |
+|  | Too many deer on the hill, so too many wolves. Bring some down, and take the meat to the town's store. Don't leave it lying; they come for that too. | `balance.ask[2]` |
+|  | I had {had}. I've {left} left. | `balance.flock_some[0]` |
+|  | I count {left} of {had} now. | `balance.flock_some[1]` |
+|  | Of {had} sheep, I've {left} left. | `balance.flock_some[2]` |
+|  | Half my flock's gone, and more. | `balance.flock_half[0]` |
+|  | Most of my sheep are gone. | `balance.flock_half[1]` |
+|  | There's hardly a flock left to count. | `balance.flock_half[2]` |
+|  | The flock will hold {days} more, no longer. | `balance.days[0]` |
+|  | In {days} I'll know how it's gone. | `balance.days[1]` |
+|  | You've {days} more before they've had the lot. | `balance.days[2]` |
+|  | This is the last day. By tomorrow we'll know. | `balance.days_last[0]` |
+|  | It ends tonight, one way or the other. | `balance.days_last[1]` |
+|  | Last day. Whatever's done, it's done by dark. | `balance.days_last[2]` |
+|  | You left a carcass to rot on my hill. The wolves thank you for it. | `balance.grudge[0]` |
+|  | That deer you left lying? The wolves found it, and then my sheep. | `balance.grudge[1]` |
+|  | You put a deer down and left it there. That's more wolves at my fold. | `balance.grudge[2]` |
+|  | Few left, but the wolves have gone. We'll build it back. | `balance.balanced_few[0]` |
+|  | A pair's enough to start again, now the wolves have drawn off. | `balance.balanced_few[1]` |
+|  | Not much of a flock, but it's safe now. It'll grow back, a lamb at a time. | `balance.balanced_few[2]` |
+|  | The flock holds. There'll be lambs soon. Thank you. | `balance.balanced[0]` |
+|  | Fewer wolves, and the sheep have settled. Lambs coming, too. | `balance.balanced[1]` |
+|  | You kept it right. The flock's whole, and lambing. | `balance.balanced[2]` |
+|  | It didn't hold. The flock's gone; give me a few days. | `balance.off[0]` |
+|  | Not a sheep left. It'll be a few days before I've a flock again. | `balance.off[1]` |
+|  | Gone, all of them. I'll start again in a few days. | `balance.off[2]` |
+|  | The flock's gone, and the wolves won't stop at my fold. Bar your doors tonight. | `balance.badly[0]` |
+|  | They've had every sheep. Now they'll come down to the town after dark. | `balance.badly[1]` |
+|  | All gone. The wolves are fat and bold now, and the town is next. | `balance.badly[2]` |
+|  | The flocks of %s hold; the wolves have drawn off. | `balance.party_zone.balanced` |
+|  | The flocks of %s are lost. | `balance.party_zone.off` |
+|  | The flocks of %s are lost to the wolves, and they are coming to the town by night. | `balance.party_zone.badly` |
+|  | %s's flock holds; the wolves have drawn off. | `balance.party.balanced` |
+|  | %s's flock is lost. | `balance.party.off` |
+|  | %s's flock is lost to the wolves, and they are coming to the town by night. | `balance.party.badly` |
+|  | %s will not open up with wolves in the lanes. | `threat.refused.wolves[0]` |
+|  | %s keeps the door shut while wolves are in the lanes. | `threat.refused.wolves[1]` |
+|  | %s stays behind a barred door until the wolves are gone. | `threat.refused.wolves[2]` |
+|  | %s will not open up with raiders in the town. | `threat.refused.raid[0]` |
+|  | %s keeps the door barred while raiders are in the town. | `threat.refused.raid[1]` |
+|  | %s stays behind a barred door until the raiders are gone. | `threat.refused.raid[2]` |
+|  | Wolves in the lanes. Come back when they're gone. | `threat.sheltering.wolves[0]` |
+|  | Not now; there are wolves about. | `threat.sheltering.wolves[1]` |
+|  | Wolves about. Get yourself indoors. | `threat.sheltering.wolves[2]` |
+|  | Raiders about. Not now, not with them out there. | `threat.sheltering.raid[0]` |
+|  | Keep your voice down; there are raiders in the town. | `threat.sheltering.raid[1]` |
+|  | Not now. Come back when the raiders have gone. | `threat.sheltering.raid[2]` |
+|  | They're gone. Back to it. | `threat.all_clear.wolves[0]` |
+|  | The wolves have gone. Back to work. | `threat.all_clear.wolves[1]` |
+|  | No more wolves. Out you come. | `threat.all_clear.wolves[2]` |
+|  | They've gone. Open up, everyone. | `threat.all_clear.raid[0]` |
+|  | The raiders have gone. Open the shutters. | `threat.all_clear.raid[1]` |
+|  | They're gone. Out you come, all of you. | `threat.all_clear.raid[2]` |
+|  | %s the healer has left the hut in the wilds for good, too old now to live so far from town. | `healer_left.heard` |
+|  | %s has left the healer's hut for good. It stands empty, but while it stands you will still wake there. | `healer_left.told` |
+|  | Nothing brewed. Bring me herbs and come back tomorrow. | `empty_shelf.potions[0]` |
+|  | The pots are empty. I need herbs before I can brew. | `empty_shelf.potions[1]` |
+|  | I've nothing ready. Herbs, that's what I'm short of. | `empty_shelf.potions[2]` |
+|  | Nothing on the rack. Bring me iron and come back tomorrow. | `empty_shelf.smithed[0]` |
+|  | I've no iron to work, so there's nothing made. | `empty_shelf.smithed[1]` |
+|  | The forge is cold for want of ore. Bring some and I'll get to it. | `empty_shelf.smithed[2]` |
+|  | Nothing made just now. Come back tomorrow. | `empty_shelf.default[0]` |
+|  | I've nothing ready for you yet. | `empty_shelf.default[1]` |
+|  | The shelf's bare. Give me time. | `empty_shelf.default[2]` |
 |  | You're in my care; fall where you will, I'll see to you. | `greet.care` |
 |  | Good to see you. | `greet.standing.trusted` |
 |  | Herbs, if you have any; the town is short of them. | `greet.trades.medicine_man[1]` |
@@ -2511,7 +2815,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Behind the castle as seen from the town (Jeff's "perhaps"): beyond the castle and the foothills, away from the wilds; the foothills' river comes down from it (decision 745). | `places[3].about` |
 | L | the Blood Rot's land | `regions[0].name` |
 |  | The whole region (lore). Its own name is Jeff's open A1. | `regions[0].about` |
-|  | Where Umbrage sits (Jeff: "Held sit in the Woodlands", before he named the town Umbrage; draft until his wording check): the wilds, Umbrage's map (held) south of it on the river, the forest west and the hills east (decision 743, layout A). | `regions[1].about` |
+|  | Where Umbrage sits (Jeff: "Held sit in the Woodlands", before he named the town Umbrage; draft until his wording check): the wilds, Umbrage's map (held) south of it on the river, the forest west and the hills east (decision 743, layout A; 756 and 760 grew the hills and the forest to 224). | `regions[1].about` |
 
 ### levels/lore/creatures.json (20)
 

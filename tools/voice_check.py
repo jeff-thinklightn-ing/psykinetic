@@ -41,7 +41,8 @@ SYSTEM_CONTEXT = re.compile(
 SYSTEM_TEXT = re.compile(r"\b(launch\.bat|press|click|settings\.cfg|screenshot|restart|reconnect|F\d+)\b", re.I)
 # Debug, tool and file-check text a player never reads.
 CHECK_SKIP_FILES = {"entities/entity_factory.gd", "sim/curves.gd", "sim/relief.gd", "sim/world_map.gd",
-                    "sim/world_routes.gd", "sim/tuning.gd", "client3d/sound_kit.gd"}
+                    "sim/world_routes.gd", "sim/tuning.gd", "client3d/sound_kit.gd",
+                    "render/admin_panel.gd", "render/tuning_panel.gd"}
 # Data keys that are prompts or rules, not lines.
 DATA_SKIP = re.compile(r"(summary|words|voice|look_words|asks\.|kinds\[|_about)", re.I)
 
@@ -76,8 +77,8 @@ def problems(text):
     return out
 
 
-# Captions live in the windows and the HUD; elsewhere a "what you..." is a prompt fragment.
-GLOSS_DIRS = {"client", "client3d"}
+# Captions live in the windows and the HUD (render/, client/, client3d/); elsewhere a "what you..." is a prompt fragment.
+GLOSS_DIRS = {"client", "client3d", "render"}
 GLOSS_KEYS = re.compile(r"(caption|subtitle|legend|desc|blurb|hint|label|title)", re.I)
 
 

@@ -55,7 +55,7 @@ speech that means:
   | Not | But |
   |---|---|
   | kill, defeat (of people) | put down [Jeff], fall, lay to rest |
-  | respawn, resurrect | brought back, wake, rise, walk again |
+  | respawn, resurrect | brought back, wake, rise, walk again (the down screen's "Bleed Out (Respawn)" is Jeff's [Jeff] and stays) |
   | dungeon, level | the barrow, below, the halls, the stone places |
   | boss | by name or kind: the draugr, Brand the Ox |
   | quest, mission | a task, a job, what was asked |

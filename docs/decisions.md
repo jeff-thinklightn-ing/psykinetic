@@ -38128,6 +38128,15 @@ apart and never reworded without asking him. Exit 0 always; not in land.sh. Its 
 lines, one of them Jeff's (the draugr's "by force!").
 Tools only, protocol unchanged, no new class_name.
 
+748 amended (5), voice's side (2026-11-02): the inventory and the check scan render/, where the
+windows moved (found after ui's 765); before this they missed every window's text. The check skips
+render/admin_panel.gd and render/tuning_panel.gd (developer panels), and flags explaining glosses
+in render/ as in client/ (Jeff's no-gloss rule). docs/voice.md marks the down screen's "Bleed Out
+(Respawn)" as Jeff's (587), so the check lists it apart. First run over render/: three card-page
+headings flagged as glosses ("What she has learned", "How she fights", "How she feels about you");
+the coordinator approved "Learned", "Fighting", "Regard" and sent them to ui.
+Tools only, protocol unchanged, no new class_name.
+
 ## 757. The Dwarven Halls' chests: dwarven_hoard
 
 castle_halls' three chests (its template's "chests": 3, decision 649's note: "the chests' loot the
