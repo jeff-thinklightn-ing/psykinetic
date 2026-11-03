@@ -39840,6 +39840,20 @@ handler only; enemy-ai adds "wave" to MESSAGE_KINDS with its send. sound_kit_tes
 unknown one silent; the slots' reach and takes) and view_test (_test_far_cry: a cue at its cell).
 No bullet: no real town has posts yet. Client only, protocol unchanged, no new class_name.
 
+771 amended (2): the waves, enemy-ai's side. World.raids.wave(town, post, kind, size) -> id, for npc's
+watch: a wave of WAVE_KINDS' kind (wolves, dead, raiders; npc's kind -> monster kinds by weight; the
+draugr, a boss, never), at most WAVE_MOST 8, comes in out of every player's sight (past VIEW_TILES) at
+most WAVE_OUT_TILES 70 out along the post's spoke (the line from the town's ground through the post),
+WAVE_SIDE_TILES 10 either side, marches on the post, fights whoever stands it, and goes on to the town's
+ground. Its signals for npc: wave_beaten (every one dead or running: the watch is paid), wave_broke (the
+first of it on the town's ground: npc raises 762's threat; it fights on there WAVE_STAY_TICKS 10 min),
+wave_faded (its zone asleep or reset, WAVE_MAX_TICKS 15 min unbroken, or the stay over); waves_at(town).
+A wave's wolves are bold and go for the watch, not the deer (Animal, its raid). Its cue: Raids.wave_coming as it
+spawns and again when its leader is halfway in; Main sends "wave" {kind, cell} to the players on the level
+within CUE_REACH 64 of the post (771 amended's handler plays it). Never saved: a restart ends a wave.
+monster_test _test_watch_wave. Protocol: the "wave" kind, a "47 (771 amended (2)):" line under rev 47;
+no new class_name; no bullet (no real town has posts yet).
+
 ## 776, companions' side: she knows a ford for shallow water
 
 776 makes the hills' streams fords: floor, so World.is_water is false on them, and a companion's

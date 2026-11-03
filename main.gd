@@ -4082,6 +4082,9 @@ func _boot() -> void:
 		World.tracks_changed.connect(_on_tracks_changed)
 	if not World.far_cry.is_connected(_on_far_cry):
 		World.far_cry.connect(_on_far_cry)
+	# A night watch's wave on its way (decision 771): its cue.
+	if not World.raids.wave_coming.is_connected(_on_wave_coming):
+		World.raids.wave_coming.connect(_on_wave_coming)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -6108,6 +6111,15 @@ func _on_far_cry(source: GridEntity, cry: StringName, reach: int) -> void:
 		var player: Player = _players.get(peer)
 		if peer not in seeing and is_instance_valid(player) and World.distance(player.tile, source.tile) <= reach:
 			Net.message_to(peer, "far_cry", {"creature": creature, "cry": str(cry), "cell": [source.tile.x, source.tile.y]})
+## Server: a night watch's wave of [param kind] is coming in [param area]
+## (Raids.wave_coming, decision 771): the players there within
+## Raids.CUE_REACH of its post hear it from [param cell] ("wave" {kind,
+## cell: [x, y]}; sound plays the kind's howls, horn or moan).
+func _on_wave_coming(_id: String, area: String, kind: String, cell: Vector2i, post: Vector2i) -> void:
+	for peer in World.peers_in(area):
+		var player: Player = _players.get(peer)
+		if is_instance_valid(player) and World.distance(player.tile, post) <= Raids.CUE_REACH:
+			Net.message_to(peer, "wave", {"kind": kind, "cell": [cell.x, cell.y]})
 
 
 ## Server: tall grass of [param level] was trampled or stood again
