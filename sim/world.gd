@@ -764,6 +764,9 @@ signal telegraph_ended(id: int, landed: bool)
 ## As telegraph_ended, with the zone it showed in (Main tells that zone).
 signal telegraph_ended_in(zone_name: String, id: int, landed: bool)
 signal stepped
+## [param player]'s arts' marks changed (766 amended; World.art_marks): Main
+## tells that player alone ("arts" message), for ui's practice bar. Server only.
+signal arts_marked(player: Player, marks: Dictionary)
 ## So many steps, all zones together.
 var steps := 0
 ## Server: who holds which place (Holdings), the world tick's to change;
@@ -2813,6 +2816,7 @@ func practise(entity: GridEntity, art: String, deed: float) -> void:
 		var was := float(cold["m"])
 		cold["m"] = maxf(0.0, was - gain * ART_COOL * float(other_shape["fade"]))
 		_art_moved(player, other, was)
+	_mark_arts(player)  # Told if its peak or fading changed (766 amended).
 
 
 ## The ticks an art stays warm unused, by its [param shape] (art_shape).
@@ -2833,6 +2837,8 @@ func _tend_arts() -> void:
 			var own: Dictionary = player.arts[art]
 			own["quiet"] = int(own["quiet"]) + 1
 			var shape := art_shape(player, art)
+			if int(own["quiet"]) == art_grace_ticks(shape) + 1:
+				_mark_arts(player)  # Fading from now (766 amended).
 			if int(own["quiet"]) > art_grace_ticks(shape) and float(own["m"]) > 0.0:
 				var was := float(own["m"])
 				own["m"] = maxf(0.0, was - was * ART_IDLE * float(shape["fade"]) / (60.0 * TICK_RATE))
@@ -2862,6 +2868,30 @@ func set_arts(player: Player, saved: Variant) -> void:
 	for art: String in player.arts:
 		feel[art] = snappedf(float(player.arts[art]["m"]), 0.01)
 	player.art_feel = feel
+	_mark_arts(player, true)
+
+
+## [param player]'s arts' marks (766 amended), for ui's practice bar:
+## {art: [its peak to the hundredth, fading: quiet past its grace, so its
+## memory is falling]}. The fill is art_feel.
+func art_marks(player: Player) -> Dictionary:
+	var marks := {}
+	for art: String in player.arts:
+		var own: Dictionary = player.arts[art]
+		marks[art] = [snappedf(float(own["peak"]), 0.01), int(own["quiet"]) > art_grace_ticks(art_shape(player, art))]
+	return marks
+
+
+## arts_marked for [param player] when its marks differ from those last told
+## (or always, [param force]: a spawn, set_arts). Server only.
+func _mark_arts(player: Player, force := false) -> void:
+	if not Net.is_authority():
+		return
+	var marks := art_marks(player)
+	if not force and marks == player.arts_told:
+		return
+	player.arts_told = marks
+	arts_marked.emit(player, marks)
 
 
 ## [param player]'s [param art] moved from [param was] (766): its felt

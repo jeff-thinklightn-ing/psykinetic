@@ -39199,6 +39199,21 @@ one ERROR and ignored, so a stray flag never sets a real player's arts on
 the box. _parse_args takes an optional argument list, for a test.
 record_keys_test _test_arts_flag (both forms, held at 1). Test flag only:
 protocol unchanged, no new class_name, no CHANGELOG bullet.
+
+766 amended: the practice bar's marks, told to their own player alone
+(release's label; ui's mock, the coordinator's OK). ui draws a thin bar
+under a sword or bow in the pack, filled to art_feel, with the art's peak
+as a faint notch and the fill dimmed while it fades. The peak and the
+fading were never sent. World.art_marks(player): {art: [peak to the
+hundredth, fading: quiet past its grace]}; World.arts_marked when they
+differ from Player.arts_told (server only), checked at each deed, when an
+art's quiet passes its grace, and always at set_arts (a spawn). Main tells
+that player alone with Net.message_to, the "arts" message kind, so nobody
+is sent another's practice (the coordinator's ask); art_feel is unchanged.
+combat_test _test_arts_marks (told on a change only; the peak to the
+hundredth; fading past the grace, told once; cleared by the next deed).
+Protocol revision 47 (the "arts" kind, shared with others in 47); no
+record change, no new class_name; the bullet comes with ui's bar.
 ## 767. Every town's gatherers: a woodcutter and a hunter, seated once
 
 Jeff: "yes add gatherers to each town" (decisions/town-gatherers.md); the coordinator approved the

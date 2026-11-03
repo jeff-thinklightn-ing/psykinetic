@@ -4031,6 +4031,8 @@ func _boot() -> void:
 	World.blood_from_dict(snapshot["blood"] if snapshot.get("blood") is Dictionary else {})
 	if not World.blood_changed.is_connected(_on_blood_changed):
 		World.blood_changed.connect(_on_blood_changed)
+	if not World.arts_marked.is_connected(_on_arts_marked):
+		World.arts_marked.connect(_on_arts_marked)  # 766 amended.
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -20221,6 +20223,14 @@ func _run_test_die_travel(tick: int) -> void:
 	World.despawn(player)  # Its death: _on_entity_despawned.
 	travel(peer, to)
 	print("[test] %s died and was brought back in %s" % [who, to])
+
+
+## [param player]'s arts' marks changed (World.arts_marked, 766 amended): told
+## to that player alone, never another ("arts" {art: [peak, fading]}), for
+## ui's practice bar; the fill is the replicated art_feel. Server.
+func _on_arts_marked(player: Player, marks: Dictionary) -> void:
+	if player.owner_peer != 0:
+		Net.message_to(player.owner_peer, "arts", marks)
 
 
 ## --test-arts (766): [param player]'s arts set as given (swordplay:1,bow:0.5),

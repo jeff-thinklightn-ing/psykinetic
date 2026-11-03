@@ -56,6 +56,7 @@ func _ready() -> void:
 	_test_sledge_recover()
 	_test_sword_lead()
 	_test_weapon_memory()
+	_test_arts_marks()
 	_test_lob_aim_on_client()
 	_test_armour()
 
@@ -556,6 +557,38 @@ func _test_sledge_recover() -> void:
 ## times as fast back to their peak, cool as another art is used once past
 ## their grace, fade slowly idle; felt in the sword's cycle and parry arc
 ## and the bow's draw and cone, never its damage.
+## The arts' marks (766 amended): told on a change only, the peak to the
+## hundredth, fading once quiet past the grace and not at the next deed.
+func _test_arts_marks() -> void:
+	print("
+== weapon memory's marks: the peak and fading, told on a change (766 amended) ==")
+	var e := _build(["#######", "#.P...#", "#######"])
+	var host: Player = e["P"][0]
+	var told: Array = []
+	var on_marks := func(player: Player, marks: Dictionary) -> void:
+		if player == host:
+			told.append(marks.duplicate(true))
+	World.arts_marked.connect(on_marks)
+	World.set_arts(host, {})
+	_check(told.size() == 1 and told[0] == {}, "set_arts tells the marks, none yet (%s)" % [told])
+	World.practise(host, "swordplay", World.ART_DEED_BLOW)
+	_check(told.size() == 2 and told[1] == {"swordplay": [0.01, false]}, "a first deed: peak 0.01, not fading (%s)" % [told.back()])
+	World.practise(host, "swordplay", World.ART_DEED_BLOW * 0.1)
+	_check(told.size() == 2, "a deed that moves the peak under a hundredth tells nothing (%d told)" % told.size())
+	var grace := World.art_grace_ticks(World.art_shape(host, "swordplay"))
+	host.arts["swordplay"]["quiet"] = grace - 1
+	World._tend_arts()
+	_check(told.size() == 2, "quiet to its grace: not fading yet")
+	World._tend_arts()
+	_check(told.size() == 3 and told[2]["swordplay"][1] == true, "quiet past its grace: fading (%s)" % [told.back()])
+	World._tend_arts()
+	_check(told.size() == 3, "told once, not every tick it fades")
+	World.practise(host, "swordplay", World.ART_DEED_BLOW)
+	_check(told.size() == 4 and told[3]["swordplay"][1] == false, "the next deed: no longer fading (%s)" % [told.back()])
+	World.arts_marked.disconnect(on_marks)
+	World.set_arts(host, {})
+
+
 func _test_weapon_memory() -> void:
 	print("\n== weapon memory: swordplay and the bow fill with use and cool with another (766) ==")
 	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])

@@ -101,6 +101,9 @@ var arts: Dictionary = {}
 ## none), replicated so a client draws the bow's pull and cone, and
 ## predicts the sword's cycle, as the server reckons them (World.art_feel).
 var art_feel: Dictionary = {}
+## The arts' marks last told to this player (World.art_marks; 766 amended):
+## so they are told only on a change. Server only, not replicated.
+var arts_told: Dictionary = {}
 
 
 func _init() -> void:
