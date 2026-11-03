@@ -90,6 +90,7 @@ func _ready() -> void:
 	_test_bodies_only_near()  # Last: its resident would answer the voice tests.
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
+	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -972,6 +973,109 @@ func _test_threat() -> void:
 	World.towns.lift_threat(STORE)
 	World.production.set_away("rs-gunn", true)
 	World.production.set_away("rs-bram", true)
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(12.0)
+
+
+## Whether [param told] holds a [param kind] message whose text is one of [param texts].
+func _told_any(told: Array[Dictionary], kind: String, texts: Array) -> bool:
+	for each: Dictionary in told:
+		if each["kind"] == kind and str(each["data"].get("text", "")) in texts:
+			return true
+	return false
+
+
+## The night watch (decision 771, phase 1): the guard captain offers a post
+## at dusk; the one who takes it stands it till dawn and is paid from the
+## treasury (what it has); one who leaves it is told, unpaid.
+func _test_watch() -> void:
+	print("\n== the night watch: the captain's post at dusk, stood till dawn, paid (decision 771) ==")
+	var player := _player()
+	if player == null or World.economy == null:
+		_check(false, "(a player and the economy)")
+		return
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.towns.lift_threat(STORE)
+	DayNight.set_hour(19.0)
+	World.towns.note_rescue(STORE, "rs-gunn", "Gunn", "guard")
+	World.production.set_away("rs-gunn", false)
+	_sync()
+	var gunn := _body("rs-gunn")
+	_check(gunn != null and _main._watch_captain(STORE) == "rs-gunn", "(Gunn the guard is the town's captain)")
+	if gunn == null:
+		return
+	var post_cell: Vector2i = _main._nearest_free(gunn.tile + Vector2i(8, 0))
+	var post_rect := Rect2i(post_cell - Vector2i.ONE, Vector2i(3, 3))  # On the room's floor, off Gunn.
+	_main.watch_posts[STORE] = [{"id": "rs-post-a", "rect": post_rect, "name": "the test post"}]
+	var told: Array[Dictionary] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind in ["party", "speech"]:
+			told.append({"kind": kind, "data": data})
+	Net.message_received.connect(heard)
+	_put(player, _main._nearest_free(gunn.tile + Vector2i(1, 0)))
+	var offer := {}
+	for each: Dictionary in Offers.of("rs-gunn", player.player_id):
+		if str(each.get("kind", "")) == Offers.WATCH:
+			offer = each
+	_check(not offer.is_empty() and "the test post" in str(offer.get("words", "")), "at dusk the captain offers a post (%s)" % [offer])
+	DayNight.set_hour(12.0)
+	_check(Offers.of("rs-gunn", player.player_id).all(func(each: Dictionary) -> bool: return str(each.get("kind", "")) != Offers.WATCH), "at noon, no watch offered")
+	DayNight.set_hour(19.0)
+	told.clear()
+	_main._accept_offer(player, str(offer.get("id", "")), 0)
+	var lines: Array = Townsfolk.days().get("watch", {}).get("sign_on", [])
+	_check(_main._on_watch(player.player_id) and _told_any(told, "speech", lines.map(func(line: Variant) -> String: return str(line) % "the test post")),
+		"taken: on the watch, and the captain names the post (%s)" % [told])
+	_check(Offers.of("rs-gunn", player.player_id).all(func(each: Dictionary) -> bool: return str(each.get("kind", "")) != Offers.WATCH), "no second post for one on the watch")
+	# Stood: at the post through the night, paid at dawn from a funded treasury.
+	_put(player, _main._nearest_free(post_cell))
+	_main._watch_tick(Main.WATCH_TICKS)
+	var entry: Dictionary = _main._watch[STORE]["rs-post-a"]
+	_check(int(entry["stood"]) > 0, "at the post: the watch counts it stood (%s in %s; post %s in %s; found %s)" % [player.tile, player.zone, entry["rect"], entry["zone"], _main._watcher(player.player_id) != null])
+	World.economy.stockpile.deposit(STORE, "gold", 100, "test")
+	var gold_before := World.gold_of(player.player_id)
+	var owed := int(Production.read_rules().get("commissions", {}).get("watch_night", 10))
+	told.clear()
+	DayNight.set_hour(6.25)
+	_main._watch_tick(Main.WATCH_TICKS)
+	var paid_lines: Array = Townsfolk.days().get("watch", {}).get("paid", [])
+	var paid_ok: bool = World.gold_of(player.player_id) - gold_before == owed and not _main._on_watch(player.player_id)
+	_check(paid_ok and _told_any(told, "party", paid_lines.map(func(line: Variant) -> String: return str(line) % owed)),
+		"dawn: paid %d gold from the treasury, told, the watch over (%s)" % [owed, told])
+	var card := Townsfolk.card_of(World.production, "rs-gunn")
+	_check(Standing.score(card, player.player_id) >= Standing.setting("watch"), "and the captain thinks the better of them (%d)" % Standing.score(card, player.player_id))
+	# Left: away past the grace, told, unpaid.
+	DayNight.set_hour(19.0)
+	_put(player, _main._nearest_free(gunn.tile + Vector2i(1, 0)))
+	_main._watch_sign_on(player, gunn, "rs-post-a")
+	_check(_main._on_watch(player.player_id), "(signed on again the next night)")
+	told.clear()
+	var grace := int(float(Townsfolk.days().get("watch", {}).get("grace_hours", 1.0)) * DayNight.day_steps / 24.0)
+	for i in grace / Main.WATCH_TICKS + 2:
+		_main._watch_tick(Main.WATCH_TICKS)
+	var left := str(Townsfolk.days().get("watch", {}).get("left", ""))
+	_check(not _main._on_watch(player.player_id) and _told_any(told, "party", [left]),
+		"away from the post past the grace: left it, told, off the watch (%s)" % [told])
+	# A treasury at its floor: the unpaid line, no gold.
+	_main._watch_sign_on(player, gunn, "rs-post-a")
+	_put(player, _main._nearest_free(post_cell))
+	var all_gold := World.economy.stockpile.count(STORE, "gold")
+	World.economy.stockpile.take(STORE, "gold", all_gold, "test")
+	gold_before = World.gold_of(player.player_id)
+	told.clear()
+	DayNight.set_hour(6.25)
+	_main._watch_tick(Main.WATCH_TICKS)
+	var unpaid := str(Townsfolk.days().get("watch", {}).get("unpaid", ""))
+	_check(World.gold_of(player.player_id) == gold_before and _told_any(told, "party", [unpaid]),
+		"an empty treasury: nothing paid, and they are told (%s)" % [told])
+	Net.message_received.disconnect(heard)
+	_main.watch_posts.erase(STORE)
+	_main._watch.clear()
+	World.production.set_away("rs-gunn", true)
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
 	DayNight.set_hour(12.0)

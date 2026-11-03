@@ -6097,6 +6097,158 @@ func _on_balance_threat(town: String, kind: String, on: bool) -> void:
 		World.towns.release_threat(town, BALANCE_HOLDER)
 
 
+# --- The night watch (decision 771) --------------------------------------------
+## A player signs on with the guard captain (the first of the town's guards
+## by id) from residents.json watch "from" to "to" for one of the town's
+## posts, and stands it till "end" (dawn): within "reach" cells of its rect,
+## away no more than "grace_hours" in all, else they have left it (told,
+## unpaid). At dawn each who stood it is paid economy.json commissions
+## watch_night from the town's treasury (Economy.pay_commission: what it
+## has) and the captain thinks the better of them (standing "watch").
+## Phase 1: no waves yet (771, enemy-ai's side; npc's side (2) wires them).
+## Not saved: a restart ends the night's watch, unpaid.
+
+## How often the watch is looked at (steps).
+const WATCH_TICKS := 60
+## Town -> [{id, rect, name}]: its posts (buildings' "post" places, 771,
+## buildings' side; a test sets its own).
+var watch_posts: Dictionary = {}
+## Town -> post id -> {player, name, worker, zone, rect, stood, away}: the night's watch.
+var _watch: Dictionary = {}
+
+
+static func _watch_rule() -> Dictionary:
+	return Townsfolk.days().get("watch", {})
+
+
+## Town [param town]'s guard captain: the first of its guards by id, "" for none.
+func _watch_captain(town: String) -> String:
+	if World.production == null or town.is_empty():
+		return ""
+	for id: String in World.production.worker_ids(town):
+		if "guard" in World.production.worker(id).get("trades", []):
+			return id
+	return ""
+
+
+## Whether [param player_id] stands a post anywhere tonight.
+func _on_watch(player_id: String) -> bool:
+	for town: String in _watch:
+		for post: String in _watch[town]:
+			if str(_watch[town][post].get("player", "")) == player_id:
+				return true
+	return false
+
+
+## The post captain [param worker_id] has for [param player_id] now (Offers
+## ctx "watch_post"): {id, name} of the first free post of his town, in the
+## sign-on hours, to one not on a watch tonight; {} otherwise.
+func _watch_post_for(worker_id: String, player_id: String) -> Dictionary:
+	if World.production == null or player_id.is_empty():
+		return {}
+	var town := str(World.production.worker(worker_id).get("town", ""))
+	var rule := _watch_rule()
+	if town.is_empty() or _watch_captain(town) != worker_id or _on_watch(player_id) \
+			or not Townsfolk._within(DayNight.hour(DayNight.now()), float(rule.get("from", 18)), float(rule.get("to", 23))):
+		return {}
+	var taken: Dictionary = _watch.get(town, {})
+	for post: Variant in watch_posts.get(town, []):
+		if post is Dictionary and not taken.has(str(post.get("id", ""))):
+			return {"id": str(post["id"]), "name": str(post.get("name", "the post"))}
+	return {}
+
+
+## [param player] takes post [param post_id] from captain [param body]: on
+## the night's watch, and the captain says where.
+func _watch_sign_on(player: Player, body: Resident, post_id: String) -> void:
+	var town := body.town
+	var post := {}
+	for each: Variant in watch_posts.get(town, []):
+		if each is Dictionary and str(each.get("id", "")) == post_id:
+			post = each
+	if post.is_empty() or _on_watch(player.player_id) or (_watch.get(town, {}) as Dictionary).has(post_id):
+		return
+	if not _watch.has(town):
+		_watch[town] = {}
+	_watch[town][post_id] = {"player": player.player_id, "name": str(post.get("name", "the post")), "worker": body.worker_id,
+		"zone": body.zone, "rect": post.get("rect", Rect2i()), "stood": 0, "away": 0}
+	var lines: Array = _watch_rule().get("sign_on", ["Take %s."])
+	_say_plain(body, body.person, str(lines[absi(hash(player.player_id + post_id)) % lines.size()]) % str(post.get("name", "the post")))
+	print("[watch] %s: a post taken" % town)
+
+
+## Server, every [param steps]: each watcher at their post or not (within
+## "reach" of its rect, in its zone); one away past "grace_hours" has left
+## it; at "end" (dawn) the night is paid and the watch is over.
+func _watch_tick(steps: int) -> void:
+	if _watch.is_empty():
+		return
+	var rule := _watch_rule()
+	var hour := DayNight.hour(DayNight.now())
+	if Townsfolk._within(hour, float(rule.get("end", 6)), float(rule.get("from", 18))):
+		_watch_dawn()
+		return
+	var grace := float(rule.get("grace_hours", 1.0)) * maxi(DayNight.day_steps, 24) / 24.0
+	var reach := int(rule.get("reach", 4))
+	for town: String in _watch.keys():
+		for post: String in (_watch[town] as Dictionary).keys():
+			var entry: Dictionary = _watch[town][post]
+			var player := _watcher(str(entry["player"]))
+			var at: bool = player != null and player.zone == str(entry["zone"]) and (entry["rect"] as Rect2i).grow(reach).has_point(player.tile)
+			var key := "stood" if at else "away"
+			entry[key] = int(entry[key]) + steps
+			if float(entry["away"]) > grace:
+				_watch_tell(str(entry["player"]), str(rule.get("left", "You left your post; the town owes you nothing for tonight.")))
+				(_watch[town] as Dictionary).erase(post)
+		if (_watch[town] as Dictionary).is_empty():
+			_watch.erase(town)
+
+
+## Dawn: each who stood the night paid from their town's treasury (what it
+## has), the captain the warmer to them; the watch over.
+func _watch_dawn() -> void:
+	var rule := _watch_rule()
+	var owed := int(Production.read_rules().get("commissions", {}).get("watch_night", 10))
+	for town: String in _watch:
+		for post: String in _watch[town]:
+			var entry: Dictionary = _watch[town][post]
+			var player_id := str(entry["player"])
+			var paid := 0
+			if World.economy != null and World.economy.has_method("pay_commission"):
+				paid = int(World.economy.pay_commission(player_id, town, owed))
+			var line := ""
+			if paid >= owed:
+				var lines: Array = rule.get("paid", ["The town pays you %d gold for the watch."])
+				line = str(lines[absi(hash(player_id + town)) % lines.size()]) % paid
+			elif paid > 0:
+				line = str(rule.get("short", "The treasury can spare only %d gold of the %d owed for the watch.")) % [paid, owed]
+			else:
+				line = str(rule.get("unpaid", "The treasury is empty; the town owes you for the night's watch."))
+			_watch_tell(player_id, line)
+			var worker := str(entry["worker"])
+			var card := Townsfolk.card_of(World.production, worker) if World.production != null else {}
+			if not card.is_empty():
+				Standing.bump(card, player_id, Standing.setting("watch"), "stood the night's watch", World.production.now())
+				World.production.set_card(worker, card)
+		print("[watch] %s: the night's watch paid at dawn (%d)" % [town, (_watch[town] as Dictionary).size()])
+	_watch.clear()
+
+
+## The spawned player [param player_id] in any zone, or null.
+func _watcher(player_id: String) -> Player:
+	for entity: GridEntity in World.sought():
+		if entity is Player and entity.spawned and (entity as Player).player_id == player_id:
+			return entity
+	return null
+
+
+## A narrated line to the watcher [param player_id], wherever they are.
+func _watch_tell(player_id: String, line: String) -> void:
+	var peer := Net.local_id if player_id == Net.player_id else _peer_of(player_id)
+	if peer != 0 and not line.is_empty():
+		Net.broadcast_to([peer], "party", {"from": "", "text": line})
+
+
 # --- The balance quest's herder (761, npc's side (2)) -------------------------
 ## The fold's herder talks of the quest Balance keeps (shared by the zone,
 ## accepted by nobody): a hail once a day to a player near, the ask with his
@@ -10270,6 +10422,8 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 		_vendor_sells(player, body, str(result["starter"]))
 	elif int(result.get("relic", 0)) > 0:
 		_relic_returned(player, body, int(result["relic"]))
+	elif not str(result.get("watch", "")).is_empty():
+		_watch_sign_on(player, body, str(result["watch"]))  # A post till dawn (771).
 	elif int(result.get("buy", 0)) > 0:
 		var counter := _counter_near(player, str(World.production.worker(worker_id).get("town", "")))
 		if counter == null:
@@ -10336,6 +10490,7 @@ func _offers_context() -> Dictionary:
 		"area_name": func(area: String) -> String: return str(_world_map.areas.get(area, {}).get("display_name", area)) if _world_map != null else area,
 		"pay_loan": Callable(World.economy, "pay_loan") if World.economy != null and World.economy.has_method("pay_loan") else Callable(),
 		"pay_commission": Callable(World.economy, "pay_commission") if World.economy != null and World.economy.has_method("pay_commission") else Callable(),
+		"watch_post": _watch_post_for,  # The captain's post for them now (771).
 		"pay": func() -> Dictionary: return pay,
 		"zone_of": _zone_of_player,
 		"name_of": func(player_id: String) -> String:
@@ -16761,6 +16916,8 @@ func _on_world_ticked(tick: int) -> void:
 			_balance_keep()  # The balance quests' last copies, for their endings (761, npc's side (2)).
 		if tick % HAIL_CHECK_TICKS == 0:
 			_hails_tick()  # Residents speaking unprompted (decision 554).
+		if tick % WATCH_TICKS == 0:
+			_watch_tick(WATCH_TICKS)  # The night watch at its posts, paid at dawn (771).
 		if tick % WORK_CHECK_TICKS == 0:
 			_visible_work_tick()  # The bodies at the work the sim does (decision 566).
 		_respawn_due_players(tick)

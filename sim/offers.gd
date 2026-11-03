@@ -92,6 +92,10 @@ const LEND := "lend"
 const CARRY := "carry"
 ## A gift of gold toward the town's next build (decision 499, npc's side).
 const GIVE := "give"
+## The night watch (decision 771): the guard captain's offer of a post till
+## dawn, kind and accept; ctx "watch_post" (worker, player) -> {id, name}
+## or {} says whether he has one for them now (Main._watch_post_for).
+const WATCH := "watch"
 ## What the treasury pays when economy's rules have no line for a key yet
 ## (economy.json "commissions"; decisions 486 and 487).
 const DEFAULT_PAY := {"dispute": 5, "escort": 8, "healing": 6}
@@ -243,6 +247,9 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 				fresh.append(offer)
 		for care: Dictionary in _care_offers(worker_id, who, town, player_id, given):
 			fresh.append(care)  # The medicine man's care and the quests behind it, after his counter (584 amended, npc's side).
+		var watch := _watch_offer(worker_id, who, player_id, given)
+		if not watch.is_empty():
+			fresh.push_front(watch)  # The captain at dusk: the post is what you came for (771).
 		var page := _page_offer(worker_id, who, town, given)
 		if not page.is_empty():
 			fresh.push_front(page)  # The desk is what you came for (decision 491).
@@ -290,6 +297,21 @@ static func _give_offers(worker_id: String, who: Dictionary, town: String, playe
 	if rest > step:
 		out.append(_offer(worker_id, GIVE, "give:rest", "Give the rest" if rest == gold else "Give what you have", "", {"gold": rest, "kind": str(wanted.get("kind", "")), "town": town}, GIVE, rest))
 	return out
+
+
+## The guard captain's offer of a post till dawn (decision 771): ctx
+## "watch_post" decides (his town's posts, the hours, one free, the player
+## not on a watch tonight); residents.json "watch" words, %s the post.
+static func _watch_offer(worker_id: String, who: Dictionary, player_id: String, given: Dictionary) -> Dictionary:
+	if _trade_of(who) != "guard" or player_id.is_empty():
+		return {}
+	var post: Variant = _call(given, "watch_post", [worker_id, player_id])
+	if not post is Dictionary or str((post as Dictionary).get("id", "")).is_empty():
+		return {}
+	var rule: Dictionary = Townsfolk.days().get("watch", {})
+	var name := str(post.get("name", "the post"))
+	return _offer(worker_id, WATCH, "watch", str(rule.get("title", "Stand a watch")),
+		str(rule.get("words", "Take %s till first light; the town pays at dawn.")) % name, {"post": str(post["id"]), "name": name}, WATCH)
 
 
 ## "the inn" for a build kind ("inn", "healers_hut").
@@ -948,6 +970,9 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		BUY:
 			out["buy"] = int(offer["what"].get("uid", 0))
 			out["ok"] = out["buy"] > 0
+		WATCH:
+			out["watch"] = str(offer["what"].get("post", ""))  # Signed on by Main (_watch_sign_on), 771.
+			out["ok"] = not out["watch"].is_empty()
 		RELIC:
 			out["relic"] = int(offer["what"].get("uid", 0))  # Laid on the altar by Main (_relic_returned), 714.
 			out["ok"] = int(out["relic"]) > 0
@@ -1622,7 +1647,7 @@ static func to_speak(worker_id: String, player_id: String, ask: String, after_id
 		"wares":
 			kinds = [SHOP]
 		"work":
-			kinds = [COMMISSION, PLEA, GIVE, PAGE]
+			kinds = [WATCH, COMMISSION, PLEA, GIVE, PAGE]
 		"news":
 			kinds = [RUMOUR, PAGE]
 	if kinds.is_empty():

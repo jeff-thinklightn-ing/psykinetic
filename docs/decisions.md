@@ -39486,3 +39486,38 @@ mine_test: the marker and props, the recess, a bare hand and a sword ringing off
 blows and sacks, rubble, the labels, a save's entry and the refill; mine_look parsing with no
 warnings, its seams in recesses, its decor placed and its slots. PROTOCOL CHANGE (Seam's
 replicated "spent", a new spawned class); new class_name Seam.
+## 771. The night watch
+
+Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";
+the watch: "stand guard on the town's edge at night. That's when the night's dangers come ... and the
+town remembers who stood it." On 11-02: "build the tavern and night watch", and "do you think it'd be fun
+to have enemies attacking the guard posts". The coordinator's design, approved: guard posts at a town's
+edges (buildings' "post" places on the spokes of the new layouts, a brazier each); a player signs on
+with the guard captain; at times something comes at a manned post (enemy-ai's waves: wolves, the dead,
+raiders, by zone and state) and the watch holds it; pay and regard at dawn, and per wave beaten. Waves
+only when someone stands watch; the world clock is never moved by a fight (the coordinator: a kill in
+Umbrage must not jump time for a player elsewhere). Sides: npc the watch (this), enemy-ai the waves
+(World.raids.wave and its signals: "771, enemy-ai's side"), buildings the posts and braziers ("771,
+buildings' side"), economy the pay (economy.json commissions), voice the lines.
+
+Phase 1 (this landing): sign-on, the night stood, pay at dawn; no waves yet (npc's side (2) wires
+World.raids.wave once enemy-ai's side is in). Main.watch_posts (town -> [{id, rect, name}]) holds each
+town's posts: buildings' Level.posts_of feeds it when their side lands; a test sets its own. The guard
+captain is the first of the town's guards by worker id (Main._watch_captain). Offers.WATCH: the captain's
+offer "Stand a watch" (residents.json "watch" title and words, %s the post's name), first among his offers,
+asked for by "work", while ctx "watch_post" (Main._watch_post_for) gives a post: his town's first free
+one, between watch "from" and "to" (18 to 23), to one not on a watch tonight. Accepted (Offers.accept
+-> "watch"), Main._watch_sign_on puts the player on the night's watch (Main._watch: town -> post ->
+{player, worker, zone, rect, stood, away}) and the captain names the post (sign_on). Main._watch_tick,
+every WATCH_TICKS (60) steps: within watch "reach" (4) cells of the post's rect in its zone counts stood,
+else away; away past "grace_hours" (1 game hour) in all and they have left it ("left", told, off the
+watch, unpaid). At "end" (06:00) _watch_dawn pays each who stood it economy.json commissions
+"watch_night" (10; economy's own key, added here with their leave) through Economy.pay_commission, which
+pays what the treasury has above its floor (economy: the player only, no second treasury path), told
+"paid", "short" (paid of owed) or "unpaid"; the town keeps no debt, so no line promises one. The captain's
+card: Standing.bump by residents.json standing "watch" (2), "stood the night's watch". Not saved: a
+restart ends the night's watch, unpaid. Voice's words (2026-11-02), lore's none beyond the design.
+resident_test _test_watch: the offer at dusk and not at noon, sign-on and its line, no second post,
+stood at the post, paid from a funded treasury and told, the captain's regard, left past the grace, an
+empty treasury told and unpaid. No bullet: no real town has posts until buildings' plan lands. Server
+only, protocol unchanged, no new class_name.
