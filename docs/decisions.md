@@ -28696,6 +28696,19 @@ and server_boot_test) takes about 16.5 minutes of tests, and perf's held the loc
 with its rebase and import, so another tree could have taken over mid-landing. CLAUDE.md's
 "older than 15" line is the coordinator's to change.
 
+667 amended (perf, 2026-11-02, release's ask): a landing beats the lock while its tests run,
+so a long one is never taken for stale. On 11-02 every landing ran lean (a full suite needs
+18.2 GB plus the gate's 8 GB margin; the machine had 24-25 GB free) and state_test had grown
+from about 400 s to 600-690 s (756's and 760's remade-level cases, four more boots one after
+another), so lean landings ran 1436-1523 s and held the lock 24-26 minutes, at the stale line.
+bench_lock.sh gains `beat <tree>`: if <tree> holds the lock, its "since" moves to now (a
+no-op otherwise, exit 0). The take also writes "taken", so the status still says how long it
+has been held, with "last beat N s ago". Staleness still counts from "since", so every
+checkout's copy, old or new, judges the same file, as release's freeze loop already does by
+writing "since". tests/land.sh's outer gated run beats the land lock for its tree every 60 s
+in a background loop that ends when land.sh does. A killed landing stops beating and goes
+stale 25 minutes after its last beat, as before. The stale line stays at 1500 s.
+
 Tools only, protocol unchanged, no new class_name.
 
 ## 664. Every Godot the tooling starts writes its own log, in its checkout's build/logs

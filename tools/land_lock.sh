@@ -3,8 +3,9 @@
 # release right after. Otherwise another tree lands between your retest and your push, and
 # you rebase and retest again (or push untested code). Same lock folder mechanics as
 # tools/bench_lock.sh (atomic mkdir), in its own folder; stale after 25 minutes (decision
-# 667): a landing (retest and push) takes about 10, a lean one (394 amended (10), its parts
-# one after another when memory is short) about 17.
+# 667) since its take or its holder's last beat: tests/land.sh beats a lock its tree holds
+# every minute while it runs (667 amended), so a long landing is never taken over.
+#   sh tools/land_lock.sh beat <tree>
 #   sh tools/land_lock.sh take <tree> "<what>"   exit 1 if another tree is landing (prints who)
 #   sh tools/land_lock.sh release <tree>
 #   sh tools/land_lock.sh status

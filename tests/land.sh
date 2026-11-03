@@ -31,8 +31,15 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# memory table): a check reading the log's tail reads the result. No
 	# result line written is a fail, whatever the exit (a killed run).
 	result="$(mktemp -t psykinetic-result.XXXXXX)"
+	# While the tests run, a land lock this tree holds is beaten each minute (667
+	# amended): a live landing, however long, is never taken for stale, and one
+	# killed stops beating (the loop ends with this script) and goes stale as before.
+	parent=$$
+	( while kill -0 "$parent" 2>/dev/null; do sh tools/land_lock.sh beat "$tree"; sleep 60; done ) &
+	beater=$!
 	HEAVY_JOB_INSIDE=1 LAND_RESULT="$result" python tools/heavy_job.py run "$tree" suite -- bash tests/land.sh
 	code=$?
+	kill "$beater" 2>/dev/null
 	line="$(cat "$result" 2>/dev/null)"
 	rm -f "$result"
 	[ -n "$line" ] || line="LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)"
