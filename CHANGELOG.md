@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hills: a two-wide bridge's posts stand at its sides, not in the middle of the walkway (505 amended (4)).
 - The hills fill in: dirt tracks from the road to the herders' hut, the cave and the shieling; two roadside camps (by the bridge and under the spur) where resting by the fire heals you once you've been unhurt a few seconds; seven patches of wild things to gather off the paths (777).
 - Counters: what you collect goes back into your hand when it's free (a shield to the left), and a finished job no longer shows as still being worked (438 amended).
 - F now sweeps up everything lying near you, each thing flying in from where it lay (773, ui's side).

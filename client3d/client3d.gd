@@ -11910,6 +11910,24 @@ func shore_at(point: Vector2, image: Image = _shore_image, origin: Vector2i = _m
 	return lerpf(lerpf(v[0], v[1], f.x), lerpf(v[2], v[3], f.x), f.y)
 
 
+## The bridge.wood.end variant for [param cell]'s end toward [param end]
+## (505 amended (4)): 1 with a post at both sides, on a bridge one cell wide;
+## on a wider one only the bridge's outer side gets a post, so none stands in
+## the walkway: 2 its post on the piece's -x, 3 on its +x (the piece turned
+## by _turned_to(end)); 1 while the kit has fewer than 3 [param variants].
+static func bridge_end_variant(rect: Rect2i, cell: Vector2i, end: Vector2i, variants: int) -> int:
+	var across := Vector2i(absi(end.y), absi(end.x))
+	var outer: Array[Vector2i] = []
+	for side: Vector2i in [across, -across]:
+		if not rect.has_point(cell + side):
+			outer.append(side)
+	if outer.size() != 1 or variants < 3:
+		return 1
+	# The piece's +x in the cell grid once turned to face [param end].
+	var plus_x := _turned_to(end) * Vector3.RIGHT
+	return 3 if plus_x.x * outer[0].x + plus_x.z * outer[0].y > 0.0 else 2
+
+
 ## A bridge (decision 505, terrain's side): art-kit's BRIDGE_DECK on each
 ## of its cells (its variant by the cell), BRIDGE_RAIL along its outer long
 ## edges and BRIDGE_END onto the bank past each end, at the deck's height
@@ -11932,7 +11950,8 @@ func _add_bridge(building: Dictionary) -> void:
 		for end: Vector2i in [along, -along]:
 			if not rect.has_point(cell + end):
 				var edge := Vector2(cell) + Vector2(end) * 0.5
-				pieces.get_or_add(BRIDGE_END + "/1", []).append(Transform3D(_turned_to(end), Vector3(edge.x, top, edge.y)))
+				var variant := bridge_end_variant(rect, cell, end, ArtKit.variant_count(BRIDGE_END))
+				pieces.get_or_add("%s/%d" % [BRIDGE_END, variant], []).append(Transform3D(_turned_to(end), Vector3(edge.x, top, edge.y)))
 	var bridge := Node3D.new()
 	bridge.name = "Bridge_%d_%d" % [rect.position.x, rect.position.y]
 	for key: String in pieces:

@@ -15261,6 +15261,21 @@ sound_kit_test (an animal's splash by size; the drip slot's reach and takes) and
 (_test_wade_drip: out of a ford a drip, dry to dry none). Client only, protocol unchanged, no new
 class_name.
 
+505 amended (4) (release's label; Jeff: "in hills bridge graphics is broken for crossing over"; the
+coordinator, from maps' stills, C:/dev/review/lands/fill_hills/bridge): the hills' bridge read as
+a fenced box perched on the banks. bridge.wood.end is one cell wide with a capped post at each
+side, and Client3D._add_bridge laid one at each end cell, so a two-wide bridge stood four posts
+across each end, two mid-walkway. Art-kit's 37344a07 gives the end variants /2 (its post on -x
+only) and /3 (on +x only), and lines up the deck variants' plank rows (the seam down the middle).
+Client3D.bridge_end_variant picks each end cell's: /1 on a one-wide bridge (both sides outer),
+else the one whose post is on the bridge's outer side (the piece's +x worked out through
+_turned_to(end): facing out, -x is the walker's right), /1 while the kit lacks the one-post
+ends. So the ends open onto the road; the threshold (flush at the deck's top, 0.42 onto the
+bank, the bank levelled to the deck by 505) and the piles are the footing. The bridge stays two
+long: the end pieces reach onto each bank, and a longer one would move bank cells for nothing.
+view_test _test_bridge_ends (the hills' four end cells; a one-wide bridge and a kit without the
+variants post both sides). Client only, protocol unchanged, no new class_name.
+
 ## 506. The level editor's properties panel
 
 level.json had grown keys only a text editor reached (links' targets,

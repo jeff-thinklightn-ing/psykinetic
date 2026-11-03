@@ -68,6 +68,7 @@ func _ready() -> void:
 		await _test_bow_sounds()
 		await _test_armour_footfalls()
 		_test_wade_drip()
+		_test_bridge_ends()
 		_test_far_cry()
 		await _test_monster_death()
 		await _test_companion_death()
@@ -1059,6 +1060,24 @@ func _test_far_cry() -> void:
 	heard = _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
 	_check(heard == ["sfx.wave_wolves"], "a night watch's wave heard from its cell (771) (%s)" % [heard])
 	_rig.sfx.hear_everything = hear_was
+
+
+## 505 amended (4): a two-wide bridge's ends post only its outer sides (the
+## hills' bridge read as a fenced box: four posts across each end). Facing
+## an end the piece's -x is the walker's right (art-kit).
+func _test_bridge_ends() -> void:
+	print("
+== a two-wide bridge's end posts at its sides (505 amended (4)) ==")
+	var rect := Rect2i(88, 110, 2, 2)  # the hills': along x, rows 110 and 111
+	var east := Vector2i(1, 0)
+	var west := Vector2i(-1, 0)
+	var picks := [Client3D.bridge_end_variant(rect, Vector2i(89, 110), east, 3), Client3D.bridge_end_variant(rect, Vector2i(89, 111), east, 3),
+		Client3D.bridge_end_variant(rect, Vector2i(88, 110), west, 3), Client3D.bridge_end_variant(rect, Vector2i(88, 111), west, 3)]
+	# Walking east the north row (110) is on the left (+x: 3), the south on the right (-x: 2); west, the other way round.
+	_check(picks == [3, 2, 2, 3], "each end cell posts its outer side only, none mid-walkway (%s)" % [picks])
+	var one := Rect2i(10, 10, 3, 1)
+	_check(Client3D.bridge_end_variant(one, Vector2i(12, 10), east, 3) == 1 and Client3D.bridge_end_variant(rect, Vector2i(89, 110), east, 1) == 1,
+		"a one-wide bridge's end posts both sides, and so does a kit without the one-post ends")
 
 
 ## 505 amended (3): a body stepping out of a ford onto dry ground drips (a
