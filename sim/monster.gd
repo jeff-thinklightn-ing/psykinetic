@@ -1893,7 +1893,9 @@ static func read_kinds(path: String) -> Dictionary:
 			"stamina_regen": maxi(0, int(row.get("stamina_regen", 0))),
 			"blows": _blows(kind, row.get("blows")),
 			"aim_spread": _aim_spread(path, kind, row.get("aim_spread", 0.0)),
-			"aim_hold_max": maxi(0, int(row.get("aim_hold_max", 0)))}
+			"aim_hold_max": maxi(0, int(row.get("aim_hold_max", 0))),
+			# A kind's own moves' numbers (GreatBear's swipe, slam and charge; 780 amended (2)).
+			"moves": (row["moves"] as Dictionary).duplicate(true) if row.get("moves") is Dictionary else {}}
 	return out
 
 

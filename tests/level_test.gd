@@ -1053,7 +1053,8 @@ func _test_world_plane() -> void:
 		var level_name := folder.trim_suffix("/")
 		if folder.ends_with("/") and level_name != "prefabs" and ResourceLoader.exists(Level.DIR + level_name + "/layout.png"):
 			levels[level_name] = Level.load_level(level_name)
-	var outdoor := levels.keys().filter(func(level_name: String) -> bool: return Level.zone_of(Level.template_config(level_name)) == "outdoors")
+	# A dev level (Level.DEV_LEVELS: bear_yard, 780) is reached by --map, never laid on the plane.
+	var outdoor := levels.keys().filter(func(level_name: String) -> bool: return Level.zone_of(Level.template_config(level_name)) == "outdoors" and level_name not in Level.DEV_LEVELS)
 	var missing := outdoor.filter(func(level_name: String) -> bool: return not zones.has(level_name))
 	var indoor_laid := zones.keys().filter(func(level_name: String) -> bool: return not level_name in outdoor)
 	_check(missing.is_empty() and indoor_laid.is_empty(), "every outdoor level has an origin, nothing else does (%s; missing %s, not outdoor %s)" % [outdoor, missing, indoor_laid])

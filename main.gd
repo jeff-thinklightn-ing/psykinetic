@@ -4076,6 +4076,12 @@ func _boot() -> void:
 		World.blood_changed.connect(_on_blood_changed)
 	if not World.arts_marked.is_connected(_on_arts_marked):
 		World.arts_marked.connect(_on_arts_marked)  # 766 amended.
+	# An apex creature's tracks, and its cry heard past sight (decision 780).
+	World.tracks_from_dict(snapshot["tracks"] if snapshot.get("tracks") is Dictionary else {})
+	if not World.tracks_changed.is_connected(_on_tracks_changed):
+		World.tracks_changed.connect(_on_tracks_changed)
+	if not World.far_cry.is_connected(_on_far_cry):
+		World.far_cry.connect(_on_far_cry)
 	# The buildings the maps already have, for towns with no record of them.
 	World.towns.seed_from(world_map)
 	_world_map = world_map
@@ -4574,6 +4580,7 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
 	Net.message_to(peer, "grass", {"level": zone_name, "full": true, "flat": World.trampled_cells(zone_name)})
 	Net.message_to(peer, "blood", {"level": zone_name, "full": true, "add": World.blood_cells(zone_name), "gone": PackedInt32Array()})
+	Net.message_to(peer, "tracks", {"level": zone_name, "full": true, "add": World.track_cells(zone_name), "gone": PackedInt32Array()})
 	World.update_visibility(peer, zone_name)
 
 
@@ -5723,6 +5730,7 @@ func _save_state(wait := true, final := false) -> void:
 		"roofs": World.roofs_damaged.keys(),
 		"trampled": World.trampled_to_dict(),
 		"blood": World.blood_to_dict(),  # Decision 764.
+		"tracks": World.tracks_to_dict(),  # Decision 780.
 		"raid_groups": World.raid_groups.to_dict() if World.raid_groups != null else {},
 		"trade": World.trade.to_dict() if World.trade != null else {},
 		"placed_captives": _placed_captives.duplicate(true),
@@ -6070,6 +6078,33 @@ func _on_blood_changed(level: String, add: PackedInt32Array, gone: PackedInt32Ar
 	var peers := World.peers_in(level)
 	if not peers.is_empty():
 		Net.broadcast_to(peers, "blood", {"level": level, "add": add, "gone": gone})
+
+
+## Server: tracks on [param level]'s ground were marked or faded
+## (World.tracks_changed, decision 780): the players in its zone are told
+## ("tracks" {level, add: [x, y, seconds left, facing, ...], gone: [x, y,
+## ...]}; on joining, "full" with every live print). Terrain draws them.
+func _on_tracks_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array, _full: bool) -> void:
+	if not Net.is_authority():
+		return
+	var peers := World.peers_in(level)
+	if not peers.is_empty():
+		Net.broadcast_to(peers, "tracks", {"level": level, "add": add, "gone": gone})
+
+
+## Server: [param source] cried [param cry], heard [param reach] cells off
+## (World.far_cry, decision 780): the players in its zone within reach who
+## don't see it are told ("far_cry" {creature: its kind, cry, cell}); those
+## who see it hear its own cry.
+func _on_far_cry(source: GridEntity, cry: StringName, reach: int) -> void:
+	if not is_instance_valid(source):
+		return
+	var seeing := source.viewers()
+	var creature := str(source.spawn_spec.get("kind", "")) if source is Monster else ""
+	for peer in World.peers_in(source.zone):
+		var player: Player = _players.get(peer)
+		if peer not in seeing and is_instance_valid(player) and World.distance(player.tile, source.tile) <= reach:
+			Net.message_to(peer, "far_cry", {"creature": creature, "cry": str(cry), "cell": [source.tile.x, source.tile.y]})
 
 
 ## Server: tall grass of [param level] was trampled or stood again
@@ -13402,6 +13437,14 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "grass":
 		if not Net.is_authority() and not str(data.get("level", "")).is_empty():
 			World.grass_told(str(data["level"]), data)
+		return
+	if kind == "tracks":
+		# An apex creature's prints (780): the host's view hears World.tracks_changed.
+		if not Net.is_authority() and not str(data.get("level", "")).is_empty():
+			var add: Variant = data.get("add", PackedInt32Array())
+			var gone: Variant = data.get("gone", PackedInt32Array())
+			World.tracks_changed.emit(str(data["level"]), PackedInt32Array(add) if add is Array or add is PackedInt32Array else PackedInt32Array(),
+					PackedInt32Array(gone) if gone is Array or gone is PackedInt32Array else PackedInt32Array(), bool(data.get("full", false)))
 		return
 	if kind == "blood":
 		# A wounded animal's blood (764): the host's view hears World.blood_changed.

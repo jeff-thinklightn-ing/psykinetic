@@ -1646,9 +1646,9 @@ func _test_raid_beaten() -> void:
 
 ## The great bear (decision 780): its den at (4, 3), a long room.
 func _test_great_bear() -> void:
-	print("\n== the great bear: asleep by day at its den, woken by a blow; swipe, slam and charge on their tells; a broken tell; off its ground it breaks off ==")
+	print("\n== the great bear: asleep by night at its den, woken by a blow; swipe, slam and charge on their tells; a broken tell; off its ground it breaks off ==")
 	Monster.idling = true
-	DayNight.set_hour(12.0)
+	DayNight.set_hour(0.0)  # Night: it sleeps (780 amended (2)).
 	var rows: Array[String] = ["#".repeat(40)]
 	for y in 5:
 		rows.append("#" + ".".repeat(38) + "#")
@@ -1657,11 +1657,14 @@ func _test_great_bear() -> void:
 	rows[3] = row.substr(0, 4) + "B" + row.substr(5)
 	var e := _build(rows)
 	var bear: GreatBear = e["B"][0]
+	var row_moves: Dictionary = Monster.kinds()["great_bear"]["moves"]
+	_check(int(bear.swipe["damage"]) == int(row_moves["swipe"]["damage"]) and int(bear.slam["windup"]) == int(row_moves["slam"]["windup"])
+			and int(bear.charge["every"]) == int(row_moves["charge"]["every"]), "its moves' numbers are its monsters.json row's \"moves\" (tuning is data)")
 	var cries: Array[StringName] = []
 	bear.cried.connect(func(kind: StringName) -> void: cries.append(kind))
 	for i in 5:
 		World.step()
-	_check(bear.asleep and bear.pose == Monster.Pose.SIT and bear.den == Vector2i(4, 3), "by day, nobody about: it sleeps at its den")
+	_check(bear.asleep and bear.pose == Monster.Pose.SIT and bear.den == Vector2i(4, 3), "by night, nobody about: it sleeps at its den")
 	var hunter := EntityFactory.build(SPECS["P"].merged({"name": "BearHunter"})) as GridEntity
 	_room.add_child(hunter)
 	World.spawn(hunter, Vector2i(8, 3))
@@ -1685,9 +1688,9 @@ func _test_great_bear() -> void:
 			break
 	_check(swiped and &"swipe" in cries, "the hunter beside it: a swipe's tell first (a cone), and its growl")
 	var before := hunter.hp
-	for i in GreatBear.SWIPE["windup"] + 1:
+	for i in bear.swipe["windup"] + 1:
 		World.step()
-	_check(hunter.hp == before - int(GreatBear.SWIPE["damage"]) and World.distance(hunter.tile, bear.tile) >= 2,
+	_check(hunter.hp == before - int(bear.swipe["damage"]) and World.distance(hunter.tile, bear.tile) >= 2,
 			"then the swipe lands: %d hp and swept back (%d off)" % [before - hunter.hp, World.distance(hunter.tile, bear.tile)])
 	# A tell broken: knocked down mid-tell, the move is lost.
 	World.despawn(hunter)
@@ -1700,10 +1703,36 @@ func _test_great_bear() -> void:
 	before = hunter.hp
 	World.knock_down(bear, hunter, 8)
 	bear._next_swipe = World.tick + 100000  # No second swipe in the window.
-	for i in GreatBear.SWIPE["windup"] + 10:  # Down 8: its tell ends unlanded when it rises.
+	for i in bear.swipe["windup"] + 10:  # Down 8: its tell ends unlanded when it rises.
 		World.step()
 	_check(hunter.hp == before and tells.call("swipe").is_empty(), "knocked down mid-tell: the swipe is broken off, no blow")
 	bear._next_swipe = World.tick + 100000
+	for i in 30:
+		World.step()
+		if bear._move.is_empty():
+			break
+	# Flanked (combat's 780 side): a blow from behind mid-tell staggers it, the move lost.
+	World.despawn(hunter)
+	World.spawn(hunter, bear.tile + Vector2i(1, 0))
+	bear._next_swipe = 0
+	bear._next_slam = World.tick + 100000  # No slam with the flanker beside it; the slam's own check sets it.
+	for i in 20:
+		World.step()
+		if not tells.call("swipe").is_empty():
+			break
+	var flanker := EntityFactory.build(SPECS["P"].merged({"name": "BearFlanker"})) as GridEntity
+	_room.add_child(flanker)
+	World.spawn(flanker, bear.tile - bear.facing)
+	var swipe_id := int(bear._move.get("telegraph", 0))
+	var flank_marked := swipe_id != 0 and bool(World._telegraphs.get(swipe_id, {}).get("flank", false))
+	var flanked := World._try_flank(flanker, bear)
+	bear._next_swipe = World.tick + 100000
+	before = hunter.hp
+	for i in bear.swipe["windup"] + 6:
+		World.step()
+	_check(flank_marked and flanked and hunter.hp == before and tells.call("swipe").is_empty(),
+			"its tells are flank-marked: struck from behind mid-swipe, it staggers and the swipe is lost (marked %s, flanked %s)" % [flank_marked, flanked])
+	World.despawn(flanker)
 	for i in 30:
 		World.step()
 		if bear._move.is_empty():
@@ -1725,7 +1754,7 @@ func _test_great_bear() -> void:
 	var slam_cells: Array = tells.call("slam")[0]["cells"] if slammed else []
 	_check(slammed and slam_cells.size() == 8, "two beside it: it rears, a ring's tell round it (%d cells)" % slam_cells.size())
 	var hp_before := [hunter.hp, second.hp]
-	for i in GreatBear.SLAM["windup"] + 1:
+	for i in bear.slam["windup"] + 1:
 		World.step()
 	_check(hunter.hp < hp_before[0] and second.hp < hp_before[1] and World.is_down(hunter) and World.is_down(second),
 			"the slam: both struck and knocked down")
@@ -1765,7 +1794,49 @@ func _test_great_bear() -> void:
 		World.step()
 	_check(bear.target == null, "its foe off its ground (its den far off): it breaks off")
 	World.despawn(hunter)
+	bear._sleep()
 	DayNight.set_hour(12.0)
+	cries.clear()
+	World.step()
+	_check(not bear.asleep and &"roar" in cries, "at dawn it wakes with a roar, to roam by day")
+	# Read from afar (780 amended (2)): its roar told past sight, its prints.
+	var far: Array[StringName] = []
+	var on_far := func(source: GridEntity, cry: StringName, reach: int) -> void:
+		if source == bear and reach == GreatBear.ROAR_REACH:
+			far.append(cry)
+	World.far_cry.connect(on_far)
+	bear._roar("test")
+	World.far_cry.disconnect(on_far)
+	_check(far == [&"roar"], "its roar goes out as a far cry, %d cells" % GreatBear.ROAR_REACH)
+	var was_outdoor := World.fields.outdoor
+	World.fields.outdoor = true
+	World.tracks.clear()
+	var marked: Array[PackedInt32Array] = []
+	var on_tracks := func(_level: String, add: PackedInt32Array, _gone: PackedInt32Array, _full: bool) -> void: marked.append(add)
+	World.tracks_changed.connect(on_tracks)
+	bear._last_tile = Monster.NO_TILE
+	for x in [20, 21, 22, 23, 24]:
+		World.despawn(bear)
+		World.spawn(bear, Vector2i(x, 3))
+		bear._track()
+	World.tracks_changed.disconnect(on_tracks)
+	var level := World.fields.level
+	var cells := World.track_cells(level)
+	_check(marked.size() == 2 and cells.size() == 8 and cells[0] == 21 and cells[1] == 3 and cells[3] == 2 and cells[4] == 23 and cells[2] > 0,
+			"walking east it leaves a print each %d cells, facing east (%s)" % [GreatBear.TRACK_STRIDE, cells])
+	var saved := World.tracks_to_dict()
+	World.tracks_from_dict(saved)
+	_check(World.track_cells(level).size() == 8, "its prints keep in the snapshot")
+	World.tracks.clear()
+	World.fields.outdoor = was_outdoor
+	# The bear yard (playtest's tour ground, a dev level): it reads clean.
+	var yard := Level.load_level("bear_yard")
+	var kinds: Array[String] = []
+	for each: Dictionary in yard.get("entities", []):
+		kinds.append(str(each.get("kind", each.get("name", ""))))
+	_check(not yard.is_empty() and (yard["warnings"] as Array).is_empty() and bool(yard["terrain"]["outdoor"]) and "great_bear" in kinds
+			and kinds.count("KitChest1") + kinds.count("KitChest2") + kinds.count("chest") >= 2 and "bear_yard" in Level.DEV_LEVELS,
+			"the bear yard: outdoors, its bear and the kit's chests, no warnings, a dev level (%s, %s)" % [kinds, yard.get("warnings")])
 
 
 func _test_raid_takes() -> void:

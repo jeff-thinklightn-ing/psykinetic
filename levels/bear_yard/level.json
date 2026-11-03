@@ -1,0 +1,59 @@
+{
+	"name": "Bear yard",
+	"music": "none",
+	"outdoor": true,
+	"centre": [
+		15,
+		22
+	],
+	"starts": [
+		[
+			22,
+			22
+		],
+		[
+			22,
+			25
+		]
+	],
+	"monsters": {
+		"great_bear": {}
+	},
+	"legend": {
+		"monster_great_bear": "#7a4a2a"
+	},
+	"entities": [
+		{
+			"at": [
+				22,
+				20
+			],
+			"name": "KitChest1",
+			"props": {
+				"slots": [
+					"sword",
+					"shield",
+					"bow",
+					"arrows"
+				]
+			}
+		},
+		{
+			"at": [
+				23,
+				20
+			],
+			"name": "KitChest2",
+			"props": {
+				"slots": [
+					"arrows",
+					"ration",
+					"ration",
+					""
+				]
+			}
+		}
+	],
+	"spawn_points": {},
+	"links": []
+}

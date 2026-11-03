@@ -678,6 +678,23 @@ const BLOOD_DAYS := 1.0 / 24.0
 ## Blood of [param level] marked ([param add]: [x, y, seconds left, ...]) or
 ## faded ([param gone]: [x, y, ...]).
 signal blood_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array)
+## Tracks on the ground (decision 780 amended (2)): level -> {cell:
+## [the world step it fades, facing 0..7]}, left by an apex creature as it
+## walks (GreatBear), outdoors only, TRACK_DAYS each, the newest TRACKS_MOST
+## a level. Saved in the snapshot; the server's, told to the clients in its
+## zone ("tracks": terrain draws the prints).
+var tracks: Dictionary[String, Dictionary] = {}
+const TRACK_DAYS := 1.0 / 24.0
+const TRACKS_MOST := 300
+## Tracks of [param level] marked ([param add]: [x, y, seconds left,
+## facing, ...], facing 0..7 clockwise from north) or faded ([param gone]:
+## [x, y, ...]). On a client, from the "tracks" message, [param full] when
+## [param add] is every live print (on joining); terrain draws them.
+signal tracks_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array, full: bool)
+## A cry heard past sight (decision 780 amended (2)): the server's,
+## from [param source] (GreatBear's roar), [param reach] cells. Main tells
+## the players in its zone within reach who don't see it ("far_cry").
+signal far_cry(source: GridEntity, cry: StringName, reach: int)
 ## Tall grass of [param level] was trampled ([param flat]) or stood again
 ## ([param stood]), flat [x, y, ...]; on a client, also after a full
 ## "grass" message (both empty): terrain redraws the trodden path.
@@ -1114,6 +1131,7 @@ func world_tick(slice := -1) -> void:
 	if slice <= 0:
 		_regrow()  # Trampled tall grass stands again (decision 508).
 		_fade_blood()  # Blood on the ground fades (764).
+		_fade_tracks()  # So do tracks (780).
 	var was := zone
 	var each_zone: Array[Zone] = []
 	each_zone.assign(zones.values())
@@ -10111,6 +10129,80 @@ func blood_from_dict(data: Dictionary) -> void:
 		for i in range(0, (flat as Array).size() - 2, 3):
 			cells[Vector2i(int(flat[i]), int(flat[i + 1]))] = int(flat[i + 2])
 		blood[str(level)] = cells
+
+
+## A print on [param cell] of the level World is in (decision 780; outdoors
+## only), [param facing] 0..7 clockwise from north (the way it walked): it
+## fades TRACK_DAYS on. Past TRACKS_MOST in the level, the oldest goes.
+func mark_track(cell: Vector2i, facing: int) -> void:
+	if not fields.outdoor:
+		return
+	if not tracks.has(fields.level):
+		tracks[fields.level] = {}
+	var cells: Dictionary = tracks[fields.level]
+	var gone := PackedInt32Array()
+	cells.erase(cell)
+	while cells.size() >= TRACKS_MOST:
+		var oldest: Vector2i = cells.keys()[0]  # Kept in the order marked.
+		cells.erase(oldest)
+		gone.append_array([oldest.x, oldest.y])
+	var until := steps + int(TRACK_DAYS * maxi(DayNight.day_steps, 1))
+	cells[cell] = [until, posmod(facing, 8)]
+	tracks_changed.emit(fields.level, PackedInt32Array([cell.x, cell.y, _blood_left(until), posmod(facing, 8)]), gone, false)
+
+
+## The facing 0..7 (clockwise from north, north up the map) of a step by
+## [param delta].
+static func track_facing(delta: Vector2i) -> int:
+	var d := Vector2i(signi(delta.x), signi(delta.y))
+	return [Vector2i(0, -1), Vector2i(1, -1), Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(-1, 1), Vector2i(-1, 0), Vector2i(-1, -1)].find(d)
+
+
+func _fade_tracks() -> void:
+	for level: String in tracks:
+		var cells: Dictionary = tracks[level]
+		var gone := PackedInt32Array()
+		for cell: Vector2i in cells.keys():
+			if int(cells[cell][0]) <= steps:
+				cells.erase(cell)
+				gone.append_array([cell.x, cell.y])
+		if not gone.is_empty():
+			tracks_changed.emit(level, PackedInt32Array(), gone, false)
+
+
+## [param level]'s tracks, [x, y, seconds left, facing, ...] (the "tracks"
+## message).
+func track_cells(level: String) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	var cells: Dictionary = tracks.get(level, {})
+	for cell: Vector2i in cells:
+		if int(cells[cell][0]) > steps:
+			out.append_array([cell.x, cell.y, _blood_left(int(cells[cell][0])), int(cells[cell][1])])
+	return out
+
+
+## The snapshot's: level -> [x, y, the step it fades, facing, ...].
+func tracks_to_dict() -> Dictionary:
+	var out := {}
+	for level: String in tracks:
+		var flat: Array = []
+		for cell: Vector2i in tracks[level]:
+			flat.append_array([cell.x, cell.y, int(tracks[level][cell][0]), int(tracks[level][cell][1])])
+		if not flat.is_empty():
+			out[level] = flat
+	return out
+
+
+func tracks_from_dict(data: Dictionary) -> void:
+	tracks.clear()
+	for level: Variant in data:
+		var flat: Variant = data[level]
+		if not flat is Array:
+			continue
+		var cells := {}
+		for i in range(0, (flat as Array).size() - 3, 4):
+			cells[Vector2i(int(flat[i]), int(flat[i + 1]))] = [int(flat[i + 2]), posmod(int(flat[i + 3]), 8)]
+		tracks[str(level)] = cells
 
 
 ## [param level]'s trampled cells, flat [x, y, ...] (the "grass" message).

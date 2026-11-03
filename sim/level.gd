@@ -480,8 +480,9 @@ static func world_cell(plane: Dictionary, level_name: String, cell: Vector2i) ->
 ## Levels for development, which no way in the world reaches and none must
 ## (decision 673: the practice hall, Net.PRACTICE_MAP, hosted on its own):
 ## WorldMap's reach checks leave them out. mine_look (769) is the mine's
-## look test, reached by --map=mine_look.
-const DEV_LEVELS: Array[String] = ["practice", "mine_look"]
+## look test, reached by --map=mine_look; bear_yard (780) is playtest's
+## great bear tour ground, the same way.
+const DEV_LEVELS: Array[String] = ["practice", "mine_look", "bear_yard"]
 
 
 static func names() -> Array[String]:
