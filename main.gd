@@ -20167,9 +20167,15 @@ func _run_test_die_travel(tick: int) -> void:
 
 
 ## --test-arts (766): [param player]'s arts set as given (swordplay:1,bow:0.5),
-## so playtest can set a practised player beside a fresh one. Test servers.
+## so playtest can set a practised player beside a fresh one. Honoured only
+## beside --run-marker, as --test-temple-day: without it one ERROR and
+## ignored, so a stray flag never sets a real player's arts on the box.
 func _test_arts(player: Player) -> void:
 	if Net.test_arts.is_empty():
+		return
+	var marked := Array(OS.get_cmdline_args() + OS.get_cmdline_user_args()).any(func(arg: String) -> bool: return arg.begins_with("--run-marker="))
+	if not marked:
+		push_error("[test] --test-arts without --run-marker: ignored (766: a test-only flag, never the box's)")
 		return
 	var given := {}
 	for art: String in Net.test_arts:

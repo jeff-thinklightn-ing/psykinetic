@@ -39121,6 +39121,16 @@ cooling, the idle fade, the four effects and the damage unchanged, a
 monster unaffected, a full draw let go); record_keys_test (the field
 through a save, and a record from before 766 or with nonsense in it).
 PROTOCOL_REVISION 45 -> 46; no new class_name.
+
+766, combat's side (2): --test-arts is read, on test runs only (release's
+label; playtest's practised run found the server ignoring it). Net's
+_parse_args lacked it among the options that take a value, so its
+_set_option case never ran. Added there; Main._test_arts now honours it
+only beside --run-marker, as --test-temple-day (404 amended): without one,
+one ERROR and ignored, so a stray flag never sets a real player's arts on
+the box. _parse_args takes an optional argument list, for a test.
+record_keys_test _test_arts_flag (both forms, held at 1). Test flag only:
+protocol unchanged, no new class_name, no CHANGELOG bullet.
 ## 767. Every town's gatherers: a woodcutter and a hunter, seated once
 
 Jeff: "yes add gatherers to each town" (decisions/town-gatherers.md); the coordinator approved the

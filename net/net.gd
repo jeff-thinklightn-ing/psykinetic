@@ -144,6 +144,7 @@ extends Node
 ##   --test-walk=<keys:secs,...>  WASD: hold these keys (e.g. w:1.5,wd:1) in turn, then let go
 ##   --test-walk-on-wind          --test-walk starts at the local player's own wind-up (392 amended), logged
 ##   --test-foe=<kind>,<weapon>   server: each player joins with that weapon in hand and that monster 3 cells east
+##   --test-arts=<art>:<m>,...    server, tests only (with --run-marker): each player joins with that weapon memory, e.g. swordplay:1,bow:0.5 (766)
 ##   --test-smooth                count jumps and back steps in what is drawn, frame by frame (60 fps), and report
 ##                                them at exit (net/smooth_meter.gd; tools/net_smooth.sh)
 ##
@@ -881,7 +882,8 @@ var test_walk: Array[Dictionary] = []
 var test_walk_on_wind := false
 ## --test-foe: [monster kind, weapon] each joining player is given, or empty.
 var test_foe: PackedStringArray = []
-## --test-arts: {art: memory} each joining player starts with (766), or empty.
+## --test-arts: {art: memory} each joining player starts with (766), or empty;
+## honoured only beside --run-marker (Main._test_arts).
 var test_arts: Dictionary = {}
 
 ## Tick times, bandwidth, corrections: see NetStats.
@@ -2030,11 +2032,12 @@ static func credential_token(directory: String) -> Variant:
 	return FileAccess.get_file_as_string(directory.path_join("token")).strip_edges()
 
 
-func _parse_args() -> void:
-	var args := OS.get_cmdline_args() + OS.get_cmdline_user_args()
+## [param given]: the arguments to read, for a test; else the command line's.
+func _parse_args(given: Array = []) -> void:
+	var args: Array = given if not given.is_empty() else Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())
 	var i := 0
 	while i < args.size():
-		var key := args[i]
+		var key: String = args[i]
 		var value := ""
 		var has_value := false
 		var equals := key.find("=")
@@ -2102,7 +2105,7 @@ func _parse_args() -> void:
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]

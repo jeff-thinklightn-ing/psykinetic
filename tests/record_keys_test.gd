@@ -66,6 +66,7 @@ func _ready() -> void:
 	_test_player_round_trip()
 	_test_solo_round_trip()
 	_test_arts_before_766()
+	_test_arts_flag()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -143,6 +144,19 @@ func _test_arts_before_766() -> void:
 	var odd := PlayerRecord.from_dict({"player_id": "p", "tile": [1, 2], "arts": {"swordplay": {"m": 4.0}, "juggling": {"m": 0.5}, "bow": 3}})
 	_check(odd != null and odd.arts.keys() == ["swordplay"] and float(odd.arts["swordplay"]["m"]) == 1.0,
 			"an art not known, or not a dictionary, dropped; a memory past 1 held at 1 (%s)" % [odd.arts if odd != null else null])
+
+
+## --test-arts is read from the command line (766, combat's side (2):
+## playtest's server ignored it, missing from the options that take a value).
+func _test_arts_flag() -> void:
+	print("
+== --test-arts is read, either form (766, combat's side (2)) ==")
+	var kept := Net.test_arts.duplicate()
+	Net._parse_args(["--test-arts=swordplay:1,bow:0.5"])
+	_check(Net.test_arts == {"swordplay": 1.0, "bow": 0.5}, "--test-arts=swordplay:1,bow:0.5 (%s)" % [Net.test_arts])
+	Net._parse_args(["--test-arts", "bow:2"])
+	_check(Net.test_arts == {"bow": 1.0}, "--test-arts bow:2, held at 1 (%s)" % [Net.test_arts])
+	Net.test_arts = kept
 
 
 func _test_solo_round_trip() -> void:
