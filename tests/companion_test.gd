@@ -110,6 +110,7 @@ func _ready() -> void:
 	_test_fallen_knight()
 	_test_follow_without_backsteps()
 	_test_follow_a_creep()
+	_test_one_cell_door()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -3274,6 +3275,105 @@ func _test_follow_a_creep() -> void:
 	_put(owner, owner_was)
 	_put(pet, pet_was)
 	_settle(pet)
+
+
+func _test_one_cell_door() -> void:
+	print("
+== a hut's one-cell door: she never stops in its gap, and his route passes through her (391 amended) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	# Outside rows 0..3, a one-cell entry (5, 4), the door between it and the
+	# hut (5, 5); inside rows 5..8 (the healer's hut the playtest was shut in).
+	var floor_cells: Array[Vector2i] = [Vector2i(5, 4)]
+	for y in 4:
+		for x in 11:
+			floor_cells.append(Vector2i(x, y))
+	for y in range(5, 9):
+		for x in range(2, 9):
+			floor_cells.append(Vector2i(x, y))
+	var door_key := Terrain.edge_key(Vector2i(5, 4), Vector2i(0, 1))
+	var moved := {}
+	for entity in World.get_entities():
+		if entity != owner and entity != pet and entity.spawned and floor_cells.has(entity.tile):
+			moved[entity] = entity.tile
+			World._relocate(entity, Vector2i(30 + moved.size(), 30))
+	World._set_terrain({"floor": floor_cells, "fire": [], "edges": {door_key: Terrain.Edge.DOOR}, "torches": []})
+	var door: Door = load("res://sim/door.gd").new()
+	door.key = door_key
+	World.register_door(door)
+	door.open = true
+	_check(Heel.pinch(Vector2i(5, 3)) and Heel.pinch(Vector2i(5, 4)) and Heel.shut_cell(Vector2i(5, 5))
+			and not Heel.pinch(Vector2i(5, 2)) and not Heel.pinch(Vector2i(4, 3)) and not Heel.pinch(Vector2i(4, 6)) and not Heel.pinch(Vector2i(0, 0)),
+			"the entry and the cell outside it are gaps, the door's inside cell a door's; open ground and the hut's floor are neither")
+	# She stands just outside the entry, he inside: his route out is through her.
+	_put(owner, Vector2i(5, 7))
+	_put(pet, Vector2i(5, 3))
+	var out := World.walk_path(owner.tile, Vector2i(5, 0), owner)
+	_check(out.has(Vector2i(5, 3)) and out.back() == Vector2i(5, 0), "his route out passes through her cell (%s)" % [out])
+	_check(World.walk_path(owner.tile, Vector2i(5, 0), null).is_empty(), "anyone else's way is shut by her")
+	var keeper_was := pet.keeper
+	var peer_was := pet.keeper_peer
+	pet.keeper = null
+	pet.keeper_peer = owner.owner_peer + 777  # Another player's companion.
+	_check(World.walk_path(owner.tile, Vector2i(5, 0), owner).is_empty()
+			and not World._line_clear(Vector2i(5, 4), Vector2i(5, 1), Vector2i(5, 1), owner),
+			"another player's companion in the same cell still shuts his route")
+	pet.keeper = keeper_was
+	pet.keeper_peer = peer_was
+	_check(World._line_clear(Vector2i(5, 4), Vector2i(5, 1), Vector2i(5, 1), owner), "and his straight line runs through her")
+	_check(_walk_own(owner, Vector2i(5, 2), 200), "he walks out of the hut past her (at %s, she at %s)" % [owner.tile, pet.tile])
+	World.face(owner, Vector2i(0, -1))
+	# He stops just outside, facing away from the hut, she inside: her heel is
+	# a cell behind him, but not the gap.
+	_put(pet, Vector2i(5, 7))
+	var gap := 0
+	for i in 120:
+		World.step()
+		if i > 60 and (Heel.shut_cell(pet.tile)):
+			gap += 1
+	_check(gap == 0 and not Heel.shut_cell(pet.tile) and World.distance(pet.tile, owner.tile) <= Heel.STOP and pet.tile.y <= 3,
+			"she comes out and stops beside the entry, not in it (at %s, he at %s; %d late ticks in a gap)" % [pet.tile, owner.tile, gap])
+	_check(Heel.cell(pet, owner, {}, Vector2i(0, -1)) not in [Vector2i(5, 3), Vector2i(5, 4)], "his heel cell is never the gap (%s)" % Heel.cell(pet, owner, {}, Vector2i(0, -1)))
+	# Back in, and out again, wherever she stands.
+	_check(_walk_own(owner, Vector2i(5, 7), 300), "he walks back in (at %s, she at %s)" % [owner.tile, pet.tile])
+	for i in 60:
+		World.step()
+	_check(not World.walk_path(owner.tile, Vector2i(5, 0), owner).is_empty(), "and has a route out, she at %s" % [pet.tile])
+	World.unregister_door(door)
+	door.free()
+	World._set_terrain(_main._terrain)
+	for entity: GridEntity in moved:
+		World._relocate(entity, moved[entity])
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
+
+
+## Walks [param owner] to [param cell] as his client would (Walk.to, but on
+## his own route, World.walk_path with him as the walker: his companion is no
+## wall to it). True once he stands there.
+func _walk_own(owner: Player, cell: Vector2i, most_ticks: int) -> bool:
+	for i in most_ticks:
+		if Walk.arrived(owner, cell):
+			return true
+		var path: Array[Vector2i] = []
+		if owner.tile != cell:
+			path = World.walk_path(owner.tile, cell, owner)
+		# A cell his body has reached is passed, as the client's route pops it
+		# (Main._free_intent): his claim of it waits on her yield.
+		while path.size() > 1 and owner.free_pos.distance_to(Vector2(path[0])) < 0.45:
+			path.pop_front()
+		var next: Vector2i = path[0] if not path.is_empty() else cell
+		var way := Vector2(next) - owner.free_pos
+		if way.length() > 0.0001:
+			var speed := 1.0 / World.step_ticks(owner, World._free_axis(way))
+			World.free_input(owner, way / maxf(way.length(), speed), World.TICK_DT)
+		World.step()
+	return Walk.arrived(owner, cell)
 
 
 func _test_follow_without_backsteps() -> void:

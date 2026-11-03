@@ -172,7 +172,7 @@ func follow(body: GridEntity, leader: GridEntity) -> void:
 
 ## The nearest of [param leader]'s last cells (their footsteps) a cell back
 ## from them and within STOP that she may make for: out of their way
-## ([param clear]), not a door's, on their side of a building's walls, and
+## ([param clear]), not a door's nor a gap's (shut_cell), on their side of a building's walls, and
 ## free or hers, nearer them than she is; NONE if none. A cell back, so a
 ## turn straight back does not walk into her. Their step due this tick and
 ## not yet taken counts as taken: she sets off with it, not a tick behind.
@@ -187,7 +187,7 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 	for at: Vector2i in steps.slice(1):
 		if World.distance(at, lead) > STOP:
 			break
-		if clear.has(at) or Companion.door_cells().has(at) or Companion._inside_of(at) != Companion._inside_of(leader.tile):
+		if clear.has(at) or shut_cell(at) or Companion._inside_of(at) != Companion._inside_of(leader.tile):
 			continue
 		if at == body.tile:
 			return at
@@ -200,12 +200,12 @@ func _footstep(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vecto
 
 ## A step out of [param leader]'s way for [param body] standing in it: the
 ## free walkable cell next to her, within STOP of them and out of their way
-## ([param clear]), never a door's, nearest them; NONE if none.
+## ([param clear]), never a door's nor a gap's (shut_cell), nearest them; NONE if none.
 static func _aside(body: GridEntity, leader: GridEntity, clear: Dictionary) -> Vector2i:
 	var best := NONE
 	for way: Vector2i in World.DIRECTIONS:
 		var at := body.tile + way
-		if clear.has(at) or World.distance(at, leader.tile) > STOP or Companion.door_cells().has(at):
+		if clear.has(at) or World.distance(at, leader.tile) > STOP or shut_cell(at):
 			continue
 		if not (World.is_walkable(at) and World.is_free(at)) or World.find_path(body.tile, at, false, null, ASIDE_SEARCH_TILES).size() != 1:
 			continue
@@ -214,11 +214,43 @@ static func _aside(body: GridEntity, leader: GridEntity, clear: Dictionary) -> V
 	return best
 
 
+## Whether [param at] is a cell she never stops on of her own accord: a
+## door's (Companion.door_cells) or a one-cell gap's (pinch).
+static func shut_cell(at: Vector2i) -> bool:
+	return Companion.door_cells().has(at) or pinch(at)
+
+
+## Whether [param at] is a one-cell gap (391 amended; playtest: Rhea stood
+## in the healer's hut's one-cell entry, outside its door, and shut her
+## player in): the cells a step from it, by the terrain alone (doors open),
+## fall into two or more groups not joined but through it, so a body on it
+## stops the way past: a doorway's passage, the cells either side of a
+## one-cell door, a gap between two trees. A dead end is none.
+static func pinch(at: Vector2i) -> bool:
+	if not World.is_walkable(at):
+		return false
+	var round: Array[Vector2i] = []
+	for way: Vector2i in World.DIRECTIONS:
+		if not World._terrain_blocks_step(at, way, true):
+			round.append(at + way)
+	if round.size() < 2:
+		return false
+	var reached: Array[Vector2i] = [round[0]]
+	var i := 0
+	while i < reached.size():
+		var from := reached[i]
+		i += 1
+		for other in round:
+			if not reached.has(other) and World.distance(from, other) == 1 					and not World._terrain_blocks_step(from, other - from, true):
+				reached.append(other)
+	return reached.size() < round.size()
+
+
 ## Whether her kept heel cell [param goal] still serves: within STOP of
 ## [param leader], walkable and free (or hers), out of their way
-## ([param clear]) and not ahead of where they go ([param way]).
+## ([param clear]), not a door's nor a gap's (shut_cell), and not ahead of where they go ([param way]).
 static func _serves(goal: Vector2i, body: GridEntity, leader: GridEntity, way: Vector2i, clear: Dictionary) -> bool:
-	if goal == NONE or clear.has(goal) or World.distance(goal, leader.tile) > STOP or Companion.door_cells().has(goal):
+	if goal == NONE or clear.has(goal) or World.distance(goal, leader.tile) > STOP or shut_cell(goal):
 		return false
 	if goal != body.tile and not (World.is_walkable(goal) and World.is_free(goal)):
 		return false
@@ -290,7 +322,7 @@ static func keep_clear(leader: GridEntity) -> Dictionary:
 
 ## The cell at [param leader]'s heel for [param body]: of the free walkable
 ## cells within STOP of them (hers among them), never a door's
-## (Companion.door_cells) nor one of [param clear] (keep_clear) nor one
+## (Companion.door_cells) nor a one-cell gap (pinch) nor one of [param clear] (keep_clear) nor one
 ## burning (707), one on
 ## their side of a building's walls (inside with them, or outside), then one
 ## behind [param way] (their facing by default; not ahead, nor beside if any
@@ -305,7 +337,7 @@ static func cell(body: GridEntity, leader: GridEntity, clear := {}, way := NONE)
 	for dy in range(-STOP, STOP + 1):
 		for dx in range(-STOP, STOP + 1):
 			var at := leader.tile + Vector2i(dx, dy)
-			if at == leader.tile or World.distance(at, leader.tile) > STOP or doors.has(at) or clear.has(at):
+			if at == leader.tile or World.distance(at, leader.tile) > STOP or doors.has(at) or clear.has(at) or pinch(at):
 				continue
 			if at != body.tile and not (World.is_walkable(at) and World.is_free(at)) or World.is_burning(at):
 				continue  # (Never a burning one, hers or not: 707.)

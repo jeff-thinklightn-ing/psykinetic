@@ -10690,6 +10690,40 @@ free cell of its own (Level.building_cells) nearest the box's middle,
 never the box's empty corner, and counts only what is on its own cells.
 A one-block building's look is as before. companion_test covers it.
 Protocol unchanged.
+
+## 391 amended: she never shuts her player in behind a one-cell door
+
+Playtest's store and makers tours (2026-11-02, through the coordinator),
+three runs out of three: the player was shut inside Hob's healer's hut
+for 40 s to 4 min while Rhea stood at (152,231). That cell is just
+outside the hut's one-cell entry (152,232), and the door edge sits
+between the entry and (152,233). His route out (World.walk_path, the
+client's click route and the tour bot's) came back empty until she
+moved. His free body walks through his own companion (688), and a grid
+step into her swaps them (679), but find_path walled off every occupant
+except the walker, her included.
+
+Two parts. find_path and _line_clear no longer count the walker's own
+companion (World._own_companion_of: her keeper, or on a client her
+keeper's peer) as occupied. Only the walker's own is skipped: a
+stranger's companion, another player's, a resident or a monster still
+blocks every route, and a walker of no keeper (ignore null, every
+monster's and resident's search) is unchanged. With a route through her,
+678's step aside (Heel.keep_clear) and 679's swap now fire. And Heel never
+settles on a one-cell gap: Heel.pinch(cell) is true when the cells a
+step from it, by terrain alone with doors open, fall into two or more
+groups joined only through it. That covers a doorway's passage, the
+cells either side of a one-cell door and a gap between two trees, but
+not a dead end. Heel.shut_cell (a door's cell or a gap) replaces
+door_cells in _footstep, _aside, _serves and cell. companion_test
+_test_one_cell_door builds such a hut. His route out runs through her,
+while a stranger's companion in the same cell still shuts it. She comes
+out behind him and stops beside the entry, never in it. His heel cell is
+never the gap, and he has a route back out wherever she stands.
+
+main.gd's client routes use walk_path, so v0.1.198 clients keep the old
+routing (her a wall to their route) until v0.1.199. That is harmless:
+the server's walk is unchanged. Protocol unchanged, no new class_name.
 ## 423. The needles' floor: a ground.needles texture under the pine stands
 
 The floor under the border's pine stands (369) was the flat NEEDLES colour

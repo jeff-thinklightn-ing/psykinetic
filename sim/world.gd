@@ -10548,7 +10548,11 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## With [param ignore_goal_occupant] the goal may be occupied (walk up to a
 ## monster, push a crate), but occupied tiles along the way still block.
 ## [param ignore] is an entity whose own tile does not count as occupied
-## (a client predicting for itself, whose replicated tile lags behind).
+## (a client predicting for itself, whose replicated tile lags behind); a
+## player's own companion does not either (391 amended): his free body
+## passes through her (688) and a grid step swaps them (679), so a route
+## never walls him in behind her (playtest: Rhea outside the healer's hut's
+## one-cell door shut her player in for minutes; the route was empty).
 ## [param max_tiles] > 0 gives up (empty) after looking at that many tiles:
 ## a monster's way to a tile beside its target is short or not worth it.
 ## With [param nearest], giving up (or no way there) gives the way to the
@@ -10682,7 +10686,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			if shut and not opens_doors:
 				continue
 			var next := current + direction
-			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore:
+			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore 					and not (ignore != null and _own_companion_of(_occupancy[next], ignore)):
 				continue
 			if walled and walls.has(next):
 				continue
@@ -10737,8 +10741,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 ## clearing is crossed straight, not as a staircase of diagonals then
 ## straights. A run grows while the line from its start to the next point
 ## of the way is all steps the way could take (_line_clear: no wall or
-## corner refusal, nobody but [param ignore] or the goal's occupant, no
-## fire); never longer, as a line of n cells is n steps and the same
+## corner refusal, nobody but [param ignore], its own companion or the
+## goal's occupant, no fire); never longer, as a line of n cells is n steps and the same
 ## diagonals. Players' own routes only (the prediction's plan and
 ## Player's re-path); monsters keep find_path.
 func walk_path(from: Vector2i, to: Vector2i, ignore: GridEntity = null, fire_extra := PATH_FIRE_EXTRA) -> Array[Vector2i]:
@@ -10773,14 +10777,15 @@ static func line_cells(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 
 ## Whether every step of the line from [param a] to [param b] could be
 ## walked as find_path walks (decision 678): the terrain lets it (walls,
-## corners, heights; doors open), nobody stands in it but [param ignore]
-## or whoever holds [param goal], and it is not on fire.
+## corners, heights; doors open), nobody stands in it but [param ignore],
+## its own companion (find_path) or whoever holds [param goal], and it is
+## not on fire.
 func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -> bool:
 	var at := a
 	for next in line_cells(a, b):
 		if _terrain_blocks_step(at, next - at, true):
 			return false
-		if next != goal and _occupancy.has(next) and _occupancy[next] != ignore:
+		if next != goal and _occupancy.has(next) and _occupancy[next] != ignore 				and not (ignore != null and _own_companion_of(_occupancy[next], ignore)):
 			return false
 		if is_burning(next):
 			return false
