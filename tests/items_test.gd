@@ -1917,6 +1917,7 @@ func _test_armour() -> void:
 	# the draw's time is the arms' load's (676), no longer the armour's own multiple.
 	_give(host, "bow", Player.RIGHT_HAND)
 	_give(host, "arrows", Player.LEFT_HAND)
+	World.set_arts(host, {})  # Unpractised (766): this run's earlier shots grew the bow.
 	_check(World.try_stance(host, "draw"), "drawn in leather")
 	host.raised_tick = World.tick - 11
 	# 1.2 kg of leather on the arms beside the bow and arrows' 1.6: 2.8 of 16, 0.025 past the free 0.15.
