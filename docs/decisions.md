@@ -38779,6 +38779,16 @@ activity, not only the shelter: work, home, the square, a visit, the rounds. res
 Bram out of doors in the wolves, his goal a cell no way leads to, waits where he is, then chooses again and
 reaches his roof (without the retry he stood there for good); its daily routines pass with it. Server only,
 protocol unchanged, no new class_name.
+762 amended (4) (the coordinator's call after playtest's balance_end_badly 3; release's label): the all-clear
+reaches every player in the town. Main._all_clear had the first of the town's bodies in World.townsfolk()
+order, awake and not on the road, say it to hearers within HEARING_RANGE of it: with Hob at the healers' hut
+first, nobody in the square heard it (playtest's bot, fighting about 8 cells from the chapel folk, got no
+speech). Now every spawned player in a zone of the town's folk hears it from the nearest of its guards up
+and about there (FIGHTERS: the one who turned out), else its nearest townsperson awake and not on the road;
+each speaker says its line once, to the peers it serves (party log once per speaker). Its folk stop
+sheltering at once, as before; same townsfolk.json threat.all_clear lines. resident_test _test_threat: a
+player beside Bram hears it from Gunn the guard, 7 cells off; with no guard up, from Bram. Server only,
+protocol unchanged, no new class_name.
 
 ## 764. Hunting a deer: burst then trot, the wounded tire and go down, a slow stalk
 

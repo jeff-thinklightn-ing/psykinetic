@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The all-clear after a town's threat reaches everyone in town, from the guard nearest you (762 amended (4)).
 - A healer gathers more herbs a day, so his shelf of remedies and potions rarely stands empty (562 amended (7)).
 - Townsfolk caught outdoors by a threat no longer stand still a few steps from shelter: one whose way is blocked tries again (762 amended (3)).
 - Ground fog no longer shows square patches or cuts a hard line across bodies, walls and hillsides: it thins softly where it meets them (309 amended).

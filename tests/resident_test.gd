@@ -858,9 +858,16 @@ func _test_threat() -> void:
 	_main._sync_residents()
 	_check(World.towns.threatened(STORE) == "raid", "the raider gone: it holds a while yet")
 	World.towns._towns[STORE]["threat"]["seen"] = World.towns.now() - clear - 1
+	if player != null:
+		_put(player, _main._nearest_free(bram.tile + Vector2i(1, 0)))  # Beside Bram, the guard further off.
 	told.clear()
 	_main._sync_residents()
 	var all_clear: Array = Townsfolk.rules().get("threat", {}).get("all_clear", {}).get("raid", [])
+	if player != null:
+		# 762 amended (4) (the coordinator, after playtest's badly 3: nobody heard it): every player in the town
+		# hears it, from the guard who turned out, however far, before the townsperson beside them.
+		var from: Array = told.filter(func(each: Dictionary) -> bool: return each["kind"] == "speech").map(func(each: Dictionary) -> String: return str(each["data"]["speaker"]))
+		_check(from == ["Gunn"], "the all-clear to the player beside Bram: from Gunn the guard, %d cells off (%s)" % [World.distance(player.tile, gunn.tile), from])
 	_check(World.towns.threatened(STORE).is_empty() and not bram.sheltering and not gunn.sheltering, "unseen for %d steps: lifted, nobody sheltering" % clear)
 	_check(told.any(func(each: Dictionary) -> bool: return each["kind"] == "speech" and str(each["data"]["text"]) in all_clear.map(func(line: Variant) -> String: return str(line)))
 		and told.any(func(each: Dictionary) -> bool: return each["kind"] == "town" and each["data"].get("town") == STORE and not each["data"].has("threat")),
@@ -872,8 +879,14 @@ func _test_threat() -> void:
 	_main._sync_residents()
 	_check(World.towns.threatened(STORE) == "wolves", "held up by its holder: it stays, unseen")
 	World.towns.release_threat(STORE, "rs-pack")
+	gunn.trade = "cook"  # No guard up (762 amended (4)): the townsperson nearest the player says it.
+	told.clear()
 	_main._sync_residents()
+	gunn.trade = "guard"
 	_check(World.towns.threatened(STORE).is_empty(), "let go, unseen: lifted")
+	if player != null:
+		var said_by: Array = told.filter(func(each: Dictionary) -> bool: return each["kind"] == "speech").map(func(each: Dictionary) -> String: return str(each["data"]["speaker"]))
+		_check(said_by == ["Bram"], "no guard: from Bram, nearest the player (%s)" % [said_by])
 	# The balance quest's town wolves (761, npc's side): Balance.threat_changed holds it up.
 	if World.balance != null:
 		World.balance.threat_changed.emit(STORE, "wolves", true)
@@ -925,8 +938,10 @@ func _test_threat() -> void:
 	_check(shut != Resident.NO_CELL and bram.doing == Resident.Doing.HIDE, "(out again in the wolves, sheltering; a cell no way leads to: %s)" % shut)
 	bram._goal = shut
 	bram._route.clear()
-	World.step()
-	World.step()
+	for i in 30:  # Until his next step is due and he looks for the way (next_move_tick).
+		if bram._retry_at >= 0:
+			break
+		World.step()
 	var stood := bram.tile
 	_check(bram._goal == stood and bram._retry_at > World.tick, "his way shut: he waits where he is, for now (%s, retry at %d, tick %d)" % [bram.tile, bram._retry_at, World.tick])
 	for i in Resident.PATH_RETRY_TICKS - 5:

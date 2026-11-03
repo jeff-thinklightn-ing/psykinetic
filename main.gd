@@ -9556,7 +9556,7 @@ func _raise_threat(town: String, kind: String, holder := "") -> void:
 
 
 ## The threats unseen for THREAT_CLEAR_HOURS lifted (762): every peer told,
-## its folk out again, the first of them up and about saying so.
+## its folk out again, each player there told by its guard (762 amended (4)).
 func _threats_lift() -> void:
 	var clear := maxi(int(float(DayNight.day_steps) * THREAT_CLEAR_HOURS / 24.0), 1)
 	for each: Dictionary in World.towns.lift_stale(clear):
@@ -9564,23 +9564,51 @@ func _threats_lift() -> void:
 		_all_clear(str(each["town"]), str(each["kind"]))
 
 
-## The all-clear (762): the first of [param town]'s bodies here, awake and
-## not on the road, says townsfolk.json threat.all_clear for [param kind];
-## its folk stop sheltering at once.
+## The all-clear (762; 762 amended (4)): [param town]'s folk stop sheltering
+## at once, and every player in a zone of its folk hears townsfolk.json
+## threat.all_clear for [param kind] from the nearest of its guards up and
+## about there (the one who turned out), else its nearest townsperson awake
+## and not on the road.
 func _all_clear(town: String, kind: String) -> void:
 	var lines: Array = Townsfolk.rules().get("threat", {}).get("all_clear", {}).get(kind, [])
-	var said := false
+	var up: Array[Resident] = []
 	for entity: GridEntity in World.townsfolk():
 		var body := entity as Resident
 		if body.town != town:
 			continue
 		body.sheltering = false
-		if said or lines.is_empty() or not body.spawned or body.sleeping() or body.strayed or not body.escort_of.is_empty():
+		if body.spawned and not body.sleeping() and not body.strayed and body.escort_of.is_empty():
+			up.append(body)
+	if lines.is_empty() or up.is_empty():
+		return
+	var heard_from: Dictionary = {}  # Resident -> peers it says it to.
+	for entity: GridEntity in World.sought():
+		var player := entity as Player
+		if player == null or not player.spawned or player.player_id.is_empty():
 			continue
-		said = true
-		var line := str(lines[absi(hash(body.worker_id + town)) % lines.size()])
-		party_log.add("%s said: \"%s\"" % [body.person, line])
-		Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": ""})
+		var peer := Net.local_id if player.player_id == Net.player_id else _peer_of(player.player_id)
+		if peer == 0:
+			continue
+		var speaker: Resident = null
+		var guard := false
+		for body: Resident in up:
+			if body.zone != player.zone:
+				continue
+			var is_guard := body.trade in Resident.FIGHTERS
+			if speaker == null or (is_guard and not guard) or (is_guard == guard
+					and World.distance(body.tile, player.tile) < World.distance(speaker.tile, player.tile)):
+				speaker = body
+				guard = is_guard
+		if speaker == null:
+			continue
+		if not heard_from.has(speaker):
+			heard_from[speaker] = [] as Array[int]
+		if peer not in heard_from[speaker]:
+			(heard_from[speaker] as Array[int]).append(peer)
+	for speaker: Resident in heard_from:
+		var line := str(lines[absi(hash(speaker.worker_id + town)) % lines.size()])
+		party_log.add("%s said: \"%s\"" % [speaker.person, line])
+		Net.broadcast_to(heard_from[speaker], "speech", {"entity": String(speaker.get_path()), "speaker": speaker.person, "text": line, "aside": ""})
 
 
 ## Each of [param wanted]'s shelter for a threat (762): "bed_roofed", whether
