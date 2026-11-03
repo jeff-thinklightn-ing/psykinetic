@@ -4069,12 +4069,8 @@ func _boot() -> void:
 	# (buildings' 424 amended), its "town" (decision 434).
 	World.counter_town = func(counter: GridEntity) -> String:
 		var area := counter.zone if not counter.zone.is_empty() else World.zone.name
-		for house: Dictionary in _world_map.areas.get(area, {}).get("buildings", []):
-			var rect: Variant = Level.building_rect(house)
-			if str(house.get("use", "")) == "temple" and rect is Rect2i and (rect as Rect2i).has_point(counter.tile) \
-					and not str(house.get("town", "")).is_empty():
-				return "%s/%s" % [area, house["town"]]
-		return Stockpile.place_at(World.holdings, area, counter.tile)
+		var town := Main.temple_town(_world_map.areas.get(area, {}).get("buildings", []), area, counter.tile)
+		return town if not town.is_empty() else Stockpile.place_at(World.holdings, area, counter.tile)
 	# Rescues (decision 428): a camp's held come home when it falls.
 	World.towns.camps = World.holdings.camps
 	World.towns.home_of = func(camp: String) -> String:
@@ -13331,6 +13327,19 @@ func give_gold(player: Player, args: Dictionary) -> int:
 	Net.broadcast_to(peers, "party", {"from": "Server", "text": line})
 	print("[economy] %s" % line)
 	return given
+
+
+## The town of the temple standing over [param cell] in [param area]'s
+## loaded [param buildings] (434; its "town"): "<area>/<town>", "" for none.
+static func temple_town(buildings: Array, area: String, cell: Vector2i) -> String:
+	for house: Variant in buildings:
+		if not house is Dictionary:
+			continue
+		var rect: Variant = Level.building_rect(house)
+		if str(house.get("use", "")) == "temple" and rect is Rect2i and (rect as Rect2i).has_point(cell) \
+				and not str(house.get("town", "")).is_empty():
+			return "%s/%s" % [area, house["town"]]
+	return ""
 
 
 ## Server: the "town_sheet" command (decision 624, economy's side; ui's

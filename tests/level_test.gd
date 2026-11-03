@@ -61,6 +61,7 @@ func _ready() -> void:
 	await _test_links_kept_clear()
 	await _test_sealed_link()
 	await _test_temple_stair()
+	_test_temple_town()
 	_test_barrow_won()
 	await _test_hall_door()
 	await _test_hidden_niche()
@@ -2086,6 +2087,23 @@ func _test_sealed_link() -> void:
 	_check(PlayerRecord.from_dict(record.to_dict().merged({"player_id": record.player_id})).marks == ["draugr"], "the mark is saved with the record")
 	_main.mark_player(id, "draugr", false)
 	_check(record.marks.is_empty(), "and taken off again")
+
+
+## A temple counter's town from the real loaded wilds (434 amended,
+## playtest's store run 3): Level.building_rect of a loaded building is its
+## laid rect, and Main.temple_town finds wilds' temple's town over its cells.
+func _test_temple_town() -> void:
+	print("\n== a temple counter's town, from the loaded wilds (434 amended) ==")
+	var houses: Array = WorldMap.build(["wilds"]).areas.get("wilds", {}).get("buildings", [])
+	var temples := houses.filter(func(each: Dictionary) -> bool: return str(each.get("use", "")) == "temple")
+	_check(not temples.is_empty() and Level.building_rect(temples[0]) is Rect2i and Level.building_rect(temples[0]) == temples[0]["rect"],
+		"a loaded building's rect is its own (%s)" % [temples.map(func(each: Dictionary) -> Variant: return each.get("rect"))])
+	if temples.is_empty():
+		return
+	var rect: Rect2i = temples[0]["rect"]
+	_check(Main.temple_town(houses, "wilds", rect.position + rect.size / 2) == "wilds/%s" % temples[0]["town"] and not str(temples[0]["town"]).is_empty(),
+		"a counter inside the temple: its town (%s)" % Main.temple_town(houses, "wilds", rect.position + rect.size / 2))
+	_check(Main.temple_town(houses, "wilds", rect.position - Vector2i(3, 3)).is_empty(), "outside it: none")
 
 
 ## The temple's stair (714, dungeon's side (2), on buildings' 715): the

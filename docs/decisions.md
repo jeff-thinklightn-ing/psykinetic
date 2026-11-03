@@ -10841,6 +10841,21 @@ nobody there, the counter's other things left alone, held in a saved world
 and read back, taken back and no longer held, refused with the priest
 away); rescue_test's mend job is kind "work".
 
+434 amended (release's label; the coordinator routed playtest's store run 3): the temple counter's
+town from a loaded level. Umbrage's temple counter opened with no squares: the server sent town ""
+and jobs []. World.counter_town looked for the temple over the counter in the world map's loaded
+buildings ({slot, cell, facing, rect, use, town, ...}, no "at") through Level.building_rect, which
+read only a level.json entry's "at" and so returned null for every loaded building; no temple
+matched, and the store place under the cell was none. blessing_test stubs counter_town, so it never
+caught it. Level.building_rect now returns a loaded building's own Rect2i "rect" when it has one,
+as Level.solid_door_of already did; a level.json entry (the editor's, the builder's, the prefabs',
+make_wilds_marks', Level's own load) is read as before. Its other callers handed loaded buildings
+now get a rect too: Level.building_blocks and Level.kind_doors / kind_open, so Main._note_cell
+(643: a notice's cell by a building's door) finds the door of a kind with doors where it fell back
+to the front cell. The temple search is Main.temple_town(buildings, area, cell), a static func;
+level_test _test_temple_town runs it on the real loaded wilds (a cell inside its temple: its
+town; outside: none). Server only; protocol unchanged; no new class_name.
+
 ## 431. A server answers a status query before anyone joins
 
 ui's menu and connect screen (418, 427) want to say whether the server is

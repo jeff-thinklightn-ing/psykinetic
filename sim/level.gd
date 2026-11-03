@@ -2753,6 +2753,10 @@ static func fill_codes(config: Dictionary) -> bool:
 static func building_rect(entry: Variant) -> Variant:
 	if not entry is Dictionary:
 		return null
+	# A loaded level's building (Level's own: {slot, cell, rect, ...}, no
+	# "at") is its rect as laid (434 amended: the temple counter's town).
+	if entry.get("rect") is Rect2i:
+		return entry["rect"]
 	var size: Variant = BUILDINGS.get(str(entry.get("slot", "")))
 	if str(entry.get("slot", "")) == BRIDGE:
 		size = Vector2i(clampi(int(entry.get("width", 1)), 1, 2), maxi(int(entry.get("length", 1)), 1))
