@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.199
+
+- What goes over the network changes, so v0.1.198 and older can't join the server: update through the launcher first.
 - A maker with nothing to sell says so in his own words when you open Barter (562 amended (6)).
 - Companions: your companion no longer stops in a doorway's one-cell gap, and a click route walks through her instead of finding no way, so she can't shut you inside a hut (391 amended).
 - Hob and the other makers take herbs or materials in trade for their goods, settling only the difference in coin, and say so when they can't pay it (562 amended (9)).
@@ -20,8 +23,8 @@ notes (decision 324).
 - Struck game cries out: a deer barks or bleats, a stag bellows and a rabbit squeals when hit and not killed (764 amended (4)).
 - A vendor sheltering from wolves or raiders no longer offers Barter on a joined game, the outpost's too: his line is enough (762 amended).
 - A badly hurt deer lies down on its belly, head up and breathing, and gets up again if left (only a dead one lies on its side), and a wounded animal leaves a trail of blood on the ground that fades after a few minutes (764 amended).
-
 - The fallen knight can be talked to after his quest: his window shows his last words with a Farewell button (747 amended (5), ui's side).
+
 ## v0.1.198
 
 - Deer can be hunted on foot: a deer sprints then slows to a trot, a wounded one tires and bleeds until it goes down, and creeping up slowly from behind (your companion creeps with you) lets you reach it and fell it with one blow; a hit deer runs far, and a herd that sees one killed stays wary and moves off (764).
