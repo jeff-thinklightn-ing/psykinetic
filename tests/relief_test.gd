@@ -696,6 +696,26 @@ func _test_hills() -> void:
 			if wet.has(at) and Vector2(x, y).length() <= 2.5 and absf(Relief.at(field, size, at) - landing) < 0.5:
 				pool += 1
 	_check(drop > 5.0 and pool >= 7, "a fall off the plateau's cliff, %.1f m, into a pool at %s (%d cells at its level; 570)" % [drop, fall, pool])
+	# 776: the streams waded anywhere: the fall's pool the only deep water,
+	# and nearly every ford beside dry land stepped into from it (its bank
+	# within a walk), but where a gorge keeps its bank.
+	var deep_far: Array = (terrain["water"] as Array).filter(func(cell: Vector2i) -> bool: return Vector2(cell - fall).length() > 3.0)
+	var wading: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain["fords"]:
+		wading[cell] = true
+	var shore := 0
+	var entered := 0
+	for cell: Vector2i in wading:
+		var dry := false
+		var walked := false
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if floor.has(cell + step) and not wading.has(cell + step):
+				dry = true
+				walked = walked or not Relief.cliff_between(Relief.at(field, size, cell), Relief.at(field, size, cell + step))
+		shore += 1 if dry else 0
+		entered += 1 if dry and walked else 0
+	_check(deep_far.is_empty() and terrain["fords"].size() > 1500 and entered >= shore * 0.9,
+		"the streams waded: no deep water but the fall's pool (%s), %d ford cells, %d of %d beside dry land stepped into (776)" % [deep_far.slice(0, 3), terrain["fords"].size(), entered, shore])
 	var area := {"relief": field, "relief_size": size, "stairs": terrain["stairs"], "heights": {}, "edges": terrain["edges"], "floor": floor, "size": size}
 	var reached := PackedFloat32Array()
 	reached.resize(size.x * size.y)

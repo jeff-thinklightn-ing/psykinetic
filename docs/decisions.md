@@ -39331,3 +39331,42 @@ _step_sound alone; drips on its side are visual only.
 sound_kit_test (an animal's splash by size; the drip slot's reach and takes) and view_test
 (_test_wade_drip: out of a ford a drip, dry to dry none). Client only, protocol unchanged, no new
 class_name.
+## 776. The hills' rivers are streams, waded anywhere
+
+Jeff, 2026-11-02 (through the coordinator): "imo the river is more like a stream and should be
+fordable anywhere, but makes character get wet"; and "the area near water fall has the lone wall
+that doesnt make sense". The coordinator approved the plan: the wall removed, the banks graded,
+the bridge and the old fords kept as the easy (dry) crossings.
+
+- The hills' generator (tools/make_hills.gd, _wade) lays every water cell of its three streams as
+  a ford (505: floor, a step into it FORD_TICK_SCALE as long, routes FORD_COST, footing the ground
+  round it), but the cells within FALL_POOL (2.5) of each fall's cell (Relief.lay's "falls"): the
+  fall's pool stays deep water, the one deep spot. No new kind and no change to Level, World or the
+  wire: fords are 505's, so World.is_ford is true on a stream and is_water false (sound's wading
+  steps, 505's, play there with no change; pc-character's wet look and sound's animal splashes
+  follow).
+- The banks graded so a body wades in from either side: a bank standing over its water by more
+  than WADE_RISE (0.42, under Relief.WALK_RISE) and under WADE_MOST (1.6) is brought down to
+  WADE_RISE over it, the land behind eased down WADE_RISE a step over WADE_RINGS (4) rings at most,
+  never across a face (an escarpment's or the plateau's, the generator's _faces) nor onto water.
+  A lowered cell that stands at a new cliff to dry land is put back as it was (_unwade, to a fixed
+  point): there the bank stays. 633 banks graded, 45 cells behind eased, 20 put back; 1825 ford
+  cells, 12 deep in the fall's pool. A bank over WADE_MOST (the gorge where the river runs along the
+  mid escarpment's face, the fall's own gorge) stays a bank: now that a ford is walked, its edge to
+  the bank is a cliff between walkable cells, traced as a ledge like any other (the generator's
+  "on no escarpment" count rises from those).
+- The low stone wall on the valley floor below the cliff (x 161, rows 34 to 41; its sight test
+  was the plateau seeing over it) is gone.
+- The bridge (88, 110) and the fords at rows 6, 13, 56 and 113 stay where they were.
+- Saves: a cell that was water held nothing (no pile, plot or body stands on water), and a graded
+  bank only moves the ground's height under what stands there, so the hills keep their grid: no
+  remade line, nothing of players' moved or dropped.
+- Herds, wolves and residents walk World's terrain rules, so they wade too (enemy-ai and economy
+  told).
+- Level.safe_paths (763): a ford is no dirt and counts as water for a bank, so a waded stream's
+  dirt banks (now floor beside floor) are not taken for tracks; the hills' safe paths stay the road.
+
+relief_test _test_hills (the fall's pool still deep; streams as fords), level_test _test_hills
+(the low wall's sight check now over open valley). Level data and the generator only; protocol
+unchanged (fords are on the wire since 505; a client and server must have the same level, so it
+ships with a cut); no new class_name.

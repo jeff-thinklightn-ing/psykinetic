@@ -1308,8 +1308,9 @@ static func markets_from(config: Dictionary, warnings: Array[String]) -> Diction
 ## safe_paths): its road curves' cells on its floor, and the layout's dirt
 ## tracks: dirt a 3 x 3 opening takes away (thin, not a cleared patch), not
 ## within 2 cells of anything not floor (a river's or pool's bank), in
-## 8-connected runs of TRACK_RUN cells or more. A level with no road curves
-## (the forest) has its dirt for paths. For what keeps off them (economy's
+## 8-connected runs of TRACK_RUN cells or more; a ford (776: a stream waded
+## anywhere) is no dirt and counts as water for a bank. A level with no road
+## curves (the forest) has its dirt for paths. For what keeps off them (economy's
 ## dens) and what should sit near them. From a parsed level's [param terrain].
 static func safe_paths(terrain: Dictionary) -> Dictionary[Vector2i, bool]:
 	var floor: Dictionary[Vector2i, bool] = {}
@@ -1321,10 +1322,13 @@ static func safe_paths(terrain: Dictionary) -> Dictionary[Vector2i, bool]:
 		for cell: Vector2i in Curves.cells(road["curve"], false):
 			if floor.has(cell):
 				out[cell] = true
+	var fords: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("fords", []):
+		fords[cell] = true
 	var dirt: Dictionary[Vector2i, bool] = {}
 	var kinds: Dictionary = terrain["kinds"]
 	for cell: Vector2i in kinds:
-		if kinds[cell] == "dirt" and floor.has(cell):
+		if kinds[cell] == "dirt" and floor.has(cell) and not fords.has(cell):
 			dirt[cell] = true
 	if roads.is_empty():
 		out.merge(dirt)
@@ -1347,7 +1351,7 @@ static func safe_paths(terrain: Dictionary) -> Dictionary[Vector2i, bool]:
 		var bank := false
 		for dy in range(-2, 3):
 			for dx in range(-2, 3):
-				if not floor.has(cell + Vector2i(dx, dy)):
+				if not floor.has(cell + Vector2i(dx, dy)) or fords.has(cell + Vector2i(dx, dy)):
 					bank = true
 		if not bank:
 			thin[cell] = true

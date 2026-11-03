@@ -31,8 +31,13 @@ extends Node
 ##   dirt on the steep bands, the crests and the banks, grass elsewhere, no
 ##   stone on the slopes (the stone ground draws as paving; the cliff's
 ##   face is the rock);
-## - a low stone wall on the valley floor below the cliff, which the plateau
-##   sees over; a few boulders and crates by the rim to push off;
+## - a few boulders and crates by the rim to push off (the low wall on the
+##   valley floor below the cliff went in 776: Jeff, "the lone wall that
+##   doesn't make sense");
+## - its rivers streams, waded anywhere (776; Jeff: "the river is more like
+##   a stream and should be fordable anywhere"): every water cell a ford
+##   but each fall's pool, their banks graded to a walk (_wade); the bridge
+##   and the old fords still the dry crossings;
 ## - starts on a levelled pad by the link to the wilds (west edge), the
 ##   road from it down through the west escarpment's way, over the bridge
 ##   and on east toward the east valley's ford;
@@ -150,9 +155,15 @@ const EAST_COLUMNS := Vector2i(118, 166)
 ## The fords' banks are walked to over this many rows either side of them
 ## (the stream's banks further off kept as laid).
 const FORD_FREE := 4
-## The low wall: its column (the edge east of it) and rows.
-const WALL_X := 161
-const WALL_ROWS := Vector2i(34, 42)
+## The streams waded (776): each fall's pool, water within FALL_POOL of its
+## cell, stays deep; a bank higher than WADE_RISE over its water is brought
+## down to it, and the ground behind it eased down WADE_RISE a step, over
+## WADE_RINGS rings at most, where that bank stands under WADE_MOST over its
+## water (a deeper cutting, a fall's gorge, is left a bank).
+const FALL_POOL := 2.5
+const WADE_RISE := 0.42
+const WADE_RINGS := 4
+const WADE_MOST := 1.6
 ## The sought's refuges here (613 amended: one place a story, its key the
 ## story's tag), each {at, name}.
 const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave"}}
@@ -264,9 +275,9 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_bridge(water)
 	_rock()
 	_knoll()
-	_wall()
 	_road(arrival)
 	_places()
+	_wade(laid["falls"])
 	# Boulders and crates by the rim, to push off.
 	for at in [Vector2i(CLIFF_X + 1, 24), Vector2i(CLIFF_X + 2, 40)]:
 		map.set_cell(at, "boulder")
@@ -672,10 +683,83 @@ static func _cells_of(rect: Rect2i) -> Array[Vector2i]:
 	return out
 
 
-## The low wall below the cliff: the edges east of WALL_X over WALL_ROWS.
-func _wall() -> void:
-	for y in range(WALL_ROWS.x, WALL_ROWS.y):
-		map.set_edge(Vector3i(WALL_X, y, Terrain.EAST), "wall")
+## The streams waded anywhere (776): every water cell a ford (floor, slow,
+## its footing the ground round it, 505) but those within FALL_POOL of a
+## fall's cell ([param falls], Relief.lay's), and each bank over its water
+## by more than WADE_RISE (and under WADE_MOST) brought down to WADE_RISE
+## over it, the land behind eased down to WADE_RISE a step, ring by ring,
+## never across a face (_faces) nor onto other water.
+func _wade(falls: Array) -> void:
+	var fords := {}
+	var pools := 0
+	for at: Vector2i in map.cells:
+		if map.cell(at) != "water":
+			continue
+		if falls.any(func(fall: Dictionary) -> bool: return Vector2(at - (fall["cell"] as Vector2i)).length() <= FALL_POOL):
+			pools += 1
+			continue
+		fords[at] = true
+	for at: Vector2i in fords:
+		map.set_cell(at, "ford")
+	var wet := func(at: Vector2i) -> bool: return map.cell(at) in ["water", "ford"]
+	var ring: Dictionary = {}
+	var graded := 0
+	var was: Dictionary = {}  # cell -> its height before, for _unwade
+	for at: Vector2i in fords:
+		for step: Vector2i in Relief.FOUR:
+			var bank: Vector2i = at + step
+			if not map.walkable(bank) or wet.call(bank) or _faces.has(Terrain.edge_key(at, step)):
+				continue
+			var over := map.relief_at(bank) - map.relief_at(at)
+			if over > WADE_RISE and over < WADE_MOST:
+				if not was.has(bank):
+					was[bank] = map.relief_at(bank)
+				map.set_relief(bank, minf(map.relief_at(bank), map.relief_at(at) + WADE_RISE))
+				ring[bank] = true
+				graded += 1
+	var eased := 0
+	for i in WADE_RINGS:
+		var next: Dictionary = {}
+		for at: Vector2i in ring:
+			for step: Vector2i in Relief.FOUR:
+				var behind: Vector2i = at + step
+				if not map.walkable(behind) or wet.call(behind) or _faces.has(Terrain.edge_key(at, step)):
+					continue
+				var over := map.relief_at(behind) - map.relief_at(at)
+				if over > WADE_RISE and over < Relief.FACE_LEAST:
+					if not was.has(behind):
+						was[behind] = map.relief_at(behind)
+					map.set_relief(behind, map.relief_at(at) + WADE_RISE)
+					next[behind] = true
+					eased += 1
+		ring = next
+	var kept := _unwade(was)
+	print("[hills] streams waded: %d ford cells, %d kept deep in %d falls' pools; %d banks graded, %d cells behind eased, %d put back (a cliff they made)" % [fords.size(), pools, falls.size(), graded, eased, kept])
+
+
+## The cells _wade lowered ([param was]: cell -> height before) that stand
+## at a cliff to dry land they did not before put back as they were, again
+## till none is (the grading stops short there, the bank kept): how many.
+func _unwade(was: Dictionary) -> int:
+	var back := 0
+	for i in 64:
+		var changed := false
+		for at: Vector2i in was:
+			if is_equal_approx(map.relief_at(at), was[at]):
+				continue
+			for step: Vector2i in Relief.FOUR:
+				var next: Vector2i = at + step
+				if not map.walkable(next) or map.cell(next) in ["water", "ford"]:
+					continue
+				var before: float = was.get(next, map.relief_at(next)) if not was.has(next) or is_equal_approx(map.relief_at(next), was[next]) else was[next]
+				if Relief.cliff_between(map.relief_at(at), map.relief_at(next)) and not Relief.cliff_between(was[at], before):
+					map.set_relief(at, was[at])
+					back += 1
+					changed = true
+					break
+		if not changed:
+			break
+	return back
 
 
 ## Says the cliff edges the relief has (the plateau's face and the

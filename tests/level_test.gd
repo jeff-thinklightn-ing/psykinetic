@@ -1163,7 +1163,7 @@ func _test_sight_over_walls() -> void:
 ## levels/hills (decision 525's relief, tools/make_hills.gd): a bot walks
 ## from the link up the plateau's spur onto its top and back down; a body
 ## pushed off its sheer face falls by the drop's levels; the plateau sees
-## over the valley's low wall, the valley floor does not; the ridge hides
+## the valley below (its low wall gone, 776); the ridge hides
 ## the valley from the west.
 func _test_hills() -> void:
 	print("
@@ -1182,7 +1182,7 @@ func _test_hills() -> void:
 	_check(player.tile == plateau, "the bot walks up there, round by the spur (%s)" % player.tile)
 	_walk_free(player, foot)
 	_check(player.tile == foot, "and back down to the valley (%s)" % player.tile)
-	# The rim on row 38, over the low wall: the first cell east of the
+	# The rim on row 38 (776: no low wall below it now): the first cell east of the
 	# valley standing well over the one west of it.
 	var rim := Vector2i(168, 38)
 	for x in range(160, 174):
@@ -1198,7 +1198,7 @@ func _test_hills() -> void:
 	_check(imp.tile.x < rim.x and hp - imp.hp == World.FALL_IMPACT_PER_LEVEL * Relief.levels(drop),
 			"pushed off the face: it falls %.1f m, %d levels, for %d (%s, %s)" % [drop, Relief.levels(drop), hp - imp.hp, imp.tile, _pushes.back()["stopped_by"]])
 	World.despawn(imp)
-	_check(World.has_line_of_sight(rim + Vector2i(1, -1), Vector2i(156, 38)), "from the plateau's rim the valley beyond the low wall is seen")
+	_check(World.has_line_of_sight(rim + Vector2i(1, -1), Vector2i(156, 38)), "from the plateau's rim the valley below is seen")
 	# Along the west escarpment (756: its face near columns 36 to 44) there
 	# is ground behind its crest: some of it hidden from the valley floor.
 	var hidden := []

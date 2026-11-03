@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The hills' rivers are streams now: wade across anywhere (slowly), the bridge and the old fords still the easy ways over; only the pool under the waterfall is deep. The lone wall below the waterfall is gone (776).
 - Animals splash as they wade through water and fords, and anyone stepping out of a stream drips a drop or two (505 amended (3)).
 - A town temple's counter shows its blessing jobs again, so things can be handed in, blessed and collected there (434 amended).
 - Townsfolk no longer sleep the whole night: each turns in for a short while, and the rest of the night they're up in the square, at night work or at the chapel (772).
