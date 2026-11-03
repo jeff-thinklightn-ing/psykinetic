@@ -83,6 +83,7 @@ func _ready() -> void:
 	_test_raid_march()
 	_test_raid_beaten()
 	_test_great_bear()
+	_test_watch_wave()
 	_test_raid_takes()
 	_test_noticing()
 	_test_wild_kinds()
@@ -1837,6 +1838,67 @@ func _test_great_bear() -> void:
 	_check(not yard.is_empty() and (yard["warnings"] as Array).is_empty() and bool(yard["terrain"]["outdoor"]) and "great_bear" in kinds
 			and kinds.count("KitChest1") + kinds.count("KitChest2") + kinds.count("chest") >= 2 and "bear_yard" in Level.DEV_LEVELS,
 			"the bear yard: outdoors, its bear and the kit's chests, no warnings, a dev level (%s, %s)" % [kinds, yard.get("warnings")])
+## The night watch's waves (decision 771, npc's Watch calls them): a town's
+## ground about (4, 3), its guard post at (21, 3) out east on its spoke.
+func _test_watch_wave() -> void:
+	print("\n== a night watch's wave comes in out of sight on the post's spoke, cues, fights the watch, is beaten or breaks through ==")
+	Monster.idling = true
+	var rows: Array[String] = ["#".repeat(100)]
+	for y in 5:
+		rows.append("#" + ".".repeat(98) + "#")
+	rows.append("#".repeat(100))
+	var raids := _raid_room(rows, Vector2i(4, 3))
+	raids.on_town = func(_town: String, cell: Vector2i) -> bool: return World.distance(cell, Vector2i(4, 3)) <= 2
+	raids.town_area = func(_town: String) -> String: return World.zone.name
+	var post := Rect2i(20, 2, 2, 2)
+	var watcher := EntityFactory.build(SPECS["P"].merged({"name": "Watcher"})) as GridEntity
+	_room.add_child(watcher)
+	World.spawn(watcher, Vector2i(22, 3))
+	var cues: Array[Dictionary] = []
+	var ends := {"beaten": [], "broke": [], "faded": []}
+	raids.wave_coming.connect(func(id: String, _area: String, kind: String, cell: Vector2i, at: Vector2i) -> void:
+		cues.append({"id": id, "kind": kind, "cell": cell, "post": at}))
+	raids.wave_beaten.connect(func(id: String, _town: String) -> void: ends["beaten"].append(id))
+	raids.wave_broke.connect(func(id: String, _town: String) -> void: ends["broke"].append(id))
+	raids.wave_faded.connect(func(id: String, _town: String) -> void: ends["faded"].append(id))
+	_check(raids.wave("t", post, "ghosts", 3) == "", "a kind it has no monsters for: no wave")
+	var id := raids.wave("t", post, "dead", 3)
+	var dead := raids.raiders(id)
+	var kinds := dead.map(func(each: Monster) -> String: return str(each.spawn_spec.get("kind", "")))
+	_check(id != "" and dead.size() == 3 and kinds.all(func(k: String) -> bool: return k in ["skeleton", "skeleton_guard"]),
+			"three of the dead come (%s: %s)" % [id, kinds])
+	_check(dead.all(func(each: Monster) -> bool: return World.distance(each.tile, watcher.tile) > World.VIEW_TILES and each.tile.x > post.position.x),
+			"out of the watcher's sight, out along the spoke past the post (%s)" % [dead.map(func(each: Monster) -> Vector2i: return each.tile)])
+	_check(cues.size() == 1 and cues[0]["kind"] == "dead" and cues[0]["post"] == post.get_center() and raids.waves_at("t") == [id],
+			"its cue as it comes in (%s)" % [cues])
+	var met := false
+	for i in 1500:
+		World.step()
+		if dead.any(func(each: Monster) -> bool: return is_instance_valid(each) and World.distance(each.tile, watcher.tile) <= 1):
+			met = true
+			break
+	_check(met and cues.size() == 2 and World.distance(cues[1]["cell"], post.get_center()) < World.distance(cues[0]["cell"], post.get_center()),
+			"they march on the post, cued again halfway, nearer (%s)" % [cues.map(func(c: Dictionary) -> Vector2i: return c["cell"])])
+	_check(ends["broke"].is_empty(), "the watch stands in their way: no break-through yet")
+	for each in raids.raiders(id):
+		World.damage(each, 999)
+	World.step()
+	_check(ends["beaten"] == [id] and raids.waves_at("t").is_empty() and raids.raiders(id).is_empty(), "every one down: the wave is beaten (%s)" % [ends])
+	# The post unwatched: wolves, more than a wave holds, go by it to the town.
+	World.despawn(watcher)
+	World.spawn(watcher, Vector2i(2, 1))
+	var wolves_id := raids.wave("t", post, "wolves", 20)
+	var wolves := raids.raiders(wolves_id)
+	_check(wolves.size() == Raids.WAVE_MOST and wolves.all(func(each: Monster) -> bool: return each is Animal),
+			"twenty asked: a wave of %d wolves at most (%d)" % [Raids.WAVE_MOST, wolves.size()])
+	for i in 2000:
+		World.step()
+		if not ends["broke"].is_empty():
+			break
+	_check(ends["broke"] == [wolves_id], "past the empty post they reach the town: a break-through (%s)" % [ends])
+	raids.hand_back(World.zone.name)
+	_check(ends["faded"] == [wolves_id] and raids.ids().is_empty() and World.monsters().is_empty(),
+			"its zone asleep, the wave fades, off the map (%s)" % [ends])
 
 
 func _test_raid_takes() -> void:
