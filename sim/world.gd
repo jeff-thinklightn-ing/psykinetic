@@ -932,6 +932,11 @@ const SLOW_TICK_USEC := 50000
 const SLOW_FRAME_USEC := 100000
 const SLOW_SAY_MSEC := 10000
 var tick_parts: Dictionary[String, int] = {}
+## Within the tick's companion turns (decision 785): microseconds by piece of
+## a turn (turn_part()), summed over the companions; told after the parts in
+## a slow tick's line.
+var turn_parts: Dictionary[String, int] = {}
+var _slow_worst_turn: Dictionary[String, int] = {}
 var _slow_count := 0
 var _slow_frames := 0
 var _slow_worst := 0
@@ -948,6 +953,14 @@ var _last_ticks_usec := 0
 func part(name: String, since: int) -> int:
 	var now := Time.get_ticks_usec()
 	tick_parts[name] = tick_parts.get(name, 0) + now - since
+	return now
+
+
+## Adds the time since [param since] to this tick's companion-turn piece
+## [param name] (785); the time now.
+func turn_part(name: String, since: int) -> int:
+	var now := Time.get_ticks_usec()
+	turn_parts[name] = turn_parts.get(name, 0) + now - since
 	return now
 
 
@@ -968,6 +981,7 @@ func _note_slow(usec: int, frame_usec: int) -> String:
 			_slow_worst = usec
 			_slow_worst_tick = tick
 			_slow_worst_parts = tick_parts.duplicate()
+			_slow_worst_turn = turn_parts.duplicate()
 	elif frame_usec > SLOW_FRAME_USEC:
 		_slow_frames += 1
 		_slow_worst_frame = maxi(_slow_worst_frame, frame_usec)
@@ -983,6 +997,14 @@ func _note_slow(usec: int, frame_usec: int) -> String:
 			top.append("%s %.1f" % [name, _slow_worst_parts[name] / 1000.0])
 		line += " %d tick%s over %d ms, the worst %.1f ms (tick %d): %s" % [_slow_count, "" if _slow_count == 1 else "s",
 			SLOW_TICK_USEC / 1000, _slow_worst / 1000.0, _slow_worst_tick, ", ".join(top)]
+		if int(_slow_worst_parts.get("act: companions", 0)) >= SLOW_TICK_USEC / 2 and not _slow_worst_turn.is_empty():
+			# Which piece of the companions' turns (785).
+			var pieces := _slow_worst_turn.keys()
+			pieces.sort_custom(func(a: String, b: String) -> bool: return _slow_worst_turn[a] > _slow_worst_turn[b])
+			var named: Array[String] = []
+			for piece: String in pieces.slice(0, 4):
+				named.append("%s %.1f" % [piece, _slow_worst_turn[piece] / 1000.0])
+			line += " (companion turns: %s)" % ", ".join(named)
 	if _slow_frames > 0:
 		line += "%s %d frame%s over %d ms outside the sim, the worst %.1f ms" % ["" if _slow_count == 0 else ";",
 			_slow_frames, "" if _slow_frames == 1 else "s", SLOW_FRAME_USEC / 1000, _slow_worst_frame / 1000.0]
@@ -1018,6 +1040,7 @@ func _process(delta: float) -> void:
 		if steps < MAX_CATCHUP_TICKS:
 			var started := Time.get_ticks_usec()
 			tick_parts.clear()
+			turn_parts.clear()
 			step()
 			var took := Time.get_ticks_usec() - started
 			ticks_usec += took

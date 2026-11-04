@@ -931,8 +931,8 @@ func addressed_to(heard: String) -> String:
 func sightings() -> Dictionary[String, Dictionary]:
 	var seen: Dictionary[String, Dictionary] = {}
 	for cell in _cells_within(PERCEPTION_RANGE):
-		if not _sees(cell):
-			continue
+		# What is there first, seen only where something is (785: the line of
+		# sight to every cell, every MEMORY_EVERY ticks, was most of her turn).
 		var kinds: Array[String] = []
 		if World.is_fire(cell):
 			kinds.append("fire")
@@ -949,11 +949,15 @@ func sightings() -> Dictionary[String, Dictionary]:
 			kinds.append(object_word(entity))
 		elif entity is Chest and entity.spawned:
 			kinds.append("chest")
+		if kinds.is_empty() or not _sees(cell):
+			continue
 		for kind in kinds:
 			if not seen.has(kind):
 				seen[kind] = {"at": cell, "point": Vector2(cell)}
 	for door: Door in World.get_doors():
 		var sides := Terrain.edge_cells(door.key)
+		if World.distance(tile, sides[0]) > PERCEPTION_RANGE + 1:
+			continue  # Far off: never near enough (785).
 		var near: Vector2i = sides[0] if _nearer(sides[0], sides[1]) else sides[1]
 		if World.distance(tile, near) <= PERCEPTION_RANGE and (_sees(sides[0]) or _sees(sides[1])):
 			if not seen.has("door") or _nearer(near, seen["door"]["at"]):
@@ -1956,6 +1960,7 @@ func restore_said(lines: Variant) -> void:
 
 
 func _sim_tick() -> void:
+	var started := Time.get_ticks_usec()
 	if mind != null:
 		for result: Dictionary in mind.take_results():
 			_take_result(result)
@@ -1981,25 +1986,35 @@ func _sim_tick() -> void:
 		_keeper_back = true
 	if _joined_tick == -1:
 		_joined_tick = World.tick
+	# Each piece timed (785): a slow tick's line names the piece.
+	var t := World.turn_part("minds' answers", started)
 	_take_noises()
 	_watch()
+	t = World.turn_part("watching", t)
 	_grow()
+	t = World.turn_part("growing", t)
 	if World.tick % MEMORY_EVERY == 0:
 		_remember_sights()
+		t = World.turn_part("remembering", t)
 	_keep_order()
 	_watch_deeds()
 	_note_engaged()
 	_calm()
+	t = World.turn_part("orders, deeds", t)
 	_tend_unasked()
 	_drink_if_low()
+	t = World.turn_part("tending", t)
 	_act()
+	t = World.turn_part("choosing", t)
 	if _held_for_bandage():
 		current_intent = Intent.IDLE  # Held still while she is bandaged (decision 713): no step to break it.
 		if errand.has("until"):
 			errand["until"] = int(errand["until"]) + 1  # Her errand's time waits with her.
 	else:
 		_execute()
+	t = World.turn_part("moving", t)
 	_note_fight()
+	World.turn_part("after", t)
 
 
 ## Whether she holds her cell this tick because someone else is bandaging
@@ -3492,12 +3507,26 @@ static func _ledge_at(cell: Vector2i) -> int:
 
 ## The cells within [param reach] paces of her, nearest first.
 func _cells_within(reach: int) -> Array[Vector2i]:
+	if not _ring_order.has(reach):
+		# The order is the same from any cell (_nearer looks only at the
+		# offset): sorted once per reach, not on every call (785).
+		var offsets: Array[Vector2i] = []
+		for dy in range(-reach, reach + 1):
+			for dx in range(-reach, reach + 1):
+				offsets.append(Vector2i(dx, dy))
+		offsets.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+			var da := maxi(absi(a.x), absi(a.y))
+			var db := maxi(absi(b.x), absi(b.y))
+			return da < db if da != db else a.length_squared() < b.length_squared())
+		_ring_order[reach] = offsets
 	var cells: Array[Vector2i] = []
-	for dy in range(-reach, reach + 1):
-		for dx in range(-reach, reach + 1):
-			cells.append(tile + Vector2i(dx, dy))
-	cells.sort_custom(_nearer)
+	for offset: Vector2i in _ring_order[reach]:
+		cells.append(tile + offset)
 	return cells
+
+
+## Reach -> the offsets within it, nearest first (_cells_within).
+static var _ring_order: Dictionary[int, Array] = {}
 
 
 func _sees(cell: Vector2i) -> bool:

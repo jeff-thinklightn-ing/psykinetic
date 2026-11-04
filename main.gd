@@ -5886,6 +5886,9 @@ func _exit_tree() -> void:
 		World.richness.finish()
 	if _richness_next != null:
 		_richness_next.finish()
+	# The mind log's and transcripts' lines still queued are written, and
+	# their thread ended (785): none lost on a quit or a deploy's restart.
+	preload("res://sim/log_writer.gd").stop()
 	# The stdin thread runs this node's method: it must have stopped before
 	# the node goes, or the server crashes on its way out (one stopped within
 	# 2 s of starting found it still waiting out stdin's end; decision 299).

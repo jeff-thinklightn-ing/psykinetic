@@ -17,6 +17,8 @@ extends RefCounted
 ## the one before) and a new one is started, so the last MAX_BYTES or more
 ## are kept and at most twice that is on disk.
 
+const Writer := preload("res://sim/log_writer.gd")
+
 ## Writing is on while there is a path and nobody turned it off.
 static var enabled := true
 ## Companion name -> its last entry, kept whether or not the file is written.
@@ -84,25 +86,12 @@ static func record(entry: Dictionary, keeper := "") -> void:
 	var path: String = Net.mind_log_path
 	if not enabled or path.is_empty():
 		return
-	var file := FileAccess.open(path, FileAccess.READ_WRITE) if FileAccess.file_exists(path) \
-			else FileAccess.open(path, FileAccess.WRITE)
-	if file != null and file.get_length() >= max_bytes:
-		file.close()
-		_rotate(path)
-		file = FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		push_warning("[mind] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
-		return
-	file.seek_end()
-	file.store_line(JSON.stringify(stamped))
-	file.close()
+	# Scrubbed above, so no name waits in the queue (781); the open, the
+	# rotation and the write are the writer thread's (785), off the tick.
+	Writer.append(path, JSON.stringify(stamped), max_bytes)
 	written += 1
 
 
-static func _rotate(path: String) -> void:
-	var old := path + ".1"
-	if FileAccess.file_exists(old):
-		DirAccess.remove_absolute(old)
-	var error := DirAccess.rename_absolute(path, old)
-	if error != OK:
-		push_warning("[mind] cannot rotate %s (%s)" % [path, error_string(error)])
+## Waits till every line recorded is in the file (readers, tests).
+static func flush() -> void:
+	Writer.flush()

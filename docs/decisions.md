@@ -40213,3 +40213,42 @@ FAIL, a NOTE once fixed) until their owners fix the ground, not changed here: fo
 (maps): (8, 61), a region of 1561 cells five levels down from (8, 60); mine_look
 (dungeon): (20, 7), 8 cells three levels down from (20, 8). Test and decisions only:
 no rule, no wire, no bullet, no new class_name.
+
+## 785. A companion's turn off the slow path: her log writes on a thread, her sights cheaper, her turn's pieces timed
+
+The box's "[net] slow:" lines (decision 469) named "act: companions": bursts of about 530 ms soon after
+a start, then 80-90 ms ones. Locally, on the wilds with two companions, every MEMORY_EVERY (10th) tick
+cost about 20 ms in "act: companions" and the others 1-2 ms; a probe of her turn's pieces put about
+21 ms of it in "remembering" (Companion._remember_sights). Three parts, server only, no protocol change.
+
+(a) The mind log's and the transcripts' file writes leave the tick. sim/log_writer.gd (preloaded, no
+class_name) keeps one queue and one low-priority thread of its own: MindLog.record and
+Transcript.record queue a line (append(path, line, rotate_at)) and the thread opens, rotates (the mind
+log at MindLog.max_bytes, to <path>.1, as before), appends and closes; the transcripts' daily prune
+goes on the same thread (run(job), a static function's Callable), in order with the lines. The thread
+touches only its queue and its files, never a node or the world. 781's scrub stays where it was: the
+entry is scrubbed (and stamped with its tick) on the tick before it is queued, so no name ever waits in
+the queue. MindLog.last is still set at once. flush() waits till the queue is empty: the console's
+transcript and transcript rebuild call it first, as do the tests before reading a file. stop() drains
+the queue and ends the thread: Main._exit_tree calls it, so a quit or a deploy's restart loses no line;
+the next line after a stop starts a new thread. companion_test _test_log_writer_off_the_tick: 200
+records queue in well under 200 ms, all 200 are in the file in order after stop(), a player's name is
+scrubbed in the file, and a record after the stop writes again.
+
+(b) Her sights cost less. sightings() (her memory of the zone each MEMORY_EVERY ticks, and her
+knowledge for her voice) asked line of sight of every cell within PERCEPTION_RANGE (169), most of them
+holding nothing; it now looks first at what a cell holds (fire, water, a stair, a torch, a ledge, a
+crate or chest) and asks sight only of a cell with something there, so what she finds is unchanged.
+Doors more than PERCEPTION_RANGE + 1 off are skipped before any sight is asked. _cells_within(reach)
+sorted its cells with a script comparator on every call (her watch, her search, her dodge, her
+sights); the order depends only on the offset, so the offsets are sorted once per reach
+(Companion._ring_order) and added to her cell. Not re-measured locally (the probe after the change was stopped, the machine short
+of memory); (c) names the piece on the box's next slow line, so the box's lines are the measure.
+
+(c) Her turn's pieces are timed, extending 469's line. Companion._sim_tick marks each piece with
+World.turn_part(name, since) into World.turn_parts (cleared with tick_parts): "minds' answers",
+"watching", "growing", "remembering", "orders, deeds", "tending", "choosing", "moving", "after",
+summed over every companion that tick. When "act: companions" is at least half of SLOW_TICK_USEC in
+the worst tick, the slow line ends " (companion turns: piece x.x, piece x.x, ...)", the four largest
+in ms; the line before it is unchanged, so greps for "[net] slow:" still match. If the box's bursts
+were something else, the next one names it.

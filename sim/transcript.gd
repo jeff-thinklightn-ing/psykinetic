@@ -16,6 +16,7 @@ extends RefCounted
 ## one: transcript <name> [<date>].
 
 const KEEP_DAYS := 30
+const Writer := preload("res://sim/log_writer.gd")
 ## Lines written this run, for tests.
 static var written := 0
 static var _pruned_on := ""
@@ -28,21 +29,13 @@ static func record(companion: String, speaker: String, text: String) -> void:
 	if dir.is_empty() or companion.is_empty():
 		return
 	var today := Time.get_date_string_from_system()
-	if not DirAccess.dir_exists_absolute(dir):
-		DirAccess.make_dir_recursive_absolute(dir)
 	if _pruned_on != today:
 		_pruned_on = today
-		prune(dir, today)
-	var path := path_of(dir, companion, today)
-	var file := FileAccess.open(path, FileAccess.READ_WRITE) if FileAccess.file_exists(path) \
-			else FileAccess.open(path, FileAccess.WRITE)
-	if file == null:
-		push_warning("[transcript] cannot write %s (%s)" % [path, error_string(FileAccess.get_open_error())])
-		return
+		Writer.run(prune.bind(dir, today))  # Off the tick, before the day's first line (785).
 	var line := text.strip_edges().replace("\n", " ")
-	file.seek_end()
-	file.store_line("%s %s" % [Time.get_time_string_from_system(), line if speaker.is_empty() else "%s: %s" % [speaker, line]])
-	file.close()
+	# Off the tick (785): the writer thread appends it, making the folder if need be.
+	Writer.append(path_of(dir, companion, today), "%s %s" % [Time.get_time_string_from_system(),
+			line if speaker.is_empty() else "%s: %s" % [speaker, line]])
 	written += 1
 
 
@@ -53,6 +46,8 @@ static func path_of(dir: String, companion: String, date: String) -> String:
 ## Deletes transcripts in [param dir] from more than KEEP_DAYS before
 ## [param today] (YYYY-MM-DD).
 static func prune(dir: String, today: String) -> int:
+	if not DirAccess.dir_exists_absolute(dir):
+		return 0
 	var day := Time.get_unix_time_from_datetime_string(today)
 	var oldest := Time.get_date_string_from_unix_time(day - KEEP_DAYS * 86400)
 	var removed := 0
@@ -90,6 +85,7 @@ const REBUILT_END := "[End of what was rebuilt.]"
 ## before anything written live; rebuilding again replaces them. The
 ## console's transcript rebuild.
 static func rebuild(paths: Array[String]) -> String:
+	Writer.flush()  # Every line queued is in its file first (785).
 	var dir: String = Net.transcripts_dir
 	if dir.is_empty():
 		return "no transcripts kept: --transcripts=<dir>"
@@ -265,6 +261,7 @@ static func _live_lines(path: String) -> Array[String]:
 ## The console's transcript command: [param companion]'s transcript of
 ## [param date] (today for ""), or why there is none.
 static func show(companion: String, date := "") -> String:
+	Writer.flush()  # Every line queued is in its file first (785).
 	var dir: String = Net.transcripts_dir
 	if dir.is_empty():
 		return "no transcripts kept: --transcripts=<dir>"

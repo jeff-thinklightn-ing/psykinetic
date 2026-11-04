@@ -72,6 +72,7 @@ func _ready() -> void:
 	_test_run_summary()
 	_test_log_collapsed()
 	_test_mind_log_rotates()
+	_test_log_writer_off_the_tick()
 	_test_situation()
 	_test_bubbles()
 	_test_spoken()
@@ -546,6 +547,7 @@ func _test_last_words() -> void:
 	var saved_dir := Net.transcripts_dir
 	Net.transcripts_dir = preload("res://tests/test_ports.gd").scratch_path("last_words_test")
 	var transcript := Transcript.path_of(Net.transcripts_dir, String(pet.name), Time.get_date_string_from_system())
+	MindLog.flush()
 	if FileAccess.file_exists(transcript):
 		DirAccess.remove_absolute(transcript)
 	var talk_lines: int = _main.talk.lines.size()
@@ -557,6 +559,7 @@ func _test_last_words() -> void:
 	_check(words.size() == 1, "the party log has her last words (%s)" % [lines])
 	_check(_main.talk.lines.size() >= mini(talk_lines + 1, TalkPanel.MAX_LINES) and _main.talk.lines.back()[1] == String(pet.name)
 			and not words.is_empty() and str(_main.talk.lines.back()[2]) in str(words[0]), "and so does the Tab panel")
+	MindLog.flush()
 	var written := FileAccess.get_file_as_string(transcript)
 	var last: String = _main.talk.lines.back()[2]
 	_check(("%s: %s" % [pet.name, last]) in written, "and her transcript, as her own line (%s)" % written.strip_edges())
@@ -2647,10 +2650,39 @@ func _test_bubbles() -> void:
 	bubbles.queue_free()
 
 
+func _test_log_writer_off_the_tick() -> void:
+	print("\n== the mind log and transcripts are written off the tick, scrubbed first; a quit writes every line queued (785) ==")
+	var Writer := preload("res://sim/log_writer.gd")
+	var path: String = preload("res://tests/test_ports.gd").scratch_path("writer_test.log")
+	Writer.flush()
+	if FileAccess.file_exists(path):
+		DirAccess.remove_absolute(path)
+	var saved := Net.mind_log_path
+	Net.mind_log_path = path
+	MindLog.player_names["Brannoc"] = true
+	var started := Time.get_ticks_usec()
+	for i in 200:
+		MindLog.record({"companion": "Quill", "kind": "probe", "n": i, "note": "Brannoc spoke to her (%d)" % i})
+	var took := Time.get_ticks_usec() - started
+	_check(took < 200000, "200 lines recorded in %.1f ms: queued, not written on the tick" % (took / 1000.0))
+	Writer.stop()  # As Main's quit does.
+	var lines := FileAccess.get_file_as_string(path).strip_edges().split("\n")
+	_check(lines.size() == 200 and "\"n\":199" in lines[199], "stopped, every line queued is in the file, in order (%d)" % lines.size())
+	_check(not FileAccess.get_file_as_string(path).contains("Brannoc") and "a player spoke to her" in lines[0],
+			"scrubbed before it was queued: no name in the file (781)")
+	MindLog.player_names.erase("Brannoc")
+	MindLog.record({"companion": "Quill", "kind": "probe", "n": 200})
+	MindLog.flush()
+	_check(FileAccess.get_file_as_string(path).strip_edges().split("\n").size() == 201, "after a stop, the next line starts the thread again")
+	DirAccess.remove_absolute(path)
+	Net.mind_log_path = saved
+
+
 func _test_mind_log_rotates() -> void:
 	print("\n== the mind log rotates: the last 5 MB and one file before it ==")
 	var path: String = preload("res://tests/test_ports.gd").scratch_path("mind_rotate_test.log")
 	for old: String in [path, path + ".1"]:
+		MindLog.flush()
 		if FileAccess.file_exists(old):
 			DirAccess.remove_absolute(old)
 	var saved := Net.mind_log_path
@@ -2662,6 +2694,7 @@ func _test_mind_log_rotates() -> void:
 	for i in 20:
 		entry["n"] = i
 		MindLog.record(entry)
+	MindLog.flush()
 	var current := FileAccess.get_file_as_string(path)
 	var rotated := FileAccess.get_file_as_string(path + ".1")
 	_check(FileAccess.file_exists(path + ".1") and current.length() < 2000 + 400,
@@ -2669,6 +2702,7 @@ func _test_mind_log_rotates() -> void:
 	_check("\"n\":19" in current and not "\"n\":0," in rotated and not FileAccess.file_exists(path + ".2"),
 			"the newest lines kept, the oldest gone, never a second rotated file")
 	for old: String in [path, path + ".1"]:
+		MindLog.flush()
 		DirAccess.remove_absolute(old)
 	Net.mind_log_path = saved
 	MindLog.max_bytes = saved_max
@@ -5384,6 +5418,7 @@ func _test_transcript() -> void:
 	var dir: String = preload("res://tests/test_ports.gd").scratch_path("transcripts_test")
 	if DirAccess.dir_exists_absolute(dir):
 		for file in DirAccess.get_files_at(dir):
+			MindLog.flush()
 			DirAccess.remove_absolute(dir.path_join(file))
 	var saved := Net.transcripts_dir
 	Net.transcripts_dir = dir
@@ -5401,6 +5436,7 @@ func _test_transcript() -> void:
 	World.step()
 	var today := Time.get_date_string_from_system()
 	var path := Transcript.path_of(dir, String(pet.name), today)
+	MindLog.flush()
 	var lines := FileAccess.get_file_as_string(path).strip_edges().split("\n")
 	var time := RegEx.create_from_string("^\\d\\d:\\d\\d:\\d\\d ")
 	_check(lines.size() >= 3 and Array(lines).all(func(l: String) -> bool: return time.search(l) != null),
@@ -5408,6 +5444,7 @@ func _test_transcript() -> void:
 	var text := "\n".join(lines)
 	_check(" Player: Look at that door." in text and (" %s: I see it." % pet.name) in text and " [Sneak fell.]" in text,
 			"her player's words, hers, and the event in brackets:\n%s" % text)
+	MindLog.flush()
 	_check(_main.admin_command("transcript %s" % String(pet.name).to_lower()) == FileAccess.get_file_as_string(path).strip_edges(false, true),
 			"console: transcript %s prints today's" % String(pet.name).to_lower())
 	var old_day := Time.get_date_string_from_unix_time(Time.get_unix_time_from_system() - 40 * 86400)
@@ -5428,6 +5465,7 @@ func _test_transcript() -> void:
 			and FileAccess.file_exists(Transcript.path_of(dir, String(pet.name), kept_day)) and FileAccess.file_exists(path),
 			"%d days are kept: the one 40 days old is deleted, 20 days old kept" % Transcript.KEEP_DAYS)
 	for file in DirAccess.get_files_at(dir):
+		MindLog.flush()
 		DirAccess.remove_absolute(dir.path_join(file))
 	DirAccess.remove_absolute(dir)
 	Net.transcripts_dir = saved
@@ -5602,12 +5640,14 @@ func _test_transcript_rebuild() -> void:
 	var reply := Transcript.rebuild(logs)
 	var day := Time.get_date_string_from_system()
 	var lines: Array[String] = []
+	MindLog.flush()
 	for line in FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n"):
 		lines.append(line.substr(9))
 	var expected: Array[String] = [Transcript.REBUILT_START, "[An imp came into sight.]", "Jeff: Look there", "Pip: Hm.",
 		"Jeff: Is it coming?", "[It came up next to you.]", "Pip: I see it.", "[An imp fell.]", "Jeff: Good", Transcript.REBUILT_END]
 	_check(lines == expected, "the asks joined, every line once and in order, though an event came in while she answered; Jeff's lines kept (%s): %s" % [reply, lines])
 	Transcript.rebuild(logs)
+	MindLog.flush()
 	var again := FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day)).strip_edges().split("\n").size()
 	_check(again == expected.size(), "rebuilding again replaces what was rebuilt (%d lines)" % again)
 	# Asked while Jeff was down, an ask called him "the one you travel with".
@@ -5619,12 +5659,14 @@ func _test_transcript_rebuild() -> void:
 		"prompt": down + "\n\nuser: Look there\n\nassistant: Hm.\n\nuser: Is it coming?\n[It came up next to you.]\n\nassistant: I see it.\n\nuser: [An imp fell.]\nGood\n[Jeff fell.]"}))
 	file.close()
 	Transcript.rebuild(logs)
+	MindLog.flush()
 	var after := FileAccess.get_file_as_string(Transcript.path_of(dir, "Pip", day))
 	_check(after.count("Jeff: Good") == 1 and not ("the one you travel with" in after) and "[Jeff fell.]" in after,
 			"an ask made while Jeff was down: his name as last known, nothing repeated")
 	for f in DirAccess.get_files_at(dir):
 		DirAccess.remove_absolute(dir.path_join(f))
 	DirAccess.remove_absolute(dir)
+	MindLog.flush()
 	DirAccess.remove_absolute(log_path)
 	Net.transcripts_dir = saved
 
@@ -5742,6 +5784,7 @@ func _test_players_heal() -> void:
 func _test_mind_log_file() -> void:
 	print("\n== the mind log: one JSON line per answer ==")
 	var path: String = preload("res://tests/test_ports.gd").scratch_path("mind_test.log")
+	MindLog.flush()
 	if FileAccess.file_exists(path):
 		DirAccess.remove_absolute(path)
 	var saved := Net.mind_log_path
@@ -5752,6 +5795,7 @@ func _test_mind_log_file() -> void:
 	MindLog.enabled = false
 	pet._ask_stance("test")
 	MindLog.enabled = true
+	MindLog.flush()
 	var lines := FileAccess.get_file_as_string(path).strip_edges().split("\n")
 	var entry: Variant = JSON.parse_string(lines[0]) if lines.size() > 0 else null
 	_check(lines.size() == 1, "one line for one answer, none while it is off (%d)" % lines.size())
@@ -5763,6 +5807,7 @@ func _test_mind_log_file() -> void:
 	_check("\"outcome\"" in shown and String(pet.name) in shown, "console: mind last %s" % pet.name)
 	_check(_main.admin_command("mind log off").begins_with("mind log off") and not MindLog.enabled
 			and _main.admin_command("mind log on").begins_with("mind log on"), "console: mind log off and on")
+	MindLog.flush()
 	DirAccess.remove_absolute(path)
 	Net.mind_log_path = saved
 
