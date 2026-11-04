@@ -93,6 +93,23 @@ var last_tick := -1
 var _seen: Dictionary[int, Dictionary] = {}
 
 
+## A "senses" block (decision 784 amended): its eyes from the same shape a
+## kind's monsters.json row carries, for any agent (a Monster's row, a
+## Resident's guard_fight): {cone: degrees it sees without turning (360 all
+## round; [param default_cone] if none), night: 0..1 its sight left in the
+## dark, alert_sight: cells more while it looks about (its cone
+## Monster.ALERT_CONE_DEGREES wider)}. Hearing and notice are a Monster's own.
+## An empty block changes nothing.
+func take(block: Dictionary, default_cone := 360.0) -> void:
+	if block.is_empty():
+		return
+	var cone := float(block.get("cone", default_cone))
+	cone_cos = Monster.cone_cos_of(cone)
+	alert_cone_cos = Monster.cone_cos_of(cone + Monster.ALERT_CONE_DEGREES)
+	if block.has("night"):
+		night = clampf(float(block["night"]), 0.0, 1.0)
+	extra_sight = maxi(0, int(block.get("alert_sight", 0)))
+
 func _init(owner: GridEntity, range_cells := 7, cone := CONE_COS) -> void:
 	agent = owner
 	sight_range = range_cells

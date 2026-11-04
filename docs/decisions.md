@@ -40562,6 +40562,17 @@ Against Jeff's rule (11-03, "less of a penalty, more of a bonus"): the dark and 
 player's to use; nothing is taken from anyone who does not. Crouch, the player's own side, is
 "784, enemy-ai's side (2)" (rev 48). monster_test _test_senses; _test_wild_wolf waits for the
 wolf's notice by night.
+
+784 amended (npc's guards, 791; the coordinator: one rule for seeing in the dark): Senses.take(block,
+default_cone) reads the eyes of a "senses" block for any agent with a Senses, not only a Monster:
+cone (default_cone if none, 360 all round), night and alert_sight (extra_sight). Hearing and notice
+stay a Monster's. Monster._take_senses passes its row's block through it, as before to the bit
+(night 0 and alert_sight 1 when a row gives a block without them). npc's guard_fight gives a
+"senses": {"night": 0.45} block that Resident.arm passes to it: sight 7 in pitch dark is about 3
+cells, more by any light, in place of 791's own dark_reach. monster_test _test_senses checks an
+empty block changes nothing and a night sets only that. Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 797. Skylights: a gap in a cave's roof
 
 Terrain's bear_cave (the great bear's den, forest plan phase B) wanted a little light on the bear in

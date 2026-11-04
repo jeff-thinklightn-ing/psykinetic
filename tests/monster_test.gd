@@ -2822,6 +2822,13 @@ func _test_senses() -> void:
 			and robber.alert_sight == int(row["alert_sight"]) and robber.senses.alert_cone_cos < robber.senses.cone_cos,
 			"a robber's senses are its row's: night %.1f, a 120-degree cone, wider looking about" % robber.senses.night)
 	_check(Monster.cone_cos_of(360.0) == -1.0 and Monster.hearing_most() >= 1.5, "all round at 360; the keenest ear is the wolf's 1.5")
+	# Any agent's eyes from the same block (784 amended: npc's guards).
+	var eyes := Senses.new(player, 7)
+	eyes.take({})
+	var unchanged := eyes.night < 0.0 and eyes.extra_sight == 0
+	eyes.take({"night": 0.45})
+	_check(unchanged and is_equal_approx(eyes.night, 0.45) and eyes.cone_cos == -1.0 and eyes.extra_sight == 0,
+			"Senses.take: an empty block changes nothing; {night: 0.45} sets its night, all round, nothing more")
 	# Woken by them near, it looks from a moment of its own (a few ticks).
 	var first := 0.0
 	var waited := 0

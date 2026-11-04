@@ -657,13 +657,12 @@ func _take_senses(given: Variant) -> void:
 	var block := given as Dictionary
 	if block.has("sight"):
 		sight_range = maxi(1, int(block["sight"]))
-	var cone := float(block.get("cone", 120.0 if _wary else 360.0))
-	senses.cone_cos = Monster.cone_cos_of(cone)
-	senses.alert_cone_cos = Monster.cone_cos_of(cone + ALERT_CONE_DEGREES)
-	senses.night = clampf(float(block.get("night", 0.0)), 0.0, 1.0)
+	var eyes := block.duplicate()
+	eyes["night"] = block.get("night", 0.0)
+	eyes["alert_sight"] = block.get("alert_sight", 1)
+	senses.take(eyes, 120.0 if _wary else 360.0)  # Its eyes, as any agent's (784 amended).
 	hearing = maxf(0.0, float(block.get("hearing", 1.0)))
-	alert_sight = maxi(0, int(block.get("alert_sight", 1)))
-	senses.extra_sight = alert_sight
+	alert_sight = senses.extra_sight
 	notice_rate = maxf(0.01, float(block.get("notice", 1.0)))
 
 
