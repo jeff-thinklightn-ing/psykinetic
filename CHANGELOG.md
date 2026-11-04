@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.201
+
+- What goes over the network changes, so v0.1.200 and older can't join the server: update through the launcher first.
 - Towns: a trader from the castle market comes every four days, buying what a town has to spare and bringing what it is short of (770).
 - Wolves and grave robbers take a moment to make you out, quicker the nearer you are, so distance and the dark let you slip by; a wolf, though, sees well by night and hears far (784).
 - A sword cut shows its wind-up and sweeps through its arc again, swung at someone or at nothing, instead of looking like a punch (338 amended (3)).
