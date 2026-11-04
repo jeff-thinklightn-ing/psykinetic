@@ -1209,6 +1209,14 @@ const CLIP_WALK := "Walk"
 ## the high-stepping Wade (humanoid_clips.py), WADE_PACE metres a second at speed 1 (feel's
 ## client3d.gait.Wade).
 const CLIP_WADE := "Wade"
+## Crouched (784 amended (3), on 784 amended (2)'s replicated crouched): standing, CLIP_CROUCH; moving, the
+## creep, CLIP_CREEP, paced as a gait at the model's own walk pace times CREEP_STRIDE (Crouch_Fwd's
+## planted foot covers 0.54 m a second at its own pace, the walk's 0.86), so the feet keep to the
+## ground at World.crouch_pace's slow step; up to CREEP_FASTEST its own speed, beyond it skating.
+const CLIP_CROUCH := "Crouch_Idle"
+const CLIP_CREEP := "Crouch_Fwd"
+const CREEP_STRIDE := 0.63
+const CREEP_FASTEST := 4.5
 ## (A ford's FORD_DEPTH counts: since 776 every hills stream cell is a ford.)
 const WADE_DEPTH := 0.04
 const WADE_PACE := 0.94  # The walk's stride (its knees lifted, not its steps lengthened): the walk's pace.
@@ -15647,6 +15655,7 @@ func _sync_puppets() -> void:
 		_sync_name(entity, puppet, now)
 		yaw = _teeter_yaw(entity, puppet, yaw, now)
 		puppet.set_meta("teetering", entity.teeter != Vector2i.ZERO)
+		puppet.set_meta("crouched", entity is Player and (entity as Player).crouched)
 		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
 			_lay(puppet, body, yaw, entity.tile)
@@ -19296,7 +19305,8 @@ func _animate(puppet: Node3D) -> void:
 		return
 	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)
 	var work: Dictionary = ACTIVITIES.get(str(puppet.get_meta("work", "")), {})
-	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm or work.has("clip")):
+	var crouched: bool = puppet.get_meta("crouched", false) and rig.has(CLIP_CROUCH)
+	if puppet.get_meta("fidgeting", false) and (speed > WALKING or not calm or work.has("clip") or crouched):
 		# A fidget (or sitting down, or getting up) is no reason to stand
 		# still, nor to put off a work begun (a bandage's kneel, items' (3)):
 		# it goes.
@@ -19325,6 +19335,15 @@ func _animate(puppet: Node3D) -> void:
 			puppet.set_meta("seated", false)
 			return
 	if _lying_down(puppet, rig, work, speed, now, tempo):
+		return
+	if crouched:
+		# Crouched (784 amended (2)): it creeps when it moves, at the creep's stride, else crouches.
+		if speed > WALKING and rig.has(CLIP_CREEP):
+			var walk := float(paced(puppet.get_meta("gaits", GAITS))[0][1])
+			rig.loop(CLIP_CREEP, clampf(speed / (walk * ArtKit.feel("client3d.creep_stride", CREEP_STRIDE) * pace)
+					* ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, CREEP_FASTEST))
+		else:
+			rig.loop(CLIP_CROUCH, tempo)
 		return
 	if speed > WALKING and wading(puppet, rig):
 		# In water over WADE_DEPTH (775): the high-stepping wade, paced as a gait.

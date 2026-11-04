@@ -152,6 +152,7 @@ func _ready() -> void:
 		_test_wet()
 		_test_sword_whiff()
 		await _test_teeter()  # Lets frames run: the rocking is timed.
+		_test_crouch()
 		_test_bow_back()
 		_test_sheathed()
 		_test_goblins_differ()
@@ -9965,6 +9966,37 @@ func _test_creature_puppets() -> void:
 ## roar; asleep (Pose SIT) its sleep, winded and standing its winded; a slot without those clips
 ## does as before. On a boar's view, its art given the great bear's clip names (the bear's slot is
 ## art-kit's to land): stand-ins copied from its own clips.
+## Crouched (784 amended (3)): a player crouching stands in Crouch_Idle and, moving, creeps
+## (Crouch_Fwd) at its own stride, the walk's pace times CREEP_STRIDE; stood up, neither.
+func _test_crouch() -> void:
+	print("
+== a crouched player crouches, and creeps at its stride (784 amended (3)) ==")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id())
+	var rig := puppet.get_meta("rig") as AnimRig
+	_check(rig.has(Client3D.CLIP_CROUCH) and rig.has(Client3D.CLIP_CREEP), "the humanoid library has Crouch_Idle and Crouch_Fwd")
+	puppet.set_meta("busy_until", 0)
+	player.crouched = true
+	_rig._process(0.0)
+	_check(rig.base_clip() == Client3D.CLIP_CROUCH, "crouched and still: crouching (%s)" % rig.base_clip())
+	# Moving one tile a second (World.crouch_pace's creep, 10 ticks a cell): the speed _animate reads.
+	var pace := 1.0
+	var now := Time.get_ticks_msec()
+	puppet.set_meta("speed", pace)
+	puppet.set_meta("last_at", puppet.position - Vector3(pace * 0.1, 0.0, 0.0))
+	puppet.set_meta("last_ms", now - 100)
+	_rig._animate(puppet)
+	var walk := float(Client3D.paced(puppet.get_meta("gaits", Client3D.GAITS))[0][1])
+	var want := pace / (walk * Client3D.CREEP_STRIDE * float(puppet.get_meta("pace", 1.0)))
+	_check(rig.base_clip() == Client3D.CLIP_CREEP and absf(rig.speed() - want) < 0.05,
+			"creeping a tile a second: Crouch_Fwd at its stride (x%.2f, want x%.2f)" % [rig.speed(), want])
+	player.crouched = false
+	puppet.set_meta("speed", 0.0)
+	puppet.set_meta("last_at", puppet.position)
+	_rig._process(0.0)
+	_check(rig.base_clip() != Client3D.CLIP_CROUCH and rig.base_clip() != Client3D.CLIP_CREEP, "stood up: neither (%s)" % rig.base_clip())
+
+
 ## Teetering on a rim (783 amended): a body whose teeter is set turns to face the drop and rocks
 ## toward it, a person wheeling its arms (Teeter), a beast with no teeter clip scrabbling (its walk,
 ## quick); set back to ZERO it stands upright again with its own facing. The local player walking

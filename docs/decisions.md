@@ -40734,6 +40734,16 @@ replicates, a client's prediction of its pace agrees. Its footstep carries CROUC
 never under SEEN_LEAST 2 cells. Against Jeff's rule: one who never crouches is heard and seen as
 ever; the slow pace is creeping's own. monster_test _test_crouch. Server and client; protocol rev
 48 ("crouched"); no new class_name; no bullet until ui's key lands with its own.
+784 amended (3): the crouch drawn (pc-character, 2026-11-04; release's label). A player whose
+replicated crouched is set (Client3D's puppet meta "crouched") stands in CLIP_CROUCH, Crouch_Idle,
+and moving creeps in CLIP_CREEP, Crouch_Fwd (UAL's, credited already; added to goblin.res), paced
+as a gait: the model's own walk pace times CREEP_STRIDE 0.63 (Crouch_Fwd's planted foot covers 0.54
+m a second at its own pace, the walk's 0.86; feel's client3d.creep_stride), so the feet keep to the
+ground at World.crouch_pace's slow step, played up to CREEP_FASTEST 4.5 times its own speed (beyond,
+about 2.6 tiles a second for a person, it skates). A fidget is cut short by crouching. A teeter or a
+knock still has the body first. view_test _test_crouch. No bullet: ui's key bullet (784 amended (4),
+voice's words) carries the look ("you kneel low when still and creep when moving"). Client only; protocol unchanged; no new
+class_name.
 
 ## 797. Skylights: a gap in a cave's roof
 
