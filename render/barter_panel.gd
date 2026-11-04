@@ -1065,13 +1065,14 @@ static func make_chip(kind: String, amount: Variant, icons: ItemIcons, color: Co
 	if kind == "gold":
 		row.add_child(Coin.new())
 	elif kind != "time":
-		var picture := TextureRect.new()
-		picture.custom_minimum_size = Vector2.ONE * 34
-		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		picture.texture = icons.icon(kind) if icons != null else null
-		if picture.texture != null:
+		var texture: Texture2D = icons.icon(kind) if icons != null else null
+		if texture != null:  # Made only when drawn: an unparented one leaked (ui_test's 18 at exit).
+			var picture := TextureRect.new()
+			picture.custom_minimum_size = Vector2.ONE * 34
+			picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			picture.texture = texture
 			row.add_child(picture)
 	var number := Label.new()
 	number.theme_type_variation = &"Caption"

@@ -40548,7 +40548,7 @@ Jeff approved round 2 of ui's town window mocks ("approved, build it", via the c
 wanted a status column showing the direct effect of a player's actions on the town: their
 regard, the town's state, what is open around it and what they did lately, and "Donate" in
 place of "Give". The coordinator ruled the movers and "thriving"; ui and economy pinned the
-fields; voice worded the lines. This is economy's side; ui's window is "768, ui's side".
+fields; voice worded the lines. This is economy's side; ui's window is "768 amended".
 
 - No new message kind: "town" already carries 762's threat and npc's all-clear. The window
   extends 624's per-player "town_sheet" answer (Main.ask_town_sheet merges Main.town_window), so
@@ -40805,6 +40805,28 @@ level itself has no words). Lore keeps its story (regions.json).
     the hook.
   - level_test (the coordinator's pick) runs physics' _trap_landings over two generations of every
     level marked "regenerate".
+768 amended (ui; release's label after v0.1.201 shipped economy's side): the window (render/town_sheet.gd, TownSheet, grown from 624's sheet;
+Jeff's approved round 2, C:/dev/review/town_status/round2). N opens it for the town underfoot, or
+a town's row in the known world, read-only anywhere. Two tabs (voice's words): "Stores" and
+"Ledger" (624's lines). Stores shows economy's town_sheet as the store's squares (BarterPanel's
+look): each stock row's picture (its "item", else its id; a raw with no items row is drawn by
+art-kit's slot, item.wool, item.fish, item.sheep, 92916670, ItemIcons.icon taking a slot's name),
+its level up the left edge and have/enough in a chip, outlined when half short. Under it the
+build's coin square (a click 10 gold toward it, a right click 10 back) and its fund bar. Beside
+them the status column: the regard's word (economy's "" reads "stranger") with a rise or fall for
+its last move, the town's states and the zone's asks, each a square with voice's words on hover.
+A town seeking a trade's newcomer shows "<Trade> wanted" with a thing of that trade
+(TownSheet.TRADE_PICTURES); a healer's ask reads its wants as a list, "Herbs wanted" when it holds
+herbs, else "Healer's need", pictured by the first want with an items row. What the player's last
+acts moved ("recent") carries a small rise. At the store or depot ("at") the window holds the pack
+open with what the town pays on each thing (765's prices); a click picks a thing (a stack as far
+as the town takes, shift one more), and one button, "Donate (2 items)" or "Donate (20 gold)", its
+Total on hover, sends "contribute" {town, give, gold} (Main.donate). The answer is a fresh sheet
+(its paid and given show in the purse and the fund); a refusal away from the store ({town, why})
+keeps the last sheet and shows its why as a line. Away from the store nothing stays picked and
+the pack's clicks are the store's again. ui_test _test_town_window. No bullet beyond economy's
+(it says the window). Client only; no new class_name (TownSheet is 624's).
+
 ## 787. The character sheet: the hands and the armour off the pack
 
 Jeff (2026-11-03): "create a character inventory sheet and move hands and armor there". The

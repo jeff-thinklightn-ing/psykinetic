@@ -12906,6 +12906,8 @@ func _build_talk() -> void:
 	if has_signal("world_changed"):
 		connect("world_changed", _refresh_card)  # 618: her page follows the world message while open.
 	town_panel = TownSheet.new()
+	town_panel.pack = pack_panel  # 768: Donate picks from the pack, the store's way.
+	town_panel.donate_asked.connect(donate)
 	$HUD.add_child(town_panel)
 	deal_panel = DealPanel.new()
 	$HUD.add_child(deal_panel)
@@ -13683,6 +13685,12 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		# Economy's rows for the sheet (624, economy's side), kept by town.
 		var for_town := str(data.get("town", ""))
 		if not for_town.is_empty():
+			if data.has("why") and not data.has("stock") and town_sheets.has(for_town):
+				# 768: a Donate refused away from the store keeps the last sheet, its why a line on it.
+				var kept: Dictionary = (town_sheets[for_town] as Dictionary).duplicate()
+				kept["why"] = data["why"]
+				kept["at"] = false
+				data = kept
 			town_sheets[for_town] = data
 			_refresh_town()
 		return
@@ -17881,6 +17889,17 @@ func _ask_town_sheet(id: String) -> void:
 		town_sheets[id] = ask_town_sheet(player, {"town": id})
 	else:
 		World.command(player, "town_sheet", {"town": id})
+
+
+## Donate in the town window (768): the "contribute" command {town, give
+## (uids), gold} (economy's), answered by its "town_sheet" message again
+## (the window refreshed, with paid and given; the purse shows the gold).
+func donate(town: String, give: Array, gold: int) -> void:
+	var player := _local_player()
+	if player == null or town.is_empty() or give.is_empty() and gold <= 0:
+		return
+	_town_sheet_asked.erase(town)  # The answer is a fresh sheet; a reopen may ask again.
+	World.command(player, "contribute", {"town": town, "give": give, "gold": gold})
 
 
 ## The first town told for the zone the player is in, "" for none.

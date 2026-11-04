@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_counter_panel()
 	await _test_world_map()
 	_test_town_sheet()  # After the map's test: the sheet's names build the map's graph (place_words).
+	_test_town_window()
 	await _test_deal_window()
 	await _test_boss_marks()
 	await _test_quest_tracker()
@@ -2199,3 +2200,89 @@ func _test_character_sheet(pack: PackPanel) -> void:
 	player.load_arms = arms_was
 	player.load_body = body_was
 	pack._refresh()
+
+
+func _test_town_window() -> void:
+	print("\n== the town window (768): Stores from economy's town_sheet, Donate at the store, the Ledger tab ==")
+	var sheet: TownSheet = _main.town_panel
+	if sheet == null:
+		print("  (no town window in this scene: its checks skipped)")
+		return
+	var zone: String = _main.zone_name_here()
+	var id := "%s/oakford" % zone
+	var states_was: Dictionary = _main.town_states.duplicate()
+	_main.town_states[id] = {"forge": {"state": "standing"}}
+	_main.open_town(id)
+	var fake := {"town": id, "name": "Oakford", "at": true, "gold": 50,
+		"stock": [{"id": "wood_bundle", "have": 4, "enough": 20, "short": 0.8}, {"id": "herbs", "have": 9, "enough": 10, "short": 0.1},
+			{"id": "wool", "have": 0, "enough": 6, "short": 1.0}],
+		"pays": {"herbs": {"gold": 2, "up_to": 1}, "wood_bundle": {"gold": 3, "up_to": 5}},
+		"build": {"kind": "smithy", "wants": 120, "fund": 45},
+		"regard": {"score": 0.6, "word": "Trusted", "last": 1, "why": []},
+		"state": [{"kind": "threatened", "by": "wolves"}, {"kind": "building", "building": "smithy", "wants": 120},
+			{"kind": "seeking", "trade": "carpenter"}],
+		"asks": [{"kind": "balance", "fold": "east", "open": true}, {"kind": "healer", "wants": ["herbs", "bandage"], "until": -1, "open": false}],
+		"recent": [{"kind": "donated", "id": "wood_bundle", "amount": 6}],
+		"pack": [{"slot": 3, "uid": 901, "id": "herbs", "uids": [901, 902], "count": 2}, {"slot": 4, "uid": 903, "id": "wood_bundle"},
+			{"slot": 5, "uid": 904, "id": "sword"}]}
+	_main._on_message("town_sheet", fake)
+	var boxes := sheet.boxes_shown()
+	_check(sheet.visible and sheet.tab_shown() == "Stores" and boxes.size() == 8
+			and boxes[0].begins_with("stock wood_bundle ") and boxes[0].ends_with("time 4/20 rose") and boxes[2] == "stock wool Wool time 0/6",
+		"Stores first: the stock as squares, have/enough in a chip, the player's own donation risen (%s)" % [boxes])
+	_check(boxes.slice(3) == ["state 0 Wolves in the lanes", "state 1 Smithy going up", "state 2 Carpenter wanted", "ask 0 Wolves at the fold", "ask 1 Herbs wanted"]
+			and TownSheet.status_picture("state", {"kind": "seeking", "trade": "carpenter"}) == "nails"
+			and TownSheet.status_picture("ask", {"kind": "healer", "wants": ["bandage", "herbs"]}) == "herbs",
+		"the status column in voice's words: the state, then the zone's asks (%s)" % [boxes.slice(3)])
+	_check(sheet.regard_shown() == "Trusted rise" and sheet.fund_shown() == "Smithy going up: 45 of 120",
+		"the regard's word and its last move (economy's direction); the building's fund (%s; %s)" % [sheet.regard_shown(), sheet.fund_shown()])
+	_check(sheet.button_shown() == "Donate" and sheet.holds_pack() and _main.pack_panel.held_open and _main.pack_panel.prices.get(3) == 2 and _main.pack_panel.prices.get(5) == 0,
+		"at the store: Donate shown, the pack held open with what the town pays on each thing")
+	var hook: Callable = _main.pack_panel.select_hook
+	hook.call(true, 3, false)
+	_check(sheet.give.keys() == [901] and sheet.button_shown() == "Donate (1 item)" and sheet.total_shown() == "Total gold 2",
+		"a stack of herbs picked, as far as the town takes (1): Donate (1 item), its Total (%s, %s)" % [sheet.button_shown(), sheet.total_shown()])
+	hook.call(true, 3, false)
+	hook.call(true, 5, false)
+	_check(sheet.give.is_empty() and sheet.hover_shown() == TownSheet.NO_USE_WORDS, "picked again: let go; a thing the town takes none of says so")
+	sheet.click_box("fund", "fund")
+	sheet.click_box("fund", "fund")
+	_check(sheet.gift == 20 and sheet.button_shown() == "Donate (20 gold)" and sheet.fund_shown() == "Smithy going up: 65 of 120",
+		"the coin square, clicked twice: 20 gold toward the smithy (%s)" % sheet.fund_shown())
+	sheet.click_box("fund", "fund", true)
+	hook.call(true, 4, false)
+	_check(sheet.gift == 0 and sheet.give.keys() == [903], "a right click takes 10 back; picking a thing lets the gold go")
+	var asked := {}
+	var catch := func(town: String, give: Array, gold: int) -> void: asked["it"] = [town, give, gold]
+	sheet.donate_asked.connect(catch)
+	sheet._confirm()
+	sheet.donate_asked.disconnect(catch)
+	_check(asked.get("it", []) == [id, [903], 0] and sheet.give.is_empty(), "Donate asks for the contribution: the town, the uids, the gold (%s)" % [asked.get("it", [])])
+	sheet.show_tab(1)
+	_check(sheet.tab_shown() == "Ledger" and sheet.button_shown() == "" and not sheet.holds_pack() and sheet.lines_shown()[0] == "Oakford",
+		"the Ledger tab: 624's lines, no Donate, the pack let go (%s)" % [sheet.lines_shown()])
+	sheet.show_tab(0)
+	sheet.click_box("fund", "fund")
+	fake["at"] = false
+	_main._on_message("town_sheet", fake)
+	_check(sheet.button_shown() == "" and not sheet.holds_pack() and not hook.call(true, 4, false) and sheet.give.is_empty(),
+		"away from the store: read only, no Donate, the pack's clicks the store's again")
+	_check(sheet.gift == 0 and sheet.give.is_empty(), "away from it, nothing stays picked")
+	sheet.click_box("fund", "fund")
+	_check(sheet.gift == 0, "nor gold toward the building")
+	_main._on_message("town_sheet", {"town": id, "why": "Bring it to the store."})
+	_check(sheet.boxes_shown().size() == 8 and sheet._asking.visible and sheet._asking.text == "Bring it to the store." and sheet.button_shown() == "",
+		"a Donate refused away: the last sheet kept, its why a line on it (%s)" % sheet._asking.text)
+	var unknown := fake.duplicate()
+	unknown["regard"] = {"score": 0.0, "word": "", "last": 0, "why": []}
+	_main._on_message("town_sheet", unknown)
+	_check(sheet.regard_shown().begins_with("stranger") and not sheet._asking.visible,
+		"a town that hasn't heard of you: stranger; a fresh sheet drops the why (%s)" % sheet.regard_shown())
+	_main.toggle_town()
+	_check(not sheet.visible and not _main.pack_panel.held_open, "closed: the pack let go")
+	_check(ItemIcons.is_slot("item.wool") and not ItemIcons.is_slot("herbs") and not ItemIcons.is_slot("item.herbs") == Items.exists("item.herbs")
+			and ArtKit.has("item.wool") and ArtKit.has("item.fish") and ArtKit.has("item.sheep"),
+		"stock with no items row drawn by its art slot (art-kit's wool, fish, sheep)")
+	_main.town_states = states_was
+	_main.town_sheets.erase(id)
+	_main._town_sheet_asked.clear()

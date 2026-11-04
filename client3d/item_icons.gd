@@ -102,9 +102,11 @@ func _ready() -> void:
 
 
 ## [param id]'s icon, or null: not drawn yet (it is queued, and icon_ready
-## follows), headless, or no art for it.
+## follows), headless, or no art for it. An art slot's name ("item.wool")
+## draws that slot (768: the town's stock with no items row, art-kit's
+## 92916670).
 func icon(id: String) -> Texture2D:
-	if not enabled or not Items.exists(id):
+	if not enabled or not (Items.exists(id) or is_slot(id)):
 		return null
 	var key := _key(id)
 	if _cache.has(key):
@@ -135,6 +137,7 @@ func _art_changed(slot: String) -> void:
 	if slot.is_empty():
 		forget()
 		return
+	forget(slot)  # Drawn by its slot's name (768).
 	for id: String in Items.ids():
 		if _slot(id) == slot:
 			forget(id)
@@ -172,7 +175,12 @@ func _draw(id: String) -> void:
 
 
 static func _slot(id: String) -> String:
-	return str(Items.def(id).get("art", ""))
+	return id if is_slot(id) else str(Items.def(id).get("art", ""))
+
+
+## Whether [param id] is an art slot's name ("item.wool"), not an item's.
+static func is_slot(id: String) -> bool:
+	return id.begins_with("item.") and not Items.exists(id)
 
 
 static func _key(id: String, placeholders := ArtKit.show_placeholders) -> String:
