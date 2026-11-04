@@ -13244,12 +13244,14 @@ func _on_telegraph_started(id: Variant, data: Dictionary) -> void:
 	var from_tick := int(data.get("from_tick", World.tick))
 	var drawn: Variant = data.get("shape", {})
 	_client3d.telegraph_show(str(id), cells, from_tick, int(data.get("lands_tick", from_tick)), drawn if drawn is Dictionary else {})
+	_client3d.creature_tell(int(id), data)  # 780 amended (6): a beast's tell, timed to land with it.
 
 
 ## A telegraph ends: landed, it flashes and goes; called off, it goes at once.
 func _on_telegraph_ended(id: Variant, landed: bool) -> void:
 	if _client3d != null:
 		_client3d.telegraph_land(str(id), landed)
+		_client3d.creature_tell_over(int(id), landed)
 
 
 ## The cells combat's Telegraph.cells gives for [param shape], the class

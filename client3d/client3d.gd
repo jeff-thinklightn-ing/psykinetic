@@ -2104,6 +2104,8 @@ var _aim_arc_angle := -1000.0
 ## landed_at}; one flat quad per cell that will be hit, filling toward
 ## lands_tick, a flash on landing.
 var _telegraphs: Dictionary = {}
+## Telegraph id to the puppet whose tell it began (creature_tell).
+var _tells: Dictionary = {}
 var _cell_quad: ArrayMesh
 ## The outline's passes (the first; each the next's next_pass), the
 ## outlined puppet (null: none), and each body material's copy that marks
@@ -4762,6 +4764,29 @@ func _curtain_mesh(segments: Array[PackedVector2Array]) -> ArrayMesh:
 
 ## Telegraph [param id] ended: [param landed] true flashes it and lets it
 ## go; false (called off) takes it away at once.
+## A telegraph begun by a creature drawn through a CreatureView (780 amended (6): the great
+## bear's swipe, slam and charge): its tell, landing on the telegraph's lands tick. [param data]
+## is the "telegraph" message's {source, kind, lands_tick}.
+func creature_tell(id: int, data: Dictionary) -> void:
+	var source := get_node_or_null(NodePath(str(data.get("source", "")))) if str(data.get("source", "")) != "" else null
+	if source == null:
+		return
+	var puppet: Node3D = _puppets.get(source.get_instance_id())
+	if puppet == null or not puppet.has_meta("creature_view"):
+		return
+	var lands_in := (int(data.get("lands_tick", World.tick)) - World.tick) * World.TICK_DT
+	if (puppet.get_meta("creature_view") as CreatureView).tell(str(data.get("kind", "")), lands_in, id):
+		_tells[id] = puppet
+
+
+## Telegraph [param id] over: the tell it began ends (cut short when it did not land).
+func creature_tell_over(id: int, landed: bool) -> void:
+	var puppet: Node3D = _tells.get(id)
+	_tells.erase(id)
+	if puppet != null and is_instance_valid(puppet) and puppet.has_meta("creature_view"):
+		(puppet.get_meta("creature_view") as CreatureView).tell_over(id, landed)
+
+
 func telegraph_land(id: String, landed: bool) -> void:
 	if not _telegraphs.has(id):
 		return
@@ -20001,6 +20026,8 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.charge()
 		elif cry == &"rout":
 			view.bolt()
+		elif cry == &"roar":
+			view.roar()
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))

@@ -166,6 +166,7 @@ func _ready() -> void:
 		await _test_indoor_phased_build()
 		await _test_creature_puppets()
 		await _test_creature_down()
+		await _test_creature_tells()
 		_test_piles()
 		_test_heard_as_monsters_hear()
 		_test_ambience_runs()
@@ -9866,6 +9867,81 @@ func _test_creature_puppets() -> void:
 	World.despawn(boar)
 	await _frames(2)
 
+
+## An apex beast's tells (780 amended (6)): a telegraph's move plays the slot clip of its name
+## (charge: charge_tell), its contact on the lands tick; called off, it stops; a roar plays its
+## roar; asleep (Pose SIT) its sleep, winded and standing its winded; a slot without those clips
+## does as before. On a boar's view, its art given the great bear's clip names (the bear's slot is
+## art-kit's to land): stand-ins copied from its own clips.
+func _test_creature_tells() -> void:
+	print("
+== a beast's tells play timed to its telegraph; asleep it sleeps, winded it heaves (780 amended (6)) ==")
+	var boar := _spawn_imp(Vector2i(9, 4), "boar")
+	await _frames(2)
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets.get(boar.get_instance_id())
+	var view := puppet.get_meta("creature_view", null) as CreatureView if puppet != null else null
+	if view == null or view.rig == null:
+		_check(false, "a boar drawn by its CreatureView")
+		World.despawn(boar)
+		return
+	var rig := view.rig
+	_check(not view.tell("swipe", 0.6, 1) and not rig.striking(), "a slot with no swipe: no tell")
+	boar.pose = Monster.Pose.SIT
+	view.frame(puppet, boar)
+	_check(rig.base_clip() == view.clips["graze"], "no sleep in the slot: sitting grazes, as before")
+	boar.pose = Monster.Pose.STAND
+	var library := rig.player.get_animation_library("")
+	for clip: String in ["swipe", "slam", "charge_tell", "roar", "sleep", "winded"]:
+		var copy := rig.player.get_animation(view.clips["attack" if clip in ["swipe", "slam", "charge_tell", "roar"] else "idle"]).duplicate() as Animation
+		copy.length = 1.1 if clip == "swipe" else 0.8
+		copy.loop_mode = Animation.LOOP_LINEAR if clip in CreatureView.LOOPED else Animation.LOOP_NONE
+		library.add_animation("Tell_" + clip, copy)
+		view.clips[clip] = "Tell_" + clip
+	view._contact["swipe"] = 0.545
+	boar.pose = Monster.Pose.SIT
+	view.frame(puppet, boar)
+	_check(rig.base_clip() == view.clips["sleep"], "asleep (Pose SIT) with a sleep: sleeping, not grazing")
+	boar.pose = Monster.Pose.STAND
+	boar.winded = true
+	view.frame(puppet, boar)
+	_check(rig.base_clip() == view.clips["winded"], "winded and standing: heaving")
+	boar.winded = false
+	view.frame(puppet, boar)
+	_check(rig.base_clip() == view.clips["idle"], "not winded: idle again")
+	var speed_for := func(contact: float, lands_in: float) -> float:
+		return clampf(contact / lands_in, ArtKit.feel("anim_rig.strike_speed_min", AnimRig.STRIKE_SPEED_MIN),
+				ArtKit.feel("anim_rig.strike_speed_max", AnimRig.STRIKE_SPEED_MAX))
+	_check(view.tell("swipe", 0.6, 7) and rig.striking() and rig.playing() == view.clips["swipe"]
+			and is_equal_approx(rig.speed(), speed_for.call(1.1 * 0.545, 0.6)),
+			"a swipe telegraphed to land in 0.6 s: its swipe, its contact (0.545 of 1.1 s) landing then (speed %.2f)" % rig.speed())
+	view.tell_over(8, false)
+	_check(rig.striking(), "another telegraph's end leaves it be")
+	view.tell_over(7, false)
+	_check(not rig.striking(), "its telegraph called off (stunned mid-tell): the tell stops")
+	_check(view.tell("charge", 0.8, 9) and rig.playing() == view.clips["charge_tell"]
+			and is_equal_approx(rig.speed(), speed_for.call(0.8, 0.8)),
+			"a charge's telegraph: its charge_tell, all wind-up, ending as the rush begins (speed %.2f)" % rig.speed())
+	var pose_x := (puppet.get_node("Body/Pose") as Node3D).position.x
+	view.charge()
+	_check(rig.playing() == view.clips["charge_tell"] and view._charge_until >= view._tell_until + int(CreatureView.CHARGE_SECONDS * 1000.0) - 5,
+			"the charge cry while telling: the tell plays on, the run after it")
+	await _frames(3)
+	_check(is_equal_approx((puppet.get_node("Body/Pose") as Node3D).position.x, pose_x), "no lunge for a beast with a tell")
+	view.tell_over(9, true)
+	_check(rig.playing() == view.clips["charge_tell"], "landed: its tell plays out")
+	view.unwind()
+	view.roar()
+	_check(rig.striking() and rig.playing() == view.clips["roar"], "a roar cried: its roar")
+	view.unwind()
+	# Through the client: the telegraph message's source and lands tick.
+	var data := {"id": 11, "source": str(boar.get_path()), "kind": "slam", "lands_tick": World.tick + 12}
+	_rig.creature_tell(11, data)
+	_check(rig.playing() == view.clips["slam"] and _rig._tells.get(11) == puppet, "Client3D.creature_tell: the slam on the puppet the message names")
+	_rig.creature_tell_over(11, false)
+	_check(not rig.striking() and not _rig._tells.has(11), "creature_tell_over: called off, stopped and forgotten")
+	World.despawn(boar)
+	await _frames(2)
 
 ## A deer down (764, pc-character's side; enemy-ai's Monster.Pose.DOWN): lain on its belly over
 ## its idle (creature_life.gd: the legs folded under, the body lowered to the ground, the neck

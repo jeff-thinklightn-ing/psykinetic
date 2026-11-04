@@ -40051,6 +40051,32 @@ breaks off from them). Companions (780 amended (5)) warn of an apex creature, ke
 and fight it only when it is engaged with her or her player. monster_test: is_apex by the row,
 the drops in the catalog, engaged with its striker and its foe and not with a bystander. Server
 only; protocol unchanged; no new class_name; no bullet (no level has a bear).
+780 amended (6): the bear's body rigged, and its tells played (pc-character, 2026-11-04). Art-kit's
+great bear body (one mesh, no armature) is rigged by a new tools/quadruped_rig.py (blender -b -P
+tools/quadruped_rig.py -- <body .blend|.glb> <out.glb> --clips bear [--tail N] [--hock SHARE]
+[--head SHARE]): landmarks measured on the mesh (the four feet by creature_rig's foot_centres, each
+foot's toe and heel, back and belly by rays down the middle, snout and rump) give a skeleton of its
+own (root, hips, spine, chest, neck, head, tail bones; per side thigh, shin, foot and upper arm,
+forearm, paw), weighted by bone heat, the mesh's own palette UVs kept; a species' clips are
+authored by script, side-view leg reaching keeping planted feet planted. A general tool rather than
+the rabbit's one-off: the hill cat goes on it next (five tail bones, ears, a jaw, a high hock). The
+bear's clips: Idle, Walk (four-beat), Run (a bound), Swipe (the right fore paw up and out, raked
+across the front, landing at 0.6 s: windup 6), Slam (reared on its hind legs, down on both fore
+paws at 1.2 s: windup 12), Charge_Tell (head down, haunches gathered, a scrape: the roar 8 before
+the rush), Roar, Winded, Sleep, Hit, Death; every clip's lowest skinned point within 4 cm of the
+ground. Art-kit lands the slot creature.great_bear (its clips: swipe contact 0.545, slam 0.706,
+charge_tell, roar, winded, sleep) and switches the row's art off creature.boar; sheet
+C:/dev/review/great_bear/great_bear_clips.png. The client (CreatureView): a World.telegraph begun
+by a creature whose slot has the move's clip (TELL_CLIPS: charge's is charge_tell, else the move's
+own name) strikes that clip so its contact lands on the telegraph's lands tick (Main's
+telegraph_started, Client3D.creature_tell by the message's source); a telegraph ended unlanded (a
+knock-down mid-tell) stops it, as a blow given up does; a charge tell is all wind-up, ending as the
+rush begins, and the sim waits the roar's ticks before it rushes, so the client holds nothing back
+(the coordinator's ask): the charge cry while telling leaves the tell be and runs after it, with
+no lunge. A roar cried plays the slot's roar; Pose SIT plays its sleep where it has one (else the
+graze, as before); a body replicated winded, standing, its winded. A slot without these clips
+draws as before. view_test _test_creature_tells. Client only; protocol unchanged; no new
+class_name; no bullet (no level has a bear).
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'

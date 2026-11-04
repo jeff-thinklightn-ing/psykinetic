@@ -47,7 +47,14 @@ const CONTACT := ArtKit.CLIP_CONTACT
 const FALLBACKS := {"graze": "idle", "feed": "graze", "trot": "walk", "charge": "run", "alert": "idle",
 	"howl": "idle", "sit": "idle", "lie": "idle"}
 ## The slot clips that loop; the rest (attack, hit, death) play once.
-const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze", "feed", "alert", "howl", "sit", "lie"]
+const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze", "feed", "alert", "howl", "sit", "lie",
+	"sleep", "winded"]
+## A move's tell (780 amended (6): an apex beast's World.telegraph, its "kind" the move): the
+## slot clip it plays, its contact landing on the telegraph's lands tick; a move not named here
+## plays the clip of its own name (swipe, slam). Only a slot listing the clip has one.
+const TELL_CLIPS := {"charge": "charge_tell"}
+## Tells whose clip is all wind-up (the slot gives no contact): their end is the move's start.
+const TELL_ENDS_AT_LANDING: Array[String] = ["charge_tell"]
 ## Monster.Pose.DOWN (enemy-ai's 764: a deer hurt past its sprint, lying a while, to be
 ## finished): drawn lying on its belly, alive (creature_life.gd, over its idle), lain down over
 ## DOWN_SECONDS, got up over UP_SECONDS; first seen down it lies at once; dying it unfolds over
@@ -69,6 +76,9 @@ var _pose: Node3D
 ## Slot clip name to how far through it its blow lands (the slot's "contact").
 var _contact := {}
 var _busy_until := 0
+## The telegraph whose tell is playing (0 for none), and when the tell's clip ends (msec).
+var _tell_id := 0
+var _tell_until := 0
 var _charge_until := 0
 var _bolt_until := 0
 var _dead := false
@@ -185,7 +195,10 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 			clip = "charge" if clips.has("charge") else "run"
 			scale = maxf(scale, ArtKit.feel("creature_view.charge_speed", CHARGE_SPEED))
 	elif monster != null and monster.pose == Monster.Pose.SIT:
-		clip = "graze" if resolve("graze") != "" else "feed"
+		# Asleep, for a beast whose slot has a sleep (the great bear at its den); else grazing.
+		clip = "sleep" if clips.has("sleep") else "graze" if resolve("graze") != "" else "feed"
+	elif monster != null and monster.winded and clips.has("winded"):
+		clip = "winded"  # Standing heaving (597), after a charge that met nobody.
 	elif alert == Monster.Alert.SUSPICIOUS:
 		clip = "alert"
 	_set_head_up(clip in HEAD_UP_FOR and not clips.has(clip))
@@ -255,24 +268,64 @@ func wind(seconds: float) -> void:
 ## The attack struck over the gait or rest, its contact landing in
 ## [param lands_in] seconds (at its own pace if negative), the rest of it at
 ## the same speed.
-func _strike(lands_in: float) -> void:
-	var animation := resolve("attack")
+func _strike(lands_in: float, clip := "attack") -> void:
+	var animation := resolve(clip)
 	if rig == null or animation == "" or _dead:
 		return
 	var length := rig.length(animation)
-	var contact := length * clampf(float(_contact.get("attack", ArtKit.feel("art_kit.clip_contact", CONTACT))), 0.0, 1.0)
+	var share := 1.0 if clip in TELL_ENDS_AT_LANDING else ArtKit.feel("art_kit.clip_contact", CONTACT)
+	var contact := length * clampf(float(_contact.get(clip, share)), 0.0, 1.0)
 	if lands_in < 0.0:
 		lands_in = contact
 	var speed := contact / lands_in if lands_in > 0.0 else 1.0
 	rig.strike(animation, contact, lands_in, (length - contact) / maxf(speed, 0.001))
 
 
+## The tell of a move telegraphed as [param move] (780 amended (6); Main's telegraph_started),
+## landing in [param lands_in] seconds: its slot clip (TELL_CLIPS, else the move's own name)
+## struck over the gait or rest so that its contact lands with the move. Whether there was one.
+func tell(move: String, lands_in: float, id: int) -> bool:
+	var clip := str(TELL_CLIPS.get(move, move))
+	if rig == null or _dead or not clips.has(clip):
+		return false
+	_strike(maxf(lands_in, 0.05), clip)
+	_tell_id = id
+	_tell_until = Time.get_ticks_msec() + int(maxf(lands_in, 0.0) * 1000.0)
+	return true
+
+
+## Telegraph [param id] over: called off (stunned, knocked down: not [param landed]), its tell
+## stops at once, as a blow given up does (unwind).
+func tell_over(id: int, landed: bool) -> void:
+	if id != _tell_id or id == 0:
+		return
+	_tell_id = 0
+	if not landed:
+		_tell_until = 0
+		unwind()
+
+
+## A roar (cried "roar"): its slot clip once at its own pace, over the gait or rest; none
+## without one.
+func roar() -> void:
+	if clips.has("roar") and not rig.striking():
+		_strike(-1.0, "roar")
+
+
 ## A charge (cried "charge"): a faster run for a while, lunging as it goes
-## when the art has no charge of its own.
+## when the art has no charge of its own. A charge whose tell plays (the great bear's roar
+## before its rush) runs on from the tell's end: the sim rushes once it lands, the client
+## holds nothing back.
 func charge() -> void:
-	_charge_until = Time.get_ticks_msec() + int(CHARGE_SECONDS * 1000.0)
+	var now := Time.get_ticks_msec()
+	var from := maxi(now, _tell_until)
+	_charge_until = from + int(CHARGE_SECONDS * 1000.0)
+	if from > now:
+		return  # Telling: the tell has it, and the run follows when the body moves.
 	_busy_until = 0
-	if clips.has("charge") or _pose == null:
+	# No lunge for a beast with a tell: it stands telling (whichever of the cry and the
+	# telegraph comes first), then runs.
+	if clips.has("charge") or clips.has("charge_tell") or _pose == null:
 		return
 	var tween := create_tween()
 	tween.tween_property(_pose, "position:x", LUNGE, CHARGE_SECONDS * 0.3).set_ease(Tween.EASE_OUT)
