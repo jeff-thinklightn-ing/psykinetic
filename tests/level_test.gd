@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_markers()
 	_test_heights_and_stairs()
 	_test_pit_ways_out()
+	_test_mine_track()
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
@@ -1312,6 +1313,73 @@ func _test_pit_ways_out() -> void:
 	World._relief = field
 	var sloped := _trap_landings(room, [0])
 	_check(sloped.is_empty(), "with a slope up its east side it is not (%s)" % [sloped])
+
+
+## Decision 794: every shipped level's mine track ("mine_track" decor, as
+## World loads it into _track) is one a cart can roll: no cell with three
+## or more track neighbours, a bend piece (2) only where its two neighbours
+## turn, a straight (1) only where they run on, every end a buffer (3), and
+## no track across a wall or cliff or on a stair (_track_faults).
+func _test_mine_track() -> void:
+	print("\n== mine track a cart can roll: no forks, bends on bends, buffers at ends, no cliffs or stairs (794) ==")
+	var pieces := 0
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		var level := Level.load_level(folder)
+		if level.is_empty():
+			continue
+		World.load_terrain(level["terrain"])
+		if World._track.is_empty():
+			continue
+		pieces += World._track.size()
+		var faults := _track_faults()
+		_check(faults.is_empty(), "%s: its %d track pieces roll (%s)" % [folder, World._track.size(), faults.slice(0, 8)])
+	_check(pieces > 0, "the levels have track to check (%d pieces)" % pieces)
+	# The check itself, on the test room's floor.
+	var room := Level.load_level("test_room")
+	World.load_terrain(room["terrain"])
+	var good := {Vector2i(2, 2): 3, Vector2i(3, 2): 1, Vector2i(4, 2): 2, Vector2i(4, 3): 1, Vector2i(4, 4): 3}
+	World._track.assign(good)
+	_check(_track_faults().is_empty(), "a run, a bend and a buffer at each end rolls (%s)" % [_track_faults()])
+	var bad := {
+		"a fork": {Vector2i(4, 1): 3},
+		"a straight on the bend": {Vector2i(4, 2): 1},
+		"a bend on a straight": {Vector2i(3, 2): 2},
+		"an open end": {Vector2i(4, 4): 1},
+	}
+	for name: String in bad:
+		World._track.assign(good)
+		World._track.merge(bad[name], true)
+		_check(not _track_faults().is_empty(), "%s is named (%s)" % [name, _track_faults()])
+	World._track.clear()
+
+
+## What in World's loaded track a cart can't roll (decision 794): each
+## fault as "cell: what".
+func _track_faults() -> Array:
+	var out := []
+	var ways: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	for cell: Vector2i in World._track:
+		var variant: int = World._track[cell]
+		var near: Array[Vector2i] = []
+		for way in ways:
+			if World._track.has(cell + way):
+				near.append(way)
+				if World._terrain_blocks_step(cell, way, false, true):
+					out.append("%s: across a wall or cliff %s" % [cell, way])
+		if World.stair_at(cell) != Vector2i.ZERO:
+			out.append("%s: on a stair" % cell)
+		var turns := near.size() == 2 and near[0] != -near[1]
+		if near.size() >= 3:
+			out.append("%s: %d track neighbours" % [cell, near.size()])
+		elif near.size() <= 1 and variant != 3:
+			out.append("%s: an end not a buffer" % cell)
+		elif variant == 2 and not turns:
+			out.append("%s: a bend piece on a straight" % cell)
+		elif variant == 1 and turns:
+			out.append("%s: a straight piece on a bend" % cell)
+	return out
 
 
 ## The landing cells (with the region's size, the drop and its rim), one per region, of ledges in World's loaded terrain that

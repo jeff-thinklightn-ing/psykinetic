@@ -14,8 +14,9 @@ const SPECS := {
 	"m": {"script": "res://sim/monster.gd", "shape": "capsule"},
 	"o": {"script": "res://sim/pushable.gd", "shape": "sphere",
 		"props": {"mass": 200.0, "body_material": GridEntity.BodyMaterial.STONE}},
+	"c": {"script": "res://sim/cargo.gd", "shape": "slab", "art": "prop.mine_cart", "props": {"mass": 60.0, "capacity": 8}},
 }
-const NAMES := {"P": "Player", "m": "Dummy", "o": "Boulder"}
+const NAMES := {"P": "Player", "m": "Dummy", "o": "Boulder", "c": "Cart"}
 
 var _failures := 0
 var _room: Node2D
@@ -47,6 +48,7 @@ func _ready() -> void:
 	_test_load()
 	_test_clank()
 	_test_falls()
+	_test_cart_roll()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -787,6 +789,129 @@ func _damage(entity: GridEntity, cause: StringName) -> int:
 		if entry.entity == entity and entry.cause == cause:
 			total += entry.amount
 	return total
+
+
+## Track on row [param row] from [param from_x] to [param to_x] (decision
+## 794's World._track, as "mine_track" decor gives it), buffers (3) at
+## [param buffers] ends.
+func _lay_track(row: int, from_x: int, to_x: int, buffers := true) -> void:
+	for x in range(from_x, to_x + 1):
+		World._track[Vector2i(x, row)] = 3 if buffers and (x == from_x or x == to_x) else 1
+
+
+## The ground in metres by [param height_of] (x -> metres), over
+## [param width] x [param height] cells.
+func _slope(width: int, height: int, height_of: Callable) -> void:
+	var field := PackedFloat32Array()
+	field.resize(width * height)
+	for y in height:
+		for x in width:
+			field[y * width + x] = float(height_of.call(x))
+	World._relief = field
+	World._relief_size = Vector2i(width, height)
+
+
+## Steps the world until [param cart] stops rolling (at most
+## [param most] steps); the steps it took.
+func _roll_out(cart: GridEntity, most := 600) -> int:
+	var steps := 0
+	while World.is_rolling(cart) and steps < most:
+		World.step()
+		steps += 1
+	return steps
+
+
+func _test_cart_roll() -> void:
+	print("\n== mine carts roll on their rails: drag, slope, buffers, bends, a body bowled (decision 794) ==")
+	var rows: Array[String] = ["##########################", "#Pc......................#", "#........................#", "##########################"]
+	var e := _build(rows, 40.0)
+	var player: GridEntity = e["P"][0]
+	var cart: GridEntity = e["c"][0]
+	_lay_track(1, 2, 24)
+	World._push(player, cart, Vector2(1, 0), 1.33)
+	_check(World.is_rolling(cart) and cart.tile == Vector2i(2, 1), "a shove along its rails sets it rolling, not sliding (%s)" % cart.tile)
+	var steps := _roll_out(cart)
+	var flat := cart.tile.x - 2
+	_check(not World.is_rolling(cart) and flat >= 8 and flat <= 12 and steps > flat,
+			"on the flat it rolls on, cell by cell, %d cells over %d steps (a slide's 1.33 m/s goes 2)" % [flat, steps])
+	_check(cart.move_ticks > 2.0 and cart.move_ticks <= World.TICK_RATE / World.cart_stop_speed,
+			"its last step slow, %.1f ticks (replicated move_ticks)" % cart.move_ticks)
+
+	e = _build(rows, 40.0)
+	cart = e["c"][0]
+	_lay_track(1, 2, 24)
+	_slope(26, 4, func(x: int) -> float: return 10.0 - 0.3 * x)
+	World._push(e["P"][0], cart, Vector2(1, 0), 1.33)
+	_roll_out(cart)
+	_check(cart.tile == Vector2i(24, 1), "downhill it gains, and runs to the buffer at the end (%s, flat %d cells)" % [cart.tile, flat])
+
+	e = _build(rows, 40.0)
+	cart = e["c"][0]
+	_lay_track(1, 2, 24)
+	_slope(26, 4, func(x: int) -> float: return 0.3 * x)
+	World._push(e["P"][0], cart, Vector2(1, 0), 2.0)
+	var turned := false
+	var high := 2
+	for i in 400:
+		World.step()
+		high = maxi(high, cart.tile.x)
+		if World.is_rolling(cart) and World._rolling[cart]["way"] == Vector2i(-1, 0):
+			turned = true
+		if not World.is_rolling(cart):
+			break
+	_check(turned and high > 2 and cart.tile.x < high, "uphill it slows, stalls at %d and rolls back down to %s" % [high, cart.tile])
+
+	e = _build(rows, 40.0)
+	cart = e["c"][0]
+	_lay_track(1, 2, 6, false)
+	World._track[Vector2i(6, 1)] = 2
+	World._track[Vector2i(6, 2)] = 3
+	World._push(e["P"][0], cart, Vector2(1, 0), 3.0)
+	_roll_out(cart)
+	_check(cart.tile == Vector2i(6, 2), "round a bend: it follows its rails south to the buffer (%s)" % cart.tile)
+	World._push(e["P"][0], cart, Vector2(0, 1), 3.0)
+	_check(not World.is_rolling(cart), "pushed past its buffer it does not roll")
+
+	e = _build(rows, 40.0)
+	cart = e["c"][0]
+	_lay_track(1, 2, 24)
+	World._push(e["P"][0], cart, Vector2(0, 1), 3.0)
+	_check(not World.is_rolling(cart) and cart.tile != Vector2i(2, 1), "pushed across its rails it slides as any push (%s)" % cart.tile)
+
+	# Walked into: it rolls on at the walker's pace, or its shove's if less.
+	e = _build(rows, 40.0)
+	player = e["P"][0]
+	cart = e["c"][0]
+	_lay_track(1, 2, 24)
+	World._shift(player, cart, Vector2i(1, 0), player.mass, 2.0, float(World.tick))
+	var given: float = World._rolling[cart]["v"] if World.is_rolling(cart) else 0.0
+	_check(cart.tile == Vector2i(3, 1) and is_equal_approx(given, minf(World.TICK_RATE / 2.0, World.push_force(player, cart))),
+			"walked into along its rails: a cell, then rolling on at %.2f" % given)
+
+	# A loaded cart bowls a kobold into the pit beyond the track's end, the
+	# kill (eight levels) the pusher's.
+	var pit_rows: Array[String] = ["############", "#Pc...m....#", "############"]
+	e = _build(pit_rows, 20.0)
+	player = e["P"][0]
+	cart = e["c"][0]
+	var kobold: GridEntity = e["m"][0]
+	_lay_track(1, 2, 6)
+	_slope(12, 3, func(x: int) -> float: return 0.0 if x <= 6 else -8.0 * Relief.LEVEL_M)
+	World._push(player, cart, Vector2(1, 0), 3.0)
+	_roll_out(cart)
+	_check(not World._alive(kobold) or kobold.hp <= 0, "the cart at speed sends a 20 kg kobold off the rim, eight levels: dead")
+	_check(cart.tile.x <= 6, "the cart stays on its rails (%s)" % cart.tile)
+	_check(is_instance_valid(kobold) and (kobold as Monster).struck_by == player, "the kill the pusher's: struck_by %s" % [(kobold as Monster).struck_by if is_instance_valid(kobold) else "freed"])
+
+	# Too slow to go over: the kobold teeters on the rim (783).
+	e = _build(pit_rows, 20.0)
+	cart = e["c"][0]
+	kobold = e["m"][0]
+	_lay_track(1, 2, 6)
+	_slope(12, 3, func(x: int) -> float: return 0.0 if x <= 6 else -2.0 * Relief.LEVEL_M)
+	World._push(e["P"][0], cart, Vector2(1, 0), 1.0)
+	_roll_out(cart)
+	_check(kobold.tile == Vector2i(6, 1) and kobold.teeter == Vector2i(1, 0), "a slow cart only sets it teetering on the rim (%s, %s)" % [kobold.tile, kobold.teeter])
 
 
 func _check(ok: bool, label: String) -> void:

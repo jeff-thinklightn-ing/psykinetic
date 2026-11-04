@@ -25,6 +25,7 @@ func _init() -> void:
 	replicate("slots")
 	replicate("slot_notes")
 	replicate("slot_counts")
+	replicate("move_ticks")  # Decision 794: a rolling cart's step, for the views' slide.
 
 
 ## Its slots cut or padded to its capacity, after a spawn spec's props set

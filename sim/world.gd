@@ -447,6 +447,15 @@ var moves := {
 @export var fall_hp_per_level := FALL_IMPACT_PER_LEVEL
 @export var fall_lethal_levels := 8
 @export var fall_down_ticks := 20
+## Mine carts (decision 794): a Cargo pushed along its rails ("mine_track"
+## decor) rolls on, losing track_drag of a ground cell's slide speed each
+## cell, gaining on a slope down by roll_gravity (v^2 += 2 g x the metres
+## dropped), at most cart_top_speed cells a second, stopping under
+## cart_stop_speed.
+@export var track_drag := 0.12
+@export var roll_gravity := 3.0
+@export var cart_top_speed := 6.0
+@export var cart_stop_speed := 0.5
 ## A swing's own weight in its impulse (swing_impulse, decision 605): the
 ## thing's kilos times this.
 @export var swing_speed := 20.0
@@ -877,6 +886,12 @@ var _rushers: Dictionary[GridEntity, Dictionary] = {}
 ## Whoever teeters on a rim (decision 783) -> the rim's cell, for
 ## _tend_teeters. Untyped: one freed some other way is dropped there.
 var _teetering := {}
+## Mine track (decision 794): cell -> its "mine_track" decor variant (3 a
+## buffer), from the terrain's decor; and each rolling cart's state (by, the
+## last to push it; v, cells a second; way; next, the tick its next cell is
+## due), for _tend_rolls.
+var _track: Dictionary[Vector2i, int] = {}
+var _rolling: Dictionary[GridEntity, Dictionary] = {}
 ## Free bodies whose push's slide is being shown (688 amended (2)), for
 ## _tend_free_kicks.
 var _free_kicked: Dictionary[GridEntity, bool] = {}
@@ -1273,6 +1288,7 @@ func _step_zone() -> void:
 	_take_roster()
 	_clear_links()
 	_tend_rushes()  # Each rush's next cell when due (decision 604).
+	_tend_rolls()  # Each rolling cart's next cell when due (decision 794).
 	_tend_free_kicks()  # Pushed free bodies' slides shown, stunned or not (688 amended (2)).
 	t = part("tiers, roster", t)
 	for entity in _actors:
@@ -2003,6 +2019,11 @@ func load_terrain(terrain: Dictionary) -> void:
 
 func _set_terrain(terrain: Dictionary) -> void:
 	zone.terrain_loads += 1
+	_track.clear()
+	_rolling.clear()
+	for piece: Dictionary in terrain.get("decor", []):
+		if str(piece.get("kind", "")) == "mine_track":
+			_track[piece["cell"]] = int(piece.get("variant", 1))
 	_grid_rect = Rect2i()
 	_grid_steps = PackedByteArray()
 	_floor.clear()
@@ -4938,7 +4959,8 @@ func load_physics_rules(text: String) -> void:
 				"momentum_ticks", "restitution", "impact_per_energy", "brace_restitution", "stun_ticks_base",
 				"stun_ticks_per_force", "knockback_stun_ticks", "lunge_ticks_per_cell", "lunge_min_speed", "rush_stop_speed", "swing_speed", "throw_speed",
 				"load_k", "load_free", "load_heavy", "load_overloaded", "clank_plate", "clank_mail",
-				"teeter_speed", "teeter_ticks", "fall_hp_per_level", "fall_lethal_levels", "fall_down_ticks"]:
+				"teeter_speed", "teeter_ticks", "fall_hp_per_level", "fall_lethal_levels", "fall_down_ticks",
+				"track_drag", "roll_gravity", "cart_top_speed", "cart_stop_speed"]:
 			push_warning("World: %s's %s is not a physics rule" % [PHYSICS_RULES, key])
 		elif (given is int or given is float) and float(given) >= 0.0:
 			set(field, int(given) if get(field) is int else float(given))
@@ -8550,6 +8572,10 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 			return out
 		# An exhausted or downed body counts as less mass (pushed_mass).
 		var body_mass := pushed_mass(body)
+		# A cart on its rails rolls on instead of sliding (decision 794).
+		if not toss and _start_roll(mover, body, line, u):
+			out.append({"body": body, "from": body.tile, "to": body.tile, "cells": 0, "stopped_by": "rolling", "impact": 0})
+			break
 		# Less than a tile's worth of speed moves nothing and hurts nothing.
 		# The ground it can cross: open cells' worth, each cell costing its
 		# ground_drag (607), so a ford or grass or a slope up shortens it.
@@ -8963,6 +8989,156 @@ func _teeter_struck(body: GridEntity, source: GridEntity, way: Vector2) -> bool:
 	# goes over (its fall ends the teeter, _fall_hurt).
 	_push(source, body, Vector2(toward), maxf(teeter_speed, ground_drag(body.tile, toward) / slide_per_speed + 0.01))
 	return true
+
+
+## The ways the rails on [param cell] run (decision 794): toward each
+## orthogonal neighbour with track; none off the track.
+func rails(cell: Vector2i) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if not _track.has(cell):
+		return out
+	for way: Vector2i in DIRECTIONS.slice(0, 4):
+		if _track.has(cell + way):
+			out.append(way)
+	return out
+
+
+## Whether [param cell]'s track is a buffer (decision 794: "mine_track"
+## variant 3), where a rolling cart stops.
+func is_buffer(cell: Vector2i) -> bool:
+	return _track.get(cell, 0) == 3
+
+
+## Whether [param cart] is rolling on its rails (decision 794).
+func is_rolling(cart: GridEntity) -> bool:
+	return _rolling.has(cart)
+
+
+## [param cart] pushed by [param by] along [param line] at [param u] (cells
+## a second): a Cargo on track whose rails run within 60 degrees of the
+## push rolls that way (decision 794) at the push's speed along them, at
+## most cart_top_speed, its next cell due at [param next] (now, -1). One
+## already rolling has the push added to its speed along its way (a push
+## against it slows it, or turns it back); [param walked] (a walker's step
+## into it) keeps the faster of the two instead, so walking behind a cart
+## never speeds it past the walk. Whether it took the push as a roll
+## (false: not a cart on rails, or not along them, and the push goes on as
+## any push does).
+func _start_roll(by: GridEntity, cart: GridEntity, line: Vector2, u: float, walked := false, next := -1.0) -> bool:
+	if not cart is Cargo or not _track.has(cart.tile) or line == Vector2.ZERO or not _alive(cart):
+		return false
+	var unit := line.normalized()
+	var way := Vector2i.ZERO
+	var along := 0.5
+	for rail: Vector2i in rails(cart.tile):
+		if unit.dot(Vector2(rail)) > along:
+			along = unit.dot(Vector2(rail))
+			way = rail
+	if way == Vector2i.ZERO:
+		return false
+	var v := u * along
+	if _rolling.has(cart):
+		var state: Dictionary = _rolling[cart]
+		var had: float = state["v"]
+		var going: Vector2i = state["way"]
+		if walked:
+			v = maxf(v, had) if going == way else v
+		elif going == way:
+			v += had
+		elif going == -way:
+			v -= had
+			if v < 0.0:
+				way = going
+				v = -v
+		if next < 0.0 and going == way:
+			next = float(state["next"])
+	v = minf(v, cart_top_speed)
+	if v < cart_stop_speed:
+		if _rolling.has(cart):
+			_end_roll(cart, "pushed to a stop")
+		return true
+	_rolling[cart] = {"by": by, "v": v, "way": way, "next": float(tick) if next < 0.0 else next}
+	_log("roll: %s pushes %s %s at %.2f" % [by.name, cart.name, way, v])
+	return true
+
+
+## Each rolling cart's next cell, when due (decision 794).
+func _tend_rolls() -> void:
+	for cart: GridEntity in _rolling.keys():
+		if not _alive(cart) or not _track.has(cart.tile):
+			_rolling.erase(cart)
+			continue
+		var state: Dictionary = _rolling[cart]
+		if float(tick) + 0.001 >= float(state["next"]):
+			_roll_step(cart, state)
+
+
+## [param cart] rolls on a cell along its rails, or stops (decision 794): on
+## round a bend (the one other way its rails run), or stopped at a buffer,
+## the track's end, a wall or a step; a body in its way takes 592's
+## collision (the one met goes on at (1 + restitution) m1 v / (m1 + m2),
+## pushed by whoever last pushed the cart, as a shove: 783's credit), the
+## cart going on with what is left unless the body stayed. The slope adds
+## or takes speed by its height (v^2 += 2 roll_gravity dh), the rails take
+## track_drag of a ground cell's slide speed; too slow to reach the next
+## cell, it rolls back if the way behind is downhill, else stops.
+func _roll_step(cart: GridEntity, state: Dictionary) -> void:
+	var at := cart.tile
+	var way: Vector2i = state["way"]
+	var v: float = state["v"]
+	if not _track.has(at + way):
+		var others := rails(at).filter(func(rail: Vector2i) -> bool: return rail != -way and rail != way)
+		if others.size() != 1 or is_buffer(at):
+			_end_roll(cart, "the buffer" if is_buffer(at) else "the track's end")
+			return
+		way = others[0]
+	var next := at + way
+	if _terrain_blocks_step(at, way, false, true):
+		_end_roll(cart, "wall" if _terrain_blocks_step(at, way, false, false) else "a step")
+		return
+	var by: GridEntity = state["by"] if _alive(state["by"]) else cart
+	var blocker: GridEntity = _occupancy.get(next)
+	if blocker != null:
+		var mass := pushed_mass(cart)
+		var other := pushed_mass(blocker)
+		var passed := (1.0 + restitution) * mass * v / (mass + other)
+		_log("roll: %s runs into %s at %.2f (passes %.2f)" % [cart.name, blocker.name, v, passed])
+		if not is_sheltered(blocker):
+			_push(by, blocker, Vector2(way), passed)
+		v = v * (mass - restitution * other) / (mass + other)
+		if v < cart_stop_speed or _occupancy.get(next) != null:
+			_end_roll(cart, "a body")
+			return
+	var squared := v * v + 2.0 * roll_gravity * (elevation_at(at) - elevation_at(next))
+	v = sqrt(maxf(squared, 0.0)) - track_drag / slide_per_speed
+	if squared <= 0.0 or v < cart_stop_speed:
+		var back := at - way
+		if _track.has(back) and elevation_at(back) < elevation_at(at) - 0.01 and not _terrain_blocks_step(at, -way, false, true):
+			state["way"] = -way
+			state["v"] = cart_stop_speed
+			state["next"] = float(tick) + TICK_RATE / cart_stop_speed
+			return
+		_end_roll(cart, "nothing (its speed spent)")
+		return
+	v = minf(v, cart_top_speed)
+	var ticks := TICK_RATE / v
+	cart.move_ticks = ticks
+	cart.step_velocity = Vector2(way) / ticks
+	cart._world_set_facing(way)
+	_relocate(cart, next)
+	state["way"] = way
+	state["v"] = v
+	state["next"] = float(tick) + ticks
+
+
+## [param cart] stops rolling (decision 794), [param why] for the log.
+func _end_roll(cart: GridEntity, why: String) -> void:
+	if not _rolling.has(cart):
+		return
+	_rolling.erase(cart)
+	if is_instance_valid(cart):
+		cart.step_velocity = Vector2.ZERO
+		_log("roll: %s stops (%s) at %s" % [cart.name, why, cart.tile])
 
 
 ## [param body] no longer teeters (decision 783): it found its feet, went
@@ -9396,6 +9572,11 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 		_log("push: %s -> %s dir=%s tiles=1 impact=0 stopped_by=nothing (walked into)" % [
 			mover.name, entity.name, direction])
 		entity_pushed.emit(entity, mover, direction, 1, 0, "nothing (walked into)")
+		# Walked into along its rails, a cart rolls on (decision 794): at the
+		# walker's pace, or what its shove would give it if less.
+		if duration > 0.0 and entity is Cargo and _track.has(entity.tile):
+			entity.move_ticks = duration
+			_start_roll(mover, entity, Vector2(direction), minf(TICK_RATE / duration, push_force(mover, entity)), true, start + duration)
 	return true
 
 
@@ -10620,6 +10801,8 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 ## the client's pace drifts from the server's (perf, 2026-10-19, looking
 ## into rubber banding by the wilds town's chests, on grass and slopes).
 func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> float:
+	if entity is Cargo and _track.has(entity.tile if from == NO_CELL else from):
+		return entity.move_ticks  # A cart on its rails (decision 794): its roll's step, replicated.
 	var ticks := entity.move_ticks * (DIAGONAL_TICK_SCALE if direction.x != 0 and direction.y != 0 else 1.0)
 	if from == NO_CELL:
 		from = entity.tile

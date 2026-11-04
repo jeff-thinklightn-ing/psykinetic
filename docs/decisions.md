@@ -41009,3 +41009,37 @@ verb answers "unknown command" unless both are set, so on the box it does not ex
 in the console's help. respawn_test _test_console: the verb unknown without the flag, the gate
 refusing a flag without a marker and a marker without the flag, and with both the hp set and
 held to 1. Server only, protocol unchanged, no new class_name, no bullet (a test tool).
+## 794. Rolling mine carts: a cart pushed along its rails rolls on
+
+The first user is 790, Hollowfell's mine (dungeon lays its track and carts). A Cargo
+standing on "mine_track" decor (variant 1 a straight, 2 a bend, 3 a buffer; World loads
+each terrain's pieces into _track) and pushed within 60 degrees of a way its rails run
+no longer slides as 592's push does: it rolls (World._start_roll, _tend_rolls,
+_roll_step), one cell at a time, at the push's speed along the rails (cells a second).
+Walked into, it steps the one cell 592's walk-push gives it and rolls on at the walker's
+pace, or its shove's (push_force) if less; a cart already rolling has a push along its
+way added, a push against it taken off (turning it back if more), and a walker behind it
+never speeds it past the walk. Each cell the rails take track_drag (0.12) of a ground
+cell's slide speed; a slope gives or takes speed by its height (v^2 += 2 roll_gravity
+(3.0) dh, in metres); at most cart_top_speed (6) cells a second; under cart_stop_speed
+(0.5) it stops, or, stalled on a slope with lower track behind, rolls back down. It
+follows a bend (the one other way its rails run at a track's end) and stops at a buffer,
+the track's end, a wall or a step (it never leaves its rails, nor goes over a ledge). A
+body in its way takes 592's collision as a push, at (1 + restitution) m1 v / (m1 + m2),
+the cart going on with v (m1 - e m2) / (m1 + m2) unless the body stayed; the push is
+the cart's last pusher's, so 783's shove rule gives that pusher a fall's kill (struck_by)
+and a slow cart only sets a body teetering on a rim. The numbers are in
+levels/physics.json. The views: Cargo replicates move_ticks (a rolling step's length),
+and World.step_ticks gives it for a cart on track, so GridEntity's slide between cells
+runs at the speed the cart rolls; sound's slots sfx.minecart_roll and sfx.minecart_stop
+(sound's follow-up) time and pitch from it. Tests: physics_test _test_cart_roll (the
+flat's run, downhill to the buffer, uphill stalling and rolling back, a bend, a push
+across the rails sliding, a walked push, a kobold bowled over eight levels and credited
+to the pusher, a slow cart's teeter); level_test _test_mine_track over every shipped
+level's track (no cell with three or more track neighbours, a bend piece only on a turn,
+a straight only on a run, every end a buffer, no track across a wall or cliff or on a
+stair) with its own bad cases. A loaded cart (ore sacks add mass through its slots) is
+harder to start and hits harder, free with this. Deferred: phase 2, riders (a body inside
+a cart: the view's seat and a way out), until this has been played; phase 3, hauling
+(economy's phase C: a sack in a cart weighs nothing to the pusher's walk; miners pushing
+carts, enemy-ai and npc's work, on a World.push_cart(by, cart, way)).

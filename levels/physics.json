@@ -26,5 +26,9 @@
 	"teeter_ticks": 12,
 	"fall_hp_per_level": 3,
 	"fall_lethal_levels": 8,
-	"fall_down_ticks": 20
+	"fall_down_ticks": 20,
+	"track_drag": 0.12,
+	"roll_gravity": 3.0,
+	"cart_top_speed": 6.0,
+	"cart_stop_speed": 0.5
 }

@@ -537,7 +537,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 48 (784 amended (2)): a Player replicates "crouched" (SUBCLASS_REPLICATED), creeping:
 ## World.step_ticks divides by World.crouch_pace while it is set, so a client's prediction
 ## agrees; an old client walks it at a walk's pace and draws it standing.
-const PROTOCOL_REVISION := 48
+## 49 (794): a Cargo replicates "move_ticks" (its rolling steps on mine track): World.step_ticks
+## gives it for a cart on track, so the views slide it at the roll's speed; an old client slides
+## it at a walk's pace.
+const PROTOCOL_REVISION := 49
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
