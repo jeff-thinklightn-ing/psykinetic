@@ -942,7 +942,13 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	var extra_types: Variant = config.get("monsters", {})
 	if extra_types is Dictionary:
 		for type: String in extra_types:
-			monster_types[type] = extra_types[type]
+			# A known kind's entry is merged over its row's body, not put in its
+			# place: bear_yard's "great_bear": {} gave the bear a Monster's 12 hp.
+			var given: Variant = extra_types[type]
+			if given is Dictionary and monster_types.get(type) is Dictionary:
+				monster_types[type] = (monster_types[type] as Dictionary).merged(given, true)
+			else:
+				monster_types[type] = given
 	var by_tile: Dictionary[Vector2i, Dictionary] = {}
 	for marker in markers:
 		by_tile[marker["tile"]] = marker

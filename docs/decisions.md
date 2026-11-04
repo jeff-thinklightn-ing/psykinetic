@@ -5032,6 +5032,16 @@ Monster.idle_of(kind). Imp, brute and sneak are its first rows, as they
 were; the ranks of the lore draft (raiders, haulers, wardens...) would be
 more rows.
 
+281 amended (playtest's find; release's label): a level's "monsters" entry
+for a kind the table already has merges over that kind's body, as "still
+add to it" meant; before, Level._place put it in the body's place, so
+bear_yard's "great_bear": {} gave the bear a Monster's defaults (12 hp, not
+90; its blows and pace too). An entry for a kind the table lacks is that
+kind's whole body, as before. Of the shipped levels only bear_yard (a dev
+level, --map only) names a known kind, so no other level's fight changes.
+monster_test _test_great_bear checks the yard's bear has its row's hp.
+Server only; protocol unchanged; no new class_name; no bullet.
+
 ## 282. Temperament: bold, cautious or cowardly, and a monster that breaks runs
 
 Each monster of a kind is BOLD, CAUTIOUS or COWARDLY (Monster.Temper): its

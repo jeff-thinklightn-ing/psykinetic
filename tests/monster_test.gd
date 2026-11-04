@@ -1847,6 +1847,13 @@ func _test_great_bear() -> void:
 	_check(not yard.is_empty() and (yard["warnings"] as Array).is_empty() and bool(yard["terrain"]["outdoor"]) and "great_bear" in kinds
 			and kinds.count("KitChest1") + kinds.count("KitChest2") + kinds.count("chest") >= 2 and "bear_yard" in Level.DEV_LEVELS,
 			"the bear yard: outdoors, its bear and the kit's chests, no warnings, a dev level (%s, %s)" % [kinds, yard.get("warnings")])
+	# Its level's "great_bear": {} merges over the row's body, never replaces it (playtest: 12/12).
+	var bear_hp := -1
+	for each: Dictionary in yard.get("entities", []):
+		if str(each.get("kind", "")) == "great_bear":
+			bear_hp = int((each.get("props", {}) as Dictionary).get("max_hp", -1))
+	var row_hp := int(Monster.kinds()["great_bear"]["body"]["max_hp"])
+	_check(bear_hp == row_hp and row_hp > 12, "the yard's bear has its row's %d hp, not a Monster's 12 (%d)" % [row_hp, bear_hp])
 ## The night watch's waves (decision 771, npc's Watch calls them): a town's
 ## ground about (4, 3), its guard post at (21, 3) out east on its spoke.
 func _test_watch_wave() -> void:
