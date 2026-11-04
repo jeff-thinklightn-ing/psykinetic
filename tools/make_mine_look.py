@@ -7,8 +7,9 @@ A small mine, 48 x 36 cells: an entrance chamber by the west edge (the
 edge still), two tunnels east from it that twist and meet again past a
 deep chamber (a loop), one narrowing to 3 cells, one widening to 5, a
 shaft beside the north tunnel (floor three levels down: a knocked foe
-falls), seams in recesses (a floor cell walled on three sides), track
-with a cart on the south tunnel's straight, lamps, arches across the
+falls, and climbs out by a stair run, 783), seams in recesses (a floor
+cell walled on three sides), track with a cart on the south tunnel's
+straight, lamps, arches across the
 tunnels where they run straight, beams over the chamber. Every cell not
 dug is void, drawn as the rock mass ("mass": "rock", terrain's side).
 
@@ -32,6 +33,7 @@ COLOURS = {
     "void": (0, 0, 0),
     "stone": (0x9A, 0x9A, 0x9A),
     "start": (0x00, 0xFF, 0xFF),
+    "stair": (0xE8, 0xD4, 0x4A),
     "lantern": (0xFF, 0xF0, 0xB0),
     "seam": (0xB8, 0x73, 0x33),
     "cart": (0x7A, 0x3C, 0xB4),
@@ -92,6 +94,19 @@ def main():
         floor.add(cell)
         height[cell] = PIT_LEVEL
     # Its rim: the tunnel cells beside it stay at the floor's level.
+    # Its way out (783: a pit with none is a trap; a body knocked in climbs
+    # out): a stair run two wide east from its north row, a level a cell (a
+    # stair cell climbs to the cell beside it a level up), to floor that
+    # joins the tunnel. On rows 5 and 6, so no stair a level under the
+    # tunnel's floor could climb two ways.
+    stairs = []
+    for y in (5, 6):
+        for k, x in enumerate(range(20, 20 + FLOOR_LEVEL)):
+            floor.add((x, y))
+            height[(x, y)] = PIT_LEVEL + k
+            stairs.append((x, y))
+    for y in (5, 6, 7):
+        dig((20 + FLOOR_LEVEL, y))
 
     # Seams: a void cell beside the tunnel, walled on its three other
     # sides, dug as a recess.
@@ -216,7 +231,7 @@ def main():
         grey = height[(x, y)] * GREY_PER_LEVEL
         for px in (2 * x, 2 * x + 1):
             for py in (2 * y, 2 * y + 1):
-                layout.putpixel((px, py), COLOURS["stone"])
+                layout.putpixel((px, py), COLOURS["stair" if (x, y) in stairs else "stone"])
                 heights.putpixel((px, py), (grey, grey, grey))
     for cell, marker in markers.items():
         layout.putpixel((cell[0] * 2, cell[1] * 2), COLOURS[marker])
@@ -239,7 +254,7 @@ def main():
         "decor": decor,
     }
     # The ledges trace_ledges wrote (the shaft's rim) kept: run it again
-    # after a change to the shaft.
+    # after a change to the shaft (level_test fails till it is).
     old_path = os.path.join(OUT, "level.json")
     if os.path.exists(old_path):
         with open(old_path, encoding="utf-8") as f:
@@ -249,8 +264,8 @@ def main():
     with open(os.path.join(OUT, "level.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(config, f, indent="\t")
         f.write("\n")
-    print("mine_look: %d floor cells, %d pit, %d seams, %d arches, %d lamps, %d track"
-          % (len(floor), len(pit), len(seams), len(arches), len(lamps), len(track)))
+    print("mine_look: %d floor cells, %d pit, %d stairs out, %d seams, %d arches, %d lamps, %d track"
+          % (len(floor), len(pit), len(stairs), len(seams), len(arches), len(lamps), len(track)))
 
 
 if __name__ == "__main__":

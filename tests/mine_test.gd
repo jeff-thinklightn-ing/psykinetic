@@ -156,6 +156,25 @@ func _test_mine_look() -> void:
 	_check(lamp.get("front") == "z" and is_equal_approx(float(lamp.get("lift")), 1.6) and is_equal_approx(float(beam.get("lift")), 2.7)
 			and beam.get("posts") == "mine.post", "the lamp hung 1.6 up, its +z out of the wall; the beam 2.7 up on mine.post (art-kit's notes)")
 	_check(Client3D.SEAM_SPENT_ART == "rock.seam_spent", "a spent seam is drawn as rock.seam_spent")
+	# 783: a pit with no way out is a trap. Every cell below the floor walks
+	# (World's own step rule) to the entrance chamber's start.
+	var start: Vector2i = level["starts"][0]
+	var floor_level := int(level["terrain"]["heights"].get(start, 0))
+	var reached := {start: true}
+	var queue: Array[Vector2i] = [start]
+	while not queue.is_empty():
+		var cell: Vector2i = queue.pop_back()
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+			if not reached.has(cell + way) and not World._terrain_blocks_step(cell + way, -way, true):
+				reached[cell + way] = true
+				queue.append(cell + way)
+	var below: Array[Vector2i] = []
+	for cell: Vector2i in level["terrain"]["floor"]:
+		if int(level["terrain"]["heights"].get(cell, 0)) < floor_level:
+			below.append(cell)
+	var trapped := below.filter(func(cell: Vector2i) -> bool: return not reached.has(cell))
+	_check(below.size() >= 8 and trapped.is_empty() and not level["terrain"]["stairs"].is_empty(),
+			"the shaft's %d cells below the floor all climb out by its stairs (trapped: %s)" % [below.size(), trapped])
 
 
 ## A room of [param rows]: "#" wall, "." floor, "P" a player, "s" a seam.

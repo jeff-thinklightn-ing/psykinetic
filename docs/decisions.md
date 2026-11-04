@@ -39653,6 +39653,17 @@ blows and sacks, rubble, the labels, a save's entry and the refill; mine_look pa
 warnings, its seams in recesses, its decor placed and its slots. PROTOCOL CHANGE (Seam's
 replicated "spent", a new spawned class); new class_name Seam.
 
+769 amended: art-kit's mine pieces (68ba9d44) hung as its notes say (2026-11-03).
+A decor kind may also say how it hangs (Level.DECOR_KINDS): "lift" metres up, "inset" metres back
+from its edge, "front": "z" (a wall piece whose +z faces out of the wall: the lamp, its bracket
+plate behind it, 0.185 inset, 1.6 up), "posts" (a span's slot stood just inside each wall: the
+beam, 2.7 up on mine.post). A spent seam is drawn as rock.seam_spent in place of its face
+(Client3D.SEAM_SPENT_ART; squat as before while the kit lacks it). A level.json entity that is no
+monster may name its "art" and its "facing" (the spawn spec's "art_facing", the view's alone: its
+art's +z turned that way, as buildings are): mine_look's cart is prop.mine_cart along its track.
+make_mine_look.py keeps trace_ledges' ledges when it writes the level again. mine_test checks
+each. Client and level data only; "art_facing" an ignorable spawn key (absent, today's drawing).
+
 ## 769 amended (2): she mines a seam near her player (step 2, companions)
 
 Companion.Intent.MINE. She mines when all of these hold: a tool (Seam.bites) is in her hands, she
@@ -39719,6 +39730,14 @@ and a room, mine_parts, the slots); view_test _test_mine_sounds (a seam struck: 
 music; a sack once, and none on a blow; the cart's roll and stop; a lamp's flame, none without a
 mine). Review: C:/dev/review/sound/mine. No CHANGELOG bullet (seams are only in mine_look so
 far). Client only, protocol unchanged, no new class_name.
+769 amended (5): mine_look's shaft has a way out (2026-11-03, dungeon). Physics' 783 check (a
+pit with no way out is a trap: walking climbs only a slope or a stair, a level a step) and the
+coordinator asked for one. The pit keeps its 3-level drop (a foe knocked in falls, 9 hp); a
+stair run two wide climbs out of its north row east, a level a cell (x 20, 21, 22 at levels 0,
+1, 2 on rows 5 and 6), to level-3 floor at x 23 that joins the tunnel at (23, 8). On rows 5
+and 6, not 6 and 7: a level-2 stair beside the tunnel's floor would climb two ways (a warning).
+tools/make_mine_look.py lays it (the stair colour); its ledges traced again. mine_test walks
+every cell below the floor back to the start by World's step rule. Level data and a test only.
 
 ## 771. The night watch
 
@@ -39894,17 +39913,6 @@ _test_mind_log_no_names: a recorded entry with her player's name and another pla
 prompt, note, words and a nested list keeps neither, has "her player" and "a player" in their
 places, leaves a longer word that starts with a name ("Brannocsson") as it was, and keeps her own
 name. No CHANGELOG bullet (logging only). Server only, protocol unchanged, no new class_name.
-
-769 amended: art-kit's mine pieces (68ba9d44) hung as its notes say (2026-11-03).
-A decor kind may also say how it hangs (Level.DECOR_KINDS): "lift" metres up, "inset" metres back
-from its edge, "front": "z" (a wall piece whose +z faces out of the wall: the lamp, its bracket
-plate behind it, 0.185 inset, 1.6 up), "posts" (a span's slot stood just inside each wall: the
-beam, 2.7 up on mine.post). A spent seam is drawn as rock.seam_spent in place of its face
-(Client3D.SEAM_SPENT_ART; squat as before while the kit lacks it). A level.json entity that is no
-monster may name its "art" and its "facing" (the spawn spec's "art_facing", the view's alone: its
-art's +z turned that way, as buildings are): mine_look's cart is prop.mine_cart along its track.
-make_mine_look.py keeps trace_ledges' ledges when it writes the level again. mine_test checks
-each. Client and level data only; "art_facing" an ignorable spawn key (absent, today's drawing).
 
 ## 777. Filling the hills, phase 1: tracks, rest camps, forage
 
