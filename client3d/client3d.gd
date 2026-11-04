@@ -772,9 +772,14 @@ const CARRIED_UP := 1.2
 ## row lights at the piece's flame, warm, shadowless; only the
 ## WALL_LAMP_NEAR nearest the camera's aim at once (picked again every
 ## WALL_LAMP_PICK s), the rest left to the piece's lit panes. The piece
-## hangs as Level.DECOR_KINDS has it.
+## hangs as Level.DECOR_KINDS has it. The light itself (769 amended (8))
+## stands WALL_LAMP_OFF m out from the flame into the passage and
+## WALL_LAMP_DROP m under it: at the flame it grazed the wall it hung on
+## (its facets turned away went black) and lit rock tops more than the floor.
 const WALL_LAMP_ENERGY := 1.4
-const WALL_LAMP_RANGE := 5.5
+const WALL_LAMP_RANGE := 7.0
+const WALL_LAMP_OFF := 0.4
+const WALL_LAMP_DROP := 0.3
 const WALL_LAMP_FALLOFF := 1.2
 const WALL_LAMP_NEAR := 6
 const WALL_LAMP_PICK := 0.5
@@ -13274,7 +13279,7 @@ func _add_lantern(cell: Vector2i) -> void:
 		light.shadow_enabled = false
 		light.visible = false
 		var inset := float(Level.DECOR_KINDS["mine_lamp"].get("inset", 0.0))
-		light.position = wall_lamp_flame(cell, hung, _height_in(cell, Vector2(cell) + Vector2(hung) * (0.5 - inset)))
+		light.position = wall_lamp_light(wall_lamp_flame(cell, hung, _height_in(cell, Vector2(cell) + Vector2(hung) * (0.5 - inset))), hung)
 		_room.add_child(light)
 		_wall_lamps.append(light)
 		_wall_lamp_clock = WALL_LAMP_PICK
@@ -14855,6 +14860,12 @@ static func wall_lamp_flame(cell: Vector2i, out: Vector2i, ground: float) -> Vec
 	var spot := Transform3D(Basis(Vector3.UP, atan2(-float(out.x), -float(out.y))), Vector3(at.x, ground + float(row.get("lift", 0.0)), at.y))
 	var socket: Variant = Flames.socket_of(WALL_LAMP_SLOT)
 	return spot * (socket as Vector3 if socket != null else Vector3(0.0, 0.12, 0.0))
+
+
+## Where a wall lamp's light stands (769 amended (8)): off its [param flame]
+## into the passage (away from the wall, -[param out]) and a little lower.
+static func wall_lamp_light(flame: Vector3, out: Vector2i) -> Vector3:
+	return flame + Vector3(-float(out.x), 0.0, -float(out.y)) * WALL_LAMP_OFF + Vector3.DOWN * WALL_LAMP_DROP
 
 
 ## The [param most] of [param lights] nearest [param aim] on the ground.

@@ -39888,6 +39888,17 @@ dungeon's level (790). Tests: weather_test _test_mine_light (the share; the lamp
 flame; the nearest lit). No CHANGELOG bullet: mine_look is a dev level. Client only, protocol
 unchanged, no new class_name.
 
+769 amended (8): the lamps' light off the wall (2026-11-04; dungeon's mine_look stills, the
+coordinator's approval, release's label). At the flame, 0.185 m from the wall face, a lamp's light
+grazed the wall it hung on and lit rock tops more than the floor, which stayed very dark between
+lamps. Its light now stands WALL_LAMP_OFF (0.4 m) out from the flame into the passage and
+WALL_LAMP_DROP (0.3 m) under it (Client3D.wall_lamp_light), reaching WALL_LAMP_RANGE 7 m (was
+5.5); the lantern piece stays where it hangs. The wall's diagonal stripes in the same stills were
+the wall's own flat facet normals under that grazing light (769 amended (7), terrain's smooth
+normals), not shadow acne: the shadow-casting lights' biases are unchanged. Tests: weather_test
+_test_mine_light (the light off the wall and lower). Client only, protocol unchanged, no new
+class_name.
+
 ## 771. The night watch
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

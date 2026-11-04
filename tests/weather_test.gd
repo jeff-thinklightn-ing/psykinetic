@@ -477,6 +477,11 @@ func _test_mine_light() -> void:
 	var wall_x := 5.0 + 0.5 - float(row["inset"])
 	_check(absf(flame.x - wall_x) < 0.1 and absf(flame.z - 4.0) < 0.05 and flame.y > 2.0 + float(row["lift"]) and flame.y < 2.0 + float(row["lift"]) + 0.4,
 			"the flame burns in the lantern hung on the wall, lifted (%s)" % [flame])
+	# 769 amended (8): the light stands off the wall into the passage, lower.
+	var lamp := Client3D.wall_lamp_light(flame, Vector2i(1, 0))
+	_check(is_equal_approx(flame.x - lamp.x, Client3D.WALL_LAMP_OFF) and is_equal_approx(lamp.z, flame.z)
+			and is_equal_approx(flame.y - lamp.y, Client3D.WALL_LAMP_DROP) and Client3D.WALL_LAMP_RANGE >= 7.0,
+			"the lamp's light stands %.1f m off the wall, %.1f m under the flame, reaching %.0f m (%s)" % [Client3D.WALL_LAMP_OFF, Client3D.WALL_LAMP_DROP, Client3D.WALL_LAMP_RANGE, lamp])
 	var lights: Array[OmniLight3D] = []
 	for x: int in [9, 1, 5, 20]:
 		var light := OmniLight3D.new()
