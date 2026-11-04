@@ -554,8 +554,8 @@ func _test_sledge_recover() -> void:
 ## past reach, so a sidestep doesn't slip it, a step straight back from the
 ## edge does; walking keys never give it up, a stun does.
 ## Weapon memory (decision 766): swordplay and the bow fill with use, three
-## times as fast back to their peak, cool as another art is used once past
-## their grace, fade slowly idle; felt in the sword's cycle and parry arc
+## times as fast back to their peak, untouched by using another (766
+## amended (4)), fade slowly idle past their grace; felt in the sword's cycle and parry arc
 ## and the bow's draw and cone, never its damage.
 ## The arts' marks (766 amended): told on a change only, the peak to the
 ## hundredth, fading once quiet past the grace and not at the next deed.
@@ -590,7 +590,7 @@ func _test_arts_marks() -> void:
 
 
 func _test_weapon_memory() -> void:
-	print("\n== weapon memory: swordplay and the bow fill with use and cool with another (766) ==")
+	print("\n== weapon memory: swordplay and the bow fill with use, fade only idle (766) ==")
 	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
 	var host: Player = e["P"][0]
 	var foe: GridEntity = e["m"][0]
@@ -630,16 +630,14 @@ func _test_weapon_memory() -> void:
 	World.set_arts(host, {"swordplay": {"m": 0.2, "peak": 0.8, "quiet": 0}})
 	World.practise(host, "swordplay", 1.0)
 	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.2 + 0.01 * 0.8 * 3.0), "below its peak: three times the gain (%.4f)" % float(host.arts["swordplay"]["m"]))
-	# Cooling: the bow used, swordplay quiet past its grace cools by a third of the gain.
+	# Another art used takes nothing (766 amended (4)): swordplay past its grace, the bow practised.
 	var grace := World.art_grace_ticks(World.art_shape(host, "swordplay"))
-	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": grace - 10}})
-	World.practise(host, "bow", World.ART_DEED_HIT)
-	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.5), "a quick switch to the bow: swordplay still warm, unchanged")
 	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": grace}})
-	World.practise(host, "bow", World.ART_DEED_HIT)
-	var gained := float(host.arts["bow"]["m"])
-	_check(is_equal_approx(float(host.arts["swordplay"]["m"]), 0.5 - gained / 3.0) and is_equal_approx(float(host.arts["swordplay"]["peak"]), 0.5),
-			"past its grace: swordplay cools by a third of the bow's gain, its peak kept (%.4f)" % float(host.arts["swordplay"]["m"]))
+	for i in 20:
+		World.practise(host, "bow", World.ART_DEED_HIT)
+	_check(float(host.arts["bow"]["m"]) > 0.1 and is_equal_approx(float(host.arts["swordplay"]["m"]), 0.5)
+			and is_equal_approx(float(host.arts["swordplay"]["peak"]), 0.5) and int(host.arts["swordplay"]["quiet"]) == grace,
+			"the bow practised: swordplay untouched, its quiet time its own (%s)" % [host.arts["swordplay"]])
 	# The idle fade: a tenth of a percent a minute of play, past the grace.
 	World.set_arts(host, {"swordplay": {"m": 0.5, "peak": 0.5, "quiet": grace}})
 	for i in 600:

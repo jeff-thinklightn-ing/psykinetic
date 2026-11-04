@@ -2841,14 +2841,14 @@ func blow_verb(attacker: GridEntity) -> Dictionary:
 ## that hit a monster (the arena's dummy, never_dies, at half). A deed adds
 ## ART_RATE times its worth times what is left to the art's cap, three times
 ## that below the art's peak (it comes back faster than it first grew).
-## Each deed also cools every other art quiet for its grace (20 minutes
-## online) by ART_COOL of what it added; any art quiet past its grace fades
-## by ART_IDLE a minute of play besides (a player crafting all evening
-## barely loses any). Offline nothing moves.
+## Using one art never takes from another (766 amended (4); Jeff's "more of
+## a bonus than a penalty"): only an art quiet past its grace (20 minutes
+## online) fades, by ART_IDLE a minute of play (a player crafting all
+## evening barely loses any), and comes back three times as fast. Offline
+## nothing moves.
 const ARTS := {"sword": "swordplay", "bow": "bow"}
 const ART_RATE := 0.01
 const ART_REGROW := 3.0
-const ART_COOL := 1.0 / 3.0
 const ART_IDLE := 0.001
 const ART_GRACE_MIN := 20.0
 const ART_DEED_BLOW := 1.0
@@ -2912,8 +2912,7 @@ func _art_worth(target: GridEntity) -> float:
 
 ## [param entity] did a deed worth [param deed] in [param art] (766): the
 ## art fills toward its cap (three times as fast below its peak), its quiet
-## time starts again, and every other art quiet past its grace cools by
-## ART_COOL of what this one gained. Players only; server only.
+## time starts again; no other art is touched. Players only; server only.
 func practise(entity: GridEntity, art: String, deed: float) -> void:
 	if not Net.is_authority() or entity is not Player or deed <= 0.0:
 		return
@@ -2927,16 +2926,6 @@ func practise(entity: GridEntity, art: String, deed: float) -> void:
 	own["quiet"] = 0
 	player.arts[art] = own
 	_art_moved(player, art, m)
-	for other: String in player.arts.keys():
-		if other == art:
-			continue
-		var cold: Dictionary = player.arts[other]
-		var other_shape := art_shape(player, other)
-		if int(cold["quiet"]) < art_grace_ticks(other_shape):
-			continue
-		var was := float(cold["m"])
-		cold["m"] = maxf(0.0, was - gain * ART_COOL * float(other_shape["fade"]))
-		_art_moved(player, other, was)
 	_mark_arts(player)  # Told if its peak or fading changed (766 amended).
 
 

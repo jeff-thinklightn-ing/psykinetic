@@ -39406,6 +39406,18 @@ release's label). Main._on_message takes combat's owner-only "arts" message
 signature carries the marks, so it redraws on the next frame. ui_test
 _test_practice_bars sends the message through Main. Client only, no protocol
 change of its own, no new class_name.
+
+766 amended (4): using one art never takes from another (2026-11-03,
+combat; release's label; the coordinator's approval under Jeff's standing
+rule, "make everything seem like less of a penalty and more of a bonus for
+those that choose to use it"). Practising the bow cooled a swordplay quiet
+past its grace by a third of the bow's gain: a penalty for the choice. That
+cross-cooling (ART_COOL) is gone. What stays: an art quiet past its 20
+minutes of grace fades by ART_IDLE a minute of play, and a deed below its
+peak fills three times as fast, so a weapon taken up again comes back
+quickly. combat_test _test_weapon_memory (the bow practised twenty times:
+swordplay past its grace untouched, its quiet its own). Sim only, protocol
+unchanged, no new class_name; a CHANGELOG bullet in voice's words.
 ## 767. Every town's gatherers: a woodcutter and a hunter, seated once
 
 Jeff: "yes add gatherers to each town" (decisions/town-gatherers.md); the coordinator approved the
