@@ -15645,11 +15645,14 @@ func _sync_puppets() -> void:
 		_sync_draw(entity, puppet)
 		_sync_ailments(entity, puppet)
 		_sync_name(entity, puppet, now)
+		yaw = _teeter_yaw(entity, puppet, yaw, now)
+		puppet.set_meta("teetering", entity.teeter != Vector2i.ZERO)
 		if puppet.has_meta("rig"):
 			var body := puppet.get_node("Body") as Node3D
 			_lay(puppet, body, yaw, entity.tile)
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
+			_teeter_lean(entity, puppet, body, now)
 			(puppet.get_meta("rig") as AnimRig).every = _pose_every(puppet)
 			_animate(puppet)
 			_footfall_sounds(entity, puppet, puppet.get_meta("rig") as AnimRig)
@@ -15657,6 +15660,7 @@ func _sync_puppets() -> void:
 			var body := puppet.get_node("Body") as Node3D
 			if not is_equal_approx(body.rotation.y, yaw):
 				body.rotation.y = yaw
+			_teeter_lean(entity, puppet, body, now)
 			var view := puppet.get_meta("creature_view") as CreatureView
 			if view.rig != null:
 				view.rig.every = _pose_every(puppet)
@@ -19092,6 +19096,94 @@ func _standing_turn(puppet: Node3D, shown: float, yaw: float) -> float:
 	return shown + signf(left) * step
 
 
+## Teetering on a rim (783 amended; the coordinator's design): while a body's
+## replicated teeter (the way the drop lies) is not ZERO its model turns to
+## face the drop over about TEETER_TURN (the sim's facing untouched), and back
+## to its own facing after; it rocks toward the drop, pivoting at its feet, a
+## jolt of TEETER_JOLT first and then TEETER_RATE swings a second about a lean
+## of TEETER_LEAN, growing from TEETER_SWING_FROM to TEETER_SWING_TO degrees
+## over TEETER_SECONDS (the sim's teeter_ticks), settled upright over
+## TEETER_SETTLE when it ends; a person plays CLIP_TEETER (a creature,
+## CreatureView's). The local player pressing a way (or walking) keeps their
+## own facing: the turn never takes the controls. Gone over, the push's knock
+## (592) has it, the rocking dropped at once.
+const TEETER_TURN := 0.1
+const TEETER_JOLT := 10.0
+const TEETER_LEAN := 4.0
+const TEETER_RATE := 2.2
+const TEETER_SWING_FROM := 6.0
+const TEETER_SWING_TO := 14.0
+const TEETER_SECONDS := 1.2
+const TEETER_SETTLE := 0.25
+const CLIP_TEETER := "Teeter"
+func _teeter_yaw(entity: GridEntity, puppet: Node3D, yaw: float, now: int) -> float:
+	if _steering(entity):
+		puppet.remove_meta("teeter_turned_until")  # Theirs at once, not eased back.
+		return yaw
+	var teetering := entity.teeter != Vector2i.ZERO
+	if teetering:
+		puppet.set_meta("teeter_turned_until", now + int((TEETER_TURN + TEETER_SETTLE) * 1000.0))
+	elif now >= int(puppet.get_meta("teeter_turned_until", 0)):
+		return yaw
+	var body := puppet.get_node_or_null("Body") as Node3D
+	if body == null:
+		return yaw
+	var to := -Vector2(entity.teeter).angle() if teetering else yaw
+	return lerp_angle(body.rotation.y, to, clampf(get_process_delta_time() / TEETER_TURN, 0.0, 1.0))
+
+
+## Whether [param entity] is the local player steering (a walk key held, or
+## walking): its facing is theirs, teetering or not.
+func _steering(entity: GridEntity) -> bool:
+	if not entity is Player or entity != _local_player():
+		return false
+	var main := get_parent()
+	return entity.stepping or main != null and main.has_method("_held_key_names") and str(main.call("_held_key_names")) != ""
+
+
+## The rock on a rim: [param body] tipped toward the drop by the lean for now
+## (degrees; negative rocks it back), about its feet, whichever way it faces.
+func _teeter_lean(entity: GridEntity, puppet: Node3D, body: Node3D, now: int) -> void:
+	var settle := 1.0
+	if entity.teeter != Vector2i.ZERO and not _sliding(puppet, entity):
+		if not puppet.has_meta("teeter_ms"):
+			puppet.set_meta("teeter_ms", now)
+		var t := (now - int(puppet.get_meta("teeter_ms"))) / 1000.0
+		var swing := lerpf(TEETER_SWING_FROM, TEETER_SWING_TO, clampf(t / TEETER_SECONDS, 0.0, 1.0)) * sin(TAU * TEETER_RATE * t)
+		var jolt := TEETER_JOLT * sin(PI * clampf(t / 0.2, 0.0, 1.0))
+		puppet.set_meta("teeter_lean", TEETER_LEAN * clampf(t / 0.1, 0.0, 1.0) + jolt + swing)
+		puppet.set_meta("teeter_way", Vector2(entity.teeter).normalized())
+		puppet.remove_meta("teeter_end")
+	elif not puppet.has_meta("teeter_lean"):
+		return
+	else:
+		puppet.remove_meta("teeter_ms")
+		if puppet.has_meta("knock"):
+			puppet.set_meta("teeter_end", 0)  # Gone over: the rock dropped at once.
+		elif not puppet.has_meta("teeter_end"):
+			puppet.set_meta("teeter_end", now)
+		var u := (now - int(puppet.get_meta("teeter_end"))) / 1000.0 / TEETER_SETTLE
+		if u >= 1.0:
+			for key in ["teeter_lean", "teeter_way", "teeter_end"]:
+				puppet.remove_meta(key)
+			body.rotation.x = 0.0
+			body.rotation.z = 0.0
+			return
+		settle = 1.0 - u
+	var way: Vector2 = puppet.get_meta("teeter_way")
+	# The drop in the body's own frame (turned by its yaw only): a lean toward its +Z is a turn
+	# about X, toward its +X one about -Z.
+	var local := Basis(Vector3.UP, -body.rotation.y) * Vector3(way.x, 0.0, way.y)
+	var lean := deg_to_rad(float(puppet.get_meta("teeter_lean")) * settle)
+	body.rotation.x = lean * local.z
+	body.rotation.z = -lean * local.x
+
+
+## Whether [param puppet]'s push slide (592's knock) is still on screen.
+static func _sliding(puppet: Node3D, entity: GridEntity) -> bool:
+	return puppet.has_meta("knock") and entity.push_shown in [GridEntity.PushShown.SLIDING, GridEntity.PushShown.WAITING]
+
+
 ## A resident addressing someone (Resident.addressing, npc's, 560) looks at
 ## them: its head turned toward theirs by a LookAtModifier3D on its skeleton
 ## (made the first time, its limits a neck's: LOOK_LIMIT across, LOOK_LIMIT_UP
@@ -19190,6 +19282,16 @@ func _animate(puppet: Node3D) -> void:
 	if seconds > 0.0:
 		speed = lerpf(speed, step.length() / seconds, clampf(seconds * 12.0, 0.0, 1.0))
 	puppet.set_meta("speed", speed)
+	var entity := instance_from_id(int(puppet.get_meta("entity_id", 0))) as GridEntity
+	if puppet.get_meta("teetering", false) and rig.has(CLIP_TEETER) and entity != null and not _sliding(puppet, entity):
+		# On a rim (783 amended): arms wheeling, once its push's slide has shown; the knock it
+		# stopped short is over, with no doubling over.
+		if puppet.has_meta("knock"):
+			puppet.remove_meta("knock")
+		puppet.set_meta("busy_until", 0)
+		puppet.set_meta("fidgeting", false)
+		rig.loop(CLIP_TEETER, 1.0)
+		return
 	if puppet.has_meta("knock") and _knocked(puppet, rig, speed, now):
 		return
 	var calm := now - int(_combat_at.get(int(puppet.get_meta("entity_id", 0)), -(1 << 40))) > int(FIDGET_CALM_SECONDS * 1000.0)

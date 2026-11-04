@@ -151,6 +151,7 @@ func _ready() -> void:
 		await _test_rest()
 		_test_wet()
 		_test_sword_whiff()
+		await _test_teeter()  # Lets frames run: the rocking is timed.
 		_test_bow_back()
 		_test_sheathed()
 		_test_goblins_differ()
@@ -9921,6 +9922,81 @@ func _test_creature_puppets() -> void:
 ## roar; asleep (Pose SIT) its sleep, winded and standing its winded; a slot without those clips
 ## does as before. On a boar's view, its art given the great bear's clip names (the bear's slot is
 ## art-kit's to land): stand-ins copied from its own clips.
+## Teetering on a rim (783 amended): a body whose teeter is set turns to face the drop and rocks
+## toward it, a person wheeling its arms (Teeter), a beast with no teeter clip scrabbling (its walk,
+## quick); set back to ZERO it stands upright again with its own facing. The local player walking
+## keeps their own facing.
+func _test_teeter() -> void:
+	print("
+== a body on a rim faces the drop and rocks toward it (783 amended) ==")
+	var player := _player()
+	var puppet: Node3D = _rig._puppets.get(player.get_instance_id())
+	var rig := puppet.get_meta("rig") as AnimRig
+	var body := puppet.get_node("Body") as Node3D
+	var facing := puppet.get_node_or_null("Facing") as Node3D
+	_check(rig.has(Client3D.CLIP_TEETER), "the humanoid library has Teeter")
+	var way := Vector2i(1, 0) if absf(angle_difference(body.rotation.y, 0.0)) > 1.0 else Vector2i(-1, 0)
+	var drop_yaw := -Vector2(way).angle()
+	player.teeter = way
+	var toward := -1.0
+	var start := Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 400:
+		await _frames(1)
+		toward = maxf(toward, body.global_transform.basis.y.dot(Vector3(way.x, 0.0, way.y)))
+	_check(absf(angle_difference(body.rotation.y, drop_yaw)) < 0.1, "teetering: the model faces the drop (%.2f, the drop %.2f)" % [body.rotation.y, drop_yaw])
+	_check(toward > sin(deg_to_rad(6.0)), "it rocks out over the drop (%.1f degrees at most)" % rad_to_deg(asin(clampf(toward, -1.0, 1.0))))
+	_check(rig.base_clip() == Client3D.CLIP_TEETER, "a person wheels its arms (%s)" % rig.base_clip())
+	if _rig._local_player() == player:
+		# A walk key held, through main's own (--test-walk's) keys; World doesn't tick here, so
+		# nobody walks (checked).
+		var tile := player.tile
+		Net.test_walk = [{"keys": "w", "seconds": 5.0}]
+		_main.set("_walk_index", -1)
+		await _frames(10)
+		_check(str(_main.call("_held_key_names")) == "w" and (facing == null or absf(angle_difference(body.rotation.y, facing.rotation.y)) < 0.05),
+				"the local player pressing a way keeps their own facing, teetering or not (%.2f, its facing %.2f)"
+				% [body.rotation.y, facing.rotation.y if facing != null else 0.0])
+		Net.test_walk = []
+		_main.set("_walk_index", -1)
+		await _frames(1)
+		_check(player.tile == tile, "(and nobody walked: World doesn't tick here)")
+	else:
+		_check(false, "the test's player is the local one")
+	player.teeter = Vector2i.ZERO
+	start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 600:
+		await _frames(1)
+	_check(is_zero_approx(body.rotation.x) and is_zero_approx(body.rotation.z), "off the rim: upright again")
+	_check(facing == null or absf(angle_difference(body.rotation.y, facing.rotation.y)) < 0.05,
+			"and turned back to its own facing (%.2f, its facing %.2f)" % [body.rotation.y, facing.rotation.y if facing != null else 0.0])
+	_check(rig.base_clip() != Client3D.CLIP_TEETER, "no longer wheeling (%s)" % rig.base_clip())
+
+	var boar := _spawn_imp(Vector2i(9, 4), "boar")
+	await _frames(2)
+	_rig._process(0.0)
+	var beast: Node3D = _rig._puppets.get(boar.get_instance_id())
+	var view := beast.get_meta("creature_view", null) as CreatureView if beast != null else null
+	if view == null or view.rig == null:
+		_check(false, "a boar drawn by its CreatureView")
+		World.despawn(boar)
+		return
+	var beast_body := beast.get_node("Body") as Node3D
+	boar.teeter = Vector2i(0, 1)
+	toward = -1.0
+	start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 400:
+		await _frames(1)
+		toward = maxf(toward, beast_body.global_transform.basis.y.dot(Vector3(0.0, 0.0, 1.0)))
+	_check(not view.clips.has("teeter") and view.rig.base_clip() == view.clips["walk"]
+			and is_equal_approx(view.rig.speed(), CreatureView.TEETER_PACE),
+			"a beast with no teeter clip scrabbles: its walk, quick (%s x%.2f)" % [view.rig.base_clip(), view.rig.speed()])
+	_check(toward > sin(deg_to_rad(6.0)) and absf(angle_difference(beast_body.rotation.y, -Vector2(0, 1).angle())) < 0.1,
+			"and faces and rocks toward the drop too")
+	boar.teeter = Vector2i.ZERO
+	World.despawn(boar)
+	await _frames(2)
+
+
 func _test_creature_tells() -> void:
 	print("
 == a beast's tells play timed to its telegraph; asleep it sleeps, winded it heaves (780 amended (6)) ==")

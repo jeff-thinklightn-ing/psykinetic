@@ -22,6 +22,8 @@ const WALK_PACE := 1.2
 const RUN_PACE := 3.5
 const SPEED_MIN := 0.6
 const SPEED_MAX := 1.8
+## Teetering on a rim (783 amended) with no teeter clip: its walk at this speed, in place.
+const TEETER_PACE := 1.6
 ## A charge (cried "charge"): run this much faster for CHARGE_SECONDS, a
 ## lunge forward of LUNGE metres as it goes.
 const CHARGE_SPEED := 1.4
@@ -180,6 +182,16 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 	_last_at = puppet.position
 	_last_ms = now
 	if _lying(monster, now):
+		return
+	if monster != null and monster.teeter != Vector2i.ZERO:
+		# On a rim (783 amended): its slot's teeter, else its paws scrabbling (the walk, quick, in
+		# place); Client3D turns it to the drop and rocks it. A flinch from the push gives way.
+		_busy_until = 0
+		_set_head_up(false)
+		if clips.has("teeter"):
+			_loop("teeter", 1.0)
+		else:
+			_loop("walk", ArtKit.feel("creature_view.teeter_pace", TEETER_PACE))
 		return
 	if now < _busy_until:
 		return

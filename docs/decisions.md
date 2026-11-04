@@ -40547,6 +40547,25 @@ the worst tick, the slow line ends " (companion turns: piece x.x, piece x.x, ...
 in ms; the line before it is unchanged, so greps for "[net] slow:" still match. If the box's bursts
 were something else, the next one names it.
 
+783 amended: a body on a rim drawn teetering (pc-character, 2026-11-04; the coordinator's approval,
+release's label). While a body's replicated teeter (the way the drop lies) is not ZERO, Client3D
+turns its model to face the drop (_teeter_yaw, over about TEETER_TURN 0.1 s; the sim's facing and
+the Facing nose untouched; back to its own facing over TEETER_SETTLE after), because a teeter only
+reads facing the edge; and rocks it toward the drop about its feet (_teeter_lean, Body's turns
+about X and Z, whichever way it faces): a TEETER_JOLT (10 degrees) first, then TEETER_RATE (2.2)
+swings a second about a TEETER_LEAN (4) lean, growing from TEETER_SWING_FROM (6) to TEETER_SWING_TO
+(14) degrees over TEETER_SECONDS (1.2, the sim's teeter_ticks), settled upright over TEETER_SETTLE
+(0.25 s) when it ends; gone over, the push's knock (592) has it and the rocking is dropped at once.
+A person plays CLIP_TEETER, Teeter (tools/humanoid_clips.py Teeter_Loop, 0.6 s: both arms
+windmilling forward round a circle out to the sides, the trunk arched back from the drop, the head
+bowed over the edge, the knees bent), once its push's slide has shown, the knock it stopped short
+ended with no doubling over; a creature (CreatureView) its slot's "teeter" clip, else its walk at
+TEETER_PACE (1.6) in place, the paws scrabbling. The local player pressing a way (main's
+_held_key_names) or walking has their own facing back at once (_steering): the turn never takes
+the controls (the coordinator). Sound's scuff keys off the same replicated value (theirs, optional). view_test
+_test_teeter. CHANGELOG bullet (voice's words). Client only; protocol unchanged (teeter replicated
+since 47); no new class_name.
+
 780 amended (3): the bear's prints drawn (terrain; release's label, the coordinator's approval).
 Client3D keeps World.tracks_changed's prints as it keeps the blood (764 amended (3)): _tracks, level
 -> {cell: [the msec it fades out at, facing]}, full replacing a level's list, another level's kept

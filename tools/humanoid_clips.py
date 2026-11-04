@@ -196,6 +196,26 @@ def wade_keys() -> list:
 CLIPS["Wade_Loop"] = {"loop": True, "keys": wade_keys()}
 
 
+# Teetering on a rim (783 amended: a body stopped at the lip of a drop, Client3D turning it to
+# face the drop and rocking it toward it): both arms windmilling forward round a circle out to
+# the sides (pointed, a key a quarter turn), the trunk arched back away from the drop, the head
+# bowed to look down over the edge, the knees bent; the trunk swaying a little side to side.
+TEETER_CYCLE = 0.6
+def teeter_keys() -> list:
+	keys = []
+	for i in range(9):
+		t = TEETER_CYCLE * i / 8
+		a = 2.0 * math.pi * i / 8
+		# Up, ahead, down, behind: the top of the circle going forward. Its middle out and a little high.
+		arm = Vector((0.55, -math.sin(a), 0.35 + math.cos(a))).normalized()
+		turns = [("upperarm_l", arm, AIM), ("upperarm_r", Vector((-arm.x, arm.y, arm.z)), AIM)] + both("lowerarm", LIFT, 15.0)
+		turns += [("spine_01", LIFT, 10.0), ("spine_02", LIFT, 8.0), ("spine_02", TILT, 6.0 * math.sin(a)), ("Head", LIFT, -40.0)]
+		turns += both("thigh", LIFT, 18.0) + both("calf", LIFT, -30.0)
+		keys.append((t, P("Idle_Loop", 0.0, turns, move=(0.0, 0.03, -0.04))))
+	return keys
+CLIPS["Teeter_Loop"] = {"loop": True, "keys": teeter_keys()}
+
+
 # The bow (Jeff: archery wants playtesting): a right-handed archer, the bow in the left hand
 # (Client3D draws a held bow there, the arrows in the right), side on to the shot: the trunk
 # turned to its right so the left shoulder leads, the head turned back to look ahead.
