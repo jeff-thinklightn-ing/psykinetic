@@ -78,6 +78,8 @@ var _next_charge := 0
 var _blow_tick := -1
 ## Foes given up: instance id -> the tick it may take them up again.
 var _left_be: Dictionary[int, int] = {}
+## Who struck it: instance id -> the tick of their last blow (engaged_with).
+var _struck_at: Dictionary[int, int] = {}
 var _roared_fight := false
 var _roared_half := false
 var _hooked := false
@@ -219,6 +221,7 @@ func _nearest_visible_target() -> GridEntity:
 
 func _give_up_on(foe: GridEntity, why: String) -> void:
 	_left_be[foe.get_instance_id()] = World.tick + BREAK_OFF_TICKS
+	_struck_at.erase(foe.get_instance_id())
 	_blow_tick = -1
 	print("[apex] %s breaks off (%s) at %s (%d/%d)" % [_kind(), why, tile, hp, max_hp])
 
@@ -226,11 +229,26 @@ func _give_up_on(foe: GridEntity, why: String) -> void:
 func note_struck(by: GridEntity) -> void:
 	super(by)
 	_blow_tick = World.tick
+	if is_instance_valid(by) and by != self:
+		_struck_at[by.get_instance_id()] = World.tick
 	if asleep:
 		_wake()
 	if not _roared_half and hp * 2 < max_hp:
 		_roared_half = true
 		_roar("half")
+
+
+## Whether it is fighting [param entity] (decision 780 amended (4), for
+## companions: she fights it only when it is engaged with her or her player):
+## its target is [param entity], or [param entity] struck it within CALM_TICKS.
+## A foe it broke off from is no longer engaged till they strike again.
+func engaged_with(entity: GridEntity) -> bool:
+	if not is_instance_valid(entity):
+		return false
+	if target == entity:
+		return true
+	var at: int = _struck_at.get(entity.get_instance_id(), -1)
+	return at >= 0 and World.tick - at <= CALM_TICKS
 
 
 ## Its moves at a player or companion; deer it hunts as Monster does.

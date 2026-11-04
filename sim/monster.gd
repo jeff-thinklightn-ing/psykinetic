@@ -1895,8 +1895,16 @@ static func read_kinds(path: String) -> Dictionary:
 			"aim_spread": _aim_spread(path, kind, row.get("aim_spread", 0.0)),
 			"aim_hold_max": maxi(0, int(row.get("aim_hold_max", 0))),
 			# A kind's own moves' numbers (GreatBear's swipe, slam and charge; 780 amended (2)).
-			"moves": (row["moves"] as Dictionary).duplicate(true) if row.get("moves") is Dictionary else {}}
+			"moves": (row["moves"] as Dictionary).duplicate(true) if row.get("moves") is Dictionary else {},
+			# An apex creature (780 amended (4)): companions keep off it (is_apex).
+			"apex": bool(row.get("apex", false))}
 	return out
+
+
+## Whether [param kind] is an apex creature, its row's "apex" (decision 780
+## amended (4); the great bear): companions warn of it and keep their distance.
+static func is_apex(kind: String) -> bool:
+	return bool(kinds().get(kind, {}).get("apex", false))
 
 
 ## A row's "aim_spread" (decision 620, enemy-ai's side): degrees, raised to

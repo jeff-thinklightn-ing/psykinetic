@@ -39797,6 +39797,40 @@ Neither is in any shop's wares. The art slots (art/kit/slots_items.json, status.
 docs/art_status.md) are regenerated; art-kit draws them. enemy-ai's great_bear drops them in
 place of its hide once these are on main. items_test. Server only; protocol unchanged; no new
 class_name; no bullet (no level has a bear).
+780 amended (2): the coordinator's flip, prints, the far cry, and the bear yard. The bear is
+the roster's day beast (coordinator, asked by lore): it roams and hunts by day and sleeps at its den
+by night, waking at dawn with a roar, so a party stalks in for the first blow by night. Its clock is
+DayNight's light (Animal's NIGHT_LIGHT) indoors too, a den in a cave keeping the hours. Read from
+afar: World.far_cry(source, cry, reach) on each roar (ROAR_REACH 50), which Main sends as "far_cry"
+{creature: its kind, cry, cell} to the players in its zone within reach who don't see it (those who
+see it hear its own cry); on a client sound's handler plays it (Client3D.far_cry, 780 sound's side). And
+tracks: World.mark_track(cell, facing) every TRACK_STRIDE 2 cells it walks, outdoors, beside blood's
+(764) shape: World.tracks, level -> {cell: [fades at step, facing 0..7 clockwise from north]},
+TRACK_DAYS 1/24, the newest TRACKS_MOST 300 a level, saved in the snapshot ("tracks"); Main sends
+"tracks" {level, add: [x, y, seconds left, facing, ...], gone, full} on arrival and on
+World.tracks_changed(level, add, gone, full), which a client emits from the message for terrain's
+prints. The bear yard (levels/bear_yard, a dev level beside 673's practice hall, in
+Level.DEV_LEVELS, reached by no way; hosted with --map=bear_yard): playtest's tour ground, 48 x 44
+outdoors, the den at (8, 22) in a crescent of rock opening east, four 2 x 2 rocks for cover off a
+clear lane along row 22, starts at (22, 22) and (22, 25). Two more "[apex]" lines for the tour's
+count: each tell as it begins ("<move> tell at <tile>, lands in N ticks") and the winded spell's end
+("recovers (winded N ticks)"). Its swipe, slam and charge tells pass World.telegraph's flank (combat's
+side, ed8641f0): a melee blow from behind mid-tell staggers it flank_stagger ticks and the move is
+lost, by the broken-tell rule above. Its moves' numbers move to its monsters.json row, "moves"
+{swipe, slam, charge} over GreatBear's defaults (combat's ask: each tuning round toward the
+coordinator's targets, one bot loses, two win in 60-90 s, is a data change; the bear's numbers are
+enemy-ai's, the general rules combat's). Rev 47 (opened by combat's 766 amended, 59518090; 46 shipped in v0.1.200), a "47 (780 amended (2)):" line under it
+in net.gd. monster_test: asleep by night, woken at dawn, the far cry, prints facing the way walked,
+kept in the snapshot, a flank-marked swipe lost to a blow from behind, the bear yard reading clean.
+780 amended (4): its trophies, and what companions read (enemy-ai, 2026-11-03). great_bear drops
+items' bear_pelt (one) and bear_claw (one to three) in place of hide (780 amended's rows). Its row
+says "apex": true, which Monster.kinds keeps, and static Monster.is_apex(kind) reads, so a later
+apex creature is one row away; GreatBear.engaged_with(entity) is true while its target is that
+entity or that entity struck it within CALM_TICKS (each striker's last blow kept, cleared when it
+breaks off from them). Companions (780 amended (5)) warn of an apex creature, keep their distance
+and fight it only when it is engaged with her or her player. monster_test: is_apex by the row,
+the drops in the catalog, engaged with its striker and its foe and not with a bystander. Server
+only; protocol unchanged; no new class_name; no bullet (no level has a bear).
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'
@@ -40003,28 +40037,3 @@ of feathers" (0.05 kg, stacks of 10) and reeds, "bundle of reeds" (1 kg, 1.2 m l
 work. Each has its size and weight and no use of its own. The art slots are regenerated for
 art-kit. items_test. Server only; protocol unchanged; no new class_name; no bullet (maps' 777
 bullet carries the forage).
-780 amended (2): the coordinator's flip, prints, the far cry, and the bear yard. The bear is
-the roster's day beast (coordinator, asked by lore): it roams and hunts by day and sleeps at its den
-by night, waking at dawn with a roar, so a party stalks in for the first blow by night. Its clock is
-DayNight's light (Animal's NIGHT_LIGHT) indoors too, a den in a cave keeping the hours. Read from
-afar: World.far_cry(source, cry, reach) on each roar (ROAR_REACH 50), which Main sends as "far_cry"
-{creature: its kind, cry, cell} to the players in its zone within reach who don't see it (those who
-see it hear its own cry); on a client sound's handler plays it (Client3D.far_cry, 780 sound's side). And
-tracks: World.mark_track(cell, facing) every TRACK_STRIDE 2 cells it walks, outdoors, beside blood's
-(764) shape: World.tracks, level -> {cell: [fades at step, facing 0..7 clockwise from north]},
-TRACK_DAYS 1/24, the newest TRACKS_MOST 300 a level, saved in the snapshot ("tracks"); Main sends
-"tracks" {level, add: [x, y, seconds left, facing, ...], gone, full} on arrival and on
-World.tracks_changed(level, add, gone, full), which a client emits from the message for terrain's
-prints. The bear yard (levels/bear_yard, a dev level beside 673's practice hall, in
-Level.DEV_LEVELS, reached by no way; hosted with --map=bear_yard): playtest's tour ground, 48 x 44
-outdoors, the den at (8, 22) in a crescent of rock opening east, four 2 x 2 rocks for cover off a
-clear lane along row 22, starts at (22, 22) and (22, 25). Two more "[apex]" lines for the tour's
-count: each tell as it begins ("<move> tell at <tile>, lands in N ticks") and the winded spell's end
-("recovers (winded N ticks)"). Its swipe, slam and charge tells pass World.telegraph's flank (combat's
-side, ed8641f0): a melee blow from behind mid-tell staggers it flank_stagger ticks and the move is
-lost, by the broken-tell rule above. Its moves' numbers move to its monsters.json row, "moves"
-{swipe, slam, charge} over GreatBear's defaults (combat's ask: each tuning round toward the
-coordinator's targets, one bot loses, two win in 60-90 s, is a data change; the bear's numbers are
-enemy-ai's, the general rules combat's). Rev 47 (opened by combat's 766 amended, 59518090; 46 shipped in v0.1.200), a "47 (780 amended (2)):" line under it
-in net.gd. monster_test: asleep by night, woken at dawn, the far cry, prints facing the way walked,
-kept in the snapshot, a flank-marked swipe lost to a blow from behind, the bear yard reading clean.

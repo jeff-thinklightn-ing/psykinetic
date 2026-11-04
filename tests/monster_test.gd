@@ -1661,6 +1661,10 @@ func _test_great_bear() -> void:
 	var row_moves: Dictionary = Monster.kinds()["great_bear"]["moves"]
 	_check(int(bear.swipe["damage"]) == int(row_moves["swipe"]["damage"]) and int(bear.slam["windup"]) == int(row_moves["slam"]["windup"])
 			and int(bear.charge["every"]) == int(row_moves["charge"]["every"]), "its moves' numbers are its monsters.json row's \"moves\" (tuning is data)")
+	var drop_items: Array = (Monster.kinds()["great_bear"]["drops"] as Array).map(func(d: Dictionary) -> String: return str(d["item"]))
+	_check(Monster.is_apex("great_bear") and not Monster.is_apex("wolf") and not Monster.is_apex("no_such_kind")
+			and drop_items == ["bear_pelt", "bear_claw"] and drop_items.all(func(item: String) -> bool: return Items.all().has(item)),
+			"an apex creature by its row (Monster.is_apex), its pelt and claws its drops (780 amended (4); %s)" % [drop_items])
 	var cries: Array[StringName] = []
 	bear.cried.connect(func(kind: StringName) -> void: cries.append(kind))
 	for i in 5:
@@ -1677,6 +1681,7 @@ func _test_great_bear() -> void:
 	World.damage(bear, 3, hunter)
 	World.step()
 	_check(not bear.asleep and &"roar" in cries, "struck asleep, it wakes with a roar (%s)" % [cries])
+	_check(bear.engaged_with(hunter) and not bear.engaged_with(null), "engaged with whoever struck it (GreatBear.engaged_with, for companions)")
 	bear._next_charge = World.tick + 100000  # Its charge waits for its own check below.
 	# The swipe: a cone, then the blow and the push.
 	var tells := func(kind: String) -> Array:
@@ -1724,6 +1729,7 @@ func _test_great_bear() -> void:
 	var flanker := EntityFactory.build(SPECS["P"].merged({"name": "BearFlanker"})) as GridEntity
 	_room.add_child(flanker)
 	World.spawn(flanker, bear.tile - bear.facing)
+	var engaged_before := bear.engaged_with(flanker)
 	var swipe_id := int(bear._move.get("telegraph", 0))
 	var flank_marked := swipe_id != 0 and bool(World._telegraphs.get(swipe_id, {}).get("flank", false))
 	var flanked := World._try_flank(flanker, bear)
@@ -1733,6 +1739,7 @@ func _test_great_bear() -> void:
 		World.step()
 	_check(flank_marked and flanked and hunter.hp == before and tells.call("swipe").is_empty(),
 			"its tells are flank-marked: struck from behind mid-swipe, it staggers and the swipe is lost (marked %s, flanked %s)" % [flank_marked, flanked])
+	_check(not engaged_before and bear.engaged_with(hunter), "not engaged with one who has not struck it nor is its foe; its foe is")
 	World.despawn(flanker)
 	for i in 30:
 		World.step()
