@@ -2590,20 +2590,32 @@ func hands_allow(entity: GridEntity, slots: PackedStringArray) -> bool:
 	return right.is_empty() or int(Items.def(right)["hands"]) < 2 or left.is_empty()
 
 
-## Why [param slots] (what [param entity]'s would be) break the armour
-## slot's rule (decision 622): only armour in it ("only armour is worn
-## there"), and armour never in a hand ("armour is worn, not held"; its
-## catalog hands 0 says so too); "" if they keep to it, or for anything
-## without hands.
+## Why [param slots] (what [param entity]'s would be) break the worn
+## slots' rule (decisions 622, 788): only armour in the armour slot ("only
+## armour is worn there"), only a thing of a worn slot's kind in it, and a
+## worn thing never in a hand ("armour is worn, not held"; its catalog
+## hands 0 says so too); "" if they keep to it, or for anything without
+## hands.
 func worn_refusal(entity: GridEntity, slots: PackedStringArray) -> String:
-	if not has_hands(entity) or slots.size() < Items.CARRIED:
+	if not has_hands(entity) or slots.size() <= Items.ARMOUR:
 		return ""  # No armour slot: nothing worn to keep to.
-	if not slots[Items.ARMOUR].is_empty() and Items.armour_of(slots[Items.ARMOUR]).is_empty():
-		return "only armour is worn there"
+	for slot: int in Items.WORN:
+		if slot < slots.size() and not slots[slot].is_empty() and Items.worn_kind(slots[slot]) != Items.WORN[slot]:
+			return "only armour is worn there" if slot == Items.ARMOUR else WORN_REFUSALS[Items.WORN[slot]]
 	for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
-		if not slots[hand].is_empty() and not Items.armour_of(slots[hand]).is_empty():
+		var kind := Items.worn_kind(slots[hand])
+		if kind == "body":
 			return "armour is worn, not held"
+		if not kind.is_empty():
+			return "the %s is worn, not held" % Items.name_of(slots[hand])
 	return ""
+
+
+## What a worn slot of each kind says to a thing that isn't of it (788):
+## voice's words.
+const WORN_REFUSALS := {"head": "only a hat or a helm is worn there", "neck": "only an amulet is worn there",
+	"back": "only a cloak is worn there", "feet": "only boots are worn there", "ring": "only a ring is worn there",
+	"charm": "only a charm is worn there"}
 
 
 ## False, a move refused: [param by] is told why if it broke the armour
@@ -2638,8 +2650,14 @@ func try_equip(by: GridEntity, carrier: GridEntity, slot: int) -> String:
 			uids[slot] = 0
 	else:
 		var targets: Array[int] = []  # Where it goes first, then what else must be emptied.
-		if not Items.armour_of(id).is_empty():
-			targets = [Items.ARMOUR]
+		var kind := Items.worn_kind(id)
+		if not kind.is_empty():
+			var places := Items.worn_slots(kind)  # A ring: the first free of its two.
+			targets = [places[0]]
+			for place in places:
+				if place < slots.size() and slots[place].is_empty():
+					targets = [place]
+					break
 		elif Items.has_tag(id, "shield"):
 			targets = [Items.LEFT_HAND]
 			if not slots[Items.RIGHT_HAND].is_empty() and int(Items.def(slots[Items.RIGHT_HAND]).get("hands", 1)) == 2:

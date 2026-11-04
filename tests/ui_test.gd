@@ -239,7 +239,7 @@ func _test_stacks_ui() -> void:
 			for child in armour_box.get_children():
 				if child is Label and child != armour_box.label and child != armour_box.count:
 					marks.append((child as Label).text)
-			_check(pack_for_armour.row_boxes(row).size() >= Items.CARRIED and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
+			_check(pack_for_armour.row_boxes(row).size() > Items.ARMOUR and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
 				"%s row: the seventh box is the armour worn, edged like the hands, marked A" % ["the player's" if mine else "the other"])
 		var right_box: PackPanel.SlotBox = pack_for_armour.box_in(true, Items.RIGHT_HAND)
 		var armour_data := {"slots_of": _main._local_player(), "slot": 0, "count": 0}

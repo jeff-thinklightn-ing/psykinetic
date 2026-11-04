@@ -540,6 +540,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 49 (794): a Cargo replicates "move_ticks" (its rolling steps on mine track): World.step_ticks
 ## gives it for a cart on track, so the views slide it at the roll's speed; an old client slides
 ## it at a walk's pace.
+## 49 (788): Player's and Companion's slots replicate 18, the worn seven appended
+## (head 11, neck 12, back 13, feet 14, rings 15 and 16, the charm 17).
 const PROTOCOL_REVISION := 49
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

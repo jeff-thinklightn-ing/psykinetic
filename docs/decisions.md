@@ -41277,3 +41277,43 @@ line names her, an order is read with her name taken out, and the console finds 
 "bond"), by her label or her node's name alike (Companion.names_of, named_by, answers_to), so a
 player who types the name shown always reaches her; what she is logged and spoken of as stays her
 label. resident_test reads its claims ask and its speaker by her label.
+## 788. Worn slots: head, neck, back, feet, two rings, the charm
+
+Jeff (11-03, via the coordinator): "I meant to add the other item slots like the hat, the boots,
+jewelry, etc."; then "Two rings. Helms, mostly decorative until items adds benefits to the
+items"; and "No, charms don't go in the hands. Charm slot." Items' plan
+(C:/dev/review/items/worn_slots_plan.md), with ui, pc-character and combat; the coordinator
+approved phase 1.
+
+- **The slots, appended.** After the pack's last (722) come the head 11, the neck 12, the back 13,
+  the feet 14, two rings 15 and 16 and the charm 17 (Items.HEAD ... Items.CHARM); CARRIED is 18,
+  for players and companions alike, as 622's armour slot was. Nothing saved or laid out by index
+  moves: the armour keeps 6 and the pack keeps 0-3 and 7-10. A record saved with 11 (or fewer)
+  reads as 18 through Items.tidy, everything where it was and the worn slots empty; a monster's
+  are tidied to 18 as before.
+- **The rule.** Items.WORN names each worn slot's kind (the armour's is "body"). A catalog row is
+  worn by a "worn" field, {slot: head | neck | back | feet | ring | charm, and its stats as
+  numbers} (Items.worn_of; Items.worn_kind gives "body" for armour). World.worn_refusal, 622's,
+  now keeps every worn slot to its kind and every worn thing out of the hands, in voice's words
+  ("only boots are worn there", "the hood is worn, not held"; armour's own two kept), so every
+  move (a drag, a pick-up, a barter's take) keeps to it. try_equip sends a worn thing to its
+  slot (a ring to the first free of its two) and a worn slot's thing back to the pack, as 722's
+  double-click does for armour. The console's give puts one on.
+- **Weight.** A worn thing weighs on the body as anything carried (_weigh, load_of's body).
+- **First rows** (draft numbers): the hood (0.3 kg, value 3) and the felt hat (0.3 kg, 4) for the
+  head, mostly looks (Jeff); soft boots (0.8 kg, 6) for the feet, with "noise": 0.75 for
+  enemy-ai's senses to read (a bonus to whoever wears them; nothing reads it yet). No "made"
+  yet: where they come from is phase 3 (economy's).
+- **What reads them.** A companion's description lists everything she wears. The views draw
+  them from the slots, which replicate: pc-character's hood and hat (the headwear meshes) and the
+  boots' colour, ui's sheet (787: "788, ui's side"). Art-kit draws the pack icons.
+
+items_test _test_worn (the slots and kinds, an 11-slot record read as 18 with nothing moved, a
+hood and a hat double-clicked onto the head and swapped, boots onto the feet and weighed, a worn
+thing never held, each slot only its kind, taken off into the pack); the slot counts in
+items_test and chest_test. Wire: PROTOCOL_REVISION 49 (shared with 794; release's; 48 ships in v0.1.203),
+the slots' length. No new class_name.
+
+The set is built as approved while Jeff's pick 1 (head, neck, back, feet and two rings, gloves
+held back) is still open, and it may change: a slot is only appended, so adding gloves or
+dropping one before a record saves anything in it costs one constant and a row in WORN.

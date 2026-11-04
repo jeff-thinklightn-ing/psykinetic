@@ -373,6 +373,25 @@
 			"type": "mesh",
 			"uses": "bunch of feathers (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.felt_hat": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.35,
+				0.15,
+				0.35
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "felt hat (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.flint": {
 			"budget": 500,
 			"category": "items",
@@ -510,6 +529,25 @@
 			},
 			"type": "mesh",
 			"uses": "holy remains (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.hood": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.3,
+				0.3,
+				0.25
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "hood (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.knife": {
 			"budget": 500,
@@ -858,6 +896,25 @@
 			},
 			"type": "mesh",
 			"uses": "silver ring (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.soft_boots": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.3,
+				0.25,
+				0.12
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "soft boots (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.spear": {
 			"budget": 500,

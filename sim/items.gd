@@ -38,7 +38,20 @@ const PACK := 4
 const RIGHT_HAND := 4
 const LEFT_HAND := 5
 const ARMOUR := 6
-const CARRIED := 11
+## The worn slots after the pack (decision 788; Jeff: "the other item slots
+## like the hat, the boots, jewelry"; "Charm slot."): appended, so nothing
+## saved or laid out by index moves. A save from before has 11; tidy pads.
+const HEAD := 11
+const NECK := 12
+const BACK := 13
+const FEET := 14
+const RING_1 := 15
+const RING_2 := 16
+const CHARM := 17
+const CARRIED := 18
+## Each worn slot's kind (788): a thing is worn only in a slot of its
+## kind ("body" is 622's armour), and never held.
+const WORN := {ARMOUR: "body", HEAD: "head", NECK: "neck", BACK: "back", FEET: "feet", RING_1: "ring", RING_2: "ring", CHARM: "charm"}
 ## The pack's slots, in order (decision 722): the first four, then the last.
 const PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10]
 ## Slots enough to have hands (the pack and both): a monster armed by a
@@ -47,7 +60,7 @@ const HANDED := LEFT_HAND + 1
 ## How a worn armour looks (decision 622): the covering the views draw.
 const ARMOUR_LOOKS: Array[String] = ["leather", "mail", "plate", "robes"]
 const FIELDS := ["id", "name", "short", "color", "art", "kind", "size", "weight", "hands", "tags", "effects", "use", "yield", "verb", "made",
-	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack", "armour"]
+	"opens", "value", "blunt", "ammo", "condition", "mend", "about", "stack", "armour", "worn"]
 ## Ids renamed since a save (decision 714, the Draugr's Totem became the
 ## Encolpion Amulet): a saved old id reads as its new one, its uid, binding
 ## and charges kept (tidy, ItemBook.from_dict).
@@ -204,6 +217,7 @@ static func _definition(id: String, entry: Dictionary) -> Dictionary:
 		"about": str(entry.get("about", "")),
 		"stack": maxi(int(entry.get("stack", 1)), 1) if entry.get("stack") is float or entry.get("stack") is int else 1,
 		"armour": _armour(id, entry["armour"]) if entry.get("armour") is Dictionary else {},
+		"worn": _worn(id, entry["worn"]) if entry.get("worn") is Dictionary else {},
 	}
 
 
@@ -245,6 +259,55 @@ static func _worn_on(id: String, value: Variant) -> Dictionary:
 ## that is not worn.
 static func armour_of(id: String) -> Dictionary:
 	return def(id).get("armour", {}) if not id.is_empty() else {}
+
+
+## A worn field as read (decision 788): {slot (one of WORN's kinds but
+## "body", which is armour's), and its stats as given, numbers}; {} with a
+## warning for an unknown slot.
+static func _worn(id: String, value: Dictionary) -> Dictionary:
+	var kind := str(value.get("slot", ""))
+	if kind == "body" or kind not in WORN.values():
+		push_warning("Items: %s's worn slot %s is not one of %s; not worn" % [id, kind, ", ".join(worn_kinds())])
+		return {}
+	var out := {"slot": kind}
+	for key: Variant in value:
+		if key != "slot" and (value[key] is float or value[key] is int):
+			out[str(key)] = float(value[key])
+	return out
+
+
+## The worn kinds a catalog row may name (788): WORN's but "body".
+static func worn_kinds() -> Array[String]:
+	var out: Array[String] = []
+	for kind: String in WORN.values():
+		if kind != "body" and kind not in out:
+			out.append(kind)
+	return out
+
+
+## The kind of slot [param id] is worn in (788): "body" for armour (622),
+## its worn field's slot, else "" (not worn).
+static func worn_kind(id: String) -> String:
+	if id.is_empty():
+		return ""
+	if not armour_of(id).is_empty():
+		return "body"
+	return str(def(id).get("worn", {}).get("slot", ""))
+
+
+## [param id]'s worn stats (788): its worn field, {} if none.
+static func worn_of(id: String) -> Dictionary:
+	return def(id).get("worn", {}) if not id.is_empty() else {}
+
+
+## The slots of [param kind], in order (788): a ring's two.
+static func worn_slots(kind: String) -> Array[int]:
+	var out: Array[int] = []
+	for slot: int in WORN:
+		if WORN[slot] == kind:
+			out.append(slot)
+	out.sort()
+	return out
 
 
 ## Why definition [param definition] may not stack (decision 619), or "":

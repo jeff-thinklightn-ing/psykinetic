@@ -68,6 +68,7 @@ func _ready() -> void:
 	_test_cache()
 	_test_stacks()
 	_test_armour()
+	_test_worn()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -222,7 +223,7 @@ func _test_given() -> void:
 	_check(World.try_transfer(host, host, 0, pet, 1), "the host gives the kit to %s" % pet.name)
 	var events: Array = World.items.history(uid)["events"]
 	_check(events[-1]["kind"] == "given" and pet.name in str(events[-1]["what"]), "given, to her (%s)" % [events[-1]])
-	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0, 0, 0, 0, 0, 0], "her player's record has its instance")
+	_check(Array(record.companion.get("items", [])) == [0, uid, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "her player's record has its instance")
 	World.steps += 20
 	_check(World.try_transfer(pet, pet, 1, host, 3), "she hands it back herself")
 	_check(World.items.held_by(uid, World.holder_key(pet)) == 20 and host.slot_items[3] == uid, "she held it 20 steps; the host has it")
@@ -976,7 +977,7 @@ func _test_blows() -> void:
 	var by_tile := {}
 	for spec: Dictionary in level["entities"]:
 		by_tile[spec["tile"]] = spec["props"].get("slots", PackedStringArray())
-	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield", "", "", "", "", ""]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
+	_check(by_tile[Vector2i(1, 1)] == PackedStringArray(["", "", "", "", "spear", "shield", "", "", "", "", "", "", "", "", "", "", "", ""]), "an entry's wields: spear and shield in the hands (%s)" % by_tile[Vector2i(1, 1)])
 	_check(by_tile[Vector2i(2, 1)][Items.RIGHT_HAND] == "giant_axe" and by_tile[Vector2i(2, 1)][Items.LEFT_HAND] == ""
 			and level["warnings"].any(func(w: String) -> bool: return "no left hand" in w), "a giant axe takes both: the shield left out, and said")
 	imp.acts = true
@@ -1988,10 +1989,72 @@ func _test_stacks() -> void:
 	_check(World.items.orphans(_all_uids()).is_empty(), "and all put back, nothing in the book nobody holds (%s)" % [World.items.orphans(_all_uids())])
 
 
+## The worn slots (decision 788; Jeff: "the other item slots like the hat,
+## the boots, jewelry"): appended after the pack, each holding only its
+## kind, never held; an 11-slot record pads, nothing moved.
+func _test_worn() -> void:
+	print("
+== the worn slots: head, neck, back, feet, two rings, the charm (decision 788) ==")
+	_check(Items.HEAD == 11 and Items.NECK == 12 and Items.BACK == 13 and Items.FEET == 14 and Items.RING_1 == 15
+			and Items.RING_2 == 16 and Items.CHARM == 17 and Items.CARRIED == 18 and Items.WORN.size() == 8,
+			"the worn slots appended after the pack's last, the charm's last; 18 carried")
+	_check(Items.worn_kind("hood") == "head" and Items.worn_kind("felt_hat") == "head" and Items.worn_kind("soft_boots") == "feet"
+			and Items.worn_kind("robes") == "body" and Items.worn_kind("knife") == "" and Items.worn_kind("") == ""
+			and Items.worn_slots("ring") == [Items.RING_1, Items.RING_2] and float(Items.worn_of("soft_boots").get("noise", 0.0)) == 0.75,
+			"the rows: a hood and a felt hat for the head, soft boots for the feet (noise 0.75), armour the body's")
+	# An old record: 11 slots, everything where it was, the worn ones empty.
+	var eleven := ["ration", "", "", "", "sword", "shield", "robes", "knife", "", "", "arrows"]
+	var old := PlayerRecord.from_dict({"player_id": "old788", "tile": [1, 1], "slots": eleven})
+	var kept := true
+	for i in eleven.size():
+		kept = kept and old.slots[i] == eleven[i]
+	for slot: int in range(11, Items.CARRIED):
+		kept = kept and old.slots[slot] == ""
+	_check(old.slots.size() == Items.CARRIED and kept, "case: an 11-slot record reads as 18, the first 11 where they were, the worn slots empty")
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	var empty: Array = []
+	empty.resize(Items.CARRIED)
+	empty.fill("")
+	World.set_slots(host, empty)
+	var hood := _give(host, "hood", 0)
+	_check(World.try_equip(host, host, 0) == "" and host.slots[Items.HEAD] == "hood" and host.slot_items[Items.HEAD] == hood and host.slots[0] == "",
+			"case: double-click a hood: onto the head")
+	var hat := _give(host, "felt_hat", 1)
+	_check(World.try_equip(host, host, 1) == "" and host.slots[Items.HEAD] == "felt_hat" and host.slot_items[1] == hood,
+			"case: a felt hat: onto the head, the hood back into the slot it left")
+	var boots := _give(host, "soft_boots", 2)
+	var was := host.mass
+	_check(World.try_equip(host, host, 2) == "" and host.slots[Items.FEET] == "soft_boots" and is_equal_approx(host.mass, was),
+			"case: soft boots onto the feet, their weight carried as before (%.2f, %.2f)" % [host.mass, was])
+	_check(not World.hands_allow(host, _with(host, Items.RIGHT_HAND, "hood")) and World.worn_refusal(host, _with(host, Items.RIGHT_HAND, "hood")) == "the hood is worn, not held",
+			"case: a hood is never held")
+	_check(World.worn_refusal(host, _with(host, Items.HEAD, "knife")) == "only a hat or a helm is worn there"
+			and World.worn_refusal(host, _with(host, Items.FEET, "hood")) == "only boots are worn there"
+			and World.worn_refusal(host, _with(host, Items.ARMOUR, "hood")) == "only armour is worn there"
+			and World.worn_refusal(host, _with(host, Items.HEAD, "robes")) == "only a hat or a helm is worn there",
+			"case: each worn slot holds only its kind, armour's own words kept")
+	_check(World.try_equip(host, host, Items.HEAD) == "" and host.slots[Items.HEAD] == "" and hat in World.slot_uids(host),
+			"case: double-click the head: the hat taken off into the pack")
+	_check(boots in World.slot_uids(host), "(the boots still worn)")
+	for uid in World.slot_uids(host):
+		if uid != 0:
+			World.items.end(uid, "gone")
+	World.set_slots(host, had_slots, had_uids)
+
+
+## [param entity]'s slots with [param id] at [param slot].
+func _with(entity: GridEntity, slot: int, id: String) -> PackedStringArray:
+	var out := entity.slots.duplicate()
+	out[slot] = id
+	return out
+
+
 func _test_armour() -> void:
 	print("\n== armour: one slot, worn, never held (decision 622) ==")
-	_check(Items.CARRIED == 11 and Items.ARMOUR == 6 and Player.SLOTS == 11 and Companion.SLOTS == 11 and Items.PACK_SLOTS == [0, 1, 2, 3, 7, 8, 9, 10],
-			"a seventh carried slot, the armour worn; the pack 8 round it (722)")
+	_check(Items.CARRIED == 18 and Items.ARMOUR == 6 and Player.SLOTS == 18 and Companion.SLOTS == 18 and Items.PACK_SLOTS == [0, 1, 2, 3, 7, 8, 9, 10],
+			"a seventh carried slot, the armour worn; the pack 8 round it (722); the worn slots after (788)")
 	_check(Items.armour_of("mail_armour").get("look") == "mail" and Items.armour_of("robes").get("look") == "robes"
 			and Items.armour_of("knife").is_empty() and not Items.armour_of("plate_armour").has("range_steps"),
 			"four kinds, each with its look and stats; a knife is not armour")
@@ -2889,11 +2952,11 @@ func _test_inventory() -> void:
 	empty.resize(Items.CARRIED)
 	empty.fill("")
 	World.set_slots(host, empty)  # Its own things put back at the end.
-	_check(host.slots.size() == 11 and Items.PACK_SLOTS.size() == 8 and not Items.is_pack(Items.RIGHT_HAND) and not Items.is_pack(Items.ARMOUR)
-			and Items.is_pack(7) and Items.is_pack(10), "case: 11 slots, the pack 8 (0-3 and 7-10), the hands and armour not in it")
+	_check(host.slots.size() == Items.CARRIED and Items.PACK_SLOTS.size() == 8 and not Items.is_pack(Items.RIGHT_HAND) and not Items.is_pack(Items.ARMOUR)
+			and Items.is_pack(7) and Items.is_pack(10) and not Items.is_pack(Items.HEAD), "case: the pack 8 (0-3 and 7-10), the hands, armour and worn slots not in it")
 	var old := PlayerRecord.from_dict({"player_id": "old", "tile": [1, 1], "slots": ["ration", "", "", "", "sword", "", "robes"]})
-	_check(old.slots.size() == 11 and old.slots[0] == "ration" and old.slots[Items.RIGHT_HAND] == "sword" and old.slots[Items.ARMOUR] == "robes"
-			and old.slots[10] == "", "case: a record saved with 7 slots reads as 11, everything where it was")
+	_check(old.slots.size() == Items.CARRIED and old.slots[0] == "ration" and old.slots[Items.RIGHT_HAND] == "sword" and old.slots[Items.ARMOUR] == "robes"
+			and old.slots[10] == "", "case: a record saved with 7 slots reads as 18, everything where it was")
 	# Double-click equips.
 	var sword := _give(host, "sword", 0)
 	_check(World.try_equip(host, host, 0) == "" and host.slots[Items.RIGHT_HAND] == "sword" and host.slots[0] == "",

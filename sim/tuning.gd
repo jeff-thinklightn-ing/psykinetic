@@ -304,8 +304,9 @@ static func give(who: GridEntity, id: String) -> bool:
 		return false
 	var definition := Items.def(id)
 	var slot := Items.RIGHT_HAND
-	if not definition.get("armour", {}).is_empty():
-		slot = Items.ARMOUR
+	var kind := Items.worn_kind(id)
+	if not kind.is_empty():
+		slot = Items.worn_slots(kind)[0]  # Worn (622, 788): its slot.
 	elif "shield" in definition.get("tags", []) or "ammo" in definition.get("tags", []):
 		slot = Items.LEFT_HAND
 	var empty: Array[int] = [slot]

@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Worn slots beside the armour for a hat or hood, an amulet, a cloak, boots, two rings and a charm, and double-click puts a thing on; a hood, a felt hat and soft boots are the first made to wear, not yet in the world (788).
 
 - The land south of Umbrage, round the Old Tower, has a name of its own: Towerside (651 amended).
 - Umbrage: the town's name and music end at its edge, so the barrow mound lies out in the wilds, and the barrow post now stands where the barrow road leaves town (774 amended).

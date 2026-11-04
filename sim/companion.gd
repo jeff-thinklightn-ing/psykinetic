@@ -1068,7 +1068,7 @@ func knowledge_of(kinds: Array[String]) -> String:
 func carried() -> String:
 	var items: Array[String] = []
 	var held: Array[String] = []
-	var worn := ""
+	var wearing: Array[String] = []  # The armour and the worn slots' things (788).
 	for i in slots.size():
 		if slots[i].is_empty():
 			continue
@@ -1076,9 +1076,14 @@ func carried() -> String:
 			items.append("a " + Items.name_of(slots[i]))
 		elif i == Items.RIGHT_HAND or i == Items.LEFT_HAND:
 			held.append("a " + Items.name_of(slots[i]))
-		elif i == Items.ARMOUR:
-			worn = " You wear %s." % Items.name_of(slots[i])
+		elif Items.WORN.has(i):
+			wearing.append(Items.name_of(slots[i]))
 	var pack := "nothing" if items.is_empty() else ", ".join(items)
+	var worn := ""  # Voice's commas: "robes, a hood and soft boots".
+	if wearing.size() == 1:
+		worn = " You wear %s." % wearing[0]
+	elif wearing.size() > 1:
+		worn = " You wear %s and %s." % [", ".join(wearing.slice(0, wearing.size() - 1)), wearing[-1]]
 	var hands := ("" if held.is_empty() else " In your hands: %s." % " and ".join(held)) + worn
 	if emit_light > 0.0:
 		return "You carry a lantern, and in your pack %s.%s" % [pack, hands]
