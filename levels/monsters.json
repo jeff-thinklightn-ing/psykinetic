@@ -75,6 +75,7 @@
 	"wolf": {
 		"side": "wild", "role": "predator", "herd": "wolf", "label": "Wolf", "art": "creature.wolf", "diet": ["rabbit", "deer", "stag"],
 		"body": {"mass": 40.0, "max_hp": 12, "move_ticks": 2.8, "attack_damage": 2, "sight_range": 8},
+		"senses": {"cone": 160, "night": 0.6, "hearing": 1.5, "alert_sight": 2, "notice": 1.2},
 		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 15,
 		"temperament": {"bold": 0, "cautious": 1, "cowardly": 0},
 		"drops": [{"item": "hide", "count": [1, 1]}]
@@ -83,6 +84,7 @@
 		"side": "wild", "role": "predator", "herd": "great_bear", "label": "Great bear", "art": "creature.boar", "diet": ["deer", "stag"],
 		"script": "res://sim/great_bear.gd", "swing_stamina": true, "apex": true,
 		"body": {"mass": 300.0, "max_hp": 90, "move_ticks": 2.6, "attack_damage": 5, "sight_range": 8},
+		"senses": {"cone": 120, "night": 0.3, "hearing": 1.0, "alert_sight": 1, "notice": 0.8},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"drops": [{"item": "bear_pelt", "count": [1, 1]}, {"item": "bear_claw", "count": [1, 3]}],
@@ -127,6 +129,7 @@
 		"label": "Grave robber",
 		"person": "headwear=hood garb=none apron=no",
 		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10, "sight_range": 5},
+		"senses": {"cone": 120, "night": 0.2, "hearing": 1.0, "alert_sight": 2, "notice": 1.0},
 		"tactic": "flank",
 		"idle": "wander",
 		"opens_doors": true,
@@ -144,6 +147,7 @@
 		"label": "Big grave robber",
 		"person": "headwear=hood garb=none apron=no build=heavy stature=tall",
 		"body": {"mass": 110.0, "move_ticks": 4.5, "max_hp": 20, "attack_ticks": 14, "attack_damage": 2, "sight_range": 5},
+		"senses": {"cone": 120, "night": 0.2, "hearing": 0.8, "alert_sight": 1, "notice": 0.7},
 		"tactic": "heavy",
 		"idle": "wander",
 		"opens_doors": true,

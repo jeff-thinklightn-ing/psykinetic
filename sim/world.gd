@@ -950,6 +950,11 @@ var _last_ticks_usec := 0
 
 ## Adds the time since [param since] (Time.get_ticks_usec) to this tick's
 ## [param name] part; the time now, to time the next part from.
+## Time a tick's monsters spent looking (decision 784: Monster's look and
+## notice), taken out of "act: monsters" into its own part, "senses".
+var senses_usec := 0
+
+
 func part(name: String, since: int) -> int:
 	var now := Time.get_ticks_usec()
 	tick_parts[name] = tick_parts.get(name, 0) + now - since
@@ -1280,7 +1285,12 @@ func _step_zone() -> void:
 			continue
 		# A stunned entity skips its turn; its orders wait for it.
 		if _alive(entity) and not is_stunned(entity) and _thinks(entity, near):
+			var looked := senses_usec
 			entity._sim_tick()
+			if senses_usec != looked:
+				# Its look (784) is "senses", not its act.
+				tick_parts["senses"] = tick_parts.get("senses", 0) + senses_usec - looked
+				t += senses_usec - looked
 			# Its turn's time, by what it is (decision 469).
 			t = part("act: monsters" if entity is Monster else "act: companions" if entity is Companion 					else "act: players" if entity is Player else "act: others", t)
 	t = Time.get_ticks_usec()
@@ -2165,16 +2175,19 @@ func noise(at: Vector2i, radius: int, kind: StringName, source: GridEntity = nul
 	for entity in _hearers:
 		if maxi(absi(entity.tile.x - at.x), absi(entity.tile.y - at.y)) <= radius:
 			_hear(entity, at, radius, kind, source)
-	if (2 * radius + 1) * (2 * radius + 1) <= monsters().size():
-		for dy in range(-radius, radius + 1):
-			for dx in range(-radius, radius + 1):
+	# A keen ear hears farther (784, its kind's "hearing"): look as far as the
+	# keenest, and each listener's own ear decides (_hear).
+	var listen := ceili(radius * Monster.hearing_most())
+	if (2 * listen + 1) * (2 * listen + 1) <= monsters().size():
+		for dy in range(-listen, listen + 1):
+			for dx in range(-listen, listen + 1):
 				var listener := _occupancy.get(at + Vector2i(dx, dy)) as Monster
 				if listener != null:
 					_hear(listener, at, radius, kind, source)
 	else:
 		for entity in monsters():
 			var d := maxi(absi(entity.tile.x - at.x), absi(entity.tile.y - at.y))
-			if d <= radius:
+			if d <= listen:
 				_hear(entity as Monster, at, radius, kind, source)
 	# A bane's bearer (decision 420) is heard bane_notice times farther by the
 	# kind it is the bane of.
@@ -2192,8 +2205,12 @@ func _hear(listener: GridEntity, at: Vector2i, radius: int, kind: StringName, so
 	if listener == source or senses == null or not listener.spawned:
 		return
 	var d := maxi(absi(listener.tile.x - at.x), absi(listener.tile.y - at.y))
+	# Its own ear (784): a kind's "hearing" times the noise's reach.
+	var reach := radius * ((listener as Monster).hearing if listener is Monster else 1.0)
+	if d > reach:
+		return
 	var muffled := d > 0 and not has_clear_line(at, listener.tile)
-	if muffled and d * 2 > radius:
+	if muffled and d * 2 > reach:
 		return  # Through a wall or a closed door: only half as far.
 	senses.hear(at, radius, kind, source, muffled)
 

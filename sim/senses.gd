@@ -74,6 +74,16 @@ var cone_cos := CONE_COS
 ## It sees the living by life, not light: the dark hides nobody from it
 ## (the draugr's oldest dead, decision 580).
 var dark_sight := false
+## Its eyes in the dark (decision 784, its kind's "senses" "night"): the
+## share of its sight left where it is dark, its reach growing with the
+## light up to DARK; under 0 (a kind with no "senses"), the dark hides all
+## past NOTICE_ALWAYS, as before.
+var night := -1.0
+## While it looks about (SUSPICIOUS or HUNTING; its agent sets it each
+## think, 784): extra_sight cells more, and alert_cone_cos its cone.
+var alerted := false
+var extra_sight := 0
+var alert_cone_cos := CONE_COS
 ## {at, radius, kind, source, tick}, oldest first.
 var heard: Array[Dictionary] = []
 ## When it last heard anything (World.tick; -1 never): a number to compare
@@ -98,13 +108,13 @@ func sees(entity: GridEntity, d := -1, in_cone := true, farther := 1.0) -> bool:
 	if d < 0:
 		d = maxi(absi(at.x - from.x), absi(at.y - from.y))
 	# Fog and rain shorten sight (Weather), but a carried light shows as far.
-	var reach := sight_range * farther
+	var reach := sight_range * farther + (extra_sight if alerted else 0)
 	if d > (reach if entity.emit_light > 0.0 else reach * World.weather_sight_at(from)):
 		return false
 	if d > NOTICE_ALWAYS:
 		if in_cone and not _in_cone(at):
 			return false
-		if entity.emit_light <= 0.0 and not dark_sight and not is_lit(at):
+		if entity.emit_light <= 0.0 and not dark_sight and d > dark_reach(at, reach):
 			return false
 		if hidden_by_cover(entity, d, not in_cone):
 			return false
@@ -188,12 +198,26 @@ func sees_cell(cell: Vector2i, dark := DARK) -> bool:
 
 
 func _in_cone(at: Vector2i) -> bool:
-	if cone_cos <= -1.0:
+	var cosine := minf(cone_cos, alert_cone_cos) if alerted else cone_cos
+	if cosine <= -1.0:
 		return true
 	var offset := Vector2(at - agent.tile)
 	var facing := Vector2(agent.facing)
 	# Unnormalized: offset . facing >= cos * |offset| * |facing|.
-	return offset.dot(facing) >= cone_cos * offset.length() * facing.length()
+	return offset.dot(facing) >= cosine * offset.length() * facing.length()
+
+
+## How far (cells) it sees one standing at [param at], unlit, by the light
+## there (decision 784): [param reach] where it is lit (DARK or more); in
+## the dark, night of it, growing with the light; with no night (under 0),
+## nothing past NOTICE_ALWAYS where it is dark (as before 784).
+func dark_reach(at: Vector2i, reach: float) -> float:
+	var light := _light(at, DARK)
+	if light >= DARK:
+		return reach
+	if night < 0.0:
+		return float(NOTICE_ALWAYS)
+	return maxf(reach * (night + (1.0 - night) * light / DARK), float(NOTICE_ALWAYS))
 
 
 ## Whether [param cell] has light enough ([param dark]) to see by: the

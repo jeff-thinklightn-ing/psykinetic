@@ -296,6 +296,28 @@ static var noticing := true
 			senses.sight_range = value
 ## What it sees, hears and remembers (the server's; null on a client).
 var senses: Senses
+## Its kind's "senses" (decision 784): how far each noise carries for it
+## (times its radius: World._hear), the cells of sight it adds while it looks
+## about, and how fast it notices someone it sees (notice_rate; 0 for a kind
+## with no "senses": it knows whom it sees at once, as before).
+var hearing := 1.0
+var alert_sight := 0
+var notice_rate := 0.0
+## Who it is noticing (784): instance id -> 0..1, NOTICE_FULL it knows
+## them; filled each think it sees them, by how near (NOTICE_FILL_TICKS
+## near at hand), faded over NOTICE_FADE_TICKS when it does not.
+var _notice: Dictionary[int, float] = {}
+var _notice_tick := -1
+const NOTICE_FULL := 1.0
+const NOTICE_SUSPECT := 0.4
+const NOTICE_FILL_TICKS := 10.0
+const NOTICE_FADE_TICKS := 100.0
+## The most a think counts for (a MID tier thinks one tick in 4).
+const NOTICE_STEP_MOST := 4
+## A look about widens its cone by so many degrees.
+const ALERT_CONE_DEGREES := 60.0
+## The keenest ear of any kind (Monster.hearing_most), for World.noise.
+static var _hearing_most := -1.0
 ## How alert it is (Alert); the views show it.
 var alert := Alert.IDLE
 ## Who it went for this tick (null for nobody), for the companions' minds.
@@ -621,6 +643,95 @@ func _ready() -> void:
 		leash = roundi(int(row.get("leash", LEASH)) * (BOLD_LEASH if temper == Temper.BOLD else 1.0))
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 		senses.dark_sight = bool(dead.get("sees_in_dark", false))
+		_take_senses(row.get("senses", {}))
+
+
+## Its kind's "senses" (decision 784; read_kinds' "senses"): {sight: cells
+## in full light, cone: degrees it sees without turning (360 all round),
+## night: 0..1 its sight left in the dark, hearing: times a noise's reach,
+## alert_sight: cells more while it looks about (its cone 60 degrees
+## wider), notice: how fast it notices}. A kind with none is as before.
+func _take_senses(given: Variant) -> void:
+	if not given is Dictionary or (given as Dictionary).is_empty():
+		return
+	var block := given as Dictionary
+	if block.has("sight"):
+		sight_range = maxi(1, int(block["sight"]))
+	var cone := float(block.get("cone", 120.0 if _wary else 360.0))
+	senses.cone_cos = Monster.cone_cos_of(cone)
+	senses.alert_cone_cos = Monster.cone_cos_of(cone + ALERT_CONE_DEGREES)
+	senses.night = clampf(float(block.get("night", 0.0)), 0.0, 1.0)
+	hearing = maxf(0.0, float(block.get("hearing", 1.0)))
+	alert_sight = maxi(0, int(block.get("alert_sight", 1)))
+	senses.extra_sight = alert_sight
+	notice_rate = maxf(0.01, float(block.get("notice", 1.0)))
+
+
+## The cosine of half of a cone of [param degrees] (Senses.cone_cos); -1
+## (all round) at 360 or more.
+static func cone_cos_of(degrees: float) -> float:
+	return -1.0 if degrees >= 360.0 else cos(deg_to_rad(clampf(degrees, 0.0, 360.0) / 2.0))
+
+
+## The keenest "hearing" of any kind, at least 1 (World.noise looks so much
+## farther for listeners, and each listener's own ear decides).
+static func hearing_most() -> float:
+	if _hearing_most < 0.0:
+		_hearing_most = 1.0
+		for kind: String in kinds():
+			var block: Variant = kinds()[kind].get("senses", {})
+			if block is Dictionary:
+				_hearing_most = maxf(_hearing_most, float((block as Dictionary).get("hearing", 1.0)))
+	return _hearing_most
+
+
+## Whether it knows [param entity], seen [param d] cells off this think, by
+## its notice (decision 784): at once for a kind with no "senses", within
+## NOTICE_ALWAYS, its target, or one that struck it; else filled by how
+## near (twice as fast while it looks about) till NOTICE_FULL. Past
+## NOTICE_SUSPECT and not yet known, it turns to look ([member _glimpsed]).
+func _noticed(entity: GridEntity, d: int, reach: float) -> bool:
+	if notice_rate <= 0.0 or d <= Senses.NOTICE_ALWAYS or entity == target or _answering(entity):
+		return true
+	var id := entity.get_instance_id()
+	var steps := _notice_steps
+	var near := clampf(1.0 - float(d) / (reach + 1.0), 0.05, 1.0)
+	var gain := notice_rate * near * steps / NOTICE_FILL_TICKS * (2.0 if senses.alerted else 1.0)
+	# Seen this think: its fade (_fade_notice) is given back.
+	var now: float = minf(float(_notice.get(id, 0.0)) + gain + steps / NOTICE_FADE_TICKS, NOTICE_FULL)
+	_notice[id] = now
+	if now >= NOTICE_FULL:
+		return true
+	if now >= NOTICE_SUSPECT and _glimpsed == NO_TILE:
+		_glimpsed = entity.tile
+	return false
+
+
+## The ticks this think counts for (784's notice), set by _fade_notice.
+var _notice_steps := 1
+
+
+## Each think (784): its notice of those it no longer sees fades, and goes
+## at 0 (so it never grows with the world); its look-about sight.
+func _fade_notice() -> void:
+	senses.alerted = alert == Alert.SUSPICIOUS or alert == Alert.HUNTING
+	if notice_rate <= 0.0:
+		return
+	_notice_steps = clampi(World.tick - _notice_tick, 1, NOTICE_STEP_MOST) if _notice_tick >= 0 else 1
+	_notice_tick = World.tick
+	for id: int in _notice.keys():
+		var left := float(_notice[id]) - _notice_steps / NOTICE_FADE_TICKS
+		if left <= 0.0 or not is_instance_id_valid(id):
+			_notice.erase(id)
+		else:
+			_notice[id] = left
+
+
+## How far it notices [param entity] (784): 0..1, 1 it knows them.
+func notice_of(entity: GridEntity) -> float:
+	if notice_rate <= 0.0:
+		return 1.0
+	return float(_notice.get(entity.get_instance_id(), 0.0))
 
 
 ## Its level's word on the dead (decision 580: barrow_lair's "dead", the
@@ -711,7 +822,10 @@ func _sim_tick() -> void:
 		return
 	if _wary and senses.last_tick > _rout_tick and _heard_rout():
 		return
+	var looked := Time.get_ticks_usec()
+	_fade_notice()
 	var seen := _nearest_visible_target()
+	World.senses_usec += Time.get_ticks_usec() - looked  # Its own part, "senses" (784).
 	if seen != null and _wary and _beyond_leash():
 		_give_up(seen)
 		seen = null
@@ -1261,7 +1375,7 @@ func _nearest_visible_target() -> GridEntity:
 	# Nobody near enough to be seen: its tier's measure (a few ticks old,
 	# nobody come or gone since) is beyond its sight by more than anyone
 	# could close meanwhile. Most looks end here.
-	if target == null and raid == "" and nearest_sought > sight_range + LOOK_MARGIN_TILES \
+	if target == null and raid == "" and nearest_sought > sight_range + LOOK_MARGIN_TILES + (alert_sight if senses.alerted else 0) \
 			and tier_comings == World.zone.comings and World.tick - tier_tick < World.TIER_EVERY_TICKS \
 			and bane.is_empty() and foes.is_empty():
 		return null
@@ -1278,7 +1392,7 @@ func _nearest_visible_target() -> GridEntity:
 		var at := entity.tile
 		var d := maxi(absi(at.x - tile.x), absi(at.y - tile.y))
 		var times := farther if entity in bane else 1.0
-		if d > sight_range * times or entity.protected or World.is_downed(entity):
+		if d > sight_range * times + (alert_sight if senses.alerted else 0) or entity.protected or World.is_downed(entity):
 			continue  # Too far, in its spawn grace, or downed (no finishing blows: decision 544).
 		if keeps_room and not _room.has_point(at) and not _answering(entity):
 			continue  # Outside the room it keeps (unless it struck it just now).
@@ -1286,7 +1400,8 @@ func _nearest_visible_target() -> GridEntity:
 			if not _given_up.is_empty() and _letting_be(entity):
 				continue
 			# Its target it follows, cone or not (it turns as it goes); one that struck it, felt.
-			if _answering(entity) or senses.sees(entity, d, entity != target, times):
+			if _answering(entity) or senses.sees(entity, d, entity != target, times) \
+					and _noticed(entity, d, sight_range * times + (alert_sight if senses.alerted else 0)):
 				if entity == target:
 					kept = d
 				if d < nearest_distance:
@@ -1304,7 +1419,8 @@ func _nearest_visible_target() -> GridEntity:
 			if waiting(entity):
 				continue
 			var d := World.distance(tile, entity.tile)
-			if d <= sight_range and d < nearest_distance and senses.sees(entity, d, entity != target):
+			# One that struck it (a guard, 784) it answers whatever its cone.
+			if d <= sight_range and d < nearest_distance and (_answering(entity) or senses.sees(entity, d, entity != target)):
 				if entity == target:
 					kept = d
 				nearest = entity
@@ -1896,6 +2012,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"aim_hold_max": maxi(0, int(row.get("aim_hold_max", 0))),
 			# A kind's own moves' numbers (GreatBear's swipe, slam and charge; 780 amended (2)).
 			"moves": (row["moves"] as Dictionary).duplicate(true) if row.get("moves") is Dictionary else {},
+			# Its sight, hearing and notice (decision 784): Monster._take_senses.
+			"senses": (row["senses"] as Dictionary).duplicate() if row.get("senses") is Dictionary else {},
 			# An apex creature (780 amended (4)): companions keep off it (is_apex).
 			"apex": bool(row.get("apex", false))}
 	return out
@@ -2500,7 +2618,8 @@ func _answering(entity: GridEntity) -> bool:
 ## [param by] struck it (World.damage): answered for ANSWER_TICKS, and no
 ## longer let be.
 func note_struck(by: GridEntity) -> void:
-	if not is_instance_valid(by) or by == self or not (by is Player or by is Companion or by is Monster):
+	# A guard's blow is answered too (784; npc's guards who fight, 771).
+	if not is_instance_valid(by) or by == self or not (by is Player or by is Companion or by is Monster or by is Resident):
 		return
 	struck_by = by
 	struck_tick = World.tick

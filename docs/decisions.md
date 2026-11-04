@@ -40492,3 +40492,38 @@ recent kept, thriving's hold); economy_test _test_town_window (the fields at the
 bundle donated: banked, paid, regard and recent; the day's cap; refused away, no pack).
 Protocol 47 (shared, a "47 (768):" line; "contribute" is a command, not a message kind). Server; no new
 class_name.
+## 784. Senses, phase 1: a kind's eyes and ears, and a notice that fills
+
+A monster knew whoever it saw at once, saw the same by night as by day past a hard cut at DARK,
+and heard every noise alike. Now a kind may carry a "senses" block in its monsters.json row
+(read_kinds keeps it; Monster._take_senses reads it after Senses.new): {cone: degrees it sees
+without turning (360 all round), night: 0..1 the share of its sight left in the dark, hearing: times
+a noise's reach, alert_sight: cells more while it looks about, notice: how fast it notices}. A kind
+with no block is as before, to the bit: the dungeon's imps, sneaks and brutes, the crypt's skeletons
+(left out on purpose: the crypt's difficulty is tuned on them as they are) and every animal but the
+wolf.
+
+- **Sight in the dark.** Senses.dark_reach(at, reach): its full reach where the cell is lit; where
+  it is not, reach x (night + (1 - night) x light / DARK), never under NOTICE_ALWAYS. A kind with no
+  night keeps the old cut (NOTICE_ALWAYS in the dark). A wolf's night is 0.6, the bear's 0.3, a
+  robber's 0.2.
+- **The notice.** A kind with notice > 0 does not know whom it sees at once: Monster._noticed fills
+  a 0..1 notice per entity by nearness (1 - d / (reach + 1), at least 0.05) x notice /
+  NOTICE_FILL_TICKS a tick, twice as fast while it looks about; it knows them at NOTICE_FULL, and
+  past NOTICE_SUSPECT it turns to look (its glimpse, SUSPICIOUS). Within NOTICE_ALWAYS, its target,
+  or one that struck it: known at once. Out of sight it fades over NOTICE_FADE_TICKS and the entry
+  goes at 0, so the table never grows with the world (perf's condition). notice_of(entity) reads it.
+- **Looking about.** While SUSPICIOUS or HUNTING (Senses.alerted) its cone is ALERT_CONE_DEGREES
+  wider and it sees alert_sight cells farther.
+- **Hearing.** World.noise reaches out to ceil(radius x Monster.hearing_most()) and each listener
+  hears within radius x its hearing (a wall still halves it). A wolf's hearing is 1.5.
+- **Guards.** Monster.note_struck takes a Resident too, so a guard who strikes a raider or a wave
+  is answered at once, and a raider goes for townsfolk it answers or sees (npc's guards, 791).
+- **Cost.** The look is timed into World.senses_usec and shown as World.part "senses". Castle 256,
+  16 players, under the gate and the bench lock, against main 15d30eb8: medians 52.53 / 50.22 ms
+  base, 51.08 / 52.19 mine, +0.26 ms in the blocks' spread, inside perf's 0.5 ms.
+
+Against Jeff's rule (11-03, "less of a penalty, more of a bonus"): the dark and distance are the
+player's to use; nothing is taken from anyone who does not. Crouch, the player's own side, is
+"784, enemy-ai's side (2)" (rev 48). monster_test _test_senses; _test_wild_wolf waits for the
+wolf's notice by night.

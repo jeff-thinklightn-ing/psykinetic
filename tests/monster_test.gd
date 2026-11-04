@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_watch_wave()
 	_test_raid_takes()
 	_test_noticing()
+	_test_senses()
 	_test_wild_kinds()
 	_test_wild_prey()
 	_test_wild_ears()
@@ -2617,7 +2618,8 @@ func _test_wild_wolf() -> void:
 		World.step()
 	_check(wolf.target == null, "by day, facing a lone hunter, it lets them be")
 	DayNight.set_hour(0.0)
-	for i in Animal.PREY_LOOK_TICKS + 2:
+	# Its notice (784) fills before it knows them: a second or two at 2 cells.
+	for i in Animal.PREY_LOOK_TICKS + 2 + 2 * int(Monster.NOTICE_FILL_TICKS):
 		World.step()
 	_check(wolf.target == e["P"][0] and wolf.temper == Monster.Temper.BOLD, "at night it is bold, and goes for them")
 	DayNight.reset()
@@ -2795,6 +2797,64 @@ func _test_noticing() -> void:
 	Monster.noticing = true
 	World.step()
 	_check(imp.alert == Monster.Alert.FIGHTING, "on again, it goes for them")
+	Monster.idling = true
+
+
+
+## Decision 784: a kind's "senses" (the wave kinds and the bear): sight in the
+## dark by its night, a cone, an ear, and a notice that fills before it knows
+## whom it sees; a kind with none as before.
+func _test_senses() -> void:
+	print("\n== senses (784): a robber's notice fills by how near, its ear by its hearing; an imp as before ==")
+	Monster.idling = true
+	DayNight.set_hour(12.0)
+	var imp: Monster = _build(["#####", "#.i.#", "#####"])["i"][0]
+	_check(imp.notice_rate == 0.0 and imp.senses.night < 0.0 and imp.hearing == 1.0, "an imp (no \"senses\") as before: knows whom it sees at once")
+	var e := _build(["##############", "#............#", "#.....P...x..#", "#............#", "##############"], {"x": {"facing": Vector2i(-1, 0)}})
+	var robber: Monster = e["x"][0]
+	var player: GridEntity = e["P"][0]
+	robber.reaction_ticks = 0
+	robber.sight_range = 5  # _build stills it (sight 0); its row's 5.
+	Monster.idling = false  # Standing, not wandering off out of its own cone.
+	_outdoors("clear")  # By daylight: its notice, not the dark, is what this measures.
+	var row: Dictionary = Monster.kinds()["robber"]["senses"]
+	_check(robber.notice_rate > 0.0 and is_equal_approx(robber.senses.night, float(row["night"])) and absf(robber.senses.cone_cos - 0.5) < 0.01
+			and robber.alert_sight == int(row["alert_sight"]) and robber.senses.alert_cone_cos < robber.senses.cone_cos,
+			"a robber's senses are its row's: night %.1f, a 120-degree cone, wider looking about" % robber.senses.night)
+	_check(Monster.cone_cos_of(360.0) == -1.0 and Monster.hearing_most() >= 1.5, "all round at 360; the keenest ear is the wolf's 1.5")
+	# Woken by them near, it looks from a moment of its own (a few ticks).
+	var first := 0.0
+	var waited := 0
+	while first <= 0.0 and waited < 12:
+		World.step()
+		waited += 1
+		first = robber.notice_of(player)
+	_check(robber.target == null and first > 0.0 and first < 1.0,
+			"a player 4 off in its cone: it notices them, not yet knowing them (%.2f after %d; sees %s, %s)"
+			% [first, waited, robber.senses.sees(player), robber.senses.dark_reach(player.tile, robber.sight_range)])
+	var known := -1
+	for i in 120:
+		World.step()
+		if robber.notice_of(player) >= Monster.NOTICE_FULL:
+			known = i + 1
+			break
+	_check(known > 2, "it knows them after %d ticks more, past a glance (turning to look on the way; %.2f)" % [known, robber.notice_of(player)])
+	_check(World.tick_parts.has("senses"), "its look is a part of the tick by name, \"senses\" (%s)" % [World.tick_parts.keys()])
+	# Its ear: a noise 4 off with a reach of 5 is heard by an ear of 1, not by one of 0.5.
+	World.despawn(player)
+	robber.target = null
+	var heard := robber.senses.heard.size()
+	robber.hearing = 0.5
+	World.noise(robber.tile + Vector2i(-4, 0), 5, &"thud")
+	var dull := robber.senses.heard.size() == heard
+	robber.hearing = 1.0
+	World.noise(robber.tile + Vector2i(-4, 0), 5, &"thud")
+	_check(dull and robber.senses.heard.size() == heard + 1, "a noise 4 off, reach 5: a dull ear (0.5) misses it, a plain one hears it")
+	# Gone from its sight: its notice fades and goes, never growing.
+	for i in 120:
+		World.step()
+	_check(robber._notice.is_empty(), "the player gone: its notice fades to nothing (%s)" % [robber._notice])
+	_indoors()
 	Monster.idling = true
 
 
