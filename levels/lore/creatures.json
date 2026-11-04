@@ -225,8 +225,8 @@
 			"id": "great_bear",
 			"type": "creature",
 			"name": "great bear",
-			"status": "draft",
-			"source": "roadmap",
+			"status": "agreed",
+			"source": "Jeff",
 			"summary": "A bear far bigger than any other keeps a den and its ground in the forest, roams and hunts deer by day and sleeps in its den by night.",
 			"relations": [],
 			"tags": [
@@ -269,6 +269,295 @@
 					"tags": [
 						"wildlife"
 					]
+				}
+			]
+		},
+		{
+			"id": "wolfskin",
+			"type": "creature",
+			"name": "wolfskin",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "A man of the town who swore himself to one of the old tribe's gods and put on a wolf's skin; by night he runs as a wolf at the forest's edge (Jeff, 2026-11-03: lore's lean (a)).",
+			"relations": [],
+			"tags": [
+				"apex",
+				"night"
+			],
+			"facts": [
+				{
+					"id": "wolfskin.night",
+					"text": "By night the wolfskin runs as a wolf at the forest's edge.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "wolfskin.missing",
+					"text": "Someone in town is gone at night, and nobody says who; some say he is the wolfskin.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed",
+					"true": true
+				},
+				{
+					"id": "wolfskin.oath",
+					"text": "The wolfskin swore himself to one of the old tribe's gods and put on a wolf's skin, and the oath won't let him take it off at night.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed",
+					"true": true
+				},
+				{
+					"id": "wolfskin.bane",
+					"text": "Silver, fire and a blessing from Theus's temple hold the wolfskin off.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "pale_lord",
+			"type": "creature",
+			"name": "pale lord",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The lord of the Old Tower, who was not among its fallen and has lived on blood since; by night he walks the ruins around the tower (Jeff, 2026-11-03: lore's lean (a)).",
+			"relations": [],
+			"tags": [
+				"apex",
+				"night"
+			],
+			"facts": [
+				{
+					"id": "pale_lord.ruins",
+					"text": "At night the pale lord walks the ruins around the Old Tower.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "pale_lord.road",
+					"text": "No one walks the old road past the Old Tower after dark.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "pale_lord.never_died",
+					"text": "The pale lord was lord of the Old Tower when it was taken; he was not among the fallen buried in the barrow, and he has lived on blood ever since.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed",
+					"true": true
+				},
+				{
+					"id": "pale_lord.bane",
+					"text": "Running water, lamps and fire, the blessed ashes and the dawn hold the pale lord off.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "hollow_stag",
+			"type": "creature",
+			"name": "hollow stag",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "A great stag that grazed too near the mine and came back changed by the rot: silent, its eyes lit like the fallen star; not one of the dead (Jeff, 2026-11-03: lore's lean (a)).",
+			"relations": [],
+			"tags": [
+				"apex",
+				"night"
+			],
+			"facts": [
+				{
+					"id": "hollow_stag.night",
+					"text": "At night a great stag walks near the ruins, silent, its eyes lit.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "hollow_stag.rot",
+					"text": "The hollow stag grazed too near the mine and came back changed by the rot, as the Blood Rot are.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed",
+					"true": true
+				}
+			]
+		},
+		{
+			"id": "cave_troll",
+			"type": "creature",
+			"name": "troll",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "Trolls are one of the land's old peoples: huge and slow, living in hill caves, hurt by daylight (Jeff, 2026-11-03: lore's lean (a)).",
+			"relations": [],
+			"tags": [
+				"apex"
+			],
+			"facts": [
+				{
+					"id": "cave_troll.people",
+					"text": "Trolls are one of the land's old peoples, huge and slow, and they live in hill caves.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "cave_troll.daylight",
+					"text": "Daylight hurts a troll, so it keeps to its cave by day.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "old_wolf",
+			"type": "creature",
+			"name": "old wolf",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "An old grey wolf that a pack follows in the hills and foothills (Jeff, 2026-11-03: lore's name).",
+			"relations": [],
+			"tags": [
+				"wildlife",
+				"apex"
+			],
+			"facts": [
+				{
+					"id": "old_wolf.pack",
+					"text": "In the hills and foothills a wolf pack follows an old grey.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "hill_cat",
+			"type": "creature",
+			"name": "hill cat",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "A great cat that lies up in the hill rocks and drops on whatever passes (Jeff, 2026-11-03: lore's name).",
+			"relations": [],
+			"tags": [
+				"wildlife",
+				"apex"
+			],
+			"facts": [
+				{
+					"id": "hill_cat.rocks",
+					"text": "A great cat lies up in the hill rocks and drops on whatever passes.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
+			"id": "boar_king",
+			"type": "creature",
+			"name": "boar king",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The boar king lives in the boar's lair in the forest; left alone a while, he ventures out into the forest (Jeff, 2026-11-03: \"Move the boar king to the boar's lair in the forest ... If he hasn't been killed in a while, he might decide to venture out into the forest\").",
+			"relations": [
+				{
+					"to": "boar",
+					"kind": "member"
+				}
+			],
+			"tags": [
+				"wildlife",
+				"apex"
+			],
+			"facts": [
+				{
+					"id": "boar_king.lair",
+					"text": "The boar king lives in the boar's lair in the forest.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "boar_king.ventures",
+					"text": "Left alone a while, the boar king ventures out into the forest.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
 				}
 			]
 		}

@@ -117,6 +117,35 @@
 			]
 		},
 		{
+			"id": "towerside",
+			"type": "place",
+			"name": "Towerside",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The land south of Umbrage round the Old Tower and its river, the map levels/held (Jeff picked the name, 2026-11-04, from lore's set worded by voice; maps' 651 amended).",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "towerside.where",
+					"text": "Towerside is the land south of Umbrage, round the Old Tower.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				}
+			]
+		},
+		{
 			"id": "old_tower",
 			"type": "place",
 			"name": "the Old Tower",
@@ -126,7 +155,7 @@
 			"place_kind": "keep",
 			"relations": [
 				{
-					"to": "town_lands",
+					"to": "towerside",
 					"kind": "in"
 				}
 			],
@@ -217,6 +246,17 @@
 					"tags": [
 						"return"
 					],
+					"status": "agreed"
+				},
+				{
+					"id": "temple.charm_blessed",
+					"text": "A charm blessed at the temple becomes Theus's.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
 					"status": "agreed"
 				}
 			]
@@ -563,6 +603,269 @@
 						"captives"
 					],
 					"status": "draft"
+				}
+			]
+		},
+		{
+			"id": "hollowfell",
+			"type": "place",
+			"name": "Hollowfell",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "The town's old iron workings in the hills, dug by the first folk and lost when the deep seams broke into caves below; whatever is strongest in the hills holds it (Jeff, 2026-11-03: \"I like the name of Hollowfell\", and lore's story). Its level is 790's mine (57e3f9e2).",
+			"place_kind": "workings",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "hollowfell.dug",
+					"text": "Hollowfell, in the hills, was dug for iron by the town's first folk, and its ore made the town's tools and blades for generations.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "hollowfell.lost",
+					"text": "Hollowfell's deep seams broke into caves no one knew of; what lived there came up, and the miners left.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "hollowfell.held",
+					"text": "Since Hollowfell was lost, whatever is strongest in the hills holds it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "hollowfell.barrow_gold",
+					"text": "When Hollowfell was lost, the town turned to the barrow's gold, and that is part of why Umbrage is cursed.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed",
+					"true": true
+				}
+			]
+		},
+		{
+			"id": "hills_watchtower",
+			"type": "place",
+			"name": "the broken watchtower",
+			"status": "draft",
+			"source": "lore",
+			"summary": "A broken watchtower on the hills plateau, north of the shieling (maps' 778, hills (186,18)): the ancients of the Old Tower kept watch over the hills road from it. Draft till Jeff's wording check; the guild sheet's lean makes it the Templars' house.",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"hills"
+			],
+			"facts": [
+				{
+					"id": "hills_watchtower.ancients",
+					"text": "The ancients who lived in the Old Tower kept watch over the hills road from the watchtower on the plateau.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "hills_watchtower.broken",
+					"text": "The watchtower on the plateau was broken when the Old Tower was taken.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "hills_watchtower.basin",
+					"text": "A cold fire-basin at the top of the watchtower is where the watch lit its warning fire.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				}
+			]
+		},
+		{
+			"id": "great_oak",
+			"type": "place",
+			"name": "the lone great oak",
+			"status": "draft",
+			"source": "lore",
+			"summary": "A lone great oak between the hills' rivers (maps' 778, hills (111,159)), older than the town. Jeff picked it for the Druids' hall, a hollow oak massive enough to walk into (2026-11-03); that stays out of the facts until the hall is built.",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"hills"
+			],
+			"facts": [
+				{
+					"id": "great_oak.old",
+					"text": "The lone great oak between the rivers is older than the town, and the hill herders won't let it be felled.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "great_oak.rags",
+					"text": "A herder who loses a beast ties a strip of cloth to the great oak, and they say the beast comes home.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				}
+			]
+		},
+		{
+			"id": "standing_stone",
+			"type": "place",
+			"name": "the standing stone",
+			"status": "draft",
+			"source": "lore",
+			"summary": "A standing stone on the hills plateau's east edge (maps' 778, hills (199,70)), older than the ancients.",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"hills"
+			],
+			"facts": [
+				{
+					"id": "standing_stone.old",
+					"text": "The standing stone on the plateau is older than the ancients; some say the old tribe raised it for their many gods.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"true": true
+				},
+				{
+					"id": "standing_stone.carving",
+					"text": "No one can read the worn carving on the standing stone, and nobody sleeps beside it.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				}
+			]
+		},
+		{
+			"id": "hills_road",
+			"type": "place",
+			"name": "the hills road",
+			"status": "draft",
+			"source": "lore",
+			"summary": "The road through the hills, west to the wilds and east to the spur and the shieling, and the small stories off it (maps' 778).",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "blood_rot_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [
+				"hills"
+			],
+			"facts": [
+				{
+					"id": "hills_road.ancients",
+					"text": "The hills road is older than the town: the ancients laid it, and the town's folk have cut new names over the milestones' worn marks.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "hills_road.traveller",
+					"text": "A traveller on the hills road was caught by raiders; they took his pack but missed a note in his coat.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "hills_road.cairn",
+					"text": "Before the raiders caught him, the traveller hid his goods under a cairn north of the hills road, east of where he lies.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"true": true
+				},
+				{
+					"id": "hills_road.fight",
+					"text": "Some years ago hill folk and Blood Rot raiders fought in the hills, and the broken gear still lies where they fell.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "hills_road.grave",
+					"text": "One of the hill folk who fell in that fight was buried where he fell, the barrow being too far, and someone still brings his grave fresh offerings.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": []
+				},
+				{
+					"id": "hills_road.lean_to",
+					"text": "His kin left the town for the hills after the fight and keeps a lean-to there, and is often out.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"true": true
 				}
 			]
 		}

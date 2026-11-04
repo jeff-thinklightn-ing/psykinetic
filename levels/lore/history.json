@@ -447,6 +447,18 @@
 					],
 					"source": "Jeff",
 					"status": "draft"
+				},
+				{
+					"id": "crypt.dead_rise",
+					"text": "On nights the robbers have dug, or when the temple's alms fall short, the barrow's dead come up out of the dark.",
+					"known": "rumour",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed",
+					"true": true
 				}
 			]
 		}

@@ -86,7 +86,16 @@
 				},
 				{
 					"id": "the_land.magic",
-					"text": "How real magic is, and what the gift is.",
+					"text": "Strength lives in things, places and some beings: what comes from a strong beast or a holy place keeps some of it, and whoever wears it long takes some of it in.",
+					"known": "common",
+					"where": [],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "the_land.gift",
+					"text": "What the gift is.",
 					"known": "common",
 					"where": [],
 					"status": "asked",
