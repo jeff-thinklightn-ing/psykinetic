@@ -40670,3 +40670,75 @@ The treasury sat at its 5-gold floor in all three, trader or not: what comes in 
 the town owes. That is the coordinator's design ask, separate. farm_test _test_trader (never the
 food or meat however much, the spare hides bought; a full market takes nothing). Server only,
 protocol unchanged, no new class_name.
+## 790. Hollowfell: the hills' mine, its tunnels laid again (769's phases 2-3; phase A)
+
+769's phases 2 and 3 (Jeff, 2026-11-02: "the mine end rooms would say the same just how you get
+there would shift"; the coordinator's phasing). Phase A is one finished floor, walkable, seamed, and
+held by the Blood Rot. Its name is Jeff's word, "Hollowfell", for the area and its place label (the
+level itself has no words). Lore keeps its story (regions.json).
+
+- **The level**: levels/hollowfell, 96 x 72 cells, made by tools/make_hollowfell.py. The template is
+  three anchors and rock, as castle_halls' is, with "walls"/"floors" "cave", terrain's "mass": "rock"
+  and environment's "ambient": 0.03.
+  - "mouth" (rect 1,29 13x12) holds the link up to the hills at (1,34) and the "from_hills" spawn
+    (3,34). It also has the start (4,35), two lamps and an arch over its inner end.
+  - "chamber_east" (80,20 14x10) has beams north to south and a cart on a short siding.
+  - "chamber_south" (70,56 12x10) has two seams in recesses inside its rect, whose border stays
+    rock, so no tunnel dug outside it opens a recess.
+  - Phase B sinks the chambers and seats the chiefs.
+  - The regenerate block reads: generator "mine", every_days 3, entrance "mouth", keep_ground
+    "entrance", monsters imp 4 / sneak 3 / brute 1 (enemy-ai), bays [4, 6], galleries [3, 5],
+    pits [2, 3], seams [7, 10], loops 0.25. respawn_s is imp 600, sneak 600, brute 900.
+- **The generator**, sim/level_gen/mine.gd. It has no class_name (Regen loads it by name). It is
+  mine_look's vocabulary laid over the whole level.
+  - The anchors' plain border floor gives the tunnels their ends.
+  - 4-6 bays (rounded rooms 6-8 across) sit in the rock, three clear of the anchors.
+  - A spanning tree over the nodes, plus a quarter of a node of the shortest pairs left (one at
+    least), closes the routes into rings.
+  - Each tunnel is a polyline through one to three waypoints thrown aside, carved with
+    mine_look's brush. It is 4 at its ends, and one tunnel a generation narrows to 3 in its middle
+    while another widens to 5. It is never under 3.
+  - Galleries (enemy-ai's flanks) are blind 2-wide spurs 5-10 deep, with rock either side.
+  - Pits are dug beside a tunnel, never across it: two wide, four deep, three levels down. A stair
+    run two wide climbs from the pit's far end, a level a cell, to floor that opens back onto the
+    tunnel. It is laid so no stair has a second cell a level up beside it (the mine_look lesson).
+    A lamp sits on the wall past the stair's foot (the coordinator: whoever falls in sees the way
+    out, whoever looks down sees the depth).
+  - Seams are recesses, the floor before each open across its way in, so none caps a one-cell nub
+    (612).
+  - Track follows physics' 794 rules: one or two straights 8-14 long down a tunnel's middle, a
+    buffer each end, and a cart (prop.mine_cart) faced along each.
+  - Arches go where a tunnel runs straight, 3-5 across. Beams cross each bay every other line.
+  - Lamps go on the walls 11 apart, each a "lantern" (environment's light).
+  - Monsters are sneaks in the galleries first and brutes in the bays first, none on track, beside
+    an anchor, or within 6 of the mouth.
+  - Every dug cell stands at level 3 except the pits'.
+- **Regen**:
+  - A generator's own decor_of, entities_of and ledges_of feed the generated level.json: its decor
+    rows added to the anchors' kept ones, its entities (the carts' art) added, and its ledges
+    (Curves.trace_ledges over the generated relief, as Level.ledges_of finds them) in place of the
+    template's.
+  - The barrow and the tower keep their own paths.
+- **Nothing lost silently** (the coordinator). Regen already lays a level only with nobody inside
+  (465). A block's "keep_ground" names an anchor ("entrance": the entrance one), and
+  Regen.keep_cell is that anchor's first template start.
+  - Regen.keep_section, given that cell, gathers every pile outside the anchors there, along with
+    the load of a cart outside them (a Cargo entity; the new map brings its own cart). It returns
+    their uids as "moved".
+  - Main._move_items places each there and notes "moved", Regen.MOVED "gathered at the way in"
+    (voice's line), so the pile is restored as theirs. Nothing is "lost".
+  - The halls and the barrows keep 465's rule.
+- **The hills side**: maps' make_hills commit, carried in this landing. It holds the link
+  (167,58) → hollowfell/from_hills at the foot of the plateau face, the spawn from_hollowfell
+  (165,58), a levelled pad, the place "hollowfell" {kind "workings", radius 3, name Hollowfell,
+  holder goblins}, and "workings" in Level.PLACE_KINDS (never "mine": WorldRichness thins game near
+  a "mine").
+- **Tests**:
+  - tests/mine_gen_test covers the template, and six generations: anchors verbatim, all different,
+    the same generation the same map. Each generation must parse cleanly, keep the width rule, have
+    its relief's ledges, and walk every cell back to the start by World's step rule. It also checks
+    the seams in recesses, track by 794's rules with carts on it, every lamp a lantern, the monster
+    counts, and none near the mouth. keep_ground is checked both ways, and so is a generator without
+    the hook.
+  - level_test (the coordinator's pick) runs physics' _trap_landings over two generations of every
+    level marked "regenerate".

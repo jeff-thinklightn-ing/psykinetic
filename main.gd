@@ -3759,8 +3759,10 @@ func _rebuild_regenerated(level_name: String, anchors: Array) -> void:
 	var ground := ground_entries(World.zone)
 	var raw: Dictionary = Snapshot.data_of({level_name: {"tick": World.tick, "entities": World.get_entities(), "respawns": respawns,
 		"ground": ground, "records": World.record_list()}})["zones"][level_name]
-	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors)
+	var keep_to: Variant = Regen.keep_cell(level_name)
+	var sifted := Regen.keep_section(Snapshot.parse_zone(raw), anchors, keep_to, World.items.id_of)
 	_lose_items(sifted["lost"], level_name)
+	_move_items(sifted["moved"], level_name, keep_to)
 	_load_level(level_name)
 	_start_level(false, false, sifted["kept"])
 	_level_stamps[level_name] = _level_stamp(level_name)
@@ -3773,6 +3775,18 @@ func _lose_items(uids: Array, level_name: String) -> void:
 	for uid: int in uids:
 		if World.items.has(uid):
 			World.items.end(uid, "lost", Regen.LOST, level_name)
+
+
+## Server: things gathered into the keep_ground pile of [param level_name]
+## on [param cell] when it was laid again (790): placed there, so the pile
+## is restored as theirs, their histories saying so (Regen.MOVED).
+func _move_items(uids: Array, level_name: String, cell: Variant) -> void:
+	if not cell is Vector2i:
+		return
+	for uid: int in uids:
+		if World.items.has(uid):
+			World.items.place(uid, "%s@%d,%d" % [level_name, cell.x, cell.y])
+			World.items.note(uid, "moved", Regen.MOVED, level_name, cell)
 
 
 ## Server: places [param gone] are no more: every record's known places
@@ -4421,9 +4435,11 @@ func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 	# A regenerating level due is laid again before it opens (decision
 	# 465); the snapshot's section for it keeps only what sits in an anchor.
 	if regenerate and _regenerate_if_due(zone_name) and not saved.is_empty():
-		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"])
+		var keep_to: Variant = Regen.keep_cell(zone_name)
+		var sifted := Regen.keep_section(saved, Regen.config_of(zone_name)["anchors"], keep_to, World.items.id_of)
 		saved = sifted["kept"]
 		_lose_items(sifted["lost"], zone_name)
+		_move_items(sifted["moved"], zone_name, keep_to)
 	var opened := World.add_zone(zone_name)
 	var was := World.enter(opened)
 	_load_level(zone_name)

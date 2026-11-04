@@ -1,0 +1,253 @@
+{
+	"name": "Hollowfell",
+	"outdoor": false,
+	"ambient": 0.03,
+	"depth": 1,
+	"walls": "cave",
+	"floors": "cave",
+	"mass": "rock",
+	"music": "music.barrow",
+	"starts": [
+		[
+			4,
+			35
+		]
+	],
+	"spawn_points": {
+		"from_hills": [
+			3,
+			34
+		]
+	},
+	"links": [
+		{
+			"at": [
+				1,
+				34
+			],
+			"to_map": "hills",
+			"to_spawn": "from_hollowfell"
+		}
+	],
+	"entities": [
+		{
+			"at": [
+				86,
+				27
+			],
+			"art": "prop.mine_cart",
+			"facing": [
+				1,
+				0
+			]
+		}
+	],
+	"decor": [
+		[
+			6,
+			31,
+			0,
+			-1,
+			"mine_lamp",
+			1
+		],
+		[
+			8,
+			38,
+			0,
+			1,
+			"mine_lamp",
+			1
+		],
+		[
+			13,
+			33,
+			0,
+			1,
+			"mine_arch",
+			1
+		],
+		[
+			82,
+			21,
+			0,
+			1,
+			"mine_beam",
+			1
+		],
+		[
+			84,
+			21,
+			0,
+			1,
+			"mine_beam",
+			1
+		],
+		[
+			86,
+			21,
+			0,
+			1,
+			"mine_beam",
+			1
+		],
+		[
+			88,
+			21,
+			0,
+			1,
+			"mine_beam",
+			1
+		],
+		[
+			90,
+			21,
+			0,
+			1,
+			"mine_beam",
+			1
+		],
+		[
+			84,
+			27,
+			-1,
+			0,
+			"mine_track",
+			3
+		],
+		[
+			85,
+			27,
+			1,
+			0,
+			"mine_track",
+			1
+		],
+		[
+			86,
+			27,
+			1,
+			0,
+			"mine_track",
+			1
+		],
+		[
+			87,
+			27,
+			1,
+			0,
+			"mine_track",
+			1
+		],
+		[
+			88,
+			27,
+			1,
+			0,
+			"mine_track",
+			1
+		],
+		[
+			89,
+			27,
+			1,
+			0,
+			"mine_track",
+			3
+		],
+		[
+			92,
+			24,
+			1,
+			0,
+			"mine_lamp",
+			1
+		],
+		[
+			87,
+			21,
+			0,
+			-1,
+			"mine_lamp",
+			1
+		],
+		[
+			71,
+			60,
+			-1,
+			0,
+			"mine_lamp",
+			1
+		],
+		[
+			78,
+			63,
+			0,
+			1,
+			"mine_lamp",
+			1
+		]
+	],
+	"regenerate": {
+		"generator": "mine",
+		"every_days": 3,
+		"entrance": "mouth",
+		"keep_ground": "entrance",
+		"anchors": [
+			{
+				"rect": [
+					1,
+					29,
+					13,
+					12
+				],
+				"name": "mouth"
+			},
+			{
+				"rect": [
+					80,
+					20,
+					14,
+					10
+				],
+				"name": "chamber_east"
+			},
+			{
+				"rect": [
+					70,
+					56,
+					12,
+					10
+				],
+				"name": "chamber_south"
+			}
+		],
+		"monsters": {
+			"imp": 4,
+			"sneak": 3,
+			"brute": 1
+		},
+		"bays": [
+			4,
+			6
+		],
+		"galleries": [
+			3,
+			5
+		],
+		"pits": [
+			2,
+			3
+		],
+		"seams": [
+			7,
+			10
+		],
+		"loops": 0.25
+	},
+	"respawn_s": {
+		"imp": 600,
+		"sneak": 600,
+		"brute": 900
+	}
+}

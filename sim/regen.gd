@@ -14,6 +14,9 @@ extends RefCounted
 const TRIES := 8
 ## How a thing lost outside the anchors is ended in the ItemBook.
 const LOST := "in the shifting halls"
+## How a thing moved into the keep_ground pile is noted in the ItemBook
+## (790: the mine's ground is never lost, only gathered by the mouth).
+const MOVED := "gathered at the way in"
 const GENERATORS := "res://sim/level_gen/"
 ## The depth bands of a generated level (a share of the farthest reach from
 ## the "entrance" anchor): where the shallow band ends and where the middle
@@ -263,6 +266,15 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 			generated["decor"].append_array(decor_of(map, anchors, config, generated, seed, bool(made["config"].get("damp", false))))
 		elif str(config.get("style", "")) == "tower":
 			generated["decor"].append_array(runes_of(map, anchors, generated, seed))
+		# A generator that lays its own decor, entities and relief (790, the
+		# mine): its rows added to the anchors' kept ones, and the ledges of
+		# the relief it made (585) in place of the template's.
+		if generator.has_method("decor_of"):
+			generated["decor"].append_array(generator.decor_of(map))
+		if generator.has_method("entities_of"):
+			generated["entities"].append_array(generator.entities_of(map))
+		if generator.has_method("ledges_of"):
+			generated["ledges"] = generator.ledges_of(map)
 		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}
@@ -661,12 +673,33 @@ static func write(level_name: String, made: Dictionary) -> bool:
 ## what sits inside [param anchors] (an entity, respawn timer or record by
 ## its marker-cell key, decision 433, else its cell; a ground pile by its
 ## cell), lost: the ItemBook uids of everything else, to be ended}.
-static func keep_section(section: Dictionary, anchors: Array) -> Dictionary:
+##
+## With [param keep_to] a cell (790: the regenerate block's "keep_ground",
+## keep_cell), nothing on the ground is lost: every pile outside the anchors,
+## and the load of a cart outside them (a Cargo entity; the new map brings
+## its own cart), go into one pile on that cell, their uids listed in
+## "moved" (Main places them there and notes it, MOVED); [param id_of]
+## (uid -> item id) names a cart's things for the pile.
+static func keep_section(section: Dictionary, anchors: Array, keep_to: Variant = null, id_of := Callable()) -> Dictionary:
 	var lost: Array[int] = []
+	var moved: Array[int] = []
 	var kept := {"tick": int(section.get("tick", 0)), "entities": [], "respawns": [], "ground": [], "records": []}
+	var keeping := keep_to is Vector2i
+	var heap := {"cell": keep_to, "ids": [], "items": [], "gold": 0}
 	for entry: Dictionary in section.get("entities", []):
 		if _keeps(anchors, entry["spec"]):
 			kept["entities"].append(entry)
+		elif keeping and str(entry["spec"].get("script", "")) == Level.CARGO and id_of.is_valid():
+			var cargo: Array[int] = []
+			_uids_of(entry.get("items", []), cargo)
+			for uid in cargo:
+				var id := str(id_of.call(uid))
+				if id.is_empty():
+					lost.append(uid)
+					continue
+				heap["ids"].append(id)
+				heap["items"].append(uid)
+				moved.append(uid)
 		else:
 			_uids_of(entry.get("items", []), lost)
 	for respawn: Dictionary in section.get("respawns", []):
@@ -674,10 +707,21 @@ static func keep_section(section: Dictionary, anchors: Array) -> Dictionary:
 		if at != null and Level.in_anchors(anchors, at):
 			kept["respawns"].append(respawn)
 	for pile: Dictionary in section.get("ground", []):
-		if Level.in_anchors(anchors, pile["cell"]):
+		if keeping and pile["cell"] == keep_to:
+			heap["ids"].append_array(pile.get("ids", []))
+			heap["items"].append_array(pile.get("items", []))
+			heap["gold"] = int(heap["gold"]) + int(pile.get("gold", 0))
+		elif Level.in_anchors(anchors, pile["cell"]):
 			kept["ground"].append(pile)
+		elif keeping:
+			heap["ids"].append_array(pile.get("ids", []))
+			heap["items"].append_array(pile.get("items", []))
+			heap["gold"] = int(heap["gold"]) + int(pile.get("gold", 0))
+			_uids_of(pile.get("items", []), moved)
 		else:
 			_uids_of(pile.get("items", []), lost)
+	if keeping and (not (heap["ids"] as Array).is_empty() or int(heap["gold"]) > 0):
+		kept["ground"].append(heap)
 	for record: Dictionary in section.get("records", []):
 		var entry: Variant = record.get("entry", {})
 		var spec: Variant = Snapshot.parse_entry(entry).get("spec", {})
@@ -685,7 +729,32 @@ static func keep_section(section: Dictionary, anchors: Array) -> Dictionary:
 			kept["records"].append(record)
 		elif entry is Dictionary:
 			_uids_of(entry.get("items", []), lost)
-	return {"kept": kept, "lost": lost}
+	return {"kept": kept, "lost": lost, "moved": moved}
+
+
+## Where level [param level_name]'s ground is gathered when it is laid again
+## (790, keep_section's keep_to): its regenerate block's "keep_ground" names
+## an anchor ("entrance": the entrance anchor, entrance_of), and the pile
+## lies on the template's first start inside it, else the anchor's centre;
+## null when the block says no "keep_ground" (465: what lies outside the
+## anchors is lost).
+static func keep_cell(level_name: String) -> Variant:
+	var config := config_of(level_name)
+	var named := str(config.get("keep_ground", ""))
+	if named.is_empty():
+		return null
+	var anchor := entrance_of(config) if named == "entrance" else {}
+	for each: Dictionary in config.get("anchors", []):
+		if str(each.get("name", "")) == named:
+			anchor = each
+	if anchor.is_empty():
+		return null
+	var rect: Rect2i = anchor["rect"]
+	for start: Variant in Level.template_config(level_name).get("starts", []):
+		var at: Variant = Level._tile(start)
+		if at is Vector2i and rect.has_point(at):
+			return at
+	return rect.position + rect.size / 2
 
 
 ## Whether a saved entity's [param spec] sits in [param anchors]: by its

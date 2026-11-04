@@ -1265,6 +1265,23 @@ func _test_pit_ways_out() -> void:
 		_check(named.is_empty(), "%s: every drop lands where its rim or a way out can be walked to (%d trap pits, landing at %s)" % [folder, named.size(), named.slice(0, 8)])
 		if named.is_empty() and PIT_TRAPS_EXPECTED.has(folder):
 			print("  NOTE  %s is fixed: take it out of PIT_TRAPS_EXPECTED" % folder)
+	# 790 (the coordinator): a level marked "regenerate" is laid again on the
+	# box, so its generations are checked too, two of each, laid as Regen
+	# lays them and read as Level reads them.
+	for level_name in Regen.marked_levels():
+		for generation in [1, 2]:
+			var made := Regen.generate(level_name, generation)
+			_check(not made.is_empty(), "%s: generation %d is made" % [level_name, generation])
+			if made.is_empty():
+				continue
+			var level := Level.parse(made["layout"], made["height"], made["config"])
+			level["name"] = level_name
+			World.load_terrain(level["terrain"])
+			var named := _trap_landings(level, drops)
+			if not named.is_empty() and PIT_TRAPS_EXPECTED.has(level_name):
+				print("  EXPECTED FAIL  %s generation %d: %d pits with no way out, landing at %s (%s fixes it)" % [level_name, generation, named.size(), named.slice(0, 8), PIT_TRAPS_EXPECTED[level_name]])
+				continue
+			_check(named.is_empty(), "%s generation %d: every drop lands where its rim or a way out can be walked to (%d trap pits, landing at %s)" % [level_name, generation, named.size(), named.slice(0, 8)])
 	_check(drops[0] > 0, "the levels have drops to check (%d ledge steps)" % drops[0])
 	# The check itself: the test room with a sheer pit sunk in it, then with a
 	# stair cut up its side.
