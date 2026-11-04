@@ -41149,3 +41149,27 @@ to 0" line is printed. Above 0 it is held to 1..max_hp as before. Same gate (--t
 --run-marker). return_test _test_main: struck down by "hp <player> 0", told the usual return,
 and brought back at full hp; respawn_test's held-to check is now at max_hp. Server only,
 protocol unchanged, no new class_name, no bullet.
+## 796. A companion goes by her own name, not her node's
+
+playtest's badly11 log: after admin moves, the companion showed as "Rhea" and "Rhea2" in turn. A
+quick re-place (an admin move, a rejoin in another zone) despawns her and spawns her afresh in the same
+frame; the old node is still in the tree, freed at the frame's end, so Godot names the new one
+"Rhea2". The node name is left as it is: the spawn sends it, so the client's node path matches the
+server's, and renaming either node risks the two paths parting. What changed is what goes by it:
+her mind-log key ("companion", and so MindLog.last and the console's mind last), her transcript's
+file (Transcript.record), the party log's lines, the "speech" message's speaker, the facts noted on
+her card ("gave Rhea2 a dagger"), her guide and capability notes, and the console's lookups all used
+the node name. They now use her label, her record's name: Companion._name_of (label, else node name),
+in Companion (every String(name)) and in Main (every pet.name), and Main._display_name answers it for
+a companion. Facts and beliefs saved under a renamed name are put right when she is spawned
+(Companion.unrename: her name followed by digits, whole words, becomes her name). Mind-log lines and
+transcript files written under "Rhea2" before this stay as written (the console's transcript Rhea2
+still shows one); every line after is under her name. companion_test _test_renamed_node_keeps_her_name.
+Server only; protocol unchanged (the speaker field still carries her name, now always her own);
+no new class_name; CHANGELOG.
+
+What reaches her goes by either name (release, after the first landing's resident_test failed): a
+line names her, an order is read with her name taken out, and the console finds her ("mind",
+"bond"), by her label or her node's name alike (Companion.names_of, named_by, answers_to), so a
+player who types the name shown always reaches her; what she is logged and spoken of as stays her
+label. resident_test reads its claims ask and its speaker by her label.

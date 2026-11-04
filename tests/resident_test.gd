@@ -2160,7 +2160,7 @@ func _test_hearsay() -> void:
 	var pet := _companion()
 	_put(pet, _main._nearest_free(mara.tile + Vector2i(0, 1)))
 	_main._on_companion_said("They say the old well is haunted.", pet)
-	_check(_main._claims_asks.any(func(each: Dictionary) -> bool: return each["worker"] == "rs-mara" and each["from"] == String(pet.name)),
+	_check(_main._claims_asks.any(func(each: Dictionary) -> bool: return each["worker"] == "rs-mara" and each["from"] == Companion._name_of(pet)),
 		"a companion's line beside her: she weighs it too")
 	_main._claims_asks.clear()
 	World.production.set_heard("rs-mara", [])
@@ -2239,7 +2239,7 @@ func _test_companion_hearsay() -> void:
 	_main._player_said(owner, "The mine is cursed, %s." % pet.name)
 	for i in 6:
 		World.step()
-	var asked := mind.claims_asks.filter(func(ask: Dictionary) -> bool: return str(ask.get("speaker", "")) == String(pet.name))
+	var asked := mind.claims_asks.filter(func(ask: Dictionary) -> bool: return str(ask.get("speaker", "")) == Companion._name_of(pet))
 	_check(asked.size() == 1 and "who travels with %s" % pet.keeper_name() in str(asked[0]["system"]), "one claims ask on her, as one who travels with her player")
 	_check(pet.heard.size() == 1 and bool(pet.heard[0]["believed"]) and record.companion.get("heard", []) == pet.heard,
 		"intellect 1: she believes it, kept in her record (%s)" % [pet.heard])

@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Struck down in a fire, you wait out the usual few seconds and wake at the temple, instead of lying in the flames for minutes (544 amended).
 
+- A companion keeps her own name after travelling, in chat, the party log and what she remembers, never "<name>2" (796).
 - Weapon practice: sword and bow each keep what you have learned with them, whichever you take up, and a weapon you come back to after a long rest returns to its best three times as fast. (766 amended (4))
 - Clicking a square in a store window or the town window picks it and leaves you standing where you are (765 amended).
 - X crouches: you kneel low when still and creep when moving, quiet, to steal up on what you hunt or slip past what hunts you; press it again, or strike, guard, draw, shoot or throw, and you are up and ready (784 amended (3), (4)).

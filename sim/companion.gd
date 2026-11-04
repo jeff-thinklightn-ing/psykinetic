@@ -914,6 +914,26 @@ static func _quoted(heard: String) -> String:
 	return heard.get_slice("\"", 1) if "\"" in heard else heard
 
 
+## The names she answers to (796, release's ask): her label, the name shown,
+## and her node's, should it differ (a quick re-place makes it "Rhea2").
+static func names_of(entity: GridEntity) -> Array[String]:
+	var names: Array[String] = []
+	for each: String in [entity.label, String(entity.name)]:
+		if not each.is_empty() and not names.has(each):
+			names.append(each)
+	return names
+
+
+## Whether [param words] name [param entity] by any name she answers to.
+static func named_by(words: String, entity: GridEntity) -> bool:
+	return names_of(entity).any(func(each: String) -> bool: return _named(words, each))
+
+
+## Whether [param who], a name typed, is one [param entity] answers to.
+static func answers_to(entity: GridEntity, who: String) -> bool:
+	return names_of(entity).any(func(each: String) -> bool: return each.to_lower() == who.to_lower())
+
+
 static func _named(words: String, who: String) -> bool:
 	return not who.is_empty() and RegEx.create_from_string("(?i)\\b%s\\b" % who).search(words) != null
 
@@ -1125,7 +1145,7 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_instruction = heard
 		_instruction_tick = World.tick
 		_instruction_stance = STANCE_NAMES[wanted]
-		_log({"kind": "stance", "companion": String(name), "mind": "phrase", "trigger": "quick phrase %d: %s" % [phrase, text],
+		_log({"kind": "stance", "companion": _name_of(self), "mind": "phrase", "trigger": "quick phrase %d: %s" % [phrase, text],
 			"stance": STANCE_NAMES[wanted], "outcome": "applied", "note": "a quick phrase: its stance at once, standing as the instruction"})
 	_ask_voice("%s just spoke to you." % keeper_name(), heard, false, PHRASE_STANCES.has(phrase))
 
@@ -1341,8 +1361,8 @@ func obey(read: Dictionary, text: String) -> bool:
 		# word, and the order done HESITATE_TICKS later.
 		_hesitant = {"read": read, "text": text, "at": World.tick + HESITATE_TICKS}
 		var lines: Array = loyalty().get("hesitate", ["Must I?"])
-		_say(str(lines[absi(hash(String(name) + text)) % lines.size()]), true)
-		_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": text, "outcome": "hesitates", "note": bond_step})
+		_say(str(lines[absi(hash(_name_of(self) + text)) % lines.size()]), true)
+		_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "hesitates", "note": bond_step})
 		return true
 	return _carry_out(read, text)
 
@@ -1359,7 +1379,7 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 		"wait", "rest", "follow":
 			if verb == "rest" and in_fight():
 				_narrate("%s asked you to rest, but there is fighting near: you will rest after it." % keeper_name())
-				_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": text, "outcome": "not now", "note": "a fight near"})
+				_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "not now", "note": "a fight near"})
 				return true
 			order = "" if verb == "follow" else verb
 			_rest_heal_at = World.tick + REST_HEAL_TICKS
@@ -1440,7 +1460,7 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 		_:
 			return false
 	_narrate(done)
-	_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": text, "outcome": "done", "note": done})
+	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": text, "outcome": "done", "note": done})
 	return true
 
 
@@ -1554,7 +1574,9 @@ func _play_on() -> void:
 ## Her player answered her ask to keep watch (decision 621): yes, she
 ## sleeps; no, she lets it be. Whether it was an answer.
 func _answered_watch(text: String) -> bool:
-	var said := " " + text.to_lower().replace(String(name).to_lower(), " ") + " "
+	var said := " " + text.to_lower() + " "
+	for each in names_of(self):
+		said = said.replace(each.to_lower(), " ")
 	if RegEx.create_from_string(ORDER_NO).search(said) != null:
 		_sleeping = {}
 		_narrate("%s would rather go on: you do not sleep now." % keeper_name())
@@ -1573,7 +1595,7 @@ func _sleep() -> void:
 	_serial += 1
 	_set_stance(Stance.HOLD, _serial, "order")
 	_narrate("You lie down to sleep, while %s keeps watch." % keeper_name())
-	_log({"kind": "order", "companion": String(name), "mind": "hands", "trigger": "keep watch", "outcome": "sleeps", "note": ""})
+	_log({"kind": "order", "companion": _name_of(self), "mind": "hands", "trigger": "keep watch", "outcome": "sleeps", "note": ""})
 
 
 ## Keeping watch (decision 621), each tick: after a hard day (a fight since
@@ -1706,7 +1728,7 @@ func _keep_order() -> void:
 	if _ack_due >= 0 and World.tick >= _ack_due:
 		_ack_due = -1
 		if _last_speech_tick < _order_tick:
-			_say(ORDER_ACKS[absi(hash(String(name))) % ORDER_ACKS.size()], true)
+			_say(ORDER_ACKS[absi(hash(_name_of(self))) % ORDER_ACKS.size()], true)
 	_play_on()
 	_keep_watch()
 	if order != "rest":
@@ -2171,7 +2193,7 @@ func _watch() -> void:
 		if not grown.facts.any(func(entry: Dictionary) -> bool: return ("first saw %s" % _a(kind)) in str(entry["text"])):
 			note_fact("%s first saw %s in %s." % [_name_of(self), _a(kind), _place_words()])
 	elif had_deaths and deaths.is_empty():
-		_log({"kind": "voice", "companion": String(name), "trigger": " ".join(dead_names),
+		_log({"kind": "voice", "companion": _name_of(self), "trigger": " ".join(dead_names),
 			"outcome": "not asked", "note": "nothing new: a monster's death, not big, not the first of its kind, not the last"})
 	if _silence_due and not fight and World.tick - _fight_ended_tick >= SILENCE_TICKS:
 		_silence_due = false
@@ -2180,7 +2202,7 @@ func _watch() -> void:
 			if _fight_notable:
 				_ask_voice("The fight is over, and you have said nothing since.")
 			else:
-				_log({"kind": "voice", "companion": String(name), "trigger": "The fight is over.",
+				_log({"kind": "voice", "companion": _name_of(self), "trigger": "The fight is over.",
 					"outcome": "not asked", "note": "nothing new in that fight: no one hurt, nothing big or new"})
 		_fight_notable = false
 	if not fight:
@@ -2291,7 +2313,7 @@ func _calm() -> void:
 		_serial += 1
 		var was := stance_name()
 		_set_stance(Stance.GUARD, _serial, "calm")
-		_log({"kind": "stance", "companion": String(name), "mind": "calm", "trigger": "calm, no instruction",
+		_log({"kind": "stance", "companion": _name_of(self), "mind": "calm", "trigger": "calm, no instruction",
 			"stance": "GUARD", "outcome": "applied", "note": "from %s: nothing hostile near and nothing asked" % was})
 	_explain_lapse()
 
@@ -2484,7 +2506,7 @@ func _drink_if_low() -> void:
 	for slot in slots.size():
 		if is_remedy(slots[slot]) and World.try_use(self, slot):
 			_narrate("Badly hurt, you drank a healing remedy.")
-			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": "drink a remedy", "outcome": "done", "note": "hp %d of %d" % [hp, max_hp]})
+			_log({"kind": "errand", "companion": _name_of(self), "mind": "hands", "trigger": "drink a remedy", "outcome": "done", "note": "hp %d of %d" % [hp, max_hp]})
 			return
 
 
@@ -2597,7 +2619,7 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 	if (heard.is_empty() or not own) and not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return  # She could not say it: the rate limit.
 	if not heard_by_anyone():
-		_log({"kind": "voice", "companion": String(name), "trigger": trigger, "outcome": "not asked",
+		_log({"kind": "voice", "companion": _name_of(self), "trigger": trigger, "outcome": "not asked",
 			"note": "no player within %d cells to hear her" % HEARING_RANGE})
 		return
 	if mind.busy("voice"):
@@ -2669,8 +2691,8 @@ func note_fact(text: String, from := "event") -> void:
 	var added := grown.add_fact(text, from, keeper_id)
 	if added.is_empty():
 		return
-	Transcript.record(String(name), "", "[Now true of her: %s]" % added["text"])
-	_log({"kind": "fact", "companion": String(name), "trigger": from, "outcome": "added", "note": added["text"], "id": added["id"]})
+	Transcript.record(_name_of(self), "", "[Now true of her: %s]" % added["text"])
+	_log({"kind": "fact", "companion": _name_of(self), "trigger": from, "outcome": "added", "note": added["text"], "id": added["id"]})
 	facts_changed.emit()
 
 
@@ -2739,7 +2761,7 @@ func _take_facts(trigger: String, answer: Dictionary, entry: Dictionary) -> void
 			var fact := grown.add_fact(str(text), "talk", keeper_id)
 			if not fact.is_empty():
 				added.append(fact["text"])
-				Transcript.record(String(name), "", "[Now true of her: %s]" % fact["text"])
+				Transcript.record(_name_of(self), "", "[Now true of her: %s]" % fact["text"])
 		# What is said of the world is no longer taken here: she hears it as
 		# hearsay, weighed by her intellect (decision 442).
 		entry["outcome"] = "added" if not added.is_empty() else ("nothing new" if not answer.is_empty() else "no answer")
@@ -3046,7 +3068,7 @@ func _narrate(text: String) -> void:
 ## user's turn are [param speaker]'s (her player's by default).
 func _add_turn(role: String, text: String, narration := false, speaker := "") -> void:
 	var who := "" if narration or role == "assistant" else speaker if not speaker.is_empty() else keeper_name()
-	Transcript.record(String(name), String(name) if role == "assistant" else who, text)
+	Transcript.record(_name_of(self), _name_of(self) if role == "assistant" else who, text)
 	_exchange.append({"role": role, "text": text, "speaker": who})
 	if _exchange.size() > EXCHANGE_KEPT:
 		_exchange.pop_front()
@@ -3812,7 +3834,7 @@ func _lately() -> Array[String]:
 func _check_instruction(wanted: int, serial: int, heard: String) -> void:
 	_checks[serial] = {"stance": wanted, "heard": heard}
 	if mind == null or mind.busy("check"):
-		_log({"kind": "check", "companion": String(name), "trigger": heard, "outcome": "not asked",
+		_log({"kind": "check", "companion": _name_of(self), "trigger": heard, "outcome": "not asked",
 			"note": "the check is busy; %s stands" % stance_name()})
 		_checks.erase(serial)
 		return
@@ -3852,7 +3874,7 @@ func _take_check(result: Dictionary, answer: Dictionary, entry: Dictionary) -> v
 ## unless a newer ask's stands, a line said unless it echoes; logged.
 func _take_result(result: Dictionary) -> void:
 	var kind := str(result.get("kind", "stance"))
-	var entry := {"kind": kind, "companion": String(name), "mind": mind.kind if mind != null else "none",
+	var entry := {"kind": kind, "companion": _name_of(self), "mind": mind.kind if mind != null else "none",
 		"trigger": result.get("trigger", ""), "prompt": result.get("prompt", ""),
 		"reply": result.get("raw", ""), "latency_ms": result.get("latency_ms", 0)}
 	# A voice on the Claude API (decision 363): which model answered, what it cost, and why her own did.
@@ -5354,19 +5376,19 @@ func _start_errand(action: Dictionary, serial: int) -> void:
 	match str(action["verb"]):
 		"make_way":
 			step_aside(keeper.facing if _alive(keeper) else facing)
-			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": action["words"], "outcome": "done",
+			_log({"kind": "errand", "companion": _name_of(self), "mind": "hands", "trigger": action["words"], "outcome": "done",
 				"note": "to %s" % _yield_tile})
 			return
 		"hold_door":
 			_door_asked = true
-			_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": action["words"], "outcome": "set off"})
+			_log({"kind": "errand", "companion": _name_of(self), "mind": "hands", "trigger": action["words"], "outcome": "set off"})
 			return
 	errand = action.duplicate()
 	_errand_no_way.clear()
 	errand["phase"] = "going"
 	errand["serial"] = serial
 	errand["until"] = World.tick + ERRAND_TICKS
-	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand["words"], "outcome": "set off"})
+	_log({"kind": "errand", "companion": _name_of(self), "mind": "hands", "trigger": errand["words"], "outcome": "set off"})
 
 
 ## Her player asked something else of her (ask [param serial]): an errand
@@ -5668,7 +5690,7 @@ func scouted_words() -> String:
 
 ## Her errand is done: [param told] narrated, and her voice asked to tell it.
 func _report_errand(told: String) -> void:
-	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand.get("words", ""), "outcome": "done",
+	_log({"kind": "errand", "companion": _name_of(self), "mind": "hands", "trigger": errand.get("words", ""), "outcome": "done",
 		"note": "" if errand.get("unasked", false) else told})
 	var unasked: bool = errand.get("unasked", false)
 	errand = {}
@@ -5681,7 +5703,7 @@ func _report_errand(told: String) -> void:
 ## voice is asked to say so (it could not be done), else it is narrated.
 func _end_errand(why: String, tell: bool) -> void:
 	var told := "You did not %s: %s." % [str(errand.get("words", "do it")).get_slice(", ", 0), why]
-	_log({"kind": "errand", "companion": String(name), "mind": "hands", "trigger": errand.get("words", ""),
+	_log({"kind": "errand", "companion": _name_of(self), "mind": "hands", "trigger": errand.get("words", ""),
 		"outcome": "undone", "note": why})
 	var unasked: bool = errand.get("unasked", false)
 	errand = {}
@@ -5795,6 +5817,19 @@ static func _hostile_near(at: Vector2i, reach: int) -> bool:
 
 ## What an entity is called to her: its label (a player's name, as the
 ## party log calls them) or, with none, its node name.
+## Decision 796: facts noted while her node was renamed ("Rhea2": a quick
+## re-place adds the new node while the old one is still freeing) name her
+## as herself again, in place: [param entries] are her record's saved facts
+## or beliefs, [param her] her name. Whole words only; the number goes.
+static func unrename(entries: Variant, her: String) -> void:
+	if not entries is Array or her.is_empty():
+		return
+	var renamed := RegEx.create_from_string("(?<![\\w])" + MindLog._escaped(her) + "\\d+(?![\\w])")
+	for entry: Variant in entries:
+		if entry is Dictionary and entry.get("text") is String and her in str(entry["text"]):
+			entry["text"] = renamed.sub(str(entry["text"]), her, true)
+
+
 static func _name_of(entity: GridEntity) -> String:
 	return entity.label if not entity.label.is_empty() else String(entity.name)
 

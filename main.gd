@@ -7526,6 +7526,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.how_we_met = str(record.companion.get("how_we_met", ""))
 	pet.card_by = str(record.companion.get("card_by", "plain"))
 	pet.card_written.connect(_on_card_written.bind(pet, record))
+	for kept: String in ["facts", "beliefs"]:
+		Companion.unrename(record.companion.get(kept, []), Companion._name_of(pet))  # 796: "Rhea2" noted before.
 	pet.grown = CompanionFacts.from_record(record.companion.get("facts", []), record.companion.get("beliefs", []))
 	pet.heard = record.companion.get("heard", [])
 	# Her bond with her player (decision 444): first met now if never, and
@@ -7571,7 +7573,7 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	_companions[record.player_id] = pet
 	_set_mood(record)  # Once she is hers: before it, her step never reached her (fond after every join).
 	print("[net] %s's companion %s is at %s%s" % [
-		record.name, pet.name, tile, " (new)" if is_new else ""])
+		record.name, Companion._name_of(pet), tile, " (new)" if is_new else ""])
 	_tell_sickness(pet, record, true)
 
 
@@ -7589,7 +7591,7 @@ func _wire_guide(pet: Companion, record: PlayerRecord, player: Player) -> void:
 	if walk != null:
 		walk.bind(pet, player)
 		pet.guide = walk
-		player.led_by = String(pet.name) if walk.going() else ""
+		player.led_by = Companion._name_of(pet) if walk.going() else ""
 		player.led_to = str(walk.goal.get("key", "")) if walk.going() else ""
 		if walk.going():
 			_guide_check.call_deferred(pet)  # The road on from here, once her voice is in.
@@ -7625,7 +7627,7 @@ func _tell_roads(record: PlayerRecord, pet: Companion) -> void:
 	if peer == 0 or _world_news == null or not _world_news.send.is_valid():
 		return
 	var roads := Guide.roads_of(record.companion)
-	_world_news.send.call(peer, {"full": false, "guide": {"companion": String(pet.name),
+	_world_news.send.call(peer, {"full": false, "guide": {"companion": Companion._name_of(pet),
 		"places": (roads["places"] as Array).duplicate(), "areas": (roads["areas"] as Array).duplicate()}})
 
 
@@ -7702,7 +7704,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 		var why := "you will not lead them anywhere now: you are unhappy with them" if not pet.bond_at_least("wary") \
 			else "you follow them, and do not trust yourself to take the lead yet"
 		pet.guide_note = "%s asked you to lead them to %s, but %s." % [_display_name(player), to["name"], why]
-		party_log.add("%s won't lead the way." % pet.name)
+		party_log.add("%s won't lead the way." % Companion._name_of(pet))
 		return
 	var day := Townsfolk.day_of(World.steps)
 	var before: Dictionary = (_guide_refused.get(pet.keeper_id, {}) as Dictionary).get(str(to.get("key", "")), {})
@@ -7715,7 +7717,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 		_guide_refuse(pet, player, to, no)
 		pet.guide_note = "%s asked you to lead them to %s, but you will not go: it isn't safe: %s.%s Tell them so." % [
 			_display_name(player), to["name"], no["reason"], _as_far_words(no)]
-		party_log.add("%s won't lead the way to %s: it isn't safe." % [pet.name, to["name"]])
+		party_log.add("%s won't lead the way to %s: it isn't safe." % [Companion._name_of(pet), to["name"]])
 		return
 	_guide_offers.erase(pet.keeper_id)
 	var walk: Guide = _guides.get(pet.keeper_id)
@@ -7727,11 +7729,11 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 	walk.send_route = _send_guide_route  # (Unbound: a walk holding itself would never be freed.)
 	_guides[pet.keeper_id] = walk
 	pet.guide = walk
-	player.led_by = String(pet.name)
+	player.led_by = Companion._name_of(pet)
 	player.led_to = str(to.get("key", ""))
 	pet.guide_note = "%s asked you to lead them to %s, and you know the way: you are leading them there now, walking ahead; you told them to follow as you set off, so don't say it again." % [_display_name(player), to["name"]]
-	party_log.add("%s leads the way to %s." % [pet.name, to["name"]])
-	print("[guide] %s leads %s to %s (%s)" % [pet.name, _display_name(player), to["name"], to["key"]])
+	party_log.add("%s leads the way to %s." % [Companion._name_of(pet), to["name"]])
+	print("[guide] %s leads %s to %s (%s)" % [Companion._name_of(pet), _display_name(player), to["name"], to["key"]])
 
 
 ## [param walk]'s route for its leader's free body to her heel (695): the
@@ -7741,7 +7743,7 @@ func _start_guide(pet: Companion, player: Player, to: Dictionary) -> void:
 func _send_guide_route(path: Array, walk: Guide) -> void:
 	if not is_instance_valid(walk.leader) or not is_instance_valid(walk.pet) or _world_news == null or not _world_news.send.is_valid():
 		return
-	_world_news.send.call(walk.leader.owner_peer, {"full": false, "guide_route": {"companion": String(walk.pet.name),
+	_world_news.send.call(walk.leader.owner_peer, {"full": false, "guide_route": {"companion": Companion._name_of(walk.pet),
 		"zone": walk.leader.zone, "path": path}})
 
 
@@ -7786,14 +7788,14 @@ func _guide_done(pet: Companion, why: String) -> void:
 		walk.leader.led_by = ""
 		walk.leader.led_to = ""
 	var words := Guide.stop_words(why, who)
-	print("[guide] %s stops: %s" % [pet.name, why])
+	print("[guide] %s stops: %s" % [Companion._name_of(pet), why])
 	if why == "arrived":
-		party_log.add("%s has brought %s to %s." % [pet.name, who, walk.goal["name"]])
+		party_log.add("%s has brought %s to %s." % [Companion._name_of(pet), who, walk.goal["name"]])
 		pet.guide = null
 		_guides.erase(pet.keeper_id)
 		pet._ask_voice("You have led %s to %s, as they asked." % [who, walk.goal["name"]])
 	elif why != "moved" and why != "lost":
-		party_log.add("%s stops leading the way: %s." % [pet.name, words])
+		party_log.add("%s stops leading the way: %s." % [Companion._name_of(pet), words])
 		pet._ask_voice("You stopped leading %s to %s: %s." % [who, walk.goal["name"], words])
 
 
@@ -7815,12 +7817,12 @@ func _guide_cross(pet: Companion, walk: Guide) -> bool:
 		var out: Vector2i = Guide.SIDES.get(str(way["side"]), Vector2i.ZERO)
 		travel.call_deferred(peer, str(way["to"]), "", {"side": way["side"], "cell": walk.crossing_at + out})
 	walk.crossing_now = true
-	print("[guide] %s takes %s through to %s" % [pet.name, _display_name(walk.leader), way["to"]])
+	print("[guide] %s takes %s through to %s" % [Companion._name_of(pet), _display_name(walk.leader), way["to"]])
 	# Through this area from a way in to a way out with no stop: a safe
 	# passage halves its dangers (551 phase 2, RoadKnowledge's).
 	var record := _record_of(pet)
 	if walk.clean and record != null and RoadKnowledge.passed(record.companion, pet.zone, Townsfolk.day_of(World.steps)):
-		print("[guide] %s came through %s safely" % [pet.name, pet.zone])
+		print("[guide] %s came through %s safely" % [Companion._name_of(pet), pet.zone])
 	return true
 
 
@@ -7862,7 +7864,7 @@ func _guide_refuse(pet: Companion, player: Player, to: Dictionary, no: Dictionar
 		_guide_offers.erase(pet.keeper_id)
 	else:
 		_guide_offers[pet.keeper_id] = {"day": day, "to": no["as_far"]}
-	print("[guide] %s refuses to lead %s to %s: %s" % [pet.name, _display_name(player), to["key"], no["reason"]])
+	print("[guide] %s refuses to lead %s to %s: %s" % [Companion._name_of(pet), _display_name(player), to["key"], no["reason"]])
 
 
 ## Her offer in [param no], for her voice: " You would lead them as far as
@@ -7887,7 +7889,7 @@ func _guide_check(pet: Companion) -> bool:
 	walk.stop("unsafe")
 	walk.leader.led_by = ""
 	walk.leader.led_to = ""
-	party_log.add("%s stops leading the way to %s: it isn't safe." % [pet.name, walk.goal["name"]])
+	party_log.add("%s stops leading the way to %s: it isn't safe." % [Companion._name_of(pet), walk.goal["name"]])
 	pet._ask_voice("You stopped leading %s to %s: it isn't safe: %s.%s" % [who, walk.goal["name"], no["reason"], _as_far_words(no)])
 	return true
 
@@ -7947,7 +7949,7 @@ func _roads_lived(entity: GridEntity, why: String) -> void:
 	if record == null or record.companion.has("resident"):
 		return
 	if not Guide.note_danger(record.companion, entity.zone, why, Townsfolk.day_of(World.steps)).is_empty():
-		print("[guide] %s will remember %s: %s" % [pet.name, entity.zone, why])
+		print("[guide] %s will remember %s: %s" % [Companion._name_of(pet), entity.zone, why])
 
 
 # --- The draugr's blessing (decision 544) -------------------------------------
@@ -8038,10 +8040,10 @@ func _begin_leaving(record: PlayerRecord, pet: Companion, going: Dictionary, pla
 		_guide_done(pet, "moved")
 	if str(going.get("deed", "")) == PARTED:
 		pet._ask_voice("%s asked you to go home for a while, and you part as friends: you go home to %s, and will travel with them again when they ask." % [record.name, town], "", true)
-		party_log.add("%s goes home to %s; you part as friends." % [pet.name, town])
+		party_log.add("%s goes home to %s; you part as friends." % [Companion._name_of(pet), town])
 	else:
 		pet._ask_voice("You are leaving %s for good, and going home to %s: they %s." % [record.name, town, str(going.get("why", "wronged you"))], "", true)
-		party_log.add("%s leaves you, and goes home to %s." % [pet.name, town])
+		party_log.add("%s leaves you, and goes home to %s." % [Companion._name_of(pet), town])
 	_return_gear(record, pet, player)
 
 
@@ -8070,7 +8072,7 @@ func _return_gear(record: PlayerRecord, pet: Companion, player: Player) -> void:
 		World.put_on_ground(taken, player.tile if is_instance_valid(player) and player.zone == pet.zone else pet.tile)
 		returned.append(what)
 	if not returned.is_empty():
-		party_log.add("%s leaves you %s." % [pet.name, Companion._listed(returned)])
+		party_log.add("%s leaves you %s." % [Companion._name_of(pet), Companion._listed(returned)])
 
 
 ## Gone home (decision 581): a resident of her home town (her record's
@@ -8152,7 +8154,7 @@ func _part_said(player: Player, pet: Companion, line: String) -> bool:
 		if record.companion.has(state):
 			return false
 	record.companion["leaving"] = {"deed": PARTED, "why": "", "day": Townsfolk.day_of(World.steps)}
-	print("[bond] %s asked their companion %s to go home for a while" % [record.name, pet.name])
+	print("[bond] %s asked their companion %s to go home for a while" % [record.name, Companion._name_of(pet)])
 	return true
 
 
@@ -8843,9 +8845,9 @@ func grant_capability(id: String, player_ids: Array) -> int:
 			marks.append(id)
 			marks.sort()
 			record.companion["marks"] = marks
-			party_log.add(Capabilities.said(id, "companion_line", String(pet.name), record.name))
+			party_log.add(Capabilities.said(id, "companion_line", Companion._name_of(pet), record.name))
 			_tell_capabilities(record, pet)
-		pet.note_fact(Capabilities.said(id, "fact", String(pet.name), record.name))
+		pet.note_fact(Capabilities.said(id, "fact", Companion._name_of(pet), record.name))
 		_bond(record, str(Capabilities.entry(id).get("bond", "earned")), str(Capabilities.entry(id).get("bond_why", "")))
 	return reached
 
@@ -8896,7 +8898,7 @@ func _grow_focus(pet: Companion, event: String) -> void:
 	pet.focus = now
 	var lean := CompanionCard.lean_of(now)
 	if not lean.is_empty() and lean != CompanionCard.lean_of(was):
-		pet.note_fact(str(rules.get("taken_to", {}).get(lean, "")).replace("{her}", String(pet.name)))
+		pet.note_fact(str(rules.get("taken_to", {}).get(lean, "")).replace("{her}", Companion._name_of(pet)))
 	for kind in CompanionCard.FOCUS:
 		if roundi(float(now[kind])) != roundi(float(was.get(kind, 0))):
 			_tell_focus(record, pet)
@@ -8909,7 +8911,7 @@ func _tell_focus(record: PlayerRecord, pet: Companion) -> void:
 	var peer := _peer_of(record.player_id)
 	if peer == 0 or _world_news == null or not _world_news.send.is_valid() or pet.focus.is_empty():
 		return
-	var told := {"companion": String(pet.name)}
+	var told := {"companion": Companion._name_of(pet)}
 	for kind in CompanionCard.FOCUS:
 		told[kind] = roundi(float(pet.focus.get(kind, 0)))
 	_world_news.send.call(peer, {"full": false, "focus": told})
@@ -8950,7 +8952,7 @@ func _tell_capabilities(record: PlayerRecord, pet: Companion) -> void:
 	var peer := _peer_of(record.player_id)
 	if peer == 0 or _world_news == null or not _world_news.send.is_valid():
 		return
-	_world_news.send.call(peer, {"full": false, "capabilities": {"companion": String(pet.name),
+	_world_news.send.call(peer, {"full": false, "capabilities": {"companion": Companion._name_of(pet),
 		"held": Capabilities.held(record.companion.get("marks", []))}})
 
 
@@ -9708,7 +9710,7 @@ func _tell_sickness(pet: Companion, record: PlayerRecord, away: bool) -> void:
 	var was: Variant = record.companion.get("was_sick")
 	if not was is Dictionary or was.is_empty():
 		return
-	var told := Companion.sickness_told(String(record.companion.get("name", pet.name)), record.name, _companion_object(record), was, away)
+	var told := Companion.sickness_told(String(record.companion.get("name", Companion._name_of(pet))), record.name, _companion_object(record), was, away)
 	party_log.add(told["log"])
 	pet.note_fact(told["fact"])
 	pet._narrate(told["narrate"])
@@ -10700,7 +10702,7 @@ func _companions_resting(place_id: String) -> Array[Dictionary]:
 ## RESIDENT_EARSHOT; none when the line names [param pet] (their own
 ## companion, if she hears) or the resident is hiding.
 func _resident_addressed(player: Player, line: String, pet: Companion) -> Resident:
-	if pet != null and Companion._named(line, String(pet.name)):
+	if pet != null and Companion.named_by(line, pet):
 		return null
 	var nearest: Resident = null
 	for entity: GridEntity in World.townsfolk():
@@ -11532,7 +11534,7 @@ func _heard_near(speaker: GridEntity, from: String, line: String, to: Resident =
 		if World.tick - _claims_at.get(key, -100000) < int(Hearsay.setting("claims_ticks")):
 			continue
 		_claims_asks = _claims_asks.filter(func(each: Dictionary) -> bool: return each["worker"] != key)
-		_claims_asks.append({"pet": pet.get_instance_id(), "player": player_id, "worker": key, "person": String(pet.name),
+		_claims_asks.append({"pet": pet.get_instance_id(), "player": player_id, "worker": key, "person": Companion._name_of(pet),
 			"from": from, "line": line, "at": World.tick})
 
 
@@ -11582,12 +11584,12 @@ func _send_claims(each: Dictionary) -> void:
 		if pet == null or not is_instance_valid(pet):
 			return
 		var known: Array[String] = []
-		var lore := Companion.lore_words(String(pet.name)).trim_prefix("What you know of the world: ")
+		var lore := Companion.lore_words(Companion._name_of(pet)).trim_prefix("What you know of the world: ")
 		if not lore.is_empty():
 			known.append(lore)
 		for fact: Dictionary in pet.grown.facts:
 			known.append(str(fact["text"]))
-		each["ask"] = Hearsay.claims_ask(String(pet.name), known, pet.heard, str(each["from"]), str(each["line"]), _resident_serial,
+		each["ask"] = Hearsay.claims_ask(Companion._name_of(pet), known, pet.heard, str(each["from"]), str(each["line"]), _resident_serial,
 			"who travels with %s" % pet.keeper_name())
 	else:
 		var body := instance_from_id(int(each["body"])) as Resident
@@ -12381,7 +12383,7 @@ func _rooms_of(zone_name: String) -> Dictionary:
 func _stay_in_town(record: PlayerRecord, pet: Companion) -> bool:
 	if World.towns == null or World.holdings == null or record.companion.is_empty():
 		return false
-	var pet_name := String(record.companion.get("name", pet.name))
+	var pet_name := String(record.companion.get("name", Companion._name_of(pet)))
 	var place := _town_ground(pet.zone, pet.tile)
 	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if place.is_empty() or trade.is_empty():
@@ -12409,7 +12411,7 @@ func _rest_in_town(record: PlayerRecord, pet: Companion, id: String, at := "", t
 	var place := at if not at.is_empty() else _first_town()
 	if place.is_empty():
 		return false
-	var pet_name := String(record.companion.get("name", pet.name))
+	var pet_name := String(record.companion.get("name", Companion._name_of(pet)))
 	var trade := str(record.companion.get("traits", {}).get("trade", ""))
 	if not trade.is_empty():
 		World.towns.note_companion_in(place, pet_name, trade, record.player_id)
@@ -12438,7 +12440,7 @@ func _mind_claude(args: Array) -> String:
 			var pet: Companion = _companions[id]
 			if is_instance_valid(pet):
 				var claude := pet.mind as ClaudeMind
-				lines.append("%s: %s" % [pet.name, ("%s%s" % [claude.model, " (off: the key was refused)" if claude.off else ""]) if claude != null else "off"])
+				lines.append("%s: %s" % [Companion._name_of(pet), ("%s%s" % [claude.model, " (off: the key was refused)" if claude.off else ""]) if claude != null else "off"])
 		lines.append("spent this session: " + ClaudeMind.spend_words())
 		return "\n".join(lines)
 	if args.size() < 2 or str(args.back()) not in ["haiku", "sonnet", "off"]:
@@ -12450,7 +12452,7 @@ func _mind_claude(args: Array) -> String:
 	var changed: Array[String] = []
 	for id: String in _companions:
 		var pet: Companion = _companions[id]
-		if not is_instance_valid(pet) or who != "all" and String(pet.name).to_lower() != who:
+		if not is_instance_valid(pet) or who != "all" and not Companion.answers_to(pet, who):
 			continue
 		var own: CompanionMind = pet.mind
 		if pet.mind is ClaudeMind:
@@ -12462,7 +12464,7 @@ func _mind_claude(args: Array) -> String:
 		else:
 			_claude_voices[id] = ClaudeMind.MODELS[choice]
 			pet.mind = ClaudeMind.new(own, ClaudeMind.MODELS[choice], self)
-		changed.append(String(pet.name))
+		changed.append(Companion._name_of(pet))
 	if changed.is_empty():
 		return "no companion named %s" % who
 	return "%s: voice %s" % [", ".join(changed), "on her own mind" if choice == "off" else "on " + ClaudeMind.MODELS[choice]]
@@ -13480,9 +13482,9 @@ func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
 	if entity is Companion:
 		# Always said: last words never wait on the speech rate limit.
 		line = COMPANION_DEATH_LINES[randi() % COMPANION_DEATH_LINES.size()]
-		party_log.add("%s said: \"%s\"" % [entity.name, line])
+		party_log.add("%s said: \"%s\"" % [Companion._name_of(entity), line])
 		# Her last words are hers: in her transcript like any line.
-		Transcript.record(String(entity.name), String(entity.name), line)
+		Transcript.record(Companion._name_of(entity), Companion._name_of(entity), line)
 	# To those it is sent to (decision 217): a death far off is nobody's to
 	# see. The host's own client has every entity.
 	var told: Array[int] = []
@@ -13499,8 +13501,8 @@ func _on_bumped(mover: GridEntity, occupant: GridEntity, direction: Vector2i) ->
 	if pet == null or pet.keeper != mover:
 		return
 	if pet.bumped(direction):
-		party_log.add("%s bumped into %s." % [_display_name(mover), pet.name])
-		print("[mind] %s bumped into %s going %s" % [_display_name(mover), pet.name, direction])
+		party_log.add("%s bumped into %s." % [_display_name(mover), Companion._name_of(pet)])
+		print("[mind] %s bumped into %s going %s" % [_display_name(mover), Companion._name_of(pet), direction])
 
 
 ## Server: [param player] clicked their own companion beside them (the
@@ -13511,7 +13513,7 @@ func _make_way(player: Player, pet: Companion) -> void:
 		return
 	var way := pet.tile - player.tile
 	if pet.bumped(Vector2i(signi(way.x), signi(way.y))):
-		party_log.add("%s bumped into %s." % [_display_name(player), pet.name])
+		party_log.add("%s bumped into %s." % [_display_name(player), Companion._name_of(pet)])
 
 
 ## Server: [param player] said [param text] (the chat box). At most
@@ -13538,7 +13540,7 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 	# She hears it only in the same zone and within earshot.
 	var hears := is_instance_valid(pet) and pet.spawned and pet.zone == player.zone \
 			and World.distance(pet.tile, player.tile) <= earshot
-	var to := String(pet.name) if hears else ""
+	var to := Companion._name_of(pet) if hears else ""
 	# A resident beside them, or named, takes typed words (decision 336);
 	# their companion hears them as said to someone else.
 	var resident := _resident_addressed(player, line, pet if hears else null) if phrase == 0 else null
@@ -13643,13 +13645,13 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 	for entity in World.get_entities():
 		var other := entity as Companion
 		if other != null and other != pet and other.spawned and World.distance(other.tile, pet.tile) <= HEARING_RANGE:
-			other.overheard(String(pet.name), text, false)
-	party_log.add("%s said: \"%s\"" % [pet.name, text])
-	_heard_near(pet, String(pet.name), text)
+			other.overheard(Companion._name_of(pet), text, false)
+	party_log.add("%s said: \"%s\"" % [Companion._name_of(pet), text])
+	_heard_near(pet, Companion._name_of(pet), text)
 	var record: PlayerRecord = _records.get(pet.keeper_id)
 	if record != null:
 		record.companion["said"] = pet.said_lines()
-	Net.broadcast_to(hearers(pet.tile), "speech", {"entity": String(pet.get_path()), "speaker": String(pet.name), "text": text})
+	Net.broadcast_to(hearers(pet.tile), "speech", {"entity": String(pet.get_path()), "speaker": Companion._name_of(pet), "text": text})
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
@@ -14210,6 +14212,8 @@ func _display_name(entity: GridEntity) -> String:
 		return entity.label
 	if entity is Monster:
 		return monster_name(entity as Monster)
+	if entity is Companion:
+		return Companion._name_of(entity)  # Her label: a quick re-place renames her node (Rhea2).
 	return String(entity.name)
 
 
@@ -14298,7 +14302,7 @@ func _card_kept(entity: GridEntity, uid: int, kept: bool) -> void:
 			pet.note_fact("%s kept %s from her." % [pet.keeper_name(), thing])
 			_bond(_record_of(pet), "kept_from", "kept %s from you" % thing)
 		elif not kept and entity == pet:
-			pet.note_fact("%s came back to %s." % [thing, pet.name])
+			pet.note_fact("%s came back to %s." % [thing, Companion._name_of(pet)])
 
 
 func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
@@ -14323,12 +14327,12 @@ func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 		if not is_instance_valid(pet) or not is_instance_valid(pet.keeper):
 			continue
 		if from == pet.keeper and to == pet:
-			pet.note_fact("%s gave %s %s." % [pet.keeper_name(), pet.name, thing])
+			pet.note_fact("%s gave %s %s." % [pet.keeper_name(), Companion._name_of(pet), thing])
 			if not _grave_goods(uid):
 				_bond(_record_of(pet), "gift", "gave you %s" % thing)
 		elif from == pet and to == pet.keeper:
 			var hers := str(World.items.name_of(uid).get("who", "")) == World.holder_key(pet)
-			pet.note_fact("%s gave %s %s%s." % [pet.name, pet.keeper_name(), thing, ", the thing named for her" if hers else ""])
+			pet.note_fact("%s gave %s %s%s." % [Companion._name_of(pet), pet.keeper_name(), thing, ", the thing named for her" if hers else ""])
 
 
 ## Her bond with her player (decision 444, on npc's Standing, 443: her
@@ -14774,7 +14778,7 @@ func _party_members() -> Array:
 	for id: String in _companions:
 		var pet: Companion = _companions[id]
 		if is_instance_valid(pet) and pet.spawned:
-			out.append({"name": pet.name, "area": pet.zone, "kind": "companion", "peer": int(peer_of.get(id, 0))})
+			out.append({"name": Companion._name_of(pet), "area": pet.zone, "kind": "companion", "peer": int(peer_of.get(id, 0))})
 	return out
 
 
@@ -15083,7 +15087,7 @@ func _bond_played(won: bool, pet: Companion) -> void:
 	var games: Dictionary = record.companion.get("games", {"hers": 0, "theirs": 0})
 	games["hers" if won else "theirs"] = int(games.get("hers" if won else "theirs", 0)) + 1
 	record.companion["games"] = games
-	party_log.add("%s %s at knucklebones (%d games to %d)." % [pet.name, "wins" if won else "loses", int(games.get("hers", 0)), int(games.get("theirs", 0))])
+	party_log.add("%s %s at knucklebones (%d games to %d)." % [Companion._name_of(pet), "wins" if won else "loses", int(games.get("hers", 0)), int(games.get("theirs", 0))])
 	_bond(record, "game", "played knucklebones with you")
 
 
@@ -17784,7 +17788,7 @@ func _watch_bond() -> void:
 	var pet := _own_companion()
 	if pet == null:
 		return
-	var name := String(pet.name)
+	var name := Companion._name_of(pet)
 	var step := str(pet.bond_step)
 	# A drop to a warm step (devoted to close, close to fond) has no words:
 	# nothing on the HUD and no log line (companions' still showed ": you
@@ -17999,7 +18003,7 @@ func _refresh_card() -> void:
 	if card_page == null or not card_page.is_node_ready():
 		return
 	var pet := _own_companion()
-	card_page.show_state(world_state, String(pet.name) if pet != null else "",
+	card_page.show_state(world_state, Companion._name_of(pet) if pet != null else "",
 		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "")  # Her bond (555) is on her node.
 
 
@@ -19440,7 +19444,7 @@ func admin_command(line: String, caller: Player = null) -> String:
 					continue
 				var record: PlayerRecord = _records.get(id)
 				lines.append("%s, with %s (%s) in %s at %s hp %d/%d stance %s intent %s%s mind %s, stance set by %s" % [
-					pet.name, record.name if record != null else "?", id.left(8), pet.zone, pet.tile, pet.hp, pet.max_hp,
+					Companion._name_of(pet), record.name if record != null else "?", id.left(8), pet.zone, pet.tile, pet.hp, pet.max_hp,
 					pet.stance_name(), pet.intent_name(), " " + pet.intent_target.name if pet.intent_target != null else "",
 					pet.mind.kind if pet.mind != null else "none", pet.last_mind])
 			return "%d companions\n%s" % [lines.size(), "\n".join(lines)] if not lines.is_empty() else "0 companions"
@@ -19486,8 +19490,8 @@ func admin_command(line: String, caller: Player = null) -> String:
 				return Transcript.rebuild(logs)
 			var who := words[1]
 			for pet: Companion in _companions.values():
-				if is_instance_valid(pet) and String(pet.name).to_lower() == who.to_lower():
-					who = String(pet.name)
+				if is_instance_valid(pet) and Companion.answers_to(pet, who):
+					who = Companion._name_of(pet)
 			return Transcript.show(who, words[2] if words.size() >= 3 else "")
 		"version":
 			return "v%s protocol %s" % [Net.version, Net.protocol()]
@@ -20101,7 +20105,7 @@ func _run_test_show(player: Player) -> void:
 				# place of this area (the HUD line), or knows the way there and the
 				# map's ask box stands beside it. The guide itself is companions'.
 				var pet := _own_companion()
-				var her := String(pet.name) if pet != null else "Wren"
+				var her := Companion._name_of(pet) if pet != null else "Wren"
 				world_map_panel._ensure_world()
 				var own_places: Variant = (world_map_panel.world.areas.get(zone_name_here(), {}) as Dictionary).get("places", {})
 				var there := ""
@@ -20143,7 +20147,7 @@ func _run_test_show(player: Player) -> void:
 				# itself is companions'.
 				var pet := _own_companion()
 				if pet != null:
-					_bond_seen[String(pet.name)] = "sullen" if what == "bond" else "fond"
+					_bond_seen[Companion._name_of(pet)] = "sullen" if what == "bond" else "fond"
 					pet.bond_step = "sullen"
 					pet.bond_why = "you left her to fall alone"
 					if what == "bond":
@@ -20152,7 +20156,7 @@ func _run_test_show(player: Player) -> void:
 				# 618, ui's side: her card page, for the shot. The sim's own words when
 				# she is here and has sent them; a sample of each the server has not.
 				var pet := _own_companion()
-				var her := String(pet.name) if pet != null else "Wren"
+				var her := Companion._name_of(pet) if pet != null else "Wren"
 				if not world_state.get("focus") is Dictionary:
 					world_state = WorldNews.merge(world_state, {"full": false, "focus": {"companion": her, "fight": 32, "magic": 18, "stealth": 50}})
 				if CardPage.held_of(world_state).is_empty():
