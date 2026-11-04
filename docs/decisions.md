@@ -40414,3 +40414,64 @@ paw is left out on water or a ford, on stone ground (TRACK_HARD) and on a stone 
 (_takes_print; a dirt road takes them); none indoors. view_test _test_tracks. Client only: the
 "tracks" message unchanged, protocol unchanged, no new class_name; no bullet (only the bear yard has
 the bear).
+## 768. The town window: what a town has, wants and thinks of you, and Donate
+
+Jeff approved round 2 of ui's town window mocks ("approved, build it", via the coordinator). He
+wanted a status column showing the direct effect of a player's actions on the town: their
+regard, the town's state, what is open around it and what they did lately, and "Donate" in
+place of "Give". The coordinator ruled the movers and "thriving"; ui and economy pinned the
+fields; voice worded the lines. This is economy's side; ui's window is "768, ui's side".
+
+- No new message kind: "town" already carries 762's threat and npc's all-clear. The window
+  extends 624's per-player "town_sheet" answer (Main.ask_town_sheet merges Main.town_window), so
+  an old client's sheet keeps working. New fields:
+  - at: the player stands on or beside a cell of that town's stockpile (Main._at_town_store, as
+    its depot and counter stand in it). gold, pays and pack are sent only there; N opens the
+    window anywhere, without them.
+  - pays {id: {gold, up_to}} (Economy.bank_pays): what each raw thing in the pack brings at the
+    store today, bank_sale's price, up_to before the town can neither pay nor owe more. Herbs
+    (maker-only) and gear (banked as a gift) are left out.
+  - pack [{slot, uid, id, uids, count}]: Main._pack_rows, now also the barter's, so the two can't
+    drift (ui reads it as BarterPanel does).
+  - owed: what the town owes the player for goods banked.
+  - stock [{id, have, enough, short -1..1, item}]: each raw it wants or has (enough = comfort plus
+    the next build's lack; gold and herbs left out) and each gear tag it wants (economy.json
+    wants, more on guard), drawn as item: the raw's own id (art-kit's item.wool), or sword,
+    shield, bandaging_kit for a tag.
+  - build {kind, wants, fund} (contribution_wanted and its fund, 499).
+  - regard {score -1..1, word, last -1/0/+1, why}: below.
+  - state [{kind, ...}]: threatened {by: wolves|raiders}, building {building, wants},
+    healer_away, hungry {count}, thriving, seeking {trade} (a newcomer sent for, 613 amended:
+    "seeking a carpenter", the coordinator's ask from 767 amended).
+  - asks [{kind, open, until (game days left, -1 none)}]: balance {fold} (761's ask by that
+    town's herder), raid, healer {wants: raws his shelf lacks}. The trader's "Caravan" comes
+    with 770.
+  - recent [{kind, id, amount}], the player's last Towns.RECENT_KEPT (5) effects there: sold
+    and donated (World._bank_thing, any player banking: paid or owed is a sale, past the owed cap
+    or gear a gift), gave_gold, brought_home and left_lying (the balance's meat).
+- Command "contribute" {town, give: [uids], gold} (Main.contribute): only at the store or depot,
+  else voice's "You can donate only at the town's store or depot."; each uid banked as the depot
+  banks it (World.donate: one unit of a stack, grave goods refused), the gold toward the next
+  build (Economy.contribute, thanked in town xp as before). Answered by the town_sheet with paid
+  (gold paid now for the goods) and given (gold given).
+- A town's regard of each player (Towns.regard_move, regard): kept on the town's record
+  "regard" {player id: {halves, since, last, why, day, gained}}, saved; a save from before has
+  none, so every player is a stranger to every town (regard word "", score 0) until it moves.
+  It counts half points, economy.json town_regard: a thing the town was short of (short > 0,
+  "gave %s the town was short of") 2, gold toward a build of at least build_gold (5) ("gave gold
+  toward the %s") 2; the balance's movers at half the herder's weight (the coordinator):
+  meat home 1 a piece ("brought meat home from the hill"), meat left -1 a piece ("left meat to
+  rot on the hill"), a balanced ending's thanks 2 ("kept the wolves from the fold";
+  Main._town_regard_from_fold, the herder's town, settled with the herder's at talk or judging).
+  Gains share day_most (4) halves a game day per player and town; losses are never capped.
+  Selling surplus moves nothing: it is a sale. Its word is the residents' ladder (voice: one
+  ladder): known, trusted from 3 points, wronged from -3; score is the points over the ladder's
+  top (6), clamped. Each move prints a name-free "[regard] town <place> <+n> halves: <reason>".
+- Thriving (Towns.thriving, the coordinator): every raw at comfort and nobody on the dole, held
+  until one falls under thriving_off (0.75) of comfort or someone goes on the dole; looked at on
+  each town's turn and kept on the record (saved), so it doesn't flicker.
+farm_test _test_town_regard (cap, losses, ladder, through a save, an old save a stranger,
+recent kept, thriving's hold); economy_test _test_town_window (the fields at the store, a short
+bundle donated: banked, paid, regard and recent; the day's cap; refused away, no pack).
+Protocol 47 (shared, a "47 (768):" line; "contribute" is a command, not a message kind). Server; no new
+class_name.

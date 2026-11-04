@@ -44,6 +44,7 @@ func _ready() -> void:
 	_test_woodcutter()
 	_test_gatherers()
 	_test_gatherers_lacking()
+	_test_town_regard()
 	_test_felling()
 	_test_stages()
 	_test_decline()
@@ -275,6 +276,56 @@ func _test_gatherers() -> void:
 	var saved := _towns(1, false)
 	saved.from_dict(towns.to_dict())
 	_check(saved.seat_gatherers(TOWN).is_empty(), "saved and loaded: never seated twice")
+
+
+## A town's regard of a player (768): moved in half points, a day's gains
+## capped and losses not, the residents' ladder for its word; kept through a
+## save, a save from before loading every player a stranger; the recent
+## effects kept to RECENT_KEPT; thriving held steady.
+func _test_town_regard() -> void:
+	print("
+== a town's regard of a player (768) ==")
+	var towns := _towns(1, false)
+	var most := int(_rules["town_regard"]["day_most"])
+	_check(towns.regard(TOWN, "p1") == {"score": 0.0, "word": "", "last": 0, "why": []}, "a stranger at first")
+	towns.regard_move(TOWN, "p1", 2, Towns.REGARD_SHORT % "wood")
+	_check(towns.regard(TOWN, "p1")["word"] == "known" and towns.regard(TOWN, "p1")["last"] == 1, "known once it moves, rising")
+	_check(towns.regard_move(TOWN, "p1", most, Towns.REGARD_HOME) == most - 2, "the day's gains capped at day_most halves")
+	_check(towns.regard_move(TOWN, "p1", 1, Towns.REGARD_HOME) == 0, "nothing more that day")
+	_check(towns.regard_move(TOWN, "p1", -3, Towns.REGARD_LEFT) == -3 and towns.regard(TOWN, "p1")["last"] == -1, "a loss never capped, falling")
+	_now += DAY
+	_check(towns.regard_move(TOWN, "p1", 2, Towns.REGARD_THANKS) == 2, "a new day: gains again")
+	for i in 3:
+		_now += DAY
+		towns.regard_move(TOWN, "p1", most, Towns.REGARD_BUILD % "inn")
+	var it := towns.regard(TOWN, "p1")
+	_check(it["word"] == "trusted" and it["score"] > 0.0 and it["score"] <= 1.0 and it["why"].size() == Standing.setting("why_kept"),
+		"trusted past the ladder's mark; its reasons kept to why_kept (%s)" % [it])
+	for i in Towns.RECENT_KEPT + 2:
+		towns.note_recent(TOWN, "p1", "sold", "wood", i)
+	_check(towns.recent(TOWN, "p1").size() == Towns.RECENT_KEPT and towns.recent(TOWN, "p1").back()["amount"] == Towns.RECENT_KEPT + 1, "recent kept to its last few")
+	var saved := _towns(1, false)
+	saved.from_dict(towns.to_dict())
+	_check(saved.regard(TOWN, "p1") == it and saved.recent(TOWN, "p1") == towns.recent(TOWN, "p1"), "regard and recent through a save")
+	var old := _towns(1, false)
+	var before: Dictionary = towns.to_dict()
+	before[TOWN].erase("regard")
+	before[TOWN].erase("recent")
+	old.from_dict(before)
+	_check(old.regard(TOWN, "p1")["word"] == "" and old.recent(TOWN, "p1").is_empty(), "a save from before: a stranger, nothing recent")
+	# Thriving: all at comfort to start, held till one falls under thriving_off of it.
+	var stock := towns.production.stockpile
+	for what: String in _rules["comfort"]:
+		if what != "gold":
+			stock.deposit(TOWN, what, towns.production.comfort(TOWN, what))
+	_check(towns.thriving(TOWN), "every raw at comfort, nobody on the dole: thriving")
+	var wood := towns.production.comfort(TOWN, "wood")
+	stock.take(TOWN, "wood", wood / 10, "test")
+	_check(towns.thriving(TOWN), "a little under comfort: still thriving")
+	stock.take(TOWN, "wood", wood / 2, "test")
+	_check(not towns.thriving(TOWN), "well under: no longer")
+	stock.deposit(TOWN, "wood", wood / 2)
+	_check(not towns.thriving(TOWN), "back near comfort but not at it: not yet again")
 
 
 ## A gatherer trade lacking after the first seating (767 amended, the

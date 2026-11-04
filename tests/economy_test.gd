@@ -641,6 +641,61 @@ func _test_town_sheet(host: Player) -> void:
 	_check(sheet["mood"] in ["safe", "uneasy", "on guard"] and sheet["season"] != "" and sheet["sought"] is Array, "the mood, season and sought")
 	_check(sheet["strain"] == World.towns.strain(STORE) and sheet["strain"].has("days") and sheet["strain"].has("why"), "its strain toward falling (649): %s" % [sheet["strain"]])
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
+	_test_town_window(host)
+
+
+## The town window (768, economy's side): the sheet's new fields for the
+## player at the store, Donate ("contribute") banking a thing the town is
+## short of with the town's regard moved and the effect noted, the day's cap,
+## and the refusal away from the store.
+func _test_town_window(host: Player) -> void:
+	print("\n== the town window (768) ==")
+	var me := host.player_id
+	var sheet: Dictionary = _main.ask_town_sheet(host, {"town": STORE})
+	_check(sheet.get("at") == true and sheet["gold"] == World.gold_of(me) and sheet["pack"] == _main._pack_rows(host),
+		"at the store: at, their gold, their pack as the barter lists it")
+	_check(["stock", "pays", "build", "owed", "regard", "state", "asks", "recent"].all(func(key: String) -> bool: return sheet.has(key)),
+		"every field there (%s)" % [sheet.keys()])
+	var wood_row: Array = sheet["stock"].filter(func(row: Dictionary) -> bool: return row["id"] == "wood")
+	_check(wood_row.size() == 1 and int(wood_row[0]["enough"]) >= int(World.economy.rules["comfort"]["wood"]) and wood_row[0]["item"] == "wood",
+		"wood in stock: enough at least its comfort, drawn as wood (%s)" % [wood_row])
+	_check(sheet["stock"].any(func(row: Dictionary) -> bool: return row["id"] == "weapon" and row.get("item") == "sword")
+		and not sheet["stock"].any(func(row: Dictionary) -> bool: return row["id"] in ["gold", "herbs"]), "a weapon row drawn as a sword; no gold or herbs")
+	_check(sheet["regard"]["word"] == "" and sheet["regard"]["score"] == 0.0 and sheet["regard"]["last"] == 0, "a stranger to the town at first")
+	# Wood short: a bundle donated is banked, paid or owed, and moves its regard.
+	_no_wood()
+	var bundle := World.items.mint("wood_bundle", "found", "test")
+	World.put_item(host, host, 1, bundle)
+	sheet = _main.ask_town_sheet(host, {"town": STORE})
+	_check(sheet["pays"].has("wood_bundle") and int(sheet["pays"]["wood_bundle"]["gold"]) > 0, "the bundle in pays (%s)" % [sheet["pays"]])
+	var gold_was := World.gold_of(me)
+	var given: Dictionary = _main.contribute(host, {"town": STORE, "give": [bundle], "gold": 0})
+	_check(host.slots[1] == "" and World.stockpile.count(STORE, "wood") == 5 and int(given.get("paid", -1)) == World.gold_of(me) - gold_was,
+		"donated: the slot empty, 5 wood banked, paid said (%s)" % given.get("paid"))
+	var regard: Dictionary = given["regard"]
+	_check(regard["word"] == "known" and regard["score"] > 0.0 and regard["last"] == 1 and regard["why"].back() == Towns.REGARD_SHORT % "wood",
+		"the town's regard up for wood it was short of (%s)" % [regard])
+	_check(given["recent"].back() == {"kind": "sold", "id": "wood", "amount": 5}, "noted among their recent effects (%s)" % [given["recent"]])
+	# The day's cap: two more short gifts move it only to day_most.
+	for i in 2:
+		_no_wood()
+		var more := World.items.mint("wood_bundle", "found", "test")
+		World.put_item(host, host, 1, more)
+		_main.contribute(host, {"town": STORE, "give": [more], "gold": 0})
+	var halves := int(World.towns.to_dict()[STORE]["regard"][me]["halves"])
+	_check(halves == int(World.economy.rules["town_regard"]["day_most"]), "a day's gains capped at day_most halves (%d)" % halves)
+	# Away from the store: voice's refusal, nothing moved.
+	var was := host.tile
+	host.tile = Vector2i(-50, -50)
+	var refused: Dictionary = _main.contribute(host, {"town": STORE, "give": [], "gold": 5})
+	_check(refused.get("why") == Main.DONATE_AWAY and _main.ask_town_sheet(host, {"town": STORE}).get("at") == false
+		and _main.ask_town_sheet(host, {"town": STORE})["pack"] == [], "away: refused in voice's words; the sheet not at, no pack")
+	host.tile = was
+
+
+func _no_wood() -> void:
+	if World.stockpile.count(STORE, "wood") > 0:
+		World.stockpile.take(STORE, "wood", World.stockpile.count(STORE, "wood"), "test")
 
 
 ## A herder's drove bought by the town (640, economy's side): as many as

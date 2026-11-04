@@ -6706,9 +6706,11 @@ func _balance_settle(card: Dictionary, player_id: String, label: String, quest: 
 	if gained > 0:
 		Standing.bump(card, player_id, gained, "meat brought home off his hill", World.production.now())
 		print("[regard] fold %s herder +%d: meat brought home" % [fold, gained])
+		_town_regard_from_fold(fold, player_id, "home", gained, Towns.REGARD_HOME, "brought_home")
 	if lost > 0:
 		Standing.bump(card, player_id, -lost, "meat left lying on his hill", World.production.now())
 		print("[regard] fold %s herder -%d: meat left lying" % [fold, lost])
+		_town_regard_from_fold(fold, player_id, "left", lost, Towns.REGARD_LEFT, "left_lying")
 	mine["left"] = left
 	mine["home"] = home
 
@@ -6722,6 +6724,24 @@ func _balance_thank(card: Dictionary, player_id: String, label: String, quest: D
 	mine["thanked"] = int(quest.get("from", -1))
 	Standing.bump(card, player_id, BALANCE_THANKS, "kept the wolves off his flock", World.production.now())
 	print("[regard] fold %s herder +%d: thanks, balanced" % [fold, BALANCE_THANKS])
+	_town_regard_from_fold(fold, player_id, "thanks", 1, Towns.REGARD_THANKS)
+
+
+## The balance's movers on [param fold]'s town too (768, the coordinator: at
+## half the herder's weight, economy.json town_regard [param key] halves a
+## piece): [param count] pieces moving the herder's town's regard of
+## [param player_id] for [param why], and with [param recent_kind] the meat
+## noted among their recent effects there.
+func _town_regard_from_fold(fold: String, player_id: String, key: String, count: int, why: String, recent_kind := "") -> void:
+	if World.towns == null or fold.is_empty() or count <= 0:
+		return
+	var trade := str(World.production.rules.get("herder", {}).get("trade", "herder"))
+	var town := str(World.production.worker("%s:%s" % [trade, fold]).get("town", ""))
+	if town.is_empty():
+		return
+	World.towns.regard_move(town, player_id, count * int(World.economy.rules.get("town_regard", {}).get(key, 0)), why)
+	if not recent_kind.is_empty():
+		World.towns.note_recent(town, player_id, recent_kind, "meat", count)
 
 
 ## The player id whose label (World._label_of: their name) is [param label]:
@@ -7044,12 +7064,7 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 	var data := {"shop": str(shop.get_path()) if maker.is_empty() else "", "resident": str(shop.get_path()) if not maker.is_empty() else "",
 		"town": place, "gold": World.gold_of(player.player_id), "goods": [], "buys": {}, "fenced": {}, "pack": [], "why": why,
 		"fence": World.fence_state(shop) if maker.is_empty() else ""}
-	var uids := World.slot_uids(player)
-	for slot in player.slots.size():
-		if not player.slots[slot].is_empty():
-			# A stack's every unit (decision 619): the barter gives that many of its uids.
-			data["pack"].append({"slot": slot, "uid": uids[slot], "id": player.slots[slot], "uids": World.slot_units(player, slot),
-				"count": World.slot_count(player, slot)})
+	data["pack"] = _pack_rows(player)  # A stack's every unit (decision 619): the barter gives that many of its uids.
 	if not maker.is_empty() and World.economy != null:
 		data["goods"] = World.economy.maker_goods(maker)
 		data["buys"] = World.economy.maker_buys(maker, Array(player.slots))
@@ -12491,6 +12506,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		give_gold(entity as Player, args)
 	elif command_name == "town_sheet" and entity is Player:
 		ask_town_sheet(entity as Player, args)
+	elif command_name == "contribute" and entity is Player:
+		contribute(entity as Player, args)
 	elif command_name == "stance" and entity is Player:
 		var stance := str(args.get("kind", ""))
 		var toward := _point_direction(entity, args)
@@ -13867,8 +13884,212 @@ func ask_town_sheet(player: Player, args: Dictionary) -> Dictionary:
 	if World.towns != null and World.towns.to_dict().has(town) \
 			and (town.begins_with(player.zone + "/") or record != null and town in record.known_places):
 		sheet = town_sheet(town)
+		sheet.merge(town_window(player, town), true)
 	Net.message_to(player.owner_peer, "town_sheet", sheet)
 	return sheet
+
+
+## Server: the "contribute" command (768, the town window's Donate) {town,
+## give: [uids in their pack], gold}: at [param player]'s own stand by that
+## town's store or depot, each thing banked as the depot banks it
+## (World.donate: raw goods paid or owed, gear a gift) and the gold given
+## toward its next build (Economy.contribute); the town's regard moves for
+## what it was short of and for gold toward a build. Answered with the
+## town_sheet plus "paid" (gold paid now for the goods) and "given" (gold
+## given); away from the store with voice's refusal ("why"). The answer.
+func contribute(player: Player, args: Dictionary) -> Dictionary:
+	var town := str(args.get("town", ""))
+	if World.towns == null or World.economy == null or not _at_town_store(player, town):
+		var refused := {"town": town, "why": DONATE_AWAY}
+		Net.message_to(player.owner_peer, "town_sheet", refused)
+		return refused
+	var player_id := player.player_id
+	var rules: Dictionary = World.economy.rules.get("town_regard", {})
+	var before := World.gold_of(player_id)
+	var cat: Dictionary = World.economy.catalog.call()
+	var short_given := {}
+	for raw: Variant in args.get("give", []):
+		var uid := int(raw)
+		var id := World.items.id_of(uid)
+		var short := World.economy.short_of(town, id, cat) if not id.is_empty() else -1.0
+		var yields := World.items.yields_of(uid)
+		var word: String = str(yields.keys()[0]) if not yields.is_empty() else Items.name_of(id).to_lower()
+		if World.donate(player, uid, town) and short > 0.0:
+			short_given[word] = true  # Wood, or the sword: what the town lacked.
+	var paid := World.gold_of(player_id) - before
+	var kind := str(World.economy.contribution_wanted(town).get("kind", ""))
+	var given := 0
+	if int(args.get("gold", 0)) > 0:
+		given = World.economy.contribute(town, player_id, int(args["gold"]))
+	for word: String in short_given:
+		World.towns.regard_move(town, player_id, int(rules.get("short", 0)), Towns.REGARD_SHORT % word)
+	if given > 0:
+		World.towns.note_recent(town, player_id, "gave_gold", "gold", given)
+		if given >= int(rules.get("build_gold", 1)):
+			World.towns.regard_move(town, player_id, int(rules.get("build", 0)), Towns.REGARD_BUILD % _building_words(kind))
+	var sheet := town_sheet(town)
+	sheet.merge(town_window(player, town), true)
+	sheet["paid"] = paid
+	sheet["given"] = given
+	Net.message_to(player.owner_peer, "town_sheet", sheet)
+	return sheet
+
+
+## Voice's refusal for a Donate away from the store (768).
+const DONATE_AWAY := "You can donate only at the town's store or depot."
+
+
+## A building kind in words ("healers_hut" -> "healers hut").
+static func _building_words(kind: String) -> String:
+	return kind.replace("_", " ") if not kind.is_empty() else "build"
+
+
+## Whether [param player] stands at [param town]'s store or depot (768): on
+## or beside a cell of its stockpile (Stockpile.place_at), as the depot and
+## the counter stand in it.
+func _at_town_store(player: Player, town: String) -> bool:
+	if town.is_empty() or World.holdings == null:
+		return false
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			if Stockpile.place_at(World.holdings, player.zone, player.tile + Vector2i(dx, dy)) == town:
+				return true
+	return false
+
+
+## [param player]'s pack as the barter and the town window list it
+## (decision 560, 619; 768): [{slot, uid, id, uids (a stack's every unit),
+## count}].
+func _pack_rows(player: Player) -> Array:
+	var rows: Array = []
+	var uids := World.slot_uids(player)
+	for slot in player.slots.size():
+		if not player.slots[slot].is_empty():
+			rows.append({"slot": slot, "uid": uids[slot], "id": player.slots[slot], "uids": World.slot_units(player, slot),
+				"count": World.slot_count(player, slot)})
+	return rows
+
+
+## What the town window (768) adds to [param town]'s sheet for [param
+## player]: at (standing by its store or depot), gold and pays and pack
+## (only there), owed, stock, build, regard, state, asks, recent.
+func town_window(player: Player, town: String) -> Dictionary:
+	var player_id := player.player_id
+	var at := _at_town_store(player, town)
+	var out := {"at": at, "gold": 0, "pays": {}, "pack": [], "owed": 0, "stock": town_stock(town), "build": {},
+		"regard": World.towns.regard(town, player_id), "state": town_state_list(town), "asks": town_asks(town),
+		"recent": World.towns.recent(town, player_id)}
+	if World.economy == null:
+		return out
+	out["owed"] = World.economy.owed_to(player_id, town)
+	var wanted := World.economy.contribution_wanted(town)
+	if not wanted.is_empty():
+		out["build"] = {"kind": str(wanted["kind"]), "wants": int(wanted["gold"]), "fund": World.economy.fund(town, str(wanted["kind"]))}
+	if at:
+		out["gold"] = World.gold_of(player_id)
+		out["pays"] = World.economy.bank_pays(town, player_id, Array(player.slots))
+		out["pack"] = _pack_rows(player)
+	return out
+
+
+## The picture for a wanted gear tag in the town window (768): an item of it.
+const TOWN_GEAR_ITEM := {"weapon": "sword", "shield": "shield", "bandage": "bandaging_kit"}
+
+
+## [param town]'s stock for its window (768): [{id, have, enough, short
+## (-1..1: 1 none, 0 enough, below 0 more than it wants), item}], each raw
+## good it wants or has (enough: its comfort and what the next build still
+## needs of it; gold and the herbs left out) and each gear tag it wants
+## (economy.json wants, more on guard).
+func town_stock(town: String) -> Array:
+	var out: Array = []
+	if World.economy == null or World.production == null:
+		return out
+	var economy := World.economy
+	var needs: Dictionary = World.towns.shortfall(town).get("needs", {})
+	for what: String in Stockpile.RESOURCES:
+		if what == "gold" or economy.rules.get("maker_only", {}).has(what):
+			continue
+		var enough := World.production.comfort(town, what) + int(needs.get(what, 0))
+		var have := World.stockpile.count(town, what)
+		if enough <= 0 and have <= 0:
+			continue
+		out.append({"id": what, "have": have, "enough": enough, "short": Economy._short(have, enough), "item": what})
+	var cat: Dictionary = economy.catalog.call()
+	var have_tags := economy._gear_by_tag(town, cat)
+	var extra: Dictionary = economy.rules.get("uneasy_extra", {}) if World.production.tier(town) == Production.DEFEND else {}
+	var wants: Dictionary = economy.rules.get("wants", {})
+	for tag: String in wants:
+		if tag in Stockpile.RESOURCES:
+			continue
+		var enough := int(wants[tag]) + int(extra.get(tag, 0))
+		var row := {"id": tag, "have": int(have_tags.get(tag, 0)), "enough": enough, "short": Economy._short(int(have_tags.get(tag, 0)), enough)}
+		if cat.has(str(TOWN_GEAR_ITEM.get(tag, ""))):
+			row["item"] = TOWN_GEAR_ITEM[tag]
+		out.append(row)
+	return out
+
+
+## [param town]'s state for its window (768): [{kind, ...}]: threatened {by:
+## wolves or raiders}, building {building, wants (gold)}, healer_away,
+## hungry {count}, thriving (Towns.thriving), seeking {trade} (a newcomer
+## sent for, 613 amended).
+func town_state_list(town: String) -> Array:
+	var out: Array = []
+	var threat := World.towns.threatened(town)
+	if not threat.is_empty():
+		out.append({"kind": "threatened", "by": "raiders" if threat == "raid" else threat})
+	var wanted := World.economy.contribution_wanted(town) if World.economy != null else {}
+	var houses := World.towns.buildings_of(town)
+	var kinds: Array = houses.keys()
+	kinds.sort()
+	for kind: String in kinds:
+		if str(houses[kind].get("state", "")) in [Towns.PLANNED, Towns.BUILDING]:
+			out.append({"kind": "building", "building": kind, "wants": int(wanted.get("gold", 0)) if str(wanted.get("kind", "")) == kind else 0})
+	var hungry := 0
+	for id in World.towns.residents(town):
+		var who := World.production.worker(id)
+		if "medicine_man" in who.get("trades", []) and (bool(who.get("away", false)) or Townsfolk.is_sick(World.production, id)):
+			out.append({"kind": "healer_away"})
+		if not bool(who.get("away", false)) and str(who.get("fed", "")) in ["dole", "hungry"]:
+			hungry += 1
+	if hungry > 0:
+		out.append({"kind": "hungry", "count": hungry})
+	if World.towns.thriving(town):
+		out.append({"kind": "thriving"})
+	for entry: Dictionary in World.towns.sought(town):
+		out.append({"kind": "seeking", "trade": str(entry["trade"])})
+	return out
+
+
+## What is open around [param town] for its window (768): [{kind, open,
+## until (game days left, -1 for no end), ...}]: balance {fold} (a herder's
+## keep-the-wolves-off ask, 761), raid (raiders on it now), healer {wants:
+## [raw ids his shelf needs]}.
+func town_asks(town: String) -> Array:
+	var out: Array = []
+	if World.balance != null and World.production != null:
+		var trade := str(World.production.rules.get("herder", {}).get("trade", "herder"))
+		var quests := World.balance.quests()
+		var folds: Array = quests.keys()
+		folds.sort()
+		for fold: String in folds:
+			if str(World.production.worker("%s:%s" % [trade, fold]).get("town", "")) == town:
+				out.append({"kind": "balance", "open": true, "fold": fold, "until": maxi(int(quests[fold].get("until", 0)) - _balance_day(), 0)})
+	if World.towns.threatened(town) == "raid":
+		out.append({"kind": "raid", "open": true, "until": -1})
+	if World.economy != null:
+		for id in World.towns.residents(town):
+			if "medicine_man" in World.production.worker(id).get("trades", []):
+				var wants: Array = []
+				var materials := World.economy.maker_materials(id, World.economy.catalog.call())
+				for what: String in materials:
+					if World.stockpile.count(town, what) < int(materials[what]):
+						wants.append(what)
+				if not wants.is_empty():
+					wants.sort()
+					out.append({"kind": "healer", "open": true, "until": -1, "wants": wants})
+	return out
 
 
 ## [param town]'s status sheet (decision 624): {town, name, population,

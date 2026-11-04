@@ -595,6 +595,7 @@ func tick() -> void:
 			var seated := seat_gatherers(town)
 			if not seated.is_empty():
 				print("[towns] %s seats its gatherers: %s" % [town, ", ".join(seated)])
+		thriving(town)  # Looked at each turn, so its hold is steady (768).
 		_water(town)
 		_crop(town)
 		_crop_shown(town)
@@ -3294,6 +3295,115 @@ func _town(town: String) -> Dictionary:
 
 # --- Saving --------------------------------------------------------------------------
 
+# --- A town's regard of each player (768) ---------------------------------------------
+
+## The regard's words (voice's): what moved it, name-free.
+const REGARD_SHORT := "gave %s the town was short of"
+const REGARD_BUILD := "gave gold toward the %s"
+const REGARD_HOME := "brought meat home from the hill"
+const REGARD_LEFT := "left meat to rot on the hill"
+const REGARD_THANKS := "kept the wolves from the fold"
+## How many of a player's recent effects on a town are kept (768's "recent").
+const RECENT_KEPT := 5
+
+
+## [param town]'s regard of [param player_id] moved by [param halves] half
+## points (economy.json town_regard: half the herder's weight is one half)
+## for [param why] (a clause, no name), within the Standing ladder's most.
+## Gains share town_regard.day_most halves a game day per player; losses are
+## never capped. Kept on the town's record "regard" {player_id: {halves,
+## since, last (-1/0/+1), why [newest last], day, gained}} (saved). The
+## halves moved, said in a name-free "[regard]" line.
+func regard_move(town: String, player_id: String, halves: int, why: String) -> int:
+	if player_id.is_empty() or halves == 0 or not _towns.has(town):
+		return 0
+	var all: Dictionary = _towns[town].get_or_add("regard", {})
+	var it: Dictionary = all.get_or_add(player_id, {"halves": 0, "since": now(), "last": 0, "why": [], "day": -1, "gained": 0})
+	if halves > 0:
+		var day := now() / maxi(DayNight.day_steps, 1)
+		if int(it.get("day", -1)) != day:
+			it["day"] = day
+			it["gained"] = 0
+		var room := int(rules.get("town_regard", {}).get("day_most", 4)) - int(it["gained"])
+		halves = mini(halves, maxi(room, 0))
+		if halves <= 0:
+			return 0
+		it["gained"] = int(it["gained"]) + halves
+	var most := Standing.setting("most") * 2
+	var before := int(it["halves"])
+	it["halves"] = clampi(before + halves, -most, most)
+	var moved := int(it["halves"]) - before
+	if moved == 0:
+		return 0
+	it["since"] = now()
+	it["last"] = signi(moved)
+	var reasons: Array = it["why"]
+	reasons.append(why)
+	while reasons.size() > Standing.setting("why_kept"):
+		reasons.pop_front()
+	print("[regard] town %s %+d halves: %s" % [town, moved, why])
+	return moved
+
+
+## [param town]'s regard of [param player_id] for its window (768): {score
+## -1..1 (its points over the ladder's top), word (the residents' ladder:
+## "" for a stranger), last (-1/0/+1, the last change's way), why}.
+func regard(town: String, player_id: String) -> Dictionary:
+	var it: Dictionary = _towns.get(town, {}).get("regard", {}).get(player_id, {})
+	if it.is_empty():
+		return {"score": 0.0, "word": "", "last": 0, "why": []}
+	var points := int(it.get("halves", 0)) / 2.0
+	var word := "known"
+	if points >= Standing.setting("trusted"):
+		word = "trusted"
+	elif points <= Standing.setting("wronged"):
+		word = "wronged"
+	return {"score": clampf(points / maxf(Standing.setting("top"), 1.0), -1.0, 1.0), "word": word,
+		"last": int(it.get("last", 0)), "why": (it.get("why", []) as Array).duplicate()}
+
+
+## Player [param player_id]'s effect on [param town] (768's "recent":
+## donated, sold, gave_gold, brought_home, left_lying) of [param amount]
+## [param id], newest last, RECENT_KEPT kept (saved).
+func note_recent(town: String, player_id: String, kind: String, id: String, amount: int) -> void:
+	if player_id.is_empty() or not _towns.has(town):
+		return
+	var all: Dictionary = _towns[town].get_or_add("recent", {})
+	var mine: Array = all.get_or_add(player_id, [])
+	mine.append({"kind": kind, "id": id, "amount": amount})
+	while mine.size() > RECENT_KEPT:
+		mine.pop_front()
+
+
+func recent(town: String, player_id: String) -> Array:
+	return (_towns.get(town, {}).get("recent", {}).get(player_id, []) as Array).duplicate(true)
+
+
+## Whether [param town] is thriving (768, the coordinator: its stores at
+## comfort and nobody on the dole), held steady: it starts with every raw at
+## comfort and stops only below town_regard.thriving_off of it, or with
+## anyone on the dole. Kept on the record ("thriving", saved); Towns.tick
+## looks each turn.
+func thriving(town: String) -> bool:
+	if not _towns.has(town):
+		return false
+	var record: Dictionary = _towns[town]
+	var was := bool(record.get("thriving", false))
+	var off := float(rules.get("town_regard", {}).get("thriving_off", 0.75))
+	var all_full := true
+	var none_low := true
+	for what: String in rules.get("comfort", {}):
+		var want := production.comfort(town, what)
+		if what == "gold" or want <= 0:
+			continue
+		var have := production.stockpile.count(town, what)
+		all_full = all_full and have >= want
+		none_low = none_low and have >= want * off
+	var now_thriving := production.on_dole(town) == 0 and (all_full or was and none_low)
+	record["thriving"] = now_thriving
+	return now_thriving
+
+
 ## For the snapshot: town -> {xp, spent, residents, buildings, objectives,
 ## captives, taken (worker id -> times carried off), log, founded,
 ## to_spread}.
@@ -3461,6 +3571,29 @@ func from_dict(saved: Dictionary) -> void:
 			record["gatherers_lacking"] = {}
 			for trade: Variant in lacking_saved:
 				record["gatherers_lacking"][str(trade)] = int(lacking_saved[trade])
+		# Its regard of each player and their recent effects (768); a save from
+		# before has none: every player a stranger to it, nothing recent.
+		var regard_saved: Variant = entry.get("regard", {})
+		if regard_saved is Dictionary:
+			for who: Variant in regard_saved:
+				var it: Variant = regard_saved[who]
+				if it is Dictionary:
+					var why: Array = []
+					for clause: Variant in (it as Dictionary).get("why", []):
+						why.append(str(clause))
+					record.get_or_add("regard", {})[str(who)] = {"halves": int(it.get("halves", 0)), "since": int(it.get("since", 0)),
+						"last": clampi(int(it.get("last", 0)), -1, 1), "why": why, "day": int(it.get("day", -1)), "gained": maxi(int(it.get("gained", 0)), 0)}
+		var recent_saved: Variant = entry.get("recent", {})
+		if recent_saved is Dictionary:
+			for who: Variant in recent_saved:
+				if recent_saved[who] is Array:
+					var mine: Array = []
+					for each: Variant in recent_saved[who]:
+						if each is Dictionary:
+							mine.append({"kind": str(each.get("kind", "")), "id": str(each.get("id", "")), "amount": int(each.get("amount", 0))})
+					record.get_or_add("recent", {})[str(who)] = mine.slice(-RECENT_KEPT)
+		if entry.has("thriving"):
+			record["thriving"] = bool(entry["thriving"])
 		var flock_saved: Variant = entry.get("flock", {})
 		if flock_saved is Dictionary and not flock_saved.is_empty():
 			record["flock"] = {"count": maxf(float(flock_saved.get("count", 0.0)), 0.0), "season": str(flock_saved.get("season", "")),

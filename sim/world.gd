@@ -4220,23 +4220,53 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 	return true
 
 
+## Player [param by] gives the thing [param uid] from their pack to
+## stockpile [param place] (768, the town window's Donate): banked as the
+## depot banks it (_bank_thing: raw goods a sale, gear a gift), one unit of
+## a stack. False, nothing moved, for a uid not in their pack or grave goods.
+func donate(by: GridEntity, uid: int, place: String) -> bool:
+	var slot := slot_of_unit(by, uid)
+	if slot < 0 or stockpile == null or place.is_empty():
+		return false
+	if not items.yields_of(uid).is_empty() and items.is_grave(uid):
+		return false  # Only the fence takes them (586).
+	var item := by.slots[slot]
+	if items.yields_of(uid).keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
+		return false
+	uid = _unit_out(by, slot, uid)
+	if uid == 0:
+		return false
+	_bank_thing(place, uid, _label_of(by), _label_of(by), by.zone, by.tile, owner_of(by))
+	_log("slots: %s donated %s from %d at %s" % [by.name, item, slot, place])
+	_slots_changed(by)
+	return true
+
+
 ## Banks the instance [param uid] (held by nothing now) at stockpile
 ## [param place], brought [param who] someone from [param from]: a resource
 ## item as its yield (its instance ended, "banked"), gear as itself.
 func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: String, tile: Vector2i, by_id := "",
 		brought_by := "") -> void:
 	var yields := items.yields_of(uid)  # A short one's share (decision 493).
+	var player_id := by_id.trim_prefix("player:") if by_id.begins_with("player:") else ""
 	if yields.is_empty():
 		stockpile.bank(place, uid, who, from, at_zone, tile, "banked", by_id)
+		if towns != null:
+			towns.note_recent(place, player_id, "donated", items.id_of(uid), 1)  # 768: gear given is a gift.
 		return
 	# A player's raw goods (or their companion's) are a sale at the delivery
 	# price (decision 498; Jeff: "players bank goods for gold"). A counter
 	# sale has no by_id: it was paid there.
-	if economy != null and by_id.begins_with("player:"):
-		var player_id := by_id.trim_prefix("player:")
+	if economy != null and not player_id.is_empty():
+		var owed_before := economy.owed_to(player_id, place)
 		var paid := economy.bank_sale(place, player_id, yields)
 		if paid > 0:
 			add_gold(player_id, paid, "banked %s" % [yields])
+		if towns != null:
+			# 768: paid now or owed, a sale; past the owed cap, a gift.
+			var sold := paid > 0 or economy.owed_to(player_id, place) > owed_before
+			for what: String in yields:
+				towns.note_recent(place, player_id, "sold" if sold else "donated", what, int(yields[what]))
 	for what: String in yields:
 		stockpile.deposit(place, what, int(yields[what]), who, from, by_id)
 	if balance != null:

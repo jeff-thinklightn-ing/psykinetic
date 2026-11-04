@@ -527,6 +527,12 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (sound's Client3D.far_cry): an old client draws no prints and hears no far cry.
 ## 47 (771 amended (2)): the "wave" message {kind, cell: [x, y]}, a night watch's
 ## wave on its way (Raids.wave_coming; sound's handler): an old client hears none.
+## 47 (768): the "town_sheet" message gains the town window's at, gold, pays
+## {id: {gold, up_to}}, pack [{slot, uid, id, uids, count}], owed, stock [{id,
+## have, enough, short, item}], build {kind, wants, fund}, regard {score, word,
+## last, why}, state [{kind, ...}], asks [{kind, open, until, ...}], recent
+## [{kind, id, amount}], and after a Donate paid and given; new command
+## "contribute" {town, give: [uids], gold}, answered by "town_sheet".
 const PROTOCOL_REVISION := 47
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

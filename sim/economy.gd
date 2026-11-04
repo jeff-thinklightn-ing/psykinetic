@@ -1825,6 +1825,38 @@ func owed_to(player_id: String, town: String) -> int:
 	return int(_player_owed.get(player_id, {}).get(town, 0))
 
 
+## What [param town]'s store would give player [param player_id] for each
+## thing in [param slots] it buys as a delivery (768, the town window's
+## "pays"; bank_sale's price): {id: {gold, up_to}}, gold one brings today,
+## up_to how many before the town can neither pay nor owe more (its gold
+## above gold_floor and the room under store.owed_cap). Herbs (maker_only)
+## and gear (a gift, unpaid) are left out.
+func bank_pays(town: String, player_id: String, slots: Array) -> Dictionary:
+	var store: Dictionary = rules.get("store", {})
+	var room := maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0) \
+		+ maxi(int(store.get("owed_cap", 30)) - owed_to(player_id, town), 0)
+	if owed_to(player_id, town) >= int(store.get("owed_cap", 30)):
+		room = 0
+	var out := {}
+	var cat: Dictionary = catalog.call()
+	for id: Variant in slots:
+		if str(id).is_empty() or out.has(str(id)):
+			continue
+		var yields: Variant = cat.get(str(id), {}).get("yield", {})
+		if not yields is Dictionary or (yields as Dictionary).is_empty():
+			continue
+		var price := 0.0
+		for what: String in yields:
+			if rules.get("maker_only", {}).has(what) or what not in Stockpile.RESOURCES:
+				price = -1.0
+				break
+			price += raw_price(town, what) * float(store.get("buy", 1.0)) * int(yields[what])
+		var gold := roundi(price)
+		if gold > 0:
+			out[str(id)] = {"gold": gold, "up_to": room / gold}
+	return out
+
+
 # --- Players' contributions (decision 499) ------------------------------------------
 
 ## What [param town]'s next build still needs in gold, for a player who
