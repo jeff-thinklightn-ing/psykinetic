@@ -24216,6 +24216,15 @@ _test_field_return and _test_death_and_respawn, return_test and
 camp_fall_test follow the downed unblessed. Protocol: revision 32
 (Player.heart, the commands); no new class_name.
 
+587 amended (2) (companions; the coordinator, from perf's soak): every call
+to Main._field_rules() re-read and re-parsed economy.json through
+Production.read_rules, and _tend_hearts asks for it every tick. That cost
+about 1 ms a tick, and one call took 33 ms. The return.field rules are now
+read once per Main (_field_rules_read) and kept. Nothing reloads
+economy.json while the game runs, and no caller changes the dictionary, so
+no check for the file changing. Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 587, sound's side. Mortally Wounded: the heartbeat over the ducked mix
 
 Jeff: "the heart beat becomes the dominant sound to the player". The

@@ -8694,10 +8694,17 @@ func _nearest_way_out(from: Vector2i) -> Vector2i:
 	return best
 
 
-## The rules of the field return: economy.json "return" "field".
+## The rules of the field return: economy.json "return" "field", read once a
+## run (587 amended (2): _tend_hearts asks every tick, and reading the file
+## cost about 1 ms each time). Nothing reloads economy.json while running.
+var _field_rules_read: Variant = null
+
+
 func _field_rules() -> Dictionary:
-	var rules: Variant = Production.read_rules().get("return", {}).get("field", {})
-	return rules if rules is Dictionary else {}
+	if _field_rules_read == null:
+		var rules: Variant = Production.read_rules().get("return", {}).get("field", {})
+		_field_rules_read = rules if rules is Dictionary else {}
+	return _field_rules_read
 
 
 ## Server: the draugr laid to rest (enemy-ai's call through World.bless,
