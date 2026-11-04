@@ -80,7 +80,26 @@ const FALL_LOUDEST := 1.0
 const SILENT := 0.01
 const BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
 	"amb.rain", "amb.storm", "amb.dungeon", "amb.town_day", "amb.town_night",
-	"amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips"]
+	"amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips",
+	"amb.mine_tunnel", "amb.mine_chamber"]
+## A mine (769 amended (4)): a level whose decor has a mine's pieces. Under
+## it no amb.dungeon (the crypt's cave bed): a near-silent tunnel's air or a
+## chamber's, by how open the floor round the listener is (openness: the
+## share of floor within OPEN_REACH cells, a tunnel's at TUNNEL_OPEN or
+## less, a chamber's from CHAMBER_OPEN); a drop now and then (DRIP_SECONDS
+## on average) from a floor cell DRIP_NEAR..DRIP_FAR off, a creak
+## (CREAK_SECONDS) from the nearest arch or beam within TIMBER_NEAR, and a
+## wall lamp's soft flame from the nearest lamp heard. Kept sparse: Jeff
+## turned down the crypt's look as busy.
+const MINE_KINDS: Array[String] = ["mine_lamp", "mine_arch", "mine_beam", "mine_track"]
+const OPEN_REACH := 3
+const TUNNEL_OPEN := 0.35
+const CHAMBER_OPEN := 0.75
+const DRIP_SECONDS := 12.0
+const CREAK_SECONDS := 40.0
+const DRIP_NEAR := 3
+const DRIP_FAR := 10
+const TIMBER_NEAR := 8
 ## Beds of the open air: muffled under a roof.
 const OUTDOOR_BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
 	"amb.rain", "amb.storm", "amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips"]
@@ -106,6 +125,9 @@ var _stream_paths: Array = []
 var _falls := {}
 var _fall_list: Array = []
 var _since_weigh := INF
+## The terrain the mine's parts were read from, and those parts (mine_parts).
+var _mine_terrain: Dictionary = {}
+var _mine := {}
 
 
 func _process(delta: float) -> void:
@@ -140,9 +162,18 @@ func _weigh() -> void:
 	var zone := str(view._terrain.get("zone", "outdoors" if view._outdoor else "indoors"))
 	var canopy := view._canopy_cover
 	var drip := Weather.drip_at(World.fields.region, steps, canopy) if World.fields != null else 0.0
+	var mine := _mine_of()
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
-			canopy, drip))
+			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0))
 	_place_torch(cell)
+	var lamps: Array[Vector2i] = []
+	if not mine.is_empty():
+		lamps = mine["lamps"]
+		if randf() < WEIGH_EVERY / DRIP_SECONDS:
+			_drip(cell, mine["floor"])
+		if randf() < WEIGH_EVERY / CREAK_SECONDS:
+			_creak(cell, mine["timbers"])
+	_place_point("amb.lamp_hiss", lamps, cell)
 	_place_draft(cell)
 	_place_streams(cell)
 	_place_falls(cell)
@@ -158,9 +189,10 @@ func _weigh() -> void:
 ## [param weather] (Weather's: rain, wind, ... each 0..1) and
 ## [param town] (0..1: how near a town's buildings), under a forest's
 ## [param canopy] (0..1: its cover round the view) with its [param drip]
-## (0..1, Weather.drip_at).
+## (0..1, Weather.drip_at); in a mine (769 amended (4)) [param mine_open]
+## its openness there (0 a tunnel .. 1 a chamber), else below 0.
 static func weights(zone: String, under_sky: bool, daylight: float, hour: float, weather: Dictionary, town: float,
-		canopy := 0.0, drip := 0.0) -> Dictionary:
+		canopy := 0.0, drip := 0.0, mine_open := -1.0) -> Dictionary:
 	var out := {}
 	for bed in BEDS:
 		out[bed] = 0.0
@@ -187,9 +219,85 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 		if not under_sky:
 			for bed in OUTDOOR_BEDS:
 				out[bed] = out[bed] * ROOFED
+	elif mine_open >= 0.0:
+		out["amb.mine_tunnel"] = 1.0 - mine_open
+		out["amb.mine_chamber"] = mine_open
 	else:
 		out["amb.dungeon"] = 1.0 if zone in ["cave", "dungeon"] else 0.0
 	return out
+
+
+## The mine's parts of [param terrain] (769 amended (4)): {floor (cell ->
+## true), lamps (each mine_lamp's cell), timbers (each arch's and beam's
+## middle cell)}; empty for a level with no mine piece.
+static func mine_parts(terrain: Dictionary) -> Dictionary:
+	var lamps: Array[Vector2i] = []
+	var timbers: Array[Vector2i] = []
+	var any := false
+	for entry: Dictionary in terrain.get("decor", []):
+		var kind := str(entry.get("kind", ""))
+		if kind not in MINE_KINDS:
+			continue
+		any = true
+		if kind == "mine_lamp":
+			lamps.append(entry["cell"])
+		elif kind != "mine_track":
+			timbers.append((entry["cell"] as Vector2i) + (entry["out"] as Vector2i) * (int(entry.get("width", 1)) / 2))
+	if not any:
+		return {}
+	var floor_cells: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("floor", []):
+		floor_cells[cell] = true
+	return {"floor": floor_cells, "lamps": lamps, "timbers": timbers}
+
+
+## How open [param floor_cells] is round [param cell] (769 amended (4)): 0 a
+## tunnel's (TUNNEL_OPEN of the cells within OPEN_REACH floor, or fewer)
+## .. 1 a chamber's (CHAMBER_OPEN or more).
+static func openness(floor_cells: Dictionary, cell: Vector2i) -> float:
+	var open := 0
+	var all := 0
+	for dx in range(-OPEN_REACH, OPEN_REACH + 1):
+		for dy in range(-OPEN_REACH, OPEN_REACH + 1):
+			if dx == 0 and dy == 0:
+				continue
+			all += 1
+			if floor_cells.has(cell + Vector2i(dx, dy)):
+				open += 1
+	return clampf((float(open) / all - TUNNEL_OPEN) / (CHAMBER_OPEN - TUNNEL_OPEN), 0.0, 1.0)
+
+
+## The view's mine parts, read again only when its terrain is another.
+func _mine_of() -> Dictionary:
+	if not is_same(_mine_terrain, view._terrain):
+		_mine_terrain = view._terrain
+		_mine = mine_parts(view._terrain)
+	return _mine
+
+
+## A drop falling from a floor cell DRIP_NEAR..DRIP_FAR off [param cell]
+## (none if a few tries find no floor), high up, heard through the rock.
+func _drip(cell: Vector2i, floor_cells: Dictionary) -> void:
+	for _try in 8:
+		var away := Vector2.from_angle(randf() * TAU) * randf_range(DRIP_NEAR, DRIP_FAR)
+		var at := cell + Vector2i(roundi(away.x), roundi(away.y))
+		if floor_cells.has(at):
+			view.sfx.play("amb.mine_drip", view._tile_position(at) + Vector3.UP * 2.5)
+			return
+
+
+## A creak from the nearest of [param timbers] within TIMBER_NEAR of
+## [param cell], up at the beam; none with none near.
+func _creak(cell: Vector2i, timbers: Array) -> void:
+	var best := Vector2i(-1, -1)
+	var nearest := TIMBER_NEAR + 1
+	for at: Vector2i in timbers:
+		var apart := maxi(absi(at.x - cell.x), absi(at.y - cell.y))
+		if apart < nearest:
+			nearest = apart
+			best = at
+	if nearest <= TIMBER_NEAR:
+		view.sfx.play("amb.timber_creak", view._tile_position(best) + Vector3.UP * 2.7)
 
 
 ## How often each night call comes (calls a second) in [param zone] with

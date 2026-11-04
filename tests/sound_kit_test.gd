@@ -329,6 +329,39 @@ func _test_ambience_weights() -> void:
 	_check(is_equal_approx(town["amb.town_day"], 1.0) and town["amb.town_night"] == 0.0, "by a town's buildings by day: its day bed")
 	var dungeon := Ambience.weights("dungeon", true, 1.0, 12.0, {"kind": "storm", "rain": 1.0, "wind": 1.0}, 0.0)
 	_check(dungeon["amb.dungeon"] == 1.0 and dungeon["amb.rain"] == 0.0 and dungeon["amb.forest_day"] == 0.0, "under stone: the dungeon bed, no weather")
+	_check(dungeon["amb.mine_tunnel"] == 0.0 and dungeon["amb.mine_chamber"] == 0.0, "no mine: no mine bed")
+	var tunnel := Ambience.weights("dungeon", false, 1.0, 12.0, clear, 0.0, 0.0, 0.0, 0.0)
+	_check(tunnel["amb.mine_tunnel"] == 1.0 and tunnel["amb.mine_chamber"] == 0.0 and tunnel["amb.dungeon"] == 0.0,
+			"in a mine's tunnel (769 amended (4)): its own near-silent bed, never the crypt's cave bed (%s)" % [tunnel])
+	var chamber := Ambience.weights("cave", false, 1.0, 12.0, clear, 0.0, 0.0, 0.0, 1.0)
+	_check(chamber["amb.mine_chamber"] == 1.0 and chamber["amb.mine_tunnel"] == 0.0 and chamber["amb.dungeon"] == 0.0,
+			"in a mine's chamber: the chamber's bed")
+	var corridor: Dictionary = {}
+	var room: Dictionary = {}
+	for x in range(-10, 11):
+		for y in range(0, 2):
+			corridor[Vector2i(x, y)] = true
+		for y in range(-5, 6):
+			room[Vector2i(x, y)] = true
+	_check(Ambience.openness(corridor, Vector2i(0, 0)) == 0.0 and Ambience.openness(room, Vector2i(0, 0)) == 1.0,
+			"a two-wide corridor reads as a tunnel (%.2f), an open room as a chamber (%.2f)"
+			% [Ambience.openness(corridor, Vector2i(0, 0)), Ambience.openness(room, Vector2i(0, 0))])
+	var floor_cells: Array[Vector2i] = [Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1)]
+	var parts := Ambience.mine_parts({"floor": floor_cells, "decor": [
+			{"cell": Vector2i(1, 1), "out": Vector2i(0, -1), "kind": "mine_lamp", "variant": 1},
+			{"cell": Vector2i(1, 1), "out": Vector2i(1, 0), "kind": "mine_arch", "variant": 1, "width": 3},
+			{"cell": Vector2i(2, 1), "out": Vector2i(1, 0), "kind": "mine_track", "variant": 1},
+			{"cell": Vector2i(3, 1), "out": Vector2i(0, 0), "kind": "barrel", "variant": 1}]})
+	_check(not parts.is_empty() and parts["lamps"] == [Vector2i(1, 1)] and parts["timbers"] == [Vector2i(2, 1)] and parts["floor"].size() == 3,
+			"a mine's parts from its decor: the lamp, the arch's middle, its floor (%s)" % [parts])
+	_check(Ambience.mine_parts({"floor": floor_cells, "decor": [{"cell": Vector2i(1, 1), "out": Vector2i(0, 0), "kind": "barrel", "variant": 1}]}).is_empty(),
+			"no mine piece: no mine")
+	for slot: String in ["amb.mine_drip", "amb.timber_creak", "amb.lamp_hiss", "sfx.pick_strike", "sfx.ore_sack", "sfx.minecart_roll", "sfx.minecart_stop"]:
+		_check(SoundKit.positional(slot) and SoundKit.noise(slot) == "" and not SoundKit.takes(slot).is_empty(), "%s: placed, no sim noise, takes of its own" % slot)
+	_check(not SoundKit.positional("amb.mine_tunnel") and not SoundKit.positional("amb.mine_chamber")
+			and not SoundKit.takes("amb.mine_tunnel").is_empty() and not SoundKit.takes("amb.mine_chamber").is_empty(), "the mine's beds: everywhere, with takes")
+	_check(SoundKit.reach("sfx.pick_strike") >= Ambience.DRIP_FAR and SoundKit.reach("amb.mine_drip") >= Ambience.DRIP_FAR
+			and SoundKit.reach("amb.timber_creak") >= Ambience.TIMBER_NEAR, "a drop heard from as far as it falls, a creak from its nearest timber")
 	_check(noon["amb.forest_deep_day"] == 0.0 and noon["amb.rain_canopy"] == 0.0 and noon["amb.drips"] == 0.0,
 			"no canopy: no deep forest, no crowns, no drips")
 	var deep := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 1.0)

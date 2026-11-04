@@ -39681,6 +39681,45 @@ said once and no blow struck. No bullet yet: seams are only in mine_look, a dev 
 reaches; dungeon's landing that puts seams in a real level carries the bullet. Server only,
 protocol unchanged, no new class_name.
 
+769 amended (4): a mine's sounds, sparse, with no crypt hum (2026-11-03, sound). The coordinator
+approved the design (Jeff had turned sour on the crypt's look; a mine should not sound like one
+either). A level is a mine when its decor holds a mine piece (Ambience.MINE_KINDS: mine_lamp,
+mine_arch, mine_beam, mine_track; Ambience.mine_parts). There amb.dungeon (the crypt's cave bed)
+never plays. In its place go two near-silent beds with no steady tone:
+- amb.mine_tunnel, weighed 1 - openness;
+- amb.mine_chamber, weighed openness.
+Ambience.openness is the share of floor within OPEN_REACH (3) cells of the listener: TUNNEL_OPEN
+(0.35) or less reads as a tunnel, CHAMBER_OPEN (0.75) or more as a chamber. Over the beds, now and
+then:
+- amb.mine_drip, about every DRIP_SECONDS (12), from a floor cell DRIP_NEAR..DRIP_FAR (3..10) off,
+  high up;
+- amb.timber_creak, about every CREAK_SECONDS (40), from the nearest arch's or beam's middle
+  within TIMBER_NEAR (8);
+- amb.lamp_hiss, a low-passed soft flame, looped from the nearest mine_lamp heard (3 cells; 578:
+  nothing steady over 4 kHz). It shares 777's Ambience._place_point.
+A blow on a seam (Client3D._on_struck, a Seam struck) plays sfx.pick_strike when the swing lands,
+in place of the flesh hit, the cry and music's fight_near. A sack given plays sfx.ore_sack
+(falling back to sfx.item_drop_heavy). Client3D._sync_seam reads the replicated hp and spent: the
+hp back up from a blow, or the last sack taking the seam to spent; a refill is silent. An entity
+drawn as prop.mine_cart (Client3D.CART_ART) holds sfx.minecart_roll while its tile moves and lets
+it go with sfx.minecart_stop CART_STOP_MS (400) after its last move (Client3D._sync_cart).
+The slots are named minecart_ because sfx.cart_roll is the wagon's (not played yet). A spent
+seam's ring waits until dungeon asks for it. Takes, all CC0 from Freesound:
+- tunnel 876690;
+- chamber 877090;
+- drips 177958 (two cuts), 162116 and 11126;
+- creaks 590148, 590157, 590159 and 590149;
+- lamp 159386, low-passed at 2.5 kHz;
+- pick 233629, 233628 and 233630;
+- sack 588467, 326301 and 34175;
+- cart roll 351382 and 435711;
+- cart stop 480032, 532874 and 532873.
+Tests: sound_kit_test (the mine's beds by openness and never amb.dungeon, openness of a corridor
+and a room, mine_parts, the slots); view_test _test_mine_sounds (a seam struck: the pick, no fight
+music; a sack once, and none on a blow; the cart's roll and stop; a lamp's flame, none without a
+mine). Review: C:/dev/review/sound/mine. No CHANGELOG bullet (seams are only in mine_look so
+far). Client only, protocol unchanged, no new class_name.
+
 ## 771. The night watch
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

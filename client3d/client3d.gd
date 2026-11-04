@@ -2030,6 +2030,10 @@ var _puppets: Dictionary[int, Node3D] = {}
 const SEAM_RUBBLE_HEIGHT := 0.35
 ## A worked-out seam's rubble (art-kit's, 769).
 const SEAM_SPENT_ART := "rock.seam_spent"
+## The mine's cart (769): its rolling loop held while its tile moves, its
+## stop heard CART_STOP_MS after the last move (_sync_cart, 769 amended (4)).
+const CART_ART := "prop.mine_cart"
+const CART_STOP_MS := 400
 ## How far inside a wall a span's posts stand (769, the beam's), metres.
 const DECOR_POST_INSET := 0.15
 ## The draugr's remains while he is gone at rest (573 amended (4)): his
@@ -15077,6 +15081,8 @@ func _sync_puppets() -> void:
 			_drop_remains(id)  # Back: his remains go as he eases in.
 		if entity is Seam:
 			_sync_seam(puppet, entity as Seam)
+		if str(entity.spawn_spec.get("art", "")) == CART_ART:
+			_sync_cart(puppet, entity, now)
 		if _low or puppet.has_meta("reach_in"):
 			# The low camera sees past World.NEAR_TILES: a body out there is
 			# not drawn (it would stand still, unthinking, 238); one crossing
@@ -15148,6 +15154,12 @@ func _sync_puppets() -> void:
 ## (SEAM_SPENT_ART in place of its face) till it fills again; squat, while
 ## the kit has no rubble.
 func _sync_seam(puppet: Node3D, seam: Seam) -> void:
+	# A sack given (769 amended (4)): its hp back up from a blow, or its last
+	# sack taking it to spent; not when it fills again, nor as first seen.
+	var was: Variant = puppet.get_meta("seam_was") if puppet.has_meta("seam_was") else null
+	puppet.set_meta("seam_was", [seam.hp, seam.spent])
+	if was is Array and not bool(was[1]) and (seam.hp > int(was[0]) or seam.spent):
+		sfx.play("sfx.ore_sack", puppet.position + Vector3.UP * 0.4)
 	if bool(puppet.get_meta("spent", false)) == seam.spent:
 		return
 	puppet.set_meta("spent", seam.spent)
@@ -15160,6 +15172,29 @@ func _sync_seam(puppet: Node3D, seam: Seam) -> void:
 		body.add_child(ArtKit.instance(SEAM_SPENT_ART if seam.spent else face))
 		return
 	puppet.scale = Vector3(1.0, SEAM_RUBBLE_HEIGHT, 1.0) if seam.spent else Vector3.ONE
+
+
+## The mine's cart (769 amended (4)): its roll held (sfx.minecart_roll) from
+## the moment its tile moves, steered along with it, and let go with its
+## stop (sfx.minecart_stop) once it has not moved for CART_STOP_MS.
+func _sync_cart(puppet: Node3D, cart: GridEntity, now: int) -> void:
+	var was: Variant = puppet.get_meta("cart_tile") if puppet.has_meta("cart_tile") else null
+	puppet.set_meta("cart_tile", cart.tile)
+	var roll: AudioStreamPlayer3D = puppet.get_meta("cart_roll") if puppet.has_meta("cart_roll") else null
+	if was is Vector2i and was != cart.tile:
+		puppet.set_meta("cart_moved", now)
+		if roll == null or not is_instance_valid(roll):
+			roll = sfx.hold("sfx.minecart_roll", puppet.position + Vector3.UP * 0.5)
+			if roll != null:
+				puppet.set_meta("cart_roll", roll)
+	if roll == null or not is_instance_valid(roll):
+		return
+	if now - int(puppet.get_meta("cart_moved", now)) < CART_STOP_MS:
+		sfx.steer(roll, puppet.position + Vector3.UP * 0.5)
+		return
+	roll.queue_free()
+	puppet.remove_meta("cart_roll")
+	sfx.play("sfx.minecart_stop", puppet.position + Vector3.UP * 0.5)
 
 
 ## Gone at rest (573 amended (4)): the draugr's remains (art-kit's one-cell
@@ -15552,6 +15587,15 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		_pain(shot, puppet)
 		puppet.set_meta("shot_ms", Time.get_ticks_msec())
 		_knockdown_blow(puppet)
+	if puppet != null and cause == &"attack" and instance_from_id(id) is Seam:
+		# A blow on an ore seam (769 amended (4)): the pick on rock, when the
+		# swing lands; no cry and no fight's music.
+		var landed := (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - Time.get_ticks_msec()) / 1000.0
+		if landed > 0.0:
+			_play_later("sfx.pick_strike", puppet.position + Vector3.UP * 0.8, landed)
+		else:
+			sfx.play("sfx.pick_strike", puppet.position + Vector3.UP * 0.8)
+		return
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity
 		var blow := _struck_with(struck)

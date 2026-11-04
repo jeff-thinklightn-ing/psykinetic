@@ -70,6 +70,7 @@ func _ready() -> void:
 		_test_wade_drip()
 		_test_bridge_ends()
 		_test_far_cry()
+		_test_mine_sounds()
 		await _test_monster_death()
 		await _test_companion_death()
 		await _test_down_grey()
@@ -1081,6 +1082,86 @@ func _test_far_cry() -> void:
 	_rig.play_cell("sfx.wave_wolves", Vector2i(40, 12))
 	heard = _rig.sfx.played.slice(before).map(func(entry: Array) -> String: return str(entry[0]))
 	_check(heard == ["sfx.wave_wolves"], "a night watch's wave heard from its cell (771) (%s)" % [heard])
+	_rig.sfx.hear_everything = hear_was
+
+
+## 769 amended (4): a mine's sounds. A blow on a seam is the pick on rock,
+## with no cry and no fight's music; a sack given (its hp back up, or spent)
+## the ore tumbling; a cart's roll held while it moves, its stop after; a
+## wall lamp's soft flame from the nearest lamp.
+func _test_mine_sounds() -> void:
+	print("\n== a mine's sounds (769 amended (4)) ==")
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	var tile := Vector2i(9, 9)
+	var occupant := World.get_entity_at(tile)
+	if occupant != null:
+		World.despawn(occupant)
+	var spec := Level.SEAM_SPEC.duplicate()
+	spec["tile"] = tile
+	spec["name"] = "ViewSeam"
+	var seam := _main._spawn(spec) as Seam
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets.get(seam.get_instance_id())
+	if puppet == null:
+		_check(false, "a seam drawn")
+		World.despawn(seam)
+		_rig.sfx.hear_everything = hear_was
+		return
+	var fight_was: bool = _rig.music._fight_heard
+	_rig.music._fight_heard = false
+	var struck := _heard(func() -> void: _rig._on_struck(1, &"attack", seam.get_instance_id()))
+	_check(struck == ["sfx.pick_strike"] and not _rig.music._fight_heard, "a seam struck: the pick on rock, no cry, no fight's music (%s)" % [struck])
+	_rig.music._fight_heard = fight_was
+	seam.hp = seam.max_hp - 1
+	_rig._sync_seam(puppet, seam)
+	var sack := _heard(func() -> void:
+		seam.hp = seam.max_hp
+		_rig._sync_seam(puppet, seam))
+	_check(sack == ["sfx.ore_sack"], "a sack given: the ore tumbling (%s)" % [sack])
+	var blow := _heard(func() -> void:
+		seam.hp = seam.max_hp - 1
+		_rig._sync_seam(puppet, seam))
+	_check(blow.is_empty(), "a blow's hp lost: no sack (%s)" % [blow])
+	var last := _heard(func() -> void:
+		seam.spent = true
+		_rig._sync_seam(puppet, seam))
+	var after := _heard(func() -> void: _rig._sync_seam(puppet, seam))
+	_check(last == ["sfx.ore_sack"] and after.is_empty(), "the last sack, the seam spent: once (%s, then %s)" % [last, after])
+	World.despawn(seam)
+	# The cart: any entity drawn as prop.mine_cart.
+	var cart := _spawn_imp(Vector2i(9, 11))
+	cart.spawn_spec["art"] = Client3D.CART_ART
+	_rig._process(0.0)
+	var body: Node3D = _rig._puppets.get(cart.get_instance_id())
+	if body == null:
+		_check(false, "a cart drawn")
+	else:
+		var now := Time.get_ticks_msec()
+		body.set_meta("cart_tile", cart.tile + Vector2i(-1, 0))
+		_rig._sync_cart(body, cart, now)
+		var rolling: Variant = body.get_meta("cart_roll") if body.has_meta("cart_roll") else null
+		_check(SoundKit.files("sfx.minecart_roll").is_empty() or rolling is AudioStreamPlayer3D, "a cart moving: its roll held")
+		var stop := _heard(func() -> void: _rig._sync_cart(body, cart, now + Client3D.CART_STOP_MS + 1))
+		_check(rolling == null or (stop == ["sfx.minecart_stop"] and not body.has_meta("cart_roll") and (rolling as Node).is_queued_for_deletion()),
+				"a cart still CART_STOP_MS: its roll let go, its stop heard (%s)" % [stop])
+	World.despawn(cart)
+	_rig._process(0.0)
+	# A wall lamp: its flame from the nearest in reach.
+	var listener: Vector2i = _rig.sfx.listener
+	var had_decor: Variant = _rig._terrain.get("decor")
+	_rig._terrain["decor"] = [{"cell": listener + Vector2i(1, 0), "out": Vector2i(0, -1), "kind": "mine_lamp", "variant": 1, "edge": Vector3i.ZERO}]
+	_rig.ambience._mine_terrain = {}
+	_rig.ambience._weigh()
+	var hiss: AudioStreamPlayer3D = _rig.ambience.points.get("amb.lamp_hiss")
+	_check(SoundKit.files("amb.lamp_hiss").is_empty() or hiss != null and hiss.playing, "by a mine's lamp: its flame")
+	if had_decor == null:
+		_rig._terrain.erase("decor")
+	else:
+		_rig._terrain["decor"] = had_decor
+	_rig.ambience._mine_terrain = {}
+	_rig.ambience._weigh()
+	_check(hiss == null or not hiss.playing, "no mine: no lamp")
 	_rig.sfx.hear_everything = hear_was
 
 

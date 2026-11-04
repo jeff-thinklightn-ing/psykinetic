@@ -1633,6 +1633,86 @@
 			"uses": "a camp's fire, fuller than a torch: a rest camp's or a raid camp's (777, sound's side); Ambience, from the nearest camp fire heard (Client3D.campfire_cells)",
 			"fallback": "amb.torch_fire"
 		},
+		"amb.mine_tunnel": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -20.0,
+			"uses": "a mine's tunnel: near-silent air, no steady tone (769 amended (4)); a bed under a zone, time or weather; Ambience.weights, by Ambience.openness"
+		},
+		"amb.mine_chamber": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -20.0,
+			"uses": "a mine's chamber: wider air, a far trickle (769 amended (4)); a bed under a zone, time or weather; Ambience.weights, by Ambience.openness"
+		},
+		"amb.mine_drip": {
+			"category": "ambience",
+			"type": "oneshot",
+			"bus": "ambience",
+			"noise": null,
+			"range": 12,
+			"volume_db": -10.0,
+			"uses": "a drop falling somewhere in a mine, now and then (769 amended (4)); Ambience._drip, a floor cell DRIP_NEAR..DRIP_FAR off"
+		},
+		"amb.timber_creak": {
+			"category": "ambience",
+			"type": "oneshot",
+			"bus": "ambience",
+			"noise": null,
+			"range": 10,
+			"volume_db": -12.0,
+			"uses": "a mine's timbers creaking now and then near an arch or beam (769 amended (4)); Ambience._creak, from the nearest within TIMBER_NEAR"
+		},
+		"amb.lamp_hiss": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 3,
+			"volume_db": -20.0,
+			"uses": "a mine's wall lamp, its soft flame (769 amended (4)); Ambience, from the nearest mine_lamp heard"
+		},
+		"sfx.pick_strike": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 12,
+			"volume_db": -4.0,
+			"uses": "a pick (or any blow) striking an ore seam (769 amended (4)); Client3D._on_struck, a Seam struck"
+		},
+		"sfx.ore_sack": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -6.0,
+			"uses": "ore tumbling into a sack as a seam gives one (769 amended (4)); Client3D._sync_seam, its hp back up or spent",
+			"fallback": "sfx.item_drop_heavy"
+		},
+		"sfx.minecart_roll": {
+			"category": "world",
+			"type": "loop",
+			"bus": "sfx",
+			"noise": null,
+			"range": 16,
+			"volume_db": -8.0,
+			"uses": "a mine cart rolling on its track (769 amended (4)); Client3D._sync_cart, held while it moves"
+		},
+		"sfx.minecart_stop": {
+			"category": "world",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 16,
+			"volume_db": -6.0,
+			"uses": "a mine cart coming to a stop (769 amended (4)); Client3D._sync_cart, CART_STOP_MS after its last move"
+		},
 		"amb.owl": {
 			"category": "ambience",
 			"type": "oneshot",

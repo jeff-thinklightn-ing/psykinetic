@@ -170,6 +170,77 @@
 				"sha256": "bdef45c37f9f5be3659cbce572bb430991006ef1d8f70418de025b816fd88395"
 			}
 		],
+		"amb.lamp_hiss": [
+			{
+				"file": "amb.lamp_hiss.ogg",
+				"from": "freesound",
+				"original": "freesound 159386: Propane Lantern (low-passed at 2.5 kHz) (from 2 s for 20 s)",
+				"sha256": "fe22daf9c47d012f2c7eae98f00519b8323425d30e65f963b4ebd1bb7bc86802",
+				"by": "clairinski",
+				"url": "https://freesound.org/people/clairinski/sounds/159386/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.mine_chamber": [
+			{
+				"file": "amb.mine_chamber.ogg",
+				"from": "freesound",
+				"original": "freesound 877090: Cave Water Dripping (from 0 s for 18 s)",
+				"sha256": "ab7f18abfb4d7e42ad3664115356ef7c8e29884c7e48ed9ec30904ccc67b5f4e",
+				"by": "zenosounds",
+				"url": "https://freesound.org/people/zenosounds/sounds/877090/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.mine_drip": [
+			{
+				"file": "amb.mine_drip.ogg",
+				"from": "freesound",
+				"original": "freesound 177958: Water Dripping in Cave.wav (from 0.9 s for 2 s)",
+				"sha256": "dec176ca19c3f18d6c0c48d37ca2c1dbca1a60addc58ff3b50d452ec19adf106",
+				"by": "Sclolex",
+				"url": "https://freesound.org/people/Sclolex/sounds/177958/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.mine_drip.2.ogg",
+				"from": "freesound",
+				"original": "freesound 177958: Water Dripping in Cave.wav (from 5.7 s for 2 s)",
+				"sha256": "1d541c96c26c9c26984aa4b4746b30201d2afc7a886523689ec094a6c7d18ed5",
+				"by": "Sclolex",
+				"url": "https://freesound.org/people/Sclolex/sounds/177958/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.mine_drip.3.ogg",
+				"from": "freesound",
+				"original": "freesound 162116: Water Dripping (Large Echo) (from 2 s for 3 s)",
+				"sha256": "c8952d33eea8f51e3a0dfa91e3cb9556b549e0aeb7ea17cfbafd6da07e2f60d4",
+				"by": "editor_adp",
+				"url": "https://freesound.org/people/editor_adp/sounds/162116/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.mine_drip.4.ogg",
+				"from": "freesound",
+				"original": "freesound 11126: Deep Drip Hit.flac (from 0 s for 3 s)",
+				"sha256": "bee1af8f6f9b36c769f6e1cd7ed979b9160bf4d60368babdc997dfb0ad43443c",
+				"by": "jnr hacksaw",
+				"url": "https://freesound.org/people/jnr hacksaw/sounds/11126/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.mine_tunnel": [
+			{
+				"file": "amb.mine_tunnel.ogg",
+				"from": "freesound",
+				"original": "freesound 876690: A cave in Laos 2 (from 10 s for 20 s)",
+				"sha256": "5de824f8cbbbc59a276a86c551c583adbe9e78679bd46907c9e98174002489a4",
+				"by": "barryshamir",
+				"url": "https://freesound.org/people/barryshamir/sounds/876690/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.owl": [
 			{
 				"file": "amb.owl.ogg",
@@ -252,6 +323,44 @@
 				"sha256": "7742d493f9d45d79d47aa4dfed760ae7c279f75075de7346b0d55faa3522fd20",
 				"by": "straget",
 				"url": "https://freesound.org/people/straget/sounds/415053/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.timber_creak": [
+			{
+				"file": "amb.timber_creak.ogg",
+				"from": "freesound",
+				"original": "freesound 590148: Creaking Wood 11.wav (from 0 s for 2.56 s)",
+				"sha256": "c57b353f43189caee91f1617432012eb358443bb9b8e4502adfd60317f650b0a",
+				"by": "Greg_Surr",
+				"url": "https://freesound.org/people/Greg_Surr/sounds/590148/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.timber_creak.2.ogg",
+				"from": "freesound",
+				"original": "freesound 590157: Creaking Wood 9.wav (from 0 s for 1.95 s)",
+				"sha256": "90165408c8c6911a6a1f874d51af369535f916db6ba8b9b3e1233d655bc3b8df",
+				"by": "Greg_Surr",
+				"url": "https://freesound.org/people/Greg_Surr/sounds/590157/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.timber_creak.3.ogg",
+				"from": "freesound",
+				"original": "freesound 590159: Creaking Wood 7.wav (from 0 s for 3.15 s)",
+				"sha256": "d3a79438aa92fe7674b5dbcf0eb08a6321c173a579d906fbd6e1aee174ad1ce5",
+				"by": "Greg_Surr",
+				"url": "https://freesound.org/people/Greg_Surr/sounds/590159/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.timber_creak.4.ogg",
+				"from": "freesound",
+				"original": "freesound 590149: Creaking Wood 10.wav (from 0 s for 5.27 s)",
+				"sha256": "f42bde47a73d34d770318965fbcfa3ad25a50e276fc2c533fc5487cc4f8b2f08",
+				"by": "Greg_Surr",
+				"url": "https://freesound.org/people/Greg_Surr/sounds/590149/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -1837,6 +1946,84 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.minecart_roll": [
+			{
+				"file": "sfx.minecart_roll.ogg",
+				"from": "freesound",
+				"original": "freesound 351382: minecart.wav (from 0 s for 14 s)",
+				"sha256": "509b29a2cf415e375802d0e440c1522f2ed52e80aebcabf5fe7ddfa28a13d6a1",
+				"by": "wmquincy101",
+				"url": "https://freesound.org/people/wmquincy101/sounds/351382/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.minecart_roll.2.ogg",
+				"from": "freesound",
+				"original": "freesound 435711: orecart_move_1.wav (from 0 s for 4.7 s)",
+				"sha256": "c8b814452dc45d74b1e0063ae504512c88d89515299e31e2c8d28ff7603c9a7c",
+				"by": "Amusquiz99",
+				"url": "https://freesound.org/people/Amusquiz99/sounds/435711/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.minecart_stop": [
+			{
+				"file": "sfx.minecart_stop.ogg",
+				"from": "freesound",
+				"original": "freesound 480032: R21-66-Wooden Wagon Stops.wav (from 4.6 s for 3.4 s)",
+				"sha256": "82e21180068c0fe576452e3a0c1b42dc7dfe8ea49faf3d8641f866e0b56c0a22",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/480032/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.minecart_stop.2.ogg",
+				"from": "freesound",
+				"original": "freesound 532874: CartImpact1.wav (from 0 s for 0.98 s)",
+				"sha256": "115501f11934932a3ba2097f1accf0319a2826a885280d033127bebb0a76d474",
+				"by": "FFeller",
+				"url": "https://freesound.org/people/FFeller/sounds/532874/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.minecart_stop.3.ogg",
+				"from": "freesound",
+				"original": "freesound 532873: CartImpact2.wav (from 0 s for 1.1 s)",
+				"sha256": "89474fad011f9c073cc7643564dcf5b45e979ccd0069fc067811d8720c6fbe47",
+				"by": "FFeller",
+				"url": "https://freesound.org/people/FFeller/sounds/532873/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.ore_sack": [
+			{
+				"file": "sfx.ore_sack.ogg",
+				"from": "freesound",
+				"original": "freesound 588467: Gravel Pouring.wav (from 0 s for 1.6 s)",
+				"sha256": "eecbd921ad833bc846234ff0c911ab368578912e410e42c59b7ab1c34a8e5332",
+				"by": "cartoonrob",
+				"url": "https://freesound.org/people/cartoonrob/sounds/588467/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.ore_sack.2.ogg",
+				"from": "freesound",
+				"original": "freesound 326301: sandfall3.wav (from 0.2 s for 2.2 s)",
+				"sha256": "32af0b04264044dfed0e71e9c4784eaa1a842f551e84bc8fd580662c3b88d5a6",
+				"by": "Wagna",
+				"url": "https://freesound.org/people/Wagna/sounds/326301/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.ore_sack.3.ogg",
+				"from": "freesound",
+				"original": "freesound 34175: pour out gravel on the stairs.wav (from 0.2 s for 2.8 s)",
+				"sha256": "37b22970e9949eb350251c368e32b2c0cf0453b10de267588ac6ed45427e6e66",
+				"by": "Dalibor",
+				"url": "https://freesound.org/people/Dalibor/sounds/34175/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.parry_clash": [
 			{
 				"file": "sfx.parry_clash.ogg",
@@ -1892,6 +2079,35 @@
 				"sha256": "f657861d87d2b67b5da599fa9fcee67838b4bca316295c1b0068f1569753f863",
 				"by": "AuDRoger",
 				"url": "https://freesound.org/people/AuDRoger/sounds/471148/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.pick_strike": [
+			{
+				"file": "sfx.pick_strike.ogg",
+				"from": "freesound",
+				"original": "freesound 233629: Pickaxe #3.wav (from 0 s for 0.5 s)",
+				"sha256": "4df51cb17165b832c86a52cd0b4e2f24886982c4082dbd1e107ececefa2a4776",
+				"by": "abstraktgeneriert",
+				"url": "https://freesound.org/people/abstraktgeneriert/sounds/233629/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.pick_strike.2.ogg",
+				"from": "freesound",
+				"original": "freesound 233628: Pickaxe #4.wav (from 0 s for 1 s)",
+				"sha256": "600d9692a5f4e2f383f1698ff0bbf2c4272c99cbf0301db7ddffce35e2c668e5",
+				"by": "abstraktgeneriert",
+				"url": "https://freesound.org/people/abstraktgeneriert/sounds/233628/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.pick_strike.3.ogg",
+				"from": "freesound",
+				"original": "freesound 233630: Pickaxe #2.wav (from 0 s for 0.8 s)",
+				"sha256": "77fb5bdab88c44cbdd020a03739c25b08957cc732756b325585f770dc5818721",
+				"by": "abstraktgeneriert",
+				"url": "https://freesound.org/people/abstraktgeneriert/sounds/233630/",
 				"license": "CC0 1.0"
 			}
 		],
