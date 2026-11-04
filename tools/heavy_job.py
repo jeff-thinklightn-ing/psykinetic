@@ -34,7 +34,8 @@ before the machine last started, is stale and dropped (394 amended (8)).
 Otherwise it waits in a queue, first come first served: only the job at
 its head may start, so a big job is not starved by small ones; except that
 a job may go past those before it that wait only on their own kind (a
-suite behind a suite: may_pass), when it is of another kind. A job run
+suite behind a suite: may_pass), when it is of another kind, or that are
+held only by such rows before them (394 amended (21)). A job run
 through `run` is watched: if free RAM falls under the margin while it runs
 and it is the newest job running, its own wrapper stops its own child (no
 one else's process: never kill by name, never another session's) and puts
@@ -336,12 +337,33 @@ def may_pass(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=N
 def passes(job, ahead, running, free_ram_gb=None, free_commit_gb=None, table=None, now=None, length_s=None):
     """may_pass's answer as (ok, past, why): past, the rows [job] goes past by
     backfill, each with "due", when its blockers should end; why, when it
-    may not, what backfill would have needed ("" if backfill never applied)."""
-    past = []
+    may not, what backfill would have needed ("" if backfill never applied).
+
+    A row ahead held only by the queue (394 amended (21)) counts as one held
+    by kind: it may not start, as [job] may not, because a row before it
+    waits on kind (a soak behind a bench behind a suite: the soak may not go
+    past the bench, and nothing ran that excludes a soak). Before, it looked
+    like a head waiting on memory and held all behind it: four scenes and
+    six imports, allowed beside the suite running, waited behind economy's
+    soak while 13.5 GB stood free (2026-11-04 10:00). The rows that hold it
+    are ahead of [job] too, so [job] still meets each: a head waiting on
+    memory or the count holds it, its own kind holds it, one it conflicts
+    with only by backfill."""
+    held = []
     for other in ahead:
+        held.append(kind_blocked(other, running) or not _passes(
+            other, ahead[:len(held)], held, running, free_ram_gb, free_commit_gb, table, now, backfill_length(other))[0])
+    return _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s)
+
+
+def _passes(job, ahead, held, running, free_ram_gb, free_commit_gb, table, now, length_s):
+    """passes over [ahead], [held] saying for each whether it waits on kind,
+    its own or by those before it."""
+    past = []
+    for other, waits in zip(ahead, held):
         if free_ram_gb is not None and out_of_reach(other, running, free_ram_gb, free_commit_gb):
             continue
-        if not kind_blocked(other, running):
+        if not waits:
             return False, [], ""
         if other.get("kind") == job.get("kind"):
             return False, [], ""

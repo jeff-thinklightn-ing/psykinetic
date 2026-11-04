@@ -274,6 +274,25 @@ check(not ok, "a suite behind a bench waiting on a soak (no soak runs) still wai
 mesh_head = dict(table["trellis_mesh"], kind="trellis_mesh", ram_gb=1e12)
 ok, _, _ = gate.passes(scene_row, [mesh_head, bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
 check(ok, "an out-of-reach head ahead is passed as before, the bench by backfill")
+# 394 amended (21): a soak held only by the queue (behind a bench waiting on the
+# suite) held every scene and import behind it, 2026-11-04 10:00.
+soak_queued = dict(soak_row, tree="economy")
+import_queued = dict(table["godot_import"], kind="godot_import")
+ok, past, _ = gate.passes(scene_row, [bench_queued, soak_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)
+check(ok and [each["kind"] for each in past] == ["bench"], "a scene goes past a soak the queue holds, the bench by backfill")
+check(gate.may_pass(import_queued, [bench_queued, soak_queued], [suite_at(now - 100)], 60.0),
+    "an import goes past both, without the clock")
+check(not gate.passes(scene_row, [bench_queued, soak_queued, dict(scene_row, tree="items")], [suite_at(now - 100)], 60.0,
+    None, runs, now, scene_long)[0], "a scene still waits behind a scene that may start")
+ok, _, _ = gate.passes(dict(soak_row, tree="b"), [bench_queued, soak_queued], [suite_at(now - 100)], 60.0, None, runs, now, 600.0)
+check(not ok, "a second soak still waits behind the first")
+check(not gate.passes(scene_row, [soak_queued], [], 60.0, None, runs, now, scene_long)[0],
+    "a soak that may start (nothing ahead of it) holds those behind it as a head")
+memory_head = dict(table["godot_import"], kind="godot_import", tree="maps")
+check(not gate.passes(scene_row, [memory_head, bench_queued, soak_queued], [suite_at(now - 100)], 60.0, None, runs, now, scene_long)[0],
+    "a head not held by kind holds everyone behind it, those it holds too")
+check(not gate.passes(import_queued, [soak_queued, bench_queued], [suite_at(now - 100)], 60.0, None, runs, now, 60.0)[0],
+    "a soak ahead of the bench may start: it is a head, not held")
 check(gate.blockers(dict(table["bench"], kind="bench"), [suite_at(now), dict(running(1, 1), kind="godot_import")]) == [suite_at(now)],
     "a bench's blockers: the suite, not an import")
 

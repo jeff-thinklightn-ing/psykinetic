@@ -9371,6 +9371,26 @@ tests/heavy_job_test: comfy_batch's 20 GB, an unmeasured kind at twice, a measur
 measure_attached's sums and peaks; a take with a child of about 300 MB attached, owed less, and
 its peak recorded at release. Tools only.
 
+394 amended (21) (perf, 2026-11-04, the coordinator's ask; release's label): a job held only by
+the queue no longer holds those behind it. At 10:00 on 11-04 the gate ran one job (environment's
+suite) with 13.5 GB of RAM free and 21 queued. Four scenes and six imports, allowed beside a
+suite, waited behind economy's soak. The soak may not go past the benches ahead of it (a soak
+never beside a bench, and soak has no runs recorded for backfill), and the benches wait on the
+suite. But nothing running excluded a soak, so kind_blocked called it a head waiting on memory,
+and first-come held everyone behind it.
+- passes now marks each row ahead as held when it waits on kind itself, or when it may not go
+  past the rows before it (the same rule, applied to it). A held row is passed as a kind-blocked one
+  was: not by its own kind, and one it conflicts with only by backfill.
+- A head that may start, or one waiting on memory or the running count, still holds everyone
+  behind it. Every row that holds a held row is itself ahead of the job, so the job meets it too.
+  A big job is still not starved, and a bench is still passed only by a job that ends before
+  the bench's blockers do.
+- The 2x commit rule for unmeasured kinds was not the cause: godot_import and scene are measured
+  (1.2 and 0.9 GB of commit). Only comfy_batch, at 32.7 GB, stood out of reach.
+tests/heavy_job_test: a scene goes past a soak the queue holds and backfills the bench. An import
+goes past both. A scene behind a scene that may start waits, and so does a second soak. A soak
+that may start holds those behind it, and so does a head held by nothing. Tools only.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
