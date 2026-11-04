@@ -81,7 +81,7 @@
 		"drops": [{"item": "hide", "count": [1, 1]}]
 	},
 	"great_bear": {
-		"side": "wild", "role": "predator", "herd": "great_bear", "label": "Great bear", "art": "creature.boar", "diet": ["deer", "stag"],
+		"side": "wild", "role": "predator", "herd": "great_bear", "label": "Great bear", "art": "creature.great_bear", "diet": ["deer", "stag"],
 		"script": "res://sim/great_bear.gd", "swing_stamina": true, "apex": true,
 		"body": {"mass": 300.0, "max_hp": 90, "move_ticks": 2.6, "attack_damage": 5, "sight_range": 8},
 		"senses": {"cone": 120, "night": 0.3, "hearing": 1.0, "alert_sight": 1, "notice": 0.8},

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The great bear, the boar king and the old wolf are drawn in bodies of their own: a true bear, a big boar with heavy tusks and a bristle crest, and a grey wolf with a ruff and a torn ear.
 - Towns: a town's treasury now saves toward growing, since townsfolk pay for mending, tool work and a bed from their own purses, waiting till they can, and borrow only for a meal (353 amended (5)).
 - A companion with a pick mines a seam when you dig or stop beside it, and follows at once with what she has dug when you walk on (769 amended (10)).
 - Struck down in a fire, you wait out the usual few seconds and wake at the temple, instead of lying in the flames for minutes (544 amended).

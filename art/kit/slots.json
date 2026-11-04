@@ -77,7 +77,7 @@
 	},
 	"credits": [
 		{"title": "Ultimate Animated Animal Pack (the Pig's rig and clips)", "by": "Quaternius", "license": "CC0 1.0",
-			"url": "https://quaternius.com/packs/ultimateanimatedanimals.html", "slots": ["creature.boar"],
+			"url": "https://quaternius.com/packs/ultimateanimatedanimals.html", "slots": ["creature.boar", "creature.boar_king"],
 			"notes": "third-party parts inside our own art, which no fill names: the game's Credits list one while a slot it names draws its own art (ArtKit.credits, decision 406); a credit with no slots is always listed"},
 		{"title": "Universal Animation Library (Pro)", "by": "Quaternius", "license": "CC0 1.0", "url": "https://quaternius.com",
 			"notes": "the human bodies' skeleton and clips and the goblin's, retargeted (art/models/SOURCES.txt); not an art slot, listed here until the animations have a credits provider of their own"}
@@ -3061,6 +3061,97 @@
 				{"at": [0, 0.191, -0.14], "size": [0.4, 0.382, 0.84]},
 				{"at": [0, 0.616, -0.14], "size": [0.5, 0.468, 1.12]},
 				{"at": [0, 0.66, 0.56], "size": [0.35, 0.18, 0.28]}
+			]
+		},
+		"creature.old_wolf": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.53, 1.14, 2.36],
+			"tolerance": 0.15,
+			"budget": 2500,
+			"source": {"by": "Quaternius (mesh, rig and clips: creature.wolf's), art-kit (the old wolf: ruff, grey muzzle, torn ear, coat, scale 1.2)", "tool": "blender",
+				"license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Wolf, docs/licenses/quaternius-cc0_2026-10-15.txt); own (the changes)", "date": "2026-11-03",
+				"notes": "C:/dev/review/old_wolf/make_old_wolf.py run on creature.wolf.blend (enemy-ai's day apex, working name; pc-character: the stock wolf's skeleton): only the stock verts moved, none added, so every weight and clip is the wolf's: a shaggy ruff round the neck and shoulders, the right ear torn short and notched, the coat greyer with a dark saddle and a pale grizzled muzzle; the armature scaled 1.2; 1962 tris"},
+			"uses": "the old wolf, the pack's old leader (enemy-ai's day apex): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest. creature.wolf's mesh, rig and clips, made old and big; read at a distance by the ruff, the grey muzzle and the torn ear",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "trot", "names": ["trot"], "fallback": "walk, faster"},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "attack", "names": ["attack", "bite"], "required": true},
+				{"name": "howl", "names": ["howl"], "fallback": "idle and a head-up tween"},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true},
+				{"name": "feed", "names": ["eating", "idle_eating", "feed"]},
+				{"name": "sit", "names": ["sit"]},
+				{"name": "lie", "names": ["lie", "lie_down"]}
+			],
+			"grey": [
+				{"at": [0, 0.24, 0.137], "size": [0.424, 0.48, 1.043]},
+				{"at": [0, 0.72, 0.137], "size": [0.53, 0.48, 1.391]},
+				{"at": [0, 1.003, 1.006], "size": [0.371, 0.274, 0.348]},
+				{"at": [0, 0.66, -0.869], "size": [0.151, 0.12, 0.621]}
+			]
+		},
+		"creature.boar_king": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.73, 1.47, 1.94],
+			"tolerance": 0.15,
+			"budget": 3500,
+			"source": {"by": "art-gen (creature.boar's mesh), art-kit (the boar king: bulk, tusks, ridge, scars, scale 1.55); rig and clips Quaternius", "tool": "blender",
+				"license": "own (mesh); CC0 1.0 (the Quaternius Pig's rig and clips, docs/licenses/quaternius-cc0_2026-10-15.txt)", "date": "2026-11-03",
+				"notes": "C:/dev/review/boar_king/make_boar_king.py run on creature.boar.blend (enemy-ai's day apex, working name; pc-character: the stock boar's skeleton): the barrel widened and a hump over the shoulders (stock verts moved); long curved ivory tusks out of the jaw on the Head bone alone, a tall bristled ridge down the spine and three pale scars raked across each flank, each new vert weighted as the stock vert nearest it; the armature scaled 1.55; 3007 tris"},
+			"uses": "the boar king, a huge old boar (enemy-ai's day apex; its forest lair): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest. creature.boar's mesh on the Quaternius Pig's rig, playing its clips; read at a distance by the long tusks (its trophy; they show when the head drops), the bristled ridge and the flank scars",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "graze", "names": ["graze", "root", "idle_eating", "eating"], "fallback": "idle"},
+				{"name": "charge", "names": ["charge"], "fallback": "run, faster, and a lunge tween"},
+				{"name": "attack", "names": ["attack", "gore", "headbutt", "attack_headbutt"], "required": true},
+				{"name": "alert", "names": ["alert", "look", "idle_2"], "fallback": "idle and a head-up tween"},
+				{"name": "hit", "names": ["hit", "hitreact", "idle_hitreact1", "idle_hitreact2", "idle_hitreact_left", "idle_hitreact_right"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.33, -0.194], "size": [0.584, 0.66, 1.164]},
+				{"at": [0, 1.065, -0.194], "size": [0.73, 0.809, 1.552]},
+				{"at": [0, 1.141, 0.776], "size": [0.511, 0.311, 0.388]}
+			]
+		},
+		"creature.great_bear": {
+			"category": "creatures",
+			"type": "mesh",
+			"kind": "creature",
+			"size": [0.79, 1.3, 2.1],
+			"tolerance": 0.15,
+			"budget": 3500,
+			"source": {"by": "art-kit (the body, by hand), pc-character (the rig and clips: tools/quadruped_rig.py)", "tool": "blender",
+				"license": "own", "date": "2026-11-04",
+				"notes": "C:/dev/review/great_bear/make_bear.py (the body: metaballs decimated to a faceted low poly, palette only) rigged by tools/quadruped_rig.py --clips bear --tail 1 (780 amended (6)) as C:/dev/review/great_bear/great_bear_rigged.blend: its own skeleton BearArmature (root, hips, spine, chest, neck, head, tail_1; per side thigh/shin/foot, upper_arm/forearm/paw), bone-heat weights, the claws and eyes on their nearest neighbours'; 11 clips, each within 4 cm of the ground (Death and Sleep raised, 2026-11-04); 3144 tris"},
+			"uses": "the great bear (780; enemy-ai's day apex, the bear's cave): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest. CreatureView plays its tells (780 amended (6)): swipe and slam struck so their contact lands on the blow's tick, charge_tell before the rush, roar, winded while winded, sleep for Pose SIT",
+			"clips": [
+				{"name": "idle", "names": ["idle"], "required": true},
+				{"name": "walk", "names": ["walk"], "required": true},
+				{"name": "run", "names": ["run", "gallop"], "required": true},
+				{"name": "attack", "names": ["swipe"], "required": true, "contact": 0.545},
+				{"name": "swipe", "names": ["swipe"], "contact": 0.545},
+				{"name": "slam", "names": ["slam"], "contact": 0.706},
+				{"name": "charge_tell", "names": ["charge_tell"]},
+				{"name": "roar", "names": ["roar"]},
+				{"name": "winded", "names": ["winded"]},
+				{"name": "sleep", "names": ["sleep"]},
+				{"name": "hit", "names": ["hit"], "fallback": "a flinch tween"},
+				{"name": "death", "names": ["death", "die"], "required": true}
+			],
+			"grey": [
+				{"at": [0, 0.3, 0.05], "size": [0.6, 0.6, 1.3]},
+				{"at": [0, 0.95, -0.15], "size": [0.79, 0.7, 1.8]},
+				{"at": [0, 1.0, 0.85], "size": [0.4, 0.35, 0.4]}
 			]
 		},
 		"creature.cow": {
