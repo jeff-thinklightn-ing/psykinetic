@@ -206,6 +206,23 @@ func _test_console() -> void:
 	_check(reply == "no --state file to save to", "'save' without --state says so (%s)" % reply)
 	reply = _main.admin_command("nonsense")
 	_check(reply.begins_with("unknown command"), "an unknown command is reported (%s)" % reply)
+	# 786: the test-only hp verb is unknown without --test-hp, and the gate
+	# needs a --run-marker beside the flag.
+	var host := _player()
+	var hp_was: int = host.hp
+	reply = _main.admin_command("hp %s 3" % host.name)
+	_check(reply.begins_with("unknown command") and host.hp == hp_was, "'hp' without --test-hp is an unknown command (%s)" % reply)
+	_check(not Main.hp_verb_allowed(true, ["--map=test_room"]), "--test-hp without a --run-marker is refused")
+	_check(not Main.hp_verb_allowed(false, ["--run-marker=7"]), "a --run-marker without --test-hp is refused")
+	_check(Main.hp_verb_allowed(true, ["--run-marker=7"]), "--test-hp beside a --run-marker is honoured")
+	Net.test_hp = true
+	reply = _main.admin_command("hp %s 3" % host.name)
+	var marked := Main.hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args()))
+	_check(not marked or host.hp == 3 and reply.begins_with("hp "), "'hp' with --test-hp and the marker sets it (%s)" % reply)
+	reply = _main.admin_command("hp %s 0" % host.name)
+	_check(not marked or host.hp == 1, "'hp' holds it to 1 at least (%s)" % reply)
+	Net.test_hp = false
+	host.hp = hp_was
 	World.damage(_slot_entity(5), 999)
 	var player := _player()
 	var was_at: Vector2i = player.tile

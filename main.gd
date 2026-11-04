@@ -4281,6 +4281,8 @@ func _boot() -> void:
 	_seat_healers()
 	_seat_gatherers()
 	_test_temple_day()
+	if Net.test_hp and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+		push_error("[test] --test-hp without --run-marker: ignored (786: a test-only flag, never the box's)")
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
 	World.bless = barrow_won  # The draugr laid to rest (decisions 548, 573).
@@ -19493,9 +19495,40 @@ func admin_command(line: String, caller: Player = null) -> String:
 			return _balance_command(words)
 		"makers":
 			return _makers_command(words)
+		"hp":
+			if hp_verb_allowed(Net.test_hp, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+				return _hp_command(words)
 		"help":
 			return "\n".join(CONSOLE_HELP)  # 672: one line a command.
 	return "unknown command %s (try help)" % words[0]
+
+
+## --test-hp (786): the "hp" verb answers only with the flag and a
+## --run-marker beside it (as _test_temple_day's guard), so on the box it is
+## an unknown command. Pure, so a test reads the gate without an ERROR line.
+static func hp_verb_allowed(flag: bool, args: Array) -> bool:
+	return flag and args.any(func(arg: Variant) -> bool: return str(arg).begins_with("--run-marker="))
+
+
+## hp <player> <n> (786, test-only): that online player's hp set to n, held
+## to 1..max_hp, the player found by name as move finds them.
+func _hp_command(words: PackedStringArray) -> String:
+	if words.size() < 3 or not words[2].is_valid_int():
+		return "hp <player> <n>: the player by name as \"players\" lists them"
+	var found: Array[Player] = []
+	for peer: int in _players:
+		var player: Player = _players[peer]
+		if not is_instance_valid(player) or not player.spawned:
+			continue
+		var record: PlayerRecord = _records.get(_peer_ids.get(peer, ""))
+		if player.name == words[1] or record != null and record.name == words[1]:
+			found.append(player)
+	if found.size() != 1:
+		return "hp: %d players online are called %s; not set" % [found.size(), words[1]]
+	var who := found[0]
+	who.hp = clampi(int(words[2]), 1, who.max_hp)
+	print("[test] hp %s: %d/%d (786)" % [who.name, who.hp, who.max_hp])
+	return "hp %s: %d/%d" % [who.name, who.hp, who.max_hp]
 
 
 ## "makers [<filter>]" (562 amended (7)): town by town, one line a worker

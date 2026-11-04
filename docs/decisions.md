@@ -40996,3 +40996,16 @@ Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator appr
   _test_town_places; resident_test (the raider seen from the new square lifted); relief_test;
   starter_town_test; view_test _test_tavern_inside. A CHANGELOG bullet. Server and level data,
   protocol unchanged (b0683fabbb20, rev 48). New class_name Relaid.
+## 786. A test-only admin verb, hp, behind --test-hp
+
+playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's
+wolves in eight minutes never fell (badly8 to badly11), and no admin verb set hp. `--test-hp`
+(Net.test_hp, server) turns on the admin verb `hp <player> <n>`: that online player's hp set
+to n, held to 1..max_hp, the player found by name as `move` finds them; a "[test] hp" line is
+printed. It is honoured only with a `--run-marker=` beside it, as 404 amended's
+`--test-temple-day` and 766's `--test-arts`: Main.hp_verb_allowed(flag, args) is the one gate.
+The flag without a marker is one ERROR at start ("a test-only flag, never the box's") and the
+verb answers "unknown command" unless both are set, so on the box it does not exist. It is not
+in the console's help. respawn_test _test_console: the verb unknown without the flag, the gate
+refusing a flag without a marker and a marker without the flag, and with both the hp set and
+held to 1. Server only, protocol unchanged, no new class_name, no bullet (a test tool).
