@@ -242,6 +242,7 @@ def main():
     config = {
         "name": "Mine look test",
         "outdoor": False,
+        "ambient": 0.03,
         "depth": 1,
         "walls": "cave",
         "floors": "cave",

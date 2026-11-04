@@ -1,6 +1,7 @@
 {
 	"name": "Mine look test",
 	"outdoor": false,
+	"ambient": 0.03,
 	"depth": 1,
 	"walls": "cave",
 	"floors": "cave",

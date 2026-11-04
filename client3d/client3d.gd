@@ -768,6 +768,17 @@ const CARRIED_PICK := 0.5
 const CARRIED_ENERGY := 1.6
 const CARRIED_RANGE := 5.0
 const CARRIED_UP := 1.2
+## The mine's wall lamps (769 amended (6)): each lantern cell with a "mine_lamp" decor
+## row lights at the piece's flame, warm, shadowless; only the
+## WALL_LAMP_NEAR nearest the camera's aim at once (picked again every
+## WALL_LAMP_PICK s), the rest left to the piece's lit panes. The piece
+## hangs as Level.DECOR_KINDS has it.
+const WALL_LAMP_ENERGY := 1.4
+const WALL_LAMP_RANGE := 5.5
+const WALL_LAMP_FALLOFF := 1.2
+const WALL_LAMP_NEAR := 6
+const WALL_LAMP_PICK := 0.5
+const WALL_LAMP_SLOT := "prop.mine_lamp"
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
@@ -2241,6 +2252,9 @@ var _carriers: Dictionary = {}
 var _carried_lights: Array[OmniLight3D] = []
 var _carried_by: Array[Node3D] = []
 var _carried_clock := 0.0
+## The room's wall lamps' lights (769 amended (6)) and the clock to the next pick.
+var _wall_lamps: Array[OmniLight3D] = []
+var _wall_lamp_clock := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
 var _sky_material: ShaderMaterial
@@ -2719,6 +2733,7 @@ func _process(delta: float) -> void:
 	_update_mourning(delta)
 	_flicker_fires(delta)
 	_light_carriers(delta)
+	_light_wall_lamps(delta)
 
 
 # --- Rig ---------------------------------------------------------------------
@@ -2788,15 +2803,19 @@ func _apply_sky() -> void:
 		_environment.background_color = BACKGROUND
 		_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 		var look: Array = ZONE_LOOK.get(str(_terrain.get("zone", "indoors")), ZONE_LOOK["indoors"])
+		# A level that sets its own "ambient" (the mine's 0.03) is that
+		# share of its zone's look, the faint key light too: past the
+		# lamps' reach its rock goes black (decision 769 amended (6)).
+		var share := ambient_share(_terrain)
 		_environment.ambient_light_color = look[0]
-		_environment.ambient_light_energy = look[1]
+		_environment.ambient_light_energy = float(look[1]) * share
 		_sun.light_color = SUN
-		_sun.light_energy = SUN_ENERGY
+		_sun.light_energy = SUN_ENERGY * share
 		# A damp level (580, terrain's side): darker and colder, a faint
 		# haze in the lanterns' light.
 		if bool(_terrain.get("damp", false)):
 			_environment.ambient_light_color = (look[0] as Color).lerp(DAMP_COLD, 0.6)
-			_environment.ambient_light_energy = float(look[1]) * DAMP_AMBIENT
+			_environment.ambient_light_energy = float(look[1]) * DAMP_AMBIENT * share
 			_environment.fog_enabled = true
 			_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
 			_environment.fog_light_color = DAMP_FOG
@@ -5808,6 +5827,7 @@ func _phase_sets() -> void:
 	_room.name = "Room"
 	add_child(_room)
 	_door_lamps.clear()  # Hung again in the new room (782).
+	_wall_lamps.clear()  # And the mine's (769 amended (6)).
 	_night_places = null
 	_stone_opaque = _stone(1.0)
 	# The map's sets; a building's walls and inside in its slot's sets
@@ -13087,6 +13107,24 @@ func _seed_shades() -> void:
 ## A lantern hung on a short post, and its pale light.
 func _add_lantern(cell: Vector2i) -> void:
 	var at := _tile_position(cell)
+	# The mine's wall lamp on this cell (769 amended (6)): its light at the piece's
+	# flame, no post; only the nearest WALL_LAMP_NEAR lit at once.
+	var hung := wall_lamp_out(_terrain.get("decor", []), cell)
+	if hung != Vector2i.ZERO:
+		var light := OmniLight3D.new()
+		light.name = "WallLamp_%d_%d" % [cell.x, cell.y]
+		light.light_color = LANTERN
+		light.light_energy = WALL_LAMP_ENERGY
+		light.omni_range = WALL_LAMP_RANGE
+		light.omni_attenuation = WALL_LAMP_FALLOFF
+		light.shadow_enabled = false
+		light.visible = false
+		var inset := float(Level.DECOR_KINDS["mine_lamp"].get("inset", 0.0))
+		light.position = wall_lamp_flame(cell, hung, _height_in(cell, Vector2(cell) + Vector2(hung) * (0.5 - inset)))
+		_room.add_child(light)
+		_wall_lamps.append(light)
+		_wall_lamp_clock = WALL_LAMP_PICK
+		return
 	var post := _box(Vector3(0.06, 0.8, 0.06), _stone_opaque)
 	post.name = "Lantern_%d_%d" % [cell.x, cell.y]
 	post.position = at
@@ -14631,6 +14669,60 @@ static func nearest_carriers(carriers: Dictionary, aim: Vector2, most: int) -> A
 	out.sort_custom(func(a: Node3D, b: Node3D) -> bool:
 		return Vector2(a.global_position.x, a.global_position.z).distance_squared_to(aim) < Vector2(b.global_position.x, b.global_position.z).distance_squared_to(aim))
 	return out.slice(0, most)
+
+
+# --- The mine's light (769 amended (6)) -----------------------------------------------------
+
+## The share of its zone's look a level's light is (769 amended (6)): terrain
+## "ambient" over DayNight.base_ambient of its zone, 1 for a level that
+## leaves it unset; at most 1 (a level is never lit above its zone).
+static func ambient_share(terrain: Dictionary) -> float:
+	var base := DayNight.base_ambient(str(terrain.get("zone", "indoors")))
+	if base <= 0.0:
+		return 1.0
+	return clampf(float(terrain.get("ambient", base)) / base, 0.0, 1.0)
+
+
+## The way out from its wall of the "mine_lamp" decor row on [param cell]
+## (its "out"), or ZERO if none hangs there.
+static func wall_lamp_out(decor: Array, cell: Vector2i) -> Vector2i:
+	for entry: Variant in decor:
+		if entry is Dictionary and str(entry.get("kind", "")) == "mine_lamp" and entry.get("cell") == cell:
+			return entry.get("out", Vector2i.ZERO)
+	return Vector2i.ZERO
+
+
+## Where a wall lamp's flame burns: the piece placed as _add_decor places
+## it (inset from the edge toward -out, its +z along -out, lifted), the
+## slot's flame socket in it; [param ground] the ground's height there.
+static func wall_lamp_flame(cell: Vector2i, out: Vector2i, ground: float) -> Vector3:
+	var row: Dictionary = Level.DECOR_KINDS["mine_lamp"]
+	var at := Vector2(cell) + Vector2(out) * (0.5 - float(row.get("inset", 0.0)))
+	var spot := Transform3D(Basis(Vector3.UP, atan2(-float(out.x), -float(out.y))), Vector3(at.x, ground + float(row.get("lift", 0.0)), at.y))
+	var socket: Variant = Flames.socket_of(WALL_LAMP_SLOT)
+	return spot * (socket as Vector3 if socket != null else Vector3(0.0, 0.12, 0.0))
+
+
+## The [param most] of [param lights] nearest [param aim] on the ground.
+static func nearest_lights(lights: Array[OmniLight3D], aim: Vector2, most: int) -> Array[OmniLight3D]:
+	var out := lights.duplicate()
+	out.sort_custom(func(a: OmniLight3D, b: OmniLight3D) -> bool:
+		return Vector2(a.position.x, a.position.z).distance_squared_to(aim) < Vector2(b.position.x, b.position.z).distance_squared_to(aim))
+	return out.slice(0, most)
+
+
+## Every WALL_LAMP_PICK s: only the nearest WALL_LAMP_NEAR wall lamps lit.
+func _light_wall_lamps(delta: float) -> void:
+	if _wall_lamps.is_empty():
+		return
+	_wall_lamp_clock += delta
+	if _wall_lamp_clock < WALL_LAMP_PICK:
+		return
+	_wall_lamp_clock = 0.0
+	var lit := nearest_lights(_wall_lamps, Vector2(_camera_target.x, _camera_target.z), WALL_LAMP_NEAR)
+	for light: OmniLight3D in _wall_lamps:
+		if is_instance_valid(light):
+			light.visible = lit.has(light)
 
 
 # --- Shadows -------------------------------------------------------------------

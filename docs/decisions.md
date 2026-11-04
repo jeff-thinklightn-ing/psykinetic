@@ -39827,6 +39827,27 @@ the ridge; no hollow; darker away from the open but never black; the walls wande
 never into the walkable; none without the key or outdoors. The level editor's level panel offers
 it (EditorFields, "past its walls": "" or "rock"; 506's every-key check). No bullet while only mine_look sets
 the key; the first real level that does brings one. Protocol unchanged, no new class_name.
+769 amended (6), environment's side: the mine's light (2026-11-04; the coordinator's design,
+agreed with dungeon, release's label). Three parts:
+- The wall lamps. A lantern cell (terrain "lanterns", the #fff0b0 marker, which Fields
+  already lights for Senses) with a "mine_lamp" decor row is lit by Client3D._add_lantern at the
+  piece's flame (wall_lamp_flame: placed as _add_decor places it, then the slot's flame socket),
+  with no post. The light is warm (LANTERN), shadowless, WALL_LAMP_ENERGY 1.4 over
+  WALL_LAMP_RANGE 5.5 m. Only the WALL_LAMP_NEAR (6) nearest the camera's aim are lit, picked
+  again every WALL_LAMP_PICK (0.5 s) (nearest_lights); the rest show only the piece's lit panes.
+  Other lanterns keep their post and light as before.
+- The dark. A level that sets its own "ambient" draws its ambient light, and the faint indoor key
+  (SUN_ENERGY), at Client3D.ambient_share of its zone's look: terrain "ambient" over
+  DayNight.base_ambient(zone), at most 1, and 1 when unset, so no level without the key changes.
+  mine_look sets "ambient": 0.03 (level.json and tools/make_mine_look.py, carried for dungeon),
+  0.075 of the indoor look, so the rock mass and walls past a lamp's reach go to black, not to
+  haze: the other half of the mass's "no black void".
+- A carried light. It is unchanged: the player's own Lantern at Fields.carried_reach (580), now
+  the main light between the lamps.
+Hollowfell's mouth (a cold daylight spill a few cells in from its link to the hills) comes with
+dungeon's level (790). Tests: weather_test _test_mine_light (the share; the lamp's wall and
+flame; the nearest lit). No CHANGELOG bullet: mine_look is a dev level. Client only, protocol
+unchanged, no new class_name.
 
 ## 771. The night watch
 

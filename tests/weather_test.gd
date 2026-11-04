@@ -32,6 +32,7 @@ func _ready() -> void:
 	_test_roofs()
 	_test_canopy()
 	_test_night_town()
+	_test_mine_light()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -426,6 +427,34 @@ func _test_canopy() -> void:
 	shafts.free()
 	Weather.reload()
 	World.steps = 0
+
+
+## The mine's light (769 amended (6)): a level's own ambient as a share of
+## its zone's, the wall lamp's flame where the piece hangs, the nearest lit.
+func _test_mine_light() -> void:
+	print("\n== the mine's light ==")
+	_check(is_equal_approx(Client3D.ambient_share({"zone": "indoors", "ambient": 0.03}), 0.075)
+			and Client3D.ambient_share({"zone": "cave", "ambient": DayNight.base_ambient("cave")}) == 1.0
+			and Client3D.ambient_share({"zone": "dungeon"}) == 1.0 and Client3D.ambient_share({"zone": "dungeon", "ambient": 0.9}) == 1.0,
+			"a level's own ambient is that share of its zone's (0.03 indoors: 0.075), unset or brighter 1")
+	var decor := [{"cell": Vector2i(3, 4), "out": Vector2i(0, -1), "kind": "mine_arch"},
+		{"cell": Vector2i(5, 4), "out": Vector2i(1, 0), "kind": "mine_lamp"}]
+	_check(Client3D.wall_lamp_out(decor, Vector2i(5, 4)) == Vector2i(1, 0) and Client3D.wall_lamp_out(decor, Vector2i(3, 4)) == Vector2i.ZERO,
+			"a lantern cell with a mine_lamp row hangs on its wall; an arch's carries none")
+	var flame := Client3D.wall_lamp_flame(Vector2i(5, 4), Vector2i(1, 0), 2.0)
+	var row: Dictionary = Level.DECOR_KINDS["mine_lamp"]
+	var wall_x := 5.0 + 0.5 - float(row["inset"])
+	_check(absf(flame.x - wall_x) < 0.1 and absf(flame.z - 4.0) < 0.05 and flame.y > 2.0 + float(row["lift"]) and flame.y < 2.0 + float(row["lift"]) + 0.4,
+			"the flame burns in the lantern hung on the wall, lifted (%s)" % [flame])
+	var lights: Array[OmniLight3D] = []
+	for x: int in [9, 1, 5, 20]:
+		var light := OmniLight3D.new()
+		light.position = Vector3(x, 0.0, 0.0)
+		lights.append(light)
+	var near := Client3D.nearest_lights(lights, Vector2(4.0, 0.0), 2)
+	_check(near.size() == 2 and near[0] == lights[2] and near[1] == lights[1], "the nearest lamps to the camera's aim are lit")
+	for light: OmniLight3D in lights:
+		light.free()
 
 
 ## The night town (782): fire pools by cluster, door lanterns' place, who
