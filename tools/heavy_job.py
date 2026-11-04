@@ -77,6 +77,19 @@ suite_lean2 (the parts after the suite) 11.8. Maps' suite
 waited 23 minutes at 18 GB free for 14.6 + 8 on 2026-10-24, about twenty
 sessions, a browser and Jeff's Ableton holding the rest.
 
+A take is not watched: it owes its whole estimate while held, and its
+kind's estimate is never measured. A process its holder starts after the
+take (art-gen's ComfyUI server, which loads the models) is attached to it
+(`attach`, 394 amended (20)): each look at the running jobs reads its
+working set and commit as the take's use, so the gate counts that memory as
+the job's, not as held outside the gate, and release records the attached
+processes' peaks (Windows' own peak counters) as the kind's estimate. A
+kind with no measured row is judged on commit at UNMEASURED_COMMIT_FACTOR
+times its RAM estimate, unless its first row names its commit: comfy_batch,
+only ever taken, sat on its first 6 GB while its server used up the commit
+(2026-11-04 00:09-00:23: free commit 1-2 GB with 15 GB of RAM free, nine
+scenes stopped, three died at launch with 0xC0000142).
+
 State and log live outside the repo, in STATE_DIR (HEAVY_JOBS_DIR to put
 them elsewhere, as the test does): running/ and queue/ hold a file a job,
 kinds.json the estimates and caps (edit a kind's max_running there to
@@ -89,6 +102,8 @@ tune it), heavy_jobs.log a line an event (`summary`).
                                                    unless --visible (664 amended (2))
   heavy_job.py take <tree> <kind> [--pid N]        wait, then hold a place (scripts that cannot wrap);
                                                    N a Windows process id (Git Bash: $(cat /proc/$$/winpid))
+  heavy_job.py attach <tree> <kind> --pid N        a process started under <tree>'s take of <kind> (a
+                                                   model server): measured as the take's (394 amended (20))
   heavy_job.py release <tree> <kind>               give back what take held
   heavy_job.py holds <tree> <kind>                 exit 0 if <tree> holds a <kind> (run or take)
   heavy_job.py status                              running, queued, free memory
@@ -166,7 +181,9 @@ BACKFILL_MARGIN = 1.25
 ## max_minutes: the limit before the kind has recorded runs.
 KINDS = {
     "trellis_mesh": {"ram_gb": 9.0, "gpu_gb": 12.0, "gpu": True},
-    "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True},
+    # Its commit near trellis_mesh's measured 20.8 GB until attach measures
+    # its server (394 amended (20)).
+    "comfy_batch": {"ram_gb": 6.0, "gpu_gb": 10.0, "gpu": True, "commit_gb": 20.0},
     "suite": {"ram_gb": 6.5, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["bench"], "max_minutes": 90,
         "lean": "suite_lean3"},  # tests/land.sh: 6.3 GB measured
     # A suite run lean (394 amended (9), (10), (12)): its estimate and runs only;
@@ -186,6 +203,10 @@ KINDS = {
     "scene": {"ram_gb": 1.5, "gpu_gb": 0.0, "gpu": False, "max_running": 2, "excludes": ["bench"], "max_minutes": 30,
         "below_normal": True},
 }
+## A kind never measured (no kinds.json row) is judged on commit at this
+## times its RAM estimate, unless its first row names commit_gb (394
+## amended (20)).
+UNMEASURED_COMMIT_FACTOR = 2.0
 GB = 1024.0 ** 3
 
 
@@ -567,6 +588,61 @@ def alive(pid, since=None):
     return since is None or started_at(pid) in (None, since)
 
 
+class _Counters(ctypes.Structure):
+    _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong),
+        ("peak_working_set", ctypes.c_size_t), ("working_set", ctypes.c_size_t),
+        ("quota_peak_paged", ctypes.c_size_t), ("quota_paged", ctypes.c_size_t),
+        ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
+        ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
+
+
+def process_memory(pid):
+    """Process [pid]'s (working set, commit, peak working set, peak
+    commit) in GB, as Windows counts them; None if it is not to be read."""
+    if not pid or os.name != "nt":
+        return None
+    kernel = ctypes.windll.kernel32
+    kernel.OpenProcess.restype = ctypes.c_void_p
+    process = kernel.OpenProcess(0x1000 | 0x0010, False, int(pid))  # QUERY_LIMITED | VM_READ
+    if not process:
+        return None
+    counters = _Counters()
+    counters.cb = ctypes.sizeof(counters)
+    ok = kernel.K32GetProcessMemoryInfo(ctypes.c_void_p(process), ctypes.byref(counters), counters.cb)
+    kernel.CloseHandle(ctypes.c_void_p(process))
+    if not ok:
+        return None
+    return (counters.working_set / GB, counters.pagefile / GB, counters.peak_working_set / GB, counters.peak_pagefile / GB)
+
+
+def measure_attached(entry, read=process_memory):
+    """A take's [entry] with its attached processes (394 amended (20))
+    read by [read] (process_memory): its using_gb and using_commit_gb their
+    sums now, attached_peak_gb and attached_peak_commit_gb the most seen
+    (their own peak counters); one gone, or its id reused, counts nothing.
+    Whether the entry changed."""
+    if not entry.get("attached"):
+        return False
+    using, commit = 0.0, 0.0
+    peak, peak_commit = entry.get("attached_peak_gb", 0.0), entry.get("attached_peak_commit_gb", 0.0)
+    for each in entry["attached"]:
+        if not alive(each.get("pid"), each.get("since")):
+            continue
+        numbers = read(each["pid"])
+        if numbers is None:
+            continue
+        using += numbers[0]
+        commit += numbers[1]
+        each["peak_gb"] = max(each.get("peak_gb", 0.0), numbers[2])
+        each["peak_commit_gb"] = max(each.get("peak_commit_gb", 0.0), numbers[3])
+    peak = max(peak, sum(each.get("peak_gb", 0.0) for each in entry["attached"]))
+    peak_commit = max(peak_commit, sum(each.get("peak_commit_gb", 0.0) for each in entry["attached"]))
+    now = (round(using, 3), round(commit, 3), round(peak, 3), round(peak_commit, 3))
+    was = (entry.get("using_gb"), entry.get("using_commit_gb"), entry.get("attached_peak_gb"), entry.get("attached_peak_commit_gb"))
+    entry["using_gb"], entry["using_commit_gb"], entry["attached_peak_gb"], entry["attached_peak_commit_gb"] = now
+    return now != was
+
+
 def started_at(pid):
     """When process [pid] was created, as Windows counts it (100 ns since
     1601), or None (not Windows, or not to be read)."""
@@ -699,12 +775,7 @@ class Job:
         return sorted(((private, working, short_command(lines.get(pid, "pid %d" % pid)))
             for pid, (private, working) in sizes.items()), reverse=True)
 
-    class _Counters(ctypes.Structure):
-        _fields_ = [("cb", ctypes.c_ulong), ("faults", ctypes.c_ulong),
-            ("peak_working_set", ctypes.c_size_t), ("working_set", ctypes.c_size_t),
-            ("quota_peak_paged", ctypes.c_size_t), ("quota_paged", ctypes.c_size_t),
-            ("quota_peak_nonpaged", ctypes.c_size_t), ("quota_nonpaged", ctypes.c_size_t),
-            ("pagefile", ctypes.c_size_t), ("peak_pagefile", ctypes.c_size_t)]
+    _Counters = _Counters
 
     def using_gb(self):
         """The working set of the job's processes now."""
@@ -858,6 +929,8 @@ def kinds():
     table = {}
     for name, first in KINDS.items():
         row = dict(first, **saved.get(name, {}))
+        if name not in saved and "commit_gb" not in first:
+            row["commit_gb"] = round(UNMEASURED_COMMIT_FACTOR * first["ram_gb"], 2)
         # Exclusions the code adds (a bench never beside a soak or a scene) hold over a
         # kinds.json written before them.
         row["excludes"] = sorted(set(first.get("excludes", [])) | set(saved.get(name, {}).get("excludes", [])))
@@ -907,6 +980,8 @@ def _entries(folder):
             os.remove(_path(folder, name))
             log("stale", entry["tree"], entry["kind"], "%s dropped" % folder)
             continue
+        if folder == "running" and not entry.get("watched") and measure_attached(entry):
+            _write(_path(folder, name), entry)
         entry["file"] = name
         out.append(entry)
     return out
@@ -1290,6 +1365,49 @@ def take(tree, kind, pid):
     return 0
 
 
+def attach(tree, kind, pid):
+    """Process [pid], started under [tree]'s take of [kind], measured as
+    the take's from now on (394 amended (20))."""
+    if _outer_run() is not None:
+        print("heavy_job: %s %s inside a run, which measures its whole tree; nothing attached" % (tree, kind))
+        return 0
+    if not alive(pid):
+        print("heavy_job: no process %s to attach" % pid, file=sys.stderr)
+        return 1
+    with StateLock():
+        for entry in _entries("running"):
+            if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
+                name = entry.pop("file")
+                attached = [each for each in entry.get("attached", []) if each.get("pid") != int(pid)]
+                entry["attached"] = attached + [{"pid": int(pid), "since": started_at(pid)}]
+                measure_attached(entry)
+                _write(_path("running", name), entry)
+                log("attach", tree, kind, "pid %s, %.1f GB commit now" % (pid, entry.get("using_commit_gb", 0.0)))
+                print("heavy_job: %s %s: pid %s measured as the take's" % (tree, kind, pid))
+                return 0
+    print("heavy_job: %s holds no %s take to attach to" % (tree, kind), file=sys.stderr)
+    return 1
+
+
+def record_attached(kind, entry):
+    """[kind]'s row in kinds.json after a take whose attached processes
+    peaked as [entry] says (394 amended (20)): RAM and commit as a run's
+    peaks set them. Nothing when none was measured."""
+    peak, peak_commit = entry.get("attached_peak_gb", 0.0), entry.get("attached_peak_commit_gb", 0.0)
+    if peak <= 0.0 and peak_commit <= 0.0:
+        return
+    table = _read(_path("kinds.json")) or {}
+    saved = dict(kinds()[kind])
+    if peak > 0.0:
+        saved["ram_gb"] = updated_estimate(saved["ram_gb"], peak)
+        saved["last_peak_gb"] = round(peak, 2)
+    if peak_commit > 0.0:
+        saved["commit_gb"] = updated_estimate(commit_of(saved), peak_commit)
+        saved["last_commit_gb"] = round(peak_commit, 2)
+    table[kind] = saved
+    _write(_path("kinds.json"), table)
+
+
 def release(tree, kind):
     outer = _outer_run()
     if outer is not None:
@@ -1300,7 +1418,10 @@ def release(tree, kind):
         for entry in _entries("running"):
             if entry["tree"] == tree and entry["kind"] == kind and not entry.get("watched"):
                 os.remove(_path("running", entry["file"]))
-                log("done", tree, kind, "released after %.0f s" % (time.time() - entry["started"]))
+                record_attached(kind, entry)
+                attached = (", attached peak %.1f GB, commit %.1f GB" % (entry.get("attached_peak_gb", 0.0),
+                    entry.get("attached_peak_commit_gb", 0.0))) if entry.get("attached") else ""
+                log("done", tree, kind, "released after %.0f s%s" % (time.time() - entry["started"], attached))
                 print("heavy_job: %s %s released" % (tree, kind))
                 return 0
     print("heavy_job: %s holds no %s" % (tree, kind), file=sys.stderr)
@@ -1415,7 +1536,7 @@ def main(args):
         print(__doc__)
         return 0
     command = args[0]
-    if command in ("run", "take", "release", "holds") and (len(args) < 3 or args[2] not in kinds()
+    if command in ("run", "take", "attach", "release", "holds") and (len(args) < 3 or args[2] not in kinds()
             or kinds()[args[2]].get("variant_of")):
         print("heavy_job: %s <tree> <kind>, a kind of: %s" % (command, ", ".join(sorted(kinds()))), file=sys.stderr)
         return 2
@@ -1442,6 +1563,11 @@ def main(args):
     if command == "take":
         pid = int(args[args.index("--pid") + 1]) if "--pid" in args else None
         return take(args[1], args[2], pid)
+    if command == "attach":
+        if "--pid" not in args or args.index("--pid") == len(args) - 1 or not args[args.index("--pid") + 1].isdigit():
+            print("heavy_job: attach <tree> <kind> --pid N", file=sys.stderr)
+            return 2
+        return attach(args[1], args[2], int(args[args.index("--pid") + 1]))
     if command == "release":
         return release(args[1], args[2])
     if command == "holds":
@@ -1457,7 +1583,7 @@ def main(args):
             print("heavy_job: note <tree> <event> <detail...>, an event of: %s" % ", ".join(NOTE_EVENTS), file=sys.stderr)
             return 2
         return note(args[1], args[2], " ".join(args[3:]))
-    print("heavy_job: no command %s (run, take, release, status, kinds, summary, note)" % command, file=sys.stderr)
+    print("heavy_job: no command %s (run, take, attach, release, status, kinds, summary, note)" % command, file=sys.stderr)
     return 2
 
 

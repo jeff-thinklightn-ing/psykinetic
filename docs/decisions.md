@@ -9332,6 +9332,29 @@ land.ps1 also beats the land lock as land.sh does (667 amended), from a PowerShe
 writes "since" each minute while its tree holds the lock and ends with the script or its
 process.
 
+394 amended (20) (perf, 2026-11-04, the coordinator's ask): a take's own processes measured,
+and a kind never measured judged on commit at twice its RAM. From 00:09 to 00:23 on 11-04 art-gen's
+comfy_batch held the gate while its ComfyUI server used up the machine's commit: free
+commit 1-2 GB with 15-17 GB of RAM free, nine scenes stopped under "free commit under 2 GB",
+three starts dead in 2 s with 0xC0000142, and the waiters told "out of reach even with no heavy
+job running (memory held outside the gate)". comfy_batch is only ever taken (art-gen takes it,
+then starts the server), so the gate never measured it; kinds.json had no row, and its first
+6 GB stood for its commit.
+- comfy_batch's first row names its commit, 20 GB (trellis_mesh measured 20.8), until it is
+  measured.
+- `heavy_job attach <tree> <kind> --pid N`: a process the holder started under its take (art-gen's
+  ComfyUI server, after the take, since starting it first would load it outside the gate) is
+  measured as the take's. Each look at the running jobs (_entries) reads the attached processes'
+  working set and commit (measure_attached, process_memory) as the take's use, so what it is owed
+  shrinks as it really uses memory and that memory is no longer counted as outside the gate;
+  release records their peaks (Windows' own peak counters, so nothing between looks is missed)
+  as the kind's estimate, as a run's do. An id since given to another process counts nothing.
+- A kind with no kinds.json row, and no commit_gb in its first row, is judged on commit at
+  UNMEASURED_COMMIT_FACTOR (2) times its RAM estimate. A measured row keeps its own.
+tests/heavy_job_test: comfy_batch's 20 GB, an unmeasured kind at twice, a measured one its own;
+measure_attached's sums and peaks; a take with a child of about 300 MB attached, owed less, and
+its peak recorded at release. Tools only.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main

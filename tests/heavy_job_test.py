@@ -665,6 +665,51 @@ gate.POLL_SECONDS = real_poll
 gate.total_ram_gb = real_total
 os.remove(gate._path("kinds.json"))
 
+print("== a take's own processes, and kinds never measured (394 amended (20)) ==")
+# comfy_batch is only ever taken, so never measured: its first 6 GB stood for
+# its commit while its ComfyUI server used up the machine's (2026-11-04).
+if os.path.exists(gate._path("kinds.json")):
+    os.remove(gate._path("kinds.json"))
+fresh = gate.kinds()
+check(fresh["comfy_batch"]["commit_gb"] == 20.0, "comfy_batch's commit estimate before any measure: 20 GB")
+check(fresh["godot_export"]["commit_gb"] == 2 * gate.KINDS["godot_export"]["ram_gb"], "an unmeasured kind: commit at twice its RAM")
+gate._write(gate._path("kinds.json"), {"godot_export": dict(gate.KINDS["godot_export"], ram_gb=2.5, commit_gb=2.6)})
+check(gate.kinds()["godot_export"]["commit_gb"] == 2.6, "a measured one: its own")
+gate._write(gate._path("kinds.json"), {"godot_export": {"ram_gb": 2.5, "gpu_gb": 0.0, "gpu": False}})
+check(gate.kinds()["godot_export"]["commit_gb"] == 2.5, "an old measured row without commit: as before (_split)")
+os.remove(gate._path("kinds.json"))
+# measure_attached with made-up numbers: sums now, peaks kept, a gone one nothing.
+me = {"pid": os.getpid(), "since": gate.started_at(os.getpid())}
+entry = {"attached": [dict(me), {"pid": 99999999, "since": 1}]}
+numbers = {os.getpid(): (1.0, 3.0, 1.5, 4.0)}
+check(gate.measure_attached(entry, lambda pid: numbers.get(pid)) and entry["using_gb"] == 1.0 and entry["using_commit_gb"] == 3.0
+    and entry["attached_peak_commit_gb"] == 4.0, "attached: its use now and its peak (%s)" % entry)
+numbers[os.getpid()] = (0.5, 1.0, 1.5, 4.0)
+gate.measure_attached(entry, lambda pid: numbers.get(pid))
+check(entry["using_commit_gb"] == 1.0 and entry["attached_peak_commit_gb"] == 4.0, "falls with it, the peak kept")
+check(not gate.measure_attached({}, lambda pid: None), "an entry with nothing attached: untouched")
+# Through take, attach and release: a child holding about 300 MB.
+import subprocess
+holder = subprocess.Popen([sys.executable, "-c", "import time; block = bytearray(300 * 1024 * 1024); time.sleep(30)"])
+time.sleep(2)
+check(gate.main(["attach", "art", "godot_export", "--pid", str(holder.pid)]) == 1, "attach with no take: refused")
+gate.take("art", "godot_export", os.getpid())
+check(gate.main(["attach", "art", "godot_export", "--pid", str(holder.pid)]) == 0, "attach to the take")
+with gate.StateLock():
+    held = [each for each in gate._entries("running") if each["tree"] == "art"]
+check(len(held) == 1 and held[0].get("using_commit_gb", 0.0) >= 0.25, "the take's use is the attached child's: %.2f GB commit" % (
+    held[0].get("using_commit_gb", 0.0) if held else -1))
+check(gate.reserved_commit_gb(held) < gate.commit_of(held[0]), "and what it is owed shrinks by it")
+holder.kill()
+holder.wait()
+gate.release("art", "godot_export")
+row = gate.kinds()["godot_export"]
+check(row.get("last_commit_gb", 0.0) >= 0.25 and row["commit_gb"] >= 0.25, "release records the attached peak as the kind's: %s" % row.get("last_commit_gb"))
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tattach\tart\tgodot_export\tpid " in text and "attached peak " in text, "the log has the attach and the peak")
+os.remove(gate._path("kinds.json"))
+
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
 sys.exit(1 if failed else 0)
