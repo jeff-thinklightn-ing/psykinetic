@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_inventory_panel()
 	_test_barter()
 	_test_sweep_key()
+	_test_crouch_key()
 	_test_practice_bars()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -1863,7 +1864,7 @@ func _test_keys() -> void:
 		"talk_log": KEY_TAB, "map": KEY_M, "lantern": KEY_L, "reset": KEY_R, "options": KEY_O, "hints": KEY_H,
 		"debug": KEY_F3, "fullscreen": KEY_F11, "builder": KEY_K, "phrase_1": KEY_1, "phrase_2": KEY_2,
 		"phrase_3": KEY_3, "phrase_4": KEY_4, "stand": KEY_SHIFT, "signature": KEY_CTRL, "bandage": KEY_B, "screenshot": KEY_F12, "yes": KEY_Y,
-		"card": KEY_C, "town": KEY_N, "world_map": KEY_J}
+		"card": KEY_C, "town": KEY_N, "world_map": KEY_J, "crouch": KEY_X}
 	var same := Keys.DEFAULTS.size() == today.size()
 	for action: String in today:
 		same = same and int(Keys.DEFAULTS.get(action, -1)) == int(today[action])
@@ -2119,6 +2120,26 @@ func _test_sweep_key() -> void:
 	for i in 20:
 		many.append({"uid": i, "id": "knife", "cell": [i, 0]})
 	_check(Client3D.sweep_flights(many).size() == Client3D.SWEEP_FLIGHTS_MOST, "at most %d fly at once" % Client3D.SWEEP_FLIGHTS_MOST)
+
+
+## X crouches and stands (784 amended (4)): the server's toggle, read back
+## from the replicated Player.crouched.
+func _test_crouch_key() -> void:
+	print("\n== X crouches and stands (784 amended (4)) ==")
+	var player: Player = _main._local_player()
+	if player == null or not "crouched" in player:
+		_check(player != null, "a player to crouch")
+		return
+	var x := InputEventKey.new()
+	x.keycode = KEY_X
+	x.pressed = true
+	var was: bool = player.get("crouched")
+	_main._unhandled_input(x)
+	var down: bool = player.get("crouched")
+	_main._unhandled_input(x)
+	_check(down != was and bool(player.get("crouched")) == was and _main.hint_lines().any(func(l: String) -> bool: return l.ends_with("crouch")),
+		"X crouches, X again stands (%s, %s, %s); the controls list names it" % [was, down, player.get("crouched")])
+	player.set("crouched", false)
 
 
 func _test_practice_bars() -> void:

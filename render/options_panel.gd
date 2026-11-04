@@ -63,7 +63,7 @@ const RESOLUTIONS: Array[Vector2i] = [Vector2i(1280, 720), Vector2i(1600, 900), 
 ## Keys.WORDS action in one (ui_test). "Testing" is shown only where
 ## dev_keys says so (Main: an admin, or a local host); its keys work anyway.
 const KEY_GROUPS := [
-	["Walking", ["forward", "back", "left", "right"]],
+	["Walking", ["forward", "back", "left", "right", "crouch"]],
 	["Actions", ["open", "pick_up", "drop", "throw", "stand", "signature", "bandage", "yes", "lantern"]],
 	["Panels", ["pack", "map", "world_map", "card", "town", "talk_log", "options", "hints"]],
 	["Talk", ["talk", "phrase_1", "phrase_2", "phrase_3", "phrase_4"]],

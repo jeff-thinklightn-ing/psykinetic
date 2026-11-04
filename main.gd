@@ -1431,6 +1431,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Keys.pressed(event, "town"):
 		toggle_town()  # 624, ui's side: the town sheet.
 		return
+	if Keys.pressed(event, "crouch"):
+		crouch()
+		return
 	if Keys.pressed(event, "reset"):
 		# A command like any other, so it works from a client too; the
 		# authority decides. With no player to send it for (dead, respawning)
@@ -17671,6 +17674,7 @@ func hint_lines() -> Array[String]:
 		"%s\topen a chest, crate, cart, door; your companion's pack" % Keys.name_of("open"), "%s\tyour pack" % Keys.name_of("pack"),
 		"%s\tyour companion's card" % Keys.name_of("card"),
 		"%s\tthe town sheet" % Keys.name_of("town"),
+		"%s\tcrouch" % Keys.name_of("crouch"),
 		"%s\tpick up" % Keys.name_of("pick_up"), "%s\tput down (hand, else pack)" % Keys.name_of("drop"), "%s\tthrow at the cursor" % Keys.name_of("throw"),
 		"%s\ta bandage on the cursor: click yourself or an ally beside you (a kit, out of combat)" % Keys.name_of("bandage"),
 		"%s hold\tbandage an ally beside you, else yourself" % Keys.name_of("open"),
@@ -17923,6 +17927,15 @@ func donate(town: String, give: Array, gold: int) -> void:
 		return
 	_town_sheet_asked.erase(town)  # The answer is a fresh sheet; a reopen may ask again.
 	World.command(player, "contribute", {"town": town, "give": give, "gold": gold})
+
+
+## X (784 amended (4)): crouch or stand. The "crouch" command with no "on"
+## toggles on the server (enemy-ai's 784 amended (2)), so the key follows
+## the replicated Player.crouched, which a blow, a draw or a throw clears.
+func crouch() -> void:
+	var player := _local_player()
+	if player != null:
+		World.command(player, "crouch", {})
 
 
 ## The first town told for the zone the player is in, "" for none.

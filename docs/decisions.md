@@ -40745,6 +40745,14 @@ knock still has the body first. view_test _test_crouch. No bullet: ui's key bull
 voice's words) carries the look ("you kneel low when still and creep when moving"). Client only; protocol unchanged; no new
 class_name.
 
+784 amended (4) (ui, release's label; the key for (2)): X crouches and stands (Keys "crouch",
+KEY_X, voice's "Crouch" in the Options' Walking rows and the controls list). Main.crouch sends "crouch" with no
+"on", so the server toggles, and the key always follows the replicated Player.crouched, which a
+swing, a draw or a throw clears (Main.CROUCH_ENDS); the client keeps no flag of its own.
+ui_test _test_crouch_key (X down, X up, the controls line) and _test_keys' defaults. One bullet
+for the key and pc-character's look (784 amended (3)), agreed with pc-character, voice's words; it
+carries none. Client only, protocol unchanged (rev 48 is (2)'s), no new class_name.
+
 ## 797. Skylights: a gap in a cave's roof
 
 Terrain's bear_cave (the great bear's den, forest plan phase B) wanted a little light on the bear in

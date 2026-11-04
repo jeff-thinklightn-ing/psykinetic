@@ -23,6 +23,7 @@ const DEFAULTS := {
 	"card": KEY_C,
 	"town": KEY_N,
 	"world_map": KEY_J,
+	"crouch": KEY_X,
 }
 ## What each action is called in the Options, in the order shown.
 const WORDS := {
@@ -39,6 +40,7 @@ const WORDS := {
 	"card": "Your companion's card",
 	"town": "The town sheet",
 	"world_map": "The world map",
+	"crouch": "Crouch",
 }
 ## Enter's other key counts as Enter.
 const ALIASES := {KEY_ENTER: [KEY_KP_ENTER]}
