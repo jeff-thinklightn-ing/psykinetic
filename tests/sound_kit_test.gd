@@ -155,6 +155,22 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.takes("amb.campfire").size() >= 2,
 			"a camp's fire (777): placed, heard further than a torch (%d > %d) and past its warmth, a torch's crackle without its own takes"
 			% [SoundKit.reach("amb.campfire"), SoundKit.reach("amb.torch_fire")])
+	_check(SoundKit.cry("boar_king", "call") == "sfx.boar_king_roar" and SoundKit.cry("boar_king", "roar") == "sfx.boar_king_roar"
+			and SoundKit.cry("boar_king", "charge") == "sfx.boar_king_charge" and SoundKit.death("boar_king") == "sfx.boar_king_death"
+			and SoundKit.footstep("dirt", 200.0, "boar_king") == "sfx.footstep_hooves_heavy" and SoundKit.CREATURE_PITCH["boar_king"] < 1.0,
+			"the boar king (795): his own roar (his call and his coming out), charge, death and heavier hooves, pitched deep")
+	_check(str(SoundKit.spec("sfx.boar_king_charge").get("fallback", "")) == "sfx.boar_charge"
+			and str(SoundKit.spec("sfx.boar_king_death").get("fallback", "")) == "sfx.boar_death"
+			and str(SoundKit.spec("sfx.footstep_hooves_heavy").get("fallback", "")) == "sfx.footstep_hooves"
+			and SoundKit.reach("sfx.boar_king_charge") == Animal.NOISE_CHARGE and SoundKit.takes("sfx.boar_king_roar").size() >= 2
+			and SoundKit.takes("sfx.boar_king_charge").size() >= 2, "his charge, death and steps a boar's where he has none of his own; takes for his roar and charge")
+	_check(SoundKit.idle("boar").has("sfx.boar_grunt") and SoundKit.idle("boar").has("sfx.boar_root") and SoundKit.idle("boar_king") == SoundKit.idle("boar")
+			and SoundKit.idle("wolf").is_empty() and SoundKit.takes("sfx.boar_grunt").size() >= 2 and SoundKit.takes("sfx.boar_root").size() >= 2
+			and SoundKit.positional("sfx.boar_grunt") and SoundKit.noise("sfx.boar_grunt") == "",
+			"a boar at peace grunts and roots (795), the king as a boar; a wolf has none; no sim noise")
+	_check(SoundKit.link_url("https://freesound.org/people/jnr hacksaw/sounds/11126/") == "https://freesound.org/people/jnr%20hacksaw/sounds/11126/"
+			and SoundKit.third_party_block().find("jnr hacksaw/") == -1 and SoundKit.third_party_block().find("jnr%20hacksaw/") >= 0,
+			"a maker's name with a space: the credit's link percent-encoded, the name as shown kept (795, release's ask)")
 	_check(SoundKit.reach("sfx.boar_charge") == Animal.NOISE_CHARGE and SoundKit.reach("sfx.wolf_howl") == Senses.NOISE_CALL,
 			"a charge carries Animal.NOISE_CHARGE, a howl the call's")
 	_check(SoundKit.death("rabbit") == "sfx.rabbit_death" and SoundKit.death("stag") == "sfx.deer_death" and SoundKit.death("brute") == "sfx.goblin_death",

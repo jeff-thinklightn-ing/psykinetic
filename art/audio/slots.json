@@ -1004,6 +1004,60 @@
 			"volume_db": -2.0,
 			"uses": "a boar bolting: a grunt and a crash (Monster.cried rout)"
 		},
+		"sfx.boar_grunt": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 12,
+			"volume_db": -10.0,
+			"uses": "a boar at peace grunting now and then (795; SoundKit.IDLE, Client3D._idle_voices); the boar king's too, pitched his"
+		},
+		"sfx.boar_root": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -12.0,
+			"uses": "a boar at peace rooting in the earth, a snuffle (795; SoundKit.IDLE, Client3D._idle_voices)"
+		},
+		"sfx.boar_king_roar": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 48,
+			"volume_db": 0.0,
+			"uses": "the boar king's deep grunt-roar (795): his call (SoundKit.OWN_CRIES call -> roar) and his roar coming out of his lair; World.far_cry's for the unseen"
+		},
+		"sfx.boar_king_charge": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "charge",
+			"volume_db": 0.0,
+			"uses": "the boar king turning to charge: a snort and squeal (795; Monster.cried charge)",
+			"fallback": "sfx.boar_charge"
+		},
+		"sfx.boar_king_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "the boar king killed (795; Client3D._fall)",
+			"fallback": "sfx.boar_death"
+		},
+		"sfx.footstep_hooves_heavy": {
+			"category": "movement",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "step",
+			"volume_db": -12.0,
+			"uses": "a step of the boar king, heavier than a boar's (795; SoundKit.FEET)",
+			"fallback": "sfx.footstep_hooves"
+		},
 		"sfx.deer_snort": {
 			"category": "creatures",
 			"type": "oneshot",

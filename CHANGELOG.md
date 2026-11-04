@@ -55,6 +55,7 @@ notes (decision 324).
 - Counters: what you collect goes back into your hand when it's free (a shield to the left), and a finished job no longer shows as still being worked (438 amended).
 - F now sweeps up everything lying near you, each thing flying in from where it lay (773, ui's side).
 - A weapon's pack square shows a thin bar for how practised you are with it (766 amended (2)).
+- Boars left in peace grunt now and then and snuffle as they root, so you hear a sounder before you see it (795).
 
 ## v0.1.200
 

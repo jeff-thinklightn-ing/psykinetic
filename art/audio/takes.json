@@ -863,6 +863,122 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.boar_grunt": [
+			{
+				"file": "sfx.boar_grunt.ogg",
+				"from": "freesound",
+				"original": "freesound 620080: LONG_Pig_Grunt_01.flac (from 0.5 s for 1.6 s)",
+				"sha256": "75b8750759d0cb8cc88fe8020fd1e7c31c4ce60ffa19423e8afb6e8cb5520c76",
+				"by": "wwstudioswastaken",
+				"url": "https://freesound.org/people/wwstudioswastaken/sounds/620080/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_grunt.2.ogg",
+				"from": "freesound",
+				"original": "freesound 612680: Pig_Grunt_01.flac (from 0.5 s for 1.6 s)",
+				"sha256": "9ef5f0a9203cf78f762bcde957a5109bee934589f10fcc36c29ade34480a54d9",
+				"by": "wwstudioswastaken",
+				"url": "https://freesound.org/people/wwstudioswastaken/sounds/612680/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_grunt.3.ogg",
+				"from": "freesound",
+				"original": "freesound 842313: Swine - Pig; Dinosaur-like Grunt (from 0 s for 1.66 s)",
+				"sha256": "502fb18f1f11c4ff4843af06083e755a66a60ef5730b3d080231ce22462a6c56",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/842313/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_grunt.4.ogg",
+				"from": "freesound",
+				"original": "freesound 620080: LONG_Pig_Grunt_01.flac (from 2.75 s for 1.5 s)",
+				"sha256": "78f9be13cd0f42debc436370c2a5c68330da8a1d46b9c28cde253b20e9ef56f2",
+				"by": "wwstudioswastaken",
+				"url": "https://freesound.org/people/wwstudioswastaken/sounds/620080/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.boar_king_charge": [
+			{
+				"file": "sfx.boar_king_charge.ogg",
+				"from": "freesound",
+				"original": "freesound 352698: Angry Pig Oinking (from 0 s for 1.4 s)",
+				"sha256": "97f1bfb27df7044334f3d61dfcd0b8622f360874a3941ccc4cd9033376c3599b",
+				"by": "Jofae",
+				"url": "https://freesound.org/people/Jofae/sounds/352698/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_charge.2.ogg",
+				"from": "freesound",
+				"original": "freesound 344972: Pig in slop squealing (from 2 s for 1.5 s)",
+				"sha256": "a5fcd8815ad50799949170e8bad66dcc783934fbc0498301608868a0ffaca925",
+				"by": "mrmunk",
+				"url": "https://freesound.org/people/mrmunk/sounds/344972/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_charge.3.ogg",
+				"from": "freesound",
+				"original": "freesound 850012: Swine - Warthog; Grunting and Squealing (from 0.5 s for 1.5 s)",
+				"sha256": "07c98abd370d65d78d997c6001f0137b3df341229b692326b7912a0310376d39",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/850012/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.boar_king_roar": [
+			{
+				"file": "sfx.boar_king_roar.ogg",
+				"from": "freesound",
+				"original": "freesound 839526: Swine - Pig; Almost Dinosaur-like Moans and some Grunts, Sheep in Background (from 0.25 s for 1.6 s)",
+				"sha256": "c4d1979e4499895a98af4d3e7c834b0fbc95d43a48dcc31db84cfc1c7361f866",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/839526/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_roar.2.ogg",
+				"from": "freesound",
+				"original": "freesound 839526: Swine - Pig; Almost Dinosaur-like Moans and some Grunts, Sheep in Background (from 3 s for 1.6 s)",
+				"sha256": "b32d8108472778b4845161c59243469d8f8d113c068799053c1be87da74371a5",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/839526/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.boar_root": [
+			{
+				"file": "sfx.boar_root.ogg",
+				"from": "freesound",
+				"original": "freesound 620084: Pig_Eating_01.flac (from 0 s for 3 s)",
+				"sha256": "c33cabba93847a9b8ad241c61825254600c4202f203cf2091c2932318bb4bae3",
+				"by": "wwstudioswastaken",
+				"url": "https://freesound.org/people/wwstudioswastaken/sounds/620084/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_root.2.ogg",
+				"from": "freesound",
+				"original": "freesound 620085: Pig_Chewing_And_Grunting_01.flac (from 0 s for 2 s)",
+				"sha256": "e5653e6277b8ca3ecf3b773bd5d6f711ee32a094856b07f6b4b442a67148f651",
+				"by": "wwstudioswastaken",
+				"url": "https://freesound.org/people/wwstudioswastaken/sounds/620085/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_root.3.ogg",
+				"from": "freesound",
+				"original": "freesound 26218: bro hog eat.wav (from 2 s for 3 s)",
+				"sha256": "ac6595a29b26843ef7530f325a4aed01201caae9eef96a003b815b59b7b55f0b",
+				"by": "Walter_Odington",
+				"url": "https://freesound.org/people/Walter_Odington/sounds/26218/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.boar_rout": [
 			{
 				"file": "sfx.boar_rout.ogg",

@@ -41465,3 +41465,25 @@ plane. The words are data, so changing one needs no new art.
   on waystone variant 3, and no words on a slot without a panel. Every printable glyph was
   checked once at 4x, Godot's triangulation against FreeType's rendering.
   Client only; protocol unchanged; no new class_name.
+## 795. The forest's sounds: the boar king, the old wolf, the lairs, the camps (part 1: boars)
+
+The design (2026-11-03) is C:/dev/review/sound/forest/design.md, approved by the coordinator. It covers the boar king, the old wolf and his pack's answer, the lairs' level "ambience" ("cave_lair", "thicket") and the forest camps' sounds over their fire. Each part rides what already reaches the client: Monster.cried, the spawn spec's kind, the level's decor and places. **No new message**. The later parts land as "795, sound's side (n)" as their kinds and places reach main.
+
+Part 1, boars:
+- **A boar at peace** grunts now and then (sfx.boar_grunt, about every 20 s) and snuffles as it roots (sfx.boar_root, about every 30 s). The table is SoundKit.IDLE / SoundKit.idle; Client3D._idle_voices checks once a second (IDLE_EVERY_MS). At most IDLE_AT_ONCE (2) sound in any IDLE_SPAN_MS (3 s), so a sounder murmurs rather than chatters. A body that fought (Client3D._combat_at) or cried (puppet meta "cried_at") in the last IDLE_QUIET_MS (6 s), or is down, stays silent. No sim noise.
+- **The boar king** (enemy-ai's kind "boar_king"; his slots wait on that kind, keyed by its name):
+  - sfx.boar_king_roar: his call (OWN_CRIES call -> roar) and his "roar" coming out of his lair, World.far_cry's for the unseen; 48 cells.
+  - sfx.boar_king_charge: his "charge" cry, falling back to sfx.boar_charge.
+  - sfx.boar_king_death, falling back to sfx.boar_death.
+  - sfx.footstep_hooves_heavy (SoundKit.FEET), falling back to sfx.footstep_hooves.
+  - He idles as a boar (IDLE_AS), all pitched CREATURE_PITCH 0.85.
+- **THIRD_PARTY:** a take's link is percent-encoded (SoundKit.link_url; release's ask), so a maker named with a space ("jnr hacksaw") renders as a link. The name shown keeps its space; the block is regenerated.
+
+Takes, all Freesound CC0:
+- grunt: 620080 (two cuts), 612680 (wwstudioswastaken), 842313 (TheKingOfGeeks360);
+- root: 620084, 620085 (wwstudioswastaken), 26218 (Walter_Odington);
+- the king's roar: 839526 (two cuts, TheKingOfGeeks360);
+- the king's charge: 352698 (Jofae), 344972 (mrmunk), 850012 (TheKingOfGeeks360).
+His death and heavy steps have no takes of their own yet; they play the boar's.
+
+Tests: sound_kit_test (the king's routing and fallbacks, the idle table, the link's encoding); view_test _test_idle_voices (three boars at peace: two heard, none more in the span, none just after a fight, none on a miss). Review: C:/dev/review/sound/forest. CHANGELOG (voice's words). Client only, protocol unchanged, no new class_name.

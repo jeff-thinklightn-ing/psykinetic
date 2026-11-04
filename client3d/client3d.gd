@@ -2072,6 +2072,13 @@ var _puppets: Dictionary[int, Node3D] = {}
 const SEAM_RUBBLE_HEIGHT := 0.35
 ## A worked-out seam's rubble (art-kit's, 769).
 const SEAM_SPENT_ART := "rock.seam_spent"
+## Idle voices (795, _idle_voices): checked every IDLE_EVERY_MS, IDLE_AT_ONCE
+## in any IDLE_SPAN_MS at most, none from a body that fought or cried in the
+## last IDLE_QUIET_MS.
+const IDLE_EVERY_MS := 1000
+const IDLE_AT_ONCE := 2
+const IDLE_SPAN_MS := 3000
+const IDLE_QUIET_MS := 6000
 ## The mine's cart (769): its rolling loop held while its tile moves, its
 ## stop heard CART_STOP_MS after the last move (_sync_cart, 769 amended (4)).
 const CART_ART := "prop.mine_cart"
@@ -2156,6 +2163,9 @@ var show_all_bars := false
 ## Entity instance id -> when it was last in a fight (msec), and its hp as
 ## last seen.
 var _combat_at: Dictionary[int, int] = {}
+## The idle voices' next check and the times they last sounded (795).
+var _idle_next := 0
+var _idle_heard: Array[int] = []
 ## Puppet id -> [msec, what it swung with] of its last swing: a blow that
 ## lands soon after, beside it, was its (_struck_with).
 var _swings: Dictionary[int, Array] = {}
@@ -15649,6 +15659,7 @@ func _set_transparency(puppet: Node3D, transparency: float) -> void:
 func _sync_puppets() -> void:
 	var seen: Dictionary[int, bool] = {}
 	var now := Time.get_ticks_msec()
+	_idle_voices(now)
 	var reach := maxf(_view_reach() + PUPPET_MARGIN, Sfx.MAX_DISTANCE) if _camera != null else INF
 	var aim := Vector2(_camera_target.x, _camera_target.z)
 	var frame := Engine.get_process_frames()
@@ -20375,6 +20386,7 @@ func _on_cried(cry: StringName, id: int) -> void:
 	var monster := instance_from_id(id) as Monster
 	if puppet == null or monster == null:
 		return
+	puppet.set_meta("cried_at", Time.get_ticks_msec())
 	var creature := str(monster.spawn_spec.get("kind", ""))
 	if puppet.has_meta("creature_view"):
 		var view := puppet.get_meta("creature_view") as CreatureView
@@ -20389,6 +20401,41 @@ func _on_cried(cry: StringName, id: int) -> void:
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
 	if cry == &"rout" and not monster is Animal and music != null and sfx.listener != null 			and _cells_apart(monster.tile, sfx.listener) <= Music.TENSION_NEAR:
 		music.sting("victory")
+
+
+## A creature at peace now and then makes its idle sounds (795; SoundKit.idle:
+## a boar's grunt and its rooting snuffle), checked once a second: each body
+## heard by the listener rolls each slot's chance, IDLE_AT_ONCE sounding in
+## any IDLE_SPAN_MS at most so a sounder murmurs, not chatters. A body that
+## fought or cried in the last IDLE_QUIET_MS, or is down, is silent.
+## [param roll] in place of randf (tests).
+func _idle_voices(now: int, roll := -1.0) -> void:
+	if now < _idle_next or sfx == null or sfx.listener == null:
+		return
+	_idle_next = now + IDLE_EVERY_MS
+	var recent: Array[int] = []
+	for at: int in _idle_heard:
+		if now - at < IDLE_SPAN_MS:
+			recent.append(at)
+	_idle_heard = recent
+	for id: int in _puppets:
+		if _idle_heard.size() >= IDLE_AT_ONCE:
+			return
+		var creature := instance_from_id(id) as Monster
+		if creature == null or creature.hp <= 0:
+			continue
+		var kind := str(creature.spawn_spec.get("kind", ""))
+		var sounds := SoundKit.idle(kind)
+		var puppet: Node3D = _puppets[id]
+		if sounds.is_empty() or now - int(_combat_at.get(id, -IDLE_QUIET_MS)) < IDLE_QUIET_MS 				or now - int(puppet.get_meta("cried_at", -IDLE_QUIET_MS)) < IDLE_QUIET_MS:
+			continue
+		for slot: String in sounds:
+			if _cells_apart(creature.tile, sfx.listener) > SoundKit.reach(slot):
+				continue
+			if (randf() if roll < 0.0 else roll) < IDLE_EVERY_MS / 1000.0 / float(sounds[slot]):
+				sfx.play(slot, puppet.position + Vector3.UP * 0.5, float(SoundKit.CREATURE_PITCH.get(kind, 1.0)))
+				_idle_heard.append(now)
+				break
 
 
 func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:

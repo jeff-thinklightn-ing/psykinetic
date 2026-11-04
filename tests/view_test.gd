@@ -72,6 +72,7 @@ func _ready() -> void:
 		_test_bridge_ends()
 		_test_far_cry()
 		_test_mine_sounds()
+		_test_idle_voices()
 		await _test_monster_death()
 		await _test_companion_death()
 		await _test_down_grey()
@@ -1178,6 +1179,42 @@ func _test_mine_sounds() -> void:
 	_rig.ambience._mine_terrain = {}
 	_rig.ambience._weigh()
 	_check(hiss == null or not hiss.playing, "no mine: no lamp")
+	_rig.sfx.hear_everything = hear_was
+
+
+## 795: a boar at peace grunts or roots now and then: two at most at once
+## (a sounder murmurs, not chatters), none from one that just fought, none
+## when the roll misses.
+func _test_idle_voices() -> void:
+	print("\n== a boar at peace grunts and roots (795) ==")
+	var hear_was: bool = _rig.sfx.hear_everything
+	_rig.sfx.hear_everything = true
+	var listener_was: Variant = _rig.sfx.listener
+	var boars: Array[Monster] = [_spawn_imp(Vector2i(9, 9), "boar"), _spawn_imp(Vector2i(10, 9), "boar"), _spawn_imp(Vector2i(11, 9), "boar")]
+	_rig._process(0.0)
+	_rig.sfx.listener = Vector2i(10, 11)
+	var now := Time.get_ticks_msec() + 100000
+	_rig._idle_next = 0
+	_rig._idle_heard.clear()
+	var heard := _heard(func() -> void: _rig._idle_voices(now, 0.0))
+	var idle := ["sfx.boar_grunt", "sfx.boar_root"]
+	_check(heard.size() == Client3D.IDLE_AT_ONCE and heard.all(func(slot: String) -> bool: return slot in idle),
+			"three boars at peace, every roll a hit: two sound (%s)" % [heard])
+	var again := _heard(func() -> void: _rig._idle_voices(now + Client3D.IDLE_EVERY_MS, 0.0))
+	_check(again.is_empty(), "a second on: still two in the span, none more (%s)" % [again])
+	var later := now + Client3D.IDLE_SPAN_MS + Client3D.IDLE_EVERY_MS * 2
+	for boar: Monster in boars:
+		_rig._combat_at[boar.get_instance_id()] = later
+	var fighting := _heard(func() -> void: _rig._idle_voices(later, 0.0))
+	_check(fighting.is_empty(), "boars that just fought: silent (%s)" % [fighting])
+	for boar: Monster in boars:
+		_rig._combat_at.erase(boar.get_instance_id())
+	var missed := _heard(func() -> void: _rig._idle_voices(later + Client3D.IDLE_EVERY_MS, 0.99))
+	_check(missed.is_empty(), "the rolls missing: silent (%s)" % [missed])
+	for boar: Monster in boars:
+		World.despawn(boar)
+	_rig.sfx.listener = listener_was
+	_rig._process(0.0)
 	_rig.sfx.hear_everything = hear_was
 
 

@@ -250,7 +250,8 @@ const STEP_MASS := [50.0, 100.0]
 
 
 ## An animal's feet (enemy-ai's kinds), for its footsteps.
-const FEET := {"deer": "hooves", "stag": "hooves", "boar": "hooves", "rabbit": "paws", "wolf": "claws"}
+const FEET := {"deer": "hooves", "stag": "hooves", "boar": "hooves", "rabbit": "paws", "wolf": "claws",
+		"boar_king": "hooves_heavy"}
 
 
 ## The footstep slot for a body of [param mass] on [param ground] (a floor
@@ -267,7 +268,7 @@ static func footstep(ground: String, mass: float, creature := "") -> String:
 ## The monster kinds that are goblins (and one of no kind), whose cries
 ## are the goblin's slots, pitched by size: an imp high, a brute low.
 const GOBLINS := ["", "imp", "brute", "sneak"]
-const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05, "great_bear": 0.85}
+const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05, "great_bear": 0.85, "boar_king": 0.85}
 ## The slot a blow lands with, by the weapon [param id] it was struck with
 ## (World.wielded): bare hands a fist's, a blunt weapon (Items' blunt) a
 ## blunt one's, any other weapon a blade's; on flesh, or on metal where the
@@ -379,9 +380,20 @@ static func speech(entity: Object, text: String) -> String:
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
 const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"},
-		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}}
+		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}, "boar_king": {"call": "roar"}}
 ## A kind that sounds as another (a stag as a deer).
 const SOUNDS_AS := {"stag": "deer"}
+## A creature's sounds while it is at peace (795): slot -> its average
+## seconds between, each body on its own; a kind in IDLE_AS has another's
+## (the boar king a boar's, pitched his own; Client3D._idle_voices).
+const IDLE := {"boar": {"sfx.boar_grunt": 20.0, "sfx.boar_root": 30.0}}
+const IDLE_AS := {"boar_king": "boar"}
+
+
+## The sounds [param creature] (a monster's kind) makes at peace, slot ->
+## its average seconds between (IDLE); empty for a kind with none.
+static func idle(creature: String) -> Dictionary:
+	return IDLE.get(str(IDLE_AS.get(creature, creature)), {})
 
 
 ## The name a [param creature] (a monster's kind) goes by in slot names:
@@ -626,6 +638,13 @@ static func status_markdown() -> String:
 
 ## THIRD_PARTY.md's sound slot block as it should read now: each
 ## third-party source the manifest names, and the slots played from it.
+## [param url] fit for a Markdown link (795, release's ask): a space or a
+## bracket in it (a Freesound maker named "jnr hacksaw") percent-encoded, so
+## the link renders; the name shown keeps its space.
+static func link_url(url: String) -> String:
+	return url.replace(" ", "%20").replace("(", "%28").replace(")", "%29")
+
+
 static func third_party_block() -> String:
 	var lines: Array[String] = [THIRD_PARTY_BEGIN, "", "| Source | Licence | Where | Slots played from it |", "|--------|---------|-------|----------------------|"]
 	var sources: Dictionary = manifest().get("sources", {})
@@ -655,7 +674,7 @@ static func third_party_block() -> String:
 		for take: Dictionary in takes(slot):
 			if str(take.get("by", "")) != "":
 				credits.append("- `%s` (%s): cut from [%s](%s) by %s, %s" % [slot, take.get("file", ""), str(take.get("original", "")).replace("[", "(").replace("]", ")"),
-					take.get("url", ""), take.get("by", ""), take.get("license", source(str(take.get("from", ""))).get("license", "?"))])
+					link_url(str(take.get("url", ""))), take.get("by", ""), take.get("license", source(str(take.get("from", ""))).get("license", "?"))])
 	if not credits.is_empty():
 		lines.append("")
 		lines.append("Takes credited to their makers:")
