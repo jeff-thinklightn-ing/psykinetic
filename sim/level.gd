@@ -116,7 +116,7 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "other"]
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,
 ## one place a story, its key the story's tag) is: the where-word economy
 ## and npc say it by.
