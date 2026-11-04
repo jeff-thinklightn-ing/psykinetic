@@ -93,7 +93,20 @@ var ailing := ""
 var escort_name := ""
 ## The medicine man's visit (decision 501): {"rect": the sick one's home, "who": their id, "until": World.steps}; {} for none.
 ## The guard captain's walk to a post a wave is coming at (771 amended (3)): {"rect": the post, "name", "post": true, "until"}.
+## A guard laid up hurt (791): {"rect": the temple, "laid_up": true, "until"}.
 var visit: Dictionary = {}
+## A guard's (decision 791): what it holds, [right, left] (the left "" for
+## now: a shield or a bow later needs no new protocol), and the armour it
+## wears, by trade (arm()); replicated for the views.
+var hands := PackedStringArray()
+var worn := ""
+## Main's: a guard says one of residents.json guard_fight's lines ("call",
+## "fall_back") and rallies others (body, key).
+var guard_told: Callable
+## The foe a guard fights, its pulling back hurt, when it last called.
+var _foe: Monster = null
+var _fall_back := false
+var _called_at := -1
 ## Companions' Heel (decision 485), loaded by path so this script stands
 ## with or without it: without, the lost one waits where they are.
 const HEEL_SCRIPT := "res://sim/heel.gd"
@@ -334,6 +347,12 @@ func _init() -> void:
 	replicate("person")
 	# Its town under a threat (762 amended, ui's side): the talk bar offers no Barter (Main._sheltering_seen).
 	replicate("sheltering")
+	# A guard's spear and mail and its fall (decision 791): the views draw the spear in hand (World.wielded),
+	# the mail (PersonLook reads worn) and the lying and the rise (pc-character's side).
+	replicate("hands")
+	replicate("worn")
+	replicate("down_until")
+	replicate("downed_until")
 	move_ticks = 3.0
 	senses = Senses.new(self, SIGHT_RANGE, -1.0)
 
@@ -365,6 +384,8 @@ static func doing_now(of_trade: String, type := "", worker_id := "") -> Doing:
 func _sim_tick() -> void:
 	if not Net.is_authority():
 		return
+	if World.is_downed(self):
+		return  # Downed (791, a guard): it lies till raised or carried off.
 	if strayed:
 		_tick_strayed()
 		return
@@ -407,11 +428,15 @@ func _sim_tick() -> void:
 		return
 	if not far and World.tick % LOOK_EVERY == 0 and activity.is_empty():
 		_look()  # Not while at work or asleep (566): the work sets the facing.
+	if not far and trade in FIGHTERS and _fight():
+		return  # A guard at a foe (791): the fight is the tick.
 	if World.tick - hurt_tick <= 1:
 		_hide_until = World.tick + HIDE_TICKS
 	var hidden := World.tick < _hide_until
 	var now := Doing.VISIT if not visit.is_empty() else doing_now(trade, type, worker_id)
-	if trade in FIGHTERS and (hidden or sheltering):
+	if laid_up():
+		now = Doing.VISIT  # Laid up hurt at the temple (791): off duty till its time is out.
+	elif trade in FIGHTERS and (hidden or sheltering or _fall_back):
 		now = Doing.SQUARE  # The fight is its job (762): it turns out.
 	elif hidden or (sheltering and not (now == Doing.HOME and sleeps_now() and bool(places.get("bed_roofed", false)) \
 			and (places["bed"] as Rect2i).has_point(tile))):
@@ -936,7 +961,9 @@ func facts_now() -> Array[String]:
 			out.append("%s saw to you today, and you expect to be on your feet tomorrow." % sick.get("cured_by", "Someone"))
 		else:
 			out.append("Nobody has seen to you yet. You would be glad of the medicine man, or of being walked to the healer's hut, or of a remedy.")
-	if bool(visit.get("post", false)):
+	if laid_up():
+		out.append(str(guard_rule().get("laid_up", "You were carried to the temple hurt in last night's fighting, and are off duty until tomorrow.")))  # 791.
+	elif bool(visit.get("post", false)):
 		out.append("Something is coming at %s in the dark, and you are going there to stand with the watch." % visit.get("name", "a post"))  # 771 amended (3).
 	elif not visit.is_empty():
 		out.append("You are on your way to %s's bedside, to see to %s." % [visit.get("name", "a neighbour"), visit.get("name", "them")])
@@ -1321,3 +1348,197 @@ func _step() -> void:
 		_stuck = 0
 		if not World.is_free(_goal):
 			_pick_goal()
+
+
+# --- Guards who fight (decision 791) -------------------------------------------
+## A guard (FIGHTERS) armed by Main (arm) holds a manned post it was sent to
+## (visit "post": the captain on a wave's first cue, another on a call), or
+## the square when its town is under threat or it is hurt (residents.json
+## guard_fight "fall_back_at" of its hp): it fights a foe within "hold" cells of that
+## ground (a raider or wave monster, or one that threatens it or struck it),
+## never one past "chase", from the side away from the watcher nearest the
+## foe (so the watcher and the guard can flank it, 780); out of a monster's
+## tell's cells first. It calls the others when it takes a foe. Beaten, it is
+## downed, never killed (Main._downed); unraised, laid up at the temple.
+
+## [param rule] residents.json guard_fight; [param captain] the town's captain:
+## its hp, blow and cadence, a spear in the right hand and mail worn.
+func arm(rule: Dictionary, captain: bool) -> void:
+	var most := int(rule.get("captain_hp" if captain else "hp", 30))
+	if max_hp != most:
+		max_hp = most
+		hp = most
+	attack_damage = int(rule.get("captain_damage" if captain else "damage", 3))
+	attack_ticks = int(rule.get("attack_ticks", 5))
+	senses.take(rule.get("senses", {}))  # A guard's night eyes (784 amended's Senses.take).
+	var gear: Dictionary = rule.get("gear", {})
+	var held := Items.tidy([], Items.CARRIED)
+	held[Items.RIGHT_HAND] = str(gear.get("right", "spear"))
+	held[Items.ARMOUR] = str(gear.get("armour", "mail_armour"))
+	if slots != held:
+		slots = held
+	if hands != PackedStringArray([held[Items.RIGHT_HAND], ""]):
+		hands = PackedStringArray([held[Items.RIGHT_HAND], ""])
+	if worn != held[Items.ARMOUR]:
+		worn = held[Items.ARMOUR]
+
+
+## Whether this body is an armed guard (arm).
+func armed() -> bool:
+	return trade in FIGHTERS and slots.size() > Items.ARMOUR and not slots[Items.RIGHT_HAND].is_empty()
+
+
+## Whether it is laid up hurt (791): at the temple, off duty, till its time is out.
+func laid_up() -> bool:
+	return bool(visit.get("laid_up", false))
+
+
+static func guard_rule() -> Dictionary:
+	return Townsfolk.days().get("guard_fight", {})
+
+
+## The ground it holds now: the square when its town is under threat or it
+## is hurt, the post it was sent to, else where it stands if struck just
+## now; a zero rect for none (it fights nothing).
+func _hold_area() -> Rect2i:
+	if laid_up():
+		return Rect2i()
+	if sheltering or _fall_back:
+		return places.get("square", Rect2i())
+	if bool(visit.get("post", false)) and visit.get("rect") is Rect2i:
+		return visit["rect"]
+	if World.tick - hurt_tick <= int(guard_rule().get("answer_ticks", 50)):
+		return Rect2i(tile, Vector2i.ONE)
+	return Rect2i()
+
+
+## A guard's fight this tick: true while it is at a foe (striking, closing
+## or stepping out of a tell), false to go about its night.
+func _fight() -> bool:
+	if not armed():
+		return false
+	var rule := guard_rule()
+	if hp * 1.0 < max_hp * float(rule.get("fall_back_at", 0.4)):
+		if not _fall_back:
+			_fall_back = true
+			_foe = null
+			if guard_told.is_valid():
+				guard_told.call(self, "fall_back")
+	elif hp >= max_hp:
+		_fall_back = false
+	var hold := _hold_area()
+	if hold.size == Vector2i.ZERO:
+		_foe = null
+		if hp < max_hp and World.tick - hurt_tick >= int(rule.get("rest_ticks", 600)) and (World.tick + id) % int(rule.get("heal_every", 100)) == 0:
+			World.heal(self, 1)  # Let be, a guard mends slowly.
+		return false
+	if _foe != null and (not is_instance_valid(_foe) or not _foe.spawned or _foe.hp <= 0 or _foe.zone != zone
+			or not hold.grow(int(rule.get("chase", 8))).has_point(_foe.tile)):
+		_foe = null
+	if _foe == null:
+		_foe = _pick_foe(hold.grow(int(rule.get("hold", 4))))
+		if _foe == null:
+			return false
+		if guard_told.is_valid() and (_called_at < 0 or World.tick - _called_at >= int(rule.get("call_ticks", 300))):
+			_called_at = World.tick
+			guard_told.call(self, "call")
+	activity = ""
+	var dodge := _dodge()
+	if dodge != NO_CELL:
+		if dodge != tile:
+			_aim(dodge)
+			_step()
+		return true
+	if World.in_reach(self, _foe):
+		if facing != _toward(_foe.tile):
+			World.face(self, _toward(_foe.tile))
+		World.try_attack(self, _foe)
+		return true
+	var cell := _strike_cell(_foe)
+	if cell != NO_CELL:
+		if cell != _goal:
+			_aim(cell)
+		_step()
+	return true
+
+
+## The nearest foe it sees within [param area]: a raider or a wave's
+## monster, one that would fight it, or one that struck it just now.
+func _pick_foe(area: Rect2i) -> Monster:
+	var best: Monster = null
+	var best_d := 1 << 30
+	for each: GridEntity in World.monsters():
+		var foe := each as Monster
+		if foe == null or not foe.spawned or foe.hp <= 0 or foe.zone != zone or not area.has_point(foe.tile):
+			continue
+		if not (foe.raid != "" or foe.threatens(self) or foe.struck_by == self):
+			continue
+		var d := World.distance(tile, foe.tile)
+		if d < best_d and senses.sees(foe, d, false):  # In the dark, as far as guard_fight "senses" night lets it.
+			best = foe
+			best_d = d
+	return best
+
+
+## Where it strikes [param foe] from: of the cells it can strike it from,
+## free and walkable, the one farthest from the player nearest the foe (so
+## the two come at it from either side), then the nearest to it.
+func _strike_cell(foe: Monster) -> Vector2i:
+	var watcher: GridEntity = null
+	var near := 1 << 30
+	for each: GridEntity in World.sought():
+		if each is Player and each.spawned and each.zone == zone and World.distance(each.tile, foe.tile) < near:
+			watcher = each
+			near = World.distance(each.tile, foe.tile)
+	var best := NO_CELL
+	var best_score := INF
+	for cell: Vector2i in World.strike_cells(self, foe):
+		if cell != tile and (not World.is_walkable(cell) or not World.is_free(cell)):
+			continue
+		var score := float(World.distance(tile, cell))
+		if watcher != null:
+			score -= 2.0 * World.distance(watcher.tile, cell)
+		if score < best_score:
+			best = cell
+			best_score = score
+	return best if best != NO_CELL else foe.tile
+
+
+## A cell out of a monster's tell that would land on it soon (as a
+## companion steps out of one): NO_CELL when it stands clear.
+func _dodge() -> Vector2i:
+	var danger := {}
+	var mine := false
+	var shown := World.telegraphs()
+	for id: int in shown:
+		var data: Dictionary = shown[id]
+		if str(data.get("zone", "")) != zone or int(data.get("lands_tick", 0)) - World.tick > int(guard_rule().get("dodge_look", 6)):
+			continue
+		for cell: Array in data.get("cells", []):
+			var at := Vector2i(int(cell[0]), int(cell[1]))
+			danger[at] = true
+			mine = mine or at == tile
+	if not mine:
+		return NO_CELL
+	var best := NO_CELL
+	var best_d := 1 << 30
+	for dx in range(-2, 3):
+		for dy in range(-2, 3):
+			var at := tile + Vector2i(dx, dy)
+			if danger.has(at) or not World.is_walkable(at) or not World.is_free(at):
+				continue
+			var d := maxi(absi(dx), absi(dy))
+			if d < best_d:
+				best = at
+				best_d = d
+	return best if best != NO_CELL else tile
+
+
+## Sent to [param rect] by a guard's call or a wave's cue (791, 771 amended
+## (3)): it goes there to hold it, unless laid up or already holding a post.
+func rally(rect: Rect2i, place_name: String, until: int) -> void:
+	if laid_up() or bool(visit.get("post", false)) or World.is_downed(self):
+		return
+	if sleeping():
+		wake()  # Called out of bed to the fight.
+	visit = {"rect": rect, "who": "", "name": place_name, "post": true, "until": until}

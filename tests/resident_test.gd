@@ -92,6 +92,7 @@ func _ready() -> void:
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
 	_test_watch_waves()  # 771 amended (3), the same way.
+	_test_guards()  # 791, the same way.
 
 	Production.type_of = Townsfolk.roll_type
 	remove_child(_main)
@@ -1104,6 +1105,115 @@ func _test_watch_waves() -> void:
 	_main._waves.clear()
 	World.towns.lift_threat(STORE)
 	World.production.set_away("rs-gunn", true)
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	DayNight.set_hour(12.0)
+
+## Guards who fight (decision 791): armed by trade (the captain's numbers),
+## sent to a post they hold it, strike a wave's monster there and call the
+## others; beaten, downed and never killed or taken; helped up free, the
+## guard the warmer; bled out, laid up at the temple, off duty.
+func _test_guards() -> void:
+	print("\n== guards who fight: armed, holding a post, the call, downed, raised, laid up (decision 791) ==")
+	var player := _player()
+	if player == null:
+		_check(false, "(a player)")
+		return
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	World.towns.lift_threat(STORE)
+	DayNight.set_hour(23.0)
+	World.towns.note_rescue(STORE, "rs-gunn", "Gunn", "guard")
+	World.towns.note_rescue(STORE, "rs-ward", "Ward", "guard")
+	World.production.set_away("rs-gunn", false)
+	World.production.set_away("rs-ward", false)
+	_sync()
+	var gunn := _body("rs-gunn")
+	var ward := _body("rs-ward")
+	if gunn == null or ward == null:
+		_check(false, "(Gunn and Ward, the guards: %s, %s)" % [gunn, ward])
+		return
+	var rule: Dictionary = Townsfolk.days().get("guard_fight", {})
+	var captain := gunn if _main._watch_captain(STORE) == "rs-gunn" else ward
+	var other := ward if captain == gunn else gunn
+	var other_id := other.worker_id
+	_check(captain.max_hp == int(rule.get("captain_hp", 40)) and other.max_hp == int(rule.get("hp", 30))
+			and other.attack_damage == int(rule.get("damage", 3)) and captain.attack_damage == int(rule.get("captain_damage", 4)),
+		"armed by trade: the captain's hp and blow, a guard's (%d/%d, %d/%d)" % [captain.max_hp, captain.attack_damage, other.max_hp, other.attack_damage])
+	_check(World.wielded(other) == "spear" and other.worn == "mail_armour" and other.hands == PackedStringArray(["spear", ""])
+			and not World.worn_armour(other).is_empty(),
+		"a spear in the right hand (hands [right, left]) and mail worn, its armour read (%s, %s, %s)" % [World.wielded(other), other.worn, other.hands])
+	# Sent to a post: it holds it, strikes the wave's monster there and calls the other.
+	var post_cell: Vector2i = _main._nearest_free(other.tile + Vector2i(6, 0))
+	var post_rect := Rect2i(post_cell - Vector2i.ONE, Vector2i(3, 3))
+	_put(player, _main._nearest_free(post_cell + Vector2i(0, 2)))
+	_put(other, _main._nearest_free(post_cell))
+	_put(captain, _main._nearest_free(post_cell + Vector2i(-8, 0)))
+	other.rally(post_rect, "the test post", World.steps + 3000)
+	var foe_cell: Vector2i = _main._nearest_free(post_cell + Vector2i(2, 0))
+	for offset: Vector2i in [Vector2i(2, 0), Vector2i(0, 2), Vector2i(-2, 0), Vector2i(0, -2), Vector2i(2, 2), Vector2i(-2, 2), Vector2i(2, -2), Vector2i(-2, -2)]:
+		var cell := other.tile + offset
+		if World.is_walkable(cell) and World.is_free(cell) and World.has_line_of_sight(other.tile, cell):
+			foe_cell = cell  # In the guard's sight: the test town has walls about.
+			break
+	var foe := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "RsWave%d" % World.tick,
+		"tile": foe_cell, "props": {"sight_range": 0}}) as Monster
+	if foe == null:
+		_check(false, "(the wave's monster)")
+		return
+	foe.raid = "wave:test:guards"
+	foe.max_hp = 60
+	foe.hp = 60
+	var told: Array[Dictionary] = []
+	var heard := func(kind: String, data: Dictionary) -> void:
+		if kind == "speech":
+			told.append({"kind": kind, "data": data})
+	Net.message_received.connect(heard)
+	_step_until(func() -> bool: return foe.hp < 60, 300)
+	_check(foe.hp < 60 and other._foe == foe, "at its post the guard fights the wave's monster (its hp %d)" % foe.hp)
+	var call_lines: Array = []
+	for line: Variant in rule.get("call", []):
+		call_lines.append(str(line))
+	var called := false
+	for each: Dictionary in told:
+		called = called or str(each["data"].get("text", "")) in call_lines
+	_check(called and bool(captain.visit.get("post", false)) and captain.visit.get("rect") == post_rect,
+		"taking a foe it calls, and the other guard comes to hold the post (%s; %s)" % [told, captain.visit])
+	# Beaten: downed, never killed or taken.
+	_check(World.raids._spared(other, foe, &"attack") == "", "a raider never takes a guard")
+	told.clear()
+	World.damage(other, other.hp, foe)
+	_check(World.is_downed(other) and other.spawned and other.hp == 1, "beaten: downed at 1 hp, not killed")
+	var downed_lines: Array = rule.get("downed", [])
+	_check(_told_any(told, "speech", downed_lines), "and says so (%s)" % [told])
+	# Helped up: free, and the guard thinks the better of them.
+	var score_before := Standing.score(Townsfolk.card_of(World.production, other.worker_id), player.player_id)
+	told.clear()
+	_main._guard_raised(player, other)
+	_check(not World.is_downed(other) and other.hp == roundi(other.max_hp * 0.5) and _told_any(told, "speech", rule.get("raised", [])),
+		"helped up: at half its hp, with its thanks (%d; %s)" % [other.hp, told])
+	_check(Standing.score(Townsfolk.card_of(World.production, other.worker_id), player.player_id) - score_before == Standing.setting("guard_raised"),
+		"and it thinks the better of them")
+	# Hurt below fall_back: back to the square.
+	World.despawn(foe)
+	other._foe = null
+	World.damage(other, other.hp - 1, null, &"fire")
+	World.step()
+	_check(other._fall_back, "hurt below %s of its hp: it falls back to the square" % rule.get("fall_back_at", 0.4))
+	# Bled out unraised: laid up at the temple, off duty.
+	World.damage(other, other.hp, null, &"attack")
+	World.damage(other, other.hp, null, &"bled")
+	_sync()
+	var back := _body(other_id)
+	_check(_main._laid_up.has(other_id) and back != null and back.laid_up() and not back._fight(),
+		"bled out unraised: back, laid up at the temple, off duty (%s)" % [back.visit if back != null else "no body"])
+	Net.message_received.disconnect(heard)
+	_main._laid_up.clear()
+	World.towns.lift_threat(STORE)
+	World.production.set_away("rs-gunn", true)
+	World.production.set_away("rs-ward", true)
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
 	DayNight.set_hour(12.0)

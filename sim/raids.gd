@@ -416,6 +416,8 @@ func _hook() -> void:
 ## World.spared: a raider's blow that would kill a companion takes it
 ## instead (decision 314): the group's id, else "".
 func _spared(target: GridEntity, source: GridEntity, _cause: StringName) -> String:
+	if target is Resident and (target as Resident).armed():
+		return ""  # A guard is downed, never taken (decision 791, npc's).
 	if (target is Companion or target is Resident) and source is Monster and (source as Monster).raid != "" \
 			and _groups.has((source as Monster).raid):
 		return (source as Monster).raid

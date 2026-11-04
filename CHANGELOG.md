@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Town guards carry spears and wear mail and fight what comes into town, calling the others to them; a guard beaten down can be helped up once it is calm and thanks you for it, and one left lying is carried to the temple and back on duty the next morning (791).
 - Boars left in peace grunt now and then and snuffle as they root, so you hear a sounder before you see it (795).
 - Hollowfell: the Blood Rot hold to their mine; beaten back, they fall back deeper into the tunnels and gather again (702 amended).
 - Worn slots beside the armour for a hat or hood, an amulet, a cloak, boots, two rings and a charm, and double-click puts a thing on; a hood, a felt hat and soft boots are the first made to wear, not yet in the world (788).

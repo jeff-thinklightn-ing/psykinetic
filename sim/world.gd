@@ -2837,7 +2837,7 @@ func has_hands(entity: GridEntity) -> bool:
 ## "wields", Level; decision 338). Only for fighting: a monster's hands are
 ## not a carrier's (nobody hands it things or bandages it).
 func holds_in_hands(entity: GridEntity) -> bool:
-	return has_hands(entity) or entity is Monster and entity.slots.size() >= Items.HANDED
+	return has_hands(entity) or (entity is Monster or entity is Resident) and entity.slots.size() >= Items.HANDED  # A guard's spear (791).
 
 
 ## The verb [param attacker]'s blow is struck with (decision 338): its

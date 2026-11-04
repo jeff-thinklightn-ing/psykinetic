@@ -41500,3 +41500,34 @@ His death and heavy steps have no takes of their own yet; they play the boar's.
 Tests: sound_kit_test (the king's routing and fallbacks, the idle table, the link's encoding); view_test _test_idle_voices (three boars at peace: two heard, none more in the span, none just after a fight, none on a miss). Review: C:/dev/review/sound/forest. CHANGELOG (voice's words). Client only, protocol unchanged, no new class_name.
 
 795 amended: the bear's cave, heard (release's label; the coordinator's ask, ahead of the other lairs, for terrain's 798 bear_cave and environment's 797 skylight). A new level.json key, "ambience" (Level.ambience_from, terrain["ambience"]), says how a level sounds where its zone alone would not: "" (its zone's), "cave_lair" or "thicket" (Level.AMBIENCES); another is warned and taken as "". It is read from each build's own levels/, as "ambient" is, so the wire is unchanged. EditorFields.NOT_OFFERED lists it (maps adds the thicket's use with its lairs). Under "cave_lair" Ambience.weights plays amb.lair_cave alone: a low, close cave room tone, nothing steady over 4 kHz, never the crypt's amb.dungeon or a mine's beds; the mine's amb.mine_drip falls from the floor LAIR_DRIP_SLOWER (2) times as rarely as in a mine (about every 24 s). On any level with 797's skylights, amb.skylight_air (wind in leaves, reach 5) is held at the nearest gap heard, by 777's _place_point, day and night. "thicket" changes nothing yet: it is outdoors, so the forest's beds play as outside; its flies and mud come with maps' boar lair. Takes, all Freesound CC0: amb.lair_cave from 164785 (INT Cave Room tone, deleted_user_2104797); amb.skylight_air from 676801 (peterkotrha) and 723569 (SoundsLikeYukon). Review: C:/dev/review/sound/forest/lair. Tests: sound_kit_test (the lair's bed alone, no bed without the key, a thicket as outside, Level.ambience_from, the slots); view_test _test_mine_sounds (a skylight's air near it, none out of reach). The bullet comes with whichever of this and 798 lands second. Client and level reading only; protocol unchanged, no new class_name.
+## 791. Guards who fight
+
+771's next phase (the night watch): a town's guards stop standing by and fight a wave beside the
+watcher (the coordinator's design; release's number; combat's and pc-character's notes). A guard
+(Resident.FIGHTERS) is armed by trade (Main._arm_guard at spawn and when its trade changes, through
+Resident.arm): residents.json "guard_fight" hp 30 (captain_hp 40 for the town's captain), damage 3
+(captain_damage 4), attack_ticks 5, a spear in the right hand and mail_armour worn (Resident.slots,
+hands [right, left], worn; World.holds_in_hands counts a Resident's slots as a Monster's). Resident._fight,
+each sim tick before its day: it holds ground (a post its visit names, the square when sheltering or
+hurt below fall_back_at 0.4 of its hp, else its own cell for answer_ticks after a blow), takes a foe
+seen (its Senses take guard_fight "senses" {night 0.45}, 784 amended's Senses.take: about 3 cells in pitch
+dark at its sight 7, more in any light, as enemy-ai's kinds see) within "hold" cells of it (a raid's or wave's monster, one that threatens it or struck it), dodges
+a tell (World.telegraphs) and strikes with World.try_attack in reach, else walks to a striking cell
+away from the nearest player so guard and watcher flank; idle, it heals 1 hp each heal_every ticks.
+Taking a foe it says "call" (at most every call_ticks), and the armed guards of its town within
+call_reach come to hold the same ground for rally_ticks (woken if asleep). A guard's lines are said in
+the fight, so 675's held tongue near a fight never holds them. On a wave's first cue (771 amended (3)) the
+captain and the nearest free guard (woken if asleep) go to the post; the captain says "to_post" once
+there; both go back when the wave is beaten, broke or faded. A guard's help is a bonus: the wave's size
+and the watcher's pay never count it. Beaten, a guard is downed (Main._downed, downed_s 45), never
+killed, and a raider never takes one (Raids._spared, enemy-ai's file, told); it says "downed". Anyone
+may help it up, free and without a blessing, when calm (Main._start_channel): Main._guard_raised, half
+its hp, "raised", and the guard's standing for a player "guard_raised" (1). Unraised, it bleeds out:
+carried to the temple (else shelter, else home) and laid up (Main._laid_up, not saved) till back_hour
+6:00 of the next day, or the day after past noon; laid up it does not fight. A guard's kill credits the
+guard (combat's note). Voice's words (fall_back, call, to_post, downed, raised, laid_up). resident_test
+_test_guards: armed numbers and gear, at a post it strikes a wave's monster and calls the other, never
+taken, downed with its line, raised at half with its thanks and regard, falls back, bled out laid up and
+off duty. A Resident now replicates hands, worn, down_until and downed_until (names
+SUBCLASS_REPLICATED already lists), so a client draws a guard's spear and mail and a downed guard;
+the protocol revision is release's. No new class_name.

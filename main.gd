@@ -6323,6 +6323,7 @@ func _watch_tick(steps: int) -> void:
 	if Townsfolk._within(hour, float(rule.get("end", 6)), float(rule.get("from", 18))):
 		_watch_dawn()
 		return
+	_guard_to_post()  # 791: the captain come to a wave's post speaks.
 	var grace := float(rule.get("grace_hours", 1.0)) * maxi(DayNight.day_steps, 24) / 24.0
 	var reach := int(rule.get("reach", 4))
 	for town: String in _watch.keys():
@@ -6505,6 +6506,13 @@ func _on_watch_wave_coming(id: String, _area: String, kind: String, _cell: Vecto
 	if captain != null:
 		captain.visit = {"rect": entry["rect"], "who": "", "name": str(entry["name"]), "post": true,
 			"until": World.steps + Raids.WAVE_MAX_TICKS}
+		_waves[id]["captain"] = captain.worker_id
+	# And one more guard per manned post (791): the nearest free one awake or woken.
+	var rect: Rect2i = entry["rect"]
+	var other := _free_guard(str(_waves[id]["town"]), rect.get_center(), [str(entry["worker"])])
+	if other != null:
+		other.rally(rect, str(entry["name"]), World.steps + Raids.WAVE_MAX_TICKS)
+		_waves[id]["guard"] = other.worker_id
 
 
 ## Server: wave [param id] beaten (Raids.wave_beaten): its watcher, still on
@@ -6565,12 +6573,127 @@ func _wave_over(id: String, town: String) -> void:
 	_waves.erase(id)
 
 
-## The captain who came to wave [param id]'s post goes back to his night.
+## The captain and the guard who came to wave [param id]'s post go back to
+## their night.
 func _captain_back(id: String) -> void:
 	var wave: Dictionary = _waves.get(id, {})
-	var captain := _resident_body(_watch_captain(str(wave.get("town", ""))))
-	if captain != null and bool(captain.visit.get("post", false)):
-		captain.visit = {}
+	for who: String in [_watch_captain(str(wave.get("town", ""))), str(wave.get("guard", ""))]:
+		var body := _resident_body(who) if not who.is_empty() else null
+		if body != null and bool(body.visit.get("post", false)):
+			body.visit = {}
+
+
+# --- Guards who fight (decision 791) --------------------------------------------
+## A town's guards (Resident.FIGHTERS) are armed by trade (residents.json
+## "guard_fight": hp, the captain's more, a player's blow and cadence, a spear and
+## mail) and fight (Resident._fight) at a manned post they are sent to and at
+## the square under a threat. Beaten, a guard is downed, never killed or
+## taken; anyone may help them up, free; unraised, they are carried to the
+## temple and laid up, off duty till the next day's work. Their help is a
+## bonus: a wave's size and its pay never count them.
+
+## Worker id -> the step its laid-up time is out (791). Not saved.
+var _laid_up: Dictionary = {}
+
+
+## [param body], if a guard: armed (the captain's numbers for its town's
+## captain), told how to speak, laid up while its time runs.
+func _arm_guard(body: Resident) -> void:
+	if body == null or not body.trade in Resident.FIGHTERS:
+		return
+	body.arm(Resident.guard_rule(), _watch_captain(body.town) == body.worker_id)
+	if not body.guard_told.is_valid():
+		body.guard_told = _guard_told
+	var until := int(_laid_up.get(body.worker_id, -1))
+	if until < 0:
+		return
+	if World.steps >= until:
+		_laid_up.erase(body.worker_id)
+	elif not body.laid_up():
+		var rest: Rect2i = body.places.get("temple", body.places.get("shelter", body.places.get("home", Rect2i())))
+		body.visit = {"rect": rest, "who": "", "name": "", "laid_up": true, "until": until}
+
+
+## A guard's line [param key] of residents.json guard_fight (call, to_post,
+## fall_back, downed, raised), said aloud; a call sends the free guards
+## within "call_reach" to hold the ground it holds.
+func _guard_told(body: Resident, key: String) -> void:
+	var rule := Resident.guard_rule()
+	var lines: Array = rule.get(key, [])
+	if not lines.is_empty() and not body.sleeping():
+		# Said in the fight, so not held as 675 holds a resident's tongue near one.
+		var words := str(lines[absi(hash(body.worker_id + key + str(World.tick / 600))) % lines.size()])
+		Transcript.record(body.person, body.person, words)
+		party_log.add("%s said: \"%s\"" % [body.person, words])
+		Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": words})
+	if key != "call":
+		return
+	var reach := int(rule.get("call_reach", 20))
+	var rect: Rect2i = body.visit["rect"] if bool(body.visit.get("post", false)) and body.visit.get("rect") is Rect2i \
+		else Rect2i(body.tile - Vector2i(2, 2), Vector2i(5, 5))
+	var name := str(body.visit.get("name", "")) if bool(body.visit.get("post", false)) else ""
+	for entity: GridEntity in World.townsfolk():
+		var other := entity as Resident
+		if other != null and other != body and other.armed() and other.town == body.town and other.zone == body.zone \
+				and World.distance(other.tile, body.tile) <= reach:
+			other.rally(rect, name, World.steps + int(rule.get("rally_ticks", 3000)))
+
+
+## The nearest guard of [param town] to [param at], armed, up and free (not
+## laid up, downed or holding a post), not one of [param besides]; woken if
+## asleep; null for none.
+func _free_guard(town: String, at: Vector2i, besides: Array) -> Resident:
+	var best: Resident = null
+	var near := 1 << 30
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or body.town != town or not body.armed() or body.worker_id in besides or body.laid_up() \
+				or World.is_downed(body) or bool(body.visit.get("post", false)):
+			continue
+		var d := World.distance(body.tile, at)
+		if d < near:
+			best = body
+			near = d
+	if best != null and best.sleeping():
+		best.wake()
+	return best
+
+
+## Each wave's captain, come to its post, says a line to the watcher (once).
+func _guard_to_post() -> void:
+	for id: String in _waves:
+		var wave: Dictionary = _waves[id]
+		if bool(wave.get("said", false)) or str(wave.get("captain", "")).is_empty():
+			continue
+		var captain := _resident_body(str(wave["captain"]))
+		if captain != null and captain.visit.get("rect") is Rect2i and (captain.visit["rect"] as Rect2i).grow(1).has_point(captain.tile):
+			wave["said"] = true
+			_guard_told(captain, "to_post")
+
+
+## [param by] helped the downed guard [param body] up (791): at half its hp,
+## its line, and it thinks the better of a player.
+func _guard_raised(by: GridEntity, body: Resident) -> void:
+	World.raise_downed(body, roundi(body.max_hp * float(_field_rules().get("hp", 0.5))))
+	_guard_told(body, "raised")
+	if by is Player and World.production != null:
+		var card := Townsfolk.card_of(World.production, body.worker_id)
+		if not card.is_empty():
+			Standing.bump(card, (by as Player).player_id, Standing.setting("guard_raised"), "helped them up in a fight", World.production.now())
+			World.production.set_card(body.worker_id, card)
+	party_log.add("%s helped %s up." % [_display_name(by), _display_name(body)])
+
+
+## The guard [param body] bled out unraised (791): laid up at the temple
+## (Main's sync brings its body back there), off duty till the next day's
+## work after the fighting.
+func _guard_laid_up(body: Resident) -> void:
+	var hour := DayNight.hour(DayNight.now())
+	var day := maxi(DayNight.day_steps, 24)
+	var day_start := World.steps - roundi(hour * day / 24.0)
+	var back := float(Resident.guard_rule().get("back_hour", 6.0))
+	_laid_up[body.worker_id] = day_start + (day if hour < 12.0 else 2 * day) + roundi(back * day / 24.0)
+	print("[guards] %s: a guard carried to the temple, laid up" % body.town)
 
 
 # --- The balance quest's herder (761, npc's side (2)) -------------------------
@@ -9505,6 +9628,9 @@ static func _uses_left(record: PlayerRecord) -> int:
 ## unblessed_s, their last moments, for Bleed Out (nobody brings them back);
 ## an unblessed companion dies as ever.
 func _downed(target: GridEntity, _source: GridEntity, _cause: StringName) -> int:
+	if target is Resident and (target as Resident).armed():
+		# A guard beaten down (791): never killed; raised, or carried to the temple when its time runs out.
+		return roundi(float(Resident.guard_rule().get("downed_s", 45)) * World.TICK_RATE)
 	if target is Resident and not (target as Resident).sought.is_empty() and not (target as Resident).escort_of.is_empty():
 		# A sought one led home (613, enemy-ai's side): beaten down, not killed; a word gets them up (_sought_spoken).
 		return roundi(float(_field_rules().get("window_s", 30)) * World.TICK_RATE)
@@ -9520,6 +9646,9 @@ func _downed(target: GridEntity, _source: GridEntity, _cause: StringName) -> int
 
 ## World.entity_downed: said to the party, and to the fallen.
 func _on_downed(entity: GridEntity, _source: GridEntity, ticks: int) -> void:
+	if entity is Resident and (entity as Resident).armed():
+		_guard_told(entity as Resident, "downed")  # 791: a guard down says so; no party line.
+		return
 	var seconds := ceili(float(ticks) / World.TICK_RATE)
 	if not _blessed(entity):
 		party_log.add("%s is mortally wounded." % _display_name(entity))
@@ -9631,6 +9760,13 @@ func _all_fallen_tick() -> void:
 ## on it, or her REVIVE): [param by] blessed, with a charge left on its
 ## player's count (573: no half to carry). False if it cannot.
 func _start_channel(by: GridEntity, body: GridEntity) -> bool:
+	if body is Resident and (body as Resident).armed() and World.is_downed(body):
+		# A downed guard (791): anyone may help them up, no blessing or charge, when it is calm.
+		if not World.calm(by) or not World.calm(body):
+			if by is Player:
+				Net.broadcast_to([by.owner_peer], "party", {"from": "Server", "text": "Not while they're fighting near."})
+			return false
+		return World.try_channel(by, body, roundi(float(_field_rules().get("channel_s", 4)) * World.TICK_RATE))
 	if not World.is_downed(body) or not _blessed(by) or not _blessed(body):
 		return false  # The unblessed lie their last moments; nobody brings them back (573).
 	var record := _blessing_record(by)
@@ -9655,6 +9791,8 @@ func _on_channel(by: GridEntity, body: GridEntity, state: StringName) -> void:
 		party_log.add("%s kneels beside %s." % [_display_name(by), _display_name(body)])
 	elif state == &"broken":
 		party_log.add("%s's return of %s is broken." % [_display_name(by) if is_instance_valid(by) else "Someone", _display_name(body)])
+	elif state == &"done" and body is Resident and (body as Resident).armed():
+		_guard_raised(by, body as Resident)  # 791: free, and the guard thinks the better of them.
 	elif state == &"done":
 		var record := _blessing_record(by)
 		if record == null or not World.totem_spend(World.totem_of(record.player_id)):
@@ -9991,6 +10129,7 @@ func _sync_residents() -> void:
 			var trade := str(wanted[body.worker_id].get("trade", ""))
 			if not trade.is_empty() and body.trade != trade:
 				body.trade = trade
+			_arm_guard(body)  # 791: a guard armed, a captain's numbers, laid up while its time runs.
 			# The herder's body follows him to market and home (640, npc's side): its town the entry's.
 			var town := str(wanted[body.worker_id].get("town", ""))
 			if not town.is_empty() and body.town != town:
@@ -11866,6 +12005,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	body.sought = str(each.get("sought", ""))
 	body.holder = str(each.get("holder", ""))
 	body.where = str(each.get("where", ""))
+	_arm_guard(body)  # A guard's spear, mail and fight (791).
 	if not body.sought.is_empty():
 		if each.has("escort"):
 			body.start_escort(str(each["escort"]), str(each.get("escort_name", "")))  # Led home: beside its leader, following (613).
@@ -13463,6 +13603,8 @@ func _robber_fell(entity: GridEntity, _cause: StringName) -> void:
 
 
 func _on_entity_died(entity: GridEntity, cause: StringName) -> void:
+	if entity is Resident and (entity as Resident).armed():
+		_guard_laid_up(entity as Resident)  # 791: a guard who bled out is carried to the temple, not lost.
 	var kind := "object"
 	if entity is Player:
 		kind = "player"
