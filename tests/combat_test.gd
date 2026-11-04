@@ -1290,10 +1290,12 @@ func _test_flank() -> void:
 	World.flanked.connect(on_flank)
 	var shape := {"kind": "cone", "origin": [foe.tile.x, foe.tile.y], "facing": [1, 0], "length": 2.0, "half_angle": 60.0}
 	var plain := World.telegraph(foe, "swipe", shape, 10)
+	_check(World.flankable(foe) == 0, "flankable: not on an unmarked move")
 	_blow(back, foe)
 	_check(not World.is_stunned(foe) and heard.is_empty(), "an unmarked move: a blow from behind staggers nothing")
 	World.end_telegraph(plain, false)
 	var marked := World.telegraph(foe, "swipe", shape, 10, true)
+	_check(World.flankable(foe) == marked, "flankable: the marked move's id mid-tell (780 amended (5))")
 	_blow(front, foe)
 	_check(not World.is_stunned(foe) and heard.is_empty(), "a marked move struck from the front: nothing")
 	back.next_attack_tick = 0
@@ -1308,6 +1310,7 @@ func _test_flank() -> void:
 	foe.stunned_until_tick = 0
 	World.tick += 10
 	var again := World.telegraph(foe, "slam", shape, 10, true)
+	_check(World.flankable(foe) == 0, "flankable: not inside flank_guard")
 	_blow(back, foe)
 	_check(not World.is_stunned(foe) and int(heard["n"]) == 1, "inside flank_guard: a second flank does nothing")
 	World.end_telegraph(again, false)

@@ -40142,6 +40142,26 @@ crouch_tell, SIT to lie) comes with that row. Art-kit lands creature.hill_cat fr
 .blend (C:/dev/review/hill_cat/hill_cat_rigged.blend; contacts swipe 0.556, bite 0.5, pounce 0.5)
 after its boar king, old wolf and great bear. Tools only; protocol unchanged; no new class_name;
 no bullet.
+
+780 amended (5): a companion and an apex creature (2026-11-03, companions). Companion.apex(entity)
+is enemy-ai's Monster.is_apex(kind) (780 amended (4)), and _apex_with its GreatBear.engaged_with. A calm apex (asleep, or roaming and in no fight with her or her player)
+is no foe of hers, even pressing: she never pulls one. Seen, she warns of it once (voice's
+APEX_SEEN, APEX_ASLEEP if asleep; again after APEX_WARN_AGAIN_TICKS, 3000, out of her sight) and
+keeps out of APEX_BERTH (6) of it: Intent.AVOID steps her out, and Heel won't step her nearer one
+inside it (Companion.shuns). Told to wait, or given an order, she holds where she is (616
+amended). It engaged (going for her or her player, or struck by one lately: GreatBear.engaged_with)
+or her player's "Get them!" at it (never refused; voice's APEX_ORDERED, one wary line), she fights
+it, and while a flank move shows she goes to a free cell behind it out of the blow's cells and
+strikes there (_flank_step), told so once in her narration. World.flankable(target) is combat's
+flank rule (ed8641f0) read through an accessor: the id of an unlanded flank telegraph of a live
+target past its guard, else 0; World._try_flank uses it, so the rule stays in one place (combat's
+OK; combat_test _test_flank checks it). She under her retreat line or her player under
+REFLEX_BELOW, she breaks off (voice's APEX_BREAK, RETREAT), and the apex is her foe only while it
+goes for her, till both are over HP_THRESHOLDS[0] again; the apex she fought last tick counts, as a
+scripted stance at her player's fall may drop her quarry first. companion_test _test_great_bear.
+Server only, protocol unchanged (intent not replicated), no new class_name; no bullet (no level has
+a bear).
+
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'

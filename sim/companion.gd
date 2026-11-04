@@ -28,10 +28,10 @@ extends GridEntity
 ## her player said in the last ECHO_TICKS, or her own last SAID_REMEMBERED, are
 ## dropped.
 
-enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP, DODGE, MINE }
+enum Intent { FOLLOW, HOLD, ATTACK, SHOVE, RETREAT, IDLE, YIELD, ERRAND, REVIVE, GUIDE, REST, SLEEP, DODGE, MINE, AVOID }
 enum Stance { STAY_CLOSE, HOLD, PRESS, GUARD, PULL_BACK }
 
-const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP", "DODGE", "MINE"]
+const INTENT_NAMES: Array[String] = ["FOLLOW", "HOLD", "ATTACK", "SHOVE", "RETREAT", "IDLE", "YIELD", "ERRAND", "REVIVE", "GUIDE", "REST", "SLEEP", "DODGE", "MINE", "AVOID"]
 const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PULL_BACK"]
 const DEFAULT_STANCE := Stance.GUARD
 ## The last tick she or her player was in a fight (decision 675).
@@ -118,6 +118,17 @@ const ORDER_MINE_STOP := "\\b((stop|quit|leave off|enough|no more|done)( with)?(
 const MINE_RANGE := 4
 ## The line she says once when her pack is full of ore (769; voice's wording).
 const MINE_FULL_LINE := "My pack's full of ore. I can't carry more."
+## An apex creature (780 amended (5), the great bear): she keeps out of
+## APEX_BERTH of one not fighting her or her player (asleep too), warns of it
+## once (again after APEX_WARN_AGAIN_TICKS out of her sight), never pulls it,
+## and, it engaged, fights it, taking the flank while a flank move shows.
+## Voice's words, three to a pool.
+const APEX_BERTH := 6
+const APEX_WARN_AGAIN_TICKS := 3000
+const APEX_SEEN: Array[String] = ["A great bear. Let's give it room.", "That's a great bear. We leave it be.", "Big one. Keep wide of it."]
+const APEX_ASLEEP: Array[String] = ["It's asleep. Let's go round, quiet.", "Bear's sleeping. Don't wake it.", "Quiet now. Let it sleep."]
+const APEX_ORDERED: Array[String] = ["If you say so. Mind its paws.", "On your word, then. Stay off its front.", "Your call. Don't stand where it can reach."]
+const APEX_BREAK: Array[String] = ["Back. We can't take it like this.", "Pull back, now. Not like this.", "Leave it. We're done if we stay."]
 const ORDER_PLAY := "\\b(knucklebones|play (a game|dice|bones|a round)|(a|another) game of (bones|dice)|throw the bones)\\b"
 ## Her player's answer when she has asked them to keep watch (decision 621).
 const ORDER_YES := "\\b(yes|yeah|yep|sure|of course|ok|okay|go on|go ahead|i will|i'll watch|i'll keep watch|sleep|get some sleep)\\b"
@@ -720,6 +731,17 @@ var mining := true
 ## full (said once, till it has room again).
 var _mine_seam: Seam = null
 var _mine_full_said := false
+## Apexes she has seen: instance id -> the tick she last saw it (780 amended
+## (5)); a warning is said when one is new or long unseen.
+var _apex_seen: Dictionary[int, int] = {}
+## Broken off from an apex fight (she or her player low): till both are over
+## HP_THRESHOLDS[0] again, an apex is her foe only while it goes for her.
+var _apex_broke := false
+## The flank telegraph she was last told of, so it is narrated once.
+var _apex_told_flank := 0
+## The apex she was fighting last tick: her player's fall under REFLEX_BELOW
+## may drop her quarry (a scripted stance) before she would break off.
+var _apex_fought: GridEntity = null
 var _order_tick := -1
 var _ack_due := -1
 var _rest_heal_at := -1
@@ -1082,7 +1104,12 @@ func owner_spoke(text: String, phrase := 0) -> void:
 	else:
 		_narrate("%s calls out to you. %s" % [keeper_name(), meaning])
 	if PHRASE_STANCES.has(phrase) or not meaning.is_empty():
+		var was_engaged := _quarry != null and apex(_quarry) and _apex_engaged(_quarry)
 		_quarry = _quarry_called() if PHRASE_STANCES.get(phrase, -1) == Stance.PRESS or text.strip_edges() == "Get them!" else null
+		if _quarry != null and apex(_quarry) and not was_engaged:
+			# Her player's word sends her at an apex (780 amended (5), order wins): wary, she goes.
+			_apex_broke = false
+			_say(APEX_ORDERED[World.tick % APEX_ORDERED.size()], true)
 	if phrase == 0 and _sleeping.has("asked_at") and _answered_watch(text):
 		_ask_voice("%s just spoke to you." % keeper_name(), heard, false, true)
 		return
@@ -1769,6 +1796,8 @@ func forget(entity: GridEntity) -> void:
 		intent_target = null
 	if _quarry == entity:
 		_quarry = null
+	if _apex_fought == entity:
+		_apex_fought = null
 	if _stalked == entity:
 		_stalked = null
 	if not errand.is_empty() and errand.values().has(entity):
@@ -2290,6 +2319,8 @@ func _hostile(entity: GridEntity) -> bool:
 		return false
 	if (entity as Monster).talks:
 		return _threatens(entity)
+	if apex(entity):
+		return _apex_engaged(entity)  # Never pulled by her (780 amended (5)).
 	return entity == _quarry or not harmless(entity)
 
 
@@ -2330,7 +2361,7 @@ func _quarry_called() -> GridEntity:
 		if not entity is Monster or not entity.spawned or World.distance(tile, entity.tile) > SIGHT_RANGE:
 			continue
 		var seen := senses.sees(entity)
-		if not harmless(entity):
+		if not harmless(entity) and not (apex(entity) and not _apex_engaged(entity)):
 			if seen:
 				return null  # A fight to be had: "Get them!" means that.
 			continue
@@ -3048,6 +3079,8 @@ func doing() -> String:
 			action = "on your way to %s" % errand.get("words", "do what you were asked")
 		Intent.MINE:
 			action = "mining the ore seam near %s" % keeper_name()
+		Intent.AVOID:
+			action = "keeping well clear of the great bear"
 		Intent.GUIDE:
 			action = "leading %s to %s" % [keeper_name(), guide.goal.get("name", "where they asked") if guide != null else "where they asked"]
 		_:
@@ -4310,6 +4343,7 @@ func _act() -> void:
 		_fight_or(foe, Intent.HOLD)
 	else:
 		_choose(foe, low)
+	_apex_after_choose()
 	asleep = current_intent == Intent.SLEEP
 	if current_intent != before or intent_target != before_target:
 		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
@@ -4554,6 +4588,8 @@ func _execute() -> void:
 	if not _danger.is_empty() and current_intent != Intent.DODGE and current_intent != Intent.RETREAT:
 		# A telegraph showing (decision 663): she steps into none of it; she
 		# strikes from where she stands if she can, else waits it out.
+		if current_intent == Intent.ATTACK and _alive(intent_target) and _flank_step(intent_target):
+			return  # Round behind an apex mid-tell, out of its blow (780 amended (5)).
 		if current_intent == Intent.ATTACK and _alive(intent_target) and World.in_reach(self, intent_target):
 			World.try_attack(self, intent_target)
 		return
@@ -4570,12 +4606,16 @@ func _execute() -> void:
 			if not _alive(intent_target):
 				current_intent = Intent.FOLLOW
 				intent_target = null
+			elif _flank_step(intent_target):
+				pass  # Round behind an apex mid-tell (780 amended (5)).
 			elif World.in_reach(self, intent_target):
 				World.try_attack(self, intent_target)
 			else:
 				_close_in(intent_target)
 		Intent.MINE:
 			_mine_step()
+		Intent.AVOID:
+			_avoid_step()
 		Intent.YIELD:
 			if _yield_tile != NONE and tile != _yield_tile and World.is_free(_yield_tile):
 				_step_toward(_yield_tile, false)
@@ -5762,3 +5802,138 @@ static func _name_of(entity: GridEntity) -> String:
 ## Safe to call with a freed reference, which a target that died can be.
 static func _alive(entity: Variant) -> bool:
 	return entity != null and is_instance_valid(entity) and entity.spawned
+
+
+# --- An apex creature (780 amended (5)) ------------------------------------
+
+## Whether [param entity] is an apex creature (enemy-ai's row flag "apex").
+static func apex(entity: Variant) -> bool:
+	if not is_instance_valid(entity) or not entity is Monster:
+		return false
+	return Monster.is_apex(str((entity as Monster).spawn_spec.get("kind", ""))) or entity is GreatBear
+
+
+## Whether apex [param entity] is in a fight with her or her player (going
+## for one, or struck by one lately: GreatBear.engaged_with), or her player
+## set her on it ("Get them!"). Broken off, only one going for her.
+func _apex_engaged(entity: GridEntity) -> bool:
+	if _apex_broke:
+		return (entity as Monster).target == self
+	if entity == _quarry:
+		return true
+	return _apex_with(entity, self) or _alive(keeper) and _apex_with(entity, keeper)
+
+
+static func _apex_with(entity: GridEntity, who: GridEntity) -> bool:
+	if entity.has_method("engaged_with"):
+		return bool(entity.call("engaged_with", who))
+	return (entity as Monster).target == who
+
+
+## The nearest apex within [param reach] of [param from] not in a fight with
+## her or her player (asleep or roaming), or null.
+func _calm_apex(from: Vector2i, reach: int) -> GridEntity:
+	var best: GridEntity = null
+	for entity in World.entities():
+		if not apex(entity) or not entity.spawned or entity.zone != zone or _apex_engaged(entity):
+			continue
+		var d := World.distance(from, entity.tile)
+		if d <= reach and (best == null or d < World.distance(from, best.tile)):
+			best = entity
+	return best
+
+
+## Whether Heel should not step her into [param cell]: inside APEX_BERTH of a
+## calm apex and no farther from it than she is now (780 amended (5)).
+func shuns(cell: Vector2i) -> bool:
+	if stance == Stance.HOLD or not order.is_empty():
+		return false
+	var bear := _calm_apex(cell, APEX_BERTH - 1)
+	return bear != null and World.distance(cell, bear.tile) <= World.distance(tile, bear.tile)
+
+
+## After her intent is chosen: warn of an apex newly seen; break off from one
+## when she or her player is low; tell her of a flank move showing; step out
+## of a calm one's berth.
+func _apex_after_choose() -> void:
+	for entity in World.entities():
+		if not apex(entity) or not entity.spawned or entity.zone != zone or not senses.sees(entity):
+			continue
+		var id := entity.get_instance_id()
+		var last := int(_apex_seen.get(id, -APEX_WARN_AGAIN_TICKS - 1))
+		_apex_seen[id] = World.tick
+		if World.tick - last > APEX_WARN_AGAIN_TICKS and not _apex_engaged(entity):
+			var asleep_now := bool(entity.get("asleep"))
+			var pool := APEX_ASLEEP if asleep_now else APEX_SEEN
+			_say(pool[World.tick % pool.size()], true)
+			_narrate("You see %s%s: too strong to take on lightly. Keep clear of it unless %s takes it on." % [
+				refer(entity), ", asleep" if asleep_now else "", keeper_name()])
+	if _apex_broke and _hp_over(self, HP_THRESHOLDS[0]) and (not _alive(keeper) or _hp_over(keeper, HP_THRESHOLDS[0])):
+		_apex_broke = false
+	var fighting: GridEntity = intent_target if current_intent == Intent.ATTACK and apex(intent_target) else null
+	if fighting == null and is_instance_valid(_apex_fought) and _alive(_apex_fought):
+		fighting = _apex_fought
+	_apex_fought = intent_target if current_intent == Intent.ATTACK and apex(intent_target) else null
+	if fighting != null and not _apex_broke and (not _hp_over(self, _retreat_below()) or _alive(keeper) and not _hp_over(keeper, REFLEX_BELOW)):
+		_apex_broke = true
+		_quarry = null
+		_say(APEX_BREAK[World.tick % APEX_BREAK.size()], true)
+		_narrate("You break off from %s and call %s back." % [refer(fighting), keeper_name()])
+		current_intent = Intent.RETREAT
+		intent_target = null
+		_apex_fought = null
+		return
+	if fighting != null and current_intent == Intent.ATTACK:
+		var flank := World.flankable(fighting)
+		if flank != 0 and flank != _apex_told_flank:
+			_apex_told_flank = flank
+			_narrate("%s is winding up a blow; from behind it can be staggered." % refer(fighting).capitalize())
+	if current_intent in [Intent.FOLLOW, Intent.IDLE, Intent.MINE] and stance != Stance.HOLD and order.is_empty() \
+			and _calm_apex(tile, APEX_BERTH - 1) != null:
+		current_intent = Intent.AVOID
+		intent_target = null
+
+
+static func _hp_over(entity: GridEntity, fraction: float) -> bool:
+	return entity.max_hp <= 0 or float(entity.hp) / entity.max_hp >= fraction
+
+
+## AVOID: a step out of a calm apex's berth, to the cell within 2 farthest
+## from it, nearer her player on a tie.
+func _avoid_step() -> void:
+	var bear := _calm_apex(tile, APEX_BERTH - 1)
+	if bear == null:
+		current_intent = Intent.FOLLOW
+		return
+	var best := NONE
+	var best_key := -INF
+	for cell in _cells_within(2):
+		if cell != tile and (not World.is_walkable(cell) or not World.is_free(cell)):
+			continue
+		var key: float = World.distance(cell, bear.tile) * 10.0 - (World.distance(cell, keeper.tile) if _alive(keeper) else 0.0)
+		if key > best_key:
+			best = cell
+			best_key = key
+	if best != NONE and best != tile:
+		_step_toward(best, false)
+
+
+## Mid-tell on a flank move (World.flankable, combat's rule), fighting an
+## apex: to a free cell behind it she can strike from, out of the blow's
+## cells; there, she strikes. True while she is at it.
+func _flank_step(target: GridEntity) -> bool:
+	if not apex(target) or World.flankable(target) == 0:
+		return false
+	if World.in_reach(self, target) and World.is_behind(self, target):
+		World.try_attack(self, target)
+		return true
+	var back := Vector2(target.facing)
+	var best := NONE
+	for cell: Vector2i in World.strike_cells(self, target):
+		if _danger.has(cell) or Vector2(cell - target.tile).dot(back) >= 0.0:
+			continue
+		if best == NONE or World.distance(tile, cell) < World.distance(tile, best):
+			best = cell
+	if best == NONE:
+		return false
+	return _step_toward(best, true)

@@ -5000,6 +5000,20 @@ func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int, 
 	return id
 
 
+## The flank-marked telegraph [param target] shows now, not yet landed and
+## past its flank guard: its id, 0 for none (780, combat's rule, read here by
+## _try_flank and by companions taking the flank: 780 amended (5)). Server
+## only: 0 off authority.
+func flankable(target: GridEntity) -> int:
+	if not Net.is_authority() or not _alive(target) or tick < int(_flank_guard_until.get(target, -1)):
+		return 0
+	for id: int in _telegraphs:
+		var each: Dictionary = _telegraphs[id]
+		if each["source"] == target and bool(each.get("flank", false)) and tick < int(each["data"]["lands_tick"]):
+			return id
+	return 0
+
+
 ## Flanking (780, combat's side; enemy-ai's apex bear, a general rule): a
 ## melee blow from [param source] landing from behind (is_behind) on
 ## [param target] while it shows a flank-marked telegraph not yet landed
@@ -5008,16 +5022,8 @@ func telegraph(source: GridEntity, kind: String, shape: Dictionary, ticks: int, 
 ## flank_stagger ticks; its mover gives the move up as stunned. Not again
 ## for flank_guard ticks after. Shots and shoves never flank. Server only.
 func _try_flank(source: GridEntity, target: GridEntity) -> bool:
-	if not Net.is_authority() or not is_instance_valid(source) or not _alive(target) \
-			or tick < int(_flank_guard_until.get(target, -1)) or not is_behind(source, target):
-		return false
-	var found := 0
-	for id: int in _telegraphs:
-		var each: Dictionary = _telegraphs[id]
-		if each["source"] == target and bool(each.get("flank", false)) and tick < int(each["data"]["lands_tick"]):
-			found = id
-			break
-	if found == 0:
+	var found := flankable(target)  # Alive, marked, unlanded, past its guard.
+	if found == 0 or not is_instance_valid(source) or not is_behind(source, target):
 		return false
 	_stun_for(target, flank_stagger)
 	_flank_guard_until[target] = tick + flank_guard

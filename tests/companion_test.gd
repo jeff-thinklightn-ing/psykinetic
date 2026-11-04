@@ -114,6 +114,7 @@ func _ready() -> void:
 	_test_one_cell_door()
 	_test_mind_log_no_names()
 	_test_mines_a_seam()
+	_test_great_bear()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
 	_test_heel_leaves_his_line()
@@ -3435,6 +3436,125 @@ func _walk_own(owner: Player, cell: Vector2i, most_ticks: int) -> bool:
 			World.free_input(owner, way / maxf(way.length(), speed), World.TICK_DT)
 		World.step()
 	return Walk.arrived(owner, cell)
+
+
+func _test_great_bear() -> void:
+	print("\n== a great bear: warned of once, kept clear of, never pulled; engaged, fought from behind mid-tell; low, broken off (780 amended (5)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var stance_was := pet.stance
+	var crates := {}  # The room's things, put back after: _put shoves one aside (Chest1 off (10, 3)).
+	for entity in World.get_entities():
+		if entity.spawned and entity != owner and entity != pet and not entity is Monster:
+			crates[entity] = entity.tile
+	var phase_was := DayNight.phase
+	var anchor_was := DayNight.anchor
+	DayNight.set_hour(0.0)  # Its sleeping hours: a day beast since 780 amended (2).
+	_put(owner, Vector2i(4, 3))
+	_put(pet, Vector2i(6, 3))
+	pet.stance = Companion.Stance.PRESS
+	var bear := _main._spawn({"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear",
+		"name": "TestBear%d" % World.tick, "tile": Vector2i(11, 3)}) as GreatBear
+	_check(bear != null and Companion.apex(bear) and not Companion.apex(_spawn_imp(Vector2i(2, 6))), "a great bear is an apex, an imp is not")
+	_kill_monsters_but(bear)
+	var said_before := 0
+	for line: String in Companion.APEX_ASLEEP + Companion.APEX_SEEN:
+		said_before += pet._said.count(line)
+	for i in 5:
+		World.step()
+	_check(bear.asleep and not pet._hostile(bear) and pet._nearest_hostile(Companion.SIGHT_RANGE) == null,
+			"asleep at its den, it is no foe of hers, even pressing (%s)" % pet.intent_name())
+	_put(pet, Vector2i(7, 3))
+	for i in 40:
+		World.step()
+	var said := -said_before
+	for line: String in Companion.APEX_ASLEEP + Companion.APEX_SEEN:
+		said += pet._said.count(line)
+	_check(said == 1, "she warns of it once, sighted asleep (%d said: %s)" % [said, pet._said.slice(-3)])
+	_check(World.distance(pet.tile, bear.tile) >= Companion.APEX_BERTH and bear.asleep,
+			"and keeps out of its berth, so it sleeps on (%d off, at %s)" % [World.distance(pet.tile, bear.tile), pet.tile])
+	# Told to wait: she holds where she is, berth or not (616 amended).
+	_put(pet, Vector2i(8, 3))
+	pet.obey(Companion.order_in("Wait here."), "Wait here.")
+	for i in Companion.HESITATE_TICKS + 10:
+		World.step()
+	_check(pet.tile == Vector2i(8, 3) and pet.current_intent != Companion.Intent.AVOID, "told to wait, she waits, near it or not (%s)" % pet.intent_name())
+	pet.obey(Companion.order_in("Follow me."), "Follow me.")
+	for i in Companion.HESITATE_TICKS + 1:
+		World.step()
+	pet.stance = Companion.Stance.PRESS
+	# "Get them!": her player's word sends her in, wary.
+	var ordered_before := 0
+	for line: String in Companion.APEX_ORDERED:
+		ordered_before += pet._said.count(line)
+	pet.owner_spoke("Get them!", 3)
+	var ordered := -ordered_before
+	for line: String in Companion.APEX_ORDERED:
+		ordered += pet._said.count(line)
+	_check(pet._quarry == bear and pet._hostile(bear) and ordered == 1, "\"Get them!\" at it: she goes, with a wary word (%d)" % ordered)
+	# Fought: mid-tell on a flank move she gets behind it and strikes.
+	bear.acts = false
+	bear.asleep = false
+	bear.facing = Vector2i(-1, 0)
+	_put(pet, Vector2i(10, 3))
+	var flanked := {}
+	var on_flank := func(target: GridEntity, source: GridEntity, _id: int) -> void:
+		if target == bear:
+			flanked["by"] = source
+	World.flanked.connect(on_flank)
+	var shape := {"kind": "cone", "origin": [bear.tile.x, bear.tile.y], "facing": [-1, 0], "length": 2.0, "half_angle": 60.0}
+	var tell := World.telegraph(bear, "swipe", shape, 60, true)
+	for i in 60:
+		World.step()
+		if flanked.has("by"):
+			break
+	World.end_telegraph(tell, false)
+	World.flanked.disconnect(on_flank)
+	_check(flanked.get("by") == pet, "mid-tell she goes round behind it and staggers it (at %s, it at %s facing %s; %s)" % [pet.tile, bear.tile, bear.facing, pet.intent_name()])
+	# Her player low: she breaks off and calls them back.
+	var hp_was := owner.hp
+	var break_before := 0
+	for line: String in Companion.APEX_BREAK:
+		break_before += pet._said.count(line)
+	pet.current_intent = Companion.Intent.ATTACK
+	pet.intent_target = bear
+	owner.hp = int(owner.max_hp * 0.2)
+	World.step()
+	var broke := -break_before
+	for line: String in Companion.APEX_BREAK:
+		broke += pet._said.count(line)
+	_check(pet._apex_broke and broke == 1 and pet.current_intent != Companion.Intent.ATTACK and not pet._hostile(bear),
+			"her player low: she breaks off and calls them back (%d said, %s)" % [broke, pet.intent_name()])
+	owner.hp = hp_was
+	World.step()
+	_check(not pet._apex_broke, "both whole again, she would take it up again")
+	World.despawn(bear)
+	bear.queue_free()
+	pet.stance = stance_was
+	pet._quarry = null
+	pet._apex_seen.clear()
+	pet._apex_broke = false
+	pet._apex_fought = null
+	pet.current_intent = Companion.Intent.FOLLOW
+	pet.intent_target = null
+	DayNight.phase = phase_was
+	DayNight.anchor = anchor_was
+	DayNight.update()
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	for crate: GridEntity in crates:
+		if is_instance_valid(crate):
+			_put(crate, crates[crate])
+	_settle(pet)
+
+
+func _kill_monsters_but(keep: GridEntity) -> void:
+	for entity in World.get_entities():
+		if entity is Monster and entity != keep:
+			World.damage(entity, 999)
 
 
 func _test_mines_a_seam() -> void:

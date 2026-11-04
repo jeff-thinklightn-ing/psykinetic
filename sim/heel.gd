@@ -391,6 +391,8 @@ static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leade
 					path = pulled
 	if leader != null and is_instance_valid(leader) and leader.spawned and path[0] != goal and keep_clear(leader).has(path[0]):
 		return true
+	if body.has_method("shuns") and bool(body.call("shuns", path[0])):
+		return true  # Not into a calm apex's berth (780 amended (5)): she waits.
 	World.try_move(body, path[0] - body.tile)
 	if not route.is_empty() and body.tile == path[0]:
 		_routes[id] = {"goal": route["goal"], "at": body.tile, "path": path.slice(1)}
