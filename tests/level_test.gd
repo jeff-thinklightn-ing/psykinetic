@@ -38,6 +38,7 @@ func _ready() -> void:
 	_test_edges_and_doors()
 	_test_markers()
 	_test_heights_and_stairs()
+	_test_pit_ways_out()
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
@@ -1234,6 +1235,127 @@ func _test_heights_and_stairs() -> void:
 	var bad := Level.parse(Level.image_from_rows(_rows(1, 2, 1, 1), {Vector2i(1, 1): "stair"}), null, {})
 	_check(bad["terrain"]["stairs"].is_empty() and str(bad["warnings"]).contains("no cell one level up"),
 			"a stair with nothing above it is floor, and said so")
+
+
+## Shipped levels with a known trap, until their owner fixes it: level -> owner
+## (783, physics' side (2)). Their traps print as EXPECTED FAIL, not a failure.
+const PIT_TRAPS_EXPECTED := {
+	"foothills": "maps",  # (8, 61): 1561 cells, 5 levels down from (8, 60).
+	"mine_look": "dungeon",  # (20, 7): 8 cells, 3 levels down from (20, 8).
+}
+
+
+## 783, physics' side (2): every drop has a way back up. For each shipped
+## level's terrain, as World walks it, every ledge a body can be knocked over
+## lands where it can walk back to its rim or to a way out (_trap_landings).
+func _test_pit_ways_out() -> void:
+	print("
+== every drop has a way back up: a fall lands where it can walk to its rim or a way out (783) ==")
+	var drops := [0]
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		var level := Level.load_level(folder)
+		if level.is_empty():
+			continue
+		World.load_terrain(level["terrain"])
+		var named := _trap_landings(level, drops)
+		if not named.is_empty() and PIT_TRAPS_EXPECTED.has(folder):
+			print("  EXPECTED FAIL  %s: %d pits with no way out, landing at %s (%s fixes it)" % [folder, named.size(), named.slice(0, 8), PIT_TRAPS_EXPECTED[folder]])
+			continue
+		_check(named.is_empty(), "%s: every drop lands where its rim or a way out can be walked to (%d trap pits, landing at %s)" % [folder, named.size(), named.slice(0, 8)])
+		if named.is_empty() and PIT_TRAPS_EXPECTED.has(folder):
+			print("  NOTE  %s is fixed: take it out of PIT_TRAPS_EXPECTED" % folder)
+	_check(drops[0] > 0, "the levels have drops to check (%d ledge steps)" % drops[0])
+	# The check itself: the test room with a sheer pit sunk in it, then with a
+	# stair cut up its side.
+	var room := Level.load_level("test_room")
+	World.load_terrain(room["terrain"])
+	var low := Vector2i(1 << 20, 1 << 20)
+	var high := -low
+	for cell: Vector2i in room["terrain"]["floor"]:
+		low = low.min(cell)
+		high = high.max(cell)
+	var size := high + Vector2i(2, 2)
+	var pit := Rect2i(low + Vector2i(2, 2), Vector2i(2, 2))
+	var field := PackedFloat32Array()
+	field.resize(size.x * size.y)
+	for y in size.y:
+		for x in size.x:
+			field[y * size.x + x] = 0.0 if pit.has_point(Vector2i(x, y)) else 4 * Relief.LEVEL_M
+	World._relief = field
+	World._relief_size = size
+	var shut := _trap_landings(room, [0])
+	_check(shut.size() == 1 and str(shut[0]).contains("(4 cells, 4 levels down"), "a sheer pit four levels deep is named a trap (%s in %s)" % [shut, pit])
+	# A slope out: the four cells east of the pit's top row rising 0.4 m
+	# each (under Relief.WALK_RISE) to the room's 2 m.
+	for i in 4:
+		var at := Vector2i(pit.end.x + i, pit.position.y)
+		field[at.y * size.x + at.x] = (i + 1) * 0.4
+	World._relief = field
+	var sloped := _trap_landings(room, [0])
+	_check(sloped.is_empty(), "with a slope up its east side it is not (%s)" % [sloped])
+
+
+## The landing cells (with the region's size, the drop and its rim), one per region, of ledges in World's loaded terrain that
+## lead where neither the rim nor a way out can be walked to. Regions are
+## filled over walking steps (_terrain_blocks_step with heights, doors
+## opened); a way out is a link not closed or a cell on an edge with a
+## neighbour (level.json "neighbours"). A ledge is an orthogonal step down
+## (height_step > 0) from rim A to floor B with no wall between. [param drops]
+## [0] counts the ledges seen.
+func _trap_landings(level: Dictionary, drops: Array) -> Array:
+	var dirs: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+			Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+	var size: Vector2i = level.get("size", Vector2i.ZERO)
+	var neighbours: Dictionary = level.get("neighbours", {})
+	var exits := {}
+	for link: Dictionary in level["links"]:
+		if not link["closed"]:
+			exits[link["tile"]] = true
+	var region := {}
+	var has_exit: Array[bool] = []
+	for start: Vector2i in level["terrain"]["floor"]:
+		if region.has(start) or not World.is_walkable(start):
+			continue
+		var id := has_exit.size()
+		var out := false
+		region[start] = id
+		var queue: Array[Vector2i] = [start]
+		while not queue.is_empty():
+			var cell: Vector2i = queue.pop_back()
+			if exits.has(cell):
+				out = true
+			for d: Vector2i in dirs.slice(0, 4):
+				var side := WorldMap.side_off(size, cell + d)
+				if not side.is_empty() and neighbours.has(side):
+					out = true
+			for d: Vector2i in dirs:
+				var next := cell + d
+				if region.has(next) or World._terrain_blocks_step(cell, d, true, true):
+					continue
+				region[next] = id
+				queue.append(next)
+		has_exit.append(out)
+	var traps := {}
+	for rim: Vector2i in region:
+		for d: Vector2i in dirs.slice(0, 4):
+			var below := rim + d
+			if not region.has(below) or World.height_step(rim, d) <= 0 or World.edge_blocks(rim, d, true):
+				continue
+			drops[0] += 1
+			var landing: int = region[below]
+			if landing != region[rim] and not has_exit[landing] and not traps.has(landing):
+				traps[landing] = [below, rim, World.height_step(rim, d)]
+	var cells := {}
+	for at: Vector2i in region:
+		cells[region[at]] = int(cells.get(region[at], 0)) + 1
+	var named: Array = []
+	for landing: int in traps:
+		var trap: Array = traps[landing]
+		named.append("%s (%d cells, %d levels down from %s)" % [trap[0], cells[landing], trap[2], trap[1]])
+	named.sort()
+	return named
 
 
 func _test_falls() -> void:

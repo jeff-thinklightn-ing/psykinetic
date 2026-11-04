@@ -40115,3 +40115,20 @@ them (lore says each as it comes back; voice has the note and the carvings ready
 level_test _test_fill_hills_sights (each piece stands, the four lying ones, none on a safe path;
 every floor cell still walked to: the levels-connect checks). Server and level data; protocol
 unchanged; no new class_name.
+
+783, physics' side (2): every drop has a way back up (the coordinator's check on the
+approval: a pit that can only be left by dying is a bug). Walking climbs only a slope
+(no cliff between, Relief.WALK_RISE) or a stair one level up, so a body knocked over a
+sheer ledge must land where it can walk back. tests/level_test _test_pit_ways_out, over
+every shipped level's terrain as World walks it: the walking regions are filled over
+_terrain_blocks_step (heights, doors opened); a region has a way out if it holds a link
+not closed or a cell on an edge with a neighbour (so a pit with its own exit, later a
+"below", passes); every orthogonal ledge down from rim A to floor B with no wall between
+must land where B's region is A's or has a way out, else the level fails naming B, its
+region's size, the drop and the rim. The check's own cases: the test room with a sheer
+pit four levels deep is named, and with a slope cut up one side is not. Two shipped
+levels fail today and are marked expected-fail (PIT_TRAPS_EXPECTED, printed as EXPECTED
+FAIL, a NOTE once fixed) until their owners fix the ground, not changed here: foothills
+(maps): (8, 61), a region of 1561 cells five levels down from (8, 60); mine_look
+(dungeon): (20, 7), 8 cells three levels down from (20, 8). Test and decisions only:
+no rule, no wire, no bullet, no new class_name.
