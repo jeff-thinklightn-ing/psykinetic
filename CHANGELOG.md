@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Wading a stream or ford soaks clothes dark and glossy up to the water line, and rain soaks them all over; out of the rain they drip and dry in a minute or two, faster by a fire, and everyone, townsfolk too, steps high through the water (775).
 - At night a lantern hangs at the chapel door and on a post by the store, and townsfolk out after dark carry one (782).
 - Towns: a town left without its carpenter, hunter or woodcutter gets a new one after a week, and one sent for but never found makes the way in alone (767 amended).
 - A camp's fire crackles now, at the hills' rest camps and at raid camps, heard a few steps off (777, sound's side).

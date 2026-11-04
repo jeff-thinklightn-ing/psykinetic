@@ -86,7 +86,7 @@ var bench_state := ""
 ## --off=a,b: in the frames, pieces of the view left out, to see what each
 ## costs: shadows (the near lights' shadows), border (terrain's band round
 ## an outdoor map), glimpse (the level past a way out), far (the low
-## camera's far landmarks, 650), minimap.
+## camera's far landmarks, 650), minimap, wet (bodies' wet look, 775: none worked out or drawn).
 var off: Array[String] = []
 
 
@@ -353,6 +353,8 @@ func _frames() -> void:
 	if off.has("minimap") and _main.minimap != null:
 		_main.minimap.visible = false
 		_main.minimap.set_process(false)
+	if off.has("wet"):
+		Client3D.WetLook.off = true
 	if not off.is_empty():
 		print("BENCH left out: %s" % ", ".join(off))
 	if view != null and not fade:

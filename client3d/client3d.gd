@@ -1175,6 +1175,13 @@ const CLIP_HEAVY_CONTACT := 0.45
 const WOUND_STRIKES := ["sword", "tomb_sledge", "giant_axe", "battle_axe"]
 const CLIP_IDLE := "Idle"
 const CLIP_WALK := "Walk"
+## Wading (775; Jeff: the hills' streams fordable): water over WADE_DEPTH at the feet plays
+## the high-stepping Wade (humanoid_clips.py), WADE_PACE metres a second at speed 1 (feel's
+## client3d.gait.Wade).
+const CLIP_WADE := "Wade"
+## (A ford's FORD_DEPTH counts: since 776 every hills stream cell is a ford.)
+const WADE_DEPTH := 0.04
+const WADE_PACE := 0.94  # The walk's stride (its knees lifted, not its steps lengthened): the walk's pace.
 const CLIP_JOG := "Jog_Fwd"
 const CLIP_SPRINT := "Sprint"
 const CLIP_ATTACK := "Punch_Jab"
@@ -1255,6 +1262,8 @@ const GAIT_FOOTFALLS: Dictionary[String, Array] = {CLIP_WALK: [0.081, 0.581], "J
 ## The human bodies' one material, shared: each body's parts' colours are its
 ## instance's (HUMAN_PARTS, from its mesh's extras; the tunic the player's).
 const HUMAN_MATERIAL := preload("res://art/models/characters/human_body.tres")
+## Bodies wet from wading and rain (decision 775): client3d/wet_look.gd.
+const WetLook := preload("res://client3d/wet_look.gd")
 ## The goblin's one material (decision 494): its paint varied per goblin by
 ## instance parameters (goblin_look), so a raid draws in one batch.
 const GOBLIN_MATERIAL := preload("res://art/models/characters/goblin_body.tres")
@@ -2675,6 +2684,7 @@ func _process(delta: float) -> void:
 		return  # Half a room (decision 660): nothing to ease, fade or grow yet.
 	_end_warm_ups()
 	_sync_puppets()
+	WetLook.update(self, delta)  # Bodies wet from water and rain, and drying (775).
 	_update_seen_through()
 	_sync_doors()
 	_ease_yaw(delta)
@@ -5028,8 +5038,11 @@ func _show_outline(puppet: Node3D, show: bool, rim: ShaderMaterial = null) -> vo
 	var meshes := body.find_children("*", "MeshInstance3D", true, false)
 	if body is MeshInstance3D:
 		meshes.append(body)
+	# The wet overlay (775) passes on to the outline, so neither takes the other's place.
+	var outline: Material = (rim if rim != null else _outline) if show else null
+	puppet.set_meta("outline", outline)
 	for source: MeshInstance3D in meshes:
-		source.material_overlay = (rim if rim != null else _outline) if show else null
+		source.material_overlay = WetLook.overlay(puppet, outline, puppet.get_meta("wet_on", false))
 		_mark_stencil(source, show)
 
 
@@ -18443,6 +18456,11 @@ func _animate(puppet: Node3D) -> void:
 			return
 	if _lying_down(puppet, rig, work, speed, now, tempo):
 		return
+	if speed > WALKING and wading(puppet, rig):
+		# In water over WADE_DEPTH (775): the high-stepping wade, paced as a gait.
+		rig.loop(CLIP_WADE, clampf(speed / (ArtKit.feel("client3d.gait." + CLIP_WADE, WADE_PACE) * pace)
+				* ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
+		return
 	if speed > WALKING:
 		var gaits := paced(puppet.get_meta("gaits", GAITS))
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
@@ -18631,9 +18649,14 @@ static func paced(gaits: Array) -> Array:
 	return _paced[prefix]
 
 
-## True if [param clip] is one of GAITS'.
+## Whether [param puppet] wades (775): in water deeper than WADE_DEPTH at its feet, with a wade to play.
+func wading(puppet: Node3D, rig: AnimRig) -> bool:
+	return rig.has(CLIP_WADE) and WetLook.depth_at(self, puppet) > WADE_DEPTH
+
+
+## True if [param clip] is one of GAITS' or the wade (775).
 static func is_gait(clip: String) -> bool:
-	return GAITS.any(func(gait: Array) -> bool: return gait[0] == clip)
+	return clip == CLIP_WADE or GAITS.any(func(gait: Array) -> bool: return gait[0] == clip)
 
 
 ## Plays [param clip] once on [param puppet]'s model, if it has one, and

@@ -3,13 +3,13 @@
 # at night, the big minimap open, at the zoom Jeff plays (camera_zoom 1.1),
 # for -Seconds; then the frame time's median, 99th percentile and worst, the
 # renderer's share, and the machine. Every piece can be left out to see what
-# it costs: -Off shadows,border,glimpse,minimap and -NoFade, -Clear (a clear
+# it costs: -Off shadows,border,glimpse,minimap,wet and -NoFade, -Clear (a clear
 # day, no storm). -AA off|fxaa|smaa|msaa4 picks the anti-aliasing (the
 # game's antialias=, decision 385; smaa as the game's default). Runs with APPDATA set to a temp folder of its own (the
 # town is made there by tools/town_state), so it reads the levels as
 # committed and writes nothing to the game's own user data.
 #   tools/frame_budget.ps1 [-Godot <exe>] [-Players 9] [-Herds 4] [-Seconds 20]
-#     [-Width 1920] [-Height 1080] [-Zoom 1.1] [-AA smaa] [-Off shadows,border,glimpse,minimap] [-NoFade] [-Clear]
+#     [-Width 1920] [-Height 1080] [-Zoom 1.1] [-AA smaa] [-Off shadows,border,glimpse,minimap,wet] [-NoFade] [-Clear]
 # The window is the game's: leave it in front and the machine otherwise idle.
 param(
 	[string]$Godot = $env:GODOT_PATH,

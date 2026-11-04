@@ -144,6 +144,7 @@ func _ready() -> void:
 		_test_sleeper()
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_rest()
+		_test_wet()
 		_test_bow_back()
 		_test_sheathed()
 		_test_goblins_differ()
@@ -8320,6 +8321,117 @@ func _test_two_hands() -> void:
 	_check(rig.upper_clip() == "", "nor the ready stance (%s)" % rig.upper_clip())
 	player.slots = was
 	_rig._process(0.0)
+
+
+## A body wet (775; Jeff: wading "makes character get wet"): standing in water it is wet up to the
+## water's depth and a splash, kept out of it and drying over DRY_SECONDS (FIRE_DRY times faster by a
+## fire); rain outdoors wets it all over, and nothing dries in it; walled in, the rain wets nothing.
+## Drawn as the overlay on its meshes, off when dry; with the target's outline, the wet overlay
+## passes on to it.
+func _test_wet() -> void:
+	print("\n== a body wet from wading and rain, drying (775) ==")
+	var WetLook := Client3D.WetLook
+	var player := _player()
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var cell := Vector2i(roundi(puppet.position.x), roundi(puppet.position.z))
+	var had_bed: bool = _rig._bed_levels.has(cell)
+	var bed: float = _rig._bed_levels.get(cell, 0.0)
+	var fires: Array[Vector2i] = _rig._terrain.get("fire", [] as Array[Vector2i])
+	var fires_were := fires.duplicate()
+	var weather = _rig._weather_view
+	var dry := func() -> void:
+		for key: String in ["wet", "wet_line", "wet_all"]:
+			puppet.set_meta(key, 0.0)
+	dry.call()
+	var water := puppet.position.y + 0.4
+	_rig._bed_levels[cell] = water
+	_check(absf(WetLook.depth_at(_rig, puppet) - 0.4) < 0.001, "the water 0.4 m deep at its feet (%.2f)" % WetLook.depth_at(_rig, puppet))
+	WetLook.soak(_rig, puppet, WetLook.STEP)
+	var line := float(puppet.get_meta("wet_line"))
+	_check(is_equal_approx(float(puppet.get_meta("wet")), 1.0) and absf(line - (0.4 + WetLook.SPLASH)) < 0.001,
+		"wading: wet up to the water and a splash (%.2f m)" % line)
+	WetLook.show(_rig, puppet)
+	var meshes := WetLook.meshes_of(puppet)
+	_check(not meshes.is_empty() and meshes.all(func(m: MeshInstance3D) -> bool: return m.material_overlay == WetLook.material_of(puppet)),
+		"its %d meshes under its own wet overlay" % meshes.size())
+	var drawn_line := float(WetLook.material_of(puppet).get_shader_parameter("wet_line"))
+	_check(absf(drawn_line - (puppet.global_position.y + line)) < 0.001, "the line drawn at the water's height on it (%.2f)" % drawn_line)
+	# Wading: a ford's water (FORD_DEPTH, every hills stream since 776) plays the wade; a skim doesn't.
+	var rig: AnimRig = puppet.get_meta("rig")
+	_rig._bed_levels[cell] = puppet.position.y + Client3D.FORD_DEPTH
+	_check(_rig.wading(puppet, rig), "in a ford's %.2f m of water: it wades" % Client3D.FORD_DEPTH)
+	_rig._bed_levels[cell] = puppet.position.y + 0.02
+	_check(not _rig.wading(puppet, rig), "in 0.02 m: it walks")
+	_rig._bed_levels.erase(cell)
+	if had_bed:
+		_rig._bed_levels[cell] = bed
+	var rained: bool = weather != null and weather.outdoor and float(weather.weather.get("rain", 0.0)) >= WetLook.RAIN_WETS and not _rig._enclosed.has(cell)
+	_check(not rained, "no rain on it here (the test's weather)")
+	WetLook.soak(_rig, puppet, WetLook.DRY_SECONDS * 0.5)
+	_check(absf(float(puppet.get_meta("wet")) - 0.5) < 0.01 and is_equal_approx(float(puppet.get_meta("wet_line")), line),
+		"out of the water: half dry after half of DRY_SECONDS, the line kept (%.2f)" % float(puppet.get_meta("wet")))
+	WetLook.soak(_rig, puppet, WetLook.DRY_SECONDS * 0.5 + 0.1)
+	WetLook.show(_rig, puppet)
+	_check(is_zero_approx(float(puppet.get_meta("wet"))) and is_zero_approx(float(puppet.get_meta("wet_line")))
+			and meshes.all(func(m: MeshInstance3D) -> bool: return m.material_overlay == null),
+		"dry after DRY_SECONDS: the line gone, the overlay off")
+	# By a fire: FIRE_DRY times faster.
+	puppet.set_meta("wet", 1.0)
+	puppet.set_meta("wet_line", 0.5)
+	fires.append(cell + Vector2i(2, 1))
+	_rig._terrain["fire"] = fires
+	WetLook.soak(_rig, puppet, WetLook.DRY_SECONDS / WetLook.FIRE_DRY * 0.5)
+	_check(absf(float(puppet.get_meta("wet")) - 0.5) < 0.01, "by a fire two cells off: half dry in a quarter of the time (%.2f)" % float(puppet.get_meta("wet")))
+	_rig._terrain["fire"] = fires_were
+	# A camp's fire ring (777, Level.camp_fire) dries as a fire does, within FIRE_REACH.
+	var buildings: Array = _rig._terrain.get("buildings", [])
+	var had_buildings := _rig._terrain.has("buildings")
+	_check(not WetLook.near_fire(_rig, cell), "no fire near it to begin with")
+	var camp := {"kind": "camp", "rect": Rect2i(cell + Vector2i(1, -2), Vector2i(3, 3)), "facing": Vector2i(0, 1)}
+	_rig._terrain["buildings"] = buildings + [camp]
+	_check(Level.camp_fire(camp) == cell + Vector2i(2, 0) and WetLook.near_fire(_rig, cell),
+		"a camp whose fire ring is two cells off: by a fire")
+	camp["rect"] = Rect2i(cell + Vector2i(2, -2), Vector2i(3, 3))
+	_rig._terrain["buildings"] = buildings + [camp, {"kind": "hut"}]  # A building more: read again.
+	_check(not WetLook.near_fire(_rig, cell), "its fire three cells off: not")
+	if had_buildings:
+		_rig._terrain["buildings"] = buildings
+	else:
+		_rig._terrain.erase("buildings")
+	# Rain: outdoors it wets all over and nothing dries; walled in, it wets nothing.
+	if weather != null:
+		var outdoor_was: bool = weather.outdoor
+		var rain_was: float = weather.weather.get("rain", 0.0)
+		weather.outdoor = true
+		weather.weather["rain"] = 1.0
+		var enclosed_had: bool = _rig._enclosed.has(cell)
+		var enclosed_was = _rig._enclosed.get(cell)
+		_rig._enclosed.erase(cell)
+		puppet.set_meta("wet", 1.0)
+		WetLook.soak(_rig, puppet, WetLook.RAIN_SOAK_SECONDS * 0.5)
+		_check(absf(float(puppet.get_meta("wet_all")) - 0.5) < 0.01 and is_equal_approx(float(puppet.get_meta("wet")), 1.0),
+			"in full rain: half soaked all over in half of RAIN_SOAK_SECONDS, the legs not drying (%.2f)" % float(puppet.get_meta("wet_all")))
+		_rig._enclosed[cell] = 1
+		_check(is_zero_approx(WetLook.rain_on(_rig, cell)), "walled in: no rain on it")
+		_rig._enclosed.erase(cell)
+		if enclosed_had:
+			_rig._enclosed[cell] = enclosed_was
+		weather.outdoor = outdoor_was
+		weather.weather["rain"] = rain_was
+	# The target's outline over a wet body: the wet overlay passes on to it, and back.
+	puppet.set_meta("wet", 1.0)
+	WetLook.show(_rig, puppet)
+	_rig._show_outline(puppet, true)
+	var over := (meshes[0] as MeshInstance3D).material_overlay
+	_check(over is ShaderMaterial and (over as ShaderMaterial).shader == WetLook.SHADER and over.next_pass == _rig._outline,
+		"outlined while wet: the wet overlay, then the outline")
+	_rig._show_outline(puppet, false)
+	_check((meshes[0] as MeshInstance3D).material_overlay == WetLook.material_of(puppet), "the outline off: the wet overlay alone again")
+	dry.call()
+	WetLook.show(_rig, puppet)
+	var drips := puppet.get_node_or_null("WetDrips") as CPUParticles3D
+	_check((meshes[0] as MeshInstance3D).material_overlay == null and not puppet.has_meta("wet_material")
+			and (drips == null or not drips.emitting), "dried: no overlay, its material dropped, no drips")
 
 
 ## Held weapons rest out of a fight (662 (b)): a two-hander calm a while (the times put back,

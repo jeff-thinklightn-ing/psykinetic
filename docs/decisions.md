@@ -40014,3 +40014,60 @@ coordinator's targets, one bot loses, two win in 60-90 s, is a data change; the 
 enemy-ai's, the general rules combat's). Rev 47 (opened by combat's 766 amended, 59518090; 46 shipped in v0.1.200), a "47 (780 amended (2)):" line under it
 in net.gd. monster_test: asleep by night, woken at dawn, the far cry, prints facing the way walked,
 kept in the snapshot, a flank-marked swipe lost to a blow from behind, the bear yard reading clean.
+## 775. Bodies wet from wading and rain
+
+Jeff: wading the hills' streams "makes character get wet". The coordinator approved the design:
+- clothes and hair go darker and glossier up to the water line;
+- rain wets the whole body;
+- drips;
+- drying over about 1.5 real minutes;
+- a higher-stepping wade.
+
+It applies to every humanoid (players, companions, townsfolk). It is worked out on the client
+from what the client already draws, with nothing on the wire.
+
+- **Wet** (client3d/wet_look.gd, preloaded by Client3D as WetLook, no class_name): every
+  WetLook.STEP (0.2 s), each humanoid puppet's wetness is worked out from where it stands. Three
+  metas hold it: "wet" (below the line), "wet_line" (metres above its feet) and "wet_all" (all
+  over).
+  - In water deeper than IN_WATER (0.03 m), it is fully wet up to the water's depth plus SPLASH
+    (0.12 m). Water is _wet, _bed_levels and the fords merged into _wet, so since 776 every hills
+    stream crossing counts. A ford wets to the shin. The line keeps the highest the water reached.
+  - Outdoors in the weather's rain (WeatherView.outdoor, not an _enclosed cell), it wets all over
+    at the rain's strength over RAIN_SOAK_SECONDS (40), up to that strength, and nothing dries.
+  - Otherwise it dries over DRY_SECONDS (90 real seconds, the coordinator's figure, some 25 game
+    minutes). It dries FIRE_DRY (4) times faster within FIRE_REACH (2) cells of a terrain fire
+    or a camp's fire ring (777's Level.camp_fire, over the drawn buildings, cached by terrain and
+    count). That is the same reach as the camp's warmed rest (maps).
+- **Drawn** (client3d/wet.gdshader): an overlay on the body's meshes, not on what its hands hold
+  (the sockets' "Held": the coordinator, nobody looks for a wet sword). It darkens and glosses
+  below the line, with a darker band just under the line as the water's mark, or all over from
+  rain a touch lighter. That is about 40% darker at the game's camera; the coordinator tuned it
+  from the stills. The shine goes first as it dries.
+  - Each wet body gets a material of its own (WetLook.material_of), set while it is wet and
+    dropped when dry. Instance uniforms would have shared one material, but a probe showed they
+    never reach a material_overlay.
+  - The target outline, which is also an overlay, becomes the wet material's next_pass
+    (Client3D._show_outline, WetLook.overlay).
+  - Within DRIPS_NEAR (14 m) of the camera, a body at least DRIPS_FROM (0.4) wet drips (a small
+    CPUParticles3D).
+- **Wading**: a humanoid moving faster than a walk in water over Client3D.WADE_DEPTH (0.04 m, so
+  a ford's 0.06 counts) loops "Wade" (Client3D.CLIP_WADE). Wade is authored in
+  tools/humanoid_clips.py: the pack's walk with each knee lifted high over the walk's measured
+  swing windows, the arms a little out, and the body a touch lower and leaning in. It is paced as
+  a gait at WADE_PACE (0.94 m/s at speed 1, the walk's stride; feel client3d.gait.Wade). The
+  footfalls are the walk's, so sound's wading steps keep their timing.
+- **Cost**: benched with map_bench on frame_budget's scene off-screen (perf's recipe): the wilds
+  town, 9 players, herds, and a storm at night that wets every outdoor body, the worst case.
+  --off=wet leaves the look out; the runs went on/off/on/off. Per-frame work for every wet body
+  first cost +0.6 ms of median frame. It is now worked out and drawn every STEP, with only a wet
+  body's line following its height between steps. The median frame is then 6.01/6.07 ms against
+  5.63/5.81 ms, +0.32 ms, about the runs' own spread. The GPU is unchanged (2.1 ms); CPU
+  rendering is +0.1-0.2 ms, the overlay pass. The coordinator: land it as is, keep hats and
+  coats wet.
+
+view_test _test_wet covers wading's line, the overlay and its line, drying, by a fire, in rain,
+walled in, a camp's fire ring two cells off and not three, the wade at a ford's depth and not in
+0.02 m, the outline over a wet body and back,
+and the material and drips dropped when dry. Stills are at C:/dev/review/wet/wet_look.png. A CHANGELOG
+bullet. Client only, protocol unchanged, no new class_name.

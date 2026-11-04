@@ -174,6 +174,26 @@ CLIPS["Posture_Slouch"] = {"keys": [(0.0, P("rest", 0.0, [("spine_02", LIFT, -4.
 	("neck_01", LIFT, -4.0), ("Head", LIFT, 8.0)] + both("clavicle", TURN, -14.0)))]}
 CLIPS["Jog_Short_Loop"] = {"loop": True, "segment": ("Jog_Fwd_Loop", 0.0, 0.9333), "stride": {"legs": 0.62, "arms": 0.8, "bounce": 0.7}}
 CLIPS["Sprint_Short_Loop"] = {"loop": True, "segment": ("Sprint_Loop", 0.0, 0.6667), "stride": {"legs": 0.72, "arms": 0.85, "bounce": 0.75}}
+# The wade (775; Jeff: wading the hills' streams): the pack's walk with each knee lifted high out
+# of the water over its swing (the walk's swing windows, measured on its feet: the right foot off
+# the ground from 0.11 s to 0.67 s of its 1.33 s, the left half a cycle on), the arms held a little
+# out for balance, elbows bent, the body leaning in a touch and a little lower.
+WALK_CYCLE = 1.3333
+WADE_SWING = 0.555
+def wade_keys() -> list:
+	keys = []
+	steps = 16
+	for i in range(steps + 1):
+		t = WALK_CYCLE * i / steps
+		def lift(start: float) -> float:
+			u = ((t - start) % WALK_CYCLE) / WADE_SWING
+			return math.sin(math.pi * u) if u <= 1.0 else 0.0
+		right, left = lift(0.111), lift(0.778)
+		turns = [("thigh_r", LIFT, 32.0 * right), ("calf_r", LIFT, -48.0 * right), ("thigh_l", LIFT, 32.0 * left),
+			("calf_l", LIFT, -48.0 * left), ("spine_01", LIFT, -5.0)] + both("upperarm", TILT, -14.0) + both("lowerarm", LIFT, 20.0)
+		keys.append((t, P("Walk_Loop", t, turns, move=(0.0, 0.0, -0.03))))
+	return keys
+CLIPS["Wade_Loop"] = {"loop": True, "keys": wade_keys()}
 
 
 # The bow (Jeff: archery wants playtesting): a right-handed archer, the bow in the left hand
