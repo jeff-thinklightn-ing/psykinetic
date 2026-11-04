@@ -40657,3 +40657,16 @@ full market, voice's line). What the town owes its people peaks higher with the 
 coordinator: a check, not a change, on the next long soak (56 days): if owed trends up over both
 harvests or the treasury never leaves its floor, a design then (the trader buying more of the
 shelf first). Server only, protocol unchanged, no new class_name.
+
+770 amended: the trader never buys what the town eats (release's label; the coordinator's 56-day check).
+770's trader bought food and meat over comfort, keeping keep_per_head (1 a resident a day until it
+came back). Over a second year that sold the first harvest's surplus to the market, and a thin
+second harvest (64 food against 200: a dry summer, no storm) left the store empty from day 40.
+Three 56-day town_balance soaks (gatherers, cook and tanner), hungry meals / owed on day 56 / all
+gold: no trader 22 / 82 / 150 -> 166; 770 as shipped 204 / 254 / 150 -> 262; never food or meat
+3 / 50 / 150 -> 233. economy.json's trader "never_buys": ["food", "meat"] replaces keep_per_head;
+Economy._trader skips those as it skips maker_only. A unit under 1 gold is still never bought.
+The treasury sat at its 5-gold floor in all three, trader or not: what comes in goes out to what
+the town owes. That is the coordinator's design ask, separate. farm_test _test_trader (never the
+food or meat however much, the spare hides bought; a full market takes nothing). Server only,
+protocol unchanged, no new class_name.

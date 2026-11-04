@@ -723,22 +723,26 @@ func _test_trader() -> void:
 	towns._visitors_turn(TOWN)
 	_check(towns.visitors(TOWN).size() == 1 and stock.count(TOWN, "gold") <= int(rules["visitors"]["kinds"]["trader"]["treasury_most"]),
 		"back on day 6; the treasury never bought past treasury_most (%d)" % stock.count(TOWN, "gold"))
-	# The town's food kept until he is back, and nothing taken for nothing (the 28-day soak).
+	# Never what the town eats (770 amended, the 56-day soak), and nothing taken for nothing (the 28-day soak).
 	var trader_rule: Dictionary = rules["visitors"]["kinds"]["trader"]
-	var keep := ceili(float(trader_rule["keep_per_head"]["food"]) * work.worker_ids(TOWN).size() * int(trader_rule["every"]))
 	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - 30, "test")
 	stock.take(TOWN, "hide", stock.count(TOWN, "hide") - work.comfort(TOWN, "hide"), "test")
-	stock.deposit(TOWN, "food", work.comfort(TOWN, "food") + keep + 5 - stock.count(TOWN, "food"), "test")
+	stock.deposit(TOWN, "hide", 6, "test")
+	stock.deposit(TOWN, "food", work.comfort(TOWN, "food") + 60 - stock.count(TOWN, "food"), "test")
+	stock.deposit(TOWN, "meat", work.comfort(TOWN, "meat") + 30 - stock.count(TOWN, "meat"), "test")
+	var food := stock.count(TOWN, "food")
+	var meat := stock.count(TOWN, "meat")
 	_now = 10 * DAY
 	towns._visitors_turn(TOWN)
-	_check(keep > 0 and stock.count(TOWN, "food") == work.comfort(TOWN, "food") + keep,
-		"food bought only above comfort and %d kept for the folk until he's back (%d)" % [keep, stock.count(TOWN, "food")])
-	stock.deposit(TOWN, "food", 5, "test")
-	economy._bought[str(trader_rule["market"])] = {"food": 100000.0, "hide": 100000.0, "leather": 100000.0}
-	var food := stock.count(TOWN, "food")
+	_check("food" in trader_rule["never_buys"] and stock.count(TOWN, "food") == food and stock.count(TOWN, "meat") == meat
+		and stock.count(TOWN, "hide") == work.comfort(TOWN, "hide"),
+		"never the town's food or meat, however much it has; the spare hides bought (%d food, %d meat, %d hides)" % [stock.count(TOWN, "food"), meat, stock.count(TOWN, "hide")])
+	stock.deposit(TOWN, "hide", 6, "test")
+	economy._bought[str(trader_rule["market"])] = {"hide": 100000.0, "leather": 100000.0}
+	var hides := stock.count(TOWN, "hide")
 	_now = 14 * DAY
 	towns._visitors_turn(TOWN)
-	_check(stock.count(TOWN, "food") == food, "a market with its fill takes nothing for nothing (%d food)" % stock.count(TOWN, "food"))
+	_check(stock.count(TOWN, "hide") == hides, "a market with its fill takes nothing for nothing (%d hides)" % stock.count(TOWN, "hide"))
 
 
 func _test_visitors() -> void:

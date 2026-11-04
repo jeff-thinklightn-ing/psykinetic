@@ -1433,13 +1433,12 @@ func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
 	for what: String in kinds:
 		if room <= 0 or stockpile.count(town, "gold") >= most:
 			break
-		if rules.get("maker_only", {}).has(what):
+		# Never what the town eats (770 amended, the 56-day soak: a harvest's
+		# surplus sold on went short the next, thin year, 204 meals hungry
+		# against 22 with no trader), nor what only its makers use.
+		if rules.get("maker_only", {}).has(what) or what in rule.get("never_buys", []):
 			continue
-		# What the town eats is kept until the trader is back: keep_per_head a
-		# day for each resident over its every days (the 28-day soak: it sold
-		# its food above comfort and went hungry from day 12).
-		var keep := ceili(float(rule.get("keep_per_head", {}).get(what, 0.0)) * production.worker_ids(town).size() * maxi(int(rule.get("every", 1)), 1))
-		var spare := mini(stockpile.count(town, what) - production.comfort(town, what) - keep - int(held.get(what, 0)), room)
+		var spare := mini(stockpile.count(town, what) - production.comfort(town, what) - int(held.get(what, 0)), room)
 		if spare <= 0:
 			continue
 		var gold := 0

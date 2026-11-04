@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: a town keeps its food and meat when the castle market's trader comes, so a thin harvest carries it through (770 amended).
 ## v0.1.201
 
 - What goes over the network changes, so v0.1.200 and older can't join the server: update through the launcher first.
