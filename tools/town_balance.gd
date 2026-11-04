@@ -13,6 +13,7 @@ extends Node
 ## (--every: a line every that many days, 7 unless given; "owed" is what the town owes its people.)
 ## --gatherers: the town's gatherers seated as the box seats them (767, Towns.seat_gatherers);
 ## --folk=<trade,trade|none>: only those of the nine (767's soak: "none" for gatherers alone).
+## --inn: an inn standing from the start (the treasury-floor check: its bed fee to the treasury).
 ## Each line then ends with the store's raws and the shelf's goods by id.
 ## Run it through the gate, its output to a file: sh tools/heavy_job.sh run <tree> soak -- "$GODOT_PATH" --headless --path . res://tools/town_balance.tscn -- --days=90 > balance.txt
 
@@ -26,6 +27,7 @@ var _now := 0
 var _every := 7
 var _gatherers := false
 var _folk: Array = []  # [] for all of FOLK.
+var _inn := false  # --inn: an inn standing from the start (its bed fee to the treasury).
 
 
 func _ready() -> void:
@@ -50,6 +52,8 @@ func _ready() -> void:
 			_folk = Array(arg.trim_prefix("--folk=").split(","))
 		elif arg == "--no-field":
 			field = false
+		elif arg == "--inn":
+			_inn = true
 	DayNight.day_steps = DAY
 	Season.season_days = 7
 	Season.year_phase = 0.0
@@ -90,6 +94,8 @@ func _run(days: int, thief: String, merchant: String, field: bool) -> void:
 	towns.seed_from(world_map)
 	if field:
 		towns._town(TOWN)["buildings"]["field"] = {"kind": "field", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	if _inn:
+		towns._town(TOWN)["buildings"]["inn"] = {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
 	for each in FOLK:
 		if each[2] == "farmer" and not field or not _folk.is_empty() and each[2] not in _folk:
 			continue

@@ -1037,7 +1037,7 @@ func _stay(id: String, need: String, rule: Dictionary) -> void:
 	var fee := _folk_price(int(rule.get("fee", 0)), id, "")
 	var what := str(rule.get("what", need))
 	if fee <= 0 or not building_stands.is_valid() \
-			or not building_stands.call(town, str(rule["building"])) or not _afford(id, town, fee):
+			or not building_stands.call(town, str(rule["building"])) or not _afford(id, town, fee, false):
 		return
 	production.spend(id, fee, what)
 	stockpile.deposit(town, "gold", fee, "folk:%s" % id, "%s paid %d gold for %s" % [who["name"], fee, what])
@@ -1064,7 +1064,10 @@ func _hire(id: String, need: String, rule: Dictionary) -> void:
 			least = int(them["purse"])
 	var base := fee
 	fee = _folk_price(base, id, best)
-	if best.is_empty() or not _afford(id, town, fee):
+	# Never on a loan (353 amended (5); 353: "nothing goes into debt"): loans for
+	# mending drained the treasury into the carpenter's purse (174 of 233 lent
+	# in a 56-day soak). A service that can't be paid for waits; only meals borrow.
+	if best.is_empty() or not _afford(id, town, fee, false):
 		return
 	production.spend(id, fee, what)
 	var seller := _pay(town, best, fee, "trade", "%s for %s" % [what, who["name"]], base)

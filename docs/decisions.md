@@ -7451,6 +7451,17 @@ soak; the box's daily spike 180-306 ms). It now walks the shop's uids, keeps tho
 hold the meal's tags and prices only them; the pick (cheapest, then lowest uid) and keep_in_shop are as
 before. goods() stays the counter's. Server only, protocol unchanged.
 
+353 amended (5): a service is never bought on a loan (release's label; the coordinator's approval after
+the treasury-floor check). 353 said a need that can't be paid for waits and nothing goes into debt; the
+bank (354) then lent through Economy._afford for every need. In a 56-day soak (770 amended) the treasury
+sat at its gold_floor throughout, and 174 of the 233 gold it lent paid for "mending at home" (64 loans;
+59 for food): treasury, loan, carpenter, whose purse went 29 to 153 while poor purses repaid slowly, so
+no town could hold the 150 gold the town stage asks. Economy._hire (mending, tool work) and _stay (the
+inn's bed) now call _afford without borrowing: from the purse or not at all, the need waiting till it is
+next due. Only a meal borrows, and not while the store has food (354 amended). folk_test
+_test_no_loan_for_services. Mending every 4 days instead of 2 follows only if the treasury still holds
+its floor in the next soak (with an inn standing, town_balance --inn). Server only, protocol unchanged.
+
 ## 354. The town's bank: loans to residents, rent 1 a day
 
 Jeff (2026-10-15), shown the official-jobs model of decision 353 beside a

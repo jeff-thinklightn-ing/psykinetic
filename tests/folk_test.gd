@@ -227,6 +227,28 @@ func _test_services() -> void:
 		"with the inn standing, a bed is paid to the treasury (%d to %d)" % [had, _stock.count(TOWN, "gold")])
 
 
+## 353 amended (5): with the bank open and gold in it, a broke resident
+## borrows nothing for mending, tool work or a bed; each waits till next due.
+func _test_no_loan_for_services() -> void:
+	_setup()
+	_inn = true
+	_stock.deposit(TOWN, "gold", 40)
+	_work.add_worker("p1", "Pell", ["carpenter"], TOWN)
+	_work.add_worker("s1", "Odo", ["smith"], TOWN)
+	_work.add_worker("x1", "Bea", ["hauler"], TOWN)
+	var needs: Dictionary = _rules["folk"]["needs"]
+	_economy.tick()
+	_now = int(needs["mend"]["every"])
+	_economy.tick()
+	var bea := _work.worker("x1")
+	# (Her purse after the tick is the wage floor's, paid after the needs.)
+	var bed := _stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return line["by"] == "folk:x1" and str(line["from"]).contains(str(needs["bed"]["what"])))
+	_check(float(bea["loan"]) == 0.0 and not bed and int(_work.worker("p1")["purse"]) == 0 and int(_work.worker("s1")["purse"]) == 0,
+		"Bea, broke with the bank holding 40, borrows nothing for mending, tool work or a bed (loan %s, Pell %d, Odo %d)" % [bea["loan"], _work.worker("p1")["purse"], _work.worker("s1")["purse"]])
+	_check(_work.need_due("x1", "mend") > _now and _work.need_due("x1", "bed") > _now, "they wait till next due")
+	_check(not _stock.ledger(TOWN).any(func(line: Dictionary) -> bool: return str(line["by"]).begins_with("loan:")), "no loan in the ledger")
+
+
 ## The game's rules without the bank: the dole when broke.
 func _no_bank() -> Dictionary:
 	var rules := _rules.duplicate(true)
@@ -284,6 +306,7 @@ func _test_bank() -> void:
 	plain["workers"]["h1"].erase("loan")
 	plain["workers"]["h1"].erase("working_off")
 	_check(float(Production.new(plain, _stock, null, Callable(), _rules).worker("h1")["loan"]) == 0.0, "a save from before owes nothing")
+	_test_no_loan_for_services()
 	# An empty bank lends nothing.
 	_setup()
 	_stock.deposit(TOWN, "food", 5)
