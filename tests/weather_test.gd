@@ -33,6 +33,7 @@ func _ready() -> void:
 	_test_canopy()
 	_test_night_town()
 	_test_mine_light()
+	_test_skylights()
 	Weather.reload()
 	DayNight.reset()
 	World.steps = 0
@@ -427,6 +428,36 @@ func _test_canopy() -> void:
 	shafts.free()
 	Weather.reload()
 	World.steps = 0
+
+
+## Skylights (797): read from level.json, the cells lit, Fields' light there
+## by day and night, the client's look.
+func _test_skylights() -> void:
+	print("
+== skylights ==")
+	var warnings: Array[String] = []
+	var read := Level.skylights_from({"skylights": [{"at": [5, 6], "radius": 9}, {"at": [1]}]}, warnings)
+	_check(read.size() == 1 and read[0]["at"] == Vector2i(5, 6) and read[0]["radius"] == Level.SKYLIGHT_RADIUS.y and warnings.size() == 1,
+			"a skylight read, its radius capped; a bad one left out and said")
+	var cells := Level.skylit_cells([{"at": Vector2i(0, 0), "radius": 2.0}])
+	_check(cells[Vector2i(0, 0)] == 1.0 and cells[Vector2i(1, 0)] == 1.0 and is_equal_approx(cells[Vector2i(2, 0)], Level.SKYLIGHT_EDGE)
+			and not cells.has(Vector2i(2, 2)), "full under the gap, fading to its edge, none past it")
+	_check(Fields.skylight_at(1.0, DayNight.NIGHT) >= Fields.SKYLIGHT_NIGHT and Fields.skylight_at(1.0, 1.0) > Fields.skylight_at(1.0, DayNight.NIGHT)
+			and Fields.skylight_at(0.5, 1.0) < Fields.skylight_at(1.0, 1.0), "the sky's light through the gap: faint at night, never out")
+	var fields := Fields.new()
+	fields.load({"ambient": 0.03, "zone": "cave", "skylights": [{"at": Vector2i(4, 4), "radius": 2.0}]})
+	var was := DayNight.light
+	DayNight.light = 1.0
+	var under := fields.ambient_at(Vector2i(4, 4))
+	var away := fields.ambient_at(Vector2i(9, 9))
+	DayNight.light = was
+	_check(under > 0.5 and is_equal_approx(away, 0.03), "Senses' light: the gap's by day, the cave's away from it (%.2f, %.2f)" % [under, away])
+	fields.load({"outdoor": true, "skylights": [{"at": Vector2i(4, 4), "radius": 2.0}]})
+	_check(fields.skylit.is_empty(), "none outdoors")
+	var night: Array = Client3D.skylight_look(DayNight.NIGHT)
+	var day: Array = Client3D.skylight_look(1.0)
+	_check(float(night[0]) > 0.0 and is_equal_approx(float(day[0]), Client3D.SKYLIGHT_ENERGY) and (night[1] as Color).b > (night[1] as Color).r,
+			"the view: bluer and faint at night, full by day")
 
 
 ## The mine's light (769 amended (6)): a level's own ambient as a share of

@@ -842,6 +842,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	_quench(level["terrain"], warnings)
 	var clearings := clearings_from(config, warnings)
 	level["terrain"]["clearings"] = clearings
+	level["terrain"]["skylights"] = skylights_from(config, warnings)
 	level["terrain"]["canopy_kind"] = canopy_kind(config, warnings)
 	level["terrain"]["canopy"] = canopy_from(cell_codes, cells, clearings) if config.has("canopy") else {}
 	_place(level, markers, config, warnings)
@@ -1504,6 +1505,46 @@ static func clearings_from(config: Dictionary, warnings: Array[String]) -> Array
 			out.append({"centre": Vector2(float(entry["centre"][0]), float(entry["centre"][1])), "radius": float(entry["radius"])})
 		else:
 			warnings.append("a clearing in level.json is not {centre: [x, y], radius}: left out (%s)" % [entry])
+	return out
+
+
+## level.json's "skylights", [{at: [x, y], radius}] (decision 797): a gap
+## in a cave's roof over [at], its light falling on the cells within radius
+## (SKYLIGHT_RADIUS cells), as {at: Vector2i, radius: float}; a bad entry is
+## left out and said in [param warnings]. Indoors only (Fields, Client3D).
+const SKYLIGHT_RADIUS := Vector2(1.0, 4.0)
+
+
+static func skylights_from(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for entry: Variant in config.get("skylights", []):
+		if entry is Dictionary and entry.get("at") is Array and (entry["at"] as Array).size() == 2:
+			var radius := clampf(float(entry.get("radius", 2.0)), SKYLIGHT_RADIUS.x, SKYLIGHT_RADIUS.y)
+			out.append({"at": Vector2i(int(entry["at"][0]), int(entry["at"][1])), "radius": radius})
+		else:
+			warnings.append("a skylight in level.json is not {at: [x, y], radius}: left out (%s)" % [entry])
+	return out
+
+
+## The cells a skylight lights, each with its share of the gap's light:
+## 1 out to half the radius, falling to SKYLIGHT_EDGE at the radius.
+const SKYLIGHT_EDGE := 0.4
+
+
+static func skylit_cells(skylights: Array) -> Dictionary[Vector2i, float]:
+	var out: Dictionary[Vector2i, float] = {}
+	for skylight: Dictionary in skylights:
+		var at: Vector2i = skylight["at"]
+		var radius := float(skylight["radius"])
+		var reach := ceili(radius)
+		for dy in range(-reach, reach + 1):
+			for dx in range(-reach, reach + 1):
+				var gone := Vector2(dx, dy).length()
+				if gone > radius:
+					continue
+				var share := 1.0 if gone <= radius * 0.5 else lerpf(1.0, SKYLIGHT_EDGE, (gone - radius * 0.5) / (radius * 0.5))
+				var cell := at + Vector2i(dx, dy)
+				out[cell] = maxf(out.get(cell, 0.0), share)
 	return out
 
 

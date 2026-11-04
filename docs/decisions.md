@@ -40553,3 +40553,33 @@ Against Jeff's rule (11-03, "less of a penalty, more of a bonus"): the dark and 
 player's to use; nothing is taken from anyone who does not. Crouch, the player's own side, is
 "784, enemy-ai's side (2)" (rev 48). monster_test _test_senses; _test_wild_wolf waits for the
 wolf's notice by night.
+## 797. Skylights: a gap in a cave's roof
+
+Terrain's bear_cave (the great bear's den, forest plan phase B) wanted a little light on the bear in
+its chamber so the fight reads. Nobody lives there, so lamps don't fit. Raising the level's "ambient"
+would lift the whole cave, passage and all. The coordinator approved a gap in the roof instead and
+asked that night stay faint but never black under it, so a player with no lantern can still make out
+the bear's shape.
+- level.json "skylights": [{"at": [x, y], "radius": r}], r in cells, clamped to
+  Level.SKYLIGHT_RADIUS (1..4, default 2). Level.skylights_from reads it into terrain "skylights"
+  ({at: Vector2i, radius}); a bad entry is left out and said. Indoors only; outdoors the sky
+  already lights every cell. EditorFields doesn't offer it (NOT_OFFERED): terrain lays it by hand.
+- The sim. Level.skylit_cells gives each cell within the radius its share of the gap's light: 1
+  out to half the radius, falling to SKYLIGHT_EDGE (0.4) at the radius. Fields.ambient_at gives a
+  skylit cell the greater of the level's ambient and Fields.skylight_at: the sky's light outside
+  (DayNight.light) at SKYLIGHT_SKY (0.7), never under SKYLIGHT_NIGHT (0.15), times its share. So
+  Senses sees by it both ways, faintly at night. The 3D floor's own shade (light_at without the
+  sky) leaves it to the view's light.
+- The view. Client3D._build_skylights hangs one shadowless SpotLight3D per gap SKYLIGHT_HIGH (10 m)
+  over its cell, straight down, its cone the radius (skylight_angle). _light_skylights sets it
+  every 0.5 s by the sky outside (skylight_look: SKYLIGHT_ENERGY 3.0 at full day, the same night
+  floor), cold white by day and bluer at night. The canopy's dusty LightShafts hang over each gap
+  by day only, straight down. One light per gap: cheap in a level with a few.
+- Wire: none. Clients read level.json from their own build, and an edited level's raw config goes
+  in the existing "terrain" message; an old client only lacks the drawn shaft (release's ruling,
+  as for "mass" and 769 amended (6)'s "ambient").
+Tests: weather_test _test_skylights (read and clamped, the cells' shares, Fields' light under and
+away by day and night, none outdoors, the view's look); view_test _test_skylights (the light over
+the gap with its cone, faint at night and bright by day, none without the key); editor_test's every
+key. No CHANGELOG bullet until a shipped level sets it (bear_cave brings one). Protocol unchanged,
+no new class_name.

@@ -46,6 +46,12 @@ const DAMP_REACH := 0.5
 const HEAT_FALLOFF := 0.35
 
 var ambient := 1.0
+## An indoor level's skylit cells (decision 797, Level.skylit_cells): cell ->
+## its share of the gap's light. Through the gap the sky's light, at
+## SKYLIGHT_SKY of it, never under SKYLIGHT_NIGHT (a shape at night).
+var skylit: Dictionary[Vector2i, float] = {}
+const SKYLIGHT_SKY := 0.7
+const SKYLIGHT_NIGHT := 0.15
 ## Whether the level is damp (Level's terrain "damp"): its carried lights
 ## reach less far (carried_reach), and nothing burns there.
 var damp := false
@@ -139,6 +145,9 @@ func load(terrain: Dictionary) -> void:
 	ambient = clampf(float(terrain.get("ambient", 1.0)), 0.0, 1.0)
 	damp = bool(terrain.get("damp", false))
 	daylight = bool(terrain.get("daylight", false))
+	skylit.clear()
+	if not bool(terrain.get("outdoor", false)):
+		skylit = Level.skylit_cells(terrain.get("skylights", []))
 	outdoor = bool(terrain.get("outdoor", false))
 	region = str(terrain.get("region", Level.DEFAULT_REGION))
 	_roofed_whole.clear()
@@ -330,7 +339,15 @@ func ambient_at(cell: Vector2i) -> float:
 	if open_sky(cell):
 		var share := (1.0 - sky_dim) * (1.0 - canopy_shade * float(canopy.get(cell, 0.0)))
 		return DayNight.NIGHT + (DayNight.light - DayNight.NIGHT) * share
+	if skylit.has(cell):
+		return maxf(ambient, skylight_at(skylit[cell], DayNight.light))
 	return ambient
+
+
+## A skylit cell's light (decision 797) at [param share] of the gap's, with
+## the sky's light [param sky] (DayNight.light) outside.
+static func skylight_at(share: float, sky: float) -> float:
+	return maxf(sky * SKYLIGHT_SKY, SKYLIGHT_NIGHT) * share
 
 
 ## How much of the sky the canopy over [param cell] hides, 0..1 (0 where

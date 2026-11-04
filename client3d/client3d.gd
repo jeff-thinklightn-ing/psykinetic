@@ -779,6 +779,15 @@ const WALL_LAMP_FALLOFF := 1.2
 const WALL_LAMP_NEAR := 6
 const WALL_LAMP_PICK := 0.5
 const WALL_LAMP_SLOT := "prop.mine_lamp"
+## A gap in a cave's roof (decision 797): its light hangs this high over the
+## floor, at most this bright (full day outside), cold by day and bluer
+## at night (faint, never out: Fields.SKYLIGHT_NIGHT); set again every
+## SKYLIGHT_PICK s.
+const SKYLIGHT_HIGH := 10.0
+const SKYLIGHT_ENERGY := 3.0
+const SKYLIGHT_DAY_COLOUR := Color(0.9, 0.94, 1.0)
+const SKYLIGHT_NIGHT_COLOUR := Color(0.55, 0.64, 0.9)
+const SKYLIGHT_PICK := 0.5
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
@@ -2257,6 +2266,9 @@ var _carried_clock := 0.0
 ## The room's wall lamps' lights (769 amended (6)) and the clock to the next pick.
 var _wall_lamps: Array[OmniLight3D] = []
 var _wall_lamp_clock := 0.0
+## The room's skylights (797) and the clock to setting them again.
+var _skylights: Array[SpotLight3D] = []
+var _skylight_clock := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
 var _sky_material: ShaderMaterial
@@ -2737,6 +2749,7 @@ func _process(delta: float) -> void:
 	_flicker_fires(delta)
 	_light_carriers(delta)
 	_light_wall_lamps(delta)
+	_light_skylights(delta)
 
 
 # --- Rig ---------------------------------------------------------------------
@@ -11975,12 +11988,79 @@ func _build_shafts() -> void:
 	if _shafts != null:
 		_shafts.queue_free()
 		_shafts = null
+	_skylights.clear()
 	var canopy: Dictionary = _terrain.get("canopy", {})
-	if canopy.is_empty() or not bool(_terrain.get("outdoor", false)):
+	if not bool(_terrain.get("outdoor", false)):
+		_build_skylights()
+		return
+	if canopy.is_empty():
 		return
 	_shafts = LightShafts.new()
 	add_child(_shafts)
 	_shafts.setup(_terrain.get("clearings", []), canopy, _tile_position)
+
+
+## An indoor level's gaps in the roof (decision 797, level.json
+## "skylights"): each a light straight down from SKYLIGHT_HIGH over its
+## cell, its cone the gap's radius, and the canopy's dusty shaft by day;
+## _light_skylights sets them by the sky's light outside.
+func _build_skylights() -> void:
+	var skylights: Array = _terrain.get("skylights", [])
+	if skylights.is_empty():
+		return
+	_shafts = LightShafts.new()
+	add_child(_shafts)
+	var gaps: Array[Dictionary] = []
+	for skylight: Dictionary in skylights:
+		var at: Vector2i = skylight["at"]
+		var radius := float(skylight["radius"])
+		gaps.append({"centre": Vector2(at), "radius": radius})
+		var light := SpotLight3D.new()
+		light.name = "Skylight_%d_%d" % [at.x, at.y]
+		light.position = _tile_position(at) + Vector3(0.0, SKYLIGHT_HIGH, 0.0)
+		light.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+		light.spot_range = SKYLIGHT_HIGH + 2.0
+		light.spot_angle = skylight_angle(radius)
+		light.spot_angle_attenuation = 0.6
+		light.shadow_enabled = false
+		_shafts.add_child(light)
+		_skylights.append(light)
+	_shafts.setup(gaps, {}, _tile_position)
+	_skylight_clock = SKYLIGHT_PICK
+
+
+## A skylight's cone (degrees) for a gap of [param radius] cells: its edge
+## on the floor at the radius, SKYLIGHT_HIGH below.
+static func skylight_angle(radius: float) -> float:
+	return rad_to_deg(atan(radius / SKYLIGHT_HIGH))
+
+
+## A skylight's energy and colour with the sky's light [param sky]
+## (DayNight.light) outside: Fields.skylight_at's share of SKYLIGHT_ENERGY
+## at full day, from SKYLIGHT_NIGHT_COLOUR to SKYLIGHT_DAY_COLOUR.
+static func skylight_look(sky: float) -> Array:
+	var full := Fields.skylight_at(1.0, 1.0)
+	var lit := Fields.skylight_at(1.0, sky)
+	var day := clampf(inverse_lerp(Fields.SKYLIGHT_NIGHT, full, lit), 0.0, 1.0)
+	return [SKYLIGHT_ENERGY * lit / full, SKYLIGHT_NIGHT_COLOUR.lerp(SKYLIGHT_DAY_COLOUR, day)]
+
+
+## Every SKYLIGHT_PICK s: the skylights by the sky outside; the dusty
+## shafts by day only.
+func _light_skylights(delta: float) -> void:
+	if _skylights.is_empty():
+		return
+	_skylight_clock += delta
+	if _skylight_clock < SKYLIGHT_PICK:
+		return
+	_skylight_clock = 0.0
+	var look := skylight_look(DayNight.light)
+	for light: SpotLight3D in _skylights:
+		if is_instance_valid(light):
+			light.light_energy = look[0]
+			light.light_color = look[1]
+	if _shafts != null:
+		_shafts.place(_camera_target, Vector3.UP, clampf(inverse_lerp(DayNight.NIGHT, 1.0, DayNight.light), 0.0, 1.0))
 
 
 ## The noise the ground's shader reads (a texture lookup is far cheaper than

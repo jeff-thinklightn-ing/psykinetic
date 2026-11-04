@@ -116,6 +116,7 @@ func _ready() -> void:
 		await _test_wall_runs()
 		_test_cave_walls()
 		_test_mass()
+		_test_skylights()
 		_test_scatter()
 		_test_buildings()
 		_test_roofs()
@@ -1765,6 +1766,36 @@ func _test_wall_runs() -> void:
 ## MASS_APRON past the map, none over the open, its edge under the cave
 ## walls' ridge, darker away from the open but never black; without the
 ## key, or outdoors, none.
+## A gap in a cave's roof (797): a light straight down per skylight, its
+## cone the gap's, a dusty shaft by day; none outdoors or without the key.
+func _test_skylights() -> void:
+	print("
+== skylights: a light down through a gap in a cave's roof ==")
+	var map := LevelMap.new(Vector2i(14, 12))
+	for x in range(2, 12):
+		for y in range(2, 10):
+			map.set_cell(Vector2i(x, y), "stone")
+	var config := {"outdoor": false, "walls": "cave", "floors": "cave", "skylights": [{"at": [7, 6], "radius": 3}]}
+	var terrain: Dictionary = Level.parse(map.to_image(), null, config)["terrain"]
+	_rig.rebuild(terrain, Vector2i(7, 6))
+	var light := _rig._shafts.get_node_or_null("Skylight_7_6") as SpotLight3D if _rig._shafts != null else null
+	_check(light != null and is_equal_approx(light.spot_angle, Client3D.skylight_angle(3.0))
+			and light.position.y > _rig._tile_position(Vector2i(7, 6)).y + 5.0 and is_equal_approx(light.position.x, 7.0),
+			"one light straight down over the gap, its cone the gap's (%s)" % [light])
+	var was := DayNight.light
+	DayNight.light = DayNight.NIGHT
+	_rig._light_skylights(Client3D.SKYLIGHT_PICK)
+	var night := light.light_energy if light != null else 0.0
+	DayNight.light = 1.0
+	_rig._light_skylights(Client3D.SKYLIGHT_PICK)
+	var day := light.light_energy if light != null else 0.0
+	DayNight.light = was
+	_check(night > 0.0 and day > night * 2.0, "faint at night, never out; bright by day (%.2f, %.2f)" % [night, day])
+	config.erase("skylights")
+	_rig.rebuild(Level.parse(map.to_image(), null, config)["terrain"], Vector2i(7, 6))
+	_check(_rig._skylights.is_empty(), "none without the key")
+
+
 func _test_mass() -> void:
 	print("\n== the rock mass: rock past the walls, lit near, dark far, never black, no edge ==")
 	var map := LevelMap.new(Vector2i(20, 14))
