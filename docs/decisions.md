@@ -42054,3 +42054,66 @@ lands, owed gold still floats as "+40 gold". The missing banner was economy's da
 town's first regard), not Gains' shown-elsewhere skip. ui_test _test_gains (the hand-in's count, the
 owed line, no coin). No bullet (804's line says what a gain shows). Client only, protocol unchanged,
 no new class_name.
+## 792. Builder mode: the new kinds
+
+As Jeff turns to content (the coordinator, 2026-11-03), builder mode has to place and edit the
+place kinds now arriving: dungeon's workings (Hollowfell, 790), the apex lairs' dens and their
+links (enemy-ai's 780, maps'), maps' forest camps (fill_forest) and buildings' plan B (774: the
+watch posts, the tavern and inn, the square fire, its braziers and lamps). Jeff should be able to
+move a lair door, a camp or a post himself. Each tree said what its kind is:
+- the workings are a plain place (kind "workings", a cell and a radius, key "hollowfell" kept);
+- a den is an ordinary monster marker (monster_<kind> in the legend, a floor cell), its escorts
+  beside it; a lair's way in is an ordinary "links" entry and the arrival spawn from_<level>;
+- a forest camp is a "camp" kind building and a "camp" place at its fire, held by any faction of
+  levels/factions.json or nobody, its "mix" bandit, trader or mixed (mark_place's mix,
+  camps only);
+- plan B's posts, tavern and fire are places with shape fields (rect [x, y, w, h]; brazier, lamp,
+  hearth [x, y]; seats [[x, y], ...]; Level.PLACE_SHAPES, 774), the inn a kind building with a
+  use and a town, like the chapel.
+
+So the session's tools gain:
+1. mark_place takes rect, brazier, lamp, hearth and seats (each in the area on ground, the brazier,
+   hearth and seats in the rect), and any holder factions.json has (its enum filled from
+   Factions.names()). Its kinds stay Level.PLACE_KINDS, so 774's and 790's appear as they land.
+2. building: lays a kind building (levels/buildings.json, any size it has) with its top-left at a
+   cell and its front to a side (the kind prefab stamped turned: south 0, west 1, north 2, east 3),
+   its use, town and name at once (set_building's checks; a refusal there undoes the stamp); or,
+   with remove, takes one away (its record and its cells' walls and doors; the floor stays).
+3. move: one thing with what belongs to it, by an offset or to a cell. A place: its cell, rect and
+   shape cells. A building (by its code): its floor, walls, doors, what stands in it, and every
+   place within a cell of it (a camp's fire, a tavern's counter), refused onto water, void, another
+   building or anything standing. A thing on a cell (a monster marker: a den or an escort; a chest):
+   its entry with it, the cell left as the ground most of its sides are. A link: its cell, and the
+   spawn point from_<the level it leads to> when it lies within 4 cells. Nothing leaves the area.
+4. link: a way off the level at a cell to another level's spawn point (checked against that
+   level's level.json when it has one), arrive putting from_<level> where folk from there land, or
+   one taken away. The way back stays the other level's link, said in the answer. Given at and
+   closed alone, it shuts (true) or opens (false) the way there, keeping where it leads (nothing in
+   play opens one yet: a landing flips it, as enemy-ai will the bear cave's). A way laid again or
+   moved keeps its other keys. cue (589's, one of Level.CUES, empty to work it out) sets how the way
+   looks, laid with it or alone on a way there; 798's "cave" joins the offer when it lands in CUES,
+   and the prompt says a cave mouth wants rock behind the way and open ground before it.
+5. skylight (797's "skylights" [{at, radius}]): a gap in the roof over a floor cell in the area, its
+   radius 1 to 4 (2 if not given), one per cell (laid again, replaced), refused outdoors; remove
+   closes it, and move {skylight: [x, y]} carries it.
+The system prompt says these and tells Claude to move rather than paint out and lay again.
+
+Limits: a regenerated level's laid parts (Hollowfell's tunnels, the lairs if they regenerate) are
+the generator's; builder edits their anchors and links, and the level keeps its "regenerate" block.
+Hills and forest are written by maps' make_hills and make_forest: an edit in the game goes to the
+overlay and wins there, and make_forest keeps a camp it finds under the same key. Nothing goes in a
+real level unless Jeff asks; these are his tools. 792 lands after 774's cut (buildings, release):
+an overlay copy of the wilds made on the old layout would shadow the re-lay.
+builder_test _test_new_kinds: a post's rect, brazier and seats held by the orcs; a brazier outside
+its rect and a holder that is no faction refused; the post moved 5 east with them; a camp built
+facing north, its place beside it, moved 6 east together and read by the level, then taken away;
+the brute's marker moved with its entry, grass behind; a move out of the area refused; a link to
+the wilds' from_hills with its arrival point, a spawn point the wilds lack refused, and the door
+moved 2 south with its arrival point; that way shut and opened where it stands, opening a cell with
+no way refused, its cue and shut kept when laid again and moved, its cue set and cleared where it
+stands and one not in CUES refused; a skylight refused outdoors
+and past radius 4, laid indoors and read back by Level.skylights_from, replaced on its cell, moved
+and closed. _test_umbrage_kinds (after 774, 25f96356): the wilds'
+level.json read, never written: its six posts, the tavern and the square's fire each moved with every
+shape it has (a rect's size kept whole numbers) and read back by Level.places_from without a warning;
+the building tool offers the inn's kind. 790's workings get the same check once it lands. Server and builder only, protocol unchanged, no new class_name.

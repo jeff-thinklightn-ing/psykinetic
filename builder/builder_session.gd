@@ -53,6 +53,17 @@ const GROUNDS: Array[String] =["stone", "grass", "dirt", "tall_grass", "water", 
 const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vector2i(0, 1), "west": Vector2i(-1, 0)}
 ## Context shown round the area, in cells.
 const MARGIN := 3
+## A place's shape cells (792; buildings' 774): [x, y] each, seats a list.
+const SHAPE_CELLS: Array[String] = ["brazier", "lamp", "hearth", "seats"]
+const MAX_SEATS := 16
+## Who keeps a forest camp (maps' fill_forest).
+const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
+## The quarter turns that face a kind building (south as made) to a side.
+const KIND_TURNS := {"south": 0, "west": 1, "north": 2, "east": 3}
+## The ground a moved thing, link or building stands on.
+const WALKED: Array[String] = ["stone", "grass", "dirt", "tall_grass"]
+## How near a link its arrival point (from_<level>) is to go with it, in cells.
+const ARRIVAL_NEAR := 4.0
 ## level.json keys a proposal may change as a whole (beyond entries and links).
 const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams"]
 
@@ -333,6 +344,12 @@ static func tools(config := {}) -> Array:
 			tool["input_schema"]["properties"]["loot"]["enum"] = Items.loot_tables().keys()
 		elif tool["name"] == "mark_place":
 			tool["input_schema"]["properties"]["kind"]["enum"] = Level.PLACE_KINDS.duplicate()
+			tool["input_schema"]["properties"]["holder"]["enum"] = Factions.read().names() + [Factions.NOBODY]
+		elif tool["name"] == "building":
+			tool["input_schema"]["properties"]["kind"]["enum"] = Level.kinds().keys()
+			tool["input_schema"]["properties"]["use"]["enum"] = building_uses() + [""]
+		elif tool["name"] == "link":
+			tool["input_schema"]["properties"]["cue"]["enum"] = Level.CUES + [""]
 	return out
 
 
@@ -385,7 +402,7 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 
 Make places with something to do, not only scenery: a chest worth opening (and something guarding it), a camp to clear, a captive to free, a larder, a puzzle of crates and boulders. Monsters are few and matter: a camp is two to five, gathered round its fire. Leave ways in: what you make must be reachable on foot from the rest of the area.
 
-The map. Cells are x to the east, y to the south, (0, 0) the top-left of the level. A cell is ground (stone, grass, dirt, or tall grass: hides who stands in it, slows a step, trampled flat), water (not walkable; nothing is built along it), a ford (shallow water, waded slowly), fire (walkable, burns), a stair, void, or a thing standing on ground. Outdoors, void is forest: a void cell next to land is drawn as a tree, so scattered void cells are scattered trees and a block of void is a wood. Walls and doors stand on the edges between two cells; an edge between land and void is a wall of its own (outdoors, the forest's edge). Things: start (where players join), crate (pushable), boulder (heavy, pushable), cart, chest (4 slots of items), torch (light and a little heat), lantern (light), link (to another level; not yours to place), and monsters by their kind:
+The map. Cells are x to the east, y to the south, (0, 0) the top-left of the level. A cell is ground (stone, grass, dirt, or tall grass: hides who stands in it, slows a step, trampled flat), water (not walkable; nothing is built along it), a ford (shallow water, waded slowly), fire (walkable, burns), a stair, void, or a thing standing on ground. Outdoors, void is forest: a void cell next to land is drawn as a tree, so scattered void cells are scattered trees and a block of void is a wood. Walls and doors stand on the edges between two cells; an edge between land and void is a wall of its own (outdoors, the forest's edge). Things: start (where players join), crate (pushable), boulder (heavy, pushable), cart, chest (4 slots of items), torch (light and a little heat), lantern (light), link (a way to another level: the link tool puts one), and monsters by their kind:
 %s
 
 The grid shows the area and a margin round it, one character a cell (the margin is shown for context; only the area may change):
@@ -398,7 +415,7 @@ Running water is a stream: the stream tool lays its course, from where it rises 
 
 Levels join at their edges: walking off one edge arrives on the neighbour's opposite edge, at the same row (east, west) or column (north, south). When the area touches the map's edge with nothing beyond it, new_area makes a new level there (its own map; a first draft of grass, groves and forest round it, open where the way arrives) and carves a way out to the edge through the area. Use it when asked for somewhere new beyond the edge ("a new area east", "the woods past here"), not for changes inside the area.
 
-Places are what factions hold (the goblins, the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius; the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
+Places are what factions hold (a faction of levels/factions.json, such as the goblins or the town, or nobody): a camp, a keep, a farm, a gate, a mine. Each is a cell and a radius, and some cover ground with cells of their own (mark_place's rect, brazier, lamp, hearth and seats: a watch post's fire basket, a tavern's hearth and benches, the ring round a fire); the ground within the radius is its holder's, and no one else's group may walk through it. mark_place names one (its key, kind, cell, radius, who holds it at the start). Mark a place when you build one: a camp's place on its gather point (where its monsters gather), a farmstead's in its yard. A goblin camp can hold captives from the start (mark_place's holds), each taken from a town (the request lists them): someone of that town, or kin of one of its workers ("the smith's daughter"). In town their kin asks players to bring them home, and they go free when the camp falls, so a camp holding a captive is worth clearing. A town's work sites are places too: a woodlot (woods its woodcutter fells: put it at the forest's edge), a hunting ground (open land with game, its hunter's), a quarry (rock to cut stone from), a farm (fields), a mine. Mark one with the town it works for (mark_place's town: the key of the town's stockpile place), held by the town, not far from it, and with a way on foot from the store to it: a site the goblins hold, or that can't be reached, is worked by no one, and the tool's answer says so. %s A woodcutter fells trees standing on a walkable cell beside the forest: a woodlot needs such a cell within its radius. Some prefabs bring their place with them. A solid building (a mound, a barrow's: earth through) stands on flat ground like any, but no one walks its cells but its door, the middle of its front row, and it takes no use; the settings show it, the grid draws its cells as the ground they were. A building prefab is a roofed building players walk into: stamp it whole, door and all, rather than drawing its walls yourself; building lays a kind with its front to a side, its use and town at once. To move something already there (a camp, a post, a building, a lair's den or its door, a way off the level), use move: it carries what belongs to it (a place's cells, a building's walls and what stands in it, a camp's or tavern's place, a link's arrival point); never paint it out and lay it again. Indoors, skylight opens a gap in the roof (a cell and a radius of 1 to 4) that lets the sky's light down on a lair or a chamber; move carries one by its cell. A building can serve a town: set_building gives one in the area a use (%s) and its town, the key of a stockpile place in this level (a place of kind stockpile, held by the town). A town has one building of each use. Stamping over a building drops its use: set it again. town_wall walls a town in: give the rectangle of cells it encloses (its buildings, its store, room to walk) and the wall stands on the edges just outside it, with gates (doors) where roads come in, one in the middle of each side if you name none. One wall per town; it looks as strong as the town has built it (a bank of rubble at first). roof puts a roof over a rectangle of floor of one height that no building covers: a room you walled yourself, or an open shelter (a market stall, a woodshed) on posts at its corners; give it a use and town and it serves the town as a building does. A plot (the request lists those here) is ground the town keeps for a new building: put a new building on an empty plot before anywhere else, whole within it, its door on the plot's street side; and a building that serves a town opens its door onto a street (a road). The tool's answer says when one doesn't. Players walk with companions: keep every way, corridor and gap between walls, buildings and things at least two cells wide; a doorway is the one cell allowed. The tool's answer names a way one cell wide.
 
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
@@ -635,15 +652,22 @@ const TOOLS := [
 			"turns": {"type": "integer", "minimum": 0, "maximum": 3},
 			"pad": {"type": "boolean", "description": "on ground shaped in metres: cut the ground flat under each building it brings (and a cell round it) first"}},
 			"required": ["prefab", "at"]}},
-	{"name": "mark_place", "description": "Marks a place factions hold: a cell in the area and a radius of ground round it, held at the start by the goblins, the town or nobody. A key already used is moved or changed.",
+	{"name": "mark_place", "description": "Marks a place factions hold: a cell in the area and a radius of ground round it, held at the start by a faction or nobody, with the ground it covers and its cells (a brazier, a lamp, a hearth, seats) if it has them. A key already used is marked again as given (to shift one with its rect and cells, use move).",
 		"input_schema": {"type": "object", "properties": {
 			"key": {"type": "string", "description": "lower case letters, digits and _, e.g. \"goblin_camp\""},
 			"kind": {"type": "string", "enum": [], "description": "what it is (Level.PLACE_KINDS)"},
 			"town": {"type": "string", "description": "a work site only (woodlot, hunting_ground, quarry, farm, mine): the key of the stockpile place here whose town works it"},
 			"at": _CELL,
 			"radius": {"type": "integer", "minimum": 1, "maximum": 32},
-			"holder": {"type": "string", "enum": ["goblins", "town", "nobody"]},
+			"holder": {"type": "string", "enum": [], "description": "a faction (levels/factions.json) or nobody"},
 			"name": {"type": "string", "description": "optional, how it is called, e.g. \"the old farmstead\""},
+			"rect": {"type": "object", "description": "optional, the ground it covers (a post's 3 x 3, a tavern's room, a fire's ring): top-left x, y, width, height, in the area",
+				"properties": _RECT["properties"], "required": _RECT["required"]},
+			"brazier": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "optional, [x, y]: a post's fire basket, in its rect (lit at night)"},
+			"lamp": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "optional, [x, y]: where a store's lantern stands"},
+			"hearth": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "optional, [x, y]: a tavern's hearth, in its rect"},
+			"seats": {"type": "array", "items": _CELL, "description": "optional, the cells folk sit on (a tavern's benches, the ring round a fire), in its rect"},
+			"mix": {"type": "string", "enum": ["bandit", "trader", "mixed"], "description": "a camp only, at its fire: who keeps it (bandits; traders, held by nobody; or both)"},
 			"holds": {"type": "array", "description": "a camp only: captives it holds from the start, each taken from a town (its id from the list of towns)",
 				"items": {"type": "object", "properties": {
 					"town": {"type": "string", "description": "a town's id, \"<level>/<store key>\""},
@@ -658,6 +682,42 @@ const TOOLS := [
 			"code": {"type": "string", "description": "the building's code (\"H3\"), instead of at"},
 			"use": {"type": "string", "description": "what the town does there (the uses are in the system prompt); empty for none"},
 			"town": {"type": "string", "description": "the key of a stockpile place in this level; empty for none"}}}},
+	{"name": "building", "description": "Builds a building of a kind (the building_<kind>_<size> prefabs) with its top-left at a cell and its front (its door) to a side, given its use and town if it serves one; or, with remove, takes a building away (its record, walls and doors; its floor stays).",
+		"input_schema": {"type": "object", "properties": {
+			"kind": {"type": "string", "enum": []},
+			"size": {"type": "string", "enum": ["small", "large"]},
+			"at": _CELL,
+			"facing": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "the side its front faces (south if not given)"},
+			"use": {"type": "string", "enum": [], "description": "optional, what the town does there"},
+			"town": {"type": "string", "description": "optional, the key of a stockpile place here"},
+			"name": {"type": "string", "description": "optional, e.g. \"the Drowned Lamb\""},
+			"pad": {"type": "boolean", "description": "cut the ground flat under it where it is uneven"},
+			"remove": {"type": "boolean", "description": "take away the building with that code or on that cell"},
+			"code": {"type": "string", "description": "with remove: the building's code, instead of at"}}}},
+	{"name": "move", "description": "Moves one thing with what belongs to it: a place by its key (its rect, brazier, lamp, hearth and seats with it), a building by its code (its walls, doors, floor, what stands in it, and the places on it or beside it: a camp's, a tavern's), or the monster, chest or link on a cell (a lair's den or escort; a way off the level, with the point beside it where folk arrive). Give to (where its cell goes) or by (cells east and south).",
+		"input_schema": {"type": "object", "properties": {
+			"place": {"type": "string", "description": "a place's key"},
+			"building": {"type": "string", "description": "a building's code (\"C1\")"},
+			"skylight": _CELL,
+			"at": _CELL,
+			"to": _CELL,
+			"by": {"type": "array", "items": {"type": "integer"}, "minItems": 2, "maxItems": 2, "description": "[x, y]: cells east (+) or west (-), south (+) or north (-)"}}}},
+	{"name": "link", "description": "Puts a way off the level at a cell (a cave mouth, a lair's door, a road's end): stepping there takes one to a spawn point in another level; arrive marks where folk from that level arrive here (spawn point from_<level>). Remove takes a way away. Give at and closed alone to shut (true) or open (false) a way already there, keeping where it leads; at and cue alone set how it looks. A cave mouth (cue cave) is a hill of rock drawn on the cells behind the way: keep those rock, open ground in front. The way back is the other level's own link.",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL,
+			"to_map": {"type": "string", "description": "the level it leads to"},
+			"to_spawn": {"type": "string", "description": "the spawn point there it leads to"},
+			"arrive": _CELL,
+			"closed": {"type": "boolean", "description": "shut till opened; false opens it"},
+			"cue": {"type": "string", "enum": [], "description": "how the way looks (an arch, waystones, a way down or up, sealed, a cave mouth); empty: worked out from where it leads"},
+			"remove": {"type": "boolean"}},
+			"required": ["at"]}},
+	{"name": "skylight", "description": "Opens a gap in a cave's roof over a cell (indoors only): the sky's light falls through it on the cells within radius, bright by day, faint by night. A gap already on that cell is replaced; remove closes it.",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL,
+			"radius": {"type": "number", "description": "cells its light reaches, 1 to 4 (2 if not given)"},
+			"remove": {"type": "boolean"}},
+			"required": ["at"]}},
 	{"name": "town_wall", "description": "Walls a town in: a wall on the edges just outside a rectangle of cells, gates (doors) in it, recorded as that town's wall (a town walled again gets the new one). Leaves the cells as they are.",
 		"input_schema": {"type": "object", "properties": {
 			"town": {"type": "string", "description": "the key of the town's stockpile place in this level"},
@@ -841,6 +901,14 @@ func _run_tool(tool: String, input: Variant) -> Dictionary:
 			return _lay(stamped, "stamped %s" % prefab_name)
 		"mark_place":
 			return _mark_place(given)
+		"building":
+			return _building(given)
+		"move":
+			return _move(given)
+		"link":
+			return _link(given)
+		"skylight":
+			return _skylight(given)
 		"set_building":
 			return _set_building(given)
 		"town_wall":
@@ -919,9 +987,18 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	if kind not in Level.PLACE_KINDS:
 		return _no("kind is one of %s" % ", ".join(Level.PLACE_KINDS))
 	if not Factions.read().has(holder):
-		return _no("holder is goblins, town or nobody")
+		return _no("holder is a faction (%s) or nobody" % ", ".join(Factions.read().names()))
+	var shape: Variant = _shape_of(given)
+	if shape is String:
+		return _no(shape)
 	var places: Dictionary = (working.config["places"] as Dictionary).duplicate(true) if working.config.get("places") is Dictionary else {}
 	var place := {"at": [at.x, at.y], "kind": kind, "radius": clampi(int(given.get("radius", Level.PLACE_RADIUS)), 1, 32), "holder": holder}
+	place.merge(shape)
+	if given.has("mix"):
+		# A forest camp's keepers (maps' fill_forest): bandit, trader or mixed.
+		if kind != "camp" or str(given["mix"]) not in CAMP_MIXES:
+			return _no("mix is for a camp only: %s" % ", ".join(CAMP_MIXES))
+		place["mix"] = str(given["mix"])
 	if given.has("name"):
 		place["name"] = str(given["name"])
 	var town := str(given.get("town", "")).strip_edges()
@@ -956,6 +1033,484 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	return {"ok": true, "text": "%s the place %s: a %s at %s, radius %d, held by %s%s" % ["changed" if again else "marked", key, kind, at, place["radius"], holder,
 		", holding %d captives" % (place["holds"] as Array).size() if place.has("holds") else ""] \
 		+ (", worked by the town of %s" % town if place.has("town") else "")}
+
+
+## A place's shape fields from [param given] (792; buildings' 774 reads them,
+## Level.places_from): {rect: [x, y, w, h], brazier, lamp, hearth: [x, y],
+## seats: [[x, y], ...]}, those given, each in the area on ground and the
+## brazier, hearth and seats in the rect if there is one; else what is wrong.
+func _shape_of(given: Dictionary) -> Variant:
+	var out := {}
+	var rect: Variant = null
+	if given.has("rect"):
+		var value: Variant = given["rect"]
+		rect = Rect2i(int(value[0]), int(value[1]), int(value[2]), int(value[3])) if value is Array and (value as Array).size() == 4 else _rect(value)
+		if rect == null or rect.size.x < 1 or rect.size.y < 1:
+			return "rect needs x, y, w and h"
+		if not area.encloses(rect):
+			return "the rect %s is not all in the area" % [rect]
+		out["rect"] = [rect.position.x, rect.position.y, rect.size.x, rect.size.y]
+	for field: String in SHAPE_CELLS:
+		if not given.has(field):
+			continue
+		var listed: Array = given[field] if field == "seats" and given[field] is Array else [given[field]]
+		if field == "seats" and (not given[field] is Array or listed.size() > MAX_SEATS):
+			return "seats is a list of up to %d cells" % MAX_SEATS
+		var cells: Array = []
+		for value: Variant in listed:
+			var cell: Variant = Level._tile(value)
+			if cell == null:
+				return "%s is [x, y]" % ("each seat" if field == "seats" else field)
+			if not area.has_point(cell):
+				return "the %s %s is outside the area" % [field.trim_suffix("s"), cell]
+			if working.map.cell(cell) in ["void", "water"]:
+				return "the %s %s is %s: it stands on ground" % [field.trim_suffix("s"), cell, working.map.cell(cell)]
+			if rect != null and field != "lamp" and not rect.has_point(cell):
+				return "the %s %s is outside the rect %s" % [field.trim_suffix("s"), cell, rect]
+			cells.append([cell.x, cell.y])
+		out[field] = cells if field == "seats" else cells[0]
+	return out
+
+
+## [param place] (a level.json "places" entry) moved [param by]: its cell,
+## rect and shape cells together (792).
+static func _place_moved(place: Dictionary, by: Vector2i) -> Dictionary:
+	var out := place.duplicate(true)
+	var at: Variant = Level._tile(place.get("at"))
+	if at != null:
+		out["at"] = [at.x + by.x, at.y + by.y]
+	if place.get("rect") is Array and (place["rect"] as Array).size() == 4:
+		out["rect"] = [int(place["rect"][0]) + by.x, int(place["rect"][1]) + by.y, int(place["rect"][2]), int(place["rect"][3])]
+	for field: String in SHAPE_CELLS:
+		var cells: Array = place[field] if field == "seats" and place.get(field) is Array else [place.get(field)]
+		var moved: Array = []
+		for value: Variant in cells:
+			var cell: Variant = Level._tile(value)
+			if cell != null:
+				moved.append([cell.x + by.x, cell.y + by.y])
+		if place.has(field) and not moved.is_empty():
+			out[field] = moved if field == "seats" else moved[0]
+	return out
+
+
+## The building tool (792): a kind building (levels/buildings.json) laid
+## with its front to a side, its use and town given, or one taken away.
+func _building(given: Dictionary) -> Dictionary:
+	if bool(given.get("remove", false)):
+		return _unbuild(given)
+	var kind := str(given.get("kind", ""))
+	var size := str(given.get("size", Level.KIND_SIZE))
+	var at: Variant = Level._tile(given.get("at"))
+	var facing := str(given.get("facing", "south"))
+	if not Level.kinds().has(kind) or at == null:
+		return _no("building needs a kind (%s) and at: [x, y], its top-left cell" % ", ".join(Level.kinds().keys()))
+	if not (Level.kinds()[kind].get("sizes", {}) as Dictionary).has(size):
+		return _no("a %s comes in %s" % [kind, ", ".join((Level.kinds()[kind].get("sizes", {}) as Dictionary).keys())])
+	if not KIND_TURNS.has(facing):
+		return _no("facing is north, east, south or west")
+	var before := working.undo_steps.size()
+	var stamped := _run_tool("stamp", {"prefab": "%s%s_%s" % [Prefab.KIND_PREFIX, kind, size], "at": [at.x - 1, at.y - 1],
+		"turns": KIND_TURNS[facing], "pad": bool(given.get("pad", false))})
+	if not stamped.get("ok", false):
+		return stamped
+	var buildings: Array = working.config.get("buildings", [])
+	var index := buildings.find_custom(func(entry: Variant) -> bool:
+		return entry is Dictionary and str(entry.get("kind", "")) == kind and Level.building_blocks(entry).any(func(rect: Rect2i) -> bool: return rect.has_point(at)))
+	if index < 0:
+		return stamped
+	var said := "a %s %s at %s, its front %s" % [size, kind, at, facing]
+	if not str(given.get("use", "")).is_empty() or not str(given.get("town", "")).is_empty():
+		var served := _set_building({"at": [at.x, at.y], "use": str(given.get("use", "")), "town": str(given.get("town", ""))})
+		if not served.get("ok", false):
+			while working.undo_steps.size() > before:
+				working.undo()
+			return served
+		said += "; " + str(served["text"])
+	if given.has("name"):
+		var named: Array = (working.config["buildings"] as Array).duplicate(true)
+		named[index]["name"] = str(given["name"])
+		working.apply_changes({"config": {"buildings": named}})
+	return {"ok": true, "text": "built " + said}
+
+
+## A building taken away (792): its record, and the walls and doors on its
+## cells' sides; its floor and what stands in it stay.
+func _unbuild(given: Dictionary) -> Dictionary:
+	var index: Variant = _building_index(given)
+	if index is String:
+		return _no(index)
+	var buildings: Array = (working.config["buildings"] as Array).duplicate(true)
+	var entry: Dictionary = buildings[index]
+	var edges: Dictionary[Vector3i, String] = {}
+	for cell: Vector2i in Level._union(Level.building_blocks(entry)):
+		if not area.has_point(cell):
+			return _no("the %s at %s is not all in the area" % [building_name(entry), entry.get("at")])
+		for side: Vector2i in SIDES.values():
+			edges[Terrain.edge_key(cell, side)] = "clear"
+	buildings.remove_at(index)
+	return _lay({"edges": edges, "covers": [], "config": {"buildings": buildings}},
+		"took away the %s at %s (its floor stays; a place of it, a tavern's, stays where it was: move or mark it)" % [building_name(entry), entry.get("at")])
+
+
+## The index in the working buildings of the one [param given] names by its
+## code or a cell of it, in the area; else what is wrong.
+func _building_index(given: Dictionary) -> Variant:
+	var buildings: Array = working.config.get("buildings", []) if working.config.get("buildings") is Array else []
+	var code := str(given.get("code", given.get("building", ""))).strip_edges().to_upper()
+	var at: Variant = Level._tile(given.get("at"))
+	var index := -1
+	if not code.is_empty():
+		index = buildings.find_custom(func(entry: Variant) -> bool: return entry is Dictionary and str(entry.get("code", "")) == code)
+		if index < 0:
+			return "no building here is %s (the request lists the level's buildings)" % code
+	elif at != null:
+		index = buildings.find_custom(func(entry: Variant) -> bool:
+			return Level.building_blocks(entry).any(func(rect: Rect2i) -> bool: return rect.has_point(at)))
+		if index < 0:
+			return "no building stands on %s" % [at]
+	else:
+		return "name the building by its code or at: [x, y], a cell of it"
+	var cell: Variant = Level._tile(buildings[index].get("at"))
+	if cell == null or not area.has_point(cell):
+		return "the %s at %s is outside the area" % [building_name(buildings[index]), buildings[index].get("at")]
+	return index
+
+
+## The move tool (792): a place by its key, a building by its code, or the
+## thing (a monster, its den or escort; a chest) or the link on a cell,
+## shifted by [x, y] or to a cell, with what belongs to it: a place's rect
+## and cells; a building's walls, doors, floor, what stands in it and the
+## places on or beside it (a camp's, a tavern's); a link's arrival point.
+func _move(given: Dictionary) -> Dictionary:
+	var from: Variant = null
+	var what := ""
+	var places: Dictionary = working.config.get("places", {}) if working.config.get("places") is Dictionary else {}
+	if given.has("place"):
+		what = "place"
+		if not places.has(str(given["place"])) or not places[str(given["place"])] is Dictionary:
+			return _no("no place %s here (there are: %s)" % [given["place"], ", ".join(places.keys())])
+		from = Level._tile(places[str(given["place"])].get("at"))
+	elif given.has("building"):
+		what = "building"
+		var index: Variant = _building_index(given)
+		if index is String:
+			return _no(index)
+		from = Level._tile((working.config["buildings"] as Array)[index].get("at"))
+	elif given.has("skylight"):
+		what = "skylight"
+		from = Level._tile(given["skylight"])
+		if from == null or _skylight_index(from) < 0:
+			return _no("no skylight is at %s" % [given["skylight"]])
+	else:
+		from = Level._tile(given.get("at"))
+		if from == null:
+			return _no("move names a place, a building (its code) or at: [x, y], the cell of a thing or a link")
+		what = "thing" if not working.entry_of(from).is_empty() or _is_thing(working.map.cell(from)) else \
+				("link" if not working.link_of(from).is_empty() else "building")
+	if from == null:
+		return _no("it has no cell to move from")
+	var to: Variant = Level._tile(given.get("to"))
+	var by: Variant = Level._tile(given.get("by"))
+	if to == null and by == null:
+		return _no("move needs to: [x, y] or by: [x, y], the cells east (+x) and south (+y)")
+	var delta: Vector2i = by if to == null else to - from
+	if delta == Vector2i.ZERO:
+		return _no("it is there already")
+	match what:
+		"place":
+			return _move_place(str(given["place"]), delta)
+		"thing":
+			return _move_thing(from, delta)
+		"link":
+			return _move_link(from, delta)
+		"skylight":
+			return _move_skylight(from, delta)
+	return _move_building(given if given.has("building") else {"at": [from.x, from.y]}, delta)
+
+
+## Whether map meaning [param meaning] is a thing on a cell (a monster, a
+## chest...), not ground.
+func _is_thing(meaning: String) -> bool:
+	return meaning.begins_with("monster_") or meaning in things(working.config).values() and meaning not in GROUNDS
+
+
+## The ground a thing moved off [param cell] leaves: what most of its
+## sides are, else grass outdoors and stone in.
+func _ground_near(cell: Vector2i) -> String:
+	var counts := {}
+	for side: Vector2i in SIDES.values():
+		var meaning := working.map.cell(cell + side)
+		if meaning in WALKED:
+			counts[meaning] = int(counts.get(meaning, 0)) + 1
+	var best := "grass" if bool(working.config.get("outdoor", false)) else "stone"
+	for meaning: String in counts:
+		if int(counts[meaning]) > int(counts.get(best, 0)):
+			best = meaning
+	return best
+
+
+## Why [param cell] can't take what is moved there, or "".
+func _cant_take(cell: Vector2i, own: Array = []) -> String:
+	if not area.has_point(cell):
+		return "%s is outside the area" % [cell]
+	if working.map.cell(cell) not in WALKED and cell not in own:
+		return "%s is %s: it goes on ground" % [cell, working.map.cell(cell)]
+	if cell not in own and (not working.entry_of(cell).is_empty() or not working.link_of(cell).is_empty()):
+		return "something stands on %s already" % [cell]
+	return ""
+
+
+func _move_place(key: String, delta: Vector2i) -> Dictionary:
+	var places: Dictionary = (working.config["places"] as Dictionary).duplicate(true)
+	var moved := _place_moved(places[key], delta)
+	var at: Vector2i = Level._tile(moved["at"])
+	if not area.has_point(at) or working.map.cell(at) in ["void", "water"]:
+		return _no("%s is %s: a place stands on ground in the area" % [at, "outside the area" if not area.has_point(at) else working.map.cell(at)])
+	var shape: Variant = _shape_of(moved)
+	if shape is String:
+		return _no(shape)
+	places[key] = moved
+	working.apply_changes({"config": {"places": places}})
+	return {"ok": true, "text": "moved the place %s to %s%s" % [key, at, " with its %s" % ", ".join(shape.keys()) if not shape.is_empty() else ""]}
+
+
+func _move_thing(from: Vector2i, delta: Vector2i) -> Dictionary:
+	var to := from + delta
+	var wrong := _cant_take(to)
+	if not wrong.is_empty():
+		return _no(wrong)
+	var meaning := working.map.cell(from)
+	var entry := working.entry_of(from).duplicate(true)
+	var changes := {"cells": {from: _ground_near(from), to: meaning}, "covers": [from, to]}
+	if not entry.is_empty():
+		entry["at"] = [to.x, to.y]
+		changes["entries"] = [entry]
+	return _lay(changes, "moved the %s from %s to %s" % [meaning.trim_prefix("monster_"), from, to])
+
+
+func _move_link(from: Vector2i, delta: Vector2i) -> Dictionary:
+	var to := from + delta
+	var wrong := _cant_take(to)
+	if not wrong.is_empty():
+		return _no(wrong)
+	var link := working.link_of(from).duplicate(true)
+	link["at"] = [to.x, to.y]
+	var changes := {"cells": {}, "covers": [from], "links": [link]}
+	var said := "moved the way to %s from %s to %s" % [link.get("to_map", "?"), from, to]
+	# Its arrival point beside it (from_<the level it leads to>) goes with it.
+	var spawns: Dictionary = (working.config["spawn_points"] as Dictionary).duplicate(true) if working.config.get("spawn_points") is Dictionary else {}
+	var arrival := "from_" + str(link.get("to_map", ""))
+	var landing: Variant = Level._tile(spawns.get(arrival))
+	if landing != null and (landing - from).length() <= ARRIVAL_NEAR:
+		var moved: Vector2i = landing + delta
+		var bad := _cant_take(moved)
+		if not bad.is_empty():
+			return _no("its arrival point %s would move to %s: %s" % [arrival, moved, bad])
+		spawns[arrival] = [moved.x, moved.y]
+		changes["config"] = {"spawn_points": spawns}
+		said += ", and %s (where they arrive from %s) to %s" % [arrival, link.get("to_map", "?"), moved]
+	return _lay(changes, said + "; the other level's way here still leads to its spawn")
+
+
+func _move_building(named: Dictionary, delta: Vector2i) -> Dictionary:
+	var index: Variant = _building_index(named)
+	if index is String:
+		return _no(index)
+	var buildings: Array = (working.config["buildings"] as Array).duplicate(true)
+	var entry: Dictionary = buildings[index]
+	var old: Array[Vector2i] = Level._union(Level.building_blocks(entry))
+	var moved := entry.duplicate(true)
+	var at: Vector2i = Level._tile(entry["at"])
+	moved["at"] = [at.x + delta.x, at.y + delta.y]
+	var new: Array[Vector2i] = Level._union(Level.building_blocks(moved))
+	var others: Dictionary[Vector2i, bool] = {}
+	for other: Variant in buildings:
+		if other != entry:
+			for cell: Vector2i in Level._union(Level.building_blocks(other)):
+				others[cell] = true
+	for cell: Vector2i in new:
+		var wrong := _cant_take(cell, old)
+		if wrong.is_empty() and others.has(cell):
+			wrong = "%s is another building's" % [cell]
+		if not wrong.is_empty():
+			return _no("the %s would stand on %s" % [building_name(entry), wrong])
+	var cells: Dictionary[Vector2i, String] = {}
+	var edges: Dictionary[Vector3i, String] = {}
+	var entries: Array = []
+	var floor := _ground_near(old[0]) if not old.is_empty() else "grass"
+	for cell: Vector2i in old:
+		if _is_thing(working.map.cell(cell)):
+			cells[cell] = floor
+		for side: Vector2i in SIDES.values():
+			edges[Terrain.edge_key(cell, side)] = "clear"
+	for cell: Vector2i in old:
+		cells[cell + delta] = working.map.cell(cell)
+		for side: Vector2i in SIDES.values():
+			edges[Terrain.edge_key(cell + delta, side)] = working.map.edge(Terrain.edge_key(cell, side))
+		var stands := working.entry_of(cell).duplicate(true)
+		if not stands.is_empty():
+			stands["at"] = [cell.x + delta.x, cell.y + delta.y]
+			entries.append(stands)
+	buildings[index] = moved
+	var uneven := pad_problem(moved)
+	if not uneven.is_empty():
+		return _no(uneven)
+	# The places on it or beside it (a camp's fire, a tavern's counter) go with it.
+	var places: Dictionary = (working.config["places"] as Dictionary).duplicate(true) if working.config.get("places") is Dictionary else {}
+	var rect: Rect2i = Level.building_rect(entry)
+	var carried: Array[String] = []
+	for key: String in places:
+		var place_at: Variant = Level._tile(places[key].get("at")) if places[key] is Dictionary else null
+		if place_at != null and rect.grow(1).has_point(place_at):
+			places[key] = _place_moved(places[key], delta)
+			carried.append(key)
+	var config := {"buildings": buildings}
+	if not carried.is_empty():
+		config["places"] = places
+	var covers: Array = old.duplicate()
+	covers.append_array(new)
+	return _lay({"cells": cells, "edges": edges, "entries": entries, "covers": covers, "config": config},
+		"moved the %s from %s to %s%s" % [building_name(entry), entry["at"], moved["at"], " with the place %s" % ", ".join(carried) if not carried.is_empty() else ""])
+
+
+## The link tool (792): a way off this level at a cell (to a level's spawn
+## point), and where folk from there arrive here; or one taken away.
+func _link(given: Dictionary) -> Dictionary:
+	var at: Variant = Level._tile(given.get("at"))
+	if at == null:
+		return _no("link needs at: [x, y]")
+	if bool(given.get("remove", false)):
+		if working.link_of(at).is_empty():
+			return _no("no way off the level is at %s" % [at])
+		return _lay({"cells": {}, "covers": [at]}, "took away the way to %s at %s (its arrival point stays)" % [working.link_of(at).get("to_map", "?"), at])
+	var there := working.link_of(at)
+	var cue := str(given.get("cue", ""))
+	if cue != "" and cue not in Level.CUES:
+		return _no("a way's cue is one of %s, or empty to work it out" % ", ".join(Level.CUES))
+	if not given.has("to_map") and (given.has("closed") or given.has("cue")) and not there.is_empty():
+		# Shut, opened or its look set where it stands, still leading where it led.
+		var turned := there.duplicate(true)
+		var said: Array[String] = []
+		if given.has("closed"):
+			turned.erase("closed")
+			if bool(given["closed"]):
+				turned["closed"] = true
+			said.append("shut" if bool(given["closed"]) else "opened")
+		if given.has("cue"):
+			turned.erase("cue")
+			if cue != "":
+				turned["cue"] = cue
+			said.append("gave a %s look to" % cue if cue != "" else "left the look worked out for")
+		return _lay({"cells": {}, "covers": [at], "links": [turned]},
+			"%s the way to %s at %s" % [" and ".join(said), there.get("to_map", "?"), at])
+	var to_map := str(given.get("to_map", ""))
+	var to_spawn := str(given.get("to_spawn", ""))
+	if not Level.exists(to_map) or to_spawn.is_empty():
+		return _no("link needs to_map, a level, and to_spawn, a spawn point there")
+	var spawns_there: Variant = _spawn_points_of(to_map)
+	if spawns_there is Dictionary and not (spawns_there as Dictionary).has(to_spawn):
+		return _no("%s has no spawn point %s (it has: %s)" % [to_map, to_spawn, ", ".join((spawns_there as Dictionary).keys())])
+	var wrong := _cant_take(at, [at] if not working.link_of(at).is_empty() else [])
+	if not wrong.is_empty():
+		return _no(wrong)
+	# A way laid again keeps what else it had (its cue), and stays shut
+	# unless closed says otherwise.
+	var link := there.duplicate(true)
+	link.merge({"at": [at.x, at.y], "to_map": to_map, "to_spawn": to_spawn}, true)
+	if given.has("closed"):
+		link.erase("closed")
+		if bool(given["closed"]):
+			link["closed"] = true
+	if given.has("cue"):
+		link.erase("cue")
+		if cue != "":
+			link["cue"] = cue
+	var changes := {"cells": {}, "covers": [at], "links": [link]}
+	var said := "a way to %s (%s) at %s" % [to_map, to_spawn, at]
+	if given.has("arrive"):
+		var arrive: Variant = Level._tile(given["arrive"])
+		if arrive == null:
+			return _no("arrive is [x, y]")
+		var bad := _cant_take(arrive, [arrive])
+		if not bad.is_empty():
+			return _no("arrive: " + bad)
+		var spawns: Dictionary = (working.config["spawn_points"] as Dictionary).duplicate(true) if working.config.get("spawn_points") is Dictionary else {}
+		spawns["from_" + to_map] = [arrive.x, arrive.y]
+		changes["config"] = {"spawn_points": spawns}
+		said += ", and from_%s at %s where folk from there arrive" % [to_map, arrive]
+	return _lay(changes, said + "; the way back is %s's own link to from_%s" % [to_map, map_name])
+
+
+## The skylight tool (792, for 797's "skylights"): a gap in the roof over a
+## cell, indoors only, its radius within Level.SKYLIGHT_RADIUS; one per cell.
+func _skylight(given: Dictionary) -> Dictionary:
+	var at: Variant = Level._tile(given.get("at"))
+	if at == null:
+		return _no("skylight needs at: [x, y]")
+	var skylights: Array = (working.config["skylights"] as Array).duplicate(true) if working.config.get("skylights") is Array else []
+	var index := _skylight_index(at)
+	if bool(given.get("remove", false)):
+		if index < 0:
+			return _no("no skylight is at %s" % [at])
+		skylights.remove_at(index)
+		return _lay({"cells": {}, "config": {"skylights": skylights}}, "closed the gap in the roof at %s" % [at])
+	if Level.zone_of(working.config) == "outdoors":
+		return _no("a skylight is a gap in a roof: this level is outdoors, where the sky lights every cell")
+	var wrong := _skylight_cell(at)
+	if not wrong.is_empty():
+		return _no(wrong)
+	var radius := float(given.get("radius", 2.0))
+	if radius < Level.SKYLIGHT_RADIUS.x or radius > Level.SKYLIGHT_RADIUS.y:
+		return _no("a skylight's radius is %d to %d cells" % [Level.SKYLIGHT_RADIUS.x, Level.SKYLIGHT_RADIUS.y])
+	var gap := {"at": [at.x, at.y], "radius": radius}
+	if index >= 0:
+		skylights[index] = gap
+	else:
+		skylights.append(gap)
+	return _lay({"cells": {}, "config": {"skylights": skylights}}, "opened a gap in the roof at %s, its light reaching %s cells" % [at, radius])
+
+
+## Why cell [param cell] can't take a skylight, or "".
+func _skylight_cell(cell: Vector2i) -> String:
+	if not area.has_point(cell):
+		return "%s is outside the area" % [cell]
+	if working.map.cell(cell) in ["void", "wall"]:
+		return "%s is %s: a skylight lights a floor" % [cell, working.map.cell(cell)]
+	return ""
+
+
+## The index in level.json's "skylights" of the one at [param cell], or -1.
+func _skylight_index(cell: Vector2i) -> int:
+	var skylights: Variant = working.config.get("skylights")
+	if not skylights is Array:
+		return -1
+	for i: int in (skylights as Array).size():
+		var entry: Variant = skylights[i]
+		if entry is Dictionary and Level._tile(entry.get("at")) == cell:
+			return i
+	return -1
+
+
+func _move_skylight(from: Vector2i, delta: Vector2i) -> Dictionary:
+	var to := from + delta
+	var wrong := _skylight_cell(to)
+	if not wrong.is_empty():
+		return _no(wrong)
+	if _skylight_index(to) >= 0:
+		return _no("a skylight is at %s already" % [to])
+	var skylights: Array = (working.config["skylights"] as Array).duplicate(true)
+	skylights[_skylight_index(from)]["at"] = [to.x, to.y]
+	return _lay({"cells": {}, "config": {"skylights": skylights}}, "moved the gap in the roof from %s to %s" % [from, to])
+
+
+## Level [param other]'s spawn points as its level.json lists them, or null
+## when it has no file to read (a level registered in memory).
+static func _spawn_points_of(other: String) -> Variant:
+	var path := Level.folder_of(other) + "level.json"
+	if not FileAccess.file_exists(path):
+		return null
+	var read: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	return read.get("spawn_points", {}) if read is Dictionary and read.get("spawn_points") is Dictionary else {}
 
 
 ## The towns a camp may hold captives from (decision 519): every stockpile

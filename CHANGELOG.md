@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Builder mode can now build a kind of building facing any side, add, shut, open or move a way to another level, open a gap in a cave's roof, and move a camp, a watch post, a building, a lair's den or its door with everything that belongs to it; shutting or opening a way keeps where it leads and how it looks (792).
 - Step out of the red marked on the ground before a blow lands and you are clear of it, even if you only pressed the step a moment before (810).
 
 - Items are easier to see in shops, the pack and the town window: bigger, on lighter squares, with each price under its item (765).

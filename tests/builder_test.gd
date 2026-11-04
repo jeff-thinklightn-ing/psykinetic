@@ -37,6 +37,8 @@ func _ready() -> void:
 	_test_visible_work()
 	_test_old_tower()
 	_test_narrow_ways()
+	_test_new_kinds()
+	_test_umbrage_kinds()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -265,7 +267,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "town_wall", "roof", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "town_wall", "roof", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
@@ -898,3 +900,152 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+func _test_new_kinds() -> void:
+	print("
+== 792: the new kinds' places, buildings, markers and links, placed and moved ==")
+	var doc := _doc()
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	# mark_place: a post's rect and brazier, held by any faction.
+	var post := session.run_tool("mark_place", {"key": "post_road", "kind": "other", "at": [10, 10], "holder": "orcs",
+		"rect": {"x": 9, "y": 9, "w": 3, "h": 3}, "brazier": [10, 10], "seats": [[9, 9], [11, 11]], "radius": 1})
+	var places: Dictionary = session.working.config.get("places", {})
+	_check(post.get("ok", false) and places.get("post_road", {}).get("rect") == [9, 9, 3, 3] and places["post_road"].get("brazier") == [10, 10]
+		and places["post_road"].get("seats") == [[9, 9], [11, 11]] and places["post_road"].get("holder") == "orcs",
+		"mark_place keeps a rect, a brazier and seats, held by the orcs (%s)" % [places.get("post_road")])
+	var outside := session.run_tool("mark_place", {"key": "post_two", "kind": "other", "at": [20, 10], "holder": "town",
+		"rect": {"x": 19, "y": 9, "w": 3, "h": 3}, "brazier": [25, 10]})
+	_check(not outside.get("ok", true) and "outside the rect" in str(outside.get("text")), "a brazier outside its rect: refused (%s)" % outside)
+	var elves := session.run_tool("mark_place", {"key": "elf", "kind": "camp", "at": [12, 12], "holder": "elves"})
+	_check(not elves.get("ok", true) and "orcs" in str(elves.get("text")), "a holder that is no faction: refused, naming them (%s)" % elves)
+	var holders: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "mark_place")[0]["input_schema"]["properties"]["holder"]["enum"]
+	_check("orcs" in holders and "nobody" in holders, "Claude is offered every faction (%s)" % [holders])
+	# move a place: its cell, rect, brazier and seats together.
+	var moved := session.run_tool("move", {"place": "post_road", "by": [5, 0]})
+	places = session.working.config.get("places", {})
+	_check(moved.get("ok", false) and places["post_road"].get("at") == [15, 10] and places["post_road"].get("rect") == [14, 9, 3, 3]
+		and places["post_road"].get("brazier") == [15, 10] and places["post_road"].get("seats") == [[14, 9], [16, 11]],
+		"move: the post goes 5 east with its rect, brazier and seats (%s)" % [places.get("post_road")])
+	# building: a camp built facing north, its place beside it, moved, taken away.
+	var built := session.run_tool("building", {"kind": "camp", "size": "small", "at": [4, 18], "facing": "north"})
+	var camps: Array = (session.working.config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "camp")
+	_check(built.get("ok", false) and camps.size() == 1 and camps[0].get("facing") == [0, -1], "building: a small camp, its front north (%s; %s)" % [built, camps])
+	if camps.size() != 1:
+		return
+	var rect: Rect2i = Level.building_rect(camps[0])
+	var fire := rect.position + rect.size / 2
+	var kept := session.run_tool("mark_place", {"key": "road_camp", "kind": "camp", "at": [fire.x, fire.y], "holder": "orcs", "radius": 3, "mix": "bandit"})
+	_check(kept.get("ok", false) and session.working.config["places"]["road_camp"].get("mix") == "bandit", "a forest camp's mix (%s)" % kept)
+	_check(not session.run_tool("mark_place", {"key": "post_mix", "kind": "other", "at": [20, 12], "holder": "town", "mix": "bandit"}).get("ok", true), "mix on a place not a camp: refused")
+	var walls_before := Level.blocks_outline(Level._union(Level.building_blocks(camps[0]))).filter(func(key: Vector3i) -> bool: return session.working.map.edge(key) != "")
+	var shifted := session.run_tool("move", {"building": str(camps[0]["code"]), "by": [6, 0]})
+	camps = (session.working.config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "camp")
+	places = session.working.config.get("places", {})
+	_check(shifted.get("ok", false) and camps.size() == 1 and Level.building_rect(camps[0]).position == rect.position + Vector2i(6, 0)
+		and places["road_camp"].get("at") == [fire.x + 6, fire.y], "move: the camp goes 6 east, its place with it (%s; %s)" % [shifted, places.get("road_camp")])
+	var old_left := walls_before.filter(func(key: Vector3i) -> bool: return session.working.map.edge(key) != "" and session.working.map.edge(key) != "clear")
+	_check(old_left.size() < walls_before.size() or walls_before.is_empty(), "its old walls are gone (%d of %d left)" % [old_left.size(), walls_before.size()])
+	var level := Level.parse(session.working.map.to_image(), null, session.working.config)
+	_check(level["buildings"].size() == 1, "the level reads the moved camp (%s)" % [level["warnings"]])
+	var gone := session.run_tool("building", {"remove": true, "code": str(camps[0]["code"])})
+	_check(gone.get("ok", false) and (session.working.config.get("buildings", []) as Array).is_empty(), "building remove: the camp taken away (%s)" % gone)
+	# move a marker: the brute at (30, 5), its entry with it, grass left behind.
+	var walked := session.run_tool("move", {"at": [30, 5], "to": [32, 6]})
+	_check(walked.get("ok", false) and session.working.map.cell(Vector2i(32, 6)) == "monster_brute" and session.working.map.cell(Vector2i(30, 5)) == "grass"
+		and session.working.entry_of(Vector2i(32, 6)).get("idle") == "guard", "move: a monster marker and its entry, grass behind it (%s)" % walked)
+	var into := session.run_tool("move", {"at": [32, 6], "to": [45, 6]})
+	_check(not into.get("ok", true), "a move out of the area: refused (%s)" % into)
+	# link: a way to the wilds, its arrival point beside it; moved together.
+	var bad := session.run_tool("link", {"at": [20, 20], "to_map": "wilds", "to_spawn": "nowhere"})
+	_check(not bad.get("ok", true) and "from_hills" in str(bad.get("text")), "a spawn point the level lacks: refused, naming its own (%s)" % bad)
+	var way := session.run_tool("link", {"at": [20, 20], "to_map": "wilds", "to_spawn": "from_hills", "arrive": [21, 20]})
+	_check(way.get("ok", false) and session.working.link_of(Vector2i(20, 20)).get("to_spawn") == "from_hills"
+		and session.working.config.get("spawn_points", {}).get("from_wilds") == [21, 20], "link: a way to the wilds and where folk arrive (%s)" % way)
+	var door := session.run_tool("move", {"at": [20, 20], "by": [0, 2]})
+	_check(door.get("ok", false) and session.working.link_of(Vector2i(20, 22)).get("to_map") == "wilds" and session.working.link_of(Vector2i(20, 20)).is_empty()
+		and session.working.config.get("spawn_points", {}).get("from_wilds") == [21, 22], "move: the lair door and its arrival point 2 south (%s)" % door)
+	# A way shut and opened where it stands; laid again, it keeps its other keys.
+	var shut := session.run_tool("link", {"at": [20, 22], "closed": true})
+	_check(shut.get("ok", false) and session.working.link_of(Vector2i(20, 22)).get("closed") == true
+		and session.working.link_of(Vector2i(20, 22)).get("to_spawn") == "from_hills", "link: shut, still to the wilds (%s)" % shut)
+	var opened := session.run_tool("link", {"at": [20, 22], "closed": false})
+	_check(opened.get("ok", false) and not session.working.link_of(Vector2i(20, 22)).has("closed")
+		and session.working.link_of(Vector2i(20, 22)).get("to_map") == "wilds", "link: opened (%s)" % opened)
+	_check(not session.run_tool("link", {"at": [25, 25], "closed": false}).get("ok", true), "opening a cell with no way: refused")
+	var marked := session.working.link_of(Vector2i(20, 22)).duplicate(true)
+	marked["cue"] = "sealed"
+	marked["closed"] = true
+	session.working.apply_changes({"cells": {}, "covers": [Vector2i(20, 22)], "links": [marked]})
+	session.run_tool("link", {"at": [20, 22], "to_map": "wilds", "to_spawn": "from_hills"})
+	_check(session.working.link_of(Vector2i(20, 22)).get("cue") == "sealed" and session.working.link_of(Vector2i(20, 22)).get("closed") == true,
+		"a way laid again keeps its cue and stays shut (%s)" % [session.working.link_of(Vector2i(20, 22))])
+	session.run_tool("move", {"at": [20, 22], "by": [1, 0]})
+	_check(session.working.link_of(Vector2i(21, 22)).get("cue") == "sealed" and session.working.link_of(Vector2i(21, 22)).get("closed") == true,
+		"a way moved keeps its cue and stays shut (%s)" % [session.working.link_of(Vector2i(21, 22))])
+	var looked := session.run_tool("link", {"at": [21, 22], "cue": "down"})
+	_check(looked.get("ok", false) and session.working.link_of(Vector2i(21, 22)).get("cue") == "down" and session.working.link_of(Vector2i(21, 22)).get("closed") == true,
+		"link: its cue set where it stands, still shut (%s)" % looked)
+	session.run_tool("link", {"at": [21, 22], "cue": ""})
+	_check(not session.working.link_of(Vector2i(21, 22)).has("cue"), "an empty cue: worked out again")
+	_check(not session.run_tool("link", {"at": [21, 22], "cue": "portal"}).get("ok", true), "a cue not in Level.CUES: refused")
+	# skylight (797): indoors only, its radius 1..4, moved and closed.
+	var sky := session.run_tool("skylight", {"at": [6, 6]})
+	_check(not sky.get("ok", true) and "outdoors" in str(sky.get("text")), "a skylight outdoors: refused (%s)" % sky)
+	session.working.config.erase("outdoor")
+	_check(not session.run_tool("skylight", {"at": [6, 6], "radius": 6}).get("ok", true), "a skylight's radius past 4: refused")
+	sky = session.run_tool("skylight", {"at": [6, 6], "radius": 3})
+	var warnings: Array[String] = []
+	var read := Level.skylights_from(session.working.config, warnings)
+	_check(sky.get("ok", false) and read.size() == 1 and read[0]["at"] == Vector2i(6, 6) and read[0]["radius"] == 3.0 and warnings.is_empty(),
+		"skylight: a gap at (6, 6), radius 3, as the level reads it (%s)" % [read])
+	session.run_tool("skylight", {"at": [6, 6], "radius": 2})
+	_check((session.working.config["skylights"] as Array).size() == 1 and session.working.config["skylights"][0]["radius"] == 2.0, "a skylight on the same cell is replaced")
+	var slid := session.run_tool("move", {"skylight": [6, 6], "to": [8, 7]})
+	_check(slid.get("ok", false) and session.working.config["skylights"][0]["at"] == [8, 7], "move: the skylight to (8, 7) (%s)" % slid)
+	var closed := session.run_tool("skylight", {"at": [8, 7], "remove": true})
+	_check(closed.get("ok", false) and (session.working.config["skylights"] as Array).is_empty(), "skylight remove: the gap closed (%s)" % closed)
+	_check(BuilderSession.system_prompt() != "", "the prompt still builds")
+
+
+## 792's follow-up: 774's real entries in the wilds (posts, the tavern, the
+## square's fire, the inn), read from levels/wilds/level.json and never written.
+func _test_umbrage_kinds() -> void:
+	print("
+== 792: Umbrage's posts, tavern, fire and inn (774) as builder mode moves them ==")
+	var config: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/wilds/level.json"))
+	_check(config is Dictionary, "the wilds' level.json reads")
+	if not config is Dictionary:
+		return
+	var places: Dictionary = config.get("places", {})
+	var shaped := places.keys().filter(func(key: String) -> bool: return places[key] is Dictionary and str(places[key].get("kind")) in ["post", "tavern", "fire"])
+	_check(shaped.size() >= 3, "774's posts, tavern and fire are there (%s)" % [shaped])
+	var moved := {}
+	for key: String in shaped:
+		var place: Dictionary = BuilderSession._place_moved(places[key], Vector2i(2, -1))
+		moved[key] = place
+		var shifted := true
+		for shape_key: String in Level.PLACE_SHAPES:
+			if not places[key].has(shape_key):
+				continue
+			var was: Variant = places[key][shape_key]
+			var now: Variant = place[shape_key]
+			match Level.PLACE_SHAPES[shape_key]:
+				"cell":
+					shifted = shifted and now == [int(was[0]) + 2, int(was[1]) - 1]
+				"rect":
+					shifted = shifted and now == [int(was[0]) + 2, int(was[1]) - 1, int(was[2]), int(was[3])]
+				"cells":
+					for i: int in (was as Array).size():
+						shifted = shifted and now[i] == [int(was[i][0]) + 2, int(was[i][1]) - 1]
+		_check(shifted and place["at"] == [int(places[key]["at"][0]) + 2, int(places[key]["at"][1]) - 1], "%s moves with every shape it has (%s)" % [key, place])
+	var warnings: Array[String] = []
+	var all_moved := places.duplicate(true)
+	all_moved.merge(moved, true)
+	var read := Level.places_from({"places": all_moved}, warnings)
+	_check(warnings.is_empty() and shaped.all(func(key: String) -> bool: return read.has(key) and (moved[key].has("rect") == read[key].has("rect"))),
+		"the level reads them back moved, shapes and all (%s)" % [warnings])
+	_check("post" in Level.PLACE_KINDS and "tavern" in Level.PLACE_KINDS and "fire" in Level.PLACE_KINDS, "mark_place offers post, tavern and fire")
+	var kinds: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "building")[0]["input_schema"]["properties"]["kind"]["enum"]
+	var inns := (config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "inn")
+	_check(not inns.is_empty() and "inn" in kinds, "the building tool offers the inn's kind (%d in the wilds)" % inns.size())
