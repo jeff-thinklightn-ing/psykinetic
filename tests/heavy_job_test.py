@@ -295,6 +295,19 @@ check(not gate.passes(import_queued, [soak_queued, bench_queued], [suite_at(now 
     "a soak ahead of the bench may start: it is a head, not held")
 check(gate.blockers(dict(table["bench"], kind="bench"), [suite_at(now), dict(running(1, 1), kind="godot_import")]) == [suite_at(now)],
     "a bench's blockers: the suite, not an import")
+# 394 amended (22): an import beside three counted jobs, one at a time so.
+import_now = dict(table["godot_import"], kind="godot_import")
+three = [suite_at(now), dict(running(1, 1), kind="scene"), dict(running(1, 1), kind="scene")]
+check(import_now.get("below_normal"), "an import runs below normal priority")
+check(gate.decide(import_now, three, True, 60.0, None)[0], "an import starts beside a suite and two scenes")
+check(not gate.decide(import_now, three + [dict(running(1, 1), kind="godot_import")], True, 60.0, None)[0],
+    "but not beside another import left uncounted")
+check(not gate.decide(scene_row, three[:2] + [dict(running(1, 1), kind="godot_import")] * 2, True, 60.0, None)[0],
+    "a second import counts: a suite, a scene and two imports hold a scene out")
+check(gate.decide(scene_row, three[:2] + [dict(running(1, 1), kind="godot_import")], True, 60.0, None)[0],
+    "one import is not counted: a scene starts beside it, a suite and a scene")
+check(not gate.decide(dict(table["godot_export"], kind="godot_export"), three, True, 60.0, None)[0],
+    "an export still counts")
 
 if os.name == "nt":
     probe = "import ctypes; k = ctypes.windll.kernel32; k.GetCurrentProcess.restype = ctypes.c_void_p; " \

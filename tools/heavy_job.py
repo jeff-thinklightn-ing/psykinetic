@@ -11,7 +11,8 @@ art-gen, which lets it start only when there is room:
     allocations fail), less the same, at least the estimate plus
     COMMIT_MARGIN_GB;
   * for a GPU kind, free GPU memory (nvidia-smi) at least its GPU estimate;
-  * fewer than MAX_RUNNING heavy jobs running, never two GPU jobs, and no
+  * fewer than MAX_RUNNING heavy jobs running (one godot_import not counted:
+    394 amended (22)), never two GPU jobs, and no
     more of a kind than its max_running (suite 1: a suite runs its scenes
     in parallel and fills the CPU, and two together took ten times as long
     each; bench 1, as the bench lock);
@@ -135,6 +136,9 @@ COMMIT_MARGIN_GB = 4.0
 ## newest job, as free RAM under MARGIN_GB does (394 amended (16)).
 COMMIT_STOP_GB = 2.0
 MAX_RUNNING = 3
+## Running jobs of an "uncounted" kind (godot_import: short, below normal
+## priority) left out of MAX_RUNNING, this many at most (394 amended (22)).
+UNCOUNTED_MOST = 1
 ## A job holding the gate this long is flagged in status, the log and the
 ## summary (a bench held 588 minutes on 2026-10-17 before anyone saw it).
 LONG_HOLD_SECONDS = 3600
@@ -191,7 +195,10 @@ KINDS = {
     # it runs as a suite (lean_row), never as a kind of its own.
     "suite_lean3": {"ram_gb": 8.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90, "variant_of": "suite"},
     "bench": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_running": 1, "excludes": ["suite", "soak", "scene"], "max_minutes": 90},
-    "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
+    # Not counted under MAX_RUNNING, one at a time (394 amended (22)): six
+    # imports waited on the count beside a suite and two scenes, 2026-11-04.
+    "godot_import": {"ram_gb": 2.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90,
+        "uncounted": True, "below_normal": True},
     "godot_export": {"ram_gb": 3.0, "gpu_gb": 0.0, "gpu": False, "max_minutes": 90},
     # A soak (394 amended an eighth time) counts sim steps, not time: it
     # runs beside a suite, at below-normal priority so the suite's scenes
@@ -239,8 +246,8 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     in GB (free_gpu_gb or free_commit_gb None: not known)."""
     if not head:
         return False, "behind others in the queue"
-    if len(running) >= MAX_RUNNING:
-        return False, "%d heavy jobs running" % len(running)
+    if counted(running) >= MAX_RUNNING and not (job.get("uncounted") and uncounted(running) < UNCOUNTED_MOST):
+        return False, "%d heavy jobs running" % counted(running)
     for each in running:
         if each.get("kind") in job.get("excludes", []):
             return False, "a %s running (never beside a %s)" % (each.get("kind"), job.get("kind"))
@@ -259,6 +266,17 @@ def decide(job, running, head, free_ram_gb, free_gpu_gb, free_commit_gb=None):
     if job["gpu"] and free_gpu_gb is not None and free_gpu_gb < job["gpu_gb"]:
         return False, "%.1f GB GPU free, %.1f GB wanted" % (free_gpu_gb, job["gpu_gb"])
     return True, ""
+
+
+def uncounted(running):
+    """How many running jobs are of an uncounted kind (394 amended (22))."""
+    return sum(1 for each in running if KINDS.get(each.get("kind"), {}).get("uncounted"))
+
+
+def counted(running):
+    """The running jobs MAX_RUNNING counts: all but UNCOUNTED_MOST of an
+    uncounted kind."""
+    return len(running) - min(UNCOUNTED_MOST, uncounted(running))
 
 
 def lean_row(table, kind):

@@ -9401,6 +9401,20 @@ tests/heavy_job_test: a scene goes past a soak the queue holds and backfills the
 goes past both. A scene behind a scene that may start waits, and so does a second soak. A soak
 that may start holds those behind it, and so does a head held by nothing. Tools only.
 
+394 amended (22) (perf, 2026-11-04; the coordinator's ruling, release's guard and label): one
+godot_import not counted under MAX_RUNNING, and imports below normal priority. Once 394 amended (21)
+freed the queue, a suite and two scenes filled MAX_RUNNING (3), and six imports waited on the
+count with 14 GB free.
+- MAX_RUNNING stays 3 for suites, benches, scenes and soaks. Landings' timing checks need the CPU.
+- A kind marked "uncounted" (godot_import alone) starts past the count when no other job of an
+  uncounted kind runs (UNCOUNTED_MOST 1, release's guard: six imports must not load every core
+  beside a suite). A second import counts as any job does. The memory checks are unchanged.
+- godot_import runs below normal priority, as soak and scene do. A landing's own import runs under
+  its suite take and is not affected.
+tests/heavy_job_test: an import starts beside a suite and two scenes, not beside another
+uncounted import; one import is not counted against a scene, two are; an export still counts.
+Tools only.
+
 ## 395. UI sounds
 
 The menus sound through one new class, `UiSounds` (`render/ui_sounds.gd`), made by Main
