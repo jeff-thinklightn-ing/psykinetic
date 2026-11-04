@@ -33323,6 +33323,15 @@ leave him be, and go for him after. _test_call_and_rout's rout case has two
 players near; _test_fight_panel counts 17 rows. Server only, protocol
 unchanged, no new class_name.
 
+698 amended (perf's profile, 11-04: castle 256, 16 players, about 1160 monsters thinking a tick):
+_band_odds went through every monster in the zone (about 2000) on each call, 629 us, 9.2 ms a tick,
+60% of the fighting sneaks' and imps' turns. It now looks at the cells within BAND_TILES (13 x 13,
+World.get_entity_at): a monster holds its cell, so the band counted is the same. _pick_slot's
+scan for slots claimed round its target (283 us a call, 2.7 calls a tick) is gathered once a tick
+instead (Monster._claimed_round: target id -> {cell: [monsters]}), each pick added as it is made,
+and read as before by each claimant's own slot and target, so a pick is the same as before. Server
+only, protocol unchanged, no new class_name.
+
 ## 689 amended (5): a free body's route steered straight at the farthest cell in clear line
 
 Jeff: "mouse move directions is very unreponsive". 683's harness on

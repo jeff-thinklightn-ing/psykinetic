@@ -1213,11 +1213,42 @@ func _go_to(to: Vector2i) -> bool:
 ## other monster is making for, nearest first; FLANK sooner behind or
 ## beside it. Its own (where it stands, or the one it was making for) a
 ## little sooner, so it does not dither. NO_TILE when there is none.
+## The slots claimed round each target (698 amended): target id -> {cell:
+## [monsters]}, gathered from every monster once a tick, each pick added
+## as it is made; read as before, by each one's own slot and target now,
+## so it is the same as going through every monster on each pick.
+static var _claims := {}
+static var _claims_tick := -1
+
+
+func _claimed_round(of: GridEntity) -> Dictionary:
+	if _claims_tick != World.tick:
+		_claims.clear()
+		_claims_tick = World.tick
+		for entity in World.monsters():
+			var other := entity as Monster
+			if other != null and other.target != null and is_instance_valid(other.target):
+				var key := other.target.get_instance_id()
+				if not _claims.has(key):
+					_claims[key] = {}
+				var round_it: Dictionary = _claims[key]
+				if not round_it.has(other.slot):
+					round_it[other.slot] = []
+				(round_it[other.slot] as Array).append(other)
+	var key := of.get_instance_id()
+	if not _claims.has(key):
+		_claims[key] = {}
+	return _claims[key]
+
+
 func _pick_slot() -> Vector2i:
+	var claims := _claimed_round(target)
 	var claimed := {}
-	for entity in World.monsters():
-		if entity != self and entity is Monster and (entity as Monster).target == target:
-			claimed[(entity as Monster).slot] = true
+	for at: Vector2i in claims:
+		for by: Object in claims[at]:
+			if by != self and is_instance_valid(by) and (by as Monster).target == target and (by as Monster).slot == at:
+				claimed[at] = true
+				break
 	var best := NO_TILE
 	var best_score := INF
 	var facing := Vector2(target.facing).normalized()
@@ -1243,6 +1274,10 @@ func _pick_slot() -> Vector2i:
 		if score < best_score:
 			best = at
 			best_score = score
+	if best != NO_TILE:
+		if not claims.has(best):
+			claims[best] = []
+		(claims[best] as Array).append(self)  # Seen by those picking after it this tick, once its slot is set.
 	return best
 
 
@@ -2206,11 +2241,15 @@ func _band_odds() -> Vector2i:
 			foes += 2 if dreaded and entity == target else 1
 	var band := 1
 	if foes > 0:
-		for entity in World.monsters():
-			var other := entity as Monster
-			if other != self and other.spawned and other.alert != Alert.FLEEING \
-					and World.distance(tile, other.tile) <= BAND_TILES and _same_side(other):
-				band += 1
+		# The cells within BAND_TILES (698 amended): a monster holds its cell,
+		# so this counts the same as going through every monster, at a few
+		# hundred looks in place of the zone's thousands.
+		for dy in range(-BAND_TILES, BAND_TILES + 1):
+			for dx in range(-BAND_TILES, BAND_TILES + 1):
+				var other := World.get_entity_at(tile + Vector2i(dx, dy)) as Monster
+				if other != null and other != self and other.spawned and other.alert != Alert.FLEEING \
+						and other.tile == tile + Vector2i(dx, dy) and _same_side(other):
+					band += 1
 	return Vector2i(band, foes)
 
 
