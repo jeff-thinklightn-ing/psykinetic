@@ -108,6 +108,7 @@ func _ready() -> void:
 		_test_streams()
 		_test_tall_grass()
 		_test_blood()
+		_test_tracks()
 		_test_rocks()
 		_test_niches()
 		_test_fire()
@@ -4378,6 +4379,109 @@ func _test_blood() -> void:
 	_rig._on_blood_changed(level, PackedInt32Array([land.x, land.y, 0]), PackedInt32Array(), true)
 	_check(_rig._blood_drawn == null and not _rig._blood.has(level), "one past its time dropped")
 	_rig._blood.clear()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## An apex creature's prints (780 amended (3), terrain's side): a pair of
+## paws a print, pointing the way walked, on the ground, none on water or
+## hard ground, more seen on grass, fading, gone when told, none indoors.
+func _test_tracks() -> void:
+	print("\n== tracks: a pair of paws a print, the way walked, none on water or stone ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	_rig.rebuild(terrain, sample["centre"])
+	var level: String = World.zone.name
+	var land := Vector2i(-1, -1)
+	var wet := Vector2i(-1, -1)
+	var floor_cells: Array = terrain["floor"]
+	for cell: Vector2i in floor_cells:
+		if _rig._terrain_water_has(cell):
+			wet = cell if wet.x < 0 else wet
+			continue
+		if land.x >= 0:
+			continue
+		var dry := true
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				var near := cell + Vector2i(x, y)
+				dry = dry and floor_cells.has(near) and not _rig._terrain_water_has(near)
+		if dry:
+			land = cell
+	for cell: Vector2i in terrain.get("water", []):
+		wet = cell if wet.x < 0 else wet
+	_check(_rig._outdoor and land.x >= 0 and wet.x >= 0, "the sample, outdoors, has dry land and water (%s, %s)" % [land, wet])
+	var kinds_were := {}
+	var set_kind := func(kind: String) -> void:
+		for y in range(-1, 2):
+			for x in range(-1, 2):
+				_rig._ground_kinds[land + Vector2i(x, y)] = kind
+	for y in range(-1, 2):
+		for x in range(-1, 2):
+			var near := land + Vector2i(x, y)
+			kinds_were[near] = _rig._ground_kinds.get(near, null)
+	set_kind.call("dirt")
+	# Facing east (2): the toes east of each pad, the right (south) paw ahead.
+	_rig._on_tracks_changed(level, PackedInt32Array([land.x, land.y, 200, 2, wet.x, wet.y, 200, 2]), PackedInt32Array(), true)
+	var parts: Array[Transform3D] = _rig._track_parts
+	var drawn: MultiMeshInstance3D = _rig._tracks_drawn
+	var count := drawn.multimesh.instance_count if drawn != null else 0
+	_check(count == 12 and parts.size() == 12, "two paws of a pad and five toes on the land, none on the water (%d parts)" % count)
+	var far := 0.0
+	var off := 0.0
+	for part in parts:
+		var at := Vector2(part.origin.x, part.origin.z)
+		far = maxf(far, at.distance_to(Vector2(land)))
+		var cell := Vector2i(roundi(at.x), roundi(at.y))
+		off = maxf(off, absf(part.origin.y - 0.012 - _rig._height_in(cell, at)))
+	_check(count == 12 and far < 1.0 and off < 0.001, "round the cell, on its ground (%.2f m out, %.3f m off)" % [far, off])
+	var pointing := func(of: Array[Transform3D], index: int) -> Vector2:
+		var pad := Vector2(of[index].origin.x, of[index].origin.z)
+		var toes := Vector2.ZERO
+		for t in range(1, 6):
+			toes += Vector2(of[index + t].origin.x, of[index + t].origin.z) / 5.0
+		return (toes - pad).normalized()
+	if count == 12:
+		var way: Vector2 = pointing.call(parts, 0)
+		var other: Vector2 = pointing.call(parts, 6)
+		var pads := Vector2(parts[6].origin.x, parts[6].origin.z) - Vector2(parts[0].origin.x, parts[0].origin.z)
+		var big := parts[0].basis.get_scale().x
+		_check(way.dot(Vector2(1, 0)) > 0.95 and other.dot(Vector2(1, 0)) > 0.95 and pads.y > 0.2 and pads.x > 0.05 and big > 0.3,
+				"pointing east the way walked, side by side, the right one ahead, a big bear's pad (%s, %s, apart %s, %.2f m)" % [way, other, pads, big])
+	_rig._on_tracks_changed(level, PackedInt32Array([land.x, land.y, 200, 0]), PackedInt32Array(), true)
+	parts = _rig._track_parts
+	var north: Vector2 = pointing.call(parts, 0) if parts.size() == 12 else Vector2.ZERO
+	_check(north.dot(Vector2(0, -1)) > 0.95, "facing 0 points north, up the map (%s)" % north)
+	var on_dirt := _rig._track_shades[0].a if not _rig._track_shades.is_empty() else 0.0
+	set_kind.call("grass")
+	_rig._draw_tracks()
+	var on_grass := _rig._track_shades[0].a if not _rig._track_shades.is_empty() else 0.0
+	_check(on_dirt > 0.35 and on_grass > on_dirt * 1.2, "fresh, and more of it on grass, to be seen there (%.2f on dirt, %.2f on grass)" % [on_dirt, on_grass])
+	set_kind.call("stone")
+	_rig._draw_tracks()
+	_check(_rig._tracks_drawn == null and _rig._track_parts.is_empty(), "none on stone ground")
+	set_kind.call("dirt")
+	_rig._outdoor = false
+	_rig._draw_tracks()
+	_rig._outdoor = true
+	_check(_rig._tracks_drawn == null, "none indoors")
+	_rig._on_tracks_changed(level, PackedInt32Array([land.x, land.y, Client3D.TRACK_FADE_MS / 2000, 2]), PackedInt32Array())
+	_check(not _rig._track_shades.is_empty() and _rig._track_shades.all(func(c: Color) -> bool: return c.a > 0.2 and c.a < 0.4) and _rig._tracks_due > 0,
+			"half way through its fade, half seen, and a redraw due (%s)" % [_rig._track_shades.slice(0, 1).map(func(c: Color) -> float: return snappedf(c.a, 0.01))])
+	_rig._on_tracks_changed(level, PackedInt32Array(), PackedInt32Array([land.x, land.y, wet.x, wet.y]))
+	_check(_rig._tracks_drawn == null and _rig._track_parts.is_empty() and not _rig._tracks.has(level), "gone when told")
+	_rig._on_tracks_changed("elsewhere", PackedInt32Array([land.x, land.y, 200, 2]), PackedInt32Array(), true)
+	_check(_rig._tracks_drawn == null and _rig._tracks.has("elsewhere"), "another level's kept, not drawn")
+	_rig._on_tracks_changed(level, PackedInt32Array([land.x, land.y, 0, 2]), PackedInt32Array(), true)
+	_check(_rig._tracks_drawn == null and not _rig._tracks.has(level), "one past its time dropped")
+	World.tracks_changed.emit(level, PackedInt32Array([land.x, land.y, 200, 4]), PackedInt32Array(), true)
+	_check(_rig._tracks_drawn != null and _rig._track_parts.size() == 12, "drawn from World.tracks_changed")
+	for near: Vector2i in kinds_were:
+		if kinds_were[near] == null:
+			_rig._ground_kinds.erase(near)
+		else:
+			_rig._ground_kinds[near] = kinds_were[near]
+	_rig._tracks.clear()
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

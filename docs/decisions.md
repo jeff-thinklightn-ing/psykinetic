@@ -40398,3 +40398,19 @@ summed over every companion that tick. When "act: companions" is at least half o
 the worst tick, the slow line ends " (companion turns: piece x.x, piece x.x, ...)", the four largest
 in ms; the line before it is unchanged, so greps for "[net] slow:" still match. If the box's bursts
 were something else, the next one names it.
+
+780 amended (3): the bear's prints drawn (terrain; release's label, the coordinator's approval).
+Client3D keeps World.tracks_changed's prints as it keeps the blood (764 amended (3)): _tracks, level
+-> {cell: [the msec it fades out at, facing]}, full replacing a level's list, another level's kept
+undrawn, one past its time dropped; the zone's drawn as one MultiMesh "Tracks" (_draw_tracks, on a
+change and at the room's build in _phase_doors; _update_tracks redraws while one fades). Each print is
+a pair of paws side by side across the way walked, TRACK_PAIR 0.44 m apart, the right one 0.16 m
+ahead, each a broad pad (TRACK_PAD 0.32 x 0.24 m, a great bear's) and five toes in an arc ahead of it,
+pointing the facing (0 north up the map, clockwise) with a little seeded turn and place each cell,
+flat discs lying on the ground's slope (_ground_up, now the blood's too), shadowless, matte.
+Pressed-earth dark (TRACK_COLOR) at TRACK_ALPHA 0.6, on grass TRACK_ON_GRASS 0.85 (the coordinator:
+dark grass swallows them otherwise), fading out over their last TRACK_FADE_MS 80 s as blood does. A
+paw is left out on water or a ford, on stone ground (TRACK_HARD) and on a stone road's surface
+(_takes_print; a dirt road takes them); none indoors. view_test _test_tracks. Client only: the
+"tracks" message unchanged, protocol unchanged, no new class_name; no bullet (only the bear yard has
+the bear).

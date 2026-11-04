@@ -2729,6 +2729,7 @@ func _process(delta: float) -> void:
 	_update_sky(delta)
 	_grow_scatter()
 	_update_blood()
+	_update_tracks()
 	_drop_departed()
 	_update_mourning(delta)
 	_flicker_fires(delta)
@@ -6332,10 +6333,13 @@ func _phase_doors() -> void:
 		World.grass_changed.connect(_on_grass_changed)
 	if not World.blood_changed.is_connected(_on_blood_changed):
 		World.blood_changed.connect(_on_blood_changed)
+	if not World.tracks_changed.is_connected(_on_tracks_changed):
+		World.tracks_changed.connect(_on_tracks_changed)
 	for door in World.get_doors():
 		_doors_due[door.key] = true
 	_show_piles()
 	_draw_blood()
+	_draw_tracks()
 
 
 ## The walls, doorways and posts of the terrain's edges; none along an
@@ -15857,9 +15861,7 @@ func _draw_blood() -> void:
 				var tint := BLOOD_ON_BROWN if brown else BLOOD_COLOR
 				var size := rng.randf_range(0.05, 0.16) * (BLOOD_BROWN_GROW if brown else 1.0)
 				var y := _height_in(cell, at)
-				var dx := _height_in(cell, at + Vector2(0.05, 0.0)) - y
-				var dz := _height_in(cell, at + Vector2(0.0, 0.05)) - y
-				var up := Vector3(-dx, 0.05, -dz).normalized()
+				var up := _ground_up(cell, at)
 				var spin := Basis(Vector3.UP, rng.randf() * TAU)
 				var tilt := Basis(Quaternion(Vector3.UP, up))
 				var shape := Basis.from_scale(Vector3(size * rng.randf_range(1.0, 1.8), 1.0, size))
@@ -15914,6 +15916,189 @@ static func _blood_look() -> StandardMaterial3D:
 		_blood_material.roughness = 0.35
 		_blood_material.albedo_color = Color.WHITE
 	return _blood_material
+
+
+## The ground's up at [param at] in [param cell] (its slope), for marks
+## lying on it (blood, prints).
+func _ground_up(cell: Vector2i, at: Vector2) -> Vector3:
+	var y := _height_in(cell, at)
+	var dx := _height_in(cell, at + Vector2(0.05, 0.0)) - y
+	var dz := _height_in(cell, at + Vector2(0.0, 0.05)) - y
+	return Vector3(-dx, 0.05, -dz).normalized()
+
+
+## An apex creature's prints (780 amended (3), terrain's side): each level's
+## marked cells, level -> {cell: [the msec it fades out at, facing 0..7
+## clockwise from north]}, from World.tracks_changed.
+var _tracks: Dictionary = {}
+## The drawn prints of the zone's level (one MultiMesh), and when they next
+## need drawing again (a print fading a step, or going); 0 for none due.
+var _tracks_drawn: MultiMeshInstance3D
+var _tracks_due := 0
+## Each drawn part's (a pad or a toe) place and colour, its fade the alpha
+## (a headless MultiMesh keeps neither, so tests read them here).
+var _track_parts: Array[Transform3D] = []
+var _track_shades: Array[Color] = []
+static var _track_mesh: Mesh
+static var _track_material: StandardMaterial3D
+## A print fades out over its last TRACK_FADE_MS; redrawn every
+## TRACK_STEP_MS while fading (blood's).
+const TRACK_FADE_MS := 80000
+const TRACK_STEP_MS := 2000
+## Pressed earth, darker than the ground; on grass more of it, or the dark
+## grass swallows it (the coordinator).
+const TRACK_COLOR := Color(0.07, 0.045, 0.025)
+const TRACK_ALPHA := 0.6
+const TRACK_ON_GRASS := 0.85
+## A paw: its pad's size across and along (m), its toes' size, how far
+## ahead of the pad's middle they sit, and how far apart the pair's paws are
+## across the way walked and along it (the right one ahead).
+const TRACK_PAD := Vector2(0.32, 0.24)
+const TRACK_TOE := 0.08
+const TRACK_TOES_AHEAD := 0.21
+const TRACK_PAIR := Vector2(0.44, 0.16)
+## No prints on these grounds (and none on a stone road, water or a ford).
+const TRACK_HARD: Array[String] = ["stone"]
+
+
+## Tracks marked or gone on [param level] (780 amended (2)): [param add] flat
+## [x, y, seconds left, facing, ...], [param gone] flat [x, y, ...]; [param
+## full] sets the level's whole list (a zone joined). Drawn at once if it is
+## this zone's.
+func _on_tracks_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array, full := false) -> void:
+	var now := Time.get_ticks_msec()
+	if full or not _tracks.has(level):
+		_tracks[level] = {}
+	var marks: Dictionary = _tracks[level]
+	for i in range(0, add.size() - 3, 4):
+		marks[Vector2i(add[i], add[i + 1])] = [now + add[i + 2] * 1000, posmod(add[i + 3], 8)]
+	for i in range(0, gone.size() - 1, 2):
+		marks.erase(Vector2i(gone[i], gone[i + 1]))
+	if marks.is_empty():
+		_tracks.erase(level)
+	if World.zone != null and level == World.zone.name:
+		_draw_tracks()
+
+
+## Redrawn when a fading print's step is due (from _process).
+func _update_tracks() -> void:
+	if _tracks_due != 0 and Time.get_ticks_msec() >= _tracks_due:
+		_draw_tracks()
+
+
+## Whether a print can be pressed at [param at] (in [param cell]): not on
+## water or a ford, hard ground, or a stone road.
+func _takes_print(cell: Vector2i, at: Vector2) -> bool:
+	if _terrain_water_has(cell) or str(_ground_kinds.get(cell, "")) in TRACK_HARD:
+		return false
+	if not _road_curves.is_empty():
+		var near := _road_near(at)
+		if near.z >= 0.0 and near.x > 0.0 and _road_curves[int(near.z)]["kind"] == "stone":
+			return false
+	return true
+
+
+## The zone's prints: a pair of paws a marked cell, pointing the way walked,
+## the right one a little ahead, each a broad pad and five toes in an arc,
+## lying on the ground's slope, seeded by the cell; fading out over their
+## last TRACK_FADE_MS; none indoors. Prints past their time are dropped here.
+func _draw_tracks() -> void:
+	_tracks_due = 0
+	var now := Time.get_ticks_msec()
+	var level := World.zone.name if World.zone != null else ""
+	var marks: Dictionary = _tracks.get(level, {})
+	for cell: Vector2i in marks.keys():
+		if int(marks[cell][0]) <= now:
+			marks.erase(cell)
+	if marks.is_empty():
+		_tracks.erase(level)
+	var parts: Array[Transform3D] = []
+	var shades: Array[Color] = []
+	if _outdoor and _room != null:
+		for cell: Vector2i in marks:
+			var left: int = int(marks[cell][0]) - now
+			var fade := clampf(float(left) / TRACK_FADE_MS, 0.0, 1.0)
+			if left < TRACK_FADE_MS:
+				var step := now + mini(TRACK_STEP_MS, left)
+				_tracks_due = step if _tracks_due == 0 else mini(_tracks_due, step)
+			else:
+				var start := now + left - TRACK_FADE_MS
+				_tracks_due = start if _tracks_due == 0 else mini(_tracks_due, start)
+			var rng := RandomNumberGenerator.new()
+			rng.seed = hash(cell) ^ 780
+			var angle := int(marks[cell][1]) * PI / 4.0 + rng.randf_range(-0.12, 0.12)
+			var ahead := Vector2(sin(angle), -cos(angle))
+			var right := Vector2(-ahead.y, ahead.x)
+			var yaw := Basis(Vector3.UP, -angle)
+			var middle := Vector2(cell) + Vector2(rng.randf_range(-0.15, 0.15), rng.randf_range(-0.15, 0.15))
+			for side: float in [-0.5, 0.5]:
+				var paw := middle + right * side * TRACK_PAIR.x + ahead * (side + 0.5) * TRACK_PAIR.y
+				var paw_cell := Vector2i(roundi(paw.x), roundi(paw.y))
+				if not _takes_print(paw_cell, paw):
+					continue
+				var tint := TRACK_ON_GRASS if str(_ground_kinds.get(paw_cell, "")) == "grass" else TRACK_ALPHA
+				var alpha := tint * fade * rng.randf_range(0.85, 1.0)
+				# The pad, then the toes: an arc, the middle ones furthest out.
+				var spots: Array[Vector4] = [Vector4(0.0, 0.0, TRACK_PAD.x, TRACK_PAD.y)]
+				for toe in 5:
+					var across := (toe - 2) * 0.25
+					spots.append(Vector4(across * TRACK_PAD.x * 0.9, TRACK_TOES_AHEAD - absf(across) * absf(across) * 0.12, TRACK_TOE, TRACK_TOE * 1.15))
+				for spot in spots:
+					var at := paw + right * spot.x + ahead * spot.y
+					var y := _height_in(paw_cell, at)
+					var tilt := Basis(Quaternion(Vector3.UP, _ground_up(paw_cell, at)))
+					var shape := Basis.from_scale(Vector3(spot.z, 1.0, spot.w))
+					parts.append(Transform3D(tilt * yaw * shape, Vector3(at.x, y + 0.012, at.y)))
+					shades.append(Color(TRACK_COLOR, alpha))
+	if parts.is_empty():
+		_track_parts = []
+		_track_shades = []
+		if is_instance_valid(_tracks_drawn):
+			_tracks_drawn.queue_free()
+		_tracks_drawn = null
+		return
+	if not is_instance_valid(_tracks_drawn) or _tracks_drawn.get_parent() != _room:
+		_tracks_drawn = MultiMeshInstance3D.new()
+		_tracks_drawn.name = "Tracks"
+		_tracks_drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		_tracks_drawn.material_override = _track_look()
+		_room.add_child(_tracks_drawn)
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.mesh = _track_part()
+	multimesh.instance_count = parts.size()
+	for i in parts.size():
+		multimesh.set_instance_transform(i, parts[i])
+		multimesh.set_instance_color(i, shades[i])
+	_tracks_drawn.multimesh = multimesh
+	_track_parts = parts
+	_track_shades = shades
+
+
+## A pad or toe: a flat round disc a metre across (scaled down per part).
+static func _track_part() -> Mesh:
+	if _track_mesh == null:
+		var disc := CylinderMesh.new()
+		disc.top_radius = 0.5
+		disc.bottom_radius = 0.5
+		disc.height = 0.004
+		disc.radial_segments = 12
+		disc.rings = 1
+		disc.cap_bottom = false
+		_track_mesh = disc
+	return _track_mesh
+
+
+## Matte, its fade each part's own.
+static func _track_look() -> StandardMaterial3D:
+	if _track_material == null:
+		_track_material = StandardMaterial3D.new()
+		_track_material.vertex_color_use_as_albedo = true
+		_track_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		_track_material.roughness = 1.0
+		_track_material.albedo_color = Color.WHITE
+	return _track_material
 
 
 ## A blow landed: a thud on flesh for an attack (an impact makes its own
