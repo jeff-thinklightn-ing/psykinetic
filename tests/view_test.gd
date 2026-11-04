@@ -61,6 +61,7 @@ func _ready() -> void:
 		_test_sight()
 		_test_ground_fields()
 		_test_glimpses_meet()
+		_test_world_map_kept()
 	else:
 		_test_every_sound_has_its_files()
 		await _test_hp_bars()
@@ -1458,6 +1459,22 @@ func _test_player_death() -> void:
 ## ground at our last land cell along the way, and so does the ground the
 ## room keeps for those cells (the forest round it stands there).
 const GLIMPSE_MEET := 0.3
+
+
+func _test_world_map_kept() -> void:
+	print("\n== the far landmarks' and glimpses' WorldMap kept until a level changes ==")
+	var first := Client3D._world_map()
+	_check(Client3D._world_map() == first, "asked again with nothing changed: the same build")
+	_check(first.areas.has("castle"), "it holds the castle")
+	# The castle made in code in its place (as a regenerated or sent level is): built again.
+	var made := Level.source("castle")
+	Level.register("castle", (made["layout"] as Image).duplicate(), made["height"], made["config"], made.get("relief"))
+	var registered := Client3D._world_map()
+	Level.unregister("castle")
+	_check(registered != first and registered.areas.has("castle"), "the castle registered: built again")
+	var back := Client3D._world_map()
+	_check(back != registered and back.areas.has("castle"), "the castle's registration gone: built again")
+	_check(Client3D._world_map() == back, "and kept again")
 
 
 func _test_glimpses_meet() -> void:

@@ -26924,6 +26924,19 @@ landmark of its own id). Data the client reads; protocol unchanged, no
 new class_name, no CHANGELOG line (nothing a player sees until terrain's
 side).
 
+650 amended (2) (perf; release's label): the world the far landmarks and the glimpses read
+(WorldMap.build(), a read and an MD5 of every level, 35.7 ms warm) is kept by Client3D
+(_world_map) and built again only when its key changes (_world_map_key): each of Level.names() by
+its folder, an overlay folder's layout, height, relief and level.json by modified time, a level
+made in code (Level.register: a regenerated level, an edit the server sent, a test's) by its
+images' instance ids and its config's hash. DIR's levels are keyed by folder alone: nothing writes
+them while a game runs (the level editor does, and draws no Client3D). An arrival asked for it
+twice (_add_far_landmarks, _plan_glimpses); a kept one costs 3.2 ms (Level.names() and the
+overlay checks). "Read at each build" above still holds for any level that changed. view_test
+_test_world_map_kept (view_land_test): the same build asked again, built again with the castle
+registered and with it gone, then kept. Client only, protocol unchanged, no new class_name, no
+CHANGELOG bullet.
+
 ## 632: the low-angle fight, 1: what hides a foe fades
 
 Jeff on 623 (v0.1.169): the low camera is the direction, but fights read harder. The

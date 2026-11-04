@@ -8103,7 +8103,7 @@ func _add_far_landmarks() -> void:
 	_far_material.set_shader_parameter("haze", _sky_horizon)
 	_far_material.set_shader_parameter("light", lerpf(FAR_NIGHT_LIGHT, 1.0, _look_daylight))
 	var level := str(_terrain.get("level", ""))
-	var world := WorldMap.build()
+	var world := _world_map()
 	var near := {}
 	if world.areas.has(level):
 		near[level] = world.areas[level]["size"]
@@ -8728,7 +8728,7 @@ func _plan_glimpses() -> Array[Dictionary]:
 	var area := str(_terrain.get("level", ""))
 	if area.is_empty() or not Level.names().has(area):
 		return out
-	var world := WorldMap.build()
+	var world := _world_map()
 	if not world.areas.has(area):
 		return out
 	var size: Vector2i = world.areas[area]["size"]
@@ -8744,6 +8744,51 @@ func _plan_glimpses() -> Array[Dictionary]:
 		if not (plan["cells"] as Dictionary).is_empty():
 			out.append(plan)
 	return out
+
+
+## WorldMap.build() as last made (the far landmarks' and the glimpses'),
+## made again only when a level changed: its overlay files (by modified
+## time) or the level made in code in its place
+## (Level.register: a regenerated level, an edit the server sent). A build
+## reads and digests every level, about 35 ms, and an arrival asked for it
+## twice. Read it, never change it.
+static var _world_built: WorldMap = null
+static var _world_key := ""
+
+
+static func _world_map() -> WorldMap:
+	var key := _world_map_key()
+	if _world_built == null or key != _world_key:
+		_world_built = WorldMap.build()
+		_world_key = key
+	return _world_built
+
+
+## What WorldMap.build() reads, each level by its folder (the overlay's
+## files by modified time) or the identity of the images registered for
+## it: equal keys, equal builds.
+static func _world_map_key() -> String:
+	var parts := PackedStringArray()
+	for level_name in Level.names():
+		var made: Dictionary = Level._registered.get(level_name, {})
+		if not made.is_empty():
+			var ids: Array[int] = []
+			for image_key: String in ["layout", "height", "relief"]:
+				var image: Variant = made.get(image_key)
+				ids.append((image as Object).get_instance_id() if image is Object else 0)
+			parts.append("%s=made %s %d" % [level_name, ids, (made.get("config", {}) as Dictionary).hash()])
+			continue
+		var folder := Level.folder_of(level_name)
+		if folder.begins_with(Level.DIR):
+			# The pck's (DIR's): never written while a game runs (the level
+			# editor, which does write there, draws no Client3D).
+			parts.append("%s=%s" % [level_name, folder])
+			continue
+		var times: Array[int] = []
+		for file: String in ["layout.png", "height.png", "relief.png", "level.json"]:
+			times.append(FileAccess.get_modified_time(folder + file) if FileAccess.file_exists(folder + file) else 0)
+		parts.append("%s=%s %s" % [level_name, folder, times])
+	return "|".join(parts)
 
 
 ## Level [param level_name] as last read for a glimpse, read again only
