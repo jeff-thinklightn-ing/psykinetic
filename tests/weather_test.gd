@@ -458,6 +458,33 @@ func _test_skylights() -> void:
 	var day: Array = Client3D.skylight_look(1.0)
 	_check(float(night[0]) > 0.0 and is_equal_approx(float(day[0]), Client3D.SKYLIGHT_ENERGY) and (night[1] as Color).b > (night[1] as Color).r,
 			"the view: bluer and faint at night, full by day")
+	# 797 amended: a cave's mouth. A corridor x 0..6 on row 2,
+	# a wall at x 3 on row 4 apart from a side passage row 4 x 4..6 joined
+	# only at x 6: the mouth's light walks the floor, never through the wall.
+	var floor: Array = []
+	for x in range(0, 7):
+		floor.append(Vector2i(x, 2))
+	for x in range(4, 7):
+		floor.append(Vector2i(x, 4))
+	floor.append(Vector2i(6, 3))
+	floor.append(Vector2i(2, 3))
+	floor.append(Vector2i(2, 4))
+	warnings.clear()
+	var mouths := Level.mouths_from({"mouths": [{"at": [0, 2], "reach": 20}, {"at": [9, 9]}, {"at": [9]}]}, floor, warnings)
+	_check(mouths.size() == 1 and mouths[0]["toward"] == Vector2i(1, 0) and mouths[0]["reach"] == Level.MOUTH_REACH.y and warnings.size() == 2,
+			"a mouth read, its way in found from the floor, its reach capped; one with no floor or a bad entry left out and said (%s)" % [warnings])
+	var lit := Level.mouth_cells([{"at": Vector2i(0, 2), "toward": Vector2i(1, 0), "reach": 4}], floor)
+	_check(lit[Vector2i(0, 2)] == 1.0 and lit[Vector2i(1, 2)] == 1.0 and is_equal_approx(lit[Vector2i(4, 2)], Level.MOUTH_EDGE)
+			and not lit.has(Vector2i(5, 2)) and lit.has(Vector2i(2, 4)) and not lit.has(Vector2i(4, 4)),
+			"full at the mouth, fading to its reach along the floor, round a corner, not through a wall (%s)" % [lit])
+	fields.load({"ambient": 0.03, "zone": "cave", "floor": floor, "mouths": [{"at": Vector2i(0, 2), "toward": Vector2i(1, 0), "reach": 4}]})
+	DayNight.light = 1.0
+	var inside := fields.ambient_at(Vector2i(1, 2))
+	DayNight.light = DayNight.NIGHT
+	var dark := fields.ambient_at(Vector2i(1, 2))
+	DayNight.light = was
+	_check(inside > 0.5 and dark >= Fields.SKYLIGHT_NIGHT and dark < inside and is_equal_approx(fields.ambient_at(Vector2i(6, 4)), 0.03),
+			"Senses' light at the mouth: the day's, faint at night; the cave's past its reach (%.2f, %.2f)" % [inside, dark])
 
 
 ## The mine's light (769 amended (6)): a level's own ambient as a share of

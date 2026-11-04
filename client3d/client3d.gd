@@ -793,6 +793,15 @@ const SKYLIGHT_ENERGY := 3.0
 const SKYLIGHT_DAY_COLOUR := Color(0.9, 0.94, 1.0)
 const SKYLIGHT_NIGHT_COLOUR := Color(0.55, 0.64, 0.9)
 const SKYLIGHT_PICK := 0.5
+## A cave's mouth (797 amended): a light outside it,
+## MOUTH_BACK cells out and MOUTH_HIGH m up, shining in and down to the floor
+## MOUTH_AIM of its reach in, at MOUTH_SHARE of a skylight's energy (it is
+## near what it lights), the same colours, shadowless.
+const MOUTH_BACK := 1.0
+const MOUTH_HIGH := 2.5
+const MOUTH_AIM := 0.5
+const MOUTH_SHARE := 0.45
+const MOUTH_ANGLE := 40.0
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
 const SUN := Color(0.6, 0.7, 1.0)
@@ -12069,6 +12078,7 @@ func _build_shafts() -> void:
 ## cell, its cone the gap's radius, and the canopy's dusty shaft by day;
 ## _light_skylights sets them by the sky's light outside.
 func _build_skylights() -> void:
+	_build_mouths()
 	var skylights: Array = _terrain.get("skylights", [])
 	if skylights.is_empty():
 		return
@@ -12091,6 +12101,36 @@ func _build_skylights() -> void:
 		_skylights.append(light)
 	_shafts.setup(gaps, {}, _tile_position)
 	_skylight_clock = SKYLIGHT_PICK
+
+
+## A cave's mouths (797 amended): one light each, outside
+## the mouth (mouth_light), lit with the skylights (_light_skylights) at
+## MOUTH_SHARE.
+func _build_mouths() -> void:
+	for mouth: Dictionary in _terrain.get("mouths", []):
+		var at: Vector2i = mouth["at"]
+		var placed := mouth_light(_tile_position(at), mouth["toward"], int(mouth["reach"]))
+		var light := SpotLight3D.new()
+		light.name = "Mouth_%d_%d" % [at.x, at.y]
+		light.transform = placed
+		light.spot_range = float(mouth["reach"]) + MOUTH_BACK + MOUTH_HIGH
+		light.spot_angle = MOUTH_ANGLE
+		light.spot_angle_attenuation = 0.8
+		light.shadow_enabled = false
+		light.set_meta("share", MOUTH_SHARE)
+		_room.add_child(light)
+		_skylights.append(light)
+	_skylight_clock = SKYLIGHT_PICK
+
+
+## Where a mouth's light stands and looks: [param floor] the mouth cell's
+## floor point, MOUTH_BACK cells out against [param toward] and MOUTH_HIGH
+## up, aimed at the floor MOUTH_AIM of [param reach] in.
+static func mouth_light(floor: Vector3, toward: Vector2i, reach: int) -> Transform3D:
+	var inward := Vector3(toward.x, 0.0, toward.y)
+	var from := floor - inward * MOUTH_BACK + Vector3(0.0, MOUTH_HIGH, 0.0)
+	var aim := floor + inward * (float(reach) * MOUTH_AIM)
+	return Transform3D(Basis.looking_at(aim - from, Vector3.UP), from)
 
 
 ## A skylight's cone (degrees) for a gap of [param radius] cells: its edge
@@ -12121,7 +12161,7 @@ func _light_skylights(delta: float) -> void:
 	var look := skylight_look(DayNight.light)
 	for light: SpotLight3D in _skylights:
 		if is_instance_valid(light):
-			light.light_energy = look[0]
+			light.light_energy = look[0] * float(light.get_meta("share", 1.0))
 			light.light_color = look[1]
 	if _shafts != null:
 		_shafts.place(_camera_target, Vector3.UP, clampf(inverse_lerp(DayNight.NIGHT, 1.0, DayNight.light), 0.0, 1.0))

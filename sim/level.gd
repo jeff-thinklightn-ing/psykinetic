@@ -848,6 +848,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	var clearings := clearings_from(config, warnings)
 	level["terrain"]["clearings"] = clearings
 	level["terrain"]["skylights"] = skylights_from(config, warnings)
+	level["terrain"]["mouths"] = mouths_from(config, floor_tiles, warnings)
 	level["terrain"]["canopy_kind"] = canopy_kind(config, warnings)
 	level["terrain"]["canopy"] = canopy_from(cell_codes, cells, clearings) if config.has("canopy") else {}
 	_place(level, markers, config, warnings)
@@ -1641,6 +1642,81 @@ static func skylit_cells(skylights: Array) -> Dictionary[Vector2i, float]:
 				var share := 1.0 if gone <= radius * 0.5 else lerpf(1.0, SKYLIGHT_EDGE, (gone - radius * 0.5) / (radius * 0.5))
 				var cell := at + Vector2i(dx, dy)
 				out[cell] = maxf(out.get(cell, 0.0), share)
+	return out
+
+
+## level.json's "mouths", [{at: [x, y], reach, toward: [dx, dy]}] (797
+## amended): a cave's mouth, open to the sky, at [at] (its
+## way out, as Hollowfell's link, 790), the day's light coming in along
+## [toward] (a step into the cave; when not given, the side whose floor
+## goes on while the other doesn't) up to [reach] (MOUTH_REACH) cells, as
+## {at: Vector2i, toward: Vector2i, reach: int}. A bad entry is left out and
+## said in [param warnings]. Indoors only (Fields, Client3D).
+const MOUTH_REACH := Vector2i(2, 8)
+const MOUTH_STEPS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+
+
+static func mouths_from(config: Dictionary, floor_tiles: Array, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var floor := {}
+	for cell: Vector2i in floor_tiles:
+		floor[cell] = true
+	for entry: Variant in config.get("mouths", []):
+		if not (entry is Dictionary and entry.get("at") is Array and (entry["at"] as Array).size() == 2):
+			warnings.append("a mouth in level.json is not {at: [x, y], reach}: left out (%s)" % [entry])
+			continue
+		var at := Vector2i(int(entry["at"][0]), int(entry["at"][1]))
+		var toward := Vector2i.ZERO
+		var given: Variant = entry.get("toward")
+		if given is Array and (given as Array).size() == 2:
+			toward = Vector2i(signi(int(given[0])), signi(int(given[1])))
+			if toward.x != 0 and toward.y != 0:
+				toward = Vector2i.ZERO
+		else:
+			for step: Vector2i in MOUTH_STEPS:
+				if floor.has(at + step) and not floor.has(at - step):
+					toward = step
+					break
+		if toward == Vector2i.ZERO:
+			warnings.append("a mouth in level.json at %s has no way in (give \"toward\" as one step): left out" % [at])
+			continue
+		var reach := clampi(int(entry.get("reach", 5)), MOUTH_REACH.x, MOUTH_REACH.y)
+		out.append({"at": at, "toward": toward, "reach": reach})
+	return out
+
+
+## The cells a mouth's daylight reaches, each with its share: walked over
+## [param floor_tiles] from the mouth (so no wall lets it through), never
+## back past it, 1 for the first step in, falling to MOUTH_EDGE at its reach.
+const MOUTH_EDGE := 0.2
+
+
+static func mouth_cells(mouths: Array, floor_tiles: Array) -> Dictionary[Vector2i, float]:
+	var out: Dictionary[Vector2i, float] = {}
+	if mouths.is_empty():
+		return out
+	var floor := {}
+	for cell: Vector2i in floor_tiles:
+		floor[cell] = true
+	for mouth: Dictionary in mouths:
+		var at: Vector2i = mouth["at"]
+		var toward: Vector2i = mouth["toward"]
+		var reach := int(mouth["reach"])
+		var steps := {at: 0}
+		var frontier: Array[Vector2i] = [at]
+		while not frontier.is_empty():
+			var cell: Vector2i = frontier.pop_front()
+			var step := int(steps[cell])
+			var share := 1.0 if step <= 1 else lerpf(1.0, MOUTH_EDGE, float(step - 1) / float(maxi(1, reach - 1)))
+			out[cell] = maxf(out.get(cell, 0.0), share)
+			if step >= reach:
+				continue
+			for next_step: Vector2i in MOUTH_STEPS:
+				var next := cell + next_step
+				if steps.has(next) or not floor.has(next) or (next.x - at.x) * toward.x + (next.y - at.y) * toward.y < 0:
+					continue
+				steps[next] = step + 1
+				frontier.append(next)
 	return out
 
 

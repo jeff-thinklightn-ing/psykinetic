@@ -40911,6 +40911,32 @@ the gap with its cone, faint at night and bright by day, none without the key); 
 key. No CHANGELOG bullet until a shipped level sets it (bear_cave brings one). Protocol unchanged,
 no new class_name.
 
+797 amended: a cave's mouth (2026-11-04; the coordinator's approval of Hollowfell's
+light, release's label). Hollowfell's way out to the hills (790, its link at (1,34) on the west edge)
+opens a dark mine to the day; the mouth should read as daylight a few cells in, cold and faint at
+night, under 0.03 ambient everywhere past it. The same mechanism as a skylight, sideways:
+- level.json "mouths": [{at: [x, y], reach, toward: [dx, dy]}] (Level.mouths_from, indoors only,
+  EditorFields NOT_OFFERED). [at] is the mouth cell (its link). [toward] is the one step into the
+  cave; when left out, it is the side whose floor goes on while the other side's doesn't (a link on
+  a map's edge). reach is 2..8 cells, default 5. A bad entry, or one with no way in, is warned and
+  left out.
+- Level.mouth_cells walks the floor from the mouth, never back past it, so no wall lets the light
+  through into a passage beside it. Each cell gets a share: 1 for the mouth and its first step in,
+  falling to MOUTH_EDGE 0.2 at the reach. Fields adds those cells to its skylit cells (the greater
+  share where a gap and a mouth meet), so Fields.ambient_at gives them the sky's light as a gap's:
+  DayNight.light at 0.7, never under 0.15. Senses sees there by day, and a little at night.
+- The view: Client3D._build_mouths puts one shadowless SpotLight3D per mouth outside it (MOUTH_BACK
+  1 cell out, MOUTH_HIGH 2.5 m up; Client3D.mouth_light), aimed in and down at the floor halfway to
+  its reach, cone MOUTH_ANGLE 40°. It is lit with the skylights by the sky outside
+  (_light_skylights, skylight_look's colours) at MOUTH_SHARE 0.45 of their energy, being much
+  nearer what it lights. No dusty shafts at a mouth.
+- Wire: none, as for "skylights".
+Hollowfell sets "mouths": [{"at": [1, 34]}] (dungeon's file). Tests: weather_test _test_skylights
+(read, its way in found, capped, bad ones said; the walk along the floor, round a corner, not through
+a wall; Fields' light by day and night, the cave's past the reach); view_test _test_skylights (the
+light outside the mouth, shining in and down, at its share by day). No CHANGELOG bullet until
+Hollowfell sets it. Protocol unchanged, no new class_name.
+
 ## 770. The market's trader: gold from outside, on a schedule
 
 A town's treasury sat at its floor, owing its people, because gold only comes in from players (761

@@ -46,8 +46,8 @@ const DAMP_REACH := 0.5
 const HEAT_FALLOFF := 0.35
 
 var ambient := 1.0
-## An indoor level's skylit cells (decision 797, Level.skylit_cells): cell ->
-## its share of the gap's light. Through the gap the sky's light, at
+## An indoor level's skylit cells (decision 797, Level.skylit_cells, and
+## its mouths' cells, Level.mouth_cells): cell -> its share of the light. Through the gap the sky's light, at
 ## SKYLIGHT_SKY of it, never under SKYLIGHT_NIGHT (a shape at night).
 var skylit: Dictionary[Vector2i, float] = {}
 const SKYLIGHT_SKY := 0.7
@@ -148,6 +148,10 @@ func load(terrain: Dictionary) -> void:
 	skylit.clear()
 	if not bool(terrain.get("outdoor", false)):
 		skylit = Level.skylit_cells(terrain.get("skylights", []))
+		# A cave's mouth (797 amended): the day's light in.
+		var mouth := Level.mouth_cells(terrain.get("mouths", []), terrain.get("floor", []))
+		for cell: Vector2i in mouth:
+			skylit[cell] = maxf(skylit.get(cell, 0.0), mouth[cell])
 	outdoor = bool(terrain.get("outdoor", false))
 	region = str(terrain.get("region", Level.DEFAULT_REGION))
 	_roofed_whole.clear()

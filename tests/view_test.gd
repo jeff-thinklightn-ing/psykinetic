@@ -1821,6 +1821,19 @@ func _test_skylights() -> void:
 	config.erase("skylights")
 	_rig.rebuild(Level.parse(map.to_image(), null, config)["terrain"], Vector2i(7, 6))
 	_check(_rig._skylights.is_empty(), "none without the key")
+	# 797 amended: a mouth on the west edge, x 2, row 6.
+	config["mouths"] = [{"at": [2, 6], "reach": 5}]
+	_rig.rebuild(Level.parse(map.to_image(), null, config)["terrain"], Vector2i(7, 6))
+	var mouth := _rig._room.get_node_or_null("Mouth_2_6") as SpotLight3D
+	var ahead := -mouth.transform.basis.z if mouth != null else Vector3.ZERO
+	_check(mouth != null and mouth.position.x < 2.0 and mouth.position.y > _rig._tile_position(Vector2i(2, 6)).y + 1.0
+			and ahead.x > 0.5 and ahead.y < 0.0 and not mouth.shadow_enabled,
+			"one light outside the mouth, shining in and down (%s, %s)" % [mouth, ahead])
+	DayNight.light = 1.0
+	_rig._light_skylights(Client3D.SKYLIGHT_PICK)
+	DayNight.light = was
+	_check(mouth != null and is_equal_approx(mouth.light_energy, Client3D.SKYLIGHT_ENERGY * Client3D.MOUTH_SHARE),
+			"lit by the sky as a skylight, at its share (%.2f)" % [mouth.light_energy if mouth != null else 0.0])
 
 
 func _test_mass() -> void:
