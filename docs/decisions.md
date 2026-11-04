@@ -40117,6 +40117,31 @@ no lunge. A roar cried plays the slot's roar; Pose SIT plays its sleep where it 
 graze, as before); a body replicated winded, standing, its winded. A slot without these clips
 draws as before. view_test _test_creature_tells. Client only; protocol unchanged; no new
 class_name; no bullet (no level has a bear).
+780 amended (7): the hill cat's body rigged (pc-character, 2026-11-04; release's label). Art-kit's
+hill cat (C:/dev/review/hill_cat/hill_cat.blend: low and long, a level tail as long as its body,
+ear cones with tufts and a jaw as loose pieces) goes on tools/quadruped_rig.py with three options
+the bear didn't need: --find-tail 1 starts a long tail where the body's depth (back less belly, down
+the middle) behind the hips first falls under TAIL_SECTION (0.6) of its depth at them, the tail's
+bones following the middle of its depth out to the tip (the cat's at y 0.272, five bones); --ears 1
+makes ear_l and ear_r on the head, from the points standing above the skull near its highest (an
+eye or brow rising a little is left out), joined by the loose pieces holding any (the ear cone, its
+tuft), which go wholly on the ear; --jaw 1 makes a jaw bone on the head for the largest loose piece
+under the snout, hinged behind and above it, the piece wholly on it. The pieces are found with
+vertices at one position joined (a faceted mesh splits its faces). The bear's rig comes out as
+before. --clips hill_cat (with --tail 5 --hock 0.2) authors Idle (the tail's tip curling and
+flicking, an ear turning), Walk, Run (a bound, the long back folding), Lie (lying up on its belly,
+fore legs out ahead, hind feet flat, the tail round its side, head up and watching), Crouch_Tell
+(the pounce's crouch, 8 ticks: flat, haunches gathered, the hind end treading), Pounce (springs,
+flies stretched out, lands on its fore paws at 0.4 s of 0.8), Recover (crouched and panting after
+a pounce, looped), Swipe (the blow at 0.5 s: windup 5), Bite (jaws open wide, shut at 0.4 s: windup
+4), Snarl (ears flat, jaws wide, the tail lashing), Hit and Death, every one within 3 cm of the
+ground; a long tail has its own helper, as a bone pointing back rises for a positive turn. The
+timings are enemy-ai's provisional moves (pounce crouch 8, swipe windup 5, bite windup 4; a
+recover of about 10 ticks), retimed when its hill_cat row lands; the client's hookup (pounce to
+crouch_tell, SIT to lie) comes with that row. Art-kit lands creature.hill_cat from the rigged
+.blend (C:/dev/review/hill_cat/hill_cat_rigged.blend; contacts swipe 0.556, bite 0.5, pounce 0.5)
+after its boar king, old wolf and great bear. Tools only; protocol unchanged; no new class_name;
+no bullet.
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'

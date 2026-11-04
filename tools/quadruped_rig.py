@@ -1,10 +1,12 @@
 # Rigs a four-legged body (art-kit's own mesh, one object, no armature) on a skeleton of its own,
 # built from landmarks measured on the mesh, and authors a species' clips by script (780: the great
-# bear first; the hill cat next, on the same bones with a longer tail). Weights by bone heat; the
-# mesh's own UVs (art-kit's palette swatches) kept; the rigged .blend saved beside the .glb.
+# bear first; the hill cat next, on the same bones with a long tail, ears and a jaw). Weights by
+# bone heat; the mesh's own UVs (art-kit's palette swatches) kept; the rigged .blend saved beside
+# the .glb.
 #
-#   blender -b -P tools/quadruped_rig.py -- <body .blend|.glb> <out.glb> --clips bear
+#   blender -b -P tools/quadruped_rig.py -- <body .blend|.glb> <out.glb> --clips bear|hill_cat
 #       [--tail N] [--hock SHARE] [--head SHARE] [--height M] [--turn DEGREES]
+#       [--find-tail 1] [--ears 1] [--jaw 1]
 #
 # The body stands four-square at rest: legs straight down and apart, head toward -Y (Blender's
 # front; --turn 180 if it faces +Y), feet on z = 0. It is centred and stood on z = 0 (scaled to
@@ -15,19 +17,26 @@
 # the centre line; the snout (the front-most points) and the rump (the rear-most). --head is the
 # head's length as a share of the body's (default 0.16); --hock the hind heel's height as a share of
 # the height (0.06, a bear's flat foot; a cat stands on its toes, about 0.2); --tail the tail's bones
-# (1 for a stub).
+# (1 for a stub). --find-tail 1: a long tail starts where the body's depth behind the hips falls
+# under TAIL_SECTION of its depth at them (else a stub off the rump). --ears 1: an ear bone a side
+# from the points standing above the skull near its highest (loose ear and tuft pieces wholly on
+# it). --jaw 1: a jaw bone for a loose jaw piece under the snout (wholly on it).
 #
 # Bones (local X is the world's +X for all of them, the body's left, so a rotation about X tips a
 # bone in the side view: positive sends its far end down, toward -Z, for a bone pointing ahead):
 #   root (the ground under the middle, along +Y), hips (the hip joint to the middle of the back),
 #   spine (to the chest), chest (to the withers, over the shoulders), neck (to the poll), head (to
 #   the snout), tail_1..N; per side (l, r) thigh, shin, foot (hip, knee, hock, toe) and upper_arm,
-#   forearm, paw (shoulder, elbow, wrist, toe).
+#   forearm, paw (shoulder, elbow, wrist, toe); ear_l, ear_r and jaw on the head where asked for.
 #
 # Clips (--clips bear): Idle, Walk, Run, Swipe, Slam, Charge_Tell, Roar, Winded, Sleep, Hit, Death; each
 # described at its function. The tells' timings are the sim's (levels/monsters.json great_bear's
 # moves, 10 ticks a second): Swipe's blow lands at 0.6 s (windup 6), Slam's at 1.2 s (windup 12),
 # Charge_Tell is the 0.8 s roar before the rush (roar 8), Winded loops (597's ~15 ticks).
+# Clips (--clips hill_cat, with --tail 5 --hock 0.2 --find-tail 1 --ears 1 --jaw 1): Idle, Walk, Run,
+# Lie, Crouch_Tell, Pounce, Recover, Swipe, Bite, Snarl, Hit, Death, on enemy-ai's provisional moves
+# (no monsters.json row yet; retimed when it lands): the pounce's crouch 8 (Crouch_Tell 0.8 s, then
+# Pounce's contact on landing at 0.4 s), swipe windup 5 (0.5 s), bite windup 4 (0.4 s).
 import math
 import os
 import sys
@@ -112,6 +121,126 @@ def marks(body, head_share: float, hock_share: float) -> dict:
 	return m
 
 
+## The body's depth (back less belly) down the middle at y, or None past its end.
+def depth(m: dict, y: float):
+	top, low = m["ray"](y, False), m["ray"](y, True)
+	return top - low if top is not None and low is not None and low < top else None
+
+
+## Where a long tail leaves the body: going back from the hips, the first y whose depth is under
+## TAIL_SECTION of the depth at the hips (between the two samples that cross it); None if none does.
+TAIL_SECTION = 0.6
+
+
+def tail_root(m: dict, hip_y: float):
+	at_hips = depth(m, hip_y)
+	if at_hips is None:
+		return None
+	step = 0.01 * m["length"]
+	y, last = hip_y, at_hips
+	while y < m["hi"].y - step:
+		y += step
+		d = depth(m, y)
+		if d is None:
+			return None
+		if d < TAIL_SECTION * at_hips:
+			u = (last - TAIL_SECTION * at_hips) / max(last - d, 1e-6)
+			found = y - step + u * step
+			print("  tail root y %.3f (depth %.3f at the hips)" % (found, at_hips))
+			return found
+		last = d
+	return None
+
+
+## The mesh's connected pieces, vertices at one position joined (a faceted mesh may split faces):
+## [vertex indices] each, the largest first.
+def pieces(body) -> list:
+	verts = body.data.vertices
+	up = list(range(len(verts)))
+
+	def find(i: int) -> int:
+		while up[i] != i:
+			up[i] = up[up[i]]
+			i = up[i]
+		return i
+
+	seen = {}
+	for v in verts:
+		key = tuple(round(c, 5) for c in v.co)
+		if key in seen:
+			up[find(v.index)] = find(seen[key])
+		else:
+			seen[key] = v.index
+	for e in body.data.edges:
+		a, b = find(e.vertices[0]), find(e.vertices[1])
+		if a != b:
+			up[a] = b
+	groups = {}
+	for v in verts:
+		groups.setdefault(find(v.index), []).append(v.index)
+	return sorted(groups.values(), key=len, reverse=True)
+
+
+## The ears: per side, the points over the head standing above the skull's top there (a ray down
+## the middle) near the highest of them (within 0.75 of its height over the skull, across), so an
+## eye or brow that rises a little isn't one, joined by the loose pieces holding any of them (the
+## ear, a tuft), which go wholly to its bone; (base, tip) from the middle of the lowest fifth of
+## their height to the highest tenth's.
+def find_ears(body, m: dict) -> None:
+	pts = [body.matrix_world @ v.co for v in body.data.vertices]
+	h, ray = m["h"], m["ray"]
+	front = m["snout"].y
+	back = front + 1.6 * m["head_len"]
+	ears, members = {}, {}
+	for s in ("l", "r"):
+		above = []
+		for i, p in enumerate(pts):
+			if (p.x > 0.0) != (s == "l") or not (front < p.y < back):
+				continue
+			skull = ray(p.y, False)
+			if skull is not None and p.z > skull + 0.01 * h:
+				above.append(i)
+		if len(above) < 3:
+			continue
+		top = max((pts[i] for i in above), key=lambda p: p.z)
+		reach = max(0.75 * (top.z - (ray(top.y, False) or top.z)), 0.03 * h)
+		above = [i for i in above if math.hypot(pts[i].x - top.x, pts[i].y - top.y) < reach]
+		loose = [p for p in m["pieces"][1:] if set(above) & set(p)]
+		above = sorted(set(above).union(*loose), key=lambda i: pts[i].z)
+		z0, z1 = pts[above[0]].z, pts[above[-1]].z
+		low = [pts[i] for i in above if pts[i].z <= z0 + 0.2 * (z1 - z0)]
+		high = [pts[i] for i in above if pts[i].z >= z1 - 0.1 * (z1 - z0)]
+		ears[s] = (middle(low), middle(high))
+		members[s] = loose
+		print("  ear_%s     (%.3f %.3f %.3f) -> (%.3f %.3f %.3f), %d points" % (s, *ears[s][0], *ears[s][1], len(above)))
+	m["ears"] = ears
+	m["ear_pieces"] = members
+
+
+## The jaw: the largest loose piece under the snout and ahead of the poll, near the middle; hinge
+## behind and above its back end, to its front. Its piece goes wholly to the jaw.
+def find_jaw(body, m: dict) -> None:
+	pts = [body.matrix_world @ v.co for v in body.data.vertices]
+	poll_y = m["snout"].y + m["head_len"]
+	best = None
+	for p in m["pieces"][1:]:
+		c = middle([pts[i] for i in p])
+		if c.y < poll_y and c.z < m["snout"].z and abs(c.x) < 0.05 * m["h"] and (best is None or len(p) > len(best)):
+			best = p
+	if best is None:
+		m["jaw"] = None
+		print("  no jaw piece")
+		return
+	ps = [pts[i] for i in best]
+	ys, zs = [p.y for p in ps], [p.z for p in ps]
+	span = max(ys) - min(ys)
+	hinge = Vector((0.0, max(ys) + 0.4 * span, max(zs) + 0.2 * span))
+	chin = Vector((0.0, min(ys), sum(zs) / len(zs)))
+	m["jaw"] = (hinge, chin)
+	m["jaw_piece"] = best
+	print("  jaw       (%.3f %.3f %.3f) -> (%.3f %.3f %.3f), %d points" % (*hinge, *chin, len(best)))
+
+
 ## The skeleton's joints from the landmarks: {bone: (head, tail, parent)}, parents first.
 def joints(m: dict, tail_bones: int) -> dict:
 	h, ray = m["h"], m["ray"]
@@ -140,16 +269,32 @@ def joints(m: dict, tail_bones: int) -> dict:
 		"neck": (withers, poll, "chest"),
 		"head": (poll, m["snout"], "neck"),
 	}
-	# The tail: from the rump's top back to its rear-most point, in equal bones.
+	# The tail: from the rump's top back to its rear-most point, in equal bones. A long tail
+	# (find_tail) starts where the body's depth behind the hips first falls under TAIL_SECTION of
+	# its depth at them, and its bones follow the middle of its depth.
 	rump = m["rump"]
 	root_y = rump.y - max(0.08 * h, 0.04 * m["length"] * tail_bones)
-	start = Vector((0.0, root_y, centre(root_y, 0.65)))
+	found = tail_root(m, hy) if m.get("find_tail") else None
+	if found is not None:
+		root_y = found
+	start = Vector((0.0, root_y, centre(root_y, 0.5 if found is not None else 0.65)))
 	parent = "hips"
 	for i in range(tail_bones):
 		a = start.lerp(rump, i / tail_bones)
 		b = start.lerp(rump, (i + 1) / tail_bones)
+		if found is not None:
+			a.z = centre(a.y) if i > 0 else start.z
+			b.z = centre(b.y) if i + 1 < tail_bones else rump.z
 		out["tail_%d" % (i + 1)] = (a, b, parent)
 		parent = "tail_%d" % (i + 1)
+	# The ears (find_ears): per side, from the lowest of the points standing above the skull to the
+	# highest (a tuft on its tip included), on the head.
+	for s, ear in m.get("ears", {}).items():
+		out["ear_" + s] = (ear[0], ear[1], "head")
+	# The jaw (a separate piece under the lip): from its hinge, behind and above its back end,
+	# to the chin.
+	if m.get("jaw") is not None:
+		out["jaw"] = (m["jaw"][0], m["jaw"][1], "head")
 	for s in ("l", "r"):
 		toe, heel, foot = m["toe_h" + s], m["heel_h" + s], m["foot_h" + s]
 		x = foot.x
@@ -220,6 +365,16 @@ def skin(body, arm) -> None:
 	bpy.context.view_layer.objects.active = body
 	bpy.ops.object.vertex_group_limit_total(group_select_mode="ALL", limit=4)
 	bpy.ops.object.vertex_group_normalize_all(group_select_mode="ALL", lock_active=False)
+
+
+## A loose piece wholly on one bone (the jaw, an ear and its tuft): every other weight taken off.
+def own(body, bone: str, members: list) -> None:
+	groups = body.vertex_groups
+	for g in groups:
+		if g.name != bone:
+			g.remove(members)
+	groups[bone].add(members, 1.0, "REPLACE")
+	print("skin: %d vertices wholly on %s" % (len(members), bone))
 
 
 # --- Posing: side-view helpers, (y, z) points ------------------------------------------------
@@ -391,8 +546,8 @@ SWEEP_IN = 80.0
 class Bear:
 	"""The great bear's clips. h the height, tail_bones the tail's."""
 
-	def __init__(self, h: float, tail_bones: int):
-		self.h = h
+	def __init__(self, m: dict, tail_bones: int):
+		self.h = m["h"]
 		self.tail_bones = tail_bones
 
 	def idle(self, t: float) -> dict:
@@ -607,7 +762,289 @@ class Bear:
 		]
 
 
-SPECIES = {"bear": Bear}
+# --- The hill cat's clips ---------------------------------------------------------------------
+
+def cat_tail(pose: dict, bones: int, up: float = 0.0, bend: float = 0.0, side: float = 0.0,
+		wave: float = 0.0, phase: float = 0.0) -> dict:
+	"""A long tail: up (degrees its root rises; a bone pointing back rises for a positive turn
+	about X), bend (curling up toward the tip, more each bone; negative hangs it), side (swept to
+	one side, curling more toward the tip) and a wave (degrees, a ripple running down it at phase
+	0..1)."""
+	for i in range(bones):
+		share = (i + 1) / bones
+		ripple = wave * share * math.sin(2.0 * math.pi * (phase - 0.5 * share))
+		add(pose, "tail_%d" % (i + 1), (up if i == 0 else 0.0) + bend * share, 0.0, side * share + ripple)
+	return pose
+
+
+def ears(pose: dict, back: float = 0.0, out: float = 0.0, flick_l: float = 0.0, flick_r: float = 0.0) -> dict:
+	"""The ears: back (degrees laid back; an upright bone tips forward for a positive turn about
+	X), out (turned out to the sides), and a flick of either."""
+	add(pose, "ear_l", -back - 25.0 * flick_l, 0.0, -out - 20.0 * flick_l)
+	add(pose, "ear_r", -back - 25.0 * flick_r, 0.0, out + 20.0 * flick_r)
+	return pose
+
+
+class HillCat:
+	"""The hill cat's clips (enemy-ai's provisional moves, 780): Idle, Walk, Run, Lie (lying up on
+	a rock, its idle in its spot), Crouch_Tell (the pounce's crouch, 8 ticks, rising from Lie or a
+	stand), Pounce (the leap, contact on landing at 0.4 s), Recover (after a pounce, about 10
+	ticks), Swipe (windup 5: the blow at 0.5 s), Bite (windup 4: the jaws shut at 0.4 s), Snarl
+	(the threat cry), Hit, Death. Low and long; the head kept level; the long tail always moving.
+	m the landmarks, tail_bones the tail's."""
+
+	def __init__(self, m: dict, tail_bones: int):
+		self.h = m["h"]
+		self.n = tail_bones
+		mid_y = sum(m["foot_" + k].y for k in ("fl", "fr", "hl", "hr")) / 4.0
+		self.belly = m["ray"](mid_y, True) or 0.4 * self.h
+
+	def tail(self, pose: dict, **kw) -> dict:
+		return cat_tail(pose, self.n, **kw)
+
+	def idle(self, t: float) -> dict:
+		"""Standing, breathing, looking about; the tail low with its tip curling up and flicking,
+		an ear turning now and then."""
+		breath = math.sin(2.0 * math.pi * 2.0 * t)
+		look = math.sin(2.0 * math.pi * t)
+		pose = {"lift": 0.004 * self.h * breath}
+		add(pose, "spine", 1.0 * breath)
+		add(pose, "neck", 2.0, 0.0, 10.0 * look)
+		add(pose, "head", -2.0, 0.0, 8.0 * look)
+		ears(pose, flick_l=bump(t, 0.3, 0.38), flick_r=bump(t, 0.72, 0.8))
+		return self.tail(pose, up=-6.0, bend=6.0 + 10.0 * bump(t, 0.5, 0.9), side=6.0 * look, wave=8.0, phase=t)
+
+	def walk(self, t: float) -> dict:
+		"""The cat's walk: hind left, fore left, hind right, fore right, soft and low, the head
+		carried level and low, the shoulder blades rolling, the tail low and swaying."""
+		pose = gait(t, self.h, 0.42 * self.h, 0.09 * self.h, 0.62, {"hl": 0.0, "fl": 0.25, "hr": 0.5, "fr": 0.75})
+		nod = math.cos(4.0 * math.pi * t)
+		pose["lift"] = -0.02 * self.h + 0.006 * self.h * nod
+		add(pose, "spine", 0.0, 0.0, 3.0 * math.sin(2.0 * math.pi * t))
+		add(pose, "chest", 1.0 * nod, 3.0 * math.sin(2.0 * math.pi * (t - 0.25)))
+		add(pose, "hips", 0.0, -3.0 * math.sin(2.0 * math.pi * t))
+		add(pose, "neck", 8.0)
+		add(pose, "head", -6.0 + 2.0 * nod, 0.0, -3.0 * math.sin(2.0 * math.pi * t))
+		return self.tail(pose, up=-8.0, bend=4.0, wave=10.0, phase=t)
+
+	def run(self, t: float) -> dict:
+		"""The bound: hind feet together, fore feet reaching out together, the long back folding
+		and stretching between, the head level and the tail out behind for balance."""
+		pose = gait(t, self.h, 0.75 * self.h, 0.12 * self.h, 0.36, {"hl": 0.0, "hr": 0.07, "fl": 0.5, "fr": 0.57})
+		flex = math.sin(2.0 * math.pi * (t - 0.15))
+		pose["lift"] = 0.05 * self.h * bump((t + 0.1) % 1.0, 0.25, 0.75) - 0.03 * self.h
+		add(pose, "hips", 12.0 * flex)
+		add(pose, "spine", -8.0 * flex)
+		add(pose, "chest", -6.0 * flex)
+		add(pose, "neck", 6.0 + 4.0 * flex)
+		add(pose, "head", -4.0 - 4.0 * flex)
+		ears(pose, back=15.0)
+		return self.tail(pose, up=4.0 - 8.0 * flex, bend=-4.0, wave=6.0, phase=t)
+
+	def lie(self, t: float) -> dict:
+		"""Lying up: on its belly, hind legs folded under, fore legs out ahead along the rock, head
+		up and watching; slow breath, the tail curled round its side, its tip flicking, the head
+		turning to look."""
+		breath = math.sin(2.0 * math.pi * t)
+		look = ease(t, 0.35, 0.45) * (1.0 - ease(t, 0.7, 0.8))
+		h = self.h
+		pose = {"lift": -(self.belly - 0.08 * h) + 0.004 * h * breath}
+		add(pose, "spine", 1.0 * breath)
+		add(pose, "neck", -14.0, 0.0, 22.0 * look)
+		add(pose, "head", 12.0, 0.0, 10.0 * look)
+		for s_ in ("l", "r"):
+			pose["f" + s_] = (-0.22 * h, 0.0, 0.0)
+			# The hock down on the rock, the hind foot flat along it (a positive pitch levels it).
+			pose["h" + s_] = (0.06 * h, -0.09 * h, 45.0)
+		ears(pose, flick_l=bump(t, 0.15, 0.22), flick_r=bump(t, 0.55, 0.62))
+		return self.tail(pose, up=-14.0, side=70.0, wave=6.0 * bump(t, 0.6, 1.0), phase=2.0 * t)
+
+	def crouch(self, t: float, seconds: float) -> dict:
+		"""The pounce's tell (crouch 8 ticks): it drops flat, belly near the ground, haunches
+		gathered under it, head low and level, ears forward and fixed; the hind end treads and
+		wiggles, the tail tip twitching; at the end it is coiled to spring."""
+		s = t * seconds
+		low = ease(s, 0.0, 0.3)
+		wiggle = math.sin(2.0 * math.pi * 5.0 * s) * bump(s, 0.35, seconds + 0.05)
+		h = self.h
+		pose = {"lift": -0.55 * self.belly * low, "back": 0.03 * h * low}
+		add(pose, "hips", -4.0 * low, 0.0, 5.0 * wiggle)
+		add(pose, "spine", 3.0 * low)
+		add(pose, "neck", 10.0 * low)
+		add(pose, "head", -10.0 * low)
+		pose["hl"] = (-0.06 * h * low, 0.01 * h * max(0.0, wiggle), 0.0)
+		pose["hr"] = (-0.06 * h * low, 0.01 * h * max(0.0, -wiggle), 0.0)
+		ears(pose, back=-10.0 * low)
+		return self.tail(pose, up=-6.0 * low, bend=-4.0, wave=14.0 * low, phase=3.0 * s)
+
+	def pounce(self, t: float, seconds: float) -> dict:
+		"""The pounce: from the crouch it springs (0..0.1 s), flies stretched out, fore legs reaching
+		ahead and claws out, hind legs trailing (0.1..0.4 s), lands on its fore paws on the target
+		(contact at 0.4 s), and gathers itself."""
+		s = t * seconds
+		h = self.h
+		spring = ease(s, 0.0, 0.1)
+		land = ease(s, 0.34, 0.42)
+		fly = spring * (1.0 - land)
+		# The legs leave the ground once the body is up off its crouch, and are planted again on landing.
+		air = ease(s, 0.08, 0.18) * (1.0 - land)
+		after = 1.0 - ease(s, 0.45, seconds)
+		coil = 1.0 - spring
+		settle = ease(s, 0.42, 0.5) * after
+		pose = {"lift": -0.55 * self.belly * coil + 0.22 * h * bump(s, 0.05, 0.42) - 0.05 * h * settle}
+		add(pose, "hips", -4.0 * coil - 10.0 * fly + 6.0 * settle)
+		add(pose, "spine", 3.0 * coil - 6.0 * fly + 4.0 * settle)
+		add(pose, "neck", 10.0 * coil - 4.0 * fly + 6.0 * settle)
+		add(pose, "head", -10.0 * coil + 2.0 * fly)
+		if air > 0.001:
+			for s_ in ("l", "r"):
+				pose["upper_arm_" + s_] = (-75.0 * air, 0.0, 0.0)
+				pose["forearm_" + s_] = (20.0 * air, 0.0, 0.0)
+				pose["paw_" + s_] = (-20.0 * air, 0.0, 0.0)
+				pose["thigh_" + s_] = (55.0 * air, 0.0, 0.0)
+				pose["shin_" + s_] = (-10.0 * air, 0.0, 0.0)
+				pose["foot_" + s_] = (30.0 * air, 0.0, 0.0)
+		else:
+			for s_ in ("l", "r"):
+				pose["f" + s_] = (-0.12 * h * land * after, 0.0, 0.0)
+				pose["h" + s_] = (-0.06 * h * coil, 0.0, 0.0)
+		ears(pose, back=-10.0 * coil + 20.0 * fly + 10.0 * land * after)
+		add(pose, "jaw", 18.0 * bump(s, 0.2, 0.6))
+		return self.tail(pose, up=-6.0 * coil + 10.0 * fly, bend=-6.0 * fly, wave=8.0 * after, phase=2.0 * s)
+
+	def recover(self, t: float) -> dict:
+		"""After a pounce: crouched low, sides heaving, mouth a little open, head low (the opening
+		for whoever it missed)."""
+		pant = math.sin(2.0 * math.pi * 3.0 * t)
+		h = self.h
+		pose = {"lift": -0.25 * self.belly + 0.005 * h * pant}
+		add(pose, "hips", 4.0)
+		add(pose, "spine", 3.0 + 1.5 * pant)
+		add(pose, "chest", 2.0 - 1.5 * pant)
+		add(pose, "neck", 18.0 + 2.0 * pant)
+		add(pose, "head", -4.0 - 2.0 * pant)
+		add(pose, "jaw", 10.0 + 4.0 * pant)
+		pose["fl"] = (-0.04 * h, 0.0, 0.0)
+		pose["fr"] = (-0.02 * h, 0.0, 0.0)
+		ears(pose, back=10.0)
+		return self.tail(pose, up=-10.0, bend=-4.0, wave=6.0, phase=t)
+
+	def swipe(self, t: float, seconds: float) -> dict:
+		"""The swipe (windup 5): weight back on the haunches, the right fore paw up and out, claws
+		out (0..0.45 s), raked across its front (the blow at 0.5 s), back down."""
+		s = t * seconds
+		wind = ease(s, 0.0, 0.42)
+		cut = ease(s, 0.44, 0.56)
+		back = 1.0 - ease(s, 0.62, seconds)
+		up = wind * back
+		h = self.h
+		pose = {"back": 0.04 * h * up, "lift": 0.01 * h * up}
+		add(pose, "hips", -6.0 * up)
+		add(pose, "spine", -3.0 * up)
+		turn_to = (10.0 * wind - 24.0 * cut) * back
+		add(pose, "chest", -4.0 * up, 0.0, turn_to)
+		add(pose, "neck", -4.0 * up, 0.0, 0.5 * turn_to)
+		add(pose, "head", 4.0 * up, 0.0, 0.5 * turn_to)
+		raised = wind * (1.0 - 0.6 * cut) * back
+		pose["upper_arm_r"] = (-100.0 * raised, (30.0 * wind - 70.0 * cut) * back, -10.0 * raised)
+		pose["forearm_r"] = (55.0 * raised, 0.0, 0.0)
+		pose["paw_r"] = (30.0 * raised, 0.0, 0.0)
+		pose["fl"] = (-0.03 * h * up, 0.0, 0.0)
+		ears(pose, back=40.0 * up, out=10.0 * up)
+		add(pose, "jaw", 12.0 * up)
+		return self.tail(pose, up=4.0 * up, wave=12.0, phase=2.0 * s)
+
+	def bite(self, t: float, seconds: float) -> dict:
+		"""The bite (windup 4): head drawn back and up, the jaws opening wide (0..0.3 s), a lunge
+		forward and down, the jaws snapping shut at 0.4 s, a shake, back."""
+		s = t * seconds
+		h = self.h
+		draw = ease(s, 0.0, 0.25) * (1.0 - ease(s, 0.25, 0.38))
+		lunge = ease(s, 0.25, 0.38) * (1.0 - ease(s, 0.5, seconds))
+		gape = ease(s, 0.05, 0.3) * (1.0 - ease(s, 0.36, 0.41))
+		shake = math.sin(2.0 * math.pi * 8.0 * s) * bump(s, 0.4, 0.6)
+		pose = {"back": 0.03 * h * draw - 0.07 * h * lunge, "lift": -0.03 * h * lunge}
+		add(pose, "hips", 3.0 * lunge)
+		add(pose, "spine", -2.0 * draw + 3.0 * lunge)
+		add(pose, "neck", -10.0 * draw + 16.0 * lunge, 0.0, 6.0 * shake)
+		add(pose, "head", 8.0 * draw - 6.0 * lunge, 0.0, 8.0 * shake)
+		add(pose, "jaw", 38.0 * gape)
+		pose["fl"] = (-0.05 * h * lunge, 0.0, 0.0)
+		pose["fr"] = (-0.05 * h * lunge, 0.0, 0.0)
+		ears(pose, back=45.0 * max(draw, lunge), out=10.0 * max(draw, lunge))
+		return self.tail(pose, up=4.0 * lunge, wave=10.0, phase=2.0 * s)
+
+	def snarl(self, t: float, seconds: float) -> dict:
+		"""The snarl (its threat cry): it sinks on its fore legs, head low and thrust out, ears flat
+		and turned out, jaws wide and trembling, the tail lashing; then rises."""
+		s = t * seconds
+		on = hold(s, (0.0, 0.2), (1.0, seconds))
+		tremble = math.sin(2.0 * math.pi * 9.0 * s)
+		h = self.h
+		pose = {"lift": -0.06 * h * on}
+		add(pose, "hips", -3.0 * on)
+		add(pose, "chest", 4.0 * on)
+		add(pose, "neck", 10.0 * on)
+		add(pose, "head", -16.0 * on + 1.5 * tremble * on)
+		add(pose, "jaw", (34.0 + 3.0 * tremble) * on)
+		pose["fl"] = (-0.03 * h * on, 0.0, 0.0)
+		pose["fr"] = (-0.03 * h * on, 0.0, 0.0)
+		ears(pose, back=55.0 * on, out=25.0 * on)
+		return self.tail(pose, up=-4.0 * on, side=10.0 * on, wave=26.0 * on, phase=2.5 * s)
+
+	def hit(self, t: float) -> dict:
+		"""Struck: a jolt back and aside, the head jerked away, ears flat."""
+		jolt = bump(t, 0.0, 0.7)
+		pose = {"back": 0.04 * self.h * jolt}
+		add(pose, "hips", -3.0 * jolt)
+		add(pose, "chest", -4.0 * jolt, 0.0, 8.0 * jolt)
+		add(pose, "neck", -10.0 * jolt, 0.0, 8.0 * jolt)
+		add(pose, "head", -6.0 * jolt, 6.0 * jolt, 0.0)
+		add(pose, "jaw", 14.0 * jolt)
+		ears(pose, back=40.0 * jolt)
+		return self.tail(pose, up=8.0 * jolt, wave=10.0, phase=t)
+
+	def death(self, t: float) -> dict:
+		"""Death: the legs give, it sinks and rolls onto its left side, the head and tail last,
+		the jaw slack."""
+		h = self.h
+		sink = ease(t, 0.0, 0.45)
+		fall = ease(t, 0.3, 0.75)
+		limp = ease(t, 0.55, 1.0)
+		pose = {"lift": -0.3 * self.belly * sink * (1.0 - fall) + 0.2 * h * fall, "roll": 84.0 * fall}
+		add(pose, "spine", 3.0 * sink)
+		add(pose, "neck", 14.0 * sink - 10.0 * limp)
+		add(pose, "head", 8.0 * limp, 0.0, 8.0 * limp)
+		add(pose, "jaw", 12.0 * limp)
+		for s_ in ("l", "r"):
+			pose["thigh_" + s_] = (-30.0 * sink + 20.0 * limp, 0.0, 0.0)
+			pose["shin_" + s_] = (40.0 * sink - 20.0 * limp, 0.0, 0.0)
+			pose["foot_" + s_] = (-20.0 * sink + 10.0 * limp, 0.0, 0.0)
+			pose["upper_arm_" + s_] = (-30.0 * sink + 20.0 * limp, 0.0, 0.0)
+			pose["forearm_" + s_] = (-20.0 * sink, 0.0, 0.0)
+			pose["paw_" + s_] = (40.0 * sink - 20.0 * limp, 0.0, 0.0)
+		ears(pose, back=20.0 * limp)
+		return self.tail(pose, bend=4.0 * limp)
+
+	def clips(self) -> list:
+		"""[name, seconds, loop, pose_at(t in 0..1)] each."""
+		return [
+			["Idle", 4.0, True, self.idle],
+			["Walk", 1.2, True, self.walk],
+			["Run", 0.55, True, self.run],
+			["Lie", 4.0, True, self.lie],
+			["Crouch_Tell", 0.8, False, lambda t: self.crouch(t, 0.8)],
+			["Pounce", 0.8, False, lambda t: self.pounce(t, 0.8)],
+			["Recover", 1.0, True, self.recover],
+			["Swipe", 0.9, False, lambda t: self.swipe(t, 0.9)],
+			["Bite", 0.8, False, lambda t: self.bite(t, 0.8)],
+			["Snarl", 1.2, False, lambda t: self.snarl(t, 1.2)],
+			["Hit", 0.4, False, self.hit],
+			["Death", 1.5, False, self.death],
+		]
+
+
+SPECIES = {"bear": Bear, "hill_cat": HillCat}
 
 
 def author(arm, legs: Legs, name: str, seconds: float, loop: bool, pose_at) -> None:
@@ -639,9 +1076,9 @@ def author(arm, legs: Legs, name: str, seconds: float, loop: bool, pose_at) -> N
 def main() -> None:
 	a = args()
 	if len(a) < 2:
-		raise SystemExit("usage: -- <body .blend|.glb> <out.glb> --clips SPECIES [--tail N] [--hock SHARE] [--head SHARE] [--height M] [--turn DEG]")
+		raise SystemExit("usage: -- <body .blend|.glb> <out.glb> --clips SPECIES [--tail N] [--hock SHARE] [--head SHARE] [--height M] [--turn DEG] [--find-tail 1] [--ears 1] [--jaw 1]")
 	body_path, out = (os.path.abspath(p) for p in a[:2])
-	opts = {"--clips": "bear", "--tail": "1", "--hock": "0.06", "--head": "0.16", "--height": "", "--turn": "0"}
+	opts = {"--clips": "bear", "--tail": "1", "--hock": "0.06", "--head": "0.16", "--height": "", "--turn": "0", "--find-tail": "0", "--ears": "0", "--jaw": "0"}
 	rest = a[2:]
 	for i in range(0, len(rest), 2):
 		if rest[i] not in opts or i + 1 >= len(rest):
@@ -656,12 +1093,23 @@ def main() -> None:
 	stand(body, float(opts["--height"]) if opts["--height"] else None)
 	tail_bones = int(opts["--tail"])
 	m = marks(body, float(opts["--head"]), float(opts["--hock"]))
+	m["pieces"] = pieces(body)
+	m["find_tail"] = opts["--find-tail"] == "1"
+	if opts["--ears"] == "1":
+		find_ears(body, m)
+	if opts["--jaw"] == "1":
+		find_jaw(body, m)
 	species = opts["--clips"]
 	arm = build_armature(joints(m, tail_bones), species.capitalize() + "Armature")
 	skin(body, arm)
+	if m.get("jaw") is not None:
+		own(body, "jaw", m["jaw_piece"])
+	for s_, loose in m.get("ear_pieces", {}).items():
+		for piece in loose:
+			own(body, "ear_" + s_, piece)
 	print("rigged: %d vertices, %d tris" % (len(body.data.vertices), tris(body)))
 	legs = Legs(arm)
-	maker = SPECIES[species](m["h"], tail_bones)
+	maker = SPECIES[species](m, tail_bones)
 	for name, seconds, loop, pose_at in maker.clips():
 		author(arm, legs, name, seconds, loop, pose_at)
 	arm.animation_data.action = None
