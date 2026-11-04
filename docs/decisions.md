@@ -39239,6 +39239,13 @@ fill and dims the fill while the art cools, fed by combat's owner-only "arts"
 message (766 amended) when it lands; until then, the fill alone. The same bars as
 an "Arts" list on the player card come with the card. ui_test _test_practice_bars.
 Client only, protocol unchanged, no new class_name.
+
+766 amended (3): the practice bar's notch and dimming are fed (2026-11-03, ui;
+release's label). Main._on_message takes combat's owner-only "arts" message
+{art: [peak, fading]} (766 amended, rev 47) into PackPanel.art_marks; the pack's
+signature carries the marks, so it redraws on the next frame. ui_test
+_test_practice_bars sends the message through Main. Client only, no protocol
+change of its own, no new class_name.
 ## 767. Every town's gatherers: a woodcutter and a hunter, seated once
 
 Jeff: "yes add gatherers to each town" (decisions/town-gatherers.md); the coordinator approved the

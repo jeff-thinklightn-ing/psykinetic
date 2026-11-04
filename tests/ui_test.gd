@@ -2140,7 +2140,8 @@ func _test_practice_bars() -> void:
 	pack._refresh()
 	_check(pack.practice_shown(hand) == [0.4, 0.4, false] and pack.practice_shown(spot).is_empty() and pack.practice_shown(Items.PACK_SLOTS[3]).is_empty(),
 		"the sword's square shows its practice; the unpractised bow and the dagger (no art) none (%s)" % [pack.practice_shown(hand)])
-	pack.art_marks = {"swordplay": [0.75, false], "bow": [0.55, true]}
+	_main._on_message("arts", {"swordplay": [0.75, false], "bow": [0.55, true]})
+	_check(pack.art_marks == {"swordplay": [0.75, false], "bow": [0.55, true]}, "combat's \"arts\" message reaches the pack's marks (766 amended (3))")
 	player.art_feel = {"swordplay": 0.4, "bow": 0.55}
 	pack._refresh()
 	_check(pack.practice_shown(hand) == [0.4, 0.75, false] and pack.practice_shown(spot) == [0.55, 0.55, true],

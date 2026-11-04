@@ -13391,6 +13391,12 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "clearing":
 		_on_clearing(data)
 		return
+	if kind == "arts":
+		# Weapon memory's peak and cooling (766 amended (3)): the pack's
+		# practice bars draw them; the pack redraws on its own signature.
+		if pack_panel != null:
+			pack_panel.art_marks = data.duplicate()
+		return
 	if kind == "folds":
 		var counts: Variant = data.get("counts", {})
 		if counts is Dictionary:
