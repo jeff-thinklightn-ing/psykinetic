@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_raid_takes()
 	_test_noticing()
 	_test_senses()
+	_test_crouch()
 	_test_wild_kinds()
 	_test_wild_prey()
 	_test_wild_ears()
@@ -2863,6 +2864,37 @@ func _test_senses() -> void:
 	_check(robber._notice.is_empty(), "the player gone: its notice fades to nothing (%s)" % [robber._notice])
 	_indoors()
 	Monster.idling = true
+
+
+
+## Decision 784 amended (2): a crouched player creeps at World.crouch_pace,
+## heard half as far and seen from 0.8 as far (never under 2 cells).
+func _test_crouch() -> void:
+	print("
+== crouch (784 amended (2)): it creeps, quieter and harder to see ==")
+	DayNight.set_hour(12.0)
+	var e := _build(["##########", "#........#", "#.P....x.#", "#........#", "##########"], {"x": {"facing": Vector2i(-1, 0)}})
+	var player := e["P"][0] as Player
+	var robber: Monster = e["x"][0]
+	robber.sight_range = 6
+	_outdoors("clear")
+	var walk := World.step_ticks(player, Vector2i(1, 0))
+	var noise := World.step_noise(player)
+	var seen := robber.senses.sees(player)
+	player.crouched = true
+	var creep := World.step_ticks(player, Vector2i(1, 0))
+	_check(is_equal_approx(creep, walk / World.crouch_pace(player)), "crouched it creeps at %.2f of a walk (%.1f ticks a step, %.1f walking)" % [World.crouch_pace(player), creep, walk])
+	_check(World.step_noise(player) == maxi(1, roundi(noise * 0.5)), "its steps carry half as far (%d, %d standing)" % [World.step_noise(player), noise])
+	_check(seen and not robber.senses.sees(player), "5 cells off a robber that sees 6: seen standing, not crouched (6 x 0.8 = 4.8)")
+	player.crouched = false
+	var f := _build(["#####", "#P.x#", "#####"], {"x": {"facing": Vector2i(-1, 0)}})
+	var near: Monster = f["x"][0]
+	near.sight_range = 2
+	var low := f["P"][0] as Player
+	low.crouched = true
+	_check(near.senses.sees(low), "2 off, crouched, is still seen: never under 2 cells")
+	low.crouched = false
+	_indoors()
 
 
 func _check(ok: bool, label: String) -> void:

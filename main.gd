@@ -12473,6 +12473,11 @@ func _remember_companion(id: String) -> void:
 ## "reset": rebuild the room, as the console's reset does. From the
 ## authority's own player always; from anyone else only while
 ## Net.player_reset is on.
+## The commands that stand a crouched player up (784 amended (2)): a blow,
+## a shove (signature), a guard or a draw (stance), a shot, a throw.
+const CROUCH_ENDS: Array[String] = ["swing", "signature", "stance", "loose", "lob", "counter", "throw"]
+
+
 func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> void:
 	# Led by her (decision 551): doing anything but talk takes control back.
 	if entity is Player and command_name not in ["say", "party", "guide", "face", "greet"]:
@@ -12482,6 +12487,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	# Arriving (decision 661): anything but talk and looking ends the shelter.
 	if entity is Player and command_name not in SHELTER_KEEPS and World.is_sheltered(entity):
 		entity.protected = false
+	if entity is Player and (entity as Player).crouched and command_name in CROUCH_ENDS:
+		(entity as Player).crouched = false  # A blow, a shove, a guard or a draw stands it up (784 amended (2)).
 	if command_name == "view_ready" and entity is Player:
 		_view_ready(entity as Player, str(args.get("zone", "")))
 	elif command_name == "guide" and entity is Player:
@@ -12564,6 +12571,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		_item_command(entity, command_name, args)
 	elif command_name == "lantern" and entity is Player:
 		(entity as Player).toggle_lantern()
+	elif command_name == "crouch" and entity is Player:
+		(entity as Player).crouched = bool(args.get("on", not (entity as Player).crouched))  # 784 amended (2).
 	elif command_name == "swing" and entity is Player:
 		var swing := _point_direction(entity, args) if args.has("at") else _direction_arg(args)
 		if swing != Vector2i.ZERO:

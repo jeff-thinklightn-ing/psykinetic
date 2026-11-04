@@ -101,6 +101,12 @@ var arts: Dictionary = {}
 ## none), replicated so a client draws the bow's pull and cone, and
 ## predicts the sword's cycle, as the server reckons them (World.art_feel).
 var art_feel: Dictionary = {}
+## Crouched (decision 784 amended (2); ui's key): it creeps at
+## World.crouch_pace of a walk, its steps heard half as far and itself seen
+## from 0.8 as far (never under 2 cells); a blow, a shove, a guard or a draw
+## stands it up. Replicated, so a client's prediction of its pace agrees and
+## its body is drawn low (pc-character).
+var crouched := false
 ## The arts' marks last told to this player (World.art_marks; 766 amended):
 ## so they are told only on a change. Server only, not replicated.
 var arts_told: Dictionary = {}
@@ -132,6 +138,7 @@ func _init() -> void:
 	replicate("lobbing")  # Decision 677: the bow aimed at the sky.
 	replicate("down_until")
 	replicate("teeter")  # Decision 783: a rim's wobble.
+	replicate("crouched")  # Decision 784 amended (2): creeping.
 	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
 	replicate("channel_of")
 	replicate("tending")

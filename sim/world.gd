@@ -2853,6 +2853,32 @@ func art_shape(_entity: GridEntity, _art: String) -> Dictionary:
 
 ## What [param entity]'s [param art] feels like now, 0..1 (766): a player's
 ## replicated art_feel; 0 for anyone else.
+## A crouched player's pace, times a walk's speed (decision 784 amended (2)):
+## CROUCH_PACE until combat's Stealth curve lifts it (to about 0.6).
+func crouch_pace(_entity: GridEntity) -> float:
+	return CROUCH_PACE
+
+
+const CROUCH_PACE := 0.25
+## A crouched player's steps are heard CROUCH_NOISE as far (never under one
+## cell), and it is seen from CROUCH_SEEN as far (Senses.sees; never under
+## Senses.SEEN_LEAST).
+const CROUCH_NOISE := 0.5
+const CROUCH_SEEN := 0.8
+
+
+## How far [param entity]'s footstep carries (Senses.step_radius, by its
+## mass); creeping, CROUCH_NOISE of that, never under one cell (784 amended (2)).
+func step_noise(entity: GridEntity) -> int:
+	var step := Senses.step_radius(entity)
+	return maxi(1, roundi(step * CROUCH_NOISE)) if crouching(entity) else step
+
+
+## Whether [param entity] creeps (a crouched player; 784 amended (2)).
+func crouching(entity: GridEntity) -> bool:
+	return entity is Player and (entity as Player).crouched
+
+
 func art_feel(entity: GridEntity, art: String) -> float:
 	return clampf(float((entity as Player).art_feel.get(art, 0.0)), 0.0, 1.0) if entity is Player else 0.0
 
@@ -7475,7 +7501,7 @@ func _stepped_off(entity: GridEntity, left: Vector2i, duration: float) -> void:
 	if entity.shelter_lead == null or not is_sheltered(entity):
 		entity.protected = false  # Moving ends spawn grace (a companion's shelter: her player's act does, 661).
 	if entity is Player or entity is Companion:
-		noise(entity.tile, Senses.step_radius(entity), &"step", entity)
+		noise(entity.tile, step_noise(entity), &"step", entity)
 		var worn := entity.slots[Items.ARMOUR] if entity.slots.size() > Items.ARMOUR else ""
 		noise(entity.tile, int(armour_noise(worn, CLANK_WALK_TICKS / maxf(duration, 0.001))["radius"]), &"clank", entity)  # 676 1b: none at 0.
 
@@ -10601,6 +10627,8 @@ func step_ticks(entity: GridEntity, direction: Vector2i, from := NO_CELL) -> flo
 		ticks *= winded_move_scale  # Decision 597; winded replicates, so a client's prediction agrees.
 	ticks /= 1.0 + buff(entity, "speed")  # A stamina potion (decision 562); buffs replicate, so a client's prediction agrees.
 	ticks *= walk_load(entity)  # Its body's load (676); replicated, so a client's prediction agrees.
+	if crouching(entity):
+		ticks /= maxf(crouch_pace(entity), 0.05)  # Creeping (784 amended (2)); crouched replicates.
 	return ticks * ground_drag(from, direction)  # The ground (607), as a slide meets it.
 
 

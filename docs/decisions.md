@@ -40649,6 +40649,17 @@ cells, more by any light, in place of 791's own dark_reach. monster_test _test_s
 empty block changes nothing and a night sets only that. Server only, protocol unchanged, no new
 class_name, no bullet.
 
+784 amended (2) (the player's side, phase 2's slow-walk pick (b) with pc-character's pose, (c)): a
+Player replicates "crouched" (rev 48). The "crouch" command {on} (ui's key; a toggle without "on")
+sets it in Main._on_command; a blow, a shove, a guard or a draw, a shot or a throw stands it up
+(Main.CROUCH_ENDS). Crouched it creeps: World.step_ticks divides by World.crouch_pace(entity),
+CROUCH_PACE 0.25 of a walk until combat's Stealth curve lifts it (to about 0.6), and since crouched
+replicates, a client's prediction of its pace agrees. Its footstep carries CROUCH_NOISE 0.5 as far
+(World.step_noise, never under one cell), and Senses.sees takes its reach CROUCH_SEEN 0.8 as far,
+never under SEEN_LEAST 2 cells. Against Jeff's rule: one who never crouches is heard and seen as
+ever; the slow pace is creeping's own. monster_test _test_crouch. Server and client; protocol rev
+48 ("crouched"); no new class_name; no bullet until ui's key lands with its own.
+
 ## 797. Skylights: a gap in a cave's roof
 
 Terrain's bear_cave (the great bear's den, forest plan phase B) wanted a little light on the bear in

@@ -22,6 +22,8 @@ const DARK := 0.35
 const GLIMPSE := 0.15
 ## So near (cells) it is noticed whatever the light or the way it faces.
 const NOTICE_ALWAYS := 1
+## The least a crouched player's seen distance falls to (784 amended (2)).
+const SEEN_LEAST := 2.0
 ## A cone of 120 degrees: the cosine of half of it.
 const CONE_COS := 0.5
 const HEARD_MAX := 8
@@ -126,6 +128,8 @@ func sees(entity: GridEntity, d := -1, in_cone := true, farther := 1.0) -> bool:
 		d = maxi(absi(at.x - from.x), absi(at.y - from.y))
 	# Fog and rain shorten sight (Weather), but a carried light shows as far.
 	var reach := sight_range * farther + (extra_sight if alerted else 0)
+	if World.crouching(entity):
+		reach = maxf(reach * World.CROUCH_SEEN, minf(reach, SEEN_LEAST))  # Creeping (784 amended (2)).
 	if d > (reach if entity.emit_light > 0.0 else reach * World.weather_sight_at(from)):
 		return false
 	if d > NOTICE_ALWAYS:
