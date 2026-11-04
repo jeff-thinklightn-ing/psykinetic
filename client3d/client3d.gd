@@ -6147,6 +6147,12 @@ const MASS_LUMP := Vector4(1.7, 1.1, 0.6, 0.25)
 const MASS_NEAR := 0.42
 const MASS_DARK := 0.12
 const MASS_DARK_CELLS := 3.5
+## It is drawn unlit (_mass_material), its shades times MASS_UNLIT: the
+## lamps hang under its tops, so lit they lit the facets tipped toward a
+## lamp and left their neighbours black (dungeon's mine_look stills). Its
+## colours are kept as sRGB (what the screen shows): kept linear in a
+## mesh's 8 bits, a dark cap's shades round to black.
+const MASS_UNLIT := 0.4
 ## With the mass, a cave wall's line wanders up to MASS_WANDER into the rock
 ## (never toward the open, so the walkable half-metre stays), back to its
 ## line at a run's ends, where the runs and posts meet.
@@ -6309,7 +6315,7 @@ func _phase_mass() -> void:
 								p2 = swap
 							normal = normal.normalized()
 							var own := lerpf(0.8, 1.15, fposmod(r * (17.0 if t == 0 else 131.0), 1.0))
-							var colour := Color(rock * (own * shade), 1.0)
+							var colour := Color(rock * (own * shade * MASS_UNLIT), 1.0)
 							vertices[k] = p0
 							vertices[k + 1] = p1
 							vertices[k + 2] = p2
@@ -6330,7 +6336,7 @@ func _phase_mass() -> void:
 			var drawn := MeshInstance3D.new()
 			drawn.name = "Mass_%d_%d" % [chunk_x, chunk_y]
 			drawn.mesh = array_mesh
-			drawn.material_override = _rock_material()
+			drawn.material_override = _mass_material()
 			# A cap over the void: it never shadows the floor the lamps light.
 			drawn.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_room.add_child(drawn)
@@ -13878,6 +13884,10 @@ func _add_cave_run(run: Array[Vector3i], states: PackedInt32Array) -> void:
 		for k in CAVE_ROWS:
 			_rock_quad(mesh, column[k], column[k + 1], column[points - 2 - k], column[points - 1 - k], out, 0.0, tall)
 		_rock_quad(mesh, column[CAVE_ROWS], column[CAVE_ROWS + 1], column[CAVE_ROWS + 2], column[CAVE_ROWS], out, 0.0, tall)
+	# Indoors only: in daylight the rock keeps its flat facets (the game's
+	# look, the coordinator).
+	if not _outdoor:
+		_smooth_normals(mesh)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = mesh[0]
@@ -13935,9 +13945,40 @@ func _rock_quad(mesh: Array, a: Vector3, b: Vector3, c: Vector3, d: Vector3, out
 		var shade := lerpf(0.8, 1.15, _roll(Vector2i(roundi(middle.x * 16.0) + roundi(middle.y * 16.0) * 131, roundi(middle.z * 16.0)), 38))
 		shade *= lerpf(0.72, 1.0, clampf(inverse_lerp(low, high, middle.y), 0.0, 1.0))
 		var colour := Color(swatch(CLIFF_ROCK.x, CLIFF_ROCK.y) * shade, 1.0)
+		if not _outdoor:
+			colour = Color(colour * CAVE_INDOOR_SHADE * CAVE_INDOOR_TINT, 1.0)
 		mesh[0].append_array([p0, p1, p2])
 		mesh[1].append_array([normal, normal, normal])
 		mesh[2].append_array([colour, colour, colour])
+
+
+## Every point of [param mesh] ([positions, normals, ...], triangles) lit by
+## the mean of its facets' normals there, its own facet's kept at
+## CAVE_FACET_KEEP: a lamp on a wall lights it at a graze, and facet normals
+## lit one triangle of each bent quad and left the other black; wholly
+## smooth, a lamp's rim went one flat pale (the coordinator), so a little of
+## each facet's own turn stays (769 amended (7)).
+const CAVE_FACET_KEEP := 0.35
+## Indoors, the cave rock this much darker and warmer, lamp-lit earth: a
+## near lamp washed its rims pale as plaster, snow on a ledge, at the
+## cliffs' shade (the coordinator; environment's lamps stay as bright, so
+## the floor keeps their light).
+const CAVE_INDOOR_SHADE := 0.4
+const CAVE_INDOOR_TINT := Color(1.1, 0.92, 0.72)
+
+
+static func _smooth_normals(mesh: Array) -> void:
+	var positions: PackedVector3Array = mesh[0]
+	var normals: PackedVector3Array = mesh[1]
+	var sums := {}
+	for k in positions.size():
+		var key := Vector3i((positions[k] * 1000.0).round())
+		sums[key] = sums.get(key, Vector3.ZERO) + normals[k]
+	for k in positions.size():
+		var sum: Vector3 = sums[Vector3i((positions[k] * 1000.0).round())]
+		if sum.length_squared() > 0.000001:
+			normals[k] = (sum.normalized() + normals[k] * CAVE_FACET_KEEP).normalized()
+	mesh[1] = normals
 
 
 ## A lump of the cave's rock at [param vertex] (its post, while wall.cave.end
@@ -14036,6 +14077,21 @@ static func _rock_material() -> StandardMaterial3D:
 		_rock.roughness = 1.0
 		_rock.cull_mode = BaseMaterial3D.CULL_DISABLED
 	return _rock
+
+
+static var _mass: StandardMaterial3D
+
+
+## The rock mass's (769 amended (7)): the cliffs' rock unlit, its facets'
+## own shades only (MASS_UNLIT).
+static func _mass_material() -> StandardMaterial3D:
+	if _mass == null:
+		_mass = StandardMaterial3D.new()
+		_mass.vertex_color_use_as_albedo = true
+		_mass.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_mass.vertex_color_is_srgb = true
+		_mass.cull_mode = BaseMaterial3D.CULL_DISABLED
+	return _mass
 
 
 ## A run's mesh leant across by [param shear] (metres across a metre up:

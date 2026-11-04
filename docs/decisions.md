@@ -39975,6 +39975,26 @@ dungeon's level (790). Tests: weather_test _test_mine_light (the share; the lamp
 flame; the nearest lit). No CHANGELOG bullet: mine_look is a dev level. Client only, protocol
 unchanged, no new class_name.
 
+769 amended (7): the rock mass drawn unlit, the cave walls lit smooth and darker (2026-11-04;
+dungeon's mine_look stills, the coordinator, release's label). Lit, the mass's facets each took the
+lamps by their own normal; the lamps hang under its tops (2.3-3.2 m), so a facet tipped toward a
+lamp lit and its neighbour went black, a checker of black triangles across the cap. The mass is now
+drawn unlit (Client3D._mass_material: unshaded, its vertex colours, both faces), its shades as
+before (darker away from the open, each facet's own roll) times MASS_UNLIT 0.4, kept as sRGB
+(vertex_color_is_srgb: kept linear, a mesh's 8-bit colours round a dark cap's shades to black); the
+walls still take the lamps. The cave walls had their own black checker and diagonal stripes where a
+wall lamp grazes them (dungeon's mass_gaps.png): one triangle of a bent quad tipped toward the lamp,
+the other away. Indoors, a cave run's points are now lit by the mean of their facets' normals with
+CAVE_FACET_KEEP 0.35 of the facet's own kept (Client3D._smooth_normals): wholly smooth, a lamp's
+rim went one flat pale (the coordinator), so the walls still read faceted. Indoors the cave rock is
+also CAVE_INDOOR_SHADE 0.4 of the cliffs' shade and warmer (CAVE_INDOOR_TINT 1.1, 0.92, 0.72):
+at the cliffs' shade a near lamp washed the rims pale as plaster, snow on a ledge against the black
+mass; now lamp-lit earth (the coordinator; environment: darker rock, not dimmer lamps, so the floor
+keeps their light). Outdoors the cliffs and rocks keep their flat facets and shade, the game's look
+in daylight (the coordinator). view_test's mass check: drawn unlit, never black; the walls'
+shared points nearly one normal, each facet still its own turn. Client only, protocol unchanged,
+no new class_name, no bullet.
+
 769 amended (8): the lamps' light off the wall (2026-11-04; dungeon's mine_look stills, the
 coordinator's approval, release's label). At the flame, 0.185 m from the wall face, a lamp's light
 grazed the wall it hung on and lit rock tops more than the floor, which stayed very dark between

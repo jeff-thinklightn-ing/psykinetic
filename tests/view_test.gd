@@ -1870,7 +1870,13 @@ func _test_mass() -> void:
 	_check(edge_high <= Client3D.MASS_EDGE + 0.001 and edge_high < Client3D.CAVE_TOP_LOW,
 			"at the walls under the cave ridge, so the wall is the lip (%.2f m, ridge from %.2f)" % [edge_high, Client3D.CAVE_TOP_LOW])
 	_check(inside_low > Client3D.MASS_EDGE - Client3D.MASS_LUMP.w - 0.01, "a mass, not a floor: no trench behind a wall, no hollow (lowest %.2f m)" % inside_low)
-	_check(darkest > 0.02 and lightest > darkest * 3.0, "darker away from the open, never black (%.3f to %.3f)" % [darkest, lightest])
+	_check(darkest > 0.01 and lightest > darkest * 3.0, "darker away from the open, never black (%.3f to %.3f)" % [darkest, lightest])
+	# Unlit: the lamps hang under its tops, so no facet beside a lit one
+	# goes black (769 amended (7)).
+	var unlit := chunks.all(func(c: MeshInstance3D) -> bool:
+		var m := c.material_override as BaseMaterial3D
+		return m != null and m.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED and m.vertex_color_use_as_albedo)
+	_check(unlit, "drawn unlit, in its own shades")
 	# The walls' lines wander into the rock, never into the walkable: no
 	# point of a wall further into an open cell than CAVE_REACH, some
 	# further into the rock than it.
@@ -1903,6 +1909,33 @@ func _test_mass() -> void:
 				into_rock = maxf(into_rock, nearest)
 	_check(into_open <= Client3D.CAVE_REACH + 0.001 and into_rock > Client3D.CAVE_REACH + 0.1,
 			"the walls wander into the rock, never the walkable (%.2f m into the open, %.2f into the rock)" % [into_open, into_rock])
+	# The walls' light runs nearly smooth: wherever facets share a point their
+	# normals are close (the mean, each keeping CAVE_FACET_KEEP of its own), so
+	# a lamp grazing a wall never lights one triangle of a quad and not the
+	# other, yet the facets still show (769 amended (7)).
+	var seen := {}
+	var split := 0
+	var shared := 0
+	var turned := 0
+	for child in _rig._room.get_children():
+		if not str(child.name).begins_with("Wall_"):
+			continue
+		var arrays := ((child as Node3D).get_node("Body") as MeshInstance3D).mesh.surface_get_arrays(0)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		seen.clear()
+		for k in points.size():
+			var key := Vector3i((points[k] * 1000.0).round())
+			if seen.has(key):
+				shared += 1
+				var apart := (seen[key] as Vector3).angle_to(normals[k])
+				if apart > deg_to_rad(45.0):
+					split += 1
+				elif apart > deg_to_rad(2.0):
+					turned += 1
+			else:
+				seen[key] = normals[k]
+	_check(shared > 0 and split == 0 and turned > 0, "the walls lit nearly smooth, their facets still showing (%d shared points, %d each its own turn, %d split)" % [shared, turned, split])
 	terrain["mass"] = ""
 	_rig.rebuild(terrain, Vector2i(12, 6))
 	var none := _rig._room.get_children().filter(func(n: Node) -> bool: return str(n.name).begins_with("Mass_")).is_empty()
