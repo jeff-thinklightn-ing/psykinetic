@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_sought()
 	_test_herders()
 	_test_visitors()
+	_test_trader()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -676,6 +677,70 @@ func _test_ruin_regrows() -> void:
 ## Visitors (711): one a day at most, never a resident, a pedlar's spare raws
 ## bought and wares sold (none a trade of the town makes), a pilgrim only
 ## with a temple, gone when their days are up, kept in the save.
+func _test_trader() -> void:
+	print("\n== the market's trader: every 4 days, buys the spare, sells what's short (770) ==")
+	var towns := _towns(1, true)
+	towns.note_rescue(TOWN, "s1", "Bran", "smith")
+	var work := towns.production
+	var rules := _rules.duplicate(true)
+	rules["visitors"]["chance"] = 0.0  # Only the scheduled trader.
+	towns.rules = rules
+	var economy := Economy.new({}, work.stockpile, work, func() -> int: return _now, rules)
+	towns.visitor_arrives = economy.visitor_arrives
+	var stock := work.stockpile
+	var gold := stock.count(TOWN, "gold")
+	if gold > 30:
+		stock.take(TOWN, "gold", gold - 30, "test")
+	elif gold < 30:
+		stock.deposit(TOWN, "gold", 30 - gold, "test")
+	stock.deposit(TOWN, "hide", work.comfort(TOWN, "hide") + 6, "test")
+	stock.deposit(TOWN, "leather", work.comfort(TOWN, "leather") + 2, "test")
+	stock.deposit(TOWN, "herbs", 9, "test")
+	var ore := stock.count(TOWN, "ore")
+	_now = 2 * DAY
+	towns._visitors_turn(TOWN)
+	var here := towns.visitors(TOWN)
+	_check(here.size() == 1 and str(here[0]["kind"]) == "trader", "the trader comes on his day, with no chance drawn (%s)" % [here])
+	_check(stock.count(TOWN, "hide") == work.comfort(TOWN, "hide") and stock.count(TOWN, "leather") == work.comfort(TOWN, "leather"),
+		"the spare hides and leather bought, down to comfort")
+	_check(stock.count(TOWN, "herbs") == 9, "never the herbs (maker-only)")
+	var said := str(towns.log_of(TOWN)[-1]["what"]) if not towns.log_of(TOWN).is_empty() else ""
+	_check(said.contains("; the town sells ") and said.contains(" hides") and said.contains(" and buys ") and not said.ends_with("."),
+		"voice's line, the town's side (%s)" % said)
+	_check(stock.count(TOWN, "ore") > ore and stock.count(TOWN, "gold") >= int(rules["gold_floor"]),
+		"ore sold to the short store, the treasury kept over its floor (%d ore, %d gold)" % [stock.count(TOWN, "ore"), stock.count(TOWN, "gold")])
+	_now += DAY / 2
+	towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).size() == 1, "one at a time")
+	_now = 4 * DAY
+	towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).is_empty(), "gone on after his day; not back before 4")
+	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), work, rules, towns.clock)
+	_check(int(saved._town(TOWN)["visitor_due"]["trader"]) == 2, "his day kept in the save")
+	stock.deposit(TOWN, "hide", 40, "test")
+	stock.deposit(TOWN, "gold", int(rules["visitors"]["kinds"]["trader"]["treasury_most"]) - 2 - stock.count(TOWN, "gold"), "test")
+	_now = 6 * DAY
+	towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).size() == 1 and stock.count(TOWN, "gold") <= int(rules["visitors"]["kinds"]["trader"]["treasury_most"]),
+		"back on day 6; the treasury never bought past treasury_most (%d)" % stock.count(TOWN, "gold"))
+	# The town's food kept until he is back, and nothing taken for nothing (the 28-day soak).
+	var trader_rule: Dictionary = rules["visitors"]["kinds"]["trader"]
+	var keep := ceili(float(trader_rule["keep_per_head"]["food"]) * work.worker_ids(TOWN).size() * int(trader_rule["every"]))
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - 30, "test")
+	stock.take(TOWN, "hide", stock.count(TOWN, "hide") - work.comfort(TOWN, "hide"), "test")
+	stock.deposit(TOWN, "food", work.comfort(TOWN, "food") + keep + 5 - stock.count(TOWN, "food"), "test")
+	_now = 10 * DAY
+	towns._visitors_turn(TOWN)
+	_check(keep > 0 and stock.count(TOWN, "food") == work.comfort(TOWN, "food") + keep,
+		"food bought only above comfort and %d kept for the folk until he's back (%d)" % [keep, stock.count(TOWN, "food")])
+	stock.deposit(TOWN, "food", 5, "test")
+	economy._bought[str(trader_rule["market"])] = {"food": 100000.0, "hide": 100000.0, "leather": 100000.0}
+	var food := stock.count(TOWN, "food")
+	_now = 14 * DAY
+	towns._visitors_turn(TOWN)
+	_check(stock.count(TOWN, "food") == food, "a market with its fill takes nothing for nothing (%d food)" % stock.count(TOWN, "food"))
+
+
 func _test_visitors() -> void:
 	print("
 == visitors come and go, the town never growing ==")

@@ -1404,6 +1404,157 @@ func temple_offering(town: String, player_id: String, waived: bool, for_name := 
 
 # --- Visitors (decision 711) -----------------------------------------------------------
 
+## The market's trader at [param town] (770; a visitor [param entry] of a
+## kind with "market"): gold from the outside world's markets, never minted
+## in town. Buys the store's raws over comfort that the market wants (most
+## wanted first, never a build's held materials, never maker_only) up to
+## "load", at market_price as it falls with what the market has had; then
+## shelf goods standing at their shelf cap (not a fence's, not a luxury),
+## "goods" at most, at item_price, the maker paid as for any sale; none of
+## it once the treasury holds "treasury_most". Then sells up to "sells" of
+## what the store is short of among the market's sells, at market_price x
+## trade.caravan.sell, while the treasury keeps its gold_floor. Words for
+## the log; the console line carries the place ids and counts only.
+func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
+	var market := str(rule["market"])
+	var trade: Dictionary = rules.get("trade", {})
+	var wants: Dictionary = trade.get("markets", {}).get(market, {}).get("wants", {})
+	var most := int(rule.get("treasury_most", 200))
+	var cat: Dictionary = catalog.call()
+	var held := {}
+	var build: Dictionary = shortfall.call(town) if shortfall.is_valid() else {}
+	if not build.is_empty():
+		held = production.job(int(build.get("job", 0))).get("cost", {}).duplicate()
+	var kinds: Array = wants.keys()
+	kinds.sort_custom(func(a: String, b: String) -> bool: return float(wants[a]) > float(wants[b]) or wants[a] == wants[b] and a < b)
+	var bought := {}
+	var paid := 0
+	var room := int(rule.get("load", 20))
+	for what: String in kinds:
+		if room <= 0 or stockpile.count(town, "gold") >= most:
+			break
+		if rules.get("maker_only", {}).has(what):
+			continue
+		# What the town eats is kept until the trader is back: keep_per_head a
+		# day for each resident over its every days (the 28-day soak: it sold
+		# its food above comfort and went hungry from day 12).
+		var keep := ceili(float(rule.get("keep_per_head", {}).get(what, 0.0)) * production.worker_ids(town).size() * maxi(int(rule.get("every", 1)), 1))
+		var spare := mini(stockpile.count(town, what) - production.comfort(town, what) - keep - int(held.get(what, 0)), room)
+		if spare <= 0:
+			continue
+		var gold := 0
+		var count := 0
+		for i in spare:
+			var each := roundi(market_price(market, what, 0.0, i))
+			if each < 1:
+				break  # The market has its fill: nothing goes for nothing.
+			if stockpile.count(town, "gold") + gold + each > most:
+				break
+			gold += each
+			count += 1
+		if count <= 0 or not stockpile.take(town, what, count, "trader:%s" % entry.get("id", "")):
+			continue
+		stockpile.deposit(town, "gold", gold, "trader:%s" % entry.get("id", ""), "%d %s sold to the trader from %s, %d" % [count, what, market, gold])
+		if not _bought.has(market):
+			_bought[market] = {}
+		_bought[market][what] = float(_bought[market].get(what, 0.0)) + count
+		bought[what] = count
+		paid += gold
+		room -= count
+	var goods := 0
+	var shelf := stockpile.shop(town)
+	shelf.sort()
+	var on_shelf := {}
+	for uid in shelf:
+		var id := stockpile.book.id_of(uid)
+		on_shelf[id] = int(on_shelf.get(id, 0)) + 1
+	for uid in shelf:
+		if goods >= int(rule.get("goods", 4)) or stockpile.count(town, "gold") >= most:
+			break
+		var id := stockpile.book.id_of(uid)
+		var made: Variant = cat.get(id, {}).get("made", {})
+		if not made is Dictionary or made.is_empty() or is_luxury(id, cat):
+			continue
+		if int(on_shelf.get(id, 0)) < int(made.get("stock", rules.get("shop_cap", 6))):
+			continue
+		var cost := item_price(town, uid, cat)
+		var maker := stockpile.maker_of(town, uid)
+		if not stockpile.take_from_shop(town, uid, "trader:%s" % entry.get("id", "")):
+			continue
+		_sale(town, maker, id, cost, "sale:trader", "sold %s to the trader" % id, -1, int(_landed.get(uid, -1)))
+		_landed.erase(uid)
+		stockpile.book.note(uid, "bought", "by the trader from %s at %s for %d gold" % [market, town, cost])
+		stockpile.book.place(uid, "")
+		production.note_sale(town, id, 1)
+		on_shelf[id] = int(on_shelf[id]) - 1
+		bought[id] = int(bought.get(id, 0)) + 1
+		paid += cost
+		goods += 1
+	var sold := {}
+	var took := 0
+	var left := int(rule.get("sells", 5))
+	for what: Variant in trade.get("markets", {}).get(market, {}).get("sells", []):
+		if left <= 0:
+			break
+		var key := str(what)
+		if is_luxury(key, cat) or not key in Stockpile.RESOURCES:
+			continue
+		var short := production.comfort(town, key) - stockpile.count(town, key)
+		var count := 0
+		var cost := 0
+		for i in mini(short, left):
+			var each := maxi(roundi(market_price(market, key, 0.0) * float(trade.get("caravan", {}).get("sell", 1.2))), 1)
+			if stockpile.count(town, "gold") - cost - each < int(rules.get("gold_floor", 0)):
+				break
+			cost += each
+			count += 1
+		if count <= 0 or not stockpile.take(town, "gold", cost, "trader:%s" % entry.get("id", "")):
+			continue
+		stockpile.deposit(town, key, count, "trader:%s" % entry.get("id", ""), "%d %s bought from the trader from %s, %d" % [count, key, market, cost])
+		sold[key] = count
+		took += cost
+		left -= count
+	if bought.is_empty() and sold.is_empty():
+		return ""
+	var n_bought := 0
+	for what: String in bought:
+		n_bought += int(bought[what])
+	var n_sold := 0
+	for what: String in sold:
+		n_sold += int(sold[what])
+	print("[economy] %s trader from %s: bought %d for %d, sold %d for %d, step %d" % [town, market, n_bought, paid, n_sold, took, now()])
+	# Voice's words, the town's side: "the town sells 20 food and 4 hides for
+	# 28 gold and buys 5 ore for 5 gold"; one side alone when only one.
+	var words: Array[String] = []
+	for what: String in bought:
+		words.append(_dealt_words(what, int(bought[what])))
+	var into: Array[String] = []
+	for what: String in sold:
+		into.append(_dealt_words(what, int(sold[what])))
+	var said: Array[String] = []
+	if not words.is_empty():
+		said.append("sells %s for %d gold" % [_and_list(words), paid])
+	if not into.is_empty():
+		said.append("buys %s for %d gold" % [_and_list(into), took])
+	return "the town " + " and ".join(said)
+
+
+## [param count] of [param what] in the trader's line (770): a raw as a mass
+## ("20 food"), a hide or a made thing counted ("4 hides", "1 sword").
+static func _dealt_words(what: String, count: int) -> String:
+	var words := what.replace("_", " ")
+	if what in Stockpile.RESOURCES and what != "hide" or count == 1:
+		return "%d %s" % [count, words]
+	return "%d %ss" % [count, words]
+
+
+## "a", "a and b", "a, b and c".
+static func _and_list(parts: Array[String]) -> String:
+	if parts.size() <= 1:
+		return "".join(parts)
+	return "%s and %s" % [", ".join(parts.slice(0, -1)), parts[-1]]
+
+
 ## What visitor [param entry] does as they come to [param town] (711; Towns'
 ## visitor_arrives): by their kind's rules (visitors.kinds), a stay at the
 ## inn ("inn": a gold range, where an inn stands), the store's spare raws
@@ -1422,6 +1573,10 @@ func visitor_arrives(town: String, entry: Dictionary) -> String:
 		if spent > 0:
 			stockpile.deposit(town, "gold", spent, "visitor:%s" % id, "%s's stay at the inn, %d" % [entry.get("name", ""), spent])
 			did.append("a stay at the inn, %d gold" % spent)
+	if rule.has("market"):
+		var traded := _trader(town, entry, rule)
+		if not traded.is_empty():
+			did.append(traded)
 	var left := int(rule.get("buys", 0))
 	for what: Variant in rule.get("raws", []):
 		var spare := mini(stockpile.count(town, str(what)) - production.comfort(town, str(what)), left)

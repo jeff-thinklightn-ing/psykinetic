@@ -40592,3 +40592,44 @@ away by day and night, none outdoors, the view's look); view_test _test_skylight
 the gap with its cone, faint at night and bright by day, none without the key); editor_test's every
 key. No CHANGELOG bullet until a shipped level sets it (bear_cave brings one). Protocol unchanged,
 no new class_name.
+
+## 770. The market's trader: gold from outside, on a schedule
+
+A town's treasury sat at its floor, owing its people, because gold only comes in from players (761
+amended's soak; 767's). The coordinator approved a trader from the market, the outside world's
+gold, coming on a schedule; this is economy's side.
+
+- A visitor kind with "every" days comes on schedule (Towns._visitors_turn): every 4 game days,
+  besides the day's chance and never counted against visitors.most; its day is the town record's
+  "visitor_due" {kind: day}, saved. A kind with weight 0 is never drawn by chance. The visitor's
+  arrival is Towns._visitor_comes (711's, split out), from its "market_from" place if it has one.
+  economy.json visitors.kinds.trader: every 4, days [1, 1], market market:castle, load 20, goods
+  4, sells 5, treasury_most 200, keep_per_head {food 1, meat 1}, names.
+- Economy._trader, on its arrival: buys the store's raws over comfort that the market wants (most
+  wanted first; never a build's held materials, never maker_only) up to load, at market_price as
+  it falls with what the market has had; then shelf goods standing at their shelf cap (not a
+  luxury), goods at most, at item_price, the maker paid as for any sale. It buys nothing once the
+  treasury holds treasury_most, so outside gold doesn't swell a town without end. Then it sells
+  up to sells of what the store is short of among the market's sells, at market_price x
+  trade.caravan.sell, while the treasury keeps its gold_floor. The town log says it from the
+  town's side, in voice's words: "Hale the trader from the road comes to <town>; the town sells 2
+  leather and 6 hides for 42 gold and buys 5 ore for 5 gold" (one side alone when only one;
+  Economy._dealt_words counts hides and made things, raws as a mass). The console line carries
+  place ids and counts only.
+- Two guards from the 28-day soak (the coordinator: both right; land as is): what the town eats is kept until the trader is back
+  (keep_per_head a day for each resident over its every days, beside comfort), and a unit the
+  market prices under 1 gold is never bought: a market with its fill takes nothing for nothing.
+  Without them, the soak's trader bought 20 food for 0 four times, the store's food was gone by
+  day 12 and 23 meals went hungry.
+- Leather gets a comfort (4, not full), so the trader leaves the tanner's stock some.
+
+Soak (town_balance, 28 days, gatherers, cook and tanner), before 770 / with it: hungry 0 / 0;
+food on day 12 59 / 21, on day 28 123 / 47; all gold 150 -> 154 / 150 -> 236 (the market's);
+owed at most 233 / 390 (day 16's harvest; 290 by day 28); the treasury at its floor (5) in
+both, its gold paid out to what it owes. The trader came 8 times: 6 to 21 raws a visit, at 9 to
+35 gold. farm_test _test_trader (on schedule without chance, down to comfort, never herbs, ore
+sold short with the floor kept, one at a time, the day saved, treasury_most, the food kept, a
+full market, voice's line). What the town owes its people peaks higher with the trader; the
+coordinator: a check, not a change, on the next long soak (56 days): if owed trends up over both
+harvests or the treasury never leaves its floor, a design then (the trader buying more of the
+shelf first). Server only, protocol unchanged, no new class_name.

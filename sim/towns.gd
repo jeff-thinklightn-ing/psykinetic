@@ -3142,18 +3142,35 @@ func _visitors_turn(town: String) -> void:
 	if int(record.get("visitor_day", -1)) == day:
 		return
 	record["visitor_day"] = day
-	if here.size() >= int(rule.get("most", 2)) or residents(town).is_empty():
+	if residents(town).is_empty():
+		return
+	var kinds: Dictionary = rule.get("kinds", {})
+	# The scheduled kinds (770: the market's trader): every "every" days,
+	# besides the day's chance and never counted against "most".
+	var due: Dictionary = record.get("visitor_due", {})
+	var names_due: Array = kinds.keys()
+	names_due.sort()
+	for kind: String in names_due:
+		var every := int(kinds[kind].get("every", 0))
+		if every <= 0 or here.any(func(each: Dictionary) -> bool: return str(each["kind"]) == kind):
+			continue
+		if day - int(due.get(kind, -every)) >= every:
+			due[kind] = day
+			record["visitor_due"] = due
+			var timed := RandomNumberGenerator.new()
+			timed.seed = hash("%s/%s/%d" % [town, kind, day])
+			_visitor_comes(town, kind, timed)
+	if here.filter(func(each: Dictionary) -> bool: return int(kinds.get(str(each["kind"]), {}).get("every", 0)) <= 0).size() >= int(rule.get("most", 2)):
 		return
 	var draw := RandomNumberGenerator.new()
 	draw.seed = hash("%s/visitor/%d" % [town, day])
 	if draw.randf() >= float(rule.get("chance", 0.35)):
 		return
-	var kinds: Dictionary = rule.get("kinds", {})
 	var open: Array[String] = []
 	var total := 0.0
 	for kind: String in kinds:
 		var needs := str(kinds[kind].get("needs", ""))
-		if needs.is_empty() or _stands(town, needs):
+		if float(kinds[kind].get("weight", 1)) > 0.0 and (needs.is_empty() or _stands(town, needs)):
 			open.append(kind)
 			total += float(kinds[kind].get("weight", 1))
 	if open.is_empty() or total <= 0.0:
@@ -3166,10 +3183,21 @@ func _visitors_turn(town: String) -> void:
 		if roll < 0.0:
 			kind = each
 			break
-	var kind_rule: Dictionary = kinds[kind]
+	_visitor_comes(town, kind, draw)
+
+
+## A visitor of [param kind] comes to [param town] (711), drawn by
+## [param draw]: their name, where from, their stay (the kind's own
+## "days", else visitors.days), their wares; Economy's visitor_arrives
+## does what they came for, said in the log.
+func _visitor_comes(town: String, kind: String, draw: RandomNumberGenerator) -> void:
+	var rule: Dictionary = rules.get("visitors", {})
+	var record := _town(town)
+	var here: Array = record.get("visitors", [])
+	var kind_rule: Dictionary = rule.get("kinds", {}).get(kind, {})
 	var names: Array = kind_rule.get("names", ["A stranger"])
-	var places: Array = visitor_from.call(town) if visitor_from.is_valid() else []
-	var days: Array = rule.get("days", [1, 3])
+	var places: Array = [str(kind_rule["market_from"])] if kind_rule.has("market_from") else visitor_from.call(town) if visitor_from.is_valid() else []
+	var days: Array = kind_rule.get("days", rule.get("days", [1, 3]))
 	var count := int(record.get("visitors_made", 0)) + 1
 	record["visitors_made"] = count
 	var entry := {"id": "visitor_%s_%d" % [town.replace("/", "_"), count], "kind": kind,
@@ -3198,7 +3226,7 @@ func _visitors_turn(town: String) -> void:
 	here.append(entry)
 	record["visitors"] = here
 	var did := str(visitor_arrives.call(town, entry)) if visitor_arrives.is_valid() else ""
-	_note(town, "%s the %s from %s comes to %s%s" % [entry["name"], kind, entry["from"], town, ": " + did if not did.is_empty() else ""])
+	_note(town, "%s the %s from %s comes to %s%s" % [entry["name"], kind, entry["from"], town, ("; " if did.begins_with("the town ") else ": ") + did if not did.is_empty() else ""])
 	visitor_came.emit(town, str(entry["id"]))
 
 
@@ -3528,6 +3556,10 @@ func from_dict(saved: Dictionary) -> void:
 		for key: String in ["visitors_made", "visitor_day"]:
 			if entry.has(key):
 				record[key] = int(entry[key])
+		var due_saved: Variant = entry.get("visitor_due", {})
+		if due_saved is Dictionary:
+			for kind: Variant in due_saved:
+				record.get_or_add("visitor_due", {})[str(kind)] = int(due_saved[kind])  # The trader's last day (770).
 		var sought_saved: Variant = entry.get("sought", {})
 		if sought_saved is Dictionary:
 			for id: Variant in sought_saved:
