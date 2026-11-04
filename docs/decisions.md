@@ -29356,6 +29356,19 @@ Client only, protocol unchanged, no new class_name.
 The land's phase, the arrival's own frame, lost most of its glimpses' plan in 327 amended (3)
 (perf, 2026-11-03): about 130 ms on the wilds.
 
+660 amended (6): the card's lift frame (2026-11-03, perf). The first frame after the card
+lifts, _room_built's _classify_walls (a forced _update_fade), took 86-120 ms on the wilds:
+indexing what fades (_index_occluders, 33-39 ms over 5228 occluders), the first read of the
+spaces walls close in (_find_enclosed, about 35 ms) and setting every occluder's look again
+(62-80 ms). Now _build_room_over_frames indexes the occluders and finds the enclosed spaces each
+a frame of its own under the card, before the chunks in sight; and a forced fade sets again only
+the occluders faded (_set_near) or hidden (_set_close) since they were built, marked with
+TOUCHED_META, besides those to fade now: one never touched is as built. Bench (windowed
+off-screen, bench lock, wilds, main and this alternated twice, three crossings each): the lift
+frame 86-120 ms to 10-13, the frame after 30-46 to 10-22, the crossing's worst frame 87-120 to
+81-93; the lift's time unchanged. view_test passes. Client only, protocol unchanged, no new
+class_name.
+
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
 Jeff, after playing: "going inside buildings should go into top down view and

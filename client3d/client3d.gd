@@ -419,6 +419,11 @@ const OPAQUE_META := &"opaque_material"
 ## A mesh's own surface overrides (its season's materials), kept while it
 ## is faded: one per surface, null where none.
 const OPAQUE_SURFACES_META := &"opaque_surfaces"
+## On an occluder once it has been faded (_set_near) or hidden (_set_close):
+## a forced fade (_update_fade(true), as the card lifts) sets again only
+## those and the ones to fade now; a piece never touched is as built
+## already (perf: 5228 occluders on the wilds, 62-80 ms a lift).
+const TOUCHED_META := &"fade_touched"
 ## The season (decision 362; terrain's side, decision 387):
 ## trees, their forest's floors and the canopy past them drawn in
 ## season.gdshader (season_material), a see-through copy beside each (this
@@ -5396,6 +5401,19 @@ func _build_room_over_frames(generation: int) -> void:
 			phase.call()
 			if phase == _phase_land:
 				_start_curves()
+		await get_tree().process_frame
+		if generation != _build_generation or not is_inside_tree():
+			return
+	# What fades, indexed a frame of its own under the card, not in the
+	# lift's (perf: 33-39 ms on the wilds' 5228 occluders).
+	if not _occluders_built:
+		_index_occluders()
+		await get_tree().process_frame
+		if generation != _build_generation or not is_inside_tree():
+			return
+	# And the spaces walls close in (_update_roofs' first read, 33-35 ms).
+	if _enclosed_dirty:
+		_find_enclosed()
 		await get_tree().process_frame
 		if generation != _build_generation or not is_inside_tree():
 			return
@@ -14443,6 +14461,9 @@ func _update_fade(force := false) -> void:
 	for entry in _occluders:
 		var piece: Node3D = entry[0]
 		var fade := now.has(piece)
+		if force and not fade and not close.has(piece) and not _faded.has(piece) and not _faded_close.has(piece) \
+				and not piece.has_meta(TOUCHED_META):
+			continue  # Never faded nor hidden: as built (TOUCHED_META).
 		if fade != _faded.has(piece) or force:
 			_set_near(piece, fade)
 		if entry[2] and (close.has(piece) != _faded_close.has(piece) or force):
@@ -14482,6 +14503,8 @@ func _close_pieces(faded: Dictionary[Node3D, bool]) -> Dictionary[Node3D, bool]:
 ## which GeometryInstance3D.transparency never reached, so a crown beside
 ## the eye stayed at NEAR_ALPHA, a pale fogged peak against the sky.
 func _set_close(piece: Node3D, close: bool) -> void:
+	if close:
+		piece.set_meta(TOUCHED_META, true)
 	for node in _descendants(piece):
 		if node is GeometryInstance3D:
 			(node as GeometryInstance3D).visible = not close
@@ -14930,6 +14953,8 @@ func _bounds(piece: Node3D) -> AABB:
 ## an override (a grey box, a flat box) as the mesh's override, kept in its
 ## OPAQUE_META to go back to; a surface's own as the surface's override.
 func _set_near(piece: Node3D, near: bool) -> void:
+	if near:
+		piece.set_meta(TOUCHED_META, true)
 	for node in _descendants(piece):
 		var mesh := node as MeshInstance3D
 		if mesh == null or mesh.mesh == null:
