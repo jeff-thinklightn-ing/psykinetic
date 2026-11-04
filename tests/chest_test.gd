@@ -86,8 +86,8 @@ func _test_there_and_back() -> void:
 	_main._open_pack(host, chest)
 	_check(panel.other == chest, "and a third opens it again")
 	_check(panel.other == chest and panel.shown_in(false, 0) == "Bandages", "a right click opens it: the kit in its first slot")
-	_check(panel.title_shown(false) == "Chest" and panel.title_shown(true) == "%s's Pack" % Net.player_name,
-			"titled Chest, and %s's Pack below it" % Net.player_name)
+	_check(panel.title_shown(false) == "Chest" and panel.title_shown(true) == "Pack" and panel.sheet.title.text == Net.player_name,
+			"titled Chest, and Pack below it; %s on the sheet beside (787)" % Net.player_name)
 	_main.sounds.clear()
 	panel.drop(chest, 0, host, 0)
 	_check(Array(host.slots) == [KIT, "", "", "", "", "", "", "", "", "", ""] and Array(chest.slots) == ["", "", "", ""],

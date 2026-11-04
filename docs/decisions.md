@@ -40805,3 +40805,50 @@ level itself has no words). Lore keeps its story (regions.json).
     the hook.
   - level_test (the coordinator's pick) runs physics' _trap_landings over two generations of every
     level marked "regenerate".
+## 787. The character sheet: the hands and the armour off the pack
+
+Jeff (2026-11-03): "create a character inventory sheet and move hands and armor there". The
+coordinator approved the mock at C:/dev/review/ui/character_sheet (stills and notes), with one
+note, built: the figure's arms reach down to the hand squares, so R and L read as held.
+
+- CharacterSheet (render/character_sheet.gd) is a panel left of the pack, its foot level with
+  the pack's. It shows whenever the pack shows (I, a chest, a store, a companion's pack), so a
+  drag between a hand and the pack crosses one gap and taking a thing straight into a hand from
+  a store or chest works as before. No new key. Kept beside the pack rather than as a page of
+  the player card: the sheet is for doing (dragging, at stores), the card for reading.
+- The sheet is headed with the player's name, which used to head the pack. The pack's heading
+  is now "Pack" (voice). Under the name, a plain dim figure faces you. R is in its right hand
+  (on your left), L in its left, A on its chest. Jeff then clarified that the sheet is for
+  more worn slots ("the other item slots like the hat, the boots, jewelry"; items leads their
+  design; its proposal: head 11, neck 12, back 13, feet 14, rings 15 and 16, the charm 17). So the figure is
+  laid out on a fixed grid of places, three columns by five rows (CharacterSheet.Figure.PLACES):
+  the head at the top, the neck below it, the chest with the back beside it, R and L, then a
+  ring under each hand and the feet between; the charm (17, Jeff: "charms don't go in the
+  hands. Charm slot.") at the belt between the hands. Only a place whose slot exists gets a square
+  (CharacterSheet.SLOT_PLACES, today R, L and A). A new worn slot is one line there, with no
+  redraw; the outline shows through the empty places.
+- The three squares are the pack's own SlotBoxes for slots 4, 5 and 6, made by PackPanel and
+  filled by its refresh (PackPanel.row_boxes adds them to the player's row; box_in finds them).
+  Drag, right click, double click, G, T, the hand swap, the store's prices and the practice
+  bars (766 amended (2)) work on them unchanged. A companion's row keeps its hands beside its
+  pack.
+- The load (676) is drawn, not written. A tall bar shows the whole load against the body's mass
+  (World.load_capacity). A short bar under the chest shows the arms' load against their share
+  (World.ARMS_SHARE). Each is full at 0.75 of what carries it. Both are brass while light or
+  burdened, rust when heavy and alarm red overloaded, with the band edges (World.load_free,
+  load_heavy, load_overloaded) as faint ticks. Hover gives the lines the pack used to show:
+  the body bar the whole and the body's line, the arms bar the arms' line. The pack's two load
+  captions are gone; weight_shown and load_shown read the same lines for tests.
+- Two modes (Jeff, via the coordinator: companions have the same worn slots, and each player
+  may change one companion's while every other's is only to look at): CharacterSheet.read_only.
+  Editable is as the pack. Read-only gives no drag from a square, takes no drop and does
+  nothing on a click (PackPanel.SlotBox.read_only); hover tips still show. The player's own
+  sheet is always editable. Opening a sheet for a companion, and which way, waits on
+  companions' design.
+- The store window (765) and the shop's (280) are placed by PackPanel.beside, clear of the
+  sheet: left of it, feet level, or above the pair, right-aligned, when the left runs off the
+  screen.
+
+ui_test _test_character_sheet and the 722 inventory check (the hands on the sheet); chest_test
+(the headings). A CHANGELOG bullet (voice's words). Client only, protocol unchanged. New
+class_name CharacterSheet.

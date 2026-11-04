@@ -236,7 +236,7 @@ func _test_stacks_ui() -> void:
 			for child in armour_box.get_children():
 				if child is Label and child != armour_box.label and child != armour_box.count:
 					marks.append((child as Label).text)
-			_check(PackPanel.boxes_of(row).size() >= Items.CARRIED and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
+			_check(pack_for_armour.row_boxes(row).size() >= Items.CARRIED and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
 				"%s row: the seventh box is the armour worn, edged like the hands, marked A" % ["the player's" if mine else "the other"])
 		var right_box: PackPanel.SlotBox = pack_for_armour.box_in(true, Items.RIGHT_HAND)
 		var armour_data := {"slots_of": _main._local_player(), "slot": 0, "count": 0}
@@ -1826,12 +1826,13 @@ func _test_inventory_panel() -> void:
 	for box in grids[0].get_children():
 		in_grid.append((box as PackPanel.SlotBox).index)
 	var gear: Array[int] = []
-	for box in grids[1].get_children():
-		gear.append((box as PackPanel.SlotBox).index)
-	_check(PackPanel.layout_of(null) == "carrier" and grids.size() == 2 and (grids[0] as GridContainer).columns == 4
+	for box: PackPanel.SlotBox in pack.sheet.boxes.values():
+		gear.append(box.index)
+	_check(PackPanel.layout_of(null) == "carrier" and grids.size() == 1 and (grids[0] as GridContainer).columns == 4
 			and in_grid == Items.PACK_SLOTS and gear == [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]
 			and pack.box_in(true, Items.ARMOUR).theme_type_variation == &"HandSlot" and pack.box_in(true, Items.PACK_SLOTS[4]).theme_type_variation == &"Inset",
-			"the player's row: the pack's eight 4 x 2 (%s), the hands and the armour beside (%s)" % [in_grid, gear])
+			"the player's row: the pack's eight 4 x 2 (%s), the hands and the armour on the sheet (787: %s)" % [in_grid, gear])
+	await _test_character_sheet(pack)
 	var locker := Locker.new()
 	locker.name = "TestLocker"
 	add_child(locker)
@@ -2150,4 +2151,51 @@ func _test_practice_bars() -> void:
 	player.slots = slots_was
 	player.art_feel = feel_was
 	pack.art_marks = {}
+	pack._refresh()
+
+
+## The character sheet (787): beside the pack whenever it shows, the hands
+## and the armour on a figure, its foot level with the pack's, the load as
+## two bars with the load lines on hover; a store window clear of both.
+func _test_character_sheet(pack: PackPanel) -> void:
+	print("\n== the character sheet (787): the hands and armour beside the pack, the load drawn ==")
+	var sheet := pack.sheet
+	var player: Player = _main._local_player()
+	if sheet == null or player == null:
+		_check(sheet != null, "the pack makes its sheet")
+		return
+	await get_tree().process_frame
+	await get_tree().process_frame
+	_check(sheet.is_inside_tree() and sheet.visible == pack.visible, "the sheet shows with the pack (%s, %s)" % [sheet.visible, pack.visible])
+	_check(sheet.boxes.keys() == [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR] and pack.box_in(true, Items.LEFT_HAND) == sheet.boxes[Items.LEFT_HAND]
+			and sheet.boxes[Items.RIGHT_HAND].position.x < sheet.boxes[Items.ARMOUR].position.x and sheet.boxes[Items.ARMOUR].position.x < sheet.boxes[Items.LEFT_HAND].position.x,
+		"R on the figure's right (your left), A on the chest, L on its left; the pack finds them as its own")
+	if pack.visible:
+		var a := pack.get_global_rect()
+		var b := sheet.get_global_rect()
+		_check(b.end.x <= a.position.x and absf(b.end.y - a.end.y) < 1.0, "the sheet left of the pack, their feet level (%s, %s)" % [a, b])
+		_check(pack.flank_rect().position.x <= b.position.x and pack.beside(Vector2(100, 100), 20).x + 100 <= b.position.x,
+			"a store window goes clear of the sheet")
+	# The two modes: read-only takes no drag from or onto a square.
+	var data := {"slots_of": player, "slot": Items.PACK_SLOTS[0], "count": 0}
+	var right: PackPanel.SlotBox = sheet.boxes[Items.RIGHT_HAND]
+	var editable := right._can_drop_data(Vector2.ZERO, data)
+	sheet.read_only = true
+	var locked := not right._can_drop_data(Vector2.ZERO, data) and right.drag_payload() == null and right.read_only
+	sheet.read_only = false
+	_check(editable and locked and not right.read_only, "editable takes a drop; read-only takes none and gives no drag")
+	var arms_was := player.load_arms
+	var body_was := player.load_body
+	player.load_arms = 5.6
+	player.load_body = 16.0
+	pack._refresh()
+	var shown := sheet.load_shown()
+	var mass := World.load_capacity(player)
+	_check(is_equal_approx(float(shown[0]), 21.6 / mass) and is_equal_approx(float(shown[1]), 5.6 / (mass * World.ARMS_SHARE))
+			and str(shown[2]).begins_with("carrying 21.6 of ") and str(shown[3]).begins_with("arms 5.6 kg"),
+		"the bars: the whole against the mass, the arms against their share; today's lines on hover (%s)" % [shown])
+	_check(CharacterSheet.band_color(0.1) == UiTheme.color("brass") and CharacterSheet.band_color(World.load_heavy) == UiTheme.color("rust")
+			and CharacterSheet.band_color(0.9) == UiTheme.color("alarm"), "brass, then rust heavy, red overloaded")
+	player.load_arms = arms_was
+	player.load_body = body_was
 	pack._refresh()

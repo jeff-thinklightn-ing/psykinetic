@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your hands and armour move off the pack onto a sheet of their own, headed with your name and laid on a figure where they are worn; I opens it beside the pack, with two bars for what you carry and what your arms bear (787).
 - In the hills, Hollowfell, an old mine, opens at the foot of the plateau's west face: twisting tunnels with ore seams to work, carts and timber, pits with a stair back out, and the Blood Rot holding it; the tunnels lie anew every three days while no one is inside (790).
 - Companions: with a pick in her hands, your companion mines an ore seam near you while all is quiet and carries the ore; tell her "stop digging" or "dig" (769 amended (2)).
 - Towns: a town keeps its food and meat when the castle market's trader comes, so a thin harvest carries it through (770 amended).

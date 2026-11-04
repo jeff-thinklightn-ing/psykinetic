@@ -116,9 +116,12 @@ var _other_mood: Label
 var _other_row: HBoxContainer
 var _player_title: Label
 var _player_row: HBoxContainer
-var _weight: Label
-## The arms' and the body's lines under the load (676, ui's side).
-var _load: Label
+## The character sheet beside the pack (787): the player's hands and armour,
+## and the load drawn; it shows whenever the pack does.
+var sheet: CharacterSheet
+## The player's load lines as last shown (676, ui's side; since 787 the
+## sheet's bars' hover words).
+var _load_lines := PackedStringArray()
 ## What the player has promised the townsfolk (open commissions, npc's
 ## "offers" with "open"; 536, ui's side): a caption in the foot, "Promised:
 ## Bring Bram home", nothing when none.
@@ -193,6 +196,9 @@ class SlotBox:
 	var price: Control
 	## Weapon memory (766, ui's side): the art's practice along its bottom.
 	var practice: PracticeBar
+	## Shown but not to be changed (787: another's companion on the sheet):
+	## no drag from it or onto it, no click's equip or use; the tip still shows.
+	var read_only := false
 
 	func _ready() -> void:
 		mouse_entered.connect(func() -> void:
@@ -212,7 +218,7 @@ class SlotBox:
 	## null for nothing to drag.
 	func drag_payload() -> Variant:
 		var entity := owner_entity()
-		if not is_instance_valid(entity) or index >= entity.slots.size() or entity.slots[index].is_empty():
+		if read_only or not is_instance_valid(entity) or index >= entity.slots.size() or entity.slots[index].is_empty():
 			return null
 		if mine and panel.selected.has(index):
 			return null  # Selected for barter (560): it stays put until unselected.
@@ -241,6 +247,8 @@ class SlotBox:
 		return data
 
 	func _gui_input(event: InputEvent) -> void:
+		if read_only:
+			return
 		var click := event as InputEventMouseButton
 		# The barter window open (560): a left click selects the thing to give.
 		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT and panel.select_hook.is_valid() \
@@ -263,7 +271,7 @@ class SlotBox:
 			accept_event()
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
-		return data is Dictionary and data.has("slots_of") and is_instance_valid(owner_entity())
+		return not read_only and data is Dictionary and data.has("slots_of") and is_instance_valid(owner_entity())
 
 	func _drop_data(_at: Vector2, data: Variant) -> void:
 		panel.drop(data["slots_of"], int(data["slot"]), owner_entity(), index, int(data.get("count", 0)))
@@ -324,13 +332,15 @@ func _ready() -> void:
 	column.add_child(_player_title)
 	_player_row = _row(true)
 	column.add_child(_player_row)
-	_weight = Label.new()
-	_weight.theme_type_variation = &"Caption"
-	column.add_child(_weight)
-	_load = Label.new()
-	_load.theme_type_variation = &"Caption"
-	_load.add_theme_color_override("font_color", UiTheme.color("text_dim"))
-	column.add_child(_load)
+	sheet = CharacterSheet.new()
+	sheet.build(self)
+	get_parent().add_child.call_deferred(sheet)
+	visibility_changed.connect(func() -> void:
+		if is_instance_valid(sheet):
+			sheet.visible = visible)
+	tree_exiting.connect(func() -> void:
+		if is_instance_valid(sheet):
+			sheet.queue_free())
 	_promised = Label.new()
 	_promised.theme_type_variation = &"Caption"
 	_promised.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -360,14 +370,15 @@ func hide_tip() -> void:
 		tip.visible = false
 
 
-## "carrying 21.6 of 80 kg: burdened" for the player's load (tests).
+## "carrying 21.6 of 80 kg: burdened" for the player's load (tests; the
+## sheet's body bar says it on hover, 787).
 func weight_shown() -> String:
-	return _weight.text
+	return _load_lines[0] if not _load_lines.is_empty() else ""
 
 
 ## The arms' and the body's lines, one a line (tests).
 func load_shown() -> String:
-	return _load.text
+	return "\n".join(_load_lines.slice(1))
 
 
 func _title() -> Label:
@@ -414,7 +425,8 @@ func _lay_out(row: HBoxContainer, mine: bool, layout: String) -> void:
 	var grids: Array[Array] = []  # [columns, indices]
 	if layout == "carrier":
 		grids.append([PACK_COLUMNS, Items.PACK_SLOTS])
-		grids.append([2, [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]])
+		if not mine:  # The player's hands and armour are on the sheet (787).
+			grids.append([2, [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]])
 	elif layout == "locker":
 		grids.append([LOCKER_COLUMNS, range(Locker.LOCKER_SLOTS)])
 	else:
@@ -431,6 +443,27 @@ func _lay_out(row: HBoxContainer, mine: bool, layout: String) -> void:
 		row.add_child(grid)
 
 
+## The pack's rect and the sheet's beside it (787): what a window placed
+## beside the pack keeps clear of.
+func flank_rect() -> Rect2:
+	var rect := get_global_rect()
+	if is_instance_valid(sheet) and sheet.visible and sheet.is_inside_tree():
+		rect = rect.merge(sheet.get_global_rect())
+	return rect
+
+
+## Where a window of [param window_size] goes beside the pack (the store's,
+## 765; the shop's, 280): left of the sheet, its foot level with theirs; when
+## that runs off the screen's left, above them, its right edge on the pack's.
+func beside(window_size: Vector2, gap: float) -> Vector2:
+	var rect := flank_rect()
+	var margin := float(UiTheme.constant("margin"))
+	var at := Vector2(rect.position.x - window_size.x - gap, rect.end.y - window_size.y)
+	if at.x < margin:
+		at = Vector2(rect.end.x - window_size.x, maxf(rect.position.y - window_size.y - gap * 4, margin))
+	return at
+
+
 ## The boxes of [param row], in no set order.
 static func boxes_of(row: HBoxContainer) -> Array[SlotBox]:
 	var out: Array[SlotBox] = []
@@ -441,10 +474,18 @@ static func boxes_of(row: HBoxContainer) -> Array[SlotBox]:
 	return out
 
 
+## [param row]'s boxes; the player's with the sheet's three (787).
+func row_boxes(row: HBoxContainer) -> Array[SlotBox]:
+	var out := boxes_of(row)
+	if row == _player_row and sheet != null:
+		out.append_array(sheet.boxes.values())
+	return out
+
+
 ## The box for slot [param index] in the open row ([param mine] false) or
 ## the player's, or null.
 func box_in(mine: bool, index: int) -> SlotBox:
-	for box in boxes_of(_player_row if mine else _other_row):
+	for box in row_boxes(_player_row if mine else _other_row):
 		if box.index == index:
 			return box
 	return null
@@ -512,6 +553,8 @@ func _process(_delta: float) -> void:
 	var began := Time.get_ticks_usec()
 	if _signature() != _signature_shown:
 		_refresh()
+	if sheet != null and sheet.visible:
+		sheet.place_beside(self)
 	UiCost.add("pack", Time.get_ticks_usec() - began)
 
 
@@ -623,7 +666,7 @@ func set_selected(indices: Array) -> void:
 			selected[int(index)] = true
 	if _player_row == null:
 		return
-	for box: SlotBox in boxes_of(_player_row):
+	for box: SlotBox in row_boxes(_player_row):
 		_frame(box)
 
 
@@ -682,7 +725,7 @@ func _show_price(box: SlotBox, held: bool) -> void:
 func prices_shown() -> Dictionary:
 	var out := {}
 	if _player_row != null:
-		for box: SlotBox in boxes_of(_player_row):
+		for box: SlotBox in row_boxes(_player_row):
 			if box.price != null:
 				out[box.index] = int(str(box.price.get_meta("words", "gold 0")).get_slice(" ", 1))
 	return out
@@ -729,7 +772,8 @@ func _refresh() -> void:
 	_other_mood.visible = not mood.is_empty()
 	_other_mood.tooltip_text = why
 	_other_title.tooltip_text = why
-	_player_title.text = title_of(player) if is_instance_valid(player) else ""
+	# 787: the pack is "Pack" (voice), the player's name heads the sheet.
+	_player_title.text = "Pack" if is_instance_valid(player) else ""
 	var landed: GridEntity = null
 	_lay_out(_other_row, false, layout_of(other))
 	_other_head.get_node(^"Deposit").visible = other is Locker
@@ -745,7 +789,7 @@ func _refresh() -> void:
 					if not item.is_empty() and i < before[1].size() and before[1][i] != item:
 						landed = entity
 			_last[row] = [entity, entity.slots.duplicate()]
-		for box: SlotBox in boxes_of(row):
+		for box: SlotBox in row_boxes(row):
 			var has := is_instance_valid(entity) and box.index < entity.slots.size()
 			box.visible = has or not is_instance_valid(entity)
 			var item := entity.slots[box.index] if has else ""
@@ -771,10 +815,12 @@ func _refresh() -> void:
 	if landed != null and sound.is_valid():
 		sound.call(SoundKit.opening(landed), landed)
 	var lines := load_lines(player) if is_instance_valid(player) else PackedStringArray()
-	_weight.text = lines[0] if not lines.is_empty() else ""
-	_weight.visible = not _weight.text.is_empty()
-	_load.text = "\n".join(lines.slice(1))
-	_load.visible = not _load.text.is_empty()
+	_load_lines = lines
+	# The sheet (787): beside the pack whenever it shows, the load drawn.
+	if sheet != null:
+		sheet.visible = visible
+		if visible:
+			sheet.show_for(player, lines)
 	_promised.text = "Promised: %s" % ", ".join(promised) if not promised.is_empty() else ""
 	_promised.visible = not promised.is_empty()
 	var held := charges_of(player if is_instance_valid(player) else null)

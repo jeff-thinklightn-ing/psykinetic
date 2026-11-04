@@ -203,4 +203,4 @@ func _place() -> void:
 	_gold_box.global_position = Vector2(rect.end.x - _gold_box.size.x, rect.position.y - _gold_box.size.y - GAP)
 	if _box.visible:
 		_box.reset_size()
-		_box.global_position = Vector2(rect.position.x - _box.size.x - GAP, rect.end.y - _box.size.y)
+		_box.global_position = pack.beside(_box.size, GAP)  # Clear of the sheet too (787).

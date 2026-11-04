@@ -1162,6 +1162,5 @@ func _place() -> void:
 		_total.visible = false
 		_tip.visible = false
 		return
-	var rect := pack.get_global_rect()
 	_box.reset_size()
-	_box.global_position = Vector2(rect.position.x - _box.size.x - GAP, rect.end.y - _box.size.y)
+	_box.global_position = pack.beside(_box.size, GAP)  # Clear of the sheet too (787).
