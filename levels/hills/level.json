@@ -32,6 +32,10 @@
 		"from_wilds": [
 			7,
 			112
+		],
+		"from_bear_cave": [
+			117,
+			104
 		]
 	},
 	"links": [
@@ -42,6 +46,16 @@
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_hills"
+		},
+		{
+			"at": [
+				117,
+				102
+			],
+			"to_map": "bear_cave",
+			"to_spawn": "from_hills",
+			"cue": "cave",
+			"closed": true
 		}
 	],
 	"entities": [],

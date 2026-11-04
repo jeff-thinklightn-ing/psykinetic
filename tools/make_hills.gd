@@ -174,6 +174,16 @@ const CAMPS: Array[Dictionary] = [
 	{"key": "bridge_camp", "name": "the camp by the bridge", "at": Vector2i(88, 116), "facing": Vector2i(0, -1)},
 	{"key": "spur_camp", "name": "the camp under the spur", "at": Vector2i(177, 95), "facing": Vector2i(-1, 0)}]
 const CAMP_SIZE := 5
+## The apex lairs' mouths here (enemy-ai's lair rule; the coordinator's
+## fill_forest plan, phase B): each a link cell at "at" into its own small
+## level, "open" the side its trampled ground lies on (toward the road);
+## a hill of rock LAIR_HILL behind it (terrain's cue draws a hillock and an
+## arch over it, the facing coming out into the hill), dirt LAIR_TRAMPLED
+## in front, and the lair's "from_<lair>" spawn two cells out.
+const LAIRS: Array[Dictionary] = [
+	{"to_map": "bear_cave", "at": Vector2i(117, 102), "open": Vector2i(0, 1), "cue": "cave", "closed": true}]
+const LAIR_HILL := Vector2i(7, 5)
+const LAIR_TRAMPLED := 1
 ## Each patch {at, kinds}: its setting's kinds (items' 777 rows; "herbs" grows
 ## meanwhile, a kind Items lacks is skipped by Forage).
 const PATCHES: Array[Dictionary] = [
@@ -297,7 +307,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY, EAST_VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, PLATEAU_WIDE, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": 0.0, "still": [FALL_LIP]}],
-		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads(),
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads() + _lair_pads(),
 		"streams": 0, "keep_clear": {},
 		"rivers": [WEST_RIVER.merged({"line": VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED + river_seed}),
 			east_river,
@@ -334,6 +344,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_places()
 	_tracks()
 	_camps()
+	_lairs()
 	_patches()
 	_wade(laid["falls"])
 	_sights()
@@ -788,6 +799,51 @@ func _camps() -> void:
 		for cell in _cells_of(Rect2i(at, Vector2i(CAMP_SIZE, CAMP_SIZE))):
 			if map.cell(cell) == "dirt":
 				map.set_cell(cell, "grass")
+
+
+## Each lair's hill and the ground before it, levelled by Relief.lay
+## (keep_flat): the hill's rect and LAIR_HILL.y cells in front.
+static func _lair_pads() -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for lair in LAIRS:
+		var open: Vector2i = lair["open"]
+		var hill := _lair_hill(lair)
+		out.append(hill.merge(Rect2i(hill.position + open * LAIR_HILL.y, hill.size)))
+	return out
+
+
+## The rock cells behind a lair's mouth: LAIR_HILL across by deep, the side
+## away from "open", the mouth's column (or row) in its middle.
+static func _lair_hill(lair: Dictionary) -> Rect2i:
+	var at: Vector2i = lair["at"]
+	var open: Vector2i = lair["open"]
+	var side := Vector2i(absi(open.y), absi(open.x))
+	var half := LAIR_HILL.x / 2
+	var a := at - open - side * half
+	var b := at - open * LAIR_HILL.y + side * half
+	return Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE)
+
+
+## The lairs' mouths (LAIRS): rock behind, trampled dirt in front, the link
+## cell, its link {at, to_map, to_spawn "from_hills", cue, closed if so} and the
+## "from_<lair>" spawn two cells out.
+func _lairs() -> void:
+	for lair in LAIRS:
+		var at: Vector2i = lair["at"]
+		var open: Vector2i = lair["open"]
+		for cell in _cells_of(_lair_hill(lair)):
+			map.set_cell(cell, "rock")
+		var side := Vector2i(absi(open.y), absi(open.x))
+		for step in range(0, 3):
+			for across in range(-LAIR_TRAMPLED, LAIR_TRAMPLED + 1):
+				map.set_cell(at + open * step + side * across, "dirt")
+		map.set_cell(at, "link")
+		var spawn := at + open * 2
+		var link := {"at": [at.x, at.y], "to_map": lair["to_map"], "to_spawn": "from_hills", "cue": lair["cue"]}
+		if lair.get("closed", false):
+			link["closed"] = true  # Sealed till its lair's rule is in (the coordinator; terrain draws a rockfall).
+		config["links"].append(link)
+		config["spawn_points"]["from_" + str(lair["to_map"])] = [spawn.x, spawn.y]
 
 
 ## The forage patches (777): level.json "forage", each PATCH_RADIUS round,
