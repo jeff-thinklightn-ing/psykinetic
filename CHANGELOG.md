@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The hills have sights along the way now: a broken watchtower, a lone great oak and a standing stone to walk to; milestones, waystones, a wayside shrine, a hunter's blind and a broken cart by the road; and, off the paths, a fallen traveller, a cairn, the rusted gear of an old fight, a grave and an empty lean-to (778).
 - Wading a stream or ford soaks clothes dark and glossy up to the water line, and rain soaks them all over; out of the rain they drip and dry in a minute or two, faster by a fire, and everyone, townsfolk too, steps high through the water (775).
 - At night a lantern hangs at the chapel door and on a post by the store, and townsfolk out after dark carry one (782).
 - Towns: a town left without its carpenter, hunter or woodcutter gets a new one after a week, and one sent for but never found makes the way in alone (767 amended).

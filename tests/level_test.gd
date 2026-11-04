@@ -223,6 +223,7 @@ func _test_every_level() -> void:
 	_test_world_plane()
 	_test_safe_paths()
 	_test_fill_hills()
+	_test_fill_hills_sights()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -981,9 +982,38 @@ func _test_safe_paths() -> void:
 const FILL_DO_REACH := 60
 
 
+## Filling the hills, phase 2 (778): the landmarks, roadside sights and
+## story pieces stand, bare (no words yet), none on a path, the lean-to with
+## its cold hearth, and every floor cell still walked to from the link.
+func _test_fill_hills_sights() -> void:
+	print("\n== filling the hills (778): landmarks, roadside sights, stories ==")
+	var level := Level.load_level("hills")
+	var counts := {}
+	for building: Dictionary in level["buildings"]:
+		var slot := str(building.get("slot", ""))
+		counts[slot] = int(counts.get(slot, 0)) + 1
+	var want := {"building.tower_ruin": 1, "building.great_tree": 1, "building.standing_stone": 1, "building.milestone": 2,
+		"building.wayside_shrine": 1, "building.woodpile": 1, "building.hunters_blind": 1, "building.waystone": 2,
+		"building.cairn": 1, "building.grave": 1, "building.lean_to": 1}
+	var short := want.keys().filter(func(slot: String) -> bool: return int(counts.get(slot, 0)) != int(want[slot]))
+	_check(short.is_empty(), "the sights stand: a watchtower, an oak, a stone, two milestones, a shrine, a stack, a blind, two waystones, a cairn, a grave, a lean-to (off: %s)" % [short])
+	var decor := {}
+	for piece: Dictionary in level["terrain"]["decor"]:
+		decor[piece["kind"]] = int(decor.get(piece["kind"], 0)) + 1
+	_check(decor.get("broken_cart", 0) == 1 and decor.get("fallen_guard", 0) == 1 and decor.get("rusted_gear", 0) == 1 and decor.get("campfire_cold", 0) == 1,
+		"and lying: a broken cart, a dead traveller, an old fight's gear, the lean-to's cold hearth (%s)" % [decor])
+	var paths: Dictionary = WorldMap.build().areas["hills"]["safe_paths"]
+	var on_path := []
+	for building: Dictionary in level["buildings"]:
+		if str(building.get("slot", "")) in want:
+			for cell in Level.rect_cells(building["rect"]):
+				if paths.has(cell):
+					on_path.append(cell)
+	_check(on_path.is_empty(), "none stands on a path (%s)" % [on_path.slice(0, 4)])
+
+
 func _test_fill_hills() -> void:
-	print("
-== filling the hills (777): tracks, rest camps, forage, the warmed rest ==")
+	print("\n== filling the hills (777): tracks, rest camps, forage, the warmed rest ==")
 	var area: Dictionary = WorldMap.build().areas["hills"]
 	var paths: Dictionary = area["safe_paths"]
 	var places: Dictionary = area["places"]

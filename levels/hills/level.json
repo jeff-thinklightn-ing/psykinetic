@@ -1807,6 +1807,162 @@
 				0
 			],
 			"code": "C2"
+		},
+		{
+			"slot": "building.tower_ruin",
+			"at": [
+				186,
+				18
+			],
+			"facing": [
+				-1,
+				0
+			],
+			"code": "T1"
+		},
+		{
+			"slot": "building.great_tree",
+			"at": [
+				111,
+				159
+			],
+			"facing": [
+				0,
+				-1
+			],
+			"code": "G1"
+		},
+		{
+			"slot": "building.standing_stone",
+			"at": [
+				199,
+				70
+			],
+			"facing": [
+				-1,
+				0
+			],
+			"code": "S1"
+		},
+		{
+			"slot": "building.milestone",
+			"at": [
+				43,
+				110
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "M1"
+		},
+		{
+			"slot": "building.milestone",
+			"at": [
+				140,
+				108
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "M2"
+		},
+		{
+			"slot": "building.wayside_shrine",
+			"at": [
+				159,
+				101
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "W1"
+		},
+		{
+			"slot": "building.woodpile",
+			"at": [
+				173,
+				87
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "W2"
+		},
+		{
+			"slot": "building.hunters_blind",
+			"at": [
+				52,
+				156
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "H3"
+		},
+		{
+			"slot": "building.waystone",
+			"at": [
+				22,
+				108
+			],
+			"facing": [
+				-1,
+				0
+			],
+			"code": "W3"
+		},
+		{
+			"slot": "building.waystone",
+			"at": [
+				52,
+				113
+			],
+			"facing": [
+				-1,
+				0
+			],
+			"code": "W4"
+		},
+		{
+			"slot": "building.cairn",
+			"at": [
+				114,
+				81
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "C3"
+		},
+		{
+			"slot": "building.grave",
+			"at": [
+				75,
+				150
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "G2"
+		},
+		{
+			"slot": "building.lean_to",
+			"at": [
+				146,
+				125
+			],
+			"facing": [
+				0,
+				1
+			],
+			"code": "L1"
 		}
 	],
 	"roads": [
@@ -2481,11 +2637,51 @@
 			]
 		}
 	],
+	"decor": [
+		[
+			122,
+			117,
+			0,
+			-1,
+			"broken_cart",
+			1
+		],
+		[
+			45,
+			69,
+			1,
+			0,
+			"fallen_guard",
+			1
+		],
+		[
+			21,
+			153,
+			0,
+			1,
+			"rusted_gear",
+			1
+		],
+		[
+			147,
+			128,
+			0,
+			1,
+			"campfire_cold",
+			1
+		]
+	],
 	"building_codes": {
 		"B": 1,
 		"F": 2,
-		"H": 2,
-		"C": 2
+		"H": 3,
+		"C": 3,
+		"T": 1,
+		"G": 2,
+		"S": 1,
+		"M": 2,
+		"W": 4,
+		"L": 1
 	},
 	"ledges": [
 		{

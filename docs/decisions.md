@@ -40084,3 +40084,34 @@ walled in, a camp's fire ring two cells off and not three, the wade at a ford's 
 0.02 m, the outline over a wet body and back,
 and the material and drips dropped when dry. Stills are at C:/dev/review/wet/wet_look.png. A CHANGELOG
 bullet. Client only, protocol unchanged, no new class_name.
+
+## 778. Filling the hills, phase 2: landmarks, roadside sights, stories (bare)
+
+The coordinator's fill-the-lands plan and maps' plan sheet (C:/dev/review/lands/fill_hills), after
+777's things to do; Jeff: "go ahead with hills plan". This lays the landmarks, the roadside sights
+and the story pieces as art only. Lore's facts for them (the watchtower's keepers, the oak's rags,
+the stone's age, the traveller and his cache, the old fight, the grave and its keeper, the
+milestones' road) are drafts with Jeff, so the coordinator's guard holds: no words until he agrees
+them (lore says each as it comes back; voice has the note and the carvings ready).
+
+- tools/make_hills.gd SIGHTS: a broken watchtower (building.tower_ruin) on the plateau, a lone
+  great oak between the streams, a standing stone on the plateau's east edge; two milestones on
+  the road west and east, a wayside shrine, a woodcutter's stack, two waystones at the tracks'
+  feet, a hunter's blind by the cave track and a broken cart beside the road (art-kit's ff512fa2:
+  prop.broken_cart); the story pieces off the paths: a dead traveller (prop.fallen_guard), a
+  cairn, an old fight's rusted gear, a grave, and an empty lean-to with its cold hearth
+  (prop.campfire_cold a cell out from its open front; its keeper out, lore's note, no body).
+  Each on the walkable cell nearest its planned one (within SIGHT_REACH 6) whose footprint is
+  grass or plain dirt within 0.6 m of one height, SIGHT_OFF_PATH (1) clear of every road and
+  track cell and of the others; faced as planned or toward the nearest path (ROADWARD); the
+  multi-cell ones' planned ground levelled (keep_flat, _sight_pads).
+- Level: building.grave (1x2), building.wayside_shrine, building.milestone (1x1),
+  building.hunters_blind (2x2) and building.lean_to (3x2) in BUILDINGS, SOLID and DOORLESS (never
+  walked onto, routes round, sight stopped as by the wilds' landmarks); decor kinds campfire_cold,
+  broken_cart and rusted_gear lying faced. Decor stays drawn only, never solid.
+- Saves: the grid is the same; the pieces' cells (41) leave the floor; nothing stood there (no
+  place, no plot), and a body saved on one is moved off by 749's spawn safety. No remade line.
+
+level_test _test_fill_hills_sights (each piece stands, the four lying ones, none on a safe path;
+every floor cell still walked to: the levels-connect checks). Server and level data; protocol
+unchanged; no new class_name.

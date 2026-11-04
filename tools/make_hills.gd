@@ -182,6 +182,35 @@ const PATCHES: Array[Dictionary] = [
 	{"at": Vector2i(14, 85), "kinds": ["berries", "herbs"]}, {"at": Vector2i(45, 140), "kinds": ["berries", "mushrooms", "herbs"]},
 	{"at": Vector2i(172, 64), "kinds": ["flint", "feathers"]}]
 const PATCH_RADIUS := 4
+## Phase 2 (778): the landmarks, roadside sights and story pieces, bare (no
+## words: lore's facts wait on Jeff). Each {key, at: its planned cell (a
+## building's footprint's top-left), and slot (a building) or decor (a
+## prop.<kind> lying faced), facing: a side, or ROADWARD to face the nearest
+## path cell}. Laid on the walkable cell nearest the planned one whose
+## footprint is grass or plain dirt, off every path by SIGHT_OFF_PATH and
+## clear of the others; the multi-cell ones' planned ground levelled
+## (keep_flat, _sight_pads).
+const ROADWARD := Vector2i.ZERO
+const SIGHTS: Array[Dictionary] = [
+	{"key": "watchtower", "slot": "building.tower_ruin", "at": Vector2i(186, 18), "facing": Vector2i(-1, 0)},
+	{"key": "great_oak", "slot": "building.great_tree", "at": Vector2i(111, 159), "facing": Vector2i(0, -1)},
+	{"key": "standing_stone", "slot": "building.standing_stone", "at": Vector2i(199, 70), "facing": Vector2i(-1, 0)},
+	{"key": "milestone_west", "slot": "building.milestone", "at": Vector2i(43, 110), "facing": ROADWARD},
+	{"key": "milestone_east", "slot": "building.milestone", "at": Vector2i(140, 108), "facing": ROADWARD},
+	{"key": "broken_cart", "decor": "broken_cart", "at": Vector2i(124, 115), "facing": ROADWARD},
+	{"key": "shrine", "slot": "building.wayside_shrine", "at": Vector2i(160, 102), "facing": ROADWARD},
+	{"key": "woodpile", "slot": "building.woodpile", "at": Vector2i(173, 87), "facing": ROADWARD},
+	{"key": "hunters_blind", "slot": "building.hunters_blind", "at": Vector2i(52, 156), "facing": Vector2i(1, 0)},
+	{"key": "waystone_hut", "slot": "building.waystone", "at": Vector2i(20, 110), "facing": ROADWARD},
+	{"key": "waystone_cave", "slot": "building.waystone", "at": Vector2i(51, 114), "facing": ROADWARD},
+	{"key": "dead_traveller", "decor": "fallen_guard", "at": Vector2i(45, 69), "facing": Vector2i(1, 0)},
+	{"key": "cairn", "slot": "building.cairn", "at": Vector2i(114, 81), "facing": Vector2i(0, 1)},
+	{"key": "rusted_gear", "decor": "rusted_gear", "at": Vector2i(21, 153), "facing": Vector2i(0, 1)},
+	{"key": "grave", "slot": "building.grave", "at": Vector2i(75, 150), "facing": Vector2i(0, 1)},
+	{"key": "lean_to", "slot": "building.lean_to", "at": Vector2i(146, 125), "facing": Vector2i(0, 1), "cold_fire": true}]
+## How far a sight keeps off a path (road or track cell), and from another.
+const SIGHT_OFF_PATH := 1
+const SIGHT_REACH := 6
 const FALL_POOL := 2.5
 const WADE_RISE := 0.42
 const WADE_RINGS := 4
@@ -215,6 +244,8 @@ var _faces: Dictionary = {}
 var _missed: Array[String] = []
 ## The road's cells, once laid (777: the tracks leave from it).
 var _road_cells: Array[Vector2i] = []
+## The tracks' cells (777), for the sights to keep off (778).
+var _track_cells: Dictionary = {}
 
 
 func _ready() -> void:
@@ -266,7 +297,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY, EAST_VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, PLATEAU_WIDE, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": 0.0, "still": [FALL_LIP]}],
-		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads(),
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads(),
 		"streams": 0, "keep_clear": {},
 		"rivers": [WEST_RIVER.merged({"line": VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED + river_seed}),
 			east_river,
@@ -305,6 +336,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_camps()
 	_patches()
 	_wade(laid["falls"])
+	_sights()
 	# Boulders and crates by the rim, to push off.
 	for at in [Vector2i(CLIFF_X + 1, 24), Vector2i(CLIFF_X + 2, 40)]:
 		map.set_cell(at, "boulder")
@@ -730,6 +762,7 @@ func _tracks() -> void:
 		for cell: Vector2i in laid["cells"]:
 			if map.cell(cell) in ["grass", "dirt"]:
 				map.set_cell(cell, "dirt")
+			_track_cells[cell] = true
 		config["roads"].append({"points": Curves.to_json(laid["points"], laid["widths"]), "kind": "dirt"})
 		print("[hills] a track to %s from %s: %d cells" % [track["to"], from, laid["cells"].size()])
 
@@ -777,6 +810,122 @@ func _nearest_grass(from: Vector2i) -> Vector2i:
 					return at
 	_missed.append("no grass near the forage patch at %s" % from)
 	return from
+
+
+## A sight's footprint at [param at] facing [param facing] (Level.BUILDINGS,
+## across by deep facing north or south); one cell for a decor piece.
+static func _sight_rect(sight: Dictionary, at: Vector2i, facing: Vector2i) -> Rect2i:
+	if not sight.has("slot"):
+		return Rect2i(at, Vector2i.ONE)
+	var size: Vector2i = Level.BUILDINGS[sight["slot"]]
+	if facing.x != 0:
+		size = Vector2i(size.y, size.x)
+	return Rect2i(at, size)
+
+
+## The multi-cell sights' planned ground and a cell round it, levelled by
+## Relief.lay (keep_flat).
+static func _sight_pads() -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for sight in SIGHTS:
+		var facing: Vector2i = sight["facing"] if sight["facing"] != ROADWARD else Vector2i(0, 1)
+		var rect := _sight_rect(sight, sight["at"], facing)
+		if rect.size != Vector2i.ONE:
+			out.append(rect.grow(1))
+	return out
+
+
+## The landmarks, roadside sights and story pieces (778, SIGHTS): each on
+## the nearest fitting cell to its plan, a building into "buildings", a
+## decor piece into "decor", faced as said or toward the nearest path cell.
+func _sights() -> void:
+	var paths := _track_cells.duplicate()
+	for cell in _road_cells:
+		paths[cell] = true
+	var taken := {}
+	for building: Dictionary in config["buildings"]:
+		var at := Vector2i(int(building["at"][0]), int(building["at"][1]))
+		var size := Vector2i.ONE
+		if building.has("kind"):
+			size = Vector2i(CAMP_SIZE, CAMP_SIZE)
+		elif building.has("length"):
+			size = Vector2i(int(building["length"]), int(building["width"]))
+		elif Level.BUILDINGS.has(building["slot"]):
+			size = Level.BUILDINGS[building["slot"]]
+			if building.has("facing") and int(building["facing"][0]) != 0:
+				size = Vector2i(size.y, size.x)
+		for cell in _cells_of(Rect2i(at, size).grow(1)):
+			taken[cell] = true
+	if not config.has("decor"):
+		config["decor"] = []
+	for sight in SIGHTS:
+		var planned: Vector2i = sight["at"]
+		var placed := false
+		for reach in range(0, SIGHT_REACH + 1):
+			for y in range(planned.y - reach, planned.y + reach + 1):
+				for x in range(planned.x - reach, planned.x + reach + 1):
+					var at := Vector2i(x, y)
+					if placed or maxi(absi(x - planned.x), absi(y - planned.y)) != reach:
+						continue
+					var facing: Vector2i = sight["facing"]
+					if facing == ROADWARD:
+						facing = _toward_path(at, paths)
+					var rect := _sight_rect(sight, at, facing)
+					if not _sight_fits(rect, paths, taken):
+						continue
+					for cell in _cells_of(rect.grow(1)):
+						taken[cell] = true
+					if sight.has("slot"):
+						config["buildings"].append({"slot": sight["slot"], "at": [at.x, at.y], "facing": [facing.x, facing.y]})
+					if sight.get("cold_fire", false):
+						# Its cold hearth (art-kit's prop.campfire_cold) a cell out from its open front's middle.
+						var front := rect.position + (rect.size - Vector2i.ONE) / 2 + facing * (rect.size.y / 2 + 2 if facing.y != 0 else rect.size.x / 2 + 2)
+						if map.cell(front) in ["grass", "dirt"]:
+							config["decor"].append([front.x, front.y, facing.x, facing.y, "campfire_cold", 1])
+						else:
+							_missed.append("no ground for the lean-to's cold hearth at %s" % front)
+					if sight.has("decor"):
+						config["decor"].append([at.x, at.y, facing.x, facing.y, sight["decor"], 1])
+					if at != planned:
+						print("[hills] %s laid at %s, not %s" % [sight["key"], at, planned])
+					placed = true
+		if not placed:
+			_missed.append("no ground for %s near %s" % [sight["key"], planned])
+			push_error("[hills] no ground for %s near %s" % [sight["key"], planned])
+	print("[hills] sights: %d buildings, %d decor" % [config["buildings"].size(), config["decor"].size()])
+
+
+## Whether every cell of [param rect] is grass or plain dirt (no path, no
+## water, no ford, no cliff's foot), SIGHT_OFF_PATH clear of every path
+## cell and clear of [param taken], on ground of one height within 0.6 m.
+func _sight_fits(rect: Rect2i, paths: Dictionary, taken: Dictionary) -> bool:
+	var low := INF
+	var high := -INF
+	for cell in _cells_of(rect):
+		if not map.cell(cell) in ["grass", "dirt"] or taken.has(cell):
+			return false
+		low = minf(low, map.relief_at(cell))
+		high = maxf(high, map.relief_at(cell))
+	if high - low > 0.6:
+		return false
+	for cell in _cells_of(rect.grow(SIGHT_OFF_PATH)):
+		if paths.has(cell):
+			return false
+	return true
+
+
+## The side of [param at] nearest a path cell (its front faced to the road).
+static func _toward_path(at: Vector2i, paths: Dictionary) -> Vector2i:
+	var best := Vector2i(0, 1)
+	var nearest := INF
+	for step: Vector2i in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0)]:
+		for d in range(1, 8):
+			if paths.has(at + step * d):
+				if d < nearest:
+					nearest = d
+					best = step
+				break
+	return best
 
 
 static func _cells_of(rect: Rect2i) -> Array[Vector2i]:

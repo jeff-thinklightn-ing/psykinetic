@@ -142,7 +142,8 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
 	"building.throne": Vector2i(1, 1), "building.dark_pillar": Vector2i(1, 1), "building.hatch_sealed": Vector2i(1, 1),
 	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1), "building.turf_house": Vector2i(7, 5),
-	"building.market_stall": Vector2i(2, 1)}
+	"building.market_stall": Vector2i(2, 1), "building.grave": Vector2i(1, 2), "building.wayside_shrine": Vector2i(1, 1),
+	"building.milestone": Vector2i(1, 1), "building.hunters_blind": Vector2i(2, 2), "building.lean_to": Vector2i(3, 2)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -208,19 +209,22 @@ const FOLD_REACH := 6
 const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall"]
+	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
+	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
 ## crypt's burial table and pillars, the rock blocks they were; 613 amended:
 ## the Dwarven Halls' great forge the smith stands before and the goblins'
 ## weapon rack, so no fight stands a body in the blades; 659 amended: the
-## dark tower's pillar; 736: Umbrage's weapon stall, its seller behind it): every cell of
-## theirs out of the floor, none walked onto or into.
+## dark tower's pillar; 736: Umbrage's weapon stall, its seller behind it; 778: the
+## hills' roadside sights and stories, a grave, a shrine, a milestone, a hunter's blind and
+## a lean-to): every cell of theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall"]
+	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
+	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -1844,7 +1848,11 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"mine_arch": {"sits": "span", "variants": 1, "slot": "mine.arch_%d", "widths": [3, 5]},
 	"mine_beam": {"sits": "span", "variants": 1, "slot": "mine.beam_8", "widths": [3, 10], "lift": 2.7, "posts": "mine.post"},
 	"mine_track": {"sits": "flat", "variants": 3, "faced": true, "slots": ["mine.track", "mine.track_bend", "mine.track_end"]},
-	"mine_lamp": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.185, "lift": 1.6}}
+	"mine_lamp": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.185, "lift": 1.6},
+	# The hills' stories and roadside sights (778): lying on the ground, faced.
+	"campfire_cold": {"sits": "flat", "variants": 1, "faced": true},
+	"broken_cart": {"sits": "flat", "variants": 1, "faced": true},
+	"rusted_gear": {"sits": "flat", "variants": 1, "faced": true}}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],
