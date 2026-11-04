@@ -174,6 +174,13 @@ const CAMPS: Array[Dictionary] = [
 	{"key": "bridge_camp", "name": "the camp by the bridge", "at": Vector2i(88, 116), "facing": Vector2i(0, -1)},
 	{"key": "spur_camp", "name": "the camp under the spur", "at": Vector2i(177, 95), "facing": Vector2i(-1, 0)}]
 const CAMP_SIZE := 5
+## Hollowfell's mouth (790, dungeon's mine below the plateau): a link at the
+## face's foot opening west into the hills, its arrival two cells out, and
+## the workings place between them, held by the goblins in it; the ground
+## before it levelled (HOLLOWFELL_PAD).
+const HOLLOWFELL := {"at": Vector2i(167, 58), "open": Vector2i(-1, 0), "to_map": "hollowfell",
+	"place": "hollowfell", "name": "Hollowfell", "holder": "goblins"}
+const HOLLOWFELL_PAD := Rect2i(164, 56, 4, 5)
 ## Each patch {at, kinds}: its setting's kinds (items' 777 rows; "herbs" grows
 ## meanwhile, a kind Items lacks is skipped by Forage).
 const PATCHES: Array[Dictionary] = [
@@ -297,7 +304,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY, EAST_VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, PLATEAU_WIDE, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": 0.0, "still": [FALL_LIP]}],
-		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads(),
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads() + [HOLLOWFELL_PAD],
 		"streams": 0, "keep_clear": {},
 		"rivers": [WEST_RIVER.merged({"line": VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED + river_seed}),
 			east_river,
@@ -334,6 +341,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_places()
 	_tracks()
 	_camps()
+	_hollowfell()
 	_patches()
 	_wade(laid["falls"])
 	_sights()
@@ -773,6 +781,21 @@ static func _camp_pads() -> Array[Rect2i]:
 	for camp in CAMPS:
 		out.append(Rect2i(camp["at"], Vector2i(CAMP_SIZE, CAMP_SIZE)))
 	return out
+
+
+## Hollowfell's mouth (790): its link cell to the mine's "from_hills", the
+## "from_hollowfell" arrival two cells out from the face, and the workings
+## place on the cell between.
+func _hollowfell() -> void:
+	var at: Vector2i = HOLLOWFELL["at"]
+	var open: Vector2i = HOLLOWFELL["open"]
+	map.set_cell(at, "link")
+	config["links"].append({"at": [at.x, at.y], "to_map": HOLLOWFELL["to_map"], "to_spawn": "from_hills"})
+	var arrival := at + open * 2
+	config["spawn_points"]["from_" + str(HOLLOWFELL["to_map"])] = [arrival.x, arrival.y]
+	var middle := at + open
+	config["places"][HOLLOWFELL["place"]] = {"at": [middle.x, middle.y], "kind": "workings", "radius": 3,
+		"name": HOLLOWFELL["name"], "holder": HOLLOWFELL["holder"]}
 
 
 ## The rest camps (777): each a building {kind camp, size small} on its pad,
