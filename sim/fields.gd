@@ -271,7 +271,7 @@ func take_touched(world: Node) -> Dictionary:
 func heat_at(world: Node, cell: Vector2i) -> float:
 	_refresh(world)
 	var heat: float = _heat.get(cell, 0.0)
-	for entity: GridEntity in world.get_entities():
+	for entity: GridEntity in world.entities():
 		if entity.emit_heat > 0.0 and entity.spawned:
 			heat += _reaching(world, entity.tile, cell, CARRIED_REACH, entity.emit_heat, true)
 	return heat
@@ -309,7 +309,7 @@ func hot_set(world: Node, threshold: float) -> Dictionary:
 
 ## Whether anything in [param world] carries heat now (see heat_at).
 func any_carried_heat(world: Node) -> bool:
-	for entity: GridEntity in world.get_entities():
+	for entity: GridEntity in world.entities():
 		if entity.emit_heat > 0.0 and entity.spawned:
 			return true
 	return false
@@ -325,7 +325,7 @@ func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> floa
 	var light: float = ambient_at(cell) if sky else (0.0 if open_sky(cell) else ambient)
 	light += _light.get(cell, 0.0)
 	if carried:
-		for entity: GridEntity in world.get_entities():
+		for entity: GridEntity in world.entities():
 			if entity.emit_light > 0.0 and entity.spawned:
 				light += _reaching(world, entity.tile, cell, carried_reach(damp), entity.emit_light, false)
 	return minf(light, 1.0)

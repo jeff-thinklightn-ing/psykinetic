@@ -1058,6 +1058,13 @@ fire does. The fixed sources are worked out on a change, the carried ones
 at each look: cheap, and never stale. Monsters' sight and nerve are left
 for later.
 
+123 amended: the carried sources are read in place (2026-11-04; perf's castle 256 profile, release's
+label). Fields.heat_at, Fields.any_carried_heat and Fields.light_at (with carried lights) looked
+for carriers in world.get_entities(), a copy of every entity in the zone (about 2600 on the castle
+bench) made at each call, and light_at runs at every Senses look. They now read world.entities(),
+the same list uncopied: they only read it and nothing spawns or despawns inside the loop, so every
+answer is as before. Protocol unchanged, no new class_name, no bullet.
+
 ## 124. Directions are compass points, worked out by the server
 
 Her bearing as she faces meant nothing to Jeff, who cannot see her
