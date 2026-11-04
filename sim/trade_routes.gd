@@ -66,6 +66,9 @@ var _routes: Dictionary[String, Dictionary] = {}
 var _routes_made := false
 ## Caravan id -> {legs, steps, exposed}: its way, made again when wanted.
 var _ways: Dictionary[String, Dictionary] = {}
+## Caravan id -> {walked, legs, at}: position()'s last answer, kept while it
+## stands on the same way.
+var _positions: Dictionary[String, Dictionary] = {}
 
 
 func _init(map: WorldMap, with_holdings: Holdings, with_towns: Towns, saved := {}, with_rules := {}) -> void:
@@ -143,6 +146,7 @@ func _dirty() -> void:
 	_routes.clear()
 	_routes_made = false
 	_ways.clear()
+	_positions.clear()
 
 
 func _on_place_taken(_id: String, _from: String, _to: String) -> void:
@@ -317,8 +321,16 @@ func position(id: String) -> Dictionary:
 	if way.is_empty():
 		return {}
 	var walked := float(caravans[id]["walked"])
+	# Kept while the caravan hasn't moved on the same way (perf's soak: shown()
+	# walked every caravan down the distance fields once per peer, every
+	# CAMP_CHECK, 12-15 ms with a caravan out).
+	var kept: Dictionary = _positions.get(id, {})
+	if not kept.is_empty() and float(kept["walked"]) == walked and is_same(kept["legs"], way["legs"]):
+		return (kept["at"] as Dictionary).duplicate()
 	var here := routes_now().along(way["legs"], walked)
-	return {"area": here["area"], "cell": here["cell"], "fraction": clampf(walked / maxf(float(way["steps"]), 1.0), 0.0, 1.0)}
+	var at := {"area": here["area"], "cell": here["cell"], "fraction": clampf(walked / maxf(float(way["steps"]), 1.0), 0.0, 1.0)}
+	_positions[id] = {"walked": walked, "legs": way["legs"], "at": at}
+	return at.duplicate()
 
 
 ## The days (game days, a float) until caravan [param id] reaches the end
@@ -425,6 +437,7 @@ func _lose(id: String, why: String, camp_id: String) -> void:
 func _end(id: String) -> void:
 	caravans.erase(id)
 	_ways.erase(id)
+	_positions.erase(id)
 
 
 ## What the world map shows of the routes touching [param areas] (a
@@ -457,6 +470,7 @@ func to_dict() -> Dictionary:
 func from_dict(saved: Dictionary) -> void:
 	caravans.clear()
 	_ways.clear()
+	_positions.clear()
 	var listed: Variant = saved.get("caravans", {})
 	if listed is Dictionary:
 		for id: String in listed:

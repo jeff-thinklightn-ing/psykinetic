@@ -7425,6 +7425,15 @@ trade's. For npc's resident cards: the record keeps "card" ({} at first,
 Production.set_card, saved as it is; a companion's stays {}), and npc hears
 of what happens to a resident by Towns.rescued(town, who, by) and
 Production.loan_changed(worker, owed, working_off), beside Towns.raided.
+
+353 amended (4): a meal prices only the shop's food (release's label; perf's town soak). Economy._eat
+took goods(town), which priced (item_price, fence_markup) and sorted every uid in the town's shop, then
+kept the food: once a resident's meal, so residents x shop size, growing as unsold goods filled the shop
+(perf, 3 players, 2 days: "meet meal" 15.5 ms of a 22.1 ms daily tick; 48.2 ms on day 2 of an earlier
+soak; the box's daily spike 180-306 ms). It now walks the shop's uids, keeps those whose catalog tags
+hold the meal's tags and prices only them; the pick (cheapest, then lowest uid) and keep_in_shop are as
+before. goods() stays the counter's. Server only, protocol unchanged.
+
 ## 354. The town's bank: loans to residents, rent 1 a day
 
 Jeff (2026-10-15), shown the official-jobs model of decision 353 beside a
@@ -15143,6 +15152,14 @@ sat at his loan cap from day 7 to 17, unable to buy hides, and the inn
 (leather 5) waited; at 8 he keeps 1.4 for the work. larder_test checks
 it from the value table. Other made raws already pay (the weaver's bolt:
 wool 2 at 2 for cloth 3 at 3).
+
+504 amended (2): a caravan's place kept while it stands (release's label; perf's town soak).
+WorldNews.update asks TradeRoutes.shown once per peer each CAMP_CHECK, and shown walked every caravan
+through position(), WorldRoutes.along down the distance fields: 11.7-14.7 ms a check with a caravan
+out. position(id) now keeps its answer (TradeRoutes._positions) while the caravan's walked and its way's
+legs are the same, cleared with the ways (_dirty, _end, from_dict); a copy is returned. shown() is
+unchanged. Making the routes when routes_in() first holds, not at the first message (56 ms once a
+start), waits for a soak that shows it at a join. Server only, protocol unchanged.
 
 ## 505. Streams with fords and bridges
 

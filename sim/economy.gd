@@ -967,8 +967,13 @@ func _eat(id: String, rule: Dictionary, cat: Dictionary) -> void:
 	# meal and their loans only grew; decision 354 amended).
 	var store_has := stores.any(func(each: Variant) -> bool: return not str(each).is_empty() and stockpile.has(town, str(each)))
 	var tags: Array = rule["tags"]
-	var food := goods(town).filter(func(each: Dictionary) -> bool:
-		return cat.get(each["id"], {}).get("tags", []).any(func(tag: Variant) -> bool: return tag in tags))
+	# Only the shop's food priced (perf's soak: goods() priced and sorted the
+	# whole shop once a meal, residents x shop size, 15 ms of a 22 ms tick).
+	var food: Array[Dictionary] = []
+	for uid in stockpile.shop(town):
+		var each_id := stockpile.book.id_of(uid)
+		if cat.get(each_id, {}).get("tags", []).any(func(tag: Variant) -> bool: return tag in tags):
+			food.append({"uid": uid, "id": each_id, "price": item_price(town, uid, cat)})
 	if food.size() > int(rules.get("folk", {}).get("keep_in_shop", 0)):
 		food.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
 			return a["price"] < b["price"] or a["price"] == b["price"] and a["uid"] < b["uid"])
