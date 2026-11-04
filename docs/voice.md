@@ -93,6 +93,13 @@ itself: no subtitle under a heading, no "X: what it means" line, no legend for w
 to see. Labels and names carry it. A heading "Charitance" stands alone, without "what you
 give and to whom" under it. This holds for all four kinds above, system text included.
 
+**Say the gain, not the cost** (Jeff, 2026-11-03: "try to make everything seem like less of a
+penalty and more of a bonus for those that choose to use it ... not just to items, but to
+stats, classes, etc."). A line about gear, a lean, the webs or focus says what someone gains by
+the choice, never what they lose or lack without it. "Heavy armour: slower" becomes what the
+armour gives; a lean is named for what it opens, not what it shuts. Where a choice has a cost,
+the number or the drawing shows it; the words stay on the gain.
+
 ## 3. Fixed speakers
 
 ### Knights of Theus: the fallen knight
