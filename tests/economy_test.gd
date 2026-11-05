@@ -739,6 +739,23 @@ func _test_person_takes(host: Player) -> void:
 		"the keeper takes the sword as a gift, not the starter dagger, not the carpenter's wood (%s)" % [keeper.map(func(row: Dictionary) -> String: return row["what"])])
 	var no_smith := not World.production.worker_ids(STORE).any(func(id: String) -> bool: return "smith" in World.production.worker(id)["trades"])
 	_check(not no_smith or _main.receiver_for(STORE, "ore") == Offers.VENDOR + STORE, "ore with no smith in town: the keeper takes it")
+
+	# The give (802 amended (2)): the wood to Cora, banked, thanked by name with "worker"; the sword
+	# to her refused (not hers to take); then the sword to the keeper.
+	var wood_uid := int(wood[0]["uid"]) if not wood.is_empty() else 0
+	var sword_uid := int(keeper.filter(func(row: Dictionary) -> bool: return row["what"] == "sword")[0]["uid"])
+	var stock := World.stockpile.count(STORE, "wood")
+	var bundles := World.count_of(host, "wood_bundle")
+	var given: Array = _main.give_to(host, carp, "Cora", [wood_uid, sword_uid])
+	var thanks: Dictionary = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me and each["data"]["track"] == "item").back()["data"]
+	_check(given.size() == bundles and World.count_of(host, "wood_bundle") == 0 and World.stockpile.count(STORE, "wood") == stock + 5 * bundles
+		and World.count_of(host, "sword") >= 1, "the whole stack of wood given and banked, the sword kept (%d given)" % given.size())
+	_check(str(thanks.get("words", "")).begins_with("Cora takes ") and thanks.get("worker") == carp,
+		"thanked by name, the reward naming her (%s)" % [thanks])
+	var gift: Array = _main.give_to(host, Offers.VENDOR + STORE, "Rolf", [sword_uid])
+	_check(gift.size() == 1 and _main.rewards_given.back()["data"].get("worker") == Offers.VENDOR + STORE
+		and str(_main.rewards_given.back()["data"]["words"]).begins_with("Rolf takes"), "the sword to the keeper, a gift (%s)" % [_main.rewards_given.back()["data"]])
+	_check(_main.give_to(host, carp, "Cora", [sword_uid]).is_empty(), "a thing no longer theirs: nothing given")
 	World.economy.rules["vendor"] = vendor
 
 

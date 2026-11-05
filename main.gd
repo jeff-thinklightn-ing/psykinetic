@@ -7345,6 +7345,7 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 		"fence": World.fence_state(shop) if maker.is_empty() else ""}
 	data["pack"] = _pack_rows(player)  # A stack's every unit (decision 619): the barter gives that many of its uids.
 	if not maker.is_empty() and World.economy != null:
+		data["takes"] = person_takes(player, maker)  # 802 amended (2): what the maker would take, for the Give tab.
 		data["goods"] = World.economy.maker_goods(maker)
 		data["buys"] = World.economy.maker_buys(maker, Array(player.slots))
 		var hut := _care_hut_of(maker)
@@ -11048,6 +11049,9 @@ func _send_offers(body: Resident, player_id: String, peer: int) -> void:
 	if body == null or not is_instance_valid(body) or player_id.is_empty() or peer < 0 or not body.player_id.is_empty() or body.sleeping():
 		return
 	var data := {"entity": String(body.get_path()), "speaker": body.person, "offers": Offers.of(body.worker_id, player_id)}
+	var taker := _player_of_id(player_id)
+	if taker != null and not _worker_town(body.worker_id).is_empty():
+		data["takes"] = person_takes(taker, body.worker_id)  # What they'd take of the pack (802 amended (2), the Give tab).
 	var standing := _standing_for(player_id, body.worker_id)
 	if not standing.is_empty():
 		data["standing"] = {"id": standing["id"], "title": standing["title"]}  # PROTOCOL_REVISION 23 (decision 536).
@@ -12840,6 +12844,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		ask_town_sheet(entity as Player, args)
 	elif command_name == "contribute" and entity is Player:
 		contribute(entity as Player, args)
+	elif command_name == "give" and entity is Player:
+		give(entity as Player, args)
 	elif command_name == "stance" and entity is Player:
 		var stance := str(args.get("kind", ""))
 		var toward := _point_direction(entity, args)
@@ -14305,6 +14311,60 @@ func contribute(player: Player, args: Dictionary) -> Dictionary:
 	return sheet
 
 
+## Server: the "give" command (802 amended (2), the townsperson window's
+## Give tab; Jeff: a hand-in goes to a person, not a chest) {entity (the
+## body's path, as "offers" names it), uids (the takes rows' uids)}: each
+## stack [param player] holds that the body's person takes (person_takes)
+## banked in their town as the depot banks it (World.donate: raws paid or
+## owed, gear a gift), within hearing; thanked once, by name, the reward
+## carrying "worker"; then the person's "offers" again with the new takes,
+## and with "barter": true (a maker's window open) their "barter" too.
+## The uids given.
+func give(player: Player, args: Dictionary) -> Array:
+	var body := get_node_or_null(NodePath(str(args.get("entity", "")))) as Resident
+	if body == null or not body.spawned or World.distance(body.tile, player.tile) > HEARING_RANGE:
+		return []
+	var given := give_to(player, body.worker_id, body.person, args.get("uids", []))
+	_send_offers(body, player.player_id, player.owner_peer)
+	if bool(args.get("barter", false)) and not body.worker_id.begins_with(Offers.VENDOR):
+		_send_barter(player, body, "", body.worker_id)  # A maker's window (ui): its pack list fresh for Sell.
+	return given
+
+
+## [param player] gives [param worker] (named [param who]) the stacks
+## [param uids] of theirs that the worker takes (person_takes), banked in
+## the worker's town and thanked once (give, without a body: tests). The
+## unit uids banked.
+func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
+	var town := _worker_town(worker)
+	var given: Array = []
+	if town.is_empty() or World.items == null:
+		return given
+	var takes := {}
+	for row: Dictionary in person_takes(player, worker):
+		takes[int(row["uid"])] = true
+	_giving_to = worker
+	_giving_name = who
+	for raw: Variant in uids:
+		var uid := int(raw)
+		if not takes.has(uid):
+			continue
+		var units: Array = [uid] + Array(World.items.stack_of(uid))
+		for unit: int in units:
+			if World.donate(player, unit, town):
+				given.append(unit)
+	_thank_hand_ins()
+	_giving_to = ""
+	_giving_name = ""
+	return given
+
+
+## Whom the hand-in being banked is given to (give): a worker key and their
+## name, "" at a chest or the town window.
+var _giving_to := ""
+var _giving_name := ""
+
+
 # --- Rewards shown (804, economy's side) ---------------------------------------
 
 ## The hand-ins not yet thanked: {player_id: {place: {raws {what: count},
@@ -14530,6 +14590,9 @@ func _on_handed_in(place: String, player_id: String, what: String, count: int, r
 	it["paid"] = int(it["paid"]) + paid
 	it["owed"] = int(it["owed"]) + owed
 	it["depot"] = bool(it["depot"]) or depot
+	if not _giving_to.is_empty():
+		it["worker"] = _giving_to  # Given to a person (802 amended (2)): their key and name.
+		it["by"] = _giving_name
 
 
 ## Thanks every hand-in not yet thanked: one town regard rise for what the
@@ -14582,9 +14645,12 @@ func _thank_hand_ins() -> void:
 				World.towns.regard_move(place, player_id, int(rules.get("use", 0)), Towns.REGARD_USE % _and_words(use_words))
 			var given: Dictionary = (it["raws"] as Dictionary).merged(it["gear"])
 			# Gains floats a hand-in by its "counted" ("+10 ore"; ui's side), "of" the town.
+			var taker := str(it.get("by", "")) if it.has("worker") else "The %s" % ("depot" if bool(it["depot"]) else "store")
 			var data := {"track": "item", "of": _town_display(place), "amount": _total_count(it),
-				"words": "The %s takes %s" % ["depot" if bool(it["depot"]) else "store", _and_words(parts)],
+				"words": "%s takes %s" % [taker, _and_words(parts)],
 				"place": place, "given": given, "counted": _and_words(parts)}  # For npc's spoken thanks: where, {id: count}, and the counted words.
+			if it.has("worker"):
+				data["worker"] = it["worker"]  # Whose thanks (npc's): a resident's id, or "vendor:" + town.
 			if int(it["paid"]) > 0:
 				data["gold"] = int(it["paid"])
 			if not bars.is_empty():

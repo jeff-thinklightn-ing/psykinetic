@@ -41770,6 +41770,21 @@ command naming the body as "offers" does ({entity, uids}; the server finds the w
 "vendor:" + town), the chest refused to players and the reward's "worker". economy_test
 _test_person_takes. Server only, protocol unchanged, no new class_name, no bullet.
 
+802 amended (2) (release's label; ui's asks for the wire): the give. The "offers" message (any
+resident who takes things, and the starter stall's keeper) and a maker's "barter" message carry
+"takes", Main.person_takes for that person and the player. A new command "give" {entity: the body's
+path, as "offers" names it, uids: the takes rows'} (Main.give): within hearing, the server finds the
+worker (a resident's worker id; the keeper's body is "vendor:" + town), and Main.give_to banks each
+stack that person takes, every unit, in their town as the depot banks it (World.donate: raws paid or
+owed, gear a gift); anything else is left in the pack. The hand-in is thanked once as before, now in
+the person's name ("Cora takes 10 wood", not "The store takes"), and the item reward carries
+"worker" (npc's spoken thanks key on it); then "offers" is sent again with the new takes, and with
+"barter": true (ui: a maker's window open, whose Sell reads the barter's pack list) the barter too. Chests
+are still open to players; refusing them with voice's pointer is the next step. economy_test
+_test_person_takes (give_to: the stack banked, thanked by name, gear refused to the carpenter and
+given to the keeper). PROTOCOL_REVISION 50 (shared with items' fishing). Server and client (the
+messages), no new class_name.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

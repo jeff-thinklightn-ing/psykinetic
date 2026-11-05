@@ -559,7 +559,12 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## banner and Gains log (render/gains.gd). An old client lists no "reward" kind and cannot join.
 ## 49 (804, maps' side): the "world" message gains "explored" {area: [have, need]}, the
 ## places reached of each known area's (WorldNews; ui's map count); an old client ignores it.
-const PROTOCOL_REVISION := 49
+## 50 (802 amended (2)): the "offers" message and a maker's "barter" message carry "takes"
+## [{uid, slot, what, count, raw, for {kind, name}, have, need, gold, owed}] (what that person
+## would take of the pack: the townsperson window's Give tab), and a new command "give" {entity,
+## uids, barter?} hands them over (Main.give; barter: re-send a maker's barter too); the item
+## reward gains "worker". An old client shows no Give.
+const PROTOCOL_REVISION := 50
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
