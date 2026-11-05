@@ -46,6 +46,7 @@ func _lay_camp() -> void:
 	var names: Array[String] = [zone]
 	World.holdings = Holdings.new(WorldMap.build(names), Factions.read(), {})
 	_camp = "%s/camp" % zone
+	World.holdings.place_taken.connect(_main._on_place_taken)  # As Main does its own Holdings.
 	_check(World.holdings.holder(_camp) == "goblins", "a goblin camp round the imp's spawn tile (%s)" % _camp)
 
 
@@ -76,8 +77,19 @@ func _test_falls() -> void:
 	var taken: Array = []
 	World.holdings.place_taken.connect(func(id: String, from: String, to: String) -> void: taken.append([id, from, to]))
 	_kill_monsters()
+	var sent: int = _main.rewards_sent
+	var players_there: int = _main._players_in(World.zone.name).size()
 	_step(_main.CAMP_FALL_TICKS + _main.CAMP_CHECK_TICKS)
 	_check(World.holdings.holder(_camp) == Factions.NOBODY, "it falls to nobody")
+	_check(players_there > 0 and _main.rewards_sent == sent + players_there,
+		"a deed for each player in its area (804, enemy-ai's side): %d sent for %d" % [_main.rewards_sent - sent, players_there])
+	var held: String = _main.camp_cleared_name("camp", "Camp", "the Blood Rot")
+	var labelled: String = _main.camp_cleared_name("bridge_camp", "the camp by the bridge", "the Blood Rot")
+	var bare: String = _main.camp_cleared_name("low_camp", "Camp below Hollowfell", "the Blood Rot")
+	_check(held == "the Blood Rot's camp" and labelled == "the camp by the bridge" and bare == "the camp below Hollowfell",
+		"its name for the float (%s; %s; %s)" % [held, labelled, bare])
+	var banners: Array = [_main.camp_cleared_banner(held), _main.camp_cleared_banner(labelled)]
+	_check(banners == ["The Blood Rot's camp, cleared", "Camp by the bridge, cleared"], "its banner in voice's words (%s)" % [banners])
 	_check(taken == [[_camp, "goblins", Factions.NOBODY]], "place_taken fires once (%s)" % [taken])
 	var log: Array[String] = _main.party_log.last(5)
 	_check(log.any(func(line: String) -> bool: return line == "The Blood Rot's camp falls."), "the party log says so (%s)" % [log])

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Clear a camp held by the town's enemies, and everyone in the land with you gets a deed and a banner for it (804).
 - Win a fight, with your last foe down or fled, and a deed rises where it fell, marked as against many when there were three or more; bring down or drive off a great foe and it gets a banner of its own (804).
 - Towns: what you bring to a town's store gets talked about, and townsfolk tell other players who brought what that day (809).
 - Towns: whoever takes what you hand in at a town's store, the keeper or whoever stands nearest, thanks you aloud for what you brought (804).

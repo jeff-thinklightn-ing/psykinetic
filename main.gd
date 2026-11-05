@@ -15567,6 +15567,46 @@ func _on_place_taken(id: String, from: String, to: String) -> void:
 		World.towns.camp_taken(id, from, to)
 	_bond_cleared(id, from, to)
 	_favour_camp(id, from, to)
+	_reward_camp_cleared(id, from, to)
+
+
+## A camp of a side hostile to the town fallen to nobody (804, enemy-ai's
+## side): a deed for each player in its area, its banner voice's words.
+func _reward_camp_cleared(id: String, from: String, to: String) -> void:
+	var factions := World.holdings.factions if World.holdings != null else null
+	var place := World.holdings.place(id) if World.holdings != null else {}
+	if factions == null or to != Factions.NOBODY or place.get("kind") != "camp" or not factions.hostile(from, "town"):
+		return
+	var camp := camp_cleared_name(str(place.get("key", "")), str(place.get("name", "")), factions.display_name(from))
+	for player_id: String in _players_in(str(place.get("area", ""))):
+		reward(player_id, {"track": "deed", "amount": 1, "of": camp, "words": "cleared %s" % camp, "big": true,
+			"banner": camp_cleared_banner(camp), "at": place.get("cell", Vector2i.ZERO)})
+
+
+## A camp cleared, as the float names it ("+1 Deeds, the Blood Rot's camp"):
+## its map label if level.json gives it one ("the camp by the bridge"), else
+## its holder's ("the Blood Rot" -> "the Blood Rot's camp").
+static func camp_cleared_name(key: String, name: String, holder: String) -> String:
+	var label := name.strip_edges()
+	if label.is_empty() or label == key.capitalize():
+		return "%s's camp" % holder.strip_edges()
+	for article: String in ["the ", "a ", "an "]:
+		if label.to_lower().begins_with(article):
+			return label.left(1).to_lower() + label.substr(1)  # "The camp by the bridge" -> "the camp by the bridge".
+	return "the " + label.left(1).to_lower() + label.substr(1)  # Voice: only its first letter; "Camp below Hollowfell" -> "the camp below Hollowfell".
+
+
+## Voice's banner for [param camp] cleared, its article dropped as labels do:
+## "Camp by the bridge, cleared", "The Blood Rot's camp, cleared" (a name's
+## own "the" kept).
+static func camp_cleared_banner(camp: String) -> String:
+	var label := camp
+	if not label.ends_with("'s camp"):
+		for article: String in ["the ", "a ", "an "]:
+			if label.to_lower().begins_with(article):
+				label = label.substr(article.length())
+				break
+	return "%s, cleared" % (label.left(1).to_upper() + label.substr(1))
 
 
 ## A camp taken from a side hostile to the town in the area she warned her

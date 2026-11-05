@@ -41922,3 +41922,19 @@ test room's imps burning in its fire no longer held the banner. And the floats r
 Gains.FLOAT_SCALE 1.3 of the HUD's text, popping in (Gains.pop: from 0.7 to 1.25 of their size in
 0.08 s, settled in 0.14 s) as they rise. ui_test _test_gains (a burn's loss is no fight, a blow
 is; the pop). No bullet (release). Client only, protocol unchanged, no new class_name.
+## 804, enemy-ai's side: a camp cleared, a deed
+
+A camp cleared is a deed (2026-11-05, enemy-ai; agreed with ui; voice's words; release's label).
+Main._on_place_taken calls Main._reward_camp_cleared: a place of kind "camp" taken from a side
+hostile to the town by nobody (Factions.NOBODY: cleared and held, decision 429) sends Main.reward
+to each player in its area (Main._players_in): {track "deed", amount 1, big, at the camp's cell,
+of the camp, words "cleared <the camp>", banner}. The camp is Main.camp_cleared_name(key, name,
+holder): its name if level.json gives it one of its own (not its key capitalized, the default),
+"the camp by the bridge" (a label without an article gets "the" and only its first letter lowered,
+voice's rule: "Camp below Hollowfell" -> "the camp below Hollowfell"), else its holder's, "the
+Blood Rot's camp", so ui's float reads "+1 Deeds, the Blood Rot's camp". The banner is
+Main.camp_cleared_banner(camp), its article dropped as labels do: "Camp by the bridge, cleared",
+"The Blood Rot's camp, cleared"; a camp cleared again reads the same. Only a gain, as 804 wants: a
+camp retaken by its side tells nobody anything. camp_fall_test _test_falls (a deed sent to the
+player there; the name and banner forms), and Main connects to the test's own Holdings as it does
+to its own. Server only (ui's "reward" message), protocol unchanged, no new class_name.
