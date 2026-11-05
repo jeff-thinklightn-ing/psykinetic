@@ -2621,6 +2621,48 @@
 			"uses": "reeds terrain scatters along water's edge (terrain part 5), drawn by MultiMesh; terrain's procedural stand-in while empty",
 			"scatter": {"scale": [0.7, 1.3], "yaw": "free", "tilt_max": 6, "sink": 0.03, "footprint_r": 0.2, "blocks": false}
 		},
+		"prop.bones": {
+			"category": "props",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [0.85, 0.12, 0.85],
+			"tolerance": 0.4,
+			"variants": 3,
+			"budget": 1100,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-04", "notes": "C:/dev/review/lair_props/make_lair.py bones1..3: big beasts' bones strewn on the floor, row 3's tans, the skulls paler: long bones with waisted shafts and two-lobed knuckles, gnawed ends dark and splintered, chips and splinters about; 1 four long bones (724 tris), 2 two long bones, four ribs and a skull (688), 3 a heap: a deer's skull with antler stubs, a smaller skull, a broken jaw, three long bones, ribs (1032)"},
+			"uses": "a scatter of gnawed bones on a floor cell (the coordinator: the bear's cave and the forest lairs; terrain places it; sound reads \"bones\" for flies): any facing, not solid; variants differ in height (6 to 17 cm), so the slot's tolerance is wide",
+			"grey": [
+				{"at": [0, 0.06, 0], "size": [0.85, 0.12, 0.85]}
+			]
+		},
+		"tree.clawed": {
+			"category": "trees",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.2, 3.2, 1.2],
+			"tolerance": 0.35,
+			"variants": 2,
+			"budget": 1200,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-04", "notes": "C:/dev/review/lair_props/make_lair.py clawed1, clawed2: a trunk raked by a great bear's claws at a standing bear's reach (1.3 to 2.1 m): two or three rakes of four dark gouges with torn pale lips, the bark stripped round each to pale wood (row 3), shreds of bark hanging below; bark on row 2 in bands, a root flare; 1 a living tree, three limbs and a small crown of clumps on row 4 paler where they face up (1.6 x 3.45, 1110 tris), 2 a snag broken off at about 2.7 m, splintered pale at the top, two stub limbs, three rakes (0.85 x 2.86, 808 tris)"},
+			"uses": "a bear-clawed tree, hills and forest decor (the coordinator: by the bear's cave and the forest lairs): 1 living, 2 a snag; any facing, solid as a tree",
+			"grey": [
+				{"at": [0, 1.4, 0], "size": [0.4, 2.8, 0.4]},
+				{"at": [0, 2.7, 0], "size": [1.2, 1.0, 1.2]}
+			]
+		},
+		"rock.split": {
+			"category": "rocks",
+			"type": "mesh",
+			"kind": "cell",
+			"size": [1.7, 0.85, 1.2],
+			"budget": 300,
+			"source": {"by": "art-kit, by hand", "tool": "blender", "license": "own", "date": "2026-11-04", "notes": "C:/dev/review/lair_props/make_lair.py split: one squat flat-bottomed boulder, a convex hull of a few points so its facets are angular like the cliffs', cut by one plane across its length (turned 22 degrees toward +z); each half the hull of its side and the cut, tipped apart about its foot so the gap opens from about 7 cm upward and the flat split faces, the palest grey, catch the light; the hills' greys (row 1, as 778's stones), darker below, lichen on the crown, moss at the foot; 114 tris"},
+			"uses": "a boulder split in two, about 1.6 m, for the hills (the coordinator; the traveller's note points to it): its split runs across x, the faces toward +z (the road) and -z; solid",
+			"grey": [
+				{"at": [-0.4625, 0.425, 0], "size": [0.775, 0.85, 1.2]},
+				{"at": [0.4625, 0.425, 0], "size": [0.775, 0.85, 1.2]}
+			]
+		},
 		"rock.large": {
 			"category": "rocks",
 			"type": "mesh",
