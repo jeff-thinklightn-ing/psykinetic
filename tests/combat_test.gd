@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_flank_party()
 	_test_fight_won()
 	_test_tell_truth()
+	_test_hurt_line()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1521,6 +1522,33 @@ func _test_tell_truth() -> void:
 		var struck: Array = bear.call("_bodies", cells)
 		_check((host in struck) == bool(each[3]), "%s (cell %s, centre %s, ends %s)" % [each[4], host.tile, host.free_pos, World.free_projected(host)])
 		World.free_drop(host)
+
+
+func _test_hurt_line() -> void:
+	print("\n== a hurt line for every blow on a player, fire gathered (544 amended (2)) ==")
+	var e := _build(["#######", "#.P.m.#", "#...m.#", "#######"])
+	var host: Player = e["P"][0]
+	var sneak: GridEntity = e["m"][0]
+	var other: GridEntity = e["m"][1]
+	var before := World.logged
+	World.damage(host, 2, sneak, &"attack")
+	_check(World.logged == before + 1 and World.last_log.begins_with("hurt: %s loses 2 to %s (attack" % [host.name, sneak.name]) \
+			and World.last_log.ends_with("hp %d/%d" % [host.hp, host.max_hp]), "a blow on a player: one hurt line (%s)" % World.last_log)
+	before = World.logged
+	World.damage(other, 1, sneak, &"attack")
+	_check(World.logged == before, "a blow among monsters: no line")
+	before = World.logged
+	World.damage(host, 1, null, &"fire")
+	World.tick += 1
+	World.damage(host, 1, null, &"fire")
+	_check(World.logged == before, "fire gathered, not told a tick at a time")
+	World.tick += World.HURT_FOLD_TICKS
+	World.call("_flush_hurts")
+	_check(World.logged == before + 1 and World.last_log.begins_with("hurt: %s loses 2 to fire over 0.2 s" % host.name), \
+			"a second's fire told as one line (%s)" % World.last_log)
+	World.lay_downed(host, 10, sneak, &"attack")
+	_check(World.last_log.ends_with("(by %s, attack)" % sneak.name), "the downed line names what laid it there (%s)" % World.last_log)
+	World.call("_tend_downed")
 
 
 func _test_spin() -> void:

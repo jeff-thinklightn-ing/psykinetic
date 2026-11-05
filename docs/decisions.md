@@ -18168,6 +18168,25 @@ and the return follows. A downed body in fire takes no harm, as before; it
 is not moved off the cell. combat_test _test_downed_fire. Sim only,
 protocol unchanged, no new class_name; CHANGELOG (voice's words).
 
+544 amended (2): a downing never comes unexplained (2026-11-05, combat;
+release's label; playtest's Hollowfell tour, Player1 downed mining at
+(19, 29) with no line naming a blow; enemy-ai's shape). World wrote no line
+for a blow that landed: only a wind-up's ("windup: ... strikes") and a
+dropped hit's, and begin_wind_up writes none for an attacker whose wind-up
+is 0, as the test sneak's. World.damage now calls _log_hurt for a player or
+companion (_logs_for(target)): a blow, a shot or an impact is told as it
+lands, "hurt: Player1 loses 3 to Sneak1 (attack, dagger), hp 4/12"; fire
+and bleeding are gathered per body and cause over HURT_FOLD_TICKS (10, a
+second) into one line, "hurt: Player1 loses 7 to fire over 1.0 s, hp
+5/12", so a body in a fire is not a line a tick in the box's journal
+(release's ask); they are told each tick once due (_flush_hurts, before the
+hazards), and at once before a downed line. The bleed of the downed
+(&"bled") is not told; nor is any blow among monsters. lay_downed takes
+the source and cause, and its line names them: "downed: Player1 lies downed
+for 100 ticks (by Sneak1, attack)". Names are entities' (Player1), as in
+the wind-up lines. combat_test _test_hurt_line. Server only, protocol
+unchanged, no new class_name, no bullet.
+
 ## 548. The draugr (the crypt's monsters, step 3)
 
 Jeff's crypt.md: "give gold to the draugr and he offers a deal: beat him,

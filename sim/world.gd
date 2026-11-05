@@ -1340,6 +1340,7 @@ func _step_zone() -> void:
 	_resolve_hits()
 	t = part("hits", t)
 	# 3. Hazard tiles; what ails (burning, bleeding; decision 375).
+	_flush_hurts()  # 544 amended (2): a second's fire or bleeding told as one line.
 	_apply_hazards()
 	_tend_ailments()
 	t = part("hazards, ailments", t)
@@ -1862,6 +1863,7 @@ func reset() -> void:
 	for id: int in _telegraphs.keys():
 		end_telegraph(id, false)  # Decision 602: none outlives the room.
 	_fights.clear()  # Decision 740: its din goes with it.
+	_hurt_folds.clear()  # 544 amended (2): no room's fire told in the next.
 	_fight_foes.clear()
 	_fight_beaten.clear()
 	_din_made.clear()
@@ -8065,6 +8067,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	var lost := mini(amount, target.hp)
 	target.hp -= lost
 	target.hurt_tick = tick
+	_log_hurt(target, lost, source, cause)  # 544 amended (2).
 	if target.hp == 0 and target is Monster and (target as Monster).never_dies:
 		target.hp = 1  # The practice dummy (decision 673): held at 1, full again when let be.
 	if cause != &"fire":
@@ -8089,7 +8092,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	if target.hp == 0 and downed.is_valid() and cause != &"bled":
 		var ticks := int(downed.call(target, source, cause))
 		if ticks > 0:
-			lay_downed(target, ticks)
+			lay_downed(target, ticks, source, cause)
 			entity_downed.emit(target, source, ticks)
 			return
 	if target.hp == 0:
@@ -11316,7 +11319,7 @@ func is_downed(entity: GridEntity) -> bool:
 ## Lays [param target] downed for [param ticks] (decision 544): 1 hp, lying
 ## (down_until, as knocked down) and stunned as long, whatever it was doing
 ## dropped. Server only.
-func lay_downed(target: GridEntity, ticks: int) -> void:
+func lay_downed(target: GridEntity, ticks: int, by: GridEntity = null, cause: StringName = &"") -> void:
 	if not Net.is_authority() or ticks <= 0 or not _alive(target):
 		return
 	target.hp = maxi(target.hp, 1)
@@ -11337,7 +11340,11 @@ func lay_downed(target: GridEntity, ticks: int) -> void:
 	if _channels.has(target):
 		_end_channel(target, &"broken")
 	_downed[target] = true
-	_log("downed: %s lies downed for %d ticks" % [target.name, ticks])
+	_flush_hurts(target)  # What it lost told before it lies down (544 amended (2)).
+	var why := ""
+	if cause != &"":
+		why = " (by %s, %s)" % [_cause_label(by, cause), cause]
+	_log("downed: %s lies downed for %d ticks%s" % [target.name, ticks, why])
 
 
 ## [param body]'s downed window, and its lying and stun with it, longer by
@@ -12076,8 +12083,75 @@ func _logs_for(by: GridEntity) -> bool:
 ## How many lines _log has written (tests check a fight among monsters
 ## writes none).
 var logged := 0
+## The last line _log wrote (544 amended (2): tests read the hurt line).
+var last_log := ""
 
 
 func _log(message: String) -> void:
 	logged += 1
+	last_log = message
 	print("[tick %d] %s" % [tick, message])
+
+
+## How long fire or bleeding on one body is gathered into one hurt line
+## (544 amended (2): release's box journal, a line a tick otherwise).
+const HURT_FOLD_TICKS := 10
+## Fire and bleeding gathered for their hurt line: "<instance id>|<cause>" to
+## {target, cause, by, total, began, last} (544 amended (2)).
+var _hurt_folds: Dictionary = {}
+
+
+## A hurt line (544 amended (2)): what [param target], a player or a
+## companion, lost and to what, so a downing never comes unexplained
+## (playtest's Hollowfell sneak, wind-up 0, wrote nothing). A blow, a shot
+## or an impact is told as it lands; fire and bleeding are gathered over
+## HURT_FOLD_TICKS into one line. The downed bleeding out (&"bled") is
+## the downed line's business, not this.
+func _log_hurt(target: GridEntity, lost: int, source: GridEntity, cause: StringName) -> void:
+	if lost <= 0 or cause == &"bled" or not _logs_for(target):
+		return
+	if cause == &"fire" or cause == &"bleed":
+		var key := "%d|%s" % [target.get_instance_id(), cause]
+		if not _hurt_folds.has(key):
+			_hurt_folds[key] = {"target": target, "cause": cause, "by": "", "total": 0, "began": tick, "last": tick}
+		var fold: Dictionary = _hurt_folds[key]
+		fold["total"] = int(fold["total"]) + lost
+		fold["last"] = tick
+		if is_instance_valid(source):
+			fold["by"] = source.name
+		if target.hp == 0:
+			_flush_hurts(target)
+		return
+	var with := ""
+	if is_instance_valid(source) and wielded(source) != "":
+		with = ", " + wielded(source)
+	_log("hurt: %s loses %d to %s (%s%s), hp %d/%d" % [target.name, lost, _cause_label(source, cause), cause, with, target.hp, target.max_hp])
+
+
+## Who or what a hurt or downed line names as the cause: the source's
+## name, else the cause itself ("fire").
+func _cause_label(source: GridEntity, cause: StringName) -> String:
+	return source.name if is_instance_valid(source) else str(cause)
+
+
+## The gathered fire and bleeding (544 amended (2)) told: those due
+## (HURT_FOLD_TICKS since they began), or all of [param only]'s at once
+## (it went down or died).
+func _flush_hurts(only: GridEntity = null) -> void:
+	if _hurt_folds.is_empty():
+		return
+	for key: String in _hurt_folds.keys():
+		var fold: Dictionary = _hurt_folds[key]
+		var target: Variant = fold["target"]
+		var gone := not is_instance_valid(target)
+		if not gone and only != null and target != only:
+			continue
+		if not gone and only == null and tick - int(fold["began"]) < HURT_FOLD_TICKS:
+			continue
+		_hurt_folds.erase(key)
+		if gone:
+			continue
+		var body := target as GridEntity
+		var what: String = fold["by"] if str(fold["by"]) != "" else str(fold["cause"])
+		var span := float(int(fold["last"]) - int(fold["began"]) + 1) / float(TICK_RATE)
+		_log("hurt: %s loses %d to %s over %.1f s, hp %d/%d" % [body.name, int(fold["total"]), what, span, body.hp, body.max_hp])

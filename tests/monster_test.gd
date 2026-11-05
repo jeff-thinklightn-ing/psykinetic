@@ -765,9 +765,10 @@ func _test_monsters_write_no_log() -> void:
 	World.try_toggle_door(e["i"][0], Vector3i(1, 1, Terrain.EAST))
 	World._set_door(door, true, e["i"][0])
 	var hits := _damage_log.filter(func(d: Dictionary) -> bool: return d["entity"] == player).size()
-	_check(hits > 0 and World.logged == before, "%d blows landed, a door opened, %d log lines" % [hits, World.logged - before])
+	# Each blow on the player is one hurt line (544 amended (2)); nothing else.
+	_check(hits > 0 and World.logged == before + hits, "%d blows landed on the player, a door opened, %d log lines (one hurt line a blow)" % [hits, World.logged - before])
 	World._set_door(door, false, player)
-	_check(World.logged == before + 1, "a player shutting it is logged")
+	_check(World.logged == before + hits + 1, "a player shutting it is logged")
 
 
 func _test_world_tick() -> void:
