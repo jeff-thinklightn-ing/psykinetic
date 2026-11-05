@@ -34224,6 +34224,20 @@ again), and _test_guide_free led past the spreading fire with neither in it
 (0 ticks); both modes. resident_test and path_bound_test pass. Server only,
 protocol unchanged, no new class_name.
 
+707 amended: a click's route ends clear of fire too (ui's; playtest, 2026-11-04, routed by the
+coordinator; release's label). A left click on a burning cell (Umbrage's square fire) walked the
+player into it: the click's route (Main._free_route, World.walk_path) already went round fire
+(PATH_FIRE_EXTRA, and _line_clear never straightens across a burning cell), but the fire itself
+was the route's end. Main.clear_of_fire now gives a burning end over to the walkable, unburning
+cell nearest the walker in the nearest ring round it (out to FIRE_CLEAR_REACH, 3), as a click on
+a wall ends beside it; with none, the walker stays. A cell not burning is kept as clicked. The
+cell a walk to talk or to open ends on (Main._beside) is never a burning one either: a person
+beside a fire is talked to from the cool side (controls_test's resident by the test room's fire,
+whose beside cell burned and whose walk clear_of_fire then cut short). Tests:
+ui_test _test_fire_click (the cell short of the fire from the north and beside it from the west,
+never a wall nor the fire, a cell not burning kept, fire all round: stay). CHANGELOG bullet
+(voice's words). Client only, protocol unchanged, no new class_name.
+
 ## 703, step 3 (companions). Heel and Guide read a free leader only
 
 6b (703): a player walks free. Heel and Guide drop their grid branch for a

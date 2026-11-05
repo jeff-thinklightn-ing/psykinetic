@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_practice_bars()
 	_test_gains()
 	_test_seam_click()
+	_test_fire_click()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2559,3 +2560,26 @@ func _test_seam_click() -> void:
 	player.action_target = null
 	player.slots = slots_was
 	World.despawn(seam)
+
+
+func _test_fire_click() -> void:
+	print("
+== a click on a fire ends beside it, never in it (playtest: Umbrage's square fire) ==")
+	# A fire of three cells in a row at (10..12, 10), a wall at (9, 9).
+	var fire := [Vector2i(10, 10), Vector2i(11, 10), Vector2i(12, 10)]
+	var burning := func(cell: Vector2i) -> bool: return cell in fire
+	var walkable := func(cell: Vector2i) -> bool: return cell != Vector2i(9, 9)
+	var none := func(_cell: Vector2i) -> bool: return false
+	var from := Vector2i(11, 4)
+	var end: Vector2i = Main.clear_of_fire(Vector2i(11, 10), from, burning, walkable)
+	_check(end == Vector2i(11, 9), "from the north, the middle of the fire: the cell just short of it (%s)" % end)
+	end = Main.clear_of_fire(Vector2i(10, 10), Vector2i(4, 10), burning, walkable)
+	_check(end == Vector2i(9, 10), "from the west, its west end: beside it on the west (%s)" % end)
+	end = Main.clear_of_fire(Vector2i(10, 10), Vector2i(4, 4), burning, walkable)
+	_check(end != Vector2i(9, 9) and not end in fire and maxi(absi(end.x - 10), absi(end.y - 10)) == 1,
+		"the nearest open cell beside it, never a wall nor the fire (%s)" % end)
+	_check(Main.clear_of_fire(Vector2i(5, 5), from, burning, walkable) == Vector2i(5, 5)
+		and Main.clear_of_fire(Main.NONE, from, burning, walkable) == Main.NONE
+		and Main.clear_of_fire(Vector2i(11, 10), from, none, walkable) == Vector2i(11, 10), "a cell not burning is kept as clicked")
+	var all := func(_cell: Vector2i) -> bool: return true
+	_check(Main.clear_of_fire(Vector2i(11, 10), from, all, walkable) == from, "fire all round: you stay where you are")

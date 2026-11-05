@@ -32,6 +32,7 @@ notes (decision 324).
 - X crouches: you kneel low when still and creep when moving, quiet, to steal up on what you hunt or slip past what hunts you; press it again, or strike, guard, draw, shoot or throw, and you are up and ready (784 amended (3), (4)).
 - What you gain shows as you gain it: a +1 rising over you, a banner for the big moments, and a Gains list in the talk log; Options, Gains shown, sets how much (804).
 - With a pick in hand, click an ore seam to walk up and mine it (769 amended (11)).
+- Clicking a fire walks you up beside it, not into it (707 amended).
 
 ## v0.1.203
 

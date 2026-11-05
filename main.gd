@@ -2599,6 +2599,8 @@ var _free := {"path": [], "held": false, "at": 0, "chase": null}
 ## How long the button is held after a click before it steers to the
 ## cursor rather than walking the click's route.
 const FREE_HOLD_SECONDS := 0.25
+## How far round a burning cell a click's route looks for a cell clear of it.
+const FIRE_CLEAR_REACH := 3
 ## 724: a click route whose next step another body has stood in the way
 ## of for FREE_BLOCKED_SECONDS (of the sim's ticks) steps to its own right, if that cell is
 ## open, and plans again round the body as a wall; with its right shut it
@@ -2968,10 +2970,41 @@ func _free_route(player: Player, tile: Vector2i) -> void:
 	# A click on the cell it is on, held or drawn in (rounded: past half way
 	# into the next), stops it where it stands: a free body has no centre to
 	# finish (the latency table's click stop went on 0.4 cells into it).
+	tile = clear_of_fire(tile, from, World.is_burning, World.is_walkable)
 	if tile != NONE and tile != from and tile != Vector2i(shown.round()):
 		for cell: Vector2i in World.walk_path(from, tile, player):
 			path.append(cell)
 	_free["path"] = path
+
+
+## A click route's end clear of fire (playtest, 2026-11-04: a click on
+## Umbrage's square fire walked into it): a burning [param tile] gives way to
+## the walkable, unburning cell nearest [param from] in the nearest ring round
+## it, out to FIRE_CLEAR_REACH, as a click on a wall ends beside it; with none,
+## [param from] (stay). The route itself already goes round fire (World.walk_path:
+## PATH_FIRE_EXTRA, and _line_clear never straightens across a burning cell).
+## [param burning] and [param walkable] are World's (cell) -> bool (tests pass
+## their own).
+static func clear_of_fire(tile: Vector2i, from: Vector2i, burning: Callable, walkable: Callable) -> Vector2i:
+	if tile == NONE or not bool(burning.call(tile)):
+		return tile
+	for reach in range(1, FIRE_CLEAR_REACH + 1):
+		var best := NONE
+		var best_distance := INF
+		for dy in range(-reach, reach + 1):
+			for dx in range(-reach, reach + 1):
+				if maxi(absi(dx), absi(dy)) != reach:
+					continue
+				var cell := tile + Vector2i(dx, dy)
+				if not bool(walkable.call(cell)) or bool(burning.call(cell)):
+					continue
+				var distance := Vector2(cell).distance_squared_to(Vector2(from))
+				if distance < best_distance:
+					best_distance = distance
+					best = cell
+		if best != NONE:
+			return best
+	return from
 
 
 ## Building (the builder's mode on): the hover square shows the cell.
@@ -18311,13 +18344,14 @@ static func opens_on_click(target: GridEntity) -> bool:
 
 
 ## The free floor cell next to [param at], reachable from it for a hand
-## (World.can_melee), nearest [param from]; NONE if there is none.
+## (World.can_melee), nearest [param from], never one burning (707 amended:
+## a walk to talk or to open never ends in a fire); NONE if there is none.
 func _beside(at: Vector2i, from: Vector2i) -> Vector2i:
 	var best := NONE
 	for direction in World.DIRECTIONS:
 		var cell := at + direction
 		var mine := cell == from
-		if (mine or World.is_free(cell)) and World.can_melee(cell, at) \
+		if (mine or World.is_free(cell) and not World.is_burning(cell)) and World.can_melee(cell, at) \
 				and (best == NONE or World.distance(from, cell) < World.distance(from, best)):
 			best = cell
 	return best
