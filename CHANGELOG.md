@@ -7,9 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.204
+
+- What goes over the network changes, so v0.1.203 and older can't join the server: update through the launcher first.
 - Builder mode can now build a kind of building facing any side, add, shut, open or move a way to another level, open a gap in a cave's roof, and move a camp, a watch post, a building, a lair's den or its door with everything that belongs to it; shutting or opening a way keeps where it leads and how it looks (792).
 - Step out of the red marked on the ground before a blow lands and you are clear of it, even if you only pressed the step a moment before (810).
-
 - Items are easier to see in shops, the pack and the town window: bigger, on lighter squares, with each price under its item (765).
 - Clear a camp held by the town's enemies, and everyone in the land with you gets a deed and a banner for it (804).
 - Win a fight, with your last foe down or fled, and a deed rises where it fell, marked as against many when there were three or more; bring down or drive off a great foe and it gets a banner of its own (804).
@@ -19,7 +21,6 @@ notes (decision 324).
 - Wren speaks up on her own when all is quiet and you've said nothing for a while: about something close by, what just happened, a place new to her or what she likes, or with a question for you; she no longer fills a silence with "it's quiet" (803 amended).
 - Reach a named place out in the lands, a hill cave, the shieling, the Old Tower, and it counts toward your Wayfaring, with a banner for the greatest of them (804).
 - When you wake far from where you left her waiting, at the temple after a fall, your companion comes to your side and keeps close again, as if you had called her (616 amended (2)).
-
 - The great axe and the battle axe swing edge first, biting into what they hit instead of striking with the flat of the blade (451 amended (3)).
 - At a seam the pick swings as a miner's does, up two-handed over the shoulder and down onto the face, the body dropping into the blow and the point biting the rock in a puff of dust and grit (769 amended (9)).
 - Town guards carry spears and wear mail and fight what comes into town, calling the others to them; a guard beaten down can be helped up once it is calm and thanks you for it, and one left lying is carried to the temple and back on duty the next morning (791).
@@ -28,7 +29,6 @@ notes (decision 324).
 - Worn slots beside the armour for a hat or hood, an amulet, a cloak, boots, two rings and a charm, and double-click puts a thing on; a hood, a felt hat and soft boots are the first made to wear, not yet in the world (788).
 - Every chest and hidden cache holds something worth the opening (330 amended).
 - Chests in the crypt, the deep, the castle halls and Hollowfell hold a find for every player who opens them: a little gold and a trinket worth selling (330 amended (2)).
-
 - The land south of Umbrage, round the Old Tower, has a name of its own: Towerside (651 amended).
 - Umbrage: the town's name and music end at its edge, so the barrow mound lies out in the wilds, and the barrow post now stands where the barrow road leaves town (774 amended).
 - Foothills: the low ground west of the river has a way back up the scarp, so a fall there no longer strands you (745 amended).
@@ -36,7 +36,6 @@ notes (decision 324).
 - Towns: a town's treasury now saves toward growing, since townsfolk pay for mending, tool work and a bed from their own purses, waiting till they can, and borrow only for a meal (353 amended (5)).
 - A companion with a pick mines a seam when you dig or stop beside it, and follows at once with what she has dug when you walk on (769 amended (10)).
 - Struck down in a fire, you wait out the usual few seconds and wake at the temple, instead of lying in the flames for minutes (544 amended).
-
 - A companion keeps her own name after travelling, in chat, the party log and what she remembers, never "<name>2" (796).
 - Weapon practice: sword and bow each keep what you have learned with them, whichever you take up, and a weapon you come back to after a long rest returns to its best three times as fast. (766 amended (4))
 - Clicking a square in a store window or the town window picks it and leaves you standing where you are (765 amended).
