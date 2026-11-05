@@ -239,6 +239,11 @@ func _test_click_from_afar() -> void:
 	var route: Array = _main._free["path"]
 	_check(panel.other == null and not route.is_empty() and _main._pack_wanted == chest,
 		"not beside it: not open, a route set (to %s)" % [route.back() if not route.is_empty() else null])
+	# A frame without the body (a join or a zone change, playtest's tour) keeps the wish (779).
+	host.spawned = false
+	_main._update_pack()
+	host.spawned = true
+	_check(_main._pack_wanted == chest, "a frame without the player: still wanted on arrival")
 	if not route.is_empty():
 		Walk.to(host, route.back(), 240)  # Its free body walked there, as Main's drive would (703).
 	await get_tree().process_frame

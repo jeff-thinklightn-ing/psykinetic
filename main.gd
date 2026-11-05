@@ -18298,7 +18298,11 @@ func _update_pack() -> void:
 	var player := _local_player()
 	pack_panel.player = player
 	if player == null:
+		# A frame without the body (a join, a zone change): the open row shuts,
+		# but a chest clicked and walked to still opens on arrival (779).
+		var wanted := _pack_wanted
 		close_other()
+		_pack_wanted = wanted
 		return
 	if is_instance_valid(_pack_wanted) and World.reaches(player, _pack_wanted):
 		open_other(_pack_wanted)

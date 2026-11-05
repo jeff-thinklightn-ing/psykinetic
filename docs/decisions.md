@@ -39649,6 +39649,13 @@ coordinator's approval) that the companion card's headings be bare words: "Learn
 chest_test (_test_click_from_afar: the rule, no attack order, the walk and the opening) and
 ui_test (the card's headings). Client only, protocol unchanged, no new class_name.
 
+779 amended (ui, release's label; playtest's tour, confirmed): a left click on a chest within a
+frame or so of a join or a zone change walked beside it and never opened it (14 of 14 tour runs on
+bear_yard; a 2 s wait before the click opened it). Main._update_pack, on a frame with no local
+player, ran close_other(), which also drops _pack_wanted, the wish to open on arrival. That frame now
+shuts the open row but keeps the wish. chest_test (_test_click_from_afar: an _update_pack without the
+player keeps it). No bullet (release). Client only, protocol unchanged, no new class_name.
+
 ## 776. The hills' rivers are streams, waded anywhere
 
 Jeff, 2026-11-02 (through the coordinator): "imo the river is more like a stream and should be
