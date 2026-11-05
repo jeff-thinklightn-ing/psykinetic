@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the hills, the milestones on the road read Umbrage and Shieling, and the waystones where the tracks leave it point the way to the hut and the cave (800).
 - Three caches lie hidden out in the lands: under a floorboard at the old farmstead, in a pack by the crates at the old camp, and among the stones heaped against the cairn in the hills (807 amended).
 - Chests stand only below ground now; whatever you left in one out in the lands lies on the ground where it stood (807).
 - The forest has camps now: bandits round their fires off the paths they rob, sitting on sacks of plunder, traders camped by their carts, one trader the bandits hold captive and another selling under their eye (793, maps' side).

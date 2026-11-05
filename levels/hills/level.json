@@ -1878,6 +1878,8 @@
 				0,
 				1
 			],
+			"variant": 2,
+			"carved": "Umbrage",
 			"code": "M1"
 		},
 		{
@@ -1890,6 +1892,8 @@
 				0,
 				1
 			],
+			"variant": 2,
+			"carved": "Shieling",
 			"code": "M2"
 		},
 		{
@@ -1938,6 +1942,9 @@
 				-1,
 				0
 			],
+			"variant": 3,
+			"carved": "Hut",
+			"arrow": "left",
 			"code": "W3"
 		},
 		{
@@ -1950,6 +1957,9 @@
 				-1,
 				0
 			],
+			"variant": 3,
+			"carved": "Cave",
+			"arrow": "right",
 			"code": "W4"
 		},
 		{

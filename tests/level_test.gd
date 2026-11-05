@@ -2742,7 +2742,9 @@ func _test_relaid() -> void:
 	_test_forest_camps()
 	_test_bear_den()
 	_test_removed(wilds)
-	_test_caches(wilds, Level.load_level("hills"))
+	var hills := Level.load_level("hills")
+	_test_caches(wilds, hills)
+	_test_carved(hills)
 
 
 ## The lands' hidden caches (807 amended): the farmstead's under a
@@ -2923,6 +2925,21 @@ func _test_bear_den() -> void:
 				open.append(cell)
 	_check(floor.has(den) and shut.is_empty() and open.is_empty(),
 		"the den at %s: rock behind it on the west, none to its south (shut south: %s; gaps in the back: %s)" % [den, shut, open])
+
+
+## The hills' carved stones (800, maps' side): the two milestones read
+## "Umbrage" and "Shieling" on milestone variant 2, the two waystones "Hut"
+## (arrow left) and "Cave" (arrow right) on waystone variant 3; no other
+## stone in the hills is carved.
+func _test_carved(hills: Dictionary) -> void:
+	print("== The hills' carved stones (800) ==")
+	var want := {"Umbrage": ["building.milestone", 2, ""], "Shieling": ["building.milestone", 2, ""],
+		"Hut": ["building.waystone", 3, "left"], "Cave": ["building.waystone", 3, "right"]}
+	var carved := {}
+	for building: Dictionary in hills.get("buildings", []):
+		if building.has("carved"):
+			carved[building["carved"]] = [building["slot"], int(building.get("variant", 1)), str(building.get("arrow", ""))]
+	_check(carved == want, "the milestones and waystones carry their words, variants and arrows, and nothing else does (%s)" % [carved])
 
 
 ## Marks every Relaid.REMOVED entry done in [param done].

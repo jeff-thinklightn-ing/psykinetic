@@ -193,7 +193,10 @@ const PATCH_RADIUS := 4
 ## words: lore's facts wait on Jeff). Each {key, at: its planned cell (a
 ## building's footprint's top-left), and slot (a building) or decor (a
 ## prop.<kind> lying faced), facing: a side, or ROADWARD to face the nearest
-## path cell}. Laid on the walkable cell nearest the planned one whose
+## path cell; a building may add its "variant" and the words cut in its face,
+## "carved" and "arrow" (800: the milestones' and waystones' names, voice's
+## words, the arrow as the stone's reader sees it)}. Laid on the walkable
+## cell nearest the planned one whose
 ## footprint is grass or plain dirt, off every path by SIGHT_OFF_PATH and
 ## clear of the others; the multi-cell ones' planned ground levelled
 ## (keep_flat, _sight_pads).
@@ -202,14 +205,14 @@ const SIGHTS: Array[Dictionary] = [
 	{"key": "watchtower", "slot": "building.tower_ruin", "at": Vector2i(186, 18), "facing": Vector2i(-1, 0)},
 	{"key": "great_oak", "slot": "building.great_tree", "at": Vector2i(111, 159), "facing": Vector2i(0, -1)},
 	{"key": "standing_stone", "slot": "building.standing_stone", "at": Vector2i(199, 70), "facing": Vector2i(-1, 0)},
-	{"key": "milestone_west", "slot": "building.milestone", "at": Vector2i(43, 110), "facing": ROADWARD},
-	{"key": "milestone_east", "slot": "building.milestone", "at": Vector2i(140, 108), "facing": ROADWARD},
+	{"key": "milestone_west", "slot": "building.milestone", "at": Vector2i(43, 110), "facing": ROADWARD, "variant": 2, "carved": "Umbrage"},
+	{"key": "milestone_east", "slot": "building.milestone", "at": Vector2i(140, 108), "facing": ROADWARD, "variant": 2, "carved": "Shieling"},
 	{"key": "broken_cart", "decor": "broken_cart", "at": Vector2i(124, 115), "facing": ROADWARD},
 	{"key": "shrine", "slot": "building.wayside_shrine", "at": Vector2i(160, 102), "facing": ROADWARD},
 	{"key": "woodpile", "slot": "building.woodpile", "at": Vector2i(173, 87), "facing": ROADWARD},
 	{"key": "hunters_blind", "slot": "building.hunters_blind", "at": Vector2i(52, 156), "facing": Vector2i(1, 0)},
-	{"key": "waystone_hut", "slot": "building.waystone", "at": Vector2i(20, 110), "facing": ROADWARD},
-	{"key": "waystone_cave", "slot": "building.waystone", "at": Vector2i(51, 114), "facing": ROADWARD},
+	{"key": "waystone_hut", "slot": "building.waystone", "at": Vector2i(20, 110), "facing": ROADWARD, "variant": 3, "carved": "Hut", "arrow": "left"},
+	{"key": "waystone_cave", "slot": "building.waystone", "at": Vector2i(51, 114), "facing": ROADWARD, "variant": 3, "carved": "Cave", "arrow": "right"},
 	{"key": "dead_traveller", "decor": "fallen_guard", "at": Vector2i(45, 69), "facing": Vector2i(1, 0)},
 	{"key": "cairn", "slot": "building.cairn", "at": Vector2i(114, 81), "facing": Vector2i(0, 1),
 		"cache": {"table": "cairn_cache", "place": "the cairn", "art": "prop.cache_stones"}},
@@ -902,7 +905,12 @@ func _sights() -> void:
 					for cell in _cells_of(rect.grow(1)):
 						taken[cell] = true
 					if sight.has("slot"):
-						config["buildings"].append({"slot": sight["slot"], "at": [at.x, at.y], "facing": [facing.x, facing.y]})
+						var building := {"slot": sight["slot"], "at": [at.x, at.y], "facing": [facing.x, facing.y]}
+						# Its look and the words cut in its face (800: voice's words, art-kit's panels).
+						for key: String in ["variant", "carved", "arrow"]:
+							if sight.has(key):
+								building[key] = sight[key]
+						config["buildings"].append(building)
 					if sight.get("cold_fire", false):
 						# Its cold hearth (art-kit's prop.campfire_cold) a cell out from its open front's middle.
 						var front := rect.position + (rect.size - Vector2i.ONE) / 2 + facing * (rect.size.y / 2 + 2 if facing.y != 0 else rect.size.x / 2 + 2)

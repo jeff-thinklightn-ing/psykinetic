@@ -42468,6 +42468,17 @@ only the pads, tracks and markers change (40191 floor cells, as before); the 72 
 taken out of trees.json once (terrain's file, nothing else in it changed). No camp is a place to
 reach (804). level_test _test_forest_camps. Protocol: a "50 (793, maps' side)" line, place kinds
 "trader" and "captive" and the fields, no bump (release; an old client has no use for them); CHANGELOG bullet (voice's words); no new class_name.
+
+800 amended (maps; release's label): the hills' four stones carry their words. make_hills' SIGHTS entries
+take a building's "variant", "carved" and "arrow", copied onto the level's building
+entry: M1 milestone_west (43, 110) "Umbrage" and M2 milestone_east (140, 108) "Shieling"
+on milestone variant 2; W3 waystone_hut (22, 108) "Hut", arrow left, and W4 waystone_cave
+(52, 113) "Cave", arrow right, on waystone variant 3 (the words voice's, the arrows as
+the stone's reader sees them, art-kit's). Hills regenerated: only those four entries
+gain the fields, no cell changes. level_test _test_carved (the four words, variants and
+arrows, and no other carved stone). Level data and a tool; protocol unchanged (building
+entries reach the client in the "terrain" message, an older client draws the stones
+bare), no new class_name.
 ## 807. Chests only in dungeons
 
 Jeff: chests stand only in dungeons, guarded, holding a little gold or things to sell,
