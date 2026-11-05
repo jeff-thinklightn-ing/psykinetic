@@ -12,7 +12,9 @@ extends RefCounted
 ## A faction may also name the factions its monsters fight on sight
 ## (on_sight, only ones it is hostile to; "town" is the residents' bodies),
 ## and say it holds no places ("holds": false: no route layer, decision
-## 545), as the barrow's dead and its robbers do.
+## 545), as the barrow's dead and its robbers do. Its camps' raids may be
+## rarer or smaller than the rest (decision 793, the bandits): "raids"
+## {"send", "strength"}, each a share of WorldRaids' (1 when unsaid).
 
 const PATH := "res://levels/factions.json"
 const NOBODY := "nobody"
@@ -22,7 +24,7 @@ const CONTESTED_COLOUR := Color(0.85, 0.3, 0.3)
 
 ## Faction id -> {name, colour (Color), monsters (Array[String]),
 ## hostile_to (Array[String]), allied_to ("" for none), lore_id,
-## on_sight (Array[String]), holds (bool)}.
+## on_sight (Array[String]), holds (bool), raids (Dictionary)}.
 var all: Dictionary[String, Dictionary] = {}
 
 
@@ -49,7 +51,8 @@ static func read(path := PATH) -> Factions:
 			on_sight.append(str(other))
 		out.all[id] = {"name": str(entry.get("name", id)), "colour": Color.from_string(str(entry.get("colour", "")), NOBODY_COLOUR),
 			"monsters": monsters, "hostile_to": hostile, "allied_to": str(entry.get("allied_to", "")),
-			"lore_id": str(entry.get("lore_id", id)), "on_sight": on_sight, "holds": bool(entry.get("holds", true))}
+			"lore_id": str(entry.get("lore_id", id)), "on_sight": on_sight, "holds": bool(entry.get("holds", true)),
+			"raids": entry.get("raids", {}) if entry.get("raids", {}) is Dictionary else {}}
 	for id: String in out.all:
 		var lead: String = out.all[id]["allied_to"]
 		if lead != "" and (not out.all.has(lead) or lead == id or out.all[lead]["allied_to"] != ""):
@@ -153,6 +156,15 @@ func on_sight(id: String) -> Array[String]:
 					out.append(other)
 	out.sort()
 	return out
+
+
+## [param id]'s share of WorldRaids' [param key] ("send": how often its
+## camps send, "strength": how strong their groups are; decision 793): its
+## "raids" entry, else 1.
+func raid_share(id: String, key: String) -> float:
+	if not all.has(id):
+		return 1.0
+	return maxf(0.0, float((all[id].get("raids", {}) as Dictionary).get(key, 1.0)))
 
 
 ## Whether [param id] holds places (and so routes the world map's ways

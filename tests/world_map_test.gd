@@ -291,9 +291,9 @@ func _test_places() -> void:
 	print("places")
 	_register_place_maps()
 	var factions := Factions.read()
-	_check(factions.names() == _strings(["dead", "goblins", "kobolds", "orcs", "robbers", "town"]) and factions.of_kind("brute") == "orcs"
+	_check(factions.names() == _strings(["bandits", "dead", "goblins", "kobolds", "orcs", "robbers", "town"]) and factions.of_kind("brute") == "orcs"
 		and factions.side("orcs") == "goblins" and factions.of_kind("wolf") == "nobody",
-		"levels/factions.json: the Blood Rot (goblins), its allies the orcs and kobolds, the town, and the barrow's dead and robbers (545); brutes act for the orcs, on the Blood Rot's side (decision 416; %s)" % [factions.names()])
+		"levels/factions.json: the Blood Rot (goblins), its allies the orcs and kobolds, the town, the barrow's dead and robbers (545), and the bandits (793); brutes act for the orcs, on the Blood Rot's side (decision 416; %s)" % [factions.names()])
 	_check(factions.hostile("goblins", "town") and not factions.hostile("town", "town") and factions.has("nobody") and not factions.has("elves"),
 		"goblins and town are hostile; nobody can hold, elves cannot")
 	var names: Array[String] = ["h_land", "h_bad"]
@@ -663,7 +663,7 @@ func _test_territory_routes() -> void:
 	routes.wait()
 	_check(str(unready) == str(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4))),
 		"a route reads the same with its fields in or not (%s)" % [unready])
-	_check(routes.factions() == _strings(["goblins", "town"]) and routes.is_ready(), "a layer per side (the allies route on the Blood Rot's, decision 416), every field in (%s)" % [routes.build_ms])
+	_check(routes.factions() == _strings(["bandits", "goblins", "town"]) and routes.is_ready(), "a layer per side (the allies route on the Blood Rot's, decision 416; the bandits their own, 793), every field in (%s)" % [routes.build_ms])
 	var town := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
 	var goblins := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")
 	_check(goblins.size() == 1 and goblins[0]["steps"] == 20.0, "the goblins walk straight through their own camp: 20 steps (%s)" % [goblins])

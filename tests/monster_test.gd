@@ -84,6 +84,7 @@ func _ready() -> void:
 	_test_raid_beaten()
 	_test_great_bear()
 	_test_bear_party()
+	_test_bandit_rows()
 	_test_watch_wave()
 	_test_raid_takes()
 	_test_noticing()
@@ -1652,6 +1653,29 @@ func _test_raid_beaten() -> void:
 ## The great bear's tells at reach and its party (780 amended (8)): a free
 ## body 2 cells off in its reach gets a tell, never a plain blow; each player
 ## who joins its fight raises its hp, 3 at most; asleep, its base again.
+## Decision 793: the bandits' kinds are the grave robbers' rows under their
+## own names, drawn as people in a vest; a client without the rows (an older
+## build, a kind it has never heard of) draws such a monster plainly: no
+## person, no model, no creature, and no error.
+func _test_bandit_rows() -> void:
+	print("== the bandits' rows (793) ==")
+	var kinds := Monster.kinds()
+	for pair: Array in [["bandit", "robber"], ["bandit_brute", "robber_brute"]]:
+		var row: Dictionary = kinds.get(pair[0], {})
+		var like: Dictionary = kinds.get(pair[1], {})
+		_check(not row.is_empty() and row.get("body") == like.get("body") and row.get("tactic") == like.get("tactic")
+				and row.get("wields") == like.get("wields") and row.get("strength") == like.get("strength"),
+			"%s fights as a %s" % pair)
+		_check(str(row.get("person", "")).contains("garb=vest") and str(row.get("label", "")).contains("andit"),
+			"%s is drawn as a person in a vest and named for a bandit (%s)" % [pair[0], row.get("label", "")])
+	var unknown := Monster.new()
+	unknown.spawn_spec = {"kind": "kind_never_heard_of"}
+	_check(Client3D.person_words(unknown) == "" and Client3D.model_for(unknown).is_empty()
+			and Client3D.creature_slot_for(unknown) == "" and Monster.art_of("kind_never_heard_of") == "",
+		"a kind a client lacks is drawn plainly")
+	unknown.free()
+
+
 func _test_bear_party() -> void:
 	print("
 == the great bear: every blow told, a free body 2 off in reach too; its hp grows by who joins its fight, 3 at most ==")

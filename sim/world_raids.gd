@@ -246,16 +246,19 @@ func _send_some() -> void:
 			if threat > best_threat:
 				best = town
 				best_threat = threat
-		if best != "" and rng.randf() < send_chance(camp["id"], best_threat):
+		if best != "" and rng.randf() < send_chance(camp["id"], best_threat, camp["faction"]):
 			send(camp["id"], best)
 			busy_towns[best] = true
 
 
 ## The chance a world tick that camp [param camp_id], with no group out,
 ## sends one at a town of [param threat]: send_chance times the threat,
-## times more the hungrier the camp (hungry_send when it ate nothing).
-func send_chance(camp_id: String, threat: float) -> float:
-	return minf(1.0, threat * float(rules["send_chance"]) * hunger_factor(float(fed.call(camp_id))))
+## times more the hungrier the camp (hungry_send when it ate nothing), times
+## its holder [param faction]'s "send" share (Factions.raid_share, decision
+## 793: the bandits' camps send rarely).
+func send_chance(camp_id: String, threat: float, faction := "") -> float:
+	var share := holdings.factions.raid_share(faction, "send") if faction != "" and holdings != null and holdings.factions != null else 1.0
+	return minf(1.0, threat * float(rules["send_chance"]) * hunger_factor(float(fed.call(camp_id))) * share)
 
 
 ## How many times a camp that ate [param ate] (0..1) sends sooner: 1 at or
@@ -284,7 +287,7 @@ func send(camp_id: String, town: String) -> String:
 	var id := "raid:%s:%d" % [camp_id, int(clock.call())]
 	var want := WANT_FOOD if hungry(camp_id) else ""
 	groups[id] = {"id": id, "faction": camp["faction"], "from": camp_id, "town": town,
-		"strength": camp["size"] * float(rules["strength_per_size"]), "carries": {"items": [], "captives": []},
+		"strength": camp["size"] * float(rules["strength_per_size"]) * holdings.factions.raid_share(camp["faction"], "strength"), "carries": {"items": [], "captives": []},
 		"want": want, "state": OUT, "raided": false, "area": camp["area"], "cell": camp["cell"], "walked": 0.0, "skip_area": ""}
 	if _route(id).is_empty():
 		groups.erase(id)

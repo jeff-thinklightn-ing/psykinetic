@@ -41,5 +41,13 @@
 		"hostile_to": ["dead", "town"],
 		"on_sight": ["dead", "town"],
 		"holds": false
+	},
+	"bandits": {
+		"name": "the bandits",
+		"colour": "#8a6a4a",
+		"monsters": ["bandit", "bandit_brute"],
+		"hostile_to": ["town"],
+		"lore_id": "bandits",
+		"raids": {"send": 0.25, "strength": 0.5}
 	}
 }

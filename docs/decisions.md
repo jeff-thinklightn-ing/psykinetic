@@ -42330,3 +42330,39 @@ to the cook, else to the taverner, and the store chest's pointer says so (voice'
 taverner.", meat and fish alike). Where npc puts the body (counter, keeper's bed) is npc's side of
 772 amended (2). larder_test _test_taverner (none without the inn; seated once, from lore's names;
 5 gold split 2 and 3). Server only, protocol unchanged, no new class_name; voice's bullet.
+
+## 793. The bandits: a faction that robs the living
+
+The bandits (2026-11-05, enemy-ai; the coordinator's approval; lore's name, "the bandits", lore_id
+"bandits", while "the Tollmen" waits on Jeff; release's number). The forest's camps want a side of
+their own that holds them and raids the towns, and the grave robbers could not be it: the
+mound-breakers dig in the barrow, hold no places ("holds": false, decision 545) and are the dead's
+enemies. levels/factions.json "bandits": hostile to the town, holding places (camps, decision 328's
+raids), no allies, no on_sight (the goblins' pattern: a camp's band fights whom it finds, a town's
+guards included, without hunting residents), monsters "bandit" and "bandit_brute".
+The kinds are the grave robbers' rows under their own names (levels/monsters.json): "Bandit"
+(dagger, flanks) and "Big bandit" (hammer, heavy), the same bodies, senses, temperaments and
+strengths, drawn as people (Client3D.person_words) in a vest, "clothes=forest" said for
+pc-character's look to come ("793, pc-character's side"; a word PersonLook does not know is passed
+over meanwhile). A client without the rows, an older build, draws such a monster plainly, as any
+kind it lacks (no person, no model, no creature slot), with no error.
+Raids rare and small, as the coordinator asked, so seven camps do not flood the forest roads; how
+rare playtest's runs will set. A faction may say its camps' share of WorldRaids' rules: factions.json
+"raids" {"send", "strength"}, Factions.raid_share(id, key), 1 when unsaid. WorldRaids.send_chance
+(camp, threat, faction) times "send", a group's strength times "strength" (Raids._spawn spends it on
+the faction's kinds, so a smaller group is fewer bandits). The bandits' are 0.25 and 0.5: a quarter
+as often as a goblin camp of the same worth, half as strong. The camps themselves are maps' ("793,
+maps' side"); the camp traders the bandits keep and spare are 799's.
+A side that holds places routes on a layer of its own (Holdings.obstacles), so WorldRoutes makes a
+fourth: open, bandits, goblins, town. On the levels, the machine quiet but for one scene, its
+distance fields took 12.3 to 12.8 s of the one pool task that builds them, layer after layer (open
+14.1 to 18.7, goblins 14.0 to 14.2, town 12.1 to 12.7; 52.5 to 58.5 s in all): the open layer is
+still made first, so the guide, trade routes and fallen bodies wait no longer, and the goblins' and
+town's raids about 12 s more at boot. Perf: off the tick on an idle box, and a place taken remakes
+only its area. A layer only for a side holding a place now was
+tried and dropped: the town needs its layer to go round goblin ground where it holds nothing.
+raid_groups_test _test_bandits (the faction, a camp taken by the bandits sends at its share and its
+group is half as strong, raiding with the bandit kinds on a layer of their own);
+monster_test _test_bandit_rows (the rows fight as the robbers', drawn in a vest; an unknown kind drawn
+plainly); world_map_test (the factions, the layers). Server and data only, protocol unchanged, no
+new class_name.

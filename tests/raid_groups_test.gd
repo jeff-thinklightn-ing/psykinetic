@@ -10,7 +10,8 @@ extends Node
 ## back in; a beaten group is gone; a hungry camp (decision 410) sends
 ## sooner, the hungrier the sooner, and its group is for food, which goes
 ## with it into play and survives a restart, while a fed camp's is as ever;
-## a group coming home to a fallen camp breaks up, its captive freed
+## a bandits' camp (decision 793) sends a quarter as often, half as strong,
+## its raiders bandits; a group coming home to a fallen camp breaks up, its captive freed
 ## (decision 429); a group under way when a level is made again (465) goes
 ## by the new map: its old route dropped, none there, it breaks up; a restart keeps the groups and the switch, one in play going on from
 ## where it was. In play for real (decision 408): the same map's town strip
@@ -55,6 +56,7 @@ func _ready() -> void:
 	_test_unseen_raid()
 	_test_handed_over()
 	_test_hungry()
+	_test_bandits()
 	_test_fallen_home()
 	_test_new_map()
 	_test_saved()
@@ -220,6 +222,34 @@ func _test_hungry() -> void:
 	_groups.hook(null)
 	_groups.live = func(_area: String) -> bool: return false
 	_groups.fed = func(_camp_id: String) -> float: return 1.0
+
+
+func _test_bandits() -> void:
+	print("== a bandits' camp (793) ==")
+	var factions := _holdings.factions
+	_check(factions.has("bandits") and factions.hostile("bandits", "town") and factions.holds("bandits")
+			and factions.of_kind("bandit") == "bandits" and factions.of_kind("bandit_brute") == "bandits",
+		"the bandits hold places, are the town's enemies, and are the bandit kinds' faction")
+	_check(is_equal_approx(factions.raid_share("goblins", "send"), 1.0) and is_equal_approx(factions.raid_share("nobody_such", "strength"), 1.0),
+		"a faction that says nothing raids as ever")
+	var goblin_chance := _groups.send_chance(CAMP, 0.000001, "goblins")
+	var goblin_id := _groups.send(CAMP, TOWN)
+	var goblin_strength := float(_groups.groups.get(goblin_id, {}).get("strength", 0.0))
+	_groups.groups.erase(goblin_id)
+	var held := _holdings.strength(CAMP)
+	_check(_holdings.take(CAMP, "bandits", held), "the bandits take the camp")
+	var share := factions.raid_share("bandits", "send")
+	_check(share > 0.0 and share < 1.0 and is_equal_approx(_groups.send_chance(CAMP, 0.000001, "bandits"), goblin_chance * share),
+		"its send chance is the bandits' share of a goblin camp's (%.4f vs %.4f)" % [_groups.send_chance(CAMP, 0.000001, "bandits"), goblin_chance])
+	var id := _groups.send(CAMP, TOWN)
+	var group: Dictionary = _groups.groups.get(id, {})
+	_check(group.get("faction") == "bandits" and is_equal_approx(float(group.get("strength", 0.0)), goblin_strength * factions.raid_share("bandits", "strength")),
+		"its group is the bandits', the bandits' share as strong (%.1f vs %.1f)" % [float(group.get("strength", 0.0)), goblin_strength])
+	_check("bandits" in _groups.routes.factions(), "they route on a layer of their own (%s)" % [_groups.routes.factions()])
+	var kinds := Raids._kinds_of("bandits")
+	_check(",".join(kinds) == "bandit,bandit_brute", "and raids with bandits (%s)" % [kinds])
+	_groups.groups.erase(id)
+	_holdings.take(CAMP, "goblins", held)
 
 
 func _test_fallen_home() -> void:
