@@ -1429,6 +1429,16 @@ func _test_bond() -> void:
 	_main._bond(record, "fed", "shared food with you")
 	_main._tend_bonds()
 	_check(score.call() == 2, "a gift, food and a day together: two steps in all (%d)" % score.call())
+	var fond_floor := int(Companion.loyalty().get("steps", {}).get("cooling", -1)) + 1
+	_check(pet.bond_bar == Vector2i(2 - fond_floor, Standing.setting("trusted") - fond_floor)
+			and _main.last_bond_gain.get("track") == "bond" and int(_main.last_bond_gain.get("amount", 0)) == 1
+			and _main.last_bond_gain.get("of") == str(record.companion.get("name")) and not _main.last_bond_gain.has("step")
+			and _main.last_bond_gain.get("bar") == {"have": pet.bond_bar.x, "need": pet.bond_bar.y},
+			"804 amended (3): each whole point a bond gain, with her bar toward close (%s; %s)" % [pet.bond_bar, _main.last_bond_gain])
+	_main.last_bond_gain = {}
+	_main._bond(record, "struck", "struck you")
+	_main._bond(record, "gift", "gave you a knife")
+	_check(_main.last_bond_gain.is_empty(), "a fall, or a deed already done today: no gain told")
 	_main._bond(record, "struck", "struck you")
 	_check(score.call() == 2, "a blow is nothing to her bond now (Jeff: damage never costs it)")
 	for day in 3:
@@ -1436,6 +1446,8 @@ func _test_bond() -> void:
 		for deed in ["gift", "fed", "day", "bandaged"]:
 			_main._bond(record, deed, "was kind")
 	_check(score.call() == 3 and pet.bond_step == "close", "warmth brings her to close and no further (%d, %s)" % [score.call(), pet.bond_step])
+	_check(_main.last_bond_gain.get("step") == "close" and _main.last_bond_gain.get("banner") == "You are close to %s" % record.companion.get("name"),
+			"the step to close: a step, its banner the card's sentence (%s)" % [_main.last_bond_gain])
 	# Trust: a step a deed, up to one short of devoted.
 	_main._bond_stood_by(owner, &"melee")
 	pet.hp = maxi(1, int(pet.max_hp * 0.25))
@@ -1448,6 +1460,8 @@ func _test_bond() -> void:
 	# A milestone: devoted.
 	_main._bond(record, "rescued", "carried you out of the raiders' camp")
 	_check(score.call() == 7 and pet.bond_step == "devoted" and int(record.companion["bond_best"]) == 7, "a rescue: devoted (%d)" % score.call())
+	_check(pet.bond_bar == Vector2i.ZERO and _main.last_bond_gain.get("step") == "devoted" and int(_main.last_bond_gain["amount"]) == 2,
+			"devoted: a step of two points, and her bar has nothing above it (%s)" % [pet.bond_bar])
 	# Hurt, then repaired within her step only.
 	_main._bond(record, "let_bleed", "let you bleed out")
 	_main._bond(record, "left_alone", "left you to fall alone")

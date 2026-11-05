@@ -42104,6 +42104,84 @@ pair 5, 3 and 4 of 6, "quiet" in 1 per run unasked. A talkative card did no bett
 rolled one (pair 3), so the card was not the lever; decision 675 still holds her tongue in a
 fight (the coordinator: as one begins and after it ends is enough). companion_test
 _test_quiet_moment. Server only, protocol unchanged, no new class_name.
+803 amended (2), her needs (step 5, phase 1; the coordinator's approval 2026-11-05, Jeff's
+five plus company): six, leisure, adventure, wonder, faith, safety, company, each 0..1 on her
+record ("needs", start 0.5), kept with it (PlayerRecord: needs, need_weights, needs_day,
+needs_today). Her weights (0.5..1.5, from 1) come from her card alone and are set once
+(Companion.need_weights_for, companion_traits.json "needs" "weights": words in her
+temperament, hobby, fear or speech, and superstition past 5 for faith); they never come from
+her player, and they shape only how fast a need settles and, in phase 2, which want she
+voices: every gain is the same size for everyone. Fed by the deeds she already has
+(Main._feed_needs from Main._bond, the "feeds" table: fire, road, rest in town, a game, a gift,
+food shared, a night watched, a fight or a camp cleared, a blessing) and by somewhere new to her
+player with her beside them (Main._discovered, "new_zone"), once a game day each deed, never
+past 1. Each whole tenth gained is a gain on 804's path, one track per need (ui's ruling; the
+words voice's: Ease, Venture, Wonder, Faith, Shelter, Company; Jeff picked "Shelter" over
+"Comfort" for safety, decisions/need-names.md), bar {have, need} in tenths. Once a game day
+each eases down settle_per_day (0.1) times her weight toward floor (0.3), never below
+(Main._settle_needs, with her bond's day): never told, never shown falling, never a cost (the
+coordinator's ruling (c)). Replicated as Companion.needs (protocol revision 51, shared with 814 and 804 amended (3)) for
+ui's bars on her card. Safety never touches combat, stance, retreat or orders. Her talk is
+unchanged: wants, with rungs as the guide (fire first), are phase 2. companion_test
+_test_needs; record_keys_test samples the keys. Server and client; protocol 51; no new
+class_name.
+
+803 amended (3) (the coordinator's approval after playtest's pair 6): an "ask" focus is told as
+a question to ask ("You want to ask her player about ... If you speak now, ask them, in your
+own words: a question, nothing else.", QUIET_ASK_LEAD; Companion.focus_text): told "You have a
+question for her player" she never asked one, 0 of 4 in pairs 5 and 6. What she sees of a place
+when asked of it (place_words_now) names no door, as a quiet moment's sight already did: three
+closed doors were all she named of one (pair 6). A focus is never kept: it is told on its one ask
+and not written to her exchange (the next answer saw only her own line about it, as any talk
+does). companion_test. Server only, protocol unchanged, no new class_name, no bullet.
+
+803 amended (4) (2026-11-06, release's label; needs phase 2, the coordinator's approved rungs):
+her wants, one at a time, and her needs as the guide a new player learns by. companion_traits.json
+"wants" holds the templates, each {key, need, rung, after, met_by, ready, words, done}: the fire
+(safety) first for everyone; then the town (company) or the pond (leisure; "ready": false until Wren
+fishes) by her weights; a first fight (adventure, met by "fought" or "cleared") once two are met; the
+temple (faith, "blessed") once three are. Companion.pick_want takes, of the templates ready, not met
+and open (met at least "after"), the one whose need lacks most by her weight, weight x (1 - need).
+Main._tend_want, once a game day beside _settle_needs: an open want unmet after lapse_days (3)
+lapses, never told, never a cost; with none open and her rest (rest_days, 1) past, she picks one.
+Main._want_deed, from Main._bond: any template a deed meets counts met, so a lesson already learnt
+is never wanted; her open want met lifts its need by met_gain (0.3), a big gain on 804's path (track
+the need), a bond deed "want_met" (trust; "a wish met, with you", voice's) and, at her next quiet
+moment, her word on it. Her voice is told a want in her quiet moments (focus "want", weight 6 while
+untold, 1 after: "You would like to sit by a fire with Jeff and rest a while. If you speak now, say
+so, in your own words."), and a want met before any other focus ("You have just done what you
+wanted: you sat by a fire with Jeff and rested."); the templates' words are voice's. Her record
+keeps want {key, need, since}, wants_met {key: day} and want_rest (a day). Companions from before
+start with none met; each is counted the next time its deed is done. No card line or map marker yet
+(those need the wire, ui's later). companion_test _test_wants, record_keys_test. Server only,
+protocol unchanged, no new class_name.
+
+803 amended (5) (2026-11-06, release's label; Jeff: "theres going to be a balance for companion
+speaking.. it might be a link to how often you respond to what they say or do", the coordinator's
+approval): how often she talks follows how her player answers. Her record keeps talk_rate {m, base,
+lo, hi} (Companion.talk_start: m and base 1.0, lo 0.6, hi 2.0; companion_traits.json "quiet" "talk"),
+shared with her node as Companion.talk_rate; m multiplies her quiet gap (gap_s 150-300 s, so 90-180 s
+at her chattiest and 300-600 s at her quietest; max_gap_s now 1200 so her letting moments pass still
+has room). Each voice line of hers her player hears (in hearing, up, in her zone) waits on an answer
+(Companion._await_reply): a word to her within answer_s (30), not addressed to another
+(Companion.addressed_to), or an act within act_s (60): coming within act_cells (2) of what a quiet
+moment had her speak of seeing, or a gift from them after she spoke of what she likes
+(Companion.answered_by_gift, from Main._card_given). Answered, m eases by answered (-0.05, chattier);
+none, by unanswered (+0.02, slowly quieter); a line unheard, or her player gone out of hearing, counts
+neither way. A quiet moment's line answered is a deed, "answered" (bond warmth, "talked with you",
+voice's; company 0.05), once a day as every deed. Her player telling her to talk less or more
+(Companion.talk_told, whole words: talk less, less talk, less talking, less chatter, enough talk, stop
+talking, shut up, hush, shush, quiet down, be quiet; talk more, talk to me more, keep talking, speak
+more, say more, chat more, chat with me; never "tell me more" or "talk to me", which answer her) sets
+base and m to less (1.6) or more (0.7), and holds m within band (0.3) of it after; rarer, never
+shorter. Her reply to "talk less" is told (TALK_LESS_ACK, voice's): "Jeff has asked you to talk less.
+Say you will, in your own words and in good spirit; you don't mind, and you'll still speak when there's
+something worth saying." Under Jeff's bonus rule nothing of it reaches her voice otherwise: she is
+never told she is ignored, never cold, and her bond never falls for it. The journal's "[voice]" line
+gains a part, counts only (Companion.talk_report): "; talk: answered A of N (said S, did D),
+unanswered U, gap x median M, range LO-HI, set less L more R", for release to grep after a deploy.
+companion_test _test_talk_rate, record_keys_test. Server only, protocol unchanged, no new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early
@@ -43266,3 +43344,19 @@ regenerated: those trail cells turn dirt and the three places appear; nothing el
 C:/dev/review/lands/fill_hills/perches/perches.png. level_test _test_perches. Protocol: 814's "51 (814)" line covers the
 kind; no new class_name; 814's CHANGELOG bullet
 (voice's words, worded to the perches as laid) rides here, the cat being real once they are.
+804 amended (3), companions' emitter (the coordinator's order: ahead of her needs, so ui's bars
+are not held). Her bond rising is a gain: Main._bond, when a raise (_bond_raise, now the whole
+points it raised, 0 while a half is carried, -1 when it did not count) adds whole points,
+calls Main._bond_gained, which tells her player Main.reward {track "bond", amount, of her name,
+words the deed's why, bar {have, need}}; when the raise warms her a step (Companion.STEPS), it
+adds step, and banner her card's own sentence (Standing.COMPANION's frames: "You are close to
+Wren"). A fall is never told (804: only gains). Her bar toward her next warmer step is
+Main.bond_bar_of (x her points past the step's floor, y the step's width, by bond_step_of's
+edges; 0,0 at devoted), set with her step in Main._set_mood and replicated as
+Companion.bond_bar (protocol revision 51, shared with 814, which opened it) for ui's landing B, her
+card and sheet. Leisure's bar comes with her needs. companion_test _test_bond (a whole point a
+gain with her bar; a fall or a deed done today, none; the step to close with its banner;
+devoted, a step of two and nothing above). Main.last_bond_gain for tests. Main.rewards_by_track
+counts gains by track: a deed now brings her bond's and needs' gains beside it, so camp_fall_test
+counts its deeds by the "deed" track, not every gain sent. Server and client; protocol 51; no new
+class_name.

@@ -498,6 +498,10 @@ var bond_step := "fond":
 ## Her bond's newest reason as her player reads it (decision 555, Main's):
 ## "you struck her"; "" for none.
 var bond_why := ""
+## Her bond toward its next warmer step (804 amended (3), Main's): x her points into
+## this step, y the step's width; y 0 at devoted, the top. For ui's bar on
+## her card and sheet: only what she gains is shown, never a fall.
+var bond_bar := Vector2i.ZERO
 ## Her superstition (442's leaning, Main's at her join): at grave_superstition
 ## or more she won't carry grave goods below close (555).
 var superstition := 5
@@ -870,6 +874,7 @@ func _init() -> void:
 	replicate("bond_step")  # Decision 555: her bond, read on her player's client.
 	replicate("asleep")  # 621 amended: her body lies down by the fire.
 	replicate("bond_why")
+	replicate("bond_bar")  # 804 amended (3): ui's bar.
 	replicate("body")
 	replicate("guide_wait")  # 708 amended: her guide walk's pause, for the beckon.
 	mass = 75.0

@@ -78,12 +78,14 @@ func _test_falls() -> void:
 	var taken: Array = []
 	World.holdings.place_taken.connect(func(id: String, from: String, to: String) -> void: taken.append([id, from, to]))
 	_kill_monsters()
-	var sent: int = _main.rewards_sent
+	var sent: int = _main.rewards_by_track.get("deed", 0)
 	var players_there: int = _main._players_in(World.zone.name).size()
 	_step(_main.CAMP_FALL_TICKS + _main.CAMP_CHECK_TICKS)
 	_check(World.holdings.holder(_camp) == Factions.NOBODY, "it falls to nobody")
-	_check(players_there > 0 and _main.rewards_sent == sent + players_there,
-		"a deed for each player in its area (804, enemy-ai's side): %d sent for %d" % [_main.rewards_sent - sent, players_there])
+	# Deeds alone: a companion there gains bond and needs of her own (804 amended (3)).
+	var deeds: int = _main.rewards_by_track.get("deed", 0) - sent
+	_check(players_there > 0 and deeds == players_there,
+		"a deed for each player in its area (804, enemy-ai's side): %d sent for %d" % [deeds, players_there])
 	var held: String = _main.camp_cleared_name("camp", "Camp", "the Blood Rot")
 	var labelled: String = _main.camp_cleared_name("bridge_camp", "the camp by the bridge", "the Blood Rot")
 	var bare: String = _main.camp_cleared_name("low_camp", "Camp below Hollowfell", "the Blood Rot")

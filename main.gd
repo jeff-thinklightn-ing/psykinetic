@@ -675,6 +675,8 @@ var arrival_card: ArrivalCard
 var gains: Gains
 ## 804: the gains told, all players together (Main.reward; tests).
 var rewards_sent := 0
+## Gains sent, by track (804 amended (3): a deed also lifts her bond and needs, each a gain of its own).
+var rewards_by_track: Dictionary[String, int] = {}
 ## 804: each art's peak as last told ("arts"), so a rise is a Practice gain;
 ## empty until the first, which only sets them.
 var _arts_seen := {}
@@ -12365,6 +12367,7 @@ func _set_mood(record: PlayerRecord) -> void:
 	if is_instance_valid(pet):
 		pet.bond_step = step
 		pet.bond_why = mood_why_of(record.companion, record.player_id, "you")
+		pet.bond_bar = bond_bar_of(record.companion, record.player_id)
 	if record.companion.has("resident"):
 		_mood_to_worker(record)
 
@@ -15774,14 +15777,19 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 	var table: Dictionary = CompanionCard.tables().get("bond", {})
 	var tier := str((table.get("deeds", {}) as Dictionary).get(event, ""))
 	var delta := int((table.get("drops", {}) as Dictionary).get(event, 0))
+	var step_was := bond_step_of(record.companion, record.player_id)
+	var raised := 0
 	if not tier.is_empty():
-		if not _bond_raise(record, event, tier, why):
+		raised = _bond_raise(record, event, tier, why)
+		if raised < 0:
 			return
 	elif delta == 0:
 		return
 	else:
 		Standing.bump(record.companion, record.player_id, delta, why, World.steps)
 	_set_mood(record)
+	if raised > 0:
+		_bond_gained(record, raised, why, step_was)
 	if delta < 0:
 		_check_leaving(record, event, why)  # The bottom step, or the last straw (decision 581).
 	# A hurt she says so of, as it happens (decision 555): told her voice once.
@@ -15795,8 +15803,9 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 
 ## A raise of her bond by [param event] of [param tier] (decision 621):
 ## once a game day each deed, the tier's "each" (halves carried on her
-## record, bond_carry), never past bond_cap. Whether it counted.
-func _bond_raise(record: PlayerRecord, event: String, tier: String, why: String) -> bool:
+## record, bond_carry), never past bond_cap. The whole points it raised (0
+## while a half is carried), or -1 when it did not count.
+func _bond_raise(record: PlayerRecord, event: String, tier: String, why: String) -> int:
 	var card := record.companion
 	var id := record.player_id
 	var day := int(World.steps / maxi(DayNight.day_steps, 1))
@@ -15806,7 +15815,7 @@ func _bond_raise(record: PlayerRecord, event: String, tier: String, why: String)
 	var score := Standing.score(card, id)
 	var cap := bond_cap(card, id, tier)
 	if event in today["deeds"] or score >= cap:
-		return false
+		return -1
 	today["deeds"].append(event)
 	card["bond_today"] = today
 	var each := float((((CompanionCard.tables().get("bond", {}) as Dictionary).get("tiers", {}) as Dictionary).get(tier, {}) as Dictionary).get("each", 1))
@@ -15815,7 +15824,45 @@ func _bond_raise(record: PlayerRecord, event: String, tier: String, why: String)
 	card["bond_carry"] = carry - floori(carry) if whole == floori(carry) else 0.0
 	Standing.bump(card, id, whole, why, World.steps)
 	card["bond_best"] = maxi(int(card.get("bond_best", 0)), Standing.score(card, id))
-	return true
+	return whole
+
+
+## The last gain _bond_gained told (tests).
+var last_bond_gain := {}
+
+
+## Her bond rose by [param amount] whole points for [param why] (804
+## amended (3)): told her player as a gain (Main.reward, track bond), with her
+## bar; a step warmer than [param step_was] is a step, its banner the card's
+## own sentence ("You are close to Wren", Standing.COMPANION's frames).
+func _bond_gained(record: PlayerRecord, amount: int, why: String, step_was: String) -> void:
+	var her := str(record.companion.get("name", ""))
+	var bar := bond_bar_of(record.companion, record.player_id)
+	var gain := {"track": "bond", "amount": amount, "of": her, "words": why, "bar": {"have": bar.x, "need": bar.y}}
+	var step := bond_step_of(record.companion, record.player_id)
+	if Companion.STEPS.find(step) > Companion.STEPS.find(step_was):
+		var frames: Dictionary = Standing.COMPANION["frames"]
+		gain["step"] = step
+		if frames.has(step):
+			gain["banner"] = frames[step] % her
+	last_bond_gain = gain
+	reward(record.player_id, gain)
+
+
+## Her bond toward its next warmer step (804 amended (3)): x her points past this
+## step's floor, y the points from its floor to the next; y 0 at devoted.
+## Steps by bond_step_of's edges, coldest first.
+static func bond_bar_of(card: Dictionary, player_id: String) -> Vector2i:
+	var score := Standing.score(card, player_id)
+	var steps: Dictionary = Companion.loyalty().get("steps", {})
+	# Each step's lowest score, from sullen up (apart has none).
+	var floors: Array[int] = [int(steps.get("apart", -7)) + 1, int(steps.get("sullen", -5)) + 1, Standing.setting("wronged") + 1,
+		int(steps.get("cooling", -1)) + 1, Standing.setting("trusted"), Standing.setting("top")]
+	var at := Companion.STEPS.find(bond_step_of(card, player_id))
+	if at >= floors.size():
+		return Vector2i.ZERO  # Devoted: nothing above.
+	var floor_of := floors[at - 1] if at > 0 else mini(score, floors[0] - 1)
+	return Vector2i(score - floor_of, floors[at] - floor_of)
 
 
 ## The most a deed of [param tier] raises her bond to (decision 621): the
@@ -22722,6 +22769,7 @@ func reward(player_id: String, data: Dictionary) -> bool:
 		told["at"] = [at.x, at.y]
 	Net.message_to(player.owner_peer, "reward", told)
 	rewards_sent += 1
+	rewards_by_track[str(data["track"])] = rewards_by_track.get(str(data["track"]), 0) + 1
 	return true
 
 
