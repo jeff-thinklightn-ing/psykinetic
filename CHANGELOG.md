@@ -7,11 +7,16 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.202
+
+- What goes over the network changes, so v0.1.201 and older can't join the server: update through the launcher first.
 - Shoved to the edge of a drop but not over, people teeter on the rim with arms wheeling and beasts scrabble, for a breath: one more blow sends them over, or they find their feet (783 amended).
 - Your hands and armour move off the pack onto a sheet of their own, headed with your name and laid on a figure where they are worn; I opens it beside the pack, with two bars for what you carry and what your arms bear (787).
 - In the hills, Hollowfell, an old mine, opens at the foot of the plateau's west face: twisting tunnels with ore seams to work, carts and timber, pits with a stair back out, and the Blood Rot holding it; the tunnels lie anew every three days while no one is inside (790).
 - Companions: with a pick in her hands, your companion mines an ore seam near you while all is quiet and carries the ore; tell her "stop digging" or "dig" (769 amended (2)).
 - Towns: a town keeps its food and meat when the castle market's trader comes, so a thin harvest carries it through (770 amended).
+- Towns: N opens the town window for the town you stand in, and a town's row on the known-world map opens it from anywhere; Stores comes first, the old sheet is now Ledger, and at the town's store or depot you can donate (768 amended).
+
 ## v0.1.201
 
 - What goes over the network changes, so v0.1.200 and older can't join the server: update through the launcher first.
