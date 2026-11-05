@@ -557,6 +557,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 49 (804): new message "reward" {track, amount, words, of, at, big, step, banner, bar, gold,
 ## bars}, sent by Main.reward to one player for a gain (never a loss): the client's floats,
 ## banner and Gains log (render/gains.gd). An old client lists no "reward" kind and cannot join.
+## 49 (804, maps' side): the "world" message gains "explored" {area: [have, need]}, the
+## places reached of each known area's (WorldNews; ui's map count); an old client ignores it.
 const PROTOCOL_REVISION := 49
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

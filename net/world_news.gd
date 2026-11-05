@@ -9,11 +9,15 @@ extends RefCounted
 ##   {"full": bool, "holdings": {place_id: [faction, strength]},
 ##    "known": {"areas": [...], "places": [...]},
 ##    "party": [{"name", "area", "kind": "player"|"companion"}],
-##    "trade": [{"id", "from_area", "to_area", "areas", "caravans": [{"area", "fraction"}]}]}
+##    "trade": [{"id", "from_area", "to_area", "areas", "caravans": [{"area", "fraction"}]}],
+##    "explored": {area: [have, need]}}
 ## Holdings go only to players who know the place (fog). Client side,
 ## merge() folds each into Main.world_state. "trade" (decision 504): the
 ## trade routes through areas the player knows, and the caravans on them;
 ## sent like the party, whole when it changes; a client before it ignores it.
+## "explored" (804, maps' side): the places reached of each known area's
+## (Holdings.explorables_in), whole in the full message and for each area
+## newly known; between them a reward's bar says it.
 ## "guide" (decision 551, sent by Main, not here): what the player's
 ## companion knows the way to, {"companion", "places": [place_id],
 ## "areas": [area]}, whole when it changes, kept through a full message.
@@ -88,8 +92,51 @@ func observe(peer: int, area: String, cell: Vector2i) -> Array[String]:
 		record.known_places.sort()
 	if (areas.is_empty() and places.is_empty()) or not _full_sent.has(peer):
 		return []
-	send.call(peer, {"full": false, "known": {"areas": areas, "places": places}, "holdings": _holdings_of(places)})
+	var told := {"full": false, "known": {"areas": areas, "places": places}, "holdings": _holdings_of(places)}
+	if not areas.is_empty():
+		told["explored"] = _explored_of(peer, areas)
+	send.call(peer, told)
 	return areas
+
+
+## Player [param peer] stands at [param cell] in [param area]: each of its
+## explorables (Holdings.explorables_in) whose radius they stand within and
+## have not reached before is reached now and kept on their record. The ids
+## reached, for Main's Wayfaring gain (decision 804, maps' side); none, and
+## nothing kept, before their full message (a join's first tick).
+func explore(peer: int, area: String, cell: Vector2i) -> Array[String]:
+	var record := _record(peer)
+	var reached: Array[String] = []
+	if record == null or not _full_sent.has(peer):
+		return reached
+	for id in holdings.explorables_in(area):
+		var place := holdings.place(id)
+		var d: Vector2i = place["cell"] - cell
+		if not record.explored_places.has(id) and d.x * d.x + d.y * d.y <= int(place["radius"]) * int(place["radius"]):
+			record.explored_places.append(id)
+			reached.append(id)
+	if not reached.is_empty():
+		record.explored_places.sort()
+	return reached
+
+
+## How many of [param area]'s explorables player [param peer] has reached,
+## and how many there are: {have, need}.
+func explored_in(peer: int, area: String) -> Dictionary:
+	var record := _record(peer)
+	var all := holdings.explorables_in(area)
+	var have := 0 if record == null else all.filter(func(id: String) -> bool: return record.explored_places.has(id)).size()
+	return {"have": have, "need": all.size()}
+
+
+## Each of [param areas]' places reached of all by player [param peer]
+## (804, maps' side; ui's map count): area -> [have, need], counts only.
+func _explored_of(peer: int, areas: Array[String]) -> Dictionary:
+	var out := {}
+	for area in areas:
+		var count := explored_in(peer, area)
+		out[area] = [count["have"], count["need"]]
+	return out
 
 
 ## Sends each player not yet sent it their full message, and each one
@@ -114,7 +161,7 @@ func update() -> void:
 			_trade_sent[peer] = routes
 			send.call(peer, {"full": true, "holdings": _holdings_of(record.known_places),
 				"known": {"areas": record.known_areas.duplicate(), "places": record.known_places.duplicate()}, "party": party,
-				"trade": routes})
+				"trade": routes, "explored": _explored_of(peer, record.known_areas)})
 			continue
 		var changed := {}
 		if _party_sent.get(peer, []) != party:
@@ -197,6 +244,12 @@ static func merge(state: Dictionary, data: Dictionary) -> Dictionary:
 			out[pair[1]].sort()
 	if data.get("party") is Array:
 		out["party"] = (data["party"] as Array).duplicate(true)
+	# The places reached of each area's (804, maps' side): area -> [have, need], each told kept.
+	if not out.get("explored") is Dictionary:
+		out["explored"] = {}
+	if data.get("explored") is Dictionary:
+		for area: Variant in data["explored"]:
+			out["explored"][str(area)] = (data["explored"][area] as Array).duplicate() if data["explored"][area] is Array else [0, 0]
 	if data.get("trade") is Array:
 		out["trade"] = (data["trade"] as Array).duplicate(true)
 	# What the player's companion knows the way to (decision 551, Main's):

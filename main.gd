@@ -15376,6 +15376,8 @@ func _tell_world(tick: int) -> void:
 		if is_instance_valid(player) and player.spawned:
 			for area: String in _world_news.observe(peer, player.zone, player.tile):
 				_discovered(peer, area)  # 804: a zone stood in for the first time.
+			for place: String in _world_news.explore(peer, player.zone, player.tile):
+				_explored(peer, place)  # 804, maps' side: a named place reached.
 	_observe_roads()  # Hers too (decision 551).
 	_world_news.update()
 
@@ -21613,6 +21615,35 @@ func _discovered(peer: int, area: String) -> void:
 	if shown.is_empty():
 		shown = area.capitalize()
 	reward(_id_of_player(player), {"track": "explore", "amount": 1, "of": shown, "words": shown, "big": true, "banner": shown})
+
+
+## Server: player [param peer] reached the place [param id] for the first
+## time (WorldNews.explore, decision 804, maps' side): +1 Wayfaring, the
+## place's name, over its cell, with the zone's places reached of all
+## ({have, need}); a fort or a working (a landmark) its banner too.
+func _explored(peer: int, id: String) -> void:
+	var player: Player = _players.get(peer)
+	var place: Dictionary = World.holdings.place(id) if World.holdings != null else {}
+	if not is_instance_valid(player) or place.is_empty():
+		return
+	var shown := str(place.get("shown", place["name"]))
+	var gain := {"track": "explore", "amount": 1, "of": shown, "words": shown, "at": place["cell"],
+		"bar": _world_news.explored_in(peer, str(place["area"]))}
+	if str(place["kind"]) in Level.EXPLORE_LANDMARKS:
+		gain["big"] = true
+		gain["banner"] = banner_of(shown)
+	print("[explore] reached %s (%d of %d)" % [id, gain["bar"]["have"], gain["bar"]["need"]])
+	reward(_id_of_player(player), gain)
+
+
+## A place's shown name as a banner's label (voice: a label drops its
+## article): "the Old Tower" -> "Old Tower", "a hill cave" -> "Hill cave".
+static func banner_of(shown: String) -> String:
+	for article: String in ["the ", "a ", "an "]:
+		if shown.to_lower().begins_with(article):
+			shown = shown.substr(article.length())
+			break
+	return shown.left(1).to_upper() + shown.substr(1)
 
 
 ## Server: [param player] picked [param taken] up ([{id, ...}], the sweep's)

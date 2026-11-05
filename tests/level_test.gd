@@ -2713,6 +2713,45 @@ func _test_relaid() -> void:
 	var fresh := {}
 	_check(Relaid.move({"ok": false, "zones": {}, "players": []}, fresh, level_of).is_empty() and fresh.get(Relaid.done_key("wilds")) == 774, "a new world has nothing to move: only marked done")
 	_test_town_places(wilds)
+	_test_explorables()
+
+
+## The places a player is rewarded for reaching (decision 804, maps'
+## side): the named refuges, rests, workings and forts out in the lands
+## (the hills' six, the Old Tower), never a town's store, stall, tavern,
+## fire, post or temple, nor a place with no name of its own.
+func _test_explorables() -> void:
+	print("== The places worth reaching (804, maps' side) ==")
+	var town_kinds := ["stockpile", "stall", "tavern", "fire", "post", "temple", "healers_hut", "keep", "gate"]
+	var wrong: Array[String] = []
+	var by_level := {}
+	for level_name: String in ["wilds", "hills", "held", "forest", "foothills", "castle_halls"]:
+		var listed: Dictionary = Level.template_config(level_name).get("places", {})
+		var warnings: Array[String] = []
+		var places := Level.places_from(Level.template_config(level_name), warnings)
+		var reached: Array[String] = []
+		for key: String in places:
+			if not places[key]["explore"]:
+				continue
+			reached.append(key)
+			if places[key]["kind"] in town_kinds or (listed[key] as Dictionary).get("name", "") == "":
+				wrong.append("%s/%s" % [level_name, key])
+		reached.sort()
+		by_level[level_name] = reached
+	_check(wrong.is_empty(), "no town place and no unnamed place is worth reaching (%s)" % [wrong])
+	_check(by_level["hills"] == ["bridge_camp", "herders_hut", "hill_cave", "hill_shieling", "hollowfell", "spur_camp"] and by_level["held"] == ["old_tower"],
+		"the hills' six and the Old Tower are (%s)" % [by_level])
+	_check(not by_level["wilds"].has("store") and by_level["wilds"].has("old_farmstead") and not by_level["forest"].has("boar_path"),
+		"the wilds' farmstead is, its store is not, nor the forest's path to the hunters' camps (a way, not a place) (%s)" % [by_level])
+	var shown := {}
+	for level_name: String in ["wilds", "hills", "forest"]:
+		var warnings: Array[String] = []
+		var places := Level.places_from(Level.template_config(level_name), warnings)
+		for key: String in places:
+			if places[key]["shown"] != places[key]["name"]:
+				shown[key] = places[key]["shown"]
+	_check(shown == {"far_bank": "the far bank", "hill_shieling": "the shieling", "woodcutters_lean_to": "a woodcutters' lean-to", "thick_wood": "the thick of the forest"},
+		"voice's shown names where the name is a where-phrase (%s)" % [shown])
 
 
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended

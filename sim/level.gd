@@ -131,6 +131,15 @@ const REFUGE_WHERE: Array[String] = ["wilds", "hills", "forest", "woods", "castl
 const BUILDING_PLACES := {"building.temple": "temple", "building.healers_hut": "healers_hut", "building.turf_house": "healers_hut"}
 ## A place's radius when level.json gives none, in cells.
 const PLACE_RADIUS := 8
+## The place kinds out in the lands a player is rewarded for reaching when
+## they have a name of their own (decision 804, maps' side: Wayfaring): a
+## refuge, a rest, a working, a fort, a work site in the wild. A place's
+## "explore": true or false says otherwise for it alone.
+const EXPLORE_KINDS: Array[String] = ["refuge", "rest", "workings", "fort", "woodlot", "hunting_ground", "fishing", "quarry", "mine"]
+## Of those, the landmarks: reaching one is a banner, not only a float.
+## A place's "shown" is the name its gain shows ("the shieling" for "a
+## shieling high on the hill"), else its name.
+const EXPLORE_LANDMARKS: Array[String] = ["fort", "workings"]
 const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i(-1, 0), "right": Vector2i(1, 0)}
 ## The buildings level.json "buildings" may name (art-kit's building.*
 ## slots, drawn over the footprint: roof, floor, trim), each its footprint
@@ -1295,7 +1304,10 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 		if radius < 1:
 			warnings.append("the place %s has a radius under 1: it is 1" % [key])
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
-			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody"))}
+			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody")),
+			"explore": bool(entry["explore"]) if entry.get("explore") is bool else kind in EXPLORE_KINDS and not str(entry.get("name", "")).strip_edges().is_empty()}
+		# The name a reached place's gain shows (804, maps' side; voice's), where its name is a where-phrase (613's).
+		out[str(key)]["shown"] = str(entry["shown"]).strip_edges() if entry.get("shown") is String and not str(entry["shown"]).strip_edges().is_empty() else out[str(key)]["name"]
 		# A refuge's where (613 amended): one of REFUGE_WHERE, else warned and left out.
 		if kind == "refuge":
 			var where := str(entry.get("where", ""))

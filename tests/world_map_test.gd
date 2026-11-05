@@ -299,7 +299,7 @@ func _test_places() -> void:
 	var names: Array[String] = ["h_land", "h_bad"]
 	var world_map := WorldMap.build(names)
 	var camp: Dictionary = world_map.areas["h_land"]["places"]["camp"]
-	_check(camp == {"key": "camp", "cell": Vector2i(15, 5), "name": "the goblin camp", "kind": "camp", "radius": 3, "worth": 2, "holder": "goblins"},
+	_check(camp == {"key": "camp", "cell": Vector2i(15, 5), "name": "the goblin camp", "kind": "camp", "radius": 3, "worth": 2, "holder": "goblins", "explore": false, "shown": "the goblin camp"},
 		"a place as level.json gives it (%s)" % [camp])
 	var ford: Dictionary = world_map.areas["h_land"]["places"]["ford"]
 	_check(ford["holder"] == "nobody" and ford["worth"] == 1 and ford["name"] == "Ford", "unsaid: held by nobody, worth 1, named from its key")

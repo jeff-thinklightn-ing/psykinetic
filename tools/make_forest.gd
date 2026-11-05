@@ -88,15 +88,16 @@ const CROSSING := {"clearing": 4, "from": Vector2i(-8, 0), "to": Vector2i(8, 0),
 const PATH_SWING := 7.0
 const PATH_BEND := 26.0
 ## The sought's refuges here (613 amended: one place a story, its key the
-## story's tag), each {at, name}.
+## story's tag), each {at, name, and shown or explore for 804's Wayfaring: the
+## name a reached place's gain shows, or false where it is no place to reach}.
 ## Each a short walk off a path, 20 cells at most (Jeff: "zones need to have
 ## safe paths with activities not too far off the paths"): the thickest
 ## trees 17 off, in a thick stand between the middle's paths.
 const REFUGES := {
 	"hunters_lean_to": {"at": Vector2i(84, 152), "name": "the hunters' lean-to"},
-	"woodcutters_lean_to": {"at": Vector2i(34, 189), "name": "a woodcutters' lean-to deep in the forest"},
-	"thick_wood": {"at": Vector2i(82, 124), "name": "where the trees are thickest"},
-	"boar_path": {"at": Vector2i(100, 126), "name": "the path to the hunters' camps"},
+	"woodcutters_lean_to": {"at": Vector2i(34, 189), "name": "a woodcutters' lean-to deep in the forest", "shown": "a woodcutters' lean-to"},
+	"thick_wood": {"at": Vector2i(82, 124), "name": "where the trees are thickest", "shown": "the thick of the forest"},
+	"boar_path": {"at": Vector2i(100, 126), "name": "the path to the hunters' camps", "explore": false},
 	"fletchers_tree": {"at": Vector2i(202, 42), "name": "the fletcher's tree"}}
 const FOREST_PACK := "res://editor/forest_pack.gd"
 const TREES := "res://levels/forest/trees.json"
@@ -270,6 +271,9 @@ func _places() -> void:
 	for key: String in REFUGES:
 		var at: Vector2i = REFUGES[key]["at"]
 		places[key] = {"at": [at.x, at.y], "kind": "refuge", "where": "forest", "radius": 3, "name": REFUGES[key]["name"]}
+		for extra: String in ["shown", "explore"]:
+			if REFUGES[key].has(extra):
+				places[key][extra] = REFUGES[key][extra]
 	config["places"] = places
 	var at: Vector2i = HUT["at"]
 	var facing: Vector2i = HUT["facing"]

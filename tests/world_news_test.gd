@@ -25,7 +25,10 @@ func _ready() -> void:
 	Level.register("wn_town", ground, null, {"outdoor": true, "neighbours": {"east": "wn_wild"}, "places": {
 		"store": {"at": [5, 5], "kind": "stockpile", "holder": "town", "radius": 3}}})
 	Level.register("wn_wild", ground, null, {"outdoor": true, "neighbours": {"west": "wn_town"}, "places": {
-		"camp": {"at": [30, 10], "kind": "camp", "holder": "goblins", "radius": 2, "worth": 4}}})
+		"camp": {"at": [30, 10], "kind": "camp", "holder": "goblins", "radius": 2, "worth": 4},
+		"cave": {"at": [10, 18], "kind": "refuge", "where": "wilds", "name": "a cave where the rocks fell", "shown": "a cave", "radius": 2},
+		"den": {"at": [36, 18], "kind": "refuge", "where": "wilds", "radius": 2},
+		"cairn": {"at": [20, 18], "kind": "other", "name": "the cairn", "radius": 2, "explore": true}}})
 	var names: Array[String] = ["wn_town", "wn_wild"]
 	var holdings := Holdings.new(WorldMap.build(names), Factions.read(), {})
 	for id: String in _peers.values():
@@ -112,6 +115,46 @@ func _ready() -> void:
 	old.erase("known_places")
 	_check(PlayerRecord.from_dict(old).known_areas.is_empty(), "a record from before knows nothing yet")
 
+	print("== reached (decision 804, maps' side) ==")
+	_check(holdings.explorables_in("wn_wild") == _strings(["wn_wild/cairn", "wn_wild/cave"]) and holdings.explorables_in("wn_town").is_empty(),
+		"the named refuge and the place marked explore count; the camp, the store and a refuge with no name of its own do not (%s)" % [holdings.explorables_in("wn_wild")])
+	_check(news.explore(2, "wn_wild", Vector2i(10, 15)).is_empty() and news.explored_in(2, "wn_wild") == {"have": 0, "need": 2},
+		"three cells off the cave (its radius 2): not reached (%s)" % [news.explored_in(2, "wn_wild")])
+	var reached := news.explore(2, "wn_wild", Vector2i(10, 16))
+	_check(reached == _strings(["wn_wild/cave"]) and _records["bo"].explored_places == _strings(["wn_wild/cave"]) and news.explored_in(2, "wn_wild") == {"have": 1, "need": 2},
+		"within its radius: reached once, kept on Bo's record, 1 of the wilds' 2 (%s)" % [reached])
+	_check(news.explore(2, "wn_wild", Vector2i(10, 18)).is_empty(), "and never again")
+	_check(news.explore(1, "wn_wild", Vector2i(10, 18)) == _strings(["wn_wild/cave"]), "Ann reaches it for herself")
+	var joining := WorldNews.new(holdings)
+	joining.send = news.send
+	joining.peers = news.peers
+	joining.record_of = news.record_of
+	joining.members = news.members
+	_check(joining.explore(2, "wn_wild", Vector2i(20, 18)).is_empty() and not _records["bo"].explored_places.has("wn_wild/cairn"),
+		"before their full message (a join's first tick): nothing reached, nothing kept")
+	var bo_again := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(_records["bo"].to_dict())))
+	_check(bo_again.explored_places == _strings(["wn_wild/cave"]), "the places reached survive the record's save")
+	_check(holdings.place("wn_wild/cave")["shown"] == "a cave" and holdings.place("wn_wild/cairn")["shown"] == "the cairn"
+		and Main.banner_of("the Old Tower") == "Old Tower" and Main.banner_of("Hollowfell") == "Hollowfell" and Main.banner_of("a hill cave") == "Hill cave",
+		"a place's shown name, else its name; a banner drops the article")
+	_sent.clear()
+	var fresh := PlayerRecord.new()
+	fresh.player_id = "cy"
+	fresh.known_areas = _strings(["wn_wild"])
+	fresh.explored_places = _strings(["wn_wild/cave"])
+	_records["cy"] = fresh
+	_peers[3] = "cy"
+	news.update()
+	var cy := _to(3)
+	_check(cy.size() == 1 and cy[0]["explored"] == {"wn_wild": [1, 2]}, "a full message carries each known area's places reached of all (%s)" % [cy])
+	_sent.clear()
+	news.observe(3, "wn_town", Vector2i(30, 15))
+	cy = _to(3)
+	_check(cy.size() == 1 and cy[0]["explored"] == {"wn_town": [0, 0]}, "an area newly known: its count with it (%s)" % [cy])
+	_peers.erase(3)
+	var folded := WorldNews.merge({}, {"full": true, "holdings": {}, "known": {"areas": ["a"], "places": []}, "party": [], "explored": {"a": [1, 3]}})
+	folded = WorldNews.merge(folded, {"full": false, "known": {"areas": ["b"], "places": []}, "explored": {"b": [0, 2]}})
+	_check(folded["explored"] == {"a": [1, 3], "b": [0, 2]}, "the client keeps each area's count (%s)" % [folded["explored"]])
 	print("== the client ==")
 	var state := WorldNews.merge({}, {"full": true, "holdings": {"a/x": ["town", 1]}, "known": {"areas": ["a"], "places": ["a/x"]}, "party": []})
 	state = WorldNews.merge(state, {"full": false, "known": {"areas": ["b"], "places": ["b/y"]}, "holdings": {"b/y": ["goblins", 2]}})

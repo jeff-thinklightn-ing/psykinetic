@@ -47,6 +47,9 @@ var slot_items := PackedInt32Array()
 ## of (decision 446, WorldNews), sorted: what their world map shows.
 var known_areas: Array[String] = []
 var known_places: Array[String] = []
+## The places they have reached (decision 804, maps' side: Holdings'
+## explorables, by id "<area>/<key>"), sorted: each one rewarded once.
+var explored_places: Array[String] = []
 ## The generation of each regenerating area they were last in (decision
 ## 465), area -> n: coming back to a newer one is told "The ways have
 ## shifted since you were last here."
@@ -135,6 +138,7 @@ func to_dict() -> Dictionary:
 		"items": Array(slot_items),
 		"known_areas": known_areas.duplicate(),
 		"known_places": known_places.duplicate(),
+		"explored_places": explored_places.duplicate(),
 		"seen_generation": seen_generation.duplicate(),
 		"marks": marks.duplicate(),
 		"barrow": barrow.duplicate(),
@@ -176,6 +180,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.arts = World.tidy_arts(entry.get("arts", {}))  # Before 766: none, a fresh player's.
 	record.known_areas = _strings(entry.get("known_areas", []))
 	record.known_places = _strings(entry.get("known_places", []))
+	record.explored_places = _strings(entry.get("explored_places", []))
 	record.marks = _strings(entry.get("marks", []))
 	record.caches = _strings(entry.get("caches", []))
 	var locker: Variant = entry.get("locker", {})

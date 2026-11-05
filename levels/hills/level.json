@@ -2548,7 +2548,8 @@
 			"kind": "refuge",
 			"where": "hills",
 			"radius": 3,
-			"name": "a shieling high on the hill"
+			"name": "a shieling high on the hill",
+			"shown": "the shieling"
 		},
 		"bridge_camp": {
 			"at": [

@@ -62,6 +62,7 @@ func rebind(world_map: WorldMap) -> Array[String]:
 			var id := "%s/%s" % [area_name, key]
 			places[id] = {"id": id, "area": area_name, "key": key, "cell": place["cell"], "name": place["name"],
 				"kind": place["kind"], "radius": place["radius"], "worth": place["worth"], "start": place["holder"],
+				"explore": bool(place.get("explore", false)), "shown": str(place.get("shown", place["name"])),
 				"town": "%s/%s" % [area_name, place["town"]] if place.has("town") else ""}
 	var gone: Array[String] = []
 	for id: String in _places:
@@ -97,14 +98,22 @@ func places_in(area_name: String) -> Array[String]:
 	return all_places().filter(func(id: String) -> bool: return _places[id]["area"] == area_name)
 
 
+## The ids of the places in [param area_name] a player is rewarded for
+## reaching (decision 804, maps' side), sorted.
+func explorables_in(area_name: String) -> Array[String]:
+	return places_in(area_name).filter(func(id: String) -> bool: return bool(_places[id].get("explore", false)))
+
+
 ## The ids of the places [param faction] holds, sorted.
 func places_of(faction: String) -> Array[String]:
 	return all_places().filter(func(id: String) -> bool: return _holder[id] == faction)
 
 
 ## Place [param id]: {id, area, key, cell, name, kind, radius, worth,
-## start, town (a work site's town, decision 517: its stockpile place's id,
-## "" for none)}; {} if there is none.
+## start, explore (a player is rewarded for reaching it, Level.EXPLORE_KINDS)
+## and shown (the name that gain shows),
+## town (a work site's town, decision 517: its stockpile place's id, "" for
+## none)}; {} if there is none.
 func place(id: String) -> Dictionary:
 	return _places.get(id, {})
 

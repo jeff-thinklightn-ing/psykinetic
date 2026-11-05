@@ -233,7 +233,7 @@ const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave"}}
 ## rect), gate (the way it opens)}.
 const HERDERS: Array[Dictionary] = [
 	{"key": "herders_hut", "name": "the herder's hut", "fold": Rect2i(16, 44, 6, 6), "gate": Vector2i(0, 1)},
-	{"key": "hill_shieling", "name": "a shieling high on the hill", "fold": Rect2i(186, 40, 6, 6), "gate": Vector2i(1, 0)}]
+	{"key": "hill_shieling", "name": "a shieling high on the hill", "shown": "the shieling", "fold": Rect2i(186, 40, 6, 6), "gate": Vector2i(1, 0)}]
 ## The way between a fold's gate and its hut's door, in cells.
 const HERDER_WAY := 2
 
@@ -741,6 +741,8 @@ func _places() -> void:
 		config["buildings"].append({"slot": "building.hut", "at": [hut.position.x, hut.position.y], "facing": [-gate.x, -gate.y]})
 		var stand := door - gate
 		places[herder["key"]] = {"at": [stand.x, stand.y], "kind": "refuge", "where": "hills", "radius": 3, "name": herder["name"]}
+		if herder.has("shown"):
+			places[herder["key"]]["shown"] = herder["shown"]  # Its Wayfaring gain's words (804, maps' side).
 	config["places"] = places
 
 

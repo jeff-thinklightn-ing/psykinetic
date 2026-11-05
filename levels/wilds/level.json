@@ -634,7 +634,8 @@
 			"kind": "refuge",
 			"where": "wilds",
 			"radius": 3,
-			"name": "the far bank upriver"
+			"name": "the far bank upriver",
+			"shown": "the far bank"
 		},
 		"old_farmstead": {
 			"at": [

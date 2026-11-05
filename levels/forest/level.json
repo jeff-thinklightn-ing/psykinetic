@@ -111,7 +111,8 @@
 			"kind": "refuge",
 			"where": "forest",
 			"radius": 3,
-			"name": "a woodcutters' lean-to deep in the forest"
+			"name": "a woodcutters' lean-to deep in the forest",
+			"shown": "a woodcutters' lean-to"
 		},
 		"thick_wood": {
 			"at": [
@@ -121,7 +122,8 @@
 			"kind": "refuge",
 			"where": "forest",
 			"radius": 3,
-			"name": "where the trees are thickest"
+			"name": "where the trees are thickest",
+			"shown": "the thick of the forest"
 		},
 		"boar_path": {
 			"at": [
@@ -131,7 +133,8 @@
 			"kind": "refuge",
 			"where": "forest",
 			"radius": 3,
-			"name": "the path to the hunters' camps"
+			"name": "the path to the hunters' camps",
+			"explore": false
 		},
 		"fletchers_tree": {
 			"at": [

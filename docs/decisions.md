@@ -41938,3 +41938,30 @@ Main.camp_cleared_banner(camp), its article dropped as labels do: "Camp by the b
 camp retaken by its side tells nobody anything. camp_fall_test _test_falls (a deed sent to the
 player there; the name and banner forms), and Main connects to the test's own Holdings as it does
 to its own. Server only (ui's "reward" message), protocol unchanged, no new class_name.
+804, maps' side: a named place reached is Wayfaring (the emitter approved with 804; release's label,
+a section of 804 while it is unshipped). A place out in the lands with a name of its own is worth
+reaching: Level's places_from marks it "explore" when its kind is one of Level.EXPLORE_KINDS
+(refuge, rest, workings, fort, woodlot, hunting_ground, fishing, quarry, mine) and its level.json
+entry names it; an entry's "explore": true or false says otherwise for it alone (a town's store,
+stall, tavern, fire, post or temple never counts by kind; the forest's boar_path, "the path to the
+hunters' camps", is false: a way, not a place, voice). A place's "shown" is the name its gain shows
+where its name is a where-phrase kept for 613's sought newcomers (voice's: the far bank, the
+shieling, a woodcutters' lean-to, the thick of the forest; make_hills and make_forest carry them).
+Holdings keeps both; explorables_in(area) lists them. WorldNews.explore(peer, area, cell), on
+Main's world beat beside observe, reaches each one whose radius the player stands within, once,
+kept on the record's explored_places (saved, "<area>/<key>", sorted); nothing before their full
+message (a join's first tick). WorldNews.explored_in gives {have, need} for the zone. Main._explored
+sends Main.reward {track explore, amount 1, of and words the shown name, at its cell, bar {have,
+need}}, and for a fort or a working (Level.EXPLORE_LANDMARKS) big with a banner, the name as a
+label (Main.banner_of drops the article: "Old Tower", "Hollowfell"); a zone's first stand stays
+ui's _discovered. One count-only line, no player named: "[explore] reached <id> (h of n)". For
+ui's map count, the "world" message gains "explored" {area: [have, need]}, counts only, whole in
+the full message and for each area newly known (a reward's bar says it between), folded by
+WorldNews.merge. Today 16 places count: the wilds' farmstead, barn, far bank and woodlot, the
+hills' six, the forest's four, the Old Tower and the dwarven forge. Sights come with the data
+pass. world_news_test (reached within the radius, once, per player, not before the full message,
+kept in the save, which places count, shown names and banners, the counts in the full message
+and with a new area, the client's fold), level_test _test_explorables (no town place, no unnamed
+one, the hills' six and the Old Tower, not the path, voice's shown names). Protocol: a "49 (804,
+maps' side)" line, the world message carrying a new key an old client ignores (rev 49 still
+open); no new class_name.
