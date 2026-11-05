@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Struck down in a fire, you wait out the usual few seconds and wake at the temple, instead of lying in the flames for minutes (544 amended).
 
 - Weapon practice: sword and bow each keep what you have learned with them, whichever you take up, and a weapon you come back to after a long rest returns to its best three times as fast. (766 amended (4))
 - Clicking a square in a store window or the town window picks it and leaves you standing where you are (765 amended).

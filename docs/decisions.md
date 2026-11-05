@@ -18103,6 +18103,19 @@ blessing for life (drafted yes, only the uses run out), finishing blows
 on the downed (drafted no).
 companion_test _test_field_return. New class_name: none.
 
+544 amended: a downed window runs out once (2026-11-04, combat; release's
+label; the coordinator's ask from playtest's A/B run, a player downed in
+Umbrage's square fire at (194, 211) laid downed again 12 times, two minutes
+instead of 10 s). The tick's order: zone fire damage (step 1) runs before
+_tend_downed (step 5), so in the tick a window ends is_downed is already
+false, the fire's FIRE_DAMAGE took the 1-hp body to 0 and World.downed
+laid it downed for a fresh window. Any blow landing in that tick did the
+same. World.damage now lets nothing but the bleed (cause &"bled") reach a
+body still in _downed, its last tick too, so _tend_downed bleeds it once
+and the return follows. A downed body in fire takes no harm, as before; it
+is not moved off the cell. combat_test _test_downed_fire. Sim only,
+protocol unchanged, no new class_name; CHANGELOG (voice's words).
+
 ## 548. The draugr (the crypt's monsters, step 3)
 
 Jeff's crypt.md: "give gold to the draugr and he offers a deal: beat him,

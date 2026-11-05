@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_telegraph_lifecycle()
 	_test_arc_spares_friends()
 	_test_flank()
+	_test_downed_fire()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1325,6 +1326,34 @@ func _test_flank() -> void:
 	_check(not World.is_stunned(foe) and int(heard["n"]) == 2, "its tell over (landed): nothing")
 	World.end_telegraph(landed, false)
 	World.flanked.disconnect(on_flank)
+
+
+## A downed body's window runs out once (544 amended; playtest's A/B run): a
+## fire's damage in the tick it ends, before _tend_downed bleeds it, never
+## lays it downed again for a fresh window.
+func _test_downed_fire() -> void:
+	print("
+== downed: one window, never re-armed by a fire (544 amended) ==")
+	var e := _build(["#####", "#.P.#", "#####"])
+	var p: Player = e["P"][0]
+	var was := World.downed
+	var laid := {"n": 0}
+	World.downed = func(_target: GridEntity, _source: GridEntity, _cause: StringName) -> int:
+		laid["n"] += 1
+		return 100
+	World.damage(p, p.hp, null, &"fire")
+	_check(World.is_downed(p) and p.hp == 1 and int(laid["n"]) == 1, "burnt to 0: downed, 1 hp (%d laid)" % int(laid["n"]))
+	var until := p.downed_until
+	World.tick += 50
+	World.damage(p, 3, null, &"fire")
+	_check(p.hp == 1 and p.downed_until == until, "mid-window: the fire takes nothing, the window as it was")
+	World.tick = until
+	_check(not World.is_downed(p), "the window over, not yet tended")
+	World.damage(p, 3, null, &"fire")
+	_check(p.downed_until == until and int(laid["n"]) == 1, "the fire in the tick it ends: not downed again (%d laid, until %d)" % [int(laid["n"]), p.downed_until])
+	World._tend_downed()
+	_check(not is_instance_valid(p) or not p.spawned or p.hp == 0, "then its time runs out: it bleeds (hp %d)" % (p.hp if is_instance_valid(p) else -1))
+	World.downed = was
 
 
 func _test_spin() -> void:

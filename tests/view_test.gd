@@ -1429,7 +1429,7 @@ func _test_down_grey() -> void:
 	await get_tree().create_timer(1.0).timeout
 	_check(_rig._down > 0.0 and _rig._environment.adjustment_saturation < 1.0 and is_equal_approx(_rig._camera.size, size),
 			"after a second: paler (saturation %.2f), the camera not pulled back (%.1f)" % [_rig._environment.adjustment_saturation, _rig._camera.size])
-	player.downed_until = World.tick  # Up again (a revival's end state).
+	World.raise_downed(player, player.max_hp)  # Up again, by a revival (544 amended: a window set over by hand left it on World._downed).
 	await get_tree().create_timer(Client3D.MOURN_RETURN_SECONDS + 0.3).timeout
 	_check(not World.is_downed(player) and is_equal_approx(_rig._environment.adjustment_saturation, 1.0) and is_zero_approx(_rig._down),
 			"up again: the colour back (%.2f)" % _rig._environment.adjustment_saturation)

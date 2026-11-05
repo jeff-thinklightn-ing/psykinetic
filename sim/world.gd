@@ -7831,8 +7831,13 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		return
 	if not target.holds_cell:
 		return  # Gone (573 amended (4), the draugr at rest): nothing there to hurt.
-	if is_downed(target) and cause != &"bled":
-		return  # Downed (decision 544): no blow lands on the fallen.
+	if (is_downed(target) or _downed.has(target)) and cause != &"bled":
+		# Downed (decision 544): no blow lands on the fallen. Nor in the tick
+		# its window ran out, before _tend_downed bleeds it: a fire's or a
+		# blow's damage there laid it downed again, a fresh window each time
+		# (544 amended: playtest's body in Umbrage's square fire, 12
+		# windows, 2 minutes down).
+		return
 	if is_sheltered(target) and cause != &"bled":
 		return  # Arriving, its view not built (decision 661): nothing lands.
 	var lost := mini(amount, target.hp)
