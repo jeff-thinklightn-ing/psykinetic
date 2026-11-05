@@ -6,9 +6,9 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.2,
+				0.1,
 				0.02,
-				0.02
+				0.08
 			],
 			"sockets": {
 				"grip": [
@@ -244,8 +244,8 @@
 			"category": "items",
 			"kind": "held",
 			"size": [
-				0.02,
-				0.02,
+				0.034,
+				0.016,
 				0.02
 			],
 			"sockets": {
