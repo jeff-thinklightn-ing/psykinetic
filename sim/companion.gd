@@ -358,7 +358,10 @@ const QUIET_TRIGGER := "quiet moment"
 ## she spoke of none (pair 4); the last turn is what a model answers.
 const QUIET_LEAD := "If you speak now, speak of that, in your own way."
 ## How each focus reaches her, before its words.
-const QUIET_OPENERS := {"sight": "You notice", "ask": "You have", "default": "You think of"}
+const QUIET_OPENERS := {"sight": "You notice", "ask": "You want to ask", "default": "You think of"}
+## Closes an "ask" focus in place of QUIET_LEAD (803 amended (3)): told "You
+## have a question for her player", she never asked one (pairs 5 and 6, 0 of 4).
+const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
 const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s": 600, "per_hour": 12,
 	"new_place_s": [20, 40], "player_quiet_s": 30,
 	"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1}}
@@ -2387,9 +2390,17 @@ func _quiet_moment() -> void:
 	_quiet_ticks.append(World.tick)
 	_quiet_next_tick = World.tick + _quiet_gap("gap_s") * _quiet_backoff
 	_quiet_last_focus = focus["key"]
-	_quiet_focus = "%s %s %s" % [QUIET_OPENERS.get(focus["key"], QUIET_OPENERS["default"]), focus["words"], QUIET_LEAD]
+	_quiet_focus = focus_text(focus)
 	_ask_voice("%s: %s" % [QUIET_TRIGGER, focus["key"]])
 	_quiet_focus = ""  # Told on that ask, or not asked at all: never carried to another.
+
+
+## A focus as her last turn tells it (803 amended (2) and (3)): "You notice a
+## cart, a few paces to the north-west. If you speak now, speak of that, in
+## your own way."; an "ask" closes with QUIET_ASK_LEAD.
+static func focus_text(focus: Dictionary) -> String:
+	return "%s %s %s" % [QUIET_OPENERS.get(focus["key"], QUIET_OPENERS["default"]), focus["words"],
+		QUIET_ASK_LEAD if focus["key"] == "ask" else QUIET_LEAD]
 
 
 ## One thing for a quiet moment to speak of, {key, words}, or {} when
@@ -2435,7 +2446,7 @@ func _quiet_pick_focus() -> Dictionary:
 	if not likes.is_empty():
 		options.append({"key": "likes", "words": likes[_quiet_rng.randi_range(0, likes.size() - 1)]})
 	if not latest.is_empty() or not seen_words.is_empty():
-		options.append({"key": "ask", "words": "a question for %s about %s" % [keeper_name(),
+		options.append({"key": "ask", "words": "%s about %s" % [keeper_name(),
 			"what happened a little while ago (%s)." % latest if not latest.is_empty() else seen_words + "."]})
 	if _zone_new_today:
 		options.append({"key": "place", "words": "%s, where you have not been before today." % _place_words()})
@@ -3681,7 +3692,8 @@ func place_words_now() -> String:
 	var parts: Array[String] = ["You are in %s." % _place_words()]
 	var sights: Array[String] = []
 	for thing: Dictionary in seen_things():
-		if thing.get("monster", false) or sights.size() >= 4:
+		# No door (803 amended (3)): three closed doors were all she named of a place (pair 6).
+		if thing.get("monster", false) or "door" in str(thing["kind"]) or sights.size() >= 4:
 			continue
 		var paces: int = thing["paces"]
 		sights.append("%s %s" % [thing["word"], "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]])

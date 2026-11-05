@@ -3014,12 +3014,12 @@ func _test_quiet_moment() -> void:
 	pet._keeper_spoke_tick = -100000
 	World.step()
 	var asked: Array = mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER))
-	_check(asked.size() == 1 and Companion.QUIET_LEAD in str(asked[0]["messages"].back()["content"])
-			and not Companion.QUIET_LEAD in str(asked[0]["system"]) and pet.said_lines().back() == "That fire smells of pine.",
+	_check(asked.size() == 1 and "If you speak now" in str(asked[0]["messages"].back()["content"])
+			and not "If you speak now" in str(asked[0]["system"]) and pet.said_lines().back() == "That fire smells of pine.",
 			"then asked, with one thing to speak of, and she says her own line (%s)" % [asked.map(func(ask: Dictionary) -> String: return ask["trigger"])])
 	_check(pet._quiet_next_tick - World.tick >= 150 * World.TICK_RATE and pet._quiet_next_tick - World.tick <= 300 * World.TICK_RATE,
 			"the next waits gap_s (%d ticks)" % (pet._quiet_next_tick - World.tick))
-	_check(not Companion.QUIET_LEAD in pet.voice_prompt("test"), "the focus is told on that ask only")
+	_check(not "If you speak now" in pet.voice_prompt("test"), "the focus is told on that ask only")
 	# Never the same focus twice running.
 	var keys: Array[String] = []
 	for i in 12:
@@ -3122,9 +3122,15 @@ func _test_quiet_moment() -> void:
 	pet._fight_tick = -100000
 	World.step()
 	var tries: Array = mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER))
-	_check(tries.size() == 2 and tries.all(func(ask: Dictionary) -> bool: return Companion.QUIET_LEAD in str(ask["messages"].back()["content"]))
+	_check(tries.size() == 2 and tries.all(func(ask: Dictionary) -> bool: return "If you speak now" in str(ask["messages"].back()["content"]))
 			and pet._quiet_focus.is_empty(),
 			"her own line back: asked again, and the retry is told the focus too (%d asks)" % tries.size())
+	# 803 amended (3): an ask is asked as a question; no door in what she sees of a place.
+	var ask_text := Companion.focus_text({"key": "ask", "words": "her player about what happened a little while ago (The boar died)."})
+	_check(ask_text.begins_with("You want to ask her player about") and ask_text.ends_with(Companion.QUIET_ASK_LEAD)
+			and not Companion.QUIET_LEAD in ask_text, "an ask focus: she wants to ask, and is told to ask it as a question (%s)" % ask_text)
+	_check(Companion.focus_text({"key": "sight", "words": "a cart."}) == "You notice a cart. " + Companion.QUIET_LEAD, "a sight as before")
+	_check(not "door" in pet.place_words_now(), "no door in what she sees of a place (%s)" % pet.place_words_now())
 	# Pair 3: "and {she} knew the way out", not "her knew".
 	var met := CompanionCard.met({"pronoun": "she", "how_we_met": "{player} was lost in a forest and {she} knew the way out"}, "her player")
 	var found_her := CompanionCard.met({"pronoun": "she", "how_we_met": "{player} found {pronoun} hiding in a ruined mill"}, "her player")
