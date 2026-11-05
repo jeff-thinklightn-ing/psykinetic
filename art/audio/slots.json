@@ -1395,6 +1395,54 @@
 			"volume_db": -8.0,
 			"uses": "a notice: a quest, a companion's word; a party line (Main._line_sound)"
 		},
+		"ui.reward_gain": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "regard, bond, ease, practice, a deed, an item: harp and piano plucks (804; ui's Gains on the server \"reward\"; the fallback of every ui.reward_*)"
+		},
+		"ui.reward_step": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a standing step up: longer harp and piano plucks (804; ui's Gains)"
+		},
+		"ui.reward_want": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a big deed, the town thanking you: a soft woodblock or marimba knock (804; ui's Gains)"
+		},
+		"ui.reward_coin": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -14.0,
+			"uses": "gold: a small coin drop (804; ui's Gains)"
+		},
+		"ui.reward_catch": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a catch: a small splash (804; ui's Gains)"
+		},
+		"ui.reward_found": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -12.0,
+			"uses": "a new zone found: a short harp motif (804; ui's Gains)"
+		},
 		"amb.field_wind": {
 			"category": "ambience",
 			"type": "bed",

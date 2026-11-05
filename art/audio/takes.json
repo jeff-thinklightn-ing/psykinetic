@@ -2684,6 +2684,180 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"ui.reward_catch": [
+			{
+				"file": "ui.reward_catch.ogg",
+				"from": "freesound",
+				"original": "freesound 507094: Fish Splashing Release 1.wav (from 0.3 s for 1 s)",
+				"sha256": "936c75fb47b64445b21f46d44703b3e46296c46550dc6386b19b8d362e723b63",
+				"by": "paulprit",
+				"url": "https://freesound.org/people/paulprit/sounds/507094/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_catch.2.ogg",
+				"from": "freesound",
+				"original": "freesound 507093: Fish Splashing Release 2.wav (from 0.4 s for 1 s)",
+				"sha256": "3139dac775b35f5250c0dbabdf52860f96eea394f118e40154f11d28815d879f",
+				"by": "paulprit",
+				"url": "https://freesound.org/people/paulprit/sounds/507093/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_catch.3.ogg",
+				"from": "freesound",
+				"original": "freesound 321490: Tiny Splash (from 0.15 s for 0.8 s)",
+				"sha256": "b795668533ff5c83d34e01b8a4b4b0e19fa94821f5c399e01253203e0a8c46a3",
+				"by": "dslrguide",
+				"url": "https://freesound.org/people/dslrguide/sounds/321490/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_coin": [
+			{
+				"file": "ui.reward_coin.ogg",
+				"from": "freesound",
+				"original": "freesound 19778: coindrop1.wav (from 0 s for 0.75 s)",
+				"sha256": "dc26f78ce053a304d619d2416304c53ee92e6ea95a0822ffa599a5d26c2266d8",
+				"by": "jmaimarc",
+				"url": "https://freesound.org/people/jmaimarc/sounds/19778/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_coin.2.ogg",
+				"from": "freesound",
+				"original": "freesound 184741: CoinDrop5.wav (from 0 s for 0.45 s)",
+				"sha256": "25a5f4e53e5e0c5f767a9a0216602fbd16901925818e3e6fa7f1653ea6b80479",
+				"by": "NickMorris",
+				"url": "https://freesound.org/people/NickMorris/sounds/184741/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_coin.3.ogg",
+				"from": "freesound",
+				"original": "freesound 184743: CoinDrop9.wav (from 0.2 s for 0.7 s)",
+				"sha256": "4127a1167ac28d2589dae6cee8e172c9c96863dd7ac864f4700f484323e72387",
+				"by": "NickMorris",
+				"url": "https://freesound.org/people/NickMorris/sounds/184743/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_found": [
+			{
+				"file": "ui.reward_found.ogg",
+				"from": "freesound",
+				"original": "freesound 563310: harp-motif3.ogg (from 0 s for 2 s)",
+				"sha256": "db518f7ae0819da29c92d48c817506045d10e26f738e88edf86f00d49b64b640",
+				"by": "DaVince21",
+				"url": "https://freesound.org/people/DaVince21/sounds/563310/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_found.2.ogg",
+				"from": "freesound",
+				"original": "freesound 563311: harp-motif2.ogg (from 0 s for 2.4 s)",
+				"sha256": "cda3ddca9bb748220e0a1ef39a37abdda7fb0ea28b90392ecfba00d8ac0d8ca9",
+				"by": "DaVince21",
+				"url": "https://freesound.org/people/DaVince21/sounds/563311/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_found.3.ogg",
+				"from": "freesound",
+				"original": "freesound 563312: harp-motif1.ogg (from 0 s for 2 s)",
+				"sha256": "cc206c3c597c1db0cc51660f7b3a5f002058fbc9f6f705a4abab90f6a9a7c4cb",
+				"by": "DaVince21",
+				"url": "https://freesound.org/people/DaVince21/sounds/563312/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_gain": [
+			{
+				"file": "ui.reward_gain.ogg",
+				"from": "freesound",
+				"original": "freesound 415463: Harp Short 7.wav (from 0.1 s for 1.2 s)",
+				"sha256": "18747697f9a6836c6821a43be84ed1761e4c8179dbddb5c62c4df3d5d7be2314",
+				"by": "luckylittleraven",
+				"url": "https://freesound.org/people/luckylittleraven/sounds/415463/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_gain.2.ogg",
+				"from": "freesound",
+				"original": "freesound 415477: Harp Short 4.wav (from 0 s for 1.2 s)",
+				"sha256": "353a0ed1763a46d10c489ada506c3ec459df2f4945cccd3f477f9ffcfadfaa58",
+				"by": "luckylittleraven",
+				"url": "https://freesound.org/people/luckylittleraven/sounds/415477/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_gain.3.ogg",
+				"from": "freesound",
+				"original": "freesound 617196: pianoroom_samples_stereo_piano_strings_plucked_short_dry_1.wav (from 0.05 s for 1 s)",
+				"sha256": "eae85a7f22237a9e1adb4888afde786dbf215121ce45c89e60df879f8ec6be46",
+				"by": "leonseptavaux",
+				"url": "https://freesound.org/people/leonseptavaux/sounds/617196/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_step": [
+			{
+				"file": "ui.reward_step.ogg",
+				"from": "freesound",
+				"original": "freesound 415456: Harp Short 13.wav (from 0 s for 1.6 s)",
+				"sha256": "ca389950c0d687e568836509877340aca3c79d21c7a86d64f78e9af402265307",
+				"by": "luckylittleraven",
+				"url": "https://freesound.org/people/luckylittleraven/sounds/415456/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_step.2.ogg",
+				"from": "freesound",
+				"original": "freesound 617201: pianoroom_samples_stereo_piano_strings_plucked_short_dry_4.wav (from 0.1 s for 1.2 s)",
+				"sha256": "a3d7e390060ba092adb5c0a5a1bcdbf2f54878027e1de6c8c39ff2b2c0e63085",
+				"by": "leonseptavaux",
+				"url": "https://freesound.org/people/leonseptavaux/sounds/617201/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_step.3.ogg",
+				"from": "freesound",
+				"original": "freesound 617203: pianoroom_samples_stereo_piano_strings_plucked_short_dry_2.wav (from 0.05 s for 1.2 s)",
+				"sha256": "aa348e4ded7454094dad9acee6ac74a64e20e5cd174aac3cc604e89b237e352f",
+				"by": "leonseptavaux",
+				"url": "https://freesound.org/people/leonseptavaux/sounds/617203/",
+				"license": "CC0 1.0"
+			}
+		],
+		"ui.reward_want": [
+			{
+				"file": "ui.reward_want.ogg",
+				"from": "freesound",
+				"original": "freesound 692828: Woodblock-soft.wav (from 0 s for 0.4 s)",
+				"sha256": "0414fad1bd921b2f48f4d73c632493c3d98b7a6c7c36904c57041a091ec67d7f",
+				"by": "hollandm",
+				"url": "https://freesound.org/people/hollandm/sounds/692828/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_want.2.ogg",
+				"from": "freesound",
+				"original": "freesound 692819: Woodblock-med.wav (from 0 s for 0.4 s)",
+				"sha256": "6be1b7a48e46f3621c724c27315c8f4b2c9576b8a31c7e4d29c990de4afbd322",
+				"by": "hollandm",
+				"url": "https://freesound.org/people/hollandm/sounds/692819/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_want.3.ogg",
+				"from": "freesound",
+				"original": "freesound 373581: Marimba - C7 (Marimba_hit_Outrigger_C6_loud_01.wav) (from 0 s for 0.8 s)",
+				"sha256": "9c97ae5a11245cefd21c30038c6a948053038b11d0350e439fdd3f328aae4754",
+				"by": "sgossner",
+				"url": "https://freesound.org/people/sgossner/sounds/373581/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.death_female": [
 			{
 				"file": "voice.death_female.ogg",

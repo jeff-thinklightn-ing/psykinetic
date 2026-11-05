@@ -673,6 +673,15 @@ func _test_ui_sounds() -> void:
 	var before := ui.played.size()
 	button.pressed.emit()
 	_check(ui.played.size() == before, "nothing while the menus are being built")
+	# 804, sound's side: ui's reward cues, each on the UI bus, everywhere,
+	# under ui.notify (heard a dozen times running), three takes of its own.
+	var rewards: Array[String] = []
+	for kind: String in ["gain", "step", "want", "coin", "catch", "found"]:
+		var slot := "ui.reward_" + kind
+		if SoundKit.bus(slot) != "ui" or SoundKit.positional(slot) or SoundKit.volume_db(slot) >= SoundKit.volume_db("ui.notify") \
+				or SoundKit.takes(slot).size() < 3:
+			rewards.append(slot)
+	_check(rewards.is_empty(), "each reward cue on the UI bus, not placed, under ui.notify, three takes (%s)" % [rewards])
 	for node: Node in [button, slider, panel, ui, sfx]:
 		node.queue_free()
 	await get_tree().process_frame
