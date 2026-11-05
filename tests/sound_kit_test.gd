@@ -682,6 +682,15 @@ func _test_ui_sounds() -> void:
 				or SoundKit.takes(slot).size() < 3:
 			rewards.append(slot)
 	_check(rewards.is_empty(), "each reward cue on the UI bus, not placed, under ui.notify, three takes (%s)" % [rewards])
+	# 805 amended (4): items' fishing cues, placed at the float, heard near,
+	# never by monsters, two takes or more.
+	var fishing: Array[String] = []
+	for kind: String in ["cast", "plop", "bite", "landed"]:
+		var slot := "sfx.fish_" + kind
+		if SoundKit.bus(slot) != "sfx" or not SoundKit.positional(slot) or SoundKit.noise(slot) != "" \
+				or SoundKit.reach(slot) > 12 or SoundKit.takes(slot).size() < 2:
+			fishing.append(slot)
+	_check(fishing.is_empty(), "each fishing cue placed on the sfx bus, no noise, heard within 12, two takes (%s)" % [fishing])
 	for node: Node in [button, slider, panel, ui, sfx]:
 		node.queue_free()
 	await get_tree().process_frame

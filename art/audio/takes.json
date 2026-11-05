@@ -1396,6 +1396,104 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.fish_bite": [
+			{
+				"file": "sfx.fish_bite.ogg",
+				"from": "freesound",
+				"original": "freesound 398038: water splash 1 (from 0 s for 0.6 s)",
+				"sha256": "b66744457a9fde6e2ea362fc02e31b1bcb75b4ae9245eb3fbde9fc51f6708bd1",
+				"by": "swordofkings128",
+				"url": "https://freesound.org/people/swordofkings128/sounds/398038/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_bite.2.ogg",
+				"from": "freesound",
+				"original": "freesound 398039: water splash 2 (from 0 s for 0.9 s)",
+				"sha256": "a991b49aa5ed2982a94659da386ff4dad8ab5b536945a80fe01081dc0a025ee3",
+				"by": "swordofkings128",
+				"url": "https://freesound.org/people/swordofkings128/sounds/398039/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_bite.3.ogg",
+				"from": "freesound",
+				"original": "freesound 507092: Fish Jumping Splash 1.wav (from 1.4 s for 0.7 s)",
+				"sha256": "533724128e37bd5abe7672c0bd4fe5829b9c4305d8fcd214ef76d92eb2e7f018",
+				"by": "paulprit",
+				"url": "https://freesound.org/people/paulprit/sounds/507092/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.fish_cast": [
+			{
+				"file": "sfx.fish_cast.ogg",
+				"from": "freesound",
+				"original": "freesound 853287: Casting Fishing Rod for Game Fishing SFX (from 0 s for 0.8 s)",
+				"sha256": "8b1c98c62a297165d4ed166c49ea907f83bd6ee8060c67f1aaa11d1e33a19987",
+				"by": "el_boss",
+				"url": "https://freesound.org/people/el_boss/sounds/853287/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_cast.2.ogg",
+				"from": "freesound",
+				"original": "freesound 529665: Fly Rod Casting.wav (from 0.2 s for 0.8 s)",
+				"sha256": "7c37bacf34b3cda27a691b9e7bc34b01ab1def14fdeb2c0fb397d6716d050bfc",
+				"by": "paulprit",
+				"url": "https://freesound.org/people/paulprit/sounds/529665/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.fish_landed": [
+			{
+				"file": "sfx.fish_landed.ogg",
+				"from": "freesound",
+				"original": "freesound 450828: fish slaps on snow writhing after caught and picked up and drop plop.wav (from 3.1 s for 0.8 s)",
+				"sha256": "d93d6524691e1008a3433dbe1eb706c77be49333508379ce276d1676f4aa5822",
+				"by": "kyles",
+				"url": "https://freesound.org/people/kyles/sounds/450828/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_landed.2.ogg",
+				"from": "freesound",
+				"original": "freesound 450830: fish slap ground or snow writhing wet.wav (from 1.1 s for 0.8 s)",
+				"sha256": "ed3c94a92db78965e9e223bb66f22e01c7a77044ea8f992fe1be5ad0a23f75e1",
+				"by": "kyles",
+				"url": "https://freesound.org/people/kyles/sounds/450830/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_landed.3.ogg",
+				"from": "freesound",
+				"original": "freesound 679389: Fish flopping over on sand (from 3.15 s for 0.9 s)",
+				"sha256": "901cc2bb37dafd65fadafd0cb8ebb6c4243b3f9b61ae4a00bf06c320764c820c",
+				"by": "adviseme333",
+				"url": "https://freesound.org/people/adviseme333/sounds/679389/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.fish_plop": [
+			{
+				"file": "sfx.fish_plop.ogg",
+				"from": "freesound",
+				"original": "freesound 853278: Fishing Lure Plop Water - Game SFX (1 or 2) (from 0.05 s for 0.6 s)",
+				"sha256": "dc664609725576b98862998a0d3659b240c95533700f6ffe5baa85ef48b542b3",
+				"by": "el_boss",
+				"url": "https://freesound.org/people/el_boss/sounds/853278/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.fish_plop.2.ogg",
+				"from": "freesound",
+				"original": "freesound 386429: Water + pebble (from 0.75 s for 0.55 s)",
+				"sha256": "38d09134bd9532edb3aa73a3074af7d22687ad5aa3c8f0a7b90d1af3bd1691fa",
+				"by": "giddster",
+				"url": "https://freesound.org/people/giddster/sounds/386429/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.footstep_claws": [
 			{
 				"file": "sfx.footstep_claws.ogg",

@@ -644,6 +644,42 @@
 			"volume_db": 0.0,
 			"uses": "a body or thing falling into water; a body shoved into water, a thing thrown into it (Client3D._on_pushed, _pile_sounds)"
 		},
+		"sfx.fish_cast": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 12,
+			"volume_db": -6.0,
+			"uses": "a fishing line cast: the rod's whip, at the float's water cell (805; items' FishingView)"
+		},
+		"sfx.fish_plop": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -8.0,
+			"uses": "a cast float landing on the water, at its cell (805; items' FishingView, when the cast turns \"wait\")"
+		},
+		"sfx.fish_bite": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -6.0,
+			"uses": "a fish biting: the float dipping with a small sharp splash (805; items' FishingView)"
+		},
+		"sfx.fish_landed": {
+			"category": "items",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -6.0,
+			"uses": "a fish pulled out of the water: a wet flop (805; items' FishingView, right after the bite)"
+		},
 		"sfx.grass_rustle": {
 			"category": "movement",
 			"type": "oneshot",

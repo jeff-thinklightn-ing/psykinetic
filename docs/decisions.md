@@ -42438,6 +42438,7 @@ it.
 items_test _test_fishing (the rows; each refusal; a cast through its states to a perch in the pack;
 a step and the rod used again reel in; a missed bite; cooking at a fire). Voice's words, lore's
 facts. New script client3d/fishing_view.gd (no class_name).
+805 amended (4): the fishing cues (release's label; items' ask; 805 shipped in v0.1.204). Four positional oneshots on the sfx bus, never heard by monsters (noise null), which items' FishingView plays at the float's water cell through SoundKit.has: sfx.fish_cast (the rod's whip as the cast begins, range 12, -6 dB), sfx.fish_plop (the float landing as the wait begins, range 10, -8; a call items added so the plop keeps the float's time, since no one recording held a whip and a plop 1.5 s apart and a take is cut from one source), sfx.fish_bite (the float dipping: a small sharp splash, range 10, -6), sfx.fish_landed (a perch pulled out: a wet slap, range 10, -6); a missed bite plays nothing. No reel cue: the fish comes out at the bite. Ten Freesound CC0 takes: cast from 853287 (el_boss) and 529665 (paulprit); plop from 853278 (el_boss) and 386429 (giddster); bite from 398038, 398039 (swordofkings128) and 507092 (paulprit); landed from 450828, 450830 (kyles) and 679389 (adviseme333). Review: C:/dev/review/sound/fishing. Tests: sound_kit_test _test_ui_sounds (each placed on the sfx bus, no noise, within 12, two takes). Client only; protocol unchanged, no new class_name, no bullet (items' 805 carries it).
 
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
