@@ -45,6 +45,8 @@ const TRACKS := {
 }
 ## A track not in TRACKS.
 const OTHER := {"label": "", "color": "#c79a55", "cue": "ui.reward_gain"}
+## Owed gold's float: the theme's dim text, not the coin's brass.
+static var OWED_COLOR: Color = UiTheme.color("text_dim")
 ## The cues over a track's own: a step, a want met (a big deed), and the
 ## one every slot falls back to before sound's takes are in (SoundKit.has).
 const STEP_CUE := "ui.reward_step"
@@ -179,17 +181,28 @@ func add(data: Dictionary) -> bool:
 	var now := _now()
 	var at: Variant = Snapshot.vector(data.get("at"))
 	var words := str(data.get("words", ""))
+	# Lines worded by the server, not counted here (playtest's reward tour):
+	# things handed in, by their own count ("+10 ore", not the town's name);
+	# gold owed, not had (a neutral line, no "+", no coin).
+	var fixed := ""
+	var owed: bool = track == "gold" and data.get("owed") == true
+	if owed:
+		fixed = words if not words.is_empty() else owed_words(int(amount))  # "Umbrage owes you 40 gold" (economy's).
+	elif track == "item" and not str(data.get("counted", "")).is_empty():
+		fixed = "+" + str(data["counted"])
+	if not fixed.is_empty():
+		key = track + "|=" + fixed
 	var merged := false
 	var line: Dictionary = lines.back() if not lines.is_empty() else {}
 	if not line.is_empty() and line["key"] == key and now - float(line["t"]) < MERGE_SECONDS:
 		line["amount"] = float(line["amount"]) + amount
-		line["text"] = text_of(track, line["amount"], of)
+		line["text"] = fixed if not fixed.is_empty() else text_of(track, line["amount"], of)
 		if not words.is_empty():
 			line["words"] = words
 		line["t"] = now
 	else:
 		lines.append({"time": Time.get_time_string_from_system().substr(0, 8), "key": key, "track": track, "of": of,
-			"amount": amount, "text": text_of(track, amount, of), "words": words, "t": now})
+			"amount": amount, "text": fixed if not fixed.is_empty() else text_of(track, amount, of), "words": words, "t": now})
 		while lines.size() > LOG_KEPT:
 			lines.pop_front()
 	var in_fight := _fighting()
@@ -202,7 +215,9 @@ func add(data: Dictionary) -> bool:
 				break
 		if not merged:
 			var made := {"key": key, "track": track, "of": of, "amount": amount, "at": at, "born": now, "merged": now,
-				"color": color_of(track), "small": in_fight}
+				"color": OWED_COLOR if owed else color_of(track), "small": in_fight}
+			if not fixed.is_empty():
+				made["text"] = fixed
 			if floats.size() < FLOATS_AT_ONCE:
 				floats.append(made)
 			else:
@@ -223,8 +238,8 @@ func add(data: Dictionary) -> bool:
 			slot = STEP_CUE
 		elif track == "deed" and big:
 			slot = WANT_CUE
-		# In a fight only a step sounds; the rest of the burst is the float.
-		if not in_fight or not step.is_empty():
+		# In a fight only a step sounds; the rest of the burst is the float. Owed gold, none.
+		if (not in_fight or not step.is_empty()) and not owed:
 			_cue(slot, merged, now)
 	logged.emit()
 	queue_redraw()
@@ -233,7 +248,14 @@ func add(data: Dictionary) -> bool:
 
 ## The float's text now (tests, _draw).
 func float_text(live: Dictionary) -> String:
+	if live.has("text"):
+		return str(live["text"])
 	return text_of(live["track"], live["amount"], live["of"])
+
+
+## Gold a town owes the player (economy's "owed"): voice's Give words, no "+".
+static func owed_words(gold: int) -> String:
+	return "Owes you %d gold" % gold
 
 
 ## The banner up now, "" for none (tests).

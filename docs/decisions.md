@@ -42005,3 +42005,15 @@ asked for in that frame: her bond's gain, a step's, any (sound: the bond is the 
 _test_gains (three needs: one need cue, after the frame; a need and her bond: the bond's alone; the
 needs' words). No bullet (sound's 804 amended (4) carries the slot). Client only, protocol unchanged,
 no new class_name.
+
+804 amended (7) (ui; playtest's reward tour, an ore hand-in at Umbrage's store, through the
+coordinator; release's label): two floats said the wrong thing. A hand-in's "item" reward has the town
+as its "of" (npc's thanks read it), and Gains counted that ("+10 Umbrages"); Gains now floats and logs
+an "item" reward that carries "counted" (economy's words for what was given) as "+" and those words
+("+10 ore"). Gold the town owes, not pays, floated as gold had ("+40 gold", the coin's cue); a "gold"
+reward with "owed": true now floats as its words ("Umbrage owes you 40 gold"; Gains.owed_words without
+them), in the theme's dim text (Gains.OWED_COLOR), with no "+" and no cue. Until economy's "owed" flag
+lands, owed gold still floats as "+40 gold". The missing banner was economy's data (no "step" at the
+town's first regard), not Gains' shown-elsewhere skip. ui_test _test_gains (the hand-in's count, the
+owed line, no coin). No bullet (804's line says what a gain shows). Client only, protocol unchanged,
+no new class_name.

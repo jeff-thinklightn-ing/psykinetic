@@ -2454,6 +2454,15 @@ func _test_gains() -> void:
 	_check(Main.mid_line("The Ossuary") == "the Ossuary" and Main.mid_line("The Tavern, upstairs") == "the Tavern, upstairs"
 		and Main.mid_line("Umbrage") == "Umbrage" and Main.mid_line("Theodric's hall") == "Theodric's hall",
 		"a place mid-sentence: a small \"the\", the rest as it is (voice's)")
+	# Playtest's reward tour, an ore hand-in at Umbrage's store: the things by their own count,
+	# the gold owed a plain line (no "+", no coin).
+	gains.add({"track": "item", "amount": 10, "of": "Umbrage", "counted": "10 ore", "words": "The depot takes 10 ore"})
+	gains.add({"track": "gold", "amount": 40, "of": "Umbrage", "owed": true, "words": "Umbrage owes you 40 gold"})
+	var texts: Array = gains.floats.map(func(live: Dictionary) -> String: return gains.float_text(live))
+	_check(texts == ["+10 ore", "Umbrage owes you 40 gold"] and gains.lines.map(func(l: Dictionary) -> String: return l["text"]) == texts
+		and not gains.cues.any(func(c: Array) -> bool: return c[0] == "ui.reward_coin") and gains.floats[1]["color"] == Gains.OWED_COLOR,
+		"a hand-in: \"+10 ore\", not the town; gold owed: a plain dim line, no coin (%s, %s)" % [texts, gains.cues])
+	clear.call()
 	gains._need_frame = -1
 	gains._other_frame = -1
 	# A rest meets three of her needs in one frame (sound's ask): one need cue, at the frame's end.
