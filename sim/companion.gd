@@ -502,6 +502,8 @@ var bond_why := ""
 ## this step, y the step's width; y 0 at devoted, the top. For ui's bar on
 ## her card and sheet: only what she gains is shown, never a fall.
 var bond_bar := Vector2i.ZERO
+## Her needs (803 amended (2)), Main's: {need: 0..1}, for ui's bars on her card.
+var needs: Dictionary = {}
 ## Her superstition (442's leaning, Main's at her join): at grave_superstition
 ## or more she won't carry grave goods below close (555).
 var superstition := 5
@@ -875,6 +877,7 @@ func _init() -> void:
 	replicate("asleep")  # 621 amended: her body lies down by the fire.
 	replicate("bond_why")
 	replicate("bond_bar")  # 804 amended (3): ui's bar.
+	replicate("needs")  # 803 amended (2): her needs' bars.
 	replicate("body")
 	replicate("guide_wait")  # 708 amended: her guide walk's pause, for the beckon.
 	mass = 75.0
@@ -4790,6 +4793,59 @@ const STEPS: Array[String] = ["apart", "sullen", "wary", "cooling", "fond", "clo
 static func loyalty() -> Dictionary:
 	var table: Variant = CompanionCard.tables().get("loyalty", {})
 	return table if table is Dictionary else {}
+
+
+# --- Her needs (803 amended (2), step 5 phase 1) -------------------------------
+
+## The rules: companion_traits.json "needs".
+static func need_rules() -> Dictionary:
+	var table: Variant = CompanionCard.tables().get("needs", {})
+	return table if table is Dictionary else {}
+
+
+## The needs' names, in order.
+static func need_names() -> Array[String]:
+	var names: Array[String] = []
+	for each: Variant in need_rules().get("names", []):
+		names.append(str(each))
+	return names
+
+
+## Her weight for each need from her card's [param traits] alone (never her
+## player): 1, plus each rule whose words her trait holds, plus faith for her
+## superstition past 5, kept within weight_min..weight_max.
+static func need_weights_for(traits: Dictionary) -> Dictionary:
+	var rules := need_rules()
+	var weights := {}
+	for need in need_names():
+		weights[need] = 1.0
+	for rule: Variant in rules.get("weights", []):
+		if not rule is Dictionary or not weights.has(str(rule.get("need", ""))):
+			continue
+		var said := str(traits.get(str(rule.get("trait", "")), "")).to_lower()
+		if said.is_empty():
+			continue
+		for word in str(rule.get("words", "")).split("|", false):
+			if word in said:
+				weights[rule["need"]] += float(rule.get("add", 0.0))
+				break
+	var leanings: Variant = traits.get("leanings", {})
+	if leanings is Dictionary and weights.has("faith") and leanings.has("superstition"):
+		weights["faith"] += maxf(float(leanings["superstition"]) - 5.0, 0.0) * float(rules.get("faith_per_superstition", 0.0))
+	for need: String in weights:
+		weights[need] = clampf(weights[need], float(rules.get("weight_min", 0.5)), float(rules.get("weight_max", 1.5)))
+	return weights
+
+
+## Her needs on [param card] (her record's companion), every one present,
+## each 0..1 (start for one not yet there).
+static func needs_of(card: Dictionary) -> Dictionary:
+	var held: Variant = card.get("needs", {})
+	var out := {}
+	for need in need_names():
+		var value: Variant = held.get(need) if held is Dictionary else null
+		out[need] = clampf(float(value), 0.0, 1.0) if value is float or value is int else float(need_rules().get("start", 0.5))
+	return out
 
 
 ## Whether her bond is at [param step] or warmer.

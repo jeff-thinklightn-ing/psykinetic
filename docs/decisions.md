@@ -42121,6 +42121,7 @@ words voice's: Ease, Venture, Wonder, Faith, Shelter, Company; Jeff picked "Shel
 each eases down settle_per_day (0.1) times her weight toward floor (0.3), never below
 (Main._settle_needs, with her bond's day): never told, never shown falling, never a cost (the
 coordinator's ruling (c)). Replicated as Companion.needs (protocol revision 51, shared with 814 and 804 amended (3)) for
+coordinator's ruling (c)). Replicated as Companion.needs (protocol revision 51, shared with 804 amended (3)) for
 ui's bars on her card. Safety never touches combat, stance, retreat or orders. Her talk is
 unchanged: wants, with rungs as the guide (fire first), are phase 2. companion_test
 _test_needs; record_keys_test samples the keys. Server and client; protocol 51; no new

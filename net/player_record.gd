@@ -307,6 +307,20 @@ static func companion_from(pet: Variant) -> Dictionary:
 	# Her tiers' counts (decision 621): the half point carried, the deeds raised today.
 	if pet.get("bond_carry") is float or pet.get("bond_carry") is int:
 		out["bond_carry"] = float(pet["bond_carry"])
+	# Her needs (803 amended (2)): each 0..1, her weights, the deeds fed today.
+	for key: String in ["needs", "need_weights"]:
+		var values: Variant = pet.get(key)
+		if values is Dictionary:
+			var kept := {}
+			for need: Variant in values:
+				if values[need] is float or values[need] is int:
+					kept[str(need)] = float(values[need])
+			out[key] = kept
+	if pet.get("needs_day") is float or pet.get("needs_day") is int:
+		out["needs_day"] = int(pet["needs_day"])
+	var fed_today: Variant = pet.get("needs_today")
+	if fed_today is Dictionary:
+		out["needs_today"] = {"day": int(fed_today.get("day", -1)), "deeds": Array(_strings(fed_today.get("deeds", [])))}
 	var games: Variant = pet.get("games")
 	if games is Dictionary:
 		out["games"] = {"hers": int(games.get("hers", 0)), "theirs": int(games.get("theirs", 0))}

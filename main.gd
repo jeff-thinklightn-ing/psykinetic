@@ -12368,6 +12368,7 @@ func _set_mood(record: PlayerRecord) -> void:
 		pet.bond_step = step
 		pet.bond_why = mood_why_of(record.companion, record.player_id, "you")
 		pet.bond_bar = bond_bar_of(record.companion, record.player_id)
+		pet.needs = Companion.needs_of(record.companion)
 	if record.companion.has("resident"):
 		_mood_to_worker(record)
 
@@ -15775,6 +15776,7 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 	if record == null or record.companion.is_empty():
 		return
 	var table: Dictionary = CompanionCard.tables().get("bond", {})
+	_feed_needs(record, event, why)
 	var tier := str((table.get("deeds", {}) as Dictionary).get(event, ""))
 	var delta := int((table.get("drops", {}) as Dictionary).get(event, 0))
 	var step_was := bond_step_of(record.companion, record.player_id)
@@ -15825,6 +15827,80 @@ func _bond_raise(record: PlayerRecord, event: String, tier: String, why: String)
 	Standing.bump(card, id, whole, why, World.steps)
 	card["bond_best"] = maxi(int(card.get("bond_best", 0)), Standing.score(card, id))
 	return whole
+
+
+## Her needs fed by [param event] (803 amended (2)): its "feeds" row raises
+## each need, once a game day each deed, never past 1; each whole tenth
+## gained is told her player on 804's path (track the need, bar in tenths).
+## Her weights are set from her card the first time.
+func _feed_needs(record: PlayerRecord, event: String, why: String) -> void:
+	if record == null or record.companion.is_empty() or not record.companion.get("alive", true):
+		return
+	var feeds: Dictionary = (Companion.need_rules().get("feeds", {}) as Dictionary).get(event, {})
+	if feeds.is_empty():
+		return
+	var card := record.companion
+	_need_weights(card)
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	var today: Dictionary = card.get("needs_today", {})
+	if int(today.get("day", -1)) != day:
+		today = {"day": day, "deeds": []}
+	if event in today["deeds"]:
+		return
+	today["deeds"].append(event)
+	card["needs_today"] = today
+	var needs := Companion.needs_of(card)
+	var her := str(card.get("name", ""))
+	for need: String in feeds:
+		if not needs.has(need):
+			continue
+		var was: float = needs[need]
+		needs[need] = minf(was + float(feeds[need]), 1.0)
+		var points := roundi(needs[need] * 10.0) - roundi(was * 10.0)
+		if points > 0:
+			last_need_gains.append({"track": need, "amount": points, "of": her, "words": why})
+			reward(record.player_id, {"track": need, "amount": points, "of": her, "words": why,
+				"bar": {"have": roundi(needs[need] * 10.0), "need": 10}})
+	card["needs"] = needs
+	var pet: Companion = _companions.get(record.player_id)
+	if is_instance_valid(pet):
+		pet.needs = needs.duplicate()
+
+
+## Her weights for her needs (803 amended (2)), set from her card once and kept.
+static func _need_weights(card: Dictionary) -> Dictionary:
+	if not card.get("need_weights") is Dictionary or (card["need_weights"] as Dictionary).is_empty():
+		var traits: Variant = card.get("traits", {})
+		card["need_weights"] = Companion.need_weights_for(traits if traits is Dictionary else {})
+	return card["need_weights"]
+
+
+## Her needs settle (803 amended (2)), once a game day: each eases down
+## settle_per_day times her weight for it, never below floor. Never told,
+## never a cost: a low need only shapes what she asks for (phase 2).
+func _settle_needs(record: PlayerRecord, day: int) -> void:
+	var card := record.companion
+	if int(card.get("needs_day", -1)) == day:
+		return
+	var first := not card.has("needs_day")
+	card["needs_day"] = day
+	if first:
+		return  # The day she is first counted: nothing to settle yet.
+	var rules := Companion.need_rules()
+	var weights := _need_weights(card)
+	var needs := Companion.needs_of(card)
+	for need: String in needs:
+		var floor_at := float(rules.get("floor", 0.3))
+		if needs[need] > floor_at:
+			needs[need] = maxf(needs[need] - float(rules.get("settle_per_day", 0.1)) * float(weights.get(need, 1.0)), floor_at)
+	card["needs"] = needs
+	var pet: Companion = _companions.get(record.player_id)
+	if is_instance_valid(pet):
+		pet.needs = needs.duplicate()
+
+
+## The need gains _feed_needs told (tests).
+var last_need_gains: Array[Dictionary] = []
 
 
 ## The last gain _bond_gained told (tests).
@@ -15898,6 +15974,7 @@ func _tend_bonds() -> void:
 		var pet: Companion = _companions.get(player_id)
 		if not (is_instance_valid(pet) and pet.spawned and is_instance_valid(pet.keeper)):
 			continue
+		_settle_needs(record, day)
 		if int(record.companion.get("bond_day", -1)) == day:
 			continue
 		record.companion["bond_day"] = day
@@ -22806,6 +22883,10 @@ func _discovered(peer: int, area: String) -> void:
 	if shown.is_empty():
 		shown = area.capitalize()
 	reward(_id_of_player(player), {"track": "explore", "amount": 1, "of": shown, "words": shown, "big": true, "banner": shown})
+	# With her beside them, somewhere new to them is somewhere new for her too (803 amended (2)).
+	var pet: Companion = _companions.get(_id_of_player(player))
+	if is_instance_valid(pet) and pet.spawned and World.distance(pet.tile, player.tile) <= Companion.HEARING_RANGE:
+		_feed_needs(_record_of(pet), "new_zone", "came somewhere new with you")
 
 
 ## Server: player [param peer] reached the place [param id] for the first

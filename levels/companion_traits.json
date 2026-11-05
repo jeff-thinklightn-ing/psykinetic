@@ -93,6 +93,38 @@
 		"player_quiet_s": 30,
 		"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1}
 	},
+	"needs": {
+		"_note": "Her needs (803 amended (2), step 5 phase 1; the coordinator's approval 2026-11-05): six, each 0..1 on her record, from start. Each settles settle_per_day (times her weight for it) toward floor once a game day, never below, never shown falling, costing nothing. A deed in feeds raises its needs by its amounts, once a game day each, never past 1; each whole tenth gained is a gain on 804's path (track = the need). Her weights (min..max, from 1) come from her card alone, set once: each rule whose words are found in her trait adds its amount; superstition (her leanings, 0..10) adds faith_per_superstition for each point past 5. Weights shape only how fast a need settles and, in phase 2, which want she voices; gains are the same for everyone.",
+		"names": ["leisure", "adventure", "wonder", "faith", "safety", "company"],
+		"start": 0.5, "floor": 0.3, "settle_per_day": 0.1,
+		"weight_min": 0.5, "weight_max": 1.5, "faith_per_superstition": 0.08,
+		"weights": [
+			{"trait": "temperament", "words": "warm|talkative|friendly|kind|cheerful", "need": "company", "add": 0.3},
+			{"trait": "temperament", "words": "watchful|wary|cautious|careful|patient", "need": "safety", "add": 0.25},
+			{"trait": "temperament", "words": "fearless|bold|restless|reckless|brave|quick", "need": "adventure", "add": 0.3},
+			{"trait": "temperament", "words": "curious|dreamy|thoughtful|quiet", "need": "wonder", "add": 0.2},
+			{"trait": "temperament", "words": "pious|devout|faithful", "need": "faith", "add": 0.4},
+			{"trait": "hobby", "words": "map|bird|star|stone|sketch|draw|flower", "need": "wonder", "add": 0.3},
+			{"trait": "hobby", "words": "fish|dice|card|knucklebone|sing|song|music|carv|whittl", "need": "leisure", "add": 0.3},
+			{"trait": "hobby", "words": "hunt|climb|explor|track", "need": "adventure", "add": 0.3},
+			{"trait": "hobby", "words": "pray|psalm|candle|temple", "need": "faith", "add": 0.3},
+			{"trait": "fear", "words": "left behind|alone", "need": "company", "add": 0.2},
+			{"trait": "speech", "words": "warm", "need": "company", "add": 0.1}
+		],
+		"feeds": {
+			"fire": {"leisure": 0.1, "safety": 0.1},
+			"road": {"adventure": 0.1},
+			"leisure": {"leisure": 0.15, "safety": 0.1, "company": 0.05},
+			"game": {"leisure": 0.1, "company": 0.1},
+			"gift": {"company": 0.1},
+			"fed": {"company": 0.1},
+			"watched": {"safety": 0.2},
+			"fought": {"adventure": 0.1},
+			"cleared": {"adventure": 0.2},
+			"new_zone": {"adventure": 0.1, "wonder": 0.1},
+			"blessed": {"faith": 0.2}
+		}
+	},
 	"bond": {
 		"_note": "Her bond with her player (decision 444, on npc's Standing, 443; tiered by decision 621, Jeff's: 'each tier has its own deeds; the deeds that got you to a tier can't raise you further'). Standing's COMPANION ladder: fond to start, wary at -3, close at 3, devoted at 6 (residents.json 'standing'). deeds: each raise's tier; tiers: what one deed of the tier adds (each, halves carried on her record as bond_carry) and the score it raises her to at most (up_to): warmth (fond to close: gifts, food, days together, plain bandaging) to close, trust (close to devoted: tending her badly hurt, standing by her, a camp cleared, a new ability) to one short of devoted, milestone (a rescue, the draugr's blessing, an area's reward) as far as Standing goes. Each deed raises her once a game day. Lower deeds repair lost points up to her best (bond_best) but never past the top of the step she is at. No decay over time. drops: what each hurt costs, at any step (damage never costs her bond: 'struck' is gone). The deeds she sees (Companion._watch_deeds, by watch): road (road_cells walked with her player in a game day, road_share on roads), fire (both within fire_cells of a fire, fire_ticks), leisure (in a town town_ticks), and the drops mule (her slots over heavy_share for heavy_cells walked, warned at half, once until she rests) and pressed (a new fight while under low_hp after she asked to rest). fought: a monster killed where both landed a blow; finished: the last hostile camp of an area cleared with her. harsh: her voice's [HURT] on her player's words, at most harsh_a_day a game day, a [SORRY] the same day taking one back. game: knucklebones by a fire ('play knucklebones'), a round a round_ticks, best_of, the first each day warmth. sleep: after a hard day (a fight since she slept, or under hard_hp) by a fire with her player she asks them to keep watch once a day; yes, or them staying within near answer_ticks, and she sleeps sleep_ticks: whole and rested after, watched (trust); gone past near and something comes, she wakes with left_line, left_alone. All drafts for Jeff.",
 		"tiers": {"warmth": {"each": 0.5, "up_to": 3}, "trust": {"each": 1, "up_to": 5}, "milestone": {"each": 2, "up_to": 10}},

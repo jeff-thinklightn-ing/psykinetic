@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- What you do with your companion lifts her Ease, Venture, Wonder, Faith, Shelter or Company: a fire, a game, a gift, food shared, the road, somewhere new, each with a +1 as it comes (803 amended (2)).
 - Your companion's bond with you shows as it grows: a +1 each time, and a banner when she becomes close, then devoted (804 amended (3)).
 - Hill cats lie up on the rises above the hills' grazing, away from the paths, and drop on whoever strays below, unless you spot them first (814).
 - In the hills, the lone great oak between the streams stands broad and low-limbed now, with strips of cloth knotted along its branches (778 amended).

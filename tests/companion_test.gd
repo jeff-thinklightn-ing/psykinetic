@@ -93,6 +93,7 @@ func _ready() -> void:
 	_test_card_things()
 	_test_record_loads()
 	_test_bond()
+	_test_needs()
 	_test_deeds()
 	_test_game_and_watch()
 	_test_sickness()
@@ -1481,6 +1482,65 @@ func _test_bond() -> void:
 		"her bond, her best, today's deeds and the half step carried are saved with her record")
 	World.steps = steps_were
 	for key in ["standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
+		record.companion.erase(key)
+	_main._set_mood(record)
+
+
+func _test_needs() -> void:
+	print("\n== her needs: six, fed by her deeds, settling to a floor, weights from her card (803 amended (2)) ==")
+	var pet := _companion()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var steps_were := World.steps
+	for key in ["needs", "need_weights", "needs_day", "needs_today", "standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
+		record.companion.erase(key)
+	Standing.met(record.companion, record.player_id, World.steps)
+	var names := Companion.need_names()
+	_check(names == ["leisure", "adventure", "wonder", "faith", "safety", "company"], "six needs (%s)" % [names])
+	var warm := Companion.need_weights_for({"temperament": "warm and talkative", "hobby": "drawing maps of where they have been"})
+	var plain := Companion.need_weights_for({})
+	_check(is_equal_approx(warm["company"], 1.3) and is_equal_approx(warm["wonder"], 1.3) and is_equal_approx(warm["faith"], 1.0)
+			and plain.values().all(func(w: float) -> bool: return is_equal_approx(w, 1.0)),
+			"her weights come from her card: warm and talkative leans to company, maps to wonder (%s)" % [warm])
+	var pious := Companion.need_weights_for({"temperament": "pious and devout", "hobby": "praying", "leanings": {"superstition": 10}})
+	_check(is_equal_approx(pious["faith"], 1.5), "never past weight_max (%s)" % pious["faith"])
+	_check(Companion.needs_of(record.companion).values().all(func(v: float) -> bool: return is_equal_approx(v, 0.5)), "each starts at 0.5")
+	# Fed by a deed she already has: the fire.
+	_main.last_need_gains.clear()
+	_main._bond(record, "fire", "sat by the fire with you")
+	var needs := Companion.needs_of(record.companion)
+	var tracks: Array = _main.last_need_gains.map(func(g: Dictionary) -> String: return "%s+%d" % [g["track"], g["amount"]])
+	_check(is_equal_approx(needs["leisure"], 0.6) and is_equal_approx(needs["safety"], 0.6) and is_equal_approx(needs["company"], 0.5)
+			and tracks == ["leisure+1", "safety+1"] and pet.needs == needs and record.companion.get("need_weights") is Dictionary,
+			"by the fire: Ease and Shelter rise a tenth, each a gain on its own track, her bars on her body (%s)" % [tracks])
+	_main.last_need_gains.clear()
+	_main._bond(record, "fire", "sat by the fire with you")
+	_check(_main.last_need_gains.is_empty() and is_equal_approx(Companion.needs_of(record.companion)["leisure"], 0.6),
+			"the same deed the same day: nothing more")
+	_main._bond(record, "kept_from", "kept you from it")
+	_check(_main.last_need_gains.is_empty(), "a deed with no feeds row: nothing")
+	record.companion["needs"]["company"] = 0.92
+	_main._bond(record, "gift", "gave you a knife")
+	_check(is_equal_approx(Companion.needs_of(record.companion)["company"], 1.0) and _main.last_need_gains.size() == 1
+			and int(_main.last_need_gains[0]["amount"]) == 1, "never past 1 (%s)" % [_main.last_need_gains])
+	# Settling: once a game day, by her weight, never below the floor; nothing told.
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	record.companion["need_weights"] = {"leisure": 1.5, "adventure": 1.0, "wonder": 1.0, "faith": 1.0, "safety": 1.0, "company": 1.0}
+	record.companion["needs"] = {"leisure": 0.9, "adventure": 0.35, "wonder": 0.3, "faith": 0.5, "safety": 0.5, "company": 0.5}
+	record.companion["needs_day"] = day - 1
+	_main.last_need_gains.clear()
+	_main._settle_needs(record, day)
+	needs = Companion.needs_of(record.companion)
+	_check(is_equal_approx(needs["leisure"], 0.75) and is_equal_approx(needs["adventure"], 0.3) and is_equal_approx(needs["wonder"], 0.3)
+			and is_equal_approx(needs["faith"], 0.4) and _main.last_need_gains.is_empty() and pet.needs == needs,
+			"a day settles each toward 0.3, faster where she cares more, never below, never told (%s)" % [needs])
+	_main._settle_needs(record, day)
+	_check(Companion.needs_of(record.companion) == needs, "once a day")
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(Companion.needs_of(saved.companion) == needs and saved.companion.get("need_weights", {}).size() == 6
+			and int(saved.companion.get("needs_day", -1)) == day and saved.companion.has("needs_today"),
+			"her needs, weights and today's deeds are saved with her record")
+	World.steps = steps_were
+	for key in ["needs", "need_weights", "needs_day", "needs_today", "standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
 		record.companion.erase(key)
 	_main._set_mood(record)
 
