@@ -94,6 +94,7 @@ func _ready() -> void:
 	_test_reset_keeps_rests()  # After it: a room reset puts the town back.
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
+	_test_tavern_keeper()  # 772 amended (2).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
 
@@ -984,6 +985,32 @@ func _test_threat() -> void:
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
 	DayNight.set_hour(12.0)
+
+
+## 772 amended (2), option B: the Mughouse's floors are an interior of
+## wilds/store (811); its taverner works the counter and sleeps in the
+## keeper's room in there; the wilds shell is no inn to stand in.
+func _test_tavern_keeper() -> void:
+	print("
+== the taverner inside the Mughouse; the shell no inn to stand in (772 amended (2)) ==")
+	_check(_main._interior_town("umbrage_tavern") == "wilds/store" and _main._interior_town("umbrage_tavern_up") == "wilds/store" and _main._interior_town("no_such_level") == "",
+		"the tavern's floors are wilds/store's ground; no level, no town")
+	var level: Dictionary = _main._zone_level("umbrage_tavern")
+	var tavern: Dictionary = Level.tavern_of(level).get("wilds/store", {})
+	_check(not tavern.is_empty(), "the Mughouse's tavern place, keyed by its level's town")
+	var places: Dictionary = _main._taverner_places(level, tavern)
+	var work: Rect2i = places.get("work", Rect2i())
+	var home: Rect2i = places.get("home", Rect2i())
+	var bed_cell: Vector2i = (places.get("bed_at", {}) as Dictionary).get("cell", Vector2i(-99, -99))
+	_check(work.has_point(tavern["counter"]) and (tavern["rect"] as Rect2i).encloses(work), "work about the counter, in the common room (%s, %s)" % [work, tavern["counter"]])
+	_check(home == Rect2i(12, 6, 6, 4) and places.get("bed") == home, "home and bed the keeper's room (%s)" % [home])
+	_check(World.distance(bed_cell, Vector2i(17, 7)) <= 1, "the keeper's bed there (%s)" % [bed_cell])
+	_check(places.get("square") == tavern["rect"] and places.get("inn") == tavern["rect"], "square and inn the common room")
+	_check(Townsfolk.night_at(_main.TAVERNER, "taverner:wilds/store", 3) == "work", "up in the night: at the counter")
+	var shell := {"town": "store", "use": "inn", "rect": Rect2i(170, 205, 10, 8), "inside": "umbrage_tavern"}
+	var open := {"town": "store", "use": "inn", "rect": Rect2i(170, 205, 10, 8)}
+	_check(_main._is_shell(shell) and not _main._is_shell(open), "a building with inside is a shell")
+	_check(_main._inn_inside({"buildings": [shell]}, {"key": "store"}) and not _main._inn_inside({"buildings": [open]}, {"key": "store"}) 		and not _main._inn_inside({"buildings": [shell]}, {"key": "other"}), "the town's inn inside when its building is a shell")
 
 
 ## The night watch's waves (771 amended (3)): a manned post's wave sent at

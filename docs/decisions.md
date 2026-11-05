@@ -39909,6 +39909,26 @@ reader. Its beds stay Level.beds_in's. The square's fire is a place too, kind "f
 _test_town_places; view_test _test_tavern_inside (walked in through the east door, the roof fades and
 inside_building() holds it). (2026-11-04, buildings)
 
+772 amended (2): the tavern inside, npc's side, option B (the coordinator's approved tavern-zone
+design, Jeff's "everyone goes in, the inn's own folk first"; lands in one push on buildings' 811, which
+makes the wilds inn a shell whose floors are umbrage_tavern, _up and _attic). The inn's own folk work and
+live inside for good and nobody else crosses the door. The inn has no trade of its own, so economy seats
+one taverner per town once the inn stands (Towns._appoint, worker "taverner:<town>"; economy's, after its
+give path; the coordinator: one is enough, and they also open the locker later). Main._tavern_folk: in a
+zone whose level names a town (Main._interior_town, the level.json "town" of 811) and holds that town's
+tavern (Level.tavern_of), the town's taverner has a body while the zone is up. Main._taverner_places: work
+the 3 x 3 about the counter within the common room, home and bed the "keeper" room and its bed (17,7),
+square and inn the common room. residents.json gives the taverner stints (home 6-9, work 9-20, home 20-6),
+and its night pick is work, so it keeps the counter into the night, abed only in its own spell. In the
+town's own zone, _sync_residents leaves the taverner out wherever the inn is a shell (Main._inn_inside).
+A shell (Main._is_shell: a building whose "inside" names a level) is no inn to stand, sleep or shelter in.
+_resident_places gives no "inn" there, so the inn stint, the homeless's home, visitors and bedrolls keep
+to the square, homes and the fire, as the design has it for all but the inn's folk; the roofless's
+shelter skips it; _inn_rect skips it. The bard's listeners are players in the inn's rect, or on any floor
+of the town's tavern. Main._zone_level loads a zone's level once. Until economy seats the taverner, the
+Mughouse has no staff and nothing else changes. resident_test _test_tavern_keeper. Server only, protocol
+measured at landing, no new class_name; no bullet (811's covers the Mughouse; economy's seating gets the taverner's).
+
 ## 779. A left click opens what E opens
 
 A left click on a counter did nothing in the store tour: counters and depots are Chests, and a

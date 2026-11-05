@@ -10235,6 +10235,8 @@ func _sync_residents() -> void:
 				return not who.begins_with("companion:") and not World.production.worker(who).is_empty() \
 					and not bool(World.production.worker(who).get("away", false)))
 			ids.sort()
+			if _inn_inside(area, place):
+				ids = ids.filter(func(who: String) -> bool: return not TAVERNER in World.production.worker(who).get("trades", []))  # Inside (772 amended (2)).
 			var folk: Array[Dictionary] = []
 			for who in ids:
 				var trades: Array = World.production.worker(who).get("trades", [])
@@ -10336,6 +10338,7 @@ func _sync_residents() -> void:
 		for each: Dictionary in _camp_traders_wanted(area):
 			if wanted.size() < RESIDENTS_MAX and not wanted.has(each["key"]):
 				wanted[each["key"]] = each
+	_tavern_folk(wanted)
 	# The lost (decision 487): a town's people beyond the walls stand at their
 	# cell of this zone, chosen once here (far from the store, off held
 	# ground, reachable), while a player is near that cell; a walked one home
@@ -10586,6 +10589,8 @@ func _town_shelter(area: Dictionary, place_id: String) -> Rect2i:
 		if not str(building.get("town", key)) in [key, ""]:
 			continue
 		var tier := 2
+		if _is_shell(building):
+			continue  # Its roof is over the tavern's floors, not this zone's ground (772 amended (2)).
 		if str(building.get("use", "")) == "inn" or str(building.get("slot", "")) == "building.inn":
 			tier = 0
 		elif _is_temple(building):
@@ -11325,11 +11330,12 @@ func _offers_context() -> Dictionary:
 		"listeners": func(town: String) -> Array:
 			var inn := _inn_rect(town)
 			var out: Array = []
-			if inn.size == Vector2i.ZERO:
-				return out
 			for peer: int in _players:
 				var player: Player = _players[peer]
-				if player != null and player.spawned and inn.has_point(player.tile):
+				if player == null or not player.spawned:
+					continue
+				# In the inn's rect, or on a floor of the town's tavern (772 amended (2): the shell's inn is inside).
+				if (inn.size != Vector2i.ZERO and player.zone == World.zone.name and inn.has_point(player.tile)) or _interior_town(player.zone) == town:
 					out.append(player.player_id)
 			return out,
 		"say": func(town: String, song: Dictionary) -> void: _sung(town, song),
@@ -11762,9 +11768,32 @@ func _inn_rect(town: String) -> Rect2i:
 		return Rect2i()
 	var key := str(World.holdings.place(town).get("key", ""))
 	for building: Dictionary in _world_map.areas.get(World.zone.name, {}).get("buildings", []):
-		if str(building.get("town", "")) == key and str(building.get("use", "")) == "inn":
+		if str(building.get("town", "")) == key and str(building.get("use", "")) == "inn" and not _is_shell(building):
 			return building.get("rect", Rect2i())
 	return Rect2i()
+
+
+## Whether [param building] is a shell (811): its "inside" names the level
+## its floors are, so nobody stands, sleeps or shelters in its footprint.
+static func _is_shell(building: Dictionary) -> bool:
+	return not str(building.get("inside", "")).is_empty()
+
+
+## The level of zone [param zone_name], loaded once (the tavern's floors'
+## "town", tavern_of, beds and rooms); {} for a zone with no level.
+func _zone_level(zone_name: String) -> Dictionary:
+	if not _zone_levels.has(zone_name):
+		_zone_levels[zone_name] = Level.load_level(zone_name) if not zone_name.is_empty() and Level.exists(zone_name) else {}
+	return _zone_levels[zone_name]
+
+
+var _zone_levels: Dictionary = {}
+
+
+## The town whose ground zone [param zone_name] is when it is an interior's
+## floor (811: its level.json "town", the Mughouse's "wilds/store"); "".
+func _interior_town(zone_name: String) -> String:
+	return str(_zone_level(zone_name).get("town", ""))
 
 
 ## Server: the bard sang in [param town] (decision 490, Townsfolk.perform's
@@ -12357,6 +12386,70 @@ func _bed_in(area: Dictionary, rect: Rect2i, nth: int) -> Dictionary:
 	return {}
 
 
+## The trade that keeps a town's tavern (772 amended (2), option B; economy
+## seats one when the inn stands, worker id "taverner:<town>").
+const TAVERNER := "taverner"
+
+
+## Whether [param place]'s inn in [param area] is a shell whose floors are
+## an interior (811): its taverner lives and works in there, not here.
+func _inn_inside(area: Dictionary, place: Dictionary) -> bool:
+	var key := str(place.get("key", ""))
+	for building: Dictionary in area.get("buildings", []):
+		if str(building.get("town", "")) == key and str(building.get("use", "")) == "inn" and _is_shell(building):
+			return true
+	return false
+
+
+## The taverner of the town whose tavern floor this zone is (772 amended
+## (2), option B; the coordinator's approved design: the inn's own folk work
+## and live inside for good, nobody else crosses): a body here while the zone
+## is up, its work the counter (Level.tavern_of's), its home the keeper's
+## room and its bed the bed there, its square and inn the common room.
+## Never in the town's own zone (_sync_residents leaves it out there).
+func _tavern_folk(wanted: Dictionary) -> void:
+	var level := _zone_level(World.zone.name)
+	var town := str(level.get("town", ""))
+	if town.is_empty() or World.towns == null or not World.towns._towns.has(town):
+		return
+	var tavern: Dictionary = Level.tavern_of(level).get(town, {})
+	if tavern.is_empty():
+		return
+	var places := _taverner_places(level, tavern)
+	for who: String in World.towns.residents(town):
+		var worker := World.production.worker(who)
+		if wanted.size() >= RESIDENTS_MAX or worker.is_empty() or bool(worker.get("away", false)) or not TAVERNER in worker.get("trades", []):
+			continue
+		wanted[who] = {"key": who, "name": str(worker.get("name", who)), "trade": TAVERNER, "player": "", "town": town,
+			"type": str(worker.get("type", "")), "places": places.duplicate()}
+
+
+## The taverner's places on a tavern floor [param level] ([param tavern],
+## Level.tavern_of's): work about the counter, home the "keeper" room (else
+## the common room) with its bed, square and inn the common room.
+func _taverner_places(level: Dictionary, tavern: Dictionary) -> Dictionary:
+	var common: Rect2i = tavern.get("rect", Rect2i())
+	var counter: Vector2i = tavern.get("counter", common.get_center())
+	var home := common
+	var keeper: Variant = (level.get("rooms", {}) as Dictionary).get("keeper")
+	if keeper is Dictionary and not (keeper["rects"] as Array).is_empty():
+		home = keeper["rects"][0]
+	var out := {"work": Rect2i(counter - Vector2i.ONE, Vector2i(3, 3)).intersection(common), "home": home, "square": common, "inn": common, "bed": home}
+	for bed: Variant in level.get("beds", []):
+		if not bed is Dictionary or (bed.get("cells", []) as Array).is_empty() or not home.has_point(bed["cells"][0]):
+			continue
+		var head: Vector2i = bed.get("head", Vector2i.ZERO)
+		var cell: Vector2i = bed["cells"][0]
+		if bool(bed.get("solid", false)):
+			for step: Vector2i in [Vector2i(head.y, head.x), Vector2i(-head.y, -head.x), -head]:
+				if World.is_walkable(cell + step):
+					cell = cell + step
+					break
+		out["bed_at"] = {"cell": cell, "head": head}
+		break
+	return out
+
+
 ## Where a resident of [param trade] (the [param index]th of its town:
 ## residents in id order, then companions) goes, in [param area] for the town at [param place]: "work", the
 ## inside of the standing building its trade works in (none: the square);
@@ -12378,8 +12471,8 @@ func _resident_places(area: Dictionary, place: Dictionary, trade: String, homes:
 		if standing and building["use"] == kind:
 			work = building["rect"]
 			work_roofed = _roofed(building)
-		elif standing and building["use"] == "inn":
-			inn = building["rect"]
+		elif standing and building["use"] == "inn" and not _is_shell(building):
+			inn = building["rect"]  # A shell's (811) inn is inside: its stint, visitors and sleepers keep to the square and homes.
 	var home := homes[index] if index < homes.size() else (inn if inn.size != Vector2i.ZERO else work)
 	var out := {"work": work if work.size != Vector2i.ZERO else square, "home": home if home.size != Vector2i.ZERO else square,
 		"square": square}
