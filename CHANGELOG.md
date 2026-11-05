@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: hover a thing in your pack to see who takes it, and anyone who takes something you carry has their name shown in faint gold (802 amended (5)).
 - Walking into Hollowfell counts once toward your Wayfaring, where before it counted twice (804 amended (8)).
 - Towns: once a town's inn stands, a taverner comes to keep it, and where there's no cook, the taverner takes the food you bring (812).
 - Towns: what you bring for a town goes into the hands of whoever uses it, the smith for ore, the cook for food, Rolf at the stall for gear, and the store's chest tells you who to take a thing to (802 amended (4)).

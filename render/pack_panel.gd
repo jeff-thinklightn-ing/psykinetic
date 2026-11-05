@@ -140,6 +140,9 @@ var _promised: Label
 var _charges: Label
 ## The hover tip, a sibling above the panel (made on the first hover).
 var tip: ItemTip
+## Who in the player's town takes what (Main.takers_here, 802 amended (5)):
+## the tip of a thing in the player's own pack says who ("For the smith").
+static var takers: Dictionary = {}
 ## Each row's entity and contents as last shown: an item new in a slot is
 ## one that landed there.
 var _last: Dictionary[HBoxContainer, Array] = {}
@@ -366,7 +369,10 @@ func show_tip(box: SlotBox) -> void:
 	if tip == null:
 		tip = ItemTip.new()
 		(get_parent() if get_parent() != null else self).add_child(tip)
-	tip.show_for(entity.slots[box.index], box.note, box.get_global_rect().position)
+	var taker := ""
+	if entity is Player and (entity as Player).owner_peer == Net.local_id and box.index in Items.PACK_SLOTS:
+		taker = Main.taker_line(takers, str(entity.slots[box.index]))
+	tip.show_for(entity.slots[box.index], box.note, box.get_global_rect().position, taker)
 
 
 func hide_tip() -> void:

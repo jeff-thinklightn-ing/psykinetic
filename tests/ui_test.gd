@@ -61,6 +61,7 @@ func _ready() -> void:
 	_test_fire_click()
 	await _test_person_window()
 	await _test_person_give()
+	_test_taker_hint()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2861,6 +2862,51 @@ func _test_person_window() -> void:
 ## what a give does; a sheet with "takes" shows the toggle and opens on Give;
 ## a pick of a square they take, the button, "give" {entity, uids}; none
 ## taken: no toggle.
+## 802 amended (5), ui's side (economy's give tour: nothing said who takes
+## the ore): economy's "takers" read for the pack's tooltip line (voice's
+## words) and the faint mark on a taker's name.
+func _test_taker_hint() -> void:
+	print("
+== the taker hint (802 amended (5)): the pack tip's \"For the smith\", the taker's name marked ==")
+	var takers := {"town": "wilds/store", "takers": {
+		"ore": {"trade": "smith", "name": "Bran", "body": "/root/Bran", "store": false},
+		"herbs": {"trade": "medicine_man", "name": "Hild", "body": "", "store": true},
+		"cloth": {"trade": "vendor", "name": "Rolf", "body": "/root/Rolf", "store": true}},
+		"gear": {"trade": "vendor", "name": "Rolf", "body": "/root/Rolf"}}
+	var lines := ["ore_sack", "herbs", "cloth_bolt", "sword", "wood_bundle", "meat"].map(func(id: String) -> String: return Main.taker_line(takers, id))
+	_check(lines == ["For the smith", "For the medicine man", "For Rolf at the stall", "For Rolf at the stall", "", ""],
+		"voice's lines: the trade, Rolf at the stall (cloth with no weaver, gear); a raw nobody takes, none (%s)" % [lines])
+	_check(Main.taker_line({"town": "", "takers": {}}, "ore_sack").is_empty() and Main.taker_line({}, "sword").is_empty(),
+		"no town, or none heard: no line")
+	var tip := ItemTip.new()
+	add_child(tip)
+	tip.show_for("ore_sack", "", Vector2(100, 400), "For the smith")
+	var texts := tip.texts()
+	tip.queue_free()
+	_check(not texts.is_empty() and texts.back() == "For the smith", "the tip ends with who takes it (%s)" % [texts])
+	var me: Player = _main._local_player()
+	if me == null:
+		print("  (no player in this scene: the marks unchecked)")
+		return
+	var was: PackedStringArray = me.slots.duplicate()
+	var pack := func(first: String, second: String) -> PackedStringArray:
+		var out: PackedStringArray = was.duplicate()
+		for slot: int in Items.PACK_SLOTS:
+			out[slot] = ""
+		out[Items.PACK_SLOTS[0]] = first
+		out[Items.PACK_SLOTS[1]] = second
+		return out
+	me.slots = pack.call("ore_sack", "herbs")
+	var marks: Dictionary = Main.taker_marks(takers, me)
+	me.slots = pack.call("ore_sack", "sword")
+	var with_gear: Dictionary = Main.taker_marks(takers, me)
+	me.slots = pack.call("", "")
+	var none: Dictionary = Main.taker_marks(takers, me)
+	me.slots = was
+	_check(marks.keys() == ["/root/Bran"] and with_gear.has("/root/Rolf") and with_gear.has("/root/Bran") and none.is_empty(),
+		"carrying ore: the smith's name marked (an unspawned taker, none); a sword: Rolf's too; nothing they take: none (%s, %s)" % [marks, with_gear])
+
+
 func _test_person_give() -> void:
 	print("
 == Give (802): the person's takes lit, voice's lines, the button gives ==")

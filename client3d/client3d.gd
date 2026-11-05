@@ -1497,6 +1497,9 @@ const LABEL_FONT_SIZE := 64
 ## A boss's nameplate (752, ui's side): brass, a skull this many world units
 ## square over its name.
 static var BOSS_NAME: Color = UiTheme.color("brass_bright")
+## A townsperson who takes something the player carries (802 amended (5),
+## ui's side): their name faintly brass, so the smith is seen across the square.
+static var TAKER_NAME: Color = Color.WHITE.lerp(UiTheme.color("brass"), 0.45)
 const BOSS_MARK := 0.32
 const SPEECH := Color(1, 0.95, 0.6)
 const HOVER := Color(1, 1, 1, 0.35)
@@ -2176,6 +2179,9 @@ var _ring_mesh: ArrayMesh
 var bubbles: SpeechBubbles
 ## Main: Alt is held, so every HP bar shows.
 var show_all_bars := false
+## Main: the bodies (node paths) who take something in the player's pack,
+## named in TAKER_NAME (802 amended (5), ui's side).
+var taker_marks: Dictionary = {}
 ## Entity instance id -> when it was last in a fight (msec), and its hp as
 ## last seen.
 var _combat_at: Dictionary[int, int] = {}
@@ -16619,6 +16625,8 @@ func _sync_ailments(entity: GridEntity, puppet: Node3D) -> void:
 	if label == null:
 		return
 	var tint := AIL_BURN if entity.ailments.has("burn") else AIL_BLEED if entity.ailments.has("bleed") else puppet.get_meta("name_tint", Color.WHITE) as Color
+	if tint == Color.WHITE and not taker_marks.is_empty() and taker_marks.has(String(entity.get_path())):
+		tint = TAKER_NAME
 	if label.modulate != tint:
 		label.modulate = tint
 

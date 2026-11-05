@@ -115,8 +115,9 @@ static func lines_for(id: String, note: String) -> Array[Dictionary]:
 
 
 ## Shown for [param id] with [param note], its bottom left at [param at]
-## (the slot's top left, in the HUD's units), kept on screen.
-func show_for(id: String, note: String, at: Vector2) -> void:
+## (the slot's top left, in the HUD's units), kept on screen; [param taker],
+## who in town takes it ("For the smith", 802 amended (5)), last.
+func show_for(id: String, note: String, at: Vector2, taker := "") -> void:
 	for child in _column.get_children():
 		_column.remove_child(child)
 		child.queue_free()
@@ -124,6 +125,8 @@ func show_for(id: String, note: String, at: Vector2) -> void:
 	if rows.is_empty():
 		visible = false
 		return
+	if not taker.is_empty():
+		rows.append({"text": taker, "style": "taker"})
 	for row in rows:
 		var label := Label.new()
 		label.text = row["text"]
@@ -146,6 +149,9 @@ func show_for(id: String, note: String, at: Vector2) -> void:
 				label.add_theme_color_override("font_color", UiTheme.color("text_dim"))
 			"warn":
 				label.add_theme_color_override("font_color", UiTheme.color("rust"))
+			"taker":
+				label.theme_type_variation = &"Caption"
+				label.add_theme_color_override("font_color", UiTheme.color("brass"))
 		_column.add_child(label)
 	visible = true
 	# Laid out over a frame before it is placed: above the slot, else beside it.

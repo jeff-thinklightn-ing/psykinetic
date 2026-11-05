@@ -41828,6 +41828,20 @@ gets {town: "", takers: {}}. The client keeps it as Main.takers_here for ui. Tow
 _test_person_takes. Protocol rev 50 (still unreleased: a "50 (802 amended (5))" line, the kind in
 MESSAGE_KINDS); server and client, no new class_name, no bullet (ui's side carries it).
 
+802 amended (5), ui's side (the coordinator's approval; voice's words; economy's "takers"): the
+pack's tooltip, on a thing in the player's own pack (Items.PACK_SLOTS), ends with who in town takes it,
+in brass: "For the smith", "For the medicine man" (the trade's word), "For Rolf at the stall" (the
+keeper, "vendor": a raw no one else takes, or gear); no line where nobody does or no town is heard.
+Voice: a window line, no full stop; the trade, not the person (the mark shows which one he is).
+Main.taker_entry / taker_line read Main.takers_here (also PackPanel.takers, a static Dictionary, for
+the tip) by the thing's raw (Items.yield_of); gear, a thing with no raw but a value or "made", goes
+to "gear". ItemTip.show_for takes the line ("taker" style). The mark: every sixth frame Main sets
+Client3D.taker_marks (Main.taker_marks: the bodies who take something in the pack), and
+Client3D._sync_ailments tints those names TAKER_NAME (white toward brass, 0.45), under a burn's or a
+bleed's tint, so the smith shows across the square. ui_test _test_taker_hint (voice's lines; none
+heard, none; the tip's last line; the marks for ore, a sword, nothing). CHANGELOG bullet (voice's
+words). Client only, rides economy's rev 50, no new class_name.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

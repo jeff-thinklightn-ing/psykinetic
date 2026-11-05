@@ -1252,6 +1252,8 @@ func _process(delta: float) -> void:
 	_drive_camera_keys(delta)
 	if Engine.get_process_frames() % 6 == 0:
 		_watch_locker()
+		if _client3d != null:
+			_client3d.taker_marks = taker_marks(takers_here, _local_player())
 	_update_pick()
 	_run_test_hold_near()
 	_run_test_latency()
@@ -14117,7 +14119,8 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "takers":
-		takers_here = data  # 802 amended (5): ui reads it.
+		takers_here = data  # 802 amended (5): the pack tooltip's line and the name-tag mark.
+		PackPanel.takers = data
 		return
 	if kind == "world":
 		if data.get("guide_route") is Dictionary:
@@ -14898,6 +14901,49 @@ func receiver_for(town: String, raw: String) -> String:
 			if str(trade) in who.get("trades", []) and not bool(who.get("away", false)):
 				return id
 	return Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else ""
+
+
+## 802 amended (5), ui's side: the "takers" entry (Main.takers_here) for
+## item [param id] carried in the pack: its raw's taker (Items.yield_of), or
+## for gear (no raw, of some worth: a value, or made) the stall's keeper;
+## {} for none.
+static func taker_entry(takers: Dictionary, id: String) -> Dictionary:
+	if id.is_empty():
+		return {}
+	var yields := Items.yield_of(id)
+	if not yields.is_empty():
+		var raw := str(yields.keys()[0])
+		return takers.get("takers", {}).get(raw, {}) if raw != "gold" else {}
+	if Items.value_of(id) > 0 or Items.def(id).get("made") is Dictionary:
+		return takers.get("gear", {})
+	return {}
+
+
+## The pack tooltip's line for item [param id] (voice's: no full stop):
+## "For the smith", "For the medicine man", "For Rolf at the stall"; "" for
+## none.
+static func taker_line(takers: Dictionary, id: String) -> String:
+	var entry := taker_entry(takers, id)
+	var trade := str(entry.get("trade", ""))
+	if trade.is_empty():
+		return ""
+	if trade == "vendor":
+		return "For %s at the stall" % str(entry.get("name", "Rolf"))
+	return "For the " + trade.replace("_", " ")
+
+
+## The bodies (node paths) who take something in [param player]'s pack
+## (Client3D.taker_marks: their names faintly brass).
+static func taker_marks(takers: Dictionary, player: Player) -> Dictionary:
+	var out := {}
+	if player == null or takers.get("takers", {}).is_empty() and takers.get("gear", {}).is_empty():
+		return out
+	for slot: int in Items.PACK_SLOTS:
+		if slot < player.slots.size():
+			var body := str(taker_entry(takers, str(player.slots[slot])).get("body", ""))
+			if not body.is_empty():
+				out[body] = true
+	return out
 
 
 ## Who in [param town] takes each raw a player could give (802 amended (5);
