@@ -366,7 +366,7 @@ func _special_tick() -> bool:
 	if d >= int(charge["from"]) and d <= int(charge["cells"]) and World.tick >= _next_charge:
 		var toward := Vector2(target.tile - tile).normalized()
 		var shape := Telegraph.line(tile, toward, float(charge["cells"]), 1)
-		if target.tile in World.telegraph_cells(shape):
+		if World.struck_cell(target) in World.telegraph_cells(shape):  # Aimed at where it is (decision 810).
 			_begin("charge", shape, int(charge["roar"]))
 			_move["toward"] = toward
 			_next_charge = World.tick + int(charge["every"])
@@ -414,14 +414,15 @@ func _tend_move() -> bool:
 	var id := int(_move["telegraph"])
 	match move:
 		"swipe":
+			var swept := _bodies(cells)
 			var struck := _hit_cells(cells, int(swipe["damage"]))
-			World.sweep(self, _move["toward"], float(swipe["half_angle"]) * 2.0, int(ceil(float(swipe["length"]))), {"impulse": float(swipe["impulse"])})
+			World.sweep(self, _move["toward"], float(swipe["half_angle"]) * 2.0, int(ceil(float(swipe["length"]))), {"impulse": float(swipe["impulse"]), "only": swept})  # A body spared is not pushed (810).
 			World.end_telegraph(id, true)
 			_log_move(move, "landed on %d" % struck if struck > 0 else "dodged")
 		"slam":
 			var hit := _bodies(cells)
 			_hit_cells(cells, int(slam["damage"]))
-			World.sweep(self, _move["toward"], 360.0, 1, {"impulse": float(slam["impulse"])})
+			World.sweep(self, _move["toward"], 360.0, 1, {"impulse": float(slam["impulse"]), "only": hit})  # A body spared is not pushed (810).
 			for each in hit:
 				if is_instance_valid(each) and each.spawned:
 					World.knock_down(each, self, int(slam["down"]))
@@ -464,11 +465,13 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 		_log_move("charge", "dodged (%s)" % reason)
 
 
-## The bodies on [param cells] but its own.
+## The bodies its tell on [param cells] strikes but its own (decision 810:
+## World.tell_struck, by the centre's cell, lag judged in the player's
+## favour; it read the held tile, which keeps a body till 0.1 past the edge).
 func _bodies(cells: Array[Vector2i]) -> Array[GridEntity]:
 	var out: Array[GridEntity] = []
-	for each in World.entities():
-		if each != self and each.spawned and each.hp > 0 and each.max_hp > 0 and each.tile in cells:
+	for each in World.tell_struck(self, cells):
+		if each.spawned and each.hp > 0 and each.max_hp > 0:
 			out.append(each)
 	return out
 

@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_downed_fire()
 	_test_flank_party()
 	_test_fight_won()
+	_test_tell_truth()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1486,6 +1487,40 @@ func _test_fight_won() -> void:
 	var fled := World.fight_reward([{"name": "Grull", "fled": true, "hard": true}], Vector2i(4, 5))
 	_check(str(fled["banner"]) == "Grull, driven off", "a hard foe fled: driven off (%s)" % [fled])
 	World.fight_won.disconnect(on_won)
+
+
+## A tell strikes the cells it draws, judged by the centre and in the
+## player's favour (decision 810): a body seen out of the red is spared, its
+## held cell notwithstanding, and so is one whose step out the server holds
+## unwalked; where the commands end counts, not where they pass.
+func _test_tell_truth() -> void:
+	print("
+== a tell strikes what it shows, lag in the player's favour (decision 810) ==")
+	var cases: Array = [
+		# [player's cell, its centre, commands [way, ticks], struck?, label]
+		[4, Vector2(4.0, 2.0), [], true, "standing in the red: struck"],
+		[6, Vector2(6.0, 2.0), [], false, "one cell outside the red: never struck"],
+		[5, Vector2(5.55, 2.0), [], false, "centre just out, its held cell still in: spared"],
+		[5, Vector2(5.0, 2.0), [[Vector2.RIGHT, 3.0]], false, "in, a step out already sent: spared"],
+		[5, Vector2(5.0, 2.0), [[Vector2.RIGHT, 1.5], [Vector2.LEFT, 1.5]], true, "a step out sent, then one back in: struck"],
+		[4, Vector2(4.0, 2.0), [[Vector2.RIGHT, 3.0], [Vector2.RIGHT, 3.0]], true, "two steps' worth sent: only FREE_BANK_TICKS counted, still in: struck"],
+	]
+	for each: Array in cases:
+		var row := "#........#"
+		row = row.substr(0, int(each[0])) + "P" + row.substr(int(each[0]) + 1)
+		var e := _build(["##########", "#........#", "#..B" + row.substr(4), "#........#", "##########"])
+		var host: Player = e["P"][0]
+		var bear: GridEntity = e["B"][0]
+		var cells := World.telegraph_cells(Telegraph.cone(bear.tile, Vector2(1, 0), 2.0, 60.0))
+		if each[0] == 6:
+			_check(Vector2i(6, 2) not in cells and Vector2i(5, 2) in cells, "the swipe's red: (5, 2) in, (6, 2) out")
+		host.free_pos = each[1]
+		World.free_drop(host)
+		for command: Array in each[2]:
+			World.free_input(host, command[0], World.TICK_DT * float(command[1]))
+		var struck: Array = bear.call("_bodies", cells)
+		_check((host in struck) == bool(each[3]), "%s (cell %s, centre %s, ends %s)" % [each[4], host.tile, host.free_pos, World.free_projected(host)])
+		World.free_drop(host)
 
 
 func _test_spin() -> void:

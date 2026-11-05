@@ -5573,6 +5573,50 @@ func _bodies_in(by: GridEntity, cells: Array[Vector2i]) -> Array[GridEntity]:
 	return out
 
 
+## Who a tell's landing on [param cells] strikes (decision 810): every body
+## whose centre's cell is in them (_bodies_in; 699's struck_cell), save one
+## tell_spares: the cells drawn are the cells read, and lag is judged in the
+## player's favour.
+func tell_struck(by: GridEntity, cells: Array[Vector2i]) -> Array[GridEntity]:
+	var out: Array[GridEntity] = []
+	for body in _bodies_in(by, cells):
+		if not tell_spares(body, cells):
+			out.append(body)
+	return out
+
+
+## Whether a tell landing on [param cells] spares [param body] (decision
+## 810): a free body whose commands the server holds and has not yet walked
+## (its own screen already shows them walked) end, walked, with its centre's
+## cell out of them. Where they end, not where they pass: a step out and one
+## back in is struck.
+func tell_spares(body: GridEntity, cells: Array[Vector2i]) -> bool:
+	return Vector2i(free_projected(body).round()) not in cells
+
+
+## Where [param body]'s centre will be once its waiting commands are walked
+## (decision 810): at most FREE_BANK_TICKS of them, in order, projected
+## without effects (_free_glide); its centre now if it holds none, is held
+## (free_held), or is no free body.
+func free_projected(body: GridEntity) -> Vector2:
+	var at := body_centre(body)
+	if not Net.is_authority() or not body is Player or not free_body(body) or free_held(body):
+		return at
+	var player := body as Player
+	var pos := player.free_pos
+	var held := player.tile
+	var left := FREE_BANK_TICKS
+	for command: Dictionary in player.free_inputs:
+		if left <= 0.001:
+			break
+		var ticks := minf(float(command["ticks"]), left)
+		var glided: Array = _free_glide(player, pos, command["intent"], ticks, false, held)
+		pos = glided[0]
+		held = glided[2]
+		left -= ticks
+	return at + (pos - player.free_pos)
+
+
 ## The cell a blow finds [param body] in (enemy-ai's free-walk audit): a
 ## body on the grid's own; a free body's the cell under its centre, held or
 ## not (699, combat's side: a telegraph by the centre's cell, so a body seen
@@ -5651,7 +5695,7 @@ func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
 		impulse = float(call("swing_impulse", by, id))  # Physics' (605), when it is in.
 	impulse *= float(move.get("impulse_scale", 1.0))  # Jeff's knob (a wall's impact grows with its square).
 	var struck := 0
-	for body in _bodies_in(by, telegraph_cells(shape)):
+	for body in tell_struck(by, telegraph_cells(shape)):  # Decision 810.
 		if not can_target(by, body):
 			continue
 		var amount := maxi(1, roundi(by.attack_damage * float(move["damage_scale"])))
@@ -5686,9 +5730,10 @@ func _throw_lands(by: GridEntity, shape: Dictionary) -> void:
 		return
 	var hit: GridEntity = null
 	var rest := by.tile
-	for cell in telegraph_cells(shape):
+	var cells := telegraph_cells(shape)
+	for cell in cells:
 		for body in bodies_struck_at(cell):
-			if body != by and _alive(body):
+			if body != by and _alive(body) and not tell_spares(body, cells):  # Decision 810.
 				hit = body
 				break
 		if hit != null:
@@ -9503,7 +9548,8 @@ func _lunge_finish(state: Dictionary) -> Dictionary:
 ## [param arc_degrees], and that a swing could reach (no wall or closed door
 ## on the cells between: _sweep_reaches), takes apply_blow along its own
 ## line from the source, so the push fans out. [param blow] as apply_blow's
-## (impulse, stagger; swing_impulse gives a weapon's). The bodies are taken
+## (impulse, stagger; swing_impulse gives a weapon's; "only", an Array, to
+## push those alone: decision 810's struck). The bodies are taken
 ## as they stand when it starts and struck from one edge of the cone to the
 ## other; one already knocked out of it on the way is passed over. Server
 ## only, at once. Each struck body's {body, result}; emitted as swept.
@@ -9521,6 +9567,8 @@ func sweep(source: GridEntity, toward: Vector2, arc_degrees: float, cells: int, 
 			var body: GridEntity = _occupancy.get(source.tile + off)
 			if body == null or body == source or not _alive(body):
 				continue
+			if blow.has("only") and body not in (blow["only"] as Array):
+				continue  # Only those its tell struck (decision 810): a body spared is not pushed either.
 			var angle := toward.angle_to(Vector2(off))
 			if absf(angle) <= half and _sweep_reaches(source.tile, source.tile + off):
 				found.append([angle, body])

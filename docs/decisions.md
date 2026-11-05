@@ -41965,3 +41965,22 @@ and with a new area, the client's fold), level_test _test_explorables (no town p
 one, the hills' six and the Old Tower, not the path, voice's shown names). Protocol: a "49 (804,
 maps' side)" line, the world message carrying a new key an old client ignores (rev 49 still
 open); no new class_name.
+## 810. A tell strikes what it shows, lag judged in the player's favour
+
+(2026-11-05, combat; the coordinator's approval, after playtest's bear13 runs; release's number.) In
+playtest's bear_yard runs, 13 of 82 great-bear hits came with the bot's cell already out of the red at
+the landing. Two causes. The bear's own landing (GreatBear._bodies, and its charge's aim) read each
+body's held tile, which keeps a free body until its centre is FREE_HYSTERESIS (0.1) past the cell's
+edge, where World already judges a blow by the cell under the centre (699's struck_cell). And nothing
+allowed for lag: the server may hold a player's movement commands it has not walked yet, while that
+player's own screen already shows them walked. World.tell_struck(by, cells) is now who a tell's landing
+strikes: every body whose centre's cell is in the cells it drew (_bodies_in), save one tell_spares
+(World.free_projected walks its waiting commands in order without effects, _free_glide, at most
+FREE_BANK_TICKS, and the centre where they end is out). Where they end counts, not where they pass,
+so a step out and one back in is struck (the coordinator's guard), and only commands the player really
+sent count. The bear's swipe and slam strike through it and push only those they struck (World.sweep's
+blow takes "only"), so a body spared is not shoved either; its charge aims at struck_cell; World's spin
+and throw strike through it. The charge's rush still hits by meeting a body on its way (a collision, not
+cells). combat_test _test_tell_truth: standing in, struck; one cell outside, never; centre just out with
+the held cell in, spared; a step out sent, spared; out then back in, struck; more than FREE_BANK_TICKS
+sent, only those counted. Sim only, protocol unchanged, no new class_name.
