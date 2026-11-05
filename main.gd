@@ -14343,17 +14343,74 @@ func _thank_aloud(player_id: String, data: Dictionary) -> void:
 	var given: Dictionary = data.get("given", {})
 	if player == null or given.is_empty():
 		return
-	var body := _thanker(player, str(data.get("worker", "")), str(data.get("place", "")))
-	if body == null:
-		return
+	var worker := str(data.get("worker", ""))
+	var place := str(data.get("place", ""))
 	var rules: Dictionary = Townsfolk.days().get("thanks", {})
+	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(given)
+	var body := _thanker(player, worker, place)
+	if body != null:
+		var line := _thanks_line(body, player_id, what, rules)
+		if not line.is_empty():
+			_resident_says(body, line, "", player, false)
+		return
+	if not worker.is_empty():
+		return  # Given to one person who does not hear: theirs alone to thank.
+	# Never silent (804, npc's side; playtest: an ore hand-in at the store went unthanked, nobody near):
+	# the town's nearest awake body calls it over, narrated to the player; with all asleep or hiding, the
+	# store's own words ("store_night" only at night, by its words).
+	var far := _far_thanker(player, place)
+	var text := ""
+	if far != null:
+		var line := _thanks_line(far, player_id, what, rules)
+		var frames: Array = rules.get("far", ["{name} calls over: \"{line}\""])
+		if not line.is_empty() and not frames.is_empty():
+			text = str(frames[absi(hash(far.worker_id + player_id)) % frames.size()]).replace("{name}", far.person).replace("{line}", line)
+	if text.is_empty():
+		var own: Array = (rules.get("store", []) as Array).duplicate()
+		if DayNight.daylight(DayNight.now()) < Animal.NIGHT_LIGHT:
+			own.append_array(rules.get("store_night", []))
+		if own.is_empty():
+			own = ["You leave {count} {item} on the store's shelves for the town."]
+		text = str(own[absi(hash(player_id + place + str(World.tick))) % own.size()]).replace("{count} {item}", what).replace("{item}", what)
+	party_log.add(text)
+	Net.broadcast_to([player.owner_peer], "party", {"from": "", "text": text})
+
+
+## [param body]'s thanks to [param player_id] for [param what] (the reward's
+## counted words), a line by its trade (residents.json "thanks", "vendor" for
+## the stall's keeper, else "default"); "" for none.
+func _thanks_line(body: Resident, player_id: String, what: String, rules: Dictionary) -> String:
 	var trade := "vendor" if body.worker_id.begins_with(Offers.VENDOR) else body.trade
 	var lines: Array = rules.get(trade, rules.get("default", []))
 	if lines.is_empty():
-		return
-	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(given)
+		return ""
 	var line := str(lines[absi(hash(body.worker_id + player_id + str(World.tick))) % lines.size()])
-	_resident_says(body, line.replace("{count} {item}", what).replace("{item}", what), "", player, false)
+	return line.replace("{count} {item}", what).replace("{item}", what)
+
+
+## The one who calls a hand-in's thanks over when nobody near hears (804,
+## npc's side, never silent): of [param place]'s town, awake, not hiding, spawned
+## in [param player]'s zone, never a visitor: its store's keeper (a merchant)
+## first, else the stall's keeper there, else the nearest to them; null for
+## none.
+func _far_thanker(player: Player, place: String) -> Resident:
+	var keeper: Resident = null
+	var vendor: Resident = null
+	var nearest: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or not body.spawned or body.zone != player.zone or body.town != place or body.doing == Resident.Doing.HIDE \
+				or body.worker_id.begins_with(Offers.VISITOR) or body.sleeping():
+			continue
+		var d := World.distance(body.tile, player.tile)
+		if body.worker_id.begins_with(Offers.VENDOR):
+			vendor = body
+		elif body.trade == "merchant":
+			if keeper == null or d < World.distance(keeper.tile, player.tile):
+				keeper = body
+		elif nearest == null or d < World.distance(nearest.tile, player.tile):
+			nearest = body
+	return keeper if keeper != null else vendor if vendor != null else nearest
 
 
 ## The hand-ins the town has news of: "player|town|day" -> true, so a
@@ -14421,10 +14478,15 @@ func _thanker(player: Player, worker: String, place: String) -> Resident:
 ## hears words (_resident_hears), or the stall's keeper in their zone within
 ## HEARING_RANGE, not hiding.
 func _hears_thanks(body: Resident, player: Player) -> bool:
-	if body != null and is_instance_valid(body) and body.worker_id.begins_with(Offers.VENDOR):
-		return body.spawned and body.zone == player.zone and body.doing != Resident.Doing.HIDE \
-			and World.distance(body.tile, player.tile) <= HEARING_RANGE
+	if body == null or not is_instance_valid(body) or World.distance(body.tile, player.tile) > (thanks_reach if thanks_reach >= 0 else HEARING_RANGE):
+		return false
+	if body.worker_id.begins_with(Offers.VENDOR):
+		return body.spawned and body.zone == player.zone and body.doing != Resident.Doing.HIDE
 	return _resident_hears(body, player)
+
+
+## A test's narrower reach for _hears_thanks (cells); -1 in play (HEARING_RANGE).
+var thanks_reach := -1
 
 
 ## [param given] ({id: count}, a raw good's name or an item's id) in words:

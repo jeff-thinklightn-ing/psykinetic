@@ -41917,6 +41917,19 @@ merchant takes it though the cook is nearer, in the reward's words; without him 
 words; nobody hearing, or a named receiver not here, nothing; a gold reward no thanks. Protocol unchanged
 ("speech" as before); no new class_name.
 
+804, npc's side: a hand-in is never silent (playtest's reward_loop tour: an ore hand-in at Umbrage's store
+went unthanked, nobody within hearing; the coordinator: it holds the cut; release's label). When nobody near
+hears (Main._thanker finds none, and no give path named the receiver), the town's nearest awake body
+(Main._far_thanker: of the hand-in's town, in the player's zone, not hiding, not asleep, never a visitor;
+the store's merchant first, then the stall's keeper, then the nearest) calls the thanks over, narrated to
+the player alone (residents.json thanks "far": "{name} calls over: \"{line}\"" / "{name} calls across to
+you: \"{line}\"", the line its trade's); with all asleep or hiding, the store's own words ("store": "You
+leave {count} {item} on the store's shelves for the town."; at night also "store_night": "No one is
+about. You leave {count} {item} on the shelves for the morning."; voice's words, "you" the doer so the verb
+never agrees with the count). A give to a person who does not hear stays theirs alone. Main._thanks_line
+split out; Main.thanks_reach a test's narrower reach (-1 in play). resident_test _test_hand_in_thanked: far,
+called over; all hiding, the store's words.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

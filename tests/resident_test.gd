@@ -2204,11 +2204,19 @@ func _test_hand_in_thanked() -> void:
 	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}})
 	said = " ".join(_main.party_log.last(1))
 	_check(said == "Tova said: \"That's 1 wood for the pot. Good.\"", "no keeper: the nearest who hears, in her trade's words (%s)" % [said])
+	var near_at := player.tile
+	_main.thanks_reach = 0  # The test town is smaller than hearing: nobody counts as near.
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}, "counted": "1 wood"})
+	_main.thanks_reach = -1
+	said = " ".join(_main.party_log.last(1))
+	_check(said.begins_with("Tova call") and "1 wood for the pot" in said, "nobody near: the town's nearest awake calls it over, narrated (%s)" % [said])
 	tova.doing = Resident.Doing.HIDE
-	before = _main.party_log.last(1)
-	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}})
-	_check(_main.party_log.last(1) == before, "nobody who hears: nothing said (%s)" % [_main.party_log.last(1)])
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}, "counted": "1 wood"})
+	said = " ".join(_main.party_log.last(1))
+	_check("You leave 1 wood on the" in said and not "Tova" in said, "all hiding: the store's own words, never silent (%s)" % [said])
 	tova.doing = Resident.Doing.SQUARE
+	_put(player, near_at)
+	before = _main.party_log.last(1)
 	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}, "worker": "rs-nobody"})
 	_check(_main.party_log.last(1) == before, "the give path names one not here: nothing said, nobody else (%s)" % [_main.party_log.last(1)])
 	_main._reward(player.player_id, {"track": "gold", "amount": 3})

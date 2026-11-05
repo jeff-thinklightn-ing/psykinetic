@@ -253,7 +253,16 @@ func _show_channel() -> void:
 	_channel.text = "party" if _box.text.begins_with("/p") else "say"
 
 
+## Scrolls to the end on the next frame, once however often it is asked in one
+## frame. A one-shot connection, not an await: a panel freed before that frame
+## drops its connection, where a resumed await raised an engine error (economy_test,
+## a hand-in's narrated thanks arriving as the test closed).
 func _scroll_to_end() -> void:
-	await get_tree().process_frame
+	if not is_inside_tree() or get_tree().process_frame.is_connected(_scroll_now):
+		return
+	get_tree().process_frame.connect(_scroll_now, CONNECT_ONE_SHOT)
+
+
+func _scroll_now() -> void:
 	if is_instance_valid(_scroll):
 		_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
