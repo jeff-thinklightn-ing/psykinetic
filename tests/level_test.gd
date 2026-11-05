@@ -2702,6 +2702,7 @@ func _test_relaid() -> void:
 			"ground": [{"cell": [well.x, well.y], "ids": ["coin"], "items": [8], "gold": 0}], "records": []}}}), "(the old world written)")
 	var snapshot := Snapshot.load(path)
 	var done: Dictionary = snapshot.get("remade", {})
+	_removals_done(done)  # 807's removals have a test of their own (_test_removed).
 	var level_of := func(_level: String) -> Dictionary: return wilds
 	# An overlay copy laid out the old way (edited before the re-lay) shadows the new one: nothing moves, nothing marked.
 	var shadowed := Relaid.move(snapshot, done, func(_level: String) -> Dictionary: return {"places": {}, "entities": [], "terrain": {"floor": []}})
@@ -2729,7 +2730,9 @@ func _test_relaid() -> void:
 	far["terrain"] = {"floor": [Vector2i(0, 0)]}
 	var lost := {"ok": true, "players": [], "zones": {"wilds": {"entities": [], "respawns": [], "records": [],
 		"ground": [{"cell": Vector2i(100, 100), "ids": ["coin"], "items": [], "gold": 0}]}}}
-	var far_lines := Relaid.move(lost, {}, func(_level: String) -> Dictionary: return far)
+	var far_done := {}
+	_removals_done(far_done)
+	var far_lines := Relaid.move(lost, far_done, func(_level: String) -> Dictionary: return far)
 	_check(far_lines.size() == 1 and far_lines[0].ends_with(", 1 left where they were (no floor near)") and lost["zones"]["wilds"]["ground"][0]["cell"] == Vector2i(100, 100),
 		"a pile with no floor near is kept where it was and counted, never dropped (%s)" % [far_lines])
 	var fresh := {}
@@ -2738,6 +2741,7 @@ func _test_relaid() -> void:
 	_test_explorables()
 	_test_forest_camps()
 	_test_bear_den()
+	_test_removed(wilds)
 
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp
@@ -2882,6 +2886,67 @@ func _test_bear_den() -> void:
 				open.append(cell)
 	_check(floor.has(den) and shut.is_empty() and open.is_empty(),
 		"the den at %s: rock behind it on the west, none to its south (shut south: %s; gaps in the back: %s)" % [den, shut, open])
+
+
+## Marks every Relaid.REMOVED entry done in [param done].
+static func _removals_done(done: Dictionary) -> void:
+	for plan: Dictionary in Relaid.REMOVED:
+		done[Relaid.done_key_of(plan["level"], plan["decision"])] = plan["decision"]
+
+
+## Chests only in dungeons (807): the removed markers are gone from their
+## levels, and a save from before has their saved chests dropped once, what
+## they held (slots, and a stacked unit the book has at it) laid on a pile on
+## the cell, the book following; a chest kept elsewhere untouched; the line
+## counts only; the next boot does nothing; a level still holding a removed
+## marker (an overlay copy) waits.
+func _test_removed(wilds: Dictionary) -> void:
+	print("
+== Chests only in dungeons: the outdoor chests removed, their things on the ground (807) ==")
+	for plan: Dictionary in Relaid.REMOVED:
+		var level := Level.load_level(plan["level"])
+		var tiles: Array = (level["entities"] as Array).map(func(spec: Dictionary) -> Vector2i: return spec["tile"])
+		for key: String in plan["removed"]:
+			_check(not Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1))) in tiles, "%s: no marker at %s now" % [plan["level"], key])
+	var full := {"script": "res://sim/chest.gd", "shape": "chest", "name": "Chest7", "tile": [201, 83], "hp": 1, "stamina": 0,
+		"facing": [0, 1], "props": {}, "spawn": 2, "spawn_key": "201,83", "slots": ["bandaging_kit", "", "arrows", ""], "items": [11, 0, 12, 0]}
+	var empty := {"script": "res://sim/chest.gd", "shape": "chest", "name": "Chest3", "tile": [122, 138], "hp": 1, "stamina": 0,
+		"facing": [0, 1], "props": {}, "spawn": 1, "spawn_key": "122,138", "slots": ["", "", "", ""], "items": [0, 0, 0, 0]}
+	var stays := {"script": "res://sim/chest.gd", "shape": "chest", "name": "Chest9", "tile": [119, 139], "hp": 1, "stamina": 0,
+		"facing": [0, 1], "props": {}, "spawn": 0, "spawn_key": "119,139", "slots": ["knife"], "items": [14]}
+	var path: String = preload("res://tests/test_ports.gd").scratch("removed_world.json")
+	_check(Snapshot.write(path, {"version": Snapshot.VERSION, "players": [], "remade": {"relaid/wilds": 774},
+		"items": {"next": 20, "book": {"11": {"id": "bandaging_kit", "at": "wilds/Chest7"}, "12": {"id": "arrows", "at": "wilds/Chest7"},
+			"13": {"id": "arrows", "at": "wilds/Chest7"}, "14": {"id": "knife", "at": "wilds/Chest9"}}},
+		"zones": {"wilds": {"tick": 9, "entities": [full, empty, stays], "respawns": [], "ground": [], "records": []}}}), "(the old world written)")
+	var snapshot := Snapshot.load(path)
+	var done: Dictionary = snapshot.get("remade", {})
+	var key := Relaid.done_key_of("wilds", 807)
+	var waits := Relaid.move(snapshot, done, func(level: String) -> Dictionary:
+			return {"entities": [{"tile": Vector2i(201, 83)}], "terrain": {"floor": []}} if level == "wilds" else Level.load_level(level))
+	_check(waits.any(func(line: String) -> bool: return "wait" in line and line.begins_with("[level] wilds")) and not done.has(key)
+		and snapshot["zones"]["wilds"]["entities"].size() == 3, "a wilds still holding a removed marker: nothing removed, not marked (%s)" % [waits])
+	var lines := Relaid.move(snapshot, done, func(level: String) -> Dictionary: return wilds if level == "wilds" else Level.load_level(level))
+	var section: Dictionary = snapshot["zones"]["wilds"]
+	var line: String = lines.filter(func(each: String) -> bool: return each.begins_with("[level] removed in wilds"))[0] if lines.size() > 0 else ""
+	_check(done.get(key) == 807 and done.get("relaid/wilds") == 774 and done.has(Relaid.done_key_of("held", 807)) and done.has(Relaid.done_key_of("castle", 807)),
+		"each removal marked done under its own key, 774's kept (%s)" % [done])
+	_check(line == "[level] removed in wilds (807): 2 saved entities removed, 1 holding things, 3 things laid on the ground, 0 left where they were (no floor near)",
+		"one count-only line for the wilds (%s)" % [lines])
+	_check(section["entities"].size() == 1 and section["entities"][0]["spec"]["spawn_key"] == "119,139" and section["entities"][0]["slots"] == ["knife"]
+		and snapshot["items"]["book"]["14"]["at"] == "wilds/Chest9", "the farmstead's cache, kept, is untouched")
+	var pile: Dictionary = section["ground"][0] if section["ground"].size() == 1 else {}
+	var at := "wilds@%d,%d" % [pile.get("cell", Vector2i(-1, -1)).x, pile.get("cell", Vector2i(-1, -1)).y]
+	_check(pile.get("cell") == Vector2i(201, 83) and pile.get("ids") == ["bandaging_kit", "arrows", "arrows"] and pile.get("items") == [11, 12, 13]
+		and ["11", "12", "13"].all(func(uid: String) -> bool: return snapshot["items"]["book"][uid]["at"] == at),
+		"the camp chest's kit and arrows, and the stacked arrow the book had at it, lie on its cell, the book following (%s)" % [pile])
+	_check(Relaid.move(snapshot, done, func(level: String) -> Dictionary: return wilds if level == "wilds" else Level.load_level(level)).is_empty(), "the next boot does nothing")
+	var odd := {"ok": true, "items": {"book": {}}, "zones": {"wilds": {"entities": [{"spec": {"name": "Chest7", "tile": Vector2i(201, 83), "spawn_key": "201,83"},
+		"slots": ["knife"], "items": [21]}], "respawns": [], "ground": [], "records": []}}}
+	var odd_line := Relaid._remove(odd, {}, func(_level: String) -> Dictionary: return wilds,
+		{"level": "wilds", "decision": 999, "removed": {"201,83": {"to": "somewhere_new"}}})
+	_check(odd_line.ends_with(", 1 with an unknown destination laid on the ground") and odd["zones"]["wilds"]["ground"].size() == 1
+		and odd["zones"]["wilds"]["ground"][0]["ids"] == ["knife"], "a destination this build does not know: on the ground, counted, never dropped (%s)" % odd_line)
 
 
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended

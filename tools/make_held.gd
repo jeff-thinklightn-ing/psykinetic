@@ -293,7 +293,16 @@ func _stamp_fort() -> void:
 		map.set_cell(cell, changes["cells"][cell])
 	for key: Vector3i in changes["edges"]:
 		map.set_edge(key, changes["edges"][key])
-	config["entities"] = (config.get("entities", []) as Array) + changes["entries"]
+	# No counter: the tower stands empty, and chests stand only in dungeons
+	# (807; the prefab's shop counter was the town's while it was here).
+	var entries: Array = []
+	for entry: Dictionary in changes["entries"]:
+		if entry.get("props") is Dictionary and bool(entry["props"].get("shop", false)):
+			var at := Vector2i(int(entry["at"][0]), int(entry["at"][1]))
+			map.set_cell(at, map.cell(at + Vector2i(0, 1)))
+			continue
+		entries.append(entry)
+	config["entities"] = (config.get("entities", []) as Array) + entries
 	var named: Dictionary = changes.get("config", {})
 	for key: String in named:
 		config[key] = named[key]

@@ -42,21 +42,7 @@
 			"to_spawn": "from_held"
 		}
 	],
-	"entities": [
-		{
-			"at": [
-				19,
-				90
-			],
-			"facing": [
-				0.0,
-				1.0
-			],
-			"props": {
-				"shop": true
-			}
-		}
-	],
+	"entities": [],
 	"waters": [
 		{
 			"points": [

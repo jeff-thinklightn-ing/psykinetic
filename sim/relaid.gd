@@ -26,6 +26,28 @@ const RELAID: Dictionary = {
 		},
 	},
 }
+## Markers taken out of a level, their saved entities with them, once
+## (decision 807: chests only in dungeons). Each {level, decision, removed:
+## marker cell "x,y" -> {to}}: the saved level entity keyed to that cell is
+## dropped, and what it held (its slots, and every thing the item book has
+## at it) goes where "to" says: "ground", a pile on its cell (or the nearest
+## floor). Each entry is done under its own key (done_key_of), so it never
+## blocks a level's RELAID or another decision's removals.
+const REMOVED: Array[Dictionary] = [
+	{"level": "wilds", "decision": 807, "removed": {
+		"122,138": {"to": "ground"},  # The old farmstead's hut chests, empty since 599.
+		"120,152": {"to": "ground"},
+		"201,83": {"to": "ground"},  # The old monster camp's (807 amended: a pack in its place).
+	}},
+	{"level": "held", "decision": 807, "removed": {
+		"19,90": {"to": "ground"},  # The Old Tower's shop counter, from when held was the town.
+	}},
+	{"level": "castle", "decision": 807, "removed": {
+		"5,5": {"to": "ground"},
+		"27,5": {"to": "ground"},
+		"5,7": {"to": "ground"},
+	}},
+]
 ## How far the nearest floor is looked for (cells).
 const FLOOR_REACH := 12
 
@@ -75,7 +97,114 @@ static func move(snapshot: Dictionary, done: Dictionary, level_of: Callable) -> 
 				counts["off"] += 1
 		lines.append("[level] re-laid %s (%d): %d place keys renamed, %d saved markers carried, %d things moved onto floor, %d left where they were (no floor near)" % [
 			level, plan["decision"], counts["places"], counts["markers"], counts["off"], counts["kept"]])
+	for plan: Dictionary in REMOVED:
+		var line := _remove(snapshot, done, level_of, plan)
+		if not line.is_empty():
+			lines.append(line)
 	return lines
+
+
+## One REMOVED entry carried out on [param snapshot] (move's arguments):
+## its count-only line, or "" when it was done already.
+static func _remove(snapshot: Dictionary, done: Dictionary, level_of: Callable, plan: Dictionary) -> String:
+	var level := str(plan["level"])
+	var key := done_key_of(level, int(plan["decision"]))
+	if int(done.get(key, 0)) == int(plan["decision"]):
+		return ""
+	var loaded: Dictionary = level_of.call(level)
+	for spec: Dictionary in loaded.get("entities", []):
+		var tile: Variant = spec.get("tile")
+		if tile is Vector2i and plan["removed"].has("%d,%d" % [tile.x, tile.y]):
+			return "[level] %s's removals (%d) wait: it still has a marker at %s (an overlay copy?); nothing removed" % [level, plan["decision"], tile]
+	done[key] = int(plan["decision"])
+	if not snapshot.get("ok", false):
+		return ""
+	var counts := {"removed": 0, "holding": 0, "laid": 0, "kept": 0, "unknown": 0}
+	var zones: Dictionary = snapshot.get("zones", {}) if snapshot.get("zones") is Dictionary else {}
+	if zones.get(level) is Dictionary:
+		var floor := {}
+		for cell: Vector2i in loaded.get("terrain", {}).get("floor", []):
+			floor[cell] = true
+		var section: Dictionary = zones[level]
+		var book: Dictionary = snapshot.get("items", {}).get("book", {}) if snapshot.get("items") is Dictionary and snapshot["items"].get("book") is Dictionary else {}
+		var renames := {}
+		var kept: Array = []
+		for entry: Dictionary in section.get("entities", []):
+			var spec: Dictionary = entry.get("spec", {})
+			if not plan["removed"].has(str(spec.get("spawn_key", ""))):
+				kept.append(entry)
+				continue
+			counts["removed"] += 1
+			var cell: Variant = _cell(spec.get("tile"))
+			if cell == null:
+				cell = _cell_of_key(str(spec["spawn_key"]))
+			var to := nearest_floor(cell, floor)
+			if to == cell and not floor.has(cell):
+				counts["kept"] += 1
+			var holder := "%s/%s" % [level, spec.get("name", "")]
+			var ids: Array = []
+			var uids: Array = []
+			var slots: Array = entry["slots"] if entry.get("slots") is Array else []
+			var items: Array = entry.get("items", [])
+			for i in slots.size():
+				if str(slots[i]).is_empty():
+					continue
+				ids.append(str(slots[i]))
+				uids.append(int(items[i]) if i < items.size() and (items[i] is float or items[i] is int) else 0)
+			# Stacked units (619) and anything else the book has at it.
+			for uid: Variant in book:
+				var thing: Variant = book[uid]
+				if thing is Dictionary and str(thing.get("at", "")) == holder and not int(str(uid)) in uids:
+					ids.append(str(thing.get("id", "")))
+					uids.append(int(str(uid)))
+			if ids.is_empty():
+				continue
+			counts["holding"] += 1
+			match str((plan["removed"][str(spec["spawn_key"])] as Dictionary).get("to", "ground")):
+				"ground":
+					pass
+				_:
+					counts["unknown"] += 1  # A "to" this build does not know: on the ground, never dropped.
+			counts["laid"] += ids.size()
+			renames[holder] = "%s@%d,%d" % [level, to.x, to.y]
+			_lay(section, to, ids, uids)
+		section["entities"] = kept
+		section["respawns"] = (section.get("respawns", []) as Array).filter(func(respawn: Dictionary) -> bool:
+				return not plan["removed"].has(str(respawn.get("spawn_key", ""))))
+		_rename_places(snapshot, renames, {"places": 0})
+	var line := "[level] removed in %s (%d): %d saved entities removed, %d holding things, %d things laid on the ground, %d left where they were (no floor near)" % [
+		level, plan["decision"], counts["removed"], counts["holding"], counts["laid"], counts["kept"]]
+	if counts["unknown"] > 0:
+		line += ", %d with an unknown destination laid on the ground" % counts["unknown"]
+	return line
+
+
+## Things [param ids] (their [param uids] beside them) laid on [param
+## section]'s ground at [param cell], on a pile there if there is one.
+static func _lay(section: Dictionary, cell: Vector2i, ids: Array, uids: Array) -> void:
+	if not section.get("ground") is Array:
+		section["ground"] = []
+	for pile: Dictionary in section["ground"]:
+		if _cell(pile.get("cell")) == cell:
+			var pile_items: Array = pile.get("items", [])
+			# Pad the pile's uids to its ids, so each new id has its uid beside it.
+			while pile_items.size() < (pile["ids"] as Array).size():
+				pile_items.append(0)
+			pile["ids"].append_array(ids)
+			pile_items.append_array(uids)
+			pile["items"] = pile_items
+			return
+	section["ground"].append({"cell": cell, "ids": ids, "items": uids, "gold": 0})
+
+
+## The key a REMOVED entry is marked done under, in Main's saved "remade":
+## its level and decision, so each is done apart from the others.
+static func done_key_of(level: String, decision: int) -> String:
+	return "relaid/%s/%d" % [level, decision]
+
+
+static func _cell_of_key(key: String) -> Vector2i:
+	return Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
 
 
 ## Every key and string under [param snapshot] naming a place in

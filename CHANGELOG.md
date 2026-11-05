@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Chests stand only below ground now; whatever you left in one out in the lands lies on the ground where it stood (807).
 - The forest has camps now: bandits round their fires off the paths they rob, sitting on sacks of plunder, traders camped by their carts, one trader the bandits hold captive and another selling under their eye (793, maps' side).
 - The barrow's grave robbers dress in dirty greys and browns of their own, not in one red tunic (793, pc-character's side).
 - Towns: hover a thing in your pack to see who takes it, and anyone who takes something you carry has their name shown in faint gold (802 amended (5)).

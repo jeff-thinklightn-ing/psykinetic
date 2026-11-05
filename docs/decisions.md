@@ -42468,3 +42468,34 @@ only the pads, tracks and markers change (40191 floor cells, as before); the 72 
 taken out of trees.json once (terrain's file, nothing else in it changed). No camp is a place to
 reach (804). level_test _test_forest_camps. Protocol: a "50 (793, maps' side)" line, place kinds
 "trader" and "captive" and the fields, no bump (release; an old client has no use for them); CHANGELOG bullet (voice's words); no new class_name.
+## 807. Chests only in dungeons
+
+Jeff: chests stand only in dungeons, guarded, holding a little gold or things to sell,
+filled per player each generation; out in the lands there are none (the coordinator's
+ruling on every tree's list; release's number; maps' side first). The removals:
+levels/wilds' two empty hut chests at the old farmstead (122, 138) and (120, 152) (599
+moved their kits into the cache) and the old monster camp's (201, 83) (one bandaging kit;
+enemy-ai: its camp keeps a find, 807 amended); held's (Towerside's) shop counter at the
+Old Tower (19, 90), the prefab's, left from when held was the town (make_held drops a
+stamped shop counter now and lays the room's floor in its cell); and the castle's three
+empty chests (5, 5), (27, 5), (5, 7) (dungeon may set guarded ones in the Dwarven Halls).
+The farmstead's cache (119, 139) stays: it rolls per player already, and becomes a
+floorboard's look in 807 amended. Buildings' town chests and counters follow their own
+plan.
+
+The box keeps them otherwise: a saved entity whose marker is gone comes back as saved,
+holding no slot (Main._level_spec_for), things and all. So Relaid gains REMOVED: per
+level and decision, marker cells whose saved entity is dropped once, at the first boot
+that loads the level without them (one still holding a marker, an overlay copy, waits
+unmarked); what it held, its slots and every uid the item book has at it (a stack's
+other units), laid on a pile on its cell or the nearest floor, joining one there, the
+book's "at" renamed to the pile's place; its dead timers dropped. Each entry is done under
+its own key, relaid/<level>/<decision>, so it never blocks 774's relaid/wilds or another
+decision's; an entry's "to" says where things go ("ground" here; buildings' town chests
+add their own destinations). One count-only line per level: "[level] removed in <level>
+(807): N saved entities removed, M holding things, K things laid on the ground, L left
+where they were (no floor near)". level_test _test_removed (the markers gone from the
+levels; a save from before: the camp chest's kit, arrows and a stacked arrow on its cell
+with the book following, an empty one dropped, the kept cache untouched, the line, the
+next boot doing nothing, a level still marked waiting); _test_relaid marks 807 done to
+test 774 alone. Level data and the boot's mover; protocol unchanged, no new class_name.
