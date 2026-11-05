@@ -42091,6 +42091,25 @@ known. Callers: npc's residents when a want names a place, companions' wants lik
 (through Main's _world_news). The message is the one "known" already carries, so the
 protocol is unchanged; a told place looks like a seen one until ui's look says otherwise.
 world_news_test "told". No new class_name.
+805 amended (2) (enemy-ai; release's label): a beast drawn to someone fishing.
+Economy's wanderer_due(pond, player_id, kind, at) says when (a player fishing at a pond long
+enough, once a pond a game day; "boar" first, then boar or wolf); World.wanderers (Wanderers,
+new) brings it. "boar" is one boar, "wolf" a pair (WANDER_KINDS). It comes in out of every
+player's sight, on a cell just past World.VIEW_TILES from each (a ring out from the cast cell,
+VIEW_TILES + 2 up to OUT_TILES more) with a way to the cast cell, and marches there; not 12-16
+cells as first drafted, since that is in view on screen. It is drawn (Animal.drawn, from its spawn
+prop "wanderer"): a wolf bold whatever the hour and after players, not its diet; a boar charging
+what it finds instead of bolting; neither keeps out of a din. Under half its hp it is driven off:
+no longer drawn, it runs, and Wanderers sends it back for the cell it came in at. It is gone once
+out of everyone's sight (or there): every one dead or gone ends it. After LINGER_TICKS (90 s) any
+not in a fight turn back the same way. Its drops are its kind's (a boar's meat, hide and tusks,
+the trip's bonus). Never saved (Snapshot skips an Animal.wanderer), never retired to a record, and
+nothing to the herds or the balance; a zone asleep ends it. Main connects the signal behind
+has_signal, so it lands before or after economy's side. monster_test _test_wanderers: an unknown
+kind or an absent player brings none; a boar comes in out of sight, drawn, unsaved, walks to the
+cast and strikes the fisher, is driven off at half and gone; "wolf" is a pair, bold by day, and
+with their time up and nobody fighting they turn back and are gone. Server only, protocol
+unchanged. New class_name Wanderers.
 
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 

@@ -898,6 +898,9 @@ var economy: Economy = null:
 ## Server: raid groups in played zones as real monsters (Raids, decision
 ## 313); maps hands them over (enter) and takes them back.
 var raids := Raids.new()
+## Server: beasts drawn to someone fishing (Wanderers, decision 805,
+## enemy-ai's side), never saved.
+var wanderers := Wanderers.new()
 ## Server: every thing in the world, with its history (ItemBook). Main
 ## replaces it at boot with the snapshot's.
 var items := ItemBook.new(steps_now)
@@ -1151,6 +1154,7 @@ func step() -> void:
 	enter(was)
 	t = Time.get_ticks_usec()
 	raids.step()
+	wanderers.step()
 	t = part("raids", t)
 	steps += 1
 	# The sky's light on the new hour (DayNight; the light field reads it).

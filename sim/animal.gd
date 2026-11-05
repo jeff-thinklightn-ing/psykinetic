@@ -159,6 +159,13 @@ var _startle_until := -1
 var _bled_tick := -1
 ## The last cell it bled on (World.mark_blood), NO_TILE for none.
 var _blood_at := NO_TILE
+## Decision 805 amended (2): the wanderer it came as (Wanderers' id, a
+## spawn prop "wanderer"; never saved), "" for none; drawn while it is
+## after the people fishing: a predator bold whatever the hour and after
+## players, not game; a boar charging what it finds, not bolting, till
+## driven off (under half its hp).
+var wanderer := ""
+var drawn := false
 
 
 func _ready() -> void:
@@ -170,6 +177,9 @@ func _ready() -> void:
 	diet.assign(row.get("diet", []))
 	herd = str(row.get("herd", spawn_spec.get("kind", "")))
 	_roam = wander_radius
+	var props: Variant = spawn_spec.get("props", {})
+	wanderer = str(props.get("wanderer", "")) if props is Dictionary else ""
+	drawn = not wanderer.is_empty()
 
 
 ## Whether [param kind] is a wild animal's (its row's "side").
@@ -182,6 +192,11 @@ func _sim_tick() -> void:
 		_unnoticing()
 		return
 	if role == Role.PREDATOR:
+		if drawn and hp * 2 < max_hp:
+			drawn = false  # Driven off (805): it runs, and is gone out of sight.
+			_bold_tick = -1
+			_flee(_struck_by().tile if _struck_by() != null else (target.tile if target != null else tile - facing))
+			return
 		_settle_bold()
 		if _errand_step():
 			return
@@ -218,7 +233,9 @@ func _sim_tick() -> void:
 			_graze_tick()
 		return
 	var from := _struck_by()
-	if role == Role.GAME and (from != null or World.distance(tile, threat.tile) <= CORNERED_TILES and _cornered(threat.tile)):
+	if role == Role.GAME and drawn and hp * 2 < max_hp:
+		drawn = false  # Driven off (805): it runs, and is gone out of sight.
+	if role == Role.GAME and (from != null or drawn or World.distance(tile, threat.tile) <= CORNERED_TILES and _cornered(threat.tile)):
 		_foe = from if from != null else threat
 		_charge_until = World.tick + CHARGE_TICKS
 		_cry(&"charge", NOISE_CHARGE)
@@ -258,7 +275,7 @@ func _graze_tick() -> void:
 ## fight's; a predator heeds towns and fires only; a player it flees by
 ## sight), it makes a spot out of it its home and walks there, not running.
 func _leave_din() -> void:
-	if _returning:
+	if _returning or drawn:
 		return
 	var din := World.din_at(tile, role == Role.PREDATOR, false)
 	if din.is_empty():
@@ -272,7 +289,7 @@ func _leave_din() -> void:
 ## It keeps its wandering out of the din (740); a hungry predator, or a
 ## town's wolf, does not (761).
 func _shuns(at: Vector2i) -> bool:
-	if role == Role.PREDATOR and (_hungry or not town_wolf.is_empty()):
+	if role == Role.PREDATOR and (_hungry or not town_wolf.is_empty()) or drawn:
 		return false
 	return not World.din_at(at, role == Role.PREDATOR).is_empty()
 
@@ -367,8 +384,8 @@ func _nearest_visible_target() -> GridEntity:
 	var player: GridEntity = super() if _bold or World.tick - hurt_tick < CHARGE_TICKS else null
 	if not town_wolf.is_empty():
 		return player  # A town's wolf hunts nothing: it fights back only when hurt (761).
-	if raid != "":
-		return player  # A wave's wolf is after the watch, not the deer (771).
+	if raid != "" or drawn:
+		return player  # A wave's wolf is after the watch, not the deer (771); a wanderer the fishers (805).
 	if _look_tick < 0 or World.tick - _look_tick >= PREY_LOOK_TICKS or (_prey != null and not is_instance_valid(_prey)):
 		_look_tick = World.tick
 		_prey = _sees_prey()
@@ -415,7 +432,7 @@ func _settle_bold() -> void:
 	_hungry = town_wolf.is_empty() and _governed() and World.herds != null \
 			and World.herds.fed(str(spawn_spec.get("group", ""))) < HUNGRY_FED
 	_bold = (night or pack >= PACK_BOLD or _hungry) and town_wolf.is_empty()  # A town's wolf never goes at people (761).
-	_bold = _bold or raid != ""  # A night watch's wave goes at the watch (771).
+	_bold = _bold or raid != "" or drawn  # A night watch's wave goes at the watch (771); a wanderer at the fishers (805).
 	wander_radius = _roam * 2 if night else DEN_RADIUS  # Out by night, at its den by day.
 	temper = Temper.BOLD if _bold else Temper.CAUTIOUS
 	var bonus := NIGHT_SIGHT if night else 0

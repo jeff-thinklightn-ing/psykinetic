@@ -82,6 +82,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			continue  # Kept in its owner's player record instead (a locker: decision 722).
 		if entity is Resident:
 			continue  # Its town's records are its truth (decision 333).
+		if entity is Animal and not (entity as Animal).wanderer.is_empty():
+			continue  # A wanderer drawn to someone fishing (805): gone with a restart.
 		var spec := entity.spawn_spec
 		var entry := {
 			"script": str(spec.get("script", "")),

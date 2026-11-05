@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_bandit_rows()
 	_test_chiefs()
 	_test_watch_wave()
+	_test_wanderers()
 	_test_raid_takes()
 	_test_noticing()
 	_test_senses()
@@ -2104,6 +2105,70 @@ func _test_watch_wave() -> void:
 	raids.hand_back(World.zone.name)
 	_check(ends["faded"] == [wolves_id] and raids.ids().is_empty() and World.monsters().is_empty(),
 			"its zone asleep, the wave fades, off the map (%s)" % [ends])
+
+
+## Decision 805 amended (2): a beast drawn to someone fishing
+## (Wanderers; economy's wanderer_due says when).
+func _test_wanderers() -> void:
+	print("\n== a wanderer: a boar comes in out of sight to the one fishing, charges, is driven off and gone; wolves give up ==")
+	Monster.idling = true
+	var rows: Array[String] = ["#".repeat(100)]
+	for y in 5:
+		rows.append("#" + ".".repeat(98) + "#")
+	rows.append("#".repeat(100))
+	_raid_room(rows, Vector2i(4, 3))
+	World.outdoor = true
+	var wanderers := World.wanderers
+	wanderers.clear()
+	var fisher := EntityFactory.build(SPECS["P"].merged({"name": "Fisher", "props": {"max_hp": 400}})) as GridEntity
+	_room.add_child(fisher)
+	World.spawn(fisher, Vector2i(10, 3))
+	wanderers.player_of = func(id: String) -> Player: return fisher as Player if id == "p1" else null
+	var cast := Vector2i(11, 3)
+	_check(wanderers.come("pond_a", "p1", "deer", cast) == "" and wanderers.come("pond_a", "p9", "boar", cast) == "",
+			"an unknown kind, or a player not here: none comes")
+	var id := wanderers.come("pond_a", "p1", "boar", cast)
+	var boars := wanderers.beasts(id)
+	_check(id != "" and boars.size() == 1 and str(boars[0].spawn_spec.get("kind", "")) == "boar" and boars[0].drawn
+			and boars[0].wanderer == id, "a boar comes, drawn (%s)" % [id])
+	var boar: Animal = boars[0] if not boars.is_empty() else null
+	if boar == null:
+		return
+	_check(World.distance(boar.tile, fisher.tile) > World.VIEW_TILES, "in at %s, out of the fisher's sight" % boar.tile)
+	_check(Snapshot._entries([boar] as Array[GridEntity]).is_empty(), "never saved")
+	var hurt := false
+	var hp0 := fisher.hp
+	for i in 1500:
+		World.step()
+		if fisher.hp < hp0:
+			hurt = true
+			break
+	_check(hurt and World.distance(boar.tile, fisher.tile) <= 2, "it walks to the cast and goes at the fisher, not bolting (%d hp, at %s)" % [fisher.hp, boar.tile])
+	World.damage(boar, boar.hp - boar.max_hp / 2 + 1, fisher)
+	var gone := false
+	for i in 1500:
+		World.step()
+		if not boar.spawned:
+			gone = true
+			break
+	_check(not boar.drawn and gone and wanderers.ids().is_empty(), "under half its hp it is driven off, runs, and is gone out of sight; the wanderer is over")
+	# Wolves, a pair, that never reach anyone before their time is up.
+	var pair_id := wanderers.come("pond_a", "p1", "wolf", cast)
+	var wolves := wanderers.beasts(pair_id)
+	_check(wolves.size() == 2 and wolves.all(func(w: Animal) -> bool: return str(w.spawn_spec.get("kind", "")) == "wolf" and w.drawn),
+			"\"wolf\" is a pair, drawn (%d)" % wolves.size())
+	for w in wolves:
+		w._bold_tick = -1
+		w._settle_bold()
+	_check(wolves.all(func(w: Animal) -> bool: return w._bold), "drawn wolves are bold by day")
+	wanderers._in_play[pair_id]["start"] = World.tick - Wanderers.LINGER_TICKS
+	World.step()
+	_check(wanderers.ids().is_empty() and wolves.all(func(w: Animal) -> bool: return not w.spawned),
+			"their time up and nobody in a fight, they turn back and are gone, out of sight")
+	World.outdoor = false
+	World.spawn_spec = Callable()
+	wanderers.player_of = Callable()
+	World.despawn(fisher)
 
 
 func _test_raid_takes() -> void:

@@ -4449,6 +4449,10 @@ func _boot() -> void:
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
 		return World.towns.building(town, kind).get("state") == Towns.STANDING
 	World.economy.dole_changed.connect(_on_dole_changed)
+	# A beast drawn to someone fishing (805 amended (2)): economy says when.
+	World.wanderers.player_of = _player_of_id
+	if World.economy.has_signal("wanderer_due"):
+		World.economy.connect("wanderer_due", World.wanderers.come)
 	# owed_paid's gold reaches the client by Economy.purse_changed, as every purse change does,
 	# and floats then, when it is paid (804, economy's side: never while only owed).
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void:
@@ -5552,6 +5556,8 @@ func _retirable(monster: Monster, near: Array[Vector2i]) -> bool:
 		return false
 	if monster is Animal and not (monster as Animal).town_wolf.is_empty():
 		return false  # A town's wolf of a night is gone at dawn, never kept (761).
+	if monster is Animal and not (monster as Animal).wanderer.is_empty():
+		return false  # A wanderer is Wanderers' till it is gone, never kept (805).
 	if monster.far_since < 0 or World.tick - monster.far_since < RETIRE_AFTER_TICKS:
 		return false
 	if monster.target != null or monster.alert != Monster.Alert.IDLE or monster._returning or World.is_stunned(monster):
