@@ -85,6 +85,7 @@ func _ready() -> void:
 	_test_great_bear()
 	_test_bear_party()
 	_test_bandit_rows()
+	_test_chiefs()
 	_test_watch_wave()
 	_test_raid_takes()
 	_test_noticing()
@@ -1674,6 +1675,67 @@ func _test_bandit_rows() -> void:
 			and Client3D.creature_slot_for(unknown) == "" and Monster.art_of("kind_never_heard_of") == "",
 		"a kind a client lacks is drawn plainly")
 	unknown.free()
+
+
+## 790 amended (2): Hollowfell's chiefs, by their named rows.
+## Grull holds his post: he takes up no one beyond it and a blow's reach, and
+## his leash is the post's, not where he took up the chase. Skeech lurks: a
+## player in plain sight is let be until its side engages near it (a blow's
+## noise) or it is struck, then it fights; with nobody left it lurks again.
+func _test_chiefs() -> void:
+	print("
+== Hollowfell's chiefs (790 amended): grull holds his post, skeech lurks ==")
+	Monster.idling = false
+	var grull_row := NamedEnemy.def("grull")
+	var skeech_row := NamedEnemy.def("skeech")
+	_check(grull_row.get("kind") == "brute" and skeech_row.get("kind") == "sneak"
+			and grull_row.get("trophy") == "rot_hammer" and skeech_row.get("trophy") == "rot_spike"
+			and not str(grull_row.get("name", "")).to_lower().contains("grull") and not str(skeech_row.get("name", "")).to_lower().contains("skeech"),
+		"their rows: an orc brute with the chief's pick-hammer, a kobold sneak with the chief's spike, names off screen (%s, %s)" % [grull_row.get("name"), skeech_row.get("name")])
+	var e := _build(["##############", "#............#", "#.b..........#", "#............#", "##############"], {"b": {"named": "grull", "facing": Vector2i(1, 0)}})
+	var grull: Monster = e["b"][0]
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(9, 2))
+	grull.sight_range = 9
+	grull.facing = Vector2i(1, 0)
+	_check(grull.holds_post == int(grull_row["holds"]) and grull.leash == grull.holds_post and grull.home == Vector2i(2, 2),
+		"grull holds his post (%d cells, home %s)" % [grull.holds_post, grull.home])
+	for i in 6:
+		World.step()
+	_check(grull.target == null, "a player 7 off, in his sight but beyond his post, is not taken up (%s)" % [grull.target])
+	_move_to(player, Vector2i(5, 2))
+	for i in 6:
+		World.step()
+	_check(grull.target == player, "3 off, at his post, he is (%s)" % [grull.target])
+	_move_to(grull, Vector2i(7, 2))
+	_check(grull._beyond_leash(), "5 from his post he is beyond his leash, wherever he took up the chase")
+	_move_to(grull, Vector2i(4, 2))
+	_check(not grull._beyond_leash(), "2 from it he is not")
+	e = _build(["##############", "#............#", "#.s..b.......#", "#............#", "##############"], {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
+	var skeech: Monster = e["s"][0]
+	var guard: Monster = e["b"][0]
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(6, 2))
+	skeech.sight_range = 7
+	skeech.facing = Vector2i(1, 0)
+	_check(skeech.lurks and skeech.idle == Monster.Idle.GUARD and skeech.lurking(), "skeech lurks, standing where it was put")
+	for i in 6:
+		World.step()
+	_check(skeech.target == null and skeech.tile == Vector2i(2, 2), "a player 4 off in plain sight is let be (%s at %s)" % [skeech.target, skeech.tile])
+	World.noise(player.tile, Senses.NOISE_FIGHT, &"fight", guard)
+	for i in 6:
+		World.step()
+	_check(skeech.target == player, "its guard strikes beside it: roused, it takes up the player (%s)" % [skeech.target])
+	e = _build(["##############", "#............#", "#.s..........#", "#............#", "##############"], {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
+	skeech = e["s"][0]
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	skeech.note_struck(player)
+	_check(not skeech.lurking(), "struck, it lurks no more")
+	Monster.idling = true
 
 
 func _test_bear_party() -> void:

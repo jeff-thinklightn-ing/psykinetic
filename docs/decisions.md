@@ -41370,6 +41370,29 @@ hammer left by the town's miners when the mine was lost; the chiefs the Blood Ro
 Blood Rot), voice's words. Named for their chiefs (lore's lean, Grull and Skeech) once Jeff
 agrees the names. items_test; art slots regenerated for art-kit.
 
+
+790 amended (2) (enemy-ai; release's label; the coordinator: read from marks, dungeon places
+them): Hollowfell's chiefs, as levels/named_enemies.json rows, so phase B's cells only say where.
+"grull", the east chief, an orc brute (strength 1.6 hp, 1.3 damage, 0.85 speed; rot_hammer; a
+boss; risen 3 world days after he falls), and "skeech", the south chief, a kobold sneak (1.2, 1.2,
+1.1; rot_spike; a boss; 3 days). On screen "Orc chief" and "Kobold chief" (voice's words) till Jeff
+picks their names (C:/dev/review/decisions/hollowfell-chiefs.md). Dungeon marks them in the
+template's anchors, kept through each laying: a monster_brute marker whose entities entry says
+"named": "grull" at chamber_east's stair foot, a monster_sneak one "named": "skeech" in
+chamber_south's dark way in, with their guards (dungeon's draft: (83, 24) and (79, 57)).
+A named row's ways, read once as it spawns (Monster._take_named_ways): "holds": n, a chief who
+holds his post (Monster.holds_post): his leash is n and measured from his home, not from where he
+took up the chase (Monster._beyond_leash), and he takes up nobody beyond his post and a blow's
+reach unless they struck him; grull holds 3. "lurks": true (Monster.lurks): it stands where it was
+put (Idle.GUARD) and, while lurking (Monster.lurking: nobody to fight, not roused), takes up no one
+it sees, goes after no noise and no glimpse; its side engaging near it (a call, or a fight noise
+whose striker is of its side) or a blow on itself rouses it for HUNT_TICKS (Monster._rouse), and it
+fights by its kind's flank. With nobody left it lurks again. Other monsters are as they were.
+monster_test _test_chiefs (the rows; grull lets a player beyond his post be, takes one at it, his
+leash from home; skeech lets a player in plain sight be, a guard's blow beside it rouses it, a blow
+on it too). No bullet (the chiefs come with dungeon's phase B). Server and data only, protocol
+unchanged, no new class_name.
+
 ## 787. The character sheet: the hands and the armour off the pack
 
 Jeff (2026-11-03): "create a character inventory sheet and move hands and armor there". The

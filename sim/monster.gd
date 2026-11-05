@@ -406,6 +406,17 @@ var _blocked_last := -1
 ## fights nobody outside it, and goes after no noise.
 var fearless := false
 var keeps_room := false
+## A named one's ways (790 amended (2): Hollowfell's chiefs; its
+## row in levels/named_enemies.json). holds_post: it holds its post (home),
+## going no further than this many cells from it after anyone and back to it
+## when they go beyond (-1: none, its leash as ever). lurks: it stands where
+## it was put and takes up no one it sees until its side engages near it (a
+## call, or a blow struck by one of its side within its hearing) or it is
+## struck; then it fights by its tactic till it has no one, and lurks again.
+var holds_post := -1
+var lurks := false
+## Till when a lurker is roused (World ticks).
+var _roused_until := -1
 ## Who struck it last, and when (World.damage; Jeff: "barrow guards aren't
 ## aggro enough sometimes just stand and take hits"). For ANSWER_TICKS after
 ## each blow it answers them: seen whatever its cone, and fought by a room
@@ -644,6 +655,32 @@ func _ready() -> void:
 		senses = Senses.new(self, sight_range, Senses.CONE_COS if _wary else -1.0)
 		senses.dark_sight = bool(dead.get("sees_in_dark", false))
 		_take_senses(row.get("senses", {}))
+		_take_named_ways()
+
+
+## Its named row's ways (holds_post, lurks; 790 amended (2)):
+## once, as it spawns. A lurker stands (Idle.GUARD) where it was put.
+func _take_named_ways() -> void:
+	if named_id.is_empty():
+		return
+	var row := NamedEnemy.def(named_id)
+	holds_post = int(row.get("holds", -1)) if row.get("holds") is float or row.get("holds") is int else -1
+	if holds_post >= 0:
+		leash = holds_post
+	lurks = bool(row.get("lurks", false))
+	if lurks:
+		idle = Idle.GUARD
+
+
+## Whether it lurks now: a lurker with nobody to fight, not roused.
+func lurking() -> bool:
+	return lurks and target == null and World.tick >= _roused_until
+
+
+## A lurker roused for HUNT_TICKS (its side engaged near it, or it was struck).
+func _rouse() -> void:
+	if lurks:
+		_roused_until = World.tick + HUNT_TICKS
 
 
 ## Its kind's "senses" (decision 784; read_kinds' "senses"): {sight: cells
@@ -1430,6 +1467,10 @@ func _nearest_visible_target() -> GridEntity:
 			continue  # Too far, in its spawn grace, or downed (no finishing blows: decision 544).
 		if keeps_room and not _room.has_point(at) and not _answering(entity):
 			continue  # Outside the room it keeps (unless it struck it just now).
+		if holds_post >= 0 and home != NO_TILE and World.distance(at, home) > holds_post + 1 and not _answering(entity):
+			continue  # Beyond a chief's post and a blow's reach: none of his.
+		if lurks and lurking() and not _answering(entity):
+			continue  # A lurker waits for its side to engage.
 		if entity is Player or (entity is Companion and entity.keeper != null):
 			if not _given_up.is_empty() and _letting_be(entity):
 				continue
@@ -1521,7 +1562,7 @@ func _alert_tick() -> void:
 		return
 	if not noise.is_empty():
 		_heard(noise)
-	elif _glimpsed != NO_TILE and alert == Alert.IDLE:
+	elif _glimpsed != NO_TILE and alert == Alert.IDLE and not lurking():
 		_follow(_glimpsed, Alert.SUSPICIOUS, SUSPICIOUS_TICKS)
 	if alert == Alert.IDLE:
 		_idle_tick()
@@ -1553,6 +1594,10 @@ func _heard(noise: Dictionary) -> void:
 	var source: Variant = noise["source"]
 	if kind == &"rout":
 		return  # Its side breaking: _heard_rout.
+	if lurks and (kind == &"call" or kind == &"fight") and source is Monster and source != self and _same_side(source):
+		_rouse()  # Its side engaged near it: out of the dark.
+	if lurking():
+		return  # Unroused, a lurker goes after no noise: it stays in the dark.
 	if kind == &"call" and source is Monster and _same_side(source):
 		# Its side calling for help: after whom they fight.
 		var caller := source as Monster
@@ -1744,6 +1789,8 @@ func _bash() -> bool:
 func _beyond_leash() -> bool:
 	if keeps_room and _room.has_area():
 		return not _room.has_point(tile) and not (_answering(target) and _room.grow(ANSWER_REACH).has_point(tile))
+	if holds_post >= 0 and home != NO_TILE:
+		return World.distance(tile, home) > holds_post  # A chief at his post: from it, not from where he took up the chase.
 	return _post != NO_TILE and World.distance(tile, _post) > leash
 
 
@@ -2673,6 +2720,7 @@ func note_struck(by: GridEntity) -> void:
 	struck_by = by
 	struck_tick = World.tick
 	_given_up.erase(by.get_instance_id())
+	_rouse()
 
 
 ## Whoever struck it just now (a fight noise on its own tile from someone),
