@@ -40122,6 +40122,29 @@ the wall's own flat facet normals under that grazing light (769 amended (7), ter
 normals), not shadow acne: the shadow-casting lights' biases are unchanged. Tests: weather_test
 _test_mine_light (the light off the wall and lower). Client only, protocol unchanged, no new
 class_name.
+769 amended (9): a miner's swing (pc-character, 2026-11-04; the coordinator's brief, release's label; Jeff
+on v0.1.202: "mining animation needs work"). The pick played Axe_Overhead, a chop down at the ground:
+at its contact the head stood 0.30 m inside the top of the seam, and its arc ran through the rock on
+the way down, since a seam's face is close (0.61-0.72 m ahead of the miner's middle up to 1.4 m, then
+rounding back to 0.9 m at its 1.6 m top; rock.seam's own profile). The pick now plays CLIP_PICK_SWING,
+Pick_Swing (tools/humanoid_clips.py; contact 0.4 s, on the pick's 4-tick lead, so it plays at speed 1
+and lands as the server strikes): from the ready, lifted two-handed over the right shoulder, the
+weight up (0.24 s); the head carried over the rock's top and dropped almost straight onto the face
+as the hands pull down to the belly (0.33, 0.37); the point driven into the face 1.3 m up, the haft
+at 50 degrees, the hips sinking and the knees bending into it with the feet kept planted (0.4); a
+small recoil off the stone (0.48), held a beat, back to the ready (1.0). The right hand at the butt,
+the left PICK_GRIP 0.54 up the haft (art-kit's grip_2). A held weapon is drawn with its striking side
+along the fingers (Client3D's HELD_EDGE_TURN), the hand bone's +y in the authoring, so the edge given
+chop() is the haft crossed with the way the point should go (PICK_SIDE, the left, for a haft in the
+swing's plane); authored as the axe's are, the head lay across the swing. Each blow that lands puffs
+rock dust and grit off the seam's face where the point lands (Client3D._seam_dust: the slab dust
+smaller and quicker, SEAM_DUST_UP 1.25 m up the front its art_facing turns, off the rubble's top
+when spent), timed with sfx.pick_strike in the seam's branch of _on_struck; no new message. Players
+and companions alike (the humanoid moves). view_test _test_pick_meets_seam: a player with a pick
+facing a seam, at the swing's contact the pick's point (PICK_POINT, its art's) is within PICK_BITE
+into and PICK_SHORT short of the rock's front at its height, 0.4-1.4 m up, and the blow's dust is
+off the face. Before and after: C:/dev/review/mining/. CHANGELOG bullet (voice's words). Client and
+tools only, protocol unchanged, no new class_name.
 
 769 amended (10): she mines when her player is at a seam, not as they walk by (2026-11-04,
 companions; the coordinator, from Jeff on v0.1.202: "wren started mining on her own when walking

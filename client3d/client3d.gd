@@ -1011,7 +1011,9 @@ const HUMANOID_MOVES := {
 		# Heaved, hung, let fall into the ground, held down and dragged back up (the sim's wind-up and recovery).
 		"tomb_sledge": [["Sledge_Attack", 0.9]],
 		"hammer": [["Mace_Overhead", 0.42]],  # One-handed: Axe_Overhead's left hand would grip nothing.
-		"pick": [["Axe_Overhead", 0.42]],  # A miner's swing, two-handed (items' 479; the kobold's, 478).
+		# A miner's swing, two-handed (items' 479; the kobold's, 478): its own (769 amended (9)), the head
+		# up over the rock and dropped onto a seam's face in the next cell on the pick's 4-tick lead.
+		"pick": [["Pick_Swing", 0.4]],
 		"dagger": [["Dagger_Stab", 0.17]],
 		"spear": [["Spear_Thrust", 0.25]],  # A level jab (Jeff, v0.1.187: "jabbing ... instead of slash").
 		"shield": [["Shield_Bash", 0.17]],
@@ -1223,6 +1225,14 @@ const CLIP_WADE := "Wade"
 ## planted foot covers 0.54 m a second at its own pace, the walk's 0.86), so the feet keep to the
 ## ground at World.crouch_pace's slow step; up to CREEP_FASTEST its own speed, beyond it skating.
 const CLIP_CROUCH := "Crouch_Idle"
+## A miner's swing (769 amended (9); Jeff on v0.1.202: "mining animation needs work"): the pick's
+## own clip (tools/humanoid_clips.py), its point meeting a seam's face in the next cell at its
+## contact, no more than PICK_BITE into the rock nor PICK_SHORT short of it (view_test).
+const CLIP_PICK_SWING := "Pick_Swing"
+const PICK_BITE := 0.08
+const PICK_SHORT := 0.05
+## The pick's point in its art's frame (art-kit's item.pick).
+const PICK_POINT := Vector3(0.27, 0.767, 0.0)
 const CLIP_CREEP := "Crouch_Fwd"
 const CREEP_STRIDE := 0.63
 const CREEP_FASTEST := 4.5
@@ -15821,6 +15831,40 @@ func _sync_seam(puppet: Node3D, seam: Seam) -> void:
 	puppet.scale = Vector3(1.0, SEAM_RUBBLE_HEIGHT, 1.0) if seam.spent else Vector3.ONE
 
 
+## A pick's blow on a seam (769 amended (9)): a puff of rock dust and grit off its face where the
+## point lands (SEAM_DUST_UP up its front, which faces its spawn's art_facing), out from the rock
+## and falling, as the strike's sound plays; a worked-out seam's rubble too (the blow rings off it).
+const SEAM_DUST_UP := 1.25
+const SEAM_DUST_OUT := 0.36
+const SEAM_DUST_PUFFS := 14
+const SEAM_DUST_SPENT_UP := 0.3
+func _seam_dust(puppet: Node3D, seam: Seam) -> void:
+	if seam == null or not puppet.is_inside_tree():
+		return
+	var dust := puppet.get_node_or_null("SeamDust") as GPUParticles3D
+	if dust == null:
+		dust = _make_slab_dust()
+		dust.name = "SeamDust"
+		dust.amount = SEAM_DUST_PUFFS
+		dust.lifetime = 0.9
+		dust.explosiveness = 0.9
+		var out: Variant = seam.spawn_spec.get("art_facing")
+		var way := Vector3(float(out.x), 0.0, float(out.y)) if out is Vector2i else Vector3(0.0, 0.0, 1.0)
+		dust.position = way * SEAM_DUST_OUT + Vector3.UP * SEAM_DUST_UP
+		var process := dust.process_material as ParticleProcessMaterial
+		process.emission_box_extents = Vector3(0.06, 0.06, 0.06)
+		process.direction = way + Vector3.UP * 0.3
+		process.spread = 40.0
+		process.initial_velocity_min = 0.6
+		process.initial_velocity_max = 1.4
+		process.gravity = Vector3(0.0, -2.5, 0.0)
+		dust.draw_pass_1 = _soft_puff(SLAB_DUST_SIZE * 0.45)
+		puppet.add_child(dust)
+	# A spent seam's rubble is low (squashed by puppet.scale, or its own art): the puff off its top.
+	dust.position.y = (SEAM_DUST_SPENT_UP if seam.spent else SEAM_DUST_UP) / maxf(puppet.scale.y, 0.01)
+	dust.restart()
+
+
 ## The mine's cart (769 amended (4)): its roll held (sfx.minecart_roll) from
 ## the moment its tile moves, steered along with it, and let go with its
 ## stop (sfx.minecart_stop) once it has not moved for cart_stop_ms; the
@@ -16436,10 +16480,15 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		# A blow on an ore seam (769 amended (4)): the pick on rock, when the
 		# swing lands; no cry and no fight's music.
 		var landed := (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - Time.get_ticks_msec()) / 1000.0
+		var seam := instance_from_id(id) as Seam
 		if landed > 0.0:
 			_play_later("sfx.pick_strike", puppet.position + Vector3.UP * 0.8, landed)
+			get_tree().create_timer(landed).timeout.connect(func() -> void:
+				if is_instance_valid(puppet) and is_instance_valid(seam):
+					_seam_dust(puppet, seam))
 		else:
 			sfx.play("sfx.pick_strike", puppet.position + Vector3.UP * 0.8)
+			_seam_dust(puppet, seam)
 		return
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity

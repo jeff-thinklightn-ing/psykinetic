@@ -154,6 +154,7 @@ func _ready() -> void:
 		_test_sword_whiff()
 		await _test_teeter()  # Lets frames run: the rocking is timed.
 		_test_crouch()
+		await _test_pick_meets_seam()  # Lets frames run to the swing's contact.
 		_test_bow_back()
 		_test_sheathed()
 		_test_goblins_differ()
@@ -10089,6 +10090,88 @@ func _test_creature_puppets() -> void:
 ## roar; asleep (Pose SIT) its sleep, winded and standing its winded; a slot without those clips
 ## does as before. On a boar's view, its art given the great bear's clip names (the bear's slot is
 ## art-kit's to land): stand-ins copied from its own clips.
+## A miner's swing meets the seam (769 amended (9)): a player with a pick, facing an ore seam in
+## the next cell (its front turned to them), swings; at the swing's contact the pick's point is at
+## the seam's face (no farther in than PICK_BITE, no short of it more than PICK_SHORT), at a height
+## on the rock, not the floor, and the blow puffs dust at the face as it lands.
+func _test_pick_meets_seam() -> void:
+	print("\n== a miner's swing: the pick's point meets the seam's face at the contact (769 amended (9)) ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	var was_facing := player.facing
+	slots[Items.RIGHT_HAND] = "pick"
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	player.facing = Vector2i(1, 0)
+	var at := player.tile + Vector2i(1, 0)
+	var occupant := World.get_entity_at(at)
+	if occupant != null:
+		World.despawn(occupant)
+	var spec: Dictionary = Level._spec_for("seam", {})
+	spec["name"] = "ViewSeam"
+	spec["tile"] = at
+	spec["art_facing"] = Vector2i(-1, 0)
+	var seam := _main._spawn(spec) as Seam
+	await _frames(3)
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rock: Node3D = _rig._puppets.get(seam.get_instance_id())
+	var rig := puppet.get_meta("rig") as AnimRig
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("wound_until", 0)
+	# The seam's face: its rock's nearest point toward the miner (+x is away from them).
+	var face := INF
+	var top := -INF
+	for mesh: MeshInstance3D in rock.find_children("*", "MeshInstance3D", true, false):
+		for v in mesh.mesh.get_faces():
+			var p := mesh.global_transform * v
+			face = minf(face, p.x)
+			top = maxf(top, p.y)
+	print("    the miner at x %.3f, the face %.3f ahead, the rock %.2f m tall; contact in %.2f s"
+			% [puppet.global_position.x, face - puppet.global_position.x, top - puppet.global_position.y, World.windup_ticks(player) * World.TICK_DT])
+	player.swung.emit(Vector2i(1, 0))
+	_rig._on_struck(1, &"attack", seam.get_instance_id())  # The blow as the server's damage reports it.
+	var contact := rig.contact_msec
+	while Time.get_ticks_msec() < contact:
+		await get_tree().process_frame
+	var held := ((puppet.get_meta("sockets") as Dictionary)["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	# The pick's point and chisel, in its art's own frame (art-kit's item.pick: the point 0.27 m off the
+	# haft toward +x, 0.767 m up it); the rock's front at the point's height.
+	var tip := Vector3(-INF, 0.0, 0.0)
+	var chisel := Vector3.ZERO
+	if held != null:
+		for mesh: MeshInstance3D in held.find_children("*", "MeshInstance3D", true, false):
+			tip = mesh.global_transform * Client3D.PICK_POINT
+			chisel = mesh.global_transform * Vector3(-0.211, 0.791, 0.0)
+	var face_there := INF
+	for mesh: MeshInstance3D in rock.find_children("*", "MeshInstance3D", true, false):
+		for v in mesh.mesh.get_faces():
+			var p := mesh.global_transform * v
+			if absf(p.y - tip.y) < 0.08:
+				face_there = minf(face_there, p.x)
+	face = face_there
+	var ground := puppet.global_position.y
+	print("    clip %s; the point at x %.3f (the face there %.3f: %+.3f), %.2f m up; the chisel %.2f ahead, %.2f up"
+			% [rig.playing(), tip.x, face, tip.x - face, tip.y - ground, chisel.x - puppet.global_position.x, chisel.y - ground])
+	_check(rig.playing() == Client3D.CLIP_PICK_SWING, "a pick swings Pick_Swing (%s)" % rig.playing())
+	_check(tip.x - face < Client3D.PICK_BITE and face - tip.x < Client3D.PICK_SHORT,
+			"at its contact the point meets the face (%+.2f m)" % (tip.x - face))
+	_check(tip.y - ground > 0.4 and tip.y - ground < 1.4, "on the rock, not the floor (%.2f m up)" % (tip.y - ground))
+	await _frames(3)
+	var dust := rock.get_node_or_null("SeamDust") as GPUParticles3D
+	_check(dust != null and dust.emitting and dust.global_position.x < face + 0.1 and absf(dust.global_position.y - ground - Client3D.SEAM_DUST_UP) < 0.05,
+			"the blow puffs dust off the face as it lands (%s)" % (str(dust.global_position) if dust != null else "none"))
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", 0)
+	World.despawn(seam)
+	player.slots = was
+	player.facing = was_facing
+	_rig._process(0.0)
+
+
 ## Crouched (784 amended (3)): a player crouching stands in Crouch_Idle and, moving, creeps
 ## (Crouch_Fwd) at its own stride, the walk's pace times CREEP_STRIDE; stood up, neither.
 func _test_crouch() -> void:

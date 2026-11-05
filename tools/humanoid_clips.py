@@ -158,7 +158,7 @@ CLIPS = {
 	]},
 }
 ## Each strike's striking bone, whose reach forward gives its contact.
-STRIKES = {"Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
+STRIKES = {"Pick_Swing": "hand_r", "Axe_Sweep": "hand_r", "Sledge_Attack": "hand_r", "Sword_Slash_F": "hand_r", "Sword_Slash_B": "hand_r", "Axe_Overhead": "hand_l", "Mace_Overhead": "hand_r", "Dagger_Stab": "hand_r", "Spear_Thrust": "hand_r", "Shield_Bash": "hand_l",
 	"Sword_Attack": "hand_r", "Sword_Attack_Standing": "hand_r", "Punch_Jab": "hand_l", "Punch_Cross": "hand_r",
 	"Kick": "foot_r"}
 CONTACT = {}
@@ -695,6 +695,45 @@ CLIPS["Axe_Overhead"] = {"keys": [
 	(0.48, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
 	(0.62, P("Idle_Loop", 0.0, AXE_DOWN, move=(0.0, -0.06, -0.06))),
 	(1.0, P("Idle_Loop", 0.0, AXE_READY)),
+]}
+# The pick's strike pose (tuned by build/mining/probe.py against the seam's face): the right wrist
+# (ahead, out, up) of the right shoulder, the haft and the point's ways.
+PICK_AT = (-0.12, -0.05, -0.46)
+PICK_HAFT = (0.64, 0.0, 0.77)
+# The edge chop() is given: a held weapon's striking side (+x) lies along the fingers in the game
+# (Client3D's HELD_EDGE_TURN), the hand bone's +y here, so for the point to lead, ahead and down the
+# swing, the edge given is the haft crossed with it: (1, 0, 0), the left, for a haft in the swing's plane.
+PICK_SIDE = (1.0, 0.0, 0.0)
+# A miner's swing (769 amended (9); Jeff on v0.1.202: "mining animation needs work"): the pick, both
+# hands, the right at its butt and the left PICK_GRIP up the haft (art-kit's grip_2), at a seam's face
+# in the next cell (0.61 m ahead of the body's middle, 1.6 m tall; view_test measures it in the game).
+# From the ready, lifted two-handed over the right shoulder, the weight up (to 0.24 s); swung down in
+# an arc, the head leading, the hips sinking back and the knees bending into it (to 0.4, the contact
+# on the pick's 4-tick lead), the point driven into the face 1.3 m up, the haft at 50 degrees; a small
+# recoil off the rock (0.48), held a beat, and back to the ready (1.0).
+PICK_GRIP = 0.54
+PICK_READY = chop((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), PICK_SIDE, grip=PICK_GRIP)
+PICK_UP = chop((0.14, 0.04, 0.06), (-0.35, -0.25, 0.9), PICK_SIDE, grip=PICK_GRIP) + [
+	("spine_01", LIFT, 6.0), ("spine_02", LIFT, 10.0), ("spine_03", LIFT, 5.0)]
+PICK_SWING = chop((0.3, 0.0, -0.1), (0.45, -0.25, 0.85), PICK_SIDE, grip=PICK_GRIP) + [("spine_02", LIFT, 2.0)]
+# Halfway down, the head falling onto the face, the hands pulled down to the belly after it.
+PICK_FALL = chop((0.12, -0.02, -0.28), (0.5, -0.12, 0.86), PICK_SIDE, grip=PICK_GRIP) + [
+	("spine_02", LIFT, -2.0)] + both("thigh", LIFT, 10.0) + both("calf", LIFT, -18.0) + both("foot", LIFT, 8.0)
+PICK_SINK = both("thigh", LIFT, 22.0) + both("calf", LIFT, -38.0) + both("foot", LIFT, 16.0)
+PICK_STRIKE = chop(PICK_AT, PICK_HAFT, PICK_SIDE, grip=PICK_GRIP) + PICK_SINK + [
+	("spine_01", LIFT, -8.0), ("spine_02", LIFT, -6.0), ("Head", LIFT, 6.0)]
+PICK_RECOIL = chop((PICK_AT[0] - 0.07, PICK_AT[1], PICK_AT[2] + 0.06), (PICK_HAFT[0], PICK_HAFT[1], PICK_HAFT[2] + 0.18),
+	PICK_SIDE, grip=PICK_GRIP) + PICK_SINK + [("spine_01", LIFT, -5.0), ("spine_02", LIFT, -4.0)]
+PICK_SUNK = (0.0, 0.04, -0.06)
+CLIPS["Pick_Swing"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, PICK_READY)),
+	(0.24, P("Idle_Loop", 0.0, PICK_UP)),
+	(0.33, P("Idle_Loop", 0.0, PICK_SWING, move=(0.0, 0.02, -0.01))),
+	(0.37, P("Idle_Loop", 0.0, PICK_FALL, move=(0.0, 0.03, -0.02))),
+	(0.4, P("Idle_Loop", 0.0, PICK_STRIKE, move=PICK_SUNK)),
+	(0.48, P("Idle_Loop", 0.0, PICK_RECOIL, move=PICK_SUNK)),
+	(0.62, P("Idle_Loop", 0.0, PICK_RECOIL, move=PICK_SUNK)),
+	(1.0, P("Idle_Loop", 0.0, PICK_READY)),
 ]}
 # The Tomb Sledge's blow, with weight (Jeff: "it also needs to move like it has mass, slow at
 # first, then faster with inertia"; combat's times, the sim's wind-up and recovery, so it plays at
