@@ -657,6 +657,16 @@
 			"radius": 3,
 			"name": "a ruined barn"
 		},
+		"reed_pond": {
+			"at": [
+				32,
+				116
+			],
+			"kind": "fishing",
+			"holder": "nobody",
+			"radius": 3,
+			"name": "the Reed Pond"
+		},
 		"tavern": {
 			"at": [
 				178,

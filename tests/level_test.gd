@@ -81,6 +81,7 @@ func _ready() -> void:
 	await _test_castle()
 	await _test_barrow_exits()
 	await _test_spawn_near()
+	_test_reed_pond()
 
 	_main.load_map(Level.DEFAULT_MAP)
 	print("")
@@ -2047,6 +2048,27 @@ func _test_building_level_link() -> void:
 			and wilds["places"].has("temple@189,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
 			and (chapel["rect"] as Rect2i).has_point(landing) and floor_cells.has(landing) and temple_said.is_empty(),
 			"Umbrage's temple is the chapel: 10 x 6 facing west, doors on (189, 201) and (189, 202), its place at the front, the counter and the shortcut's landing inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
+
+
+## The Reed Pond (805, maps' side; economy's fishing slice 1): the wilds'
+## west pond's fishing place, on its north bank, the water beside it and two
+## dry rows behind it to stand and walk on.
+func _test_reed_pond() -> void:
+	print("
+== The Reed Pond (805): a fishing place on a dry bank ==")
+	var wilds := Level.load_level("wilds")
+	var place: Dictionary = wilds["places"].get("reed_pond", {})
+	var terrain: Dictionary = wilds["terrain"]
+	var floor := {}
+	for cell: Vector2i in terrain["floor"]:
+		floor[cell] = true
+	var water: Variant = terrain.get("water", [])
+	var at: Vector2i = place.get("cell", Vector2i(-1, -1))
+	var wet := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)].filter(func(step: Vector2i) -> bool: return at + step in water)
+	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "the Reed Pond" and place.get("holder", "") == Factions.NOBODY
+			and floor.has(at) and not at in water and wet.size() >= 1
+			and floor.has(at + Vector2i(0, -1)) and floor.has(at + Vector2i(0, -2)) and floor.has(at + Vector2i(-1, -1)) and floor.has(at + Vector2i(1, -1)),
+		"reed_pond: fishing, nobody's, on dry floor at %s with water beside it (%s) and two dry rows behind" % [at, wet])
 
 
 ## Umbrage's locker (722): one chest prop {"locker": true}, since 737 in

@@ -42039,6 +42039,25 @@ never agrees with the count). A give to a person who does not hear stays theirs 
 split out; Main.thanks_reach a test's narrower reach (-1 in play). resident_test _test_hand_in_thanked: far,
 called over; all hiding, the store's words.
 
+805 amended (maps; release's label): the Reed Pond. levels/wilds gains the place "reed_pond" {kind "fishing",
+at (32, 116), radius 3, holder nobody, name "the Reed Pond" (lore's placeholder, pending
+Jeff)} on the north bank of the wilds' west pond (a closed water about 5 x 5, cells 30..34
+x 117..121), about 185 cells from Umbrage's square (a minute's walk), near the forest link
+and the great tree. Its cell is dry floor with the water south of it and dry grass rows
+behind (113..116), away from the road that passes the pond's south side (rows 121..127),
+so the fishing side keeps a two-cell walkway (the two-cell rule). No town holds it, so no
+fisherman (594) walks to it. level_test _test_reed_pond. Level data only; no regen.
+
+805 amended, its second part: a told place is known. WorldNews.tell(player_id, place_id) puts a
+place into the player's known_places, as coming within SIGHT of it does (observe), and,
+if they are in the game, sends it as {"full": false, "known": {"areas": [], "places":
+[id]}, "holdings": ...}; a player not in the game gets it with their next full message.
+True when it was new; false for a place no level has, a record not found, or one already
+known. Callers: npc's residents when a want names a place, companions' wants likewise
+(through Main's _world_news). The message is the one "known" already carries, so the
+protocol is unchanged; a told place looks like a seen one until ui's look says otherwise.
+world_news_test "told". No new class_name.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

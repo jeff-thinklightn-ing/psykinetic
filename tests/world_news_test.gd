@@ -106,6 +106,24 @@ func _ready() -> void:
 	_check(_to(1).size() == 1 and _to(1)[0]["trade"][0]["caravans"].size() == 1, "a caravan on its way: sent again")
 	news.trade = Callable()
 
+	print("== told (decision 805) ==")
+	_sent.clear()
+	_check(news.tell("bo", "wn_wild/camp"), "Bo is told of the camp he has never come near")
+	bo = _to(2)
+	_check(bo.size() == 1 and bo[0]["known"] == {"areas": [], "places": ["wn_wild/camp"]} and bo[0]["holdings"] == {"wn_wild/camp": [Factions.NOBODY, 1]}
+			and _records["bo"].known_places.has("wn_wild/camp") and _to(1).is_empty(),
+		"it is known to him now, sent with whose it is, to him only (%s)" % [_sent])
+	_sent.clear()
+	_check(not news.tell("bo", "wn_wild/camp") and _sent.is_empty(), "told again: nothing new, nothing sent")
+	_check(not news.tell("bo", "wn_wild/nowhere") and not news.tell("nobody_here", "wn_wild/camp") and _sent.is_empty(),
+		"a place no level has, or a player with no record: nothing")
+	var away := PlayerRecord.new()
+	away.player_id = "cy"
+	_records["cy"] = away
+	_check(news.tell("cy", "wn_town/store") and away.known_places == _strings(["wn_town/store"]) and _sent.is_empty(),
+		"a player not in the game: kept on the record, sent with the full message when they come")
+	_records.erase("cy")
+
 	print("== kept ==")
 	var again := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(_records["ann"].to_dict())))
 	_check(again.known_areas == _strings(["wn_town", "wn_wild"]) and again.known_places == _strings(["wn_town/store", "wn_wild/camp"]),

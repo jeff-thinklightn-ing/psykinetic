@@ -139,6 +139,25 @@ func _explored_of(peer: int, areas: Array[String]) -> Dictionary:
 	return out
 
 
+## Player [param player_id] is told of place [param place_id] (decision 805,
+## maps' side (2)): a resident's want or a companion's naming it, before
+## they have seen it. It is known from now on, as a seen place is (kept on
+## their record, drawn on their map, its holding sent), and sent now if they
+## are in the game. True when it was new to them; false for a place no
+## level has, a record not found, or one that knew it already.
+func tell(player_id: String, place_id: String) -> bool:
+	var record: PlayerRecord = record_of.call(player_id) if record_of.is_valid() else null
+	if record == null or holdings.place(place_id).is_empty() or record.known_places.has(place_id):
+		return false
+	record.known_places.append(place_id)
+	record.known_places.sort()
+	var now: Dictionary = peers.call() if peers.is_valid() else {}
+	for peer: int in now:
+		if str(now[peer]) == player_id and _full_sent.has(peer):
+			send.call(peer, {"full": false, "known": {"areas": [], "places": [place_id]}, "holdings": _holdings_of([place_id])})
+	return true
+
+
 ## Sends each player not yet sent it their full message, and each one
 ## whose party list changed the new one. Main calls it now and then.
 func update() -> void:
