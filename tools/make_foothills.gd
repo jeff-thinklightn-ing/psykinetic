@@ -47,6 +47,10 @@ const TILT := Vector2(0.0, -0.07)
 ## ground rises to them, where along them the ways up are.
 const LOW_SCARP: Array[Vector2i] = [Vector2i(4, 62), Vector2i(30, 56), Vector2i(58, 63), Vector2i(90, 57), Vector2i(120, 64), Vector2i(150, 58), Vector2i(180, 64), Vector2i(212, 57), Vector2i(252, 63)]
 const HIGH_SCARP: Array[Vector2i] = [Vector2i(92, 27), Vector2i(120, 21), Vector2i(150, 29), Vector2i(172, 24), Vector2i(188, 24), Vector2i(212, 30), Vector2i(252, 23)]
+## The low scarp's west way up (745 amended): the ground under it west of
+## the river had none, so a body knocked or walked off its rim could not
+## climb back (physics' pit check, 783).
+const WEST_WAY_X := 30
 const LOW_HEIGHT := 4.0
 const HIGH_HEIGHT := 3.0
 const WANDER := 1.5
@@ -96,7 +100,7 @@ func _build(wander_seed: int) -> void:
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
 		"base": BASE, "amplitude": 1.5, "scale": 60.0, "octaves": 2, "tilt": TILT,
 		"escarpments": [
-			{"line": LOW_SCARP, "face": "south", "height": LOW_HEIGHT, "back": 26.0, "ways": [_fraction(LOW_SCARP, ROAD_X), _fraction(LOW_SCARP, 214)], "wander": WANDER, "wander_seed": wander_seed},
+			{"line": LOW_SCARP, "face": "south", "height": LOW_HEIGHT, "back": 26.0, "ways": [_fraction(LOW_SCARP, WEST_WAY_X), _fraction(LOW_SCARP, ROAD_X), _fraction(LOW_SCARP, 214)], "wander": WANDER, "wander_seed": wander_seed},
 			{"line": HIGH_SCARP, "face": "south", "height": HIGH_HEIGHT, "back": 20.0, "ways": [_fraction(HIGH_SCARP, ROAD_X), _fraction(HIGH_SCARP, 226)], "wander": WANDER, "wander_seed": wander_seed}],
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [RIVER], "valley_depth": 1.5, "valley_floor": 8.0, "valley_fall": 3.0, "valley_width": 16.0, "kinds": true, "min_flow": 30,

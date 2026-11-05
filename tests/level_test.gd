@@ -1242,7 +1242,6 @@ func _test_heights_and_stairs() -> void:
 ## Shipped levels with a known trap, until their owner fixes it: level -> owner
 ## (783, physics' side (2)). Their traps print as EXPECTED FAIL, not a failure.
 const PIT_TRAPS_EXPECTED := {
-	"foothills": "maps",  # (8, 61): 1561 cells, 5 levels down from (8, 60).
 }
 
 

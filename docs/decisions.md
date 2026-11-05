@@ -37301,6 +37301,18 @@ from_foothills), world_map_test (the wilds' way north to the foothills; the test
 through the castle and the foothills). A client cut with the server redeployed; protocol
 unchanged; no new class_name.
 
+745 amended: the low scarp's west way up (2026-11-04, maps; physics' pit check, 783, side (2)).
+The ground under the low scarp west of the river had no way back up: a body knocked or walked
+off the rim near (8, 60) landed among 1561 cells five levels down with no link and no edge out
+(level_test's _test_pit_ways_out, foothills marked expected-fail). make_foothills' LOW_SCARP
+gains a third way, at WEST_WAY_X 30 (the road's and the east one kept), which the cap makes a
+ramp up the face there, so that ground walks back to the rim. Regenerated levels/foothills: 52
+cells change kind (dirt and grass, the ramp's ground), its ledges retraced; the grid, the floor
+(19642) and every link, spawn and entity unchanged, so no remade line. level_test's
+PIT_TRAPS_EXPECTED loses foothills (now empty). Tests: level_test (the foothills' drops all
+land where a way out can be walked to), relief_test. Level data and a test; protocol
+unchanged; no new class_name.
+
 ## 747: the fallen knight's quest, and the way below revealed
 
 Jeff: "lets do a smaller encounter with a astral projection of a fallen
