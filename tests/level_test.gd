@@ -783,8 +783,8 @@ func _test_held() -> void:
 		if str(building.get("town", "")) != "":
 			town_cells.append(building["cell"])
 	_check(town_cells.all(func(cell: Vector2i) -> bool: return Level.room_at(wilds, cell) == "umbrage") and wilds["rooms"]["umbrage"]["name"] == "Umbrage"
-			and Level.room_at(wilds, Vector2i(70, 202)) == "",
-		"the wilds' town ground is named Umbrage while the town stands there (665's rooms; the store, the woodlot, the town's buildings), the standing stones not (%s: %s)"
+			and Level.room_at(wilds, Vector2i(70, 202)) == "" and Level.room_at(wilds, Vector2i(170, 180)) == "" and Level.room_at(wilds, Vector2i(165, 180)) == "",
+		"the wilds' town ground is named Umbrage while the town stands there (665's rooms; the store, the woodlot, the town's buildings), the standing stones and the barrow's mound and link not (774 amended) (%s: %s)"
 			% [town_cells, town_cells.map(func(cell: Vector2i) -> String: return Level.room_at(wilds, cell))])
 	var back: Array = wilds["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "held")
 	_check(to_wilds.size() == 1 and (to_wilds[0]["tile"] as Vector2i).y == 0 and back.size() == 1 and (back[0]["tile"] as Vector2i).y >= 236

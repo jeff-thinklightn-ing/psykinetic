@@ -41148,6 +41148,21 @@ Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator appr
   _test_town_places; resident_test (the raider seen from the new square lifted); relief_test;
   starter_town_test; view_test _test_tavern_inside. A CHANGELOG bullet. Server and level data,
   protocol unchanged (b0683fabbb20, rev 48). New class_name Relaid.
+
+774 amended: the town ends at its edge (2026-11-04, maps; the coordinator's approval, release's label). Jeff,
+playing v0.1.203: "barrows and the river ruins feel a little too close to the town now". The re-lay
+brought the square about 10 cells nearer the barrow (39 cells, about 10 s on foot, against 49), and
+the Umbrage room, widened to [157, 160, 85, 81], took in the barrow mound (165, 180) and its link
+(170, 180): the town's name and music ran onto the barrow, and post_barrow (179, 167) stood past
+it. levels/wilds: the room is the town proper, [165, 185, 71, 56] (x 165..235, y 185..240), with
+every town building, the store and the woodlot in it and the healer's turf hut (149, 232) out
+(plan B keeps the healer outside the town); post_barrow moves to (187, 184), rect 186..188 x
+183..185, its brazier at its middle, on grass east of the barrow spoke where it leaves the town,
+before the lane to the mound forks off. No mover (buildings): posts, rooms and room_at are read
+from the level; the watch's post rect, raid waves and the captain's visit are memory only; a pile
+dropped at the old post stays on its wilds floor. Moving the barrow and the Old Tower farther out
+waits on Jeff's pick. level_test _test_held: the mound and link are outside the room. Level data
+only; protocol unchanged, no new class_name.
 ## 786. A test-only admin verb, hp, behind --test-hp
 
 playtest's town-wolves tour must see a player fall and come back, but a bot beside the town's

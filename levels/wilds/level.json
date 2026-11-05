@@ -780,8 +780,8 @@
 		},
 		"post_barrow": {
 			"at": [
-				179,
-				167
+				187,
+				184
 			],
 			"kind": "post",
 			"town": "store",
@@ -790,14 +790,14 @@
 			"holder": "town",
 			"name": "the barrow post",
 			"rect": [
-				178,
-				166,
+				186,
+				183,
 				3,
 				3
 			],
 			"brazier": [
-				179,
-				167
+				187,
+				184
 			]
 		},
 		"post_hill_road": {
@@ -894,10 +894,10 @@
 			"name": "Umbrage",
 			"music": "music.umbrage",
 			"rect": [
-				157,
-				160,
-				85,
-				81
+				165,
+				185,
+				71,
+				56
 			]
 		}
 	},
