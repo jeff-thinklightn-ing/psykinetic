@@ -39585,6 +39585,19 @@ barter window), 562, 584 amended, 438, 711 and 736.
 ui_test (_test_barter, _test_counter_panel, the stack hovers) and resident_test
 (_test_vendor_buttons: Rolf's sword bought through Buy, end to end). Client only, protocol
 unchanged; CounterPanel's class_name is gone (no other tree names it); no new class_name.
+
+765 amended (ui, release's label; Jeff on v0.1.202: "clicking on npc shops items clicks through the
+menu and moves position"): a click on a store square (StoreBox) ran click_box, whose _rebuild
+takes every square out of the grid, this one with it, before accept_event(); out of the tree that
+marks nothing, so the press went on to Main._unhandled_input and walked to the ground under it.
+StoreBox and the town window's TownBox now accept first, then act; PackPanel.SlotBox, which
+accepts only when its call takes the click, holds its viewport from before the call and marks the
+press handled on it. Main.world_clicks counts the presses that reach the world. ui_test
+_test_window_clicks pushes a press and release through the viewport onto a square of the pack, the
+character sheet, the store (picked, then let go) and the town window, none reaching the world, and
+one on bare ground that does; before the fix the store's reached it. CHANGELOG bullet (voice's
+words). Client only, protocol unchanged, no new class_name.
+
 ## 772. The tavern and the townsfolk's night
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

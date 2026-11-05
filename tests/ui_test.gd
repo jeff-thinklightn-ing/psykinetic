@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_options_tabs()
 	_test_inventory_panel()
 	_test_barter()
+	await _test_window_clicks()
 	_test_sweep_key()
 	_test_crouch_key()
 	_test_practice_bars()
@@ -2179,6 +2180,93 @@ func _test_practice_bars() -> void:
 ## The character sheet (787): beside the pack whenever it shows, the hands
 ## and the armour on a figure, its foot level with the pack's, the load as
 ## two bars with the load lines on hover; a store window clear of both.
+## A left press and release through the viewport at [param control]'s centre, in the
+## viewport's own pixels, as the mouse would: how many reached the world (Main.world_clicks).
+func _click_through(control: Control) -> int:
+	var at := control.get_global_transform_with_canvas() * (control.size / 2.0)
+	var before: int = _main.world_clicks
+	var motion := InputEventMouseMotion.new()
+	motion.position = at
+	motion.global_position = at
+	get_viewport().push_input(motion, true)
+	await get_tree().process_frame
+	for pressed: bool in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = pressed
+		click.position = at
+		click.global_position = at
+		get_viewport().push_input(click, true)
+		await get_tree().process_frame
+	return _main.world_clicks - before
+
+
+## The first shown square of [param type] under [param root] (an inner class: by its script).
+func _square(root: Node, type: Variant) -> Control:
+	for node: Node in root.find_children("*", "", true, false):
+		if is_instance_of(node, type) and (node as Control).is_visible_in_tree():
+			return node
+	return null
+
+
+func _test_window_clicks() -> void:
+	print("
+== a click on a window's square stays in the window, never a walk (Jeff on v0.1.202) ==")
+	var barter: BarterPanel = _main.barter_panel
+	var pack: PackPanel = _main.pack_panel
+	if barter == null or pack == null or _main._local_player() == null:
+		print("  (no windows or no player in this scene: its checks skipped)")
+		return
+	var reached: Dictionary = {}
+	# The probe itself: a press on bare ground does reach the world.
+	var ground := Control.new()
+	ground.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ground.size = Vector2(4, 4)
+	ground.position = Vector2(8, get_viewport().get_visible_rect().size.y * 0.5)
+	add_child(ground)
+	var bare := await _click_through(ground)
+	ground.queue_free()
+	pack.shown = true
+	await get_tree().process_frame
+	var mine := _square(pack.get_child(0), PackPanel.SlotBox)
+	reached["pack"] = await _click_through(mine) if mine != null else -1
+	var worn: Control = _square(pack.sheet, PackPanel.SlotBox) if is_instance_valid(pack.sheet) else null
+	reached["character sheet"] = await _click_through(worn) if worn != null else -1
+	barter.open(null, "Snagfin")
+	barter.show_barter({"shop": "", "town": "Umbrage", "gold": 12,
+		"goods": [{"uid": 101, "id": "sword", "price": 10}, {"uid": 102, "id": "bandaging_kit", "price": 1}],
+		"buys": {"hide": {"gold": 20, "up_to": 1}}, "fenced": {},
+		"pack": [{"slot": 0, "uid": 201, "id": "hide"}], "why": ""})
+	for i in 3:
+		await get_tree().process_frame
+	var good := _square(barter, BarterPanel.StoreBox)
+	reached["store's good (picked)"] = await _click_through(good) if good != null else -1
+	var picked := barter.take.size()
+	good = _square(barter, BarterPanel.StoreBox)
+	reached["store's good again (let go)"] = await _click_through(good) if good != null else -1
+	barter.close()
+	var town: TownSheet = _main.town_panel
+	if town != null:
+		var id := "%s/oakford" % _main.zone_name_here()
+		var states_was: Dictionary = _main.town_states.duplicate()
+		_main.town_states[id] = {"forge": {"state": "standing"}}
+		_main.open_town(id)
+		_main._on_message("town_sheet", {"town": id, "name": "Oakford", "at": true, "gold": 50,
+			"stock": [{"id": "wood_bundle", "have": 4, "enough": 20, "short": 0.8}], "pays": {"wood_bundle": {"gold": 3, "up_to": 5}},
+			"pack": [{"slot": 4, "uid": 903, "id": "wood_bundle"}]})
+		for i in 3:
+			await get_tree().process_frame
+		var box := _square(town, TownSheet.TownBox)
+		reached["town window"] = await _click_through(box) if box != null else -1
+		town.visible = false
+		_main.town_states = states_was
+	pack.shown = false
+	_check(bare == 1, "the probe: a press on bare ground reaches the world (%d)" % bare)
+	_check(picked == 1, "the store's good was picked by the click (%d)" % picked)
+	_check(reached.values().all(func(n: int) -> bool: return n == 0),
+		"a press on a square in the pack, the sheet, the store and the town window never reaches the world (%s; -1: no square)" % [reached])
+
+
 func _test_character_sheet(pack: PackPanel) -> void:
 	print("\n== the character sheet (787): the hands and armour beside the pack, the load drawn ==")
 	var sheet := pack.sheet

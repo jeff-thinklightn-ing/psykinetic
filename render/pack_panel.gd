@@ -249,11 +249,14 @@ class SlotBox:
 	func _gui_input(event: InputEvent) -> void:
 		if read_only:
 			return
+		# Taken now: what a click does can rebuild these squares, this one out of the tree,
+		# and accept_event() then marks nothing, so the press walked (Jeff on v0.1.202).
+		var viewport := get_viewport()
 		var click := event as InputEventMouseButton
 		# The barter window open (560): a left click selects the thing to give.
 		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT and panel.select_hook.is_valid() \
 				and panel.select_hook.call(mine, index, click.shift_pressed):
-			accept_event()
+			viewport.set_input_as_handled()
 			return
 		# 722: a double-click equips, or with a chest open deposits or withdraws.
 		if click != null and click.pressed and click.double_click and click.button_index == MOUSE_BUTTON_LEFT \
@@ -261,14 +264,14 @@ class SlotBox:
 			var entity_clicked := owner_entity()
 			if is_instance_valid(entity_clicked) and index < entity_clicked.slots.size() and not entity_clicked.slots[index].is_empty():
 				panel.double_click.call(mine, index)
-				accept_event()
+				viewport.set_input_as_handled()
 				return
 		if click == null or not click.pressed or click.button_index != MOUSE_BUTTON_RIGHT or not mine:
 			return
 		var entity := owner_entity()
 		if is_instance_valid(entity) and index < entity.slots.size() and not entity.slots[index].is_empty() and panel.use.is_valid():
 			panel.use.call(index)
-			accept_event()
+			viewport.set_input_as_handled()
 
 	func _can_drop_data(_at: Vector2, data: Variant) -> bool:
 		return not read_only and data is Dictionary and data.has("slots_of") and is_instance_valid(owner_entity())

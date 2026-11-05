@@ -127,8 +127,8 @@ class TownBox:
 	func _gui_input(event: InputEvent) -> void:
 		var click := event as InputEventMouseButton
 		if click != null and click.pressed and click.button_index in [MOUSE_BUTTON_LEFT, MOUSE_BUTTON_RIGHT]:
+			accept_event()  # First: the click rebuilds the grid, this square out of the tree (Jeff on v0.1.202).
 			window.click_box(kind, key, click.button_index == MOUSE_BUTTON_RIGHT)
-			accept_event()
 
 	func draw_over() -> void:
 		var area := overlay.size

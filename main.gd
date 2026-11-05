@@ -512,6 +512,8 @@ var _lead := Vector2.ZERO
 ## camera has moved (see _update_pick): the hover shows it and every
 ## click this frame uses it, so the two always agree.
 var _pick_grid := Vector2(NAN, NAN)
+## The mouse presses that reached the world (a move, a talk, an attack, an open), not a window.
+var world_clicks := 0
 ## 3D: the screen point a middle drag went down at (x NAN when none), and
 ## what it is: UNDECIDED until it has moved (let go so, it does nothing),
 ## then TURN or PITCH (WASD) or PAN (click).
@@ -1512,6 +1514,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if not click.pressed:
 		return
+	world_clicks += 1  # ui_test: a press on a window's square never gets here.
 	# A sprite under the cursor is the target whatever cell is under those
 	# pixels; otherwise the click resolves on the ground plane, to the floor
 	# cell under the cursor and whatever stands on it. The right button also
