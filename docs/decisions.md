@@ -40944,6 +40944,21 @@ The treasury sat at its 5-gold floor in all three, trader or not: what comes in 
 the town owes. That is the coordinator's design ask, separate. farm_test _test_trader (never the
 food or meat however much, the spare hides bought; a full market takes nothing). Server only,
 protocol unchanged, no new class_name.
+
+770 amended (2): the trader's cap reads the town's whole gold (release's label; the coordinator's
+approval after the inn soak). 770 stopped his buying once the treasury held treasury_most (200). A
+treasury passes what it is paid on to its people (what it owes them, wages), so it never neared 200
+and the cap never bound: in a 56-day town_balance soak with an inn standing (after 353 amended (5))
+the town's gold went 154 -> 449, the trader paying in 296 and pedlars 86 against 66 of goods the
+town bought from them, held in purses (the woodcutter 246, the hunter 99). economy.json's trader
+"town_gold_most": 300 replaces treasury_most; Economy.town_gold(town) is the treasury and its
+residents' purses, and _trader buys raws and shelf goods only while that and what he has paid stay
+under it. At the cap he still sells, so gold can leave. The cap limits the trader only, never
+players: a capped town's surplus stays in its store and shop, for a player to buy there as before.
+farm_test _test_trader (the town's gold never bought past the cap; with the gold in a purse and the
+treasury near its floor he buys no hides and still sells ore). Server only, protocol unchanged, no
+new class_name, no bullet.
+
 ## 790. Hollowfell: the hills' mine, its tunnels laid again (769's phases 2-3; phase A)
 
 769's phases 2 and 3 (Jeff, 2026-11-02: "the mine end rooms would say the same just how you get

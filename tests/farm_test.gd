@@ -718,11 +718,12 @@ func _test_trader() -> void:
 	var saved := Towns.new(JSON.parse_string(JSON.stringify(towns.to_dict())), work, rules, towns.clock)
 	_check(int(saved._town(TOWN)["visitor_due"]["trader"]) == 2, "his day kept in the save")
 	stock.deposit(TOWN, "hide", 40, "test")
-	stock.deposit(TOWN, "gold", int(rules["visitors"]["kinds"]["trader"]["treasury_most"]) - 2 - stock.count(TOWN, "gold"), "test")
+	var most := int(rules["visitors"]["kinds"]["trader"]["town_gold_most"])
+	stock.deposit(TOWN, "gold", most - 2 - economy.town_gold(TOWN), "test")
 	_now = 6 * DAY
 	towns._visitors_turn(TOWN)
-	_check(towns.visitors(TOWN).size() == 1 and stock.count(TOWN, "gold") <= int(rules["visitors"]["kinds"]["trader"]["treasury_most"]),
-		"back on day 6; the treasury never bought past treasury_most (%d)" % stock.count(TOWN, "gold"))
+	_check(towns.visitors(TOWN).size() == 1 and economy.town_gold(TOWN) <= most,
+		"back on day 6; the town's gold never bought past town_gold_most (%d)" % economy.town_gold(TOWN))
 	# Never what the town eats (770 amended, the 56-day soak), and nothing taken for nothing (the 28-day soak).
 	var trader_rule: Dictionary = rules["visitors"]["kinds"]["trader"]
 	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - 30, "test")
@@ -743,6 +744,25 @@ func _test_trader() -> void:
 	_now = 14 * DAY
 	towns._visitors_turn(TOWN)
 	_check(stock.count(TOWN, "hide") == hides, "a market with its fill takes nothing for nothing (%d hides)" % stock.count(TOWN, "hide"))
+	# 770 amended (2): the cap reads the residents' purses too. The treasury
+	# 20 over its floor, the rest of town_gold_most in a purse, the market
+	# wanting hides again: he buys none, and still sells the short store ore.
+	economy._bought.erase(str(trader_rule["market"]))
+	var ids := work.worker_ids(TOWN)
+	_check(not ids.is_empty(), "a resident to hold the purse")
+	if ids.is_empty():
+		return
+	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - int(rules["gold_floor"]) - 20, "test")
+	work.pay(ids[0], most - economy.town_gold(TOWN), "test")
+	stock.deposit(TOWN, "hide", 6, "test")
+	var capped_hides := stock.count(TOWN, "hide")
+	var at_cap := economy.town_gold(TOWN)
+	stock.take(TOWN, "ore", stock.count(TOWN, "ore"), "test")
+	_now = 18 * DAY
+	towns._visitors_turn(TOWN)
+	_check(towns.visitors(TOWN).size() == 1 and at_cap == most and stock.count(TOWN, "hide") == capped_hides,
+		"the gold in a purse, the town at town_gold_most (%d): he buys none of its %d hides" % [at_cap, capped_hides])
+	_check(stock.count(TOWN, "ore") > 0, "and still sells it ore (%d)" % stock.count(TOWN, "ore"))
 
 
 func _test_visitors() -> void:

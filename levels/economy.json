@@ -90,7 +90,7 @@
 	"visitors": {"_": "Decision 711 (Jeff: strangers come and go, bringing news and trade, the town never growing by them): once a day a town with people and fewer than most visitors gets one at chance, staying days (a range); a kind by weight among those whose needs building stands. inn: gold spent at the inn where one stands; raws: the store's spare (over comfort) bought, buys at most, at the store's price; offering: gold to the temple's alms; wares (items' list): lines a pedlar draws draw (a range) of, never one a trade of the town's makes (unless). Their gold comes from outside and leaves with them.",
 		"chance": 0.35, "most": 2, "days": [1, 3],
 		"kinds": {
-			"trader": {"weight": 0, "every": 4, "days": [1, 1], "market": "market:castle", "load": 20, "goods": 4, "sells": 5, "treasury_most": 200, "never_buys": ["food", "meat"],
+			"trader": {"weight": 0, "every": 4, "days": [1, 1], "market": "market:castle", "load": 20, "goods": 4, "sells": 5, "town_gold_most": 300, "never_buys": ["food", "meat"],
 				"names": ["Hale", "Oswin", "Maud", "Tamsin", "Garrick", "Edda"]},
 			"traveller": {"weight": 3, "inn": [2, 6], "names": ["Hale", "Oswin", "Maud", "Tamsin", "Garrick", "Edda"]},
 			"pedlar": {"weight": 2, "raws": ["ore", "wood", "cloth", "meat", "hide"], "buys": 4, "draw": [3, 5], "names": ["Jory", "Bess", "Wat", "Nell"],

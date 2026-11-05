@@ -1405,6 +1405,15 @@ func temple_offering(town: String, player_id: String, waived: bool, for_name := 
 	return paid
 
 
+## All the gold [param town] holds (770 amended (2)): its treasury and
+## its residents' purses.
+func town_gold(town: String) -> int:
+	var gold := stockpile.count(town, "gold")
+	for id in production.worker_ids(town):
+		gold += int(production.worker(id).get("purse", 0))
+	return gold
+
+
 # --- Visitors (decision 711) -----------------------------------------------------------
 
 ## The market's trader at [param town] (770; a visitor [param entry] of a
@@ -1414,7 +1423,8 @@ func temple_offering(town: String, player_id: String, waived: bool, for_name := 
 ## "load", at market_price as it falls with what the market has had; then
 ## shelf goods standing at their shelf cap (not a fence's, not a luxury),
 ## "goods" at most, at item_price, the maker paid as for any sale; none of
-## it once the treasury holds "treasury_most". Then sells up to "sells" of
+## it once the town's gold (its treasury and its residents' purses,
+## town_gold) reaches "town_gold_most" (770 amended (2)). Then sells up to "sells" of
 ## what the store is short of among the market's sells, at market_price x
 ## trade.caravan.sell, while the treasury keeps its gold_floor. Words for
 ## the log; the console line carries the place ids and counts only.
@@ -1422,7 +1432,11 @@ func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
 	var market := str(rule["market"])
 	var trade: Dictionary = rules.get("trade", {})
 	var wants: Dictionary = trade.get("markets", {}).get(market, {}).get("wants", {})
-	var most := int(rule.get("treasury_most", 200))
+	# The cap reads the whole town (770 amended (2)): the treasury passes what
+	# it is paid on to its people, so a cap on it alone never bound (56 days:
+	# the town's gold 154 to 449, in purses). Outside gold is what he pays.
+	var most := int(rule.get("town_gold_most", 300))
+	var had := town_gold(town)
 	var cat: Dictionary = catalog.call()
 	var held := {}
 	var build: Dictionary = shortfall.call(town) if shortfall.is_valid() else {}
@@ -1434,7 +1448,7 @@ func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
 	var paid := 0
 	var room := int(rule.get("load", 20))
 	for what: String in kinds:
-		if room <= 0 or stockpile.count(town, "gold") >= most:
+		if room <= 0 or had + paid >= most:
 			break
 		# Never what the town eats (770 amended, the 56-day soak: a harvest's
 		# surplus sold on went short the next, thin year, 204 meals hungry
@@ -1450,7 +1464,7 @@ func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
 			var each := roundi(market_price(market, what, 0.0, i))
 			if each < 1:
 				break  # The market has its fill: nothing goes for nothing.
-			if stockpile.count(town, "gold") + gold + each > most:
+			if had + paid + gold + each > most:
 				break
 			gold += each
 			count += 1
@@ -1471,7 +1485,7 @@ func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
 		var id := stockpile.book.id_of(uid)
 		on_shelf[id] = int(on_shelf.get(id, 0)) + 1
 	for uid in shelf:
-		if goods >= int(rule.get("goods", 4)) or stockpile.count(town, "gold") >= most:
+		if goods >= int(rule.get("goods", 4)) or had + paid >= most:
 			break
 		var id := stockpile.book.id_of(uid)
 		var made: Variant = cat.get(id, {}).get("made", {})
