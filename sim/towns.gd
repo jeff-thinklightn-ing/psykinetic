@@ -164,6 +164,9 @@ signal visitor_left(town: String, id: String)
 ## day's cap) for [param why]; [param word] is the ladder word after it,
 ## [param was] the word before (804, economy's side: Main shows the rise).
 signal regard_rose(town: String, player_id: String, halves: int, why: String, word: String, was: String)
+## [param kind] stands in [param town] (built a level, or [param repaired]),
+## [param by] who gave toward it {player_id: {what: count}} (804 amended).
+signal stood(town: String, kind: String, by: Dictionary, repaired: bool)
 ## (town) -> Array of place names a visitor to it may come from (711; Main,
 ## from the world plane); "the road" while unset.
 var visitor_from := Callable()
@@ -775,6 +778,7 @@ func unlock(town: String, kind: String) -> bool:
 		cost[what] = int(spec["cost"][what]) * level
 	var entry: Dictionary = record["buildings"].get(kind, {"kind": kind, "level": 0, "state": PLANNED, "since": now(), "job": 0})
 	entry["state"] = BUILDING if int(entry["level"]) >= 1 else PLANNED
+	entry["by"] = {}  # Who gives toward this level (804 amended: credit_build).
 	record["buildings"][kind] = entry
 	if kind in record.get("gone", []):  # Built again (649): its ground taken back from the forest.
 		record["gone"].erase(kind)
@@ -967,6 +971,7 @@ func _built(town: String, kind: String) -> void:
 			repaired["job"] = 0
 			_note(town, "the %s is repaired, at its %s stage" % [_said(str(repaired["kind"])), _stage(int(repaired["level"]))])
 			building_changed.emit(town, str(repaired["kind"]))
+			_stood(town, repaired, true)
 			_seat(town)
 		return
 	var entry: Dictionary = record["buildings"].get(kind, {"kind": kind, "level": 0, "job": 0})
@@ -977,7 +982,34 @@ func _built(town: String, kind: String) -> void:
 	record["buildings"][kind] = entry
 	_note(town, "the %s stands at its %s stage" % [_said(kind), _stage(int(entry["level"]))])
 	building_changed.emit(town, kind)
+	_stood(town, entry, false)
 	_seat(town)
+
+
+## [param entry]'s level stands: those who gave toward it (its "by") are
+## told (stood), and it keeps them as "built_by" for residents' talk (804
+## amended, npc's facts) till its next level is begun.
+func _stood(town: String, entry: Dictionary, repaired: bool) -> void:
+	var by: Dictionary = entry.get("by", {})
+	entry.erase("by")
+	if by.is_empty():
+		return
+	entry["built_by"] = by
+	stood.emit(town, str(entry["kind"]), by.duplicate(true), repaired)
+
+
+## Credits [param player_id] with [param count] of [param what] (a raw, or
+## "gold") given toward [param town]'s build [param kind] (a building
+## kind, or REPAIR + one): kept on the building's entry as "by" {player_id:
+## {what: count}} until it stands (804 amended, the build credit).
+func credit_build(town: String, kind: String, player_id: String, what: String, count: int) -> void:
+	if player_id.is_empty() or count <= 0 or not _towns.has(town):
+		return
+	var entry: Dictionary = _towns[town]["buildings"].get(kind.trim_prefix(REPAIR), {})
+	if entry.is_empty():
+		return
+	var theirs: Dictionary = entry.get_or_add("by", {}).get_or_add(player_id, {})
+	theirs[what] = int(theirs.get(what, 0)) + count
 
 
 ## Seats [param town]'s residents who have no workshop at one of their

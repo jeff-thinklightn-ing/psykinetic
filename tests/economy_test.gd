@@ -878,6 +878,7 @@ func _test_town_window(host: Player) -> void:
 		_main.contribute(host, {"town": STORE, "give": [more], "gold": 0})
 	var halves := int(World.towns.to_dict()[STORE]["regard"][me]["halves"])
 	_check(halves == int(World.economy.rules["town_regard"]["day_most"]), "a day's gains capped at day_most halves (%d)" % halves)
+	await _test_build_credit(host)
 	# Away from the store: voice's refusal, nothing moved.
 	var was := host.tile
 	host.tile = Vector2i(-50, -50)
@@ -898,6 +899,41 @@ func _test_town_window(host: Player) -> void:
 		and owed_gold.size() == 1 and owed_gold[0].get("owed") == true and " owes you " in str(owed_gold[0]["words"]),
 		"804, economy's side: an empty treasury: the hide thanked, the gold owed marked owed, not received (%s)" % [after])
 	World.stockpile.deposit(STORE, "gold", treasury, "test")
+
+
+## 804 amended, the build credit: raws a queued build lacked, handed in,
+## and gold given toward it are kept on its entry; when it stands, each
+## giver is told in voice's words, and it keeps them as built_by.
+func _test_build_credit(host: Player) -> void:
+	var me := host.player_id
+	World.towns.add_xp(STORE, 500, "test")
+	var kind := ""
+	for each: String in ["temple", "forge", "kitchen", "inn"]:
+		if World.towns.unlock(STORE, each):
+			kind = each
+			break
+	var short := World.towns.shortfall(STORE)
+	_check(not kind.is_empty() and not short.is_empty(), "(a build begun and queued: %s, %s)" % [kind, short])
+	if short.is_empty():
+		return
+	kind = str(short["kind"])
+	var lacks: Dictionary = short["needs"]
+	var raw := "ore" if lacks.has("ore") else str(lacks.keys()[0]) if not lacks.is_empty() else ""
+	if not raw.is_empty():
+		var sack := World.items.mint({"ore": "ore_sack", "wood": "wood_bundle"}.get(raw, "ore_sack"), "found", "test")
+		World.put_item(host, host, 1, sack)
+		World.donate(host, sack, STORE)
+		await get_tree().process_frame
+	var given := World.economy.contribute(STORE, me, 5) if World.gold_of(me) >= 5 else 0
+	var entry: Dictionary = World.towns.to_dict()[STORE]["buildings"].get(kind.trim_prefix(Towns.REPAIR), {})
+	var by: Dictionary = entry.get("by", {}).get(me, {})
+	_check((raw.is_empty() or int(by.get(raw, 0)) > 0) and (given == 0 or int(by.get("gold", 0)) == given),
+		"what it lacked, handed in, and the gold given are credited to the build (%s)" % [by])
+	World.towns._built(STORE, kind)
+	var last: Dictionary = _main.rewards_given.back()["data"] if not _main.rewards_given.is_empty() else {}
+	_check(last.get("track") == "deed" and last.get("big") == true and str(last.get("words", "")).begins_with("The %s stands, built with your " % Main._building_words(kind))
+		and World.towns.to_dict()[STORE]["buildings"][kind].get("built_by", {}).has(me) and not World.towns.to_dict()[STORE]["buildings"][kind].has("by"),
+		"when it stands, the giver told in a banner (%s); built_by kept" % last.get("words"))
 
 
 func _no_wood() -> void:

@@ -42041,6 +42041,19 @@ gold reward marked "owed": true, which Gains shows as its words alone ("Umbrage 
 no "+" and no coin; and when Economy.owed_paid pays it, it floats then ("Paid 40 gold you were owed").
 economy_test _test_town_window. Server only, protocol unchanged ("owed" and "banner" ride 804's
 reward), no new class_name, no bullet.
+804 amended (2) (release's label; the coordinator's approval of the hand-in's three layers, the
+first: credit): a building remembers who gave toward it. Towns.credit_build(town, kind, player_id,
+what, count) keeps "by" {player_id: {what: count}} on the building's entry (a repair's on the building
+repaired) while its level is wanted; Main credits a player's raws banked at a store or depot as far as
+the town's queued build still lacked them (Main._credit_hand_in: the job's cost less what the store
+held before), and gold given to the build's fund (the contributed signal). When the level stands
+(Towns._built, or a repair done) Towns.stood(town, kind, by, repaired) fires and "by" becomes
+"built_by", kept for npc's residents to speak of until the next level is begun; Main sends each giver
+a big deed, voice's words: "The temple stands, built with your timber and gold" (wood is "timber",
+gold last). The ids stay on the server: buildings_of and the town sheet copy only state, level,
+progress and walls. economy_test _test_build_credit. Server only, protocol unchanged (804's
+"reward"), no new class_name, no bullet.
+
 ## 805. The core loop's first slice: Wren wants to go fishing
 
 Jeff's loop, the coordinator's top priority: a town or companion has a need, the player works out

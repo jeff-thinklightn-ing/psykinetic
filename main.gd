@@ -4303,6 +4303,7 @@ func _boot() -> void:
 	World.clearing.unplotted.connect(_on_unplotted)  # A plot dropped (649, maps' side).
 	World.towns.building_changed.connect(_on_town_building_changed)
 	World.towns.regard_rose.connect(_on_regard_rose)  # 804, economy's side: every rise shown.
+	World.towns.stood.connect(_on_stood)  # 804 amended: "built with your ore".
 	World.towns.stage_changed.connect(func(town: String) -> void: _on_town_building_changed(town, ""))  # Its stage told (591).
 	# The roofs storms broke and nobody has mended yet (decision 383).
 	World.roofs_damaged.clear()
@@ -4506,7 +4507,8 @@ func _boot() -> void:
 		World.trade.caravan_lost.connect(World.economy.caravan_lost)
 	World.production.settle_fund = World.economy.settle_fund
 	World.economy.contributed.connect(func(town: String, player_id: String, kind: String, gold: int, xp: int) -> void:
-		World.towns.add_xp(town, xp, "%s gave %d gold toward the %s" % [player_id, gold, kind]))
+		World.towns.add_xp(town, xp, "%s gave %d gold toward the %s" % [player_id, gold, kind])
+		World.towns.credit_build(town, kind, player_id, "gold", gold))  # 804 amended: "built with your gold".
 	# The fallen come back at a temple or a healer's hut (decision 396).
 	World.production.returned = _on_returned
 	if not World.production.work_done.is_connected(_on_counter_work_done):
@@ -14760,6 +14762,35 @@ func _on_handed_in(place: String, player_id: String, what: String, count: int, r
 	if not _giving_to.is_empty():
 		it["worker"] = _giving_to  # Given to a person (802 amended (2)): their key and name.
 		it["by"] = _giving_name
+	if raw:
+		_credit_hand_in(place, player_id, what, count)
+
+
+## Credits [param player_id]'s [param count] of raw [param what], just
+## banked at [param town], to the town's queued build as far as the build
+## lacked it (804 amended, the build credit: "built with your ore").
+func _credit_hand_in(town: String, player_id: String, what: String, count: int) -> void:
+	var short := World.towns.shortfall(town)
+	if short.is_empty() or World.production == null:
+		return
+	var cost := int(World.production.job(int(short["job"])).get("cost", {}).get(what, 0))
+	var lacked := cost - (World.stockpile.count(town, what) - count)
+	World.towns.credit_build(town, str(short["kind"]), player_id, what, mini(count, lacked))
+
+
+## [param kind] stands in [param town]: each who gave toward it is told,
+## a big deed in voice's words ("The forge stands, built with your ore").
+func _on_stood(town: String, kind: String, by: Dictionary, _repaired: bool) -> void:
+	for player_id: String in by:
+		var gave: Array = (by[player_id] as Dictionary).keys()
+		gave.sort_custom(func(a: String, b: String) -> bool: return (a != "gold" and b == "gold") or (a != "gold" and b != "gold" and a < b))
+		var words: Array = gave.map(func(what: String) -> String: return str(BUILT_WORDS.get(what, what)))
+		_reward(player_id, {"track": "deed", "big": true, "of": _town_display(town),
+			"words": "The %s stands, built with your %s" % [_building_words(kind.trim_prefix(Towns.REPAIR)), _and_words(words)]})
+
+
+## A raw as a build's credit names it (voice's): wood is timber.
+const BUILT_WORDS := {"wood": "timber"}
 
 
 ## Thanks every hand-in not yet thanked: one town regard rise for what the
