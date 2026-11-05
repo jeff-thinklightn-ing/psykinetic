@@ -41585,3 +41585,36 @@ sends "to"; it shows "asleep" from Resident.sleeping and closes on a hide or she
 vendor's window has no chat input. resident_test _test_said_to: the line goes to the window's body
 though another is nearer and named; with no "to", the nearest as before; a body hiding hears nothing and
 nobody else takes it. Protocol: what "say" carries changes (rev 49, "49 (802):"). No new class_name.
+
+## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
+
+Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when
+i was just capsules and i was talking to wren and she was making up things she couldnt do...
+now she just saying the same things a lot and i dont get the sense that she's 'there'"). The
+diagnosis found her made safe one rule at a time since 84 and 373 split her voice from her
+hands; this first step changes nothing she says, only what we can see of it, and closes one
+likely cause.
+
+- net/ollama_mind.gd asks num_ctx (OllamaMind.NUM_CTX, 8192) on every native request and on
+  the warm-up. It was never set, so Ollama's default applied, and a prompt past it is cut
+  from its front without an error: the front of her voice's prompt is her card. One size for
+  every channel and every mind (residents ask through OllamaMind too), so the model is never
+  reloaded for a different size. keep_alive was already -1 on every request (373).
+- A native reply's prompt_eval_count, eval_count and load_duration come back with each result
+  (OllamaMind.measures_of) and go into the mind log's entry as prompt_tokens, reply_tokens and
+  load_ms, beside latency_ms: whether her prompt fits, and when the model was loaded again.
+- The journal gets the voice's outcomes as counts, so release can measure her from it (the
+  box's mind.log is Jeff's to read): every VOICE_REPORT_STEPS (10 minutes) Main prints
+  Companion.voice_report, "[voice] 10 min: said N, silent N, filtered N, asked again N, no
+  answer N, timeout N, held tongue N, not asked N, fixed N; latency median N ms, worst N;
+  prompt tokens median N, worst N of 8192", every companion's together, and the counts start
+  again; nothing when there were none. Filtered is a reply dropped once cleaned (spoken, an
+  echo, a fragment, the speech interval); fixed is a line said that her voice did not write
+  (Companion._say outside the voice's reply, _saying_voice). No words, names or ids.
+
+The later steps are amendments of this one: 2 and 4 together (her rules as who she is and
+how she talks, with room to wonder and wish, and a quiet-moment trigger so she speaks
+unasked), 3 (fixed lines handed to her voice), 5 (her needs and wants), then burdens.
+companion_test _test_voice_measures: num_ctx on every channel and the warm-up, the measures
+read, a voice entry's tokens in the mind log, the journal line's counts with no words or
+names, counted out after. Server only, protocol unchanged, no new class_name, no bullet.

@@ -5793,6 +5793,11 @@ func _finish_saving() -> void:
 		_saver = null
 
 
+## How often the journal gets the companions' "[voice]" counts (decision
+## 803): every 10 minutes of world steps.
+const VOICE_REPORT_STEPS := 6000
+
+
 ## Once every awake zone has stepped: the snapshot, every SNAPSHOT_EVERY_TICKS,
 ## written on a thread (decision 360).
 func _on_world_stepped() -> void:
@@ -5805,6 +5810,11 @@ func _on_world_stepped() -> void:
 		Net.broadcast("sky", sky_message())
 		_regenerate_due()
 		World.refill_seams()  # Decision 769.
+	if Net.is_authority() and World.steps % VOICE_REPORT_STEPS == 0:
+		# Decision 803: the companions' voice outcomes, counts only, for the journal.
+		var voice_line := Companion.voice_report(VOICE_REPORT_STEPS / (World.TICK_RATE * 60))
+		if not voice_line.is_empty():
+			print(voice_line)
 	if Net.is_authority() and World.steps % HALL_SEAL_EVERY == 0:
 		for zone_name: String in _hall_seals:
 			if _hall_seals[zone_name]:

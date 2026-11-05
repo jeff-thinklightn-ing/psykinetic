@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_malformed_llm_reply()
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
+	_test_voice_measures()
 	_test_yields_when_bumped()
 	_test_says_so_with_no_room()
 	_test_stance_events()
@@ -2869,6 +2870,44 @@ func _test_llm_reasoning_is_off_and_stripped() -> void:
 	pet.mind = ScriptedMind.new()
 	pet.stance = Companion.Stance.GUARD
 
+
+func _test_voice_measures() -> void:
+	print("
+== 803: num_ctx on every ask, the prompt's tokens in the mind log, the journal's counts-only [voice] line ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(pet, owner.tile + Vector2i(1, 0))
+	var mind := OllamaMind.new(Net.DEFAULT_LLM_URL, "stub", _main)
+	var all_ctx := true
+	for what: String in ["stance", "voice", "check", "card", "facts"]:
+		var body: Variant = JSON.parse_string(mind.request_messages([{"role": "user", "content": "hi"}], what))
+		all_ctx = all_ctx and int(body["options"].get("num_ctx", 0)) == OllamaMind.NUM_CTX
+	mind.stub_warm = true
+	mind.warm()
+	_check(all_ctx and mind.warm_sent.all(func(sent: Dictionary) -> bool: return int(sent["body"]["options"]["num_ctx"]) == OllamaMind.NUM_CTX),
+			"every channel and the warm-up ask num_ctx %d, one size so the model is never reloaded for it" % OllamaMind.NUM_CTX)
+	_check(OllamaMind.measures_of({"prompt_eval_count": 2900, "eval_count": 31, "load_duration": 4500000000}) == {"prompt_tokens": 2900, "reply_tokens": 31, "load_ms": 4500}
+			and OllamaMind.measures_of({"choices": []}).is_empty(), "a native reply's prompt and reply tokens and load time are read")
+	Companion.voice_report(10)  # Whatever came before, counted out.
+	pet.mind = mind
+	pet._last_speech_tick = -1000
+	pet._fight_tick = -100000
+	mind.stub_next_reply(JSON.stringify({"model": "stub", "done": true, "prompt_eval_count": 2900, "eval_count": 9,
+		"message": {"role": "assistant", "content": "The wind's turned cold tonight."}}))
+	pet._ask_voice("%s just spoke to you." % pet.keeper_name(), "%s just said to you: \"Cold?\"" % pet.keeper_name())
+	World.step()
+	var logged: Dictionary = MindLog.last.get(String(pet.name), {})
+	_check(logged.get("kind") == "voice" and int(logged.get("prompt_tokens", 0)) == 2900 and int(logged.get("reply_tokens", 0)) == 9,
+			"the mind log's voice entry has the prompt's tokens and the reply's (%s, %s)" % [logged.get("prompt_tokens"), logged.get("reply_tokens")])
+	pet._last_speech_tick = -1000
+	pet._say("There's no room for me to move.", true)
+	var line := Companion.voice_report(10)
+	_check(line.begins_with("[voice] 10 min: said 1") and "fixed 1" in line and "prompt tokens median 2900, worst 2900 of %d" % OllamaMind.NUM_CTX in line
+			and not "wind" in line and not pet.keeper_name() in line, "the journal's line: counts, latency and tokens, no words or names (%s)" % line)
+	_check(Companion.voice_report(10).is_empty(), "and counted out: the next is empty till more")
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
 
 func _test_native_ollama_endpoint() -> void:
 	print("\n== Ollama's native /api/chat: request and reply shape, two channels ==")

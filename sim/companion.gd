@@ -572,6 +572,13 @@ var _known_friends: Dictionary[int, bool] = {}
 ## steps away and back is not new.
 var _adjacent_before: Dictionary[int, bool] = {}
 var _last_speech_tick := -1000
+## Decision 803: while her voice's reply is being said (a line said
+## otherwise is a fixed one), and every companion's voice counts since the
+## journal's last "[voice]" line (voice_report).
+var _saying_voice := false
+static var voice_counts: Dictionary[String, int] = {}
+static var voice_latencies: Array[int] = []
+static var voice_prompt_tokens: Array[int] = []
 ## How things stood last tick (_situation_now), to see what changed.
 var _seen := {}
 ## Deaths in sight, from Main, not yet watched: {who (its name, for the
@@ -3901,7 +3908,7 @@ func _take_result(result: Dictionary) -> void:
 		"trigger": result.get("trigger", ""), "prompt": result.get("prompt", ""),
 		"reply": result.get("raw", ""), "latency_ms": result.get("latency_ms", 0)}
 	# A voice on the Claude API (decision 363): which model answered, what it cost, and why her own did.
-	for measure: String in ["model", "tokens_in", "tokens_out", "est_cost", "fallback"]:
+	for measure: String in ["model", "tokens_in", "tokens_out", "est_cost", "fallback", "prompt_tokens", "reply_tokens", "load_ms"]:
 		if result.has(measure):
 			entry[measure] = result[measure]
 	var answer: Dictionary = result.get("answer", {})
@@ -4031,6 +4038,7 @@ func _take_result(result: Dictionary) -> void:
 	if echo.is_empty() and line != raw_line:
 		entry["say_raw"] = raw_line
 	var we_should := not spoken_to and RegEx.create_from_string(WE_SHOULD).search(line) != null
+	_saying_voice = true  # A line said below is her own words, not a fixed one (803's counts).
 	if raw_line.is_empty():
 		entry["outcome"] = "silent"
 	elif not echo.is_empty():
@@ -4056,6 +4064,7 @@ func _take_result(result: Dictionary) -> void:
 		entry["say_dropped"] = line
 		entry["note"] = "within %d ticks of her last line" % SPEECH_INTERVAL_TICKS
 		line = ""
+	_saying_voice = false
 	entry["say"] = line
 	if we_should and not line.is_empty():
 		_we_should_tick = World.tick
@@ -4089,6 +4098,8 @@ func _say(line: String, always: bool) -> bool:
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return false
 	_last_speech_tick = World.tick
+	if not _saying_voice:
+		voice_counts["fixed"] = int(voice_counts.get("fixed", 0)) + 1  # 803: a line not of her voice's making.
 	_around_said = surroundings_keys()
 	remember_said(line)
 	_add_turn("assistant", line)
@@ -5063,10 +5074,57 @@ func _out_of_reach(entity: GridEntity) -> bool:
 ## [param entry] in the mind log, with her stance and how far her player is
 ## as it is written.
 func _log(entry: Dictionary) -> void:
+	if entry.get("kind") == "voice":
+		_count_voice(entry)
 	entry["stance_now"] = stance_name()
 	entry["keeper_distance"] = World.distance(tile, keeper.tile) if _alive(keeper) else -1
 	keeper_name()  # Refreshes keeper_label from a live keeper.
 	MindLog.record(entry, keeper_label)  # Her player's name kept out (781).
+
+
+## Decision 803: a voice entry counted for the journal's "[voice]" line by
+## outcome (said, silent, filtered: dropped or asked again, no answer of
+## which timeout, held tongue, not asked), with its latency and prompt
+## tokens when the model was asked. Counts only: no words, no names.
+func _count_voice(entry: Dictionary) -> void:
+	var outcome := str(entry.get("outcome", ""))
+	var key: String = {"said": "said", "silent": "silent", "dropped": "filtered", "asked again": "asked again",
+			"no answer": "no answer", "held tongue": "held tongue", "not asked": "not asked"}.get(outcome, "other")
+	voice_counts[key] = int(voice_counts.get(key, 0)) + 1
+	if outcome == "no answer" and "timed out" in str(entry.get("note", "")):
+		voice_counts["timeout"] = int(voice_counts.get("timeout", 0)) + 1
+	if outcome in ["said", "silent", "dropped", "asked again", "no answer"]:
+		voice_latencies.append(int(entry.get("latency_ms", 0)))
+		if entry.has("prompt_tokens"):
+			voice_prompt_tokens.append(int(entry["prompt_tokens"]))
+
+
+## The journal's "[voice]" line for the counts since the last (decision
+## 803), "" when there were none; the counts start again. Every companion's
+## together: "[voice] 10 min: said 4, silent 1, filtered 2, ...; latency
+## median 1830 ms, worst 4100; prompt tokens median 2900, worst 3600 of 8192".
+static func voice_report(minutes: int) -> String:
+	if voice_counts.is_empty():
+		return ""
+	var parts: Array[String] = []
+	for key: String in ["said", "silent", "filtered", "asked again", "no answer", "timeout", "held tongue", "not asked", "fixed", "other"]:
+		if voice_counts.has(key):
+			parts.append("%s %d" % [key, voice_counts[key]])
+	var line := "[voice] %d min: %s" % [minutes, ", ".join(parts)]
+	if not voice_latencies.is_empty():
+		line += "; latency median %d ms, worst %d" % [_median(voice_latencies), voice_latencies.max()]
+	if not voice_prompt_tokens.is_empty():
+		line += "; prompt tokens median %d, worst %d of %d" % [_median(voice_prompt_tokens), voice_prompt_tokens.max(), OllamaMind.NUM_CTX]
+	voice_counts.clear()
+	voice_latencies.clear()
+	voice_prompt_tokens.clear()
+	return line
+
+
+static func _median(values: Array[int]) -> int:
+	var sorted := values.duplicate()
+	sorted.sort()
+	return sorted[sorted.size() / 2]
 
 
 ## FOLLOW: still while her player is within FOLLOW_START - 1 cells; once

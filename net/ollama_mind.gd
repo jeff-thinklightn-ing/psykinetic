@@ -24,6 +24,12 @@ const MAX_TOKENS := {"stance": 24, "voice": 90, "check": 12, "card": 320, "facts
 const TEMPERATURE := {"stance": 0.2, "voice": 0.8, "check": 0.0, "card": 0.9, "facts": 0.2}
 ## More with --mind-why, for the reason after the answer.
 const WHY_TOKENS := 40
+## The context every native request asks for (decision 803): unset, Ollama's
+## default applies and a longer prompt is cut from its front without a word,
+## her card first. One value for every channel and every mind (residents
+## ask through this class too), so the model is never reloaded for a
+## different size; the warm-up asks the same.
+const NUM_CTX := 8192
 ## Loading a model cold takes the box half a minute; a warm-up may.
 const WARM_TIMEOUT := 120.0
 
@@ -117,7 +123,7 @@ func warm() -> void:
 		var key := "%s %s" % [_urls[what], _models[what]]
 		if _warming.has(key):
 			continue
-		var body := JSON.stringify({"model": _models[what], "messages": [], "keep_alive": -1})
+		var body := JSON.stringify({"model": _models[what], "messages": [], "keep_alive": -1, "options": {"num_ctx": NUM_CTX}})
 		if stub_warm:
 			warm_sent.append({"url": _urls[what], "body": JSON.parse_string(body)})
 			_warming[key] = null
@@ -183,7 +189,7 @@ func request_messages(messages: Array, what := "stance") -> String:
 		})
 	var body := {
 		"model": channel_model, "think": false, "stream": false, "keep_alive": -1,
-		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5)}, "messages": messages,
+		"options": {"num_predict": max_tokens(what), "temperature": TEMPERATURE.get(what, 0.5), "num_ctx": NUM_CTX}, "messages": messages,
 	}
 	if what in ["stance", "check", "card", "facts"]:
 		body["format"] = "json"
@@ -241,7 +247,7 @@ func take_results() -> Array[Dictionary]:
 	return results
 
 
-func _result(what: String, raw: String, answer: Dictionary, error: String) -> void:
+func _result(what: String, raw: String, answer: Dictionary, error: String, measures := {}) -> void:
 	var sent: Dictionary = _sent.get(what, {})
 	var ask: Dictionary = sent.get("ask", {})
 	_sent[what] = {}
@@ -251,6 +257,7 @@ func _result(what: String, raw: String, answer: Dictionary, error: String) -> vo
 		"error": error, "latency_ms": Time.get_ticks_msec() - int(sent.get("at", Time.get_ticks_msec())),
 		"spoken_to": ask.get("spoken_to", false), "asked": ask.get("asked", false), "always": ask.get("always", false),
 		"heard": ask.get("heard", "")})
+	_results.back().merge(measures)
 
 
 ## Test hook: the next ask gets this as the endpoint's response body.
@@ -272,9 +279,10 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 	if content.is_empty():
 		_fail(what, "no message content in the response", text)
 		return
+	var measures := measures_of(response)
 	if what == "voice":
 		last_error = ""
-		_result(what, content, parse_voice(strip_think(content), str(_sent[what].get("ask", {}).get("speaker", ""))), "")
+		_result(what, content, parse_voice(strip_think(content), str(_sent[what].get("ask", {}).get("speaker", ""))), "", measures)
 		return
 	var answer: Variant = _parse(_strip_fences(strip_think(content)))
 	if answer == null and what == "stance":
@@ -287,7 +295,23 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 		_fail(what, "reply is not a JSON object with a %s: %s" % [needs, content.left(80)], content)
 		return
 	last_error = ""
-	_result(what, content, answer, "")
+	_result(what, content, answer, "", measures)
+
+
+## What a native reply says of itself, for the mind log (decision 803): the
+## prompt's tokens as the model read them (prompt_tokens: against NUM_CTX,
+## whether it was cut), the reply's, and the time spent loading the model
+## (load_ms: a reload shows here). {} for an OpenAI-shaped reply.
+static func measures_of(response: Variant) -> Dictionary:
+	var out := {}
+	if response is not Dictionary:
+		return out
+	for pair: Array in [["prompt_eval_count", "prompt_tokens"], ["eval_count", "reply_tokens"]]:
+		if response.has(pair[0]):
+			out[pair[1]] = int(response[pair[0]])
+	if response.has("load_duration"):
+		out["load_ms"] = int(float(response["load_duration"]) / 1000000.0)
+	return out
 
 
 ## message.content of an Ollama /api/chat response, or "".
