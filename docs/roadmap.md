@@ -3,7 +3,29 @@
 Last updated: 2026-10-14. Owner: Jeff. Every session reads this before starting work.
 The player-facing version (for Dire) lives in a separate doc; this one is for building.
 
-## Goal right now
+## Goal right now (Jeff, 2026-11-04: "the game doesn't seem fun yet")
+
+**The core.** Jeff: "some of the 'core' of the game is that you are tending to the companions needs
+and as a result you end up seeing and learning the game from that." The companion has needs
+(leisure, adventure, faith, wonder, safety, and more from basic human needs); her least-fed need
+becomes a want she voices in her own words; meeting it takes you somewhere and teaches you the
+world. The fun he remembers is the early Wren who improvised and felt "there": her presence comes
+before more systems.
+
+**The loop.** "town/companion have need --> figure out where to go --> overcome obstacle --> return
+to town --> player/companion rewarded." First slice: Wren wants to go fishing at the pond (economy
+leads the design; companions, items, enemy-ai, ui, sound, voice, lore). Then iron from Hollowfell
+with a tight yield (one trip meets most of a need, never 45 of 10).
+
+**Order (Jeff):** 1. the visible reward system first (ui leads, 804: every deed is acknowledged with a
+float, a banner, a bar, a sound; bonuses only); 2. Wren's presence (companions' steps 1-5: the
+prompt fixed, positive rules with imagination, quiet-moment talk, fewer fixed lines, her day and
+needs); 3. the fishing slice; 4. layout sense in every generated map (dungeon leads) before new
+places (the crypt under the temple, the new barrows). Every new system is weighed against this:
+does it give her something to want or react to, or reward the player visibly? Tests check fun too
+(playtest's voiced tours: reward moments, her own lines against fixed ones, repeats).
+
+## Earlier goal (2026-10-14)
 
 The foundations work (co-op server, zones, physics combat, talking companions, level
 editor, art pipeline). What's missing is a reason to play: something to find, something
