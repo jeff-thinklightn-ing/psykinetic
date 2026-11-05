@@ -9950,6 +9950,17 @@ Main._test_foe now makes the foe from its kind's level spec
 and its recover ("wields battle_axe, wind-up 8, recover 3" for the
 draugr). Test servers only; no game, wire or class_name change.
 
+392 amended (4): the test foe comes in a count (the coordinator's approval;
+playtest's deeds tour could not see 804 amended (5)'s held second deed live:
+--test-foe laid one foe, and the admin move is a rejoin, a new Player whose
+minute starts afresh). --test-foe=<kind>,<weapon>,<n> lays n (1..9) of the
+kind, Foe, Foe2, ..., the first 3 cells east as before and each next
+Main.TEST_FOE_SPACING (8) cells past the last, each made and armed as in 392
+amended (3), so each is a fight of its own: the bot beats Foe, is told its
+deed, walks on to Foe2, and that win, inside the minute, is held and told
+once it is past. Without a count it is as before. Test servers only; no
+game, wire or class_name change.
+
 ## 390. One rig plays a model's clips: an AnimationTree each, in layers (combat animation, phase A)
 
 Roadmap step 3. Every model's clips play through an AnimRig

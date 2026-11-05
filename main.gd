@@ -22303,21 +22303,29 @@ func _test_arts(player: Player) -> void:
 
 ## --test-foe: [param player] given the weapon in hand and the monster 3
 ## cells east (392 amended's wind-up on a real client), made and armed as a
-## level's (392 amended (3): playtest's draugr fought bare-handed).
+## level's (392 amended (3): playtest's draugr fought bare-handed). An
+## optional count lays that many, Foe, Foe2, ..., each TEST_FOE_SPACING
+## cells past the last, so each is a fight of its own (playtest's live
+## check of 804 amended (5)'s held second deed).
+const TEST_FOE_SPACING := 8
 func _test_foe(player: Player) -> void:
-	if Net.test_foe.size() != 2:
+	if Net.test_foe.size() < 2 or Net.test_foe.size() > 3:
 		return
+	var count := 1
+	if Net.test_foe.size() == 3:
+		count = clampi(Net.test_foe[2].to_int(), 1, 9)
 	World.set_slots(player, Items.tidy(["", "", "", "", Net.test_foe[1], ""], Items.CARRIED))
-	var spec := Level._spec_for("monster_" + Net.test_foe[0], Level.MONSTER_TYPES)
-	if spec.is_empty():
-		spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": Net.test_foe[0]}
-	spec["name"] = "Foe"
-	spec["tile"] = _nearest_free(player.tile + Vector2i(3, 0))
-	Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
-	var foe := _spawn(spec)
-	print("[test] foe %s at %s (wields %s, wind-up %d, recover %d), %s in hand at %s" % [Net.test_foe[0],
-			foe.tile if foe != null else Vector2i.ZERO, World.wielded(foe) if foe != null else "", World.windup_ticks(foe),
-			World.recover_ticks(foe), Net.test_foe[1], player.tile])
+	for k in count:
+		var spec := Level._spec_for("monster_" + Net.test_foe[0], Level.MONSTER_TYPES)
+		if spec.is_empty():
+			spec = {"script": "res://sim/monster.gd", "shape": "capsule", "kind": Net.test_foe[0]}
+		spec["name"] = "Foe" if k == 0 else "Foe%d" % (k + 1)
+		spec["tile"] = _nearest_free(player.tile + Vector2i(3 + TEST_FOE_SPACING * k, 0))
+		Level.arm(spec)  # Its kind's weapon, as a level's monster has (the draugr's battle axe).
+		var foe := _spawn(spec)
+		print("[test] foe %s at %s (wields %s, wind-up %d, recover %d), %s in hand at %s" % [Net.test_foe[0],
+				foe.tile if foe != null else Vector2i.ZERO, World.wielded(foe) if foe != null else "", World.windup_ticks(foe),
+				World.recover_ticks(foe), Net.test_foe[1], player.tile])
 
 
 ## --test-walk-on-wind: true once the local player's own wind-up has begun;
