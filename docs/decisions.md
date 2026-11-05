@@ -39822,6 +39822,15 @@ player, ran close_other(), which also drops _pack_wanted, the wish to open on ar
 shuts the open row but keeps the wish. chest_test (_test_click_from_afar: an _update_pack without the
 player keeps it). No bullet (release). Client only, protocol unchanged, no new class_name.
 
+779 amended (2) (ui, release's label; playtest's bear tour, 5 of 5 bots): a chest clicked about
+0.2 s after a join still never opened: the bot stood where it joined. The click came before the
+client had heard its own body's free state (703), so Main._move_click dropped the walk while
+_open_pack kept the wish. Such a click is now kept (Main._free_waiting: its cell, zone and
+deadline, FREE_WAIT_MSEC 5000) and walked by Main._free_drive the first frame the free state is
+there; another click replaces it, and a zone change or the deadline drops it. chest_test
+(_test_click_from_afar: walked once the state comes, the wish kept; too late, dropped). No bullet
+(release). Client only, protocol unchanged, no new class_name.
+
 ## 776. The hills' rivers are streams, waded anywhere
 
 Jeff, 2026-11-02 (through the coordinator): "imo the river is more like a stream and should be

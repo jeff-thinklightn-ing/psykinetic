@@ -2577,7 +2577,12 @@ func _apply_azimuth() -> void:
 func _move_click(player: Player, tile: Vector2i, ripple_it := true) -> void:
 	_pack_wanted = null
 	_talk_wanted = null
+	_free_waiting = {}
 	if _free_own(player) == null:
+		# Just after a join, before the body's free state is heard: the
+		# route waits for it (_free_drive), as a chest's wish does (779).
+		if player != null and tile != NONE:
+			_free_waiting = {"tile": tile, "zone": String(player.zone), "until": Time.get_ticks_msec() + FREE_WAIT_MSEC}
 		return
 	_free_route(player, tile)
 	if _test_holding:
@@ -2599,6 +2604,11 @@ var _free := {"path": [], "held": false, "at": 0, "chase": null}
 ## How long the button is held after a click before it steers to the
 ## cursor rather than walking the click's route.
 const FREE_HOLD_SECONDS := 0.25
+## A click before the own body's free state is heard (just after a join or a
+## zone change): its cell, walked once the state comes ({tile, zone, until}),
+## for up to FREE_WAIT_MSEC (779 amended (2); playtest's bear tour).
+var _free_waiting := {}
+const FREE_WAIT_MSEC := 5000
 ## How far round a burning cell a click's route looks for a cell clear of it.
 const FIRE_CLEAR_REACH := 3
 ## 724: a click route whose next step another body has stood in the way
@@ -2644,6 +2654,12 @@ func _free_drive(delta: float) -> bool:
 	if own == null:
 		_free["path"] = []
 		return false
+	if not _free_waiting.is_empty():
+		var waiting := _free_waiting
+		_free_waiting = {}
+		if Time.get_ticks_msec() <= int(waiting["until"]) and String(waiting["zone"]) == String(player.zone):
+			_free_route(player, waiting["tile"])
+			_free["held"] = false  # No button held through it: never a steer.
 	var intent := _wind_up_held(player, _free_intent(player, own))
 	_record_walk(player)
 	if intent != Vector2.ZERO:

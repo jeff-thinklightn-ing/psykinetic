@@ -244,6 +244,19 @@ func _test_click_from_afar() -> void:
 	_main._update_pack()
 	host.spawned = true
 	_check(_main._pack_wanted == chest, "a frame without the player: still wanted on arrival")
+	# A click before the body's free state is heard (just after a join:
+	# playtest's bear tour, 5 of 5): the route waits for it, the wish kept.
+	_main._free["path"] = []
+	_main._free_waiting = {"tile": route.back() if not route.is_empty() else chest.tile, "zone": String(host.zone), "until": Time.get_ticks_msec() + 1000}
+	_main._free_drive(0.0)
+	route = _main._free["path"]
+	_check(_main._free_waiting.is_empty() and not route.is_empty() and _main._pack_wanted == chest,
+		"a click before the free state: walked once it comes, still wanted on arrival")
+	_main._free["path"] = []
+	_main._free_waiting = {"tile": chest.tile, "zone": String(host.zone), "until": Time.get_ticks_msec() - 1}
+	_main._free_drive(0.0)
+	_check(_main._free_waiting.is_empty() and (_main._free["path"] as Array).is_empty(), "too late: dropped, never a walk out of nowhere")
+	_main._free["path"] = route
 	if not route.is_empty():
 		Walk.to(host, route.back(), 240)  # Its free body walked there, as Main's drive would (703).
 	await get_tree().process_frame
