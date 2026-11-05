@@ -181,6 +181,31 @@ const CAMP_SIZE := 5
 const HOLLOWFELL := {"at": Vector2i(167, 58), "open": Vector2i(-1, 0), "to_map": "hollowfell",
 	"place": "hollowfell", "name": "Hollowfell", "holder": "goblins"}
 const HOLLOWFELL_PAD := Rect2i(164, 56, 4, 5)
+## The apex lairs' mouths here (enemy-ai's lair rule; the coordinator's
+## fill_forest plan, phase B): each a link cell at "at" into its own small
+## level, "open" the side its trampled ground lies on (toward the road);
+## a hill of rock LAIR_HILL behind it (terrain's cue draws a hillock and an
+## arch over it, the facing coming out into the hill), dirt LAIR_TRAMPLED
+## in front, and the lair's "from_<lair>" spawn two cells out.
+const LAIRS: Array[Dictionary] = [
+	{"to_map": "bear_cave", "at": Vector2i(117, 102), "open": Vector2i(0, 1), "cue": "cave", "closed": true}]
+const LAIR_HILL := Vector2i(7, 5)
+const LAIR_TRAMPLED := 1
+## Each lair's bank (the coordinator: "the cave is a hole in the face of a
+## bank"): the hill's rock cells stand LAIR_RISE metres over the link's
+## ground (terrain draws the hill on them: the face, a broken rim, grass
+## over the top); being no floor they are left out of the lay, so no face
+## or capped slope runs past them. Round them the grass rises in a knoll
+## (LAIR_KNOLL: metres at its crest, cells out; the crest at LAIR_KNOLL_AT
+## from the mouth), kept low before
+## the mouth by the levelled front, and held grass LAIR_GRASS cells round
+## the hill (the slope's dirt otherwise rings it).
+const LAIR_RISE := 3.1
+const LAIR_KNOLL := Vector2(4.0, 12.0)
+## Where the crest stands from the mouth: cells back, and across (+x for a
+## south-facing mouth; leaning it east lost the west shoulder for little).
+const LAIR_KNOLL_AT := Vector2i(10, 0)
+const LAIR_GRASS := 10
 ## Each patch {at, kinds}: its setting's kinds (items' 777 rows; "herbs" grows
 ## meanwhile, a kind Items lacks is skipped by Forage).
 const PATCHES: Array[Dictionary] = [
@@ -294,6 +319,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 			if inward > 3 + 6.0 * (edge.get_noise_2d(x, y) * 0.5 + 0.5):
 				map.set_cell(Vector2i(x, y), "grass")
 	var arrival := _link()
+	_lair_rock()
 	var east_river := EAST_RIVER.merged({"line": EAST_VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED})
 	var laid := Relief.lay(map, Rect2i(Vector2i.ZERO, SIZE), SEED, {
 		"base": BASE, "amplitude": 2.0, "scale": 110.0, "octaves": 2, "tilt": TILT,
@@ -301,10 +327,11 @@ func _build(wander_seed: int, river_seed: int) -> void:
 			{"line": WEST_SCARP, "face": "east", "height": SCARP_HEIGHT, "back": 22.0, "ways": [WEST_WAY], "wander": WANDER, "wander_seed": wander_seed},
 			{"line": SOUTH_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.3], "wander": WANDER, "wander_seed": wander_seed},
 			{"line": MID_SCARP, "face": "north", "height": SCARP_HEIGHT - 0.5, "back": 20.0, "ways": [0.5], "wander": WANDER, "wander_seed": wander_seed}],
+		"ridges": _lair_knolls(),
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [VALLEY, EAST_VALLEY], "valley_depth": 4.5, "valley_floor": RIVER_FLOOR, "valley_fall": 5.0, "valley_width": 30.0, "kinds": true, "min_flow": 30,
 		"plateaus": [{"rect": Rect2i(CLIFF_X, 0, PLATEAU_WIDE, FOOT), "height": PLATEAU_HEIGHT, "faces": ["west"], "spur": 0.25, "wander": 0.0, "still": [FALL_LIP]}],
-		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads() + [HOLLOWFELL_PAD],
+		"keep_flat": [Rect2i(arrival - Vector2i(2, 3), Vector2i(4, 7))] + _herder_pads() + _camp_pads() + _sight_pads() + [HOLLOWFELL_PAD] + _lair_pads(),
 		"streams": 0, "keep_clear": {},
 		"rivers": [WEST_RIVER.merged({"line": VALLEY, "width": RIVER_WIDTH, "seed": RIVER_SEED + river_seed}),
 			east_river,
@@ -320,6 +347,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	LevelMap._fill_gaps(map.relief, filled, SIZE)
 	for at: Vector2i in laid["cells"]:
 		map.set_cell(at, laid["cells"][at])
+	_lair_ground()
 	# The river is its curve (decision 559): Level lays its cells and its
 	# "streams" path from it on load.
 	config["waters"] = laid["waters"].map(func(water: Dictionary) -> Dictionary:
@@ -342,6 +370,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	_tracks()
 	_camps()
 	_hollowfell()
+	_lairs()
 	_patches()
 	_wade(laid["falls"])
 	_sights()
@@ -811,6 +840,90 @@ func _camps() -> void:
 		for cell in _cells_of(Rect2i(at, Vector2i(CAMP_SIZE, CAMP_SIZE))):
 			if map.cell(cell) == "dirt":
 				map.set_cell(cell, "grass")
+
+
+## The ground before each lair's mouth, levelled by Relief.lay (keep_flat,
+## its one-cell apron reaching the link but not the bank's top): the
+## trampled dirt's width, from a cell out to its last row.
+static func _lair_pads() -> Array[Rect2i]:
+	var out: Array[Rect2i] = []
+	for lair in LAIRS:
+		var at: Vector2i = lair["at"]
+		var open: Vector2i = lair["open"]
+		var side := Vector2i(absi(open.y), absi(open.x))
+		var a: Vector2i = at + open - side * LAIR_TRAMPLED
+		var b: Vector2i = at + open * 2 + side * LAIR_TRAMPLED
+		out.append(Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE))
+	return out
+
+
+## Each lair's hill laid as rock before the ground is (no floor: the lay
+## leaves it out).
+func _lair_rock() -> void:
+	for lair in LAIRS:
+		for cell in _cells_of(_lair_hill(lair)):
+			map.set_cell(cell, "rock")
+
+
+## Each lair's knoll: a ridge of one point LAIR_KNOLL_AT behind its
+## mouth (not over the front, which it would lift with it), the levelled
+## front's slope cap shaping its shoulders down toward the mouth.
+static func _lair_knolls() -> Array:
+	var out := []
+	for lair in LAIRS:
+		var at: Vector2i = lair["at"]
+		var open: Vector2i = lair["open"]
+		var side := Vector2i(absi(open.y), absi(open.x))
+		out.append({"line": [at - open * LAIR_KNOLL_AT.x + side * LAIR_KNOLL_AT.y], "height": LAIR_KNOLL.x, "width": LAIR_KNOLL.y})
+	return out
+
+
+## After the lay: each hill's rock cells LAIR_RISE over its link's ground,
+## and the ground round it held grass (but water).
+func _lair_ground() -> void:
+	for lair in LAIRS:
+		var at: Vector2i = lair["at"]
+		var hill := _lair_hill(lair)
+		var top := map.relief[at.y * SIZE.x + at.x] + LAIR_RISE
+		for cell in _cells_of(hill):
+			map.relief[cell.y * SIZE.x + cell.x] = top
+		for cell in _cells_of(hill.grow(LAIR_GRASS)):
+			if map.cell(cell) == "dirt":
+				map.set_cell(cell, "grass")
+
+
+## The rock cells behind a lair's mouth: LAIR_HILL across by deep, the side
+## away from "open", the mouth's column (or row) in its middle.
+static func _lair_hill(lair: Dictionary) -> Rect2i:
+	var at: Vector2i = lair["at"]
+	var open: Vector2i = lair["open"]
+	var side := Vector2i(absi(open.y), absi(open.x))
+	var half := LAIR_HILL.x / 2
+	var a := at - open - side * half
+	var b := at - open * LAIR_HILL.y + side * half
+	return Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE)
+
+
+## The lairs' mouths (LAIRS): rock behind, trampled dirt in front, the link
+## cell, its link {at, to_map, to_spawn "from_hills", cue, closed if so} and the
+## "from_<lair>" spawn two cells out.
+func _lairs() -> void:
+	for lair in LAIRS:
+		var at: Vector2i = lair["at"]
+		var open: Vector2i = lair["open"]
+		for cell in _cells_of(_lair_hill(lair)):
+			map.set_cell(cell, "rock")
+		var side := Vector2i(absi(open.y), absi(open.x))
+		for step in range(0, 3):
+			for across in range(-LAIR_TRAMPLED, LAIR_TRAMPLED + 1):
+				map.set_cell(at + open * step + side * across, "dirt")
+		map.set_cell(at, "link")
+		var spawn := at + open * 2
+		var link := {"at": [at.x, at.y], "to_map": lair["to_map"], "to_spawn": "from_hills", "cue": lair["cue"]}
+		if lair.get("closed", false):
+			link["closed"] = true  # Sealed till its lair's rule is in (the coordinator; terrain draws a rockfall).
+		config["links"].append(link)
+		config["spawn_points"]["from_" + str(lair["to_map"])] = [spawn.x, spawn.y]
 
 
 ## The forage patches (777): level.json "forage", each PATCH_RADIUS round,
