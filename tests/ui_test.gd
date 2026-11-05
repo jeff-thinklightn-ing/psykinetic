@@ -2583,6 +2583,41 @@ func _test_seam_click() -> void:
 	player.action_target = null
 	player.slots = slots_was
 	World.despawn(seam)
+	# Playtest's Hollowfell stand (Seam5 from its diagonal, a wall's corner between):
+	# near enough by distance, but no blow lands across a corner, so the chase walks on.
+	var corner := Main.NONE
+	var stand := Main.NONE
+	for x in range(1, 40):
+		for y in range(1, 40):
+			var at := Vector2i(x, y)
+			var diagonal := at + Vector2i(-1, 1)
+			if World.is_free(at) and World.is_free(diagonal) and (not World.is_walkable(at + Vector2i(-1, 0)) or not World.is_walkable(at + Vector2i(0, 1))) 					and (World.is_free(at + Vector2i(1, 0)) or World.is_free(at + Vector2i(0, -1))):
+				corner = at
+				stand = diagonal
+				break
+		if corner != Main.NONE:
+			break
+	if corner == Main.NONE:
+		print("  (no wall corner with room here: the corner stand unchecked)")
+		return
+	spec["tile"] = corner
+	var walled := _main._spawn(spec) as Seam
+	var home := player.tile
+	World._relocate(player, stand)
+	player.free_pos = Vector2(stand)
+	var own = _main._free_own(player)
+	if own != null:
+		own.base = Vector2.INF
+	_check(not World._body_reach(Vector2(stand), World.body_centre(walled), player, walled, World.blow_verb(player)),
+		"across a wall's corner from %s: no blow lands on %s" % [stand, corner])
+	_main._free_chase_start(player, walled)
+	_main._free_chase(player, Vector2(stand))
+	var route: Array = _main._free["path"]
+	_check(_main._free["chase"] == walled and not route.is_empty(), "so the chase walks on round the corner, never stops short (%s)" % [route])
+	_main._free["chase"] = null
+	_main._free["path"] = []
+	World._relocate(player, home)
+	World.despawn(walled)
 
 
 func _test_fire_click() -> void:

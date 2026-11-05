@@ -2961,7 +2961,10 @@ func _free_chase(player: Player, at: Vector2) -> void:
 	var target := foe as GridEntity
 	var cell := World.free_cell(player, at)
 	var apart := World.distance(cell, target.tile)
-	if at.distance_to(World.body_centre(target)) <= World.reach_limit(player) - 0.02:
+	# In reach as the server judges a blow (World._body_reach, 699): near
+	# enough, and the line between clear, so a seam or a foe across a wall's
+	# corner is walked round to, never stopped short of (769 amended (12)).
+	if World._body_reach(at, World.body_centre(target), player, target, World.blow_verb(player), -0.02):
 		_free["chase"] = null
 		_free["path"] = []
 		return

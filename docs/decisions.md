@@ -40241,6 +40241,17 @@ still taken first, and Shift's swing still strikes a seam with anything. Tests: 
 _test_seam_click (empty-handed it walks, a pick strikes, a sword walks, nothing but a seam mines).
 CHANGELOG bullet (voice's words). Client only, protocol unchanged, no new class_name.
 
+769 amended (12) (ui's; playtest's Hollowfell tour, Seam5 at (20, 28) from (19, 29); release's
+label): a seam clicked from its diagonal, a wall's corner between, was never mined, by the click or
+by Shift's swing. The click's chase (Main._free_chase, 697) stopped once the centres were within
+World.reach_limit, but the server lands a blow only where World._body_reach finds the line between
+clear (699: no wall's edge on it), so the player stood there and nothing struck. The chase now stops
+only when World._body_reach says a blow lands (the server's own rule, 0.02 short), so it walks on
+round the corner to a side that opens. It holds for any chased target, a foe across a corner too.
+Tests: ui_test _test_seam_click (from a corner stand no blow lands, and the chase walks on). No
+bullet (release: 769 amended (11)'s line already says it). Client only, protocol unchanged, no new
+class_name.
+
 ## 771. The night watch
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";
