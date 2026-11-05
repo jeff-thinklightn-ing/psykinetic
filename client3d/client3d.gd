@@ -793,6 +793,16 @@ const SKYLIGHT_ENERGY := 3.0
 const SKYLIGHT_DAY_COLOUR := Color(0.9, 0.94, 1.0)
 const SKYLIGHT_NIGHT_COLOUR := Color(0.55, 0.64, 0.9)
 const SKYLIGHT_PICK := 0.5
+## The dust in a skylight's beam (797 amended (2)): MOTE_COUNT specks
+## drifting slowly in a column MOTE_WIDE across and MOTE_HIGH up from the
+## floor, each living MOTE_SECONDS, glowing additively at MOTE_GLOW of the
+## shaft's colour by day (the shaft's day share), none at night.
+const MOTE_COUNT := 14
+const MOTE_SECONDS := 9.0
+const MOTE_SIZE := 0.025
+const MOTE_WIDE := 0.6
+const MOTE_HIGH := 3.0
+const MOTE_GLOW := 0.6
 ## A cave's mouth (797 amended): a light outside it,
 ## MOUTH_BACK cells out and MOUTH_HIGH m up, shining in and down to the floor
 ## MOUTH_AIM of its reach in, at MOUTH_SHARE of a skylight's energy (it is
@@ -2323,6 +2333,10 @@ var _wall_lamps: Array[OmniLight3D] = []
 var _wall_lamp_clock := 0.0
 ## The room's skylights (797) and the clock to setting them again.
 var _skylights: Array[SpotLight3D] = []
+## The dust in their beams (797 amended (2)), one each, and the material
+## they share, its colour set with the shafts' day share.
+var _motes: Array[GPUParticles3D] = []
+var _mote_material: StandardMaterial3D = null
 var _skylight_clock := 0.0
 ## Outdoors: the sky, and the step of the day (SKY_STEPS) it shows, -1 for
 ## none yet.
@@ -12098,6 +12112,7 @@ func _build_shafts() -> void:
 		_shafts.queue_free()
 		_shafts = null
 	_skylights.clear()
+	_motes.clear()
 	var canopy: Dictionary = _terrain.get("canopy", {})
 	if not bool(_terrain.get("outdoor", false)):
 		_build_skylights()
@@ -12135,8 +12150,61 @@ func _build_skylights() -> void:
 		light.shadow_enabled = false
 		_shafts.add_child(light)
 		_skylights.append(light)
+		var motes := _make_motes()
+		motes.name = "Motes_%d_%d" % [at.x, at.y]
+		motes.position = _tile_position(at) + Vector3(0.0, MOTE_HIGH * 0.5, 0.0)
+		_shafts.add_child(motes)
+		_motes.append(motes)
 	_shafts.setup(gaps, {}, _tile_position)
 	_skylight_clock = SKYLIGHT_PICK
+
+
+## A skylight's dust (797 amended (2)): MOTE_COUNT specks drifting slowly
+## every way and sinking a little, in a column MOTE_WIDE across and
+## MOTE_HIGH up about its middle, fading in and out over each life. Unshaded
+## and added to what lies behind, so they glow in the beam and are nothing
+## where it is dark; _mote_material's colour carries the day.
+func _make_motes() -> GPUParticles3D:
+	var motes := GPUParticles3D.new()
+	motes.amount = MOTE_COUNT
+	motes.lifetime = MOTE_SECONDS
+	motes.preprocess = MOTE_SECONDS
+	motes.local_coords = true
+	motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	motes.visibility_aabb = AABB(Vector3(-MOTE_WIDE, -MOTE_HIGH * 0.5 - 0.5, -MOTE_WIDE), Vector3(MOTE_WIDE * 2.0, MOTE_HIGH + 1.0, MOTE_WIDE * 2.0))
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(MOTE_WIDE * 0.5, MOTE_HIGH * 0.5, MOTE_WIDE * 0.5)
+	process.direction = Vector3.UP
+	process.spread = 180.0
+	process.initial_velocity_min = 0.01
+	process.initial_velocity_max = 0.05
+	process.gravity = Vector3(0.0, -0.02, 0.0)
+	process.scale_min = 0.6
+	process.scale_max = 1.2
+	# Added light: black is nothing, so the ramp fades by colour.
+	var fade := Gradient.new()
+	fade.set_color(0, Color.BLACK)
+	fade.set_color(1, Color.BLACK)
+	fade.add_point(0.25, Color.WHITE)
+	fade.add_point(0.75, Color.WHITE)
+	var fade_texture := GradientTexture1D.new()
+	fade_texture.gradient = fade
+	process.color_ramp = fade_texture
+	motes.process_material = process
+	if _mote_material == null:
+		_mote_material = StandardMaterial3D.new()
+		_mote_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_mote_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_mote_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		_mote_material.vertex_color_use_as_albedo = true
+		_mote_material.disable_receive_shadows = true
+		_mote_material.albedo_color = Color.BLACK
+	var speck := QuadMesh.new()
+	speck.size = Vector2(MOTE_SIZE, MOTE_SIZE)
+	speck.material = _mote_material
+	motes.draw_pass_1 = speck
+	return motes
 
 
 ## A cave's mouths (797 amended): one light each, outside
@@ -12199,8 +12267,14 @@ func _light_skylights(delta: float) -> void:
 		if is_instance_valid(light):
 			light.light_energy = look[0] * float(light.get_meta("share", 1.0))
 			light.light_color = look[1]
+	var day := clampf(inverse_lerp(DayNight.NIGHT, 1.0, DayNight.light), 0.0, 1.0)
 	if _shafts != null:
-		_shafts.place(_camera_target, Vector3.UP, clampf(inverse_lerp(DayNight.NIGHT, 1.0, DayNight.light), 0.0, 1.0))
+		_shafts.place(_camera_target, Vector3.UP, day)
+	if _mote_material != null:
+		_mote_material.albedo_color = Color(LightShafts.COLOUR * MOTE_GLOW * day, 1.0)
+	for motes: GPUParticles3D in _motes:
+		if is_instance_valid(motes):
+			motes.visible = day > 0.02
 
 
 ## The noise the ground's shader reads (a texture lookup is far cheaper than

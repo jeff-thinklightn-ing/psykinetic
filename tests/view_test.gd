@@ -1886,11 +1886,20 @@ func _test_skylights() -> void:
 	DayNight.light = DayNight.NIGHT
 	_rig._light_skylights(Client3D.SKYLIGHT_PICK)
 	var night := light.light_energy if light != null else 0.0
+	# 797 amended (2): the dust in the beam, glowing by day, gone at night.
+	var motes := _rig._shafts.get_node_or_null("Motes_7_6") as GPUParticles3D if _rig._shafts != null else null
+	var motes_night := motes != null and motes.visible
 	DayNight.light = 1.0
 	_rig._light_skylights(Client3D.SKYLIGHT_PICK)
 	var day := light.light_energy if light != null else 0.0
+	var glow: Color = _rig._mote_material.albedo_color if _rig._mote_material != null else Color.BLACK
 	DayNight.light = was
 	_check(night > 0.0 and day > night * 2.0, "faint at night, never out; bright by day (%.2f, %.2f)" % [night, day])
+	var foot := _rig._tile_position(Vector2i(7, 6))
+	_check(motes != null and motes.amount == Client3D.MOTE_COUNT and not motes_night and motes.visible
+			and is_equal_approx(motes.position.x, foot.x) and motes.position.y > foot.y
+			and glow.r > 0.3 and motes.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF,
+			"dust drifting in the beam: none at night, glowing by day (%s, %s)" % [motes, glow])
 	config.erase("skylights")
 	_rig.rebuild(Level.parse(map.to_image(), null, config)["terrain"], Vector2i(7, 6))
 	_check(_rig._skylights.is_empty(), "none without the key")

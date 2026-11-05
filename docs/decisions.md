@@ -41197,6 +41197,24 @@ a wall; Fields' light by day and night, the cave's past the reach); view_test _t
 light outside the mouth, shining in and down, at its share by day). No CHANGELOG bullet until
 Hollowfell sets it. Protocol unchanged, no new class_name.
 
+797 amended (2): dust in a skylight's beam (2026-11-05; dungeon's 806 crypt light shaft, art-kit's
+question who owns its beam, the coordinator's approval, release's label). The crypt's shaft is a
+797 skylight: barrow's level.json gets "skylights": [{"at": [46, 13], "radius": 1}] in the First Hall
+(dungeon's, with art-kit's prop.set_light_shaft on the cell, its floor piece only: rubble, roots, no
+beam and no lit patch baked in), under buildings' yard grate in the wilds chapel yard at (201,202).
+The light (Fields and the view's spotlight) and the beam (LightShafts' camera-facing quad, by day
+only) were already 797's; this adds the dust the coordinator asked for:
+- Each skylight gets "Motes_x_y" (Client3D._make_motes): a GPUParticles3D of MOTE_COUNT 14 specks
+  MOTE_SIZE 2.5 cm, each living MOTE_SECONDS 9 s (preprocessed, so the beam is never empty), drifting
+  slowly every way and sinking a little in a column MOTE_WIDE 0.6 m across and MOTE_HIGH 3 m up from
+  the floor, fading in and out over each life.
+- Unshaded and added to what lies behind, so they glow in the beam and add nothing in the dark. One
+  shared material; _light_skylights sets its colour to the shafts' colour at MOTE_GLOW 0.6 times the
+  shafts' day share, and hides the motes when it is under 0.02 (night).
+- Cost: 14 particles per skylight, no shadows, no light.
+Tests: view_test _test_skylights (the motes in the beam over the gap, hidden at night, glowing by
+day). Client only, protocol unchanged, no new class_name.
+
 ## 770. The market's trader: gold from outside, on a schedule
 
 A town's treasury sat at its floor, owing its people, because gold only comes in from players (761
