@@ -3,7 +3,8 @@ extends Node
 ## Each item's icon for the HUD (the pack panel), drawn from its art-kit
 ## slot (Items' "art") on demand: the first ask for one queues it and gives
 ## null; it is rendered in a SubViewport of its own (an orthographic camera
-## from the game's 3/4 angle, SIZE px, a clear background), one a frame,
+## from the game's 3/4 angle, SIZE px, a clear background, a dark rim
+## round it: outlined), one a frame,
 ## kept, and icon_ready(id) says it is there. A long thing (a spear, a bundle
 ## of wood) is turned to lie across the icon's diagonal. Headless nothing is
 ## rendered: icon gives null always, and the panel shows names instead.
@@ -22,6 +23,13 @@ const PITCH := -PI / 6.0
 const MARGIN := 1.18
 ## Taller than this times its width and depth: laid across the diagonal.
 const LONG := 1.6
+## The rim round every icon (the coordinator, for Jeff: "small images on
+## brown"): a dark line OUTLINE px wide hugging the thing's edge, then a
+## fainter one out to OUTLINE_SOFT, so iron and wood stand off any square.
+const OUTLINE := 1.5
+const OUTLINE_SOFT := 2.5
+const OUTLINE_COLOR := Color(0.06, 0.05, 0.04)
+const OUTLINE_SOFT_ALPHA := 0.45
 
 ## Off headless: whether icons are drawn at all.
 var enabled := DisplayServer.get_name() != "headless"
@@ -53,6 +61,55 @@ static func frame(bounds: AABB, view: Basis, place := Transform3D.IDENTITY) -> D
 	var size := maxf(maxf(extent.x, extent.y) * MARGIN, 0.01)
 	var back := extent.z * 0.5 + 1.0
 	return {"transform": Transform3D(view, middle + view.z * back), "size": size, "far": back + extent.z * 0.5 + 1.0}
+
+
+
+## [param image] with the rim drawn round what it shows (straight alpha,
+## any format; RGBA8 back): each edge pixel (some alpha, beside a clear
+## one) spreads its alpha to the pixels within OUTLINE whole and within
+## OUTLINE_SOFT at OUTLINE_SOFT_ALPHA; the rim is laid under each pixel.
+static func outlined(image: Image) -> Image:
+	var out := image.duplicate() as Image
+	out.convert(Image.FORMAT_RGBA8)
+	var w := out.get_width()
+	var h := out.get_height()
+	var data := out.get_data()
+	var rim := PackedFloat32Array()
+	rim.resize(w * h)
+	var reach := ceili(OUTLINE_SOFT)
+	var offsets: Array[Vector3] = []  # x, y, weight
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var d := Vector2(dx, dy).length()
+			if d > 0.0 and d <= OUTLINE_SOFT:
+				offsets.append(Vector3(dx, dy, 1.0 if d <= OUTLINE else OUTLINE_SOFT_ALPHA))
+	for y in h:
+		for x in w:
+			var a := data[(y * w + x) * 4 + 3]
+			if a == 0:
+				continue
+			var edge := x == 0 or y == 0 or x == w - 1 or y == h - 1
+			if not edge:
+				edge = data[(y * w + x - 1) * 4 + 3] < 255 or data[(y * w + x + 1) * 4 + 3] < 255 \
+						or data[((y - 1) * w + x) * 4 + 3] < 255 or data[((y + 1) * w + x) * 4 + 3] < 255
+			if not edge:
+				continue
+			for o in offsets:
+				var nx := x + int(o.x)
+				var ny := y + int(o.y)
+				if nx >= 0 and ny >= 0 and nx < w and ny < h:
+					rim[ny * w + nx] = maxf(rim[ny * w + nx], a / 255.0 * o.z)
+	for i in w * h:
+		var r := rim[i]
+		var a := data[i * 4 + 3] / 255.0
+		if r <= 0.0 or a >= 1.0:
+			continue
+		var total := a + r * (1.0 - a)
+		for k in 3:
+			var c := data[i * 4 + k] / 255.0
+			data[i * 4 + k] = clampi(roundi((c * a + OUTLINE_COLOR[k] * r * (1.0 - a)) / total * 255.0), 0, 255)
+		data[i * 4 + 3] = clampi(roundi(total * 255.0), 0, 255)
+	return Image.create_from_data(w, h, false, Image.FORMAT_RGBA8, data)
 
 
 ## The camera's basis for an icon.
@@ -170,7 +227,7 @@ func _draw(id: String) -> void:
 	_busy = false
 	if image == null or image.is_empty():
 		return
-	_cache[_key(id)] = ImageTexture.create_from_image(image)
+	_cache[_key(id)] = ImageTexture.create_from_image(outlined(image))
 	icon_ready.emit(id)
 
 

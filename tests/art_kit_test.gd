@@ -636,6 +636,19 @@ func _test_changed_told() -> void:
 	_check(not icons._cache.has(ItemIcons._key(ids[0])) and icons._cache.has(ItemIcons._key(other)),
 			"%s's art changed: %s's icon is drawn again, %s's kept" % [slot, ids[0], other])
 	icons.free()
+	# Every icon gets a dark rim (ItemIcons.outlined): a 2 x 2 white square on clear
+	# keeps its white, the pixel beside it is the rim's dark at full alpha, the next
+	# out the soft rim, and the corner stays clear.
+	var square := Image.create(10, 10, false, Image.FORMAT_RGBA8)
+	square.fill(Color(0, 0, 0, 0))
+	for p: Vector2i in [Vector2i(4, 4), Vector2i(5, 4), Vector2i(4, 5), Vector2i(5, 5)]:
+		square.set_pixelv(p, Color.WHITE)
+	var rimmed := ItemIcons.outlined(square)
+	var beside := rimmed.get_pixel(3, 4)
+	var next := rimmed.get_pixel(2, 4)
+	_check(rimmed.get_pixel(4, 4).is_equal_approx(Color.WHITE) and beside.a > 0.99 and beside.r < 0.1
+			and absf(next.a - ItemIcons.OUTLINE_SOFT_ALPHA) < 0.01 and rimmed.get_pixel(0, 0).a == 0.0,
+			"an icon's rim: the thing kept, dark beside it (%s), soft past that (%s), clear beyond" % [beside, next])
 
 
 ## Only the preview reads art live: the game, its tools and the export
