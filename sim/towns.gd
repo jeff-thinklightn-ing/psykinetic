@@ -3353,6 +3353,7 @@ func regard_move(town: String, player_id: String, halves: int, why: String) -> i
 	if player_id.is_empty() or halves == 0 or not _towns.has(town):
 		return 0
 	var all: Dictionary = _towns[town].get_or_add("regard", {})
+	var stranger := not all.has(player_id)  # The ladder's first step is from "" (a stranger) to known.
 	var it: Dictionary = all.get_or_add(player_id, {"halves": 0, "since": now(), "last": 0, "why": [], "day": -1, "gained": 0})
 	if halves > 0:
 		var day := now() / maxi(DayNight.day_steps, 1)
@@ -3366,7 +3367,7 @@ func regard_move(town: String, player_id: String, halves: int, why: String) -> i
 		it["gained"] = int(it["gained"]) + halves
 	var most := Standing.setting("most") * 2
 	var before := int(it["halves"])
-	var was := regard_word(before)
+	var was := "" if stranger else regard_word(before)
 	it["halves"] = clampi(before + halves, -most, most)
 	var moved := int(it["halves"]) - before
 	if moved == 0:

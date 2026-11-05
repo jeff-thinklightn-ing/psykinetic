@@ -4345,7 +4345,11 @@ func _boot() -> void:
 	World.economy.building_stands = func(town: String, kind: String) -> bool:
 		return World.towns.building(town, kind).get("state") == Towns.STANDING
 	World.economy.dole_changed.connect(_on_dole_changed)
-	# owed_paid's gold reaches the client by Economy.purse_changed, as every purse change does.
+	# owed_paid's gold reaches the client by Economy.purse_changed, as every purse change does,
+	# and floats then, when it is paid (804, economy's side: never while only owed).
+	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void:
+		if gold > 0:
+			_reward(player_id, {"track": "gold", "amount": gold, "words": OWED_PAID % gold}))
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
 	World.economy.before_harvest = World.towns.before_harvest
@@ -14436,10 +14440,16 @@ func _given_words(given: Dictionary) -> String:
 	return _and_words(parts)
 
 
+## A town's regard step bannered (804, economy's side): its new ladder word's line.
+const REGARD_BANNERS := {"known": "%s knows you", "trusted": "%s trusts you"}
+
+
 func _on_regard_rose(town: String, player_id: String, halves: int, why: String, word: String, was: String) -> void:
 	var data := {"track": "regard", "amount": halves / 2.0, "words": why, "of": _town_display(town)}
 	if word != was:
 		data["step"] = word
+		data["big"] = true
+		data["banner"] = str(REGARD_BANNERS.get(word, "")) % _town_display(town) if REGARD_BANNERS.has(word) else ""  # "Umbrage knows you".
 	if not _regard_bar.is_empty():
 		data["bar"] = _regard_bar.duplicate()
 	_reward(player_id, data)
@@ -14509,6 +14519,7 @@ func _thank_hand_ins() -> void:
 			elif not use_words.is_empty():
 				World.towns.regard_move(place, player_id, int(rules.get("use", 0)), Towns.REGARD_USE % _and_words(use_words))
 			var given: Dictionary = (it["raws"] as Dictionary).merged(it["gear"])
+			# Gains floats a hand-in by its "counted" ("+10 ore"; ui's side), "of" the town.
 			var data := {"track": "item", "of": _town_display(place), "amount": _total_count(it),
 				"words": "The %s takes %s" % ["depot" if bool(it["depot"]) else "store", _and_words(parts)],
 				"place": place, "given": given, "counted": _and_words(parts)}  # For npc's spoken thanks: where, {id: count}, and the counted words.
@@ -14520,9 +14531,20 @@ func _thank_hand_ins() -> void:
 			if not with.is_empty():
 				data["with"] = with  # For her needs (companions: pride, company).
 			_reward(player_id, data)
+			if int(it["paid"]) > 0:
+				_reward(player_id, {"track": "gold", "amount": int(it["paid"]), "words": PAID_WORDS % int(it["paid"])})
 			if int(it["owed"]) > 0:
-				_reward(player_id, {"track": "gold", "of": _town_display(place), "amount": int(it["owed"]),
-					"words": "%s owes you %d gold" % [_town_display(place), int(it["owed"])]})
+				# Owed, not received: "owed" (ui) shows the words plain, no "+" and no coin.
+				_reward(player_id, {"track": "gold", "of": _town_display(place), "amount": int(it["owed"]), "owed": true,
+					"words": OWED_WORDS % [_town_display(place), int(it["owed"])]})
+
+
+## Voice's words for gold a hand-in brings (804, economy's side): paid
+## now, a "+N gold" float; owed, a gold reward marked "owed" that Gains
+## shows as these words, plain; paid later, its float then.
+const PAID_WORDS := "Pays %d gold"
+const OWED_WORDS := "%s owes you %d gold"
+const OWED_PAID := "Paid %d gold you were owed"
 
 
 ## The names of [param player_id]'s companions within World.COMPANION_REACH

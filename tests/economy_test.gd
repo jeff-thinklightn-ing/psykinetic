@@ -739,15 +739,25 @@ func _test_town_window(host: Player) -> void:
 		"the town's regard up for wood it was short of (%s)" % [regard])
 	_check(given["recent"].back() == {"kind": "sold", "id": "wood", "amount": 5}, "noted among their recent effects (%s)" % [given["recent"]])
 	# 804, economy's side: one rise and one thanks for the hand-in, shown.
-	var sent: Array = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me).slice(-2)
-	_check(sent.size() == 2 and sent[0]["data"]["track"] == "regard" and sent[0]["data"]["words"] == Towns.REGARD_SHORT % "wood"
-		and is_equal_approx(float(sent[0]["data"]["amount"]), int(World.economy.rules["town_regard"]["short"]) / 2.0),
-		"804: the regard's rise sent, its words and amount (%s)" % [sent[0] if not sent.is_empty() else {}])
-	var thanks: Dictionary = sent[1]["data"] if sent.size() == 2 else {}
-	_check(thanks.get("track") == "item" and thanks.get("words") == "The store takes 5 wood" and int(thanks.get("amount", 0)) == 5
+	var sent: Array = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me).slice(-3)
+	var rise: Dictionary = sent[0]["data"] if sent.size() == 3 else {}
+	_check(rise.get("track") == "regard" and rise.get("words") == Towns.REGARD_SHORT % "wood"
+		and is_equal_approx(float(rise.get("amount", 0)), int(World.economy.rules["town_regard"]["short"]) / 2.0)
+		and rise.get("step") == "known" and rise.get("big") == true and str(rise.get("banner", "")).ends_with(" knows you"),
+		"804: the regard's rise sent, its words and amount; a stranger's first, a step bannered \"... knows you\" (%s)" % [rise])
+	var thanks: Dictionary = sent[1]["data"] if sent.size() == 3 else {}
+	_check(thanks.get("track") == "item" and thanks.get("of") == "the market" and thanks.get("words") == "The store takes 5 wood" and int(thanks.get("amount", 0)) == 5
 		and int(thanks.get("gold", 0)) == int(given["paid"]) and thanks.get("bars", []).any(func(bar: Dictionary) -> bool: return bar["id"] == "wood" and int(bar["have"]) == 5)
 		and thanks.get("place") == STORE and thanks.get("given") == {"wood": 5} and thanks.get("counted") == "5 wood",
 		"804: then the store's thanks: its words, the count, the gold paid, wood's bar, the place and what was given (%s)" % [thanks])
+	var pay: Dictionary = sent[2]["data"] if sent.size() == 3 else {}
+	_check(pay.get("track") == "gold" and int(pay.get("amount", 0)) == int(given["paid"]) and pay.get("words") == Main.PAID_WORDS % int(given["paid"]),
+		"804, economy's side: the gold paid floats as gold (%s)" % [pay])
+	# Owed, never floated: said in the thanks' words; floated when paid.
+	var floats_before: int = _main.rewards_given.size()
+	World.economy.owed_paid.emit(me, 7)
+	_check(_main.rewards_given.size() == floats_before + 1 and _main.rewards_given.back()["data"] == {"track": "gold", "amount": 7, "words": Main.OWED_PAID % 7},
+		"804, economy's side: what was owed floats when it is paid (%s)" % [_main.rewards_given.back()["data"]])
 	# Wood at its enough, under twice it: handed in (World.donate, thanked at the frame's end), a
 	# half for what the town can use.
 	var enough := int(_main.town_stock(STORE).filter(func(row: Dictionary) -> bool: return row["id"] == "wood")[0]["enough"])
@@ -775,6 +785,19 @@ func _test_town_window(host: Player) -> void:
 	_check(refused.get("why") == Main.DONATE_AWAY and _main.ask_town_sheet(host, {"town": STORE}).get("at") == false
 		and _main.ask_town_sheet(host, {"town": STORE})["pack"] == [], "away: refused in voice's words; the sheet not at, no pack")
 	host.tile = was
+	var treasury: int = World.stockpile.count(STORE, "gold")
+	World.stockpile.take(STORE, "gold", treasury, "test")
+	_main._hand_item(me, "hide", "test")
+	var hide_uid: int = World.slot_uid(host, Array(host.slots).find("hide"))
+	var count_before: int = _main.rewards_given.size()
+	World.donate(host, hide_uid, STORE)
+	await get_tree().process_frame
+	var after: Array = _main.rewards_given.slice(count_before).map(func(each: Dictionary) -> Dictionary: return each["data"])
+	var owed_gold: Array = after.filter(func(data: Dictionary) -> bool: return data["track"] == "gold")
+	_check(after.any(func(data: Dictionary) -> bool: return data["track"] == "item" and data.get("counted") == "1 hide")
+		and owed_gold.size() == 1 and owed_gold[0].get("owed") == true and " owes you " in str(owed_gold[0]["words"]),
+		"804, economy's side: an empty treasury: the hide thanked, the gold owed marked owed, not received (%s)" % [after])
+	World.stockpile.deposit(STORE, "gold", treasury, "test")
 
 
 func _no_wood() -> void:

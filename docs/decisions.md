@@ -41859,6 +41859,18 @@ Main.reward's path and its drops, picked-up gains, a zone's first stand).
 - Then {track "gold", words "Umbrage owes you 6 gold"} when the treasury could not pay, shown neutrally.
 The rise: town_regard "short" (2 halves) for what the town was short of, as before. New: "use" (1 half, REGARD_USE "brought %s the town can use") for a hand-in while the town held under twice its enough (the coordinator's ruling; ui backed it). So a useful hand-in always shows, and a pile far past enough only pays, at the lower price (Jeff's 45/10).
 Main._reward calls Main.reward (804's) and keeps the last 32 in rewards_given for tests. economy_test _test_town_window. Server only, no protocol change of its own (804's "reward"), no new class_name.
+
+804, economy's side, after playtest's reward tour on main (the coordinator held the cut for it; ui's
+Gains floats a hand-in by its "counted", "+10 ore", its "of" still the town): a town's first regard is
+a step. Towns.regard_move took a stranger's "was" as regard_word(0), already "known", so no rise ever
+crossed the ladder's first rung and nothing was bannered; a player with no regard there is "" (as
+Towns.regard shows a stranger), so their first rise steps to known. A step is sent big, with a banner
+in voice's form ("Umbrage knows you", "Umbrage trusts you"; Main.REGARD_BANNERS), not the rise's why.
+Gold: what a hand-in is paid floats as gold ("Pays 6 gold", Main.PAID_WORDS); what the town owes is a
+gold reward marked "owed": true, which Gains shows as its words alone ("Umbrage owes you 40 gold"),
+no "+" and no coin; and when Economy.owed_paid pays it, it floats then ("Paid 40 gold you were owed").
+economy_test _test_town_window. Server only, protocol unchanged ("owed" and "banner" ride 804's
+reward), no new class_name, no bullet.
 ## 805. The core loop's first slice: Wren wants to go fishing
 
 Jeff's loop, the coordinator's top priority: a town or companion has a need, the player works out
