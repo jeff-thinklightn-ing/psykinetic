@@ -42883,8 +42883,8 @@ since the crypt and the new barrows are built under them.
   - the checker on small made-up floors, each rule named;
   - every generation (two) of every regenerating level, with counts reported;
   - every level's chests, reported.
-  - Nothing fails yet. LAYOUT_HELD names the rules a level is held to, and each generator's fix
-    (806 amended (k)) adds its level as it lands, so no landing is blocked meanwhile.
+  - A level's "regenerate" block names the rules it is held to ("held"; 806 amended), each
+    generator's fix adding them as it lands, so no landing is blocked meanwhile.
   - The fix order is the coordinator's: Hollowfell's tunnel ends and rock rings with the tour's
     fixes, then the barrow's rooms with the crypt, then castle_halls.
 - **The plan sheets for people**:
@@ -42893,6 +42893,9 @@ since the crypt and the new barrows are built under them.
     `--all <dump> <out>` does every generation dumped.
 - Also in this landing: level_test's generations loop (790) checks each generation's track with
   physics' _track_faults (794).
+
+
+806 amended: Hollowfell held to the rules, with playtest's tour fixes (the coordinator's order: Hollowfell first). The tour walked mouth to both chambers and met no fight; two walks stalled at a cart in a two-cell way; the plans showed empty tunnel ends and empty bays. (1) A level's "regenerate" block may list "held" rules, with its "ways" and "pillars": Regen tries up to HELD_TRIES (16) seeds and takes the first with none of those faults (Regen.layout_faults, held_faults), else the fewest, saying "[regen] <level>: the best of 16 tries keeps N layout faults (806)". It runs on the regen thread; a Hollowfell generation takes 0.3 to 4 s. hollowfell holds dead_end, loop and purpose; castle_halls' block carries ways 5 and pillars 4; level_test reads both from the block. (2) The mine: a seam in each gallery's end wall; a bay holding nothing gets a seam in its wall (_fill_bays); the Blood Rot laid by the route, the shortest walk from the mouth to each chamber (_routes): an imp guard GUARD_OUT (4) cells out from each chamber, the brute in the bay nearest the route with an imp beside it, each sneak two cells into a gallery opening on the route (enemy-ai: right for the back-turned strike), the other imps along the route ROUTE_APART (9) apart. Track only where the tunnel is TRACK_WIDE (4) to TRACK_SPAN (6) across, with no anchor or gallery within TRACK_CLEAR (2). (3) The checker: a stub counts from STUB_DEEP (3) cells deep (a rough side's bulge is no way); a ring that climbs (a pit's way out) is no loop; anchors may be given as Rect2i. (4) levels/hollowfell: "home_kinds" (enemy-ai's 702 amended: its monsters stay in), "mouths" (environment's 797 amended: daylight at the mouth). (5) Tests: level_test's generations loop checks each Hollowfell generation for a fight within 10 steps of each chamber, most monsters within 5 cells of the walk to them, and every track piece in a tunnel four across; Hollowfell's held rules fail the test. tools/layout_dump.tscn writes the checker's faults beside each generation (and --check re-checks an earlier dump), and tools/layout_audit.py draws those, so the sheets show what the test counts (before and after: C:/dev/review/layout/hollowfell_before, hollowfell_after).
 
 ## 808. A dungeon's chests: each a find of its own, per player and per generation
 

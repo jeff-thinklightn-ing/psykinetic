@@ -12,6 +12,10 @@ extends RefCounted
 
 ## Tries at a generation before the last good map is kept.
 const TRIES := 8
+## Seeds tried for a level held to layout rules (806): the first with no
+## fault of them, else the fewest.
+const HELD_TRIES := 16
+const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
 ## How a thing lost outside the anchors is ended in the ItemBook.
 const LOST := "in the shifting halls"
 ## How a thing moved into the keep_ground pile is noted in the ItemBook
@@ -238,7 +242,9 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 	var template := LevelMap.from_image(layout, made["config"])
 	template.read_heights(made["height"])
 	var anchors: Array = config["anchors"]
-	for attempt in TRIES:
+	var best := {}
+	var held: Array = config.get("held", [])
+	for attempt in (HELD_TRIES if not held.is_empty() else TRIES):
 		var seed := seed_for(level_name, generation, attempt)
 		var map: LevelMap = generator.generate(template, config, seed)
 		if map == null:
@@ -275,9 +281,37 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 			generated["entities"].append_array(generator.entities_of(map))
 		if generator.has_method("ledges_of"):
 			generated["ledges"] = generator.ledges_of(map)
-		return {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
+		var result := {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
+		# 806: a level whose block lists "held" rules takes the first try
+		# with none of those faults, else the try with the fewest.
+		if held.is_empty():
+			return result
+		var faults := held_faults(result, config, held)
+		result["faults"] = faults.size()
+		if result["faults"] == 0:
+			return result
+		if best.is_empty() or int(result["faults"]) < int(best["faults"]):
+			best = result
+	if not best.is_empty():
+		print("[regen] %s: the best of %d tries keeps %d layout faults (806)" % [level_name, HELD_TRIES, best["faults"]])
+		return best
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}
+
+
+## 806: a made generation's faults (sim/layout_sense.gd) under the rules
+## [param held] its "regenerate" block holds it to ("held"), checked with
+## the block's "ways" and "pillars" and its anchors.
+static func held_faults(made: Dictionary, config: Dictionary, held: Array) -> Array:
+	return layout_faults(made, config).filter(func(fault: Dictionary) -> bool: return fault["rule"] in held)
+
+
+## 806: every layout fault of a made generation, by its "regenerate" block
+## [param config] (its "ways", default 3, "pillars", default 0, anchors).
+static func layout_faults(made: Dictionary, config: Dictionary) -> Array:
+	var level := Level.parse(made["layout"], made["height"], made["config"])
+	return LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), {"ways": int(config.get("ways", 3)),
+			"anchors": config.get("anchors", []), "dungeon": true, "pillars": int(config.get("pillars", 0))})
 
 
 ## The graves of a generated [param map] (542 amended, enemy-ai's crypt

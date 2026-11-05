@@ -188,6 +188,8 @@
 			1
 		]
 	],
+	"home_kinds": ["imp", "sneak", "brute"],
+	"mouths": [{"at": [1, 34]}],
 	"regenerate": {
 		"generator": "mine",
 		"every_days": 3,
@@ -243,7 +245,9 @@
 			7,
 			10
 		],
-		"loops": 0.25
+		"loops": 0.25,
+		"ways": 4,
+		"held": ["dead_end", "loop", "purpose"]
 	},
 	"respawn_s": {
 		"imp": 600,

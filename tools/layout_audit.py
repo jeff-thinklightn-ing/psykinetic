@@ -25,6 +25,9 @@ LEGEND = {"void": "#000000", "stone": "#9a9a9a", "grass": "#4f9a3c", "dirt": "#8
 LIGHTS = {"torch", "lantern", "lamp_cold"}
 NOT_FLOOR = {"void", "wall", "door", "water", "rock", None}
 LIGHT_DECOR = ("lamp", "torch", "sconce", "brazier", "candle", "lantern")
+# Decor that is a sight in itself (layout_sense.gd's SIGHT_WORDS).
+SIGHT_WORDS = ("fallen", "statue", "altar", "shrine", "sarcophag", "collapse", "carving", "relief", "set_")
+STUB_DEEP = 3  # A stub counts from this many cells deep (layout_sense.gd).
 
 
 def hexrgb(h):
@@ -111,7 +114,8 @@ def things(mean, config):
         out.append((*at(row), "purpose", "niche"))
     for row in config.get("decor") or []:
         name = str(row[4]) if len(row) > 4 else "decor"
-        out.append((*at(row), "light" if any(w in name for w in LIGHT_DECOR) else "dressing", name))
+        kind = "light" if any(w in name for w in LIGHT_DECOR) else ("sight" if any(w in name for w in SIGHT_WORDS) else "dressing")
+        out.append((*at(row), kind, name))
     places = config.get("places") or {}
     for k, p in (places.items() if isinstance(places, dict) else []):
         if isinstance(p, dict) and isinstance(p.get("at"), list) and len(p["at"]) == 2:
@@ -237,13 +241,14 @@ def audit(name, layout_path, config, cw, regen_config=None, pillared=False):
     def has(u, kinds):
         return any(k in kinds for k, _ in content.get(u, []))
 
-    # Rule: a room has a purpose (something besides monsters, lights, dressing).
+    # Rule: no room is empty (Jeff, 11-04: "a reward, a visual point of
+    # interest, an enemy, a npc, chest, loot, secret, lore exposition,
+    # transition to a new area. anything but an empty square").
     purposeless = []
     for r in range(1, R + 1):
-        if not has(r, ("purpose", "link", "start")):
+        if not has(r, ("purpose", "link", "start", "monster", "sight")):
             purposeless.append(r)
-            what = "monsters only" if has(r, ("monster",)) else "empty"
-            faults.append(("purpose", centre(room == r), "room with no purpose (%s)" % what))
+            faults.append(("purpose", centre(room == r), "empty room"))
     # Rule: a corridor never wraps a room. (a) a corridor ring round a room;
     # (b) a corridor running along two or more of a room's sides.
     wraps = 0
@@ -281,6 +286,18 @@ def audit(name, layout_path, config, cw, regen_config=None, pillared=False):
             m = clab == c
             stub_comp.add(c)
             x, y = centre(m)
+            # How deep it runs from the floor outside it, in cells: a bulge in
+            # a room's rough side is no way anywhere.
+            reached = m & ndi.binary_dilation(walk & ~m, structure=ndi.generate_binary_structure(2, 1))
+            steps = 0
+            while reached.any() and steps < 2 * STUB_DEEP + 2:
+                grown = m & ndi.binary_dilation(reached, structure=ndi.generate_binary_structure(2, 1))
+                if (grown == reached).all():
+                    break
+                reached = grown
+                steps += 1
+            if steps + 1 < 2 * STUB_DEEP - 1 and not has(u, ("purpose", "link", "start")):
+                continue
             if has(u, ("purpose", "link", "start")):
                 faults.append(("deadend_ok", (x, y), "stub holding something"))
             elif has(u, ("monster",)):
@@ -423,9 +440,31 @@ def audit(name, layout_path, config, cw, regen_config=None, pillared=False):
                 start=start, heart=heart, metrics=metrics)
 
 
+CHECKER = {"door": "door", "purpose": "purpose", "wrap": "wrap", "dead_end": "deadend", "loop": "loop", "spine": "offspine", "chest": "chest"}
+
+
+def use_checker(a, faults):
+    """The game's own faults (tools/layout_dump.tscn's _faults.json, from
+    sim/layout_sense.gd) in place of this file's estimate: the sheet then
+    shows exactly what level_test counts."""
+    a["faults"] = [(CHECKER.get(f["rule"], f["rule"]), (2 * f["cell"][0], 2 * f["cell"][1]), f["what"]) for f in faults]
+    counts = {}
+    for f in faults:
+        counts[f["rule"]] = counts.get(f["rule"], 0) + 1
+    m = a["metrics"]
+    m["checker"] = counts
+    m["rooms_without_purpose"] = counts.get("purpose", 0)
+    m["dead_ends_empty"] = counts.get("dead_end", 0)
+    m["dead_ends_holding"] = 0
+    m["dead_ends_monster_only"] = 0
+    m["corridor_wraps"] = counts.get("wrap", 0)
+    m["loops_corridor_only"] = counts.get("loop", 0)
+    m["loops_through_rooms"] = 0
+
+
 COLOURS = {"purpose": (230, 60, 60), "wrap": (255, 140, 0), "deadend": (220, 0, 220), "deadend_ok": (90, 170, 90), "deadend_mon": (200, 90, 160),
-           "door": (255, 0, 0), "loop": (0, 170, 220), "offspine": (150, 120, 255)}
-SHORT = {"purpose": "P", "wrap": "W", "deadend": "D", "deadend_ok": "d", "deadend_mon": "M", "door": "X", "loop": "L", "offspine": "S"}
+           "door": (255, 0, 0), "loop": (0, 170, 220), "offspine": (150, 120, 255), "chest": (140, 74, 28)}
+SHORT = {"purpose": "P", "wrap": "W", "deadend": "D", "deadend_ok": "d", "deadend_mon": "M", "door": "X", "loop": "L", "offspine": "S", "chest": "C"}
 
 
 def draw(a, out_png, title):
@@ -512,6 +551,9 @@ def run(out, name, layout, config_path, cw, template):
     config = json.load(open(config_path, encoding="utf-8"))
     regen = json.load(open(template, encoding="utf-8")).get("regenerate") if template else config.get("regenerate")
     a = audit(name, layout, config, cw, regen, pillared=(regen or {}).get("style") == "dwarven")
+    checked = layout.replace("_layout.png", "_faults.json")
+    if checked != layout and os.path.exists(checked):
+        use_checker(a, json.load(open(checked, encoding="utf-8")))
     os.makedirs(out, exist_ok=True)
     draw(a, os.path.join(out, name + ".png"), name)
     json.dump(a["metrics"], open(os.path.join(out, name + ".json"), "w"), indent=1)
@@ -533,6 +575,9 @@ elif __name__ == "__main__":
     config = json.load(open(config_path, encoding="utf-8"))
     regen = json.load(open(template, encoding="utf-8")).get("regenerate") if template else config.get("regenerate")
     a = audit(name, layout, config, cw, regen, pillared=(regen or {}).get("style") == "dwarven")
+    checked = layout.replace("_layout.png", "_faults.json")
+    if checked != layout and os.path.exists(checked):
+        use_checker(a, json.load(open(checked, encoding="utf-8")))
     os.makedirs(out, exist_ok=True)
     draw(a, os.path.join(out, name + ".png"), name)
     json.dump(a["metrics"], open(os.path.join(out, name + ".json"), "w"), indent=1)

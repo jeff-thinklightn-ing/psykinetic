@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hollowfell: the Blood Rot wait along the way to its two chambers, a guard before each and more lurking in the side galleries and bays; every gallery ends at an ore seam, carts stand only where there is room to pass, and daylight reaches a few steps in at the mouth, faint by night (806 amended).
 - Umbrage: the inn is the Last Light Mughouse now, a painted lantern on its sign by the door, and you can walk in: a common room with a fire in its stone hearth, laid tables and the taverner's bar with its barrels, a kitchen and the keeper's room, and up the stair five hired rooms and an attic of stores (811).
 - The forest's camp traders sell to you, and the one the bandits hold captive gives a gift and a better price to whoever clears his captors off (799).
 - With the low camera, the forest past the map's edge runs on as one far ridge: no more grey slabs floating over the horizon or a pink strip under them, seen from the wilds' south-east corner (623 amended (4)).

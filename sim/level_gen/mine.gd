@@ -35,8 +35,13 @@ const SEAM_APART := 6
 const LAMP_APART := 11
 const ARCH_APART := 6
 const TRACK_LENGTH: Array[int] = [8, 14]
+const TRACK_WIDE := 4
+const TRACK_SPAN := 6
+const TRACK_CLEAR := 2
 ## No monster within this many cells (Chebyshev) of the entrance anchor.
 const MOUTH_CLEAR := 6
+const GUARD_OUT := 4
+const ROUTE_APART := 9
 
 
 static func generate(template: LevelMap, config: Dictionary, seed: int) -> LevelMap:
@@ -74,6 +79,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	_beams(map, plan)
 	_lamps(map, anchors, plan)
 	_monsters(map, anchors, config, rng, plan)
+	_fill_bays(map, anchors, rng, plan)
 	var levels: Dictionary = plan["levels"]
 	for cell: Vector2i in map.cells:
 		if not Level.in_anchors(anchors, cell):
@@ -289,6 +295,11 @@ static func _galleries(map: LevelMap, anchors: Array, config: Dictionary, rng: R
 			for at in cells:
 				Tools.carve(map, at, plan["carved"])
 				galleries[at] = true
+			# 806: a dead end holds something. A seam in the gallery's end wall,
+			# what the miners dug it for.
+			var end := cell + d * (length + 1) + p * rng.randi_range(0, 1)
+			map.set_cell(end, "seam")
+			plan["carved"][end] = true
 			mouths.append(cell)
 			break
 
@@ -457,11 +468,28 @@ static func _track(map: LevelMap, anchors: Array, rng: RandomNumberGenerator, pl
 		plan["entities"].append({"at": [cart.x, cart.y], "art": "prop.mine_cart", "facing": [a.x, a.y]})
 
 
+## A cell track may run along [param a] through (806 amended; the tour
+## stalled 25 s at a cart in a two-cell way): floor at the tunnel's level
+## either side, the tunnel TRACK_WIDE across at least (a cart on it leaves
+## a way past) and at most TRACK_SPAN (no crossing of ways), no anchor or
+## gallery within TRACK_CLEAR (a buffer never stands in a doorway).
 static func _track_cell(map: LevelMap, anchors: Array, plan: Dictionary, cell: Vector2i, a: Vector2i) -> bool:
 	var q := Vector2i(a.y, a.x)
 	for at: Vector2i in [cell, cell + q, cell - q]:
 		if map.cell(at) != FLOOR or Level.in_anchors(anchors, at) or plan["levels"].has(at) or plan["galleries"].has(at):
 			return false
+	var across := 1
+	for side: Vector2i in [q, -q]:
+		var k := 1
+		while k <= TRACK_SPAN and map.walkable(cell + side * k):
+			k += 1
+		across += k - 1
+	if across < TRACK_WIDE or across > TRACK_SPAN or _near_anchor(anchors, cell, TRACK_CLEAR):
+		return false
+	for dy in range(-TRACK_CLEAR, TRACK_CLEAR + 1):
+		for dx in range(-TRACK_CLEAR, TRACK_CLEAR + 1):
+			if plan["galleries"].has(cell + Vector2i(dx, dy)):
+				return false
 	return true
 
 
@@ -570,11 +598,16 @@ static func _lamps(map: LevelMap, anchors: Array, plan: Dictionary) -> void:
 				break
 
 
-## The monsters ("monsters" {kind: count}): "monster_<kind>" markers on
-## plain floor at the tunnel's level, never on track, beside an anchor or
-## within MOUTH_CLEAR of the entrance anchor: sneaks in the galleries first
-## (enemy-ai: they flank from there), brutes in the bays first, the rest
-## anywhere, the kinds in name order.
+## The Blood Rot ("monsters" {kind: count}), laid where a walker meets
+## them (806 amended; playtest's tour: mouth to both chambers and not one
+## fight). The route is the shortest walks from the entrance to each other
+## anchor. First a guard on the route a few cells outside each chamber (an
+## imp, else any kind), so every chamber has its fight; the brute in the bay
+## nearest the route with an imp beside it if one is left; each sneak two
+## cells into a gallery whose mouth is on the route, waiting in the dark
+## off the way; the imps left along the route, ROUTE_APART apart. What finds
+## no such spot goes anywhere, as before. Never within MOUTH_CLEAR of the
+## entrance, on track, a stair or a pit.
 static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: RandomNumberGenerator, plan: Dictionary) -> void:
 	var counts: Variant = config.get("monsters", {})
 	if not counts is Dictionary:
@@ -584,38 +617,196 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 		if map.cell(cell) != FLOOR or plan["track"].has(cell) or plan["levels"].has(cell) or _near_anchor(anchors, cell, 1):
 			return false
 		return mouth.is_empty() or not (mouth["rect"] as Rect2i).grow(MOUTH_CLEAR).has_point(cell)
+	var left := {}
+	for kind: Variant in counts:
+		if map.colours.has("monster_" + str(kind)):
+			left[str(kind)] = int(counts[kind])
+	var lay := func(kind: String, cell: Vector2i) -> bool:
+		if int(left.get(kind, 0)) <= 0 or not fit.call(cell):
+			return false
+		map.set_cell(cell, "monster_" + kind)
+		left[kind] = int(left[kind]) - 1
+		return true
+	var first_of := func(kinds: Array) -> String:
+		for kind: String in kinds:
+			if int(left.get(kind, 0)) > 0:
+				return kind
+		for kind: String in left:
+			if int(left[kind]) > 0:
+				return kind
+		return ""
+	var routes := _routes(map, anchors, mouth)
+	var on_route := {}
+	for path: Array in routes:
+		for cell: Vector2i in path:
+			on_route[cell] = true
+	# A guard before each chamber: on its route, GUARD_OUT cells out from it.
+	for path: Array in routes:
+		var kind: String = first_of.call(["imp"])
+		for back in range(GUARD_OUT, path.size()):
+			if kind.is_empty() or lay.call(kind, path[path.size() - 1 - back]):
+				break
+	# The brute in the bay nearest the route, an imp at its side.
+	var bays: Array = (plan["bays"] as Array).duplicate()
+	bays.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _gap(on_route, a["cells"]) < _gap(on_route, b["cells"]))
+	if not bays.is_empty() and int(left.get("brute", 0)) > 0:
+		var cells: Array[Vector2i] = []
+		cells.assign(bays[0]["cells"])
+		cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return _gap(on_route, [a]) < _gap(on_route, [b]))
+		for cell in cells:
+			if lay.call("brute", cell):
+				for d in DIRECTIONS:
+					if lay.call("imp", cell + d):
+						break
+				break
+	# Each sneak at the end of a gallery opening on the route.
+	var ends: Array = []
+	for pair: Array in _gallery_ends(plan["galleries"]):
+		var near := _gap(on_route, [pair[0]]) <= _gap(on_route, [pair[1]])
+		ends.append([pair[0] if near else pair[1], pair[1] if near else pair[0], mini(_gap(on_route, [pair[0]]), _gap(on_route, [pair[1]]))])
+	ends.sort_custom(func(a: Array, b: Array) -> bool: return a[2] < b[2])
+	for gallery: Array in ends:
+		if int(left.get("sneak", 0)) <= 0 or gallery[2] > 3:
+			break
+		# Two cells in from its mouth: in the dark off the way, a lunge from it.
+		var inward := Vector2(gallery[1] - gallery[0]).normalized()
+		lay.call("sneak", gallery[0] + Vector2i(roundi(inward.x * 2.0), roundi(inward.y * 2.0)))
+	# The rest along the route, apart.
+	var route_cells: Array[Vector2i] = []
+	for path: Array in routes:
+		for cell: Vector2i in path:
+			if not cell in route_cells:
+				route_cells.append(cell)
+	Tools.shuffle(route_cells, rng)
+	var laid: Array[Vector2i] = []
+	for y in map.size.y:
+		for x in map.size.x:
+			if map.cell(Vector2i(x, y)).begins_with("monster_"):
+				laid.append(Vector2i(x, y))
+	for cell in route_cells:
+		var kind: String = first_of.call(["imp", "sneak", "brute"])
+		if kind.is_empty():
+			break
+		if laid.any(func(other: Vector2i) -> bool: return Tools.distance(other, cell) < ROUTE_APART):
+			continue
+		if lay.call(kind, cell):
+			laid.append(cell)
 	var everywhere: Array[Vector2i] = []
 	everywhere.assign(_floor_cells(map, anchors).filter(fit))
 	Tools.shuffle(everywhere, rng)
-	var galleries: Array[Vector2i] = []
-	galleries.assign(Tools.sorted_cells(plan["galleries"]).filter(fit))
-	Tools.shuffle(galleries, rng)
-	var bays: Array[Vector2i] = []
-	for bay: Dictionary in plan["bays"]:
-		for cell: Vector2i in bay["cells"]:
-			if fit.call(cell):
-				bays.append(cell)
-	Tools.shuffle(bays, rng)
-	var kinds: Array = (counts as Dictionary).keys()
-	kinds.sort()
-	for kind: Variant in kinds:
-		var marker := "monster_" + str(kind)
-		if not map.colours.has(marker):
+	for cell in everywhere:
+		var kind: String = first_of.call([])
+		if kind.is_empty():
+			break
+		lay.call(kind, cell)
+
+
+## The shortest walks (LevelMap.walkable, four ways) from the entrance's
+## exits to each other anchor's, one [cell, ...] each, entrance first; an
+## anchor that can't be reached has none.
+static func _routes(map: LevelMap, anchors: Array, mouth: Dictionary) -> Array:
+	if mouth.is_empty():
+		return []
+	var dist := {}
+	var prev := {}
+	var queue: Array[Vector2i] = []
+	for cell in Level.rect_cells(mouth["rect"]):
+		if map.walkable(cell):
+			dist[cell] = 0
+			prev[cell] = cell
+			queue.append(cell)
+	var at := 0
+	while at < queue.size():
+		var cell := queue[at]
+		at += 1
+		for d in DIRECTIONS:
+			var next := cell + d
+			if not dist.has(next) and map.walkable(next):
+				dist[next] = int(dist[cell]) + 1
+				prev[next] = cell
+				queue.append(next)
+	var out: Array = []
+	for anchor: Dictionary in anchors:
+		if anchor == mouth:
 			continue
-		var spots: Array[Vector2i] = []
-		if str(kind) == "sneak":
-			spots.append_array(galleries)
-		elif str(kind) == "brute":
-			spots.append_array(bays)
-		spots.append_array(everywhere)
-		var laid := 0
-		for cell in spots:
-			if laid >= int(counts[kind]):
+		var best := Vector2i(-1, -1)
+		for cell in Level.rect_cells(anchor["rect"]):
+			if dist.has(cell) and (best.x < 0 or int(dist[cell]) < int(dist[best])):
+				best = cell
+		if best.x < 0:
+			continue
+		var path: Array[Vector2i] = []
+		var cell := best
+		while prev[cell] != cell:
+			cell = prev[cell]
+			if not Level.in_anchors(anchors, cell):
+				path.append(cell)
+		path.reverse()
+		out.append(path)
+	return out
+
+
+## Fewest steps (as the crow flies, Tools.distance) from any of [param cells]
+## to the route.
+static func _gap(route: Dictionary, cells: Array) -> int:
+	var best := 1 << 20
+	for cell: Vector2i in cells:
+		if route.has(cell):
+			return 0
+		for other: Vector2i in route:
+			best = mini(best, Tools.distance(cell, other))
+	return best
+
+
+## The galleries' two ends, [first, last] in cell order, each gallery's
+## cells (plan's) a piece of its own.
+static func _gallery_ends(galleries: Dictionary) -> Array:
+	var out: Array = []
+	var seen := {}
+	for start: Vector2i in Tools.sorted_cells(galleries):
+		if seen.has(start):
+			continue
+		var piece: Array[Vector2i] = [start]
+		seen[start] = true
+		var at := 0
+		while at < piece.size():
+			for d in DIRECTIONS:
+				var next := piece[at] + d
+				if galleries.has(next) and not seen.has(next):
+					seen[next] = true
+					piece.append(next)
+			at += 1
+		piece.sort()
+		var a := piece[0]
+		var b := piece[-1]
+		out.append([a, b])
+	return out
+
+
+## 806 (Jeff: "no room should be empty"): a bay holding no monster, seam,
+## cart or crate gets a seam cut into its wall, a working face.
+static func _fill_bays(map: LevelMap, anchors: Array, rng: RandomNumberGenerator, plan: Dictionary) -> void:
+	for bay: Dictionary in plan["bays"]:
+		var held := false
+		var walls: Array[Vector2i] = []
+		for cell: Vector2i in bay["cells"]:
+			var here := map.cell(cell)
+			if here.begins_with("monster_") or here in ["cart", "crate", "boulder"]:
+				held = true
 				break
-			if map.cell(cell) != FLOOR:
-				continue
-			map.set_cell(cell, marker)
-			laid += 1
+			for d in DIRECTIONS:
+				var at := cell + d
+				if map.cell(at) == "seam":
+					held = true
+				elif map.cell(at) == "void" and _diggable(map, anchors, at) and not _near_anchor(anchors, at, 3) 						and not plan["levels"].has(cell) and not plan["track"].has(cell) and not walls.has(at):
+					walls.append(at)
+			if held:
+				break
+		if held or walls.is_empty():
+			continue
+		var at := walls[rng.randi_range(0, walls.size() - 1)]
+		map.set_cell(at, "seam")
+		plan["carved"][at] = true
 
 
 ## Plain floor cells outside the anchors, in row order.

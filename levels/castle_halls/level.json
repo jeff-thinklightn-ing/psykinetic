@@ -125,6 +125,8 @@
 	},
 	"entities": [],
 	"regenerate": {
+		"ways": 5,
+		"pillars": 4,
 		"generator": "labyrinth",
 		"style": "dwarven",
 		"ways": 5,

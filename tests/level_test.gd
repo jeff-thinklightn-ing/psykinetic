@@ -1284,6 +1284,8 @@ func _test_pit_ways_out() -> void:
 			# 794 (physics): a generation's track rolls as a laid level's must.
 			var faults := _track_faults()
 			_check(faults.is_empty(), "%s generation %d: its track rolls (%s)" % [level_name, generation, faults.slice(0, 8)])
+			if level_name == "hollowfell":
+				_mine_fights(level, made["config"], "%s generation %d" % [level_name, generation])
 			var named := _trap_landings(level, drops)
 			if not named.is_empty() and PIT_TRAPS_EXPECTED.has(level_name):
 				print("  EXPECTED FAIL  %s generation %d: %d pits with no way out, landing at %s (%s fixes it)" % [level_name, generation, named.size(), named.slice(0, 8), PIT_TRAPS_EXPECTED[level_name]])
@@ -4361,14 +4363,6 @@ func _test_tower_levels() -> void:
 
 
 const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
-## Each regenerating level's way width, for finding its rooms by shape (806).
-const LAYOUT_WAYS := {"barrow": 3, "barrow_deep": 3, "castle_halls": 5, "hollowfell": 4}
-## The rules each level is held to so far (806 amended (k) adds one as its
-## generator is fixed); the rest are reported, not failed.
-const LAYOUT_HELD := {}
-## Rock pieces no bigger than this inside a level's floor are a hall's pillars
-## (castle_halls' dwarven columns), not loops.
-const LAYOUT_PILLARS := {"castle_halls": 4}
 
 
 func _test_layout_sense() -> void:
@@ -4445,7 +4439,7 @@ func _test_layout_sense() -> void:
 		if not chest_faults.is_empty():
 			print("  REPORT  %s chests: %s" % [folder, chest_faults.map(func(f: Dictionary) -> String: return "%s %s" % [f["cell"], f["what"]])])
 	# Every generation of every regenerating level, measured (reported; a
-	# rule fails only once LAYOUT_HELD holds the level to it).
+	# rule fails only once its block's "held" lists it).
 	for level_name in Regen.marked_levels():
 		var totals := {}
 		for generation in [1, 2]:
@@ -4453,12 +4447,15 @@ func _test_layout_sense() -> void:
 			if made.is_empty():
 				continue
 			var level := Level.parse(made["layout"], made["height"], made["config"])
-			var anchors: Array = (made["config"].get("regenerate", {}) as Dictionary).get("anchors", [])
-			var found := LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), {"ways": LAYOUT_WAYS.get(level_name, 3), "anchors": anchors, "dungeon": true, "pillars": LAYOUT_PILLARS.get(level_name, 0)})
+			var block: Dictionary = made["config"].get("regenerate", {})
+			var anchors: Array = block.get("anchors", [])
+			var found := LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), {"ways": int(block.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(block.get("pillars", 0))})
 			var by_rule := LAYOUT_SENSE.counts(found)
 			for rule: String in by_rule:
 				totals[rule] = int(totals.get(rule, 0)) + int(by_rule[rule])
-			for rule: String in LAYOUT_HELD.get(level_name, []):
+			# The rules its "regenerate" block holds it to ("held", 806 amended
+			# (a)); the rest are reported, not failed.
+			for rule: String in block.get("held", []):
 				_check(by_rule[rule] == 0, "%s generation %d: no %s faults (%s)" % [level_name, generation, rule,
 						found.filter(func(f: Dictionary) -> bool: return f["rule"] == rule).slice(0, 6)])
 		print("  REPORT  %s, two generations: %s" % [level_name, totals])
@@ -4467,6 +4464,92 @@ func _test_layout_sense() -> void:
 ## A made-up level for the checker: [param rects] floor, [param edges]
 ## [[cell, way, Terrain.Edge], ...], a start at each of [param starts], a
 ## thing with a purpose (a bier) at each of [param things].
+## 806 amended (playtest's tour: mouth to both chambers, not one fight):
+## each chamber but the entrance has a monster within GUARD_STEPS walked
+## steps of it, and most monsters stand within ROUTE_NEAR of the walk from
+## the entrance to the chambers.
+const GUARD_STEPS := 10
+const ROUTE_NEAR := 5
+
+
+func _mine_fights(level: Dictionary, config: Dictionary, label: String) -> void:
+	var regen: Dictionary = config.get("regenerate", {})
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var monsters: Array[Vector2i] = []
+	for spec: Dictionary in level["entities"]:
+		if spec.has("home") and spec.get("tile") is Vector2i:
+			monsters.append(spec["tile"])
+	var rects := {}
+	for anchor: Dictionary in regen.get("anchors", []):
+		var r: Array = anchor["rect"]
+		rects[str(anchor["name"])] = Rect2i(int(r[0]), int(r[1]), int(r[2]), int(r[3]))
+	var walk := func(from: Array) -> Dictionary:
+		var dist := {}
+		var queue: Array = []
+		for cell: Vector2i in from:
+			dist[cell] = 0
+			queue.append(cell)
+		var at := 0
+		while at < queue.size():
+			var cell: Vector2i = queue[at]
+			at += 1
+			for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if floor.has(cell + way) and not dist.has(cell + way):
+					dist[cell + way] = int(dist[cell]) + 1
+					queue.append(cell + way)
+		return dist
+	var entrance := str(regen.get("entrance", ""))
+	var from_mouth: Dictionary = walk.call(Level.rect_cells(rects[entrance]).filter(func(c: Vector2i) -> bool: return floor.has(c)))
+	var route := {}
+	for name: String in rects:
+		if name == entrance:
+			continue
+		var inside: Array = Level.rect_cells(rects[name]).filter(func(c: Vector2i) -> bool: return floor.has(c))
+		var near: Dictionary = walk.call(inside)
+		var guarded := monsters.filter(func(m: Vector2i) -> bool: return int(near.get(m, 1 << 20)) <= GUARD_STEPS)
+		_check(not guarded.is_empty(), "%s: a fight before %s, within %d steps (monsters at %s)" % [label, name, GUARD_STEPS, monsters])
+		# The walk back from the chamber's nearest cell to the mouth.
+		var cell: Vector2i = inside[0]
+		for each: Vector2i in inside:
+			if int(from_mouth.get(each, 1 << 20)) < int(from_mouth.get(cell, 1 << 20)):
+				cell = each
+		while from_mouth.has(cell) and int(from_mouth[cell]) > 0:
+			route[cell] = true
+			for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				if int(from_mouth.get(cell + way, 1 << 20)) == int(from_mouth[cell]) - 1:
+					cell = cell + way
+					break
+	var on_route := monsters.filter(func(m: Vector2i) -> bool:
+		for dy in range(-ROUTE_NEAR, ROUTE_NEAR + 1):
+			for dx in range(-ROUTE_NEAR, ROUTE_NEAR + 1):
+				if route.has(m + Vector2i(dx, dy)):
+					return true
+		return false)
+	# A cart's track runs where the tunnel is four across at least, so a cart
+	# on it leaves a way past (the tour stalled at one in a two-cell way).
+	var narrow := []
+	var laid := 0
+	for row: Dictionary in level["terrain"].get("decor", []):
+		if row.get("kind") != "mine_track":
+			continue
+		laid += 1
+		var out: Vector2i = row["out"]
+		var q := Vector2i(absi(out.y), absi(out.x))
+		var across := 1
+		for side: Vector2i in [q, -q]:
+			var k := 1
+			while floor.has(row["cell"] + side * k) and k <= 8:
+				k += 1
+			across += k - 1
+		if across < 4:
+			narrow.append(row["cell"])
+	_check(laid > 0 and narrow.is_empty(), "%s: %d track pieces, each in a tunnel four across or more (narrower at %s)" % [label, laid, narrow.slice(0, 6)])
+	var off := monsters.filter(func(m: Vector2i) -> bool: return not m in on_route)
+	_check(on_route.size() * 3 >= monsters.size() * 2, "%s: most monsters by the way from the mouth to the chambers (%d of %d; off it %s)" % [label, on_route.size(), monsters.size(), off])
+
+
 func _ls_level(rects: Array, edges: Array, starts: Array, things: Array) -> Dictionary:
 	var floor: Array[Vector2i] = []
 	for rect: Rect2i in rects:

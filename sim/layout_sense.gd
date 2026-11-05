@@ -50,6 +50,7 @@ const WRAP_SHARE := 0.6
 const WRAP_BAND := 2
 ## The least a rock island must be to make a loop (smaller is a wall stub
 ## or a pillar).
+const STUB_DEEP := 3
 const LOOP_ROCK := 3
 ## Decor kinds that are lights.
 const LIGHT_WORDS: Array[String] = ["lamp", "torch", "sconce", "brazier", "candle", "lantern"]
@@ -463,7 +464,7 @@ static func _purpose(lay: Dictionary, faults: Array) -> void:
 			continue
 		if lay["named"] and str(lay["uses"].get(room, "")).is_empty():
 			faults.append({"rule": "purpose", "cell": _centre(cells), "what": "a room with no use"})
-		elif not _holds(lay, room) and not (lay["held"].get(room, {}) as Dictionary).has("monster") 				and not (lay["held"].get(room, {}) as Dictionary).has("sight"):
+		elif not _holds(lay, room) and not (lay["held"].get(room, {}) as Dictionary).has("monster") and not (lay["held"].get(room, {}) as Dictionary).has("sight"):
 			# Jeff, 11-04: "no room should be empty ... a reward, a visual point of
 			# interest, an enemy, a npc, chest, loot, secret, lore exposition,
 			# transition to a new area. anything but an empty square."
@@ -532,6 +533,34 @@ static func _doors(lay: Dictionary, faults: Array) -> void:
 						"what": "a door to %s" % ("a stub" if node >= 1000 else "a closet with nothing in it")})
 
 
+## How many cells deep [param cells] (a corridor) run from the floor
+## outside them: 1 for a row along a room's side.
+static func _depth(lay: Dictionary, cells: Array) -> int:
+	var inside := {}
+	for cell: Vector2i in cells:
+		inside[cell] = true
+	var dist := {}
+	var queue: Array[Vector2i] = []
+	for cell: Vector2i in cells:
+		for way in WAYS:
+			if lay["floor"].has(cell + way) and not inside.has(cell + way) and _steps(lay, cell, way):
+				dist[cell] = 1
+				queue.append(cell)
+				break
+	var at := 0
+	var most := 0
+	while at < queue.size():
+		var cell := queue[at]
+		at += 1
+		most = maxi(most, dist[cell])
+		for way in WAYS:
+			var next := cell + way
+			if inside.has(next) and not dist.has(next) and _steps(lay, cell, way):
+				dist[next] = int(dist[cell]) + 1
+				queue.append(next)
+	return most
+
+
 static func _dead_ends(lay: Dictionary, faults: Array) -> void:
 	# A corridor joined to one node or none: a stub.
 	var stubs := {}
@@ -541,7 +570,9 @@ static func _dead_ends(lay: Dictionary, faults: Array) -> void:
 	for node: int in corridors:
 		if (lay["adjacent"].get(node, {}) as Dictionary).size() <= 1:
 			stubs[node] = true
-			if not _holds(lay, node):
+			# A bulge in a room's rough side (a mine's) is no way anywhere:
+			# a stub counts from STUB_DEEP cells in.
+			if not _holds(lay, node) and _depth(lay, corridors[node]) >= STUB_DEEP:
 				var held: Dictionary = lay["held"].get(node, {})
 				faults.append({"rule": "dead_end", "cell": _centre(corridors[node]),
 					"what": "a stub holding %s" % ("only a monster" if held.has("monster") else "nothing")})
@@ -624,16 +655,23 @@ static func _loops(lay: Dictionary, faults: Array) -> void:
 		if true:
 			var rooms := {}
 			var corridor := false
+			var heights := {}
 			for cell in piece:
 				for way in AROUND:
 					var node := _node(lay, cell + way)
+					if node != 0 and not (lay["relief"] as PackedFloat32Array).is_empty():
+						heights[snappedf(Relief.at(lay["relief"], lay["relief_size"], cell + way), 0.25)] = true
+					if lay["stairs"].has(cell + way):
+						heights[-99.0] = true
 					if node >= 1000:
 						corridor = true
 					elif node > 0:
 						rooms[node] = true
-			if not corridor or rooms.size() >= 2:
+			# A ring that climbs (a pit's way out, a stair round a ledge) goes
+			# somewhere: only a ring on one level is a loop with no meaning.
+			if not corridor or rooms.size() >= 2 or heights.size() > 1:
 				continue
-			faults.append({"rule": "loop", "cell": _centre(piece), "what": "a loop round plain rock, through %d rooms" % rooms.size()})
+			faults.append({"rule": "loop", "cell": _centre(piece), "what": "a loop round %d cells of plain rock, through %d rooms" % [piece.size(), rooms.size()]})
 
 
 static func _spine(lay: Dictionary, options: Dictionary, faults: Array) -> void:
@@ -663,9 +701,14 @@ static func _spine(lay: Dictionary, options: Dictionary, faults: Array) -> void:
 	if not heart is Vector2i:
 		var best := -1
 		for anchor: Variant in options.get("anchors", []):
-			if not anchor is Dictionary or not (anchor as Dictionary).get("rect") is Array:
+			if not anchor is Dictionary:
 				continue
-			for cell in _room_cells({"rect": anchor["rect"]}):
+			var rect: Variant = (anchor as Dictionary).get("rect")
+			if rect is Rect2i:
+				rect = [rect.position.x, rect.position.y, rect.size.x, rect.size.y]
+			if not rect is Array:
+				continue
+			for cell in _room_cells({"rect": rect}):
 				if dist.has(cell) and int(dist[cell]) > best:
 					best = dist[cell]
 					heart = cell
