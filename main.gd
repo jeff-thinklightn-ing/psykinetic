@@ -15051,6 +15051,28 @@ func _far_thanker(player: Player, place: String) -> Resident:
 var _hand_in_news: Dictionary = {}
 
 
+## What [param body]'s town knows of [param player_id], for a stranger's
+## greeting (Resident.HAIL_KNOWN_OF; the coordinator, from playtest's reward
+## tour: "you're the one who came in with the ore"): their latest hand-in
+## at its store ("they brought 10 ore to the store"), else that another of
+## its residents has met them; "" for nothing.
+func _known_of(body: Resident, player_id: String) -> String:
+	var what := str(_hand_ins_known.get(player_id + "|" + body.town, ""))
+	if not what.is_empty():
+		return "they brought %s to the store" % what
+	for entity: GridEntity in World.townsfolk():
+		var other := entity as Resident
+		if other != null and other != body and other.town == body.town \
+				and not Standing.entry(Townsfolk.card_of(World.production, other.worker_id), player_id).is_empty():
+			return "others in town have met them already"
+	return ""
+
+
+## "player|town" -> the counted words of their latest hand-in at that town's
+## store (_known_of's), kept for the run.
+var _hand_ins_known: Dictionary = {}
+
+
 ## Hearsay of a hand-in (decision 809; Jeff: "nothing happens when I hand
 ## things in"): [param player_id]'s first hand-in of the day at a town (an
 ## "item" reward's "place", the town's store) becomes the town's news
@@ -15065,13 +15087,16 @@ func _hand_in_heard(player_id: String, data: Dictionary) -> void:
 		return
 	var day := "|%d" % Townsfolk.day_of(World.production.now())
 	var key := "%s|%s%s" % [player_id, town, day]
+	var given_words := str(data.get("counted", "")) if data.has("counted") else _given_words(data.get("given", {}))
+	if not given_words.is_empty():
+		_hand_ins_known[player_id + "|" + town] = given_words
 	if _hand_in_news.has(key):
 		return
 	for old: String in _hand_in_news.keys():
 		if not old.ends_with(day):
 			_hand_in_news.erase(old)  # Only today's are kept.
 	var lines: Array = Townsfolk.days().get("hand_in_news", {}).get("lines", [])
-	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(data.get("given", {}))
+	var what := given_words
 	_hand_in_news[key] = what  # What they brought, for the residents' credit (809 amended).
 	if lines.is_empty() or what.is_empty():
 		return
@@ -17663,7 +17688,8 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 		_resident_says(body, credit, "", player, false)
 		print("[%s] %s to %s: credit" % ["greet" if clicked else "hail", body.person, _display_name(player)])
 		return true
-	var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok)
+	var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok,
+		_known_of(body, player.player_id))
 	if cue.is_empty():
 		_hail_tried[tried] = World.tick
 		return false

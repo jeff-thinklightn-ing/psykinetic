@@ -627,6 +627,21 @@ const HAIL_GREETINGS := {
 	"trusted": "You trust %s; you greet them warmly.",
 	"wronged": "%s wronged you once; you greet them coolly, and say so without a quarrel.",
 }
+## A stranger's greeting, each resident's own (by its id), so a town does not
+## greet a newcomer with one line three times (playtest's reward tour; the
+## coordinator: Jeff's "same things a lot"; voice's words: none says "as the
+## town does a newcomer", which made "You're new to the town" every time).
+const HAIL_STRANGER := [
+	"%s is a stranger to you; you remark on something they carry or wear.",
+	"%s is a stranger to you; you ask them what brings them here.",
+	"%s is a stranger to you; you tell them your name and your trade.",
+	"%s is a stranger to you; you wish them a good day and ask whether they mean to stay.",
+	"%s is a stranger to you; you give them a short nod and a word of welcome, no more.",
+	"%s is a stranger to you; you ask where they've come from and say a word about the road.",
+]
+## A stranger the town already knows of (Main's known_of: what they did here,
+## or that others in town have met them): no longer new to all of it.
+const HAIL_KNOWN_OF := "%s is a stranger to you, but you have heard of them: %s. You greet them as someone whose name has reached you, and say what you heard."
 
 ## Spoken unprompted to [param speaker] (decision 554; the ask Main queues
 ## as a voice ask, lowest of all): voice_ask's shape with [param cue]
@@ -673,10 +688,12 @@ static func hailed_today(card: Dictionary, player_id: String, day: int) -> bool:
 ## said) is skipped, and a shared one (SHARED_CUES) this player heard today
 ## from anyone ([param heard], Main's); no greeting when [param greeting_ok]
 ## is false (Main's cap of hail.greetings_a_day a player a day from the
-## whole town, the coordinator's: a newcomer is greeted, not mobbed).
+## whole town, the coordinator's: a newcomer is greeted, not mobbed). A
+## stranger's greeting is the resident's own of HAIL_STRANGER, or, with
+## [param known_of] (what the town knows of them), HAIL_KNOWN_OF.
 ## {kind, text}, {} for nothing to say.
 static func hail_cue(worker_id: String, town: String, player_id: String, player_name: String, production: Production, now: int, sky: String,
-		given: Dictionary = Offers.ctx, heard: Array = [], greeting_ok := true) -> Dictionary:
+		given: Dictionary = Offers.ctx, heard: Array = [], greeting_ok := true, known_of := "") -> Dictionary:
 	var card := Townsfolk.card_of(production, worker_id)
 	if card.is_empty():
 		return {}
@@ -713,7 +730,10 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 	if not sky.is_empty() and str(hails.get("sky", "")) != sky:
 		cues.append({"kind": "sky", "text": _sentence(sky)})
 	var word := Standing.words(card, player_id)
-	if greeting_ok and HAIL_GREETINGS.has(word):
+	if greeting_ok and word == "stranger":
+		cues.append({"kind": "greeting", "text": HAIL_KNOWN_OF % [player_name, known_of.trim_suffix(".")] if not known_of.is_empty()
+			else str(HAIL_STRANGER[absi(hash(worker_id)) % HAIL_STRANGER.size()]) % player_name})
+	elif greeting_ok and HAIL_GREETINGS.has(word):
 		cues.append({"kind": "greeting", "text": HAIL_GREETINGS[word] % player_name})
 	for cue: Dictionary in cues:
 		if said.has(cue["text"]):

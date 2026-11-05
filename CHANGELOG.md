@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Townsfolk greet a newcomer each in their own way, and once you've done something for the town, the rest have heard of you (809).
 - Towns: townsfolk you pass thank you for what you brought the store that day, and for a building that stands with your goods in it (809 amended).
 - In the forest's west, off the path to the healer's, wolves den in a cave under a rock outcrop, with bones trampled into the ground before it: two watch the mouth, two more lie in the dark round a rock pillar, and at the back a lost traveller's pack holds a find of your own; finding the cave counts toward your Wayfaring, clearing it is a deed, and the wolves are back after a day or so (815).
 - Your companion notices when things go your way, a camp cleared, a place found, a building raised with your goods, the two of you growing closer, and now and then says a word about it (804 amended (14)).

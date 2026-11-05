@@ -42577,6 +42577,21 @@ test room's imps burning in its fire no longer held the banner. And the floats r
 Gains.FLOAT_SCALE 1.3 of the HUD's text, popping in (Gains.pop: from 0.7 to 1.25 of their size in
 0.08 s, settled in 0.14 s) as they rise. ui_test _test_gains (a burn's loss is no fight, a blow
 is; the pop). No bullet (release). Client only, protocol unchanged, no new class_name.
+809 amended (2) (the coordinator, from playtest's reward tour: three residents in a row greeted the
+player "You're new to the town, aren't you?", Jeff's "same things a lot"; release's label; voice's
+words): a stranger's greeting, 554's hail cue by standing, now varies by resident and carries
+hearsay. Resident.HAIL_STRANGER holds six thoughts (remark on something they carry or wear; ask
+what brings them; your name and trade; a good day and whether they mean to stay; a short nod and a
+word of welcome; where they've come from and a word about the road), each resident's own by its id.
+The old "as the town does a newcomer" is gone: it was what made the one line. Once the town knows
+of the player (Main._known_of: their latest hand-in at its store, "they brought 10 ore to the
+store", kept from _hand_in_heard in Main._hand_ins_known for the run; else "others in town have met
+them already", when another of its residents has a standing entry for them), a stranger greets them
+by Resident.HAIL_KNOWN_OF: "... but you have heard of them: <what>. You greet them as someone whose
+name has reached you, and say what you heard." hail_cue gains known_of. 554's cap and order stand.
+resident_test (in _test_hail: her own greeting, six spread over a town, known of, _known_of). Server
+only, protocol unchanged, no new class_name.
+
 ## 804, enemy-ai's side: a camp cleared, a deed
 
 A camp cleared is a deed (2026-11-05, enemy-ai; agreed with ui; voice's words; release's label).

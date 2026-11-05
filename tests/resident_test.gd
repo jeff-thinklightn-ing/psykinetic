@@ -3819,6 +3819,23 @@ func _test_hails() -> void:
 	World.production.set_card("rs-mara", card)
 	var cue := Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "")
 	_check(cue.get("kind") == "greeting" and "Jeff is a stranger to you" in str(cue.get("text", "")), "nothing else to say: a greeting by standing, a stranger (%s)" % [cue])
+	# A stranger's greeting is each resident's own; one the town knows of is greeted as such (playtest's reward tour).
+	var own_text: String = Resident.HAIL_STRANGER[absi(hash("rs-mara")) % Resident.HAIL_STRANGER.size()] % "Jeff"
+	_check(cue.get("text") == own_text, "her own of the stranger greetings, by her id (%s)" % [cue])
+	var picks := {}
+	for n in 40:
+		picks[absi(hash("rs-folk%02d" % n)) % Resident.HAIL_STRANGER.size()] = true
+	_check(picks.size() >= 4, "a town's residents spread over the greetings (%d of %d)" % [picks.size(), Resident.HAIL_STRANGER.size()])
+	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "", Offers.ctx, [], true, "they brought 10 ore to the store")
+	_check(cue.get("text") == "Jeff is a stranger to you, but you have heard of them: they brought 10 ore to the store. You greet them as someone whose name has reached you, and say what you heard.",
+		"known of: greeted as one whose name has reached her (%s)" % [cue])
+	var known_body := _body("rs-mara")
+	if known_body != null:
+		var no_known: String = _main._known_of(known_body, "pid-never-here")
+		_check(no_known.is_empty(), "nothing known of one never here (%s)" % [no_known])
+		_main._hand_ins_known["pid-ore|" + known_body.town] = "10 ore"
+		_check(_main._known_of(known_body, "pid-ore") == "they brought 10 ore to the store", "their hand-in at her town's store is what she has heard")
+		_main._hand_ins_known.erase("pid-ore|" + known_body.town)
 	var sky := "It is noon in high summer; the sky is clear"
 	cue = Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, sky)
 	_check(cue.get("kind") == "sky" and cue.get("text") == sky + ".", "the sky before the greeting (%s)" % [cue])
@@ -3848,7 +3865,7 @@ func _test_hails() -> void:
 		"her card remembers the day, the four things said and the sky spoken of")
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "It is dusk; rain falls", Offers.ctx, ["It is dusk; rain falls."]).is_empty(),
 		"but not one this player heard today from someone else")
-	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, ["Bo is a stranger to you; you greet them as the town does a newcomer."]).get("kind") == "greeting",
+	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, [Resident.HAIL_STRANGER[absi(hash("rs-mara")) % Resident.HAIL_STRANGER.size()] % "Bo"]).get("kind") == "greeting",
 		"a greeting is each resident's own: another's does not silence it")
 	var undone := Townsfolk.card_of(World.production, "rs-mara")
 	var said_before: int = undone["hails"]["said"].size()
@@ -3856,7 +3873,7 @@ func _test_hails() -> void:
 	undone = Townsfolk.card_of(World.production, "rs-mara")
 	_check(not Resident.hailed_today(undone, pid, today) and undone["hails"]["said"].size() == said_before - 1, "a hail not said gives back the day's mark and its text")
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Bo", World.production, now, "", Offers.ctx, [], false).is_empty(), "greetings capped for the day: nothing, when a greeting was all there was")
-	Resident.hail_done(World.production, "rs-mara", pid, {"kind": "greeting", "text": "Jeff is a stranger to you; you greet them as the town does a newcomer."}, today, sky)
+	Resident.hail_done(World.production, "rs-mara", pid, {"kind": "greeting", "text": own_text}, today, sky)
 	Townsfolk._remember(STORE, "Odo saw the wagon come home", "rs-mara", true, now)
 	_check(Resident.hail_cue("rs-mara", STORE, pid, "Jeff", World.production, now, "").is_empty(), "their own event line is not news to them")
 	log = Offers._call(Offers.ctx, "memory", [STORE])
