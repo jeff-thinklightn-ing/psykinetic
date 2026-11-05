@@ -15752,6 +15752,8 @@ func _sync_puppets() -> void:
 				yaw = _standing_turn(puppet, facing.rotation.y, yaw)
 			if not is_equal_approx(facing.rotation.y, yaw):
 				facing.rotation.y = yaw
+		if entity is Resident and not Net.is_authority():
+			_mirror_hands(entity as Resident)  # Before anything reads its hands: a guard's spear.
 		_sync_held(entity, puppet)
 		_slide_reach(puppet)
 		_sync_worn(entity, puppet)
@@ -17413,6 +17415,30 @@ const QUIVER := "gear.quiver"
 ## slots, but a bow (World.drawn_slot) always in the left and the other
 ## hand's thing (its arrows) in the right, as a right-handed archer holds
 ## them (decision 462).
+## A guard's arms as a client sees them (791, npc's: Resident replicates
+## hands, [right, left], not its slots): copied into its slots, so whatever
+## reads what a body holds (held_ids, World.wielded's swing and strike, the
+## ready stance, its rests) sees the spear a guard holds; its worn (the mail)
+## and down_until (its lie, downed or knocked down) are read as a player's.
+## A mirror only (never the authority: there the slots are World's and
+## hands follows them).
+static func _mirror_hands(resident: Resident) -> void:
+	if resident.hands.is_empty():
+		return
+	var slots := resident.slots
+	if slots.size() < Items.HANDED:
+		slots.resize(Items.HANDED)
+	var changed := false
+	for i in 2:  # hands is [right, left]; the slots number them Items.RIGHT_HAND, LEFT_HAND.
+		var slot: int = [Items.RIGHT_HAND, Items.LEFT_HAND][i]
+		var id := resident.hands[i] if resident.hands.size() > i else ""
+		if slots[slot] != id:
+			slots[slot] = id
+			changed = true
+	if changed:
+		resident.slots = slots
+
+
 static func held_ids(entity: GridEntity) -> Array:
 	var right := entity.slots[Items.RIGHT_HAND] if entity.slots.size() > Items.RIGHT_HAND else ""
 	var left := entity.slots[Items.LEFT_HAND] if entity.slots.size() > Items.LEFT_HAND else ""

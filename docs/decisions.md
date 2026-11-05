@@ -41615,6 +41615,20 @@ off duty. A Resident now replicates hands, worn, down_until and downed_until (na
 SUBCLASS_REPLICATED already lists), so a client draws a guard's spear and mail and a downed guard;
 the protocol revision is release's. No new class_name.
 
+## 791, pc-character's side: a guard drawn armed
+
+A Resident replicates hands ([right, left]), not its slots, so on a client a guard drew and swung
+bare-handed: held_ids, World.wielded (the swing's sound and strike clip), the ready stance and the rests
+all read slots. Client3D._mirror_hands copies a guard's hands into its slots on a client (only where
+Net.is_authority() is false: there the slots are World's and hands follows them), before anything reads
+them each frame, so the spear is in its right hand, swung (Spear_Thrust) and rested as a player's. Its
+mail (worn) and its lie need nothing new: _sync_worn reads any entity's worn, and _sync_down its
+down_until, which a downing raises to the downed window's end, so a downed guard lies as a downed player
+does, rises when helped up, and is gone when laid up (npc's). view_test _test_guard_arms (no hands sent:
+its slots as they were; sent: the spear in its slots, held and struck with, drawn in the right hand; the
+mail worn; downed lying, helped up rising). No bullet (npc's 791 carries it). Client only, protocol
+unchanged, no new class_name.
+
 ## 802. The townsperson window: words said to the one it shows
 
 Jeff: one window per townsperson. A left click opens it with their name, a chat area with the input

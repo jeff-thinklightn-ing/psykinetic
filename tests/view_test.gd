@@ -158,6 +158,7 @@ func _ready() -> void:
 		_test_bow_back()  # Reads a draw's pose on the wall clock: right after the pick's swing, as fitted.
 		_test_sheathed()
 		await _test_axe_edge_leads()
+		_test_guard_arms()
 		_test_goblins_differ()
 		_test_allies()
 		_test_barrow_dead()
@@ -10230,6 +10231,48 @@ func _test_axe_edge_leads() -> void:
 	player.slots = was
 	_rig._process(0.0)
 	await get_tree().create_timer(0.6).timeout  # The axes' ready stance faded off the upper body before the bow's tests read it.
+	_rig._process(0.0)
+
+
+## A guard as a client draws it (791, npc's side; pc-character's): its replicated hands are its
+## slots (Client3D._mirror_hands), so the spear is in its right hand and is what it strikes with;
+## its mail (worn) worn, and its lie (down_until: knocked down, or downed for as long) drawn, as a
+## player's. A resident with no hands sent keeps what it has.
+func _test_guard_arms() -> void:
+	print("
+== a guard as a client draws it: the spear in hand, the mail, the lie (791) ==")
+	var player := _player()
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	var guard := Resident.new()
+	guard.name = "GuardArmsResident"
+	add_child(guard)
+	Client3D._mirror_hands(guard)
+	_check(guard.slots.is_empty(), "no hands sent: its slots as they were")
+	guard.hands = PackedStringArray(["spear", ""])
+	guard.worn = "mail_armour"
+	Client3D._mirror_hands(guard)
+	_check(guard.slots.size() >= Items.HANDED and guard.slots[Items.RIGHT_HAND] == "spear" and guard.slots[Items.LEFT_HAND] == "",
+			"its hands are its slots: the spear in the right (%s)" % [guard.slots])
+	_check(Client3D.held_ids(guard) == ["spear", ""] and World.wielded(guard) == "spear",
+			"held and struck with: the spear (%s, %s)" % [Client3D.held_ids(guard), World.wielded(guard)])
+	_rig._sync_held(guard, puppet)
+	var held := (sockets["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+	_check(held != null, "drawn: the spear in its right hand")
+	_rig._sync_worn(guard, puppet)
+	var model := puppet.get_node("Body/Model") as Node3D
+	_check(str(model.get_meta("worn", "")) == "mail_armour", "the mail worn (%s)" % model.get_meta("worn", ""))
+	guard.down_until = World.tick + 100
+	guard.downed_until = World.tick + 100
+	_rig._sync_down(guard, puppet)
+	_check(bool(puppet.get_meta("lying", false)), "downed: lying, as a downed player lies")
+	guard.down_until = 0
+	guard.downed_until = 0
+	_rig._sync_down(guard, puppet)
+	_check(not bool(puppet.get_meta("lying", false)), "helped up: rising")
+	guard.free()
+	_rig._sync_worn(player, puppet)
 	_rig._process(0.0)
 
 
