@@ -676,7 +676,7 @@ func _test_ui_sounds() -> void:
 	# 804, sound's side: ui's reward cues, each on the UI bus, everywhere,
 	# under ui.notify (heard a dozen times running), three takes of its own.
 	var rewards: Array[String] = []
-	for kind: String in ["gain", "step", "want", "coin", "catch", "found"]:
+	for kind: String in ["gain", "step", "want", "coin", "catch", "found", "need"]:
 		var slot := "ui.reward_" + kind
 		if SoundKit.bus(slot) != "ui" or SoundKit.positional(slot) or SoundKit.volume_db(slot) >= SoundKit.volume_db("ui.notify") \
 				or SoundKit.takes(slot).size() < 3:

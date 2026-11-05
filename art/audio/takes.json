@@ -2898,6 +2898,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"ui.reward_need": [
+			{
+				"file": "ui.reward_need.ogg",
+				"from": "freesound",
+				"original": "freesound 691781: C3 soft - kalimba (from 0 s for 1.2 s)",
+				"sha256": "d90b1dcf391db8a576400e61a76746fad609dc4d6a437eece758d7d7906e44c7",
+				"by": "hollandm",
+				"url": "https://freesound.org/people/hollandm/sounds/691781/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_need.2.ogg",
+				"from": "freesound",
+				"original": "freesound 691793: E3 soft - kalimba (from 0 s for 1.2 s)",
+				"sha256": "3aab8d530f0fd2ce063af309a27a51d6499ccc9e89078d83b196f8e03c493646",
+				"by": "hollandm",
+				"url": "https://freesound.org/people/hollandm/sounds/691793/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "ui.reward_need.3.ogg",
+				"from": "freesound",
+				"original": "freesound 659909: Kalimba.wav (from 0 s for 1.2 s)",
+				"sha256": "3b79ac5a4f728e2008afd1f623309500b70d8040ec17368bb9f2cff7f8601387",
+				"by": "PanPiper5",
+				"url": "https://freesound.org/people/PanPiper5/sounds/659909/",
+				"license": "CC0 1.0"
+			}
+		],
 		"ui.reward_step": [
 			{
 				"file": "ui.reward_step.ogg",

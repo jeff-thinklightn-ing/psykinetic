@@ -1479,6 +1479,14 @@
 			"volume_db": -12.0,
 			"uses": "a new zone found: a short harp motif (804; ui's Gains)"
 		},
+		"ui.reward_need": {
+			"category": "ui",
+			"type": "oneshot",
+			"bus": "ui",
+			"positional": false,
+			"volume_db": -15.0,
+			"uses": "a companion's need met (leisure, adventure, wonder, faith, safety, company): one soft kalimba note a burst (804 amended (4); ui's Gains)"
+		},
 		"amb.field_wind": {
 			"category": "ambience",
 			"type": "bed",
