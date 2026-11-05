@@ -14288,6 +14288,7 @@ func _reward(player_id: String, data: Dictionary) -> void:
 	reward(player_id, data)
 	if str(data.get("track", "")) == "item":
 		_thank_aloud(player_id, data)  # 804, npc's side.
+		_hand_in_heard(player_id, data)  # 809.
 
 
 ## The last rewards sent ({player, data}), for tests.
@@ -14315,6 +14316,39 @@ func _thank_aloud(player_id: String, data: Dictionary) -> void:
 	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(given)
 	var line := str(lines[absi(hash(body.worker_id + player_id + str(World.tick))) % lines.size()])
 	_resident_says(body, line.replace("{count} {item}", what).replace("{item}", what), "", player, false)
+
+
+## The hand-ins the town has news of: "player|town|day" -> true, so a
+## player's first hand-in of a day at a town is its news, once (809).
+var _hand_in_news: Dictionary = {}
+
+
+## Hearsay of a hand-in (decision 809; Jeff: "nothing happens when I hand
+## things in"): [param player_id]'s first hand-in of the day at a town (an
+## "item" reward's "place", the town's store) becomes the town's news
+## (Townsfolk._remember, an event; residents.json "hand_in_news", voice's
+## words, naming them and what), which its residents bring up unasked in a
+## hail to other players (Resident.hail_cue's "news" cue), never to them
+## (its "about"). A depot's (no town of its own) is no news.
+func _hand_in_heard(player_id: String, data: Dictionary) -> void:
+	var town := str(data.get("place", ""))
+	var record: PlayerRecord = _records.get(player_id)
+	if World.towns == null or record == null or not World.towns._towns.has(town) or World.production == null:
+		return
+	var day := "|%d" % Townsfolk.day_of(World.production.now())
+	var key := "%s|%s%s" % [player_id, town, day]
+	if _hand_in_news.has(key):
+		return
+	for old: String in _hand_in_news.keys():
+		if not old.ends_with(day):
+			_hand_in_news.erase(old)  # Only today's are kept.
+	_hand_in_news[key] = true
+	var lines: Array = Townsfolk.days().get("hand_in_news", {}).get("lines", [])
+	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(data.get("given", {}))
+	if lines.is_empty() or what.is_empty():
+		return
+	var line := str(lines[absi(hash(key)) % lines.size()])
+	Townsfolk._remember(town, line.replace("{name}", record.name).replace("{count} {item}", what), "", false, World.production.now(), player_id)
 
 
 ## Who takes [param player]'s hand-in at [param place] and thanks them: the

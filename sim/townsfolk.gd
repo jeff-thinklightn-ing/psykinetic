@@ -1327,7 +1327,9 @@ static func _sold_words(went: Dictionary) -> String:
 
 ## The town's memory takes [param text] from [param teller]: a belief, or a
 ## candidate for the lawspeaker when [param candidate] (as a death is, 501).
-static func _remember(town: String, text: String, teller: String, candidate: bool, at: int) -> void:
+## News of a player's own doing names them as [param about] (809: a
+## hand-in), and is never told back to them as news (Resident.hail_cue).
+static func _remember(town: String, text: String, teller: String, candidate: bool, at: int, about := "") -> void:
 	var log: Variant = Offers._call(Offers.ctx, "memory", [town])
 	if not log is Array:
 		return
@@ -1336,6 +1338,8 @@ static func _remember(town: String, text: String, teller: String, candidate: boo
 		entry["tier"] = TownMemory.CANDIDATE
 	if not entry.is_empty():
 		entry["event"] = true  # The town's own news (a wagon struck, home or lost, the runner), not talk: a hail's "news" cue (554).
+		if not about.is_empty():
+			entry["about"] = about
 	Offers._call(Offers.ctx, "set_memory", [town, log])
 
 

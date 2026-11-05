@@ -41820,3 +41820,18 @@ hand-in is thanked; the reward's banner (ui) is the written half. resident_test 
 merchant takes it though the cook is nearer, in the reward's words; without him the nearest in her trade's
 words; nobody hearing, or a named receiver not here, nothing; a gold reward no thanks. Protocol unchanged
 ("speech" as before); no new class_name.
+
+## 809. Hearsay of hand-ins: the town talks of what a player brings
+
+Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's
+number. A hand-in is thanked aloud by the one who takes it (804, npc's side); beyond that, the town talks
+of it. A player's first hand-in of a day at a town (an "item" reward, 804's economy's side, whose "place"
+is the town's store) becomes that town's news: Main._hand_in_heard puts voice's words (residents.json
+"hand_in_news": "{name} brought {count} {item} to the store.", the reward's "counted" words) into the town's
+memory as an event (Townsfolk._remember), with "about" naming the player. Residents bring it up unasked in a
+hail to other players, as any day's news (Resident.hail_cue's "news" cue, one shared fact a day to a
+player, after a resident's own plea), never to the player it is about (hail_cue skips an event "about"
+them). Once a player a town a day (Main._hand_in_news, today's only); a depot's hand-in, with no town of its
+own, is no news. The build credit (residents saying "That's your ore in the forge" to a giver, from economy's
+"built_by" and Towns.stood) follows as this decision's amendment once economy's build credit lands.
+resident_test _test_hand_in_news. Protocol unchanged; no new class_name.

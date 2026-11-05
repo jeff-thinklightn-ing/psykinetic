@@ -696,6 +696,7 @@ static func hail_cue(worker_id: String, town: String, player_id: String, player_
 				continue
 			var ruling: Variant = entry.get("ruling", {})
 			if bool(entry.get("event", false)) and str(entry.get("said_by", "")) != worker_id and (not ruling is Dictionary or ruling.is_empty()) \
+					and str(entry.get("about", "")) != player_id \
 					and Townsfolk.day_of(int(entry.get("first_said", -1))) == today and int(entry.get("first_said", -1)) >= int(newest.get("first_said", -1)):
 				newest = entry
 			if ruling is Dictionary and ruling.has("step") and Townsfolk.day_of(int(ruling.get("step", -1))) == today and int(ruling.get("step", -1)) >= int(ruled.get("ruling", {}).get("step", -1)):

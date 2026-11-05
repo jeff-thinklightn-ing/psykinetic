@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: what you bring to a town's store gets talked about, and townsfolk tell other players who brought what that day (809).
 - Towns: whoever takes what you hand in at a town's store, the keeper or whoever stands nearest, thanks you aloud for what you brought (804).
 - Towns: whatever you hand in at the store or depot that the town can use earns a little regard, not only what it is short of, and each hand-in shows the store's thanks and the gold paid (804).
 - Wren speaks up on her own when all is quiet and you've said nothing for a while: about something close by, what just happened, a place new to her or what she likes, or with a question for you; she no longer fills a silence with "it's quiet" (803 amended).

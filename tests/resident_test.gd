@@ -2213,8 +2213,50 @@ func _test_hand_in_thanked() -> void:
 	_check(_main.party_log.last(1) == before, "the give path names one not here: nothing said, nobody else (%s)" % [_main.party_log.last(1)])
 	_main._reward(player.player_id, {"track": "gold", "amount": 3})
 	_check(_main.party_log.last(1) == before, "a gold reward: no thanks of its own (%s)" % [_main.party_log.last(1)])
+	_test_hand_in_news(player, tova)
 	World.production.set_away("rs-tova", true)
 	World.despawn(tova)
+
+
+## Decision 809: a player's first hand-in of the day at a town is its news,
+## once, naming them and what; a resident's hail tells it to another player,
+## never to them; a depot (no town) is no news.
+func _test_hand_in_news(player: Player, tova: Resident) -> void:
+	print("
+== a hand-in is the town's news, told to others, never back to the giver (809) ==")
+	var record: PlayerRecord = _main._records.get(player.player_id)
+	if record == null:
+		_check(false, "(a record for the player)")
+		return
+	var ours := func() -> Array:
+		return _main._town_memory(STORE).filter(func(e: Dictionary) -> bool: return bool(e.get("event", false)) and str(e.get("about", "")) == player.player_id)
+	var was: int = ours.call().size()
+	_main._hand_in_news.clear()
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"fish": 3}, "counted": "3 fish"})
+	var news: Array = ours.call()
+	_check(news.size() == was + 1 and str(news[-1]["text"]).begins_with("%s brought 3 fish to the store" % record.name), "the town's news names them and what (%s)" % [news.map(func(e: Dictionary) -> String: return str(e["text"]))])
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 2}, "counted": "2 wood"})
+	_check(ours.call().size() == was + 1, "a second hand-in that day: no more news (%d)" % ours.call().size())
+	_main._reward(player.player_id, {"track": "item", "place": "rs_town/no_such_depot", "given": {"wood": 2}, "counted": "2 wood"})
+	_check(ours.call().size() == was + 1, "a depot's, no town of its own: no news")
+	var now := World.production.now()
+	var told_them := false
+	var told_me := false
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or body.worker_id.begins_with(Offers.VENDOR) or body.worker_id.begins_with(Offers.VISITOR):
+			continue
+		var theirs := Resident.hail_cue(body.worker_id, STORE, "rs-another-player", "Someone", World.production, now, "", Offers.ctx, [], false)
+		var mine := Resident.hail_cue(body.worker_id, STORE, player.player_id, record.name, World.production, now, "", Offers.ctx, [], false)
+		for i in 3:  # Her own plea comes first; once said (as a hail does), the town's news.
+			if str(theirs.get("kind", "")) in ["", "news"]:
+				break
+			Resident.hail_done(World.production, body.worker_id, "rs-another-player", theirs, Townsfolk.day_of(now), "")
+			theirs = Resident.hail_cue(body.worker_id, STORE, "rs-another-player", "Someone", World.production, now, "", Offers.ctx, [], false)
+		told_them = told_them or (str(theirs.get("kind", "")) == "news" and record.name + " brought 3 fish" in str(theirs.get("text", "")))
+		told_me = told_me or record.name + " brought" in str(mine.get("text", ""))
+	_check(told_them, "another player hears it in a hail, after her own plea")
+	_check(not told_me, "never told back to the giver")
 
 
 func _test_means_in_voice() -> void:
