@@ -565,6 +565,9 @@ static func load_level(level_name: String) -> Dictionary:
 		ring["town_id"] = "%s/%s" % [level_name, ring["town"]]
 	for roof: Dictionary in level["roofs"]:
 		roof["town_id"] = "%s/%s" % [level_name, roof["town"]] if not roof["town"].is_empty() else ""
+	for link: Dictionary in level["links"]:
+		if link.has("stands"):
+			link["stands"]["town"] = "%s/%s" % [level_name, link["stands"]["town"]]
 	for warning: String in level["warnings"]:
 		push_warning("[level] %s: %s" % [level_name, warning])
 	return level
@@ -889,6 +892,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["terrain"]["ledges"] = _ledges(level["terrain"], config, warnings)
 	level["building_cells"] = inside_cells(level["buildings"])
 	_beds_round(level)
+	_interior_from(level, config, warnings)
 	_clear_tall_grass(level, warnings)
 	building_places(level["buildings"], level["places"])
 	# The views draw them (roofs, inside floors) from the terrain they are given.
@@ -898,6 +902,60 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["roofs"] = roofs_from(config, level["terrain"], level["buildings"], warnings)
 	level["terrain"]["roofs"] = level["roofs"]
 	return level
+
+
+## level.json's interior keys (the tavern zone; tools/make_interior.py
+## writes them): "town", the full id of the town it stands in
+## ("wilds/store"), so its places are that town's (tavern_of); "storeys",
+## the levels of its building, ground floor first, this one among them;
+## "beds", [[x, y, dx, dy], ...]: a bed's head cell and the way its head
+## points, its foot the cell behind. As level "town" ("" for none),
+## "storeys" ([] for none) and "beds" ([{cells: [head, foot], head, prop}],
+## as Level.beds_in's); a bed off the floor is said in [param warnings]
+## and left out.
+static func _interior_from(level: Dictionary, config: Dictionary, warnings: Array[String]) -> void:
+	level["town"] = str(config.get("town", ""))
+	var storeys: Array[String] = []
+	var listed: Variant = config.get("storeys", [])
+	for each: Variant in listed if listed is Array else []:
+		storeys.append(str(each))
+	level["storeys"] = storeys
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var beds: Array[Dictionary] = []
+	var given: Variant = config.get("beds", [])
+	for entry: Variant in given if given is Array else []:
+		if not entry is Array or (entry as Array).size() != 4:
+			warnings.append("a bed %s is not [x, y, dx, dy]: left out" % [entry])
+			continue
+		var head := Vector2i(int(entry[0]), int(entry[1]))
+		var way := Vector2i(int(entry[2]), int(entry[3]))
+		if absi(way.x) + absi(way.y) != 1 or not floor.has(head) or not floor.has(head - way):
+			warnings.append("the bed at %s (head %s) is not on floor: left out" % [head, way])
+			continue
+		beds.append({"cells": [head, head - way], "head": way, "prop": "prop.bed"})
+	level["beds"] = beds
+
+
+## A building's floors, ground first ([param level_name]'s "storeys", else
+## itself alone), and their beds together: {storeys, beds: [{level, cells,
+## head, prop}]} (the tavern zone: the inn's beds counted over its every
+## floor, found from its shell's "inside").
+static func storeys_of(level_name: String) -> Dictionary:
+	var ground := load_level(level_name)
+	var names: Array[String] = []
+	names.assign(ground.get("storeys", []))
+	if names.is_empty():
+		names.append(level_name)
+	var beds: Array[Dictionary] = []
+	for name in names:
+		var floor := ground if name == level_name else load_level(name)
+		for bed: Dictionary in floor.get("beds", []):
+			var each := bed.duplicate()
+			each["level"] = name
+			beds.append(each)
+	return {"storeys": names, "beds": beds}
 
 
 ## level.json's "damp" (the barrow's deepest: "too moist to light lamps"):
@@ -1421,16 +1479,19 @@ static func posts_of(level: Dictionary) -> Dictionary:
 ## [param level]'s taverns (772, buildings' side): town id -> {id, counter
 ## (the cell the taverner stands at, the place's "at"), rect, seats, hearth
 ## (null if not said)}; {} for a level with none.
+## An interior floor (the tavern zone) keys it by the town its level.json
+## names ("town": "wilds/store"), the tavern standing in that town's level.
 static func tavern_of(level: Dictionary) -> Dictionary:
 	var out := {}
 	var places: Dictionary = level.get("places", {})
+	var town_of := str(level.get("town", ""))
 	for key: String in places:
 		var place: Dictionary = places[key]
-		if place["kind"] != "tavern" or not place.has("town"):
+		if place["kind"] != "tavern" or not (place.has("town") or not town_of.is_empty()):
 			continue
 		var seats: Array[Vector2i] = []
 		seats.assign(place.get("seats", []))
-		out["%s/%s" % [level.get("name", ""), place["town"]]] = {"id": key, "counter": place["cell"],
+		out[town_of if not town_of.is_empty() else "%s/%s" % [level.get("name", ""), place["town"]]] = {"id": key, "counter": place["cell"],
 			"rect": place.get("rect", Rect2i(place["cell"], Vector2i.ONE)), "seats": seats, "hearth": place.get("hearth")}
 	return out
 
@@ -1917,6 +1978,12 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 		_link(building, entry, config, linked, warnings)
 		if entry.has("level_link"):
 			building["level_link"] = entry["level_link"]
+		if entry.has("level_links"):
+			building["level_links"] = entry["level_links"]
+		# A shell (the tavern zone): its inside is the level named, its
+		# beds that level's building's (Level.storeys_of), none of its own.
+		if not str(entry.get("inside", "")).is_empty():
+			building["inside"] = str(entry["inside"])
 		# A player's house (737): labelled "Your house" to every viewer.
 		if bool(entry.get("home", false)):
 			building["home"] = true
@@ -2139,9 +2206,14 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"campfire_cold": {"sits": "flat", "variants": 1, "faced": true},
 	"broken_cart": {"sits": "flat", "variants": 1, "faced": true},
 	"rusted_gear": {"sits": "flat", "variants": 1, "faced": true},
-	# The forest's camps (793, maps' side): a trader's bedroll and cart, sacks of goods or plunder.
+	# The forest's camps (793, maps' side): a trader's bedroll and cart, sacks of goods or plunder (the sack below, shared).
 	"bedroll": {"sits": "flat", "variants": 1, "faced": true},
 	"cart": {"sits": "flat", "variants": 1, "faced": true},
+	# An interior's stores (the tavern zone, tools/make_interior.py): drawn
+	# only, never opened (Jeff: nothing openable that gives nothing), stood
+	# against a wall out of the way since decor is never solid; the sack below too.
+	"crate": {"sits": "flat", "variants": 1, "faced": true},
+	"barrel": {"sits": "flat", "variants": 1, "faced": true},
 	"sack": {"sits": "flat", "variants": 1, "faced": true}}
 
 
@@ -2595,16 +2667,27 @@ static func solid_door(rect: Rect2i, facing: Vector2i) -> Vector2i:
 ## its facing as a kind's doors are), to_map, to_spawn, sealed, cue,
 ## variant}; the link's "building" is the building's code, else its slot,
 ## for the far side to find it by. One not on floor inside the building, or
-## on its door or front, is said in [param warnings] and left out.
+## on its door or front, is said in [param warnings] and left out. Its
+## "level_links" (the tavern zone, the tavern's two-cell way in: the
+## two-cell passages rule) is a list of such, each laid as one is. A
+## building whose "inside" names a level (the inn's shell) gives its links
+## "stands": {town, use}, so the way is closed while the building isn't
+## standing (Main._take_link).
 static func _building_links(level: Dictionary, config: Dictionary, warnings: Array[String]) -> void:
 	var links: Array[Dictionary] = level["links"]
 	var floor := {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor[cell] = true
+	var givens: Array[Array] = []  # [building, its link entry]
 	for building: Dictionary in level["buildings"]:
-		var given: Variant = building.get("level_link")
-		if given == null:
-			continue
+		if building.get("level_link") != null:
+			givens.append([building, building["level_link"]])
+		var listed: Variant = building.get("level_links", [])
+		for each: Variant in listed if listed is Array else []:
+			givens.append([building, each])
+	for pair: Array in givens:
+		var building: Dictionary = pair[0]
+		var given: Variant = pair[1]
 		var rect: Rect2i = building["rect"]
 		var facing: Vector2i = building["facing"]
 		var local: Variant = _tile(given.get("cell") if given is Dictionary else null)
@@ -2630,6 +2713,8 @@ static func _building_links(level: Dictionary, config: Dictionary, warnings: Arr
 				"sealed": str(given.get("sealed", "")), "hidden": bool(given.get("hidden", false)),
 				"building": code if not code.is_empty() else str(building["slot"]),
 				"cue": str(given.get("cue", "")), "variant": maxi(1, int(given.get("variant", 1)))})
+		if not str(building.get("inside", "")).is_empty() and not str(building.get("town", "")).is_empty():
+			links.back()["stands"] = {"town": str(building["town"]), "use": str(building.get("use", ""))}  # The town's id by load_level.
 	# Where they are, for the terrain's readers (World keeps them clear, 571).
 	level["terrain"]["links_at"] = links.map(func(link: Dictionary) -> Vector2i: return link["tile"])
 	# A dungeon's (level.json "depth") ways out, for a routed band to run for
@@ -2703,8 +2788,8 @@ static func beds_in(building: Dictionary, terrain: Dictionary, blocked: Dictiona
 		out.append({"cells": at, "head": at[0] - at[1], "prop": "prop.bed_straw", "solid": true})
 		return out
 	var key := str(building["kind"]) if building.has("kind") else slot
-	if not BEDS.has(key) or bool(building.get("ruined", false)):
-		return out
+	if not BEDS.has(key) or bool(building.get("ruined", false)) or not str(building.get("inside", "")).is_empty():
+		return out  # A shell's beds are its inside's (storeys_of).
 	if not building.has("kind") and not str(building.get("use", "")).is_empty():
 		return out
 	var count := int(BEDS[key][2] if str(building.get("size", KIND_SIZE)) == "large" else BEDS[key][1])

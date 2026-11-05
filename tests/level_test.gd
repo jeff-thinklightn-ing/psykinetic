@@ -2745,6 +2745,8 @@ func _test_relaid() -> void:
 	var hills := Level.load_level("hills")
 	_test_caches(wilds, hills)
 	_test_carved(hills)
+	_test_tavern_zone(wilds)
+	_test_shelled(wilds)
 
 
 ## The lands' hidden caches (807 amended): the farmstead's under a
@@ -3003,6 +3005,124 @@ func _test_removed(wilds: Dictionary) -> void:
 		and odd["zones"]["wilds"]["ground"][0]["ids"] == ["knife"], "a destination this build does not know: on the ground, counted, never dropped (%s)" % odd_line)
 
 
+## The inn become a shell (811): what was saved inside its footprint (a
+## pile, an entity, a player and their companion) carried out once onto the
+## nearest floor outside it, the pile's item-book place with it; a level
+## loading with no shell (an overlay copy) waits unmarked; the next boot
+## moves nothing.
+func _test_shelled(wilds: Dictionary) -> void:
+	print("
+== the inn become a shell: what was saved inside carried out once (811) ==")
+	var plan: Dictionary = Relaid.SHELLS["wilds"]
+	var rect := Rect2i(plan["rect"][0], plan["rect"][1], plan["rect"][2], plan["rect"][3])
+	var inside := Vector2i(173, 207)
+	var record := PlayerRecord.new()
+	record.player_id = "lt-shelled"
+	record.zone = "wilds"
+	record.tile = inside
+	record.companion = {"tile": [174, 207]}
+	var crate := {"script": "res://sim/chest.gd", "shape": "chest", "name": "chest", "tile": [174, 210], "hp": 1, "stamina": 0,
+		"facing": [0, 1], "props": {}, "spawn": -1, "spawn_key": "", "slots": [], "items": []}
+	var path: String = preload("res://tests/test_ports.gd").scratch("shelled_world.json")
+	_check(Snapshot.write(path, {"version": Snapshot.VERSION, "players": [record.to_dict()], "remade": {"relaid/wilds": 774},
+		"items": {"9": {"at": "wilds@176,206"}},
+		"zones": {"wilds": {"tick": 9, "entities": [crate], "respawns": [],
+			"ground": [{"cell": [176, 206], "ids": ["coin"], "items": [9], "gold": 0}], "records": []}}}), "(the world before the shell written)")
+	var snapshot := Snapshot.load(path)
+	var done: Dictionary = snapshot.get("remade", {})
+	var waits := Relaid.shell(snapshot, done, func(_level: String) -> Dictionary: return {"buildings": [], "terrain": {"floor": []}})
+	_check(waits.size() == 1 and "not shelled" in waits[0] and not done.has(Relaid.done_key_of("wilds", 811)), "no shell where it loads: nothing moved, it waits (%s)" % [waits])
+	var lines := Relaid.shell(snapshot, done, func(_level: String) -> Dictionary: return wilds)
+	var pile: Dictionary = snapshot["zones"]["wilds"]["ground"][0]
+	var moved: PlayerRecord = snapshot["players"][0]
+	var spec: Dictionary = snapshot["zones"]["wilds"]["entities"][0]["spec"]
+	var floor := {}
+	for cell: Vector2i in wilds["terrain"]["floor"]:
+		floor[cell] = true
+	var out := func(cell: Variant) -> bool: return cell is Vector2i and floor.has(cell) and not rect.has_point(cell)
+	var cell: Variant = Snapshot.vector(pile["cell"]) if not pile["cell"] is Vector2i else pile["cell"]
+	_check(lines.size() == 1 and lines[0].begins_with("[level] shelled wilds (811): 1 saved entities, 1 ground piles and 1 players moved out")
+		and lines[0].ends_with(", 0 left where they were (no floor near)") and not "lt-shelled" in lines[0] and done.get(Relaid.done_key_of("wilds", 811)) == 811
+		and done.get("relaid/wilds") == 774, "one count-only line, marked done under its own key beside the re-lay's (%s)" % [lines])
+	_check(out.call(cell) and out.call(spec["tile"]) and out.call(moved.tile) and moved.companion.get("tile") == null
+		and snapshot["items"]["9"]["at"] == "wilds@%d,%d" % [cell.x, cell.y],
+		"the pile, the entity and the player outside the inn on floor, the companion beside them, the item book following the pile")
+	_check(Relaid.shell(snapshot, done, func(_level: String) -> Dictionary: return wilds).is_empty(), "the next boot moves nothing")
+
+
+## Umbrage's tavern as its own zone (the tavern zone design; Jeff: "allows
+## multi floors, attics, rooms etc"): tools/make_interior.py's three floors
+## parse clean, each Umbrage's and naming the building's storeys; the
+## wilds inn's two-cell way in leads to the ground floor's arrival and
+## closes while the inn isn't standing; every link's far spawn exists;
+## every floor cell is reached from where one arrives; the tavern (its
+## counter, eight seats, hearth) on the ground floor, Umbrage's; the beds
+## counted over every floor; the stores drawn as decor.
+func _test_tavern_zone(wilds: Dictionary) -> void:
+	print("
+== Umbrage's tavern, its own zone: three floors, its way in, its tavern and beds ==")
+	var names: Array[String] = ["umbrage_tavern", "umbrage_tavern_up", "umbrage_tavern_attic"]
+	var floors := {}
+	for name in names:
+		floors[name] = Level.load_level(name)
+		var level: Dictionary = floors[name]
+		_check(not level.is_empty() and (level["warnings"] as Array).is_empty() and level["town"] == "wilds/store" and level["storeys"] == names
+			and not level["terrain"]["outdoor"], "%s: parses clean, indoors, Umbrage's, its storeys the building's (%s)" % [name, level.get("warnings")])
+	floors["wilds"] = wilds
+	var ins := (wilds["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "umbrage_tavern")
+	var tiles := ins.map(func(link: Dictionary) -> Vector2i: return link["tile"])
+	tiles.sort()
+	_check(tiles == [Vector2i(178, 208), Vector2i(178, 209)] and ins.all(func(link: Dictionary) -> bool:
+		return link["to_spawn"] == "from_wilds" and link.get("stands", {}) == {"town": "wilds/store", "use": "inn"}),
+		"the inn's way in: two cells inside its door, to the ground floor, closed unless the inn stands (%s)" % [tiles])
+	var unpaired: Array[String] = []
+	for name: String in floors:
+		for link: Dictionary in floors[name]["links"]:
+			var far: Dictionary = floors.get(link["to_map"], {})
+			if (name != "wilds" or link["to_map"].begins_with("umbrage_tavern")) and not far.get("spawn_points", {}).has(link["to_spawn"]):
+				unpaired.append("%s %s -> %s/%s" % [name, link["tile"], link["to_map"], link["to_spawn"]])
+	_check(unpaired.is_empty(), "every link in and out lands on a spawn on its far side (%s)" % [unpaired])
+	for name in names:
+		var level: Dictionary = floors[name]
+		var floor := {}
+		for cell: Vector2i in level["terrain"]["floor"]:
+			floor[cell] = true
+		var edges: Dictionary = level["terrain"]["edges"]
+		var from: Vector2i = level["spawn_points"].values()[0]
+		var seen := {from: true}
+		var todo: Array[Vector2i] = [from]
+		while not todo.is_empty():
+			var cell: Vector2i = todo.pop_back()
+			for way: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+				var next := cell + way
+				if floor.has(next) and not seen.has(next) and int(edges.get(Terrain.edge_key(cell, way), Terrain.Edge.OPEN)) != Terrain.Edge.WALL:
+					seen[next] = true
+					todo.append(next)
+		_check(seen.size() == floor.size(), "%s: all %d floor cells reached from %s (%d)" % [name, floor.size(), from, seen.size()])
+	var ground: Dictionary = floors["umbrage_tavern"]
+	var tavern: Dictionary = Level.tavern_of(ground).get("wilds/store", {})
+	var cells: Array[Vector2i] = []
+	if not tavern.is_empty():
+		cells.assign([tavern["counter"]] + tavern["seats"])
+	var ground_floor := {}
+	for cell: Vector2i in ground["terrain"]["floor"]:
+		ground_floor[cell] = true
+	_check(Level.tavern_of(ground).keys() == ["wilds/store"] and tavern["seats"].size() == 8 and (ground["terrain"]["fire"] as Array).has(tavern["hearth"])
+		and cells.all(func(cell: Vector2i) -> bool: return (tavern["rect"] as Rect2i).has_point(cell) and ground_floor.has(cell)),
+		"the tavern on the ground floor, Umbrage's: its counter and eight seats on floor in the common room, its hearth a fire")
+	var storeys := Level.storeys_of("umbrage_tavern")
+	var beds: Array = storeys["beds"]
+	var laid := beds.filter(func(bed: Dictionary) -> bool:
+		var floor: Array = floors[bed["level"]]["terrain"]["floor"]
+		return (bed["cells"] as Array).all(func(cell: Vector2i) -> bool: return floor.has(cell)))
+	_check(storeys["storeys"] == names and beds.size() == 6 and laid.size() == 6
+		and beds.filter(func(bed: Dictionary) -> bool: return bed["level"] == "umbrage_tavern_up").size() == 5,
+		"its beds over every floor: the keeper's below, five hired rooms upstairs (%d)" % beds.size())
+	var stores := func(level: Dictionary) -> Array: return (level["terrain"]["decor"] as Array).map(func(piece: Dictionary) -> String: return piece["kind"])
+	_check(stores.call(ground) == ["crate", "barrel"] and stores.call(floors["umbrage_tavern_attic"]) == ["crate", "barrel", "sack", "crate"],
+		"the kitchen's and the attic's stores drawn as decor, nothing to open (%s)" % [stores.call(floors["umbrage_tavern_attic"])])
+
+
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended
 ## (4), 772 amended, 774; npc's and environment's readers): read by their
 ## Level calls, on floor, the tavern the town's inn with its counter, seats
@@ -3025,20 +3145,12 @@ func _test_town_places(wilds: Dictionary) -> void:
 				clear = clear and floor.has(Vector2i(x, y))
 		_check(clear and rect.has_point(post["brazier"]) and not str(post["name"]).is_empty(), "%s: its 3 x 3 on floor, its brazier in it (%s)" % [post["id"], rect])
 	_check(Level.posts_of(Level.load_level("forest")).is_empty(), "a level with no posts: {}")
-	var tavern: Dictionary = Level.tavern_of(wilds).get("wilds/store", {})
+	# The inn a shell (the tavern zone): its inside the tavern's own levels,
+	# no beds nor tavern of its own in the wilds.
 	var inn: Array = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool: return str(building.get("use", "")) == "inn")
-	_check(inn.size() == 1 and inn[0]["rect"] == tavern.get("rect") and str(inn[0].get("town", "")) == "store", "the tavern: the town's inn, its place's rect the building's (%s)" % [tavern.get("rect")])
-	if inn.size() == 1:
-		var beds := {}
-		for bed: Dictionary in Level.beds_in(inn[0], wilds["terrain"]):
-			for cell: Vector2i in bed["cells"]:
-				beds[cell] = true
-		var cells: Array[Vector2i] = [tavern["counter"], tavern["hearth"]]
-		cells.append_array(tavern["seats"])
-		var rect: Rect2i = tavern["rect"]
-		_check(cells.all(func(cell: Vector2i) -> bool: return rect.has_point(cell) and floor.has(cell) and not beds.has(cell)) and tavern["seats"].size() == 6 and beds.size() > 0,
-			"its counter, six seats and hearth inside, on floor, clear of its %d beds (%s off; beds %s)" % [beds.size() / 2,
-			cells.filter(func(cell: Vector2i) -> bool: return not (rect.has_point(cell) and floor.has(cell) and not beds.has(cell))), beds.keys()])
+	_check(inn.size() == 1 and str(inn[0].get("inside", "")) == "umbrage_tavern" and str(inn[0].get("town", "")) == "store"
+		and Level.beds_in(inn[0], wilds["terrain"]).is_empty() and not inn[0].has("beds") and Level.tavern_of(wilds).is_empty(),
+		"the inn a shell: its inside umbrage_tavern, no beds nor tavern in the wilds (%s)" % [Level.tavern_of(wilds).keys()])
 	var fires := Level.fires_of(wilds)
 	_check(fires.size() == 1 and fires[0]["id"] == "square_fire" and fires[0]["cell"] == Vector2i(194, 211) and fires[0]["town"] == "wilds/store"
 		and (wilds["terrain"]["fire"] as Array).has(Vector2i(194, 211)) and fires[0]["seats"].size() == 8

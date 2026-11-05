@@ -1,0 +1,317 @@
+{
+	"name": "The Mughouse, upstairs",
+	"outdoor": false,
+	"town": "wilds/store",
+	"building": "umbrage_tavern",
+	"storeys": [
+		"umbrage_tavern",
+		"umbrage_tavern_up",
+		"umbrage_tavern_attic"
+	],
+	"ambient": 0.15,
+	"walls": "wood",
+	"floors": "wood",
+	"starts": [
+		[
+			15,
+			12
+		]
+	],
+	"spawn_points": {
+		"from_umbrage_tavern_0": [
+			15,
+			12
+		],
+		"from_umbrage_tavern_1": [
+			16,
+			12
+		],
+		"from_umbrage_tavern_attic_0": [
+			16,
+			10
+		],
+		"from_umbrage_tavern_attic_1": [
+			17,
+			10
+		]
+	},
+	"links": [
+		{
+			"at": [
+				15,
+				13
+			],
+			"to_map": "umbrage_tavern",
+			"to_spawn": "from_umbrage_tavern_up_0",
+			"cue": "down"
+		},
+		{
+			"at": [
+				16,
+				13
+			],
+			"to_map": "umbrage_tavern",
+			"to_spawn": "from_umbrage_tavern_up_1",
+			"cue": "down"
+		},
+		{
+			"at": [
+				16,
+				9
+			],
+			"to_map": "umbrage_tavern_attic",
+			"to_spawn": "from_umbrage_tavern_up_0",
+			"cue": "up"
+		},
+		{
+			"at": [
+				17,
+				9
+			],
+			"to_map": "umbrage_tavern_attic",
+			"to_spawn": "from_umbrage_tavern_up_1",
+			"cue": "up"
+		}
+	],
+	"buildings": [],
+	"decor": [],
+	"places": {},
+	"beds": [
+		[
+			1,
+			0,
+			0,
+			-1
+		],
+		[
+			7,
+			0,
+			0,
+			-1
+		],
+		[
+			16,
+			0,
+			0,
+			-1
+		],
+		[
+			1,
+			13,
+			0,
+			1
+		],
+		[
+			7,
+			13,
+			0,
+			1
+		]
+	],
+	"rooms": {
+		"room_1": {
+			"id": "room_1",
+			"use": "room",
+			"rect": [
+				0,
+				0,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "hall_up",
+					"cells": [
+						[
+							2,
+							5
+						],
+						[
+							3,
+							5
+						]
+					],
+					"side": "south"
+				}
+			],
+			"beds": [
+				[
+					1,
+					0
+				]
+			],
+			"name": "Hired room"
+		},
+		"room_2": {
+			"id": "room_2",
+			"use": "room",
+			"rect": [
+				6,
+				0,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "hall_up",
+					"cells": [
+						[
+							8,
+							5
+						],
+						[
+							9,
+							5
+						]
+					],
+					"side": "south"
+				}
+			],
+			"beds": [
+				[
+					7,
+					0
+				]
+			],
+			"name": "Hired room"
+		},
+		"room_3": {
+			"id": "room_3",
+			"use": "room",
+			"rect": [
+				12,
+				0,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "hall_up",
+					"cells": [
+						[
+							14,
+							5
+						],
+						[
+							15,
+							5
+						]
+					],
+					"side": "south"
+				}
+			],
+			"beds": [
+				[
+					16,
+					0
+				]
+			],
+			"name": "Hired room"
+		},
+		"room_4": {
+			"id": "room_4",
+			"use": "room",
+			"rect": [
+				0,
+				8,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "hall_up",
+					"cells": [
+						[
+							2,
+							8
+						],
+						[
+							3,
+							8
+						]
+					],
+					"side": "north"
+				}
+			],
+			"beds": [
+				[
+					1,
+					13
+				]
+			],
+			"name": "Hired room"
+		},
+		"room_5": {
+			"id": "room_5",
+			"use": "room",
+			"rect": [
+				6,
+				8,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "hall_up",
+					"cells": [
+						[
+							8,
+							8
+						],
+						[
+							9,
+							8
+						]
+					],
+					"side": "north"
+				}
+			],
+			"beds": [
+				[
+					7,
+					13
+				]
+			],
+			"name": "Hired room"
+		}
+	},
+	"passages": {
+		"hall_up": {
+			"id": "hall_up",
+			"use": "hall",
+			"rect": [
+				0,
+				6,
+				18,
+				2
+			],
+			"doors": []
+		},
+		"stair_up": {
+			"id": "stair_up",
+			"use": "stair",
+			"rect": [
+				12,
+				8,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "hall_up",
+					"cells": [
+						[
+							13,
+							8
+						],
+						[
+							14,
+							8
+						]
+					],
+					"side": "north"
+				}
+			]
+		}
+	}
+}

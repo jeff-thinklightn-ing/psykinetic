@@ -1,0 +1,70 @@
+{
+	"building": "umbrage_tavern",
+	"town": "wilds/store",
+	"place_name": "the Mughouse",
+	"walls": "wood",
+	"floors_set": "wood",
+	"front": {"floor": "umbrage_tavern", "cells": [[5, 13], [6, 13]], "to_map": "wilds", "to_spawn": "from_tavern", "spawn": "from_wilds"},
+	"floors": [
+		{
+			"level": "umbrage_tavern",
+			"name": "The Last Light Mughouse",
+			"size": [18, 14],
+			"ambient": 0.25,
+			"rooms": [
+				{"id": "common", "use": "common", "name": "Common room", "rect": [0, 0, 12, 14],
+					"hearth": [0, 6], "counter": [[9, 1], [10, 1]],
+					"tables": [[2, 3], [7, 3], [2, 8], [7, 8]]},
+				{"id": "kitchen", "use": "kitchen", "name": "Kitchen", "rect": [12, 0, 6, 6],
+					"doors": [{"to": "common", "cells": [[12, 2], [12, 3]], "side": "west"}],
+					"holds": [[16, 1], [16, 4]]},
+				{"id": "keeper", "use": "keeper", "name": "Keeper's room", "rect": [12, 6, 6, 4],
+					"doors": [{"to": "common", "cells": [[12, 7], [12, 8]], "side": "west"}],
+					"beds": [[17, 7]]},
+				{"id": "stair_ground", "use": "stair", "rect": [12, 10, 6, 4],
+					"doors": [{"to": "common", "cells": [[12, 11], [12, 12]], "side": "west"}]}
+			],
+			"stairs": [
+				{"cells": [[15, 13], [16, 13]], "to": "umbrage_tavern_up", "spawns": [[15, 12], [16, 12]], "way": "up"}
+			]
+		},
+		{
+			"level": "umbrage_tavern_up",
+			"name": "The Mughouse, upstairs",
+			"size": [18, 14],
+			"ambient": 0.15,
+			"rooms": [
+				{"id": "hall_up", "use": "hall", "rect": [0, 6, 18, 2]},
+				{"id": "room_1", "use": "room", "name": "Hired room", "rect": [0, 0, 6, 6],
+					"doors": [{"to": "hall_up", "cells": [[2, 5], [3, 5]], "side": "south"}], "beds": [[1, 0]]},
+				{"id": "room_2", "use": "room", "name": "Hired room", "rect": [6, 0, 6, 6],
+					"doors": [{"to": "hall_up", "cells": [[8, 5], [9, 5]], "side": "south"}], "beds": [[7, 0]]},
+				{"id": "room_3", "use": "room", "name": "Hired room", "rect": [12, 0, 6, 6],
+					"doors": [{"to": "hall_up", "cells": [[14, 5], [15, 5]], "side": "south"}], "beds": [[16, 0]]},
+				{"id": "room_4", "use": "room", "name": "Hired room", "rect": [0, 8, 6, 6],
+					"doors": [{"to": "hall_up", "cells": [[2, 8], [3, 8]], "side": "north"}], "beds": [[1, 13]]},
+				{"id": "room_5", "use": "room", "name": "Hired room", "rect": [6, 8, 6, 6],
+					"doors": [{"to": "hall_up", "cells": [[8, 8], [9, 8]], "side": "north"}], "beds": [[7, 13]]},
+				{"id": "stair_up", "use": "stair", "rect": [12, 8, 6, 6],
+					"doors": [{"to": "hall_up", "cells": [[13, 8], [14, 8]], "side": "north"}]}
+			],
+			"stairs": [
+				{"cells": [[15, 13], [16, 13]], "to": "umbrage_tavern", "spawns": [[15, 12], [16, 12]], "way": "down"},
+				{"cells": [[16, 9], [17, 9]], "to": "umbrage_tavern_attic", "spawns": [[16, 10], [17, 10]], "way": "up"}
+			]
+		},
+		{
+			"level": "umbrage_tavern_attic",
+			"name": "The Mughouse attic",
+			"size": [18, 8],
+			"ambient": 0.05,
+			"rooms": [
+				{"id": "attic", "use": "attic", "name": "Attic", "rect": [0, 0, 18, 8],
+					"holds": [[1, 1], [2, 1], [1, 6], [9, 3]]}
+			],
+			"stairs": [
+				{"cells": [[16, 0], [17, 0]], "to": "umbrage_tavern_up", "spawns": [[16, 1], [17, 1]], "way": "down"}
+			]
+		}
+	]
+}

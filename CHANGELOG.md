@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage: the inn is the Last Light Mughouse now, and you can walk in: a common room with a hearth and the taverner's counter, a kitchen and the keeper's room, and up the stair five hired rooms and an attic of stores (811).
 - The forest's camp traders sell to you, and the one the bandits hold captive gives a gift and a better price to whoever clears his captors off (799).
 - With the low camera, the forest past the map's edge runs on as one far ridge: no more grey slabs floating over the horizon or a pink strip under them, seen from the wilds' south-east corner (623 amended (4)).
 - The haze over the land is gone: the countryside is clear to the horizon and far sights like the castle stand out on the skyline, while fog and rain still close in (623 amended (3)).

@@ -1,0 +1,102 @@
+{
+	"name": "The Mughouse attic",
+	"outdoor": false,
+	"town": "wilds/store",
+	"building": "umbrage_tavern",
+	"storeys": [
+		"umbrage_tavern",
+		"umbrage_tavern_up",
+		"umbrage_tavern_attic"
+	],
+	"ambient": 0.05,
+	"walls": "wood",
+	"floors": "wood",
+	"starts": [
+		[
+			16,
+			1
+		]
+	],
+	"spawn_points": {
+		"from_umbrage_tavern_up_0": [
+			16,
+			1
+		],
+		"from_umbrage_tavern_up_1": [
+			17,
+			1
+		]
+	},
+	"links": [
+		{
+			"at": [
+				16,
+				0
+			],
+			"to_map": "umbrage_tavern_up",
+			"to_spawn": "from_umbrage_tavern_attic_0",
+			"cue": "down"
+		},
+		{
+			"at": [
+				17,
+				0
+			],
+			"to_map": "umbrage_tavern_up",
+			"to_spawn": "from_umbrage_tavern_attic_1",
+			"cue": "down"
+		}
+	],
+	"buildings": [],
+	"decor": [
+		[
+			1,
+			1,
+			0,
+			1,
+			"crate",
+			1
+		],
+		[
+			2,
+			1,
+			0,
+			1,
+			"barrel",
+			1
+		],
+		[
+			1,
+			6,
+			0,
+			1,
+			"sack",
+			1
+		],
+		[
+			9,
+			3,
+			0,
+			1,
+			"crate",
+			1
+		]
+	],
+	"places": {},
+	"beds": [],
+	"rooms": {
+		"attic": {
+			"id": "attic",
+			"use": "attic",
+			"rect": [
+				0,
+				0,
+				18,
+				8
+			],
+			"doors": [],
+			"name": "Attic"
+		}
+	},
+	"passages": {}
+}

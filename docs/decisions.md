@@ -42680,3 +42680,62 @@ camp_captive(camp) is {}, the captive's hold being npc's ("camp_holds"). His wor
 camp_traders.say (voice's). The economy saves "camp_traders" {camp: {stock, purse, restocked}}; for
 release's journal (counts only, no ids), a load holding any prints "[economy] loaded N camp
 traders". economy_test _test_camp_traders. Server only; protocol unchanged, no new class_name.
+## 811. Umbrage's tavern as its own zone: the Last Light Mughouse
+
+The tavern zone (2026-11-05, buildings; the coordinator's approved design,
+C:/dev/review/umbrage_b/tavern_zone_design.md, and its amendment, Jeff: "probably, and allows multi
+floors, attics, rooms etc"; Jeff named it "the Last Light Mughouse", the locals "the Mughouse";
+voice's words; release's number). Umbrage's inn is a shell in the wilds, and its inside is levels of
+its own, a level per floor, joined by two-cell stairs: travel, saving, light, sound and talk per
+zone, with no new engine work. Its landing waits on the stair's pause (perf's 660 amended (7) bench,
+under 300 ms, the coordinator's gate) and lands in one push under npc's 772 amended (2), which hands
+the inn's folk through its door, so the inn is never shut with nobody to go in.
+
+- **tools/make_interior.py** lays a building's floors from levels/interiors/<building>.json, a
+  room by rect, use (common, kitchen, cellar, room, keeper, attic, hall, stair), doors, a name for
+  the named, and what it holds. Nothing is written unless the spec makes sense (dungeon's
+  layout-sense rules, the coordinator): two-cell doors and stairs, each stair with a stair back as
+  wide, every door into the room it names, a hall joining two rooms or more, no dead end holding
+  nothing, every room reached from the front door, every bed against a wall. It writes each
+  floor's layout.png (imported as an Image), level.json (rooms and passages, 665/806; the stair
+  links with an "up" or "down" cue; "town", "building", "storeys", "beds"; the tavern place; the
+  tables as building.round_table) and the stores a room holds as decor crates, barrels and sacks:
+  never a chest (Jeff: chests are for dungeons; nothing openable that gives nothing).
+- **levels/umbrage_tavern** (The Last Light Mughouse, 18 x 14): the common room with its hearth,
+  four tables and eight seats and the taverner's counter; the kitchen; the keeper's room and bed;
+  the stairwell. **umbrage_tavern_up** (The Mughouse, upstairs): five hired rooms of a bed each off
+  a hall, and the stair on up. **umbrage_tavern_attic** (The Mughouse attic): stores. Rooms are
+  said as labels (voice): Common room, Kitchen, Keeper's room, Hired room, Attic.
+- **Level**: level.json "town" (a full town id) keys an interior's places as that town's, so
+  Level.tavern_of(umbrage_tavern) is {"wilds/store": ...} (the place named "the Mughouse");
+  "storeys" names the building's floors and "beds" ([x, y, dx, dy]) its beds, and
+  Level.storeys_of(level) gives the floors and every floor's beds, each with its level. A building
+  entry's "level_links" is a list of 715's level_link, each laid alike (the two-cell way in; the
+  crypt's stair will use it too). A building's "inside" names the level it is a shell of: Level.beds_in
+  gives it none, and its links carry "stands" {town id, use}, so Main.shell_stands closes the way
+  ("The way on is closed.") while the town's building of that use isn't standing (a ruined inn).
+  DECOR_KINDS gains crate, barrel and sack (flat, faced; art-kit's prop.<kind>; drawn, never solid,
+  so stood against walls).
+- **The wilds**: the inn (170,205) is the shell, "inside": "umbrage_tavern", its two links at
+  (178,208) and (178,209), just inside its door, to umbrage_tavern's "from_wilds"; the way out
+  arrives at "from_tavern" (181,208). Its "tavern" place moves inside; the economy's inn record still
+  reads the shell (use "inn", town "store", the same rect), so seeding, the bed fee, repair and
+  decline are unchanged (economy).
+- **On the box** (release's two points): a link's cell holds no body but a player's (571), so
+  nobody walks into the shell past its way in. Relaid.SHELLS and Relaid.shell carry what was saved
+  in its footprint out once at Main._boot, after the re-lay: saved entities and ground piles to the
+  nearest floor outside it (a pile's item-book place following), a player saved there likewise,
+  their companion beside them. No chest stands in the inn and residents' bodies are never saved, so
+  this is the players' own dropped things and logged-out players. It is marked done under
+  "relaid/wilds/811" (Relaid.done_key_of, maps' 807 shape), beside 774's "relaid/wilds"; a level
+  loading with no shell (an overlay copy) waits, said once a boot. Boot lines to grep: "[level]
+  shelled wilds (811): N saved entities, N ground piles and N players moved out of the shell at
+  (170, 205), N left where they were (no floor near)" (0 left is right), or "[level] wilds not
+  shelled (811)"; and the new zones' own "[level] umbrage_tavern: N cells, ..." lines as each is
+  first loaded (umbrage_tavern, umbrage_tavern_up, umbrage_tavern_attic).
+- Tests: level_test _test_tavern_zone (three floors parse clean, Umbrage's, their storeys; the
+  shell's two links, its stands, no beds; every link lands on a spawn on its far side; every floor
+  cell reached; the tavern's counter, eight seats and hearth; six beds across floors; the stores as
+  decor), _test_shelled (a pile, an entity and a player inside the inn carried out once, the item
+  book following; an overlay copy waits; the next boot moves nothing) and _test_town_places (the
+  inn a shell); view_test _test_tavern_inside reads the inn by its use. Server and level data.

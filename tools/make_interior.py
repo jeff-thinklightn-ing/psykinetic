@@ -1,0 +1,318 @@
+"""Lays a building's inside as levels, a level per floor, from its spec
+(levels/interiors/<building>.json; the tavern design's amendment, Jeff:
+"probably, and allows multi floors, attics, rooms etc").
+
+A spec names the building, its town, its wall and floor sets, its front door
+(the floor and cells the street's link arrives on, and where they lead back
+out) and its floors. A floor has a level name, a size, an ambient light, its
+rooms and its stairs:
+
+- a room: an id, a use (USES), a rect; its doors, each the cells inside the
+  room it opens from, the side it opens on and the room it leads "to"; a name
+  if it is said mid-screen (Level.rooms_from; a hall or stair has none); what
+  it holds ("beds", "holds" (stores drawn as decor: crates, barrels,
+  sacks, with no hover and no click, since nothing openable gives nothing,
+  Jeff), "hearth", "counter", "tables").
+  Never a chest: chests are for dungeons only (Jeff, 2026-11-04). A
+  player's storage at home is its own container piece (a strongbox,
+  wardrobe or vault), and the locker is opened through a person.
+- a stair: two cells side by side (the two-cell passages rule), the floor it
+  reaches, the two cells beside it one arrives on from there, and its way
+  ("up" or "down"). Each cell is a link to the matching arrival on the other
+  floor, whose stair back must be as wide.
+
+Every spec must make sense (the coordinator, 2026-11-04, with dungeon's
+layout-sense rules) or nothing is written: every door leads into the room it
+names, every room has a use, a hall joins two rooms or more, a room with one
+way in holds something (a stair room holds its stair), and every room of
+every floor is reached from the front door.
+
+Run from the checkout: python -B tools/make_interior.py <building> [...]
+(no name: every spec under levels/interiors).
+"""
+import json
+import os
+import sys
+
+from PIL import Image
+
+SPECS = os.path.join("levels", "interiors")
+USES = ["common", "kitchen", "cellar", "room", "keeper", "attic", "hall", "stair"]
+COLOURS = {
+    "void": (0, 0, 0),
+    "stone": (0x9A, 0x9A, 0x9A),
+    "fire": (0xFF, 0x6A, 0x00),
+    "wall": (0x3C, 0x2A, 0x22),
+    "door": (0xC8, 0x8A, 0x3C),
+    "start": (0x00, 0xFF, 0xFF),
+    "link": (0xFF, 0x00, 0xFF),
+}
+SIDES = {"north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)}
+HOLDING = ["beds", "holds", "hearth", "counter", "tables"]
+# The stores a room's "holds" are drawn as, in turn (art-kit's prop.<kind>).
+STORES = ["crate", "barrel", "sack"]
+# A building.round_table's footprint (Level's slot sizes: 3 x 3, solid).
+TABLE = 3
+# Godot imports a level's layout as an Image (Level._image), never a texture.
+IMPORT = '[remap]\n\nimporter="image"\ntype="Image"\n'
+
+
+class SpecError(Exception):
+    pass
+
+
+def cells_of(rect):
+    x0, y0, w, h = rect
+    return [(x, y) for y in range(y0, y0 + h) for x in range(x0, x0 + w)]
+
+
+def bed_way(rect, cell):
+    """The way a bed at [cell] lies with its head to the room's wall: the
+    first of north, west, east, south whose step leaves the room while the
+    cell behind (its foot) is inside it."""
+    x0, y0, w, h = rect
+    inside = lambda c: x0 <= c[0] < x0 + w and y0 <= c[1] < y0 + h
+    for dx, dy in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+        if not inside((cell[0] + dx, cell[1] + dy)) and inside((cell[0] - dx, cell[1] - dy)):
+            return (dx, dy)
+    raise SpecError("the bed at %s is against no wall" % (cell,))
+
+
+def spawn_name(from_level, index):
+    return "from_%s_%d" % (from_level, index)
+
+
+def check(spec):
+    """The spec's faults, as lines; empty when it makes sense."""
+    faults = []
+    floors = {f["level"]: f for f in spec["floors"]}
+    owner = {}  # (level, cell) -> room id
+    for floor in spec["floors"]:
+        level = floor["level"]
+        w, h = floor["size"]
+        for room in floor["rooms"]:
+            if room.get("use") not in USES:
+                faults.append("%s/%s: use %r is none of %s" % (level, room["id"], room.get("use"), USES))
+            for cell in cells_of(room["rect"]):
+                if not (0 <= cell[0] < w and 0 <= cell[1] < h):
+                    faults.append("%s/%s: %s is off the floor" % (level, room["id"], cell))
+                elif (level, cell) in owner:
+                    faults.append("%s/%s: %s is %s's too" % (level, room["id"], cell, owner[(level, cell)]))
+                else:
+                    owner[(level, cell)] = room["id"]
+    # Doors: each cell inside its room, the cell across its side inside "to".
+    ways = {}  # (level, room) -> set of rooms or floors it opens to
+    for floor in spec["floors"]:
+        level = floor["level"]
+        for room in floor["rooms"]:
+            for door in room.get("doors", []):
+                if len(door["cells"]) < 2:
+                    faults.append("%s/%s: a door one cell wide (two-cell passages)" % (level, room["id"]))
+                dx, dy = SIDES[door["side"]]
+                for cell in door["cells"]:
+                    cell = tuple(cell)
+                    if owner.get((level, cell)) != room["id"]:
+                        faults.append("%s/%s: door cell %s is not in the room" % (level, room["id"], cell))
+                    across = (cell[0] + dx, cell[1] + dy)
+                    if owner.get((level, across)) != door["to"]:
+                        faults.append("%s/%s: the door at %s opens onto %s, not %s"
+                                      % (level, room["id"], cell, owner.get((level, across)), door["to"]))
+                ways.setdefault((level, room["id"]), set()).add(door["to"])
+                ways.setdefault((level, door["to"]), set()).add(room["id"])
+    # Stairs: two cells in a room, a stair back as wide on the floor reached.
+    for floor in spec["floors"]:
+        level = floor["level"]
+        for stair in floor.get("stairs", []):
+            if len(stair["cells"]) != 2 or len(stair["spawns"]) != 2:
+                faults.append("%s: a stair to %s is not two cells with two arrivals" % (level, stair["to"]))
+                continue
+            rooms = {owner.get((level, tuple(c))) for c in stair["cells"] + stair["spawns"]}
+            if None in rooms or len(rooms) != 1:
+                faults.append("%s: the stair to %s is not inside one room (%s)" % (level, stair["to"], rooms))
+            other = floors.get(stair["to"])
+            back = [s for s in (other or {}).get("stairs", []) if s["to"] == level]
+            if len(back) != 1:
+                faults.append("%s: the stair to %s has %d stairs back" % (level, stair["to"], len(back)))
+            room = owner.get((level, tuple(stair["cells"][0])))
+            ways.setdefault((level, room), set()).add("floor:" + stair["to"])
+    # A hall joins two rooms or more; a room with one way in holds something.
+    for floor in spec["floors"]:
+        level = floor["level"]
+        for room in floor["rooms"]:
+            opens = ways.get((level, room["id"]), set())
+            if room["use"] == "hall" and len([o for o in opens if not o.startswith("floor:")]) < 2:
+                faults.append("%s/%s: a hall joining %d rooms" % (level, room["id"], len(opens)))
+            for cell in room.get("beds", []):
+                try:
+                    bed_way(room["rect"], cell)
+                except SpecError as e:
+                    faults.append("%s/%s: %s" % (level, room["id"], e))
+            holds = any(room.get(key) for key in HOLDING) or any(o.startswith("floor:") for o in opens)
+            if len(opens) <= 1 and not holds and room["use"] not in ("common",):
+                faults.append("%s/%s: a dead end holding nothing" % (level, room["id"]))
+    # Every room reached from the front door.
+    front = spec["front"]
+    start = (front["floor"], owner.get((front["floor"], tuple(front["cells"][0]))))
+    seen = {start}
+    todo = [start]
+    while todo:
+        level, room = todo.pop()
+        for to in ways.get((level, room), set()):
+            if to.startswith("floor:"):
+                target = to[len("floor:"):]
+                for stair in floors[target].get("stairs", []):
+                    if stair["to"] == level:
+                        nxt = (target, owner.get((target, tuple(stair["cells"][0]))))
+                        if nxt not in seen:
+                            seen.add(nxt)
+                            todo.append(nxt)
+            elif (level, to) not in seen:
+                seen.add((level, to))
+                todo.append((level, to))
+    for floor in spec["floors"]:
+        for room in floor["rooms"]:
+            if (floor["level"], room["id"]) not in seen:
+                faults.append("%s/%s: not reached from the front door" % (floor["level"], room["id"]))
+    return faults
+
+
+def lay(spec, floor):
+    level = floor["level"]
+    w, h = floor["size"]
+    room_of = {}
+    for room in floor["rooms"]:
+        for cell in cells_of(room["rect"]):
+            room_of[cell] = room["id"]
+    markers = {}
+    links = []
+    spawns = {}
+    starts = []
+    front = spec["front"]
+    if front["floor"] == level:
+        for cell in front["cells"]:
+            markers[tuple(cell)] = "link"
+            links.append({"at": list(cell), "to_map": front["to_map"], "to_spawn": front["to_spawn"]})
+        # One arrives from the street a cell inside the door.
+        inside = [front["cells"][0][0], front["cells"][0][1] - 1]
+        spawns[front["spawn"]] = inside
+        starts.append(inside)
+    for stair in floor.get("stairs", []):
+        for index, cell in enumerate(stair["cells"]):
+            markers[tuple(cell)] = "link"
+            links.append({"at": list(cell), "to_map": stair["to"], "to_spawn": spawn_name(level, index), "cue": stair["way"]})
+        for index, cell in enumerate(stair["spawns"]):
+            spawns[spawn_name(stair["to"], index)] = list(cell)
+    buildings = []
+    decor = []
+    named = {}
+    passages = {}
+    places = {}
+    beds = []
+    for room in floor["rooms"]:
+        for cell in room.get("beds", []):
+            beds.append(list(cell) + list(bed_way(room["rect"], cell)))
+        if room["use"] == "common" and room.get("counter"):
+            # The tavern (772's keys, Level.tavern_of): the taverner at the
+            # counter's first cell, a seat each side of every table (a
+            # round_table is TABLE x TABLE cells, solid, from its cell).
+            seats = []
+            for x, y in room.get("tables", []):
+                seats += [[x - 1, y + TABLE // 2], [x + TABLE, y + TABLE // 2]]
+            places["tavern"] = {"at": list(room["counter"][0]), "kind": "tavern", "radius": 1, "name": spec.get("place_name", "the tavern"),
+                                "rect": room["rect"], "seats": seats}
+            if room.get("hearth"):
+                places["tavern"]["hearth"] = list(room["hearth"])
+        if room.get("hearth"):
+            markers[tuple(room["hearth"])] = "fire"
+        for index, cell in enumerate(room.get("holds", [])):
+            # Plain decor (Level.DECOR_KINDS, flat): never a Pushable crate.
+            decor.append([cell[0], cell[1], 0, 1, STORES[index % len(STORES)], 1])
+        for cell in room.get("tables", []):
+            buildings.append({"slot": "building.round_table", "at": list(cell)})
+        entry = {"id": room["id"], "use": room["use"], "rect": room["rect"],
+                 "doors": [{"to": d["to"], "cells": d["cells"], "side": d["side"]} for d in room.get("doors", [])]}
+        for key in ("beds", "counter", "hearth"):
+            if room.get(key):
+                entry[key] = room[key]
+        if room.get("name"):
+            entry["name"] = room["name"]
+            named[room["id"]] = entry
+        else:
+            passages[room["id"]] = entry
+    if not starts:
+        first = floor["stairs"][0]["spawns"][0]
+        starts.append(list(first))
+    doors = set()
+    for room in floor["rooms"]:
+        for door in room.get("doors", []):
+            dx, dy = SIDES[door["side"]]
+            for cell in door["cells"]:
+                doors.add(frozenset({tuple(cell), (cell[0] + dx, cell[1] + dy)}))
+
+    layout = Image.new("RGB", (w * 2 - 1, h * 2 - 1), COLOURS["void"])
+    for (x, y) in room_of:
+        layout.putpixel((2 * x, 2 * y), COLOURS[markers.get((x, y), "stone")])
+    for (x, y), room in room_of.items():
+        for nx, ny, px, py in ((x + 1, y, 2 * x + 1, 2 * y), (x, y + 1, 2 * x, 2 * y + 1)):
+            other = room_of.get((nx, ny))
+            if other is None:
+                continue
+            if frozenset({(x, y), (nx, ny)}) in doors:
+                layout.putpixel((px, py), COLOURS["door"])
+            elif other != room:
+                layout.putpixel((px, py), COLOURS["wall"])
+            elif (x, y) not in markers and (nx, ny) not in markers:
+                layout.putpixel((px, py), COLOURS["stone"])
+    out = os.path.join("levels", level)
+    os.makedirs(out, exist_ok=True)
+    layout.save(os.path.join(out, "layout.png"))
+    imported = os.path.join(out, "layout.png.import")
+    if not os.path.exists(imported) or 'importer="image"' not in open(imported, encoding="utf-8").read():
+        with open(imported, "w", encoding="utf-8", newline="\n") as f:
+            f.write(IMPORT)
+    config = {
+        "name": floor["name"],
+        "outdoor": False,
+        "town": spec["town"],
+        "building": spec["building"],
+        "storeys": [f["level"] for f in spec["floors"]],
+        "ambient": floor["ambient"],
+        "walls": spec["walls"],
+        "floors": spec["floors_set"],
+        "starts": starts,
+        "spawn_points": spawns,
+        "links": links,
+        "buildings": buildings,
+        "decor": decor,
+        "places": places,
+        "beds": beds,
+        "rooms": named,
+        "passages": passages,
+    }
+    with open(os.path.join(out, "level.json"), "w", encoding="utf-8", newline="\n") as f:
+        json.dump(config, f, indent="\t")
+        f.write("\n")
+    print("%s: %d cells, %d rooms, %d links" % (level, len(room_of), len(floor["rooms"]), len(links)))
+
+
+def main(names):
+    if not names:
+        names = sorted(n[:-5] for n in os.listdir(SPECS) if n.endswith(".json"))
+    failed = False
+    for name in names:
+        with open(os.path.join(SPECS, name + ".json"), encoding="utf-8") as f:
+            spec = json.load(f)
+        faults = check(spec)
+        if faults:
+            failed = True
+            print("%s makes no sense, nothing written:" % name)
+            for fault in faults:
+                print("  " + fault)
+            continue
+        for floor in spec["floors"]:
+            lay(spec, floor)
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://c5shtjltgn5rt"
+path="res://.godot/imported/layout.png-848ae3f4cbfcbbf2bca3cdf7d553b8c2.image"
+
+[deps]
+
+source_file="res://levels/umbrage_tavern/layout.png"
+dest_files=["res://.godot/imported/layout.png-848ae3f4cbfcbbf2bca3cdf7d553b8c2.image"]
+
+[params]
+

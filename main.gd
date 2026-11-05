@@ -4248,6 +4248,10 @@ func _boot() -> void:
 	# carried onto the new layout once, before anything below reads it.
 	for line: String in Relaid.move(snapshot, _remade, func(level: String) -> Dictionary: return Level.load_level(level)):
 		print(line)
+	# A building become a shell (Relaid.SHELLS, 811: the inn, its inside the
+	# Mughouse's levels): what was saved inside it carried out once.
+	for line: String in Relaid.shell(snapshot, _remade, func(level: String) -> Dictionary: return Level.load_level(level)):
+		print(line)
 	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
 	_healer_terms = snapshot.get("healer_terms", {}).duplicate(true) if snapshot.get("healer_terms") is Dictionary else {}
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
@@ -4916,6 +4920,18 @@ func _move_command(words: PackedStringArray) -> String:
 	return "moved %s to %s in %s%s" % [who, landed, zone_name, "" if landed == target else " (nearest walkable to %s)" % target]
 
 
+## Whether the building [param link] leads into stands (the tavern zone: an
+## inn's shell, its link's "stands" {town, use}): true for a link of no
+## shell, or with no town record to ask; a ruined or unbuilt inn's way in
+## is closed.
+func shell_stands(link: Dictionary) -> bool:
+	var stands: Variant = link.get("stands")
+	if not stands is Dictionary or World.towns == null:
+		return true
+	var building := World.towns.building(str(stands["town"]), str(stands["use"]))
+	return building.is_empty() or str(building.get("state", "")) == Towns.STANDING
+
+
 ## Whether [param link] (a level's, Level.parse) lets [param peer]'s player
 ## through (decision 540): a link not sealed does; a sealed one only when
 ## they or the companion with them hold its mark (party_has, decision 576). Their companion goes with them, as always.
@@ -5163,7 +5179,7 @@ const SEALED_LINES := {"barrow_deep": "The stair down is barred from below."}
 ## told it is closed or sealed; off any link, told again next time.
 func _take_link(entity: GridEntity, to: Vector2i) -> void:
 	for link: Dictionary in level.get("links", []):
-		if link["tile"] == to and link.get("closed", false):
+		if link["tile"] == to and (link.get("closed", false) or not shell_stands(link)):
 			# Shown, not travelled yet (decision 463): said once a stand.
 			if _told_closed.get(entity.owner_peer) != to:
 				_told_closed[entity.owner_peer] = to

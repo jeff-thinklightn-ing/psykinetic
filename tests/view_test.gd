@@ -2620,10 +2620,12 @@ func _test_tavern_inside() -> void:
 	print("\n== the wilds' tavern, walked into through its door: inside, its own bounds and roof (774) ==")
 	var wilds := Level.load_level("wilds")
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
-	var tavern: Dictionary = Level.tavern_of(wilds).get("wilds/store", {})
-	var rect: Rect2i = tavern.get("rect", Rect2i())
+	# The inn's shell (the tavern zone: its inside is umbrage_tavern, its way
+	# in two cells inside the door; the roof still eases off a player there).
+	var inns: Array = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool: return str(building.get("use", "")) == "inn")
+	var rect: Rect2i = inns[0]["rect"] if inns.size() == 1 else Rect2i()
 	var drawn: Array = _rig._buildings.filter(func(building: Dictionary) -> bool: return building.get("rect") == rect)
-	_check(rect.size == Vector2i(10, 8) and drawn.size() == 1, "the tavern drawn where its place says (%s, %d drawn)" % [rect, drawn.size()])
+	_check(rect.size == Vector2i(10, 8) and drawn.size() == 1, "the inn drawn where it stands (%s, %d drawn)" % [rect, drawn.size()])
 	if drawn.size() != 1:
 		return
 	var told: Array = []

@@ -48,6 +48,15 @@ const REMOVED: Array[Dictionary] = [
 		"5,7": {"to": "ground"},
 	}},
 ]
+
+
+## A building become a shell (decision 811: Umbrage's inn, its inside now
+## the Last Light Mughouse's own levels), level -> {decision, rect: [x, y,
+## w, h] its footprint}: what was saved inside it carried out once (shell).
+const SHELLS: Dictionary = {
+	"wilds": {"decision": 811, "rect": [170, 205, 10, 8]},
+}
+
 ## How far the nearest floor is looked for (cells).
 const FLOOR_REACH := 12
 
@@ -197,8 +206,70 @@ static func _lay(section: Dictionary, cell: Vector2i, ids: Array, uids: Array) -
 	section["ground"].append({"cell": cell, "ids": ids, "items": uids, "gold": 0})
 
 
-## The key a REMOVED entry is marked done under, in Main's saved "remade":
-## its level and decision, so each is done apart from the others.
+## Carries [param snapshot] out of each SHELLS building not yet in
+## [param done] (under done_key_of(level, decision)), and marks it done: a
+## shell's inside is walked into by no one now (its way in is a link, and
+## no body but a player stands on a link's cell), so the zone's saved
+## entities and ground piles in its footprint go to the nearest floor
+## outside it (a pile's item-book place following), and a player saved in
+## it stands there too, their companion beside them. A level that loads
+## with no shell there (an overlay copy) waits, said once a boot. Returns
+## one count-only line per level, for release to grep:
+## "[level] shelled <level> (<decision>): ...".
+static func shell(snapshot: Dictionary, done: Dictionary, level_of: Callable) -> Array[String]:
+	var lines: Array[String] = []
+	for level: String in SHELLS:
+		var plan: Dictionary = SHELLS[level]
+		var key := done_key_of(level, int(plan["decision"]))
+		if done.has(key):
+			continue
+		var rect := Rect2i(plan["rect"][0], plan["rect"][1], plan["rect"][2], plan["rect"][3])
+		var loaded: Dictionary = level_of.call(level)
+		var shelled := (loaded.get("buildings", []) as Array).any(func(building: Dictionary) -> bool:
+			return building.get("rect") == rect and not str(building.get("inside", "")).is_empty())
+		if not shelled:
+			lines.append("[level] %s not shelled (%d): it loads with no shell at %s (an overlay copy?); nothing moved, it waits" % [level, plan["decision"], rect.position])
+			continue
+		done[key] = int(plan["decision"])
+		if not snapshot.get("ok", false):
+			continue
+		var outside := {}
+		for cell: Vector2i in loaded.get("terrain", {}).get("floor", []):
+			if not rect.has_point(cell):
+				outside[cell] = true
+		var counts := {"entities": 0, "piles": 0, "players": 0, "kept": 0}
+		var zones: Dictionary = snapshot.get("zones", {}) if snapshot.get("zones") is Dictionary else {}
+		var section: Dictionary = zones.get(level, {}) if zones.get(level) is Dictionary else {}
+		var out_of := func(cell: Vector2i, what: String) -> Vector2i:
+			var to := nearest_floor(cell, outside)
+			counts[what if to != cell else "kept"] += 1
+			return to
+		for entry: Dictionary in section.get("entities", []):
+			var tile: Variant = _cell(entry["spec"].get("tile"))
+			if tile is Vector2i and rect.has_point(tile):
+				entry["spec"]["tile"] = out_of.call(tile, "entities")
+		var piles := {}
+		for pile: Dictionary in section.get("ground", []):
+			var cell: Variant = _cell(pile.get("cell"))
+			if cell is Vector2i and rect.has_point(cell):
+				var to: Vector2i = out_of.call(cell, "piles")
+				if to != cell:
+					piles["%s@%d,%d" % [level, cell.x, cell.y]] = "%s@%d,%d" % [level, to.x, to.y]
+					pile["cell"] = to
+		_rename_places(snapshot, piles, {"places": 0})
+		for record: PlayerRecord in snapshot.get("players", []):
+			if record.zone == level and rect.has_point(record.tile):
+				record.tile = out_of.call(record.tile, "players")
+				if not record.companion.is_empty():
+					record.companion["tile"] = null  # She comes back beside them.
+		lines.append("[level] shelled %s (%d): %d saved entities, %d ground piles and %d players moved out of the shell at %s, %d left where they were (no floor near)" % [
+			level, plan["decision"], counts["entities"], counts["piles"], counts["players"], rect.position, counts["kept"]])
+	return lines
+
+
+## The key a REMOVED entry or a SHELLS building is marked done under, in
+## Main's saved "remade": its level and decision, so each is done apart
+## from the others: "relaid/<level>/<decision>".
 static func done_key_of(level: String, decision: int) -> String:
 	return "relaid/%s/%d" % [level, decision]
 

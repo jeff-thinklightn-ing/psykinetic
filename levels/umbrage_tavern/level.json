@@ -1,0 +1,297 @@
+{
+	"name": "The Last Light Mughouse",
+	"outdoor": false,
+	"town": "wilds/store",
+	"building": "umbrage_tavern",
+	"storeys": [
+		"umbrage_tavern",
+		"umbrage_tavern_up",
+		"umbrage_tavern_attic"
+	],
+	"ambient": 0.25,
+	"walls": "wood",
+	"floors": "wood",
+	"starts": [
+		[
+			5,
+			12
+		]
+	],
+	"spawn_points": {
+		"from_wilds": [
+			5,
+			12
+		],
+		"from_umbrage_tavern_up_0": [
+			15,
+			12
+		],
+		"from_umbrage_tavern_up_1": [
+			16,
+			12
+		]
+	},
+	"links": [
+		{
+			"at": [
+				5,
+				13
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_tavern"
+		},
+		{
+			"at": [
+				6,
+				13
+			],
+			"to_map": "wilds",
+			"to_spawn": "from_tavern"
+		},
+		{
+			"at": [
+				15,
+				13
+			],
+			"to_map": "umbrage_tavern_up",
+			"to_spawn": "from_umbrage_tavern_0",
+			"cue": "up"
+		},
+		{
+			"at": [
+				16,
+				13
+			],
+			"to_map": "umbrage_tavern_up",
+			"to_spawn": "from_umbrage_tavern_1",
+			"cue": "up"
+		}
+	],
+	"buildings": [
+		{
+			"slot": "building.round_table",
+			"at": [
+				2,
+				3
+			]
+		},
+		{
+			"slot": "building.round_table",
+			"at": [
+				7,
+				3
+			]
+		},
+		{
+			"slot": "building.round_table",
+			"at": [
+				2,
+				8
+			]
+		},
+		{
+			"slot": "building.round_table",
+			"at": [
+				7,
+				8
+			]
+		}
+	],
+	"decor": [
+		[
+			16,
+			1,
+			0,
+			1,
+			"crate",
+			1
+		],
+		[
+			16,
+			4,
+			0,
+			1,
+			"barrel",
+			1
+		]
+	],
+	"places": {
+		"tavern": {
+			"at": [
+				9,
+				1
+			],
+			"kind": "tavern",
+			"radius": 1,
+			"name": "the Mughouse",
+			"rect": [
+				0,
+				0,
+				12,
+				14
+			],
+			"seats": [
+				[
+					1,
+					4
+				],
+				[
+					5,
+					4
+				],
+				[
+					6,
+					4
+				],
+				[
+					10,
+					4
+				],
+				[
+					1,
+					9
+				],
+				[
+					5,
+					9
+				],
+				[
+					6,
+					9
+				],
+				[
+					10,
+					9
+				]
+			],
+			"hearth": [
+				0,
+				6
+			]
+		}
+	},
+	"beds": [
+		[
+			17,
+			7,
+			1,
+			0
+		]
+	],
+	"rooms": {
+		"common": {
+			"id": "common",
+			"use": "common",
+			"rect": [
+				0,
+				0,
+				12,
+				14
+			],
+			"doors": [],
+			"counter": [
+				[
+					9,
+					1
+				],
+				[
+					10,
+					1
+				]
+			],
+			"hearth": [
+				0,
+				6
+			],
+			"name": "Common room"
+		},
+		"kitchen": {
+			"id": "kitchen",
+			"use": "kitchen",
+			"rect": [
+				12,
+				0,
+				6,
+				6
+			],
+			"doors": [
+				{
+					"to": "common",
+					"cells": [
+						[
+							12,
+							2
+						],
+						[
+							12,
+							3
+						]
+					],
+					"side": "west"
+				}
+			],
+			"name": "Kitchen"
+		},
+		"keeper": {
+			"id": "keeper",
+			"use": "keeper",
+			"rect": [
+				12,
+				6,
+				6,
+				4
+			],
+			"doors": [
+				{
+					"to": "common",
+					"cells": [
+						[
+							12,
+							7
+						],
+						[
+							12,
+							8
+						]
+					],
+					"side": "west"
+				}
+			],
+			"beds": [
+				[
+					17,
+					7
+				]
+			],
+			"name": "Keeper's room"
+		}
+	},
+	"passages": {
+		"stair_ground": {
+			"id": "stair_ground",
+			"use": "stair",
+			"rect": [
+				12,
+				10,
+				6,
+				4
+			],
+			"doors": [
+				{
+					"to": "common",
+					"cells": [
+						[
+							12,
+							11
+						],
+						[
+							12,
+							12
+						]
+					],
+					"side": "west"
+				}
+			]
+		}
+	}
+}

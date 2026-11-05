@@ -27,6 +27,10 @@
 		]
 	],
 	"spawn_points": {
+		"from_tavern": [
+			181,
+			208
+		],
 		"from_foothills": [
 			128.0,
 			22.0
@@ -580,7 +584,12 @@
 				0
 			],
 			"use": "inn",
-			"town": "store"
+			"town": "store",
+			"inside": "umbrage_tavern",
+			"level_links": [
+				{"cell": [3, 8], "to_map": "umbrage_tavern", "to_spawn": "from_wilds"},
+				{"cell": [4, 8], "to_map": "umbrage_tavern", "to_spawn": "from_wilds"}
+			]
 		}
 	],
 	"became": {
@@ -664,54 +673,6 @@
 			"holder": "nobody",
 			"radius": 3,
 			"name": "the Reed Pond"
-		},
-		"tavern": {
-			"at": [
-				178,
-				206
-			],
-			"kind": "tavern",
-			"town": "store",
-			"radius": 1,
-			"worth": 0,
-			"holder": "town",
-			"name": "the tavern",
-			"rect": [
-				170,
-				205,
-				10,
-				8
-			],
-			"seats": [
-				[
-					174,
-					207
-				],
-				[
-					176,
-					206
-				],
-				[
-					174,
-					210
-				],
-				[
-					176,
-					211
-				],
-				[
-					177,
-					206
-				],
-				[
-					177,
-					211
-				]
-			],
-			"hearth": [
-				178,
-				211
-			]
 		},
 		"square_fire": {
 			"at": [
