@@ -41099,6 +41099,17 @@ keeps the last sheet and shows its why as a line. Away from the store nothing st
 the pack's clicks are the store's again. ui_test _test_town_window. No bullet beyond economy's
 (it says the window). Client only; no new class_name (TownSheet is 624's).
 
+790 amended (release's label): the two chiefs' trophies (dungeon's phase B, enemy-ai's named
+rows), each a stock tool made better, so a trophy only adds (Jeff's bonus rule). rot_hammer,
+"Chief's pick-hammer", the orc brute's: the pick (3.5 kg, force 1.5) made heavy, 6 kg, two hands,
+knockback force 2.6, speed 1.9, damage 1.5, wind-up 4, under Brand's tomb sledge (9 kg, 4.5); the
+gain is its mass. rot_spike, "Chief's spike", the kobold sneak's: the dagger's backstab at 2.4 from
+behind (the dagger's 2.0), 0.4 kg, one hand, speed 0.55, damage 0.55. Values 14 and 10, tags
+weapon and trophy, no "made", so they stay rare. Lore's facts (Hollowfell dug for iron, the
+hammer left by the town's miners when the mine was lost; the chiefs the Blood Rot's allies, not
+Blood Rot), voice's words. Named for their chiefs (lore's lean, Grull and Skeech) once Jeff
+agrees the names. items_test; art slots regenerated for art-kit.
+
 ## 787. The character sheet: the hands and the armour off the pack
 
 Jeff (2026-11-03): "create a character inventory sheet and move hands and armor there". The
