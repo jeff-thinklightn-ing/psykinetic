@@ -1704,11 +1704,48 @@ func _test_bear_party() -> void:
 	var three := bear.max_hp
 	World.damage(bear, 1, hunters[3])
 	World.damage(bear, 1, near)
-	_check(two == roundi(base * 1.6) and three == roundi(base * 2.2) and bear.max_hp == three and bear.party_size == 3,
-			"each who strikes it joins its fight: %d, %d, then %d for a fourth and a second blow (3 at most; hp_per_player 0.6)" % [two, three, bear.max_hp])
+	var per := float(bear.party["hp_per_player"])
+	_check(two == roundi(base * (1.0 + per)) and three == roundi(base * (1.0 + 2.0 * per)) and bear.max_hp == three and bear.party_size == 3,
+			"each who strikes it joins its fight: %d, %d, then %d for a fourth and a second blow (3 at most; hp_per_player %s)" % [two, three, bear.max_hp, per])
 	_check(absf(float(bear.hp) / float(bear.max_hp) - share) < 0.05, "its hp kept in the same share as it grows (%d/%d)" % [bear.hp, bear.max_hp])
 	bear._sleep()
 	_check(bear.party_size == 1 and bear.max_hp == base and bear.hp <= base, "asleep: its base again (%d/%d)" % [bear.hp, bear.max_hp])
+	# 780 amended (10): a companion who joins counts companion_share of a player; party_size stays the players.
+	bear.asleep = false
+	var cshare := float(bear.party["companion_share"])
+	var kin := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "BearKin",
+		"props": {"max_hp": 10}}) as Companion
+	_room.add_child(kin)
+	World.spawn(kin, Vector2i(6, 5))
+	World.damage(bear, 1, near)
+	World.damage(bear, 1, kin)
+	World.damage(bear, 1, kin)
+	_check(cshare == 0.75 and bear.party_size == 1 and bear.companions == 1 and bear.max_hp == roundi(base * (1.0 + per * cshare)),
+			"a player and a companion in its fight: party %d, companions %d, %d hp (companion_share %s)" % [bear.party_size, bear.companions, bear.max_hp, cshare])
+	World.damage(bear, 1, hunters[1])
+	_check(bear.party_size == 2 and bear.companions == 1 and bear.max_hp == roundi(base * (1.0 + per * (1.0 + cshare))),
+			"a second player: party 2, the companion still counted (%d hp)" % bear.max_hp)
+	bear._sleep()
+	_check(bear.party_size == 1 and bear.companions == 0 and bear.max_hp == base, "asleep: companions forgotten too (%d)" % bear.max_hp)
+	World.despawn(kin)
+	# playtest's bear14E: one who leaves and comes back (a new body, the same player_id) is still one.
+	bear.asleep = false
+	var first := EntityFactory.build(SPECS["P"].merged({"name": "PartyBack"})) as GridEntity
+	(first as Player).player_id = "party_back"
+	_room.add_child(first)
+	World.spawn(first, Vector2i(12, 5))
+	World.damage(bear, 1, first)
+	World.despawn(first)
+	var again := EntityFactory.build(SPECS["P"].merged({"name": "PartyBack2"})) as GridEntity
+	(again as Player).player_id = "party_back"
+	_room.add_child(again)
+	World.spawn(again, Vector2i(12, 5))
+	World.damage(bear, 1, again)
+	_check(bear.party_size == 1 and bear.max_hp == base, "one who comes back is the same one: party %d (%d hp)" % [bear.party_size, bear.max_hp])
+	World.damage(bear, 1, hunters[1])
+	_check(bear.party_size == 2, "a second player still joins: party %d" % bear.party_size)
+	bear._sleep()
+	World.despawn(again)
 	Monster.idling = true
 
 

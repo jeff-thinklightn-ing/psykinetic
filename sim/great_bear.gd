@@ -39,10 +39,13 @@ extends Animal
 ##
 ## Its party (780 amended (8), combat's draft, the coordinator's ruling):
 ## the players who join its fight, once they strike it, are struck by it or
-## are a tell's target (companions never count), PARTY "most" at most. Its
-## hp grows by "hp_per_player" of its base for each past the first, its hp
+## are a tell's target, PARTY "most" at most. Its hp grows by
+## "hp_per_player" of its base for each past the first, its hp
 ## kept in the same share; each newcomer raises it once, none leaving lowers
 ## it; asleep, it is its base again. Combat's flank guard reads party_size.
+## Companions who join the same way count too (780 amended (10), the
+## coordinator's ruling): "companion_share" of a player each, "most" at most;
+## party_size stays the players alone (the flank guard is player-only).
 ##
 ## Read from afar (780 amended (2)): its roar is told to players
 ## out of sight within ROAR_REACH (World.far_cry: sound's "far_cry"), and it
@@ -73,7 +76,7 @@ const SLAM := {"windup": 12, "length": 1.5, "damage": 9, "impulse": 100.0, "down
 const CHARGE := {"roar": 8, "cells": 6, "from": 3, "damage": 8, "impulse": 140.0, "every": 80}
 ## The moves as this bear has them: the defaults with its row's "moves" over them.
 ## Its party's numbers, the defaults under the row's "party" block.
-const PARTY := {"hp_per_player": 0.0, "most": 3}
+const PARTY := {"hp_per_player": 0.0, "companion_share": 0.0, "most": 3}
 var swipe := SWIPE.duplicate()
 var slam := SLAM.duplicate()
 var charge := CHARGE.duplicate()
@@ -103,11 +106,16 @@ var _strides := 0
 var _winded_at := -1
 ## The players it is fighting on its ground (780 amended (8)); 1 out of a fight.
 var party_size := 1
+## The companions in its fight (780 amended (10)); 0 out of a fight.
+var companions := 0
 var party := PARTY.duplicate()
 ## Its max_hp for one player (its row's).
 var _base_hp := 0
-## The players who joined its fight: instance id -> true.
-var _joined: Dictionary[int, bool] = {}
+## The players who joined its fight: player_id (else the body's instance id)
+## -> the body's instance id.
+var _joined: Dictionary[String, int] = {}
+## The companions who joined its fight: instance id -> instance id.
+var _joined_companions: Dictionary[String, int] = {}
 
 
 func _ready() -> void:
@@ -133,6 +141,7 @@ func _sim_tick() -> void:
 	if not _hooked:
 		_hooked = true
 		World.rush_ended.connect(_on_rush_ended)
+		World.entity_died.connect(_on_died)
 	if den == NO_TILE:
 		den = tile
 	_track()
@@ -169,26 +178,46 @@ func _sim_tick() -> void:
 
 
 ## [param entity] joins its fight (a player striking it, struck by it, or a
-## tell's target): its party grows by one, PARTY "most" at most.
+## tell's target): its party grows by one, PARTY "most" at most; a
+## companion the same, in its own count (780 amended (10)).
 func _join(entity: GridEntity) -> void:
-	if not entity is Player or not is_instance_valid(entity) or entity.hp <= 0:
+	if not is_instance_valid(entity) or entity.hp <= 0:
 		return
-	var id := entity.get_instance_id()
-	if _joined.has(id) or _joined.size() >= maxi(1, int(party["most"])):
+	var into: Dictionary[String, int]
+	var key := str(entity.get_instance_id())
+	if entity is Player:
+		into = _joined
+		if (entity as Player).player_id != "":
+			key = (entity as Player).player_id  # One who comes back (a new body) is the same one.
+	elif entity is Companion:
+		into = _joined_companions
+	else:
 		return
-	_joined[id] = true
-	_set_party(_joined.size())
+	for each: String in into.keys():
+		var body := instance_from_id(into[each]) as GridEntity
+		if body == null or not body.spawned:
+			into.erase(each)  # Gone from the land: a newcomer takes its place, not one beside it.
+	if into.has(key):
+		into[key] = entity.get_instance_id()
+		return
+	if into.size() >= maxi(1, int(party["most"])):
+		return
+	into[key] = entity.get_instance_id()
+	_set_party(maxi(party_size, _joined.size()), maxi(companions, _joined_companions.size()))  # Never lowered in a fight.
 
 
-## Its party to [param n]: max_hp from its base, hp kept in the same share.
-func _set_party(n: int) -> void:
-	if n == party_size or _base_hp <= 0:
+## Its party to [param n] players and [param with] companions: max_hp from
+## its base, hp kept in the same share.
+func _set_party(n: int, with := 0) -> void:
+	if (n == party_size and with == companions) or _base_hp <= 0:
 		return
 	var share := float(hp) / float(maxi(1, max_hp))
 	party_size = n
-	max_hp = roundi(_base_hp * (1.0 + float(party["hp_per_player"]) * (n - 1)))
+	companions = with
+	var counted := n + float(party["companion_share"]) * with
+	max_hp = roundi(_base_hp * (1.0 + float(party["hp_per_player"]) * (counted - 1.0)))
 	hp = clampi(roundi(share * max_hp), 1 if hp > 0 else 0, max_hp)
-	print("[apex] %s party %d at %s (%d/%d)" % [_kind(), n, tile, hp, max_hp])
+	print("[apex] %s party %d, companions %d at %s (%d/%d)" % [_kind(), n, with, tile, hp, max_hp])
 
 
 ## A plain blow (Monster's): never meant to land (every blow is told), so
@@ -210,8 +239,9 @@ func _sleep() -> void:
 	asleep = true
 	pose = Pose.SIT
 	sight_range = SLEEP_SIGHT
-	print("[apex] %s sleeps at its den %s (%d/%d)" % [_kind(), den, hp, max_hp])
+	print("[apex] %s sleeps at %s (its den %s) (%d/%d)" % [_kind(), tile, den, hp, max_hp])
 	_joined.clear()
+	_joined_companions.clear()
 	_set_party(1)  # Asleep: its base again (780 amended (8)).
 
 
@@ -405,6 +435,12 @@ func _tend_move() -> bool:
 			_log_move(move, "no room")
 	_move = {}
 	return true
+
+
+## Its fall, logged for playtest's tours (which inferred it from its hp).
+func _on_died(entity: GridEntity, cause: StringName) -> void:
+	if entity == self:
+		print("[apex] %s falls (%s) at %s, party %d" % [_kind(), cause, tile, party_size])
 
 
 ## A charge's rush over: the body it met takes the blow; none met, it is

@@ -39957,6 +39957,40 @@ body without party_size or a party block keeps flank_guard. combat_test
 _test_flank_party. Sim only, protocol unchanged, no new class_name, no
 bullet (the bear is in no real level yet).
 
+780 amended (10): a tell to step out of, and a bear sized to whoever is in the
+fight, companions too (2026-11-05, combat's draft from playtest's bear_yard
+runs bear9 to bear13; the coordinator's rulings; release's label). A player
+walks a cell in 2.5 ticks and needs 1 to 1.5 to leave a 2-long, 120-degree
+cone, so with a 0.3 s reaction and a tick of lag a 6-tick swipe could not be
+stepped out of (dodging bots left 1 tell in 7). Swipe windup 6 -> 10, every 15
+-> 20, damage 6 -> 4; charge roar 8 -> 12, damage 8 -> 6; slam damage 9 -> 6.
+Its base max_hp 90 -> 70 and party hp_per_player 0.6 -> 0.9. Dodging bots now
+leave about 3 tells in 4, and standing and trading still falls within 20 s at
+every size. A real player has a companion beside them, and companions hit the
+bear hard (4 to 9 a blow), so GreatBear._join counts a companion who joins its
+fight (strikes it, struck by it, a tell's target; at most party "most" of
+them, kept apart from the players) as the row's party "companion_share" 0.75
+of a player: max_hp = base 70 x (1 + hp_per_player 0.9 x (players + 0.75 x
+companions - 1)), players counted at least 1 (a companion striking first
+counts as beside one), so 70 / 133 / 196 bare and 117 / 228 with companions,
+hp kept in the same share as it grows. A companion makes the fight safer and a
+little quicker, and a bare player meets the same bear as before. party_size
+stays the player count (780 amended (9)'s flank guard reads it);
+GreatBear.companions holds the rest; asleep it forgets both. A player is kept
+by player_id, so one who drops and comes back in a new body is still one
+(playtest's bear14E counted a rejoin as party 2), and a body gone from the
+land gives its place to a newcomer; the party is still never lowered in a
+fight. The "[apex] ... party" line names both ("party 2, companions 2").
+bear13: a solo with a companion kills him in 67 s (target 75), a dodging pair
+with companions leaves him at 34/228 at 40 s (a little hard, as wanted: people
+strike back more than the bots), and a bare solo dodger can win (the best of
+four at 43 s). An "[apex] great_bear falls (<cause>) at <tile>, party N" line
+(World.entity_died) for the tours. monster_test _test_bear_party:
+hp_per_player read from the row, and a player with a companion (117), a second
+player (180), asleep (70), and one who comes back stays party 1. Server only,
+protocol unchanged, no new class_name, no bullet (the bear is in no real level
+yet).
+
 ## 769. The mine: ore seams, and its look (phase 1)
 
 Jeff (2026-11-02): "theres a mine entrance in the hills and its overrun, its the source of ore

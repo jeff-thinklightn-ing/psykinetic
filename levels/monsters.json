@@ -83,16 +83,16 @@
 	"great_bear": {
 		"side": "wild", "role": "predator", "herd": "great_bear", "label": "Great bear", "art": "creature.great_bear", "diet": ["deer", "stag"],
 		"script": "res://sim/great_bear.gd", "swing_stamina": true, "apex": true,
-		"body": {"mass": 300.0, "max_hp": 90, "move_ticks": 2.6, "attack_damage": 5, "sight_range": 8},
+		"body": {"mass": 300.0, "max_hp": 70, "move_ticks": 2.6, "attack_damage": 5, "sight_range": 8},
 		"senses": {"cone": 120, "night": 0.3, "hearing": 1.0, "alert_sight": 1, "notice": 0.8},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"drops": [{"item": "bear_pelt", "count": [1, 1]}, {"item": "bear_claw", "count": [1, 3]}],
-		"party": {"hp_per_player": 0.6, "flank_guard_per_player": 25, "most": 3},
+		"party": {"hp_per_player": 0.9, "companion_share": 0.75, "flank_guard_per_player": 25, "most": 3},
 			"moves": {
-			"swipe": {"windup": 6, "length": 2.0, "half_angle": 60.0, "damage": 6, "impulse": 140.0, "every": 15},
-			"slam": {"windup": 12, "length": 1.5, "damage": 9, "impulse": 100.0, "down": 15, "every": 50},
-			"charge": {"roar": 8, "cells": 6, "from": 3, "damage": 8, "impulse": 140.0, "every": 80}
+			"swipe": {"windup": 10, "length": 2.0, "half_angle": 60.0, "damage": 4, "impulse": 140.0, "every": 20},
+			"slam": {"windup": 12, "length": 1.5, "damage": 6, "impulse": 100.0, "down": 15, "every": 50},
+			"charge": {"roar": 12, "cells": 6, "from": 3, "damage": 6, "impulse": 140.0, "every": 80}
 		}
 	},
 	"skeleton": {
