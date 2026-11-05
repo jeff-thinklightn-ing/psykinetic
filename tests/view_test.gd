@@ -952,9 +952,17 @@ func _test_bow_sounds() -> void:
 		var whistles_at_first := -1
 		var ring_at_last := false
 		var landed_at: Array[Vector3] = []
-		while Time.get_ticks_msec() - start < 1400:
+		# Game time, as the falls' tweens run (process delta), not the wall clock: under a
+		# suite's load a long frame put the thuds 0.3 s late by the clock (terrain's landing,
+		# 2026-11-04 22:54). A fall is heard at most a frame after its tick.
+		var game := 0.0
+		var longest := 0.0
+		while game < 1.4 and Time.get_ticks_msec() - start < 10000:
 			await get_tree().process_frame
-			var now := (Time.get_ticks_msec() - start) / 1000.0
+			var step := get_process_delta_time()
+			game += step
+			longest = maxf(longest, step)
+			var now := game
 			if is_instance_valid(lofted):
 				high = maxf(high, lofted.position.y)
 				var meshes := ([lofted] if lofted is GeometryInstance3D else []) + lofted.find_children("*", "GeometryInstance3D", true, false)
@@ -975,8 +983,8 @@ func _test_bow_sounds() -> void:
 		var flight := float(ticks) / World.TICK_RATE
 		var on_time := lands.size() == 3
 		for i in lands.size():
-			on_time = on_time and absf(lands[i] - (flight + float(i) / World.TICK_RATE)) < 0.1
-		_check(on_time, "each fall thuds in at its tick, %.1f s apart (%s)" % [1.0 / World.TICK_RATE, lands])
+			on_time = on_time and absf(lands[i] - (flight + float(i) / World.TICK_RATE)) < 0.1 + longest
+		_check(on_time, "each fall thuds in at its tick, %.1f s apart, by game time within a frame (%s; longest frame %.3f s)" % [1.0 / World.TICK_RATE, lands, longest])
 		var on_point := landed_at.size() == 3
 		for i in landed_at.size():
 			on_point = on_point and Vector2(landed_at[i].x, landed_at[i].z).distance_to(falls[i]) < 0.2
