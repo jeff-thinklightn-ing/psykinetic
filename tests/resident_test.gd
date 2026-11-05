@@ -497,6 +497,9 @@ func _test_bodies_in_town() -> void:
 	_step_until(func() -> bool: return bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), 150)
 	_check(bram.doing == Resident.Doing.HIDE and hut.has_point(bram.tile), "a raider in sight: he hides at home (at %s)" % bram.tile)
 	World.despawn(raider)
+	# The raider seen near the store raised the town's threat (762) when the square put Bram near it: lifted,
+	# or every later check of the hour finds the folk sheltering (the lawspeaker hid at nine).
+	World.towns.lift_threat(STORE)
 	World.entity_taken.emit(bram, "raid-9")
 	_check(not bram.spawned and _body("rs-bram") == null, "beaten down by raiders: his body is carried off")
 	_check("rs-bram" not in World.towns.residents(STORE) and World.towns.captives(STORE).any(func(each: Dictionary) -> bool:

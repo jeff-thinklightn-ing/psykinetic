@@ -214,7 +214,8 @@ func _lay(area: String, id: String, day: int) -> void:
 		for t in TRIES:
 			var town := towns[draw.randi_range(0, towns.size() - 1)]
 			var cell := town + Vector2i(draw.randi_range(-reach, reach), draw.randi_range(-reach, reach))
-			if fits(area, cell, towns, rule):
+			# A town's never grows in a healer's hut's circle: those count apart.
+			if fits(area, cell, towns, rule) and not near_hut(area, id, cell):
 				var uid := World.items.mint(id, GREW, "wild", area, cell)
 				World.put_on_ground(uid, cell)
 				break

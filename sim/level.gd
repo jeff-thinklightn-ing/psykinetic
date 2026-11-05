@@ -116,7 +116,12 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "post", "tavern", "fire", "other"]
+## A place's own cells and rect, kept on Level's place dict when given and
+## well-formed (771/772/774, buildings' side; environment's 782 lights read
+## "brazier" and "lamp"): key -> "cell" (a Vector2i), "rect" (a Rect2i) or
+## "cells" (an Array of Vector2i).
+const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells"}
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,
 ## one place a story, its key the story's tag) is: the where-word economy
 ## and npc say it by.
@@ -1301,6 +1306,14 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 				out[str(key)]["holds"] = kept
 		elif holds != null:
 			warnings.append("the place %s's holds is not a list: left out" % [key])
+		for shape_key: String in PLACE_SHAPES:
+			if not entry.has(shape_key):
+				continue
+			var shape: Variant = _place_shape(entry[shape_key], PLACE_SHAPES[shape_key])
+			if shape == null:
+				warnings.append("the place %s's %s is not a %s: left out" % [key, shape_key, PLACE_SHAPES[shape_key]])
+			else:
+				out[str(key)][shape_key] = shape
 	for key: String in out:
 		var town := str(listed[key].get("town", ""))
 		if town.is_empty():
@@ -1309,6 +1322,83 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			warnings.append("the place %s works for town \"%s\": no stockpile place of that key here; it works for none" % [key, town])
 			continue
 		out[key]["town"] = town
+	return out
+
+
+## A place's [param value] as PLACE_SHAPES' [param shape] says, else null.
+static func _place_shape(value: Variant, shape: String) -> Variant:
+	match shape:
+		"cell":
+			return _tile(value)
+		"rect":
+			if value is Array and value.size() == 4 and int(value[2]) > 0 and int(value[3]) > 0:
+				return Rect2i(int(value[0]), int(value[1]), int(value[2]), int(value[3]))
+		"cells":
+			if value is Array:
+				var cells: Array[Vector2i] = []
+				for each: Variant in value:
+					var cell: Variant = _tile(each)
+					if cell == null:
+						return null
+					cells.append(cell)
+				return cells
+	return null
+
+
+## [param level]'s (Level.load_level's) watch posts (771, buildings' side;
+## npc's Main.watch_posts): town id ("<level>/<store key>") -> [{id (the
+## place key), rect, brazier (the rect's middle if not said), name}], by
+## key; {} for a level with none. A post with no rect or no town is none.
+static func posts_of(level: Dictionary) -> Dictionary:
+	var out := {}
+	var places: Dictionary = level.get("places", {})
+	var keys: Array = places.keys()
+	keys.sort()
+	for key: String in keys:
+		var place: Dictionary = places[key]
+		if place["kind"] != "post" or not place.has("rect") or not place.has("town"):
+			continue
+		var town := "%s/%s" % [level.get("name", ""), place["town"]]
+		if not out.has(town):
+			out[town] = []
+		var rect: Rect2i = place["rect"]
+		out[town].append({"id": key, "rect": rect, "brazier": place.get("brazier", rect.position + rect.size / 2), "name": place["name"]})
+	return out
+
+
+## [param level]'s taverns (772, buildings' side): town id -> {id, counter
+## (the cell the taverner stands at, the place's "at"), rect, seats, hearth
+## (null if not said)}; {} for a level with none.
+static func tavern_of(level: Dictionary) -> Dictionary:
+	var out := {}
+	var places: Dictionary = level.get("places", {})
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if place["kind"] != "tavern" or not place.has("town"):
+			continue
+		var seats: Array[Vector2i] = []
+		seats.assign(place.get("seats", []))
+		out["%s/%s" % [level.get("name", ""), place["town"]]] = {"id": key, "counter": place["cell"],
+			"rect": place.get("rect", Rect2i(place["cell"], Vector2i.ONE)), "seats": seats, "hearth": place.get("hearth")}
+	return out
+
+
+## [param level]'s fires to sit at (774; the square's): [{id, cell (the
+## pit, a terrain fire cell), rect, seats, town (its id, "" for none)}], by
+## key; [] for a level with none.
+static func fires_of(level: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var places: Dictionary = level.get("places", {})
+	var keys: Array = places.keys()
+	keys.sort()
+	for key: String in keys:
+		var place: Dictionary = places[key]
+		if place["kind"] != "fire":
+			continue
+		var seats: Array[Vector2i] = []
+		seats.assign(place.get("seats", []))
+		out.append({"id": key, "cell": place["cell"], "rect": place.get("rect", Rect2i(place["cell"], Vector2i.ONE)), "seats": seats,
+			"town": "%s/%s" % [level.get("name", ""), place["town"]] if place.has("town") else ""})
 	return out
 
 

@@ -277,7 +277,8 @@ var _regen: Dictionary = {}
 ## holds from the level, placed once; saved ("placed_captives").
 var _placed_captives: Dictionary = {}
 ## Each remade level (Level.REMADE, decision 756) whose old-grid state is
-## moved already, with the decision it was moved for; saved ("remade").
+## moved already, with the decision it was moved for; saved ("remade"). A
+## level re-laid in place (Relaid, 774) is kept here the same way.
 var _remade: Dictionary = {}
 ## The sought's bands (613, enemy-ai's side): sought id -> {place (the place
 ## it was placed at), stood (its band stood there for that placing)}; saved
@@ -4020,6 +4021,10 @@ func _boot() -> void:
 	# A level-placed captive (decision 518): the camps whose holds are placed already, so each is placed once.
 	_placed_captives = snapshot.get("placed_captives", {}).duplicate(true) if snapshot.get("placed_captives") is Dictionary else {}
 	_remade = snapshot.get("remade", {}).duplicate(true) if snapshot.get("remade") is Dictionary else {}
+	# A level laid out again in place (Relaid, decision 774): its saved state
+	# carried onto the new layout once, before anything below reads it.
+	for line: String in Relaid.move(snapshot, _remade, func(level: String) -> Dictionary: return Level.load_level(level)):
+		print(line)
 	_sought_bands = snapshot.get("sought_bands", {}).duplicate(true) if snapshot.get("sought_bands") is Dictionary else {}
 	_healer_terms = snapshot.get("healer_terms", {}).duplicate(true) if snapshot.get("healer_terms") is Dictionary else {}
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}

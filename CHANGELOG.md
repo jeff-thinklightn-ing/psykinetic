@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Umbrage is laid out again round its chapel: a square with a fire to sit at, the store and shop by the well, the tavern, Snagfin's stall by the square, roads out to six watch posts; what you left in town comes along.
+
 ## v0.1.202
 
 - What goes over the network changes, so v0.1.201 and older can't join the server: update through the launcher first.

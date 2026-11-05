@@ -2471,6 +2471,49 @@ func _test_kinds() -> void:
 	_test_chapel()
 	_test_home_label()
 	_test_inside_is_his()
+	_test_tavern_inside()
+
+
+## Umbrage's tavern, re-laid (774; the coordinator: "a player who walks into
+## the moved inn" must see its inside): on the real wilds, walked in through
+## its east door a cell at a time, the view tells it inside, the bounds
+## ui's camera frames within the inn's footprint and round the player, and
+## the inn's own roof eased off; out again, not inside.
+func _test_tavern_inside() -> void:
+	print("\n== the wilds' tavern, walked into through its door: inside, its own bounds and roof (774) ==")
+	var wilds := Level.load_level("wilds")
+	_rig.rebuild(wilds["terrain"], wilds["centre"])
+	var tavern: Dictionary = Level.tavern_of(wilds).get("wilds/store", {})
+	var rect: Rect2i = tavern.get("rect", Rect2i())
+	var drawn: Array = _rig._buildings.filter(func(building: Dictionary) -> bool: return building.get("rect") == rect)
+	_check(rect.size == Vector2i(10, 8) and drawn.size() == 1, "the tavern drawn where its place says (%s, %d drawn)" % [rect, drawn.size()])
+	if drawn.size() != 1:
+		return
+	var told: Array = []
+	var listen := func(inside: bool, bounds: Rect2i) -> void: told.append([inside, bounds])
+	_rig.inside_changed.connect(listen)
+	var at := func(cell: Vector2i) -> void:
+		_rig._update_roofs([_rig.to_global(Vector3(cell.x, 0.5, cell.y))])
+	var path: Array[Vector2i] = [Vector2i(182, 208), Vector2i(181, 208), Vector2i(180, 208), Vector2i(179, 208), Vector2i(178, 208), Vector2i(177, 208), Vector2i(176, 208)]
+	var outside := not _rig._indoors(path[0]) and _rig.inside_building() == Rect2i()
+	for cell: Vector2i in path:
+		at.call(cell)
+	var bounds := _rig.inside_building()
+	_check(outside and bounds != Rect2i() and rect.encloses(bounds) and bounds.has_point(path.back()) and not told.is_empty() and told.back()[0],
+			"walked in through its east door: inside, the camera's bounds %s within the inn %s and round the player at %s" % [bounds, rect, path.back()])
+	var roof: Node3D = drawn[0]["roof"]
+	for i in 3:
+		_rig._fade_clock += Client3D.ROOF_FADE
+		at.call(path.back())
+	var meshes: Array = _rig._descendants(roof).filter(func(node: Node) -> bool: return node is GeometryInstance3D)
+	_check(not meshes.is_empty() and (meshes[0] as GeometryInstance3D).cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_SHADOWS_ONLY,
+			"the inn's own roof eased off over the player")
+	at.call(path[0])
+	_check(not told.back()[0] and _rig.inside_building() == Rect2i(), "out of its door again: not inside")
+	_rig._fade_clock += Client3D.FADE_HOLD + Client3D.ROOF_FADE * 4.0
+	at.call(path[0])
+	_rig.inside_changed.disconnect(listen)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## A building being built (decision 566): its stages by its town record's

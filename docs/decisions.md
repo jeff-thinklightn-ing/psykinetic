@@ -39620,6 +39620,15 @@ threat's bedtime) at each body's own spell; _test_short_sleep (lengths, the stag
 the night's place outside it, the guard and the priest, no id as before). Server only, protocol
 unchanged, no new class_name.
 
+772 amended: the tavern as the inn, buildings' side (774's re-lay builds it). Umbrage's tavern is an
+inn building (small, 10 x 8 at 170,205, use "inn", town "store"), so Towns seeds the town's inn record
+from it (starter_town_test: the forge, the inn, the kitchen and the temple). Its place, kind "tavern",
+has "at" the counter (178,206), "rect" the building's, six "seats" clear of its beds, and a "hearth"
+(178,211). Level.tavern_of(level) gives town id -> {id, counter, rect, seats, hearth}, for npc's 772
+reader. Its beds stay Level.beds_in's. The square's fire is a place too, kind "fire" (774). level_test
+_test_town_places; view_test _test_tavern_inside (walked in through the east door, the roof fades and
+inside_building() holds it). (2026-11-04, buildings)
+
 ## 779. A left click opens what E opens
 
 A left click on a counter did nothing in the store tour: counters and depots are Chests, and a
@@ -40031,6 +40040,14 @@ the watcher away, sent at its time with its size and kind, one out at a time, th
 and the captain at the post, broke's threat and holder, beaten paid and told, the threat let go, the
 captain's regard, the post's own kinds, an empty treasury unpaid, no third wave. Not saved; no bullet
 until a real town has posts. Server only, protocol unchanged, no new class_name.
+
+771 amended (4): the posts, buildings' side (774's re-lay places them). Level places gain the kind
+"post" with a "rect" and a "brazier" cell (Level.PLACE_SHAPES: a place's own "cell", "rect" or "cells",
+kept when well-formed, else warned and left out). Level.posts_of(level) gives town id -> [{id, rect,
+brazier (the rect's middle if not said), name}] by key, {} for a level with none, for npc's
+Main.watch_posts. Umbrage has six, each a 3 x 3 on floor with its brazier in the middle: the crossroads,
+the barrow, the hill road, the smithy, the woodlot and the healer's post, on the roads out of town.
+level_test _test_town_places. (2026-11-04, buildings)
 
 ## 776, companions' side: she knows a ford for shallow water
 
@@ -40943,3 +40960,39 @@ note, built: the figure's arms reach down to the hand squares, so R and L read a
 ui_test _test_character_sheet and the 722 inventory check (the hands on the sheet); chest_test
 (the headings). A CHANGELOG bullet (voice's words). Client only, protocol unchanged. New
 class_name CharacterSheet.
+
+## 774. Umbrage laid out again round its chapel (plan B), and Relaid
+
+Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator approved the stills
+(C:/dev/review/umbrage_b). Released alone (v0.1.203), so v0.1.202 is its rollback.
+
+- **The layout**: levels/wilds is laid out again in place round the chapel and a square. The chapel
+  (the temple, 10 x 6 at 190,199) keeps its sealed stair down to barrow_deep (199,199). The store's and
+  the shop's counters stand by the well, the store's lamp at 191,194; the kitchen is at 178,196, the
+  forge at 214,194, the home house with the locker at 170,193, the tavern at 170,205 (772 amended),
+  Snagfin's stall by the square (residents.json home 203,210) and the weapon stall at 203,196. The
+  square has a fire to sit at: a place of the new kind "fire" ({cell (the pit), rect, seats, town};
+  Level.fires_of, for npc's night and environment's light). Six spokes of dirt road run out of the
+  square and a lane to the barrow's door (relief_test: eleven roads); six watch posts sit on them
+  (771 amended (4)). 26 buildings, was 24.
+- **Relaid** (sim/relaid.gd, a new class_name): a level re-laid in place keeps its saved state, unlike a
+  remade one (756) whose section is dropped. Relaid.RELAID names, per level, the decision, the place
+  ids that moved with their building (the temple's; Holdings' and "stockpile:" keys follow) and the
+  saved markers that moved (the counters, the temple's, Snagfin's three chests, the locker), old cell
+  to new. Main._boot calls Relaid.move on the snapshot as read, before anything reads it: the places
+  are renamed, the markers' saved things carried by key (never duplicated, never dropped), and
+  whatever lay or stood on a cell that is no floor now goes to the nearest floor within FLOOR_REACH 12,
+  else stays and is counted. Done is kept in Main's saved "remade" under "relaid/<level>" (its own
+  key, so a later remake isn't taken for done); a new world is only marked done. One count-only line
+  per level: "[level] re-laid wilds (774): ... N left where they were (no floor near)", once. A level
+  that loads laid out the old way (an overlay copy edited before the re-lay; Relaid.is_laid checks the
+  new place and markers) is left alone and not marked: "[level] wilds not re-laid (774)" says so, and
+  it moves at the first boot that loads the new layout. The box's overlay holds no wilds (release,
+  2026-11-04).
+- **Forage**: a town's forage never grows in a healer's hut's circle (Forage.near_hut), which the
+  new layout brought near the town.
+- level_test _test_relaid (the mover on a written snapshot: renames, markers, onto floor, the next
+  boot moves nothing, an old-layout level waits, a far cell stays and is counted, a new world) and
+  _test_town_places; resident_test (the raider seen from the new square lifted); relief_test;
+  starter_town_test; view_test _test_tavern_inside. A CHANGELOG bullet. Server and level data,
+  protocol unchanged (b0683fabbb20, rev 48). New class_name Relaid.

@@ -840,7 +840,8 @@ func _test_wilds() -> void:
 		"crossed by a ford (%d cells) and a bridge (%d), both walked to" % [terrain["fords"].size(), bridged.size()])
 	# The roads (569): from the castle's, the forest's and the hills' links to
 	# the waystone, the forest road over the bridge, their ground dirt; and
-	# since 743 a fourth from the waystone south to Umbrage's link.
+	# since 743 a fourth from the waystone south to Umbrage's link; since 774
+	# Umbrage's six spokes from its square and the lane to the barrow's door.
 	var roads: Array = terrain["roads"]
 	var starts_at := roads.map(func(road: Dictionary) -> Vector2i: return Vector2i((road["points"] as PackedVector2Array)[0]))
 	var ends_at := roads.map(func(road: Dictionary) -> Vector2i: return Vector2i((road["points"] as PackedVector2Array)[-1]))
@@ -850,9 +851,9 @@ func _test_wilds() -> void:
 	var dirt := roads.all(func(road: Dictionary) -> bool:
 		return Curves.cells(road["curve"], false).keys().all(func(cell: Vector2i) -> bool:
 			return not floor.has(cell) or terrain["kinds"].get(cell, "") == "dirt"))
-	_check(roads.size() == 4 and starts_at.has(level["spawn_points"]["from_foothills"]) and starts_at.has(level["spawn_points"]["from_hills"])
+	_check(roads.size() == 11 and starts_at.has(level["spawn_points"]["from_foothills"]) and starts_at.has(level["spawn_points"]["from_hills"])
 		and starts_at.has(level["spawn_points"]["from_forest"]) and ends_at.has(level["spawn_points"]["from_held"]) and over_bridge and dirt,
-		"four dirt roads: from the foothills' (the castle's till 745), the forest's and the hills' links, the forest road over the bridge, and south to Umbrage's (569, 743; from %s, to %s)" % [starts_at, ends_at])
+		"eleven dirt roads: from the foothills' (the castle's till 745), the forest's and the hills' links, the forest road over the bridge, south to Umbrage's, its six spokes and the barrow lane (569, 743, 774; from %s, to %s)" % [starts_at, ends_at])
 
 
 ## A bridge's deck kept out of the relief (505 amended): under each of the

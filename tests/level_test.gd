@@ -225,6 +225,7 @@ func _test_every_level() -> void:
 	_test_safe_paths()
 	_test_fill_hills()
 	_test_fill_hills_sights()
+	_test_relaid()
 	print("
 == the levels connect: WorldMap.problems() (links and spawn points, ways back, reachable) ==")
 	var problems := WorldMap.build().problems()
@@ -377,8 +378,8 @@ func _test_link_cues() -> void:
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
 	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
 			"the barrow's depths: the Ossuary's stair up to the shallower, the sealed shortcut behind the throne its slab (666)")
-	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(215, 191)).get("cue") == "sealed",
-			"the mound's door is its own cue; the sealed shortcut (in the temple since 715, its back corner since 734 amended (2)) its slab")
+	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(199, 199)).get("cue") == "sealed",
+			"the mound's door is its own cue; the sealed shortcut (in the temple since 715, its back corner since 734 amended (2), the chapel at the centre since 774) its slab")
 	var wilds := Level.load_level("wilds")
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
 			"each link carries its cue for the big map")
@@ -1526,10 +1527,10 @@ func _test_solid() -> void:
 	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_wilds")
 	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(170, 179)
 		and not Vector2i(170, 179) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
-	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it.
+	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it (by Snagfin's stall since 774).
 	var held := []
 	for spec: Dictionary in wilds["entities"]:
-		if spec["tile"] in [Vector2i(219, 226), Vector2i(219, 225)] and str(spec.get("script", "")).ends_with("chest.gd"):
+		if spec["tile"] in [Vector2i(206, 208), Vector2i(206, 207)] and str(spec.get("script", "")).ends_with("chest.gd"):
 			held.append_array(Array(spec.get("props", {}).get("slots", [])))
 	_check(["sword", "spear", "hammer", "shield", "giant_axe", "dagger", "buckler"].all(func(id: String) -> bool: return id in held),
 			"the town chest's two beside it hold a sword, a spear, a hammer, a shield, a giant axe, a dagger and a buckler (%s)" % [held])
@@ -1961,23 +1962,24 @@ func _test_building_level_link() -> void:
 	var wilds := Level.load_level("wilds")
 	var temple: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b.get("kind", "") == "temple")
 	var stair: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow_deep")
-	_check(temple.size() == 1 and stair.size() == 1 and stair[0]["tile"] == (temple[0]["rect"] as Rect2i).position and stair[0]["building"] == temple[0]["code"]
+	_check(temple.size() == 1 and stair.size() == 1 and stair[0]["tile"] == Vector2i(199, 199) and stair[0]["building"] == temple[0]["code"]
 		and stair[0]["sealed"] == "draugr" and stair[0]["to_spawn"] == "from_temple" and not Vector2i(217, 193) in wilds["terrain"]["links_at"]
 		and wilds["warnings"].filter(func(w: String) -> bool: return "link" in w).is_empty(),
-		"the wilds' temple carries the sealed stair down in its north-west back corner; the old one behind it is gone (%s)" % [stair])
-	# 734 amended (2): Umbrage's temple is the chapel, the temple kind, its
-	# doors, front, counter and the shortcut's landing as they were.
+		"the wilds' temple carries the sealed stair down in its back corner, (199, 199) (774: it faces west); the old one behind it is gone (%s)" % [stair])
+	# 734 amended (2): Umbrage's temple is the chapel, the temple kind; since
+	# 774 at the square's centre, its doors west down the main road, its
+	# counter and the shortcut's landing inside.
 	if temple.size() == 1:
 		var chapel: Dictionary = temple[0]
 		var floor_cells: Array = wilds["terrain"]["floor"]
 		var counter: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return bool(spec.get("props", {}).get("temple", false)))
 		var landing: Vector2i = Vector2i(wilds["spawn_points"]["from_barrow_shortcut"]) if wilds["spawn_points"].get("from_barrow_shortcut") is Vector2i else Vector2i(-1, -1)
 		var temple_said: Array = wilds["warnings"].filter(func(w: String) -> bool: return "temple" in w)
-		_check(chapel["rect"] == Rect2i(215, 191, 6, 10) and chapel["size"] == "small" and chapel["place"] == "temple" and chapel["use"] == "temple"
-			and chapel["doors"] == [Vector3i(217, 200, Terrain.SOUTH), Vector3i(218, 200, Terrain.SOUTH)] and chapel["front"] == Vector2i(217, 201)
-			and wilds["places"].has("temple@217,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
+		_check(chapel["rect"] == Rect2i(190, 199, 10, 6) and chapel["size"] == "small" and chapel["place"] == "temple" and chapel["use"] == "temple"
+			and chapel["doors"] == [Vector3i(189, 201, Terrain.EAST), Vector3i(189, 202, Terrain.EAST)] and chapel["front"] == Vector2i(189, 201)
+			and wilds["places"].has("temple@189,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
 			and (chapel["rect"] as Rect2i).has_point(landing) and floor_cells.has(landing) and temple_said.is_empty(),
-			"Umbrage's temple is the chapel: 6 x 10, doors (217, 200) and (218, 200), its place at the front, the counter and the shortcut's landing inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
+			"Umbrage's temple is the chapel: 10 x 6 facing west, doors on (189, 201) and (189, 202), its place at the front, the counter and the shortcut's landing inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
 
 
 ## Umbrage's locker (722): one chest prop {"locker": true}, since 737 in
@@ -2098,27 +2100,29 @@ func _test_umbrage_locker() -> void:
 	print("\n== Umbrage's locker (722), in the player's house (737) ==")
 	var wilds := Level.load_level("wilds")
 	var lockers: Array = wilds["entities"].filter(func(spec: Dictionary) -> bool: return bool((spec.get("props", {}) as Dictionary).get("locker", false)))
-	var at := Vector2i(195, 220)
+	var at := Vector2i(172, 193)
 	_check(lockers.size() == 1 and lockers[0]["tile"] == at
-		and wilds["terrain"]["edges"].get(Terrain.edge_key(at, Vector2i(0, 1))) == Terrain.Edge.WALL
-		and wilds["terrain"]["floor"].has(at + Vector2i(0, -1)) and not wilds["terrain"]["edges"].has(Terrain.edge_key(at, Vector2i(0, -1)))
-		and wilds["entities"].all(func(spec: Dictionary) -> bool: return spec["tile"] != at + Vector2i(0, -1)),
-		"one locker, at (195, 220), its back to the house's south wall, the cell before it clear floor (%s)" % [lockers])
+		and wilds["terrain"]["edges"].get(Terrain.edge_key(at, Vector2i(0, -1))) == Terrain.Edge.WALL
+		and wilds["terrain"]["floor"].has(at + Vector2i(0, 1)) and not wilds["terrain"]["edges"].has(Terrain.edge_key(at, Vector2i(0, 1)))
+		and wilds["entities"].all(func(spec: Dictionary) -> bool: return spec["tile"] != at + Vector2i(0, 1)),
+		"one locker, at (172, 193), its back to the house's north wall (774: its door is in the south), the cell before it clear floor (%s)" % [lockers])
 	var homes: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building.get("home", false))
-	_check(homes.size() == 1 and (homes[0]["rect"] as Rect2i) == Rect2i(194, 215, 4, 6) and Level.building_cells(homes[0]).has(at)
+	_check(homes.size() == 1 and (homes[0]["rect"] as Rect2i) == Rect2i(170, 193, 4, 6) and Level.building_cells(homes[0]).has(at)
 		and str(homes[0].get("use", "")).is_empty(),
-		"one house marked the player's (737), the free house at (194, 215), the locker inside it (%d)" % homes.size())
+		"one house marked the player's (737), the house at (170, 193) on the main road (774), the locker inside it (%d)" % homes.size())
 	# 736: the weapon stall, solid and doorless, faces the square; its seller stands behind it.
+	# 774: Rolf's on the square's north-east rim facing in, Snagfin's on its south-east.
 	var stalls: Array = wilds["buildings"].filter(func(building: Dictionary) -> bool: return building["slot"] == "building.market_stall")
 	var place: Dictionary = wilds["places"].get("weapon_stall", {})
-	_check(stalls.size() == 1 and stalls[0]["rect"] == Rect2i(212, 202, 2, 1) and stalls[0]["facing"] == Vector2i(0, -1)
-		and not wilds["terrain"]["floor"].has(Vector2i(212, 202)) and not wilds["terrain"]["floor"].has(Vector2i(213, 202))
-		and wilds["terrain"]["solid"].has(Vector2i(212, 202)) and wilds["terrain"]["floor"].has(Vector2i(212, 201)) and wilds["terrain"]["floor"].has(Vector2i(213, 201)),
-		"one weapon stall at (212, 202), 2 x 1 facing north, solid, the square's side before it floor (%s)" % [stalls])
-	_check(place.get("cell") == Vector2i(212, 203) and place.get("kind") == "stall" and place.get("radius") == 1 and place.get("worth") == 0
-		and place.get("town") == "store" and wilds["terrain"]["floor"].has(Vector2i(212, 203)) and wilds["terrain"]["floor"].has(Vector2i(213, 203))
-		and wilds["entities"].all(func(spec: Dictionary) -> bool: return not Rect2i(212, 201, 2, 3).has_point(spec["tile"])),
-		"the place weapon_stall, a stall worth nothing, at (212, 203) behind it on floor, no marker in or about it (%s)" % [place])
+	_check(stalls.size() == 2 and stalls[0]["rect"] == Rect2i(203, 197, 2, 1) and stalls[0]["facing"] == Vector2i(0, 1)
+		and stalls[1]["rect"] == Rect2i(203, 207, 2, 1) and stalls[1]["facing"] == Vector2i(0, -1)
+		and not wilds["terrain"]["floor"].has(Vector2i(203, 197)) and not wilds["terrain"]["floor"].has(Vector2i(204, 197))
+		and wilds["terrain"]["solid"].has(Vector2i(203, 197)) and wilds["terrain"]["floor"].has(Vector2i(203, 198)) and wilds["terrain"]["floor"].has(Vector2i(204, 198)),
+		"Rolf's weapon stall at (203, 197), 2 x 1 facing south into the square, solid, the square before it floor; Snagfin's at (203, 207) (%s)" % [stalls])
+	_check(place.get("cell") == Vector2i(203, 196) and place.get("kind") == "stall" and place.get("radius") == 1 and place.get("worth") == 0
+		and place.get("town") == "store" and wilds["terrain"]["floor"].has(Vector2i(203, 196)) and wilds["terrain"]["floor"].has(Vector2i(204, 196))
+		and wilds["entities"].all(func(spec: Dictionary) -> bool: return not Rect2i(203, 196, 2, 3).has_point(spec["tile"])),
+		"the place weapon_stall, a stall worth nothing, at (203, 196) behind it on floor, no marker in or about it (%s)" % [place])
 
 
 func _test_building_links() -> void:
@@ -2563,6 +2567,131 @@ func _test_hall_door() -> void:
 	_main._records = kept_records
 	_main.load_map("test_room")
 	Level.unregister("lt_hall")
+
+
+## Umbrage re-laid round its chapel (Relaid, 774): a save on the old layout
+## carried over once, nothing dropped: the chapel's place keys renamed
+## (holdings, its stockpile, the item book, a player's map), Snagfin's chest
+## keyed and stood at its new marker with its things, a pile and a player on
+## a cell that is no floor now moved onto the nearest floor; the next boot
+## moves nothing; a new world is only marked done.
+func _test_relaid() -> void:
+	print("
+== Umbrage re-laid in place: its saved state carried over once (774) ==")
+	var plan: Dictionary = Relaid.RELAID["wilds"]
+	var wilds := Level.load_level("wilds")
+	var floor := {}
+	for cell: Vector2i in wilds["terrain"]["floor"]:
+		floor[cell] = true
+	var old_temple := "wilds/temple@217,201"
+	var new_temple: String = plan["places"][old_temple]
+	_check(wilds["places"].has(new_temple.trim_prefix("wilds/")), "the chapel's place is where the mover renames it to (%s)" % new_temple)
+	for key: String in plan["markers"]:
+		var to: Array = plan["markers"][key]
+		var found := (wilds["entities"] as Array).filter(func(spec: Dictionary) -> bool: return spec["tile"] == Vector2i(to[0], to[1]))
+		_check(found.size() == 1, "the marker from %s stands at %s in the level (%d)" % [key, to, found.size()])
+	# No level entity stands on an old marker cell now (each moved is in the map, so none is laid twice).
+	for key: String in plan["markers"]:
+		var old := Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+		_check((wilds["entities"] as Array).all(func(spec: Dictionary) -> bool: return spec["tile"] != old), "no marker left at the old %s" % key)
+	var well: Vector2i = Vector2i(194, 190)
+	_check(not floor.has(well), "the well's water is no floor")
+	var record := PlayerRecord.new()
+	record.player_id = "lt-relaid"
+	record.zone = "wilds"
+	record.tile = well
+	record.known_places.assign(["wilds/store", old_temple])
+	# A saved world from before the re-lay, as the game writes it, read back as the box's boot reads it.
+	var chest := {"script": "res://sim/chest.gd", "shape": "chest", "name": "chest", "tile": [221, 225], "hp": 1, "stamina": 0,
+		"facing": [0, 1], "props": {}, "spawn": 4, "spawn_key": "221,225", "slots": ["coin"], "items": [7]}
+	var path: String = preload("res://tests/test_ports.gd").scratch("relaid_world.json")
+	_check(Snapshot.write(path, {"version": Snapshot.VERSION, "players": [record.to_dict()], "remade": {"hills": 756},
+		"holdings": {old_temple: {"holder": "nobody", "strength": 0, "age": 3}},
+		"stockpile": {"stockpile:" + old_temple: {"x": 1}},
+		"items": {"7": {"at": "stockpile:" + old_temple}, "8": {"at": "wilds@194,190"}},
+		"zones": {"wilds": {"tick": 9, "entities": [chest], "respawns": [{"spawn": 3, "spawn_key": "209,199", "ticks_left": 5}],
+			"ground": [{"cell": [well.x, well.y], "ids": ["coin"], "items": [8], "gold": 0}], "records": []}}}), "(the old world written)")
+	var snapshot := Snapshot.load(path)
+	var done: Dictionary = snapshot.get("remade", {})
+	var level_of := func(_level: String) -> Dictionary: return wilds
+	# An overlay copy laid out the old way (edited before the re-lay) shadows the new one: nothing moves, nothing marked.
+	var shadowed := Relaid.move(snapshot, done, func(_level: String) -> Dictionary: return {"places": {}, "entities": [], "terrain": {"floor": []}})
+	_check(shadowed.size() == 1 and "not re-laid" in shadowed[0] and not done.has(Relaid.done_key("wilds")) and snapshot["holdings"].has(old_temple)
+		and snapshot["zones"]["wilds"]["entities"][0]["spec"]["spawn_key"] == "221,225", "an old-layout level loading here: nothing moved, not marked, it waits (%s)" % [shadowed])
+	var lines := Relaid.move(snapshot, done, level_of)
+	var moved: PlayerRecord = snapshot["players"][0]
+	var pile: Dictionary = snapshot["zones"]["wilds"]["ground"][0]
+	chest = snapshot["zones"]["wilds"]["entities"][0]
+	_check(lines.size() == 1 and done.get(Relaid.done_key("wilds")) == 774 and done.get("hills") == 756 and not done.has("wilds"),
+		"one count-only line, the level marked done under its own key, a remake's mark kept (%s, %s)" % [lines, done])
+	_check(lines[0].ends_with(", 0 left where they were (no floor near)") and not "lt-relaid" in lines[0], "nothing left off the floor; no id in the line")
+	_check(snapshot["zones"]["wilds"]["entities"].size() == 1 and snapshot["zones"]["wilds"]["ground"].size() == 1 and snapshot["players"].size() == 1,
+		"nothing dropped: the chest, the pile and the player all there")
+	_check(snapshot["holdings"].has(new_temple) and not snapshot["holdings"].has(old_temple) and snapshot["stockpile"].has("stockpile:" + new_temple)
+		and snapshot["items"]["7"]["at"] == "stockpile:" + new_temple and new_temple in moved.known_places and not old_temple in moved.known_places,
+		"the chapel's place keys renamed: holdings, its stockpile, the item book, the player's map")
+	_check(chest["spec"]["spawn_key"] == "205,208" and chest["spec"]["tile"] == Vector2i(205, 208) and chest["slots"] == ["coin"]
+		and snapshot["zones"]["wilds"]["respawns"][0]["spawn_key"] == "190,196", "Snagfin's chest keyed and stood at its new marker, its things kept; a dead timer follows its marker")
+	_check(floor.has(moved.tile) and floor.has(pile["cell"]) and pile["ids"] == ["coin"]
+		and snapshot["items"]["8"]["at"] == "wilds@%d,%d" % [pile["cell"].x, pile["cell"].y],
+		"a player and a pile in the new well's water moved onto floor beside it, the pile's things following it (%s, %s)" % [moved.tile, pile["cell"]])
+	_check(Relaid.move(snapshot, done, level_of).is_empty(), "the next boot moves nothing")
+	var far := wilds.duplicate()
+	far["terrain"] = {"floor": [Vector2i(0, 0)]}
+	var lost := {"ok": true, "players": [], "zones": {"wilds": {"entities": [], "respawns": [], "records": [],
+		"ground": [{"cell": Vector2i(100, 100), "ids": ["coin"], "items": [], "gold": 0}]}}}
+	var far_lines := Relaid.move(lost, {}, func(_level: String) -> Dictionary: return far)
+	_check(far_lines.size() == 1 and far_lines[0].ends_with(", 1 left where they were (no floor near)") and lost["zones"]["wilds"]["ground"][0]["cell"] == Vector2i(100, 100),
+		"a pile with no floor near is kept where it was and counted, never dropped (%s)" % [far_lines])
+	var fresh := {}
+	_check(Relaid.move({"ok": false, "zones": {}, "players": []}, fresh, level_of).is_empty() and fresh.get(Relaid.done_key("wilds")) == 774, "a new world has nothing to move: only marked done")
+	_test_town_places(wilds)
+
+
+## Umbrage's watch posts, tavern, square fire and store lamp (771 amended
+## (4), 772 amended, 774; npc's and environment's readers): read by their
+## Level calls, on floor, the tavern the town's inn with its counter, seats
+## and hearth clear of its beds; a malformed shape warned and left out.
+func _test_town_places(wilds: Dictionary) -> void:
+	print("
+== Umbrage's posts, tavern, fire and lamp, as npc and environment read them ==")
+	var floor := {}
+	for cell: Vector2i in wilds["terrain"]["floor"]:
+		floor[cell] = true
+	var posts := Level.posts_of(wilds)
+	var ids: Array = (posts.get("wilds/store", []) as Array).map(func(post: Dictionary) -> String: return post["id"])
+	_check(posts.keys() == ["wilds/store"] and ids == ["post_barrow", "post_crossroads", "post_healer", "post_hill_road", "post_smithy", "post_woodlot"],
+		"six posts, one per spoke, the town's (%s)" % [posts.keys()])
+	for post: Dictionary in posts.get("wilds/store", []):
+		var rect: Rect2i = post["rect"]
+		var clear := true
+		for x in range(rect.position.x, rect.end.x):
+			for y in range(rect.position.y, rect.end.y):
+				clear = clear and floor.has(Vector2i(x, y))
+		_check(clear and rect.has_point(post["brazier"]) and not str(post["name"]).is_empty(), "%s: its 3 x 3 on floor, its brazier in it (%s)" % [post["id"], rect])
+	_check(Level.posts_of(Level.load_level("forest")).is_empty(), "a level with no posts: {}")
+	var tavern: Dictionary = Level.tavern_of(wilds).get("wilds/store", {})
+	var inn: Array = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool: return str(building.get("use", "")) == "inn")
+	_check(inn.size() == 1 and inn[0]["rect"] == tavern.get("rect") and str(inn[0].get("town", "")) == "store", "the tavern: the town's inn, its place's rect the building's (%s)" % [tavern.get("rect")])
+	if inn.size() == 1:
+		var beds := {}
+		for bed: Dictionary in Level.beds_in(inn[0], wilds["terrain"]):
+			for cell: Vector2i in bed["cells"]:
+				beds[cell] = true
+		var cells: Array[Vector2i] = [tavern["counter"], tavern["hearth"]]
+		cells.append_array(tavern["seats"])
+		var rect: Rect2i = tavern["rect"]
+		_check(cells.all(func(cell: Vector2i) -> bool: return rect.has_point(cell) and floor.has(cell) and not beds.has(cell)) and tavern["seats"].size() == 6 and beds.size() > 0,
+			"its counter, six seats and hearth inside, on floor, clear of its %d beds (%s off; beds %s)" % [beds.size() / 2,
+			cells.filter(func(cell: Vector2i) -> bool: return not (rect.has_point(cell) and floor.has(cell) and not beds.has(cell))), beds.keys()])
+	var fires := Level.fires_of(wilds)
+	_check(fires.size() == 1 and fires[0]["id"] == "square_fire" and fires[0]["cell"] == Vector2i(194, 211) and fires[0]["town"] == "wilds/store"
+		and (wilds["terrain"]["fire"] as Array).has(Vector2i(194, 211)) and fires[0]["seats"].size() == 8
+		and (fires[0]["seats"] as Array).all(func(cell: Vector2i) -> bool: return floor.has(cell)), "the square's fire: a fire cell, eight seats on floor round it")
+	_check(wilds["places"]["store"].get("lamp") == Vector2i(191, 194) and floor.has(Vector2i(191, 194)), "the store's lamp, on floor")
+	var warnings: Array[String] = []
+	var odd := Level.places_from({"places": {"a": {"at": [1, 1], "kind": "post", "rect": [1, 1, 0, 3], "brazier": "x", "seats": [[1, 1], 2]}}}, warnings)
+	_check(not odd["a"].has("rect") and not odd["a"].has("brazier") and not odd["a"].has("seats") and warnings.size() == 3, "a malformed rect, cell or seats: warned, left out (%s)" % [warnings])
 
 
 ## A 12 x 10 level [param level_name]: open floor, a lair anchor
