@@ -1937,6 +1937,78 @@ func _test_cache() -> void:
 	World._relocate(host, host_at)
 	chest.cache = ""
 	chest.cache_place = ""
+	_test_dungeon_caches(host, chest)
+
+
+## 808: in a regenerating level a cache is each chest's own, per player and
+## per generation; a save keeps only the generations still laid.
+func _test_dungeon_caches(host: Player, chest: Chest) -> void:
+	print("
+== 808: a dungeon's caches, per player and per generation ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var mine := record.caches.duplicate()
+	var entry := record.to_dict()
+	entry["player_id"] = "other"
+	entry["caches"] = []
+	var other := PlayerRecord.from_dict(entry)
+	var kept_regen: Variant = _main._regen.get("barrow")
+	var host_zone := host.zone
+	var chest_zone := chest.zone
+	var host_at := host.tile
+	host.zone = "barrow"
+	chest.zone = "barrow"
+	chest.cache = "farmstead_cache"
+	_main._regen["barrow"] = {"generation": 1, "at_step": 0}
+	_beside(host, chest)
+	var key := "farmstead_cache@barrow:%d,%d#1" % [chest.tile.x, chest.tile.y]
+	_check(_main.cache_record_key(chest) == key, "a dungeon chest's key: table, level, cell, generation (%s)" % _main.cache_record_key(chest))
+	var counts := []
+	for generation in [1, 2]:
+		_main._regen["barrow"] = {"generation": generation, "at_step": 0}
+		for who: PlayerRecord in [record, other]:
+			_main._records[Net.player_id] = who
+			var had := _units_of(host).size() + World.ground_uids(host.tile).size()
+			var found: bool = _main.search(host, chest)
+			counts.append([found, _main.search(host, chest)])
+			_check(found and _units_of(host).size() + World.ground_uids(host.tile).size() > had,
+					"generation %d, %s: finds theirs" % [generation, who.player_id])
+	_main._records[Net.player_id] = record
+	_check(counts.all(func(pair: Array) -> bool: return pair[0] and not pair[1]),
+			"each player finds once a generation, and again in the next (%s)" % [counts])
+	_check(key in record.caches and key.replace("#1", "#2") in record.caches, "both generations on the record")
+	var pruned: Array[String] = _main.prune_caches(record.caches)
+	_check(not key in pruned and key.replace("#1", "#2") in pruned and pruned.has("farmstead_cache") == record.caches.has("farmstead_cache"),
+			"a save keeps the generation laid now, drops the gone one, keeps a plain cache (%s)" % [pruned])
+	_main._regen["barrow"] = {"generation": 2, "at_step": 0}
+	entry.erase("caches")
+	entry["player_id"] = "old"
+	var old := PlayerRecord.from_dict(entry)
+	_check(old.caches.is_empty() and _main.prune_caches(old.caches).is_empty(), "a record saved before 808 loads with no caches")
+	# Tidy: the finds, the zones, the generation, the record.
+	for uid: int in World.items._book.keys():
+		var events: Array = World.items.history(uid).get("events", [])
+		if events.is_empty() or events[0]["kind"] != "cached":
+			continue
+		if World.slot_of_unit(host, uid) >= 0:
+			World.take_units(host, [uid])
+		else:
+			var at := World.items.at_of(uid)
+			if at.contains("@"):
+				var xy := at.get_slice("@", 1).split(",")
+				var cell := Vector2i(int(xy[0]), int(xy[1]))
+				var index := World.ground_uids(cell).find(uid)
+				if index >= 0:
+					World.take_from_ground(cell, index)
+		World.items.end(uid, "gone")
+	record.caches = mine
+	host.zone = host_zone
+	chest.zone = chest_zone
+	World._relocate(host, host_at)
+	chest.cache = ""
+	if kept_regen == null:
+		_main._regen.erase("barrow")
+	else:
+		_main._regen["barrow"] = kept_regen
 
 
 func _test_stacks() -> void:

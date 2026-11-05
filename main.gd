@@ -5969,6 +5969,8 @@ func _save_state(wait := true, final := false) -> void:
 		_remember_companion(id)
 	var records: Array[PlayerRecord] = []
 	records.assign(_records.values())
+	for record in records:
+		record.caches = prune_caches(record.caches)  # 808: finds of generations gone.
 	var zones := {}
 	var level_held := 0
 	var keyed := 0
@@ -19688,12 +19690,34 @@ static func _plural(word: String) -> String:
 	return word + "s"
 
 
-## What [param chest]'s find is kept by on a player's record
-## (PlayerRecord.caches): once per player per key. Its table for now;
-## dungeon's 808 makes it per chest and per generation for a regenerating
-## level (330 amended (2)).
+## What a search of [param chest] is kept under on a player's record
+## (PlayerRecord.caches): its table alone, once per player for life (599),
+## or, in a regenerating level, the table, the level, the chest's cell and
+## the generation, "<table>@<level>:<x>,<y>#<gen>" (808: Jeff, "chests use
+## only for dungeons"; each chest a find of its own for every player, again
+## when the level is laid again). The find and its gold both seed from it
+## (330 amended (2)).
 func cache_record_key(chest: Chest) -> String:
-	return chest.cache
+	if not Regen.marked(chest.zone):
+		return chest.cache
+	return "%s@%s:%d,%d#%d" % [chest.cache, chest.zone, chest.tile.x, chest.tile.y, generation_of(chest.zone)]
+
+
+## [param caches] (a record's) without the keys of generations gone (808):
+## a key "...@<level>:...#<gen>" is kept only while <level> is at <gen>; a
+## table alone (599) always is.
+func prune_caches(caches: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for key in caches:
+		var at := key.rfind("@")
+		var hash := key.rfind("#")
+		if at < 0 or hash < at:
+			out.append(key)
+			continue
+		var level := key.substr(at + 1, key.rfind(":") - at - 1)
+		if key.substr(hash + 1).is_valid_int() and int(key.substr(hash + 1)) == generation_of(level):
+			out.append(key)
+	return out
 
 
 ## The robbers' camp chest's rules (742, amended): economy.json "robbers"

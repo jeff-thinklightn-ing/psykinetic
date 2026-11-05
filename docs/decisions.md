@@ -42893,3 +42893,32 @@ since the crypt and the new barrows are built under them.
     `--all <dump> <out>` does every generation dumped.
 - Also in this landing: level_test's generations loop (790) checks each generation's track with
   physics' _track_faults (794).
+
+## 808. A dungeon's chests: each a find of its own, per player and per generation
+
+Jeff, 2026-11-04: "all chests in the game should have some item in them, if theres no item to put
+in, then no chest"; "chests use only for dungeons and keep them guarded". The coordinator: dungeon
+chests become caches (599), each player's own, found again when the level is laid again.
+
+- **The key** (Main.cache_record_key(chest)): what a search is kept under on the player's record
+  (PlayerRecord.caches).
+  - In a level that doesn't regenerate, the table alone, as 599 had it: once per player for life
+    (the farmstead).
+  - In a regenerating one, "<table>@<level>:<x>,<y>#<generation>". So two chests of one table are
+    two finds, and a new generation gives every player a new find.
+  - The roll's seed is the player and the key, so each chest's find differs.
+  - The robbers' camp keeps its own rule (742 amended).
+  - items' gold from caches (330 amended) checks and records through the same function.
+- **Pruning** (Main.prune_caches, at every save): a dungeon key is kept only while its level is at
+  that generation. A plain table is always kept. The current generation's keys are never dropped,
+  since a key is kept exactly when its number is the level's generation now.
+- **Saved records**: a record without "caches" loads with none (PlayerRecord.from_dict, unchanged).
+  The format of an entry is a string as before.
+- **Chests on the box**: this landing converts none. A dungeon chest becomes a cache when its
+  generator writes the "cache" prop from items' tables by depth (crypt_cache, deep_cache,
+  castle_cache, hollowfell_cache). That comes with each generator's 806 fix, in the level's next
+  generation; a generated chest's slots are rolled again at every generation anyway, so nothing
+  saved is carried over or lost beyond what a re-lay already does. Those landings say their counts.
+- **items_test _test_dungeon_caches**: two players and two generations, each finding once a
+  generation and again in the next; the save's prune keeping the laid generation and a plain cache,
+  dropping the gone one; a record saved before 808 loading.
