@@ -4585,6 +4585,33 @@ she rejoins. A bane, grudge or vengeance of her named thing (417) is her
 card's too. companion_test covers them. Her bond with her player, which
 these events will move, is 444.
 
+Amended (2) (2026-11-05, release's label; the coordinator's approval after
+playtest's voice A/B): her card no longer turns her temperament into
+silence, and her birthplace and parentage agree. A rolled "steady and
+watchful" came back from the card writer as "careful and cautious in
+everything ... not one for idle chatter ... a quiet presence", and her talk
+followed it; one card said she was born in a fishing village on a grey
+coast, the youngest of nine on a farm, and she spoke of "the farm".
+CARD_SYSTEM now says, in voice's words, what she is rather than a ban
+(naming "quiet" would put the word before the model): "Her temperament
+colours how she talks, never whether she talks: whatever her traits, she
+speaks her mind, has opinions and has things she likes to talk about, and
+her card says what they are." A ban is the fallback if cards still come
+back quiet. companion_traits.json "parentage_fits", lore's pairs: a
+parentage that names a place or needs a fixed home is rolled only beside a
+birthplace it fits (a farm child: the hill farms, a crossroads inn, a
+walled market town; a miner's child: the mining town in the north, never
+the region's hills, Hollowfell being lost; a shrine foundling or a
+beekeeping aunt: anywhere but the river barge); any other fits anywhere.
+CompanionCard.fitting_parentage re-picks only the parentage, by a seed of
+its own, so the rest of a roll is unchanged; cards already written are
+left as they are. At boot the server prints one line of counts only, no
+name and no card's words (CompanionCard.card_counts, counts_line):
+"[companions] cards: N; quiet/silent A, 'not one for' B,
+watchful/cautious C, birthplace-parentage clash D", for release to grep
+after a deploy. companion_test covers them. Server only, protocol
+unchanged, no bullet.
+
 ## 295. Raids on a town: one entry point, food and people only, damage repaired, captives kept until rescued
 
 Economy step 6 (sim/towns.gd). A raid is a real group of raiders: maps

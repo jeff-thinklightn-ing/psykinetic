@@ -1197,6 +1197,25 @@ func _test_card() -> void:
 		and not CompanionCard.is_legacy("Tamsin"), "Wren, Nix and Pip are from before: a new roll never gives their names (%s)" % [never])
 	_check(CompanionCard.roll("a", "Nix")["pronoun"] == "she" and CompanionCard.roll("b", "Wren")["pronoun"] == "she"
 		and CompanionCard.roll("a", "Nix")["name"] == "Nix", "and they keep their names; Wren and Nix are women, the rest rolled")
+	var clashes := 0
+	var repicked := 0
+	for i in 200:
+		var each := CompanionCard.roll("player %d" % i)
+		clashes += 0 if CompanionCard.parentage_fits(str(each["parentage"]), str(each["birthplace"])) else 1
+		repicked += 1 if CompanionCard.tables()["parentage_fits"].has(str(each["parentage"])) else 0
+	_check(clashes == 0 and repicked > 0 and not CompanionCard.parentage_fits("the youngest of nine on a farm", "a fishing village on a grey coast")
+		and not CompanionCard.parentage_fits("a foundling brought up at a shrine", "a river barge that never stopped long")
+		and CompanionCard.parentage_fits("a smith's child", "a fishing village on a grey coast")
+		and CompanionCard.parentage_fits("a smith's child", "a river barge that never stopped long"),
+		"her parentage agrees with her birthplace: no farm child born on the coast, no shrine foundling on a barge (293 amended (2); %d of 200 held to a place)" % repicked)
+	_check(CompanionCard.CARD_SYSTEM.contains("colours how she talks, never\nwhether she talks") and CompanionCard.CARD_SYSTEM.contains("her\ncard says what they are")
+		and not CompanionCard.CARD_SYSTEM.contains("quiet"), "the card writer is told her temperament colours how she talks, never whether, and to name her topics")
+	var counted := CompanionCard.card_counts([{"card": "A quiet presence, not one for chatter, watchful.", "traits": {"birthplace": "a fishing village on a grey coast",
+			"parentage": "the youngest of nine on a farm"}}, {"card": "Bright and cautious.", "traits": {}}, {"card": "", "traits": {}}, "not a record"])
+	var line := CompanionCard.counts_line(counted)
+	_check(counted == {"cards": 2, "quiet": 1, "not_one_for": 1, "watchful": 2, "clash": 1}
+		and line == "[companions] cards: 2; quiet/silent 1, 'not one for' 1, watchful/cautious 2, birthplace-parentage clash 1",
+		"the boot line counts cards, and says no card's words (%s)" % line)
 	var pip := CompanionCard.roll("c", "Pip")
 	var pip_card := CompanionCard.plain_card(pip)
 	_check(pip["pronoun"] == "he" and pip_card.begins_with("Pip, a young man, was born") and "He wants to become a squire, though no one has been knighted in ages." in pip_card

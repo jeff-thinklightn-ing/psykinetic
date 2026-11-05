@@ -211,6 +211,13 @@
 	"pronoun": ["she", "she", "he", "he", "they"],
 	"birthplace": ["a fishing village on a grey coast", "the hill farms", "a mining town in the north", "the lower streets of an old city", "a river barge that never stopped long", "a forest hamlet of charcoal burners", "a crossroads inn", "a walled market town"],
 	"parentage": ["a smith's child", "raised by an aunt who kept bees", "a foundling brought up at a shrine", "the youngest of nine on a farm", "a soldier's child, moved from post to post", "a merchant's child who ran away", "a miner's child", "raised by a grandmother who told stories"],
+	"_parentage_fits": "293 amended (2), lore's pairs: a parentage that names a place, or needs a fixed home, is rolled only beside a birthplace it fits; one not listed fits anywhere, the barge included. Never the region's hills for a miner: Hollowfell is lost.",
+	"parentage_fits": {
+		"the youngest of nine on a farm": ["the hill farms", "a crossroads inn", "a walled market town"],
+		"a miner's child": ["a mining town in the north"],
+		"a foundling brought up at a shrine": ["a fishing village on a grey coast", "the hill farms", "a mining town in the north", "the lower streets of an old city", "a forest hamlet of charcoal burners", "a crossroads inn", "a walled market town"],
+		"raised by an aunt who kept bees": ["a fishing village on a grey coast", "the hill farms", "a mining town in the north", "the lower streets of an old city", "a forest hamlet of charcoal burners", "a crossroads inn", "a walled market town"]
+	},
 	"profession": [
 		{"words": "a carpenter", "trade": "carpenter"},
 		{"words": "a joiner's apprentice who never finished", "trade": "carpenter"},

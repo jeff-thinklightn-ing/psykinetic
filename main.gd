@@ -4584,6 +4584,8 @@ func _boot() -> void:
 	_records.clear()
 	for record: PlayerRecord in snapshot["players"]:
 		_records[record.player_id] = record
+	print(CompanionCard.counts_line(CompanionCard.card_counts(_records.values().map(func(r: PlayerRecord) -> Dictionary:
+		return r.companion))))  # Counts only (293 amended (2)): no name, no card's words.
 	_move_off_retired(snapshot)
 	_move_off_remade(snapshot)
 	var saved: Dictionary = snapshot["zones"]

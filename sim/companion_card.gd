@@ -15,7 +15,9 @@ const KEYS: Array[String] = ["pronoun", "birthplace", "parentage", "profession",
 ## The card call: one paragraph, a sentence of how they met, as JSON.
 const CARD_SYSTEM := """You write a character card for a companion in a game: who she is, from facts given. Write in the
 third person with the pronoun given, in plain words, one paragraph of four to six sentences: what she is like, what she cares about, how she
-speaks, what she fears. Use every fact; add nothing that goes against them. Never write speech, dialogue or quotes,
+speaks, what she fears. Use every fact; add nothing that goes against them. Her temperament colours how she talks, never
+whether she talks: whatever her traits, she speaks her mind, has opinions and has things she likes to talk about, and her
+card says what they are. Never write speech, dialogue or quotes,
 and never use the words game, player or companion. Then one sentence, in the third person, of how she and %s met,
 from the fact given. Reply with one JSON object and nothing else: {"card": "<the paragraph>", "how_we_met": "<the sentence>"}."""
 
@@ -95,6 +97,7 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 			traits["trade"] = str(picked.get("trade", ""))
 		else:
 			traits[key] = str(picked)
+	traits["parentage"] = fitting_parentage(traits, player_id)
 	# One from before keeps her fixed facts; the roll fills in round them.
 	if is_legacy(name):
 		var fixed: Variant = table["legacy"][name].get("fixed", {})
@@ -108,6 +111,52 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 	traits["leanings"] = roll_leanings(player_id, traits)
 	traits["justice"] = justice(traits, player_id)
 	return traits
+
+
+## Her parentage, agreeing with her birthplace (293 amended (2)): one that names
+## a place ("the youngest of nine on a farm") and doesn't fit hers (the
+## table's "parentage_fits") is rolled again, by a seed of its own, from
+## those that fit; the rest of her roll is untouched.
+static func fitting_parentage(traits: Dictionary, player_id: String) -> String:
+	var had := str(traits.get("parentage", ""))
+	if parentage_fits(had, str(traits.get("birthplace", ""))):
+		return had
+	var options: Array = tables().get("parentage", []).filter(func(each: Variant) -> bool:
+		return parentage_fits(str(each), str(traits.get("birthplace", ""))))
+	if options.is_empty():
+		return had
+	return str(options[absi(hash("parentage:" + player_id)) % options.size()])
+
+
+## Whether [param parentage] fits [param birthplace]: one not in the
+## table's "parentage_fits" fits anywhere.
+static func parentage_fits(parentage: String, birthplace: String) -> bool:
+	var fits: Variant = tables().get("parentage_fits", {}).get(parentage)
+	return not fits is Array or birthplace in fits
+
+
+## What the server's companions' cards say, counted (293 amended (2)): the
+## boot line's numbers, never a name or a card's words. [param companions]
+## each a record's companion {traits, card}.
+static func card_counts(companions: Array) -> Dictionary:
+	var counts := {"cards": 0, "quiet": 0, "not_one_for": 0, "watchful": 0, "clash": 0}
+	for companion: Variant in companions:
+		if not companion is Dictionary or str(companion.get("card", "")).is_empty():
+			continue
+		var words := str(companion["card"]).to_lower()
+		var traits: Dictionary = companion.get("traits", {}) if companion.get("traits") is Dictionary else {}
+		counts["cards"] += 1
+		counts["quiet"] += 1 if words.contains("quiet") or words.contains("silent") else 0
+		counts["not_one_for"] += 1 if words.contains("not one for") else 0
+		counts["watchful"] += 1 if words.contains("watchful") or words.contains("cautious") else 0
+		counts["clash"] += 0 if parentage_fits(str(traits.get("parentage", "")), str(traits.get("birthplace", ""))) else 1
+	return counts
+
+
+## card_counts as the boot line.
+static func counts_line(counts: Dictionary) -> String:
+	return "[companions] cards: %d; quiet/silent %d, 'not one for' %d, watchful/cautious %d, birthplace-parentage clash %d" % [
+		counts["cards"], counts["quiet"], counts["not_one_for"], counts["watchful"], counts["clash"]]
 
 
 ## Her leanings that weigh what she hears (decision 442, as a resident's,
