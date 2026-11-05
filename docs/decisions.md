@@ -42106,6 +42106,16 @@ one, the hills' six and the Old Tower, not the path, voice's shown names). Proto
 maps' side)" line, the world message carrying a new key an old client ignores (rev 49 still
 open); no new class_name.
 
+804 amended (8): a zone's mouth counts once (2026-11-05, maps; release's label; the coordinator's
+ask, from playtest's reward tour, build\reward10, gains 2 and 3: walking from the hills into the
+mine gave "+1 Wayfaring, Hollowfell" twice within 3 s, once for the hills' place at the mine's
+mouth, hills/hollowfell, and once for the Hollowfell zone, ui's first stand). A named place with a
+link to another level within its radius (Level.at_a_mouth, from Level.places_from) is no longer
+worth reaching by default: the zone it opens on counts instead. An "explore" set in level.json
+still overrides. Today that drops hills/hollowfell alone (15 places count, from 16), and it covers
+the crypt's dig mouth to come without a data change. level_test _test_explorables (the hills' five,
+not Hollowfell's mouth). CHANGELOG bullet (voice's words). Protocol unchanged, no new class_name.
+
 804 amended (5): a fight won paced (2026-11-05, combat; release's label; the coordinator's ask and
 approval, from playtest's reward_loop tour: "+1 Deeds, a fight won" nine times in 83 s, the
 companion's own skirmishes counted as the player's, noise rather than a reward). A fight pays only

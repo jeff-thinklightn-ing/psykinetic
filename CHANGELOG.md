@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Walking into Hollowfell counts once toward your Wayfaring, where before it counted twice (804 amended (8)).
 - Towns: once a town's inn stands, a taverner comes to keep it, and where there's no cook, the taverner takes the food you bring (812).
 - Towns: what you bring for a town goes into the hands of whoever uses it, the smith for ore, the cook for food, Rolf at the stall for gear, and the store's chest tells you who to take a thing to (802 amended (4)).
 - Towns: click a townsperson to talk, trade or give in one window; what you type goes to them, and Give hands them what they can use from your pack, toward a build or the town's stores and paid for now or owed, or gear to Rolf as a gift (802).

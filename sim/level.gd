@@ -1284,6 +1284,22 @@ static func room_at(level: Dictionary, cell: Vector2i) -> String:
 ## places factions hold (Holdings). An entry with no cell, a kind there is
 ## not, or a town that is no stockpile place here, is said in
 ## [param warnings].
+## Whether a link to another level lies within [param radius] of
+## [param at] in [param config] (level.json's): a place at a zone's mouth,
+## whose reaching the zone itself counts (804, maps' side, amended).
+static func at_a_mouth(at: Vector2i, radius: int, config: Dictionary) -> bool:
+	var links: Variant = config.get("links", [])
+	if not links is Array:
+		return false
+	for link: Variant in links:
+		if not link is Dictionary or str(link.get("to_map", "")).is_empty():
+			continue
+		var cell: Variant = _tile(link.get("at"))
+		if cell is Vector2i and maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= radius:
+			return true
+	return false
+
+
 static func places_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
 	var out: Dictionary[String, Dictionary] = {}
 	var listed: Variant = config.get("places", {})
@@ -1305,7 +1321,8 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			warnings.append("the place %s has a radius under 1: it is 1" % [key])
 		out[str(key)] = {"key": str(key), "cell": at, "name": str(entry.get("name", str(key).capitalize())), "kind": kind,
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody")),
-			"explore": bool(entry["explore"]) if entry.get("explore") is bool else kind in EXPLORE_KINDS and not str(entry.get("name", "")).strip_edges().is_empty()}
+			"explore": bool(entry["explore"]) if entry.get("explore") is bool else kind in EXPLORE_KINDS and not str(entry.get("name", "")).strip_edges().is_empty()
+				and not at_a_mouth(at, maxi(radius, 1), config)}
 		# The name a reached place's gain shows (804, maps' side; voice's), where its name is a where-phrase (613's).
 		out[str(key)]["shown"] = str(entry["shown"]).strip_edges() if entry.get("shown") is String and not str(entry["shown"]).strip_edges().is_empty() else out[str(key)]["name"]
 		# A refuge's where (613 amended): one of REFUGE_WHERE, else warned and left out.

@@ -2739,8 +2739,8 @@ func _test_explorables() -> void:
 		reached.sort()
 		by_level[level_name] = reached
 	_check(wrong.is_empty(), "no town place and no unnamed place is worth reaching (%s)" % [wrong])
-	_check(by_level["hills"] == ["bridge_camp", "herders_hut", "hill_cave", "hill_shieling", "hollowfell", "spur_camp"] and by_level["held"] == ["old_tower"],
-		"the hills' six and the Old Tower are (%s)" % [by_level])
+	_check(by_level["hills"] == ["bridge_camp", "herders_hut", "hill_cave", "hill_shieling", "spur_camp"] and by_level["held"] == ["old_tower"],
+		"the hills' five and the Old Tower are; Hollowfell's mouth is not, the zone counts (%s)" % [by_level])
 	_check(not by_level["wilds"].has("store") and by_level["wilds"].has("old_farmstead") and not by_level["forest"].has("boar_path"),
 		"the wilds' farmstead is, its store is not, nor the forest's path to the hunters' camps (a way, not a place) (%s)" % [by_level])
 	var shown := {}
