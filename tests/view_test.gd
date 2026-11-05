@@ -1149,6 +1149,7 @@ func _test_mine_sounds() -> void:
 	# The cart: any entity drawn as prop.mine_cart.
 	var cart := _spawn_imp(Vector2i(9, 11))
 	cart.spawn_spec["art"] = Client3D.CART_ART
+	cart.move_ticks = 2.0  # A quick roll's step: its stop at CART_STOP_MS (794, sound's side).
 	_rig._process(0.0)
 	var body: Node3D = _rig._puppets.get(cart.get_instance_id())
 	if body == null:
@@ -1162,6 +1163,21 @@ func _test_mine_sounds() -> void:
 		var stop := _heard(func() -> void: _rig._sync_cart(body, cart, now + Client3D.CART_STOP_MS + 1))
 		_check(rolling == null or (stop == ["sfx.minecart_stop"] and not body.has_meta("cart_roll") and (rolling as Node).is_queued_for_deletion()),
 				"a cart still CART_STOP_MS: its roll let go, its stop heard (%s)" % [stop])
+		# A slow roll (794, sound's side): low, and its stop waits out the step.
+		cart.move_ticks = World.TICK_RATE / World.cart_stop_speed
+		var then := now + 5000
+		body.set_meta("cart_tile", cart.tile + Vector2i(-1, 0))
+		_rig._sync_cart(body, cart, then)
+		var slow: Variant = body.get_meta("cart_roll") if body.has_meta("cart_roll") else null
+		var early := _heard(func() -> void: _rig._sync_cart(body, cart, then + Client3D.CART_STOP_MS + 1))
+		_check(slow == null or (early.is_empty() and is_equal_approx((slow as AudioStreamPlayer3D).pitch_scale, Client3D.CART_PITCH.x)),
+				"a cart rolling at cart_stop_speed: pitched low (%s), no stop CART_STOP_MS into a %d ms step (%s)"
+				% [str((slow as AudioStreamPlayer3D).pitch_scale) if slow != null else "-", Client3D.cart_stop_ms(cart.move_ticks), early])
+		var late := _heard(func() -> void: _rig._sync_cart(body, cart, then + Client3D.cart_stop_ms(cart.move_ticks) + 1))
+		_check(slow == null or late == ["sfx.minecart_stop"], "its step out and the slack past: its stop heard (%s)" % [late])
+		_check(is_equal_approx(Client3D.cart_roll_pitch(World.TICK_RATE / World.cart_top_speed), Client3D.CART_PITCH.y)
+				and Client3D.cart_stop_ms(2.0) == Client3D.CART_STOP_MS,
+				"a cart at cart_top_speed pitched high; a quick step's stop at CART_STOP_MS")
 	World.despawn(cart)
 	_rig._process(0.0)
 	# A wall lamp: its flame from the nearest in reach.

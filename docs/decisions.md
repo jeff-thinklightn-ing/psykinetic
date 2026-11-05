@@ -41465,6 +41465,17 @@ plane. The words are data, so changing one needs no new art.
   on waystone variant 3, and no words on a slot without a panel. Every printable glyph was
   checked once at 4x, Godot's triangulation against FreeType's rendering.
   Client only; protocol unchanged; no new class_name.
+794, sound's side: the roll heard at its speed (release's label; physics' numbers). 769
+amended (4)'s sfx.minecart_roll and sfx.minecart_stop (Client3D._sync_cart) read the
+cart's replicated move_ticks. The roll's pitch runs from CART_PITCH 0.8 at
+cart_stop_speed to 1.2 at cart_top_speed, by 10 / move_ticks cells a second
+(Client3D.cart_roll_pitch), set each frame it moves. The stop is heard once the cart has
+held its cell past its last step and CART_STOP_SLACK_MS 150 more, never sooner than
+CART_STOP_MS 400 (Client3D.cart_stop_ms): a slow cart's 2 s step no longer plays its
+stop mid-step. No take changes. view_test _test_mine_sounds: a cart at cart_stop_speed
+is pitched low and still at 401 ms, stops after its step; the top speed is pitched high.
+Client only, protocol unchanged, no new class_name, no bullet (it comes with 790's carts).
+
 ## 795. The forest's sounds: the boar king, the old wolf, the lairs, the camps (part 1: boars)
 
 The design (2026-11-03) is C:/dev/review/sound/forest/design.md, approved by the coordinator. It covers the boar king, the old wolf and his pack's answer, the lairs' level "ambience" ("cave_lair", "thicket") and the forest camps' sounds over their fire. Each part rides what already reaches the client: Monster.cried, the spawn spec's kind, the level's decor and places. **No new message**. The later parts land as "795, sound's side (n)" as their kinds and places reach main.

@@ -2083,6 +2083,12 @@ const IDLE_QUIET_MS := 6000
 ## stop heard CART_STOP_MS after the last move (_sync_cart, 769 amended (4)).
 const CART_ART := "prop.mine_cart"
 const CART_STOP_MS := 400
+## A rolling cart (794, sound's side): its stop waits out its last step
+## (move_ticks) and CART_STOP_SLACK_MS more, never under CART_STOP_MS; its
+## roll pitched from CART_PITCH.x at cart_stop_speed to CART_PITCH.y at
+## cart_top_speed (cart_roll_pitch).
+const CART_STOP_SLACK_MS := 150
+const CART_PITCH := Vector2(0.8, 1.2)
 ## How far inside a wall a span's posts stand (769, the beam's), metres.
 const DECOR_POST_INSET := 0.15
 ## The draugr's remains while he is gone at rest (573 amended (4)): his
@@ -15817,7 +15823,8 @@ func _sync_seam(puppet: Node3D, seam: Seam) -> void:
 
 ## The mine's cart (769 amended (4)): its roll held (sfx.minecart_roll) from
 ## the moment its tile moves, steered along with it, and let go with its
-## stop (sfx.minecart_stop) once it has not moved for CART_STOP_MS.
+## stop (sfx.minecart_stop) once it has not moved for cart_stop_ms; the
+## roll pitched by its speed (794, sound's side).
 func _sync_cart(puppet: Node3D, cart: GridEntity, now: int) -> void:
 	var was: Variant = puppet.get_meta("cart_tile") if puppet.has_meta("cart_tile") else null
 	puppet.set_meta("cart_tile", cart.tile)
@@ -15830,12 +15837,28 @@ func _sync_cart(puppet: Node3D, cart: GridEntity, now: int) -> void:
 				puppet.set_meta("cart_roll", roll)
 	if roll == null or not is_instance_valid(roll):
 		return
-	if now - int(puppet.get_meta("cart_moved", now)) < CART_STOP_MS:
+	if now - int(puppet.get_meta("cart_moved", now)) < cart_stop_ms(cart.move_ticks):
 		sfx.steer(roll, puppet.position + Vector3.UP * 0.5)
+		roll.pitch_scale = cart_roll_pitch(cart.move_ticks)
 		return
 	roll.queue_free()
 	puppet.remove_meta("cart_roll")
 	sfx.play("sfx.minecart_stop", puppet.position + Vector3.UP * 0.5)
+
+
+## How long a cart whose step takes [param move_ticks] (794's replicated
+## roll) waits still before its stop is heard: past its step, at least
+## CART_STOP_MS.
+static func cart_stop_ms(move_ticks: float) -> int:
+	return maxi(CART_STOP_MS, roundi(move_ticks * 1000.0 / World.TICK_RATE) + CART_STOP_SLACK_MS)
+
+
+## A rolling cart's pitch at [param move_ticks] a step: CART_PITCH.x at
+## World.cart_stop_speed cells a second .. CART_PITCH.y at cart_top_speed.
+static func cart_roll_pitch(move_ticks: float) -> float:
+	var speed := World.TICK_RATE / maxf(move_ticks, 0.1)
+	var share := inverse_lerp(World.cart_stop_speed, World.cart_top_speed, speed)
+	return lerpf(CART_PITCH.x, CART_PITCH.y, clampf(share, 0.0, 1.0))
 
 
 ## Gone at rest (573 amended (4)): the draugr's remains (art-kit's one-cell
