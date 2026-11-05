@@ -160,6 +160,10 @@ var _huts: Dictionary = {}
 ## entry by [param id], for npc's bodies.
 signal visitor_came(town: String, id: String)
 signal visitor_left(town: String, id: String)
+## A player's regard with [param town] rose by [param halves] (after the
+## day's cap) for [param why]; [param word] is the ladder word after it,
+## [param was] the word before (804, economy's side: Main shows the rise).
+signal regard_rose(town: String, player_id: String, halves: int, why: String, word: String, was: String)
 ## (town) -> Array of place names a visitor to it may come from (711; Main,
 ## from the world plane); "the road" while unset.
 var visitor_from := Callable()
@@ -3331,6 +3335,9 @@ const REGARD_BUILD := "gave gold toward the %s"
 const REGARD_HOME := "brought meat home from the hill"
 const REGARD_LEFT := "left meat to rot on the hill"
 const REGARD_THANKS := "kept the wolves from the fold"
+## A raw or a piece of gear handed in while the town holds under twice its
+## enough (804, economy's side; voice's words).
+const REGARD_USE := "brought %s the town can use"
 ## How many of a player's recent effects on a town are kept (768's "recent").
 const RECENT_KEPT := 5
 
@@ -3359,6 +3366,7 @@ func regard_move(town: String, player_id: String, halves: int, why: String) -> i
 		it["gained"] = int(it["gained"]) + halves
 	var most := Standing.setting("most") * 2
 	var before := int(it["halves"])
+	var was := regard_word(before)
 	it["halves"] = clampi(before + halves, -most, most)
 	var moved := int(it["halves"]) - before
 	if moved == 0:
@@ -3370,7 +3378,20 @@ func regard_move(town: String, player_id: String, halves: int, why: String) -> i
 	while reasons.size() > Standing.setting("why_kept"):
 		reasons.pop_front()
 	print("[regard] town %s %+d halves: %s" % [town, moved, why])
+	if moved > 0:
+		regard_rose.emit(town, player_id, moved, why, regard_word(int(it["halves"])), was)
 	return moved
+
+
+## The residents' ladder word for [param halves] of a town's regard (768):
+## "known", "trusted" or "wronged".
+static func regard_word(halves: int) -> String:
+	var points := halves / 2.0
+	if points >= Standing.setting("trusted"):
+		return "trusted"
+	if points <= Standing.setting("wronged"):
+		return "wronged"
+	return "known"
 
 
 ## [param town]'s regard of [param player_id] for its window (768): {score
@@ -3381,11 +3402,7 @@ func regard(town: String, player_id: String) -> Dictionary:
 	if it.is_empty():
 		return {"score": 0.0, "word": "", "last": 0, "why": []}
 	var points := int(it.get("halves", 0)) / 2.0
-	var word := "known"
-	if points >= Standing.setting("trusted"):
-		word = "trusted"
-	elif points <= Standing.setting("wronged"):
-		word = "wronged"
+	var word := regard_word(int(it.get("halves", 0)))
 	return {"score": clampf(points / maxf(Standing.setting("top"), 1.0), -1.0, 1.0), "word": word,
 		"last": int(it.get("last", 0)), "why": (it.get("why", []) as Array).duplicate()}
 

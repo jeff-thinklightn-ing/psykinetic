@@ -1190,6 +1190,7 @@ func _go_online() -> void:
 		World.ground_changed.connect(_on_ground_changed)
 		World.gold_changed.connect(_on_gold_changed)
 		World.traded.connect(_on_traded)
+		World.handed_in.connect(_on_handed_in)  # 804, economy's side: a hand-in thanked.
 		World.slot_refused.connect(_on_slot_refused)
 		BuilderHost.warn_overlays()
 		if BuilderHost.available():
@@ -4161,6 +4162,7 @@ func _boot() -> void:
 	World.clearing.plotted.connect(_on_plotted)
 	World.clearing.unplotted.connect(_on_unplotted)  # A plot dropped (649, maps' side).
 	World.towns.building_changed.connect(_on_town_building_changed)
+	World.towns.regard_rose.connect(_on_regard_rose)  # 804, economy's side: every rise shown.
 	World.towns.stage_changed.connect(func(town: String) -> void: _on_town_building_changed(town, ""))  # Its stage told (591).
 	# The roofs storms broke and nobody has mended yet (decision 383).
 	World.roofs_damaged.clear()
@@ -14241,33 +14243,198 @@ func contribute(player: Player, args: Dictionary) -> Dictionary:
 	var player_id := player.player_id
 	var rules: Dictionary = World.economy.rules.get("town_regard", {})
 	var before := World.gold_of(player_id)
-	var cat: Dictionary = World.economy.catalog.call()
-	var short_given := {}
 	for raw: Variant in args.get("give", []):
-		var uid := int(raw)
-		var id := World.items.id_of(uid)
-		var short := World.economy.short_of(town, id, cat) if not id.is_empty() else -1.0
-		var yields := World.items.yields_of(uid)
-		var word: String = str(yields.keys()[0]) if not yields.is_empty() else Items.name_of(id).to_lower()
-		if World.donate(player, uid, town) and short > 0.0:
-			short_given[word] = true  # Wood, or the sword: what the town lacked.
+		World.donate(player, int(raw), town)  # Thanked with the store ground's, below (804).
+	_thank_hand_ins()  # One rise and one thanks, as at the store's ground (804, economy's side).
 	var paid := World.gold_of(player_id) - before
-	var kind := str(World.economy.contribution_wanted(town).get("kind", ""))
+	var wanted := World.economy.contribution_wanted(town)
+	var kind := str(wanted.get("kind", ""))
 	var given := 0
 	if int(args.get("gold", 0)) > 0:
 		given = World.economy.contribute(town, player_id, int(args["gold"]))
-	for word: String in short_given:
-		World.towns.regard_move(town, player_id, int(rules.get("short", 0)), Towns.REGARD_SHORT % word)
 	if given > 0:
 		World.towns.note_recent(town, player_id, "gave_gold", "gold", given)
 		if given >= int(rules.get("build_gold", 1)):
+			var fund := World.economy.fund(town, kind)
+			_regard_bar = {"have": fund, "need": fund + maxi(int(wanted.get("gold", 0)) - given, 0)}
 			World.towns.regard_move(town, player_id, int(rules.get("build", 0)), Towns.REGARD_BUILD % _building_words(kind))
+			_regard_bar = {}
 	var sheet := town_sheet(town)
 	sheet.merge(town_window(player, town), true)
 	sheet["paid"] = paid
 	sheet["given"] = given
 	Net.message_to(player.owner_peer, "town_sheet", sheet)
 	return sheet
+
+
+# --- Rewards shown (804, economy's side) ---------------------------------------
+
+## The hand-ins not yet thanked: {player_id: {place: {raws {what: count},
+## gear {id: count}, short {id: most short}, paid, owed, depot}}}, thanked
+## once a hand-in (_thank_hand_ins, deferred to the end of the frame, or at
+## once by contribute), so a window's Donate and a pile dropped on the
+## store's ground give one rise and one thanks alike.
+var _hand_ins := {}
+## A build fund's progress to show with the next regard rise, set by contribute.
+var _regard_bar := {}
+
+
+## Sends [param player_id] a reward to show (decision 804: Main.reward, ui's
+## message), kept in rewards_given for the tests.
+func _reward(player_id: String, data: Dictionary) -> void:
+	rewards_given.append({"player": player_id, "data": data})
+	while rewards_given.size() > 32:
+		rewards_given.pop_front()
+	reward(player_id, data)
+
+
+## The last rewards sent ({player, data}), for tests.
+var rewards_given: Array[Dictionary] = []
+
+
+func _on_regard_rose(town: String, player_id: String, halves: int, why: String, word: String, was: String) -> void:
+	var data := {"track": "regard", "amount": halves / 2.0, "words": why, "of": _town_display(town)}
+	if word != was:
+		data["step"] = word
+	if not _regard_bar.is_empty():
+		data["bar"] = _regard_bar.duplicate()
+	_reward(player_id, data)
+
+
+func _on_handed_in(place: String, player_id: String, what: String, count: int, raw: bool, short: float, paid: int,
+		owed: int, depot: bool) -> void:
+	if _hand_ins.is_empty():
+		_thank_hand_ins.call_deferred()
+	var theirs: Dictionary = _hand_ins.get_or_add(player_id, {})
+	var it: Dictionary = theirs.get_or_add(place, {"raws": {}, "gear": {}, "short": {}, "paid": 0, "owed": 0, "depot": depot})
+	var into: Dictionary = it["raws"] if raw else it["gear"]
+	into[what] = int(into.get(what, 0)) + count
+	if not raw:
+		it["short"][what] = maxf(float(it["short"].get(what, -1.0)), short)
+	it["paid"] = int(it["paid"]) + paid
+	it["owed"] = int(it["owed"]) + owed
+	it["depot"] = bool(it["depot"]) or depot
+
+
+## Thanks every hand-in not yet thanked: one town regard rise for what the
+## town could use (rules "town_regard" short for what it was short of, else
+## "use" while it held under twice its enough: 804's bonus, inside the day's
+## cap), then one "item" reward with the words, the gold paid and the need
+## bars, and the gold owed if the treasury could not pay.
+func _thank_hand_ins() -> void:
+	var all := _hand_ins
+	_hand_ins = {}
+	if World.towns == null or World.economy == null:
+		return
+	var rules: Dictionary = World.economy.rules.get("town_regard", {})
+	var cat: Dictionary = World.economy.catalog.call()
+	for player_id: String in all:
+		for place: String in all[player_id]:
+			var it: Dictionary = all[player_id][place]
+			var stock := {}
+			for row: Dictionary in town_stock(place):
+				stock[str(row["id"])] = row
+			var short_words: Array = []
+			var use_words: Array = []
+			var bars: Array = []
+			var parts: Array = []
+			for what: String in it["raws"]:
+				var count := int(it["raws"][what])
+				parts.append(_count_words(what, count, true))
+				var row: Dictionary = stock.get(what, {})
+				var enough := int(row.get("enough", 0))
+				var have := int(row.get("have", 0))
+				var short := Economy._short(have - count, enough)  # As it stood before.
+				if short > 0.0:
+					short_words.append(what)
+				elif short > -1.0:
+					use_words.append(what)
+				if enough > 0:
+					bars.append({"id": what, "have": have, "enough": enough})
+			for id: String in it["gear"]:
+				var count := int(it["gear"][id])
+				var word := Items.name_of(id).to_lower() if cat.has(id) else id
+				parts.append(_count_words(word, count, false))
+				var short := float(it["short"].get(id, -1.0))
+				if short > 0.0:
+					short_words.append(word)
+				elif short > -1.0:
+					use_words.append(word)
+			if not short_words.is_empty():
+				World.towns.regard_move(place, player_id, int(rules.get("short", 0)), Towns.REGARD_SHORT % _and_words(short_words))
+			elif not use_words.is_empty():
+				World.towns.regard_move(place, player_id, int(rules.get("use", 0)), Towns.REGARD_USE % _and_words(use_words))
+			var given: Dictionary = (it["raws"] as Dictionary).merged(it["gear"])
+			var data := {"track": "item", "of": _town_display(place), "amount": _total_count(it),
+				"words": "The %s takes %s" % ["depot" if bool(it["depot"]) else "store", _and_words(parts)],
+				"place": place, "given": given, "counted": _and_words(parts)}  # For npc's spoken thanks: where, {id: count}, and the counted words.
+			if int(it["paid"]) > 0:
+				data["gold"] = int(it["paid"])
+			if not bars.is_empty():
+				data["bars"] = bars
+			var with := _companions_beside(player_id)
+			if not with.is_empty():
+				data["with"] = with  # For her needs (companions: pride, company).
+			_reward(player_id, data)
+			if int(it["owed"]) > 0:
+				_reward(player_id, {"track": "gold", "of": _town_display(place), "amount": int(it["owed"]),
+					"words": "%s owes you %d gold" % [_town_display(place), int(it["owed"])]})
+
+
+## The names of [param player_id]'s companions within World.COMPANION_REACH
+## of them in their zone (a hand-in's "with").
+func _companions_beside(player_id: String) -> Array:
+	var me := _player_of_id(player_id)
+	var out: Array = []
+	if me == null:
+		return out
+	for entity in World.get_entities():
+		if entity is Companion and (entity as Companion).keeper_id == player_id and entity.zone == me.zone \
+				and World.distance(entity.tile, me.tile) <= World.COMPANION_REACH:
+			out.append(String(entity.name))
+	return out
+
+
+## How many of [param word], in voice's words: "6 fish", "3 ore", "2 hides",
+## "a spear", "2 spears".
+static func _count_words(word: String, count: int, raw: bool) -> String:
+	if raw:
+		return "%d %s" % [count, word + "s" if word in COUNTED_RAWS and count != 1 else word]
+	if count == 1:
+		return "%s %s" % ["an" if not word.is_empty() and word[0] in "aeiou" else "a", word]
+	return "%d %ss" % [count, word]
+
+
+## The raw goods counted one by one; the rest are a heap ("3 ore").
+const COUNTED_RAWS := ["hide", "sheep"]
+
+
+static func _total_count(it: Dictionary) -> int:
+	var total := 0
+	for key: String in ["raws", "gear"]:
+		for what: String in it[key]:
+			total += int(it[key][what])
+	return total
+
+
+## "a", "a and b", "a, b and c".
+static func _and_words(words: Array) -> String:
+	if words.size() <= 1:
+		return str(words[0]) if not words.is_empty() else ""
+	return "%s and %s" % [", ".join(words.slice(0, words.size() - 1)), words[-1]]
+
+
+## [param town]'s name as players know it: the named room its store stands
+## in ("Umbrage"), else its place's name, else its id.
+func _town_display(town: String) -> String:
+	var place: Dictionary = World.holdings.place(town) if World.holdings != null else {}
+	if place.is_empty():
+		return town
+	var rooms := _rooms_of(str(place.get("area", "")))
+	var key := Level.room_at({"rooms": rooms}, place.get("cell", Vector2i(-1, -1)))
+	if not key.is_empty():
+		return str(rooms[key]["name"])
+	return str(place.get("name", town))
 
 
 ## Voice's refusal for a Donate away from the store (768).

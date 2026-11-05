@@ -96,6 +96,13 @@ signal gold_changed(player_id: String, gold: int)
 ## A player put a thing into a resident's hands (try_transfer): a gift (decision 443).
 signal handed(by: GridEntity, to: GridEntity, item: String, uid: int)
 signal traded(by: GridEntity, shop: GridEntity, why: String)
+## A player (or their companion) handed [param count] of [param what] in at
+## stockpile [param place] (804, economy's side): a raw good as its resource
+## ([param raw]), gear as its item id with [param short], how short the town
+## was of it before (Economy.short_of); [param paid] the gold paid for it,
+## [param owed] what the town came to owe them for it, [param depot] true at
+## a depot. Main thanks them once a hand-in (Main._thank_hand_ins).
+signal handed_in(place: String, player_id: String, what: String, count: int, raw: bool, short: float, paid: int, owed: int, depot: bool)
 ## A move of things between slots refused for the armour slot's rule
 ## (decision 622): [param why] is said to whoever moved them (Main).
 signal slot_refused(by: GridEntity, why: String)
@@ -4285,7 +4292,9 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 		_log("slots: %s refused %s: grave goods, only the fence takes them" % [depot.name, item])  # 586.
 		return false
 	uid = _unit_out(from, from_slot)  # One of a stack (decision 619).
+	_at_depot = true
 	_bank_thing(place, uid, _label_of(by), _label_of(from), depot.zone, depot.tile, owner_of(by))
+	_at_depot = false
 	_log("slots: %s banked %s from %s %d at %s" % [by.name, item, from.name, from_slot, place])
 	_slots_changed(from)
 	return true
@@ -4313,6 +4322,10 @@ func donate(by: GridEntity, uid: int, place: String) -> bool:
 	return true
 
 
+## True while a depot banks (World._bank), for handed_in's words.
+var _at_depot := false
+
+
 ## Banks the instance [param uid] (held by nothing now) at stockpile
 ## [param place], brought [param who] someone from [param from]: a resource
 ## item as its yield (its instance ended, "banked"), gear as itself.
@@ -4321,16 +4334,23 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 	var yields := items.yields_of(uid)  # A short one's share (decision 493).
 	var player_id := by_id.trim_prefix("player:") if by_id.begins_with("player:") else ""
 	if yields.is_empty():
+		var id := items.id_of(uid)
+		var short := economy.short_of(place, id) if economy != null and not player_id.is_empty() else -1.0
 		stockpile.bank(place, uid, who, from, at_zone, tile, "banked", by_id)
 		if towns != null:
-			towns.note_recent(place, player_id, "donated", items.id_of(uid), 1)  # 768: gear given is a gift.
+			towns.note_recent(place, player_id, "donated", id, 1)  # 768: gear given is a gift.
+		if not player_id.is_empty():
+			handed_in.emit(place, player_id, id, 1, false, short, 0, 0, _at_depot)
 		return
+	var paid := 0
+	var owed := 0
 	# A player's raw goods (or their companion's) are a sale at the delivery
 	# price (decision 498; Jeff: "players bank goods for gold"). A counter
 	# sale has no by_id: it was paid there.
 	if economy != null and not player_id.is_empty():
 		var owed_before := economy.owed_to(player_id, place)
-		var paid := economy.bank_sale(place, player_id, yields)
+		paid = economy.bank_sale(place, player_id, yields)
+		owed = maxi(economy.owed_to(player_id, place) - owed_before, 0)
 		if paid > 0:
 			add_gold(player_id, paid, "banked %s" % [yields])
 		if towns != null:
@@ -4340,6 +4360,11 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 				towns.note_recent(place, player_id, "sold" if sold else "donated", what, int(yields[what]))
 	for what: String in yields:
 		stockpile.deposit(place, what, int(yields[what]), who, from, by_id)
+	if economy != null and not player_id.is_empty():
+		var first := true
+		for what: String in yields:  # The pay with the first: one sack, one sale.
+			handed_in.emit(place, player_id, what, int(yields[what]), true, 0.0, paid if first else 0, owed if first else 0, _at_depot)
+			first = false
 	if balance != null:
 		# Meat brought home (761), by its bringer's label: the depot's who, or
 		# a counter sale's seller (761 amended (5)), never "sold:<id>".

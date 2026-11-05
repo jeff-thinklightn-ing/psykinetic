@@ -489,7 +489,7 @@ func _test_in_town() -> void:
 	await _test_barter_in_town(host, counter)
 	_test_robber_falls(host)
 	await _test_give_in_town(host)
-	_test_town_sheet(host)
+	await _test_town_sheet(host)
 	_test_drove()
 	_test_makers_command()
 	remove_child(_main)
@@ -641,7 +641,7 @@ func _test_town_sheet(host: Player) -> void:
 	_check(sheet["mood"] in ["safe", "uneasy", "on guard"] and sheet["season"] != "" and sheet["sought"] is Array, "the mood, season and sought")
 	_check(sheet["strain"] == World.towns.strain(STORE) and sheet["strain"].has("days") and sheet["strain"].has("why"), "its strain toward falling (649): %s" % [sheet["strain"]])
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
-	_test_town_window(host)
+	await _test_town_window(host)
 
 
 ## The town window (768, economy's side): the sheet's new fields for the
@@ -676,6 +676,28 @@ func _test_town_window(host: Player) -> void:
 	_check(regard["word"] == "known" and regard["score"] > 0.0 and regard["last"] == 1 and regard["why"].back() == Towns.REGARD_SHORT % "wood",
 		"the town's regard up for wood it was short of (%s)" % [regard])
 	_check(given["recent"].back() == {"kind": "sold", "id": "wood", "amount": 5}, "noted among their recent effects (%s)" % [given["recent"]])
+	# 804, economy's side: one rise and one thanks for the hand-in, shown.
+	var sent: Array = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me).slice(-2)
+	_check(sent.size() == 2 and sent[0]["data"]["track"] == "regard" and sent[0]["data"]["words"] == Towns.REGARD_SHORT % "wood"
+		and is_equal_approx(float(sent[0]["data"]["amount"]), int(World.economy.rules["town_regard"]["short"]) / 2.0),
+		"804: the regard's rise sent, its words and amount (%s)" % [sent[0] if not sent.is_empty() else {}])
+	var thanks: Dictionary = sent[1]["data"] if sent.size() == 2 else {}
+	_check(thanks.get("track") == "item" and thanks.get("words") == "The store takes 5 wood" and int(thanks.get("amount", 0)) == 5
+		and int(thanks.get("gold", 0)) == int(given["paid"]) and thanks.get("bars", []).any(func(bar: Dictionary) -> bool: return bar["id"] == "wood" and int(bar["have"]) == 5)
+		and thanks.get("place") == STORE and thanks.get("given") == {"wood": 5} and thanks.get("counted") == "5 wood",
+		"804: then the store's thanks: its words, the count, the gold paid, wood's bar, the place and what was given (%s)" % [thanks])
+	# Wood at its enough, under twice it: handed in (World.donate, thanked at the frame's end), a
+	# half for what the town can use.
+	var enough := int(_main.town_stock(STORE).filter(func(row: Dictionary) -> bool: return row["id"] == "wood")[0]["enough"])
+	World.stockpile.deposit(STORE, "wood", enough - World.stockpile.count(STORE, "wood"), "test")
+	var halves_was := int(World.towns.to_dict()[STORE]["regard"][me]["halves"])
+	var handed := World.items.mint("wood_bundle", "found", "test")
+	World.put_item(host, host, 1, handed)
+	_check(World.donate(host, handed, STORE), "(a bundle handed in)")
+	await get_tree().process_frame
+	var used: Dictionary = World.towns.to_dict()[STORE]["regard"][me]
+	_check(int(used["halves"]) == halves_was + int(World.economy.rules["town_regard"]["use"]) and used["why"].back() == Towns.REGARD_USE % "wood",
+		"at its enough, under twice it: a half for wood the town can use (%s)" % [used["why"].back()])
 	# The day's cap: two more short gifts move it only to day_most.
 	for i in 2:
 		_no_wood()
