@@ -437,7 +437,7 @@ func _test_overheard() -> void:
 	_check(pip_text.ends_with("%s: Bo, take the left side." % Net.player_name)
 			and ("%s: Bo, take the left side." % Net.player_name) in Companion.render(nix.voice_messages()),
 		"both companions hear the line, labelled with who said it")
-	_check("Not everything said near you is meant for you" in pip_text and "Bo is " in pip_text,
+	_check(("has just spoken to Bo, not to you") in pip_text and "Bo is " in pip_text,
 		"Pip is told a line may not be for her, and that Bo is there to be spoken to")
 	_check(MindLog.last[String(pip.name)].get("outcome") == "silent" and pip._said.is_empty() and pip.stance != Companion.Stance.PRESS
 			and MindLog.last[String(pip.name)].get("stance_ignored") == "PRESS",

@@ -52,6 +52,8 @@ extends Node
 ##   --builder-model=<m>          and --builder-effort=<e>, --builder-max-cost=<dollars a request>
 ##   --mind-why                   ask the minds for a short "why" with each answer, for the log
 ##                                (or PSYKINETIC_MIND_WHY=1)
+##   --voice-ab=capsule           server/host, for the voice A/B only (decision 803 amended): her
+##                                voice's prompt as it was on 2026-10-07; never on the box
 ##   --perception=list|grid|both  what the minds are told she sees around her: a list of the
 ##                                nearest things with where each is (default), a map of the
 ##                                cells around her, or the map then the list (or
@@ -145,6 +147,9 @@ extends Node
 ##   --test-walk=<keys:secs,...>  WASD: hold these keys (e.g. w:1.5,wd:1) in turn, then let go
 ##   --test-walk-on-wind          --test-walk starts at the local player's own wind-up (392 amended), logged
 ##   --test-foe=<kind>,<weapon>   server: each player joins with that weapon in hand and that monster 3 cells east
+##   --test-traits=<k>:<v>;...    server, the voice A/B only (803 amended): over a companion's rolled traits,
+##                                e.g. temperament:warm and talkative
+##   --test-card=<file>           server, the voice A/B only: her card is that file's text, not the model's
 ##   --test-arts=<art>:<m>,...    server, tests only (with --run-marker): each player joins with that weapon memory, e.g. swordplay:1,bow:0.5 (766)
 ##   --test-smooth                count jumps and back steps in what is drawn, frame by frame (60 fps), and report
 ##                                them at exit (net/smooth_meter.gd; tools/net_smooth.sh)
@@ -917,6 +922,11 @@ var test_walk: Array[Dictionary] = []
 var test_walk_on_wind := false
 ## --test-foe: [monster kind, weapon] each joining player is given, or empty.
 var test_foe: PackedStringArray = []
+## The voice A/B only (decision 803 amended): traits laid over a companion's
+## roll (--test-traits), and a card that stands in for the written one
+## (--test-card). Never on the box.
+var test_traits: Dictionary = {}
+var test_card := ""
 ## --test-arts: {art: memory} each joining player starts with (766), or empty;
 ## honoured only beside --run-marker (Main._test_arts).
 var test_arts: Dictionary = {}
@@ -2138,11 +2148,11 @@ func _parse_args(given: Array = []) -> void:
 			"--lawspeaker-players":
 				lawspeaker_players = true
 			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \
-					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
+					"--llm-url", "--llm-model", "--voice-url", "--voice-model", "--voice-ab", "--perception", "--mind-log", "--map", "--day-minutes", "--hour", "--weather", "--season", "--season-days", "--edit", "--edit-size", "--transcripts", \
 					"--builders", "--builder-model", "--builder-effort", "--builder-max-cost", "--lawspeaker", "--proposed", \
 					"--test-move", "--test-contest", "--test-reset", "--test-die-travel", "--test-builder", "--test-exit-after", "--test-exit-on", "--test-wait-players", "--test-herds", "--test-hold", "--test-version", "--test-protocol", \
 					"--screenshot", "--test-show", "--test-hover", "--test-door", "--test-chest", "--test-click", "--test-fullscreen", "--test-azimuth", "--test-yaw", \
-					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
+					"--test-lag", "--test-steer", "--test-fight", "--test-chase", "--test-walk", "--test-foe", "--test-traits", "--test-card", "--tick-send-hz", "--test-hold-near", "--test-latency", "--test-kicks", "--test-arts":
 				if not has_value and i + 1 < args.size():
 					i += 1
 					value = args[i]
@@ -2207,6 +2217,17 @@ func _set_option(key: String, value: String) -> void:
 					test_walk.append({"keys": pieces[0].to_lower(), "seconds": pieces[1].to_float()})
 		"--test-foe":
 			test_foe = value.split(",")
+		"--test-traits":
+			# Decision 803 amended, the voice A/B only: "key:value;key:value" over a companion's roll.
+			test_traits.clear()
+			for part in value.split(";"):
+				var at := part.find(":")
+				if at > 0:
+					test_traits[part.substr(0, at).strip_edges()] = part.substr(at + 1).strip_edges()
+		"--test-card":
+			# The voice A/B only: her card read from this file, never written by the model.
+			var card_file := FileAccess.open(value, FileAccess.READ)
+			test_card = card_file.get_as_text().strip_edges() if card_file != null else ""
 		"--test-arts":
 			test_arts.clear()
 			for part in value.split(","):
@@ -2234,6 +2255,9 @@ func _set_option(key: String, value: String) -> void:
 			voice_url = value
 		"--voice-model":
 			voice_model = value
+		"--voice-ab":
+			# Decision 803 amended: the A/B's October voice prompt; never on the box.
+			Companion.capsule_style = value.to_lower() == "capsule"
 		"--perception":
 			if value.to_lower() in PERCEPTIONS:
 				perception = value.to_lower()

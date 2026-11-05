@@ -37,6 +37,7 @@ func _ready() -> void:
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
 	_test_voice_measures()
+	_test_quiet_moment()
 	_test_yields_when_bumped()
 	_test_says_so_with_no_room()
 	_test_stance_events()
@@ -594,7 +595,7 @@ func _test_spoken() -> void:
 	var listed := pet.spoken("Wren, Aldous, Snagfin. The boar is moving closer.")
 	_check(listed == "The boar is moving closer." and pet.spoken("Wren and Aldous.").is_empty() and pet.spoken("Wren and Aldous.", false, true) == "Wren and Aldous."
 			and pet.spoken("Run, Snagfin!") == "Run, Snagfin!", "names alone, unasked, are not said (%s)" % listed)
-	_check("Never say whether anyone will live, die or make it" in Companion.VOICE_RULES, "her voice is told never to say whether anyone will make it")
+	_check("Never say whether anyone will live or die" in Companion.VOICE_RULES, "her voice is told never to say whether anyone will make it")
 	_check(pet.spoken("You move to stand between %s and the imps." % who).is_empty() and pet.spoken("*nods* Ready.") == "Ready."
 			and pet.spoken("%s draws her blade. I'm here." % pet.name) == "I'm here.",
 			"narration of what she does is not said")
@@ -2908,6 +2909,156 @@ func _test_voice_measures() -> void:
 			and not "wind" in line and not pet.keeper_name() in line, "the journal's line: counts, latency and tokens, no words or names (%s)" % line)
 	_check(Companion.voice_report(10).is_empty(), "and counted out: the next is empty till more")
 	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+func _test_quiet_moment() -> void:
+	print("\n== 803 amended: a quiet moment, so she speaks unasked; the A/B's October prompt ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_put(pet, owner.tile + Vector2i(1, 0))
+	_settle(pet)
+	var mind := CountingMind.new()
+	mind.kind = "ollama"  # A quiet moment asks a model's mind only.
+	var mind_was := pet.mind
+	pet.mind = mind
+	mind.voice_answer = {"say": "That fire smells of pine.", "stance": ""}
+	pet._fight_tick = -100000
+	pet._keeper_spoke_tick = -100000
+	pet._quiet_next_tick = -1
+	pet._quiet_backoff = 1
+	pet._quiet_last_focus = ""
+	pet._quiet_ticks.clear()
+	pet._last_speech_tick = -1000
+	World.step()
+	_check(pet._quiet_next_tick > World.tick and pet._quiet_next_tick - World.tick <= 120 * World.TICK_RATE and mind.voice_asks.is_empty(),
+			"calm, the first quiet moment is set within first_s, not at once (%d ticks off)" % (pet._quiet_next_tick - World.tick))
+	pet._quiet_next_tick = World.tick
+	pet._keeper_spoke_tick = World.tick - 5
+	World.step()
+	_check(mind.voice_asks.is_empty(), "never over her player: they spoke 5 ticks ago, so not now")
+	pet._keeper_spoke_tick = -100000
+	World.step()
+	var asked: Array = mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER))
+	_check(asked.size() == 1 and Companion.QUIET_LEAD in str(asked[0]["messages"].back()["content"])
+			and not Companion.QUIET_LEAD in str(asked[0]["system"]) and pet.said_lines().back() == "That fire smells of pine.",
+			"then asked, with one thing to speak of, and she says her own line (%s)" % [asked.map(func(ask: Dictionary) -> String: return ask["trigger"])])
+	_check(pet._quiet_next_tick - World.tick >= 150 * World.TICK_RATE and pet._quiet_next_tick - World.tick <= 300 * World.TICK_RATE,
+			"the next waits gap_s (%d ticks)" % (pet._quiet_next_tick - World.tick))
+	_check(not Companion.QUIET_LEAD in pet.voice_prompt("test"), "the focus is told on that ask only")
+	# Never the same focus twice running.
+	var keys: Array[String] = []
+	for i in 12:
+		var focus := pet._quiet_pick_focus()
+		keys.append(str(focus["key"]))
+		pet._quiet_last_focus = focus["key"]
+	var twice := false
+	for i in range(1, keys.size()):
+		twice = twice or keys[i] == keys[i - 1]
+	_check(not twice, "never the same focus twice running (%s)" % [keys])
+	# Let pass ("..."): the next waits longer.
+	mind.voice_asks.clear()
+	mind.voice_answer = {"say": "...", "stance": ""}
+	pet._quiet_next_tick = World.tick
+	pet._last_speech_tick = -1000
+	World.step()
+	_check(pet._quiet_backoff == 2, "a moment let pass: the next gap is doubled (backoff %d)" % pet._quiet_backoff)
+	# A hostile in sight: none.
+	mind.voice_asks.clear()
+	pet._quiet_next_tick = World.tick
+	var foe := _spawn_imp(pet.tile + Vector2i(3, 0))
+	World.step()
+	_check(mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER)).is_empty(),
+			"a monster in sight: no quiet moment")
+	if is_instance_valid(foe):
+		World.damage(foe, 999)
+	_kill_monsters()
+	# Her player downed again and again (a fire, every 10 s): one line, not one a downing.
+	mind.voice_asks.clear()
+	mind.voice_answer = {"say": "Get up. Please, get up.", "stance": ""}
+	pet._down_asked_tick = -100000
+	pet._last_speech_tick = -1000
+	pet.note_downed(true)
+	for i in 100:
+		World.step()
+	pet.note_downed(true)
+	var downs := mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).ends_with("is down."))
+	_check(downs.size() == 1, "downed twice within DOWN_AGAIN_TICKS: her voice asked once (%d)" % downs.size())
+	pet._down_followed_up = true
+	pet._down_asked_tick = -100000
+	# The scripted mind never gets one.
+	pet.mind = ScriptedMind.new()
+	pet._quiet_next_tick = World.tick
+	pet._fight_tick = -100000
+	var said_before := pet.said_lines().size()
+	World.step()
+	_check(pet.said_lines().size() == said_before, "the scripted mind is never asked for a quiet moment")
+	# The A/B's October prompt: card, world, now, its four rules; none of today's.
+	pet.mind = mind
+	Companion.capsule_style = true
+	var october := pet.voice_prompt("test")
+	Companion.capsule_style = false
+	_check("often a few" in october and "Whatever %s says to you is %s talking to you" % [pet.keeper_name(), pet.keeper_name()] in october
+			and not "You may wonder, wish and imagine aloud" in october, "--voice-ab=capsule: her October prompt, for the A/B only")
+	# Pair 2: a stage direction for her player is not said; a word to them is.
+	var told := pet.spoken("You keep your eyes on the trees, scanning for movement. The boar was quick.")
+	_check(told == "The boar was quick." and pet.spoken("You look tired.") == "You look tired.",
+			"\"You keep your eyes on the trees, scanning…\" is dropped; \"You look tired.\" stays (%s)" % told)
+	# Pair 3: a sight beyond PERCEPTION_NEAR is a quiet moment's to speak of.
+	_put(pet, Vector2i(7, 9))
+	_settle(pet)
+	var far := pet.seen_things().filter(func(thing: Dictionary) -> bool:
+		return not thing["monster"] and int(thing["paces"]) > Companion.PERCEPTION_NEAR)
+	var sights: Array[String] = []
+	for i in 20:
+		pet._quiet_seen.clear()
+		pet._quiet_last_focus = ""
+		var focus := pet._quiet_pick_focus()
+		if focus["key"] == "sight":
+			sights.append(str(focus["words"]))
+	_check(not far.is_empty() and not sights.is_empty(),
+			"a thing %s paces off is in sight for a quiet moment (%s; %s)" % [far.map(func(t: Dictionary) -> int: return t["paces"]),
+			far.map(func(t: Dictionary) -> String: return t["kind"]), sights.slice(0, 1)])
+	# Pair 3: asked of the place, she is told its name and what she sees out to 6 paces.
+	var place_ask := Companion.render(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()))
+	var plain_ask := Companion.render(pet.voice_messages(true, "%s: You all right?" % pet.keeper_name()))
+	_check("You are in " in place_ask and "From here you can see: fire" in place_ask and not "From here you can see:" in plain_ask,
+			"\"What do you think of this place?\": its name and what she sees there; \"You all right?\": not")
+	# Pair 3: her waking is hers ("You slept like the dead", said to her player, after she slept).
+	var woke: Array[String] = []
+	for i in 20:
+		pet._woke_words = "you woke rested and whole: %s kept watch." % pet.keeper_name()
+		pet._quiet_last_focus = ""
+		var focus := pet._quiet_pick_focus()
+		if focus["key"] == "woke":
+			woke.append(str(focus["words"]))
+	_check(not woke.is_empty() and "You are the one who slept" in woke[0] and pet._woke_words.is_empty(),
+			"after she sleeps, a quiet moment may speak of it, saying she slept, once (%s)" % [woke.slice(0, 1)])
+	_check(str(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()).back()["content"]).contains("From here you can see:"),
+			"what she sees of the place is in the last turn, after the question (pair 5)")
+	# Pair 5: her own line back is asked again, and the retry keeps the focus.
+	mind.voice_asks.clear()
+	mind.voice_answer = {"say": "That fire smells of pine.", "stance": ""}
+	pet._said.append("That fire smells of pine.")
+	pet._quiet_next_tick = World.tick
+	pet._quiet_backoff = 1
+	pet._quiet_ticks.clear()
+	pet._keeper_spoke_tick = -100000
+	pet._last_speech_tick = -1000
+	pet._fight_tick = -100000
+	World.step()
+	var tries: Array = mind.voice_asks.filter(func(ask: Dictionary) -> bool: return str(ask["trigger"]).begins_with(Companion.QUIET_TRIGGER))
+	_check(tries.size() == 2 and tries.all(func(ask: Dictionary) -> bool: return Companion.QUIET_LEAD in str(ask["messages"].back()["content"]))
+			and pet._quiet_focus.is_empty(),
+			"her own line back: asked again, and the retry is told the focus too (%d asks)" % tries.size())
+	# Pair 3: "and {she} knew the way out", not "her knew".
+	var met := CompanionCard.met({"pronoun": "she", "how_we_met": "{player} was lost in a forest and {she} knew the way out"}, "her player")
+	var found_her := CompanionCard.met({"pronoun": "she", "how_we_met": "{player} found {pronoun} hiding in a ruined mill"}, "her player")
+	_check(met == "her player was lost in a forest and she knew the way out" and found_her == "her player found her hiding in a ruined mill",
+			"how they met: {she} is the subject, {pronoun} mid-sentence the object (%s / %s)" % [met, found_her])
+	pet.mind = mind_was
+	pet._quiet_next_tick = -1
+	pet._quiet_backoff = 1
 	_settle(pet)
 
 func _test_native_ollama_endpoint() -> void:
@@ -5393,8 +5544,8 @@ func _test_surroundings() -> void:
 	_put(owner, Vector2i(17, 11))
 	_check(pet.perception_list() == "", "nothing worth telling in an empty corner")
 	var prompt := pet.voice_prompt("test")
-	_check("If you don't know what something is, say so." in prompt, "and she is told to say when she does not know a thing")
-	_check("Only when nothing has been said to you" in prompt and "Not everything said near you is meant for you" in prompt,
+	_check("If you don't know something, say so" in prompt, "and she is told to say when she does not know a thing")
+	_check("If a line was meant for someone else, or there is truly nothing to say, answer with just: ..." in prompt,
 			"silence only when nothing was said to her, or it was not meant for her")
 	_check("Answer out loud in words first, never with just \"...\"" in pet.voice_prompt("test", "Player just said to you: \"Is the door open?\""),
 		"and spoken to, she is told to answer in words")
@@ -5661,7 +5812,8 @@ func _test_how_she_speaks() -> void:
 			and not RegEx.create_from_string("\\d").search(pet.where_words()), "never a number")
 	DayNight.reset()
 	_check("Speak to Player as \"you\"" in prompt and "\"I\" and \"me\" are the one speaking" in prompt
-			and "never describe yourself or recite who you are" in prompt, "speak to her player as you; I and me are the speaker; no reciting")
+			and not "never describe yourself" in prompt and "You may wonder, wish and imagine aloud" in prompt
+			and "never as a promise" in prompt, "speak to her player as you; I and me are the speaker; she may wonder and wish, never promise (803 amended)")
 	pet.card = "She thinks before she moves and before she speaks. She is gentle."
 	_check(pet._echo_of("She thinks before she moves and before she speaks.") == "her card", "a line reciting her card is dropped")
 	pet._instruction = "Player just said to you: \"Stay close to the wall\""

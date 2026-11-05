@@ -41631,3 +41631,39 @@ unasked), 3 (fixed lines handed to her voice), 5 (her needs and wants), then bur
 companion_test _test_voice_measures: num_ctx on every channel and the warm-up, the measures
 read, a voice entry's tokens in the mind log, the journal line's counts with no words or
 names, counted out after. Server only, protocol unchanged, no new class_name, no bullet.
+
+803 amended (steps 2 and 4, the coordinator's approval 2026-11-05; Jeff saw the lines): her
+voice's rules are who she is, and a quiet moment lets her speak unasked. VOICE_RULES replaces
+about twenty lines of don'ts: she talks the way she always talks, a sentence or two; of what
+is around her, what just happened, what she likes and would like to do; she may wonder, wish
+and imagine aloud, as a wish or a guess, never a promise; she says so when she doesn't know;
+her player is "you", and she never speaks for them; nobody's death is foretold; her world is
+never spoken of from outside it; "..." when a line was someone else's or there is nothing to
+say. The calm opener ("Neither of you is in danger") is gone from her voice's Now:
+(situation_text keeps it for the hands). A quiet moment (Companion._quiet_moment, the
+"quiet" block of levels/companion_traits.json): calm, her player within hearing and silent
+player_quiet_s (30), no hostile in sight, not on an errand or asleep, a model's mind (never
+the scripted one), she is asked after first_s (60-120 s), then every gap_s (150-300), doubled
+each time she lets one pass (to max_gap_s 600), at most per_hour (12). Each is given one
+concrete thing (Companion._quiet_pick_focus, by focus_weights): her waking, if she has just
+woken (always first: told only the waking, she said her player had slept); something she sees
+out to PERCEPTION_RANGE (seen_things; perceived() keeps 2 paces, and no sight came up in 11
+moments), never a monster, stair, ledge or door, and not the same kind twice a day; the
+latest thing that happened (never a joining or leaving); her hobby or food; a question for her
+player; a place new to her today. Never the same kind twice running; with none, none is asked.
+The focus goes in her last turn ("[A moment passes. You notice a cart, a few paces to the
+north-west. If you speak now, speak of that, in your own way.]"): in Now: she passed over it
+(pair 4: 0 of 3), in the last turn she used it (pair 5: 5 of 6); an ask again keeps it. Asked
+of the place (PLACE_WORDS), what she sees there and what happened lately follow the question
+in that turn (place_words_now). Her player downed again within DOWN_AGAIN_TICKS (60 s) gets no
+new ask, and one follow-up if still down after DOWN_FOLLOW_UP_TICKS (playtest: 12 downings on
+a fire, 13 lines). The narration filter drops a stage direction for her player ("You keep
+your eyes on the trees, scanning..."). how_we_met seeds take {she} for a subject ("and {she}
+knew the way out" read "her knew"). For voice A/B runs only, never on the box: --voice-ab
+(her October prompt, CAPSULE_RULES), --test-traits=k:v;k:v (laid over a roll) and
+--test-card=<file> (her card as written). Measured by playtest with qwen3:14b, lines scored
+specific (only she could say it, there and then) or not: October 2-4 of 9 with "quiet" in 4;
+pair 5, 3 and 4 of 6, "quiet" in 1 per run unasked. A talkative card did no better than her
+rolled one (pair 3), so the card was not the lever; decision 675 still holds her tongue in a
+fight (the coordinator: as one begins and after it ends is enough). companion_test
+_test_quiet_moment. Server only, protocol unchanged, no new class_name.

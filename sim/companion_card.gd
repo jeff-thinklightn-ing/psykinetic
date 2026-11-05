@@ -101,6 +101,8 @@ static func roll(player_id: String, keep_name := "", taken: Array[String] = []) 
 		if fixed is Dictionary:
 			for key: String in fixed:
 				traits[key] = str(fixed[key])
+	for key: String in Net.test_traits:
+		traits[key] = str(Net.test_traits[key])  # The voice A/B only.
 	traits["body"] = String(body_of(traits, player_id))
 	traits["look"] = roll_look(player_id, traits)
 	traits["leanings"] = roll_leanings(player_id, traits)
@@ -377,7 +379,9 @@ static func met(traits: Dictionary, player: String) -> String:
 	var object: String = {"she": "her", "he": "him", "they": "them"}.get(str(traits.get("pronoun", "she")), "her")
 	var start := str(traits.get("how_we_met", ""))
 	var said := start.replace("{player}", player)
-	# At the start of the sentence it is the subject.
+	# {she} is always the subject ("and {she} knew the way out"; as {pronoun}
+	# it read "her knew", pair 3); {pronoun} is the subject only at the start.
+	said = said.replace("{she}", str(traits.get("pronoun", "she")))
 	said = said.replace("{pronoun} ", str(traits.get("pronoun", "she")) + " ") if start.begins_with("{pronoun}") else said
 	said = said.replace("{pronoun}", object)
 	return said

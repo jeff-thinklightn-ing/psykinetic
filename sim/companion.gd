@@ -328,22 +328,40 @@ see. Fire burns whoever stands in it. Crates and boulders can be shoved; doors o
 Wounds do not close on their own; a bandaging kit, used away from danger, mends them.
 Whoever falls can be brought back, but it hurts, and no one wants to fall.
 Directions are spoken as north, south, east and west."""
-const VOICE_RULES := """Say what you would say out loud right now, as yourself, in one or two short sentences. However few
-your words, say them as whole sentences, never a single word or a bare name. Your words are only what you say aloud:
-never describe what you do or where you go. Not everything said near you is meant for you: a line that says your name is for you; a line that
-names someone else is not; a line that names no one is open to anyone near, and you answer it if you have something
-useful to say; from %s with no one else near, it is for you. When a line is meant for you, always answer in words,
-even if only to say you don't know; when it is not, you usually stay quiet and answer with just: ... Never say again
-what you have already said, and never repeat anyone's words back. When something has just happened, speak to
-it, not to what to do next. Only when nothing has been said to you and there is
-truly nothing worth saying, answer with just: ...
-Speak to %s as "you", never of them by name, and to no one else unless they have just spoken to you or are in danger you must warn them
-of; say a name only to call out. In what anyone says, "I" and "me" are the one speaking.
-Never repeat back what you were asked to do, and never describe yourself or recite who you are.
-You speak only for yourself: never put words in %s's mouth, never quote them, and never say what kind of person they are or what they feel.
-Whatever anyone says near you is them talking, nothing more; you answer only as yourself.
-If you don't know what something is, say so. If you haven't seen something, you don't know whether it is there, and a plain no would claim you do.
-Never say whether anyone will live, die or make it; say what you fear or what to do."""
+const VOICE_RULES := """You are yourself, and you talk the way you always talk. Say what you would say out loud right now: a
+sentence or two, a little more when something moves you.
+Talk about what is around you, what just happened, what today has been like, what you like, and what you would like to do.
+You may wonder, wish and imagine aloud ("I wish I could climb that", "I'd love to see the sea one day"): say it as a wish or
+a guess, never as a promise.
+If you don't know something, say so; you may wonder about it.
+Speak to %s as "you", and say a name only to call out. In what anyone says, "I" and "me" are the one speaking.
+You speak only for yourself: never put words in %s's mouth, and never say what they think or feel.
+Never say whether anyone will live or die; say what you fear, or what you hope.
+Never speak of your world from outside it: no players, levels, points or rules of play. You live here.
+If a line was meant for someone else, or there is truly nothing to say, answer with just: ..."""
+## Decision 803 amended (step 2): the rules above replace about twenty lines
+## of don'ts piled up since 84 (the coordinator's diagnosis: "made safe one
+## rule at a time"). For the A/B only (--voice-ab=capsule; never on the
+## box), her prompt as it was on 2026-10-07 (99330a99): her card, the world,
+## now, and these four lines.
+const CAPSULE_RULES := """Say what you would say out loud right now, as yourself, in a sentence or two at most; often a few
+words are enough. When %s speaks to you, answer. Never say again what you have already said, and never repeat %s's
+words back. Only if there is truly nothing worth saying, answer with just: ...
+Whatever %s says to you is %s talking to you, nothing more; you answer only as yourself."""
+## Decision 803 amended: a quiet moment (step 4). Calm, her player near and
+## quiet, she is asked now and then with one thing to speak of (a focus),
+## so she talks unasked; the numbers are companion_traits.json "quiet".
+const QUIET_TRIGGER := "quiet moment"
+## What a quiet moment's focus is told with: nothing of calm (pair 1).
+## Closes a quiet moment's last turn, after what she notices or thinks of.
+## Told in Now:, the focus was passed over: of 7 sights, doors told there,
+## she spoke of none (pair 4); the last turn is what a model answers.
+const QUIET_LEAD := "If you speak now, speak of that, in your own way."
+## How each focus reaches her, before its words.
+const QUIET_OPENERS := {"sight": "You notice", "ask": "You have", "default": "You think of"}
+const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s": 600, "per_hour": 12,
+	"new_place_s": [20, 40], "player_quiet_s": 30,
+	"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1}}
 ## Who her player's words were for, as the server knows it (addressed):
 ## said her name, or no one else near enough to hear ("certain"); others
 ## near ("maybe"). Then VOICE_ASKED, the stances.
@@ -395,7 +413,7 @@ const OWN_ITEMS := "\\b(lanterns?|bandag\\w*|pack)\\b"
 ## what kind of person they are or what they feel. Such a sentence goes
 ## (spoken), and a line with one is asked again, once (_take_result).
 const SPEAKS_FOR := "(?i)[\"\u201c\u201d]|\\byou (say|said|mutter\\w*|whisper\\w*|repl\\w*|add|added)\\b|^you(?:'re|\u2019re| are) (not )?(the|a|an) (kind|type|sort)\\b|^you (don'?t|don\u2019t|do not|can'?t|can\u2019t|cannot|never) (trust|shake|look back|seem|like|care)\\b"
-const NARRATION := "(?i)^(%s) [a-z]+s\\b|^a moment passes\\b|^(you |)(nod|nods|smile|smiles|sigh|sighs|shrug|shrugs|grin|grins|frown|frowns)\\b|^you (move|step|walk|go|turn|shift|edge|plant|brace|position) .*\\b(stand|between|beside|in front of|yourself)\\b"
+const NARRATION := "(?i)^(%s) [a-z]+s\\b|^a moment passes\\b|^you (keep|scan|glance|peer|survey|study|search|sweep|fix) (your|the)\\b|^you [a-z]+ [^,]*, (scanning|watching|searching|listening|peering)\\b|^(you |)(nod|nods|smile|smiles|sigh|sighs|shrug|shrugs|grin|grins|frown|frowns)\\b|^you (move|step|walk|go|turn|shift|edge|plant|brace|position) .*\\b(stand|between|beside|in front of|yourself)\\b"
 ## The recent exchange the voice sees: so many turns and narrations.
 const EXCHANGE_KEPT := 16
 ## With --mind-why each reply gives its reason too, for the mind log.
@@ -576,6 +594,33 @@ var _last_speech_tick := -1000
 ## otherwise is a fixed one), and every companion's voice counts since the
 ## journal's last "[voice]" line (voice_report).
 var _saying_voice := false
+## Decision 803 amended (step 4): her quiet moments. The tick the next may
+## come; how many times longer the gap is after quiet moments she let pass
+## ("..."); the ticks of this hour's; the last focus; the focus told her
+## voice on this ask; the kinds she was told of today, and the day; the
+## zones seen today; when her player last spoke to her. capsule_style: the
+## A/B's October prompt (--voice-ab=capsule).
+var _quiet_next_tick := -1
+var _quiet_backoff := 1
+var _quiet_ticks: Array[int] = []
+var _quiet_last_focus := ""
+var _quiet_focus := ""
+var _quiet_seen: Dictionary[String, bool] = {}
+## Her waking, for the next quiet moment's "woke" focus ("" once spoken of):
+## told only "You wake rested and whole: her player kept watch.", she said
+## "You slept like the dead" to her player (pair 3).
+var _woke_words := ""
+## A quiet moment's focus by the serial it was told on, for an ask again.
+var _focus_serials: Dictionary[int, String] = {}
+var _quiet_day := -1
+var _zones_today: Dictionary[String, bool] = {}
+var _keeper_spoke_tick := -100000
+var _zone_new_today := false
+var _quiet_rng := RandomNumberGenerator.new()
+static var capsule_style := false
+## The minds a quiet moment asks: a model's own words only, never the
+## scripted mind's "Hm?" (tests add their own).
+static var quiet_minds: Array[String] = ["ollama", "claude"]
 static var voice_counts: Dictionary[String, int] = {}
 static var voice_latencies: Array[int] = []
 static var voice_prompt_tokens: Array[int] = []
@@ -599,6 +644,15 @@ var _lapsed_from := ""
 var _lapse_why := ""
 ## Her player died and has not respawned yet.
 var _keeper_down := false
+## Her player downed (803 amended, step 2; playtest's run: downed again every
+## 10 s on a fire, 13 lines in 2 minutes, most the same): the tick her voice
+## was last asked about it, and whether its one follow-up (still down after
+## DOWN_FOLLOW_UP_TICKS) was asked. A downing within DOWN_AGAIN_TICKS of the
+## last ask gets no new one.
+var _down_asked_tick := -100000
+var _down_followed_up := true
+const DOWN_AGAIN_TICKS := 600
+const DOWN_FOLLOW_UP_TICKS := 600
 var _keeper_back := false
 ## Her own last lines, newest last; words heard, {text, tick, speaker}.
 var _said: Array[String] = []
@@ -1143,6 +1197,7 @@ func friend_words(entity: GridEntity) -> String:
 ## (PHRASE_STANCES) and stands as the instruction; her voice still answers
 ## it, but its stance, if any, is not taken.
 func owner_spoke(text: String, phrase := 0) -> void:
+	_keeper_spoke_tick = World.tick
 	_heard.append({"text": text, "tick": World.tick, "speaker": keeper_name()})
 	_talked("%s: %s" % [keeper_name(), text])
 	var meaning := meaning_of(text, keeper_name())
@@ -1669,6 +1724,7 @@ func _keep_watch() -> void:
 			_serial += 1
 			_set_stance(DEFAULT_STANCE, _serial, "order")
 			_narrate(woke)
+			_woke_words = woke.replace("You wake", "you woke").replace("while you slept", "while you were asleep")
 		return
 	if World.tick % DEED_EVERY != 0 or not _alive(keeper) or not order.is_empty() or _hostile_within(SIGHT_RANGE):
 		if _sleeping.has("asked_at") and _hostile_within(SIGHT_RANGE):
@@ -1869,7 +1925,12 @@ func note_downed(theirs: bool) -> void:
 		var can := can_revive.is_valid() and bool(can_revive.call())
 		_narrate("%s is down. %s" % [keeper_name(), "You may bring them back where they lie." if can
 			else "You cannot bring them back; someone blessed, with a charge, may."])
-		_ask_voice("%s is down." % keeper_name(), "", true)
+		# Told every time; asked to speak once: down again so soon (a fire's
+		# every 10 s), she has said it already.
+		if World.tick - _down_asked_tick >= DOWN_AGAIN_TICKS:
+			_down_asked_tick = World.tick
+			_down_followed_up = false
+			_ask_voice("%s is down." % keeper_name(), "", true)
 	else:
 		_narrate("You are down, and lie where you fell.")
 
@@ -2116,6 +2177,10 @@ func _held_for_bandage() -> bool:
 ## Compares the room with last tick's and asks the hands and the voice on
 ## what matters; sends asks a busy mind made wait.
 func _watch() -> void:
+	if not _down_followed_up and World.tick - _down_asked_tick >= DOWN_FOLLOW_UP_TICKS:
+		_down_followed_up = true
+		if _alive(keeper) and World.is_downed(keeper):
+			_ask_voice("%s is still down." % keeper_name(), "", true)  # Its one follow-up.
 	var now := _situation_now()
 	var events: Array[String] = []
 	var threshold := false
@@ -2246,6 +2311,150 @@ func _watch() -> void:
 		_pending_voice = {}
 		_ask_voice(waiting["trigger"], waiting["heard"], waiting.get("always", false), waiting.get("phrase", false),
 			waiting.get("own", true), waiting.get("report", false))
+	elif not fight:
+		_quiet_moment()
+
+
+## Decision 803 amended (step 4): companion_traits.json "quiet" over
+## QUIET_DEFAULTS (drafts for Jeff).
+static func quiet_rules() -> Dictionary:
+	var rules: Dictionary = QUIET_DEFAULTS.duplicate(true)
+	rules.merge(CompanionCard.tables().get("quiet", {}), true)
+	return rules
+
+
+## A wait in ticks from quiet_rules' [param key], a [low, high] range in
+## seconds, drawn from her own generator (seeded by her name and the day).
+func _quiet_gap(key: String) -> int:
+	var span: Array = quiet_rules().get(key, [60, 120])
+	return _quiet_rng.randi_range(int(span[0]), int(span[1])) * World.TICK_RATE
+
+
+func _quiet_gap_mid() -> int:
+	var span: Array = quiet_rules().get("gap_s", [150, 300])
+	return maxi((int(span[0]) + int(span[1])) / 2 * World.TICK_RATE, 1)
+
+
+## A quiet moment (803 amended, step 4): calm (no fight, nothing hostile in
+## sight, no errand, not resting or asleep), her player near enough to hear,
+## up, and not having spoken to her for player_quiet_s; past the wait set
+## after her last line (gap_s, longer after moments she let pass) or, the
+## first, first_s after she came; a zone new today shortens the wait to
+## new_place_s; at most per_hour an hour. Her voice is asked with one
+## thing to speak of (_quiet_pick_focus), and may still answer "...".
+func _quiet_moment() -> void:
+	if mind == null or not _alive(keeper) or World.is_downed(keeper) or quiet() \
+			or not quiet_minds.any(func(prefix: String) -> bool: return mind.kind.begins_with(prefix)):
+		return
+	var rules := quiet_rules()
+	var day := Townsfolk.day_of(World.steps)
+	if day != _quiet_day:
+		_quiet_day = day
+		_quiet_seen.clear()
+		_zones_today.clear()
+		_quiet_rng.seed = hash("%s %d" % [_name_of(self), day])
+	if _quiet_next_tick < 0:
+		_zones_today[zone] = true
+		_quiet_next_tick = World.tick + _quiet_gap("first_s")
+		return
+	if not _zones_today.has(zone):
+		_zones_today[zone] = true
+		_zone_new_today = true
+		_quiet_next_tick = mini(_quiet_next_tick, World.tick + _quiet_gap("new_place_s"))
+	if World.tick < _quiet_next_tick:
+		return
+	if _on_errand() or current_intent in [Intent.REST, Intent.SLEEP] or order in ["rest", "watch"] \
+			or _hostile_within(SIGHT_RANGE) or not heard_by_anyone() or mind.busy("voice") \
+			or World.tick - _keeper_spoke_tick < int(rules.get("player_quiet_s", 30)) * World.TICK_RATE:
+		return  # Not now: looked at again next tick.
+	var hour := 3600 * World.TICK_RATE
+	_quiet_ticks = _quiet_ticks.filter(func(at: int) -> bool: return World.tick - at < hour)
+	if _quiet_ticks.size() >= int(rules.get("per_hour", 12)):
+		_quiet_next_tick = _quiet_ticks[0] + hour
+		return
+	var focus := _quiet_pick_focus()
+	if focus.is_empty():
+		_quiet_next_tick = World.tick + 30 * World.TICK_RATE  # Nothing with a detail to it: look again in a while.
+		return
+	_quiet_ticks.append(World.tick)
+	_quiet_next_tick = World.tick + _quiet_gap("gap_s") * _quiet_backoff
+	_quiet_last_focus = focus["key"]
+	_quiet_focus = "%s %s %s" % [QUIET_OPENERS.get(focus["key"], QUIET_OPENERS["default"]), focus["words"], QUIET_LEAD]
+	_ask_voice("%s: %s" % [QUIET_TRIGGER, focus["key"]])
+	_quiet_focus = ""  # Told on that ask, or not asked at all: never carried to another.
+
+
+## One thing for a quiet moment to speak of, {key, words}, or {} when
+## nothing has a detail to it (the coordinator: "the model can't be generic
+## about a frayed rope"; a thin focus is not sent). Drawn by quiet_rules'
+## focus_weights from those there are, never the last one's key twice
+## running: "sight", one thing she can see (not a creature, a stair or a
+## ledge) and has not been told of today, with where it is and what it is
+## beside; "today", the latest thing that happened; "likes", her hobby or
+## her food, by name; "ask", a question for her player about that latest
+## thing or that sight; "place", a zone new to her today. Nothing is said
+## of calm or quiet: that word coloured every line (pair 1).
+func _quiet_pick_focus() -> Dictionary:
+	var weights: Dictionary = quiet_rules().get("focus_weights", {})
+	var options: Array[Dictionary] = []
+	var seen_words := ""
+	if not _woke_words.is_empty():
+		options.append({"key": "woke", "words": "your own sleep just now: %s You are the one who slept; %s stayed awake." % [_woke_words, keeper_name()]})
+	for thing: Dictionary in seen_things():
+		var kind := str(thing["kind"])
+		# A door has nothing to it to speak of: every sight in pair 4 was one, and none was spoken of.
+		if thing.get("monster", false) or kind in ["stair", "ledge"] or "door" in kind or _quiet_seen.has(kind):
+			continue
+		var paces: int = thing["paces"]
+		var where := "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]
+		var relations: Array[String] = thing["relations"]
+		seen_words = "%s, %s%s" % [thing["word"], where, " (" + ", ".join(relations) + ")" if not relations.is_empty() else ""]
+		options.append({"key": "sight", "words": seen_words + ".", "kind": kind})
+		break
+	var lately := _lately()
+	# A coming or going ("joined", "left") has nothing in it to speak of (pair 2).
+	var latest := ""
+	for line: String in lately:
+		if not (" joined" in line or " left" in line or " came back" in line or " logged" in line):
+			latest = line
+	if not latest.is_empty():
+		options.append({"key": "today", "words": "what happened a little while ago: %s" % latest})
+	var likes: Array[String] = []
+	if traits.get("hobby") is String and not str(traits["hobby"]).is_empty():
+		likes.append("%s, which you have not had a chance to do today." % traits["hobby"])
+	if traits.get("food") is String and not str(traits["food"]).is_empty():
+		likes.append("%s, which you have not had in a while." % traits["food"])
+	if not likes.is_empty():
+		options.append({"key": "likes", "words": likes[_quiet_rng.randi_range(0, likes.size() - 1)]})
+	if not latest.is_empty() or not seen_words.is_empty():
+		options.append({"key": "ask", "words": "a question for %s about %s" % [keeper_name(),
+			"what happened a little while ago (%s)." % latest if not latest.is_empty() else seen_words + "."]})
+	if _zone_new_today:
+		options.append({"key": "place", "words": "%s, where you have not been before today." % _place_words()})
+	if options.is_empty():
+		return {}
+	if options[0]["key"] == "woke":
+		_woke_words = ""
+		return options[0]  # Just woken, that comes first (pair 5: told "the boar died" instead, she mixed up who slept).
+	var open := options.filter(func(each: Dictionary) -> bool: return each["key"] != _quiet_last_focus)
+	if open.is_empty():
+		open = options
+	var total := 0
+	for each: Dictionary in open:
+		total += maxi(int(weights.get(each["key"], 1)), 0)
+	var roll := _quiet_rng.randi_range(1, maxi(total, 1))
+	var chosen: Dictionary = open[0]
+	for each: Dictionary in open:
+		roll -= maxi(int(weights.get(each["key"], 1)), 0)
+		if roll <= 0:
+			chosen = each
+			break
+	if chosen.has("kind"):
+		_quiet_seen[chosen["kind"]] = true
+	if chosen["key"] == "place":
+		_zone_new_today = false
+	_woke_words = ""  # Her waking is spoken of at the next quiet moment or not at all.
+	return chosen
 
 
 ## Narrates the deaths seen and clears them; returns those her voice is
@@ -2664,6 +2873,11 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 		_reask_next = false
 	if report:
 		_report_serials[_serial] = true
+	if not _quiet_focus.is_empty():
+		# Kept for an ask again: the retry lost it and she said "You slept without trouble" (pair 5).
+		if _focus_serials.size() > 8:
+			_focus_serials.clear()
+		_focus_serials[_serial] = _quiet_focus
 	var asked := not heard.is_empty() and own
 	# Certainly hers: then a stance with no words still counts.
 	_certain_serials[_serial] = asked and addressed_to(heard) == "her"
@@ -2684,6 +2898,11 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 ## (CompanionCard.CARD_SYSTEM); until it answers, her plain card stands.
 ## Not asked when it was written already, or she has no traits or mind.
 func write_card() -> void:
+	if not Net.test_card.is_empty() and card_by != "model":
+		card = Net.test_card  # The voice A/B's fixed card (--test-card), not the writer's.
+		card_by = "model"
+		card_written.emit()
+		return
 	if mind == null or traits.is_empty() or card_by == "model" or mind.busy("card"):
 		return
 	_serial += 1
@@ -2978,6 +3197,9 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var now: Array[String] = [voice_situation(), others_here()]
 	if asks_about_items(heard):
 		now.append(carried())
+	# In the last turn, after the question, as a quiet moment's focus is (pair 5:
+	# in Now:, both runs said "It's quiet here, but that doesn't mean it's safe").
+	var place_note := place_words_now() if asks_about_place(heard) else ""
 	now.append(doing())
 	if not works_as.is_empty():
 		now.append("While %s is away you stay in this town and work as its %s." % [who, works_as])
@@ -3024,7 +3246,11 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var known := Companion.lore_words(_name_of(self), lore_topics(things))
 	var system := "%s %s%s%s\n\n%s%s\n\nNow: %s\n\n%s%s" % [identity(), card, met, instructed, where_world(),
 		"\n" + known if not known.is_empty() else "", " ".join(now),
-		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who, who]]
+		around + "\n\n" if not around.is_empty() else "", VOICE_RULES % [who, who]]
+	if capsule_style:
+		# The A/B's October side (99330a99): card, world, now, four rules.
+		system = "%s %s%s\n\n%s\n\nNow: %s\n\n%s" % [identity(), card, instructed, where_world(), " ".join(now),
+			CAPSULE_RULES % [who, who, who, who]]
 	var addressed := addressed_to(heard)
 	var speaker := heard.get_slice(" ", 0)
 	if asked:
@@ -3053,6 +3279,10 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 		system += "\n\n" + VOICE_NAMED % speaker
 	elif addressed == "open":
 		system += "\n\n" + VOICE_OPEN % [speaker, " and ".join(others_near())]
+	elif addressed == "other":
+		# Someone else's line to another (803 amended: the rules no longer say
+		# who a line is for, so each ask is told, as for her player's).
+		system += "\n\n" + VOICE_FOR_OTHER % [speaker, " and ".join(_others_named(heard))]
 	if not _repeat_note.is_empty():
 		system += "\n\nYou have just said \"%s\" already: never say it again. Say something new about what just happened, or answer with just: ..." % _repeat_note
 		_repeat_note = ""
@@ -3074,6 +3304,14 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 			messages.append({"role": role, "content": text})
 	if messages.back()["role"] != "user":
 		messages.append({"role": "user", "content": "[A moment passes.]"})
+	if not place_note.is_empty():
+		messages.back()["content"] += "\n[%s]" % place_note
+	if not _quiet_focus.is_empty():
+		# A quiet moment's one thing to speak of (803 amended), in the last turn.
+		var last: String = messages.back()["content"]
+		messages.back()["content"] = ("[A moment passes. %s]" % _quiet_focus) if last == "[A moment passes.]" \
+			else "%s\n[%s]" % [last, _quiet_focus]
+		_quiet_focus = ""
 	return messages
 
 
@@ -3322,8 +3560,8 @@ func voice_situation() -> String:
 		sentences.append("%s is in danger." % who)
 	elif low:
 		sentences.append("Nothing is near enough to strike.")
-	else:
-		sentences.append("Neither of you is in danger.")
+	# Calm, nothing is said of danger (803 amended): "Neither of you is in
+	# danger" drew "too still, I'll keep watch" (the coordinator, pair 1).
 	sentences.append(where_words(_sky_asked))
 	return " ".join(sentences)
 
@@ -3418,6 +3656,38 @@ func surroundings_keys(seen: Variant = null) -> Array[String]:
 
 
 ## Whether her player's words ([param heard]) ask about what is around them.
+## Words in her player's that ask about the place itself ("What do you think
+## of this place?"): every side of pair 3, and October, answered "quiet, too
+## still", told nothing of it.
+const PLACE_WORDS := "(?i)\\b(place|where are we|around here|these (woods|parts|lands?)|this (land|wood|forest|town|cave|spot))\\b"
+
+
+static func asks_about_place(heard: String) -> bool:
+	return not heard.is_empty() and RegEx.create_from_string(PLACE_WORDS).search(heard) != null
+
+
+## For a question about the place (asks_about_place): its name, what she
+## sees out to PERCEPTION_RANGE (seen_things, not the near few), and what
+## happened lately, so her answer has something of it in.
+func place_words_now() -> String:
+	var parts: Array[String] = ["You are in %s." % _place_words()]
+	var sights: Array[String] = []
+	for thing: Dictionary in seen_things():
+		if thing.get("monster", false) or sights.size() >= 4:
+			continue
+		var paces: int = thing["paces"]
+		sights.append("%s %s" % [thing["word"], "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]])
+	if not sights.is_empty():
+		parts.append("From here you can see: %s." % "; ".join(sights))
+	var lately: Array[String] = []
+	for line: String in _lately():
+		if not (" joined" in line or " left" in line or " came back" in line or " logged" in line):
+			lately.append(line)
+	if not lately.is_empty():
+		parts.append("Here lately: %s" % " ".join(lately.slice(-2)))
+	return " ".join(parts)
+
+
 static func asks_about_surroundings(heard: String) -> bool:
 	return not heard.is_empty() and RegEx.create_from_string(SURROUNDINGS_WORDS).search(heard.to_lower()) != null
 
@@ -3445,6 +3715,25 @@ func mentioned_topics() -> Array[String]:
 ## either side of it is. Relations are worked out here (relations_of), not
 ## left to the model.
 func perceived() -> Array[Dictionary]:
+	var found := seen_things()
+	var asked := asked_about()
+	var chosen: Array[Dictionary] = []
+	for wanted: Callable in [
+			func(thing: Dictionary) -> bool: return thing["monster"],
+			func(thing: Dictionary) -> bool: return str(thing["kind"]).get_slice(" ", 1 if "door" in thing["kind"] else 0) in asked,
+			func(thing: Dictionary) -> bool: return thing["paces"] <= PERCEPTION_NEAR]:
+		for thing in found:
+			if chosen.size() < PERCEPTION_MAX and thing not in chosen and wanted.call(thing):
+				chosen.append(thing)
+	chosen.sort_custom(_nearer_found)
+	return chosen
+
+
+## Everything she can see within PERCEPTION_RANGE, nearest first, before
+## perceived() keeps the near ones: a quiet moment's sight draws on these,
+## since nothing in the wilds sat within PERCEPTION_NEAR (pair 3: no sight
+## focus in 11 quiet moments).
+func seen_things() -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	var told_once: Dictionary[String, bool] = {}
 	for cell in _cells_within(PERCEPTION_RANGE):
@@ -3481,17 +3770,7 @@ func perceived() -> Array[Dictionary]:
 			found.append(_thing("open door" if door.is_open() else "locked door" if door.state() == "locked" else "closed door", near,
 				Vector2(sides[0] + sides[1]) / 2.0))
 	found.sort_custom(_nearer_found)
-	var asked := asked_about()
-	var chosen: Array[Dictionary] = []
-	for wanted: Callable in [
-			func(thing: Dictionary) -> bool: return thing["monster"],
-			func(thing: Dictionary) -> bool: return str(thing["kind"]).get_slice(" ", 1 if "door" in thing["kind"] else 0) in asked,
-			func(thing: Dictionary) -> bool: return thing["paces"] <= PERCEPTION_NEAR]:
-		for thing in found:
-			if chosen.size() < PERCEPTION_MAX and thing not in chosen and wanted.call(thing):
-				chosen.append(thing)
-	chosen.sort_custom(_nearer_found)
-	return chosen
+	return found
 
 
 ## asked_about's patterns, by kind, compiled once.
@@ -4006,6 +4285,8 @@ func _take_result(result: Dictionary) -> void:
 	var raw_line := trim_line(str(promised["line"]))
 	var second_try: bool = _reask_serials.get(serial, false)
 	_reask_serials.erase(serial)
+	var focus_told: String = _focus_serials.get(serial, "")
+	_focus_serials.erase(serial)
 	if not second_try and speaks_for(raw_line):
 		# Words put in her player's mouth: asked once more, this line unsaid.
 		entry["outcome"] = "asked again"
@@ -4013,8 +4294,10 @@ func _take_result(result: Dictionary) -> void:
 		entry["note"] = "spoke for her player"
 		_log(entry)
 		_reask_next = true
+		_quiet_focus = focus_told
 		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, false, true, report)
 		_reask_next = false
+		_quiet_focus = ""
 		return
 	# A whole line said back is dropped as such; then what is left of it
 	# once cleaned (spoken) is what she says.
@@ -4031,8 +4314,10 @@ func _take_result(result: Dictionary) -> void:
 		_log(entry)
 		_repeat_note = raw_line
 		_reask_next = true
+		_quiet_focus = focus_told
 		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, false, true, report)
 		_reask_next = false
+		_quiet_focus = ""
 		return
 	var line := "" if not echo.is_empty() else trim_line(spoken(raw_line, items_told, spoken_to))
 	if echo.is_empty() and line != raw_line:
@@ -4116,6 +4401,7 @@ func _say(line: String, always: bool) -> bool:
 	_last_speech_tick = World.tick
 	if not _saying_voice:
 		voice_counts["fixed"] = int(voice_counts.get("fixed", 0)) + 1  # 803: a line not of her voice's making.
+	_quiet_next_tick = World.tick + _quiet_gap("gap_s") * _quiet_backoff  # Any line of hers puts the next quiet moment off.
 	_around_said = surroundings_keys()
 	remember_said(line)
 	_add_turn("assistant", line)
@@ -5092,6 +5378,10 @@ func _out_of_reach(entity: GridEntity) -> bool:
 func _log(entry: Dictionary) -> void:
 	if entry.get("kind") == "voice":
 		_count_voice(entry)
+		if str(entry.get("trigger", "")).begins_with(QUIET_TRIGGER) and entry.has("outcome") and entry["outcome"] != "not asked":
+			# Let pass ("..."), the next waits longer, up to max_gap_s; said, as before.
+			var widest := maxi(int(float(quiet_rules().get("max_gap_s", 600)) * World.TICK_RATE / float(_quiet_gap_mid())), 1)
+			_quiet_backoff = 1 if entry["outcome"] == "said" else mini(_quiet_backoff * 2, widest)
 	entry["stance_now"] = stance_name()
 	entry["keeper_distance"] = World.distance(tile, keeper.tile) if _alive(keeper) else -1
 	keeper_name()  # Refreshes keeper_label from a live keeper.

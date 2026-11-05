@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Wren speaks up on her own when all is quiet and you've said nothing for a while: about something close by, what just happened, a place new to her or what she likes, or with a question for you; she no longer fills a silence with "it's quiet" (803 amended).
 - When you wake far from where you left her waiting, at the temple after a fall, your companion comes to your side and keeps close again, as if you had called her (616 amended (2)).
 
 - The great axe and the battle axe swing edge first, biting into what they hit instead of striking with the flat of the blade (451 amended (3)).

@@ -1,5 +1,5 @@
 {
-	"_note": "What a companion is made of, rolled once when she is first given (Companions.roll, seeded by her player's id, so the same player gets the same roll), and kept in her record. One call to the voice model then writes her card, a paragraph, from these, and one sentence of how she and her player met (decision 293). Each entry is a few plain words, never prose or a line to say. 'trade' in a profession is the trade she works in a town she stays in (decision 284; one of levels/economy.json's, or empty for none). In how_we_met, {player} is her player's name and {pronoun} her own. Lore will supply birthplaces and names per region once facts are agreed.",
+	"_note": "What a companion is made of, rolled once when she is first given (Companions.roll, seeded by her player's id, so the same player gets the same roll), and kept in her record. One call to the voice model then writes her card, a paragraph, from these, and one sentence of how she and her player met (decision 293). Each entry is a few plain words, never prose or a line to say. 'trade' in a profession is the trade she works in a town she stays in (decision 284; one of levels/economy.json's, or empty for none). In how_we_met, {player} is her player's name and {pronoun} her own (the subject at the start, else 'her'), {she} her own as the subject. Lore will supply birthplaces and names per region once facts are agreed.",
 	"name": ["Tamsin", "Bram", "Ozzie", "Juno", "Fenn", "Rook", "Sable", "Hollis", "Mara", "Tobin", "Ivo", "Lark", "Brannoc", "Edda", "Cael", "Rhea", "Odo", "Senna", "Wick", "Ansel", "Fern", "Garrow", "Isolde", "Kip", "Maud", "Corin", "Ysolt"],
 	"growth": {
 		"_note": "Her card grows (decision 294): at most facts_max facts about her (over it, the oldest of what she witnessed is merged into a short history) and beliefs_max beliefs about the world (the oldest dropped); her voice is told them within prompt_chars characters, her newest event_facts_shown witnessed facts among them; what was said with her player is read for new facts once a stretch of at least talk_lines lines of theirs has been quiet for quiet_seconds.",
@@ -82,6 +82,16 @@
 		"words": {"cooling": "You are unhappy with %s, and may say so.", "wary": "You keep your distance from %s now, and fight only what comes at you.", "sullen": "You do as little for %s as you can: you won't carry their things or lead them anywhere.", "apart": "You are thinking of leaving %s."},
 		"guide_words": {"devoted": "If they speak of one of these places or seem unsure of the way, offer to lead them.", "close": "But you follow them; you do not take the lead yet.", "fond": "But you follow them; you do not take the lead yet.", "cooling": "But you follow them; you do not take the lead.", "wary": "But you follow them; you do not take the lead.", "sullen": "But you will not lead them anywhere now.", "apart": "But you will not lead them anywhere now."},
 		"hesitate": ["Must I?", "If I have to.", "Hm. Fine.", "You're sure?"]
+	},
+	"quiet": {
+		"_note": "Her quiet moments (decision 803 amended, step 4): calm, her player near and not speaking for player_quiet_s, she is asked now and then with one thing to speak of, and may answer nothing. first_s after she comes, gap_s after any line of hers (doubled after each moment she lets pass, up to max_gap_s), new_place_s when a zone is new today, at most per_hour. focus_weights: what a moment offers, by weight, never the same twice running: sight (something she sees, not yet told of today), today (what happened lately), likes (her hobby or food), ask (a question for her player), place (where she is and the sky; least, as weather talk reads as filler). Seconds. Drafts for Jeff.",
+		"first_s": [60, 120],
+		"gap_s": [150, 300],
+		"max_gap_s": 600,
+		"per_hour": 12,
+		"new_place_s": [20, 40],
+		"player_quiet_s": 30,
+		"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1}
 	},
 	"bond": {
 		"_note": "Her bond with her player (decision 444, on npc's Standing, 443; tiered by decision 621, Jeff's: 'each tier has its own deeds; the deeds that got you to a tier can't raise you further'). Standing's COMPANION ladder: fond to start, wary at -3, close at 3, devoted at 6 (residents.json 'standing'). deeds: each raise's tier; tiers: what one deed of the tier adds (each, halves carried on her record as bond_carry) and the score it raises her to at most (up_to): warmth (fond to close: gifts, food, days together, plain bandaging) to close, trust (close to devoted: tending her badly hurt, standing by her, a camp cleared, a new ability) to one short of devoted, milestone (a rescue, the draugr's blessing, an area's reward) as far as Standing goes. Each deed raises her once a game day. Lower deeds repair lost points up to her best (bond_best) but never past the top of the step she is at. No decay over time. drops: what each hurt costs, at any step (damage never costs her bond: 'struck' is gone). The deeds she sees (Companion._watch_deeds, by watch): road (road_cells walked with her player in a game day, road_share on roads), fire (both within fire_cells of a fire, fire_ticks), leisure (in a town town_ticks), and the drops mule (her slots over heavy_share for heavy_cells walked, warned at half, once until she rests) and pressed (a new fight while under low_hp after she asked to rest). fought: a monster killed where both landed a blow; finished: the last hostile camp of an area cleared with her. harsh: her voice's [HURT] on her player's words, at most harsh_a_day a game day, a [SORRY] the same day taking one back. game: knucklebones by a fire ('play knucklebones'), a round a round_ticks, best_of, the first each day warmth. sleep: after a hard day (a fight since she slept, or under hard_hp) by a fire with her player she asks them to keep watch once a day; yes, or them staying within near answer_ticks, and she sleeps sleep_ticks: whole and rested after, watched (trust); gone past near and something comes, she wakes with left_line, left_alone. All drafts for Jeff.",
@@ -188,10 +198,10 @@
 		"{player} found {pronoun} hiding in a ruined mill",
 		"{pronoun} pulled {player} out of a flooded cellar",
 		"they shared a fire on a cold road and kept walking together",
-		"{player} paid off a debt {pronoun} owed a tavern keeper",
+		"{player} paid off a debt {she} owed a tavern keeper",
 		"they were the only two to walk away from a caravan ambush",
 		"{pronoun} was guarding a bridge {player} needed to cross, and they came to terms",
-		"{player} was lost in a forest and {pronoun} knew the way out",
+		"{player} was lost in a forest and {she} knew the way out",
 		"they were hired for the same job and the employer never paid either of them"
 	]
 }
