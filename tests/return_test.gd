@@ -341,6 +341,23 @@ func _test_main() -> void:
 	player = _player()
 	_check(player != null and World.distance(player.tile, hut) > 2, "with the medicine man away: the old respawn, at a start tile (at %s)"
 		% (player.tile if player else World.NO_CELL))
+	# 786 amended: the test-only "hp <player> 0" (--test-hp beside the run
+	# marker) is a lethal blow through World.damage: downed, then the same
+	# fall and return as any other.
+	if Main.hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+		Net.test_hp = true
+		_told.clear()
+		var struck: String = _main.admin_command("hp %s 0" % player.name)
+		_check(World.is_downed(player) or not player.spawned, "'hp <player> 0' strikes them down (%s; hp %d)" % [struck, player.hp])
+		if is_instance_valid(player) and World.is_downed(player):
+			World.damage(player, player.hp, null, &"bled")
+		_check(_told == [{"by": "", "where": "", "seconds": _main.RESPAWN_TICKS / World.TICK_RATE}],
+			"and it is the usual fall: told nobody, coming back in %d s (%s)" % [_main.RESPAWN_TICKS / World.TICK_RATE, _told])
+		for i in _main.RESPAWN_TICKS + 1:
+			World.step()
+		player = _player()
+		_check(player != null and player.hp == player.max_hp, "brought back as any fallen player, at full hp")
+		Net.test_hp = false
 
 
 ## A player killed: beaten to 0, and, lying their last moments (Mortally

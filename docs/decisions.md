@@ -41127,3 +41127,12 @@ harder to start and hits harder, free with this. Deferred: phase 2, riders (a bo
 a cart: the view's seat and a way out), until this has been played; phase 3, hauling
 (economy's phase C: a sack in a cart weighs nothing to the pusher's walk; miners pushing
 carts, enemy-ai and npc's work, on a World.push_cart(by, cart, way)).
+
+786 amended: "hp <player> 0" is a lethal blow (the coordinator, after badly12: the town's wolves never go at
+people, 761, so the tour's fall during the threat needs its own blow; release's label). A
+0 or less goes through World.damage(player, hp), so the usual fall runs as any other: downed,
+bled, the drops, the temple's or healer's return, a companion's answer; a "[test] hp ... struck
+to 0" line is printed. Above 0 it is held to 1..max_hp as before. Same gate (--test-hp beside
+--run-marker). return_test _test_main: struck down by "hp <player> 0", told the usual return,
+and brought back at full hp; respawn_test's held-to check is now at max_hp. Server only,
+protocol unchanged, no new class_name, no bullet.

@@ -219,8 +219,8 @@ func _test_console() -> void:
 	reply = _main.admin_command("hp %s 3" % host.name)
 	var marked := Main.hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args()))
 	_check(not marked or host.hp == 3 and reply.begins_with("hp "), "'hp' with --test-hp and the marker sets it (%s)" % reply)
-	reply = _main.admin_command("hp %s 0" % host.name)
-	_check(not marked or host.hp == 1, "'hp' holds it to 1 at least (%s)" % reply)
+	reply = _main.admin_command("hp %s 999" % host.name)
+	_check(not marked or host.hp == host.max_hp, "'hp' holds it to max_hp at most (%s)" % reply)
 	Net.test_hp = false
 	host.hp = hp_was
 	World.damage(_slot_entity(5), 999)

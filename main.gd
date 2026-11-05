@@ -19546,6 +19546,12 @@ func _hp_command(words: PackedStringArray) -> String:
 	if found.size() != 1:
 		return "hp: %d players online are called %s; not set" % [found.size(), words[1]]
 	var who := found[0]
+	if int(words[2]) <= 0:
+		# 786 amended: 0 is a lethal blow through World.damage, so the usual
+		# fall runs (downed, bled, the drops, the return, a companion's answer).
+		World.damage(who, who.hp, null, &"attack")
+		print("[test] hp %s: struck to 0 (786 amended)" % who.name)
+		return "hp %s: struck to 0" % who.name
 	who.hp = clampi(int(words[2]), 1, who.max_hp)
 	print("[test] hp %s: %d/%d (786)" % [who.name, who.hp, who.max_hp])
 	return "hp %s: %d/%d" % [who.name, who.hp, who.max_hp]
