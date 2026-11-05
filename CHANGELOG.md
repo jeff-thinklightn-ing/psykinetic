@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The land south of Umbrage, round the Old Tower, has a name of its own: Towerside (651 amended).
 - Umbrage: the town's name and music end at its edge, so the barrow mound lies out in the wilds, and the barrow post now stands where the barrow road leaves town (774 amended).
 - Foothills: the low ground west of the river has a way back up the scarp, so a fall there no longer strands you (745 amended).
 - The great bear, the boar king and the old wolf are drawn in bodies of their own: a true bear, a big boar with heavy tusks and a bristle crest, and a grey wolf with a ruff and a torn ear.

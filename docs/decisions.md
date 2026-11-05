@@ -27727,6 +27727,14 @@ level_test _test_held (the link both ways, the fort a fort for no town, no
 houses, the store's pad, the tower's room walked to over the bridge and,
 the bridge gone, over the ford); the world plane test lays it. No wire
 change, no new class_name.
+
+651 amended: Held is Towerside (2026-11-04, maps; Jeff's pick of lore's and voice's three, release's
+label). Since 774 the town stands in the wilds, but levels/held kept the town's name, so walking
+south from Umbrage said Umbrage again (Jeff, v0.1.203: "the zone to the south is still labeled
+umbrage"). make_held's config and levels/held/level.json name it "Towerside" (no "the"; in a
+sentence "the road to Towerside"), for the Old Tower's ground by the river; the id stays held,
+so links, spawns and saved zones are untouched. Nothing regenerated. level_test _test_held reads
+the name. Level data only; protocol unchanged, no new class_name.
 ## 650 amended: the lands, one truth for where everything lies
 
 Jeff (2026-10-24): "might as well draw out a map of the "lands" while
