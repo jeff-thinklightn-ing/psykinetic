@@ -951,8 +951,10 @@ static func has_loot(table: String) -> bool:
 ## [param table] rolled: the ids it gives, row by row (each with its
 ## chance, then a count from least to most), at most [param room]. Drawn by
 ## [param seed_text]: one seed gives the same every time, so a level built
-## twice is stocked the same. An unknown table gives nothing.
-static func roll_loot(table: String, seed_text: String, room: int) -> PackedStringArray:
+## twice is stocked the same. An unknown table gives nothing. With
+## [param sure] (a chest, a cache: Jeff, "every chest must hold something"),
+## a roll that gives nothing gives the table's first row once instead.
+static func roll_loot(table: String, seed_text: String, room: int, sure := false) -> PackedStringArray:
 	var out := PackedStringArray()
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(seed_text.sha256_text())  # Mixed: near names, near seeds, alike rolls.
@@ -963,6 +965,9 @@ static func roll_loot(table: String, seed_text: String, room: int) -> PackedStri
 			if out.size() >= room:
 				return out
 			out.append(str(row["item"]))
+	var rows: Array = loot_tables().get(table, [])
+	if sure and out.is_empty() and room > 0 and not rows.is_empty():
+		out.append(str(rows[0]["item"]))
 	return out
 
 

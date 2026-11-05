@@ -18120,7 +18120,7 @@ func search(player: Player, chest: Chest) -> bool:
 		return false
 	record.caches.append(chest.cache)
 	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
-	var found := Items.roll_loot(chest.cache, "%s:%s" % [record.player_id, chest.cache], 64)
+	var found := Items.roll_loot(chest.cache, "%s:%s" % [record.player_id, chest.cache], 64, true)
 	var counts := {}
 	for id in found:
 		var uid := World.items.mint(id, "cached", place, chest.zone, chest.tile)

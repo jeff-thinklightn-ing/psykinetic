@@ -6622,6 +6622,20 @@ Not done: a carried thing's weight on the monster, monsters picking things
 up, and a raid's took carried as things (Raids keeps it as uids). The
 entity entry key "loot" is orderless: naming a table does not rename.
 
+330 amended (release's label; Jeff via the coordinator and buildings: "every chest must hold
+something", and a place with nothing to hold has no chest): a chest's roll is sure. Items.roll_loot
+takes "sure"; a roll that gives nothing then gives the table's first row once (room allowing).
+Level._stock passes it for a chest, Main.search for a cache (599), never for a monster, whose
+pockets may be empty. A table's first row is so its likeliest thing. The robbers' camp cache keeps
+its empty table: it holds economy's camp gold (742 amended), never nothing. A new table,
+barrow_goods: grave goods the robbers missed (a sure dagger; a silver ring, a spear, a sword,
+a shield by chance; no armour, the crypt's alone, 622), for the barrow's generated chests (dungeon's "loot": {"chest": "barrow_goods"}). A chest with a "role" prop (a quest's container: Offers' altar, a commission's drop) is never stocked by the level's default table, and stays as its quest leaves it. And for maps' hills finds (Jeff's newer
+rule: chests only in dungeons, outdoor finds per player and never empty; the coordinator's):
+cairn_cache, the one find on the hills' chase, under a cairn (lore: the raiders took the fallen
+traveller's pack, so he gives only his note): a sure ration or two; a bandaging kit, flint, a
+knife, a silver ring by chance; and camp_pack, the wilds' old monster camp's pack in place of its chest (a sure bandaging kit, as the chest held; a ration, arrows, a dagger by chance). The wilds farmstead's
+two empty chests wait on the coordinator (Jeff's newer rule: chests only in dungeons). items_test (a sure roll, every chest table always giving).
+
 ## 336. Residents speak when spoken to
 
 What: typed words a player says go to a resident (333) standing within

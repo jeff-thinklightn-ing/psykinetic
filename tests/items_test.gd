@@ -2683,12 +2683,28 @@ func _test_loot() -> void:
 	for i in 20:
 		same = same and Items.roll_loot("supplies", "seed%d" % i, 4) == Items.roll_loot("supplies", "seed%d" % i, 4)
 	_check(same, "one seed, the same roll every time")
+	# 330 amended (Jeff: "every chest must hold something"): a chest's or a cache's roll is sure.
+	Items.add_loot_for_test("test_never", [{"item": "ration", "chance": 0.0}, {"item": "dagger", "chance": 0.0}])
+	_check(Items.roll_loot("test_never", "x", 4).is_empty() and Items.roll_loot("test_never", "x", 4, true) == PackedStringArray(["ration"])
+			and Items.roll_loot("test_never", "x", 0, true).is_empty() and Items.roll_loot("no_such_table", "x", 4, true).is_empty(),
+			"a monster's roll may give nothing; a chest's never does: the first row once (none with no room or no table)")
+	var sure_full := true
+	for i in 40:
+		for table: String in ["supplies", "armoury", "ossuary_grave", "fallen_grave", "barrow_goods", "cairn_cache", "camp_pack"]:
+			sure_full = sure_full and not Items.roll_loot(table, "seed%d" % i, 4, true).is_empty()
+	var barrow: Array = Items.loot_tables().get("barrow_goods", [])
+	var hills: Array = Items.loot_tables().get("cairn_cache", []) + Items.loot_tables().get("camp_pack", [])
+	_check(sure_full and barrow.size() == 5 and hills.size() == 9 and not Items.has_loot("traveller_pack") and hills.all(func(row: Dictionary) -> bool: return Items.exists(str(row["item"])))
+			and Items.roll_loot("cairn_cache", "y", 8).has("ration") and Items.roll_loot("camp_pack", "y", 8).has("bandaging_kit")
+			and barrow.all(func(row: Dictionary) -> bool: return Items.exists(str(row["item"])))
+			and Items.roll_loot("barrow_goods", "y", 8).has("dagger"),
+			"every chest table always gives something; barrow_goods (a dagger sure), the hills' cairn_cache (a ration sure), the camp's pack (a bandaging kit sure), all known")
 	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
 	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "chest", Vector2i(2, 2): "monster_imp",
 		Vector2i(4, 2): "monster_brute", Vector2i(5, 2): "start"}
 	var config := {"name": "loot_test", "loot": {"chest": "test_sure", "brute": "test_sure"},
 		"entities": [{"at": [1, 1], "props": {"slots": ["bandaging_kit", "", "", ""]}}, {"at": [3, 1], "loot": "no_such_table"},
-			{"at": [2, 2], "loot": "test_sure"}]}
+			{"at": [2, 2], "loot": "test_sure"}, {"at": [5, 1], "props": {"role": "altar"}}]}
 	var level := Level.parse(Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	var by_tile := {}
 	for spec: Dictionary in level["entities"]:
@@ -2696,6 +2712,8 @@ func _test_loot() -> void:
 	var slots_at := func(cell: Vector2i) -> PackedStringArray: return by_tile[cell].get("props", {}).get("slots", PackedStringArray())
 	_check(slots_at.call(Vector2i(1, 1)) == PackedStringArray(["bandaging_kit", "ration", "ration", "dagger"]),
 			"a chest with the level's chest table: its own kit kept, the empty slots filled (%s)" % slots_at.call(Vector2i(1, 1)))
+	_check(not slots_at.call(Vector2i(5, 1)).has("ration"),
+			"a quest's container (props role) is never stocked by the level's chest table (330 amended) (%s)" % slots_at.call(Vector2i(5, 1)))
 	_check(slots_at.call(Vector2i(3, 1)).is_empty() and level["warnings"].any(func(w: String) -> bool: return "no_such_table" in w),
 			"a table that is not there: nothing, and a warning")
 	_check(slots_at.call(Vector2i(2, 2)) == PackedStringArray(["ration", "ration", "dagger", ""]) and slots_at.call(Vector2i(4, 2))[2] == "dagger",

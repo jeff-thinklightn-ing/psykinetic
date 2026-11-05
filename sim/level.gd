@@ -3596,7 +3596,9 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 		if not (chest or monster):
 			warnings.append("loot at %s: only a chest or a monster takes a loot table" % at)
 			return
-	elif defaults is Dictionary and chest:
+	elif defaults is Dictionary and chest and not props.has("role"):
+		# A quest's container (props "role": Offers' altar, a commission's drop) is
+		# no loot chest: the level's default never stocks it (330 amended).
 		table = str(defaults.get("chest", ""))
 	elif defaults is Dictionary and monster:
 		table = str(defaults.get(kind, "" if Animal.is_wild(kind) else defaults.get("monster", "")))
@@ -3613,7 +3615,7 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 	var key := "%s:%d,%d" % [str(config.get("name", "")), at.x, at.y]
 	if config.has("generation"):
 		key += "#%d" % int(config["generation"])
-	var rolled := Items.roll_loot(table, key, empty.size())
+	var rolled := Items.roll_loot(table, key, empty.size(), chest)
 	for i in rolled.size():
 		slots[empty[i]] = rolled[i]
 	props["slots"] = slots
