@@ -2714,6 +2714,7 @@ func _test_relaid() -> void:
 	_check(Relaid.move({"ok": false, "zones": {}, "players": []}, fresh, level_of).is_empty() and fresh.get(Relaid.done_key("wilds")) == 774, "a new world has nothing to move: only marked done")
 	_test_town_places(wilds)
 	_test_explorables()
+	_test_bear_den()
 
 
 ## The places a player is rewarded for reaching (decision 804, maps'
@@ -2752,6 +2753,31 @@ func _test_explorables() -> void:
 				shown[key] = places[key]["shown"]
 	_check(shown == {"far_bank": "the far bank", "hill_shieling": "the shieling", "woodcutters_lean_to": "a woodcutters' lean-to", "thick_wood": "the thick of the forest"},
 		"voice's shown names where the name is a where-phrase (%s)" % [shown])
+
+
+## The bear yard's den (780's dev level; combat's ask, through the
+## coordinator): its rock crescent backs the den on the west with an arm on
+## the north only, so a player fighting it in the den's south corner has
+## open ground to step out to, not a pocket (playtest's bear13 duel was
+## boxed in at (7..10, 24..27)).
+func _test_bear_den() -> void:
+	print("== The bear yard's den opens east and south ==")
+	var yard := Level.load_level("bear_yard")
+	var floor := {}
+	for cell: Vector2i in yard["terrain"]["floor"]:
+		floor[cell] = true
+	var den := Vector2i(8, 22)
+	var shut: Array[Vector2i] = []
+	var open: Array[Vector2i] = []
+	for y in range(den.y - 3, den.y + 6):
+		for x in range(den.x - 2, den.x + 3):
+			var cell := Vector2i(x, y)
+			if x > den.x - 2 and y > den.y + 2 and not floor.has(cell):
+				shut.append(cell)
+			elif x == den.x - 2 and y >= den.y - 3 and y <= den.y + 3 and floor.has(cell):
+				open.append(cell)
+	_check(floor.has(den) and shut.is_empty() and open.is_empty(),
+		"the den at %s: rock behind it on the west, none to its south (shut south: %s; gaps in the back: %s)" % [den, shut, open])
 
 
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended
