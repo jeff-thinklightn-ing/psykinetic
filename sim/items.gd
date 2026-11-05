@@ -90,6 +90,7 @@ const GEAR_TAGS: Array[String] = ["armour", "tool"]
 
 static var _catalog: Dictionary = {}
 static var _loot: Dictionary = {}
+static var _loot_gold: Dictionary = {}
 static var _naming: Dictionary = {}
 static var _curse: Dictionary = {}
 static var _growth := {}
@@ -390,6 +391,7 @@ static func add_for_test(entry: Dictionary) -> Dictionary:
 static func reset() -> void:
 	_catalog = {}
 	_loot = {}
+	_loot_gold = {}
 	_naming = {}
 	_curse = {}
 	_growth = {}
@@ -969,6 +971,33 @@ static func roll_loot(table: String, seed_text: String, room: int, sure := false
 	if sure and out.is_empty() and room > 0 and not rows.is_empty():
 		out.append(str(rows[0]["item"]))
 	return out
+
+
+## A cache table's gold (330 amended (2); Jeff: dungeon chests hold "a
+## small amount of gold, or trinkets that can be sold"): loot.json "gold",
+## table -> [least, most]; [] for a table with none.
+static func loot_gold(table: String) -> Array:
+	if _loot_gold.is_empty():
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(LOOT))
+		var given: Variant = parsed.get("gold", {}) if parsed is Dictionary else {}
+		_loot_gold[""] = []  # Read: an empty file is not read again.
+		for name: String in (given if given is Dictionary else {}):
+			var pair: Variant = given[name]
+			if pair is Array and pair.size() == 2:
+				var least := maxi(0, int(pair[0]))
+				_loot_gold[name] = [least, maxi(least, int(pair[1]))]
+	return (_loot_gold.get(table, []) as Array).duplicate()
+
+
+## [param table]'s gold rolled by [param seed_text] (one seed, the same
+## sum): least to most, 0 for a table with none.
+static func roll_gold(table: String, seed_text: String) -> int:
+	var pair := loot_gold(table)
+	if pair.is_empty():
+		return 0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(("gold:" + seed_text).sha256_text())
+	return rng.randi_range(int(pair[0]), int(pair[1]))
 
 
 ## For tests: [param rows] as table [param table], as if in the file,

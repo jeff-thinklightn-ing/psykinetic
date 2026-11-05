@@ -1906,6 +1906,34 @@ func _test_cache() -> void:
 			World.take_from_ground(cell, World.ground_uids(cell).find(uid))
 		World.items.end(uid, "gone")
 	record.caches.erase("farmstead_cache")
+	# 330 amended (2): a dungeon cache, gold into the purse and a trinket, once per player by its record key.
+	chest.cache = "crypt_cache"
+	chest.cache_place = "the crypt"
+	var me := str(record.player_id)
+	var purse_was := World.gold_of(me)
+	var crypt_held := _units_of(host)
+	var crypt_ground := World.ground_uids(host.tile)
+	var crypt_found: bool = _main.search(host, chest)
+	var paid := World.gold_of(me) - purse_was
+	var trinkets: Array[int] = []
+	for uid in _units_of(host):
+		if not uid in crypt_held:
+			trinkets.append(uid)
+	for uid in World.ground_uids(host.tile):
+		if not uid in crypt_ground:
+			trinkets.append(uid)
+	_check(crypt_found and paid >= 3 and paid <= 8 and not trinkets.is_empty()
+			and trinkets.all(func(uid: int) -> bool: return Items.has_tag(World.items.id_of(uid), "trinket"))
+			and _main.cache_record_key(chest) in record.caches and not _main.search(host, chest) and World.gold_of(me) == purse_was + paid,
+			"the crypt's cache: 3-8 gold to the purse (%d) and a trinket (%d); once per player" % [paid, trinkets.size()])
+	for uid in trinkets:
+		if World.slot_of_unit(host, uid) >= 0:
+			World.take_units(host, [uid])
+		else:
+			World.take_from_ground(host.tile, World.ground_uids(host.tile).find(uid))
+		World.items.end(uid, "gone")
+	World.add_gold(me, -paid, "test")
+	record.caches.erase(_main.cache_record_key(chest))
 	World._relocate(host, host_at)
 	chest.cache = ""
 	chest.cache_place = ""
@@ -2688,6 +2716,16 @@ func _test_loot() -> void:
 	_check(Items.roll_loot("test_never", "x", 4).is_empty() and Items.roll_loot("test_never", "x", 4, true) == PackedStringArray(["ration"])
 			and Items.roll_loot("test_never", "x", 0, true).is_empty() and Items.roll_loot("no_such_table", "x", 4, true).is_empty(),
 			"a monster's roll may give nothing; a chest's never does: the first row once (none with no room or no table)")
+	# 330 amended (2): the dungeon caches' gold, sure and seeded, and a trinket sure.
+	var gold_ok := Items.loot_gold("crypt_cache") == [3, 8] and Items.loot_gold("hollowfell_cache") == [5, 15] and Items.loot_gold("supplies").is_empty()
+	for i in 30:
+		var g := Items.roll_gold("castle_cache", "seed%d" % i)
+		gold_ok = gold_ok and g >= 10 and g <= 25 and g == Items.roll_gold("castle_cache", "seed%d" % i)
+		for table: String in ["crypt_cache", "deep_cache", "castle_cache", "hollowfell_cache"]:
+			var got := Items.roll_loot(table, "seed%d" % i, 64, true)
+			gold_ok = gold_ok and not got.is_empty() and Array(got).all(func(id: String) -> bool: return Items.has_tag(id, "trinket") and Items.has_tag(id, "luxury"))
+	_check(gold_ok and Items.roll_gold("supplies", "x") == 0 and Items.worn_kind("signet_ring") == "ring",
+			"the dungeon caches: gold in their range, the same by one seed, and always a trinket; a table without gold gives none; the signet ring is worn as a ring")
 	var sure_full := true
 	for i in 40:
 		for table: String in ["supplies", "armoury", "ossuary_grave", "fallen_grave", "barrow_goods", "cairn_cache", "camp_pack"]:

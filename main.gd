@@ -18115,12 +18115,16 @@ func search(player: Player, chest: Chest) -> bool:
 	var camp: Dictionary = _camp_rules()
 	if not camp.is_empty() and chest.cache == str(camp.get("cache", "")):
 		return _search_camp(player, chest, camp, tell)
-	if chest.cache in record.caches:
+	var key := cache_record_key(chest)
+	if key in record.caches:
 		tell.call("Nothing more here.")
 		return false
-	record.caches.append(chest.cache)
+	record.caches.append(key)
 	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
-	var found := Items.roll_loot(chest.cache, "%s:%s" % [record.player_id, chest.cache], 64, true)
+	var found := Items.roll_loot(chest.cache, "%s:%s" % [record.player_id, key], 64, true)
+	var gold := Items.roll_gold(chest.cache, "%s:%s" % [record.player_id, key])
+	if gold > 0:
+		World.add_gold(str(record.player_id), gold, "found in %s" % place)
 	var counts := {}
 	for id in found:
 		var uid := World.items.mint(id, "cached", place, chest.zone, chest.tile)
@@ -18130,12 +18134,38 @@ func search(player: Player, chest: Chest) -> bool:
 		if slot < 0 or not World.put_item(player, player, slot, uid):
 			World.put_on_ground(uid, player.tile)
 		counts[id] = int(counts.get(id, 0)) + 1
-	var words := PackedStringArray()
+	var words := PackedStringArray()  # Voice's sentence, as the pickup line (330 amended (2)).
 	for id: String in counts:
-		words.append(str(Items.def(id).get("name", id)) + (" (%d)" % counts[id] if counts[id] > 1 else ""))
-	print("[cache] %s searched %s at %s: %s" % [player.name, chest.cache, place, ", ".join(words)])
-	tell.call("You find in %s: %s." % [place, ", ".join(words)] if not words.is_empty() else "Nothing here.")
-	return not found.is_empty()
+		var word := Items.name_of(id)
+		word = word.left(1).to_lower() + word.substr(1)
+		if counts[id] > 1:
+			words.append("%d %s" % [counts[id], _plural(word)])
+		else:
+			words.append(("an " if word.left(1) in "aeiou" else "a ") + word)
+	if gold > 0:
+		words.append("%d gold" % gold)
+	var listed := words[0] if words.size() == 1 else ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1] if not words.is_empty() else ""
+	print("[cache] %s searched %s at %s: %s" % [player.name, key, place, listed])
+	tell.call("You find %s in %s." % [listed, place] if not words.is_empty() else "Nothing here.")
+	return not words.is_empty()
+
+
+## [param word] for more than one, in a line: "2 bandaging kits", "2 bone
+## dice" (a word ending in s, or dice, is kept).
+static func _plural(word: String) -> String:
+	if word.ends_with("s") or word.ends_with("dice"):
+		return word
+	if word.ends_with("fe"):
+		return word.left(word.length() - 2) + "ves"
+	return word + "s"
+
+
+## What [param chest]'s find is kept by on a player's record
+## (PlayerRecord.caches): once per player per key. Its table for now;
+## dungeon's 808 makes it per chest and per generation for a regenerating
+## level (330 amended (2)).
+func cache_record_key(chest: Chest) -> String:
+	return chest.cache
 
 
 ## The robbers' camp chest's rules (742, amended): economy.json "robbers"

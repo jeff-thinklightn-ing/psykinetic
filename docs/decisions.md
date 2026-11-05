@@ -6636,6 +6636,22 @@ traveller's pack, so he gives only his note): a sure ration or two; a bandaging 
 knife, a silver ring by chance; and camp_pack, the wilds' old monster camp's pack in place of its chest (a sure bandaging kit, as the chest held; a ration, arrows, a dagger by chance). The wilds farmstead's
 two empty chests wait on the coordinator (Jeff's newer rule: chests only in dungeons). items_test (a sure roll, every chest table always giving).
 
+330 amended (2) (release's label): dungeon chests become per-player caches (Jeff, via the
+coordinator and dungeon: chests only in dungeons, always guarded, holding "a small amount of gold,
+or trinkets that can be sold", each player their own find each generation). A cache table may
+carry gold: loot.json "gold", table -> [least, most] (Items.loot_gold, roll_gold, seeded as the
+roll). Main.search pays it into the purse (World.add_gold, outside gold, as the camp's) beside
+the things found, and keeps the find by Main.cache_record_key(chest), the table for now: dungeon's
+808 makes it per chest and per generation. One table per depth, by level: crypt_cache (barrow,
+3-8 gold), deep_cache (barrow_deep, 8-20), castle_cache (castle_halls, 10-25), hollowfell_cache
+(hollowfell, 5-15: its reward is its ore, so no cache outweighs the dig; economy's numbers). Each
+gives a trinket of its depth, sure: twelve rows tagged trinket and luxury (jewellery for the
+brooches, beads, ring and clasp, so economy's luxury "kept" reads them), light, value 2 to 25 (the
+best under half a town's starting 50), no use. Sold at the store at its luxury ratio, to a
+merchant (514) or a pedlar; given to a town, a sale (economy's). The signet ring is worn as a
+ring, looks only. Lore's facts (Hollowfell is iron: a town miner's brass lamp, not silver;
+the token the town miners'), voice's words. items_test.
+
 ## 336. Residents speak when spoken to
 
 What: typed words a player says go to a resident (333) standing within

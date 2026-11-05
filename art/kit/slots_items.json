@@ -1,6 +1,25 @@
 {
 	"about": "Generated from the item catalog (levels/items.json) by tools/items_art_slots.gd; do not edit by hand.",
 	"slots": {
+		"item.amber_beads": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.2,
+				0.02,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Amber beads (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.antlers": {
 			"budget": 500,
 			"category": "items",
@@ -220,6 +239,25 @@
 			"type": "mesh",
 			"uses": "handful of berries (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.bone_dice": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.02,
+				0.02,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Bone dice (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bow": {
 			"budget": 500,
 			"category": "items",
@@ -315,6 +353,25 @@
 			},
 			"type": "mesh",
 			"uses": "gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there"
+		},
+		"item.copper_brooch": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.05,
+				0.05,
+				0.01
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Copper brooch (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.dagger": {
 			"budget": 500,
@@ -454,6 +511,25 @@
 			"type": "mesh",
 			"uses": "giant axe (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.gilt_buckle": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.06,
+				0.05,
+				0.01
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Gilt buckle (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.hammer": {
 			"budget": 500,
 			"category": "items",
@@ -548,6 +624,25 @@
 			},
 			"type": "mesh",
 			"uses": "hood (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.jewelled_clasp": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.06,
+				0.04,
+				0.015
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Jewelled clasp (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.knife": {
 			"budget": 500,
@@ -644,6 +739,44 @@
 			"type": "mesh",
 			"uses": "cut of meat (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.miners_lamp": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.12,
+				0.2,
+				0.12
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Miner's brass lamp (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.miners_token": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.03,
+				0.03,
+				0.003
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Tally token (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.mushrooms": {
 			"budget": 500,
 			"category": "items",
@@ -700,6 +833,25 @@
 			},
 			"type": "mesh",
 			"uses": "sack of ore (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.pewter_cup": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.08,
+				0.1,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Pewter cup (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.pick": {
 			"budget": 500,
@@ -762,6 +914,25 @@
 			},
 			"type": "mesh",
 			"uses": "travel ration (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.raw_garnet": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.05,
+				0.04,
+				0.04
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Rough garnet (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.reeds": {
 			"budget": 500,
@@ -920,6 +1091,63 @@
 			},
 			"type": "mesh",
 			"uses": "round shield (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.signet_ring": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.03,
+				0.03,
+				0.012
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Signet ring (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.silver_brooch": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.05,
+				0.05,
+				0.01
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Silver brooch (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.silver_cup": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.08,
+				0.12,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "Silver cup (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.silver_ring": {
 			"budget": 500,
