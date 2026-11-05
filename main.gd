@@ -14669,6 +14669,107 @@ func _town_display(town: String) -> String:
 const DONATE_AWAY := "You can donate only at the town's store or depot."
 
 
+# --- Giving to people (804's hand-in, the give path's data) ------------------------
+
+## Who in [param town] takes raw [param raw] a player gives (economy.json
+## "receives"): the first resident of the town whose trade is listed for it,
+## in the list's order, else the starter stall's keeper ("vendor:" + town)
+## where the town has one; "" for nobody. Gear goes to the keeper.
+func receiver_for(town: String, raw: String) -> String:
+	if World.economy == null or World.production == null:
+		return ""
+	var trades: Array = World.economy.rules.get("receives", {}).get(raw, []) if not raw.is_empty() else []
+	for trade: Variant in trades:
+		for id: String in World.production.worker_ids(town):
+			var who := World.production.worker(id)
+			if str(trade) in who.get("trades", []) and not bool(who.get("away", false)):
+				return id
+	return Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else ""
+
+
+## The town [param worker] (a resident's id, or "vendor:" + town) takes
+## things for; "" for nobody known.
+func _worker_town(worker: String) -> String:
+	if worker.begins_with(Offers.VENDOR):
+		return worker.trim_prefix(Offers.VENDOR)
+	return str(World.production.worker(worker).get("town", "")) if World.production != null else ""
+
+
+## What giving [param count] of raw [param raw] to [param town] would do
+## for player [param player_id] (the give path's give_outcome): {for {kind
+## "build" (its queued build lacks it; name "the new forge") or "stores"
+## (name "the larder" for food, else "the store")}, have and need after the
+## give (toward the build's cost, or the store's enough), gold the treasury
+## pays now and owed what it would owe, as banking does}.
+func give_outcome(town: String, player_id: String, raw: String, count: int) -> Dictionary:
+	var out := {"for": {"kind": "stores", "name": str(World.economy.rules.get("receives", {}).get("stores", {}).get(raw, "the store"))},
+		"have": 0, "need": 0, "gold": 0, "owed": 0}
+	if World.economy == null or World.stockpile == null or raw.is_empty():
+		return out
+	var have := World.stockpile.count(town, raw)
+	var short := World.towns.shortfall(town) if World.towns != null else {}
+	var cost := int(World.production.job(int(short["job"])).get("cost", {}).get(raw, 0)) if not short.is_empty() and World.production != null else 0
+	if cost > have:
+		out["for"] = {"kind": "build", "name": "the new %s" % _building_words(str(short.get("kind", "")).trim_prefix(Towns.REPAIR))}
+		out["need"] = cost
+	else:
+		var row: Array = town_stock(town).filter(func(each: Dictionary) -> bool: return each["id"] == raw)
+		out["need"] = int(row[0]["enough"]) if not row.is_empty() else 0
+	out["have"] = have + count
+	var economy := World.economy
+	var store: Dictionary = economy.rules.get("store", {})
+	var worth := roundi(economy.raw_price(town, raw) * float(store.get("buy", 1.0)) * count)
+	var cap := int(store.get("owed_cap", 30))
+	var payable := maxi(World.stockpile.count(town, "gold") - int(economy.rules.get("gold_floor", 0)), 0)
+	out["gold"] = mini(worth, payable)
+	out["owed"] = mini(worth - int(out["gold"]), maxi(cap - economy.owed_to(player_id, town), 0)) if economy.owed_to(player_id, town) < cap else 0
+	return out
+
+
+## What [param worker] would take from [param player]'s pack (the person's
+## sheet's "takes", ui's Give tab): [{uid, slot, what (its item id), count
+## (the stack), raw (its unit word: "ore"; "" for gear), for {kind, name}
+## ({} for a gift), have, need, gold, owed}], one row a slot. A
+## raw goes to its receiver_for alone; gear only to the stall's keeper, a
+## gift (no gold), anything of value but a starter ware (736: never taken back).
+func person_takes(player: Player, worker: String) -> Array:
+	var out: Array = []
+	var town := _worker_town(worker)
+	if town.is_empty() or World.economy == null or World.items == null:
+		return out
+	var player_id := _id_of_player(player)
+	for slot in player.slots.size():
+		var id := str(player.slots[slot])
+		if id.is_empty():
+			continue
+		var uid := World.slot_uid(player, slot)
+		var count := 1 + World.items.stack_of(uid).size()
+		var yields := Items.yield_of(id)
+		var row := {}
+		if not yields.is_empty():
+			var raw := str(yields.keys()[0])
+			if raw == "gold" or receiver_for(town, raw) != worker:
+				continue
+			row = give_outcome(town, player_id, raw, int(yields[raw]) * count)
+			row["raw"] = raw
+		elif worker.begins_with(Offers.VENDOR) and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
+			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "owed": 0}  # A gift: "for" empty (ui).
+			var tags: Array = Items.def(id).get("tags", [])
+			for each: Dictionary in town_stock(town):
+				if each["id"] in tags:
+					row["have"] = int(each["have"]) + count
+					row["need"] = int(each["enough"])
+					break
+		else:
+			continue
+		row["uid"] = uid
+		row["slot"] = slot
+		row["what"] = id
+		row["count"] = count
+		out.append(row)
+	return out
+
+
 ## A building kind in words ("healers_hut" -> "healers hut").
 static func _building_words(kind: String) -> String:
 	return kind.replace("_", " ") if not kind.is_empty() else "build"

@@ -41752,6 +41752,24 @@ vendor's window has no chat input. resident_test _test_said_to: the line goes to
 though another is nearer and named; with no "to", the nearest as before; a body hiding hears nothing and
 nobody else takes it. Protocol: what "say" carries changes (rev 49, "49 (802):"). No new class_name.
 
+802 amended (release's label; the coordinator's approval of hand-ins to people, Jeff: a hand-in goes
+to a person, not a chest): economy's data for the window's Give tab, landed ahead of the give itself
+so the window isn't held. economy.json "receives": the trades that take each raw (ore the smith;
+wood the carpenter, then the fletcher; food, meat and fish the cook; hide and leather the tanner;
+wool and cloth the weaver; herbs the medicine man; sheep the shepherd, then the herder), and "stores"
+names ("the larder" for food, meat and fish). Main.receiver_for(town, raw): the first resident of a
+listed trade, in list order, else the starter stall's keeper ("vendor:" + town) where the town has
+one, who also takes gear. Main.give_outcome(town, player_id, raw, count): {for {kind "build" when
+the town's queued build lacks it, named "the new forge", else "stores"}, have and need after the
+give (toward the build's cost, or the store's enough), gold the treasury pays now and owed what it
+would owe, as banking does}. Main.person_takes(player, worker): the person sheet's "takes", one row a
+pack slot [{uid, slot, what, count, raw (the unit word, "ore"), for, have, need, gold, owed}]; a raw
+only to its receiver, gear only to the keeper as a gift ("for" empty), never a starter ware (736). The give itself follows in one protocol revision
+(ui's ask): "takes" put into the maker's barter sheet and Rolf's stall sheet by economy, the "give"
+command naming the body as "offers" does ({entity, uids}; the server finds the worker, Rolf's body
+"vendor:" + town), the chest refused to players and the reward's "worker". economy_test
+_test_person_takes. Server only, protocol unchanged, no new class_name, no bullet.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

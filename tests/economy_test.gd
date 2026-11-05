@@ -704,6 +704,42 @@ func _test_town_sheet(host: Player) -> void:
 	_check(sheet["strain"] == World.towns.strain(STORE) and sheet["strain"].has("days") and sheet["strain"].has("why"), "its strain toward falling (649): %s" % [sheet["strain"]])
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
 	await _test_town_window(host)
+	_test_person_takes(host)
+
+
+## The give path's data (804's hand-in to people; ui's Give tab): wood goes
+## to the town's carpenter alone, with what it does for the town and the gold;
+## gear to the stall's keeper, never a starter ware; the keeper takes a raw
+## nobody's trade takes.
+func _test_person_takes(host: Player) -> void:
+	print("
+== giving to people: who takes what, and what it does (804's give path) ==")
+	World.production.add_worker("give_cora", "Cora", ["carpenter"], STORE, "test")
+	var carp: String = _main.receiver_for(STORE, "wood")
+	_check(not carp.is_empty() and "carpenter" in World.production.worker(carp)["trades"], "wood goes to a carpenter (%s)" % carp)
+	var me: String = _main._id_of_player(host)
+	for i in 2:
+		_main._hand_item(me, "wood_bundle", "test")
+	var vendor: Dictionary = World.economy.rules.get("vendor", {}).duplicate(true)
+	World.economy.rules["vendor"] = {"towns": [STORE], "name": "Rolf", "price": 1, "wares": []}
+	_main._hand_item(me, "sword", "test")
+	_main._hand_item(me, "dagger", "test", true)
+	var takes: Array = _main.person_takes(host, carp)
+	var wood: Array = takes.filter(func(row: Dictionary) -> bool: return row["what"] == "wood_bundle")
+	var had := World.stockpile.count(STORE, "wood")
+	_check(wood.size() == 1 and int(wood[0]["count"]) >= 2 and int(wood[0]["uid"]) > 0 and int(wood[0]["have"]) == had + 5 * int(wood[0]["count"])
+		and wood[0]["for"]["kind"] in ["build", "stores"] and not str(wood[0]["for"]["name"]).is_empty() and int(wood[0]["need"]) > 0
+		and wood[0]["raw"] == "wood" and str(host.slots[int(wood[0]["slot"])]) == "wood_bundle",
+		"the carpenter takes the wood: the stack, what it is for, have and need after (%s)" % [wood])
+	_check(int(wood[0]["gold"]) + int(wood[0]["owed"]) > 0 if not wood.is_empty() else false, "and the gold it pays or owes")
+	_check(not takes.any(func(row: Dictionary) -> bool: return row["what"] in ["sword", "dagger"]), "the carpenter takes no gear")
+	var keeper: Array = _main.person_takes(host, Offers.VENDOR + STORE)
+	_check(keeper.any(func(row: Dictionary) -> bool: return row["what"] == "sword" and int(row["gold"]) == 0 and (row["for"] as Dictionary).is_empty())
+		and not keeper.any(func(row: Dictionary) -> bool: return row["what"] in ["dagger", "wood_bundle"]),
+		"the keeper takes the sword as a gift, not the starter dagger, not the carpenter's wood (%s)" % [keeper.map(func(row: Dictionary) -> String: return row["what"])])
+	var no_smith := not World.production.worker_ids(STORE).any(func(id: String) -> bool: return "smith" in World.production.worker(id)["trades"])
+	_check(not no_smith or _main.receiver_for(STORE, "ore") == Offers.VENDOR + STORE, "ore with no smith in town: the keeper takes it")
+	World.economy.rules["vendor"] = vendor
 
 
 ## The town window (768, economy's side): the sheet's new fields for the
