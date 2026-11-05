@@ -705,6 +705,7 @@ func _test_town_sheet(host: Player) -> void:
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
 	await _test_town_window(host)
 	_test_person_takes(host)
+	_test_admin_stock(host)
 
 
 ## The give path's data (804's hand-in to people; ui's Give tab): wood goes
@@ -804,6 +805,29 @@ func _test_person_takes(host: Player) -> void:
 	World.slot_refused.disconnect(hear)
 	chest.free()
 	World.economy.rules["vendor"] = vendor
+
+
+## The admin's stock and give (709 amended; playtest's 804 tour): a store's
+## raw and treasury set either way, logged as the admin's; new items handed a
+## player; nonsense refused.
+func _test_admin_stock(host: Player) -> void:
+	print("
+== the admin's stock and give (709 amended) ==")
+	var reply: String = _main.admin_command("stock %s wood 3" % STORE)
+	_check(World.stockpile.count(STORE, "wood") == 3, "stock wood 3: the store holds 3 wood (%s)" % reply)
+	_main.admin_command("stock %s wood 41" % STORE)
+	_main.admin_command("stock %s gold 0" % STORE)
+	_check(World.stockpile.count(STORE, "wood") == 41 and World.stockpile.count(STORE, "gold") == 0, "raised to 41 wood, the treasury emptied")
+	_check(_main.admin_command("stock %s crowns 2" % STORE).begins_with("stock: crowns isn't a raw")
+		and _main.admin_command("stock nowhere/store wood 2").begins_with("stock: no town store")
+		and _main.admin_command("stock %s wood -1" % STORE).begins_with("usage"), "a thing that isn't a raw, no such store, a count under 0: refused")
+	var had := World.count_of(host, "wood_bundle")
+	reply = _main.admin_command("give %s wood_bundle 4" % host.name)
+	_check(World.count_of(host, "wood_bundle") == had + 4, "give: 4 bundles of wood in their pack (%s)" % reply)
+	_check("wood_bundle" in _main.admin_command("give %s wood 2" % host.name), "a raw named: told what carries it")
+	_check(_main.admin_command("give %s nothing_such 2" % host.name).begins_with("give: no item")
+		and _main.admin_command("give nobody wood 2").begins_with("no player"), "no such item, no such player: refused")
+	_main.admin_command("stock %s gold 100" % STORE)
 
 
 ## The town window (768, economy's side): the sheet's new fields for the

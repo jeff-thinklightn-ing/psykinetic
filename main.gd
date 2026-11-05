@@ -20792,6 +20792,8 @@ const CONSOLE_HELP: Array[String] = [
 	"zone reset <name>: that zone rebuilt from its map",
 	"zone move <player> <zone>: that player and their companion to that zone's start",
 	"gold <player or id prefix> <amount> [why]: give that player gold (why: admin grant unless said)",
+	"stock <town store> <raw|gold> <count>: a town store's count of a raw, or its treasury, set (wilds/store wood 4)",
+	"give <player> <item> [count]: that player handed new items (wood_bundle 8, fish 6), what won't fit at their feet",
 	"herds [seed <area>|all]: each area's game, seeded or its ground still building; or seeded now",
 	"balance [ask <fold>]: the keep-the-balance areas' deer, wolves and folds, each quest and its outcome if judged now; or a fold's quest asked now",
 	"makers [<town or trade>]: each maker's trade, place and the goods of their own make on their town's shelf, by count (no names)",
@@ -20964,6 +20966,10 @@ func admin_command(line: String, caller: Player = null) -> String:
 			return "%s\n%s" % [Net.stats.server_text(), ", ".join(peers) if not peers.is_empty() else "no peers"]
 		"gold":
 			return _gold_command(words)
+		"stock":
+			return _stock_command(words)
+		"give":
+			return _give_command(words)
 		"herds":
 			return _herds_command(words)
 		"balance":
@@ -21173,6 +21179,51 @@ func _gold_command(words: PackedStringArray) -> String:
 	print("[economy] the admin gave %d gold (%s)" % [amount, why])
 	var record: PlayerRecord = _records.get(id)
 	return "%s: %d gold given (%s), %d now" % [record.name if record != null else id.left(8), amount, why, World.economy.gold(id)]
+
+
+## "stock <town store> <raw|gold> <count>" (709 amended; playtest's 804
+## tour stages a town short, past twice enough, or with its treasury empty):
+## sets the store's count, the change deposited or taken as "admin" in its
+## stock log.
+func _stock_command(words: PackedStringArray) -> String:
+	if words.size() < 4 or not words[3].is_valid_int() or words[3].to_int() < 0:
+		return "usage: stock <town store> <raw|gold> <count>"
+	if World.stockpile == null or World.towns == null:
+		return "stock: no stockpile"
+	var town := words[1]
+	var what := words[2]
+	if not World.towns.is_town(town) or World.holdings == null or World.holdings.place(town).is_empty():
+		return "stock: no town store %s" % town
+	if what not in Stockpile.RESOURCES:
+		return "stock: %s isn't a raw (%s)" % [what, ", ".join(Stockpile.RESOURCES)]
+	var want := words[3].to_int()
+	var had := World.stockpile.count(town, what)
+	if want > had:
+		World.stockpile.deposit(town, what, want - had, "admin", "the admin's stock command")
+	elif want < had:
+		World.stockpile.take(town, what, had - want, "admin")
+	print("[economy] the admin set %s's %s to %d (was %d)" % [town, what, want, had])
+	return "%s: %s %d (was %d)" % [town, what, World.stockpile.count(town, what), had]
+
+
+## "give <player> <item> [count]" (709 amended; playtest's tours): that
+## player (by name, or PlayerN) handed [count] new items, onto their stacks
+## first, what won't fit at their feet.
+func _give_command(words: PackedStringArray) -> String:
+	if words.size() < 3 or (words.size() > 3 and (not words[3].is_valid_int() or words[3].to_int() <= 0)):
+		return "usage: give <player> <item> [count]"
+	var id := str(_admin_player(words[1]).get("id", ""))
+	if id.is_empty() or _player_of_id(id) == null:
+		return "no player %s in the game" % words[1]
+	var item := words[2]
+	if Items.def(item).is_empty():
+		var carriers := Items.ids().filter(func(each: String) -> bool: return Items.yield_of(each).has(item))
+		return "give: no item %s%s" % [item, " (it's carried as %s)" % ", ".join(carriers) if not carriers.is_empty() else ""]
+	var count := mini(words[3].to_int() if words.size() > 3 else 1, 200)
+	for i in count:
+		_hand_item(id, item, "the admin")
+	print("[economy] the admin gave %d %s" % [count, item])
+	return "%s: %d %s given" % [words[1], count, item]
 
 
 ## The console's zones: each loaded zone, awake or asleep, its tick, and who

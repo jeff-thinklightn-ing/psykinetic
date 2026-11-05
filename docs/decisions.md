@@ -34342,6 +34342,18 @@ Jeff needed to give his character gold (25, for the draugr), and the console had
 - It is logged: Economy.add_gold's usual "[economy] ... got N gold (why)" line, plus "[economy] the admin gave N gold (why)" with no name or id. The reply gives the player's new total.
 
 zone_test _test_console: by name, by id prefix with a why, a negative amount refused, no such player and no amount refused. Server only: no wire change, no new class_name.
+
+709 amended (release's label; playtest asked, to stage its 804 hand-in tour exactly): two more admin
+verbs beside gold. "stock <town store> <raw|gold> <count>" sets a town store's count of a raw, or its
+treasury, the change deposited or taken as "admin" in its stock log ("wilds/store wood 4"); so a tour
+can make the town short, past twice its enough, or unable to pay. "give <player> <item> [count]" mints
+count new items (200 at most) into that player's pack, onto their stacks first, what won't fit at
+their feet, from "the admin"; a raw's name is answered with the item that carries it ("wood" is
+wood_bundle). Both refuse nonsense (no such store, raw, item or player; a count under 0) with a
+usage line, and print an admin line. On the live box they are Jeff's to run, not a session's.
+economy_test _test_admin_stock. Server only (the console), protocol unchanged, no new class_name, no
+bullet.
+
 ## 608 amended (2), sound's side. The slab's grind
 
 Dungeon and the coordinator (2026-10-27; Jeff: the barrow's hidden niche
