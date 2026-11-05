@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- When you wake far from where you left her waiting, at the temple after a fall, your companion comes to your side and keeps close again, as if you had called her (616 amended (2)).
 
 - The great axe and the battle axe swing edge first, biting into what they hit instead of striking with the flat of the blade (451 amended (3)).
 - At a seam the pick swings as a miner's does, up two-handed over the shoulder and down onto the face, the body dropping into the blow and the point biting the rock in a puff of dust and grit (769 amended (9)).

@@ -4075,6 +4075,22 @@ func _take_result(result: Dictionary) -> void:
 		_start_errand(offered[chosen], serial)
 
 
+## Brought to her player's side from where she was told to wait or rest
+## (Main's rejoin: they came back somewhere else, a temple after a fall):
+## her wait is over, as if they had said "come here" (playtest's badly13;
+## the coordinator: "when the return brings her to her player, her wait
+## ends"). The order and the instruction go, and she keeps close. Nothing
+## when she was not waiting or resting.
+func brought_back() -> void:
+	if order not in ["wait", "rest"] and stance != Stance.HOLD:
+		return
+	order = ""
+	_instruction = ""
+	_serial += 1
+	_set_stance(Stance.STAY_CLOSE, _serial, "order")
+	_narrate("You were brought to %s's side, so you wait no longer: you come along with them." % keeper_name())
+
+
 func _set_stance(wanted: int, serial: int, source: String) -> void:
 	_stance_serial = serial
 	last_mind = source

@@ -7601,6 +7601,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 			World._relocate(existing, _nearest_free(player.tile))
 			print("[spawn] %s's companion %s waited at %s, %d from where %s came back; beside them" % [
 				record.name, existing.name, was, World.distance(was, player.tile), record.name])
+			existing.keeper = player  # Her keeper_name for the narration below.
+			existing.brought_back()  # Beside them, her wait is over (badly13).
 		existing.works_as = ""
 		existing.home = record.companion.get("home", {})
 		existing.keeper = player

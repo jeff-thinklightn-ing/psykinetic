@@ -23945,6 +23945,19 @@ player's own words (_take_check) is their newer word and is unchanged.
 companion_test (the stance-answer case). Server only, protocol unchanged, no
 new class_name.
 
+616 amended (2): a far return ends her wait (2026-11-04, companions; playtest's badly13, the
+coordinator's ruling). Told "Wait here." and holding, Rhea was brought beside her player when
+they came back at the store's temple after a fall ("[spawn] ... waited at (238,128), 73 from
+where Tourbot came back; beside them"), but her order and HOLD stood, so she logged "ATTACK
+town_wolf (HOLD)", dropped, and held beside them through the wolves. The ruling: "when the
+return brings her to her player, her wait ends: stance FOLLOW, same as 'come here'". Main's
+_join_companion, in its branch that relocates her beside them (further than REJOIN_NEAR),
+calls Companion.brought_back(): when she was waiting or resting (order "wait" or "rest", or
+stance HOLD), the order and the standing instruction go and she keeps close (STAY_CLOSE, as
+"follow" sets), told so in a narration for her voice. A return within REJOIN_NEAR, or a
+companion not waiting, is untouched. companion_test _test_brought_back_ends_wait. CHANGELOG
+bullet (voice's words). Server only, protocol unchanged, no new class_name.
+
 ## 586. Snagfin is the only fence, and only by night
 
 Jeff, through the coordinator: "Snagfin could be the only fence, he will

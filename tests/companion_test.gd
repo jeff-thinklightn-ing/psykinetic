@@ -117,6 +117,7 @@ func _ready() -> void:
 	_test_mind_log_no_names()
 	_test_mines_a_seam()
 	_test_mines_only_at_a_seam()
+	_test_brought_back_ends_wait()
 	_test_great_bear()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
@@ -3625,6 +3626,38 @@ func _kill_monsters_but(keep: GridEntity) -> void:
 		if entity is Monster and entity != keep:
 			World.damage(entity, 999)
 
+
+func _test_brought_back_ends_wait() -> void:
+	print("
+== told to wait, then her player comes back somewhere else (a temple after a fall): brought to their side, her wait is over (badly13) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var stance_was := pet.stance
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_put(owner, Vector2i(2, 2))
+	_put(pet, Vector2i(3, 2))
+	pet.owner_spoke("Wait here.")
+	World.step()
+	_check(pet.stance == Companion.Stance.HOLD and pet.order == "wait", "told to wait, she holds (%s, order %s)" % [pet.stance_name(), pet.order])
+	_put(pet, Vector2i(12, 9))
+	_put(owner, Vector2i(2, 3))
+	_main._join_companion(record, owner)
+	World.step()
+	_check(pet.stance != Companion.Stance.HOLD and pet.order.is_empty() and World.distance(pet.tile, owner.tile) <= 2,
+			"come back far off, she is brought beside them and keeps close, no longer waiting (%s, order \"%s\", %d away)" % [pet.stance_name(), pet.order, World.distance(pet.tile, owner.tile)])
+	# Not waiting: her stance is let be.
+	pet._set_stance(Companion.Stance.GUARD, pet._serial, "test")
+	_put(pet, Vector2i(12, 9))
+	_main._join_companion(record, owner)
+	_check(pet.stance == Companion.Stance.GUARD, "not waiting, her stance stands (%s)" % pet.stance_name())
+	pet._set_stance(stance_was, pet._serial, "test")
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
 
 func _test_mines_a_seam() -> void:
 	print("
