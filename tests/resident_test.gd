@@ -72,6 +72,7 @@ func _ready() -> void:
 	_test_herbs()
 	_test_resident_voices()
 	_test_said_to()
+	_test_hand_in_thanked()
 	_test_means_in_voice()
 	_test_hearsay()
 	_test_houses()
@@ -2170,6 +2171,50 @@ func _test_said_to() -> void:
 	World.production.set_away("rs-bram", true)
 	World.despawn(mara)
 	World.despawn(bram)
+
+
+func _test_hand_in_thanked() -> void:
+	print("\n== a hand-in is thanked aloud by the one who takes it, naming what (804, npc's side) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-tova", "Tova", "cook")
+	World.towns.note_rescue(STORE, "rs-orrin", "Orrin", "merchant")
+	World.production.set_away("rs-tova", false)
+	World.production.set_away("rs-orrin", false)
+	_sync()
+	var tova := _body("rs-tova")
+	var orrin := _body("rs-orrin")
+	var player := _player()
+	if tova == null or orrin == null or player == null:
+		_check(false, "(Tova and Orrin in the town, and a player: %s, %s)" % [tova, orrin])
+		return
+	_put(orrin, _main._nearest_free(tova.tile + Vector2i(3, 0)))
+	_put(player, _main._nearest_free(tova.tile + Vector2i(-1, 0)))
+	var before: Array = _main.party_log.last(1)
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 3, "hide": 2}, "counted": "3 wood and 2 hides"})
+	var said := " ".join(_main.party_log.last(1))
+	_check(said.begins_with("Orrin said:") and "3 wood and 2 hides" in said, "the store's keeper takes it, though the cook is nearer, and names it in the reward's own words (%s)" % [said])
+	World.production.set_away("rs-orrin", true)
+	for body: GridEntity in World.townsfolk().duplicate():
+		if body != tova:
+			World.despawn(body)  # Tova alone in the town from here.
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}})
+	said = " ".join(_main.party_log.last(1))
+	_check(said == "Tova said: \"That's 1 wood for the pot. Good.\"", "no keeper: the nearest who hears, in her trade's words (%s)" % [said])
+	tova.doing = Resident.Doing.HIDE
+	before = _main.party_log.last(1)
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}})
+	_check(_main.party_log.last(1) == before, "nobody who hears: nothing said (%s)" % [_main.party_log.last(1)])
+	tova.doing = Resident.Doing.SQUARE
+	_main._reward(player.player_id, {"track": "item", "place": STORE, "given": {"wood": 1}, "worker": "rs-nobody"})
+	_check(_main.party_log.last(1) == before, "the give path names one not here: nothing said, nobody else (%s)" % [_main.party_log.last(1)])
+	_main._reward(player.player_id, {"track": "gold", "amount": 3})
+	_check(_main.party_log.last(1) == before, "a gold reward: no thanks of its own (%s)" % [_main.party_log.last(1)])
+	World.production.set_away("rs-tova", true)
+	World.despawn(tova)
 
 
 func _test_means_in_voice() -> void:

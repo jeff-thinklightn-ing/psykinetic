@@ -14286,10 +14286,86 @@ func _reward(player_id: String, data: Dictionary) -> void:
 	while rewards_given.size() > 32:
 		rewards_given.pop_front()
 	reward(player_id, data)
+	if str(data.get("track", "")) == "item":
+		_thank_aloud(player_id, data)  # 804, npc's side.
 
 
 ## The last rewards sent ({player, data}), for tests.
 var rewards_given: Array[Dictionary] = []
+
+
+## A hand-in thanked aloud (804, npc's side; Jeff: "nothing happens when I
+## hand things in"): [param data], an "item" reward to [param player_id],
+## is answered by the one who takes it (_thanker), naming what and how many
+## ("given"), in a line by its trade (residents.json "thanks", voice's
+## words); nobody near who hears, nothing said. Said in passing: no panel.
+func _thank_aloud(player_id: String, data: Dictionary) -> void:
+	var player := _player_of_id(player_id)
+	var given: Dictionary = data.get("given", {})
+	if player == null or given.is_empty():
+		return
+	var body := _thanker(player, str(data.get("worker", "")), str(data.get("place", "")))
+	if body == null:
+		return
+	var rules: Dictionary = Townsfolk.days().get("thanks", {})
+	var trade := "vendor" if body.worker_id.begins_with(Offers.VENDOR) else body.trade
+	var lines: Array = rules.get(trade, rules.get("default", []))
+	if lines.is_empty():
+		return
+	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(given)
+	var line := str(lines[absi(hash(body.worker_id + player_id + str(World.tick))) % lines.size()])
+	_resident_says(body, line.replace("{count} {item}", what).replace("{item}", what), "", player, false)
+
+
+## Who takes [param player]'s hand-in at [param place] and thanks them: the
+## one the give path names ([param worker], when it hears them), else the
+## store's keeper (a merchant) who hears them, else the stall's keeper by
+## that store (736, who keeps all hours), else the nearest resident who
+## hears them; null for nobody. Never a visitor.
+func _thanker(player: Player, worker: String, place: String) -> Resident:
+	if not worker.is_empty():
+		var named := _resident_body(worker)
+		return named if _hears_thanks(named, player) else null
+	var keeper: Resident = null
+	var vendor: Resident = null
+	var nearest: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body == null or body.worker_id.begins_with(Offers.VISITOR) or not _hears_thanks(body, player):
+			continue
+		var d := World.distance(body.tile, player.tile)
+		if body.worker_id.begins_with(Offers.VENDOR):
+			if body.worker_id == Offers.VENDOR + place:
+				vendor = body
+		elif body.trade == "merchant":
+			if keeper == null or d < World.distance(keeper.tile, player.tile):
+				keeper = body
+		elif nearest == null or d < World.distance(nearest.tile, player.tile):
+			nearest = body
+	return keeper if keeper != null else vendor if vendor != null else nearest
+
+
+## Whether [param body] hears [param player] to thank them: a resident who
+## hears words (_resident_hears), or the stall's keeper in their zone within
+## HEARING_RANGE, not hiding.
+func _hears_thanks(body: Resident, player: Player) -> bool:
+	if body != null and is_instance_valid(body) and body.worker_id.begins_with(Offers.VENDOR):
+		return body.spawned and body.zone == player.zone and body.doing != Resident.Doing.HIDE \
+			and World.distance(body.tile, player.tile) <= HEARING_RANGE
+	return _resident_hears(body, player)
+
+
+## [param given] ({id: count}, a raw good's name or an item's id) in words:
+## "3 wood", "a spear", "5 wood and 2 hides", as the reward's own words.
+func _given_words(given: Dictionary) -> String:
+	var cat: Dictionary = World.economy.catalog.call() if World.economy != null else {}
+	var parts: Array = []
+	for id: String in given:
+		if cat.has(id):
+			parts.append(_count_words(Items.name_of(id).to_lower(), int(given[id]), false))
+		else:
+			parts.append(_count_words(id, int(given[id]), true))
+	return _and_words(parts)
 
 
 func _on_regard_rose(town: String, player_id: String, halves: int, why: String, word: String, was: String) -> void:
@@ -16732,11 +16808,13 @@ func _greeted(player: Player, body: Resident) -> void:
 ## [param line] said by [param body] to [param player] without the mind
 ## (560's greeting word, its refusal): the transcript, the party log, the
 ## neighbours' hearing, the "speech" message with [param aside] ("" for
-## none), and the player's offers (536).
-func _resident_says(body: Resident, line: String, aside: String, player: Player) -> void:
+## none), and the player's offers (536) unless [param offers] is false (a
+## hand-in's thanks, 804's npc's side: said in passing, no panel).
+func _resident_says(body: Resident, line: String, aside: String, player: Player, offers := true) -> void:
 	if _resident_quiet(body, player):
 		_held_tongue("say")  # Held near a fight; the panel still comes (675, npc's side).
-		_send_offers(body, player.player_id, player.owner_peer)
+		if offers:
+			_send_offers(body, player.player_id, player.owner_peer)
 		return
 	Transcript.record(body.person, body.person, line)
 	if not aside.is_empty():
@@ -16745,7 +16823,8 @@ func _resident_says(body: Resident, line: String, aside: String, player: Player)
 	_heard_near(body, body.person, line)
 	_own_tale(body, line, _display_name(player))
 	Net.broadcast_to(hearers(body.tile), "speech", {"entity": String(body.get_path()), "speaker": body.person, "text": line, "aside": aside})
-	_send_offers(body, player.player_id, player.owner_peer)
+	if offers:
+		_send_offers(body, player.player_id, player.owner_peer)
 
 
 ## Why [param player] hears no hail now (decision 554): led by a companion,

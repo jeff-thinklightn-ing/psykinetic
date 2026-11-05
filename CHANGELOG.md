@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Towns: whoever takes what you hand in at a town's store, the keeper or whoever stands nearest, thanks you aloud for what you brought (804).
 - Towns: whatever you hand in at the store or depot that the town can use earns a little regard, not only what it is short of, and each hand-in shows the store's thanks and the gold paid (804).
 - Wren speaks up on her own when all is quiet and you've said nothing for a while: about something close by, what just happened, a place new to her or what she likes, or with a question for you; she no longer fills a silence with "it's quiet" (803 amended).
 - When you wake far from where you left her waiting, at the temple after a fall, your companion comes to your side and keeps close again, as if you had called her (616 amended (2)).

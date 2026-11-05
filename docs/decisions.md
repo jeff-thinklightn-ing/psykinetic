@@ -41805,3 +41805,18 @@ A vendor.wares line may carry its own "price" (Economy.vendor_sale, Offers._vend
 fishing rod at 3 gold once items' row is in, the rest at vendor.price. economy_test _test_ponds.
 Server only, protocol unchanged, no new class_name, no bullet (nothing shows until the rod and the
 pond are in).
+804, npc's side: a hand-in thanked aloud (Jeff: "nothing happens when I hand things in"; the coordinator's
+order, the reward loop first; release's label). Economy's "item" reward (804, economy's side: one per
+hand-in per player per place, its "place", "given" {id: count} and "counted" words) is answered aloud by
+the one who takes it: Main._reward calls Main._thank_aloud for track "item". Main._thanker picks who: the
+receiver the give path names ("worker", once economy's give to people lands), if it hears the player, else
+nobody; without one, the store's keeper (a merchant) who hears, else the stall's keeper by that store (736,
+who keeps all hours; Main._hears_thanks lets him, whom _resident_hears leaves to clicks), else the nearest
+resident who hears; never a visitor; nobody near, nothing said. The line is by trade (residents.json
+"thanks", voice's words, "vendor" for the stall's keeper, else "default"), with "{count} {item}" filled
+from "counted" (Main._given_words rebuilds it from "given" if absent), and said through
+Main._resident_says with no offers panel (its new offers flag): a word in passing, not a talk. Every
+hand-in is thanked; the reward's banner (ui) is the written half. resident_test _test_hand_in_thanked: the
+merchant takes it though the cook is nearer, in the reward's words; without him the nearest in her trade's
+words; nobody hearing, or a named receiver not here, nothing; a gold reward no thanks. Protocol unchanged
+("speech" as before); no new class_name.
