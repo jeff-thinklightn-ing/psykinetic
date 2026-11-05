@@ -101,9 +101,21 @@
 				119.0,
 				139.0
 			],
+			"art": "prop.cache_floorboard",
 			"props": {
 				"cache": "farmstead_cache",
 				"cache_place": "the old farmstead"
+			}
+		},
+		{
+			"at": [
+				198.0,
+				83.0
+			],
+			"art": "prop.cache_pack",
+			"props": {
+				"cache": "camp_pack",
+				"cache_place": "the old camp"
 			}
 		},
 		{

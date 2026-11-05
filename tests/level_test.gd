@@ -2742,6 +2742,43 @@ func _test_relaid() -> void:
 	_test_forest_camps()
 	_test_bear_den()
 	_test_removed(wilds)
+	_test_caches(wilds, Level.load_level("hills"))
+
+
+## The lands' hidden caches (807 amended): the farmstead's under a
+## floorboard, the old camp's pack (off the removed chest's cell, so 807's
+## removal never waits on it), and the cairn's in the hills on its side away
+## from the road; each a chest with its own table and art, and no other
+## cache out in the lands (the town's counters and stalls are buildings').
+func _test_caches(wilds: Dictionary, hills: Dictionary) -> void:
+	print("== The lands' caches (807 amended) ==")
+	var want := {
+		"wilds": {Vector2i(119, 139): ["farmstead_cache", "prop.cache_floorboard"], Vector2i(198, 83): ["camp_pack", "prop.cache_pack"]},
+		"hills": {Vector2i(114, 80): ["cairn_cache", "prop.cache_stones"]}}
+	for level: String in want:
+		var loaded: Dictionary = wilds if level == "wilds" else hills
+		var chests := {}
+		for spec: Dictionary in loaded.get("entities", []):
+			if spec.get("script") == Level.CHEST and (spec.get("props", {}) as Dictionary).has("cache"):
+				chests[spec["tile"]] = spec
+		_check(chests.keys().size() == want[level].size() and chests.keys().all(func(at: Vector2i) -> bool: return want[level].has(at)),
+			"%s: its caches are these alone (%s)" % [level, chests.keys()])
+		for at: Vector2i in want[level]:
+			var spec: Dictionary = chests.get(at, {})
+			var props: Dictionary = spec.get("props", {})
+			_check(str(props.get("cache", "")) == want[level][at][0] and Items.has_loot(want[level][at][0]) and str(spec.get("art", "")) == want[level][at][1]
+				and not str(props.get("cache_place", "")).is_empty(),
+				"%s %s: the %s cache, drawn as %s, a place to name (%s)" % [level, at, want[level][at][0], want[level][at][1], spec])
+	for plan: Dictionary in Relaid.REMOVED:
+		for key: String in plan["removed"]:
+			var cell := Vector2i(int(key.get_slice(",", 0)), int(key.get_slice(",", 1)))
+			_check(not (want.get(plan["level"], {}) as Dictionary).has(cell), "%s %s: no cache on a removed chest's cell" % [plan["level"], key])
+	var cairn := Rect2i()
+	for building: Dictionary in hills.get("buildings", []):
+		if building.get("slot") == "building.cairn":
+			cairn = building["rect"]
+	_check(cairn.grow(1).has_point(Vector2i(114, 80)) and not cairn.has_point(Vector2i(114, 80)),
+		"the cairn's cache stands against the cairn (%s)" % [cairn])
 
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp

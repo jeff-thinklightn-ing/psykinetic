@@ -42499,3 +42499,21 @@ levels; a save from before: the camp chest's kit, arrows and a stacked arrow on 
 with the book following, an empty one dropped, the kept cache untouched, the line, the
 next boot doing nothing, a level still marked waiting); _test_relaid marks 807 done to
 test 774 alone. Level data and the boot's mover; protocol unchanged, no new class_name.
+
+807 amended: the lands' three caches, each its own look (items' tables, 330 amended
+(2), 5cb8911a: every chest holds something, and a chest with its own table is never
+stocked from the level's). The farmstead's (119, 139) is drawn as prop.cache_floorboard.
+The old camp's pack is a cache chest again, camp_pack ("the old camp"), drawn as
+prop.cache_pack, at (198, 83) by the crates, not on the removed chest's cell: a marker
+there would leave 807's removal waiting for ever, and three cells off it is past a moved
+marker's reach (2), so the camp's old saved chest is never adopted by the pack. The
+hills' cairn (C3) gains the hills chase's find, cairn_cache ("the cairn"), drawn as
+prop.cache_stones: make_hills' SIGHTS entry takes a "cache", and _cache_by sets a chest a
+cell out from the middle of the cairn's side farthest from every path (114, 80, 30 cells
+off), so it is come on by walking round the cairn, not seen from the road; hills
+regenerated, only that cell and its entry changed. No traveller's pack (lore's option
+(a)). Art-kit's three slots come later; till then each is the chest's grey shape
+(Client3D.art_slot_for). New markers in a saved zone spawn as new (Main's "new in the level
+since the save"), so no mover. level_test _test_caches (each level's caches by cell,
+table and art, none on a removed cell, the cairn's against the cairn). Level data and a
+tool; protocol unchanged, no new class_name.

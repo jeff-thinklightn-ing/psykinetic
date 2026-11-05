@@ -211,7 +211,8 @@ const SIGHTS: Array[Dictionary] = [
 	{"key": "waystone_hut", "slot": "building.waystone", "at": Vector2i(20, 110), "facing": ROADWARD},
 	{"key": "waystone_cave", "slot": "building.waystone", "at": Vector2i(51, 114), "facing": ROADWARD},
 	{"key": "dead_traveller", "decor": "fallen_guard", "at": Vector2i(45, 69), "facing": Vector2i(1, 0)},
-	{"key": "cairn", "slot": "building.cairn", "at": Vector2i(114, 81), "facing": Vector2i(0, 1)},
+	{"key": "cairn", "slot": "building.cairn", "at": Vector2i(114, 81), "facing": Vector2i(0, 1),
+		"cache": {"table": "cairn_cache", "place": "the cairn", "art": "prop.cache_stones"}},
 	{"key": "rusted_gear", "decor": "rusted_gear", "at": Vector2i(21, 153), "facing": Vector2i(0, 1)},
 	{"key": "grave", "slot": "building.grave", "at": Vector2i(75, 150), "facing": Vector2i(0, 1)},
 	{"key": "lean_to", "slot": "building.lean_to", "at": Vector2i(146, 125), "facing": Vector2i(0, 1), "cold_fire": true}]
@@ -911,6 +912,8 @@ func _sights() -> void:
 							_missed.append("no ground for the lean-to's cold hearth at %s" % front)
 					if sight.has("decor"):
 						config["decor"].append([at.x, at.y, facing.x, facing.y, sight["decor"], 1])
+					if sight.has("cache"):
+						_cache_by(sight, rect, paths)
 					if at != planned:
 						print("[hills] %s laid at %s, not %s" % [sight["key"], at, planned])
 					placed = true
@@ -918,6 +921,39 @@ func _sights() -> void:
 			_missed.append("no ground for %s near %s" % [sight["key"], planned])
 			push_error("[hills] no ground for %s near %s" % [sight["key"], planned])
 	print("[hills] sights: %d buildings, %d decor" % [config["buildings"].size(), config["decor"].size()])
+
+
+## A sight's hidden cache (807 amended: the cairn's, the hills chase's
+## find): a chest a cell out from the middle of whichever side of
+## [param rect] lies farthest from every path, so it is found by walking
+## round the sight, not seen from the road; its table, place words and art
+## from the sight's "cache".
+func _cache_by(sight: Dictionary, rect: Rect2i, paths: Dictionary) -> void:
+	var mid := rect.position + (rect.size - Vector2i.ONE) / 2
+	var best := Vector2i(-1, -1)
+	var best_d := -1.0
+	for side: Vector2i in [Vector2i(0, -1), Vector2i(1, 0), Vector2i(0, 1), Vector2i(-1, 0)]:
+		var cell := mid
+		if side.x != 0:
+			cell.x = rect.end.x if side.x > 0 else rect.position.x - 1
+		if side.y != 0:
+			cell.y = rect.end.y if side.y > 0 else rect.position.y - 1
+		if not map.cell(cell) in ["grass", "dirt"]:
+			continue
+		var near := INF
+		for path: Vector2i in paths:
+			near = minf(near, Vector2(path - cell).length())
+		if near > best_d:
+			best = cell
+			best_d = near
+	if best_d < 0.0:
+		_missed.append("no ground for %s's cache" % sight["key"])
+		return
+	var cache: Dictionary = sight["cache"]
+	map.set_cell(best, "chest")
+	entries.append({"at": [best.x, best.y], "art": cache["art"],
+		"props": {"cache": cache["table"], "cache_place": cache["place"]}})
+	print("[hills] %s's cache at %s, %.0f cells off the nearest path" % [sight["key"], best, best_d])
 
 
 ## Whether every cell of [param rect] is grass or plain dirt (no path, no

@@ -56,7 +56,19 @@
 			"to_spawn": "from_hills"
 		}
 	],
-	"entities": [],
+	"entities": [
+		{
+			"at": [
+				114,
+				80
+			],
+			"art": "prop.cache_stones",
+			"props": {
+				"cache": "cairn_cache",
+				"cache_place": "the cairn"
+			}
+		}
+	],
 	"waters": [
 		{
 			"points": [
