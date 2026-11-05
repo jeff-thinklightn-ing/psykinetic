@@ -10139,6 +10139,14 @@ func _test_pick_meets_seam() -> void:
 	var contact := rig.contact_msec
 	while Time.get_ticks_msec() < contact:
 		await get_tree().process_frame
+	# The pose read at the contact in the clip's own time, held there: under a loaded suite one long frame
+	# ran the wall clock past it (maps' landing, -0.14 m; +0.03 alone).
+	rig._contact_msec = -1  # Its own switch to the recovery's speed would run it on past the seek.
+	rig._set_action_speed(0.0)
+	rig.tree.set("parameters/action_seek/seek_request", rig.contact_at)
+	rig._apply()
+	_rig._process(0.0)
+	await get_tree().process_frame
 	var held := ((puppet.get_meta("sockets") as Dictionary)["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
 	# The pick's point and chisel, in its art's own frame (art-kit's item.pick: the point 0.27 m off the
 	# haft toward +x, 0.767 m up it); the rock's front at the point's height.
@@ -10162,9 +10170,12 @@ func _test_pick_meets_seam() -> void:
 	_check(tip.x - face < Client3D.PICK_BITE and face - tip.x < Client3D.PICK_SHORT,
 			"at its contact the point meets the face (%+.2f m)" % (tip.x - face))
 	_check(tip.y - ground > 0.4 and tip.y - ground < 1.4, "on the rock, not the floor (%.2f m up)" % (tip.y - ground))
+	rig._set_action_speed(rig._recover_speed)
 	await _frames(3)
 	var dust := rock.get_node_or_null("SeamDust") as GPUParticles3D
-	_check(dust != null and dust.emitting and dust.global_position.x < face + 0.1 and absf(dust.global_position.y - ground - Client3D.SEAM_DUST_UP) < 0.05,
+	# Made by this blow (the seam is this test's own), so not read by its emitting: that runs out on the
+	# wall clock, and a 200 ms stall before the contact's seek had it out.
+	_check(dust != null and dust.global_position.x < face + 0.1 and absf(dust.global_position.y - ground - Client3D.SEAM_DUST_UP) < 0.05,
 			"the blow puffs dust off the face as it lands (%s)" % (str(dust.global_position) if dust != null else "none"))
 	rig.cancel_strike()
 	puppet.set_meta("busy_until", 0)
