@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_account()
 	_test_livings()
 	_test_offering()
+	_test_taverner()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -1266,6 +1267,33 @@ func _test_offering() -> void:
 	_now += DayNight.day_steps
 	economy._floor_turn()
 	_check(int(work.worker("ac")["purse"]) == 3 * keep and int(work.worker("ac").get("owed", 0)) == keep, "the treasury at its floor: owed him")
+
+
+## The inn's taverner (buildings.inn.keeper; npc's 772 amended (2)):
+## seated once the inn stands, half the inn's takings theirs.
+func _test_taverner() -> void:
+	print("
+== the inn's taverner ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var stock := Stockpile.new({}, clock, ItemBook.new(clock))
+	var work := Production.new({}, stock, null, clock, _rules)
+	var economy := Economy.new({}, stock, work, clock, _rules)
+	var towns := Towns.new({}, work, _rules, clock)
+	var keeper: Dictionary = _rules["buildings"]["inn"]["keeper"]
+	var id := "taverner:%s" % TOWN
+	towns._appoint(TOWN)
+	_check(work.worker(id).is_empty() and economy.inn_takings(TOWN, 4, "test", "test").is_empty(), "no inn: no taverner, the takings not theirs")
+	towns._town(TOWN)["buildings"]["inn"] = {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": 0, "job": 0}
+	towns._appoint(TOWN)
+	_check(str(work.worker(id).get("name", "")) in keeper["names"] and id in towns.residents(TOWN), "the inn stands: a taverner seated (%s)" % [work.worker(id).get("name")])
+	towns._appoint(TOWN)
+	_check(towns.residents(TOWN).filter(func(who: String) -> bool: return who == id).size() == 1, "one only")
+	var purse := int(work.worker(id)["purse"])
+	var gold := stock.count(TOWN, "gold")
+	_check(economy.inn_takings(TOWN, 5, "visitor:v1", "Edda's stay at the inn, 5") == id
+		and int(work.worker(id)["purse"]) == purse + int(floor(5 * float(keeper["share"]))) and stock.count(TOWN, "gold") == gold + 5 - int(floor(5 * float(keeper["share"]))),
+		"5 gold at the inn: %d the taverner's, the rest the treasury's" % int(floor(5 * float(keeper["share"]))))
 
 
 func _check(ok: bool, what: String) -> void:

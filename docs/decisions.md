@@ -42240,3 +42240,27 @@ crosses a tenth of the bar (Main._practice_gained marks it "whole"). The sim and
 unchanged. ui_test _test_gains (rises held, then one float; a whole step at once; the 10 s fallback;
 the fight's end; Main's tenth). No bullet (804's line says what a gain shows). Client only, protocol
 unchanged, no new class_name.
+## 812. The inn's taverner: a keeper seated when the inn stands, half the inn's takings theirs
+
+The coordinator's go (2026-11-05), for npc's Mughouse (772 amended (2)) in buildings' tavern zone
+(811): the inn had no trade, so nothing seated a keeper there. economy.json buildings.inn gains
+"keeper" {trade "taverner", share 0.5, names: lore's Margery, Dunstan, Bessa, Wilmot (drafts; a name
+Jeff gives wins)}. Towns._appoint seats a building's keeper the way it seats the temple's priest:
+one per town once that building is STANDING, a resident "taverner:<town>" (origin "appointed"),
+named by the town's hash (Umbrage's is Margery). Its log line is the priest's: "[towns] <town>:
+<name> comes to be the town's taverner". It is a keeper, not the building's "trade": a trade would
+make the inn a housing building whose level the town raises (Towns.choose) and a workshop the trade
+gates (kind_for), and a return.places entry would make the inn a place fallen players come back at.
+
+Their living is the inn's takings (the coordinator's pick (a), at half; a wage like the priest's
+would come out of the treasury). Economy.inn_takings(town, gold, from, why): with a taverner seated,
+floor(gold x share) goes to their purse (Production.pay) and the rest to the treasury, the ledger's
+line ending "(the inn's share)"; with none, all to the treasury as before. What the treasury gets
+from a stay now: a resident's bed (folk need "bed", 2 gold every 54000 steps) 1 of 2; a traveller's
+stay (visitors' "inn", 2 to 6 gold) 1 to 3, the larger half of an odd sum. The taverner spends like
+any resident, so the gold still moves through the town; the next economy soak watches the treasury.
+The give path (802 amended) gains the taverner for food, meat and fish, after the cook: a gift goes
+to the cook, else to the taverner, and the store chest's pointer says so (voice's "Food goes to the
+taverner.", meat and fish alike). Where npc puts the body (counter, keeper's bed) is npc's side of
+772 amended (2). larder_test _test_taverner (none without the inn; seated once, from lore's names;
+5 gold split 2 and 3). Server only, protocol unchanged, no new class_name; voice's bullet.

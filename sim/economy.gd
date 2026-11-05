@@ -1056,8 +1056,30 @@ func _stay(id: String, need: String, rule: Dictionary) -> void:
 			or not building_stands.call(town, str(rule["building"])) or not _afford(id, town, fee, false):
 		return
 	production.spend(id, fee, what)
-	stockpile.deposit(town, "gold", fee, "folk:%s" % id, "%s paid %d gold for %s" % [who["name"], fee, what])
-	production.note_trade(id, what, fee, TREASURY)
+	var keeper := inn_takings(town, fee, "folk:%s" % id, "%s paid %d gold for %s" % [who["name"], fee, what]) 		if str(rule["building"]) == "inn" else ""
+	if keeper.is_empty():
+		stockpile.deposit(town, "gold", fee, "folk:%s" % id, "%s paid %d gold for %s" % [who["name"], fee, what])
+	production.note_trade(id, what, fee, keeper if not keeper.is_empty() else TREASURY)
+
+
+## The inn's takings, [param gold] paid at [param town]'s inn (a bed, a
+## traveller's stay): with a taverner seated (buildings.inn.keeper), their
+## "share" goes to the taverner's purse and the rest to the treasury; the
+## taverner's worker id, or "" for none seated (the caller banks it all).
+func inn_takings(town: String, gold: int, from: String, why: String) -> String:
+	var rule: Dictionary = rules.get("buildings", {}).get("inn", {}).get("keeper", {})
+	var trade := str(rule.get("trade", ""))
+	if trade.is_empty() or gold <= 0:
+		return ""
+	for keeper in production.worker_ids(town):
+		if trade in production.worker(keeper).get("trades", []):
+			var theirs := int(floor(gold * float(rule.get("share", 0.5))))
+			if gold - theirs > 0:
+				stockpile.deposit(town, "gold", gold - theirs, from, "%s (the inn's share)" % why)
+			if theirs > 0:
+				production.pay(keeper, theirs, why)
+			return keeper
+	return ""
 
 
 func _hire(id: String, need: String, rule: Dictionary) -> void:
@@ -1603,7 +1625,9 @@ func visitor_arrives(town: String, entry: Dictionary) -> String:
 	if rule.get("inn") is Array and building_stands.is_valid() and bool(building_stands.call(town, "inn")):
 		var spent := draw.randi_range(int(rule["inn"][0]), int(rule["inn"][-1]))
 		if spent > 0:
-			stockpile.deposit(town, "gold", spent, "visitor:%s" % id, "%s's stay at the inn, %d" % [entry.get("name", ""), spent])
+			var stay := "%s's stay at the inn, %d" % [entry.get("name", ""), spent]
+			if inn_takings(town, spent, "visitor:%s" % id, stay).is_empty():
+				stockpile.deposit(town, "gold", spent, "visitor:%s" % id, stay)
 			did.append("a stay at the inn, %d gold" % spent)
 	if rule.has("market"):
 		var traded := _trader(town, entry, rule)

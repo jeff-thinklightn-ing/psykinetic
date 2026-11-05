@@ -637,7 +637,11 @@ func tick() -> void:
 ## (its trade: the priest) once it stands, if the town has none: a resident
 ## named from the place's names by the town, seated there (decision 396).
 func _appoint(town: String) -> void:
-	var places: Dictionary = rules.get("return", {}).get("places", {})
+	var places: Dictionary = rules.get("return", {}).get("places", {}).duplicate()
+	# A building's keeper (its "keeper": the inn's taverner), seated the same way.
+	for kind: String in rules.get("buildings", {}):
+		if rules["buildings"][kind].get("keeper") is Dictionary:
+			places[kind] = rules["buildings"][kind]["keeper"]
 	var record := _town(town)
 	for kind: String in places:
 		var rule: Dictionary = places[kind]
