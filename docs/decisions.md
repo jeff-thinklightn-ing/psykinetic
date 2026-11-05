@@ -43764,3 +43764,17 @@ the hills or foothills.
   (Main.load_map). level_test _test_wolf_cave, _test_forest's links. CHANGELOG bullet (voice's
   words). Lands after the boar lair (780 amended (12), after terrain's 798) and items' run with the
   table. Protocol unchanged, no new class_name.
+
+809 amended: the town credits the doer (the coordinator: telling only other players defeats it for Jeff,
+usually alone on the box; the point is that you feel the town noticed; release's label). A resident credits
+a player in passing for a deed of theirs in its town, in place of its hail that day (Main._credit_line, in
+Main._hail_now before the cue; a scripted line, no mind asked; Resident.hail_done marks the day's hail
+said): their hand-in there today (Main._hand_in_news now keeps what they brought, the reward's "counted")
+or a building standing with their goods in it (economy's 804 amended (2): the entry's "built_by"
+{player_id: {what: count}} until its next level begins; the good they gave most of, not gold, wood as
+timber, and the building's name). Voice's words, residents.json "credit": hand_in "Heard you brought
+{count} {item} to the store. Good of you." / "Word is you brought the store {count} {item}. That helps.";
+built "That's your {item} in the {building}." / "The {building} went up with your {item}." Each resident
+credits a deed once (Main._credited); a player hears at most "a_day" (2) credits a day (Main._credits_today),
+so it never nags. The deed's banner at the moment it stands (economy's) is the written half; the spoken
+credit comes at a later hail. resident_test _test_credit. Protocol unchanged; no new class_name.

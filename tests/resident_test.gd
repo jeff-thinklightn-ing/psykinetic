@@ -2250,8 +2250,56 @@ func _test_hand_in_thanked() -> void:
 	_main._reward(player.player_id, {"track": "gold", "amount": 3})
 	_check(_main.party_log.last(1) == before, "a gold reward: no thanks of its own (%s)" % [_main.party_log.last(1)])
 	_test_hand_in_news(player, tova)
+	_test_credit(player, tova)
 	World.production.set_away("rs-tova", true)
 	World.despawn(tova)
+
+
+## Decision 809 amended: a resident credits the doer in passing, in place
+## of its hail: their hand-in there today, then a building standing with
+## their goods; each deed once a resident, a_day credits a player a day.
+func _test_credit(player: Player, tova: Resident) -> void:
+	print("
+== the town notices: a resident credits the doer in passing (809 amended) ==")
+	var day := Townsfolk.day_of(World.production.now())
+	var key := "%s|%s|%d" % [player.player_id, STORE, day]
+	_main._hand_in_news[key] = "3 fish"
+	_main._credited.clear()
+	_main._credits_today.clear()
+	var buildings: Dictionary = World.towns._towns.get(STORE, {}).get("buildings", {})
+	var kinds: Array = buildings.keys()
+	var kind := str(kinds[0]) if not kinds.is_empty() else ""
+	var was: Variant = buildings[kind].get("built_by") if not kind.is_empty() else null
+	if not kind.is_empty():
+		buildings[kind]["built_by"] = {player.player_id: {"ore": 4, "wood": 2, "gold": 10}}
+	var first: String = _main._credit_line(tova, player, day)
+	_check(first in ["Heard you brought 3 fish to the store. Good of you.", "Word is you brought the store 3 fish. That helps."], "their hand-in today first (%s)" % first)
+	var second: String = _main._credit_line(tova, player, day)
+	if not kind.is_empty():
+		var name := kind.replace("_", " ")
+		_check(second in ["That's your ore in the %s." % name, "The %s went up with your ore." % name], "then the building with their goods, the good they gave most of, not gold (%s)" % second)
+	_check(_main._credit_line(tova, player, day) == "", "two a day at most, and each deed once from her")
+	_main._credits_today.clear()
+	_check(_main._credit_line(tova, player, day) == "", "a new day's room, but she has credited both deeds")
+	_main._credited.clear()
+	_main._credits_today.clear()
+	var card := Townsfolk.card_of(World.production, tova.worker_id)
+	if not card.is_empty():
+		Resident.hails_of(card).get("to", {}).erase(player.player_id)
+	_put(player, _main._nearest_free(tova.tile + Vector2i(1, 0)))
+	_main._hail_at.erase(player.player_id)
+	_main._hail_tried.clear()
+	tova.doing = Resident.Doing.SQUARE
+	var asks: int = _main._resident_asks.size()
+	var hailed: bool = _main._hail_now(tova, player, Townsfolk.rules().get("hail", {}), Time.get_ticks_msec() + 10_000_000, World.production.now(), day, "", true)
+	var said := " ".join(_main.party_log.last(1))
+	_check(hailed and ("Heard you brought 3 fish" in said or "Word is you brought the store 3 fish" in said) and _main._resident_asks.size() == asks, "a hail: her credit said in its place, no mind asked (%s)" % said)
+	if not kind.is_empty():
+		if was == null:
+			buildings[kind].erase("built_by")
+		else:
+			buildings[kind]["built_by"] = was
+	_main._hand_in_news.erase(key)
 
 
 ## Decision 809: a player's first hand-in of the day at a town is its news,

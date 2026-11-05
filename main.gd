@@ -15070,13 +15070,66 @@ func _hand_in_heard(player_id: String, data: Dictionary) -> void:
 	for old: String in _hand_in_news.keys():
 		if not old.ends_with(day):
 			_hand_in_news.erase(old)  # Only today's are kept.
-	_hand_in_news[key] = true
 	var lines: Array = Townsfolk.days().get("hand_in_news", {}).get("lines", [])
 	var what := str(data.get("counted", "")) if data.has("counted") else _given_words(data.get("given", {}))
+	_hand_in_news[key] = what  # What they brought, for the residents' credit (809 amended).
 	if lines.is_empty() or what.is_empty():
 		return
 	var line := str(lines[absi(hash(key)) % lines.size()])
 	Townsfolk._remember(town, line.replace("{name}", record.name).replace("{count} {item}", what), "", false, World.production.now(), player_id)
+
+
+## Credits given (809 amended): "resident|player|deed" -> true, each deed
+## credited once by each resident; and per player {day, n}, at most
+## residents.json "credit" "a_day" a day.
+var _credited: Dictionary = {}
+var _credits_today: Dictionary = {}
+
+
+## [param body]'s word of credit to [param player] for a deed of theirs in
+## its town, said in passing in place of its hail (809 amended; the
+## coordinator: one alone on the box should feel the town noticed): their
+## hand-in there today (_hand_in_news, "hand_in" lines) or a building that
+## stands with their goods in it (Towns' "built_by", "built" lines, the
+## building's name and the most they gave of a good, not gold), one this
+## resident has not credited them for; "" for none, or once they have had
+## "a_day" credits today. Voice's words, residents.json "credit". Marked said.
+func _credit_line(body: Resident, player: Player, day: int) -> String:
+	var rules: Dictionary = Townsfolk.days().get("credit", {})
+	var today: Dictionary = _credits_today.get_or_add(player.player_id, {"day": day, "n": 0})
+	if int(today.get("day", -1)) != day:
+		today["day"] = day
+		today["n"] = 0
+	if World.towns == null or World.production == null or int(today["n"]) >= int(rules.get("a_day", 2)):
+		return ""
+	var deeds: Array[Dictionary] = []
+	var news_key := "%s|%s|%d" % [player.player_id, body.town, Townsfolk.day_of(World.production.now())]
+	if _hand_in_news.get(news_key) is String and not str(_hand_in_news[news_key]).is_empty():
+		deeds.append({"key": "hand_in|" + news_key, "lines": rules.get("hand_in", []), "what": str(_hand_in_news[news_key]), "building": ""})
+	var buildings: Dictionary = World.towns._towns.get(body.town, {}).get("buildings", {})
+	var kinds: Array = buildings.keys()
+	kinds.sort()
+	for kind: String in kinds:
+		var gave: Variant = (buildings[kind] as Dictionary).get("built_by", {}).get(player.player_id)
+		if not gave is Dictionary:
+			continue
+		var most := ""
+		for what: String in gave:
+			if what != "gold" and (most.is_empty() or int(gave[what]) > int(gave[most])):
+				most = what
+		if not most.is_empty():
+			deeds.append({"key": "built|%s|%s|%s|%d" % [player.player_id, body.town, kind, int(buildings[kind].get("level", 0))],
+				"lines": rules.get("built", []), "what": str(BUILT_WORDS.get(most, most)), "building": _building_words(kind.trim_prefix(Towns.REPAIR))})
+	for deed: Dictionary in deeds:
+		var key := body.worker_id + "|" + str(deed["key"])
+		var lines: Array = deed["lines"]
+		if _credited.has(key) or lines.is_empty():
+			continue
+		_credited[key] = true
+		today["n"] = int(today["n"]) + 1
+		var line := str(lines[absi(hash(key)) % lines.size()])
+		return line.replace("{count} {item}", str(deed["what"])).replace("{item}", str(deed["what"])).replace("{building}", str(deed["building"]))
+	return ""
 
 
 ## Who takes [param player]'s hand-in at [param place] and thanks them: the
@@ -17602,6 +17655,14 @@ func _hail_now(body: Resident, player: Player, rules: Dictionary, now_msec: int,
 		greeted["day"] = day
 		greeted["n"] = 0
 	var greeting_ok := int(greeted["n"]) < int(rules.get("greetings_a_day", 3))
+	var credit := _credit_line(body, player, day)
+	if not credit.is_empty():  # Credit in passing for their deed (809 amended), in place of today's hail.
+		Resident.hail_done(World.production, body.worker_id, player.player_id, {"kind": "credit", "text": credit}, day, sky)
+		_write_resident_card(body)
+		_hail_at[player.player_id] = now_msec
+		_resident_says(body, credit, "", player, false)
+		print("[%s] %s to %s: credit" % ["greet" if clicked else "hail", body.person, _display_name(player)])
+		return true
 	var cue := Resident.hail_cue(body.worker_id, body.town, player.player_id, _display_name(player), World.production, now, sky, Offers.ctx, heard.keys(), greeting_ok)
 	if cue.is_empty():
 		_hail_tried[tried] = World.tick
