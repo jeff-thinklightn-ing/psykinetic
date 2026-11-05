@@ -11409,7 +11409,10 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 ## zone within HEARING_RANGE, not hiding, not asleep (751), and not a
 ## visitor (711) or the stall's keeper (736), who answer a click, not the mind.
 func _resident_hears(body: Resident, player: Player) -> bool:
-	return body != null and is_instance_valid(body) and body.spawned and body.zone == player.zone 		and body.doing != Resident.Doing.HIDE and World.distance(body.tile, player.tile) <= HEARING_RANGE 		and not body.worker_id.begins_with(Offers.VISITOR) and not body.worker_id.begins_with(Offers.VENDOR) 		and not body.sleeping()
+	return body != null and is_instance_valid(body) and body.spawned and body.zone == player.zone \
+		and body.doing != Resident.Doing.HIDE and World.distance(body.tile, player.tile) <= HEARING_RANGE \
+		and not body.worker_id.begins_with(Offers.VISITOR) and not body.worker_id.begins_with(Offers.VENDOR) \
+		and not body.sleeping()
 
 
 ## The body [param path] names for typed words from [param player] (802, the
@@ -11471,6 +11474,8 @@ func _send_offers(body: Resident, player_id: String, peer: int) -> void:
 	var taker := _player_of_id(player_id)
 	if taker != null and not _worker_town(body.worker_id).is_empty():
 		data["takes"] = person_takes(taker, body.worker_id)  # What they'd take of the pack (802 amended (2), the Give tab).
+	if body.worker_id.begins_with(Offers.VENDOR) and _records.has(player_id) and not (_records[player_id] as PlayerRecord).kit_given:
+		data["kit"] = true  # His practice kit is owed (807 amended (2)): ui's Kit button.
 	var standing := _standing_for(player_id, body.worker_id)
 	if not standing.is_empty():
 		data["standing"] = {"id": standing["id"], "title": standing["title"]}  # PROTOCOL_REVISION 23 (decision 536).
@@ -13417,9 +13422,16 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		if facing != Vector2i.ZERO:
 			World.face(entity, facing)
 	elif command_name == "locker" and entity is Player:
-		var prop := get_node_or_null(NodePath(str(args.get("prop", "")))) as Chest
-		if prop != null:
-			open_locker(entity as Player, prop)
+		if args.has("keeper"):  # The stall's keeper keeps it (807 amended (2)).
+			keeper_locker(entity as Player, get_node_or_null(NodePath(str(args["keeper"]))) as Resident)
+		else:
+			var prop := get_node_or_null(NodePath(str(args.get("prop", "")))) as Chest
+			if prop != null:
+				open_locker(entity as Player, prop)
+	elif command_name == "kit" and entity is Player:
+		if keeper_kit(entity as Player, get_node_or_null(NodePath(str(args.get("keeper", "")))) as Resident):
+			var kept := get_node_or_null(NodePath(str(args.get("keeper", "")))) as Resident
+			_send_offers(kept, (entity as Player).player_id, (entity as Player).owner_peer)  # Its button gone.
 	elif command_name in ["deposit", "withdraw", "deposit_all"] and entity is Player:
 		var locker := World.locker_of((entity as Player).player_id)
 		if locker != null:
@@ -18161,9 +18173,9 @@ func _greeted(player: Player, body: Resident) -> void:
 		return
 	if body.worker_id.begins_with(Offers.VENDOR):
 		body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
-		var greetings: Array = Townsfolk.rules().get("visitors", {}).get("greetings", {}).get("vendor", ["Blades for the road, one gold apiece. Take your pick."])
-		if not greetings.is_empty():
-			_resident_says(body, str(greetings[absi(hash(body.worker_id + player.player_id)) % greetings.size()]), "", player)  # 736.
+		# His own words (807 amended (2); voice's): "greet" to one he hasn't kitted out yet, "greet_again" after.
+		var record: PlayerRecord = _records.get(player.player_id)
+		_keeper_says(body, "greet_again" if record != null and record.kit_given else "greet", player)
 		return
 	var busy := false
 	for each: Dictionary in _resident_asks:
@@ -18224,12 +18236,30 @@ func _resident_says(body: Resident, line: String, aside: String, player: Player,
 ## them within the minute (a talk), or a hail within hail.minute_seconds.
 ## [param player] clicked [param body] asleep in its bed (decision 751):
 ## one narrated line to them alone (townsfolk.json "asleep", voice's words,
-## picked by the body's id), and the sleeper does not stir.
+## picked by the body's id), and the sleeper does not stir. The store's
+## keeper (a merchant) asleep points to the stall's keeper by the store, who
+## keeps all hours ("asleep_store", 807 amended (2); never the temple's: its
+## work is never his, lore).
 func _asleep_told(player: Player, body: Resident) -> void:
 	var lines: Array = Townsfolk.rules().get("asleep", ["%s is asleep."])
 	var who := body.person if not body.person.is_empty() else "The %s" % (body.trade if not body.trade.is_empty() else "sleeper")
+	var keeper := _stall_keeper(body.town) if body.trade == "merchant" else null
+	if keeper != null:
+		lines = Townsfolk.rules().get("asleep_store", lines)
 	var line := str(lines[absi(hash(body.worker_id)) % lines.size()]) if not lines.is_empty() else "%s is asleep."
+	line = line.replace("{name}", who).replace("{other}", keeper.person if keeper != null else "")
 	Net.broadcast_to([player.owner_peer], "party", {"from": "", "text": line % who if line.contains("%s") else line})
+
+
+## The stall's keeper by [param town]'s store (736; 807 amended (2): the
+## keeper of all hours) when he stands there, not hiding; else null.
+func _stall_keeper(town: String) -> Resident:
+	for entity: GridEntity in World.townsfolk():
+		var body := entity as Resident
+		if body != null and body.spawned and body.worker_id.begins_with(Offers.VENDOR) and body.town == town \
+				and body.doing != Resident.Doing.HIDE:
+			return body
+	return null
 
 
 ## Woken (decision 751): a sleeper hit, or a hit or a death within
@@ -20717,23 +20747,90 @@ func _transfer(from: GridEntity, from_slot: int, to: GridEntity, to_slot: int, c
 ## their record, and its opened count rises (the client's cue to show it).
 ## One already open elsewhere moves here. Its Locker, or null.
 func open_locker(player: Player, prop: Chest) -> Locker:
+	if not Net.is_authority() or not prop.locker or not World.reaches(player, prop):
+		return null
+	return _open_locker_at(player, prop.zone, prop.tile)
+
+
+## Server: [param player]'s locker opened by the stall's keeper (807, npc's
+## side: the keeper of all hours keeps it, chests gone from towns): [param
+## keeper], the vendor's body, within reach of them in their zone and not
+## hiding, brings it out on the cell beside him toward them and says so
+## (residents.json "keeper" "locker", voice's words). Its Locker, or null.
+func keeper_locker(player: Player, keeper: Resident) -> Locker:
+	if not Net.is_authority() or not _keeper_serves(player, keeper):
+		return null
+	var toward := keeper.tile + (player.tile - keeper.tile).clampi(-1, 1)
+	var locker := _open_locker_at(player, keeper.zone, toward)
+	if locker != null:
+		_keeper_says(keeper, "locker", player)
+	return locker
+
+
+## Whether [param keeper] serves [param player] now (807 amended (2)): the
+## stall's keeper, in their zone, not hiding, within World.COMPANION_REACH
+## of them and in sight (a word across the counter).
+func _keeper_serves(player: Player, keeper: Resident) -> bool:
+	return player != null and keeper != null and is_instance_valid(keeper) and keeper.spawned \
+		and keeper.worker_id.begins_with(Offers.VENDOR) and keeper.zone == player.zone \
+		and keeper.doing != Resident.Doing.HIDE and World.distance(player.tile, keeper.tile) <= World.COMPANION_REACH \
+		and World.has_line_of_sight(player.tile, keeper.tile)
+
+
+## [param keeper]'s own line of [param kind] ("greet", "locker", "kit": residents.json
+## "keeper", voice's words) said to [param player] in passing, picked by
+## their ids; none, nothing.
+func _keeper_says(keeper: Resident, kind: String, player: Player) -> void:
+	var lines: Array = Townsfolk.days().get("keeper", {}).get(kind, [])
+	if not lines.is_empty():
+		_resident_says(keeper, str(lines[absi(hash(keeper.worker_id + player.player_id)) % lines.size()]), "", player)
+
+
+## Server: [param player]'s locker (722) opened on [param tile] of [param
+## zone]: their own chest stands there, its slots from their record, and its
+## opened count rises (the client's cue to show it); one open elsewhere
+## moves here. Its Locker, or null.
+func _open_locker_at(player: Player, zone: String, tile: Vector2i) -> Locker:
 	var record: PlayerRecord = _records.get(player.player_id)
-	if not Net.is_authority() or not prop.locker or not World.reaches(player, prop) or record == null:
+	if record == null:
 		return null
 	var locker := World.locker_of(player.player_id)
-	if locker != null and (locker.zone != prop.zone or locker.tile != prop.tile):
+	if locker != null and (locker.zone != zone or locker.tile != tile):
 		World.despawn(locker)
 		locker = null
 	if locker == null:
-		locker = _spawn({"script": "res://sim/locker.gd", "shape": "chest", "name": "Locker_%d" % record.index, "tile": prop.tile}) as Locker
+		locker = _spawn({"script": "res://sim/locker.gd", "shape": "chest", "name": "Locker_%d" % record.index, "tile": tile}) as Locker
 		if locker == null:
 			return null
 		locker.player_id = player.player_id
 		locker.viewer = player.owner_peer
 		World.set_slots(locker, record.locker_slots, record.locker_items)
-		World.update_visibility(player.owner_peer, prop.zone)  # Asked at its spawn, before it had a viewer.
+		World.update_visibility(player.owner_peer, zone)  # Asked at its spawn, before it had a viewer.
 	locker.opened += 1
 	return locker
+
+
+## Server: the stall's keeper's practice kit (807 amended (2); the
+## coordinator: one of each starter weapon, so a new player tries them all):
+## [param keeper] serving [param player] hands them each ware of the
+## vendor's (economy.json "vendor" wares, but a line "kit": false) its count
+## times, marked starter as his sales are, once a player (PlayerRecord
+## kit_given), free; he says so. Whether he handed it.
+func keeper_kit(player: Player, keeper: Resident) -> bool:
+	var record: PlayerRecord = _records.get(player.player_id) if player != null else null
+	if not Net.is_authority() or record == null or record.kit_given or World.economy == null or not _keeper_serves(player, keeper):
+		return false
+	record.kit_given = true
+	for line: Variant in World.economy.rules.get("vendor", {}).get("wares", []):
+		if not line is Dictionary or not bool((line as Dictionary).get("kit", true)):
+			continue
+		var item := str(line.get("item", line.get("id", "")))
+		if item.is_empty():
+			continue
+		for i in maxi(int(line.get("count", 1)), 1):
+			_hand_item(player.player_id, item, keeper.person, true)
+	_keeper_says(keeper, "kit", player)
+	return true
 
 
 ## Server: [param from]'s whole [param slot] (a stack whole) into the first

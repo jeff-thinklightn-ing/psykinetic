@@ -4877,10 +4877,95 @@ func _test_vendor() -> void:
 		"bought: the price paid, the sword in hand, marked starter (gold %d, slots %s)" % [World.economy.gold(pid), player.slots])
 	_check(spoken.size() == 1, "he says so (%s)" % [spoken])
 	_test_vendor_buttons(player, rolf, rule)
+	_test_keeper(player, rolf)
 	Net.message_received.disconnect(heard)
 	rule["towns"] = towns_was
 	_sync()
 	_check(_body(Offers.VENDOR + STORE) == null, "not among the rule's towns: no body")
+
+
+## Rolf, the keeper of all hours (807 amended (2)): his own greeting; a
+## player's locker brought out beside him, not while he hides; his practice
+## kit once, one of each kit ware, marked starter, and the offers' "kit" flag
+## till then; the store's keeper asleep points to him, the temple's never.
+func _test_keeper(player: Player, rolf: Resident) -> void:
+	print("
+== Rolf keeps the lockers and hands his practice kit once (807 amended (2)) ==")
+	var record: PlayerRecord = _main._records.get(player.player_id)
+	if record == null:
+		_check(false, "(a record for the player)")
+		return
+	record.kit_given = false
+	var heard: Array[Dictionary] = []
+	var listen := func(kind: String, data: Dictionary) -> void:
+		heard.append({"kind": kind, "data": data})
+	Net.message_received.connect(listen)
+	var said := func() -> Array:
+		return heard.filter(func(m: Dictionary) -> bool: return m["kind"] == "speech").map(func(m: Dictionary) -> String: return str(m["data"].get("text", "")))
+	var offered := func() -> Array:
+		return heard.filter(func(m: Dictionary) -> bool: return m["kind"] == "offers" and str(m["data"].get("entity", "")) == String(rolf.get_path()))
+	_put(player, _main._nearest_free(rolf.tile + Vector2i(1, 0)))
+	_main._greet_at.clear()
+	_main._resident_fight_at.clear()
+	_main._greeted(player, rolf)
+	_check(said.call() == ["Store's open. What do you need?"], "his own greeting to one not yet kitted out (%s)" % [said.call()])
+	var o: Array = offered.call()
+	_check(not o.is_empty() and bool(o[-1]["data"].get("kit", false)), "his offers say a kit is owed (%s)" % [o.map(func(m: Dictionary) -> Variant: return m["data"].get("kit"))])
+	heard.clear()
+	var locker: Locker = _main.keeper_locker(player, rolf)
+	_check(locker != null and locker.opened >= 1 and locker.player_id == player.player_id and World.distance(locker.tile, rolf.tile) <= 1,
+		"the locker brought out beside him (%s)" % [locker.tile if locker != null else null])
+	_check(said.call() == ["Here's your locker, as you left it."], "and he says so (%s)" % [said.call()])
+	rolf.doing = Resident.Doing.HIDE
+	_check(_main.keeper_locker(player, rolf) == null and not _main.keeper_kit(player, rolf), "hiding: no locker, no kit")
+	rolf.doing = Resident.Doing.WORK
+	for slot in player.slots.size():
+		if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
+			World.items.place(World._take_out(player, slot), "the test")
+	heard.clear()
+	var wares: Array = (World.economy.rules["vendor"].get("wares", []) as Array).filter(func(w: Dictionary) -> bool: return bool(w.get("kit", true)))
+	_check(_main.keeper_kit(player, rolf) and record.kit_given, "the kit handed, and noted on the record")
+	var at_feet: Array[String] = []  # No room in the hands and pack: at their feet, as any handed thing.
+	for cell: Vector2i in World.zone.ground:
+		if World.distance(cell, player.tile) <= 2:
+			for uid: int in World.zone.ground[cell]:
+				at_feet.append(World.items.id_of(uid))
+	var missing: Array = wares.filter(func(w: Dictionary) -> bool: return not player.slots.has(str(w["item"])) and not str(w["item"]) in at_feet)
+	var dagger := player.slots.find("dagger")
+	_check(missing.is_empty() and dagger >= 0 and World.is_starter(World.slot_uid(player, dagger)), "one of each kit ware, in hand or at their feet, marked starter (missing %s)" % [missing])
+	_check(said.call() == ["Here, take this. Something to practise with."], "he says so (%s)" % [said.call()])
+	_check(not _main.keeper_kit(player, rolf), "only once")
+	heard.clear()
+	_main._send_offers(rolf, player.player_id, player.owner_peer)
+	o = offered.call()
+	_check(not o.is_empty() and not o[-1]["data"].has("kit"), "his offers no longer owe one")
+	heard.clear()
+	_main._greet_at.clear()
+	_main._greeted(player, rolf)
+	_check(said.call() == ["Back again. What'll it be?"], "after: his greeting again (%s)" % [said.call()])
+	var other: Resident = null
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and not (entity as Resident).worker_id.begins_with(Offers.VENDOR) and (entity as Resident).town == rolf.town:
+			other = entity
+	if other != null:
+		var trade_was := other.trade
+		other.trade = "merchant"
+		heard.clear()
+		_main._asleep_told(player, other)
+		var told: Array = heard.filter(func(m: Dictionary) -> bool: return m["kind"] == "party").map(func(m: Dictionary) -> String: return str(m["data"].get("text", "")))
+		_check(told.size() == 1 and told[0].ends_with("at the store will see to you.") and rolf.person in told[0], "the store's keeper asleep: Rolf will see to you (%s)" % [told])
+		other.trade = "priest"
+		heard.clear()
+		_main._asleep_told(player, other)
+		told = heard.filter(func(m: Dictionary) -> bool: return m["kind"] == "party").map(func(m: Dictionary) -> String: return str(m["data"].get("text", "")))
+		_check(told.size() == 1 and not rolf.person in told[0], "the temple's asleep: not pointed to him (%s)" % [told])
+		other.trade = trade_was
+	else:
+		_check(false, "(another resident of the town for the asleep lines)")
+	Net.message_received.disconnect(listen)
+	record.kit_given = false
+	if locker != null and is_instance_valid(locker):
+		World.despawn(locker)
 
 
 ## The Rolf fix, ui's side (Jeff on v0.1.194: Rolf "advertises but doesn't

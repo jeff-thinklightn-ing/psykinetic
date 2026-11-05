@@ -94,6 +94,9 @@ var caches: Array[String] = []
 ## instance in each, LOCKER_SLOTS of them; saved only while it holds something.
 var locker_slots := Items.tidy([], Locker.LOCKER_SLOTS)
 var locker_items := PackedInt32Array()
+## Whether the stall's keeper has handed them his practice kit (807, npc's
+## side: one of each starter weapon, free, once a player).
+var kit_given := false
 ## Companions who travelled with this player once and were handed to a
 ## town (686): {"companion": her record as she was, "worker": the town's
 ## worker id she is now}, newest first, a few at most.
@@ -150,6 +153,7 @@ func to_dict() -> Dictionary:
 		"locker": {"slots": Array(locker_slots), "items": Array(locker_items)} if locker_slots.count("") < locker_slots.size() else {},
 		"former": former.duplicate(true),
 		"arts": arts.duplicate(true),
+		"kit": kit_given,
 	}
 
 
@@ -183,6 +187,7 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 	record.explored_places = _strings(entry.get("explored_places", []))
 	record.marks = _strings(entry.get("marks", []))
 	record.caches = _strings(entry.get("caches", []))
+	record.kit_given = bool(entry.get("kit", false))  # Before 807: none given.
 	var locker: Variant = entry.get("locker", {})
 	if locker is Dictionary:
 		record.locker_slots = Items.tidy(locker.get("slots", []), Locker.LOCKER_SLOTS)

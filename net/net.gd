@@ -581,6 +581,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## {state, at}, the cast's state and the float's water cell, {} when not fishing.
 ## 51 (789): Player and Companion replicate "aura" (SUBCLASS_REPLICATED), 0..1 to the
 ## hundredth, the worn charm's glow; 0 with no charm.
+## 51 (807 amended (2)): "locker" takes {"keeper": the stall keeper's path} beside {"prop"}, a
+## new "kit" command {"keeper"} hands his practice kit once, and "offers" carries "kit": true
+## while one is owed; an old client opens lockers only at chests and shows no Kit button. Shares 51 with 814.
 const PROTOCOL_REVISION := 51
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

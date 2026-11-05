@@ -42972,6 +42972,28 @@ since the save"), so no mover. level_test _test_caches (each level's caches by c
 table and art, none on a removed cell, the cairn's against the cairn). Level data and a
 tool; protocol unchanged, no new class_name.
 
+807 amended (2): Rolf, the keeper of all hours (the coordinator's chests out of towns; release's label;
+lore: a plain townsman of the town, never a smith). With chests gone from towns (807, maps' side), the
+stall's keeper by each store (736's vendor) keeps the players' lockers and hands a practice kit; he keeps
+all hours and hides only in a raid, as before. Locker: the "locker" command also takes {"keeper": his
+path} beside {"prop"}; Main.keeper_locker, when he serves the player (Main._keeper_serves: his zone, not
+hiding, within World.COMPANION_REACH and in sight, a word across the counter), opens their locker
+(Main._open_locker_at, split out of open_locker) on the cell beside him toward them; the deposit and
+withdraw commands are unchanged. Kit (the coordinator: one of each starter weapon, so a new player tries
+them all, no classes): the "kit" command {"keeper"}; Main.keeper_kit hands each line of economy.json
+"vendor" wares, but one "kit": false (economy: the fishing rod, a later non-weapon), its count times
+through _hand_item marked starter as his sales are (economy: no gold moves, nothing of theirs), once a
+player (PlayerRecord.kit_given, saved as "kit"; an older record has none given); no room, at their feet as
+any handed thing. His "offers" message carries "kit": true while one is owed (ui's Kit button). His own
+lines (residents.json "keeper", voice's words): greet to one not yet kitted out, greet_again after (736's
+blades greeting goes), locker, kit, through Main._keeper_says. Banking stays economy's: World._bank moves
+onto the give path with him as the fallback receiver (804's "worker" "vendor:<place>"), thanked by 804,
+npc's side. Asleep: the store's keeper (a merchant) clicked asleep points to him (townsfolk.json
+"asleep_store", "{name} is asleep. {other} at the store will see to you."); the temple's never (lore: its
+work is Aldous's and Pip's). ui's side: the Locker and Kit buttons in the vendor's window, his name over
+his head. resident_test _test_keeper. Protocol: "locker" carries "keeper", "kit" is a new command, and
+"offers" carries "kit": PROTOCOL_REVISION 51, which 814 opened after v0.1.205's cut (a "51 (807 amended (2))" line, sharing it). No new class_name.
+
 ## 799. The forest camps' traders
 
 The coordinator's approved design (2026-11-04), on maps' forest phase C (793, maps' side,
