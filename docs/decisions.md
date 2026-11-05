@@ -41851,3 +41851,11 @@ Main.reward with it. combat_test _test_fight_won (a lone kill, two players both 
 walking away, the bear hard and named by its row, the reward's three forms); ui_test: World.fight_won
 reaches the player as a float where it ended. Server only, protocol unchanged ("reward" is 804's), no
 new class_name.
+804 amended (ui; the coordinator on the stills, C:/dev/review/rewards; release's label): a fight
+is a blow, not any hit points falling. Main._in_fight counts a blow taken by the player or their
+companion, a blow on a monster within Gains.FIGHT_NEAR, or a hostile within it hunting or fighting
+(Monster.alert, replicated); hit points a burn or a bleed takes are no blow (Main._blow_on), so the
+test room's imps burning in its fire no longer held the banner. And the floats read larger:
+Gains.FLOAT_SCALE 1.3 of the HUD's text, popping in (Gains.pop: from 0.7 to 1.25 of their size in
+0.08 s, settled in 0.14 s) as they rise. ui_test _test_gains (a burn's loss is no fight, a blow
+is; the pop). No bullet (release). Client only, protocol unchanged, no new class_name.

@@ -2519,6 +2519,24 @@ func _test_gains() -> void:
 		var picked := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
 		_check(picked == ["+12 gold", "+2 " + Gains.counted(Items.name_of("wood_bundle"), 2)], "picked up: the gold, and each kind of thing counted (%s)" % [picked])
 		clear.call()
+		# 804 amended: a blow taken is a fight; hit points lost to a burn are not.
+		_main._fight_until = 0.0
+		_main._fight_hp = {}
+		var hp_was := me.hp
+		var ailments_was: Dictionary = me.ailments.duplicate()
+		_main._in_fight()
+		me.ailments["burn"] = 1
+		me.hp = hp_was - 1
+		var burnt: bool = _main._in_fight()
+		me.ailments = ailments_was
+		me.hp = hp_was - 2
+		var struck: bool = _main._in_fight()
+		me.hp = hp_was
+		_main._fight_until = 0.0
+		_main._fight_hp = {}
+		_check(not burnt and struck, "a fight: a blow taken, never hit points a burn takes (burnt %s, struck %s)" % [burnt, struck])
+		_check(Gains.pop(0.0) < 1.0 and Gains.pop(Gains.POP_UP) > 1.0 and is_equal_approx(Gains.pop(1.0), 1.0),
+			"a float pops: a swell, then its size")
 		_main._discovered(me.owner_peer, me.zone)
 		_check(gains.lines.size() == 1 and gains.lines[0]["track"] == "explore" and str(gains.lines[0]["text"]).begins_with("+1 Wayfaring, "),
 			"a zone stood in the first time: +1 Wayfaring (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])

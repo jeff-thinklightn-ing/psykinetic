@@ -58,9 +58,19 @@ const FLOAT_RISE_TILES := 1.5
 ## Floats over one another, in lines.
 const FLOAT_STACK := 1.1
 const FLOATS_AT_ONCE := 3
+## A float's size, times the HUD's text (the coordinator on the still: "the
+## reward centre" reads small at 1080p).
+const FLOAT_SCALE := 1.3
+## A float pops in: from POP_FROM of its size up to POP_PEAK in POP_UP
+## seconds, then settles to its size in POP_SETTLE.
+const POP_FROM := 0.7
+const POP_PEAK := 1.25
+const POP_UP := 0.08
+const POP_SETTLE := 0.14
 const FIGHT_SCALE := 0.7
 const FIGHT_SECONDS := 4.0
-## A monster this near (cells) whose hit points fall is a fight (Main._in_fight).
+## A body this near (cells): a blow on it, or it hunting or fighting, is a
+## fight (Main._in_fight).
 const FIGHT_NEAR := 8
 const BANNER_SECONDS := 2.5
 const BANNER_FADE := 0.4
@@ -232,6 +242,15 @@ func _cue(slot: String, merged: bool, now: float) -> void:
 		play.call(chosen, pitch, QUIET_DB if shown == "quiet" else 0.0)
 
 
+## A float's pop at [param age] seconds: a quick swell, then its size (1).
+static func pop(age: float) -> float:
+	if age < POP_UP:
+		return lerpf(POP_FROM, POP_PEAK, age / POP_UP)
+	if age < POP_UP + POP_SETTLE:
+		return lerpf(POP_PEAK, 1.0, (age - POP_UP) / POP_SETTLE)
+	return 1.0
+
+
 func _fighting() -> bool:
 	return fighting.is_valid() and bool(fighting.call())
 
@@ -270,7 +289,7 @@ func _draw() -> void:
 			continue
 		var age := now - float(live["born"])
 		var alpha := clampf((FLOAT_SECONDS - age) / FLOAT_FADE, 0.0, 1.0)
-		var font_size := int(size_hud * (FIGHT_SCALE if live["small"] else 1.0))
+		var font_size := maxi(int(size_hud * FLOAT_SCALE * (FIGHT_SCALE if live["small"] else 1.0) * pop(age)), 1)
 		var spot := str(live["at"])
 		var row := int(stacked.get(spot, 0))
 		stacked[spot] = row + 1

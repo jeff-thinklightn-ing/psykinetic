@@ -680,7 +680,7 @@ var rewards_sent := 0
 var _arts_seen := {}
 ## 804: the local player's and the near monsters' hit points together, as last
 ## looked at (-1: not yet), and until when a fall in them keeps the fight on.
-var _fight_hp := -1
+var _fight_hp := {}
 var _fight_until := 0.0
 ## The named room the local player's shown cell is in (665, ui's side;
 ## Level.room_at), and when each room was last left (msec), so stepping
@@ -21590,22 +21590,42 @@ func _gain_anchor(at: Variant) -> Variant:
 	return _bubble_anchor(me.get_instance_id()) if me != null else null
 
 
-## Whether a blow was given or taken lately: the local player's and the near
-## monsters' hit points fell within Gains.FIGHT_SECONDS (Gains asks each frame).
+## Whether the player is in a fight, lately (Gains.FIGHT_SECONDS; Gains asks
+## each frame): a blow taken by them or their companion, a blow on a monster
+## near (Gains.FIGHT_NEAR), or a hostile near hunting or fighting (the
+## coordinator, 804 amended: a monster burning in a fire near is no fight,
+## so hit points lost to a burn or a bleed are not a blow).
 func _in_fight() -> bool:
 	var now := Time.get_ticks_msec() / 1000.0
 	var me := _local_player()
 	if me == null or World.zone == null:
-		_fight_hp = -1
+		_fight_hp = {}
 		return now < _fight_until
-	var sum := me.hp
+	var seen := {}
+	var fight := _blow_on(me, seen)
+	for body: GridEntity in World.sought():
+		if is_instance_valid(body) and _is_own_companion(body):
+			fight = _blow_on(body, seen) or fight
 	for monster: GridEntity in World.monsters():
-		if is_instance_valid(monster) and World.distance(monster.tile, me.tile) <= Gains.FIGHT_NEAR:
-			sum += monster.hp
-	if _fight_hp >= 0 and sum < _fight_hp:
+		if not is_instance_valid(monster) or World.distance(monster.tile, me.tile) > Gains.FIGHT_NEAR:
+			continue
+		fight = _blow_on(monster, seen) or fight
+		if monster is Monster and not (monster as Monster).peaceable \
+				and (monster as Monster).alert in [Monster.Alert.HUNTING, Monster.Alert.FIGHTING]:
+			fight = true
+	_fight_hp = seen
+	if fight:
 		_fight_until = now + Gains.FIGHT_SECONDS
-	_fight_hp = sum
 	return now < _fight_until
+
+
+## Whether [param body]'s hit points fell since the last frame by a blow (not
+## a burn's or a bleed's); its hit points noted in [param seen].
+func _blow_on(body: GridEntity, seen: Dictionary) -> bool:
+	var id := body.get_instance_id()
+	seen[id] = body.hp
+	return _fight_hp.has(id) and body.hp < int(_fight_hp[id]) \
+			and not body.ailments.has("burn") and not body.ailments.has("bleed")
 
 
 func _gain_cue(slot: String, pitch: float, volume_db: float) -> void:
