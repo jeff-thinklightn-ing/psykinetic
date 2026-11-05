@@ -2606,3 +2606,62 @@ func _test_fire_click() -> void:
 		and Main.clear_of_fire(Vector2i(11, 10), from, none, walkable) == Vector2i(11, 10), "a cell not burning is kept as clicked")
 	var all := func(_cell: Vector2i) -> bool: return true
 	_check(Main.clear_of_fire(Vector2i(11, 10), from, all, walkable) == from, "fire all round: you stay where you are")
+	_test_fire_walk_round()
+
+
+## 707 amended (2) (playtest's fire tour: a walk past the square fire went
+## through its cell): the room's fire, a click past it from the east; the
+## route never cuts a burning corner, and the body driven along it (Main's
+## own drive, frame by frame) never stands in a burning cell.
+func _test_fire_walk_round() -> void:
+	var me: Player = _main._local_player()
+	var burning: Array[Vector2i] = []
+	for x in range(0, 40):
+		for y in range(0, 40):
+			if World.is_burning(Vector2i(x, y)):
+				burning.append(Vector2i(x, y))
+	var start := Main.NONE
+	var goal := Main.NONE
+	for b: Vector2i in burning:
+		if World.is_free(b + Vector2i(4, 0)) and World.is_walkable(b + Vector2i(-4, 0)) and not (b + Vector2i(-4, 0)) in burning:
+			start = b + Vector2i(4, 0)
+			goal = b + Vector2i(-4, 0)
+			break
+	if me == null or start == Main.NONE:
+		print("  (no fire with room round it here: the walk past it unchecked)")
+		return
+	var corner := func(cell: Vector2i) -> bool: return cell == Vector2i(7, 5)
+	_check(Main.segment_burns(Vector2(9.15, 5.66), Vector2(3, 5), corner) and not Main.segment_burns(Vector2(9, 6), Vector2(4, 6), corner),
+		"a straight way from off a cell's centre that dips into a burning cell is seen; one beside it is not")
+	var path := World.walk_path(start, goal, me)
+	var cuts := 0
+	var at := start
+	for next: Vector2i in path:
+		var step := next - at
+		if World.is_burning(next) or step.x != 0 and step.y != 0 and (World.is_burning(at + Vector2i(step.x, 0)) or World.is_burning(at + Vector2i(0, step.y))):
+			cuts += 1
+		at = next
+	_check(not path.is_empty() and path.back() == goal and cuts == 0, "past a fire: the route goes round, never through it nor across its corner (%s)" % [path])
+	var home := me.tile
+	World._relocate(me, start)
+	var own = _main._free_own(me)
+	if own == null:
+		World._relocate(me, home)
+		return
+	own.base = Vector2.INF
+	me.free_pos = Vector2(start)
+	_main._free_route(me, goal)
+	_main._free["held"] = false
+	var walked: Array[Vector2i] = []
+	for i in 400:
+		_main._free_drive(0.05)
+		World.step()
+		var cell: Vector2i = Vector2i((own.shown(me) as Vector2).round())
+		if walked.is_empty() or walked.back() != cell:
+			walked.append(cell)
+		if (_main._free["path"] as Array).is_empty() and i > 10:
+			break
+	var hot := walked.filter(func(cell: Vector2i) -> bool: return World.is_burning(cell))
+	_check(hot.is_empty() and walked.has(goal), "walked past it, frame by frame: never in a burning cell, and there (%s)" % [walked])
+	_main._free["path"] = []
+	World._relocate(me, home)

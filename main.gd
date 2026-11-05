@@ -2611,6 +2611,10 @@ const FREE_HOLD_SECONDS := 0.25
 ## for up to FREE_WAIT_MSEC (779 amended (2); playtest's bear tour).
 var _free_waiting := {}
 const FREE_WAIT_MSEC := 5000
+## How finely a body's straight way is looked at for fire (segment_burns), in cells.
+const FIRE_SAMPLE := 0.1
+## How near a burning cell's edge a body's way may pass (segment_burns), in cells.
+const FIRE_MARGIN := 0.15
 ## How far round a burning cell a click's route looks for a cell clear of it.
 const FIRE_CLEAR_REACH := 3
 ## 724: a click route whose next step another body has stood in the way
@@ -2869,14 +2873,34 @@ func _free_blocked(player: Player, at: Vector2, way: Vector2, path: Array) -> bo
 func _free_pull(player: Player, path: Array, at: Vector2) -> void:
 	var from := World.free_cell(player, at)
 	for k in range(mini(path.size() - 1, FREE_PULL_CELLS), 0, -1):
-		if World._line_clear(from, path[k], path[k], player):
+		if World._line_clear(from, path[k], path[k], player) and not segment_burns(at, Vector2(path[k]), World.is_burning):
 			for i in k:
 				path.pop_front()
 			return
 	var here := Vector2i(at.round())
 	while path.size() >= 2 and at.distance_to(Vector2(path[1])) <= Vector2(path[0]).distance_to(Vector2(path[1])) \
-			and World._line_clear(here, path[1], path[1], player):
+			and World._line_clear(here, path[1], path[1], player) and not segment_burns(at, Vector2(path[1]), World.is_burning):
 		path.pop_front()
+
+
+## Whether a body going straight from [param a] to [param b] would stand,
+## on the way, in a cell [param burning] says burns (its cell: its centre
+## rounded; 707 amended (2): a pull from where the body is, off the cells'
+## centres, may pass a fire's cell the cells' own line goes beside, or graze
+## its corner). Looked at every FIRE_SAMPLE of a cell, FIRE_MARGIN round.
+static func segment_burns(a: Vector2, b: Vector2, burning: Callable) -> bool:
+	var steps := maxi(ceili(a.distance_to(b) / FIRE_SAMPLE), 1)
+	var seen := {Vector2i(a.round()): true}
+	for k in range(1, steps + 1):
+		var point := a.lerp(b, float(k) / steps)
+		# Its cell and any within FIRE_MARGIN of it: a corner grazed counts.
+		for corner: Vector2 in [Vector2(-FIRE_MARGIN, -FIRE_MARGIN), Vector2(FIRE_MARGIN, -FIRE_MARGIN), Vector2(-FIRE_MARGIN, FIRE_MARGIN), Vector2(FIRE_MARGIN, FIRE_MARGIN)]:
+			var cell := Vector2i((point + corner).round())
+			if not seen.has(cell):
+				seen[cell] = true
+				if bool(burning.call(cell)):
+					return true
+	return false
 
 
 ## Her route for his body while she leads him (695, ui's side; Guide under

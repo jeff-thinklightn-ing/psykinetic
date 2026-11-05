@@ -1149,6 +1149,9 @@ func _test_free_chase() -> void:
 == a click on an imp with a free body: walked to it, then struck ==")
 	var player := _place_player(Vector2i(4, 3))
 	_free_start(player)
+	var occupant := World.get_entity_at(Vector2i(9, 3))
+	if occupant != null and occupant != player:
+		World.despawn(occupant)  # A crate an earlier walk pushed there (its route round the room's fire, 707 amended (2)).
 	var imp := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule",
 		"name": "ChaseImp", "tile": Vector2i(9, 3), "props": {"mass": 40.0}}) as Monster
 	imp.sight_range = 0

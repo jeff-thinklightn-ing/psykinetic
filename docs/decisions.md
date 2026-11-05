@@ -34238,6 +34238,24 @@ ui_test _test_fire_click (the cell short of the fire from the north and beside i
 never a wall nor the fire, a cell not burning kept, fire all round: stay). CHANGELOG bullet
 (voice's words). Client only, protocol unchanged, no new class_name.
 
+707 amended (2) (ui's; playtest's fire tour on Umbrage's square fire; release's label): a walk past
+a fire went round it and still stood in it for a step ((195, 211), (194, 211), (193, 211)). The
+route was clear, but a free body's centre clipped the fire's cell: on a diagonal step past a
+burning cell, the centre crosses that cell's corner, and a route straightened from where the body
+stood, off a cell's centre, dipped into it. Three changes. World.find_path prices a diagonal step
+that passes a burning cell's corner (either of the two cells it goes between, World._fire_corner)
+as a step into fire (fire_extra), so the way round goes square past it; this is the shared path,
+so it holds for every walker that routes through find_path and walk_path (monsters, residents,
+companions and the server's own walks, not only clicks). World._line_clear never draws a line
+that cuts such a corner. Main._free_pull straightens a click's route only where the body's own
+straight way, from where it is, comes no nearer than FIRE_MARGIN (0.15 of a cell) to a burning
+cell (Main.segment_burns, looked at every FIRE_SAMPLE, 0.1). Tests: ui_test _test_fire_walk_round
+(the route past the room's fire never through it nor across its corner; the body driven by Main's
+own drive, frame by frame, never in a burning cell; segment_burns sees the dip), controls_test's
+chase imp's cell cleared first (the walks before it now go round that room's fire and push a crate
+there). No bullet (release: 707 amended's line already says it). Protocol unchanged, no new
+class_name.
+
 ## 703, step 3 (companions). Heel and Guide read a free leader only
 
 6b (703): a player walks free. Heel and Guide drop their grid branch for a

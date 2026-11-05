@@ -11777,6 +11777,8 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 					next_cost += PATH_DOOR_EXTRA
 			if is_burning(next) if heat_carried else hot_any and hot.has(next):
 				next_cost += fire_extra
+			elif way >= 4 and _fire_corner(current, direction, heat_carried, hot_any, hot):
+				next_cost += fire_extra  # 707 amended (2): a diagonal past a burning cell's corner grazes it.
 			var seen := _search_opened[next_at] == stamp
 			if not seen or next_cost < _search_cost[next_at]:
 				_search_cost[next_at] = next_cost
@@ -11867,8 +11869,23 @@ func _line_clear(a: Vector2i, b: Vector2i, goal: Vector2i, ignore: GridEntity) -
 			return false
 		if is_burning(next):
 			return false
+		var step := next - at
+		if step.x != 0 and step.y != 0 and (is_burning(at + Vector2i(step.x, 0)) or is_burning(at + Vector2i(0, step.y))):
+			return false  # 707 amended (2): never cut a burning cell's corner.
 		at = next
 	return true
+
+
+## Whether the diagonal step from [param at] the way [param direction]
+## passes the corner of a burning cell (either of the two it goes between;
+## 707 amended (2): a free body's centre crosses that corner, and its cell
+## is the fire's for the moment). [param heat_carried], [param hot_any] and
+## [param hot] as find_path reads the fire.
+func _fire_corner(at: Vector2i, direction: Vector2i, heat_carried: bool, hot_any: bool, hot: Dictionary) -> bool:
+	for side: Vector2i in [at + Vector2i(direction.x, 0), at + Vector2i(0, direction.y)]:
+		if is_burning(side) if heat_carried else hot_any and hot.has(side):
+			return true
+	return false
 
 
 ## What the terrain lets a walker who opens doors do stepping from
