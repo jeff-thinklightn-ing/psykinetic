@@ -95,6 +95,11 @@ const CUE_GAP := 0.25
 const CUE_RISE := 0.06
 const CUE_HIGHEST := 1.3
 const QUIET_DB := -6.0
+## Practice in a fight (playtest's bear tour: "Practice, swordplay" eleven
+## times in 13 s): an art's rises are held, and float as one when the fight
+## is over, or once none has come for HOLD_SECONDS; a whole step (a tenth of
+## the bar, Main._practice_gained) floats at once, with what was held.
+const HOLD_SECONDS := 10.0
 
 ## A line was logged or merged (the talk panel's Gains redraws).
 signal logged
@@ -132,6 +137,8 @@ var _last_cue := -100.0
 var _need_frame := -1
 var _other_frame := -1
 var _burst := 0
+## Practice held in a fight: art -> {amount, last} (HOLD_SECONDS).
+var held: Dictionary = {}
 
 
 func _init() -> void:
@@ -179,6 +186,13 @@ func add(data: Dictionary) -> bool:
 	var of := str(data.get("of", ""))
 	var key := track + "|" + of
 	var now := _now()
+	if track == "practice" and data.get("folded") != true:
+		var kept: Dictionary = held.get(of, {})
+		if data.get("whole") != true and _fighting():
+			held[of] = {"amount": float(kept.get("amount", 0.0)) + amount, "last": now}
+			return true
+		amount += float(kept.get("amount", 0.0))  # A step: what was held floats with it.
+		held.erase(of)
 	var at: Variant = Snapshot.vector(data.get("at"))
 	var words := str(data.get("words", ""))
 	# Lines worded by the server, not counted here (playtest's reward tour):
@@ -319,6 +333,11 @@ func _process(_delta: float) -> void:
 	_flush_need()
 	var now := _now()
 	var in_fight := _fighting()  # Asked each frame, so a fall in hit points is seen.
+	for art: String in held.keys():
+		if not in_fight or now - float(held[art]["last"]) >= HOLD_SECONDS:
+			var amount := float(held[art]["amount"])
+			held.erase(art)
+			add({"track": "practice", "amount": amount, "of": art, "folded": true})
 	floats = floats.filter(func(live: Dictionary) -> bool: return now - float(live["born"]) < FLOAT_SECONDS)
 	while floats.size() < FLOATS_AT_ONCE and not waiting.is_empty():
 		var next: Dictionary = waiting.pop_front()

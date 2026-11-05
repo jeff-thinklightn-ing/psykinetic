@@ -22056,7 +22056,8 @@ func _picked_gains(player: Player, taken: Array, gold: int) -> void:
 
 ## Client: the arts' marks told ("arts" {art: [peak, fading]}): each peak
 ## risen since the last is a Practice gain, in hundredths ("+3 Practice,
-## sword"). The first told only sets them (a join, not a gain).
+## sword"). The first told only sets them (a join, not a gain). A rise
+## past a tenth of the bar is "whole" (Gains: it floats even in a fight).
 func _practice_gained(marks: Dictionary) -> void:
 	var first := _arts_seen.is_empty()
 	for art: Variant in marks:
@@ -22068,7 +22069,9 @@ func _practice_gained(marks: Dictionary) -> void:
 		_arts_seen[art] = peak
 		var points := int(roundf((peak - was) * 100.0))
 		if points > 0 and gains != null:
-			gains.add({"track": "practice", "amount": points, "of": str(art).replace("_", " ").to_lower()})
+			# A whole step: a tenth of the bar crossed (Gains floats it even in a fight).
+			gains.add({"track": "practice", "amount": points, "of": str(art).replace("_", " ").to_lower(),
+				"whole": floori(peak * 10.0 + 0.0001) > floori(was * 10.0 + 0.0001)})
 
 
 ## Where a gain's float rises: over [param at]'s cell, or over the local

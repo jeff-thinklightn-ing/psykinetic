@@ -2510,6 +2510,43 @@ func _test_gains() -> void:
 	gains._process(0.0)
 	_check(gains.banner_shown() == "Umbrage knows you", "the fight over: the banner shows")
 	clear.call()
+	# Practice in a fight (playtest's bear tour, eleven floats in 13 s): held, one float after.
+	gains.held.clear()
+	gains.fighting = func() -> bool: return true
+	for i in 5:
+		gains.add({"track": "practice", "amount": 1, "of": "swordplay"})
+	var held_quiet: bool = gains.floats.is_empty() and gains.lines.is_empty()
+	gains.add({"track": "practice", "amount": 2, "of": "swordplay", "whole": true})
+	var whole: Array = gains.floats.map(func(live: Dictionary) -> String: return gains.float_text(live))
+	_check(held_quiet and whole == ["+7 Practice, swordplay"] and gains.held.is_empty(),
+		"in a fight an art's rises are held; a whole step floats at once, with them (%s)" % [whole])
+	clear.call()
+	for i in 3:
+		gains.add({"track": "practice", "amount": 1, "of": "swordplay"})
+	gains._process(0.0)
+	var still: bool = gains.floats.is_empty()
+	gains.held["swordplay"]["last"] = gains._now() - Gains.HOLD_SECONDS
+	gains._process(0.0)
+	whole = gains.floats.map(func(live: Dictionary) -> String: return gains.float_text(live))
+	_check(still and whole == ["+3 Practice, swordplay"], "none for %d s, still fighting: what was held floats as one (%s)" % [int(Gains.HOLD_SECONDS), whole])
+	clear.call()
+	gains.add({"track": "practice", "amount": 2, "of": "bow"})
+	gains.fighting = func() -> bool: return false
+	gains._process(0.0)
+	whole = gains.lines.map(func(l: Dictionary) -> String: return l["text"])
+	_check(whole == ["+2 Practice, bow"] and gains.held.is_empty(), "the fight over: one float and one line (%s)" % [whole])
+	clear.call()
+	gains.fighting = func() -> bool: return true
+	_main._arts_seen = {"swordplay": 0.38}
+	_main._practice_gained({"swordplay": [0.39, false]})
+	var before_step: bool = gains.lines.is_empty()
+	_main._practice_gained({"swordplay": [0.41, false]})
+	whole = gains.lines.map(func(l: Dictionary) -> String: return l["text"])
+	_check(before_step and whole == ["+3 Practice, swordplay"], "Main: a rise past a tenth of the bar is a whole step (%s)" % [whole])
+	gains.fighting = func() -> bool: return false
+	_main._arts_seen = {}
+	gains.held.clear()
+	clear.call()
 	gains.shown = "quiet"
 	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "big": true, "banner": "Umbrage knows you"})
 	_check(gains.banners.is_empty() and gains.floats.size() == 1 and gains.cues.size() == 1, "Quiet: the float and the cue, no banner")

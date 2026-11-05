@@ -42216,3 +42216,14 @@ and closed. _test_umbrage_kinds (after 774, 25f96356): the wilds'
 level.json read, never written: its six posts, the tavern and the square's fire each moved with every
 shape it has (a rect's size kept whole numbers) and read back by Level.places_from without a warning;
 the building tool offers the inn's kind. 790's workings get the same check once it lands. Server and builder only, protocol unchanged, no new class_name.
+
+804 amended (10) (ui; the coordinator's ruling on playtest's bear_deed tour, where "Practice, swordplay"
+floated 11 times in 13 s mid-fight; combat: the "arts" message comes on every change to a peak, so each
+blow can send one; release's label): in a fight (Gains.fighting, the client's own test), an art's
+practice rises are held (Gains.held), with no float, line or cue. They float and log as one gain
+("+11 Practice, swordplay", voice's form) once the fight is over, or once none has come for
+Gains.HOLD_SECONDS (10). A whole step floats at once, even in a fight, with what was held: a rise that
+crosses a tenth of the bar (Main._practice_gained marks it "whole"). The sim and the practice bar are
+unchanged. ui_test _test_gains (rises held, then one float; a whole step at once; the 10 s fallback;
+the fight's end; Main's tenth). No bullet (804's line says what a gain shows). Client only, protocol
+unchanged, no new class_name.
