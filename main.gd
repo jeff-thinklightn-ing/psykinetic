@@ -1163,6 +1163,7 @@ func _go_online() -> void:
 		World.entity_damaged.connect(func(entity: GridEntity, _amount: int, _source: GridEntity, _cause: StringName) -> void: _wake_near(entity.tile, entity))  # 751.
 		World.entity_died.connect(func(entity: GridEntity, _cause: StringName) -> void: _robber_gone(entity))  # 714: the robbers' clear.
 		World.entity_died.connect(_quest_credit)  # 747: a named robber felled, on its slayer's list.
+		World.fight_won.connect(_reward_fight_won)  # 804, combat's side: a fight won, a deed.
 		World.entity_despawned.connect(_robber_gone)
 		World.entity_taken.connect(_on_entity_taken)
 		World.telegraph_started.connect(_tell_telegraph)  # Decision 602.
@@ -21518,6 +21519,14 @@ func reward(player_id: String, data: Dictionary) -> bool:
 	Net.message_to(player.owner_peer, "reward", told)
 	rewards_sent += 1
 	return true
+
+
+## A fight won (804, combat's side): [param player]'s last foe fell or
+## routed (World.fight_won), told as a deed (World.fight_reward: the plain
+## float, "against many", or a hard foe's banner) at [param at].
+func _reward_fight_won(player: Player, at: Vector2i, beaten: Array) -> void:
+	if is_instance_valid(player):
+		reward(_id_of_player(player), World.fight_reward(beaten, at))
 
 
 ## The id of [param player] (its peer's; the host's own is Net.player_id).

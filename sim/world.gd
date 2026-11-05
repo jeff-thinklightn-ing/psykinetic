@@ -55,6 +55,11 @@ signal entity_despawned(entity: GridEntity)
 ## Reduced to 0 hp by [param cause] (&"attack", &"shot", &"impact", &"fire"), just
 ## before it is removed.
 signal entity_died(entity: GridEntity, cause: StringName)
+## [param player] won a fight (804, combat's side; ui's visible rewards):
+## the last foe it was fighting fell or broke and ran, none other still on
+## it. [param at] the cell it ended at; [param beaten] each foe beaten, as
+## {name, fled, hard} (_fight_beaten). Main makes it a "deed" reward.
+signal fight_won(player: Player, at: Vector2i, beaten: Array)
 ## A named enemy's moment for npc's memory of it (decision 716): [param kind]
 ## met, fought, killed_by, killed, fled_from (with [param player_id], a
 ## player's id) or rose ("" for nobody).
@@ -652,6 +657,16 @@ var _fire: Dictionary[Vector2i, bool] = {}
 var din_rules := {"town_base": 8.0, "town_per_resident": 0.5, "town_most": 20.0, "fire": 6.0, "fight": 10.0,
 	"fight_seconds": 30.0, "player": 4.0}
 var _fights: Array[Array] = []  # [zone name, cell, tick]
+## Who is fighting whom (804, combat's side), server only: each player's foes
+## to the tick it last struck or was struck by each (a companion's for its
+## keeper), and the foes it has beaten in that fight. A foe is a Monster
+## that isn't harmless to it (Companion.harmless: no prey, no peaceable
+## talker).
+var _fight_foes: Dictionary = {}  # Player -> {Monster: tick}
+var _fight_beaten: Dictionary = {}  # Player -> Array of {name, fled, hard}
+## A foe not touched for so long (ticks) is no longer in the fight: walked
+## away from, or lost (804, combat's side; 10 s).
+const FIGHT_FORGET_TICKS := 100
 var _din: Array[Dictionary] = []
 var _din_tick := -1000000
 ## Each zone's din and the tick it was made, so zones stepped in turn keep theirs.
@@ -1336,6 +1351,7 @@ func _step_zone() -> void:
 	_tend_teeters()  # Found its feet on a rim (783).
 	_fade_buffs()
 	_tend_arts()  # Weapon memory's quiet time and fade (decision 766).
+	_tend_fights()  # A fight won (804, combat's side).
 	t = part("stamina, wounds, buffs", t)
 	var timed := _parts_total()
 	ticked.emit(tick)
@@ -1846,6 +1862,8 @@ func reset() -> void:
 	for id: int in _telegraphs.keys():
 		end_telegraph(id, false)  # Decision 602: none outlives the room.
 	_fights.clear()  # Decision 740: its din goes with it.
+	_fight_foes.clear()
+	_fight_beaten.clear()
 	_din_made.clear()
 	_din_tick = -1000000
 	raids.hand_back(zone.name)  # Its raiders go with the room: back to maps.
@@ -3656,6 +3674,102 @@ func named_may_rise(spec: Dictionary) -> bool:
 		return true
 	var returns_at := int(named[id].get("returns_at", 0))
 	return steps >= returns_at or returns_at - steps > NamedEnemy.rise_steps(id)
+
+
+## The player on [param entity]'s side of a fight (804, combat's side): a
+## player itself, a companion's keeper; null for anyone else.
+static func _fighter(entity: GridEntity) -> Player:
+	if entity is Player:
+		return entity as Player
+	if entity is Companion and (entity as Companion).keeper is Player:
+		return (entity as Companion).keeper as Player
+	return null
+
+
+## [param a] struck [param b] (World.damage): if one is a player's side
+## and the other a foe to it, both are in a fight now (804, combat's side).
+## A blocked or parried blow is still a fight: _meet_guard marks it too.
+func _mark_fight(a: GridEntity, b: GridEntity) -> void:
+	if not is_instance_valid(a) or not is_instance_valid(b):
+		return
+	for pair: Array in [[a, b], [b, a]]:
+		var player := _fighter(pair[0])
+		var foe := pair[1] as Monster
+		if player == null or foe == null or Companion.harmless(foe):
+			continue
+		if not _fight_foes.has(player):
+			_fight_foes[player] = {}
+		_fight_foes[player][foe] = tick
+
+
+## The "deed" reward for a fight won (804, combat's side) with
+## [param beaten] (fight_won's), for Main.reward; voice's words. A hard foe
+## (apex, boss, named) gets a banner, "<name>, brought down" or "driven
+## off", its float bare; three or more beaten, "against many"; else "a fight
+## won". [param at] the cell it ended at.
+static func fight_reward(beaten: Array, at: Vector2i) -> Dictionary:
+	var out := {"track": "deed", "amount": 1, "at": at}
+	for each: Dictionary in beaten:
+		if bool(each.get("hard", false)):
+			var line := "%s, %s" % [str(each["name"]), "driven off" if bool(each.get("fled", false)) else "brought down"]
+			out.merge({"big": true, "banner": line, "words": line, "of": ""})
+			return out
+	var clause := "against many" if beaten.size() >= 3 else "a fight won"
+	out.merge({"of": clause, "words": clause})
+	return out
+
+
+## [param foe] beaten (804, combat's side): fallen, or [param fled] broken
+## and running (a rout; a foe that gives up the chase is no win). Each
+## player fighting it has it beaten; _tend_fights tells the win when none is
+## left on them.
+func _foe_beaten(foe: Monster, fled: bool) -> void:
+	var kind := kind_of(foe)
+	var hard := Monster.is_apex(kind) or foe.boss or not foe.given_name.is_empty() or not foe.named_id.is_empty()
+	var label := str(Monster.kinds().get(kind, {}).get("label", kind))
+	var name := foe.given_name if not foe.given_name.is_empty() else "The " + label.to_lower()
+	for player: Player in _fight_foes.keys():
+		var foes: Dictionary = _fight_foes[player]
+		if not foes.has(foe):
+			continue
+		foes.erase(foe)
+		if not _fight_beaten.has(player):
+			_fight_beaten[player] = []
+		(_fight_beaten[player] as Array).append({"name": name, "fled": fled, "hard": hard, "at": foe.tile})
+	_tend_fights()
+
+
+## A fight won (804, combat's side), each tick: a foe on a player that broke
+## and runs is beaten; a dead or forgotten one (FIGHT_FORGET_TICKS) leaves
+## the fight. A player with foes beaten and none left gets fight_won.
+func _tend_fights() -> void:
+	for player: Player in _fight_foes.keys():
+		if not is_instance_valid(player) or not player.spawned:
+			_fight_foes.erase(player)
+			_fight_beaten.erase(player)
+			continue
+		var foes: Dictionary = _fight_foes[player]
+		for foe: Variant in foes.keys():
+			if not is_instance_valid(foe) or not (foe as Monster).spawned:
+				foes.erase(foe)
+			elif (foe as Monster).alert == Monster.Alert.FLEEING:
+				_foe_beaten(foe as Monster, true)
+				return  # _foe_beaten tended again.
+			elif tick - int(foes[foe]) > FIGHT_FORGET_TICKS:
+				foes.erase(foe)
+		if foes.is_empty() and not (_fight_beaten.get(player, []) as Array).is_empty():
+			var beaten: Array = _fight_beaten[player]
+			_fight_foes.erase(player)
+			_fight_beaten.erase(player)
+			fight_won.emit(player, beaten[-1]["at"], beaten)
+		elif foes.is_empty():
+			_fight_foes.erase(player)
+	for player: Player in _fight_beaten.keys():
+		if not _fight_foes.has(player):
+			var beaten: Array = _fight_beaten[player]
+			_fight_beaten.erase(player)
+			if is_instance_valid(player) and player.spawned:
+				fight_won.emit(player, beaten[-1]["at"], beaten)
 
 
 ## [param monster] (a named one) has [param kind] (named_event's) with
@@ -6792,6 +6906,7 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	var verb := guarding(target, source)
 	if verb.is_empty() or is_sheltered(target):
 		return null  # (Arriving, decision 661: nothing reaches its guard.)
+	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
 	var weight := amount + force
 	var slot := Items.LEFT_HAND if target.raised == "block" else Items.RIGHT_HAND  # As guarding found it.
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
@@ -7913,6 +8028,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 	target._world_damaged(amount, cause)
 	entity_damaged.emit(target, amount, source, cause)
 	if is_instance_valid(source):
+		_mark_fight(source, target)  # 804, combat's side: in it together.
 		_take_grudges(target, source, lost)  # Decisions 417, 473.
 		_named_fight(target, source)
 		if target is Monster and cause in [&"attack", &"shot"]:
@@ -7934,6 +8050,11 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 			noise(target.tile, Senses.NOISE_BREAK, &"break", source)  # A crate or a barrel smashed.
 		if target is Monster and not (target as Monster).named_id.is_empty():
 			_named_fell(target as Monster, source)
+		if target is Monster:
+			_foe_beaten(target as Monster, false)  # 804, combat's side.
+		elif target is Player:
+			_fight_foes.erase(target)
+			_fight_beaten.erase(target)
 		entity_died.emit(target, cause)
 		var spilt: Array[int] = []
 		if target is Cargo:

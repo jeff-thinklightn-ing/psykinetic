@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_flank()
 	_test_downed_fire()
 	_test_flank_party()
+	_test_fight_won()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1400,6 +1401,91 @@ func _test_flank_party() -> void:
 	_check(World.flankable(bear) == past, "past 100 ticks: flankable again")
 	World.end_telegraph(past, false)
 	bear.set("party_size", 1)
+
+
+## A fight won (804, combat's side): the last foe on a player falls or
+## routs, none other touched in FIGHT_FORGET_TICKS; each who fought it told
+## once; an escape (the foe forgotten, never beaten) tells nothing.
+func _test_fight_won() -> void:
+	print("
+== a fight won: the last foe falls or routs (804, combat's side) ==")
+	var won: Array = []
+	var on_won := func(player: Player, at: Vector2i, beaten: Array) -> void:
+		won.append([player, at, beaten])
+	World.fight_won.connect(on_won)
+	# A lone foe killed.
+	var e := _build(["#######", "#.Pm..#", "#######"])
+	var p: Player = e["P"][0]
+	var m: GridEntity = e["m"][0]
+	_blow(p, m)
+	_check(won.is_empty(), "struck, still standing: no win yet")
+	m.hp = 1
+	_blow(p, m)
+	_check(won.size() == 1 and won[0][0] == p and won[0][1] == Vector2i(3, 1) and (won[0][2] as Array).size() == 1
+			and not bool(won[0][2][0]["fled"]) and not bool(won[0][2][0]["hard"]), "the foe killed: one win, where it fell, not hard (%s)" % [won])
+	# Two players on one foe: both told.
+	won.clear()
+	e = _build(["#######", "#.PmP.#", "#######"])
+	var a: Player = e["P"][0]
+	var b: Player = e["P"][1]
+	m = e["m"][0]
+	_blow(a, m)
+	_blow(b, m)
+	m.hp = 1
+	_blow(a, m)
+	var told := won.map(func(w: Array) -> Player: return w[0])
+	_check(won.size() == 2 and a in told and b in told, "two on one foe: both told (%d)" % won.size())
+	# Two foes: one down while the other is still on you, no win; then both.
+	won.clear()
+	e = _build(["#######", "#.mPm.#", "#######"])
+	p = e["P"][0]
+	var m1: GridEntity = e["m"][0]
+	var m2: GridEntity = e["m"][1]
+	_blow(p, m2)
+	m1.hp = 1
+	_blow(p, m1)
+	World._tend_fights()
+	_check(won.is_empty(), "one of two down, the other struck just now: the fight goes on")
+	m2.hp = 1
+	_blow(p, m2)
+	_check(won.size() == 1 and (won[0][2] as Array).size() == 2, "the second down: one win, both beaten (%s)" % [won])
+	# A rout counts; an escape doesn't.
+	won.clear()
+	e = _build(["#######", "#.Pm..#", "#######"])
+	p = e["P"][0]
+	m = e["m"][0]
+	_blow(p, m)
+	(m as Monster).alert = Monster.Alert.FLEEING
+	World._tend_fights()
+	_check(won.size() == 1 and bool(won[0][2][0]["fled"]), "the foe broke and ran: a win, fled (%s)" % [won])
+	won.clear()
+	e = _build(["#######", "#.Pm..#", "#######"])
+	p = e["P"][0]
+	m = e["m"][0]
+	_blow(p, m)
+	World.tick += World.FIGHT_FORGET_TICKS + 1
+	World._tend_fights()
+	_check(won.is_empty(), "walked away from, %d ticks untouched: no win" % (World.FIGHT_FORGET_TICKS + 1))
+	# A hard foe: the great bear, by its row's label.
+	won.clear()
+	e = _build(["#######", "#.PB..#", "#######"])
+	p = e["P"][0]
+	var bear: GridEntity = e["B"][0]
+	_blow(p, bear)
+	bear.hp = 1
+	_blow(p, bear)
+	_check(won.size() == 1 and bool(won[0][2][0]["hard"]) and str(won[0][2][0]["name"]) == "The great bear",
+			"the great bear brought down: hard, named by its row (%s)" % [won])
+	var plain := World.fight_reward([{"name": "The wolf", "fled": false, "hard": false}], Vector2i(4, 5))
+	_check(plain == {"track": "deed", "amount": 1, "at": Vector2i(4, 5), "of": "a fight won", "words": "a fight won"}, "the reward: a fight won (%s)" % [plain])
+	var plain3 := {"name": "The wolf", "fled": false, "hard": false}
+	var many := World.fight_reward([plain3, plain3, plain3], Vector2i(4, 5))
+	_check(str(many["of"]) == "against many" and not many.has("big"), "three beaten: against many (%s)" % [many])
+	var hard := World.fight_reward([plain3, won[0][2][0]], Vector2i(4, 5))
+	_check(bool(hard["big"]) and str(hard["banner"]) == "The great bear, brought down" and str(hard["of"]) == "", "a hard foe: the banner, the float bare (%s)" % [hard])
+	var fled := World.fight_reward([{"name": "Grull", "fled": true, "hard": true}], Vector2i(4, 5))
+	_check(str(fled["banner"]) == "Grull, driven off", "a hard foe fled: driven off (%s)" % [fled])
+	World.fight_won.disconnect(on_won)
 
 
 func _test_spin() -> void:

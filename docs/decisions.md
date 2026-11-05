@@ -41836,3 +41836,18 @@ own, is no news. The build credit (residents saying "That's your ore in the forg
 "built_by" and Towns.stood) follows as this decision's amendment once economy's build credit lands.
 resident_test _test_hand_in_news. Protocol unchanged; no new class_name.
 804, sound's side: the reward cues (release's label; sound-1f). Six slots, non-positional oneshots on the ui bus, each under ui.notify's -8 dB so a dozen hand-ins in a row don't tire (Gains' pitch rise of +0.06 a quick repeat does the rest): ui.reward_gain (regard, bond, ease, practice, a deed, an item, and every cue's fallback: harp and piano plucks, -12), ui.reward_step (a standing step: longer plucks, -12), ui.reward_want (a big deed, the town thanking you: a soft woodblock or marimba knock, -12), ui.reward_coin (gold: small coin drops, -14), ui.reward_catch (a catch: a small splash alone; ui keeps it without a pluck, the float and colour already saying gain), ui.reward_found (a new zone: a short harp motif, -12). Three takes a cue, one picked at random, all Freesound CC0: gain from 415463, 415477 (luckylittleraven) and 617196 (leonseptavaux); step from 415456, 617201 and 617203; want from 692828, 692819 (hollandm) and 373581 (sgossner); coin from 19778 (jmaimarc), 184741 and 184743 (NickMorris); catch from 507094, 507093 (paulprit) and 321490 (dslrguide); found from 563310, 563311 and 563312 (DaVince21). Review: C:/dev/review/sound/rewards. Tests: sound_kit_test _test_ui_sounds (each on the ui bus, not placed, under ui.notify, three takes). Client only; protocol unchanged, no new class_name, no bullet (ui's 804 carries it).
+804, combat's side: a fight won (2026-11-05, combat; the coordinator's approval; ui's data shape; voice's
+clauses; release's label). World keeps a fight ledger per player: a Monster it struck or was struck by
+(a companion's blows count for its keeper; harmless bodies, Companion.harmless, never), each by the
+tick last touched (World._mark_fight, from damage and _meet_guard). A foe that dies or routs (alert
+FLEEING) moves to that player's beaten list, and one untouched for FIGHT_FORGET_TICKS (100, 10 s) is
+forgotten, never beaten: an escape tells nothing. When a player has no foe left and has beaten some,
+World.fight_won(player, at, beaten) fires once (at, the last foe's cell); a second foe still struck keeps
+the fight going, and every player in it is told. World.fight_reward(beaten, at) is the deed: {track
+"deed", amount 1, at}, words and of "a fight won", or "against many" for three or more; a hard foe
+(Monster.is_apex, a boss, or a given or named one) makes it big, with the banner "<name>, brought down",
+or "<name>, driven off" if it fled, the float bare ("of" empty). Main._reward_fight_won calls
+Main.reward with it. combat_test _test_fight_won (a lone kill, two players both told, two foes, a rout,
+walking away, the bear hard and named by its row, the reward's three forms); ui_test: World.fight_won
+reaches the player as a float where it ended. Server only, protocol unchanged ("reward" is 804's), no
+new class_name.

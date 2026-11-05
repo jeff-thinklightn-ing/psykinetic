@@ -2510,6 +2510,11 @@ func _test_gains() -> void:
 		_check(not _main.reward(id, {"track": "regard", "amount": -1}) and not _main.reward("nobody", {"track": "regard", "amount": 1})
 			and _main.rewards_sent == sent + 1, "the server sends no loss, and nothing to no one")
 		clear.call()
+		World.fight_won.emit(me, Vector2i(2, 3), [{"name": "The wolf", "fled": false, "hard": false, "at": Vector2i(2, 3)}])
+		var won := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
+		_check(_main.rewards_sent == sent + 2 and gains.lines.size() == 1 and gains.floats[0]["at"] == Vector2i(2, 3),
+				"a fight won (804, combat's side): World.fight_won told as a deed where it ended (%s)" % [won])
+		clear.call()
 		_main._picked_gains(me, [{"id": "wood_bundle"}, {"id": "wood_bundle"}], 12)
 		var picked := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
 		_check(picked == ["+12 gold", "+2 " + Gains.counted(Items.name_of("wood_bundle"), 2)], "picked up: the gold, and each kind of thing counted (%s)" % [picked])
