@@ -39778,6 +39778,18 @@ character sheet, the store (picked, then let go) and the town window, none reach
 one on bare ground that does; before the fix the store's reached it. CHANGELOG bullet (voice's
 words). Client only, protocol unchanged, no new class_name.
 
+765 amended (2) (ui; Jeff on the live game: "in rolf shop its difficult to see the items because of the
+small image on brown backgrounds"; the coordinator's ask and approval of the stills,
+C:/dev/review/store; release's label): the squares items sit on (the theme's "slot" and "hand_slot",
+the Inset and HandSlot types: the store's, the pack's, the town sheet's) move from the dark brown
+(0.29, 0.23, 0.15) to a cooler, lighter slate (0.40, 0.44, 0.48), so iron, leather and wood all stand
+off them; the theme's "slot" colour, and PackPanel.selected_style's back with it, follows. The icons
+fill more of a square (PackPanel.ICON_INSET 3, was 8; ItemIcons' framing as it was, so art-kit's rim
+has its room). A store's square carries its price under it (StoreBox.face the square, its chips
+centred in a row below: BarterPanel.PRICE_ROW), no longer over its corner; the pack's sale chips stay on
+its squares. Names on hover as before. ui_test's store checks unchanged and passing. CHANGELOG bullet
+(voice's words). Client only, protocol unchanged, no new class_name.
+
 ## 772. The tavern and the townsfolk's night
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

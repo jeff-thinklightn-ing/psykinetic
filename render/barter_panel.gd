@@ -36,6 +36,10 @@ const GAP := 20
 const COLUMNS := 6
 ## A price chip: its height, and the coin's radius.
 const CHIP_HEIGHT := 40
+## The price row under a store's square: the gap above it, and its height
+## with the gap (CHIP_HEIGHT; more for a job's two chips, which widen it).
+const PRICE_GAP := 4
+const PRICE_ROW := CHIP_HEIGHT + PRICE_GAP
 const COIN_RADIUS := 11
 ## The theme's: a price in brass, a refusal in rust, the hover's words dim,
 ## a picked square's frame bright brass.
@@ -137,13 +141,15 @@ class Coin:
 class StoreBox:
 	extends Panel
 	var window: BarterPanel
+	## The square itself (the slate, the picked frame); the price row under it.
+	var face: Panel
 	## What it is: "good" (key a uid), "ware" (an offer id), "care" (a pay),
 	## "job" (a slot), "working" or "ready" (a uid).
 	var kind := ""
 	var key: Variant
 	var words := ""
 	var icon: TextureRect
-	var chips: VBoxContainer
+	var chips: BoxContainer
 
 	func _ready() -> void:
 		mouse_entered.connect(func() -> void: window._show_tip(self))
@@ -880,7 +886,7 @@ func _rebuild() -> void:
 			var held := bool(offered.get("in_care", false))
 			var box := _add_box("care", pay, "", "care", [] if held else [[pay, maxi(price - care_given(offered, pay), 0)]], SERVICE_NAMES["care"])
 			if held and str(offered.get("by", "")) == pay:
-				box.add_theme_stylebox_override("panel", PackPanel.selected_style())
+				box.face.add_theme_stylebox_override("panel", PackPanel.selected_style())
 			if held or not care_hands(pay) > 0 or pay == "gold" and purse < price:
 				box.modulate.a = 0.5
 	for each: Variant in counter.get("jobs", []):
@@ -962,8 +968,17 @@ func _add_box(kind: String, key: Variant, item: String, service: String, pays: A
 	box.kind = kind
 	box.key = key
 	box.words = words
-	box.custom_minimum_size = PackPanel.SLOT_SIZE
-	box.theme_type_variation = &"Inset"
+	# The square, then its price under it (Jeff: "the price under each item").
+	box.custom_minimum_size = PackPanel.SLOT_SIZE + Vector2(0, PRICE_ROW)
+	box.add_theme_stylebox_override("panel", StyleBoxEmpty.new())
+	var face := Panel.new()
+	face.theme_type_variation = &"Inset"
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	face.position = Vector2.ZERO
+	face.size = PackPanel.SLOT_SIZE
+	face.custom_minimum_size = PackPanel.SLOT_SIZE
+	box.add_child(face)
+	box.face = face
 	var picture := TextureRect.new()
 	picture.set_anchors_preset(Control.PRESET_FULL_RECT)
 	for side: String in ["offset_left", "offset_top"]:
@@ -977,7 +992,7 @@ func _add_box(kind: String, key: Variant, item: String, service: String, pays: A
 		picture.texture = mark_of(service)
 	else:
 		picture.texture = _icon(item)
-	box.add_child(picture)
+	face.add_child(picture)
 	box.icon = picture
 	if not item.is_empty() and picture.texture == null:
 		var label := Label.new()
@@ -988,7 +1003,7 @@ func _add_box(kind: String, key: Variant, item: String, service: String, pays: A
 		label.add_theme_font_size_override("font_size", PackPanel.CAPTION_SIZE)
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		label.text = Items.short_of(item)  # No icon (headless, not drawn yet): the short name.
-		box.add_child(label)
+		face.add_child(label)
 	if not item.is_empty() and not service.is_empty():
 		var badge := PanelContainer.new()
 		badge.theme_type_variation = &"Chip"
@@ -1004,26 +1019,22 @@ func _add_box(kind: String, key: Variant, item: String, service: String, pays: A
 		mark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		badge.add_child(mark)
-		box.add_child(badge)
-	var chips := VBoxContainer.new()
+		face.add_child(badge)
+	var chips := HBoxContainer.new()
 	chips.add_theme_constant_override("separation", 4)
-	chips.alignment = BoxContainer.ALIGNMENT_END
+	chips.alignment = BoxContainer.ALIGNMENT_CENTER
 	chips.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	chips.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	chips.grow_horizontal = Control.GROW_DIRECTION_BEGIN
-	chips.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	chips.offset_right = -5
-	chips.offset_bottom = -5
+	chips.position = Vector2(0, PackPanel.SLOT_SIZE.y + PRICE_GAP)
+	chips.size = Vector2(PackPanel.SLOT_SIZE.x, CHIP_HEIGHT)
 	for pay: Array in pays:
 		if str(pay[0]) not in ["gold", "time"]:
 			_icon(str(pay[0]))
 		var chip := make_chip(str(pay[0]), pay[1], pack.icons if pack != null else null, OUT if short else PRICE)
-		chip.size_flags_horizontal = Control.SIZE_SHRINK_END
 		chips.add_child(chip)
 	box.add_child(chips)
 	box.chips = chips
 	if _is_picked(kind, key):
-		box.add_theme_stylebox_override("panel", PackPanel.selected_style())
+		face.add_theme_stylebox_override("panel", PackPanel.selected_style())
 	_grid.add_child(box)
 	return box
 

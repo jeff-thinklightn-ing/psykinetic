@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Step out of the red marked on the ground before a blow lands and you are clear of it, even if you only pressed the step a moment before (810).
 
+- Items are easier to see in shops, the pack and the town window: bigger, on lighter squares, with each price under its item (765).
 - Clear a camp held by the town's enemies, and everyone in the land with you gets a deed and a banner for it (804).
 - Win a fight, with your last foe down or fled, and a deed rises where it fell, marked as against many when there were three or more; bring down or drive off a great foe and it gets a banner of its own (804).
 - Towns: what you bring to a town's store gets talked about, and townsfolk tell other players who brought what that day (809).

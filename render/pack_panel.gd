@@ -32,7 +32,8 @@ static var FONT_SIZE: int = UiTheme.size("body")
 ## The theme's caption size: a chip's number, a store square's name with no icon.
 static var CAPTION_SIZE: int = UiTheme.size("caption")
 ## Room round an icon in its box (765: no caption under it; the name on hover).
-const ICON_INSET := 8
+## Jeff: the items too small in their squares; 3 (8 before).
+const ICON_INSET := 3
 ## A named thing's caption (decision 365): the theme's brass_bright.
 static var NAMED_COLOR: Color = UiTheme.color("brass_bright")
 ## One kept from its namer (World.KEPT_MARK; decision 370): rust.
