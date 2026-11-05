@@ -7,7 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
-- Umbrage is laid out again round its chapel: a square with a fire to sit at, the store and shop by the well, the tavern, Snagfin's stall by the square, roads out to six watch posts; what you left in town comes along.
+## v0.1.203
+
+- Umbrage is laid out anew round its chapel: a square with a fire to sit at, the store and shop by the well, the tavern, Snagfin's stall by the square, and roads out to six watch posts; what you left in town is still yours, moved with the rest (774).
 
 ## v0.1.202
 
