@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The great axe and the battle axe swing edge first, biting into what they hit instead of striking with the flat of the blade (451 amended (3)).
 - At a seam the pick swings as a miner's does, up two-handed over the shoulder and down onto the face, the body dropping into the blow and the point biting the rock in a puff of dust and grit (769 amended (9)).
 - Town guards carry spears and wear mail and fight what comes into town, calling the others to them; a guard beaten down can be helped up once it is calm and thanks you for it, and one left lying is carried to the temple and back on duty the next morning (791).
 - Boars left in peace grunt now and then and snuffle as they root, so you hear a sounder before you see it (795).

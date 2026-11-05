@@ -155,8 +155,9 @@ func _ready() -> void:
 		await _test_teeter()  # Lets frames run: the rocking is timed.
 		_test_crouch()
 		await _test_pick_meets_seam()  # Lets frames run to the swing's contact.
-		_test_bow_back()
+		_test_bow_back()  # Reads a draw's pose on the wall clock: right after the pick's swing, as fitted.
 		_test_sheathed()
+		await _test_axe_edge_leads()
 		_test_goblins_differ()
 		_test_allies()
 		_test_barrow_dead()
@@ -10169,6 +10170,66 @@ func _test_pick_meets_seam() -> void:
 	World.despawn(seam)
 	player.slots = was
 	player.facing = was_facing
+	_rig._process(0.0)
+
+
+## The heavy axes' sweep leads with the edge: through the blow (Axe_Sweep's fast stretch about its
+## contact) each axe's striking side (its art's +x, laid along the fingers by HELD_EDGE_TURN) faces
+## the way its head travels, not the flat (the great-axe check: the blade hung edge down across the
+## level swing, 0.0-0.2 of the way along its travel). Scrubbed, as the sledge's slide is.
+func _test_axe_edge_leads() -> void:
+	print("
+== the heavy axes' sweep: the edge leads the blow ==")
+	var player := _player()
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	for id: String in ["battle_axe", "giant_axe"]:
+		slots[Items.RIGHT_HAND] = id
+		slots[Items.LEFT_HAND] = ""
+		player.slots = slots
+		_rig._process(0.0)
+		var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+		var rig := puppet.get_meta("rig") as AnimRig
+		var held := ((puppet.get_meta("sockets") as Dictionary)["hand_r"] as Node3D).get_node_or_null("Held") as Node3D
+		if held == null:
+			_check(false, "%s in hand" % id)
+			continue
+		rig.strike("Axe_Sweep", 0.8, 0.8, 0.5)
+		rig._contact_msec = -1
+		rig._strike_msec = Time.get_ticks_msec() + 600000
+		rig._set_action_speed(0.0)
+		# Its fade in run out first: on the wall clock, so the first steps scrubbed stood half blended with the rest.
+		rig.tree.set("parameters/action_seek/seek_request", 0.55)
+		rig._apply()
+		await get_tree().create_timer(0.5).timeout
+		var heads: Array[Vector3] = []
+		var edges: Array[Vector3] = []
+		for step in 11:
+			rig.tree.set("parameters/action_seek/seek_request", 0.55 + step * 0.05)
+			rig._apply()
+			_rig._process(0.0)
+			await get_tree().process_frame
+			# In the piece's own frame (art_style: its length +y, its striking side +x), the head 1.1 m up it.
+			heads.append(held.global_transform * Vector3(0.0, 1.1, 0.0))
+			edges.append(held.global_basis.x.normalized())
+		var worst := INF
+		for k in range(1, heads.size() - 1):
+			worst = minf(worst, edges[k].dot((heads[k + 1] - heads[k - 1]).normalized()))
+		_check(worst > 0.8, "%s: through the blow its edge leads the head's travel (at worst %.2f of the way)" % [id, worst])
+		# Ended as a strike ends (as the sledge's): run out at speed, so the tests after it stand on the rest.
+		rig._set_action_speed(1.0)
+		rig.tree.set("parameters/action_seek/seek_request", rig.length("Axe_Sweep"))
+		rig._apply()
+		rig._strike_msec = 0
+		# Its fade out run in time (the next axe's blow, or the bow's pose after, stood on it half faded).
+		await get_tree().create_timer(0.6).timeout
+		_rig._process(0.0)
+		puppet.set_meta("busy_until", 0)
+	player.slots = was
+	_rig._process(0.0)
+	await get_tree().create_timer(0.6).timeout  # The axes' ready stance faded off the upper body before the bow's tests read it.
 	_rig._process(0.0)
 
 

@@ -12012,6 +12012,17 @@ shield in the left, an emptied hand drawing nothing, the lantern at the belt,
 a goblin's dagger in its hand. Rejected: items as their own puppets placed by
 script each frame (the bone attachment follows every pose for free); a socket
 table per model file (the profile's frames make one table, scaled, enough).
+451 amended (3): the heavy axes swing edge first (release's label; the coordinator's great-axe check after
+769 amended (9)). Client3D lays a held weapon's striking side along the fingers (HELD_EDGE_TURN), which is
+edge x haft of the edge tools/humanoid_clips.py's chop() is given, so a clip authored with the edge toward
+where the blade should go draws the head crosswise. Axe_Sweep, the giant and battle axes' blow, did: the blade
+hung edge down across the level swing, its edge along the head's travel 0.0-0.2 through the blow (measured,
+the axe held as the game holds it). Its keys now take SWEEP_UP (up x haft: the way a swing round to the left
+travels), 0.90-1.00 from 0.55 to 1.05 s; Axe_Overhead's raise, swing and blow take AXE_SIDE (the side, as
+PICK_SIDE does for the pick), 0.85-0.94 through its blow, no weapon swinging it now. The ready (AXE_READY)
+keeps its outward blade (the coordinator). Re-extracted into goblin.res. view_test _test_axe_edge_leads (each
+heavy axe's +x along its head's travel through the sweep, scrubbed). Client and tools only, protocol
+unchanged, no new class_name.
 ## 447. The town memory log: what the town's people say of its small life, kept with its source
 
 Phase 1 of Jeff's lawspeaker proposal (docs/lore/lawspeaker.md, 2026-10-17:

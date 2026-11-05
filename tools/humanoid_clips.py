@@ -567,11 +567,15 @@ CLIPS["Chop_Loop"] = {"loop": True, "keys": [
 # body, raised over the right shoulder, swung through high ahead, brought down ahead and low, the
 # trunk bowing into it. Every hold keeps the left wrist within reach of its shoulder (0.52 m).
 GREAT_GRIP = 0.45
+# Swung over and down, the edge leads (451 amended (3)): the game lays a held weapon's edge along the fingers
+# (HELD_EDGE_TURN), edge x haft of what chop() is given, so a blow in the body's own upright plane takes the side,
+# as the pick's does (PICK_SIDE). Given ahead or down, as before, the head swung flat. The ready keeps its own.
+AXE_SIDE = (1.0, 0.0, 0.0)
 AXE_READY = chop((0.16, -0.06, -0.43), (0.57, -0.4, 0.66), (0.0, -1.0, 0.0), grip=GREAT_GRIP)
-AXE_UP = chop((0.2, 0.0, 0.0), (-0.3, -0.3, 0.9), (0.0, -1.0, 0.45), grip=GREAT_GRIP) + [
+AXE_UP = chop((0.2, 0.0, 0.0), (-0.3, -0.3, 0.9), AXE_SIDE, grip=GREAT_GRIP) + [
 	("spine_02", LIFT, 10.0), ("spine_03", LIFT, 5.0)]
-AXE_SWING = chop((0.22, 0.0, -0.12), (0.4, -0.35, 0.85), (0.0, -1.0, 0.0), grip=GREAT_GRIP) + [("spine_02", LIFT, 2.0)]
-AXE_DOWN = chop((0.0, -0.05, 0.02), (0.6, -0.4, -0.55), (0.0, 0.0, -1.0), grip=GREAT_GRIP) + [
+AXE_SWING = chop((0.22, 0.0, -0.12), (0.4, -0.35, 0.85), AXE_SIDE, grip=GREAT_GRIP) + [("spine_02", LIFT, 2.0)]
+AXE_DOWN = chop((0.0, -0.05, 0.02), (0.6, -0.4, -0.55), AXE_SIDE, grip=GREAT_GRIP) + [
 	("spine_01", LIFT, -16.0), ("spine_02", LIFT, -12.0), ("Head", LIFT, 14.0)]
 # Standing ready with it, both hands on the haft (Client3D plays it on the upper layer while
 # HandReach holds the left hand there, so the left arm isn't stretched for it).
@@ -779,6 +783,13 @@ CLIPS["Sledge_Attack"] = {"keys": [
 # (to 0.8, the contact dead ahead, the head mid-arc: the blow strikes the cell ahead and both diagonals);
 # carried on past to the left, the trunk wound round, half a step on (to 1.05); drawn back up to the
 # guard (1.3). The edge leads the head along the arc.
+# The sweep's edge leads it (451 amended (3)): the game lays a held weapon's edge along the
+# fingers (Client3D's HELD_EDGE_TURN), edge x haft of what chop() is given, so a level swing round to the left takes
+# SWEEP_UP, which puts the edge along up x haft, the way the head travels. Given ahead or down, as before, the blade
+# hung flat across the swing (edge against its travel 0.0-0.2 through the blow, measured).
+SWEEP_UP = (0.0, 0.0, 1.0)
+
+
 def sweep(right: tuple, haft: tuple, edge: tuple, grip: float, trunk: list = (), poles: tuple = ((-1.0, 0.3, -0.5), (0.8, -0.6, -0.4))) -> list:
 	return chop(right, haft, edge, poles, grip=grip) + list(trunk)
 
@@ -790,19 +801,19 @@ def sweep(right: tuple, haft: tuple, edge: tuple, grip: float, trunk: list = (),
 # foot, the hips driving round ahead of the shoulders; carried a touch past balance, then recovered. The
 # feet stay planted where they don't step (each thigh turned back against the pelvis); the shoulders'
 # whole turn is the pelvis's and the spine's together, kept so the left hand reaches the haft.
-SWEEP_COIL = sweep((0.04, -0.02, -0.44), (-0.62, 0.72, 0.3), (0.0, -1.0, 0.0), 0.2, [("pelvis", TURN, -18.0),
+SWEEP_COIL = sweep((0.04, -0.02, -0.44), (-0.62, 0.72, 0.3), SWEEP_UP, 0.2, [("pelvis", TURN, -18.0),
 	("thigh_l", TURN, 18.0), ("thigh_r", TURN, 18.0), ("thigh_r", LIFT, 12.0), ("calf_r", LIFT, -18.0), ("thigh_l", LIFT, -4.0),
 	("spine_01", TURN, -8.0), ("spine_02", TURN, -10.0), ("spine_03", TURN, -6.0), ("Head", TURN, 28.0), ("spine_02", LIFT, -4.0)])
-SWEEP_HANG = sweep((0.02, -0.01, -0.43), (-0.66, 0.68, 0.3), (0.0, -1.0, 0.0), 0.2, [("pelvis", TURN, -19.0),
+SWEEP_HANG = sweep((0.02, -0.01, -0.43), (-0.66, 0.68, 0.3), SWEEP_UP, 0.2, [("pelvis", TURN, -19.0),
 	("thigh_l", TURN, 19.0), ("thigh_r", TURN, 19.0), ("thigh_r", LIFT, 14.0), ("calf_r", LIFT, -20.0), ("thigh_l", LIFT, -4.0),
 	("spine_01", TURN, -8.0), ("spine_02", TURN, -11.0), ("spine_03", TURN, -7.0), ("Head", TURN, 32.0), ("spine_02", LIFT, -4.0)])
-SWEEP_OUT = sweep((0.2, -0.04, -0.4), (0.0, 1.0, 0.1), (0.0, -1.0, 0.0), 0.1, [("pelvis", TURN, 6.0),
+SWEEP_OUT = sweep((0.2, -0.04, -0.4), (0.0, 1.0, 0.1), SWEEP_UP, 0.1, [("pelvis", TURN, 6.0),
 	("thigh_r", TURN, -6.0), ("thigh_l", LIFT, 20.0), ("calf_l", LIFT, -28.0), ("thigh_r", LIFT, 4.0), ("calf_r", LIFT, -8.0),
 	("spine_01", TURN, -11.0), ("spine_02", TURN, -11.0), ("Head", TURN, 10.0)])
-SWEEP_HIT = sweep((0.24, -0.2, -0.34), (1.0, 0.05, 0.05), (1.0, 0.0, 0.0), 0.12, [("pelvis", TURN, 18.0),
+SWEEP_HIT = sweep((0.24, -0.2, -0.34), (1.0, 0.05, 0.05), SWEEP_UP, 0.12, [("pelvis", TURN, 18.0),
 	("thigh_r", TURN, -18.0), ("thigh_l", TURN, -10.0), ("thigh_l", LIFT, 24.0), ("calf_l", LIFT, -14.0), ("thigh_r", LIFT, -10.0),
 	("spine_01", TURN, -8.0), ("spine_02", TURN, -8.0), ("spine_02", LIFT, -6.0), ("Head", TURN, -14.0)])
-SWEEP_PAST = sweep((0.12, -0.36, -0.3), (0.15, -0.95, 0.2), (0.0, 1.0, 0.0), 0.15, [("pelvis", TURN, 26.0),
+SWEEP_PAST = sweep((0.12, -0.36, -0.3), (0.15, -0.95, 0.2), SWEEP_UP, 0.15, [("pelvis", TURN, 26.0),
 	("thigh_r", TURN, -26.0), ("thigh_l", TURN, -14.0), ("thigh_l", LIFT, 28.0), ("calf_l", LIFT, -24.0), ("thigh_r", LIFT, -16.0),
 	("spine_01", TURN, 4.0), ("spine_02", TURN, 4.0), ("spine_03", TURN, 4.0), ("spine_01", LIFT, -6.0), ("spine_02", LIFT, -8.0),
 	("Head", TURN, -28.0)])
