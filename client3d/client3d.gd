@@ -1498,8 +1498,9 @@ const LABEL_FONT_SIZE := 64
 ## square over its name.
 static var BOSS_NAME: Color = UiTheme.color("brass_bright")
 ## A townsperson who takes something the player carries (802 amended (5),
-## ui's side): their name faintly brass, so the smith is seen across the square.
-static var TAKER_NAME: Color = Color.WHITE.lerp(UiTheme.color("brass"), 0.45)
+## ui's side): their name a light gold, so the smith is seen across the square
+## (the still, C:/dev/review/give: white toward brass was lost, or muddy on dirt).
+const TAKER_NAME := Color(1.0, 0.86, 0.5)
 const BOSS_MARK := 0.32
 const SPEECH := Color(1, 0.95, 0.6)
 const HOVER := Color(1, 1, 1, 0.35)
