@@ -65,11 +65,13 @@ func _on_strength_changed(id: String, _value: int) -> void:
 ## Player [param peer] stands at [param cell] in [param area]: the area, and
 ## places within SIGHT, are known to them from now on; what is new is sent
 ## (with the holdings of the places just learned), unless their full
-## message has yet to go, which will carry it.
-func observe(peer: int, area: String, cell: Vector2i) -> void:
+## message has yet to go, which will carry it. The areas newly known and so
+## sent, for Main's gain (decision 804): none before the full message (a
+## join's first area, or one an old record knew, is no discovery).
+func observe(peer: int, area: String, cell: Vector2i) -> Array[String]:
 	var record := _record(peer)
 	if record == null:
-		return
+		return []
 	var areas: Array[String] = []
 	if not area.is_empty() and not record.known_areas.has(area):
 		record.known_areas.append(area)
@@ -85,8 +87,9 @@ func observe(peer: int, area: String, cell: Vector2i) -> void:
 	if not places.is_empty():
 		record.known_places.sort()
 	if (areas.is_empty() and places.is_empty()) or not _full_sent.has(peer):
-		return
+		return []
 	send.call(peer, {"full": false, "known": {"areas": areas, "places": places}, "holdings": _holdings_of(places)})
+	return areas
 
 
 ## Sends each player not yet sent it their full message, and each one

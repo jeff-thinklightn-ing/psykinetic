@@ -119,6 +119,7 @@ extends Node
 ##   --test-ui-cost               print the interface's per-frame cost at exit (UiCost; ui's measure)
 ##   --test-show=<a,b>            open these on the HUD once the player is in (for the ui tree's screenshots):
 ##                                hints, options, pack, talk, chat, debug, say (a speech bubble), shop (the nearest counter's),
+##                                gains (804: a float burst and a banner 0.8 s before the screenshot),
 ##                                game_menu, menu, setup (the connect screen's fields), connect, failed (its states), over the game;
 ##                                tip (a sample named dagger's tip over the pack: nothing in play is named yet),
 ##                                hint (the cursor's hint on the nearest crate or chest, as if the cursor were on it),
@@ -184,6 +185,8 @@ signal peer_left(peer: int)
 ## The Options' low-horizon camera toggle (decision 623) changed: the 3D
 ## view applies it at once.
 signal camera_low_changed(low: bool)
+## The Options' Gains shown changed (decision 804): Main's Gains follows.
+signal gains_shown_changed(value: String)
 ## A peer has sent a good hello and may be given a player. Main spawns
 ## players on this, never on peer_connected.
 signal peer_authenticated(peer: int, player_id: String, player_name: String)
@@ -551,11 +554,14 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## a guard's spear and mail, and a downed guard; an old client draws it bare-handed and standing.
 ## 49 (802): the "say" command gains an optional "to", a body's path (the townsperson
 ## window): the line is that body's if it hears, else nobody's; an old client sends none.
+## 49 (804): new message "reward" {track, amount, words, of, at, big, step, banner, bar, gold,
+## bars}, sent by Main.reward to one player for a gain (never a loss): the client's floats,
+## banner and Gains log (render/gains.gd). An old client lists no "reward" kind and cannot join.
 const PROTOCOL_REVISION := 49
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "arts", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "far_cry", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "tracks", "wave", "world"]
+const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "arts", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "far_cry", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "reward", "roofs", "shop", "sky", "speech", "telegraph", "terrain", "town", "town_sheet", "tracks", "wave", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "body", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "crouched", "down_until", "downed_until", "emit_light", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "spent", "teeter", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
@@ -783,6 +789,10 @@ var text_scale := 1.0
 var colours := "normal"
 ## The first-time talk hint was shown (hinted_talk=on).
 var hinted_talk := false
+## How much of a gain is shown (decision 804, Gains): "all", "quiet" (no
+## banners, softer cues) or "log" (the Gains log alone); settings.cfg
+## gains=, "all" by default.
+var gains_shown := "all"
 ## settings.cfg screenshot_dir=: where F12's screenshots go (decision 538; Jeff's
 ## NAS folder), "" for the game's own user://screenshots. Kept as any
 ## unknown key is.
@@ -1219,6 +1229,9 @@ func _apply_access_settings() -> void:
 		camera_low = camera_low_from(str(settings.get("camera", "")))
 		camera_overhead = str(settings.get("camera_overhead", "")).strip_edges() == "on"
 		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
+		var gains := str(settings.get("gains", "all")).strip_edges()
+		if gains in Gains.SHOWN:
+			gains_shown = gains
 		screenshot_dir = str(settings.get("screenshot_dir", "")).strip_edges()
 		hinted_shot = str(settings.get("hinted_shot", "off")) == "on"
 		Keys.read(settings)  # key_<action>= (decision 453).
@@ -1275,6 +1288,18 @@ func set_colours(value: String, save := true) -> void:
 	UiTheme.apply_colours(value)
 	if save:
 		_settings_kept["colours"] = value
+		save_view_settings()
+
+
+## The Options' Gains shown (decision 804): "all", "quiet" or "log",
+## written as gains=.
+func set_gains_shown(value: String, save := true) -> void:
+	if value not in Gains.SHOWN:
+		return
+	gains_shown = value
+	gains_shown_changed.emit(value)
+	if save:
+		_settings_kept["gains"] = value
 		save_view_settings()
 
 

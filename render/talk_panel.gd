@@ -15,6 +15,11 @@ extends PanelContainer
 ## chat box's channel ("say" or "party", from Main's /p prefix) is named
 ## beside it. Companions own what the log records (lines[]'s shape, the
 ## keep); ui the look (decisions 401, step 3).
+##
+## Gains (decision 804): the button over the lines shows instead what the
+## player has gained this session (Gains.lines, by gains_of), newest at the
+## bottom, each in its track's colour with its words dim after it; pressed
+## again, the talk.
 
 ## A line was added: who said it, a chat line, a party line (sound's).
 signal line_added(speaker: String, is_chat: bool, party: bool)
@@ -46,6 +51,12 @@ var _channel: Label
 var _box: LineEdit
 var _hovering := false
 var _shown_until := 0.0
+## () -> Gains.lines (Main); none: no Gains button.
+var gains_of: Callable
+## Whether the Gains list shows in place of the talk.
+var showing_gains := false
+var _gains_button: Button
+var _gains_list: VBoxContainer
 
 
 func _init() -> void:
@@ -57,6 +68,16 @@ func _init() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	add_child(column)
+	_gains_button = Button.new()
+	_gains_button.name = "GainsButton"
+	_gains_button.text = "Gains"  # Voice's (804).
+	_gains_button.toggle_mode = true
+	_gains_button.theme_type_variation = &"Small"
+	_gains_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	_gains_button.focus_mode = Control.FOCUS_NONE
+	_gains_button.visible = false
+	_gains_button.toggled.connect(show_gains)
+	column.add_child(_gains_button)
 	_scroll = ScrollContainer.new()
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.custom_minimum_size = Vector2(WIDTH, 0)
@@ -68,7 +89,18 @@ func _init() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.mouse_filter = Control.MOUSE_FILTER_PASS
 	_list.add_theme_constant_override("separation", 4)
-	_scroll.add_child(_list)
+	var lists := VBoxContainer.new()
+	lists.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lists.mouse_filter = Control.MOUSE_FILTER_PASS
+	_scroll.add_child(lists)
+	lists.add_child(_list)
+	_gains_list = VBoxContainer.new()
+	_gains_list.name = "GainsList"
+	_gains_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_gains_list.mouse_filter = Control.MOUSE_FILTER_PASS
+	_gains_list.add_theme_constant_override("separation", 4)
+	_gains_list.visible = false
+	lists.add_child(_gains_list)
 	_box_row = HBoxContainer.new()
 	_box_row.add_theme_constant_override("separation", UiTheme.constant("row"))
 	_box_row.visible = false
@@ -157,6 +189,44 @@ func add_line(speaker: String, text: String, is_chat := false, party := false, a
 	line_added.emit(speaker, is_chat, party)
 
 
+## The Gains list in place of the talk ([param on]), or the talk again.
+func show_gains(on: bool) -> void:
+	showing_gains = on and gains_of.is_valid()
+	_gains_button.set_pressed_no_signal(showing_gains)
+	_list.visible = not showing_gains
+	_gains_list.visible = showing_gains
+	if showing_gains:
+		refresh_gains()
+	_scroll_to_end()
+
+
+## The Gains list redrawn from gains_of (Gains.logged, while it shows).
+func refresh_gains() -> void:
+	if not showing_gains or not gains_of.is_valid():
+		return
+	for child in _gains_list.get_children():
+		_gains_list.remove_child(child)
+		child.queue_free()
+	for line: Dictionary in gains_of.call():
+		var label := RichTextLabel.new()
+		label.fit_content = true
+		label.scroll_active = false
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		label.tooltip_text = str(line.get("time", ""))
+		label.mouse_filter = Control.MOUSE_FILTER_PASS
+		label.push_color(Gains.color_of(str(line.get("track", ""))))
+		label.add_text(str(line.get("text", "")))
+		label.pop()
+		var words := str(line.get("words", ""))
+		if not words.is_empty() and words != str(line.get("of", "")):
+			label.push_color(ASIDE)
+			label.add_text(ASIDE_DASH + words)
+			label.pop()
+		_gains_list.add_child(label)
+	_scroll_to_end()
+
+
 ## Whether the panel is kept shown by a recent line, the pin, the mouse
 ## or the open chat box (tests).
 func keeps_showing() -> bool:
@@ -170,8 +240,10 @@ func _process(_delta: float) -> void:
 		visible = false
 	if _box != null and _box.visible:
 		_show_channel()  # Main may set the text (Tab), which text_changed does not say.
+	_gains_button.visible = gains_of.is_valid() and (pinned or _hovering or showing_gains)
 	# As tall as its lines, up to LIST_HEIGHT while pinned (then it scrolls).
-	_scroll.custom_minimum_size.y = minf(_list.get_combined_minimum_size().y, LIST_HEIGHT)
+	var shown_list := _gains_list if showing_gains else _list
+	_scroll.custom_minimum_size.y = minf(shown_list.get_combined_minimum_size().y, LIST_HEIGHT)
 	UiCost.add("talk", Time.get_ticks_usec() - began)
 
 

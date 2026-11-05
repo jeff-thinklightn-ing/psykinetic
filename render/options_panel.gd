@@ -150,6 +150,9 @@ func _ready() -> void:
 		func(value: String) -> void:
 			Net.set_hints(value == "on")
 			hints_changed.emit(value == "on")))
+	# 804: how much of a gain is shown (voice's words).
+	interface.add_child(_choice_row("Gains shown", "gains", [["all", "All"], ["quiet", "Quiet"], ["log", "Log only"]],
+		func() -> String: return Net.gains_shown, Net.set_gains_shown))
 	var sound := add_section("Sound")
 	for volume: Array in VOLUMES:
 		sound.add_child(_slider_row(volume[0], volume[1]))

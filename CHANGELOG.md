@@ -30,6 +30,8 @@ notes (decision 324).
 - Weapon practice: sword and bow each keep what you have learned with them, whichever you take up, and a weapon you come back to after a long rest returns to its best three times as fast. (766 amended (4))
 - Clicking a square in a store window or the town window picks it and leaves you standing where you are (765 amended).
 - X crouches: you kneel low when still and creep when moving, quiet, to steal up on what you hunt or slip past what hunts you; press it again, or strike, guard, draw, shoot or throw, and you are up and ready (784 amended (3), (4)).
+- What you gain shows as you gain it: a +1 rising over you, a banner for the big moments, and a Gains list in the talk log; Options, Gains shown, sets how much (804).
+
 ## v0.1.203
 
 - Umbrage is laid out anew round its chapel: a square with a fire to sit at, the store and shop by the well, the tavern, Snagfin's stall by the square, and roads out to six watch posts; what you left in town is still yours, moved with the rest (774).

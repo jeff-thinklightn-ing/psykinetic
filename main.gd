@@ -670,6 +670,18 @@ var down_screen: DownScreen
 ## begin(zone_display_name()) as a crossing starts and finish() when the
 ## rebuild is done.
 var arrival_card: ArrivalCard
+## What the player gains, shown as it happens (decision 804): the "reward"
+## message's floats, banner and the Gains log, on the HUD.
+var gains: Gains
+## 804: the gains told, all players together (Main.reward; tests).
+var rewards_sent := 0
+## 804: each art's peak as last told ("arts"), so a rise is a Practice gain;
+## empty until the first, which only sets them.
+var _arts_seen := {}
+## 804: the local player's and the near monsters' hit points together, as last
+## looked at (-1: not yet), and until when a fall in them keeps the fight on.
+var _fight_hp := -1
+var _fight_until := 0.0
 ## The named room the local player's shown cell is in (665, ui's side;
 ## Level.room_at), and when each room was last left (msec), so stepping
 ## out and back within ROOM_AGAIN_MSEC says nothing.
@@ -3157,7 +3169,8 @@ func _local_player() -> Player:
 	# The roster (players and companions), not a copy of every entity: this
 	# is asked several times a frame.
 	for entity in World.sought():
-		if entity is Player and entity.owner_peer == Net.local_id and entity.spawned:
+		# A body freed this frame may still be listed (Gains draws mid-teardown: far_tier_test).
+		if is_instance_valid(entity) and entity is Player and entity.owner_peer == Net.local_id and entity.spawned:
 			return entity
 	return null
 
@@ -12957,6 +12970,17 @@ func _build_talk() -> void:
 	bubbles.tile_px = _bubble_tile_px
 	$HUD.add_child(bubbles)
 	$HUD.move_child(bubbles, 0)
+	gains = Gains.new()
+	gains.shown = Net.gains_shown
+	gains.anchor_of = _gain_anchor
+	gains.tile_px = _bubble_tile_px
+	gains.fighting = _in_fight
+	gains.play = _gain_cue
+	gains.has_cue = SoundKit.has
+	gains.shown_elsewhere = _gain_shown_elsewhere
+	$HUD.add_child(gains)
+	$HUD.move_child(gains, 1)
+	Net.gains_shown_changed.connect(_on_gains_shown)
 	compass = HudCompass.new()
 	compass.name = "Compass"
 	$HUD.add_child(compass)
@@ -13073,6 +13097,9 @@ func _build_talk() -> void:
 	$HUD.add_child(_bar)
 	talk = TalkPanel.new()
 	talk.line_added.connect(_line_sound)
+	if gains != null:
+		talk.gains_of = _gain_lines  # 804: the Gains list.
+		gains.logged.connect(talk.refresh_gains)
 	talk.anchor_left = 0.0
 	talk.anchor_top = 1.0
 	talk.anchor_bottom = 1.0
@@ -13852,7 +13879,12 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "clearing":
 		_on_clearing(data)
 		return
+	if kind == "reward":
+		if gains != null:
+			gains.add(data)  # 804: a gain, shown.
+		return
 	if kind == "arts":
+		_practice_gained(data)  # 804: a peak risen is a Practice gain.
 		# Weapon memory's peak and cooling (766 amended (3)): the pack's
 		# practice bars draw them; the pack redraws on its own signature.
 		if pack_panel != null:
@@ -14973,7 +15005,8 @@ func _tell_world(tick: int) -> void:
 	for peer: int in _players:
 		var player: Player = _players[peer]
 		if is_instance_valid(player) and player.spawned:
-			_world_news.observe(peer, player.zone, player.tile)
+			for area: String in _world_news.observe(peer, player.zone, player.tile):
+				_discovered(peer, area)  # 804: a zone stood in for the first time.
 	_observe_roads()  # Hers too (decision 551).
 	_world_news.update()
 
@@ -18596,6 +18629,7 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 					for each: Dictionary in taken:
 						cells_out.append({"uid": each["uid"], "id": each["id"], "cell": [each["cell"].x, each["cell"].y]})
 					Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text, "taken": cells_out, "gold": int(swept["gold"])})
+					_picked_gains(player, taken, int(swept["gold"]))  # 804.
 				elif swept["bound"]:
 					party_log.add(BOUND_AXE_WORDS)  # 603 amended: his, till the pact is won.
 				return
@@ -18610,6 +18644,7 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 				var gold := World.try_pick_up_gold(player, each)
 				if gold > 0:
 					Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": "You pick up %d gold." % gold})  # As the sweep says it (voice, 773).
+					_picked_gains(player, [], gold)  # 804.
 					return
 				if not World.ground_uids(each).is_empty() and World.try_pick_up(player, each):
 					return
@@ -20244,6 +20279,16 @@ func _run_test_offer(player: Player) -> void:
 ## --test-show: the named HUD panels opened once the player is in, for
 ## screenshots of them (the ui tree's audit); the talk log gets a few
 ## marked test lines so there is something to see.
+## --test-show=gains (804): the floats and a banner, as the server would send them.
+func _test_show_gains() -> void:
+	if gains == null:
+		return
+	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "words": "gave ore the town was short of",
+		"step": "known", "banner": "Umbrage knows you"})
+	gains.add({"track": "item", "amount": 6, "of": "iron ore"})
+	gains.add({"track": "gold", "amount": 12})
+
+
 func _run_test_show(player: Player) -> void:
 	if Net.test_show.is_empty() or _test_show_done or player == null:
 		return
@@ -20257,6 +20302,10 @@ func _run_test_show(player: Player) -> void:
 					options_panel.toggle()
 			"pack":
 				pack_panel.shown = true
+			"gains":
+				# 804, for the shot: a burst of gains and a banner, 0.8 s before the
+				# screenshot, so the float is up and the banner full.
+				get_tree().create_timer(maxf(Net.test_exit_after - 0.8, 0.0)).timeout.connect(_test_show_gains)
 			"telegraph":
 				# 602, ui's side: a sample cone ahead of the player, landing in 3 s, for the shot.
 				if player != null:
@@ -21096,6 +21145,132 @@ func _run_test_die_travel(tick: int) -> void:
 func _on_arts_marked(player: Player, marks: Dictionary) -> void:
 	if player.owner_peer != 0:
 		Net.message_to(player.owner_peer, "arts", marks)
+
+
+# --- Gains (decision 804) ---------------------------------------------------------
+
+## Server: one gain of the player whose id is [param player_id], told to them
+## alone as a "reward" message (Gains shows it): {track (Gains.TRACKS: explore,
+## regard, bond, leisure, practice, deed, catch, gold, item), amount (> 0),
+## words (voice's clause, for the log), of (whose or what: "Umbrage", "Wren",
+## "sword", the thing), at (optional: a cell in their zone, Vector2i or [x, y];
+## else over them), big (a banner), step (a ladder's new rung: a banner and the
+## step cue), banner (the banner's words, else words), bar {have, need}, gold,
+## bars [{id, have, enough}]}. Only gains: no track, or an amount of 0 or less,
+## is dropped here, so no emitter can show a loss. False when not sent (no
+## such player in the game). Any tree's emitter calls it.
+func reward(player_id: String, data: Dictionary) -> bool:
+	var amount: Variant = data.get("amount", 0)
+	if not (amount is int or amount is float) or not float(amount) > 0.0 or str(data.get("track", "")).is_empty():
+		return false
+	var player := _player_of_id(player_id)
+	if player == null or player.owner_peer == 0:
+		return false
+	var told := data.duplicate(true)
+	var at: Variant = told.get("at")
+	if at is Vector2i:
+		told["at"] = [at.x, at.y]
+	Net.message_to(player.owner_peer, "reward", told)
+	rewards_sent += 1
+	return true
+
+
+## The id of [param player] (its peer's; the host's own is Net.player_id).
+func _id_of_player(player: Player) -> String:
+	return str(_peer_ids.get(player.owner_peer, Net.player_id if player.owner_peer == Net.local_id else ""))
+
+
+## Server: player [param peer] stood in [param area] for the first time
+## (WorldNews.observe after their first full message): +1 Wayfaring, the
+## zone's name its banner (the arrival card has said it, so Gains shows the
+## float and the cue).
+func _discovered(peer: int, area: String) -> void:
+	var player: Player = _players.get(peer)
+	if not is_instance_valid(player):
+		return
+	var shown := str(Level.load_level(area).get("display_name", "")).strip_edges()
+	if shown.is_empty():
+		shown = area.capitalize()
+	reward(_id_of_player(player), {"track": "explore", "amount": 1, "of": shown, "words": shown, "big": true, "banner": shown})
+
+
+## Server: [param player] picked [param taken] up ([{id, ...}], the sweep's)
+## and [param gold]: "+12 gold", and one "+2 hides" for each kind of thing.
+func _picked_gains(player: Player, taken: Array, gold: int) -> void:
+	var id := _id_of_player(player)
+	if gold > 0:
+		reward(id, {"track": "gold", "amount": gold})
+	var counts := {}
+	for each: Dictionary in taken:
+		var what := str(each.get("id", ""))
+		counts[what] = int(counts.get(what, 0)) + 1
+	for what: String in counts:
+		reward(id, {"track": "item", "amount": counts[what], "of": Items.name_of(what)})
+
+
+## Client: the arts' marks told ("arts" {art: [peak, fading]}): each peak
+## risen since the last is a Practice gain, in hundredths ("+3 Practice,
+## sword"). The first told only sets them (a join, not a gain).
+func _practice_gained(marks: Dictionary) -> void:
+	var first := _arts_seen.is_empty()
+	for art: Variant in marks:
+		var mark: Variant = marks[art]
+		if mark is not Array or mark.is_empty() or not (mark[0] is float or mark[0] is int):
+			continue
+		var peak := float(mark[0])
+		var was := float(_arts_seen.get(art, peak if first else 0.0))
+		_arts_seen[art] = peak
+		var points := int(roundf((peak - was) * 100.0))
+		if points > 0 and gains != null:
+			gains.add({"track": "practice", "amount": points, "of": str(art).replace("_", " ").to_lower()})
+
+
+## Where a gain's float rises: over [param at]'s cell, or over the local
+## player (null); null when not to be seen.
+func _gain_anchor(at: Variant) -> Variant:
+	if at is Vector2i:
+		if _client3d == null:
+			return null
+		return _client3d.screen_of_tile(at) - Vector2(0.0, _client3d.tile_px())
+	var me := _local_player()
+	return _bubble_anchor(me.get_instance_id()) if me != null else null
+
+
+## Whether a blow was given or taken lately: the local player's and the near
+## monsters' hit points fell within Gains.FIGHT_SECONDS (Gains asks each frame).
+func _in_fight() -> bool:
+	var now := Time.get_ticks_msec() / 1000.0
+	var me := _local_player()
+	if me == null or World.zone == null:
+		_fight_hp = -1
+		return now < _fight_until
+	var sum := me.hp
+	for monster: GridEntity in World.monsters():
+		if is_instance_valid(monster) and World.distance(monster.tile, me.tile) <= Gains.FIGHT_NEAR:
+			sum += monster.hp
+	if _fight_hp >= 0 and sum < _fight_hp:
+		_fight_until = now + Gains.FIGHT_SECONDS
+	_fight_hp = sum
+	return now < _fight_until
+
+
+func _gain_cue(slot: String, pitch: float, volume_db: float) -> void:
+	if ui_sounds != null:
+		ui_sounds.play(slot, pitch, volume_db)
+
+
+## A banner the arrival card shows now (a zone's name on its crossing).
+func _gain_shown_elsewhere(text: String) -> bool:
+	return arrival_card != null and arrival_card.zone_name == text
+
+
+func _gain_lines() -> Array[Dictionary]:
+	return gains.lines if gains != null else ([] as Array[Dictionary])
+
+
+func _on_gains_shown(value: String) -> void:
+	if gains != null:
+		gains.shown = value
 
 
 ## --test-arts (766): [param player]'s arts set as given (swordplay:1,bow:0.5),

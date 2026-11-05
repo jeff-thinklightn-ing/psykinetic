@@ -41667,3 +41667,55 @@ pair 5, 3 and 4 of 6, "quiet" in 1 per run unasked. A talkative card did no bett
 rolled one (pair 3), so the card was not the lever; decision 675 still holds her tongue in a
 fight (the coordinator: as one begins and after it ends is enough). companion_test
 _test_quiet_moment. Server only, protocol unchanged, no new class_name.
+## 804. Gains: what the player gains, shown as it happens
+
+ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early
+that they get rewarded for everything they do ... something happens, a sound, an
+acknowledgement. right now you turn in the ore to the town chest nothing happens at all").
+One path: any system on the server calls `Main.reward(player_id, data)`, which tells that
+player alone a new message, "reward" (`Net.MESSAGE_KINDS`; rev 49 (804), no bump: an old
+client cannot join a server with a kind it does not list, decision 239). data is {track,
+amount, words, of, at, big, step, banner, bar, gold, bars}: track one of explore, regard,
+bond, leisure, practice, deed, catch, gold, item (`Gains.TRACKS`: each its word, colour and
+sound cue; an unknown track shows in brass with no word, so a later emitter needs no new
+client); amount above 0; words the emitter's clause (voice's) for the log; of whose or what
+("Umbrage", "Wren", "sword", the thing); at an optional cell in the player's zone
+(Vector2i or [x, y]; else over the player); big or step (a ladder's new rung) a banner,
+banner its words (else words); bar {have, need}, gold and bars [{id, have, enough}] for the
+bars that live in their windows (landing B). Only gains: `Main.reward` drops a missing track
+and an amount of 0 or less, so no emitter can show a loss, and Gains drops them again.
+
+The show (`render/gains.gd`, class_name Gains, on the HUD): a float, "+1 Regard, Umbrage"
+(voice's form: the track's word, a comma, whose; "+12 gold" and "+2 hides" name the thing, its last word
+pluralised past one by World._plural unless a mass (Gains.MASS_WORDS: "+20 food");
+the coordinator ruled the track's word stays), rising 1.5 tiles over 1.4 s over the cell or
+the player and fading; the same track and whose within MERGE_SECONDS (1.0) rolls up the live
+float's number, so a burst is one float; FLOATS_AT_ONCE (3) at most, the rest wait. A banner,
+top centre, 2.5 s, one at a time, queued, for a big gain or a step; a zone's name the
+arrival card shows (665) is not shown twice. A log, the session's last 40 gains, merged as the
+floats are: the talk panel's Gains button (Tab pins the panel) lists them in their track's
+colour, the emitter's words dim after. Sound's cues (sound-1f: ui.reward_gain, _step, _want,
+_catch, _found, _coin, on the ui bus) one per burst, CUE_GAP (0.25 s) apart, a little higher
+as a burst merges; a slot sound has no takes for yet falls back to ui.reward_gain, else none
+(SoundKit.has). Options, Interface: "Gains shown" (voice's words): All (default), Quiet (no
+banners, cues 6 dB softer), Log only; settings.cfg gains=. In a fight (Main._in_fight: the
+local player's and the monsters within 8 cells' hit points fell in the last 4 s) the floats
+are 70% the size, the banners wait until it is over, and only a step's cue sounds.
+
+ui's own emitters in this landing: a zone stood in for the first time (`WorldNews.observe`
+now returns the areas newly known and sent; none before a player's first full "world"
+message, so a join's first area, or one an old record already knew, is no discovery): +1
+Wayfaring, the zone's display name; gold and things picked up (`Main._picked_gains`, F's
+sweep and a single pick-up): "+12 gold", one "+2 hides" per kind; a weapon art's peak risen
+(the "arts" message, client side, `Main._practice_gained`): "+3 Practice, swordplay" in
+hundredths, the first told only setting them. The emitters approved with it, each its own
+side or amendment: economy (town regard at `Towns.regard_move`, a hand-in's thanks with the
+need bars, a build funded or begun, owed gold shown neutrally; a raw handed in while the town
+holds under twice enough earns half a point of regard inside the day cap), companions (bond
+deeds and steps, her bond and leisure bars, a want met), maps (named places, sights and
+regions reached, explored.places, per-zone counts), combat (a fight won), enemy-ai (a camp
+cleared). Landing B: the bars filling with a flourish in the town window, her card and sheet,
+and the map's count. Tests: ui_test _test_gains (the form, merging, the at-once cap, nothing
+for a loss, step and want and coin cues, the fallback cue, the arrival card's name, the fight
+hold, Quiet and Log only, the Options row, practice from "arts", the talk panel's list,
+Main.reward's path and its drops, picked-up gains, a zone's first stand).

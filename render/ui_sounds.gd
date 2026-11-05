@@ -43,15 +43,16 @@ func watch(panel: CanvasItem) -> void:
 
 
 ## Plays the UI slot [param slot] (ui.*), unless the menus are still being
-## built or there is nothing to play through.
-func play(slot: String) -> void:
+## built or there is nothing to play through; at [param pitch] and
+## [param volume_db] over the slot's own (Gains' cues, decision 804).
+func play(slot: String, pitch := 1.0, volume_db := 0.0) -> void:
 	if Time.get_ticks_msec() < _quiet_until or not sfx_of.is_valid():
 		return
 	var sfx: Sfx = sfx_of.call()
 	if sfx == null or not is_instance_valid(sfx) or not sfx.is_inside_tree():
 		return
 	played.append(slot)
-	sfx.play_flat(slot)
+	sfx.play_flat(slot, pitch, volume_db)
 
 
 func _on_node_added(node: Node) -> void:

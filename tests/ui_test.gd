@@ -56,6 +56,7 @@ func _ready() -> void:
 	_test_sweep_key()
 	_test_crouch_key()
 	_test_practice_bars()
+	_test_gains()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2395,3 +2396,128 @@ func _test_town_window() -> void:
 	_main.town_states = states_was
 	_main.town_sheets.erase(id)
 	_main._town_sheet_asked.clear()
+
+
+func _test_gains() -> void:
+	print("\n== gains (804): the \"reward\" message's float, banner, log and cue; only gains; the server's path ==")
+	var gains: Gains = _main.gains
+	if gains == null:
+		_check(false, "Main has its Gains")
+		return
+	var shown_was: String = gains.shown
+	var cue_was: Callable = gains.has_cue
+	var fight_was: Callable = gains.fighting
+	var clear := func() -> void:
+		gains.lines.clear()
+		gains.floats.clear()
+		gains.waiting.clear()
+		gains.banners.clear()
+		gains._banner = {}
+		gains.cues.clear()
+		gains._last_cue = -100.0
+	gains.has_cue = func(_slot: String) -> bool: return true
+	gains.fighting = func() -> bool: return false
+	gains.shown = "all"
+	clear.call()
+	_check(Gains.text_of("regard", 1, "Umbrage") == "+1 Regard, Umbrage" and Gains.text_of("bond", 0.5, "Wren") == "+0.5 Bond, Wren"
+		and Gains.text_of("gold", 12, "") == "+12 gold" and Gains.text_of("item", 2, "hide") == "+2 hides"
+		and Gains.text_of("item", 2, "wood bundle") == "+2 wood bundles" and Gains.text_of("item", 20, "food") == "+20 food"
+		and Gains.text_of("item", 1, "perch") == "+1 perch" and Gains.text_of("item", 2, "bundle of wood") == "+2 bundles of wood"
+		and Gains.text_of("item", 2, "bone dice") == "+2 bone dice" and Gains.text_of("item", 3, "amber beads") == "+3 amber beads"
+		and Gains.text_of("deed", 1, "") == "+1 Deeds" and Gains.text_of("someday", 1, "Umbrage") == "+1, Umbrage",
+		"voice's form: the track's word, then whose; gold and things by name, counted (a mass not); an unknown track has no word")
+	_main._on_message("reward", {"track": "regard", "amount": 1, "of": "Umbrage", "words": "gave ore the town was short of"})
+	_main._on_message("reward", {"track": "regard", "amount": 1, "of": "Umbrage"})
+	_check(gains.lines.size() == 1 and gains.lines[0]["text"] == "+2 Regard, Umbrage" and gains.floats.size() == 1
+		and gains.float_text(gains.floats[0]) == "+2 Regard, Umbrage" and gains.lines[0]["words"] == "gave ore the town was short of",
+		"two gains within a second are one float and one log line, rolled up (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])
+	_check(gains.cues.size() == 1 and gains.cues[0][0] == "ui.reward_gain", "one cue for the burst (%s)" % [gains.cues])
+	_check(not gains.add({"track": "regard", "amount": 0, "of": "Umbrage"}) and not gains.add({"track": "regard", "amount": -2, "of": "Umbrage"})
+		and not gains.add({"amount": 3}) and gains.lines.size() == 1, "nothing for a loss, a nought or no track")
+	for i in 5:
+		gains.add({"track": "item", "amount": 1, "of": "thing %d" % i})
+	_check(gains.floats.size() == Gains.FLOATS_AT_ONCE and gains.waiting.size() == 6 - Gains.FLOATS_AT_ONCE,
+		"at most %d floats at once, the rest wait their turn (%d, %d)" % [Gains.FLOATS_AT_ONCE, gains.floats.size(), gains.waiting.size()])
+	clear.call()
+	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "step": "trusted", "banner": "Umbrage trusts you"})
+	gains._process(0.0)
+	_check(gains.banner_shown() == "Umbrage trusts you" and gains.cues.back()[0] == Gains.STEP_CUE, "a step: its banner and the step cue")
+	clear.call()
+	gains.add({"track": "gold", "amount": 12})
+	_check(gains.cues.back()[0] == "ui.reward_coin", "gold: the coin")
+	clear.call()
+	gains.add({"track": "deed", "amount": 1, "of": "Wren", "big": true, "banner": "Wren is content"})
+	_check(gains.cues.back()[0] == Gains.WANT_CUE and gains.banners.size() == 1, "a big deed: the want cue and a banner")
+	clear.call()
+	gains.has_cue = func(slot: String) -> bool: return slot == Gains.FALLBACK_CUE
+	gains.add({"track": "catch", "amount": 1})
+	gains.has_cue = func(_slot: String) -> bool: return false
+	gains._last_cue = -100.0
+	gains.add({"track": "explore", "amount": 1, "of": "Hollowfell"})
+	_check(gains.cues.size() == 1 and gains.cues[0][0] == Gains.FALLBACK_CUE, "a cue sound has no takes for falls back to the gain's, else none (%s)" % [gains.cues])
+	gains.has_cue = func(_slot: String) -> bool: return true
+	clear.call()
+	if _main.arrival_card != null:
+		var name_was: String = _main.arrival_card.zone_name
+		_main.arrival_card.zone_name = "Hollowfell"
+		gains.add({"track": "explore", "amount": 1, "of": "Hollowfell", "big": true, "banner": "Hollowfell"})
+		_check(gains.banners.is_empty() and gains.floats.size() == 1, "a zone's name the arrival card shows is no second banner; the float stays")
+		_main.arrival_card.zone_name = name_was
+	clear.call()
+	gains.fighting = func() -> bool: return true
+	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "big": true, "banner": "Umbrage knows you"})
+	gains.add({"track": "practice", "amount": 2, "of": "sword"})
+	gains._process(0.0)
+	_check(gains.floats.all(func(f: Dictionary) -> bool: return f["small"]) and gains.banner_shown().is_empty() and gains.banners.size() == 1
+		and gains.cues.is_empty(), "in a fight: the floats small, the banner held, no cue")
+	gains.fighting = func() -> bool: return false
+	gains._process(0.0)
+	_check(gains.banner_shown() == "Umbrage knows you", "the fight over: the banner shows")
+	clear.call()
+	gains.shown = "quiet"
+	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "big": true, "banner": "Umbrage knows you"})
+	_check(gains.banners.is_empty() and gains.floats.size() == 1 and gains.cues.size() == 1, "Quiet: the float and the cue, no banner")
+	clear.call()
+	gains.shown = "log"
+	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "big": true, "banner": "Umbrage knows you"})
+	_check(gains.banners.is_empty() and gains.floats.is_empty() and gains.cues.is_empty() and gains.lines.size() == 1, "Log only: the line alone")
+	gains.shown = "all"
+	_check(_main.options_panel != null and _main.options_panel.choices.has("gains")
+		and _main.options_panel.choices["gains"]["buttons"].keys() == ["all", "quiet", "log"], "the Options' Gains shown: All, Quiet, Log only")
+	Net.set_gains_shown("quiet", false)
+	_check(gains.shown == "quiet", "Net.gains_shown reaches the Gains")
+	Net.set_gains_shown("all", false)
+	clear.call()
+	_main._arts_seen = {}
+	_main._on_message("arts", {"swordplay": [0.10, false]})
+	_main._on_message("arts", {"swordplay": [0.13, false], "bow": [0.02, false]})
+	var practice := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
+	_check(practice == ["+3 Practice, swordplay", "+2 Practice, bow"], "an art's peak risen is Practice; the first told only sets them (%s)" % [practice])
+	if _main.talk != null:
+		_main.talk.show_gains(true)
+		var listed: int = _main.talk._gains_list.get_child_count()
+		_check(_main.talk.showing_gains and listed == gains.lines.size(), "the talk panel's Gains lists them (%d of %d)" % [listed, gains.lines.size()])
+		_main.talk.show_gains(false)
+	clear.call()
+	var me: Player = _main._local_player()
+	if me != null:
+		var id: String = _main._id_of_player(me)
+		var sent: int = _main.rewards_sent
+		_check(_main.reward(id, {"track": "deed", "amount": 1, "at": Vector2i(3, 4)}) and _main.rewards_sent == sent + 1
+			and gains.lines.size() == 1 and gains.floats[0]["at"] == Vector2i(3, 4), "Main.reward tells the player; a cell for at arrives as one")
+		_check(not _main.reward(id, {"track": "regard", "amount": -1}) and not _main.reward("nobody", {"track": "regard", "amount": 1})
+			and _main.rewards_sent == sent + 1, "the server sends no loss, and nothing to no one")
+		clear.call()
+		_main._picked_gains(me, [{"id": "wood_bundle"}, {"id": "wood_bundle"}], 12)
+		var picked := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
+		_check(picked == ["+12 gold", "+2 " + Gains.counted(Items.name_of("wood_bundle"), 2)], "picked up: the gold, and each kind of thing counted (%s)" % [picked])
+		clear.call()
+		_main._discovered(me.owner_peer, me.zone)
+		_check(gains.lines.size() == 1 and gains.lines[0]["track"] == "explore" and str(gains.lines[0]["text"]).begins_with("+1 Wayfaring, "),
+			"a zone stood in the first time: +1 Wayfaring (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])
+	else:
+		print("  (no player in this scene: the server's checks skipped)")
+	clear.call()
+	gains.shown = shown_was
+	gains.has_cue = cue_was
+	gains.fighting = fight_was
