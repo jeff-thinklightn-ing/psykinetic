@@ -1244,6 +1244,17 @@ func _test_offering() -> void:
 	_check(economy.lift_below(TOWN, 100) == taken and economy.below_gold(TOWN) == 0, "robbers lift what is there, no more")
 	var saved := Economy.new(economy.to_dict(), stock, work, clock, _rules)
 	_check(saved.last_down_day(TOWN) == 3, "saved and loaded")
+	# The alms fall short (546 amended (2)): no gold down for more than alms_short_days.
+	var short_days := int(_rules["return"]["alms_short_days"])
+	_check(not economy.alms_short(TOWN), "gold went down today: the alms aren't short")
+	_now = (3 + short_days + 1) * DayNight.day_steps
+	_check(economy.alms_short(TOWN) and not economy.alms_short("nowhere/store"), "%d days on with none: short; a town with no priest never is" % (short_days + 1))
+	economy.altar_down(TOWN, 1)
+	_check(not economy.alms_short(TOWN), "a run lays gold down: not short")
+	var fresh := Economy.new({}, stock, work, clock, _rules)
+	_check(not fresh.alms_short(TOWN), "a priest first counted today: not short yet")
+	_check(Economy.new(fresh.to_dict(), stock, work, clock, _rules)._priest_since.get(TOWN) == fresh._priest_since.get(TOWN), "the day kept, saved and loaded")
+	_now = 3 * DayNight.day_steps
 	# The acolyte lives on the alms after the priest's share (546 amended).
 	work.add_worker("ac", "Pip", ["acolyte"], TOWN, "test", "steady")
 	var keep := int(_rules["return"]["acolyte"]["keep"])

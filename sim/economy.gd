@@ -134,6 +134,8 @@ var _landed: Dictionary = {}
 ## A rich resident's want the shelf couldn't meet, a commission for the
 ## next caravan (514 amended): town -> worker id.
 var _commissions: Dictionary = {}
+## The game day each town first had a priest (546 amended (2)): {town: day}; saved.
+var _priest_since: Dictionary = {}
 ## Each pond's fish (805): {pond place id: {fish, day}}, the day its count
 ## was last refilled to; saved.
 var _ponds: Dictionary = {}
@@ -879,6 +881,7 @@ func sell(player_id: String, town: String, id: String, is_fenced := false, at :=
 func tick() -> void:
 	_band_turn()
 	_wanderer_turn()
+	_priest_turn()
 	var folk: Dictionary = rules.get("folk", {})
 	var needs: Dictionary = folk.get("needs", {})
 	if needs.is_empty():
@@ -1781,6 +1784,31 @@ func below_gold(town: String) -> int:
 ## (the creep reads it: enemy-ai's).
 func last_down_day(town: String) -> int:
 	return int(_down_day.get(town, -1))
+
+
+## Whether [param town]'s alms have fallen short (546 amended (2); npc's 771
+## amended (5), lore's crypt.dead_rise: the dead come up when the alms fall
+## short): no gold gone down to its barrow altar for return.alms_short_days
+## game days, counted from the day it first had a priest; a run, or a player
+## keeping Aldous's promise, clears it. False for a town that never had one.
+func alms_short(town: String) -> bool:
+	_priest_turn()
+	var since := last_down_day(town)
+	if since < 0:
+		since = int(_priest_since.get(town, -1))
+	if since < 0:
+		return false
+	return now() / maxi(DayNight.day_steps, 1) - since > int(rules.get("return", {}).get("alms_short_days", 3))
+
+
+## Notes the day each town first has a priest (alms_short counts from it).
+func _priest_turn() -> void:
+	var trade := str(rules.get("return", {}).get("places", {}).get("temple", {}).get("trade", "priest"))
+	for id in production.worker_ids():
+		var who := production.worker(id)
+		var town := str(who.get("town", ""))
+		if not town.is_empty() and trade in who.get("trades", []) and not _priest_since.has(town):
+			_priest_since[town] = now() / maxi(DayNight.day_steps, 1)
 
 
 ## The draugr's deals (decision 573, economy's side): rules' return.field
@@ -2928,7 +2956,7 @@ func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
 		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
-		"commissions": _commissions.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true)}
+		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true)}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -2958,10 +2986,10 @@ func from_dict(saved: Dictionary) -> void:
 	if bands is Dictionary:
 		for barrow: Variant in bands:
 			_bands[str(barrow)] = maxi(int(bands[barrow]), 0)
-	for key: String in ["alms", "below", "down_day"]:
+	for key: String in ["alms", "below", "down_day", "priest_since"]:
 		var each: Variant = saved.get(key, {})
 		if each is Dictionary:
-			var into: Dictionary = {"alms": _alms, "below": _below, "down_day": _down_day}[key]
+			var into: Dictionary = {"alms": _alms, "below": _below, "down_day": _down_day, "priest_since": _priest_since}[key]
 			for town: Variant in each:
 				into[str(town)] = int(each[town])
 	var owed_what: Variant = saved.get("owed_what", {})

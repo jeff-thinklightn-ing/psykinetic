@@ -18247,6 +18247,15 @@ replicated property. dungeon's barrow swaps its stand-in for a
 monster_draugr marker in its level.json legend. monster_test
 (_test_draugr); level_test, protocol_test, builder_test unchanged.
 
+546 amended (2) (release's label; npc asked, for 771 amended (5): the barrow post's night waves bring
+the dead "while the robbers aren't cleared or the alms fall short"; lore's crypt.dead_rise): the alms
+fall short when no gold has gone down to the town's barrow altar for return.alms_short_days (3) game
+days. Economy.alms_short(town) counts from the last altar_down (last_down_day), or before any from
+the day the town first had a priest (Economy._priest_turn, saved as "priest_since"), so a fresh world
+is not short on its first night; a run, or a player keeping Aldous's promise, clears it. A town that
+never had a priest is never short. The dead rise, then, when the runs stop: the alms eaten by the
+wage, or the runner dead or kept away (a lever for players: keep the runner alive). larder_test
+_test_offering. Server only, protocol unchanged, no new class_name, no bullet.
 
 ## 546, npc's side: the crypt's people, and a speaker that is not a townsperson
 
