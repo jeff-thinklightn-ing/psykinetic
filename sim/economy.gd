@@ -42,6 +42,13 @@ signal contributed(town: String, player_id: String, kind: String, gold: int, xp:
 ## [param proceeds], [param wages] of it to its members (decision 504,
 ## for npc's road news: whether the wagon sold well).
 signal caravan_sold(id: String, town: String, market: String, proceeds: int, wages: int)
+## A wanderer is due at pond [param pond], where player [param player_id]
+## has been fishing a while (decision 805, the core loop's first slice):
+## enemy-ai spawns [param kind] ("boar" on a player's first visit, then
+## ponds.wanderer.then; "wolf" a pair) out of sight with a goal at
+## [param at], the cell their cast was made at (pond_cast). Once per pond
+## per player a game day, from Economy.tick.
+signal wanderer_due(pond: String, player_id: String, kind: String, at: Vector2i)
 
 const PATH := "res://levels/economy.json"
 const TREASURY := "the town"
@@ -127,6 +134,14 @@ var _landed: Dictionary = {}
 ## A rich resident's want the shelf couldn't meet, a commission for the
 ## next caravan (514 amended): town -> worker id.
 var _commissions: Dictionary = {}
+## Each pond's fish (805): {pond place id: {fish, day}}, the day its count
+## was last refilled to; saved.
+var _ponds: Dictionary = {}
+## Who is fishing where (805): {pond: {player id: {since, last}}}, the step
+## their first cast of this visit and their latest; not saved.
+var _anglers: Dictionary = {}
+## Wanderers sent (805): {pond: {player id: {count, day}}}; saved.
+var _wandered: Dictionary = {}
 const LOG_SIZE := 50
 
 
@@ -863,6 +878,7 @@ func sell(player_id: String, town: String, id: String, is_fenced := false, at :=
 ## worker's last_trade; Production.on_dole a signal.
 func tick() -> void:
 	_band_turn()
+	_wanderer_turn()
 	var folk: Dictionary = rules.get("folk", {})
 	var needs: Dictionary = folk.get("needs", {})
 	if needs.is_empty():
@@ -1613,7 +1629,8 @@ func visitor_arrives(town: String, entry: Dictionary) -> String:
 
 
 ## The starter vendor's sale (736; Jeff: "a vendor with the base weapons
-## for 1g each"): [param item] one of rules' vendor.wares, at vendor.price,
+## for 1g each"): [param item] one of rules' vendor.wares, at its own
+## "price" if it has one (805: the fishing rod, 3), else vendor.price,
 ## from [param player_id]'s purse. Outside every town: no stock, no
 ## treasury, no tax; the gold leaves the world. The caller mints the wares
 ## and marks them starter (World.mark_starter), which no buyer takes back.
@@ -1626,7 +1643,7 @@ func vendor_sale(player_id: String, item: String) -> Dictionary:
 			line = each
 	if line.is_empty():
 		return {"ok": false, "say": "I've none of that.", "gold": 0, "count": 0}
-	var cost := maxi(int(rule.get("price", 1)), 0)
+	var cost := maxi(int(line.get("price", rule.get("price", 1))), 0)
 	if gold(player_id) < cost:
 		return {"ok": false, "say": "That's %d gold, friend." % cost, "gold": 0, "count": 0}
 	if cost > 0:
@@ -2783,6 +2800,103 @@ func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 	return paid
 
 
+# --- Ponds (decision 805) ----------------------------------------------------------
+
+## economy.json "ponds": {fish, refill, catch, wanderer}.
+func pond_rule() -> Dictionary:
+	return rules.get("ponds", {})
+
+
+## Pond [param pond]'s fish now: ponds.fish to start, refilled ponds.refill
+## a game day up to ponds.fish.
+func pond_fish(pond: String) -> int:
+	var rule := pond_rule()
+	var most := int(rule.get("fish", 8))
+	var day := now() / maxi(DayNight.day_steps, 1)
+	if not _ponds.has(pond):
+		_ponds[pond] = {"fish": most, "day": day}
+	var entry: Dictionary = _ponds[pond]
+	if day > int(entry["day"]):
+		entry["fish"] = mini(int(entry["fish"]) + (day - int(entry["day"])) * int(rule.get("refill", 2)), most)
+		entry["day"] = day
+	return int(entry["fish"])
+
+
+## Player [param player_id]'s cast at pond [param pond] ends (805; items'
+## try_use "fish"): true, and one fish fewer in the pond, if it has any and
+## [param roll] (0..1, randf() if left out) falls under ponds.catch. Every
+## cast counts toward the visit that brings the wanderer.
+func pond_catch(pond: String, player_id: String, roll := -1.0) -> bool:
+	if pond.is_empty():
+		return false
+	_angling(pond, player_id)
+	var fish := pond_fish(pond)
+	if fish <= 0 or (roll if roll >= 0.0 else randf()) >= float(pond_rule().get("catch", 0.6)):
+		return false
+	_ponds[pond]["fish"] = fish - 1
+	return true
+
+
+## Player [param player_id] casts at pond [param pond] from cell
+## [param at] (805): call when a cast begins, so the wanderer's clock starts
+## at the first; the wanderer is sent to the latest cell.
+func pond_cast(pond: String, player_id: String, at := Vector2i.ZERO) -> void:
+	if not pond.is_empty():
+		_angling(pond, player_id, at)
+
+
+func _angling(pond: String, player_id: String, cell := Vector2i.ZERO) -> void:
+	if player_id.is_empty():
+		return
+	if not _anglers.has(pond):
+		_anglers[pond] = {}
+	var at := now()
+	var gap := int(pond_rule().get("wanderer", {}).get("visit_ends", 1800))
+	var visit: Dictionary = _anglers[pond].get(player_id, {})
+	if visit.is_empty() or at - int(visit["last"]) > gap:
+		var after: Array = pond_rule().get("wanderer", {}).get("after", [900, 1500])
+		var wait := randi_range(int(after[0]), int(after[-1])) if not after.is_empty() else 1200
+		visit = {"since": at, "due": at + wait, "sent": false}
+	visit["last"] = at
+	if cell != Vector2i.ZERO:
+		visit["at"] = cell
+	_anglers[pond][player_id] = visit
+
+
+## The wanderer's trigger (805): a player fishing at a pond since
+## wanderer.after steps ago, who had none there this game day (nor in the
+## last wanderer.cooldown days), gets one: "boar" first, then a pick from
+## wanderer.then. A visit with no cast for wanderer.visit_ends steps is over.
+func _wanderer_turn() -> void:
+	if _anglers.is_empty():
+		return
+	var rule: Dictionary = pond_rule().get("wanderer", {})
+	var at := now()
+	var day := at / maxi(DayNight.day_steps, 1)
+	for pond: String in _anglers.keys():
+		var by: Dictionary = _anglers[pond]
+		for player_id: String in by.keys():
+			var visit: Dictionary = by[player_id]
+			if at - int(visit["last"]) > int(rule.get("visit_ends", 1800)):
+				by.erase(player_id)
+				continue
+			if bool(visit["sent"]) or at < int(visit["due"]):
+				continue
+			visit["sent"] = true
+			var had: Dictionary = _wandered.get(pond, {}).get(player_id, {})
+			if not had.is_empty() and day - int(had["day"]) < maxi(int(rule.get("cooldown", 1)), 1):
+				continue
+			var count := int(had.get("count", 0))
+			var then: Array = rule.get("then", ["boar"])
+			var kind := str(rule.get("first", "boar")) if count == 0 or then.is_empty() else str(then[randi() % then.size()])
+			if not _wandered.has(pond):
+				_wandered[pond] = {}
+			_wandered[pond][player_id] = {"count": count + 1, "day": day}
+			wanderer_due.emit(pond, player_id, kind, visit.get("at", Vector2i.ZERO))
+		if by.is_empty():
+			_anglers.erase(pond)
+
+
 # --- Saving --------------------------------------------------------------------------
 
 ## For the snapshot: {purses: {player id: gold}, log}.
@@ -2790,7 +2904,7 @@ func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
 		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
-		"commissions": _commissions.duplicate()}
+		"commissions": _commissions.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true)}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -2831,6 +2945,13 @@ func from_dict(saved: Dictionary) -> void:
 		for id: Variant in owed_what:
 			if owed_what[id] is Array:
 				_owed_what[str(id)] = (owed_what[id] as Array).map(func(what: Variant) -> String: return str(what))
+	for key: String in ["ponds", "wandered"]:
+		var each: Variant = saved.get(key, {})
+		if each is Dictionary:
+			var into: Dictionary = _ponds if key == "ponds" else _wandered
+			for pond: Variant in each:
+				if each[pond] is Dictionary:
+					into[str(pond)] = (each[pond] as Dictionary).duplicate(true)
 	var commissions: Variant = saved.get("commissions", {})
 	if commissions is Dictionary:
 		for town: Variant in commissions:

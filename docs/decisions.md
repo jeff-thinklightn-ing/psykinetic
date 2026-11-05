@@ -41775,3 +41775,33 @@ Main.reward's path and its drops, picked-up gains, a zone's first stand).
 - Then {track "gold", words "Umbrage owes you 6 gold"} when the treasury could not pay, shown neutrally.
 The rise: town_regard "short" (2 halves) for what the town was short of, as before. New: "use" (1 half, REGARD_USE "brought %s the town can use") for a hand-in while the town held under twice its enough (the coordinator's ruling; ui backed it). So a useful hand-in always shows, and a pile far past enough only pays, at the lower price (Jeff's 45/10).
 Main._reward calls Main.reward (804's) and keeps the last 32 in rewards_given for tests. economy_test _test_town_window. Server only, no protocol change of its own (804's "reward"), no new class_name.
+## 805. The core loop's first slice: Wren wants to go fishing
+
+Jeff's loop, the coordinator's top priority: a town or companion has a need, the player works out
+where to go, gets past what is in the way, comes home, and the player and the companion are
+rewarded. The first slice is his own example, fishing; iron is the second. The parts, by tree: her
+want (companions: a want as a rung, "an afternoon fishing at the Reed Pond", her leisure 0..1 and a
+"fished" deed); the place (maps: the wilds' west pond at (30..34, 117..121), a "fishing" place
+"wilds/reed_pond" on its north bank at (32, 116), radius 3, and WorldNews.tell for a place named
+before it is seen; "The Reed Pond" is lore's name, waiting on Jeff); the gear and the cast (items:
+fishing_rod, fish, cooked_fish, try_use "fish" and the cook at a fire); the poses (pc-character); the
+wanderer (enemy-ai); the cues (sound); the floats and bars (ui's 804 rewards). Feeds: a shared cooked
+meal is company, fishing is leisure, donating together is pride, selling is nothing.
+
+Economy's side, in this entry: the pond's fish, the wanderer's trigger, and the rod's price at the
+starter stall. economy.json "ponds": a pond holds fish 8 to start and at most, gets refill 2 back a
+game day (counted lazily, on the day of the next read), and a cast catches while it has any on a roll
+under catch 0.6. Economy.pond_fish(pond), pond_catch(pond, player_id, roll) (one fish fewer on a
+catch; items puts the fish in the pack) and pond_cast(pond, player_id, at), called when a cast
+begins. Saved as "ponds" {pond: {fish, day}}. Shared later with the 594 fisherman, whose shore
+becomes his work place (npc). The wanderer: a player who has been fishing at a pond for
+wanderer.after 900-1500 steps (90-150 s, picked per visit; a visit ends with no cast for visit_ends
+1800) gets one, at most once a pond every cooldown 1 game day: "boar" on their first there, then a
+pick of then ["boar", "wolf"] (a wolf is a pair, enemy-ai's). Economy.tick sends wanderer_due(pond,
+player_id, kind, at), at the cell of their latest cast; enemy-ai spawns it out of sight with a goal
+there, never saved nor counted in herds or Balance. Saved as "wandered" {pond: {player: {count,
+day}}} so the first-boar rule and the cooldown hold over a restart; who is fishing now is not saved.
+A vendor.wares line may carry its own "price" (Economy.vendor_sale, Offers._vendor_offers): the
+fishing rod at 3 gold once items' row is in, the rest at vendor.price. economy_test _test_ponds.
+Server only, protocol unchanged, no new class_name, no bullet (nothing shows until the rod and the
+pond are in).

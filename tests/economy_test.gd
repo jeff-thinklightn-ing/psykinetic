@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_counter_raws()
 	_test_barter()
 	_test_vendor()
+	_test_ponds()
 	_test_maker_barter()
 	_test_barrow_charges()
 	_test_robbers_band()
@@ -182,6 +183,67 @@ func _test_vendor() -> void:
 		and economy.stockpile.count(TOWN, "gold") == treasury, "arrows for 1 gold, a bundle, no treasury's (%s)" % [sale])
 	_check(not economy.vendor_sale("p1", "crown")["ok"] and economy.gold("p1") == 2, "not one of its wares: refused")
 	_check(not economy.vendor_sale("p2", "sword")["ok"] and economy.gold("p2") == 0, "no gold: refused")
+
+
+## A pond's fish and its wanderer (805): 8 to start, a catch under 0.6
+## takes one, refilled 2 a game day up to 8 and saved; a player fishing past
+## wanderer.after gets one boar, then nothing more there that game day, and a
+## later visit another; the stall's rod at its own price.
+func _test_ponds() -> void:
+	print("
+== a pond: 8 fish, 2 a day back, a boar while you fish (805) ==")
+	var economy := _fresh()
+	economy.rules = economy.rules.duplicate(true)
+	economy.rules["ponds"] = Production.read_rules()["ponds"]
+	const POND := "wilds/test_pond"
+	_check(economy.pond_fish(POND) == 8, "a new pond holds 8 fish")
+	_check(not economy.pond_catch(POND, "p1", 0.7) and economy.pond_fish(POND) == 8, "a roll of 0.7: nothing, the pond keeps its fish")
+	for i in 8:
+		economy.pond_catch(POND, "p1", 0.1)
+	_check(economy.pond_fish(POND) == 0 and not economy.pond_catch(POND, "p1", 0.0), "8 caught: the pond is empty and a good roll catches nothing")
+	_now += DayNight.day_steps
+	_check(economy.pond_fish(POND) == 2, "a game day on: 2 fish back (%d)" % economy.pond_fish(POND))
+	_now += 10 * DayNight.day_steps
+	_check(economy.pond_fish(POND) == 8, "ten days on: full at 8, no more")
+	economy.pond_catch(POND, "p1", 0.1)
+	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, economy.rules, economy.catalog)
+	_check(again.pond_fish(POND) == 7, "saved and loaded: 7 fish")
+
+	var sent: Array = []
+	economy.wanderer_due.connect(func(pond: String, player_id: String, kind: String, at: Vector2i) -> void: sent.append([pond, player_id, kind, at]))
+	economy.pond_cast(POND, "p1", Vector2i(32, 116))
+	var start := _now
+	while _now - start < 1500:
+		_now += 300
+		economy.pond_cast(POND, "p1")
+		economy.tick()
+	_check(sent == [[POND, "p1", "boar", Vector2i(32, 116)]], "fishing 2.5 minutes: one boar sent to the cast's cell (%s)" % [sent])
+	for i in 6:
+		_now += 300
+		economy.pond_cast(POND, "p1")
+		economy.tick()
+	_check(sent.size() == 1, "fishing on: no second one")
+	_now += 2000
+	economy.tick()
+	economy.pond_cast(POND, "p1")
+	for i in 6:
+		_now += 300
+		economy.pond_cast(POND, "p1")
+		economy.tick()
+	_check(sent.size() == 1, "a new visit the same game day: none")
+	_now += DayNight.day_steps
+	economy.pond_cast(POND, "p1")
+	for i in 6:
+		_now += 300
+		economy.pond_cast(POND, "p1")
+		economy.tick()
+	_check(sent.size() == 2 and str(sent[1][2]) in ["boar", "wolf"], "the next game day, a second visit: another (%s)" % [sent])
+
+	economy.rules["vendor"] = {"price": 1, "wares": [{"item": "fishing_rod", "count": 1, "price": 3}, {"item": "arrows", "count": 1}]}
+	economy.add_gold("p3", 5, "test")
+	var rod := economy.vendor_sale("p3", "fishing_rod")
+	_check(rod["ok"] and int(rod["gold"]) == 3 and economy.gold("p3") == 2 and int(economy.vendor_sale("p3", "arrows")["gold"]) == 1,
+		"the stall's rod at its own 3 gold, arrows still 1 (%s)" % [rod])
 
 
 func _test_barter() -> void:

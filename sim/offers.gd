@@ -394,6 +394,7 @@ static func _vendor_offers(worker_id: String, given: Dictionary) -> Array[Dictio
 		if item.is_empty():
 			continue
 		var name := str(catalog.get(item, {}).get("name", item.replace("_", " "))) if catalog is Dictionary else item.replace("_", " ")
+		price = int(line.get("price", rule.get("price", 1)))  # A ware's own price (805: the fishing rod, 3).
 		var thing := name if item == "arrows" or name.ends_with("s") else Companion._a(name)
 		out.append(_offer(worker_id, VENDOR_WARES, item, "%s, %d gold" % [_upper_first(thing), price],
 			"%s for %d gold, for the road. Mind, no one will buy it back off you." % [_upper_first(thing), price], {"item": item, "price": price}, VENDOR_WARES, price))
