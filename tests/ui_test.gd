@@ -2451,6 +2451,9 @@ func _test_gains() -> void:
 	gains.add({"track": "deed", "amount": 1, "of": "Wren", "big": true, "banner": "Wren is content"})
 	_check(gains.cues.back()[0] == Gains.WANT_CUE and gains.banners.size() == 1, "a big deed: the want cue and a banner")
 	clear.call()
+	_check(Main.mid_line("The Ossuary") == "the Ossuary" and Main.mid_line("The Tavern, upstairs") == "the Tavern, upstairs"
+		and Main.mid_line("Umbrage") == "Umbrage" and Main.mid_line("Theodric's hall") == "Theodric's hall",
+		"a place mid-sentence: a small \"the\", the rest as it is (voice's)")
 	gains._need_frame = -1
 	gains._other_frame = -1
 	# A rest meets three of her needs in one frame (sound's ask): one need cue, at the frame's end.

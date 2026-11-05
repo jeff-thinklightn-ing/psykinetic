@@ -3268,6 +3268,12 @@ func _local_player() -> Player:
 	return null
 
 
+## A place's name in mid-sentence (voice's): a leading "The " small ("The
+## Ossuary": "the Ossuary"), the rest as it is; one with no article unchanged.
+static func mid_line(name: String) -> String:
+	return "the " + name.trim_prefix("The ") if name.begins_with("The ") else name
+
+
 ## The entity whose sprite is under the cursor, or null. Sprites stand taller
 ## than their tile, so pointing at a body would otherwise hit the tile behind
 ## it. Where sprites overlap, the one drawn in front (lower on screen) wins.
@@ -4789,7 +4795,7 @@ func _move_command(words: PackedStringArray) -> String:
 	var moved: Player = _players.get(peer)
 	var landed: Vector2i = moved.tile if is_instance_valid(moved) else cell
 	var place := str(Level.load_level(zone_name).get("display_name", zone_name))
-	Net.broadcast_to([peer], "party", {"from": "Server", "text": "You find yourself in %s." % (place if not place.is_empty() else zone_name)})
+	Net.broadcast_to([peer], "party", {"from": "Server", "text": "You find yourself in %s." % mid_line(place if not place.is_empty() else zone_name)})
 	print("[admin] moved %s to %s in %s" % [who, landed, zone_name])
 	return "moved %s to %s in %s%s" % [who, landed, zone_name, "" if landed == target else " (nearest walkable to %s)" % target]
 
@@ -4929,7 +4935,7 @@ func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.N
 	if to_spawn == "from_below":
 		_reveal_from_below(to_map)  # The hidden door pushed open from behind (608).
 	print("[zone] %s went from %s to %s" % [record.name, from_name, to_map])
-	party_log.add("%s went to %s." % [record.name, str(level.get("display_name", to_map))])
+	party_log.add("%s went to %s." % [record.name, mid_line(str(level.get("display_name", to_map)))])
 	World.enter(World.home())
 	return true
 
