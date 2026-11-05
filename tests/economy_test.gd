@@ -756,6 +756,36 @@ func _test_person_takes(host: Player) -> void:
 	_check(gift.size() == 1 and _main.rewards_given.back()["data"].get("worker") == Offers.VENDOR + STORE
 		and str(_main.rewards_given.back()["data"]["words"]).begins_with("Rolf takes"), "the sword to the keeper, a gift (%s)" % [_main.rewards_given.back()["data"]])
 	_check(_main.give_to(host, carp, "Cora", [sword_uid]).is_empty(), "a thing no longer theirs: nothing given")
+
+	# The store chest refuses players (802 amended (3)), saying who takes it, in voice's words.
+	_check(_main.depot_pointer(STORE, "wood_bundle") == "Wood goes to the carpenter." and _main.depot_pointer(STORE, "sword") == "That goes to Rolf at the stall.",
+		"the pointers: wood to the carpenter, gear to Rolf (%s, %s)" % [_main.depot_pointer(STORE, "wood_bundle"), _main.depot_pointer(STORE, "sword")])
+	# A thing held is never offered as a gift (802 amended (4); playtest's pick in hand).
+	_main._hand_item(me, "sword", "test")
+	var packed: int = Array(host.slots).find("sword")
+	if packed != Items.RIGHT_HAND and str(host.slots[Items.RIGHT_HAND]).is_empty():
+		World.try_transfer(host, host, packed, host, Items.RIGHT_HAND)
+	var into_hand: bool = str(host.slots[Items.RIGHT_HAND]) == "sword"
+	var offered: Array = _main.person_takes(host, Offers.VENDOR + STORE)
+	_check(into_hand and str(host.slots[Items.RIGHT_HAND]) == "sword"
+		and not offered.any(func(row: Dictionary) -> bool: return int(row["slot"]) == Items.RIGHT_HAND),
+		"a sword in hand: not offered to the keeper (%s; slots %s)" % [offered.map(func(row: Dictionary) -> String: return "%s@%d" % [row["what"], row["slot"]]), Array(host.slots)])
+	World.economy.rules["vendor"] = {}
+	_check(_main.depot_pointer(STORE, "sword") == "Nobody here takes that.", "no stall here: nobody takes gear")
+	_main._hand_item(me, "wood_bundle", "test")
+	var chest := Chest.new()
+	chest.depot = true
+	chest.tile = World.holdings.place(STORE)["cell"]
+	chest.zone = host.zone
+	var told: Array = []
+	var hear := func(by: GridEntity, why: String) -> void: told.append(why)
+	World.slot_refused.connect(hear)
+	var slot := Array(host.slots).find("wood_bundle")
+	var before := World.stockpile.count(STORE, "wood")
+	_check(not World._bank(host, host, slot, chest) and World.stockpile.count(STORE, "wood") == before and host.slots[slot] == "wood_bundle"
+		and told == ["Wood goes to the carpenter."], "a player's wood at the store chest: refused, kept, told who takes it (%s)" % [told])
+	World.slot_refused.disconnect(hear)
+	chest.free()
 	World.economy.rules["vendor"] = vendor
 
 

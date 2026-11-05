@@ -41814,6 +41814,19 @@ pick, the give, no toggle for none); controls_test's friend click (the window, n
 frees the keys). CHANGELOG bullet (voice's words, one for the window and economy's give). Client
 only, protocol unchanged by this side (economy's give, rev 50), no new class_name.
 
+802 amended (4) (release's label; Jeff, 2026-11-05: "i dont want items turned into a 'chest' -
+always a trader/npc"; the coordinator: chests refuse players once the give lands): a town's store
+and depot chests no longer take a player's things. World._bank asks World.depot_pointer (a Callable
+Main sets) when a Player is the one banking, and refuses with its line through slot_refused: the
+person to take it to, from voice's table in economy.json receives.pointers (one line per raw and per
+trade: "Wood goes to the carpenter."; gear, "That goes to Rolf at the stall."; none, "Nobody here
+takes that."). Main.depot_pointer(town, id) reads receives the way receiver_for does. Residents,
+carts and the town's own moves still bank as before; only a player's hand is turned to a person.
+economy_test (the pointer lines, World._bank refused at an unspawned depot chest); stockpile_test tests the bank with no pointer, then _test_player_refused. Server only,
+protocol unchanged (slot_refused's words ride its message), no new class_name. The Give tab offers
+gear as a gift only from the pack's slots (Items.PACK_SLOTS), never a thing held or worn (playtest's
+give tour listed a pick in hand for Rolf); economy_test checks a sword in hand.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

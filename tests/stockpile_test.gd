@@ -39,6 +39,7 @@ func _ready() -> void:
 	await _test_hauling()
 	await _test_cart()
 	_test_old_and_odd_snapshots()
+	_test_player_refused()
 
 	remove_child(_main)
 	_main.free()
@@ -83,6 +84,9 @@ func _boot() -> void:
 	World.holdings.rebind(WorldMap.build(names))
 	for i in 3:
 		World.step()
+	# The bank itself, as it was a player's hand that tests it here: since 802 amended (4)
+	# Main turns a player's hand to a person (World.depot_pointer); _test_player_refused.
+	World.depot_pointer = Callable()
 
 
 func _test_boot() -> void:
@@ -262,6 +266,25 @@ func _test_hauling() -> void:
 	World.try_drop(host, _slot_of(host, "ore_sack"))
 	await get_tree().process_frame
 	_check(stock.count(STORE, "ore") == ore + 15 and World.ground_at(host.tile).is_empty(), "the town takes it back: picked up and put down, it's banked")
+
+
+## 802 amended (4): with Main's pointer, a player's hand is refused at the
+## depot and told who takes the thing; it stays in the pack.
+func _test_player_refused() -> void:
+	print("
+== a player's things go to a person, not the depot (802 amended (4)) ==")
+	World.depot_pointer = _main.depot_pointer
+	var host := _player(Net.local_id)
+	World._relocate(host, Vector2i(5, 3))
+	_main._hand_item(host.player_id, "bandaging_kit", "test")
+	var at := Array(host.slots).find("bandaging_kit")
+	var refused := []
+	var heard := func(by: Node, why: String) -> void: refused.append(why)
+	World.slot_refused.connect(heard)
+	_check(at >= 0 and not World.try_transfer(host, host, at, _entity("Depot1"), 0) and Array(host.slots)[at] == "bandaging_kit"
+		and not refused.is_empty(), "refused, the kit kept, a pointer said (%s)" % [refused])
+	World.slot_refused.disconnect(heard)
+	World.depot_pointer = Callable()
 
 
 func _test_cart() -> void:

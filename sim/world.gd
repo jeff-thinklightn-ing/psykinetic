@@ -4450,6 +4450,12 @@ func _bank(by: GridEntity, from: GridEntity, from_slot: int, depot: GridEntity) 
 			or yields.keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
 		_log("slots: %s refused %s: no stockpile the town holds there" % [depot.name, item])
 		return false
+	if by is Player and depot_pointer.is_valid():
+		# Hand-ins go to people (802 amended (3); Jeff: not a chest): a player's thing is
+		# refused at a town's store chest, told who takes it (Main.depot_pointer, voice's).
+		slot_refused.emit(by, str(depot_pointer.call(place, item)))
+		_log("slots: %s refused %s from %s: hand-ins go to people" % [depot.name, item, by.name])
+		return false
 	var uid := slot_uid(from, from_slot)
 	if not yields.is_empty() and items.is_grave(uid) and owner_of(by).begins_with("player:"):
 		_log("slots: %s refused %s: grave goods, only the fence takes them" % [depot.name, item])  # 586.
@@ -4483,6 +4489,12 @@ func donate(by: GridEntity, uid: int, place: String) -> bool:
 	_log("slots: %s donated %s from %d at %s" % [by.name, item, slot, place])
 	_slots_changed(by)
 	return true
+
+
+## Main's words for a player's thing refused at a town's store chest (802
+## amended (3)): (place, item id) -> String. Unset, players bank there as
+## gatherers do (a world with no Main: tests).
+var depot_pointer := Callable()
 
 
 ## True while a depot banks (World._bank), for handed_in's words.

@@ -1196,6 +1196,7 @@ func _go_online() -> void:
 		World.gold_changed.connect(_on_gold_changed)
 		World.traded.connect(_on_traded)
 		World.handed_in.connect(_on_handed_in)  # 804, economy's side: a hand-in thanked.
+		World.depot_pointer = depot_pointer  # 802 amended (3): a store chest refuses players, saying who takes it.
 		World.slot_refused.connect(_on_slot_refused)
 		BuilderHost.warn_overlays()
 		if BuilderHost.available():
@@ -7403,7 +7404,7 @@ const BANDAGE_REFUSED := {"not_beside": "You can't bandage %s: come within two s
 func _on_slot_refused(by: GridEntity, why: String) -> void:
 	var peer := by.owner_peer if by is Player else by.keeper_peer
 	if peer != 0:
-		Net.broadcast_to([peer], "party", {"from": "Server", "text": why[0].to_upper() + why.substr(1) + "."})
+		Net.broadcast_to([peer], "party", {"from": "Server", "text": why[0].to_upper() + why.substr(1).trim_suffix(".") + "."})
 
 
 func _on_traded(by: GridEntity, shop: GridEntity, why: String) -> void:
@@ -14955,7 +14956,9 @@ func person_takes(player: Player, worker: String) -> Array:
 				continue
 			row = give_outcome(town, player_id, raw, int(yields[raw]) * count)
 			row["raw"] = raw
-		elif worker.begins_with(Offers.VENDOR) and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
+		elif worker.begins_with(Offers.VENDOR) and slot in Items.PACK_SLOTS and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
+			# Gear only from the pack (802 amended (4); playtest: a tool in hand was offered
+			# as a gift): never what is held or worn.
 			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "owed": 0}  # A gift: "for" empty (ui).
 			var tags: Array = Items.def(id).get("tags", [])
 			for each: Dictionary in town_stock(town):
@@ -14971,6 +14974,27 @@ func person_takes(player: Player, worker: String) -> Array:
 		row["count"] = count
 		out.append(row)
 	return out
+
+
+## Voice's words for item [param id] refused at [param town]'s store chest
+## (802 amended (3)): who takes it there ("Ore goes to the smith."; gear,
+## or a raw only the stall's keeper takes, "That goes to Rolf at the
+## stall."), else "Nobody here takes that.".
+func depot_pointer(town: String, id: String) -> String:
+	var words: Dictionary = World.economy.rules.get("receives", {}).get("pointers", {}) if World.economy != null else {}
+	var nobody := str(words.get("nobody", "Nobody here takes that."))
+	var yields := Items.yield_of(id)
+	var raw := str(yields.keys()[0]) if not yields.is_empty() else ""
+	var worker := receiver_for(town, raw) if not raw.is_empty() else (Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else "")
+	if worker.is_empty():
+		return nobody
+	if worker.begins_with(Offers.VENDOR):
+		return str(words.get("keeper", "That goes to %s at the stall.")) % str(World.economy.rules.get("vendor", {}).get("name", "Rolf"))
+	var trades: Array = World.production.worker(worker).get("trades", [])
+	for trade: String in words.get(raw, {}):
+		if trade in trades:
+			return str(words[raw][trade])
+	return nobody
 
 
 ## A building kind in words ("healers_hut" -> "healers hut").
