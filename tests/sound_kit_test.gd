@@ -378,6 +378,20 @@ func _test_ambience_weights() -> void:
 			and not SoundKit.takes("amb.mine_tunnel").is_empty() and not SoundKit.takes("amb.mine_chamber").is_empty(), "the mine's beds: everywhere, with takes")
 	_check(SoundKit.reach("sfx.pick_strike") >= Ambience.DRIP_FAR and SoundKit.reach("amb.mine_drip") >= Ambience.DRIP_FAR
 			and SoundKit.reach("amb.timber_creak") >= Ambience.TIMBER_NEAR, "a drop heard from as far as it falls, a creak from its nearest timber")
+	# A beast's cave (795 amended): its own bed, never the crypt's or a mine's.
+	var lair := Ambience.weights("cave", false, 1.0, 12.0, clear, 0.0, 0.0, 0.0, -1.0, "cave_lair")
+	_check(lair["amb.lair_cave"] == 1.0 and lair["amb.dungeon"] == 0.0 and lair["amb.mine_tunnel"] == 0.0 and lair["amb.mine_chamber"] == 0.0,
+			"in a cave_lair: the lair's bed alone (%s)" % [lair])
+	_check(Ambience.weights("cave", false, 1.0, 12.0, clear, 0.0)["amb.lair_cave"] == 0.0
+			and Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 0.0, 0.0, -1.0, "thicket")["amb.forest_day"] > 0.0,
+			"no ambience key: no lair bed; a thicket under the sky: the forest's beds as outside")
+	var said: Array[String] = []
+	_check(Level.ambience_from({"ambience": "cave_lair"}, said) == "cave_lair" and Level.ambience_from({}, said) == "" and said.is_empty()
+			and Level.ambience_from({"ambience": "cavern"}, said) == "" and said.size() == 1,
+			"level.json's ambience: cave_lair read, none \"\", an unknown one \"\" and said (%s)" % [said])
+	_check(not SoundKit.positional("amb.lair_cave") and not SoundKit.takes("amb.lair_cave").is_empty()
+			and SoundKit.positional("amb.skylight_air") and SoundKit.noise("amb.skylight_air") == "" and SoundKit.takes("amb.skylight_air").size() >= 2
+			and SoundKit.reach("amb.skylight_air") <= 6, "the lair's bed everywhere; the skylight's air placed, near (%d), takes of its own" % SoundKit.reach("amb.skylight_air"))
 	_check(noon["amb.forest_deep_day"] == 0.0 and noon["amb.rain_canopy"] == 0.0 and noon["amb.drips"] == 0.0,
 			"no canopy: no deep forest, no crowns, no drips")
 	var deep := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 1.0)

@@ -1730,6 +1730,23 @@
 			"volume_db": -20.0,
 			"uses": "a mine's wall lamp, its soft flame (769 amended (4)); Ambience, from the nearest mine_lamp heard"
 		},
+		"amb.lair_cave": {
+			"category": "ambience",
+			"type": "bed",
+			"bus": "ambience",
+			"positional": false,
+			"volume_db": -18.0,
+			"uses": "a beast's cave (level.json \"ambience\": \"cave_lair\", 795 amended): low, close air, heavier than a mine's, no steady tone; a bed in place of the crypt's, Ambience.weights"
+		},
+		"amb.skylight_air": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 5,
+			"volume_db": -22.0,
+			"uses": "the outside's faint air through a gap in a cave's roof (797's skylights; 795 amended): wind in leaves, from the nearest skylight heard"
+		},
 		"sfx.pick_strike": {
 			"category": "world",
 			"type": "oneshot",

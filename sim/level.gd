@@ -847,6 +847,8 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 			"border": str(config.get("border", "forest")),
 			# Indoors, what is drawn over the void: "" (black) or "rock" (769).
 			"mass": str(config.get("mass", "")),
+			# How it sounds, past its zone: "" or a lair's (795 amended).
+			"ambience": ambience_from(config, warnings),
 		},
 		"size": cells,
 		"warnings": warnings,
@@ -1610,6 +1612,21 @@ static func clearings_from(config: Dictionary, warnings: Array[String]) -> Array
 		else:
 			warnings.append("a clearing in level.json is not {centre: [x, y], radius}: left out (%s)" % [entry])
 	return out
+
+
+## level.json's "ambience" (795 amended): how the level sounds where its
+## zone alone would not say, one of AMBIENCES ("" its zone's, "cave_lair" a
+## beast's cave, "thicket" a lair under the sky); another is said in
+## [param warnings] and taken as "". Read by the client's Ambience.
+const AMBIENCES: Array[String] = ["", "cave_lair", "thicket"]
+
+
+static func ambience_from(config: Dictionary, warnings: Array[String]) -> String:
+	var ambience := str(config.get("ambience", ""))
+	if ambience in AMBIENCES:
+		return ambience
+	warnings.append("level.json's \"ambience\" is not one of %s: left as the zone's (%s)" % [AMBIENCES, ambience])
+	return ""
 
 
 ## level.json's "skylights", [{at: [x, y], radius}] (decision 797): a gap

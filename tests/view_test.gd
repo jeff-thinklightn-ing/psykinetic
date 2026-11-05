@@ -1195,6 +1195,22 @@ func _test_mine_sounds() -> void:
 	_rig.ambience._mine_terrain = {}
 	_rig.ambience._weigh()
 	_check(hiss == null or not hiss.playing, "no mine: no lamp")
+	# A skylight (797; 795 amended): the outside's faint air from the gap.
+	var had_skylights: Variant = _rig._terrain.get("skylights")
+	_rig._terrain["skylights"] = [{"at": listener + Vector2i(2, 0), "radius": 2.0}]
+	_rig.ambience._mine_terrain = {}
+	_rig.ambience._weigh()
+	var air: AudioStreamPlayer3D = _rig.ambience.points.get("amb.skylight_air")
+	_check(SoundKit.files("amb.skylight_air").is_empty() or air != null and air.playing, "under a skylight: the outside's air")
+	_rig._terrain["skylights"] = [{"at": listener + Vector2i(SoundKit.reach("amb.skylight_air") + 3, 0), "radius": 2.0}]
+	_rig.ambience._mine_terrain = {}
+	_rig.ambience._weigh()
+	_check(air == null or not air.playing, "a skylight out of reach: no air")
+	if had_skylights == null:
+		_rig._terrain.erase("skylights")
+	else:
+		_rig._terrain["skylights"] = had_skylights
+	_rig.ambience._mine_terrain = {}
 	_rig.sfx.hear_everything = hear_was
 
 

@@ -81,7 +81,7 @@ const SILENT := 0.01
 const BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
 	"amb.rain", "amb.storm", "amb.dungeon", "amb.town_day", "amb.town_night",
 	"amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips",
-	"amb.mine_tunnel", "amb.mine_chamber"]
+	"amb.mine_tunnel", "amb.mine_chamber", "amb.lair_cave"]
 ## A mine (769 amended (4)): a level whose decor has a mine's pieces. Under
 ## it no amb.dungeon (the crypt's cave bed): a near-silent tunnel's air or a
 ## chamber's, by how open the floor round the listener is (openness: the
@@ -100,6 +100,11 @@ const CREAK_SECONDS := 40.0
 const DRIP_NEAR := 3
 const DRIP_FAR := 10
 const TIMBER_NEAR := 8
+## A beast's cave (level.json "ambience": "cave_lair", 795 amended): its own
+## bed, amb.lair_cave, in place of the crypt's or a mine's, and the mine's
+## drops LAIR_DRIP_SLOWER times as rarely. Any level's skylights (797) let
+## in the outside's faint air, amb.skylight_air, from the nearest heard.
+const LAIR_DRIP_SLOWER := 2.0
 ## Beds of the open air: muffled under a roof.
 const OUTDOOR_BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
 	"amb.rain", "amb.storm", "amb.forest_deep_day", "amb.forest_deep_night", "amb.rain_canopy", "amb.drips"]
@@ -125,9 +130,12 @@ var _stream_paths: Array = []
 var _falls := {}
 var _fall_list: Array = []
 var _since_weigh := INF
-## The terrain the mine's parts were read from, and those parts (mine_parts).
+## The terrain the mine's parts were read from, and those parts (mine_parts);
+## from the same terrain, its floor (cell -> true) and its skylights' cells.
 var _mine_terrain: Dictionary = {}
 var _mine := {}
+var _floor: Dictionary[Vector2i, bool] = {}
+var _skylights: Array[Vector2i] = []
 
 
 func _process(delta: float) -> void:
@@ -163,8 +171,12 @@ func _weigh() -> void:
 	var canopy := view._canopy_cover
 	var drip := Weather.drip_at(World.fields.region, steps, canopy) if World.fields != null else 0.0
 	var mine := _mine_of()
+	var lair := str(view._terrain.get("ambience", ""))
 	targets.assign(weights(zone, under_sky, DayNight.daylight(steps), DayNight.hour(steps), weather, _town_nearness(cell),
-			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0))
+			canopy, drip, openness(mine["floor"], cell) if not mine.is_empty() else -1.0, lair))
+	if lair == "cave_lair" and randf() < WEIGH_EVERY / (DRIP_SECONDS * LAIR_DRIP_SLOWER):
+		_drip(cell, _floor)
+	_place_point("amb.skylight_air", _skylights, cell)
 	_place_torch(cell)
 	var lamps: Array[Vector2i] = []
 	if not mine.is_empty():
@@ -190,9 +202,10 @@ func _weigh() -> void:
 ## [param town] (0..1: how near a town's buildings), under a forest's
 ## [param canopy] (0..1: its cover round the view) with its [param drip]
 ## (0..1, Weather.drip_at); in a mine (769 amended (4)) [param mine_open]
-## its openness there (0 a tunnel .. 1 a chamber), else below 0.
+## its openness there (0 a tunnel .. 1 a chamber), else below 0; under
+## level.json's [param lair] "ambience" (795 amended) "cave_lair", its bed.
 static func weights(zone: String, under_sky: bool, daylight: float, hour: float, weather: Dictionary, town: float,
-		canopy := 0.0, drip := 0.0, mine_open := -1.0) -> Dictionary:
+		canopy := 0.0, drip := 0.0, mine_open := -1.0, lair := "") -> Dictionary:
 	var out := {}
 	for bed in BEDS:
 		out[bed] = 0.0
@@ -219,6 +232,8 @@ static func weights(zone: String, under_sky: bool, daylight: float, hour: float,
 		if not under_sky:
 			for bed in OUTDOOR_BEDS:
 				out[bed] = out[bed] * ROOFED
+	elif lair == "cave_lair":
+		out["amb.lair_cave"] = 1.0
 	elif mine_open >= 0.0:
 		out["amb.mine_tunnel"] = 1.0 - mine_open
 		out["amb.mine_chamber"] = mine_open
@@ -272,6 +287,12 @@ func _mine_of() -> Dictionary:
 	if not is_same(_mine_terrain, view._terrain):
 		_mine_terrain = view._terrain
 		_mine = mine_parts(view._terrain)
+		_floor.clear()
+		for at: Vector2i in view._terrain.get("floor", []):
+			_floor[at] = true
+		_skylights.clear()
+		for skylight: Dictionary in view._terrain.get("skylights", []):
+			_skylights.append(skylight["at"])
 	return _mine
 
 

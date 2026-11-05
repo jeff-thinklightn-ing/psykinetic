@@ -170,6 +170,17 @@
 				"sha256": "bdef45c37f9f5be3659cbce572bb430991006ef1d8f70418de025b816fd88395"
 			}
 		],
+		"amb.lair_cave": [
+			{
+				"file": "amb.lair_cave.ogg",
+				"from": "freesound",
+				"original": "freesound 164785: INT Cave Room tone.wav (from 4 s for 90 s)",
+				"sha256": "66ae8fdfdd34a8190916cfae7cda966695912a2b47eadb03e791517561201239",
+				"by": "deleted_user_2104797",
+				"url": "https://freesound.org/people/deleted_user_2104797/sounds/164785/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.lamp_hiss": [
 			{
 				"file": "amb.lamp_hiss.ogg",
@@ -305,6 +316,26 @@
 				"by": "Arctura",
 				"url": "https://freesound.org/people/Arctura/sounds/34073/",
 				"license": "CC BY 3.0"
+			}
+		],
+		"amb.skylight_air": [
+			{
+				"file": "amb.skylight_air.ogg",
+				"from": "freesound",
+				"original": "freesound 676801: 2023 leaves snow wind forest_MIXPRE-759.wav (from 4 s for 36 s)",
+				"sha256": "a09a1fc0cfbc296530e0c20fe59590f4bc9ac86b6d096dbc7f715f94a5c78086",
+				"by": "peterkotrha",
+				"url": "https://freesound.org/people/peterkotrha/sounds/676801/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.skylight_air.2.ogg",
+				"from": "freesound",
+				"original": "freesound 723569: Riverdale south wind (from 36 s for 28 s)",
+				"sha256": "29d0c9d91a693664be6b7702d8a3f1faf2ee06d2cea42a0eca521d775342001c",
+				"by": "SoundsLikeYukon",
+				"url": "https://freesound.org/people/SoundsLikeYukon/sounds/723569/",
+				"license": "CC0 1.0"
 			}
 		],
 		"amb.storm": [
