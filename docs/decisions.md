@@ -40375,6 +40375,23 @@ scripted stance at her player's fall may drop her quarry first. companion_test _
 Server only, protocol unchanged (intent not replicated), no new class_name; no bullet (no level has
 a bear).
 
+780 amended (8): the bear tuned for one to three (enemy-ai, 2026-11-04; combat's draft from
+playtest's bear_yard runs, the coordinator's ruling; release's label). Playtest's players fell to
+an untold plain blow (attack_damage 5 a second), not to the moves: a player is a free body, kept on
+its cell till its centre is FREE_HYSTERESIS past the edge, so one 2 cells off stood in the bear's
+reach (World.in_reach, 1.5) while GreatBear._special_tick took only a foe 1 off, and Monster's
+plain fight struck. Now a foe it can touch (1 off, or in reach) gets a swipe or a slam, and
+_foes_beside counts the same way: every blow is told, as 780 meant (combat: no cuff). A plain blow
+that ever lands logs "[apex] great_bear blow <kind> <damage>", a tripwire the tours keep at 0.
+Swipe damage 7 to 6 (three tells still down a fresh player, two do not). Its party: the players who
+join its fight, once they strike it, are struck by it or are a tell's target (never a companion),
+"most" 3; each past the first adds "hp_per_player" 0.6 of its base (90, 144, 198), its hp kept in
+the same share; a newcomer raises it once, none leaving lowers it; asleep it is its base again.
+GreatBear.party_size and .party (the row's whole "party" block, which Monster.kinds now keeps) are
+read by combat's flank guard (780 amended (9), flank_guard_per_player 25). An "[apex] ... party N"
+line when it changes. monster_test _test_bear_party. Server only, protocol unchanged, no new
+class_name; no bullet (the bear lives in bear_yard only).
+
 ## 781. The mind log keeps no player names
 
 Release's rule, after 616 amended's review: mind.log (MindLog, the companion and resident minds'

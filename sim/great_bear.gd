@@ -33,6 +33,17 @@ extends Animal
 ## flank-marked, World.telegraph's flank, combat's 780 side) breaks the move off, its telegraph ended unlanded. Every move logs "[apex]"
 ## with its end and the bear's hp, never a player's name.
 ##
+## Every blow is told (780 amended (8)): a foe it can touch (beside it, or
+## a free body within its body's reach, 2 cells off) gets a swipe or a slam,
+## never a plain blow; "[apex] ... blow" logs one if it ever lands.
+##
+## Its party (780 amended (8), combat's draft, the coordinator's ruling):
+## the players who join its fight, once they strike it, are struck by it or
+## are a tell's target (companions never count), PARTY "most" at most. Its
+## hp grows by "hp_per_player" of its base for each past the first, its hp
+## kept in the same share; each newcomer raises it once, none leaving lowers
+## it; asleep, it is its base again. Combat's flank guard reads party_size.
+##
 ## Read from afar (780 amended (2)): its roar is told to players
 ## out of sight within ROAR_REACH (World.far_cry: sound's "far_cry"), and it
 ## leaves prints as it walks, one each TRACK_STRIDE cells (World.mark_track:
@@ -57,10 +68,12 @@ const TRACK_STRIDE := 2
 ## mine; drafts, tuned from playtest's runs): ticks to land, its
 ## shape, damage, impulse (physics' kg x speed: 140 pushes a player 2
 ## cells), and the ticks before it may use the move again.
-const SWIPE := {"windup": 6, "length": 2.0, "half_angle": 60.0, "damage": 7, "impulse": 140.0, "every": 15}
+const SWIPE := {"windup": 6, "length": 2.0, "half_angle": 60.0, "damage": 6, "impulse": 140.0, "every": 15}
 const SLAM := {"windup": 12, "length": 1.5, "damage": 9, "impulse": 100.0, "down": 15, "every": 50}
 const CHARGE := {"roar": 8, "cells": 6, "from": 3, "damage": 8, "impulse": 140.0, "every": 80}
 ## The moves as this bear has them: the defaults with its row's "moves" over them.
+## Its party's numbers, the defaults under the row's "party" block.
+const PARTY := {"hp_per_player": 0.0, "most": 3}
 var swipe := SWIPE.duplicate()
 var slam := SLAM.duplicate()
 var charge := CHARGE.duplicate()
@@ -88,11 +101,23 @@ var _last_tile := NO_TILE
 var _strides := 0
 ## The tick it was winded at, -1 while it is not (its "recovers" line).
 var _winded_at := -1
+## The players it is fighting on its ground (780 amended (8)); 1 out of a fight.
+var party_size := 1
+var party := PARTY.duplicate()
+## Its max_hp for one player (its row's).
+var _base_hp := 0
+## The players who joined its fight: instance id -> true.
+var _joined: Dictionary[int, bool] = {}
 
 
 func _ready() -> void:
 	super()
 	den = home if home != NO_TILE else tile
+	_base_hp = max_hp
+	var given_party: Variant = Monster.kinds().get(_kind(), {}).get("party", {})
+	if given_party is Dictionary:
+		for key: String in given_party:
+			party[key] = float(given_party[key])  # The whole block (combat's flank_guard_per_player reads it too).
 	var moves: Variant = Monster.kinds().get(_kind(), {}).get("moves", {})
 	if moves is Dictionary:
 		for move: String in ["swipe", "slam", "charge"]:
@@ -143,6 +168,38 @@ func _sim_tick() -> void:
 		_roared_fight = false
 
 
+## [param entity] joins its fight (a player striking it, struck by it, or a
+## tell's target): its party grows by one, PARTY "most" at most.
+func _join(entity: GridEntity) -> void:
+	if not entity is Player or not is_instance_valid(entity) or entity.hp <= 0:
+		return
+	var id := entity.get_instance_id()
+	if _joined.has(id) or _joined.size() >= maxi(1, int(party["most"])):
+		return
+	_joined[id] = true
+	_set_party(_joined.size())
+
+
+## Its party to [param n]: max_hp from its base, hp kept in the same share.
+func _set_party(n: int) -> void:
+	if n == party_size or _base_hp <= 0:
+		return
+	var share := float(hp) / float(maxi(1, max_hp))
+	party_size = n
+	max_hp = roundi(_base_hp * (1.0 + float(party["hp_per_player"]) * (n - 1)))
+	hp = clampi(roundi(share * max_hp), 1 if hp > 0 else 0, max_hp)
+	print("[apex] %s party %d at %s (%d/%d)" % [_kind(), n, tile, hp, max_hp])
+
+
+## A plain blow (Monster's): never meant to land (every blow is told), so
+## logged if it does: a tripwire for the tours.
+func _blow() -> void:
+	var was := target.hp if is_instance_valid(target) else 0
+	super()
+	if is_instance_valid(target) and target.hp < was:
+		print("[apex] %s blow %s %d at %s (%d/%d)" % [_kind(), World.kind_of(target), was - target.hp, tile, hp, max_hp])
+
+
 ## Whether it is night by its body's clock (DayNight's light under Animal's
 ## NIGHT_LIGHT), indoors too: a den in a cave keeps the hours.
 func _is_night() -> bool:
@@ -154,6 +211,8 @@ func _sleep() -> void:
 	pose = Pose.SIT
 	sight_range = SLEEP_SIGHT
 	print("[apex] %s sleeps at its den %s (%d/%d)" % [_kind(), den, hp, max_hp])
+	_joined.clear()
+	_set_party(1)  # Asleep: its base again (780 amended (8)).
 
 
 func _wake() -> void:
@@ -231,6 +290,7 @@ func note_struck(by: GridEntity) -> void:
 	_blow_tick = World.tick
 	if is_instance_valid(by) and by != self:
 		_struck_at[by.get_instance_id()] = World.tick
+		_join(by)
 	if asleep:
 		_wake()
 	if not _roared_half and hp * 2 < max_hp:
@@ -262,7 +322,7 @@ func _special_tick() -> bool:
 		return true  # Winded after a charge that met nobody: it stands, heaving (the opening).
 	var d := World.distance(tile, target.tile)
 	World.face(self, Senses.way_toward(tile, target.tile))
-	if d <= 1:
+	if d <= 1 or _in_strike_reach(target):  # A free body touched from 2 off is beside it too (780 amended (8)).
 		if World.tick >= _next_slam and _foes_beside() >= 2:
 			var ring := {"kind": "ring", "origin": [tile.x, tile.y], "facing": [facing.x, facing.y],
 				"length": float(slam["length"]), "inner": 0.0}  # Every cell beside it (combat's).
@@ -287,7 +347,7 @@ func _special_tick() -> bool:
 func _foes_beside() -> int:
 	var count := 0
 	for each in World.sought():
-		if each != self and World.distance(tile, each.tile) <= 1 and each.hp > 0:
+		if each != self and each.hp > 0 and (World.distance(tile, each.tile) <= 1 or _in_strike_reach(each)):
 			count += 1
 	return count
 
@@ -296,6 +356,7 @@ func _begin(move: String, shape: Dictionary, ticks: int) -> void:
 	var id := World.telegraph(self, move, shape, ticks, true)  # Flank-marked (combat's 780 side): a blow from behind staggers it.
 	if id == 0:
 		return
+	_join(target)
 	_move = {"move": move, "telegraph": id, "lands": World.tick + ticks, "shape": shape, "toward": Vector2(facing), "from": World.tick}
 	_cry(StringName(move), TELL_REACH)
 	print("[apex] %s %s tell at %s, lands in %d ticks (%d/%d)" % [_kind(), move, tile, ticks, hp, max_hp])
@@ -380,6 +441,7 @@ func _bodies(cells: Array[Vector2i]) -> Array[GridEntity]:
 func _hit_cells(cells: Array[Vector2i], damage: int) -> int:
 	var hit := _bodies(cells)
 	for each in hit:
+		_join(each)
 		World.damage(each, damage, self, &"attack")
 	if not hit.is_empty():
 		_blow_tick = World.tick

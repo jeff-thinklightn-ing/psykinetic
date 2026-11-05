@@ -2048,6 +2048,8 @@ static func read_kinds(path: String) -> Dictionary:
 			"moves": (row["moves"] as Dictionary).duplicate(true) if row.get("moves") is Dictionary else {},
 			# Its sight, hearing and notice (decision 784): Monster._take_senses.
 			"senses": (row["senses"] as Dictionary).duplicate() if row.get("senses") is Dictionary else {},
+			# Its party (780 amended (8)): GreatBear's hp and combat's flank guard by who joins its fight.
+			"party": (row["party"] as Dictionary).duplicate() if row.get("party") is Dictionary else {},
 			# An apex creature (780 amended (4)): companions keep off it (is_apex).
 			"apex": bool(row.get("apex", false))}
 	return out

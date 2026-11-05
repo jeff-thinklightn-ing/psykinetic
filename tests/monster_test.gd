@@ -83,6 +83,7 @@ func _ready() -> void:
 	_test_raid_march()
 	_test_raid_beaten()
 	_test_great_bear()
+	_test_bear_party()
 	_test_watch_wave()
 	_test_raid_takes()
 	_test_noticing()
@@ -1645,6 +1646,70 @@ func _test_raid_beaten() -> void:
 	raids.enter({"id": "g3", "faction": "goblins", "strength": 2.0, "town": "t"}, World.zone.name, Vector2i(2, 2))
 	raids.hand_back(World.zone.name)
 	_check(left == ["g3"] and raids.ids().is_empty(), "its zone asleep, a group goes back to maps")
+
+
+## The great bear's tells at reach and its party (780 amended (8)): a free
+## body 2 cells off in its reach gets a tell, never a plain blow; each player
+## who joins its fight raises its hp, 3 at most; asleep, its base again.
+func _test_bear_party() -> void:
+	print("
+== the great bear: every blow told, a free body 2 off in reach too; its hp grows by who joins its fight, 3 at most ==")
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 5:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	var row := rows[3]
+	rows[3] = row.substr(0, 4) + "B" + row.substr(5)
+	var e := _build(rows)
+	var bear: GreatBear = e["B"][0]
+	bear.sight_range = 8
+	bear._next_swipe = World.tick + 100000
+	bear._next_slam = World.tick + 100000
+	bear._next_charge = World.tick + 100000
+	var hunters: Array[GridEntity] = []
+	for i in 4:
+		var each := EntityFactory.build(SPECS["P"].merged({"name": "PartyHunter%d" % i})) as GridEntity
+		_room.add_child(each)
+		World.spawn(each, Vector2i(6 + 2 * i, 3 if i == 0 else 1))
+		hunters.append(each)
+	var near := hunters[0]
+	near.free_pos = Vector2(bear.tile) + Vector2(1.4, 0.0)  # Its tile kept 2 off (FREE_HYSTERESIS), its body in the bear's reach.
+	_check(World.distance(bear.tile, near.tile) == 2 and World.in_reach(bear, near),
+			"a free body 2 cells off, its centre 1.4 away: in the bear's reach")
+	World.damage(bear, 1, near)
+	var before := near.hp
+	for i in 40:
+		World.step()
+	_check(near.hp == before and bear.party_size == 1 and bear.max_hp == bear._base_hp,
+			"its swipe and slam held back, it stands: no plain blow at reach (%d hp lost); one in the fight, its base %d hp" % [before - near.hp, bear.max_hp])
+	var tells := func(kind: String) -> Array:
+		return World.telegraphs().values().filter(func(t: Dictionary) -> bool: return t["kind"] == kind and t["source"] == str(bear.get_path()))
+	bear._next_swipe = 0
+	var told := false
+	for i in 10:
+		World.step()
+		if not tells.call("swipe").is_empty():
+			told = true
+			break
+	_check(told, "its swipe ready: a tell at the free body 2 off, as at one beside it")
+	_check(bear.party.get("flank_guard_per_player") == 25.0 and bear.party.get("most") == 3.0 and Monster.kinds()["great_bear"]["party"] is Dictionary,
+			"its party block as its row has it, all of it (combat's flank guard reads it: %s)" % [bear.party])
+	var base: int = bear._base_hp
+	var share := float(bear.hp) / float(bear.max_hp)
+	World.damage(bear, 1, hunters[1])
+	var two := bear.max_hp
+	World.damage(bear, 1, hunters[2])
+	var three := bear.max_hp
+	World.damage(bear, 1, hunters[3])
+	World.damage(bear, 1, near)
+	_check(two == roundi(base * 1.6) and three == roundi(base * 2.2) and bear.max_hp == three and bear.party_size == 3,
+			"each who strikes it joins its fight: %d, %d, then %d for a fourth and a second blow (3 at most; hp_per_player 0.6)" % [two, three, bear.max_hp])
+	_check(absf(float(bear.hp) / float(bear.max_hp) - share) < 0.05, "its hp kept in the same share as it grows (%d/%d)" % [bear.hp, bear.max_hp])
+	bear._sleep()
+	_check(bear.party_size == 1 and bear.max_hp == base and bear.hp <= base, "asleep: its base again (%d/%d)" % [bear.hp, bear.max_hp])
+	Monster.idling = true
 
 
 ## The great bear (decision 780): its den at (4, 3), a long room.
