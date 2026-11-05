@@ -1985,6 +1985,15 @@ func _test_stacks() -> void:
 	_check(World.try_transfer(host, host, free, host, second) and World.slot_count(host, second) == 6 and host.slots[free].is_empty(),
 			"and joined onto the two (%s)" % host.slot_counts)
 	_check(World.count_of(host, "herbs") == 12 and World.units(host, "herbs").size() == 12, "still twelve, each one its own")
+	# One split off into a container that never held anything (playtest's
+	# Hollowfell cart: its uids were shorter than its slots).
+	var box := _main._spawn({"script": Level.CARGO, "shape": "slab", "name": "TestSplitBox", "tile": _open_line(host, 1),
+		"props": {"capacity": 4}}) as Cargo
+	box.slot_items = PackedInt32Array()
+	_check(World.try_transfer(host, host, slot, box, 0, 1) and World.slot_count(box, 0) == 1 and World.slot_count(host, slot) == 5
+			and box.slot_items.size() == box.slots.size(), "one herb split off into a fresh box (%s)" % [Array(box.slots)])
+	_check(World.try_transfer(host, box, 0, host, slot) and box.slots[0].is_empty() and World.slot_count(host, slot) == 6, "and back onto its stack")
+	World.despawn(box)
 	# A grave-marked herb keeps a slot of its own.
 	var marked := World.items.mint("herbs", "gathered")
 	World.items.mark_grave(marked, "a barrow")

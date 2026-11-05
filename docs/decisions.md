@@ -25178,6 +25178,15 @@ put down, one taken out, the book saved); return_test (five antlers in one
 slot pay the healer); economy_test (a bought kit joins the stack it finds).
 No new class_name.
 
+619 amended: a split into a container that never held anything (playtest's
+Hollowfell tour, release's label). Shift-dragging one ore sack off a stack of
+two into a fresh cart threw "Out of bounds set index" in World._move_units and
+nothing moved: try_transfer's split and join branch returned before
+_fit_uids, so a container with no uids yet had none for its slots. Both sides'
+uids are now padded first, ahead of every branch. items_test _test_stacks
+splits one herb into a fresh box and back. Server only, protocol unchanged, no
+new class_name.
+
 ## 623. The low-horizon camera, a trial toggle
 
 Jeff (2026-10-22): "drop the camera angle so we can see the sky and the

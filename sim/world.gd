@@ -2476,13 +2476,15 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 	# bond gone sullen); she says why.
 	if from != to and to.has_method("turns_down") and not str(to.call("turns_down", by, uid, other_uid)).is_empty():
 		return false
+	# Both sides' uids as long as their slots before anything moves: a
+	# container that never held anything has none yet (playtest's cart).
+	_fit_uids(from)
+	_fit_uids(to)
 	# A split onto an empty slot, or units joining a stack (decision 619).
 	var all := slot_count(from, from_slot)
 	var some := all if count <= 0 else mini(count, all)
 	if other_uid != 0 and stacks_onto(other_uid, uid, 1, false) or other_uid == 0 and some < all:
 		return _move_units(by, from, from_slot, to, to_slot, some) > 0
-	_fit_uids(from)
-	_fit_uids(to)
 	# New arrays, so each synchronizer sees a change.
 	var taken := from.slots.duplicate()
 	var taken_uids := from.slot_items.duplicate()
