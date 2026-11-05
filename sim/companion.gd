@@ -116,6 +116,14 @@ const ORDER_MINE := "\\b(dig|digging|mining|mine (it|this|that|the|here|there|fo
 const ORDER_MINE_STOP := "\\b((stop|quit|leave off|enough|no more|done)( with)?( the)? (mining|digging)|(don'?t|do not|no) (mine|dig)|stop (mine|dig))\\b"
 ## A seam this near her player she mines (769).
 const MINE_RANGE := 4
+## Her player at a seam (769 amended (10); Jeff: "wren started mining on
+## her own when walking by a vein"): she mines on her own only while they
+## dig (struck a seam within MINE_DUG_TICKS) or have stood on one cell
+## MINE_STILL_TICKS (4 s) with a seam within MINE_RANGE; once they are more
+## than MINE_LEAVE cells from where they stood, she stops and follows.
+const MINE_DUG_TICKS := 30
+const MINE_STILL_TICKS := 40
+const MINE_LEAVE := 2
 ## The line she says once when her pack is full of ore (769; voice's wording).
 const MINE_FULL_LINE := "My pack's full of ore. I can't carry more."
 ## An apex creature (780 amended (5), the great bear): she keeps out of
@@ -731,6 +739,14 @@ var mining := true
 ## full (said once, till it has room again).
 var _mine_seam: Seam = null
 var _mine_full_said := false
+## 769 amended (10): where her player stood when her mining began (NO_CELL
+## while she is not at it), whether "dig" began it (then her player's
+## standing does not matter, only MINE_RANGE), and the cell they have stood
+## on since which tick.
+var _mine_anchor := World.NO_CELL
+var _mine_told := false
+var _keeper_still_tile := World.NO_CELL
+var _keeper_still_since := 0
 ## Apexes she has seen: instance id -> the tick she last saw it (780 amended
 ## (5)); a warning is said when one is new or long unseen.
 var _apex_seen: Dictionary[int, int] = {}
@@ -1420,6 +1436,8 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 		"mine":
 			mining = bool(read.get("on", true))
 			_mine_full_said = false
+			_mine_told = mining
+			_mine_anchor = World.NO_CELL
 			if not mining:
 				_mine_seam = null
 				done = "%s asked you to stop mining; you leave the seam be till they ask again." % keeper_name()
@@ -4380,6 +4398,9 @@ func _reviving() -> bool:
 
 ## Her intent, her player up: the reflex, an errand, a door, her stance.
 func _choose(foe: GridEntity, low: bool) -> void:
+	if keeper.tile != _keeper_still_tile:
+		_keeper_still_tile = keeper.tile
+		_keeper_still_since = World.tick
 	# Bandaging herself, low, with nothing at her: she keeps at it.
 	var mending_self: bool = str(errand.get("verb", "")) == "bandage" and errand.get("patient") == self and foe == null
 	if low and not mending_self:
@@ -4919,6 +4940,8 @@ func _mine_pick() -> Seam:
 		return null
 	if not _alive(keeper) or World.is_downed(keeper) or keeper.hp < keeper.max_hp * HP_THRESHOLDS[0] or _hostile_within(SIGHT_RANGE):
 		return null
+	if not _mine_told and not _mine_at_seam():
+		return null
 	if not _mine_room():
 		if not _mine_full_said and _say(MINE_FULL_LINE, true):
 			_mine_full_said = true
@@ -4937,7 +4960,35 @@ func _mine_pick() -> Seam:
 			if seam == null or World.distance(each.tile, tile) < World.distance(seam.tile, tile):
 				seam = each
 	_mine_seam = seam
+	if seam == null:
+		_mine_told = false  # "dig" was for the seam there; none left near her player.
+		_mine_anchor = World.NO_CELL
 	return seam
+
+
+## 769 amended (10): whether her player is at a seam, for her to mine
+## unasked: begun when they dig (struck a seam near them within
+## MINE_DUG_TICKS) or have stood MINE_STILL_TICKS on one cell with a seam
+## within MINE_RANGE; kept while they stay within MINE_LEAVE of where they
+## were then. Walked off, she drops it and follows at once with what she
+## carries.
+func _mine_at_seam() -> bool:
+	if _mine_anchor != World.NO_CELL:
+		if World.distance(keeper.tile, _mine_anchor) <= MINE_LEAVE:
+			return true
+		_mine_anchor = World.NO_CELL
+		return false
+	var still := World.tick - _keeper_still_since >= MINE_STILL_TICKS
+	for entity in World.get_entities():
+		var each := entity as Seam
+		if each == null or not each.spawned or each.zone != zone or World.distance(each.tile, keeper.tile) > MINE_RANGE:
+			continue
+		var dug := each.struck_by == keeper and World.tick - each.struck_at <= MINE_DUG_TICKS \
+				and World.distance(each.tile, keeper.tile) <= MINE_LEAVE  # At it, not walked on from it.
+		if dug or (still and not each.spent):
+			_mine_anchor = keeper.tile
+			return true
+	return false
 
 
 ## Whether she can take a sack of ore (769): ore lying at her feet, or room

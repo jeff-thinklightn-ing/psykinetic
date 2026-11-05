@@ -115,6 +115,7 @@ func _ready() -> void:
 	_test_one_cell_door()
 	_test_mind_log_no_names()
 	_test_mines_a_seam()
+	_test_mines_only_at_a_seam()
 	_test_great_bear()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
@@ -3694,6 +3695,82 @@ func _test_mines_a_seam() -> void:
 	_put(pet, pet_was)
 	_settle(pet)
 
+
+func _test_mines_only_at_a_seam() -> void:
+	print("
+== walked past, a seam is let be; her player standing at it or digging, she mines; walked off, she follows (769 amended (10)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	var slots_was := pet.slots.duplicate()
+	var taken := {}
+	for slot in pet.slots.size():
+		if not pet.slots[slot].is_empty():
+			taken[slot] = World.take_item(pet, pet, slot)
+	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("pick", "built"))
+	var spot := Vector2i(10, 9)
+	if World.get_entity_at(spot) != null:
+		World._relocate(World.get_entity_at(spot), _main._nearest_free(Vector2i(2, 9)))
+	var spec: Dictionary = Level._spec_for("seam", {})
+	spec["name"] = "WalkSeam%d" % World.tick
+	spec["tile"] = spot
+	var seam := _main._spawn(spec) as Seam
+	_put(owner, Vector2i(2, 7))
+	_put(pet, Vector2i(2, 8))
+	for i in 10:
+		World.step()
+	# Walked past: a cell every 4 ticks along row 7, within MINE_RANGE of it for most of the way.
+	var mined_walking := 0
+	for x in range(3, 13):
+		_put(owner, Vector2i(x, 7))
+		for i in 4:
+			World.step()
+			mined_walking += 1 if pet.current_intent == Companion.Intent.MINE else 0
+	_check(mined_walking == 0 and seam.hp == seam.max_hp, "her player walks past the seam: she lets it be (%d ticks mining, hp %d of %d)" % [mined_walking, seam.hp, seam.max_hp])
+	# Stood still beside it: not at once, but after MINE_STILL_TICKS.
+	_put(owner, Vector2i(9, 7))
+	var early := 0
+	for i in Companion.MINE_STILL_TICKS - 5:
+		World.step()
+		early += 1 if pet.current_intent == Companion.Intent.MINE else 0
+	var later := 0
+	for i in 60:
+		World.step()
+		later += 1 if pet.current_intent == Companion.Intent.MINE else 0
+	_check(early == 0 and later > 0, "her player stands by it: she starts mining after a few seconds, not before (%d early, %d after)" % [early, later])
+	# Walked off: she stops at once and follows.
+	_put(owner, Vector2i(4, 7))
+	for i in 3:
+		World.step()
+	var after_off := 0
+	for i in 30:
+		World.step()
+		after_off += 1 if pet.current_intent == Companion.Intent.MINE else 0
+	_check(after_off == 0 and World.distance(pet.tile, owner.tile) <= Heel.START + 1, "her player walks off: she stops mining and follows (%d ticks mining, %s at %s, he at %s)" % [after_off, pet.intent_name(), pet.tile, owner.tile])
+	# Her player digging: at once, no wait.
+	_put(owner, Vector2i(9, 8))
+	World.step()
+	World._strike_seam(seam, owner, &"attack")
+	var digging := false
+	for i in 10:
+		World.step()
+		digging = digging or pet.current_intent == Companion.Intent.MINE
+	_check(digging, "her player strikes the seam: she joins in at once (%s)" % pet.intent_name())
+	World.despawn(seam)
+	for slot in pet.slots.size():
+		while not pet.slots[slot].is_empty():
+			World.items.end(World.take_item(pet, pet, slot), "gone")
+	for slot: int in taken:
+		World.put_item(pet, pet, slot, taken[slot])
+	_check(pet.slots == slots_was, "her own things back (%s, was %s)" % [pet.slots, slots_was])
+	pet._mine_anchor = World.NO_CELL
+	pet._mine_told = false
+	_put(owner, owner_was)
+	_put(pet, pet_was)
+	_settle(pet)
 
 func _test_follow_without_backsteps() -> void:
 	print("\n== she follows a walking player with purpose: no steps back and forth (a regression check; ui's net_smooth trace cleared her follow) ==")

@@ -7901,6 +7901,8 @@ func _strike_seam(seam: Seam, source: GridEntity, cause: StringName) -> void:
 	if cause != &"attack" or not is_instance_valid(source) or not seam.spawned:
 		return
 	noise(seam.tile, Senses.NOISE_FIGHT, &"fight", source)
+	seam.struck_by = source
+	seam.struck_at = tick
 	if seam.spent or not Seam.bites(wielded(source)):
 		_log("seam: %s's blow rings off %s" % [source.name, seam.name])
 		seam_rang.emit(seam, source)

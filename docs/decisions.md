@@ -40033,6 +40033,23 @@ normals), not shadow acne: the shadow-casting lights' biases are unchanged. Test
 _test_mine_light (the light off the wall and lower). Client only, protocol unchanged, no new
 class_name.
 
+769 amended (10): she mines when her player is at a seam, not as they walk by (2026-11-04,
+companions; the coordinator, from Jeff on v0.1.202: "wren started mining on her own when walking
+by a vein"). 769 amended (2) had her take any seam within MINE_RANGE whenever all was quiet, so
+she stopped to dig as he passed one. Now, unasked, she begins only when (a) her player struck a
+seam within MINE_LEAVE (2) of them in the last MINE_DUG_TICKS (3 s), a ringing blow too
+(World._strike_seam sets Seam.struck_by and struck_at, server only, not kept), or (b) her player
+has stood on one cell MINE_STILL_TICKS (4 s; Companion tracks the cell in _choose) with an unspent
+seam within MINE_RANGE. Where they stood is kept (_mine_anchor); once they are more than
+MINE_LEAVE from it she drops the seam on that tick and follows, with the ore already in her
+pack. "dig" starts her at once whatever her player does (_mine_told), for the seam near them,
+till none is left within MINE_RANGE of them; "stop digging" still holds until "dig". Every
+other 769 amended (2) condition stands. companion_test _test_mines_only_at_a_seam: walked past
+a cell every 4 ticks, no blow; stood beside it, nothing for the first MINE_STILL_TICKS, then she
+mines; walked 5 cells off, she stops and is back at heel; her player's blow at the seam starts
+her at once. _test_mines_a_seam unchanged and passing. Bullet in voice's words. Server only,
+protocol unchanged, no new class_name.
+
 ## 771. The night watch
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

@@ -39,6 +39,11 @@ const SPENT_LABEL := "Worked-out seam"
 ## World.steps when it was spent; -1 while it has ore.
 @export var spent_at := -1
 @export var refill_days := REFILL_DAYS
+## Who struck it last and at which World.tick, a ringing blow too (769
+## amended (LABEL): a companion mines beside her player while they dig).
+## Server only, not kept.
+var struck_by: GridEntity = null
+var struck_at := -1
 ## Worked out, rubble (replicated: the views draw it so, and name it).
 var spent := false:
 	set(value):

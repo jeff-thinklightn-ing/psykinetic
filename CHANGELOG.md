@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- A companion with a pick mines a seam when you dig or stop beside it, and follows at once with what she has dug when you walk on (769 amended (10)).
 - Struck down in a fire, you wait out the usual few seconds and wake at the temple, instead of lying in the flames for minutes (544 amended).
 
 - A companion keeps her own name after travelling, in chat, the party log and what she remembers, never "<name>2" (796).
