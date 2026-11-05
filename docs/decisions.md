@@ -39878,6 +39878,20 @@ again; a landed tell nothing). Sim only, protocol unchanged, no new
 class_name. No CHANGELOG bullet yet: it comes when the bear is in a real
 level.
 
+780 amended (9): the flank guard grows with the party in the fight
+(2026-11-04, combat; release's label; the coordinator's approval of the
+great bear's 1-to-3-player design, agreed with enemy-ai). After a flank,
+World._try_flank sets the guard to World.flank_guard_for(target):
+flank_guard (50) plus the body's row "party" flank_guard_per_player (25 for
+the great bear) for each player past the first in its GreatBear.party_size
+(enemy-ai's 780 amended (8): who struck it, was struck by it or was a tell's
+target, at most party "most" 3). That is 5 s solo, 7.5 s for two and 10 s
+for three, so three players can't take turns staggering every tell.
+flankable reads the same guard, so companions taking the flank agree. A
+body without party_size or a party block keeps flank_guard. combat_test
+_test_flank_party. Sim only, protocol unchanged, no new class_name, no
+bullet (the bear is in no real level yet).
+
 ## 769. The mine: ore seams, and its look (phase 1)
 
 Jeff (2026-11-02): "theres a mine entrance in the hills and its overrun, its the source of ore

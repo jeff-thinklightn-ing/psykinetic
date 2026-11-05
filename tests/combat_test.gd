@@ -15,9 +15,10 @@ extends Node
 const SPECS := {
 	"P": {"script": "res://sim/player.gd", "shape": "capsule"},
 	"m": {"script": "res://sim/monster.gd", "shape": "capsule"},
+	"B": {"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear"},
 }
 const Walk := preload("res://tests/walk.gd")
-const NAMES := {"P": "Player", "m": "Dummy"}
+const NAMES := {"P": "Player", "m": "Dummy", "B": "Bear"}
 
 var _failures := 0
 var _room: Node2D
@@ -38,6 +39,7 @@ func _ready() -> void:
 	_test_arc_spares_friends()
 	_test_flank()
 	_test_downed_fire()
+	_test_flank_party()
 	_test_spin()
 	_test_spin_throws()
 	_test_spin_broken()
@@ -1354,6 +1356,50 @@ func _test_downed_fire() -> void:
 	World._tend_downed()
 	_check(not is_instance_valid(p) or not p.spawned or p.hp == 0, "then its time runs out: it bleeds (hp %d)" % (p.hp if is_instance_valid(p) else -1))
 	World.downed = was
+
+## The flank guard grows with the party in the fight (780 amended (9)): the
+## great bear's row "party" {flank_guard_per_player 25, most 3} over
+## GreatBear.party_size (enemy-ai's 780 amended (8)); a body without one keeps
+## flank_guard.
+func _test_flank_party() -> void:
+	print("
+== flanking: the guard grows with the party in the fight (780 amended (9)) ==")
+	var e := _build(["#########", "#....P..#", "#..PB..m#", "#....P..#", "#########"])
+	var back: Player = null
+	for each: Player in e["P"]:
+		if each.tile == Vector2i(3, 2):
+			back = each
+	var bear: GridEntity = e["B"][0]
+	var dummy: GridEntity = e["m"][0]
+	bear.hp = bear.max_hp
+	_check(World.flank_guard_for(dummy) == World.flank_guard, "a body with no party: flank_guard (%d)" % World.flank_guard_for(dummy))
+	var party: Dictionary = bear.get("party")
+	_check(int(party.get("flank_guard_per_player", 0)) == 25 and int(party.get("most", 0)) == 3, "the bear's row: party {flank_guard_per_player 25, most 3} (%s)" % [party])
+	var want := {1: 50, 2: 75, 3: 100, 5: 100}
+	for n: int in want:
+		bear.set("party_size", n)
+		_check(World.flank_guard_for(bear) == int(want[n]), "party of %d: guard %d ticks (%d)" % [n, want[n], World.flank_guard_for(bear)])
+	bear.set("party_size", 1)
+	for each: Player in e["P"]:
+		bear.call("_join", each)  # Three players in its fight, as by striking it (780 amended (8)).
+	_check(int(bear.get("party_size")) == 3, "three players joined: party of 3 (%d)" % int(bear.get("party_size")))
+	bear.facing = Vector2i(1, 0)
+	back.free_pos = Vector2(3.0, 2.0)
+	var shape := {"kind": "cone", "origin": [bear.tile.x, bear.tile.y], "facing": [1, 0], "length": 2.0, "half_angle": 60.0}
+	var marked := World.telegraph(bear, "swipe", shape, 10, true)
+	_blow(back, bear)
+	_check(World.is_stunned(bear), "a party of 3: flanked from behind mid-tell")
+	World.end_telegraph(marked, false)
+	bear.stunned_until_tick = 0
+	World.tick += 60
+	var inside := World.telegraph(bear, "slam", shape, 10, true)
+	_check(World.flankable(bear) == 0, "60 ticks on, inside a party of 3's 100: not flankable (companions read the same)")
+	World.end_telegraph(inside, false)
+	World.tick += 41
+	var past := World.telegraph(bear, "slam", shape, 10, true)
+	_check(World.flankable(bear) == past, "past 100 ticks: flankable again")
+	World.end_telegraph(past, false)
+	bear.set("party_size", 1)
 
 
 func _test_spin() -> void:

@@ -5081,10 +5081,27 @@ func _try_flank(source: GridEntity, target: GridEntity) -> bool:
 	if found == 0 or not is_instance_valid(source) or not is_behind(source, target):
 		return false
 	_stun_for(target, flank_stagger)
-	_flank_guard_until[target] = tick + flank_guard
+	_flank_guard_until[target] = tick + flank_guard_for(target)
 	_log("flank: %s staggers %s, its %s lost" % [source.name, target.name, _telegraphs[found]["data"]["kind"]])
 	flanked.emit(target, source, found)
 	return true
+
+
+## The ticks [param target] can't be flanked again after a flank (780
+## amended (9), the coordinator's party scaling): flank_guard, plus its
+## row's party "flank_guard_per_player" for each player past the first in
+## the fight it counts (GreatBear.party_size, 780 amended (8): who struck it,
+## was struck by it or was a tell's target; at most its party "most"). So
+## three players can't take turns staggering every tell. A body with no
+## party_size or no party block: flank_guard.
+func flank_guard_for(target: GridEntity) -> int:
+	if not is_instance_valid(target) or not ("party_size" in target) or not ("party" in target):
+		return flank_guard
+	var party: Variant = target.get("party")
+	if not party is Dictionary:
+		return flank_guard
+	var n := clampi(int(target.get("party_size")), 1, maxi(1, int(party.get("most", 3))))
+	return flank_guard + roundi(float(party.get("flank_guard_per_player", 0.0)) * (n - 1))
 
 
 ## Telegraph [param id] over: [param landed], its blow struck; false, given
