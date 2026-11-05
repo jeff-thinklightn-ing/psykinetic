@@ -326,6 +326,175 @@ static func instance(slot: String, variant := 1) -> Node3D:
 	return _make(recipes[posmod(variant - 1, recipes.size())])
 
 
+## Words cut in a stone's face (decision 800): the slot's "carve" panels, one
+## per variant ({"at": [x, y, z], "size": [w, h]}: the panel's middle on the
+## face, the face toward +z, its width and height, and "lean", degrees the face tips back,
+## if it does). The word, in CARVE_FONT's
+## chiselled capitals fitted to the panel's width or height (whichever is
+## less), reads as cut into the stone, not stuck on it: its letters a darker
+## shade of the stone (CARVE_CELL), lying just on the face, over a copy of them
+## in the stone's palest (CARVE_LIP_CELL) a little lower and behind, which
+## shows as a thin light lip on each stroke's lower edge, the lit floor of a
+## cut seen from above. An arrow (CARVE_ARROWS, Level.CARVED_ARROWS's: the
+## reader's left, right or up) is cut the same way under the word, in
+## CARVE_ARROW_SHARE of the panel, as wide as the word's band. Moss
+## (CARVE_MOSS_CELL) grows in the cuts, mottled, so the words look old. Never a label: no billboard, no glow, lit as the stone.
+## Cinzel Black (OFL; its hairlines hold at the game camera's 6 px letters, Bold's U lost its
+## bowl) with its duplicate points dropped, as TextMesh needs (C:/dev/review/carved/clean_cinzel.py).
+const CARVE_FONT := "res://art/fonts/CinzelCarve-Black.ttf"
+## (column, row): row 1's greys, a shade darker than the stones, and the palest.
+const CARVE_CELL := Vector2i(6, 1)
+const CARVE_LIP_CELL := Vector2i(0, 1)
+## The moss on the waystone's foot and the stones' crowns.
+const CARVE_MOSS_CELL := Vector2i(2, 4)
+## The cut's two layers: thin, the letters' face CARVE_PROUD out from the
+## panel (a face a few millimetres uneven still shows them), the lip's
+## CARVE_LIP_BACK behind it and CARVE_LIP_DROP of the letters' height lower.
+const CARVE_DEPTH := 0.004
+const CARVE_PROUD := 0.003
+const CARVE_LIP_BACK := 0.001
+const CARVE_LIP_DROP := 0.045
+const CARVE_ARROW_SHARE := 0.34
+## How much taller than the font's own a word may stand to fill its band.
+const CARVE_STRETCH := 1.4
+## Level.CARVED_ARROWS again: naming Level here would pull the autoloads into
+## tools/art_status.gd, which runs as a bare --script.
+const CARVE_ARROWS: Array[String] = ["left", "right", "up"]
+static var _carve_materials := {}
+static var _carve_font: FontVariation = null
+
+
+## Cuts [param word] (and [param arrow]) into [param node], an instance of
+## [param slot]'s [param variant]: a "carved" child, or null where the slot
+## has no panel or the word is empty.
+static func carve(node: Node3D, slot: String, variant: int, word: String, arrow := "") -> Node3D:
+	var panels: Variant = spec(slot).get("carve")
+	word = word.strip_edges()
+	if not (panels is Array) or (panels as Array).is_empty() or word == "":
+		return null
+	var panel: Dictionary = (panels as Array)[posmod(variant - 1, (panels as Array).size())]
+	var width := float(panel["size"][0])
+	var height := float(panel["size"][1])
+	var arrowed := arrow in CARVE_ARROWS
+	var text_height := height * (1.0 - CARVE_ARROW_SHARE) if arrowed else height
+	var root := Node3D.new()
+	root.name = "carved"
+	root.position = _vec(panel["at"])
+	# A face that leans back (its "lean", degrees, top away from the reader) holds the cut flat.
+	root.rotation.x = -deg_to_rad(float(panel.get("lean", 0.0)))
+	var text := TextMesh.new()
+	# In capitals, as inscriptions are (CARVE_FONT's small-capital u and g don't triangulate).
+	text.text = word.to_upper()
+	text.font = carve_font()
+	text.font_size = 64
+	text.depth = CARVE_DEPTH
+	text.pixel_size = 0.001
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	var box := text.get_aabb()
+	text.pixel_size = 0.001 * minf(width / maxf(box.size.x, 0.0001), text_height / maxf(box.size.y, 0.0001))
+	var lifted := (height - text_height) * 0.5 if arrowed else 0.0
+	# A word that fits its band's width with height to spare stands taller, up to
+	# CARVE_STRETCH: the camera looks down at 50 degrees and shortens an upright face.
+	var stretch := clampf(text_height / maxf(text.get_aabb().size.y, 0.0001), 1.0, CARVE_STRETCH)
+	var drop := text.get_aabb().size.y * stretch * CARVE_LIP_DROP
+	var face := CARVE_PROUD - CARVE_DEPTH * 0.5
+	var cut := _carve_part("word", text, carve_material(), Vector3(0, lifted, face))
+	var lip := _carve_part("lip", text, carve_material(CARVE_LIP_CELL), Vector3(0, lifted - drop, face - CARVE_LIP_BACK))
+	for part: MeshInstance3D in [cut, lip]:
+		part.scale.y = stretch
+		root.add_child(part)
+	if arrowed:
+		var share := height * CARVE_ARROW_SHARE
+		var length := share if arrow == "up" else minf(width, share * 2.4)
+		var y := -(height - share) * 0.5
+		root.add_child(_carve_arrow(arrow, length, share * 0.8, y, carve_material(), face))
+		var under := _carve_arrow(arrow, length, share * 0.8, y - drop, carve_material(CARVE_LIP_CELL), face - CARVE_LIP_BACK)
+		under.name = "arrow_lip"
+		root.add_child(under)
+	node.add_child(root)
+	return root
+
+
+## CARVE_FONT, as a FontVariation (one place to set its spacing).
+static func carve_font() -> FontVariation:
+	if _carve_font == null:
+		_carve_font = FontVariation.new()
+		_carve_font.base_font = load(CARVE_FONT)
+		_carve_font.spacing_glyph = 2
+	return _carve_font
+
+
+static func _carve_part(part_name: String, mesh: Mesh, material: Material, at: Vector3) -> MeshInstance3D:
+	var part := MeshInstance3D.new()
+	part.name = part_name
+	part.mesh = mesh
+	part.material_override = material
+	part.position = at
+	part.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return part
+
+
+## The palette's [param cell] (CARVE_CELL, the cut's shade, by default), lit
+## and as rough as the palette material; the cut's shade mottled with moss.
+static func carve_material(cell := CARVE_CELL) -> StandardMaterial3D:
+	var worn := cell == CARVE_CELL
+	var key := "%s%s" % [cell, worn]
+	if not _carve_materials.has(key):
+		var material := StandardMaterial3D.new()
+		material.albedo_color = _palette_colour(cell)
+		material.roughness = 0.95
+		if worn:
+			var ramp := Gradient.new()
+			ramp.set_color(0, _palette_colour(CARVE_CELL))
+			ramp.set_color(1, _palette_colour(CARVE_MOSS_CELL))
+			ramp.add_point(0.3, _palette_colour(CARVE_CELL))
+			var noise := FastNoiseLite.new()
+			noise.seed = 800
+			noise.frequency = 0.12
+			var mottle := NoiseTexture2D.new()
+			mottle.width = 128
+			mottle.height = 128
+			mottle.seamless = true
+			mottle.noise = noise
+			mottle.color_ramp = ramp
+			material.albedo_color = Color.WHITE
+			material.albedo_texture = mottle
+			material.uv1_triplanar = true
+			material.uv1_world_triplanar = true
+			material.uv1_scale = Vector3(2.0, 2.0, 2.0)
+		_carve_materials[key] = material
+	return _carve_materials[key]
+
+
+static func _palette_colour(cell: Vector2i) -> Color:
+	var image := (load("res://art/kit/palette.png") as Texture2D).get_image()
+	var size := image.get_width() / 8.0
+	return image.get_pixel(int((cell.x + 0.5) * size), int((cell.y + 0.5) * size))
+
+
+## An arrow cut under the word: a shaft and a head, [param length] long and
+## [param tall] across, its middle [param y] below the panel's and [param z]
+## out from it, in [param material]; pointing to the reader's left (-x),
+## right (+x) or up.
+static func _carve_arrow(way: String, length: float, tall: float, y: float, material: Material, z: float) -> Node3D:
+	var arrow := Node3D.new()
+	arrow.name = "arrow"
+	arrow.position = Vector3(0, y, z)
+	var head_long := minf(tall, length * 0.45)
+	var shaft := BoxMesh.new()
+	shaft.size = Vector3(length - head_long, tall * 0.28, CARVE_DEPTH)
+	var head := PrismMesh.new()
+	head.size = Vector3(tall, head_long, CARVE_DEPTH)
+	arrow.add_child(_carve_part("shaft", shaft, material, Vector3(-head_long * 0.5, 0, 0)))
+	# A prism's point is up (+y): turned to point along +x, the arrow's way.
+	var point := _carve_part("head", head, material, Vector3((length - head_long) * 0.5, 0, 0))
+	point.rotation.z = -PI * 0.5
+	arrow.add_child(point)
+	arrow.rotation.z = {"right": 0.0, "left": PI, "up": PI * 0.5}[way]
+	return arrow
+
+
 ## Forgets what was made for [param slot] (every slot when empty), so the
 ## next instance reads its files again.
 static func forget(slot := "") -> void:

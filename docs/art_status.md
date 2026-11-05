@@ -61,7 +61,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.lean_to` | 1 | art-kit, by hand | own | 2026-11-03 |
 | `building.link_arch` | 3 | art-kit, by hand | own | 2026-10-22 |
 | `building.market_stall` | 1 | art-gen, fitted by art-kit | own | 2026-10-29 |
-| `building.milestone` | 1 | art-kit, by hand | own | 2026-11-03 |
+| `building.milestone` | 2 | art-kit, by hand | own | 2026-11-03 |
 | `building.mound` | 1 | Jeff, by hand (on art-kit's scripted mound) | own | 2026-10-22 |
 | `building.round_table` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `building.rubble_heap` | 3 | art-kit, by hand | own | 2026-10-22 |
@@ -73,7 +73,7 @@ Drawn as a grey box (a texture slot: terrain's procedural colour).
 | `building.tower_ruin` | 1 | art-kit, by hand | own | 2026-10-22 |
 | `building.turf_house` | 2 | art-kit, by hand | own | 2026-10-27 |
 | `building.wayside_shrine` | 1 | art-kit, by hand | own | 2026-11-03 |
-| `building.waystone` | 2 | art-kit, by hand | own | 2026-10-21 |
+| `building.waystone` | 3 | art-kit, by hand | own | 2026-10-21 |
 | `building.weapon_rack` | 1 | art-kit, by hand | own | 2026-10-23 |
 | `building.well` | 1 | art-kit, by hand | own | 2026-10-19 |
 | `building.woodpile` | 3 | art-kit, by hand | own | 2026-10-22 |

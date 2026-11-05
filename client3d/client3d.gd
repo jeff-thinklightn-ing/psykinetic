@@ -6517,6 +6517,9 @@ func _add_buildings() -> void:
 		var slot := str(building["slot"])
 		var facing: Vector2i = building["facing"]
 		var node := ArtKit.instance(slot, int(building.get("variant", 1)))
+		# Words cut in a stone's face (800): a milestone's or a waystone's name.
+		if building.has("carved"):
+			ArtKit.carve(node, slot, int(building.get("variant", 1)), str(building["carved"]), str(building.get("arrow", "")))
 		# Leaves that turn with the seasons (a great tree's crown, 567).
 		if ArtKit.spec(slot).get("leaf", false):
 			season_dress(node, true)

@@ -36,6 +36,7 @@ func _ready() -> void:
 	_test_credits()
 	_test_overrides()
 	_test_swatch_uvs()
+	_test_carved()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -521,6 +522,68 @@ func _test_creature_rig() -> void:
 	_check(not warned.call("creature.orc") and warned.call("creature.wolf"), "the orc's body_material \"orc\" accepted; a wolf in it warned")
 	body.free()
 	grey.free()
+
+
+## Words cut in a stone's face (decision 800): a building entry's "carved"
+## and "arrow" carried by Level (an arrow not one of CARVED_ARROWS dropped,
+## a blank word none); ArtKit.carve cuts the word as lit lettering flush on
+## the variant's panel, fitted inside it, in the palette's dark grey, an
+## arrow under it turned the reader's way; nothing on a slot with no panel.
+func _test_carved() -> void:
+	print("
+== a stone's carved words: carried by Level, cut by ArtKit.carve on the slot's panel ==")
+	var rows: Array[String] = []
+	# Two pixels a cell (Level.image_from_rows): 9 x 9 cells.
+	for y in 18:
+		rows.append(".".repeat(18))
+	var config := {"outdoor": true, "buildings": [
+		{"slot": "building.waystone", "at": [2, 2], "facing": [0, 1], "carved": "  Hut ", "arrow": "left"},
+		{"slot": "building.milestone", "at": [6, 2], "facing": [0, 1], "carved": "Shieling", "arrow": "sideways", "variant": 2},
+		{"slot": "building.milestone", "at": [6, 6], "facing": [0, 1], "carved": "   "}]}
+	var level := Level.parse(Level.image_from_rows(rows, {Vector2i(1, 1): "start"}), null, config)
+	var built: Array = level["buildings"]
+	_check(built.size() == 3 and built[0].get("carved") == "Hut" and built[0].get("arrow") == "left"
+		and built[1].get("carved") == "Shieling" and not built[1].has("arrow") and not built[2].has("carved"),
+		"Level carries the word trimmed and a known arrow; an odd arrow and a blank word are dropped (%s, %s)" % [built, level["warnings"]])
+	_check(ArtKit.CARVE_ARROWS == Level.CARVED_ARROWS, "ArtKit's arrows are Level's (%s)" % [ArtKit.CARVE_ARROWS])
+	var stone := ArtKit.instance("building.milestone", 2)
+	var cut := ArtKit.carve(stone, "building.milestone", 2, "Shieling")
+	var panel: Dictionary = ArtKit.spec("building.milestone")["carve"][1]
+	var word := cut.get_node_or_null("word") as MeshInstance3D if cut != null else null
+	var box := word.mesh.get_aabb() if word != null else AABB()
+	_check(word != null and word.mesh is TextMesh and (word.mesh as TextMesh).text == "SHIELING"
+		and box.size.x <= float(panel["size"][0]) + 0.001 and box.size.y <= float(panel["size"][1]) + 0.001
+		and box.size.x > float(panel["size"][0]) * 0.9, "the word fills the wide band's width, inside it (%s, the band %s)" % [box.size, panel["size"]])
+	_check(cut != null and cut.position.is_equal_approx(ArtKit._vec(panel["at"])) and absf(box.get_center().z) < 0.001,
+		"its middle on the panel's, half sunk in the face")
+	var material := word.material_override as StandardMaterial3D if word != null else null
+	_check(material != null and material.shading_mode == BaseMaterial3D.SHADING_MODE_PER_PIXEL and material.billboard_mode == BaseMaterial3D.BILLBOARD_DISABLED
+		and not material.emission_enabled and material.albedo_texture is NoiseTexture2D, "lit as the stone, its cut mottled with moss, no glow, no billboard")
+	var lip := cut.get_node_or_null("lip") as MeshInstance3D if cut != null else null
+	var lit := lip.material_override as StandardMaterial3D if lip != null else null
+	_check(lip != null and lip.mesh == word.mesh and lip.position.y < word.position.y and lip.position.z < word.position.z
+		and lit.albedo_color.v > ArtKit._palette_colour(ArtKit.CARVE_CELL).v, "a light lip under each stroke, a little lower and behind: cut, not stuck on")
+	_check(word != null and ((word.mesh as TextMesh).font as FontVariation).base_font.resource_path == ArtKit.CARVE_FONT, "in the chiselled capitals (%s)" % ArtKit.CARVE_FONT)
+	stone.free()
+	# Variant 3, the carved waystone: no arrow cut in the stone, the word's own the only one,
+	# as wide as the word or wider (the coordinator's, 800).
+	var way := ArtKit.instance("building.waystone", 3)
+	var pointed := ArtKit.carve(way, "building.waystone", 3, "Cave", "right")
+	var arrow := pointed.get_node_or_null("arrow") as Node3D if pointed != null else null
+	var said := pointed.get_node("word") as MeshInstance3D if pointed != null else null
+	_check(arrow != null and is_zero_approx(arrow.rotation.z) and arrow.position.y < said.position.y,
+		"an arrow under the word, pointing the reader's right")
+	var span := 0.0
+	if arrow != null:
+		span = (arrow.get_node("shaft") as MeshInstance3D).mesh.get_aabb().size.x + (arrow.get_node("head") as MeshInstance3D).mesh.get_aabb().size.y
+	_check(said != null and span >= said.mesh.get_aabb().size.x - 0.001, "the arrow as wide as the word or wider (%.3f, the word %.3f)" % [span, said.mesh.get_aabb().size.x if said else 0.0])
+	var left := ArtKit.carve(way, "building.waystone", 3, "Hut", "left")
+	_check(left != null and is_equal_approx((left.get_node("arrow") as Node3D).rotation.z, PI), "left turned to the reader's left")
+	way.free()
+	var plain := ArtKit.instance("building.standing_stone")
+	_check(ArtKit.carve(plain, "building.standing_stone", 1, "Nothing") == null and plain.get_node_or_null("carved") == null,
+		"a slot with no panel gets no words")
+	plain.free()
 
 
 func _test_swatch_uvs() -> void:

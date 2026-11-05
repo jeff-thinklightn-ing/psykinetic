@@ -193,6 +193,13 @@ const ON_WATER: Array[String] = ["building.well"]
 ## floor cell with a piece on it, no wall round it; so is the dark tower's
 ## sealed hatch (659 amended), laid over the mine's sealed link.
 const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne", "building.hatch_sealed"]
+## Words cut in a stone's face (decision 800): a building entry's "carved"
+## (voice's words, maps' row: a milestone's or a waystone's name) up to
+## CARVED_MAX letters, and its "arrow", one of CARVED_ARROWS, on the side of
+## someone reading the stone's front. The client draws them (ArtKit.carve)
+## where the slot has a panel for them; the sim only carries them.
+const CARVED_MAX := 24
+const CARVED_ARROWS: Array[String] = ["left", "right", "up"]
 ## The placed pieces with no walls of their own that stand taller than a
 ## player's middle (about 1.5 m, by art-kit's drawn heights): on the line
 ## from the camera to the player they fade as trees do (623 amended (2):
@@ -1838,6 +1845,11 @@ static func buildings_from(config: Dictionary, terrain: Dictionary, warnings: Ar
 			building["variant"] = maxi(1, int(entry["variant"]))
 		if entry.get("yaw") is float or entry.get("yaw") is int:
 			building["yaw"] = float(entry["yaw"])
+		# Words cut in its face, and the way they point (800).
+		if entry.get("carved") is String and str(entry["carved"]).strip_edges() != "":
+			building["carved"] = str(entry["carved"]).strip_edges().left(CARVED_MAX)
+			if str(entry.get("arrow", "")) in CARVED_ARROWS:
+				building["arrow"] = str(entry["arrow"])
 		# A BANKED one's door opens onto its approach, inside its plot (718).
 		if BANKED.has(what):
 			building["front"] = front_cell(blocks[0], building["facing"])

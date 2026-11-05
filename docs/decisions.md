@@ -41404,3 +41404,64 @@ the slots' length. No new class_name.
 The set is built as approved while Jeff's pick 1 (head, neck, back, feet and two rings, gloves
 held back) is still open, and it may change: a slot is only appended, so adding gloves or
 dropping one before a record saves anything in it costs one constant and a row in WORN.
+## 800. Carved words on stones
+
+The coordinator's ask (2026-11-04): a milestone or waystone can carry words cut into its face,
+for a traveller standing beside it to read, drawn as letters cut into the stone and never as a
+floating label. Voice words them, and lore checks the names and directions against the world
+plane. The words are data, so changing one needs no new art.
+
+- A level's building entry may carry "carved" (a word, trimmed, at most Level.CARVED_MAX = 24
+  letters) and "arrow" (Level.CARVED_ARROWS: "left", "right" or "up", as seen by someone
+  reading the stone's front, +z). Level.buildings_from copies them onto the parsed building. A
+  blank word and an arrow not in the list are dropped. The sim only carries them.
+- A slot that can be carved has "carve": one panel per variant, each {"at": [x, y, z], "size":
+  [w, h]}, the panel's middle on the front face and its width and height.
+  - building.milestone: variant 1's small pale panel, and a new variant 2, the same stone long,
+    low and squarer (0.91 m across) with a flat plain front for the words, its face a step darker
+    (row 1's columns 3 and 4, rock.split's grey) so it doesn't glow by the road. The
+    coordinator chose the wide one for named milestones, because "a milestone's whole job is to
+    be read": at the camera's normal zoom (CAMERA_SIZE 12 m on screen) the narrow panel's 6 cm
+    letters are a mark, not a word. A panel may carry "lean", the degrees its face tips back,
+    and the words tip with it (variant 2's leans 2.1).
+  - building.waystone: variants 1 and 2 keep their cut arrows (up the road; a link's way out)
+    and the flat front under them. A new variant 3 is variant 1's stone with no arrows cut,
+    the same darker grey, its panel on the plain front: a carved waystone's arrow is the word's
+    own, the only way it shows (the coordinator: two arrows pointing two ways read as none).
+- Client3D, building a building with "carved", calls ArtKit.carve(node, slot, variant, word,
+  arrow). It adds a "carved" child at the panel. The look (after Jeff's note on the first
+  stills: "the milestones don't look right, might be the font, might be the 'label' look"):
+  - No band, no label. The word is cut in capitals, as inscriptions are (the data keeps its
+    case), in Cinzel Black, Roman inscription capitals (OFL 1.1). The shipped file is a
+    cleaned copy, "Cinzel Carve" (C:/dev/review/carved/clean_cinzel.py: overlaps removed and
+    duplicate points dropped, which Godot's TextMesh can't triangulate; the outlines are
+    otherwise the designer's). Black, not Bold: at normal zoom a letter is about 6 px tall and
+    Bold's hairlines (the U's bowl) fell between pixels. Cinzel's small-capital u and g still
+    don't triangulate, which is a second reason for capitals.
+  - It is fitted to the panel's width or height, whichever is less. A word that fits the width
+    with height to spare stands up to CARVE_STRETCH (1.4) taller, because the camera's 50
+    degrees shortens an upright face.
+  - The cut: the letters in a darker grey of the stone (CARVE_CELL, row 1 column 6), thin and
+    lying just on the face (CARVE_PROUD 3 mm), over a copy of them in the stone's palest
+    (CARVE_LIP_CELL) a little lower and behind. The copy shows as a thin light lip under each
+    stroke: the lit floor of a cut seen from above. Moss (CARVE_MOSS_CELL) mottles the cuts, so
+    the words look old. Everything is a plain StandardMaterial3D, lit and as rough as the
+    stone: no billboard, no glow, no Label3D.
+  - An arrow, a shaft and a head cut the same way, takes the lower CARVE_ARROW_SHARE of the
+    panel, as wide as the word's band, turned to point the reader's way. A slot with no panel
+    draws no words.
+  ArtKit keeps its own copy of the arrow names (CARVE_ARROWS), because naming Level
+  would pull the autoloads into tools/art_status.gd, which runs as a bare --script. The test
+  pins the two lists equal.
+- The wire: building entries reach the client in the "terrain" message's level, so an older
+  client ignores the two keys and draws the stone bare. That is the same case as 797's
+  skylights, and release ruled no PROTOCOL_REVISION.
+- The hills' four (maps adds the keys on top of terrain's 798; the words are voice's, checked
+  by lore): M1 "Umbrage" and M2 "Shieling" on variant 2 milestones, W3 "Hut" with an arrow
+  left (north, up the track to the herder's hut) and W4 "Cave" with an arrow right (south, to
+  the hill cave), both on variant 3 waystones.
+- Test: art_kit_test _test_carved covers Level's carrying and dropping, the word fitted inside
+  the wide band, the material and its moss, the light lip, the font, the arrow's turn and width
+  on waystone variant 3, and no words on a slot without a panel. Every printable glyph was
+  checked once at 4x, Godot's triangulation against FreeType's rendering.
+  Client only; protocol unchanged; no new class_name.
