@@ -3751,6 +3751,16 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 	var hard := Monster.is_apex(kind) or foe.boss or not foe.given_name.is_empty() or not foe.named_id.is_empty()
 	var label := str(Monster.kinds().get(kind, {}).get("label", kind))
 	var name := foe.given_name if not foe.given_name.is_empty() else "The " + label.to_lower()
+	var id := foe.get_instance_id()
+	if not fled:
+		# Routed, then brought down before the win is told (804 amended (9):
+		# playtest's bear, run off at 18 hp and felled on the way to its den,
+		# bannered "driven off"): it fell.
+		for player: Player in _fight_beaten.keys():
+			for each: Dictionary in _fight_beaten[player]:
+				if int(each.get("id", 0)) == id and bool(each["fled"]):
+					each["fled"] = false
+					each["at"] = foe.tile
 	for player: Player in _fight_foes.keys():
 		var foes: Dictionary = _fight_foes[player]
 		if not foes.has(foe):
@@ -3758,7 +3768,7 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 		foes.erase(foe)
 		if not _fight_beaten.has(player):
 			_fight_beaten[player] = []
-		(_fight_beaten[player] as Array).append({"name": name, "fled": fled, "hard": hard, "at": foe.tile})
+		(_fight_beaten[player] as Array).append({"name": name, "fled": fled, "hard": hard, "at": foe.tile, "id": id})
 	_tend_fights()
 
 

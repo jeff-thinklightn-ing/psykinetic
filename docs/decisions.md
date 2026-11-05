@@ -42120,6 +42120,17 @@ alone nothing, with the player in it a deed, a second within the minute held the
 bear within the minute at once); _test_fight_won waits out the window. Server only, protocol
 unchanged, no new class_name; the bullet stands.
 
+804 amended (9): routed, then brought down, is brought down (2026-11-05, combat; release's label;
+the coordinator's OK; playtest's bear_deed tour on 24a59b95: the great bear broke and ran at 18 hp
+from (11, 25), Rhea felled it at (8, 23) on its way to the den, and the deed's banner read "The
+great bear, driven off"). A rout makes a foe beaten at once (804, combat's side), so its death after
+found it gone from every fight and changed nothing. Each beaten entry now keeps the foe's instance
+id; World._foe_beaten for a death turns a fled entry of that foe still waiting to be told (the
+merge window, or held by the minute) to fallen, where it fell. One that gets away, or is felled after
+its win was told, is as before. combat_test _test_fight_paced (run off then felled in the window:
+one foe, "brought down"; run off and away: "driven off"). Server only, protocol unchanged, no new
+class_name, no bullet.
+
 ## 810. A tell strikes what it shows, lag judged in the player's favour
 
 (2026-11-05, combat; the coordinator's approval, after playtest's bear13 runs; release's number.) In

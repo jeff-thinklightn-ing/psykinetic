@@ -1485,6 +1485,28 @@ func _test_fight_paced(won: Array) -> void:
 	World._foe_beaten(bear as Monster, false)
 	_settle()
 	_check(won.size() == 2 and bool(won[1][2][0]["hard"]), "the great bear within the minute: told at once (%s)" % [won])
+	# Routed, then felled before the win is told: brought down (804 amended (9)).
+	won.clear()
+	e = _build(["#######", "#.PB..#", "#######"])
+	p = e["P"][0]
+	bear = e["B"][0]
+	_blow(p, bear)
+	(bear as Monster).alert = Monster.Alert.FLEEING
+	World._tend_fights()
+	World._foe_beaten(bear as Monster, false)
+	_settle()
+	var reward := World.fight_reward(won[0][2] if won.size() == 1 else [], Vector2i.ZERO)
+	_check(won.size() == 1 and (won[0][2] as Array).size() == 1 and not bool(won[0][2][0]["fled"])
+			and str(reward.get("banner", "")) == "The great bear, brought down", "run off, then felled in the window: one foe, brought down (%s)" % [reward])
+	# Routed and got away: driven off still.
+	won.clear()
+	e = _build(["#######", "#.PB..#", "#######"])
+	p = e["P"][0]
+	bear = e["B"][0]
+	_blow(p, bear)
+	(bear as Monster).alert = Monster.Alert.FLEEING
+	_settle()
+	_check(won.size() == 1 and bool(won[0][2][0]["fled"]), "run off and away: driven off (%s)" % [won])
 
 
 func _test_fight_won() -> void:
