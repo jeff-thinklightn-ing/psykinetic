@@ -42828,3 +42828,68 @@ four neighbours at 5.69 m (relief_test: every spawn on level ground; 0.25 m down
 floor at its door, walkable), and EditorFields.NOT_OFFERED names an interior's "town", "storeys"
 and "beds" (editor_test: every key a row). Client and level data, protocol unchanged, no new
 class_name.
+## 806. Layout sense: the rules an interior is laid under, checked on every generation
+
+Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel
+sloppy and doesn't make sense, like a door leading to a hallway that wraps around a room, doors that
+lead to dead ends, rooms that don't have purposes, etc." The coordinator ordered the rules first,
+since the crypt and the new barrows are built under them.
+
+- **The audit** (C:/dev/review/layout/README.md, with an annotated plan per generation). Three
+  generations each of barrow, barrow_deep, castle_halls and hollowfell were drawn from the data and
+  measured.
+  - barrow: 70-80% of its rooms hold nothing with a purpose, and half sit two or more steps off the
+    spine.
+  - castle_halls: about 60% of its rooms are empty, and about one door in six leads to a stub or an
+    empty closet.
+  - barrow_deep: graves everywhere, but up to 2.3 times the straight line to the lair.
+  - hollowfell: bays with only beams, tunnel rings round plain rock, empty tunnel ends.
+  - A corridor wrapping a room turned up rarely (2 in 12).
+  - Every town building is one open room, which the rules can't fault.
+- **The rules** (sim/layout_sense.gd; no class_name, preloaded).
+  `check(level, rooms, options) -> [{rule, cell, what}]`, with `counts(faults)` and
+  `check_chests(level, options)`.
+  - **door**: every door leads to a room or a through-route, never a stub or an empty one-door
+    closet.
+  - **purpose** (and Jeff, the same night: "no room should be empty, it should have at least some
+    reward, a visual point of interest, an enemy, a npc, chest, loot, secret, lore exposition,
+    transition to a new area. anything but an empty square"): a room has a use when the level
+    names its rooms, and holds at least one of an enemy, an NPC, a chest or loot, a niche, a sign,
+    a link or start, or a set piece (decor named as a sight: SIGHT_WORDS, statue, altar,
+    sarcophagus, collapse, carving, fallen ...). Lights and scattered dressing (webs, moss, beams)
+    don't count. Corridors are not held to it.
+  - **wrap**: no corridor runs along two of a room's sides (60% of each, within 2 cells).
+  - **dead_end**: a dead end holds something. A stub corridor, or a spur's tip (the thinned
+    corridor's end, away from rooms, starts and links); a monster alone doesn't count.
+  - **spine**: the walk from the start to the heart (an option, else the farthest anchor, else the
+    farthest floor) is at most 1.6 times the straight line. Every room is on the spine or one step
+    off it, except rooms given a "wing".
+  - **loop**: a rock island ringed by floor touches two rooms or more. A piece no bigger than the
+    option "pillars" (castle_halls' columns: 4) is a pillar, part of the room round it.
+  - **chest** (Jeff, the same night: "all chests in the game should have some item in them, if
+    theres no item to put in, then no chest"; "an empty chest is like an anti-reward"; "chests use
+    only for dungeons and keep them guarded"): a chest gives something (a cache table, rolled loot,
+    items laid in it), stands in a dungeon, and has a monster in its room or within 8 steps.
+    - A chest with a role of its own is left out: props "role", the barrow's offering Altar and the
+      Runner's pack the commissions drop into.
+    - So are a depot, shop, locker or temple.
+    - Per-player chests are 808.
+- **Rooms**: when a level names its rooms (a generator's "laid_rooms", buildings' "rooms" and
+  "passages": {id, use, rect | cells, wing}), the check uses them. Otherwise it finds them by shape:
+  floor where a clear square one cell wider than the level's ways fits (no wall or cliff inside),
+  with pieces smaller than a room left as corridor.
+- **Steps** follow World's rule (walls, cliffs by Relief.step), with doors open.
+- **level_test _test_layout_sense**:
+  - the checker on small made-up floors, each rule named;
+  - every generation (two) of every regenerating level, with counts reported;
+  - every level's chests, reported.
+  - Nothing fails yet. LAYOUT_HELD names the rules a level is held to, and each generator's fix
+    (806 amended (k)) adds its level as it lands, so no landing is blocked meanwhile.
+  - The fix order is the coordinator's: Hollowfell's tunnel ends and rock rings with the tour's
+    fixes, then the barrow's rooms with the crypt, then castle_halls.
+- **The plan sheets for people**:
+  - tools/layout_dump.tscn writes generations' layouts.
+  - tools/layout_audit.py draws and measures them the same way, numbered faults on a plan view;
+    `--all <dump> <out>` does every generation dumped.
+- Also in this landing: level_test's generations loop (790) checks each generation's track with
+  physics' _track_faults (794).

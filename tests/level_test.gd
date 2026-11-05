@@ -41,6 +41,7 @@ func _ready() -> void:
 	_test_pit_ways_out()
 	_test_mine_track()
 	_test_step_cache()
+	_test_layout_sense()
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
@@ -1280,6 +1281,9 @@ func _test_pit_ways_out() -> void:
 			var level := Level.parse(made["layout"], made["height"], made["config"])
 			level["name"] = level_name
 			World.load_terrain(level["terrain"])
+			# 794 (physics): a generation's track rolls as a laid level's must.
+			var faults := _track_faults()
+			_check(faults.is_empty(), "%s generation %d: its track rolls (%s)" % [level_name, generation, faults.slice(0, 8)])
 			var named := _trap_landings(level, drops)
 			if not named.is_empty() and PIT_TRAPS_EXPECTED.has(level_name):
 				print("  EXPECTED FAIL  %s generation %d: %d pits with no way out, landing at %s (%s fixes it)" % [level_name, generation, named.size(), named.slice(0, 8), PIT_TRAPS_EXPECTED[level_name]])
@@ -4354,6 +4358,131 @@ func _test_tower_levels() -> void:
 			var hatch: Dictionary = link_at.call(level, Vector2i(c, 2))
 			_check(hatch.get("to_map") == "lt_tower_mine" and hatch.get("sealed") == "tower_mine" and cue_at.call(level, Vector2i(c, 2)) == "sealed",
 				"the mine's way down under the north wall is a sealed link (%s)" % [hatch])
+
+
+const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
+## Each regenerating level's way width, for finding its rooms by shape (806).
+const LAYOUT_WAYS := {"barrow": 3, "barrow_deep": 3, "castle_halls": 5, "hollowfell": 4}
+## The rules each level is held to so far (806 amended (k) adds one as its
+## generator is fixed); the rest are reported, not failed.
+const LAYOUT_HELD := {}
+## Rock pieces no bigger than this inside a level's floor are a hall's pillars
+## (castle_halls' dwarven columns), not loops.
+const LAYOUT_PILLARS := {"castle_halls": 4}
+
+
+func _test_layout_sense() -> void:
+	print("\n== 806: layout sense: doors lead somewhere, rooms have purposes, no corridor wraps a room, dead ends hold something, a spine, loops through rooms ==")
+	# The checker itself, on small made-up floors (ways 2: a room is where a
+	# 3 x 3 square fits).
+	var clean := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 2, 6, 2), Rect2i(12, 0, 6, 6)], [], [Vector2i(2, 2)], [Vector2i(15, 3)])
+	var faults := LAYOUT_SENSE.check(clean, [], {"ways": 2})
+	_check(faults.is_empty(), "two rooms, each holding something, joined straight: no faults (%s)" % [faults])
+	# A door off the first room into a short blind way with nothing in it.
+	var stub := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 2, 6, 2), Rect2i(12, 0, 6, 6), Rect2i(2, 6, 2, 3)],
+			[[Vector2i(2, 5), Vector2i(0, 1), Terrain.Edge.DOOR], [Vector2i(3, 5), Vector2i(0, 1), Terrain.Edge.DOOR]],
+			[Vector2i(2, 2)], [Vector2i(15, 3)])
+	var counts := LAYOUT_SENSE.counts(LAYOUT_SENSE.check(stub, [], {"ways": 2}))
+	_check(counts["door"] == 1 and counts["dead_end"] == 1, "a door to an empty stub is a door fault and a dead end (%s)" % [counts])
+	# A third room holding nothing.
+	var empty := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 2, 6, 2), Rect2i(12, 0, 6, 6), Rect2i(18, 2, 4, 2), Rect2i(22, 0, 6, 6)], [],
+			[Vector2i(2, 2)], [Vector2i(15, 3)])
+	counts = LAYOUT_SENSE.counts(LAYOUT_SENSE.check(empty, [], {"ways": 2}))
+	_check(counts["purpose"] == 1, "a room holding nothing has no purpose (%s)" % [counts])
+	_check(LAYOUT_SENSE.counts(LAYOUT_SENSE.check(empty, [{"rect": [0, 0, 6, 6], "use": "tomb"},
+			{"rect": [12, 0, 6, 6], "use": ""}, {"rect": [22, 0, 6, 6], "use": "store"}], {}))["purpose"] >= 2,
+			"named rooms: one with no use, one holding nothing, are both named")
+	# Jeff, 11-04: an enemy alone is enough for a room ("anything but an empty square").
+	var guarded := empty.duplicate(true)
+	guarded["entities"].append({"tile": Vector2i(25, 3), "name": "Ghoul", "home": Vector2i(25, 3)})
+	counts = LAYOUT_SENSE.counts(LAYOUT_SENSE.check(guarded, [], {"ways": 2}))
+	_check(counts["purpose"] == 0, "a room holding an enemy is not empty (%s)" % [counts])
+	# A hall with a pillar in it is one room, and the pillar no loop.
+	var hall := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 2, 6, 2), Rect2i(12, 0, 7, 7)], [], [Vector2i(2, 2)], [Vector2i(17, 5)])
+	hall["terrain"]["floor"].erase(Vector2i(15, 3))
+	counts = LAYOUT_SENSE.counts(LAYOUT_SENSE.check(hall, [], {"ways": 2, "pillars": 4}))
+	_check(counts["loop"] == 0 and counts["purpose"] == 0, "a pillar in a hall is part of the hall, not a loop (%s)" % [counts])
+	# A way that splits round a block of plain rock and joins again.
+	var ring := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 1, 9, 2), Rect2i(6, 5, 9, 2), Rect2i(6, 3, 2, 2), Rect2i(13, 3, 2, 2),
+			Rect2i(15, 1, 2, 2), Rect2i(17, 0, 6, 6)], [], [Vector2i(2, 2)], [Vector2i(20, 3)])
+	counts = LAYOUT_SENSE.counts(LAYOUT_SENSE.check(ring, [], {"ways": 2}))
+	_check(counts["loop"] >= 1, "a corridor ring round plain rock is a loop with no meaning (%s)" % [counts])
+	# A way hugging two sides of a room before it goes in (walled off it).
+	var hug_floor := [Rect2i(0, 0, 6, 6), Rect2i(6, 0, 2, 10), Rect2i(8, 8, 8, 2), Rect2i(8, 2, 6, 6), Rect2i(14, 2, 2, 6)]
+	var walls := []
+	for y in range(2, 6):
+		walls.append([Vector2i(5, y), Vector2i(1, 0), Terrain.Edge.WALL])
+	for y in range(2, 8):
+		walls.append([Vector2i(7, y), Vector2i(1, 0), Terrain.Edge.WALL])
+	for x in range(8, 14):
+		walls.append([Vector2i(x, 7), Vector2i(0, 1), Terrain.Edge.WALL])
+	var hug := _ls_level(hug_floor, walls, [Vector2i(2, 2)], [Vector2i(10, 4)])
+	counts = LAYOUT_SENSE.counts(LAYOUT_SENSE.check(hug, [], {"ways": 2}))
+	_check(counts["wrap"] >= 1, "a corridor running along two sides of a room wraps it (%s)" % [counts])
+	# Chests (Jeff: every chest gives something, in a dungeon, guarded).
+	var vault := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 2, 6, 2), Rect2i(12, 0, 6, 6)], [], [Vector2i(2, 2)], [])
+	vault["entities"] = [{"tile": Vector2i(15, 3), "name": "Chest", "script": Level.CHEST, "props": {"slots": ["", ""]}}]
+	var said := LAYOUT_SENSE.check_chests(vault, {"dungeon": true})
+	_check(said.size() == 2, "an empty chest with no guard is named twice: it gives nothing, and it is unguarded (%s)" % [said])
+	vault["entities"] = [{"tile": Vector2i(15, 3), "name": "Chest", "script": Level.CHEST, "props": {"cache": "robbers_camp"}},
+		{"tile": Vector2i(14, 1), "name": "Imp1", "script": Level.MONSTER, "home": Vector2i(14, 1)}]
+	said = LAYOUT_SENSE.check_chests(vault, {"dungeon": true})
+	_check(said.is_empty(), "a cache with an imp beside it passes (%s)" % [said])
+	said = LAYOUT_SENSE.check_chests(vault, {"dungeon": false})
+	_check(said.size() == 1, "the same chest outside a dungeon is named (%s)" % [said])
+	vault["entities"] = [{"tile": Vector2i(15, 3), "name": "Altar", "script": Level.CHEST, "props": {"role": "offering", "slots": [""]}}]
+	_check(LAYOUT_SENSE.check_chests(vault, {"dungeon": true}).is_empty(), "a chest with a role of its own (an offering altar) is left out")
+	# Every level's chests today (reported).
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		var laid := Level.load_level(folder)
+		if laid.is_empty():
+			continue
+		var config: Variant = JSON.parse_string(FileAccess.get_file_as_string(Level.DIR + folder + "/level.json"))
+		var depth := int((config as Dictionary).get("depth", 0)) if config is Dictionary else 0
+		var chest_faults := LAYOUT_SENSE.check_chests(laid, {"dungeon": depth > 0 or laid.get("regenerate") is Dictionary})
+		if not chest_faults.is_empty():
+			print("  REPORT  %s chests: %s" % [folder, chest_faults.map(func(f: Dictionary) -> String: return "%s %s" % [f["cell"], f["what"]])])
+	# Every generation of every regenerating level, measured (reported; a
+	# rule fails only once LAYOUT_HELD holds the level to it).
+	for level_name in Regen.marked_levels():
+		var totals := {}
+		for generation in [1, 2]:
+			var made := Regen.generate(level_name, generation)
+			if made.is_empty():
+				continue
+			var level := Level.parse(made["layout"], made["height"], made["config"])
+			var anchors: Array = (made["config"].get("regenerate", {}) as Dictionary).get("anchors", [])
+			var found := LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), {"ways": LAYOUT_WAYS.get(level_name, 3), "anchors": anchors, "dungeon": true, "pillars": LAYOUT_PILLARS.get(level_name, 0)})
+			var by_rule := LAYOUT_SENSE.counts(found)
+			for rule: String in by_rule:
+				totals[rule] = int(totals.get(rule, 0)) + int(by_rule[rule])
+			for rule: String in LAYOUT_HELD.get(level_name, []):
+				_check(by_rule[rule] == 0, "%s generation %d: no %s faults (%s)" % [level_name, generation, rule,
+						found.filter(func(f: Dictionary) -> bool: return f["rule"] == rule).slice(0, 6)])
+		print("  REPORT  %s, two generations: %s" % [level_name, totals])
+
+
+## A made-up level for the checker: [param rects] floor, [param edges]
+## [[cell, way, Terrain.Edge], ...], a start at each of [param starts], a
+## thing with a purpose (a bier) at each of [param things].
+func _ls_level(rects: Array, edges: Array, starts: Array, things: Array) -> Dictionary:
+	var floor: Array[Vector2i] = []
+	for rect: Rect2i in rects:
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				if not Vector2i(x, y) in floor:
+					floor.append(Vector2i(x, y))
+	var kinds := {}
+	for row: Array in edges:
+		kinds[Terrain.edge_key(row[0], row[1])] = row[2]
+	var starts_typed: Array[Vector2i] = []
+	starts_typed.assign(starts)
+	var entities := []
+	for cell: Vector2i in things:
+		entities.append({"tile": cell, "name": "Bier"})
+	return {"terrain": {"floor": floor, "edges": kinds}, "starts": starts_typed, "entities": entities, "links": []}
 
 
 func _check(ok: bool, label: String) -> void:

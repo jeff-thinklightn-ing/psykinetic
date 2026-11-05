@@ -209,6 +209,7 @@
 			],
 			"name": "Altar",
 			"props": {
+				"role": "offering",
 				"slots": [
 					"",
 					"",
@@ -224,6 +225,7 @@
 			],
 			"name": "Runner's pack",
 			"props": {
+				"role": "commission",
 				"grave": false,
 				"slots": [
 					"",
