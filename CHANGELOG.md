@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: click a townsperson to talk, trade or give in one window; what you type goes to them, and Give hands them what they can use from your pack, toward a build or the town's stores and paid for now or owed, or gear to Rolf as a gift (802).
 ## v0.1.204
 
 - What goes over the network changes, so v0.1.203 and older can't join the server: update through the launcher first.

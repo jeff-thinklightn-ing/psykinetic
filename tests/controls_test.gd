@@ -700,10 +700,13 @@ func _test_friend_click() -> void:
 		_main.add_child(body)  # On screen, for the bar to stand under (the 2D view's anchor).
 	_main._pick_grid = Vector2(9.1, 6.1)
 	_left(false)
-	_check(_main._bar.visible and _main._bar_for == body, "beside them, a plain click opens the talk bar under them (560 amended)")
+	var window: BarterPanel = _main.barter_panel
+	_check(window.is_open() and window.person == body and window.talks and not _main._bar.visible,
+		"beside them, a plain click opens their window, its typing line, no talk bar (802)")
 	_main._pick_grid = Vector2(11.1, 3.1)
 	_left(false)
-	_check(not _main._bar.visible, "and a click elsewhere closes it")
+	_check(not window.is_typing(), "and a click elsewhere takes the keys back from the typing line (802)")
+	window.close()
 	_place_player(Vector2i(10, 5))
 	_main._pick_grid = Vector2(9.1, 6.1)
 	_left(true)

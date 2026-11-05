@@ -59,6 +59,8 @@ func _ready() -> void:
 	await _test_gains()
 	_test_seam_click()
 	_test_fire_click()
+	await _test_person_window()
+	await _test_person_give()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2721,14 +2723,164 @@ func _test_fire_walk_round() -> void:
 	_main._free["held"] = false
 	var walked: Array[Vector2i] = []
 	for i in 400:
+		me.hp = me.max_hp  # The room's imp: the walk is the check, not a fight (later tests need him standing).
 		_main._free_drive(0.05)
 		World.step()
 		var cell: Vector2i = Vector2i((own.shown(me) as Vector2).round())
 		if walked.is_empty() or walked.back() != cell:
 			walked.append(cell)
-		if (_main._free["path"] as Array).is_empty() and i > 10:
+		if cell == goal or (_main._free["path"] as Array).is_empty() and i > 10:
 			break
 	var hot := walked.filter(func(cell: Vector2i) -> bool: return World.is_burning(cell))
 	_check(hot.is_empty() and walked.has(goal), "walked past it, frame by frame: never in a burning cell, and there (%s)" % [walked])
 	_main._free["path"] = []
 	World._relocate(me, home)
+
+
+func _test_person_window() -> void:
+	print("\n== the townsperson window (802): a click opens it, the typing line has the keys, their words and yours in it, the range ==")
+	var me: Player = _main._local_player()
+	var window: BarterPanel = _main.barter_panel
+	if me == null or window == null:
+		print("  (no player in this scene: skipped)")
+		return
+	var home := me.tile
+	var cell: Vector2i = _main._beside(me.tile, Vector2i(-1000, -1000))
+	var body: Resident = load(Main.RESIDENT).new()
+	body.name = "UiTestOda"
+	body.person = "Oda"
+	body.trade = "farmer"
+	if cell == Main.NONE or not World.spawn(body, cell):
+		_check(false, "a townsperson stands beside the player")
+		return
+	if not body.is_inside_tree():
+		_main.add_child(body)  # In the tree, as a spawned body is in the game (its path the window's "to").
+	window.close()
+	_main._open_talk(body)
+	for i in 3:
+		await get_tree().process_frame
+	_check(window.is_open() and window.person == body and window.talks and not window.trades and window.title_shown() == "Oda"
+		and not _main._bar.visible, "a click: their window, their name, the typing line, no squares for a farmer, no talk bar")
+	_check(window.is_typing() and _main.is_typing(), "the typing line has the keys at once: no game key moves you")
+	_main._chat_sent_at = 0
+	window._submit("good morning")
+	_check(window.chat_shown() == ["%s: good morning" % _main._display_name(me)], "Enter: your line in the window (%s)" % [window.chat_shown()])
+	_check(_main._window_to() == str(body.get_path()), "said to them (\"to\"), and Y's yes too")
+	_main._on_message("speech", {"entity": str(body.get_path()), "speaker": "Oda", "text": "Morning to you.", "aside": ""})
+	_main._on_message("speech", {"entity": str(me.get_path()), "speaker": "Someone", "text": "not hers", "aside": ""})
+	_check(window.chat_shown().size() == 2 and window.chat_shown().back() == "Oda: Morning to you.", "their words in it; nobody else's (%s)" % [window.chat_shown()])
+	var band := Main.NONE
+	var far := Main.NONE
+	for dx in range(-8, 9):
+		for dy in range(-8, 9):
+			var at := body.tile + Vector2i(dx, dy)
+			if not World.is_free(at) or not World.has_line_of_sight(at, body.tile):
+				continue
+			var gap := World.distance(at, body.tile)
+			if gap == World.PERSON_REACH + 1 and band == Main.NONE:
+				band = at
+			elif gap >= World.PERSON_REACH + 3 and far == Main.NONE:
+				far = at
+	if band != Main.NONE:
+		World._relocate(me, band)
+		_main._update_store()
+		_check(window.is_open() and not window.near and window.foot_shown() == BarterPanel.STEP_CLOSER,
+			"a step past trading reach: still open, Step closer to trade")
+	else:
+		print("  (no cell a step past reach in sight here: the band unchecked)")
+	if far != Main.NONE:
+		World._relocate(me, far)
+		_main._update_store()
+		_check(window.is_open(), "out of reach for a moment: held open (no flicker)")
+		_main._person_far_since -= Main.PERSON_HOLD + 0.1
+		_main._update_store()
+		_check(not window.is_open() and window.chat_shown().is_empty(), "out of reach past the hold: closed, the chat gone")
+	else:
+		print("  (no far cell in sight here: the close unchecked)")
+	World._relocate(me, home)
+	_main._open_talk(body)
+	for i in 2:
+		await get_tree().process_frame
+	var escape := InputEventKey.new()
+	escape.keycode = KEY_ESCAPE
+	escape.pressed = true
+	window._line_input(escape)
+	_check(not window.is_open() and not _main.is_typing(), "Esc in the typing line: closed")
+	body.activity = "sleep"
+	_main._open_talk(body)
+	_check(not window.is_open(), "asleep: no window (npc's line comes from the greet)")
+	body.activity = ""
+	var visitor: Resident = load(Main.RESIDENT).new()
+	visitor.name = ("Resident_" + Offers.VISITOR + "pedlar").validate_node_name()
+	_check(Main.answers_clicks_only(visitor) and not Main.answers_clicks_only(body), "a visitor answers clicks only: no typing line in theirs")
+	visitor.free()
+	window.close()
+	World.despawn(body)
+	if is_instance_valid(body):
+		body.queue_free()
+
+
+## 802 Give (Jeff: things handed to a person, not a chest): voice's lines for
+## what a give does; a sheet with "takes" shows the toggle and opens on Give;
+## a pick of a square they take, the button, "give" {entity, uids}; none
+## taken: no toggle.
+func _test_person_give() -> void:
+	print("
+== Give (802): the person's takes lit, voice's lines, the button gives ==")
+	var rows := [
+		{"uid": 901, "what": "ore_sack", "count": 2, "slot": 0, "raw": "ore", "for": {"kind": "build", "name": "the new forge"}, "have": 12, "need": 20, "gold": 3, "owed": 0},
+		{"uid": 902, "what": "bread", "count": 1, "slot": 1, "raw": "food", "for": {"kind": "stores", "name": "the larder"}, "have": 14, "need": 22, "gold": 0, "owed": 2},
+		{"uid": 903, "what": "sword", "count": 1, "slot": 2, "for": {}, "have": 0, "need": 0, "gold": 0, "owed": 0}]
+	_check(BarterPanel.give_lines(rows) == ["For the new forge: 12 of 20 ore", "For the larder: 14 of 22 food", "A gift", "Pays 3 gold", "Owes you 2 gold"],
+		"voice's lines: toward a build, the larder, a gift, paid and owed (%s)" % [BarterPanel.give_lines(rows)])
+	_check(BarterPanel.give_lines([rows[2]]) == ["A gift"] and BarterPanel.raw_word({"what": "wood_bundle"}) == "wood",
+		"a gift alone says so and nothing of gold; a row with no raw word reads its sack's")
+	var me: Player = _main._local_player()
+	var window: BarterPanel = _main.barter_panel
+	if me == null or window == null:
+		print("  (no player in this scene: the window's checks skipped)")
+		return
+	var cell: Vector2i = _main._beside(me.tile, Vector2i(-1000, -1000))
+	var body: Resident = load(Main.RESIDENT).new()
+	body.name = "UiTestBran"
+	body.person = "Bran"
+	body.trade = "carpenter"
+	if cell == Main.NONE or not World.spawn(body, cell):
+		_check(false, "a townsperson stands beside the player")
+		return
+	if not body.is_inside_tree():
+		_main.add_child(body)
+	window.close()
+	window.open(body, "Bran")
+	window.set_person(body, true, true)
+	window.show_barter({"resident": str(body.get_path()), "gold": 5, "goods": [], "buys": {}, "pack": [], "takes": rows})
+	_check(window.giving and window._give_tab.visible and window._give_tab.button_pressed, "carrying what they take: the window opens on Give, its toggle shown")
+	var lights: Dictionary = window.pack.prices if window.pack != null else {}
+	_check(window.pack == null or int(lights.get(0, -9)) == 3 and int(lights.get(1, -9)) == -1 and int(lights.get(3, -9)) == 0,
+		"the squares they take lit (a coin where they pay now), the rest dim (%s)" % [lights])
+	_check(window._select_mine(true, 0) and window.gift.has(901) and window.action().get("words") == "Give (1 item)",
+		"a click on a square they take picks it: Give (1 item)")
+	window._select_mine(true, 3)
+	_check(window.gift.size() == 1, "a square they don't take: nothing picked")
+	var lines: Array[String] = []
+	for line: Node in window._outcome.get_children():
+		lines.append((line as Label).text)
+	_check(lines == ["For the new forge: 12 of 20 ore", "Pays 3 gold"], "the lines under say what it does (%s)" % [lines])
+	var sent := []
+	# The sheet as it stood: the give (economy's, on the host) answers with a fresh one.
+	var sheet: Dictionary = window.data.duplicate()
+	var catch := func(to: GridEntity, uids: Array) -> void: sent.append([to, uids])
+	window.give_asked.connect(catch)
+	window._confirm()
+	window.give_asked.disconnect(catch)
+	_check(sent.size() == 1 and sent[0][0] == body and sent[0][1] == [901] and window.gift.is_empty(), "the button gives: their uids, to them (%s)" % [sent])
+	var args: Dictionary = Main.give_args(body, [901], sheet)
+	_check(args.get("barter") == true and args.get("entity") == str(body.get_path()) and args.get("uids") == [901]
+		and not Main.give_args(body, [901], {}).has("barter"), "sent with barter while their barter is open, not otherwise (%s)" % [args])
+	window.set_giving(false)
+	_check(not window.giving and window._grid.visible, "the toggle off: the trade back")
+	window.show_barter({"resident": str(body.get_path()), "gold": 5, "goods": [], "buys": {}, "pack": [], "takes": []})
+	_check(not window.giving and not window._give_tab.visible, "they take nothing carried: no toggle")
+	window.close()
+	World.despawn(body)
+	body.queue_free()

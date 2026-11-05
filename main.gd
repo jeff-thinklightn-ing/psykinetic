@@ -804,6 +804,10 @@ var _bar: PanelContainer
 var _bar_name: Label
 var _bar_barter: Button
 var _bar_for: GridEntity
+## 802: when the townsperson's window first went out of reach or sight (-1: in it).
+var _person_far_since := -1.0
+## 802: how long out of reach or sight before the window closes.
+const PERSON_HOLD := 0.5
 ## The pack sounds asked for, "set entity" each, newest last (tests).
 var sounds: Array[String] = []
 var _test_chest_done := false
@@ -1380,6 +1384,8 @@ func _process(delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
+	if barter_panel != null and barter_panel.is_typing() and event is InputEventMouseButton and (event as InputEventMouseButton).pressed:
+		barter_panel.release_line()  # 802: a click on the world takes the keys back from the typing line, and goes on as a click.
 	if is_typing():
 		return
 	if _arriving():
@@ -1430,7 +1436,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		take_screenshot()
 		return
 	if Keys.pressed(event, "yes") and not standing_title.is_empty() and not is_typing():
-		_send_chat("yes")  # 536: the word, said; the server takes it.
+		_send_chat("yes", 0, _window_to())  # 536: the word, said; the server takes it (802: to the window's person).
 		return
 	if Keys.pressed(event, "hints"):
 		toggle_hints()
@@ -1529,6 +1535,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not click.pressed:
 		return
 	world_clicks += 1  # ui_test: a press on a window's square never gets here.
+	if barter_panel != null:
+		barter_panel.release_line()  # 802: a click on the world takes the keys back from the typing line.
 	# A sprite under the cursor is the target whatever cell is under those
 	# pixels; otherwise the click resolves on the ground plane, to the floor
 	# cell under the cursor and whatever stands on it. The right button also
@@ -1695,8 +1703,8 @@ func _talk_to(player: Player, friend: GridEntity) -> void:
 func _open_talk(friend: GridEntity) -> void:
 	_talk_wanted = null
 	if friend is Resident:
-		_greet(friend)  # 560, ui's side: the click greets; the bar's Talk opens the say line.
-		_open_bar(friend)
+		_greet(friend)  # 560, ui's side: the click greets (they stop and turn).
+		_open_person(friend)  # 802: their window, talk and trade in one.
 	elif talks_peaceably(friend):
 		_greet(friend)  # 629, ui's side: the greet speaks his deal; his "offers" message opens the deal window.
 	elif is_friend(friend) and friend != _local_player():
@@ -1852,6 +1860,93 @@ func _open_barter_with(resident: GridEntity) -> void:
 	else:
 		barter_panel.open(resident, person)
 		World.command(player, "barter", {"resident": str(resident.get_path())})
+
+
+## The townsperson window (802, ui's side): [param body]'s window, their name
+## over a chat area and the typing line (none for a visitor or the stall's
+## keeper, who answer clicks), their squares below if they trade (a
+## merchant's on the counter they front; economy's "barter" asked as the
+## bar's Barter did). Asleep: no window (751 amended (2); npc's "<Name> is
+## asleep." comes from the greet).
+func _open_person(body: GridEntity) -> void:
+	var player := _local_player()
+	if player == null or barter_panel == null or not is_instance_valid(body) or _asleep_seen(body):
+		return
+	var who := str(body.get("person")) if body.get("person") != null else ""
+	if who.is_empty():
+		who = _display_name(body)
+	var clicks_only := answers_clicks_only(body)
+	var trade := _barters(body)
+	if trade and str(body.get("trade")) == "merchant":
+		var counter := _shop_counter_near(body)
+		barter_panel.open(counter, who)
+		World.command(player, "barter", {"shop": str(counter.get_path())})
+	elif trade:
+		barter_panel.open(body, who)
+		World.command(player, "barter", {"resident": str(body.get_path())})
+	elif not (barter_panel.is_open() and barter_panel.with == body):
+		barter_panel.open(body, who)  # A ware seller's wares come with their "offers" (show_wares).
+	barter_panel.set_person(body, not clicks_only, trade or clicks_only)
+	_person_far_since = -1.0
+
+
+## Whether [param body] answers clicks only, never typed words (802): a
+## visitor or the stall's keeper (Offers.VISITOR, VENDOR: their worker id on
+## the server, the node name it gives on a client).
+static func answers_clicks_only(body: GridEntity) -> bool:
+	if body == null or not body is Resident:
+		return false
+	var id := (body as Resident).worker_id
+	if id.begins_with(Offers.VISITOR) or id.begins_with(Offers.VENDOR):
+		return true
+	var named := String(body.name)
+	return named.begins_with(("Resident_" + Offers.VISITOR).validate_node_name()) \
+			or named.begins_with(("Resident_" + Offers.VENDOR).validate_node_name())
+
+
+## Give's button (802): "give" {entity: [param to]'s path, uids, barter
+## while a maker's barter is open} (economy's give path; the answer an item
+## reward, their thanks as speech and a fresh sheet). Sent only while the sheet carries "takes" (the tab shown).
+func _give_to_person(to: GridEntity, uids: Array) -> void:
+	if to == null or not is_instance_valid(to) or not to.is_inside_tree() or uids.is_empty():
+		return
+	var me := _local_player()
+	if me != null:
+		World.command(me, "give", give_args(to, uids, barter_panel.data))
+
+
+## The "give" command's args for [param to]: its path, [param uids], and
+## barter while [param sheet] (the window's barter message) is theirs (a
+## maker's barter open: the server sends it again, its pack fresh; economy's).
+static func give_args(to: GridEntity, uids: Array, sheet: Dictionary) -> Dictionary:
+	var args := {"entity": str(to.get_path()), "uids": uids}
+	if str(sheet.get("resident", "")) == str(to.get_path()):
+		args["barter"] = true
+	return args
+
+
+## The window's typing line, Enter (802): "say" with "to", the window's
+## person, so the line is theirs whoever else is near (npc's side); shown in
+## the window at once. One line per CHAT_INTERVAL, as the chat box.
+func _say_to_person(text: String) -> void:
+	var me := _local_player()
+	var body := barter_panel.person if barter_panel != null else null
+	var line := text.strip_edges().left(CHAT_MAX_CHARS)
+	if me == null or line.is_empty() or not is_instance_valid(body):
+		return
+	if Time.get_ticks_msec() - _chat_sent_at < CHAT_INTERVAL * 1000.0:
+		hud.text = "wait a moment before saying more"
+		return
+	_chat_sent_at = Time.get_ticks_msec()
+	World.command(me, "say", {"text": line, "phrase": 0, "to": str(body.get_path())})
+	barter_panel.add_said(_display_name(me), line)
+
+
+## The path "to" takes while a townsperson's window talks (802; Y's "yes" too), else "".
+func _window_to() -> String:
+	if barter_panel != null and barter_panel.is_open() and barter_panel.talks and is_instance_valid(barter_panel.person):
+		return str(barter_panel.person.get_path())
+	return ""
 
 
 ## Whether [param body] is seen asleep (751): its replicated activity, so
@@ -13168,6 +13263,8 @@ func _build_talk() -> void:
 	barter_panel.offer_asked.connect(_offer_deal)  # 765: a ware picked and bought (Rolf's stall, a pedlar's).
 	barter_panel.order_asked.connect(_order_at_counter)  # 765: work ordered at a counter.
 	barter_panel.collect_asked.connect(_collect_at_counter)
+	barter_panel.said.connect(_say_to_person)  # 802: the window's typing line.
+	barter_panel.give_asked.connect(_give_to_person)  # 802: Give's button.
 	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):
@@ -13420,6 +13517,7 @@ func _bubble_tile_px() -> float:
 ## The chat box is open: the game's keys are the box's.
 func is_typing() -> bool:
 	return _chat_box != null and _chat_box.visible or _builder_ui != null and _builder_ui.is_typing() \
+			or barter_panel != null and barter_panel.is_typing() \
 			or admin_panel != null and admin_panel.is_typing() or tuning_panel != null and tuning_panel.is_typing()
 
 
@@ -13439,7 +13537,7 @@ func _close_chat() -> void:
 ## Enter in the chat box: send the line (as a command, so the server checks
 ## and spreads it), at most one per CHAT_INTERVAL from here as well.
 ## [param phrase]: the quick phrase it is (1-4), 0 for typed words.
-func _send_chat(text: String, phrase := 0) -> void:
+func _send_chat(text: String, phrase := 0, to := "") -> void:
 	_close_chat()
 	var me := _local_player()
 	var line := text.strip_edges().left(CHAT_MAX_CHARS)
@@ -13454,7 +13552,10 @@ func _send_chat(text: String, phrase := 0) -> void:
 		if not words.is_empty():
 			World.command(me, "party", {"text": words})
 		return
-	World.command(me, "say", {"text": line, "phrase": phrase})
+	var args := {"text": line, "phrase": phrase}
+	if not to.is_empty():
+		args["to"] = to  # 802: the townsperson whose window is open.
+	World.command(me, "say", args)
 	# Said to a town's person in earshot (decision 336's rule): the server answers as
 	# their speech, and takes a word that accepts their standing offer (536).
 
@@ -13499,6 +13600,8 @@ func _on_offers_message(data: Dictionary) -> void:
 		# store window since 765 (none closes it if it shows theirs).
 		if barter_panel != null:
 			barter_panel.show_wares(who, str(data.get("speaker", "")), data.get("offers", []) if data.get("offers") is Array else [], gold)
+			if data.has("takes") and barter_panel.is_open() and barter_panel.person == who:
+				barter_panel.set_takes(data["takes"])  # 802 Give: what Rolf takes (gear, a gift).
 		if deal_panel.visible and deal_panel.entity_id == who.get_instance_id():
 			deal_panel.close()
 
@@ -13567,15 +13670,47 @@ func _update_deal() -> void:
 
 ## The store window watched (765): open on a townsperson (a maker, a
 ## ware seller), closed once they are gone or out of hearing; a ware
-## seller's purse follows the player's gold.
+## seller's purse follows the player's gold. A townsperson's window (802):
+## closed past PERSON_REACH + 1 or out of sight for PERSON_HOLD seconds (so
+## the edge never flickers), or on their sheltering or leaving the zone;
+## short of PERSON_REACH and in sight, its button dims ("Step closer to trade").
 func _update_store() -> void:
-	if barter_panel == null or not barter_panel.is_open() or not barter_panel.with is Resident:
+	if barter_panel == null or not barter_panel.is_open():
+		return
+	if barter_panel.person != null:
+		_update_person_window()
+		return
+	if not barter_panel.with is Resident:
 		return
 	var who := barter_panel.with
 	var player := _local_player()
 	if not is_instance_valid(who) or not who.spawned or player == null or World.distance(player.tile, talk_cell(who)) > HEARING_RANGE:
 		barter_panel.close()
 	elif barter_panel.data.is_empty() and barter_panel.purse != gold:
+		barter_panel.set_purse(gold)
+
+
+func _update_person_window() -> void:
+	var who := barter_panel.person
+	var player := _local_player()
+	if not is_instance_valid(who) or not who.spawned or player == null or who.zone != player.zone or _sheltering_seen(who):
+		barter_panel.close()
+		return
+	var cell := talk_cell(who)
+	var distance := World.distance(player.tile, cell)
+	var seen := World.has_line_of_sight(player.tile, cell)
+	var now := Time.get_ticks_msec() / 1000.0
+	if distance > World.PERSON_REACH + 1 or not seen:
+		if _person_far_since < 0.0:
+			_person_far_since = now
+		elif now - _person_far_since >= PERSON_HOLD:
+			barter_panel.close()
+			return
+	else:
+		_person_far_since = -1.0
+	barter_panel.set_near(distance <= World.PERSON_REACH and seen)
+	barter_panel.set_asleep(_asleep_seen(who))
+	if barter_panel.data.is_empty() and barter_panel.purse != gold:
 		barter_panel.set_purse(gold)
 
 
@@ -14164,6 +14299,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		var speaker := str(data.get("speaker", entity.name if entity != null else "?"))
 		print("[speech] %s: %s" % [speaker, data.get("text", "")])
 		talk.add_line(speaker, str(data.get("text", "")), false, false, str(data.get("aside", "")))  # The aside dim after it (336 amended); the bubble the words alone.
+		if entity != null and barter_panel != null and barter_panel.is_open() and barter_panel.person == entity:
+			barter_panel.add_said(speaker, str(data.get("text", "")), str(data.get("aside", "")))  # 802: in their window too.
 		if entity != null:
 			bubbles.show_line(entity.get_instance_id(), str(data.get("text", "")))
 			var said := SoundKit.speech(entity, str(data.get("text", "")))

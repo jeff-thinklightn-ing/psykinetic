@@ -30,6 +30,26 @@ extends Control
 ## its message again; a refusal's why under the grid in rust (refused:
 ## Main's error sound). Sizes in the HUD's 3840 x 2160 units; the look the
 ## shared theme's (UiTheme, docs/ui_style.md).
+##
+## The townsperson window (decision 802, ui's side; Jeff: one window per
+## townsperson): the same window, opened by a click on the person, carries
+## their name, a chat area (their lines and the player's while it is open,
+## CHAT_LINES high, scrolling) and the typing line, focused on open, above
+## their squares; for one with no trade, the chat alone; a visitor's or the
+## stall keeper's (who answer clicks only), no typing line. Enter speaks
+## (said: Main sends "say" with "to"), Esc closes. person is whose window it
+## is, though `with` is the counter a merchant fronts. Out of reach for a
+## trade (near false, Main's) the button dims, "Step closer to trade".
+##
+## Give (802, Jeff: things handed to a person, not a chest): with what the
+## person takes from the player's pack (economy's "takes" rows in their
+## sheet, person_takes), a Give toggle beside the name; on, the pack's
+## squares they take are lit (a coin where they pay now), the rest dim, a
+## click picks a row, the lines under say what it does (voice's: "For the
+## new forge: 12 of 20 ore", "Pays 3 gold", "Owes you 3 gold", "A gift")
+## and the button gives ("Give (2 items)": Main sends "give" {entity,
+## uids}). Opened while carrying something they take, the window opens on
+## Give. Nothing they take: no toggle.
 
 const GAP := 20
 ## Squares a line before the grid wraps.
@@ -73,6 +93,23 @@ signal offer_asked(id: String, gold: int)
 signal order_asked(slot: int, effect: String, to_id: String)
 ## Work ready at a counter: the thing's uid (Main sends "counter" collect).
 signal collect_asked(uid: int)
+## 802: the typing line's words, Enter pressed (Main sends "say" {to}).
+signal said(text: String)
+## 802 Give: the rows' uids handed to [param to] (Main sends "give").
+signal give_asked(to: GridEntity, uids: Array)
+
+## 802: the chat area's height in lines, and how many lines it keeps.
+const CHAT_LINES := 6
+const CHAT_KEPT := 40
+const CHAT_WIDTH := 600
+## 802: the typing line's longest line (Main.CHAT_MAX_CHARS's).
+const LINE_MOST := 200
+## Voice's words (802): the button's foot while out of reach for a trade.
+const STEP_CLOSER := "Step closer to trade"
+const ASLEEP_WORDS := "asleep"
+## Voice's words for Give (802): the toggle and the button's verb, a gift's line.
+const GIVE_WORDS := "Give"
+const GIFT_WORDS := "A gift"
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
@@ -100,8 +137,33 @@ var care_pay := ""
 var jobs_pick: Dictionary = {}
 
 var _open := false
+## 802: whose window it is (null: a counter's or a chest's, no person).
+var person: GridEntity
+## 802: the typing line shown (a townsperson who hears typed words).
+var talks := false
+## 802: whether the squares show (a person with no trade: the chat alone).
+var trades := true
+## 802: within reach for a trade (Main's, each frame); false dims the button.
+var near := true
+## 802: the person asleep (Resident's activity), shown under the name.
+var asleep := false
+## 802 Give: what the person takes from the pack (economy's rows: uid, what,
+## count, slot, raw, for {kind, name}, have, need, gold, owed), whether the
+## window gives, and the rows picked (uid -> true).
+var takes: Array = []
+var giving := false
+var gift: Dictionary = {}
+var _give_due := false
 var _box: PanelContainer
 var _title: Label
+var _give_tab: Button
+var _outcome: VBoxContainer
+var _state: Label
+var _chat_scroll: ScrollContainer
+var _chat: VBoxContainer
+var _line: LineEdit
+var _foot_row: HBoxContainer
+var _focus_due := false
 var _grid: GridContainer
 var _hover: Label
 var _button: Button
@@ -170,14 +232,51 @@ func _ready() -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", UiTheme.constant("row"))
 	_box.add_child(column)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", UiTheme.constant("row"))
+	column.add_child(head)
 	_title = Label.new()
 	_title.theme_type_variation = &"Heading"
-	column.add_child(_title)
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(_title)
+	_give_tab = Button.new()
+	_give_tab.name = "GiveTab"
+	_give_tab.text = GIVE_WORDS
+	_give_tab.toggle_mode = true
+	_give_tab.focus_mode = Control.FOCUS_NONE
+	_give_tab.visible = false
+	_give_tab.toggled.connect(set_giving)
+	head.add_child(_give_tab)
+	_state = Label.new()
+	_state.theme_type_variation = &"Caption"
+	_state.add_theme_color_override("font_color", DIM)
+	_state.visible = false
+	column.add_child(_state)
+	_chat_scroll = ScrollContainer.new()
+	_chat_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_chat_scroll.custom_minimum_size.x = CHAT_WIDTH
+	_chat_scroll.visible = false
+	column.add_child(_chat_scroll)
+	_chat = VBoxContainer.new()
+	_chat.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_chat.add_theme_constant_override("separation", 2)
+	_chat_scroll.add_child(_chat)
+	_line = LineEdit.new()
+	_line.name = "SayLine"
+	_line.max_length = LINE_MOST
+	_line.visible = false
+	_line.text_submitted.connect(_submit)
+	_line.gui_input.connect(_line_input)
+	column.add_child(_line)
 	_grid = GridContainer.new()
 	_grid.columns = COLUMNS
 	_grid.add_theme_constant_override("h_separation", UiTheme.constant("slot_gap"))
 	_grid.add_theme_constant_override("v_separation", UiTheme.constant("slot_gap"))
 	column.add_child(_grid)
+	_outcome = VBoxContainer.new()
+	_outcome.add_theme_constant_override("separation", 2)
+	_outcome.visible = false
+	column.add_child(_outcome)
 	_hover = Label.new()
 	_hover.theme_type_variation = &"Caption"
 	_hover.add_theme_color_override("font_color", DIM)
@@ -186,6 +285,7 @@ func _ready() -> void:
 	var foot := HBoxContainer.new()
 	foot.add_theme_constant_override("separation", UiTheme.constant("row"))
 	column.add_child(foot)
+	_foot_row = foot
 	_button = Button.new()
 	_button.focus_mode = Control.FOCUS_NONE
 	_button.pressed.connect(_confirm)
@@ -275,9 +375,145 @@ func set_purse(gold: int) -> void:
 		_rebuild()
 
 
+## 802: the window is [param body]'s, the townsperson clicked: [param chat]
+## shows the typing line (focused), [param trade] their squares. Call after
+## open() (a merchant's opens on the counter they front).
+func set_person(body: GridEntity, chat: bool, trade: bool) -> void:
+	if body != person:
+		_clear_chat()
+		_line.text = ""
+	if body != person:
+		_give_due = true  # The first sheet with takes opens on Give (Jeff).
+	person = body
+	talks = chat
+	trades = trade
+	near = true
+	_rebuild()
+	if talks and _open:
+		focus_line()
+
+
+## 802: the typing line takes the keys (a click on it does too); the frame
+## the window first shows if it is not shown yet (_place).
+func focus_line() -> void:
+	if _line == null or not talks or not _open:
+		return
+	if _line.is_visible_in_tree():
+		_line.grab_focus()
+		_focus_due = false
+	else:
+		_focus_due = true
+
+
+## 802: a click on the world takes the keys back from the typing line.
+func release_line() -> void:
+	if _line != null and _line.has_focus():
+		_line.release_focus()
+
+
+## 802: whether the typing line has the keys (Main.is_typing: no game key).
+func is_typing() -> bool:
+	return _open and talks and _line != null and _line.has_focus()
+
+
+## 802: in reach for a trade or not (Main, each frame).
+func set_near(value: bool) -> void:
+	if value != near:
+		near = value
+		_rebuild()
+
+
+## 802: the person seen asleep or not.
+func set_asleep(value: bool) -> void:
+	if value != asleep:
+		asleep = value
+		_rebuild()
+
+
+## 802: a line in the chat area: [param speaker]'s [param text], an aside dim after it.
+func add_said(speaker: String, text: String, aside := "") -> void:
+	if not _open or person == null or text.strip_edges().is_empty():
+		return
+	var label := RichTextLabel.new()
+	label.fit_content = true
+	label.scroll_active = false
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.mouse_filter = Control.MOUSE_FILTER_PASS
+	label.push_color(TalkPanel.SPEAKER)
+	label.add_text("%s: " % speaker)
+	label.pop()
+	label.add_text(text)
+	if not aside.is_empty():
+		label.push_color(TalkPanel.ASIDE)
+		label.add_text(TalkPanel.ASIDE_DASH + aside)
+		label.pop()
+	label.set_meta("words", "%s: %s" % [speaker, text])
+	_chat.add_child(label)
+	while _chat.get_child_count() > CHAT_KEPT:
+		var oldest := _chat.get_child(0)
+		_chat.remove_child(oldest)
+		oldest.queue_free()
+	_chat_scroll.visible = true
+	_size_chat.call_deferred()
+
+
+## 802: the chat area's lines (tests): "speaker: text" each.
+func chat_shown() -> Array[String]:
+	var out: Array[String] = []
+	for line: Node in _chat.get_children():
+		out.append(str(line.get_meta("words", "")))
+	return out
+
+
+func _clear_chat() -> void:
+	if _chat == null:
+		return
+	for line: Node in _chat.get_children():
+		_chat.remove_child(line)
+		line.queue_free()
+	_chat_scroll.visible = false
+
+
+## The chat area as tall as its lines, up to CHAT_LINES, scrolled to the newest.
+func _size_chat() -> void:
+	if _chat.get_child_count() == 0:
+		return
+	var line_height := maxf((_chat.get_child(0) as Control).get_combined_minimum_size().y, 1.0)
+	_chat_scroll.custom_minimum_size.y = minf(_chat.get_combined_minimum_size().y, line_height * CHAT_LINES)
+	_chat_scroll.scroll_vertical = int(_chat.get_combined_minimum_size().y)
+
+
+func _submit(text: String) -> void:
+	var line := text.strip_edges()
+	_line.text = ""
+	if not line.is_empty():
+		said.emit(line)
+
+
+## Esc in the typing line closes the window (802; Options' "Close").
+func _line_input(event: InputEvent) -> void:
+	if event is InputEventKey and (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE:
+		_line.accept_event()
+		close()
+
+
 func close() -> void:
 	_open = false
 	with = null
+	person = null
+	talks = false
+	trades = true
+	near = true
+	asleep = false
+	takes = []
+	giving = false
+	_give_due = false
+	_focus_due = false
+	if _line != null:
+		_line.text = ""  # A half-typed line goes with the window (802).
+		_line.release_focus()
+	_clear_chat()
 	_clear_picks()
 	data = {}
 	counter = {}
@@ -312,7 +548,132 @@ func show_barter(given: Dictionary) -> void:
 	var why := str(data.get("why", ""))
 	if not why.is_empty():
 		refused.emit(why)
+	set_takes(given.get("takes", []))
+
+
+## 802 Give: the person's "takes" rows from their sheet (the barter message,
+## or the stall's offers); a pick no longer taken is dropped; none ends Give;
+## the first rows after the window opens open it on Give.
+func set_takes(rows: Variant) -> void:
+	takes = []
+	if rows is Array:
+		for row: Variant in rows:
+			if row is Dictionary:
+				takes.append(row)
+	for uid: Variant in gift.keys():
+		if takes_row(int(uid)).is_empty():
+			gift.erase(uid)
+	if takes.is_empty():
+		giving = false
+	elif _give_due and person != null:
+		_open_on_give()
+	_give_due = false
 	_rebuild()
+
+
+func _open_on_give() -> void:
+	_clear_picks()
+	giving = true
+
+
+## 802 Give: the window gives ([param on]) or trades; the picks either way dropped.
+func set_giving(on: bool) -> void:
+	on = on and not takes.is_empty()
+	if on == giving:
+		_rebuild()
+		return
+	_clear_picks()
+	giving = on
+	_total.visible = false
+	_rebuild()
+
+
+## The takes row for [param uid], {} for none.
+func takes_row(uid: int) -> Dictionary:
+	for row: Dictionary in takes:
+		if int(row.get("uid", 0)) == uid:
+			return row
+	return {}
+
+
+## The takes row at the pack's [param slot] (its "slot", else the barter
+## pack's entry there), {} for none.
+func takes_at(slot: int) -> Dictionary:
+	for row: Dictionary in takes:
+		if row.has("slot") and int(row["slot"]) == slot:
+			return row
+	var entry := pack_entry_at(slot)
+	return takes_row(int(entry.get("uid", 0))) if not entry.is_empty() else {}
+
+
+## A pick of the row [param uid] for Give, or its unpick.
+func toggle_gift(uid: int) -> void:
+	if not _open or not giving:
+		return
+	if gift.has(uid):
+		gift.erase(uid)
+	elif not takes_row(uid).is_empty():
+		gift[uid] = true
+	_rebuild()
+
+
+## What giving [param rows] does, voice's lines (802): one a thing it goes
+## toward, "For the new forge: 12 of 20 ore" (the row there furthest on,
+## have and need as after the give); "A gift" for gear; then "Pays 3 gold"
+## and "Owes you 3 gold" (nothing for neither). No full stops.
+static func give_lines(rows: Array) -> Array[String]:
+	var toward := {}
+	var order: Array[String] = []
+	var gifts := false
+	var gold := 0
+	var owed := 0
+	for row: Variant in rows:
+		if not row is Dictionary:
+			continue
+		gold += int(row.get("gold", 0))
+		owed += int(row.get("owed", 0))
+		var target: Variant = row.get("for")
+		var name := str(target.get("name", "")) if target is Dictionary else ""
+		if name.is_empty():
+			gifts = true
+			continue
+		if not toward.has(name):
+			order.append(name)
+		if not toward.has(name) or int(row.get("have", 0)) > int(toward[name].get("have", 0)):
+			toward[name] = row
+	var out: Array[String] = []
+	for name: String in order:
+		var row: Dictionary = toward[name]
+		out.append("For %s: %d of %d %s" % [name, int(row.get("have", 0)), int(row.get("need", 0)), raw_word(row)])
+	if gifts:
+		out.append(GIFT_WORDS)
+	if gold > 0:
+		out.append("Pays %d gold" % gold)
+	if owed > 0:
+		out.append("Owes you %d gold" % owed)
+	return out
+
+
+## A takes row's unit word: its "raw" (economy's), else its thing's id
+## without its sack or bundle ("ore_sack": "ore").
+static func raw_word(row: Dictionary) -> String:
+	var raw := str(row.get("raw", ""))
+	if not raw.is_empty():
+		return raw
+	var what := str(row.get("what", ""))
+	for tail: String in ["_sack", "_bundle", "_bolt"]:
+		if what.ends_with(tail):
+			return what.trim_suffix(tail)
+	return what
+
+
+## The picked rows (Give), in the order the sheet lists them.
+func gift_rows() -> Array:
+	var out := []
+	for row: Dictionary in takes:
+		if gift.has(int(row.get("uid", 0))):
+			out.append(row)
+	return out
 
 
 ## The counter message (economy's, 438) for the counter open; a pick no
@@ -569,6 +930,10 @@ func job_at(slot: int) -> Dictionary:
 ## What the picks come to: {verb, count, noun, gold (signed, the player's
 ## side), total ([kind, amount] chips), signed (a Trade's), ok}; {} for none.
 func action() -> Dictionary:
+	if giving:
+		if gift.is_empty():
+			return {}
+		return {"words": button_words(GIVE_WORDS, gift.size()), "gold": 0, "total": [], "signed": false, "ok": true}
 	if not care_pay.is_empty():
 		var hands := care_hands(care_pay)
 		return {"words": pay_words(care_pay, hands), "gold": -hands if care_pay == "gold" else 0,
@@ -629,6 +994,7 @@ func _keep_only(group: String) -> void:
 
 
 func _clear_picks() -> void:
+	gift.clear()
 	give.clear()
 	take.clear()
 	wares_pick.clear()
@@ -767,9 +1133,12 @@ func box_words(kind: String, key: Variant) -> String:
 ## or more owed than the purse holds, does nothing.
 func _confirm() -> void:
 	var act := action()
-	if not _open or act.is_empty() or not bool(act["ok"]) or not shortfall_words(int(act["gold"]), purse).is_empty():
-		return
-	if not care_pay.is_empty():
+	if not _open or act.is_empty() or not bool(act["ok"]) or not shortfall_words(int(act["gold"]), purse).is_empty() or not near:
+		return  # Out of reach (802): never sent, the button dim.
+	if giving:
+		give_asked.emit(person if person != null else with, gift.keys())
+		gift.clear()
+	elif not care_pay.is_empty():
 		care_asked.emit(with, care_pay)
 		care_pay = ""
 	elif not jobs_pick.is_empty():
@@ -795,6 +1164,11 @@ func _confirm() -> void:
 ## takes, or unpicks it all; a shift-click one more unit, or one fewer when
 ## all are given.
 func _select_mine(mine: bool, index: int, shift := false) -> bool:
+	if _open and mine and giving:
+		var row := takes_at(index)
+		if not row.is_empty():
+			toggle_gift(int(row.get("uid", 0)))
+		return true  # Giving: a square they don't take does nothing.
 	if not _open or not mine or data.is_empty():
 		return false
 	var entry := pack_entry_at(index)
@@ -870,14 +1244,30 @@ func _rebuild() -> void:
 		_total.visible = false
 		return
 	_title.text = title_words(merchant, str(counter.get("kind", "")) if not counter.is_empty() else "")
-	for each: Variant in data.get("goods", []):
+	_state.text = ASLEEP_WORDS
+	_state.visible = person != null and asleep
+	_line.visible = person != null and talks
+	_give_tab.visible = trades and not takes.is_empty()
+	_give_tab.set_pressed_no_signal(giving)
+	_grid.visible = trades and not giving
+	_foot_row.visible = trades
+	for child: Node in _outcome.get_children():
+		_outcome.remove_child(child)
+		child.queue_free()
+	_outcome.visible = trades and giving
+	if giving:
+		for words: String in give_lines(gift_rows()):
+			var line := Label.new()
+			line.text = words
+			_outcome.add_child(line)
+	for each: Variant in ([] if giving else data.get("goods", [])):
 		if each is Dictionary:
 			_add_box("good", int(each.get("uid", 0)), str(each.get("id", "")), "", [["gold", int(each.get("price", 0))]],
 				Items.name_of(str(each.get("id", ""))))
-	for each: Dictionary in wares:
+	for each: Dictionary in ([] as Array[Dictionary] if giving else wares):
 		var item := ware_item(each)
 		_add_box("ware", str(each.get("id", "")), item, "", [["gold", int(each.get("cost", 0))]], Items.name_of(item))
-	var offered := care()
+	var offered := {} if giving else care()
 	if not offered.is_empty():
 		for pay: String in CARE_PAYS:
 			var price := int(offered.get(pay, 0))
@@ -889,7 +1279,7 @@ func _rebuild() -> void:
 				box.face.add_theme_stylebox_override("panel", PackPanel.selected_style())
 			if held or not care_hands(pay) > 0 or pay == "gold" and purse < price:
 				box.modulate.a = 0.5
-	for each: Variant in counter.get("jobs", []):
+	for each: Variant in ([] if giving else counter.get("jobs", [])):
 		if each is Dictionary:
 			var effect := str(each.get("effect", ""))
 			var pays: Array = [["gold", int(each.get("price", 0))]]
@@ -910,7 +1300,7 @@ func _rebuild() -> void:
 		if each is Dictionary:
 			var item := str(each.get("id", ""))
 			_add_box("ready", int(each.get("uid", 0)), item, str(each.get("effect", "")), [], "%s, ready" % Items.name_of(item).capitalize())
-	if _grid.get_child_count() == 0:
+	if _grid.get_child_count() == 0 and not giving:
 		var empty := Label.new()
 		empty.theme_type_variation = &"Caption"
 		empty.add_theme_color_override("font_color", DIM)
@@ -924,13 +1314,27 @@ func _rebuild() -> void:
 		if not bool(job_at(int(slot)).get("ok", true)):
 			job_why = str(job_at(int(slot)).get("why", ""))
 	_button.text = str(act.get("words", "Buy"))
-	_button.disabled = act.is_empty() or not bool(act["ok"]) or not short.is_empty()
-	_foot.text = short
-	_foot.visible = not short.is_empty()
+	_button.disabled = act.is_empty() or not bool(act["ok"]) or not short.is_empty() or not near
+	_foot.text = short if near else STEP_CLOSER
+	_foot.visible = not _foot.text.is_empty()
 	var why := job_why if not job_why.is_empty() else str(data.get("why", counter.get("why", "")))
 	_why.text = why
-	_why.visible = not why.is_empty()
-	if pack != null:
+	_why.visible = not why.is_empty() and trades
+	if pack != null and giving:
+		# Give: the squares they take lit (a coin where they pay now), the rest dim.
+		var slots := []
+		var lights := {}
+		for slot: int in Items.CARRIED:
+			lights[slot] = 0
+		for row: Dictionary in takes:
+			var at := int(row.get("slot", pack_entry(int(row.get("uid", 0))).get("slot", -1)))
+			lights[at] = int(row.get("gold", 0)) if int(row.get("gold", 0)) > 0 else -1
+			if gift.has(int(row.get("uid", 0))):
+				slots.append(at)
+		pack.set_selected(slots)
+		pack.set_prices(lights)
+		pack.held_open = true
+	elif pack != null:
 		var slots := []
 		for uid: Variant in give:
 			slots.append(int(pack_entry(int(uid)).get("slot", -1)))
@@ -1130,7 +1534,7 @@ func _hide_tip() -> void:
 ## something is picked.
 func _show_total() -> void:
 	var act := action()
-	if act.is_empty():
+	if act.is_empty() or (act["total"] as Array).is_empty():
 		return
 	for child: Node in _total_chip.get_children():
 		_total_chip.remove_child(child)
@@ -1176,3 +1580,5 @@ func _place() -> void:
 		return
 	_box.reset_size()
 	_box.global_position = pack.beside(_box.size, GAP)  # Clear of the sheet too (787).
+	if _focus_due:
+		focus_line()

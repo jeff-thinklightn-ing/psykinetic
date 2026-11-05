@@ -41784,6 +41784,35 @@ are still open to players; refusing them with voice's pointer is the next step. 
 _test_person_takes (give_to: the stack banked, thanked by name, gear refused to the carpenter and
 given to the keeper). PROTOCOL_REVISION 50 (shared with items' fishing). Server and client (the
 messages), no new class_name.
+802 amended (3), ui's side (release's label; the coordinator's approval of ui's design; voice's words; economy's Give data). The
+window is the store window (BarterPanel, 765) grown: a left click on a townsperson
+(Main._open_talk, then Main._open_person) opens it on them, with their name, a chat area
+(CHAT_LINES 6 high, scrolling, CHAT_KEPT 40: their speech and the player's lines while it is open,
+others' not) and the typing line (LineEdit "SayLine"), focused at once, above their squares: a
+merchant's counter, a maker's barter, Rolf's or a pedlar's wares; a person with no trade shows the
+chat alone, and a visitor's or the stall keeper's (who answer clicks only, Main.answers_clicks_only)
+has no typing line. The talk bar (Talk / Barter) is gone for townsfolk. Enter sends "say" {text,
+phrase 0, to: the body's path} (Main._say_to_person, one line per CHAT_INTERVAL) and Y's yes carries
+"to" too (Main._window_to); while the line has the keys no game key acts (Main.is_typing), Esc
+closes the window, and a click on the world takes the keys back and goes on as a click. Range
+(Main._update_person_window, each frame): past PERSON_REACH + 1 or out of sight, held PERSON_HOLD
+0.5 s, the window closes; within that but out of trading reach (World.in_person: PERSON_REACH and
+in sight) the button dims and the foot says "Step closer to trade" (voice's), and nothing is sent.
+Asleep: no window. Out of zone, gone or sheltering: it closes, the picks and a half-typed line with
+it. Give (Jeff: things handed to a person, not a chest): economy's person_takes rows ("takes" in the
+barter sheet and the offers message: uid, what, count, slot, raw, for {kind, name}, have, need,
+gold, owed) show a Give toggle beside the name; on, the pack's squares they take are lit (a coin
+where they pay now), the rest dim, a click picks a row, the lines under it are voice's
+(BarterPanel.give_lines: "For the new forge: 12 of 20 ore", one a thing it goes toward, the row
+furthest on; "A gift" for gear, an empty "for"; "Pays 3 gold", "Owes you 3 gold", nothing for
+neither), and the button ("Give (2 items)") sends "give" {entity, uids, and barter: true while a maker's barter is open, so the server sends
+it again with the pack fresh} (Main._give_to_person).
+Opened while carrying something they take, the window opens on Give; nothing taken, no toggle. Tests:
+ui_test _test_person_window (the window, the line's keys, said with "to", their words in it, the
+range's dim and close, asleep) and _test_person_give (voice's lines, opens on Give, the lights, a
+pick, the give, no toggle for none); controls_test's friend click (the window, no bar; a world click
+frees the keys). CHANGELOG bullet (voice's words, one for the window and economy's give). Client
+only, protocol unchanged by this side (economy's give, rev 50), no new class_name.
 
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
