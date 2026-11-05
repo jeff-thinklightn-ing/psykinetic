@@ -56,7 +56,7 @@ func _ready() -> void:
 	_test_sweep_key()
 	_test_crouch_key()
 	_test_practice_bars()
-	_test_gains()
+	await _test_gains()
 	_test_seam_click()
 	_test_fire_click()
 	print("")
@@ -2450,6 +2450,26 @@ func _test_gains() -> void:
 	clear.call()
 	gains.add({"track": "deed", "amount": 1, "of": "Wren", "big": true, "banner": "Wren is content"})
 	_check(gains.cues.back()[0] == Gains.WANT_CUE and gains.banners.size() == 1, "a big deed: the want cue and a banner")
+	clear.call()
+	gains._need_frame = -1
+	gains._other_frame = -1
+	# A rest meets three of her needs in one frame (sound's ask): one need cue, at the frame's end.
+	for track: String in ["leisure", "safety", "company"]:
+		gains.add({"track": track, "amount": 1, "of": "Wren"})
+	_check(gains.cues.is_empty(), "her needs met: no cue until the frame is over")
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var slots: Array = gains.cues.map(func(c: Array) -> String: return c[0])
+	_check(slots == [Gains.NEED_CUE] and Gains.text_of("safety", 1, "Wren") == "+1 Shelter, Wren" and Gains.text_of("adventure", 1, "Wren") == "+1 Venture, Wren",
+		"three needs in one frame: one need cue; the needs' words (%s)" % [slots])
+	clear.call()
+	# Her bond in the same frame: the bond's gain alone (sound: the bigger news; two takes clash).
+	gains.add({"track": "leisure", "amount": 1, "of": "Wren"})
+	gains.add({"track": "bond", "amount": 1, "of": "Wren"})
+	await get_tree().process_frame
+	await get_tree().process_frame
+	slots = gains.cues.map(func(c: Array) -> String: return c[0])
+	_check(slots == ["ui.reward_gain"], "a need and her bond in one frame: the bond's cue alone (%s)" % [slots])
 	clear.call()
 	gains.has_cue = func(slot: String) -> bool: return slot == Gains.FALLBACK_CUE
 	gains.add({"track": "catch", "amount": 1})

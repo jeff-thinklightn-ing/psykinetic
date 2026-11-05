@@ -41993,3 +41993,15 @@ and throw strike through it. The charge's rush still hits by meeting a body on i
 cells). combat_test _test_tell_truth: standing in, struck; one cell outside, never; centre just out with
 the held cell in, spared; a step out sent, spared; out then back in, struck; more than FREE_BANK_TICKS
 sent, only those counted. Sim only, protocol unchanged, no new class_name.
+
+804 amended (6) (ui; sound's ask, the coordinator's approval of ui.reward_need; release's label): a
+companion's needs met. Companions send six need tracks to Gains ("leisure", "adventure", "wonder",
+"faith", "safety", "company"; amount 1, of her name, a bar); Gains.TRACKS words them Ease, Venture,
+Wonder, Faith, Shelter (Jeff's pick) and Company, and their cue is ui.reward_need (sound's soft note,
+under the gain's; the gain's while it has no takes). One cue a frame: one deed can meet three needs and
+her bond at once (a rest: leisure, safety, company), and two takes in random keys clash, so a need's cue
+waits for its frame's end (Gains._flush_need, the next _process) and sounds only if no other cue was
+asked for in that frame: her bond's gain, a step's, any (sound: the bond is the bigger news). ui_test
+_test_gains (three needs: one need cue, after the frame; a need and her bond: the bond's alone; the
+needs' words). No bullet (sound's 804 amended (4) carries the slot). Client only, protocol unchanged,
+no new class_name.

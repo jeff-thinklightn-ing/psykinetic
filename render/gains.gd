@@ -30,7 +30,13 @@ const TRACKS := {
 	"explore": {"label": "Wayfaring", "color": "#9cc8e0", "cue": "ui.reward_found"},
 	"regard": {"label": "Regard", "color": "#ffd27a", "cue": "ui.reward_gain"},
 	"bond": {"label": "Bond", "color": "#eaa0a0", "cue": "ui.reward_gain"},
-	"leisure": {"label": "Ease", "color": "#a8c870", "cue": "ui.reward_gain"},
+	# A companion's needs (companions' six; Jeff picked Shelter): the need cue, one a frame.
+	"leisure": {"label": "Ease", "color": "#a8c870", "cue": "ui.reward_need"},
+	"adventure": {"label": "Venture", "color": "#d8a070", "cue": "ui.reward_need"},
+	"wonder": {"label": "Wonder", "color": "#b0a0e0", "cue": "ui.reward_need"},
+	"faith": {"label": "Faith", "color": "#e8d8a0", "cue": "ui.reward_need"},
+	"safety": {"label": "Shelter", "color": "#90b8a8", "cue": "ui.reward_need"},
+	"company": {"label": "Company", "color": "#e0b0c8", "cue": "ui.reward_need"},
 	"practice": {"label": "Practice", "color": "#c4d0d8", "cue": "ui.reward_gain"},
 	"deed": {"label": "Deeds", "color": "#f0b860", "cue": "ui.reward_gain"},
 	"catch": {"label": "Catch", "color": "#7cc8c0", "cue": "ui.reward_catch"},
@@ -44,6 +50,11 @@ const OTHER := {"label": "", "color": "#c79a55", "cue": "ui.reward_gain"}
 const STEP_CUE := "ui.reward_step"
 const WANT_CUE := "ui.reward_want"
 const FALLBACK_CUE := "ui.reward_gain"
+## A companion's need met (sound's soft note, under the gain's): one a frame
+## however many needs one deed meets, and only on a frame no other cue was
+## asked for (sound: her bond's gain, or a step, is the bigger news, and two
+## takes in random keys clash); played at the frame's end (_flush_need).
+const NEED_CUE := "ui.reward_need"
 const SHOWN := ["all", "quiet", "log"]
 ## A thing's last word counted as a mass, never pluralised (voice: "+20 food",
 ## "+2 leather"); any other counted thing's last word is (World._plural:
@@ -114,6 +125,10 @@ var lines: Array[Dictionary] = []
 var cues: Array[Array] = []
 var _banner := {}
 var _last_cue := -100.0
+## The frame a need cue waits on (-1 none), and the frame another cue was
+## last asked for.
+var _need_frame := -1
+var _other_frame := -1
 var _burst := 0
 
 
@@ -227,10 +242,29 @@ func banner_shown() -> String:
 
 
 func _cue(slot: String, merged: bool, now: float) -> void:
+	if slot == NEED_CUE:
+		_need_frame = Engine.get_process_frames()  # Waits for the frame's end.
+		return
+	_other_frame = Engine.get_process_frames()
 	if now - _last_cue < CUE_GAP:
 		return
 	_burst = _burst + 1 if merged else 0
 	_last_cue = now
+	_play(slot)
+
+
+## The need cue waiting, once its frame is over (the next _process): played
+## unless another cue was asked for that frame.
+func _flush_need() -> void:
+	if _need_frame < 0 or _need_frame >= Engine.get_process_frames():
+		return
+	var frame := _need_frame
+	_need_frame = -1
+	if frame != _other_frame:
+		_play(NEED_CUE)
+
+
+func _play(slot: String) -> void:
 	var chosen := slot
 	if has_cue.is_valid() and not bool(has_cue.call(chosen)):
 		chosen = FALLBACK_CUE
@@ -260,6 +294,7 @@ func _now() -> float:
 
 
 func _process(_delta: float) -> void:
+	_flush_need()
 	var now := _now()
 	var in_fight := _fighting()  # Asked each frame, so a fall in hit points is seen.
 	floats = floats.filter(func(live: Dictionary) -> bool: return now - float(live["born"]) < FLOAT_SECONDS)
