@@ -41814,6 +41814,20 @@ protocol unchanged (slot_refused's words ride its message), no new class_name. T
 gear as a gift only from the pack's slots (Items.PACK_SLOTS), never a thing held or worn (playtest's
 give tour listed a pick in hand for Rolf); economy_test checks a sword in hand.
 
+802 amended (5) (release's label; the coordinator approved ui's taker hint: a pack square's tooltip,
+"For the smith", and a faint mark on the name tag of a townsperson who takes something carried):
+who takes what is the server's (receiver_for), so a new server message "takers" tells the client.
+Main.takers_of(town): {town, takers: {raw: {trade, name, body, store}}, gear?}. trade is the
+receiver's ("vendor" for the stall's keeper), name theirs, body their body's path as "offers" names
+it ("" unspawned), store whether the raw goes to the town's stores rather than a build (give_outcome);
+a raw nobody takes is left out; "gear" {trade, name, body} names the stall's keeper where the town has
+one. Main._tell_takers, in _tell_world's per-player pass, sends it for the first town of the player's
+area whenever it differs from what that player was last told (Main._takers_sent, forgotten on leave):
+on entering an area, and as takers change (a smith hired, one away, the stall). An area with no town
+gets {town: "", takers: {}}. The client keeps it as Main.takers_here for ui. Towns.ids(). economy_test
+_test_person_takes. Protocol rev 50 (still unreleased: a "50 (802 amended (5))" line, the kind in
+MESSAGE_KINDS); server and client, no new class_name, no bullet (ui's side carries it).
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

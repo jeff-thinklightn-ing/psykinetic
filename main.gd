@@ -791,6 +791,12 @@ signal telegraph_ended(id: int, landed: bool)
 ## it was last looked at.
 var _world_news: WorldNews
 var _news_tick := -1
+## Server: the "takers" message last sent each peer (802 amended (5)), as text,
+## so it is sent again only when it changes.
+var _takers_sent: Dictionary = {}
+## Client: the last "takers" message (802 amended (5)): {town, takers: {raw:
+## {trade, name, body, store}}, gear?}; ui's pack tooltip and name-tag mark.
+var takers_here: Dictionary = {}
 ## A chest or companion right-clicked from afar: opened once in reach.
 var _pack_wanted: GridEntity
 ## A friend left-clicked from afar (decision 454): talk opens once within
@@ -14110,6 +14116,9 @@ func _on_companion_said(text: String, pet: Companion) -> void:
 
 
 func _on_message(kind: String, data: Dictionary) -> void:
+	if kind == "takers":
+		takers_here = data  # 802 amended (5): ui reads it.
+		return
 	if kind == "world":
 		if data.get("guide_route") is Dictionary:
 			_guide_route(data["guide_route"])
@@ -14889,6 +14898,66 @@ func receiver_for(town: String, raw: String) -> String:
 			if str(trade) in who.get("trades", []) and not bool(who.get("away", false)):
 				return id
 	return Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else ""
+
+
+## Who in [param town] takes each raw a player could give (802 amended (5);
+## ui's pack tooltip, "For the smith", and the taker's name-tag mark):
+## {town, takers: {raw: {trade, name, body, store}}, gear?}. trade is the
+## receiver's ("vendor" for the stall's keeper), name theirs, body their
+## body's path as "offers" names it ("" when unspawned), store whether the
+## raw goes to the town's stores (not a build); a raw nobody takes is left
+## out. "gear" {trade, name, body}: the stall's keeper, who takes gear of
+## value from the pack, when the town has one.
+func takers_of(town: String) -> Dictionary:
+	var out := {"town": town, "takers": {}}
+	if town.is_empty() or World.economy == null or World.production == null:
+		return out
+	var receives: Dictionary = World.economy.rules.get("receives", {})
+	var raws: Array = receives.keys().filter(func(key: String) -> bool: return not key.begins_with("_") and receives[key] is Array)
+	raws.sort()
+	for raw: String in raws:
+		var worker := receiver_for(town, raw)
+		if worker.is_empty():
+			continue
+		var entry := _taker_entry(worker)
+		entry["store"] = give_outcome(town, "", raw, 1)["for"]["kind"] == "stores"
+		out["takers"][raw] = entry
+	if town in World.economy.rules.get("vendor", {}).get("towns", []):
+		out["gear"] = _taker_entry(Offers.VENDOR + town)
+	return out
+
+
+## A taker's trade, name and body path (takers_of).
+func _taker_entry(worker: String) -> Dictionary:
+	var body := _resident_body(worker)
+	var path := String(body.get_path()) if body != null and body.is_inside_tree() else ""
+	if worker.begins_with(Offers.VENDOR):
+		return {"trade": "vendor", "name": str(World.economy.rules.get("vendor", {}).get("name", "Rolf")), "body": path}
+	var who := World.production.worker(worker)
+	var trades: Array = who.get("trades", [])
+	return {"trade": str(trades[0]) if not trades.is_empty() else "", "name": str(who.get("name", "")), "body": path}
+
+
+## Server: [param peer] told its area's takers (takers_of the first town in
+## [param zone]) when they differ from what it was last told: on entering
+## an area, and as the town's takers change (a smith hired, one away).
+func _tell_takers(peer: int, zone: String) -> void:
+	if World.towns == null:
+		return
+	var town := ""
+	for id: String in World.towns.ids():
+		if id.begins_with(zone + "/"):
+			town = id
+			break
+	var data := takers_of(town)
+	var text := var_to_str(data)
+	if _takers_sent.get(peer) == text:
+		return
+	_takers_sent[peer] = text
+	if peer == Net.local_id:
+		_on_message("takers", data)
+	else:
+		Net.message_to(peer, "takers", data)
 
 
 ## The town [param worker] (a resident's id, or "vendor:" + town) takes
@@ -15676,6 +15745,7 @@ func _leave(peer: int, player: Player, id: String) -> void:
 	_players.erase(peer)
 	_peer_ids.erase(peer)
 	_respawn_at.erase(peer)
+	_takers_sent.erase(peer)
 	if id == "":
 		print("[net] peer %d left before joining" % peer)
 		return
@@ -15796,6 +15866,7 @@ func _tell_world(tick: int) -> void:
 				_discovered(peer, area)  # 804: a zone stood in for the first time.
 			for place: String in _world_news.explore(peer, player.zone, player.tile):
 				_explored(peer, place)  # 804, maps' side: a named place reached.
+			_tell_takers(peer, player.zone)
 	_observe_roads()  # Hers too (decision 551).
 	_world_news.update()
 

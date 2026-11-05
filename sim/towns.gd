@@ -226,6 +226,14 @@ func xp_earned(town: String) -> int:
 	return int(_towns.get(town, {}).get("xp", 0))
 
 
+## Every town's id (its store's place key), sorted.
+func ids() -> Array[String]:
+	var out: Array[String] = []
+	out.assign(_towns.keys())
+	out.sort()
+	return out
+
+
 func residents(town: String) -> Array[String]:
 	var out: Array[String] = []
 	out.assign(_towns.get(town, {}).get("residents", []))
