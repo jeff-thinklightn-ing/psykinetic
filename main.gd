@@ -1593,20 +1593,35 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	match click.button_index:
 		MOUSE_BUTTON_LEFT:
-			# A creature (a monster: friends are above): go to it and
-			# attack. Anything else: walk there (and push), to the nearest
-			# floor if the click was off it.
-			if targetable and target.is_creature():
-				World.command_attack(player, target)
-				_free_chase_start(player, target)
-			else:
-				_move_click(player, tile if target != null else _snap_to_floor(_mouse_grid()))
+			_plain_left(player, target, tile if target != null else _snap_to_floor(_mouse_grid()), targetable)
 		MOUSE_BUTTON_RIGHT:
 			# Any entity: go to it and shove. Sent on release, so that
 			# dragging first can aim it.
 			if targetable:
 				_toss_target = target
 				_toss_from = get_global_mouse_position()
+
+
+## A plain left click on [param target] (null: the ground at [param tile]),
+## not a friend nor something to open: a creature (a monster: friends are
+## above), or an ore seam a held tool bites (mines_on_click), is gone to and
+## struck; anything else is walked to (and pushed).
+func _plain_left(player: Player, target: GridEntity, tile: Vector2i, targetable: bool) -> void:
+	if targetable and (target.is_creature() or mines_on_click(player, target)):
+		World.command_attack(player, target)
+		_free_chase_start(player, target)
+	else:
+		_move_click(player, tile)
+
+
+## Whether a plain left click on [param target] mines it: an ore seam, with
+## a tool in hand that bites one (Seam.bites, items' "tool" tag: the pick
+## today, any tool row later), as World._strike_seam asks; the coordinator,
+## from playtest's Hollowfell tour (a click on the ore only walked; mining
+## was Shift's swing, unsaid). Without one a seam is the ground; Shift's
+## swing strikes it either way.
+func mines_on_click(player: GridEntity, target: GridEntity) -> bool:
+	return target is Seam and player != null and Seam.bites(World.wielded(player))
 
 
 ## A plain left click with a bow in hand: never an attack (Jeff: "mouse to

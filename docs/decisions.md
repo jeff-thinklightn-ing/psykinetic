@@ -40187,6 +40187,19 @@ mines; walked 5 cells off, she stops and is back at heel; her player's blow at t
 her at once. _test_mines_a_seam unchanged and passing. Bullet in voice's words. Server only,
 protocol unchanged, no new class_name.
 
+769 amended (11): a click on a seam mines it (ui's; the coordinator's ruling from playtest's
+Hollowfell tour, release's label). With a pick in hand a plain left click on an ore seam only
+walked to it; mining was Shift's swing (593), and nothing said so. Now a plain left click on a seam
+with a tool in hand that bites it (Main.mines_on_click: Seam.bites(World.wielded(player)), items'
+"tool" tag, the check World._strike_seam makes, so any later tool row works and nothing is keyed on
+the pick's name) goes to it and strikes, as a click on a foe does (Main._plain_left: the attack
+order and the free chase); each strike mines as Shift's swing does. Without such a tool, or with a
+sword, the seam is the ground and a click walks there. This sits beside 779's click rule (a left
+click opens what E opens, walking beside it first) in the same dispatch: what opens or talks is
+still taken first, and Shift's swing still strikes a seam with anything. Tests: ui_test
+_test_seam_click (empty-handed it walks, a pick strikes, a sword walks, nothing but a seam mines).
+CHANGELOG bullet (voice's words). Client only, protocol unchanged, no new class_name.
+
 ## 771. The night watch
 
 Jeff (2026-11-01, activities-and-growth.md): "town is dull at night, theres nothing to do for player";

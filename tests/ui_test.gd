@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_crouch_key()
 	_test_practice_bars()
 	_test_gains()
+	_test_seam_click()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -2521,3 +2522,40 @@ func _test_gains() -> void:
 	gains.shown = shown_was
 	gains.has_cue = cue_was
 	gains.fighting = fight_was
+
+
+func _test_seam_click() -> void:
+	print("
+== a click on an ore seam with a pick mines it; without one it walks (playtest's Hollowfell tour) ==")
+	var player: Player = _main._local_player()
+	if player == null or not Net.is_authority():
+		print("  (no player or not the host: its checks skipped)")
+		return
+	var spot: Vector2i = _main._nearest_free(player.tile + Vector2i(3, 0))
+	var spec: Dictionary = Level._spec_for("seam", {})
+	spec["name"] = "UiTestSeam"
+	spec["tile"] = spot
+	var seam := _main._spawn(spec) as Seam
+	if seam == null:
+		_check(false, "a seam to click")
+		return
+	var slots_was := player.slots.duplicate()
+	var slots := player.slots.duplicate()
+	slots[Items.RIGHT_HAND] = ""
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	player.action_target = null
+	_check(not _main.mines_on_click(player, seam), "empty-handed, a seam is no mine")
+	_main._plain_left(player, seam, seam.tile, World.can_target(player, seam))
+	_check(player.action_target != seam, "empty-handed, a click on the seam walks, never strikes")
+	slots[Items.RIGHT_HAND] = "pick"
+	player.slots = slots
+	_check(_main.mines_on_click(player, seam) and not _main.mines_on_click(player, player), "a pick in hand: the seam mines (Seam.bites), nothing else does")
+	_main._plain_left(player, seam, seam.tile, World.can_target(player, seam))
+	_check(player.action_target == seam, "with a pick, a click on the seam goes to it and strikes (%s)" % [player.action_target])
+	slots[Items.RIGHT_HAND] = "sword"
+	player.slots = slots
+	_check(not _main.mines_on_click(player, seam), "a sword does not bite: the seam is the ground")
+	player.action_target = null
+	player.slots = slots_was
+	World.despawn(seam)
