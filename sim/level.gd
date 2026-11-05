@@ -893,6 +893,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
 	level["terrain"]["decor"] = decor_from(config, level["terrain"], warnings)
+	level["carvings"] = carvings_from(config, warnings)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
 	level["terrain"]["ledges"] = _ledges(level["terrain"], config, warnings)
@@ -2206,6 +2207,11 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"fallen_guard": {"sits": "flat", "variants": 2, "faced": true},
 	"grave_fence": {"sits": "edge", "variants": 3},
 	"rune_strip": {"sits": "wall", "variants": 2},
+	# The crypt's (806 amended): bones heaped in the ossuary; a carving on a
+	# tomb's wall, the words of it in level.json "carvings" (the rune strip's
+	# piece until art-kit's own).
+	"bones": {"sits": "flat", "variants": 3, "faced": true},
+	"carving": {"sits": "wall", "variants": 1, "slot": "prop.rune_strip"},
 	# The mine's (decision 769): an arch or a beam spans a way from wall to
 	# wall ("span"), art-kit's piece by the width it spans; track a cell a
 	# piece, faced the way it runs; a lamp hung on a wall.
@@ -2231,6 +2237,30 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# sign out of the street front's wall, +x out.
 	"wall_hearth": {"sits": "wall", "variants": 1, "front": "z", "wide": 2},
 	"inn_sign": {"sits": "edge", "variants": 1}}
+
+
+## level.json's "carvings" (806 amended, the crypt; lore's lines in voice's
+## words): the words cut on a wall, [{at: [x, y], side: [dx, dy] (the wall
+## it is on, a "carving" decor piece there), cut: the words, look: what is
+## seen where there are no words or before them, fact: what a companion
+## knows from reading it}], as [{cell, side, cut, look, fact}] ("" for
+## what is missing). Server-side words for the companions' minds and the
+## inspect line; one with neither cut nor look is said and left out.
+static func carvings_from(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("carvings", [])
+	if not listed is Array:
+		warnings.append("\"carvings\" in level.json is not a list")
+		return out
+	for entry: Variant in listed:
+		var at: Variant = _tile(entry.get("at")) if entry is Dictionary else null
+		var side: Variant = _tile(entry.get("side")) if entry is Dictionary else null
+		if at == null or side == null or (str(entry.get("cut", "")).is_empty() and str(entry.get("look", "")).is_empty()):
+			warnings.append("a carving %s has no at, side, or words: left out" % [entry])
+			continue
+		out.append({"cell": at, "side": side, "cut": str(entry.get("cut", "")), "look": str(entry.get("look", "")),
+			"fact": str(entry.get("fact", ""))})
+	return out
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],

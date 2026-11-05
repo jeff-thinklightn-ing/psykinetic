@@ -248,10 +248,19 @@
 		}
 	],
 	"regenerate": {
-		"generator": "labyrinth",
+		"generator": "crypt",
 		"style": "barrow",
 		"layer": 1,
 		"ways": 5,
+		"held": [
+			"door",
+			"purpose",
+			"wrap",
+			"dead_end",
+			"spine",
+			"loop",
+			"chest"
+		],
 		"every_days": 3,
 		"anchors": [
 			{
@@ -292,31 +301,45 @@
 			}
 		],
 		"entrance": "entrance",
-		"rooms": {
-			"count": [
-				8,
-				11
-			],
-			"size": [
-				[
-					8,
-					7
-				],
-				[
-					14,
-					11
-				]
-			]
-		},
-		"loops": 0.15,
+		"heart": "camp",
 		"monsters": {
 			"robber": 8,
 			"robber_brute": 1
 		},
 		"near": {
-			"robber_brute": "camp"
+			"robber_brute": "camp",
+			"robber": "camp"
 		},
+		"guard": "robber",
 		"chests": 3,
+		"cache": "crypt_cache",
+		"carvings": [
+			{
+				"cut": "Edmund Varrow, who built the first mill. His sons laid him here.",
+				"fact": "The Varrows were one of Umbrage's first wealthy families; Edmund built its first mill."
+			},
+			{
+				"cut": "Maud Corwen kept the town's purse forty years. She gave to the temple and owed no one.",
+				"fact": "Maud Corwen kept Umbrage's purse for forty years and gave to the temple."
+			},
+			{
+				"cut": "The children of the house of Hale. Three winters took them.",
+				"fact": "The Hale family lost three children to hard winters."
+			},
+			{
+				"cut": "Osric Hale, who paid for this tomb and the two beside it.",
+				"fact": "Osric Hale paid for his family's tombs; the Hales were rich."
+			},
+			{
+				"cut": "Who opens this tomb answers to those below.",
+				"fact": "The town's dead are said to answer anyone who breaks their tombs."
+			},
+			{
+				"cut": "Faithful to Theus all her days. Let her rest.",
+				"fact": "The wealthy of Umbrage are laid here as followers of Theus.",
+				"chapel": true
+			}
+		],
 		"band": {
 			"_": "714, dungeon's side (4): the mound-breakers (enemy-ai's named band, 716): each kind's markers, in cell order, are these named ones (Regen.band_of).",
 			"robber_brute": [

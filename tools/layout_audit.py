@@ -338,10 +338,10 @@ def audit(name, layout_path, config, cw, regen_config=None, pillared=False):
                 if 0 <= ny < H and 0 <= nx < W and node[ny, nx] and not door[ny, nx]:
                     sides.add(int(node[ny, nx]))
         for u in sides:
-            if u >= 1000 and len(adj.get(u, ())) <= 1 and not has(u, ("purpose", "link", "start")):
+            if u >= 1000 and len(adj.get(u, ())) <= 1 and not has(u, ("purpose", "link", "start", "sight")):
                 stub_doors += 1
                 faults.append(("door", (int(xs.mean()), int(ys.mean())), "door to a stub"))
-            if u < 1000 and len(adj.get(u, ())) <= 1 and not has(u, ("purpose", "link", "start")):
+            if u < 1000 and len(adj.get(u, ())) <= 1 and not has(u, ("purpose", "link", "start", "sight")):
                 stub_doors += 1
                 faults.append(("door", (int(xs.mean()), int(ys.mean())), "door to an empty closet"))
     # Loops: rock islands enclosed by floor. A pillar inside one room is not one.
@@ -496,7 +496,7 @@ def draw(a, out_png, title):
         d.line(pts, fill=(40, 90, 230), width=3)
     for (px, py, kind, label) in a["th"]:
         c = {"purpose": (40, 40, 40), "monster": (190, 30, 30), "light": (250, 220, 40), "dressing": (150, 130, 100),
-             "link": (255, 0, 255), "start": (0, 220, 220)}[kind]
+             "link": (255, 0, 255), "start": (0, 220, 220), "sight": (90, 60, 160)}[kind]
         r = 3 if kind in ("light", "dressing") else 4
         cx, cy = px * S + S // 2, py * S + S // 2 + 40
         d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=c)

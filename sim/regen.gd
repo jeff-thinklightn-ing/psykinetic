@@ -281,6 +281,17 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 			generated["entities"].append_array(generator.entities_of(map))
 		if generator.has_method("ledges_of"):
 			generated["ledges"] = generator.ledges_of(map)
+		# A generator that names what it lays by section (806 amended, the
+		# crypt): each section's rows added to the anchors' kept ones (decor,
+		# entities, buildings, niches), or set where the template has none
+		# (its "laid_rooms" for layout_sense, its "carvings").
+		if generator.has_method("rows_of"):
+			var rows: Dictionary = generator.rows_of(map)
+			for section: String in rows:
+				if generated.get(section) is Array:
+					(generated[section] as Array).append_array(rows[section])
+				else:
+					generated[section] = rows[section]
 		var result := {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 		# 806: a level whose block lists "held" rules takes the first try
 		# with none of those faults, else the try with the fewest.
@@ -310,8 +321,19 @@ static func held_faults(made: Dictionary, config: Dictionary, held: Array) -> Ar
 ## [param config] (its "ways", default 3, "pillars", default 0, anchors).
 static func layout_faults(made: Dictionary, config: Dictionary) -> Array:
 	var level := Level.parse(made["layout"], made["height"], made["config"])
-	return LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), {"ways": int(config.get("ways", 3)),
-			"anchors": config.get("anchors", []), "dungeon": true, "pillars": int(config.get("pillars", 0))})
+	return LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), layout_options(config))
+
+
+## 806: the checker's options for a "regenerate" block [param config]: its
+## "ways" (default 3) and "pillars" (0), a dungeon, and the anchors the
+## spine's heart is sought in: the block's "heart" anchor when it names one
+## (the crypt's: the robbers' camp), else every anchor (the farthest).
+static func layout_options(config: Dictionary) -> Dictionary:
+	var anchors: Array = config.get("anchors", [])
+	var heart := str(config.get("heart", ""))
+	if not heart.is_empty():
+		anchors = anchors.filter(func(anchor: Variant) -> bool: return anchor is Dictionary and str(anchor.get("name", "")) == heart)
+	return {"ways": int(config.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(config.get("pillars", 0))}
 
 
 ## The graves of a generated [param map] (542 amended, enemy-ai's crypt

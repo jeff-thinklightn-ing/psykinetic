@@ -3647,11 +3647,17 @@ func _test_barrow_level() -> void:
 		"a generation of each depth is laid and joins every anchor (%d and %d tries)" % [made.get("tries", 0), made_deep.get("tries", 0)])
 	var gen_barrow := Level.parse(made["layout"], made["height"], made["config"])
 	var gen_deep := Level.parse(made_deep["layout"], made_deep["height"], made_deep["config"])
-	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == 6 and gen_deep["terrain"]["solid"].size() == 20 + 9 + 8
+	# The crypt's (806 amended): the First Hall's table, and each tomb's
+	# sarcophagi and the chapel's bier the generation lays, all solid.
+	var laid_solid := 0
+	for building: Dictionary in gen_barrow["buildings"]:
+		laid_solid += (building["rect"] as Rect2i).get_area()
+	_check(gen_barrow["warnings"].is_empty() and gen_deep["warnings"].is_empty() and gen_barrow["terrain"]["solid"].size() == laid_solid and laid_solid > 6 and gen_deep["terrain"]["solid"].size() == 20 + 9 + 8
 		and gen_deep["terrain"]["stairs"].size() == 12 and int(gen_deep["terrain"]["heights"].get(Vector2i(49, 75), 0)) == 1 and made_deep["height"] != null
 		and Level.narrow_runs(gen_barrow["terrain"]).is_empty() and Level.narrow_runs(gen_deep["terrain"]).is_empty()
 		and made["config"].get("rooms", {}).size() == 3 and made_deep["config"].get("rooms", {}).has("lair"),
-		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, no way one cell wide, and the named rooms (%s %s)" % [gen_barrow["warnings"], gen_deep["warnings"]])
+		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, no way one cell wide, and the named rooms (%s %s; solid %d of %d laid; narrow %s)" % [gen_barrow["warnings"], gen_deep["warnings"],
+			gen_barrow["terrain"]["solid"].size(), laid_solid, Level.narrow_runs(gen_barrow["terrain"]).slice(0, 8)])
 	# Armour as grave goods (622, dungeon's side): the Ossuary's chests roll
 	# mail shirts; every generated chest's goods carry the grave mark; nowhere
 	# else gives armour. The rolls are seeded by level and cell, so which
@@ -4448,8 +4454,7 @@ func _test_layout_sense() -> void:
 				continue
 			var level := Level.parse(made["layout"], made["height"], made["config"])
 			var block: Dictionary = made["config"].get("regenerate", {})
-			var anchors: Array = block.get("anchors", [])
-			var found := LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), {"ways": int(block.get("ways", 3)), "anchors": anchors, "dungeon": true, "pillars": int(block.get("pillars", 0))})
+			var found := LAYOUT_SENSE.check(level, made["config"].get("laid_rooms", []), Regen.layout_options(block))
 			var by_rule := LAYOUT_SENSE.counts(found)
 			for rule: String in by_rule:
 				totals[rule] = int(totals.get(rule, 0)) + int(by_rule[rule])

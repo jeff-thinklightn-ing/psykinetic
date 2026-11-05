@@ -423,7 +423,7 @@ static func _things(level: Dictionary, options: Dictionary) -> Array:
 
 static func _holds(lay: Dictionary, node: int) -> bool:
 	var held: Dictionary = lay["held"].get(node, {})
-	return held.has("purpose") or held.has("link") or held.has("start")
+	return held.has("purpose") or held.has("sight") or held.has("link") or held.has("start")
 
 
 static func _centre(cells: Array) -> Vector2i:
