@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Stand watch at one of Umbrage's six posts and the night's trouble comes to you there; at the barrow post, while the dead lie unquiet, it's the dead that come (771 amended (5)).
 - Towns: Rolf at the store brings out your locker when you talk to him, no chest needed, and the first time gives you a practice kit, one of each starter weapon; when the keeper is asleep, he sees to you (807).
 - Townsfolk greet a newcomer each in their own way, and once you've done something for the town, the rest have heard of you (809).
 - Towns: townsfolk you pass thank you for what you brought the store that day, and for a building that stands with your goods in it (809 amended).

@@ -6532,9 +6532,51 @@ func _on_balance_threat(town: String, kind: String, on: bool) -> void:
 
 ## How often the watch is looked at (steps).
 const WATCH_TICKS := 60
-## Town -> [{id, rect, name}]: its posts (buildings' "post" places, 771,
-## buildings' side; a test sets its own).
+## Town -> [{id, rect, brazier, name}]: its posts (buildings' "post" places,
+## 771 amended (4); read from its level by _posts_of, 771 amended (5); a
+## test sets its own).
 var watch_posts: Dictionary = {}
+
+
+## A test's stand-in for _dead_unquiet (town) -> bool; unset in play.
+var dead_unquiet: Callable
+
+
+## [param town]'s posts (771 amended (5)): its level's "post" places
+## (Level.posts_of; the town's level is its id's first part), read once and
+## kept in watch_posts; [] for a town with none or no level.
+func _posts_of(town: String) -> Array:
+	if not watch_posts.has(town):
+		var level := town.get_slice("/", 0)
+		watch_posts[town] = Level.posts_of(Level.load_level(level)).get(town, []) if not level.is_empty() and Level.exists(level) else []
+	return watch_posts[town]
+
+
+## A wave's mix at [param post_id] of [param town] (771 amended (5)): the
+## post's own (residents.json watch.waves.posts, by its id) while it holds
+## ("unquiet": only while the dead are unquiet, _dead_unquiet), else the
+## night's kinds ({kind: weight}).
+func _post_kinds(town: String, post_id: String) -> Dictionary:
+	var rule := _wave_rule()
+	var own: Dictionary = rule.get("posts", {}).get(post_id, {})
+	if not own.is_empty() and (not bool(own.get("unquiet", false)) or _dead_unquiet(town)):
+		return own.get("kinds", {})
+	return rule.get("kinds", {"wolves": 1})
+
+
+## Whether the dead near [param town] are unquiet (771 amended (5); lore's
+## crypt.dead_rise: they come up on nights the robbers have dug, or when the
+## alms fall short): the barrow's robbers not cleared (robbers_cleared), or
+## the town's alms short (economy's Economy.alms_short, when it has one).
+func _dead_unquiet(town: String) -> bool:
+	if dead_unquiet.is_valid():
+		return bool(dead_unquiet.call(town))  # A test's.
+	if World.economy == null:
+		return false
+	var barrow := str(World.economy.rules.get("robbers", {}).get("barrow", ""))
+	if not barrow.is_empty() and not robbers_cleared(barrow):
+		return true
+	return World.economy.has_method("alms_short") and bool(World.economy.call("alms_short", town))
 ## Town -> post id -> {player, name, worker, zone, rect, stood, away}: the night's watch.
 var _watch: Dictionary = {}
 
@@ -6574,7 +6616,7 @@ func _watch_post_for(worker_id: String, player_id: String) -> Dictionary:
 			or not Townsfolk._within(DayNight.hour(DayNight.now()), float(rule.get("from", 18)), float(rule.get("to", 23))):
 		return {}
 	var taken: Dictionary = _watch.get(town, {})
-	for post: Variant in watch_posts.get(town, []):
+	for post: Variant in _posts_of(town):
 		if post is Dictionary and not taken.has(str(post.get("id", ""))):
 			return {"id": str(post["id"]), "name": str(post.get("name", "the post"))}
 	return {}
@@ -6585,7 +6627,7 @@ func _watch_post_for(worker_id: String, player_id: String) -> Dictionary:
 func _watch_sign_on(player: Player, body: Resident, post_id: String) -> void:
 	var town := body.town
 	var post := {}
-	for each: Variant in watch_posts.get(town, []):
+	for each: Variant in _posts_of(town):
 		if each is Dictionary and str(each.get("id", "")) == post_id:
 			post = each
 	if post.is_empty() or _on_watch(player.player_id) or (_watch.get(town, {}) as Dictionary).has(post_id):
@@ -6740,7 +6782,7 @@ func _wave_due(town: String, post: String, entry: Dictionary, hour: float) -> vo
 	_wave_hook()
 	var weights: Dictionary = entry.get("kinds", {})
 	if weights.is_empty():
-		weights = rule.get("kinds", {"wolves": 1})
+		weights = _post_kinds(town, post)  # The post's own mix while it holds (771 amended (5)).
 	var kind := _wave_kind(weights, hash("%s:%s:%d:%d" % [town, post, Townsfolk.day_of(World.steps), sent]))
 	var size := 1 + (_watch[town] as Dictionary).size()
 	entry["sent"] = sent + 1

@@ -95,6 +95,7 @@ func _ready() -> void:
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
 	_test_tavern_keeper()  # 772 amended (2).
+	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
 
@@ -1011,6 +1012,31 @@ func _test_tavern_keeper() -> void:
 	var open := {"town": "store", "use": "inn", "rect": Rect2i(170, 205, 10, 8)}
 	_check(_main._is_shell(shell) and not _main._is_shell(open), "a building with inside is a shell")
 	_check(_main._inn_inside({"buildings": [shell]}, {"key": "store"}) and not _main._inn_inside({"buildings": [open]}, {"key": "store"}) 		and not _main._inn_inside({"buildings": [shell]}, {"key": "other"}), "the town's inn inside when its building is a shell")
+
+
+## 771 amended (5): a town's posts come from its level (Level.posts_of,
+## buildings' places), read once; the barrow post's own mix (the dead) only
+## while the dead are unquiet, else the night's kinds; another post the
+## night's kinds always.
+func _test_posts_live() -> void:
+	print("
+== the posts live from the level; the barrow's dead only while unquiet (771 amended (5)) ==")
+	var town := "wilds/store"
+	_main.watch_posts.erase(town)
+	var posts: Array = _main._posts_of(town)
+	var ids: Array = posts.map(func(p: Dictionary) -> String: return str(p["id"]))
+	_check(posts.size() == 6 and ids.has("post_barrow") and ids.has("post_crossroads") and posts.all(func(p: Dictionary) -> bool: return p["rect"] is Rect2i and p["rect"].size == Vector2i(3, 3)),
+		"Umbrage's six posts read from the wilds level (%s)" % [ids])
+	_check(_main._posts_of("no_such_level/store").is_empty(), "a town with no level: none")
+	var night: Dictionary = Townsfolk.days()["watch"]["waves"]["kinds"]
+	_main.dead_unquiet = func(_t: String) -> bool: return true
+	var unquiet: Dictionary = _main._post_kinds(town, "post_barrow")
+	_check(unquiet.has("dead"), "the dead unquiet: the barrow post draws them (%s)" % [unquiet])
+	_check(_main._post_kinds(town, "post_crossroads") == night, "another post: the night's kinds, no dead (%s)" % [_main._post_kinds(town, "post_crossroads")])
+	_main.dead_unquiet = func(_t: String) -> bool: return false
+	_check(_main._post_kinds(town, "post_barrow") == night, "the dead at rest: the barrow post as any other (%s)" % [_main._post_kinds(town, "post_barrow")])
+	_main.dead_unquiet = Callable()
+	_main.watch_posts.erase(town)
 
 
 ## The night watch's waves (771 amended (3)): a manned post's wave sent at

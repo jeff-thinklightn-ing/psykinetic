@@ -40588,6 +40588,17 @@ Main.watch_posts. Umbrage has six, each a 3 x 3 on floor with its brazier in the
 the barrow, the hill road, the smithy, the woodlot and the healer's post, on the roads out of town.
 level_test _test_town_places. (2026-11-04, buildings)
 
+771 amended (5): the posts, npc's side (the coordinator's queue; lore's crypt.dead_rise; economy's
+546 amended (2)). Main.watch_posts is filled from the level, not by hand: Main._posts_of(town) reads
+Level.posts_of(Level.load_level(<the town's level>)) once per town and keeps it (Umbrage's six on the
+wilds level; a town whose level has none, or no level, none). A wave's mix is the post's own
+(residents.json watch.waves.posts, by post id, Main._post_kinds) where one is given, else the night's
+kinds. The barrow post's is {dead 2, wolves 1} and "unquiet": it holds only while the dead are unquiet
+(Main._dead_unquiet: the barrow's robbers not cleared, or Economy.alms_short(town), economy's: no gold
+gone down to the barrow altar for three days since the town had a priest; guarded by has_method), else
+the barrow post draws the night's kinds as any other. Main.dead_unquiet a test's stand-in.
+resident_test _test_posts_live. Server only, protocol unchanged, no new class_name.
+
 ## 776, companions' side: she knows a ford for shallow water
 
 776 makes the hills' streams fords: floor, so World.is_water is false on them, and a companion's
