@@ -41531,3 +41531,23 @@ taken, downed with its line, raised at half with its thanks and regard, falls ba
 off duty. A Resident now replicates hands, worn, down_until and downed_until (names
 SUBCLASS_REPLICATED already lists), so a client draws a guard's spear and mail and a downed guard;
 the protocol revision is release's. No new class_name.
+
+## 802. The townsperson window: words said to the one it shows
+
+Jeff: one window per townsperson. A left click opens it with their name, a chat area with the input
+focused, and their barter squares below, with no Talk button and no "Name, " typed before the line
+(ui's design; the coordinator's approval; release's number). The window can't put the name in the line,
+because Main._offer_said takes a standing offer's yes and an amount only when the line starts with the
+word or is the number (Offers.ask_kind, amount_said), so "Aldous, yes" would take nothing. Instead the
+"say" command gains an optional "to", the body's path (as "speech" and "offers" carry it as "entity"), and
+the line stays as typed. npc's side: Main._player_said gives the line to the body "to" names
+(Main._speaker_meant) over the name search and the nearest. That body is a Resident that hears
+(Main._resident_hears, split out of _resident_addressed: its zone, HEARING_RANGE, not hiding, not
+asleep, not a visitor or the stall's keeper, who answer clicks) or a talking Monster (the draugr) in the
+player's zone within HEARING_RANGE. One that doesn't hear takes nothing and nobody else answers; the line
+is still said aloud, to them, and the player's companion overhears it as not hers. Without "to", nothing
+changes: chat-box talk and older clients still work. ui's side ("802, ui's side") is the window, which
+sends "to"; it shows "asleep" from Resident.sleeping and closes on a hide or sheltering. A visitor's or
+vendor's window has no chat input. resident_test _test_said_to: the line goes to the window's body
+though another is nearer and named; with no "to", the nearest as before; a body hiding hears nothing and
+nobody else takes it. Protocol: what "say" carries changes (rev 49, "49 (802):"). No new class_name.

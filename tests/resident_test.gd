@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_alms_run()
 	_test_herbs()
 	_test_resident_voices()
+	_test_said_to()
 	_test_means_in_voice()
 	_test_hearsay()
 	_test_houses()
@@ -2123,6 +2124,52 @@ func _test_resident_voices() -> void:
 	Net.message_received.disconnect(heard)
 	_main._resident_mind = null
 	World.despawn(mara)
+
+
+## Said in a townsperson's window (decision 802): "say" {to} gives the line
+## to that body over the name search and the nearest; one that does not
+## hear (hiding) takes it from nobody, and nobody else answers.
+func _test_said_to() -> void:
+	print("
+== said in a townsperson's window: the line is theirs, or nobody's (decision 802) ==")
+	for body: GridEntity in World.townsfolk().duplicate():
+		World.despawn(body)
+	for i in 14:
+		World.production.set_away("rs-folk%02d" % i, true)
+	DayNight.set_hour(12.0)
+	World.towns.note_rescue(STORE, "rs-mara", "Mara", "cook")
+	World.towns.note_rescue(STORE, "rs-bram", "Bram", "cook")
+	World.production.set_away("rs-mara", false)
+	World.production.set_away("rs-bram", false)
+	_sync()
+	var mara := _body("rs-mara")
+	var bram := _body("rs-bram")
+	var player := _player()
+	if mara == null or bram == null or player == null:
+		_check(false, "(Mara and Bram in the town, and a player: %s, %s)" % [mara, bram])
+		return
+	_put(bram, _main._nearest_free(mara.tile + Vector2i(4, 0)))
+	_put(player, _main._nearest_free(bram.tile + Vector2i(1, 0)))
+	var to := String(mara.get_path())
+	_main._resident_asks.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Bram, what are you making today?", 0, to)
+	var asked: Array = _main._resident_asks.map(func(each: Dictionary) -> int: return int(each["body"]))
+	_check(asked == [mara.get_instance_id()], "said to Mara in her window: hers, though Bram is nearer and named (%s)" % [asked])
+	_main._resident_asks.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "What are you making today?")
+	asked = _main._resident_asks.map(func(each: Dictionary) -> int: return int(each["body"]))
+	_check(asked == [bram.get_instance_id()], "no \"to\": the nearest, as before (%s)" % [asked])
+	mara.doing = Resident.Doing.HIDE
+	_main._resident_asks.clear()
+	_main._chat_tick.clear()
+	_main._player_said(player, "Are you all right?", 0, to)
+	_check(_main._resident_asks.is_empty(), "Mara hiding: unheard, and nobody else takes it (%s)" % [_main._resident_asks])
+	_main._resident_asks.clear()
+	World.production.set_away("rs-bram", true)
+	World.despawn(mara)
+	World.despawn(bram)
 
 
 func _test_means_in_voice() -> void:

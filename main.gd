@@ -10847,15 +10847,33 @@ func _resident_addressed(player: Player, line: String, pet: Companion) -> Reside
 	for entity: GridEntity in World.townsfolk():
 		var body := entity as Resident
 		var d := World.distance(body.tile, player.tile)
-		if body.doing == Resident.Doing.HIDE or d > HEARING_RANGE or body.worker_id.begins_with(Offers.VISITOR) or body.worker_id.begins_with(Offers.VENDOR):
-			continue  # A visitor (711) or the stall's keeper (736) answers a click, not the mind.
-		if body.sleeping():
-			continue  # Asleep (751): typed words go unheard.
+		if not _resident_hears(body, player):
+			continue
 		if not body.person.is_empty() and Companion._named(line, body.person):
 			return body
 		if d <= RESIDENT_EARSHOT and (nearest == null or d < World.distance(nearest.tile, player.tile)):
 			nearest = body
 	return nearest
+
+
+## Whether [param body] hears typed words from [param player]: in their
+## zone within HEARING_RANGE, not hiding, not asleep (751), and not a
+## visitor (711) or the stall's keeper (736), who answer a click, not the mind.
+func _resident_hears(body: Resident, player: Player) -> bool:
+	return body != null and is_instance_valid(body) and body.spawned and body.zone == player.zone 		and body.doing != Resident.Doing.HIDE and World.distance(body.tile, player.tile) <= HEARING_RANGE 		and not body.worker_id.begins_with(Offers.VISITOR) and not body.worker_id.begins_with(Offers.VENDOR) 		and not body.sleeping()
+
+
+## The body [param path] names for typed words from [param player] (802, the
+## townsperson window's "to"): a Resident that hears (_resident_hears) or a
+## talking Monster in their zone within HEARING_RANGE; null when it does not
+## hear, and then nobody else takes the line.
+func _speaker_meant(player: Player, path: String) -> GridEntity:
+	var node := get_node_or_null(NodePath(path))
+	if node is Resident:
+		return node if _resident_hears(node as Resident, player) else null
+	if node is Monster and (node as Monster).talks and node.has_method("offers_for") and (node as Monster).spawned 			and (node as Monster).zone == player.zone and World.distance((node as Monster).tile, player.tile) <= HEARING_RANGE:
+		return node
+	return null
 
 
 ## Server: [param body] is asked [param line] by [param speaker]: an ask
@@ -12667,7 +12685,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "make_way" and entity is Player:
 		_make_way(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Companion)
 	elif command_name == "say" and entity is Player:
-		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)))
+		_player_said(entity, str(args.get("text", "")), int(args.get("phrase", 0)), str(args.get("to", "")))
 	elif command_name == "party" and entity is Player:
 		_party_said(entity, str(args.get("text", "")))
 	elif command_name == "bandage" and entity is Player:
@@ -13663,7 +13681,7 @@ func _make_way(player: Player, pet: Companion) -> void:
 ## the party log, and to their companion as a decision, the words as data.
 ## A whisper ("/w words") carries WHISPER_RANGE, not HEARING_RANGE; a line in
 ## capitals is a shout, heard farther by monsters (Senses.speech_radius).
-func _player_said(player: Player, text: String, phrase := 0) -> void:
+func _player_said(player: Player, text: String, phrase := 0, to_path := "") -> void:
 	var line := text.strip_edges().left(CHAT_MAX_CHARS)
 	if World.is_downed(player):
 		return  # Downed (decision 544): no word.
@@ -13684,14 +13702,21 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 			and World.distance(pet.tile, player.tile) <= earshot
 	var to := Companion._name_of(pet) if hears else ""
 	# A resident beside them, or named, takes typed words (decision 336);
-	# their companion hears them as said to someone else.
-	var resident := _resident_addressed(player, line, pet if hears else null) if phrase == 0 else null
+	# their companion hears them as said to someone else. Said in a
+	# townsperson's window (802), the line is that body's ("to"), or nobody's
+	# when it does not hear.
+	var aimed := not to_path.is_empty() and phrase == 0
+	var meant := _speaker_meant(player, to_path) if aimed else null
+	var resident: Resident = meant as Resident if aimed else (_resident_addressed(player, line, pet if hears else null) if phrase == 0 else null)
 	if resident != null:
 		to = resident.person
 	# Or a monster that talks (the draugr, 548; decision 546, npc's side): named, or nearest within earshot.
-	var talker: GridEntity = _monster_addressed(player, line) if resident == null and phrase == 0 else null
+	var talker: GridEntity = (meant if meant is Monster else null) if aimed 		else (_monster_addressed(player, line) if resident == null and phrase == 0 else null)
 	if talker != null:
 		to = _display_name(talker)
+	if aimed and meant == null:
+		var unheard := get_node_or_null(NodePath(to_path))
+		to = _display_name(unheard) if unheard is GridEntity else ""  # Said to them; unheard, nobody answers.
 	# Every other companion within earshot hears it too, labelled; her voice
 	# decides whether it was meant for her.
 	for entity in World.get_entities():
@@ -13715,6 +13740,9 @@ func _player_said(player: Player, text: String, phrase := 0) -> void:
 		_monster_said(talker, player, line)
 		if hears:
 			pet.overheard(_display_name(player), line, false)
+	elif aimed:
+		if hears:
+			pet.overheard(_display_name(player), line, false)  # Meant for someone who did not hear: not hers.
 	elif not hears and _calls_absent(player, pet, line, phrase):
 		pass  # Told where she is (the barrow: he called for Pip, who worked in town).
 	elif to != "":

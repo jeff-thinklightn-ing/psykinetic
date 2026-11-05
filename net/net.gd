@@ -544,6 +544,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## (head 11, neck 12, back 13, feet 14, rings 15 and 16, the charm 17).
 ## 49 (791): a Resident replicates hands, worn, down_until, downed_until (guards who fight):
 ## a guard's spear and mail, and a downed guard; an old client draws it bare-handed and standing.
+## 49 (802): the "say" command gains an optional "to", a body's path (the townsperson
+## window): the line is that body's if it hears, else nobody's; an old client sends none.
 const PROTOCOL_REVISION := 49
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
