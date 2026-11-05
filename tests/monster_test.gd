@@ -2403,6 +2403,22 @@ func _test_rout_way_out() -> void:
 	_check(outside._way_out == Monster.NO_TILE and outside.alert == Monster.Alert.FLEEING,
 			"a robber routed under the sky: the plain flee, no way out sought")
 	World.outdoor = false
+	# 702 amended: a level that is its kind's home ("home_kinds") keeps it.
+	Level.register("mt_home", Level.image_from_rows(["..."]), null, {"home_kinds": ["robber"]})
+	var was_name := World.zone.name
+	World.zone.name = "mt_home"
+	var homed := EntityFactory.build(SPECS["x"].merged({"name": "Homed", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(homed)
+	World.spawn(homed, path[8])
+	homed._flee(player.tile)
+	var sought := homed._way_out
+	for i in 120:
+		World.step()
+	_check(homed.at_home() and sought == Monster.NO_TILE and homed._way_out == Monster.NO_TILE and homed.spawned,
+			"a robber routed where robbers are at home: no way out, still there at %s" % homed.tile)
+	World.zone.name = was_name
+	Level.unregister("mt_home")
+	World.despawn(homed)
 	World.despawn(outside)
 	World.despawn(bones)
 	World.despawn(player)

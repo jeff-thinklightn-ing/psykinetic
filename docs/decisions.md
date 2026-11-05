@@ -33799,6 +33799,21 @@ and are gone beside it by tick 57; a skeleton routed beside them stays; a
 robber routed under the sky flees as ever. Server only, protocol unchanged,
 no new class_name.
 
+702 amended (playtest's Hollowfell tour, through dungeon; release's
+label): routed Blood Rot ran out the mine's mouth to the hills ("Sneak1 got
+away by (1, 34)"), leaving Hollowfell empty, though the mine is their home.
+"bound" is a kind's word for everywhere; this is a level's: its
+"home_kinds" (a list of monster kinds, no default) are at home there, and
+one of them routed there never takes a way out (Monster.at_home); it flees
+deeper (its post, else away) and rallies as anywhere. A kinds list, not a
+faction: the goblins (the Blood Rot) list only the imp in factions.json, and
+adding the sneak and brute there would put them in goblin raids, a call of
+its own. Hollowfell's level.json gives ["imp", "sneak", "brute"] (dungeon's
+fixes landing); the crypt's robbers keep the way out. monster_test
+_test_rout_way_out: a robber routed where robbers are at home seeks no way
+out and is still there 120 ticks on. Server only, protocol unchanged, no
+new class_name.
+
 ## 177 amended: every body shader marks the stencil under the target outline
 
 Jeff on v0.1.187: "mousing over or left clicking an enemy causes their whole

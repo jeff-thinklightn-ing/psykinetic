@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Hollowfell: the Blood Rot hold to their mine; beaten back, they fall back deeper into the tunnels and gather again (702 amended).
 - Worn slots beside the armour for a hat or hood, an amulet, a cloak, boots, two rings and a charm, and double-click puts a thing on; a hood, a felt hat and soft boots are the first made to wear, not yet in the world (788).
 - Every chest and hidden cache holds something worth the opening (330 amended).
 - Chests in the crypt, the deep, the castle halls and Hollowfell hold a find for every player who opens them: a little gold and a trinket worth selling (330 amended (2)).

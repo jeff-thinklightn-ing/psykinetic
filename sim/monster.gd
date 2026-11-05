@@ -2281,10 +2281,19 @@ func _flee(threat: Vector2i, routs := true) -> void:
 	_lead = NO_TILE
 	move_ticks = _pace
 	_way_out = NO_TILE
-	if not World.outdoor and not bound and _wary and not self is Animal:
+	if not World.outdoor and not bound and _wary and not self is Animal and not at_home():
 		_way_out = _pick_way_out(_foe_cell(threat))
 	if routs:
 		_cry(&"rout", Senses.NOISE_ROUT)
+
+
+## Whether its level is its home (702 amended; playtest's Hollowfell tour:
+## the Blood Rot fled out the mine's mouth and left it empty): its kind is
+## in the level's "home_kinds". Routed there it never takes a way out; it
+## flees deeper, to its post or away, and rallies as anywhere.
+func at_home() -> bool:
+	var given: Variant = _zone_config().get("home_kinds", [])
+	return given is Array and str(spawn_spec.get("kind", "")) in given
 
 
 ## FLEEING: a step away from what it runs from, toward its post if that is
