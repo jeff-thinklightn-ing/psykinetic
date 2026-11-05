@@ -488,6 +488,22 @@
 					"status": "draft"
 				}
 			]
+		},
+		{
+			"id": "bandits",
+			"type": "faction",
+			"name": "the bandits",
+			"status": "draft",
+			"source": "lore",
+			"summary": "Outlaws in the forest's camps who rob the living on its paths, apart from the Mound-breakers in the crypt (enemy-ai's 793 faction, approved by the coordinator). Their name is with Jeff (lean: the Tollmen).",
+			"relations": [
+				{
+					"to": "town",
+					"kind": "enemy"
+				}
+			],
+			"tags": [],
+			"facts": []
 		}
 	]
 }

@@ -262,6 +262,46 @@
 			]
 		},
 		{
+			"id": "last_light",
+			"type": "place",
+			"name": "the Last Light Mughouse",
+			"status": "agreed",
+			"source": "Jeff",
+			"summary": "Umbrage's tavern on the west of the square, three floors (Jeff named it, 2026-11-05: \"Last Light Mughouse\"); locals call it the Mughouse.",
+			"place_kind": "tavern",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "last_light.name",
+					"text": "Umbrage's tavern is the Last Light Mughouse, and locals call it the Mughouse.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "Jeff",
+					"status": "agreed"
+				},
+				{
+					"id": "last_light.lamp",
+					"text": "The Last Light keeps a lamp burning in its window all night.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
+				}
+			]
+		},
+		{
 			"id": "healers_hut",
 			"type": "place",
 			"name": "the healer's hut",
