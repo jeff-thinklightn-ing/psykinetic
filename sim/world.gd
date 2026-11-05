@@ -667,6 +667,20 @@ var _fight_beaten: Dictionary = {}  # Player -> Array of {name, fled, hard}
 ## A foe not touched for so long (ticks) is no longer in the fight: walked
 ## away from, or lost (804, combat's side; 10 s).
 const FIGHT_FORGET_TICKS := 100
+## Players who struck or were struck themselves in their fight (804 amended
+## (5)): a companion's fight alone is never the player's deed.
+var _fight_own: Dictionary = {}  # Player -> true
+## The tick each player's last foe left its fight; foes that come within
+## FIGHT_MERGE_TICKS of it are the same fight (804 amended (5): a pack that
+## comes on one by one is one fight won).
+var _fight_ended: Dictionary = {}  # Player -> tick
+const FIGHT_MERGE_TICKS := 50
+## The tick each player was last told a fight won. Another within
+## FIGHT_WON_GAP_TICKS is held, its foes counted in, until the gap is past
+## (804 amended (5): playtest's 9 in 83 s were noise); a hard foe's never
+## waits.
+var _fight_last_won: Dictionary = {}  # Player -> tick
+const FIGHT_WON_GAP_TICKS := 600
 var _din: Array[Dictionary] = []
 var _din_tick := -1000000
 ## Each zone's din and the tick it was made, so zones stepped in turn keep theirs.
@@ -1866,6 +1880,9 @@ func reset() -> void:
 	_hurt_folds.clear()  # 544 amended (2): no room's fire told in the next.
 	_fight_foes.clear()
 	_fight_beaten.clear()
+	_fight_own.clear()
+	_fight_ended.clear()
+	_fight_last_won.clear()
 	_din_made.clear()
 	_din_tick = -1000000
 	raids.hand_back(zone.name)  # Its raiders go with the room: back to maps.
@@ -3704,6 +3721,8 @@ func _mark_fight(a: GridEntity, b: GridEntity) -> void:
 		if not _fight_foes.has(player):
 			_fight_foes[player] = {}
 		_fight_foes[player][foe] = tick
+		if pair[0] is Player:
+			_fight_own[player] = true  # Its own blow, or one on it (804 amended (5)).
 
 
 ## The "deed" reward for a fight won (804, combat's side) with
@@ -3749,8 +3768,7 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 func _tend_fights() -> void:
 	for player: Player in _fight_foes.keys():
 		if not is_instance_valid(player) or not player.spawned:
-			_fight_foes.erase(player)
-			_fight_beaten.erase(player)
+			_forget_fight(player)
 			continue
 		var foes: Dictionary = _fight_foes[player]
 		for foe: Variant in foes.keys():
@@ -3761,19 +3779,46 @@ func _tend_fights() -> void:
 				return  # _foe_beaten tended again.
 			elif tick - int(foes[foe]) > FIGHT_FORGET_TICKS:
 				foes.erase(foe)
-		if foes.is_empty() and not (_fight_beaten.get(player, []) as Array).is_empty():
-			var beaten: Array = _fight_beaten[player]
+		if foes.is_empty():
 			_fight_foes.erase(player)
-			_fight_beaten.erase(player)
-			fight_won.emit(player, beaten[-1]["at"], beaten)
-		elif foes.is_empty():
-			_fight_foes.erase(player)
+			if not _fight_beaten.has(player):
+				_forget_fight(player)  # Nothing beaten: walked away from, no deed.
+	# 804 amended (5): a fight with none left is told once its window is
+	# past (a foe that comes in it is the same fight), only if the player
+	# was in it itself, and no sooner than FIGHT_WON_GAP_TICKS after its
+	# last, unless a hard foe is among the beaten; held, never dropped.
 	for player: Player in _fight_beaten.keys():
-		if not _fight_foes.has(player):
-			var beaten: Array = _fight_beaten[player]
-			_fight_beaten.erase(player)
-			if is_instance_valid(player) and player.spawned:
-				fight_won.emit(player, beaten[-1]["at"], beaten)
+		if _fight_foes.has(player):
+			_fight_ended.erase(player)  # Still at it.
+			continue
+		if not is_instance_valid(player) or not player.spawned:
+			_forget_fight(player)
+			continue
+		if not _fight_ended.has(player):
+			_fight_ended[player] = tick
+		if tick - int(_fight_ended[player]) < FIGHT_MERGE_TICKS:
+			continue
+		if not _fight_own.has(player):
+			_forget_fight(player)  # A companion's fight alone.
+			continue
+		var beaten: Array = _fight_beaten[player]
+		var hard := false
+		for each: Dictionary in beaten:
+			hard = hard or bool(each.get("hard", false))
+		if not hard and _fight_last_won.has(player) and tick - int(_fight_last_won[player]) < FIGHT_WON_GAP_TICKS:
+			continue
+		_forget_fight(player)
+		_fight_last_won[player] = tick
+		fight_won.emit(player, beaten[-1]["at"], beaten)
+
+
+## [param player]'s fight let go (804 amended (5)): its foes, the beaten,
+## whether it was in it, its window. When it was last told stays.
+func _forget_fight(player: Player) -> void:
+	_fight_foes.erase(player)
+	_fight_beaten.erase(player)
+	_fight_own.erase(player)
+	_fight_ended.erase(player)
 
 
 ## [param monster] (a named one) has [param kind] (named_event's) with
@@ -8103,8 +8148,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		if target is Monster:
 			_foe_beaten(target as Monster, false)  # 804, combat's side.
 		elif target is Player:
-			_fight_foes.erase(target)
-			_fight_beaten.erase(target)
+			_forget_fight(target as Player)
 		entity_died.emit(target, cause)
 		var spilt: Array[int] = []
 		if target is Cargo:

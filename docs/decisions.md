@@ -42030,6 +42030,24 @@ and with a new area, the client's fold), level_test _test_explorables (no town p
 one, the hills' six and the Old Tower, not the path, voice's shown names). Protocol: a "49 (804,
 maps' side)" line, the world message carrying a new key an old client ignores (rev 49 still
 open); no new class_name.
+
+804 amended (5): a fight won paced (2026-11-05, combat; release's label; the coordinator's ask and
+approval, from playtest's reward_loop tour: "+1 Deeds, a fight won" nine times in 83 s, the
+companion's own skirmishes counted as the player's, noise rather than a reward). A fight pays only
+if the player itself struck or was struck in it (World._fight_own, set by _mark_fight when the
+player's side of the pair is the player and not its companion): a companion's blows still keep a
+foe in its keeper's fight, so a pack fought together is one fight, but a companion's fight alone
+pays nothing. A fight with no foe left waits FIGHT_MERGE_TICKS (50, 5 s, from _fight_ended) before
+it is told; a foe struck in that window is the same fight, so a pack that comes on one by one is one
+deed, "against many" at three. A win within FIGHT_WON_GAP_TICKS (600, a minute) of that player's last
+(_fight_last_won) is held, never dropped: a fight begun meanwhile adds its foes to it, and it is told
+once the minute is past; a hard foe among the beaten (apex, boss, given or named) is told without
+waiting. World._forget_fight lets a fight go (its foes, beaten, part in it, window; not when it was
+last told). combat_test _test_fight_paced (a pack within the window one fight, the companion's fight
+alone nothing, with the player in it a deed, a second within the minute held then told, the great
+bear within the minute at once); _test_fight_won waits out the window. Server only, protocol
+unchanged, no new class_name; the bullet stands.
+
 ## 810. A tell strikes what it shows, lag judged in the player's favour
 
 (2026-11-05, combat; the coordinator's approval, after playtest's bear13 runs; release's number.) In

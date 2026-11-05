@@ -1408,6 +1408,85 @@ func _test_flank_party() -> void:
 ## A fight won (804, combat's side): the last foe on a player falls or
 ## routs, none other touched in FIGHT_FORGET_TICKS; each who fought it told
 ## once; an escape (the foe forgotten, never beaten) tells nothing.
+## The merge window waited out and the fights tended (804 amended (5)).
+func _settle() -> void:
+	World._tend_fights()
+	World.tick += World.FIGHT_MERGE_TICKS
+	World._tend_fights()
+
+
+## 804 amended (5): a fight won paced, read through [param won] (fight_won's).
+func _test_fight_paced(won: Array) -> void:
+	# A pack that comes on one by one, within the window: one fight.
+	won.clear()
+	var e := _build(["#######", "#.mPm.#", "#######"])
+	var p: Player = e["P"][0]
+	var m1: GridEntity = e["m"][0]
+	var m2: GridEntity = e["m"][1]
+	_blow(p, m1)
+	m1.hp = 1
+	_blow(p, m1)
+	World.tick += 25  # Half the window.
+	World._tend_fights()
+	_blow(p, m2)
+	m2.hp = 1
+	_blow(p, m2)
+	_settle()
+	_check(won.size() == 1 and (won[0][2] as Array).size() == 2, "a second foe within the window: one fight, both beaten (%s)" % [won])
+	# A companion's fight alone: no deed for its keeper.
+	won.clear()
+	e = _build(["#######", "#.P.m.#", "#######"])
+	p = e["P"][0]
+	var m: GridEntity = e["m"][0]
+	var pet: Companion = load("res://sim/companion.gd").new()
+	pet.keeper = p
+	World._mark_fight(pet, m)
+	World._foe_beaten(m as Monster, false)
+	_settle()
+	_check(won.is_empty(), "the companion's fight alone: no deed (%s)" % [won])
+	# Its fight with the player in it: the player's.
+	e = _build(["#######", "#.Pm..#", "#######"])
+	p = e["P"][0]
+	m = e["m"][0]
+	pet.keeper = p
+	World._mark_fight(pet, m)
+	_blow(p, m)
+	World._foe_beaten(m as Monster, false)
+	_settle()
+	_check(won.size() == 1 and won[0][0] == p, "the player in it with its companion: a deed (%s)" % [won])
+	pet.free()
+	# A second win within the minute: held, then told with both counted.
+	won.clear()
+	e = _build(["#########", "#.Pm...m#", "#########"])
+	p = e["P"][0]
+	m1 = e["m"][0]
+	m2 = e["m"][1]
+	m1.hp = 1
+	_blow(p, m1)
+	_settle()
+	_check(won.size() == 1, "the first fight: told")
+	World._mark_fight(p, m2)
+	World._foe_beaten(m2 as Monster, false)
+	_settle()
+	_check(won.size() == 1, "a second within the minute: held, not told yet")
+	World.tick += World.FIGHT_WON_GAP_TICKS
+	World._tend_fights()
+	_check(won.size() == 2 and (won[1][2] as Array).size() == 1, "the minute past: told (%s)" % [won])
+	# A hard foe never waits on the minute.
+	won.clear()
+	e = _build(["#########", "#.Pm..B.#", "#########"])
+	p = e["P"][0]
+	m = e["m"][0]
+	var bear: GridEntity = e["B"][0]
+	m.hp = 1
+	_blow(p, m)
+	_settle()
+	World._mark_fight(p, bear)
+	World._foe_beaten(bear as Monster, false)
+	_settle()
+	_check(won.size() == 2 and bool(won[1][2][0]["hard"]), "the great bear within the minute: told at once (%s)" % [won])
+
+
 func _test_fight_won() -> void:
 	print("
 == a fight won: the last foe falls or routs (804, combat's side) ==")
@@ -1423,6 +1502,8 @@ func _test_fight_won() -> void:
 	_check(won.is_empty(), "struck, still standing: no win yet")
 	m.hp = 1
 	_blow(p, m)
+	_check(won.is_empty(), "the foe killed: held while another may come (804 amended (5))")
+	_settle()
 	_check(won.size() == 1 and won[0][0] == p and won[0][1] == Vector2i(3, 1) and (won[0][2] as Array).size() == 1
 			and not bool(won[0][2][0]["fled"]) and not bool(won[0][2][0]["hard"]), "the foe killed: one win, where it fell, not hard (%s)" % [won])
 	# Two players on one foe: both told.
@@ -1435,6 +1516,7 @@ func _test_fight_won() -> void:
 	_blow(b, m)
 	m.hp = 1
 	_blow(a, m)
+	_settle()
 	var told := won.map(func(w: Array) -> Player: return w[0])
 	_check(won.size() == 2 and a in told and b in told, "two on one foe: both told (%d)" % won.size())
 	# Two foes: one down while the other is still on you, no win; then both.
@@ -1450,6 +1532,7 @@ func _test_fight_won() -> void:
 	_check(won.is_empty(), "one of two down, the other struck just now: the fight goes on")
 	m2.hp = 1
 	_blow(p, m2)
+	_settle()
 	_check(won.size() == 1 and (won[0][2] as Array).size() == 2, "the second down: one win, both beaten (%s)" % [won])
 	# A rout counts; an escape doesn't.
 	won.clear()
@@ -1459,6 +1542,7 @@ func _test_fight_won() -> void:
 	_blow(p, m)
 	(m as Monster).alert = Monster.Alert.FLEEING
 	World._tend_fights()
+	_settle()
 	_check(won.size() == 1 and bool(won[0][2][0]["fled"]), "the foe broke and ran: a win, fled (%s)" % [won])
 	won.clear()
 	e = _build(["#######", "#.Pm..#", "#######"])
@@ -1476,6 +1560,7 @@ func _test_fight_won() -> void:
 	_blow(p, bear)
 	bear.hp = 1
 	_blow(p, bear)
+	_settle()
 	_check(won.size() == 1 and bool(won[0][2][0]["hard"]) and str(won[0][2][0]["name"]) == "The great bear",
 			"the great bear brought down: hard, named by its row (%s)" % [won])
 	var plain := World.fight_reward([{"name": "The wolf", "fled": false, "hard": false}], Vector2i(4, 5))
@@ -1487,6 +1572,7 @@ func _test_fight_won() -> void:
 	_check(bool(hard["big"]) and str(hard["banner"]) == "The great bear, brought down" and str(hard["of"]) == "", "a hard foe: the banner, the float bare (%s)" % [hard])
 	var fled := World.fight_reward([{"name": "Grull", "fled": true, "hard": true}], Vector2i(4, 5))
 	_check(str(fled["banner"]) == "Grull, driven off", "a hard foe fled: driven off (%s)" % [fled])
+	_test_fight_paced(won)  # After the reward's checks, which read the bear from won.
 	World.fight_won.disconnect(on_won)
 
 
