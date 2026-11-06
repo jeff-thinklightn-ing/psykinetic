@@ -71,6 +71,13 @@ const LIE_UP_RUN := 12
 const HURT_PACE := 3.0
 const LIE_UP_GONE_TICKS := 100
 const LIE_UP_ROUSED := 3
+## Limping off, it is lost only this far off (or out of line): it lies up
+## 12 or so from where it broke, so a late follower closing in keeps it
+## (playtest's seventh tour: at 14 its first limp step had it gone).
+const SLINK_LOST_REACH := 20
+## And it limps at least this long first (playtest's eighth tour: lying up
+## out of the follower's line, it was gone the tick it got up).
+const SLINK_MIN_TICKS := 20
 ## World steps between perch checks.
 const PERCH_CHECK_STEPS := 50
 
@@ -107,6 +114,7 @@ var _unfollowed_since := -1
 var _near_mark := 1 << 20
 ## Unfollowed, it limps off away from them, gone once it has lost them all.
 var _slinking := false
+var _slink_since := -1
 ## Each player's cell at its last look, lying up: found is a player who came
 ## within LIE_UP_ROUSED by their own steps, not one it limped past.
 var _seen_at: Dictionary[int, Vector2i] = {}
@@ -487,9 +495,10 @@ func _lie_up_tick() -> void:
 			_near_mark = d  # Gone farther: only coming back in counts again.
 		if not _slinking and World.tick - _unfollowed_since >= LIE_UP_GONE_TICKS:
 			_slinking = true  # Nobody came: it gets up and limps off (combat's: not gone in plain sight).
+			_slink_since = World.tick
 			print("[cat] %s unfollowed, slinks off from %s" % [name, tile])
 		if _slinking:
-			if _lost_to_all():
+			if World.tick - _slink_since >= SLINK_MIN_TICKS and _lost_to_all(SLINK_LOST_REACH):
 				HillCat.close(perch, BEATEN_DAYS)
 				print("[cat] %s beaten off, gone from %s" % [name, perch])
 				World.despawn(self)
@@ -553,9 +562,9 @@ func _go_back_up() -> void:
 
 ## Broken off, whether it has lost them: every player LOST_REACH off, or
 ## with no line to it (over a rise, behind rock).
-func _lost_to_all() -> bool:
+func _lost_to_all(reach := LOST_REACH) -> bool:
 	for each in World.sought():
-		if each is Player and World.distance(each.tile, tile) <= World.VIEW_TILES 				and (World.distance(each.tile, tile) <= LOST_REACH and World.has_line_of_sight(each.tile, tile)):
+		if each is Player and World.distance(each.tile, tile) <= mini(reach, World.VIEW_TILES) 				and World.has_line_of_sight(each.tile, tile):
 			return false
 	return true
 

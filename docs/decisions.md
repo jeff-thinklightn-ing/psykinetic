@@ -43226,8 +43226,12 @@ came within LIE_UP_ROUSED by their own steps, not one it limps past. Unfollowed,
 nearer to it for LIE_UP_GONE_TICKS (10 s, the coordinator's: time to bind a wound or find the trail; by
 what players do, not what they see, combat's, as playtest's sixth tour had it lie for ever 12 cells from
 an idle player in plain sight on the open hills), it gets up and limps off away from them (the open way
-farthest from them), and once every player is LOST_REACH (14) off or has no line to it, it is gone and
-its perch empty BEATEN_DAYS (1 game day): not back that
+farthest from them), and once every player is SLINK_LOST_REACH (20) off or has no line to it, it is
+gone (not 14: it lies up 12 or so off, and playtest's seventh tour had it gone 0.3 s after it got up;
+combat's: always seen limping off, and one who starts after it has a few seconds), after limping at least
+SLINK_MIN_TICKS (2 s; playtest's eighth tour: lying up out of the follower's line, it was gone the tick
+it got up) and its perch empty
+BEATEN_DAYS (1 game day): not back that
 night to pounce or be beaten again for its pelt (the coordinator's ask). With no foe for CALM_TICKS it goes
 back up and lies up again (a leap back, unseen, where no way up on foot). Killed, its perch is empty
 KILLED_DAYS (2). Never saved (Snapshot skips it), never retired (Main._retirable); a restart lays every
