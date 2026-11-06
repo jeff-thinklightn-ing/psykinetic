@@ -43723,7 +43723,7 @@ the hills or foothills.
   and "from_forest" just inside), lit by a skylight (797) so the pack's watchers are plain; a short
   passage, two wide and three long (short, so nobody holds it against a pack that circles); a den
   about 12 x 12 with a rock pillar in its middle, no floor, for the pack to circle round (enemy-ai:
-  they dart and give ground, and a ring is what makes them dangerous). Dim: "ambient" 0.22 and one
+  they dart and give ground, and a ring is what makes them dangerous). Dim: "ambient" 0.3 (the sim's light) and one
   shaft by the pillar, never black, a torch a real help (enemy-ai's; the coordinator: readable, not
   murky).
 - The pack: four monster_wolf, two lying by the den within 3 to 4 cells, two in the mouth chamber as
@@ -43747,6 +43747,13 @@ the hills or foothills.
   (terrain's 798 cue), closed false}, the rock behind and beside it void (the cue draws the outcrop),
   a trampled dirt pad with two bones, "from_wolf_cave" two cells out. A LAIRS entry says "clawed"
   (the boar's tusk-scored tree; none here). The forest regenerated: 20 cells changed round the mouth.
+- Drawn, a "cave" level's "ambient" is a share of the zone's base (0.2) at most 1 (769 amended (6)), so
+  past 0.2 it draws the cave look at full; the stills (C:/dev/review/lands/fill_forest/phase_e) showed
+  that look too dark for a wolf to read without its tag, so the coordinator gave the cave look's
+  energy to environment (769 amended, from 0.4), landing before or with this.
+- The compass's place line (main.gd place_text, ui's) said a level that is all one place twice ("the
+  wolves' cave, The wolves' cave"): when the place's name is the zone's, case aside, it says it once
+  (ui_test).
 - The first load prints "[level] wolf_cave: 190 cells, 5 entities, 1 starts, 1 links"
   (Main.load_map). level_test _test_wolf_cave, _test_forest's links. CHANGELOG bullet (voice's
   words). Lands after the boar lair (780 amended (12), after terrain's 798) and items' run with the

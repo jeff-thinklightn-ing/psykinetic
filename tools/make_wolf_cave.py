@@ -113,7 +113,7 @@ def main():
     config = {
         "name": "The wolves' cave",
         "zone": "cave",
-        "ambient": 0.22,
+        "ambient": 0.3,
         "walls": "cave",
         "floors": "cave",
         "mass": "rock",

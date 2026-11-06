@@ -13903,7 +13903,10 @@ func context_hint_for(thing: Node) -> String:
 
 ## The place the player stands in, for the compass: the level's place
 ## whose disc covers their cell (the nearest centre of several; maps'
-## rule) and the zone's name; the zone alone outside every place.
+## rule) and the zone's name; the zone alone outside every place, and
+## when the place's name is the zone's, case aside (815: a level that is
+## all one place), the zone's form once, not "the wolves' cave, The
+## wolves' cave".
 func place_text(player: GridEntity) -> String:
 	var zone_name := str(level.get("display_name", level.get("name", "")))
 	if player == null:
@@ -13919,6 +13922,9 @@ func place_text(player: GridEntity) -> String:
 		if away <= radius * radius and away < best_distance:
 			best_distance = away
 			best = str(place.get("name", key))
+	# 815: a level that is all one place (a lair, a cave) is named once.
+	if best.to_lower() == zone_name.to_lower():
+		return zone_name
 	return "%s, %s" % [best, zone_name] if not best.is_empty() and not zone_name.is_empty() else best + zone_name
 
 

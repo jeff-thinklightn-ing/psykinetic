@@ -427,6 +427,10 @@ func _test_context_and_place() -> void:
 	_main.level["places"] = was
 	_check(_main.place_text(player) == zone_name or _main.place_text(player).ends_with(zone_name),
 		"outside every place: the zone (%s)" % _main.place_text(player))
+	var places_saved: Dictionary = _main.level.get("places", {})
+	_main.level["places"] = {"whole": {"cell": player.tile, "radius": 50, "name": zone_name.to_lower()}}
+	_check(_main.place_text(player) == zone_name, "a place named as its level: the zone's name once (815; %s)" % _main.place_text(player))
+	_main.level["places"] = places_saved
 	_main.hint_panel.set_lines(_main.hint_lines())
 	_check(_main.hint_panel.lines().size() > 10 and _main.hint_panel._columns.size() == 2
 			and _main.hint_panel._columns[0].get_child_count() >= _main.hint_panel._columns[1].get_child_count(),
