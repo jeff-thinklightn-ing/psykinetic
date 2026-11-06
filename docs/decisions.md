@@ -41563,6 +41563,30 @@ ui_test _test_character_sheet and the 722 inventory check (the hands on the shee
 (the headings). A CHANGELOG bullet (voice's words). Client only, protocol unchanged. New
 class_name CharacterSheet.
 
+787 amended: the figure as a body, 788's worn slots on it, the panel tidied (Jeff, for
+v0.1.205: "try to get the inventory ui fixed for the next cut, the hilariously long neck on
+the stick man for example"; the coordinator's approval of C:/dev/review/inventory, before and
+after at 1280x720 and 1920x1080; release's label). CharacterSheet.Figure is a filled body
+facing you: a head on a short neck on the shoulders, a torso to the waist, arms down to the
+hands, two legs (Figure.SIDE, mirrored; HEAD_RADIUS; ARM_FROM, ARM_WIDTH), in the theme's
+slot units (Figure.PLACES, WIDE x TALL), lighter than before (FIGURE_FILL, FIGURE_EDGE).
+SLOT_PLACES gains 788's worn slots, each where it is worn: the hat on the head, the amulet at
+the throat, the cloak at a shoulder (your right), the armour on the torso, R and L at the ends
+of the arms, the first ring under the figure's right hand and the second under its left, the
+charm at the belt, the boots at the feet. The sheet's squares are SQUARE (0.84) of the pack's,
+centred on their places, so the body shows round them; an empty one keeps its outline, so the
+figure reads as a body wearing nothing. Only R, L and A keep a letter. The load bars go under
+the feet, the figure's width: the whole above, the arms' below (the tall bar beside the figure,
+empty most of the time, is gone; their hover words as before). The gold (ShopPanel's) sits at
+the right end of the pack's title row (PackPanel.pack_title_rect), not above the pack; the
+pack's and the sheet's backing is the theme's panel at PackPanel.SOLID (0.97,
+PackPanel.solid_panel), so a name tag or a float in the world no longer shows through. ui_test
+_test_character_sheet: head to feet down the middle, a ring under each hand, the cloak at the
+shoulder, no square over another, all on the figure, the worn slots unlettered, the gold in the
+title row, both panels on screen. A CHANGELOG bullet (voice's words). Client only, protocol
+unchanged, no new class_name. The felt hat's, the soft boots' and the hood's icons wait on
+art-kit's slots (placeholders until then).
+
 ## 774. Umbrage laid out again round its chapel (plan B), and Relaid
 
 Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator approved the stills

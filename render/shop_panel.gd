@@ -200,7 +200,10 @@ func _place() -> void:
 		return
 	var rect := pack.get_global_rect()
 	_gold_box.reset_size()
-	_gold_box.global_position = Vector2(rect.end.x - _gold_box.size.x, rect.position.y - _gold_box.size.y - GAP)
+	# In the pack's title row, at its right end, so it sits square with the
+	# pack and the sheet (Jeff's inventory tidy, for v0.1.205).
+	var title := pack.pack_title_rect()
+	_gold_box.global_position = Vector2(title.end.x - _gold_box.size.x, title.get_center().y - _gold_box.size.y / 2)
 	if _box.visible:
 		_box.reset_size()
 		_box.global_position = pack.beside(_box.size, GAP)  # Clear of the sheet too (787).

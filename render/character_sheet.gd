@@ -2,29 +2,33 @@ class_name CharacterSheet
 extends PanelContainer
 ## The character sheet (decision 787; Jeff: "create a character inventory
 ## sheet and move hands and armor there"; the coordinator's approval of
-## C:/dev/review/ui/character_sheet): the player's hands and armour on a
-## plain figure facing you, where they are worn (R in its right hand, on
-## your left; L in its left; A on the chest), and the load drawn as two
-## bars, no words but on hover. It shows beside the pack, its foot on the
-## pack's, whenever the pack shows (I, a chest, a store, a companion), so a
-## drag between a hand and the pack crosses one gap. The squares are the
-## pack's own SlotBoxes for slots 4, 5 and 6 (PackPanel makes and fills
-## them), so a drag, a right click, a double click, the store's prices and
-## the practice bars work on them as they did in the pack.
+## C:/dev/review/ui/character_sheet): the player's hands, armour and worn
+## things (788) on a filled figure facing you, each square where it is worn
+## (R in its right hand, on your left; L in its left; A on the chest; the
+## hat on the head, the boots at the feet; Figure), and the load drawn as
+## two bars under it, no words but on hover. It shows beside the pack, its
+## foot on the pack's, whenever the pack shows (I, a chest, a store, a
+## companion), so a drag between a hand and the pack crosses one gap. The
+## squares are the pack's own SlotBoxes for the worn slots (PackPanel makes
+## and fills them), so a drag, a right click, a double click, the store's
+## prices and the practice bars work on them as they did in the pack.
 
-## The figure's proportions, as drawn in the mock at a slot of 132.
+## The slot the bars' sizes are drawn for (the theme's own, 132).
 const MOCK_SLOT := 132.0
 ## The load bars' scale: full at this share of what carries the load.
 const BAR_TOP := 0.75
-const FIGURE_FILL := Color("3d3226")
-const FIGURE_EDGE := Color("5c4f3c")
+const FIGURE_FILL := Color("4e4131")
+const FIGURE_EDGE := Color("85745a")
+## The sheet's squares, a share of the pack's, centred on their places, so
+## the body shows round them.
+const SQUARE := 0.84
 
 var pack: PackPanel
 var title: Label
 var figure: Figure
-## The whole load against the body's mass (the tall bar on the right).
+## The whole load against the body's mass (the upper bar under the figure).
 var body_bar: LoadBar
-## The arms' load against their share of it (the short bar under the chest).
+## The arms' load against their share of it (the lower bar).
 var arms_bar: LoadBar
 ## The squares, by slot.
 var boxes: Dictionary[int, PackPanel.SlotBox] = {}
@@ -39,10 +43,12 @@ var read_only := false:
 		read_only = value
 		for box: PackPanel.SlotBox in boxes.values():
 			box.read_only = value
-## Each slot the sheet shows and its place on the figure (Figure.PLACES).
-## A worn slot the server gains later (items' proposal: head 11, neck 12,
-## back 13, feet 14, rings 15 and 16, the charm 17) is one line here.
-const SLOT_PLACES := {Items.RIGHT_HAND: "right", Items.LEFT_HAND: "left", Items.ARMOUR: "body"}
+## Each slot the sheet shows and its place on the figure (Figure.PLACES):
+## the hands, the armour and 788's worn slots (the first ring on the
+## figure's right hand, the second on its left).
+const SLOT_PLACES := {Items.RIGHT_HAND: "right", Items.LEFT_HAND: "left", Items.ARMOUR: "body",
+	Items.HEAD: "head", Items.NECK: "neck", Items.BACK: "back", Items.FEET: "feet",
+	Items.RING_1: "ring_right", Items.RING_2: "ring_left", Items.CHARM: "charm"}
 
 
 ## A load bar: filled to its share of BAR_TOP, brass while light or
@@ -78,68 +84,88 @@ class LoadBar:
 				draw_line(Vector2(x, size.y + 1), Vector2(x, size.y + 5), tick, 2.0)
 
 
-## The figure: a faint outline facing you on a fixed grid of places, three
-## columns by four rows, each a square where that thing is worn (Jeff,
-## 2026-11-03: "the other item slots like the hat, the boots, jewelry"; the
-## coordinator: lay it out so they drop in without a redraw). Only places
-## whose slots exist get a square (CharacterSheet.SLOT_PLACES); the rest
-## show the outline. The arms reach down to the hand squares, so R and L
-## read as held (the coordinator's note on the mock).
+## The figure: a filled body facing you (Jeff, for v0.1.205: "the
+## hilariously long neck on the stick man"), a head on its shoulders, a
+## torso, arms and legs, and each worn slot's square where that thing is
+## worn: the hat on the head, the amulet at the throat, the cloak on its
+## left shoulder (your right), the chest's armour on the torso, the hands at
+## the ends of the arms, a ring under each hand, the charm at the belt and
+## the boots at the feet (788's slots). An empty square still shows its
+## outline, so the figure reads as a body wearing nothing. Places and the
+## body are in slots (SLOT units), so the figure scales with the theme's slot.
 class Figure:
 	extends Control
-	## Each place's cell: column (0 your left, 1 the middle, 2 your right),
-	## row (0 the head's, 4 the feet's). "right" is the figure's right hand.
-	## Items' proposed worn slots (head 11, neck 12, back 13, feet 14, rings
-	## 15 and 16): the head at the top, the neck below it, the back beside
-	## the body, the feet at the bottom, a ring under each hand; the charm
-	## (17; Jeff: "charms don't go in the hands. Charm slot.") at the belt.
+	## Each place's square's top-left, in slots: x from your left, y down.
+	## "right" is the figure's right hand (on your left).
 	const PLACES := {
-		"head": Vector2i(1, 0),
-		"neck": Vector2i(1, 1),
-		"body": Vector2i(1, 2), "back": Vector2i(2, 2),
-		"right": Vector2i(0, 3), "charm": Vector2i(1, 3), "left": Vector2i(2, 3),
-		"ring_right": Vector2i(0, 4), "feet": Vector2i(1, 4), "ring_left": Vector2i(2, 4),
+		"head": Vector2(1.22, 0.0),
+		"neck": Vector2(1.22, 1.2), "back": Vector2(2.44, 1.2),
+		"body": Vector2(1.22, 2.4),
+		"right": Vector2(0.0, 2.9), "left": Vector2(2.44, 2.9),
+		"charm": Vector2(1.22, 3.6),
+		"ring_right": Vector2(0.0, 4.1), "ring_left": Vector2(2.44, 4.1),
+		"feet": Vector2(1.22, 5.0),
 	}
-	var k := 1.0
+	## The figure's width and height, in slots.
+	const WIDE := 3.44
+	const TALL := 6.0
+	## One side of the body's outline (your left), in slots from the middle
+	## line: neck, shoulder, armpit, waist, hip, knee, ankle, the sole's
+	## outer and inner ends, the inner knee, the fork; mirrored for the other.
+	const SIDE: Array[Vector2] = [Vector2(-0.24, 1.08), Vector2(-0.26, 1.3), Vector2(-0.86, 1.4), Vector2(-1.02, 1.62),
+		Vector2(-0.84, 2.3), Vector2(-0.64, 3.5), Vector2(-0.76, 4.25), Vector2(-0.7, 5.0), Vector2(-0.62, 5.82),
+		Vector2(-0.66, 5.96), Vector2(-0.12, 5.96), Vector2(-0.12, 5.0), Vector2(0.0, 4.55)]
+	const HEAD_RADIUS := 0.6
+	## An arm: shoulder to wrist (the hand's square's top), its width.
+	const ARM_FROM := Vector2(-0.96, 1.62)
+	const ARM_WIDTH := 0.3
 	var slot := 132.0
-	var column_gap := 30.0
-	var row_gap := 34.0
 
 	func _init(slot_size: float) -> void:
 		slot = slot_size
-		k = slot / CharacterSheet.MOCK_SLOT
-		column_gap = 30 * k
-		row_gap = 34 * k
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
-		custom_minimum_size = Vector2(3 * slot + 2 * column_gap + 26 * k + 22 * k, 5 * slot + 4 * row_gap)
+		custom_minimum_size = Vector2(WIDE, TALL) * slot
 
 	## The top-left of [param place]'s square.
 	func place_at(place: String) -> Vector2:
-		var cell: Vector2i = PLACES[place]
-		return Vector2(cell.x * (slot + column_gap), cell.y * (slot + row_gap))
+		return (PLACES[place] as Vector2) * slot
+
+	## The middle line's x, in pixels.
+	func middle() -> float:
+		return place_at("body").x + slot / 2
+
+	## The body's outline, in pixels: SIDE, then SIDE mirrored back up.
+	func outline() -> PackedVector2Array:
+		var cx := middle()
+		var out := PackedVector2Array()
+		for p: Vector2 in SIDE:
+			out.append(Vector2(cx + p.x * slot, p.y * slot))
+		for i in range(SIDE.size() - 2, -1, -1):
+			out.append(Vector2(cx - SIDE[i].x * slot, SIDE[i].y * slot))
+		return out
 
 	func _draw() -> void:
-		var cx := place_at("body").x + slot / 2
-		var head := place_at("head") + Vector2(slot / 2, slot / 2)
-		var chest := place_at("body").y
-		var foot := place_at("feet").y + slot - 6 * k
-		var hip := place_at("right").y + slot / 2
+		var cx := middle()
 		var fill := CharacterSheet.FIGURE_FILL
-		var edge_colour := CharacterSheet.FIGURE_EDGE
-		draw_circle(head, 46 * k, fill)
-		draw_arc(head, 46 * k, 0, TAU, 48, edge_colour, 2.0)
-		draw_rect(Rect2(cx - 16 * k, head.y + 40 * k, 32 * k, chest - head.y - 40 * k), fill)
-		var body := PackedVector2Array([Vector2(cx - 74 * k, chest - 10 * k), Vector2(cx + 74 * k, chest - 10 * k),
-			Vector2(cx + 60 * k, hip), Vector2(cx + 50 * k, foot), Vector2(cx + 12 * k, foot),
-			Vector2(cx, hip + 40 * k), Vector2(cx - 12 * k, foot), Vector2(cx - 50 * k, foot),
-			Vector2(cx - 60 * k, hip)])
-		draw_colored_polygon(body, fill)
-		var edge := body.duplicate()
-		edge.append(body[0])
-		draw_polyline(edge, edge_colour, 2.0)
+		var edge := CharacterSheet.FIGURE_EDGE
+		var line := maxf(2.0, slot / 60.0)
+		# The arms first, the torso drawn over their tops.
 		for side: float in [-1.0, 1.0]:
 			var hand := place_at("right" if side < 0 else "left")
-			draw_line(Vector2(cx + side * 70 * k, chest), Vector2(hand.x + slot / 2, hand.y + 4 * k), edge_colour, 16 * k)
+			var from := Vector2(cx + side * absf(ARM_FROM.x) * slot, ARM_FROM.y * slot)
+			var to := Vector2(hand.x + slot / 2, hand.y + slot * 0.1)
+			var across := (to - from).orthogonal().normalized() * ARM_WIDTH * slot / 2
+			var arm := PackedVector2Array([from - across, from + across, to + across * 0.8, to - across * 0.8])
+			draw_colored_polygon(arm, fill)
+			draw_polyline(PackedVector2Array([arm[0], arm[3], arm[2], arm[1]]), edge, line)
+		var body := outline()
+		draw_colored_polygon(body, fill)
+		var closed := body.duplicate()
+		closed.append(body[0])
+		draw_polyline(closed, edge, line)
+		var head := Vector2(cx, place_at("head").y + slot / 2)
+		draw_circle(head, HEAD_RADIUS * slot, fill)
+		draw_arc(head, HEAD_RADIUS * slot, 0, TAU, 64, edge, line)
 
 
 func _init() -> void:
@@ -153,8 +179,8 @@ func _init() -> void:
 	visible = false
 
 
-## Made by [param owner_pack]: the title, the figure, the three squares (its
-## own SlotBoxes) and the two bars.
+## Made by [param owner_pack]: the title, the figure, its squares (the
+## pack's SlotBoxes for SLOT_PLACES) and the two bars.
 func build(owner_pack: PackPanel) -> void:
 	pack = owner_pack
 	var column := VBoxContainer.new()
@@ -168,20 +194,21 @@ func build(owner_pack: PackPanel) -> void:
 	column.add_child(figure)
 	for i: int in SLOT_PLACES:
 		var box := pack._box(true, i, true)
-		box.position = figure.place_at(SLOT_PLACES[i])
+		box.custom_minimum_size = PackPanel.SLOT_SIZE * SQUARE
+		box.size = box.custom_minimum_size
+		box.position = figure.place_at(SLOT_PLACES[i]) + PackPanel.SLOT_SIZE * (1.0 - SQUARE) / 2
 		figure.add_child(box)
 		boxes[i] = box
-	var k := figure.k
-	# The arms' bar in the gap under the chest's square.
-	var chest := figure.place_at("body")
+	# The two load bars under the feet, the figure's width: the whole load,
+	# then the arms' (their band ticks below each).
+	var k := slot / MOCK_SLOT
+	body_bar = LoadBar.new(false)
+	body_bar.custom_minimum_size = Vector2(figure.custom_minimum_size.x, 20 * k)
+	column.add_child(body_bar)
 	arms_bar = LoadBar.new(false)
-	arms_bar.position = Vector2(chest.x, chest.y + slot + 9 * k)
-	arms_bar.size = Vector2(slot, 16 * k)
-	figure.add_child(arms_bar)
-	body_bar = LoadBar.new(true)
-	body_bar.position = Vector2(figure.custom_minimum_size.x - 22 * k, 10 * k)
-	body_bar.size = Vector2(22 * k, figure.custom_minimum_size.y - 10 * k)
-	figure.add_child(body_bar)
+	arms_bar.custom_minimum_size = Vector2(figure.custom_minimum_size.x, 14 * k)
+	column.add_child(arms_bar)
+	add_theme_stylebox_override("panel", PackPanel.solid_panel())
 
 
 ## A load's band colour by its share (decision 676's bands).

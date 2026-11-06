@@ -1838,9 +1838,9 @@ func _test_inventory_panel() -> void:
 	for box: PackPanel.SlotBox in pack.sheet.boxes.values():
 		gear.append(box.index)
 	_check(PackPanel.layout_of(null) == "carrier" and grids.size() == 1 and (grids[0] as GridContainer).columns == 4
-			and in_grid == Items.PACK_SLOTS and gear == [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]
+			and in_grid == Items.PACK_SLOTS and gear == CharacterSheet.SLOT_PLACES.keys()
 			and pack.box_in(true, Items.ARMOUR).theme_type_variation == &"HandSlot" and pack.box_in(true, Items.PACK_SLOTS[4]).theme_type_variation == &"Inset",
-			"the player's row: the pack's eight 4 x 2 (%s), the hands and the armour on the sheet (787: %s)" % [in_grid, gear])
+			"the player's row: the pack's eight 4 x 2 (%s), the hands, the armour and the worn slots on the sheet (787, 788: %s)" % [in_grid, gear])
 	await _test_character_sheet(pack)
 	var locker := Locker.new()
 	locker.name = "TestLocker"
@@ -2283,13 +2283,43 @@ func _test_character_sheet(pack: PackPanel) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check(sheet.is_inside_tree() and sheet.visible == pack.visible, "the sheet shows with the pack (%s, %s)" % [sheet.visible, pack.visible])
-	_check(sheet.boxes.keys() == [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR] and pack.box_in(true, Items.LEFT_HAND) == sheet.boxes[Items.LEFT_HAND]
+	_check(sheet.boxes.keys() == CharacterSheet.SLOT_PLACES.keys() and pack.box_in(true, Items.LEFT_HAND) == sheet.boxes[Items.LEFT_HAND]
+			and pack.box_in(true, Items.CHARM) == sheet.boxes[Items.CHARM]
 			and sheet.boxes[Items.RIGHT_HAND].position.x < sheet.boxes[Items.ARMOUR].position.x and sheet.boxes[Items.ARMOUR].position.x < sheet.boxes[Items.LEFT_HAND].position.x,
-		"R on the figure's right (your left), A on the chest, L on its left; the pack finds them as its own")
+		"R on the figure's right (your left), A on the chest, L on its left, and 788's worn slots; the pack finds them as its own")
+	# Each worn square where it is worn (Jeff's tidy, for v0.1.205): down the
+	# middle the hat, the amulet, the chest, the charm, the boots; a ring
+	# under each hand; the cloak at a shoulder; none overlapping, all on the figure.
+	var at := func(slot: int) -> Rect2: return Rect2(sheet.boxes[slot].position, sheet.boxes[slot].size)
+	var middle: Array[int] = [Items.HEAD, Items.NECK, Items.ARMOUR, Items.CHARM, Items.FEET]
+	var down := true
+	for i in middle.size() - 1:
+		down = down and at.call(middle[i]).end.y < at.call(middle[i + 1]).position.y and at.call(middle[i]).position.x == at.call(middle[i + 1]).position.x
+	var overlaps := 0
+	var rects: Array = sheet.boxes.keys().map(at)
+	for i in rects.size():
+		for j in range(i + 1, rects.size()):
+			if (rects[i] as Rect2).intersects(rects[j]):
+				overlaps += 1
+	var figure_rect := Rect2(Vector2.ZERO, sheet.figure.custom_minimum_size)
+	_check(down and at.call(Items.RING_1).position.y > at.call(Items.RIGHT_HAND).end.y and at.call(Items.RING_2).position.y > at.call(Items.LEFT_HAND).end.y
+			and at.call(Items.RING_1).position.x == at.call(Items.RIGHT_HAND).position.x and at.call(Items.BACK).position.y == at.call(Items.NECK).position.y
+			and overlaps == 0 and rects.all(func(r: Rect2) -> bool: return figure_rect.encloses(r)),
+		"head to feet down the middle, a ring under each hand, the cloak at the shoulder; no square over another, all on the figure (%d overlapping)" % overlaps)
+	_check(sheet.boxes[Items.HEAD].get_children().filter(func(c: Node) -> bool: return c is Label and c.text.length() == 1).is_empty()
+			and sheet.boxes[Items.ARMOUR].get_children().any(func(c: Node) -> bool: return c is Label and c.text == "A"),
+		"the worn slots carry no letter; R, L and A keep theirs")
 	if pack.visible:
 		var a := pack.get_global_rect()
 		var b := sheet.get_global_rect()
 		_check(b.end.x <= a.position.x and absf(b.end.y - a.end.y) < 1.0, "the sheet left of the pack, their feet level (%s, %s)" % [a, b])
+		var gold: Control = _main.shop_panel._gold_box if _main.shop_panel != null else null
+		var title := pack.pack_title_rect()
+		_check(gold == null or not gold.visible or (a.encloses(gold.get_global_rect()) and absf(gold.get_global_rect().get_center().y - title.get_center().y) < 1.0
+				and absf(gold.get_global_rect().end.x - title.end.x) < 1.0),
+			"the gold at the right end of the pack's title row, inside the pack (%s, %s)" % [gold.get_global_rect(), title])
+		var screen := get_viewport().get_visible_rect()
+		_check(screen.encloses(b) and screen.encloses(a), "the sheet and the pack on the screen (%s, %s in %s)" % [b, a, screen])
 		_check(pack.flank_rect().position.x <= b.position.x and pack.beside(Vector2(100, 100), 20).x + 100 <= b.position.x,
 			"a store window goes clear of the sheet")
 	# The two modes: read-only takes no drag from or onto a square.

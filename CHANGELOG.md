@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Inventory: the character sheet shows a filled figure with a square where each thing is worn, hat, amulet, cloak, rings, charm and boots beside the hands and armour, and your load as two bars under its feet; your gold sits in the pack's title, and the pack and sheet no longer show the world through them (787 amended).
 - In the crypt's sealed vault, hold both floor plates down at once, with your companion, a friend or a boulder pushed onto one, and the bricked wall sinks open on a find of your own; ask your companion and she may tell you which niche hides more (813).
 - Caves are dark but readable: without a light you can make out the floor and the beasts in it, and a lantern still lights a clear warm circle (304 amended).
 - In the crypt, sarcophagi lie with their lids shoved off where robbers have dug, bones are stacked along the ossuary's walls, candles burn round the chapel's bier, roots hang where a gallery fell in, and daylight falls through a grate into the first hall (806 amended (3)).

@@ -339,6 +339,7 @@ func _ready() -> void:
 	column.add_child(_player_title)
 	_player_row = _row(true)
 	column.add_child(_player_row)
+	add_theme_stylebox_override("panel", solid_panel())
 	sheet = CharacterSheet.new()
 	sheet.build(self)
 	get_parent().add_child.call_deferred(sheet)
@@ -413,6 +414,8 @@ static func layout_of(entity: GridEntity) -> String:
 const LOCKER_COLUMNS := 12
 ## The pack's grid, boxes a line (4 x 2, decision 722).
 const PACK_COLUMNS := 4
+## The pack's and the sheet's backing's alpha (solid_panel).
+const SOLID := 0.97
 
 
 func _row(mine: bool) -> HBoxContainer:
@@ -501,6 +504,22 @@ func box_in(mine: bool, index: int) -> SlotBox:
 	return null
 
 
+## The pack's and the sheet's backing: the theme's panel, nearly opaque, so
+## a name or a float in the world never shows through the squares.
+static func solid_panel() -> StyleBox:
+	var box := UiTheme.style("panel", "PanelContainer")
+	if box is StyleBoxFlat:
+		box = box.duplicate()
+		(box as StyleBoxFlat).bg_color.a = SOLID
+	return box
+
+
+## The pack's title's rect on screen ("Pack"), the gold at its right end
+## (ShopPanel).
+func pack_title_rect() -> Rect2:
+	return _player_title.get_global_rect()
+
+
 func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	var box := SlotBox.new()
 	box.panel = self
@@ -508,7 +527,7 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	box.index = i
 	box.custom_minimum_size = SLOT_SIZE
 	box.theme_type_variation = &"HandSlot" if hand else &"Inset"
-	if hand:
+	if hand and i in [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]:  # 788's worn slots unlettered: their place says it.
 		var mark := Label.new()
 		mark.text = "R" if i == Items.RIGHT_HAND else "L" if i == Items.LEFT_HAND else "A"  # The armour worn (622).
 		mark.theme_type_variation = &"Small"
