@@ -9083,8 +9083,14 @@ func _test_bow_back() -> void:
 	player.raised = ""
 	var id := player.get_instance_id()
 	# Standing, whatever the tests before left: _sync_bow reads the base clip the frame before chose, and a
-	# gait still on it (a walk's speed eased off on the wall clock) read "carry" under load (environment's runs).
+	# gait still on it read "carry" under load (environment's runs): a walk's speed easing off, or the
+	# shuffle of a turn where it stands (the pick's test turns the player to its seam and back; "base Walk,
+	# 0.00 m/s"), both on the wall clock.
 	var standing: Node3D = _rig._puppets[id]
+	standing.set_meta("shuffle_until", 0)
+	standing.set_meta("turning", false)
+	standing.set_meta("turned_ms", -1)  # The turn's next frame snaps to the facing (_standing_turn).
+	standing.set_meta("busy_until", 0)
 	standing.set_meta("speed", 0.0)
 	standing.set_meta("last_at", standing.position)
 	standing.set_meta("last_ms", Time.get_ticks_msec())
