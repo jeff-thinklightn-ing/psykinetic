@@ -42,6 +42,7 @@ func _ready() -> void:
 	_test_mine_track()
 	_test_step_cache()
 	_test_layout_sense()
+	_test_castle_hold()
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
@@ -3893,8 +3894,8 @@ func _test_castle_halls_level() -> void:
 		"The Dwarven Halls, 90 x 70, depth 1, parse with no warning (%s)" % [halls["warnings"]])
 	var block := Regen.config_of("castle_halls")
 	_check(Regen.marked("castle_halls") and block.get("style") == "dwarven" and int(block.get("ways", 0)) == 5 and block["anchors"].size() == 3 and block.get("entrance") == "stair_foot"
-		and block.get("monsters") == {"imp": 5, "brute": 1},
-		"marked to regenerate in the dwarven style, ways five wide, three anchors, depth from the stair foot, enemy-ai's five imps and a brute (%s)" % [block.keys()])
+		and block.get("monsters") == {"imp": 7, "brute": 1} and block.get("uses") == "hold" and block.get("heart") == "forge",
+		"marked to regenerate in the dwarven style, ways five wide, three anchors, depth from the stair foot, enemy-ai's seven imps and a brute (806 amended (4): one a room, a guard before the forge), the hold's uses, the forge its heart (%s)" % [block.keys()])
 	_check(halls["links"].size() == 1 and halls["links"][0]["tile"] == Vector2i(44, 1) and halls["links"][0]["to_map"] == "castle" and halls["links"][0]["to_spawn"] == "from_halls"
 		and halls["spawn_points"].get("from_castle") == Vector2i(44, 2) and halls["terrain"]["floor"].has(Vector2i(44, 2)),
 		"the stair up in the stair foot's north wall leads to the castle's from_halls; from_castle on the floor beside it")
@@ -3949,9 +3950,11 @@ func _test_castle_halls_level() -> void:
 			for id: String in goods:
 				if id not in hoard or Items.has_tag(id, "armour"):
 					strays.append(id)
+	# 806 amended (4): the generations' chests are caches (castle_cache, the
+	# armoury's armoury); the forge's two, the refuge's hoard, stay stocked.
 	_check(Level.template_config("castle_halls").get("loot", {}).get("chest", "") == "dwarven_hoard" and not hoard.is_empty()
-		and chests_seen >= 6 * 5 and stocked > 0 and strays.is_empty(),
-		"the halls' chests roll dwarven_hoard, every generation's and the template's, no armour (%d chests, %d stocked, strays %s)" % [chests_seen, stocked, strays])
+		and chests_seen == 6 * 2 and stocked == chests_seen and strays.is_empty(),
+		"the forge's hoard chests roll dwarven_hoard every generation, no armour; the rest are caches (%d chests, %d stocked, strays %s)" % [chests_seen, stocked, strays])
 
 
 func _test_edge_links() -> void:
@@ -4477,7 +4480,93 @@ func _test_tower_levels() -> void:
 				"the mine's way down under the north wall is a sealed link (%s)" % [hatch])
 
 
+const LABYRINTH := preload("res://sim/level_gen/labyrinth.gd")
 const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
+
+
+## castle_halls under the layout rules (806 (c), the coordinator's plan):
+## two generations, each room laid with a use; the cold forge, a broken
+## rack and the relief laid; each use's main piece lit (a torch within
+## four cells); every cache chest guarded (a monster within three cells),
+## the brute at the armoury's; the forge (a refuge, its hoard tagged so)
+## reached past a guard on its approach; the held rules clean, "prefer"
+## spine and wrap reported.
+func _test_castle_hold() -> void:
+	print("\n== castle_halls (806 (c)): rooms with uses, lit pieces, guarded finds, a guard before the forge ==")
+	var block: Dictionary = Regen.config_of("castle_halls")
+	for generation in [1, 2]:
+		var made := Regen.generate("castle_halls", generation)
+		if made.is_empty():
+			_check(false, "castle_halls generation %d is made" % generation)
+			continue
+		var config: Dictionary = made["config"]
+		var map := LevelMap.from_image(made["layout"], config)
+		var torches: Array[Vector2i] = []
+		var monsters: Array[Vector2i] = []
+		for cell: Vector2i in map.cells:
+			if map.cells[cell] == "torch":
+				torches.append(cell)
+			elif str(map.cells[cell]).begins_with("monster_"):
+				monsters.append(cell)
+		var lit := func(at: Vector2i) -> bool: return torches.any(func(t: Vector2i) -> bool: return _cells_apart(t, at) <= 5)
+		var uses := {}
+		for room: Dictionary in config.get("laid_rooms", []):
+			uses[str(room["use"])] = int(uses.get(str(room["use"]), 0)) + 1
+		var unused: Array = config.get("laid_rooms", []).filter(func(room: Dictionary) -> bool: return str(room.get("use", "")).is_empty())
+		var slots := {}
+		var dark: Array = []
+		for building: Dictionary in config.get("buildings", []):
+			var slot := "%s v%d" % [building["slot"], int(building.get("variant", 1))]
+			slots[slot] = true
+			if slot == "building.set_cold_forge v1" and not lit.call(Vector2i(int(building["at"][0]), int(building["at"][1]))):
+				dark.append(slot)
+			if slot == "building.weapon_rack v2" and lit.call(Vector2i(int(building["at"][0]), int(building["at"][1]))):
+				slots["armoury lit"] = true
+		var reliefs: Array = config.get("decor", []).filter(func(row: Array) -> bool: return row[4] == "relief")
+		for row: Array in reliefs:
+			if not lit.call(Vector2i(int(row[0]), int(row[1]))):
+				dark.append("relief")
+		_check(unused.is_empty() and uses.has("guardroom") and uses.has("armoury") and uses.has("store") and uses.has("cold_forge")
+				and uses.has("relief_hall") and slots.has("building.set_cold_forge v1") and slots.has("building.weapon_rack v2")
+				and reliefs.size() == 1 and dark.is_empty() and slots.has("armoury lit"),
+				"castle_halls generation %d: every room a use, the cold forge, a broken rack and the relief laid, each lit (%s; dark %s)" % [generation, uses, dark])
+		var unguarded: Array = []
+		var tables := {}
+		for entity: Dictionary in config.get("entities", []):
+			var props: Dictionary = entity.get("props", {})
+			if not props.has("cache"):
+				continue
+			var at := Vector2i(int(entity["at"][0]), int(entity["at"][1]))
+			tables[str(props["cache"])] = true
+			if not monsters.any(func(m: Vector2i) -> bool: return maxi(absi(m.x - at.x), absi(m.y - at.y)) <= 3):
+				unguarded.append(at)
+		_check(unguarded.is_empty() and tables.has("armoury") and tables.has("castle_cache"),
+				"castle_halls generation %d: each find guarded, the armoury's chest its own table (%s; unguarded %s)" % [generation, tables.keys(), unguarded])
+		# The refuge's approach: a monster within two cells of the walk's
+		# last eight cells before the forge.
+		var forge := Rect2i()
+		var stair := Rect2i()
+		for anchor: Dictionary in block.get("anchors", []):
+			var rect: Rect2i = anchor["rect"] if anchor["rect"] is Rect2i else Rect2i(int(anchor["rect"][0]), int(anchor["rect"][1]), int(anchor["rect"][2]), int(anchor["rect"][3]))
+			if anchor["name"] == "forge":
+				forge = rect
+			elif anchor["name"] == "stair_foot":
+				stair = rect
+		var path := LABYRINTH._path_to(map, stair.position + stair.size / 2, forge.position + forge.size / 2)
+		var enter := -1
+		for index in path.size():
+			if forge.has_point(path[index]):
+				enter = index
+				break
+		var before := path.slice(maxi(0, enter - 8), maxi(0, enter))
+		var watched := before.any(func(cell: Vector2i) -> bool: return monsters.any(func(m: Vector2i) -> bool: return maxi(absi(m.x - cell.x), absi(m.y - cell.y)) <= 2))
+		var refuge: Array = config.get("entities", []).filter(func(entity: Dictionary) -> bool: return (entity.get("props", {}) as Dictionary).get("role", "") == "refuge")
+		_check(enter > 0 and watched and refuge.size() == 2,
+				"castle_halls generation %d: the forge (a refuge, its hoard tagged so) is reached past a guard on its approach (%d steps)" % [generation, enter])
+
+
+static func _cells_apart(a: Vector2i, b: Vector2i) -> int:
+	return maxi(absi(a.x - b.x), absi(a.y - b.y))
 
 
 func _test_layout_sense() -> void:

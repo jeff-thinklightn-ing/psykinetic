@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The dwarven halls under the castle are laid out anew every few days, and every room holds something: a guardroom with its rack and imps, an armoury of broken racks with a brute over the chest, a cold forge with an imp at the dead hearth, a hall carved with the great forge, stores with a guarded chest and a pillared hall; each room's heart is lit, and a guarded way runs straight from the stair down to the great forge (806 amended (4)).
 - In the forest west of the south road, the ground is trampled bare, with bones in the dirt and a tree scored by tusks (780 amended (12)).
 ## v0.1.205
 

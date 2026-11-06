@@ -302,14 +302,20 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 		# with none of those faults, else the try with the fewest.
 		if held.is_empty():
 			return result
-		var faults := held_faults(result, config, held)
-		result["faults"] = faults.size()
-		if result["faults"] == 0:
+		# 806 (c): the block's "prefer" rules (castle_halls' spine and wrap)
+		# break ties: the first try with none held and none preferred, else
+		# the fewest held, then the fewest preferred. Only "held" fails a test.
+		var prefer: Array = config.get("prefer", [])
+		var found := layout_faults(result, config)
+		result["faults"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in held).size()
+		result["preferred"] = found.filter(func(fault: Dictionary) -> bool: return fault["rule"] in prefer).size()
+		if result["faults"] == 0 and result["preferred"] == 0:
 			return result
-		if best.is_empty() or int(result["faults"]) < int(best["faults"]):
+		if best.is_empty() or [int(result["faults"]), int(result["preferred"])] < [int(best["faults"]), int(best["preferred"])]:
 			best = result
 	if not best.is_empty():
-		print("[regen] %s: the best of %d tries keeps %d layout faults (806)" % [level_name, HELD_TRIES, best["faults"]])
+		if int(best["faults"]) > 0:
+			print("[regen] %s: the best of %d tries keeps %d layout faults (806)" % [level_name, HELD_TRIES, best["faults"]])
 		return best
 	push_warning("[regen] %s: no map of %d tries joined every anchor; the last one stands" % [level_name, TRIES])
 	return {}

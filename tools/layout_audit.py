@@ -105,6 +105,8 @@ def things(mean, config):
         if isinstance(e, dict) and "at" in e:
             if e.get("named") or str(e.get("kind", "")).startswith("monster"):
                 out.append((*at(e["at"]), "monster", str(e.get("named", "named"))))
+            elif "idle" in e:
+                continue  # A marker's own row (806 (c): its idle): the marker draws it.
             else:
                 out.append((*at(e["at"]), "purpose", str(e.get("name") or e.get("art") or "entity")))
     for b in config.get("buildings") or []:
@@ -460,6 +462,9 @@ def use_checker(a, faults):
     m["corridor_wraps"] = counts.get("wrap", 0)
     m["loops_corridor_only"] = counts.get("loop", 0)
     m["loops_through_rooms"] = 0
+    # 806 (c), the coordinator: every count on the sheet the checker's own.
+    m["doors_to_stubs"] = counts.get("door", 0)
+    m["rooms_more_than_one_off_spine"] = sum(1 for f in faults if f["rule"] == "spine" and "steps off" in f["what"])
 
 
 COLOURS = {"purpose": (230, 60, 60), "wrap": (255, 140, 0), "deadend": (220, 0, 220), "deadend_ok": (90, 170, 90), "deadend_mon": (200, 90, 160),

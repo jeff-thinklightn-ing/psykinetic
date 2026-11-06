@@ -147,7 +147,25 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	# "ways"; unsaid, its ways stay two wide as before.
 	var brush := _brush_of(config) if style == "barrow" or config.has("ways") else 0
 	var paths: Dictionary[Vector2i, bool] = {}
-	for way in _ways(nodes, config, rng):
+	# 806 (c), the hold: a trunk way from the entrance straight to the heart,
+	# carved first (the spine rule: the walk at most 1.6 times the straight line).
+	var trunk: Array = []
+	if str(config.get("uses", "")) == "hold":
+		var from := -1
+		var to := -1
+		for index in nodes.size():
+			if nodes[index]["kind"] != "anchor":
+				continue
+			if nodes[index]["name"] == str(config.get("entrance", "")):
+				from = index
+			if nodes[index]["name"] == str(config.get("heart", "")):
+				to = index
+		if from >= 0 and to >= 0 and from != to:
+			trunk = [from, to]
+	var ways := _ways(nodes, config, rng)
+	if not trunk.is_empty():
+		ways.push_front(trunk)
+	for way in ways:
 		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, paths, depth, [], brush)
 	var ends := _blind_ways(map, anchors, rooms, corridors, old, rng, carved, depth)
 	# The width rule (612): rooms walled where a way touches them (their
@@ -181,9 +199,21 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 			break
 	if not old:
 		_torches(map, anchors, rooms, corridors, depth, LIGHTS.get(style, "torch"))
-	_markers(map, anchors, rooms, corridors, ends, config, rng, depth)
+	# 806 (c), the hold's rooms: a block with "uses": "hold" gives each room
+	# its use and lays what it holds; the markers then lay what is left.
+	var left := config
+	if str(config.get("uses", "")) == "hold":
+		left = _hold(map, anchors, rooms, nodes, config, rng)
+	_markers(map, anchors, rooms, corridors, ends, left, rng, depth)
 	map.extras["paths"] = paths
 	return map
+
+
+## What the generation lays besides cells and edges, for Regen to add to
+## the generated level.json: {section: rows} (806 (c): the hold's
+## buildings, decor, entities, carvings and laid_rooms; {} otherwise).
+static func rows_of(map: LevelMap) -> Dictionary:
+	return (map.extras.get("rows", {}) as Dictionary).duplicate(true)
 
 
 ## [param anchors] as the carving sees them: beside a niche-sized anchor
@@ -539,12 +569,16 @@ static func _grow_cavern(rect: Rect2i, rng: RandomNumberGenerator) -> Dictionary
 ## Which nodes are joined, as pairs of indices: a minimum spanning tree
 ## over the centres (Prim's, by walking distance), then "loops" extra
 ## ways as a share of the nodes, drawn among the shortest left over.
-static func _ways(nodes: Array[Dictionary], config: Dictionary, rng: RandomNumberGenerator) -> Array[Array]:
+static func _ways(nodes: Array[Dictionary], config: Dictionary, rng: RandomNumberGenerator, trunk: Array = []) -> Array[Array]:
 	var out: Array[Array] = []
 	var n := nodes.size()
 	if n < 2:
 		return out
 	var in_tree: Dictionary[int, bool] = {0: true}
+	# A trunk (806 (c)): its two ends joined first, the tree grown from both.
+	if trunk.size() == 2:
+		in_tree = {int(trunk[0]): true, int(trunk[1]): true}
+		out.append([int(trunk[0]), int(trunk[1])])
 	while in_tree.size() < n:
 		var best := -1
 		var best_pair: Array = []
@@ -1138,4 +1172,536 @@ static func _lay_by_band(map: LevelMap, anchors: Array, marker: String, count: i
 		var cells: Array[Vector2i] = []
 		cells.assign(by_band[band])
 		laid += _lay(map, anchors, marker, share, _deepest_first(depth, cells), apart)
+	return laid
+
+
+# --- The hold's rooms (806 (c)) ---------------------------------------------------------
+
+## The uses a hold's rooms are given (806 (c), the coordinator's plan; Jeff:
+## "no room should be empty"), by the walk from the "entrance" anchor: the
+## first room a guardroom, the deepest a store, the armoury, the cold forge
+## and the relief hall nearest the walk's middle; the first great hall a
+## pillared hall, the second the relief hall when there is one; any room
+## left over a guardroom (a rack, its set piece). Every chest stands by a
+## guard; the armoury and store are wings (finds off the way, layout_sense).
+const HOLD_USES: Array[String] = ["guardroom", "armoury", "cold_forge", "relief_hall", "store", "pillared_hall"]
+## Enemy-ai's rooms (806 (c)): [use, kind, count, idle].
+const HOLD_GUARDS: Array[Array] = [["armoury", "brute", 1, {"mode": "guard"}], ["store", "imp", 1, {"mode": "guard"}],
+	["guardroom", "imp", 2, {"mode": "guard"}], ["cold_forge", "imp", 1, {"mode": "gather"}],
+	["pillared_hall", "imp", 2, {"mode": "wander", "radius": 3}]]
+## A chest's guard stands within this many cells of it.
+const GUARD_NEAR := 3
+
+
+## The hold (806 (c)): uses given, rooms furnished and lit, chests and
+## their guards laid (map.extras["rows"]); the block's config with what is
+## left for _markers (chests and monsters it laid taken off).
+static func _hold(map: LevelMap, anchors: Array, rooms: Array[Dictionary], nodes: Array[Dictionary], config: Dictionary,
+		rng: RandomNumberGenerator) -> Dictionary:
+	var plan := {"buildings": [], "decor": [], "entities": [], "carvings": [], "laid_rooms": []}
+	var start := Vector2i.ZERO
+	var entrance := str(config.get("entrance", ""))
+	for node in nodes:
+		if node["kind"] == "anchor" and (entrance.is_empty() or node["name"] == entrance):
+			start = node["centre"]
+			break
+	var walk := _walk_from(map, start)
+	for index in rooms.size():
+		var room := rooms[index]
+		room["id"] = "room_%d" % (index + 1)
+		var least := 1 << 30
+		for cell: Vector2i in room["cells"]:
+			least = mini(least, int(walk.get(cell, 1 << 30)))
+		room["walk"] = least
+	var heart := str(config.get("heart", ""))
+	var spine: Array[Vector2i] = []
+	var heart_rect := Rect2i()
+	for node in nodes:
+		if node["kind"] == "anchor" and node["name"] == heart:
+			spine = _path_to(map, start, node["centre"])
+			heart_rect = node["rect"]
+	var off := _off_spine(map, spine)
+	var steps := _room_steps(map, rooms, spine)
+	for index in rooms.size():
+		var room := rooms[index]
+		var nearest := 1 << 30
+		for cell: Vector2i in room["cells"]:
+			nearest = mini(nearest, int(off.get(cell, 1 << 30)))
+		room["off"] = nearest
+		room["steps"] = int(steps.get(index, 99))
+	_hold_uses(rooms)
+	var kept := door_line(map)
+	var chests := int(config.get("chests", 0))
+	var left_monsters: Dictionary = (config.get("monsters", {}) as Dictionary).duplicate() if config.get("monsters") is Dictionary else {}
+	var lines: Array = (config.get("carvings", []) as Array).duplicate()
+	Tools.shuffle(lines, rng)
+	var words := lines.filter(func(line: Variant) -> bool: return line is Dictionary and not str(line.get("cut", "")).is_empty())
+	var looks := lines.filter(func(line: Variant) -> bool: return line is Dictionary and str(line.get("cut", "")).is_empty())
+	var stores := rooms.filter(func(room: Dictionary) -> bool: return room["use"] == "store").size()
+	var ordered := rooms.duplicate()
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) < int(b["walk"]))
+	for room: Dictionary in ordered:
+		var use: String = room["use"]
+		var main: Variant = null
+		if use == "guardroom":
+			main = _against_wall(map, room, kept, "building.weapon_rack", 2, plan, 1)
+		elif use == "armoury":
+			main = _against_wall(map, room, kept, "building.weapon_rack", 2, plan, 2)
+			_against_wall(map, room, kept, "building.weapon_rack", 2, plan, 2)
+			if chests > 0 and _hold_chest(map, room, kept, str(config.get("armoury_cache", config.get("cache", ""))), plan):
+				chests -= 1
+		elif use == "cold_forge":
+			main = _against_wall(map, room, kept, "building.set_cold_forge", 2, plan, 1)
+		elif use == "relief_hall":
+			main = _on_wall(map, room, kept, "relief", plan, looks.pop_front() if not looks.is_empty() else {})
+			if not words.is_empty():
+				_on_wall(map, room, kept, "carving", plan, words.pop_front())
+		elif use == "store":
+			if chests > 0 and _hold_chest(map, room, kept, str(config.get("cache", "")), plan):
+				chests -= 1
+				main = room["chest"]
+		elif use == "pillared_hall":
+			if chests > 0 and stores < 2 and _hold_chest(map, room, kept, str(config.get("cache", "")), plan):
+				chests -= 1
+				main = room["chest"]
+		# A room its piece fits nowhere in still holds something: a rack on
+		# any wall that takes one, else a carving's look on its back wall.
+		if main == null and not room.has("chest") and use != "relief_hall":
+			main = _against_wall(map, room, kept, "building.weapon_rack", 2, plan, 1)
+		if main == null and not room.has("chest") and int(room.get("things", 0)) == 0:
+			main = _on_wall(map, room, kept, "relief", plan, {})
+		if main is Vector2i:
+			room["main"] = main
+		# The coordinator: each use's main piece lit, so no room reads as a dark box.
+		if main is Vector2i:
+			var spot: Variant = _by_wall_near(map, room["cells"], main, kept)
+			if spot != null and Tools.distance(spot, main) <= 4 and not _beside_anchor(anchors, spot):
+				map.set_cell(spot, "torch")
+				kept[spot] = true
+	# Enemy-ai's guards: by the chest where the room has one, else on its
+	# open floor; facing the room's door, or at the forge.
+	var guard_done := {}
+	# The heart's approach (the coordinator, 806 (c): the forge is a refuge,
+	# its hoard the reward for the fight before it): an imp on guard by the
+	# walk's last cells before the heart, facing back up the way.
+	var approach_first := true
+	for row: Array in HOLD_GUARDS:
+		# The approach guard after the chests' own, before the rooms'.
+		if approach_first and row[0] == "guardroom":
+			approach_first = false
+			if heart_rect.size != Vector2i.ZERO and int(left_monsters.get("imp", 0)) > 0:
+				left_monsters["imp"] = int(left_monsters["imp"]) - _approach_guard(map, anchors, spine, heart_rect, plan)
+				heart_rect = Rect2i()
+		for room: Dictionary in ordered:
+			if room["use"] != row[0] or guard_done.has(room["use"]):
+				continue
+			# Every store its guard; the other uses' first room alone.
+			if room["use"] != "store":
+				guard_done[room["use"]] = true
+			var kind: String = row[1]
+			var count := mini(int(row[2]), int(left_monsters.get(kind, 0)))
+			var laid := _hold_guards(map, anchors, room, kind, count, row[3], plan)
+			left_monsters[kind] = int(left_monsters.get(kind, 0)) - laid
+	# A chest with no guard yet (a second store, a leftover): the nearest imp left.
+	for room: Dictionary in ordered:
+		if room.has("chest") and not room.get("guarded", false) and int(left_monsters.get("imp", 0)) > 0:
+			left_monsters["imp"] = int(left_monsters["imp"]) - _hold_guards(map, anchors, room, "imp", 1, {"mode": "guard"}, plan)
+	for anchor: Variant in config.get("anchors", []):
+		if not anchor is Dictionary:
+			continue
+		var given: Variant = anchor.get("rect")
+		var rect := Rect2i()
+		if given is Rect2i:
+			rect = given
+		elif given is Array and given.size() == 4:
+			rect = Rect2i(int(given[0]), int(given[1]), int(given[2]), int(given[3]))
+		else:
+			continue
+		if true:
+			var named := {"id": str(anchor.get("name", "")), "use": str(anchor.get("use", anchor.get("name", ""))),
+				"rect": [rect.position.x, rect.position.y, rect.size.x, rect.size.y]}
+			# An anchor the walk to the heart need not pass (the template's own
+			# set piece, the ambush) is a wing of its own (the spine rule).
+			if named["id"] != str(config.get("entrance", "")) and named["id"] != str(config.get("heart", "")):
+				named["wing"] = named["id"]
+			plan["laid_rooms"].append(named)
+	for room: Dictionary in ordered:
+		var cells: Array = []
+		for cell in Tools.sorted_cells(room["cells"]):
+			cells.append([cell.x, cell.y])
+		var laid := {"id": room["id"], "use": room["use"], "cells": cells}
+		# A find or a sight off the way is a wing (the coordinator, 806 (c)).
+		if room["use"] in ["armoury", "store", "relief_hall"]:
+			laid["wing"] = "finds"
+		plan["laid_rooms"].append(laid)
+	map.extras["rows"] = plan
+	var left := config.duplicate()
+	left["chests"] = chests
+	left["monsters"] = left_monsters
+	return left
+
+
+## Steps from [param start] over walkable floor, through doors, never
+## through a wall edge.
+static func _walk_from(map: LevelMap, start: Vector2i) -> Dictionary:
+	var dist := {start: 0}
+	var queue: Array[Vector2i] = [start]
+	var i := 0
+	while i < queue.size():
+		var cell := queue[i]
+		i += 1
+		for direction in DIRECTIONS:
+			var next := cell + direction
+			if dist.has(next) or not map.walkable(next) or map.edge(Terrain.edge_key(cell, direction)) == "wall":
+				continue
+			dist[next] = int(dist[cell]) + 1
+			queue.append(next)
+	return dist
+
+
+## The cells of a shortest walk from [param from] to [param to] (doors
+## open, walls shut), [param from] first; [] where none.
+static func _path_to(map: LevelMap, from: Vector2i, to: Vector2i) -> Array[Vector2i]:
+	var parent := {from: from}
+	var queue: Array[Vector2i] = [from]
+	var i := 0
+	while i < queue.size():
+		var cell := queue[i]
+		i += 1
+		if cell == to:
+			break
+		for direction in DIRECTIONS:
+			var next := cell + direction
+			if parent.has(next) or not map.walkable(next) or map.edge(Terrain.edge_key(cell, direction)) == "wall":
+				continue
+			parent[next] = cell
+			queue.append(next)
+	var out: Array[Vector2i] = []
+	if not parent.has(to):
+		return out
+	var at := to
+	while at != from:
+		out.push_front(at)
+		at = parent[at]
+	out.push_front(from)
+	return out
+
+
+## Each room's steps off [param spine] as layout_sense counts them: 0
+## where the walk runs through it, else the rooms entered on the way to it
+## from the spine (its own counted): index -> steps.
+static func _room_steps(map: LevelMap, rooms: Array[Dictionary], spine: Array[Vector2i]) -> Dictionary:
+	var room_of := {}
+	for index in rooms.size():
+		for cell: Vector2i in rooms[index]["cells"]:
+			room_of[cell] = index
+	var cost := {}
+	var front: Array[Vector2i] = []
+	for cell in spine:
+		cost[cell] = 0
+		front.append(cell)
+	# 0-1 walk: a step into another room's cells costs one.
+	while not front.is_empty():
+		var next_front: Array[Vector2i] = []
+		var i := 0
+		while i < front.size():
+			var cell := front[i]
+			i += 1
+			for direction in DIRECTIONS:
+				var next := cell + direction
+				if not map.walkable(next) or map.edge(Terrain.edge_key(cell, direction)) == "wall":
+					continue
+				var step := 1 if room_of.has(next) and room_of.get(next) != room_of.get(cell) else 0
+				var c := int(cost[cell]) + step
+				if cost.has(next) and int(cost[next]) <= c:
+					continue
+				cost[next] = c
+				if step == 0:
+					front.append(next)
+				else:
+					next_front.append(next)
+		front = next_front
+	var out := {}
+	for cell: Vector2i in room_of:
+		if cost.has(cell):
+			var index: int = room_of[cell]
+			out[index] = mini(int(out.get(index, 99)), int(cost[cell]))
+	return out
+
+
+## Steps from the nearest cell of [param spine] over the floor.
+static func _off_spine(map: LevelMap, spine: Array[Vector2i]) -> Dictionary:
+	var dist := {}
+	var queue: Array[Vector2i] = []
+	for cell in spine:
+		dist[cell] = 0
+		queue.append(cell)
+	var i := 0
+	while i < queue.size():
+		var cell := queue[i]
+		i += 1
+		for direction in DIRECTIONS:
+			var next := cell + direction
+			if dist.has(next) or not map.walkable(next) or map.edge(Terrain.edge_key(cell, direction)) == "wall":
+				continue
+			dist[next] = int(dist[cell]) + 1
+			queue.append(next)
+	return dist
+
+
+## An imp on guard on the heart's approach: the open floor cell nearest
+## the last cells of [param spine] before it enters [param heart_rect]
+## (APPROACH steps back along it at most), outside every anchor, facing
+## back up the walk. How many were laid (0 or 1).
+const APPROACH := 8
+static func _approach_guard(map: LevelMap, anchors: Array, spine: Array[Vector2i], heart_rect: Rect2i, plan: Dictionary) -> int:
+	if not map.colours.has("monster_imp"):
+		return 0
+	var enter := -1
+	for index in spine.size():
+		if heart_rect.has_point(spine[index]):
+			enter = index
+			break
+	if enter <= 0:
+		return 0
+	var before := spine.slice(maxi(0, enter - APPROACH), enter)
+	var best := Vector2i(-1, -1)
+	var best_d := 1 << 30
+	for cell: Vector2i in before:
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				var at := cell + Vector2i(dx, dy)
+				if map.cell(at) != FLOOR or not _open_floor(map, at) or Level.in_anchors(anchors, at) or _beside_anchor(anchors, at):
+					continue
+				var d := Tools.distance(at, spine[enter])
+				if d < best_d:
+					best = at
+					best_d = d
+	if best.x < 0:
+		return 0
+	map.set_cell(best, "monster_imp")
+	var back: Vector2i = spine[maxi(0, enter - APPROACH)] - best
+	var face := Vector2i(signi(back.x), 0) if absi(back.x) >= absi(back.y) else Vector2i(0, signi(back.y))
+	plan["entities"].append({"at": [best.x, best.y], "facing": [face.x, face.y], "idle": {"mode": "guard"}})
+	return 1
+
+
+## Each room's "use" (HOLD_USES; the class doc of _hold).
+static func _hold_uses(rooms: Array[Dictionary]) -> void:
+	var halls := rooms.filter(func(room: Dictionary) -> bool: return room["kind"] == "hall")
+	var plain := rooms.filter(func(room: Dictionary) -> bool: return room["kind"] != "hall")
+	halls.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) < int(b["walk"]))
+	plain.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) < int(b["walk"]))
+	var wanted: Array[String] = []
+	# The first great hall the pillared hall; any other joins the rest (the
+	# relief hall where it stays free, else a find off the way).
+	if not halls.is_empty():
+		halls[0]["use"] = "pillared_hall"
+	var second: Variant = halls[1] if halls.size() > 1 else null
+	for k in range(1, halls.size()):
+		plain.append(halls[k])
+	plain.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) < int(b["walk"]))
+	if plain.is_empty():
+		return
+	plain[0]["use"] = "guardroom"
+	# The finds off the way (the spine rule's wings): the store the room
+	# farthest off the spine in the deeper half, the armoury the next
+	# farthest off; a tie goes to the deeper.
+	var rest := plain.slice(1)
+	var half := float(int(plain[plain.size() - 1]["walk"]) + int(plain[0]["walk"])) / 2.0
+	var by_off := func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["steps"]) != int(b["steps"]):
+			return int(a["steps"]) > int(b["steps"])
+		return int(a["off"]) > int(b["off"]) if int(a["off"]) != int(b["off"]) else int(a["walk"]) > int(b["walk"])
+	var deep := rest.filter(func(room: Dictionary) -> bool: return float(room["walk"]) >= half)
+	if deep.is_empty():
+		deep = rest.duplicate()
+	deep.sort_custom(by_off)
+	if not deep.is_empty():
+		deep[0]["use"] = "store"
+		rest.erase(deep[0])
+	rest.sort_custom(by_off)
+	if not rest.is_empty():
+		rest[0]["use"] = "armoury"
+		rest.remove_at(0)
+	# A further room two or more steps off the spine is a store too (a find
+	# off the way, its chest the hall's).
+	var extra_stores := 0
+	while not rest.is_empty() and int(rest[0]["steps"]) >= 2 and extra_stores < 1:
+		rest[0]["use"] = "store"
+		rest.remove_at(0)
+		extra_stores += 1
+	if second != null and second in rest:
+		second["use"] = "relief_hall"
+		rest.erase(second)
+	else:
+		wanted.append("relief_hall")
+	var middle := rest
+	var far := half
+	middle.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return absf(int(a["walk"]) - far) < absf(int(b["walk"]) - far))
+	wanted.push_front("cold_forge")
+	for room: Dictionary in middle:
+		room["use"] = wanted.pop_front() if not wanted.is_empty() else "guardroom"
+
+
+## A building [param slot] [param along] cells long laid flush against a
+## wall of [param room] (its back to the rock, facing in), as near the
+## middle of the wall across from the room's first door as it fits, then
+## any wall: floor two cells deep before it, and along the wall either the
+## room's corner or two cells of floor (612: no one-cell way). Its entry in
+## plan["buildings"] (with [param variant]), its cells kept; the cell before
+## its middle (what its light is laid by), or null where it fits nowhere.
+static func _against_wall(map: LevelMap, room: Dictionary, kept: Dictionary, slot: String, along: int, plan: Dictionary,
+		variant := 1) -> Variant:
+	for spot: Array in _wall_spots(map, room, kept, along):
+		var cells: Array[Vector2i] = []
+		cells.assign(spot[0])
+		var inward: Vector2i = spot[1]
+		var entry := {"slot": slot, "at": [cells[0].x, cells[0].y], "facing": [inward.x, inward.y], "variant": variant}
+		var top_left := cells[0]
+		for cell in cells:
+			top_left = Vector2i(mini(top_left.x, cell.x), mini(top_left.y, cell.y))
+		entry["at"] = [top_left.x, top_left.y]
+		var rect: Variant = Level.building_rect(entry)
+		if not rect is Rect2i or Level.rect_cells(rect).size() != cells.size() or Level.rect_cells(rect).any(func(cell: Vector2i) -> bool: return not cell in cells):
+			continue
+		for cell in cells:
+			kept[cell] = true
+			for direction in DIRECTIONS:
+				kept[cell + direction] = true
+		plan["buildings"].append(entry)
+		room["things"] = int(room.get("things", 0)) + 1
+		return cells[cells.size() / 2] + inward
+	return null
+
+
+## The wall runs of [param room] a piece [param along] cells long fits
+## against: [[cells], inward], the wall across from its first door first,
+## each wall's middle first.
+static func _wall_spots(map: LevelMap, room: Dictionary, kept: Dictionary, along: int) -> Array:
+	var cells: Dictionary = room["cells"]
+	var rect: Rect2i = room["rect"]
+	var centre := rect.position + rect.size / 2
+	var back := Vector2i.ZERO
+	if not (room["doors"] as Array).is_empty():
+		var door: Vector2i = room["doors"][0]
+		var off := door - centre
+		back = Vector2i(-signi(off.x), 0) if absi(off.x) * rect.size.y > absi(off.y) * rect.size.x else Vector2i(0, -signi(off.y))
+	var walls: Array[Vector2i] = []
+	if back != Vector2i.ZERO:
+		walls.append(back)
+	for direction in DIRECTIONS:
+		if not direction in walls:
+			walls.append(direction)
+	var out: Array = []
+	for wall in walls:
+		var run_way := Vector2i(absi(wall.y), absi(wall.x))
+		var runs: Array = []
+		for cell in Tools.sorted_cells(cells):
+			if cells.has(cell + wall) or map.walkable(cell + wall) or map.edge(Terrain.edge_key(cell, wall)) == "door":
+				continue
+			var piece: Array[Vector2i] = []
+			var fits := true
+			for k in along:
+				var at := cell + run_way * k
+				if not cells.has(at) or kept.has(at) or map.cell(at) != FLOOR or cells.has(at + wall) or map.walkable(at + wall) \
+						or map.edge(Terrain.edge_key(at, wall)) == "door":
+					fits = false
+					break
+				# Two cells of floor before it.
+				for depth_in in [1, 2]:
+					if not cells.has(at - wall * depth_in) or map.cell(at - wall * depth_in) != FLOOR:
+						fits = false
+				piece.append(at)
+			if not fits:
+				continue
+			# Along the wall either end: the room's corner, or two cells of floor.
+			for pair: Array in [[piece[0] - run_way, piece[0] - run_way * 2], [piece[piece.size() - 1] + run_way, piece[piece.size() - 1] + run_way * 2]]:
+				if cells.has(pair[0]) and not cells.has(pair[1]):
+					fits = false
+			if fits:
+				runs.append([piece, -wall, Tools.distance(piece[0], centre)])
+		runs.sort_custom(func(a: Array, b: Array) -> bool: return int(a[2]) < int(b[2]))
+		out.append_array(runs)
+	return out
+
+
+## A wall piece of decor [param kind] on [param room]'s back wall (the
+## first door's far side), the floor cell nearest its middle with rock
+## behind, out of the doors' lines; its words [param line] ({cut, look,
+## fact}: voice's, lore's facts) in plan["carvings"] when it has any. The
+## floor cell before it, or null.
+static func _on_wall(map: LevelMap, room: Dictionary, kept: Dictionary, kind: String, plan: Dictionary, line: Dictionary) -> Variant:
+	for spot: Array in _wall_spots(map, room, kept, 1):
+		var cell: Vector2i = spot[0][0]
+		var wall: Vector2i = -(spot[1] as Vector2i)
+		if plan["decor"].any(func(row: Array) -> bool: return row[0] == cell.x and row[1] == cell.y):
+			continue
+		plan["decor"].append([cell.x, cell.y, wall.x, wall.y, kind, 1])
+		kept[cell] = true
+		if not line.is_empty():
+			var row := {"at": [cell.x, cell.y], "side": [wall.x, wall.y]}
+			for key: String in ["cut", "look", "fact"]:
+				if line.has(key):
+					row[key] = line[key]
+			plan["carvings"].append(row)
+		room["things"] = int(room.get("things", 0)) + 1
+		return cell
+	return null
+
+
+## The block's cache chest (808: each player's find, never empty) by
+## [param room]'s back wall: the chest marker and its entity row {at,
+## props: {cache}}, room["chest"]. Whether it was laid.
+static func _hold_chest(map: LevelMap, room: Dictionary, kept: Dictionary, cache: String, plan: Dictionary) -> bool:
+	if cache.is_empty():
+		return false
+	for spot: Array in _wall_spots(map, room, kept, 1):
+		var cell: Vector2i = spot[0][0]
+		map.set_cell(cell, "chest")
+		kept[cell] = true
+		plan["entities"].append({"at": [cell.x, cell.y], "props": {"cache": cache}})
+		room["chest"] = cell
+		room["things"] = int(room.get("things", 0)) + 1
+		return true
+	return false
+
+
+## [param count] monsters [param kind] in [param room] (enemy-ai's idle
+## modes, level.json "idle" on each entity row): by its chest (within
+## GUARD_NEAR) where it has one, else on its open floor nearest its
+## middle; facing the room's first door, a "gather" one round the room's
+## main piece. How many were laid.
+static func _hold_guards(map: LevelMap, anchors: Array, room: Dictionary, kind: String, count: int, idle: Dictionary,
+		plan: Dictionary) -> int:
+	if count <= 0 or not map.colours.has("monster_" + kind):
+		return 0
+	var rect: Rect2i = room["rect"]
+	var focus: Vector2i = room.get("chest", room.get("main", rect.position + rect.size / 2))
+	var spots: Array[Vector2i] = []
+	for cell in Tools.sorted_cells(room["cells"]):
+		if _open_floor(map, cell) and not _beside_anchor(anchors, cell):
+			spots.append(cell)
+	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, focus) < Tools.distance(b, focus))
+	if room.has("chest"):
+		spots = spots.filter(func(cell: Vector2i) -> bool: return maxi(absi(cell.x - focus.x), absi(cell.y - focus.y)) <= GUARD_NEAR)
+	var door: Vector2i = room["doors"][0] if not (room["doors"] as Array).is_empty() else focus
+	var laid := 0
+	for cell in spots:
+		if laid >= count:
+			break
+		if map.cell(cell) != FLOOR:
+			continue
+		map.set_cell(cell, "monster_" + kind)
+		var row := {"at": [cell.x, cell.y], "idle": idle.duplicate()}
+		var off := door - cell
+		if off != Vector2i.ZERO:
+			var face := Vector2i(signi(off.x), 0) if absi(off.x) >= absi(off.y) else Vector2i(0, signi(off.y))
+			row["facing"] = [face.x, face.y]
+		if str(idle.get("mode", "")) == "gather":
+			row["idle"]["point"] = [focus.x, focus.y]
+		plan["entities"].append(row)
+		laid += 1
+	if laid > 0 and room.has("chest"):
+		room["guarded"] = true
 	return laid

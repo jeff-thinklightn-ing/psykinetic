@@ -123,11 +123,51 @@
 			"name": "the great dwarven forge"
 		}
 	},
-	"entities": [],
+	"entities": [
+		{
+			"at": [36, 66],
+			"loot": "dwarven_hoard",
+			"props": {"role": "refuge"}
+		},
+		{
+			"at": [53, 66],
+			"loot": "dwarven_hoard",
+			"props": {"role": "refuge"}
+		}
+	],
 	"regenerate": {
 		"ways": 5,
 		"pillars": 4,
 		"generator": "labyrinth",
+		"uses": "hold",
+		"heart": "forge",
+		"held": ["door", "purpose", "dead_end", "loop", "chest"],
+		"prefer": ["spine", "wrap"],
+		"cache": "castle_cache",
+		"armoury_cache": "armoury",
+		"carvings": [
+			{
+				"look": "a band of dwarves at the forge in worn relief: a smith with his hammer up over the anvil, strikers, bellows and fire",
+				"fact": "The dwarves who cut these halls were smiths; the great forge below was theirs."
+			},
+			{
+				"cut": "This hall stands over the way below, that none go down unseen.",
+				"fact": "The dwarves built the castle over a known entrance to the labyrinths, to guard it."
+			},
+			{
+				"cut": "Cut true. Set true. Stand long.",
+				"look": "a mason's mark beneath: a hammer over three lines",
+				"fact": "The dwarven stone smiths built plain and to last."
+			},
+			{
+				"cut": "Weapons are left at the door. Guests eat first.",
+				"fact": "The dwarves kept rules of the hall for guests."
+			},
+			{
+				"cut": "The way below changes. Trust no mark you did not cut.",
+				"fact": "The labyrinths below the castle shift."
+			}
+		],
 		"style": "dwarven",
 		"ways": 5,
 		"every_days": 3,
@@ -179,11 +219,12 @@
 		},
 		"loops": 0.2,
 		"monsters": {
-			"imp": 5,
+			"imp": 7,
 			"brute": 1
 		},
 		"chests": 3
 	},
+	"home_kinds": ["imp", "brute"],
 	"respawn_s": {
 		"imp": 600,
 		"brute": 600

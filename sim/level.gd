@@ -164,7 +164,9 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	# The Last Light Mughouse's common room (811 amended, art-kit's pieces):
 	# the taverner's counter and tap rack, and its tables.
 	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2),
-	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2), "tree.clawed": Vector2i(1, 1)}
+	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2), "tree.clawed": Vector2i(1, 1),
+	# castle_halls' cold forge (806 (c), art-kit's c7539ec7): its back to the wall.
+	"building.set_cold_forge": Vector2i(2, 1)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -240,7 +242,7 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -251,7 +253,7 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## hills' roadside sights and stories, a grave, a shrine, a milestone, a hunter's blind and
 ## a lean-to; 811 amended: the Mughouse's counter, tap rack and tables, the
 ## taverner behind the counter; 806 amended (3): the crypt's sarcophagi and the
-## robbers' dig into a tomb's floor): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
+## robbers' dig into a tomb's floor; 806 (c): castle_halls' cold forge): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
 ## the boar's lair's mouth, a tree scored by its tusks, tree.clawed).
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
@@ -259,7 +261,7 @@ const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "build
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -2228,6 +2230,9 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"candles": {"sits": "flat", "variants": 1, "faced": false, "slot": "prop.candles"},
 	"collapse_roots": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.collapse_roots"},
 	"light_shaft": {"sits": "flat", "variants": 1, "faced": false, "slot": "prop.set_light_shaft"},
+	# castle_halls' relief hall (806 (c), art-kit's c7539ec7): a dwarven band at
+	# the forge in worn relief, its back to the wall; its words, if any, in "carvings".
+	"relief": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.carved_relief"},
 	# The mine's (decision 769): an arch or a beam spans a way from wall to
 	# wall ("span"), art-kit's piece by the width it spans; track a cell a
 	# piece, faced the way it runs; a lamp hung on a wall.
