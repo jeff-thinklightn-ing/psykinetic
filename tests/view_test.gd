@@ -114,6 +114,7 @@ func _ready() -> void:
 		_test_tracks()
 		_test_cave_mouth()
 		_test_thicket_mouth()
+		_test_den_mouth()
 		_test_rocks()
 		_test_niches()
 		_test_fire()
@@ -5036,6 +5037,101 @@ func _test_thicket_mouth() -> void:
 		else:
 			_check(tangle != null and Vector2i(roundi(tangle.position.x), roundi(tangle.position.z)) == at,
 					"closed: a low tangle in its gap")
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## 798 amended (2): a den mouth ("den", maps' old grey's den): a low earth
+## bank over the boar's footprint, a hole into it at the link cell's far
+## edge going black, a tilted shelf of rock over it, art-kit's root lip as
+## its top and the signs before it; the wood's trees kept off the bank.
+func _test_den_mouth() -> void:
+	print("
+== den mouth: a low hole under a shelf, roots over its lip ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	var floor_cells: Array = terrain["floor"]
+	var at := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		if floor_cells.has(cell + Vector2i(-2, -2)) and floor_cells.has(cell + Vector2i(2, -2)) and floor_cells.has(cell + Vector2i(0, 2)):
+			at = cell
+			break
+	if at.x < 0:
+		_check(false, "the sample has room for a den")
+		return
+	var ahead := Vector2i(0, -1)
+	for closed in [false, true]:
+		terrain["link_cues"] = [{"tile": at, "cue": "den", "facing": ahead, "variant": 1, "closed": closed}]
+		_rig.rebuild(terrain, sample["centre"])
+		var holder: Node3D = _rig._room.get_node_or_null("DenMouth_%d_%d" % [at.x, at.y])
+		var bank: MeshInstance3D = holder.get_node_or_null("Bank") if holder != null else null
+		var throat: MeshInstance3D = holder.get_node_or_null("Throat") if holder != null else null
+		if bank == null or bank.mesh == null or throat == null:
+			_check(false, "drawn on the link's cell: its bank and throat")
+			_rig.rebuild(_main._terrain, Vector2i.ZERO)
+			return
+		if closed:
+			_check(holder.get_node_or_null("Stopped") != null and holder.get_node("Stopped").get_child_count() > 0,
+					"closed: stones in its hole")
+			continue
+		var points: PackedVector3Array = bank.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		# In its frame: +z into the bank.
+		var top := -INF
+		var out := 0.0
+		for p in points:
+			top = maxf(top, p.y)
+			out = maxf(out, maxf(absf(p.x) - Client3D.DEN_MOUND.x * 0.5, maxf(-0.5 - p.z, p.z - 2.5)))
+		var into := holder.transform.basis * Vector3(0, 0, 1)
+		_check(top > Client3D.DEN_HOLE.y + 0.4 and top < 2.9 and out < 0.15 and Vector2(into.x, into.z).dot(Vector2(ahead)) > 0.99,
+				"low, a bank over its cells, the way it faces (%.2f m high, %.2f m out, into %s)" % [top, out, into])
+		# Looking in at the hole's middle, knee high: past the face, the
+		# throat's black end, nothing of the bank across the hole.
+		var dark: PackedVector3Array = throat.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var from := Vector3(0.0, 0.4, -2.0)
+		var near_bank := INF
+		for i in range(0, points.size(), 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(from, Vector3(0, 0, 1), points[i], points[i + 1], points[i + 2])
+			if hit != null:
+				near_bank = minf(near_bank, (hit as Vector3).z)
+		var near_dark := INF
+		for i in range(0, dark.size(), 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(from, Vector3(0, 0, 1), dark[i], dark[i + 1], dark[i + 2])
+			if hit != null:
+				near_dark = minf(near_dark, (hit as Vector3).z)
+		_check(near_dark > 0.5 and near_dark < 0.5 + Client3D.DEN_VEIL + 0.05 and near_dark < near_bank,
+				"its hole open, black just past the roots (the dark at %.2f m, the bank at %.2f m)" % [near_dark, near_bank])
+		# Over the hole, the shelf: rock above its top, jutting past the face.
+		var over := INF
+		var jut := INF
+		for p in points:
+			if absf(p.x) < Client3D.DEN_HOLE.x * 0.5 and p.y > Client3D.DEN_HOLE.y:
+				jut = minf(jut, p.z)
+		var up_from := Vector3(0.0, 0.5, 0.9)
+		for i in range(0, points.size(), 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(up_from, Vector3.UP, points[i], points[i + 1], points[i + 2])
+			if hit != null:
+				over = minf(over, (hit as Vector3).y)
+		_check(jut < 0.5 - 0.1 and over > Client3D.DEN_HOLE.y - 0.3 and over < 2.7,
+				"a shelf over it, jutting past its face (its front at %.2f m, %.2f m over the throat)" % [jut, over])
+		var lip: Node3D = holder.get_node_or_null("RootLip")
+		var signs := 0
+		for child: Node in holder.get_children():
+			if str(child.name).begins_with("Sign_"):
+				signs += 1
+		_check(lip != null and absf(lip.rotation.y) > 3.0 and signs == Client3D.DEN_SIGNS.size(),
+				"art-kit's root lip turned out over it, its fur and rakes before it (%d signs)" % signs)
+		var cells := _rig._den_cells()
+		var grown := 0
+		for child: Node in _rig._room.get_children():
+			if child is Node3D and (str(child.name).begins_with("Tree_") or str(child.name).begins_with("Sapling_")):
+				var spot := Vector2i(roundi((child as Node3D).position.x), roundi((child as Node3D).position.z))
+				if cells.has(spot):
+					grown += 1
+		var all_stood := true
+		for cell: Vector2i in cells:
+			all_stood = all_stood and _rig._stood.has(cell)
+		_check(cells.size() == 14 and not cells.has(at) and all_stood and grown == 0,
+				"its 14 cells kept from the wood's trees (%d cells, %d trees)" % [cells.size(), grown])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

@@ -6728,6 +6728,9 @@ func _add_link_cues() -> void:
 		if cue["cue"] == "thicket":
 			_add_thicket_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
 			continue
+		if cue["cue"] == "den":
+			_add_den_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
+			continue
 		var slot := str(Level.CUE_SLOTS.get(cue["cue"], ""))
 		if slot.is_empty() or not ArtKit.has(slot):
 			continue
@@ -6874,6 +6877,372 @@ func _add_thicket_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
 		var key := Vector2i(at.x * 7 + 5, at.y * 7 + 5)
 		put.call(Vector2(at) + Vector2(ahead) * 0.35, THICKET_GATE, key, THICKET_NARROW)
 		holder.get_child(holder.get_child_count() - 1).name = "Tangle"
+
+
+## A den mouth (798 amended (2); a link's cue "den", maps' old grey's den,
+## enemy-ai's design: "something lives here, and it isn't the bear"): a
+## low hole dug into an earth bank under a tilted rock shelf, roots over its
+## lip, drawn from the cue. The bank over DEN_MOUND across and deep (the
+## link's row too) behind and beside the link (maps' void cells, the
+## boar's footprint), DEN_BANK high at its crest and DEN_FRONT over the
+## hole, its shoulders reaching forward beside it; the hole DEN_HOLE wide
+## and high at the link cell's far edge, its throat DEN_THROAT deep going
+## black; the shelf DEN_SHELF across, thick and deep, tilted DEN_TILT
+## (sideways, front down, radians), jutting DEN_JUT over the hole. Art-kit's
+## prop.root_lip under the shelf as the hole's top (its roots hanging over
+## it), a tuft of grey fur (prop.fur_tuft) caught on it and claw rakes
+## (prop.scratch_marks) on the trodden ground before it, where the kit has
+## them. [param closed]: stones heaped in the hole.
+const DEN_MOUND := Vector2i(5, 3)
+const DEN_BANK := 2.15
+const DEN_FRONT := 1.6
+const DEN_HOLE := Vector2(1.9, 1.45)
+const DEN_THROAT := 1.6
+const DEN_SHELF := Vector3(2.3, 0.42, 1.7)
+const DEN_TILT := Vector2(0.24, 0.12)
+const DEN_JUT := 0.25
+## How far in behind the face the hole goes black (in front of the root
+## lip's own hollow).
+const DEN_VEIL := 0.12
+## The shelf's rock, the cliffs' times DEN_SHELF_SHADE; its top's facets
+## mossy one in DEN_SHELF_MOSS.
+const DEN_SHELF_SHADE := 0.62
+const DEN_SHELF_MOSS := 0.45
+## The bank's earth, the dirt swatch times DEN_EARTH; its gentle top grass.
+const DEN_EARTH := 0.5
+## [slot, x, z (the mouth's frame), turn, size]: the fur on a root end at the
+## lip, the rakes on the link cell and the pad.
+const DEN_SIGNS := [
+	["prop.fur_tuft", 0.42, 0.38, 0.4, 1.3],
+	["prop.scratch_marks", -0.55, -0.35, 0.5, 1.0],
+	["prop.scratch_marks", 0.75, -1.45, 2.2, 0.9],
+]
+
+
+## The cells a den mouth's bank stands on: DEN_MOUND behind and beside each
+## "den" link, the link's own cell its hole's.
+func _den_cells() -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for cue: Dictionary in _terrain.get("link_cues", []):
+		if cue["cue"] != "den":
+			continue
+		var at: Vector2i = cue["tile"]
+		var ahead: Vector2i = cue["facing"]
+		var across := Vector2i(-ahead.y, ahead.x)
+		for back in DEN_MOUND.y:
+			for x in range(-(DEN_MOUND.x / 2), DEN_MOUND.x / 2 + 1):
+				if back > 0 or x != 0:
+					out[at + ahead * back + across * x] = true
+	return out
+
+
+## The den mouth over [param at], its bank the way [param ahead] (into it),
+## named "DenMouth_x_y": "Bank" (earth, its shelf and the face over the
+## hole, the rock material's vertex colours), "Throat" (black, unlit), the
+## kit's pieces. In its frame +z runs into the bank, x across, the hole's
+## face at z 0.5 (the link cell's far edge).
+func _add_den_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
+	var holder := Node3D.new()
+	holder.name = "DenMouth_%d_%d" % [at.x, at.y]
+	var base := _height_in(at, Vector2(at))
+	holder.position = Vector3(at.x, base, at.y)
+	holder.rotation.y = atan2(float(ahead.x), float(ahead.y))
+	_room.add_child(holder)
+	var ground := func(x: float, z: float) -> float:
+		var world := holder.transform * Vector3(x, 0.0, z)
+		return _height_in(Vector2i(roundi(world.x), roundi(world.z)), Vector2(world.x, world.z)) - base
+	var dirt_at: Vector2i = GROUND_SWATCHES["dirt"]
+	var grass_at: Vector2i = GROUND_SWATCHES["grass"]
+	var earth := swatch(dirt_at.x, dirt_at.y)
+	var grass := swatch(grass_at.x, grass_at.y)
+	var rock := swatch(CLIFF_ROCK.x, CLIFF_ROCK.y)
+	# Arrays, not packed ones: a lambda holds a packed array by value.
+	var vertices: Array[Vector3] = []
+	var normals: Array[Vector3] = []
+	var colours: Array[Color] = []
+	var put := func(a: Vector3, b: Vector3, c: Vector3, hint: Vector3, shade: Color) -> void:
+		var normal := (b - a).cross(c - a)
+		if normal.dot(hint) < 0.0:
+			normal = -normal
+		normal = normal.normalized()
+		vertices.append_array([a, b, c])
+		normals.append_array([normal, normal, normal])
+		colours.append_array([shade, shade, shade])
+	var tone := func(a: Vector3, b: Vector3, c: Vector3, key: Vector2i, darken: float) -> Color:
+		var n := (b - a).cross(c - a).normalized()
+		var up := absf(n.y)
+		var own := _roll(key, 151)
+		if up > 0.75 and _roll(key, 152) < up:
+			return Color(grass * lerpf(0.45, 0.68, own) * darken, 1.0)
+		return Color(earth * DEN_EARTH * lerpf(0.75, 1.1, own) * darken, 1.0)
+	var face := 0.5
+	var half := DEN_MOUND.x * 0.5
+	var front_z := -0.5
+	var back_z := face + DEN_MOUND.y - 1.0
+	var gap := DEN_HOLE.x * 0.5 + 0.15
+	var hole_top := func(x: float) -> float:
+		var t := absf(x) / (DEN_HOLE.x * 0.5)
+		return DEN_HOLE.y * pow(maxf(0.0, 1.0 - t * t), 0.3) if t < 1.0 else -1.0
+	# The bank: a heightfield over the footprint, sunk at its edges, its
+	# shoulders reaching forward beside the hole, nothing before the hole.
+	var step := 0.25
+	var columns := roundi(DEN_MOUND.x / step)
+	var rows := roundi((back_z - front_z) / step)
+	var heights: Array[float] = []
+	heights.resize((columns + 1) * (rows + 1))
+	var crest_x := (_roll(at, 153) - 0.5) * 1.2
+	for r in rows + 1:
+		for c in columns + 1:
+			var x := -half + c * step
+			var z := front_z + r * step
+			var side_seed := _roll(Vector2i(at.x, at.y + (0 if x < 0.0 else 1)), 154) * TAU
+			var edge := 1.0 - 0.2 * (0.5 + 0.5 * sin(z * 1.7 + side_seed))
+			var across := clampf(1.0 - pow(absf(x) / (half * edge), 2.4), 0.0, 1.0)
+			var along := 1.0 - smoothstep(back_z - 1.2, back_z, z)
+			# Forward of the face only the shoulders, rising to it.
+			var forward := smoothstep(front_z, face + 0.2, z) if absf(x) >= gap else (1.0 if z >= face - 0.01 else 0.0)
+			var crest := exp(-pow((x - crest_x) / 1.8, 2.0) - pow((z - face - 1.3) / 0.9, 2.0))
+			var h := lerpf(DEN_FRONT, DEN_BANK, crest) * pow(across, 0.6) * along * forward
+			h += (_roll(Vector2i(at.x * 29 + c, at.y * 29 + r), 155) - 0.5) * 0.3 * across * along * forward
+			if c == 0 or c == columns or r == 0 or r == rows:
+				h = -0.25
+			heights[r * (columns + 1) + c] = maxf(h, -0.25) + float(ground.call(x, z))
+	for r in rows:
+		for c in columns:
+			var i := r * (columns + 1) + c
+			var x := -half + c * step
+			var z := front_z + r * step
+			# Before the hole, nothing (the hole's own face stands there).
+			if z < face - 0.01 and absf(x + step * 0.5) < gap:
+				continue
+			var a := Vector3(x, heights[i], z)
+			var b := Vector3(x + step, heights[i + 1], z)
+			var cc := Vector3(x + step, heights[i + columns + 2], z + step)
+			var d := Vector3(x, heights[i + columns + 1], z + step)
+			var bare := true
+			for corner: Vector3 in [a, b, cc, d]:
+				bare = bare and corner.y < float(ground.call(corner.x, corner.z)) + 0.03
+			if bare:
+				continue
+			var key := Vector2i(at.x * 31 + c * 2, at.y * 31 + r)
+			put.call(a, b, cc, Vector3.UP, tone.call(a, b, cc, key, 1.0))
+			key.x += 1
+			put.call(a, cc, d, Vector3.UP, tone.call(a, cc, d, key, 0.94))
+	var height_at := func(x: float, z: float) -> float:
+		var c := clampi(roundi((x + half) / step), 0, columns)
+		var r := clampi(roundi((z - front_z) / step), 0, rows)
+		return heights[r * (columns + 1) + c]
+	# The shoulders' inner sides, down beside the hole's way.
+	for side: float in [-1.0, 1.0]:
+		var x := side * ceilf(gap / step) * step
+		var z := front_z
+		while z < face - 0.01:
+			var top0: float = height_at.call(x, z)
+			var top1: float = height_at.call(x, z + step)
+			var low0: float = float(ground.call(x, z)) - 0.2
+			var low1: float = float(ground.call(x, z + step)) - 0.2
+			var key := Vector2i(at.x * 37 + roundi(z * 8.0), at.y * 37 + int(side))
+			var shade := Color(earth * DEN_EARTH * lerpf(0.6, 0.8, _roll(key, 156)), 1.0)
+			var into := Vector3(-side, 0.0, 0.0)
+			put.call(Vector3(x, low0, z), Vector3(x, top0, z), Vector3(x, top1, z + step), into, shade)
+			put.call(Vector3(x, low0, z), Vector3(x, top1, z + step), Vector3(x, low1, z + step), into, shade)
+			z += step
+	# The face over the hole: from its top (or under the ground beside it)
+	# up to the bank, darker at the lip.
+	var fine := 0.2
+	var wide_face := ceilf(gap / step) * step
+	var count := roundi(wide_face * 2.0 / fine)
+	for k in count:
+		var x0 := -wide_face + k * fine
+		var x1 := x0 + fine
+		var low0: float = hole_top.call(x0 + 0.001)
+		var low1: float = hole_top.call(x1 - 0.001)
+		low0 = low0 if low0 >= 0.0 else float(ground.call(x0, face)) - 0.2
+		low1 = low1 if low1 >= 0.0 else float(ground.call(x1, face)) - 0.2
+		var up0: float = height_at.call(x0, face)
+		var up1: float = height_at.call(x1, face)
+		var key := Vector2i(at.x * 41 + k, at.y * 41)
+		var shade := Color(earth * DEN_EARTH * lerpf(0.45, 0.6, _roll(key, 157)), 1.0)
+		var out := Vector3(0.0, 0.0, -1.0)
+		put.call(Vector3(x0, low0, face), Vector3(x1, low1, face), Vector3(x1, up1, face), out, shade)
+		put.call(Vector3(x0, low0, face), Vector3(x1, up1, face), Vector3(x0, up0, face), out, shade)
+	# The shelf: a slab of rock over the hole, tilted, jutting out over it
+	# and sunk in the bank behind; a broken slab (its top and edges in
+	# facets, each pushed a little), dark, its top mossy here and there.
+	var lean := 1.0 if _roll(at, 159) < 0.5 else -1.0
+	var shelf := Transform3D(Basis.from_euler(Vector3(-DEN_TILT.y, (_roll(at, 158) - 0.5) * 0.3, DEN_TILT.x * lean)),
+			Vector3((_roll(at, 160) - 0.5) * 0.3, DEN_FRONT + DEN_SHELF.y * 0.2, face - DEN_JUT + DEN_SHELF.z * 0.5))
+	var n := 4
+	var slab := func(i: int, j: int, top: bool) -> Vector3:
+		var key := Vector2i(at.x * 59 + i * 7 + (3 if top else 0), at.y * 59 + j)
+		var x := lerpf(-0.5, 0.5, i / float(n)) * DEN_SHELF.x
+		var z := lerpf(-0.5, 0.5, j / float(n)) * DEN_SHELF.z
+		var rim := i == 0 or i == n or j == 0 or j == n
+		# Its outline ragged: each rim point in or out a little.
+		if rim:
+			var inward := Vector2(x, z).normalized() * (_roll(key, 167) - 0.3) * 0.3
+			x -= inward.x
+			z -= inward.y
+		var y := DEN_SHELF.y * 0.5 * (1.0 if top else -1.0)
+		if top:
+			y += (_roll(key, 168) - 0.5) * 0.14 - (0.08 if rim else 0.0)
+		else:
+			y += (_roll(key, 169) - 0.5) * 0.08
+		return shelf * Vector3(x, y, z)
+	var rock_tone := func(key: Vector2i, darken: float, mossy: bool) -> Color:
+		if mossy and _roll(key, 170) < DEN_SHELF_MOSS:
+			return Color(grass * lerpf(0.4, 0.58, _roll(key, 171)) * darken, 1.0)
+		var tint := MOUTH_WARM if _roll(key, 165) < 0.5 else MOUTH_COLD
+		return Color(rock * (DEN_SHELF_SHADE * lerpf(0.8, 1.1, _roll(key, 164)) * darken), 1.0) * tint
+	var middle := shelf.origin
+	var lift := shelf.basis * Vector3.UP
+	for i in n:
+		for j in n:
+			var key := Vector2i(at.x * 61 + i, at.y * 61 + j)
+			var a: Vector3 = slab.call(i, j, true)
+			var b: Vector3 = slab.call(i + 1, j, true)
+			var c: Vector3 = slab.call(i + 1, j + 1, true)
+			var d: Vector3 = slab.call(i, j + 1, true)
+			put.call(a, b, c, lift, rock_tone.call(key, 1.0, true))
+			key.y += 101
+			put.call(a, c, d, lift, rock_tone.call(key, 0.95, true))
+			var ua: Vector3 = slab.call(i, j, false)
+			var ub: Vector3 = slab.call(i + 1, j, false)
+			var uc: Vector3 = slab.call(i + 1, j + 1, false)
+			var ud: Vector3 = slab.call(i, j + 1, false)
+			put.call(ua, ub, uc, -lift, rock_tone.call(key, 0.55, false))
+			put.call(ua, uc, ud, -lift, rock_tone.call(key, 0.55, false))
+	# Its edges, top rim to bottom rim all round.
+	var rim_path: Array[Vector2i] = []
+	for i in n:
+		rim_path.append(Vector2i(i, 0))
+	for j in n:
+		rim_path.append(Vector2i(n, j))
+	for i in range(n, 0, -1):
+		rim_path.append(Vector2i(i, n))
+	for j in range(n, 0, -1):
+		rim_path.append(Vector2i(0, j))
+	for k in rim_path.size():
+		var p := rim_path[k]
+		var q := rim_path[(k + 1) % rim_path.size()]
+		var a: Vector3 = slab.call(p.x, p.y, true)
+		var b: Vector3 = slab.call(q.x, q.y, true)
+		var c: Vector3 = slab.call(q.x, q.y, false)
+		var d: Vector3 = slab.call(p.x, p.y, false)
+		var out := (a + b) * 0.5 - middle
+		var key := Vector2i(at.x * 67 + k, at.y * 67)
+		put.call(a, b, c, out, rock_tone.call(key, 0.8, false))
+		put.call(a, c, d, out, rock_tone.call(key, 0.75, false))
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
+	arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(normals)
+	arrays[Mesh.ARRAY_COLOR] = PackedColorArray(colours)
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var body := MeshInstance3D.new()
+	body.name = "Bank"
+	body.mesh = mesh
+	body.material_override = _rock_material()
+	holder.add_child(body)
+	# The throat: the hole carried in, black: its roof, its walls' foot, its
+	# floor and its end.
+	var dark := PackedVector3Array()
+	var rings := 4
+	var inner := DEN_HOLE.x * 0.5 - 0.001
+	for ring in rings:
+		var z0 := face + DEN_THROAT * ring / rings
+		var z1 := face + DEN_THROAT * (ring + 1) / rings
+		var s0 := 1.0 - 0.2 * ring / rings
+		var s1 := 1.0 - 0.2 * (ring + 1) / rings
+		for k in roundi(DEN_HOLE.x / fine):
+			var xa := -DEN_HOLE.x * 0.5 + k * fine
+			var xb := xa + fine
+			var ya: float = hole_top.call(clampf(xa, -inner, inner))
+			var yb: float = hole_top.call(clampf(xb, -inner, inner))
+			dark.append_array([Vector3(xa * s0, ya * s0, z0), Vector3(xb * s0, yb * s0, z0), Vector3(xb * s1, yb * s1, z1)])
+			dark.append_array([Vector3(xa * s0, ya * s0, z0), Vector3(xb * s1, yb * s1, z1), Vector3(xa * s1, ya * s1, z1)])
+		for side: float in [-1.0, 1.0]:
+			var e := side * DEN_HOLE.x * 0.5
+			var y0: float = hole_top.call(side * inner) * s0
+			var y1: float = hole_top.call(side * inner) * s1
+			dark.append_array([Vector3(e * s0, -0.15, z0), Vector3(e * s0, y0, z0), Vector3(e * s1, y1, z1)])
+			dark.append_array([Vector3(e * s0, -0.15, z0), Vector3(e * s1, y1, z1), Vector3(e * s1, -0.15, z1)])
+		var w0 := DEN_HOLE.x * 0.5 * s0
+		var w1 := DEN_HOLE.x * 0.5 * s1
+		dark.append_array([Vector3(-w0, 0.02, z0), Vector3(w0, 0.02, z0), Vector3(w1, 0.02, z1)])
+		dark.append_array([Vector3(-w0, 0.02, z0), Vector3(w1, 0.02, z1), Vector3(-w1, 0.02, z1)])
+	# Just behind the roots, the dark itself: the hole's shape, black, before
+	# the lip's own hollow (lit earth there, the coordinator), so the hole
+	# reads as going deep.
+	var veil := face + DEN_VEIL
+	for k in roundi(DEN_HOLE.x / fine):
+		var xa := -DEN_HOLE.x * 0.5 + k * fine
+		var xb := xa + fine
+		var ya: float = hole_top.call(clampf(xa, -inner, inner))
+		var yb: float = hole_top.call(clampf(xb, -inner, inner))
+		dark.append_array([Vector3(xa, -0.1, veil), Vector3(xb, -0.1, veil), Vector3(xb, yb, veil)])
+		dark.append_array([Vector3(xa, -0.1, veil), Vector3(xb, yb, veil), Vector3(xa, ya, veil)])
+	var end := face + DEN_THROAT
+	var last := DEN_HOLE.x * 0.5 * 0.8
+	var roof := DEN_HOLE.y * 0.8
+	dark.append_array([Vector3(-last, -0.1, end), Vector3(last, -0.1, end), Vector3(last, roof, end)])
+	dark.append_array([Vector3(-last, -0.1, end), Vector3(last, roof, end), Vector3(-last, roof, end)])
+	var dark_arrays := []
+	dark_arrays.resize(Mesh.ARRAY_MAX)
+	dark_arrays[Mesh.ARRAY_VERTEX] = dark
+	var dark_mesh := ArrayMesh.new()
+	dark_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, dark_arrays)
+	var throat := MeshInstance3D.new()
+	throat.name = "Throat"
+	throat.mesh = dark_mesh
+	var black := StandardMaterial3D.new()
+	black.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	black.albedo_color = Color(0.015, 0.014, 0.01)
+	black.cull_mode = BaseMaterial3D.CULL_DISABLED
+	throat.material_override = black
+	throat.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(throat)
+	# The kit's root lip as the hole's top: its front (+z) out of the bank,
+	# its hanging edge at the face.
+	if ArtKit.has("prop.root_lip"):
+		var lip := ArtKit.instance("prop.root_lip", 1)
+		lip.name = "RootLip"
+		var spec: Dictionary = ArtKit.spec("prop.root_lip")
+		var size: Array = spec.get("size", [1.7, 0.97, 1.12])
+		var mid: Array = spec.get("middle", [0.0, 0.0, -0.371])
+		var reach := float(mid[2]) + float(size[2]) * 0.5
+		lip.rotation.y = PI
+		lip.scale = Vector3((DEN_HOLE.x + 0.2) / float(size[0]), DEN_HOLE.y / float(size[1]), 1.0)
+		lip.position = Vector3(0.0, float(ground.call(0.0, face)), face - 0.04 + reach)
+		holder.add_child(lip)
+	for k in DEN_SIGNS.size():
+		var sign: Array = DEN_SIGNS[k]
+		var slot := str(sign[0])
+		if not ArtKit.has(slot):
+			continue
+		var piece := ArtKit.instance(slot, 1 + posmod(hash(at) + k, maxi(ArtKit.variant_count(slot), 1)))
+		piece.name = "Sign_%d" % k
+		var sx := float(sign[1])
+		var sz := float(sign[2])
+		var y: float = ground.call(sx, sz)
+		if slot == "prop.fur_tuft":
+			# On a root end, under the lip.
+			y = float(ground.call(0.0, face)) + DEN_HOLE.y * 0.55
+		piece.position = Vector3(sx, y, sz)
+		piece.rotation.y = float(sign[3])
+		piece.scale = Vector3.ONE * float(sign[4])
+		holder.add_child(piece)
+	if closed and ArtKit.has("rock.small"):
+		var heap := Node3D.new()
+		heap.name = "Stopped"
+		for k in 4:
+			var stone := ArtKit.instance("rock.small", 1 + posmod(hash(at) + k, maxi(ArtKit.variant_count("rock.small"), 1)))
+			stone.position = Vector3((k - 1.5) * 0.4, 0.1 + (0.25 if k % 2 == 1 else 0.0), face + 0.25)
+			stone.rotation.y = _roll(at + Vector2i(k, 7), 166) * TAU
+			stone.scale = Vector3.ONE * 0.75
+			heap.add_child(stone)
+		holder.add_child(heap)
 
 
 ## A cave mouth (a link's cue "cave"; the forest plan's lairs): a
@@ -8722,6 +9091,9 @@ func _add_forest_stands() -> void:
 	# A thicket mouth's mound (798 amended) stands on its cells: no tree,
 	# sapling, rock or deadwood of the wood's there.
 	for cell: Vector2i in _thicket_cells():
+		_stood[cell] = true
+	# A den mouth's bank (798 amended (2)) likewise.
+	for cell: Vector2i in _den_cells():
 		_stood[cell] = true
 
 

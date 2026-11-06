@@ -43508,6 +43508,26 @@ gap; none of the wood's trees on the mound). No bullet (voice: maps' lair line a
 there; the lair's comes when it opens). Client and Level's cue list only, protocol unchanged, no new
 class_name.
 
+798 amended (2): the den mouth (2026-11-06; enemy-ai's old grey's den design, maps' den, 780 amended (14); the
+coordinator's approval; release's label). A third mouth cue: Level.CUES takes "den", given by the link's "cue" or
+"mouth" (maps' grey_den link at the foothills' (97,31), opening south under the high scarp). Enemy-ai's read:
+"something lives here, and it isn't the bear", so not a second cave (a dressed "cave" would still be a 3 m hill
+with a tall arch). Client3D._add_den_mouth draws "DenMouth_x_y" from the cue: "Bank", an earth heightfield over
+DEN_MOUND, the boar's footprint (5 across, 3 deep counting the link's row, the link its hole's; Client3D._den_cells,
+maps' 14 void cells), DEN_BANK 2.15 m at a crest behind the hole and DEN_FRONT 1.6 m over it, its shoulders reaching
+forward beside it, sunk at its edges, the dirt swatch times DEN_EARTH with grass on its gentle facets; the hole
+DEN_HOLE 1.9 x 1.45 m at the link cell's far edge (a stooping person's, the coordinator: you walk in for
+the den keepers; low and wide beside a cave's arch), an earth face over it; a shelf of the cliffs' rock over the hole
+(DEN_SHELF 2.3 x 0.42 x 1.7 m, tilted DEN_TILT, jutting DEN_JUT 0.25 m past the face, sunk in the bank behind, its top
+and rim in jittered facets, DEN_SHELF_SHADE, mossy one facet in DEN_SHELF_MOSS); "Throat", the hole carried
+DEN_THROAT 1.6 m in, black and unlit, and black across the hole DEN_VEIL 0.12 m in, before the root lip's own
+hollow (lit earth there; the coordinator: the hole reads as going deep). Art-kit's prop.root_lip (800f9093d) as the hole's top, turned out of the bank,
+its roots hanging over it; DEN_SIGNS: prop.fur_tuft on a root end, two prop.scratch_marks on the link cell and the
+pad (bones are maps'). Closed: stones heaped in the hole ("Stopped"). The bank's cells go in _stood, as the
+thicket's. view_test _test_den_mouth (low and on its cells, the way it faces; the hole open and black inside; the
+shelf over it past the face; the lip and signs; the cells kept from the wood's trees; closed, the stones). No
+bullet. Client and Level's cue list only, protocol unchanged, no new class_name.
+
 780 amended (12): the boar's lair, forest phase D (2026-11-05, maps; enemy-ai's apex-lair rule,
 C:/dev/review/enemy-ai/apex_lairs_design.md, its residents as enemy-ai gave them; the coordinator's
 go and its ruling on the roof; terrain's mouth order; release's label). A new level, levels/boar_lair
