@@ -25737,6 +25737,19 @@ so nothing new on the wire:
 
 tests: companion_test _test_game_and_watch. Server only, protocol unchanged,
 no new class_name.
+
+621 amended (2) (2026-11-06, release's label; playtest's reward_loop, routed by the coordinator):
+she always asks before she sleeps. Told she was tired and to ask her player to keep watch, she spoke
+of Maud and a chisel and then slept unasked: the ask sat in her trigger, where the model does not
+heed it (pair 6), and answer_ticks with her player standing by settled her to sleep whatever she had
+said. The ask is now her last turn's focus (Companion.WATCH_FOCUS, voice's words: "... You would like
+to sleep a while if Jeff keeps watch over you. If you speak now, ask Jeff that, in your own words: one
+question, and nothing else."), and her sleep waits on an ask made: her own line with a question in it
+marks it asked; if none came by answer_ticks, she says one of WATCH_ASK (voice's, picked by her name:
+"I'm worn through. Will you keep watch while I sleep a little?" / "Could you keep watch a while? I
+need to close my eyes." / "Will you watch over me for a bit? I could sleep where I stand.") and waits
+answer_ticks again. Only then, her player still by her, does she settle without a word, as before.
+companion_test _test_game_and_watch. Server only, protocol unchanged, no new class_name.
 ## 622, combat's side: armour turns arrows and thrusts, and weighs on the breath
 
 Jeff's draft values from items' design (C:/dev/review/armour/design.md, section 4), the

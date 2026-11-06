@@ -139,6 +139,12 @@ const APEX_ORDERED: Array[String] = ["If you say so. Mind its paws.", "On your w
 const APEX_BREAK: Array[String] = ["Back. We can't take it like this.", "Pull back, now. Not like this.", "Leave it. We're done if we stay."]
 const ORDER_PLAY := "\\b(knucklebones|play (a game|dice|bones|a round)|(a|another) game of (bones|dice)|throw the bones)\\b"
 ## Her player's answer when she has asked them to keep watch (decision 621).
+## Her ask to keep watch (621 amended (2)): told in her last turn, where a
+## focus is heard (pair 6), not her trigger, where it was not (the
+## coordinator's reward_loop: a line about Maud and a chisel, then she slept
+## unasked); and the fixed ask if her own line asked nothing (voice's words).
+const WATCH_FOCUS := "You are worn out after a hard day (%s), here in %s%s, and nothing hostile is near. You would like to sleep a while if %s keeps watch over you. If you speak now, ask %s that, in your own words: one question, and nothing else."
+const WATCH_ASK: Array[String] = ["I'm worn through. Will you keep watch while I sleep a little?", "Could you keep watch a while? I need to close my eyes.", "Will you watch over me for a bit? I could sleep where I stand."]
 const ORDER_YES := "\\b(yes|yeah|yep|sure|of course|ok|okay|go on|go ahead|i will|i'll watch|i'll keep watch|sleep|get some sleep)\\b"
 const ORDER_NO := "\\b(no|nope|not now|not yet|keep going|later)\\b"
 const ORDER_GIVE_BACK := "\\b(give|hand|pass|return)\\b.*\\b(me|back)\\b"
@@ -1895,8 +1901,16 @@ func _keep_watch() -> void:
 		return
 	if _sleeping.has("asked_at"):
 		if World.tick - int(_sleeping["asked_at"]) >= int(rules.get("answer_ticks", 200)):
-			if World.distance(tile, keeper.tile) <= near and keeper.tile == _sleeping.get("their_tile"):
-				_sleep()  # Settled by her without a word: they stay.
+			if not _sleeping.get("asked", false):
+				# Her line asked nothing (or she let it pass): the plain ask, once, and wait again.
+				if _say(WATCH_ASK[absi(hash(_name_of(self))) % WATCH_ASK.size()], true):
+					_sleeping["asked"] = true
+					_sleeping["asked_at"] = World.tick
+					_sleeping["their_tile"] = keeper.tile
+				else:
+					_sleeping = {}
+			elif World.distance(tile, keeper.tile) <= near and keeper.tile == _sleeping.get("their_tile"):
+				_sleep()  # Asked, and they stayed by: settled without a word.
 			else:
 				_sleeping = {}
 		return
@@ -1907,11 +1921,11 @@ func _keep_watch() -> void:
 			and World.tick - _town_since >= int(rules.get("ask_after_ticks", 3000)):
 		_watch_day = day
 		_sleeping = {"asked_at": World.tick, "their_tile": keeper.tile}
-		# Her own words, not a fixed line (738): where she is, why, then the ask.
-		_ask_voice(("You are worn out after a hard day (%s), here in %s%s, and nothing hostile is near. You'd like to sleep "
-			+ "a while if %s keeps watch over you: ask them, in your own words.") % [
-				"you fought today" if _hard_day else "%d of %d" % [hp, max_hp], _place_words(),
-				", by the fire" if _fire_near(tile, reach) else "", keeper_name()], "", true)
+		# Her own words, not a fixed line (738): where she is, why, then the ask, in her last turn.
+		_quiet_focus = WATCH_FOCUS % ["you fought today" if _hard_day else "%d of %d" % [hp, max_hp], _place_words(),
+			", by the fire" if _fire_near(tile, reach) else "", keeper_name(), keeper_name()]
+		_ask_voice("You are tired.", "", true)
+		_quiet_focus = ""
 
 
 ## Whether she may rest or sleep here (decision 738, Jeff: a camp is "not a
@@ -4627,6 +4641,8 @@ func _say(line: String, always: bool) -> bool:
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
 		return false
 	_last_speech_tick = World.tick
+	if _saying_voice and _sleeping.has("asked_at") and not _sleeping.get("asked", false) and "?" in line:
+		_sleeping["asked"] = true  # Her own words asked it (621 amended (2)).
 	if not _saying_voice:
 		voice_counts["fixed"] = int(voice_counts.get("fixed", 0)) + 1  # 803: a line not of her voice's making.
 	_quiet_next_tick = World.tick + int(_quiet_gap("gap_s") * _quiet_backoff * talk_m())  # Any line of hers puts the next quiet moment off.

@@ -1882,7 +1882,7 @@ func _test_game_and_watch() -> void:
 	pet.hp = int(pet.max_hp * 0.5)
 	for i in Companion.DEED_EVERY * 3:
 		World.step()
-	_check(not pet._sleeping.has("asked_at") and counting.triggers("voice").filter(func(t: String) -> bool: return "keeps watch" in t).is_empty(),
+	_check(not pet._sleeping.has("asked_at") and counting.voice_asks.filter(func(a: Dictionary) -> bool: return "keeps watch" in str(a.get("user", ""))).is_empty(),
 		"a hard day by a camp's fire: she never asks to sleep there (%s)" % [counting.triggers("voice")])
 	in_town["on"] = true
 	for i in Companion.DEED_EVERY * 3:
@@ -1910,9 +1910,10 @@ func _test_game_and_watch() -> void:
 	pet.hp = int(pet.max_hp * 0.5)
 	for i in Companion.DEED_EVERY:
 		World.step()
-	var sleep_asks := counting.triggers("voice").filter(func(t: String) -> bool: return "keeps watch" in t)
-	_check(sleep_asks.size() == 1 and pet._sleeping.has("asked_at") and "you fought today" in str(sleep_asks[0]),
-		"a hard day, in town: her voice is asked, with the facts, to ask her player to keep watch; no fixed line (738) (%s)" % [sleep_asks])
+	var sleep_asks := counting.voice_asks.filter(func(a: Dictionary) -> bool: return "keeps watch" in str(a.get("user", "")))
+	var last_turn := str(sleep_asks[-1]["messages"][-1]["content"]) if not sleep_asks.is_empty() else ""
+	_check(sleep_asks.size() == 1 and pet._sleeping.has("asked_at") and "you fought today" in last_turn and "one question, and nothing else" in last_turn,
+		"a hard day, in town: her voice is asked, in her last turn, with the facts, to ask her player to keep watch; no fixed line (738) (%s)" % last_turn)
 	_say_to(pet, owner, "Yes, get some sleep.")
 	World.step()
 	_check(pet.order == "watch" and pet.current_intent == Companion.Intent.SLEEP and pet.asleep,
@@ -1926,8 +1927,23 @@ func _test_game_and_watch() -> void:
 	for i in Companion.DEED_EVERY * 2:
 		World.step()
 	_check(not pet._sleeping.has("asked_at"), "another hard day the same day: not asked again (ask_days)")
-	# Left sleeping, and something comes.
+	# Her line asked nothing: the plain ask, then she waits again; never asleep unasked.
 	_kill_monsters()
+	pet._watch_day = -1
+	pet._hard_day = true
+	var count_plain := func() -> int:
+		return pet._said.filter(func(l: String) -> bool: return l in Companion.WATCH_ASK).size()
+	var plain_before: int = count_plain.call()
+	for i in Companion.DEED_EVERY:
+		World.step()
+	_check(pet._sleeping.has("asked_at") and not pet._sleeping.get("asked", false), "her voice gave no question: not yet asked")
+	pet._sleeping["asked_at"] = World.tick - int(sleep["answer_ticks"])
+	for i in Companion.DEED_EVERY:
+		World.step()
+	_check(count_plain.call() == plain_before + 1 and pet._sleeping.get("asked", false) and pet.order != "watch",
+		"so she asks plainly, once, and waits for them; no sleep unasked (the coordinator's reward_loop) (%s)" % [pet._said.slice(-1)])
+	pet._sleeping = {}
+	# Left sleeping, and something comes.
 	pet._watch_day = -1
 	pet._hard_day = true
 	for i in Companion.DEED_EVERY:
