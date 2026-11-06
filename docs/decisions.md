@@ -43109,6 +43109,15 @@ work is Aldous's and Pip's). ui's side: the Locker and Kit buttons in the vendor
 his head. resident_test _test_keeper. Protocol: "locker" carries "keeper", "kit" is a new command, and
 "offers" carries "kit": PROTOCOL_REVISION 51, which 814 opened after v0.1.205's cut (a "51 (807 amended (2))" line, sharing it). No new class_name.
 
+807 amended (3): Rolf's buttons, ui's side (release's label; voice's words). His store window
+(BarterPanel) shows "Open locker" while it shows his stall's wares (an Offers.VENDOR_WARES
+offer; a pedlar's or a camp trader's never), and "Take practice kit" while his "offers" carry
+"kit" (BarterPanel.set_keeper, from Main._on_offers_message). They send the "locker" {keeper}
+and "kit" {keeper} commands (Main._keeper_command); the server's _keeper_serves decides, his
+own line answers, and his offers come again without "kit" once it is taken, so the button
+goes. resident_test _test_keeper_buttons drives the client's path. Client only, protocol
+unchanged (rev 51 is npc's), no new class_name.
+
 ## 799. The forest camps' traders
 
 The coordinator's approved design (2026-11-04), on maps' forest phase C (793, maps' side,

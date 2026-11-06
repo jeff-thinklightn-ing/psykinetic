@@ -1927,6 +1927,16 @@ static func answers_clicks_only(body: GridEntity) -> bool:
 ## Give's button (802): "give" {entity: [param to]'s path, uids, barter
 ## while a maker's barter is open} (economy's give path; the answer an item
 ## reward, their thanks as speech and a fresh sheet). Sent only while the sheet carries "takes" (the tab shown).
+## Rolf's buttons (807 amended (3)): [param command] ("locker": the
+## player's locker opened beside him; "kit": his practice kit) asked of the
+## stall keeper [param keeper]; the server checks he serves them, and his
+## "offers" come again without "kit" once it is taken.
+func _keeper_command(keeper: GridEntity, command: String) -> void:
+	var me := _local_player()
+	if me != null and keeper != null and is_instance_valid(keeper) and keeper.is_inside_tree():
+		World.command(me, command, {"keeper": str(keeper.get_path())})
+
+
 func _give_to_person(to: GridEntity, uids: Array) -> void:
 	if to == null or not is_instance_valid(to) or not to.is_inside_tree() or uids.is_empty():
 		return
@@ -13750,6 +13760,8 @@ func _build_talk() -> void:
 	barter_panel.collect_asked.connect(_collect_at_counter)
 	barter_panel.said.connect(_say_to_person)  # 802: the window's typing line.
 	barter_panel.give_asked.connect(_give_to_person)  # 802: Give's button.
+	barter_panel.locker_asked.connect(_keeper_command.bind("locker"))  # 807 amended (3): Rolf's buttons.
+	barter_panel.kit_asked.connect(_keeper_command.bind("kit"))
 	barter_panel.refused.connect(func(_why: String) -> void: ui_sounds.play("ui.error"))
 	$HUD.add_child(barter_panel)
 	if has_signal("barter_told"):
@@ -14093,6 +14105,9 @@ func _on_offers_message(data: Dictionary) -> void:
 			barter_panel.show_wares(who, str(data.get("speaker", "")), data.get("offers", []) if data.get("offers") is Array else [], gold)
 			if data.has("takes") and barter_panel.is_open() and barter_panel.person == who:
 				barter_panel.set_takes(data["takes"])  # 802 Give: what Rolf takes (gear, a gift).
+			if barter_panel.is_open() and barter_panel.with == who:
+				# 807 amended (3): his Open locker, and Take practice kit while owed.
+				barter_panel.set_keeper(data.get("offers", []) if data.get("offers") is Array else [], bool(data.get("kit", false)))
 		if deal_panel.visible and deal_panel.entity_id == who.get_instance_id():
 			deal_panel.close()
 

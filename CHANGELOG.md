@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: Rolf's window has a button to open your locker beside him and, until you take it, one for the practice kit he keeps for newcomers (807 amended (3)).
 - Outdoors, when a house, a tree or a wall hides you, the camera turns a little by itself to bring you back into view, never far from where you set it; turning it yourself holds it off for a few seconds, and Options can switch it off (801).
 - What you and your companion wear now shows on you: a hood drawn up over the hair, a felt hat, a long cloak open in front, soft boots, an amulet at the throat and a charm at the belt (788 amended (2)).
 - Wind sighs at the mouth of a beast's cave and fades as you go in, and wolves not yet roused growl low now and then, one at a time, when you come near (795 amended (3)).

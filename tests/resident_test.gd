@@ -4978,10 +4978,50 @@ func _test_vendor() -> void:
 	_check(spoken.size() == 1, "he says so (%s)" % [spoken])
 	_test_vendor_buttons(player, rolf, rule)
 	_test_keeper(player, rolf)
+	_test_keeper_buttons(player, rolf)
 	Net.message_received.disconnect(heard)
 	rule["towns"] = towns_was
 	_sync()
 	_check(_body(Offers.VENDOR + STORE) == null, "not among the rule's towns: no body")
+
+
+## Rolf's buttons (807 amended (3)), the client's whole path: greeted, his
+## store window shows Open locker and, while his "offers" say a kit is owed,
+## Take practice kit; Open locker brings the player's locker out beside him;
+## Take practice kit hands it and the button goes with the offers sent again.
+## A pedlar's or a maker's window has neither.
+func _test_keeper_buttons(player: Player, rolf: Resident) -> void:
+	print("
+== Rolf's Open locker and Take practice kit buttons (807 amended (3)) ==")
+	var panel: BarterPanel = _main.barter_panel
+	var record: PlayerRecord = _main._records.get(player.player_id)
+	if panel == null or record == null:
+		_check(false, "(the store window and a record)")
+		return
+	record.kit_given = false
+	if rolf.doing == Resident.Doing.HIDE:
+		rolf.doing = Resident.Doing.WORK
+	_put(player, _main._nearest_free(rolf.tile + Vector2i(1, 0)))
+	panel.close()
+	_main._greet_at.clear()
+	_main._resident_fight_at.clear()
+	_main._greeted(player, rolf)
+	_check(panel.is_open() and panel.with == rolf and panel.keeper_buttons() == [true, true],
+		"greeted, a kit owed: Open locker and Take practice kit (%s)" % [panel.keeper_buttons()])
+	panel._locker_button.pressed.emit()
+	var locker := World.locker_of(player.player_id)
+	_check(locker != null and World.distance(locker.tile, rolf.tile) <= 1, "Open locker: the locker beside him (%s)" % [locker.tile if locker != null else null])
+	panel._kit_button.pressed.emit()
+	_check(record.kit_given and panel.is_open() and panel.keeper_buttons() == [true, false],
+		"Take practice kit: handed, and the button gone with his offers sent again (%s)" % [panel.keeper_buttons()])
+	var pedlar_wares: Array = [{"id": "visitor:x|wares|knife", "kind": Offers.WARES, "accept": Offers.WARES, "what": {"item": "knife"}}]
+	panel.set_keeper(pedlar_wares, true)
+	_check(panel.keeper_buttons() == [false, false], "a pedlar's wares: neither button")
+	panel.close()
+	_check(panel.keeper_buttons() == [false, false], "closed: neither")
+	if locker != null and is_instance_valid(locker):
+		World.despawn(locker)
+	record.kit_given = false
 
 
 ## Rolf, the keeper of all hours (807 amended (2)): his own greeting; a
