@@ -42471,6 +42471,26 @@ a step and the rod used again reel in; a missed bite; cooking at a fire). Voice'
 facts. New script client3d/fishing_view.gd (no class_name).
 805 amended (4): the fishing cues (release's label; items' ask; 805 shipped in v0.1.204). Four positional oneshots on the sfx bus, never heard by monsters (noise null), which items' FishingView plays at the float's water cell through SoundKit.has: sfx.fish_cast (the rod's whip as the cast begins, range 12, -6 dB), sfx.fish_plop (the float landing as the wait begins, range 10, -8; a call items added so the plop keeps the float's time, since no one recording held a whip and a plop 1.5 s apart and a take is cut from one source), sfx.fish_bite (the float dipping: a small sharp splash, range 10, -6), sfx.fish_landed (a perch pulled out: a wet slap, range 10, -6); a missed bite plays nothing. No reel cue: the fish comes out at the bite. Ten Freesound CC0 takes: cast from 853287 (el_boss) and 529665 (paulprit); plop from 853278 (el_boss) and 386429 (giddster); bite from 398038, 398039 (swordofkings128) and 507092 (paulprit); landed from 450828, 450830 (kyles) and 679389 (adviseme333). Review: C:/dev/review/sound/fishing. Tests: sound_kit_test _test_ui_sounds (each placed on the sfx bus, no noise, within 12, two takes). Client only; protocol unchanged, no new class_name, no bullet (items' 805 carries it).
 
+805 amended (5) (2026-11-06, release's label; the coordinator's approval): Wren fishes with her player,
+by World.try_fish(her), her keeper the angler (pond stock, the wanderer, the catch's reward as a
+player's). Only with a rod she carries: Companion._rod_in_hand moves it from her pack to a free hand,
+else her off hand, never the hand her weapon is in (World.try_transfer, the swap kept), and
+_rod_away puts both back after. Asked ("let's go fishing", "fish with me", "cast a line"; "reel in",
+"stop fishing" stop: Companion.ORDER_FISH, ORDER_FISH_STOP, the order verb "fish"), she goes to
+Companion.fish_spot_near her player (a free dry cell within FISH_SEEK of them, not theirs, with water
+within World.FISH_REACH at a fishing place), holds there, faces the water and casts, and casts again
+till told to stop. Unasked, her player casting within FISH_NEAR with all safe: she goes and casts too,
+once per cast of theirs, and reels in when they do (the coordinator: her presence is the fun). A
+hostile in sight, a fight, her player past FISH_NEAR, or, while they fish, her pond down to FISH_LOW
+(2) fish, and she reels in: what is left is theirs. No rod: asked, FISH_NO_ROD ("I've no rod to fish
+with."); her player fishing beside her, once a game day FISH_WISH ("I'd join you, if I had a rod.");
+no pond near, FISH_NO_WATER ("Nothing to fish in here. We'd need a pond."); voice's words. Her own
+cast's end is told her voice at once (FISH_CAUGHT / FISH_MISSED). Main._fish_changed (World.
+fishing_changed): a fish landed by her or her player with the other within FISH_NEAR is the deed
+"fished" ("went fishing with you"; warmth; leisure 0.15, company 0.05), once a game day as every deed,
+meeting her "pond" want, now ready. companion_test _test_fishing, and _test_wants with the pond
+open. Server only, protocol unchanged (Companion.fishing already replicates), no new class_name.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

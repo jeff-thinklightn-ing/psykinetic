@@ -675,6 +675,8 @@ var arrival_card: ArrivalCard
 var gains: Gains
 ## 804: the gains told, all players together (Main.reward; tests).
 var rewards_sent := 0
+## The companion whose last "fished" deed was given (805 amended (5)), for tests.
+var last_fished := ""
 ## Gains sent, by track (804 amended (3): a deed also lifts her bond and needs, each a gain of its own).
 var rewards_by_track: Dictionary[String, int] = {}
 ## 804: each art's peak as last told ("arts"), so a rise is a Practice gain;
@@ -8029,6 +8031,8 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
 	if not room_solved.is_connected(_tomb_opened):
 		room_solved.connect(_tomb_opened)
+	if not World.fishing_changed.is_connected(_fish_changed):
+		World.fishing_changed.connect(_fish_changed)
 	pet.felt.connect(_bond_felt.bind(pet))
 	pet.played.connect(_bond_played.bind(pet))
 	pet.on_road = _on_road
@@ -10030,6 +10034,26 @@ func _secrets_unfound(pet: Companion) -> Array:
 ## player or she held a plate, or whose player is in its room, is told it;
 ## it is a deed ("tomb", her bond: dungeon's deed reward is the player's,
 ## not repeated) and a fact of her card.
+## A cast's end (805 amended (5), from World.fishing_changed): her own,
+## told her voice; a fish landed by her or her player with the other within
+## Companion.FISH_NEAR is the deed "fished" ("went fishing with you": warmth,
+## leisure and company; it meets her "pond" want), once a game day as every deed.
+func _fish_changed(by: GridEntity, state: StringName, _uid: int) -> void:
+	if state != &"caught" and state != &"missed":
+		return
+	var caught := state == &"caught"
+	for pet: Companion in _companions.values():
+		if not is_instance_valid(pet) or not is_instance_valid(pet.keeper):
+			continue
+		if by == pet:
+			pet.fish_done(caught)
+		elif by != pet.keeper:
+			continue
+		if caught and pet.zone == pet.keeper.zone and World.distance(pet.tile, pet.keeper.tile) <= Companion.FISH_NEAR:
+			last_fished = Companion._name_of(pet)
+			_bond(_record_of(pet), "fished", "went fishing with you")
+
+
 func _tomb_opened(zone_name: String, room: String, by: Array) -> void:
 	for pet: Companion in _companions.values():
 		if not is_instance_valid(pet) or pet.zone != zone_name or not is_instance_valid(pet.keeper):

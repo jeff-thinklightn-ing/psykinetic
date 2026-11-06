@@ -97,6 +97,7 @@ func _ready() -> void:
 	_test_wants()
 	_test_talk_rate()
 	_test_tomb()
+	_test_fishing()
 	_test_deeds()
 	_test_game_and_watch()
 	_test_sickness()
@@ -1590,14 +1591,15 @@ func _test_wants() -> void:
 	_check(Companion.pick_want(card, even).get("key") == "fire", "the fire first, whatever she lacks most (%s)" % [Companion.pick_want(card, even)])
 	card["wants_met"] = {"fire": 1}
 	card["needs"]["company"] = 0.2
-	_check(Companion.pick_want(card, even).get("key") == "town", "then the town by her most-lacking need, company; the pond waits on fishing")
+	_check(Companion.pick_want(card, even).get("key") == "town", "then the town by her most-lacking need, company, before the pond")
 	var lonely_less := even.duplicate()
 	lonely_less["company"] = 0.5
 	card["needs"]["adventure"] = 0.1
-	_check(Companion.pick_want(card, lonely_less).get("key") == "town", "and no fight before two are met, however she lacks adventure")
+	_check(Companion.pick_want(card, lonely_less).get("key") in ["town", "pond"], "and no fight before two are met, however she lacks adventure (%s)" % [Companion.pick_want(card, lonely_less)])
+	_check(Companion.pick_want(card, lonely_less).get("key") == "pond", "fishing there now (805 amended (5)): the pond, by leisure, once company lacks less")
 	card["wants_met"]["town"] = 2
 	_check(Companion.pick_want(card, even).get("key") == "wolves", "two met: the fight opens")
-	card["wants_met"] = {"fire": 1, "town": 2, "wolves": 3, "temple": 4}
+	card["wants_met"] = {"fire": 1, "town": 2, "pond": 3, "wolves": 4, "temple": 5}
 	_check(Companion.pick_want(card, even).is_empty(), "all she can want met: none")
 	_check(Companion.focus_text({"key": "want", "words": "to sit by a fire with Bo."}).begins_with("You would like to sit by a fire with Bo.")
 		and Companion.focus_text({"key": "want", "words": "x."}).ends_with(Companion.QUIET_WANT_LEAD), "a want is told as hers, to say in her own words")
@@ -1767,6 +1769,115 @@ func _test_tomb() -> void:
 	_check(str(pet.grown.facts).contains("opened a sealed tomb together") and "tomb" in record.companion.get("bond_today", {}).get("deeds", []),
 		"a tomb opened with her on a plate: a fact of her card and a deed of her bond")
 	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
+	_settle(pet)
+
+
+func _test_fishing() -> void:
+	print("\n== fishing with her player: asked, or beside them as they cast; the deed, and a wish for a rod (805 amended (5)) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var owner: GridEntity = pet.keeper
+	var record: PlayerRecord = _main._records[Net.player_id]
+	_check(Companion.order_in("Let's go fishing.").get("verb") == "fish" and Companion.order_in("Fish with me.").get("on") == true
+			and Companion.order_in("Reel in.").get("on") == false and Companion.order_in("Let's go.").get("verb") != "fish",
+		"let's go fishing and fish with me are read; reel in stops; let's go is not fishing")
+	var held_was := pet.slots.duplicate()
+	for slot in pet.slots.size():
+		if not pet.slots[slot].is_empty() and Items.def(pet.slots[slot]).get("use") == "fish":
+			pet.slots[slot] = ""
+	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
+	_check(pet.order != "fish" and Companion.FISH_NO_ROD in pet._said, "no rod: she says so, and does not go")
+	# A pond two cells from her player, a rod in her pack.
+	var water := World.NO_CELL
+	for cell: Vector2i in [owner.tile + Vector2i(2, 0), owner.tile + Vector2i(-2, 0), owner.tile + Vector2i(0, 2), owner.tile + Vector2i(0, -2)]:
+		if World.is_walkable(cell) and not World._occupancy.has(cell):
+			water = cell
+			break
+	var had_water := World.is_water(water)
+	World._water[water] = true
+	var pond := "%s/test_pond" % World.zone.name
+	World.holdings._places[pond] = {"id": pond, "area": World.zone.name, "key": "test_pond", "cell": water, "name": "the test pond",
+		"kind": "fishing", "radius": 3, "worth": 1, "start": "nobody", "town": ""}
+	World.holdings._holder[pond] = "nobody"
+	World.holdings._strength[pond] = 1
+	World.holdings._since[pond] = 0
+	var rod := World.items.mint("fishing_rod", "built")
+	var pack := -1
+	for slot: int in Items.PACK_SLOTS:
+		if slot < pet.slots.size() and pet.slots[slot].is_empty():
+			pack = slot
+			break
+	World.put_item(pet, pet, pack, rod)
+	_check(pack >= 0 and pet.slots[pack] == "fishing_rod" and World.rod_hand(pet) < 0, "a rod in her pack, not her hand (slot %d)" % pack)
+	var spot := pet.fish_spot_near(owner.tile)
+	_check(spot != World.NO_CELL and spot != owner.tile and Companion._water_by(spot) != World.NO_CELL, "a place to fish beside her player (%s)" % [spot])
+	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
+	_check(pet.order == "fish" and pet.hold_tile == spot, "asked: she goes to the water's edge")
+	for i in 60:
+		World.step()
+		if not pet.fishing.is_empty():
+			break
+	_check(pet.tile == spot and World.rod_hand(pet) >= 0 and str(pet.fishing.get("state", "")) == "cast",
+		"there, the rod from her pack into a hand, and she casts (%s, %s)" % [pet.tile, pet.fishing])
+	World._fishing[pet]["roll"] = 0.0  # A sure catch.
+	World._fishing[pet]["bite"] = World.tick + 1
+	World._fishing[pet]["ends"] = World.tick + 2
+	_main.last_fished = ""
+	var kept_bond: Variant = _bond_as(0)  # Room under the warmth tier's cap.
+	for i in 6:
+		World.step()
+	var fish_kept := Array(pet.slots).has("fish")
+	_check(_main.last_fished == Companion._name_of(pet) and "fished" in record.companion.get("bond_today", {}).get("deeds", []) and fish_kept,
+		"a fish landed beside her player: the deed \"went fishing with you\" (%s, %s)" % [_main.last_fished, record.companion.get("bond_today", {}).get("deeds", [])])
+	_bond_as(0, kept_bond)
+	pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
+	_check(pet.order == "" and World.rod_hand(pet) < 0 and pet.slots[pack] == "fishing_rod", "told to stop: the rod back in her pack, her hand as it was")
+	# Beside her player as they cast: she casts too, unasked.
+	var theirs := World.items.mint("fishing_rod", "built")
+	var their_hand_was: String = owner.slots[Items.RIGHT_HAND]
+	owner.slots[Items.RIGHT_HAND] = ""
+	World.put_item(owner, owner, Items.RIGHT_HAND, theirs)
+	World.face(owner, (water - owner.tile).sign())
+	_check(World.try_fish(owner) and str(owner.fishing.get("state", "")) == "cast", "her player casts (%s)" % [owner.fishing])
+	for i in Companion.DEED_EVERY * 4:
+		World.step()
+		if not pet.fishing.is_empty():
+			break
+	_check(not pet.fishing.is_empty(), "beside them, she casts too, unasked (%s, order %s)" % [pet.fishing, pet.order])
+	pet._stop_fishing()
+	World.try_fish(owner)  # Reeled in.
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
+	# No rod: once a game day, a wish for one.
+	pet.slots[pack] = ""
+	pet._fish_wish_day = -1
+	World.try_fish(owner)
+	for i in Companion.DEED_EVERY * 2:
+		World.step()
+	var wished := pet._said.count(Companion.FISH_WISH)
+	World.try_fish(owner)
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
+	World.try_fish(owner)
+	for i in Companion.DEED_EVERY * 2:
+		World.step()
+	_check(wished == 1 and pet._said.count(Companion.FISH_WISH) == 1 and pet.fishing.is_empty(),
+		"no rod, her player fishing: she wishes she had one, once a day (%d, %d)" % [wished, pet._said.count(Companion.FISH_WISH)])
+	World.try_fish(owner)
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
+	owner.slots[Items.RIGHT_HAND] = their_hand_was
+	if not had_water:
+		World._water.erase(water)
+	World.holdings._places.erase(pond)
+	World.holdings._holder.erase(pond)
+	World.holdings._strength.erase(pond)
+	World.holdings._since.erase(pond)
+	for slot in held_was.size():
+		pet.slots[slot] = held_was[slot]
 	_settle(pet)
 
 

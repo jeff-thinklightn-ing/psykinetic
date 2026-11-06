@@ -127,7 +127,8 @@
 			"new_zone": {"adventure": 0.1, "wonder": 0.1},
 			"blessed": {"faith": 0.2},
 			"answered": {"company": 0.05},
-			"tomb": {"adventure": 0.2, "wonder": 0.1}
+			"tomb": {"adventure": 0.2, "wonder": 0.1},
+			"fished": {"leisure": 0.15, "company": 0.05}
 		}
 	},
 	"wants": {
@@ -138,7 +139,7 @@
 		"templates": [
 			{"key": "fire", "need": "safety", "rung": 1, "after": 0, "met_by": ["fire"], "words": "to sit by a fire with {player} and rest a while", "done": "sat by a fire with {player} and rested"},
 			{"key": "town", "need": "company", "rung": 2, "after": 1, "met_by": ["leisure"], "words": "to spend a while in a town among other folk", "done": "spent a while in a town among other folk"},
-			{"key": "pond", "need": "leisure", "rung": 3, "after": 1, "met_by": ["fished"], "ready": false, "words": "to go fishing with {player}", "done": "went fishing with {player}"},
+			{"key": "pond", "need": "leisure", "rung": 3, "after": 1, "met_by": ["fished"], "ready": true, "words": "to go fishing with {player}", "done": "went fishing with {player}"},
 			{"key": "wolves", "need": "adventure", "rung": 4, "after": 2, "met_by": ["fought", "cleared"], "words": "to win a fight with {player} beside you", "done": "won a fight beside {player}"},
 			{"key": "temple", "need": "faith", "rung": 5, "after": 3, "met_by": ["blessed"], "words": "to go to the temple and be blessed", "done": "were blessed at the temple"}
 		]
@@ -149,7 +150,7 @@
 		"deeds": {"gift": "warmth", "fed": "warmth", "day": "warmth", "bandaged": "warmth",
 			"road": "warmth", "fire": "warmth", "leisure": "warmth", "game": "warmth",
 			"tended": "trust", "stood_by": "trust", "cleared": "trust", "earned": "trust", "fought": "trust", "watched": "trust",
-			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust", "answered": "warmth", "tomb": "milestone"},
+			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust", "answered": "warmth", "tomb": "milestone", "fished": "warmth"},
 		"drops": {"kept_from": -1, "left_alone": -1, "let_bleed": -2, "grave": -1, "warned": -1, "harsh": -1, "mule": -1, "pressed": -1},
 		"harsh_a_day": 2,
 		"game": {"fire_cells": 2, "round_ticks": 60, "best_of": 3, "rounds_most": 9},
