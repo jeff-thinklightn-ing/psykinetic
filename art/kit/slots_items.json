@@ -701,6 +701,25 @@
 			"type": "mesh",
 			"uses": "raw hide (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.hill_cat_pelt": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				1.0,
+				0.2,
+				0.6
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "hill cat's pelt (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.holy_remains": {
 			"budget": 500,
 			"category": "items",
