@@ -3686,6 +3686,22 @@ before. Only spoken() asks it (near_repeat's openings): her facts, which open al
 another ("A wolf moved like a shadow too.") still pass. companion_test. Server only, protocol
 unchanged, no new class_name.
 
+228 amended (3) (2026-11-06, release's label; the coordinator's approval, playtest's voice7_hot2): her
+player's question is answered. Asked "What do you think of this place?" just after her arrival line
+("This place reeks of old bones."), she answered "This place reeks of old bones and older secrets...",
+an echo of her own line (Companion._echo_of), and since the one re-ask (amended above, 21:56) was only
+for a line nobody asked for, it was dropped and her player heard nothing. Now her player's ask is asked
+once more too, told "You have just said ... already" (_repeat_note); on that retry an echo of her own
+line that is not word for word one of hers (_plain) is said (the coordinator: a direct question
+should rarely meet silence). A reply to her player that ends unsaid (a true repeat, empty, or any other
+drop) is kept in her exchange as "..." (the prompt's own sign for silence), so the next ask opens a
+moment of its own: voice7_hot2's bond notice was tacked onto the stale question as one user turn, and
+she answered the place again, "It's quiet here. Too quiet.", and not the bond. A quick phrase's stance
+is kept through a re-ask (Companion's was_phrase; the retry otherwise took her voice's own stance).
+companion_test _test_answer_echo (an echo re-asked and the second said; a near echo said; a true
+repeat twice unsaid, "..." kept; the bond notice after it its own moment). Server only, protocol
+unchanged, no new class_name.
+
 ## 237. Companions perceive through Senses: sight by light, deaths witnessed, noises heard
 
 A Companion has Senses (222) as the monsters do: Senses.new(self,
@@ -42514,7 +42530,30 @@ something worth saying." Under Jeff's bonus rule nothing of it reaches her voice
 never told she is ignored, never cold, and her bond never falls for it. The journal's "[voice]" line
 gains a part, counts only (Companion.talk_report): "; talk: answered A of N (said S, did D),
 unanswered U, gap x median M, range LO-HI, set less L more R", for release to grep after a deploy.
-companion_test _test_talk_rate, record_keys_test. Server only, protocol unchanged, no new class_name.
+companion_test _test_talk_rate, record_keys_test. Server only, protocol unchanged, no new class_name
+
+803 amended (6) (2026-11-06, release's label; the coordinator's approval: Jeff's only fun so far was
+Wren improvising): a place spoken of from one real thing there. "What do you think of this place?"
+led with "quiet" (v0.1.204's checklist): she was given only its name, four sights and two lines of
+late. Given everything real (playtest's pair 7: named spots, lore, what she and her player did there,
+sights), she still answered with made-up mood ("seen more than its share of blood"), so the code picks
+the one thing (the coordinator): Companion.place_brief(zone) is "You are in X." and, first found, what
+happened there (her card's newest fact with that zone, by a new "zone" key on each fact noted from now,
+Companion.note_fact; older facts have none: "Something that happened here: ..."), else a named spot
+or building there (Holdings' or BUILDING_WORDS, never one the place is named for: "There is ... here."),
+else its weightiest agreed lore fact, a kept secret never, nor a place's bare-name fact (an id ending
+".name", "...locals call it the Mughouse": voice8/9, qwen3:14b never said a name it was handed, and the
+name is the head's; the coordinator: a thing she can see, lore's hearth, sign or lamp) ("One thing you
+know of it: ..."); a place's "The" lowered mid-sentence ("You are in the Barrow."). Asked
+(place_words_now, in the last turn, after the question): that, then a direct question on it by its
+kind (PLACE_ASK, the coordinator's pick after voice8, where a fact merely told was passed over: "What do
+you make of that, now you're back here?" / "What do you make of {it}?" / "What do you make of that?"),
+then PLACE_LEAD (voice's: "Answer in one line, in your own words. Don't make up what happened here;
+what you don't know, leave out. Never call it quiet, calm or peaceful."); with none, PLACE_LITTLE.
+Unasked, new to her today: the quiet "place" focus is the same, and with none it is not offered at all
+(the coordinator: silence beats filler). No sights in it now. The ban on quiet is in this focus only,
+not in her rules. companion_test (nothing known; a named spot, not the place's own; a fact of hers
+there first; asked and unasked). Server only, protocol unchanged, no new class_name.
 
 ## 804. Gains: what the player gains, shown as it happens
 

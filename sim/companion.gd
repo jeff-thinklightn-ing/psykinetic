@@ -427,6 +427,16 @@ const QUIET_OPENERS := {"sight": "You notice", "ask": "You want to ask", "want":
 const QUIET_WANT_LEAD := "If you speak now, say so, in your own words."
 ## Closes an "ask" focus in place of QUIET_LEAD (803 amended (3)): told "You
 ## have a question for her player", she never asked one (pairs 5 and 6, 0 of 4).
+## A place spoken of (803 amended (6), the coordinator after pair 7: given
+## everything, she answered with made-up mood): the code picks the one real
+## thing (place_brief), and she is asked of that alone.
+const PLACE_LEAD := "Answer in one line, in your own words. Don't make up what happened here; what you don't know, leave out. Never call it quiet, calm or peaceful."
+## The direct question on place_brief's one thing, by its kind (the
+## coordinator after voice8: qwen3:14b passed over a fact merely told, "the
+## walls remember" for the Mughouse; a question on it is harder to ignore).
+const PLACE_ASK := {"done": "What do you make of that, now you're back here?", "named": "What do you make of %s?", "lore": "What do you make of that?"}
+## Asked of a place she knows nothing real of: no mood for filler.
+const PLACE_LITTLE := "You know little of this place yet. If you answer, say so plainly; don't make up what happened here. Never call it quiet, calm or peaceful."
 ## Her player's rewards (804 amended (14), the coordinator: Jeff's visible
 ## reward with her presence in it): at most one reaction in NOTICE_GAP_S, a
 ## kind of thing once a game day, out of a fight; one waiting past
@@ -3073,6 +3083,8 @@ static func want_said(key: String, field: String, player: String) -> String:
 ## cart, a few paces to the north-west. If you speak now, speak of that, in
 ## your own way."; an "ask" closes with QUIET_ASK_LEAD.
 static func focus_text(focus: Dictionary) -> String:
+	if focus["key"] == "place":
+		return "%s %s" % [focus["words"], PLACE_LEAD]
 	return "%s %s %s" % [QUIET_OPENERS.get(focus["key"], QUIET_OPENERS["default"]), focus["words"],
 		QUIET_ASK_LEAD if focus["key"] == "ask" else QUIET_WANT_LEAD if focus["key"] == "want" else QUIET_LEAD]
 
@@ -3123,7 +3135,9 @@ func _quiet_pick_focus() -> Dictionary:
 		options.append({"key": "ask", "words": "%s about %s" % [keeper_name(),
 			"what happened a little while ago (%s)." % latest if not latest.is_empty() else seen_words + "."]})
 	if _zone_new_today:
-		options.append({"key": "place", "words": "%s, where you have not been before today." % _place_words()})
+		var brief := place_brief(World.zone.name if World.zone != null else "", true)
+		if bool(brief["real"]):
+			options.append({"key": "place", "words": "%s %s" % [brief["text"], brief["ask"]]})  # Nothing real of it: nothing said (the coordinator).
 	if not options.is_empty() and options[0]["key"] == "woke":
 		_woke_words = ""
 		return options[0]  # Just woken, that comes first (pair 5: told "the boar died" instead, she mixed up who slept).
@@ -3713,6 +3727,8 @@ func note_fact(text: String, from := "event") -> void:
 	var added := grown.add_fact(text, from, keeper_id)
 	if added.is_empty():
 		return
+	if World.zone != null:
+		added["zone"] = World.zone.name  # Where it happened (803 amended (6): place_brief's "what happened here").
 	Transcript.record(_name_of(self), "", "[Now true of her: %s]" % added["text"])
 	_log({"kind": "fact", "companion": _name_of(self), "trigger": from, "outcome": "added", "note": added["text"], "id": added["id"]})
 	facts_changed.emit()
@@ -4439,27 +4455,63 @@ static func asks_about_place(heard: String) -> bool:
 	return not heard.is_empty() and RegEx.create_from_string(PLACE_WORDS).search(heard) != null
 
 
-## For a question about the place (asks_about_place): its name, what she
-## sees out to PERCEPTION_RANGE (seen_things, not the near few), and what
-## happened lately, so her answer has something of it in.
+## For a question about the place (asks_about_place): place_brief's one thing,
+## closed by PLACE_LEAD, or by PLACE_LITTLE when there is none.
 func place_words_now() -> String:
-	var parts: Array[String] = ["You are in %s." % _place_words()]
-	var sights: Array[String] = []
-	for thing: Dictionary in seen_things():
-		# No door (803 amended (3)): three closed doors were all she named of a place (pair 6).
-		if thing.get("monster", false) or "door" in str(thing["kind"]) or sights.size() >= 4:
-			continue
-		var paces: int = thing["paces"]
-		sights.append("%s %s" % [thing["word"], "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]])
-	if not sights.is_empty():
-		parts.append("From here you can see: %s." % "; ".join(sights))
-	var lately: Array[String] = []
-	for line: String in _lately():
-		if not (" joined" in line or " left" in line or " came back" in line or " logged" in line):
-			lately.append(line)
-	if not lately.is_empty():
-		parts.append("Here lately: %s" % " ".join(lately.slice(-2)))
-	return " ".join(parts)
+	var brief := place_brief(World.zone.name if World.zone != null else "", false)
+	if not bool(brief["real"]):
+		return "%s %s" % [brief["text"], PLACE_LITTLE]
+	return "%s %s %s" % [brief["text"], brief["ask"], PLACE_LEAD]
+
+
+## The one real thing of [param zone_name] for her to speak of (803 amended (6),
+## the coordinator after pair 7), {text, real, kind}: what she and her player
+## did there (her card's newest fact with that zone), else a named spot or
+## building there (Holdings', not one the place is named for), else its
+## weightiest agreed lore fact (never a kept secret). text: where she is
+## ([param new_today]: not been before today) and that thing; ask, the direct
+## question on it (PLACE_ASK); real false, and kind and ask "", with none.
+func place_brief(zone_name: String, new_today := false) -> Dictionary:
+	var name := place_name(zone_name) if not zone_name.is_empty() else ""
+	if name.begins_with("The "):
+		name = "the " + name.substr(4)  # "You are in the Barrow", mid-sentence.
+	var head := "You are in %s%s." % [name, ", where you have not been before today" if new_today else ""]
+	if zone_name.is_empty():
+		return {"text": head, "real": false, "kind": "", "ask": ""}
+	for i in range(grown.facts.size() - 1, -1, -1):
+		var entry: Dictionary = grown.facts[i]
+		if str(entry.get("zone", "")) == zone_name:
+			return {"text": "%s Something that happened here: %s" % [head, str(entry["text"])], "real": true, "kind": "done", "ask": PLACE_ASK["done"]}
+	var bare := func(words: String) -> String: return words.to_lower().trim_prefix("the ").strip_edges()
+	var named := ""
+	if World.holdings != null:
+		for id: String in World.holdings.places_in(zone_name):
+			var shown := str(World.holdings.place(id).get("name", ""))
+			if not shown.is_empty() and not bare.call(shown) in bare.call(name) and not bare.call(name) in bare.call(shown):
+				named = shown
+				break
+	if named.is_empty():
+		for building: Dictionary in _zone_buildings.get(zone_name, {}).values():
+			var word := str(BUILDING_WORDS.get(str(building.get("slot", "")), building.get("kind", "")))
+			if not word.is_empty():
+				named = word
+				break
+	if not named.is_empty():
+		return {"text": "%s There is %s here." % [head, named], "real": true, "kind": "named",
+			"ask": PLACE_ASK["named"] % ("the " + named.substr(2) if named.begins_with("a ") else named)}  # "a shed" asked as "the shed".
+	var knower := _name_of(self).to_lower() if Lore.knowers().has(_name_of(self).to_lower()) else "townsfolk"
+	# Never a place's bare name (its ".name" fact, "...locals call it the Mughouse"): the
+	# model would not say a name it was handed (voice9, twice), and the name is the head's;
+	# a thing she can see there instead (the coordinator: the hearth, the sign, the lamp).
+	var facts := Lore.known_by(knower, PackedStringArray([zone_name, name]), "agreed").filter(
+		func(fact: Dictionary) -> bool: return not str(fact.get("id", "")).ends_with(".name") and (not bool(fact.get("secret", false)) or not bool(fact.get("kept", false))))
+	if not facts.is_empty():
+		facts.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["weight"]) > float(y["weight"]))
+		var text := str(facts[0]["text"]).strip_edges()
+		if bool(facts[0].get("hearsay", false)):
+			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
+		return {"text": "%s One thing you know of it: %s" % [head, text], "real": true, "kind": "lore", "ask": PLACE_ASK["lore"]}
+	return {"text": head, "real": false, "kind": "", "ask": ""}
 
 
 static func asks_about_surroundings(heard: String) -> bool:
@@ -5013,7 +5065,8 @@ func _take_result(result: Dictionary) -> void:
 		entry["felt"] = hurt
 		felt.emit(hurt)  # Harsh words, or sorry for them (decision 621): Main's.
 	var asked: bool = result.get("asked", false)
-	if _phrase_serials.get(serial, false):
+	var was_phrase: bool = _phrase_serials.get(serial, false)
+	if was_phrase:
 		asked = false  # A quick phrase's stance is set already.
 	_phrase_serials.erase(serial)
 	var always: bool = spoken_to or result.get("always", false)
@@ -5069,19 +5122,24 @@ func _take_result(result: Dictionary) -> void:
 		_log(entry)
 		_reask_next = true
 		_quiet_focus = focus_told
-		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, false, true, report)
+		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, was_phrase, true, report)  # A phrase's stance kept.
 		_reask_next = false
 		_quiet_focus = ""
 		return
 	# A whole line said back is dropped as such; then what is left of it
 	# once cleaned (spoken) is what she says.
 	var echo := _echo_of(raw_line)
+	if spoken_to and second_try and echo == "her own line" and not _said.any(func(own: String) -> bool: return _plain(own) == _plain(raw_line)):
+		echo = ""  # Her player's question, asked again: a near-echo is let through, only a true repeat dropped (the coordinator).
 	# Her things may be spoken of when asked about, told of in a report, or
 	# given or fetched.
 	var items_told: bool = asks_about_items(str(result.get("heard", ""))) or report or chosen >= 0 and offered[chosen].has("item")
-	if echo == "her own line" and not second_try and not spoken_to:
+	if echo == "her own line" and not second_try:
 		# Her own line again, to something new (228 amended: three moments
-		# lost so at 21:56): asked once more, told not to say it.
+		# lost so at 21:56): asked once more, told not to say it. Her
+		# player's question too (voice7_hot2: "This place reeks of old bones
+		# and older secrets" after "This place reeks of old bones" left them
+		# unanswered).
 		entry["outcome"] = "asked again"
 		entry["say_dropped"] = raw_line
 		entry["note"] = "echoes her own line"
@@ -5089,7 +5147,7 @@ func _take_result(result: Dictionary) -> void:
 		_repeat_note = raw_line
 		_reask_next = true
 		_quiet_focus = focus_told
-		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, false, true, report)
+		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, was_phrase, true, report)  # A phrase's stance kept.
 		_reask_next = false
 		_quiet_focus = ""
 		return
@@ -5125,6 +5183,10 @@ func _take_result(result: Dictionary) -> void:
 		line = ""
 	_saying_voice = false
 	entry["say"] = line
+	if spoken_to and line.is_empty():
+		# Unsaid to her player (a true repeat, or nothing): her turn is "...", so the
+		# next moment does not answer their stale question (voice7_hot2's bond notice).
+		_add_turn("assistant", "...")
 	if we_should and not line.is_empty():
 		_we_should_tick = World.tick
 	if chosen >= 0:

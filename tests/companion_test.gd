@@ -80,6 +80,7 @@ func _ready() -> void:
 	_test_bubbles()
 	_test_spoken()
 	_test_spoken_polish()
+	_test_answer_echo()
 	_test_speaks_only_for_herself()
 	_test_claude_voice()
 	_test_knows_her_town()
@@ -203,8 +204,9 @@ func _test_phrase_stances() -> void:
 		_main._chat_tick.clear()
 		_main._on_command(owner, "say", {"text": Net.DEFAULT_PHRASES[slot - 1], "phrase": slot})
 		got.append(pet.stance_name())
+		# Asked once; once more when the scripted answer echoes her last (her player's words get that re-ask).
 		_check(pet.stance == want[slot] and not pet.standing_instruction().is_empty() and mind.stance_asks.is_empty()
-				and mind.voice_asks.size() == 1,
+				and mind.voice_asks.size() == (1 if slot == 1 else 2),
 				"%d %s: %s at once, standing as the instruction, no stance model; her voice asked" % [
 					slot, Net.DEFAULT_PHRASES[slot - 1], pet.stance_name()])
 	var entry: Dictionary = MindLog.last[Companion._name_of(pet)]
@@ -763,6 +765,57 @@ func _test_speaks_only_for_herself() -> void:
 	pet._last_speech_tick = -1000
 	pet._ask_voice("%s just spoke to you." % pet.keeper_name(), "%s just said to you: \"Shall we?\"" % pet.keeper_name())
 	_check(mind.voice_asks.size() == 2 and pet.said_lines().back() == "I'll follow.", "asked again only once: then only her own words are said (%s)" % pet.said_lines().back())
+	pet.mind = ScriptedMind.new()
+	_settle(pet)
+
+
+func _test_answer_echo() -> void:
+	print("
+== her player's question gets an answer: an echo asked again once, a near-echo said, only a true repeat unsaid and kept as \"...\" (the coordinator after voice7_hot2) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	_put(owner, Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	pet._said.clear()
+	pet._said.append("This place reeks of old bones.")
+	var mind := CountingMind.new()
+	pet.mind = mind
+	var asked := "%s just said to you: \"What do you think of this place?\"" % pet.keeper_name()
+	var trigger := "%s just spoke to you." % pet.keeper_name()
+	pet._last_speech_tick = -1000
+	mind.voice_answer = {"say": "This place reeks of old bones.", "stance": ""}
+	mind.next_voice_answers = [{"say": "The niche in that wall is new to me.", "stance": ""}]
+	pet._ask_voice(trigger, asked, true)
+	_check(mind.voice_asks.size() == 2 and pet.said_lines().back() == "The niche in that wall is new to me."
+			and "This place reeks of old bones" in str(mind.voice_asks[1]["system"]),
+		"her own line back to her player: asked once more, told not to say it, the second said (%s)" % [pet.said_lines().slice(-1)])
+	mind.voice_asks.clear()
+	pet._last_speech_tick = -1000
+	mind.voice_answer = {"say": "This place reeks of old bones and older secrets.", "stance": ""}
+	mind.next_voice_answers = [{"say": "This place reeks of old bones, and of robbers.", "stance": ""}]
+	pet._ask_voice(trigger, asked, true)
+	_check(mind.voice_asks.size() == 2 and pet.said_lines().back() == "This place reeks of old bones, and of robbers.",
+		"asked again, a near-echo: said, a question rarely met with silence (%s)" % [pet.said_lines().slice(-1)])
+	mind.voice_asks.clear()
+	pet._last_speech_tick = -1000
+	var lines_were := pet.said_lines().size()
+	mind.voice_answer = {"say": "This place reeks of old bones.", "stance": ""}
+	mind.next_voice_answers = [{"say": "This place reeks of old bones.", "stance": ""}]
+	pet._ask_voice(trigger, asked, true)
+	var last_turn: Dictionary = pet._exchange.back()
+	_check(mind.voice_asks.size() == 2 and pet.said_lines().size() == lines_were and last_turn["role"] == "assistant" and last_turn["text"] == "...",
+		"a true repeat twice: nothing said, her turn kept as \"...\" (%s)" % [last_turn])
+	# The stale question (voice7_hot2): the bond notice after that dropped reply is its own moment.
+	pet._add_turn("user", "What do you think of this place?")
+	pet._ask_voice(trigger, asked, true)
+	pet._quiet_focus = "You and %s have just grown closer; you are close to %s now. %s" % [pet.keeper_name(), pet.keeper_name(), Companion.NOTICE_BOND_LEAD]
+	var notice := pet.voice_messages(false, "")
+	var final_turn := str(notice.back()["content"])
+	_check(notice[notice.size() - 2]["role"] == "assistant" and notice[notice.size() - 2]["content"] == "..."
+			and final_turn.begins_with("[A moment passes. You and") and not "What do you think of this place" in final_turn,
+		"then the bond notice: its own moment after her \"...\", not tacked onto the stale question (%s)" % final_turn.left(90))
 	pet.mind = ScriptedMind.new()
 	_settle(pet)
 
@@ -3582,11 +3635,11 @@ func _test_quiet_moment() -> void:
 	_check(not far.is_empty() and not sights.is_empty(),
 			"a thing %s paces off is in sight for a quiet moment (%s; %s)" % [far.map(func(t: Dictionary) -> int: return t["paces"]),
 			far.map(func(t: Dictionary) -> String: return t["kind"]), sights.slice(0, 1)])
-	# Pair 3: asked of the place, she is told its name and what she sees out to 6 paces.
+	# Pair 3: asked of the place, she is told its name (803 amended (6): and one real thing, not the sights).
 	var place_ask := Companion.render(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()))
 	var plain_ask := Companion.render(pet.voice_messages(true, "%s: You all right?" % pet.keeper_name()))
-	_check("You are in " in place_ask and "From here you can see: fire" in place_ask and not "From here you can see:" in plain_ask,
-			"\"What do you think of this place?\": its name and what she sees there; \"You all right?\": not")
+	_check("You are in " in place_ask and (Companion.PLACE_LEAD in place_ask or Companion.PLACE_LITTLE in place_ask) and not "You are in " in plain_ask,
+			"\"What do you think of this place?\": its name and one thing, or that she knows little; \"You all right?\": not")
 	# Pair 3: her waking is hers ("You slept like the dead", said to her player, after she slept).
 	var woke: Array[String] = []
 	for i in 20:
@@ -3597,8 +3650,8 @@ func _test_quiet_moment() -> void:
 			woke.append(str(focus["words"]))
 	_check(not woke.is_empty() and "You are the one who slept" in woke[0] and pet._woke_words.is_empty(),
 			"after she sleeps, a quiet moment may speak of it, saying she slept, once (%s)" % [woke.slice(0, 1)])
-	_check(str(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()).back()["content"]).contains("From here you can see:"),
-			"what she sees of the place is in the last turn, after the question (pair 5)")
+	_check(str(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()).back()["content"]).contains("You are in "),
+			"the place is in the last turn, after the question (pair 5)")
 	# Pair 5: her own line back is asked again, and the retry keeps the focus.
 	mind.voice_asks.clear()
 	mind.voice_answer = {"say": "That fire smells of pine.", "stance": ""}
@@ -3620,6 +3673,55 @@ func _test_quiet_moment() -> void:
 			and not Companion.QUIET_LEAD in ask_text, "an ask focus: she wants to ask, and is told to ask it as a question (%s)" % ask_text)
 	_check(Companion.focus_text({"key": "sight", "words": "a cart."}) == "You notice a cart. " + Companion.QUIET_LEAD, "a sight as before")
 	_check(not "door" in pet.place_words_now(), "no door in what she sees of a place (%s)" % pet.place_words_now())
+	# 803 amended (6): a place from what is really there and what happened there; nothing real, no mood.
+	var facts_were: Array[Dictionary] = pet.grown.facts.duplicate(true)
+	var nowhere: Dictionary = pet.place_brief("no_such_zone")
+	_check(not bool(nowhere["real"]) and not "happened here" in str(nowhere["text"]), "a place with nothing of it known: nothing real (%s)" % nowhere["text"])
+	# No fact of hers here: a named spot, never the one the place is named for (pair 7's "the Mughouse" in the Mughouse).
+	var zone_place := "%s/test_named" % World.zone.name
+	var spot_place := "%s/test_well" % World.zone.name
+	World.holdings._places[zone_place] = {"id": zone_place, "area": World.zone.name, "key": "test_named", "cell": Vector2i(1, 1),
+		"name": "the %s" % Companion.place_name(World.zone.name), "kind": "camp", "radius": 1, "worth": 1, "start": "nobody", "town": ""}
+	var only_zone: Dictionary = pet.place_brief(World.zone.name)
+	World.holdings._places[spot_place] = {"id": spot_place, "area": World.zone.name, "key": "test_well", "cell": Vector2i(2, 2),
+		"name": "the old well", "kind": "camp", "radius": 1, "worth": 1, "start": "nobody", "town": ""}
+	var with_spot: Dictionary = pet.place_brief(World.zone.name)
+	World.holdings._places.erase(zone_place)
+	World.holdings._places.erase(spot_place)
+	_check(not "There is the %s" % Companion.place_name(World.zone.name) in str(only_zone["text"]) and with_spot["kind"] == "named"
+			and str(with_spot["text"]).ends_with("There is the old well here.") and with_spot["ask"] == "What do you make of the old well?",
+		"a named spot, not the place's own name, and asked of by name (%s; %s; %s)" % [only_zone["text"], with_spot["text"], with_spot["ask"]])
+	_check(str(nowhere["ask"]).is_empty() and (Companion.PLACE_LITTLE in pet.place_words_now()) == (not bool(pet.place_brief(World.zone.name)["real"])),
+		"nothing real: no question, PLACE_LITTLE")
+	# Never the place's bare name for its one thing (voice9: "the Mughouse", handed twice, never said).
+	var tavern: Dictionary = pet.place_brief("umbrage_tavern")
+	_check(bool(tavern["real"]) and not "locals call it" in str(tavern["text"]) and str(tavern["text"]).begins_with("You are in the Last Light Mughouse.")
+			and (tavern["kind"] != "lore" or ["hearth", "sign", "lamp"].any(func(word: String) -> bool: return word in str(tavern["text"]))),
+		"the Mughouse: its name the head's, and a thing to see there, not its .name fact (%s)" % tavern["text"])
+	var before_brief: Dictionary = pet.place_brief(World.zone.name)
+	pet.note_fact("%s and %s opened a sealed tomb together." % [Companion._name_of(pet), pet.keeper_name()])
+	var here_brief: Dictionary = pet.place_brief(World.zone.name)
+	_check(bool(here_brief["real"]) and here_brief["kind"] == "done"
+			and str(here_brief["text"]).ends_with("Something that happened here: %s and %s opened a sealed tomb together." % [Companion._name_of(pet), pet.keeper_name()]),
+		"what they did here comes first, the one thing she is given (%s; before it, %s)" % [here_brief["text"], before_brief["text"]])
+	_check(str(pet.grown.facts.back().get("zone", "")) == World.zone.name, "a new fact keeps where it happened")
+	var asked_place := str(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()).back()["content"])
+	_check("Something that happened here:" in asked_place and asked_place.ends_with("%s %s]" % [Companion.PLACE_ASK["done"], Companion.PLACE_LEAD]),
+		"asked of the place: that one thing, a question on it and its lead, last in the last turn")
+	pet._zone_new_today = true
+	var place_focus := ""
+	for i in 30:
+		pet._quiet_last_focus = ""
+		var focus := pet._quiet_pick_focus()
+		if focus.get("key") == "place":
+			place_focus = Companion.focus_text(focus)
+			break
+		pet._zone_new_today = true
+	_check("where you have not been before today" in place_focus and "Something that happened here:" in place_focus
+			and place_focus.ends_with("%s %s" % [Companion.PLACE_ASK["done"], Companion.PLACE_LEAD]),
+		"new here today, unasked: the same brief and lead (%s)" % place_focus)
+	pet.grown.facts = facts_were
+	pet._zone_new_today = false
 	# Pair 3: "and {she} knew the way out", not "her knew".
 	var met := CompanionCard.met({"pronoun": "she", "how_we_met": "{player} was lost in a forest and {she} knew the way out"}, "her player")
 	var found_her := CompanionCard.met({"pronoun": "she", "how_we_met": "{player} found {pronoun} hiding in a ruined mill"}, "her player")

@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- Come somewhere new with your companion and listen: she speaks of something really there, or of what the two of you did there, where before she said how quiet it was; ask what she thinks of a place and she does the same (803 amended (6)).
+- Ask your companion something just after she's spoken and she answers you, where before an answer too like what she'd just said was dropped and you heard nothing (228 amended (3)).
 - The white outline on the foe a click would strike now hugs its body at any camera height, where before the low camera drew it as a shifted double (Jeff's playtest).
 - The great axe hits harder than a sword now and swings sooner, and a light blow no longer spoils its wind-up: you take the hurt and the swing still lands (392 amended (5)).
 - In the crypt, a grave robber facing you marks a short line on the ground before he lunges along it: step aside and he misses, open to you for a moment, or take it on a raised shield (790 amended (4)).
