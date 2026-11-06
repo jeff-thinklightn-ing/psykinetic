@@ -95,6 +95,7 @@ func _ready() -> void:
 	_test_bond()
 	_test_needs()
 	_test_wants()
+	_test_talk_rate()
 	_test_deeds()
 	_test_game_and_watch()
 	_test_sickness()
@@ -1638,6 +1639,74 @@ func _test_wants() -> void:
 	_main._set_mood(record)
 	pet.want_words = ""
 	pet.want_glad = ""
+
+
+func _test_talk_rate() -> void:
+	print("\n== her talk follows her player's answers: chattier answered, slowly quieter not, set by a word (803 amended (5)) ==")
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	for key: String in ["talk_rate", "bond_today", "needs_today"]:
+		record.companion.erase(key)
+	_main._set_mood(record)
+	_check(record.companion.get("talk_rate") is Dictionary and is_same(pet.talk_rate, record.companion["talk_rate"]) and is_equal_approx(pet.talk_m(), 1.0),
+		"her talk starts at today's gap, kept on her record")
+	_check(Companion.talk_told("Could you talk less?") == "less" and Companion.talk_told("Hush now.") == "less"
+		and Companion.talk_told("Talk more, I like it.") == "more" and Companion.talk_told("What a quiet place.") == ""
+		and Companion.talk_told("Tell me more about it.") == "" and Companion.talk_told("A hushed wood.") == ""
+		and Companion.talk_told("It's quieter here.") == "" and Companion.talk_told("Oh, shut up.") == "less"
+		and Companion.talk_told("Keep talking.") == "more", "talk less and talk more are read, nothing else")
+	Companion.talk_counts.clear()
+	Companion.talk_moves.clear()
+	# A quiet moment's line answered by a word.
+	pet._reply_quiet = {"tick": World.tick, "cell": World.NO_CELL, "likes": false}
+	pet._await_reply()
+	_check(not pet._reply_wait.is_empty() and pet._reply_wait["quiet"], "her line, heard, waits on an answer")
+	pet._reply_came("said")
+	var today: Dictionary = record.companion.get("bond_today", {})
+	_check(is_equal_approx(pet.talk_m(), 0.95) and pet._reply_wait.is_empty() and "answered" in today.get("deeds", []),
+		"answered: a little chattier, and a quiet line answered is a deed of hers (%s, %s)" % [pet.talk_m(), today])
+	# Unanswered.
+	pet._await_reply()
+	pet._reply_wait["tick"] = World.tick - 31 * World.TICK_RATE
+	pet._tend_reply()
+	_check(is_equal_approx(pet.talk_m(), 0.97) and pet._reply_wait.is_empty(), "no answer in 30 s: slowly quieter (%s)" % pet.talk_m())
+	# An act: coming to what she spoke of seeing.
+	pet._reply_quiet = {"tick": World.tick, "cell": pet.keeper.tile, "likes": false}
+	pet._await_reply()
+	pet._reply_wait["tick"] = World.tick - 2 * World.TICK_RATE
+	pet._tend_reply()
+	_check(is_equal_approx(pet.talk_m(), 0.92), "going to what she spoke of seeing answers it (%s)" % pet.talk_m())
+	# A gift after she spoke of what she likes.
+	pet._reply_quiet = {"tick": World.tick, "cell": World.NO_CELL, "likes": true}
+	pet._await_reply()
+	pet.answered_by_gift()
+	_check(is_equal_approx(pet.talk_m(), 0.87), "a gift after she spoke of what she likes answers it (%s)" % pet.talk_m())
+	pet.answered_by_gift()
+	_check(is_equal_approx(pet.talk_m(), 0.87), "once a line")
+	for i in 20:
+		pet._await_reply()
+		pet._reply_came("said")
+	_check(is_equal_approx(pet.talk_m(), 0.6), "never chattier than lo (%s)" % pet.talk_m())
+	var line := Companion.talk_report()
+	_check(line.begins_with("; talk: answered 23 of 24 (said 21, did 2), unanswered 1, gap x median") and line.contains("range 0.60-0.97")
+		and line.ends_with("set less 0 more 0") and Companion.talk_counts.is_empty(), "the [voice] line counts it, no words, no names (%s)" % line)
+	# Talk less: rarer, held near it; her answer told to take it well.
+	pet.owner_spoke("Talk less, please.")
+	_check(is_equal_approx(pet.talk_m(), 1.6) and is_equal_approx(float(pet.talk_rate["lo"]), 1.3) and is_equal_approx(float(pet.talk_rate["hi"]), 1.9)
+		and pet._quiet_focus == "", "talk less: her gap half again longer, held there (%s)" % [pet.talk_rate])
+	for i in 20:
+		pet._await_reply()
+		pet._reply_came("said")
+	_check(is_equal_approx(pet.talk_m(), 1.3), "answered after, chattier only to the band's edge (%s)" % pet.talk_m())
+	_check(Companion.TALK_LESS_ACK.contains("in good spirit") and Companion.TALK_LESS_ACK.contains("something worth saying") and Companion.talk_report().contains("set less 1"), "and she is told to take it in good spirit")
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(is_equal_approx(float(saved.companion.get("talk_rate", {}).get("m", 0.0)), 1.3) and is_equal_approx(float(saved.companion["talk_rate"]["base"]), 1.6),
+		"her talk is saved with her record, so it survives a rejoin")
+	record.companion.erase("talk_rate")
+	_main._set_mood(record)
+	Companion.talk_counts.clear()
+	Companion.talk_moves.clear()
 
 
 func _test_deeds() -> void:

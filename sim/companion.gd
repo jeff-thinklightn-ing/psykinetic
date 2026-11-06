@@ -366,7 +366,7 @@ const QUIET_WANT_LEAD := "If you speak now, say so, in your own words."
 ## Closes an "ask" focus in place of QUIET_LEAD (803 amended (3)): told "You
 ## have a question for her player", she never asked one (pairs 5 and 6, 0 of 4).
 const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
-const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s": 600, "per_hour": 12,
+const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s": 1200, "per_hour": 12,
 	"new_place_s": [20, 40], "player_quiet_s": 30,
 	"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1}}
 ## Who her player's words were for, as the server knows it (addressed):
@@ -522,6 +522,18 @@ var want_words := "":
 		want_words = value
 var want_glad := ""
 var _want_told := false
+## Her talk with her player (803 amended (5)), her record's "talk" itself
+## (Main's, shared): {m, base, lo, hi}; m times her quiet gap.
+var talk_rate: Dictionary = {}
+## A line of hers waiting on her player's answer: {tick, cell (what she spoke
+## of seeing, NO_CELL none), likes (she spoke of what she likes), quiet (a
+## quiet moment's)}; {} none. The quiet moment just asked: what it offered.
+var _reply_wait: Dictionary = {}
+var _reply_quiet := {}
+## Her player told her to talk less (803 amended (5)): her answer says so (voice's words).
+const TALK_LESS_ACK := "%s has asked you to talk less. Say you will, in your own words and in good spirit; you don't mind, and you'll still speak when there's something worth saying."
+const TALK_LESS := ["talk less", "less talk", "less talking", "less chatter", "enough talk", "stop talking", "shut up", "hush", "shush", "quiet down", "be quiet"]
+const TALK_MORE := ["talk more", "talk to me more", "keep talking", "speak more", "say more", "chat more", "chat with me"]
 ## Her superstition (442's leaning, Main's at her join): at grave_superstition
 ## or more she won't carry grave goods below close (555).
 var superstition := 5
@@ -646,6 +658,10 @@ static var capsule_style := false
 ## scripted mind's "Hm?" (tests add their own).
 static var quiet_minds: Array[String] = ["ollama", "claude"]
 static var voice_counts: Dictionary[String, int] = {}
+## Her talk's answers counted for the "[voice]" line (803 amended (5)):
+## answered (said, did), unanswered, set less / more; and m after each move.
+static var talk_counts: Dictionary[String, int] = {}
+static var talk_moves: Array[float] = []
 static var voice_latencies: Array[int] = []
 static var voice_prompt_tokens: Array[int] = []
 ## How things stood last tick (_situation_now), to see what changed.
@@ -1228,6 +1244,11 @@ func owner_spoke(text: String, phrase := 0) -> void:
 	_talked("%s: %s" % [keeper_name(), text])
 	var meaning := meaning_of(text, keeper_name())
 	var heard := meaning if not meaning.is_empty() else "%s just said to you: \"%s\"" % [keeper_name(), text]
+	var told := talk_told(text)
+	if not told.is_empty():
+		_talk_set(told)
+	elif addressed_to(heard) != "other":
+		_reply_came("said")
 	if meaning.is_empty():
 		_add_turn("user", text)
 	else:
@@ -1256,7 +1277,121 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		_instruction_stance = STANCE_NAMES[wanted]
 		_log({"kind": "stance", "companion": _name_of(self), "mind": "phrase", "trigger": "quick phrase %d: %s" % [phrase, text],
 			"stance": STANCE_NAMES[wanted], "outcome": "applied", "note": "a quick phrase: its stance at once, standing as the instruction"})
+	if told == "less":
+		_quiet_focus = TALK_LESS_ACK % keeper_name()
 	_ask_voice("%s just spoke to you." % keeper_name(), heard, false, PHRASE_STANCES.has(phrase))
+	_quiet_focus = ""
+
+
+## Her talk's rules (803 amended (5)): quiet_rules' "talk".
+static func talk_rules() -> Dictionary:
+	var rules: Variant = quiet_rules().get("talk", {})
+	return rules if rules is Dictionary else {}
+
+
+## A new talk record: m and base at start, the full range.
+static func talk_start() -> Dictionary:
+	var rules := talk_rules()
+	return {"m": float(rules.get("start", 1.0)), "base": float(rules.get("start", 1.0)),
+		"lo": float(rules.get("lo", 0.6)), "hi": float(rules.get("hi", 2.0))}
+
+
+## Her quiet gap's multiplier now (1 with no talk record).
+func talk_m() -> float:
+	return float(talk_rate.get("m", 1.0))
+
+
+## "less" or "more" when her player's [param text] tells her to talk less
+## or more, "" when not.
+static func talk_told(text: String) -> String:
+	var said := " " + text.to_lower().strip_edges() + " "
+	for words: String in TALK_LESS:
+		if RegEx.create_from_string("\\b%s\\b" % words).search(said) != null:
+			return "less"
+	for words: String in TALK_MORE:
+		if RegEx.create_from_string("\\b%s\\b" % words).search(said) != null:
+			return "more"
+	return ""
+
+
+## Her player's word sets her talk (803 amended (5)): m and base to the
+## rules' less or more, held within band of it from now on.
+func _talk_set(told: String) -> void:
+	var rules := talk_rules()
+	var base := float(rules.get(told, 1.0))
+	var band := float(rules.get("band", 0.3))
+	talk_rate["base"] = base
+	talk_rate["m"] = base
+	talk_rate["lo"] = maxf(base - band, float(rules.get("lo", 0.6)))
+	talk_rate["hi"] = minf(base + band, float(rules.get("hi", 2.0)))
+	talk_counts[told] = int(talk_counts.get(told, 0)) + 1
+	talk_moves.append(base)
+	_reply_wait = {}
+
+
+## A line of hers just said: it waits on her player's answer, if they heard it.
+func _await_reply() -> void:
+	_reply_wait = {}
+	if not _alive(keeper) or World.is_downed(keeper) or keeper.zone != zone or World.distance(tile, keeper.tile) > HEARING_RANGE:
+		return  # Unheard: counts neither way.
+	var quiet_now := not _reply_quiet.is_empty() and World.tick - int(_reply_quiet["tick"]) <= 15 * World.TICK_RATE
+	_reply_wait = {"tick": World.tick, "cell": _reply_quiet.get("cell", World.NO_CELL) if quiet_now else World.NO_CELL,
+		"likes": quiet_now and _reply_quiet.get("likes", false), "quiet": quiet_now}
+	_reply_quiet = {}
+
+
+## Her player answered the line waiting ([param how] "said" or "did"): m
+## eases toward chattier; a quiet moment's line answered is a deed (a bond
+## and company gain, once a day: Main's tables).
+func _reply_came(how: String) -> void:
+	if _reply_wait.is_empty():
+		return
+	var rules := talk_rules()
+	var limit := int(rules.get("act_s" if how == "did" else "answer_s", 30)) * World.TICK_RATE
+	if World.tick - int(_reply_wait["tick"]) > limit:
+		return
+	var quiet_line: bool = _reply_wait.get("quiet", false)
+	_reply_wait = {}
+	_talk_move(float(rules.get("answered", -0.05)))
+	talk_counts["answered"] = int(talk_counts.get("answered", 0)) + 1
+	talk_counts[how] = int(talk_counts.get(how, 0)) + 1
+	if quiet_line:
+		deed.emit("answered", "talked with you")
+
+
+## A gift from her player (Main's): an answer if she spoke of what she likes.
+func answered_by_gift() -> void:
+	if _reply_wait.get("likes", false):
+		_reply_came("did")
+
+
+## Each tick: an act on what she spoke of seeing answers it; past its time
+## with none, the line goes unanswered (m eases toward quieter), unless her
+## player has gone out of hearing.
+func _tend_reply() -> void:
+	if _reply_wait.is_empty():
+		return
+	var rules := talk_rules()
+	var cell: Vector2i = _reply_wait.get("cell", World.NO_CELL)
+	if cell != World.NO_CELL and _alive(keeper) and World.distance(keeper.tile, cell) <= int(rules.get("act_cells", 2)) \
+			and World.tick - int(_reply_wait["tick"]) > World.TICK_RATE:
+		_reply_came("did")
+		return
+	var wait := int(rules.get("act_s" if cell != World.NO_CELL or _reply_wait.get("likes", false) else "answer_s", 30)) * World.TICK_RATE
+	if World.tick - int(_reply_wait["tick"]) <= wait:
+		return
+	_reply_wait = {}
+	if not _alive(keeper) or keeper.zone != zone or World.distance(tile, keeper.tile) > HEARING_RANGE:
+		return  # Gone out of hearing: counts neither way.
+	_talk_move(float(rules.get("unanswered", 0.02)))
+	talk_counts["unanswered"] = int(talk_counts.get("unanswered", 0)) + 1
+
+
+func _talk_move(by: float) -> void:
+	if talk_rate.is_empty():
+		talk_rate.merge(talk_start())
+	talk_rate["m"] = clampf(snappedf(talk_m() + by, 0.001), float(talk_rate.get("lo", 0.6)), float(talk_rate.get("hi", 2.0)))
+	talk_moves.append(talk_m())
 
 
 ## The plain order in her player's [param text] (decision 616), read with
@@ -2339,6 +2474,7 @@ func _watch() -> void:
 			waiting.get("own", true), waiting.get("report", false))
 	elif not fight:
 		_quiet_moment()
+	_tend_reply()
 
 
 ## Decision 803 amended (step 4): companion_traits.json "quiet" over
@@ -2403,8 +2539,9 @@ func _quiet_moment() -> void:
 		_quiet_next_tick = World.tick + 30 * World.TICK_RATE  # Nothing with a detail to it: look again in a while.
 		return
 	_quiet_ticks.append(World.tick)
-	_quiet_next_tick = World.tick + _quiet_gap("gap_s") * _quiet_backoff
+	_quiet_next_tick = World.tick + int(_quiet_gap("gap_s") * _quiet_backoff * talk_m())
 	_quiet_last_focus = focus["key"]
+	_reply_quiet = {"tick": World.tick, "cell": focus.get("at", World.NO_CELL), "likes": focus["key"] == "likes"}
 	_quiet_focus = focus_text(focus)
 	_ask_voice("%s: %s" % [QUIET_TRIGGER, focus["key"]])
 	_quiet_focus = ""  # Told on that ask, or not asked at all: never carried to another.
@@ -2489,7 +2626,7 @@ func _quiet_pick_focus() -> Dictionary:
 		var where := "where you stand" if paces == 0 else "%s %s" % [distance_words(paces), _direction(thing["point"])]
 		var relations: Array[String] = thing["relations"]
 		seen_words = "%s, %s%s" % [thing["word"], where, " (" + ", ".join(relations) + ")" if not relations.is_empty() else ""]
-		options.append({"key": "sight", "words": seen_words + ".", "kind": kind})
+		options.append({"key": "sight", "words": seen_words + ".", "kind": kind, "at": thing["at"]})
 		break
 	var lately := _lately()
 	# A coming or going ("joined", "left") has nothing in it to speak of (pair 2).
@@ -4490,7 +4627,9 @@ func _say(line: String, always: bool) -> bool:
 	_last_speech_tick = World.tick
 	if not _saying_voice:
 		voice_counts["fixed"] = int(voice_counts.get("fixed", 0)) + 1  # 803: a line not of her voice's making.
-	_quiet_next_tick = World.tick + _quiet_gap("gap_s") * _quiet_backoff  # Any line of hers puts the next quiet moment off.
+	_quiet_next_tick = World.tick + int(_quiet_gap("gap_s") * _quiet_backoff * talk_m())  # Any line of hers puts the next quiet moment off.
+	if _saying_voice:
+		_await_reply()
 	_around_said = surroundings_keys()
 	remember_said(line)
 	_add_turn("assistant", line)
@@ -5547,6 +5686,26 @@ func _count_voice(entry: Dictionary) -> void:
 			voice_prompt_tokens.append(int(entry["prompt_tokens"]))
 
 
+## The "[voice]" line's talk part since the last (803 amended (5)), counts
+## only, "" with none: "; talk: answered 3 of 5 (said 2, did 1), unanswered
+## 2, gap x median 0.85, range 0.70-1.20, set less 0 more 1". Counts start again.
+static func talk_report() -> String:
+	if talk_counts.is_empty() and talk_moves.is_empty():
+		return ""
+	var answered := int(talk_counts.get("answered", 0))
+	var unanswered := int(talk_counts.get("unanswered", 0))
+	var part := "; talk: answered %d of %d (said %d, did %d), unanswered %d" % [answered, answered + unanswered,
+		int(talk_counts.get("said", 0)), int(talk_counts.get("did", 0)), unanswered]
+	if not talk_moves.is_empty():
+		var sorted := talk_moves.duplicate()
+		sorted.sort()
+		part += ", gap x median %.2f, range %.2f-%.2f" % [sorted[sorted.size() / 2], sorted[0], sorted[-1]]
+	part += ", set less %d more %d" % [int(talk_counts.get("less", 0)), int(talk_counts.get("more", 0))]
+	talk_counts.clear()
+	talk_moves.clear()
+	return part
+
+
 ## The journal's "[voice]" line for the counts since the last (decision
 ## 803), "" when there were none; the counts start again. Every companion's
 ## together: "[voice] 10 min: said 4, silent 1, filtered 2, ...; latency
@@ -5563,6 +5722,7 @@ static func voice_report(minutes: int) -> String:
 		line += "; latency median %d ms, worst %d" % [_median(voice_latencies), voice_latencies.max()]
 	if not voice_prompt_tokens.is_empty():
 		line += "; prompt tokens median %d, worst %d of %d" % [_median(voice_prompt_tokens), voice_prompt_tokens.max(), OllamaMind.NUM_CTX]
+	line += talk_report()
 	voice_counts.clear()
 	voice_latencies.clear()
 	voice_prompt_tokens.clear()

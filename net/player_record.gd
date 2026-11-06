@@ -331,6 +331,11 @@ static func companion_from(pet: Variant) -> Dictionary:
 		for key: Variant in wants_met:
 			kept_met[str(key)] = int(wants_met[key])
 		out["wants_met"] = kept_met
+	# Her talk with her player (803 amended (5)): m, base and its range.
+	var rate: Variant = pet.get("talk_rate")
+	if rate is Dictionary:
+		out["talk_rate"] = {"m": float(rate.get("m", 1.0)), "base": float(rate.get("base", 1.0)), "lo": float(rate.get("lo", 0.6)),
+			"hi": float(rate.get("hi", 2.0))}
 	if pet.get("want_rest") is float or pet.get("want_rest") is int:
 		out["want_rest"] = int(pet["want_rest"])
 	var games: Variant = pet.get("games")

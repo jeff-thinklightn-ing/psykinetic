@@ -87,7 +87,10 @@
 		"_note": "Her quiet moments (decision 803 amended, step 4): calm, her player near and not speaking for player_quiet_s, she is asked now and then with one thing to speak of, and may answer nothing. first_s after she comes, gap_s after any line of hers (doubled after each moment she lets pass, up to max_gap_s), new_place_s when a zone is new today, at most per_hour. focus_weights: what a moment offers, by weight, never the same twice running: sight (something she sees, not yet told of today), today (what happened lately), likes (her hobby or food), ask (a question for her player), place (where she is and the sky; least, as weather talk reads as filler). Seconds. Drafts for Jeff.",
 		"first_s": [60, 120],
 		"gap_s": [150, 300],
-		"max_gap_s": 600,
+		"max_gap_s": 1200,
+		"talk": {"_note": "Her talk follows her player's answers (803 amended (5), Jeff's balance): m times gap_s, 1 at first, lo..hi. Each line of hers her player hears waits answer_s for a word to her (not to another), or act_s for an act on it (coming within act_cells of what she spoke of seeing; a gift after she spoke of what she likes): answered, m less by answered (chattier); none, m more by unanswered (slowly quieter). Unheard lines count neither way. 'Talk less' sets m and base to less, 'talk more' to more, and holds m within band of it. Never cold: nothing of it reaches her voice. Drafts for Jeff.",
+			"start": 1.0, "lo": 0.6, "hi": 2.0, "answered": -0.05, "unanswered": 0.02, "answer_s": 30, "act_s": 60, "act_cells": 2,
+			"less": 1.6, "more": 0.7, "band": 0.3},
 		"per_hour": 12,
 		"new_place_s": [20, 40],
 		"player_quiet_s": 30,
@@ -122,7 +125,8 @@
 			"fought": {"adventure": 0.1},
 			"cleared": {"adventure": 0.2},
 			"new_zone": {"adventure": 0.1, "wonder": 0.1},
-			"blessed": {"faith": 0.2}
+			"blessed": {"faith": 0.2},
+			"answered": {"company": 0.05}
 		}
 	},
 	"wants": {
@@ -144,7 +148,7 @@
 		"deeds": {"gift": "warmth", "fed": "warmth", "day": "warmth", "bandaged": "warmth",
 			"road": "warmth", "fire": "warmth", "leisure": "warmth", "game": "warmth",
 			"tended": "trust", "stood_by": "trust", "cleared": "trust", "earned": "trust", "fought": "trust", "watched": "trust",
-			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust"},
+			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust", "answered": "warmth"},
 		"drops": {"kept_from": -1, "left_alone": -1, "let_bleed": -2, "grave": -1, "warned": -1, "harsh": -1, "mule": -1, "pressed": -1},
 		"harsh_a_day": 2,
 		"game": {"fire_cells": 2, "round_ticks": 60, "best_of": 3, "rounds_most": 9},

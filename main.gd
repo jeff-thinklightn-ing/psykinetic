@@ -12371,6 +12371,9 @@ func _set_mood(record: PlayerRecord) -> void:
 		pet.bond_why = mood_why_of(record.companion, record.player_id, "you")
 		pet.bond_bar = bond_bar_of(record.companion, record.player_id)
 		pet.needs = Companion.needs_of(record.companion)
+		if not record.companion.get("talk_rate") is Dictionary:
+			record.companion["talk_rate"] = Companion.talk_start()
+		pet.talk_rate = record.companion["talk_rate"]  # Shared: her moves are her record's (803 amended (5)).
 		var want: Variant = record.companion.get("want")
 		pet.want_words = Companion.want_said(str(want["key"]), "words", record.name) if want is Dictionary else ""
 	if record.companion.has("resident"):
@@ -15743,6 +15746,8 @@ func _card_kept(entity: GridEntity, uid: int, kept: bool) -> void:
 
 func _card_given(from: GridEntity, to: GridEntity, uid: int) -> void:
 	var id := World.items.id_of(uid)
+	if to is Companion and from == (to as Companion).keeper:
+		(to as Companion).answered_by_gift()  # After she spoke of what she likes, an answer (803 amended (5)).
 	var named := World.item_title(uid).get_slice(" (", 0)
 	if str(Items.def(id).get("use", "")) == "eat":
 		# Food from her player moves her bond (444), though no card fact.
