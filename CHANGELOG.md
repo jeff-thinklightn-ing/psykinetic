@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.205
+
+- What goes over the network changes, so v0.1.204 and older can't join the server: update through the launcher first.
 - In the hills, a little north of the main road, a cave opens in the face of a grassy bank, sealed by a rockfall (798).
 - The felt hat, the hood and the soft boots look like themselves now, on the character sheet, in your pack, in hand and on the ground: a brimmed hat with a band, a green wool hood with a short cape, and leather boots with turned-down cuffs, where before each was a grey block (788).
 - Inventory: the character sheet shows a filled figure with a square where each thing is worn, hat, amulet, cloak, rings, charm and boots beside the hands and armour, and your load as two bars under its feet; your gold sits in the pack's title, and the pack and sheet no longer show the world through them (787 amended).
@@ -29,6 +32,7 @@ notes (decision 324).
 - Towns: once a town's inn stands, a taverner comes to keep it, and where there's no cook, the taverner takes the food you bring (812).
 - Towns: what you bring for a town goes into the hands of whoever uses it, the smith for ore, the cook for food, Rolf at the stall for gear, and the store's chest tells you who to take a thing to (802 amended (4)).
 - Towns: click a townsperson to talk, trade or give in one window; what you type goes to them, and Give hands them what they can use from your pack, toward a build or the town's stores and paid for now or owed, or gear to Rolf as a gift (802).
+
 ## v0.1.204
 
 - What goes over the network changes, so v0.1.203 and older can't join the server: update through the launcher first.
