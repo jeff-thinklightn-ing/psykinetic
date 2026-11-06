@@ -490,6 +490,17 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
+				},
+				{
+					"id": "old_wolf.hunter",
+					"text": "A hunter from the forest's camps went up into the foothills after the old grey, and never came back.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
 				}
 			]
 		},
