@@ -2698,6 +2698,7 @@
 			"category": "trees",
 			"type": "mesh",
 			"kind": "cell",
+			"footprint": [1, 1],
 			"size": [1.2, 3.2, 1.2],
 			"tolerance": 0.35,
 			"variants": 2,

@@ -128,6 +128,21 @@ const CAMPS: Array[Dictionary] = [
 ## Cells cleared round a camp's footprint, and the bandits' marker colours.
 const CAMP_MARGIN := 2
 const CAMP_LEGEND := {"monster_bandit": "#b4643c", "monster_bandit_brute": "#6e3218"}
+## The apex lairs' mouths here (780 amended (12), forest phase D; enemy-ai's
+## lair rule): each a link cell "at" into its own small level, sealed
+## ("closed") till enemy-ai's phase 2 brings its apex, "open" the side
+## toward the nearest path (10 cells off it, so the apex's roam crosses a
+## road now and then). Behind and beside the link the thicket: LAIR_MOUND
+## cells void (terrain's "thicket" mouth draws a bramble mound on them,
+## art-kit's wall.thicket; till then the wood's trees); in front a trampled
+## dirt pad LAIR_PAD rows deep, three wide, a few bones on it (the
+## coordinator: a sign of what lives there) and a tree scored by tusks
+## (tree.clawed, solid) at its side; the lair's "from_<lair>" spawn two
+## cells out.
+const LAIRS: Array[Dictionary] = [
+	{"to_map": "boar_lair", "at": Vector2i(122, 175), "open": Vector2i(1, 0), "mouth": "thicket", "closed": true}]
+const LAIR_MOUND := Vector2i(5, 2)
+const LAIR_PAD := 2
 const FOREST_PACK := "res://editor/forest_pack.gd"
 const TREES := "res://levels/forest/trees.json"
 
@@ -193,10 +208,12 @@ func _ready() -> void:
 	for key: Vector3i in hut_edges:
 		map.set_edge(key, hut_edges[key])
 	var camps := _camp_grounds()
+	_lair_grounds()
 	_trunks()
 	_places()
 	_camps(camps)
 	_links(east, north)
+	_lairs()
 	_close_pockets(east + Vector2i(-2, 0))
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
@@ -391,6 +408,11 @@ func _camps(camps: Array[Dictionary]) -> void:
 				stake -= side
 			config["places"][camp["key"] + "_captive"] = {"at": [stake.x, stake.y], "kind": "captive", "radius": 1, "name": "a captive"}
 			taken[stake] = true
+			# The post he is tied to (art-kit's prop.captive_post), a cell
+			# farther out, its front (+z) toward him (780 amended (12)).
+			var post := stake - side
+			decor.append([post.x, post.y, side.x, side.y, "captive_post", 1])
+			taken[post] = true
 		# The band round the fire: brutes first, at the back, then the rest.
 		var spots: Array[Vector2i] = [fire - facing, fire - side, fire - facing - side, fire + facing - side,
 			fire - facing + side, fire + facing, fire + facing + side, fire - side * 2]
@@ -438,6 +460,59 @@ func _links(east: Vector2i, north: Vector2i) -> void:
 		{"at": [north.x, north.y], "to_map": "stronghold", "to_spawn": "from_forest", "closed": true},
 	]
 	config["entities"] = []
+
+
+## Each lair's cells, by what they are: "mound" (the thicket behind and
+## beside the link, void), "pad" (trampled dirt before it), "tree" (the
+## clawed tree's cell, at the pad's side).
+static func lair_cells(lair: Dictionary) -> Dictionary:
+	var at: Vector2i = lair["at"]
+	var open: Vector2i = lair["open"]
+	var side := Vector2i(absi(open.y), absi(open.x))
+	var mound: Array[Vector2i] = []
+	for back in range(0, LAIR_MOUND.y + 1):
+		for across in range(-(LAIR_MOUND.x / 2), LAIR_MOUND.x / 2 + 1):
+			if back > 0 or across != 0:
+				mound.append(at - open * back + side * across)
+	var pad: Array[Vector2i] = []
+	for out in range(1, LAIR_PAD + 1):
+		for across in [-1, 0, 1]:
+			pad.append(at + open * out + side * across)
+	return {"mound": mound, "pad": pad, "tree": at + open + side * 2}
+
+
+## Each lair's ground before the trunks: the mound void, the pad and the
+## link's cell dirt, the clawed tree's cell grass.
+func _lair_grounds() -> void:
+	for lair: Dictionary in LAIRS:
+		var cells := lair_cells(lair)
+		for cell: Vector2i in cells["mound"]:
+			map.set_cell(cell, "void")
+		for cell: Vector2i in cells["pad"] + [lair["at"] as Vector2i]:
+			map.set_cell(cell, "dirt")
+			keep_clear[cell] = true
+		_clear(cells["tree"], "grass")
+
+
+## Each lair's link (sealed), its spawn, the bones on its pad and the
+## clawed tree.
+func _lairs() -> void:
+	var decor: Array = config.get("decor", [])
+	for lair: Dictionary in LAIRS:
+		var at: Vector2i = lair["at"]
+		var open: Vector2i = lair["open"]
+		var cells := lair_cells(lair)
+		map.set_cell(at, "link")
+		config["links"].append({"at": [at.x, at.y], "to_map": lair["to_map"], "to_spawn": "from_forest",
+			"mouth": lair["mouth"], "closed": lair["closed"]})
+		var out := at + open * 2
+		config["spawn_points"]["from_" + str(lair["to_map"])] = [out.x, out.y]
+		var pad: Array = cells["pad"]
+		decor.append([pad[0].x, pad[0].y, open.x, open.y, "scattered_bones", 1])
+		decor.append([pad[5].x, pad[5].y, -open.x, -open.y, "scattered_bones", 1])
+		var tree: Vector2i = cells["tree"]
+		config["buildings"].append({"slot": "tree.clawed", "at": [tree.x, tree.y], "facing": [open.x, open.y]})
+	config["decor"] = decor
 
 
 ## The wilds' end: its link to the forest and its "from_forest" arrival,

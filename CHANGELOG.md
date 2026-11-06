@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the forest west of the south road, the ground is trampled bare, with bones in the dirt and a tree scored by tusks (780 amended (12)).
 ## v0.1.205
 
 - What goes over the network changes, so v0.1.204 and older can't join the server: update through the launcher first.

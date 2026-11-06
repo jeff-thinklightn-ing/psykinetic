@@ -1681,8 +1681,9 @@ func _test_forest() -> void:
 	print("== levels/forest ==")
 	var forest := Level.load_level("forest")
 	var links: Array = forest.get("links", [])
-	_check(forest.get("display_name") == "The Forest" and links.size() == 2 and links[0]["to_map"] == "wilds"
-		and links[1]["to_map"] == "stronghold" and links[1]["closed"], "The Forest: back to the wilds, on to the stronghold closed (%s)" % [links])
+	_check(forest.get("display_name") == "The Forest" and links.size() == 3 and links[0]["to_map"] == "wilds"
+		and links[1]["to_map"] == "stronghold" and links[1]["closed"] and links[2]["to_map"] == "boar_lair" and links[2]["closed"],
+		"The Forest: back to the wilds, on to the stronghold and the boar's lair closed (%s)" % [links])
 	_check(_main.load_map("forest") and World.outdoor, "forest loads, outdoors")
 	var player := _player()
 	var east: Vector2i = links[1]["tile"]
@@ -2788,6 +2789,7 @@ func _test_relaid() -> void:
 	_test_town_places(wilds)
 	_test_explorables()
 	_test_forest_camps()
+	_test_boar_lair()
 	_test_bear_den()
 	_test_removed(wilds)
 	var hills := Level.load_level("hills")
@@ -2832,6 +2834,79 @@ func _test_caches(wilds: Dictionary, hills: Dictionary) -> void:
 	_check(cairn.grow(1).has_point(Vector2i(114, 80)) and not cairn.has_point(Vector2i(114, 80)),
 		"the cairn's cache stands against the cairn (%s)" % [cairn])
 
+
+
+## The boar's lair (780 amended (12), forest phase D): a thorn-roofed den
+## (indoors, lit plainly, a skylight by the door) with one way out, a
+## two-cell way up to its link to the forest; the den at its "lair" place;
+## an open middle of 12 x 12 with nothing laid in it; three boars 3 to 4
+## cells from the den; no chest, no entity. In the forest its mouth is
+## sealed till enemy-ai's phase 2, the thicket behind it no floor, a
+## trampled dirt pad before it with bones on it and the clawed tree, solid,
+## at its side, "from_boar_lair" on the pad.
+func _test_boar_lair() -> void:
+	print("== The boar's lair (780 amended (12)) ==")
+	var lair := Level.load_level("boar_lair")
+	var config := Level.template_config("boar_lair")
+	var floor := {}
+	for cell: Vector2i in lair["terrain"]["floor"]:
+		floor[cell] = true
+	var links: Array = lair["links"]
+	_check(lair["warnings"].is_empty() and not lair["terrain"]["outdoor"] and lair["terrain"]["ambience"] == "thicket"
+		and lair["terrain"]["walls"] == "thicket" and float(lair["terrain"]["ambient"]) >= 0.25,
+		"read with no warning, indoors (thorn-roofed), lit plainly, thicket walls and sound (%s)" % [lair["warnings"]])
+	_check(links.size() == 1 and links[0]["to_map"] == "forest" and links[0]["to_spawn"] == "from_boar_lair",
+		"one way out, up to the forest (%s)" % [links])
+	var way: Vector2i = links[0]["tile"]
+	_check(floor.has(way + Vector2i(1, 0)) or floor.has(way + Vector2i(-1, 0)), "the way out two cells wide at its link")
+	var places := Level.places_from(config, [] as Array[String])
+	var den := Vector2i(-1, -1)
+	if places.has("boar_lair"):
+		den = places["boar_lair"]["den"]
+	_check(places.size() == 1 and places.has("boar_lair") and places["boar_lair"]["kind"] == "lair"
+		and places["boar_lair"]["holder"] == "nobody" and places["boar_lair"]["cell"] == den and floor.has(den),
+		"its one place, the lair, held by nobody, at its den (%s)" % [places])
+	var boars: Array[Vector2i] = []
+	var others: Array = []
+	for entity: Dictionary in lair["entities"]:
+		if str(entity.get("kind", "")) == "boar":
+			boars.append(entity["tile"])
+		else:
+			others.append(entity)
+	_check(boars.size() == 3 and boars.all(func(at: Vector2i) -> bool: return Vector2(at - den).length() <= 4.5),
+		"three boars within 4 cells of the den, nothing else (%s; %s)" % [boars, others])
+	_check(others.is_empty(), "no chest, no other entity in the lair (%s)" % [others])
+	var open := Rect2i(8, 8, 12, 12)
+	var open_floor := true
+	for y in range(open.position.y, open.end.y):
+		for x in range(open.position.x, open.end.x):
+			open_floor = open_floor and floor.has(Vector2i(x, y))
+	var in_open: Array = lair["terrain"].get("decor", []).filter(func(entry: Dictionary) -> bool: return open.has_point(entry["cell"]))
+	_check(open_floor and in_open.is_empty(), "an open middle of 12 x 12, floor, nothing laid in it (%s)" % [in_open])
+	var by_door: bool = lair["terrain"]["skylights"].any(func(light: Dictionary) -> bool: return Vector2(light["at"] - way).length() <= 6.0)
+	_check(by_door, "a skylight by the door, so the first meeting is fair")
+	var forest := Level.load_level("forest")
+	var mouth: Dictionary = {}
+	for link: Dictionary in forest["links"]:
+		if link["to_map"] == "boar_lair":
+			mouth = link
+	var forest_floor := {}
+	for cell: Vector2i in forest["terrain"]["floor"]:
+		forest_floor[cell] = true
+	var spawn: Array = Level.template_config("forest")["spawn_points"].get("from_boar_lair", [])
+	var at: Vector2i = mouth.get("tile", Vector2i(-1, -1))
+	_check(not mouth.is_empty() and mouth["closed"] and mouth["to_spawn"] == "from_forest" and spawn.size() == 2
+		and forest_floor.has(Vector2i(spawn[0], spawn[1])) and Vector2(Vector2i(spawn[0], spawn[1]) - at).length() == 2.0,
+		"the forest's mouth sealed, its spawn two cells out on the pad (%s, %s)" % [mouth, spawn])
+	var behind := at - Vector2i(1, 0)
+	_check(not forest_floor.has(behind) and not forest_floor.has(at + Vector2i(0, 1)) and not forest_floor.has(at + Vector2i(0, -1)),
+		"the thicket behind and beside the mouth is no floor")
+	var clawed: Array = forest["buildings"].filter(func(building: Dictionary) -> bool: return building.get("slot") == "tree.clawed")
+	var bones: Array = forest["terrain"].get("decor", []).filter(func(entry: Dictionary) -> bool:
+		return entry["kind"] == "scattered_bones" and Vector2(entry["cell"] - at).length() <= 3.0)
+	_check(clawed.size() == 1 and Vector2(clawed[0]["cell"] - at).length() <= 3.0
+		and not forest_floor.has(clawed[0]["cell"]) and bones.size() >= 2,
+		"a clawed tree (solid) and bones at the mouth, a sign of what lives there (%s, %d bones)" % [clawed, bones.size()])
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp
 ## building with its place at its fire, 6 to 12 cells off a path and 24

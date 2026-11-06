@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://bhmcjvyd1to43"
+path="res://.godot/imported/layout.png-0df55cc01580c180222fa3661c119ab2.image"
+
+[deps]
+
+source_file="res://levels/boar_lair/layout.png"
+dest_files=["res://.godot/imported/layout.png-0df55cc01580c180222fa3661c119ab2.image"]
+
+[params]
+

@@ -117,12 +117,12 @@ const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
 	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "post", "tavern", "fire",
-	"trader", "captive", "other"]
+	"trader", "captive", "lair", "other"]
 ## A place's own cells and rect, kept on Level's place dict when given and
 ## well-formed (771/772/774, buildings' side; environment's 782 lights read
 ## "brazier" and "lamp"): key -> "cell" (a Vector2i), "rect" (a Rect2i) or
 ## "cells" (an Array of Vector2i).
-const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells", "bed": "cell", "facing": "cell"}
+const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells", "bed": "cell", "facing": "cell", "den": "cell"}
 ## What a camp is (793, maps' side; sound's fires read it): a camp place's "mix".
 const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,
@@ -164,7 +164,7 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	# The Last Light Mughouse's common room (811 amended, art-kit's pieces):
 	# the taverner's counter and tap rack, and its tables.
 	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2),
-	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2)}
+	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2), "tree.clawed": Vector2i(1, 1)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -223,7 +223,7 @@ const CARVED_ARROWS: Array[String] = ["left", "right", "up"]
 ## Buildings' list; the low ones (a woodpile, a table, a chair) stay.
 const FADES_ON_LINE: Array[String] = ["building.market_stall", "building.well", "building.cairn", "building.standing_stone",
 	"building.waystone", "building.great_tree", "building.tower_ruin", "building.mound", "building.crypt_pillar",
-	"building.dark_pillar", "building.dwarven_forge", "building.weapon_rack", "building.throne"]
+	"building.dark_pillar", "building.dwarven_forge", "building.weapon_rack", "building.throne", "tree.clawed"]
 ## A herder's fold (640), and how far from its holding's place cell it may
 ## stand (fold_near).
 const FOLD := "building.fold"
@@ -240,7 +240,7 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -251,14 +251,15 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## hills' roadside sights and stories, a grave, a shrine, a milestone, a hunter's blind and
 ## a lean-to; 811 amended: the Mughouse's counter, tap rack and tables, the
 ## taverner behind the counter; 806 amended (3): the crypt's sarcophagi and the
-## robbers' dig into a tomb's floor): every cell of theirs out of the floor, none walked onto or into.
+## robbers' dig into a tomb's floor): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
+## the boar's lair's mouth, a tree scored by its tusks, tree.clawed).
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -2251,7 +2252,16 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# against the common room's wall, over the hearth's two fire cells; its
 	# sign out of the street front's wall, +x out.
 	"wall_hearth": {"sits": "wall", "variants": 1, "front": "z", "wide": 2},
-	"inn_sign": {"sits": "edge", "variants": 1}}
+	"inn_sign": {"sits": "edge", "variants": 1},
+	# The boar's lair (780 amended (12); art-kit's lair commit): a wallow, wet
+	# or drying; boars' rooted-up ground; the trodden run through the thorns;
+	# a few bones scattered (a heap is the crypt's "bones"; set dressing, never a find).
+	"wallow": {"sits": "flat", "variants": 2, "faced": true},
+	"rooted_ground": {"sits": "flat", "variants": 1, "faced": true},
+	"trodden_run": {"sits": "flat", "variants": 1, "faced": true},
+	"scattered_bones": {"sits": "flat", "variants": 1, "faced": true, "slot": "prop.bones"},
+	# The forest camp C3's captive's post (793; art-kit's, with the lair's pieces).
+	"captive_post": {"sits": "flat", "variants": 1, "faced": true}}
 
 
 ## level.json's "carvings" (806 amended, the crypt; lore's lines in voice's

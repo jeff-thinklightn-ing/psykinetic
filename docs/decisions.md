@@ -43104,3 +43104,43 @@ view_test _test_cave_mouth (the hill behind, the way it faces; the arch open to 
 face beside it; the hill's cells; grass on its top and its lip in shadow; the scree; the rockfall
 only when closed, low in the arch; no ground in the throat); level_test covers the level (its
 link both ways, no trap pit). CHANGELOG (voice's words). Protocol unchanged, no new class_name.
+780 amended (12): the boar's lair, forest phase D (2026-11-05, maps; enemy-ai's apex-lair rule,
+C:/dev/review/enemy-ai/apex_lairs_design.md, its residents as enemy-ai gave them; the coordinator's
+go and its ruling on the roof; terrain's mouth order; release's label). A new level, levels/boar_lair
+(tools/make_boar_lair.py, seed 780): a thorn-roofed den in a forest thicket. The coordinator ruled it
+roofed, not open to the sky: an open hollow would be an outdoor level and so on the world plane (650),
+which a pocket off the forest cannot be; so it is indoors, with no origin, as world_plane.json says
+lairs are, and 650 is unchanged. Readable, not murky (Jeff had the haze taken out for dullness):
+"ambient" 0.3 and four skylights (797), one by the door so the first meeting is fair (enemy-ai: sight
+reads World.light_at), one over the den, one each side. A ragged hollow about 23 x 20 (393 floor
+cells), walled by the thicket ("walls": "thicket", art-kit's swept wall set, 874d2537), floors "thicket"
+(its earth and leaf litter), "ambience": "thicket" (795 amended; sound's
+slop at the nearest wallow and flies at the nearest bones), no music. One way out: a way two cells
+wide up from its south side to the link to the forest ("from_boar_lair"), "from_forest" and the start
+just inside, a trodden run along it. The den at the north: the "lair" place "boar_lair" (a new place
+kind; held by nobody, radius 10, its "at" and its "den" the den cell, PLACE_SHAPES gains "den"),
+named plainly ("a boar's lair") till lore and Jeff name it. Enemy-ai's phase 2 lays the boar king's
+marker on the den with his row; until then there is none, so the level warns of nothing. An open middle
+of 12 x 12 with nothing laid in it, room for the king's charge; round the edges three wallows, bones
+(set dressing, never a find) and rooted-up ground. The sounder: three monster_boar by the wallows, 3
+to 4 cells from the den (ordinary boars till phase 2 makes them his escort). No chest, no loot (the
+find is the king's own drops). New decor kinds (art-kit's lair commit; grey till it lands): "wallow" (2
+variants, wet and drying), "rooted_ground", "trodden_run" and "scattered_bones" (prop.bones, a few bones; a heap is the crypt's "bones",
+prop.set_bone_heap, 806 amended (3)).
+In the forest, make_forest's LAIRS lays the mouth at (122,175), 10 cells west of the south road,
+opening east toward it: the link {to_map "boar_lair", to_spawn "from_forest", mouth "thicket", closed
+true}, sealed till enemy-ai's phase 2 brings the king (an open lair today would hold only three
+ordinary boars). Behind and beside it the thicket, LAIR_MOUND cells made void (terrain's "thicket"
+mouth cue draws a bramble mound on them once art-kit's wall.thicket is in; till then the wood's
+trees). Before it a trampled dirt pad two rows deep and three wide, with "from_boar_lair" two cells
+out. A sign of what lives there (the coordinator): two bones on the pad and a tree scored by tusks,
+tree.clawed, standing solid at the pad's side as a one-cell landmark (Level.BUILDINGS, SOLID,
+DOORLESS and FADES_ON_LINE gain it; its slot's "footprint" [1, 1] added to art/kit/slots.json with
+art-kit's OK). The forest camp C3's captive gets his post (art-kit's prop.captive_post, decor kind
+"captive_post"): a cell farther out from the camp than his place, at (101,65), its front toward him.
+The forest regenerated: only those 21 cells changed (40178 floor cells), and the two
+grown trees on the pad taken out of trees.json. The first load prints "[level] boar_lair: 393 cells,
+3 entities, 1 starts, 1 links" (Main.load_map). level_test _test_boar_lair, _test_forest's links. CHANGELOG
+bullet (voice's words; the thicket's words come with terrain's cue).
+Protocol unchanged (--print-protocol fc7438491ba8 before and after: the place kind "lair" and its
+"den" are not on the wire); no new class_name.

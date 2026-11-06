@@ -1,0 +1,234 @@
+{
+	"name": "The boar's lair",
+	"outdoor": false,
+	"ambient": 0.3,
+	"walls": "thicket",
+	"floors": "thicket",
+	"music": "none",
+	"ambience": "thicket",
+	"starts": [
+		[
+			14,
+			24
+		]
+	],
+	"spawn_points": {
+		"from_forest": [
+			13,
+			24
+		]
+	},
+	"links": [
+		{
+			"at": [
+				13,
+				26
+			],
+			"to_map": "forest",
+			"to_spawn": "from_boar_lair"
+		}
+	],
+	"legend": {
+		"monster_boar": "#8b5a2b"
+	},
+	"skylights": [
+		{
+			"at": [
+				14,
+				21
+			],
+			"radius": 2.0
+		},
+		{
+			"at": [
+				14,
+				5
+			],
+			"radius": 2.5
+		},
+		{
+			"at": [
+				6,
+				13
+			],
+			"radius": 1.5
+		},
+		{
+			"at": [
+				22,
+				13
+			],
+			"radius": 1.5
+		}
+	],
+	"places": {
+		"boar_lair": {
+			"at": [
+				14,
+				5
+			],
+			"kind": "lair",
+			"radius": 10,
+			"name": "a boar's lair",
+			"holder": "nobody",
+			"den": [
+				14,
+				5
+			]
+		}
+	},
+	"decor": [
+		[
+			10,
+			4,
+			0,
+			1,
+			"wallow",
+			1
+		],
+		[
+			18,
+			4,
+			0,
+			1,
+			"wallow",
+			2
+		],
+		[
+			5,
+			11,
+			0,
+			1,
+			"wallow",
+			1
+		],
+		[
+			12,
+			3,
+			1,
+			0,
+			"scattered_bones",
+			1
+		],
+		[
+			16,
+			3,
+			1,
+			0,
+			"bones",
+			1
+		],
+		[
+			16,
+			22,
+			1,
+			0,
+			"scattered_bones",
+			1
+		],
+		[
+			7,
+			6,
+			0,
+			1,
+			"rooted_ground",
+			1
+		],
+		[
+			21,
+			8,
+			1,
+			0,
+			"rooted_ground",
+			1
+		],
+		[
+			23,
+			13,
+			0,
+			-1,
+			"rooted_ground",
+			1
+		],
+		[
+			5,
+			16,
+			-1,
+			0,
+			"rooted_ground",
+			1
+		],
+		[
+			7,
+			20,
+			0,
+			1,
+			"rooted_ground",
+			1
+		],
+		[
+			21,
+			19,
+			1,
+			0,
+			"rooted_ground",
+			1
+		],
+		[
+			9,
+			22,
+			0,
+			-1,
+			"rooted_ground",
+			1
+		],
+		[
+			13,
+			21,
+			0,
+			1,
+			"trodden_run",
+			1
+		],
+		[
+			13,
+			22,
+			0,
+			1,
+			"trodden_run",
+			1
+		],
+		[
+			13,
+			23,
+			0,
+			1,
+			"trodden_run",
+			1
+		],
+		[
+			13,
+			24,
+			0,
+			1,
+			"trodden_run",
+			1
+		],
+		[
+			13,
+			25,
+			0,
+			1,
+			"trodden_run",
+			1
+		],
+		[
+			13,
+			26,
+			0,
+			1,
+			"trodden_run",
+			1
+		]
+	]
+}
