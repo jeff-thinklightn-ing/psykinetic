@@ -12371,6 +12371,8 @@ func _set_mood(record: PlayerRecord) -> void:
 		pet.bond_why = mood_why_of(record.companion, record.player_id, "you")
 		pet.bond_bar = bond_bar_of(record.companion, record.player_id)
 		pet.needs = Companion.needs_of(record.companion)
+		var want: Variant = record.companion.get("want")
+		pet.want_words = Companion.want_said(str(want["key"]), "words", record.name) if want is Dictionary else ""
 	if record.companion.has("resident"):
 		_mood_to_worker(record)
 
@@ -15779,6 +15781,7 @@ func _bond(record: PlayerRecord, event: String, why: String) -> void:
 		return
 	var table: Dictionary = CompanionCard.tables().get("bond", {})
 	_feed_needs(record, event, why)
+	_want_deed(record, event, why)
 	var tier := str((table.get("deeds", {}) as Dictionary).get(event, ""))
 	var delta := int((table.get("drops", {}) as Dictionary).get(event, 0))
 	var step_was := bond_step_of(record.companion, record.player_id)
@@ -15901,6 +15904,78 @@ func _settle_needs(record: PlayerRecord, day: int) -> void:
 		pet.needs = needs.duplicate()
 
 
+## Her wants (803 amended (4)), once a game day: an open want unmet after
+## lapse_days lapses, never told, never a cost; with none open and her rest
+## past, she picks one (Companion.pick_want) and her voice is told it.
+func _tend_want(record: PlayerRecord, day: int) -> void:
+	var card := record.companion
+	var rules := Companion.want_rules()
+	var want: Variant = card.get("want")
+	if want is Dictionary and day - int(want.get("since", day)) >= int(rules.get("lapse_days", 3)):
+		card.erase("want")
+		card["want_rest"] = day + int(rules.get("rest_days", 1))
+		want = null
+	if not want is Dictionary and day >= int(card.get("want_rest", -1)):
+		var picked := Companion.pick_want(card, _need_weights(card))
+		if not picked.is_empty():
+			picked["since"] = day
+			card["want"] = picked
+	_set_want_words(record)
+
+
+## Her voice's want words from her record (803 amended (4)).
+func _set_want_words(record: PlayerRecord) -> void:
+	var pet: Companion = _companions.get(record.player_id)
+	if not is_instance_valid(pet):
+		return
+	var want: Variant = record.companion.get("want")
+	pet.want_words = Companion.want_said(str(want["key"]), "words", record.name) if want is Dictionary else ""
+
+
+## A deed of hers and her player's (803 amended (4)): any template it meets
+## counts met (a lesson already learnt is never wanted); her open want met
+## lifts its need by met_gain, a big gain on 804's path, a bond deed, and
+## her own word at her next quiet moment.
+func _want_deed(record: PlayerRecord, event: String, why: String) -> void:
+	var card := record.companion
+	if not card.get("alive", true):
+		return
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	var met: Dictionary = card.get("wants_met", {}) if card.get("wants_met") is Dictionary else {}
+	for template: Variant in Companion.want_templates():
+		if template is Dictionary and event in template.get("met_by", []) and not met.has(str(template["key"])):
+			met[str(template["key"])] = day
+	if not met.is_empty():
+		card["wants_met"] = met
+	var want: Variant = card.get("want")
+	if not want is Dictionary or event not in Companion.want_template(str(want["key"])).get("met_by", []):
+		return
+	var rules := Companion.want_rules()
+	card.erase("want")
+	card["want_rest"] = day + int(rules.get("rest_days", 1))
+	var need := str(want["need"])
+	var needs := Companion.needs_of(card)
+	var was := float(needs.get(need, 0.5))
+	needs[need] = minf(was + float(rules.get("met_gain", 0.3)), 1.0)
+	card["needs"] = needs
+	var points := roundi(needs[need] * 10.0) - roundi(was * 10.0)
+	var her := str(card.get("name", ""))
+	last_want_met = {"key": str(want["key"]), "need": need, "amount": points}
+	if points > 0:
+		reward(record.player_id, {"track": need, "amount": points, "of": her, "words": why, "big": true,
+			"bar": {"have": roundi(needs[need] * 10.0), "need": 10}})
+	var pet: Companion = _companions.get(record.player_id)
+	if is_instance_valid(pet):
+		pet.needs = needs.duplicate()
+		pet.want_words = ""
+		pet.want_glad = Companion.want_said(str(want["key"]), "done", record.name)
+	_bond(record, "want_met", "a wish met, with you")
+
+
+## The want _want_deed last met (tests).
+var last_want_met := {}
+
+
 ## The need gains _feed_needs told (tests).
 var last_need_gains: Array[Dictionary] = []
 
@@ -15977,6 +16052,7 @@ func _tend_bonds() -> void:
 		if not (is_instance_valid(pet) and pet.spawned and is_instance_valid(pet.keeper)):
 			continue
 		_settle_needs(record, day)
+		_tend_want(record, day)
 		if int(record.companion.get("bond_day", -1)) == day:
 			continue
 		record.companion["bond_day"] = day

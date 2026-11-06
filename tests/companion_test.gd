@@ -94,6 +94,7 @@ func _ready() -> void:
 	_test_record_loads()
 	_test_bond()
 	_test_needs()
+	_test_wants()
 	_test_deeds()
 	_test_game_and_watch()
 	_test_sickness()
@@ -1562,6 +1563,81 @@ func _test_needs() -> void:
 	for key in ["needs", "need_weights", "needs_day", "needs_today", "standing", "bond_day", "bond_today", "bond_carry", "bond_best"]:
 		record.companion.erase(key)
 	_main._set_mood(record)
+
+
+func _test_wants() -> void:
+	print("\n== her wants: one at a time, in rungs, the fire first; met by a deed, a big gain; lapsing unseen (803 amended (4)) ==")
+	var pet := _companion()
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var steps_were := World.steps
+	var keys := ["needs", "need_weights", "needs_day", "needs_today", "standing", "bond_day", "bond_today", "bond_carry", "bond_best",
+		"want", "wants_met", "want_rest"]
+	for key: String in keys:
+		record.companion.erase(key)
+	Standing.met(record.companion, record.player_id, World.steps)
+	var even := {"leisure": 1.0, "adventure": 1.0, "wonder": 1.0, "faith": 1.0, "safety": 1.0, "company": 1.0}
+	var card := {"needs": {"leisure": 0.3, "adventure": 0.3, "wonder": 0.3, "faith": 0.3, "safety": 0.9, "company": 0.3}}
+	_check(Companion.pick_want(card, even).get("key") == "fire", "the fire first, whatever she lacks most (%s)" % [Companion.pick_want(card, even)])
+	card["wants_met"] = {"fire": 1}
+	card["needs"]["company"] = 0.2
+	_check(Companion.pick_want(card, even).get("key") == "town", "then the town by her most-lacking need, company; the pond waits on fishing")
+	var lonely_less := even.duplicate()
+	lonely_less["company"] = 0.5
+	card["needs"]["adventure"] = 0.1
+	_check(Companion.pick_want(card, lonely_less).get("key") == "town", "and no fight before two are met, however she lacks adventure")
+	card["wants_met"]["town"] = 2
+	_check(Companion.pick_want(card, even).get("key") == "wolves", "two met: the fight opens")
+	card["wants_met"] = {"fire": 1, "town": 2, "wolves": 3, "temple": 4}
+	_check(Companion.pick_want(card, even).is_empty(), "all she can want met: none")
+	_check(Companion.focus_text({"key": "want", "words": "to sit by a fire with Bo."}).begins_with("You would like to sit by a fire with Bo.")
+		and Companion.focus_text({"key": "want", "words": "x."}).ends_with(Companion.QUIET_WANT_LEAD), "a want is told as hers, to say in her own words")
+	# Tended: picked once a game day, told her voice.
+	var day := int(World.steps / maxi(DayNight.day_steps, 1))
+	_main._tend_want(record, day)
+	var want: Dictionary = record.companion.get("want", {})
+	_check(want.get("key") == "fire" and int(want.get("since", -1)) == day and pet.want_words.contains(record.name)
+			and pet.want_words.begins_with("to sit by a fire"), "her first want, the fire, on her record and in her voice (%s)" % pet.want_words)
+	var focus := pet._quiet_pick_focus()
+	var tries := 0
+	while focus.get("key") != "want" and tries < 20:
+		focus = pet._quiet_pick_focus()
+		tries += 1
+	_check(focus.get("key") == "want" and pet._want_told, "a quiet moment tells it (%s)" % [focus])
+	# A lesson already learnt counts met, unwanted: rest in town.
+	_main._bond(record, "leisure", "rested in town with you")
+	_check(record.companion["wants_met"].has("town") and record.companion.has("want"), "rest in town before wanting it: the town counts met, the fire still wanted")
+	# Met: the fire.
+	_main.last_want_met = {}
+	var safety_was := float(Companion.needs_of(record.companion)["safety"])
+	var bond_was := Standing.score(record.companion, record.player_id)
+	_main._bond(record, "fire", "sat by the fire with you")
+	var needs := Companion.needs_of(record.companion)
+	_check(_main.last_want_met.get("key") == "fire" and not record.companion.has("want") and int(record.companion.get("want_rest", -1)) == day + 1
+			and needs["safety"] >= safety_was + 0.39 and pet.want_words == "" and pet.want_glad.begins_with("sat by a fire with")
+			and Standing.score(record.companion, record.player_id) > bond_was,
+			"met: its need up a tenth from the fire and three from the want, a big gain, her bond, her glad word to come (%s)" % [_main.last_want_met])
+	var glad := pet._quiet_pick_focus()
+	_check(glad.get("key") == "glad" and Companion.focus_text(glad).begins_with("You have just done what you wanted: you sat by a fire with")
+		and pet.want_glad == "", "her next quiet moment speaks of it, once (%s)" % Companion.focus_text(glad))
+	_main._tend_want(record, day)
+	_check(not record.companion.has("want"), "resting a day before the next")
+	# Lapses: unmet after lapse_days, gone unseen.
+	record.companion["want"] = {"key": "wolves", "need": "adventure", "since": day - 3}
+	_main.last_need_gains.clear()
+	_main._tend_want(record, day)
+	_check(not record.companion.has("want") and _main.last_need_gains.is_empty() and int(record.companion["want_rest"]) == day + 1,
+		"unmet three days: it lapses, nothing told, nothing lost")
+	_main._tend_want(record, day + 1)
+	_check(record.companion.get("want", {}).get("key") == "wolves", "rested: the next, the fight (fire and town met)")
+	var saved := PlayerRecord.from_dict(JSON.parse_string(JSON.stringify(record.to_dict())))
+	_check(saved.companion.get("want", {}).get("key") == "wolves" and saved.companion.get("wants_met", {}).has("fire")
+		and saved.companion.has("want_rest"), "her want, those met and her rest are saved with her record")
+	World.steps = steps_were
+	for key: String in keys:
+		record.companion.erase(key)
+	_main._set_mood(record)
+	pet.want_words = ""
+	pet.want_glad = ""
 
 
 func _test_deeds() -> void:

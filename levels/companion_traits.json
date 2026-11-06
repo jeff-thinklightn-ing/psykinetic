@@ -91,7 +91,7 @@
 		"per_hour": 12,
 		"new_place_s": [20, 40],
 		"player_quiet_s": 30,
-		"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1}
+		"focus_weights": {"woke": 8, "sight": 5, "today": 3, "likes": 2, "ask": 2, "place": 1, "want": 6, "want_told": 1}
 	},
 	"needs": {
 		"_note": "Her needs (803 amended (2), step 5 phase 1; the coordinator's approval 2026-11-05): six, each 0..1 on her record, from start. Each settles settle_per_day (times her weight for it) toward floor once a game day, never below, never shown falling, costing nothing. A deed in feeds raises its needs by its amounts, once a game day each, never past 1; each whole tenth gained is a gain on 804's path (track = the need). Her weights (min..max, from 1) come from her card alone, set once: each rule whose words are found in her trait adds its amount; superstition (her leanings, 0..10) adds faith_per_superstition for each point past 5. Weights shape only how fast a need settles and, in phase 2, which want she voices; gains are the same for everyone.",
@@ -125,13 +125,26 @@
 			"blessed": {"faith": 0.2}
 		}
 	},
+	"wants": {
+		"_note": "Her wants (803 amended (4), needs phase 2; the coordinator's rungs): one at a time, from her most-lacking need (weight x (1 - need)) among the templates open to her: one opens once she has met 'after' wants (the fire first for everyone; then the town or the pond by her weights; the wolves; the temple). A want is met by a deed in met_by, and any template's deed done before she wanted it counts it met (a lesson already learnt is skipped). Met: met_gain on its need, a big gain, a bond deed, and her own word at her next quiet moment. Unmet after lapse_days it lapses, never told, never a cost; rest_days before the next. 'ready': false until its deed exists (the pond: Wren fishing). words: what she wants; done: what she did. {player} is her player's name. Drafts for Jeff.",
+		"lapse_days": 3,
+		"rest_days": 1,
+		"met_gain": 0.3,
+		"templates": [
+			{"key": "fire", "need": "safety", "rung": 1, "after": 0, "met_by": ["fire"], "words": "to sit by a fire with {player} and rest a while", "done": "sat by a fire with {player} and rested"},
+			{"key": "town", "need": "company", "rung": 2, "after": 1, "met_by": ["leisure"], "words": "to spend a while in a town among other folk", "done": "spent a while in a town among other folk"},
+			{"key": "pond", "need": "leisure", "rung": 3, "after": 1, "met_by": ["fished"], "ready": false, "words": "to go fishing with {player}", "done": "went fishing with {player}"},
+			{"key": "wolves", "need": "adventure", "rung": 4, "after": 2, "met_by": ["fought", "cleared"], "words": "to win a fight with {player} beside you", "done": "won a fight beside {player}"},
+			{"key": "temple", "need": "faith", "rung": 5, "after": 3, "met_by": ["blessed"], "words": "to go to the temple and be blessed", "done": "were blessed at the temple"}
+		]
+	},
 	"bond": {
 		"_note": "Her bond with her player (decision 444, on npc's Standing, 443; tiered by decision 621, Jeff's: 'each tier has its own deeds; the deeds that got you to a tier can't raise you further'). Standing's COMPANION ladder: fond to start, wary at -3, close at 3, devoted at 6 (residents.json 'standing'). deeds: each raise's tier; tiers: what one deed of the tier adds (each, halves carried on her record as bond_carry) and the score it raises her to at most (up_to): warmth (fond to close: gifts, food, days together, plain bandaging) to close, trust (close to devoted: tending her badly hurt, standing by her, a camp cleared, a new ability) to one short of devoted, milestone (a rescue, the draugr's blessing, an area's reward) as far as Standing goes. Each deed raises her once a game day. Lower deeds repair lost points up to her best (bond_best) but never past the top of the step she is at. No decay over time. drops: what each hurt costs, at any step (damage never costs her bond: 'struck' is gone). The deeds she sees (Companion._watch_deeds, by watch): road (road_cells walked with her player in a game day, road_share on roads), fire (both within fire_cells of a fire, fire_ticks), leisure (in a town town_ticks), and the drops mule (her slots over heavy_share for heavy_cells walked, warned at half, once until she rests) and pressed (a new fight while under low_hp after she asked to rest). fought: a monster killed where both landed a blow; finished: the last hostile camp of an area cleared with her. harsh: her voice's [HURT] on her player's words, at most harsh_a_day a game day, a [SORRY] the same day taking one back. game: knucklebones by a fire ('play knucklebones'), a round a round_ticks, best_of, the first each day warmth. sleep: after a hard day (a fight since she slept, or under hard_hp) by a fire with her player she asks them to keep watch once a day; yes, or them staying within near answer_ticks, and she sleeps sleep_ticks: whole and rested after, watched (trust); gone past near and something comes, she wakes with left_line, left_alone. All drafts for Jeff.",
 		"tiers": {"warmth": {"each": 0.5, "up_to": 3}, "trust": {"each": 1, "up_to": 5}, "milestone": {"each": 2, "up_to": 10}},
 		"deeds": {"gift": "warmth", "fed": "warmth", "day": "warmth", "bandaged": "warmth",
 			"road": "warmth", "fire": "warmth", "leisure": "warmth", "game": "warmth",
 			"tended": "trust", "stood_by": "trust", "cleared": "trust", "earned": "trust", "fought": "trust", "watched": "trust",
-			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone"},
+			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust"},
 		"drops": {"kept_from": -1, "left_alone": -1, "let_bleed": -2, "grave": -1, "warned": -1, "harsh": -1, "mule": -1, "pressed": -1},
 		"harsh_a_day": 2,
 		"game": {"fire_cells": 2, "round_ticks": 60, "best_of": 3, "rounds_most": 9},

@@ -321,6 +321,18 @@ static func companion_from(pet: Variant) -> Dictionary:
 	var fed_today: Variant = pet.get("needs_today")
 	if fed_today is Dictionary:
 		out["needs_today"] = {"day": int(fed_today.get("day", -1)), "deeds": Array(_strings(fed_today.get("deeds", [])))}
+	# Her wants (803 amended (4)): the open one, those met (key: day), her rest.
+	var want: Variant = pet.get("want")
+	if want is Dictionary and not want.is_empty():
+		out["want"] = {"key": str(want.get("key", "")), "need": str(want.get("need", "")), "since": int(want.get("since", 0))}
+	var wants_met: Variant = pet.get("wants_met")
+	if wants_met is Dictionary:
+		var kept_met := {}
+		for key: Variant in wants_met:
+			kept_met[str(key)] = int(wants_met[key])
+		out["wants_met"] = kept_met
+	if pet.get("want_rest") is float or pet.get("want_rest") is int:
+		out["want_rest"] = int(pet["want_rest"])
 	var games: Variant = pet.get("games")
 	if games is Dictionary:
 		out["games"] = {"hers": int(games.get("hers", 0)), "theirs": int(games.get("theirs", 0))}

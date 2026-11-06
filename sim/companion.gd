@@ -358,7 +358,11 @@ const QUIET_TRIGGER := "quiet moment"
 ## she spoke of none (pair 4); the last turn is what a model answers.
 const QUIET_LEAD := "If you speak now, speak of that, in your own way."
 ## How each focus reaches her, before its words.
-const QUIET_OPENERS := {"sight": "You notice", "ask": "You want to ask", "default": "You think of"}
+const QUIET_OPENERS := {"sight": "You notice", "ask": "You want to ask", "want": "You would like", "glad": "You have just done what you wanted: you",
+		"default": "You think of"}
+## Closes a "want" focus (803 amended (4)): she says what she would like, once
+## it is new, and now and then while it is open.
+const QUIET_WANT_LEAD := "If you speak now, say so, in your own words."
 ## Closes an "ask" focus in place of QUIET_LEAD (803 amended (3)): told "You
 ## have a question for her player", she never asked one (pairs 5 and 6, 0 of 4).
 const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
@@ -507,6 +511,17 @@ var bond_why := ""
 var bond_bar := Vector2i.ZERO
 ## Her needs (803 amended (2)), Main's: {need: 0..1}, for ui's bars on her card.
 var needs: Dictionary = {}
+## Her open want (803 amended (4)), Main's: what she would like, {player}
+## filled ("to sit by a fire with Jeff and rest a while"), "" for none; and
+## the want just met, what she did ("sat by a fire with Jeff and rested"),
+## spoken of at her next quiet moment, then "".
+var want_words := "":
+	set(value):
+		if value != want_words:
+			_want_told = false
+		want_words = value
+var want_glad := ""
+var _want_told := false
 ## Her superstition (442's leaning, Main's at her join): at grave_superstition
 ## or more she won't carry grave goods below close (555).
 var superstition := 5
@@ -2395,12 +2410,58 @@ func _quiet_moment() -> void:
 	_quiet_focus = ""  # Told on that ask, or not asked at all: never carried to another.
 
 
+## Her wants' rules (803 amended (4)): companion_traits.json "wants".
+static func want_rules() -> Dictionary:
+	var rules: Variant = CompanionCard.tables().get("wants", {})
+	return rules if rules is Dictionary else {}
+
+
+## The want templates, in rung order.
+static func want_templates() -> Array:
+	var templates: Variant = want_rules().get("templates", [])
+	return templates if templates is Array else []
+
+
+## The template keyed [param key], {} for none.
+static func want_template(key: String) -> Dictionary:
+	for template: Variant in want_templates():
+		if template is Dictionary and str(template.get("key", "")) == key:
+			return template
+	return {}
+
+
+## The want she picks now from [param card] (her record's companion) and
+## [param weights], {key, need} or {} for none: of the templates ready, not
+## yet met and open to her (met at least "after" of them), the one whose need
+## lacks most by her weight, weight x (1 - need); the first on a tie.
+static func pick_want(card: Dictionary, weights: Dictionary) -> Dictionary:
+	var met: Dictionary = card.get("wants_met", {}) if card.get("wants_met") is Dictionary else {}
+	var needs := needs_of(card)
+	var best := {}
+	var best_lack := -1.0
+	for template: Variant in want_templates():
+		if not template is Dictionary or not template.get("ready", true) or met.has(str(template.get("key", ""))) \
+				or int(template.get("after", 0)) > met.size():
+			continue
+		var need := str(template.get("need", ""))
+		var lack := float(weights.get(need, 1.0)) * (1.0 - float(needs.get(need, 0.5)))
+		if lack > best_lack:
+			best_lack = lack
+			best = {"key": str(template["key"]), "need": need}
+	return best
+
+
+## A template's [param field] ("words", "done") with her player's name in it.
+static func want_said(key: String, field: String, player: String) -> String:
+	return str(want_template(key).get(field, "")).replace("{player}", player)
+
+
 ## A focus as her last turn tells it (803 amended (2) and (3)): "You notice a
 ## cart, a few paces to the north-west. If you speak now, speak of that, in
 ## your own way."; an "ask" closes with QUIET_ASK_LEAD.
 static func focus_text(focus: Dictionary) -> String:
 	return "%s %s %s" % [QUIET_OPENERS.get(focus["key"], QUIET_OPENERS["default"]), focus["words"],
-		QUIET_ASK_LEAD if focus["key"] == "ask" else QUIET_LEAD]
+		QUIET_ASK_LEAD if focus["key"] == "ask" else QUIET_WANT_LEAD if focus["key"] == "want" else QUIET_LEAD]
 
 
 ## One thing for a quiet moment to speak of, {key, words}, or {} when
@@ -2450,21 +2511,27 @@ func _quiet_pick_focus() -> Dictionary:
 			"what happened a little while ago (%s)." % latest if not latest.is_empty() else seen_words + "."]})
 	if _zone_new_today:
 		options.append({"key": "place", "words": "%s, where you have not been before today." % _place_words()})
-	if options.is_empty():
-		return {}
-	if options[0]["key"] == "woke":
+	if not options.is_empty() and options[0]["key"] == "woke":
 		_woke_words = ""
 		return options[0]  # Just woken, that comes first (pair 5: told "the boar died" instead, she mixed up who slept).
+	if not want_glad.is_empty():
+		var glad := {"key": "glad", "words": want_glad + "."}
+		want_glad = ""
+		return glad  # A want just met (803 amended (4)): her own word on it, next.
+	if not want_words.is_empty():
+		options.append({"key": "want", "weight": "want_told" if _want_told else "want", "words": want_words + "."})
+	if options.is_empty():
+		return {}
 	var open := options.filter(func(each: Dictionary) -> bool: return each["key"] != _quiet_last_focus)
 	if open.is_empty():
 		open = options
 	var total := 0
 	for each: Dictionary in open:
-		total += maxi(int(weights.get(each["key"], 1)), 0)
+		total += maxi(int(weights.get(each.get("weight", each["key"]), 1)), 0)
 	var roll := _quiet_rng.randi_range(1, maxi(total, 1))
 	var chosen: Dictionary = open[0]
 	for each: Dictionary in open:
-		roll -= maxi(int(weights.get(each["key"], 1)), 0)
+		roll -= maxi(int(weights.get(each.get("weight", each["key"]), 1)), 0)
 		if roll <= 0:
 			chosen = each
 			break
@@ -2472,6 +2539,8 @@ func _quiet_pick_focus() -> Dictionary:
 		_quiet_seen[chosen["kind"]] = true
 	if chosen["key"] == "place":
 		_zone_new_today = false
+	if chosen["key"] == "want":
+		_want_told = true
 	_woke_words = ""  # Her waking is spoken of at the next quiet moment or not at all.
 	return chosen
 
