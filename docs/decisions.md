@@ -41922,6 +41922,33 @@ putting it on or taking it off changes nothing else; totem_of finds it wherever 
 charges stay as they were. items_test _test_worn checks both. Catalog and client only: protocol
 unchanged, no new class_name, no bullet (the drawing carries it).
 
+788 amended (2): pc-character's side, worn gear drawn on bodies (the coordinator's approval of
+pc-character's design; release's label). What a player or a companion has in its head, back, feet,
+neck and charm slots shows on its body (Client3D._sync_worn_gear, after _sync_worn's armour, again
+whenever those slots or the armour change). Two ways, by the row's worn look (788 amended):
+- A look word draws a body part, skinned, so it bends with the body: tools/body_gen.py's Worn_Hood
+  (the hood's shape), Worn_Cloak and Worn_Boots, each in the Tunic region on its own mesh, tinted its
+  item's colour as armour is (WORN_PARTS: hood, cloak, boots_soft). The cloak is its own, not the
+  garb's cape (the coordinator: "longer, to the calf, and fuller"): from round the neck over the
+  shoulders, down the back and sides to mid-calf, each ring a thin C open in front so the arms swing
+  out of it, its rings from the hips down moving with the pelvis alone. The soft boots go over the
+  body's own, fuller, their soles and toes just past them, the shaft's top turned down in a cuff. A
+  worn hood hides the hair and any headwear under it; a worn cloak hides the garb's cape.
+- No look word: the row's art on its slot's socket (WORN_SOCKET_OF), art-kit's worn.<id> where
+  made (worn.felt_hat, worn.encolpion_amulet), else its item.<id> (the bear's-claw charm hangs from
+  its own loop). Two new sockets on a person's front, measured once per body off its rest
+  (WORN_SOCKETS, _front_socket): "neck" on UpperChest at the collarbone notch (the Body's front at
+  the Neck bone's height), "belt_c" on Hips at the belt's front left of the buckle; "head" is the
+  bard's hat's. A worn hat hides the look's own headwear and shows its own hair, even where its own
+  hood had hidden it (Wren's). Rings draw nothing.
+Taken off, the look's own parts again. A body without the part or the socket (an ally's) wears
+nothing new. human_m and human_f built again (tools/body_gen.py, then body_build.py --parts): every
+part before the worn three is the same to the vertex. view_test _test_worn_gear (the parts and the
+sockets on the body, the neck at the throat and belt_c on the belt; the hood up in its colour with
+the hair hidden, the boots on; the amulet and the charm on their sockets; the felt hat for the hood,
+the hair again; all off). Stills of the player and Wren, front and back: C:/dev/review/worn_gear/.
+Client and art only, protocol unchanged, no new class_name. CHANGELOG bullet (voice's words).
+
 ## 800. Carved words on stones
 
 The coordinator's ask (2026-11-04): a milestone or waystone can carry words cut into its face,

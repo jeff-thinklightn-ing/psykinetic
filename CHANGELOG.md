@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- What you and your companion wear now shows on you: a hood drawn up over the hair, a felt hat, a long cloak open in front, soft boots, an amulet at the throat and a charm at the belt (788 amended (2)).
 - Wind sighs at the mouth of a beast's cave and fades as you go in, and wolves not yet roused growl low now and then, one at a time, when you come near (795 amended (3)).
 - Your companion answers you and speaks up again near a foe that hasn't noticed anyone or only stands off watching, such as a robber guarding a crypt chest, where before she fell silent for minutes as if in a fight; only a fight under way keeps her, or townsfolk, quiet (675 amended; 675 amended (2)).
 

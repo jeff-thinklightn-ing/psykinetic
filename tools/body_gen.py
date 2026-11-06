@@ -1283,10 +1283,10 @@ def curtain(J: dict) -> Part:
 	return p
 
 
-def hood(J: dict) -> list:
+def hood(J: dict, name: str = "Hood", region: str = "Hat") -> list:
 	"""A hood: a cloth cap over the head, open round the face and closed under it, its cowl
 	down onto the shoulders."""
-	p = Part("Hood", "Hat")
+	p = Part(name, region)
 	p.bones = ["Head", "neck_01", "spine_03"]
 	base = J["Head"] + Vector((0, 0, -0.015))
 	kw, kd = pick((1.0, 1.0), (0.95, 0.97))
@@ -1560,6 +1560,77 @@ def robes(J: dict) -> list:
 	return out
 
 
+## A worn cloak (788's back slot, look "cloak"; the coordinator: "longer, to the calf, and
+## fuller" than a townsman's cape): from round the neck over the shoulders, down the back and
+## sides to the calf, open in front below the throat. Each ring a thin C (CLOAK_THICK through)
+## round the back, spanning CLOAK_SPANS of a turn: nearly closed at the neck, wrapping the
+## sides lower down, so the arms swing out of its open front. Its rings at and below the hips
+## move with the pelvis alone (pins), hung clear of the legs behind.
+CLOAK_THICK = 0.012
+
+
+def cloak_ring(centre: Vector, w: float, d: float, span: float, n: int = 16) -> list:
+	"""A C of [n] points round [centre] behind it (+Y), [w] half-wide and [d] deep, over [span]
+	of a turn: the outer arc, then the inner back along it CLOAK_THICK in."""
+	half = math.pi * span
+	outer, inner = [], []
+	for i in range(n // 2):
+		a = -half + 2.0 * half * i / (n // 2 - 1)
+		outer.append(centre + X * math.sin(a) * w + Y * math.cos(a) * d)
+		inner.append(centre + X * math.sin(a) * (w - CLOAK_THICK) + Y * math.cos(a) * (d - CLOAK_THICK))
+	return outer + list(reversed(inner))
+
+
+def cloak(J: dict) -> list:
+	p = Part("Cloak", "Tunic")
+	p.bones = ["pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "clavicle_l", "clavicle_r"]
+	n, s3, s1, pelvis = J["neck_01"], J["spine_03"], J["spine_01"], J["pelvis"]
+	knee, ankle = J["calf_l"], J["foot_l"]
+	hem = torso_rings(J)[0][0].z
+	ws, wt = m("shoulders") * m("torso"), m("torso")
+	# (height, half-width, depth, centre's y behind, span of a turn)
+	rows = [(n.z + 0.025, 0.088 * ws, 0.082 * wt, 0.005, 0.94), (n.z - 0.01, 0.175 * ws, 0.11 * wt, 0.005, 0.9),
+		(s3.z + 0.07, 0.245 * ws, 0.14 * wt, 0.01, 0.78), (s3.z - 0.02, 0.27 * ws, 0.16 * wt, 0.015, 0.66),
+		(s3.z - 0.10, 0.275 * ws, 0.17 * wt, 0.02, 0.6), (s1.z, 0.27 * wt, 0.18 * wt, 0.03, 0.58),
+		(pelvis.z, 0.27 * wt, 0.19 * wt, 0.04, 0.58), (hem, 0.275 * wt, 0.2 * wt, 0.06, 0.58),
+		(knee.z, 0.29 * wt, 0.21 * wt, 0.09, 0.58), (knee.lerp(ankle, 0.45).z, 0.3 * wt, 0.22 * wt, 0.11, 0.58)]
+	for k, (z, w, d, back, span) in enumerate(rows):
+		p.add(cloak_ring(Vector((0.0, back, z)), w, d, span))
+		if z <= pelvis.z + 0.001:
+			p.pins[k] = "pelvis"
+	return [p]
+
+
+SOFT_SOLE = 0.002
+SOFT_PAST = 0.008
+SOFT_FULL = 1.1
+
+
+def soft_boot(J: dict, side: str) -> Part:
+	"""Soft boots (788's feet slot, look "boots_soft"): over the body's own boots, a little
+	fuller, the shaft's top turned down in a loose cuff."""
+	b = boot(J, side)
+	p = Part("Worn_Boot_" + side, "Tunic")
+	p.bones = b.bones
+	rings = []
+	shaft = 4  # boot()'s shaft rings; the foot's after, heel to toe.
+	for k, r in enumerate(b.rings):
+		c = Vector((sum((q.x for q in r), 0.0) / len(r), sum((q.y for q in r), 0.0) / len(r), sum((q.z for q in r), 0.0) / len(r)))
+		if k < shaft:
+			rings.append([c + (q - c) * (1.14 if k == 0 else SOFT_FULL) for q in r])
+			continue
+		# The foot: fuller round it, its sole SOFT_SOLE under the boot's, its heel and toe past them.
+		floor = min(q.z for q in r)
+		along = -SOFT_PAST if k == len(b.rings) - 1 else SOFT_PAST if k == shaft else 0.0  # FRONT is -Y.
+		rings.append([Vector((c.x + (q.x - c.x) * SOFT_FULL, c.y + (q.y - c.y) * SOFT_FULL + along, floor - SOFT_SOLE + (q.z - floor) * SOFT_FULL))
+			for q in r])
+	top = rings[0]
+	c = Vector((sum((q.x for q in top), 0.0) / len(top), sum((q.y for q in top), 0.0) / len(top), top[0].z))
+	cuff = [c + (q - c) * 1.1 + Vector((0, 0, 0.012)) for q in top]
+	p.rings = [cuff] + rings
+	return p
+
+
 ## The parts a person may wear, by name: each its own mesh on the skeleton, shape-keyed
 ## as the body is, shown or not by the game. Bald is no hair part.
 WEARABLES = {
@@ -1582,6 +1653,11 @@ WEARABLES = {
 	"Armour_Mail": mail_armour,
 	"Armour_Plate": plate_armour,
 	"Armour_Robes": robes,
+	# Worn gear (788's worn slots; Items.worn_of(id)["look"], the coordinator's approval): in the
+	# "Tunic" region, each on its own mesh, so the game tints it its item's colour as armour is.
+	"Worn_Hood": lambda J: hood(J, "Worn_Hood", "Tunic"),
+	"Worn_Cloak": cloak,
+	"Worn_Boots": lambda J: [soft_boot(J, "l"), soft_boot(J, "r")],
 }
 ## An ally's own (decision 478): an orc may crop or bind its hair (a topknot); a kobold wears
 ## its cap or goes bare-headed.

@@ -143,6 +143,7 @@ func _ready() -> void:
 		await _test_goblin()
 		_test_humans()
 		_test_worn()
+		_test_worn_gear()
 		_test_asleep()
 		_test_person_looks()
 		_test_person_garb()
@@ -11274,6 +11275,74 @@ func _frames(count: int) -> void:
 ## Long enough for a bar to fade all the way in or out.
 func _fade() -> void:
 	await get_tree().create_timer(1.0 / Client3D.HP_BAR_FADE + 0.1).timeout
+
+
+func _test_worn_gear() -> void:
+	print("\n== worn gear on the body (788's worn slots): hood, cloak and boots as parts, the hat, amulet and charm on sockets ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to dress")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var look := puppet.get_meta("look") as PersonLook
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	var sockets: Dictionary = puppet.get_meta("sockets", {})
+	_check(model != null and sockets.has("neck") and sockets.has("belt_c") and sockets.has("head")
+			and model.find_child("Worn_Hood", true, false) != null and model.find_child("Worn_Cloak", true, false) != null
+			and model.find_child("Worn_Boots", true, false) != null, "a person's body has the worn parts and the neck and belt_c sockets")
+	if model == null or not sockets.has("neck"):
+		return
+	# Where the sockets sit on the body: the neck's at the throat, the belt's at the waist, both on its front.
+	var feet := puppet.global_position
+	var neck := (sockets["neck"] as Node3D).global_position - feet
+	var belt := (sockets["belt_c"] as Node3D).global_position - feet
+	var front := (model.global_basis * Vector3(0, 0, 1)).normalized()
+	var body_y := model.global_basis.y.length()
+	_check(neck.y > 1.2 * body_y and neck.y < 1.6 * body_y and belt.y > 0.85 * body_y and belt.y < 1.15 * body_y
+			and Vector3(neck.x, 0, neck.z).dot(front) > 0.03 and Vector3(belt.x, 0, belt.z).dot(front) > 0.05,
+			"the neck socket at the throat (%.2f m up), belt_c on the belt (%.2f m up), both on the front" % [neck.y, belt.y])
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	var visible := func(name: String) -> bool:
+		var mesh := model.find_child(name, true, false) as MeshInstance3D
+		return mesh != null and mesh.visible
+	var hair := func() -> bool:
+		return PersonLook.HAIR_PARTS.values().any(func(n: String) -> bool: return n != "" and visible.call(n))
+	look.parts.append("Hair_Cropped")  # Hair, to be hooded.
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	slots[Items.HEAD] = "hood"
+	slots[Items.FEET] = "soft_boots"
+	slots[Items.NECK] = "encolpion_amulet"
+	slots[Items.CHARM] = "bear_claw_charm"
+	player.slots = slots
+	_rig._process(0.0)
+	var hood := model.find_child("Worn_Hood", true, false) as MeshInstance3D
+	var boots := model.find_child("Worn_Boots", true, false) as MeshInstance3D
+	_check(hood.visible and hood.get_instance_shader_parameter("tunic") == Items.color_of("hood") and not hair.call()
+			and boots.visible and boots.get_instance_shader_parameter("tunic") == Items.color_of("soft_boots") and not visible.call("Worn_Cloak"),
+			"the hood up in its colour, the hair under it hidden; the soft boots on; no cloak")
+	var amulet := (sockets["neck"] as Node3D).get_node_or_null("Worn") as Node3D
+	var charm := (sockets["belt_c"] as Node3D).get_node_or_null("Worn") as Node3D
+	_check((amulet != null) == (ArtKit.has("worn.encolpion_amulet") or ArtKit.has("item.encolpion_amulet"))
+			and (charm != null) == ArtKit.has("item.bear_claw_charm"),
+			"the amulet at the neck (%s), the charm at the belt (%s), each as its art is made" % [amulet != null, charm != null])
+	slots[Items.HEAD] = "felt_hat"
+	player.slots = slots
+	_rig._process(0.0)
+	var hat := (sockets["head"] as Node3D).get_node_or_null("Worn") as Node3D
+	_check(not hood.visible and hair.call() and (hat != null) == ArtKit.has("worn.felt_hat"), "the hood off for the felt hat: the hair again, the hat on the head")
+	player.slots = was
+	_rig._process(0.0)
+	_check(not hood.visible and not boots.visible and (sockets["head"] as Node3D).get_node_or_null("Worn") == null
+			and (sockets["neck"] as Node3D).get_node_or_null("Worn") == null and hair.call(), "all off: the look's own again")
+	look.parts.erase("Hair_Cropped")
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	_rig._process(0.0)
 
 
 func _test_worn() -> void:

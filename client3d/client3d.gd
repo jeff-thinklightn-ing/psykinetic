@@ -17430,6 +17430,7 @@ func _sync_puppets() -> void:
 		_sync_held(entity, puppet)
 		_slide_reach(puppet)
 		_sync_worn(entity, puppet)
+		_sync_worn_gear(entity, puppet)  # After the armour: a cloak over it, the cape under it.
 		if entity is Resident:
 			_sync_carried(entity as Resident, puppet, id)
 			_sync_addressing(entity as Resident, puppet)
@@ -18833,6 +18834,10 @@ static func _attach_sockets(scene: Node3D, sizes: Dictionary, model_scale: float
 	var crown := _head_socket(skeleton) if sizes.get("crown", false) else []
 	if not crown.is_empty():
 		table["head"] = crown
+		for worn: String in WORN_SOCKETS:
+			var at := _front_socket(skeleton, worn)
+			if not at.is_empty():
+				table[worn] = at
 	for name: String in table:
 		var bone: String = table[name][0]
 		if skeleton.find_bone(bone) < 0:
@@ -20726,6 +20731,117 @@ static func _head_socket(skeleton: Skeleton3D) -> Array:
 				back = minf(back, v.z)
 		_crowns[body.mesh] = Vector3(rest.origin.x, top, (front + back) * 0.5 if front > back else rest.origin.z)
 	return ["Head", Transform3D(rest.basis.orthonormalized().inverse() * SHOULDER_LEVEL, rest.affine_inverse() * (_crowns[body.mesh] as Vector3))]
+
+
+## Worn gear's sockets on a person's front (788's worn slots; the coordinator's
+## approval), level in the body's frame as "head" is (+x forward, +y up):
+## "neck", the amulet's, on UpperChest where the cord lies at the collarbone
+## notch (the Body's front at the Neck bone's height, on the middle line);
+## "belt_c", a charm's, on Hips at the belt's front, BELT_C_LEFT to the left of
+## the buckle (between the sheath's hip_l and the lantern's belt_r), BELT_C_UP
+## over the hips' bone. Each [bone it rides, height bone, height, across],
+## measured once per body mesh off its rest; [] without the bones or the Body.
+const WORN_SOCKETS := {"neck": ["UpperChest", "Neck", 0.0, 0.0], "belt_c": ["Hips", "Hips", 0.075, 0.07]}
+## How near the height and the line across a vertex counts, and how far out
+## from the front the socket stands (the cord's or the thong's thickness).
+const FRONT_BAND := 0.025
+const FRONT_OUT := 0.004
+static var _fronts := {}
+static func _front_socket(skeleton: Skeleton3D, name: String) -> Array:
+	var spec: Array = WORN_SOCKETS[name]
+	var ride := skeleton.find_bone(spec[0])
+	var level := skeleton.find_bone(spec[1])
+	var body := skeleton.get_node_or_null("Body") as MeshInstance3D
+	if ride < 0 or level < 0 or body == null or body.mesh == null:
+		return []
+	var key := [body.mesh, name]
+	if not _fronts.has(key):
+		var height := skeleton.get_bone_global_rest(level).origin.y + float(spec[2])
+		var across := float(spec[3])
+		var front := -INF
+		var vertices: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		for v in vertices:
+			if absf(v.y - height) < FRONT_BAND and absf(v.x - across) < FRONT_BAND:
+				front = maxf(front, v.z)
+		if front == -INF:
+			return []
+		_fronts[key] = Vector3(across, height, front + FRONT_OUT)
+	var rest := skeleton.get_bone_global_rest(ride)
+	return [spec[0], Transform3D(rest.basis.orthonormalized().inverse() * SHOULDER_LEVEL, rest.affine_inverse() * (_fronts[key] as Vector3))]
+
+
+## Worn gear drawn on a person (788's worn slots; the coordinator's approval):
+## what a player or a companion has in its head, back, feet, neck and charm
+## slots. A row whose worn "look" (Items.worn_of) names a body part shows
+## that part (WORN_PARTS: body_gen's Worn_*), tinted its item's colour as
+## armour is; a hood hides the hair and any headwear under it, a cloak the
+## garb's cape. A row without one hangs its art on its slot's socket
+## (WORN_SOCKET_OF): art-kit's worn.<id> if made, else its item.<id> (the
+## bear's-claw charm hangs from its own loop); a hat hides the look's own
+## headwear. Rings draw nothing. Off, the look's own parts again. A body
+## without the part or the socket (an ally's) wears nothing new.
+const WORN_PARTS := {"hood": "Worn_Hood", "cloak": "Worn_Cloak", "boots_soft": "Worn_Boots"}
+const WORN_SOCKET_OF := {Items.HEAD: "head", Items.NECK: "neck", Items.CHARM: "belt_c"}
+const WORN_DRAWN: Array[int] = [Items.HEAD, Items.BACK, Items.FEET, Items.NECK, Items.CHARM]
+const HAIR_MESHES: Array[String] = ["Hair_Cropped", "Hair_Bound", "Hair_Long"]
+func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
+	if not (entity is Player or entity is Companion) or not puppet.has_meta("look"):
+		return
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	if model == null:
+		return
+	var ids: Array[String] = []
+	for slot in WORN_DRAWN:
+		ids.append(entity.slots[slot] if slot < entity.slots.size() else "")
+	var key := "|".join(ids) + "|" + str(model.get_meta("worn", ""))
+	if key == str(model.get_meta("worn_gear", "")):
+		return
+	model.set_meta("worn_gear", key)
+	var look := puppet.get_meta("look") as PersonLook
+	var sockets: Dictionary = puppet.get_meta("sockets", {})
+	var shown := {}  # Worn_* part -> its item.
+	var hats := false
+	for i in WORN_DRAWN.size():
+		var id := ids[i]
+		var slot := WORN_DRAWN[i]
+		var word := str(Items.worn_of(id).get("look", "")) if not id.is_empty() else ""
+		if WORN_PARTS.has(word):
+			shown[WORN_PARTS[word]] = id
+		var socket := sockets.get(str(WORN_SOCKET_OF.get(slot, ""))) as Node3D
+		if socket == null:
+			continue
+		var old := socket.get_node_or_null("Worn")
+		if old != null:
+			socket.remove_child(old)
+			old.queue_free()
+		if id.is_empty() or not word.is_empty():
+			continue
+		var art := "worn." + id if ArtKit.has("worn." + id) else str(Items.def(id).get("art", "item." + id))
+		if not ArtKit.has(art):
+			continue
+		var piece := ArtKit.instance(art)
+		piece.name = "Worn"
+		socket.add_child(piece)
+		hats = hats or slot == Items.HEAD
+	var armoured := false
+	for mesh: MeshInstance3D in model.find_children("Armour_*", "MeshInstance3D", true, false):
+		armoured = armoured or mesh.visible
+	var hooded := shown.has("Worn_Hood") and model.find_child("Worn_Hood", true, false) != null
+	var cloaked := shown.has("Worn_Cloak") and model.find_child("Worn_Cloak", true, false) != null
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		var name := String(mesh.name)
+		if name.begins_with("Worn_"):
+			mesh.visible = shown.has(name)
+			if mesh.visible:
+				mesh.set_instance_shader_parameter("tunic", Items.color_of(shown[name]))
+		elif name in HAIR_MESHES:
+			# Under a worn hat, the look's own hair even where its own hood had hidden it.
+			var own_hair := hats and name == str(PersonLook.HAIR_PARTS.get(look.hair, ""))
+			mesh.visible = (name in look.parts or own_hair) and not hooded
+		elif name in HEADWEAR_MESHES:
+			mesh.visible = name in look.parts and not hooded and not hats
+		elif name == "Cape":
+			mesh.visible = name in look.parts and not cloaked and not armoured
 
 
 ## A hat by its look word (npc's look_spec "hat=<word>"; the bard's): HATS'
