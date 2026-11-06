@@ -12,6 +12,8 @@ extends RefCounted
 ## trade> (npc's look_spec writes it from the card): a trade dresses them
 ## (TRADE_GARB) where no garb or headwear is said, the card's own words
 ## winning; a person's face its own (FACE_KEYS, seeded, never said);
+## clothes=forest|grave (793: a bandit's or a grave robber's tunic and
+## trousers in its own colours, CLOTHES, by the same draws as a town's);
 ## worn=leather|mail|plate|robes (armour, a resident's: npc's look_spec;
 ## a player's or a companion's is their worn item, Client3D._sync_worn);
 ## and people=orc or people=kobold (decision 478): one of the Blood Rot's
@@ -46,6 +48,17 @@ const OLD_GREY := 0.7
 ## Clothes when the look gives none (a player's tunic is their colour instead).
 const TUNICS := ["838065", "6b7a8a", "8a5a4a", "5f6e4e", "9a8a6a", "6a5a7a"]
 const TROUSERS := ["533e2d", "3f3a34", "4a4a3e", "5a4632"]
+## clothes= (793, pc-character's side): a foe's own colours for the tunic and
+## trousers in place of a town's, [tunics, trousers]. forest, the bandits':
+## moss, pine, olive and bark, darker and greener than any town's; grave, the
+## grave robbers' (the Mound-breakers): greys and dirt browns, no green; so the
+## two, both hooded, are told apart at a glance. The hood and vest are leather,
+## on the palette, the same for all.
+const FOREST_TUNICS := ["4a5a32", "3e4f2e", "5a6438", "4f4a2e", "3f5236"]
+const FOREST_TROUSERS := ["3a3424", "2f3a26", "4a3e2a", "35301f"]
+const GRAVE_TUNICS := ["6e6a64", "5a5652", "7a6e60", "605448", "4e4a46"]
+const GRAVE_TROUSERS := ["3e3a36", "4a4038", "352f2a", "524a42"]
+const CLOTHES := {"forest": [FOREST_TUNICS, FOREST_TROUSERS], "grave": [GRAVE_TUNICS, GRAVE_TROUSERS]}
 ## Hair styles by body, as the seed picks them (bald among a man's, more so old).
 const HAIR_STYLES := {"male": ["cropped", "cropped", "long", "bald"], "female": ["bound", "bound", "long"]}
 const HAIR_PARTS := {"cropped": "Hair_Cropped", "bound": "Hair_Bound", "long": "Hair_Long", "bald": ""}
@@ -136,6 +149,8 @@ var hair_colour := ""
 var beard := ""
 var skin := 1
 var garb := "none"
+## The clothes word the look said ("forest", "grave": CLOTHES), else "".
+var clothes := ""
 var trade := ""
 ## The armour look its words say it wears (worn=), "" for none.
 var worn := ""
@@ -207,8 +222,16 @@ func _resolve(body_by_default: StringName) -> void:
 		hair_name = str(words["hair_colour"])
 	colours["hair"] = Color(HAIR_COLOURS[hair_name])
 	hair_colour = hair_name
-	colours["tunic"] = Color(TUNICS[rng.randi() % TUNICS.size()])
-	colours["trousers"] = Color(TROUSERS[rng.randi() % TROUSERS.size()])
+	var tunic_roll := rng.randi()
+	var trousers_roll := rng.randi()
+	colours["tunic"] = Color(TUNICS[tunic_roll % TUNICS.size()])
+	colours["trousers"] = Color(TROUSERS[trousers_roll % TROUSERS.size()])
+	if CLOTHES.has(str(words.get("clothes", ""))):
+		# The same draws, on the foe's own colours (793, pc-character's side).
+		clothes = str(words["clothes"])
+		var own: Array = CLOTHES[clothes]
+		colours["tunic"] = Color(own[0][tunic_roll % (own[0] as Array).size()])
+		colours["trousers"] = Color(own[1][trousers_roll % (own[1] as Array).size()])
 	# Parts.
 	var styles: Array = HAIR_STYLES[String(body)]
 	hair = _word("hair", HAIR_PARTS.keys(), rng, styles)

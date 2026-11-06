@@ -163,6 +163,7 @@ func _ready() -> void:
 		_test_allies()
 		_test_barrow_dead()
 		_test_person_monster()
+		_test_bandit_look()
 		_test_shadows_in_view()
 		_test_no_2d_under_3d()
 		await _test_doors_swing()
@@ -7511,6 +7512,56 @@ func _test_person_monster() -> void:
 	_check(plain_scene == null or not plain_scene.scene_file_path in [Client3D.HUMAN["scene"], Client3D.HUMAN_F["scene"]],
 			"without the words, drawn as before")
 	World.despawn(plain)
+	_rig._process(0.0)
+
+
+## The bandits dressed for the forest (793, pc-character's side): their rows' clothes=forest draws
+## the tunic and trousers from PersonLook's FOREST_TUNICS and FOREST_TROUSERS, by the same draws as a
+## town's colours, so every other word of a seed is as it was; a vest over it, the hood up. A grave
+## robber's clothes=grave its greys and dirt browns (enemy-ai's rows), no vest; neither in a town's colours.
+func _test_bandit_look() -> void:
+	print("\n== the bandits dressed for the forest (793, pc-character's side) ==")
+	var plain := PersonLook.make("seed=4242 headwear=hood garb=vest apron=no")
+	var forest := PersonLook.make("seed=4242 headwear=hood garb=vest apron=no clothes=forest")
+	_check(forest.clothes == "forest" and plain.clothes == "" and forest.build == plain.build and forest.hair == plain.hair
+			and forest.skin == plain.skin and forest.keys == plain.keys and forest.parts == plain.parts and forest.scale == plain.scale,
+			"clothes=forest changes only the clothes' colours: the seed's body, face and parts the same")
+	var forest_tunics := PersonLook.FOREST_TUNICS.map(func(h: String) -> Color: return Color(h))
+	var forest_trousers := PersonLook.FOREST_TROUSERS.map(func(h: String) -> Color: return Color(h))
+	var town_tunics := PersonLook.TUNICS.map(func(h: String) -> Color: return Color(h))
+	var grave_tunics := PersonLook.GRAVE_TUNICS.map(func(h: String) -> Color: return Color(h))
+	var grave_trousers := PersonLook.GRAVE_TROUSERS.map(func(h: String) -> Color: return Color(h))
+	var seen := {}
+	var off := []
+	for seed in 40:
+		var each := PersonLook.make("seed=%d clothes=forest" % seed)
+		var tunic: Color = each.colours["tunic"]
+		if not tunic in forest_tunics or not each.colours["trousers"] in forest_trousers or tunic in town_tunics:
+			off.append(seed)
+		seen[tunic.to_html(false)] = true
+		var grave := PersonLook.make("seed=%d clothes=grave" % seed)
+		var grey: Color = grave.colours["tunic"]
+		if grave.clothes != "grave" or not grey in grave_tunics or not grave.colours["trousers"] in grave_trousers or grey in town_tunics or grey in forest_tunics:
+			off.append(-seed - 1)
+	_check(off.is_empty() and seen.size() >= 3, "40 seeds: each in a forest (or with clothes=grave, a grave) tunic and trousers, %d forest tunics of %d among them (off: %s)" % [
+			seen.size(), PersonLook.FOREST_TUNICS.size(), off])
+	var shown := []
+	for kind: String in ["bandit", "bandit_brute", "robber"]:
+		var entity := _spawn_imp(Vector2i(9 + shown.size(), 6), kind)
+		_rig._process(0.0)
+		var puppet: Node3D = _rig._puppets[entity.get_instance_id()]
+		var scene := puppet.get_node_or_null("Body/Model") as Node3D
+		var body := scene.find_child("Body", true, false) as MeshInstance3D if scene != null else null
+		var tunic: Variant = body.get_instance_shader_parameter("tunic") if body != null else null
+		var vest := scene.find_child("Vest", true, false) as MeshInstance3D if scene != null else null
+		var hood := scene.find_child("Hood", true, false) as MeshInstance3D if scene != null else null
+		var dressed: bool = tunic is Color and (tunic in (grave_tunics if kind == "robber" else forest_tunics))
+		_check(dressed and hood != null and hood.visible and vest != null and vest.visible == (kind != "robber"),
+				"%s: %s, the hood up, %s" % [kind, ("in the forest's %s" if kind != "robber" else "in the grave's %s") % (tunic.to_html(false) if tunic is Color else "nothing"),
+				"a vest over it" if vest != null and vest.visible else "no vest"])
+		shown.append(entity)
+	for entity: Monster in shown:
+		World.despawn(entity)
 	_rig._process(0.0)
 
 

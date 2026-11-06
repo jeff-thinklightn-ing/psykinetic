@@ -42420,3 +42420,26 @@ group is half as strong, raiding with the bandit kinds on a layer of their own);
 monster_test _test_bandit_rows (the rows fight as the robbers', drawn in a vest; an unknown kind drawn
 plainly); world_map_test (the factions, the layers). Server and data only, protocol unchanged, no
 new class_name.
+
+## 793, pc-character's side: the bandits dressed for the forest
+
+PersonLook learns "clothes=forest", the word enemy-ai's bandit rows already said (c5486e10; release's
+label). It draws the tunic and trousers from FOREST_TUNICS (moss, pine, olive, bark) and FOREST_TROUSERS
+by the same draws that pick a town's colours (TUNICS, TROUSERS), so a seed's body, face, hair and parts
+are the same with the word or without it, and a look without it is unchanged. The hood and the vest are
+leather on art-kit's palette, the same for robbers and bandits: a bandit is told from a grave robber by
+its forest clothes and its vest (the robber wears none), and the robber by its grave clothes below. PersonLook.clothes says "forest" when the word
+was given, "" when not. "clothes=grave" (enemy-ai's ask: the grave robbers, the Mound-breakers, told
+from the bandits at a glance) draws them from GRAVE_TUNICS and GRAVE_TROUSERS, greys and dirt browns with
+no green; the robber and robber_brute rows in levels/monsters.json say it (enemy-ai's rows, its one-word
+edit made here with its leave). PersonLook.CLOTHES holds each word's [tunics, trousers].
+A monster drawn as a person (Client3D.person_words: robbers, bandits) now wears its look's tunic. Its
+puppet's tint is its 2D sprite's shade by mass (Monster.SHADE_LIGHT to SHADE_DARK), and _make_model put
+that on the tunic as a player's colour, so every robber had been drawn in the same red (c66d64). The
+puppet's "look_dresses" meta, set for any monster with person words, keeps the tunic white, as an
+ally's is, so PersonLook.apply's colours stand. Players, companions and residents are unchanged.
+view_test _test_bandit_look: forty seeds in forest colours, the words' other draws unchanged, and a
+spawned bandit, a big bandit and a robber each drawn in its own colours with its hood, and its vest or
+none. CHANGELOG bullet (voice's words) for the robbers, live in the barrow; the bandits' comes with maps'
+camps (enemy-ai's, release).
+Client only, protocol unchanged, no new class_name.

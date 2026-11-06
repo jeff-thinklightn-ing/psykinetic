@@ -128,7 +128,7 @@
 	},
 	"robber": {
 		"label": "Grave robber",
-		"person": "headwear=hood garb=none apron=no",
+		"person": "headwear=hood garb=none apron=no clothes=grave",
 		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10, "sight_range": 5},
 		"senses": {"cone": 120, "night": 0.2, "hearing": 1.0, "alert_sight": 2, "notice": 1.0},
 		"tactic": "flank",
@@ -146,7 +146,7 @@
 	},
 	"robber_brute": {
 		"label": "Big grave robber",
-		"person": "headwear=hood garb=none apron=no build=heavy stature=tall",
+		"person": "headwear=hood garb=none apron=no clothes=grave build=heavy stature=tall",
 		"body": {"mass": 110.0, "move_ticks": 4.5, "max_hp": 20, "attack_ticks": 14, "attack_damage": 2, "sight_range": 5},
 		"senses": {"cone": 120, "night": 0.2, "hearing": 0.8, "alert_sight": 1, "notice": 0.7},
 		"tactic": "heavy",

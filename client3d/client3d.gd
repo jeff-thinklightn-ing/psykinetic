@@ -17085,8 +17085,10 @@ static func _make_model(model: Dictionary, puppet: Node3D) -> Node3D:
 			elif own != null and own.resource_name == GHOST_MATERIAL:
 				mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	if model.get("parts", false):
-		# A person's tunic in their colour; an ally's in its look's.
-		var tunic: Color = Color.WHITE if model.has("people") else puppet.get_meta("tint", Color.WHITE)
+		# A person's tunic in their colour; an ally's in its look's, and a monster drawn as a person's
+		# (793, pc-character's side: its sprite's tint is its mass's shade, not its clothes, and drew
+		# every robber and bandit in the same red).
+		var tunic: Color = Color.WHITE if model.has("people") or puppet.get_meta("look_dresses", false) else puppet.get_meta("tint", Color.WHITE)
 		_dress(scene, tunic)
 		if puppet.has_meta("look"):
 			(puppet.get_meta("look") as PersonLook).apply(scene, tunic)
@@ -19888,6 +19890,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 	var sprite := entity.get_node_or_null("Sprite") as Sprite2D
 	material.albedo_color = sprite.modulate if sprite != null else Color.WHITE
 	puppet.set_meta("tint", material.albedo_color)  # A model's "tint" material.
+	if not person_words(entity).is_empty():
+		puppet.set_meta("look_dresses", true)  # Its look's clothes, not its sprite's tint (_make_model).
 	material.roughness = 0.8
 	# A touch of glow so a body reads in the dark away from any light.
 	material.emission_enabled = true
