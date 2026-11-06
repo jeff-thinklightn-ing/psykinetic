@@ -6321,7 +6321,9 @@ func _test_far_landmarks() -> void:
 		var rise := rad_to_deg(atan2(top.y - eye.y, Vector2(top.x - eye.x, top.z - eye.z).length()))
 		placed = placed and (rise <= top_edge - Client3D.FAR_TOP_MARGIN + 0.01 or is_equal_approx(shrink, Client3D.FAR_SHRINK_MOST))
 		var geometry: GeometryInstance3D = mark["meshes"][0]
-		shares[String(node.name)] = float(geometry.get_instance_shader_parameter("haze_share"))
+		shares[String(node.name)] = Client3D.far_haze(float(geometry.get_instance_shader_parameter("true_distance")),
+				_rig._environment.fog_depth_begin, _rig._environment.fog_depth_end)
+		placed = placed and is_equal_approx(float(geometry.get_instance_shader_parameter("true_distance")), distance)
 		placed = placed and geometry.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF and geometry.material_override == _rig._far_material
 	_check(placed, "each on its true line from the camera, no further than FAR_DRAW and scaled by as much, shrunk to keep its top in frame (top edge %.1f degrees); no shadows" % top_edge)
 	# More sky on screen: nearer true size, with no code change.
@@ -6337,10 +6339,21 @@ func _test_far_landmarks() -> void:
 	_rig._camera.fov = fov_was
 	_rig._place_far_landmarks()
 	_check(not tower.is_empty() and grown > small * 1.5, "with more sky on screen the tower is drawn nearer its true size (%.3f to %.3f)" % [small, grown])
-	_check(shares.get("Far_tower_over_the_mine", 0.0) > shares.get("Far_castle", 1.0) and shares.get("Far_tower_over_the_mine", 1.0) <= Client3D.FAR_HAZE_MOST,
-			"the far tower more hazed than the castle (%s)" % [shares])
-	_check(_rig._far_material.get_shader_parameter("haze") == _rig._sky_horizon and _rig._sky_material.get_shader_parameter("sky_horizon_color") == _rig._sky_horizon,
-			"their haze the sky's horizon colour")
+	_check(shares.get("Far_tower_over_the_mine", 0.0) > shares.get("Far_castle", 1.0) and shares.get("Far_tower_over_the_mine", 1.0) < 1.0
+			and shares.get("Far_castle", 1.0) < 0.5,
+			"the far tower more hazed than the castle, both seen; the castle reads (%s)" % [shares])
+	_check(_rig._far_material.get_shader_parameter("haze") == _rig._environment.fog_light_color
+			and is_equal_approx(float(_rig._far_material.get_shader_parameter("depth_end")), _rig._environment.fog_depth_end),
+			"their haze the scene fog's colour, on its curve")
+	# 623 amended (3): one curve with the land's own haze to the hand-over,
+	# lighter past it; full at the fog's end only for what is no landmark.
+	var b := _rig._environment.fog_depth_begin
+	var e := _rig._environment.fog_depth_end
+	var at_hand := Client3D.far_haze(Client3D.FAR_HAND_OVER, b, e)
+	_check(is_equal_approx(Client3D.far_haze(60.0, b, e), clampf((60.0 - b) / (e - b), 0.0, 1.0))
+			and absf(Client3D.far_haze(Client3D.FAR_HAND_OVER + 0.01, b, e) - at_hand) < 0.001
+			and Client3D.far_haze(e + 50.0, b, e) < 0.6,
+			"a far piece's haze the land's own to the hand-over, no step there, lighter past the land's edge (%.3f at %.0f m)" % [Client3D.far_haze(e + 50.0, b, e), e + 50.0])
 	# The camera moved sideways: the castle seen along another line.
 	var castle_node: Node3D = root.get_node_or_null("Far_castle")
 	var before := (castle_node.position - eye).normalized() if castle_node != null else Vector3.ZERO
@@ -6412,10 +6425,11 @@ func _test_low_camera() -> void:
 			"half the distance off, the wheel's low pitch above the ground (%.1f, %.1f)" % [offset.length(), rad_to_deg(asin(offset.normalized().y))])
 	var look_fog: float = _rig.canopied_look(_rig.weathered_look(_rig.seasoned_look(_rig._look, Season.at(World.fields.region, DayNight.now())), _rig._weather_view.weather),
 			_rig._canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)["fog_density"]
-	_check(is_equal_approx(_rig._environment.fog_density, look_fog + Client3D.LOW_FOG)
+	_check(_rig._environment.fog_mode == Environment.FOG_MODE_DEPTH and _rig._environment.fog_depth_end <= Client3D.LOW_EDGE
+			and _rig._environment.fog_depth_begin <= Client3D.LOW_CLEAR and _rig._environment.fog_depth_begin < _rig._environment.fog_depth_end
 			and is_equal_approx(_rig._environment.fog_aerial_perspective, Client3D.LOW_AERIAL)
 			and _rig._environment.background_mode == Environment.BG_SKY,
-			"LOW_FOG of haze over the look's own, LOW_AERIAL of the sky in it, the day's sky behind (%.4f vs %.4f)" % [_rig._environment.fog_density, look_fog])
+			"depth haze, clear out to at most LOW_CLEAR and full by LOW_EDGE, LOW_AERIAL of the sky in it, the day's sky behind (%.0f to %.0f m; look %.4f)" % [_rig._environment.fog_depth_begin, _rig._environment.fog_depth_end, look_fog])
 	_check(_rig._sun.directional_shadow_mode == DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 			and is_equal_approx(_rig._sun.directional_shadow_max_distance, Client3D.LOW_SHADOW_DISTANCE),
 			"the sun's shadows out to LOW_SHADOW_DISTANCE in two splits")

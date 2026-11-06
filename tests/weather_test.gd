@@ -218,13 +218,25 @@ func _test_low_view() -> void:
 	_check(is_equal_approx(Client3D.hazed_density(base, weather, false, near), storm["fog_density"]) and weather > 0.0,
 			"ortho's haze is the look's, as ever")
 	# Through the weather's share alone, the aim as far off as ortho's.
-	_check(is_equal_approx((low - base - Client3D.LOW_FOG) * near, weather * Client3D.CAMERA_DISTANCE),
-			"under the low camera the storm's haze to the aim reads as ortho's (%.4f over %.0f, %.4f over %.0f)" % [low - base - Client3D.LOW_FOG, near, weather, Client3D.CAMERA_DISTANCE])
+	_check(is_equal_approx(low * near, weather * Client3D.CAMERA_DISTANCE),
+			"under the low camera the storm's haze to the aim reads as ortho's (%.4f over %.0f, %.4f over %.0f)" % [low, near, weather, Client3D.CAMERA_DISTANCE])
 	_check(is_equal_approx(Client3D.hazed_density(base, weather, true, 8.0), low) and Client3D.hazed_density(base, weather, true, near * 2.0) < low,
 			"zoomed in nearer than the rest, the storm's haze no thicker; further out, thinner")
 	var clear := Client3D.weathered_look(noon, Weather.KINDS["clear"])
-	_check(is_equal_approx(Client3D.hazed_density(clear["fog_density"], clear["fog_weather"], true, near), float(clear["fog_density"]) + Client3D.LOW_FOG),
-			"clear air: only the low camera's own haze added")
+	_check(is_zero_approx(Client3D.hazed_density(clear["fog_density"], clear["fog_weather"], true, near)),
+			"clear air: no haze but the low camera's depth haze")
+	# 623 amended (3): depth haze, clear to LOW_CLEAR, full at LOW_EDGE;
+	# the weather pulls both in, a fog or storm's clear stretch gone.
+	var calm := Client3D.low_haze(0.0)
+	var foggy := Client3D.low_haze(Client3D.hazed_density(0.0, float(Client3D.weathered_look(noon, Weather.KINDS["fog"])["fog_weather"]), true, near))
+	var stormy := Client3D.low_haze(low)
+	_check(is_equal_approx(calm.x, Client3D.LOW_CLEAR) and is_equal_approx(calm.y, Client3D.LOW_EDGE)
+			and foggy.y < calm.y * 0.6 and foggy.x < 10.0 and stormy.y < Client3D.LOW_EDGE and stormy.x < calm.x,
+			"the low haze: clear to %.0f m, full at %.0f; in fog %.0f to %.0f; in a storm %.0f to %.0f" % [calm.x, calm.y, foggy.x, foggy.y, stormy.x, stormy.y])
+	_check(is_equal_approx(Client3D.low_dusk(2.0), 1.0) and is_equal_approx(Client3D.low_dusk(-3.0), 1.0)
+			and is_zero_approx(Client3D.low_dusk(60.0)) and is_zero_approx(Client3D.low_dusk(-30.0))
+			and Client3D.low_dusk(10.0) > 0.0 and Client3D.low_dusk(10.0) < 1.0,
+			"dusk's lift under the low camera: whole near the horizon, none at noon or deep night, easing between")
 	var grey := Client3D.hazed_horizon(storm, Weather.KINDS["storm"])
 	_check(Client3D.hazed_horizon(clear, Weather.KINDS["clear"]) == clear["horizon"] and grey.is_equal_approx(storm["fog"]),
 			"the horizon: the sky's in clear air, the haze's colour in a storm")
@@ -404,6 +416,10 @@ func _test_canopy() -> void:
 	_check(under["ambient_energy"] < noon["ambient_energy"] * 0.5 and under["ambient"].g > under["ambient"].b
 			and under["energy"] == noon["energy"], "under the roof the ambient darker and greener; the sun's left to the crowns' shadows")
 	_check(Client3D.canopied_look(noon, 0.0) == noon, "no canopy, no change")
+	var dusk_under := Client3D.canopied_look(noon, 1.0, Client3D.LOW_DUSK_CANOPY)
+	_check(is_equal_approx(dusk_under["ambient_energy"], float(noon["ambient_energy"]) * (1.0 - Client3D.LOW_DUSK_CANOPY))
+			and dusk_under["ambient_energy"] > under["ambient_energy"],
+			"at dusk under the low camera the canopy cuts the ambient less (623 amended (3))")
 	var LightShafts := preload("res://client3d/light_shafts.gd")
 	var clear: float = LightShafts.strength_for(1.0, Weather.KINDS["clear"])
 	_check(clear > 0.5 and LightShafts.strength_for(0.0, Weather.KINDS["clear"]) == 0.0

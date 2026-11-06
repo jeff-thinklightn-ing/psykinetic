@@ -462,8 +462,8 @@ const CAMERA_PITCH := 50.0
 ## a perspective camera LOW_PITCH above the ground at LOW_FOV, half the
 ## distance off (LOW_DISTANCE_SHARE of CAMERA_DISTANCE; the wheel, a peek
 ## and the mourning pull-back scale that distance, as they do the ortho
-## size), seeing LOW_FAR out under LOW_FOG of haze over the look's own
-## fog with LOW_AERIAL of the sky in it, the sun's shadows out to
+## size), seeing LOW_FAR out, its haze clear out to LOW_CLEAR and full at
+## LOW_EDGE (low_haze; 623 amended (3)) with LOW_AERIAL of the sky in it, the sun's shadows out to
 ## LOW_SHADOW_DISTANCE in two splits so the edge where they stop is not
 ## in the middle of the view. The ridge rule (525) lifts it as before. Under stone, and with the toggle off, the
 ## ortho camera exactly as before. What is drawn and known stays within
@@ -478,7 +478,30 @@ const LOW_PITCH_NEAR := 12.0
 const LOW_FOV := 50.0
 const LOW_DISTANCE_SHARE := 0.5
 const LOW_FAR := 300.0
-const LOW_FOG := 0.012
+## The low camera's haze (623 amended (3); Jeff: "i dont like the haze at
+## all really"): none out to LOW_CLEAR m, then closing linearly to full at
+## LOW_EDGE m, so the land is clear and its edge (Border's canopy and far
+## floor, the void past them) never shows (Godot's depth fog). The weather's
+## haze pulls it in: full at LOW_WEATHER_FULL over the weather's density (as
+## far as that density's exponential fog is about 78% thick), and the clear
+## stretch gone once that density reaches LOW_WEATHER_THICK.
+const LOW_CLEAR := 150.0
+const LOW_EDGE := 280.0
+const LOW_WEATHER_FULL := 1.5
+const LOW_WEATHER_THICK := 0.006
+## Dusk and dawn under the low camera without the haze that lifted them
+## (623 amended (3), the coordinator on the stills: the forest went black):
+## the ambient LOW_DUSK_LIFT more and LOW_DUSK_WARM toward the haze's colour
+## while the sun is within LOW_DUSK_FULL (degrees) of the horizon, easing to
+## nothing by LOW_DUSK_EDGE either side (low_dusk).
+const LOW_DUSK_LIFT := 1.0
+const LOW_DUSK_WARM := 0.15
+const LOW_DUSK_FULL := Vector2(-5.0, 6.0)
+const LOW_DUSK_EDGE := Vector2(-14.0, 14.0)
+## The canopy's cut to the ambient at dusk under the low camera (in place of
+## CANOPY_AMBIENT, by low_dusk): the low sun is in the trees' shadow, and
+## without the haze a meadow beside the wood went black.
+const LOW_DUSK_CANOPY := 0.35
 const LOW_AERIAL := 0.6
 ## How far below the horizon the sky's ground stays the haze's colour under
 ## the low camera (the sky shader's ground_curve, as ProceduralSky's): the sliver past
@@ -533,8 +556,12 @@ const FAR_MEADOW_FADE := 8.0
 ## further than FAR_DRAW (inside LOW_FAR) is drawn at FAR_DRAW along its line
 ## from the camera, scaled by FAR_DRAW over its distance: the same on screen,
 ## and it still shifts against the land as the camera moves. The fog off on
-## it (far.gdshader), its own haze toward the sky's horizon by its true
-## distance: FAR_HAZE_MOST of it, 1 - exp(-distance / FAR_HAZE_SPAN). A
+## it (far.gdshader), its haze by its true distance on the scene's own curve
+## (623 amended (3)): the low camera's depth fog (low_haze) out to
+## FAR_HAND_OVER, so a piece handed over to the real thing there can't pop;
+## past it lighter, landmarks being what is meant to be seen, rising from
+## there toward FAR_HAZE_MOST (or the fog there, if thicker) as 1 -
+## exp(-(distance - FAR_HAND_OVER) / FAR_HAZE_SPAN), toward the fog's colour. A
 ## landmark on a cell this view draws (its land or a glimpse), or in this
 ## level or one it links to (WorldMap.ways_from, read at each build: the
 ## glimpse and the crossing show those), is left to them. The low camera
@@ -547,6 +574,7 @@ const FAR_MEADOW_FADE := 8.0
 const FAR_DRAW := 270.0
 const FAR_HAZE_SPAN := 450.0
 const FAR_HAZE_MOST := 0.85
+const FAR_HAND_OVER := 120.0
 const FAR_TOP_MARGIN := 0.5
 ## The least share of its true size a landmark is shrunk to.
 const FAR_SHRINK_MOST := 0.05
@@ -2349,6 +2377,8 @@ var _sky_step := -1
 ## by day there (0..1); the weather drawn (decision 309).
 var _look := {}
 var _look_daylight := 0.0
+## The sun's height the look was last worked out at (degrees).
+var _look_elevation := 90.0
 ## The haze's density (look's own, the weather's share), for _set_haze.
 var _haze := Vector2.ZERO
 var _weather_view: WeatherView
@@ -2994,6 +3024,7 @@ func _update_sky(delta: float) -> void:
 		var fraction := float(step) / SKY_STEPS
 		var elevation := DayNight.elevation_at(fraction)
 		_look = sky_look(elevation).duplicate()
+		_look_elevation = elevation
 		_look_daylight = smoothstep(DayNight.TWILIGHT_LOW, DayNight.TWILIGHT_HIGH, elevation)
 		# The moon by night, opposite the sun; either casts from its
 		# height lifted (shadow_elevation), from where it stands round.
@@ -3006,14 +3037,17 @@ func _update_sky(delta: float) -> void:
 		toward = Vector3(round_by.x * cos(lifted), sin(lifted), round_by.y * cos(lifted))
 		_sun.shadow_opacity = SHADOW_STRENGTH * smoothstep(0.0, SHADOW_FADE, absf(elevation - MOON_BELOW))
 		_sun.basis = Basis.looking_at(-_level_direction(toward.normalized()), Vector3.UP)
+	var canopy_cut := lerpf(CANOPY_AMBIENT, LOW_DUSK_CANOPY, low_dusk(_look_elevation)) if _low else CANOPY_AMBIENT
 	var look := canopied_look(weathered_look(seasoned_look(_look, season), _weather_view.weather),
-			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE)
+			_canopy_cover * World.fields.canopy_shade / DayNight.CANOPY_SHADE, canopy_cut)
 	_look["weather_fog"] = look["fog"]
 	_sky_horizon = hazed_horizon(look, _weather_view.weather) if _low else look["horizon"]
 	_sky_material.set_shader_parameter("sky_top_color", look["top"])
 	_sky_material.set_shader_parameter("sky_horizon_color", _sky_horizon)
 	if _far_material != null:
-		_far_material.set_shader_parameter("haze", _sky_horizon)
+		# The scene fog's colour (623 amended (3)): far pieces haze into
+		# the land's own haze behind them, one curve and one colour.
+		_far_material.set_shader_parameter("haze", look["fog"])
 		_far_material.set_shader_parameter("light", lerpf(FAR_NIGHT_LIGHT, 1.0, _look_daylight))
 	# Under the low camera the sky shows below the horizon past LOW_FAR, and
 	# the fog never reaches it: the haze's colour there, not the forest floor's
@@ -3026,6 +3060,13 @@ func _update_sky(delta: float) -> void:
 	_set_sky_bodies(look)
 	_environment.ambient_light_color = look["ambient"]
 	_environment.ambient_light_energy = look["ambient_energy"]
+	if _low:
+		# The haze lifted dusk under the low camera; with it gone (623
+		# amended (3)) the ambient takes its place: LOW_DUSK_LIFT more,
+		# warmed LOW_DUSK_WARM toward the dusk's own haze colour.
+		var dusk := low_dusk(_look_elevation)
+		_environment.ambient_light_color = (look["ambient"] as Color).lerp(look["fog"], LOW_DUSK_WARM * dusk)
+		_environment.ambient_light_energy = float(look["ambient_energy"]) * (1.0 + LOW_DUSK_LIFT * dusk)
 	_environment.fog_light_color = look["fog"]
 	_haze = Vector2(float(look["fog_density"]) - float(look["fog_weather"]), look["fog_weather"])
 	_set_haze()
@@ -3040,7 +3081,11 @@ func _update_sky(delta: float) -> void:
 	var light := DayNight.NIGHT + (day - DayNight.NIGHT) * share
 	var roof := DayNight.NIGHT + (day - DayNight.NIGHT) * share * (1.0 - World.fields.canopy_shade)
 	var lit := bool(_terrain.get("daylight", false))
-	_set_sky_floor(floor_brightness(light) if lit else 0.0, floor_brightness(roof) if lit else 0.0)
+	# Dusk's lift under the low camera (623 amended (3)) reaches the floor
+	# too: it takes its light from here, not the ambient, and stayed black.
+	var lift := 1.0 + LOW_DUSK_LIFT * low_dusk(_look_elevation) if _low else 1.0
+	_set_sky_floor(minf(floor_brightness(light) * lift, 1.0) if lit else 0.0,
+			minf(floor_brightness(roof) * lift, 1.0) if lit else 0.0)
 
 
 ## The sun, the moon, the stars and the clouds on the sky (decision 744),
@@ -3089,15 +3134,33 @@ static func moon_phase(steps: float) -> float:
 ## The haze's density (623, environment's side): the look's own [param base]
 ## and the [param weather]'s share (weathered_look's fog_weather, per unit,
 ## tuned for a camera CAMERA_DISTANCE off); under the [param low] camera
-## [param distance] off, the weather's share scaled so the aim reads as in
-## ortho (a storm then hides the hills) and LOW_FOG over it. Ortho: as ever.
+## [param distance] off, the weather's share alone, scaled so the aim reads
+## as in ortho (a storm then hides the hills): the look's own haze is
+## low_haze's clear stretch there (623 amended (3)). Ortho: as ever.
 ## Zoomed in nearer than the low camera's rest (CAMERA_DISTANCE *
 ## LOW_DISTANCE_SHARE) the share stays the rest's (623 amended (2),
 ## environment's side): coming closer never thickens the weather.
 static func hazed_density(base: float, weather: float, low: bool, distance: float) -> float:
 	if not low:
 		return base + weather
-	return base + weather * CAMERA_DISTANCE / maxf(distance, CAMERA_DISTANCE * LOW_DISTANCE_SHARE) + LOW_FOG
+	return weather * CAMERA_DISTANCE / maxf(distance, CAMERA_DISTANCE * LOW_DISTANCE_SHARE)
+
+
+## How much of dusk's lift (623 amended (3)) the sun at [param elevation]
+## (degrees) brings: 1 within LOW_DUSK_FULL, 0 past LOW_DUSK_EDGE.
+static func low_dusk(elevation: float) -> float:
+	return smoothstep(LOW_DUSK_EDGE.x, LOW_DUSK_FULL.x, elevation) * (1.0 - smoothstep(LOW_DUSK_FULL.y, LOW_DUSK_EDGE.y, elevation))
+
+
+## The low camera's depth haze (623 amended (3)) for the weather's
+## [param density] (hazed_density's, low): [where it begins, where it is
+## full] (m). Clear: LOW_CLEAR to LOW_EDGE. The weather brings its full in
+## to LOW_WEATHER_FULL / density (never past LOW_EDGE) and its begin in
+## toward the camera, gone at LOW_WEATHER_THICK.
+static func low_haze(density: float) -> Vector2:
+	var end := minf(LOW_EDGE, LOW_WEATHER_FULL / maxf(density, 0.000001))
+	var clear := clampf(1.0 - density / LOW_WEATHER_THICK, 0.0, 1.0)
+	return Vector2(minf(LOW_CLEAR, end * LOW_CLEAR / LOW_EDGE) * clear, end)
 
 
 ## The sky's horizon under the low camera (623, environment's side): the
@@ -3111,9 +3174,25 @@ static func hazed_horizon(look: Dictionary, weather: Dictionary) -> Color:
 
 
 ## The haze as it stands: hazed_density of the look's last (_haze), for the
-## camera's distance now (the wheel moves it under the low camera).
+## camera's distance now (the wheel moves it under the low camera). Under
+## the low camera, depth fog to full (low_haze), its begin and end handed to
+## the far landmarks' shader too, so their haze is the same curve (623
+## amended (3)); overhead, exponential as ever.
 func _set_haze() -> void:
-	_environment.fog_density = hazed_density(_haze.x, _haze.y, _low, _camera_distance())
+	var density := hazed_density(_haze.x, _haze.y, _low, _camera_distance())
+	if not _low:
+		_environment.fog_mode = Environment.FOG_MODE_EXPONENTIAL
+		_environment.fog_density = density
+		return
+	var haze := low_haze(density)
+	_environment.fog_mode = Environment.FOG_MODE_DEPTH
+	_environment.fog_density = 1.0
+	_environment.fog_depth_curve = 1.0
+	_environment.fog_depth_begin = haze.x
+	_environment.fog_depth_end = haze.y
+	if _far_material != null:
+		_far_material.set_shader_parameter("depth_begin", haze.x)
+		_far_material.set_shader_parameter("depth_end", haze.y)
 
 
 ## The height (degrees) shadows are cast from for a light [param elevation]
@@ -3165,14 +3244,16 @@ static func weathered_look(look: Dictionary, weather: Dictionary) -> Dictionary:
 
 ## [param look] under a forest's canopy of [param under] (0..1: its cover
 ## round the view, as a share of the sim's full shade; decision 477): the
-## ambient darker and greener, the haze too. The sun's light stays: the
-## crowns' shadows take it, so the clearings stay sunlit.
-static func canopied_look(look: Dictionary, under: float) -> Dictionary:
+## ambient darker and greener (by [param cut] of it at full cover:
+## CANOPY_AMBIENT, less at dusk under the low camera, 623 amended (3)), the
+## haze too. The sun's light stays: the crowns' shadows take it, so the
+## clearings stay sunlit.
+static func canopied_look(look: Dictionary, under: float, cut := CANOPY_AMBIENT) -> Dictionary:
 	if under <= 0.0:
 		return look
 	var out := look.duplicate()
 	out["ambient"] = (look["ambient"] as Color).lerp(CANOPY_TINT, 0.45 * under)
-	out["ambient_energy"] = float(look["ambient_energy"]) * (1.0 - CANOPY_AMBIENT * under)
+	out["ambient_energy"] = float(look["ambient_energy"]) * (1.0 - cut * under)
 	out["fog"] = (look["fog"] as Color).lerp(CANOPY_FOG, 0.5 * under)
 	return out
 
@@ -8178,7 +8259,12 @@ func _add_far_landmarks() -> void:
 	if _far_material == null:
 		_far_material = ShaderMaterial.new()
 		_far_material.shader = FAR_SHADER
-	_far_material.set_shader_parameter("haze", _sky_horizon)
+	_far_material.set_shader_parameter("haze", _environment.fog_light_color)
+	_far_material.set_shader_parameter("depth_begin", _environment.fog_depth_begin)
+	_far_material.set_shader_parameter("depth_end", _environment.fog_depth_end)
+	_far_material.set_shader_parameter("hand_over", FAR_HAND_OVER)
+	_far_material.set_shader_parameter("most", FAR_HAZE_MOST)
+	_far_material.set_shader_parameter("span", FAR_HAZE_SPAN)
 	_far_material.set_shader_parameter("light", lerpf(FAR_NIGHT_LIGHT, 1.0, _look_daylight))
 	var level := str(_terrain.get("level", ""))
 	var world := _world_map()
@@ -8231,9 +8317,23 @@ func _place_far_landmarks() -> void:
 		var node: Node3D = mark["node"]
 		node.position = eye + (at - eye) * pull
 		node.scale = Vector3.ONE * pull * far_shrink(eye, at, mark["height"], top_edge - FAR_TOP_MARGIN)
-		var share := FAR_HAZE_MOST * (1.0 - exp(-distance / FAR_HAZE_SPAN))
+		# Its true distance: the shader hazes it on the scene's curve
+		# (far_haze), not by where it is drawn.
 		for geometry: GeometryInstance3D in mark["meshes"]:
-			geometry.set_instance_shader_parameter("haze_share", share)
+			geometry.set_instance_shader_parameter("true_distance", distance)
+
+
+## A far landmark's haze (623 amended (3); far.gdshader works the same) at
+## its true [param distance] under the low camera's depth fog from
+## [param begin] to [param end] (low_haze): the fog's own out to
+## FAR_HAND_OVER, then rising from there toward FAR_HAZE_MOST (or that, if
+## thicker) over FAR_HAZE_SPAN.
+static func far_haze(distance: float, begin: float, end: float) -> float:
+	var fog := func(d: float) -> float: return clampf((d - begin) / maxf(end - begin, 0.001), 0.0, 1.0)
+	if distance <= FAR_HAND_OVER:
+		return fog.call(distance)
+	var at_hand: float = fog.call(FAR_HAND_OVER)
+	return at_hand + (maxf(FAR_HAZE_MOST, at_hand) - at_hand) * (1.0 - exp(-(distance - FAR_HAND_OVER) / FAR_HAZE_SPAN))
 
 
 ## The share of its true size a landmark [param height] tall, its foot at
