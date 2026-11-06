@@ -164,6 +164,14 @@ func _test_noises_are_the_sims() -> void:
 			and str(SoundKit.spec("sfx.footstep_hooves_heavy").get("fallback", "")) == "sfx.footstep_hooves"
 			and SoundKit.reach("sfx.boar_king_charge") == Animal.NOISE_CHARGE and SoundKit.takes("sfx.boar_king_roar").size() >= 2
 			and SoundKit.takes("sfx.boar_king_charge").size() >= 2, "his charge, death and steps a boar's where he has none of his own; takes for his roar and charge")
+	# 814, sound's side: the hill cat snarls when seen, roars as it lands its
+	# leap, hisses struck, dies its own way (else a wolf's), on paws.
+	_check(SoundKit.cry("hill_cat", "call") == "sfx.hill_cat_snarl" and SoundKit.cry("hill_cat", "pounce") == "sfx.hill_cat_pounce"
+			and SoundKit.struck("hill_cat") == "sfx.hill_cat_struck" and SoundKit.death("hill_cat") == "sfx.hill_cat_death"
+			and SoundKit.footstep("dirt", 200.0, "hill_cat") == "sfx.footstep_paws"
+			and str(SoundKit.spec("sfx.hill_cat_death").get("fallback", "")) == "sfx.wolf_death"
+			and ["snarl", "pounce", "struck", "death"].all(func(cry: String) -> bool: return SoundKit.takes("sfx.hill_cat_" + cry).size() >= 3),
+			"the hill cat: its snarl, pounce, hurt and death its own, three takes each, its death a wolf's without; on paws")
 	_check(SoundKit.idle("boar").has("sfx.boar_grunt") and SoundKit.idle("boar").has("sfx.boar_root") and SoundKit.idle("boar_king") == SoundKit.idle("boar")
 			and SoundKit.idle("wolf").is_empty() and SoundKit.takes("sfx.boar_grunt").size() >= 2 and SoundKit.takes("sfx.boar_root").size() >= 2
 			and SoundKit.positional("sfx.boar_grunt") and SoundKit.noise("sfx.boar_grunt") == "",

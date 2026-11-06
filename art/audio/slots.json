@@ -1173,6 +1173,42 @@
 			"uses": "a wolf killed (Client3D._fall)",
 			"fallback": "sfx.knockback_body_soft"
 		},
+		"sfx.hill_cat_snarl": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -4.0,
+			"uses": "a hill cat seen: its snarl, a hiss and a yowl (814; Monster.cried call, SoundKit.OWN_CRIES)"
+		},
+		"sfx.hill_cat_pounce": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -2.0,
+			"uses": "a hill cat landing its leap: a short roar (814; Monster.cried pounce)"
+		},
+		"sfx.hill_cat_struck": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 10,
+			"volume_db": -4.0,
+			"uses": "a hill cat struck and not killed: a hiss or a growl (814; SoundKit.struck)"
+		},
+		"sfx.hill_cat_death": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -2.0,
+			"uses": "a hill cat killed: a dying roar (814; Client3D._fall)",
+			"fallback": "sfx.wolf_death"
+		},
 		"sfx.wave_wolves": {
 			"category": "creatures",
 			"type": "oneshot",

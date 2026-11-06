@@ -251,7 +251,7 @@ const STEP_MASS := [50.0, 100.0]
 
 ## An animal's feet (enemy-ai's kinds), for its footsteps.
 const FEET := {"deer": "hooves", "stag": "hooves", "boar": "hooves", "rabbit": "paws", "wolf": "claws",
-		"boar_king": "hooves_heavy"}
+		"boar_king": "hooves_heavy", "hill_cat": "paws"}
 
 
 ## The footstep slot for a body of [param mass] on [param ground] (a floor
@@ -380,7 +380,8 @@ static func speech(entity: Object, text: String) -> String:
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
 const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"},
-		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}, "boar_king": {"call": "roar"}}
+		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}, "boar_king": {"call": "roar"},
+		"hill_cat": {"call": "snarl"}}
 ## A kind that sounds as another (a stag as a deer).
 const SOUNDS_AS := {"stag": "deer"}
 ## A creature's sounds while it is at peace (795): slot -> its average

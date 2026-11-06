@@ -43446,6 +43446,9 @@ devoted, a step of two and nothing above). Main.last_bond_gain for tests. Main.r
 counts gains by track: a deed now brings her bond's and needs' gains beside it, so camp_fall_test
 counts its deeds by the "deed" track, not every gain sent. Server and client; protocol 51; no new
 class_name.
+
+814, sound's side: the hill cat heard (release's label; enemy-ai's 814 design). Its own cries by kind "hill_cat", all on the voice bus, never heard by monsters but its death: sfx.hill_cat_snarl (its "call" as a player spots it, a hiss and a yowl; SoundKit.OWN_CRIES; range 8, -4 dB), sfx.hill_cat_pounce (as it lands its leap, its "pounce" cry: a short roar; range 8, -2), sfx.hill_cat_struck (struck and not killed: a hiss or a growl; SoundKit.struck; range 10, -4) and sfx.hill_cat_death (a dying roar, heard as a fight, falling back to sfx.wolf_death; -2). Its feet on paws (SoundKit.FEET). Twelve Freesound CC0 takes, three a cue: snarl from 389708 (suspensiondigital), 63668 (Miselaineous) and 844316 (TheKingOfGeeks360); pounce from 559270 (KristopherTiberiusHaven), 410343 (waxsocks) and 381857 (cribbler); struck from 485952 (aunrea), 819958 (rickismyname) and 63668; death from 410343, 389708 and 559270. Review: C:/dev/review/sound/hill_cat. Tests: sound_kit_test (the cat's routing, fallback, feet and takes). Client only; protocol unchanged, no new class_name, no bullet (enemy-ai's 814 carries it).
+
 ## 789. Magic, phase 1: the bear's-claw charm, the aura's light, the bear's-grease draught
 
 Jeff (11-03): "charms that grow a characters magic aura, or ingredients to spells"; magic lives

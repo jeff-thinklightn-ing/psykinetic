@@ -2084,6 +2084,122 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.hill_cat_death": [
+			{
+				"file": "sfx.hill_cat_death.ogg",
+				"from": "freesound",
+				"original": "freesound 410343: Roar.wav (from 2.8 s for 2.8 s)",
+				"sha256": "da67ea5af88d3385bad320b3171696f891307a87193bff3cf3a86af8f4f8e11c",
+				"by": "waxsocks",
+				"url": "https://freesound.org/people/waxsocks/sounds/410343/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_death.2.ogg",
+				"from": "freesound",
+				"original": "freesound 389708: Large Angry Cats.wav (from 1.9 s for 1.1 s)",
+				"sha256": "1edc15cf85df305f8f8ea9c1154b6979a25fb16b649b41052d7f5f68a27a21f1",
+				"by": "suspensiondigital",
+				"url": "https://freesound.org/people/suspensiondigital/sounds/389708/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_death.3.ogg",
+				"from": "freesound",
+				"original": "freesound 559270: Hiss Roar.mp3 (from 1.1 s for 1.4 s)",
+				"sha256": "0311731612d56dd2a3e463e263b10a71ef665f17e627aafbf69c1af8f94613cf",
+				"by": "KristopherTiberiusHaven",
+				"url": "https://freesound.org/people/KristopherTiberiusHaven/sounds/559270/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.hill_cat_pounce": [
+			{
+				"file": "sfx.hill_cat_pounce.ogg",
+				"from": "freesound",
+				"original": "freesound 559270: Hiss Roar.mp3 (from 0.2 s for 0.9 s)",
+				"sha256": "c8d4c2ec99b98e4588751ee3fb9a1fa5f40c3cd1328e1fb3161059269753e571",
+				"by": "KristopherTiberiusHaven",
+				"url": "https://freesound.org/people/KristopherTiberiusHaven/sounds/559270/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_pounce.2.ogg",
+				"from": "freesound",
+				"original": "freesound 410343: Roar.wav (from 1.45 s for 0.9 s)",
+				"sha256": "8eb291ec9795dae2417377de2a510f430a1b6d50ef877ac145d0a64926e29c05",
+				"by": "waxsocks",
+				"url": "https://freesound.org/people/waxsocks/sounds/410343/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_pounce.3.ogg",
+				"from": "freesound",
+				"original": "freesound 381857: Cat Monster.wav (from 0.05 s for 1.1 s)",
+				"sha256": "a4e160130aa92ca7303dbe5d553db94502f8e544869dfb9bcba2cca77012ba71",
+				"by": "cribbler",
+				"url": "https://freesound.org/people/cribbler/sounds/381857/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.hill_cat_snarl": [
+			{
+				"file": "sfx.hill_cat_snarl.ogg",
+				"from": "freesound",
+				"original": "freesound 389708: Large Angry Cats.wav (from 1.2 s for 1.7 s)",
+				"sha256": "3b4f42b62480b17d405296691f81dbe357f3901084f0fc98d872c05a036bf429",
+				"by": "suspensiondigital",
+				"url": "https://freesound.org/people/suspensiondigital/sounds/389708/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_snarl.2.ogg",
+				"from": "freesound",
+				"original": "freesound 63668: elaine-growl.wav (from 0.1 s for 1.1 s)",
+				"sha256": "a84f786c3cc9b3833b3eaef28c6f4c432c06662c1f4c7d471d7d5477d1befc81",
+				"by": "Miselaineous",
+				"url": "https://freesound.org/people/Miselaineous/sounds/63668/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_snarl.3.ogg",
+				"from": "freesound",
+				"original": "freesound 844316: Wild Cats - Siberian Lynx, Huff (from 0.2 s for 0.8 s)",
+				"sha256": "023cb55d4aa1019eaddd6f5c840ae26c239b000ba78bc8cc529a4c3d1d8d7103",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/844316/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.hill_cat_struck": [
+			{
+				"file": "sfx.hill_cat_struck.ogg",
+				"from": "freesound",
+				"original": "freesound 485952: Cat Hissing (from 0 s for 0.6 s)",
+				"sha256": "7088ef9ba12eef8a7eef82e2aaddc650d7a4e84610515f40770e26d472974f77",
+				"by": "aunrea",
+				"url": "https://freesound.org/people/aunrea/sounds/485952/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_struck.2.ogg",
+				"from": "freesound",
+				"original": "freesound 819958: Cat hissing (from 1.5 s for 0.65 s)",
+				"sha256": "9351bcd5b289cacb54e88f5b142301ca510bd6bedfa859f89dd4c49e931c794e",
+				"by": "rickismyname",
+				"url": "https://freesound.org/people/rickismyname/sounds/819958/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.hill_cat_struck.3.ogg",
+				"from": "freesound",
+				"original": "freesound 63668: elaine-growl.wav (from 1.55 s for 0.6 s)",
+				"sha256": "b2f4593b39d798fc60889f0a5dc201cb4f59b35e083f307abf3e951525169cbc",
+				"by": "Miselaineous",
+				"url": "https://freesound.org/people/Miselaineous/sounds/63668/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.hit_blade_armor": [
 			{
 				"file": "sfx.hit_blade_armor.ogg",
