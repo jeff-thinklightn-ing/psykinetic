@@ -4261,6 +4261,17 @@ func _boot() -> void:
 	# Jeff: "why does his health and status not reset on server restart"): he is back seated, whole,
 	# his dead awake. A room reset keeps it (_start_level); it is not saved.
 	World.dead_rest.clear()
+	# The apex creatures' records (780 amended (13)), as saved; their bodies
+	# laid afresh.
+	World.apexes.clear()
+	Apex.clear()
+	var apexes: Variant = snapshot.get("apexes", {})
+	if apexes is Dictionary:
+		for kind: Variant in apexes:
+			if apexes[kind] is Dictionary:
+				World.apexes[str(kind)] = (apexes[kind] as Dictionary).duplicate()
+	print("[apex] records: %s" % ", ".join(World.apexes.keys().map(func(kind: String) -> String:
+		return "%s %s" % [kind, World.apexes[kind].get("state", "?")])) if not World.apexes.is_empty() else "none yet")
 	# The named enemies' records (decision 716), alive or dead, as saved.
 	World.named.clear()
 	var named: Variant = snapshot.get("named", {})
@@ -5628,6 +5639,8 @@ func _retirable(monster: Monster, near: Array[Vector2i]) -> bool:
 		return false  # A wanderer is Wanderers' till it is gone, never kept (805).
 	if monster is HillCat:
 		return false  # Its perch's, never kept (814).
+	if Apex.is_body(monster):
+		return false  # Its record's, never kept (780 amended (13)).
 	if monster.far_since < 0 or World.tick - monster.far_since < RETIRE_AFTER_TICKS:
 		return false
 	if monster.target != null or monster.alert != Monster.Alert.IDLE or monster._returning or World.is_stunned(monster):
@@ -6078,6 +6091,7 @@ func _save_state(wait := true, final := false) -> void:
 		"items": World.items.to_dict(),
 		"regen": _regen,
 		"named": World.named,  # Decision 716: the named enemies' records.
+		"apexes": World.apexes,  # 780 amended (13): each apex lair, out or dead.
 		"sky": _sky_saved()}).duplicate(true)  # Its own: the sim goes on meanwhile.
 	_finish_saving()
 	_saver = Thread.new()
@@ -6247,6 +6261,8 @@ func _exit_tree() -> void:
 
 func _spawn(spec: Dictionary) -> GridEntity:
 	spec["zone"] = World.zone.name
+	if Apex.holds_marker(spec, World.zone.name):
+		return null  # An apex's den: its record lays it (780 amended (13)).
 	var entity := spawner.spawn(spec) as GridEntity
 	if not World.spawn(entity, spec["tile"]):
 		entities.remove_child(entity)

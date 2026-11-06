@@ -66,6 +66,8 @@ const SLEEP_SIGHT := 2
 const HEAL_EVERY := 50
 ## A print each this many cells walked.
 const TRACK_STRIDE := 2
+## How far its walk to its door or its ground may plan (a hill's 40 cells).
+const WALK_SEARCH_TILES := 6000
 ## Its moves' numbers, the defaults under monsters.json's row "moves"
 ## {swipe, slam, charge} (780 amended (2): tuning is data, combat's and
 ## mine; drafts, tuned from playtest's runs): ticks to land, its
@@ -83,6 +85,12 @@ var charge := CHARGE.duplicate()
 
 ## The den: where it spawned (its home).
 var den := NO_TILE
+## Its lair's door it walks to, going in or out with a player watching
+## (Apex, 780 amended (13)); NO_TILE when not.
+var apex_goal := NO_TILE
+## Out in its land (Apex): it roams by its ground there and never sleeps
+## out (dusk takes it home).
+var apex_out := false
 var asleep := false
 ## The move under way: {move, telegraph, lands, shape, toward}; a charge's
 ## rush {move: "rush"} till rush_ended.
@@ -120,6 +128,7 @@ var _joined_companions: Dictionary[String, int] = {}
 
 func _ready() -> void:
 	super()
+	_hook()  # Before its first tick: one laid and killed at once still falls (Apex).
 	den = home if home != NO_TILE else tile
 	_base_hp = max_hp
 	var given_party: Variant = Monster.kinds().get(_kind(), {}).get("party", {})
@@ -138,10 +147,7 @@ func _ready() -> void:
 
 
 func _sim_tick() -> void:
-	if not _hooked:
-		_hooked = true
-		World.rush_ended.connect(_on_rush_ended)
-		World.entity_died.connect(_on_died)
+	_hook()
 	if den == NO_TILE:
 		den = tile
 	_track()
@@ -151,6 +157,9 @@ func _sim_tick() -> void:
 		print("[apex] %s recovers (winded %d ticks) at %s (%d/%d)" % [_kind(), World.tick - _winded_at, tile, hp, max_hp])
 		_winded_at = -1
 	if _tend_move():
+		return
+	if apex_goal != NO_TILE or apex_out and target == null 			and (_blow_tick < 0 or World.tick - _blow_tick > CALM_TICKS) and World.distance(tile, home) > wander_radius * 2 + 2:
+		_walk_to(apex_goal if apex_goal != NO_TILE else home)
 		return
 	if asleep:
 		var foe := _struck_by()
@@ -165,7 +174,7 @@ func _sim_tick() -> void:
 				hp += 1
 			return
 		_wake()
-	elif _is_night() and target == null and alert != Alert.FIGHTING and (_blow_tick < 0 or World.tick - _blow_tick > CALM_TICKS):
+	elif not apex_out and _is_night() and target == null and alert != Alert.FIGHTING and (_blow_tick < 0 or World.tick - _blow_tick > CALM_TICKS):
 		if World.distance(tile, den) <= 1:
 			_sleep()
 			return
@@ -175,6 +184,27 @@ func _sim_tick() -> void:
 	super()
 	if target == null:
 		_roared_fight = false
+
+
+## To its door, or out to its roaming ground (Apex): awake, after no one,
+## at its pace to the door, slower to its ground.
+func _walk_to(to: Vector2i) -> void:
+	if asleep:
+		_wake()
+	if apex_goal != NO_TILE:
+		target = null
+	if World.tick < next_move_tick or World.is_stunned(self):
+		return
+	move_ticks = _pace if apex_goal != NO_TILE else _pace * IDLE_PACE
+	if not _idle_step(to, WALK_SEARCH_TILES):
+		next_move_tick = World.tick + 5  # A crowd, or no way just now: a moment.
+
+
+func _hook() -> void:
+	if not _hooked:
+		_hooked = true
+		World.rush_ended.connect(_on_rush_ended)
+		World.entity_died.connect(_on_died)
 
 
 ## [param entity] joins its fight (a player striking it, struck by it, or a
@@ -321,6 +351,7 @@ func note_struck(by: GridEntity) -> void:
 	if is_instance_valid(by) and by != self:
 		_struck_at[by.get_instance_id()] = World.tick
 		_join(by)
+	Apex.struck(self)  # Its wait to go out starts again (780 amended (13)).
 	if asleep:
 		_wake()
 	if not _roared_half and hp * 2 < max_hp:
@@ -442,6 +473,7 @@ func _tend_move() -> bool:
 func _on_died(entity: GridEntity, cause: StringName) -> void:
 	if entity == self:
 		print("[apex] %s falls (%s) at %s, party %d" % [_kind(), cause, tile, party_size])
+		Apex.died(self)  # Dead its rise, then in its lair (780 amended (13)).
 
 
 ## A charge's rush over: the body it met takes the blow; none met, it is

@@ -188,7 +188,7 @@ const HOLLOWFELL_PAD := Rect2i(164, 56, 4, 5)
 ## arch over it, the facing coming out into the hill), dirt LAIR_TRAMPLED
 ## in front, and the lair's "from_<lair>" spawn two cells out.
 const LAIRS: Array[Dictionary] = [
-	{"to_map": "bear_cave", "at": Vector2i(117, 102), "open": Vector2i(0, 1), "cue": "cave", "closed": true}]
+	{"to_map": "bear_cave", "at": Vector2i(117, 102), "open": Vector2i(0, 1), "cue": "cave"}]  # Open since 780 amended (13): the lair rule is in.
 const LAIR_HILL := Vector2i(7, 5)
 const LAIR_TRAMPLED := 1
 ## Each lair's bank (the coordinator: "the cave is a hole in the face of a

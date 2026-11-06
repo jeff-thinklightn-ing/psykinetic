@@ -815,6 +815,9 @@ var dead_rest: Dictionary[String, Dictionary] = {}
 ## npc's card, memories and track on them). Kept through a room reset
 ## (Main's) and saved.
 var named: Dictionary[String, Dictionary] = {}
+## The apex creatures' records by kind (Apex.record's; 780 amended (13)):
+## lair, out or dead, saved.
+var apexes: Dictionary = {}
 ## Main's (714): whether a named one's trophy is due,
 ## (player_id, named_id, trophy) -> bool, player_id "" for "is it out to be
 ## won"; and its record of one won, (player_id, named_id, trophy). Unset,
@@ -1172,6 +1175,7 @@ func step() -> void:
 	wanderers.step()
 	if steps % HillCat.PERCH_CHECK_STEPS == 0:
 		HillCat.step_perches()  # A hill cat on each empty perch (814).
+	Apex.step()  # The apexes in their lairs and lands (780 amended (13)).
 	t = part("raids", t)
 	steps += 1
 	# The sky's light on the new hour (DayNight; the light field reads it).

@@ -43686,6 +43686,39 @@ bullet (voice's words; the thicket's words come with terrain's cue).
 Protocol unchanged (--print-protocol fc7438491ba8 before and after: the place kind "lair" and its
 "den" are not on the wire); no new class_name.
 
+780 amended (13): the lair rule, phase 1: the great bear in bear_cave and out in the hills (2026-11-06,
+enemy-ai; the coordinator's approval of C:/dev/review/enemy-ai/apex_lairs_design.md, 11-03, with its
+notes, and its 11-04 ruling on the check; release's label). Apex (new class_name, statics, sim/apex.gd)
+keeps one record per kind whose monsters.json row has a "lair" block, in World.apexes, saved in the
+world save under "apexes" (its bodies never: Snapshot and Main._retirable leave them out, and the
+record lays them afresh). The great bear's: {"zone": "bear_cave", "land": ["hills"], "range": 40,
+"hours": [6, 20], "venture_after_s": 1800, "out_most_s": 2400, "fall_back_hp": 0.4, "rise_s": 1800,
+"path_margin": 6}. World.step calls Apex.step every step; each kind is checked every CHECK_STEPS (50,
+5 s), or every step while it walks to its door, never inside a monster's turn. A record is in one of
+three states. "lair": laid at its den (its marker in its lair; Main._spawn never spawns that marker as
+a level entity, Apex.holds_marker; in bear_yard it is the old den in the open) whenever the lair zone
+is awake, whole again LAIR_HEAL_STEPS (30 s) after its last blow. Unattacked venture_after_s
+(from the later of its last blow and its death), within its hours and fighting nobody, it goes "out".
+"out": laid in front of the cave's mouth in its land (the land's from_<lair> spawn point) when the land
+is awake, at the hp it left with, its den and home a roaming ground every ROAM_STEPS (2 min): a cell
+within range of the mouth, past ROAM_RADIUS of it, more than path_margin from Level.safe_paths (the
+hills give 1688), wandering ROAM_RADIUS there (GreatBear.apex_out: walks there first, never sleeps
+out). It falls back "beaten back" at fall_back_hp of its hp (fighting or not), else, fighting nobody,
+"its hours over" or "out long" (out_most_s). Going either way it walks to the door (GreatBear.apex_goal,
+at its full pace, after no one) when a player in its zone sees it (VIEW_TILES, a clear line), roaring,
+and is gone at it (or after LEAVE_MOST_STEPS, a crowd in the way); unseen, it simply changes state. A
+blow on its way out (Apex.struck, from GreatBear.note_struck) and it stays. "dead": killed anywhere
+(Apex.died, from GreatBear's fall), dead rise_s, then in its lair. Every change logs "[apex] <kind>
+<why>: <from> -> <to> (<zone>)"; each laying "[apex] <kind> in <zone> at <cell>"; the boot line
+"[apex] records: great_bear lair" (or "none yet"). No names or ids. The hills' cave mouth opens
+(make_hills.gd's lair link and hills/level.json lose "closed"; terrain's rockfall goes with it).
+monster_test _test_apex_lair (the real places: den (6, 7), doors (4, 24) and (117, 104), roaming
+grounds all off the safe paths; the marker held only in its lair; in two zones of its own: laid at its
+den, out unseen at once, out of its door and walking to its ground, beaten back seen through its door
+with its hp kept, a player in its lair seeing it go to its door, struck on the way and staying, killed
+and dead its rise, then in its lair). Server and level data; protocol per --print-protocol (a saved
+record, no wire change); new class_name Apex.
+
 813 amended: the family tomb's wall and plates heard (release's label; dungeon's ask). Two positional oneshots on the sfx bus, which dungeon's Client3D plays through SoundKit.has: sfx.wall_sink (the vault's bricks sinking into the floor as its door goes shut to open, once: a heavy stone grind ending in a stop, about 1.5 s, -10 dB, heard like a door, noise "door", so the dead hear it as they hear the door; falling back to sfx.slab_grind) and sfx.plate_click (a plate going up to down: a soft stone click, range 6, -14, never heard by monsters; nothing on release or on first sight). Six Freesound CC0 takes: wall from 833925 (harrisonlace), 530987 (patchytherat) and 243699 (ertfelda); plate from 466272 (proolsen), 422870 (IPaddeh) and 508581 (Wdomino). Review: C:/dev/review/sound/crypt. Tests: sound_kit_test _test_ui_sounds (the wall a door's noise with the slab's fallback, the plate close and unheard, three takes each). Client only; protocol unchanged, no new class_name, no bullet (dungeon's 813 carries it).
 
 813 amended (2) (2026-11-06, release's label; the companion's part, dungeon's API): she plays the tomb

@@ -2204,7 +2204,9 @@ static func read_kinds(path: String) -> Dictionary:
 			# Its party (780 amended (8)): GreatBear's hp and combat's flank guard by who joins its fight.
 			"party": (row["party"] as Dictionary).duplicate() if row.get("party") is Dictionary else {},
 			# An apex creature (780 amended (4)): companions keep off it (is_apex).
-			"apex": bool(row.get("apex", false))}
+			"apex": bool(row.get("apex", false)),
+			# Its lair and its land (Apex, 780 amended (13)).
+			"lair": (row["lair"] as Dictionary).duplicate(true) if row.get("lair") is Dictionary else {}}
 	return out
 
 

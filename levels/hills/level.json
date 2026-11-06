@@ -66,8 +66,7 @@
 			],
 			"to_map": "bear_cave",
 			"to_spawn": "from_hills",
-			"cue": "cave",
-			"closed": true
+			"cue": "cave"
 		}
 	],
 	"entities": [

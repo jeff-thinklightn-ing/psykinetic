@@ -84,6 +84,7 @@ func _ready() -> void:
 	_test_raid_beaten()
 	_test_great_bear()
 	_test_bear_party()
+	_test_apex_lair()
 	_test_bandit_rows()
 	_test_chiefs()
 	_test_watch_wave()
@@ -1857,6 +1858,139 @@ func _test_given_strength() -> void:
 	World.spawn(rolled2, Vector2i(12, 1))
 	_check(rolled2.max_hp == roundi(built_hp * 0.9), "its stored strength kept at the next spawn (%d)" % rolled2.max_hp)
 	NamedEnemy.reset_for_test()  # The test row gone; the file's read again.
+## The lair rule (780 amended (13)): the great bear in its lair, out in its
+## land, back, dead and risen, between two zones.
+func _test_apex_lair() -> void:
+	print("
+== an apex in its lair and its land: laid at its den, out unattacked, beaten back through its door, dead its rise ==")
+	# The real places: the den, the doors either side, the roaming grounds.
+	Apex.clear()
+	var real_row: Dictionary = Monster.kinds()["great_bear"]["lair"]
+	var real := Apex._places_of("great_bear", real_row)
+	var roads := Level.safe_paths(Level.load_level("hills")["terrain"])
+	var clear_of_roads := (real.get("roam", []) as Array).all(func(cell: Vector2i) -> bool:
+		for path: Vector2i in roads:
+			if maxi(absi(path.x - cell.x), absi(path.y - cell.y)) <= int(real_row["path_margin"]):
+				return false
+		return true)
+	_check(real.get("den") == Vector2i(6, 7) and real.get("lair_door") == Vector2i(4, 24) and real.get("land_door") == Vector2i(117, 104)
+			and (real.get("roam", []) as Array).size() > 20 and clear_of_roads,
+			"its den in bear_cave, the doors either side, and %d roaming grounds in the hills, every one off the safe paths" % (real.get("roam", []) as Array).size())
+	_check(Apex.holds_marker({"spawn": 0, "kind": "great_bear"}, "bear_cave") and not Apex.holds_marker({"spawn": 0, "kind": "great_bear"}, "bear_yard")
+			and not Apex.holds_marker({"kind": "great_bear"}, "bear_cave") and not Apex.holds_marker({"spawn": 0, "kind": "wolf"}, "bear_cave"),
+			"its marker in its lair is its den, never a level entity; in the bear yard it is")
+	# Two zones of our own: the land (here) and the lair.
+	var land_rows: Array[String] = ["#".repeat(40)]
+	for y in 8:
+		land_rows.append("#" + ".".repeat(38) + "#")
+	land_rows.append("#".repeat(40))
+	_build(land_rows, {}, {}, "ap_land")
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var entity := EntityFactory.build(spec)
+		_room.add_child(entity)
+		if not World.spawn(entity, spec["tile"]):
+			entity.free()
+			return null
+		return entity
+	var land := World.zone
+	World.zones[land.name] = land
+	var lair := World.add_zone("ap_lair")
+	World.enter(lair)
+	var lair_rows: Array[String] = ["#".repeat(20)]
+	for y in 8:
+		lair_rows.append("#" + ".".repeat(18) + "#")
+	lair_rows.append("#".repeat(20))
+	World.load_terrain(Terrain.parse(Terrain.expand(lair_rows)))
+	World.enter(land)
+	var kinds := Monster.kinds()
+	var row_was: Dictionary = kinds["great_bear"]["lair"]
+	var row: Dictionary = row_was.duplicate(true)
+	row["zone"] = "ap_lair"
+	row["land"] = ["ap_land"]
+	kinds["great_bear"]["lair"] = row
+	Apex.clear()
+	World.apexes.clear()
+	Apex._places["great_bear"] = {"den": Vector2i(14, 4), "lair_door": Vector2i(2, 4), "land_door": Vector2i(3, 4),
+			"roam": [Vector2i(30, 4)] as Array[Vector2i]}
+	DayNight.set_hour(12.0)
+	var idling_was := Monster.idling
+	Monster.idling = true
+	var keeper := EntityFactory.build(SPECS["P"].merged({"name": "LairKeeper"})) as Player
+	_room.add_child(keeper)
+	World.enter(lair)
+	World.spawn(keeper, Vector2i(2, 7))
+	World.enter(land)
+	Apex._check("great_bear", row)
+	var bear := Apex.body_of("great_bear")
+	var rec := Apex.record("great_bear")
+	_check(bear != null and bear.zone == "ap_lair" and bear.tile == Vector2i(14, 4) and rec["state"] == "lair" and bear.hp == bear.max_hp,
+		"in its lair, its zone awake: laid at its den, whole (%s)" % [rec])
+	# Unattacked its wait, by day, nobody seeing it: out at once.
+	World.enter(lair)
+	World.despawn(keeper)
+	World.enter(land)
+	var walker := EntityFactory.build(SPECS["P"].merged({"name": "LandWalker"})) as Player
+	_room.add_child(walker)
+	World.spawn(walker, Vector2i(36, 8))
+	rec["attacked"] = World.steps - Apex._steps(row, "venture_after_s", 1800.0)
+	Apex._check("great_bear", row)
+	_check(rec["state"] == "out" and (not is_instance_valid(bear) or not (bear as Monster).spawned), "unattacked its wait, by day, unseen: gone from its lair (%s)" % [rec["state"]])
+	Apex._check("great_bear", row)
+	bear = Apex.body_of("great_bear")
+	_check(bear != null and bear.zone == "ap_land" and World.distance(bear.tile, Vector2i(3, 4)) <= 1 and (bear as GreatBear).apex_out
+		and bear.home == Vector2i(30, 4), "out of its door in its land, off to roam its ground (%s)" % [bear.home if bear != null else null])
+	for i in 120:
+		World.step()
+	_check(World.distance(bear.tile, Vector2i(30, 4)) <= 8 and not (bear as GreatBear).asleep, "it walks out to its ground and roams there (%s)" % bear.tile)
+	# Beaten back, seen: it walks to its door, then is in its lair.
+	World.despawn(walker)
+	World.spawn(walker, bear.tile + Vector2i(-3, 0))
+	bear.hp = roundi(bear.max_hp * 0.3)
+	var hurt := bear.hp
+	Apex._check("great_bear", row)
+	_check((bear as GreatBear).apex_goal == Vector2i(3, 4) and rec["state"] == "out", "beaten down, seen: it makes for its door")
+	for i in 400:
+		World.step()
+		if rec["state"] == "lair":
+			break
+	_check(rec["state"] == "lair" and not (is_instance_valid(bear) and bear.spawned) and int(rec["hp"]) == hurt,
+		"at its door it is gone into its lair (%s, hp kept %d)" % [rec["state"], int(rec["hp"])])
+	# In its lair again (a player there), struck on its way out: it stays.
+	World.enter(lair)
+	World.spawn(keeper, Vector2i(10, 4))
+	World.enter(land)
+	Apex._check("great_bear", row)
+	bear = Apex.body_of("great_bear")
+	_check(bear != null and bear.zone == "ap_lair", "back in its lair, laid at its den")
+	rec["attacked"] = World.steps - Apex._steps(row, "venture_after_s", 1800.0)
+	Apex._check("great_bear", row)
+	_check(bear != null and (bear as GreatBear).apex_goal == Vector2i(2, 4), "its wait out, a player in its lair sees it go to its door")
+	Apex.struck(bear)
+	Apex._check("great_bear", row)
+	_check(rec["state"] == "lair" and (bear as GreatBear).apex_goal == Monster.NO_TILE and bear.spawned, "struck on its way, it stays")
+	# Killed: dead its rise, then in its lair.
+	World.enter(lair)
+	World.damage(bear, bear.hp + 10)
+	World.enter(land)
+	_check(rec["state"] == "dead" and int(rec["dead_until"]) == World.steps + Apex._steps(row, "rise_s", 1800.0),
+		"killed: dead its rise_s (%s)" % [rec])
+	Apex._check("great_bear", row)
+	_check(rec["state"] == "dead", "and dead till then")
+	rec["dead_until"] = World.steps
+	Apex._check("great_bear", row)
+	_check(rec["state"] == "lair", "then in its lair again")
+	World.enter(lair)
+	World.despawn(keeper)
+	World.enter(land)
+	World.despawn(walker)
+	kinds["great_bear"]["lair"] = row_was
+	Apex.clear()
+	World.apexes.clear()
+	World.zones.erase("ap_lair")
+	World.zones.erase("ap_land")
+	World.enter(land)
+	Monster.idling = idling_was
+	World.spawn_spec = Callable()
 
 
 func _test_bear_party() -> void:

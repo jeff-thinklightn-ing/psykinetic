@@ -86,6 +86,8 @@ static func _entries(entities: Array[GridEntity]) -> Array[Dictionary]:
 			continue  # A wanderer drawn to someone fishing (805): gone with a restart.
 		if entity is HillCat:
 			continue  # Its perch lays it afresh (814).
+		if Apex.is_body(entity):
+			continue  # Its record lays it afresh (780 amended (13)).
 		var spec := entity.spawn_spec
 		var entry := {
 			"script": str(spec.get("script", "")),

@@ -83,6 +83,8 @@
 	"great_bear": {
 		"side": "wild", "role": "predator", "herd": "great_bear", "label": "Great bear", "art": "creature.great_bear", "diet": ["deer", "stag"],
 		"script": "res://sim/great_bear.gd", "swing_stamina": true, "apex": true,
+		"lair": {"zone": "bear_cave", "land": ["hills"], "range": 40, "hours": [6, 20], "venture_after_s": 1800,
+			"out_most_s": 2400, "fall_back_hp": 0.4, "rise_s": 1800, "path_margin": 6},
 		"body": {"mass": 300.0, "max_hp": 70, "move_ticks": 2.6, "attack_damage": 5, "sight_range": 8},
 		"senses": {"cone": 120, "night": 0.3, "hearing": 1.0, "alert_sight": 1, "notice": 0.8},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
