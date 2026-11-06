@@ -188,7 +188,24 @@
 			1,
 			"moss_strip",
 			1
+		],
+		[
+			46,
+			13,
+			0,
+			0,
+			"light_shaft",
+			1
 		]
+	],
+	"skylights": [
+		{
+			"at": [
+				46,
+				13
+			],
+			"radius": 1
+		}
 	],
 	"places": {
 		"niche": {

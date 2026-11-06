@@ -163,7 +163,8 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.milestone": Vector2i(1, 1), "building.hunters_blind": Vector2i(2, 2), "building.lean_to": Vector2i(3, 2),
 	# The Last Light Mughouse's common room (811 amended, art-kit's pieces):
 	# the taverner's counter and tap rack, and its tables.
-	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2)}
+	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2),
+	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -238,7 +239,8 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
-	"building.bar_counter", "building.tap_rack", "building.tavern_table"]
+	"building.bar_counter", "building.tap_rack", "building.tavern_table",
+	"building.sarcophagus", "building.robbers_dig"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -248,13 +250,15 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## dark tower's pillar; 736: Umbrage's weapon stall, its seller behind it; 778: the
 ## hills' roadside sights and stories, a grave, a shrine, a milestone, a hunter's blind and
 ## a lean-to; 811 amended: the Mughouse's counter, tap rack and tables, the
-## taverner behind the counter): every cell of theirs out of the floor, none walked onto or into.
+## taverner behind the counter; 806 amended (3): the crypt's sarcophagi and the
+## robbers' dig into a tomb's floor): every cell of theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
-	"building.bar_counter", "building.tap_rack", "building.tavern_table"]
+	"building.bar_counter", "building.tap_rack", "building.tavern_table",
+	"building.sarcophagus", "building.robbers_dig"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -2209,9 +2213,17 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"rune_strip": {"sits": "wall", "variants": 2},
 	# The crypt's (806 amended): bones heaped in the ossuary; a carving on a
 	# tomb's wall, the words of it in level.json "carvings" (the rune strip's
-	# piece until art-kit's own).
-	"bones": {"sits": "flat", "variants": 3, "faced": true},
+	# piece until art-kit's own). 806 amended (3), art-kit's set: skulls and
+	# long bones stacked against the ossuary's walls; candles in the chapel;
+	# roots come down a collapsed gallery's end; the first hall's light shaft
+	# under the temple yard's grate (its "skylights" entry, 797). The wall
+	# pieces stand in the cell, their backs (-z) to the wall.
+	"bones": {"sits": "flat", "variants": 1, "faced": true, "slot": "prop.set_bone_heap"},
 	"carving": {"sits": "wall", "variants": 1, "slot": "prop.rune_strip"},
+	"ossuary_stack": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.set_ossuary_stack"},
+	"candles": {"sits": "flat", "variants": 1, "faced": false, "slot": "prop.candles"},
+	"collapse_roots": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.collapse_roots"},
+	"light_shaft": {"sits": "flat", "variants": 1, "faced": false, "slot": "prop.set_light_shaft"},
 	# The mine's (decision 769): an arch or a beam spans a way from wall to
 	# wall ("span"), art-kit's piece by the width it spans; track a cell a
 	# piece, faced the way it runs; a lamp hung on a wall.

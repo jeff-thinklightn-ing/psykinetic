@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, sarcophagi lie with their lids shoved off where robbers have dug, bones are stacked along the ossuary's walls, candles burn round the chapel's bier, roots hang where a gallery fell in, and daylight falls through a grate into the first hall (806 amended (3)).
 - The barrow's upper halls are laid out anew as the town's crypt: family tombs with carved names, burial niches, an ossuary, a chapel of rest and a sealed vault open off a long processional, and every chest has a find of your own and a robber at it (806 amended).
 - Hollowfell: the Blood Rot wait along the way to its two chambers, a guard before each and more lurking in the side galleries and bays; every gallery ends at an ore seam, carts stand only where there is room to pass, and daylight reaches a few steps in at the mouth, faint by night (806 amended).
 - Umbrage: the inn is the Last Light Mughouse now, a painted lantern on its sign by the door, and you can walk in: a common room with a fire in its stone hearth, laid tables and the taverner's bar with its barrels, a kitchen and the keeper's room, and up the stair five hired rooms and an attic of stores (811).

@@ -86,7 +86,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	Labyrinth._move_hidden(map, Labyrinth.niche_plan(config, seed))
 	var carved: Dictionary[Vector2i, bool] = {}
 	var plan := {"rooms": [], "ways": {}, "decor": [], "entities": [], "buildings": [], "niches": [], "carvings": [],
-		"laid_rooms": [], "processional": []}
+		"laid_rooms": [], "processional": [], "ends": []}
 	var nodes := Labyrinth._anchor_nodes(template, given, {})
 	if nodes.is_empty():
 		return map
@@ -529,6 +529,9 @@ static func _trim_galleries(map: LevelMap, galleries: Array, carved: Dictionary[
 				keep = i + 1
 		if keep == line.size():
 			continue
+		if keep > 0:
+			# Its end, where the roots came down and the rest fell in.
+			plan["ends"].append({"cell": (line[0] as Vector2i) + gallery["along"] * (keep - 1), "along": gallery["along"], "across": across})
 		# Past the last door, rock: to a cell past its tip, which the brush
 		# carved too (left, it is an island the joining up runs a way to).
 		var along: Vector2i = gallery["along"]
@@ -559,10 +562,14 @@ static func _uses(map: LevelMap, anchors: Array, entrance: int, nodes: Array[Dic
 	var free := rooms.duplicate()
 	var by_middle := func(a: Dictionary, b: Dictionary) -> bool:
 		return absi(int(a["walk"]) * 2 - far) < absi(int(b["walk"]) * 2 - far)
-	var chapel := free.filter(func(room: Dictionary) -> bool: return room.get("processional", false))
-	var roomy := chapel.filter(func(room: Dictionary) -> bool: return room["wide"] >= 7 and room["deep"] >= 6)
-	if not roomy.is_empty():
-		chapel = roomy  # The bier, three across, with two cells either side.
+	# Room for the bier, three across, two cells clear all round: on the
+	# processional if one has it, else off a gallery, else the processional's.
+	var fits := func(room: Dictionary) -> bool: return room["wide"] >= 7 and room["deep"] >= 6
+	var chapel := free.filter(func(room: Dictionary) -> bool: return room.get("processional", false) and fits.call(room))
+	if chapel.is_empty():
+		chapel = free.filter(fits)
+	if chapel.is_empty():
+		chapel = free.filter(func(room: Dictionary) -> bool: return room.get("processional", false))
 	chapel.sort_custom(by_middle)
 	if not chapel.is_empty():
 		chapel[0]["use"] = "chapel_of_rest"
@@ -616,21 +623,32 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 	var kept := Labyrinth.door_line(map)
 	var chests := int(config.get("chests", 0))
 	var tombs: Array = []
+	# The robbers' dig: into the floor of the family tomb walked farthest
+	# (nearest their camp) that it fits.
+	var by_walk: Array = plan["rooms"].filter(func(room: Dictionary) -> bool: return room["use"] == "family_tomb")
+	by_walk.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
+	for room: Dictionary in by_walk:
+		if not _dig(map, room, kept, plan).is_empty():
+			room["dug"] = true
+			break
 	for room: Dictionary in plan["rooms"]:
 		var use: String = room["use"]
 		if use == "family_tomb":
 			tombs.append(room)
-			_sarcophagi(map, room, kept, plan)
+			if not room.get("dug", false):
+				_sarcophagi(map, room, kept, plan)
 			_niches_in(map, room, kept, 2, rng, plan)
 			if not tomb_lines.is_empty():
 				_carving(map, room, kept, tomb_lines.pop_front(), plan)
 		elif use == "ossuary":
-			_niches_in(map, room, kept, 1, rng, plan)
+			_niches_in(map, room, kept, 2, rng, plan)
+			_stacks(map, room, kept, plan)
 			_bones(map, room, kept, rng, plan)
 		elif use == "chapel_of_rest":
 			_bier(map, room, kept, plan)
 			if not rest_lines.is_empty():
 				_carving(map, room, kept, rest_lines[0], plan)
+			_candles(map, room, kept, plan)
 		elif use == "sealed_vault":
 			_sarcophagi(map, room, kept, plan)
 			if chests > 0 and _chest(map, room, kept, config, plan):
@@ -641,6 +659,14 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 			break
 		if _chest(map, room, kept, config, plan):
 			chests -= 1
+	# A tomb the robbers have been at (its chest theirs to guard, or their
+	# dig in it): its sarcophagi robbed (art-kit's variant 2, the lid off).
+	for room: Dictionary in tombs:
+		if room.has("chest") or room.get("dug", false):
+			for entry: Dictionary in room.get("pieces", []):
+				if entry["slot"] == "building.sarcophagus":
+					entry["variant"] = 2
+	_roots(map, kept, plan)
 
 
 ## A cell of [param room] by its frame: [param x] along its door wall, [param y] in from it.
@@ -648,7 +674,7 @@ static func _at(room: Dictionary, x: int, y: int) -> Vector2i:
 	return (room["start"] as Vector2i) + (room["x_way"] as Vector2i) * x - (room["out"] as Vector2i) * y
 
 
-## Its sarcophagi (building.grave): one in the middle of a narrow tomb, two
+## Its sarcophagi (building.sarcophagus, sealed): one in the middle of a narrow tomb, two
 ## side by side in a wide one, each a cell clear of the walls, laid along
 ## the room's depth, its foot to the door.
 static func _sarcophagi(map: LevelMap, room: Dictionary, kept: Dictionary, plan: Dictionary) -> void:
@@ -657,15 +683,16 @@ static func _sarcophagi(map: LevelMap, room: Dictionary, kept: Dictionary, plan:
 	if deep < 6:
 		# A shallow tomb: the one laid across it, its foot to the side.
 		var across := (wide - 2) / 2
-		_building(map, room, kept, "building.grave", [_at(room, across, deep / 2), _at(room, across + 1, deep / 2)], plan, room["x_way"])
+		_building(map, room, kept, "building.sarcophagus", [_at(room, across, deep / 2), _at(room, across + 1, deep / 2)], plan, room["x_way"])
 		return
 	var xs: Array = [wide / 2] if wide < 8 else [wide / 2 - 2, wide / 2 + 1]
 	for x: int in xs:
 		var y := (deep - 2) / 2
-		_building(map, room, kept, "building.grave", [_at(room, x, y), _at(room, x, y + 1)], plan)
+		_building(map, room, kept, "building.sarcophagus", [_at(room, x, y), _at(room, x, y + 1)], plan)
 
 
-## The bier (building.burial_table, 3 x 2) in the chapel's middle, its long
+## The bier (building.burial_table's variant 2: a bare slab, a folded
+## shroud, a candle stand at each corner) in the chapel's middle, its long
 ## side across the room.
 static func _bier(map: LevelMap, room: Dictionary, kept: Dictionary, plan: Dictionary) -> void:
 	var x: int = (room["wide"] - 3) / 2
@@ -674,40 +701,56 @@ static func _bier(map: LevelMap, room: Dictionary, kept: Dictionary, plan: Dicti
 	for dy in 2:
 		for dx in 3:
 			cells.append(_at(room, x + dx, y + dy))
-	_building(map, room, kept, "building.burial_table", cells, plan)
+	var entry := _building(map, room, kept, "building.burial_table", cells, plan)
+	if not entry.is_empty():
+		entry["variant"] = 2
+
+
+## The robbers' dig (building.robbers_dig, 2 x 2) in [param room]'s middle,
+## its open mouth to the door: the entry, or {} where it does not fit.
+static func _dig(map: LevelMap, room: Dictionary, kept: Dictionary, plan: Dictionary) -> Dictionary:
+	var x: int = (room["wide"] - 2) / 2
+	var y: int = (room["deep"] - 2) / 2
+	var cells: Array[Vector2i] = []
+	for dy in 2:
+		for dx in 2:
+			cells.append(_at(room, x + dx, y + dy))
+	return _building(map, room, kept, "building.robbers_dig", cells, plan)
 
 
 ## A building laid on [param cells] of [param room] when they are its
 ## floor, two cells clear of its walls (no way beside it one cell wide)
 ## and out of every door's line: its entry {slot, at: the footprint's
-## top-left, facing: toward the door, or [param facing]}.
+## top-left, facing: toward the door, or [param facing]}, kept in the
+## room's "pieces" too; {} where it does not fit.
 static func _building(map: LevelMap, room: Dictionary, kept: Dictionary, slot: String, cells: Array[Vector2i], plan: Dictionary,
-		facing: Variant = null) -> bool:
+		facing: Variant = null) -> Dictionary:
 	var top_left := cells[0]
 	for cell in cells:
 		if not room["cells"].has(cell) or kept.has(cell) or map.cell(cell) != FLOOR:
-			return false
+			return {}
 		# Two cells of floor all round it (612: no way one cell wide).
 		for dy in range(-2, 3):
 			for dx in range(-2, 3):
 				if not room["cells"].has(cell + Vector2i(dx, dy)):
-					return false
+					return {}
 		top_left = Vector2i(mini(top_left.x, cell.x), mini(top_left.y, cell.y))
 	var out_way: Vector2i = room["out"] if facing == null else facing
 	var entry := {"slot": slot, "at": [top_left.x, top_left.y], "facing": [out_way.x, out_way.y]}
 	var rect: Variant = Level.building_rect(entry)
 	if not rect is Rect2i:
-		return false
+		return {}
 	for cell in Level.rect_cells(rect):
 		if not cell in cells:
-			return false
+			return {}
 	for cell in cells:
 		kept[cell] = true
 		for direction in DIRECTIONS:
 			kept[cell + direction] = true  # A walk round it, nothing laid hard by.
 	plan["buildings"].append(entry)
+	room["pieces"] = room.get("pieces", []) + [entry]
 	room["things"] = int(room.get("things", 0)) + 1
-	return true
+	return entry
 
 
 ## Burial niches in [param room]'s walls: every [param every]th cell along
@@ -761,6 +804,50 @@ static func _bones(map: LevelMap, room: Dictionary, kept: Dictionary, rng: Rando
 		laid.append(cell)
 		kept[cell] = true
 	room["things"] = int(room.get("things", 0)) + laid.size()
+
+
+## Skulls and long bones stacked against the ossuary's walls
+## (prop.set_ossuary_stack), on every wall cell its niches left, none in a
+## door's line.
+static func _stacks(map: LevelMap, room: Dictionary, kept: Dictionary, plan: Dictionary) -> void:
+	for cell in Tools.sorted_cells(room["cells"]):
+		if kept.has(cell) or map.cell(cell) != FLOOR:
+			continue
+		for direction in DIRECTIONS:
+			var behind := cell + direction
+			if room["cells"].has(behind) or map.walkable(behind) or map.edge(Terrain.edge_key(cell, direction)) == "door":
+				continue
+			if _taken_wall(plan, cell, direction):
+				continue
+			plan["decor"].append([cell.x, cell.y, direction.x, direction.y, "ossuary_stack", 1])
+			room["things"] = int(room.get("things", 0)) + 1
+			break
+
+
+## Candles burning on the chapel's floor before its carving (the light is
+## the chapel's two torches).
+static func _candles(map: LevelMap, room: Dictionary, kept: Dictionary, plan: Dictionary) -> void:
+	for row: Dictionary in plan["carvings"]:
+		var cell := Vector2i(int(row["at"][0]), int(row["at"][1]))
+		if room["cells"].has(cell) and not kept.has(cell):
+			plan["decor"].append([cell.x, cell.y, 0, 0, "candles", 1])
+			kept[cell] = true
+			return
+
+
+## Roots come down the end wall of each gallery that ends past its last
+## door (the rest of it fell in): its middle cell, else a side one. A wall
+## piece, never solid, so a door's line may hold it.
+static func _roots(map: LevelMap, kept: Dictionary, plan: Dictionary) -> void:
+	for end: Dictionary in plan["ends"]:
+		var along: Vector2i = end["along"]
+		for j: int in [0, 1, -1]:
+			var cell: Vector2i = end["cell"] + end["across"] * j
+			if map.cell(cell) != FLOOR or map.walkable(cell + along) or map.edge(Terrain.edge_key(cell, along)) == "door" \
+					or _taken_wall(plan, cell, along):
+				continue
+			plan["decor"].append([cell.x, cell.y, along.x, along.y, "collapse_roots", 1])
+			break
 
 
 ## A carving on [param room]'s back wall (the wall across from its door),

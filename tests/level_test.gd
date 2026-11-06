@@ -3546,8 +3546,13 @@ func _test_barrow_level() -> void:
 	# Moss and webs (647): the templates' own, the rest rolled by a generation.
 	var corner_webs := func(level: Dictionary) -> int:
 		return level["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "web_corner").size()
-	_check(barrow["terrain"]["decor"].size() == 3 and corner_webs.call(barrow) == 2 and deep["terrain"]["decor"].size() == 30 and corner_webs.call(deep) == 4,
-		"the first hall holds two cobwebbed corners and a strip of moss, the Ossuary's Hall of Fallen Souls its moss and four webbed corners (%d, %d)" % [barrow["terrain"]["decor"].size(), deep["terrain"]["decor"].size()])
+	# 806 amended (3): and the light shaft under the temple yard's grate, its skylight.
+	var shafts: Array = barrow["terrain"]["decor"].filter(func(d: Dictionary) -> bool: return d["kind"] == "light_shaft")
+	var skylights: Array = barrow["terrain"]["skylights"]
+	_check(barrow["terrain"]["decor"].size() == 4 and corner_webs.call(barrow) == 2 and shafts.size() == 1 and skylights.size() == 1
+			and shafts[0]["cell"] == Vector2i(46, 13) and skylights[0]["at"] == Vector2i(46, 13)
+			and deep["terrain"]["decor"].size() == 30 and corner_webs.call(deep) == 4,
+		"the first hall holds two cobwebbed corners, a strip of moss and the light shaft under its skylight, the Ossuary's Hall of Fallen Souls its moss and four webbed corners (%d, %s, %d)" % [barrow["terrain"]["decor"].size(), skylights, deep["terrain"]["decor"].size()])
 	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 4 and int(Regen.config_of("barrow").get("layer", 0)) == 1
 		and Regen.marked("barrow_deep") and Regen.config_of("barrow_deep")["anchors"].size() == 2 and int(Regen.config_of("barrow_deep").get("layer", 0)) == 2
 		and Regen.config_of("barrow_deep")["anchors"][1]["name"] == "lair" and Regen.config_of("barrow_deep").get("monsters") == {"skeleton": 12, "skeleton_guard": 2}
