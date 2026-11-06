@@ -86,6 +86,7 @@ func _ready() -> void:
 	await _test_barrow_exits()
 	await _test_spawn_near()
 	_test_reed_pond()
+	_test_kind_lists()
 
 	_main.load_map(Level.DEFAULT_MAP)
 	print("")
@@ -2100,6 +2101,41 @@ func _test_building_level_link() -> void:
 			and wilds["places"].has("temple@189,201") and counter.size() == 1 and (chapel["rect"] as Rect2i).has_point(counter[0]["tile"])
 			and (chapel["rect"] as Rect2i).has_point(landing) and floor_cells.has(landing) and temple_said.is_empty(),
 			"Umbrage's temple is the chapel: 10 x 6 facing west, doors on (189, 201) and (189, 202), its place at the front, the counter and the shortcut's landing inside (%s, %s, %s)" % [chapel["rect"], landing, temple_said])
+
+
+## The kind lists (816): each one entry a line, sorted, so two trees adding
+## kinds touch different lines; sorted also means no kind twice. A dictionary
+## keeps its keys in the order written, so its keys are the source's order.
+func _test_kind_lists() -> void:
+	print("== The kind lists, sorted (816) ==")
+	var lists := {"BUILDINGS": Level.BUILDINGS.keys(), "SOLID": Level.SOLID, "DOORLESS": Level.DOORLESS,
+		"OPEN_AIR": Level.OPEN_AIR, "FADES_ON_LINE": Level.FADES_ON_LINE}
+	for name: String in lists:
+		var kinds: Array = lists[name]
+		var out_of_order: Array = []
+		for i in range(1, kinds.size()):
+			if not (str(kinds[i - 1]) < str(kinds[i])):
+				out_of_order.append("%s then %s" % [kinds[i - 1], kinds[i]])
+		_check(out_of_order.is_empty(), "Level.%s sorted, no kind twice (%s)" % [name, out_of_order])
+	# One a line, in the source: from each list's const line to its closing
+	# bracket, no line holds two kinds.
+	var source := FileAccess.get_file_as_string("res://sim/level.gd").split("
+")
+	var crowded: Array = []
+	for name: String in lists:
+		var inside := false
+		for line: String in source:
+			if line.begins_with("const %s" % name):
+				inside = true
+			elif not inside:
+				continue
+			if line.strip_edges().begins_with("#"):
+				continue
+			if line.split("#")[0].count("\"") > 2:
+				crowded.append("%s: %s" % [name, line.strip_edges()])
+			if line == "]" or line == "}":
+				break
+	_check(crowded.is_empty(), "each kind a line of its own in sim/level.gd (%s)" % [crowded])
 
 
 ## The Reed Pond (805, maps' side; economy's fishing slice 1): the wilds'

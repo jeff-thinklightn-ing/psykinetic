@@ -43845,3 +43845,28 @@ a stronger 1.0 to 1.6 washed it out; in the open at night the moon lights the gr
 the coordinator asked for an outdoors tell of its own (aura motes, to come before 789 opens). Tests:
 weather_test (aura_glow's ends, aura_shows, with_own), view_test _test_aura (the marker, a cool real
 light at the reach, none with no aura). Client only, no new class_name.
+
+## 816. The kind lists in sim/level.gd: one entry a line, sorted
+
+The coordinator's chore, from release: Level.BUILDINGS, SOLID and DOORLESS were written as long
+wrapped lines, and every new kind was appended to the same last line, so two trees each adding a
+kind conflicted at the rebase (three landings stopped on it on 2026-11-06). Release numbered it a
+decision of its own because it sets a rule for every tree that adds a kind.
+
+- BUILDINGS, SOLID, DOORLESS, OPEN_AIR and FADES_ON_LINE (the last two the same shape, and added
+  to the same way, as the great oak's 778 amended did) are one entry a line, sorted by name, each
+  with its trailing comma, the closing bracket on a line of its own. A new kind goes in its own
+  line at its sorted place, so two trees' adds land on different lines unless they add the same
+  kind. A note on one entry rides on its line (the Mughouse's pieces, the cold forge).
+- DECOR_KINDS was one per line already, in commented groups (the crypt's, the mine's, the lair's):
+  sorting would scatter the groups, so it keeps its order; its last entry gains its comma and the
+  closing brace a line of its own, so an add at the end no longer rewrites the last entry's line.
+- No behaviour change: the same kinds and sizes (checked entry by entry against the old file). The
+  one order a reader saw is Level.buildings_from's warning for a building with no known slot, which lists
+  BUILDINGS' slots: now in sorted order. No data file changes.
+- level_test _test_kind_lists: each list sorted, so no kind twice (a dictionary keeps its keys in the
+  order written), and, read from the source, no line inside them holds two kinds.
+- The reflow is a small script (maps' scratchpad, reflow_kinds.py), rerun if a rebase brings in a kind
+  added the old way. Every tree was told the rule once.
+
+Protocol unchanged, no new class_name, no bullet.

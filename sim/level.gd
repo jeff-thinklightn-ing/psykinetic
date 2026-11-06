@@ -149,26 +149,53 @@ const NORTHS := {"up": Vector2i(0, -1), "down": Vector2i(0, 1), "left": Vector2i
 ## in cells, across by deep as it faces north or south (the other way round
 ## facing east or west). The footprint is the inside; its walls and door
 ## are the map's own edges on its outline (decision 265).
-const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4, 6), "building.shed": Vector2i(2, 3),
-	"building.well": Vector2i(1, 1), "building.temple": Vector2i(4, 6), "building.healers_hut": Vector2i(3, 3),
-	"building.field": Vector2i(4, 4), "building.fold": Vector2i(6, 6), "building.mound": Vector2i(12, 12),
-	"building.great_tree": Vector2i(3, 3), "building.cairn": Vector2i(2, 2), "building.standing_stone": Vector2i(1, 1),
-	"building.waystone": Vector2i(1, 1), "building.chopping_block": Vector2i(1, 1), "building.woodpile": Vector2i(1, 1),
-	"building.tower_ruin": Vector2i(3, 3), "building.rubble_heap": Vector2i(1, 1), "building.fallen_column": Vector2i(2, 1),
-	"building.burial_table": Vector2i(3, 2), "building.crypt_pillar": Vector2i(2, 2),
-	"building.round_table": Vector2i(3, 3), "building.hall_chair": Vector2i(1, 1), "building.broken_table": Vector2i(2, 1),
-	"building.throne": Vector2i(1, 1), "building.dark_pillar": Vector2i(1, 1), "building.hatch_sealed": Vector2i(1, 1),
-	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1), "building.turf_house": Vector2i(7, 5),
-	"building.market_stall": Vector2i(2, 1), "building.grave": Vector2i(1, 2), "building.wayside_shrine": Vector2i(1, 1),
-	"building.milestone": Vector2i(1, 1), "building.hunters_blind": Vector2i(2, 2), "building.lean_to": Vector2i(3, 2),
-	# The Last Light Mughouse's common room (811 amended, art-kit's pieces):
-	# the taverner's counter and tap rack, and its tables.
-	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2),
-	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2), "tree.clawed": Vector2i(1, 1),
-	# castle_halls' cold forge (806 (c), art-kit's c7539ec7): its back to the wall.
-	"building.set_cold_forge": Vector2i(2, 1), "tree.great_oak": Vector2i(4, 4),
-	# Hollowfell's windlass over an old shaft (790 amended (3); art-kit 4bc722a8).
-	"building.set_windlass": Vector2i(2, 1)}
+## One entry a line, sorted, each with its comma (816: a new kind is its own line).
+const BUILDINGS := {
+	"building.bar_counter": Vector2i(3, 1),  # The Mughouse's (811 amended, art-kit's): the taverner's counter.
+	"building.broken_table": Vector2i(2, 1),
+	"building.burial_table": Vector2i(3, 2),
+	"building.cairn": Vector2i(2, 2),
+	"building.chopping_block": Vector2i(1, 1),
+	"building.crypt_pillar": Vector2i(2, 2),
+	"building.dark_pillar": Vector2i(1, 1),
+	"building.dwarven_forge": Vector2i(6, 3),
+	"building.fallen_column": Vector2i(2, 1),
+	"building.field": Vector2i(4, 4),
+	"building.fold": Vector2i(6, 6),
+	"building.grave": Vector2i(1, 2),
+	"building.great_tree": Vector2i(3, 3),
+	"building.hall_chair": Vector2i(1, 1),
+	"building.hatch_sealed": Vector2i(1, 1),
+	"building.healers_hut": Vector2i(3, 3),
+	"building.house": Vector2i(4, 6),
+	"building.hunters_blind": Vector2i(2, 2),
+	"building.hut": Vector2i(3, 3),
+	"building.lean_to": Vector2i(3, 2),
+	"building.market_stall": Vector2i(2, 1),
+	"building.milestone": Vector2i(1, 1),
+	"building.mound": Vector2i(12, 12),
+	"building.robbers_dig": Vector2i(2, 2),
+	"building.round_table": Vector2i(3, 3),
+	"building.rubble_heap": Vector2i(1, 1),
+	"building.sarcophagus": Vector2i(1, 2),
+	"building.set_cold_forge": Vector2i(2, 1),  # castle_halls' cold forge (806 (c), art-kit's c7539ec7): its back to the wall.
+	"building.set_windlass": Vector2i(2, 1),  # Hollowfell's windlass over an old shaft (790 amended (3); art-kit 4bc722a8).
+	"building.shed": Vector2i(2, 3),
+	"building.standing_stone": Vector2i(1, 1),
+	"building.tap_rack": Vector2i(2, 1),  # The Mughouse's (811 amended): its tap rack.
+	"building.tavern_table": Vector2i(2, 2),  # The Mughouse's (811 amended): its tables.
+	"building.temple": Vector2i(4, 6),
+	"building.throne": Vector2i(1, 1),
+	"building.tower_ruin": Vector2i(3, 3),
+	"building.turf_house": Vector2i(7, 5),
+	"building.wayside_shrine": Vector2i(1, 1),
+	"building.waystone": Vector2i(1, 1),
+	"building.weapon_rack": Vector2i(2, 1),
+	"building.well": Vector2i(1, 1),
+	"building.woodpile": Vector2i(1, 1),
+	"tree.clawed": Vector2i(1, 1),
+	"tree.great_oak": Vector2i(4, 4),
+}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -212,7 +239,14 @@ const ON_WATER: Array[String] = ["building.well"]
 ## and the draugr's throne (580 step 3) are walked onto too: a seat is a
 ## floor cell with a piece on it, no wall round it; so is the dark tower's
 ## sealed hatch (659 amended), laid over the mine's sealed link.
-const OPEN_AIR: Array[String] = ["building.field", "building.fold", "building.hall_chair", "building.throne", "building.hatch_sealed"]
+## One entry a line, sorted, each with its comma (816: a new kind is its own line).
+const OPEN_AIR: Array[String] = [
+	"building.field",
+	"building.fold",
+	"building.hall_chair",
+	"building.hatch_sealed",
+	"building.throne",
+]
 ## Words cut in a stone's face (decision 800): a building entry's "carved"
 ## (voice's words, maps' row: a milestone's or a waystone's name) up to
 ## CARVED_MAX letters, and its "arrow", one of CARVED_ARROWS, on the side of
@@ -225,9 +259,24 @@ const CARVED_ARROWS: Array[String] = ["left", "right", "up"]
 ## from the camera to the player they fade as trees do (623 amended (2):
 ## the low camera nearer and flatter, Rolf's stall hid the player whole).
 ## Buildings' list; the low ones (a woodpile, a table, a chair) stay.
-const FADES_ON_LINE: Array[String] = ["building.market_stall", "building.well", "building.cairn", "building.standing_stone",
-	"building.waystone", "building.great_tree", "building.tower_ruin", "building.mound", "building.crypt_pillar",
-	"building.dark_pillar", "building.dwarven_forge", "building.weapon_rack", "building.throne", "tree.clawed", "tree.great_oak"]
+## One entry a line, sorted, each with its comma (816: a new kind is its own line).
+const FADES_ON_LINE: Array[String] = [
+	"building.cairn",
+	"building.crypt_pillar",
+	"building.dark_pillar",
+	"building.dwarven_forge",
+	"building.great_tree",
+	"building.market_stall",
+	"building.mound",
+	"building.standing_stone",
+	"building.throne",
+	"building.tower_ruin",
+	"building.waystone",
+	"building.weapon_rack",
+	"building.well",
+	"tree.clawed",
+	"tree.great_oak",
+]
 ## A herder's fold (640), and how far from its holding's place cell it may
 ## stand (fold_near).
 const FOLD := "building.fold"
@@ -238,13 +287,41 @@ const FOLD_REACH := 6
 ## them, routes go round) and listed in terrain "solid", which stops sight
 ## as a wall does; their outline has no walls (the slot's mesh is the
 ## mound), none expected.
-const SOLID: Array[String] = ["building.mound", "building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
-	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
-	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
-	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
-	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak", "building.set_windlass"]
+## One entry a line, sorted, each with its comma (816: a new kind is its own line).
+const SOLID: Array[String] = [
+	"building.bar_counter",
+	"building.broken_table",
+	"building.burial_table",
+	"building.cairn",
+	"building.chopping_block",
+	"building.crypt_pillar",
+	"building.dark_pillar",
+	"building.dwarven_forge",
+	"building.fallen_column",
+	"building.grave",
+	"building.great_tree",
+	"building.hunters_blind",
+	"building.lean_to",
+	"building.market_stall",
+	"building.milestone",
+	"building.mound",
+	"building.robbers_dig",
+	"building.round_table",
+	"building.rubble_heap",
+	"building.sarcophagus",
+	"building.set_cold_forge",
+	"building.set_windlass",
+	"building.standing_stone",
+	"building.tap_rack",
+	"building.tavern_table",
+	"building.tower_ruin",
+	"building.wayside_shrine",
+	"building.waystone",
+	"building.weapon_rack",
+	"building.woodpile",
+	"tree.clawed",
+	"tree.great_oak",
+]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -258,13 +335,40 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## robbers' dig into a tomb's floor; 806 (c): castle_halls' cold forge): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
 ## the boar's lair's mouth, a tree scored by its tusks, tree.clawed; 778 amended: the hills'
 ## great oak, art-kit's tree.great_oak, its trunk and roots).
-const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
-	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
-	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
-	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
-	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
-	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak", "building.set_windlass"]
+## One entry a line, sorted, each with its comma (816: a new kind is its own line).
+const DOORLESS: Array[String] = [
+	"building.bar_counter",
+	"building.broken_table",
+	"building.burial_table",
+	"building.cairn",
+	"building.chopping_block",
+	"building.crypt_pillar",
+	"building.dark_pillar",
+	"building.dwarven_forge",
+	"building.fallen_column",
+	"building.grave",
+	"building.great_tree",
+	"building.hunters_blind",
+	"building.lean_to",
+	"building.market_stall",
+	"building.milestone",
+	"building.robbers_dig",
+	"building.round_table",
+	"building.rubble_heap",
+	"building.sarcophagus",
+	"building.set_cold_forge",
+	"building.set_windlass",
+	"building.standing_stone",
+	"building.tap_rack",
+	"building.tavern_table",
+	"building.tower_ruin",
+	"building.wayside_shrine",
+	"building.waystone",
+	"building.weapon_rack",
+	"building.woodpile",
+	"tree.clawed",
+	"tree.great_oak",
+]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -2284,7 +2388,8 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"trodden_run": {"sits": "flat", "variants": 1, "faced": true},
 	"scattered_bones": {"sits": "flat", "variants": 1, "faced": true, "slot": "prop.bones"},
 	# The forest camp C3's captive's post (793; art-kit's, with the lair's pieces).
-	"captive_post": {"sits": "flat", "variants": 1, "faced": true}}
+	"captive_post": {"sits": "flat", "variants": 1, "faced": true},
+}
 
 
 ## level.json's "carvings" (806 amended, the crypt; lore's lines in voice's
