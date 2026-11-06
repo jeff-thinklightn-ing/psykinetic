@@ -43241,3 +43241,24 @@ blind is hit at the lead, one who stops at the tell missed; under half it breaks
 closed two days; step_perches lays a cat from Holdings' perch place in an awake zone. Server only.
 Protocol: a "51 (814)" line (the place kind and watch); it opens PROTOCOL_REVISION 51, the
 first wire change after v0.1.205's cut (release's). New class_name HillCat.
+
+814, maps' side: the hill cat's perches (2026-11-05, maps; enemy-ai's design,
+C:/dev/review/enemy-ai/hill_cat_design.md, its choice (a) of the two maps put; release's label).
+In the hills every way is a safe path (the road, and the tracks since 763), and the cat keeps off
+them, so a perch looks down on grazing ground, not on a path. tools/make_hills.gd _perches, after
+the land is softened: three "perch" places (814's place kind and its "watch" cells, enemy-ai's Level lines),
+each at a walkable cell where the cat lies up, held by nobody, radius 4, named plainly ("a perch on
+the rocks"). Its "watch" is the grass within PERCH_REACH 4 of it and 1 to 2.5 m below it
+(PERCH_DROP), 8 cells or more: enemy-ai's pounce ground, the cat pounces only onto them. The perch
+and every watch cell lie 6 or more cells (PERCH_OFF_SAFE) from every safe cell, so a walker who
+keeps to the road and tracks never meets the cat; one who strays to a sight or a herd may. Chosen
+by most watch cells, rock beside the perch counting as cover, a sight or story piece 10 to 30
+cells off counting more (PERCH_STRAY: where a player strays to), kept 15 cells in from the land's
+edge, 10 from any place or building, the perches 45 apart (one walk, one cat): perch_1 (157,75)
+above the east river's bank, 17 watch cells; perch_2 (177,128), 14; perch_3 (110,175), south of
+the great oak, 8. A faint dirt trail (PERCH_TRAIL 9 cells, not in "roads", so unsafe) runs across
+each watch, square to the way the perch looks, for prey and walkers to cross it on. The hills
+regenerated: those trail cells turn dirt and the three places appear; nothing else moves. Sheet:
+C:/dev/review/lands/fill_hills/perches/perches.png. level_test _test_perches. Protocol: 814's "51 (814)" line covers the
+kind; no new class_name; 814's CHANGELOG bullet
+(voice's words, worded to the perches as laid) rides here, the cat being real once they are.

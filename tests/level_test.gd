@@ -2798,6 +2798,7 @@ func _test_relaid() -> void:
 	_test_carved(hills)
 	_test_tavern_zone(wilds)
 	_test_shelled(wilds)
+	_test_perches(hills)
 
 
 ## The lands' hidden caches (807 amended): the farmstead's under a
@@ -3052,6 +3053,44 @@ func _test_bear_den() -> void:
 	_check(floor.has(den) and shut.is_empty() and open.is_empty(),
 		"the den at %s: rock behind it on the west, none to its south (shut south: %s; gaps in the back: %s)" % [den, shut, open])
 
+
+
+## The hill cat's perches (maps' side): three "perch" places in the hills,
+## held by nobody, each with a "watch" of 8 or more cells within 4 of it;
+## the perch and every watch cell floor, 6 or more cells from every safe
+## path (the road and the tracks), the watch lower than the perch by 1 to
+## 2.5 m; the perches 45 or more apart.
+func _test_perches(hills: Dictionary) -> void:
+	print("== The hill cat's perches ==")
+	var config := Level.template_config("hills")
+	var warnings: Array[String] = []
+	var places := Level.places_from(config, warnings)
+	var safe := Level.safe_paths(hills["terrain"])
+	var floor := {}
+	for cell: Vector2i in hills["terrain"]["floor"]:
+		floor[cell] = true
+	var perches: Array[Dictionary] = []
+	for key: String in places:
+		if places[key]["kind"] == "perch":
+			perches.append(places[key])
+	_check(warnings.is_empty() and perches.size() == 3 and perches.all(func(perch: Dictionary) -> bool: return perch["holder"] == "nobody"),
+		"three perches, held by nobody, read with no warning (%s)" % [warnings])
+	var near_safe := func(at: Vector2i) -> bool:
+		return safe.keys().any(func(cell: Vector2i) -> bool: return Vector2(cell - at).length() < 6.0)
+	for perch in perches:
+		var at: Vector2i = perch["cell"]
+		var watch: Array = perch.get("watch", [])
+		var top := Level._elevation(hills["terrain"], at)
+		var bad := watch.filter(func(cell: Vector2i) -> bool:
+			var drop := top - Level._elevation(hills["terrain"], cell)
+			return not floor.has(cell) or Vector2(cell - at).length() > 4.0 or near_safe.call(cell) or drop < 0.99 or drop > 2.51)
+		_check(floor.has(at) and not near_safe.call(at) and watch.size() >= 8 and bad.is_empty(),
+			"%s at %s: off every safe path, %d watch cells below it within 4 (bad %s)" % [perch["key"], at, watch.size(), bad])
+	var close := false
+	for i in perches.size():
+		for j in range(i + 1, perches.size()):
+			close = close or Vector2(perches[i]["cell"] - perches[j]["cell"]).length() < 45.0
+	_check(not close, "the perches 45 or more apart: one walk, one cat")
 
 ## The hills' carved stones (800, maps' side): the two milestones read
 ## "Umbrage" and "Shieling" on milestone variant 2, the two waystones "Hut"

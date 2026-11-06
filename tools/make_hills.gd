@@ -230,6 +230,29 @@ const PATCH_RADIUS := 4
 ## footprint is grass or plain dirt, off every path by SIGHT_OFF_PATH and
 ## clear of the others; the multi-cell ones' planned ground levelled
 ## (keep_flat, _sight_pads).
+## The hill cat's perches (enemy-ai's hill cat, its design approved; maps'
+## side): PERCHES of them, each a walkable cell up on the land looking down
+## on grazing ground where it hunts, its "watch" (enemy-ai: the cells it
+## pounces onto): the grass within PERCH_REACH of it PERCH_DROP lower, every
+## watch cell and the perch PERCH_OFF_SAFE cells or more from a safe path
+## (the road and the tracks, 763: the cat keeps off them, so a careful
+## walker on a track never meets it; one who strays to a sight or a herd
+## may). Chosen by most watch cells, rock beside the perch counting as cover,
+## PERCH_APART from each other (one walk, one cat) and PERCH_CLEAR from any
+## place or building. A faint dirt trail (unsafe, not in "roads") runs
+## across each watch, PERCH_TRAIL cells, for prey and walkers to cross it on.
+const PERCHES := 3
+const PERCH_REACH := 4
+const PERCH_DROP := Vector2(1.0, 2.5)
+const PERCH_OFF_SAFE := 6
+const PERCH_APART := 45.0
+const PERCH_CLEAR := 10.0
+const PERCH_MIN_WATCH := 8
+const PERCH_TRAIL := 9
+## Kept in from the land's edge; and the ground a player strays to: a sight
+## or a story piece (SIGHTS) within PERCH_STRAY counts for a perch.
+const PERCH_EDGE := 15
+const PERCH_STRAY := Vector2(10.0, 30.0)
 const ROADWARD := Vector2i.ZERO
 const SIGHTS: Array[Dictionary] = [
 	{"key": "watchtower", "slot": "building.tower_ruin", "at": Vector2i(186, 18), "facing": Vector2i(-1, 0)},
@@ -388,7 +411,98 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	for at in [Vector2i(CLIFF_X + 1, 34), Vector2i(CLIFF_X + 1, 36)]:
 		map.set_cell(at, "crate")
 	_soften()
+	_perches()
 	_save()
+
+
+## The hill cat's perches (PERCHES): each a "perch" place {at, watch,
+## radius PERCH_REACH, held by nobody}, and its faint trail.
+func _perches() -> void:
+	var safe := {}
+	for cell in _road_cells:
+		safe[cell] = true
+	for cell: Vector2i in _track_cells:
+		safe[cell] = true
+	# Each cell's distance to the nearest safe cell, to PERCH_OFF_SAFE.
+	var near_safe := {}
+	for cell: Vector2i in safe:
+		for dy in range(-PERCH_OFF_SAFE + 1, PERCH_OFF_SAFE):
+			for dx in range(-PERCH_OFF_SAFE + 1, PERCH_OFF_SAFE):
+				if Vector2(dx, dy).length() < PERCH_OFF_SAFE:
+					near_safe[cell + Vector2i(dx, dy)] = true
+	var others: Array[Vector2i] = []
+	for key: String in config["places"]:
+		var place: Dictionary = config["places"][key]
+		others.append(Vector2i(int(place["at"][0]), int(place["at"][1])))
+	for building: Dictionary in config["buildings"]:
+		others.append(Vector2i(int(building["at"][0]), int(building["at"][1])))
+	var candidates: Array[Dictionary] = []
+	var sights: Array[Vector2i] = []
+	for building: Dictionary in config["buildings"]:
+		if building.has("slot"):
+			sights.append(Vector2i(int(building["at"][0]), int(building["at"][1])))
+	for row: Array in config.get("decor", []):
+		sights.append(Vector2i(int(row[0]), int(row[1])))
+	for y in range(PERCH_EDGE, SIZE.y - PERCH_EDGE):
+		for x in range(PERCH_EDGE, SIZE.x - PERCH_EDGE):
+			var at := Vector2i(x, y)
+			if not map.cell(at) in ["grass", "dirt"] or near_safe.has(at):
+				continue
+			if others.any(func(other: Vector2i) -> bool: return Vector2(other - at).length() < PERCH_CLEAR):
+				continue
+			var top := map.relief[y * SIZE.x + x]
+			var watch: Array[Vector2i] = []
+			for dy in range(-PERCH_REACH, PERCH_REACH + 1):
+				for dx in range(-PERCH_REACH, PERCH_REACH + 1):
+					var cell := at + Vector2i(dx, dy)
+					if Vector2(dx, dy).length() > PERCH_REACH or map.cell(cell) != "grass" or near_safe.has(cell):
+						continue
+					var drop := top - map.relief[cell.y * SIZE.x + cell.x]
+					if drop >= PERCH_DROP.x and drop <= PERCH_DROP.y:
+						watch.append(cell)
+			if watch.size() < PERCH_MIN_WATCH:
+				continue
+			var cover := 0
+			for step in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				if map.cell(at + step) == "rock":
+					cover += 1
+			var strays := sights.any(func(sight: Vector2i) -> bool:
+				var off := Vector2(sight - at).length()
+				return off >= PERCH_STRAY.x and off <= PERCH_STRAY.y)
+			candidates.append({"at": at, "watch": watch, "score": watch.size() + 4 * mini(cover, 2) + (12 if strays else 0)})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a["score"] > b["score"] or (a["score"] == b["score"] and (a["at"].y < b["at"].y or (a["at"].y == b["at"].y and a["at"].x < b["at"].x))))
+	var chosen: Array[Dictionary] = []
+	for candidate in candidates:
+		if chosen.size() >= PERCHES:
+			break
+		if chosen.any(func(other: Dictionary) -> bool: return Vector2(other["at"] - candidate["at"]).length() < PERCH_APART):
+			continue
+		chosen.append(candidate)
+	for i in chosen.size():
+		var perch: Dictionary = chosen[i]
+		var at: Vector2i = perch["at"]
+		var watch: Array[Vector2i] = perch["watch"]
+		# The trail: across the watch, square to the way the perch looks.
+		var middle := Vector2.ZERO
+		for cell in watch:
+			middle += Vector2(cell)
+		middle /= watch.size()
+		var look := (middle - Vector2(at)).normalized()
+		var across := Vector2(-look.y, look.x)
+		var trail: Array[Vector2i] = []
+		for step in range(-(PERCH_TRAIL / 2), PERCH_TRAIL / 2 + 1):
+			var cell := Vector2i((middle + across * step).round())
+			if map.cell(cell) == "grass" and not near_safe.has(cell):
+				map.set_cell(cell, "dirt")
+				trail.append(cell)
+		var key := "perch_%d" % (i + 1)
+		config["places"][key] = {"at": [at.x, at.y], "kind": "perch", "radius": PERCH_REACH, "name": "a perch on the rocks",
+			"holder": "nobody", "watch": watch.map(func(cell: Vector2i) -> Array: return [cell.x, cell.y])}
+		print("[hills] %s at %s: %d watch cells, %d trail cells, score %d" % [key, at, watch.size(), trail.size(), perch["score"]])
+	if chosen.size() < PERCHES:
+		_missed.append("only %d perches" % chosen.size())
+		push_error("[hills] only %d perches of %d" % [chosen.size(), PERCHES])
 
 
 ## The fall's stream's line: FALL_STREAM, its last point moved onto the east

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Hill cats lie up on the rises above the hills' grazing, away from the paths, and drop on whoever strays below, unless you spot them first (814).
 - In the hills, the lone great oak between the streams stands broad and low-limbed now, with strips of cloth knotted along its branches (778 amended).
 - The dwarven halls under the castle are laid out anew every few days, and every room holds something: a guardroom with its rack and imps, an armoury of broken racks with a brute over the chest, a cold forge with an imp at the dead hearth, a hall carved with the great forge, stores with a guarded chest and a pillared hall; each room's heart is lit, and a guarded way runs straight from the stair down to the great forge (806 amended (4)).
 - In the forest west of the south road, the ground is trampled bare, with bones in the dirt and a tree scored by tusks (780 amended (12)).
