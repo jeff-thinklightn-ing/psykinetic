@@ -82,7 +82,8 @@ func _test_falls() -> void:
 	var players_there: int = _main._players_in(World.zone.name).size()
 	_step(_main.CAMP_FALL_TICKS + _main.CAMP_CHECK_TICKS)
 	_check(World.holdings.holder(_camp) == Factions.NOBODY, "it falls to nobody")
-	# Deeds alone: a companion there gains bond and needs of her own (804 amended (3)).
+	# Deeds alone: a companion there gains bond and needs of her own (804 amended (3)). The camp
+	# falls here without a fight; cleared by a kill, combat's "a fight won" deed would make it 2 for 1.
 	var deeds: int = _main.rewards_by_track.get("deed", 0) - sent
 	_check(players_there > 0 and deeds == players_there,
 		"a deed for each player in its area (804, enemy-ai's side): %d sent for %d" % [deeds, players_there])

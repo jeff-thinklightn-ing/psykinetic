@@ -1981,17 +1981,18 @@ func _test_coop_tomb(host: Player, chest: Chest) -> void:
 	var solved: Array = []
 	var on_solved := func(zone: String, room: String, by: Array) -> void: solved.append([zone, room, by.size()])
 	_main.room_solved.connect(on_solved)
-	var rewards: int = _main.rewards_sent
+	# Deeds alone: a companion there gains bond and needs of her own (813 amended (2)).
+	var rewards: int = _main.rewards_by_track.get("deed", 0)
 	World._relocate(host, cells[0])
 	_check(World.plate_held(zone_name, "vault", 0) and not World.plate_held(zone_name, "vault", 1) and not World.plate_held(zone_name, "vault")
 		and not door.open and solved.is_empty(), "one body on one plate opens nothing")
 	World._relocate(chest, cells[1])
 	_check(World.plate_held(zone_name, "vault") and door.open and door.lock == "" and solved == [[zone_name, "tomb", 2]]
-		and _main.rewards_sent == rewards + 1 and "vault" in _main._regen[zone_name].get("solved", []),
-		"both plates held: the vault opens for good, room_solved names both, the deed given (%s, rewards %d)" % [solved, _main.rewards_sent - rewards])
+		and _main.rewards_by_track.get("deed", 0) == rewards + 1 and "vault" in _main._regen[zone_name].get("solved", []),
+		"both plates held: the vault opens for good, room_solved names both, the deed given (%s, rewards %d)" % [solved, _main.rewards_by_track.get("deed", 0) - rewards])
 	World._relocate(host, host_at)
 	World._relocate(host, cells[0])
-	_check(door.open and solved.size() == 1 and _main.rewards_sent == rewards + 1, "off and on again: still open, solved and rewarded once")
+	_check(door.open and solved.size() == 1 and _main.rewards_by_track.get("deed", 0) == rewards + 1, "off and on again: still open, solved and rewarded once")
 	World._relocate(host, host_at)
 	World._relocate(chest, chest_at)
 	_main.room_solved.disconnect(on_solved)

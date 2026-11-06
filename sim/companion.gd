@@ -164,7 +164,16 @@ const REST_LEAVE := 8
 const HESITATE_TICKS := 15
 ## How often she looks over her day for the deeds that move her bond (decision 621).
 const DEED_EVERY := 10
-const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give", "play", "look"]
+const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry", "give", "play", "look", "plate"]
+## The co-op tomb (813 amended (2)): "stand on the plate", "wait on the other plate".
+const ORDER_PLATE := "\\b(stand|stay|wait|step|go|get|hold|keep)\\b[^.!?]*\\bplates?\\b"
+## Her player asking what she makes of a room (813 amended (2)): "anything odd here?",
+## "what do you see?", "help": the next clue of a secret there, only then.
+const HINT_ASK := "\\b(anything (odd|strange|unusual|hidden|here)|what do you (see|make of|think of) (this|it|here)|what do you see|see anything|notice anything|any ideas|a clue|hint|any help|help me find|look around|what'?s this)\\b"
+## What her voice is told (voice's words): a tomb opened, a clue.
+const TOMB_TOGETHER := "You and %s just opened a sealed tomb: the bricked wall sank open as you both held the plates. If you speak now, speak of that, in your own way."
+const TOMB_OPENED := "%s just opened a sealed tomb: a bricked wall sank open. If you speak now, speak of that, in your own way."
+const CLUE_FOCUS := "You notice something here: %s If you speak now, say only that, in your own words."
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
 const PHRASE_MEANINGS := {
@@ -1293,7 +1302,75 @@ func owner_spoke(text: String, phrase := 0) -> void:
 			"stance": STANCE_NAMES[wanted], "outcome": "applied", "note": "a quick phrase: its stance at once, standing as the instruction"})
 	if told == "less":
 		_quiet_focus = TALK_LESS_ACK % keeper_name()
+	elif not in_fight() and RegEx.create_from_string(HINT_ASK).search(text.to_lower()) != null:
+		var clue := next_clue()
+		if not clue.is_empty():
+			_quiet_focus = CLUE_FOCUS % clue  # Asked (813 amended (2)): never offered unasked.
 	_ask_voice("%s just spoke to you." % keeper_name(), heard, false, PHRASE_STANCES.has(phrase))
+	_quiet_focus = ""
+
+
+## The plate cell she goes to (813 amended (2)): of her zone's plate sets, a cell
+## nothing else stands on, the set her player already holds first, then
+## one in her player's laid room, then the nearest; NO_CELL for none.
+func plate_for_me() -> Vector2i:
+	var here: Zone = World.zones.get(zone)
+	if here == null:
+		return World.NO_CELL
+	var best := World.NO_CELL
+	var best_key := 0
+	var room := keeper_room()
+	for plate: Dictionary in here.plates:
+		var cells: Array = plate.get("cells", [])
+		var other_held := cells.any(func(each: Vector2i) -> bool: return World.plate_body(here, each) != null and World.plate_body(here, each) != self)
+		for cell: Vector2i in cells:
+			var body := World.plate_body(here, cell)
+			if body != null and body != self:
+				continue
+			var key := (0 if other_held else 100000) + (0 if not room.is_empty() and str(plate.get("room", "")) == room else 10000) + World.distance(tile, cell)
+			if best == World.NO_CELL or key < best_key:
+				best = cell
+				best_key = key
+	return best
+
+
+## The laid room of a cell of her zone (Main's, 813 amended (2); Level.laid_room_at), "" for none.
+var room_of := Callable()
+
+
+## Her player's laid room now, "" for none.
+func keeper_room() -> String:
+	return str(room_of.call(keeper.tile)) if room_of.is_valid() and _alive(keeper) else ""
+## The unfound secrets of her player's room (Main's, 813 amended (2)): [{id, clues}],
+## Level.secrets_of less those her player has searched.
+var secrets_here := Callable()
+## Which clue of each secret she has given: {zone/id: n}.
+var _clues_given := {}
+
+
+## The next clue of the first secret unfound in her player's room (813 amended (2)):
+## vague, then its side, then plain; the last again after. "" for none.
+func next_clue() -> String:
+	if not secrets_here.is_valid():
+		return ""
+	for secret: Variant in secrets_here.call():
+		if not secret is Dictionary:
+			continue
+		var clues: Array = secret.get("clues", [])
+		if clues.is_empty():
+			continue
+		var key := "%s/%s" % [zone, str(secret.get("id", ""))]
+		var n := int(_clues_given.get(key, 0))
+		_clues_given[key] = mini(n + 1, clues.size())
+		return str(clues[mini(n, clues.size() - 1)])
+	return ""
+
+
+## A sealed tomb just opened near her (813 amended (2), Main's from room_solved): her
+## voice is told it, with her player or by them.
+func tomb_opened(together: bool) -> void:
+	_quiet_focus = (TOMB_TOGETHER if together else TOMB_OPENED) % keeper_name()
+	_ask_voice("A sealed wall ground open.", "", true)
 	_quiet_focus = ""
 
 
@@ -1451,6 +1528,8 @@ static func order_in(text: String, held: Array[String] = [], carried: Array[Stri
 		return {"verb": "rest"}
 	if found.call(ORDER_FOLLOW):
 		return {"verb": "follow"}
+	if RegEx.create_from_string(ORDER_PLATE).search(said) != null:
+		return {"verb": "plate"}
 	if found.call(ORDER_WAIT):
 		return {"verb": "wait"}
 	return {}
@@ -1649,6 +1728,18 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 			done = {"wait": "You stay where you are, as %s asked, till they call you on.",
 				"rest": "You sit down to rest, as %s asked, and get your breath back.",
 				"follow": "You come along with %s, as they asked."}[verb] % keeper_name()
+		"plate":
+			var cell := plate_for_me()
+			if cell == World.NO_CELL:
+				done = "%s asked you to stand on a plate, but you see no free one here; say so." % keeper_name()
+			else:
+				order = "wait"
+				_set_stance(Stance.HOLD, _serial, "order")
+				hold_tile = cell
+				_instruction = "%s told you: \"%s\"" % [keeper_name(), text]
+				_instruction_tick = World.tick
+				_instruction_stance = STANCE_NAMES[Stance.HOLD]
+				done = "You go and stand on the plate, as %s asked, and stay on it till %s calls you off it." % [keeper_name(), keeper_name()]
 		"bandage":
 			var patient: GridEntity = self if read["patient"] == "self" or not _alive(keeper) else keeper
 			if read["patient"] == "" and _alive(keeper) and keeper.hp >= keeper.max_hp:

@@ -43349,6 +43349,27 @@ Protocol unchanged (--print-protocol fc7438491ba8 before and after: the place ki
 
 813 amended: the family tomb's wall and plates heard (release's label; dungeon's ask). Two positional oneshots on the sfx bus, which dungeon's Client3D plays through SoundKit.has: sfx.wall_sink (the vault's bricks sinking into the floor as its door goes shut to open, once: a heavy stone grind ending in a stop, about 1.5 s, -10 dB, heard like a door, noise "door", so the dead hear it as they hear the door; falling back to sfx.slab_grind) and sfx.plate_click (a plate going up to down: a soft stone click, range 6, -14, never heard by monsters; nothing on release or on first sight). Six Freesound CC0 takes: wall from 833925 (harrisonlace), 530987 (patchytherat) and 243699 (ertfelda); plate from 466272 (proolsen), 422870 (IPaddeh) and 508581 (Wdomino). Review: C:/dev/review/sound/crypt. Tests: sound_kit_test _test_ui_sounds (the wall a door's noise with the slab's fallback, the plate close and unheard, three takes each). Client only; protocol unchanged, no new class_name, no bullet (dungeon's 813 carries it).
 
+813 amended (2) (2026-11-06, release's label; the companion's part, dungeon's API): she plays the tomb
+with her player. "Stand on the plate" (Companion.ORDER_PLATE: stand, stay, wait, step, go, get, hold or
+keep, then plate) sends her to Companion.plate_for_me, a plate cell nothing else stands on, the set
+her player already holds first, then one in her player's laid room (Companion.room_of, Main's:
+Level.laid_room_at), then the nearest; she holds there (order "wait", HOLD) till called off. A tomb
+opened (Main.room_solved -> Main._tomb_opened): each companion in its zone whose player or she held a
+plate, or whose player is in its room, gets a fact of her card ("Wren and Jeff opened a sealed tomb
+together." / "Jeff opened a sealed tomb while Wren looked on."), the deed "tomb" (milestone, "opened
+a sealed tomb with you"; adventure 0.2, wonder 0.1), and her voice is told it (TOMB_TOGETHER /
+TOMB_OPENED, voice's: "... the bricked wall sank open ..."); the deed reward stays dungeon's, not
+repeated. Clues only when asked: her player's line to her matching Companion.HINT_ASK (anything
+odd/strange/unusual/hidden/here, what do you see, see or notice anything, any ideas, a clue, hint,
+any help, help me find, look around, what's this; never a bare "help", a call for aid in a fight),
+out of a fight, tells her voice the next clue (CLUE_FOCUS, "You notice something here: ... If you
+speak now, say only that, in your own words.") of the first secret in her player's laid room they
+have not searched (Main._secrets_unfound: Level.secrets_of less Main.secret_found), vague, then its
+side, then plain, the last again after; kept per secret in her node (a generation's, so not saved).
+Never in a quiet moment, never unasked (Jeff, via the coordinator). companion_test _test_tomb;
+items_test _test_coop_tomb counts its deed by the "deed" track (Main.rewards_by_track), as her
+bond and needs gains come beside it. Server only, protocol unchanged, no new class_name.
+
 ## 814. The hill cat: a predator that lies up and drops on what passes
 
 The coordinator's approval of C:/dev/review/enemy-ai/hill_cat_design.md (the apex lairs design left it

@@ -96,6 +96,7 @@ func _ready() -> void:
 	_test_needs()
 	_test_wants()
 	_test_talk_rate()
+	_test_tomb()
 	_test_deeds()
 	_test_game_and_watch()
 	_test_sickness()
@@ -1713,6 +1714,58 @@ func _test_talk_rate() -> void:
 	_main._set_mood(record)
 	Companion.talk_counts.clear()
 	Companion.talk_moves.clear()
+
+
+func _test_tomb() -> void:
+	print("\n== the co-op tomb: she stands on a plate when asked, gives a clue only when asked, and the opening is hers too (813 amended (2)) ==")
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	record.companion.erase("bond_today")
+	_check(Companion.order_in("Stand on the plate.").get("verb") == "plate" and Companion.order_in("wait on the other plate, Wren").get("verb") == "plate"
+		and Companion.order_in("Wait here.").get("verb") == "wait", "stand on the plate is read; wait here is still wait")
+	var here: Zone = World.zones[pet.zone]
+	var plates_were: Array = here.plates
+	var free := _free_tile_between(pet, 2, 3)
+	here.plates = [{"id": "test_vault", "cells": [pet.keeper.tile, free], "edge": Vector3i.ZERO, "room": "room_t"}]
+	pet.room_of = func(_cell: Vector2i) -> String: return "room_t"
+	_check(pet.plate_for_me() == free, "her player on one plate: she takes the other (%s)" % [pet.plate_for_me()])
+	pet._carry_out({"verb": "plate"}, "Stand on the plate.")
+	_check(pet.order == "wait" and pet.stance == Companion.Stance.HOLD and pet.hold_tile == free, "she goes to it and holds there")
+	for i in 30:
+		World.step()
+	_check(pet.tile == free, "and stands on it (%s, plate %s)" % [pet.tile, free])
+	here.plates = plates_were
+	pet._carry_out({"verb": "follow"}, "Follow me.")
+	# Clues: only asked, vague to plain, the last again.
+	pet._clues_given.clear()
+	pet.secrets_here = func() -> Array: return [{"id": "s1", "clues": ["A faint draught comes from somewhere.", "It is on the east side.", "One brick in the east wall is loose."]}]
+	var given: Array[String] = []
+	for i in 4:
+		given.append(pet.next_clue())
+	_check(given == ["A faint draught comes from somewhere.", "It is on the east side.", "One brick in the east wall is loose.", "One brick in the east wall is loose."],
+		"asked, a clue at a time, vague to plain, then the last again (%s)" % [given])
+	pet._clues_given.clear()
+	var volunteered := false
+	for i in 20:
+		var focus := pet._quiet_pick_focus()
+		volunteered = volunteered or "draught" in str(focus) or "brick" in str(focus)
+	_check(not volunteered and pet._clues_given.is_empty(), "never offered unasked, not in a quiet moment")
+	pet.owner_spoke("Anything odd here?")
+	_check(int(pet._clues_given.get("%s/s1" % pet.zone, 0)) == 1 and pet._quiet_focus == "", "anything odd here? gives the first")
+	pet.owner_spoke("Help!")
+	_check(int(pet._clues_given.get("%s/s1" % pet.zone, 0)) == 1, "a bare help! is a call for aid, not a hint ask")
+	pet.secrets_here = func() -> Array: return []
+	pet.owner_spoke("Anything odd here?")
+	_check(pet._quiet_focus == "", "with none unfound, nothing")
+	pet.secrets_here = func() -> Array: return _main._secrets_unfound(pet)
+	pet._clues_given.clear()
+	# Opened: hers too.
+	_main._tomb_opened(pet.zone, "room_t", [pet, pet.keeper])
+	_check(str(pet.grown.facts).contains("opened a sealed tomb together") and "tomb" in record.companion.get("bond_today", {}).get("deeds", []),
+		"a tomb opened with her on a plate: a fact of her card and a deed of her bond")
+	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
+	_settle(pet)
 
 
 func _test_deeds() -> void:

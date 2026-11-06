@@ -8025,6 +8025,10 @@ func _join_companion(record: PlayerRecord, player: Player) -> void:
 	pet.said.connect(_on_companion_said.bind(pet))
 	# The deeds she sees and her voice feels (decision 621).
 	pet.deed.connect(func(event: String, why: String) -> void: _bond(_record_of(pet), event, why))
+	pet.secrets_here = func() -> Array: return _secrets_unfound(pet)
+	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
+	if not room_solved.is_connected(_tomb_opened):
+		room_solved.connect(_tomb_opened)
 	pet.felt.connect(_bond_felt.bind(pet))
 	pet.played.connect(_bond_played.bind(pet))
 	pet.on_road = _on_road
@@ -10007,6 +10011,38 @@ func _reward_solvers(zone_name: String, plate: Dictionary, by: Array, state: Dic
 		rewarded.append(player_id)
 		reward(player_id, {"track": "deed", "amount": 1, "of": TOMB_OPENED, "words": TOMB_OPENED_WORDS, "at": cell})
 	state["solved_rewarded"] = rewarded
+
+
+## Her player's laid room's secrets they have not searched (813 amended
+## (2)): [{id, clues}], for her clues when asked.
+func _secrets_unfound(pet: Companion) -> Array:
+	var room := pet.keeper_room()
+	var out: Array = []
+	if room.is_empty():
+		return out
+	for secret: Dictionary in Level.secrets_of(pet.zone):
+		if str(secret.get("room", "")) == room and not secret_found(pet.zone, str(secret["id"]), pet.keeper_id):
+			out.append({"id": str(secret["id"]), "clues": secret.get("clues", [])})
+	return out
+
+
+## A co-op tomb opened (813 amended (2)): each companion there whose
+## player or she held a plate, or whose player is in its room, is told it;
+## it is a deed ("tomb", her bond: dungeon's deed reward is the player's,
+## not repeated) and a fact of her card.
+func _tomb_opened(zone_name: String, room: String, by: Array) -> void:
+	for pet: Companion in _companions.values():
+		if not is_instance_valid(pet) or pet.zone != zone_name or not is_instance_valid(pet.keeper):
+			continue
+		var together := pet in by
+		var there := together or pet.keeper in by or Level.laid_room_at(Level.load_level(zone_name), pet.keeper.tile) == room
+		if not there:
+			continue
+		var her := Companion._name_of(pet)
+		pet.note_fact("%s and %s opened a sealed tomb together." % [her, pet.keeper_name()] if together
+			else "%s opened a sealed tomb while %s looked on." % [pet.keeper_name(), her])
+		_bond(_record_of(pet), "tomb", "opened a sealed tomb with you")
+		pet.tomb_opened(together)
 
 
 ## Whether [param player_id] has searched secret [param id] of [param

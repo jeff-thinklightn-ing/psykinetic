@@ -13,6 +13,7 @@ notes (decision 324).
 - Your companion wants one thing at a time and tells you so when all is quiet: a rest by a fire, a while in town, a first fight won, a blessing at the temple; do it together and it lifts her far more than usual, and she speaks of it after (803 amended (4)).
 - Your companion talks more when you answer her, by a word or by going to what she pointed out, and a little less when you don't; tell her to talk less or more and she will (803 amended (5)).
 - After a hard day your companion asks you to keep watch before she lies down to sleep, and waits for your answer, where before she sometimes slept without asking (621 amended (2)).
+- In the crypt's sealed vault, ask your companion to stand on a plate and she does, ask what she sees and she gives you a clue to the hidden niche, and she remembers each tomb you open with her (813 amended (2)).
 - Your companion's bond with you shows as it grows: a +1 each time, and a banner when she becomes close, then devoted (804 amended (3)).
 - Hill cats lie up on the rises above the hills' grazing, away from the paths, and drop on whoever strays below, unless you spot them first (814).
 - In the hills, the lone great oak between the streams stands broad and low-limbed now, with strips of cloth knotted along its branches (778 amended).
