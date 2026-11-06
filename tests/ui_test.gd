@@ -1507,7 +1507,7 @@ func _test_card_page() -> void:
 	var body_name := String(pet.name) if pet != null else ""
 	_main.world_state = {}
 	_main.toggle_card()
-	_check([page._learned_heading.text, page._bent_heading.text, page._feels_heading.text] == ["Learned", "Fighting", "Regard"],
+	_check([page._learned_heading.text, page._bent_heading.text, page._feels_heading.text, page._needs_heading.text] == ["Learned", "Fighting", "Regard", "Needs"],
 		"the card's headings are bare words, no glosses (voice; Jeff's rule)")
 	if pet == null:
 		_check(page.visible and page.title_shown() == "Your companion" and page._alone.visible, "opened with nobody: the page says no one travels with you")
@@ -1541,6 +1541,33 @@ func _test_card_page() -> void:
 		pet.bond_why = "you fed her when she was hungry"
 		_main._refresh_card()
 		_check(page.feels_shown() == "Close." and page.feels_why_shown() == "you fed her when she was hungry", "opened on her body: her node's step and reason")
+		# 804's bars (Landing B): her bond toward its next step, her needs, from her body.
+		var bar_was: Vector2i = pet.bond_bar
+		var needs_was: Dictionary = pet.needs.duplicate()
+		pet.bond_bar = Vector2i(3, 12)
+		pet.needs = {"leisure": 0.4, "adventure": 0.9, "wonder": 0.0, "faith": 0.2, "safety": 1.0, "company": 0.5}
+		_main._refresh_card()
+		var bars := page.bars_shown()
+		_check(is_equal_approx(float(bars["bond"]), 0.25) and is_equal_approx(float(bars["adventure"]), 0.9) and is_equal_approx(float(bars["safety"]), 1.0)
+				and bars.size() == 7 and page._needs_heading.text == "Needs" and page._needs_heading.visible,
+			"her bond bar a quarter into her step; her six needs' bars under Needs (%s)" % [bars])
+		_check(CardPage.bond_share(Vector2i.ZERO) == 1.0 and CardPage.bond_share(Vector2i(6, 12)) == 0.5, "devoted (y 0) is full; x of y otherwise")
+		pet.bond_bar = Vector2i(9, 12)
+		_main._card_bars()
+		var rising: float = page._bond.share
+		_check(is_equal_approx(page._bond.target, 0.75) and rising < 0.75 and page._bond.pulse > 0.0, "a rise tweens and pulses (%.2f on its way)" % rising)
+		pet.needs = {"leisure": 0.1, "adventure": 0.9, "wonder": 0.0, "faith": 0.2, "safety": 1.0, "company": 0.5}
+		_main._card_bars()
+		_check(is_equal_approx(page._needs["leisure"].share, 0.1) and page._needs["leisure"].pulse == 0.0, "a fall is shown at once, no flourish")
+		pet.bond_step = "devoted"
+		pet.bond_bar = Vector2i.ZERO
+		_main._card_bars()
+		_check(page._bond.target == 1.0 and page._bond.pulse > 0.0, "a warmer step: full at devoted, a pulse")
+		pet.needs = {}
+		_main._card_bars()
+		_check(not page._needs_heading.visible and page.bars_shown().size() == 1, "no needs told: no Needs section")
+		pet.bond_bar = bar_was
+		pet.needs = needs_was
 		pet.bond_step = step_was
 		pet.bond_why = why_was
 	_main.escape()

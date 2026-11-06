@@ -20,10 +20,21 @@ extends PanelContainer
 ## message. The look is the shared theme's (UiTheme, docs/ui_style.md).
 
 const WIDTH := 980.0
+## The heading over her needs (voice's word).
+const NEEDS_HEADING := "Needs"
 const CHART_RADIUS := 170.0
 ## The share a chart point reaches the corner at: a lean (45) reads as
 ## three quarters of the way out, an even split a little past half.
 const CHART_FULL := 60.0
+## Her needs as her card lists them (companions' 803 amended (2)), each named and
+## coloured as its Gains track (voice's words: Ease, Venture, Wonder, Faith, Shelter, Company).
+const NEEDS: Array[String] = ["leisure", "adventure", "wonder", "faith", "safety", "company"]
+## Her bond's steps, coldest first (555): a move up one pulses the bar.
+const STEPS: Array[String] = ["apart", "sullen", "wary", "cooling", "fond", "close", "devoted"]
+## A bar's rise and pulse (804's flourish).
+const RISE_SECONDS := 0.6
+const BAR_HEIGHT := 18.0
+const NEED_BAR_HEIGHT := 12.0
 ## The three axes, from the top clockwise: the focus key and its name on the card.
 const AXES: Array[Array] = [["fight", "Fighting"], ["magic", "Magic"], ["stealth", "Stealth"]]
 
@@ -38,6 +49,14 @@ var _alone: Label
 var _feels_heading: Label
 var _feels: Label
 var _feels_why: Label
+## Her bond toward its next warmer step (804's bars, Landing B), under her tier word.
+var _bond: GrowBar
+var _needs_heading: Label
+## Her needs' bars, by need (NEEDS), each named with its Gains word.
+var _needs: Dictionary[String, GrowBar] = {}
+var _needs_grid: GridContainer
+## Her bond's step as last shown: a warmer one pulses the bar.
+var _step_shown := ""
 
 
 func _init() -> void:
@@ -80,10 +99,30 @@ func _ready() -> void:
 	_feels_heading = _heading(column, "Regard")
 	_feels = Label.new()
 	column.add_child(_feels)
+	_bond = GrowBar.new(Color.html(str(Gains.TRACKS["bond"]["color"])), BAR_HEIGHT)
+	column.add_child(_bond)
 	_feels_why = Label.new()
 	_feels_why.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_feels_why.add_theme_color_override("font_color", UiTheme.color("text_dim"))
 	column.add_child(_feels_why)
+	_needs_heading = _heading(column, NEEDS_HEADING)
+	_needs_grid = GridContainer.new()
+	_needs_grid.columns = 2
+	_needs_grid.add_theme_constant_override("h_separation", UiTheme.constant("section"))
+	_needs_grid.add_theme_constant_override("v_separation", UiTheme.constant("row"))
+	column.add_child(_needs_grid)
+	for need: String in NEEDS:
+		var track: Dictionary = Gains.TRACKS[need]
+		var name_label := Label.new()
+		name_label.text = str(track["label"])
+		name_label.theme_type_variation = &"Caption"
+		_needs_grid.add_child(name_label)
+		var bar := GrowBar.new(Color.html(str(track["color"])), NEED_BAR_HEIGHT)
+		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_needs_grid.add_child(bar)
+		_needs[need] = bar
+	show_bars(Vector2i.ZERO, {}, "")
 
 
 func _heading(column: VBoxContainer, words: String) -> Label:
@@ -141,6 +180,85 @@ func _add_line(into: VBoxContainer, words: String) -> void:
 	line.text = words
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	into.add_child(line)
+
+
+## Her bars from her body (Companion.bond_bar, needs, bond_step), while the
+## page shows (Main: on open and every few frames): the bond's fill is x / y
+## of its step, full at devoted (y 0); each need 0..1. A rise tweens and
+## pulses, a warmer step pulses; a fall is shown at once, without a flourish
+## (only what she gains is shown: 804). Her bond bar hides without a step,
+## her needs without any.
+func show_bars(bond_bar: Vector2i, needs: Dictionary, bond_step: String) -> void:
+	var step := bond_step.strip_edges().to_lower()
+	_bond.visible = _feels.visible and not step.is_empty()
+	var warmer := STEPS.find(step) > STEPS.find(_step_shown) and not _step_shown.is_empty()
+	_step_shown = step
+	_bond.show_share(bond_share(bond_bar), warmer)
+	var any := false
+	for need: String in NEEDS:
+		var has := needs.has(need)
+		any = any or has
+		_needs[need].show_share(clampf(float(needs.get(need, 0.0)), 0.0, 1.0), false)
+	_needs_heading.visible = _title.text != "Your companion" and any
+	_needs_grid.visible = _needs_heading.visible
+
+
+## Her bond bar's fill: x of y into her step, full at devoted (y 0).
+static func bond_share(bond_bar: Vector2i) -> float:
+	return 1.0 if bond_bar.y <= 0 else clampf(float(bond_bar.x) / bond_bar.y, 0.0, 1.0)
+
+
+## The bars as shown (tests): {"bond": share or -1 hidden, need: share... (shown ones)}.
+func bars_shown() -> Dictionary:
+	var out := {"bond": _bond.target if _bond.visible else -1.0}
+	if _needs_grid.visible:
+		for need: String in NEEDS:
+			out[need] = _needs[need].target
+	return out
+
+
+## A bar that grows (804's flourish): its fill tweens up over RISE_SECONDS
+## with a light pulse round it; a fall snaps. No numbers.
+class GrowBar:
+	extends Control
+	var colour := Color.WHITE
+	## The share shown now (tweened) and the one it is going to.
+	var share := 0.0
+	var target := 0.0
+	var pulse := 0.0
+	var _tween: Tween
+
+	func _init(fill: Color, height: float) -> void:
+		colour = fill
+		custom_minimum_size = Vector2(0, height)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	func show_share(to: float, stepped: bool) -> void:
+		if is_equal_approx(to, target) and not stepped:
+			return
+		var rise := to > target + 0.0001 or stepped
+		target = to
+		if _tween != null:
+			_tween.kill()
+			_tween = null
+		if rise and is_visible_in_tree():
+			_tween = create_tween().set_parallel()
+			_tween.tween_property(self, "share", to, CardPage.RISE_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+			pulse = 1.0
+			_tween.tween_property(self, "pulse", 0.0, CardPage.RISE_SECONDS)
+			_tween.tween_method(func(_v: float) -> void: queue_redraw(), 0.0, 1.0, CardPage.RISE_SECONDS)
+		else:
+			share = to
+			pulse = 0.0
+		queue_redraw()
+
+	func _draw() -> void:
+		var whole := Rect2(Vector2.ZERO, size)
+		draw_rect(whole, UiTheme.color("backing_deep"))
+		var inner := whole.grow(-2)
+		if share > 0.0:
+			draw_rect(Rect2(inner.position, Vector2(inner.size.x * clampf(share, 0.0, 1.0), inner.size.y)), colour)
+		draw_rect(whole, UiTheme.color("edge") if pulse <= 0.0 else UiTheme.color("edge").lerp(colour.lightened(0.4), pulse), false, 2.0)
 
 
 ## The lines under "Learned" as shown (tests).

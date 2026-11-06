@@ -1260,6 +1260,8 @@ func _process(delta: float) -> void:
 		_watch_locker()
 		if _client3d != null:
 			_client3d.taker_marks = taker_marks(takers_here, _local_player())
+		if card_page != null and card_page.visible:
+			_card_bars()  # 804's bars: her bond and needs, as they change.
 	_update_pick()
 	_run_test_hold_near()
 	_run_test_latency()
@@ -20012,6 +20014,17 @@ func _refresh_card() -> void:
 	var pet := _own_companion()
 	card_page.show_state(world_state, Companion._name_of(pet) if pet != null else "",
 		pet.bond_step if pet != null else "", pet.bond_why if pet != null else "")  # Her bond (555) is on her node.
+	_card_bars()
+
+
+## Her card's bars (804, Landing B) from her body: Companion.bond_bar,
+## needs and bond_step, replicated (804 amended (3), 803 amended (2)).
+func _card_bars() -> void:
+	if card_page == null or not card_page.is_node_ready():
+		return
+	var pet := _own_companion()
+	card_page.show_bars(pet.bond_bar if pet != null else Vector2i.ZERO, pet.needs if pet != null else {},
+		pet.bond_step if pet != null else "")
 
 
 ## O: the options shown or hidden; hiding writes what changed. Closed

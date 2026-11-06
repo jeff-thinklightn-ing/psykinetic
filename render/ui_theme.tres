@@ -18,13 +18,13 @@ variation_opentype = {
 2003265652: 700.0
 }
 
-; backing #2c2418 at 0.86, edge leather #7a6e58: a panel.
+; backing #2c2418 at 0.97 (804 amended (12): no window shows the world through it), edge leather #7a6e58: a panel.
 [sub_resource type="StyleBoxFlat" id="panel"]
 content_margin_left = 24.0
 content_margin_top = 24.0
 content_margin_right = 24.0
 content_margin_bottom = 24.0
-bg_color = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.86)
+bg_color = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.97)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -41,7 +41,7 @@ content_margin_left = 14.0
 content_margin_top = 10.0
 content_margin_right = 14.0
 content_margin_bottom = 10.0
-bg_color = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.94)
+bg_color = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.97)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -384,7 +384,7 @@ PopupMenu/styles/hover = SubResource("menu_hover")
 PopupMenu/styles/panel = SubResource("panel")
 Psykinetic/colors/aloud = Color(0.9568627450980393, 0.9372549019607843, 0.9019607843137255, 0.95)
 Psykinetic/colors/alarm = Color(0.7215686274509804, 0.19607843137254902, 0.16470588235294117, 1)
-Psykinetic/colors/backing = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.86)
+Psykinetic/colors/backing = Color(0.17254901960784313, 0.1411764705882353, 0.09411764705882353, 0.97)
 Psykinetic/colors/slot = Color(0.4, 0.44, 0.48, 0.96)
 Psykinetic/colors/backing_deep = Color(0.11764705882352941, 0.09411764705882353, 0.07058823529411765, 0.95)
 Psykinetic/colors/brass = Color(0.7803921568627451, 0.6039215686274509, 0.3333333333333333, 1)

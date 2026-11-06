@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your companion's card shows her bond with you as a bar filling toward her next step, and her six needs as bars beneath it, each rising with a glow as it grows; and every window and tooltip now hides the world behind it (804 amended (12)).
 - Your companion fishes with you when she carries a rod: ask her, or cast beside her and she joins in; a fish landed together lifts her, and meets her wish to go fishing (805 amended (5)).
 - You hear a forest bandit camp before you see it, voices and rough laughter round its fire; clear it and only the fire crackles (795 amended (2)).
 - Fishing: cast a rod into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).

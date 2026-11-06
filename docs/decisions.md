@@ -43581,3 +43581,19 @@ chosen, beside the apex warnings). Companion.harmless counts a lying cat
 or fight, it is a foe. Every call is behind has_method, never naming
 HillCat. companion_test _test_lying_cat, with tests/lying_cat_stub.gd.
 Server only, protocol unchanged, no new class_name, no bullet (814's own).
+804 amended (12) (ui, Landing B's first part; the coordinator's approval of C:/dev/review/bars;
+voice's words; release's label): her card's bars. Her card (C, CardPage) shows her bond under
+her tier word as a bar in Bond's rose filling toward her next warmer step (Companion.bond_bar
+x of y, full at devoted, y 0: CardPage.bond_share), and her needs (Companion.needs, 0..1, 803
+amended (2)) as six slim bars under the heading "Needs", each named and coloured as its Gains
+track (Ease, Venture, Wonder, Faith, Shelter, Company; CardPage.NEEDS). No numbers. A rise
+tweens over RISE_SECONDS (0.6 s, sine out) with its edge lit and fading (CardPage.GrowBar); a
+warmer step (CardPage.STEPS) pulses the bond bar; a fall is shown at once, without a flourish
+(only what she gains is shown). Main._card_bars feeds them from her body on open and every
+sixth frame while the card shows; the bond bar hides without a step, the needs without any.
+Every window matches the pack's and the sheet's backing (787 amended): the theme's panel and
+tooltip, and the "backing" colour, at 0.97 (render/ui_theme.tres, docs/ui_style.md), so no
+window shows the world through it (the coordinator, from the card's still). ui_test
+_test_card_page: the bars from her body, a rise tweening and pulsing, a fall at once, a warmer
+step, no needs no section, the four bare headings. CHANGELOG (voice's words). Client only,
+protocol unchanged, no new class_name.

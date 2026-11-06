@@ -60,7 +60,7 @@ the theme (type `Psykinetic`) and read by code through `UiTheme.color(name)`.
 
 | Name | Swatch | Use |
 |------|--------|-----|
-| `backing` | earth darkest `#2c2418` at 0.86 | a panel's fill |
+| `backing` | earth darkest `#2c2418` at 0.97 (804 amended (12): no window shows the world through) | a panel's fill |
 | `backing_deep` | `#1e1812` (earth darkest, darker) at 0.95 | a text field, a deep panel: an inset |
 | `slot` | earth `#4a3a25` at 0.92 | a slot's fill (765: a step lighter than an inset, so a dark blade reads) |
 | `edge` | leather `#7a6e58` at 0.9 | a panel's and a slot's border |
