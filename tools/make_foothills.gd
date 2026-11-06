@@ -24,6 +24,10 @@ extends Node
 ## - the ground's kinds by slope (Relief.lay "kinds"), and level.json's
 ##   "ledges" traced from the faces (585: MapDoc.save traces them);
 ## - starts on a levelled pad by the link to the wilds.
+## - the old grey's den mouth (780 amended (14)): GREY_DEN, a link into his
+##   lair under the high scarp's west end, laid as the forest's lairs are
+##   (make_forest's lair_cells): terrain's "den" cue on its void footprint, a
+##   trampled dirt pad with bones, a sightline strip south kept clear.
 ## No monsters, no people, no buildings. The same seed makes the same map.
 
 const SIZE := Vector2i(256, 96)
@@ -65,6 +69,15 @@ const ROAD_WIDTH := 2.0
 ## can pull a ledge's curve further off).
 const WANDER_SEEDS: Array[int] = [3, 1, 2, 0]
 const LEDGE_FIT := 0.42
+## The old grey's den (780 amended (14); enemy-ai's design, the coordinator's
+## pick A, terrain's cue): a link at (97, 31) opening south under the high
+## scarp's west end, 43.8 cells from the castle's pad, 71 from the wilds',
+## 28.5 from the road. Its cells are make_forest's lair_cells for a "den"
+## mouth: LAIR_MOUND (5 x 3 behind and beside the link) void, never cliff;
+## the pad and the link flat (keep_flat), so no cliff runs on the link or the
+## cells beside it; the lair's "from_grey_den" spawn two cells out.
+const GREY_DEN := {"to_map": "grey_den", "at": Vector2i(97, 31), "open": Vector2i(0, 1), "mouth": "den", "closed": false, "clawed": false}
+const MakeForest := preload("res://tools/make_forest.gd")
 const CONFIG := {"name": "The Foothills", "outdoor": true, "zone": "outdoors", "region": "town_lands", "border": "forest", "walls": "stone", "floors": "cave"}
 
 var map: LevelMap
@@ -104,7 +117,8 @@ func _build(wander_seed: int) -> void:
 			{"line": HIGH_SCARP, "face": "south", "height": HIGH_HEIGHT, "back": 20.0, "ways": [_fraction(HIGH_SCARP, ROAD_X), _fraction(HIGH_SCARP, 226)], "wander": WANDER, "wander_seed": wander_seed}],
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [RIVER], "valley_depth": 1.5, "valley_floor": 8.0, "valley_fall": 3.0, "valley_width": 16.0, "kinds": true, "min_flow": 30,
-		"keep_flat": [Rect2i(arrivals[0] - Vector2i(3, 2), Vector2i(7, 5)), Rect2i(arrivals[1] - Vector2i(3, 2), Vector2i(7, 5))],
+		"keep_flat": [Rect2i(arrivals[0] - Vector2i(3, 2), Vector2i(7, 5)), Rect2i(arrivals[1] - Vector2i(3, 2), Vector2i(7, 5)),
+			Rect2i(GREY_DEN["at"] - Vector2i(2, 0), Vector2i(5, 3))],
 		"streams": 0, "keep_clear": {},
 		"rivers": [{"line": RIVER, "wavelength": 24.0, "amplitude": 4.0, "width": RIVER_WIDTH}]})
 	map.relief = PackedFloat32Array()
@@ -123,6 +137,7 @@ func _build(wander_seed: int) -> void:
 	print("[foothills] falls: %s" % [laid.get("falls", [])])
 	var road := _road(arrivals[0], arrivals[1])
 	_clumps(road)
+	_den_mouth()
 	_soften()
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
@@ -240,6 +255,29 @@ func _clumps(road: Dictionary) -> void:
 				map.set_cell(cell, "void")
 		laid += 1
 	print("[foothills] %d tree clumps" % laid)
+
+
+## The old grey's den mouth: its footprint void (terrain's "den" cue draws on
+## it), its pad and link dirt with bones on the pad, its sightline grass, the
+## link (open, "mouth": "den") and its "from_grey_den" spawn.
+func _den_mouth() -> void:
+	var at: Vector2i = GREY_DEN["at"]
+	var open: Vector2i = GREY_DEN["open"]
+	var cells: Dictionary = MakeForest.lair_cells(GREY_DEN)
+	for cell: Vector2i in cells["mound"]:
+		map.set_cell(cell, "void")
+	for cell: Vector2i in cells["pad"]:
+		map.set_cell(cell, "dirt")
+	for cell: Vector2i in cells["sight"]:
+		if map.cell(cell) in ["void", "grass", "dirt"]:
+			map.set_cell(cell, "grass")
+	map.set_cell(at, "link")
+	config["links"].append({"at": [at.x, at.y], "to_map": GREY_DEN["to_map"], "to_spawn": "from_foothills", "mouth": GREY_DEN["mouth"]})
+	var out := at + open * 2
+	config["spawn_points"]["from_grey_den"] = [out.x, out.y]
+	var pad: Array = cells["pad"]
+	config["decor"] = [[pad[0].x, pad[0].y, open.x, open.y, "scattered_bones", 1],
+		[pad[5].x, pad[5].y, -open.x, -open.y, "scattered_bones", 1]]
 
 
 ## How far along [param line] (0 to 1) it crosses column [param x].

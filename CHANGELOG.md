@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- In the foothills, under the high scarp west of the road, a low den is dug into the hillside, bones on the trampled earth before it: inside, past a turn, two wolves keep the old grey's den, and by his bed at the back lies the pack of a hunter who went after him and never came back (780 amended (14)).
 - Gains read the thing first, with the track and amount after it in brackets, as in "Umbrage (Regard +1)", on floats, banners and the talk log alike, and banners stay up longer (804).
 
 - Towns: Rolf's window has a button to open your locker beside him and, until you take it, one for the practice kit he keeps for newcomers (807 amended (3)).

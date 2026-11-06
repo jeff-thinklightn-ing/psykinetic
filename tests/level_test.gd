@@ -2830,6 +2830,7 @@ func _test_relaid() -> void:
 	_test_forest_camps()
 	_test_boar_lair()
 	_test_wolf_cave()
+	_test_grey_den()
 	_test_bear_den()
 	_test_removed(wilds)
 	var hills := Level.load_level("hills")
@@ -3034,6 +3035,109 @@ func _test_wolf_cave() -> void:
 	_check(not door.is_empty() and not door["closed"] and spawn.size() == 2 and forest_floor.has(Vector2i(spawn[0], spawn[1]))
 		and not forest_floor.has(at + Vector2i(0, 1)), "the forest's mouth open, its spawn on the pad, rock behind it (%s, %s)" % [door, spawn])
 	_check_lair_sight(at, Vector2i(0, -1), forest_floor)
+
+## The old grey's den (780 amended (14)): the old wolf's lair off the
+## foothills, its mouth at (97, 31) opening south under the high scarp
+## (terrain's "den" cue: its footprint void, no cliff at the link or beside
+## it), a two-wide run that turns once so the den is out of sight from the
+## door, his bed at the den's back with the hunter's pack at its foot, two
+## keepers, and its place, nobody's.
+func _test_grey_den() -> void:
+	print("== The old grey's den (780 amended (14)) ==")
+	var den_level := Level.load_level("grey_den")
+	var config := Level.template_config("grey_den")
+	var floor := {}
+	for cell: Vector2i in den_level["terrain"]["floor"]:
+		floor[cell] = true
+	_check(den_level["terrain"]["zone"] == "cave" and float(den_level["terrain"]["ambient"]) >= 0.1
+		and den_level["terrain"]["ambience"] == "cave_lair", "a cave, dim but never black, the lair's ambience")
+	var links: Array = den_level["links"]
+	_check(links.size() == 1 and links[0]["to_map"] == "foothills" and links[0]["to_spawn"] == "from_grey_den" and not links[0]["closed"],
+		"one way out, to the foothills (%s)" % [links])
+	var places := Level.places_from(config, [] as Array[String])
+	var place: Dictionary = places.get("grey_den", {})
+	_check(places.size() == 1 and place.get("kind") == "lair" and place.get("holder") == "nobody" and place.get("explore") == true
+		and place.get("name") == "the old grey's den", "its place: the old grey's den, a lair, nobody's, explored (%s)" % [place])
+	var bed: Vector2i = place.get("cell", Vector2i(-1, -1))
+	var wolves: Array[Vector2i] = []
+	var caches: Array = []
+	for entity: Dictionary in den_level["entities"]:
+		if str(entity.get("kind", "")) == "wolf":
+			wolves.append(entity["tile"])
+		elif str(entity.get("props", {}).get("cache", "")) == "grey_den_cache":
+			caches.append(entity)
+	_check(wolves.size() == 2 and wolves.all(func(at: Vector2i) -> bool: return Vector2(at - bed).length() <= 6.0),
+		"two den keepers, in the den (%s)" % [wolves])
+	_check(caches.size() == 1 and Vector2(caches[0]["tile"] - bed).length() <= 1.5 and caches[0].get("art") == "prop.cache_pack",
+		"the hunter's pack at the bed's foot (%s)" % [caches])
+	_check(int(config.get("respawn_s", {}).get("wolf", 0)) >= DayNight.DEFAULT_DAY_MINUTES * 60, "the keepers back after a game day or more")
+	# Walked from the way in: every cell reached, none on a one-cell leg, the
+	# bed not in a straight line north of the link (the run turns once).
+	var mouth: Vector2i = links[0]["tile"]
+	var start := mouth + Vector2i(0, -1)
+	var seen := {start: true}
+	var queue: Array[Vector2i] = [start]
+	while not queue.is_empty():
+		var cell: Vector2i = queue.pop_back()
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			if floor.has(cell + step) and not seen.has(cell + step):
+				seen[cell + step] = true
+				queue.append(cell + step)
+	var narrow: Array[Vector2i] = []
+	for cell: Vector2i in floor:
+		var across_x := floor.has(cell + Vector2i(1, 0)) or floor.has(cell + Vector2i(-1, 0))
+		var across_y := floor.has(cell + Vector2i(0, 1)) or floor.has(cell + Vector2i(0, -1))
+		if cell != mouth and not (across_x and across_y):
+			narrow.append(cell)
+	_check(seen.size() >= floor.size() - 1 and floor.has(bed) and narrow.is_empty(),
+		"one piece from the way in, no leg under two wide (%d of %d, narrow %s)" % [seen.size(), floor.size(), narrow])
+	var hidden := true
+	for y in range(bed.y, mouth.y):
+		hidden = hidden and not (floor.has(Vector2i(mouth.x, y)) and Vector2(Vector2i(mouth.x, y) - bed).length() <= 5.0)
+	_check(floor.size() >= 130 and floor.size() <= 210 and hidden and absi(bed.x - mouth.x) >= 8,
+		"small (%d cells), the den off the door's line" % floor.size())
+	# The foothills' side.
+	var hills := Level.load_level("foothills")
+	var hills_floor := {}
+	for cell: Vector2i in hills["terrain"]["floor"]:
+		hills_floor[cell] = true
+	var door: Dictionary = {}
+	for link: Dictionary in hills["links"]:
+		if link["to_map"] == "grey_den":
+			door = link
+	var at: Vector2i = door.get("tile", Vector2i(-1, -1))
+	var entry: Dictionary = {}
+	for given: Dictionary in Level.template_config("foothills").get("links", []):
+		if given.get("to_map") == "grey_den":
+			entry = given
+	var spawn: Array = Level.template_config("foothills")["spawn_points"].get("from_grey_den", [])
+	_check(at == Vector2i(97, 31) and not door["closed"] and entry.get("mouth") == "den" and spawn.size() == 2
+		and Vector2i(spawn[0], spawn[1]) == Vector2i(97, 33) and hills_floor.has(Vector2i(97, 33)),
+		"the foothills' den mouth at (97, 31), open, its spawn on the pad (%s, %s)" % [door, spawn])
+	var footprint: Array[Vector2i] = []
+	for back in range(0, 3):
+		for across in range(-2, 3):
+			if back > 0 or across != 0:
+				footprint.append(at + Vector2i(across, -back))
+	var dug: Array = footprint.filter(func(cell: Vector2i) -> bool: return hills_floor.has(cell))
+	_check(footprint.size() == 14 and dug.is_empty(), "its footprint's 14 cells void, for terrain's den (%s)" % [dug])
+	var relief: PackedFloat32Array = hills["terrain"]["relief"]
+	var size: Vector2i = hills["terrain"]["relief_size"]
+	var cliffs: Array = []
+	for cell: Vector2i in [at, at + Vector2i(-1, 1), at + Vector2i(0, 1), at + Vector2i(1, 1), at + Vector2i(0, 2)]:
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1)]:
+			var next := cell + step
+			if (hills_floor.has(next) or next == at) and Relief.cliff_between(Relief.at(relief, size, cell), Relief.at(relief, size, next)):
+				cliffs.append([cell, next])
+	_check(cliffs.is_empty(), "no cliff at the link, its pad or beside them (%s)" % [cliffs])
+	var strip: Array[Vector2i] = []
+	for out in range(3, 9):
+		for across in range(-(2 if out >= 5 else 1), (2 if out >= 5 else 1) + 1):
+			if not hills_floor.has(at + Vector2i(across, out)):
+				strip.append(at + Vector2i(across, out))
+	_check(strip.is_empty(), "its sightline south open ground, no clump on it (%s)" % [strip])
+	var pads: Array = [Vector2i(128, 93), Vector2i(128, 2)]
+	_check(pads.all(func(pad: Vector2i) -> bool: return Vector2(pad - at).length() >= 30.0), "30 cells or more from either pad")
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp
 ## building with its place at its fire, 6 to 12 cells off a path and 24

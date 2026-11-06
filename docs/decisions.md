@@ -44102,3 +44102,26 @@ a later search may turn instead. Net.camera_turn, settings.cfg camera_turn=on|of
 off was chosen; Jeff judges the default from the cut's checklist. tools/clip.sh camera_turn
 (an outdoor field with a clump of trees; the clip's pan toward the monster left out).
 view_test _test_camera_turn. Client only, protocol unchanged, no new class_name.
+780 amended (14): the old grey's den (2026-11-06, maps; enemy-ai's old wolf design, approved by the
+coordinator; lore's name; terrain's "den" cue). The old wolf's lair is its own small level, grey_den,
+off the foothills, the bear's in the hills, so one trip never meets two apexes.
+- Its mouth: candidate A, the foothills' link at (97, 31) opening south under the high scarp's west
+  end, 43.8 cells from the castle's pad, 71 from the wilds', 28.5 from the road (enemy-ai's roam
+  keeps 30 off every pad). make_foothills lays it with make_forest's lair_cells, a "den" mouth read as
+  a thicket's: its 14 footprint cells (5 across, 3 deep, the link the gap) void, never cliff, for
+  terrain's den to draw on; the link and its pad held flat (keep_flat), so no cliff runs on the link
+  or beside it; a dirt pad with bones; the sightline strip south kept clear; "from_grey_den" two cells
+  out. The link's "mouth" is "den"; till terrain's cue lands it reads as a way down. The foothills
+  regenerated change only round the mouth.
+- The den (tools/make_grey_den.py, as the wolves' cave's): 149 cells, zone cave, ambience cave_lair,
+  ambient 0.2; a two-wide run north from the link that turns once, three wide at the turn, east into
+  the side of an 11 x 11 earth chamber with its corners rounded, so the den can't be seen from the
+  door; no leg under two wide. His bed at the back (the place's cell); two den keepers
+  (monster_wolf, respawn_s 6000) that stay when he goes out; the hunter's pack (prop.cache_pack,
+  items' grey_den_cache) at the bed's foot; bones, a heap by the bed; a shaft of light in the den.
+  Its place "grey_den", "the old grey's den", a lair, nobody's, explored. No spear: no item lies flat
+  as decor yet, and the find doesn't need one.
+- The old wolf's marker at his bed comes with enemy-ai's landing (his row): make_grey_den's
+  HIS_MARKER, False till then. level_test _test_grey_den: the den in one piece, two wide, off the
+  door's line; the mouth's footprint void, no cliff at the link or its pad, the strip open, 30 from
+  either pad.

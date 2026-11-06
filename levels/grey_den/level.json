@@ -1,0 +1,116 @@
+{
+	"name": "The old grey's den",
+	"zone": "cave",
+	"depth": 1,
+	"ambient": 0.2,
+	"walls": "cave",
+	"floors": "cave",
+	"mass": "rock",
+	"music": "none",
+	"ambience": "cave_lair",
+	"starts": [
+		[
+			5,
+			20
+		]
+	],
+	"spawn_points": {
+		"from_foothills": [
+			4,
+			20
+		]
+	},
+	"links": [
+		{
+			"at": [
+				4,
+				22
+			],
+			"to_map": "foothills",
+			"to_spawn": "from_grey_den"
+		}
+	],
+	"legend": {
+		"monster_wolf": "#6e6e78"
+	},
+	"skylights": [
+		{
+			"at": [
+				15,
+				7
+			],
+			"radius": 1.5
+		}
+	],
+	"places": {
+		"grey_den": {
+			"at": [
+				18,
+				4
+			],
+			"kind": "lair",
+			"radius": 12,
+			"name": "the old grey's den",
+			"holder": "nobody",
+			"explore": true
+		}
+	},
+	"entities": [
+		{
+			"at": [
+				17,
+				5
+			],
+			"art": "prop.cache_pack",
+			"props": {
+				"cache": "grey_den_cache",
+				"cache_place": "the old grey's den"
+			}
+		}
+	],
+	"decor": [
+		[
+			19,
+			6,
+			1,
+			0,
+			"bones",
+			1
+		],
+		[
+			12,
+			4,
+			1,
+			0,
+			"scattered_bones",
+			1
+		],
+		[
+			15,
+			11,
+			1,
+			0,
+			"scattered_bones",
+			1
+		],
+		[
+			5,
+			16,
+			1,
+			0,
+			"scattered_bones",
+			1
+		],
+		[
+			8,
+			9,
+			1,
+			0,
+			"scattered_bones",
+			1
+		]
+	],
+	"respawn_s": {
+		"wolf": 6000
+	}
+}
