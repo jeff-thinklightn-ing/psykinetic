@@ -2926,9 +2926,13 @@ func _hostile(entity: GridEntity) -> bool:
 ## Wild prey, or game going for no one (decision 332): no foe to her, nor
 ## danger, unless she is set on it. Nor a monster that talks and is
 ## peaceable now (peaceful_talker): the fallen knight always, the draugr
-## while seated or at rest.
+## while seated or at rest. Nor one of a band keeping a truce (799 amended,
+## enemy-ai's Monster.in_truce: the Toll Camp's, till one of its band is
+## struck): on guard she lets it be, so she never breaks it for her player.
 static func harmless(entity: GridEntity) -> bool:
 	if peaceful_talker(entity):
+		return true
+	if entity is Monster and entity.has_method("in_truce") and bool(entity.call("in_truce")):
 		return true
 	var animal := entity as Animal
 	if animal == null:

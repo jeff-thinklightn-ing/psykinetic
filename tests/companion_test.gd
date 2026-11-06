@@ -116,6 +116,7 @@ func _ready() -> void:
 	_test_wild()
 	_test_seated_boss()
 	_test_fallen_knight()
+	_test_truce()
 	_test_follow_without_backsteps()
 	_test_follow_a_creep()
 	_test_one_cell_door()
@@ -3736,6 +3737,29 @@ func _test_fallen_knight() -> void:
 	World.despawn(knight)
 	_kill_monsters()
 	_settle(pet)
+
+
+## A camp band's monster with enemy-ai's in_truce (799), off the world.
+class TruceMonster extends Monster:
+	var truce := true
+
+	func in_truce() -> bool:
+		return truce
+
+
+func _test_truce() -> void:
+	print("\n== a band keeping a truce she lets be on guard, so she never breaks it (799 amended, enemy-ai's ask) ==")
+	var pet := _companion()
+	var bandit := TruceMonster.new()
+	bandit.spawned = true
+	var was: GridEntity = pet._quarry
+	_check(Companion.harmless(bandit) and not pet._hostile(bandit), "in truce: no foe of hers")
+	pet._quarry = bandit
+	_check(pet._hostile(bandit), "unless her player set her on it")
+	pet._quarry = was
+	bandit.truce = false
+	_check(not Companion.harmless(bandit) and pet._hostile(bandit), "the truce broken: a foe again")
+	bandit.free()
 
 
 func _test_dodge() -> void:

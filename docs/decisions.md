@@ -42963,6 +42963,17 @@ camp_captive(camp) is {}, the captive's hold being npc's ("camp_holds"). His wor
 camp_traders.say (voice's). The economy saves "camp_traders" {camp: {stock, purse, restocked}}; for
 release's journal (counts only, no ids), a load holding any prints "[economy] loaded N camp
 traders". economy_test _test_camp_traders. Server only; protocol unchanged, no new class_name.
+
+799 amended (2026-11-06, release's label; enemy-ai's ask): she keeps a camp's truce on guard. The Toll Camp (forest/southeast_camp,
+maps' "truce": true) takes no player or kept companion for a foe until one
+of them strikes one of its band (799, enemy-ai's side: Monster.in_truce,
+and Monster.threatens false while it holds). A bandit is not harmless to
+her, so on GUARD she attacked the band on sight and broke the truce for her
+player. Companion.harmless now counts a monster whose in_truce() is true as
+no foe of hers, nor a danger to a lead, behind a has_method guard: on guard
+she lets the band be. A quarry her player set her on still counts, and once
+the truce breaks the band are foes again. companion_test _test_truce.
+Server only, protocol unchanged, no new class_name, no bullet.
 ## 811. Umbrage's tavern as its own zone: the Last Light Mughouse
 
 The tavern zone (2026-11-05, buildings; the coordinator's approved design,
@@ -43534,3 +43545,19 @@ items_test _test_charm (the rows and the drop; no aura without a charm or from t
 aura at once on wearing, growing with the charge to its cap; the light with the lantern covered;
 the charge saved and kept when taken off; the draught's +15 kg and its wearing off). No bullet
 until the bear is in a real land (release; voice's line held). No new class_name.
+
+## 814, companions' side: she points out a hill cat lying up, and never springs it
+
+enemy-ai's 814 (release's label; the coordinator's ask that the player gets
+to look first). A hill cat lying up she sees, within CAT_POINT_RANGE (6) of
+her player and not yet seen by them (cat.spotted_by), she points out with
+one of voice's fixed lines, CAT_POINT ("Cat up on that rise. Watching." /
+"Look there. There's a cat lying up on the bank." / "Easy. Hill cat, on
+the rise ahead."; its perches are grassy rises, maps', not rocks), and marks it spotted for them (cat.mark_spotted, the same path as
+their own sighting, so its float and seen-first follow): once per cat per
+player, one cat at a time (Companion._point_out_cats, after her intent is
+chosen, beside the apex warnings). Companion.harmless counts a lying cat
+(cat.lying()) as no foe, so she never springs the ambush; risen to crouch
+or fight, it is a foe. Every call is behind has_method, never naming
+HillCat. companion_test _test_lying_cat, with tests/lying_cat_stub.gd.
+Server only, protocol unchanged, no new class_name, no bullet (814's own).
