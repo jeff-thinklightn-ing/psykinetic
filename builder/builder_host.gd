@@ -147,6 +147,9 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 	var streets: Array = result.get("street_warnings", [])
 	if not streets.is_empty():
 		reply["summary"] += "\nStreets: " + "; ".join(streets)
+	var layout: Array = result.get("layout_warnings", [])
+	if not layout.is_empty():
+		reply["summary"] += "\nLayout (can't be accepted until fixed): " + "; ".join(layout)
 	reply["cost"] = result["cost"]
 	reply["total"] = session.usage["cost"]
 	_reply(peer, reply)
@@ -193,7 +196,8 @@ func _accept(peer: int, player_id: String) -> void:
 	var zone_name: String = _session_zone[peer]
 	var plan := session.new_area.duplicate()
 	if not session.accept():
-		_reply(peer, {"state": "nothing"})
+		# 806: a layout fault the change adds keeps it off the level.
+		_reply(peer, {"state": "error", "error": session.refused} if not session.refused.is_empty() else {"state": "nothing"})
 		return
 	if session.created_doc != null:
 		# The new level first, so the way to it never leads nowhere.

@@ -66,6 +66,8 @@ const WALKED: Array[String] = ["stone", "grass", "dirt", "tall_grass"]
 const ARRIVAL_NEAR := 4.0
 ## level.json keys a proposal may change as a whole (beyond entries and links).
 const CONFIG_KEYS: Array[String] = ["neighbours", "places", "buildings", "building_codes", "town_walls", "roofs", "legend", "streams"]
+## Dungeon's layout rules (806), checked on accept: see layout_news.
+const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
 
 ## Asks Claude: send(body: Dictionary) -> Dictionary (a Messages API
 ## response, or {"error": "..."}), awaited (ClaudeClient, StubClaude).
@@ -96,6 +98,8 @@ var new_area := {}
 ## Accepted: the new level made (its MapDoc, saved by the caller), and its name.
 var created_doc: MapDoc
 var created := ""
+## Why the last accept() laid nothing ("" when it did, or had nothing to lay).
+var refused := ""
 
 
 func _init(level_doc: MapDoc, selected: Rect2i, level_name: String, claude: Object) -> void:
@@ -132,6 +136,9 @@ func ask(text: String) -> Dictionary:
 	messages.append({"role": "user", "content": prompt})
 	var spent := 0.0
 	var result := {"ok": false, "summary": "", "cost": 0.0, "error": ""}
+	# The level's own layout faults (806), and those the proposal adds already said.
+	var layout_before := layout_faults(doc)
+	var layout_said: Array[String] = []
 	for turn in MAX_TURNS:
 		var response: Dictionary = await client.send(_body())
 		if response.has("error"):
@@ -168,6 +175,12 @@ Heights now: " + "; ".join(ground)
 					var streets := street_checks().filter(func(warning: String) -> bool: return warning not in streets_before)
 					if not streets.is_empty():
 						outcome["text"] += "\nStreets now: " + "; ".join(streets)
+					# And to the layout rules, which accepting it must not break (806).
+					var layout := layout_news(layout_before)
+					var unsaid := layout.filter(func(fault: String) -> bool: return fault not in layout_said)
+					layout_said = layout
+					if not unsaid.is_empty():
+						outcome["text"] += "\nLayout now (fix it before you finish: the player can't accept a fault): " + "; ".join(unsaid)
 					results.append({"type": "tool_result", "tool_use_id": block.get("id"),
 						"content": outcome["text"], "is_error": not outcome["ok"]})
 			messages.append({"role": "user", "content": results})
@@ -192,6 +205,7 @@ Heights now: " + "; ".join(ground)
 	result["height_warnings"] = height_checks()
 	result["site_warnings"] = site_checks()
 	result["street_warnings"] = street_checks()
+	result["layout_warnings"] = layout_news(layout_before)
 	result["cost"] = spent
 	busy = false
 	return result
@@ -409,7 +423,7 @@ The grid shows the area and a margin round it, one character a cell (the margin 
 %s
 Each row starts with its y; the first line says the x of the first column. Walls and doors are listed after the grid by the cell and its side.
 
-Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A chest of loot goes only in a dungeon (a level below ground, or one that regenerates) and always holds something: items or a loot table; outside a dungeon a chest is only a town store's depot or a shop counter (use). A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
+Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A chest of loot goes only in a dungeon (a level below ground, or one that regenerates) and always holds something: items or a loot table; outside a dungeon a chest is only a town store's depot or a shop counter (use). Indoors and in a dungeon the layout rules hold (a tool's result says any you break as "Layout now"): every room has a use (something in it: a monster, a chest, a sight, a sign, a way on), a chest has a monster near it, no way ends blind for nothing; a change that breaks one can't be accepted. A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
 
 Running water is a stream: the stream tool lays its course, from where it rises to where it goes. Give it a ford or a bridge wherever a path meets it, or the far bank is cut off; a bridge needs level banks of floor at both ends.
 
@@ -2338,10 +2352,47 @@ func proposal() -> Dictionary:
 ## Lays the proposal on the doc as one undo step. Whether it changed
 ## anything. With a new area, [member created_doc] is the new level (not
 ## saved: the caller saves it, first) and [member created] its name.
+## Dungeon's layout faults (806, sim/layout_sense.gd) of [param of] (the
+## level, or the working copy): every rule in a dungeon or indoors, by the
+## regenerate block's options when it has one (Regen.layout_options); out
+## of doors only the chest rule (no interior to judge).
+static func layout_faults(of: MapDoc) -> Array:
+	var level := of.parsed()
+	var config := of.config
+	if Level.zone_of(config) == "outdoors" and not is_dungeon(config):
+		return LAYOUT_SENSE.check_chests(level, {"dungeon": false})
+	var block: Variant = config.get("regenerate")
+	var options := Regen.layout_options(block) if block is Dictionary else {"dungeon": is_dungeon(config)}
+	return LAYOUT_SENSE.check(level, config.get("laid_rooms", []), options)
+
+
+## The layout faults the proposal adds, said ("<rule> at <cell>: <what>"):
+## those of the working copy not in [param before] (the level's, by rule
+## and cell; layout_faults(doc) when not given). A fault the level already
+## had stays its own (the barrow's empty rooms, castle_halls'): only what
+## the edit adds is refused, a fault moved with its chest or room included.
+func layout_news(before: Variant = null) -> Array[String]:
+	var had := {}
+	for fault: Dictionary in (before if before is Array else layout_faults(doc)):
+		had["%s %s" % [fault["rule"], fault["cell"]]] = true
+	var out: Array[String] = []
+	for fault: Dictionary in layout_faults(working):
+		if not had.has("%s %s" % [fault["rule"], fault["cell"]]):
+			out.append("%s at %s: %s" % [fault["rule"], fault["cell"], fault["what"]])
+	return out
+
+
 func accept() -> bool:
-	var changes := proposal()
 	created_doc = null
 	created = ""
+	refused = ""
+	# 806 amended (7): the proposal may not add a layout fault (an empty
+	# room, a chest that gives nothing or stands unguarded, ...).
+	var news := layout_news()
+	if not news.is_empty():
+		refused = "the change breaks the layout rules: " + "; ".join(news)
+		return false
+	var changes := proposal()
 	if not new_area.is_empty():
 		# A level beyond an edge is out of doors unless the one it leads from says otherwise.
 		var zone := Level.zone_of(doc.config) if doc.config.has("zone") or doc.config.has("outdoor") else "outdoors"

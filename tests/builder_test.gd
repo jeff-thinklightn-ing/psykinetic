@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_new_kinds()
 	_test_umbrage_kinds()
 	_test_chest_rule()
+	await _test_layout_on_accept()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -184,9 +185,8 @@ func _test_heights() -> void:
 	print("
 == heights: a hill, a chest cut off on it and told, stairs up to it, the ghost and the save ==")
 	var doc := _doc()
-	doc.config["depth"] = 1  # a loot chest goes only in a dungeon (806)
 	var stub := StubClaude.new([
-		[{"name": "place", "input": {"at": [14, 12], "thing": "chest", "loot": "supplies"}},
+		[{"name": "place", "input": {"at": [14, 12], "thing": "chest", "use": "shop"}},  # out of doors only a counter's chest (807)
 			{"name": "hill", "input": {"at": [14, 12], "radius": 4, "top": 2}},
 			{"name": "stairs", "input": {"at": [14, 17], "up": "north"}},
 			{"name": "stairs", "input": {"at": [14, 15], "up": "north"}},
@@ -1079,3 +1079,73 @@ func _test_chest_rule() -> void:
 	_check(session.run_tool("place", {"at": [15, 10], "thing": "chest"}).get("ok", false), "a regenerated level's chest with the level's chest loot: placed")
 	_check(BuilderSession.is_dungeon({"depth": 2}) and not BuilderSession.is_dungeon({"outdoor": true}), "a dungeon: below ground or regenerated")
 	_check("only in a dungeon" in BuilderSession.system_prompt(), "the prompt says the rule")
+
+
+## A 40 x 30 dungeon (depth 1, indoors) of rock: hall A (4..11, 4..9) with
+## a brute at (6, 6), a way two wide (12..19, 6..7) east to hall B
+## (20..27, 4..9), empty.
+func _dungeon_doc() -> MapDoc:
+	var doc := MapDoc.new()
+	doc.folder = preload("res://tests/test_ports.gd").scratch("builder_test/")
+	doc.map = LevelMap.new(Vector2i(40, 30))
+	for y in 30:
+		for x in 40:
+			var hall := (x >= 4 and x < 12 or x >= 20 and x < 28) and y >= 4 and y < 10
+			var way := x >= 12 and x < 20 and y >= 6 and y < 8
+			doc.map.set_cell(Vector2i(x, y), "stone" if hall or way else "void")
+	doc.map.set_cell(Vector2i(6, 6), "monster_brute")
+	doc.config = {"name": "Test Delve", "depth": 1, "entities": [{"at": [6, 6], "idle": "guard"}]}
+	return doc
+
+
+func _test_layout_on_accept() -> void:
+	print("
+== 806 amended (7): accept refuses only the layout faults the change adds ==")
+	var doc := _dungeon_doc()
+	var had := BuilderSession.layout_faults(doc)
+	print("  the level's own faults: %s" % [had])
+	_check(had.any(func(fault: Dictionary) -> bool: return fault["rule"] == "purpose"), "hall B, empty, is the level's own fault")
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_delve", StubClaude.new([]))
+	_check(session.layout_news().is_empty(), "nothing done: nothing new")
+	# Hall C south of B, empty, and a way down to it.
+	session.run_tool("paint", {"ground": "stone", "rects": [{"x": 22, "y": 10, "w": 2, "h": 4}, {"x": 20, "y": 14, "w": 8, "h": 6}]})
+	var news := session.layout_news()
+	_check(news.any(func(fault: String) -> bool: return fault.begins_with("purpose")), "an empty hall added: a new purpose fault (%s)" % [news])
+	_check(not session.accept() and "purpose" in session.refused and doc.undo_steps.is_empty() and doc.map.cell(Vector2i(22, 16)) == "void",
+			"accept refuses it, saying why, and the level is untouched (%s)" % session.refused)
+	# The same with a monster in it, and a chest of loot by it.
+	session.run_tool("paint", {"ground": "stone", "rects": [{"x": 22, "y": 10, "w": 2, "h": 4}, {"x": 20, "y": 14, "w": 8, "h": 6}]})
+	session.run_tool("place", {"at": [23, 16], "thing": "brute"})
+	session.run_tool("place", {"at": [25, 17], "thing": "chest", "loot": "supplies"})
+	news = session.layout_news()
+	_check(news.is_empty(), "a guarded hall: nothing new, B's old fault not counted (%s)" % [news])
+	_check(session.accept() and session.refused.is_empty() and doc.map.cell(Vector2i(25, 17)) == "chest", "accepted")
+	# An unguarded chest of loot far from any monster.
+	session.run_tool("paint", {"ground": "stone", "rects": [{"x": 28, "y": 6, "w": 10, "h": 2}, {"x": 32, "y": 8, "w": 6, "h": 20}]})
+	session.run_tool("place", {"at": [35, 26], "thing": "chest", "loot": "supplies"})
+	news = session.layout_news()
+	_check(news.any(func(fault: String) -> bool: return fault.begins_with("chest") and "unguarded" in fault), "a chest left unguarded: a new chest fault (%s)" % [news])
+	_check(not session.accept() and "unguarded" in session.refused, "accept refuses it")
+	session.discard()
+	# Claude is told as it goes, and the summary carries what's left.
+	var stub := StubClaude.new([
+		[{"name": "paint", "input": {"ground": "stone", "rects": [{"x": 22, "y": 10, "w": 2, "h": 4}, {"x": 20, "y": 14, "w": 8, "h": 6}]}}],
+		"A hall.",
+	])
+	var asked := BuilderSession.new(_dungeon_doc(), Rect2i(0, 0, 40, 30), "test_delve", stub)
+	var result: Dictionary = await asked.ask("a hall south")
+	var told := str(stub.sent[1]["messages"][2]["content"][0]["content"])
+	_check("Layout now" in told and "purpose" in told, "the tool's result tells Claude (%s)" % told)
+	_check((result["layout_warnings"] as Array).size() > 0, "the result's layout_warnings say it (%s)" % [result["layout_warnings"]])
+	# Out of doors only the chest rule: the grass field's open ground is no room.
+	var field := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	field.run_tool("paint", {"ground": "stone", "rects": [{"x": 10, "y": 10, "w": 8, "h": 8}]})
+	_check(field.layout_news().is_empty() and BuilderSession.layout_faults(field.working).is_empty(), "outdoors: no room faults")
+	_check("layout rules hold" in BuilderSession.system_prompt(), "the prompt says the layout rules")
+	# The real dungeons (read only, from levels/): their own faults are theirs, nothing new untouched.
+	for level_name in ["castle_halls", "barrow"]:
+		var real := BuilderSession.new(MapDoc.open("res://levels/%s/" % level_name), Rect2i(0, 0, 8, 8), level_name, StubClaude.new([]))
+		var started := Time.get_ticks_msec()
+		var own := BuilderSession.layout_faults(real.doc)
+		var took := Time.get_ticks_msec() - started
+		_check(real.layout_news(own).is_empty(), "%s untouched: nothing new (its own: %s, checked in %d ms)" % [level_name, BuilderSession.LAYOUT_SENSE.counts(own), took])
