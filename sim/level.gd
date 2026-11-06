@@ -2404,6 +2404,10 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"scattered_bones": {"sits": "flat", "variants": 1, "faced": true, "slot": "prop.bones"},
 	# The forest camp C3's captive's post (793; art-kit's, with the lair's pieces).
 	"captive_post": {"sits": "flat", "variants": 1, "faced": true},
+	# The wilds chapel yard's grate (806 amended (6); art-kit's): flat in
+	# the paving over the barrow's first hall, the daylight down it the
+	# hall's light shaft (806 amended (3)); 2 a sunk, cracked flag.
+	"yard_grate": {"sits": "flat", "variants": 2, "faced": false},
 }
 
 

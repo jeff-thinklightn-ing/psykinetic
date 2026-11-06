@@ -3435,6 +3435,14 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	var inn_rect: Rect2i = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool: return building.get("use") == "inn")[0]["rect"]
 	_check(signs.size() == 1 and signs[0]["cell"] == Vector2i(180, 207) and not inn_rect.has_point(signs[0]["cell"])
 		and inn_rect.has_point(signs[0]["cell"] + signs[0]["out"]), "the inn's sign on its street front, out of its wall (%s)" % [signs])
+	# The chapel yard's grate (806, buildings' side) over the barrow's first
+	# hall, whose light shaft and skylight stand under it at (46, 13).
+	var grates: Array = (wilds["terrain"]["decor"] as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "yard_grate")
+	var barrow := Level.load_level("barrow")
+	var lit: Array = (barrow["terrain"]["skylights"] as Array).filter(func(sky: Dictionary) -> bool: return sky["at"] == Vector2i(46, 13))
+	var roofed := (wilds["buildings"] as Array).any(func(building: Dictionary) -> bool: return (building["rect"] as Rect2i).has_point(Vector2i(201, 202)))
+	_check(grates.size() == 1 and grates[0]["cell"] == Vector2i(201, 202) and int(grates[0]["variant"]) == 1 and not roofed and lit.size() == 1,
+		"the chapel yard's grate at (201, 202) in the open, over the first hall's skylight (%s, %s)" % [grates, lit])
 
 
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended
