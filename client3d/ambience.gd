@@ -192,6 +192,7 @@ func _weigh() -> void:
 			_creak(cell, mine["timbers"])
 	_place_point("amb.lamp_hiss", lamps, cell)
 	_place_draft(cell)
+	_place_point("amb.forge_roar", lit_forges(view._terrain.get("plates", []), _door_open), cell)
 	_place_streams(cell)
 	_place_falls(cell)
 	var rates := calls(zone, DayNight.daylight(steps), weather, canopy, _tower_nearness(cell))
@@ -504,6 +505,28 @@ func _place_draft(cell: Vector2i) -> void:
 	_draft.volume_db = SoundKit.volume_db("amb.draft") + float(best.db)
 	if not _draft.playing:
 		_draft.play()
+
+
+## The cold forge lit (813 amended (6)): the forge cells of [param plates]
+## (terrain "plates") whose set is of kind "forge" and whose door, on its
+## "edge", [param is_open] says is open (dungeon's 813 amended (4): it opens
+## as the forge catches and stays open the generation), where Ambience holds
+## amb.forge_roar.
+static func lit_forges(plates: Array, is_open: Callable) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for plate: Variant in plates:
+		if plate is Dictionary and str(plate.get("kind", "")) == "forge" and plate.get("forge") is Vector2i \
+				and plate.has("edge") and bool(is_open.call(plate["edge"])):
+			out.append(plate["forge"])
+	return out
+
+
+## Whether the Door on [param edge] stands open (none: shut).
+func _door_open(edge: Variant) -> bool:
+	if not edge is Vector3i:
+		return false
+	var door := World.door_on(edge)
+	return door != null and door.is_open()
 
 
 ## The torch loop at the nearest torch heard from [param cell], and the

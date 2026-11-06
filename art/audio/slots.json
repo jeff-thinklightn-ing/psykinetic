@@ -724,6 +724,35 @@
 			"volume_db": -14.0,
 			"uses": "a pressure plate pressed down: a soft stone click (813; Client3D, as a plate goes up to down; none on release or first sight)"
 		},
+		"sfx.bellows_wheeze": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 8,
+			"volume_db": -10.0,
+			"uses": "the cold forge's bellows pressed: a breath of air forced through (813 amended (6)); dungeon's Client3D, as the bellows' plate goes down",
+			"fallback": "sfx.plate_click"
+		},
+		"sfx.lever_clank": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 8,
+			"volume_db": -10.0,
+			"uses": "the cold forge's lever pulled down: a heavy iron clank (813 amended (6)); dungeon's Client3D, as the lever's plate goes down",
+			"fallback": "sfx.plate_click"
+		},
+		"sfx.forge_whoomph": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 14,
+			"volume_db": -4.0,
+			"uses": "the cold forge catching: a deep whoomph of flame (813 amended (6)); dungeon's Client3D, at the forge as its door opens"
+		},
 		"sfx.door_wood_open": {
 			"category": "doors",
 			"type": "oneshot",
@@ -1953,6 +1982,15 @@
 			"range": 8,
 			"volume_db": -18.0,
 			"uses": "wind at a beast's cave's mouth (795 amended (3)): a low hollow wind, from the nearest mouth heard (terrain \"lair_mouths\": each link cell of a \"cave_lair\" level, fading in toward its skylights); Ambience"
+		},
+		"amb.forge_roar": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 10,
+			"volume_db": -14.0,
+			"uses": "the cold forge lit: a fire roaring in its hearth (813 amended (6)); Ambience, at the forge's cell of terrain \"plates\"' set of kind \"forge\" while its door is open"
 		},
 		"sfx.pick_strike": {
 			"category": "world",

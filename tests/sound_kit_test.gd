@@ -764,6 +764,19 @@ func _test_ui_sounds() -> void:
 			and SoundKit.positional("sfx.plate_click") and SoundKit.noise("sfx.plate_click") == ""
 			and SoundKit.reach("sfx.plate_click") <= 6 and SoundKit.takes("sfx.plate_click").size() >= 3,
 			"the tomb's wall sinks like a door, else the slab; its plates click close, unheard by monsters")
+	# 813 amended (6): the cold forge heard; its roar held while its door is open.
+	var forge_set := {"kind": "forge", "forge": Vector2i(5, 5), "edge": Vector3i(5, 6, 0)}
+	var tomb_set := {"kind": "tomb", "edge": Vector3i(9, 9, 0)}
+	var all_open := func(_edge: Variant) -> bool: return true
+	var all_shut := func(_edge: Variant) -> bool: return false
+	_check(Ambience.lit_forges([forge_set, tomb_set], all_open) == [Vector2i(5, 5)] and Ambience.lit_forges([forge_set], all_shut).is_empty()
+			and Ambience.lit_forges([], all_open).is_empty(),
+			"the forge's roar at its cell once its door is open; shut, none; a tomb's plates none")
+	var forge_cues := ["sfx.bellows_wheeze", "sfx.lever_clank", "sfx.forge_whoomph", "amb.forge_roar"].filter(func(slot: String) -> bool:
+		return not SoundKit.positional(slot) or SoundKit.noise(slot) != "" or SoundKit.takes(slot).size() < 3)
+	_check(forge_cues.is_empty() and str(SoundKit.spec("sfx.bellows_wheeze").get("fallback", "")) == "sfx.plate_click"
+			and str(SoundKit.spec("sfx.lever_clank").get("fallback", "")) == "sfx.plate_click" and SoundKit.reach("sfx.forge_whoomph") > SoundKit.reach("sfx.lever_clank"),
+			"the forge's bellows, lever, catching and roar placed, unheard by monsters, three takes each; the pieces a plate's click without (%s)" % [forge_cues])
 	for node: Node in [button, slider, panel, ui, sfx]:
 		node.queue_free()
 	await get_tree().process_frame

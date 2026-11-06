@@ -257,6 +257,35 @@
 				"sha256": "bdef45c37f9f5be3659cbce572bb430991006ef1d8f70418de025b816fd88395"
 			}
 		],
+		"amb.forge_roar": [
+			{
+				"file": "amb.forge_roar.ogg",
+				"from": "freesound",
+				"original": "freesound 386560: fire roar and crackle.flac (from 10 s for 20 s)",
+				"sha256": "c3fa45db4234aa0027e7cf9924fd95b3bd95a1943b6506ba82c6bee7c59d7bc6",
+				"by": "laptaper",
+				"url": "https://freesound.org/people/laptaper/sounds/386560/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.forge_roar.2.ogg",
+				"from": "freesound",
+				"original": "freesound 794817: Fireplace Rumble (from 5 s for 20 s)",
+				"sha256": "d388cc4d7c0d56fdcca04f377215adb25ab3ff769a2ded3c94bddb7263d7fcf8",
+				"by": "SamsterBirdies",
+				"url": "https://freesound.org/people/SamsterBirdies/sounds/794817/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.forge_roar.3.ogg",
+				"from": "freesound",
+				"original": "freesound 395883: flame in furnace.wav (from 1 s for 11 s)",
+				"sha256": "24b48045fb30adf0f41bef8dfeb63719d594277bbb2971e005ca942d7c6ffd8b",
+				"by": "jokallset",
+				"url": "https://freesound.org/people/jokallset/sounds/395883/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.lair_cave": [
 			{
 				"file": "amb.lair_cave.ogg",
@@ -891,6 +920,35 @@
 				"sha256": "cc10338ac48fdb81c26c61909a114676a0d00ec40cf53f294cf56b3ae4c04ab5",
 				"by": "ChuckleNutsDev",
 				"url": "https://freesound.org/people/ChuckleNutsDev/sounds/718668/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.bellows_wheeze": [
+			{
+				"file": "sfx.bellows_wheeze.ogg",
+				"from": "freesound",
+				"original": "freesound 613613: bellows.wav (from 3.4 s for 1.2 s)",
+				"sha256": "8f3496ebe561e54f4cda0f27ce66332ce25867ed034bb1befa317f740834eb22",
+				"by": "noisymichael",
+				"url": "https://freesound.org/people/noisymichael/sounds/613613/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bellows_wheeze.2.ogg",
+				"from": "freesound",
+				"original": "freesound 613613: bellows.wav (from 5.6 s for 1 s)",
+				"sha256": "4a0ea6eba09cff8a278756493293bf149b62d3bbb861d0a401fd1e4c0313f3c4",
+				"by": "noisymichael",
+				"url": "https://freesound.org/people/noisymichael/sounds/613613/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.bellows_wheeze.3.ogg",
+				"from": "freesound",
+				"original": "freesound 368498: bellows.wav (from 0.2 s for 2.4 s)",
+				"sha256": "89d01657b4c020752f65a5afe88946451b7807d83400703dbf30608523255f06",
+				"by": "lensson",
+				"url": "https://freesound.org/people/lensson/sounds/368498/",
 				"license": "CC0 1.0"
 			}
 		],
@@ -1834,6 +1892,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.forge_whoomph": [
+			{
+				"file": "sfx.forge_whoomph.ogg",
+				"from": "freesound",
+				"original": "freesound 186374: Bonfire Being Lit (from 1.2 s for 1.2 s)",
+				"sha256": "377ca1fc952095ed88da20763969ab6e6a37ab2c62e2558d35fc5fda56513e61",
+				"by": "samararaine",
+				"url": "https://freesound.org/people/samararaine/sounds/186374/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.forge_whoomph.2.ogg",
+				"from": "freesound",
+				"original": "freesound 244926: fire-whoosh.wav (from 0 s for 3 s)",
+				"sha256": "9deef379c0f9e1570d7084115d647ca21b04fb4cdeb20105f5329e1c86ed4f68",
+				"by": "hnhnh",
+				"url": "https://freesound.org/people/hnhnh/sounds/244926/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.forge_whoomph.3.ogg",
+				"from": "freesound",
+				"original": "freesound 260555: Basic Fire Whoosh 2 (from 0 s for 1.6 s)",
+				"sha256": "88b05119898d5afcc23ebc16ab2f23102f8794a3ebbb17bacab442937e22cd3c",
+				"by": "LookIMadeAThing",
+				"url": "https://freesound.org/people/LookIMadeAThing/sounds/260555/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.gear_draw": [
 			{
 				"file": "sfx.gear_draw.ogg",
@@ -2420,6 +2507,35 @@
 				"sha256": "37b641c47cb3b88bc0c69d628848513ca11e75e682a0b3762aa87a179409ff6e",
 				"by": "deleted_user_2104797",
 				"url": "https://freesound.org/people/deleted_user_2104797/sounds/346695/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.lever_clank": [
+			{
+				"file": "sfx.lever_clank.ogg",
+				"from": "freesound",
+				"original": "freesound 696746: lever.wav (from 0 s for 0.6 s)",
+				"sha256": "806354701d109a936d78fa6210324dacfa69af29a4bbf36b6041ea0a8903869d",
+				"by": "Krokulator",
+				"url": "https://freesound.org/people/Krokulator/sounds/696746/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.lever_clank.2.ogg",
+				"from": "freesound",
+				"original": "freesound 835550: Industrial Lever (from 0 s for 0.9 s)",
+				"sha256": "92f3c61db4ad97878d6a6f1b8497ab61ad5d17be55b0ce4c69550726c3d8a898",
+				"by": "Autobot8299",
+				"url": "https://freesound.org/people/Autobot8299/sounds/835550/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.lever_clank.3.ogg",
+				"from": "freesound",
+				"original": "freesound 828131: lever.wav (from 0 s for 0.74 s)",
+				"sha256": "b0034faf1b05880f2f299a6fe1f5ffeb1b6a2882503aa9eff9bbfd858de95dbe",
+				"by": "Mihacappy",
+				"url": "https://freesound.org/people/Mihacappy/sounds/828131/",
 				"license": "CC0 1.0"
 			}
 		],
