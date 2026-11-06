@@ -43144,3 +43144,84 @@ grown trees on the pad taken out of trees.json. The first load prints "[level] b
 bullet (voice's words; the thicket's words come with terrain's cue).
 Protocol unchanged (--print-protocol fc7438491ba8 before and after: the place kind "lair" and its
 "den" are not on the wire); no new class_name.
+## 814. The hill cat: a predator that lies up and drops on what passes
+
+The coordinator's approval of C:/dev/review/enemy-ai/hill_cat_design.md (the apex lairs design left it
+out of the lair rule: "it lies up in hill rocks and drops on whatever passes"), with my leans on its
+three picks (a few cats, one a perch; seen first as the counter; the pounce knocks back and never downs)
+and two additions (seeing it first shows; no farming its pelt). An ordinary wild predator, not an apex:
+levels/monsters.json "hill_cat" (label "Hill cat", art creature.hill_cat, script res://sim/hill_cat.gd,
+diet deer and rabbit, hp 20, bite 2 every 14 ticks, move 2.2, dart with its fight's dart_after_ticks 6 (combat's tune from playtest's cat runs (rounds 1–5); at first, at 30 hp and 3 a bite it downed a lone player 8 of 8); drops meat 1-2 now, and its pelt once items' hill_cat_pelt
+row is on main). HillCat (new class_name, on Animal).
+
+Its perch: a place of kind "perch" (Level.PLACE_KINDS; taken here from maps' side so the kind lands with
+the cat) whose "at" is where it lies and "watch" (Level.PLACE_SHAPES, cells; Holdings.place carries it)
+the cells below it may pounce onto, all 6+ cells from every safe path (maps' choice (a): in the hills
+every track is a safe path, so the cat watches grazing ground and a faint unsafe game trail, and a
+player meets it by straying off the track). HillCat.step_perches (World.step, every PERCH_CHECK_STEPS)
+lays a cat on each perch of an awake zone that has none and is not closed, out of every player's sight.
+
+Lying up (HillCat.lying), it looks about every PERCH_LOOK_TICKS (3). A player within SPOT_DAY (5) cells by
+day or SPOT_NIGHT (3) by night, looking its way (within SPOT_HALF_ANGLE, 60 degrees, of their facing)
+with a clear line for SPOT_LOOK_TICKS (6) on end, spots it (a glance past is not a look; one mid-look is
+not pounced on, as it would be seen crouching) (HillCat.mark_spotted, once a cat a player): it snarls (its "call" cry,
+sound's sfx.hill_cat_snarl) and World.cat_spotted tells Main, which floats the player a gain (ui's
+path, voice's words: Main.reward {track "explore", amount 1, of "a hill cat", words "spotted a hill
+cat", at its cell}, "+1 Wayfaring, a hill cat"). A spotted player, or a companion whose keeper spotted
+it, is never pounced on: the careful player's bonus. A spotted player within CORNERED (2) brings it
+down to fight, as a blow does. Companions' 814 side reads lying(), spotted_by(player_id) and
+mark_spotted(player_id) (Wren points one out to her player within 6 cells; her pick leaves a lying
+cat be).
+
+The pounce (its row's "moves" "pounce" over HillCat.POUNCE; combat's to tune): something on its watch
+within its reach (4 by night, 3 by day, against day spotting at 5: a careless walker by day can be dropped on), a player or
+kept companion who has not spotted it or an animal of its diet, it crouches for: a told line
+(World.telegraph "pounce", 11 ticks, flank-marked), aimed at its lead: where it will stand at landing,
+a free walker (a player, 699) from its centre (World.body_centre) at its velocity
+(World.body_velocity) from now, as its held tile lags its centre and its step is part-way through
+(combat's, from playtest's fourth tour: walkers coming in were a cell past it); a body on the grid on
+along its step's way at its step's pace (step_velocity, step_until); seen at one look before it is
+pounced on; its own cell (the struck cell) if it stands; on rock, the nearest walkable cell back along the line. The lead is never capped: one whose lead falls
+off the watch or out of reach is not pounced on that look (combat's: one skirting the edge is let by, one
+coming in toward the perch is dropped on). The told line ends on that cell (810) at its true length (a
+slant's line is longer than its count of cells; at the grid's count a slanted pounce was never begun). Playtest's tour had a walker who kept moving missed 7 of 7 at the cell it stood on;
+one who reads the crouch and stops or turns is still missed. The told line is 3 wide ("width"), and it comes
+down on a T: the aimed cell and its two neighbours across the leap (combat's, from playtest's third tour:
+a walker's way bends a cell round the rocks under a perch, and the lead alone hit 1 of 26). The band
+shows the whole leap but only its far T strikes: it over-shows near the cat (safe for 810, which bars
+striking outside what is shown; one dodging there dodges for nothing). A line with a wide end would be
+a new Telegraph shape the clients draw, so it is left for if it reads badly (combat's note). A body on
+the T (World.tell_struck, 810) takes 6 (cause &"pounce", so 544 amended (2)'s hurt line names it), never
+below 1 hp for a player or companion, and is knocked a cell (World.sweep, impulse 70); the cat lands
+on the free cell nearest the end, beside them, and its cry is "pounce". One who stepped off the line
+takes nothing, and the cat lands where they stood, open, for "recover" (6) ticks: the opening. A hit, it waits its attack_ticks before its first bite (combat's: a
+beat for the one knocked back to stand). Every
+"every" (40) ticks at most. Its moves are logged "[cat] ...".
+
+Off its perch it fights as a bold predator. Under half its hp it breaks off and runs LIE_UP_RUN (12)
+cells, faster than a player walks (BROKEN_PACE 1.5 ticks a cell against 2.5), biting no more and
+bleeding a trail (World.mark_blood, 764's) (playtest's second tour: it turned and bit a chaser, and the
+chase killed it 8 of 8, once 35 cells off; its third: a sword chaser then never caught it). There it
+lies up hurt. One who follows and comes within LIE_UP_ROUSED (3), or strikes it, finds it cornered: it
+fights where it lies, plain (no dart, combat's), at HURT_PACE (3.0, slower than a walk), and runs no
+more, so a melee player who keeps after it wins the pelt for about three blows (the coordinator's: the
+design's "a player who chases it down gets the kill"). A bow can drop it on the run. Found means one who
+came within LIE_UP_ROUSED by their own steps, not one it limps past. Unfollowed, nobody having come
+nearer to it for LIE_UP_GONE_TICKS (10 s, the coordinator's: time to bind a wound or find the trail; by
+what players do, not what they see, combat's, as playtest's sixth tour had it lie for ever 12 cells from
+an idle player in plain sight on the open hills), it gets up and limps off away from them (the open way
+farthest from them), and once every player is LOST_REACH (14) off or has no line to it, it is gone and
+its perch empty BEATEN_DAYS (1 game day): not back that
+night to pounce or be beaten again for its pelt (the coordinator's ask). With no foe for CALM_TICKS it goes
+back up and lies up again (a leap back, unseen, where no way up on foot). Killed, its perch is empty
+KILLED_DAYS (2). Never saved (Snapshot skips it), never retired (Main._retirable); a restart lays every
+perch afresh. Hours as the design: abroad by night is its reach and its spotting; by day it lies up.
+
+monster_test _test_hill_cat: a perch place and its watch read; a cat laid on its perch, lying, unsaved;
+one walking below looking away is pounced on (6, the cat beside them); a pounce never downs (3 hp left
+at 1); one looking its way spots it, once, and is let be; one who steps off the line is missed, the cat
+landing where they stood; a look takes SPOT_LOOK_TICKS and is not pounced mid-look; a walker walking on
+blind is hit at the lead, one who stops at the tell missed; under half it breaks off, runs, lies up hurt, and with one standing in sight not following it limps off and is gone, its perch closed; one who follows the blood finds it and finishes it where it lies; killed,
+closed two days; step_perches lays a cat from Holdings' perch place in an awake zone. Server only.
+Protocol: a "51 (814)" line (the place kind and watch); it opens PROTOCOL_REVISION 51, the
+first wire change after v0.1.205's cut (release's). New class_name HillCat.

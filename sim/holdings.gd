@@ -66,6 +66,8 @@ func rebind(world_map: WorldMap) -> Array[String]:
 				"town": "%s/%s" % [area_name, place["town"]] if place.has("town") else ""}
 			if place.get("truce", false):
 				places[id]["truce"] = true  # 799: its band keeps a truce with players (Monster.in_truce).
+			if place.has("watch"):
+				places[id]["watch"] = place["watch"]  # 814: a perch's pounce ground (HillCat).
 	var gone: Array[String] = []
 	for id: String in _places:
 		if not places.has(id):
@@ -115,7 +117,8 @@ func places_of(faction: String) -> Array[String]:
 ## start, explore (a player is rewarded for reaching it, Level.EXPLORE_KINDS)
 ## and shown (the name that gain shows),
 ## town (a work site's town, decision 517: its stockpile place's id, "" for
-## none), and truce (799: a camp whose band keeps a truce, only when true)};
+## none), truce (799: a camp whose band keeps a truce, only when true) and
+## watch (814: a perch's cells, when given)};
 ## {} if there is none.
 func place(id: String) -> Dictionary:
 	return _places.get(id, {})

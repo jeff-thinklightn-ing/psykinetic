@@ -571,7 +571,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 50 (793, maps' side): place kinds "trader" and "captive" (Level.PLACE_KINDS); a place may
 ## carry "mix" (a camp: bandit, trader, mixed), "bed" and "facing" (cells), for npc's camp
 ## traders and sound's camp fires. No bump (release): an old client has no use for them.
-const PROTOCOL_REVISION := 50
+## 51 (814): place kind "perch" (Level.PLACE_KINDS; the hill cat's) and a place's "watch" (cells, its
+## pounce ground); opens 51, the first wire change after v0.1.205's cut (release's).
+const PROTOCOL_REVISION := 51
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

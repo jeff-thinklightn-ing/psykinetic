@@ -117,12 +117,12 @@ const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
 	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "post", "tavern", "fire",
-	"trader", "captive", "lair", "other"]
+	"trader", "captive", "lair", "perch", "other"]
 ## A place's own cells and rect, kept on Level's place dict when given and
 ## well-formed (771/772/774, buildings' side; environment's 782 lights read
 ## "brazier" and "lamp"): key -> "cell" (a Vector2i), "rect" (a Rect2i) or
 ## "cells" (an Array of Vector2i).
-const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells", "bed": "cell", "facing": "cell", "den": "cell"}
+const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells", "bed": "cell", "facing": "cell", "den": "cell", "watch": "cells"}
 ## What a camp is (793, maps' side; sound's fires read it): a camp place's "mix".
 const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,

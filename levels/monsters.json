@@ -95,6 +95,20 @@
 			"charge": {"roar": 12, "cells": 6, "from": 3, "damage": 6, "impulse": 140.0, "every": 80}
 		}
 	},
+	"hill_cat": {
+		"_": "Decision 814: lies up on a hill perch and drops on what passes (HillCat). Drops its pelt once items' hill_cat_pelt row is on main.",
+		"side": "wild", "role": "predator", "herd": "hill_cat", "label": "Hill cat", "art": "creature.hill_cat", "diet": ["deer", "rabbit"],
+		"script": "res://sim/hill_cat.gd",
+		"body": {"mass": 45.0, "max_hp": 20, "move_ticks": 2.2, "attack_damage": 2, "attack_ticks": 14, "sight_range": 9},
+		"fight": {"dart_after_ticks": 6},
+		"senses": {"cone": 150, "night": 0.8, "hearing": 1.2, "alert_sight": 2, "notice": 1.2},
+		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 12,
+		"temperament": {"bold": 0, "cautious": 1, "cowardly": 0},
+		"drops": [{"item": "meat", "count": [1, 2]}],
+		"moves": {
+			"pounce": {"reach": 4, "day_reach": 3, "windup": 11, "damage": 6, "impulse": 70.0, "every": 40, "recover": 6, "width": 3}
+		}
+	},
 	"skeleton": {
 		"bound": true,
 		"label": "Skeleton",

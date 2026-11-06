@@ -740,6 +740,9 @@ signal tracks_changed(level: String, add: PackedInt32Array, gone: PackedInt32Arr
 ## from [param source] (GreatBear's roar), [param reach] cells. Main tells
 ## the players in its zone within reach who don't see it ("far_cry").
 signal far_cry(source: GridEntity, cry: StringName, reach: int)
+## Player [param player_id] spotted a hill cat lying up (decision 814,
+## HillCat.mark_spotted), once a cat a player: Main floats them a gain.
+signal cat_spotted(cat: GridEntity, player_id: String)
 ## Tall grass of [param level] was trampled ([param flat]) or stood again
 ## ([param stood]), flat [x, y, ...]; on a client, also after a full
 ## "grass" message (both empty): terrain redraws the trodden path.
@@ -1155,6 +1158,8 @@ func step() -> void:
 	t = Time.get_ticks_usec()
 	raids.step()
 	wanderers.step()
+	if steps % HillCat.PERCH_CHECK_STEPS == 0:
+		HillCat.step_perches()  # A hill cat on each empty perch (814).
 	t = part("raids", t)
 	steps += 1
 	# The sky's light on the new hour (DayNight; the light field reads it).

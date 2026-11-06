@@ -4460,6 +4460,9 @@ func _boot() -> void:
 	World.wanderers.player_of = _player_of_id
 	if World.economy.has_signal("wanderer_due"):
 		World.economy.connect("wanderer_due", World.wanderers.come)
+	# A hill cat spotted lying up (814): the careful player's gain (ui's path, voice's words).
+	if not World.cat_spotted.is_connected(_on_cat_spotted):
+		World.cat_spotted.connect(_on_cat_spotted)
 	# owed_paid's gold reaches the client by Economy.purse_changed, as every purse change does,
 	# and floats then, when it is paid (804, economy's side: never while only owed).
 	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void:
@@ -5589,6 +5592,8 @@ func _retirable(monster: Monster, near: Array[Vector2i]) -> bool:
 		return false  # A town's wolf of a night is gone at dawn, never kept (761).
 	if monster is Animal and not (monster as Animal).wanderer.is_empty():
 		return false  # A wanderer is Wanderers' till it is gone, never kept (805).
+	if monster is HillCat:
+		return false  # Its perch's, never kept (814).
 	if monster.far_since < 0 or World.tick - monster.far_since < RETIRE_AFTER_TICKS:
 		return false
 	if monster.target != null or monster.alert != Monster.Alert.IDLE or monster._returning or World.is_stunned(monster):
@@ -22718,6 +22723,14 @@ func reward(player_id: String, data: Dictionary) -> bool:
 	Net.message_to(player.owner_peer, "reward", told)
 	rewards_sent += 1
 	return true
+
+
+## Decision 814: player [param player_id] spotted the hill cat [param cat]
+## lying up (HillCat.mark_spotted): +1 Wayfaring over its cell (ui's and
+## voice's: noticing is what Wayfaring rewards).
+func _on_cat_spotted(cat: GridEntity, player_id: String) -> void:
+	if is_instance_valid(cat):
+		reward(player_id, {"track": "explore", "amount": 1, "of": "a hill cat", "words": "spotted a hill cat", "at": cat.tile})
 
 
 ## A fight won (804, combat's side): [param player]'s last foe fell or

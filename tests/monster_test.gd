@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_chiefs()
 	_test_watch_wave()
 	_test_wanderers()
+	_test_hill_cat()
 	_test_raid_takes()
 	_test_noticing()
 	_test_senses()
@@ -2171,6 +2172,241 @@ func _test_wanderers() -> void:
 	World.despawn(fisher)
 
 
+## Decision 814: the hill cat. Its perch's place read (kind "perch",
+## "watch"); laid on its perch, lying, unsaved; a player on its watch looking
+## away is pounced on (a told line, hurt, never to 0); one looking its way
+## spots it (once, World.cat_spotted) and is let be; one who steps off the
+## line is missed and it lands open; under half it breaks off and is gone
+## out of sight, its perch closed; killed, closed longer.
+func _test_hill_cat() -> void:
+	print("
+== the hill cat (814): lies up, pounces on the unwary, lets be who spots it ==")
+	Monster.idling = true
+	var warnings: Array[String] = []
+	var read := Level.places_from({"places": {"p": {"at": [1, 1], "kind": "perch", "watch": [[2, 2], [3, 3]]}}}, warnings)
+	_check(read.get("p", {}).get("kind") == "perch" and read["p"].get("watch") == [Vector2i(2, 2), Vector2i(3, 3)] and warnings.is_empty(),
+		"a perch place and its watch are read (%s; %s)" % [read.get("p", {}), warnings])
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 9:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	_raid_room(rows, Vector2i(35, 5))
+	World.outdoor = true
+	HillCat.clear_perches()
+	var watch: Array = []
+	for x in range(6, 10):
+		for y in range(3, 8):
+			watch.append(Vector2i(x, y))
+	var place := {"key": "perch_t", "cell": Vector2i(5, 5), "watch": watch}
+	var cat := HillCat._lay("t/perch_t", place)
+	_check(cat != null and cat.tile == Vector2i(5, 5) and cat.lying() and HillCat.on_perch("t/perch_t") == cat
+		and cat.watch.size() == watch.size(), "a cat lies up on its perch")
+	if cat == null:
+		return
+	_check(Snapshot._entries([cat] as Array[GridEntity]).is_empty(), "never saved")
+	cat.pounce["day_reach"] = cat.pounce["reach"]  # Its night reach, whatever the hour here.
+	var walker := EntityFactory.build(SPECS["P"].merged({"name": "Walker", "props": {"max_hp": 20}})) as Player
+	_room.add_child(walker)
+	walker.player_id = "p1"
+	World.spawn(walker, Vector2i(8, 5))
+	walker.protected = false
+	World.face(walker, Vector2i(1, 0))  # Eyes ahead, away from the rocks.
+	var spotted: Array = []
+	var on_spotted := func(c: GridEntity, pid: String) -> void: spotted.append([c, pid])
+	World.cat_spotted.connect(on_spotted)
+	var hp0 := walker.hp
+	for i in 40:
+		World.step()
+		if walker.hp < hp0:
+			break
+	_check(walker.hp == hp0 - int(cat.pounce["damage"]) and not cat.lying() and World.distance(cat.tile, walker.tile) <= 1 and spotted.is_empty(),
+		"one walking on below, eyes ahead, is pounced on: %d hurt, the cat beside them at %s" % [hp0 - walker.hp, cat.tile])
+	# Never downed by it.
+	World.despawn(cat)
+	var cat2 := HillCat._lay("t/perch_t", place, true)
+	cat2.pounce["day_reach"] = cat2.pounce["reach"]
+	walker.hp = 3
+	walker.protected = false
+	for i in 40:
+		World.step()
+		if walker.hp < 3:
+			break
+	_check(walker.hp == 1 and not World.is_downed(walker), "a pounce never downs: left at %d" % walker.hp)
+	World.despawn(cat2)
+	walker.hp = walker.max_hp
+	# Spotted first: let be.
+	var cat3 := HillCat._lay("t/perch_t", place, true)
+	cat3.pounce["day_reach"] = cat3.pounce["reach"]
+	World.face(walker, Vector2i(-1, 0))  # Looking up at the rocks.
+	for i in HillCat.SPOT_LOOK_TICKS - 1:
+		World.step()
+	_check(not cat3.spotted_by("p1") and walker.hp == walker.max_hp, "a look takes a while: not spotted at once, and not pounced on mid-look")
+	for i in 60:
+		World.step()
+	_check(cat3.spotted_by("p1") and spotted.size() == 1 and walker.hp == walker.max_hp and cat3.lying(),
+		"one looking its way spots it (once) and is let be (%s, %d hp)" % [spotted.size(), walker.hp])
+	cat3.mark_spotted("p1")
+	_check(spotted.size() == 1, "spotted once a cat a player")
+	# Stepped off the line: missed, it lands open.
+	World.despawn(cat3)
+	var cat4 := HillCat._lay("t/perch_t", place, true)
+	cat4.pounce["day_reach"] = cat4.pounce["reach"]
+	World.face(walker, Vector2i(1, 0))
+	for i in 10:
+		World.step()
+		if not cat4._move.is_empty():
+			break
+	_check(not cat4._move.is_empty(), "it crouches for the walker (a told pounce)")
+	World._relocate(walker, Vector2i(8, 8))
+	for i in 20:
+		World.step()
+		if cat4.tile != Vector2i(5, 5):
+			break
+	_check(walker.hp == walker.max_hp and cat4.tile == Vector2i(8, 5), "stepped off the line: missed, it lands where they stood (%s)" % cat4.tile)
+	# A cell beside the aim, as a path bends round the rocks: still under its
+	# paws (the told line 3 wide); two off, clear.
+	for off in [1, 2]:
+		World.despawn(cat4)
+		cat4 = HillCat._lay("t/perch_t", place, true)
+		cat4.pounce["day_reach"] = cat4.pounce["reach"]
+		walker.hp = walker.max_hp
+		walker.protected = false
+		World._relocate(walker, Vector2i(8, 5))
+		World.face(walker, Vector2i(1, 0))
+		for i in 12:
+			World.step()
+			if not cat4._move.is_empty():
+				break
+		World._relocate(walker, Vector2i(8, 5 + off))
+		for i in 20:
+			World.step()
+			if cat4._move.is_empty():
+				break
+		_check((walker.hp < walker.max_hp) == (off == 1),
+			"one %d cell%s beside the aimed cell at the landing is %s (%d hp)" % [off, "" if off == 1 else "s", "hit" if off == 1 else "clear", walker.hp])
+	# A walker who keeps on: it aims at where they will be (the lead), and
+	# one walking on blind is hit there; one who stops at the tell is missed.
+	for stops in [false, true]:
+		World.despawn(cat4)
+		cat4 = HillCat._lay("t/perch_t", place, true)
+		cat4.pounce["day_reach"] = cat4.pounce["reach"]
+		walker.hp = walker.max_hp
+		walker.protected = false
+		World._relocate(walker, Vector2i(8, 3))
+		World.face(walker, Vector2i(1, 0))
+		walker.move_ticks = 4.0
+		walker.next_move_tick = 0
+		var crouch_at: Vector2i = HillCat.NO_TILE
+		for i in 60:
+			if crouch_at == HillCat.NO_TILE and not cat4._move.is_empty():
+				crouch_at = walker.tile
+			var walking: bool = walker.tile.y < 9 and not (stops and crouch_at != HillCat.NO_TILE)
+			if walking:
+				World.try_move(walker, Vector2i(0, 1))  # A cell every 4 ticks, eyes down the way: its lead about 3 on.
+			World.step()
+			if walker.hp < walker.max_hp or (crouch_at != HillCat.NO_TILE and cat4._move.is_empty()):
+				break
+		if stops:
+			_check(crouch_at != HillCat.NO_TILE and walker.hp == walker.max_hp,
+				"one who stops at the tell is missed (crouched at them on %s, they stood at %s)" % [crouch_at, walker.tile])
+		else:
+			_check(crouch_at != HillCat.NO_TILE and crouch_at.y < 7 and walker.hp == walker.max_hp - int(cat4.pounce["damage"]),
+				"a walker walking on blind is hit at their lead (crouched with them on %s, hit on %s)" % [crouch_at, walker.tile])
+	World._relocate(walker, Vector2i(8, 5))
+	walker.hp = walker.max_hp
+	walker.move_ticks = 2.5
+	# Beaten off: gone out of sight, its perch closed.
+	World.damage(cat4, cat4.hp - cat4.max_hp / 2 + 1, walker)
+	for i in 30:
+		World.step()
+		if cat4._broke_off:
+			break
+	World.step()
+	var broken_pace: float = cat4.move_ticks
+	var lay_hurt := false
+	var slunk := false
+	for i in 500:  # The walker stands where they were, the cat in their sight: not following.
+		World.step()
+		lay_hurt = lay_hurt or cat4._lying_hurt
+		slunk = slunk or cat4._slinking
+		if not cat4.spawned:
+			break
+	var cat_at := cat4.tile
+	var walker_at := walker.tile
+	World.despawn(walker)
+	print("  (the cat at %s, the walker at %s)" % [cat_at, walker_at])
+	_check(not cat4.spawned and lay_hurt and slunk and HillCat.on_perch("t/perch_t") == null and broken_pace == HillCat.BROKEN_PACE and int(HillCat._perches["t/perch_t"]["closed_until"]) > World.steps,
+		"under half it breaks off, lies up hurt, and with nobody coming after it (one standing in sight) it limps off and is gone, its perch empty a while")
+	# Followed: it runs a short way, bleeding, and lies up hurt; a walker who
+	# follows the trail finds it there and it fights where it lies.
+	HillCat.clear_perches()
+	var fields_outdoor_was: bool = World.fields.outdoor
+	World.fields.outdoor = true  # Blood is marked out of doors (764).
+	var blood_was: Dictionary = World.blood.duplicate(true)
+	var cat6 := HillCat._lay("t/perch_t", place, true)
+	var chaser := EntityFactory.build(SPECS["P"].merged({"name": "Chaser", "props": {"max_hp": 20}})) as Player
+	_room.add_child(chaser)
+	chaser.player_id = "p2"
+	World.spawn(chaser, Vector2i(6, 5))
+	chaser.protected = false
+	cat6._lying = false
+	World.damage(cat6, cat6.hp - cat6.max_hp / 2 + 1, chaser)
+	var broke_from := cat6.tile
+	var bled := 0
+	var found := false
+	var fled_after := 0
+	for i in 400:
+		if cat6._lying_hurt and not found and World.distance(chaser.tile, cat6.tile) > 1:
+			var way := (cat6.tile - chaser.tile).clamp(Vector2i(-1, -1), Vector2i(1, 1))
+			World.try_move(chaser, way)
+		World.step()
+		if not cat6.spawned:
+			break
+		if cat6._roused and not found:
+			found = true
+			broke_from = cat6.tile
+		if found:
+			fled_after = maxi(fled_after, World.distance(cat6.tile, broke_from))
+			if i % 6 == 0:
+				World.damage(cat6, 3, chaser)
+	for cell: Vector2i in World.blood.get(World.fields.level, {}):
+		bled += 1
+	_check(found and not cat6.spawned and fled_after <= 1 and bled >= 3,
+		"broken, it runs a short way bleeding (%d marks), lies up hurt, and a walker who follows finds it and finishes it where it lies (moved %d once found)" % [bled, fled_after])
+	World.despawn(chaser)
+	World.fields.outdoor = fields_outdoor_was
+	World.blood = blood_was  # Its trail is not the next test's.
+	# Killed: closed longer.
+	HillCat.clear_perches()
+	var cat5 := HillCat._lay("t/perch_t", place, true)
+	World.damage(cat5, cat5.hp + 5)
+	_check(int(HillCat._perches.get("t/perch_t", {}).get("closed_until", 0)) >= World.steps + int(HillCat.KILLED_DAYS * DayNight.day_steps) - 1,
+		"killed, its perch is empty for %.0f days" % HillCat.KILLED_DAYS)
+	# The perches' own laying: Holdings' perch place (its watch carried), an
+	# awake zone, the perch out of the player's sight.
+	HillCat.clear_perches()
+	var zone_name: String = World.zone.name
+	Level.register(zone_name, Level.image_from_rows(rows), null, {"outdoor": true, "places": {
+		"perch_z": {"at": [5, 5], "kind": "perch", "watch": [[6, 5], [7, 5]]}}})
+	var held_was := World.holdings
+	var names: Array[String] = [zone_name]
+	World.holdings = Holdings.new(WorldMap.build(names), Factions.read(), {})
+	var far := EntityFactory.build(SPECS["P"].merged({"name": "FarOff"})) as Player
+	_room.add_child(far)
+	World.spawn(far, Vector2i(38, 8))
+	World.step()
+	HillCat.step_perches()
+	var laid := HillCat.on_perch("%s/perch_z" % zone_name)
+	_check(laid != null and laid.tile == Vector2i(5, 5) and laid.watch.size() == 2 and laid.perch == "%s/perch_z" % zone_name,
+		"step_perches lays a cat on an empty perch of an awake zone, its watch from Holdings")
+	World.despawn(far)
+	World.holdings = held_was
+	World.cat_spotted.disconnect(on_spotted)
+	HillCat.clear_perches()
+	World.outdoor = false
+	World.spawn_spec = Callable()
+
+
 func _test_raid_takes() -> void:
 	print("\n== a raider kills a player, but a companion it beats down is taken ==")
 	Monster.idling = false
@@ -3671,9 +3907,16 @@ func _test_fight_data() -> void:
 		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
 		"band_min": 3}
 	var differ: Array[String] = []
+	# Rows tuned since (each its decision's): the hill cat's dart (814, combat's).
+	var tuned := {"hill_cat.dart_after_ticks": 6}
 	for kind: String in Monster.kinds():
 		var rules := Monster.fight_for(kind)
 		for key: String in old:
+			var at := "%s.%s" % [kind, key]
+			if tuned.has(at):
+				if rules.get(key) != tuned[at]:
+					differ.append("%s: %s, not its tuned %s" % [at, rules.get(key), tuned[at]])
+				continue
 			if str(rules.get(key)) != str(old[key]) or typeof(rules.get(key)) != typeof(old[key]):
 				differ.append("%s.%s: %s" % [kind, key, rules.get(key)])
 	_check(differ.is_empty() and Monster.kinds().size() > 10 and not Monster.kinds().has("fight"),
