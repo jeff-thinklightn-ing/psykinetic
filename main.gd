@@ -10255,13 +10255,23 @@ func _fish_changed(by: GridEntity, state: StringName, _uid: int) -> void:
 
 
 func _tomb_opened(zone_name: String, room: String, by: Array, kind := "tomb") -> void:
-	# The forge's companion side is companions' (813 amended (5)).
-	if kind != "tomb":
+	# A kind of room other than these is not hers (813 amended (5): the forge's side).
+	if kind != "tomb" and kind != "forge":
 		return
 	for pet: Companion in _companions.values():
 		if not is_instance_valid(pet) or pet.zone != zone_name or not is_instance_valid(pet.keeper):
 			continue
 		var together := pet in by
+		if kind == "forge":
+			# 813 amended (5): only those who woke it, never one come later (the coordinator).
+			if not together and not pet.keeper in by:
+				continue
+			var name := Companion._name_of(pet)
+			pet.note_fact("%s and %s woke a cold forge together." % [name, pet.keeper_name()] if together
+				else "%s woke a cold forge while %s looked on." % [pet.keeper_name(), name])
+			_bond(_record_of(pet), "forge", "woke a cold forge with you")
+			pet.forge_woken(together)
+			continue
 		var there := together or pet.keeper in by or Level.laid_room_at(Level.load_level(zone_name), pet.keeper.tile) == room
 		if not there:
 			continue

@@ -214,6 +214,9 @@ const HINT_ASK := "\\b(anything (odd|strange|unusual|hidden|here)|what do you (s
 ## What her voice is told (voice's words): a tomb opened, a clue.
 const TOMB_TOGETHER := "You and %s just opened a sealed tomb: the bricked wall sank open as you both held the plates. If you speak now, speak of that, in your own way."
 const TOMB_OPENED := "%s just opened a sealed tomb: a bricked wall sank open. If you speak now, speak of that, in your own way."
+## A cold forge woken (813 amended (5), dungeon's second co-op room; voice's words).
+const FORGE_TOGETHER := "You and %s just woke a cold forge: it roared alight as the two of you worked the bellows and the lever, and a stone shutter ground up behind it. If you speak now, speak of that, in your own way."
+const FORGE_WOKEN := "%s just woke a cold forge: it roared alight, and a stone shutter ground up behind it. If you speak now, speak of that, in your own way."
 const CLUE_FOCUS := "You notice something here: %s If you speak now, say only that, in your own words."
 const INSTRUCTION_LOCK_TICKS := 60
 ## The quick phrases' defaults reach her as what they mean, never quoted.
@@ -1720,6 +1723,12 @@ func fish_done(caught: bool) -> void:
 	_fish_said = World.tick
 	_quiet_focus = FISH_CAUGHT % keeper_name()
 	_ask_voice("Your line came in.", "", true)
+	_quiet_focus = ""
+
+
+func forge_woken(together: bool) -> void:
+	_quiet_focus = (FORGE_TOGETHER if together else FORGE_WOKEN) % keeper_name()
+	_ask_voice("A cold forge roared alight.", "", true)
 	_quiet_focus = ""
 
 

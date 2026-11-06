@@ -1824,6 +1824,20 @@ func _test_tomb() -> void:
 	_main._tomb_opened(pet.zone, "room_t", [pet, pet.keeper])
 	_check(str(pet.grown.facts).contains("opened a sealed tomb together") and "tomb" in record.companion.get("bond_today", {}).get("deeds", []),
 		"a tomb opened with her on a plate: a fact of her card and a deed of her bond")
+	# 813 amended (5): a cold forge, only for those who woke it.
+	var kept_forge: Variant = _bond_as(0)
+	var facts_before := pet.grown.facts.size()
+	_main._tomb_opened(pet.zone, "room_f", [], "forge")
+	_check(pet.grown.facts.size() == facts_before and not "forge" in record.companion.get("bond_today", {}).get("deeds", []),
+		"a forge woken by others, her and her player come later: nothing")
+	_main._tomb_opened(pet.zone, "room_f", [pet.keeper], "forge")
+	_check(str(pet.grown.facts.back()["text"]) == "%s woke a cold forge while %s looked on." % [pet.keeper_name(), Companion._name_of(pet)]
+			and "forge" in record.companion.get("bond_today", {}).get("deeds", []),
+		"her player woke it: her fact as one who looked on, and the deed \"woke a cold forge with you\" (%s)" % [pet.grown.facts.back()])
+	_main._tomb_opened(pet.zone, "room_f", [pet, pet.keeper], "forge")
+	_check(str(pet.grown.facts.back()["text"]) == "%s and %s woke a cold forge together." % [Companion._name_of(pet), pet.keeper_name()],
+		"woken together: her fact says so")
+	_bond_as(0, kept_forge)
 	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
 	_settle(pet)
 
