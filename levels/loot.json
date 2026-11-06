@@ -53,6 +53,15 @@
 			{"item": "raw_garnet", "chance": 0.3},
 			{"item": "miners_lamp", "chance": 0.3}
 		],
+		"wolf_cave_cache": [
+			{"item": "ration", "count": [1, 2]},
+			{"item": "bandaging_kit", "chance": 0.5},
+			{"item": "knife", "chance": 0.4},
+			{"item": "soft_boots", "chance": 0.3},
+			{"item": "flint", "chance": 0.3},
+			{"item": "hood", "chance": 0.25},
+			{"item": "silver_ring", "chance": 0.15}
+		],
 		"barrow_goods": [
 			{"item": "dagger"},
 			{"item": "silver_ring", "chance": 0.3},
@@ -87,6 +96,7 @@
 		"crypt_cache": [3, 8],
 		"deep_cache": [8, 20],
 		"castle_cache": [10, 25],
-		"hollowfell_cache": [5, 15]
+		"hollowfell_cache": [5, 15],
+		"wolf_cave_cache": [4, 12]
 	}
 }
