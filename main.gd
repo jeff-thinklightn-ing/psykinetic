@@ -23093,6 +23093,10 @@ func reward(player_id: String, data: Dictionary) -> bool:
 		told["at"] = [at.x, at.y]
 	Net.message_to(player.owner_peer, "reward", told)
 	rewards_sent += 1
+	# Her player's reward, near her (804 amended (14)): hers to notice.
+	var pet: Companion = _companions.get(player_id)
+	if is_instance_valid(pet) and pet.spawned and pet.zone == player.zone and World.distance(pet.tile, player.tile) <= Companion.HEARING_RANGE:
+		pet.noticed(data)
 	rewards_by_track[str(data["track"])] = rewards_by_track.get(str(data["track"]), 0) + 1
 	return true
 

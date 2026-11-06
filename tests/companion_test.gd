@@ -98,6 +98,7 @@ func _ready() -> void:
 	_test_talk_rate()
 	_test_tomb()
 	_test_fishing()
+	_test_notice()
 	_test_deeds()
 	_test_game_and_watch()
 	_test_sickness()
@@ -1923,6 +1924,52 @@ func _test_fishing() -> void:
 	World.holdings._since.erase(pond)
 	for slot in held_was.size():
 		pet.slots[slot] = held_was[slot]
+	_settle(pet)
+
+
+func _test_notice() -> void:
+	print("
+== she notices her player's rewards: once, briefly, not every float (804 amended (14)) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	pet._notice = {}
+	pet._notice_today = {}
+	pet._notice_last = -100000
+	Companion.notice_counts.clear()
+	_check(_main.reward(Net.player_id, {"track": "explore", "amount": 1, "of": "The Reed Pond", "words": "The Reed Pond", "big": true, "banner": "The Reed Pond"})
+			and "%s has just found the Reed Pond." % pet.keeper_name() in str(pet._notice.get("focus", "")),
+		"her player finds a place, she beside them: hers to notice (%s)" % [pet._notice])
+	pet._notice = {}
+	pet.noticed({"track": "gold", "amount": 5, "big": true})
+	pet.noticed({"track": "leisure", "amount": 1, "big": true})
+	pet.noticed({"track": "item", "amount": 6, "of": "iron ore"})
+	pet.noticed({"track": "bond", "amount": 1, "of": "her"})
+	_check(pet._notice.is_empty(), "gold, her own needs, a plain float, a bond point without a step: nothing")
+	pet.noticed({"track": "deed", "amount": 1, "of": "the Blood Rot's camp", "words": "cleared the Blood Rot's camp", "big": true, "banner": "The Blood Rot's camp falls"})
+	var focus := str(pet._notice.get("focus", ""))
+	_check(focus == "%s has just cleared the Blood Rot's camp. %s" % [pet.keeper_name(), Companion.NOTICE_LEAD],
+		"a camp cleared: what it was, no banner, and react briefly, in her own way (%s)" % focus)
+	for i in 5:
+		World.step()
+	_check(pet._notice.is_empty() and int(Companion.notice_counts.get("asked", 0)) == 1 and "deed" in pet._notice_today.get("kinds", []),
+		"out of a fight, her voice is asked, once (%s)" % [Companion.notice_counts])
+	pet.noticed({"track": "deed", "amount": 1, "of": "a sealed tomb", "words": "opened a sealed tomb", "big": true})
+	_check(pet._notice.is_empty(), "a second of that kind today: not remarked")
+	pet.noticed({"track": "regard", "big": true, "of": "Umbrage", "words": "The forge stands, built with your iron"})
+	_check("saw: \"The forge stands, built with your iron.\"" in str(pet._notice.get("focus", "")), "a sentence of the player's, quoted as what they saw (%s)" % [pet._notice])
+	pet._notice = {}
+	pet.noticed({"track": "bond", "amount": 1, "of": "her", "step": "close", "banner": "You are close to her"})
+	_check("You and %s have just grown closer: You are close to her" % pet.keeper_name() in str(pet._notice.get("focus", "")) and str(pet._notice.get("focus", "")).ends_with(Companion.NOTICE_BOND_LEAD),
+		"her bond's step: she may say something of it, and need not")
+	for i in 5:
+		World.step()
+	_check(not pet._notice.is_empty() and int(Companion.notice_counts.get("asked", 0)) == 1, "within two minutes of the last: it waits")
+	pet._notice["at"] = World.tick - Companion.NOTICE_STALE_S * World.TICK_RATE - 1
+	World.step()
+	_check(pet._notice.is_empty() and int(Companion.notice_counts.get("asked", 0)) == 1, "waited too long: let go, never said late")
+	_check(Companion.notice_report() == "; noticed: 1 of 4 offered" and Companion.notice_counts.is_empty(), "the [voice] line's part, counts only")
+	pet._notice_last = -100000
 	_settle(pet)
 
 

@@ -414,6 +414,16 @@ const QUIET_OPENERS := {"sight": "You notice", "ask": "You want to ask", "want":
 const QUIET_WANT_LEAD := "If you speak now, say so, in your own words."
 ## Closes an "ask" focus in place of QUIET_LEAD (803 amended (3)): told "You
 ## have a question for her player", she never asked one (pairs 5 and 6, 0 of 4).
+## Her player's rewards (804 amended (14), the coordinator: Jeff's visible
+## reward with her presence in it): at most one reaction in NOTICE_GAP_S, a
+## kind of thing once a game day, out of a fight; one waiting past
+## NOTICE_STALE_S is let go. Never a plain float, a need, gold, a catch or
+## practice. No fixed line: silence is the fallback.
+const NOTICE_GAP_S := 120
+const NOTICE_STALE_S := 60
+const NOTICE_SKIP: Array[String] = ["gold", "catch", "practice", "item", "leisure", "adventure", "wonder", "faith", "safety", "company"]
+const NOTICE_LEAD := "If you speak now, react to that, briefly, in your own way: one short line."
+const NOTICE_BOND_LEAD := "If you want, say something of it, briefly; you need not."
 const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
 const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s": 1200, "per_hour": 12,
 	"new_place_s": [20, 40], "player_quiet_s": 30,
@@ -710,6 +720,13 @@ static var voice_counts: Dictionary[String, int] = {}
 ## Her talk's answers counted for the "[voice]" line (803 amended (5)):
 ## answered (said, did), unanswered, set less / more; and m after each move.
 static var talk_counts: Dictionary[String, int] = {}
+## Her player's rewards she noticed (804 amended (14)): offered, asked of her voice.
+static var notice_counts: Dictionary[String, int] = {}
+## The reward she will react to (804 amended (14)): {focus, kind, at}, the newest
+## winning; when she last did; the kinds of thing reacted to today ({day, kinds}).
+var _notice := {}
+var _notice_last := -100000
+var _notice_today := {}
 static var talk_moves: Array[float] = []
 static var voice_latencies: Array[int] = []
 static var voice_prompt_tokens: Array[int] = []
@@ -1584,6 +1601,74 @@ func _tend_fish() -> void:
 	var spot := fish_spot_near(keeper.tile)
 	if spot != World.NO_CELL:
 		_go_fish(spot, false)
+
+
+## A reward of her player's (Main.reward's [param data]) she may react to
+## (804 amended (14)): a banner or a big gain, or her own bond's step; not
+## what NOTICE_SKIP names, nor a kind she reacted to today. The newest waits.
+func noticed(data: Dictionary) -> void:
+	var track := str(data.get("track", ""))
+	if track in NOTICE_SKIP or not (data.has("banner") or bool(data.get("big", false))):
+		return
+	var kind := track
+	var day := Townsfolk.day_of(World.steps)
+	if int(_notice_today.get("day", -1)) != day:
+		_notice_today = {"day": day, "kinds": []}
+	if kind in _notice_today["kinds"]:
+		return
+	var who := keeper_name()
+	var focus := ""
+	if track == "bond":
+		if not data.has("step"):
+			return
+		focus = "You and %s have just grown closer: %s. %s" % [who, str(data.get("banner", "")).trim_suffix("."), NOTICE_BOND_LEAD]
+	else:
+		var words := str(data.get("words", ""))
+		var of := str(data.get("of", ""))
+		var what := ""
+		# Voice's: a place's "The" lower mid-sentence; a sentence of the player's
+		# quoted as what they saw, so its "your" never reads as hers; no bare banner.
+		var mid := of.substr(0, 4).to_lower() + of.substr(4) if of.begins_with("The ") else of
+		if track == "explore":
+			what = "%s has just found %s." % [who, mid]
+		elif not words.is_empty() and words.left(1) == words.left(1).to_upper() and words.left(1) != words.left(1).to_lower():
+			what = "Just now %s saw: \"%s.\"" % [who, words.trim_suffix(".")]
+		elif not words.is_empty():
+			what = "%s has just %s." % [who, words.trim_suffix(".")]
+		else:
+			what = "%s has just earned %s." % [who, mid]
+		focus = "%s %s" % [what, NOTICE_LEAD]
+	_notice = {"focus": focus, "kind": kind, "at": World.tick}
+	notice_counts["offered"] = int(notice_counts.get("offered", 0)) + 1
+
+
+## Each tick (804 amended (14)): the waiting reward, once out of a fight and
+## NOTICE_GAP_S after the last, told her voice in its last turn; stale, let go.
+func _tend_notice() -> void:
+	if _notice.is_empty():
+		return
+	if World.tick - int(_notice["at"]) > NOTICE_STALE_S * World.TICK_RATE:
+		_notice = {}
+		return
+	if in_fight() or quiet() or World.is_downed(self) or World.tick - _notice_last < NOTICE_GAP_S * World.TICK_RATE:
+		return
+	var waiting := _notice
+	_notice = {}
+	_notice_last = World.tick
+	_notice_today["kinds"].append(waiting["kind"])
+	notice_counts["asked"] = int(notice_counts.get("asked", 0)) + 1
+	_quiet_focus = waiting["focus"]
+	_ask_voice("Something just went well for %s." % keeper_name(), "", true)
+	_quiet_focus = ""
+
+
+## The [voice] line's part for her noticing (804 amended (14)), "" for none.
+static func notice_report() -> String:
+	if notice_counts.is_empty():
+		return ""
+	var part := "; noticed: %d of %d offered" % [int(notice_counts.get("asked", 0)), int(notice_counts.get("offered", 0))]
+	notice_counts.clear()
+	return part
 
 
 ## Her own cast's end (Main's, from World.fishing_changed): the first catch
@@ -2844,6 +2929,7 @@ func _watch() -> void:
 		_quiet_moment()
 	_tend_reply()
 	_tend_fish()
+	_tend_notice()
 
 
 ## Decision 803 amended (step 4): companion_traits.json "quiet" over
@@ -6111,6 +6197,7 @@ static func voice_report(minutes: int) -> String:
 	if not voice_prompt_tokens.is_empty():
 		line += "; prompt tokens median %d, worst %d of %d" % [_median(voice_prompt_tokens), voice_prompt_tokens.max(), OllamaMind.NUM_CTX]
 	line += talk_report()
+	line += notice_report()
 	voice_counts.clear()
 	voice_latencies.clear()
 	voice_prompt_tokens.clear()

@@ -43573,6 +43573,23 @@ counts gains by track: a deed now brings her bond's and needs' gains beside it, 
 counts its deeds by the "deed" track, not every gain sent. Server and client; protocol 51; no new
 class_name.
 
+804 amended (14) (2026-11-06, release's label; the coordinator's approval: the visible reward, with
+her presence in it): she notices her player's rewards. Main.reward, a gain sent to a player whose
+companion is spawned in their zone within Companion.HEARING_RANGE, hands it to Companion.noticed:
+one with a banner or "big", or her bond's step; never what NOTICE_SKIP names (gold, a catch,
+practice, a plain item float, her own needs) nor a bond point without a step, and a kind of thing
+(its track) once a game day. The newest waits (Companion._tend_notice) till she is out of a fight
+and NOTICE_GAP_S (120) past her last, then goes to her voice in the last turn: "{player} has just
+cleared the Blood Rot's camp." / "{player} has just found the pond." (a place's "The" lowered mid-
+sentence) / a sentence of the player's quoted as theirs, Just now {player} saw: "The forge stands,
+built with your iron." (so its "your" never reads as hers; no bare banner), closed by NOTICE_LEAD
+("If you speak now, react to that, briefly, in your own way: one short line."); her step: "You and
+{player} have just grown closer: <her card's step sentence>. If you want, say something of it,
+briefly; you need not." (voice's words). Waiting past NOTICE_STALE_S (60) it is let go, never said
+late. No fixed line: silence is the fallback. The [voice] line gains "; noticed: A of O offered"
+(Companion.notice_report, counts only) for release's grep. companion_test _test_notice. Server
+only, protocol unchanged, no new class_name.
+
 814, sound's side: the hill cat heard (release's label; enemy-ai's 814 design). Its own cries by kind "hill_cat", all on the voice bus, never heard by monsters but its death: sfx.hill_cat_snarl (its "call" as a player spots it, a hiss and a yowl; SoundKit.OWN_CRIES; range 8, -4 dB), sfx.hill_cat_pounce (as it lands its leap, its "pounce" cry: a short roar; range 8, -2), sfx.hill_cat_struck (struck and not killed: a hiss or a growl; SoundKit.struck; range 10, -4) and sfx.hill_cat_death (a dying roar, heard as a fight, falling back to sfx.wolf_death; -2). Its feet on paws (SoundKit.FEET). Twelve Freesound CC0 takes, three a cue: snarl from 389708 (suspensiondigital), 63668 (Miselaineous) and 844316 (TheKingOfGeeks360); pounce from 559270 (KristopherTiberiusHaven), 410343 (waxsocks) and 381857 (cribbler); struck from 485952 (aunrea), 819958 (rickismyname) and 63668; death from 410343, 389708 and 559270. Review: C:/dev/review/sound/hill_cat. Tests: sound_kit_test (the cat's routing, fallback, feet and takes). Client only; protocol unchanged, no new class_name, no bullet (enemy-ai's 814 carries it).
 
 ## 789. Magic, phase 1: the bear's-claw charm, the aura's light, the bear's-grease draught
