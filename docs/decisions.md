@@ -42416,6 +42416,8 @@ behind (113..116), away from the road that passes the pond's south side (rows 12
 so the fishing side keeps a two-cell walkway (the two-cell rule). No town holds it, so no
 fisherman (594) walks to it. level_test _test_reed_pond. Level data only; no regen.
 
+2026-11-06 (voice's check): the pond is shown as "the pond" until Jeff names it; its key "reed_pond" stays.
+
 805 amended, its second part: a told place is known. WorldNews.tell(player_id, place_id) puts a
 place into the player's known_places, as coming within SIGHT of it does (observe), and,
 if they are in the game, sends it as {"full": false, "known": {"areas": [], "places":

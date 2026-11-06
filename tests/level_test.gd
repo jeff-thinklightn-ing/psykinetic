@@ -2117,7 +2117,7 @@ func _test_reed_pond() -> void:
 	var water: Variant = terrain.get("water", [])
 	var at: Vector2i = place.get("cell", Vector2i(-1, -1))
 	var wet := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)].filter(func(step: Vector2i) -> bool: return at + step in water)
-	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "the Reed Pond" and place.get("holder", "") == Factions.NOBODY
+	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "the pond" and place.get("holder", "") == Factions.NOBODY
 			and floor.has(at) and not at in water and wet.size() >= 1
 			and floor.has(at + Vector2i(0, -1)) and floor.has(at + Vector2i(0, -2)) and floor.has(at + Vector2i(-1, -1)) and floor.has(at + Vector2i(1, -1)),
 		"reed_pond: fishing, nobody's, on dry floor at %s with water beside it (%s) and two dry rows behind" % [at, wet])
