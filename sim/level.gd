@@ -166,7 +166,7 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2),
 	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2), "tree.clawed": Vector2i(1, 1),
 	# castle_halls' cold forge (806 (c), art-kit's c7539ec7): its back to the wall.
-	"building.set_cold_forge": Vector2i(2, 1)}
+	"building.set_cold_forge": Vector2i(2, 1), "tree.great_oak": Vector2i(4, 4)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -225,7 +225,7 @@ const CARVED_ARROWS: Array[String] = ["left", "right", "up"]
 ## Buildings' list; the low ones (a woodpile, a table, a chair) stay.
 const FADES_ON_LINE: Array[String] = ["building.market_stall", "building.well", "building.cairn", "building.standing_stone",
 	"building.waystone", "building.great_tree", "building.tower_ruin", "building.mound", "building.crypt_pillar",
-	"building.dark_pillar", "building.dwarven_forge", "building.weapon_rack", "building.throne", "tree.clawed"]
+	"building.dark_pillar", "building.dwarven_forge", "building.weapon_rack", "building.throne", "tree.clawed", "tree.great_oak"]
 ## A herder's fold (640), and how far from its holding's place cell it may
 ## stand (fold_near).
 const FOLD := "building.fold"
@@ -242,7 +242,7 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -254,14 +254,15 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## a lean-to; 811 amended: the Mughouse's counter, tap rack and tables, the
 ## taverner behind the counter; 806 amended (3): the crypt's sarcophagi and the
 ## robbers' dig into a tomb's floor; 806 (c): castle_halls' cold forge): every cell of theirs out of the floor, none walked onto or into; 780 amended (12):
-## the boar's lair's mouth, a tree scored by its tusks, tree.clawed).
+## the boar's lair's mouth, a tree scored by its tusks, tree.clawed; 778 amended: the hills'
+## great oak, art-kit's tree.great_oak, its trunk and roots).
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,

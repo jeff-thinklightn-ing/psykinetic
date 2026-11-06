@@ -999,7 +999,7 @@ func _test_fill_hills_sights() -> void:
 	for building: Dictionary in level["buildings"]:
 		var slot := str(building.get("slot", ""))
 		counts[slot] = int(counts.get(slot, 0)) + 1
-	var want := {"building.tower_ruin": 1, "building.great_tree": 1, "building.standing_stone": 1, "building.milestone": 2,
+	var want := {"building.tower_ruin": 1, "tree.great_oak": 1, "building.standing_stone": 1, "building.milestone": 2,
 		"building.wayside_shrine": 1, "building.woodpile": 1, "building.hunters_blind": 1, "building.waystone": 2,
 		"building.cairn": 1, "building.grave": 1, "building.lean_to": 1}
 	var short := want.keys().filter(func(slot: String) -> bool: return int(counts.get(slot, 0)) != int(want[slot]))

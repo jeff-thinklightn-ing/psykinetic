@@ -41035,6 +41035,20 @@ FAIL, a NOTE once fixed) until their owners fix the ground, not changed here: fo
 (dungeon): (20, 7), 8 cells three levels down from (20, 8). Test and decisions only:
 no rule, no wire, no bullet, no new class_name.
 
+
+778 amended: the hills' great oak drawn as itself (2026-11-05, maps; art-kit's tree.great_oak, bf692a87;
+release's label). The great oak between the streams (SIGHTS "great_oak", (111,159), facing north) was
+the wilds' 3 x 3 building.great_tree standing in; it is now art-kit's tree.great_oak, 4 x 4 cells of
+trunk and roots, its crown about 16 x 14 m over them, its front (+z, the "hollow_door" socket kept for
+a later Druids' hall, not built) toward the path. Level.BUILDINGS gains it at 4 x 4, and SOLID, DOORLESS
+and FADES_ON_LINE (taller than a player's middle, it fades on the camera's line as the wilds' great
+tree does). A SIGHTS entry may keep its "code" (decision 537): the oak keeps the G1 its stand-in had, so
+no other building's code moves. The hills regenerated (tools/make_hills.gd): its building entry's slot
+changes and nothing else in level.json; the layout's grass and dirt differ in 13 cells round the
+larger levelled pad, the relief beside them. After the deploy the hills' "[level] hills: ..." line
+says the level loaded. level_test's hills sights count it; relief, view, builder and editor tests
+pass. CHANGELOG bullet (voice's words; the rags named, not explained, till lore's story is agreed).
+Protocol unchanged, no new class_name.
 ## 785. A companion's turn off the slow path: her log writes on a thread, her sights cheaper, her turn's pieces timed
 
 The box's "[net] slow:" lines (decision 469) named "act: companions": bursts of about 530 ms soon after

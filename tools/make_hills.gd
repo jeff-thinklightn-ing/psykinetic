@@ -224,7 +224,8 @@ const PATCH_RADIUS := 4
 ## prop.<kind> lying faced), facing: a side, or ROADWARD to face the nearest
 ## path cell; a building may add its "variant" and the words cut in its face,
 ## "carved" and "arrow" (800: the milestones' and waystones' names, voice's
-## words, the arrow as the stone's reader sees it)}. Laid on the walkable
+## words, the arrow as the stone's reader sees it) and its "code" kept
+## (778 amended: the great oak keeps the G1 its stand-in had, decision 537)}. Laid on the walkable
 ## cell nearest the planned one whose
 ## footprint is grass or plain dirt, off every path by SIGHT_OFF_PATH and
 ## clear of the others; the multi-cell ones' planned ground levelled
@@ -232,7 +233,7 @@ const PATCH_RADIUS := 4
 const ROADWARD := Vector2i.ZERO
 const SIGHTS: Array[Dictionary] = [
 	{"key": "watchtower", "slot": "building.tower_ruin", "at": Vector2i(186, 18), "facing": Vector2i(-1, 0)},
-	{"key": "great_oak", "slot": "building.great_tree", "at": Vector2i(111, 159), "facing": Vector2i(0, -1)},
+	{"key": "great_oak", "slot": "tree.great_oak", "at": Vector2i(111, 159), "facing": Vector2i(0, -1), "code": "G1"},
 	{"key": "standing_stone", "slot": "building.standing_stone", "at": Vector2i(199, 70), "facing": Vector2i(-1, 0)},
 	{"key": "milestone_west", "slot": "building.milestone", "at": Vector2i(43, 110), "facing": ROADWARD, "variant": 2, "carved": "Umbrage"},
 	{"key": "milestone_east", "slot": "building.milestone", "at": Vector2i(140, 108), "facing": ROADWARD, "variant": 2, "carved": "Shieling"},
@@ -1037,7 +1038,7 @@ func _sights() -> void:
 					if sight.has("slot"):
 						var building := {"slot": sight["slot"], "at": [at.x, at.y], "facing": [facing.x, facing.y]}
 						# Its look and the words cut in its face (800: voice's words, art-kit's panels).
-						for key: String in ["variant", "carved", "arrow"]:
+						for key: String in ["variant", "carved", "arrow", "code"]:
 							if sight.has(key):
 								building[key] = sight[key]
 						config["buildings"].append(building)

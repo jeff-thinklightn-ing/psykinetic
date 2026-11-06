@@ -1859,7 +1859,7 @@
 			"code": "T1"
 		},
 		{
-			"slot": "building.great_tree",
+			"slot": "tree.great_oak",
 			"at": [
 				111,
 				159
