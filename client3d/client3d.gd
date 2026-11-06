@@ -832,9 +832,10 @@ const WALL_LAMP_SLOT := "prop.mine_lamp"
 ## A gap in a cave's roof (decision 797): its light hangs this high over the
 ## floor, at most this bright (full day outside), cold by day and bluer
 ## at night (faint, never out: Fields.SKYLIGHT_NIGHT); set again every
-## SKYLIGHT_PICK s.
+## SKYLIGHT_PICK s. Its reach is twice its height, so the floor isn't at the
+## end of its fade, and its pool shows past a wall torch (2026-11-06).
 const SKYLIGHT_HIGH := 10.0
-const SKYLIGHT_ENERGY := 3.0
+const SKYLIGHT_ENERGY := 6.0
 const SKYLIGHT_DAY_COLOUR := Color(0.9, 0.94, 1.0)
 const SKYLIGHT_NIGHT_COLOUR := Color(0.55, 0.64, 0.9)
 const SKYLIGHT_PICK := 0.5
@@ -855,7 +856,7 @@ const MOTE_GLOW := 0.6
 const MOUTH_BACK := 1.0
 const MOUTH_HIGH := 2.5
 const MOUTH_AIM := 0.5
-const MOUTH_SHARE := 0.45
+const MOUTH_SHARE := 0.225   # the mouth as bright as at 3.0 x 0.45
 const MOUTH_ANGLE := 40.0
 const AMBIENT := Color(0.05, 0.05, 0.07)
 const BACKGROUND := Color(0.02, 0.02, 0.025)
@@ -13018,7 +13019,7 @@ func _build_skylights() -> void:
 		light.name = "Skylight_%d_%d" % [at.x, at.y]
 		light.position = _tile_position(at) + Vector3(0.0, SKYLIGHT_HIGH, 0.0)
 		light.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
-		light.spot_range = SKYLIGHT_HIGH + 2.0
+		light.spot_range = SKYLIGHT_HIGH * 2.0
 		light.spot_angle = skylight_angle(radius)
 		light.spot_angle_attenuation = 0.6
 		light.shadow_enabled = false
