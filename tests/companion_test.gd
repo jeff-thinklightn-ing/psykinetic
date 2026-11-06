@@ -598,6 +598,12 @@ func _test_spoken() -> void:
 	var listed := pet.spoken("Wren, Aldous, Snagfin. The boar is moving closer.")
 	_check(listed == "The boar is moving closer." and pet.spoken("Wren and Aldous.").is_empty() and pet.spoken("Wren and Aldous.", false, true) == "Wren and Aldous."
 			and pet.spoken("Run, Snagfin!") == "Run, Snagfin!", "names alone, unasked, are not said (%s)" % listed)
+	var sneak := Companion._plain("The sneak moved like a shadow, but I saw them.")
+	_check(Companion.near_repeat(Companion._plain("The sneak moves like a shadow, and I watch them closely."), [sneak], true)
+			and not Companion.near_repeat(Companion._plain("The sneak moves like a shadow, and I watch them closely."), [sneak])
+			and not Companion.near_repeat(Companion._plain("The sneak was quick on its feet."), [sneak], true)
+			and not Companion.near_repeat(Companion._plain("A wolf moved like a shadow too."), [sneak], true),
+		"in what she says, the same three-word opening is said again (her facts keep theirs); another sneak line, or a like line of another beast, is not (228 amended (2))")
 	_check("Never say whether anyone will live or die" in Companion.VOICE_RULES, "her voice is told never to say whether anyone will make it")
 	_check(pet.spoken("You move to stand between %s and the imps." % who).is_empty() and pet.spoken("*nods* Ready.") == "Ready."
 			and pet.spoken("%s draws her blade. I'm here." % pet.name) == "I'm here.",

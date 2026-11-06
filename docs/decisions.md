@@ -3643,6 +3643,18 @@ and dropped as an echo each time):
   room).
 companion_test and resident_test cover each. Protocol unchanged.
 
+228 amended (2) (2026-11-06, release's label; playtest's reward_loop, routed by the coordinator): a
+sentence that opens as one said lately is said again. Rhea, after two sneaks 16 s apart: "The sneak
+moved like a shadow, but I saw them." then "The sneak moves like a shadow, and I watch them closely."
+They share half their words (5 of 10, endings aside), under NEAR_SHARE, so near_repeat let the second
+through. Now a sentence whose first NEAR_OPENING (3) words, COMMON_WORDS aside and endings trimmed as
+_word_set does, match those of one in the likeness list (her last REPEAT_LINES lines, others' lately,
+her exchange's narration) is a near repeat too (Companion._opening); asked lines are free of it as
+before. Only spoken() asks it (near_repeat's openings): her facts, which open alike by kind
+("Wren saw a wolf fall in ..."), are matched as before. Another line on the same beast ("The sneak was quick on its feet.") and the same words about
+another ("A wolf moved like a shadow too.") still pass. companion_test. Server only, protocol
+unchanged, no new class_name.
+
 ## 237. Companions perceive through Senses: sight by light, deaths witnessed, noises heard
 
 A Companion has Senses (222) as the monsters do: Senses.new(self,

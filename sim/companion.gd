@@ -211,6 +211,12 @@ const COMMON_WORDS: Array[String] = ["i", "ill", "im", "ive", "id", "we", "well"
 	"the", "a", "an", "is", "are", "was", "it", "its", "to", "of", "and", "then", "now", "still", "will", "be", "me", "my",
 	"us", "our", "on", "in", "at", "this", "that", "there", "here", "just", "so", "lets", "let", "all", "your", "up", "for"]
 const NEAR_SHARE := 0.8
+## ... or, for what she says (not her facts, whose openings repeat by
+## kind), begins with the same NEAR_OPENING words, COMMON_WORDS aside, as
+## one (228 amended (2): "The sneak moved like a shadow, but I saw them." then
+## "The sneak moves like a shadow, and I watch them closely.", playtest's
+## reward_loop: half their words shared, under NEAR_SHARE).
+const NEAR_OPENING := 3
 ## What the other companions near her said in the last OTHERS_SAID_TICKS
 ## is not hers to say again.
 const OTHERS_SAID_TICKS := 200
@@ -4754,7 +4760,7 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 		plain = _plain(sentence)
 		if plain.is_empty() or repeated.has(plain):
 			continue
-		if not asked and (report.search(sentence) != null or near_repeat(plain, alike)):
+		if not asked and (report.search(sentence) != null or near_repeat(plain, alike, true)):
 			continue
 		if (called.is_empty() or called == keeper_word) and not keeper_word.is_empty() and keeper_named.search(sentence) != null:
 			continue  # Her player, spoken of: she speaks to them, as you.
@@ -4861,14 +4867,17 @@ static func _plain(text: String) -> String:
 ## them: one word alone is too little to tell), or sharing NEAR_SHARE of
 ## the words of both. A sentence of common words alone is near only one
 ## the same.
-static func near_repeat(plain: String, others: Array[String]) -> bool:
+static func near_repeat(plain: String, others: Array[String], openings := false) -> bool:
 	var words := _word_set(plain)
+	var opening := _opening(words) if openings else ""
 	for other in others:
 		if other == plain:
 			return true
 		var theirs := _word_set(other)
 		if words.is_empty() or theirs.is_empty():
 			continue
+		if not opening.is_empty() and opening == _opening(theirs):
+			return true
 		var shared := 0
 		for word: String in words:
 			if theirs.has(word):
@@ -4876,6 +4885,13 @@ static func near_repeat(plain: String, others: Array[String]) -> bool:
 		if shared == words.size() and shared >= 2 or float(shared) / (words.size() + theirs.size() - shared) >= NEAR_SHARE:
 			return true
 	return false
+
+
+## The first NEAR_OPENING of [param words] (_word_set's, in order), "" if fewer.
+static func _opening(words: Dictionary[String, bool]) -> String:
+	if words.size() < NEAR_OPENING:
+		return ""
+	return " ".join(words.keys().slice(0, NEAR_OPENING))
 
 
 ## [param plain]'s words, COMMON_WORDS aside, each without a plural or
