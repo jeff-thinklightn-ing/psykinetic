@@ -502,8 +502,7 @@
 			"summary": "A great cat that lies up in the hill rocks and drops on whatever passes (Jeff, 2026-11-03: lore's name).",
 			"relations": [],
 			"tags": [
-				"wildlife",
-				"apex"
+				"wildlife"
 			],
 			"facts": [
 				{
@@ -516,6 +515,39 @@
 					"tags": [],
 					"source": "Jeff",
 					"status": "agreed"
+				},
+				{
+					"id": "hill_cat.night",
+					"text": "The hill cat hunts from dusk to dawn and lies up by day.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
+				},
+				{
+					"id": "hill_cat.herders",
+					"text": "The hill folk lose goats to the hill cat, and a herder looks up at the rocks before he walks under them.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
+				},
+				{
+					"id": "hill_cat.keeps_off",
+					"text": "The hill cat keeps away from roads and towns.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
 				}
 			]
 		},
