@@ -287,6 +287,7 @@ func obstacles(world_map: WorldMap) -> Dictionary:
 ## as it changes (attach): a layer per faction.
 func make_routes(world_map: WorldMap) -> WorldRoutes:
 	var routes := WorldRoutes.new(world_map, true, true, obstacles(world_map))
+	routes.log_layers_ready()
 	attach(routes)
 	return routes
 

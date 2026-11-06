@@ -664,6 +664,14 @@ func _test_territory_routes() -> void:
 	_check(str(unready) == str(routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4))),
 		"a route reads the same with its fields in or not (%s)" % [unready])
 	_check(routes.factions() == _strings(["bandits", "goblins", "town"]) and routes.is_ready(), "a layer per side (the allies route on the Blood Rot's, decision 416; the bandits their own, 793), every field in (%s)" % [routes.build_ms])
+	var in_line := WorldRoutes.new(world_map, false, true, holdings.obstacles(world_map))
+	var differ: Array[String] = []
+	for faction: String in [WorldRoutes.OPEN] + routes.factions():
+		if routes._layers[faction].fields != in_line._layers[faction].fields:
+			differ.append(faction)
+	_check(differ.is_empty() and routes._shared.workers == 0 and routes._shared.queue.is_empty()
+		and WorldRoutes.tasks_most() >= 1 and WorldRoutes.tasks_most() <= WorldRoutes.TASKS_MOST,
+		"a layer's area a task, up to %d at once: every field as made in one go (differ: %s), the queue empty, no task left counted" % [WorldRoutes.tasks_most(), differ])
 	var town := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "town")
 	var goblins := routes.route("t_mid", Vector2i(0, 4), "t_mid", Vector2i(20, 4), "goblins")
 	_check(goblins.size() == 1 and goblins[0]["steps"] == 20.0, "the goblins walk straight through their own camp: 20 steps (%s)" % [goblins])

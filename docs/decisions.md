@@ -2373,6 +2373,23 @@ the fields on the server's thread at load (seconds once the wilds has a
 few more ways), and fields per area pair instead of per portal (no cheaper
 to make, and along() needs the per-portal ones).
 
+202 amended (2026-11-05, perf; release's label, the coordinator's go): the fields from a queue
+of pool tasks, a layer's area each, a quarter of the threads at most. One task made every layer
+in turn, so 793's fourth layer (the bandits) put about 55 s of fields on one thread at boot
+while the box's other 31 stood idle. Now _start queues the job's entries (the open layer's
+first) and starts tasks up to tasks_most() (a quarter of OS.get_processor_count(), 1 to
+TASKS_MOST 8: 8 on the box, leaving the rest to the tick, the voice calls and the view), each
+taking entries till the queue is empty (_work); the task count drops under the same lock as the
+last look at the queue. What each entry makes, and when an area counts as ready, is unchanged.
+Holdings.make_routes logs a line as each layer's first fields are all in ("[routes] layer <name>
+ready <s> s after the routes were made", counts only) for release to read at boot. The real
+map, headless, 4 tasks, this and main alternated twice (a scene, not a bench): every field in
+25.0-25.5 s against 64-84 s, the open layer ready at 13.4-13.7 s against about 17 s; the
+summed task time rises 64-84 s to 82-85 s with four at once. One area's fields are still one
+task, so the wilds, the largest, bounds a layer's readiness. world_map_test: the fields equal
+those made in one go, the queue empty and no task left counted. Server only, protocol
+unchanged, no new class_name.
+
 ## 203. A light's lines are worked out once; a door asks only its doors
 
 A door a monster opened cost 3.6 to 4.5 ms (tools/map_bench, now
