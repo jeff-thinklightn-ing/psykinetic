@@ -95,6 +95,12 @@ function Save-Token($reply) {
 	} | ConvertTo-Json | Set-Content -LiteralPath $TokenFile -Encoding UTF8
 }
 
+# A GET of the API, its JSON read as UTF-8: Windows PowerShell's Invoke-RestMethod reads a
+# reply with no charset as Latin-1, so a name's n-tilde came out double-encoded (472401).
+function Get-Json($uri, $headers = @{}, $body = @{}) {
+	$reply = Invoke-WebRequest -Uri $uri -Headers $headers -Body $body -UseBasicParsing
+	return [Text.Encoding]::UTF8.GetString($reply.RawContentStream.ToArray()) | ConvertFrom-Json
+}
 function Sound-Folder { Join-Path (Join-Path (Join-Path $Library 'freesound') $Slot) "$Id" }
 
 switch ($Command) {
@@ -103,7 +109,7 @@ switch ($Command) {
 		$c = Read-Credentials
 		$filter = 'license:("Creative Commons 0" OR "Attribution")'
 		if ($MaxSeconds -gt 0) { $filter += " duration:[0 TO $MaxSeconds]" }
-		$found = Invoke-RestMethod -Uri "$api/search/text/" -Body @{
+		$found = Get-Json "$api/search/text/" @{} @{
 			query = $Query; filter = $filter; page_size = $Max; page = $Page; sort = $Sort; token = $c.client_secret
 			fields = 'id,name,username,license,duration,channels,samplerate,type,avg_rating,num_ratings,num_downloads,tags'
 		}
@@ -135,7 +141,7 @@ switch ($Command) {
 		$folder = Sound-Folder
 		if (Test-Path -LiteralPath (Join-Path $folder 'freesound.json')) { "freesound: $Id is in $folder already"; break }
 		$headers = @{ Authorization = "Bearer $(Access-Token)" }
-		$sound = Invoke-RestMethod -Uri "$api/sounds/$Id/" -Headers $headers -Body @{ fields = 'id,name,username,license,url,type,duration,channels,samplerate' }
+		$sound = Get-Json "$api/sounds/$Id/" $headers @{ fields = 'id,name,username,license,url,type,duration,channels,samplerate' }
 		$licence = Licence-Name $sound.license
 		if (-not $licence) { Fail "$Id is under $($sound.license): not a licence we take" }
 		# A file name of our own: the original's name is untrusted.
