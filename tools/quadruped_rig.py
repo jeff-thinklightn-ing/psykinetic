@@ -34,9 +34,10 @@
 # moves, 10 ticks a second): Swipe's blow lands at 0.6 s (windup 6), Slam's at 1.2 s (windup 12),
 # Charge_Tell is the 0.8 s roar before the rush (roar 8), Winded loops (597's ~15 ticks).
 # Clips (--clips hill_cat, with --tail 5 --hock 0.2 --find-tail 1 --ears 1 --jaw 1): Idle, Walk, Run,
-# Lie, Crouch_Tell, Pounce, Recover, Swipe, Bite, Snarl, Hit, Death, on enemy-ai's provisional moves
-# (no monsters.json row yet; retimed when it lands): the pounce's crouch 8 (Crouch_Tell 0.8 s, then
-# Pounce's contact on landing at 0.4 s), swipe windup 5 (0.5 s), bite windup 4 (0.4 s).
+# Lie, Crouch_Tell, Pounce, Recover, Swipe, Bite, Snarl, Hit, Death, on enemy-ai's approved moves (20 ticks
+# a second): Crouch_Tell 0.55 s (11 ticks), Pounce 0.45 s landing at 0.4 s, Recover 0.6 s, Swipe's blow at
+# 0.3 s (windup 6), Bite's jaws at 0.4 s (windup 8), Snarl 0.8 s. Each clip is its first draft played at
+# the new pace: pose_at(t) is asked at the draft's seconds, the clip itself is the new length.
 import math
 import os
 import sys
@@ -1033,12 +1034,13 @@ class HillCat:
 			["Walk", 1.2, True, self.walk],
 			["Run", 0.55, True, self.run],
 			["Lie", 4.0, True, self.lie],
-			["Crouch_Tell", 0.8, False, lambda t: self.crouch(t, 0.8)],
-			["Pounce", 0.8, False, lambda t: self.pounce(t, 0.8)],
-			["Recover", 1.0, True, self.recover],
-			["Swipe", 0.9, False, lambda t: self.swipe(t, 0.9)],
+			["Crouch_Tell", 0.55, False, lambda t: self.crouch(t, 0.8)],
+			# airborne to the landing at 0.4 s of 0.45 (the draft's 0.4 of 0.8), then the draft's gathering in 0.05 s
+			["Pounce", 0.45, False, lambda t: self.pounce(min(t * 0.45, 0.4) / 0.8 + max(t * 0.45 - 0.4, 0.0) * 8.0 / 0.8, 0.8)],
+			["Recover", 0.6, True, self.recover],
+			["Swipe", 0.54, False, lambda t: self.swipe(t, 0.9)],
 			["Bite", 0.8, False, lambda t: self.bite(t, 0.8)],
-			["Snarl", 1.2, False, lambda t: self.snarl(t, 1.2)],
+			["Snarl", 0.8, False, lambda t: self.snarl(t, 1.2)],
 			["Hit", 0.4, False, self.hit],
 			["Death", 1.5, False, self.death],
 		]
