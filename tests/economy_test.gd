@@ -184,6 +184,9 @@ func _test_vendor() -> void:
 		and economy.stockpile.count(TOWN, "gold") == treasury, "arrows for 1 gold, a bundle, no treasury's (%s)" % [sale])
 	_check(not economy.vendor_sale("p1", "crown")["ok"] and economy.gold("p1") == 2, "not one of its wares: refused")
 	_check(not economy.vendor_sale("p2", "sword")["ok"] and economy.gold("p2") == 0, "no gold: refused")
+	economy.add_gold("p1", 1, "test")
+	var rod := economy.vendor_sale("p1", "fishing_rod")
+	_check(rod["ok"] and int(rod["gold"]) == 3 and economy.gold("p1") == 0, "Rolf's fishing rod: 3 gold (805; %s)" % [rod])
 
 
 ## A forest camp's trader (799, economy's side): stock drawn from his mix,

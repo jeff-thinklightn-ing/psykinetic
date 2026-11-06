@@ -7,11 +7,11 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fishing: buy a rod from Rolf at the stall for 3 gold, cast it into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).
 - The map of the known world shows under each area's name how many of its places you've found, and the character sheet no longer covers it (804 amended (13)).
 - Your companion's card shows her bond with you as a bar filling toward her next step, and her six needs as bars beneath it, each rising with a glow as it grows; and every window and tooltip now hides the world behind it (804 amended (12)).
 - Your companion fishes with you when she carries a rod: ask her, or cast beside her and she joins in; a fish landed together lifts her, and meets her wish to go fishing (805 amended (5)).
 - You hear a forest bandit camp before you see it, voices and rough laughter round its fire; clear it and only the fire crackles (795 amended (2)).
-- Fishing: cast a rod into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).
 - What you do with your companion lifts her Ease, Venture, Wonder, Faith, Shelter or Company: a fire, a game, a gift, food shared, the road, somewhere new, each with a +1 as it comes (803 amended (2)).
 - Your companion wants one thing at a time and tells you so when all is quiet: a rest by a fire, a while in town, a first fight won, a blessing at the temple; do it together and it lifts her far more than usual, and she speaks of it after (803 amended (4)).
 - Your companion talks more when you answer her, by a word or by going to what she pointed out, and a little less when you don't; tell her to talk less or more and she will (803 amended (5)).

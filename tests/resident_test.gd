@@ -4789,8 +4789,11 @@ func _test_vendor() -> void:
 	_check(spoken.size() == 1, "a greeting (%s)" % [spoken])
 	_check(_main._resident_addressed(player, "hello there", null) != rolf, "typed words never reach him")
 	var offers := Offers.of(rolf.worker_id, pid)
-	_check(offers.size() == (rule.get("wares", []) as Array).size() and offers.all(func(o: Dictionary) -> bool: return int(o["cost"]) == int(rule.get("price", 1)) and str(o["kind"]) == Offers.VENDOR_WARES),
-		"every ware at the rule's price (%s)" % [offers.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	var ware_price := {}  # A ware's own price, else the rule's (805: the fishing rod, 3).
+	for line: Dictionary in rule.get("wares", []):
+		ware_price[str(line["item"])] = int(line.get("price", rule.get("price", 1)))
+	_check(offers.size() == (rule.get("wares", []) as Array).size() and offers.all(func(o: Dictionary) -> bool: return int(o["cost"]) == int(ware_price.get(str(o["what"].get("item", "")), -1)) and str(o["kind"]) == Offers.VENDOR_WARES),
+		"every ware at its price (%s)" % [offers.map(func(o: Dictionary) -> String: return str(o["title"]))])
 	var sword := offers.filter(func(o: Dictionary) -> bool: return str(o["what"].get("item", "")) == "sword")
 	World.economy.add_gold(pid, -World.economy.gold(pid), "the test")
 	spoken.clear()
@@ -4830,6 +4833,9 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 		return
 	var pid := Net.player_id
 	var price := int(rule.get("price", 1))
+	var ware_price := {}  # A ware's own price, else the rule's (805: the fishing rod, 3).
+	for line: Dictionary in rule.get("wares", []):
+		ware_price[str(line["item"])] = int(line.get("price", price))
 	for slot in player.slots.size():
 		if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
 			World.items.place(World._take_out(player, slot), "the test")  # Empty hands again.
@@ -4841,7 +4847,7 @@ func _test_vendor_buttons(player: Player, rolf: Resident, rule: Dictionary) -> v
 	var count := (rule.get("wares", []) as Array).size()
 	var boxes := panel.boxes_shown()
 	_check(panel.is_open() and panel.with == rolf and panel.title_shown() == rolf.person and boxes.size() == count
-			and boxes.all(func(b: String) -> bool: return b.begins_with("ware ") and b.ends_with("gold %d" % price)),
+			and boxes.all(func(b: String) -> bool: return b.begins_with("ware ") and b.ends_with("gold %d" % int(ware_price.get(b.get_slice("|", 2).get_slice(" ", 0), price)))),
 		"greeted: the store window on him, his name, a square a ware with its price chip (%d of %d: %s)" % [boxes.size(), count, boxes.slice(0, 2)])
 	var sword := ""
 	for each: Dictionary in panel.wares:
