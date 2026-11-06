@@ -116,12 +116,15 @@ const SIDES := {"north": Vector2i(0, -1), "east": Vector2i(1, 0), "south": Vecto
 const OPPOSITE := {"north": "south", "east": "west", "south": "north", "west": "east"}
 ## What a place (level.json "places", Holdings) can be.
 const PLACE_KINDS: Array[String] = ["camp", "keep", "farm", "gate", "mine", "stockpile", "temple", "healers_hut",
-	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "post", "tavern", "fire", "other"]
+	"woodlot", "hunting_ground", "quarry", "fishing", "fort", "refuge", "stall", "rest", "workings", "post", "tavern", "fire",
+	"trader", "captive", "other"]
 ## A place's own cells and rect, kept on Level's place dict when given and
 ## well-formed (771/772/774, buildings' side; environment's 782 lights read
 ## "brazier" and "lamp"): key -> "cell" (a Vector2i), "rect" (a Rect2i) or
 ## "cells" (an Array of Vector2i).
-const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells"}
+const PLACE_SHAPES := {"brazier": "cell", "lamp": "cell", "hearth": "cell", "rect": "rect", "seats": "cells", "bed": "cell", "facing": "cell"}
+## What a camp is (793, maps' side; sound's fires read it): a camp place's "mix".
+const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## Where a refuge (decision 613 amended: where a sought newcomer is found,
 ## one place a story, its key the story's tag) is: the where-word economy
 ## and npc say it by.
@@ -1345,6 +1348,11 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 				out[str(key)]["holds"] = kept
 		elif holds != null:
 			warnings.append("the place %s's holds is not a list: left out" % [key])
+		if entry.has("mix"):
+			if str(entry["mix"]) in CAMP_MIXES:
+				out[str(key)]["mix"] = str(entry["mix"])
+			else:
+				warnings.append("the place %s's mix is not one of %s: left out" % [key, ", ".join(CAMP_MIXES)])
 		for shape_key: String in PLACE_SHAPES:
 			if not entry.has(shape_key):
 				continue
@@ -2125,7 +2133,11 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# The hills' stories and roadside sights (778): lying on the ground, faced.
 	"campfire_cold": {"sits": "flat", "variants": 1, "faced": true},
 	"broken_cart": {"sits": "flat", "variants": 1, "faced": true},
-	"rusted_gear": {"sits": "flat", "variants": 1, "faced": true}}
+	"rusted_gear": {"sits": "flat", "variants": 1, "faced": true},
+	# The forest's camps (793, maps' side): a trader's bedroll and cart, sacks of goods or plunder.
+	"bedroll": {"sits": "flat", "variants": 1, "faced": true},
+	"cart": {"sits": "flat", "variants": 1, "faced": true},
+	"sack": {"sits": "flat", "variants": 1, "faced": true}}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],

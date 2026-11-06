@@ -30,7 +30,11 @@ extends Node
 ##   house (718) where it stood: its cells and walls copied from the level
 ##   as it is, so its place key (forest/healers_hut@45,31, Level's
 ##   building_places on its front cell) and its keeper stay (718's way).
-## No monsters, no buildings but the healer's. The same seed makes the same map.
+## - the camps (793, maps' side; CAMPS): seven camp buildings off the paths,
+##   their bands, traders and plunder; their pads and tracks cleared, the
+##   grown trees on them taken out of trees.json once by hand (72).
+## No monsters but the camps' bands, no buildings but the healer's and the
+## camps. The same seed makes the same map.
 
 const SIZE := Vector2i(224, 224)
 const SEED := 452
@@ -99,6 +103,31 @@ const REFUGES := {
 	"thick_wood": {"at": Vector2i(82, 124), "name": "where the trees are thickest", "shown": "the thick of the forest"},
 	"boar_path": {"at": Vector2i(100, 126), "name": "the path to the hunters' camps", "explore": false},
 	"fletchers_tree": {"at": Vector2i(202, 42), "name": "the fletcher's tree"}}
+## The camps (793, maps' side; forest phase C, C:/dev/review/lands/fill_forest):
+## seven, each a camp building (649) on a pad cleared in the wood, 6 to 12
+## cells off a path, with a short track to it, at least 24 apart. Each
+## {key, centre, size small (5) or large (6), mix bandit / trader / mixed,
+## name, bandits and brutes (the band standing round its fire), and what
+## lies about it (decor: sacks of plunder, a trader's cart and bedroll)}.
+## A bandit or mixed camp is held by the bandits (factions.json, 793), a
+## traders' camp by nobody; a trader or mixed camp has a "<key>_trader"
+## place by its fire (npc's: kind trader, facing the fire, rect the camp,
+## bed his night cell with a bedroll); C3's trader is the bandits' captive
+## ("<key>_captive", at the camp's edge). No chests (Jeff: chests are the
+## dungeons'): a camp's things are on its band. Names are plain until
+## lore's names are Jeff's.
+const CAMPS: Array[Dictionary] = [
+	{"key": "north_traders_camp", "centre": Vector2i(152, 38), "size": 5, "mix": "trader", "name": "a traders' camp"},
+	{"key": "east_bandit_camp", "centre": Vector2i(190, 90), "size": 5, "mix": "bandit", "name": "a bandit camp", "bandits": 2, "brutes": 1},
+	{"key": "loop_camp", "centre": Vector2i(100, 70), "size": 6, "mix": "mixed", "name": "a bandit camp", "bandits": 2, "brutes": 1, "captive": true},
+	{"key": "west_bandit_camp", "centre": Vector2i(77, 94), "size": 6, "mix": "bandit", "name": "a bandit camp", "bandits": 3, "brutes": 1},
+	{"key": "south_traders_camp", "centre": Vector2i(124, 145), "size": 5, "mix": "trader", "name": "a traders' camp"},
+	{"key": "southwest_bandit_camp", "centre": Vector2i(51, 165), "size": 5, "mix": "bandit", "name": "a bandit camp", "bandits": 2, "brutes": 1},
+	{"key": "southeast_camp", "centre": Vector2i(171, 172), "size": 6, "mix": "mixed", "name": "a bandit camp", "bandits": 2, "brutes": 1},
+]
+## Cells cleared round a camp's footprint, and the bandits' marker colours.
+const CAMP_MARGIN := 2
+const CAMP_LEGEND := {"monster_bandit": "#b4643c", "monster_bandit_brute": "#6e3218"}
 const FOREST_PACK := "res://editor/forest_pack.gd"
 const TREES := "res://levels/forest/trees.json"
 
@@ -163,13 +192,16 @@ func _ready() -> void:
 		keep_clear[at] = true
 	for key: Vector3i in hut_edges:
 		map.set_edge(key, hut_edges[key])
+	var camps := _camp_grounds()
 	_trunks()
 	_places()
+	_camps(camps)
 	_links(east, north)
 	_close_pockets(east + Vector2i(-2, 0))
 	var doc := MapDoc.open(FOLDER, SIZE)
 	doc.map = map
 	doc.config = config
+	doc.map.colours = LevelMap.legend_colours(config)
 	doc.config_dirty = true
 	doc.save()
 	print("[forest] " + doc.report)
@@ -279,6 +311,110 @@ func _places() -> void:
 	var facing: Vector2i = HUT["facing"]
 	config["buildings"] = [{"slot": "building.turf_house", "at": [at.x, at.y], "facing": [facing.x, facing.y], "code": HUT["code"]}]
 	config["building_codes"] = {"H": 1}
+
+
+## The camps' grounds, laid before the trunks: each camp's footprint
+## (CAMPS) centred on its cell, facing the nearest path, its pad (the
+## footprint and CAMP_MARGIN round it) kept clear, and a track from its
+## front to that path. Returns each camp with its "rect" and "facing".
+func _camp_grounds() -> Array[Dictionary]:
+	var paths: Array[Vector2i] = []
+	for at: Vector2i in map.cells:
+		if map.cell(at) == "dirt":
+			paths.append(at)
+	var out: Array[Dictionary] = []
+	for camp: Dictionary in CAMPS:
+		var centre: Vector2i = camp["centre"]
+		var size: int = camp["size"]
+		var rect := Rect2i(centre - Vector2i(size / 2, size / 2), Vector2i(size, size))
+		var nearest := paths[0]
+		for at in paths:
+			if Vector2(at - centre).length_squared() < Vector2(nearest - centre).length_squared():
+				nearest = at
+		var way := nearest - centre
+		var facing := Vector2i(signi(way.x), 0) if absi(way.x) >= absi(way.y) else Vector2i(0, signi(way.y))
+		for y in range(rect.position.y - CAMP_MARGIN, rect.end.y + CAMP_MARGIN):
+			for x in range(rect.position.x - CAMP_MARGIN, rect.end.x + CAMP_MARGIN):
+				_clear(Vector2i(x, y), "grass")
+		var front := centre + facing * ((size + 1) / 2)
+		_path(front, nearest, SEED + 100 + out.size(), 1.5)
+		var laid := camp.duplicate()
+		laid["rect"] = rect
+		laid["facing"] = facing
+		out.append(laid)
+	return out
+
+
+## The camps (793, maps' side) on their grounds, after the trunks: each pad
+## grass again where a grown trunk stood; the camp building and its place
+## at its fire (Level.camp_fire), held by the bandits or by nobody; the
+## band's markers round the fire; a trader's place, bed and cart; C3's
+## captive at the camp's edge; what lies about in "decor".
+func _camps(camps: Array[Dictionary]) -> void:
+	var legend: Dictionary = config.get("legend", {})
+	legend.merge(CAMP_LEGEND)
+	config["legend"] = legend
+	var decor: Array = config.get("decor", [])
+	for camp: Dictionary in camps:
+		var rect: Rect2i = camp["rect"]
+		var facing: Vector2i = camp["facing"]
+		var side := Vector2i(-facing.y, facing.x)
+		for y in range(rect.position.y - CAMP_MARGIN, rect.end.y + CAMP_MARGIN):
+			for x in range(rect.position.x - CAMP_MARGIN, rect.end.x + CAMP_MARGIN):
+				if map.cell(Vector2i(x, y)) == "void":
+					map.set_cell(Vector2i(x, y), "grass")
+		config["buildings"].append({"kind": "camp", "size": "small" if camp["size"] == 5 else "large",
+			"at": [rect.position.x, rect.position.y], "facing": [facing.x, facing.y]})
+		var fire := Level.camp_fire({"kind": "camp", "rect": rect, "facing": facing})
+		# The canopy open over it (a clearing: light on the camp, its smoke out).
+		config["clearings"].append({"centre": [fire.x, fire.y], "radius": camp["size"] / 2 + CAMP_MARGIN})
+		var mix: String = camp["mix"]
+		config["places"][camp["key"]] = {"at": [fire.x, fire.y], "kind": "camp", "radius": 4, "name": camp["name"],
+			"holder": "nobody" if mix == "trader" else "bandits", "worth": 2 if camp["size"] == 6 else 1, "mix": mix}
+		var taken: Dictionary[Vector2i, bool] = {fire: true}
+		if mix != "bandit":
+			var stand := fire + side
+			var bed := fire + side - facing
+			config["places"][camp["key"] + "_trader"] = {"at": [stand.x, stand.y], "kind": "trader", "radius": 2,
+				"name": "a trader", "facing": [-side.x, -side.y], "bed": [bed.x, bed.y],
+				"rect": [rect.position.x, rect.position.y, rect.size.x, rect.size.y]}
+			var cart := fire + side * 2 + facing
+			decor.append([bed.x, bed.y, -side.x, -side.y, "bedroll", 1])
+			decor.append([cart.x, cart.y, facing.x, facing.y, "cart", 1])
+			for cell in [stand, bed, cart]:
+				taken[cell] = true
+		if camp.get("captive", false):
+			var stake := fire - side * (rect.size.x / 2 + 1)
+			if rect.has_point(stake):
+				stake -= side
+			config["places"][camp["key"] + "_captive"] = {"at": [stake.x, stake.y], "kind": "captive", "radius": 1, "name": "a captive"}
+			taken[stake] = true
+		# The band round the fire: brutes first, at the back, then the rest.
+		var spots: Array[Vector2i] = [fire - facing, fire - side, fire - facing - side, fire + facing - side,
+			fire - facing + side, fire + facing, fire + facing + side, fire - side * 2]
+		var band: Array[String] = []
+		for i in int(camp.get("brutes", 0)):
+			band.append("monster_bandit_brute")
+		for i in int(camp.get("bandits", 0)):
+			band.append("monster_bandit")
+		for spot in spots:
+			if band.is_empty():
+				break
+			if taken.has(spot) or not rect.has_point(spot):
+				continue
+			map.set_cell(spot, band.pop_front())
+			taken[spot] = true
+		if not band.is_empty():
+			push_error("[forest] %s: no room for %d of its band" % [camp["key"], band.size()])
+		# Plunder, or a trader's goods: sacks at the back of the camp.
+		for i in (2 if mix != "trader" else 1):
+			var sack := rect.position + Vector2i(i, 0) if facing.y > 0 else rect.end - Vector2i.ONE - Vector2i(i, 0)
+			if facing.x != 0:
+				sack = Vector2i(rect.position.x if facing.x > 0 else rect.end.x - 1, rect.position.y + i)
+			if not taken.has(sack):
+				decor.append([sack.x, sack.y, facing.x, facing.y, "sack", 1])
+				taken[sack] = true
+	config["decor"] = decor
 
 
 ## The links: back to the wilds at [param east], on to the stronghold

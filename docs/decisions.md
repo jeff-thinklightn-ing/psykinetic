@@ -42443,3 +42443,28 @@ spawned bandit, a big bandit and a robber each drawn in its own colours with its
 none. CHANGELOG bullet (voice's words) for the robbers, live in the barrow; the bandits' comes with maps'
 camps (enemy-ai's, release).
 Client only, protocol unchanged, no new class_name.
+793, maps' side: the forest's camps (2026-11-05, maps; forest phase C, C:/dev/review/lands/fill_forest;
+the coordinator's approval, npc's people as proposed; release's label). tools/make_forest.gd CAMPS
+lays seven camps, each a camp building (649, small 5 or large 6) on a pad cleared in the wood (the
+footprint and CAMP_MARGIN 2 round it), facing the nearest path, a 2-wide track from its edge to that
+path, the canopy open over it (a "clearings" entry), 6.7 to 10 cells off a path, 33 or more apart and
+30 or more from any other place, none near the way in: C1 north_traders_camp and C5
+south_traders_camp traders' (held by nobody; 770's trader rests there), C2 east_bandit_camp, C4
+west_bandit_camp and C6 southwest_bandit_camp the bandits', C3 loop_camp and C7 southeast_camp mixed
+(the bandits', a trader with them: C3's their captive, C7's selling at their markup, economy's).
+Each camp's place sits at its fire (Level.camp_fire), kind "camp", radius 4, worth 1 (small) or 2
+(large), holder "bandits" or "nobody", and "mix" (Level.CAMP_MIXES, kept by places_from; sound's
+fires read it). A trader or mixed camp has "<key>_trader" (npc's: kind "trader", at beside the fire
+and facing it, rect the camp, "bed" his night cell beside him; PLACE_SHAPES gains "bed" and
+"facing"), its bedroll and a cart as decor; C3 has "loop_camp_captive" (kind "captive") a cell
+outside the camp's edge. The bandits' band stands round the fire as layout markers, a big bandit
+behind it (monster_bandit, monster_bandit_brute in the forest's legend): two and a big one, three
+and a big one at C4; sacks of plunder (one of goods at a traders') at the back. Decor kinds
+"bedroll", "cart" and "sack" (art-kit's prop.*). Jeff's rules: no chests (a camp's things are on its
+band, enemy-ai's), and every camp has a fire, people and goods or plunder. Names plain ("a bandit
+camp", "a traders' camp", "a trader", "a captive") until Jeff picks lore's (Pedlar's Clearing, Knife
+Hollow, Fetter Camp, Crow's Camp, Hunters' Rest, Blackthorn, the Toll Camp). The forest regenerated:
+only the pads, tracks and markers change (40191 floor cells, as before); the 72 grown trees on them
+taken out of trees.json once (terrain's file, nothing else in it changed). No camp is a place to
+reach (804). level_test _test_forest_camps. Protocol: a "50 (793, maps' side)" line, place kinds
+"trader" and "captive" and the fields, no bump (release; an old client has no use for them); CHANGELOG bullet (voice's words); no new class_name.

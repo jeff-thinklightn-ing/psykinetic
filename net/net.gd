@@ -568,6 +568,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 50 (802 amended (5)): a new server message "takers" {town, takers: {raw: {trade, name, body,
 ## store}}, gear?: {trade, name, body}}: who in the player's area's town takes each raw (Main.takers_of),
 ## sent on entering an area and when it changes (ui's pack tooltip and name-tag mark).
+## 50 (793, maps' side): place kinds "trader" and "captive" (Level.PLACE_KINDS); a place may
+## carry "mix" (a camp: bandit, trader, mixed), "bed" and "facing" (cells), for npc's camp
+## traders and sound's camp fires. No bump (release): an old client has no use for them.
 const PROTOCOL_REVISION := 50
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

@@ -2736,7 +2736,89 @@ func _test_relaid() -> void:
 	_check(Relaid.move({"ok": false, "zones": {}, "players": []}, fresh, level_of).is_empty() and fresh.get(Relaid.done_key("wilds")) == 774, "a new world has nothing to move: only marked done")
 	_test_town_places(wilds)
 	_test_explorables()
+	_test_forest_camps()
 	_test_bear_den()
+
+
+## The forest's camps (793, maps' side; forest phase C): seven, each a camp
+## building with its place at its fire, 6 to 12 cells off a path and 24
+## apart; bandit and mixed camps the bandits', with their band round the
+## fire; traders' and mixed camps a trader by the fire, his bed and cart in
+## the camp; C3's captive at its edge; something at every camp, never a
+## chest (Jeff: chests are the dungeons').
+func _test_forest_camps() -> void:
+	print("== The forest's camps (793, maps' side) ==")
+	var warnings: Array[String] = []
+	var forest := Level.load_level("forest")
+	var floor := {}
+	for cell: Vector2i in forest["terrain"]["floor"]:
+		floor[cell] = true
+	var config := Level.template_config("forest")
+	var places := Level.places_from(config, warnings)
+	_check(warnings.is_empty(), "the forest's places read without a warning (%s)" % [warnings])
+	var camps := {}
+	for key: String in places:
+		if places[key]["kind"] == "camp":
+			camps[key] = places[key]
+	_check(camps.size() == 7, "seven camps (%s)" % [camps.keys()])
+	_check(Factions.read().hostile("bandits", "town"), "the camps' holder, the bandits, is hostile to the town (793)")
+	var rects := {}
+	for building: Dictionary in forest["buildings"]:
+		if building.get("kind") == "camp":
+			rects[Level.camp_fire(building)] = building["rect"]
+	var wrong: Array[String] = []
+	var band := {}
+	for spec: Dictionary in forest["entities"]:
+		if str(spec.get("kind", "")).begins_with("bandit"):
+			band[spec["tile"]] = spec["kind"]
+		if str(spec.get("kind", "")) == "chest" or str(spec.get("name", "")).begins_with("Chest"):
+			wrong.append("a chest at %s" % [spec["tile"]])
+	for key: String in camps:
+		var camp: Dictionary = camps[key]
+		var fire: Vector2i = camp["cell"]
+		if not rects.has(fire):
+			wrong.append("%s: no camp building with its fire at %s" % [key, fire])
+			continue
+		var rect: Rect2i = rects[fire]
+		var mix: String = camp.get("mix", "")
+		if camp["holder"] != ("nobody" if mix == "trader" else "bandits"):
+			wrong.append("%s (%s) held by %s" % [key, mix, camp["holder"]])
+		var in_band := 0
+		for at: Vector2i in band:
+			if rect.has_point(at):
+				in_band += 1
+		if (mix == "trader") != (in_band == 0):
+			wrong.append("%s (%s): %d bandits" % [key, mix, in_band])
+		if mix != "bandit":
+			var trader: Dictionary = places.get(key + "_trader", {})
+			if trader.get("kind") != "trader" or not rect.has_point(trader.get("bed", Vector2i(-1, -1))) or trader.get("rect") != rect 					or trader["cell"] + trader.get("facing", Vector2i.ZERO) != fire:
+				wrong.append("%s: its trader (%s)" % [key, trader])
+		for other: String in camps:
+			if other != key and Vector2(camps[other]["cell"] - fire).length() < 24.0:
+				wrong.append("%s within 24 of %s" % [key, other])
+		for y in range(rect.position.y, rect.end.y):
+			for x in range(rect.position.x, rect.end.x):
+				if not floor.has(Vector2i(x, y)):
+					wrong.append("%s: (%d, %d) in it is no floor" % [key, x, y])
+	_check(wrong.is_empty(), "each camp's building, holder, band and trader as its mix says, 24 apart, on floor, no chest (%s)" % [wrong])
+	var captive: Dictionary = places.get("loop_camp_captive", {})
+	var loop_rect: Rect2i = rects.get(camps.get("loop_camp", {}).get("cell", Vector2i(-1, -1)), Rect2i())
+	_check(captive.get("kind") == "captive" and not loop_rect.has_point(captive["cell"]) and floor.has(captive["cell"])
+		and Vector2(captive["cell"] - camps["loop_camp"]["cell"]).length() < 6.0,
+		"C3's captive stands at its camp's edge, outside it (%s)" % [captive])
+	var decor_at := {}
+	for piece: Dictionary in forest["terrain"]["decor"]:
+		decor_at[piece["cell"]] = piece["kind"]
+	var bare: Array[String] = []
+	for key: String in camps:
+		var rect: Rect2i = rects.get(camps[key]["cell"], Rect2i())
+		var things := 0
+		for at: Vector2i in decor_at:
+			if rect.has_point(at):
+				things += 1
+		if things == 0:
+			bare.append(key)
+	_check(bare.is_empty(), "every camp has goods or plunder lying in it besides its fire and people (bare: %s)" % [bare])
 
 
 ## The places a player is rewarded for reaching (decision 804, maps'

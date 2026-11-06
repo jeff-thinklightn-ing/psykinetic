@@ -90,6 +90,55 @@
 				200
 			],
 			"radius": 5
+		},
+		{
+			"centre": [
+				152,
+				37
+			],
+			"radius": 4
+		},
+		{
+			"centre": [
+				191,
+				90
+			],
+			"radius": 4
+		},
+		{
+			"centre": [
+				101,
+				70
+			],
+			"radius": 5
+		},
+		{
+			"centre": [
+				77,
+				93
+			],
+			"radius": 5
+		},
+		{
+			"centre": [
+				125,
+				145
+			],
+			"radius": 4
+		},
+		{
+			"centre": [
+				52,
+				165
+			],
+			"radius": 4
+		},
+		{
+			"centre": [
+				171,
+				171
+			],
+			"radius": 5
 		}
 	],
 	"places": {
@@ -145,6 +194,191 @@
 			"where": "forest",
 			"radius": 3,
 			"name": "the fletcher's tree"
+		},
+		"north_traders_camp": {
+			"at": [
+				152,
+				37
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a traders' camp",
+			"holder": "nobody",
+			"worth": 1,
+			"mix": "trader"
+		},
+		"north_traders_camp_trader": {
+			"at": [
+				153,
+				37
+			],
+			"kind": "trader",
+			"radius": 2,
+			"name": "a trader",
+			"facing": [
+				-1,
+				0
+			],
+			"bed": [
+				153,
+				38
+			],
+			"rect": [
+				150,
+				36,
+				5,
+				5
+			]
+		},
+		"east_bandit_camp": {
+			"at": [
+				191,
+				90
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a bandit camp",
+			"holder": "bandits",
+			"worth": 1,
+			"mix": "bandit"
+		},
+		"loop_camp": {
+			"at": [
+				101,
+				70
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a bandit camp",
+			"holder": "bandits",
+			"worth": 2,
+			"mix": "mixed"
+		},
+		"loop_camp_trader": {
+			"at": [
+				101,
+				71
+			],
+			"kind": "trader",
+			"radius": 2,
+			"name": "a trader",
+			"facing": [
+				0,
+				-1
+			],
+			"bed": [
+				100,
+				71
+			],
+			"rect": [
+				97,
+				67,
+				6,
+				6
+			]
+		},
+		"loop_camp_captive": {
+			"at": [
+				101,
+				66
+			],
+			"kind": "captive",
+			"radius": 1,
+			"name": "a captive"
+		},
+		"west_bandit_camp": {
+			"at": [
+				77,
+				93
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a bandit camp",
+			"holder": "bandits",
+			"worth": 2,
+			"mix": "bandit"
+		},
+		"south_traders_camp": {
+			"at": [
+				125,
+				145
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a traders' camp",
+			"holder": "nobody",
+			"worth": 1,
+			"mix": "trader"
+		},
+		"south_traders_camp_trader": {
+			"at": [
+				125,
+				146
+			],
+			"kind": "trader",
+			"radius": 2,
+			"name": "a trader",
+			"facing": [
+				0,
+				-1
+			],
+			"bed": [
+				124,
+				146
+			],
+			"rect": [
+				122,
+				143,
+				5,
+				5
+			]
+		},
+		"southwest_bandit_camp": {
+			"at": [
+				52,
+				165
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a bandit camp",
+			"holder": "bandits",
+			"worth": 1,
+			"mix": "bandit"
+		},
+		"southeast_camp": {
+			"at": [
+				171,
+				171
+			],
+			"kind": "camp",
+			"radius": 4,
+			"name": "a bandit camp",
+			"holder": "bandits",
+			"worth": 2,
+			"mix": "mixed"
+		},
+		"southeast_camp_trader": {
+			"at": [
+				172,
+				171
+			],
+			"kind": "trader",
+			"radius": 2,
+			"name": "a trader",
+			"facing": [
+				-1,
+				0
+			],
+			"bed": [
+				172,
+				172
+			],
+			"rect": [
+				168,
+				169,
+				6,
+				6
+			]
 		}
 	},
 	"buildings": [
@@ -159,11 +393,269 @@
 				1
 			],
 			"code": "H1"
+		},
+		{
+			"kind": "camp",
+			"size": "small",
+			"at": [
+				150,
+				36
+			],
+			"facing": [
+				0,
+				-1
+			],
+			"code": "C1"
+		},
+		{
+			"kind": "camp",
+			"size": "small",
+			"at": [
+				188,
+				88
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "C2"
+		},
+		{
+			"kind": "camp",
+			"size": "large",
+			"at": [
+				97,
+				67
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "C3"
+		},
+		{
+			"kind": "camp",
+			"size": "large",
+			"at": [
+				74,
+				91
+			],
+			"facing": [
+				0,
+				-1
+			],
+			"code": "C4"
+		},
+		{
+			"kind": "camp",
+			"size": "small",
+			"at": [
+				122,
+				143
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "C5"
+		},
+		{
+			"kind": "camp",
+			"size": "small",
+			"at": [
+				49,
+				163
+			],
+			"facing": [
+				1,
+				0
+			],
+			"code": "C6"
+		},
+		{
+			"kind": "camp",
+			"size": "large",
+			"at": [
+				168,
+				169
+			],
+			"facing": [
+				0,
+				-1
+			],
+			"code": "C7"
 		}
 	],
 	"building_codes": {
-		"H": 1
+		"H": 1,
+		"C": 7
 	},
+	"legend": {
+		"monster_bandit": "#b4643c",
+		"monster_bandit_brute": "#6e3218"
+	},
+	"decor": [
+		[
+			153,
+			38,
+			-1,
+			0,
+			"bedroll",
+			1
+		],
+		[
+			154,
+			36,
+			0,
+			-1,
+			"cart",
+			1
+		],
+		[
+			154,
+			40,
+			0,
+			-1,
+			"sack",
+			1
+		],
+		[
+			188,
+			88,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			188,
+			89,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			100,
+			71,
+			0,
+			-1,
+			"bedroll",
+			1
+		],
+		[
+			102,
+			72,
+			1,
+			0,
+			"cart",
+			1
+		],
+		[
+			97,
+			67,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			97,
+			68,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			79,
+			96,
+			0,
+			-1,
+			"sack",
+			1
+		],
+		[
+			78,
+			96,
+			0,
+			-1,
+			"sack",
+			1
+		],
+		[
+			124,
+			146,
+			0,
+			-1,
+			"bedroll",
+			1
+		],
+		[
+			126,
+			147,
+			1,
+			0,
+			"cart",
+			1
+		],
+		[
+			122,
+			143,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			49,
+			163,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			49,
+			164,
+			1,
+			0,
+			"sack",
+			1
+		],
+		[
+			172,
+			172,
+			-1,
+			0,
+			"bedroll",
+			1
+		],
+		[
+			173,
+			170,
+			0,
+			-1,
+			"cart",
+			1
+		],
+		[
+			173,
+			174,
+			0,
+			-1,
+			"sack",
+			1
+		],
+		[
+			172,
+			174,
+			0,
+			-1,
+			"sack",
+			1
+		]
+	],
 	"centre": [
 		220,
 		48
