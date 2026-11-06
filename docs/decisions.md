@@ -14522,6 +14522,20 @@ _test_plinth: an L-house on a slope 0.3 m a row, its walls, posts and roof
 on its pad, each run with its plinth down to the ground beside it; the
 stone cottage none. Shots: C:/dev/review/plinth (before, after).
 
+489 amended (2): a wall's window by its height (release's label; art-kit's coming
+wall.wood.window_tall, a two-storey wood window, for the Last Light Mughouse's 6 m walls and its
+sill lamp, 811 amended). A set's tall window was taken whenever the slot existed, so a wood one
+would have turned every one-storey house window into a 6 m piece. Client3D.window_slot(set,
+height): the set's wall.<set>.window_tall on a wall two storeys high (within WINDOW_STRETCH of
+2 x WALL_HEIGHT), or on any wall when the set has no plain window (the chapel's lancets, 734, as
+before); a wood wall of a storey's height its wall.wood.window; none between. Both the window
+state (_building_sets) and the run's piece (_add_wall_run) read it, and _dress_window stretches a
+piece by its own drawn height (Client3D.window_drawn_height: a tall window beside a plain one two
+storeys, any other one), so a 6 m wall's tall window is drawn 6 m, not 12. It lands before the
+slot and changes nothing until the slot exists. view_test _test_window_slot (a stand-in
+wall.wood.window_tall: plain at a storey, tall at two, none between, drawn heights; the lancet
+unchanged). Client only, protocol unchanged, no new class_name, no bullet.
+
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
 A material's pipelines are compiled the first time it is drawn, so its first

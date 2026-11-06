@@ -2596,6 +2596,7 @@ func _test_kinds() -> void:
 			"its outline walled round both blocks, its door a doorway (%d of %d; %s)" % [walls.size(), outline.size(), doors])
 	_test_composer()
 	_test_stages()
+	_test_window_slot()
 	_test_plinth()
 	_test_open_kinds()
 	_test_plots()
@@ -2687,6 +2688,37 @@ func _test_tavern_inside() -> void:
 			and BuildingComposer.sill_lamp_edge(house, [] as Array[Vector3i]) == BuildingComposer.NO_SILL,
 			"no lamp on a building that is no shell, nor on a shell with no window")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Which window a wall takes by its height (489 amended (2)): a wood wall
+## of a storey its plain window; two storeys a tall one only once the set
+## has one (art-kit's wall.wood.window_tall, here a stand-in), never on a
+## one-storey wall; between, none; a set with no plain window (the
+## chapel's lancets) its tall one on any wall, drawn at a storey; a wood
+## tall window drawn two storeys high.
+func _test_window_slot() -> void:
+	print("
+== a wall's window by its height: one storey or two (489 amended (2)) ==")
+	var slots := ArtKit.slots()
+	var had := slots.has("wall.wood.window_tall")
+	var saved: Variant = slots.get("wall.wood.window_tall")
+	slots.erase("wall.wood.window_tall")
+	var c := Client3D
+	var h := Client3D.WALL_HEIGHT
+	var bare := [c.window_slot("wood", h), c.window_slot("wood", 2.0 * h)]
+	_check(bare == ["wall.wood.window", ""], "without a tall wood window: the plain one at a storey, none at two (%s)" % [bare])
+	slots["wall.wood.window_tall"] = {"category": "walls", "kind": "edge", "size": [0.3, 2.0 * h, 1.0]}
+	var tall := [c.window_slot("wood", h), c.window_slot("wood", h + 0.4), c.window_slot("wood", 1.5 * h), c.window_slot("wood", 2.0 * h)]
+	_check(tall == ["wall.wood.window", "wall.wood.window", "", "wall.wood.window_tall"],
+			"with one: the plain window on a storey's wall, the tall one on two storeys', none between (%s)" % [tall])
+	_check(is_equal_approx(c.window_drawn_height("wall.wood.window_tall"), 2.0 * h) and is_equal_approx(c.window_drawn_height("wall.wood.window"), h),
+			"the tall wood window drawn two storeys high, the plain one one")
+	slots.erase("wall.wood.window_tall")
+	if had:
+		slots["wall.wood.window_tall"] = saved
+	var lancet := c.window_slot("chapel", 4.5)
+	_check((lancet == "wall.chapel.window_tall") == ArtKit.has("wall.chapel.window_tall") and is_equal_approx(c.window_drawn_height("wall.chapel.window_tall"), h),
+			"the chapel's lancet on its wall whatever its height, drawn as before (%s)" % [lancet])
 
 
 ## A building being built (decision 566): its stages by its town record's

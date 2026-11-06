@@ -6836,11 +6836,9 @@ func _building_sets(building: Dictionary) -> void:
 				_pad_cell[key] = pad
 				if wall_set == "wood":
 					_plinths[key] = true
-		# A kind's windows (489 amended), its wood walls of a storey's height:
-		# art-kit's window there, turned so its shutters open outward.
-		# A chapel's lancets (734) are its own height.
-		if building.has("kind") and key in windows and (wall_set == "wood" and absf(_height_of(key) - WALL_HEIGHT) <= WINDOW_STRETCH
-				or ArtKit.has("wall.%s.window_tall" % wall_set)):
+		# A kind's windows (489 amended), art-kit's window there by its wall's
+		# height (window_slot), turned so its shutters open outward.
+		if building.has("kind") and key in windows and not window_slot(wall_set, _height_of(key)).is_empty():
 			_set_wall_state(key, "window")
 			_window_code[key] = [awake_town(building, str(_terrain.get("level", ""))), str(building.get("code", "")), true,
 				hut_id(building, str(_terrain.get("level", "")))]
@@ -7816,7 +7814,30 @@ static func _broken_pick(key: Vector3i) -> bool:
 ## half round where its outside is the run's -x (_window_flipped), as tall
 ## as the wall there, its shutters open (two in three, by the edge: each
 ## leaf 90 to 108 degrees, a little apart) or shut.
-func _dress_window(made: Node3D, key: Vector3i) -> void:
+## The window piece a wall of [param wall_set] [param height] tall takes
+## (489 amended (2): the Mughouse's two storeys, any set): a set's
+## wall.<set>.window_tall on a wall two storeys high (within
+## WINDOW_STRETCH), or on any wall when the set has no plain window (the
+## chapel's lancets, 734, their own height); a wood wall of a storey's
+## height its wall.wood.window; "" for none.
+static func window_slot(wall_set: String, height: float) -> String:
+	var tall := "wall.%s.window_tall" % wall_set
+	var plain := "wall.%s.window" % wall_set
+	if ArtKit.has(tall) and (not ArtKit.has(plain) or absf(height - 2.0 * WALL_HEIGHT) <= WINDOW_STRETCH):
+		return tall
+	if wall_set == "wood" and absf(height - WALL_HEIGHT) <= WINDOW_STRETCH:
+		return plain
+	return ""
+
+
+## The height [param slot] (a window piece, window_slot's) is drawn at: a
+## set's tall window beside a plain one stands two storeys, any other one.
+static func window_drawn_height(slot: String) -> float:
+	var two := slot.ends_with(".window_tall") and ArtKit.has(slot.trim_suffix("_tall"))
+	return WALL_HEIGHT * (2.0 if two else 1.0)
+
+
+func _dress_window(made: Node3D, key: Vector3i, slot := "") -> void:
 	if _window_flipped.get(key, false):
 		made.rotation.y = PI
 	# Its light (566): art-kit's "glow" pane, lit as its building is.
@@ -7825,7 +7846,7 @@ func _dress_window(made: Node3D, key: Vector3i) -> void:
 		_glows.append([glow, _window_code[key]])
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
 				DayNight.elevation(DayNight.now()))
-	made.scale.y = _height_of(key) / WALL_HEIGHT
+	made.scale.y = _height_of(key) / window_drawn_height(slot)
 	# A shell's lamp on its sill (811 amended), in the wall's middle, kept
 	# its own height however the window is stretched.
 	if _sill_lamps.has(key) and ArtKit.has(SILL_LAMP_SLOT):
@@ -13981,7 +14002,7 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		elif states[k] == WALL_TOPLESS and _wall_states.has(run[k]):
 			piece = "wall.%s.straight_ruined" % set_name
 		elif states[k] == WALL_WHOLE and _wall_states.get(run[k]) == "window":
-			piece = "wall.%s.window_tall" % set_name if ArtKit.has("wall.%s.window_tall" % set_name) else "wall.%s.window" % set_name
+			piece = window_slot(set_name, _height_of(run[k]))
 		elif states[k] == WALL_WHOLE and _niche_at.has(run[k]) and str(_niche_at[run[k]]["kind"]) != "hidden":
 			piece = NICHE_PIECE % _niche_at[run[k]]["kind"]
 		if piece != "" and ArtKit.has(piece) and ArtKit.filled_by(piece) != "placeholder":
@@ -14040,7 +14061,7 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		made.name = "Piece_%d" % k
 		made.position = Vector3(0.0, 0.0, k + 0.5)
 		if _wall_states.get(run[k]) == "window":
-			_dress_window(made, run[k])
+			_dress_window(made, run[k], pieces[k])
 		if not niche.is_empty():
 			# Its +x toward the niche's room: the run's +x is east (an east
 			# run) or north (a south run, turned a quarter).
