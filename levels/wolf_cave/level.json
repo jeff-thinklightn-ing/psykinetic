@@ -81,14 +81,14 @@
 			1,
 			0,
 			"bones",
-			2
+			1
 		],
 		[
 			17,
 			9,
 			1,
 			0,
-			"bones",
+			"scattered_bones",
 			1
 		],
 		[
@@ -96,7 +96,7 @@
 			17,
 			1,
 			0,
-			"bones",
+			"scattered_bones",
 			1
 		],
 		[
@@ -104,7 +104,7 @@
 			15,
 			1,
 			0,
-			"bones",
+			"scattered_bones",
 			1
 		],
 		[
@@ -112,7 +112,7 @@
 			19,
 			1,
 			0,
-			"bones",
+			"scattered_bones",
 			1
 		]
 	],

@@ -145,6 +145,10 @@ const LAIRS: Array[Dictionary] = [
 	# wolf's, the coordinator), open from the start; bones its only sign.
 	{"to_map": "wolf_cave", "at": Vector2i(53, 76), "open": Vector2i(0, -1), "mouth": "cave", "closed": false, "clawed": false}]
 const LAIR_MOUND := Vector2i(5, 2)
+## A cave mouth's hill (815; terrain's 798 cue): rock, not void, this many
+## cells across and deep behind its link (Client3D.MOUTH_CELLS, as the hills'
+## bear's), the cells beside the link grass.
+const CAVE_HILL := Vector2i(7, 5)
 const LAIR_PAD := 2
 ## A lair's sightline (the coordinator, from terrain's low still): past its
 ## pad out along "open" to LAIR_SIGHT cells no tree stands, 3 cells across
@@ -480,10 +484,18 @@ static func lair_cells(lair: Dictionary) -> Dictionary:
 	var open: Vector2i = lair["open"]
 	var side := Vector2i(absi(open.y), absi(open.x))
 	var mound: Array[Vector2i] = []
-	for back in range(0, LAIR_MOUND.y + 1):
-		for across in range(-(LAIR_MOUND.x / 2), LAIR_MOUND.x / 2 + 1):
-			if back > 0 or across != 0:
+	var beside: Array[Vector2i] = []
+	if lair["mouth"] == "cave":
+		for back in range(1, CAVE_HILL.y + 1):
+			for across in range(-(CAVE_HILL.x / 2), CAVE_HILL.x / 2 + 1):
 				mound.append(at - open * back + side * across)
+		for across in [-1, 1]:
+			beside.append(at + side * across)
+	else:
+		for back in range(0, LAIR_MOUND.y + 1):
+			for across in range(-(LAIR_MOUND.x / 2), LAIR_MOUND.x / 2 + 1):
+				if back > 0 or across != 0:
+					mound.append(at - open * back + side * across)
 	var pad: Array[Vector2i] = []
 	for out in range(1, LAIR_PAD + 1):
 		for across in [-1, 0, 1]:
@@ -493,16 +505,20 @@ static func lair_cells(lair: Dictionary) -> Dictionary:
 		var half := 2 if out >= LAIR_SIGHT_WIDE else 1
 		for across in range(-half, half + 1):
 			sight.append(at + open * out + side * across)
-	return {"mound": mound, "pad": pad, "sight": sight, "tree": at + open + side * 2}
+	return {"mound": mound, "beside": beside, "pad": pad, "sight": sight, "tree": at + open + side * 2}
 
 
-## Each lair's ground before the trunks: the mound void, the pad and the
-## link's cell dirt, the clawed tree's cell grass.
+## Each lair's ground before the trunks: the mound void (a thicket's) or
+## rock (a cave's, with grass beside its link), the pad and the link's cell
+## dirt, the clawed tree's cell grass.
 func _lair_grounds() -> void:
 	for lair: Dictionary in LAIRS:
 		var cells := lair_cells(lair)
 		for cell: Vector2i in cells["mound"]:
-			map.set_cell(cell, "void")
+			map.set_cell(cell, "rock" if lair["mouth"] == "cave" else "void")
+		for cell: Vector2i in cells["beside"]:
+			map.set_cell(cell, "grass")
+			keep_clear[cell] = true
 		for cell: Vector2i in cells["pad"] + [lair["at"] as Vector2i]:
 			map.set_cell(cell, "dirt")
 			keep_clear[cell] = true

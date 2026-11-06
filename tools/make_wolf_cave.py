@@ -88,7 +88,8 @@ def main():
     markers = {LINK: "link", START: "start", PACK: "chest"}
     for cell in WOLVES:
         markers[cell] = WOLF
-    decor = [[c[0], c[1], 1, 0, "bones", v] for c, v in BONES]
+    # A few scattered (scattered_bones) or a heap (the crypt's "bones").
+    decor = [[c[0], c[1], 1, 0, "bones" if v == 2 else "scattered_bones", 1] for c, v in BONES]
     for cell in list(markers) + [DEN_CELL, FROM_FOREST] + [(r[0], r[1]) for r in decor]:
         assert cell in floor, cell
     for skylight in SKYLIGHTS:

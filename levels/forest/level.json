@@ -698,7 +698,7 @@
 			75,
 			0,
 			-1,
-			"bones",
+			"scattered_bones",
 			1
 		],
 		[
@@ -706,7 +706,7 @@
 			74,
 			0,
 			1,
-			"bones",
+			"scattered_bones",
 			1
 		]
 	],
