@@ -42231,6 +42231,18 @@ its win was told, is as before. combat_test _test_fight_paced (run off then fell
 one foe, "brought down"; run off and away: "driven off"). Server only, protocol unchanged, no new
 class_name, no bullet.
 
+804 amended (11): a routed foe struck again is still one foe (2026-11-05, combat; release's label; the
+coordinator's approval, found reading the rout window for playtest). A blow on a foe that has broken
+and runs brings it back into the fight (World._mark_fight from damage), and the next tick found it
+fleeing and counted it beaten again: one boar run off and struck twice more in the merge window was
+three beaten, "against many". World._foe_beaten now adds a foe to a player's beaten only if no entry
+there has its instance id (804 amended (9)'s); a death still turns its fled entry to fallen. Known
+gap, left by the coordinator's ruling: the minute between deeds (804 amended (5),
+World._fight_last_won) is kept per Player entity, so one who leaves and rejoins, a new Player, may be
+told a deed at once (playtest's deeds1 tour, 18 s apart); a reconnect a fight isn't worth farming,
+and an extra deed is a bonus, not a harm. combat_test _test_fight_paced (run off and struck twice
+more: one foe, "a fight won"). Server only, protocol unchanged, no new class_name, no bullet.
+
 ## 810. A tell strikes what it shows, lag judged in the player's favour
 
 (2026-11-05, combat; the coordinator's approval, after playtest's bear13 runs; release's number.) In

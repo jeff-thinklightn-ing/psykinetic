@@ -3772,7 +3772,14 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 		foes.erase(foe)
 		if not _fight_beaten.has(player):
 			_fight_beaten[player] = []
-		(_fight_beaten[player] as Array).append({"name": name, "fled": fled, "hard": hard, "at": foe.tile, "id": id})
+		# A routed foe struck again as it runs comes back into the fight and
+		# breaks again: it is still the one foe beaten (804 amended (11): one boar
+		# run off and struck twice more read "against many").
+		var known := false
+		for each: Dictionary in _fight_beaten[player]:
+			known = known or int(each.get("id", 0)) == id
+		if not known:
+			(_fight_beaten[player] as Array).append({"name": name, "fled": fled, "hard": hard, "at": foe.tile, "id": id})
 	_tend_fights()
 
 

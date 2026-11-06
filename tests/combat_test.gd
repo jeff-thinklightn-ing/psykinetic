@@ -1507,6 +1507,22 @@ func _test_fight_paced(won: Array) -> void:
 	(bear as Monster).alert = Monster.Alert.FLEEING
 	_settle()
 	_check(won.size() == 1 and bool(won[0][2][0]["fled"]), "run off and away: driven off (%s)" % [won])
+	# Run off, then struck twice more as it runs: one foe beaten (804 amended (11)).
+	won.clear()
+	e = _build(["#######", "#.Pm..#", "#######"])
+	p = e["P"][0]
+	m = e["m"][0]
+	_blow(p, m)
+	(m as Monster).alert = Monster.Alert.FLEEING
+	World._tend_fights()
+	for i in 2:
+		World._mark_fight(p, m)  # A blow on it as it runs.
+		World.tick += 1
+		World._tend_fights()
+	_settle()
+	reward = World.fight_reward(won[0][2] if won.size() == 1 else [], Vector2i.ZERO)
+	_check(won.size() == 1 and (won[0][2] as Array).size() == 1 and str(reward.get("words", "")) == "a fight won",
+			"run off and struck again: one foe, a fight won, not against many (%s)" % [won])
 
 
 func _test_fight_won() -> void:
