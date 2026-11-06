@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.206
+
+- What goes over the network changes, so v0.1.205 and older can't join the server: update through the launcher first.
 - Daylight falling through a gap in a cave's or a crypt's roof lies clear and cool on the floor now, where before a torch beside it washed it out (797).
 - Stand watch at one of Umbrage's six posts and the night's trouble comes to you there; at the barrow post, while the dead lie unquiet, it's the dead that come (771 amended (5)).
 - Towns: Rolf at the store brings out your locker when you talk to him, no chest needed, and the first time gives you a practice kit, one of each starter weapon; when the keeper is asleep, he sees to you (807).
@@ -32,6 +35,7 @@ notes (decision 324).
 - In the hills, the lone great oak between the streams stands broad and low-limbed now, with strips of cloth knotted along its branches (778 amended).
 - The dwarven halls under the castle are laid out anew every few days, and every room holds something: a guardroom with its rack and imps, an armoury of broken racks with a brute over the chest, a cold forge with an imp at the dead hearth, a hall carved with the great forge, stores with a guarded chest and a pillared hall; each room's heart is lit, and a guarded way runs straight from the stair down to the great forge (806 amended (4)).
 - In the forest west of the south road, the ground is trampled bare, with bones in the dirt and a tree scored by tusks (780 amended (12)).
+
 ## v0.1.205
 
 - What goes over the network changes, so v0.1.204 and older can't join the server: update through the launcher first.
