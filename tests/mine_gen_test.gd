@@ -132,8 +132,10 @@ func _check_seams(generation: int, level: Dictionary, config: Dictionary) -> voi
 			seams += 1
 			recessed += 1 if World.in_recess(spec["tile"]) else 0
 	var span: Array = config["seams"]
-	_check(seams >= int(span[0]) + 2 and seams <= int(span[1]) + 2 and recessed == seams,
-			"generation %d: %d seams (the chamber's 2 and %s laid), all in a recess" % [generation, seams, span])
+	# 806 amended: besides, one in each gallery's end and in any bay holding nothing.
+	var most := int(span[1]) + 2 + int(config.get("galleries", [0, 5])[1]) + int(config.get("bays", [0, 6])[1])
+	_check(seams >= int(span[0]) + 2 and seams <= most and recessed == seams,
+			"generation %d: %d seams (the chamber's 2, %s laid, and the galleries' and empty bays'; at most %d), all in a recess" % [generation, seams, span, most])
 
 
 ## Physics' 794 rules: no track cell with three track neighbours, every end

@@ -99,6 +99,8 @@ const KINDS := {
 ## by other tools, or not hand-edited): the every-key check's other half.
 const NOT_OFFERED: Array[String] = ["legend", "became", "loot", "clearings", "roofs", "town_walls", "item_style", "grave_goods", "monsters", "centre",
 	"herds", "dead_ground", "building_codes", "niches", "plots", "decor", "rooms", "generation", "forage", "skylights", "mouths", "ambience",
+	# A crypt generation's carvings (806 amended (2): crypt.gd writes them).
+	"carvings",
 	# An interior's own (811: tools/make_interior.py writes them from its spec).
 	"town", "storeys", "beds"]
 const FACINGS := {"north": [0, -1], "east": [1, 0], "south": [0, 1], "west": [-1, 0]}

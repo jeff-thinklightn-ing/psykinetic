@@ -38,6 +38,9 @@ const TRACK_LENGTH: Array[int] = [8, 14]
 const TRACK_WIDE := 4
 const TRACK_SPAN := 6
 const TRACK_CLEAR := 2
+## The track's tiers, tried in order until one lays a run: [least across,
+## most across, clearance from anchors and galleries].
+const TRACK_TIERS: Array[Array] = [[TRACK_WIDE, TRACK_SPAN, TRACK_CLEAR], [TRACK_WIDE - 1, TRACK_SPAN, TRACK_CLEAR], [TRACK_WIDE - 1, TRACK_SPAN + 3, 1]]
 ## No monster within this many cells (Chebyshev) of the entrance anchor.
 const MOUTH_CLEAR := 6
 const GUARD_OUT := 4
@@ -424,15 +427,21 @@ static func _seams(map: LevelMap, anchors: Array, config: Dictionary, rng: Rando
 ## one cell of each.
 static func _track(map: LevelMap, anchors: Array, rng: RandomNumberGenerator, plan: Dictionary) -> void:
 	var runs: Array = []
-	for cell in _floor_cells(map, anchors):
-		for a: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
-			if _track_cell(map, anchors, plan, cell - a, a):
-				continue  # Not a run's first cell.
-			var length := 0
-			while length < TRACK_LENGTH[1] and _track_cell(map, anchors, plan, cell + a * length, a):
-				length += 1
-			if length >= TRACK_LENGTH[0]:
-				runs.append([length + rng.randf(), cell, a, length])
+	# TRACK_WIDE first; a generation with no run there lays it in a tunnel a
+	# cell narrower (two cells still pass the cart), and failing that with a
+	# wider span and a cell's clearance (TRACK_TIERS: [wide, span, clear]).
+	for tier: Array in TRACK_TIERS:
+		for cell in _floor_cells(map, anchors):
+			for a: Vector2i in [Vector2i(1, 0), Vector2i(0, 1)]:
+				if _track_cell(map, anchors, plan, cell - a, a, tier):
+					continue  # Not a run's first cell.
+				var length := 0
+				while length < TRACK_LENGTH[1] and _track_cell(map, anchors, plan, cell + a * length, a, tier):
+					length += 1
+				if length >= TRACK_LENGTH[0]:
+					runs.append([length + rng.randf(), cell, a, length])
+		if not runs.is_empty():
+			break
 	runs.sort_custom(func(p: Array, q: Array) -> bool: return p[0] > q[0])
 	var wanted := rng.randi_range(1, 2)
 	var laid: Array[Array] = []
@@ -473,7 +482,10 @@ static func _track(map: LevelMap, anchors: Array, rng: RandomNumberGenerator, pl
 ## either side, the tunnel TRACK_WIDE across at least (a cart on it leaves
 ## a way past) and at most TRACK_SPAN (no crossing of ways), no anchor or
 ## gallery within TRACK_CLEAR (a buffer never stands in a doorway).
-static func _track_cell(map: LevelMap, anchors: Array, plan: Dictionary, cell: Vector2i, a: Vector2i) -> bool:
+static func _track_cell(map: LevelMap, anchors: Array, plan: Dictionary, cell: Vector2i, a: Vector2i, tier: Array = TRACK_TIERS[0]) -> bool:
+	var wide: int = tier[0]
+	var span: int = tier[1]
+	var clear: int = tier[2]
 	var q := Vector2i(a.y, a.x)
 	for at: Vector2i in [cell, cell + q, cell - q]:
 		if map.cell(at) != FLOOR or Level.in_anchors(anchors, at) or plan["levels"].has(at) or plan["galleries"].has(at):
@@ -481,13 +493,13 @@ static func _track_cell(map: LevelMap, anchors: Array, plan: Dictionary, cell: V
 	var across := 1
 	for side: Vector2i in [q, -q]:
 		var k := 1
-		while k <= TRACK_SPAN and map.walkable(cell + side * k):
+		while k <= span and map.walkable(cell + side * k):
 			k += 1
 		across += k - 1
-	if across < TRACK_WIDE or across > TRACK_SPAN or _near_anchor(anchors, cell, TRACK_CLEAR):
+	if across < wide or across > span or _near_anchor(anchors, cell, clear):
 		return false
-	for dy in range(-TRACK_CLEAR, TRACK_CLEAR + 1):
-		for dx in range(-TRACK_CLEAR, TRACK_CLEAR + 1):
+	for dy in range(-clear, clear + 1):
+		for dx in range(-clear, clear + 1):
 			if plan["galleries"].has(cell + Vector2i(dx, dy)):
 				return false
 	return true
@@ -798,7 +810,9 @@ static func _fill_bays(map: LevelMap, anchors: Array, rng: RandomNumberGenerator
 				var at := cell + d
 				if map.cell(at) == "seam":
 					held = true
-				elif map.cell(at) == "void" and _diggable(map, anchors, at) and not _near_anchor(anchors, at, 3) 						and not plan["levels"].has(cell) and not plan["track"].has(cell) and not walls.has(at):
+				elif map.cell(at) == "void" and _diggable(map, anchors, at) and not _near_anchor(anchors, at, 3) \
+						and not plan["levels"].has(cell) and not plan["track"].has(cell) and not walls.has(at) \
+						and _open_sides(map, at) == 1 and not _holds_decor(plan, at):
 					walls.append(at)
 			if held:
 				break
@@ -807,6 +821,30 @@ static func _fill_bays(map: LevelMap, anchors: Array, rng: RandomNumberGenerator
 		var at := walls[rng.randi_range(0, walls.size() - 1)]
 		map.set_cell(at, "seam")
 		plan["carved"][at] = true
+
+
+## Whether a seam cut at wall cell [param cell] would take a laid piece's
+## wall: a lamp's (its cell and side), or a beam's or arch's, on the line it
+## spans (mine_gen_test: the piece would fit no more and be left out).
+static func _holds_decor(plan: Dictionary, cell: Vector2i) -> bool:
+	for piece: Array in plan["decor"]:
+		var at := Vector2i(int(piece[0]), int(piece[1]))
+		var side := Vector2i(int(piece[2]), int(piece[3]))
+		if str(piece[4]) in ["mine_beam", "mine_arch"]:
+			var off := cell - at
+			if off.x * side.y - off.y * side.x == 0:
+				return true
+		elif at + side == cell:
+			return true
+	return false
+
+
+## How many of [param cell]'s four sides open on walkable ground.
+static func _open_sides(map: LevelMap, cell: Vector2i) -> int:
+	var open := 0
+	for d in DIRECTIONS:
+		open += 1 if map.walkable(cell + d) else 0
+	return open
 
 
 ## Plain floor cells outside the anchors, in row order.
