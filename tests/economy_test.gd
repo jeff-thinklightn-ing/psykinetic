@@ -48,6 +48,7 @@ func _ready() -> void:
 	_test_counter_raws()
 	_test_barter()
 	_test_vendor()
+	_test_camp_traders()
 	_test_ponds()
 	_test_maker_barter()
 	_test_barrow_charges()
@@ -183,6 +184,65 @@ func _test_vendor() -> void:
 		and economy.stockpile.count(TOWN, "gold") == treasury, "arrows for 1 gold, a bundle, no treasury's (%s)" % [sale])
 	_check(not economy.vendor_sale("p1", "crown")["ok"] and economy.gold("p1") == 2, "not one of its wares: refused")
 	_check(not economy.vendor_sale("p2", "sword")["ok"] and economy.gold("p2") == 0, "no gold: refused")
+
+
+## A forest camp's trader (799, economy's side): stock drawn from his mix,
+## kept until restock_days; sells at value x 1.15 (x 1.5 toll, x 0.8 for his
+## freer), buys raws at value x 0.85 while his 30-gold purse lasts, gives his
+## freer one ware; saved and loaded.
+func _test_camp_traders() -> void:
+	print("
+== a camp trader: stock, prices, his purse, the gift (799) ==")
+	var economy := _fresh()
+	economy.rules = economy.rules.duplicate(true)
+	economy.rules["camp_traders"] = Production.read_rules()["camp_traders"]
+	economy.catalog = Economy.items_defs
+	const CAMP := "forest/test_camp"
+	var stock := economy.camp_stock(CAMP, "trader")
+	_check(stock.size() >= 5 and stock.size() <= 6, "a trader camp shows 5 or 6 wares (%d)" % stock.size())
+	_check(economy.camp_stock(CAMP, "trader") == stock, "asked again the same day: the same stock")
+	_check(economy.camp_stock("forest/other_camp", "mixed").size() in [4, 5], "a mixed camp shows 4 or 5")
+	_check(economy.camp_price(CAMP, "spice") == 14 and economy.camp_price(CAMP, "spice", true) == 21
+		and economy.camp_price(CAMP, "spice", true, true) == 17 and economy.camp_price(CAMP, "spice", false, true) == 11,
+		"spice (12): 14, tolled 21, tolled for his freer 17, freer 11")
+	var item := str(stock[0]["item"])
+	var had := int(stock[0]["count"])
+	var cost := economy.camp_price(CAMP, item)
+	var treasury := economy.stockpile.count(TOWN, "gold")
+	var refused := economy.camp_sale(CAMP, "trader", "p1", item)
+	_check(not refused["ok"] and refused["why"] == "gold" and str(refused["say"]).contains(str(cost)), "no gold: refused, the price said (%s)" % [refused])
+	economy.add_gold("p1", 100, "test")
+	var sold := economy.camp_sale(CAMP, "trader", "p1", item)
+	_check(sold["ok"] and int(sold["price"]) == cost and economy.gold("p1") == 100 - cost
+		and economy.stockpile.count(TOWN, "gold") == treasury, "bought one %s for %d, no town's gold (%s)" % [item, cost, sold])
+	var left := 0
+	for line: Dictionary in economy.camp_stock(CAMP, "trader"):
+		if line["item"] == item:
+			left = int(line["count"])
+	_check(left == had - 1, "his stock one fewer (%d of %d)" % [left, had])
+	for i in had:
+		economy.camp_sale(CAMP, "trader", "p1", item)
+	var none := economy.camp_sale(CAMP, "trader", "p1", item)
+	_check(not none["ok"] and none["why"] == "stock", "sold out: refused")
+
+	var wont := economy.camp_buy(CAMP, "trader", "p1", "spice", 1)
+	_check(not wont["ok"] and wont["why"] == "wont" and int(wont["count"]) == 0, "spice: not a thing he buys")
+	var before := economy.gold("p1")
+	var hides := economy.camp_buy(CAMP, "trader", "p1", "hide", 20)
+	_check(hides["ok"] and int(hides["count"]) == 10 and int(hides["gold"]) == 30 and economy.gold("p1") == before + 30,
+		"20 hides at 3: his 30 gold takes 10 (%s)" % [hides])
+	var broke := economy.camp_buy(CAMP, "trader", "p1", "feathers", 1)
+	_check(not broke["ok"] and broke["why"] == "purse", "his purse empty: refused")
+
+	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, economy.rules, economy.catalog)
+	_check(again.camp_stock(CAMP, "trader") == economy.camp_stock(CAMP, "trader") and not again.camp_buy(CAMP, "trader", "p1", "meat", 1)["ok"],
+		"saved and loaded: the same stock, his purse still empty")
+	_now += 3 * DayNight.day_steps
+	_check(economy.camp_buy(CAMP, "trader", "p1", "meat", 1)["ok"], "three days on: restocked, his purse full again")
+
+	var gift := economy.camp_gift(CAMP, "trader")
+	_check(not gift.is_empty() and economy.value_of(gift) <= 12, "freed, he gives a ware worth 12 at most (%s)" % gift)
+	_check(economy.camp_captive(CAMP).is_empty(), "the captive's side is npc's")
 
 
 ## A pond's fish and its wanderer (805): 8 to start, a catch under 0.6

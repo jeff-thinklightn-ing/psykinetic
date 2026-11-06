@@ -144,6 +144,8 @@ var _ponds: Dictionary = {}
 var _anglers: Dictionary = {}
 ## Wanderers sent (805): {pond: {player id: {count, day}}}; saved.
 var _wandered: Dictionary = {}
+## Camp traders (799): camp place id -> {stock {item: count}, purse, restocked (day)}.
+var _camp_traders: Dictionary = {}
 const LOG_SIZE := 50
 
 
@@ -2949,6 +2951,150 @@ func _wanderer_turn() -> void:
 			_anglers.erase(pond)
 
 
+# --- Camp traders (799, economy's side) ------------------------------------------
+
+## A camp's trader (799; npc's design, maps' forest camps): outside every
+## town, no store, treasury, tax or regard. [param camp] is the camp's place
+## id ("forest/loop_camp"), [param mix] its place's "mix" ("trader",
+## "mixed"). Stock is drawn from rules' camp_traders.mixes[mix] and drawn
+## again every restock_days game days, when his purse is set back to purse.
+## Gold he takes leaves the world with his wares; gold he pays comes from
+## outside it.
+func camp_rule() -> Dictionary:
+	return rules.get("camp_traders", {})
+
+
+func _camp(camp: String, mix: String) -> Dictionary:
+	var rule := camp_rule()
+	var day := now() / maxi(DayNight.day_steps, 1)
+	var entry: Dictionary = _camp_traders.get(camp, {})
+	if not entry.is_empty() and day - int(entry.get("restocked", 0)) < maxi(int(rule.get("restock_days", 3)), 1):
+		return entry
+	var stock := {}
+	var lines: Array = rule.get("mixes", {}).get(mix, {}).get("wares", [])
+	var draw: Array = rule.get("mixes", {}).get(mix, {}).get("draw", [4, 6])
+	var dice := RandomNumberGenerator.new()
+	dice.seed = hash("%s:%d" % [camp, day])
+	var pool: Array = lines.filter(func(line: Variant) -> bool: return line is Dictionary)
+	var want := dice.randi_range(int(draw[0]), int(draw[-1])) if not draw.is_empty() else pool.size()
+	while stock.size() < want and not pool.is_empty():
+		var total := 0.0
+		for line: Dictionary in pool:
+			total += maxf(float(line.get("weight", 1)), 0.0)
+		var roll := dice.randf() * total
+		var pick := pool.size() - 1
+		for i in pool.size():
+			roll -= maxf(float(pool[i].get("weight", 1)), 0.0)
+			if roll < 0.0:
+				pick = i
+				break
+		var line: Dictionary = pool[pick]
+		pool.remove_at(pick)
+		stock[str(line["item"])] = maxi(int(line.get("count", 1)), 1)
+	entry = {"stock": stock, "purse": int(rule.get("purse", 30)), "restocked": day}
+	_camp_traders[camp] = entry
+	return entry
+
+
+## What [param camp]'s trader has, for his wares panel: [{item, count,
+## price}] at the plain price (camp_price with no toll and no freer; the
+## caller asks camp_price for the price it shows a bandit-held camp at).
+func camp_stock(camp: String, mix: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var stock: Dictionary = _camp(camp, mix)["stock"]
+	for item: String in stock:
+		if int(stock[item]) > 0:
+			out.append({"item": item, "count": int(stock[item]), "price": camp_price(camp, item, false, false)})
+	return out
+
+
+## What [param camp]'s trader asks for one [param item]: its value x
+## camp_traders.sell (merchant.sell's 1.15), x toll (1.5) where the camp's
+## holders take their cut (C7, [param toll]), x freer (0.8) for the player
+## who freed him ([param freer]); 1 at least.
+func camp_price(_camp_id: String, item: String, toll := false, freer := false) -> int:
+	var rule := camp_rule()
+	var each := value_of(item) * float(rule.get("sell", rules.get("merchant", {}).get("sell", 1.15)))
+	if toll:
+		each *= float(rule.get("toll", 1.5))
+	if freer:
+		each *= float(rule.get("freer", 0.8))
+	return maxi(roundi(each), 1)
+
+
+## Player [param player_id] buys one [param item] from [param camp]'s
+## trader at camp_price. {ok, price, say, why}: why "" when sold, else
+## "stock" (none left), "gold" (too little).
+func camp_sale(camp: String, mix: String, player_id: String, item: String, toll := false, freer := false) -> Dictionary:
+	var words: Dictionary = camp_rule().get("say", {})
+	var stock: Dictionary = _camp(camp, mix)["stock"]
+	var cost := camp_price(camp, item, toll, freer)
+	if int(stock.get(item, 0)) <= 0:
+		return {"ok": false, "price": cost, "say": str(words.get("none", "I've none of that.")), "why": "stock"}
+	if gold(player_id) < cost:
+		return {"ok": false, "price": cost, "say": str(words.get("short", "That's %d gold, friend.")) % cost, "why": "gold"}
+	add_gold(player_id, -cost, "%s from a camp trader" % item)
+	stock[item] = int(stock[item]) - 1
+	if int(stock[item]) <= 0:
+		stock.erase(item)
+	return {"ok": true, "price": cost, "say": str(words.get("sold", "Yours, for %d.")) % cost, "why": ""}
+
+
+## What [param camp]'s trader pays for one [param item], or 0 where he
+## doesn't buy it (not in camp_traders.buys): its value x buy (0.85), 1
+## at least.
+func camp_offer(item: String) -> int:
+	var rule := camp_rule()
+	if not item in rule.get("buys", []):
+		return 0
+	return maxi(roundi(value_of(item) * float(rule.get("buy", rules.get("merchant", {}).get("buy", 0.85)))), 1)
+
+
+## Player [param player_id] sells [param count] [param item] to
+## [param camp]'s trader: as many as his purse covers at camp_offer each.
+## The caller takes [code]count[/code] of them from the player.
+## {ok, gold (paid), count (taken), say, why}: why "" when bought, else
+## "wont" (not a thing he buys), "purse" (no gold left for one).
+func camp_buy(camp: String, mix: String, player_id: String, item: String, count := 1) -> Dictionary:
+	var words: Dictionary = camp_rule().get("say", {})
+	var each := camp_offer(item)
+	if each <= 0 or count <= 0:
+		return {"ok": false, "gold": 0, "count": 0, "say": str(words.get("wont", "I've no use for that.")), "why": "wont"}
+	var entry := _camp(camp, mix)
+	var taken := mini(count, int(entry["purse"]) / each)
+	if taken <= 0:
+		return {"ok": false, "gold": 0, "count": 0, "say": str(words.get("purse", "I've no coin left for that.")), "why": "purse"}
+	var paid := taken * each
+	entry["purse"] = int(entry["purse"]) - paid
+	add_gold(player_id, paid, "%d %s to a camp trader" % [taken, item])
+	return {"ok": true, "gold": paid, "count": taken, "say": str(words.get("bought", "There's %d gold for it.")) % paid, "why": ""}
+
+
+## The freed trader's thanks (799, C3 option A): one ware out of
+## [param camp]'s stock, the dearest worth at most camp_traders.gift_most,
+## taken from his stock; "" when he has none that fits. The caller gives it.
+func camp_gift(camp: String, mix: String) -> String:
+	var stock: Dictionary = _camp(camp, mix)["stock"]
+	var most := int(camp_rule().get("gift_most", 12))
+	var best := ""
+	for item: String in stock:
+		var worth := value_of(item)
+		if int(stock[item]) > 0 and worth <= most and (best.is_empty() or worth > value_of(best)):
+			best = item
+	if best.is_empty():
+		return ""
+	stock[best] = int(stock[best]) - 1
+	if int(stock[best]) <= 0:
+		stock.erase(best)
+	return best
+
+
+## A captive's side of [param camp] (799): npc's ("camp_holds": held,
+## freed_by); economy keeps nothing of it, so {}.
+func camp_captive(_camp_id: String) -> Dictionary:
+	return {}
+
+
 # --- Saving --------------------------------------------------------------------------
 
 ## For the snapshot: {purses: {player id: gold}, log}.
@@ -2956,7 +3102,7 @@ func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
 		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
-		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true)}
+		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true), "camp_traders": _camp_traders.duplicate(true)}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -3004,6 +3150,17 @@ func from_dict(saved: Dictionary) -> void:
 			for pond: Variant in each:
 				if each[pond] is Dictionary:
 					into[str(pond)] = (each[pond] as Dictionary).duplicate(true)
+	var camps: Variant = saved.get("camp_traders", {})
+	if camps is Dictionary:
+		for camp: Variant in camps:
+			var each: Variant = camps[camp]
+			if each is Dictionary and each.get("stock") is Dictionary:
+				var stock := {}
+				for item: Variant in each["stock"]:
+					stock[str(item)] = int(each["stock"][item])
+				_camp_traders[str(camp)] = {"stock": stock, "purse": int(each.get("purse", 0)), "restocked": int(each.get("restocked", 0))}
+		if not _camp_traders.is_empty():
+			print("[economy] loaded %d camp traders" % _camp_traders.size())
 	var commissions: Variant = saved.get("commissions", {})
 	if commissions is Dictionary:
 		for town: Variant in commissions:

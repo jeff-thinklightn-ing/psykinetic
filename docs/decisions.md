@@ -42644,3 +42644,24 @@ truce: its trader is a captive. camp_fall_test _test_truce: the flag read, the b
 let be and a din not minded, a camp trader no foe even to a side that fights the town, one blow
 turning the band, the truce back after the camp is retaken. Server only, protocol unchanged, no new
 class_name.
+
+## 799, economy's side: the camp traders' stock, prices and purse
+
+npc's design (the coordinator's approval, 11-04; maps' forest camps, 976d59c3). A camp's trader is
+outside every town, with no store, treasury, tax or regard; his gold comes from outside the world
+and what he takes leaves with his wares. Economy keys him by the camp's place id
+("forest/loop_camp", not its _trader place) and draws his stock from levels/economy.json
+camp_traders.mixes[mix] (the place's "mix": "trader" draws 5 or 6 lines, "mixed" 4 or 5, by weight,
+seeded by camp and day), drawn again every restock_days (3) game days, when his purse is set back to
+purse (30). Economy.camp_stock(camp, mix) is [{item, count, price}]; camp_price(camp, item, toll,
+freer) is an item's value x sell (1.15), x toll (1.5) where the camp's holders take their cut (C7),
+x freer (0.8) for the player who freed him; camp_sale(camp, mix, player, item, toll, freer) {ok,
+price, say, why} sells one; camp_offer(item) is value x buy (0.85) for the things in buys (hide,
+tusks, meat, feathers, antlers, bear_claw; a bear pelt is worth more than his purse and goes to a
+town's tanner), and camp_buy(camp, mix, player, item, count) {ok, gold, count, say, why} pays for as
+many as his purse covers, the caller taking that many; camp_gift(camp, mix) is the freed trader's
+thanks (C3, option A), his dearest ware worth gift_most (12) at most, out of his stock;
+camp_captive(camp) is {}, the captive's hold being npc's ("camp_holds"). His words are
+camp_traders.say (voice's). The economy saves "camp_traders" {camp: {stock, purse, restocked}}; for
+release's journal (counts only, no ids), a load holding any prints "[economy] loaded N camp
+traders". economy_test _test_camp_traders. Server only; protocol unchanged, no new class_name.
