@@ -42491,6 +42491,25 @@ fishing_changed): a fish landed by her or her player with the other within FISH_
 meeting her "pond" want, now ready. companion_test _test_fishing, and _test_wants with the pond
 open. Server only, protocol unchanged (Companion.fishing already replicates), no new class_name.
 
+805 amended (6): pc-character's side, the poses (release's label; the poses items' (3) left to
+pc-character). Five clips, tools/humanoid_clips.py's Fish_* in goblin.res, the rod in the right
+hand (one_hand, its length the held thing's), the left hand forward at the waist by the line, played
+by Client3D._fishing_pose from the replicated GridEntity.fishing (FISH_CLIPS): cast, Fish_Cast once
+(1.5 s, FISH_CAST_TICKS: drawn back over the right shoulder, hung a beat, whipped forward as the
+float flies, carried through low and settled to the hold); wait, Fish_Hold looped (the rod out ahead
+and 30 degrees up, a slow sway); bite, Fish_Bite looped (the tip tugged down twice in 0.6 s, the head
+and back bowing to it); landed, Fish_Reel once (0.8 s: swept up near upright, leaning back, and back
+down); missed, Fish_Miss once (0.8 s: a late lift, then the rod sagging below level, the shoulders
+and head dropping). A once runs out on busy_until (nothing cuts it short); a once's state still on
+after it ends holds the rod out (FISH_HOLD). The puppet keeps its "fish_state", dropped when it
+stops fishing, so the next cast casts again. Players and companions alike. Client3D.rod_tip(puppet)
+(static): the held rod's "tip" socket (art-kit's item.fishing_rod, [0, 1.55, 0]) in the world, else
+ROD_TIP up its length; null with no rod drawn. FishingView's line leaves it once items switches to it
+(its feet + up + ahead stays the fallback). view_test _test_fishing_pose (the rod drawn and its tip
+found; each state its clip; waiting, the tip 1.5 to 2.5 m up and 0.9 to 2.2 m out; reeled in, it
+stands). Strip of the poses C:/dev/review/fishing/. Client and tools only, protocol unchanged, no
+new class_name. CHANGELOG bullet of its own (voice's words; items' fishing bullet left as it is).
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

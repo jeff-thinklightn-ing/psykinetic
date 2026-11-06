@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When you or your companion fish, the cast whips out from over the shoulder, the rod tip tugs down at a bite, and it sweeps up with a catch or sags when one gets away (805 amended (6)).
 - Fishing: buy a rod from Rolf at the stall for 3 gold, cast it into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).
 - The map of the known world shows under each area's name how many of its places you've found, and the character sheet no longer covers it (804 amended (13)).
 - Your companion's card shows her bond with you as a bar filling toward her next step, and her six needs as bars beneath it, each rising with a glow as it grows; and every window and tooltip now hides the world behind it (804 amended (12)).

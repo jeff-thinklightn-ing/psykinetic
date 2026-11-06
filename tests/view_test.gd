@@ -158,6 +158,7 @@ func _ready() -> void:
 		await _test_pick_meets_seam()  # Lets frames run to the swing's contact.
 		_test_bow_back()  # Reads a draw's pose on the wall clock: right after the pick's swing, as fitted.
 		_test_sheathed()
+		await _test_fishing_pose()  # Lets frames run: the rod's tip is read off the pose.
 		await _test_axe_edge_leads()
 		_test_guard_arms()
 		_test_goblins_differ()
@@ -7770,6 +7771,63 @@ func _test_person_monster() -> void:
 ## the tunic and trousers from PersonLook's FOREST_TUNICS and FOREST_TROUSERS, by the same draws as a
 ## town's colours, so every other word of a seed is as it was; a vest over it, the hood up. A grave
 ## robber's clothes=grave its greys and dirt browns (enemy-ai's rows), no vest; neither in a town's colours.
+func _test_fishing_pose() -> void:
+	print("\n== fishing seen: the cast, the wait, the bite, landed and missed (805 amended (6)) ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to fish")
+		return
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	slots[Items.RIGHT_HAND] = "fishing_rod"
+	slots[Items.LEFT_HAND] = ""
+	player.slots = slots
+	player.raised = ""
+	var id := player.get_instance_id()
+	var puppet: Node3D = _rig._puppets[id]
+	for key: String in ["shuffle_until", "busy_until"]:
+		puppet.set_meta(key, 0)
+	puppet.set_meta("turning", false)
+	puppet.set_meta("turned_ms", -1)
+	puppet.set_meta("speed", 0.0)
+	puppet.set_meta("last_at", puppet.position)
+	puppet.set_meta("last_ms", Time.get_ticks_msec())
+	_rig._process(0.0)
+	var rig := puppet.get_meta("rig") as AnimRig
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	_check((sockets["hand_r"] as Node3D).has_node("Held") and Client3D.rod_tip(puppet) != null and rig.has("Fish_Cast")
+			and rig.has(Client3D.FISH_HOLD), "the rod in the right hand, its tip found; the clips in the library")
+	var played := {}
+	for state: String in ["cast", "wait", "bite", "landed", "missed"]:
+		puppet.set_meta("busy_until", 0)
+		player.fishing = {"state": state, "at": player.tile + Vector2i(0, 2)}
+		_rig._process(0.0)
+		played[state] = rig.base_clip()
+	var want := {}
+	for state: String in Client3D.FISH_CLIPS:
+		want[state] = Client3D.FISH_CLIPS[state]
+	_check(played == want, "each state its clip: %s" % played)
+	# Waiting: the rod held out ahead and up, its tip where the line leaves it.
+	player.fishing = {"state": "wait", "at": player.tile + Vector2i(0, 2)}
+	puppet.set_meta("busy_until", 0)
+	for i in 30:
+		await get_tree().process_frame
+	var tip: Variant = Client3D.rod_tip(puppet)
+	var model := puppet.get_node("Body/Model") as Node3D
+	var ahead := -model.global_basis.z.normalized() if model != null else Vector3.FORWARD
+	var reach := Vector3(tip.x - puppet.global_position.x, 0.0, tip.z - puppet.global_position.z) if tip is Vector3 else Vector3.ZERO
+	var up := float(tip.y - puppet.global_position.y) if tip is Vector3 else 0.0
+	_check(tip is Vector3 and up > 1.5 and up < 2.5 and reach.length() > 0.9 and reach.length() < 2.2,
+			"waiting: the tip out and up, %.2f m up, %.2f m out (%s; the model's front %s)" % [up, reach.length(), rig.base_clip(), ahead])
+	player.fishing = {}
+	_rig._process(0.0)
+	_check(not puppet.has_meta("fish_state") and not rig.base_clip().begins_with("Fish"), "reeled in: the next cast casts again, and it stands (%s)" % rig.base_clip())
+	player.slots = was
+	_rig._process(0.0)
+
+
 func _test_bandit_look() -> void:
 	print("\n== the bandits dressed for the forest (793, pc-character's side) ==")
 	var plain := PersonLook.make("seed=4242 headwear=hood garb=vest apron=no")

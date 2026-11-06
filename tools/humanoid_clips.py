@@ -997,6 +997,68 @@ for _kind, (_mouth, _pull, _bent) in SHEATH_MOUTHS.items():
 		(0.9, P("Idle_Loop", 0.0, [("upperarm_r", LIFT, 12.0), ("upperarm_r", TILT, 12.0), ("lowerarm_r", LIFT, 6.0)])),
 		(1.0, P("Idle_Loop", 0.0)),
 	]}
+# Fishing (805 amended (6)): the rod (items' item.fishing_rod, 1.8 m, one hand, held 0.25 m up from
+# its butt) in the right hand, its length along one_hand's [length] (left +X, ahead -Y, up +Z), the
+# left hand forward at the waist by the line. Client3D plays them by GridEntity.fishing's state: the
+# cast once (Fish_Cast, World.FISH_CAST_TICKS' 1.5 s: drawn back over the shoulder, whipped forward,
+# the float flying from the tip, and settled to the hold), waiting (Fish_Hold_Loop: the rod out ahead
+# and up, a slow sway), the bite (Fish_Bite_Loop: the tip pulled down in tugs), landed (Fish_Reel,
+# 0.8 s: the rod swept up high, leaning back) and missed (Fish_Miss, 0.8 s: a late lift, then the rod
+# sagging as the line goes slack).
+FISH_FACE = (0.0, 0.0, 1.0)
+FISH_POLE = (-1.0, 0.4, -0.5)
+FISH_LEFT = [("upperarm_l", LIFT, 22.0), ("lowerarm_l", LIFT, 55.0), ("upperarm_l", TURN, -12.0)]
+FISH_ROD = (0.0, -0.87, 0.5)
+
+
+def rod(right: tuple, length: tuple, trunk: list = ()) -> list:
+	"""The rod in the right hand at [right] (one_hand's), along [length], the left hand by the line."""
+	return one_hand(right, length, FISH_FACE, FISH_POLE) + FISH_LEFT + list(trunk)
+
+
+FISH_HOLD = rod((0.3, 0.12, -0.3), FISH_ROD)
+FISH_HOLD_SWAY = rod((0.3, 0.11, -0.28), (0.04, -0.86, 0.51), [("spine_02", TURN, 2.0)])
+FISH_BACK = rod((0.04, 0.16, 0.14), (0.0, 0.5, 0.87), [("spine_02", TURN, -16.0), ("spine_03", TURN, -6.0), ("spine_02", LIFT, 6.0)])
+FISH_HUNG = rod((0.03, 0.16, 0.15), (0.0, 0.58, 0.82), [("spine_02", TURN, -17.0), ("spine_03", TURN, -7.0), ("spine_02", LIFT, 7.0)])
+FISH_WHIP = rod((0.38, 0.1, 0.06), (0.0, -0.66, 0.75), [("spine_02", TURN, 8.0), ("spine_01", LIFT, -5.0)])
+FISH_THROUGH = rod((0.42, 0.08, -0.2), (0.0, -0.97, 0.22), [("spine_02", TURN, 6.0), ("spine_01", LIFT, -8.0), ("spine_02", LIFT, -4.0)])
+FISH_DIP = rod((0.34, 0.1, -0.36), (0.0, -0.95, 0.3), [("spine_01", LIFT, -5.0), ("Head", LIFT, -6.0)])
+FISH_UP = rod((0.18, 0.1, 0.1), (0.0, -0.2, 0.98), [("spine_01", LIFT, 7.0), ("spine_02", LIFT, 5.0)])
+FISH_LATE = rod((0.24, 0.11, -0.18), (0.0, -0.5, 0.87))
+FISH_SLACK = rod((0.32, 0.12, -0.42), (0.0, -0.99, -0.12), [("spine_02", LIFT, -5.0), ("Head", LIFT, -10.0)] + both("clavicle", LIFT, -4.0, mirror=False))
+CLIPS["Fish_Cast"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
+	(0.35, P("Idle_Loop", 0.0, FISH_BACK, move=(0.0, 0.03, 0.0))),
+	(0.48, P("Idle_Loop", 0.0, FISH_HUNG, move=(0.0, 0.035, 0.0))),
+	(0.6, P("Idle_Loop", 0.0, FISH_WHIP, move=(0.0, -0.03, 0.0))),
+	(0.72, P("Idle_Loop", 0.0, FISH_THROUGH, move=(0.0, -0.05, -0.01))),
+	(1.0, P("Idle_Loop", 0.0, FISH_THROUGH, move=(0.0, -0.04, -0.01))),
+	(1.5, P("Idle_Loop", 0.0, FISH_HOLD)),
+]}
+CLIPS["Fish_Hold_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
+	(1.5, P("Idle_Loop", 1.5, FISH_HOLD_SWAY)),
+	(3.0, P("Idle_Loop", 0.0, FISH_HOLD)),
+]}
+CLIPS["Fish_Bite_Loop"] = {"loop": True, "keys": [
+	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
+	(0.12, P("Idle_Loop", 0.0, FISH_DIP, move=(0.0, -0.02, 0.0))),
+	(0.3, P("Idle_Loop", 0.0, FISH_HOLD)),
+	(0.42, P("Idle_Loop", 0.0, FISH_DIP, move=(0.0, -0.02, 0.0))),
+	(0.6, P("Idle_Loop", 0.0, FISH_HOLD)),
+]}
+CLIPS["Fish_Reel"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
+	(0.2, P("Idle_Loop", 0.0, FISH_UP, move=(0.0, 0.05, 0.0))),
+	(0.5, P("Idle_Loop", 0.0, FISH_UP, move=(0.0, 0.05, 0.0))),
+	(0.8, P("Idle_Loop", 0.0, FISH_HOLD)),
+]}
+CLIPS["Fish_Miss"] = {"keys": [
+	(0.0, P("Idle_Loop", 0.0, FISH_HOLD)),
+	(0.15, P("Idle_Loop", 0.0, FISH_LATE)),
+	(0.45, P("Idle_Loop", 0.0, FISH_SLACK)),
+	(0.8, P("Idle_Loop", 0.0, FISH_SLACK)),
+]}
 
 
 def args() -> list:

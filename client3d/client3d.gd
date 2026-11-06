@@ -20483,6 +20483,11 @@ func _animate(puppet: Node3D) -> void:
 		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
 		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
+	if entity != null and not entity.fishing.is_empty():
+		if _fishing_pose(puppet, rig, entity, now):
+			return
+	elif puppet.has_meta("fish_state"):
+		puppet.remove_meta("fish_state")  # Reeled in: the next cast is cast again.
 	if speed <= WALKING and work.has("clip") and rig.has(str(work["clip"])):
 		# At its work (566): the work's clip, looped.
 		rig.loop(str(work["clip"]), tempo)
@@ -20541,6 +20546,55 @@ func _lying_down(puppet: Node3D, rig: AnimRig, work: Dictionary, speed: float, n
 ## [param clip] once through from its start, at [param tempo], blended in,
 ## the model busy with it till it ends (a fidget: dropped if it moves or a
 ## fight comes to it).
+## Fishing (805 amended (6); items' GridEntity.fishing): each state's clip
+## (tools/humanoid_clips.py), the rod in the right hand. The cast (as long as
+## World.FISH_CAST_TICKS), the reel when it is landed and the sag when it is
+## missed play once as the state begins (busy_until holds them, as a fidget's,
+## but nothing cuts them short); waiting and the bite loop. A state whose
+## once is over and not yet followed holds the rod out (FISH_HOLD). False
+## (it stands or works as before) when the rig lacks the clip.
+const FISH_CLIPS := {"cast": "Fish_Cast", "wait": "Fish_Hold", "bite": "Fish_Bite", "landed": "Fish_Reel", "missed": "Fish_Miss"}
+const FISH_ONCE: Array[String] = ["cast", "landed", "missed"]
+const FISH_HOLD := "Fish_Hold"
+func _fishing_pose(puppet: Node3D, rig: AnimRig, entity: GridEntity, now: int) -> bool:
+	var state := str(entity.fishing.get("state", ""))
+	var was := str(puppet.get_meta("fish_state", ""))
+	var clip := str(FISH_CLIPS.get(state, ""))
+	if clip.is_empty() or not rig.has(clip):
+		return false
+	puppet.set_meta("fish_state", state)
+	if state in FISH_ONCE and state != was:
+		var seconds := rig.once(clip, 1.0, ArtKit.feel("client3d.clip_blend", CLIP_BLEND))
+		puppet.set_meta("busy_until", now + int(seconds * 1000.0))
+		return true
+	rig.loop(FISH_HOLD if state in FISH_ONCE else clip, 1.0)
+	return true
+
+
+## The fishing rod's tip in the world, on [param puppet] (a Client3D puppet:
+## FishingView's line leaves it): the held rod's "tip" socket (art-kit's
+## item.fishing_rod), else ROD_TIP up its length from the hold; null with no
+## rod in either hand drawn.
+const ROD_TIP := Vector3(0.0, 1.55, 0.0)
+static func rod_tip(puppet: Node3D) -> Variant:
+	if puppet == null or not puppet.has_meta("sockets") or not puppet.has_meta("held"):
+		return null
+	var held: Array = puppet.get_meta("held")
+	var sockets: Dictionary = puppet.get_meta("sockets")
+	for hand in 2:
+		var id := str(held[hand])
+		if id.is_empty() or id.begins_with(ART_ID) or str(Items.def(id).get("use", "")) != "fish":
+			continue
+		var socket := sockets.get("hand_r" if hand == 0 else "hand_l") as Node3D
+		var rod := socket.get_node_or_null("Held") as Node3D if socket != null else null
+		if rod == null or not rod.is_inside_tree():
+			continue
+		var tip: Variant = (ArtKit.spec(str(Items.def(id).get("art", "item." + id))).get("sockets", {}) as Dictionary).get("tip")
+		var local := Vector3(float(tip[0]), float(tip[1]), float(tip[2])) if tip is Array and (tip as Array).size() == 3 else ROD_TIP
+		return rod.global_transform * local
+	return null
+
+
 static func _play_fidget(puppet: Node3D, rig: AnimRig, clip: String, now: int, tempo: float) -> void:
 	var seconds := rig.once(clip, tempo, ArtKit.feel("client3d.clip_blend", CLIP_BLEND) * 2.0)
 	puppet.set_meta("fidgeting", true)
