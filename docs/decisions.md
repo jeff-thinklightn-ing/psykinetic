@@ -43321,6 +43321,9 @@ grown trees on the pad taken out of trees.json. The first load prints "[level] b
 bullet (voice's words; the thicket's words come with terrain's cue).
 Protocol unchanged (--print-protocol fc7438491ba8 before and after: the place kind "lair" and its
 "den" are not on the wire); no new class_name.
+
+813 amended: the family tomb's wall and plates heard (release's label; dungeon's ask). Two positional oneshots on the sfx bus, which dungeon's Client3D plays through SoundKit.has: sfx.wall_sink (the vault's bricks sinking into the floor as its door goes shut to open, once: a heavy stone grind ending in a stop, about 1.5 s, -10 dB, heard like a door, noise "door", so the dead hear it as they hear the door; falling back to sfx.slab_grind) and sfx.plate_click (a plate going up to down: a soft stone click, range 6, -14, never heard by monsters; nothing on release or on first sight). Six Freesound CC0 takes: wall from 833925 (harrisonlace), 530987 (patchytherat) and 243699 (ertfelda); plate from 466272 (proolsen), 422870 (IPaddeh) and 508581 (Wdomino). Review: C:/dev/review/sound/crypt. Tests: sound_kit_test _test_ui_sounds (the wall a door's noise with the slab's fallback, the plate close and unheard, three takes each). Client only; protocol unchanged, no new class_name, no bullet (dungeon's 813 carries it).
+
 ## 814. The hill cat: a predator that lies up and drops on what passes
 
 The coordinator's approval of C:/dev/review/enemy-ai/hill_cat_design.md (the apex lairs design left it

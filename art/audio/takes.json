@@ -2414,6 +2414,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.plate_click": [
+			{
+				"file": "sfx.plate_click.ogg",
+				"from": "freesound",
+				"original": "freesound 466272: Pressure Plate (from 0 s for 0.45 s)",
+				"sha256": "a59de1b59035ebdc0a1e050561ebc146d78a9035575ea3f45ec14b87774d4c38",
+				"by": "proolsen",
+				"url": "https://freesound.org/people/proolsen/sounds/466272/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.plate_click.2.ogg",
+				"from": "freesound",
+				"original": "freesound 422870: Pressure_Plate_Stone.wav (from 0 s for 0.85 s)",
+				"sha256": "88ddae1879e5ab1a9b0421892647826e41025804e22235d1a28d084881e2c335",
+				"by": "IPaddeh",
+				"url": "https://freesound.org/people/IPaddeh/sounds/422870/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.plate_click.3.ogg",
+				"from": "freesound",
+				"original": "freesound 508581: PressurePlate.wav (from 0 s for 0.9 s)",
+				"sha256": "240bae4debe14b23d45893353590d4bf97b3ff9217fcc730c90512eef3e3dcbd",
+				"by": "Wdomino",
+				"url": "https://freesound.org/people/Wdomino/sounds/508581/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.rabbit_death": [
 			{
 				"file": "sfx.rabbit_death.ogg",
@@ -2633,6 +2662,35 @@
 				"sha256": "a749e8a8814fa313a9f31974cc5290ed965bf827b3cd42d89d25e39b3ef2aa47",
 				"by": "deleted_user_2104797",
 				"url": "https://freesound.org/people/deleted_user_2104797/sounds/166325/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.wall_sink": [
+			{
+				"file": "sfx.wall_sink.ogg",
+				"from": "freesound",
+				"original": "freesound 833925: DOORSton_Stone Door Opening, Secret Passage Entry (from 4 s for 1.6 s)",
+				"sha256": "8e4c068db2204efbd773803f48f739d86787b54c7b4250c9b264468475233665",
+				"by": "harrisonlace",
+				"url": "https://freesound.org/people/harrisonlace/sounds/833925/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wall_sink.2.ogg",
+				"from": "freesound",
+				"original": "freesound 530987: stone door close.wav (from 0 s for 1.5 s)",
+				"sha256": "d9a81277eb512a3829574943a3647052fd49926ee524b18a7967a901e9f88912",
+				"by": "patchytherat",
+				"url": "https://freesound.org/people/patchytherat/sounds/530987/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wall_sink.3.ogg",
+				"from": "freesound",
+				"original": "freesound 243699: Hidden Wall Opening (from 1.7 s for 1.5 s)",
+				"sha256": "0a98c73ccb984d6cc63b347c83b54b0b6a70d039237e117cd9e28a22f8021081",
+				"by": "ertfelda",
+				"url": "https://freesound.org/people/ertfelda/sounds/243699/",
 				"license": "CC0 1.0"
 			}
 		],

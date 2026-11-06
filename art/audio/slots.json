@@ -706,6 +706,24 @@
 			"uses": "a crypt's stone slab drawn open, about 1.1 s with its motion: a knock, a short grind as it's pushed back, a longer scraping slide, a low settling thud (the barrow's hidden niche; Client3D, the door shut to open while drawn); heard like a door",
 			"fallback": "sfx.knockback_stone"
 		},
+		"sfx.wall_sink": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "door",
+			"volume_db": -10.0,
+			"uses": "a crypt's bricked wall sinking into the floor, about 1.5 s: a heavy grind ending in a stop (813; the family tomb's vault, Client3D as its door goes shut to open); heard like a door",
+			"fallback": "sfx.slab_grind"
+		},
+		"sfx.plate_click": {
+			"category": "doors",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 6,
+			"volume_db": -14.0,
+			"uses": "a pressure plate pressed down: a soft stone click (813; Client3D, as a plate goes up to down; none on release or first sight)"
+		},
 		"sfx.door_wood_open": {
 			"category": "doors",
 			"type": "oneshot",

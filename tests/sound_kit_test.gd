@@ -718,6 +718,13 @@ func _test_ui_sounds() -> void:
 				or SoundKit.reach(slot) > 12 or SoundKit.takes(slot).size() < 2:
 			fishing.append(slot)
 	_check(fishing.is_empty(), "each fishing cue placed on the sfx bus, no noise, heard within 12, two takes (%s)" % [fishing])
+	# 813 amended: the family tomb's wall heard like a door, falling
+	# back to the slab's grind; its plates a close click no monster hears.
+	_check(SoundKit.positional("sfx.wall_sink") and SoundKit.noise("sfx.wall_sink") == "door"
+			and str(SoundKit.spec("sfx.wall_sink").get("fallback", "")) == "sfx.slab_grind" and SoundKit.takes("sfx.wall_sink").size() >= 3
+			and SoundKit.positional("sfx.plate_click") and SoundKit.noise("sfx.plate_click") == ""
+			and SoundKit.reach("sfx.plate_click") <= 6 and SoundKit.takes("sfx.plate_click").size() >= 3,
+			"the tomb's wall sinks like a door, else the slab; its plates click close, unheard by monsters")
 	for node: Node in [button, slider, panel, ui, sfx]:
 		node.queue_free()
 	await get_tree().process_frame
