@@ -1391,7 +1391,10 @@ func plate_for_me() -> Vector2i:
 	var room := keeper_room()
 	for plate: Dictionary in here.plates:
 		var cells: Array = plate.get("cells", [])
-		var other_held := cells.any(func(each: Vector2i) -> bool: return World.plate_body(here, each) != null and World.plate_body(here, each) != self)
+		var other_held := false  # Another plate of the set held (by weight, 813 amended (3)), not by her.
+		for k in cells.size():
+			var holder := World.plate_holder(here, plate, k)
+			other_held = other_held or holder != null and holder != self
 		for cell: Vector2i in cells:
 			var body := World.plate_body(here, cell)
 			if body != null and body != self:

@@ -14358,21 +14358,25 @@ func _show_vault(key: Vector3i, opened: bool) -> void:
 func _add_plates() -> void:
 	_plates_shown.clear()
 	for plate: Dictionary in _terrain.get("plates", []):
-		for cell: Vector2i in plate["cells"]:
+		for k in (plate["cells"] as Array).size():
+			var cell: Vector2i = plate["cells"][k]
 			var piece := ArtKit.instance(PLATE_SLOT)
 			piece.name = "Plate_%d_%d" % [cell.x, cell.y]
 			piece.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)
 			_room.add_child(piece)
-			_plates_shown.append({"cell": cell, "part": piece.find_child("plate", true, false), "down": false, "at": piece.position})
+			_plates_shown.append({"cell": cell, "part": piece.find_child("plate", true, false), "down": false, "at": piece.position,
+				"need": World.plate_need(plate, k)})
 
 
 ## Each plate's slab down while a body stands on its cell (the bodies'
-## cells, as replicated), clicked as it goes down; none on first sight.
+## cells, as replicated) that holds it (World.plate_weighs: a plate with a
+## need, 813 amended (3), stays up under an imp), clicked as it goes down;
+## none on first sight.
 func _sync_plates() -> void:
 	if _plates_shown.is_empty() or World.zone == null:
 		return
 	for shown: Dictionary in _plates_shown:
-		var down := World.plate_body(World.zone, shown["cell"]) != null
+		var down := World.plate_weighs(World.plate_body(World.zone, shown["cell"]), shown["need"])
 		if down == shown["down"]:
 			continue
 		shown["down"] = down

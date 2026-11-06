@@ -2336,7 +2336,8 @@ func door_on(key: Vector3i) -> Door:
 ## Zone [param zone_name]'s plate set [param id] (terrain "plates", the
 ## co-op family tomb) held: every plate of it ([param index] -1), or the
 ## plate [param index] alone, held by anything standing on its cell (a
-## player, a companion, a monster, a boulder). False for none.
+## player, a companion, a monster, a boulder), or, on a plate with a need
+## (813 amended (3)), by what plate_weighs says. False for none.
 func plate_held(zone_name: String, id: String, index := -1) -> bool:
 	var each: Zone = zones.get(zone_name)
 	if each == null:
@@ -2346,9 +2347,36 @@ func plate_held(zone_name: String, id: String, index := -1) -> bool:
 			continue
 		var cells: Array = plate["cells"]
 		if index >= 0:
-			return index < cells.size() and plate_body(each, cells[index]) != null
-		return cells.all(func(cell: Vector2i) -> bool: return plate_body(each, cell) != null)
+			return index < cells.size() and plate_holder(each, plate, index) != null
+		for k in cells.size():
+			if plate_holder(each, plate, k) == null:
+				return false
+		return true
 	return false
+
+
+## What holds plate [param index] of set [param plate] in [param each] (a
+## zone): the body on its cell if it weighs enough (plate_weighs), or null.
+func plate_holder(each: Zone, plate: Dictionary, index: int) -> GridEntity:
+	var body := plate_body(each, plate["cells"][index])
+	return body if plate_weighs(body, plate_need(plate, index)) else null
+
+
+## Plate [param index]'s need in kg (813 amended (3)): 0 for none.
+static func plate_need(plate: Dictionary, index: int) -> float:
+	var need: Array = plate.get("need", [])
+	return float(need[index]) if index < need.size() else 0.0
+
+
+## Whether [param body] holds a plate that needs [param need] kg (813
+## amended (3), the co-op forge's treadle): anything where none is needed;
+## else a player or a companion whatever they weigh (the coordinator: the
+## weight keeps imps and empty crates off, never a person), or a body of
+## at least [param need] (its mass, what it carries in: a cart's load).
+static func plate_weighs(body: GridEntity, need: float) -> bool:
+	if body == null:
+		return false
+	return need <= 0.0 or body is Player or body is Companion or body.mass >= need
 
 
 ## What stands on plate cell [param cell] of [param each] (a zone), or null.

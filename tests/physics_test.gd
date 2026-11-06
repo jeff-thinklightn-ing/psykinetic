@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_clank()
 	_test_falls()
 	_test_cart_roll()
+	_test_plate_need()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -912,6 +913,73 @@ func _test_cart_roll() -> void:
 	World._push(e["P"][0], cart, Vector2(1, 0), 1.0)
 	_roll_out(cart)
 	_check(kobold.tile == Vector2i(6, 1) and kobold.teeter == Vector2i(1, 0), "a slow cart only sets it teetering on the rim (%s, %s)" % [kobold.tile, kobold.teeter])
+
+
+## 813 amended (3), the co-op forge's treadle: a plate with a "need" (kg)
+## is held only by a player or a companion whatever they weigh, or by a
+## body of at least its need; one without keeps 813's anything-holds.
+func _test_plate_need() -> void:
+	print("\n== a plate's need: a player and a companion always hold it, else the body's mass (813 amended (3)) ==")
+	# The level's "need": one for every plate, or a list; anything else said and left out.
+	var door_key := Terrain.edge_key(Vector2i(1, 0), Vector2i(0, -1))
+	var terrain := {"floor": [Vector2i(1, 1), Vector2i(4, 1)], "edges": {door_key: Terrain.Edge.DOOR}}
+	var warnings: Array[String] = []
+	var set_of := func(need: Variant) -> Dictionary:
+		var entry := {"id": "forge", "cells": [[1, 1], [4, 1]], "door": [1, 0, 0, -1], "room": "forge"}
+		if need != null:
+			entry["need"] = need
+		return {"plates": [entry]}
+	var parsed := Level.plates_from(set_of.call(50), terrain, warnings)
+	_check(parsed.size() == 1 and parsed[0]["need"] == [50.0, 50.0] and warnings.is_empty(), "\"need\": 50 is 50 kg on every plate (%s)" % [parsed])
+	parsed = Level.plates_from(set_of.call([50, 0]), terrain, warnings)
+	_check(parsed.size() == 1 and parsed[0]["need"] == [50.0, 0.0], "a list is one per plate (%s)" % [parsed])
+	parsed = Level.plates_from(set_of.call(null), terrain, warnings)
+	_check(parsed.size() == 1 and not parsed[0].has("need") and warnings.is_empty(), "no need: none carried (813's rule)")
+	for bad: Variant in ["heavy", -5, [50]]:
+		warnings.clear()
+		parsed = Level.plates_from(set_of.call(bad), terrain, warnings)
+		_check(parsed.is_empty() and warnings.size() == 1, "need %s is said and the set left out (%s)" % [bad, warnings])
+
+	# Who holds a need-50 plate (masses: player 80, companion 75, boulder 200, cart 60, crate 30).
+	var rows: Array[String] = ["#########", "#P.m.o.c#", "#########"]
+	var e := _build(rows, 3.0)  # The monster an imp: 3 kg.
+	var crate := EntityFactory.build(Level.CRATE.duplicate(true).merged({"name": "Crate"}))
+	_room.add_child(crate)
+	World.spawn(crate, Vector2i(2, 1))
+	var wren := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Wren", "props": {"max_hp": 10}}) as Companion
+	_room.add_child(wren)
+	World.spawn(wren, Vector2i(4, 1))
+	var player: GridEntity = e["P"][0]
+	var imp: GridEntity = e["m"][0]
+	var boulder: GridEntity = e["o"][0]
+	var cart: GridEntity = e["c"][0]
+	var light := {}
+	for body: GridEntity in [player, wren, imp, boulder, cart, crate]:
+		light[body.name] = World.plate_weighs(body, 50.0)
+	_check(light == {player.name: true, "Wren": true, imp.name: false, boulder.name: true, cart.name: true, "Crate": false},
+		"need 50: the player, Wren, the boulder and the cart hold it; the imp (3) and the empty crate (30) do not (%s)" % [light])
+	player.mass = 1.0
+	wren.mass = 1.0  # Travelling light: a person holds it whatever they weigh.
+	_check(World.plate_weighs(player, 50.0) and World.plate_weighs(wren, 50.0) and World.plate_weighs(player, 10000.0),
+		"the lightest player and Wren (1 kg) still hold it, and any need")
+	_check(World.plate_weighs(imp, 0.0) and World.plate_weighs(crate, 0.0) and not World.plate_weighs(null, 0.0),
+		"with no need anything holds it, as 813 has it (the imp, the crate)")
+	crate.mass = 55.0  # What it carries counts (entity.mass): a loaded crate.
+	_check(World.plate_weighs(crate, 50.0), "a crate loaded past the need holds it")
+
+	# plate_held over a set: plate 0 needs 50, plate 1 needs none.
+	var zone_name := World.zone.name
+	var had_zone := World.zones.has(zone_name)
+	World.zones[zone_name] = World.zone
+	var kept_plates := World.zone.plates
+	World.zone.plates = [{"id": "forge", "cells": [imp.tile, wren.tile], "edge": door_key, "room": "forge", "need": [50.0, 0.0]}]
+	_check(not World.plate_held(zone_name, "forge", 0) and World.plate_held(zone_name, "forge", 1) and not World.plate_held(zone_name, "forge"),
+		"the imp on the treadle does not hold it, Wren on the plain plate does: the set not held")
+	World.zone.plates[0]["cells"] = [boulder.tile, wren.tile]
+	_check(World.plate_held(zone_name, "forge"), "the boulder on the treadle and Wren on the other: held")
+	World.zone.plates = kept_plates
+	if not had_zone:
+		World.zones.erase(zone_name)
 
 
 func _check(ok: bool, label: String) -> void:

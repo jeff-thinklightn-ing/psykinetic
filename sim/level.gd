@@ -2464,7 +2464,10 @@ static func carvings_from(config: Dictionary, warnings: Array[String]) -> Array[
 ## while every one of them is held at once (anything standing on its cell:
 ## World.plate_held), for good this generation (Main's solve); as [{id,
 ## cells: Array[Vector2i], edge: Vector3i, room}]. A plate off the floor or
-## a door edge that is none is said and left out.
+## a door edge that is none is said and left out. "need" (kg, one for
+## every plate or a list, one per cell; the co-op forge's treadle) is
+## carried as need: Array[float]: a plate with one is held only by a
+## player, a companion or a body that heavy (World.plate_weighs).
 static func plates_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	var listed: Variant = config.get("plates", [])
@@ -2488,7 +2491,31 @@ static func plates_from(config: Dictionary, terrain: Dictionary, warnings: Array
 		if cells.size() != (entry["cells"] as Array).size() or cells.size() < 2 or int(terrain["edges"].get(key, Terrain.Edge.OPEN)) != Terrain.Edge.DOOR:
 			warnings.append("the plate set %s has a plate off the floor, fewer than two, or no door on its edge: left out" % [entry.get("id", "")])
 			continue
-		out.append({"id": str(entry.get("id", "plates_%d" % out.size())), "cells": cells, "edge": key, "room": str(entry.get("room", ""))})
+		var plate := {"id": str(entry.get("id", "plates_%d" % out.size())), "cells": cells, "edge": key, "room": str(entry.get("room", ""))}
+		if entry.has("need"):
+			var need: Variant = _plate_need(entry["need"], cells.size())
+			if need == null:
+				warnings.append("the plate set %s has a need that is not a weight in kg (a number, or one per cell): left out" % [entry.get("id", "")])
+				continue
+			plate["need"] = need
+		out.append(plate)
+	return out
+
+
+## A plate set's "need" ([param value]: kg, one for every plate or a list,
+## one per cell) as Array[float] of [param count]; null if it is not.
+static func _plate_need(value: Variant, count: int) -> Variant:
+	var listed: Array = value if value is Array else []
+	if not value is Array:
+		listed.resize(count)
+		listed.fill(value)
+	if listed.size() != count:
+		return null
+	var out: Array[float] = []
+	for each: Variant in listed:
+		if not (each is float or each is int) or float(each) < 0.0:
+			return null
+		out.append(float(each))
 	return out
 
 

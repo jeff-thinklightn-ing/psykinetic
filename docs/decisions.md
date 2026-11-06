@@ -43970,6 +43970,29 @@ Never in a quiet moment, never unasked (Jeff, via the coordinator). companion_te
 items_test _test_coop_tomb counts its deed by the "deed" track (Main.rewards_by_track), as her
 bond and needs gains come beside it. Server only, protocol unchanged, no new class_name.
 
+813 amended (3) (2026-11-06, release's label; dungeon's ask for its co-op forge, the coordinator's
+approval): a plate may need weight. A plate set in level.json "plates" may carry "need" (kg): one
+number for every plate of it, or a list, one per cell. Level.plates_from carries it in terrain as need:
+Array[float]. A need that is not a number of at least 0, or a list of the wrong length, is said and
+leaves the set out. With a need, a plate is held (World.plate_holder, World.plate_weighs) only by a
+player or a companion, whatever they weigh, or by another body whose mass is at least the need.
+The coordinator's rule is that the weight keeps imps and empty crates off and never a person: Wren
+travelling light still holds it. The mass is entity.mass, so what a body carries counts (a cart's
+load, a filled crate's), while a body down or tired weighs the same. The forge's treadle needs 50:
+the player (80), Wren (75), a boulder (200) and a cart (60, empty or loaded) hold it, while an imp (3)
+and an empty crate (30) do not. A plate goes fully down or stays up, with no partial sink: Client3D's
+slab goes down by the same World.plate_weighs, from the bodies' spawn masses. That matches the
+server's except for a crate loaded past the need, which holds it on the server while its slab
+stays up; nothing in the forge does that. Companion.plate_for_me's "another plate of the set held"
+asks plate_holder too. Without "need", 813's anything-holds stands, so the tomb is unchanged.
+physics_test _test_plate_need covers the parse (one, a list, none, three bad forms), who holds 50 (the
+lightest player and Wren at 1 kg, the imp, the crate empty and loaded), and plate_held over a set.
+No number in physics.json: the need is the level's. EditorFields lists nothing, since "plates" is
+not offered. Server, level data and a view tweak; protocol unchanged; no new class_name; no bullet
+(dungeon's forge, 813 amended (4), carries it). Package: the cold forge (Jeff's "content ships as
+packages"). It lands ahead switched off: no shipped level has a need, so nothing a player meets
+changes until dungeon's forge, which carries the only one, is switched on.
+
 ## 814. The hill cat: a predator that lies up and drops on what passes
 
 The coordinator's approval of C:/dev/review/enemy-ai/hill_cat_design.md (the apex lairs design left it
