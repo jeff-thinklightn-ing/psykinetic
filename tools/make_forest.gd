@@ -123,7 +123,7 @@ const CAMPS: Array[Dictionary] = [
 	{"key": "west_bandit_camp", "centre": Vector2i(77, 94), "size": 6, "mix": "bandit", "name": "a bandit camp", "bandits": 3, "brutes": 1},
 	{"key": "south_traders_camp", "centre": Vector2i(124, 145), "size": 5, "mix": "trader", "name": "a traders' camp"},
 	{"key": "southwest_bandit_camp", "centre": Vector2i(51, 165), "size": 5, "mix": "bandit", "name": "a bandit camp", "bandits": 2, "brutes": 1},
-	{"key": "southeast_camp", "centre": Vector2i(171, 172), "size": 6, "mix": "mixed", "name": "a bandit camp", "bandits": 2, "brutes": 1},
+	{"key": "southeast_camp", "centre": Vector2i(171, 172), "size": 6, "mix": "mixed", "name": "a bandit camp", "bandits": 2, "brutes": 1, "truce": true},
 ]
 ## Cells cleared round a camp's footprint, and the bandits' marker colours.
 const CAMP_MARGIN := 2
@@ -371,6 +371,8 @@ func _camps(camps: Array[Dictionary]) -> void:
 		var mix: String = camp["mix"]
 		config["places"][camp["key"]] = {"at": [fire.x, fire.y], "kind": "camp", "radius": 4, "name": camp["name"],
 			"holder": "nobody" if mix == "trader" else "bandits", "worth": 2 if camp["size"] == 6 else 1, "mix": mix}
+		if camp.get("truce", false):
+			config["places"][camp["key"]]["truce"] = true  # The Toll Camp's truce (799, enemy-ai's side).
 		var taken: Dictionary[Vector2i, bool] = {fire: true}
 		if mix != "bandit":
 			var stand := fire + side

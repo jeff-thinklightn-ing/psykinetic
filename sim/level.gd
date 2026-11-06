@@ -1353,6 +1353,11 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 				out[str(key)]["mix"] = str(entry["mix"])
 			else:
 				warnings.append("the place %s's mix is not one of %s: left out" % [key, ", ".join(CAMP_MIXES)])
+		# A camp's truce with players (799, enemy-ai's side; the Toll Camp): true, else left out.
+		if entry.get("truce") == true and kind == "camp":
+			out[str(key)]["truce"] = true
+		elif entry.has("truce"):
+			warnings.append("the place %s's truce is not true on a camp: left out" % [key])
 		for shape_key: String in PLACE_SHAPES:
 			if not entry.has(shape_key):
 				continue

@@ -417,6 +417,16 @@ var holds_post := -1
 var lurks := false
 ## Till when a lurker is roused (World ticks).
 var _roused_until := -1
+## Decision 799, enemy-ai's side: the truce camp whose band it is ("" none;
+## "?" not yet looked up). A camp place with "truce" (maps' level.json; the
+## Toll Camp) keeps a truce with players: its band, of the holder's side and
+## spawned in its radius, takes no player or kept companion as a foe till
+## one of them strikes one of the band; then the whole band fights, till
+## the camp falls and is retaken (Holdings.since moves on).
+var _truce_camp := "?"
+## Camp place id -> Holdings.now() its truce was broken at (never saved: a
+## restart forms the bands afresh).
+static var truce_broken: Dictionary[String, int] = {}
 ## Who struck it last, and when (World.damage; Jeff: "barrow guards aren't
 ## aggro enough sometimes just stand and take hits"). For ANSWER_TICKS after
 ## each blow it answers them: seen whatever its cone, and fought by a room
@@ -1474,6 +1484,8 @@ func _nearest_visible_target() -> GridEntity:
 		if entity is Player or (entity is Companion and entity.keeper != null):
 			if not _given_up.is_empty() and _letting_be(entity):
 				continue
+			if in_truce():
+				continue  # Its camp's truce holds (799): nobody has struck the band.
 			# Its target it follows, cone or not (it turns as it goes); one that struck it, felt.
 			if _answering(entity) or senses.sees(entity, d, entity != target, times) \
 					and _noticed(entity, d, sight_range * times + (alert_sight if senses.alerted else 0)):
@@ -1598,6 +1610,8 @@ func _heard(noise: Dictionary) -> void:
 		_rouse()  # Its side engaged near it: out of the dark.
 	if lurking():
 		return  # Unroused, a lurker goes after no noise: it stays in the dark.
+	if in_truce():
+		return  # Its camp's truce holds (799): it minds no din till the band is struck.
 	if kind == &"call" and source is Monster and _same_side(source):
 		# Its side calling for help: after whom they fight.
 		var caller := source as Monster
@@ -2647,7 +2661,8 @@ func _may_fight(other: GridEntity) -> bool:
 	if other is Player or (other is Companion and (other as Companion).keeper != null):
 		return true
 	if other is Resident:
-		return "town" in foes and not waiting(other)
+		# A camp trader (799, npc's Resident.camp_trader) is nobody's foe.
+		return "town" in foes and not waiting(other) and not camp_trader(other)
 	return other is Monster and not other is Animal and _factions().of_kind(World.kind_of(other)) in foes
 
 
@@ -2663,9 +2678,9 @@ func threatens(entity: GridEntity) -> bool:
 	if keeps_room and not _room.has_point(entity.tile) and not _answering(entity):
 		return false
 	if entity is Player or (entity is Companion and (entity as Companion).keeper != null):
-		return _given_up.is_empty() or not _letting_be(entity)
+		return not in_truce() and (_given_up.is_empty() or not _letting_be(entity))
 	if raid != "" or "town" in foes:
-		if entity in World.townsfolk():
+		if entity in World.townsfolk() and not camp_trader(entity):
 			return true
 	return _may_fight(entity)
 
@@ -2676,6 +2691,66 @@ func threatens(entity: GridEntity) -> bool:
 func _may_threaten(entity: GridEntity) -> bool:
 	return spawned and hp > 0 and not laid and entity != null and is_instance_valid(entity) and entity != self \
 			and entity.spawned and entity.hp > 0 and not entity.protected and not World.is_downed(entity) and not waiting(entity)
+
+
+## Whether [param entity] is a camp trader (decision 799, npc's
+## Resident.camp_trader: the trader's place key, "" for townsfolk): no
+## monster's foe, whoever holds the camp.
+static func camp_trader(entity: GridEntity) -> bool:
+	if not entity is Resident:
+		return false
+	var key: Variant = entity.get("camp_trader")
+	return key is String and not (key as String).is_empty()
+
+
+## The truce camp whose band it is (799): a camp place of its zone with
+## "truce", held by its side, its home within the radius; "" for none.
+## Looked up once, after it is spawned and placed.
+func truce_camp() -> String:
+	if _truce_camp != "?":
+		return _truce_camp
+	if not spawned or home == NO_TILE or World.holdings == null or World.zone == null:
+		return ""
+	_truce_camp = ""
+	if self is Animal:
+		return _truce_camp
+	var factions := World.holdings.factions
+	var side := factions.of_kind(World.kind_of(self))
+	if side == Factions.NOBODY:
+		return _truce_camp
+	for id in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(id)
+		if place.get("kind") != "camp" or not place.get("truce", false):
+			continue
+		var off: Vector2i = home - place["cell"]
+		var radius := int(place["radius"])
+		if off.x * off.x + off.y * off.y <= radius * radius and factions.same_side(side, World.holdings.holder(id)):
+			_truce_camp = id
+			break
+	return _truce_camp
+
+
+## Whether its camp's truce holds (799): it is of a truce camp's band, its
+## side still holds the camp, and nobody has struck the band since the camp
+## last changed hands.
+func in_truce() -> bool:
+	var id := truce_camp()
+	if id.is_empty():
+		return false
+	var factions := World.holdings.factions
+	if not factions.same_side(factions.of_kind(World.kind_of(self)), World.holdings.holder(id)):
+		return false
+	return not truce_broken.has(id) or World.holdings.since(id) > truce_broken[id]
+
+
+## A player or their companion struck one of [param id]'s band (799): the
+## whole band fights, till the camp falls and is retaken.
+static func break_truce(id: String) -> void:
+	if id.is_empty() or World.holdings == null:
+		return
+	if not truce_broken.has(id) or World.holdings.since(id) > truce_broken[id]:
+		print("[truce] %s: struck, the band turns" % id)
+	truce_broken[id] = World.holdings.now()
 
 
 ## Whether [param entity] is a sought newcomer waiting to be found (613,
@@ -2721,6 +2796,8 @@ func note_struck(by: GridEntity) -> void:
 	struck_tick = World.tick
 	_given_up.erase(by.get_instance_id())
 	_rouse()
+	if (by is Player or by is Companion) and in_truce():
+		break_truce(_truce_camp)
 
 
 ## Whoever struck it just now (a fight noise on its own tile from someone),

@@ -22,6 +22,7 @@ func _ready() -> void:
 	Net.port = preload("res://tests/test_ports.gd").of(17858)
 	_main = preload("res://main.tscn").instantiate()
 	add_child(_main)
+	_test_truce()
 	_lay_camp()
 	_test_holds()
 	_test_clock_restarts()
@@ -175,6 +176,72 @@ func _test_occupied() -> void:
 	_check(_slot_entity(IMP_SLOT) == null and int(_main._dead_since.get(IMP_SLOT, 0)) >= left - _main.RESPAWN_STAGGER_TICKS,
 			"left, it is not back at once: its full wait runs from when they left")
 	_check(_main.held_camp(CAMP_CELL) == "", "nobody in it: not held")
+
+
+## Decision 799, enemy-ai's side: the camp laid with "truce" (the Toll
+## Camp's): the imp, of its band, lets a player beside it be and goes after
+## no din; a camp trader is nobody's foe; the player's blow turns the whole
+## band (both slots in the camp); the camp changing hands brings the truce
+## back. The plain camp is laid after.
+func _test_truce() -> void:
+	print("
+== a camp's truce (799, enemy-ai's side) ==")
+	var zone: String = World.zone.name
+	var rows: Array[String] = []
+	for y in 2 * 20 - 1:
+		rows.append(".".repeat(2 * 30 - 1))
+	Level.register(zone, Level.image_from_rows(rows), null, {"outdoor": true, "places": {
+		"camp": {"at": [CAMP_CELL.x, CAMP_CELL.y], "kind": "camp", "holder": "goblins", "radius": 1, "worth": 4, "truce": true},
+		"post": {"at": [20, 20], "kind": "other", "truce": true}}})
+	var names: Array[String] = [zone]
+	World.holdings = Holdings.new(WorldMap.build(names), Factions.read(), {}, func() -> int: return World.steps)
+	var camp := "%s/camp" % zone
+	_check(World.holdings.place(camp).get("truce", false) and not World.holdings.place("%s/post" % zone).has("truce"),
+		"a camp's truce is read; on a place not a camp it is left out")
+	var band: Array[Monster] = []
+	for entity in World.get_entities():
+		if entity is Monster and not entity is Animal and entity.spawned:
+			if _main._within((entity as Monster).home, CAMP_CELL, 1):
+				band.append(entity)
+	var imp := _slot_entity(IMP_SLOT) as Monster
+	_check(imp != null and imp in band and imp.truce_camp() == camp and imp.in_truce(),
+		"the imp is of the camp's band, its truce holding (%s, band %d)" % [imp.truce_camp() if imp != null else "?", band.size()])
+	# Its pick asked straight, with no steps: the room's companion goes for
+	# monsters on sight (her own side of the truce is companions').
+	var player := _player()
+	var graced: bool = player.protected
+	player.protected = false  # Out of its spawn grace, so only the truce keeps it out of the fight.
+	_check(player != null and imp._nearest_visible_target() != player and not imp.threatens(player),
+		"a player in the room is let be (picks %s)" % [imp._nearest_visible_target()])
+	var alert_was: int = imp.alert
+	imp._heard({"at": imp.tile + Vector2i(1, 0), "kind": &"fight", "radius": 8, "source": player, "tick": World.tick})
+	_check(imp.alert == alert_was, "a din near it is not minded")
+	var trader := Resident.new()
+	trader.camp_trader = "forest/southeast_camp_trader"  # npc's 799: his place id.
+	var townsfolk := Resident.new()
+	_check(Monster.camp_trader(trader) and not Monster.camp_trader(townsfolk) and not Monster.camp_trader(player),
+		"a camp trader is told by Resident.camp_trader, townsfolk and players not")
+	imp.foes.append("town")
+	_check(not imp._may_fight(trader), "a camp trader is no foe, even to a side that fights the town")
+	imp.foes.erase("town")
+	trader.free()
+	townsfolk.free()
+	World.damage(imp, 1, player)
+	_check(not imp.in_truce() and band.all(func(each: Monster) -> bool: return not each.in_truce()),
+		"the player's blow breaks it for the whole band (%d)" % band.size())
+	_check(imp.threatens(player) and band.all(func(each: Monster) -> bool: return each.threatens(player)),
+		"the band would fight the player now")
+	World.steps += 1
+	World.holdings.take(camp, Factions.NOBODY)
+	World.steps += 1
+	World.holdings.take(camp, "goblins")
+	_check(imp.in_truce(), "the camp fallen and retaken, its band keeps the truce again")
+	imp.struck_by = null
+	player.protected = graced
+	imp.hp = imp.max_hp
+	Monster.truce_broken.clear()
+	for each in band:
+		each._truce_camp = "?"
 
 
 ## The player on their feet: one beaten down by the camp's monsters while

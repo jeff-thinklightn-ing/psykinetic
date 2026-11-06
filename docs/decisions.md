@@ -42590,3 +42590,23 @@ a visit a visitor's piece of news (Main._visitor_news). Economy's calls are read
 so either side lands first. Not yet: the raws he buys (economy's camp_offer and camp_buy) through
 the window's Sell, a follow-up with ui; his name (lore's drafts, with Jeff); the facing at work.
 resident_test _test_camp_traders. Server only, protocol unchanged, no new class_name.
+
+## 799, enemy-ai's side: camp traders are nobody's foe, and the Toll Camp keeps a truce
+
+npc's camp traders (Resident.camp_trader, the trader's place id, "" for townsfolk) are never a
+monster's foe: Monster.camp_trader(entity), read behind a property check so either side lands first,
+keeps them out of Monster._may_fight and Monster.threatens, whoever holds their camp (a captive
+trader at the loop camp too). The Toll Camp (forest/southeast_camp; the coordinator's approval) keeps
+a truce with players: a camp place may say "truce": true (Level.places_from keeps it on a camp and
+warns it off any other place; Holdings.place carries it; maps' make_forest.gd writes it), and a
+monster of the holder's side whose home lies within its radius is of its band (Monster.truce_camp,
+looked up once). While Monster.in_truce holds, the band takes no player or kept companion as a foe
+(its pick skips them, threatens says no) and goes after no din. A blow from a player or a companion
+on any one of the band (Monster.note_struck) breaks it for all of them (Monster.truce_broken, camp ->
+Holdings.now(), "[truce] <camp>: struck, the band turns"). It holds again once the camp has changed
+hands since (cleared and retaken), and after a restart, since it is never saved. A kept companion's
+own pick is companions' ("799, companions' side": Companion.harmless for a monster in_truce). C3's band keeps no
+truce: its trader is a captive. camp_fall_test _test_truce: the flag read, the band found, a player
+let be and a din not minded, a camp trader no foe even to a side that fights the town, one blow
+turning the band, the truce back after the camp is retaken. Server only, protocol unchanged, no new
+class_name.

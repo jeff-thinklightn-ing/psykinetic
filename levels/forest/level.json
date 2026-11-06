@@ -355,7 +355,8 @@
 			"name": "a bandit camp",
 			"holder": "bandits",
 			"worth": 2,
-			"mix": "mixed"
+			"mix": "mixed",
+			"truce": true
 		},
 		"southeast_camp_trader": {
 			"at": [
