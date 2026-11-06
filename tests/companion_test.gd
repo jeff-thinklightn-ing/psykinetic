@@ -2024,7 +2024,7 @@ func _test_notice() -> void:
 	_check("saw: \"The forge stands, built with your iron.\"" in str(pet._notice.get("focus", "")), "a sentence of the player's, quoted as what they saw (%s)" % [pet._notice])
 	pet._notice = {}
 	pet.noticed({"track": "bond", "amount": 1, "of": "her", "step": "close", "banner": "You are close to her"})
-	_check("You and %s have just grown closer: You are close to her" % pet.keeper_name() in str(pet._notice.get("focus", "")) and str(pet._notice.get("focus", "")).ends_with(Companion.NOTICE_BOND_LEAD),
+	_check("You and %s have just grown closer; you are close to %s now." % [pet.keeper_name(), pet.keeper_name()] in str(pet._notice.get("focus", "")) and str(pet._notice.get("focus", "")).ends_with(Companion.NOTICE_BOND_LEAD),
 		"her bond's step: she may say something of it, and need not")
 	for i in 5:
 		World.step()

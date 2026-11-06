@@ -44077,6 +44077,13 @@ late. No fixed line: silence is the fallback. The [voice] line gains "; noticed:
 (Companion.notice_report, counts only) for release's grep. companion_test _test_notice. Server
 only, protocol unchanged, no new class_name.
 
+804 amended (15) (2026-11-06, release's label; voice's words): her bond's step in her own words. The
+step's notice handed her the banner's sentence, "You are close to her", which is her player's view, so
+it read as if spoken to her. Now: "You and {player} have just grown closer; you are {fond of | close to
+| devoted to} {player} now." (Companion.NOTICE_BOND_TIERS by the gain's step), then NOTICE_BOND_LEAD as
+before; a step not in it (one up from the cold end) is not yet growing closer and is not offered.
+companion_test _test_notice. Server only, protocol unchanged, no new class_name.
+
 814, sound's side: the hill cat heard (release's label; enemy-ai's 814 design). Its own cries by kind "hill_cat", all on the voice bus, never heard by monsters but its death: sfx.hill_cat_snarl (its "call" as a player spots it, a hiss and a yowl; SoundKit.OWN_CRIES; range 8, -4 dB), sfx.hill_cat_pounce (as it lands its leap, its "pounce" cry: a short roar; range 8, -2), sfx.hill_cat_struck (struck and not killed: a hiss or a growl; SoundKit.struck; range 10, -4) and sfx.hill_cat_death (a dying roar, heard as a fight, falling back to sfx.wolf_death; -2). Its feet on paws (SoundKit.FEET). Twelve Freesound CC0 takes, three a cue: snarl from 389708 (suspensiondigital), 63668 (Miselaineous) and 844316 (TheKingOfGeeks360); pounce from 559270 (KristopherTiberiusHaven), 410343 (waxsocks) and 381857 (cribbler); struck from 485952 (aunrea), 819958 (rickismyname) and 63668; death from 410343, 389708 and 559270. Review: C:/dev/review/sound/hill_cat. Tests: sound_kit_test (the cat's routing, fallback, feet and takes). Client only; protocol unchanged, no new class_name, no bullet (enemy-ai's 814 carries it).
 
 ## 789. Magic, phase 1: the bear's-claw charm, the aura's light, the bear's-grease draught

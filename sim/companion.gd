@@ -446,6 +446,7 @@ const NOTICE_GAP_S := 120
 const NOTICE_STALE_S := 60
 const NOTICE_SKIP: Array[String] = ["gold", "catch", "practice", "item", "leisure", "adventure", "wonder", "faith", "safety", "company"]
 const NOTICE_LEAD := "If you speak now, react to that, briefly, in your own way: one short line."
+const NOTICE_BOND_TIERS := {"fond": "fond of", "close": "close to", "devoted": "devoted to"}
 const NOTICE_BOND_LEAD := "If you want, say something of it, briefly; you need not."
 const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
 const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s": 1200, "per_hour": 12,
@@ -1649,7 +1650,11 @@ func noticed(data: Dictionary) -> void:
 	if track == "bond":
 		if not data.has("step"):
 			return
-		focus = "You and %s have just grown closer: %s. %s" % [who, str(data.get("banner", "")).trim_suffix("."), NOTICE_BOND_LEAD]
+		# Her own line (voice's), never the banner's "You are close to her", which is her player's.
+		var tier := str(data.get("step", ""))
+		if not NOTICE_BOND_TIERS.has(tier):
+			return  # A step up from the cold end is not yet growing closer.
+		focus = "You and %s have just grown closer; you are %s %s now. %s" % [who, NOTICE_BOND_TIERS[tier], who, NOTICE_BOND_LEAD]
 	else:
 		var words := str(data.get("words", ""))
 		var of := str(data.get("of", ""))
