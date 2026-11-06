@@ -1408,6 +1408,38 @@ func _test_flank_party() -> void:
 ## A fight won (804, combat's side): the last foe on a player falls or
 ## routs, none other touched in FIGHT_FORGET_TICKS; each who fought it told
 ## once; an escape (the foe forgotten, never beaten) tells nothing.
+## A fighter freed mid-fight (gone from the zone with no despawn of this
+## world's) is let go quietly: World._tend_fights' typed loops threw on it
+## every tick and stopped the zone's tick (v0.1.206). One despawned leaves
+## the ledger at once.
+func _test_fight_freed() -> void:
+	var e := _build(["#######", "#.Pm..#", "#######"])
+	var p: Player = e["P"][0]
+	var m: GridEntity = e["m"][0]
+	var gone := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Gone1"})) as Player
+	_room.add_child(gone)
+	World._mark_fight(gone, m)
+	World._fight_beaten[gone] = [{"name": "The wolf", "fled": false, "hard": false, "at": Vector2i(3, 1), "id": 1}]
+	World._fight_last_won[gone] = World.tick
+	_blow(p, m)
+	gone.free()
+	var ticks := [0]
+	var on_tick := func(_a: Variant = null, _b: Variant = null) -> void: ticks[0] += 1
+	World.ticked.connect(on_tick)
+	for i in 3:
+		World.step()
+	World.ticked.disconnect(on_tick)
+	_check(int(ticks[0]) >= 3, "the zone ticks on with a freed fighter in the ledger (%d of 3)" % int(ticks[0]))
+	_check(World._fight_foes.size() == 1 and World._fight_foes.has(p) and World._fight_beaten.is_empty() and World._fight_last_won.is_empty(),
+		"the freed one dropped, the other's fight kept (%s, %s, %s)" % [World._fight_foes.size(), World._fight_beaten.size(), World._fight_last_won.size()])
+	World._foe_beaten(m as Monster, false)
+	_check(World._fight_beaten.size() == 1, "a foe beaten after: told to the one still here")
+	World.despawn(p)
+	_check(World._fight_foes.is_empty() and World._fight_beaten.is_empty() and World._fight_own.is_empty(), "one despawned leaves the ledger at once")
+	for i in 2:
+		World.step()
+
+
 ## The merge window waited out and the fights tended (804 amended (5)).
 func _settle() -> void:
 	World._tend_fights()
@@ -1611,6 +1643,7 @@ func _test_fight_won() -> void:
 	var fled := World.fight_reward([{"name": "Grull", "fled": true, "hard": true}], Vector2i(4, 5))
 	_check(str(fled["banner"]) == "Grull, driven off", "a hard foe fled: driven off (%s)" % [fled])
 	_test_fight_paced(won)  # After the reward's checks, which read the bear from won.
+	_test_fight_freed()
 	World.fight_won.disconnect(on_won)
 
 

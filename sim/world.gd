@@ -3793,14 +3793,14 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 		# Routed, then brought down before the win is told (804 amended (9):
 		# playtest's bear, run off at 18 hp and felled on the way to its den,
 		# bannered "driven off"): it fell.
-		for player: Player in _fight_beaten.keys():
+		for player: Variant in _fight_beaten.keys():  # Untyped: one freed since is let be till _tend_fights drops it.
 			for each: Dictionary in _fight_beaten[player]:
 				if int(each.get("id", 0)) == id and bool(each["fled"]):
 					each["fled"] = false
 					each["at"] = foe.tile
-	for player: Player in _fight_foes.keys():
+	for player: Variant in _fight_foes.keys():
 		var foes: Dictionary = _fight_foes[player]
-		if not foes.has(foe):
+		if not foes.has(foe) or not is_instance_valid(player):
 			continue
 		foes.erase(foe)
 		if not _fight_beaten.has(player):
@@ -3820,10 +3820,16 @@ func _foe_beaten(foe: Monster, fled: bool) -> void:
 ## and runs is beaten; a dead or forgotten one (FIGHT_FORGET_TICKS) leaves
 ## the fight. A player with foes beaten and none left gets fight_won.
 func _tend_fights() -> void:
-	for player: Player in _fight_foes.keys():
-		if not is_instance_valid(player) or not player.spawned:
-			_forget_fight(player)
+	# Keys untyped till checked: a player freed since (gone from the zone)
+	# threw on a typed loop every tick, and the zone's tick stopped with it.
+	for key: Variant in _fight_last_won.keys():
+		if not is_instance_valid(key):
+			_fight_last_won.erase(key)
+	for key: Variant in _fight_foes.keys():
+		if not is_instance_valid(key) or not (key as Player).spawned:
+			_forget_fight(key)
 			continue
+		var player := key as Player
 		var foes: Dictionary = _fight_foes[player]
 		for foe: Variant in foes.keys():
 			if not is_instance_valid(foe) or not (foe as Monster).spawned:
@@ -3841,12 +3847,13 @@ func _tend_fights() -> void:
 	# past (a foe that comes in it is the same fight), only if the player
 	# was in it itself, and no sooner than FIGHT_WON_GAP_TICKS after its
 	# last, unless a hard foe is among the beaten; held, never dropped.
-	for player: Player in _fight_beaten.keys():
+	for key: Variant in _fight_beaten.keys():
+		if not is_instance_valid(key) or not (key as Player).spawned:
+			_forget_fight(key)
+			continue
+		var player := key as Player
 		if _fight_foes.has(player):
 			_fight_ended.erase(player)  # Still at it.
-			continue
-		if not is_instance_valid(player) or not player.spawned:
-			_forget_fight(player)
 			continue
 		if not _fight_ended.has(player):
 			_fight_ended[player] = tick
@@ -3867,8 +3874,9 @@ func _tend_fights() -> void:
 
 
 ## [param player]'s fight let go (804 amended (5)): its foes, the beaten,
-## whether it was in it, its window. When it was last told stays.
-func _forget_fight(player: Player) -> void:
+## whether it was in it, its window. When it was last told stays. Untyped:
+## it may be a player freed since.
+func _forget_fight(player: Variant) -> void:
 	_fight_foes.erase(player)
 	_fight_beaten.erase(player)
 	_fight_own.erase(player)
@@ -8032,6 +8040,9 @@ func _forget_jobs(entity: GridEntity) -> void:
 			end_telegraph(id, false)  # Its source gone: never lands (decision 602).
 	_buffed.erase(entity)
 	_mending.erase(entity)
+	if entity is Player:
+		_forget_fight(entity)  # Its fight's ledger (804): none is told to one gone.
+		_fight_last_won.erase(entity)
 	_fishing.erase(entity)
 	_cooking.erase(entity)
 	_winders.erase(entity)
