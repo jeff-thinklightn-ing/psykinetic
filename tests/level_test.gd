@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_heights_and_stairs()
 	_test_pit_ways_out()
 	_test_mine_track()
+	_test_step_cache()
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
@@ -1353,6 +1354,47 @@ func _test_mine_track() -> void:
 		World._track.merge(bad[name], true)
 		_check(not _track_faults().is_empty(), "%s is named (%s)" % [name, _track_faults()])
 	World._track.clear()
+
+
+## World._step_blocked, the step check read from find_path's step cache,
+## gives what _terrain_blocks_step does: over each shipped level's cells by
+## an edge (walls, doors) and a spread of the rest, every way, opening
+## doors or not. A level's first difference is named.
+func _test_step_cache() -> void:
+	print("\n== a step's check from the paths' cache answers as the full check does (perf) ==")
+	var asked := 0
+	for folder in DirAccess.get_directories_at(Level.DIR):
+		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):
+			continue
+		var level := Level.load_level(folder)
+		if level.is_empty():
+			continue
+		World.load_terrain(level["terrain"])
+		var edged := {}
+		for key: Vector3i in level["terrain"].get("edges", {}):
+			edged[Vector2i(key.x, key.y)] = true
+			edged[Vector2i(key.x, key.y) + (Vector2i(1, 0) if key.z == Terrain.EAST else Vector2i(0, 1))] = true
+		var cells: Array = level["terrain"]["floor"].keys() if level["terrain"]["floor"] is Dictionary else level["terrain"]["floor"]
+		var stride := maxi(1, cells.size() / 1500)
+		var picked: Array[Vector2i] = []
+		var edge_stride := maxi(1, edged.size() / 3000)
+		var n := 0
+		for cell: Vector2i in edged:
+			if n % edge_stride == 0:
+				picked.append(cell)
+			n += 1
+		for i in range(0, cells.size(), stride):
+			picked.append(cells[i])
+		var differ := ""
+		for cell in picked:
+			for direction: Vector2i in World.DIRECTIONS:
+				for opens in [false, true]:
+					asked += 1
+					var full := World._terrain_blocks_step(cell, direction, opens)
+					if World._step_blocked(cell, direction, opens) != full and differ.is_empty():
+						differ = "%s %s opens=%s: full %s" % [cell, direction, opens, full]
+		_check(differ.is_empty(), "%s: %d cells, the cache's answers the full check's (%s)" % [folder, picked.size(), differ if not differ.is_empty() else "none differ"])
+	_check(asked > 0, "steps compared (%d)" % asked)
 
 
 ## What in World's loaded track a cart can't roll (decision 794): each

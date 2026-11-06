@@ -1468,7 +1468,7 @@ func held_against(entity: GridEntity) -> Dictionary:
 ## points by the terrain (walls, corners, ledges; doors it opens) and not
 ## into fire: what find_path would let it, but for who stands there.
 func terrain_step_open(from: Vector2i, direction: Vector2i) -> bool:
-	return not _terrain_blocks_step(from, direction, true) and not is_burning(from + direction)
+	return not _step_blocked(from, direction, true) and not is_burning(from + direction)
 
 
 var _plans_step := -1
@@ -9859,7 +9859,7 @@ func _shift(mover: GridEntity, entity: GridEntity, direction: Vector2i, push_bud
 		duration: float, start: float) -> bool:
 	var from: Vector2i = entity.tile
 	var to: Vector2i = from + direction
-	if _terrain_blocks_step(from, direction, entity.is_creature()):
+	if _step_blocked(from, direction, entity.is_creature()):
 		return false
 	var door := _closed_door_across(from, direction)
 	if door != null and not may_open(entity, door):
@@ -12142,6 +12142,27 @@ func _terrain_blocks_step(from: Vector2i, direction: Vector2i, opens_doors := fa
 		return true
 	return edge_blocks(from, via_x) or edge_blocks(from + via_x, via_y) \
 			or edge_blocks(from, via_y) or edge_blocks(from + via_y, via_x)
+
+
+## _terrain_blocks_step(from, direction, opens_doors) (heights counted),
+## the same answer, read from find_path's step cache (_path_step) where it
+## settles it (perf: a monster's step asked it twice, terrain_step_open's
+## and _shift's): a step it marks open is open, a straight one it marks
+## blocked is blocked, a door edge straight through is open to one who
+## opens doors; anything else (a diagonal it blocks, which it may for a
+## cliff by a corner the step itself allows, one past a door, a door for
+## one who doesn't open them, a cell off its grid) is asked in full.
+func _step_blocked(from: Vector2i, direction: Vector2i, opens_doors := false) -> bool:
+	var way := DIRECTIONS.find(direction)
+	if way >= 0:
+		_ensure_grid()
+		if _grid_rect.has_point(from) and _grid_rect.has_point(from + direction):
+			var step := _path_step(from, way)
+			if step == PATH_STEP_OPEN or step == PATH_STEP_DOOR and opens_doors:
+				return false
+			if step == PATH_STEP_BLOCKED and way < 4:
+				return true
+	return _terrain_blocks_step(from, direction, opens_doors)
 
 
 func _alive(entity: Variant) -> bool:

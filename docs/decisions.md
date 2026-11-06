@@ -6507,6 +6507,28 @@ Measured and not done:
   occupied (an early, free failure), so the door search finds a way with
   no door and the monster gives up anyway. Skipping it there changes what a
   monster does, enemy-ai's to decide; told to the coordinator.
+
+334 amended (2026-11-05, perf's find, the coordinator's approval; release's
+label): a walking step's check reads the memo too. Perf's probes on castle
+256 at 16 players put World.terrain_step_open at about 21 us a call and
+try_move's swap/shift at 28. Both asked _terrain_blocks_step in full each
+step, though find_path's memo (_path_step) already holds the answer for
+most of them. World._step_blocked(from, direction, opens_doors) is now
+their check. A step the memo calls open, or a door with opens_doors, is
+taken. A straight step it calls blocked is refused. Everything else, a
+blocked diagonal (the memo's is stricter: it refuses a diagonal past a
+cliff corner) or a cell off the grid, asks _terrain_blocks_step as before,
+so no answer changes. The memo is already rebuilt on every terrain, edge,
+building and zone change, so there is nothing new to keep in step. level_test
+_test_step_cache compares the two over every shipped level: the cells by
+each edge plus a sample of floor, all eight ways, with doors and without
+(490,608 steps, none differ). Perf's A/B on castle 256 at 16 players, the
+change against main in turn, after, before, after, before, five blocks of
+120 ticks each: swap/shift 23.7 and 22.3 us a call against 27.2 and 28.0
+(2.08 and 1.96 ms a tick against 2.40 and 2.47, about -0.4 ms a tick);
+terrain_step_open 21.0 and 20.2 against 21.5 and 21.8 (its cost is
+is_burning, next). The whole tick (median 48.9 and 45.1 ms against 48.0 and
+51.5) is within the bench's noise. Server only; protocol unchanged.
 ## 333. Residents are bodies in their town
 
 What: a town's residents (Towns.residents, Production.worker: records
