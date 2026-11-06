@@ -42468,7 +42468,9 @@ try_strike is the hook for a later click at the bite: it lands the catch at once
 51, shared with 814, which opened it; release's): Player and Companion replicate "fishing", {state: cast,
 wait, bite, landed or missed; at: the float's water cell}, {} when not fishing. Client3D's
 FishingView draws a quill float flying out in an arc, bobbing while it waits, dipping with a
-spreading ring at the bite and pulled back to the rod's tip, with a line from the tip; sound's
+spreading ring at the bite and pulled back to the rod's tip, with a line from the tip (the held
+rod's own "tip" socket by pc-character's Client3D.rod_tip, 805 amended (6); with no rod drawn, a
+guess up and ahead of the angler's feet); sound's
 sfx.fish_cast (the whip), sfx.fish_plop (the float landing), sfx.fish_bite and sfx.fish_landed play
 when they have takes. A perch landed calls 804's Main.reward(player, {track "catch",
 amount 1, of "perch", at the float's cell}); no party line (voice). Cooking (World.try_cook, from

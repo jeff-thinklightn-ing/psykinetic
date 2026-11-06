@@ -139,9 +139,14 @@ func _line(line: MeshInstance3D, from: Vector3, to: Vector3) -> void:
 	mesh.surface_end()
 
 
-## The rod's tip: up from the angler's drawn place and out along its facing.
+## The rod's tip: the held rod's own tip (pc-character's Client3D.rod_tip,
+## art-kit's "tip" socket); with no rod drawn, up from the angler's drawn
+## place and out along its facing.
 func _tip(entity: GridEntity) -> Vector3:
 	var puppet: Node3D = view._puppets.get(entity.get_instance_id())
+	var held: Variant = Client3D.rod_tip(puppet)
+	if held is Vector3:
+		return held
 	var feet: Vector3 = puppet.position if puppet != null else view._tile_position(entity.tile)
 	var ahead := Vector2(entity.facing).normalized() if entity.facing != Vector2i.ZERO else Vector2(0, 1)
 	return feet + Vector3(ahead.x * TIP_OUT, TIP_UP, ahead.y * TIP_OUT)
