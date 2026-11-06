@@ -8,6 +8,8 @@ notes (decision 324).
 ## Unreleased
 - Your companion answers you and speaks up again near a foe that hasn't noticed anyone or only stands off watching, such as a robber guarding a crypt chest, where before she fell silent for minutes as if in a fight; only a fight under way keeps her, or townsfolk, quiet (675 amended; 675 amended (2)).
 
+- Hollowfell's chiefs make a longer fight of it, and the kobold chief hisses before he strikes from behind, marking the blow on the ground under you: step out of it and he misses, open to you for a moment (790 amended (4)).
+
 ## v0.1.206
 
 - What goes over the network changes, so v0.1.205 and older can't join the server: update through the launcher first.

@@ -1737,7 +1737,79 @@ func _test_chiefs() -> void:
 	World.spawn(player, Vector2i(3, 2))
 	skeech.note_struck(player)
 	_check(not skeech.lurking(), "struck, it lurks no more")
+	_test_ambush()
 	Monster.idling = true
+
+
+## The ambush's told cell(s) shown now (790 amended (4)): [] for none.
+func _ambush_cells() -> Array:
+	for id: int in World.telegraphs():
+		var data: Dictionary = World.telegraphs()[id]
+		if str(data["kind"]) == "ambush":
+			return data["cells"]
+	return []
+
+
+## 790 amended (4): skeech's told strike from behind (enemy-ai chooses when;
+## here begun by hand): told and cried, it lands on one who stays, a step
+## out of it a miss and an opening, a stun breaks it; the chiefs' hp.
+func _test_ambush() -> void:
+	var grull_row := NamedEnemy.def("grull")
+	var skeech_row := NamedEnemy.def("skeech")
+	_check(is_equal_approx(float(grull_row["strength"]["hp"]), 2.2) and is_equal_approx(float(skeech_row["strength"]["hp"]), 2.0),
+		"the chiefs make a longer fight of it: hp 2.2 and 2.0 (%s, %s)" % [grull_row["strength"], skeech_row["strength"]])
+	var rows: Array[String] = ["##############", "#............#", "#.s..........#", "#............#", "##############"]
+	var e := _build(rows, {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
+	var skeech: Monster = e["s"][0]
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	_check(int(skeech.ambush.get("windup", 0)) == 8 and int(skeech.ambush.get("damage", 0)) == 5,
+		"skeech has the ambush, its row's numbers (%s)" % [skeech.ambush])
+	var cries: Array[StringName] = []
+	skeech.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	var hp := player.hp
+	_check(skeech.begin_ambush(player) and skeech.ambushing(), "begun on the player beside it")
+	_check(Vector2i(3, 2) in _ambush_cells().map(func(c: Array) -> Vector2i: return Vector2i(c[0], c[1])),
+		"the player's cell told (%s)" % [_ambush_cells()])
+	_check(cries.has(&"ambush"), "its cue cried (%s)" % [cries])
+	_check(not skeech.begin_ambush(player), "never two at once")
+	for i in 7:
+		World.tick += 1
+		skeech._tend_ambush()
+	_check(player.hp == hp and skeech.ambushing(), "held through its windup, nothing struck yet (%d)" % player.hp)
+	World.tick += 1
+	skeech._tend_ambush()
+	_check(player.hp == hp - 5 and _ambush_cells().is_empty(), "the player who stayed: struck for 5, the tell gone (%d of %d)" % [player.hp, hp])
+	_check(World.tick >= skeech._ambush_open_until, "struck home: no opening after")
+	# A step out of it: a miss, and it stands open.
+	e = _build(rows, {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
+	skeech = e["s"][0]
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	hp = player.hp
+	_check(skeech.begin_ambush(player), "begun again")
+	_move_to(player, Vector2i(3, 3))
+	for i in 8:
+		World.tick += 1
+		skeech._tend_ambush()
+	_check(player.hp == hp and skeech.ambushing() and _ambush_cells().is_empty(), "stepped out of it: missed, and it stands open (%d)" % player.hp)
+	World.tick += int(skeech.ambush["recover"])
+	_check(not skeech.ambushing(), "the opening past: it fights on")
+	# A stun in its windup breaks it.
+	_check(skeech.begin_ambush(player), "begun a third time")
+	skeech.stunned_until_tick = World.tick + 5
+	World.tick += 1
+	_check(not skeech._tend_ambush() and not skeech.ambushing() and _ambush_cells().is_empty(), "staggered in its windup: broken, nothing told")
+	_check(player.hp == hp, "and nothing struck (%d)" % player.hp)
+	skeech.stunned_until_tick = 0
+	# One with no ambush in its row never begins one.
+	e = _build(rows, {"s": {"named": "grull", "facing": Vector2i(1, 0)}})
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
 
 
 func _test_bear_party() -> void:

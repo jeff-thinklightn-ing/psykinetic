@@ -108,6 +108,10 @@ const CHARGE_PACE := 0.5
 const WINDUP_TICKS := 6
 const FLANK_PATIENCE_TICKS := 20
 const BACKSTAB_DAMAGE := 1
+## A lurking chief's told strike from behind (790 amended (4), combat's
+## numbers; its named row's "moves" "ambush" over these): the windup's ticks,
+## its damage, the ticks it stands open after a miss, and its cue's reach.
+const AMBUSH := {"windup": 8, "damage": 5, "recover": 8, "cue_reach": 8}
 ## Its manner, from its name: a step this much quicker or slower, a cooldown
 ## this many ticks either way, up to REACTION_TICKS_MAX to act on a new
 ## target, a chance a tick of PAUSE_CHANCE_MAX at most to stop a moment
@@ -680,6 +684,12 @@ func _take_named_ways() -> void:
 	lurks = bool(row.get("lurks", false))
 	if lurks:
 		idle = Idle.GUARD
+	var moves: Variant = row.get("moves")
+	if moves is Dictionary and (moves as Dictionary).get("ambush") is Dictionary:
+		ambush = AMBUSH.duplicate()
+		for key: String in moves["ambush"]:
+			if ambush.has(key):
+				ambush[key] = moves["ambush"][key]
 
 
 ## Whether it lurks now: a lurker with nobody to fight, not roused.
@@ -691,6 +701,86 @@ func lurking() -> bool:
 func _rouse() -> void:
 	if lurks:
 		_roused_until = World.tick + HUNT_TICKS
+
+
+## Its told strike from behind (790 amended (4)): its numbers (AMBUSH's, by
+## its named row), empty for one that has none.
+var ambush := {}
+## The ambush under way: {telegraph, lands, shape, aim, from}; empty for none.
+var _ambush := {}
+## Missed: it stands open till this tick.
+var _ambush_open_until := -1
+
+
+## Begins its told strike on [param on] (enemy-ai's to choose when: 790
+## amended (4)): it faces them, the strike's cell told (World.telegraph
+## "ambush", flank-marked: a blow from behind staggers it and breaks it),
+## its cue cried, and it holds still for "windup" ticks. False, nothing
+## begun, when it has no ambush, one is under way, or the told line from
+## where it stands does not end on their cell (810: the tell shows what
+## is struck).
+func begin_ambush(on: GridEntity) -> bool:
+	if ambush.is_empty() or not _ambush.is_empty() or not is_instance_valid(on) or not on.spawned:
+		return false
+	var aim := on.tile
+	if aim == tile:
+		return false
+	var toward := Vector2(aim - tile).normalized()
+	var shape := Telegraph.line(tile, toward, Vector2(aim - tile).length(), 1)
+	if aim not in World.telegraph_cells(shape):
+		return false
+	World.face(self, Senses.way_toward(tile, aim))
+	var ticks := int(ambush["windup"])
+	var id := World.telegraph(self, "ambush", shape, ticks, true)
+	if id == 0:
+		return false
+	_ambush = {"telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": aim, "from": World.tick, "at": tile}
+	_cry(&"ambush", int(ambush["cue_reach"]))
+	print("[ambush] %s winds up at %s on %s at %s, lands in %d ticks" % [name, tile, on.name, aim, ticks])
+	return true
+
+
+## Whether its ambush holds it: wound up, or standing open after a miss.
+func ambushing() -> bool:
+	return not _ambush.is_empty() or World.tick < _ambush_open_until
+
+
+## The ambush under way, each fighting tick: true while it holds it. It
+## lands when due on whoever is still on the told cell (World.tell_struck,
+## 810): "damage", cause &"ambush". On nobody it stands open "recover"
+## ticks. A stun, a down or a knock off its cell since it began breaks it.
+func _tend_ambush() -> bool:
+	if _ambush.is_empty():
+		return World.tick < _ambush_open_until
+	var from := int(_ambush["from"])
+	if stunned_until_tick > from or down_until > from or tile != _ambush["at"] or not spawned:
+		_end_ambush(false)
+		print("[ambush] %s broken" % name)
+		return false
+	if World.tick < int(_ambush["lands"]):
+		return true
+	var aim: Vector2i = _ambush["aim"]
+	var cells := World.telegraph_cells(_ambush["shape"])
+	_end_ambush(true)
+	var hit: Array[GridEntity] = []
+	if aim in cells:
+		for each in World.tell_struck(self, [aim] as Array[Vector2i]):
+			if each != self and each.spawned and each.hp > 0 and each.max_hp > 0:
+				hit.append(each)
+	for each in hit:
+		World.damage(each, int(ambush["damage"]), self, &"ambush")
+	if hit.is_empty():
+		_ambush_open_until = World.tick + int(ambush["recover"])  # Stepped out of it: the opening.
+	else:
+		next_attack_tick = maxi(next_attack_tick, World.tick + attack_ticks)
+	print("[ambush] %s at %s -> %s" % [name, aim, "struck %d" % hit.size() if not hit.is_empty() else "missed"])
+	return true
+
+
+func _end_ambush(landed: bool) -> void:
+	if not _ambush.is_empty():
+		World.end_telegraph(int(_ambush["telegraph"]), landed)
+	_ambush = {}
 
 
 ## Its kind's "senses" (decision 784; read_kinds' "senses"): {sight: cells
@@ -918,6 +1008,8 @@ func _sim_tick() -> void:
 		if _should_flee():
 			_flee(target.tile)
 			return
+	if _tend_ambush():
+		return  # Its told strike from behind, or the opening after (790 amended (4)).
 	if not World.winding(self).is_empty():
 		return  # Its heavy blow wound up: it stands till World strikes it.
 	if _meet_wind_up():
@@ -3246,6 +3338,7 @@ func _drop_windup() -> void:
 	if not _windup.is_empty():
 		_world_winding(_windup["direction"], 0)
 	_windup = {}
+	_end_ambush(false)
 
 
 ## A cry of [param kind], heard [param radius] cells off (World.noise), and
