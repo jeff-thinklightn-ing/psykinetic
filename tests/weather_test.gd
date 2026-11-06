@@ -582,8 +582,18 @@ func _test_night_town() -> void:
 	var near := Client3D.nearest_carriers(carriers, Vector2(0.0, 0.0), Client3D.CARRIED_NEAR)
 	_check(near.size() == Client3D.CARRIED_NEAR and near[0] == carriers[0] and near[1] == carriers[2] and not carriers.has(1),
 			"the %d carriers nearest the camera light the ground, nearest first; a lantern put away drops out" % Client3D.CARRIED_NEAR)
+	var own: Node3D = made[5]
+	var with := Client3D.with_own(near, own, Client3D.CARRIED_NEAR)
+	_check(with.size() == Client3D.CARRIED_NEAR and with[0] == own and with[1] == near[0] and not near[near.size() - 1] in with
+			and Client3D.with_own(near, near[2], Client3D.CARRIED_NEAR) == near and Client3D.with_own(near, null, Client3D.CARRIED_NEAR) == near,
+			"the followed player's aura is always lit: put first if it was left out, the farthest dropped (789)")
 	for lantern in made:
 		lantern.free()
+	_check(Client3D.aura_glow(0.34) == Vector2(Client3D.AURA_REACH.x, Client3D.AURA_ENERGY.x) and Client3D.aura_glow(1.0) == Vector2(Client3D.AURA_REACH.y, Client3D.AURA_ENERGY.y)
+			and Client3D.aura_glow(0.67).x > Client3D.AURA_REACH.x and Client3D.aura_glow(0.67).x < Client3D.AURA_REACH.y and Client3D.AURA_REACH == Vector2(3.0, 6.0),
+			"an aura's light: 3 m at 0.35 (and the least aura, 1/3) to 6 m at 1, growing between (789)")
+	_check(Client3D.aura_shows(0.34, true, true) and Client3D.aura_shows(0.34, false, false) and not Client3D.aura_shows(0.34, false, true) and not Client3D.aura_shows(0.0, true, false),
+			"an aura shows after sunset or under a roof, never by day in the open, never with none")
 
 
 func _check(ok: bool, label: String) -> void:

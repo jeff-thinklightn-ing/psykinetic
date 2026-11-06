@@ -43826,3 +43826,22 @@ built "That's your {item} in the {building}." / "The {building} went up with you
 credits a deed once (Main._credited); a player hears at most "a_day" (2) credits a day (Main._credits_today),
 so it never nags. The deed's banner at the moment it stands (economy's) is the written half; the spoken
 credit comes at a later hail. resident_test _test_credit. Protocol unchanged; no new class_name.
+## 789, environment's side: the aura's glow
+
+The coordinator's approved design (a worn charm gives its wearer a pale, steady, cool light where it is
+dark), drawn from items' GridEntity.aura, which Player and Companion already replicate: no field and no
+protocol change of environment's own. Client3D: an aura shows (aura_shows) when it is above 0 and the
+sun is down or a roof is over the wearer; never by day in the open. Its light (aura_glow) is
+AURA_COLOUR (0.78, 0.86, 1.0), AURA_UP 1.6 m over the body, reaching AURA_REACH 3 m at aura AURA_FROM
+0.35 (and under it: a new charm is 0.33) to 6 m at 1.0, AURA_ENERGY 0.6 to 1.2 likewise, steady, never
+flickering; paler than a lantern (1.2 over 6 m), so a lantern still matters. Today's charms give 0.33 to
+0.5, about 3 to 3.7 m. A wearer's "AuraGlow" marker (_sync_aura) joins the carried lanterns
+(_carriers, 782) for the CARRIED_NEAR 4 real lights nearest the camera's aim, lit by kind in
+_light_carriers; the followed player's own is always among them (with_own, put first and the farthest
+dropped). A wearer left out draws an unlit, additive glow on the ground instead (its "Disc",
+AURA_DISC 0.3 strong at full energy, AURA_DISC_SHARE 0.7 of the reach across) and lights nothing. The
+stills (C:/dev/review/lands/env_stills_1106/aura) settled the energy: a clear pool in the barrow, while
+a stronger 1.0 to 1.6 washed it out; in the open at night the moon lights the ground about as much, so
+the coordinator asked for an outdoors tell of its own (aura motes, to come before 789 opens). Tests:
+weather_test (aura_glow's ends, aura_shows, with_own), view_test _test_aura (the marker, a cool real
+light at the reach, none with no aura). Client only, no new class_name.

@@ -813,6 +813,21 @@ const CARRIED_PICK := 0.5
 const CARRIED_ENERGY := 1.6
 const CARRIED_RANGE := 5.0
 const CARRIED_UP := 1.2
+## A charm's aura (789; items' GridEntity.aura, 0..1): a pale, steady, cool
+## light on the ground round its wearer after sunset or under a roof,
+## AURA_REACH.x m at aura AURA_FROM to AURA_REACH.y m at 1, AURA_ENERGY
+## likewise, AURA_UP m over the body. It shares the CARRIED_NEAR real lights
+## with the carried lanterns, the followed player's own always among them;
+## a wearer left out draws an unlit glow on the ground (AURA_DISC strong,
+## AURA_DISC_SHARE of the reach across) and lights nothing.
+const AURA_COLOUR := Color(0.78, 0.86, 1.0)
+const AURA_REACH := Vector2(3.0, 6.0)
+const AURA_ENERGY := Vector2(0.6, 1.2)
+const AURA_FROM := 0.35
+const AURA_UP := 1.6
+const AURA_DISC := 0.3
+const AURA_DISC_SHARE := 0.7
+const AURA_DISC_SHADER := "shader_type spatial;\nrender_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;\nuniform vec4 tint : source_color;\nvoid fragment() {\n\tfloat d = clamp(length(UV - vec2(0.5)) * 2.0, 0.0, 1.0);\n\tfloat a = 1.0 - d * d;\n\tALBEDO = tint.rgb * a * a * tint.a;\n}\n"
 ## The mine's wall lamps (769 amended (6)): each lantern cell with a "mine_lamp" decor
 ## row lights at the piece's flame, warm, shadowless; only the
 ## WALL_LAMP_NEAR nearest the camera's aim at once (picked again every
@@ -15976,7 +15991,9 @@ func _sync_carried(body: Resident, puppet: Node3D, id: int) -> void:
 ## The carried lanterns' lights (782): CARRIED_NEAR lights, kept on the
 ## carriers nearest the camera's aim (picked again every CARRIED_PICK s),
 ## CARRIED_UP over the lantern, flickering a little; the rest of the
-## carriers' lanterns glow and light nothing.
+## carriers' lanterns glow and light nothing. A charm's aura (789,
+## _sync_aura) is a carrier too, lit AURA_COLOUR and steady, the followed
+## player's own always lit; an aura left out shows its ground glow.
 func _light_carriers(delta: float) -> void:
 	if _carried_lights.is_empty():
 		if _carriers.is_empty():
@@ -15990,16 +16007,111 @@ func _light_carriers(delta: float) -> void:
 	_carried_clock += delta
 	if _carried_clock >= CARRIED_PICK:
 		_carried_clock = 0.0
-		_carried_by = nearest_carriers(_carriers, Vector2(_camera_target.x, _camera_target.z), CARRIED_NEAR)
+		var own: Node3D = null
+		var player := _local_player()
+		if player != null and _carriers.has(player.get_instance_id()):
+			own = _carriers[player.get_instance_id()]
+		_carried_by = with_own(nearest_carriers(_carriers, Vector2(_camera_target.x, _camera_target.z), CARRIED_NEAR), own, CARRIED_NEAR)
+		for carried: Node3D in _carriers.values():
+			if carried.has_meta("aura"):
+				(carried.get_node("Disc") as Node3D).visible = not carried in _carried_by
 	for i in _carried_lights.size():
 		var light := _carried_lights[i]
 		var lantern: Node3D = _carried_by[i] if i < _carried_by.size() else null
 		var lit := lantern != null and is_instance_valid(lantern) and lantern.visible
 		if light.visible != lit:
 			light.visible = lit
-		if lit:
+		if not lit:
+			continue
+		if lantern.has_meta("aura"):
+			var glow := aura_glow(float(lantern.get_meta("aura")))
+			light.light_color = AURA_COLOUR
+			light.omni_range = glow.x
+			light.light_energy = glow.y
+			light.global_position = lantern.global_position + Vector3(0.0, AURA_UP, 0.0)
+		else:
+			light.light_color = LANTERN
+			light.omni_range = CARRIED_RANGE
 			light.global_position = lantern.global_position + Vector3(0.0, CARRIED_UP, 0.0)
 			light.light_energy = CARRIED_ENERGY * Flames.flicker(_fire_time, float(i) * 1.7, LANTERN_FLICKER)
+
+
+## [param near] with [param own] (the followed player's aura, or null) in
+## it, first if it had to be put in, the farthest dropped past [param most].
+static func with_own(near: Array[Node3D], own: Node3D, most: int) -> Array[Node3D]:
+	if own == null or not is_instance_valid(own) or not own.visible or own in near:
+		return near
+	var out: Array[Node3D] = [own]
+	out.append_array(near)
+	return out.slice(0, most)
+
+
+## An aura's light (789): its reach and energy, Vector2(m, energy), from
+## AURA_REACH.x and AURA_ENERGY.x at AURA_FROM (and under it) to .y at 1.
+static func aura_glow(aura: float) -> Vector2:
+	var t := clampf(inverse_lerp(AURA_FROM, 1.0, aura), 0.0, 1.0)
+	return Vector2(lerpf(AURA_REACH.x, AURA_REACH.y, t), lerpf(AURA_ENERGY.x, AURA_ENERGY.y, t))
+
+
+## Whether a wearer's aura shows (789): some aura, and the sun down
+## ([param night]) or a roof over it ([param outdoor] false).
+static func aura_shows(aura: float, night: bool, outdoor: bool) -> bool:
+	return aura > 0.0 and (night or not outdoor)
+
+
+## A player's or companion's aura (789): an "AuraGlow" marker at its feet,
+## kept in _carriers while it shows (_light_carriers lights it), with its
+## ground glow "Disc" for when it is not lit.
+func _sync_aura(entity: GridEntity, puppet: Node3D, id: int) -> void:
+	var shows := aura_shows(entity.aura, _night, _outdoor)
+	var glow := puppet.get_node_or_null("AuraGlow") as Node3D
+	if glow == null:
+		if not shows:
+			return
+		glow = _aura_glow()
+		puppet.add_child(glow)
+	if glow.visible != shows:
+		glow.visible = shows
+	if not shows:
+		if _carriers.get(id) == glow:
+			_carriers.erase(id)
+		return
+	if not is_equal_approx(float(glow.get_meta("aura", -1.0)), entity.aura):
+		glow.set_meta("aura", entity.aura)
+		var reach := aura_glow(entity.aura)
+		var disc := glow.get_node("Disc") as MeshInstance3D
+		var across := reach.x * AURA_DISC_SHARE * 2.0
+		disc.scale = Vector3(across, 1.0, across)
+		(disc.material_override as ShaderMaterial).set_shader_parameter("tint",
+				Color(AURA_COLOUR, AURA_DISC * reach.y / AURA_ENERGY.y))
+	_carriers[id] = glow
+
+
+var _aura_shader: Shader
+
+
+## An aura's marker (789): a Node3D at the body's feet holding its ground
+## glow, an unlit additive disc a hair over the floor, hidden until
+## _light_carriers leaves it out of the real lights.
+func _aura_glow() -> Node3D:
+	if _aura_shader == null:
+		_aura_shader = Shader.new()
+		_aura_shader.code = AURA_DISC_SHADER
+	var glow := Node3D.new()
+	glow.name = "AuraGlow"
+	var disc := MeshInstance3D.new()
+	disc.name = "Disc"
+	var plane := PlaneMesh.new()
+	plane.size = Vector2.ONE
+	disc.mesh = plane
+	disc.position.y = 0.03
+	disc.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var material := ShaderMaterial.new()
+	material.shader = _aura_shader
+	disc.material_override = material
+	disc.visible = false
+	glow.add_child(disc)
+	return glow
 
 
 ## The [param most] of [param carriers]' lanterns (id -> Node3D) nearest
@@ -16819,6 +16931,7 @@ func _sync_puppets() -> void:
 			_sync_work(entity as Resident, puppet)
 		elif entity is Player or entity is Companion:
 			_sync_work(entity, puppet)  # Its bandaging (the kneel); a companion's sleep.
+			_sync_aura(entity, puppet, id)
 			if entity is Companion:
 				puppet.set_meta("guide_wait", (entity as Companion).guide_wait)
 		_sync_bow(entity, puppet)

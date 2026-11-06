@@ -74,6 +74,7 @@ func _ready() -> void:
 		_test_mine_sounds()
 		_test_idle_voices()
 		await _test_monster_death()
+		_test_aura()
 		await _test_companion_death()
 		await _test_down_grey()
 		await _test_player_death()
@@ -1471,6 +1472,37 @@ func _death_after_despawn() -> void:
 	_rig._process(0.0)
 	await get_tree().create_timer(Client3D.DEPARTED_SECONDS + 0.2).timeout
 	_check(not is_instance_valid(gone), "gone without a death: freed after %d ms" % roundi(Client3D.DEPARTED_SECONDS * 1000.0))
+
+
+## A charm's aura (789): a cool, steady light over its wearer after
+## sunset, the followed player's own always among the real lights; none
+## with no aura.
+func _test_aura() -> void:
+	print("\n== a charm's aura: a cool light round the wearer at night, always the player's own ==")
+	var player := _player()
+	_rig._process(0.0)
+	var id := player.get_instance_id()
+	var puppet: Node3D = _rig._puppets[id]
+	var night := _rig._night
+	_rig._night = true
+	player.aura = 0.67
+	_rig._sync_aura(player, puppet, id)
+	var glow := puppet.get_node_or_null("AuraGlow") as Node3D
+	_check(glow != null and glow.visible and _rig._carriers.get(id) == glow, "a worn aura at night: its marker, kept with the carried lanterns")
+	_rig._carried_clock = Client3D.CARRIED_PICK
+	_rig._light_carriers(0.0)
+	var want := Client3D.aura_glow(0.67)
+	var lit := _rig._carried_lights.filter(func(light: OmniLight3D) -> bool:
+		return light.visible and light.light_color == Client3D.AURA_COLOUR)
+	_check(lit.size() == 1 and is_equal_approx((lit[0] as OmniLight3D).omni_range, want.x) and is_equal_approx((lit[0] as OmniLight3D).light_energy, want.y)
+			and not (glow.get_node("Disc") as Node3D).visible,
+			"lit by a real light, cool, %.1f m at aura 0.67, no ground glow" % want.x)
+	player.aura = 0.0
+	_rig._sync_aura(player, puppet, id)
+	_check(not glow.visible and not _rig._carriers.has(id), "no aura, no light")
+	_rig._night = night
+	_rig._carried_clock = Client3D.CARRIED_PICK
+	_rig._light_carriers(0.0)
 
 
 func _test_companion_death() -> void:
