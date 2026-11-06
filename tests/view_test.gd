@@ -75,6 +75,7 @@ func _ready() -> void:
 		_test_idle_voices()
 		await _test_monster_death()
 		_test_aura()
+		await _test_forge()
 		await _test_companion_death()
 		await _test_down_grey()
 		await _test_player_death()
@@ -1543,6 +1544,47 @@ func _test_aura() -> void:
 	_rig._night = night
 	_rig._carried_clock = Client3D.CARRIED_PICK
 	_rig._light_carriers(0.0)
+
+
+## The cold forge woken (813 amended (7)): dungeon's hook on a bare holder
+## (its piece is art-kit's to come), caught in view, then as found lit.
+func _test_forge() -> void:
+	print("\n== the cold forge woken: a flare and sparks as it catches, then a steady fire ==")
+	var forge := Node3D.new()
+	forge.name = "TestForge"
+	_rig.add_child(forge)
+	_rig._show_forge(forge, true, true)
+	var fire := forge.get_node_or_null("ForgeFire") as Node3D
+	var light := fire.get_node_or_null("Light") as OmniLight3D if fire != null else null
+	_check(light != null and light.light_color == Client3D.FORGE_COLOUR and light in _rig._forge_lights
+			and fire.position == Client3D.FORGE_HEARTH and fire.get_node_or_null("Burst") != null and fire.get_node_or_null("Sparks") != null,
+			"caught: a forge-orange light at the hearth, a burst of sparks and their trickle")
+	if light == null:
+		forge.free()
+		return
+	await get_tree().create_timer(Client3D.FORGE_CATCH + 0.1).timeout
+	var peak := float(light.get_meta(&"base"))
+	_check(peak > Client3D.FORGE_ENERGY * 1.5 and light.omni_range > Client3D.FORGE_RANGE,
+			"the flare: brighter than it burns (%.1f), reaching further (%.1f m)" % [peak, light.omni_range])
+	await get_tree().create_timer(Client3D.FORGE_SETTLE + 0.1).timeout
+	_check(is_equal_approx(float(light.get_meta(&"base")), Client3D.FORGE_ENERGY) and is_equal_approx(light.omni_range, Client3D.FORGE_RANGE),
+			"then it settles to its fire: %.1f, %.0f m" % [Client3D.FORGE_ENERGY, Client3D.FORGE_RANGE])
+	_rig._show_forge(forge, true, false)
+	_check(forge.get_children().filter(func(child: Node) -> bool: return child.name.begins_with("ForgeFire")).size() == 1, "lit twice is lit once")
+	_rig._show_forge(forge, false, false)
+	_check(forge.get_node_or_null("ForgeFire") == null and not light in _rig._forge_lights and not light in _rig._shadow_lights,
+			"cold again (a regen): no fire left, nor its shadow")
+	var hearth := Marker3D.new()
+	hearth.name = "hearth"
+	forge.add_child(hearth)
+	_rig._show_forge(forge, true, false)
+	fire = hearth.get_node_or_null("ForgeFire") as Node3D
+	light = fire.get_node_or_null("Light") as OmniLight3D if fire != null else null
+	_check(light != null and is_equal_approx(float(light.get_meta(&"base")), Client3D.FORGE_ENERGY) and fire.get_node_or_null("Burst") == null,
+			"found already lit: at the piece's hearth, burning steady, no flare or burst")
+	forge.free()
+	_rig._flicker_fires(0.016)
+	_check(_rig._forge_lights.is_empty(), "the forge freed with its room: its light dropped")
 
 
 func _test_companion_death() -> void:

@@ -40,7 +40,7 @@ const VIEW: Array[StringName] = [
 	&"_turn_view", &"_walk", &"_walk_from", &"_hand_yaw", &"_line_fade", &"_fade_clock",
 	&"_inside_rect", &"_builder_marks", &"_code_labels", &"_codes_on", &"_aura_mote_material",
 	&"_aura_shader", &"drips", &"_shadow_checked", &"_lamp_clock", &"_roofs_clock",
-	&"scatter_reach_low", &"_sky_floor"
+	&"scatter_reach_low", &"_sky_floor", &"_spark_material"
 ]
 
 
@@ -58,8 +58,9 @@ const ROOM: Array[StringName] = [
 	&"_dry_water", &"_bed_levels", &"_deck_tops", &"_deck_ends", &"_fords", &"_rocks",
 	&"_solid_cells", &"_posts", &"_doorways", &"_door_hinges", &"_door_states", &"_doors_due",
 	&"torch_cells", &"_terrain", &"_outdoor", &"_fire_lights", &"_lamp_lights", &"_door_lamps",
-	&"_night_posts", &"_night_stores", &"_night_places", &"_wall_lamps", &"_skylights", &"_motes",
-	&"_mote_material", &"_shafts", &"_ground_shader_material", &"_cliff_material", &"_land",
+	&"_night_posts", &"_night_stores", &"_night_places", &"_wall_lamps", &"_forge_lights", &"_skylights",
+	&"_motes", &"_mote_material", &"_shafts", &"_ground_shader_material", &"_cliff_material",
+	&"_land",
 	&"_relief", &"_relief_size", &"_relief_given", &"_wet", &"_ground_top", &"_ground_look",
 	&"_hillshade_yaw", &"_ground_bottom", &"_corners", &"_ramp_heights", &"_dais_stairs",
 	&"_ridge_pitch", &"_sight_cut", &"_sight_hidden", &"_sight_key", &"_water_mask", &"_shore_mask",

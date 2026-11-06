@@ -856,6 +856,26 @@ const AURA_MOTE_HIGH := Vector2(0.2, 1.8)
 const AURA_MOTE_GLOW := 0.9
 const AURA_MOTE_DAY := 0.6
 const AURA_MOTE_FAR := 40.0
+
+## The cold forge woken (813 amended (7), dungeon's co-op room): its light
+## at the set piece's "hearth" (else FORGE_HEARTH from its origin, +z toward
+## the room), FORGE_COLOUR, FORGE_RANGE and FORGE_ENERGY, flickering as a
+## fire (Flames.FIRE_FLICKER), casting shadows. Caught as it is seen: a
+## flare to FORGE_FLARE in FORGE_CATCH seconds, the reach swelling to
+## FORGE_SWELL, both settling over FORGE_SETTLE; FORGE_BURST sparks thrown
+## up and out, then FORGE_TRICKLE a second rising while it burns.
+const FORGE_COLOUR := Color(1.0, 0.55, 0.25)
+const FORGE_HEARTH := Vector3(0.0, 0.6, 0.4)
+const FORGE_RANGE := 8.0
+const FORGE_SWELL := 10.0
+const FORGE_ENERGY := 2.4
+const FORGE_FLARE := 6.0
+const FORGE_CATCH := 0.2
+const FORGE_SETTLE := 1.8
+const FORGE_BURST := 60
+const FORGE_TRICKLE := 8.0
+const FORGE_SPARK_SECONDS := 1.5
+const FORGE_SPARK_SIZE := 0.06
 ## The mine's wall lamps (769 amended (6)): each lantern cell with a "mine_lamp" decor
 ## row lights at the piece's flame, warm, shadowless; only the
 ## WALL_LAMP_NEAR nearest the camera's aim at once (picked again every
@@ -16667,7 +16687,7 @@ func _add_fire(cell: Vector2i) -> void:
 ## (Flames.day_share). World's light (Fields) is never touched: it stays
 ## steady for Senses.
 func _flicker_fires(delta: float) -> void:
-	if _fire_lights.is_empty() and _lamp_lights.is_empty():
+	if _fire_lights.is_empty() and _lamp_lights.is_empty() and _forge_lights.is_empty():
 		return
 	_fire_time += delta
 	for lamp: Array in _lamp_lights:
@@ -16679,6 +16699,7 @@ func _flicker_fires(delta: float) -> void:
 		var light := fire[0] as OmniLight3D
 		if is_instance_valid(light):
 			light.light_energy = float(fire[1]) * share * Flames.flicker(_fire_time, float(fire[2]), float(fire[3]))
+	_flicker_forges()
 
 
 # --- The night town (782) --------------------------------------------------------
@@ -17157,6 +17178,132 @@ func _aura_glow() -> Node3D:
 	disc.visible = false
 	glow.add_child(disc)
 	return glow
+
+
+# --- The cold forge woken (813 amended (7)) ---------------------------------------
+
+## The forges lit (813 amended (7)): their lights, flickered with the fires
+## (_flicker_forges); a freed forge's dropped.
+var _forge_lights: Array[OmniLight3D] = []
+var _spark_material: StandardMaterial3D = null
+
+
+## Dungeon's cold forge [param forge] (set_cold_forge's holder) lit or not,
+## as its smith's cupboard's door is open (_sync_doors): its light and
+## sparks under a "ForgeFire" child at the hearth. [param catching] (lit
+## from shut as it is drawn, _show_vault's rule) flares it and throws the
+## burst; otherwise it is simply burning. Lit twice is lit once.
+func _show_forge(forge: Node3D, lit: bool, catching: bool) -> void:
+	if forge == null or not is_instance_valid(forge):
+		return
+	var fire := forge.find_child("ForgeFire", true, false) as Node3D
+	if not lit:
+		if fire != null:
+			var out := fire.get_node("Light") as OmniLight3D
+			_forge_lights.erase(out)
+			_shadow_lights.erase(out)
+			fire.name = "ForgeFireOut"  # Not found as lit while it waits to be freed.
+			fire.hide()
+			fire.queue_free()
+		return
+	if fire != null:
+		return
+	fire = Node3D.new()
+	fire.name = "ForgeFire"
+	var hearth := forge.find_child("hearth", true, false) as Node3D
+	if hearth != null:
+		hearth.add_child(fire)
+	else:
+		fire.position = FORGE_HEARTH
+		forge.add_child(fire)
+	var light := OmniLight3D.new()
+	light.name = "Light"
+	light.light_color = FORGE_COLOUR
+	light.omni_range = FORGE_RANGE
+	light.set_meta(&"phase", randf() * TAU)
+	fire.add_child(light)
+	_cast_shadows(light)
+	_forge_lights.append(light)
+	var trickle := _forge_sparks(false)
+	trickle.name = "Sparks"
+	fire.add_child(trickle)
+	if not catching:
+		light.set_meta(&"base", FORGE_ENERGY)
+		light.light_energy = FORGE_ENERGY
+		return
+	light.set_meta(&"base", 0.0)
+	light.light_energy = 0.0
+	var burst := _forge_sparks(true)
+	burst.name = "Burst"
+	fire.add_child(burst)
+	burst.emitting = true
+	burst.finished.connect(burst.queue_free)
+	var flare := light.create_tween()
+	flare.tween_method(func(energy: float) -> void: light.set_meta(&"base", energy), 0.0, FORGE_FLARE, FORGE_CATCH).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	flare.parallel().tween_property(light, "omni_range", FORGE_SWELL, FORGE_CATCH)
+	flare.tween_method(func(energy: float) -> void: light.set_meta(&"base", energy), FORGE_FLARE, FORGE_ENERGY, FORGE_SETTLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	flare.parallel().tween_property(light, "omni_range", FORGE_RANGE, FORGE_SETTLE).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+## Each lit forge's light at its base (FORGE_ENERGY, or the flare's) with a
+## fire's flicker; a forge freed with its room is dropped.
+func _flicker_forges() -> void:
+	for i in range(_forge_lights.size() - 1, -1, -1):
+		var light := _forge_lights[i]
+		if not is_instance_valid(light):
+			_forge_lights.remove_at(i)
+			continue
+		light.light_energy = float(light.get_meta(&"base", FORGE_ENERGY)) * Flames.flicker(_fire_time, float(light.get_meta(&"phase", 0.0)), Flames.FIRE_FLICKER)
+
+
+## A forge's sparks: the [param burst] as it catches (FORGE_BURST at once,
+## thrown up and out, falling) or its trickle while it burns
+## (FORGE_TRICKLE a second, rising). Orange-white to nothing, unshaded and
+## added; indoors only, so off the screen is the only cut (no distance one:
+## the ortho camera stands CAMERA_DISTANCE off, past which a range would cut).
+func _forge_sparks(burst: bool) -> GPUParticles3D:
+	var sparks := GPUParticles3D.new()
+	sparks.lifetime = FORGE_SPARK_SECONDS * (0.8 if burst else 1.0)
+	sparks.amount = FORGE_BURST if burst else ceili(FORGE_TRICKLE * FORGE_SPARK_SECONDS)
+	sparks.one_shot = burst
+	sparks.explosiveness = 1.0 if burst else 0.0
+	sparks.randomness = 0.5
+	sparks.emitting = not burst
+	sparks.local_coords = false
+	sparks.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	sparks.visibility_aabb = AABB(Vector3(-3.0, -1.0, -3.0), Vector3(6.0, 5.0, 6.0))
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	process.emission_sphere_radius = 0.2
+	process.direction = Vector3.UP
+	process.spread = 55.0 if burst else 20.0
+	process.initial_velocity_min = 2.0 if burst else 0.6
+	process.initial_velocity_max = 4.0 if burst else 1.4
+	process.gravity = Vector3(0.0, -6.0, 0.0) if burst else Vector3(0.0, 0.4, 0.0)
+	process.damping_min = 0.5
+	process.damping_max = 1.5
+	process.scale_min = 0.5
+	process.scale_max = 1.2
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1.0, 0.95, 0.75))
+	fade.set_color(1, Color.BLACK)
+	fade.add_point(0.4, FORGE_COLOUR)
+	var fade_texture := GradientTexture1D.new()
+	fade_texture.gradient = fade
+	process.color_ramp = fade_texture
+	sparks.process_material = process
+	if _spark_material == null:
+		_spark_material = StandardMaterial3D.new()
+		_spark_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_spark_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_spark_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		_spark_material.vertex_color_use_as_albedo = true
+		_spark_material.disable_receive_shadows = true
+	var speck := QuadMesh.new()
+	speck.size = Vector2(FORGE_SPARK_SIZE, FORGE_SPARK_SIZE)
+	speck.material = _spark_material
+	sparks.draw_pass_1 = speck
+	return sparks
 
 
 ## The [param most] of [param carriers]' lanterns (id -> Node3D) nearest
