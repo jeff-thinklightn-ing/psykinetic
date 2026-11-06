@@ -1,0 +1,14 @@
+[remap]
+
+importer="image"
+type="Image"
+uid="uid://cnwaefnufmxg5"
+path="res://.godot/imported/layout.png-2448c35c711cef839882a7a3ef1349ec.image"
+
+[deps]
+
+source_file="res://levels/bear_cave/layout.png"
+dest_files=["res://.godot/imported/layout.png-2448c35c711cef839882a7a3ef1349ec.image"]
+
+[params]
+

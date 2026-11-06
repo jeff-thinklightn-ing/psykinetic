@@ -2724,8 +2724,10 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 
 ## The cues a link's piece may be (decision 589): "arch" (a gate arch over
 ## it), "waystones" (a pair either side), "down" (a stair down, a dark
-## mouth), "up" (a stair up, or a climb), "sealed" (shut), "none".
-const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none"]
+## mouth), "up" (a stair up, or a climb), "sealed" (shut), "none", "cave"
+## (a cave mouth in a hill of rock, the forest plan's lairs: drawn by
+## Client3D, no slot; given by the link's "cue").
+const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none", "cave"]
 ## Each cue's art-kit slot (waystones: two, either side of the link).
 const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.waystone", "down": "building.stair_down", "up": "building.stair_up"}
 
@@ -2799,7 +2801,8 @@ static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary
 			if facing.x != 0 and facing.y != 0:
 				facing.y = 0
 		link["cue"] = cue  # The big map marks it (ui).
-		out.append({"tile": at, "cue": cue, "facing": facing, "variant": maxi(1, int(entry.get("variant", 1)))})
+		out.append({"tile": at, "cue": cue, "facing": facing, "variant": maxi(1, int(entry.get("variant", 1))),
+				"closed": bool(link["closed"]) or link["sealed"] != ""})
 	return out
 
 

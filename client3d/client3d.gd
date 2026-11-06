@@ -6684,6 +6684,9 @@ func _edge_drawn(key: Vector3i, fences: Dictionary[Vector3i, bool]) -> bool:
 ## "sealed" (its own slab) or "none". Drawn only: the cell is walked on.
 func _add_link_cues() -> void:
 	for cue: Dictionary in _terrain.get("link_cues", []):
+		if cue["cue"] == "cave":
+			_add_cave_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
+			continue
 		var slot := str(Level.CUE_SLOTS.get(cue["cue"], ""))
 		if slot.is_empty() or not ArtKit.has(slot):
 			continue
@@ -6699,6 +6702,468 @@ func _add_link_cues() -> void:
 			node.position = Vector3(cell.x, _elevation(cell), cell.y)
 			node.rotation.y = atan2(float(facing.x), float(facing.y))
 			_room.add_child(node)
+
+
+## A cave mouth (a link's cue "cave"; the forest plan's lairs): a
+## hill of the cliffs' faceted rock behind the link cell, its face across
+## the cell's far edge with a low dark arch in it and a throat going black,
+## drawn from the cue (no art piece). Across, high and deep (m): the hill's
+## footprint MOUTH_CELLS across and deep behind the link cell (the cells
+## maps lays as rock); the arch's width and height; how far its throat goes.
+const MOUTH_HILL := Vector3(7.0, 3.0, 5.0)
+const MOUTH_CELLS := Vector2i(7, 5)
+const MOUTH_ARCH := Vector2(3.0, 2.3)
+const MOUTH_THROAT := 2.6
+## The throat's rock at its lip, of the cliffs' rock, darkening to nothing.
+const MOUTH_LIP_SHADE := 0.06
+## The hill's rock (the coordinator: an outcrop, not a sheet): the cliffs'
+## swatch times MOUTH_ROCK_SHADE, each facet warm or cold; a gentle top
+## facet grass and moss at odds MOUTH_MOSS (times how flat it is); its
+## heights half stepped into ledges MOUTH_LEDGE apart; its face in
+## MOUTH_FACE_BANDS ledged bands, MOUTH_LIP_DARK of its shade just over and
+## beside the arch, its own MOUTH_LIP_REACH out, so the mouth reads as a
+## hole into the dark, even blocked.
+const MOUTH_ROCK_SHADE := 0.6
+## The hill's shape sunk this far, so its edge meets the ground ragged.
+const MOUTH_SINK := 0.9
+## The rock over the throat, over the arch's curve.
+const MOUTH_ROOF := 0.6
+## In a bank, the rock over its grass: a broken rim MOUTH_RIM high along
+## the face, MOUTH_RIM_REACH m deep; MOUTH_OUTCROPS boulders sunk in the
+## top (art-kit's, MOUTH_OUTCROP its size and how far it is sunk), the
+## grass between.
+const MOUTH_RIM := 0.35
+const MOUTH_RIM_REACH := 0.9
+const MOUTH_OUTCROPS := 3
+const MOUTH_OUTCROP := Vector2(1.3, 0.35)
+## Where the hill's rock cells stand over the ground beside and behind
+## them, a skirt of rock falls from their edge MOUTH_SKIRT m out (wandering
+## by a share of it either way), bulging, to the ground: no square wall.
+const MOUTH_SKIRT := 1.2
+const MOUTH_SKIRT_ROWS := 4
+## Its top edge wanders up to this far in from the cells' edge, and its
+## back corners are rounded this much (m).
+const MOUTH_SKIRT_INSET := 0.6
+const MOUTH_CORNER := 1.0
+const MOUTH_WARM := Color(1.08, 1.0, 0.86)
+const MOUTH_COLD := Color(0.9, 0.96, 1.06)
+const MOUTH_MOSS := 0.7
+const MOUTH_LEDGE := 0.6
+const MOUTH_FACE_BANDS := 6
+const MOUTH_LIP_DARK := 0.12
+const MOUTH_LIP_REACH := 0.8
+## Scree at its foot: [slot, x as a share of the hill's half width (signed),
+## z in the mouth's frame, size], half sunk in its skirt.
+const MOUTH_SCREE := [
+	["rock.small", -0.62, 0.35, 0.55], ["rock.small", 0.66, 0.3, 0.5],
+	["rock.boulder", -0.86, 1.4, 0.7], ["rock.small", -0.9, 2.6, 0.6],
+	["rock.boulder", 0.84, 1.9, 0.75], ["rock.small", 0.92, 3.3, 0.55],
+	["rock.small", -0.75, 4.2, 0.6], ["rock.small", 0.35, 5.2, 0.6],
+	["rock.boulder", -0.2, 5.4, 0.65],
+]
+## A closed mouth's rockfall (the coordinator: blocked, not a painted wall):
+## [slot, where in the mouth's frame (y over the ground there), size],
+## heaped in the arch and spilling out over the link cell; kept under
+## MOUTH_ROCKFALL_TOP, so the black throat shows over it across the arch's
+## width and the mouth reads in daylight as a cave, blocked (the
+## coordinator, on the noon stills: a crag otherwise).
+const MOUTH_ROCKFALL_TOP := 1.1
+const MOUTH_ROCKFALL := [
+	["rock.large", Vector3(0.0, -0.5, 1.0), 1.0],
+	["rock.large", Vector3(-0.8, -0.35, 1.2), 0.6],
+	["rock.large", Vector3(0.85, -0.3, 1.1), 0.6],
+	["rock.small", Vector3(0.15, 0.5, 1.05), 0.7],
+	["rock.small", Vector3(1.15, -0.05, 0.4), 0.8],
+	["rock.small", Vector3(-1.2, -0.05, 0.45), 0.9],
+	["rock.small", Vector3(-0.3, -0.1, 0.05), 0.6],
+	["prop.rubble_spill", Vector3(0.1, 0.0, -0.25), 1.2],
+]
+
+
+## The cells a cave mouth's hill stands on (no art rock drawn there):
+## MOUTH_CELLS behind each "cave" cue's link cell, the way it faces.
+func _mouth_cells() -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for cue: Dictionary in _terrain.get("link_cues", []):
+		if cue["cue"] != "cave":
+			continue
+		var at: Vector2i = cue["tile"]
+		var ahead: Vector2i = cue["facing"]
+		var across := Vector2i(-ahead.y, ahead.x)
+		for z in range(1, MOUTH_CELLS.y + 1):
+			for x in range(-(MOUTH_CELLS.x / 2), MOUTH_CELLS.x / 2 + 1):
+				out[at + ahead * z + across * x] = true
+	return out
+
+
+## The cells under each cave mouth's throat (798): MOUTH_THROAT deep
+## behind the link cell (whole cells), the arch's width across; no ground
+## drawn there.
+func _throat_cells() -> Dictionary[Vector2i, bool]:
+	var out: Dictionary[Vector2i, bool] = {}
+	for cue: Dictionary in _terrain.get("link_cues", []):
+		if cue["cue"] != "cave":
+			continue
+		var at: Vector2i = cue["tile"]
+		var ahead: Vector2i = cue["facing"]
+		var across := Vector2i(-ahead.y, ahead.x)
+		var wide := ceili(MOUTH_ARCH.x * 0.5 - 0.5)
+		for z in range(1, ceili(MOUTH_THROAT) + 1):
+			for x in range(-wide, wide + 1):
+				out[at + ahead * z + across * x] = true
+	return out
+
+
+## The cave mouth over [param at], its arch facing back from [param ahead]
+## (into the hill): one mesh in the cave walls' rock, shadowed, named
+## "Mouth_x_y". In its own frame +z runs into the hill, x across, the face
+## at z 0.5 (the link cell's far edge). [param closed] (the link closed or
+## sealed): a rockfall heaped in the arch (MOUTH_ROCKFALL), spilling out.
+func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
+	var holder := Node3D.new()
+	holder.name = "Mouth_%d_%d" % [at.x, at.y]
+	var base := _height_in(at, Vector2(at))
+	holder.position = Vector3(at.x, base, at.y)
+	holder.rotation.y = atan2(float(ahead.x), float(ahead.y))
+	var rock := swatch(CLIFF_ROCK.x, CLIFF_ROCK.y)
+	# Arrays, not packed ones: a lambda holds a packed array by value.
+	var vertices: Array[Vector3] = []
+	var normals: Array[Vector3] = []
+	var colours: Array[Color] = []
+	var face := 0.5
+	var half := MOUTH_HILL.x * 0.5
+	var ground := func(x: float, z: float) -> float:
+		var world := holder.transform * Vector3(x, 0.0, z)
+		var cell := Vector2i(roundi(world.x), roundi(world.z))
+		return _height_in(cell, Vector2(world.x, world.z)) - base
+	var arch_top := func(x: float) -> float:
+		var t := x / (MOUTH_ARCH.x * 0.5)
+		return MOUTH_ARCH.y * sqrt(maxf(0.0, 1.0 - t * t)) if absf(t) < 1.0 else -1.0
+	# Inside the arch, the same height wherever two strips share an edge.
+	var arch_in := func(x: float) -> float:
+		return arch_top.call(clampf(x, -MOUTH_ARCH.x * 0.5 + 0.001, MOUTH_ARCH.x * 0.5 - 0.001))
+	# A facet's colour: the cliffs' rock, darker, each facet warm or cold
+	# and its own shade; a gentle top facet (a ledge, the hill's top) often
+	# grass and moss, so the hill grows out of the hills.
+	var grass_at: Vector2i = GROUND_SWATCHES["grass"]
+	var grass := swatch(grass_at.x, grass_at.y)
+	var tone := func(normal: Vector3, key: Vector2i, darken: float) -> Color:
+		var own := _roll(key, 82)
+		var tint := MOUTH_WARM if _roll(key, 89) < 0.5 else MOUTH_COLD
+		var colour := Color(rock * (MOUTH_ROCK_SHADE * lerpf(0.75, 1.1, own) * darken), 1.0) * tint
+		if normal.y > 0.8 and _roll(key, 90) < MOUTH_MOSS * normal.y:
+			colour = Color(grass * lerpf(0.42, 0.66, own), 1.0)
+		return colour
+	# The hill: a heightfield from the face back, a shoulder rising to a
+	# crest off its middle and sinking into the ground at its back and its
+	# wandering sides; the face's corners low, so the cut face stands about
+	# the arch only; its heights half stepped into ledges, lumped.
+	var step := 0.5
+	var columns := roundi(MOUTH_HILL.x / step)
+	var rows := roundi((MOUTH_HILL.z - face) / step)
+	var heights := PackedFloat32Array()
+	heights.resize((columns + 1) * (rows + 1))
+	var crest_x := (_roll(at, 86) - 0.5) * 1.6
+	var tilt := (_roll(at, 87) - 0.5) * 0.5
+	# In a bank (the ground already rising behind the face, the relief's):
+	# how far it stands in for the hill, 1 when the ground two metres in is
+	# as high as the arch's roof. Then the rock is its face, a roof over the
+	# throat and a few outcrops, the bank's own grass between.
+	var roof_high := MOUTH_ARCH.y + MOUTH_ROOF
+	var bank := clampf(ground.call(0.0, face + 2.0) / roof_high, 0.0, 1.0)
+	var lays := PackedFloat32Array()
+	lays.resize(heights.size())
+	# The bank's outcrops: off the throat's line, on the top.
+	var knobs: Array[Vector2] = []
+	for k in MOUTH_OUTCROPS:
+		var side := -1.0 if (k + int(_roll(at, 95) * 2.0)) % 2 == 0 else 1.0
+		knobs.append(Vector2(side * lerpf(MOUTH_ARCH.x * 0.5 + 0.4, half - 1.0, _roll(at + Vector2i(k, 0), 96)),
+				lerpf(face + 1.4, MOUTH_HILL.z - 1.2, _roll(at + Vector2i(0, k), 97))))
+	for r in rows + 1:
+		for c in columns + 1:
+			var x := -half + c * step
+			var z := face + r * step
+			# The face's own row stands on the ground just behind its line.
+			var lay: float = ground.call(x, maxf(z, face + 0.05))
+			lays[r * (columns + 1) + c] = lay
+			# Its edge wanders: each row's side and each column's back reach
+			# their own way in, and the shape is sunk MOUTH_SINK, so it meets
+			# the ground on a ragged line inside the lattice, never its box.
+			var side_seed := _roll(Vector2i(at.x, at.y + (0 if x < 0.0 else 1)), 88) * TAU
+			var edge := 1.0 - 0.3 * (0.5 + 0.5 * sin(z * 1.4 + side_seed))
+			var back := MOUTH_HILL.z * (1.0 - 0.25 * (0.5 + 0.5 * sin(x * 1.1 + _roll(at, 93) * TAU)))
+			var across := clampf(1.0 - pow(absf(x) / (half * edge), 2.0), 0.0, 1.0)
+			var along := 1.0 - smoothstep(MOUTH_HILL.z * 0.4, back, z)
+			var crest := exp(-pow((x - crest_x) / 2.2, 2.0) - pow((z - 2.6) / 1.8, 2.0))
+			var h := (MOUTH_HILL.y + MOUTH_SINK) * (0.55 * pow(across, 0.8) + 0.45 * crest) * along * (1.0 + tilt * x / half) - MOUTH_SINK
+			var beside := smoothstep(MOUTH_ARCH.x * 0.5 + 0.6, half, absf(x))
+			h *= lerpf(1.0, 0.3 + 0.7 * smoothstep(face, face + 2.0, z), beside)
+			h = lerpf(h, roundf(h / MOUTH_LEDGE) * MOUTH_LEDGE, 0.5)
+			var lump := _roll(Vector2i(at.x * 31 + c, at.y * 31 + r), 81)
+			h += (lump - 0.5) * 0.4 * across * along
+			# A roof over the throat: the arch's curve and MOUTH_ROOF of rock
+			# (rounded, not a table), to the throat's end.
+			if z < face + MOUTH_THROAT + 0.6:
+				var ceiling: float = arch_top.call(clampf(x * 0.92, -MOUTH_ARCH.x * 0.5 + 0.01, MOUTH_ARCH.x * 0.5 - 0.01))
+				var reach := 1.0 - smoothstep(MOUTH_ARCH.x * 0.5, MOUTH_ARCH.x * 0.5 + 0.9, absf(x))
+				h = maxf(h, (ceiling + MOUTH_ROOF + lump * 0.3) * reach)
+			# The cut face holds up about the arch, falling away a metre out.
+			var shoulder := 1.0 - smoothstep(MOUTH_ARCH.x * 0.5 + 0.2, MOUTH_ARCH.x * 0.5 + 1.4, absf(x))
+			h = maxf(h, (MOUTH_ARCH.y + 0.5) * shoulder * (1.0 - smoothstep(face + 0.5, face + 1.5, z)))
+			h = maxf(h, -0.3)
+			if c == 0 or c == columns or r == rows:
+				h = -0.3
+			var own := h + lay
+			if bank > 0.0:
+				# The bank's way: its ground, an outcrop here and there and a
+				# rim of rock along the face; the roof over the throat.
+				var broken := _roll(Vector2i(at.x * 37 + c, at.y * 37 + r), 94)
+				var crag := MOUTH_RIM * (0.4 + 0.6 * broken) * (1.0 - smoothstep(face + MOUTH_RIM_REACH * 0.5, face + MOUTH_RIM_REACH, z))
+				var need := -INF
+				if z < face + MOUTH_THROAT + 0.6:
+					var ceiling: float = arch_top.call(clampf(x * 0.92, -MOUTH_ARCH.x * 0.5 + 0.01, MOUTH_ARCH.x * 0.5 - 0.01))
+					need = (ceiling + MOUTH_ROOF + lump * 0.3) * (1.0 - smoothstep(MOUTH_ARCH.x * 0.5, MOUTH_ARCH.x * 0.5 + 0.9, absf(x)))
+				own = lerpf(own, maxf(lay + crag, need), bank)
+			heights[r * (columns + 1) + c] = own
+	var put := func(a: Vector3, b: Vector3, c: Vector3, hint: Vector3, shade: Color) -> void:
+		var normal := (b - a).cross(c - a)
+		if normal.dot(hint) < 0.0:
+			normal = -normal
+		normal = normal.normalized()
+		vertices.append_array([a, b, c])
+		normals.append_array([normal, normal, normal])
+		colours.append_array([shade, shade, shade])
+	var up_of := func(a: Vector3, b: Vector3, c: Vector3) -> Vector3:
+		var n := (b - a).cross(c - a).normalized()
+		return -n if n.y < 0.0 else n
+	for r in rows:
+		for c in columns:
+			var i := r * (columns + 1) + c
+			var x := -half + c * step
+			var z := face + r * step
+			var a := Vector3(x, heights[i], z)
+			var b := Vector3(x + step, heights[i + 1], z)
+			var cc := Vector3(x + step, heights[i + columns + 2], z + step)
+			var d := Vector3(x, heights[i + columns + 1], z + step)
+			# Nothing drawn where the rock is no more than its ground (a
+			# bank's grass shows through).
+			var bare := true
+			for corner in [i, i + 1, i + columns + 2, i + columns + 1]:
+				bare = bare and heights[corner] < lays[corner] + 0.05
+			if bare:
+				continue
+			var key := Vector2i(at.x * 17 + c * 2, at.y * 17 + r)
+			var first: Array[Vector3] = [a, b, cc]
+			var second: Array[Vector3] = [a, cc, d]
+			if _roll(key, 91) >= 0.5:
+				first = [a, b, d]
+				second = [b, cc, d]
+			put.call(first[0], first[1], first[2], Vector3.UP, tone.call(up_of.call(first[0], first[1], first[2]), key, 1.0))
+			key.x += 1
+			put.call(second[0], second[1], second[2], Vector3.UP, tone.call(up_of.call(second[0], second[1], second[2]), key, 0.93))
+	# In a bank, the skirt: round the hill's sides and back (its back
+	# corners rounded, MOUTH_CORNER), its top edge wandering a little in
+	# from the cells' edge, down to the lower ground beside, wherever that
+	# is lower.
+	if bank > 0.0:
+		var back_edge := face + MOUTH_CELLS.y
+		var corner := MOUTH_CORNER
+		var path: Array[Vector3] = []
+		var outs: Array[Vector3] = []
+		var line := func(from: Vector3, to: Vector3, out: Vector3) -> void:
+			var count := maxi(1, roundi(from.distance_to(to) / step))
+			for k in count:
+				path.append(from.lerp(to, k / float(count)))
+				outs.append(out)
+		var arc := func(centre: Vector3, from: float, to: float) -> void:
+			var count := maxi(2, roundi(absf(to - from) * corner / (step * 0.6)))
+			for k in count:
+				var angle := lerpf(from, to, k / float(count))
+				var out := Vector3(cos(angle), 0.0, sin(angle))
+				path.append(centre + out * corner)
+				outs.append(out)
+		line.call(Vector3(-half, 0.0, face), Vector3(-half, 0.0, back_edge - corner), Vector3(-1.0, 0.0, 0.0))
+		arc.call(Vector3(-half + corner, 0.0, back_edge - corner), PI, PI * 0.5)
+		line.call(Vector3(-half + corner, 0.0, back_edge), Vector3(half - corner, 0.0, back_edge), Vector3(0.0, 0.0, 1.0))
+		arc.call(Vector3(half - corner, 0.0, back_edge - corner), PI * 0.5, 0.0)
+		line.call(Vector3(half, 0.0, back_edge - corner), Vector3(half, 0.0, face), Vector3(1.0, 0.0, 0.0))
+		path.append(Vector3(half, 0.0, face))
+		outs.append(Vector3(1.0, 0.0, 0.0))
+		var grid: Array[PackedVector3Array] = []
+		var drops: Array[float] = []
+		var seed := _roll(at, 102) * TAU
+		for k in path.size():
+			var out: Vector3 = outs[k]
+			# Its top edge in from the cells' edge by a wandering share,
+			# never at the face's own corners (the face meets it there).
+			var front := smoothstep(face, face + 1.0, path[k].z)
+			var inset := MOUTH_SKIRT_INSET * front * (0.5 + 0.5 * sin(k * 0.9 + seed)) * (0.6 + 0.8 * _roll(Vector2i(at.x * 47 + k, at.y), 103))
+			var edge: Vector3 = path[k] - out * inset
+			var top: float = ground.call(edge.x, edge.z) + 0.08 * front
+			var reach := inset + MOUTH_SKIRT * (0.7 + 0.6 * _roll(Vector2i(at.x * 41 + k, at.y * 41), 98))
+			var low: float = ground.call(edge.x + out.x * reach, edge.z + out.z * reach)
+			drops.append(top - low)
+			var row := PackedVector3Array()
+			for r in MOUTH_SKIRT_ROWS + 1:
+				var t := r / float(MOUTH_SKIRT_ROWS)
+				var spot := edge + out * (reach * t)
+				var lift := lerpf(top, low, pow(t, 1.7))
+				if r > 0 and r < MOUTH_SKIRT_ROWS:
+					lift += (top - low) * 0.12 * sin(PI * t) + (_roll(Vector2i(at.x * 43 + k, at.y * 43 + r), 99) - 0.5) * 0.25
+				# Its foot a little under the ground, so it meets it ragged.
+				row.append(Vector3(spot.x, lift - (0.15 if r == MOUTH_SKIRT_ROWS else 0.0), spot.z))
+			grid.append(row)
+		for k in path.size() - 1:
+			if maxf(drops[k], drops[k + 1]) < 0.3:
+				continue
+			var hint: Vector3 = (outs[k] + outs[k + 1]) * 0.5 + Vector3.UP * 0.5
+			for r in MOUTH_SKIRT_ROWS:
+				var a := grid[k][r]
+				var b := grid[k + 1][r]
+				var c := grid[k + 1][r + 1]
+				var d := grid[k][r + 1]
+				var key := Vector2i(at.x * 19 + k * 2, at.y * 19 + r)
+				put.call(a, b, c, hint, tone.call(up_of.call(a, b, c), key, 0.95))
+				key.x += 1
+				put.call(a, c, d, hint, tone.call(up_of.call(a, c, d), key, 0.9))
+		# The skirt's two front ends: a cap facing out of the face.
+		for end: int in [0, path.size() - 1]:
+			if drops[end] < 0.3:
+				continue
+			var row: PackedVector3Array = grid[end]
+			var foot := Vector3(row[0].x, row[MOUTH_SKIRT_ROWS].y, face)
+			for r in MOUTH_SKIRT_ROWS:
+				put.call(row[r], row[r + 1], foot, Vector3(0.0, 0.0, -1.0), tone.call(Vector3(0.0, 0.0, -1.0), Vector2i(at.x * 23 + r, at.y * 23 + end), 0.8))
+	# The face: from under the ground to the hill's front edge, the arch cut
+	# out of it, in MOUTH_FACE_BANDS ledged bands (a band's inner points
+	# pushed in and out, the same wherever they are shared); darker under
+	# and beside the arch's lip, so the mouth reads as a hole.
+	var fine := 0.25
+	var point_at := func(x: float, low: float, top: float, j: int) -> Vector3:
+		var y := lerpf(low, top, j / float(MOUTH_FACE_BANDS))
+		if j == 0 or j == MOUTH_FACE_BANDS:
+			return Vector3(x, y, face)
+		return Vector3(x, y, face + (_roll(Vector2i(roundi(x * 64.0) + at.x * 7, j + at.y * 7), 83) - 0.5) * 0.24)
+	for k in roundi(MOUTH_HILL.x / fine):
+		var x0 := -half + k * fine
+		var x1 := x0 + fine
+		var top0: float = lerpf(heights[floori((x0 + half) / step)], heights[mini(ceili((x0 + half) / step), columns)], fposmod((x0 + half) / step, 1.0))
+		var top1: float = lerpf(heights[floori((x1 + half) / step)], heights[mini(ceili((x1 + half) / step), columns)], fposmod((x1 + half) / step, 1.0))
+		var low0: float = arch_top.call(x0 + 0.001)
+		var low1: float = arch_top.call(x1 - 0.001)
+		low0 = low0 if low0 >= 0.0 else ground.call(x0, face) - 0.3
+		low1 = low1 if low1 >= 0.0 else ground.call(x1, face) - 0.3
+		var hint := Vector3(0.0, 0.0, -1.0)
+		for j in MOUTH_FACE_BANDS:
+			var a: Vector3 = point_at.call(x0, low0, top0, j)
+			var b: Vector3 = point_at.call(x1, low1, top1, j)
+			var c: Vector3 = point_at.call(x1, low1, top1, j + 1)
+			var d: Vector3 = point_at.call(x0, low0, top0, j + 1)
+			var middle := (a + b + c + d) * 0.25
+			# Darkest just over and beside the arch, back to the rock's own
+			# shade MOUTH_LIP_REACH out from it.
+			var over := absf(middle.x) - MOUTH_ARCH.x * 0.5
+			var lip_y: float = arch_top.call(middle.x)
+			var off := over if lip_y < 0.0 else middle.y - lip_y
+			var lip := lerpf(MOUTH_LIP_DARK, 1.0, smoothstep(0.0, MOUTH_LIP_REACH, maxf(off, 0.0)))
+			var key := Vector2i(at.x * 13 + k, at.y * 13 + j)
+			put.call(a, b, c, hint, tone.call(Vector3(0.0, 0.0, -1.0), key, 0.85 * lip))
+			key.y += 101
+			put.call(a, c, d, hint, tone.call(Vector3(0.0, 0.0, -1.0), key, 0.8 * lip))
+	# The throat: the arch carried in, narrowing a little, darkening to
+	# black; its floor, and a black end.
+	var rings := 6
+	for ring in rings:
+		var z0 := face + MOUTH_THROAT * ring / rings
+		var z1 := face + MOUTH_THROAT * (ring + 1) / rings
+		var s0 := 1.0 - 0.15 * ring / rings
+		var s1 := 1.0 - 0.15 * (ring + 1) / rings
+		var dark := MOUTH_LIP_SHADE * pow(1.0 - float(ring) / rings, 2.0)
+		var shade := Color(rock * dark, 1.0)
+		var floor_shade := Color(rock * dark * 0.6, 1.0)
+		for k in roundi(MOUTH_ARCH.x / fine):
+			var xa := -MOUTH_ARCH.x * 0.5 + k * fine
+			var xb := xa + fine
+			var a := Vector3(xa * s0, arch_in.call(xa) * s0, z0)
+			var b := Vector3(xb * s0, arch_in.call(xb) * s0, z0)
+			var c := Vector3(xb * s1, arch_in.call(xb) * s1, z1)
+			var d := Vector3(xa * s1, arch_in.call(xa) * s1, z1)
+			var inward := Vector3(0.0, MOUTH_ARCH.y * 0.3, (z0 + z1) * 0.5) - (a + c) * 0.5
+			put.call(a, b, c, inward, shade)
+			put.call(a, c, d, inward, shade)
+		var fa := Vector3(-MOUTH_ARCH.x * 0.5 * s0, 0.02, z0)
+		var fb := Vector3(MOUTH_ARCH.x * 0.5 * s0, 0.02, z0)
+		var fc := Vector3(MOUTH_ARCH.x * 0.5 * s1, 0.02, z1)
+		var fd := Vector3(-MOUTH_ARCH.x * 0.5 * s1, 0.02, z1)
+		put.call(fa, fb, fc, Vector3.UP, floor_shade)
+		put.call(fa, fc, fd, Vector3.UP, floor_shade)
+	var back := face + MOUTH_THROAT
+	var narrow := 0.85
+	for k in roundi(MOUTH_ARCH.x / fine):
+		var xa := -MOUTH_ARCH.x * 0.5 + k * fine
+		var xb := xa + fine
+		put.call(Vector3(xa * narrow, 0.0, back), Vector3(xb * narrow, 0.0, back),
+				Vector3(xb * narrow, arch_in.call(xb) * narrow, back), Vector3(0.0, 0.0, -1.0), Color.BLACK)
+		put.call(Vector3(xa * narrow, 0.0, back), Vector3(xb * narrow, arch_in.call(xb) * narrow, back),
+				Vector3(xa * narrow, arch_in.call(xa) * narrow, back), Vector3(0.0, 0.0, -1.0), Color.BLACK)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
+	arrays[Mesh.ARRAY_NORMAL] = PackedVector3Array(normals)
+	arrays[Mesh.ARRAY_COLOR] = PackedColorArray(colours)
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var drawn := MeshInstance3D.new()
+	drawn.name = "Body"
+	drawn.mesh = mesh
+	drawn.material_override = _rock_material()
+	holder.add_child(drawn)
+	if closed:
+		var heap := Node3D.new()
+		heap.name = "Rockfall"
+		for k in MOUTH_ROCKFALL.size():
+			var spec: Array = MOUTH_ROCKFALL[k]
+			var slot := str(spec[0])
+			if not ArtKit.has(slot):
+				continue
+			var stone := ArtKit.instance(slot, 1 + posmod(hash(at) + k, maxi(ArtKit.variant_count(slot), 1)))
+			var place: Vector3 = spec[1]
+			# In the throat on its floor, not the bank's ground over it.
+			var under: float = 0.0 if place.z > face else ground.call(place.x, place.z)
+			stone.position = Vector3(place.x, place.y + under, place.z)
+			stone.rotation.y = _roll(at + Vector2i(k, 0), 85) * TAU
+			stone.scale = Vector3.ONE * float(spec[2])
+			heap.add_child(stone)
+		holder.add_child(heap)
+	var scree := Node3D.new()
+	scree.name = "Scree"
+	for k in MOUTH_SCREE.size():
+		var spec: Array = MOUTH_SCREE[k]
+		var slot := str(spec[0])
+		if not ArtKit.has(slot):
+			continue
+		var stone := ArtKit.instance(slot, 1 + posmod(hash(at) + k * 7, maxi(ArtKit.variant_count(slot), 1)))
+		var sx := float(spec[1]) * half
+		var sz := float(spec[2])
+		stone.position = Vector3(sx, ground.call(sx, sz) - 0.1, sz)
+		stone.rotation.y = _roll(at + Vector2i(k, 3), 92) * TAU
+		stone.scale = Vector3.ONE * float(spec[3])
+		scree.add_child(stone)
+	# In a bank, its outcrops: boulders sunk in the grass on top.
+	if bank > 0.5 and ArtKit.has("rock.boulder"):
+		var outcrops := Node3D.new()
+		outcrops.name = "Outcrops"
+		holder.add_child(outcrops)
+		for k in knobs.size():
+			var knob: Vector2 = knobs[k]
+			var stone := ArtKit.instance("rock.boulder", 1 + posmod(hash(at) + k * 11, maxi(ArtKit.variant_count("rock.boulder"), 1)))
+			var size := MOUTH_OUTCROP.x * lerpf(0.8, 1.2, _roll(at + Vector2i(k, 5), 100))
+			stone.position = Vector3(knob.x, ground.call(knob.x, knob.y) - MOUTH_OUTCROP.y * size, knob.y)
+			stone.rotation.y = _roll(at + Vector2i(k, 6), 101) * TAU
+			stone.scale = Vector3.ONE * size
+			outcrops.add_child(stone)
+	holder.add_child(scree)
+	_room.add_child(holder)
 
 
 ## The terrain's buildings (Level.buildings_from): art-kit's slot over each
@@ -9988,6 +10453,13 @@ func _build_ground(kinds: Dictionary) -> void:
 ## water, the forest's ring, under grown trunks) and the members the build
 ## remakes cleared; {} with no cells.
 func _ground_input(kinds: Dictionary) -> Dictionary:
+	# A cave mouth's hill is its ground's grass (798: the bank's top, where
+	# the rock leaves it), not the stone footing of its rock cells.
+	var under := _mouth_cells()
+	if not under.is_empty():
+		kinds = kinds.duplicate()
+		for cell: Vector2i in under:
+			kinds[cell] = "grass"
 	# Water's cells are the ground too, its bed: a corner with water all
 	# round it sinks WATER_BED_DEPTH, so a pond deepens toward its middle
 	# and meets its shore with no edge (the surface is _build_water's).
@@ -10024,6 +10496,12 @@ func _ground_input(kinds: Dictionary) -> Dictionary:
 	for cell: Vector2i in _terrain.get("solid", []):
 		if not _rocks.has(cell):
 			land.append(cell)
+	# No ground in a cave mouth's throat (798): in a bank its cells stand
+	# over the arch, and their ground would wall it up; the hill's top
+	# covers them, the throat's walls and black end close it.
+	var throat := _throat_cells()
+	if not throat.is_empty():
+		land = land.filter(func(cell: Vector2i) -> bool: return not throat.has(cell))
 	var floor_size: int = land.size()
 	var dry: Array = []
 	var wet: Array = []
@@ -13324,7 +13802,15 @@ static func _soft_puff(size: float) -> QuadMesh:
 func _add_rocks() -> void:
 	if _rocks.is_empty():
 		return
-	var plan := rock_plan(_rocks)
+	# None under a cave mouth's hill (its own rock).
+	var under := _mouth_cells()
+	var kept := {}
+	for cell: Vector2i in _rocks:
+		if not under.has(cell):
+			kept[cell] = true
+	if kept.is_empty():
+		return
+	var plan := rock_plan(kept)
 	var pieces: Dictionary[String, Array] = {}
 	for cell: Vector2i in plan["small"]:
 		var size := lerpf(ROCK_SMALL_SIZES.x, ROCK_SMALL_SIZES.y, _roll(cell, 131))
@@ -13452,6 +13938,10 @@ func _cliffs_start() -> Dictionary:
 	# A rock on a lip stands on the raised ground: its face drawn as the
 	# ground's.
 	floor_cells.merge(_rocks)
+	# None down a cave mouth's throat cells (798): in a bank their face
+	# would stand across the arch.
+	for cell: Vector2i in _throat_cells():
+		floor_cells.erase(cell)
 	var water: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in _terrain.get("water", []):
 		water[cell] = true

@@ -43028,3 +43028,79 @@ loose niche with a find of its own (no second hidden door beside 608's).
     both, the deed once; off and on again, nothing more; the loose niche's find once, then nothing.
 - **Protocol:** unchanged (fc7438491ba8): new level.json keys, a new lock string, Door.open as today.
   No new class_name.
+## 798. The bear's cave: a lair level, and a cave mouth in the hills
+
+The forest plan's phase B (maps' sheet, C:/dev/review/lands/fill_forest; Jeff: the great bear and
+the old wolf "can be found in their cave if they're not spawned in the wild"; the coordinator's
+design and approval; enemy-ai's apex-lair rule, 780). Two parts, one landing with maps' make_hills
+side (a one-sided link fails level_test).
+
+The level: levels/bear_cave, laid by tools/make_bear_cave.py (same seed, same level), 22 x 28,
+indoor, "mass": "rock" (769 amended (3)), cave walls and floor, "ambient" 0.03, "ambience"
+"cave_lair" (sound's). A U, every leg 3 cells wide (the bear's body; the coordinator: never 2, well
+clear of the two-cell rule): in from the way out at the bottom going north, east along the bottom,
+north up the east side, west into the den chamber, so the den is out of sight from the way in. The
+chamber about 14 x 13 open floor, corners rounded, a straight run of 18 along rows 10-11 (the
+charge needs about 10, enemy-ai); the den, the monster_great_bear marker, at (6, 7) with 2+ cells
+clear all round (swipe and slam), the sides' rough cells only where they open on two sides or more, so
+no one-cell nook (combat, from playtest's bear13 duel: a fighter boxed in a corner), its floor trampled (dirt) in a hollow round it. No door (the bear
+opens none). One link out at (4, 26) to hills/from_bear_cave; from_hills (4, 24). A skylight over
+the den, "skylights": [{"at": [6, 7], "radius": 3}] (environment's 797): a little light on the bear
+so the fight reads (the coordinator), the passage left dark. No place: the lair rule reads the
+level's name (enemy-ai: its row's "lair" {"zone": "bear_cave", "land": ["hills"]}).
+
+The mouth: a link's cue (589) may be "cave" (Level.CUES), given by the link's "cue"; facing as a
+stair's, away from the open ground it is walked into from. No art piece: Client3D._add_cave_mouth
+draws it from the cliffs' rock (the cave walls' material, shadowed), "Mouth_x_y": an outcrop
+grown out of the hills, not a set-down dome (the coordinator, on the first stills): a hill within
+MOUTH_HILL 7 x 3 x 5 m behind the link cell, a shoulder rising to a crest off its middle and one
+side higher, its shape sunk MOUTH_SINK so it meets the ground on a ragged line inside its box, its
+sides and back wandering; its heights half stepped into ledges MOUTH_LEDGE apart, lumped; the
+cliffs' rock at MOUTH_ROCK_SHADE, each facet warm or cold (MOUTH_WARM, MOUTH_COLD) and its own
+shade, its gentle top facets grass and moss at odds MOUTH_MOSS; scree and boulders half sunk at its
+foot (MOUTH_SCREE: art-kit's rock.small and rock.boulder). Its face across the cell's far edge
+stands about the arch only, in MOUTH_FACE_BANDS ledged bands, with an arch MOUTH_ARCH 3 m wide and
+2.3 m high cut out of it, the face MOUTH_LIP_DARK of its shade just over and beside the arch out
+to MOUTH_LIP_REACH, so the mouth reads as a hole into the dark even blocked; its throat
+MOUTH_THROAT 2.6 m in, narrowing and darkening from MOUTH_LIP_SHADE to black, a black end. The MOUTH_CELLS 7 x 5 behind the link
+(_mouth_cells) are rock cells in the level (maps lays them: blocked) and draw no art rock: the hill
+is their rock. Level.link_cues' entries carry "closed" (the link closed or sealed); a closed cave
+mouth has a rockfall heaped in its arch (MOUTH_ROCKFALL: art-kit's rock.large and rock.small,
+prop.rubble_spill spilling over the link cell; the coordinator: blocked, not a painted wall).
+
+In a bank (the coordinator: "the cave is a hole in the face of a bank"): where
+the ground already rises behind the face, the hill gives way to it by how high the ground stands two
+metres in against the arch's roof (MOUTH_ARCH's height plus MOUTH_ROOF): at full, the rock is the
+face, a roof over the throat, a broken rim MOUTH_RIM high and MOUTH_RIM_REACH deep along the face's
+top, and MOUTH_OUTCROPS of art-kit's rock.boulder sunk in the top (MOUTH_OUTCROP), off the throat's
+line, the bank's own grass between. Where the hill's rock cells stand over the ground beside and
+behind them, a skirt of rock (MOUTH_SKIRT out, MOUTH_SKIRT_ROWS rows, bulging) falls from their edge
+to the ground, its top wandering up to MOUTH_SKIRT_INSET in and its back corners rounded
+MOUTH_CORNER, so no square wall shows. maps' side: the hill's rock cells stand LAIR_RISE 3.1 m over
+the link's ground and are left out of the lay; round them the grass is raised after the lay to a mound
+(the shoulders near the top, the front corners proud), never steeper than the grass's cap
+(LAIR_SLOPE), and held grass LAIR_GRASS cells round.
+
+The arch on the noon stills (the coordinator: from the road it read as a crag; a player has to see a
+cave mouth in daylight, "a cave, blocked"): in a bank the throat's cells stand 3.1 m over the link
+cell, and the hills' ground and cliff face down their edge stood across the arch, a wall of lit rock
+in it. Client3D._throat_cells (the arch's width across, MOUTH_THROAT deep in whole cells, behind
+each "cave" link) draw no ground (_ground_input) and no cliff face (_cliffs_start); the hill's top
+covers them, the throat's walls and black end close it. The rockfall sits on the throat's floor, not
+the bank's ground over it, and stays under MOUTH_ROCKFALL_TOP 1.1 m, so over a metre of black throat
+shows above it across the arch; MOUTH_LIP_DARK 0.3 to 0.12 and MOUTH_LIP_SHADE 0.12 to 0.06; the
+throat's strips share their edges' heights (no light seams). view_test: no ground in the throat, the
+rockfall low; its no-hole check counts the throat's cells as floored (by the hill).
+
+In the hills (maps' make_hills, cherry-picked in this landing): the mouth at (117, 102), 9 cells
+north of the main road, facing it; rock under the hill (x 114-120, rows 97-101), trampled dirt in
+front (x 116-118, rows 102-104), from_bear_cave at (117, 104), kept flat. The link lands "closed":
+true (the coordinator's ruling: a player's first time in should meet the bear, and the bear's fight
+is not yet tuned for 1-3 players; enemy-ai opens it, one key, with the lair rule after combat's
+tuning). Until then the mouth is seen from the road, sealed. The great bear spawns at its den in the
+sealed cave. The big map shows no glyph for a "cave" cue (render/minimap's GLYPH_CUES; ui's call).
+
+view_test _test_cave_mouth (the hill behind, the way it faces; the arch open to the black end; the
+face beside it; the hill's cells; grass on its top and its lip in shadow; the scree; the rockfall
+only when closed, low in the arch; no ground in the throat); level_test covers the level (its
+link both ways, no trap pit). CHANGELOG (voice's words). Protocol unchanged, no new class_name.

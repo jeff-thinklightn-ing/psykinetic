@@ -111,6 +111,7 @@ func _ready() -> void:
 		_test_tall_grass()
 		_test_blood()
 		_test_tracks()
+		_test_cave_mouth()
 		_test_rocks()
 		_test_niches()
 		_test_fire()
@@ -4783,6 +4784,117 @@ func _test_tracks() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
+## A cave mouth (a link's cue "cave", the forest plan's lairs): a hill of
+## rock behind the link cell, the way it faces; an open arch at the cell's
+## far edge, its throat going black; no art rock under the hill.
+func _test_cave_mouth() -> void:
+	print("\n== cave mouth: a hill of rock, an open arch, a throat going black ==")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	var floor_cells: Array = terrain["floor"]
+	var at := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		if floor_cells.has(cell + Vector2i(0, -5)) and floor_cells.has(cell + Vector2i(3, -5)) and floor_cells.has(cell + Vector2i(-3, -5)):
+			at = cell
+			break
+	_check(at.x >= 0, "the sample has room for a hill (%s)" % at)
+	if at.x < 0:
+		return
+	var ahead := Vector2i(0, -1)
+	terrain["link_cues"] = [{"tile": at, "cue": "cave", "facing": ahead, "variant": 1}]
+	_rig.rebuild(terrain, sample["centre"])
+	var holder: Node3D = _rig._room.get_node_or_null("Mouth_%d_%d" % [at.x, at.y])
+	var body: MeshInstance3D = holder.get_node_or_null("Body") if holder != null else null
+	_check(body != null and body.mesh != null, "drawn on the link's cell, in one mesh")
+	if body == null or body.mesh == null:
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var arrays := body.mesh.surface_get_arrays(0)
+	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var shades: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+	# In the mouth's frame: +z into the hill.
+	var top := -INF
+	var out := 0.0
+	for p in points:
+		top = maxf(top, p.y)
+		out = maxf(out, maxf(absf(p.x) - Client3D.MOUTH_HILL.x * 0.5, maxf(0.2 - p.z, p.z - Client3D.MOUTH_HILL.z)))
+	var into := holder.transform.basis * Vector3(0, 0, 1)
+	_check(top > Client3D.MOUTH_ARCH.y + 0.6 and out < 0.05 and Vector2(into.x, into.z).dot(Vector2(ahead)) > 0.99,
+			"a hill of rock behind the cell, the way it faces (%.1f m high, %.2f m out, into %s)" % [top, out, into])
+	# Looking in at the arch's middle, waist high: the first thing met is
+	# the black end of the throat, not rock across the arch.
+	var near := INF
+	var met := Color.WHITE
+	var from := Vector3(0.0, 1.0, -2.0)
+	for i in range(0, points.size(), 3):
+		var hit: Variant = Geometry3D.ray_intersects_triangle(from, Vector3(0, 0, 1), points[i], points[i + 1], points[i + 2])
+		if hit != null and (hit as Vector3).z < near:
+			near = (hit as Vector3).z
+			met = shades[i]
+	_check(near > 0.5 + Client3D.MOUTH_THROAT - 0.1 and met.get_luminance() < 0.01,
+			"the arch open, its throat going black (met at %.2f m, %.3f)" % [near, met.get_luminance()])
+	var face_hit := INF
+	from = Vector3(Client3D.MOUTH_ARCH.x * 0.5 + 0.6, 1.0, -2.0)
+	for i in range(0, points.size(), 3):
+		var hit: Variant = Geometry3D.ray_intersects_triangle(from, Vector3(0, 0, 1), points[i], points[i + 1], points[i + 2])
+		if hit != null:
+			face_hit = minf(face_hit, (hit as Vector3).z)
+	_check(face_hit < 0.8, "beside the arch, the hill's face (met at %.2f m)" % face_hit)
+	var under := _rig._mouth_cells()
+	_check(under.size() == Client3D.MOUTH_CELLS.x * Client3D.MOUTH_CELLS.y and under.has(at + ahead) and under.has(at + ahead * Client3D.MOUTH_CELLS.y) and not under.has(at),
+			"its hill's cells behind the link, none on it (%d)" % under.size())
+	# No ground in its throat (in a bank it would wall the arch up).
+	var throat := _rig._throat_cells()
+	var walled := 0
+	for cell: Vector2i in _rig._ground_cells:
+		if throat.has(cell):
+			walled += 1
+	_check(throat.has(at + ahead) and throat.has(at + ahead * 3) and not throat.has(at) and walled == 0,
+			"no ground in its throat (%d cells, %d drawn)" % [throat.size(), walled])
+	# An outcrop grown out of the hills (the coordinator): grass and moss on
+	# some of its gentle top facets, rock darkest just over the arch, scree
+	# at its foot.
+	var green := 0
+	var lip := INF
+	var face_rest := 0.0
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	for i in range(0, points.size(), 3):
+		var shade := shades[i]
+		if normals[i].y > 0.8 and shade.g > shade.r * 1.15 and shade.g > shade.b * 1.15:
+			green += 1
+		var middle := (points[i] + points[i + 1] + points[i + 2]) / 3.0
+		if absf(normals[i].z) > 0.9 and middle.z < 0.8:
+			if absf(middle.x) < Client3D.MOUTH_ARCH.x * 0.5 and middle.y > Client3D.MOUTH_ARCH.y and middle.y < Client3D.MOUTH_ARCH.y + 0.25:
+				lip = minf(lip, shade.get_luminance())
+			elif absf(middle.x) > Client3D.MOUTH_ARCH.x * 0.5 + Client3D.MOUTH_LIP_REACH and middle.y > 0.3:
+				face_rest = maxf(face_rest, shade.get_luminance())
+	_check(green > 4 and lip < face_rest * 0.6, "grass on its top, its lip in shadow (%d green facets, lip %.3f, face %.3f)" % [green, lip, face_rest])
+	var scree: Node3D = holder.get_node_or_null("Scree")
+	_check(scree != null and scree.get_child_count() == Client3D.MOUTH_SCREE.size(), "scree at its foot (%d)" % (scree.get_child_count() if scree != null else 0))
+	var open_heap := holder.get_node_or_null("Rockfall")
+	# Closed (the link closed or sealed): a rockfall heaped in the arch.
+	terrain["link_cues"] = [{"tile": at, "cue": "cave", "facing": ahead, "variant": 1, "closed": true}]
+	_rig.rebuild(terrain, sample["centre"])
+	holder = _rig._room.get_node_or_null("Mouth_%d_%d" % [at.x, at.y])
+	var heap: Node3D = holder.get_node_or_null("Rockfall") if holder != null else null
+	var stones := heap.get_child_count() if heap != null else 0
+	var stray := 0.0
+	for stone: Node3D in (heap.get_children() if heap != null else []):
+		stray = maxf(stray, maxf(absf(stone.position.x) - Client3D.MOUTH_ARCH.x * 0.5, maxf(-0.5 - stone.position.z, stone.position.z - 1.6)))
+	_check(open_heap == null and stones == Client3D.MOUTH_ROCKFALL.size() and stray <= 0.0,
+			"closed, a rockfall heaped in the arch; none when open (%d stones, %.2f m stray)" % [stones, stray])
+	# Kept low, so the black throat shows over it across the arch (the
+	# coordinator: a cave, blocked, in daylight).
+	var heap_top := -INF
+	for mesh: MeshInstance3D in (heap.find_children("*", "MeshInstance3D", true, false) if heap != null else []):
+		var box := holder.global_transform.affine_inverse() * mesh.global_transform * mesh.get_aabb()
+		heap_top = maxf(heap_top, box.end.y)
+	_check(heap_top < Client3D.MOUTH_ROCKFALL_TOP + 0.1 and heap_top < Client3D.MOUTH_ARCH.y - 1.0,
+			"the rockfall low in the arch, the throat black over it (top at %.2f m)" % heap_top)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 ## levels/sample's stream (decision 505, terrain's side): the ford and the
 ## water under the bridge in the water mask with the stream's (a ford's
 ## shallow), the flow down the path and none on still water, the bed under
@@ -4992,6 +5104,8 @@ func _test_forest_floor_whole() -> void:
 		var covered: Dictionary = {}
 		for cell: Vector2i in _rig._ground_cells:
 			covered[cell] = true
+		# A cave mouth's throat (798) is floored by its hill and throat.
+		covered.merge(_rig._throat_cells())
 		var bare: Array[Vector2i] = []
 		for cell: Vector2i in _rig._land:
 			if not covered.has(cell):

@@ -664,8 +664,10 @@ func _test_hills() -> void:
 	var kinds := {}
 	var stone: Array[Vector2i] = []
 	for cell: Vector2i in terrain["kinds"]:
-		# A ford's footing is the ground beside it, stone mid-river (559).
-		if not terrain["fords"].has(cell):
+		# A ford's footing is the ground beside it, stone mid-river (559); a
+		# rock's is the ground round it, stone inside a block of them (a lair's
+		# hill, 798), never seen.
+		if not terrain["fords"].has(cell) and not terrain["rocks"].has(cell):
 			kinds[terrain["kinds"][cell]] = int(kinds.get(terrain["kinds"][cell], 0)) + 1
 			if terrain["kinds"][cell] == "stone":
 				stone.append(cell)

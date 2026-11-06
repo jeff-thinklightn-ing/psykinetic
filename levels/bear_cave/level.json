@@ -1,0 +1,48 @@
+{
+	"name": "Bear cave",
+	"outdoor": false,
+	"depth": 1,
+	"walls": "cave",
+	"floors": "cave",
+	"mass": "rock",
+	"ambient": 0.03,
+	"music": "none",
+	"ambience": "cave_lair",
+	"starts": [
+		[
+			4,
+			24
+		]
+	],
+	"spawn_points": {
+		"from_hills": [
+			4,
+			24
+		]
+	},
+	"links": [
+		{
+			"at": [
+				4,
+				26
+			],
+			"to_map": "hills",
+			"to_spawn": "from_bear_cave"
+		}
+	],
+	"monsters": {
+		"great_bear": {}
+	},
+	"legend": {
+		"monster_great_bear": "#7a4a2a"
+	},
+	"skylights": [
+		{
+			"at": [
+				6,
+				7
+			],
+			"radius": 3
+		}
+	]
+}
