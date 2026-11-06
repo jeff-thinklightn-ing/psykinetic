@@ -17676,8 +17676,8 @@ func _resident_quiet(body: Resident, player: GridEntity = null) -> bool:
 	return World.tick - last <= Companion.QUIET_AFTER
 
 
-## A monster or beast within Companion.COMBAT_RANGE of [param body] or
-## [param player] that would fight either (enemy-ai's threatens, 551): a
+## A roused (Companion.roused, 675 amended) monster or beast within
+## Companion.COMBAT_RANGE of [param body] or [param player] that would fight either (enemy-ai's threatens, 551): a
 ## raider, a predator, a charging boar, a draugr only while he would.
 func _fight_near(body: Resident, player: GridEntity) -> bool:
 	for entity in World.get_entities():
@@ -17688,6 +17688,8 @@ func _fight_near(body: Resident, player: GridEntity) -> bool:
 		var reach := Companion.COMBAT_RANGE
 		if World.distance(body.tile, monster.tile) > reach and not (listener and World.distance(player.tile, monster.tile) <= reach):
 			continue
+		if not Companion.roused(monster):
+			continue  # 675 amended: one idle on its post, unaware, hushes no one.
 		if monster.threatens(body) or (listener and monster.threatens(player)):
 			return true
 	return false

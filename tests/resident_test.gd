@@ -4196,9 +4196,16 @@ func _test_quiet_near_hostile() -> void:
 	if foe == null:
 		Net.message_received.disconnect(heard)
 		return
+	foe.acts = false  # Its alert as set here (675 amended: only a roused one hushes anyone).
 	_check(not _main._resident_quiet(mara, player), "one that would fight nobody: she talks as ever")
-	_main._resident_asks.append({"body": mara.get_instance_id(), "ask": {"serial": 0, "trigger": "x", "speaker": "Mara"}, "at": World.tick, "player": "", "peer": -1})
 	foe.set("fights", [player])
+	foe.idle = Monster.Idle.GUARD
+	foe.alert = Monster.Alert.IDLE
+	foe.target = null
+	_check(not _main._resident_quiet(mara, player) and _main._resident_fight_at.is_empty(),
+		"675 amended: one on guard at its post, unroused, though it would fight the player: she talks as ever")
+	foe.alert = Monster.Alert.FIGHTING
+	_main._resident_asks.append({"body": mara.get_instance_id(), "ask": {"serial": 0, "trigger": "x", "speaker": "Mara"}, "at": World.tick, "player": "", "peer": -1})
 	_check(_main._resident_quiet(mara, player), "one that would fight the player she talks with: quiet")
 	_check(_main._resident_asks.is_empty() and str(MindLog.last.get("", {}).get("outcome", "")) == "held tongue"
 		and str(MindLog.last[""].get("trigger", "")) == "ask" and str(MindLog.last[""].get("say", "")).is_empty(), "the fight begun lets her waiting ask go, counted with no words")

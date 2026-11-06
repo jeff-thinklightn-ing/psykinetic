@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Your companion answers you and speaks up again near a foe that hasn't noticed anyone, such as a robber guarding a crypt chest, where before she fell silent for minutes as if in a fight; only a fight that has begun keeps her, or townsfolk, quiet (675 amended).
 
 ## v0.1.206
 

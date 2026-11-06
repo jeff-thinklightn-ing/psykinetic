@@ -1650,7 +1650,7 @@ func _tend_notice() -> void:
 	if World.tick - int(_notice["at"]) > NOTICE_STALE_S * World.TICK_RATE:
 		_notice = {}
 		return
-	if in_fight() or quiet() or World.is_downed(self) or World.tick - _notice_last < NOTICE_GAP_S * World.TICK_RATE:
+	if fight_roused() or quiet() or World.is_downed(self) or World.tick - _notice_last < NOTICE_GAP_S * World.TICK_RATE:
 		return
 	var waiting := _notice
 	_notice = {}
@@ -3372,11 +3372,13 @@ func quiet() -> bool:
 
 
 ## Marks this tick a fighting one when she or her player fights (decision
-## 675); a fight just begun drops what her voice had waiting.
+## 675); a fight just begun drops what her voice had waiting. Only a roused
+## hostile (675 amended, fight_roused): a guard idle at its post beside a
+## vault kept her quiet 4.5 minutes (voice8).
 func _note_fight() -> void:
 	if _fight_tick == World.tick:
 		return
-	if in_fight() or current_intent == Intent.ATTACK or current_intent == Intent.DODGE or current_intent == Intent.RETREAT:
+	if fight_roused() or current_intent == Intent.ATTACK or current_intent == Intent.DODGE or current_intent == Intent.RETREAT:
 		if World.tick - _fight_tick > QUIET_AFTER:
 			_pending_voice = {}
 		_fight_tick = World.tick
@@ -3457,6 +3459,26 @@ func _wants_tending(patient: GridEntity) -> bool:
 ## A hostile within COMBAT_RANGE of her or her player.
 func in_fight() -> bool:
 	return _hostile_within(COMBAT_RANGE)
+
+
+## For her tongue and her noticing (675 amended): a hostile within
+## COMBAT_RANGE of her or her player that is roused (Companion.roused); one
+## idle on its post, unaware of anyone, is no fight to hush for.
+func fight_roused() -> bool:
+	var player_here := _alive(keeper)
+	for entity in World.get_entities():
+		if _hostile(entity) and roused(entity) and (World.distance(tile, entity.tile) <= COMBAT_RANGE
+				or player_here and World.distance(keeper.tile, entity.tile) <= COMBAT_RANGE):
+			return true
+	return false
+
+
+## Whether [param entity] is stirred (675 amended): a monster not IDLE
+## (suspicious, hunting, fighting, fleeing) or going for someone. Anything
+## else is taken as roused. Main._fight_near (townsfolk's side) reads it too.
+static func roused(entity: GridEntity) -> bool:
+	var monster := entity as Monster
+	return monster == null or monster.alert != Monster.Alert.IDLE or monster.target != null
 
 
 func _hostile_within(reach: int) -> bool:

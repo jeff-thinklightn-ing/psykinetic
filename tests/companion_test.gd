@@ -3875,6 +3875,7 @@ func _test_quiet() -> void:
 	spoken.clear()
 	var imp := _spawn_imp(_free_tile_between(pet, 2, 3))
 	imp.acts = false
+	imp.alert = Monster.Alert.FIGHTING  # As one coming at them (675 amended: only a roused one hushes her).
 	World.step()
 	_check(pet.in_fight() and pet.quiet(), "a monster near: she holds her tongue")
 	_check(not pet._say("Behind you!", true) and spoken.is_empty(), "a line, even an always one: dropped")
@@ -3888,6 +3889,34 @@ func _test_quiet() -> void:
 	for i in Companion.QUIET_AFTER + 1:
 		World.step()
 	_check(not pet.quiet() and pet._say("That's done.", true) and spoken == ["That's done."], "%d ticks on: she may speak again" % Companion.QUIET_AFTER)
+	# 675 amended (voice8): a guard idle on its post by a vault, unaware, is no fight to hush for.
+	spoken.clear()
+	pet._carry_out({"verb": "wait"}, "Wait here.")  # Held, as on the barrow's plate: she does not go for it herself.
+	var guard := _spawn_imp(_free_tile_between(pet, 2, 3))
+	guard.acts = false
+	guard.idle = Monster.Idle.GUARD
+	guard.alert = Monster.Alert.IDLE
+	guard.target = null
+	for i in Companion.QUIET_AFTER + 5:
+		World.step()
+	_check(pet.in_fight() and not pet.fight_roused() and not pet.quiet() and pet._say("A guard, there.", true) and spoken == ["A guard, there."],
+		"a guard on its post within %d cells, unroused: she still speaks (%s)" % [Companion.COMBAT_RANGE, spoken])
+	pet._notice = {}
+	pet._notice_today = {}
+	pet._notice_last = -100000
+	pet.noticed({"track": "deed", "amount": 1, "of": "a sealed tomb", "words": "opened a sealed tomb", "big": true})
+	var offered := not pet._notice.is_empty()
+	World.step()
+	_check(offered and pet._notice.is_empty(), "and her noticing does not wait on it")
+	_check(not Companion.roused(guard), "Companion.roused: an idle guard is not (townsfolk's _fight_near reads it too)")
+	guard.alert = Monster.Alert.SUSPICIOUS
+	World.step()
+	_check(Companion.roused(guard) and pet.fight_roused() and pet.quiet(), "roused (suspicious): she hushes")
+	World.despawn(guard)
+	pet._carry_out({"verb": "follow"}, "Follow me.")
+	for i in Companion.QUIET_AFTER + 1:
+		World.step()
+	pet._notice_last = -100000
 	pet.said.disconnect(on_said)
 	Companion.hold_tongue = false
 	_settle(pet)

@@ -31368,6 +31368,25 @@ dropped and her player's words unanswered; the fight over, quiet a breath
 with nothing waiting; QUIET_AFTER on, she speaks. Server only, protocol
 unchanged, no new class_name.
 
+675 amended: only a roused hostile is a fight to hush for (the coordinator's approval, a
+hotfix; playtest's voice8). Since 806 amended (5), each barrow cache chest's robber stands guard
+on its post and does not come; one by the vault stood within COMBAT_RANGE of her and her player,
+so in_fight() stayed true and she held her tongue 4.5 minutes: the vault's line, her player's
+question and the bond step's notice all dropped as "held tongue" (live in v0.1.206). Now her
+tongue (_note_fight) and her noticing's wait (_tend_notice) read Companion.fight_roused(): a
+hostile, by her _hostile, within COMBAT_RANGE of her or her player that is roused
+(Companion.roused: a monster whose alert is not IDLE, or that is going for someone). A guard
+idle on its post, unaware of anyone, hushes no one; once it is suspicious, hunting or fighting,
+she is quiet as before. Her intent ATTACK, DODGE or RETREAT still counts. in_fight() itself,
+which her stances, errands and guarding read, is unchanged. Townsfolk (npc's side,
+Main._fight_near) read the same Companion.roused, so a posted guard near a player does not
+silence the resident they talk with either (on guard, she would go for a foe in reach herself,
+and that fight hushes her as before). companion_test _test_quiet: held (as on the barrow's
+plate), a guard on its post within COMBAT_RANGE, unroused: she speaks and her notice goes out; suspicious: she hushes (the
+older check's imp now FIGHTING, as one coming at them is). resident_test: the stub on guard,
+unroused, though it would fight the player: she talks. Server only, protocol unchanged, no new
+class_name.
+
 ## 663 amended: she keeps out of her player's firing cone
 
 Jeff, 2026-10-25: "nocking and aiming an arrow should alert the companion
