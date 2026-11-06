@@ -682,6 +682,44 @@
 			"type": "mesh",
 			"uses": "Gilt buckle (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.grey_fang": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.06,
+				0.02,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "old grey's fang (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.grey_pelt": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				1.4,
+				0.2,
+				0.7
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "old grey's pelt (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.hammer": {
 			"budget": 500,
 			"category": "items",
