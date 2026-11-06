@@ -43704,3 +43704,50 @@ world) covers it too; before, the sheet drew over the map. ui_test _test_world_m
 none at [0, 0], a gain's bar moving the count, another track's not) and _test_character_sheet
 (the sheet right after the pack). CHANGELOG (voice's words). Client only, protocol unchanged,
 no new class_name.
+Protocol: a "50 (780 amended (12))" line for the place kind "lair" and its "den", no bump; no new
+class_name.
+
+## 815. The wolves' cave: a pack's den in the forest's west (forest phase E)
+
+The coordinator's fill_forest plan, phase E (C:/dev/review/lands/fill_forest), approved with three
+additions for Jeff's visible-reward rule (a find, a named place for Wayfaring, a deed with a slow
+refill); enemy-ai's residents and layout; lore's name and facts; items' table; release's number. The
+sheet planned the old wolf's cave here; lore's agreed fact (Jeff's: "In the hills and foothills a wolf
+pack follows an old grey") puts the old wolf elsewhere, so the coordinator ruled the forest cave an
+ordinary pack's den, open from the start; the old wolf's own den comes with enemy-ai's apex phase 1, in
+the hills or foothills.
+
+- A new level, levels/wolf_cave (tools/make_wolf_cave.py, seed 781): a rock cave, zone "cave", walls,
+  floors "cave", "mass" rock, "ambience" "cave_lair" (795 amended), no music; 190 floor cells. A
+  mouth chamber at the way in (two cells wide up to the link to the forest, "from_wolf_cave"; the start
+  and "from_forest" just inside), lit by a skylight (797) so the pack's watchers are plain; a short
+  passage, two wide and three long (short, so nobody holds it against a pack that circles); a den
+  about 12 x 12 with a rock pillar in its middle, no floor, for the pack to circle round (enemy-ai:
+  they dart and give ground, and a ring is what makes them dangerous). Dim: "ambient" 0.22 and one
+  shaft by the pillar, never black, a torch a real help (enemy-ai's; the coordinator: readable, not
+  murky).
+- The pack: four monster_wolf, two lying by the den within 3 to 4 cells, two in the mouth chamber as
+  watchers, so whoever comes in meets the pack's warning first and the fight carries back. They drop
+  only what wolves do. "respawn_s" {"wolf": 6000}: back after more than a game day (90 minutes), so
+  the cave is not farmed (level.json's "respawn_s", Monster's respawn wait).
+- The find: a lost traveller's pack among the bones at the den's back, behind the wolves: a cache
+  (decision 599: each player searches it once; never empty), art-kit's prop.cache_pack, its table
+  items' "wolf_cave_cache" (rations always, a bandaging kit, a knife, soft boots, flint, a hood, a
+  silver ring by chance, 4-12 gold: a notch above the old camp's, the first place 788's hood and
+  boots turn up), "cache_place" the cave's name. No chest. Lore: the pack drags its kills home, so
+  the bones (decor, 780 amended (12)'s "bones") are deer and boar; the pack belonged to a traveller
+  who strayed off the path; nobody is named.
+- Its place: "wolf_cave", kind "lair" (780 amended (12)), "the wolves' cave" (lore; "the Wolf's
+  Mouth" is a draft for Jeff's names), held by nobody, radius 12, at the den, "explore": true, so a
+  first visit gives the Wayfaring float (804). Clearing it is a deed through enemy-ai's lair rule
+  (every hostile monster spawned in a "lair" level dead while a player is in it: an 804 deed each,
+  counted again only after the lair refills; enemy-ai's, voice's words).
+- In the forest, make_forest's LAIRS gains its mouth at (53,76), 11.7 cells off the healer's path,
+  opening north toward it: the link {to_map "wolf_cave", to_spawn "from_forest", mouth "cave"
+  (terrain's 798 cue), closed false}, the rock behind and beside it void (the cue draws the outcrop),
+  a trampled dirt pad with two bones, "from_wolf_cave" two cells out. A LAIRS entry says "clawed"
+  (the boar's tusk-scored tree; none here). The forest regenerated: 20 cells changed round the mouth.
+- The first load prints "[level] wolf_cave: 190 cells, 5 entities, 1 starts, 1 links"
+  (Main.load_map). level_test _test_wolf_cave, _test_forest's links. CHANGELOG bullet (voice's
+  words). Lands after the boar lair (780 amended (12), after terrain's 798) and items' run with the
+  table. Protocol unchanged, no new class_name.

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the forest's west, off the path to the healer's, wolves den in a cave under a rock outcrop, with bones trampled into the ground before it: two watch the mouth, two more lie in the dark round a rock pillar, and at the back a lost traveller's pack holds a find of your own; finding the cave counts toward your Wayfaring, clearing it is a deed, and the wolves are back after a day or so (815).
 - Your companion notices when things go your way, a camp cleared, a place found, a building raised with your goods, the two of you growing closer, and now and then says a word about it (804 amended (14)).
 - Hollowfell: its two deep chambers lie a level down now, a stair to each; in the east the orc chief holds the stair's foot with an imp at each flank and his hoard behind him; in the south the kobold chief lies in wait in the dark by the way in, two of his kin deeper in and his hoard by the back wall; and off the galleries, one bay holds a cold miners' shrine and another an old windlass over a shaft (790 amended (3)).
 - In the crypt, the robbers and Brand stay over the chests they're robbing, where before they wandered off from them (806 amended (5)).

@@ -692,6 +692,22 @@
 			0,
 			"scattered_bones",
 			1
+		],
+		[
+			52,
+			75,
+			0,
+			-1,
+			"bones",
+			1
+		],
+		[
+			54,
+			74,
+			0,
+			1,
+			"bones",
+			1
 		]
 	],
 	"centre": [
@@ -728,6 +744,10 @@
 		"from_boar_lair": [
 			124,
 			175
+		],
+		"from_wolf_cave": [
+			53,
+			74
 		]
 	},
 	"links": [
@@ -757,6 +777,16 @@
 			"to_spawn": "from_forest",
 			"mouth": "thicket",
 			"closed": true
+		},
+		{
+			"at": [
+				53,
+				76
+			],
+			"to_map": "wolf_cave",
+			"to_spawn": "from_forest",
+			"mouth": "cave",
+			"closed": false
 		}
 	],
 	"entities": []

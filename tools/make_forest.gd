@@ -136,11 +136,14 @@ const CAMP_LEGEND := {"monster_bandit": "#b4643c", "monster_bandit_brute": "#6e3
 ## cells void (terrain's "thicket" mouth draws a bramble mound on them,
 ## art-kit's wall.thicket; till then the wood's trees); in front a trampled
 ## dirt pad LAIR_PAD rows deep, three wide, a few bones on it (the
-## coordinator: a sign of what lives there) and a tree scored by tusks
-## (tree.clawed, solid) at its side; the lair's "from_<lair>" spawn two
+## coordinator: a sign of what lives there) and, at a boar's, a tree scored
+## by tusks (tree.clawed, solid) at its side ("clawed"); the lair's "from_<lair>" spawn two
 ## cells out.
 const LAIRS: Array[Dictionary] = [
-	{"to_map": "boar_lair", "at": Vector2i(122, 175), "open": Vector2i(1, 0), "mouth": "thicket", "closed": true}]
+	{"to_map": "boar_lair", "at": Vector2i(122, 175), "open": Vector2i(1, 0), "mouth": "thicket", "closed": true, "clawed": true},
+	# Forest phase E: the wolves' cave, an ordinary pack's den (not the old
+	# wolf's, the coordinator), open from the start; bones its only sign.
+	{"to_map": "wolf_cave", "at": Vector2i(53, 76), "open": Vector2i(0, -1), "mouth": "cave", "closed": false, "clawed": false}]
 const LAIR_MOUND := Vector2i(5, 2)
 const LAIR_PAD := 2
 ## A lair's sightline (the coordinator, from terrain's low still): past its
@@ -507,7 +510,8 @@ func _lair_grounds() -> void:
 			if map.cell(cell) == "void" or map.cell(cell) == "grass":
 				map.set_cell(cell, "grass")
 			keep_clear[cell] = true
-		_clear(cells["tree"], "grass")
+		if lair["clawed"]:
+			_clear(cells["tree"], "grass")
 
 
 ## Each lair's link (sealed), its spawn, the bones on its pad and the
@@ -526,8 +530,9 @@ func _lairs() -> void:
 		var pad: Array = cells["pad"]
 		decor.append([pad[0].x, pad[0].y, open.x, open.y, "scattered_bones", 1])
 		decor.append([pad[5].x, pad[5].y, -open.x, -open.y, "scattered_bones", 1])
-		var tree: Vector2i = cells["tree"]
-		config["buildings"].append({"slot": "tree.clawed", "at": [tree.x, tree.y], "facing": [open.x, open.y]})
+		if lair["clawed"]:
+			var tree: Vector2i = cells["tree"]
+			config["buildings"].append({"slot": "tree.clawed", "at": [tree.x, tree.y], "facing": [open.x, open.y]})
 	config["decor"] = decor
 
 

@@ -1683,9 +1683,10 @@ func _test_forest() -> void:
 	print("== levels/forest ==")
 	var forest := Level.load_level("forest")
 	var links: Array = forest.get("links", [])
-	_check(forest.get("display_name") == "The Forest" and links.size() == 3 and links[0]["to_map"] == "wilds"
-		and links[1]["to_map"] == "stronghold" and links[1]["closed"] and links[2]["to_map"] == "boar_lair" and links[2]["closed"],
-		"The Forest: back to the wilds, on to the stronghold and the boar's lair closed (%s)" % [links])
+	_check(forest.get("display_name") == "The Forest" and links.size() == 4 and links[0]["to_map"] == "wilds"
+		and links[1]["to_map"] == "stronghold" and links[1]["closed"] and links[2]["to_map"] == "boar_lair" and links[2]["closed"]
+		and links[3]["to_map"] == "wolf_cave" and not links[3]["closed"],
+		"The Forest: back to the wilds, on to the stronghold and the boar's lair closed, the wolves' cave open (%s)" % [links])
 	_check(_main.load_map("forest") and World.outdoor, "forest loads, outdoors")
 	var player := _player()
 	var east: Vector2i = links[1]["tile"]
@@ -2792,6 +2793,7 @@ func _test_relaid() -> void:
 	_test_explorables()
 	_test_forest_camps()
 	_test_boar_lair()
+	_test_wolf_cave()
 	_test_bear_den()
 	_test_removed(wilds)
 	var hills := Level.load_level("hills")
@@ -2924,6 +2926,67 @@ func _test_boar_lair() -> void:
 		if spot.x >= at.x + 3 and spot.x < at.x + 9 and absf(spot.y - (at.y + 0.5)) < 2.5:
 			sight_blocked.append(spot)
 	_check(sight_blocked.is_empty(), "a clear sightline to the mouth across the pad, no tree in it (%s)" % [sight_blocked])
+
+
+## The wolves' cave (forest phase E): a pack's den in rock, its own lair
+## place ("explore": a first visit's float; enemy-ai's lair rule makes
+## clearing it a deed); a skylit mouth chamber with two watchers, a short
+## two-wide passage, a den with a pillar to circle round (no floor), two
+## wolves by the den; dim but never black (ambient 0.1 or more, a shaft
+## in the den); the traveller's pack a cache (599) at the den's back; the
+## wolves back after a game day or more. In the forest its mouth is open,
+## "from_wolf_cave" two cells out, the rock behind it no floor.
+func _test_wolf_cave() -> void:
+	print("== The wolves' cave (forest phase E) ==")
+	var cave := Level.load_level("wolf_cave")
+	var config := Level.template_config("wolf_cave")
+	var floor := {}
+	for cell: Vector2i in cave["terrain"]["floor"]:
+		floor[cell] = true
+	_check(cave["warnings"].is_empty() and cave["terrain"]["zone"] == "cave" and float(cave["terrain"]["ambient"]) >= 0.1
+		and cave["terrain"]["ambience"] == "cave_lair", "read with no warning, a cave, dim but never black (%s)" % [cave["warnings"]])
+	var links: Array = cave["links"]
+	_check(links.size() == 1 and links[0]["to_map"] == "forest" and links[0]["to_spawn"] == "from_wolf_cave" and not links[0]["closed"],
+		"one way out, up to the forest (%s)" % [links])
+	var places := Level.places_from(config, [] as Array[String])
+	var place: Dictionary = places.get("wolf_cave", {})
+	_check(places.size() == 1 and place.get("kind") == "lair" and place.get("holder") == "nobody" and place.get("explore") == true
+		and place.get("name") == "the wolves' cave", "its place: the wolves' cave, a lair, nobody's, explored (%s)" % [place])
+	var den: Vector2i = place.get("cell", Vector2i(-1, -1))
+	var wolves: Array[Vector2i] = []
+	var caches: Array = []
+	for entity: Dictionary in cave["entities"]:
+		if str(entity.get("kind", "")) == "wolf":
+			wolves.append(entity["tile"])
+		elif str(entity.get("props", {}).get("cache", "")) == "wolf_cave_cache":
+			caches.append(entity)
+	var by_den := wolves.filter(func(at: Vector2i) -> bool: return Vector2(at - den).length() <= 4.0)
+	_check(wolves.size() == 4 and by_den.size() == 2, "four wolves, two by the den (%s)" % [wolves])
+	_check(caches.size() == 1 and Vector2(caches[0]["tile"] - den).length() <= 2.5 and caches[0].get("art") == "prop.cache_pack",
+		"the traveller's pack, a cache at the den's back (%s)" % [caches])
+	var mouth := links[0]["tile"] as Vector2i
+	var watchers := wolves.filter(func(at: Vector2i) -> bool: return Vector2(at - mouth).length() <= 10.0)
+	var lit: Array = cave["terrain"]["skylights"].filter(func(light: Dictionary) -> bool: return Vector2(light["at"] - mouth).length() <= 8.0)
+	var shaft: Array = cave["terrain"]["skylights"].filter(func(light: Dictionary) -> bool: return Vector2(light["at"] - den).length() <= 8.0)
+	_check(watchers.size() == 2 and lit.size() >= 1 and shaft.size() >= 1, "two watchers in a skylit mouth chamber, a shaft in the den")
+	var pillar := Vector2i(19, 12)
+	var ring := true
+	for step: Vector2i in [Vector2i(-2, 0), Vector2i(3, 0), Vector2i(0, -2), Vector2i(0, 3)]:
+		ring = ring and floor.has(pillar + step)
+	_check(not floor.has(pillar) and ring, "a pillar in the den, floor all round it to circle")
+	_check(int(config.get("respawn_s", {}).get("wolf", 0)) >= DayNight.DEFAULT_DAY_MINUTES * 60, "the wolves back after a game day or more")
+	var forest := Level.load_level("forest")
+	var forest_floor := {}
+	for cell: Vector2i in forest["terrain"]["floor"]:
+		forest_floor[cell] = true
+	var door: Dictionary = {}
+	for link: Dictionary in forest["links"]:
+		if link["to_map"] == "wolf_cave":
+			door = link
+	var spawn: Array = Level.template_config("forest")["spawn_points"].get("from_wolf_cave", [])
+	var at: Vector2i = door.get("tile", Vector2i(-1, -1))
+	_check(not door.is_empty() and not door["closed"] and spawn.size() == 2 and forest_floor.has(Vector2i(spawn[0], spawn[1]))
+		and not forest_floor.has(at + Vector2i(0, 1)), "the forest's mouth open, its spawn on the pad, rock behind it (%s, %s)" % [door, spawn])
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp
 ## building with its place at its fire, 6 to 12 cells off a path and 24
