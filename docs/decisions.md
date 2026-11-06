@@ -12879,6 +12879,20 @@ measure and none without one, and no camp sends; in, it sends; not in
 again, the group holds its cell, walked and plan; in, it walks on. Server
 only, protocol unchanged, no new class_name.
 
+465 amended (3): a quitting server retires its routes before it waits for
+them (release's label; the coordinator's go; release's slow landings). The
+trade's and the raids' finish(), called from Main._exit_tree, waited for
+every distance field to be made: with 793's fourth layer that was 64-84 s
+of a core, longer under load, on every server's way out, a test's included.
+art-kit's landing had state_test at 1239 s and zone_test and items_test
+killed at 300 s after PASS; a suite with nothing beside it went from about
+730 s to 1100 from 793's landing on. finish() now calls retire() first, so
+the tasks stop at their next portal, then waits. The state is saved before
+(Main._exit_tree saves first) and no field is saved: routes are made again
+at boot. zone_test on main: 280 s run, 115 s from RESULT to exit; with it,
+33 s and 1 s. land.sh 694 s, state_test 233 s. A deploy's restart quits as
+fast. Server only, no bullet, protocol unchanged, no new class_name.
+
 ## 466. A forest's canopy: trunks as void cells, a cover layer on every peer
 
 Jeff (2026-10-17, through the coordinator): "a forest zone - while walking

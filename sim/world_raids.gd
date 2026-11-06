@@ -102,9 +102,12 @@ static func _read_rules() -> Dictionary:
 	return {}
 
 
-## Waits for any routes still being made: before the server quits.
+## Before the server quits: routes still being made are retired (their
+## tasks stop at their next portal) and waited for, so a quit does not sit
+## out every layer's fields (465 amended (3)).
 func finish() -> void:
 	if _routes != null:
+		_routes.retire()
 		_routes.wait()
 	for each in _retired:
 		each.wait()

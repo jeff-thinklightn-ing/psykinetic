@@ -117,9 +117,12 @@ func routes_now() -> WorldRoutes:
 	return _own_routes
 
 
-## Waits for its own routes' fields, if it made them: before the server quits.
+## Before the server quits: its own routes, if it made them, are retired
+## (their tasks stop at their next portal) and waited for, so a quit does not
+## sit out every layer's fields (465 amended (3)).
 func finish() -> void:
 	if _own_routes != null:
+		_own_routes.retire()
 		_own_routes.wait()
 	for each in _retired:
 		each.wait()
