@@ -131,6 +131,9 @@ func _ready() -> void:
 	video.add_child(_choice_row("Camera: low horizon", "camera", [["off", "Off"], ["on", "On"]],
 		func() -> String: return "on" if Net.camera_low else "off",
 		func(value: String) -> void: Net.set_camera_low(value == "on")))
+	video.add_child(_choice_row("Camera: keep you in view", "camera_turn", [["off", "Off"], ["on", "On"]],
+		func() -> String: return "on" if Net.camera_turn else "off",
+		func(value: String) -> void: Net.set_camera_turn(value == "on")))
 	var interface := add_section("Interface")
 	interface.add_child(_choice_row("Interface size", "ui_scale",
 		[["0.80", "Smaller"], ["1.00", "Normal"], ["1.25", "Larger"], ["1.50", "Largest"]],

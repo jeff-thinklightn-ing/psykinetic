@@ -44057,3 +44057,39 @@ The 0.9-1.3 s worst tick at 16 players is a fault of its own, whichever
 template: perf finds what it is next.
 
 Server only, protocol unchanged, no new class_name, no bullet.
+
+## 801. Outdoors the camera turns to keep you in view
+
+The coordinator's approval, 2026-11-04, and its review of the first clip, 2026-11-06 (turns
+held within 45 degrees; voice's words). Outdoors (level.json "outdoor"), what stands between
+the camera and the player or their companion (walls, roofs, lone trees, Level.FADES_ON_LINE
+pieces) no longer fades at once, and the fight's other side (_fight_points) not at all. Kept:
+a building's near side and its roof off while they are in it (_inside_walls, _update_roofs),
+the low camera's lens-close hide of a piece on the line (NEAR_CLOSE, held FADE_HOLD,
+_close_at), and the grown forest's see-through under its canopy (a canopy hides them from
+every yaw, so no turn clears it). Indoors nothing changes.
+
+Instead the camera turns (client3d/camera_turn.gd, no class_name). The player is hidden
+(Client3D._is_hidden) when the line back to the camera from their chest (FADE_HEIGHTS' 0.9)
+and from their feet or head meets a piece standing (_point_blocked, the fade's test), a
+building's near side they are in, the lens-close pieces and the roofs off aside. Hidden for
+HIDE_SECONDS (0.6), the yaw is tried SEARCH_STEP (15) degrees at a time both ways, never
+further than TURN_MOST (45) from the yaw the player last set themselves (Client3D._hand_yaw,
+set by a settle of A/D or a drag; a bigger swing turned the world, the compass and the walk
+keys under them for a tree clump). The nearest yaw from which all three points are clear
+wins; of two as near, the one looking more the way they walk (their puppet's eased ground
+velocity). The camera turns there as a sine out at TURN_SPEED (120 degrees a second on
+average), stops on it (no snap to a diamond) and stays, also when they come out: no turn
+back. The yaw is saved as a hand-turned one is. After a turn, or a search that found none,
+COOL_DOWN (1.5 s). During a turn the walk keys go by the yaw it set off from
+(Client3D.move_yaw, Main._view_yaw). Never against the player: A/D, a middle drag (turn or
+pitch peek), W/S's overhead, or a settle still easing stop a turn at once, and none starts
+for MANUAL_HOLD (6 s) after.
+
+When they are hidden and no turn helps (none within TURN_MOST clears, the hold is on, or the
+Options' Display "Camera: keep you in view" is off), what hides them fades as it always did
+(Client3D._line_fade puts the line's pieces back in _hiding); they still count as hidden, so
+a later search may turn instead. Net.camera_turn, settings.cfg camera_turn=on|off, on unless
+off was chosen; Jeff judges the default from the cut's checklist. tools/clip.sh camera_turn
+(an outdoor field with a clump of trees; the clip's pan toward the monster left out).
+view_test _test_camera_turn. Client only, protocol unchanged, no new class_name.

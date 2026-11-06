@@ -16,6 +16,9 @@ extends Node
 ##     covered, walks behind it (out of its cone, beyond its hearing), up
 ##     its side and round in front of it in the dark, unseen; lights the
 ##     lantern and is seen at once.
+##   camera_turn: outdoors (801), a clump of trees in a field; the player
+##   walks behind it from the camera, waits there (the camera turns to
+##   show them), then walks round it and waits again.
 ##   escape: an imp on guard sees the player, who runs down a corridor and
 ##     round two corners; the imp hunts to where it last saw them and on,
 ##     looks round, gives up and walks home.
@@ -201,6 +204,8 @@ func _ready() -> void:
 	match scenario:
 		"sneak":
 			_sneak()
+		"camera_turn":
+			_camera_turn()
 		"escape":
 			_escape()
 		"leash":
@@ -299,6 +304,8 @@ func _ready() -> void:
 		_main.hint_panel.visible = false  # The controls list would cover the caption.
 	if scenario.begins_with("items"):
 		_main.pack_panel.shown = true
+	if scenario == "camera_turn":
+		_main.pack_panel.shown = false
 	if scenario == "items_use":
 		World.get_doors()[0].lock = "cellar"
 	_caption = Label.new()
@@ -328,7 +335,7 @@ func _process(delta: float) -> void:
 		return
 	var at: Node3D = view._puppets.get(_player.get_instance_id())
 	var monster: Node3D = view._puppets.get(_monster.get_instance_id())
-	if at != null and monster != null:
+	if at != null and monster != null and scenario != "camera_turn":  # 801: on the player alone.
 		var middle: Vector3 = (monster.position - at.position) * 0.5
 		view.pan = view.pan.lerp(middle, 1.0 - exp(-3.0 * delta)).limit_length(view.PAN_MAX)
 
@@ -373,6 +380,41 @@ func _sneak() -> void:
 		["wait", 15, ""],
 		["lantern", true, "Lantern lit: seen."],
 		["wait", 50, ""],
+	]
+
+
+func _camera_turn() -> void:
+	var rows: Array[String] = [
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+		"............####..............",
+		"............####..............",
+		"............####..............",
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+		"..............................",
+	]
+	var start := Vector2i(20, 12)
+	var markers := {start: "start", Vector2i(1, 15): "monster_imp"}
+	var config := {"name": "Clip", "outdoor": true,
+		"entities": [{"at": [1, 15], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["wait", 20, ""],
+		["walk", Vector2i(10, 5), ""],
+		["wait", 60, ""],
+		["walk", Vector2i(17, 4), ""],
+		["wait", 40, ""],
+		["walk", Vector2i(11, 10), ""],
+		["wait", 60, ""],
 	]
 
 

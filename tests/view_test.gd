@@ -86,6 +86,7 @@ func _ready() -> void:
 		await _test_low_camera()
 		_test_indoor_camera()
 		_test_camera_feel()
+		_test_camera_turn()
 		_test_draw_pull()
 		_test_low_scatter()
 		await _test_far_restart()
@@ -7061,6 +7062,120 @@ func _test_low_camera() -> void:
 			"Off: the ortho view exactly as before (far, pitch, haze, shadows, distance)")
 	Net.set_camera_low(low_was, false)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Outdoors the camera turns to keep the player in view (801): behind a
+## house from the camera, nothing fades for the line to them; hidden past
+## HIDE_SECONDS, it turns to the nearest yaw within TURN_MOST of the one
+## they set that shows them whole (a sine out), the walk keys going by the
+## yaw it set off from meanwhile, and stays (saved); the player's own turn
+## stops one at once and holds it; with the turning off (or no yaw within
+## reach clearing them) what hides them fades as it always did.
+func _test_camera_turn() -> void:
+	print("
+== outdoors the camera turns to keep you in view (801) ==")
+	const CameraTurn := preload("res://client3d/camera_turn.gd")
+	var symmetric := func(degrees: float) -> bool: return absf(degrees - 30.0) < 20.0
+	var pick := CameraTurn.choose(30.0, symmetric, CameraTurn.looking(15.0), 30.0)
+	var none := CameraTurn.choose(30.0, func(_degrees: float) -> bool: return false, Vector2.ZERO, 30.0)
+	var only_far := func(degrees: float) -> bool: return degrees == -60.0
+	_check(pick == 15.0 and CameraTurn.choose(30.0, symmetric, Vector2.ZERO, 30.0) == 45.0 and is_nan(none)
+			and CameraTurn.choose(0.0, func(degrees: float) -> bool: return degrees == -45.0, Vector2.ZERO, 0.0) == -45.0
+			and is_nan(CameraTurn.choose(0.0, only_far, Vector2.ZERO, 0.0)) and CameraTurn.choose(-30.0, only_far, Vector2.ZERO, -30.0) == -60.0,
+			"the nearest clearing yaw, 15 degrees a step, within 45 of the one they set; of two as near, the one looking the way they walk (%s); none: NAN" % pick)
+	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
+	_rig.set_process(false)
+	var player := _player()
+	var companion := _companion()
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var other: Node3D = _rig._puppets.get(companion.get_instance_id()) if companion != null else null
+	var was := puppet.global_position
+	var other_was := other.global_position if other != null else Vector3.ZERO
+	var yaw_was: float = _rig.yaw
+	if other != null:
+		other.global_position = _rig.to_global(_rig._tile_position(Vector2i(14, 12)))
+	# The house is x 3..6, y 3..8; the camera at yaw 0 is off +x +y: behind it.
+	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(2, 5)))
+	_rig._set_yaw(0.0)
+	_rig._yaw_step = 0.0
+	_rig._hand_yaw = 0.0
+	_rig._ease_t = 1.0
+	_rig._turn_view = CameraTurn.new()
+	_rig._camera_target = puppet.position
+	_rig._place_camera()
+	_rig._update_fade(true)
+	var faded_walls := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return _rig._walls.values().has(piece)).size()
+	_check(_rig._outdoor and _rig._player_hidden and not _rig._lined.is_empty() and faded_walls == 0,
+			"behind the house: hidden, and nothing fades for it (%d on the line, %d walls faded)" % [_rig._lined.size(), faded_walls])
+	var target := CameraTurn.choose(0.0, _rig._clears, Vector2.ZERO, 0.0)
+	_check(not is_nan(target) and absf(target) <= CameraTurn.TURN_MOST and _rig._clears(target) and not _rig._clears(0.0),
+			"a yaw within 45 degrees shows them whole (%s)" % target)
+	# Not before HIDE_SECONDS.
+	_rig._drive_turn(CameraTurn.HIDE_SECONDS * 0.5)
+	var early: bool = _rig._turn_view.turning or _rig._line_fade
+	_rig._drive_turn(CameraTurn.HIDE_SECONDS * 0.6)
+	var started: bool = _rig._turn_view.turning
+	_rig._drive_turn(0.05)
+	var mid: float = _rig.yaw
+	var frame_kept: bool = _rig.move_yaw() == 0.0 and mid != 0.0
+	for i in 40:
+		_rig._drive_turn(0.05)
+	_rig._update_fade(true)
+	_check(not early and started and frame_kept and is_equal_approx(_rig.yaw, target) and not _rig._turn_view.turning
+			and is_equal_approx(Net.camera_yaw, Client3D.wrapped_yaw(target)) and not _rig._player_hidden,
+			"after HIDE_SECONDS it turns there and stays, the walk keys going by where it set off meanwhile (%s, mid-turn %.1f); seen now" % [_rig.yaw, mid])
+	# Back behind the house, the player's own turn stops a turn under way.
+	_rig._set_yaw(0.0)
+	_rig._update_fade(true)
+	_rig._turn_view = CameraTurn.new()
+	_rig._drive_turn(CameraTurn.HIDE_SECONDS + 0.1)
+	var turning_before: bool = _rig._turn_view.turning
+	_rig.turn(1.0, 0.0)
+	_rig.end_turn()
+	_rig._ease_t = 1.0
+	var stopped: bool = not _rig._turn_view.turning
+	_rig._set_yaw(0.0)
+	_rig._update_fade(true)
+	_rig._drive_turn(CameraTurn.HIDE_SECONDS + 0.1)
+	_rig._drive_turn(0.25)
+	var walls_faded := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return _rig._walls.values().has(piece)).size()
+	_check(turning_before and stopped and not _rig._turn_view.turning and _rig._line_fade and walls_faded > 0,
+			"A/D stops it at once, none for MANUAL_HOLD, and what hides them fades meanwhile (%d walls)" % walls_faded)
+	# Turned off past TURN_MOST by hand's yaw: nothing within reach clears, so it fades.
+	_rig._turn_view = CameraTurn.new()
+	_rig._line_fade = false
+	_rig._hand_yaw = 0.0
+	var clear_at := func(_degrees: float) -> bool: return false
+	_check(is_nan(CameraTurn.choose(0.0, clear_at, Vector2.ZERO, 0.0)), "nothing clears: no turn")
+	# The Options' turning off: never turns; what hides them fades, as ever.
+	_rig._turn_view = CameraTurn.new()
+	_rig._line_fade = false
+	_rig._update_fade(true)
+	Net.camera_turn = false
+	for i in 20:
+		_rig._drive_turn(0.1)
+	var off_faded := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return _rig._walls.values().has(piece)).size()
+	_check(_rig.yaw == 0.0 and _rig._line_fade and off_faded > 0 and _rig._player_hidden,
+			"turning off in Options: it never turns, and what hides them fades (%d walls; still counted hidden, so it turns again when on)" % off_faded)
+	Net.camera_turn = true
+	# Out in the open: not hidden, nothing shown through.
+	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(13, 11)))
+	_rig._camera_target = puppet.position
+	_rig._place_camera()
+	_rig._update_fade(true)
+	for i in 5:
+		_rig._drive_turn(0.1)
+	_check(not _rig._player_hidden and not _rig._line_fade and is_equal_approx(_rig.yaw, 0.0), "in the open: seen, nothing faded for them, and no turn back")
+	puppet.global_position = was
+	if other != null:
+		other.global_position = other_was
+	_rig._turn_view = CameraTurn.new()
+	_rig._line_fade = false
+	_rig._set_yaw(yaw_was)
+	_rig._yaw_step = yaw_was
+	Net.camera_yaw = Client3D.wrapped_yaw(yaw_was)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	_rig.set_process(true)
 
 
 ## Indoors (671): top-down in a walled space, eased; out after a hold, so a

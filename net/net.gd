@@ -788,6 +788,10 @@ var camera_zoom := 1.0
 ## Jeff 2026-10-28: "new players shouldnt have to find that in options");
 ## off in the editor and tests, which have no settings file.
 var camera_low := false
+## Outdoors the 3D camera turns by itself to keep the player in view
+## (decision 801, Client3D's CameraTurn): settings.cfg camera_turn=on|off,
+## on unless off was chosen (the Options' Display).
+var camera_turn := true
 ## The 3D camera's overhead view (decision 671, W/S): settings.cfg
 ## camera_overhead=on|off, off by default.
 var camera_overhead := false
@@ -1261,6 +1265,7 @@ func _apply_access_settings() -> void:
 			colours = set
 		camera_low = camera_low_from(str(settings.get("camera", "")))
 		camera_overhead = str(settings.get("camera_overhead", "")).strip_edges() == "on"
+		camera_turn = str(settings.get("camera_turn", "on")).strip_edges() != "off"
 		hinted_talk = str(settings.get("hinted_talk", "off")) == "on"
 		var gains := str(settings.get("gains", "all")).strip_edges()
 		if gains in Gains.SHOWN:
@@ -1355,6 +1360,13 @@ func set_camera_low(value: bool, save := true) -> void:
 	if save:
 		_settings_kept["camera"] = "low" if value else "high"
 		save_view_settings()
+
+
+## The Options' camera turning (801) on or off, written as camera_turn=.
+func set_camera_turn(value: bool) -> void:
+	camera_turn = value
+	_settings_kept["camera_turn"] = "on" if value else "off"
+	save_view_settings()
 
 
 ## camera= as read from the settings file (623 amended): low unless it says

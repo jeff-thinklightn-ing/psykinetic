@@ -2766,6 +2766,25 @@ var _hid_at: Dictionary[Node3D, float] = {}
 var _fade_key := ""
 ## The faded pieces within NEAR_CLOSE of the low camera (NEAR_CLOSE_ALPHA).
 var _faded_close: Dictionary[Node3D, bool] = {}
+## Outdoors (801): the pieces on the lines to the local player and their
+## companion, not faded (the camera turns instead), as last worked out;
+## when each was last within NEAR_CLOSE of the low camera, hidden for
+## FADE_HOLD after; whether the player is hidden (_is_hidden); the turn's
+## state (client3d/camera_turn.gd); the way the player moves (x and z, a
+## second's worth, eased) and where their puppet was; the yaw the player
+## last set themselves (the turn's own stay within CameraTurn.TURN_MOST of
+## it); whether what hides them fades as indoors (no turn helps); the near
+## side of a building they are in.
+var _lined: Dictionary[Node3D, bool] = {}
+var _close_at: Dictionary[Node3D, float] = {}
+var _player_hidden := false
+const CameraTurn := preload("res://client3d/camera_turn.gd")
+var _turn_view: RefCounted = CameraTurn.new()
+var _walk := Vector2.ZERO
+var _walk_from := Vector3(INF, 0.0, 0.0)
+var _hand_yaw := 0.0
+var _line_fade := false
+var _inside_hiding: Dictionary[Node3D, bool] = {}
 ## Each fading piece's entry in _occluders (_close_pieces).
 var _occluder_of: Dictionary[Node3D, int] = {}
 ## Seconds of frames drawn, for FADE_HOLD.
@@ -2871,6 +2890,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	# The saved diamond, or --test-yaw exactly, for screenshots.
 	yaw = Net.camera_yaw
 	_yaw_step = yaw  # 671 amended: the saved yaw as it is.
+	_hand_yaw = yaw
 	overhead = Net.camera_overhead
 	pitch = rest_pitch()
 	if not Net.camera_low_changed.is_connected(_on_camera_low_changed):
@@ -2904,6 +2924,7 @@ func _process(delta: float) -> void:
 	_follow(delta)
 	_fade_clock += delta
 	_update_fade()
+	_drive_turn(delta)
 	_lamp_clock += delta
 	if _lamp_clock >= LAMP_CHECK:
 		_lamp_clock = 0.0
@@ -3845,6 +3866,7 @@ func _ease_zoom(delta: float) -> void:
 ## Click scheme, A/D held: turn [param direction] (-1 or 1) for
 ## [param delta] seconds at TURN_RATE, through any angle.
 func turn(direction: float, delta: float) -> void:
+	_turned_by_hand()
 	if _turning == 0.0:
 		_turn_from = _yaw_step
 	_ease_t = 1.0
@@ -3894,6 +3916,7 @@ static func settle_target(from: float, degrees: float, direction: float) -> floa
 func set_overhead(on: bool) -> void:
 	if _peeking:
 		return
+	_turned_by_hand()
 	_inside_chosen = indoors  # Inside, the player's own choice wins (671 amended (2)).
 	if overhead != on:
 		overhead = on
@@ -3925,6 +3948,7 @@ func _set_pitch(degrees: float) -> void:
 ## wherever the camera is now (a spring back or a pitch ease under way
 ## stops there).
 func begin_pitch_peek() -> void:
+	_turned_by_hand()
 	_peeking = true
 	_peek_pitch = true
 	_peek_t = 1.0
@@ -3978,6 +4002,7 @@ func _set_peek(amount: float) -> void:
 
 ## WASD: the middle button went down; the drag turns from the yaw now.
 func begin_drag() -> void:
+	_turned_by_hand()
 	_dragging = true
 	_settle_pending = false
 	_drag_base = yaw
@@ -4052,6 +4077,7 @@ static func nearest_diamond(degrees: float) -> float:
 ## settings file keeps.
 func _settle_on(step: float) -> void:
 	_yaw_step = step
+	_hand_yaw = step
 	Net.camera_yaw = wrapped_yaw(step)
 	Net.save_view_settings()
 	_ease_toward(step)
@@ -16769,12 +16795,27 @@ func _update_fade(force := false) -> void:
 	_show_home_labels(points)
 	var roofs_changed := _update_roofs(points)
 	var toward := _camera.global_transform.basis.z
-	var fought := points + _fight_points(points)
-	var key := "%s %s %s" % [toward, _camera.global_position, fought]
-	if key != _fade_key or force:
+	# Outdoors (801) nothing fades for the lines to them: only the near side
+	# of a building they are in, its roof off; the camera turns instead.
+	var fought := points if _outdoor else points + _fight_points(points)
+	var key := "%s %s %s %s" % [toward, _camera.global_position, fought, _line_fade]
+	var moved := key != _fade_key or force
+	if moved:
 		_fade_key = key
-		_hiding = _hiding_pieces(fought, toward)
-		_hiding.merge(_inside_walls(points, toward))
+		if _outdoor:
+			_inside_hiding = _inside_walls(points, toward)
+			_hiding = _inside_hiding.duplicate()
+			_lined = _hiding_pieces(points, toward)
+			# No turn helps (none within TURN_MOST clears them, their own
+			# turning holds it, or Options' turning is off): what hides them
+			# fades as it always did.
+			if _line_fade:
+				_hiding.merge(_lined)
+		else:
+			_hiding = _hiding_pieces(fought, toward)
+			_hiding.merge(_inside_walls(points, toward))
+			_lined.clear()
+			_inside_hiding.clear()
 	for piece in _hiding:
 		_hid_at[piece] = _fade_clock
 	var now: Dictionary[Node3D, bool] = {}
@@ -16784,6 +16825,21 @@ func _update_fade(force := false) -> void:
 		else:
 			_hid_at.erase(piece)
 	var close := _close_pieces(now)
+	if _outdoor:
+		# A crown or a stall by the low camera's lens on the line is still
+		# hidden (623 amended (2)), held FADE_HOLD as a fade is.
+		for piece in _close_pieces(_lined):
+			_close_at[piece] = _fade_clock
+		for piece: Node3D in _close_at.keys():
+			if _fade_clock - _close_at[piece] <= FADE_HOLD:
+				close[piece] = true
+			else:
+				_close_at.erase(piece)
+		if moved or close.size() != _faded_close.size():
+			_player_hidden = _is_hidden(points, toward, close)
+	else:
+		_close_at.clear()
+		_player_hidden = false
 	if not force and not roofs_changed and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)) 			and close.size() == _faded_close.size() and close.keys().all(func(piece: Node3D) -> bool: return _faded_close.has(piece)):
 		return
 	for entry in _occluders:
@@ -17094,6 +17150,127 @@ func _hiding_pieces(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3
 					out[piece] = true
 				break
 	return out
+
+
+## Outdoors (801): whether the local player (the first FADE_HEIGHTS of
+## [param points], _focus_points) is hidden from a camera looking back
+## along [param toward]: their chest and their feet or head behind
+## something standing (_point_blocked), not counting [param close] (hidden
+## by the lens) nor what is see-through already.
+func _is_hidden(points: Array[Vector3], toward: Vector3, close: Dictionary[Node3D, bool]) -> bool:
+	if _local_player() == null or points.size() < FADE_HEIGHTS.size():
+		return false
+	var skip := _see_through_now(close)
+	if not _point_blocked(points[1], toward, skip):
+		return false
+	return _point_blocked(points[0], toward, skip) or _point_blocked(points[2], toward, skip)
+
+
+## What does not hide them now: a building's near side, they being in it,
+## [param close], and the roofs off. Not what fades for the line to them
+## (_line_fade): that still hides them, for the turn to clear.
+func _see_through_now(close: Dictionary[Node3D, bool]) -> Dictionary[Node3D, bool]:
+	var skip := _inside_hiding.duplicate()
+	skip.merge(close)
+	for building in _buildings:
+		if building["off"] and building["roof"] != null:
+			skip[building["roof"]] = true
+	return skip
+
+
+## Whether a piece other than [param skip]'s stands between [param point]
+## and a camera looking back along [param toward] (_hiding_pieces' test).
+func _point_blocked(point: Vector3, toward: Vector3, skip: Dictionary[Node3D, bool]) -> bool:
+	var reach := _camera_distance() * 2.0
+	if toward.y > 0.01:
+		reach = minf(reach, maxf(_occluder_top - point.y, 0.0) / toward.y)
+	var end := point + toward * reach
+	var low := Vector2i(floori(minf(point.x, end.x) / FADE_CHUNK), floori(minf(point.z, end.z) / FADE_CHUNK))
+	var high := Vector2i(floori(maxf(point.x, end.x) / FADE_CHUNK), floori(maxf(point.z, end.z) / FADE_CHUNK))
+	for x in range(low.x, high.x + 1):
+		for z in range(low.y, high.y + 1):
+			for index: int in _occluder_chunks.get(Vector2i(x, z), []):
+				var entry := _occluders[index]
+				if skip.has(entry[0]):
+					continue
+				var bounds: AABB = entry[1]
+				var ahead := bounds.get_center() - point
+				if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_segment(point, end) != null:
+					return true
+	return false
+
+
+## The way back to the camera (its basis z) at [param degrees] of yaw and
+## the pitch now.
+func _toward_at(degrees: float) -> Vector3:
+	var saved := yaw
+	yaw = degrees
+	var offset := _camera_offset()
+	yaw = saved
+	return offset.normalized()
+
+
+## Whether the local player is seen whole (none of their FADE_HEIGHTS
+## blocked) from the camera at [param degrees] of yaw.
+func _clears(degrees: float) -> bool:
+	var points := _focus_points()
+	if points.size() < FADE_HEIGHTS.size():
+		return false
+	var toward := _toward_at(degrees)
+	var skip := _see_through_now(_faded_close)
+	for i in FADE_HEIGHTS.size():
+		if _point_blocked(points[i], toward, skip):
+			return false
+	return true
+
+
+## The yaw the walk keys go by: during a turn of its own (801), the one it
+## set off from, so a held key keeps its way across the screen's turn.
+func move_yaw() -> float:
+	return _turn_view.move_yaw if _turn_view.turning else yaw
+
+
+## The player turned the camera (A/D, a middle drag, the overhead key): a
+## turn of its own stops, and none starts for CameraTurn's MANUAL_HOLD.
+func _turned_by_hand() -> void:
+	_turn_view.manual()
+
+
+## Each frame, outdoors (801): a turn of its own under way goes on; one is
+## searched for when they have been hidden long enough (camera_turn.gd);
+## what hides them fades when no turn helps (_line_fade).
+func _drive_turn(delta: float) -> void:
+	var on := Net.camera_turn
+	var puppet: Node3D = null
+	var player := _local_player()
+	if player != null:
+		puppet = _puppets.get(player.get_instance_id())
+	if puppet != null and delta > 0.0:
+		var flat := Vector2(puppet.global_position.x - _walk_from.x, puppet.global_position.z - _walk_from.z)
+		if _walk_from.x != INF and flat.length() < 2.0:
+			_walk = _walk.lerp(flat / delta, 1.0 - exp(-4.0 * delta))
+		_walk_from = puppet.global_position
+	var hidden := _outdoor and _player_hidden
+	var manual := _turning != 0.0 or _dragging or _peeking or _ease_t < 1.0
+	if _turn_view.turning:
+		if manual or not _outdoor:
+			_turn_view.manual()
+		else:
+			_set_yaw(_turn_view.advance(delta))
+			if not _turn_view.turning:
+				_yaw_step = yaw
+				Net.camera_yaw = wrapped_yaw(yaw)
+				Net.save_view_settings()
+	elif _turn_view.step(delta, hidden and not manual, on):
+		var target := CameraTurn.choose(yaw, _clears, _walk, _hand_yaw)
+		if is_nan(target):
+			_turn_view.not_found()
+		else:
+			_turn_view.start(yaw, target)
+	var fade: bool = _turn_view.no_help(hidden, on)
+	if fade != _line_fade:
+		_line_fade = fade
+		_update_fade()
 
 
 ## Where the local player and their companion are, at FADE_HEIGHTS: as

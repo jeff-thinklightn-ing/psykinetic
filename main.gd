@@ -2423,8 +2423,10 @@ func _drive_camera_keys(delta: float) -> void:
 		_client3d.end_turn()
 
 
+## The yaw the walk keys go by (Client3D.move_yaw: during the camera's own
+## turn, 801, the one it set off from).
 func _view_yaw() -> float:
-	return _client3d.yaw if _client3d != null else 0.0
+	return _client3d.move_yaw() if _client3d != null else 0.0
 
 
 ## The stand key with a bow, each frame (583 amended; Jeff: "holding down
