@@ -835,12 +835,18 @@ func _test_person_takes(host: Player) -> void:
 		and not offered.any(func(row: Dictionary) -> bool: return int(row["slot"]) == Items.RIGHT_HAND),
 		"a sword in hand: not offered to the keeper (%s; slots %s)" % [offered.map(func(row: Dictionary) -> String: return "%s@%d" % [row["what"], row["slot"]]), Array(host.slots)])
 	# The takers (802 amended (5)): who in town takes each raw, for ui's hint; sent once till it changes.
+	var started := Time.get_ticks_usec()
 	var takers: Dictionary = _main.takers_of(STORE)
+	print("[test] takers_of(%s) took %d us" % [STORE, Time.get_ticks_usec() - started])
 	var wood_taker: Dictionary = takers["takers"].get("wood", {})
 	_check(takers["town"] == STORE and wood_taker.get("trade") == "carpenter" and wood_taker.get("name") == "Cora" and wood_taker.get("store") is bool
 		and takers.get("gear", {}).get("trade") == "vendor" and takers["gear"].get("name") == "Rolf",
 		"802 amended (5): the takers: wood to Cora the carpenter, gear to Rolf (%s)" % [takers])
+	_check(takers["takers"].keys().all(func(raw: String) -> bool: return takers["takers"][raw]["store"] == (_main.give_outcome(STORE, "", raw, 1)["for"]["kind"] == "stores"))
+		and takers.get("gear", {}).get("body") == (String(_main._resident_body(Offers.VENDOR + STORE).get_path()) if _main._resident_body(Offers.VENDOR + STORE) != null else ""),
+		"each raw's store flag as give_outcome says, the bodies as found one by one (perf: built once)")
 	_main._takers_sent.erase(Net.local_id)
+	_main._takers_by_zone.clear()
 	_main.takers_here = {}
 	_main._tell_takers(Net.local_id, STORE.get_slice("/", 0))
 	var first: Dictionary = _main.takers_here
@@ -848,6 +854,9 @@ func _test_person_takes(host: Player) -> void:
 	_main._tell_takers(Net.local_id, STORE.get_slice("/", 0))
 	_check(first.get("town") == STORE and _main.takers_here.is_empty(), "told on entering, not again while the same (%s)" % [first.get("town")])
 	World.economy.rules["vendor"] = {}
+	_main._tell_takers(Net.local_id, STORE.get_slice("/", 0))
+	_check(_main.takers_here.is_empty(), "within one pass the zone's takers are shared, not built again")
+	_main._takers_by_zone.clear()  # The next pass (_tell_world clears it after each).
 	_main._tell_takers(Net.local_id, STORE.get_slice("/", 0))
 	_check(_main.takers_here.get("town") == STORE and not _main.takers_here.has("gear"), "told again when it changes: no stall, no gear")
 	_main._tell_takers(Net.local_id, "nowhere")

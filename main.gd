@@ -795,9 +795,11 @@ signal telegraph_ended(id: int, landed: bool)
 ## it was last looked at.
 var _world_news: WorldNews
 var _news_tick := -1
-## Server: the "takers" message last sent each peer (802 amended (5)), as text,
+## Server: the "takers" message last sent each peer (802 amended (5)), as its hash,
 ## so it is sent again only when it changes.
 var _takers_sent: Dictionary = {}
+## This pass's takers by zone, [data, hash] (_tell_takers; cleared after each pass).
+var _takers_by_zone: Dictionary = {}
 ## Client: the last "takers" message (802 amended (5)): {town, takers: {raw:
 ## {trade, name, body, store}}, gear?}; ui's pack tooltip and name-tag mark.
 var takers_here: Dictionary = {}
@@ -15402,6 +15404,12 @@ func takers_of(town: String) -> Dictionary:
 	var out := {"town": town, "takers": {}}
 	if town.is_empty() or World.economy == null or World.production == null:
 		return out
+	# Once each (coordinator, perf): the town's queued build, and its bodies by worker, not per raw.
+	var lacking: Dictionary = World.towns.shortfall(town).get("needs", {}) if World.towns != null else {}
+	var bodies := {}
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and entity.is_inside_tree():
+			bodies[(entity as Resident).worker_id] = String(entity.get_path())
 	var receives: Dictionary = World.economy.rules.get("receives", {})
 	var raws: Array = receives.keys().filter(func(key: String) -> bool: return not key.begins_with("_") and receives[key] is Array)
 	raws.sort()
@@ -15409,18 +15417,23 @@ func takers_of(town: String) -> Dictionary:
 		var worker := receiver_for(town, raw)
 		if worker.is_empty():
 			continue
-		var entry := _taker_entry(worker)
-		entry["store"] = give_outcome(town, "", raw, 1)["for"]["kind"] == "stores"
+		var entry := _taker_entry(worker, bodies)
+		entry["store"] = not lacking.has(raw)  # As give_outcome: "build" while the queued build lacks it.
 		out["takers"][raw] = entry
 	if town in World.economy.rules.get("vendor", {}).get("towns", []):
-		out["gear"] = _taker_entry(Offers.VENDOR + town)
+		out["gear"] = _taker_entry(Offers.VENDOR + town, bodies)
 	return out
 
 
-## A taker's trade, name and body path (takers_of).
-func _taker_entry(worker: String) -> Dictionary:
-	var body := _resident_body(worker)
-	var path := String(body.get_path()) if body != null and body.is_inside_tree() else ""
+## A taker's trade, name and body path (takers_of), the path from
+## [param bodies] (worker id -> path) when given.
+func _taker_entry(worker: String, bodies = null) -> Dictionary:
+	var path := ""
+	if bodies is Dictionary:
+		path = str(bodies.get(worker, ""))
+	else:
+		var body := _resident_body(worker)
+		path = String(body.get_path()) if body != null and body.is_inside_tree() else ""
 	if worker.begins_with(Offers.VENDOR):
 		return {"trade": "vendor", "name": str(World.economy.rules.get("vendor", {}).get("name", "Rolf")), "body": path}
 	var who := World.production.worker(worker)
@@ -15434,20 +15447,22 @@ func _taker_entry(worker: String) -> Dictionary:
 func _tell_takers(peer: int, zone: String) -> void:
 	if World.towns == null:
 		return
-	var town := ""
-	for id: String in World.towns.ids():
-		if id.begins_with(zone + "/"):
-			town = id
-			break
-	var data := takers_of(town)
-	var text := var_to_str(data)
-	if _takers_sent.get(peer) == text:
+	if not _takers_by_zone.has(zone):
+		var town := ""
+		for id: String in World.towns.ids():
+			if id.begins_with(zone + "/"):
+				town = id
+				break
+		var data := takers_of(town)
+		_takers_by_zone[zone] = [data, hash(data)]
+	var known: Array = _takers_by_zone[zone]
+	if _takers_sent.get(peer, 0) == int(known[1]):
 		return
-	_takers_sent[peer] = text
+	_takers_sent[peer] = int(known[1])
 	if peer == Net.local_id:
-		_on_message("takers", data)
+		_on_message("takers", known[0])
 	else:
-		Net.message_to(peer, "takers", data)
+		Net.message_to(peer, "takers", known[0])
 
 
 ## The town [param worker] (a resident's id, or "vendor:" + town) takes
@@ -16553,6 +16568,7 @@ func _tell_world(tick: int) -> void:
 			for place: String in _world_news.explore(peer, player.zone, player.tile):
 				_explored(peer, place)  # 804, maps' side: a named place reached.
 			_tell_takers(peer, player.zone)
+	_takers_by_zone.clear()  # Built once a zone a pass, shared by its players (perf).
 	_observe_roads()  # Hers too (decision 551).
 	_world_news.update()
 

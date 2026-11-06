@@ -42102,6 +42102,17 @@ bleed's tint, so the smith shows across the square. ui_test _test_taker_hint (vo
 heard, none; the tip's last line; the marks for ore, a sword, nothing). CHANGELOG bullet (voice's
 words). Client only, rides economy's rev 50, no new class_name.
 
+802 amended (6) (release's label; the coordinator's ask, from perf's measure of v0.1.205): the
+takers built once. Main._tell_takers rebuilt takers_of for every player at every check
+(_tell_world's pass, every 30 ticks), each build walking the town's jobs, its store and every
+townsperson again for each raw: about 12.5 ms a player a check (248 ms worst with 3 players, about
+65 ms at 16). Now takers_of finds the town's queued build (Towns.shortfall) and its townsfolk's
+bodies once, a raw's store flag being whether that build lacks it (as give_outcome decides), and
+_tell_takers builds it once a zone a pass (_takers_by_zone, cleared after each), shared by every
+player there, each peer's last send kept as its hash, not var_to_str. The message is unchanged.
+economy_test _test_person_takes: each raw's store flag as give_outcome says, one build a pass.
+Server only; protocol unchanged, no new class_name, no bullet.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when
