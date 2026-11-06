@@ -2090,6 +2090,7 @@ func _set_terrain(terrain: Dictionary) -> void:
 		_torches[cell] = true
 	niche_edges.clear()
 	niche_cells.clear()
+	zone.plates = terrain.get("plates", [])
 	for niche: Dictionary in terrain.get("niches", []):
 		niche_edges[niche["edge"]] = str(niche["kind"])
 		niche_cells[niche["edge"]] = niche["cell"]
@@ -2307,6 +2308,30 @@ func bearing_index(offset: Vector2) -> int:
 ## The door on edge [param key], or null.
 func door_on(key: Vector3i) -> Door:
 	return _doors.get(key)
+
+
+## Zone [param zone_name]'s plate set [param id] (terrain "plates", the
+## co-op family tomb) held: every plate of it ([param index] -1), or the
+## plate [param index] alone, held by anything standing on its cell (a
+## player, a companion, a monster, a boulder). False for none.
+func plate_held(zone_name: String, id: String, index := -1) -> bool:
+	var each: Zone = zones.get(zone_name)
+	if each == null:
+		return false
+	for plate: Dictionary in each.plates:
+		if plate["id"] != id:
+			continue
+		var cells: Array = plate["cells"]
+		if index >= 0:
+			return index < cells.size() and plate_body(each, cells[index]) != null
+		return cells.all(func(cell: Vector2i) -> bool: return plate_body(each, cell) != null)
+	return false
+
+
+## What stands on plate cell [param cell] of [param each] (a zone), or null.
+func plate_body(each: Zone, cell: Vector2i) -> GridEntity:
+	var body: GridEntity = each.occupancy.get(cell)
+	return body if body != null and is_instance_valid(body) and body.spawned else null
 
 
 ## The zone's hidden niche (608 amended: the marker every clue to the hidden

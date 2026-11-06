@@ -5154,7 +5154,8 @@ func load_map(level_name: String) -> bool:
 
 ## Server: a player stepping onto a level link goes to the zone it leads
 ## to, with their companion; nobody else moves.
-func _on_entity_moved(entity: GridEntity, _from: Vector2i, to: Vector2i) -> void:
+func _on_entity_moved(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
+	_check_plates(entity, from, to)
 	if not entity is Player:
 		return
 	_tell_draft(entity, to)
@@ -5244,11 +5245,21 @@ func _spawn_doors() -> void:
 	for niche: Dictionary in _terrain.get("niches", []):
 		if str(niche["kind"]) == "hidden":
 			hidden[niche["edge"]] = true
+	# The co-op tomb's bricked vault (crypt landing 2): stone, locked to its
+	# plates until they are held together; opened this generation, open.
+	var plated: Dictionary[Vector3i, String] = {}
+	for plate: Dictionary in _terrain.get("plates", []):
+		plated[plate["edge"]] = plate["id"]
+	var solved: Array = _solved_state(World.zone.name).get("solved", [])
 	for key: Vector3i in edges:
 		if edges[key] == Terrain.Edge.DOOR:
 			var props := {"max_hp": 20, "body_material": GridEntity.BodyMaterial.WOOD}
 			if hidden.has(key):
 				props = {"max_hp": 20, "body_material": GridEntity.BodyMaterial.STONE, "lock": HIDDEN_LOCK}
+			elif plated.has(key):
+				props = {"max_hp": 20, "body_material": GridEntity.BodyMaterial.STONE, "lock": PLATE_LOCK}
+				if plated[key] in solved:
+					props = {"max_hp": 20, "body_material": GridEntity.BodyMaterial.STONE, "open": true}
 			Net.interest.add(spawner.spawn({"script": DOOR, "name": "Door_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"],
 				"edge": [key.x, key.y, key.z], "zone": World.zone.name, "props": props}))
 
@@ -9678,6 +9689,10 @@ func hall_lair_rect(zone_name: String) -> Rect2i:
 func _on_niche_pressed(entity: GridEntity, key: Vector3i) -> void:
 	if not entity is Player:
 		return
+	for secret: Dictionary in Level.secrets_of(World.zone.name):
+		if secret["edge"] == key:
+			_search_secret(entity, secret)
+			return
 	var peer: int = entity.owner_peer
 	var door := World.door_on(key)
 	if World.niche_edges.get(key, "") == "hidden" and door != null and door.lock == HIDDEN_LOCK and not door.open 			and way_revealed(str(_peer_ids.get(peer, Net.player_id if peer == Net.local_id else "")), World.zone.name):
@@ -9830,6 +9845,139 @@ func _robber_gone(entity: GridEntity) -> void:
 		return
 	state["robbers_down"] = true
 	print("[level] the robbers of %s are down: its hidden way can be found this generation" % entity.zone)
+
+
+## The co-op family tomb (crypt landing 2): a key nobody holds, its
+## bricked vault's door locked till its plates are held together.
+const PLATE_LOCK := "plates"
+## Voice's line as the loose niche's mortar gives (before the find line).
+const LOOSE_NICHE_LINE := "The fresh mortar crumbles under your hands, and the niche comes open."
+## Voice's float and Gains words for a co-op tomb opened (804's path).
+const TOMB_OPENED := "a sealed tomb opened"
+const TOMB_OPENED_WORDS := "opened a sealed tomb"
+
+## The co-op tomb's state outside a regenerating level's (a test's level):
+## zone -> {solved, solved_rewarded}.
+var _plain_solved := {}
+
+
+## A co-op tomb opened (crypt landing 2): [param zone] and the laid room
+## [param room] its plates open into, [param by] what held the plates (the
+## players, companions, monsters or boulders on them, and a boulder's
+## pusher beside it). Once a room a generation. Companions hang her
+## reaction, memory and bond on it.
+signal room_solved(zone: String, room: String, by: Array)
+
+
+## The co-op tombs' state of [param zone_name] (its regen state, saved
+## with it; "solved", "solved_rewarded"): a generation's, gone with it.
+func _solved_state(zone_name: String) -> Dictionary:
+	if _regen.has(zone_name):
+		return _regen[zone_name]
+	if not _plain_solved.has(zone_name):
+		_plain_solved[zone_name] = {}
+	return _plain_solved[zone_name]
+
+
+## Server: [param entity] moved [param from] [param to]: a plate set of its
+## zone with a plate there, held now at once, opens its vault (_solve_plates).
+func _check_plates(entity: GridEntity, from: Vector2i, to: Vector2i) -> void:
+	if not Net.is_authority() or not World.zones.has(entity.zone):
+		return
+	for plate: Dictionary in World.zones[entity.zone].plates:
+		var cells: Array = plate["cells"]
+		if (to in cells or from in cells) and World.plate_held(entity.zone, plate["id"]):
+			_solve_plates(entity.zone, plate, entity)
+
+
+## The plate set [param plate] of [param zone_name] held together, the
+## first time this generation: its door unlocked and open for good (the
+## wall sinks; a door's noise, so the dead hear it), "[crypt]" said,
+## room_solved, and each player there given the deed once a generation.
+func _solve_plates(zone_name: String, plate: Dictionary, mover: GridEntity) -> void:
+	var state := _solved_state(zone_name)
+	var solved: Array = state.get("solved", [])
+	if plate["id"] in solved:
+		return
+	solved.append(plate["id"])
+	state["solved"] = solved
+	var was := World.enter_named(zone_name)
+	var door := World.door_on(plate["edge"])
+	if door != null:
+		World.hold_door(door, false, PLATE_LOCK)
+		door.open = true
+		World.door_changed.emit(door, mover)
+	World.noise(Terrain.edge_cells(plate["edge"])[0], Senses.NOISE_DOOR, &"door", mover)
+	var each: Zone = World.zones[zone_name]
+	var by: Array = []
+	for cell: Vector2i in plate["cells"]:
+		var body := World.plate_body(each, cell)
+		if body == null:
+			continue
+		by.append(body)
+		if body.pushable:
+			for direction: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var pusher := World.plate_body(each, cell + direction)
+				if pusher != null and pusher.is_creature() and not pusher in by:
+					by.append(pusher)
+					break
+	World.enter(was)
+	print("[crypt] %s: %s opened by %d holding" % [zone_name, plate["room"], by.size()])
+	room_solved.emit(zone_name, str(plate["room"]), by)
+	_reward_solvers(zone_name, plate, by, state)
+
+
+## Each player at the solve (holding a plate, or in its room) given the
+## deed (804: "+1 Deeds, a sealed tomb opened"), once a generation.
+func _reward_solvers(zone_name: String, plate: Dictionary, by: Array, state: Dictionary) -> void:
+	var laid := Level.load_level(zone_name)
+	var rewarded: Array = state.get("solved_rewarded", [])
+	var cell: Vector2i = Terrain.edge_cells(plate["edge"])[0]
+	for player_id: String in _players_in(zone_name):
+		var body := _player_of_id(player_id)
+		if body == null or player_id in rewarded:
+			continue
+		if not body in by and Level.laid_room_at(laid, body.tile) != str(plate["room"]):
+			continue
+		rewarded.append(player_id)
+		reward(player_id, {"track": "deed", "amount": 1, "of": TOMB_OPENED, "words": TOMB_OPENED_WORDS, "at": cell})
+	state["solved_rewarded"] = rewarded
+
+
+## Whether [param player_id] has searched secret [param id] of [param
+## zone_name] this generation (its find kept on their record, 808).
+func secret_found(zone_name: String, id: String, player_id: String) -> bool:
+	var record: PlayerRecord = _records.get(player_id)
+	if record == null:
+		return false
+	for secret: Dictionary in Level.secrets_of(zone_name):
+		if secret["id"] == id:
+			return _secret_key(zone_name, secret) in record.caches
+	return false
+
+
+## A secret's record key, as a dungeon chest's (808).
+func _secret_key(zone_name: String, secret: Dictionary) -> String:
+	var cell: Vector2i = secret["cell"]
+	return "%s@%s:%d,%d#%d" % [secret["cache"], zone_name, cell.x, cell.y, generation_of(zone_name)]
+
+
+## [param player] presses the loose niche [param secret] (the whispering
+## wall): its mortar gives (voice's line) and its find is theirs, once a
+## generation (808), as a cache's; after, nothing more.
+func _search_secret(player: Player, secret: Dictionary) -> void:
+	var record: PlayerRecord = _records.get(str(player.player_id))
+	if record == null or str(secret["cache"]).is_empty():
+		return
+	var tell := func(text: String) -> void:
+		if player.owner_peer != 0:
+			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text})
+	var key := _secret_key(World.zone.name, secret)
+	if key in record.caches:
+		tell.call("Nothing more here.")
+		return
+	tell.call(LOOSE_NICHE_LINE)
+	_give_cache(player, record, key, str(secret["cache"]), "the niche", World.zone.name, secret["cell"], tell)
 
 
 ## A player come up into [param zone_name] by its "from_below" spawn point
@@ -19649,15 +19797,24 @@ func search(player: Player, chest: Chest) -> bool:
 	if key in record.caches:
 		tell.call("Nothing more here.")
 		return false
-	record.caches.append(key)
 	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
-	var found := Items.roll_loot(chest.cache, "%s:%s" % [record.player_id, key], 64, true)
-	var gold := Items.roll_gold(chest.cache, "%s:%s" % [record.player_id, key])
+	return _give_cache(player, record, key, chest.cache, place, chest.zone, chest.tile, tell)
+
+
+## A cache's find (599; 808) given [param player]: table [param table]
+## rolled by them and [param key] (kept on [param record]), gold to the
+## purse, things to their pack (else the ground), voice's find line told
+## (330 amended (2)). True if anything was found.
+func _give_cache(player: Player, record: PlayerRecord, key: String, table: String, place: String, zone_name: String, tile: Vector2i,
+		tell: Callable) -> bool:
+	record.caches.append(key)
+	var found := Items.roll_loot(table, "%s:%s" % [record.player_id, key], 64, true)
+	var gold := Items.roll_gold(table, "%s:%s" % [record.player_id, key])
 	if gold > 0:
 		World.add_gold(str(record.player_id), gold, "found in %s" % place)
 	var counts := {}
 	for id in found:
-		var uid := World.items.mint(id, "cached", place, chest.zone, chest.tile)
+		var uid := World.items.mint(id, "cached", place, zone_name, tile)
 		if Items.condition_max(id) > 1:
 			World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
 		var slot := World.room_for(player, uid)  # Onto a stack of its kind first (decision 619).

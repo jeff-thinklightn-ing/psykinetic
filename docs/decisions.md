@@ -42932,3 +42932,75 @@ chests become caches (599), each player's own, found again when the level is lai
 - **items_test _test_dungeon_caches**: two players and two generations, each finding once a
   generation and again in the next; the save's prune keeping the laid generation and a plain cache,
   dropping the gone one; a record saved before 808 loading.
+
+## 813. The co-op family tomb: twin plates, a bricked vault and a loose niche
+
+Jeff: "there might be some rooms that are designed to be 'solved' by you and your companion
+cooperating ... two pressure plates that both need to be depressed, secrets that your companion can
+hint at, similar to the hidden door. but only when you ask." The coordinator approved the co-op rooms
+design and this build (C:/dev/review/dungeon/coop_tomb_build.md), with two picks: the vault stays open
+for the generation once solved (nobody is shut in when Wren steps off), and the whispering wall is a
+loose niche with a find of its own (no second hidden door beside 608's).
+
+- **Where:** the crypt's sealed vault (806 amended (2)), a gallery room off the spine, when it fits.
+  - crypt.gd `_coop` lays an alcove behind the middle of its back wall, a door on that edge, and the
+    vault's cache chest in the alcove (808: each player's find).
+  - Two plates go in its floor at least PLATES_APART (3) apart, out of the doors' lines.
+  - A boulder stands a cell off one plate, with the cell beyond it free to push from: a lone
+    player's stand-in.
+  - The sarcophagi and niches follow.
+  - All eight sample generations lay it.
+- **Data:** level.json "plates" [{id, cells, door: [x, y, dx, dy], room}]. Level.plates_from puts it in
+  terrain "plates" [{id, cells, edge, room}], and World keeps it per zone (Zone.plates).
+  - level.json "secrets" [{id, at, side, room, cache, clues}]; Level.secrets_from puts it in
+    level["secrets"].
+  - level.json "laid_rooms" goes to level["laid_rooms"] (Level.laid_rooms_from, laid_room_at).
+- **Holding:** World.plate_held(zone, id, index) and World.plate_body.
+  - A plate is held by anything standing on its cell: a player, a companion, a monster, a boulder.
+  - The generator keeps monsters off plate cells.
+- **The vault wall:** an ordinary Door on its edge, stone, locked with Main.PLATE_LOCK ("plates"), a key
+  nobody holds.
+  - On every move onto or off a plate (Main._check_plates on World.entity_moved), a set held all at
+    once solves it (_solve_plates), the first time this generation:
+    - the door is unlocked and opened;
+    - the noise is a door's (the dead hear it);
+    - "[crypt] <zone>: <room> opened by K holding" (a count only);
+    - Main.room_solved(zone, room, by) fires once. by = what holds the plates, and a boulder's pusher.
+      Companions hang her reaction, memory and bond on it.
+    - Each player holding a plate or in its laid room gets 804's deed through Main.reward ("+1 Deeds,
+      a sealed tomb opened"; Gains "opened a sealed tomb": voice's words), once a generation.
+  - "solved" and "solved_rewarded" are kept in the zone's regen state, saved (Regen.states_from) and
+    gone with the generation. A solved vault's door spawns open and unlocked.
+- **The whispering wall:** one of the tomb's niches (not its first from the door) is loose.
+  - Pressing it (Main._on_niche_pressed, _search_secret) gives voice's line, "The fresh mortar crumbles
+    under your hands, and the niche comes open.", then its find (the block's "loose_cache", else its
+    "cache"), once per player a generation.
+  - It uses the record key a dungeon chest's would (808) and Main._give_cache, which Main.search now
+    shares.
+  - Main.secret_found(zone, id, player_id).
+  - The clues are voice's three facts, vague, then the wall's side, then the niche counted from the
+    door. A companion's mind words them, one per ask, only when asked, never volunteered (Jeff). That
+    is companions' side, on Level.secrets_of / secret_at.
+  - The secrets stay on the server: BuilderHost.terrain_message strips "secrets" from the config it
+    sends.
+- **Drawn (client3d):**
+  - plated_edges and _add_vault: wall.crypt.vault_bricked on the door edge. Its "bricks" part sinks
+    2.4 m over 1.3 s as the door opens (_show_vault, from _sync_doors), with sound's sfx.wall_sink,
+    else sfx.slab_grind.
+  - _add_plates and _sync_plates: building.floor_plate on each plate cell. Its "plate" part is 3 cm
+    down while a body stands there, with sfx.plate_click as it goes down. That is read from the
+    replicated bodies' cells, so there is no new wire data.
+- **The checker (806):** a new rule, "coop". Each plate set:
+  - has two plates or more, PLATES_APART apart;
+  - each walked to from its door's room side;
+  - has a stand-in (a boulder or crate) within STAND_IN_REACH (8) steps of one;
+  - has a giving chest behind its door.
+  Every secret has two clues or more. The barrow is held to it. tools/layout_audit.py draws it.
+- **Tests:**
+  - level_test: the rule on a made-up tomb, clean, and each fault named; the generated barrow's tomb
+    (plates, door, chest, boulder, three clues, no coop fault); a level's terrain message without its
+    secrets.
+  - items_test _test_coop_tomb: one body opens nothing; two open it for good, room_solved once naming
+    both, the deed once; off and on again, nothing more; the loose niche's find once, then nothing.
+- **Protocol:** unchanged (fc7438491ba8): new level.json keys, a new lock string, Door.open as today.
+  No new class_name.

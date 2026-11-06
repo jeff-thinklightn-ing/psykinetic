@@ -160,6 +160,11 @@ static func states_from(saved: Variant) -> Dictionary:
 					out[str(area)]["robbers_down"] = true  # 714: the robbers' clear, latched for the generation.
 				if entry.get("robbers_fallen") is Array:
 					out[str(area)]["robbers_fallen"] = (entry["robbers_fallen"] as Array).map(func(id: Variant) -> String: return str(id))
+				# The co-op tombs opened this generation, and who was given
+				# its deed (crypt landing 2).
+				for key: String in ["solved", "solved_rewarded"]:
+					if entry.get(key) is Array:
+						out[str(area)][key] = (entry[key] as Array).map(func(id: Variant) -> String: return str(id))
 	return out
 
 

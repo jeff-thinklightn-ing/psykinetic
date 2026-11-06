@@ -32,6 +32,9 @@ var torches: Dictionary[Vector2i, bool] = {}
 var niche_edges: Dictionary[Vector3i, String] = {}
 ## Edge key -> the niche's floor cell, the one stepped from (608 amended; World.niche_cells).
 var niche_cells: Dictionary[Vector3i, Vector2i] = {}
+## Its plates (terrain "plates", the co-op family tomb): [{id, cells, edge,
+## room}] (World.plate_held).
+var plates: Array = []
 ## How many times its terrain has been loaded (a reload, a generation): what
 ## reads its level.json once knows when to read it again (Monster's graves).
 var terrain_loads := 0

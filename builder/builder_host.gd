@@ -291,8 +291,14 @@ static func terrain_message(level_name: String) -> Dictionary:
 	var layout: Image = made["layout"]
 	var height: Image = made["height"]
 	var relief: Image = made.get("relief")
+	# A level's secrets (the co-op tomb's loose niche and its clues) stay
+	# on the server: no client is told where they are.
+	var config: Dictionary = made["config"]
+	if config.has("secrets"):
+		config = config.duplicate()
+		config.erase("secrets")
 	return {"name": level_name, "layout": layout.save_png_to_buffer() if layout != null else PackedByteArray(),
-		"height": height.save_png_to_buffer() if height != null else PackedByteArray(), "config": made["config"],
+		"height": height.save_png_to_buffer() if height != null else PackedByteArray(), "config": config,
 		"relief": relief.save_png_to_buffer() if relief != null else PackedByteArray()}
 
 

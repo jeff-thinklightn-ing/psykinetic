@@ -74,6 +74,13 @@ const BRANCH_CHANCE := 0.5
 const ROOM_CLEAR := 1
 
 const USES: Array[String] = ["family_tomb", "ossuary", "chapel_of_rest", "sealed_vault"]
+## The co-op tomb's plates at least this far apart (cells, the longer
+## axis): one body never holds both.
+const PLATES_APART := 3
+## The loose niche's clues (voice's): a wall by the way it faces, north up,
+## and the niche counted from the door.
+const SIDES := {Vector2i(0, -1): "north", Vector2i(1, 0): "east", Vector2i(0, 1): "south", Vector2i(-1, 0): "west"}
+const ORDINALS: Array[String] = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth"]
 
 
 static func generate(template: LevelMap, config: Dictionary, seed: int) -> LevelMap:
@@ -86,7 +93,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	Labyrinth._move_hidden(map, Labyrinth.niche_plan(config, seed))
 	var carved: Dictionary[Vector2i, bool] = {}
 	var plan := {"rooms": [], "ways": {}, "decor": [], "entities": [], "buildings": [], "niches": [], "carvings": [],
-		"laid_rooms": [], "processional": [], "ends": []}
+		"laid_rooms": [], "processional": [], "ends": [], "plates": [], "secrets": [], "plate_cells": {}}
 	var nodes := Labyrinth._anchor_nodes(template, given, {})
 	if nodes.is_empty():
 		return map
@@ -165,7 +172,8 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	_monsters(map, anchors, config, rng, plan)
 	_laid_rooms(given, plan)
 	map.extras["rows"] = {"decor": plan["decor"], "entities": plan["entities"], "buildings": plan["buildings"],
-		"niches": plan["niches"], "carvings": plan["carvings"], "laid_rooms": plan["laid_rooms"]}
+		"niches": plan["niches"], "carvings": plan["carvings"], "laid_rooms": plan["laid_rooms"], "plates": plan["plates"],
+		"secrets": plan["secrets"]}
 	# The ways, and what the generation stood in the rooms: Regen's moss and
 	# webs keep off them (647; a patch under a sarcophagus is on no floor).
 	var clear: Dictionary = plan["ways"].duplicate()
@@ -176,6 +184,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 		clear[Vector2i(row[0], row[1])] = true
 	for row: Array in plan["niches"]:
 		clear[Vector2i(row[0], row[1])] = true
+	clear.merge(plan["plate_cells"])
 	map.extras["paths"] = clear
 	return map
 
@@ -650,9 +659,17 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 				_carving(map, room, kept, rest_lines[0], plan)
 			_candles(map, room, kept, plan)
 		elif use == "sealed_vault":
-			_sarcophagi(map, room, kept, plan)
-			if chests > 0 and _chest(map, room, kept, config, plan):
+			# The co-op family tomb (crypt landing 2): its twin plates and
+			# bricked vault first, then what else it holds.
+			if chests > 0 and _coop(map, room, kept, config, plan):
 				chests -= 1
+				_sarcophagi(map, room, kept, plan)
+				_niches_in(map, room, kept, 2, rng, plan)
+				_loose_niche(map, room, config, rng, plan)
+			else:
+				_sarcophagi(map, room, kept, plan)
+				if chests > 0 and _chest(map, room, kept, config, plan):
+					chests -= 1
 	tombs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
 	for room: Dictionary in tombs:
 		if chests <= 0:
@@ -875,6 +892,121 @@ static func _carving(map: LevelMap, room: Dictionary, kept: Dictionary, line: Di
 		return
 
 
+## The co-op family tomb (crypt landing 2; Jeff: "two pressure plates that
+## both need to be depressed"): in [param room] (the sealed vault), an
+## alcove behind the middle of its back wall, a door on that edge (the
+## bricked vault, wall.crypt.vault_bricked; Main locks it to the plates)
+## and the vault's cache chest in it (808: each player's find); two plates
+## in the floor at least PLATES_APART apart, out of the doors' lines; and a
+## boulder a cell off one of them with a cell behind it to push from (a
+## lone player's stand-in). Written as level.json "plates" {id, cells,
+## door, room}. Whether it was laid.
+static func _coop(map: LevelMap, room: Dictionary, kept: Dictionary, config: Dictionary, plan: Dictionary) -> bool:
+	var cache := str(config.get("cache", ""))
+	if cache.is_empty():
+		return false
+	var back: Vector2i = -(room["out"] as Vector2i)
+	var wide: int = room["wide"]
+	var deep: int = room["deep"]
+	var order: Array[int] = []
+	for i in wide:
+		order.append(i)
+	order.sort_custom(func(a: int, b: int) -> bool: return absi(a * 2 - wide + 1) < absi(b * 2 - wide + 1))
+	for x in order:
+		var before := _at(room, x, deep - 1)
+		var alcove := before + back
+		if map.cell(before) != FLOOR or kept.has(before) or not _alcove_fits(map, alcove, before):
+			continue
+		var pair := _plates(map, room, kept, before)
+		if pair.is_empty():
+			continue
+		map.set_cell(alcove, "chest")
+		for direction in DIRECTIONS:
+			map.set_edge(Terrain.edge_key(alcove, direction), "door" if alcove + direction == before else "wall")
+		plan["entities"].append({"at": [alcove.x, alcove.y], "props": {"cache": cache}})
+		room["chest"] = alcove
+		map.set_cell(pair["boulder"], "boulder")
+		for cell: Vector2i in [before, pair["boulder"], pair["from"]] + pair["cells"]:
+			kept[cell] = true
+		for cell: Vector2i in pair["cells"]:
+			plan["plate_cells"][cell] = true
+		plan["plate_cells"][pair["boulder"]] = true
+		plan["plates"].append({"id": "vault", "cells": pair["cells"].map(func(cell: Vector2i) -> Array: return [cell.x, cell.y]),
+			"door": [before.x, before.y, back.x, back.y], "room": room["id"]})
+		room["coop"] = true
+		room["things"] = int(room.get("things", 0)) + 2
+		return true
+	return false
+
+
+## Whether [param alcove] is rock in the map's rim with no way beside it
+## but [param before], the cell it opens off.
+static func _alcove_fits(map: LevelMap, alcove: Vector2i, before: Vector2i) -> bool:
+	if map.walkable(alcove) or alcove.x < RIM or alcove.y < RIM or alcove.x >= map.size.x - RIM or alcove.y >= map.size.y - RIM:
+		return false
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var near := alcove + Vector2i(dx, dy)
+			if near != alcove and near != before and map.walkable(near) and absi(dx) + absi(dy) == 1:
+				return false
+	return true
+
+
+## Two plates in [param room], the farthest pair at least PLATES_APART
+## apart, each floor out of [param kept] (doors' lines, what stands there)
+## and off [param before]; and a boulder a cell off one, with the cell past
+## it free to push from: {cells: [a, b], boulder, from}, or {}.
+static func _plates(map: LevelMap, room: Dictionary, kept: Dictionary, before: Vector2i) -> Dictionary:
+	var free := func(cell: Vector2i) -> bool:
+		return room["cells"].has(cell) and map.cell(cell) == FLOOR and not kept.has(cell) and cell != before
+	var spots: Array[Vector2i] = []
+	for cell in Tools.sorted_cells(room["cells"]):
+		if free.call(cell):
+			spots.append(cell)
+	var pairs: Array = []
+	for i in spots.size():
+		for j in range(i + 1, spots.size()):
+			if Tools.distance(spots[i], spots[j]) >= PLATES_APART:
+				pairs.append([spots[i], spots[j]])
+	pairs.sort_custom(func(a: Array, b: Array) -> bool: return Tools.distance(a[0], a[1]) > Tools.distance(b[0], b[1]))
+	for pair: Array in pairs:
+		for k in 2:
+			var plate: Vector2i = pair[k]
+			var other: Vector2i = pair[1 - k]
+			for direction in DIRECTIONS:
+				var boulder := plate + direction
+				var from := boulder + direction
+				if free.call(boulder) and free.call(from) and boulder != other and from != other:
+					return {"cells": [pair[0], pair[1]], "boulder": boulder, "from": from}
+	return {}
+
+
+## The whispering wall (crypt landing 2): one of [param room]'s niches is
+## loose, sealed with fresh mortar, a find of its own behind it (the
+## block's "loose_cache", else its "cache"); level.json "secrets" {id, at,
+## side, room, cache, clues}, the clues voice's facts, vague to plain, for
+## a companion's mind to word when asked (never volunteered).
+static func _loose_niche(map: LevelMap, room: Dictionary, config: Dictionary, rng: RandomNumberGenerator, plan: Dictionary) -> void:
+	var doors: Array = room["doors"]
+	var door: Vector2i = doors[0] if not doors.is_empty() else room["start"]
+	var mine: Array = plan["niches"].filter(func(row: Array) -> bool: return room["cells"].has(Vector2i(row[0], row[1])))
+	if mine.size() < 2:
+		return
+	mine.sort_custom(func(a: Array, b: Array) -> bool:
+		return Tools.distance(Vector2i(a[0], a[1]), door) < Tools.distance(Vector2i(b[0], b[1]), door))
+	var index := rng.randi_range(1, mini(mine.size(), ORDINALS.size()) - 1)
+	var row: Array = mine[index]
+	var side := Vector2i(row[2], row[3])
+	var cache := str(config.get("loose_cache", config.get("cache", "")))
+	if cache.is_empty():
+		return
+	plan["secrets"].append({"id": "loose", "at": [row[0], row[1]], "side": [side.x, side.y], "room": room["id"], "cache": cache,
+		"clues": ["one of the niches in this tomb has been sealed more recently than the rest",
+			"the mortar along the %s wall is paler and newer than the rest" % SIDES.get(side, "far"),
+			"the %s niche from the door is sealed with fresh mortar that hasn't yet darkened" % ORDINALS[index]]})
+	room["things"] = int(room.get("things", 0)) + 1
+
+
 ## A cache chest in [param room] by its back wall, beside its middle: the
 ## chest marker and its entry {at, props: {cache}} (the block's "cache"
 ## table, rolled per player and generation, 808). Whether it was laid.
@@ -950,13 +1082,14 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 			continue
 		var spots: Array[Vector2i] = []
 		for cell in Tools.sorted_cells(room["cells"]):
-			if Labyrinth._open_floor(map, cell):
+			if Labyrinth._open_floor(map, cell) and not plan["plate_cells"].has(cell):
 				spots.append(cell)
 		spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, room["chest"]) < Tools.distance(b, room["chest"]))
 		left[guard] = int(left[guard]) - Labyrinth._lay(map, anchors, "monster_" + guard, 1, spots)
 	var floor: Array[Vector2i] = []
 	for cell: Vector2i in Tools.sorted_cells(map.cells):
-		if map.cell(cell) == FLOOR and not quiet.has(cell) and not Level.in_anchors(anchors, cell) and Labyrinth._open_floor(map, cell):
+		if map.cell(cell) == FLOOR and not quiet.has(cell) and not plan["plate_cells"].has(cell) and not Level.in_anchors(anchors, cell) \
+				and Labyrinth._open_floor(map, cell):
 			floor.append(cell)
 	Tools.shuffle(floor, rng)
 	var near: Dictionary = config.get("near", {}) if config.get("near") is Dictionary else {}

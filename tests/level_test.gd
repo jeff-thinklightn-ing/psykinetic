@@ -3663,6 +3663,35 @@ func _test_barrow_level() -> void:
 		and made["config"].get("rooms", {}).size() == 3 and made_deep["config"].get("rooms", {}).has("lair"),
 		"a generation keeps the dressed halls: the table and pillars solid, the dais raised with its stairs, no way one cell wide, and the named rooms (%s %s; solid %d of %d laid; narrow %s)" % [gen_barrow["warnings"], gen_deep["warnings"],
 			gen_barrow["terrain"]["solid"].size(), laid_solid, Level.narrow_runs(gen_barrow["terrain"]).slice(0, 8)])
+	# The co-op family tomb (crypt landing 2): one plate set, two plates at
+	# least three apart, its door a door edge with the vault's cache chest
+	# behind it and a boulder in the tomb; one loose niche with voice's three
+	# clues; the co-op rule clean; and the secrets never in the terrain
+	# message a client is sent.
+	var plates: Array = gen_barrow["terrain"]["plates"]
+	var secrets: Array = gen_barrow["secrets"]
+	var plate_ok := plates.size() == 1 and (plates[0]["cells"] as Array).size() == 2
+	var behind := {}
+	var boulders := 0
+	for spec: Dictionary in gen_barrow["entities"]:
+		if spec.get("script") == Level.CHEST and not str(spec.get("props", {}).get("cache", "")).is_empty():
+			behind[spec["tile"]] = true
+		elif spec.get("script") == Level.PUSHABLE:
+			boulders += 1
+	if plate_ok:
+		var cells: Array = plates[0]["cells"]
+		var gap: Vector2i = (cells[0] as Vector2i) - (cells[1] as Vector2i)
+		var sides := Terrain.edge_cells(plates[0]["edge"])
+		plate_ok = absi(gap.x) + absi(gap.y) >= 3 and int(gen_barrow["terrain"]["edges"].get(plates[0]["edge"], 0)) == Terrain.Edge.DOOR \
+			and (behind.has(sides[0]) or behind.has(sides[1])) and boulders >= 1
+	var coop_faults := Regen.layout_faults(made, Regen.config_of("barrow")).filter(func(fault: Dictionary) -> bool: return fault["rule"] == "coop")
+	_check(plate_ok and secrets.size() == 1 and (secrets[0]["clues"] as Array).size() == 3 and coop_faults.is_empty(),
+		"the crypt's sealed vault is the co-op tomb: two plates three apart, a cache behind its bricked door, a boulder for a lone player, a loose niche with three clues (%s; %s; %s)" % [plates, secrets.map(func(secret: Dictionary) -> Array: return [secret["cell"], secret["clues"]]), coop_faults])
+	Level.register("coop_secrets_test", made["layout"], made["height"], made["config"])
+	var sent: Dictionary = BuilderHost.terrain_message("coop_secrets_test")["config"]
+	_check(not sent.has("secrets") and made["config"].has("secrets") and Level.secrets_of("coop_secrets_test").size() == 1,
+		"a level's secrets stay on the server: its terrain message has none, its level still does")
+	Level.unregister("coop_secrets_test")
 	# Armour as grave goods (622, dungeon's side): the Ossuary's chests roll
 	# mail shirts; every generated chest's goods carry the grave mark; nowhere
 	# else gives armour. The rolls are seeded by level and cell, so which
@@ -4437,6 +4466,27 @@ func _test_layout_sense() -> void:
 	_check(said.size() == 1, "the same chest outside a dungeon is named (%s)" % [said])
 	vault["entities"] = [{"tile": Vector2i(15, 3), "name": "Altar", "script": Level.CHEST, "props": {"role": "offering", "slots": [""]}}]
 	_check(LAYOUT_SENSE.check_chests(vault, {"dungeon": true}).is_empty(), "a chest with a role of its own (an offering altar) is left out")
+	# The co-op tomb (crypt landing 2): a room, an alcove behind a door on
+	# its east wall with a chest in it, two plates three apart, a boulder by
+	# one; then plates side by side, no boulder, an empty alcove, one clue.
+	var tomb := _ls_level([Rect2i(0, 0, 6, 6), Rect2i(6, 2, 1, 1)], [[Vector2i(5, 2), Vector2i(1, 0), Terrain.Edge.DOOR]], [Vector2i(2, 2)], [])
+	var door_edge := Terrain.edge_key(Vector2i(5, 2), Vector2i(1, 0))
+	var coop_counts := func(plates: Array, entities: Array, clues: Array) -> int:
+		var level := tomb.duplicate(true)
+		level["terrain"]["plates"] = [{"id": "vault", "cells": plates, "edge": door_edge, "room": "tomb"}]
+		level["entities"] = entities
+		level["secrets"] = [{"id": "loose", "cell": Vector2i(0, 4), "side": Vector2i(-1, 0), "clues": clues}]
+		return int(LAYOUT_SENSE.counts(LAYOUT_SENSE.check(level, [], {"ways": 2}))["coop"])
+	var boulder := {"tile": Vector2i(2, 4), "name": "Boulder", "script": Level.PUSHABLE}
+	var cached := {"tile": Vector2i(6, 2), "name": "Chest", "script": Level.CHEST, "props": {"cache": "crypt_cache"}}
+	var three := ["a", "b", "c"]
+	var coop_said := [coop_counts.call([Vector2i(1, 1), Vector2i(1, 4)], [boulder, cached], three),
+		coop_counts.call([Vector2i(1, 1), Vector2i(2, 1)], [boulder, cached], three),
+		coop_counts.call([Vector2i(1, 1), Vector2i(1, 4)], [cached], three),
+		coop_counts.call([Vector2i(1, 1), Vector2i(1, 4)], [boulder], three),
+		coop_counts.call([Vector2i(1, 1), Vector2i(1, 4)], [boulder, cached], ["a"])]
+	_check(coop_said == [0, 1, 1, 1, 1],
+		"the co-op rule: a clean tomb passes; plates one body holds, no stand-in for a lone player, nothing behind the door, a secret of one clue are each named (%s)" % [coop_said])
 	# Every level's chests today (reported).
 	for folder in DirAccess.get_directories_at(Level.DIR):
 		if Level.DIR + folder + "/" == Prefab.DIR or not FileAccess.file_exists(Level.DIR + folder + "/layout.png"):

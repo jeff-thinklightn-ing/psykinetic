@@ -440,7 +440,7 @@ def audit(name, layout_path, config, cw, regen_config=None, pillared=False):
                 start=start, heart=heart, metrics=metrics)
 
 
-CHECKER = {"door": "door", "purpose": "purpose", "wrap": "wrap", "dead_end": "deadend", "loop": "loop", "spine": "offspine", "chest": "chest"}
+CHECKER = {"door": "door", "purpose": "purpose", "wrap": "wrap", "dead_end": "deadend", "loop": "loop", "spine": "offspine", "chest": "chest", "coop": "coop"}
 
 
 def use_checker(a, faults):
@@ -463,8 +463,8 @@ def use_checker(a, faults):
 
 
 COLOURS = {"purpose": (230, 60, 60), "wrap": (255, 140, 0), "deadend": (220, 0, 220), "deadend_ok": (90, 170, 90), "deadend_mon": (200, 90, 160),
-           "door": (255, 0, 0), "loop": (0, 170, 220), "offspine": (150, 120, 255), "chest": (140, 74, 28)}
-SHORT = {"purpose": "P", "wrap": "W", "deadend": "D", "deadend_ok": "d", "deadend_mon": "M", "door": "X", "loop": "L", "offspine": "S", "chest": "C"}
+           "door": (255, 0, 0), "loop": (0, 170, 220), "offspine": (150, 120, 255), "chest": (140, 74, 28), "coop": (0, 160, 90)}
+SHORT = {"purpose": "P", "wrap": "W", "deadend": "D", "deadend_ok": "d", "deadend_mon": "M", "door": "X", "loop": "L", "offspine": "S", "chest": "C", "coop": "K"}
 
 
 def draw(a, out_png, title):

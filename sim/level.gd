@@ -898,6 +898,9 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
 	level["terrain"]["decor"] = decor_from(config, level["terrain"], warnings)
 	level["carvings"] = carvings_from(config, warnings)
+	level["terrain"]["plates"] = plates_from(config, level["terrain"], warnings)
+	level["secrets"] = secrets_from(config, level["terrain"], warnings)
+	level["laid_rooms"] = laid_rooms_from(config)
 	_check_fords(level["terrain"], warnings)
 	_check_water(level["terrain"], warnings)
 	level["terrain"]["ledges"] = _ledges(level["terrain"], config, warnings)
@@ -2273,6 +2276,113 @@ static func carvings_from(config: Dictionary, warnings: Array[String]) -> Array[
 		out.append({"cell": at, "side": side, "cut": str(entry.get("cut", "")), "look": str(entry.get("look", "")),
 			"fact": str(entry.get("fact", ""))})
 	return out
+
+
+## level.json's "plates" (the co-op family tomb, crypt landing 2): [{id,
+## cells: [[x, y], ...], door: [x, y, dx, dy], room}], twin plates in a
+## floor that open the door on the edge from cell (x, y) toward (dx, dy)
+## while every one of them is held at once (anything standing on its cell:
+## World.plate_held), for good this generation (Main's solve); as [{id,
+## cells: Array[Vector2i], edge: Vector3i, room}]. A plate off the floor or
+## a door edge that is none is said and left out.
+static func plates_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("plates", [])
+	if not listed is Array:
+		warnings.append("\"plates\" in level.json is not a list")
+		return out
+	var floor: Dictionary = {}
+	for cell: Vector2i in terrain.get("floor", []):
+		floor[cell] = true
+	for entry: Variant in listed:
+		if not entry is Dictionary or not entry.get("cells") is Array or not entry.get("door") is Array or (entry["door"] as Array).size() != 4:
+			warnings.append("a plate set %s is not {id, cells, door: [x, y, dx, dy]}: left out" % [entry])
+			continue
+		var cells: Array[Vector2i] = []
+		for value: Variant in entry["cells"]:
+			var at: Variant = _tile(value)
+			if at != null and floor.has(at):
+				cells.append(at)
+		var door: Array = entry["door"]
+		var key := Terrain.edge_key(Vector2i(int(door[0]), int(door[1])), Vector2i(int(door[2]), int(door[3])))
+		if cells.size() != (entry["cells"] as Array).size() or cells.size() < 2 or int(terrain["edges"].get(key, Terrain.Edge.OPEN)) != Terrain.Edge.DOOR:
+			warnings.append("the plate set %s has a plate off the floor, fewer than two, or no door on its edge: left out" % [entry.get("id", "")])
+			continue
+		out.append({"id": str(entry.get("id", "plates_%d" % out.size())), "cells": cells, "edge": key, "room": str(entry.get("room", ""))})
+	return out
+
+
+## level.json's "secrets" (the co-op family tomb's whispering wall): [{id,
+## at: [x, y], side: [dx, dy], room, cache, clues: [fact, ...]}], a loose
+## niche (at a niche of terrain "niches", that edge) searched for a find of
+## its own (Main), with graded clues, vague to plain, the facts a
+## companion's mind words when asked. Server-side only: never sent
+## (BuilderHost.terrain_message takes them out). As [{id, cell, side, edge,
+## room, cache, clues: Array[String]}]; one on no niche is said and left out.
+static func secrets_from(config: Dictionary, terrain: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("secrets", [])
+	if not listed is Array:
+		warnings.append("\"secrets\" in level.json is not a list")
+		return out
+	var niches: Dictionary = {}
+	for niche: Dictionary in terrain.get("niches", []):
+		niches[niche["edge"]] = true
+	for entry: Variant in listed:
+		var at: Variant = _tile(entry.get("at")) if entry is Dictionary else null
+		var side: Variant = _tile(entry.get("side")) if entry is Dictionary else null
+		if at == null or side == null or not niches.has(Terrain.edge_key(at, side)):
+			warnings.append("a secret %s is on no niche: left out" % [entry])
+			continue
+		var clues: Array[String] = []
+		for clue: Variant in entry.get("clues", []):
+			clues.append(str(clue))
+		out.append({"id": str(entry.get("id", "secret_%d" % out.size())), "cell": at, "side": side, "edge": Terrain.edge_key(at, side),
+			"room": str(entry.get("room", "")), "cache": str(entry.get("cache", "")), "clues": clues})
+	return out
+
+
+## level.json's "laid_rooms" (806: a generation's rooms, each {id, use,
+## cells | rect}) as id -> {use, cells: Dictionary[Vector2i, bool]}.
+static func laid_rooms_from(config: Dictionary) -> Dictionary:
+	var out := {}
+	for entry: Variant in config.get("laid_rooms", []):
+		if not entry is Dictionary:
+			continue
+		var cells: Dictionary[Vector2i, bool] = {}
+		for value: Variant in entry.get("cells", []):
+			var at: Variant = _tile(value)
+			if at != null:
+				cells[at] = true
+		var rect: Variant = entry.get("rect")
+		if rect is Array and (rect as Array).size() == 4:
+			for cell in rect_cells(Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3]))):
+				cells[cell] = true
+		out[str(entry.get("id", ""))] = {"use": str(entry.get("use", "")), "cells": cells}
+	return out
+
+
+## The laid room (laid_rooms_from) [param cell] of [param level] is in, by
+## its id; "" in none.
+static func laid_room_at(level: Dictionary, cell: Vector2i) -> String:
+	var rooms: Dictionary = level.get("laid_rooms", {})
+	for id: String in rooms:
+		if rooms[id]["cells"].has(cell):
+			return id
+	return ""
+
+
+## Level [param level_name]'s secrets (secrets_from), server-side.
+static func secrets_of(level_name: String) -> Array:
+	return load_level(level_name).get("secrets", [])
+
+
+## Level [param level_name]'s secret whose niche is on [param cell], or {}.
+static func secret_at(level_name: String, cell: Vector2i) -> Dictionary:
+	for secret: Dictionary in secrets_of(level_name):
+		if secret["cell"] == cell:
+			return secret
+	return {}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],

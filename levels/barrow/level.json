@@ -276,7 +276,8 @@
 			"dead_end",
 			"spine",
 			"loop",
-			"chest"
+			"chest",
+			"coop"
 		],
 		"every_days": 3,
 		"anchors": [

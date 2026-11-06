@@ -1938,6 +1938,95 @@ func _test_cache() -> void:
 	chest.cache = ""
 	chest.cache_place = ""
 	_test_dungeon_caches(host, chest)
+	_test_coop_tomb(host, chest)
+
+
+## The co-op family tomb (crypt landing 2): a plate set in the host's zone
+## on two free cells three apart, its door one of the zone's, locked to the
+## plates. One body on one plate opens nothing; a second (the chest stood
+## there, as a boulder would be) opens it for good: unlocked and open,
+## room_solved once naming both, the host's deed once; off and on again,
+## nothing more. Then a loose niche searched: the find once, then nothing.
+func _test_coop_tomb(host: Player, chest: Chest) -> void:
+	print("\n== crypt landing 2: the co-op tomb's plates, its bricked vault, the loose niche ==")
+	var zone_name := host.zone
+	var each: Zone = World.zones[zone_name]
+	var door: Door = null
+	for candidate: Door in World.get_doors():
+		if candidate.zone == zone_name:
+			door = candidate
+			break
+	var host_at := host.tile
+	var chest_at := chest.tile
+	var cells: Array[Vector2i] = []
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var cell := host_at + Vector2i(dx, dy)
+			if cells.size() < 2 and World.is_walkable(cell) and World.is_free(cell) and cell != host_at \
+					and (cells.is_empty() or absi(cell.x - cells[0].x) + absi(cell.y - cells[0].y) >= 3):
+				cells.append(cell)
+	if door == null or cells.size() < 2:
+		_check(false, "the co-op tomb test finds a door and two free cells in the test room (%s, %s)" % [door, cells])
+		return
+	var was_open := door.open
+	var was_lock := door.lock
+	door.open = false
+	door.lock = Main.PLATE_LOCK
+	var kept_plates := each.plates
+	each.plates = [{"id": "vault", "cells": cells, "edge": door.key, "room": "tomb"}]
+	var kept_regen: Variant = _main._regen.get(zone_name)
+	_main._regen[zone_name] = {"generation": 1, "at_step": 0}
+	var solved: Array = []
+	var on_solved := func(zone: String, room: String, by: Array) -> void: solved.append([zone, room, by.size()])
+	_main.room_solved.connect(on_solved)
+	var rewards: int = _main.rewards_sent
+	World._relocate(host, cells[0])
+	_check(World.plate_held(zone_name, "vault", 0) and not World.plate_held(zone_name, "vault", 1) and not World.plate_held(zone_name, "vault")
+		and not door.open and solved.is_empty(), "one body on one plate opens nothing")
+	World._relocate(chest, cells[1])
+	_check(World.plate_held(zone_name, "vault") and door.open and door.lock == "" and solved == [[zone_name, "tomb", 2]]
+		and _main.rewards_sent == rewards + 1 and "vault" in _main._regen[zone_name].get("solved", []),
+		"both plates held: the vault opens for good, room_solved names both, the deed given (%s, rewards %d)" % [solved, _main.rewards_sent - rewards])
+	World._relocate(host, host_at)
+	World._relocate(host, cells[0])
+	_check(door.open and solved.size() == 1 and _main.rewards_sent == rewards + 1, "off and on again: still open, solved and rewarded once")
+	World._relocate(host, host_at)
+	World._relocate(chest, chest_at)
+	_main.room_solved.disconnect(on_solved)
+	# The loose niche: its find once a generation, voice's line before it.
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var secret := {"id": "loose", "cell": host_at, "side": Vector2i(1, 0), "edge": Terrain.edge_key(host_at, Vector2i(1, 0)), "room": "tomb",
+		"cache": "crypt_cache", "clues": ["a", "b", "c"]}
+	var had := _units_of(host).size() + World.ground_uids(host.tile).size()
+	var gold := World.gold_of(Net.player_id)
+	_main._search_secret(host, secret)
+	var found := _units_of(host).size() + World.ground_uids(host.tile).size()
+	var key: String = _main._secret_key(zone_name, secret)
+	_main._search_secret(host, secret)
+	_check(found > had and World.gold_of(Net.player_id) > gold and key in record.caches
+		and _units_of(host).size() + World.ground_uids(host.tile).size() == found,
+		"the loose niche gives its find once a generation, then nothing (%s)" % key)
+	# Tidy.
+	for uid: int in World.items._book.keys():
+		var events: Array = World.items.history(uid).get("events", [])
+		if events.is_empty() or events[0]["kind"] != "cached":
+			continue
+		if World.slot_of_unit(host, uid) >= 0:
+			World.take_units(host, [uid])
+		else:
+			var index := World.ground_uids(host.tile).find(uid)
+			if index >= 0:
+				World.take_from_ground(host.tile, index)
+		World.items.end(uid, "gone")
+	World.add_gold(Net.player_id, gold - World.gold_of(Net.player_id), "test")
+	record.caches.erase(key)
+	each.plates = kept_plates
+	door.lock = was_lock
+	door.open = was_open
+	if kept_regen == null:
+		_main._regen.erase(zone_name)
+	else:
+		_main._regen[zone_name] = kept_regen
 
 
 ## 808: in a regenerating level a cache is each chest's own, per player and

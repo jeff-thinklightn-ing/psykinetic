@@ -33,13 +33,25 @@ extends RefCounted
 ##             in a dungeon ([param options] "dungeon"), and has a monster in
 ##             its room or within GUARD_REACH steps. A chest with a role of its
 ##             own (props "role": an offering altar, a commission's drop) is
-##             not loot and is left out; a depot, shop, locker or temple too.
+##             not loot and is left out; a depot, shop, locker or temple too;
+##   coop      (crypt landing 2, the co-op family tomb) each plate set has two
+##             plates or more, PLATES_APART apart, each walked to from its
+##             door's room side; a stand-in (a boulder or crate) within
+##             STAND_IN_REACH steps of one, so a lone player can solve it;
+##             what its door opens on holds a chest that gives; and every
+##             secret has two clues or more.
 ## options: "ways" (the level's way width, cells), "heart" (Vector2i: the
 ## spine's far end; else the regenerate block's farthest anchor, else the
 ## farthest floor), "anchors" (the regenerate block's), "config" (level.json,
 ## for its niches and decor rows when [param level] lacks them).
 
-const RULES: Array[String] = ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest"]
+const RULES: Array[String] = ["door", "purpose", "wrap", "dead_end", "spine", "loop", "chest", "coop"]
+## The co-op rule's reaches (crypt landing 2): a stand-in within STAND_IN_REACH
+## steps of a plate; plates PLATES_APART apart; a plate within PLATE_REACH
+## steps of its door.
+const STAND_IN_REACH := 8
+const PLATES_APART := 3
+const PLATE_REACH := 40
 ## How near (steps) a monster must stand to guard a chest outside its room.
 const GUARD_REACH := 8
 ## The longest a spine may walk against the straight line.
@@ -73,6 +85,7 @@ static func check(level: Dictionary, rooms: Array = [], options: Dictionary = {}
 	_loops(lay, faults)
 	_spine(lay, options, faults)
 	_chests(level, lay, options, faults)
+	_coop(level, lay, faults)
 	return faults
 
 
@@ -769,6 +782,63 @@ static func _spine(lay: Dictionary, options: Dictionary, faults: Array) -> void:
 		if not depth.has(room) or int(depth[room]) > 1:
 			faults.append({"rule": "spine", "cell": _centre(_cells_of(lay, room)),
 				"what": "a room %s steps off the spine" % (str(depth[room]) if depth.has(room) else "unreached")})
+
+
+static func _coop(level: Dictionary, lay: Dictionary, faults: Array) -> void:
+	var stand_ins: Array[Vector2i] = []
+	var chests := {}
+	for spec: Dictionary in level.get("entities", []):
+		if not spec.get("tile") is Vector2i:
+			continue
+		if spec.get("script") in [Level.PUSHABLE, Level.CARGO]:
+			stand_ins.append(spec["tile"])
+		elif spec.get("script") == Level.CHEST and not str(spec.get("props", {}).get("cache", "")).is_empty():
+			chests[spec["tile"]] = true
+	for plate: Dictionary in level.get("terrain", {}).get("plates", []):
+		var cells: Array = plate["cells"]
+		var sides := Terrain.edge_cells(plate["edge"])
+		# The far side is the vault's (its chest); the near the room's.
+		var far: Vector2i = sides[0] if chests.has(sides[0]) else sides[1]
+		var room_side: Vector2i = sides[1] if far == sides[0] else sides[0]
+		var near := _walked(lay, room_side, PLATE_REACH)
+		if cells.size() < 2:
+			faults.append({"rule": "coop", "cell": room_side, "what": "plate set %s has one plate" % plate["id"]})
+		for i in cells.size():
+			if not near.has(cells[i]):
+				faults.append({"rule": "coop", "cell": cells[i], "what": "a plate not walked to from its door"})
+			for j in range(i + 1, cells.size()):
+				var gap: Vector2i = (cells[i] as Vector2i) - (cells[j] as Vector2i)
+				if absi(gap.x) + absi(gap.y) < PLATES_APART:
+					faults.append({"rule": "coop", "cell": cells[i], "what": "two plates one body holds"})
+		var helped := false
+		for cell: Vector2i in cells:
+			var reach := _walked(lay, cell, STAND_IN_REACH)
+			helped = helped or stand_ins.any(func(at: Vector2i) -> bool: return reach.has(at))
+		if not helped:
+			faults.append({"rule": "coop", "cell": cells[0], "what": "no stand-in within reach of a plate (a lone player)"})
+		if not chests.has(far):
+			faults.append({"rule": "coop", "cell": far, "what": "its door opens on no chest that gives"})
+	for secret: Dictionary in level.get("secrets", []):
+		if (secret["clues"] as Array).size() < 2:
+			faults.append({"rule": "coop", "cell": secret["cell"], "what": "a secret with fewer than two clues"})
+
+
+## The cells walked to from [param start] within [param most] steps.
+static func _walked(lay: Dictionary, start: Vector2i, most: int) -> Dictionary:
+	var near := {start: 0}
+	var queue: Array[Vector2i] = [start]
+	var i := 0
+	while i < queue.size():
+		var cell := queue[i]
+		i += 1
+		if int(near[cell]) >= most:
+			continue
+		for way in WAYS:
+			var next := cell + way
+			if not near.has(next) and _steps(lay, cell, way):
+				near[next] = int(near[cell]) + 1
+				queue.append(next)
+	return near
 
 
 static func _chests(level: Dictionary, lay: Dictionary, options: Dictionary, faults: Array) -> void:

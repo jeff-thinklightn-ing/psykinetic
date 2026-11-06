@@ -326,6 +326,17 @@ const BRIDGE_END := "bridge.wood.end"
 ## found. Each piece 0.5 m thick on its edge, +x toward the room.
 const NICHE_PIECE := "wall.crypt.niche_%s"
 const NICHE_CRACKED := "wall.crypt.cracked"
+## The co-op family tomb (crypt landing 2): its bricked vault on the plates'
+## door edge, its bricks (the part) sunk VAULT_SINK into the floor over
+## VAULT_SINK_SECONDS as it opens, sounded; and each plate, its slab (the
+## part) PLATE_DOWN down while anything stands on it, clicked as it goes.
+const VAULT_SLOT := "wall.crypt.vault_bricked"
+const PLATE_SLOT := "building.floor_plate"
+const VAULT_SINK := 2.4
+const VAULT_SINK_SECONDS := 1.3
+const PLATE_DOWN := 0.03
+const WALL_SINK_SOUND := "sfx.wall_sink"
+const PLATE_CLICK_SOUND := "sfx.plate_click"
 ## A dais indoors (580 step 3, terrain's side; the Hall of Fallen Souls):
 ## an edge between two floors exactly one level apart is art-kit's
 ## dais.edge in place of a cliff face, dais.steps where the low cell is a
@@ -2498,6 +2509,11 @@ var _edge_mask: ImageTexture
 ## their edge: [cracked, open, its draft].
 var _niche_at: Dictionary[Vector3i, Dictionary] = {}
 var _hidden_niches: Dictionary[Vector3i, Array] = {}
+## The co-op tomb's bricked vaults by their door edge: [bricks part or
+## null, last shown: -1 none yet, 0 shut, 1 open]; its plates: [{cell,
+## part, down}].
+var _vaults: Dictionary[Vector3i, Array] = {}
+var _plates_shown: Array[Dictionary] = []
 ## The ledges as curves (585, terrain's side, maps' terrain "ledges"): each
 ## {curve: Curves' sample with tops and feet, closed, up: 1 if its high side
 ## is right of its way (y down), else -1}; each cell near one -> (which, its
@@ -2837,6 +2853,7 @@ func _process(delta: float) -> void:
 	WetLook.update(self, delta)  # Bodies wet from water and rain, and drying (775).
 	_update_seen_through()
 	_sync_doors()
+	_sync_plates()
 	_ease_yaw(delta)
 	_ease_peek(delta)
 	_update_indoors()
@@ -6060,7 +6077,7 @@ func _descendants(node: Node) -> Array[Node]:
 ## _build_room, a frame apart by _build_room_over_frames.
 func _room_phases() -> Array[Callable]:
 	return [_phase_sets, _phase_land, _phase_reach, _phase_edges, _phase_ground, _build_water, _add_cliffs, _phase_lights,
-		_add_walls, _add_decor, _phase_stands, _phase_forest, _phase_forest_edge, _phase_forest_band, _phase_grown, _phase_border, _phase_mass, _phase_glimpses,
+		_add_walls, _add_decor, _add_plates, _phase_stands, _phase_forest, _phase_forest_edge, _phase_forest_band, _phase_grown, _phase_border, _phase_mass, _phase_glimpses,
 		_add_buildings, _phase_roofs, _phase_doors]
 
 
@@ -6607,6 +6624,7 @@ func _add_walls() -> void:
 	var doubles := _double_doors()
 	var seconds := doubles.values()
 	var fences := _fence_keys()
+	var plated := plated_edges(_terrain)
 	for key: Vector3i in edges:
 		if not _edge_drawn(key, fences):
 			continue
@@ -6620,6 +6638,8 @@ func _add_walls() -> void:
 				# The hidden niche's door is no doorway but its wall (608).
 				if _niche_at.has(key) and str(_niche_at[key]["kind"]) == "hidden":
 					_add_hidden_niche(key)
+				elif plated.has(key):
+					_add_vault(key, plated[key])
 				elif not key in seconds:
 					_add_doorway(key, doubles.get(key, key))
 			_:
@@ -12913,6 +12933,7 @@ func _rock_edge(key: Vector3i) -> bool:
 func _read_niches() -> void:
 	_niche_at.clear()
 	_hidden_niches.clear()
+	_vaults.clear()
 	for niche: Dictionary in _terrain.get("niches", []):
 		var cell: Vector2i = niche["cell"]
 		var out: Vector2i = niche["out"]
@@ -13038,6 +13059,89 @@ func _add_hidden_niche(key: Vector3i) -> void:
 		prints.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)
 		prints.rotation.y = atan2(float(out.y), -float(out.x))
 		_room.add_child(prints)
+
+
+## The co-op tombs' door edges in [param terrain] (its "plates"): edge ->
+## the step from the wall into the room (toward the plates).
+static func plated_edges(terrain: Dictionary) -> Dictionary[Vector3i, Vector2i]:
+	var out: Dictionary[Vector3i, Vector2i] = {}
+	for plate: Dictionary in terrain.get("plates", []):
+		var key: Vector3i = plate["edge"]
+		var sides := Terrain.edge_cells(key)
+		var near: Vector2i = plate["cells"][0]
+		var room: Vector2i = sides[0] if Vector2(sides[0]).distance_to(Vector2(near)) <= Vector2(sides[1]).distance_to(Vector2(near)) else sides[1]
+		out[key] = room - (sides[1] if room == sides[0] else sides[0])
+	return out
+
+
+## The co-op tomb's bricked vault on door edge [param key] (crypt landing
+## 2): wall.crypt.vault_bricked, +x toward the room ([param out]), shown
+## shut or sunk as its Door is (_sync_doors, _show_vault).
+func _add_vault(key: Vector3i, out: Vector2i) -> void:
+	var holder := ArtKit.instance(VAULT_SLOT)
+	holder.name = "Vault_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
+	holder.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
+	holder.rotation.y = atan2(-float(out.y), float(out.x))
+	_room.add_child(holder)
+	_walls[key] = holder
+	_vaults[key] = [holder.find_child("bricks", true, false) as Node3D, -1]
+	_doors_due[key] = true
+
+
+## The bricked vault on [param key] shut or [param opened]: its bricks up,
+## or down in the floor; opened from shut as it is drawn, they sink with
+## the wall's grind (sound's, the slab's till theirs).
+func _show_vault(key: Vector3i, opened: bool) -> void:
+	var parts: Array = _vaults[key]
+	var sinks: bool = opened and int(parts[1]) == 0
+	parts[1] = 1 if opened else 0
+	var bricks := parts[0] as Node3D
+	if bricks == null:
+		return
+	var moving := bricks.get_meta(&"tween") as Tween if bricks.has_meta(&"tween") else null
+	if moving != null and moving.is_valid():
+		moving.kill()
+	if not sinks:
+		bricks.position.y = -VAULT_SINK if opened else 0.0
+		bricks.visible = not opened
+		return
+	var sound := WALL_SINK_SOUND if SoundKit.has(WALL_SINK_SOUND) else SLAB_SOUND
+	if SoundKit.has(sound):
+		sfx.play(sound, bricks.global_position + Vector3.UP)
+	var tween := bricks.create_tween()
+	bricks.set_meta(&"tween", tween)
+	tween.tween_property(bricks, "position:y", -VAULT_SINK, VAULT_SINK_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_callback(bricks.hide)
+
+
+## The co-op tombs' plates (terrain "plates"): building.floor_plate on
+## each plate's cell, its slab down while anything stands there.
+func _add_plates() -> void:
+	_plates_shown.clear()
+	for plate: Dictionary in _terrain.get("plates", []):
+		for cell: Vector2i in plate["cells"]:
+			var piece := ArtKit.instance(PLATE_SLOT)
+			piece.name = "Plate_%d_%d" % [cell.x, cell.y]
+			piece.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)
+			_room.add_child(piece)
+			_plates_shown.append({"cell": cell, "part": piece.find_child("plate", true, false), "down": false, "at": piece.position})
+
+
+## Each plate's slab down while a body stands on its cell (the bodies'
+## cells, as replicated), clicked as it goes down; none on first sight.
+func _sync_plates() -> void:
+	if _plates_shown.is_empty() or World.zone == null:
+		return
+	for shown: Dictionary in _plates_shown:
+		var down := World.plate_body(World.zone, shown["cell"]) != null
+		if down == shown["down"]:
+			continue
+		shown["down"] = down
+		var part := shown["part"] as Node3D
+		if is_instance_valid(part):
+			part.position.y = -PLATE_DOWN if down else 0.0
+		if down and SoundKit.has(PLATE_CLICK_SOUND):
+			sfx.play(PLATE_CLICK_SOUND, shown["at"])
 
 
 ## The hidden niche on [param key] shut or [param opened]: the cracked wall
@@ -20959,6 +21063,11 @@ func _sync_doors() -> void:
 		if _hidden_niches.has(key):
 			if door != null:
 				_show_hidden_niche(key, door.is_open())
+			_doors_due.erase(key)
+			continue
+		if _vaults.has(key):
+			if door != null:
+				_show_vault(key, door.is_open())
 			_doors_due.erase(key)
 			continue
 		var doorway: Node3D = _doorways.get(key)
