@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_step_cache()
 	_test_layout_sense()
 	_test_castle_hold()
+	_test_hollow_chiefs()
 	_test_falls()
 	_test_sight_over_walls()
 	_test_hills()
@@ -4626,6 +4627,65 @@ func _test_castle_hold() -> void:
 		var refuge: Array = config.get("entities", []).filter(func(entity: Dictionary) -> bool: return (entity.get("props", {}) as Dictionary).get("role", "") == "refuge")
 		_check(enter > 0 and watched and refuge.size() == 2,
 				"castle_halls generation %d: the forge (a refuge, its hoard tagged so) is reached past a guard on its approach (%d steps)" % [generation, enter])
+
+
+## Hollowfell phase B (790 amended (3), the coordinator's plan):
+## two generations, each chamber sunk a level with one way in down a stair
+## two wide; Grull at the east stair's foot facing up it and Skeech side-on
+## in the south's dark (no lamp within 6), each named, on guard, with his
+## two; each chief's find (a hollowfell_cache chest) by him; the shrine (its
+## look) and the windlass laid, lit, the windlass solid.
+func _test_hollow_chiefs() -> void:
+	print("\n== hollowfell phase B (790 amended (3)): sunk chambers, the chiefs and their finds, the shrine and the windlass ==")
+	for generation in [1, 2]:
+		var made := Regen.generate("hollowfell", generation)
+		if made.is_empty():
+			_check(false, "hollowfell generation %d is made" % generation)
+			continue
+		var config: Dictionary = made["config"]
+		var map := LevelMap.from_image(made["layout"], config)
+		var height: Image = made["height"]
+		var level_at := func(cell: Vector2i) -> int: return roundi(height.get_pixel(2 * cell.x, 2 * cell.y).r8 / float(Level.GREY_PER_LEVEL))
+		var wrong: Array = []
+		for chamber: Array in [[Rect2i(80, 20, 14, 10), [Vector2i(80, 24), Vector2i(80, 25)], [Vector2i(81, 24), Vector2i(81, 25)]],
+				[Rect2i(70, 56, 12, 10), [Vector2i(75, 56), Vector2i(76, 56)], [Vector2i(75, 57), Vector2i(76, 57)]]]:
+			for cell in Level.rect_cells(chamber[0]):
+				if not map.walkable(cell):
+					continue
+				var want := 3 if cell in chamber[1] else 2
+				if level_at.call(cell) != want or (cell in chamber[2]) != (map.cell(cell) == "stair"):
+					wrong.append(cell)
+		_check(wrong.is_empty(), "hollowfell generation %d: both chambers a level down, their one way in a stair two wide (wrong at %s)" % [generation, wrong])
+		var parsed := Level.parse(made["layout"], made["height"], config)
+		var chiefs := {}
+		var monsters: Array[Vector2i] = []
+		var finds: Array[Vector2i] = []
+		for spec: Dictionary in parsed["entities"]:
+			if spec.has("named") and (spec.get("idle", {}) as Dictionary).get("mode", "") == "guard":
+				chiefs[spec["named"]] = [spec["tile"], spec.get("facing")]
+			if str(spec.get("script", "")) == Level.MONSTER:
+				monsters.append(spec["tile"])
+			if str(spec.get("script", "")) == Level.CHEST and (spec.get("props", {}) as Dictionary).get("cache", "") == "hollowfell_cache":
+				finds.append(spec["tile"])
+		var lamps: Array[Vector2i] = []
+		for cell: Vector2i in map.cells:
+			if map.cells[cell] == "lantern":
+				lamps.append(cell)
+		var dark := not lamps.any(func(cell: Vector2i) -> bool: return _cells_apart(cell, Vector2i(71, 58)) <= 6)
+		var guarded := finds.all(func(at: Vector2i) -> bool:
+			return monsters.filter(func(m: Vector2i) -> bool: return _cells_apart(m, at) <= 8).size() >= 2)
+		_check(chiefs.get("grull", []) == [Vector2i(82, 24), Vector2i(-1, 0)] and chiefs.get("skeech", []) == [Vector2i(71, 58), Vector2i(1, 0)]
+				and dark and finds.size() == 2 and guarded,
+				"hollowfell generation %d: Grull at the east stair's foot facing up it, Skeech side-on in the south's dark, each on guard, each find guarded (%s; dark %s; finds %s)" % [generation, chiefs, dark, finds])
+		var shrines: Array = config.get("decor", []).filter(func(row: Array) -> bool: return row[4] == "miners_shrine")
+		var looks: Array = config.get("carvings", []).filter(func(row: Dictionary) -> bool: return not str(row.get("look", "")).is_empty())
+		var windlass: Array = config.get("buildings", []).filter(func(row: Dictionary) -> bool: return row["slot"] == "building.set_windlass")
+		var lit := func(at: Vector2i) -> bool: return lamps.any(func(cell: Vector2i) -> bool: return _cells_apart(cell, at) <= 4)
+		var solid: Variant = parsed["terrain"]["solid"]
+		_check(shrines.size() == 1 and looks.size() == 1 and windlass.size() == 1
+				and lit.call(Vector2i(int(shrines[0][0]), int(shrines[0][1]))) and lit.call(Vector2i(int(windlass[0]["at"][0]), int(windlass[0]["at"][1])))
+				and solid.has(Vector2i(int(windlass[0]["at"][0]), int(windlass[0]["at"][1]))) and solid.has(Vector2i(int(windlass[0]["at"][0]) + 1, int(windlass[0]["at"][1]))),
+				"hollowfell generation %d: the miners' shrine with its look and the windlass laid in the bays, each lit, the windlass solid (%d, %d, %d)" % [generation, shrines.size(), looks.size(), windlass.size()])
 
 
 static func _cells_apart(a: Vector2i, b: Vector2i) -> int:

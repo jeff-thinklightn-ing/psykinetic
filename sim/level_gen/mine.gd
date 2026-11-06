@@ -54,7 +54,8 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	var map := template.copy()
 	Tools.clear_outside(map, anchors)
 	var carved: Dictionary[Vector2i, bool] = {}
-	var plan := {"carved": carved, "levels": {}, "bays": [], "galleries": {}, "track": {}, "decor": [], "entities": []}
+	var plan := {"carved": carved, "levels": {}, "bays": [], "galleries": {}, "track": {}, "decor": [], "entities": [],
+		"buildings": [], "carvings": [], "kept": {}}
 	var nodes: Array[Dictionary] = []
 	for anchor: Dictionary in anchors:
 		var exits := _exits(map, anchors, anchor["rect"])
@@ -80,8 +81,9 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	_track(map, anchors, rng, plan)
 	_arches(map, anchors, plan)
 	_beams(map, plan)
-	_lamps(map, anchors, plan)
+	_lamps(map, anchors, plan, config)
 	_monsters(map, anchors, config, rng, plan)
+	_sights(map, anchors, config, rng, plan)
 	_fill_bays(map, anchors, rng, plan)
 	var levels: Dictionary = plan["levels"]
 	for cell: Vector2i in map.cells:
@@ -93,7 +95,14 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 				map.heights.erase(cell)
 	map.extras["decor"] = plan["decor"]
 	map.extras["entities"] = plan["entities"]
+	map.extras["rows"] = {"buildings": plan["buildings"], "carvings": plan["carvings"]}
 	return map
+
+
+## The generation's rows Regen adds by section (790 amended (3)):
+## the windlass (buildings) and the shrine's look (carvings).
+static func rows_of(map: LevelMap) -> Dictionary:
+	return (map.extras.get("rows", {}) as Dictionary).duplicate(true)
 
 
 ## The decor rows the generation laid (Level.decor_from's [x, y, dx, dy,
@@ -592,13 +601,19 @@ static func _beams(map: LevelMap, plan: Dictionary) -> void:
 ## Lamps on the walls, LAMP_APART from another (and from the anchors'
 ## own): a floor cell at the tunnel's level with a wall on a side, its first
 ## walled side the lamp's; the cell marked "lantern" (environment's light).
-static func _lamps(map: LevelMap, anchors: Array, plan: Dictionary) -> void:
+static func _lamps(map: LevelMap, anchors: Array, plan: Dictionary, config: Dictionary = {}) -> void:
+	# The block's "dark" spots ({at, radius}; Skeech's way in, enemy-ai):
+	# no lamp laid within radius of one.
+	var dark: Array = config.get("dark", [])
+	var in_dark := func(cell: Vector2i) -> bool:
+		return dark.any(func(spot: Dictionary) -> bool:
+			return Tools.distance(cell, Vector2i(int(spot["at"][0]), int(spot["at"][1]))) <= int(spot.get("radius", 6)))
 	var lamps: Array[Vector2i] = []
 	for cell: Vector2i in map.cells:
 		if map.cells[cell] == "lantern":
 			lamps.append(cell)
 	for cell in _floor_cells(map, anchors):
-		if plan["track"].has(cell) or plan["levels"].has(cell):
+		if plan["track"].has(cell) or plan["levels"].has(cell) or in_dark.call(cell):
 			continue
 		if lamps.any(func(other: Vector2i) -> bool: return Tools.distance(other, cell) < LAMP_APART):
 			continue
@@ -803,7 +818,7 @@ static func _fill_bays(map: LevelMap, anchors: Array, rng: RandomNumberGenerator
 		var walls: Array[Vector2i] = []
 		for cell: Vector2i in bay["cells"]:
 			var here := map.cell(cell)
-			if here.begins_with("monster_") or here in ["cart", "crate", "boulder"]:
+			if here.begins_with("monster_") or here in ["cart", "crate", "boulder"] or plan["kept"].has(cell):
 				held = true
 				break
 			for d in DIRECTIONS:
@@ -823,6 +838,133 @@ static func _fill_bays(map: LevelMap, anchors: Array, rng: RandomNumberGenerator
 		plan["carved"][at] = true
 
 
+## The bays' sights (790 amended (3), the coordinator's plan):
+## the miners' shrine (decor "miners_shrine", art-kit's wall piece, and its
+## "look" line, the block's "shrine_look") on a wall of the bay nearest the
+## middle of the walk to the chambers, and the windlass
+## (building.set_windlass, 2 x 1, solid) on the floor of another bay, the
+## one farthest from the shrine's, with two cells clear round it. Each lit:
+## a lamp within SIGHT_LIT cells, else one laid on a wall beside it. A bay
+## holding one is no empty bay (_fill_bays leaves it).
+const SIGHT_LIT := 4
+static func _sights(map: LevelMap, anchors: Array, config: Dictionary, rng: RandomNumberGenerator, plan: Dictionary) -> void:
+	var bays: Array = (plan["bays"] as Array).duplicate()
+	if bays.is_empty():
+		return
+	var mouth := Regen.entrance_of(config)
+	var routes := _routes(map, anchors, mouth)
+	var longest: Array = []
+	for path: Array in routes:
+		if path.size() > longest.size():
+			longest = path
+	var middle: Vector2i = longest[longest.size() / 2] if not longest.is_empty() else Vector2i(map.size / 2)
+	bays.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return Tools.distance(a["centre"], middle) < Tools.distance(b["centre"], middle))
+	var shrine_bay: Dictionary = {}
+	for bay: Dictionary in bays:
+		if _shrine(map, anchors, config, bay, plan):
+			shrine_bay = bay
+			break
+	var rest := bays.filter(func(bay: Dictionary) -> bool: return bay != shrine_bay)
+	if not shrine_bay.is_empty():
+		rest.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+			return Tools.distance(a["centre"], shrine_bay["centre"]) > Tools.distance(b["centre"], shrine_bay["centre"]))
+	# Last, the shrine's own bay, where no other has room.
+	if not shrine_bay.is_empty():
+		rest.append(shrine_bay)
+	for bay: Dictionary in rest:
+		if _windlass(map, anchors, bay, plan):
+			return
+	# Else a wide stretch of tunnel: every floor cell outside the anchors a
+	# bay of its own, the windlass two clear rows either side (the
+	# two-cell passage rule), nearest the walk's middle.
+	var floor: Array[Vector2i] = _floor_cells(map, anchors)
+	floor.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, middle) < Tools.distance(b, middle))
+	_windlass(map, anchors, {"cells": floor, "centre": middle}, plan, 2)
+
+
+## The shrine on a wall cell of [param bay]: floor with rock behind it on
+## exactly one side, no lamp, seam, monster or track on it, nearest the
+## bay's middle. Whether it was laid.
+static func _shrine(map: LevelMap, anchors: Array, config: Dictionary, bay: Dictionary, plan: Dictionary) -> bool:
+	var spots: Array[Vector2i] = []
+	spots.assign((bay["cells"] as Array).filter(func(cell: Vector2i) -> bool:
+		return map.cell(cell) == FLOOR and not plan["track"].has(cell) and not plan["levels"].has(cell) and _open_sides(map, cell) == 3))
+	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, bay["centre"]) < Tools.distance(b, bay["centre"]))
+	for cell in spots:
+		var wall := Vector2i.ZERO
+		for d in DIRECTIONS:
+			if not map.walkable(cell + d):
+				wall = d
+		if wall == Vector2i.ZERO or _holds_decor(plan, cell + wall) or _on_span(plan, cell) \
+				or plan["decor"].any(func(row: Array) -> bool: return row[0] == cell.x and row[1] == cell.y):
+			continue
+		if not _light(map, anchors, cell, bay, plan, [cell]):
+			continue
+		plan["decor"].append([cell.x, cell.y, wall.x, wall.y, "miners_shrine", 1])
+		plan["kept"][cell] = true
+		var look := str(config.get("shrine_look", ""))
+		if not look.is_empty():
+			plan["carvings"].append({"at": [cell.x, cell.y], "side": [wall.x, wall.y], "look": look})
+		return true
+	return false
+
+
+## The windlass on two floor cells of [param bay] along x, two cells clear
+## round it of anything but plain floor, nearest the bay's middle. Whether
+## it was laid.
+static func _windlass(map: LevelMap, anchors: Array, bay: Dictionary, plan: Dictionary, clear_rows := 1) -> bool:
+	var cells: Dictionary = {}
+	for cell: Vector2i in bay["cells"]:
+		cells[cell] = true
+	var spots: Array[Vector2i] = []
+	spots.assign(bay["cells"])
+	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, bay["centre"]) < Tools.distance(b, bay["centre"]))
+	for at in spots:
+		var clear := true
+		for dy in range(-clear_rows, clear_rows + 1):
+			for dx in range(-1, 3):
+				var near := at + Vector2i(dx, dy)
+				if not cells.has(near) or map.cell(near) != FLOOR or plan["track"].has(near) or plan["levels"].has(near) or plan["kept"].has(near) \
+						or _on_span(plan, near):
+					clear = false
+		if not clear or not _light(map, anchors, at, bay, plan, Level.rect_cells(Rect2i(at - Vector2i(1, 1), Vector2i(4, 3)))):
+			continue
+		plan["buildings"].append({"slot": "building.set_windlass", "at": [at.x, at.y], "facing": [0, 1], "variant": 1})
+		for dx in 2:
+			plan["kept"][at + Vector2i(dx, 0)] = true
+		return true
+	return false
+
+
+## A lamp within SIGHT_LIT of [param at], else one laid on the nearest wall
+## cell of [param bay] that takes one (none of [param avoid], the sight's
+## own cells). Whether [param at] is lit.
+static func _light(map: LevelMap, anchors: Array, at: Vector2i, bay: Dictionary, plan: Dictionary, avoid: Array = []) -> bool:
+	for cell: Vector2i in map.cells:
+		if map.cells[cell] == "lantern" and Tools.distance(cell, at) <= SIGHT_LIT:
+			return true
+	# Any floor beside a wall within reach, in the bay or the tunnel by it,
+	# outside the anchors.
+	var spots: Array[Vector2i] = []
+	for dy in range(-SIGHT_LIT, SIGHT_LIT + 1):
+		for dx in range(-SIGHT_LIT, SIGHT_LIT + 1):
+			var cell := at + Vector2i(dx, dy)
+			if map.cell(cell) == FLOOR and not plan["kept"].has(cell) and not plan["track"].has(cell) and not plan["levels"].has(cell) \
+					and not Level.in_anchors(anchors, cell) and _open_sides(map, cell) < 4:
+				spots.append(cell)
+	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, at) < Tools.distance(b, at))
+	for cell in spots:
+		if cell == at or cell in avoid or _on_span(plan, cell):
+			continue
+		for way in DIRECTIONS:
+			if not map.walkable(cell + way) and not _holds_decor(plan, cell + way):
+				map.set_cell(cell, "lantern")
+				plan["decor"].append([cell.x, cell.y, way.x, way.y, "mine_lamp", 1])
+				return true
+	return false
+
+
 ## Whether a seam cut at wall cell [param cell] would take a laid piece's
 ## wall: a lamp's (its cell and side), or a beam's or arch's, on the line it
 ## spans (mine_gen_test: the piece would fit no more and be left out).
@@ -835,6 +977,22 @@ static func _holds_decor(plan: Dictionary, cell: Vector2i) -> bool:
 			if off.x * side.y - off.y * side.x == 0:
 				return true
 		elif at + side == cell:
+			return true
+	return false
+
+
+## Whether floor [param cell] lies under a beam's or arch's span (on its
+## line, SPAN_NEAR cells of it at most): a sight or a lamp there would take
+## the span's floor and leave the piece fitting nowhere (mine_gen_test).
+const SPAN_NEAR := 6
+static func _on_span(plan: Dictionary, cell: Vector2i) -> bool:
+	for piece: Array in plan["decor"]:
+		if not str(piece[4]) in ["mine_beam", "mine_arch"]:
+			continue
+		var at := Vector2i(int(piece[0]), int(piece[1]))
+		var side := Vector2i(int(piece[2]), int(piece[3]))
+		var off := cell - at
+		if off.x * side.y - off.y * side.x == 0 and Tools.distance(cell, at) <= SPAN_NEAR:
 			return true
 	return false
 

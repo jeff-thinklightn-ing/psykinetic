@@ -182,6 +182,10 @@ func _check_monsters(generation: int, level: Dictionary, config: Dictionary) -> 
 		var kind := str(spec.get("kind", ""))
 		if kind.is_empty():
 			continue
+		# The chambers' own (790 amended (3)): each chief and his two,
+		# marked in the template's anchors, beside the block's "monsters".
+		if Level.in_anchors(config.get("anchors", []), spec["tile"]):
+			continue
 		counts[kind] = int(counts.get(kind, 0)) + 1
 		if mouth.grow(6).has_point(spec["tile"]):
 			near.append(spec["tile"])

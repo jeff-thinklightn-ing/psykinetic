@@ -9,7 +9,7 @@ extends Node
 ## relief changes. The key is written into the file's text, the rest of it
 ## as it was.
 
-const FOLDERS := ["res://levels/sample/", "res://levels/mine_look/"]
+const FOLDERS := ["res://levels/sample/", "res://levels/mine_look/", "res://levels/hollowfell/"]
 
 
 func _ready() -> void:

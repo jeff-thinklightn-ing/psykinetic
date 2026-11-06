@@ -166,7 +166,9 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2),
 	"building.sarcophagus": Vector2i(1, 2), "building.robbers_dig": Vector2i(2, 2), "tree.clawed": Vector2i(1, 1),
 	# castle_halls' cold forge (806 (c), art-kit's c7539ec7): its back to the wall.
-	"building.set_cold_forge": Vector2i(2, 1), "tree.great_oak": Vector2i(4, 4)}
+	"building.set_cold_forge": Vector2i(2, 1), "tree.great_oak": Vector2i(4, 4),
+	# Hollowfell's windlass over an old shaft (790 amended (3); art-kit 4bc722a8).
+	"building.set_windlass": Vector2i(2, 1)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -242,7 +244,7 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak", "building.set_windlass"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -262,7 +264,7 @@ const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "build
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
 	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
 	"building.bar_counter", "building.tap_rack", "building.tavern_table",
-	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak"]
+	"building.sarcophagus", "building.robbers_dig", "tree.clawed", "building.set_cold_forge", "tree.great_oak", "building.set_windlass"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -2247,6 +2249,8 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# castle_halls' relief hall (806 (c), art-kit's c7539ec7): a dwarven band at
 	# the forge in worn relief, its back to the wall; its words, if any, in "carvings".
 	"relief": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.carved_relief"},
+	# Hollowfell's miners' shrine (790 amended (3); art-kit 4bc722a8): its back to the drift's wall.
+	"miners_shrine": {"sits": "wall", "variants": 1, "front": "z", "inset": 0.5, "slot": "prop.set_miners_shrine"},
 	# The mine's (decision 769): an arch or a beam spans a way from wall to
 	# wall ("span"), art-kit's piece by the width it spans; track a cell a
 	# piece, faced the way it runs; a lamp hung on a wall.

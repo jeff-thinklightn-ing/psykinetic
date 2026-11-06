@@ -30,6 +30,14 @@
 		}
 	],
 	"entities": [
+		{"at": [82, 24], "named": "grull", "facing": [-1, 0], "idle": {"mode": "guard"}},
+		{"at": [85, 22], "facing": [-1, 0], "idle": {"mode": "guard"}},
+		{"at": [84, 26], "facing": [-1, 0], "idle": {"mode": "guard"}},
+		{"at": [92, 26], "props": {"cache": "hollowfell_cache", "cache_place": "the orc chief's hoard"}},
+		{"at": [71, 58], "named": "skeech", "facing": [1, 0], "idle": {"mode": "guard"}},
+		{"at": [73, 62], "facing": [0, -1], "idle": {"mode": "guard"}},
+		{"at": [76, 62], "facing": [0, -1], "idle": {"mode": "guard"}},
+		{"at": [73, 63], "props": {"cache": "hollowfell_cache", "cache_place": "the kobold chief's hoard"}},
 		{
 			"at": [
 				86,
@@ -172,14 +180,6 @@
 			1
 		],
 		[
-			71,
-			60,
-			-1,
-			0,
-			"mine_lamp",
-			1
-		],
-		[
 			78,
 			63,
 			0,
@@ -247,11 +247,76 @@
 		],
 		"loops": 0.25,
 		"ways": 4,
-		"held": ["dead_end", "loop", "purpose"]
+		"held": ["dead_end", "loop", "purpose", "door", "wrap"],
+		"prefer": ["spine"],
+		"dark": [{"at": [71, 58], "radius": 6}],
+		"shrine_look": "A worn stone miner squats in a niche in the wall, a lump of rust-red ore in its hands, rubbed smooth where they've touched it. Old tin tokens and cold candle stubs lie round a little iron lamp, long out, and a cup lies on its side."
 	},
 	"respawn_s": {
 		"imp": 600,
 		"sneak": 600,
 		"brute": 900
-	}
+	},
+	"ledges": [
+		{
+			"points": [
+				[
+					80.5,
+					23.5,
+					1.25,
+					1.25
+				],
+				[
+					80.5,
+					24.0,
+					1.5,
+					1.0
+				],
+				[
+					80.5,
+					25.0,
+					1.5,
+					1.0
+				],
+				[
+					80.5,
+					25.5,
+					1.25,
+					1.25
+				]
+			],
+			"up": "right",
+			"closed": false
+		},
+		{
+			"points": [
+				[
+					74.5,
+					56.5,
+					1.25,
+					1.25
+				],
+				[
+					75.0,
+					56.5,
+					1.5,
+					1.0
+				],
+				[
+					76.0,
+					56.5,
+					1.5,
+					1.0
+				],
+				[
+					76.5,
+					56.5,
+					1.25,
+					1.25
+				]
+			],
+			"up": "left",
+			"closed": false
+		}
+	]
 }
