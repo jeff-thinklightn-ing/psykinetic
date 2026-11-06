@@ -1943,6 +1943,7 @@ func _test_cache() -> void:
 	_test_find_window(host, chest)
 	_test_dungeon_caches(host, chest)
 	_test_coop_tomb(host, chest)
+	_test_coop_forge(host, chest)
 
 
 ## The co-op family tomb (crypt landing 2): a plate set in the host's zone
@@ -1981,7 +1982,7 @@ func _test_coop_tomb(host: Player, chest: Chest) -> void:
 	var kept_regen: Variant = _main._regen.get(zone_name)
 	_main._regen[zone_name] = {"generation": 1, "at_step": 0}
 	var solved: Array = []
-	var on_solved := func(zone: String, room: String, by: Array) -> void: solved.append([zone, room, by.size()])
+	var on_solved := func(zone: String, room: String, by: Array, _kind: String) -> void: solved.append([zone, room, by.size()])
 	_main.room_solved.connect(on_solved)
 	# Deeds alone: a companion there gains bond and needs of her own (813 amended (2)).
 	var rewards: int = _main.rewards_by_track.get("deed", 0)
@@ -2025,6 +2026,71 @@ func _test_coop_tomb(host: Player, chest: Chest) -> void:
 		World.items.end(uid, "gone")
 	World.add_gold(Net.player_id, gold - World.gold_of(Net.player_id), "test")
 	record.caches.erase(key)
+	each.plates = kept_plates
+	door.lock = was_lock
+	door.open = was_open
+	if kept_regen == null:
+		_main._regen.erase(zone_name)
+	else:
+		_main._regen[zone_name] = kept_regen
+
+## The cold forge woken (813 amended (4)): a plate set of kind "forge" (the
+## bellows and the lever) on two free cells three apart, its door one of
+## the zone's, locked to the plates. One body opens nothing; two wake it for
+## good: the shutter's door open, room_solved once with kind "forge", the
+## deed once and in voice's words; the tomb's state untouched. A later
+## comer (in no hold) is given no deed: the forge's is its wakers' alone.
+func _test_coop_forge(host: Player, chest: Chest) -> void:
+	print("\n== 813 amended (4): the cold forge woken, the bellows and the lever at once ==")
+	var zone_name := host.zone
+	var each: Zone = World.zones[zone_name]
+	var door: Door = null
+	for candidate: Door in World.get_doors():
+		if candidate.zone == zone_name:
+			door = candidate
+			break
+	var host_at := host.tile
+	var chest_at := chest.tile
+	var cells: Array[Vector2i] = []
+	for dy in range(-6, 7):
+		for dx in range(-6, 7):
+			var cell := host_at + Vector2i(dx, dy)
+			if cells.size() < 2 and World.is_walkable(cell) and World.is_free(cell) and cell != host_at \
+					and (cells.is_empty() or absi(cell.x - cells[0].x) + absi(cell.y - cells[0].y) >= 3):
+				cells.append(cell)
+	if door == null or cells.size() < 2:
+		_check(false, "the cold forge test finds a door and two free cells in the test room (%s, %s)" % [door, cells])
+		return
+	var was_open := door.open
+	var was_lock := door.lock
+	door.open = false
+	door.lock = Main.PLATE_LOCK
+	var kept_plates := each.plates
+	var forge := {"id": "forge", "kind": "forge", "cells": cells, "edge": door.key, "room": "forge_room", "pieces": ["bellows", "lever"]}
+	each.plates = [forge]
+	var kept_regen: Variant = _main._regen.get(zone_name)
+	_main._regen[zone_name] = {"generation": 1, "at_step": 0}
+	var solved: Array = []
+	var on_solved := func(zone: String, room: String, by: Array, kind: String) -> void: solved.append([zone, room, by.size(), kind])
+	_main.room_solved.connect(on_solved)
+	var rewards: int = _main.rewards_by_track.get("deed", 0)
+	World._relocate(host, cells[0])
+	_check(not World.plate_held(zone_name, "forge") and not door.open and solved.is_empty(), "the forge: one body at the bellows wakes nothing")
+	World._relocate(chest, cells[1])
+	_check(door.open and door.lock == "" and solved == [[zone_name, "forge_room", 2, "forge"]]
+		and _main.rewards_by_track.get("deed", 0) == rewards + 1 and "forge" in _main._regen[zone_name].get("solved", []),
+		"the bellows and the lever at once: the forge woken for good, room_solved with kind forge, the deed given (%s)" % [solved])
+	World._relocate(host, host_at)
+	World._relocate(host, cells[0])
+	_check(solved.size() == 1 and _main.rewards_by_track.get("deed", 0) == rewards + 1, "the forge: off and on again, woken and rewarded once")
+	World._relocate(host, host_at)
+	World._relocate(chest, chest_at)
+	# A later comer: no deed (the coordinator: the store's find, never the deed).
+	var state: Dictionary = _main._regen[zone_name]
+	state["solved_rewarded"] = []
+	_main._reward_solvers(zone_name, forge, [], state)
+	_check(_main.rewards_by_track.get("deed", 0) == rewards + 1, "the forge: a player who held nothing at the waking is given no deed")
+	_main.room_solved.disconnect(on_solved)
 	each.plates = kept_plates
 	door.lock = was_lock
 	door.open = was_open

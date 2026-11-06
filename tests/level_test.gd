@@ -4880,7 +4880,8 @@ func _test_castle_hold() -> void:
 		var tables := {}
 		for entity: Dictionary in config.get("entities", []):
 			var props: Dictionary = entity.get("props", {})
-			if not props.has("cache"):
+			# The forge's store (813 amended (4)): kept by its shutter, no guard's.
+			if not props.has("cache") or props.get("cache_place") == LABYRINTH.FORGE_PLACE:
 				continue
 			var at := Vector2i(int(entity["at"][0]), int(entity["at"][1]))
 			tables[str(props["cache"])] = true
@@ -4892,7 +4893,7 @@ func _test_castle_hold() -> void:
 			if (row.get("idle", {}) as Dictionary).get("mode", "") == "guard":
 				posts.append(Vector2i(int(row["at"][0]), int(row["at"][1])))
 		for entity: Dictionary in config.get("entities", []):
-			if (entity.get("props", {}) as Dictionary).has("cache"):
+			if (entity.get("props", {}) as Dictionary).has("cache") and entity["props"].get("cache_place") != LABYRINTH.FORGE_PLACE:
 				var spot := Vector2i(int(entity["at"][0]), int(entity["at"][1]))
 				if not posts.any(func(p: Vector2i) -> bool: return _cells_apart(p, spot) <= 3):
 					unguarded.append(spot)
@@ -4919,6 +4920,69 @@ func _test_castle_hold() -> void:
 		var refuge: Array = config.get("entities", []).filter(func(entity: Dictionary) -> bool: return (entity.get("props", {}) as Dictionary).get("role", "") == "refuge")
 		_check(enter > 0 and watched and refuge.size() == 2,
 				"castle_halls generation %d: the forge (a refuge, its hoard tagged so) is reached past a guard on its approach (%d steps)" % [generation, enter])
+		# 813 amended (4): off in play till its pieces and flare are in.
+		var forge_sets: Array = config.get("plates", []).filter(func(plate: Dictionary) -> bool: return plate.get("kind") == "forge")
+		_check(forge_sets.size() == (1 if block.get("coop_forge", false) else 0),
+				"castle_halls generation %d: the cold forge's set laid only with the block's coop_forge on (%s)" % [generation, block.get("coop_forge", false)])
+	# The cold forge woken, switched on (as it will be): its set in each.
+	for generation in [1, 2]:
+		var prepared := Regen.prepare("castle_halls").duplicate()
+		prepared["config"] = (prepared["config"] as Dictionary).duplicate(true)
+		prepared["config"]["coop_forge"] = true
+		prepared["config"]["forge_cache"] = "forge_cache"
+		var made := Regen.generate_prepared(prepared, generation)
+		if made.is_empty():
+			_check(false, "castle_halls generation %d with the cold forge on is made" % generation)
+			continue
+		var map := LevelMap.from_image(made["layout"], made["config"])
+		var monsters: Array[Vector2i] = []
+		for cell: Vector2i in map.cells:
+			if str(map.cells[cell]).begins_with("monster_"):
+				monsters.append(cell)
+		_check_cold_forge(generation, made, prepared["config"], monsters)
+
+
+## The cold forge woken (813 amended (4)) in castle_halls generation
+## [param generation] ([param made]): one plate set of kind "forge" in the
+## cold forge's room, the bellows beside the forge and the lever FORGE_APART
+## off at least, each FORGE_NEED; no monster on either; a cart within the
+## checker's reach; the shutter's door into the store, its chest the
+## block's forge_cache with the store's place; the mechanism's three clues;
+## and no coop fault.
+func _check_cold_forge(generation: int, made: Dictionary, block: Dictionary, monsters: Array[Vector2i]) -> void:
+	var config: Dictionary = made["config"]
+	var level := Level.parse(made["layout"], made["height"], config)
+	var sets: Array = level["terrain"].get("plates", []).filter(func(plate: Dictionary) -> bool: return plate.get("kind") == "forge")
+	var room := ""
+	for laid: Dictionary in config.get("laid_rooms", []):
+		if laid.get("use") == "cold_forge":
+			room = str(laid["id"])
+	if sets.size() != 1:
+		_check(false, "castle_halls generation %d: one forge plate set (%d)" % [generation, sets.size()])
+		return
+	var plate: Dictionary = sets[0]
+	var cells: Array = plate["cells"]
+	var forge: Variant = plate.get("forge")
+	var sides := Terrain.edge_cells(plate["edge"])
+	var store: Array = config.get("entities", []).filter(func(entity: Dictionary) -> bool:
+		var at := Vector2i(int(entity["at"][0]), int(entity["at"][1]))
+		return at in sides and (entity.get("props", {}) as Dictionary).get("cache") == block.get("forge_cache") \
+			and entity["props"].get("cache_place") == LABYRINTH.FORGE_PLACE)
+	var forge_rect := Rect2i()
+	for building: Dictionary in config.get("buildings", []):
+		if building["slot"] == "building.set_cold_forge":
+			forge_rect = Level.building_rect(building)
+	var beside: bool = forge is Vector2i and forge_rect.position == forge and forge_rect.grow(1).has_point(cells[0]) and not forge_rect.has_point(cells[0])
+	var gap: Vector2i = (cells[1] as Vector2i) - (cells[0] as Vector2i)
+	var mechanism: Array = level.get("secrets", []).filter(func(secret: Dictionary) -> bool:
+		return secret.get("kind") == "mechanism" and secret.get("plates") == "forge" and secret.get("room") == room)
+	var faults: Array = LAYOUT_SENSE.check(level, config.get("laid_rooms", []), Regen.layout_options(block)).filter(func(fault: Dictionary) -> bool:
+		return fault["rule"] == "coop")
+	_check(plate["room"] == room and plate.get("pieces") == ["bellows", "lever"] and int(config["plates"][0].get("need", 0)) == LABYRINTH.FORGE_NEED
+			and beside and absi(gap.x) + absi(gap.y) >= LABYRINTH.FORGE_APART and not cells.any(func(cell: Vector2i) -> bool: return cell in monsters)
+			and store.size() == 1 and mechanism.size() == 1 and (mechanism[0]["clues"] as Array).size() == 3 and faults.is_empty(),
+			"castle_halls generation %d: the cold forge woken: bellows by the forge, the lever %d off, no monster on them, the shutter on its store (%s), three clues, no coop fault (%s)"
+			% [generation, absi(gap.x) + absi(gap.y), store.size(), faults])
 
 
 ## Hollowfell phase B (790 amended (3), the coordinator's plan):

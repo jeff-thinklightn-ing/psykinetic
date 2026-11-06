@@ -1077,6 +1077,12 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 		room_cells = _deepest_first(depth, room_cells)
 	var chest_spots: Array[Vector2i] = ends.duplicate()
 	chest_spots.append_array(corners)
+	# 813 amended (4): nothing laid on the forge's plates or by its cart.
+	var plated: Dictionary = map.extras.get("plate_cells", {})
+	if not plated.is_empty():
+		room_cells.assign(room_cells.filter(func(cell: Vector2i) -> bool: return not plated.has(cell)))
+		corridor_cells.assign(corridor_cells.filter(func(cell: Vector2i) -> bool: return not plated.has(cell)))
+		chest_spots.assign(chest_spots.filter(func(cell: Vector2i) -> bool: return not plated.has(cell)))
 	chest_spots.append_array(room_cells)
 	_lay(map, anchors, "chest", int(config.get("chests", 0)), chest_spots)
 	_lay(map, anchors, "crate", int(config.get("crates", 0)), room_cells)
@@ -1198,7 +1204,7 @@ const GUARD_NEAR := 3
 ## left for _markers (chests and monsters it laid taken off).
 static func _hold(map: LevelMap, anchors: Array, rooms: Array[Dictionary], nodes: Array[Dictionary], config: Dictionary,
 		rng: RandomNumberGenerator) -> Dictionary:
-	var plan := {"buildings": [], "decor": [], "entities": [], "carvings": [], "laid_rooms": []}
+	var plan := {"buildings": [], "decor": [], "entities": [], "carvings": [], "laid_rooms": [], "plates": [], "secrets": []}
 	var start := Vector2i.ZERO
 	var entrance := str(config.get("entrance", ""))
 	for node in nodes:
@@ -1252,6 +1258,9 @@ static func _hold(map: LevelMap, anchors: Array, rooms: Array[Dictionary], nodes
 				chests -= 1
 		elif use == "cold_forge":
 			main = _against_wall(map, room, kept, "building.set_cold_forge", 2, plan, 1)
+			# 813 amended (4): the cold forge woken, two at once.
+			if main != null:
+				_coop_forge(map, room, kept, config, plan)
 		elif use == "relief_hall":
 			main = _on_wall(map, room, kept, "relief", plan, looks.pop_front() if not looks.is_empty() else {})
 			if not words.is_empty():
@@ -1339,6 +1348,149 @@ static func _hold(map: LevelMap, anchors: Array, rooms: Array[Dictionary], nodes
 	left["chests"] = chests
 	left["monsters"] = left_monsters
 	return left
+
+
+# --- The cold forge woken (813 amended (4)) ------------------------------------------------
+
+## The cold forge woken (813 amended (4), the coordinator's approval of
+## coop_forge.md): the hold's second co-op room, 813's plates in the cold
+## forge's room. A treadle bellows on a cell beside the forge and an iron
+## lever on a cell against a far wall (FORGE_APART apart at least), held at
+## once (World.plate_held, each FORGE_NEED kg at least: physics' "need", so
+## an imp or an empty crate holds neither) wake the forge (Main's solve:
+## the shutter's door opened for the generation; the client lights the
+## forge from it). The shutter is a door on the edge into an alcove behind
+## the wall beside the forge (a sealed store; its chest the block's
+## "forge_cache", 808: each player's find, the latecomer's too). A cart a
+## cell off the bellows, the cell past it free to push from: a lone
+## player's stand-in. Written as level.json "plates" {id, kind "forge",
+## cells, pieces, need, forge, door, room} and a "secrets" row of kind
+## "mechanism" (voice's three clues, vague to plain; found once the set is
+## solved, Main.secret_found). Laid only where the block says "coop_forge":
+## true (the coordinator: off in play till art-kit's pieces and
+## environment's flare are in, then switched on with a still). Whether it
+## was laid.
+const FORGE_APART := 3
+const FORGE_NEED := 50
+## How far from the forge the store may be when its own wall has no room.
+const FORGE_STORE_NEAR := 6
+const FORGE_CLUES: Array[String] = ["The forge is cold, but its bellows still look sound.",
+	"There's an iron handle on the far wall, set like a lever.",
+	"It would take one working the bellows and another holding the lever down, both at once."]
+## The store's place line (lore: no "smith" a player reads).
+const FORGE_PLACE := "the forge's sealed store"
+static func _coop_forge(map: LevelMap, room: Dictionary, kept: Dictionary, config: Dictionary, plan: Dictionary) -> bool:
+	var cache := str(config.get("forge_cache", ""))
+	if not config.get("coop_forge", false) or cache.is_empty() or (plan["buildings"] as Array).is_empty():
+		return false
+	var forge: Dictionary = plan["buildings"].back()
+	if str(forge.get("slot", "")) != "building.set_cold_forge":
+		return false
+	var rect: Rect2i = Level.building_rect(forge)
+	var inward := Vector2i(int(forge["facing"][0]), int(forge["facing"][1]))
+	var back := -inward
+	var run := Vector2i(absi(back.y), absi(back.x))
+	var lines := door_line(map)
+	var cells: Dictionary = room["cells"]
+	var free := func(cell: Vector2i) -> bool:
+		return cells.has(cell) and map.cell(cell) == FLOOR and not lines.has(cell) and not rect.has_point(cell)
+	var first := rect.position
+	var last := rect.end - Vector2i.ONE
+	# The store: in the forge's wall beside it, else (that wall backed by a
+	# way) in the room's nearest other wall, FORGE_STORE_NEAR at most.
+	var spots: Array = []
+	for step in range(1, 5):
+		for side: int in [1, -1]:
+			spots.append([(last if side > 0 else first) + run * side * step, back])
+	var others: Array = []
+	for cell in Tools.sorted_cells(cells):
+		for way in DIRECTIONS:
+			if way != back and not cells.has(cell + way) and Tools.distance(cell, first) <= FORGE_STORE_NEAR:
+				others.append([cell, way])
+	others.sort_custom(func(a: Array, b: Array) -> bool: return Tools.distance(a[0], first) < Tools.distance(b[0], first))
+	spots.append_array(others)
+	for spot: Array in spots:
+		var before: Vector2i = spot[0]
+		var wall: Vector2i = spot[1]
+		var alcove := before + wall
+		if not free.call(before) or map.walkable(alcove) or map.edge(Terrain.edge_key(before, wall)) == "door" \
+				or not _alcove_fits(map, alcove, before):
+			continue
+		var pair := _forge_pair(map, room, kept, rect, before, alcove, free)
+		if pair.is_empty():
+			continue
+		map.set_cell(alcove, "chest")
+		for direction in DIRECTIONS:
+			map.set_edge(Terrain.edge_key(alcove, direction), "door" if alcove + direction == before else "wall")
+		plan["entities"].append({"at": [alcove.x, alcove.y], "props": {"cache": cache, "cache_place": FORGE_PLACE}})
+		map.set_cell(pair["cart"], "cart")
+		var plates: Dictionary = map.extras.get("plate_cells", {})
+		for cell: Vector2i in [before, pair["cart"], pair["from"], pair["bellows"], pair["lever"]]:
+			kept[cell] = true
+			plates[cell] = true
+		map.extras["plate_cells"] = plates
+		var bellows: Vector2i = pair["bellows"]
+		var lever: Vector2i = pair["lever"]
+		plan["plates"].append({"id": "forge", "kind": "forge", "cells": [[bellows.x, bellows.y], [lever.x, lever.y]],
+			"pieces": ["bellows", "lever"], "need": FORGE_NEED, "forge": [rect.position.x, rect.position.y],
+			"door": [before.x, before.y, wall.x, wall.y], "room": room["id"]})
+		plan["secrets"].append({"id": "forge_mechanism", "kind": "mechanism", "plates": "forge", "room": room["id"],
+			"clues": FORGE_CLUES.duplicate()})
+		room["coop"] = true
+		room["things"] = int(room.get("things", 0)) + 3
+		return true
+	return false
+
+
+## The forge's bellows, lever and cart: the bellows on a free cell beside
+## [param rect] (the forge), the end away from the store's [param before]
+## first, with a cell off it for the cart and the one past that to push
+## from; the lever on a free cell against a wall, out of [param kept], the
+## farthest from the bellows and FORGE_APART at least: {bellows, lever,
+## cart, from}, or {}.
+static func _forge_pair(map: LevelMap, room: Dictionary, kept: Dictionary, rect: Rect2i, before: Vector2i, alcove: Vector2i,
+		free: Callable) -> Dictionary:
+	var ring: Array[Vector2i] = []
+	for cell in Level.rect_cells(rect.grow(1)):
+		if rect.has_point(cell) or (cell.x != clampi(cell.x, rect.position.x, rect.end.x - 1) and cell.y != clampi(cell.y, rect.position.y, rect.end.y - 1)):
+			continue
+		if free.call(cell) and cell != before:
+			ring.append(cell)
+	ring.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, before) > Tools.distance(b, before))
+	var taken := [before, alcove]
+	for bellows in ring:
+		for direction in DIRECTIONS:
+			var cart := bellows + direction
+			var from := cart + direction
+			if not free.call(cart) or not free.call(from) or cart in taken or from in taken:
+				continue
+			var best: Variant = null
+			for cell in Tools.sorted_cells(room["cells"]):
+				if not free.call(cell) or kept.has(cell) or cell in taken or cell in [bellows, cart, from]:
+					continue
+				var gap := cell - bellows
+				if absi(gap.x) + absi(gap.y) < FORGE_APART or Tools.distance(cell, before) < 2:
+					continue
+				var walled := false
+				for way in DIRECTIONS:
+					walled = walled or (not map.walkable(cell + way) and not room["cells"].has(cell + way))
+				if walled and (best == null or Tools.distance(cell, bellows) > Tools.distance(best, bellows)):
+					best = cell
+			if best != null:
+				return {"bellows": bellows, "lever": best, "cart": cart, "from": from}
+	return {}
+
+
+## Whether [param alcove] is rock off the map's edge with no way beside it
+## but [param before], the cell it opens off (the crypt's vault's test).
+static func _alcove_fits(map: LevelMap, alcove: Vector2i, before: Vector2i) -> bool:
+	if map.walkable(alcove) or alcove.x < 1 or alcove.y < 1 or alcove.x >= map.size.x - 1 or alcove.y >= map.size.y - 1:
+		return false
+	for direction in DIRECTIONS:
+		var near := alcove + direction
+		if near != before and map.walkable(near):
+			return false
+	return true
 
 
 ## Steps from [param start] over walkable floor, through doors, never
@@ -1680,7 +1832,7 @@ static func _hold_guards(map: LevelMap, anchors: Array, room: Dictionary, kind: 
 	var focus: Vector2i = room.get("chest", room.get("main", rect.position + rect.size / 2))
 	var spots: Array[Vector2i] = []
 	for cell in Tools.sorted_cells(room["cells"]):
-		if _open_floor(map, cell) and not _beside_anchor(anchors, cell):
+		if _open_floor(map, cell) and not _beside_anchor(anchors, cell) and not map.extras.get("plate_cells", {}).has(cell):
 			spots.append(cell)
 	spots.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, focus) < Tools.distance(b, focus))
 	if room.has("chest"):

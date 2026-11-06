@@ -10108,6 +10108,9 @@ const LOOSE_NICHE_LINE := "The fresh mortar crumbles under your hands, and the n
 ## Voice's float and Gains words for a co-op tomb opened (804's path).
 const TOMB_OPENED := "a sealed tomb opened"
 const TOMB_OPENED_WORDS := "opened a sealed tomb"
+## Voice's float and Gains words for a cold forge woken (813 amended (4)).
+const FORGE_WOKEN := "a cold forge woken"
+const FORGE_WOKEN_WORDS := "woke a cold forge"
 
 ## The co-op tomb's state outside a regenerating level's (a test's level):
 ## zone -> {solved, solved_rewarded}.
@@ -10118,8 +10121,9 @@ var _plain_solved := {}
 ## [param room] its plates open into, [param by] what held the plates (the
 ## players, companions, monsters or boulders on them, and a boulder's
 ## pusher beside it). Once a room a generation. Companions hang her
-## reaction, memory and bond on it.
-signal room_solved(zone: String, room: String, by: Array)
+## reaction, memory and bond on it. [param kind] the set's (813 amended
+## (4)): "tomb" or "forge".
+signal room_solved(zone: String, room: String, by: Array, kind: String)
 
 
 ## The co-op tombs' state of [param zone_name] (its regen state, saved
@@ -10175,8 +10179,9 @@ func _solve_plates(zone_name: String, plate: Dictionary, mover: GridEntity) -> v
 					by.append(pusher)
 					break
 	World.enter(was)
-	print("[crypt] %s: %s opened by %d holding" % [zone_name, plate["room"], by.size()])
-	room_solved.emit(zone_name, str(plate["room"]), by)
+	var kind := str(plate.get("kind", "tomb"))
+	print("[%s] %s: %s opened by %d holding" % ["crypt" if kind == "tomb" else kind, zone_name, plate["room"], by.size()])
+	room_solved.emit(zone_name, str(plate["room"]), by, kind)
 	_reward_solvers(zone_name, plate, by, state)
 
 
@@ -10190,10 +10195,14 @@ func _reward_solvers(zone_name: String, plate: Dictionary, by: Array, state: Dic
 		var body := _player_of_id(player_id)
 		if body == null or player_id in rewarded:
 			continue
-		if not body in by and Level.laid_room_at(laid, body.tile) != str(plate["room"]):
+		# The cold forge's deed is its wakers' alone (the coordinator: a
+		# later comer has the store's find, never the deed).
+		var forge := str(plate.get("kind", "")) == "forge"
+		if not body in by and (forge or Level.laid_room_at(laid, body.tile) != str(plate["room"])):
 			continue
 		rewarded.append(player_id)
-		reward(player_id, {"track": "deed", "amount": 1, "of": TOMB_OPENED, "words": TOMB_OPENED_WORDS, "at": cell})
+		reward(player_id, {"track": "deed", "amount": 1, "of": FORGE_WOKEN if forge else TOMB_OPENED,
+			"words": FORGE_WOKEN_WORDS if forge else TOMB_OPENED_WORDS, "at": cell})
 	state["solved_rewarded"] = rewarded
 
 
@@ -10234,7 +10243,10 @@ func _fish_changed(by: GridEntity, state: StringName, _uid: int) -> void:
 			_bond(_record_of(pet), "fished", "went fishing with you")
 
 
-func _tomb_opened(zone_name: String, room: String, by: Array) -> void:
+func _tomb_opened(zone_name: String, room: String, by: Array, kind := "tomb") -> void:
+	# The forge's companion side is companions' (813 amended (5)).
+	if kind != "tomb":
+		return
 	for pet: Companion in _companions.values():
 		if not is_instance_valid(pet) or pet.zone != zone_name or not is_instance_valid(pet.keeper):
 			continue
@@ -10257,6 +10269,9 @@ func secret_found(zone_name: String, id: String, player_id: String) -> bool:
 		return false
 	for secret: Dictionary in Level.secrets_of(zone_name):
 		if secret["id"] == id:
+			# A mechanism (813 amended (4)): found once its set is solved.
+			if str(secret.get("kind", "")) == "mechanism":
+				return str(secret["plates"]) in _solved_state(zone_name).get("solved", [])
 			return _secret_key(zone_name, secret) in record.caches
 	return false
 

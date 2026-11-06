@@ -2491,14 +2491,22 @@ static func plates_from(config: Dictionary, terrain: Dictionary, warnings: Array
 		if cells.size() != (entry["cells"] as Array).size() or cells.size() < 2 or int(terrain["edges"].get(key, Terrain.Edge.OPEN)) != Terrain.Edge.DOOR:
 			warnings.append("the plate set %s has a plate off the floor, fewer than two, or no door on its edge: left out" % [entry.get("id", "")])
 			continue
-		var plate := {"id": str(entry.get("id", "plates_%d" % out.size())), "cells": cells, "edge": key, "room": str(entry.get("room", ""))}
+		var made := {"id": str(entry.get("id", "plates_%d" % out.size())), "cells": cells, "edge": key, "room": str(entry.get("room", "")),
+			"kind": str(entry.get("kind", "tomb"))}
+		# 813 amended (4), the cold forge woken: what stands on each plate
+		# (the bellows, the lever; the client's pieces) and the forge it wakes.
+		if entry.get("pieces") is Array:
+			made["pieces"] = (entry["pieces"] as Array).map(func(piece: Variant) -> String: return str(piece))
+		var forge: Variant = _tile(entry.get("forge"))
+		if forge != null:
+			made["forge"] = forge
 		if entry.has("need"):
 			var need: Variant = _plate_need(entry["need"], cells.size())
 			if need == null:
 				warnings.append("the plate set %s has a need that is not a weight in kg (a number, or one per cell): left out" % [entry.get("id", "")])
 				continue
-			plate["need"] = need
-		out.append(plate)
+			made["need"] = need
+		out.append(made)
 	return out
 
 
@@ -2536,6 +2544,15 @@ static func secrets_from(config: Dictionary, terrain: Dictionary, warnings: Arra
 	for niche: Dictionary in terrain.get("niches", []):
 		niches[niche["edge"]] = true
 	for entry: Variant in listed:
+		# 813 amended (4): a mechanism's clues (the cold forge's), on no
+		# niche, nothing to search: found once its plate set is solved.
+		if entry is Dictionary and str(entry.get("kind", "")) == "mechanism":
+			var hints: Array[String] = []
+			for clue: Variant in entry.get("clues", []):
+				hints.append(str(clue))
+			out.append({"id": str(entry.get("id", "secret_%d" % out.size())), "kind": "mechanism", "plates": str(entry.get("plates", "")),
+				"cell": Vector2i(-1, -1), "room": str(entry.get("room", "")), "cache": "", "clues": hints})
+			continue
 		var at: Variant = _tile(entry.get("at")) if entry is Dictionary else null
 		var side: Variant = _tile(entry.get("side")) if entry is Dictionary else null
 		if at == null or side == null or not niches.has(Terrain.edge_key(at, side)):

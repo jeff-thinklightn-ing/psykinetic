@@ -337,6 +337,19 @@ const VAULT_SINK_SECONDS := 1.3
 const PLATE_DOWN := 0.03
 const WALL_SINK_SOUND := "sfx.wall_sink"
 const PLATE_CLICK_SOUND := "sfx.plate_click"
+## The cold forge woken (813 amended (4)): its store's stone shutter on the
+## set's door edge (art-kit's, its "shutter" part sunk VAULT_SINK as it
+## opens, as the vault's bricks; theirs till it is in), each plate's piece
+## by the set's "pieces" (the bellows' treadle down, its nozzle at the
+## forge; the lever's handle swung LEVER_DOWN forward and down, its back to
+## the wall; while a body stands there; the floor plate till theirs), and
+## the forge lit from the shutter's door (its "fire" part shown;
+## environment's light and sparks on its "hearth", _show_forge).
+const FORGE_SHUTTER_SLOT := "wall.stone.forge_shutter"
+const FORGE_PIECES := {"bellows": ["building.forge_bellows", "treadle", "sfx.bellows_wheeze"],
+	"lever": ["building.forge_lever", "handle", "sfx.lever_clank"]}
+const LEVER_DOWN := deg_to_rad(150.0)
+const FORGE_WHOOMPH_SOUND := "sfx.forge_whoomph"
 ## A dais indoors (580 step 3, terrain's side; the Hall of Fallen Souls):
 ## an edge between two floors exactly one level apart is art-kit's
 ## dais.edge in place of a cliff face, dais.steps where the low cell is a
@@ -14317,14 +14330,27 @@ static func plated_edges(terrain: Dictionary) -> Dictionary[Vector3i, Vector2i]:
 ## 2): wall.crypt.vault_bricked, +x toward the room ([param out]), shown
 ## shut or sunk as its Door is (_sync_doors, _show_vault).
 func _add_vault(key: Vector3i, out: Vector2i) -> void:
-	var holder := ArtKit.instance(VAULT_SLOT)
+	var set_of := plate_set_on(_terrain, key)
+	var forge := str(set_of.get("kind", "")) == "forge"
+	var holder := ArtKit.instance(FORGE_SHUTTER_SLOT if forge and ArtKit.has(FORGE_SHUTTER_SLOT) else VAULT_SLOT)
 	holder.name = "Vault_%d_%d_%s" % [key.x, key.y, "e" if key.z == Terrain.EAST else "s"]
 	holder.position = _edge_midpoint(key) + Vector3(0.0, _edge_base(key), 0.0)
 	holder.rotation.y = atan2(-float(out.y), float(out.x))
 	_room.add_child(holder)
 	_walls[key] = holder
-	_vaults[key] = [holder.find_child("bricks", true, false) as Node3D, -1]
+	var shutter := holder.find_child("shutter", true, false) as Node3D
+	# [part, shown, the forge's cell or null].
+	_vaults[key] = [shutter if shutter != null else holder.find_child("bricks", true, false) as Node3D, -1,
+		set_of.get("forge") if forge else null]
 	_doors_due[key] = true
+
+
+## The plate set of [param terrain] whose door is on edge [param key], or {}.
+static func plate_set_on(terrain: Dictionary, key: Vector3i) -> Dictionary:
+	for plate: Dictionary in terrain.get("plates", []):
+		if plate["edge"] == key:
+			return plate
+	return {}
 
 
 ## The bricked vault on [param key] shut or [param opened]: its bricks up,
@@ -14334,14 +14360,17 @@ func _show_vault(key: Vector3i, opened: bool) -> void:
 	var parts: Array = _vaults[key]
 	var sinks: bool = opened and int(parts[1]) == 0
 	parts[1] = 1 if opened else 0
+	if parts.size() > 2 and parts[2] is Vector2i:
+		_light_forge(parts[2], opened, sinks)
 	var bricks := parts[0] as Node3D
 	if bricks == null:
 		return
+	var goes := -VAULT_SINK
 	var moving := bricks.get_meta(&"tween") as Tween if bricks.has_meta(&"tween") else null
 	if moving != null and moving.is_valid():
 		moving.kill()
 	if not sinks:
-		bricks.position.y = -VAULT_SINK if opened else 0.0
+		bricks.position.y = goes if opened else 0.0
 		bricks.visible = not opened
 		return
 	var sound := WALL_SINK_SOUND if SoundKit.has(WALL_SINK_SOUND) else SLAB_SOUND
@@ -14349,8 +14378,29 @@ func _show_vault(key: Vector3i, opened: bool) -> void:
 		sfx.play(sound, bricks.global_position + Vector3.UP)
 	var tween := bricks.create_tween()
 	bricks.set_meta(&"tween", tween)
-	tween.tween_property(bricks, "position:y", -VAULT_SINK, VAULT_SINK_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tween.tween_property(bricks, "position:y", goes, VAULT_SINK_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
 	tween.tween_callback(bricks.hide)
+
+
+## The cold forge at [param cell] (813 amended (4)) lit or cold: its slot's
+## "fire" part shown while [param lit], and environment's light and sparks
+## (_show_forge, theirs: a flare as it [param catching], from cold as drawn;
+## a later comer or a reload sees it steady), the catch sounded.
+func _light_forge(cell: Vector2i, lit: bool, catching: bool) -> void:
+	var forge: Node3D = null
+	for building: Dictionary in _buildings:
+		if (building["rect"] as Rect2i).has_point(cell) and is_instance_valid(building["node"]):
+			forge = building["node"]
+			break
+	if forge == null:
+		return
+	var fire := forge.find_child("fire", true, false) as Node3D
+	if fire != null:
+		fire.visible = lit
+	if has_method("_show_forge"):
+		call("_show_forge", forge, lit, catching)
+	if catching and SoundKit.has(FORGE_WHOOMPH_SOUND):
+		sfx.play(FORGE_WHOOMPH_SOUND, forge.global_position + Vector3.UP)
 
 
 ## The co-op tombs' plates (terrain "plates"): building.floor_plate on
@@ -14358,14 +14408,33 @@ func _show_vault(key: Vector3i, opened: bool) -> void:
 func _add_plates() -> void:
 	_plates_shown.clear()
 	for plate: Dictionary in _terrain.get("plates", []):
-		for k in (plate["cells"] as Array).size():
-			var cell: Vector2i = plate["cells"][k]
-			var piece := ArtKit.instance(PLATE_SLOT)
+		var pieces: Array = plate.get("pieces", [])
+		for i in (plate["cells"] as Array).size():
+			var cell: Vector2i = plate["cells"][i]
+			var what: Array = FORGE_PIECES.get(str(pieces[i]) if i < pieces.size() else "", [])
+			var own := not what.is_empty() and ArtKit.has(str(what[0]))
+			var piece := ArtKit.instance(str(what[0]) if own else PLATE_SLOT)
 			piece.name = "Plate_%d_%d" % [cell.x, cell.y]
 			piece.position = Vector3(cell.x, _height_in(cell, Vector2(cell)), cell.y)
+			# The lever, a wall piece: its back (-z) to the wall beside it. The
+			# bellows: its nozzle (+x) at the forge beside it.
+			if own and str(pieces[i]) == "lever":
+				for way: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+					if not (cell + way) in _terrain["floor"]:
+						piece.rotation.y = atan2(-float(way.x), -float(way.y))
+						break
+			elif own and str(pieces[i]) == "bellows":
+				for building: Dictionary in _drawn_buildings():
+					for way: Vector2i in [Vector2i(0, 1), Vector2i(1, 0), Vector2i(0, -1), Vector2i(-1, 0)]:
+						if str(building.get("slot", "")) == "building.set_cold_forge" and (building["rect"] as Rect2i).has_point(cell + way):
+							piece.rotation.y = atan2(-float(way.y), float(way.x))
 			_room.add_child(piece)
-			_plates_shown.append({"cell": cell, "part": piece.find_child("plate", true, false), "down": false, "at": piece.position,
-				"need": World.plate_need(plate, k)})
+			var part: Node3D = piece.find_child(str(what[1]), true, false) as Node3D if own else null
+			if part == null:
+				part = piece.find_child("plate", true, false) as Node3D
+			_plates_shown.append({"cell": cell, "part": part, "down": false, "at": piece.position,
+				"need": World.plate_need(plate, i), "swings": own and str(what[1]) == "handle",
+				"sound": str(what[2]) if not what.is_empty() and SoundKit.has(str(what[2])) else PLATE_CLICK_SOUND})
 
 
 ## Each plate's slab down while a body stands on its cell (the bodies'
@@ -14382,9 +14451,15 @@ func _sync_plates() -> void:
 		shown["down"] = down
 		var part := shown["part"] as Node3D
 		if is_instance_valid(part):
-			part.position.y = -PLATE_DOWN if down else 0.0
-		if down and SoundKit.has(PLATE_CLICK_SOUND):
-			sfx.play(PLATE_CLICK_SOUND, shown["at"])
+			if shown.get("swings", false):
+				# Art-kit's hinge range [0, 150]: positive about x swings the
+				# handle's top toward +z, forward off the wall and down.
+				part.rotation.x = LEVER_DOWN if down else 0.0
+			else:
+				part.position.y = -PLATE_DOWN if down else 0.0
+		var sound := str(shown.get("sound", PLATE_CLICK_SOUND))
+		if down and SoundKit.has(sound):
+			sfx.play(sound, shown["at"])
 
 
 ## The hidden niche on [param key] shut or [param opened]: the cracked wall
