@@ -2723,9 +2723,21 @@ func _test_tavern_inside() -> void:
 	at.call(path[0])
 	_rig.inside_changed.disconnect(listen)
 	# The Mughouse's front (811 amended, art-kit's pieces): its sign out of
-	# the street front's wall beside the door. (Its lamp goes on a window
-	# sill, but the inn's walls stand two storeys, where no wood window is
-	# drawn: the lamp is shown below on a shell of one storey.)
+	# the street front's wall beside the door; its two-storey walls' windows
+	# art-kit's tall wood ones (489 amended (2)), and the lamp on the sill of
+	# the one nearest its door, at the ground storey's sill.
+	var inn_windows := BuildingComposer.windows(inns[0], wilds["terrain"]["edges"])
+	var inn_sill := BuildingComposer.sill_lamp_edge(inns[0], inn_windows)
+	var tall_drawn := inn_windows.all(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "window") 			and Client3D.window_slot("wood", _rig._height_of(inn_sill)) == "wall.wood.window_tall"
+	var inn_lamps: Array = _rig._descendants(_rig._room).filter(func(node: Node) -> bool: return node.name == "SillLamp")
+	var inn_sides := Terrain.edge_cells(inn_sill) if inn_sill != BuildingComposer.NO_SILL else [Vector2i.ZERO, Vector2i.ZERO]
+	var inn_middle := Vector2(inn_sides[0] + inn_sides[1]) * 0.5
+	var inside_cell: Vector2i = inn_sides[0] if rect.has_point(inn_sides[0]) else inn_sides[1]
+	var inn_spot := _rig._room.to_local((inn_lamps[0] as Node3D).global_position) if inn_lamps.size() == 1 else Vector3(-9.0, -9.0, -9.0)
+	var lift := inn_spot.y - _rig._elevation(inside_cell)
+	_check(not inn_windows.is_empty() and tall_drawn and inn_lamps.size() == 1 and Vector2(inn_spot.x, inn_spot.z).distance_to(inn_middle) < 0.05
+			and absf(lift - Client3D.SILL_LAMP_LIFT) < 0.05,
+			"the Mughouse's %d windows drawn two storeys tall, its lamp on the sill of the one %s nearest its door, %.2f m up" % [inn_windows.size(), inn_sill, lift])
 	var sign := _rig._room.get_node_or_null("Decor_180_207_inn_sign_-1_0") as Node3D
 	_check(sign != null and is_equal_approx(sign.position.x, 179.5) and is_equal_approx(sign.position.z, 207.0),
 			"the inn's sign out of its street front by the door (%s)" % [sign.position if sign != null else null])
