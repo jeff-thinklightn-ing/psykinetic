@@ -594,6 +594,13 @@ func _test_night_town() -> void:
 			"an aura's light: 3 m at 0.35 (and the least aura, 1/3) to 6 m at 1, growing between (789)")
 	_check(Client3D.aura_shows(0.34, true, true) and Client3D.aura_shows(0.34, false, false) and not Client3D.aura_shows(0.34, false, true) and not Client3D.aura_shows(0.0, true, false),
 			"an aura shows after sunset or under a roof, never by day in the open, never with none")
+	_check(Client3D.aura_motes(0.0) == 0 and Client3D.aura_motes(0.33) == 5 and Client3D.aura_motes(0.5) == 8 and Client3D.aura_motes(1.0) == 16
+			and Client3D.aura_motes(0.01) == 1,
+			"an aura's motes: none with none, 5 for a new charm, 8 at a half, 16 at full, one at the least (789 amended)")
+	_check(is_equal_approx(Client3D.aura_mote_glow(1.0, true), Client3D.AURA_MOTE_GLOW * Client3D.AURA_MOTE_DAY)
+			and is_equal_approx(Client3D.aura_mote_glow(0.0, true), Client3D.AURA_MOTE_GLOW)
+			and is_equal_approx(Client3D.aura_mote_glow(1.0, false), Client3D.AURA_MOTE_GLOW),
+			"the motes faint by day in the open, full at night or under a roof (789 amended)")
 
 
 func _check(ok: bool, label: String) -> void:

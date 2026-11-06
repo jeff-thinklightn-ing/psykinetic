@@ -43918,3 +43918,20 @@ decision of its own because it sets a rule for every tree that adds a kind.
   added the old way. Every tree was told the rule once.
 
 Protocol unchanged, no new class_name, no bullet.
+Amended (789 amended): the aura's motes (2026-11-06, release's label; the coordinator's approved
+outdoors tell). Cool specks drift round every wearer while a charm is worn, by day as well as by night,
+so the aura reads even where its light doesn't (by day in the open, or a wearer left out of the
+CARRIED_NEAR lights). An "AuraMotes" GPUParticles3D on the body (Client3D._sync_aura_motes, called
+from _sync_aura, made like a skylight's motes, _make_aura_motes) holds aura_motes(aura) =
+round(AURA_MOTES_MOST 16 x aura), at least 1: 5 for a new charm's third, 8 at a half, 16 at full. Each
+lives AURA_MOTE_SECONDS 3 s in a column AURA_MOTE_WIDE 0.5 m across from 0.2 to 1.8 m up, drifting
+and rising slowly, fading in and out, AURA_MOTE_SIZE 8 cm, soft and round (a radial texture). They're unshaded and additive, in one shared
+material of AURA_COLOUR x aura_mote_glow: AURA_MOTE_GLOW 0.9 at night or under a roof, falling to
+AURA_MOTE_DAY 0.6 of it in the open as the day comes up. They aren't drawn for a wearer more than
+AURA_MOTE_FAR 40 m on the ground from the view's aim (a ground distance, not the camera's: the ortho
+camera stands 40 m off). Tests: weather_test (aura_motes' counts, aura_mote_glow's day and roof),
+view_test _test_aura (the motes at the count, kept by day in the open while the light goes, none with no
+aura). Stills (C:/dev/review/lands/motes_1106): 3 cm barely showed at play zoom and squares looked hard;
+6 cm soft read as small glints at night and under a roof, next to nothing on sunlit stone (faint by day,
+as asked; kept additive, no tint on the body); the coordinator took 8 cm. Client only, protocol
+unchanged, no new class_name, no bullet (the charm stays hidden until the bear's cave opens).

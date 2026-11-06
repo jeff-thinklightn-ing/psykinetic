@@ -1497,9 +1497,20 @@ func _test_aura() -> void:
 	_check(lit.size() == 1 and is_equal_approx((lit[0] as OmniLight3D).omni_range, want.x) and is_equal_approx((lit[0] as OmniLight3D).light_energy, want.y)
 			and not (glow.get_node("Disc") as Node3D).visible,
 			"lit by a real light, cool, %.1f m at aura 0.67, no ground glow" % want.x)
+	var motes := puppet.get_node_or_null("AuraMotes") as GPUParticles3D
+	_check(motes != null and motes.visible and motes.emitting and motes.amount == Client3D.aura_motes(0.67),
+			"and its motes round the body, %d at aura 0.67 (789 amended)" % Client3D.aura_motes(0.67))
+	_rig._night = false
+	var outdoor := _rig._outdoor
+	_rig._outdoor = true
+	_rig._sync_aura(player, puppet, id)
+	_check(motes.visible and not glow.visible, "by day in the open: no light, the motes still")
+	_rig._outdoor = outdoor
+	_rig._night = true
 	player.aura = 0.0
 	_rig._sync_aura(player, puppet, id)
 	_check(not glow.visible and not _rig._carriers.has(id), "no aura, no light")
+	_check(not motes.visible and not motes.emitting, "nor motes")
 	_rig._night = night
 	_rig._carried_clock = Client3D.CARRIED_PICK
 	_rig._light_carriers(0.0)

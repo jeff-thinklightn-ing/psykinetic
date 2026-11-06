@@ -828,6 +828,21 @@ const AURA_UP := 1.6
 const AURA_DISC := 0.3
 const AURA_DISC_SHARE := 0.7
 const AURA_DISC_SHADER := "shader_type spatial;\nrender_mode unshaded, blend_add, depth_draw_never, cull_disabled, shadows_disabled;\nuniform vec4 tint : source_color;\nvoid fragment() {\n\tfloat d = clamp(length(UV - vec2(0.5)) * 2.0, 0.0, 1.0);\n\tfloat a = 1.0 - d * d;\n\tALBEDO = tint.rgb * a * a * tint.a;\n}\n"
+## The aura's motes (789 amended): cool specks drifting round every wearer
+## while a charm is worn, day or night: AURA_MOTES_MOST at aura 1, fewer as
+## it is less (aura_motes), each living AURA_MOTE_SECONDS in a column
+## AURA_MOTE_WIDE across from AURA_MOTE_HIGH.x to .y m up, rising slowly.
+## Soft round specks, unshaded and added, AURA_MOTE_GLOW of AURA_COLOUR in the dark or under a
+## roof, AURA_MOTE_DAY of that in the open by day (aura_mote_glow). Not
+## drawn for a wearer past AURA_MOTE_FAR m on the ground from the view's aim.
+const AURA_MOTES_MOST := 16
+const AURA_MOTE_SECONDS := 3.0
+const AURA_MOTE_SIZE := 0.08
+const AURA_MOTE_WIDE := 0.5
+const AURA_MOTE_HIGH := Vector2(0.2, 1.8)
+const AURA_MOTE_GLOW := 0.9
+const AURA_MOTE_DAY := 0.6
+const AURA_MOTE_FAR := 40.0
 ## The mine's wall lamps (769 amended (6)): each lantern cell with a "mine_lamp" decor
 ## row lights at the piece's flame, warm, shadowless; only the
 ## WALL_LAMP_NEAR nearest the camera's aim at once (picked again every
@@ -16072,10 +16087,114 @@ static func aura_shows(aura: float, night: bool, outdoor: bool) -> bool:
 	return aura > 0.0 and (night or not outdoor)
 
 
+## How many motes an [param aura] keeps round its wearer (789 amended):
+## AURA_MOTES_MOST at 1, as many for less in proportion (5 for a new
+## charm's third, 8 at a half), at least one for any; none for none.
+static func aura_motes(aura: float) -> int:
+	return 0 if aura <= 0.0 else maxi(1, roundi(AURA_MOTES_MOST * minf(aura, 1.0)))
+
+
+## How bright an aura's motes are (789 amended): AURA_MOTE_GLOW in the dark
+## or under a roof; in the open, toward AURA_MOTE_DAY of it as [param day]
+## (0 night .. 1 full day) comes up.
+static func aura_mote_glow(day: float, outdoor: bool) -> float:
+	return AURA_MOTE_GLOW * (lerpf(1.0, AURA_MOTE_DAY, clampf(day, 0.0, 1.0)) if outdoor else 1.0)
+
+
+var _aura_mote_material: StandardMaterial3D = null
+
+
+## A wearer's motes (789 amended): an "AuraMotes" child of its body, as many
+## as its aura keeps (aura_motes), emitting while it has any and is within
+## AURA_MOTE_FAR of the view's aim; their shared colour follows the day.
+func _sync_aura_motes(entity: GridEntity, puppet: Node3D) -> void:
+	var count := aura_motes(entity.aura)
+	var near := Vector2(puppet.global_position.x - _camera_target.x, puppet.global_position.z - _camera_target.z).length() <= AURA_MOTE_FAR
+	var motes := puppet.get_node_or_null("AuraMotes") as GPUParticles3D
+	if count == 0 or not near:
+		if motes != null and motes.visible:
+			motes.emitting = false
+			motes.visible = false
+		return
+	if motes == null:
+		motes = _make_aura_motes()
+		puppet.add_child(motes)
+	if motes.amount != count:
+		motes.amount = count
+	if not motes.visible:
+		motes.visible = true
+		motes.emitting = true
+	var day := clampf(inverse_lerp(DayNight.NIGHT, 1.0, DayNight.light), 0.0, 1.0)
+	_aura_mote_material.albedo_color = Color(AURA_COLOUR * aura_mote_glow(day, _outdoor), 1.0)
+
+
+## The specks round a wearer (789 amended), as a skylight's motes are made
+## (_make_motes): following the body, drifting every way and rising a
+## little, fading in and out over each life.
+func _make_aura_motes() -> GPUParticles3D:
+	var motes := GPUParticles3D.new()
+	motes.name = "AuraMotes"
+	motes.amount = AURA_MOTES_MOST
+	motes.lifetime = AURA_MOTE_SECONDS
+	motes.preprocess = AURA_MOTE_SECONDS
+	motes.randomness = 0.4
+	motes.local_coords = true
+	motes.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	motes.position.y = (AURA_MOTE_HIGH.x + AURA_MOTE_HIGH.y) * 0.5
+	var high := AURA_MOTE_HIGH.y - AURA_MOTE_HIGH.x
+	motes.visibility_aabb = AABB(Vector3(-AURA_MOTE_WIDE, -high * 0.5 - 0.5, -AURA_MOTE_WIDE), Vector3(AURA_MOTE_WIDE * 2.0, high + 1.5, AURA_MOTE_WIDE * 2.0))
+	var process := ParticleProcessMaterial.new()
+	process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process.emission_box_extents = Vector3(AURA_MOTE_WIDE * 0.5, high * 0.5, AURA_MOTE_WIDE * 0.5)
+	process.direction = Vector3.UP
+	process.spread = 180.0
+	process.initial_velocity_min = 0.03
+	process.initial_velocity_max = 0.12
+	process.gravity = Vector3(0.0, 0.05, 0.0)
+	process.scale_min = 0.6
+	process.scale_max = 1.3
+	var fade := Gradient.new()
+	fade.set_color(0, Color.BLACK)
+	fade.set_color(1, Color.BLACK)
+	fade.add_point(0.3, Color.WHITE)
+	fade.add_point(0.7, Color.WHITE)
+	var fade_texture := GradientTexture1D.new()
+	fade_texture.gradient = fade
+	process.color_ramp = fade_texture
+	motes.process_material = process
+	if _aura_mote_material == null:
+		_aura_mote_material = StandardMaterial3D.new()
+		_aura_mote_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_aura_mote_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_aura_mote_material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		_aura_mote_material.vertex_color_use_as_albedo = true
+		_aura_mote_material.disable_receive_shadows = true
+		_aura_mote_material.albedo_color = Color(AURA_COLOUR * AURA_MOTE_GLOW, 1.0)
+		# Round and soft, not a square: white at the middle to nothing at the rim.
+		var soft := GradientTexture2D.new()
+		soft.width = 32
+		soft.height = 32
+		soft.fill = GradientTexture2D.FILL_RADIAL
+		soft.fill_from = Vector2(0.5, 0.5)
+		soft.fill_to = Vector2(1.0, 0.5)
+		var rim := Gradient.new()
+		rim.set_color(0, Color.WHITE)
+		rim.set_color(1, Color.BLACK)
+		rim.add_point(0.35, Color.WHITE)
+		soft.gradient = rim
+		_aura_mote_material.albedo_texture = soft
+	var speck := QuadMesh.new()
+	speck.size = Vector2(AURA_MOTE_SIZE, AURA_MOTE_SIZE)
+	speck.material = _aura_mote_material
+	motes.draw_pass_1 = speck
+	return motes
+
+
 ## A player's or companion's aura (789): an "AuraGlow" marker at its feet,
 ## kept in _carriers while it shows (_light_carriers lights it), with its
 ## ground glow "Disc" for when it is not lit.
 func _sync_aura(entity: GridEntity, puppet: Node3D, id: int) -> void:
+	_sync_aura_motes(entity, puppet)
 	var shows := aura_shows(entity.aura, _night, _outdoor)
 	var glow := puppet.get_node_or_null("AuraGlow") as Node3D
 	if glow == null:
