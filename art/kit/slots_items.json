@@ -601,6 +601,44 @@
 			"type": "mesh",
 			"uses": "sack of food (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.forge_tongs": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.5,
+				0.06,
+				0.03
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "forge tongs (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.forging_hammer": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.35,
+				0.12,
+				0.05
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "forging hammer (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.giant_axe": {
 			"budget": 500,
 			"category": "items",
@@ -757,6 +795,25 @@
 			},
 			"type": "mesh",
 			"uses": "hood (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.iron_bar": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.25,
+				0.04,
+				0.05
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bar of iron (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.jewelled_clasp": {
 			"budget": 500,
