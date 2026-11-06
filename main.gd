@@ -12740,8 +12740,9 @@ func _inn_inside(area: Dictionary, place: Dictionary) -> bool:
 ## is up, its work the counter (Level.tavern_of's), its home the keeper's
 ## room and its bed the bed there, its square and inn the common room.
 ## Never in the town's own zone (_sync_residents leaves it out there).
-func _tavern_folk(wanted: Dictionary) -> void:
-	var level := _zone_level(World.zone.name)
+## [param zone_name] the floor's level, "" for the zone World is in (tests).
+func _tavern_folk(wanted: Dictionary, zone_name := "") -> void:
+	var level := _zone_level(zone_name if not zone_name.is_empty() else World.zone.name)
 	var town := str(level.get("town", ""))
 	if town.is_empty() or World.towns == null or not World.towns._towns.has(town):
 		return

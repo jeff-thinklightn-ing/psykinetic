@@ -95,6 +95,7 @@ func _ready() -> void:
 	_test_threat()  # 762, at the end: a rescued guard and a lit house would move the hail and lamp checks.
 	_test_watch()  # 771, after 762's: its guard and its town's folk set aside the same way.
 	_test_tavern_keeper()  # 772 amended (2).
+	_test_taverner_end_to_end()  # 772 amended (2) with economy's 812.
 	_test_posts_live()  # 771 amended (5).
 	_test_watch_waves()  # 771 amended (3), the same way.
 	_test_guards()  # 791, the same way.
@@ -986,6 +987,72 @@ func _test_threat() -> void:
 	for body: GridEntity in World.townsfolk().duplicate():
 		World.despawn(body)
 	DayNight.set_hour(12.0)
+
+
+## The taverner end to end (772 amended (2) with economy's 812): the inn
+## standing seats "taverner:<town>" (Towns._appoint); with the town's inn an
+## open building its body is one of the town's; with the inn a shell (811's
+## "inside") it is never in the town's zone, and on the tavern floor (here
+## the Mughouse, wilds/store's) it stands about the counter, the keeper's
+## room its home.
+func _test_taverner_end_to_end() -> void:
+	print("\n== the taverner end to end: seated when the inn stands, a body in town or on the tavern floor, never both (772 amended (2), 812) ==")
+	var record: Dictionary = World.towns._town(STORE)
+	var had_inn: Variant = record["buildings"].get("inn")
+	record["buildings"]["inn"] = {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
+	World.towns._appoint(STORE)
+	var keeper := "taverner:" + STORE
+	_check(keeper in World.towns.residents(STORE) and _main.TAVERNER in World.production.worker(keeper).get("trades", []),
+		"the inn standing: economy seats the town's taverner (%s)" % [World.production.worker(keeper).get("name", "")])
+	# Room under RESIDENTS_MAX for the taverner (its id sorts after the town's folk).
+	var away_before := {}
+	for who: String in World.towns.residents(STORE):
+		away_before[who] = bool(World.production.worker(who).get("away", false))
+		if who != keeper:
+			World.production.set_away(who, true)
+	DayNight.set_hour(12.0)
+	_sync()
+	_check(_body(keeper) != null, "an open inn: the taverner's body is one of the town's")
+	var buildings: Array = _main._world_map.areas[TOWN]["buildings"]
+	var shell := {"slot": "building.shed", "rect": Rect2i(20, 14, 3, 3), "facing": Vector2i(0, 1), "town": STORE.get_slice("/", 1), "use": "inn",
+		"inside": "umbrage_tavern"}
+	buildings.append(shell)
+	_sync()
+	_check(_body(keeper) == null, "the inn a shell: no taverner in the town's zone")
+	buildings.erase(shell)
+	# The tavern floor: the Mughouse is wilds/store's; its seated taverner stands there.
+	var wilds := "wilds/store"
+	if not World.towns._towns.has(wilds):
+		_check(false, "(wilds/store's town record, for the Mughouse's taverner)")
+	else:
+		var wilds_record: Dictionary = World.towns._town(wilds)
+		var wilds_inn: Variant = wilds_record["buildings"].get("inn")
+		wilds_record["buildings"]["inn"] = {"kind": "inn", "level": 1, "state": Towns.STANDING, "since": World.towns.now(), "job": 0}
+		World.towns._appoint(wilds)
+		var margery := "taverner:" + wilds
+		var wanted := {}
+		_main._tavern_folk(wanted, "umbrage_tavern")
+		var level: Dictionary = _main._zone_level("umbrage_tavern")
+		var tavern: Dictionary = Level.tavern_of(level).get(wilds, {})
+		var places: Dictionary = (wanted.get(margery, {}) as Dictionary).get("places", {})
+		_check(wanted.has(margery) and wanted[margery]["town"] == wilds and (places.get("work", Rect2i()) as Rect2i).has_point(tavern.get("counter", Vector2i(-9, -9))),
+			"on the Mughouse's floor: the seated taverner wanted, about the counter (%s)" % [places.get("work", "")])
+		_check(places.get("home") == Rect2i(12, 6, 6, 4), "the keeper's room the taverner's home there")
+		var none := {}
+		_main._tavern_folk(none, TOWN)
+		_check(none.is_empty(), "a town's own zone is no tavern floor: no taverner wanted by it")
+		if wilds_inn == null:
+			wilds_record["buildings"].erase("inn")
+		else:
+			wilds_record["buildings"]["inn"] = wilds_inn
+	for who: String in away_before:
+		World.production.set_away(who, bool(away_before[who]))
+	World.production.set_away(keeper, true)  # Not one of the town's folk for the tests after.
+	if had_inn == null:
+		record["buildings"].erase("inn")
+	else:
+		record["buildings"]["inn"] = had_inn
+	_sync()
 
 
 ## 772 amended (2), option B: the Mughouse's floors are an interior of
