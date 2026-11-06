@@ -12,7 +12,16 @@ rooms and its stairs:
   if it is said mid-screen (Level.rooms_from; a hall or stair has none); what
   it holds ("beds", "holds" (stores drawn as decor: crates, barrels,
   sacks, with no hover and no click, since nothing openable gives nothing,
-  Jeff), "hearth", "counter", "tables").
+  Jeff), "hearth", "counter", "taps", "tables"). A common room's furniture
+  (811 amended, art-kit's Mughouse pieces): its "hearth" the north or west
+  cell of a fireplace two cells along a wall (both cells fire, the
+  prop.wall_hearth over them as "wall" decor); its "counter" the west cell
+  of a building.bar_counter three cells across, its front to the south,
+  the taverner standing behind its middle; its "taps" the west cell of a
+  building.tap_rack two across, its back to the north wall; its "tables"
+  each the north-west cell of a building.tavern_table two by two (every
+  other one laid, variant 2), a seat west of its top row and east of its
+  bottom one. No piece on another, on a fire, a seat or a door's cell.
   Never a chest: chests are for dungeons only (Jeff, 2026-11-04). A
   player's storage at home is its own container piece (a strongbox,
   wardrobe or vault), and the locker is opened through a person.
@@ -48,11 +57,16 @@ COLOURS = {
     "link": (0xFF, 0x00, 0xFF),
 }
 SIDES = {"north": (0, -1), "south": (0, 1), "west": (-1, 0), "east": (1, 0)}
-HOLDING = ["beds", "holds", "hearth", "counter", "tables"]
+HOLDING = ["beds", "holds", "hearth", "counter", "taps", "tables"]
 # The stores a room's "holds" are drawn as, in turn (art-kit's prop.<kind>).
 STORES = ["crate", "barrel", "sack"]
-# A building.round_table's footprint (Level's slot sizes: 3 x 3, solid).
-TABLE = 3
+# The common room's pieces (Level.BUILDINGS' sizes, all solid, facing
+# south): slot, cells across, cells deep.
+TABLE = ("building.tavern_table", 2, 2)
+COUNTER = ("building.bar_counter", 3, 1)
+TAPS = ("building.tap_rack", 2, 1)
+# A wall hearth's cells along its wall (prop.wall_hearth, 2.04 m wide).
+HEARTH_WIDE = 2
 # Godot imports a level's layout as an Image (Level._image), never a texture.
 IMPORT = '[remap]\n\nimporter="image"\ntype="Image"\n'
 
@@ -76,6 +90,78 @@ def bed_way(rect, cell):
         if not inside((cell[0] + dx, cell[1] + dy)) and inside((cell[0] - dx, cell[1] - dy)):
             return (dx, dy)
     raise SpecError("the bed at %s is against no wall" % (cell,))
+
+
+def hearth_cells(rect, cell):
+    """A hearth at [cell]: its wall's step out of the room (north or west,
+    as bed_way finds it) and its cells, [cell] and the next along that
+    wall (south of it or east)."""
+    way = bed_way(rect, cell)
+    if way not in ((0, -1), (-1, 0)):
+        raise SpecError("the hearth at %s is on no north or west wall" % (cell,))
+    along = (abs(way[1]), abs(way[0]))
+    cells = [(cell[0] + along[0] * i, cell[1] + along[1] * i) for i in range(HEARTH_WIDE)]
+    x0, y0, w, h = rect
+    if not all(x0 <= c[0] < x0 + w and y0 <= c[1] < y0 + h for c in cells):
+        raise SpecError("the hearth at %s runs off its wall" % (cell,))
+    return way, cells
+
+
+def piece_cells(kind, at):
+    _slot, across, deep = kind
+    return [(at[0] + x, at[1] + y) for y in range(deep) for x in range(across)]
+
+
+def furniture(room):
+    """A common room's pieces [(kind, at, variant)], its hearth's fire
+    cells and its seats."""
+    pieces = []
+    if room.get("counter"):
+        pieces.append((COUNTER, room["counter"], 1))
+    if room.get("taps"):
+        pieces.append((TAPS, room["taps"], 1))
+    for index, at in enumerate(room.get("tables", [])):
+        pieces.append((TABLE, at, 1 + index % 2))
+    fire = hearth_cells(room["rect"], room["hearth"])[1] if room.get("hearth") else []
+    seats = []
+    for x, y in room.get("tables", []):
+        seats += [(x - 1, y), (x + TABLE[1], y + TABLE[2] - 1)]
+    return pieces, fire, seats
+
+
+def keeper_at(room):
+    """Where the taverner stands: behind the counter's middle."""
+    x, y = room["counter"]
+    return [x + COUNTER[1] // 2, y - 1]
+
+
+def furniture_faults(room):
+    """A common room's furniture laid wrong: off the room, on another
+    piece, a fire, a seat or a door's cell, or a seat or the taverner off
+    the floor that is left."""
+    faults = []
+    try:
+        pieces, fire, seats = furniture(room)
+    except SpecError as e:
+        return [str(e)]
+    x0, y0, w, h = room["rect"]
+    inside = lambda c: x0 <= c[0] < x0 + w and y0 <= c[1] < y0 + h
+    doors = {tuple(c) for d in room.get("doors", []) for c in d["cells"]}
+    taken = {}
+    for kind, at, _variant in pieces:
+        for cell in piece_cells(kind, at):
+            if not inside(cell):
+                faults.append("the %s at %s runs off the room at %s" % (kind[0], at, cell))
+            elif cell in taken:
+                faults.append("the %s at %s is on the %s at %s" % (kind[0], at, taken[cell], cell))
+            elif cell in fire or cell in seats or cell in doors:
+                faults.append("the %s at %s is on a fire, a seat or a door at %s" % (kind[0], at, cell))
+            taken[cell] = kind[0]
+    standing = seats + ([tuple(keeper_at(room))] if room.get("counter") else [])
+    for cell in standing:
+        if not inside(cell) or cell in taken or cell in fire:
+            faults.append("%s, a seat or the taverner's, is off the floor" % (cell,))
+    return faults
 
 
 def spawn_name(from_level, index):
@@ -147,6 +233,8 @@ def check(spec):
                     bed_way(room["rect"], cell)
                 except SpecError as e:
                     faults.append("%s/%s: %s" % (level, room["id"], e))
+            if room["use"] == "common":
+                faults += ["%s/%s: %s" % (level, room["id"], f) for f in furniture_faults(room)]
             holds = any(room.get(key) for key in HOLDING) or any(o.startswith("floor:") for o in opens)
             if len(opens) <= 1 and not holds and room["use"] not in ("common",):
                 faults.append("%s/%s: a dead end holding nothing" % (level, room["id"]))
@@ -211,27 +299,36 @@ def lay(spec, floor):
     for room in floor["rooms"]:
         for cell in room.get("beds", []):
             beds.append(list(cell) + list(bed_way(room["rect"], cell)))
-        if room["use"] == "common" and room.get("counter"):
-            # The tavern (772's keys, Level.tavern_of): the taverner at the
-            # counter's first cell, a seat each side of every table (a
-            # round_table is TABLE x TABLE cells, solid, from its cell).
-            seats = []
-            for x, y in room.get("tables", []):
-                seats += [[x - 1, y + TABLE // 2], [x + TABLE, y + TABLE // 2]]
-            places["tavern"] = {"at": list(room["counter"][0]), "kind": "tavern", "radius": 1, "name": spec.get("place_name", "the tavern"),
-                                "rect": room["rect"], "seats": seats}
+        if room["use"] == "common":
+            # The common room's furniture (811 amended): solid pieces, and
+            # the hearth's two fire cells under its wall decor.
+            pieces, fire, seats = furniture(room)
+            for (slot, _across, _deep), at, variant in pieces:
+                piece = {"slot": slot, "at": list(at)}
+                if variant != 1:
+                    piece["variant"] = variant
+                buildings.append(piece)
+            for cell in fire:
+                markers[cell] = "fire"
             if room.get("hearth"):
-                places["tavern"]["hearth"] = list(room["hearth"])
-        if room.get("hearth"):
-            markers[tuple(room["hearth"])] = "fire"
+                way, _cells = hearth_cells(room["rect"], room["hearth"])
+                decor.append([room["hearth"][0], room["hearth"][1], way[0], way[1], "wall_hearth", 1])
+            if room.get("counter"):
+                # The tavern (772's keys, Level.tavern_of): the taverner
+                # behind the counter, a seat each side of every table; its
+                # lore entry (lore's regions.json place) if the spec names one.
+                places["tavern"] = {"at": keeper_at(room), "kind": "tavern", "radius": 1, "name": spec.get("place_name", "the tavern"),
+                                    "rect": room["rect"], "seats": [list(c) for c in seats]}
+                if spec.get("lore_id"):
+                    places["tavern"]["lore_id"] = spec["lore_id"]
+                if room.get("hearth"):
+                    places["tavern"]["hearth"] = list(room["hearth"])
         for index, cell in enumerate(room.get("holds", [])):
             # Plain decor (Level.DECOR_KINDS, flat): never a Pushable crate.
             decor.append([cell[0], cell[1], 0, 1, STORES[index % len(STORES)], 1])
-        for cell in room.get("tables", []):
-            buildings.append({"slot": "building.round_table", "at": list(cell)})
         entry = {"id": room["id"], "use": room["use"], "rect": room["rect"],
                  "doors": [{"to": d["to"], "cells": d["cells"], "side": d["side"]} for d in room.get("doors", [])]}
-        for key in ("beds", "counter", "hearth"):
+        for key in ("beds", "counter", "taps", "hearth"):
             if room.get(key):
                 entry[key] = room[key]
         if room.get("name"):

@@ -2652,6 +2652,40 @@ func _test_tavern_inside() -> void:
 	_rig._fade_clock += Client3D.FADE_HOLD + Client3D.ROOF_FADE * 4.0
 	at.call(path[0])
 	_rig.inside_changed.disconnect(listen)
+	# The Mughouse's front (811 amended, art-kit's pieces): its sign out of
+	# the street front's wall beside the door. (Its lamp goes on a window
+	# sill, but the inn's walls stand two storeys, where no wood window is
+	# drawn: the lamp is shown below on a shell of one storey.)
+	var sign := _rig._room.get_node_or_null("Decor_180_207_inn_sign_-1_0") as Node3D
+	_check(sign != null and is_equal_approx(sign.position.x, 179.5) and is_equal_approx(sign.position.z, 207.0),
+			"the inn's sign out of its street front by the door (%s)" % [sign.position if sign != null else null])
+	# Inside, its common room's fireplace over the hearth's two fire cells,
+	# its back to the west wall, at their middle.
+	var ground := Level.load_level("umbrage_tavern")
+	_rig.rebuild(ground["terrain"], ground["spawn_points"]["from_wilds"])
+	var hearth := _rig._room.get_node_or_null("Decor_0_6_wall_hearth_-1_0") as Node3D
+	_check(hearth != null and is_equal_approx(hearth.position.x, -0.5) and is_equal_approx(hearth.position.z, 6.5)
+			and is_equal_approx(hearth.rotation.y, PI * 0.5),
+			"the Mughouse's fireplace against its west wall, over its two fire cells (%s)" % [hearth.position if hearth != null else null])
+	# A shell's lamp (811 amended, art-kit's prop.sill_lamp): one, on the
+	# sill of its window nearest its door, at the sill's height; none on a
+	# building that is no shell.
+	var level := _kinds_level([["building_l_house_small", Vector2i(1, 1), false]])
+	var house: Dictionary = level["buildings"][0]
+	house["inside"] = "a_shell"
+	var windows := BuildingComposer.windows(house, level["terrain"]["edges"])
+	var sill := BuildingComposer.sill_lamp_edge(house, windows)
+	_rig.rebuild(level["terrain"], Vector2i(12, 12))
+	var lamps: Array = _rig._descendants(_rig._room).filter(func(node: Node) -> bool: return node.name == "SillLamp")
+	var spot := _rig._room.to_local((lamps[0] as Node3D).global_position) if lamps.size() == 1 else Vector3(-9.0, -9.0, -9.0)
+	var sides := Terrain.edge_cells(sill) if sill != BuildingComposer.NO_SILL else [Vector2i.ZERO, Vector2i.ZERO]
+	var middle := Vector2(sides[0] + sides[1]) * 0.5
+	_check(sill in windows and lamps.size() == 1 and Vector2(spot.x, spot.z).distance_to(middle) < 0.05
+			and spot.y - _rig._height_in(sides[0], middle) > Client3D.SILL_LAMP_LIFT - 0.05,
+			"a shell's lamp on the sill of its window %s nearest its door (%s)" % [sill, spot])
+	_check(BuildingComposer.sill_lamp_edge(house.merged({"inside": ""}, true), windows) == BuildingComposer.NO_SILL
+			and BuildingComposer.sill_lamp_edge(house, [] as Array[Vector3i]) == BuildingComposer.NO_SILL,
+			"no lamp on a building that is no shell, nor on a shell with no window")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

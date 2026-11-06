@@ -3119,8 +3119,34 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 		and beds.filter(func(bed: Dictionary) -> bool: return bed["level"] == "umbrage_tavern_up").size() == 5,
 		"its beds over every floor: the keeper's below, five hired rooms upstairs (%d)" % beds.size())
 	var stores := func(level: Dictionary) -> Array: return (level["terrain"]["decor"] as Array).map(func(piece: Dictionary) -> String: return piece["kind"])
-	_check(stores.call(ground) == ["crate", "barrel"] and stores.call(floors["umbrage_tavern_attic"]) == ["crate", "barrel", "sack", "crate"],
+	_check(stores.call(ground) == ["wall_hearth", "crate", "barrel"] and stores.call(floors["umbrage_tavern_attic"]) == ["crate", "barrel", "sack", "crate"],
 		"the kitchen's and the attic's stores drawn as decor, nothing to open (%s)" % [stores.call(floors["umbrage_tavern_attic"])])
+	# Its common room furnished (811 amended, art-kit's Mughouse pieces): the
+	# counter with the taverner behind it, the tap rack against the wall
+	# behind him, four tables (two laid), all solid, every seat and the
+	# taverner on the floor left; the fireplace over the hearth's two fire
+	# cells against the west wall; the tavern lore's last_light.
+	var pieces := {}
+	for building: Dictionary in ground["buildings"]:
+		pieces[building["rect"]] = [building["slot"], int(building.get("variant", 1))]
+	var want := {Rect2i(8, 3, 3, 1): ["building.bar_counter", 1], Rect2i(9, 0, 2, 1): ["building.tap_rack", 1],
+		Rect2i(3, 6, 2, 2): ["building.tavern_table", 1], Rect2i(8, 6, 2, 2): ["building.tavern_table", 2],
+		Rect2i(3, 10, 2, 2): ["building.tavern_table", 1], Rect2i(8, 10, 2, 2): ["building.tavern_table", 2]}
+	var solid := want.keys().all(func(rect: Rect2i) -> bool:
+		return Level.rect_cells(rect).all(func(cell: Vector2i) -> bool: return not ground_floor.has(cell)))
+	_check(pieces == want and solid and tavern["counter"] == Vector2i(9, 2),
+		"the common room's counter, tap rack and four tables where laid, solid, the taverner behind the counter (%s)" % [pieces])
+	var hearth: Array = (ground["terrain"]["decor"] as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "wall_hearth")
+	_check(hearth.size() == 1 and hearth[0]["cell"] == Vector2i(0, 6) and hearth[0]["out"] == Vector2i(-1, 0)
+		and [Vector2i(0, 6), Vector2i(0, 7)].all(func(cell: Vector2i) -> bool: return (ground["terrain"]["fire"] as Array).has(cell)),
+		"the fireplace against the west wall over the hearth's two fire cells (%s)" % [hearth])
+	var tavern_place: Dictionary = ground["places"].get("tavern", {})
+	_check(tavern_place.get("lore_id") == "last_light" and Lore.entries().get("last_light", {}).get("type") == "place",
+		"the tavern is lore's last_light, a place (%s)" % [tavern_place.get("lore_id")])
+	var signs: Array = (wilds["terrain"]["decor"] as Array).filter(func(piece: Dictionary) -> bool: return piece["kind"] == "inn_sign")
+	var inn_rect: Rect2i = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool: return building.get("use") == "inn")[0]["rect"]
+	_check(signs.size() == 1 and signs[0]["cell"] == Vector2i(180, 207) and not inn_rect.has_point(signs[0]["cell"])
+		and inn_rect.has_point(signs[0]["cell"] + signs[0]["out"]), "the inn's sign on its street front, out of its wall (%s)" % [signs])
 
 
 ## Umbrage's watch posts, tavern, square fire and store lamp (771 amended

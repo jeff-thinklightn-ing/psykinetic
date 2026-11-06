@@ -69,35 +69,59 @@
 	],
 	"buildings": [
 		{
-			"slot": "building.round_table",
+			"slot": "building.bar_counter",
 			"at": [
-				2,
+				8,
 				3
 			]
 		},
 		{
-			"slot": "building.round_table",
+			"slot": "building.tap_rack",
 			"at": [
-				7,
-				3
+				9,
+				0
 			]
 		},
 		{
-			"slot": "building.round_table",
+			"slot": "building.tavern_table",
 			"at": [
-				2,
-				8
+				3,
+				6
 			]
 		},
 		{
-			"slot": "building.round_table",
+			"slot": "building.tavern_table",
 			"at": [
-				7,
-				8
+				8,
+				6
+			],
+			"variant": 2
+		},
+		{
+			"slot": "building.tavern_table",
+			"at": [
+				3,
+				10
 			]
+		},
+		{
+			"slot": "building.tavern_table",
+			"at": [
+				8,
+				10
+			],
+			"variant": 2
 		}
 	],
 	"decor": [
+		[
+			0,
+			6,
+			-1,
+			0,
+			"wall_hearth",
+			1
+		],
 		[
 			16,
 			1,
@@ -119,7 +143,7 @@
 		"tavern": {
 			"at": [
 				9,
-				1
+				2
 			],
 			"kind": "tavern",
 			"radius": 1,
@@ -132,38 +156,39 @@
 			],
 			"seats": [
 				[
-					1,
-					4
+					2,
+					6
 				],
 				[
 					5,
-					4
+					7
 				],
 				[
-					6,
-					4
+					7,
+					6
 				],
 				[
 					10,
-					4
+					7
 				],
 				[
-					1,
-					9
+					2,
+					10
 				],
 				[
 					5,
-					9
+					11
 				],
 				[
-					6,
-					9
+					7,
+					10
 				],
 				[
 					10,
-					9
+					11
 				]
 			],
+			"lore_id": "last_light",
 			"hearth": [
 				0,
 				6
@@ -190,14 +215,12 @@
 			],
 			"doors": [],
 			"counter": [
-				[
-					9,
-					1
-				],
-				[
-					10,
-					1
-				]
+				8,
+				3
+			],
+			"taps": [
+				9,
+				0
 			],
 			"hearth": [
 				0,

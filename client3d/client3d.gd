@@ -114,6 +114,10 @@ const WINDOW_STRETCH := 0.6
 const PLINTH_HEIGHT := 0.6
 const PLINTH_PROUD := 0.05
 const SHUTTERS_OPEN := 0.66
+## The lamp on a shell's window sill (811 amended, art-kit's): its slot,
+## and how high its foot stands (wall.wood.window's sill).
+const SILL_LAMP_SLOT := "prop.sill_lamp"
+const SILL_LAMP_LIFT := 1.3
 ## A window lit by the hour goes out at this hour, the sun down; how often
 ## the window lights are looked at, seconds (decision 566).
 const LAMP_OUT := 22.0
@@ -2068,6 +2072,9 @@ var _window_flipped: Dictionary[Vector3i, bool] = {}
 ## 566): whose window light a window there is (_dress_window): [town id,
 ## building code, its building standing] (_show_stage keeps the last).
 var _window_code: Dictionary[Vector3i, Array] = {}
+## The window edges with a lamp on their sill (811 amended: a shell's
+## window nearest its door, BuildingComposer.sill_lamp_edge).
+var _sill_lamps: Dictionary[Vector3i, bool] = {}
 ## The window lights drawn: [its glow node, its _window_code row] each
 ## (_update_lamps).
 var _glows: Array[Array] = []
@@ -6077,6 +6084,7 @@ func _phase_sets() -> void:
 	_state_walls.clear()
 	_window_flipped.clear()
 	_window_code.clear()
+	_sill_lamps.clear()
 	_glows.clear()
 	for key in _town_wall_sets:
 		_wall_sets.erase(key)
@@ -6811,6 +6819,9 @@ func _building_sets(building: Dictionary) -> void:
 	if building.has("kind"):
 		heights = BuildingComposer.wall_heights(building)
 		windows = BuildingComposer.windows(building, _terrain["edges"])
+		var sill := BuildingComposer.sill_lamp_edge(building, windows)
+		if sill != BuildingComposer.NO_SILL:
+			_sill_lamps[sill] = true
 		for cell in Level.building_cells(building):
 			cells[cell] = true
 		pad = cells.keys()[0]
@@ -7815,6 +7826,14 @@ func _dress_window(made: Node3D, key: Vector3i) -> void:
 		glow.visible = _window_lit(_window_code[key], DayNight.hour(DayNight.now()),
 				DayNight.elevation(DayNight.now()))
 	made.scale.y = _height_of(key) / WALL_HEIGHT
+	# A shell's lamp on its sill (811 amended), in the wall's middle, kept
+	# its own height however the window is stretched.
+	if _sill_lamps.has(key) and ArtKit.has(SILL_LAMP_SLOT):
+		var lamp := ArtKit.instance(SILL_LAMP_SLOT)
+		lamp.name = "SillLamp"
+		lamp.position = Vector3(0.0, SILL_LAMP_LIFT / made.scale.y, 0.0)
+		lamp.scale = Vector3(1.0, 1.0 / made.scale.y, 1.0)
+		made.add_child(lamp)
 	var cell := Vector2i(key.x, key.y)
 	if _roll(cell, 50 + key.z) >= SHUTTERS_OPEN:
 		return
@@ -12900,6 +12919,9 @@ func _add_decor() -> void:
 				# of doors, 658), the cell on +x: +x along -out, z along the edge;
 				# a "front": "z" piece (the mine's lamp, 769) its +z along -out.
 				at += Vector2(out) * (0.5 - float(row.get("inset", 0.0)))
+				# A wide wall piece (811 amended, the Mughouse's hearth): at the
+				# middle of its cells along the wall, east or south.
+				at += Vector2(absi(out.y), absi(out.x)) * (int(row.get("wide", 1)) - 1) * 0.5
 				piece.rotation.y = atan2(-float(out.x), -float(out.y)) if row.get("front") == "z" else _yaw_of(-Vector2(out))
 		var base := _height_in(cell, at)
 		piece.position = Vector3(at.x, base + float(row.get("lift", 0.0)), at.y)

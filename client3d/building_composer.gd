@@ -107,6 +107,8 @@ const CRUCKS := {"longhouse": 0.8, "cottage": 0.4, "hut": 0.3, "house": 0.2}
 const CRUCK_SPAN := Vector2i(4, 6)
 ## How likely a wall of a straight stretch is a window (windows).
 const WINDOW_ODDS := 0.3
+## sill_lamp_edge's answer when no lamp burns.
+const NO_SILL := Vector3i(-1, -1, -1)
 ## Posts under open edges (591): every this many vertices along a run, and
 ## a plain post's side where art-kit has none.
 const OPEN_POST_EVERY := 2
@@ -356,6 +358,26 @@ static func windows(building: Dictionary, edges: Dictionary) -> Array[Vector3i]:
 		if roll < WINDOW_ODDS:
 			out.append(key)
 	return out
+
+
+## The window edge of [param windows] (windows' answer for [param
+## building]) a lamp burns on (811 amended, art-kit's prop.sill_lamp: the
+## Last Light Mughouse's lamp in its window): a shell's (a building whose
+## "inside" is its own levels) nearest its door, by its front cell; NO_SILL
+## for any other building, or a shell with no window.
+static func sill_lamp_edge(building: Dictionary, windows: Array[Vector3i]) -> Vector3i:
+	if str(building.get("inside", "")).is_empty() or windows.is_empty():
+		return NO_SILL
+	var front := Vector2(building.get("front", Level.front_cell(building["rect"], building["facing"])))
+	var best := NO_SILL
+	var near := INF
+	for key in windows:
+		var sides := Terrain.edge_cells(key)
+		var gap := (Vector2(sides[0] + sides[1]) * 0.5).distance_squared_to(front)
+		if gap < near:
+			near = gap
+			best = key
+	return best
 
 
 ## [param building]'s wall set's profile (wall.<set>.profile), {} without.

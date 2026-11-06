@@ -2494,6 +2494,16 @@
 			"kind": "dirt"
 		}
 	],
+	"decor": [
+		[
+			180,
+			207,
+			-1,
+			0,
+			"inn_sign",
+			1
+		]
+	],
 	"ledges": [
 		{
 			"points": [

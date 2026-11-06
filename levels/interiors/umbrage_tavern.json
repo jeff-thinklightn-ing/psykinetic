@@ -2,6 +2,7 @@
 	"building": "umbrage_tavern",
 	"town": "wilds/store",
 	"place_name": "the Mughouse",
+	"lore_id": "last_light",
 	"walls": "wood",
 	"floors_set": "wood",
 	"front": {"floor": "umbrage_tavern", "cells": [[5, 13], [6, 13]], "to_map": "wilds", "to_spawn": "from_tavern", "spawn": "from_wilds"},
@@ -13,8 +14,8 @@
 			"ambient": 0.25,
 			"rooms": [
 				{"id": "common", "use": "common", "name": "Common room", "rect": [0, 0, 12, 14],
-					"hearth": [0, 6], "counter": [[9, 1], [10, 1]],
-					"tables": [[2, 3], [7, 3], [2, 8], [7, 8]]},
+					"hearth": [0, 6], "counter": [8, 3], "taps": [9, 0],
+					"tables": [[3, 6], [8, 6], [3, 10], [8, 10]]},
 				{"id": "kitchen", "use": "kitchen", "name": "Kitchen", "rect": [12, 0, 6, 6],
 					"doors": [{"to": "common", "cells": [[12, 2], [12, 3]], "side": "west"}],
 					"holds": [[16, 1], [16, 4]]},

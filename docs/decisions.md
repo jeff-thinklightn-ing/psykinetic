@@ -42759,3 +42759,36 @@ the inn's folk through its door, so the inn is never shut with nobody to go in.
   decor), _test_shelled (a pile, an entity and a player inside the inn carried out once, the item
   book following; an overlay copy waits; the next boot moves nothing) and _test_town_places (the
   inn a shell); view_test _test_tavern_inside reads the inn by its use. Server and level data.
+
+811 amended: the Mughouse furnished (art-kit's Mughouse pieces, 0bf79a43; the coordinator's ask;
+lore's last_light, 174dae41; release's label; voice's words). Level.BUILDINGS gains
+building.bar_counter (3 x 1), building.tap_rack (2 x 1) and building.tavern_table (2 x 2, variant 2
+laid with tankards, a jug and bread), all SOLID and DOORLESS, facing south (their +z, the counter's
+front to the room, the rack's back to the north wall). DECOR_KINDS gains "wall_hearth" (prop.wall_hearth:
+"wall", "front": "z", and the new "wide": 2, that many cells along its wall from its cell east or
+south, each walled alike, drawn at their middle) and "inn_sign" (prop.inn_sign: "edge", its bracket
++x out of the wall). Level.places_from carries a place's "lore_id". tools/make_interior.py lays a
+common room's "counter" (the bar's west cell; the taverner, the tavern place's "at", behind its
+middle), "taps" (the rack's west cell), "tables" (each table's north-west cell, every other one
+laid; a seat west of its top row and east of its bottom one) and "hearth" (the north or west cell
+of a fireplace two cells along its wall: both cells fire, the wall_hearth over them), and refuses a
+piece off the room, on another, on a fire, a seat or a door's cell, or a seat or the taverner off
+the floor left; a spec's "lore_id" goes on its tavern place. umbrage_tavern: the counter at (8..10,
+3), the taverner at (9, 2), the taps at (9..10, 0), the lane behind two cells deep; tables at (3, 6),
+(8, 6), (3, 10) and (8, 10), two rows clear of the counter and each other (two-cell passages); the
+fireplace on the west wall over (0, 6) and (0, 7); the tavern place lore's last_light. The wilds:
+the sign at (180, 207) out of the inn's street front, beside its door. A lamp on a sill
+(prop.sill_lamp): BuildingComposer.sill_lamp_edge picks a shell's window nearest its door and Client3D
+stands the lamp on it at SILL_LAMP_LIFT 1.3 m; but the inn's walls stand two storeys (6 m), where
+no wood window is drawn (WINDOW_STRETCH; there is no wall.wood.window_tall), so it shows on the
+inn once such a window is drawn (art-kit asked). Tests: level_test _test_tavern_zone (the pieces
+where laid and solid, the taverner behind the counter, the fireplace over its two fire cells, the
+tavern lore's last_light as a place, the sign on the street front); view_test _test_tavern_inside
+(the sign drawn on the front, the fireplace at its cells' middle against the west wall, a one-storey
+shell's lamp on its window nearest its door, none on a building that is no shell). 811's
+CHANGELOG bullet grows to say it (voice: one place, one bullet). Two of 811's own, found by the
+full suite: the wilds' relief.png gives the way out, "from_tavern" (181, 208), a level pad of its
+four neighbours at 5.69 m (relief_test: every spawn on level ground; 0.25 m down from the inn's
+floor at its door, walkable), and EditorFields.NOT_OFFERED names an interior's "town", "storeys"
+and "beds" (editor_test: every key a row). Client and level data, protocol unchanged, no new
+class_name.

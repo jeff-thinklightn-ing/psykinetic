@@ -160,7 +160,10 @@ const BUILDINGS := {"building.hut": Vector2i(3, 3), "building.house": Vector2i(4
 	"building.throne": Vector2i(1, 1), "building.dark_pillar": Vector2i(1, 1), "building.hatch_sealed": Vector2i(1, 1),
 	"building.dwarven_forge": Vector2i(6, 3), "building.weapon_rack": Vector2i(2, 1), "building.turf_house": Vector2i(7, 5),
 	"building.market_stall": Vector2i(2, 1), "building.grave": Vector2i(1, 2), "building.wayside_shrine": Vector2i(1, 1),
-	"building.milestone": Vector2i(1, 1), "building.hunters_blind": Vector2i(2, 2), "building.lean_to": Vector2i(3, 2)}
+	"building.milestone": Vector2i(1, 1), "building.hunters_blind": Vector2i(2, 2), "building.lean_to": Vector2i(3, 2),
+	# The Last Light Mughouse's common room (811 amended, art-kit's pieces):
+	# the taverner's counter and tap rack, and its tables.
+	"building.bar_counter": Vector2i(3, 1), "building.tap_rack": Vector2i(2, 1), "building.tavern_table": Vector2i(2, 2)}
 ## The buildings whose footprint is a plot round a smaller inside (718: the
 ## healer's turf house, its earth bank heaped round it): slot -> the ring's
 ## width in cells. Its one block (its inside, walled on its outline as any
@@ -234,7 +237,8 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
-	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to"]
+	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
+	"building.bar_counter", "building.tap_rack", "building.tavern_table"]
 ## The solid buildings with no door (decision 567: the wilds' landmarks; 566
 ## amended: the work props, a chopping block and a woodpile a body stands
 ## beside; 600: the Old Tower's broken tower and fallen stone; 580 step 3: the
@@ -243,12 +247,14 @@ const SOLID: Array[String] = ["building.mound", "building.great_tree", "building
 ## weapon rack, so no fight stands a body in the blades; 659 amended: the
 ## dark tower's pillar; 736: Umbrage's weapon stall, its seller behind it; 778: the
 ## hills' roadside sights and stories, a grave, a shrine, a milestone, a hunter's blind and
-## a lean-to): every cell of theirs out of the floor, none walked onto or into.
+## a lean-to; 811 amended: the Mughouse's counter, tap rack and tables, the
+## taverner behind the counter): every cell of theirs out of the floor, none walked onto or into.
 const DOORLESS: Array[String] = ["building.great_tree", "building.cairn", "building.standing_stone", "building.waystone",
 	"building.chopping_block", "building.woodpile", "building.tower_ruin", "building.rubble_heap", "building.fallen_column",
 	"building.burial_table", "building.crypt_pillar", "building.round_table", "building.broken_table",
 	"building.dwarven_forge", "building.weapon_rack", "building.dark_pillar", "building.market_stall",
-	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to"]
+	"building.grave", "building.wayside_shrine", "building.milestone", "building.hunters_blind", "building.lean_to",
+	"building.bar_counter", "building.tap_rack", "building.tavern_table"]
 ## solid_door_of's answer for a DOORLESS building.
 const NO_DOOR := Vector2i(-1, -1)
 ## A bridge (decision 505): a building entry {slot: "bridge", at, facing,
@@ -1384,6 +1390,9 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			"radius": maxi(radius, 1), "worth": maxi(int(entry.get("worth", 1)), 0), "holder": str(entry.get("holder", "nobody")),
 			"explore": bool(entry["explore"]) if entry.get("explore") is bool else kind in EXPLORE_KINDS and not str(entry.get("name", "")).strip_edges().is_empty()
 				and not at_a_mouth(at, maxi(radius, 1), config)}
+		# The lore entry it is (811 amended: the Mughouse, lore's last_light), carried for its readers.
+		if not str(entry.get("lore_id", "")).is_empty():
+			out[str(key)]["lore_id"] = str(entry["lore_id"])
 		# The name a reached place's gain shows (804, maps' side; voice's), where its name is a where-phrase (613's).
 		out[str(key)]["shown"] = str(entry["shown"]).strip_edges() if entry.get("shown") is String and not str(entry["shown"]).strip_edges().is_empty() else out[str(key)]["name"]
 		# A refuge's where (613 amended): one of REFUGE_WHERE, else warned and left out.
@@ -2186,7 +2195,9 @@ static func niches_from(config: Dictionary, terrain: Dictionary, warnings: Array
 ## "lift" (metres up), "inset" (metres back from its edge into the cell),
 ## "front": "z" (a wall piece whose +z faces out of the wall, the lamp's
 ## bracket behind it, not +x), "posts" (a span's slot stood at each end,
-## the beam's).
+## the beam's). A wall piece may be "wide" (811 amended: the Mughouse's
+## hearth): that many cells along its wall from its cell, east or south,
+## each walled on the same side, drawn at their middle.
 const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	"moss_patch": {"sits": "flat", "variants": 3, "faced": false},
 	"moss_strip": {"sits": "wall", "variants": 2},
@@ -2214,7 +2225,12 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# against a wall out of the way since decor is never solid; the sack below too.
 	"crate": {"sits": "flat", "variants": 1, "faced": true},
 	"barrel": {"sits": "flat", "variants": 1, "faced": true},
-	"sack": {"sits": "flat", "variants": 1, "faced": true}}
+	"sack": {"sits": "flat", "variants": 1, "faced": true},
+	# The Last Light Mughouse (811 amended, art-kit's pieces): its fireplace
+	# against the common room's wall, over the hearth's two fire cells; its
+	# sign out of the street front's wall, +x out.
+	"wall_hearth": {"sits": "wall", "variants": 1, "front": "z", "wide": 2},
+	"inn_sign": {"sits": "edge", "variants": 1}}
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],
@@ -2273,6 +2289,10 @@ static func decor_from(config: Dictionary, terrain: Dictionary, warnings: Array[
 			"wall":
 				fits = side and walled.call(cell, way)
 				piece["edge"] = Terrain.edge_key(cell, way)
+				# A wide piece (811 amended): every cell along on floor, walled alike.
+				var along := Vector2i(absi(way.y), absi(way.x))
+				for step in range(1, int(DECOR_KINDS[kind].get("wide", 1))):
+					fits = fits and floor.has(cell + along * step) and walled.call(cell + along * step, way)
 			"edge":
 				fits = side
 				if side:
