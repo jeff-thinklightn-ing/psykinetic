@@ -2206,6 +2206,9 @@ func _test_worn() -> void:
 	_check(Items.worn_of("hood").get("look") == "hood" and Items.worn_of("soft_boots").get("look") == "boots_soft"
 			and not Items.worn_of("felt_hat").has("look") and not Items.worn_of("bear_claw_charm").has("look"),
 			"a worn look word for a drawn body part: the hood's, the soft boots'; none for the felt hat or the charm (worn.<id> meshes)")
+	_check(Items.worn_kind("cloak") == "back" and Items.worn_of("cloak").get("look") == "cloak"
+			and Items.worn_kind("encolpion_amulet") == "neck" and not Items.worn_of("encolpion_amulet").has("look"),
+			"a cloak for the back (look cloak); the Encolpion Amulet at the neck (art-kit's worn mesh)")
 	# An old record: 11 slots, everything where it was, the worn ones empty.
 	var eleven := ["ration", "", "", "", "sword", "shield", "robes", "knife", "", "", "arrows"]
 	var old := PlayerRecord.from_dict({"player_id": "old788", "tile": [1, 1], "slots": eleven})

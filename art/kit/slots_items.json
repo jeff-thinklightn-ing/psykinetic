@@ -373,6 +373,25 @@
 			"type": "mesh",
 			"uses": "Mound-breakers' key (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.cloak": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.4,
+				0.12,
+				0.3
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "woollen cloak (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.cloth_bolt": {
 			"budget": 500,
 			"category": "items",

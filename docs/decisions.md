@@ -41913,8 +41913,14 @@ part the views draw for it, tinted the row's colour, as armour's look (622) does
 felt hat, amulets, the charm) is drawn by art-kit's worn.<id> mesh on its slot's socket; rings
 draw nothing. Items._worn kept only numbers and now keeps a "look" string too; the words are
 pc-character's, who draws them, and cites this amendment. items_test _test_worn checks the two
-words and their absence on the hat and the charm. Catalog and client only: protocol unchanged,
-no new class_name, no bullet (the drawing carries it).
+words and their absence on the hat and the charm. The rows the drawing needs (the coordinator's
+ask): a woollen cloak ("cloak", lore's name: the back slot, look "cloak", clothing, 1.5 kg, value 8;
+Rolf's stall sells it, economy's line after this; art-kit's icon), and the Encolpion Amulet worn at
+the neck ("worn": {"slot": "neck"}, no look word: art-kit's worn.encolpion_amulet). The amulet is
+soulbound: it may move between its own carrier's slots (try_transfer from and to the same body), so
+putting it on or taking it off changes nothing else; totem_of finds it wherever it sits, and its
+charges stay as they were. items_test _test_worn checks both. Catalog and client only: protocol
+unchanged, no new class_name, no bullet (the drawing carries it).
 
 ## 800. Carved words on stones
 
