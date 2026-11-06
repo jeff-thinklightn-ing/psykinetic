@@ -2912,19 +2912,29 @@ func _test_boar_lair() -> void:
 	_check(clawed.size() == 1 and Vector2(clawed[0]["cell"] - at).length() <= 3.0
 		and not forest_floor.has(clawed[0]["cell"]) and bones.size() >= 2,
 		"a clawed tree (solid) and bones at the mouth, a sign of what lives there (%s, %d bones)" % [clawed, bones.size()])
-	# The sightline (the coordinator, terrain's still): out along the way in to
-	# 8 cells, 5 across past the first two rows, no trunk and no grown tree.
+	_check_lair_sight(at, Vector2i(1, 0), forest_floor)
+
+
+## A lair's sightline (780 amended (12), the coordinator, terrain's still):
+## out from its mouth along "open" to 8 cells, 3 across in the first two rows
+## past the pad, 5 after, no trunk (every cell floor) and no tree from
+## trees.json standing in it, grown or young.
+func _check_lair_sight(at: Vector2i, open: Vector2i, forest_floor: Dictionary) -> void:
+	var side := Vector2i(absi(open.y), absi(open.x))
 	var sight_blocked: Array = []
 	for out in range(3, 9):
-		for across in range(-2 if out >= 5 else -1, (2 if out >= 5 else 1) + 1):
-			var cell := at + Vector2i(out, across)
+		var half := 2 if out >= 5 else 1
+		for across in range(-half, half + 1):
+			var cell := at + open * out + side * across
 			if not forest_floor.has(cell):
 				sight_blocked.append(cell)
 	var grown: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/forest/trees.json"))
+	var middle := Vector2(at) + Vector2(0.5, 0.5)
 	for tree: Dictionary in (grown as Dictionary).get("trees", []):
-		var spot := Vector2(float(tree["at"][0]), float(tree["at"][1]))
-		if spot.x >= at.x + 3 and spot.x < at.x + 9 and absf(spot.y - (at.y + 0.5)) < 2.5:
-			sight_blocked.append(spot)
+		var off := Vector2(float(tree["at"][0]), float(tree["at"][1])) - middle
+		var along := off.dot(Vector2(open))
+		if along >= 2.5 and along < 8.5 and absf(off.dot(Vector2(side))) < 2.5:
+			sight_blocked.append(tree["at"])
 	_check(sight_blocked.is_empty(), "a clear sightline to the mouth across the pad, no tree in it (%s)" % [sight_blocked])
 
 
@@ -2987,6 +2997,7 @@ func _test_wolf_cave() -> void:
 	var at: Vector2i = door.get("tile", Vector2i(-1, -1))
 	_check(not door.is_empty() and not door["closed"] and spawn.size() == 2 and forest_floor.has(Vector2i(spawn[0], spawn[1]))
 		and not forest_floor.has(at + Vector2i(0, 1)), "the forest's mouth open, its spawn on the pad, rock behind it (%s, %s)" % [door, spawn])
+	_check_lair_sight(at, Vector2i(0, -1), forest_floor)
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp
 ## building with its place at its fire, 6 to 12 cells off a path and 24

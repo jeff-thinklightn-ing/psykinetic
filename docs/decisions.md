@@ -43744,9 +43744,13 @@ the hills or foothills.
   counted again only after the lair refills; enemy-ai's, voice's words).
 - In the forest, make_forest's LAIRS gains its mouth at (53,76), 11.7 cells off the healer's path,
   opening north toward it: the link {to_map "wolf_cave", to_spawn "from_forest", mouth "cave"
-  (terrain's 798 cue), closed false}, the rock behind and beside it void (the cue draws the outcrop),
-  a trampled dirt pad with two bones, "from_wolf_cave" two cells out. A LAIRS entry says "clawed"
-  (the boar's tusk-scored tree; none here). The forest regenerated: 20 cells changed round the mouth.
+  (terrain's 798 cue), closed false}, "rock" cells behind it over the cue's footprint (CAVE_HILL,
+  7 x 5, Client3D.MOUTH_CELLS: the cue draws the outcrop there), grass beside the link, a trampled
+  dirt pad with two bones (scattered_bones), "from_wolf_cave" two cells out. A LAIRS entry says
+  "clawed" (the boar's tusk-scored tree; none here). Before the pad, the boar lair's sightline strip
+  (780 amended (12), the coordinator's: 8 cells out, 3 then 5 across) runs north toward the path, so
+  the mouth shows from the low camera; its six trees (five grown, a sapling) taken out of trees.json
+  by hand, level_test checking the strip for both lairs. The forest regenerated round the mouth.
 - Drawn, a "cave" level's "ambient" is a share of the zone's base (0.2) at most 1 (769 amended (6)), so
   past 0.2 it draws the cave look at full; the stills (C:/dev/review/lands/fill_forest/phase_e) showed
   that look too dark for a wolf to read without its tag, so the coordinator gave the cave look's
