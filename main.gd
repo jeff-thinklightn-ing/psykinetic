@@ -4535,6 +4535,8 @@ func _boot() -> void:
 	_test_temple_day()
 	if Net.test_hp and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
 		push_error("[test] --test-hp without --run-marker: ignored (786: a test-only flag, never the box's)")
+	if Net.test_companion and not hp_verb_allowed(true, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+		push_error("[test] --test-companion without --run-marker: ignored (786 amended (2): a test-only flag, never the box's)")
 	# Raiders come into a played zone as its level's monsters do.
 	World.spawn_spec = _spawn
 	World.bless = barrow_won  # The draugr laid to rest (decisions 548, 573).
@@ -21359,8 +21361,12 @@ func _poll_console() -> void:
 ## companion (decision 294), by id; "companion forget <player> <id>": one
 ## of them gone (her live self too, if she is in the world).
 func _companion_command(words: PackedStringArray) -> String:
+	if words.size() == 3 and words[1] in ["rod", "bond", "camp", "explore"]:
+		if not hp_verb_allowed(Net.test_companion, Array(OS.get_cmdline_args() + OS.get_cmdline_user_args())):
+			return "not on this server"
+		return _companion_test_command(words)
 	if words.size() < 3 or words[1] not in ["facts", "forget"]:
-		return "companion facts <player> | companion forget <player> <id>"
+		return "companion facts <player> | companion forget <player> <id> | companion rod|bond|camp|explore <player>"
 	var record: PlayerRecord = null
 	for each: PlayerRecord in _records.values():
 		if each.name.to_lower() == words[2].to_lower():
@@ -21708,7 +21714,7 @@ const CONSOLE_HELP: Array[String] = [
 	"hour [<h>] | day_minutes [<m>]: the time of day, the day's length",
 	"season [<name>] | season_days [<n>]: the season, its length",
 	"weather [<kind>|auto|reload] [<minutes>] [<region>|all]: the weather",
-	"companions | companion facts <player> | companion forget <player> <id>: the companions",
+	"companions | companion facts <player> | companion forget <player> <id> | companion rod|bond|camp|explore <player>: the companions (rod, bond, camp, explore: a rod in her pack, her next bond step, a camp cleared or a place found, the real gains, for voice runs; test servers only: --test-companion beside --run-marker)",
 	"mind scripted|ollama | mind log on|off | mind last <name>: the residents' minds",
 	"perception list|grid|both: what the minds are told",
 	"transcript <name> [<date>]: a mind's talk",
@@ -22125,6 +22131,67 @@ func _give_command(words: PackedStringArray) -> String:
 		_hand_item(id, item, "the admin")
 	print("[economy] the admin gave %d %s" % [count, item])
 	return "%s: %d %s given" % [words[1], count, item]
+
+
+## "companion rod|bond|camp|explore <player>" (playtest's voice runs, pair 7):
+## rod, a fishing rod into her pack's first free slot; bond, her bond raised to
+## its next step as a deed would (Main._bond_gained, its banner); camp and
+## explore, the gain a cleared camp or a found place sends (Main.reward), on
+## the first camp or named place of their zone. Each goes the real way, so she
+## hears it as she would in play. Test and local servers only (786 amended
+## (2), the coordinator): a faked step or gain in a real player's record would
+## later be read as play, so they answer only with --test-companion beside a
+## --run-marker (Main.hp_verb_allowed), else "not on this server".
+func _companion_test_command(words: PackedStringArray) -> String:
+	var verb := words[1]
+	var id := str(_admin_player(words[2]).get("id", ""))
+	var player := _player_of_id(id) if not id.is_empty() else null
+	var record: PlayerRecord = _records.get(id)
+	var pet: Companion = _companions.get(id)
+	if player == null or record == null or not is_instance_valid(pet):
+		return "no player %s with a companion in the game" % words[2]
+	match verb:
+		"rod":
+			for slot: int in Items.PACK_SLOTS:
+				if slot < pet.slots.size() and pet.slots[slot].is_empty():
+					World.put_item(pet, pet, slot, World.items.mint("fishing_rod", "built"))
+					return "%s: a rod in her pack (slot %d)" % [Companion._name_of(pet), slot]
+			return "%s: no room in her pack" % Companion._name_of(pet)
+		"bond":
+			var step_was := bond_step_of(record.companion, id)
+			var bar := bond_bar_of(record.companion, id)
+			if bar.y <= 0:
+				return "%s: devoted already" % Companion._name_of(pet)
+			Standing.bump(record.companion, id, bar.y - bar.x, "stood by you", World.steps)
+			_set_mood(record)
+			_bond_gained(record, bar.y - bar.x, "stood by you", step_was)
+			return "%s: %s -> %s" % [Companion._name_of(pet), step_was, bond_step_of(record.companion, id)]
+		"camp":
+			var key := "camp"
+			var name := ""
+			var cell := player.tile
+			if World.holdings != null:
+				for place_id: String in World.holdings.places_in(player.zone):
+					var place := World.holdings.place(place_id)
+					if str(place.get("kind", "")) == "camp":
+						key = str(place.get("key", key))
+						name = str(place.get("name", ""))
+						cell = place.get("cell", cell)
+						break
+			var camp := camp_cleared_name(key, name, "the Blood Rot")
+			reward(id, {"track": "deed", "amount": 1, "of": camp, "words": "cleared %s" % camp, "big": true,
+				"banner": camp_cleared_banner(camp), "at": cell})
+			return "%s: cleared %s" % [words[2], camp]
+		_:
+			var shown := Companion.place_name(player.zone)
+			if World.holdings != null:
+				for place_id: String in World.holdings.places_in(player.zone):
+					var named := str(World.holdings.place(place_id).get("name", ""))
+					if not named.is_empty():
+						shown = named
+						break
+			reward(id, {"track": "explore", "amount": 1, "of": shown, "words": shown, "big": true, "banner": shown})
+			return "%s: found %s" % [words[2], shown]
 
 
 ## The console's zones: each loaded zone, awake or asleep, its tick, and who

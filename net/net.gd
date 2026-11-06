@@ -113,6 +113,7 @@ extends Node
 ##   --test-herds=<n>             server: n herds of wild animals in each outdoor zone built (perf's benches; Main._test_herds)
 ##   --test-temple-day            server, tests only (with --run-marker): today is everyone's temple day (404 amended; playtest's tours)
 ##   --test-hp                    server, tests only (with --run-marker): the admin verb "hp <player> <n>" sets a player's hp (786; playtest's tours)
+##   --test-companion             server, tests only (with --run-marker): the admin verbs "companion rod|bond|camp|explore <player>" (786 amended (2); playtest's voice runs)
 ##   --screenshot=<path>          save the window as PNG when --test-exit-after quits
 ##   --test-minimap               open the big map at the start (for screenshots)
 ##   --menu                       start at the main menu, as an exported client does (for screenshots)
@@ -682,6 +683,11 @@ var test_temple_day := false
 ## (a fall forced beside a wolf); honoured only beside --run-marker
 ## (Main.hp_verb_allowed), else one ERROR at start and the verb unknown.
 var test_hp := false
+## --test-companion (786 amended (2)): the admin verbs "companion
+## rod|bond|camp|explore <player>", for playtest's voice runs; honoured only
+## beside --run-marker (Main.hp_verb_allowed), else one ERROR at start and the
+## verbs answer "not on this server".
+var test_companion := false
 ## The lawspeaker (decision 448), server only: --lawspeaker=<haiku|sonnet|opus|off>
 ## (or PSYKINETIC_LAWSPEAKER) turns his daily rulings on through the Claude
 ## API (ANTHROPIC_API_KEY, as the builder); off by default, and the box stays
@@ -2197,6 +2203,8 @@ func _parse_args(given: Array = []) -> void:
 				test_temple_day = true
 			"--test-hp":
 				test_hp = true
+			"--test-companion":
+				test_companion = true
 			"--lawspeaker-players":
 				lawspeaker_players = true
 			"--address", "--port", "--bind", "--state", "--admin-port", "--status-port", "--max-players", "--token", "--settings", "--player-id", "--name", "--renderer", "--controls", \

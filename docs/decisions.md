@@ -41748,6 +41748,21 @@ verb answers "unknown command" unless both are set, so on the box it does not ex
 in the console's help. respawn_test _test_console: the verb unknown without the flag, the gate
 refusing a flag without a marker and a marker without the flag, and with both the hp set and
 held to 1. Server only, protocol unchanged, no new class_name, no bullet (a test tool).
+
+786 amended (2): the companion's test verbs, behind `--test-companion` (the coordinator's
+approval; playtest's voice runs, pair 7). The console's `companion` command gains
+`companion rod|bond|camp|explore <player>`: rod, a fishing rod in her pack's first free slot;
+bond, her bond raised to its next step as a deed would (Main._bond_gained, its banner); camp and
+explore, the gain a cleared camp or a found place sends (Main.reward) for the first camp or
+named place of the player's zone. Each goes the real way, so she hears it as she would in play.
+They are for test and local servers only: a faked step or gain in a real player's record would
+later be read as play. So, as hp, `--test-companion` (Net.test_companion, server) turns them on,
+honoured only beside a `--run-marker=` through the same gate (Main.hp_verb_allowed); the flag
+without a marker is one ERROR at start, and without both the verbs answer "not on this server"
+(the coordinator's words; the command itself stays, for facts and forget). They are in the
+console's help, marked test servers only. companion_test _test_companion_verb: without the flag
+"not on this server" and nothing given, the gate refusing a flag without a marker, and with both
+each verb's real gain. Server only, protocol unchanged, no new class_name, no bullet.
 ## 794. Rolling mine carts: a cart pushed along its rails rolls on
 
 The first user is 790, Hollowfell's mine (dungeon lays its track and carts). A Cargo

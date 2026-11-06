@@ -97,6 +97,7 @@ func _ready() -> void:
 	_test_wants()
 	_test_talk_rate()
 	_test_tomb()
+	_test_companion_verb()
 	_test_fishing()
 	_test_notice()
 	_test_deeds()
@@ -1970,6 +1971,40 @@ func _test_notice() -> void:
 	_check(pet._notice.is_empty() and int(Companion.notice_counts.get("asked", 0)) == 1, "waited too long: let go, never said late")
 	_check(Companion.notice_report() == "; noticed: 1 of 4 offered" and Companion.notice_counts.is_empty(), "the [voice] line's part, counts only")
 	pet._notice_last = -100000
+	_settle(pet)
+
+
+func _test_companion_verb() -> void:
+	print("
+== the console's companion verb, for playtest's voice runs: the real gains ==")
+	var pet := _companion()
+	_settle(pet)
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var who: String = record.name
+	var slots_were := pet.slots.duplicate()
+	Net.test_companion = false
+	var said: String = _main._companion_command(PackedStringArray(["companion", "rod", who]))
+	_check(said == "not on this server" and not Array(pet.slots).has("fishing_rod"), "without --test-companion: not on this server, nothing given (%s)" % said)
+	_check(not Main.hp_verb_allowed(true, ["--map=test_room", "--server"]) and Main.hp_verb_allowed(true, ["--run-marker=7"]),
+		"the flag honoured only beside a --run-marker")
+	Net.test_companion = true
+	said = _main._companion_command(PackedStringArray(["companion", "rod", who]))
+	_check(Array(pet.slots).has("fishing_rod"), "rod: a rod in her pack (%s)" % said)
+	var kept_bond: Variant = _bond_as(0)
+	var step_was: String = _main.bond_step_of(record.companion, record.player_id)
+	said = _main._companion_command(PackedStringArray(["companion", "bond", who]))
+	_check(_main.bond_step_of(record.companion, record.player_id) != step_was and _main.last_bond_gain.has("step"), "bond: her next step, its banner (%s)" % said)
+	_bond_as(0, kept_bond)
+	var deeds: int = _main.rewards_by_track.get("deed", 0)
+	var found: int = _main.rewards_by_track.get("explore", 0)
+	said = _main._companion_command(PackedStringArray(["companion", "camp", who]))
+	var said2: String = _main._companion_command(PackedStringArray(["companion", "explore", who]))
+	_check(_main.rewards_by_track.get("deed", 0) == deeds + 1 and _main.rewards_by_track.get("explore", 0) == found + 1,
+		"camp and explore: the gains a cleared camp and a found place send (%s; %s)" % [said, said2])
+	_check(_main._companion_command(PackedStringArray(["companion", "dance", who])).contains("companion rod|bond|camp|explore"), "anything else: its usage")
+	Net.test_companion = false
+	for slot in slots_were.size():
+		pet.slots[slot] = slots_were[slot]
 	_settle(pet)
 
 
