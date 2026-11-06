@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fishing: cast a rod into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).
 - What you do with your companion lifts her Ease, Venture, Wonder, Faith, Shelter or Company: a fire, a game, a gift, food shared, the road, somewhere new, each with a +1 as it comes (803 amended (2)).
 - Your companion wants one thing at a time and tells you so when all is quiet: a rest by a fire, a while in town, a first fight won, a blessing at the temple; do it together and it lifts her far more than usual, and she speaks of it after (803 amended (4)).
 - Your companion talks more when you answer her, by a word or by going to what she pointed out, and a little less when you don't; tell her to talk less or more and she will (803 amended (5)).

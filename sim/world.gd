@@ -1371,6 +1371,7 @@ func _step_zone() -> void:
 	_regen_stamina()
 	# 5. Bandaging and mending; buffs wearing off.
 	_tend_wounds()
+	_tend_fishing()  # Casts and cooking (805 amended (3)).
 	_tend_downed()
 	_tend_teeters()  # Found its feet on a rim (783).
 	_fade_buffs()
@@ -7245,9 +7246,13 @@ func try_use(by: GridEntity, slot: int) -> bool:
 			add_buff(by, effect["kind"], effect["amount"], effect["ticks"])
 		_log("use: %s consumed %s" % [by.name, id])
 		return true
+	if not str(Items.def(id).get("cooks", "")).is_empty():
+		return try_cook(by, slot)  # A raw thing at a fire (805 amended (3)).
 	match str(Items.def(id).get("use", "")):
 		"bandage":
 			return try_bandage(by, by)
+		"fish":
+			return try_fish(by)
 	return false
 
 
@@ -7526,6 +7531,296 @@ func _tend_wounds() -> void:
 			bandage_changed.emit(null, patient, &"mended")
 
 
+# --- Fishing and cooking (805 amended (3)) --------------------------------------------
+
+## A rod's reach: water within this many cells of the angler (any way round).
+const FISH_REACH := 2
+## The cast's flight: the float in the air, then on the water.
+const FISH_CAST_TICKS := 15
+## The wait after the cast lands, before the bite: FISH_WAIT_LEAST to
+## FISH_WAIT_MOST ticks, a seeded roll per cast (the whole cast 15-30 s).
+const FISH_WAIT_LEAST := 120
+const FISH_WAIT_MOST := 270
+## The bite: the float dips, the splash and its cue; at its end the catch
+## lands or slips the hook. The strike hook (try_strike) cuts it short.
+const FISH_BITE_TICKS := 12
+## How long a cast's end ("landed", "missed") stays shown before it clears.
+const FISH_END_TICKS := 8
+## Without the pond's own stock (economy's pond_catch), a bite's chance.
+const FISH_CATCH := 0.6
+## Cooking at a fire: this many ticks, broken as a cast is.
+const COOK_TICKS := 100
+
+## A cast ([param state] &"cast"), the bite (&"bite"), a fish landed
+## (&"caught", [param uid] the fish), the bite missed (&"missed") or a cast
+## broken off (&"broken": fish_broke_why says why). Server only.
+signal fishing_changed(by: GridEntity, state: StringName, uid: int)
+## Cooking began (&"started"), was done (&"done", [param uid] the cooked
+## thing) or broken off (&"broken": fish_broke_why). Server only.
+signal cooking_changed(by: GridEntity, state: StringName, uid: int)
+
+## Server: casts under way, angler -> {pond, at, tile, from, exerted, bite,
+## ends, rod, roll, over (once landed or missed)}; cooking, cook -> {raw,
+## made, slot, tile, from, exerted, until}.
+var _fishing: Dictionary[GridEntity, Dictionary] = {}
+var _cooking: Dictionary[GridEntity, Dictionary] = {}
+## Why the last cast or cooking broke off: "moved", "hurt", "lowered", "gone".
+var fish_broke_why := ""
+
+
+## The hand holding a rod (a thing whose catalog use is "fish"), -1 if none.
+func rod_hand(entity: GridEntity) -> int:
+	for slot: int in [Items.RIGHT_HAND, Items.LEFT_HAND]:
+		if slot < entity.slots.size() and not entity.slots[slot].is_empty() and Items.def(entity.slots[slot]).get("use") == "fish":
+			return slot
+	return -1
+
+
+## The water cell [param entity] would cast into: within FISH_REACH, the one
+## most ahead of its facing, then the nearest; NO_CELL if none.
+func cast_cell(entity: GridEntity) -> Vector2i:
+	var best := NO_CELL
+	var best_score := -INF
+	var ahead := Vector2(entity.facing).normalized() if entity.facing != Vector2i.ZERO else Vector2.ZERO
+	for dy in range(-FISH_REACH, FISH_REACH + 1):
+		for dx in range(-FISH_REACH, FISH_REACH + 1):
+			var cell := entity.tile + Vector2i(dx, dy)
+			if (dx == 0 and dy == 0) or not is_water(cell):
+				continue
+			var way := Vector2(dx, dy)
+			var score := ahead.dot(way.normalized()) * 2.0 - way.length() * 0.5
+			if score > best_score:
+				best_score = score
+				best = cell
+	return best
+
+
+## The fishing place (maps' place of kind "fishing", Holdings' id) whose
+## ground takes in [param cell] or [param from], "" for none.
+func pond_at(cell: Vector2i, from := NO_CELL) -> String:
+	if holdings == null:
+		return ""
+	for id in holdings.places_in(zone.name):
+		if str(holdings.place(id).get("kind", "")) == "fishing" \
+				and (holdings.covers(id, cell) or from != NO_CELL and holdings.covers(id, from)):
+			return id
+	return ""
+
+
+## Whom a pond counts a cast for (economy's anglers): a player's id, a
+## companion's keeper's; "" for anyone else.
+func _angler_id(entity: GridEntity) -> String:
+	if entity is Player:
+		return (entity as Player).player_id
+	if entity is Companion:
+		return (entity as Companion).keeper_id
+	return ""
+
+
+## Why [param by] could not cast now (try_fish's checks, in its order), ""
+## if it could: "no_rod", "busy", "no_water", "no_fish" (water no fishing
+## place takes in), "fished_out" (its pond's stock is 0 today).
+func fish_refusal(by: GridEntity) -> String:
+	if rod_hand(by) < 0:
+		return "no_rod"
+	if _fishing.has(by) or _cooking.has(by) or _bandaging.has(by) or is_stunned(by) or not has_hands(by) or is_downed(by):
+		return "busy"
+	var at := cast_cell(by)
+	if at == NO_CELL:
+		return "no_water"
+	var pond := pond_at(at, by.tile)
+	if pond.is_empty():
+		return "no_fish"
+	if economy != null and economy.has_method("pond_fish") and int(economy.call("pond_fish", pond)) <= 0:
+		return "fished_out"
+	return ""
+
+
+## [param by] (a player or a companion with a rod in hand) casts into the
+## water within FISH_REACH (cast_cell), at a fishing place (pond_at): the
+## float flies (FISH_CAST_TICKS), sits (a seeded FISH_WAIT_LEAST to
+## FISH_WAIT_MOST), then bites (FISH_BITE_TICKS), and the catch lands
+## (economy's pond_catch, else FISH_CATCH) into its pack, or at its feet
+## with the pack full. Moving, a blow, a hurt or lowering the rod reels in
+## (_tend_fishing); using the rod again while casting reels in. False, and
+## nothing starts, if it cannot (fish_refusal).
+func try_fish(by: GridEntity) -> bool:
+	if not Net.is_authority() or not _can_handle(by):
+		return false
+	if _fishing.has(by):
+		if not _fishing[by].has("over"):
+			_reel_in(by, "lowered")
+		return true
+	if not fish_refusal(by).is_empty():
+		return false
+	var at := cast_cell(by)
+	var pond := pond_at(at, by.tile)
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("%s:%d:%s" % [by.name, tick, at])
+	var bite := tick + FISH_CAST_TICKS + roll.randi_range(FISH_WAIT_LEAST, FISH_WAIT_MOST)
+	_fishing[by] = {"pond": pond, "at": at, "tile": by.tile, "from": tick, "exerted": by.last_exertion_tick(),
+		"bite": bite, "ends": bite + FISH_BITE_TICKS, "rod": rod_hand(by), "roll": roll.randf()}
+	by.fishing = {"state": "cast", "at": at}
+	if free_body(by):
+		halt(by, tick)  # Its banked free steps dropped, as a bandager's (713).
+	if economy != null and economy.has_method("pond_cast"):
+		economy.call("pond_cast", pond, _angler_id(by), at)
+	_log("fish: %s casts into %s at %s" % [by.name, pond, at])
+	fishing_changed.emit(by, &"cast", 0)
+	return true
+
+
+## The strike, the hook for a later click at the bite: during the bite the
+## catch is decided now; else nothing. True if it struck.
+func try_strike(by: GridEntity) -> bool:
+	if not Net.is_authority() or not _fishing.has(by) or str(by.fishing.get("state", "")) != "bite":
+		return false
+	_land_catch(by)
+	return true
+
+
+## [param by]'s cast broken off for [param why] (fish_broke_why).
+func _reel_in(by: GridEntity, why: String) -> void:
+	_fishing.erase(by)
+	if is_instance_valid(by):
+		by.fishing = {}
+	fish_broke_why = why
+	_log("fish: %s reels in (%s)" % [by.name if is_instance_valid(by) else "?", why])
+	fishing_changed.emit(by, &"broken", 0)
+
+
+## Why a job (a cast, cooking) begun as [param job] is broken now, "" if
+## it is not: "gone" (dead or downed), "hurt", "moved" (a step, a blow).
+func _job_broken(by: GridEntity, job: Dictionary) -> String:
+	if not _alive(by) or is_downed(by):
+		return "gone"
+	if by.hurt_tick >= int(job["from"]):
+		return "hurt"
+	if by.tile != job["tile"] or by.last_exertion_tick() != int(job["exerted"]):
+		return "moved"
+	return ""
+
+
+## The bite's end: the catch lands into the pack (else at the feet), or
+## slips the hook.
+func _land_catch(by: GridEntity) -> void:
+	var job: Dictionary = _fishing[by]
+	var caught: bool
+	if economy != null and economy.has_method("pond_catch"):
+		caught = bool(economy.call("pond_catch", job["pond"], _angler_id(by), float(job["roll"])))  # The cast's seeded roll.
+	else:
+		caught = float(job["roll"]) < FISH_CATCH
+	job["over"] = tick + FISH_END_TICKS
+	var uid := 0
+	if caught:
+		uid = items.mint("fish", "caught", _label_of(by), zone.name, job["at"])
+		var slot := room_for(by, uid)
+		if slot < 0 or not put_item(by, by, slot, uid):
+			put_on_ground(uid, by.tile)
+	by.fishing = {"state": "landed" if caught else "missed", "at": job["at"]}
+	_log("fish: %s %s at %s" % [by.name, "lands a fish" if caught else "loses the bite", job["pond"]])
+	fishing_changed.emit(by, &"caught" if caught else &"missed", uid)
+
+
+## Each tick: casts fly, wait, bite and land, or break off; cooking cooks.
+func _tend_fishing() -> void:
+	for by: GridEntity in _fishing.keys():
+		var job: Dictionary = _fishing[by]
+		if _alive(by) and by.zone != zone.name:
+			continue
+		if job.has("over"):
+			if tick >= int(job["over"]):
+				_fishing.erase(by)
+				if is_instance_valid(by):
+					by.fishing = {}
+			continue
+		var why := _job_broken(by, job)
+		if why.is_empty() and rod_hand(by) != int(job["rod"]):
+			why = "lowered"
+		if not why.is_empty():
+			_reel_in(by, why)
+		elif tick >= int(job["ends"]):
+			_land_catch(by)
+		elif tick >= int(job["bite"]):
+			if str(by.fishing.get("state", "")) != "bite":
+				by.fishing = {"state": "bite", "at": job["at"]}
+				fishing_changed.emit(by, &"bite", 0)
+		elif tick >= int(job["from"]) + FISH_CAST_TICKS and str(by.fishing.get("state", "")) == "cast":
+			by.fishing = {"state": "wait", "at": job["at"]}
+	for by: GridEntity in _cooking.keys():
+		var job: Dictionary = _cooking[by]
+		if _alive(by) and by.zone != zone.name:
+			continue
+		var why := _job_broken(by, job)
+		if why.is_empty() and not _beside_fire(by.tile):
+			why = "moved"
+		if not why.is_empty():
+			_cooking.erase(by)
+			fish_broke_why = why
+			cooking_changed.emit(by, &"broken", 0)
+		elif tick >= int(job["until"]):
+			_cooking.erase(by)
+			_cook_done(by, job)
+
+
+## Whether a fire burns on [param cell] or a cell beside it.
+func _beside_fire(cell: Vector2i) -> bool:
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			if is_fire(cell + Vector2i(dx, dy)):
+				return true
+	return false
+
+
+## Why [param by] could not cook what is in [param slot] now, "" if it
+## could: "not_raw" (no "cooks" in its row), "busy", "no_fire".
+func cook_refusal(by: GridEntity, slot: int) -> String:
+	if slot < 0 or slot >= by.slots.size() or by.slots[slot].is_empty() or str(Items.def(by.slots[slot]).get("cooks", "")).is_empty():
+		return "not_raw"
+	if _fishing.has(by) or _cooking.has(by) or _bandaging.has(by) or is_stunned(by) or not has_hands(by) or is_downed(by):
+		return "busy"
+	if not _beside_fire(by.tile):
+		return "no_fire"
+	return ""
+
+
+## [param by] cooks one of what is in [param slot] (a raw thing whose row
+## names what it "cooks" to: a perch to a roast perch, meat to roast meat)
+## at a fire on or beside its cell: COOK_TICKS, broken as a cast is, then
+## one raw unit is gone and the cooked one is in the pack (else at its
+## feet). False, and nothing starts, if it cannot (cook_refusal).
+func try_cook(by: GridEntity, slot: int) -> bool:
+	if not Net.is_authority() or not _can_handle(by) or not cook_refusal(by, slot).is_empty():
+		return false
+	var raw := by.slots[slot]
+	_cooking[by] = {"raw": raw, "made": str(Items.def(raw)["cooks"]), "slot": slot, "tile": by.tile, "from": tick,
+		"exerted": by.last_exertion_tick(), "until": tick + COOK_TICKS}
+	if free_body(by):
+		halt(by, tick)
+	_log("cook: %s cooks %s" % [by.name, raw])
+	cooking_changed.emit(by, &"started", 0)
+	return true
+
+
+## The cooking done: one raw unit out (its slot, else any holding it), the
+## cooked thing in.
+func _cook_done(by: GridEntity, job: Dictionary) -> void:
+	var slot := int(job["slot"])
+	if slot >= by.slots.size() or by.slots[slot] != job["raw"]:
+		slot = Array(by.slots).find(str(job["raw"]))
+	var raw_uid := _take_out(by, slot) if slot >= 0 else 0
+	if raw_uid == 0:
+		fish_broke_why = "gone"
+		cooking_changed.emit(by, &"broken", 0)
+		return
+	items.end(raw_uid, "cooked", "by %s" % _label_of(by), zone.name, by.tile)
+	var uid := items.mint(str(job["made"]), "cooked", _label_of(by), zone.name, by.tile)
+	var into := room_for(by, uid)
+	if into < 0 or not put_item(by, by, into, uid):
+		put_on_ground(uid, by.tile)
+	_log("cook: %s cooked %s" % [by.name, job["made"]])
+	cooking_changed.emit(by, &"done", uid)
+
 ## Puts saved contents back into [param entity]'s slots (unknown items
 ## dropped, cut or padded to its size), each with its saved instance from
 ## [param uids] where the book still has it, a new one ("migrated": a save
@@ -7655,6 +7950,8 @@ func _forget_jobs(entity: GridEntity) -> void:
 			end_telegraph(id, false)  # Its source gone: never lands (decision 602).
 	_buffed.erase(entity)
 	_mending.erase(entity)
+	_fishing.erase(entity)
+	_cooking.erase(entity)
 	_winders.erase(entity)
 	_rushers.erase(entity)
 	_downed.erase(entity)

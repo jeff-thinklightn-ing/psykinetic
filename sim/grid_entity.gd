@@ -146,6 +146,11 @@ var channel_until := 0
 ## it is bandaging (its own for itself), "" when not. A player's and a
 ## companion's replicate, for the views (its kneel, sound's ruffle).
 var tending := ""
+## An angler's cast (World.try_fish; 805 amended (3)): {} when not fishing,
+## else {"state": "cast", "wait", "bite", "landed" or "missed", "at": the
+## water cell the float sits on}. A player's and a companion's replicate,
+## for the views (the float, the bite's splash, the poses).
+var fishing := {}
 ## Server: its last step's velocity in cells a tick (World.try_move), for
 ## the momentum it carries into a blow (World.body_velocity, decision 592).
 var step_velocity := Vector2.ZERO

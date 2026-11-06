@@ -84,6 +84,7 @@ func _ready() -> void:
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
+	_test_fishing()  # Last: its casts' ticks, and it clears the host (805 amended (3)).
 
 	DirAccess.remove_absolute(Net.state_path)
 	Net.state_path = ""
@@ -3361,6 +3362,102 @@ func _free_near(entity: GridEntity, cells: int) -> Vector2i:
 			return cell
 	return entity.tile
 
+
+## Fishing and cooking (805 amended (3)): a rod in hand casts into water a
+## fishing place takes in; the float flies, waits, bites, and a perch lands
+## in the pack or slips the hook; moving or lowering the rod reels in; a raw
+## perch cooked at a fire is a roast perch.
+func _test_fishing() -> void:
+	print("\n== fishing (805 amended (3)): cast, wait, bite, a perch; reeling in; cooking it ==")
+	var host := _player(Net.local_id)
+	for monster in World.monsters():
+		World.despawn(monster)  # Nothing to strike the angler mid-cast.
+	_clear(host)
+	World._relocate(host, _free_near(host, 0))
+	_check(Items.def("fishing_rod").get("use") == "fish" and "tool" not in Items.def("fishing_rod").get("tags", [])
+			and Items.def("fish").get("cooks") == "cooked_fish" and Items.def("meat").get("cooks") == "roast"
+			and Items.name_of("fish") == "perch" and Items.name_of("cooked_fish") == "roast perch",
+		"the rows: a rod used to fish (no tool, so no seam bites it), a perch cooks to a roast perch, meat to roast meat")
+	_check(World.fish_refusal(host) == "no_rod", "no rod in hand: no cast (%s)" % World.fish_refusal(host))
+	_give(host, "fishing_rod", Items.RIGHT_HAND)
+	var water := World.NO_CELL
+	for cell in [host.tile + Vector2i(2, 0), host.tile + Vector2i(-2, 0), host.tile + Vector2i(0, 2), host.tile + Vector2i(0, -2)]:
+		if not World._occupancy.has(cell):
+			water = cell
+			break
+	var had_water := World.is_water(water)
+	var near_water := World.cast_cell(host) != World.NO_CELL
+	_check(near_water or World.fish_refusal(host) == "no_water", "the rod in hand, no water near: no cast (%s)" % World.fish_refusal(host))
+	World._water[water] = true
+	_check(World.cast_cell(host) != World.NO_CELL and World.fish_refusal(host) == "no_fish",
+		"water within two, but no fishing place takes it in: nothing takes the line (%s)" % World.fish_refusal(host))
+	var pond := "%s/test_pond" % World.zone.name
+	World.holdings._places[pond] = {"id": pond, "area": World.zone.name, "key": "test_pond", "cell": water, "name": "the test pond",
+		"kind": "fishing", "radius": 2, "worth": 1, "start": "nobody", "town": ""}
+	World.holdings._holder[pond] = "nobody"
+	World.holdings._strength[pond] = 1
+	World.holdings._since[pond] = 0
+	_check(World.pond_at(water) == pond and World.fish_refusal(host) == "", "a fishing place there: the cast may begin")
+	_check(World.try_use(host, Items.RIGHT_HAND) and host.fishing.get("state") == "cast" and host.fishing.get("at") == World.cast_cell(host),
+		"using the rod casts: the float flies to the water (%s)" % host.fishing)
+	_check(World.fish_refusal(host) == "busy", "not twice at once")
+	_steps(World.FISH_CAST_TICKS)
+	_check(host.fishing.get("state") == "wait", "the float on the water: waiting (%s)" % host.fishing)
+	World._fishing[host]["roll"] = 0.0  # A sure catch.
+	_steps(int(World._fishing[host]["bite"]) - World.tick)
+	_check(host.fishing.get("state") == "bite", "then the bite (%s)" % host.fishing)
+	var caught: Array = []
+	var on_caught := func(by: GridEntity, state: StringName, uid: int) -> void: caught.append([by, state, uid])
+	World.fishing_changed.connect(on_caught)
+	_steps(World.FISH_BITE_TICKS)
+	_check(host.fishing.get("state") == "landed" and Array(host.slots).has("fish") and not caught.is_empty()
+			and caught[-1][1] == &"caught" and World.items.id_of(int(caught[-1][2])) == "fish",
+		"the bite's end: a perch landed, in the pack (%s)" % [Array(host.slots)])
+	_steps(World.FISH_END_TICKS)
+	_check(host.fishing.is_empty() and not World._fishing.has(host), "and the cast is over")
+	# Moving reels in.
+	World.try_use(host, Items.RIGHT_HAND)
+	_steps(3)
+	var stood := host.tile
+	World._relocate(host, _free_near(host, 1))
+	_steps(1)
+	World._relocate(host, stood)
+	_check(host.fishing.is_empty() and World.fish_broke_why == "moved", "a step reels in (%s)" % World.fish_broke_why)
+	# Lowering the rod reels in, and using it again does too.
+	World.try_use(host, Items.RIGHT_HAND)
+	_check(World.try_use(host, Items.RIGHT_HAND) and host.fishing.is_empty() and World.fish_broke_why == "lowered",
+		"the rod used again: reeled in")
+	# A bite missed: nothing more in the pack.
+	World.try_use(host, Items.RIGHT_HAND)
+	World._fishing[host]["roll"] = 0.99
+	var fish_before := _fish_units(host)
+	_steps(int(World._fishing[host]["ends"]) - World.tick)
+	_check(host.fishing.get("state") == "missed" and caught[-1][1] == &"missed"
+			and _fish_units(host) == fish_before,
+		"a bite missed: it slips the hook, nothing more in the pack")
+	_steps(World.FISH_END_TICKS)
+	World.fishing_changed.disconnect(on_caught)
+	# Cooking at a fire.
+	var slot := Array(host.slots).find("fish")
+	_check(World.cook_refusal(host, slot) == "no_fire" and not World.try_use(host, slot), "no fire beside: no cooking")
+	var fire := host.tile + Vector2i(1, 0)
+	World._fire[fire] = true
+	_check(World.try_use(host, slot) and World._cooking.has(host), "a fire beside: the perch cooks")
+	_steps(World.COOK_TICKS)
+	_check(Array(host.slots).has("cooked_fish") and not World._cooking.has(host), "done: a roast perch in the pack (%s)" % [Array(host.slots)])
+	World._fire.erase(fire)
+	if not had_water:
+		World._water.erase(water)
+	World.holdings._places.erase(pond)
+	World.holdings._holder.erase(pond)
+	World.holdings._strength.erase(pond)
+	World.holdings._since.erase(pond)
+	_clear(host)
+
+
+## How many perch [param entity] carries.
+func _fish_units(entity: GridEntity) -> int:
+	return _units_of(entity).filter(func(uid: int) -> bool: return World.items.id_of(uid) == "fish").size()
 
 func _test_restart() -> void:
 	print("\n== a restart keeps every instance and its history ==")

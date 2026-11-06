@@ -904,6 +904,7 @@ func _init() -> void:
 	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
 	replicate("channel_of")
 	replicate("tending")
+	replicate("fishing")  # 805 amended (3): the cast, the wait, the bite.
 	replicate("channel_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")

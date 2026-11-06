@@ -1163,6 +1163,8 @@ func _go_online() -> void:
 		# Her bond with her player (decision 444).
 		World.bandage_changed.connect(_bond_bandaged)
 		World.bandage_changed.connect(_tell_bandage_broke)  # decision 625.
+		World.fishing_changed.connect(_on_fishing_changed)  # 805 amended (3).
+		World.cooking_changed.connect(_on_cooking_changed)
 		World.entity_died.connect(_bond_stood_by)
 		World.entity_damaged.connect(_bond_blow)  # Fights won together (decision 621).
 		World.entity_died.connect(_bond_won)
@@ -7447,6 +7449,60 @@ func _tell_bandage_broke(by: GridEntity, patient: GridEntity, state: StringName)
 		Net.broadcast_to([(by as Player).owner_peer], "party", {"from": "Server", "text": "Your bandaging broke off: %s." % why})
 
 
+## Why a cast or cooking could not begin (805 amended (3); voice's words).
+const FISH_REFUSED := {"no_rod": "Take the rod in hand to fish.", "busy": "Your hands are full.",
+	"no_water": "There's no water near enough to cast into.", "no_fish": "Nothing takes the line here.",
+	"fished_out": "This water is fished out for today."}
+const COOK_REFUSED := {"busy": "Your hands are full.", "no_fire": "You need a fire beside you to cook."}
+## Why a cast or cooking broke off (World.fish_broke_why), the clause after the colon.
+const FISH_BROKE := {"moved": "you moved", "hurt": "you were struck"}
+
+
+## A player's "use" that did nothing: a rod's or a raw thing's why, told
+## to them (805 amended (3)); other things say nothing, as before.
+func _tell_use_refused(player: Player, slot: int) -> void:
+	if player.owner_peer == 0 or slot < 0 or slot >= player.slots.size() or player.slots[slot].is_empty():
+		return
+	var row := Items.def(player.slots[slot])
+	var why := ""
+	if not str(row.get("cooks", "")).is_empty():
+		why = COOK_REFUSED.get(World.cook_refusal(player, slot), "")
+	elif row.get("use") == "fish":
+		why = FISH_REFUSED.get(World.fish_refusal(player), "")
+	if not why.is_empty():
+		Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": why})
+
+
+## A cast's news (World.fishing_changed): broken off or slipped, told to
+## its player; a fish landed is a gain (804's Main.reward, "catch").
+func _on_fishing_changed(by: GridEntity, state: StringName, uid: int) -> void:
+	if not by is Player or (by as Player).owner_peer == 0:
+		return
+	var peer := (by as Player).owner_peer
+	if state == &"broken":
+		var why: String = FISH_BROKE.get(World.fish_broke_why, "")
+		if World.fish_broke_why != "gone":
+			Net.broadcast_to([peer], "party", {"from": "Server", "text": "You reel in: %s." % why if not why.is_empty() else "You reel in."})
+	elif state == &"missed":
+		Net.broadcast_to([peer], "party", {"from": "Server", "text": "It slips the hook and is gone."})
+	elif state == &"caught":
+		var at: Variant = by.fishing.get("at", null)
+		var gain := {"track": "catch", "amount": 1, "of": Items.name_of(World.items.id_of(uid))}
+		if at is Vector2i:
+			gain["at"] = at
+		reward((by as Player).player_id, gain)
+
+
+## Cooking's news (World.cooking_changed): broken off, told to its player.
+## Done says nothing: the cooked thing in the pack says it.
+func _on_cooking_changed(by: GridEntity, state: StringName, _uid: int) -> void:
+	if state != &"broken" or not by is Player or (by as Player).owner_peer == 0:
+		return
+	var why: String = FISH_BROKE.get(World.fish_broke_why, "")
+	if not why.is_empty():
+		Net.broadcast_to([(by as Player).owner_peer], "party", {"from": "Server", "text": "You stop cooking: %s." % why})
+
+
 ## Why a player's own bandage could not begin (decision 625), %s whom.
 const BANDAGE_REFUSED := {"not_beside": "You can't bandage %s: come within two steps of them, nothing between.", "no_wound": "You can't bandage %s: there's no wound to bind.",
 	"mending": "You can't bandage %s: the wound is bound already.", "busy": "You can't bandage %s: your hands are busy.",
@@ -13233,7 +13289,9 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "search" and entity is Player:
 		search(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
 	elif command_name == "use" and entity is Player:
-		World.try_use(entity, int(args.get("slot", -1)))
+		var used := int(args.get("slot", -1))
+		if not World.try_use(entity, used):
+			_tell_use_refused(entity as Player, used)
 	elif command_name == "retain" and entity is Player:
 		retain(entity as Player, args)
 	elif command_name == "give_gold" and entity is Player:

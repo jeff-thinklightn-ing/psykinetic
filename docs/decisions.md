@@ -42389,6 +42389,44 @@ kind or an absent player brings none; a boar comes in out of sight, drawn, unsav
 cast and strikes the fisher, is driven off at half and gone; "wolf" is a pair, bold by day, and
 with their time up and nobody fighting they turn back and are gone. Server only, protocol
 unchanged. New class_name Wanderers.
+805 amended (3): items' side, the rod, the cast, the perch and the fire. Items' part of the slice
+(the coordinator's approval; economy's slice draft's items row and its RETURN (c); release's label).
+The pond's stock, its calls and the wanderer's clock are economy's; the Reed Pond place is maps';
+the poses are pc-character's.
+
+The rows: fishing_rod ("fishing rod"/"Rod", 1 kg, one hand, use "fish", value 3, made by the fletcher
+from wood 1 (the carpenter standing in); lore's willow rod, horsehair line and quill float). Not
+tagged "tool": a "tool" mines a seam (Seam.bites). fish ("perch", lore's fish of the Reed Pond; 0.5
+kg, stacks 10, raw, yields fish 1, value 1, "cooks": "cooked_fish"; art-kit's town-window fish mesh,
+its slot now an override of the generated one). cooked_fish ("roast perch": eaten, mass +10 for 1800
+ticks, as a ration; the cook makes it from fish 1). meat gains "cooks": "roast". The ids stay
+"fish"/"cooked_fish" if eel comes as a second row. The cast (World.try_fish, from try_use's "fish"):
+a rod in a hand (rod_hand) and water within FISH_REACH 2 (cast_cell: the cell most ahead of the
+facing, then the nearest) that a fishing place takes in (pond_at: a Holdings place of kind "fishing"
+covering the water or the angler's cell). Refused, in order: no_rod, busy, no_water, no_fish (water
+no place takes in: "Nothing takes the line here."), fished_out (economy's pond_fish 0). It flies
+FISH_CAST_TICKS (1.5 s), waits a seeded 12-27 s, bites FISH_BITE_TICKS (1.2 s), then the catch:
+economy's pond_catch(pond, angler, roll) with the cast's own seeded roll, else FISH_CATCH 0.6. A
+perch goes into the pack (onto its stack first), else at the feet, never lost. Missed: "It slips the
+hook and is gone." A step, a blow, a hurt or the rod out of hand reels in; the rod used again reels
+in. The cast begins with economy's pond_cast(pond, angler, at), so the wanderer goes to the cast's
+cell. A companion casts by the same call (companions' part), her keeper's id the angler's.
+try_strike is the hook for a later click at the bite: it lands the catch at once. On the wire (rev
+51, shared with 814, which opened it; release's): Player and Companion replicate "fishing", {state: cast,
+wait, bite, landed or missed; at: the float's water cell}, {} when not fishing. Client3D's
+FishingView draws a quill float flying out in an arc, bobbing while it waits, dipping with a
+spreading ring at the bite and pulled back to the rod's tip, with a line from the tip; sound's
+sfx.fish_cast (the whip), sfx.fish_plop (the float landing), sfx.fish_bite and sfx.fish_landed play
+when they have takes. A perch landed calls 804's Main.reward(player, {track "catch",
+amount 1, of "perch", at the float's cell}); no party line (voice). Cooking (World.try_cook, from
+try_use on anything with "cooks"): a fire on or beside the cell, COOK_TICKS (10 s), broken as a cast
+is; one raw unit out, the cooked thing in. Refused: "Your hands are full.", "You need a fire beside
+you to cook."; broken: "You stop cooking: you moved." Done says nothing: the roast in the pack says
+it.
+
+items_test _test_fishing (the rows; each refusal; a cast through its states to a perch in the pack;
+a step and the rod used again reel in; a missed bite; cooking at a fire). Voice's words, lore's
+facts. New script client3d/fishing_view.gd (no class_name).
 
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 

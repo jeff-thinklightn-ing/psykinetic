@@ -404,6 +404,7 @@ const SCATTER_SIGHT_SHADER := preload("res://client3d/scatter_sight.gdshader")
 const LightShafts := preload("res://client3d/light_shafts.gd")
 const Heartbeat := preload("res://client3d/heartbeat.gd")
 const Bandaging := preload("res://client3d/bandaging.gd")
+const FishingView := preload("res://client3d/fishing_view.gd")
 ## A cell's corners, from its top left, in the order the ground's arrays
 ## keep them.
 const GROUND_CORNERS: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)]
@@ -2329,6 +2330,8 @@ var music: Music
 var heartbeat: Heartbeat
 ## Bandaging heard: a cloth ruffle from each bandager while it runs.
 var bandaging: Bandaging
+## The casts' floats, lines and bites (805 amended (3)).
+var fishing_view: FishingView
 ## The cells fire burns on, torches (_add_torch) and fires (_add_fire),
 ## for their crackle (Ambience).
 var torch_cells: Array[Vector2i] = []
@@ -2823,6 +2826,10 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	bandaging.name = "Bandaging"
 	bandaging.view = self
 	add_child(bandaging)
+	fishing_view = FishingView.new()
+	fishing_view.name = "FishingView"
+	fishing_view.view = self
+	add_child(fishing_view)
 	# Sounds are heard from the player's place: the camera is 40 units off.
 	_listener = AudioListener3D.new()
 	_listener.name = "Listener"

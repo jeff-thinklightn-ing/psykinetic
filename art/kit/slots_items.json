@@ -354,6 +354,25 @@
 			"type": "mesh",
 			"uses": "gold on the ground (World.drop_gold): one purse drawn in its pile, however much lies there"
 		},
+		"item.cooked_fish": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.28,
+				0.06,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "roast perch (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.copper_brooch": {
 			"budget": 500,
 			"category": "items",
@@ -448,6 +467,44 @@
 			},
 			"type": "mesh",
 			"uses": "felt hat (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.fish": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.395,
+				0.056,
+				0.156
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "perch (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.fishing_rod": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.03,
+				1.8,
+				0.03
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "fishing rod (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.flint": {
 			"budget": 500,

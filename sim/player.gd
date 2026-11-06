@@ -142,6 +142,7 @@ func _init() -> void:
 	replicate("downed_until")  # Decision 544: downed, and bringing back the downed.
 	replicate("channel_of")
 	replicate("tending")
+	replicate("fishing")  # 805 amended (3): the cast, the wait, the bite.
 	replicate("channel_until")
 	# Its lantern lit or covered (L): what the views draw and monsters see by.
 	replicate("emit_light")
