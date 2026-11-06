@@ -1137,6 +1137,15 @@
 			"volume_db": -2.0,
 			"uses": "a wolf calling its pack: a howl (Monster.cried call)"
 		},
+		"sfx.wolf_growl": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -10.0,
+			"uses": "a wolf at peace growling low now and then (795 amended (3); SoundKit.IDLE, Client3D._idle_voices), never two within IDLE_APART_MS, none while it sits or is down"
+		},
 		"sfx.rabbit_death": {
 			"category": "creatures",
 			"type": "oneshot",
@@ -1910,6 +1919,15 @@
 			"range": 5,
 			"volume_db": -22.0,
 			"uses": "the outside's faint air through a gap in a cave's roof (797's skylights; 795 amended): wind in leaves, from the nearest skylight heard"
+		},
+		"amb.cave_mouth_wind": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 8,
+			"volume_db": -18.0,
+			"uses": "wind at a beast's cave's mouth (795 amended (3)): a low hollow wind, from the nearest mouth heard (terrain \"lair_mouths\": each link cell of a \"cave_lair\" level, fading in toward its skylights); Ambience"
 		},
 		"sfx.pick_strike": {
 			"category": "world",

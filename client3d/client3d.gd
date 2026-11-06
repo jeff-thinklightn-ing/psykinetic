@@ -2281,6 +2281,8 @@ var _combat_at: Dictionary[int, int] = {}
 ## The idle voices' next check and the times they last sounded (795).
 var _idle_next := 0
 var _idle_heard: Array[int] = []
+## When each idle slot last sounded, ms (SoundKit.IDLE_APART_MS).
+var _idle_slot_at := {}
 ## Puppet id -> [msec, what it swung with] of its last swing: a blow that
 ## lands soon after, beside it, was its (_struck_with).
 var _swings: Dictionary[int, Array] = {}
@@ -22237,7 +22239,9 @@ func _on_cried(cry: StringName, id: int) -> void:
 ## a boar's grunt and its rooting snuffle), checked once a second: each body
 ## heard by the listener rolls each slot's chance, IDLE_AT_ONCE sounding in
 ## any IDLE_SPAN_MS at most so a sounder murmurs, not chatters. A body that
-## fought or cried in the last IDLE_QUIET_MS, or is down, is silent.
+## fought or cried in the last IDLE_QUIET_MS, or is down, is silent; so is
+## one sitting or knocked down (Monster.pose, 795 amended (3)), and a slot
+## heard within its SoundKit.IDLE_APART_MS (a wolf's growl) waits.
 ## [param roll] in place of randf (tests).
 func _idle_voices(now: int, roll := -1.0) -> void:
 	if now < _idle_next or sfx == null or sfx.listener == null:
@@ -22252,7 +22256,7 @@ func _idle_voices(now: int, roll := -1.0) -> void:
 		if _idle_heard.size() >= IDLE_AT_ONCE:
 			return
 		var creature := instance_from_id(id) as Monster
-		if creature == null or creature.hp <= 0:
+		if creature == null or creature.hp <= 0 or creature.pose != Monster.Pose.STAND:
 			continue
 		var kind := str(creature.spawn_spec.get("kind", ""))
 		var sounds := SoundKit.idle(kind)
@@ -22260,11 +22264,13 @@ func _idle_voices(now: int, roll := -1.0) -> void:
 		if sounds.is_empty() or now - int(_combat_at.get(id, -IDLE_QUIET_MS)) < IDLE_QUIET_MS 				or now - int(puppet.get_meta("cried_at", -IDLE_QUIET_MS)) < IDLE_QUIET_MS:
 			continue
 		for slot: String in sounds:
-			if _cells_apart(creature.tile, sfx.listener) > SoundKit.reach(slot):
+			if _cells_apart(creature.tile, sfx.listener) > SoundKit.reach(slot) \
+					or now - int(_idle_slot_at.get(slot, -(1 << 40))) < int(SoundKit.IDLE_APART_MS.get(slot, 0)):
 				continue
 			if (randf() if roll < 0.0 else roll) < IDLE_EVERY_MS / 1000.0 / float(sounds[slot]):
 				sfx.play(slot, puppet.position + Vector3.UP * 0.5, float(SoundKit.CREATURE_PITCH.get(kind, 1.0)))
 				_idle_heard.append(now)
+				_idle_slot_at[slot] = now
 				break
 
 

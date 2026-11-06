@@ -104,6 +104,8 @@ const TIMBER_NEAR := 8
 ## bed, amb.lair_cave, in place of the crypt's or a mine's, and the mine's
 ## drops LAIR_DRIP_SLOWER times as rarely. Any level's skylights (797) let
 ## in the outside's faint air, amb.skylight_air, from the nearest heard.
+## Its way out (terrain "lair_mouths", 795 amended (3)) breathes wind,
+## amb.cave_mouth_wind, from the nearest mouth heard, fading inward.
 const LAIR_DRIP_SLOWER := 2.0
 ## Beds of the open air: muffled under a roof.
 const OUTDOOR_BEDS: Array[String] = ["amb.forest_dawn", "amb.forest_day", "amb.forest_night", "amb.field_wind",
@@ -177,6 +179,9 @@ func _weigh() -> void:
 	if lair == "cave_lair" and randf() < WEIGH_EVERY / (DRIP_SECONDS * LAIR_DRIP_SLOWER):
 		_drip(cell, _floor)
 	_place_point("amb.skylight_air", _skylights, cell)
+	var mouths: Array[Vector2i] = []
+	mouths.assign(view._terrain.get("lair_mouths", []))
+	_place_point("amb.cave_mouth_wind", mouths, cell)
 	_place_torch(cell)
 	var lamps: Array[Vector2i] = []
 	if not mine.is_empty():

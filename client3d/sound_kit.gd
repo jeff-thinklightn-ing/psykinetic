@@ -387,7 +387,11 @@ const SOUNDS_AS := {"stag": "deer"}
 ## A creature's sounds while it is at peace (795): slot -> its average
 ## seconds between, each body on its own; a kind in IDLE_AS has another's
 ## (the boar king a boar's, pitched his own; Client3D._idle_voices).
-const IDLE := {"boar": {"sfx.boar_grunt": 20.0, "sfx.boar_root": 30.0}}
+const IDLE := {"boar": {"sfx.boar_grunt": 20.0, "sfx.boar_root": 30.0},
+		"wolf": {"sfx.wolf_growl": 25.0}}
+## An idle slot never sounds again, from any body, within its ms here (795
+## amended (3): a pack of four growls in turn, never two at once).
+const IDLE_APART_MS := {"sfx.wolf_growl": 5000}
 const IDLE_AS := {"boar_king": "boar"}
 
 

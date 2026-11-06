@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- Wind sighs at the mouth of a beast's cave and fades as you go in, and wolves not yet roused growl low now and then, one at a time, when you come near (795 amended (3)).
 - Your companion answers you and speaks up again near a foe that hasn't noticed anyone or only stands off watching, such as a robber guarding a crypt chest, where before she fell silent for minutes as if in a fight; only a fight under way keeps her, or townsfolk, quiet (675 amended; 675 amended (2)).
 
 - Hollowfell's chiefs make a longer fight of it, and the kobold chief hisses before he strikes from behind, marking the blow on the ground under you: step out of it and he misses, open to you for a moment (790 amended (4)).

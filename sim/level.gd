@@ -1291,6 +1291,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["starts"] = starts
 	level["spawn_points"] = spawn_points
 	level["links"] = links
+	level["terrain"]["lair_mouths"] = lair_mouths_of(str(level["terrain"].get("ambience", "")), links)
 	level["centre"] = centre if centre != null else starts[0] if not starts.is_empty() else Vector2i.ZERO
 	level["display_name"] = str(config.get("name", ""))
 
@@ -1484,6 +1485,20 @@ static func at_a_mouth(at: Vector2i, radius: int, config: Dictionary) -> bool:
 		if cell is Vector2i and maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= radius:
 			return true
 	return false
+
+
+## A beast's cave's mouths (795 amended (3)): each link's cell of a
+## "cave_lair" level, its way out, where Ambience holds the wind
+## (amb.cave_mouth_wind); none in any other level. Each build reads its own
+## levels/, so the wire is unchanged.
+static func lair_mouths_of(ambience: String, links: Array[Dictionary]) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if ambience != "cave_lair":
+		return out
+	for link: Dictionary in links:
+		if link.get("tile") is Vector2i and not out.has(link["tile"]):
+			out.append(link["tile"])
+	return out
 
 
 ## A camp's fire and who holds it (795 amended (2), sound's side, reading

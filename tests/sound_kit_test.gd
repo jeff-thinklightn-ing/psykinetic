@@ -173,9 +173,9 @@ func _test_noises_are_the_sims() -> void:
 			and ["snarl", "pounce", "struck", "death"].all(func(cry: String) -> bool: return SoundKit.takes("sfx.hill_cat_" + cry).size() >= 3),
 			"the hill cat: its snarl, pounce, hurt and death its own, three takes each, its death a wolf's without; on paws")
 	_check(SoundKit.idle("boar").has("sfx.boar_grunt") and SoundKit.idle("boar").has("sfx.boar_root") and SoundKit.idle("boar_king") == SoundKit.idle("boar")
-			and SoundKit.idle("wolf").is_empty() and SoundKit.takes("sfx.boar_grunt").size() >= 2 and SoundKit.takes("sfx.boar_root").size() >= 2
+			and SoundKit.idle("deer").is_empty() and SoundKit.takes("sfx.boar_grunt").size() >= 2 and SoundKit.takes("sfx.boar_root").size() >= 2
 			and SoundKit.positional("sfx.boar_grunt") and SoundKit.noise("sfx.boar_grunt") == "",
-			"a boar at peace grunts and roots (795), the king as a boar; a wolf has none; no sim noise")
+			"a boar at peace grunts and roots (795), the king as a boar; a deer has none; no sim noise")
 	_check(SoundKit.link_url("https://freesound.org/people/jnr hacksaw/sounds/11126/") == "https://freesound.org/people/jnr%20hacksaw/sounds/11126/"
 			and SoundKit.third_party_block().find("jnr hacksaw/") == -1 and SoundKit.third_party_block().find("jnr%20hacksaw/") >= 0,
 			"a maker's name with a space: the credit's link percent-encoded, the name as shown kept (795, release's ask)")
@@ -427,6 +427,21 @@ func _test_ambience_weights() -> void:
 			and SoundKit.positional("amb.camp_trader") and SoundKit.noise("amb.camp_trader") == "" and SoundKit.takes("amb.camp_trader").size() >= 3
 			and SoundKit.volume_db("amb.camp_bandit") < SoundKit.volume_db("amb.campfire"),
 			"the murmurs placed, unheard by monsters, under the fire, three takes each")
+	# 795 amended (3): a beast's cave's way out breathes wind; the wolves growl.
+	var bear_cave := Level.load_level("bear_cave")
+	var cave_mouths: Array = bear_cave.get("terrain", {}).get("lair_mouths", [])
+	var no_lair: Array = Level.lair_mouths_of("", [{"tile": Vector2i(3, 3)}] as Array[Dictionary])
+	var wolf_mouths: Array = Level.load_level("wolf_cave").get("terrain", {}).get("lair_mouths", [])
+	_check(cave_mouths == [Vector2i(4, 26)] and wolf_mouths == [Vector2i(6, 24)] and no_lair.is_empty()
+			and Level.load_level("forest").get("terrain", {}).get("lair_mouths", []).is_empty(),
+			"the bear's and the wolves' caves' mouths their links' cells (%s, %s); no mouths but a cave_lair's" % [cave_mouths, wolf_mouths])
+	_check(SoundKit.positional("amb.cave_mouth_wind") and SoundKit.noise("amb.cave_mouth_wind") == ""
+			and SoundKit.reach("amb.cave_mouth_wind") <= 10 and SoundKit.takes("amb.cave_mouth_wind").size() >= 3,
+			"the mouth's wind placed, unheard by monsters, within 10, three takes")
+	_check(SoundKit.idle("wolf").has("sfx.wolf_growl") and SoundKit.positional("sfx.wolf_growl") and SoundKit.noise("sfx.wolf_growl") == ""
+			and SoundKit.bus("sfx.wolf_growl") == "voice" and SoundKit.reach("sfx.wolf_growl") <= 8
+			and int(SoundKit.IDLE_APART_MS.get("sfx.wolf_growl", 0)) >= 4000 and SoundKit.takes("sfx.wolf_growl").size() >= 3,
+			"a wolf at peace growls, near, unheard by monsters, never two within IDLE_APART_MS, three takes or more")
 	_check(noon["amb.forest_deep_day"] == 0.0 and noon["amb.rain_canopy"] == 0.0 and noon["amb.drips"] == 0.0,
 			"no canopy: no deep forest, no crowns, no drips")
 	var deep := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 1.0)

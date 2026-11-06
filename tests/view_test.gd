@@ -1254,6 +1254,28 @@ func _test_idle_voices() -> void:
 	_check(missed.is_empty(), "the rolls missing: silent (%s)" % [missed])
 	for boar: Monster in boars:
 		World.despawn(boar)
+	# 795 amended (3): a pack growls in turn, never two within IDLE_APART_MS;
+	# a wolf sitting is quiet.
+	var wolves: Array[Monster] = [_spawn_imp(Vector2i(9, 9), "wolf"), _spawn_imp(Vector2i(10, 9), "wolf"),
+		_spawn_imp(Vector2i(11, 9), "wolf"), _spawn_imp(Vector2i(12, 9), "wolf")]
+	_rig._process(0.0)
+	var apart := int(SoundKit.IDLE_APART_MS["sfx.wolf_growl"])
+	var t := later + Client3D.IDLE_SPAN_MS * 2
+	_rig._idle_heard.clear()
+	_rig._idle_slot_at.clear()
+	var pack := _heard(func() -> void: _rig._idle_voices(t, 0.0))
+	var soon := _heard(func() -> void: _rig._idle_voices(t + Client3D.IDLE_SPAN_MS + Client3D.IDLE_EVERY_MS, 0.0))
+	var after := _heard(func() -> void: _rig._idle_voices(t + apart, 0.0))
+	_check(pack == ["sfx.wolf_growl"] and soon.is_empty() and after == ["sfx.wolf_growl"],
+			"four wolves at peace, every roll a hit: one growl, none more within %d ms, the next after (%s, %s, %s)" % [apart, pack, soon, after])
+	for wolf: Monster in wolves:
+		wolf.pose = Monster.Pose.SIT
+	_rig._idle_heard.clear()
+	_rig._idle_slot_at.clear()
+	var sitting := _heard(func() -> void: _rig._idle_voices(t + apart * 3, 0.0))
+	_check(sitting.is_empty(), "the pack sitting: no growl (%s)" % [sitting])
+	for wolf: Monster in wolves:
+		World.despawn(wolf)
 	_rig.sfx.listener = listener_was
 	_rig._process(0.0)
 	_rig.sfx.hear_everything = hear_was
