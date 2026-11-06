@@ -84,6 +84,9 @@ var strayed := false
 var sought := ""
 var holder := ""
 var where := ""
+## A forest camp's trader (799, npc's side): his trader place id ("forest/loop_camp_trader"), "" for the rest;
+## never a monster's foe (enemy-ai's Monster._may_fight). Server only.
+var camp_trader := ""
 var escort_of := ""
 ## What they lie abed with (decision 501 amended, ui's ask): the sickness's
 ## kind ("a fever", "a cough"), "" when well. Replicated, so a client can

@@ -87,6 +87,10 @@ const WARES := "wares"
 ## through Economy.vendor_sale, minted and marked starter.
 const VENDOR := "vendor:"
 const VENDOR_WARES := "vendor_wares"
+## A forest camp's trader (799, npc's side): CAMP_TRADER: "camp:" + his trader place id, no
+## worker, no card. His wares are CAMP_WARES, sold by Main through Economy.camp_sale.
+const CAMP_TRADER := "camp:"
+const CAMP_WARES := "camp_wares"
 const TAKE := "take"
 const LEND := "lend"
 const CARRY := "carry"
@@ -213,6 +217,8 @@ static func of(worker_id: String, player_id: String, given: Dictionary = ctx) ->
 		return _visitor_offers(worker_id, given)
 	if worker_id.begins_with(VENDOR):
 		return _vendor_offers(worker_id, given)
+	if worker_id.begins_with(CAMP_TRADER):
+		return _camp_offers(worker_id, player_id, given)
 	if production == null or worker_id.begins_with(Townsfolk.COMPANION):
 		return out
 	var who := production.worker(worker_id)
@@ -398,6 +404,27 @@ static func _vendor_offers(worker_id: String, given: Dictionary) -> Array[Dictio
 		var thing := name if item == "arrows" or name.ends_with("s") else Companion._a(name)
 		out.append(_offer(worker_id, VENDOR_WARES, item, "%s, %d gold" % [_upper_first(thing), price],
 			"%s for %d gold, for the road. Mind, no one will buy it back off you." % [_upper_first(thing), price], {"item": item, "price": price}, VENDOR_WARES, price))
+	return out
+
+
+## A forest camp's trader's wares (799, npc's side): ctx "camp_stock" (Main:
+## Economy.camp_stock at his camp's prices for this player), one line each,
+## "A hide scraper, 6 gold"; none while he is held captive.
+static func _camp_offers(worker_id: String, player_id: String, given: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var stock: Variant = _call(given, "camp_stock", [worker_id, player_id])
+	if not stock is Array:
+		return out
+	var catalog: Variant = _call(given, "catalog")
+	for line: Variant in stock:
+		var item := str(line.get("item", "")) if line is Dictionary else ""
+		if item.is_empty() or int(line.get("count", 1)) <= 0:
+			continue
+		var price := int(line.get("price", 1))
+		var name := str(catalog.get(item, {}).get("name", item.replace("_", " "))) if catalog is Dictionary else item.replace("_", " ")
+		var thing := name if name.ends_with("s") else Companion._a(name)
+		out.append(_offer(worker_id, CAMP_WARES, item, "%s, %d gold" % [_upper_first(thing), price],
+			"%s for %d gold." % [_upper_first(thing), price], {"item": item, "price": price}, CAMP_WARES, price))
 	return out
 
 
@@ -977,6 +1004,9 @@ static func accept(worker_id: String, player_id: String, player_name: String, of
 		RELIC:
 			out["relic"] = int(offer["what"].get("uid", 0))  # Laid on the altar by Main (_relic_returned), 714.
 			out["ok"] = int(out["relic"]) > 0
+		CAMP_WARES:
+			out["camp_ware"] = str(offer["what"].get("item", ""))  # Sold by Main (Economy.camp_sale), 799.
+			out["ok"] = not out["camp_ware"].is_empty()
 		VENDOR_WARES:
 			out["starter"] = str(offer["what"].get("item", ""))  # Sold by Main (Economy.vendor_sale), 736.
 			out["ok"] = not out["starter"].is_empty()

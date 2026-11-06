@@ -53,8 +53,16 @@
 			"herder": ["Up from the hills with the drove. What is it?", "Mind the sheep. Aye?", "The weather holds, for now. What?"]
 		}
 	},
+	"camp": {
+		"_about": "npc's side of the forest camps' traders (decision 799, npc's side): his greeting by how his camp stands (Main._camp_greeted). held: tied up by those who hold his camp (C3); toll: his camp held, his prices carry their cut (C7); freed: to one who cleared his camp; open: the rest. gift: once, to a freer of his captors, with Economy.camp_gift's thing. Voice's words, lore's facts.",
+		"open": ["Furs, tools, a bit of everything. Have a look.", "Sit by the fire a moment. Need anything for the road?"],
+		"toll": ["They take a cut of all I sell. Keep your hands easy and so will they.", "Trade's open. The toll's not mine, but it's in the price."],
+		"held": ["Cut me loose, will you? They've had me tied here for days.", "Quiet, now. Clear them off and I'll make it worth your while."],
+		"freed": ["You cleared them off. For you, the better price.", "Good to see you again, friend. You'll have it cheaper."],
+		"gift": ["Here, take this. It's the least I owe you.", "For cutting me loose. Take it."]
+	},
 	"visitors": {
-		"_about": "npc's side of visitors (decision 711, npc's side): what a stranger passing through says when clicked. greetings by kind (traveller, pedlar, pilgrim), %s where they come from; road: their news when the towns have none to carry, %s again where they come from; leaving: said once they are on their way out. Each player gets one piece of their news a visit.",
+		"_about":"npc's side of visitors (decision 711, npc's side): what a stranger passing through says when clicked. greetings by kind (traveller, pedlar, pilgrim), %s where they come from; road: their news when the towns have none to carry, %s again where they come from; leaving: said once they are on their way out. Each player gets one piece of their news a visit.",
 		"greetings": {
 			"vendor": ["Blades for the road, one gold apiece. Take your pick.", "Starting out? A gold buys you something to swing.", "One gold each, and never sold dear. What'll it be?"],
 			"traveller": ["Just passing through, from %s.", "Long road from %s. Is the inn any good?"],

@@ -86,6 +86,7 @@ func _ready() -> void:
 	_test_quiet_near_hostile()  # Late: its steps move the hail tick's phase the voice tests count on.
 	_test_named_enemy()  # Beside it: a named one spawned in the town, no steps.
 	_test_visitors()  # After them: its syncs step the world.
+	_test_camp_traders()  # 799: the forest camps' traders.
 	_test_relic()  # 714: the knight's remains to Aldous.
 	_test_vendor()  # 736: the starter stall.
 	_test_hut_ruin()  # 733: last, it takes the hut's keeper away.
@@ -4996,6 +4997,102 @@ func _test_relic() -> void:
 	voice.trade = "smith"
 	_check(voice.world_facts().all(func(f: String) -> bool: return not f.contains("Encolpion")), "a smith does not")
 	voice.free()
+
+
+## The forest camps' traders (799, npc's side): in the test town, an open
+## camp "tc" (its trader by the fire by day, his bedroll his bed, the camp
+## his ground; behind his cart while a fight is near), a captive's camp "tk"
+## held by bandits (its trader tied at the captive place, no wares; cleared,
+## the players in the area its freers, at the fire again), and a toll camp
+## "tt" held by bandits with no captive place (the toll on).
+func _test_camp_traders() -> void:
+	print("\n== the forest camps' traders: by the fire, held captive, freed, behind the cart (799, npc's side) ==")
+	var player := _player()
+	_check(player != null, "(a player in the town)")
+	if player == null:
+		return
+	var raw: Dictionary = _main._world_map.areas[TOWN]["places"]
+	var added := {
+		"tc": {"key": "tc", "cell": Vector2i(20, 12), "name": "a traders' camp", "kind": "camp", "radius": 2, "worth": 0, "holder": "nobody", "mix": "trader"},
+		"tc_trader": {"key": "tc_trader", "cell": Vector2i(20, 13), "name": "a trader", "kind": "trader", "radius": 2, "worth": 0, "holder": "nobody",
+			"rect": Rect2i(18, 11, 5, 5), "bed": Vector2i(21, 13), "facing": Vector2i(0, -1)},
+		"tk": {"key": "tk", "cell": Vector2i(25, 5), "name": "a bandit camp", "kind": "camp", "radius": 2, "worth": 0, "holder": "bandits", "mix": "mixed"},
+		"tk_trader": {"key": "tk_trader", "cell": Vector2i(25, 6), "name": "a trader", "kind": "trader", "radius": 2, "worth": 0, "holder": "nobody",
+			"rect": Rect2i(23, 4, 5, 5), "bed": Vector2i(24, 6)},
+		"tk_captive": {"key": "tk_captive", "cell": Vector2i(25, 10), "name": "a captive", "kind": "captive", "radius": 1, "worth": 0, "holder": "nobody"},
+		"tt": {"key": "tt", "cell": Vector2i(25, 15), "name": "a bandit camp", "kind": "camp", "radius": 2, "worth": 0, "holder": "bandits", "mix": "bandit"},
+		"tt_trader": {"key": "tt_trader", "cell": Vector2i(25, 16), "name": "a trader", "kind": "trader", "radius": 2, "worth": 0, "holder": "nobody",
+			"rect": Rect2i(23, 14, 5, 5)}}
+	for key: String in added:
+		raw[key] = added[key]
+		var id := "%s/%s" % [TOWN, key]  # As the herder's test: no rebind, which drops places tests made.
+		World.holdings._places[id] = {"id": id, "area": TOWN, "key": key, "cell": added[key]["cell"], "name": added[key]["name"],
+			"kind": added[key]["kind"], "radius": added[key]["radius"], "worth": 0, "start": added[key]["holder"]}
+		World.holdings._holder[id] = added[key]["holder"]
+		World.holdings._strength[id] = 1
+		World.holdings._since[id] = World.holdings.now()
+	var tc := TOWN + "/tc"
+	var tk := TOWN + "/tk"
+	var tt := TOWN + "/tt"
+	_check(_main._camp_of(tc + "_trader") == tc and _main._camp_of(TOWN + "/store").is_empty(), "a trader place's camp is its key less _trader")
+	_check(not _main._camp_toll(tc) and not _main._camp_captive(tc), "an open camp: no toll, no captive")
+	_check(_main._camp_captive(tk) and not _main._camp_toll(tk), "a captive's camp held: its trader held, no toll")
+	_check(_main._camp_toll(tt) and not _main._camp_captive(tt), "a camp held with no captive place: the toll")
+	var area: Dictionary = _main._world_map.areas[TOWN]
+	var wanted := {}
+	for each: Dictionary in _main._camp_traders_wanted(area):
+		wanted[each["key"]] = each
+	var open_key := Offers.CAMP_TRADER + tc + "_trader"
+	var held_key := Offers.CAMP_TRADER + tk + "_trader"
+	_check(wanted.size() == 3 and wanted.has(open_key) and wanted.has(held_key), "a body wanted at each trader place (%s)" % [wanted.keys()])
+	if not wanted.has(open_key) or not wanted.has(held_key):
+		return
+	var open: Dictionary = wanted[open_key]["places"]
+	_check(open["work"] == Rect2i(20, 13, 1, 1) and open["home"] == Rect2i(18, 11, 5, 5) and open["bed"] == Rect2i(18, 11, 5, 5) and open["bed_at"] == Vector2i(21, 13),
+		"open: by the fire by day, his bedroll his bed, the camp his ground (%s)" % [open])
+	_check(wanted[open_key]["camp_trader"] == tc + "_trader" and wanted[open_key]["town"] == tc, "keyed by his place, his camp his town")
+	_check((wanted[held_key]["places"] as Dictionary)["work"] == Rect2i(25, 10, 1, 1) and (wanted[held_key]["places"] as Dictionary)["home"] == Rect2i(25, 10, 1, 1),
+		"held: tied at the captive place, day and night")
+	# A body of his: the field enemy-ai reads, answering clicks only.
+	var body := _main._spawn_resident(wanted[open_key]) as Resident
+	_check(body != null and body.camp_trader == tc + "_trader" and Main.answers_clicks_only(body), "his body: camp_trader set (never a monster's foe), clicks only")
+	_check(Offers.of(held_key, Net.player_id).is_empty(), "held: no wares")
+	# A fight near: behind his cart, out of the camp, away from the fire.
+	_main._camp_carts[World.zone.name] = [Vector2i(20, 11)]
+	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "CampRaider%d" % World.tick, "tile": _main._nearest_free(Vector2i(16, 13))}) as Monster
+	if raider != null:
+		_put(raider, Vector2i(16, 13))
+		raider.alert = Monster.Alert.FIGHTING
+	var covered := {}
+	for each: Dictionary in _main._camp_traders_wanted(area):
+		covered[each["key"]] = each
+	_check(raider != null and (covered[open_key]["places"] as Dictionary)["work"] == Rect2i(20, 10, 1, 1), "a fight near: behind his cart, out of the camp (%s; raider hp %d, %d cells off, near %s)" % [covered[open_key]["places"]["work"],
+		raider.hp if raider != null else -1, World.distance(raider.tile, Vector2i(20, 13)) if raider != null else -1, _main._camp_fight_near(Vector2i(20, 13))])
+	if raider != null:
+		World.despawn(raider)
+	_main._camp_carts.erase(World.zone.name)
+	# The captive's camp cleared: the players in the area its freers, he at his fire; re-formed, held again.
+	World.holdings.take(tk, Factions.NOBODY)
+	_check(not _main._camp_captive(tk) and _main._camp_freer(tk, Net.player_id) and not _main._camp_freer(tc, Net.player_id),
+		"cleared: freed, the players in the area its freers (%s)" % [_main._camp_holds.get(tk, {}).get("state", "")])
+	var freed := {}
+	for each: Dictionary in _main._camp_traders_wanted(area):
+		freed[each["key"]] = each
+	_check((freed[held_key]["places"] as Dictionary)["work"] == Rect2i(25, 6, 1, 1), "freed: by his fire")
+	World.holdings.take(tk, "bandits")
+	_check(_main._camp_captive(tk) and not _main._camp_freer(tk, Net.player_id), "re-formed: held again, no freers")
+	_check(str(_main._camp_holds.get(tk, {}).get("state", "")) == "held", "camp_holds: held (saved as \"camp_holds\")")
+	if body != null:
+		World.despawn(body)
+	_main._camp_holds.clear()
+	for key: String in added:
+		raw.erase(key)
+		var id := "%s/%s" % [TOWN, key]
+		World.holdings._places.erase(id)
+		World.holdings._holder.erase(id)
+		World.holdings._strength.erase(id)
+		World.holdings._since.erase(id)
+		World.holdings._fell_from.erase(id)
 
 
 func _test_visitors() -> void:

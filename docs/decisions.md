@@ -42555,3 +42555,38 @@ regenerated, only that cell and its entry changed. No traveller's pack (lore's o
 since the save"), so no mover. level_test _test_caches (each level's caches by cell,
 table and art, none on a removed cell, the cairn's against the cairn). Level data and a
 tool; protocol unchanged, no new class_name.
+
+## 799. The forest camps' traders
+
+The coordinator's approved design (2026-11-04), on maps' forest phase C (793, maps' side,
+976d59c3): four "trader" places, north_traders_camp_trader, south_traders_camp_trader (C1, C5,
+camps held by nobody), loop_camp_trader (C3, the Fetter Camp, held by bandits, with a "captive"
+place loop_camp_captive outside it) and southeast_camp_trader (C7, the Toll Camp, held by bandits).
+Each trader place carries "at" (beside the fire), "rect" (the camp), "bed" (his bedroll's cell) and
+"facing". A camp trader is a 711-pedlar-style body: no worker, no card, keyed Offers.CAMP_TRADER + his
+place id ("camp:forest/loop_camp_trader"), his camp the trader place's key less "_trader" (maps':
+stable once on main). Three sides: npc's (the body, his days, his words, held and freed), economy's
+(his stock, prices, purse and gift: "799, economy's side") and enemy-ai's (never a monster's foe,
+C7's truce: "799, enemy-ai's side").
+
+npc's side. Main._camp_traders_wanted (in _sync_residents, while someone is near the place, as a
+town's folk): by day his work is the fire's cell, by night his bed the camp with bed_at his bedroll;
+while a monster hunting or fighting (its alert) is within CAMP_FIGHT_REACH (6) of the fire,
+all his places are the cell behind his cart, from the cart away from the fire and out of the camp
+(Main._camp_cover; the zone's carts read once from its level's decor). Resident.camp_trader holds
+his place id (server only; enemy-ai's Monster._may_fight reads it). A camp whose "<camp>_captive"
+place is a captive place and whose holder is not nobody holds him (C3): all day at that cell, no
+wares, a "held" greeting. A camp held by a side hostile to the towns with no captive place is a
+toll camp (C7): economy's markup on his prices. Main._on_place_taken: a trader's camp fallen to
+nobody records its freers, the players in its area then (_camp_holds {state, freed_by, gifted},
+saved as "camp_holds"); re-formed from nobody, held again, no freers, and at a captive's camp
+Economy.camp_captive. His wares (Offers._camp_offers, ctx "camp_stock"): Economy.camp_stock's
+lines at Economy.camp_price(camp, item, toll, freer) for the player asking; bought through the
+window's ware path (accept CAMP_WARES -> Main._camp_sells -> Economy.camp_sale, npc mints, "say"
+spoken). Talk is no model (he answers clicks only, Main.answers_clicks_only): a greeting by how his
+camp stands (townsfolk.json "camp": held, toll, freed, open; voice's words, lore's facts), to a
+freer of a captive's camp once his gift (Economy.camp_gift's item minted, a "gift" line), then once
+a visit a visitor's piece of news (Main._visitor_news). Economy's calls are read behind has_method,
+so either side lands first. Not yet: the raws he buys (economy's camp_offer and camp_buy) through
+the window's Sell, a follow-up with ui; his name (lore's drafts, with Jeff); the facing at work.
+resident_test _test_camp_traders. Server only, protocol unchanged, no new class_name.

@@ -1906,11 +1906,12 @@ static func answers_clicks_only(body: GridEntity) -> bool:
 	if body == null or not body is Resident:
 		return false
 	var id := (body as Resident).worker_id
-	if id.begins_with(Offers.VISITOR) or id.begins_with(Offers.VENDOR):
+	if id.begins_with(Offers.VISITOR) or id.begins_with(Offers.VENDOR) or id.begins_with(Offers.CAMP_TRADER):
 		return true
 	var named := String(body.name)
 	return named.begins_with(("Resident_" + Offers.VISITOR).validate_node_name()) \
-			or named.begins_with(("Resident_" + Offers.VENDOR).validate_node_name())
+			or named.begins_with(("Resident_" + Offers.VENDOR).validate_node_name()) \
+			or named.begins_with(("Resident_" + Offers.CAMP_TRADER).validate_node_name())
 
 
 ## Give's button (802): "give" {entity: [param to]'s path, uids, barter
@@ -4252,6 +4253,7 @@ func _boot() -> void:
 	_alms_runs = snapshot.get("alms_runs", {}).duplicate(true) if snapshot.get("alms_runs") is Dictionary else {}
 	_crypt_told = snapshot.get("crypt_told", {}).duplicate(true) if snapshot.get("crypt_told") is Dictionary else {}
 	_runner_out = snapshot.get("runner_out", {}).duplicate(true) if snapshot.get("runner_out") is Dictionary else {}
+	_camp_holds = snapshot.get("camp_holds", {}).duplicate(true) if snapshot.get("camp_holds") is Dictionary else {}  # 799.
 	# The hour and the day's length go on as saved (DayNight), unless
 	# --hour or --day-minutes say otherwise.
 	DayNight.reset()
@@ -5999,6 +6001,7 @@ func _save_state(wait := true, final := false) -> void:
 		"alms_runs": _alms_runs.duplicate(true),
 		"crypt_told": _crypt_told.duplicate(true),
 		"runner_out": _runner_out.duplicate(true),
+		"camp_holds": _camp_holds.duplicate(true),  # 799.
 		"economy": World.economy.to_dict() if World.economy != null else {},
 		"herds": World.herds.to_dict() if World.herds != null else {},
 		"balance": World.balance.to_dict() if World.balance != null else {},  # Decision 761.
@@ -10311,6 +10314,10 @@ func _sync_residents() -> void:
 			wanted[who] = {"key": who, "name": str(worker.get("name", who)), "trade": str(trades[0]) if not trades.is_empty() else "",
 				"player": "", "town": buyer, "type": str(worker.get("type", "")),
 				"places": {"work": square, "home": square, "square": square}}
+		# The forest camps' traders (799, npc's side): one body at each "trader" place while someone is near.
+		for each: Dictionary in _camp_traders_wanted(area):
+			if wanted.size() < RESIDENTS_MAX and not wanted.has(each["key"]):
+				wanted[each["key"]] = each
 	# The lost (decision 487): a town's people beyond the walls stand at their
 	# cell of this zone, chosen once here (far from the store, off held
 	# ground, reachable), while a player is near that cell; a walked one home
@@ -11196,6 +11203,8 @@ func _accept_offer(player: Player, offer_id: String, gold: int) -> void:
 		_read_page(player, body, result["read"])  # The scholar's chronicle (decision 491).
 	elif not str(result.get("ware", "")).is_empty():
 		_visitor_sells(player, body, str(result["ware"]))
+	elif not str(result.get("camp_ware", "")).is_empty():
+		_camp_sells(player, body, str(result["camp_ware"]))  # 799.
 	elif not str(result.get("starter", "")).is_empty():
 		_vendor_sells(player, body, str(result["starter"]))
 	elif int(result.get("relic", 0)) > 0:
@@ -11279,6 +11288,7 @@ func _offers_context() -> Dictionary:
 		"set_memory": _set_town_memory,
 		"visitor": _visitor_of,
 		"visitor_price": _visitor_price,
+		"camp_stock": _camp_stock,  # A forest camp's trader's wares (799).
 		"vendor": func() -> Dictionary: return World.economy.rules.get("vendor", {}) if World.economy != null else {},
 		"relics": _relics_held,
 		"barrow_knight": barrow_knight,
@@ -12266,6 +12276,7 @@ func _spawn_resident(each: Dictionary) -> Resident:
 	body.sought = str(each.get("sought", ""))
 	body.holder = str(each.get("holder", ""))
 	body.where = str(each.get("where", ""))
+	body.camp_trader = str(each.get("camp_trader", ""))  # 799: never a monster's foe (enemy-ai's _may_fight).
 	_arm_guard(body)  # A guard's spear, mail and fight (791).
 	if not body.sought.is_empty():
 		if each.has("escort"):
@@ -16111,6 +16122,7 @@ func _on_place_taken(id: String, from: String, to: String) -> void:
 	_bond_cleared(id, from, to)
 	_favour_camp(id, from, to)
 	_reward_camp_cleared(id, from, to)
+	_camp_place_taken(id, from, to)  # 799: a camp trader's freers, or held again.
 
 
 ## A camp of a side hostile to the town fallen to nobody (804, enemy-ai's
@@ -17412,6 +17424,9 @@ func _greeted(player: Player, body: Resident) -> void:
 	if body.worker_id.begins_with(Offers.VISITOR):
 		_visitor_greeted(player, body, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
 		return
+	if body.worker_id.begins_with(Offers.CAMP_TRADER):
+		_camp_greeted(player, body, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))  # 799.
+		return
 	if body.worker_id.begins_with(Offers.VENDOR):
 		body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
 		var greetings: Array = Townsfolk.rules().get("visitors", {}).get("greetings", {}).get("vendor", ["Blades for the road, one gold apiece. Take your pick."])
@@ -17628,6 +17643,208 @@ func _visitors_wanted(area: Dictionary, place_id: String, place: Dictionary) -> 
 		out.append({"key": key, "name": str(going["name"]), "trade": "", "player": "", "town": place_id,
 			"places": _visitor_places(Rect2i(going["edge"], Vector2i.ONE))})
 	return out
+
+
+## The forest camps' traders and what befell their camps (799, npc's side),
+## by camp place id ("forest/loop_camp"): {state "held" | "cleared", freed_by
+## [player ids in the area when it was cleared], gifted [freers given their
+## gift]}. Saved ("camp_holds"); economy's stock is its own ("camp_traders").
+var _camp_holds: Dictionary = {}
+## The carts of a zone's camps (799): zone -> [cell], read once from its level.
+var _camp_carts: Dictionary = {}
+## How near a fight puts a camp's trader behind his cart (799).
+const CAMP_FIGHT_REACH := 6
+
+
+## The camp place id of trader place [param trader_id] ("forest/loop_camp_trader"
+## -> "forest/loop_camp"), "" when no camp of that key stands beside it.
+func _camp_of(trader_id: String) -> String:
+	var camp := trader_id.trim_suffix("_trader")
+	return camp if camp != trader_id and World.holdings.place(camp).get("kind") == "camp" else ""
+
+
+## The raw level place of [param place_id] (rect, bed, facing kept), {} for none.
+func _level_place(place_id: String) -> Dictionary:
+	var area := place_id.get_slice("/", 0)
+	return _world_map.areas.get(area, {}).get("places", {}).get(place_id.trim_prefix(area + "/"), {}) if _world_map != null else {}
+
+
+## Whether [param camp]'s trader is held captive now (799, C3): his camp has a
+## "captive" place ("<camp>_captive") and someone holds it.
+func _camp_captive(camp: String) -> bool:
+	return World.holdings.place(camp + "_captive").get("kind") == "captive" and World.holdings.holder(camp) != Factions.NOBODY
+
+
+## Whether [param camp]'s trader sells at the toll (799, C7): no captive place,
+## and a side hostile to the towns holds his camp (economy's markup).
+func _camp_toll(camp: String) -> bool:
+	var holder := World.holdings.holder(camp)
+	return World.holdings.place(camp + "_captive").is_empty() and holder != Factions.NOBODY \
+		and World.holdings.factions != null and World.holdings.factions.hostile(holder, "town")
+
+
+## Whether [param player_id] cleared [param camp] (799): the freer's price and gift.
+func _camp_freer(camp: String, player_id: String) -> bool:
+	return player_id in (_camp_holds.get(camp, {}) as Dictionary).get("freed_by", [])
+
+
+## The camp's mix ("trader", "mixed", ...), economy's stock key.
+func _camp_mix(camp: String) -> String:
+	return str(_level_place(camp).get("mix", "trader"))
+
+
+## The cell behind [param rect]'s cart from the fire at [param at] (799): from
+## the cart away from the fire, the first cell out of the camp; the fire's cell
+## for no cart.
+func _camp_cover(at: Vector2i, rect: Rect2i) -> Vector2i:
+	var zone := World.zone.name
+	if not _camp_carts.has(zone):
+		var carts: Array = []
+		for piece: Variant in Level.load_level(zone).get("terrain", {}).get("decor", []):
+			if piece is Dictionary and str(piece.get("kind", "")) == "cart":
+				carts.append(piece["cell"])
+		_camp_carts[zone] = carts
+	var cart := Vector2i(-1, -1)
+	for cell: Vector2i in _camp_carts[zone]:
+		if rect.has_point(cell) and (cart.x < 0 or World.distance(cell, at) < World.distance(cart, at)):
+			cart = cell
+	if cart.x < 0:
+		return at
+	var away := Vector2i(signi(cart.x - at.x), signi(cart.y - at.y))
+	if away == Vector2i.ZERO:
+		away = Vector2i(0, -1)
+	var cell := cart
+	while rect.has_point(cell):
+		cell += away
+	return cell
+
+
+## Whether a living monster hunting or fighting is within CAMP_FIGHT_REACH of
+## [param at] (799: the trader takes cover behind his cart).
+func _camp_fight_near(at: Vector2i) -> bool:
+	for entity in World.monsters():
+		var monster := entity as Monster
+		if monster != null and monster.spawned and monster.zone == World.zone.name and monster.hp > 0 \
+				and monster.alert in [Monster.Alert.HUNTING, Monster.Alert.FIGHTING] and World.distance(monster.tile, at) <= CAMP_FIGHT_REACH:
+			return true
+	return false
+
+
+## The forest camps' traders wanted here as bodies (_sync_residents; 799, npc's
+## side): one at each "trader" place of [param area] while someone is near, by
+## the fire by day and on his bedroll by night, within his camp; held captive
+## (C3), at the camp's captive place all day; behind his cart while a fight is
+## near. Key Offers.CAMP_TRADER + his place id; no worker, no card.
+func _camp_traders_wanted(area: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if area.is_empty():
+		return out
+	for place_id: String in World.holdings.places_in(World.zone.name):
+		var place := World.holdings.place(place_id)
+		if place.get("kind") != "trader" or not _town_near(place_id, place):
+			continue
+		var camp := _camp_of(place_id)
+		var raw := _level_place(place_id)
+		var at: Vector2i = place.get("cell", Vector2i.ZERO)
+		var rect: Rect2i = raw.get("rect", Rect2i(at - Vector2i(2, 2), Vector2i(5, 5)))
+		var places := {}
+		if not camp.is_empty() and _camp_captive(camp):
+			places = _visitor_places(Rect2i(World.holdings.place(camp + "_captive").get("cell", at), Vector2i.ONE))
+		elif _camp_fight_near(at):
+			places = _visitor_places(Rect2i(_camp_cover(at, rect), Vector2i.ONE))
+		else:
+			places = {"work": Rect2i(at, Vector2i.ONE), "home": rect, "square": rect, "bed": rect}
+			if raw.get("bed") is Vector2i:
+				places["bed_at"] = raw["bed"]
+		out.append({"key": Offers.CAMP_TRADER + place_id, "name": str(place.get("name", "a trader")), "trade": "", "player": "",
+			"town": camp if not camp.is_empty() else place_id, "camp_trader": place_id, "places": places})
+	return out
+
+
+## A camp changed hands (799, npc's side): cleared, its freers are those in its
+## area now (their price and, at a captive's camp, his gift); re-formed, held
+## again (economy's camp_captive at a captive's camp).
+func _camp_place_taken(id: String, from: String, to: String) -> void:
+	if World.holdings.place(id).get("kind") != "camp" or World.holdings.place(id + "_trader").get("kind") != "trader":
+		return
+	if to == Factions.NOBODY:
+		_camp_holds[id] = {"state": "cleared", "freed_by": _players_in(str(World.holdings.place(id).get("area", ""))), "gifted": []}
+	elif from == Factions.NOBODY:
+		_camp_holds[id] = {"state": "held", "freed_by": [], "gifted": []}
+		if World.holdings.place(id + "_captive").get("kind") == "captive" and World.economy != null and World.economy.has_method("camp_captive"):
+			World.economy.camp_captive(id)
+
+
+## [param worker_id]'s wares for [param player_id] (ctx "camp_stock", 799):
+## economy's stock at his camp's price for them; none held captive.
+func _camp_stock(worker_id: String, player_id := "") -> Array:
+	var camp := _camp_of(worker_id.trim_prefix(Offers.CAMP_TRADER))
+	if camp.is_empty() or _camp_captive(camp) or World.economy == null or not World.economy.has_method("camp_stock"):
+		return []
+	var out: Array = []
+	for line: Variant in World.economy.camp_stock(camp, _camp_mix(camp)):
+		if line is Dictionary:
+			var each: Dictionary = (line as Dictionary).duplicate()
+			if World.economy.has_method("camp_price"):
+				each["price"] = World.economy.camp_price(camp, str(each.get("item", "")), _camp_toll(camp), _camp_freer(camp, player_id))
+			out.append(each)
+	return out
+
+
+## [param player] bought [param item] from camp trader [param body] (799):
+## economy takes the gold and the stock (Economy.camp_sale), npc mints it into
+## their hands; the trader says how it went.
+func _camp_sells(player: Player, body: Resident, item: String) -> void:
+	var camp := _camp_of(body.camp_trader)
+	if camp.is_empty() or _camp_captive(camp) or World.economy == null or not World.economy.has_method("camp_sale"):
+		return
+	var done: Dictionary = World.economy.camp_sale(camp, _camp_mix(camp), player.player_id, item, _camp_toll(camp), _camp_freer(camp, player.player_id))
+	if bool(done.get("ok", false)):
+		_hand_item(player.player_id, item, body.person)
+	var say := str(done.get("say", ""))
+	if not say.is_empty():
+		_resident_says(body, say, "", player)
+
+
+## A camp's trader greeted (799, npc's side): a line by how his camp stands
+## (townsfolk.json "camp": "held" captive, "toll", "freed" to a freer, else
+## "open"); to a freer of a captive's camp once, his gift (Economy.camp_gift)
+## and its line; then once a visit a word of the towns or the road, as a
+## visitor's.
+func _camp_greeted(player: Player, body: Resident, stop_ticks: int) -> void:
+	body.address(player, stop_ticks)
+	var words: Dictionary = Townsfolk.rules().get("camp", {})
+	var camp := _camp_of(body.camp_trader)
+	var held := not camp.is_empty() and _camp_captive(camp)
+	var freer := not camp.is_empty() and _camp_freer(camp, player.player_id)
+	var kind := "held" if held else ("toll" if not camp.is_empty() and _camp_toll(camp) else ("freed" if freer else "open"))
+	var lines: Array = words.get(kind, [])
+	if not lines.is_empty():
+		_resident_says(body, str(lines[absi(hash(body.worker_id + player.player_id)) % lines.size()]), "", player)
+	if held:
+		return
+	var record: Dictionary = _camp_holds.get(camp, {})
+	if freer and World.holdings.place(camp + "_captive").get("kind") == "captive" and not player.player_id in record.get("gifted", []) \
+			and World.economy != null and World.economy.has_method("camp_gift"):
+		var gifted: Array = record.get("gifted", [])
+		gifted.append(player.player_id)
+		record["gifted"] = gifted
+		_camp_holds[camp] = record
+		var item := str(World.economy.camp_gift(camp, _camp_mix(camp)))
+		if not item.is_empty() and _hand_item(player.player_id, item, body.person):
+			var gift: Array = words.get("gift", [])
+			if not gift.is_empty():
+				_resident_says(body, str(gift[absi(hash(body.worker_id + player.player_id)) % gift.size()]), "", player)
+	var told := body.worker_id + "|" + player.player_id
+	if _visitor_told.has(told):
+		return
+	var news := _visitor_news("", {"id": body.worker_id, "from": "the forest"})
+	if news.is_empty():
+		return
+	_visitor_told[told] = true
+	var text := str(news[0].get("text", "")) if news[0] is Dictionary else str(news[0])
+	if not text.is_empty():
+		_resident_says(body, text, "", player)
 
 
 ## Where the starter stall's keeper of [param place_id] stands (736): within
