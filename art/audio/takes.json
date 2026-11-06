@@ -1891,6 +1891,35 @@
 				"sha256": "60f1154073de9bdbe4f80de1ce1d0c3b7e284bc9d164b9682493a2a81a8a7ded"
 			}
 		],
+		"sfx.goblin_ambush": [
+			{
+				"file": "sfx.goblin_ambush.ogg",
+				"from": "freesound",
+				"original": "freesound 874259: House Cats - Hiss, Medium Perspective (from 0.1 s for 0.6 s)",
+				"sha256": "a6f8992ab48c82ef93087c7dcd01c160e5071f7b7f61c4e1e3a71ef473420f42",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/874259/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_ambush.2.ogg",
+				"from": "freesound",
+				"original": "freesound 840807: Waterfowl - Chinese Goose; Hiss (from 0.3 s for 0.6 s)",
+				"sha256": "15ea60fcc990982f07689bad2e06ba1d126862fe082933883ca29d073d92cd57",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/840807/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_ambush.3.ogg",
+				"from": "freesound",
+				"original": "freesound 758900: Insects - Madagascar Hissing Cockroach, Short Hiss (from 0.15 s for 0.35 s)",
+				"sha256": "9c35220f1a7556872fdb53ce0d5ac0d546f34026cafb4a6d178d5be739948cab",
+				"by": "TheKingOfGeeks360",
+				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/758900/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.goblin_chatter": [
 			{
 				"file": "sfx.goblin_chatter.ogg",

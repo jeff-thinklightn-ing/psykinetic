@@ -976,6 +976,15 @@
 			"volume_db": -2.0,
 			"uses": "a goblin breaking and running: a yelp and a scramble (the sim's rout); Monster.cried rout (SoundKit.cry)"
 		},
+		"sfx.goblin_ambush": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -2.0,
+			"uses": "a lurker breaking cover behind you: a sharp hiss as its 0.8 s windup starts, heard in time to step aside (790 amended (4): Skeech, the kobold chief; Monster.cried ambush, SoundKit.cry)"
+		},
 		"sfx.goblin_pain": {
 			"category": "creatures",
 			"type": "oneshot",
