@@ -41798,6 +41798,17 @@ the slots' length. No new class_name.
 The set is built as approved while Jeff's pick 1 (head, neck, back, feet and two rings, gloves
 held back) is still open, and it may change: a slot is only appended, so adding gloves or
 dropping one before a record saves anything in it costs one constant and a row in WORN.
+
+788 amended: a worn row's look (pc-character's ask for drawing worn gear on bodies, the
+coordinator's approval; release's label). A worn field may carry "look", a word naming the body
+part the views draw for it, tinted the row's colour, as armour's look (622) does: the hood's
+"hood", the soft boots' "boots_soft", a cloak's "cloak" when one is made. A row without one (the
+felt hat, amulets, the charm) is drawn by art-kit's worn.<id> mesh on its slot's socket; rings
+draw nothing. Items._worn kept only numbers and now keeps a "look" string too; the words are
+pc-character's, who draws them, and cites this amendment. items_test _test_worn checks the two
+words and their absence on the hat and the charm. Catalog and client only: protocol unchanged,
+no new class_name, no bullet (the drawing carries it).
+
 ## 800. Carved words on stones
 
 The coordinator's ask (2026-11-04): a milestone or waystone can carry words cut into its face,

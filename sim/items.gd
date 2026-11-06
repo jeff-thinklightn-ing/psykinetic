@@ -264,8 +264,10 @@ static func armour_of(id: String) -> Dictionary:
 
 
 ## A worn field as read (decision 788): {slot (one of WORN's kinds but
-## "body", which is armour's), and its stats as given, numbers}; {} with a
-## warning for an unknown slot.
+## "body", which is armour's), look (pc-character's word for the body part
+## the views draw, tinted the row's colour, as armour's look; left out for
+## art-kit's worn.<id> mesh on the slot's socket), and its stats as given,
+## numbers}; {} with a warning for an unknown slot.
 static func _worn(id: String, value: Dictionary) -> Dictionary:
 	var kind := str(value.get("slot", ""))
 	if kind == "body" or kind not in WORN.values():
@@ -275,6 +277,8 @@ static func _worn(id: String, value: Dictionary) -> Dictionary:
 	for key: Variant in value:
 		if key != "slot" and (value[key] is float or value[key] is int):
 			out[str(key)] = float(value[key])
+	if value.get("look") is String and not str(value["look"]).is_empty():
+		out["look"] = str(value["look"])
 	return out
 
 
