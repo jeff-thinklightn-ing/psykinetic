@@ -7248,6 +7248,19 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
 			var inward := Vector3(0.0, MOUTH_ARCH.y * 0.3, (z0 + z1) * 0.5) - (a + c) * 0.5
 			put.call(a, b, c, inward, shade)
 			put.call(a, c, d, inward, shade)
+		# Its walls' foot: the vault ends a little over the floor at the
+		# arch's sides (the curve's last strip), so down to under it, or
+		# the light shows through a slit along each side (the coordinator,
+		# on the wolves' cave from above).
+		for side: float in [-1.0, 1.0]:
+			var e := side * MOUTH_ARCH.x * 0.5
+			var top0 := Vector3(e * s0, arch_in.call(e) * s0, z0)
+			var top1 := Vector3(e * s1, arch_in.call(e) * s1, z1)
+			var foot0 := Vector3(e * s0, -0.1, z0)
+			var foot1 := Vector3(e * s1, -0.1, z1)
+			var into := Vector3(-side, 0.0, 0.0)
+			put.call(foot0, top0, top1, into, shade)
+			put.call(foot0, top1, foot1, into, shade)
 		var fa := Vector3(-MOUTH_ARCH.x * 0.5 * s0, 0.02, z0)
 		var fb := Vector3(MOUTH_ARCH.x * 0.5 * s0, 0.02, z0)
 		var fc := Vector3(MOUTH_ARCH.x * 0.5 * s1, 0.02, z1)

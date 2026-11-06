@@ -4868,6 +4868,21 @@ func _test_cave_mouth() -> void:
 			met = shades[i]
 	_check(near > 0.5 + Client3D.MOUTH_THROAT - 0.1 and met.get_luminance() < 0.01,
 			"the arch open, its throat going black (met at %.2f m, %.3f)" % [near, met.get_luminance()])
+	# Along the throat's floor, just over it, to either side: its wall met
+	# at the arch's edge, no slit under the vault (the light line the
+	# coordinator saw from above).
+	var slit := 0.0
+	for side: float in [-1.0, 1.0]:
+		for z: float in [0.9, 1.8, 2.7]:
+			var at_floor := Vector3(0.0, 0.05, z)
+			var reach := INF
+			for i in range(0, points.size(), 3):
+				var hit: Variant = Geometry3D.ray_intersects_triangle(at_floor, Vector3(side, 0, 0), points[i], points[i + 1], points[i + 2])
+				if hit != null:
+					reach = minf(reach, absf((hit as Vector3).x))
+			slit = maxf(slit, reach)
+	_check(slit < Client3D.MOUTH_ARCH.x * 0.5 + 0.1,
+			"the throat's walls down to its floor, no slit along its sides (met at %.2f m)" % slit)
 	var face_hit := INF
 	from = Vector3(Client3D.MOUTH_ARCH.x * 0.5 + 0.6, 1.0, -2.0)
 	for i in range(0, points.size(), 3):
