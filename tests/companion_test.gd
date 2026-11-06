@@ -6270,6 +6270,23 @@ func _test_fields() -> void:
 			"within reach but behind the room's south wall: none (%.2f)" % World.heat_at(Vector2i(4, 8)))
 	_check(is_equal_approx(World.light_at(Vector2i(1, 1), false), DayNight.base_ambient("indoors")),
 			"the test room has an indoor level's light (%.2f)" % World.light_at(Vector2i(1, 1), false))
+	# Carried heat (178 amended): a body giving heat is one of heat_carriers
+	# while it does, and burns where it stands; at 0, or freed, it is gone.
+	var spot := pet.tile
+	World._carried_heat_key = Vector2i(-1, -1)
+	_check(not GridEntity.heat_carriers.has(pet) and not World.is_burning(spot), "she carries no heat; her cell does not burn (%s)" % spot)
+	pet.emit_heat = 20.0
+	World._carried_heat_key = Vector2i(-1, -1)
+	_check(GridEntity.heat_carriers.has(pet) and World.is_burning(spot), "she carries heat: a carrier, and her cell burns")
+	pet.emit_heat = 0.0
+	World._carried_heat_key = Vector2i(-1, -1)
+	_check(not GridEntity.heat_carriers.has(pet) and not World.is_burning(spot), "at 0 she is no carrier, and it burns no more")
+	var carriers := GridEntity.heat_carriers.size()
+	var brand := GridEntity.new()
+	brand.emit_heat = 5.0
+	var held := GridEntity.heat_carriers.has(brand) and GridEntity.heat_carriers.size() == carriers + 1
+	brand.free()
+	_check(held and GridEntity.heat_carriers.size() == carriers, "a carrier freed leaves the set")
 	# A small level of its own: a ring of fire, a wall, a door, in the dark.
 	var floor_cells: Array[Vector2i] = []
 	for y in 5:

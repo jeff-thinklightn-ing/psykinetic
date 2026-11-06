@@ -311,10 +311,12 @@ func hot_set(world: Node, threshold: float) -> Dictionary:
 	return _hot[threshold]
 
 
-## Whether anything in [param world] carries heat now (see heat_at).
+## Whether anything in [param world] carries heat now (see heat_at): only
+## the bodies that give any (GridEntity.heat_carriers, 178 amended) are
+## looked at, each asked whether it is in this world.
 func any_carried_heat(world: Node) -> bool:
-	for entity: GridEntity in world.entities():
-		if entity.emit_heat > 0.0 and entity.spawned:
+	for entity: GridEntity in GridEntity.heat_carriers:
+		if entity.emit_heat > 0.0 and entity.spawned and world.entities().has(entity):
 			return true
 	return false
 

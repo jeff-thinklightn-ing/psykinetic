@@ -201,7 +201,20 @@ var sync: MultiplayerSynchronizer
 ## Light and heat this body gives off where it stands (Fields): a carried
 ## lantern, a burning thing.
 @export var emit_light := 0.0
-@export var emit_heat := 0.0
+## Heat it gives off; above 0 it is one of heat_carriers (178 amended).
+@export var emit_heat := 0.0:
+	set(value):
+		emit_heat = value
+		if value > 0.0:
+			heat_carriers[self] = true
+		else:
+			heat_carriers.erase(self)
+## Every body whose emit_heat is above 0, {body: true} (178 amended): what
+## Fields.any_carried_heat goes through instead of every entity in the zone,
+## a walk of thousands a tick for heat nothing carries. Every zone's, and on
+## a host the mirrors' too: its readers check the body is in their world. A
+## body leaves it when its heat goes to 0 or it is freed.
+static var heat_carriers: Dictionary = {}
 ## Its magic aura (789): 0 to 1, to the hundredth, 0 with no charm in its
 ## charm slot (Items.CHARM). The final value, its multiplier folded in
 ## (phase 1: (1 + the worn charm's charge) / World.AURA_MOST); environment
@@ -495,6 +508,11 @@ func _ready() -> void:
 	if not Net.is_authority():
 		World.mirror_add(self)
 		_mirroring = true
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		heat_carriers.erase(self)
 
 
 func _exit_tree() -> void:

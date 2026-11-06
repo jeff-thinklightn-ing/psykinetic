@@ -1802,6 +1802,21 @@ same; heat and light over 20 door flips, the same to the bit).
 The castle tick, profiled: 2.3 ms on average with several over 15, worst
 19, to 1.2, worst 8.
 
+178 amended: the bodies that carry heat are kept in a set (perf's heat
+run; environment's review; the coordinator's go). The once-a-tick "does
+anything carry heat" walked every entity in the zone, 2608 in the 256
+castle, for heat nothing sets: 0.6 ms of a 53 ms tick. GridEntity.emit_heat
+has a setter that keeps GridEntity.heat_carriers (a body is in it while its
+emit_heat is above 0, and leaves it when freed), and Fields.any_carried_heat
+goes through that set alone, asking each body whether it is spawned and in
+this world, so the answer is the same. Castle 256, 16 players, headless,
+twice: 0.08 ms a tick against 0.60. The rest of is_burning's cost is a
+door's redo of the heat and light near it (123's fields; about 2 a tick at
+0.7-0.8 ms each), left as it is. World.carried_lights walks only the players
+and companions, and the bench never called it, so it is unchanged.
+companion_test _test_fields: a carrier burns its cell, at 0 or freed it
+is gone from the set.
+
 ## 179. A companion warms her model when she comes into the world
 
 Her asks time out quickly (2 s for a stance, 5 s for a line), and a cold
