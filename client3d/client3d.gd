@@ -958,7 +958,10 @@ const SHADOW_FADE := 5.0
 ## (decision 304), spread as the sim's light is: a room is dim but all of
 ## it shows, warm-grey; a cave is moonlight, shapes without colour; a
 ## dungeon is near black past the lamps.
-const ZONE_LOOK := {"indoors": [Color(0.62, 0.56, 0.48), 0.55], "cave": [Color(0.42, 0.48, 0.62), 0.22],
+## A cave's floor drawn at least this share of its colour (304 amended):
+## the sim lights its cells by the zone's 0.2, near black on screen.
+const CAVE_FLOOR := 0.6
+const ZONE_LOOK := {"indoors": [Color(0.62, 0.56, 0.48), 0.55], "cave": [Color(0.42, 0.48, 0.62), 0.55],
 	"dungeon": [AMBIENT, 0.5]}
 ## The sky moves on in steps of a game minute (a day's 1440th): the sun's
 ## direction stays put between, so shadow edges do not crawl (decision 292).
@@ -2385,6 +2388,9 @@ var _sky_step := -1
 ## by day there (0..1); the weather drawn (decision 309).
 var _look := {}
 var _look_daylight := 0.0
+## Indoors, the least the floor is drawn at (a cave's CAVE_FLOOR, 304
+## amended; else 0, the sim's cell light alone).
+var _floor_least := 0.0
 ## The sun's height the look was last worked out at (degrees).
 var _look_elevation := 90.0
 ## The haze's density (look's own, the weather's share), for _set_haze.
@@ -2934,6 +2940,13 @@ func _apply_sky() -> void:
 		_environment.ambient_light_energy = float(look[1]) * share
 		_sun.light_color = SUN
 		_sun.light_energy = SUN_ENERGY * share
+		# A cave's floor (304 amended): drawn no darker than CAVE_FLOOR of its
+		# own colour (the sim's cell light left as it is), so its edge reads
+		# without a torch; a lantern's pool still lights above it.
+		_floor_least = CAVE_FLOOR * share if str(_terrain.get("zone", "")) == "cave" else 0.0
+		if _ground_shader_material != null:
+			_ground_shader_material.set_shader_parameter("sky_floor", _floor_least)
+			_ground_shader_material.set_shader_parameter("sky_floor_roof", _floor_least)
 		# A damp level (580, terrain's side): darker and colder, a faint
 		# haze in the lanterns' light.
 		if bool(_terrain.get("damp", false)):
@@ -12308,7 +12321,8 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	material.set_shader_parameter("needles_own", needles != null)
 	if ArtKit.has(PineStands.NEEDLES_SLOT):
 		material.set_shader_parameter("needles_tile", float(ArtKit.spec(PineStands.NEEDLES_SLOT).get("tile_m", 4.0)))
-	material.set_shader_parameter("sky_floor", _sky_floor)
+	material.set_shader_parameter("sky_floor", _sky_floor if _outdoor else _floor_least)
+	material.set_shader_parameter("sky_floor_roof", _sky_floor if _outdoor else _floor_least)
 	material.set_shader_parameter("floors", _floor_mask)
 	for floor_set: String in FLOOR_SWATCHES:
 		var at: Vector2i = FLOOR_SWATCHES[floor_set]

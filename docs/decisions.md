@@ -5016,6 +5016,9 @@ kind (Client3D.ZONE_LOOK), spread as the sim's values are: a room is dim
 but all of it shows, warm-grey, the fire a warm patch; a cave is cool
 moonlight, shapes with little colour, the fire the only warmth; a dungeon
 is near black past the fire and the lanterns.
+
+304 amended (environment, the coordinator's ask for maps' wolves' cave, 815; release's label): a cave was murky, its wolves shown only by their name tags. The cave's look (Client3D.ZONE_LOOK["cave"]) goes from 0.22 to 0.55, and a cave's floor is drawn no darker than CAVE_FLOOR 0.6 of its own colour (the ground's sky_floor indoors, Client3D._floor_least, times the level's ambient_share as 769 amended (6) has it), as the floor is drawn at the sim's cell light, not the ambient, and stayed black at any ambient (4.7 to 6.3 of 255 at 0.4). The sim's cave light (DayNight.ZONE_AMBIENT 0.2) is unchanged, so who is seen in a cave is too; a lantern's pool still lights above the floor's least (the ground takes the brighter). Cave zone and ground only: other zones' floors and the cave's walls as before. Judged on stills of the den (0.4 / 0.45 left the wolves faint; at 0.55 / 0.6 the floor reads to its edges and a wolf's body shows, the lantern's circle still a clear gain). view_test _test_damp_look (the barrow as a cave).
+
 ## 281. A monster's kind is a row of levels/monsters.json
 
 What a kind is was spread over four tables in code (Level.MONSTER_TYPES,

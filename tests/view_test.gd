@@ -5517,6 +5517,19 @@ func _test_damp_look() -> void:
 	var back := lanterns.all(func(light: OmniLight3D) -> bool: return is_equal_approx(light.omni_range, Client3D.PLAYER_LIGHT_RANGE))
 	_check(back and not _rig._environment.fog_enabled and is_equal_approx(_rig._environment.ambient_light_energy, dry_energy),
 			"not damp: the lanterns at %.1f m again, no haze" % Client3D.PLAYER_LIGHT_RANGE)
+	# A cave (304 amended): its look's ambient, and the floor drawn no darker
+	# than CAVE_FLOOR of its colour; other zones the sim's cell light alone.
+	var cave: Dictionary = plain.duplicate()
+	cave["zone"] = "cave"
+	cave.erase("ambient")
+	_rig.rebuild(cave, barrow["centre"])
+	var cave_floor: float = _rig._ground_shader_material.get_shader_parameter("sky_floor")
+	var cave_energy := _rig._environment.ambient_light_energy
+	_rig.rebuild(plain, barrow["centre"])
+	var plain_floor: float = _rig._ground_shader_material.get_shader_parameter("sky_floor")
+	_check(is_equal_approx(cave_floor, Client3D.CAVE_FLOOR) and is_equal_approx(cave_energy, float(Client3D.ZONE_LOOK["cave"][1]))
+			and is_zero_approx(plain_floor),
+			"a cave: ambient %.2f, its floor drawn at least %.2f; the barrow's floor %.2f (the sim's light alone)" % [cave_energy, cave_floor, plain_floor])
 	# The soft scatter darkens with the floor indoors (the global floor_shade,
 	# each cell's brightness as the floor draws it); outdoors none.
 	_rig._shade_floor()
