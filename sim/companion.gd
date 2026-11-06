@@ -187,7 +187,12 @@ const FISH_NO_WATER := "Nothing to fish in here. We'd need a pond."
 const FISH_WISH := "I'd join you, if I had a rod."
 ## Her own cast's end, told her voice at once (805 amended (5)).
 const FISH_CAUGHT := "You just landed a fish, fishing beside %s. If you speak now, speak of that, in your own way."
-const FISH_MISSED := "A fish took your line and slipped the hook, fishing beside %s. If you speak now, speak of that, in your own way."
+## Her catches spoken of (805 amended (5), the coordinator after playtest's pair 7:
+## 13 lines in 5 minutes, counted): only the first catch of a fishing spell (a
+## cast ending more than FISH_SPELL_S after her last), at most one in
+## FISH_TALK_GAP_S; a slipped hook, never.
+const FISH_SPELL_S := 60
+const FISH_TALK_GAP_S := 180
 ## The co-op tomb (813 amended (2)): "stand on the plate", "wait on the other plate".
 const ORDER_PLATE := "\\b(stand|stay|wait|step|go|get|hold|keep)\\b[^.!?]*\\bplates?\\b"
 ## Her player asking what she makes of a room (813 amended (2)): "anything odd here?",
@@ -1376,6 +1381,10 @@ var _clues_given := {}
 var fish_spot := World.NO_CELL
 var _fish_put := {}
 var _fish_joined := -1
+## Her last cast's end, and her last catch spoken of (ticks).
+var _fish_last_end := -100000
+var _fish_said := -100000
+var _fish_spell_spoken := false
 var _fish_wish_day := -1
 var _fish_asked := false
 
@@ -1462,36 +1471,55 @@ func _go_fish(spot: Vector2i, asked: bool) -> void:
 	hold_tile = spot
 
 
-## The rod into a free hand, else her off hand (never the one her weapon is
-## in), the swap kept to undo; true with a rod in hand.
+## The rod into her right hand (805 amended (5): pc-character's casting clips
+## are right-handed). What that hand held, her weapon, goes to her pack (the
+## rod's slot, by the swap), never her off hand: pc-character's poses rest that
+## hand by the line. What moved is kept to undo; true with the rod in her right hand.
 func _rod_in_hand() -> bool:
-	if World.rod_hand(self) >= 0:
+	if World.rod_hand(self) == Items.RIGHT_HAND:
 		return true
 	var rod := _rod_slot()
 	if rod < 0:
 		return false
-	var weapon := World.wielded(self)
-	var hand := -1
-	for each: int in [Items.LEFT_HAND, Items.RIGHT_HAND]:
-		if slots[each].is_empty():
-			hand = each
-			break
-	if hand < 0:
-		for each: int in [Items.LEFT_HAND, Items.RIGHT_HAND]:
-			if weapon.is_empty() or slots[each] != weapon:
-				hand = each
+	var held := slots[Items.RIGHT_HAND]
+	var held_at := rod  # By the swap below.
+	if not held.is_empty() and rod == Items.LEFT_HAND:
+		# The rod in her off hand: her weapon to her pack first, not across.
+		held_at = -1
+		for slot: int in Items.PACK_SLOTS:
+			if slot < slots.size() and slots[slot].is_empty():
+				held_at = slot
 				break
-	if hand < 0 or not World.try_transfer(self, self, rod, self, hand):
+		if held_at < 0 or not World.try_transfer(self, self, Items.RIGHT_HAND, self, held_at):
+			return false
+	if not World.try_transfer(self, self, rod, self, Items.RIGHT_HAND):
+		if held_at != rod:
+			World.try_transfer(self, self, held_at, self, Items.RIGHT_HAND)
 		return false
-	_fish_put = {"rod_slot": rod, "hand": hand}
-	return World.rod_hand(self) >= 0
+	_fish_put = {"rod_slot": rod, "held": held, "held_at": held_at if not held.is_empty() else -1}
+	return World.rod_hand(self) == Items.RIGHT_HAND
 
 
-## The rod back where it came from, and what her hand held back in it.
+## The rod back where it came from and her weapon back in her right hand,
+## first thing on reeling in (805 amended (5)).
 func _rod_away() -> void:
 	if _fish_put.is_empty():
 		return
-	World.try_transfer(self, self, int(_fish_put["hand"]), self, int(_fish_put["rod_slot"]))
+	var held := str(_fish_put["held"])
+	var at := int(_fish_put["held_at"])
+	# Its own slot if still empty (or her weapon's, by the swap); a catch may
+	# have filled it, so else her pack's first free slot.
+	var back := int(_fish_put["rod_slot"])
+	if not (slots[back].is_empty() or (back == at and slots[back] == held)):
+		back = -1
+		for slot: int in Items.PACK_SLOTS:
+			if slot < slots.size() and slots[slot].is_empty():
+				back = slot
+				break
+	if back < 0 or not World.try_transfer(self, self, Items.RIGHT_HAND, self, back):
+		return  # No room: the rod stays in hand, kept to put away later.
+	if not held.is_empty() and slots[Items.RIGHT_HAND] != held and at >= 0 and at < slots.size() and slots[at] == held:
+		World.try_transfer(self, self, at, self, Items.RIGHT_HAND)
 	_fish_put = {}
 
 
@@ -1558,9 +1586,18 @@ func _tend_fish() -> void:
 		_go_fish(spot, false)
 
 
-## Her own cast's end (Main's, from World.fishing_changed): told her voice.
+## Her own cast's end (Main's, from World.fishing_changed): the first catch
+## of a spell told her voice, at most one in FISH_TALK_GAP_S (_fish_said, when).
 func fish_done(caught: bool) -> void:
-	_quiet_focus = (FISH_CAUGHT if caught else FISH_MISSED) % keeper_name()
+	var new_spell := World.tick - _fish_last_end > FISH_SPELL_S * World.TICK_RATE
+	_fish_last_end = World.tick
+	if new_spell:
+		_fish_spell_spoken = false
+	if not caught or _fish_spell_spoken or World.tick - _fish_said < FISH_TALK_GAP_S * World.TICK_RATE:
+		return
+	_fish_spell_spoken = true
+	_fish_said = World.tick
+	_quiet_focus = FISH_CAUGHT % keeper_name()
 	_ask_voice("Your line came in.", "", true)
 	_quiet_focus = ""
 

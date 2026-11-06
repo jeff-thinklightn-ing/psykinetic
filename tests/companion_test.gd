@@ -1810,6 +1810,10 @@ func _test_fishing() -> void:
 			break
 	World.put_item(pet, pet, pack, rod)
 	_check(pack >= 0 and pet.slots[pack] == "fishing_rod" and World.rod_hand(pet) < 0, "a rod in her pack, not her hand (slot %d)" % pack)
+	# A one-handed sword in her right hand, her off hand empty (805 amended (5)): to her pack all the same.
+	pet.slots[Items.RIGHT_HAND] = ""
+	pet.slots[Items.LEFT_HAND] = ""
+	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("sword", "built"))
 	var spot := pet.fish_spot_near(owner.tile)
 	_check(spot != World.NO_CELL and spot != owner.tile and Companion._water_by(spot) != World.NO_CELL, "a place to fish beside her player (%s)" % [spot])
 	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
@@ -1818,8 +1822,9 @@ func _test_fishing() -> void:
 		World.step()
 		if not pet.fishing.is_empty():
 			break
-	_check(pet.tile == spot and World.rod_hand(pet) >= 0 and str(pet.fishing.get("state", "")) == "cast",
-		"there, the rod from her pack into a hand, and she casts (%s, %s)" % [pet.tile, pet.fishing])
+	_check(pet.tile == spot and World.rod_hand(pet) == Items.RIGHT_HAND and pet.slots[Items.LEFT_HAND] == "" and Array(pet.slots).find("sword") in Items.PACK_SLOTS
+			and str(pet.fishing.get("state", "")) == "cast",
+		"there, the rod from her pack into her right hand, her sword to her pack (her off hand left free), and she casts (%s, %s, %s)" % [pet.tile, pet.slots, pet.fishing])
 	World._fishing[pet]["roll"] = 0.0  # A sure catch.
 	World._fishing[pet]["bite"] = World.tick + 1
 	World._fishing[pet]["ends"] = World.tick + 2
@@ -1834,7 +1839,27 @@ func _test_fishing() -> void:
 	pet._carry_out({"verb": "fish", "on": false}, "Reel in.")
 	for i in World.FISH_END_TICKS + 2:
 		World.step()
-	_check(pet.order == "" and World.rod_hand(pet) < 0 and pet.slots[pack] == "fishing_rod", "told to stop: the rod back in her pack, her hand as it was")
+	var rod_at := Array(pet.slots).find("fishing_rod")
+	_check(pet.order == "" and World.rod_hand(pet) < 0 and rod_at in Items.PACK_SLOTS and pet.slots[Items.RIGHT_HAND] == "sword"
+			and pet.slots[Items.LEFT_HAND] != "sword", "told to stop: the rod back in her pack, her sword back in her right hand (%s)" % [pet.slots])
+	# A hostile breaks her cast: her sword back in her right hand first thing (805 amended (5)).
+	pet.slots[Items.LEFT_HAND] = "shield" if not Items.def("shield").is_empty() else "torch"
+	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
+	for i in 60:
+		World.step()
+		if not pet.fishing.is_empty():
+			break
+	_check(World.rod_hand(pet) == Items.RIGHT_HAND and Array(pet.slots).find("sword") in Items.PACK_SLOTS,
+		"her off hand full: the rod in her right hand, her sword to her pack (%s)" % [pet.slots])
+	var _imp := _foe_nearby(pet)
+	for i in 3:
+		World.step()
+	_check(pet.order != "fish" and World.rod_hand(pet) < 0 and pet.slots[Items.RIGHT_HAND] == "sword" and Array(pet.slots).find("fishing_rod") in Items.PACK_SLOTS,
+		"a hostile in sight: she reels in, the rod to her pack, her sword back in her right hand (%s)" % [pet.slots])
+	_kill_monsters()
+	pet.slots[Items.LEFT_HAND] = ""
+	for i in World.FISH_END_TICKS + 2:
+		World.step()
 	# Beside her player as they cast: she casts too, unasked.
 	var theirs := World.items.mint("fishing_rod", "built")
 	var their_hand_was: String = owner.slots[Items.RIGHT_HAND]
@@ -1851,8 +1876,28 @@ func _test_fishing() -> void:
 	World.try_fish(owner)  # Reeled in.
 	for i in World.FISH_END_TICKS + 2:
 		World.step()
+	# Her catches spoken of (805 amended (5)): the first of a spell, one in FISH_TALK_GAP_S, never a slipped hook.
+	pet._fish_last_end = -100000
+	pet._fish_said = -100000
+	pet.fish_done(false)
+	var said_at := pet._fish_said
+	pet.fish_done(true)
+	var first := pet._fish_said
+	World.tick += 20
+	pet.fish_done(true)
+	var second := pet._fish_said
+	World.tick += Companion.FISH_SPELL_S * World.TICK_RATE + 10
+	pet.fish_done(true)
+	var later_spell := pet._fish_said
+	World.tick += Companion.FISH_TALK_GAP_S * World.TICK_RATE
+	pet.fish_done(true)
+	var after_gap := pet._fish_said
+	_check(said_at < 0 and first >= 0 and second == first and later_spell == first and after_gap > first,
+		"her catches: a slipped hook unsaid, the first of a spell said, the next of it not, a new spell inside the gap not, one past the gap said (%d, %d, %d, %d, %d)" % [said_at, first, second, later_spell, after_gap])
 	# No rod: once a game day, a wish for one.
-	pet.slots[pack] = ""
+	for slot in pet.slots.size():
+		if pet.slots[slot] == "fishing_rod":
+			pet.slots[slot] = ""
 	pet._fish_wish_day = -1
 	World.try_fish(owner)
 	for i in Companion.DEED_EVERY * 2:

@@ -42505,6 +42505,19 @@ fishing_changed): a fish landed by her or her player with the other within FISH_
 "fished" ("went fishing with you"; warmth; leisure 0.15, company 0.05), once a game day as every deed,
 meeting her "pond" want, now ready. companion_test _test_fishing, and _test_wants with the pond
 open. Server only, protocol unchanged (Companion.fishing already replicates), no new class_name.
+Her right hand (the coordinator's ask; pc-character's casting clips are right-handed): she casts with
+the rod in her right hand. Companion._rod_in_hand moves what that hand held, her weapon, to her pack
+(the rod's slot, by the swap), never her off hand (pc-character: its poses rest that hand by the line); on
+reeling in, by a hostile, an order or her player moving off, _rod_away puts the rod back (its own
+slot if still empty, else her pack's first free one: a catch may fill it) and her weapon in her right
+hand first thing. She fishes only when it is safe, so the swap costs her nothing. companion_test
+_test_fishing (a sword to her pack, her off hand free or full; back in her right
+hand when she is told to stop and when a hostile breaks her cast).
+Her catches, fewer (the coordinator, after playtest's pair 7: 13 lines in 5 minutes at the pond, and
+counted, "the fifth... the sixth"): Companion.fish_done tells her voice only the first catch of a
+fishing spell (a cast ending more than FISH_SPELL_S, 60, after her last), at most one in
+FISH_TALK_GAP_S (180), and never a slipped hook (FISH_MISSED gone). A catch has no size yet, so "a big
+one" waits for one. companion_test _test_fishing.
 
 805 amended (6): pc-character's side, the poses (release's label; the poses items' (3) left to
 pc-character). Five clips, tools/humanoid_clips.py's Fish_* in goblin.res, the rod in the right
