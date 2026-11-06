@@ -196,6 +196,63 @@
 			"type": "mesh",
 			"uses": "great bear's claw (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.bear_claw_charm": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.04,
+				0.12,
+				0.02
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bear's-claw charm (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.bear_grease": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.09,
+				0.08,
+				0.09
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "crock of bear's grease (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.bear_grease_draught": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.05,
+				0.11,
+				0.05
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "bear's-grease draught (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bear_pelt": {
 			"budget": 500,
 			"category": "items",

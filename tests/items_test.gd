@@ -84,6 +84,7 @@ func _ready() -> void:
 	await _test_restart()
 	await _test_migration()
 	_test_rebuild()
+	_test_charm()  # Before fishing: its steps would shift the timed checks.
 	_test_fishing()  # Last: its casts' ticks, and it clears the host (805 amended (3)).
 
 	DirAccess.remove_absolute(Net.state_path)
@@ -3340,6 +3341,65 @@ func _test_starter_gear() -> void:
 	for uid in [plain, starter, starter2]:
 		World.items.end(uid, "gone")
 	World.set_slots(host, had_slots, had_uids)
+
+
+## Magic, phase 1 (789): the bear's-claw charm worn in the charm slot gives
+## an aura at once and charges while worn, kept in the charm; the aura's
+## glow is a light the senses see by; the bear's-grease draught makes you
+## heavy for ten minutes; the bear may drop the grease.
+func _test_charm() -> void:
+	print("\n== magic, phase 1 (789): the charm, its charge and glow; the grease draught ==")
+	var host := _player(Net.local_id)
+	_clear(host)
+	var charm_row := Items.worn_of("bear_claw_charm")
+	_check(charm_row.get("slot") == "charm" and float(charm_row.get("cap", 0.0)) == 0.5
+			and Items.def("bear_claw_charm")["made"].get("from", {}) == {"bear_claw": 1, "feathers": 1, "flint": 1}
+			and Items.def("bear_claw_charm")["made"].get("by") == "medicine_man",
+		"the charm's row: worn at the charm slot, cap 0.5, the medicine man makes it from a claw, feathers and flint")
+	var grease := {}
+	for drop: Dictionary in Monster.kinds()["great_bear"]["drops"]:
+		if drop.get("item") == "bear_grease":
+			grease = drop
+	_check(float(grease.get("chance", 1.0)) == 0.25, "the great bear drops its grease one time in four (%s)" % grease)
+	_check(host.aura == 0.0 and World.worn_charm(host) == 0, "no charm: no aura")
+	var charm := _give(host, "bear_claw_charm", 0)
+	_check(host.aura == 0.0, "a charm in the pack gives none")
+	_check(World.try_transfer(host, host, 0, host, Items.CHARM) and World.worn_charm(host) == charm
+			and is_equal_approx(host.aura, 0.33), "worn in the charm slot, the aura comes at once (%.2f)" % host.aura)
+	World.items.set_charge(charm, 0.2)
+	var rate := World.charm_rate(host, charm)
+	_steps(World.TICK_RATE - World.tick % World.TICK_RATE)
+	_check(rate > 0.0 and is_equal_approx(World.items.charge_of(charm), 0.2 + rate) and is_equal_approx(host.aura, 0.4),
+			"it charges while worn (%.6f a second), and the aura grows with it (%.2f)" % [rate, host.aura])
+	_check(rate * 6 * 3600 <= 0.5 * World.CHARM_NIGHT + 0.0001 and rate * 6 * 3600 >= 0.5 - 0.0001,
+			"its cap in six hours worn, sooner at night")
+	World.items.set_charge(charm, 0.5)
+	_steps(World.TICK_RATE)
+	_check(is_equal_approx(World.items.charge_of(charm), 0.5) and is_equal_approx(host.aura, 0.5), "never past its cap (%.2f)" % host.aura)
+	var lantern := host.emit_light
+	host.emit_light = 0.0
+	_check(is_equal_approx(host.light_given(), 0.5 * GridEntity.AURA_LIGHT) and World.carried_lights().has(host),
+			"the glow is a light: its lantern covered, it still lights the ground round it")
+	host.emit_light = lantern
+	_check(is_equal_approx(host.light_given(), maxf(lantern, 0.5 * GridEntity.AURA_LIGHT)), "with the lantern lit, the brighter of the two")
+	var copy := ItemBook.from_dict(JSON.parse_string(JSON.stringify(World.items.to_dict())))
+	_check(is_equal_approx(copy.charge_of(charm), 0.5), "the charge is saved with the book")
+	var free := host.slots.find("")
+	_check(World.try_transfer(host, host, Items.CHARM, host, free) and host.aura == 0.0 and is_equal_approx(World.items.charge_of(charm), 0.5),
+			"taken off, no aura, and the charm keeps its charge")
+	World.try_transfer(host, host, free, host, Items.CHARM)
+	_check(is_equal_approx(host.aura, 0.5), "worn again, it glows as it did")
+	# The bear's-grease draught.
+	_give(host, "bear_grease_draught", Items.RIGHT_HAND)
+	var mass := host.mass
+	_check(World.try_use(host, Items.RIGHT_HAND) and is_equal_approx(host.mass, mass - Items.weight_of("bear_grease_draught") + 15.0),
+			"the grease draught drunk: fifteen kilograms heavier (%.1f to %.1f)" % [mass, host.mass])
+	_check(int(host.buffs["mass"][1]) - World.tick == 6000 or int(host.buffs["mass"][1]) - World.tick == 5999, "for ten minutes")
+	host.buffs["mass"][1] = World.tick + 1
+	_steps(2)
+	_check(is_equal_approx(host.mass, mass - Items.weight_of("bear_grease_draught")), "worn off, as heavy as before (%.1f)" % host.mass)
+	_clear(host)
+	_check(host.aura == 0.0, "and all put back")
 
 
 func _steps(count: int) -> void:

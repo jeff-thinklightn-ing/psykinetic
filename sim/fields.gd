@@ -330,8 +330,8 @@ func light_at(world: Node, cell: Vector2i, carried := true, sky := true) -> floa
 	light += _light.get(cell, 0.0)
 	if carried:
 		for entity: GridEntity in world.entities():
-			if entity.emit_light > 0.0 and entity.spawned:
-				light += _reaching(world, entity.tile, cell, carried_reach(damp), entity.emit_light, false)
+			if entity.light_given() > 0.0 and entity.spawned:
+				light += _reaching(world, entity.tile, cell, carried_reach(damp), entity.light_given(), false)
 	return minf(light, 1.0)
 
 

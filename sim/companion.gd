@@ -905,6 +905,7 @@ func _init() -> void:
 	replicate("channel_of")
 	replicate("tending")
 	replicate("fishing")  # 805 amended (3): the cast, the wait, the bite.
+	replicate("aura")  # 789: the worn charm's glow.
 	replicate("channel_until")
 	# Her player's peer changes when they rejoin and she was waiting.
 	replicate("keeper_peer")

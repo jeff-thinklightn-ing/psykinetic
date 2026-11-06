@@ -1375,6 +1375,7 @@ func _step_zone() -> void:
 	_tend_downed()
 	_tend_teeters()  # Found its feet on a rim (783).
 	_fade_buffs()
+	_tend_charms()  # A worn charm charges (789).
 	_tend_arts()  # Weapon memory's quiet time and fade (decision 766).
 	_tend_fights()  # A fight won (804, combat's side).
 	t = part("stamina, wounds, buffs", t)
@@ -2223,7 +2224,7 @@ func carried_lights() -> Array[GridEntity]:
 		_carried_lights_key = key
 		_carried_lights = []
 		for entity in sought():
-			if entity.emit_light > 0.0 and entity.spawned:
+			if entity.light_given() > 0.0 and entity.spawned:
 				_carried_lights.append(entity)
 	return _carried_lights
 
@@ -3141,6 +3142,7 @@ func _slots_changed(entity: GridEntity) -> void:
 		if now != worn:
 			entity.set("worn", now)  # The armour worn, replicated for the views (decision 622).
 	_weigh(entity)
+	_wear_charm(entity)
 	if not entity.raised.is_empty() and off_hand(entity) != entity.raised:
 		entity.raised = ""  # What it needed left the hand.
 	_show_notes(entity)
@@ -7284,6 +7286,86 @@ func add_buff(entity: GridEntity, kind: String, amount: float, ticks: int) -> vo
 func buff(entity: GridEntity, kind: String) -> float:
 	var on: Array = entity.buffs.get(kind, [])
 	return float(on[0]) if not on.is_empty() else 0.0
+
+
+## The aura's multiplier at its most (789; the plan's x3, a draft): the
+## aura is the multiplier over this, so 0..1.
+const AURA_MOST := 3.0
+## Seconds of night out of doors count this many times over toward a
+## charm's charge (789: "faster at night").
+const CHARM_NIGHT := 2.0
+## Who wears a charm in its charm slot (789), for _tend_charms.
+var _charmed: Dictionary[GridEntity, bool] = {}
+
+
+## The uid of the charm [param entity] wears in its charm slot (789), 0 for
+## none: a thing worn there with a "cap" (a charm's).
+func worn_charm(entity: GridEntity) -> int:
+	if entity.slots.size() <= Items.CHARM or entity.slots[Items.CHARM].is_empty():
+		return 0
+	if not Items.worn_of(entity.slots[Items.CHARM]).has("cap"):
+		return 0
+	return slot_uid(entity, Items.CHARM)
+
+
+## How much [param uid]'s charge grows in one second worn by
+## [param entity] (789): its cap over its "hours" of wearing, more at night
+## out of doors (CHARM_NIGHT).
+func charm_rate(entity: GridEntity, uid: int) -> float:
+	var worn := Items.worn_of(items.id_of(uid))
+	var rate := float(worn.get("cap", 0.0)) / maxf(float(worn.get("hours", 6.0)) * 3600.0, 1.0)
+	return rate * (CHARM_NIGHT if Companion.is_night() and entity.zone == zone.name else 1.0)
+
+
+## [param entity]'s slots changed: whether it wears a charm now, and its
+## aura (789), which jumps at once on and off.
+func _wear_charm(entity: GridEntity) -> void:
+	if not (entity is Player or entity is Companion):
+		return
+	if worn_charm(entity) != 0:
+		_charmed[entity] = true
+	else:
+		_charmed.erase(entity)
+	_show_aura(entity)
+
+
+## Once a second, each worn charm in this zone charges toward its cap (789;
+## the plan: "about two evenings to its cap", by time worn online). Nothing
+## takes it away: downed, dropped or traded, the charge stays in the charm.
+func _tend_charms() -> void:
+	if _charmed.is_empty() or tick % TICK_RATE != 0:
+		return
+	# A freed key is never looked up or erased (a typed dictionary refuses
+	# one; decision 572 amended): the live ones are kept.
+	if _charmed.keys().any(func(held: Variant) -> bool: return not is_instance_valid(held)):
+		var live: Dictionary[GridEntity, bool] = {}
+		for held: Variant in _charmed.keys():
+			if is_instance_valid(held):
+				live[held] = true
+		_charmed = live
+	for entity: GridEntity in _charmed.keys():
+		if entity.zone != zone.name or not entity.spawned:
+			continue
+		var uid := worn_charm(entity)
+		if uid == 0:
+			_charmed.erase(entity)
+			_show_aura(entity)
+			continue
+		var cap := float(Items.worn_of(items.id_of(uid)).get("cap", 0.0))
+		var charge := items.charge_of(uid)
+		if charge < cap:
+			items.set_charge(uid, minf(charge + charm_rate(entity, uid), cap))
+		_show_aura(entity)  # Set only when it changes.
+
+
+## [param entity]'s aura (789, phase 1): (1 + its worn charm's charge) over
+## AURA_MOST, to the hundredth; 0 with no charm. Set only when it changes.
+## (The floor and the Magic spoke come with the card's web, later.)
+func _show_aura(entity: GridEntity) -> void:
+	var uid := worn_charm(entity)
+	var aura := 0.0 if uid == 0 else snappedf(clampf((1.0 + items.charge_of(uid)) / AURA_MOST, 0.0, 1.0), 0.01)
+	if not is_equal_approx(entity.aura, aura):
+		entity.aura = aura
 
 
 ## Buffs whose time is up wear off (this zone's buffed only).

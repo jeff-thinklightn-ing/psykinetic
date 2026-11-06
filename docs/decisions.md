@@ -43426,3 +43426,42 @@ devoted, a step of two and nothing above). Main.last_bond_gain for tests. Main.r
 counts gains by track: a deed now brings her bond's and needs' gains beside it, so camp_fall_test
 counts its deeds by the "deed" track, not every gain sent. Server and client; protocol 51; no new
 class_name.
+## 789. Magic, phase 1: the bear's-claw charm, the aura's light, the bear's-grease draught
+
+Jeff (11-03): "charms that grow a characters magic aura, or ingredients to spells"; magic lives
+in things as stats, and the effect falls out of the world. The coordinator's go for phase 1 of
+the magic plan (C:/dev/review/items/magic_items_plan.md): the charm slot (788's 17), the bear's
+claw charm, the aura's light from the charm slot (only with a charm until Jeff's pick 4), and
+the bear's-grease draught as the bear's rare drop. A pure bonus (Jeff's rule): a charm only adds.
+
+- **Rows.** bear_claw_charm ("bear's-claw charm"/"Claw charm", 0.1 kg, tags charm, value 30,
+  worn {slot charm, cap 0.5, hours 6}; the medicine man makes it from bear_claw 1, feathers 1,
+  flint 1, steps 1200; lore's folk craft, "worn smooth and dark with handling": the thing never
+  shines). bear_grease ("crock of bear's grease", 0.6 kg, stacks 5, material, value 12).
+  bear_grease_draught (mass +15 kg for 6000 ticks, ten minutes, through the mass buff World._weigh
+  already reads: shoves and blows land harder and shove it less; the medicine man makes it from
+  bear_grease 1, herbs 2). The great bear's drops gain {bear_grease, [1, 1], chance 0.25},
+  beside its pelt and claws, on the ground for the party (780 amended (4)'s table).
+- **The charge is in the charm** (ItemBook "charge", saved; charge_of, set_charge). Worn in the
+  charm slot (World.worn_charm: a worn row with a "cap"), it grows once a second by cap over
+  "hours" (World.charm_rate: six hours worn to the bear claw's cap, about two evenings), times
+  CHARM_NIGHT 2 at night out of doors (Companion.is_night). Nothing takes it away: downed,
+  dropped, traded or stolen, it stays in the charm (the first draft's halving dropped as a
+  penalty). Only the charm slot counts, never a hand or the pack.
+- **The aura** (GridEntity.aura, 0..1 to the hundredth): phase 1's is (1 + the worn charm's
+  charge) / AURA_MOST 3 (the plan's x3 multiplier cap), 0 with no charm; the floor and the
+  Magic spoke join it with the card's web. It jumps on equip and unequip (World._wear_charm from
+  _slots_changed) and rises as the charm charges (_tend_charms, _show_aura, set only when it
+  changes). Player and Companion replicate it; environment draws its glow from it (3 m at 0.35
+  to 6 m at 1.0), and the charm's art may darken with wear (art-kit).
+- **Its light is the wearer's** (lore: "the light belongs to the wearer"): GridEntity.light_given
+  is the brighter of the lantern (emit_light) and aura x AURA_LIGHT 0.6. Fields' carried light,
+  World.carried_lights and Senses read it, so the wearer lights the ground round them and is
+  seen by it at night, as by a lantern. The lantern's mesh still shows only when lit. Off comes
+  the charm, out goes the light.
+- **On the wire** (rev 51, shared with 814, which opened it, and 805 amended (3); release's): "aura" in SUBCLASS_REPLICATED.
+
+items_test _test_charm (the rows and the drop; no aura without a charm or from the pack; the
+aura at once on wearing, growing with the charge to its cap; the light with the lantern covered;
+the charge saved and kept when taken off; the draught's +15 kg and its wearing off). No bullet
+until the bear is in a real land (release; voice's line held). No new class_name.

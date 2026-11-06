@@ -498,6 +498,19 @@ func mark_starter(uid: int) -> void:
 		_book[uid]["starter"] = true
 
 
+## A charm's charge (789): 0 to its cap (Items.worn_of's "cap"), grown
+## while worn in the charm slot (World._tend_charms), kept in the charm
+## through a downing, a trade or a theft; 0 for none.
+func charge_of(uid: int) -> float:
+	return float(_book[uid].get("charge", 0.0)) if _book.has(uid) else 0.0
+
+
+## [param uid]'s charge set to [param amount] (at least 0; 789).
+func set_charge(uid: int, amount: float) -> void:
+	if _book.has(uid):
+		_book[uid]["charge"] = maxf(amount, 0.0)
+
+
 ## [param uid]'s charges set to [param amount] (at least 0).
 func set_charges(uid: int, amount: int) -> void:
 	if _book.has(uid):
@@ -662,6 +675,8 @@ static func from_dict(data: Variant, steps: Callable = Callable()) -> ItemBook:
 				items._book[int(key)]["stack"] = entry["stack"].map(func(each: Variant) -> int: return int(each))  # Decision 619.
 			if entry.get("charges") is float or entry.get("charges") is int:
 				items._book[int(key)]["charges"] = maxi(int(entry["charges"]), 0)  # Decision 573 amended.
+			if entry.get("charge") is float or entry.get("charge") is int:
+				items._book[int(key)]["charge"] = maxf(float(entry["charge"]), 0.0)  # A charm's (789).
 			if entry.get("starter") == true:
 				items._book[int(key)]["starter"] = true  # Decision 736.
 			if entry.get("relic") is Dictionary and entry["relic"].get("knight") is String:

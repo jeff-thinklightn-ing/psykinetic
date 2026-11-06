@@ -130,12 +130,12 @@ func sees(entity: GridEntity, d := -1, in_cone := true, farther := 1.0) -> bool:
 	var reach := sight_range * farther + (extra_sight if alerted else 0)
 	if World.crouching(entity):
 		reach = maxf(reach * World.CROUCH_SEEN, minf(reach, SEEN_LEAST))  # Creeping (784 amended (2)).
-	if d > (reach if entity.emit_light > 0.0 else reach * World.weather_sight_at(from)):
+	if d > (reach if entity.light_given() > 0.0 else reach * World.weather_sight_at(from)):
 		return false
 	if d > NOTICE_ALWAYS:
 		if in_cone and not _in_cone(at):
 			return false
-		if entity.emit_light <= 0.0 and not dark_sight and d > dark_reach(at, reach):
+		if entity.light_given() <= 0.0 and not dark_sight and d > dark_reach(at, reach):
 			return false
 		if hidden_by_cover(entity, d, not in_cone):
 			return false
@@ -161,7 +161,7 @@ func hidden_by_cover(entity: GridEntity, d: int, held := false) -> bool:
 	var cover := World.cover_at(entity.tile)
 	if cover <= 0.0 or (agent is Companion and (agent as Companion).keeper == entity):
 		return false
-	if entity.emit_light > 0.0 and World.light_at(entity.tile, false) < DARK:
+	if entity.light_given() > 0.0 and World.light_at(entity.tile, false) < DARK:
 		return false
 	if World.tick - entity.last_step_tick >= STILL_TICKS:
 		return true
@@ -262,7 +262,7 @@ static func _light(cell: Vector2i, enough: float) -> float:
 		var d := maxi(absi(carrier.tile.x - cell.x), absi(carrier.tile.y - cell.y))
 		if d > Fields.carried_reach(World.fields.damp):
 			continue
-		light += World.fields.carried_light(World, carrier.tile, cell, carrier.emit_light)
+		light += World.fields.carried_light(World, carrier.tile, cell, carrier.light_given())
 		if light >= enough:
 			return light
 	return light

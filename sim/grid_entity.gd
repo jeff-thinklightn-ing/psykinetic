@@ -202,6 +202,20 @@ var sync: MultiplayerSynchronizer
 ## lantern, a burning thing.
 @export var emit_light := 0.0
 @export var emit_heat := 0.0
+## Its magic aura (789): 0 to 1, to the hundredth, 0 with no charm in its
+## charm slot (Items.CHARM). The final value, its multiplier folded in
+## (phase 1: (1 + the worn charm's charge) / World.AURA_MOST); environment
+## draws its glow from it. Replicated by Player and Companion; written only
+## by World (_show_aura).
+var aura := 0.0
+## The aura's light at full (789): a lantern gives 0.9.
+const AURA_LIGHT := 0.6
+
+
+## The light this body gives off (Fields, Senses): its lantern, or its
+## aura's glow (789), whichever is brighter.
+func light_given() -> float:
+	return maxf(emit_light, aura * AURA_LIGHT)
 ## Ticks one step takes, maybe fractional; also the cooldown before the
 ## next step.
 @export var move_ticks := 2.0

@@ -579,13 +579,15 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## adventure, wonder, faith, safety, company), for ui's bars on her card; an old client draws none.
 ## 51 (805 amended (3)): Player and Companion replicate "fishing" (SUBCLASS_REPLICATED):
 ## {state, at}, the cast's state and the float's water cell, {} when not fishing.
+## 51 (789): Player and Companion replicate "aura" (SUBCLASS_REPLICATED), 0..1 to the
+## hundredth, the worn charm's glow; 0 with no charm.
 const PROTOCOL_REVISION := 51
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
 const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "arts", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "far_cry", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "reward", "roofs", "shop", "sky", "speech", "takers", "telegraph", "terrain", "town", "town_sheet", "tracks", "wave", "world"]
 ## Properties entity subclasses add with replicate().
-const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "body", "bond_bar", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "crouched", "down_until", "downed_until", "emit_light", "fishing", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "needs", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "spent", "teeter", "tending", "trade", "worn"]
+const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "aura", "body", "bond_bar", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "crouched", "down_until", "downed_until", "emit_light", "fishing", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "needs", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "spent", "teeter", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
 ## First launch: half the 3840x2160 base, windowed.
 const DEFAULT_WINDOW_SIZE := Vector2i(1920, 1080)
