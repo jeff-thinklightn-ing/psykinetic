@@ -848,6 +848,53 @@ func _test_person_takes(host: Player) -> void:
 	_check(takers["takers"].keys().all(func(raw: String) -> bool: return takers["takers"][raw]["store"] == (_main.give_outcome(STORE, "", raw, 1)["for"]["kind"] == "stores"))
 		and takers.get("gear", {}).get("body") == (String(_main._resident_body(Offers.VENDOR + STORE).get_path()) if _main._resident_body(Offers.VENDOR + STORE) != null else ""),
 		"each raw's store flag as give_outcome says, the bodies as found one by one (perf: built once)")
+	var cora_id := ""
+	for id: String in World.production.worker_ids(STORE):
+		if World.production.worker(id)["name"] == "Cora":
+			cora_id = id
+	_check(is_same(_main.takers_of(STORE), _main.takers_of(STORE)), "802 amended (7): nothing changed, the last build again (not rebuilt)")
+	World.production.set_away(cora_id, true)
+	var away: Dictionary = _main.takers_of(STORE)
+	World.production.set_away(cora_id, false)
+	_check(away["takers"].get("wood", {}).get("name") != "Cora" and _main.takers_of(STORE)["takers"].get("wood", {}).get("name") == "Cora",
+		"Cora away: built again, wood to another; home: to her again (%s)" % [away["takers"].get("wood", {})])
+	# Each thing a build reads moves it (the coordinator: a stale stamp would name the wrong taker).
+	_check(not _main.takers_of(STORE)["takers"].has("hide") or _main.takers_of(STORE)["takers"]["hide"].get("trade") != "tanner", "no tanner yet")
+	World.production.add_worker("zz_stamp_tanner", "Wat", ["tanner"], STORE, "test")
+	_check(_main.takers_of(STORE)["takers"].get("hide", {}).get("name") == "Wat", "a tanner hired: hide to him, built again")
+	World.production.remove_worker("zz_stamp_tanner")
+	_check(_main.takers_of(STORE)["takers"].get("hide", {}).get("name") != "Wat", "and gone again: not to him")
+	var body := _main._spawn({"script": Main.RESIDENT, "shape": "capsule", "name": "Resident_stamp_cora", "label": "Cora, carpenter",
+		"tile": _main._nearest_free(Vector2i(4, 4))}) as Resident
+	body.worker_id = cora_id
+	var with_body: Dictionary = _main.takers_of(STORE)["takers"].get("wood", {})
+	World.despawn(body)
+	var no_body: Dictionary = _main.takers_of(STORE)["takers"].get("wood", {})
+	_check(str(with_body.get("body", "")).ends_with("Resident_stamp_cora") and not str(no_body.get("body", "")).ends_with("Resident_stamp_cora"),
+		"her body spawned: its path; despawned: gone (%s, %s)" % [with_body.get("body"), no_body.get("body")])
+	# The town's queued build (the temple here): a raw it lacks is for the build, enough of it for the stores.
+	var short := World.towns.shortfall(STORE)
+	var queued := World.production.job(int(short.get("job", 0)))
+	var raw := ""
+	for what: String in queued.get("cost", {}):
+		if _main.takers_of(STORE)["takers"].has(what):
+			raw = what
+			break
+	var cost := int(queued.get("cost", {}).get(raw, 0))
+	var raw_had := World.stockpile.count(STORE, raw)
+	if raw_had >= cost:
+		World.stockpile.take(STORE, raw, raw_had - cost + 1, "test")
+	_check(not raw.is_empty() and _main.takers_of(STORE)["takers"][raw]["store"] == false, "the %s lacks %s: it is for the build (%s)" % [short.get("kind"), raw, short])
+	World.stockpile.deposit(STORE, raw, 1, "test")
+	_check(_main.takers_of(STORE)["takers"][raw]["store"] == true, "one more %s in the store: the build lacks none, for the stores" % raw)
+	World.stockpile.take(STORE, raw, 1, "test")
+	_check(_main.takers_of(STORE)["takers"][raw]["store"] == false, "one taken again: for the build again")
+	World.production.cancel(int(short["job"]))
+	_check(_main.takers_of(STORE)["takers"][raw]["store"] == true, "the build gone: for the stores")
+	World.production.order_build(STORE, str(short["kind"]), str(queued.get("trade", "carpenter")), queued.get("cost", {}), int(short.get("steps", 0)))
+	_check(_main.takers_of(STORE)["takers"][raw]["store"] == false, "a build queued again that lacks it: for the build")
+	if raw_had > World.stockpile.count(STORE, raw):
+		World.stockpile.deposit(STORE, raw, raw_had - World.stockpile.count(STORE, raw), "test")
 	_main._takers_sent.erase(Net.local_id)
 	_main._takers_by_zone.clear()
 	_main.takers_here = {}

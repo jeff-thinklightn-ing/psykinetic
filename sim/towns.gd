@@ -743,17 +743,17 @@ func choose(town: String) -> String:
 ## the first build job still queued (its materials not yet taken), {} for
 ## none. Walls are the town's defences.
 func shortfall(town: String) -> Dictionary:
-	for id in production.jobs():
-		var each := production.job(id)
-		if each["kind"] != "build" or each["town"] != town or each["state"] != "queued":
-			continue
-		var needs := {}
-		for what: String in each.get("cost", {}):
-			var lacking := int(each["cost"][what]) - production.stockpile.count(town, what)
-			if lacking > 0:
-				needs[what] = lacking
-		return {"kind": str(each["recipe"]), "job": id, "steps": int(each.get("steps", 0)), "needs": needs}
-	return {}
+	var found := production.queued_build(town)  # Not a copy of every job (802 amended (7)).
+	var id := int(found[0])
+	var each: Dictionary = found[1]
+	if each.is_empty():
+		return {}
+	var needs := {}
+	for what: String in each.get("cost", {}):
+		var lacking := int(each["cost"][what]) - production.stockpile.count(town, what)
+		if lacking > 0:
+			needs[what] = lacking
+	return {"kind": str(each["recipe"]), "job": id, "steps": int(each.get("steps", 0)), "needs": needs}
 
 
 ## [param town] spends experience on [param kind]'s next level: a build job

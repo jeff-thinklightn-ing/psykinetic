@@ -734,6 +734,26 @@ func job(id: int) -> Dictionary:
 	return _jobs.get(id, {}).duplicate(true)
 
 
+## [param town]'s first build job still queued (by id), without copying
+## every job: [id, a copy of it], or [0, {}] for none (Towns.shortfall).
+func queued_build(town: String) -> Array:
+	for id in jobs():
+		var each: Dictionary = _jobs[id]
+		if each["kind"] == "build" and each["town"] == town and each["state"] == "queued":
+			return [id, each.duplicate(true)]
+	return [0, {}]
+
+
+## [param town]'s workers in id order as [{id, name, trades, away}], without
+## copying each whole record (802 amended (7): the takers, each check).
+func town_workers(town: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for id: String in worker_ids(town):
+		var who: Dictionary = _workers[id]
+		out.append({"id": id, "name": str(who.get("name", "")), "trades": (who.get("trades", []) as Array).duplicate(), "away": bool(who.get("away", false))})
+	return out
+
+
 ## Every job's id, in order.
 func jobs() -> Array[int]:
 	var out: Array[int] = []

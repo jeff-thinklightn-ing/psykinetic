@@ -42230,6 +42230,21 @@ player there, each peer's last send kept as its hash, not var_to_str. The messag
 economy_test _test_person_takes: each raw's store flag as give_outcome says, one build a pass.
 Server only; protocol unchanged, no new class_name, no bullet.
 
+802 amended (7) (release's label; the coordinator's ask, from perf's split soak of 802 amended (6):
+takers_of 1.8 ms median a check, the per-player part nothing): the takers' build skipped when
+nothing moved. The build's cost was copying: Production.worker() and job() return deep copies, and
+receiver_for asked worker() for every worker for every raw and trade, Towns.shortfall job() for
+every job. Production.town_workers(town) ([{id, name, trades, away}]) and queued_build(town) ([id, a
+copy of that one job]) read without copying the rest; receiver_for and takers_of use the first,
+Towns.shortfall the second (every caller gains). takers_of keeps, per town (_takers_built), a stamp
+of all it reads: the town's workers (id, name, trades, away), the raws its queued build lacks, every
+townsperson's body path, the stall's towns and the receives table's size; the same stamp returns the
+last build and its hash. Anything takers_of comes to read later must join the stamp (Main.takers_of,
+the hash([...]) line), or the pack's hint names a taker who has gone. economy_test
+_test_person_takes proves the build moves with each: a tanner hired and removed, Cora away and home,
+a body spawned and despawned, the temple's lacking raw tipped by one either way, the build cancelled
+and queued again. Server only; protocol unchanged, no new class_name, no bullet.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

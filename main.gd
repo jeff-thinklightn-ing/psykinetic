@@ -803,6 +803,8 @@ var _news_tick := -1
 var _takers_sent: Dictionary = {}
 ## This pass's takers by zone, [data, hash] (_tell_takers; cleared after each pass).
 var _takers_by_zone: Dictionary = {}
+## The last takers_of build per town: {stamp (what it read), data, hash} (802 amended (7)).
+var _takers_built: Dictionary = {}
 ## Client: the last "takers" message (802 amended (5)): {town, takers: {raw:
 ## {trade, name, body, store}}, gear?}; ui's pack tooltip and name-tag mark.
 var takers_here: Dictionary = {}
@@ -15499,15 +15501,15 @@ const DONATE_AWAY := "You can donate only at the town's store or depot."
 ## "receives"): the first resident of the town whose trade is listed for it,
 ## in the list's order, else the starter stall's keeper ("vendor:" + town)
 ## where the town has one; "" for nobody. Gear goes to the keeper.
-func receiver_for(town: String, raw: String) -> String:
+func receiver_for(town: String, raw: String, workers = null) -> String:
 	if World.economy == null or World.production == null:
 		return ""
 	var trades: Array = World.economy.rules.get("receives", {}).get(raw, []) if not raw.is_empty() else []
+	var here: Array = workers if workers is Array else World.production.town_workers(town)  # 802 amended (7): no copy of each worker.
 	for trade: Variant in trades:
-		for id: String in World.production.worker_ids(town):
-			var who := World.production.worker(id)
-			if str(trade) in who.get("trades", []) and not bool(who.get("away", false)):
-				return id
+		for who: Dictionary in here:
+			if str(trade) in who["trades"] and not bool(who["away"]):
+				return str(who["id"])
 	return Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else ""
 
 
@@ -15566,30 +15568,43 @@ func takers_of(town: String) -> Dictionary:
 	var out := {"town": town, "takers": {}}
 	if town.is_empty() or World.economy == null or World.production == null:
 		return out
-	# Once each (coordinator, perf): the town's queued build, and its bodies by worker, not per raw.
+	var workers := World.production.town_workers(town)
+	# Once each (802 amended (6)): the town's queued build, and its bodies by worker, not per raw.
 	var lacking: Dictionary = World.towns.shortfall(town).get("needs", {}) if World.towns != null else {}
-	var bodies := {}
-	for entity: GridEntity in World.townsfolk():
-		if entity is Resident and entity.is_inside_tree():
-			bodies[(entity as Resident).worker_id] = String(entity.get_path())
+	var bodies := _bodies_by_worker()
+	# Every input of the build below (802 amended (7)): add to it anything takers_of comes to read.
+	var stamp := hash([workers, lacking.keys(), bodies, World.economy.rules.get("vendor", {}).get("towns", []), World.economy.rules.get("receives", {}).size()])
+	var known: Dictionary = _takers_built.get(town, {})
+	if int(known.get("stamp", 0)) == stamp and known.has("data"):
+		return known["data"]  # Nothing it reads has changed (802 amended (7)): the last build.
 	var receives: Dictionary = World.economy.rules.get("receives", {})
 	var raws: Array = receives.keys().filter(func(key: String) -> bool: return not key.begins_with("_") and receives[key] is Array)
 	raws.sort()
 	for raw: String in raws:
-		var worker := receiver_for(town, raw)
+		var worker := receiver_for(town, raw, workers)
 		if worker.is_empty():
 			continue
-		var entry := _taker_entry(worker, bodies)
+		var entry := _taker_entry(worker, bodies, workers)
 		entry["store"] = not lacking.has(raw)  # As give_outcome: "build" while the queued build lacks it.
 		out["takers"][raw] = entry
 	if town in World.economy.rules.get("vendor", {}).get("towns", []):
-		out["gear"] = _taker_entry(Offers.VENDOR + town, bodies)
+		out["gear"] = _taker_entry(Offers.VENDOR + town, bodies, workers)
+	_takers_built[town] = {"stamp": stamp, "data": out, "hash": hash(out)}
 	return out
+
+
+## Every townsperson's body path by worker id (takers_of).
+func _bodies_by_worker() -> Dictionary:
+	var bodies := {}
+	for entity: GridEntity in World.townsfolk():
+		if entity is Resident and entity.is_inside_tree():
+			bodies[(entity as Resident).worker_id] = String(entity.get_path())
+	return bodies
 
 
 ## A taker's trade, name and body path (takers_of), the path from
 ## [param bodies] (worker id -> path) when given.
-func _taker_entry(worker: String, bodies = null) -> Dictionary:
+func _taker_entry(worker: String, bodies = null, workers = null) -> Dictionary:
 	var path := ""
 	if bodies is Dictionary:
 		path = str(bodies.get(worker, ""))
@@ -15598,7 +15613,13 @@ func _taker_entry(worker: String, bodies = null) -> Dictionary:
 		path = String(body.get_path()) if body != null and body.is_inside_tree() else ""
 	if worker.begins_with(Offers.VENDOR):
 		return {"trade": "vendor", "name": str(World.economy.rules.get("vendor", {}).get("name", "Rolf")), "body": path}
-	var who := World.production.worker(worker)
+	var who := {}
+	if workers is Array:
+		for each: Dictionary in workers:
+			if each["id"] == worker:
+				who = each
+	else:
+		who = World.production.worker(worker)
 	var trades: Array = who.get("trades", [])
 	return {"trade": str(trades[0]) if not trades.is_empty() else "", "name": str(who.get("name", "")), "body": path}
 
@@ -15616,7 +15637,7 @@ func _tell_takers(peer: int, zone: String) -> void:
 				town = id
 				break
 		var data := takers_of(town)
-		_takers_by_zone[zone] = [data, hash(data)]
+		_takers_by_zone[zone] = [data, int(_takers_built.get(town, {}).get("hash", hash(data)))]
 	var known: Array = _takers_by_zone[zone]
 	if _takers_sent.get(peer, 0) == int(known[1]):
 		return
