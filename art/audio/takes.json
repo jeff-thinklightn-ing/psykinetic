@@ -39,6 +39,64 @@
 				"license": "CC BY 4.0"
 			}
 		],
+		"amb.camp_bandit": [
+			{
+				"file": "amb.camp_bandit.ogg",
+				"from": "freesound",
+				"original": "freesound 480790: R08-01-Group of non-English Speaking Men.wav (from 2 s for 22 s)",
+				"sha256": "d08fd352aadb8f0ee42ed95c2b375ff13c56f0a2a3af57c79117e7703af11956",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/480790/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.camp_bandit.2.ogg",
+				"from": "freesound",
+				"original": "freesound 480790: R08-01-Group of non-English Speaking Men.wav (from 38 s for 26 s)",
+				"sha256": "9227458595223330abb7007cf82c33d761579512d5a88312c715c844f313e425",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/480790/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.camp_bandit.3.ogg",
+				"from": "freesound",
+				"original": "freesound 482797: R27-21-Medium Group Talk and Cheer.wav (from 5 s for 20 s)",
+				"sha256": "17ab11c5a6f8d5f230f38fd785972e3d800502f0d187cded975e20bfb8763063",
+				"by": "craigsmith",
+				"url": "https://freesound.org/people/craigsmith/sounds/482797/",
+				"license": "CC0 1.0"
+			}
+		],
+		"amb.camp_trader": [
+			{
+				"file": "amb.camp_trader.ogg",
+				"from": "freesound",
+				"original": "freesound 260121: Indoor adult murmur, small group.wav (from 0 s for 25 s)",
+				"sha256": "798d14a2231cae65c9849ba46ce7dadc171e8cc93a17bb048157b2c211ad36b6",
+				"by": "SpliceSound",
+				"url": "https://freesound.org/people/SpliceSound/sounds/260121/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.camp_trader.2.ogg",
+				"from": "freesound",
+				"original": "freesound 260124: Indoor adult murmur, couple.wav (from 0 s for 19 s)",
+				"sha256": "218af0f02d1a650cf14bdc8e6e1294522d6e88b2eeaee5d953b1a4cee67c61cd",
+				"by": "SpliceSound",
+				"url": "https://freesound.org/people/SpliceSound/sounds/260124/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "amb.camp_trader.3.ogg",
+				"from": "freesound",
+				"original": "freesound 653920: Small Crowd Walla (from 1 s for 20 s)",
+				"sha256": "4d37586c2e83232c7fe7bd3c0fc319f7f18c886ee308942bd40ffe9fd8f962ed",
+				"by": "IENBA",
+				"url": "https://freesound.org/people/IENBA/sounds/653920/",
+				"license": "CC0 1.0"
+			}
+		],
 		"amb.campfire": [
 			{
 				"file": "amb.campfire.ogg",

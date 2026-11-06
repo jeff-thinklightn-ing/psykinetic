@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- You hear a forest bandit camp before you see it, voices and rough laughter round its fire; clear it and only the fire crackles (795 amended (2)).
 - Fishing: cast a rod into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).
 - What you do with your companion lifts her Ease, Venture, Wonder, Faith, Shelter or Company: a fire, a game, a gift, food shared, the road, somewhere new, each with a +1 as it comes (803 amended (2)).
 - Your companion wants one thing at a time and tells you so when all is quiet: a rest by a fire, a while in town, a first fight won, a blessing at the temple; do it together and it lifts her far more than usual, and she speaks of it after (803 amended (4)).

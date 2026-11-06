@@ -506,6 +506,57 @@ func _place_draft(cell: Vector2i) -> void:
 func _place_torch(cell: Vector2i) -> void:
 	_place_point("amb.torch_fire", view.torch_cells, cell)
 	_place_point("amb.campfire", view.campfire_cells(), cell)
+	var held := held_camps(view._terrain.get("camps", []), _camp_people())
+	for slot: String in CAMP_TALK:
+		_place_point(slot, held[slot], cell)
+
+
+## The camps' murmur (795 amended (2), reading 793, maps' side's "mix"): each
+## loop, the mixes it is heard at and who must be by the fire for it: the
+## bandits' talk while a bandit holds a "bandit" or "mixed" camp, the
+## traders' while its trader is there, so an emptied camp falls silent but
+## for its fire, and a mixed one cleared of bandits keeps only its trader's.
+const CAMP_TALK := {"amb.camp_bandit": {"mixes": ["bandit", "mixed"], "who": "bandits"},
+		"amb.camp_trader": {"mixes": ["trader", "mixed"], "who": "traders"}}
+## The bandits, by monster kind (enemy-ai's 793 rows); a captive never counts.
+const CAMP_HOLDERS: Array[String] = ["bandit", "bandit_brute"]
+## A camp trader (799, npc's side), by the start of his node's name
+## ("Resident_" + Offers.CAMP): he has no kind on a client.
+const CAMP_TRADER_PREFIX := "Resident_camp_"
+const CAMP_HELD_CELLS := 4
+
+
+## Each CAMP_TALK loop's fires of [param camps] (Level.camps_of) with one of
+## its people within CAMP_HELD_CELLS: [param people] is {"bandits": cells,
+## "traders": cells}.
+static func held_camps(camps: Array, people: Dictionary) -> Dictionary:
+	var out := {}
+	for slot: String in CAMP_TALK:
+		out[slot] = [] as Array[Vector2i]
+	for camp: Dictionary in camps:
+		var at: Vector2i = camp["at"]
+		for slot: String in CAMP_TALK:
+			var talk: Dictionary = CAMP_TALK[slot]
+			var near: Array = people.get(talk["who"], [])
+			if str(camp["mix"]) in talk["mixes"] and near.any(func(h: Vector2i) -> bool:
+					return maxi(absi(h.x - at.x), absi(h.y - at.y)) <= CAMP_HELD_CELLS):
+				(out[slot] as Array[Vector2i]).append(at)
+	return out
+
+
+## The cells of the living bandits and camp traders the view draws.
+func _camp_people() -> Dictionary:
+	var bandits: Array[Vector2i] = []
+	var traders: Array[Vector2i] = []
+	for id: int in view._puppets:
+		var body := instance_from_id(id) as GridEntity
+		if body == null or (body is Monster and body.hp <= 0):
+			continue
+		if body is Monster and str((body as Monster).spawn_spec.get("kind", "")) in CAMP_HOLDERS:
+			bandits.append(body.tile)
+		elif body is Resident and str(body.name).begins_with(CAMP_TRADER_PREFIX):
+			traders.append(body.tile)
+	return {"bandits": bandits, "traders": traders}
 
 
 ## [param slot]'s loop at whichever of [param cells] is heard best from

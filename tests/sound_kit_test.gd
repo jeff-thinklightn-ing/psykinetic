@@ -392,6 +392,33 @@ func _test_ambience_weights() -> void:
 	_check(not SoundKit.positional("amb.lair_cave") and not SoundKit.takes("amb.lair_cave").is_empty()
 			and SoundKit.positional("amb.skylight_air") and SoundKit.noise("amb.skylight_air") == "" and SoundKit.takes("amb.skylight_air").size() >= 2
 			and SoundKit.reach("amb.skylight_air") <= 6, "the lair's bed everywhere; the skylight's air placed, near (%d), takes of its own" % SoundKit.reach("amb.skylight_air"))
+	# 795 amended (2): the camps' murmur, by 793's "mix", while a holder lives
+	# by the fire.
+	var camps: Array = [{"at": Vector2i(10, 10), "mix": "bandit"}, {"at": Vector2i(30, 10), "mix": "trader"},
+		{"at": Vector2i(50, 10), "mix": "mixed"}]
+	var far := Vector2i(50 + Ambience.CAMP_HELD_CELLS + 1, 10)
+	var held := Ambience.held_camps(camps, {"bandits": [Vector2i(13, 12), far] as Array[Vector2i], "traders": [] as Array[Vector2i]})
+	_check(held["amb.camp_bandit"] == [Vector2i(10, 10)] and held["amb.camp_trader"].is_empty(),
+			"a bandit within CAMP_HELD_CELLS: its camp's talk; one past it: the mixed camp silent; no trader, no traders' talk (%s)" % [held])
+	held = Ambience.held_camps(camps, {"bandits": [Vector2i(50, 13), Vector2i(30, 10)] as Array[Vector2i], "traders": [Vector2i(30, 11)] as Array[Vector2i]})
+	_check(held["amb.camp_bandit"] == [Vector2i(50, 10)] and held["amb.camp_trader"] == [Vector2i(30, 10)],
+			"a mixed camp held by bandits, its trader away: their talk alone; a trader at his fire: his; a bandit at a trader camp: none of theirs (%s)" % [held])
+	held = Ambience.held_camps(camps, {"bandits": [] as Array[Vector2i], "traders": [Vector2i(51, 10)] as Array[Vector2i]})
+	_check(held["amb.camp_bandit"].is_empty() and held["amb.camp_trader"] == [Vector2i(50, 10)],
+			"a mixed camp cleared of bandits, its trader back at the fire: only his talk (%s)" % [held])
+	held = Ambience.held_camps(camps, {})
+	_check(held["amb.camp_bandit"].is_empty() and held["amb.camp_trader"].is_empty(), "every camp emptied: no murmur")
+	var forest_camps := Level.camps_of(Level.load_level("forest").get("places", {}))
+	var mixes := {}
+	for camp: Dictionary in forest_camps:
+		mixes[camp["mix"]] = true
+	_check(forest_camps.size() >= 3 and mixes.has("bandit") and mixes.has("trader") and mixes.has("mixed")
+			and "captive" not in Ambience.CAMP_HOLDERS,
+			"the forest's camps read with their mix (%d: %s); a captive holds nothing" % [forest_camps.size(), mixes.keys()])
+	_check(SoundKit.positional("amb.camp_bandit") and SoundKit.noise("amb.camp_bandit") == "" and SoundKit.takes("amb.camp_bandit").size() >= 3
+			and SoundKit.positional("amb.camp_trader") and SoundKit.noise("amb.camp_trader") == "" and SoundKit.takes("amb.camp_trader").size() >= 3
+			and SoundKit.volume_db("amb.camp_bandit") < SoundKit.volume_db("amb.campfire"),
+			"the murmurs placed, unheard by monsters, under the fire, three takes each")
 	_check(noon["amb.forest_deep_day"] == 0.0 and noon["amb.rain_canopy"] == 0.0 and noon["amb.drips"] == 0.0,
 			"no canopy: no deep forest, no crowns, no drips")
 	var deep := Ambience.weights("outdoors", true, 1.0, 12.0, clear, 0.0, 1.0)

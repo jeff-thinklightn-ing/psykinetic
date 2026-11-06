@@ -1779,6 +1779,24 @@
 			"uses": "a camp's fire, fuller than a torch: a rest camp's or a raid camp's (777, sound's side); Ambience, from the nearest camp fire heard (Client3D.campfire_cells)",
 			"fallback": "amb.torch_fire"
 		},
+		"amb.camp_bandit": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 10,
+			"volume_db": -18.0,
+			"uses": "a held bandit camp's murmur by its fire: rough men's voices, a laugh now and then (795 amended (2); Ambience, while a bandit lives within 4 of a \"bandit\" or \"mixed\" camp's fire)"
+		},
+		"amb.camp_trader": {
+			"category": "ambience",
+			"type": "loop",
+			"bus": "ambience",
+			"noise": null,
+			"range": 10,
+			"volume_db": -20.0,
+			"uses": "a held trader camp's murmur by its fire: quiet talk (795 amended (2); Ambience, at a \"trader\" or \"mixed\" camp's fire while it is held)"
+		},
 		"amb.mine_tunnel": {
 			"category": "ambience",
 			"type": "bed",

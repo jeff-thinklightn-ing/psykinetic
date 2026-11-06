@@ -1176,6 +1176,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	var centre: Variant = _tile(config.get("centre"))
 	level["neighbours"] = neighbours_from(config, warnings)
 	level["places"] = places_from(config, warnings)
+	level["terrain"]["camps"] = camps_of(level["places"])
 	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
 	level["forage"] = forage_from(config, warnings)
@@ -1377,6 +1378,18 @@ static func at_a_mouth(at: Vector2i, radius: int, config: Dictionary) -> bool:
 		if cell is Vector2i and maxi(absi(cell.x - at.x), absi(cell.y - at.y)) <= radius:
 			return true
 	return false
+
+
+## A camp's fire and who holds it (795 amended (2), sound's side, reading
+## 793, maps' side's "mix"): each camp place given a mix, {"at": its cell,
+## "mix": "bandit", "trader" or "mixed"}, for Ambience's murmur by the fire.
+static func camps_of(places: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if str(place.get("kind", "")) == "camp" and place.has("mix") and place.get("cell") is Vector2i:
+			out.append({"at": place["cell"], "mix": str(place["mix"])})
+	return out
 
 
 static func places_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
