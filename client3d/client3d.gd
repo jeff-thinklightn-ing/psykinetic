@@ -546,6 +546,7 @@ const SKIRT_TOP := 4.5
 const SKIRT_BUMPS := 1.6
 const SKIRT_RIDGE := 14.0
 const SKIRT_STEP := 2.0
+const SKIRT_EDGE_SPAN := 3
 const SKIRT_ROWS: PackedFloat32Array = [-3.0, -1.0, 1.0, 3.0, 5.0, 8.0, 12.0, 17.0, 24.0, 33.0, 45.0, 60.0, 80.0, 100.0, 120.0]
 const SKIRT_GREEN := Color("2e4a2a")
 const SKIRT_DARK := Color("1b2d1c")
@@ -8148,9 +8149,14 @@ func _band_height(cell: Vector2i) -> float:
 ## The low camera's skirt (623, terrain's side): round the forest's bounds
 ## (its cells, glimpses' included), a column every SKIRT_STEP along each side
 ## and a fan at each corner, each out along its normal through SKIRT_ROWS;
-## a point's height its rise from under the crowns to SKIRT_TOP, the
-## treetop bumps, and the far ridge. Vertex colours between the greens by
-## the bumps; no shadows; drawn in season as leaves.
+## a point's height its rise from under the crowns to SKIRT_TOP over the
+## land's edge there (_skirt_edge, so a map's high corner has no trench past
+## its canopy), the treetop bumps, and the far ridge. Its top faces up, and
+## it is drawn both ways (its underside a copy, lit as the top): where the
+## ridge stands over the eye a gentle stretch shows its underside, which,
+## culled, left the ridge's steeper bits floating as grey slabs. Vertex
+## colours between the greens by the bumps; no shadows; drawn in season as
+## leaves.
 func _add_skirt() -> void:
 	var low := Vector2(INF, INF)
 	var high := -low
@@ -8177,15 +8183,19 @@ func _add_skirt() -> void:
 	var points := PackedVector3Array()
 	var colours := PackedColorArray()
 	var rows := SKIRT_ROWS.size()
+	var edges := {}
 	for entry: Array in ring:
 		var base: Vector2 = entry[0]
 		var out: Vector2 = entry[1]
+		if not edges.has(base):
+			edges[base] = _skirt_edge(base)
+		var edge: float = edges[base]
 		for d: float in SKIRT_ROWS:
 			var at := base + out * d
 			var bump := _field(at, 6.0, 90)
 			var rise := clampf((d + SKIRT_IN) / (SKIRT_RISE + SKIRT_IN), 0.0, 1.0)
 			var ridge := SKIRT_RIDGE * _field(at, 70.0, 91) * smoothstep(20.0, SKIRT_WIDE, d)
-			var height := lerpf(floor_y - 1.0, SKIRT_TOP + SKIRT_BUMPS * (bump - 0.5) + ridge, rise)
+			var height := lerpf(minf(floor_y, edge) - 1.0, edge + SKIRT_TOP + SKIRT_BUMPS * (bump - 0.5) + ridge, rise)
 			points.append(Vector3(at.x, height, at.y))
 			colours.append(SKIRT_DARK.lerp(SKIRT_GREEN, bump))
 	var indices := PackedInt32Array()
@@ -8197,7 +8207,8 @@ func _add_skirt() -> void:
 			var b := j * rows + k
 			if points[a].is_equal_approx(points[b]) and points[a + 1].is_equal_approx(points[b + 1]):
 				continue  # A corner's fan at its own point.
-			indices.append_array([a, a + 1, b, b, a + 1, b + 1])
+			# Clockwise seen from above (Godot's front): the top faces up.
+			indices.append_array([a, b, a + 1, b, b + 1, a + 1])
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points
@@ -8208,15 +8219,44 @@ func _add_skirt() -> void:
 	var tool := SurfaceTool.new()
 	tool.create_from(mesh, 0)
 	tool.generate_normals()
+	var top := tool.commit_to_arrays()
+	# The underside: the same points again, the top's normals, wound back.
+	var both := top.duplicate()
+	var count_top: int = (top[Mesh.ARRAY_VERTEX] as PackedVector3Array).size()
+	for kind in [Mesh.ARRAY_VERTEX, Mesh.ARRAY_NORMAL, Mesh.ARRAY_COLOR]:
+		var doubled = top[kind].duplicate()
+		doubled.append_array(top[kind])
+		both[kind] = doubled
+	var wound: PackedInt32Array = top[Mesh.ARRAY_INDEX].duplicate()
+	var faces_top: PackedInt32Array = top[Mesh.ARRAY_INDEX]
+	for f in range(0, faces_top.size(), 3):
+		wound.append_array([faces_top[f] + count_top, faces_top[f + 2] + count_top, faces_top[f + 1] + count_top])
+	both[Mesh.ARRAY_INDEX] = wound
+	var drawn := ArrayMesh.new()
+	drawn.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, both)
 	var material := StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
 	material.roughness = 1.0
 	_skirt = MeshInstance3D.new()
 	_skirt.name = "Skirt"
-	_skirt.mesh = tool.commit()
+	_skirt.mesh = drawn
 	_skirt.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_skirt.material_override = season_material(material, true, false)
 	_room.add_child(_skirt)
+
+
+## The land's edge under the skirt at [param at] (a point on the forest's
+## bounds): the mean forest floor (_band_height) over the cells SKIRT_EDGE_SPAN
+## round it, so the skirt rises from the land it rings, not from 0.
+func _skirt_edge(at: Vector2) -> float:
+	var middle := Vector2i(roundi(at.x), roundi(at.y))
+	var sum := 0.0
+	var count := 0
+	for dy in range(-SKIRT_EDGE_SPAN, SKIRT_EDGE_SPAN + 1):
+		for dx in range(-SKIRT_EDGE_SPAN, SKIRT_EDGE_SPAN + 1):
+			sum += _band_height(middle + Vector2i(dx, dy))
+			count += 1
+	return sum / count
 
 
 ## The far landmarks this view draws (650, terrain's side), from [param

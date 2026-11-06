@@ -6238,6 +6238,39 @@ func _test_horizon() -> void:
 			and bounds.position.x < forest.position.x - Client3D.SKIRT_WIDE + 1.0 and bounds.end.x > forest.end.x + Client3D.SKIRT_WIDE - 1.0
 			and inner < _rig._ground_bottom and outer > Client3D.SKIRT_TOP - Client3D.SKIRT_BUMPS,
 			"a skirt round the forest out SKIRT_WIDE, from under the crowns (%.1f) up past the treetops (%.1f), no shadows" % [inner, outer])
+	# Its top faces up (Godot's front winds clockwise: (c - a) x (b - a)), its
+	# underside the same faces wound back: wound down, the top was culled and
+	# the ridge's undersides floated over the horizon as grey slabs.
+	var up := 0
+	var down := 0
+	var wrong := 0
+	if skirt != null:
+		var arrays := skirt.mesh.surface_get_arrays(0)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var faces: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
+		var half := faces.size() / 2
+		for f in range(0, faces.size(), 3):
+			var a := vertices[faces[f]]
+			var facing := (vertices[faces[f + 2]] - a).cross(vertices[faces[f + 1]] - a)
+			if absf(facing.y) < 1e-6:
+				continue
+			# Past the bounds only: inside a corner the fan's rows under the
+			# crowns (SKIRT_IN) fold over themselves, unseen.
+			var inside := false
+			for g in 3:
+				var at := vertices[faces[f + g]]
+				inside = inside or forest.grow(0.6).has_point(Vector2(at.x, at.z))
+			if inside:
+				continue
+			if (facing.y > 0.0) == (f < half):
+				if f < half:
+					up += 1
+				else:
+					down += 1
+			else:
+				wrong += 1
+	_check(up > 0 and up == down and wrong == 0,
+			"the skirt's top faces up, its underside drawn too (%d up, %d down, %d wrong)" % [up, down, wrong])
 	_check(is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_meadow")), 1.0)
 			and is_equal_approx(float(_rig._ground_look.get_shader_parameter("far_from")), _rig.scatter_reach_low - Client3D.FAR_MEADOW_FADE * 0.5),
 			"the far meadow on, from the scatter's reach")

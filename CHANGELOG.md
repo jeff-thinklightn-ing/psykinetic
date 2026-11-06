@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- With the low camera, the forest past the map's edge runs on as one far ridge: no more grey slabs floating over the horizon or a pink strip under them, seen from the wilds' south-east corner (623 amended (4)).
 - The haze over the land is gone: the countryside is clear to the horizon and far sights like the castle stand out on the skyline, while fog and rain still close in (623 amended (3)).
 - In the hills, the milestones on the road read Umbrage and Shieling, and the waystones where the tracks leave it point the way to the hut and the cave (800).
 - Three caches lie hidden out in the lands: under a floorboard at the old farmstead, in a pack by the crates at the old camp, and among the stones heaped against the cairn in the hills (807 amended).
