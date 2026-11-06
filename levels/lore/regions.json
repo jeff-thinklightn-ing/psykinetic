@@ -302,6 +302,39 @@
 			]
 		},
 		{
+			"id": "smithy",
+			"type": "place",
+			"name": "the smithy",
+			"status": "agreed",
+			"source": "game",
+			"summary": "Umbrage's smithy, cold since its smith went below the castle after the great dwarven forge and was taken.",
+			"place_kind": "other",
+			"relations": [
+				{
+					"to": "town_lands",
+					"kind": "in"
+				},
+				{
+					"to": "smith",
+					"kind": "from"
+				}
+			],
+			"tags": [],
+			"facts": [
+				{
+					"id": "smithy.cold",
+					"text": "Umbrage's smithy has stood cold since the smith went below the castle.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
+				}
+			]
+		},
+		{
 			"id": "healers_hut",
 			"type": "place",
 			"name": "the healer's hut",
