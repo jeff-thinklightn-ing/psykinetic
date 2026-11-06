@@ -87,7 +87,13 @@ func _test_rescues_and_the_forge() -> void:
 	_check(_work.worker("dag").get("origin") == "rescued:dag" and _work.workshop_of("dag") == "%s:carpenter" % TOWN,
 		"a resident, working at once: no building houses a carpenter (%s)" % _work.workshop_of("dag"))
 	_check(not _towns.note_rescue(TOWN, "dag", "Dag", "carpenter"), "rescued twice: once a resident")
+	_check(not _towns.has_resident(TOWN, "smith") and _towns.resident_trades(TOWN).has("carpenter") and not _towns.resident_trades(TOWN).has("smith"),
+		"297 amended: no smith yet; the carpenter a resident (%s)" % [_towns.resident_trades(TOWN)])
+	_towns._seek(TOWN, "wyn", "Wyn", "weaver")
+	_check(_towns._has_trade(TOWN, "weaver") and not _towns.has_resident(TOWN, "weaver") and not _towns.resident_trades(TOWN).has("weaver"),
+		"a weaver sought: the town waits for one, but has none living there")
 	_towns.note_rescue(TOWN, "bram", "Bram", "smith")
+	_check(_towns.has_resident(TOWN, "smith") and _towns.resident_trades(TOWN).has("smith"), "Bram rescued: a smith lives there, waiting for his forge or not")
 	_check(_work.workshop_of("bram") == "" and _towns.log_of(TOWN).any(func(line: Dictionary) -> bool:
 		return line["what"] == "Bram the smith waits for a forge"), "Bram the smith waits for a forge")
 	_check(_towns.xp(TOWN) == 125, "20 experience for the two rescues (%d)" % _towns.xp(TOWN))

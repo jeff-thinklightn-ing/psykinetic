@@ -910,6 +910,16 @@ func _test_person_takes(host: Player) -> void:
 	_main._takers_by_zone.clear()  # The next pass (_tell_world clears it after each).
 	_main._tell_takers(Net.local_id, STORE.get_slice("/", 0))
 	_check(_main.takers_here.get("town") == STORE and not _main.takers_here.has("gear"), "told again when it changes: no stall, no gear")
+	# 297 amended: the "town" message's residents' trades, sent again when they change.
+	var trades_from := Time.get_ticks_usec()
+	_main._tell_town_trades()
+	print("[test] _tell_town_trades over %d towns took %d us" % [World.towns.ids().size(), Time.get_ticks_usec() - trades_from])
+	_main.town_trades.erase(STORE)
+	World.towns.move_in(STORE, "zz_trades_weaver", "Mabyn", "weaver")
+	_main._tell_town_trades()
+	_check((_main.town_trades.get(STORE, []) as Array).has("weaver") and _main.town_has_trade(STORE, "weaver") and not _main.town_has_trade(STORE, "fisherman"),
+		"a weaver moves in: the town told again, its trades with her (%s)" % [_main.town_trades.get(STORE)])
+	_check(_main._town_message(STORE).get("trades") == World.towns.resident_trades(STORE), "the town message carries the residents' trades")
 	_main._tell_takers(Net.local_id, "nowhere")
 	_check(_main.takers_here == {"town": "", "takers": {}}, "an area with no town: told so")
 	_check(_main.depot_pointer(STORE, "sword") == "Nobody here takes that.", "no stall here: nobody takes gear")

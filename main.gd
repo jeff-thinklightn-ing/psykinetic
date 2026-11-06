@@ -557,6 +557,11 @@ var town_states := {}
 ## Town id -> {map building code: awake} as the server last told ("town"
 ## "awake", decision 566), for the window light; the view's set_awake.
 var town_awake := {}
+## Client: each town's residents' trades, from its "town" message (297
+## amended); the server reads Towns (town_has_trade).
+var town_trades: Dictionary = {}
+## Server: each town's residents' trades last told (_tell_town_trades).
+var _trades_told: Dictionary = {}
 ## Town id -> the threat over it as the server last told ("town" "threat",
 ## decision 762; absent, none): the bar's Barter reads it (_threat_near).
 var town_threats := {}
@@ -7461,10 +7466,35 @@ func _send_towns(peer: int, zone_name: String) -> void:
 func _town_message(town: String) -> Dictionary:
 	var out := {"town": town, "buildings": World.towns.buildings_of(town), "awake": World.towns.awake_of(town),
 		"stage": World.towns.stage(town)}
+	out["trades"] = World.towns.resident_trades(town)  # 297 amended: who lives there (Umbrage's forge lit while it has a smith).
 	var threat := World.towns.threatened(town)
 	if not threat.is_empty():
 		out["threat"] = threat
 	return out
+
+
+## Whether [param town] has a resident of [param trade] (297 amended;
+## buildings' smithy lit while Umbrage has a smith): Towns on the server,
+## the last "town" message's "trades" on a client.
+func town_has_trade(town: String, trade: String) -> bool:
+	if Net.is_authority() and World.towns != null:
+		return World.towns.has_resident(town, trade)
+	return trade in town_trades.get(town, [])
+
+
+## Server: each town whose residents' trades changed since last told is
+## sent again ("town", to every peer), checked once a pass (_tell_world):
+## a rescue, a death, an arrival or a leaving, whichever way it came.
+func _tell_town_trades() -> void:
+	if World.towns == null:
+		return
+	for town: String in World.towns.ids():
+		var trades := World.towns.resident_trades(town)
+		if not _trades_told.has(town):
+			_trades_told[town] = trades  # The first look: joining peers are told by _send_towns.
+		elif _trades_told[town] != trades:
+			_trades_told[town] = trades
+			Net.broadcast("town", _town_message(town))
 
 
 ## Server: the healer's huts of [param area] with a record (Towns.hut,
@@ -14687,6 +14717,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "town":
 		var town := str(data.get("town", ""))
 		var buildings: Variant = data.get("buildings", {})
+		if not town.is_empty() and data.get("trades") is Array:
+			town_trades[town] = (data["trades"] as Array).map(func(each: Variant) -> String: return str(each))
 		if not town.is_empty() and data.get("awake") is Dictionary:
 			town_awake[town] = data["awake"]
 			if _client3d != null and _client3d.has_method("set_awake"):
@@ -16825,6 +16857,7 @@ func _tell_world(tick: int) -> void:
 				_explored(peer, place)  # 804, maps' side: a named place reached.
 			_tell_takers(peer, player.zone)
 	_takers_by_zone.clear()  # Built once a zone a pass, shared by its players (perf).
+	_tell_town_trades()
 	_observe_roads()  # Hers too (decision 551).
 	_world_news.update()
 

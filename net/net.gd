@@ -588,6 +588,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 52 (821): a takes row (the "offers" and "barter" messages' "takes") for a trophy carries for
 ## {kind "maker", name: what it is for} and the gold paid and owed (a row that was a gift is now a
 ## sale), and "takers" carries "trophies" {item id: its buyer}; an old client prints "For F: 0 of 0".
+## 52 (297 amended): the "town" message carries "trades", its residents' trades (sorted, each once;
+## Towns.resident_trades), sent again when they change; Main.town_has_trade reads it (an old client ignores it). Shares 52 with 821.
 const PROTOCOL_REVISION := 52
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

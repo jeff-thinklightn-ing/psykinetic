@@ -4922,6 +4922,23 @@ each is, the same on every peer, redrawn by rebuild_walls. Later:
 whether a damaged roof lets daylight in (environment's 291 has every
 footprint roofed); for now it stays roofed.
 
+297 amended (release's label; npc's and buildings' ask, the coordinator's ruling that Umbrage's
+forge stays cold and dark until its smith is home): the "town" message carries "trades", the trades
+of the town's residents, each once, sorted (Towns.resident_trades). Towns.has_resident(town, trade)
+is whether a resident of the trade lives there now: seated, never one still sought (Towns._has_trade
+counts those too, for the town's choosing), one away on an errand counting; a smith who dies leaves
+the town without, a town that starts with one has one. Main.town_has_trade(town, trade) answers on
+the server from Towns and on a client from the last "town" message (Main.town_trades), so buildings'
+forge and npc read one call. Residents come and go by many ways (a rescue, a death, a move-in,
+growth, a companion settling, a seizure), so rather than a signal at each, Main._tell_town_trades
+looks once a pass (_tell_world) and broadcasts a town's "town" message again when its trades
+changed. Measured, given 802 amended (6)'s cost: the look over economy_test's 2 towns took 26 µs
+(residents' trades read by Production.trades_of, no record copied). Production.trades_of(id) reads a
+worker's trades without copying the record. towns_test _test_rescues_and_the_forge (a smith sought
+is not a resident; rescued, he is); economy_test _test_person_takes (a weaver moves in: told again).
+Protocol 52 ("town" carries a new field; an old client ignores it), no new class_name, no bullet
+(the forge's light is buildings').
+
 ## 272. Bandaging: a kit, out of combat, then mending you can walk away from
 
 Items step 4, first part (the roadmap's rule: right-click-hold on an

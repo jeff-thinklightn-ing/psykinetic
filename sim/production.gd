@@ -716,6 +716,12 @@ func worker(id: String) -> Dictionary:
 	return _workers.get(id, {}).duplicate(true)
 
 
+## Worker [param id]'s trades, without copying the rest of the record
+## (Towns.has_resident, resident_trades: each pass).
+func trades_of(id: String) -> Array:
+	return (_workers.get(id, {}).get("trades", []) as Array).duplicate()
+
+
 ## [param town]'s workshop ids, in order.
 func workshop_ids(town: String) -> Array[String]:
 	var out: Array[String] = []

@@ -1748,7 +1748,28 @@ func _has_trade(town: String, trade: String) -> bool:
 	for each: Dictionary in _town(town).get("sought", {}).values():
 		if str(each["trade"]) == trade:
 			return true
-	return residents(town).any(func(who: String) -> bool: return trade in production.worker(who).get("trades", []))
+	return has_resident(town, trade)
+
+
+## Whether [param town] has a resident of [param trade] now: seated, not
+## one still sought (npc's and buildings' ask: Umbrage's smithy lit only
+## while it has a smith; one who dies leaves it cold, a town that starts
+## with one is lit). Away on an errand still counts. The client reads it
+## from Main's "town" message, which carries resident_trades.
+func has_resident(town: String, trade: String) -> bool:
+	return residents(town).any(func(who: String) -> bool: return trade in production.trades_of(who))
+
+
+## The trades of [param town]'s residents, each once, sorted (the "town"
+## message's "trades": the client's Main.town_has_trade).
+func resident_trades(town: String) -> Array[String]:
+	var out: Array[String] = []
+	for who: String in residents(town):
+		for trade: Variant in production.trades_of(who):
+			if not str(trade) in out:
+				out.append(str(trade))
+	out.sort()
+	return out
 
 
 ## [param trade]'s story (613 amended, Jeff: "every npc has their own
