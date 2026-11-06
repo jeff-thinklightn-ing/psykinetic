@@ -29616,6 +29616,21 @@ frame 86-120 ms to 10-13, the frame after 30-46 to 10-22, the crossing's worst f
 81-93; the lift's time unchanged. view_test passes. Client only, protocol unchanged, no new
 class_name.
 
+660 amended (7): room phases share a frame within the card budget (2026-11-05, perf; the
+Mughouse's gate, under 300 ms room to barrow, the coordinator's). A small room's build waited a
+frame after every phase, so a tavern-sized indoor room took 27 frames for about 1 ms of work
+each. Now _build_room_over_frames records each phase's last cost (_phase_usec) and goes straight
+on to the next while the frame's time so far plus that phase's last cost is under
+CARD_BUDGET_USEC (14 ms, _phase_fits); otherwise it awaits a frame as before. _index_occluders
+likewise runs in the same frame when it fits; _find_enclosed still has a frame of its own. A big
+level's phases each fill a frame alone, so the wilds is unchanged. Bench (buildings'
+stair probe, an 18 x 14 indoor room, headless, bench lock, this and main alternated twice):
+room to barrow and back 38-56 ms over 7-8 frames against 204-208 ms over 27, worst frame 14-17
+ms against 16-18 (about 120-135 ms against 450 on a 60 Hz screen); windowed off-screen agreed on
+the frames (8-9 against 27-31; an off-screen window presents at about 94 ms a frame, so its ms
+are not timings). view_test's indoor build: the card lifts within INDOOR_LIFT_FRAMES (16; 7
+seen). Client only, protocol unchanged, no new class_name.
+
 ## 671, buildings' side: inside is a space closed in by walls; the roof eases off
 
 Jeff, after playing: "going inside buildings should go into top down view and

@@ -5599,7 +5599,12 @@ func _build_room_over_frames(generation: int) -> void:
 	# The view where the card will lift: what it sees is built first.
 	_apply_camera_mode()
 	_place_camera()
+	# 660 amended (7): the next phase runs in the same frame while the time
+	# this frame has spent and its last cost fit CARD_BUDGET_USEC; a small
+	# room's twenty phase frames were 450 ms at 60 fps on a tavern stair.
+	var frame_started := Time.get_ticks_usec()
 	for phase: Callable in _room_phases():
+		var phase_started := Time.get_ticks_usec()
 		if phase == _phase_ground:
 			if not await _phase_ground_over_frames(generation):
 				return
@@ -5614,19 +5619,37 @@ func _build_room_over_frames(generation: int) -> void:
 			phase.call()
 			if phase == _phase_land:
 				_start_curves()
+		var phase_name := phase.get_method()
+		if phase_name != &"_phase_ground" and phase_name != &"_phase_edges":
+			# Those two wait frames of their own: their cost is not one frame's.
+			_phase_usec[phase_name] = Time.get_ticks_usec() - phase_started
+		var next: StringName = &"_index_occluders"
+		var phases := _room_phases()
+		var at := phases.find(phase)
+		if at >= 0 and at + 1 < phases.size():
+			next = phases[at + 1].get_method()
+		if _phase_fits(frame_started, next):
+			continue
 		await get_tree().process_frame
+		frame_started = Time.get_ticks_usec()
 		if generation != _build_generation or not is_inside_tree():
 			return
 	# What fades, indexed a frame of its own under the card, not in the
 	# lift's (perf: 33-39 ms on the wilds' 5228 occluders).
 	if not _occluders_built:
+		var index_started := Time.get_ticks_usec()
 		_index_occluders()
-		await get_tree().process_frame
-		if generation != _build_generation or not is_inside_tree():
-			return
+		_phase_usec[&"_index_occluders"] = Time.get_ticks_usec() - index_started
+		if not _phase_fits(frame_started, &"_find_enclosed"):
+			await get_tree().process_frame
+			frame_started = Time.get_ticks_usec()
+			if generation != _build_generation or not is_inside_tree():
+				return
 	# And the spaces walls close in (_update_roofs' first read, 33-35 ms).
 	if _enclosed_dirty:
+		var enclosed_started := Time.get_ticks_usec()
 		_find_enclosed()
+		_phase_usec[&"_find_enclosed"] = Time.get_ticks_usec() - enclosed_started
 		await get_tree().process_frame
 		if generation != _build_generation or not is_inside_tree():
 			return
@@ -5642,6 +5665,20 @@ func _build_room_over_frames(generation: int) -> void:
 		if generation != _build_generation or not is_inside_tree():
 			return
 	_fill_finished()
+
+
+## Each room phase's cost the last time it ran over frames, in µs, by its
+## method's name (660 amended (7)); a phase never seen counts as nothing, so a
+## first build runs as much in a frame as fits.
+var _phase_usec := {}
+
+
+## Whether the phase [param next] may run in the frame begun at
+## [param frame_started]: the frame's time so far and its last cost within
+## CARD_BUDGET_USEC (660 amended (7)).
+func _phase_fits(frame_started: int, next: StringName) -> bool:
+	var spent := Time.get_ticks_usec() - frame_started
+	return spent + int(_phase_usec.get(next, 0)) < CARD_BUDGET_USEC
 
 
 ## The ground over frames (decision 660): its fields on a worker while the

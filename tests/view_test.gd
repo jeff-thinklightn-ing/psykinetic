@@ -10042,6 +10042,10 @@ func _test_phased_build() -> void:
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
+## The most frames a small indoor room's card may take to lift (660 amended (7)).
+const INDOOR_LIFT_FRAMES := 16
+
+
 ## 660 amended (4): an indoor zone built over frames (no wooded land, no
 ## edge) is the room built at once. The curves' start once took the indoor
 ## case's empty set as a script error and the barrow never drew (black but
@@ -10059,12 +10063,18 @@ func _test_indoor_phased_build() -> void:
 	var at_once: int = drawn.call()
 	_rig.rebuild(terrain, barrow["centre"], true)
 	var frames := 0
+	var lifted := -1
 	while (_rig.building_room or _rig.ground_filling) and frames < 400:
 		await get_tree().process_frame
 		frames += 1
+		if lifted < 0 and not _rig.building_room:
+			lifted = frames
 	await _frames(Client3D.WARM_FRAMES + 2)
 	_check(not _rig._outdoor and not _rig.building_room and not _rig.ground_filling and _rig._curves_task == -1,
 			"the barrow built over %d frames, then whole" % frames)
+	# 660 amended (7): a small room's phases share frames while the card's
+	# budget allows (a frame each was 27 frames to the lift, 450 ms at 60 fps).
+	_check(lifted > 0 and lifted <= INDOOR_LIFT_FRAMES, "the barrow's card lifts within %d frames (%d)" % [INDOOR_LIFT_FRAMES, lifted])
 	_check(at_once > 0 and drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
