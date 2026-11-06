@@ -2759,8 +2759,10 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 ## it), "waystones" (a pair either side), "down" (a stair down, a dark
 ## mouth), "up" (a stair up, or a climb), "sealed" (shut), "none", "cave"
 ## (a cave mouth in a hill of rock, the forest plan's lairs: drawn by
-## Client3D, no slot; given by the link's "cue").
-const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none", "cave"]
+## Client3D, no slot; given by the link's "cue"), "thicket" (798 amended: a
+## lair's way into a bramble mound, maps' boar lair; drawn by Client3D from
+## art-kit's wall.thicket bushes; given by the link's "cue" or "mouth").
+const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none", "cave", "thicket"]
 ## Each cue's art-kit slot (waystones: two, either side of the link).
 const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.waystone", "down": "building.stair_down", "up": "building.stair_up"}
 
@@ -2802,8 +2804,10 @@ static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary
 		var entry: Dictionary = entries.get(at, link if link.has("building") else {})
 		var far := template_config(str(link["to_map"]))
 		var cue := "none"
-		if str(entry.get("cue", "")) in CUES:
-			cue = str(entry["cue"])
+		# A lair's "mouth" (maps' make_forest) is its cue.
+		var given := str(entry.get("cue", entry.get("mouth", "")))
+		if given in CUES:
+			cue = given
 		elif link["hidden"]:
 			cue = "none"
 		elif link["sealed"] != "" or link["closed"]:

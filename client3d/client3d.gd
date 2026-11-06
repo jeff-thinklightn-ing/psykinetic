@@ -6694,6 +6694,9 @@ func _add_link_cues() -> void:
 		if cue["cue"] == "cave":
 			_add_cave_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
 			continue
+		if cue["cue"] == "thicket":
+			_add_thicket_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
+			continue
 		var slot := str(Level.CUE_SLOTS.get(cue["cue"], ""))
 		if slot.is_empty() or not ArtKit.has(slot):
 			continue
@@ -6709,6 +6712,137 @@ func _add_link_cues() -> void:
 			node.position = Vector3(cell.x, _elevation(cell), cell.y)
 			node.rotation.y = atan2(float(facing.x), float(facing.y))
 			_room.add_child(node)
+
+
+## A thicket mouth (798 amended; a link's cue "thicket", maps' boar lair,
+## 780 amended (12)): a low mound of brambles over the lair's void cells,
+## THICKET_MOUND across and deep (the link's row too) behind and beside the
+## link, the link itself its gap. Art-kit's wall.thicket bushes, one or two
+## a cell (one at the mound's sides, so it thins there), each turned and
+## jittered, THICKET_ROWS high by row from the gap's (the front lower),
+## THICKET_SIDE of that at the sides, THICKET_WIDE across so they run
+## together; behind the gap the way in, dark. [param closed]: a low tangle
+## THICKET_GATE high in the gap, the dark over it.
+const THICKET_MOUND := Vector2i(5, 3)
+const THICKET_ROWS: Array[float] = [1.25, 1.7, 1.9]
+const THICKET_SIDE := 0.8
+const THICKET_WIDE := Vector2(1.25, 1.55)
+const THICKET_GATE := 0.7
+## The den's way in, seen through the gap (the coordinator: a den you can
+## see into, not yet enter): the bushes of the cell behind the gap parted
+## THICKET_PART either side of its line under one laid over them
+## THICKET_ROOF high, and the dark beyond, THICKET_DEN wide and high
+## (black, unlit) across its back, its floor dark to the gap.
+## Those beside it (the parted ones and the front row's, drawn back half
+## THICKET_PART) THICKET_NARROW of the others' width.
+const THICKET_PART := 0.85
+const THICKET_ROOF := 1.0
+const THICKET_DEN := Vector2(1.2, 1.2)
+const THICKET_NARROW := 0.7
+const THICKET_SLOTS: Array[String] = ["wall.thicket.end", "wall.thicket.post"]
+
+
+## The cells a thicket mouth's mound stands on: THICKET_MOUND behind and
+## beside each "thicket" link, the link's own cell its gap.
+func _thicket_cells() -> Dictionary[Vector2i, int]:
+	var out: Dictionary[Vector2i, int] = {}
+	for cue: Dictionary in _terrain.get("link_cues", []):
+		if cue["cue"] != "thicket":
+			continue
+		var at: Vector2i = cue["tile"]
+		var ahead: Vector2i = cue["facing"]
+		var across := Vector2i(-ahead.y, ahead.x)
+		for back in THICKET_MOUND.y:
+			for x in range(-(THICKET_MOUND.x / 2), THICKET_MOUND.x / 2 + 1):
+				if back > 0 or x != 0:
+					out[at + ahead * back + across * x] = back
+	return out
+
+
+## The thicket mouth over [param at], its mound the way [param ahead]
+## (into it), named "Thicket_x_y".
+func _add_thicket_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
+	var slots: Array[String] = []
+	for slot in THICKET_SLOTS:
+		if ArtKit.has(slot):
+			slots.append(slot)
+	if slots.is_empty():
+		return
+	var holder := Node3D.new()
+	holder.name = "Thicket_%d_%d" % [at.x, at.y]
+	_room.add_child(holder)
+	var across := Vector2i(-ahead.y, ahead.x)
+	var put := func(spot: Vector2, high: float, key: Vector2i, narrow: float) -> void:
+		var slot: String = slots[int(_roll(key, 141) * slots.size()) % slots.size()]
+		var bush := ArtKit.instance(slot, 1 + int(_roll(key, 142) * maxi(ArtKit.variant_count(slot), 1)) % maxi(ArtKit.variant_count(slot), 1))
+		var size: Array = ArtKit.spec(slot).get("size", [1.0, 2.2, 1.0])
+		var tall := high / float(size[1])
+		var wide := lerpf(THICKET_WIDE.x, THICKET_WIDE.y, _roll(key, 143)) * narrow / maxf(float(size[0]), 0.5)
+		bush.name = "Bush_%d" % holder.get_child_count()
+		bush.position = Vector3(spot.x, _height_in(Vector2i(roundi(spot.x), roundi(spot.y)), spot), spot.y)
+		bush.rotation.y = _roll(key, 144) * TAU
+		bush.scale = Vector3(wide, tall, wide)
+		holder.add_child(bush)
+	for back in THICKET_MOUND.y:
+		for x in range(-(THICKET_MOUND.x / 2), THICKET_MOUND.x / 2 + 1):
+			if back == 0 and x == 0:
+				continue
+			var cell := at + ahead * back + across * x
+			var side := absi(x) == THICKET_MOUND.x / 2
+			var high := THICKET_ROWS[back] * (THICKET_SIDE if side else 1.0)
+			if back == 1 and x == 0:
+				# The way in: parted either side, one laid over.
+				for k in 2:
+					var key := Vector2i(cell.x * 7 + k, cell.y * 7 + k)
+					var part := Vector2(across) * THICKET_PART * (1.0 if k == 0 else -1.0)
+					put.call(Vector2(cell) + part + Vector2(ahead) * 0.1, high * lerpf(0.9, 1.05, _roll(key, 147)), key, THICKET_NARROW)
+				var over := Vector2i(cell.x * 7 + 3, cell.y * 7 + 3)
+				put.call(Vector2(cell) + Vector2(ahead) * 0.35, high - THICKET_ROOF, over, THICKET_NARROW)
+				var roof: Node3D = holder.get_child(holder.get_child_count() - 1)
+				roof.position.y += THICKET_ROOF
+				continue
+			for k in (1 if side else 2):
+				var key := Vector2i(cell.x * 7 + k, cell.y * 7 + k)
+				var jitter := Vector2(_roll(key, 145) - 0.5, _roll(key, 146) - 0.5) * (0.5 if k == 0 else 0.8)
+				var narrow := 1.0
+				if back == 0 and absi(x) == 1:
+					# Beside the gap: drawn back from it, so the way in shows.
+					jitter += Vector2(across) * signf(x) * THICKET_PART * 0.5
+					narrow = THICKET_NARROW
+				put.call(Vector2(cell) + jitter, high * lerpf(0.88, 1.1, _roll(key, 147)) * (1.0 if k == 0 else 0.8), key, narrow)
+	# The dark beyond the way in: its back across the cell behind the gap,
+	# its floor from the gap's edge to it.
+	var den_at := Vector2(at) + Vector2(ahead) * 1.45
+	var gap_at := Vector2(at) + Vector2(ahead) * 0.5
+	var half := Vector2(across) * THICKET_DEN.x * 0.5
+	var low := _height_in(at + ahead, den_at)
+	var near := _height_in(at, gap_at)
+	var dark := PackedVector3Array()
+	var to3 := func(p: Vector2, y: float) -> Vector3:
+		return Vector3(p.x, y, p.y)
+	dark.append_array([to3.call(den_at - half, low), to3.call(den_at + half, low), to3.call(den_at + half, low + THICKET_DEN.y),
+			to3.call(den_at - half, low), to3.call(den_at + half, low + THICKET_DEN.y), to3.call(den_at - half, low + THICKET_DEN.y)])
+	dark.append_array([to3.call(gap_at - half, near + 0.03), to3.call(gap_at + half, near + 0.03), to3.call(den_at + half, low + 0.03),
+			to3.call(gap_at - half, near + 0.03), to3.call(den_at + half, low + 0.03), to3.call(den_at - half, low + 0.03)])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = dark
+	var den_mesh := ArrayMesh.new()
+	den_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var den := MeshInstance3D.new()
+	den.name = "Den"
+	den.mesh = den_mesh
+	var black := StandardMaterial3D.new()
+	black.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	black.albedo_color = Color(0.015, 0.014, 0.01)
+	black.cull_mode = BaseMaterial3D.CULL_DISABLED
+	den.material_override = black
+	den.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(den)
+	if closed:
+		var key := Vector2i(at.x * 7 + 5, at.y * 7 + 5)
+		put.call(Vector2(at) + Vector2(ahead) * 0.35, THICKET_GATE, key, THICKET_NARROW)
+		holder.get_child(holder.get_child_count() - 1).name = "Tangle"
 
 
 ## A cave mouth (a link's cue "cave"; the forest plan's lairs): a
@@ -8541,6 +8675,10 @@ func _add_forest_stands() -> void:
 		return
 	if PineStands.drawn():
 		_add_stands(_forest_distance, _stood)
+	# A thicket mouth's mound (798 amended) stands on its cells: no tree,
+	# sapling, rock or deadwood of the wood's there.
+	for cell: Vector2i in _thicket_cells():
+		_stood[cell] = true
 
 
 ## Trees on the void around the land (then _add_forest_edge: the first

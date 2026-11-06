@@ -43386,6 +43386,30 @@ view_test _test_cave_mouth (the hill behind, the way it faces; the arch open to 
 face beside it; the hill's cells; grass on its top and its lip in shadow; the scree; the rockfall
 only when closed, low in the arch; no ground in the throat); level_test covers the level (its
 link both ways, no trap pit). CHANGELOG (voice's words). Protocol unchanged, no new class_name.
+
+798 amended: the thicket mouth (2026-11-06; maps' boar lair, 780 amended (12); the coordinator's
+approval, signs of a lair left to maps' rows; release's label). A second kind of mouth cue: Level.CUES
+takes "thicket", given by the link's "cue" or, as maps' make_forest writes a lair's link, its "mouth".
+Client3D._add_thicket_mouth draws "Thicket_x_y" from art-kit's wall.thicket bushes (.end and .post,
+no new art): a low mound of brambles over THICKET_MOUND, 5 across and 3 deep counting the link's row,
+behind and beside the link (Client3D._thicket_cells; maps lays those 14 cells void), the link itself
+its gap. One bush a cell at the mound's sides and two elsewhere, each turned and jittered,
+THICKET_ROWS 1.25, 1.7 and 1.9 m high by row from the gap's (the front lower), THICKET_SIDE 0.8 of
+that at the sides, THICKET_WIDE 1.25-1.55 m across so they run together. The coordinator, on the
+design: a den you can see into, not yet enter (as the bear's reads "a cave, blocked"). So the way in:
+the front row's bushes beside the gap drawn back half THICKET_PART, the cell behind it parted
+THICKET_PART 0.85 either side under one laid over THICKET_ROOF 1 m up, those THICKET_NARROW 0.7 as
+wide; and "Den", the dark beyond, an unlit near-black face THICKET_DEN 1.2 x 1.2 m across the back of
+the cell behind the gap, its floor dark to the gap. A closed link (sealed till enemy-ai's phase 2) has
+a low tangle, THICKET_GATE 0.7 m, in its gap, the dark over it. The mound's cells are the wood's first
+ring, and the wood planted its trees on them: they go in _stood (as a pine stand's), so no tree,
+sapling, rock or deadwood there. The pad, the bones and the clawed tree are maps'. view_test
+_test_thicket_mouth (bushes over the 14 cells, none on the link or the pad; low at the front, 1.5-2 m
+behind, thinner at the sides; the gap clear when open, the tangle when closed; the dark behind the
+gap; none of the wood's trees on the mound). No bullet (voice: maps' lair line already sends players
+there; the lair's comes when it opens). Client and Level's cue list only, protocol unchanged, no new
+class_name.
+
 780 amended (12): the boar's lair, forest phase D (2026-11-05, maps; enemy-ai's apex-lair rule,
 C:/dev/review/enemy-ai/apex_lairs_design.md, its residents as enemy-ai gave them; the coordinator's
 go and its ruling on the roof; terrain's mouth order; release's label). A new level, levels/boar_lair

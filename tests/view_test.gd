@@ -112,6 +112,7 @@ func _ready() -> void:
 		_test_blood()
 		_test_tracks()
 		_test_cave_mouth()
+		_test_thicket_mouth()
 		_test_rocks()
 		_test_niches()
 		_test_fire()
@@ -4893,6 +4894,90 @@ func _test_cave_mouth() -> void:
 		heap_top = maxf(heap_top, box.end.y)
 	_check(heap_top < Client3D.MOUTH_ROCKFALL_TOP + 0.1 and heap_top < Client3D.MOUTH_ARCH.y - 1.0,
 			"the rockfall low in the arch, the throat black over it (top at %.2f m)" % heap_top)
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A thicket mouth (798 amended, maps' boar lair): a mound of art-kit's
+## bramble bushes behind and beside the link, the link its gap, lower at
+## the front and thinner at the sides; a low tangle in the gap when closed.
+func _test_thicket_mouth() -> void:
+	print("
+== thicket mouth: a bramble mound, the link its gap ==")
+	if not ArtKit.has("wall.thicket.end"):
+		_check(false, "art-kit's wall.thicket.end")
+		return
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	var floor_cells: Array = terrain["floor"]
+	var at := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		if floor_cells.has(cell + Vector2i(-2, -2)) and floor_cells.has(cell + Vector2i(2, -2)) and floor_cells.has(cell + Vector2i(0, 2)):
+			at = cell
+			break
+	if at.x < 0:
+		_check(false, "the sample has room for a mound")
+		return
+	var ahead := Vector2i(0, -1)
+	for closed in [false, true]:
+		terrain["link_cues"] = [{"tile": at, "cue": "thicket", "facing": ahead, "variant": 1, "closed": closed}]
+		_rig.rebuild(terrain, sample["centre"])
+		var holder: Node3D = _rig._room.get_node_or_null("Thicket_%d_%d" % [at.x, at.y])
+		var mound := _rig._thicket_cells()
+		var bushes := 0
+		var stray := 0
+		var front := 0.0
+		var back := 0.0
+		var per_cell: Dictionary[Vector2i, int] = {}
+		for bush: Node3D in (holder.get_children() if holder != null else []):
+			if bush.name == "Tangle" or bush.name == "Den":
+				continue
+			bushes += 1
+			var cell := Vector2i(roundi(bush.position.x), roundi(bush.position.z))
+			if not mound.has(cell):
+				stray += 1
+				continue
+			per_cell[cell] = int(per_cell.get(cell, 0)) + 1
+			var top := -INF
+			for mesh: MeshInstance3D in bush.find_children("*", "MeshInstance3D", true, false):
+				var box := holder.global_transform.affine_inverse() * mesh.global_transform * mesh.get_aabb()
+				top = maxf(top, box.end.y - bush.position.y)
+			if mound[cell] == 0:
+				front = maxf(front, top)
+			else:
+				back = maxf(back, top)
+		var tangle := holder.get_node_or_null("Tangle") if holder != null else null
+		if not closed:
+			var sides: int = per_cell.get(at + Vector2i(2, -1), 0) + per_cell.get(at + Vector2i(-2, -1), 0)
+			var inner: int = per_cell.get(at + Vector2i(0, -1), 0) + per_cell.get(at + Vector2i(0, -2), 0)
+			var bare := 0
+			for cell: Vector2i in mound:
+				var near := false
+				for bush: Node3D in holder.get_children() if holder != null else []:
+					near = near or bush.name != "Den" and Vector2(bush.position.x, bush.position.z).distance_to(Vector2(cell)) < 1.0
+				if not near:
+					bare += 1
+			_check(holder != null and mound.size() == 14 and not mound.has(at) and bushes > 14 and stray == 0 and bare == 0,
+					"a mound of bushes over its 14 cells, none on the link or the pad (%d bushes, %d stray, %d cells bare)" % [bushes, stray, bare])
+			_check(front > 0.9 and front < back and back > 1.5 and back < 2.3 and sides < inner,
+					"low at the front, 1.5-2 m behind, thinner at its sides (front %.2f m, back %.2f m, %d at the sides, %d in the middle)" % [front, back, sides, inner])
+			_check(tangle == null, "open: its gap clear")
+			var wood := 0
+			for cell: Vector2i in mound:
+				if _rig._stood.has(cell) and (_rig._room.has_node("Tree_%d_%d" % [cell.x, cell.y]) or _rig._room.has_node("Sapling_%d_%d" % [cell.x, cell.y])):
+					wood += 1
+			_check(mound.keys().all(func(cell: Vector2i) -> bool: return _rig._stood.has(cell)) and wood == 0,
+					"none of the wood's trees on its mound (%d)" % wood)
+			var den: MeshInstance3D = holder.get_node_or_null("Den") if holder != null else null
+			var dark := den != null and den.mesh != null and (den.material_override as StandardMaterial3D).albedo_color.get_luminance() < 0.05
+			var den_cell := Vector2i(-1, -1)
+			if dark:
+				var box := den.mesh.get_aabb()
+				den_cell = Vector2i(roundi(box.get_center().x), roundi(box.get_center().z))
+			_check(dark and den_cell == at + ahead, "behind its gap the way in, dark (%s)" % den_cell)
+		else:
+			_check(tangle != null and Vector2i(roundi(tangle.position.x), roundi(tangle.position.z)) == at,
+					"closed: a low tangle in its gap")
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
