@@ -43445,7 +43445,11 @@ DOORLESS and FADES_ON_LINE gain it; its slot's "footprint" [1, 1] added to art/k
 art-kit's OK). The forest camp C3's captive gets his post (art-kit's prop.captive_post, decor kind
 "captive_post"): a cell farther out from the camp than his place, at (101,65), its front toward him.
 The forest regenerated: only those 21 cells changed (40178 floor cells), and the two
-grown trees on the pad taken out of trees.json. The first load prints "[level] boar_lair: 393 cells,
+grown trees on the pad taken out of trees.json. A clear sightline before each lair's mouth (the
+coordinator, from terrain's low still, where trunks across the pad hid the way in): past the pad out
+along "open" to LAIR_SIGHT (8) cells no tree stands, 3 cells across, then 5 from LAIR_SIGHT_WIDE (5) out;
+grass, kept clear, and the three grown trees on it ((127.15,172.35), (129.53,174.19), (130.66,178.44))
+taken out of trees.json once by hand; level_test checks it. The first load prints "[level] boar_lair: 393 cells,
 3 entities, 1 starts, 1 links" (Main.load_map). level_test _test_boar_lair, _test_forest's links. CHANGELOG
 bullet (voice's words; the thicket's words come with terrain's cue).
 Protocol unchanged (--print-protocol fc7438491ba8 before and after: the place kind "lair" and its

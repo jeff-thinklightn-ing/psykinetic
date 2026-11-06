@@ -143,6 +143,13 @@ const LAIRS: Array[Dictionary] = [
 	{"to_map": "boar_lair", "at": Vector2i(122, 175), "open": Vector2i(1, 0), "mouth": "thicket", "closed": true}]
 const LAIR_MOUND := Vector2i(5, 2)
 const LAIR_PAD := 2
+## A lair's sightline (the coordinator, from terrain's low still): past its
+## pad out along "open" to LAIR_SIGHT cells no tree stands, 3 cells across
+## at first, 5 from LAIR_SIGHT_WIDE out, so the way in shows from the low
+## camera as the bear's cave does from the road. Grass, kept clear; the
+## grown trees on it taken out of trees.json once by hand (as the camps).
+const LAIR_SIGHT := 8
+const LAIR_SIGHT_WIDE := 5
 const FOREST_PACK := "res://editor/forest_pack.gd"
 const TREES := "res://levels/forest/trees.json"
 
@@ -478,7 +485,12 @@ static func lair_cells(lair: Dictionary) -> Dictionary:
 	for out in range(1, LAIR_PAD + 1):
 		for across in [-1, 0, 1]:
 			pad.append(at + open * out + side * across)
-	return {"mound": mound, "pad": pad, "tree": at + open + side * 2}
+	var sight: Array[Vector2i] = []
+	for out in range(LAIR_PAD + 1, LAIR_SIGHT + 1):
+		var half := 2 if out >= LAIR_SIGHT_WIDE else 1
+		for across in range(-half, half + 1):
+			sight.append(at + open * out + side * across)
+	return {"mound": mound, "pad": pad, "sight": sight, "tree": at + open + side * 2}
 
 
 ## Each lair's ground before the trunks: the mound void, the pad and the
@@ -490,6 +502,10 @@ func _lair_grounds() -> void:
 			map.set_cell(cell, "void")
 		for cell: Vector2i in cells["pad"] + [lair["at"] as Vector2i]:
 			map.set_cell(cell, "dirt")
+			keep_clear[cell] = true
+		for cell: Vector2i in cells["sight"]:
+			if map.cell(cell) == "void" or map.cell(cell) == "grass":
+				map.set_cell(cell, "grass")
 			keep_clear[cell] = true
 		_clear(cells["tree"], "grass")
 

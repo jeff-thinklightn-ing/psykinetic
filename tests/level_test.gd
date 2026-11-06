@@ -2910,6 +2910,20 @@ func _test_boar_lair() -> void:
 	_check(clawed.size() == 1 and Vector2(clawed[0]["cell"] - at).length() <= 3.0
 		and not forest_floor.has(clawed[0]["cell"]) and bones.size() >= 2,
 		"a clawed tree (solid) and bones at the mouth, a sign of what lives there (%s, %d bones)" % [clawed, bones.size()])
+	# The sightline (the coordinator, terrain's still): out along the way in to
+	# 8 cells, 5 across past the first two rows, no trunk and no grown tree.
+	var sight_blocked: Array = []
+	for out in range(3, 9):
+		for across in range(-2 if out >= 5 else -1, (2 if out >= 5 else 1) + 1):
+			var cell := at + Vector2i(out, across)
+			if not forest_floor.has(cell):
+				sight_blocked.append(cell)
+	var grown: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/forest/trees.json"))
+	for tree: Dictionary in (grown as Dictionary).get("trees", []):
+		var spot := Vector2(float(tree["at"][0]), float(tree["at"][1]))
+		if spot.x >= at.x + 3 and spot.x < at.x + 9 and absf(spot.y - (at.y + 0.5)) < 2.5:
+			sight_blocked.append(spot)
+	_check(sight_blocked.is_empty(), "a clear sightline to the mouth across the pad, no tree in it (%s)" % [sight_blocked])
 
 ## The forest's camps (793, maps' side; forest phase C): seven, each a camp
 ## building with its place at its fire, 6 to 12 cells off a path and 24
