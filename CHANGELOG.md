@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The map of the known world shows under each area's name how many of its places you've found, and the character sheet no longer covers it (804 amended (13)).
 - Your companion's card shows her bond with you as a bar filling toward her next step, and her six needs as bars beneath it, each rising with a glow as it grows; and every window and tooltip now hides the world behind it (804 amended (12)).
 - Your companion fishes with you when she carries a rod: ask her, or cast beside her and she joins in; a fish landed together lifts her, and meets her wish to go fishing (805 amended (5)).
 - You hear a forest bandit camp before you see it, voices and rough laughter round its fire; clear it and only the fire crackles (795 amended (2)).

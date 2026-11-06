@@ -43,6 +43,10 @@ var holdings: Dictionary = {}
 ## "known_places"; empty means everything is drawn as known).
 var known_areas: Dictionary = {}
 var known_places: Dictionary = {}
+## The places reached of each known area (maps' "explored", 804; Main's
+## world_state, kept live by Wayfaring gains): area -> [have, need]; drawn
+## dim under the area's name (804 amended (13)), none where need is 0.
+var explored: Dictionary = {}
 ## The trade routes through known areas (decision 504; Main's world_state
 ## "trade"): [{id, from_area, to_area, areas, caravans: [{area, fraction}]}].
 var trade: Array = []
@@ -139,6 +143,7 @@ func set_world_state(state: Dictionary, here: Array[Dictionary]) -> void:
 	known_places.clear()
 	for id: Variant in state.get("known_places", []):
 		known_places[str(id)] = true
+	explored = (state.get("explored") as Dictionary).duplicate(true) if state.get("explored") is Dictionary else {}
 	trade = (state.get("trade", []) as Array).duplicate(true) if state.get("trade") is Array else []
 	guide = (state.get("guide") as Dictionary).duplicate(true) if state.get("guide") is Dictionary else {}
 	if not knows_way(_ask):
@@ -462,6 +467,15 @@ func ask_pending() -> String:
 
 
 ## Hovering a marked row: "Wren knows the way".
+## [param area_name]'s places reached, in voice's words: "7 of 23 places
+## found"; "" when the area has none to find (or none told).
+func found_words(area_name: String) -> String:
+	var count: Variant = explored.get(area_name)
+	if not count is Array or (count as Array).size() < 2 or int(count[1]) <= 0:
+		return ""
+	return "%d of %d places found" % [int(count[0]), int(count[1])]
+
+
 static func knows_words(name: String) -> String:
 	return "%s knows the way" % name
 
@@ -617,6 +631,10 @@ func _draw() -> void:
 		if knows_way(area_name):  # She knows the way to the area itself (551).
 			_mark_row(area_name, at, serif.get_string_size(area_words, HORIZONTAL_ALIGNMENT_LEFT, -1, int(heading * scale)).x, heading * scale, scale)
 		at.y += caption * 1.3 * scale
+		var found := found_words(area_name)
+		if not found.is_empty():
+			draw_string(sans, at, found, HORIZONTAL_ALIGNMENT_LEFT, rect.size.x - 36.0 * scale, int(caption * 0.85 * scale), UiTheme.color("text_dim"))
+			at.y += caption * 1.2 * scale
 		var places: Dictionary = area.get("places", {})
 		for key: String in places:
 			var place: Dictionary = places[key]

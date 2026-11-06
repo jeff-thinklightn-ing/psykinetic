@@ -14554,6 +14554,7 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "reward":
 		if gains != null:
 			gains.add(data)  # 804: a gain, shown.
+		_explored_gained(data)
 		return
 	if kind == "arts":
 		_practice_gained(data)  # 804: a peak risen is a Practice gain.
@@ -19735,6 +19736,22 @@ func open_world_map() -> void:
 		return
 	_refresh_world_map()
 	world_map_panel.open()
+
+
+## A Wayfaring gain's bar ({have, need}: the places reached in the zone the
+## player stands in, maps' 804 side) kept in world_state's "explored", so
+## the world map's count follows between world messages (804 amended (13)).
+func _explored_gained(data: Dictionary) -> void:
+	var bar: Variant = data.get("bar")
+	if str(data.get("track", "")) != "explore" or not bar is Dictionary or not (bar as Dictionary).has("need"):
+		return
+	var zone := zone_name_here()
+	if zone.is_empty():
+		return
+	if not world_state.get("explored") is Dictionary:
+		world_state["explored"] = {}
+	world_state["explored"][zone] = [int(bar.get("have", 0)), int(bar["need"])]
+	_refresh_world_map()
 
 
 func _refresh_world_map() -> void:

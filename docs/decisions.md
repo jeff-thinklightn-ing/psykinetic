@@ -43597,3 +43597,16 @@ window shows the world through it (the coordinator, from the card's still). ui_t
 _test_card_page: the bars from her body, a rise tweening and pulsing, a fall at once, a warmer
 step, no needs no section, the four bare headings. CHANGELOG (voice's words). Client only,
 protocol unchanged, no new class_name.
+
+804 amended (13) (ui, Landing B's second part; the coordinator's approval; voice's words;
+release's label): the places found on the known world. Under each known area's name the map
+(J, WorldMapPanel) says how many of its places the player has reached, in voice's words: "7 of
+23 places found" (WorldMapPanel.found_words), dim, from maps' "explored" {area: [have, need]}
+(804, maps' side; world_state, WorldMapPanel.explored); none where need is 0 or nothing is told.
+Between world messages a Wayfaring gain's bar ({have, need}, the zone the player stands in)
+moves that zone's count (Main._explored_gained). The character sheet is made the pack's next
+sibling (add_sibling), not the HUD's last child, so a window opened over the pack (the known
+world) covers it too; before, the sheet drew over the map. ui_test _test_world_map (the words,
+none at [0, 0], a gain's bar moving the count, another track's not) and _test_character_sheet
+(the sheet right after the pack). CHANGELOG (voice's words). Client only, protocol unchanged,
+no new class_name.

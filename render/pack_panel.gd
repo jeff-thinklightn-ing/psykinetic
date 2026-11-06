@@ -342,7 +342,7 @@ func _ready() -> void:
 	add_theme_stylebox_override("panel", solid_panel())
 	sheet = CharacterSheet.new()
 	sheet.build(self)
-	get_parent().add_child.call_deferred(sheet)
+	add_sibling.call_deferred(sheet)  # Drawn with the pack, under windows opened over it (the world map).
 	visibility_changed.connect(func() -> void:
 		if is_instance_valid(sheet):
 			sheet.visible = visible)

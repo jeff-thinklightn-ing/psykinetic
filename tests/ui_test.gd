@@ -1679,6 +1679,20 @@ func _test_world_map() -> void:
 		"party": [{"name": "Wren", "area": "castle", "kind": "companion"}]}, [{"name": "Tam", "area": panel.own_area, "kind": "player"}])
 	_check(panel.holdings.has("wilds/camp") and panel.known_areas.has("wilds") and panel.party.size() == 2,
 		"maps' world_state read: holdings, known, the party here and elsewhere")
+	# 804 amended (13): each known area's places found under its name, kept live by a Wayfaring gain.
+	panel.set_world_state({"explored": {"wilds": [7, 23], "castle": [0, 0]}}, [])
+	_check(panel.found_words("wilds") == "7 of 23 places found" and panel.found_words("castle") == "" and panel.found_words("barrow") == "",
+		"the places found under an area's name in voice's words; none where there is nothing to find or nothing told")
+	var explored_was: Variant = _main.world_state.get("explored")
+	_main._on_message("reward", {"track": "explore", "amount": 1, "of": "the shieling", "words": "the shieling", "bar": {"have": 8, "need": 23}})
+	_check(_main.world_state.get("explored", {}).get(_main.zone_name_here()) == [8, 23] and panel.found_words(_main.zone_name_here()) == "8 of 23 places found",
+		"a Wayfaring gain's bar moves the count of the area the player stands in (%s)" % [_main.world_state.get("explored")])
+	_main._on_message("reward", {"track": "deed", "amount": 1, "of": "x", "bar": {"have": 1, "need": 2}})
+	_check(_main.world_state.get("explored", {}).get(_main.zone_name_here()) == [8, 23], "another track's bar leaves it be")
+	if explored_was == null:
+		_main.world_state.erase("explored")
+	else:
+		_main.world_state["explored"] = explored_was
 	# The guide (551, ui's side): what she knows the way to, the marks' words, the ask box.
 	panel.set_world_state({"guide": {"companion": "Wren", "places": ["wilds/camp"], "areas": ["castle"]}}, [])
 	_check(panel.knows_way("wilds/camp") and panel.knows_way("castle") and not panel.knows_way("wilds/well") and not panel.knows_way(""),
@@ -2310,6 +2324,8 @@ func _test_character_sheet(pack: PackPanel) -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check(sheet.is_inside_tree() and sheet.visible == pack.visible, "the sheet shows with the pack (%s, %s)" % [sheet.visible, pack.visible])
+	_check(sheet.get_index() == pack.get_index() + 1 and sheet.get_parent() == pack.get_parent(),
+		"the sheet drawn right after the pack, so a window opened over the pack (the world map) covers it too")
 	_check(sheet.boxes.keys() == CharacterSheet.SLOT_PLACES.keys() and pack.box_in(true, Items.LEFT_HAND) == sheet.boxes[Items.LEFT_HAND]
 			and pack.box_in(true, Items.CHARM) == sheet.boxes[Items.CHARM]
 			and sheet.boxes[Items.RIGHT_HAND].position.x < sheet.boxes[Items.ARMOUR].position.x and sheet.boxes[Items.ARMOUR].position.x < sheet.boxes[Items.LEFT_HAND].position.x,
