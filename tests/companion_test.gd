@@ -117,6 +117,7 @@ func _ready() -> void:
 	_test_seated_boss()
 	_test_fallen_knight()
 	_test_truce()
+	_test_lying_cat()
 	_test_follow_without_backsteps()
 	_test_follow_a_creep()
 	_test_one_cell_door()
@@ -3760,6 +3761,33 @@ func _test_truce() -> void:
 	bandit.truce = false
 	_check(not Companion.harmless(bandit) and pet._hostile(bandit), "the truce broken: a foe again")
 	bandit.free()
+
+
+func _test_lying_cat() -> void:
+	print("\n== a cat lying up she points out to her player near it, and never springs (814, companions' side) ==")
+	_kill_monsters()
+	var pet := _companion()
+	_settle(pet)
+	var at := _free_tile_between(pet, 2, 3)
+	var cat := _main._spawn({"script": "res://tests/lying_cat_stub.gd", "shape": "capsule", "name": "TestCat%d" % World.tick, "tile": at}) as Monster
+	cat.sight_range = 0
+	_check(cat != null and Companion.harmless(cat) and not pet._hostile(cat), "lying up: no foe of hers")
+	var count := func() -> int:
+		var n := 0
+		for line: String in Companion.CAT_POINT:
+			n += pet._said.count(line)
+		return n
+	var before: int = count.call()
+	pet._point_out_cats()
+	_check(bool(cat.call("spotted_by", pet.keeper_id)) and count.call() == before + 1,
+		"her player near and not having seen it: she points it out, and it counts as spotted (%s)" % [pet._said.slice(-1)])
+	pet._point_out_cats()
+	_check(count.call() == before + 1, "once per cat per player")
+	cat.set("lies", false)
+	_check(not Companion.harmless(cat), "risen to crouch or fight: a foe")
+	World.despawn(cat)
+	_kill_monsters()
+	_settle(pet)
 
 
 func _test_dodge() -> void:

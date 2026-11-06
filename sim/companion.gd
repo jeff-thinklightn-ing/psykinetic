@@ -134,6 +134,11 @@ const MINE_FULL_LINE := "My pack's full of ore. I can't carry more."
 const APEX_BERTH := 6
 const APEX_WARN_AGAIN_TICKS := 3000
 const APEX_SEEN: Array[String] = ["A great bear. Let's give it room.", "That's a great bear. We leave it be.", "Big one. Keep wide of it."]
+## A hill cat lying up (814, companions' side; voice's words): what she says
+## pointing it out to her player, once they are within CAT_POINT_RANGE and
+## have not seen it themselves.
+const CAT_POINT: Array[String] = ["Cat up on that rise. Watching.", "Look there. There's a cat lying up on the bank.", "Easy. Hill cat, on the rise ahead."]
+const CAT_POINT_RANGE := 6
 const APEX_ASLEEP: Array[String] = ["It's asleep. Let's go round, quiet.", "Bear's sleeping. Don't wake it.", "Quiet now. Let it sleep."]
 const APEX_ORDERED: Array[String] = ["If you say so. Mind its paws.", "On your word, then. Stay off its front.", "Your call. Don't stand where it can reach."]
 const APEX_BREAK: Array[String] = ["Back. We can't take it like this.", "Pull back, now. Not like this.", "Leave it. We're done if we stay."]
@@ -2934,6 +2939,8 @@ static func harmless(entity: GridEntity) -> bool:
 		return true
 	if entity is Monster and entity.has_method("in_truce") and bool(entity.call("in_truce")):
 		return true
+	if entity.has_method("lying") and bool(entity.call("lying")):
+		return true  # A cat lying up (814): sprung only when it crouches or fights, never by her.
 	var animal := entity as Animal
 	if animal == null:
 		return false
@@ -5059,6 +5066,7 @@ func _act() -> void:
 	else:
 		_choose(foe, low)
 	_apex_after_choose()
+	_point_out_cats()
 	asleep = current_intent == Intent.SLEEP
 	if current_intent != before or intent_target != before_target:
 		print("[mind] %s: %s%s (%s)" % [name, intent_name(),
@@ -6778,6 +6786,26 @@ func _apex_after_choose() -> void:
 			and _calm_apex(tile, APEX_BERTH - 1) != null:
 		current_intent = Intent.AVOID
 		intent_target = null
+
+
+## A creature lying up to spring (814, enemy-ai's cat.lying(), spotted_by
+## and mark_spotted; never naming its class): one she sees, lying, within
+## CAT_POINT_RANGE of her player and not yet seen by them, she points out
+## (CAT_POINT) and it counts as spotted by them, the same path as their own
+## sighting. Once per cat per player: spotted_by keeps it.
+func _point_out_cats() -> void:
+	if keeper_id.is_empty() or not _alive(keeper) or World.is_downed(keeper):
+		return
+	for entity in World.entities():
+		if not entity.has_method("lying") or not entity.has_method("spotted_by") or not entity.has_method("mark_spotted") \
+				or not entity.spawned or entity.zone != zone or not bool(entity.call("lying")) \
+				or bool(entity.call("spotted_by", keeper_id)) or World.distance(keeper.tile, entity.tile) > CAT_POINT_RANGE \
+				or not senses.sees(entity):
+			continue
+		_say(CAT_POINT[World.tick % CAT_POINT.size()], true)
+		_narrate("You point out %s to %s, lying up on a rise, watching." % [refer(entity), keeper_name()])
+		entity.call("mark_spotted", keeper_id)
+		return  # One at a time.
 
 
 static func _hp_over(entity: GridEntity, fraction: float) -> bool:
