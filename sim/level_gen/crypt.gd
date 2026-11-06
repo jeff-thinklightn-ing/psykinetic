@@ -170,6 +170,7 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	_furnish(map, anchors, config, rng, plan)
 	_torches(map, anchors, brush, plan)
 	_monsters(map, anchors, config, rng, plan)
+	_guard_rows(map, plan, nodes[entrance]["centre"])
 	_laid_rooms(given, plan)
 	map.extras["rows"] = {"decor": plan["decor"], "entities": plan["entities"], "buildings": plan["buildings"],
 		"niches": plan["niches"], "carvings": plan["carvings"], "laid_rooms": plan["laid_rooms"], "plates": plan["plates"],
@@ -1102,6 +1103,44 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 				var rect: Rect2i = anchor["rect"]
 				spots = Labyrinth._nearest_first(rect.position + rect.size / 2, spots)
 		Labyrinth._lay(map, anchors, "monster_" + kind, int(left[kind]), spots, int(apart.get(kind, 0)))
+
+
+## Each chest's guard stays at it (806 amended (5); playtest's tour found
+## the camp's brute laid 2 cells from the robbers' chest and gone 30 s on):
+## the nearest living monster within GUARD_HOLD cells of each chest marker,
+## the template's and the generation's, gets an entities row idling
+## "guard", facing the first step of its walk to [param way_in] (who comes
+## for the chest comes that way), so it keeps its post (Idle.GUARD) instead
+## of its kind's default. Never the dead (enemy-ai): a skeleton idles
+## homeward to its niche (547), the draugr sits; the dead near a chest are
+## guard enough.
+const GUARD_HOLD := 4
+const DEAD: Array[String] = ["monster_skeleton", "monster_draugr"]
+static func _guard_rows(map: LevelMap, plan: Dictionary, way_in: Vector2i) -> void:
+	var chests: Array[Vector2i] = []
+	var monsters: Array[Vector2i] = []
+	for cell: Vector2i in Tools.sorted_cells(map.cells):
+		if map.cells[cell] == "chest":
+			chests.append(cell)
+		elif str(map.cells[cell]).begins_with("monster_") and map.cells[cell] not in DEAD:
+			monsters.append(cell)
+	var held := {}
+	for chest in chests:
+		var best := Vector2i(-1, -1)
+		for cell in monsters:
+			if held.has(cell) or Tools.distance(cell, chest) > GUARD_HOLD:
+				continue
+			if best.x < 0 or Tools.distance(cell, chest) < Tools.distance(best, chest):
+				best = cell
+		if best.x < 0:
+			continue
+		held[best] = true
+		var row := {"at": [best.x, best.y], "idle": {"mode": "guard"}}
+		var walk := Labyrinth._path_to(map, best, way_in)
+		if not walk.is_empty():
+			var step: Vector2i = walk[0] - best
+			row["facing"] = [signi(step.x), signi(step.y)]
+		plan["entities"].append(row)
 
 
 ## The rooms named for the checker: every room laid {id, use, cells}, and

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, the robbers and Brand stay over the chests they're robbing, where before they wandered off from them (806 amended (5)).
 - When you or your companion fish, the cast whips out from over the shoulder, the rod tip tugs down at a bite, and it sweeps up with a catch or sags when one gets away (805 amended (6)).
 - Fishing: buy a rod from Rolf at the stall for 3 gold, cast it into a pond and wait for the bite to pull in a perch, then cook it over a fire, sell it or hand it in (805 amended (3)).
 - The map of the known world shows under each area's name how many of its places you've found, and the character sheet no longer covers it (804 amended (13)).

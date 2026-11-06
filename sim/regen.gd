@@ -182,6 +182,27 @@ static func generate(level_name: String, generation: int) -> Dictionary:
 ## markers on [param map], in cell order, given the next id as a level
 ## entity entry {at, named} (Level.parse puts it on the spawn), the rest
 ## left plain. [] without a band.
+## [param rows] with every two rows on one cell made one (806 amended (5):
+## a band's "named" row and the generator's "idle" row for the same
+## marker; Level keeps one row a cell, the last).
+static func merged_rows(rows: Array) -> Array:
+	var out: Array = []
+	var by_cell := {}
+	for row: Variant in rows:
+		if not row is Dictionary or not (row as Dictionary).get("at") is Array:
+			out.append(row)
+			continue
+		var at: Array = row["at"]
+		var key := Vector2i(int(at[0]), int(at[1]))
+		if by_cell.has(key):
+			(by_cell[key] as Dictionary).merge(row)
+			continue
+		var copy := (row as Dictionary).duplicate()
+		by_cell[key] = copy
+		out.append(copy)
+	return out
+
+
 static func band_of(map: LevelMap, config: Dictionary) -> Array:
 	var out: Array = []
 	var band: Variant = config.get("band", {})
@@ -297,6 +318,8 @@ static func generate_prepared(prepared: Dictionary, generation: int) -> Dictiona
 					(generated[section] as Array).append_array(rows[section])
 				else:
 					generated[section] = rows[section]
+		if generated.get("entities") is Array:
+			generated["entities"] = merged_rows(generated["entities"])
 		var result := {"layout": map.to_image(), "height": height, "config": generated, "seed": seed, "tries": attempt + 1, "anchors": anchors}
 		# 806: a level whose block lists "held" rules takes the first try
 		# with none of those faults, else the try with the fewest.

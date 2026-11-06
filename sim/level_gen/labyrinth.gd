@@ -1694,6 +1694,10 @@ static func _hold_guards(map: LevelMap, anchors: Array, room: Dictionary, kind: 
 			continue
 		map.set_cell(cell, "monster_" + kind)
 		var row := {"at": [cell.x, cell.y], "idle": idle.duplicate()}
+		# A chest in a room of wanderers (the pillared hall's, enemy-ai): the
+		# first stands guard beside it, facing the way in; the rest wander.
+		if laid == 0 and room.has("chest") and str(idle.get("mode", "")) == "wander":
+			row["idle"] = {"mode": "guard"}
 		var off := door - cell
 		if off != Vector2i.ZERO:
 			var face := Vector2i(signi(off.x), 0) if absi(off.x) >= absi(off.y) else Vector2i(0, signi(off.y))

@@ -3766,6 +3766,20 @@ func _test_barrow_level() -> void:
 		and not made_deep.is_empty() and Regen.connected(LevelMap.from_image(made_deep["layout"], made_deep["config"]), made_deep["anchors"]),
 		"a generation of each depth is laid and joins every anchor (%d and %d tries)" % [made.get("tries", 0), made_deep.get("tries", 0)])
 	var gen_barrow := Level.parse(made["layout"], made["height"], made["config"])
+	# 806 amended (5): each chest's guard holds its post (Idle.GUARD), the
+	# robbers' chest's (Brand, named and guarding) among them.
+	var posts: Array[Vector2i] = []
+	var brand_guards := false
+	for spec: Dictionary in gen_barrow["entities"]:
+		if (spec.get("idle", {}) as Dictionary).get("mode", "") == "guard":
+			posts.append(spec["tile"])
+			brand_guards = brand_guards or spec.get("named", "") == "brand"
+	var loose: Array = []
+	for spec: Dictionary in gen_barrow["entities"]:
+		if str(spec.get("script", "")) == Level.CHEST and (spec.get("props", {}) as Dictionary).has("cache") 				and not posts.any(func(p: Vector2i) -> bool: return _cells_apart(p, spec["tile"]) <= 4):
+			loose.append(spec["tile"])
+	_check(loose.is_empty() and posts.size() >= 3 and brand_guards,
+		"the barrow's chests each with a guard holding its post within 4 cells, Brand at the robbers' chest (%d posts, loose %s)" % [posts.size(), loose])
 	var gen_deep := Level.parse(made_deep["layout"], made_deep["height"], made_deep["config"])
 	# The crypt's (806 amended): the First Hall's table, and each tomb's
 	# sarcophagi and the chapel's bier the generation lays, all solid.
@@ -4579,6 +4593,16 @@ func _test_castle_hold() -> void:
 			tables[str(props["cache"])] = true
 			if not monsters.any(func(m: Vector2i) -> bool: return maxi(absi(m.x - at.x), absi(m.y - at.y)) <= 3):
 				unguarded.append(at)
+		# 806 amended (5): every cache chest has a guard on its post within 3.
+		var posts: Array[Vector2i] = []
+		for row: Dictionary in config.get("entities", []):
+			if (row.get("idle", {}) as Dictionary).get("mode", "") == "guard":
+				posts.append(Vector2i(int(row["at"][0]), int(row["at"][1])))
+		for entity: Dictionary in config.get("entities", []):
+			if (entity.get("props", {}) as Dictionary).has("cache"):
+				var spot := Vector2i(int(entity["at"][0]), int(entity["at"][1]))
+				if not posts.any(func(p: Vector2i) -> bool: return _cells_apart(p, spot) <= 3):
+					unguarded.append(spot)
 		_check(unguarded.is_empty() and tables.has("armoury") and tables.has("castle_cache"),
 				"castle_halls generation %d: each find guarded, the armoury's chest its own table (%s; unguarded %s)" % [generation, tables.keys(), unguarded])
 		# The refuge's approach: a monster within two cells of the walk's
