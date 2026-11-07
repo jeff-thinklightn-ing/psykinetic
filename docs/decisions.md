@@ -43432,6 +43432,29 @@ _camp so a restock due refills it first (npc's up to per raw and the all-or-noth
 camp_buy, which still pays); camp_traders.buys gains the hill cat's pelt (the coordinator's ask; 17
 gold, so a fresh purse of 30 takes one); the wolves' cave drops plain hide, already bought.
 economy_test _test_camp_traders. Server only, protocol unchanged, no new class_name, no bullet.
+## 799 amended (2), npc's side: the camp trader buys your raws through Sell
+
+2026-11-06, the coordinator's approval of npc's design, release's label. At an open forest camp, or
+one held by a hostile side for its toll, the trader buys the raws economy lists (camp_traders.buys:
+hide, tusks, meat, feathers, antlers, bear_claw, and economy's hill_cat_pelt) through the trading
+window's Sell. His own wares stay the "offers" list they were (799). The barter command's "resident"
+branch names him (his worker_id Offers.CAMP_TRADER + his place) and goes its own way:
+Main._send_camp_barter answers "barter" as a maker's has it, "resident" his path, no "goods" (his
+wares are minted only as bought), "buys" from Main._camp_buys (each raw in the pack he takes at
+Economy.camp_offer, value x 0.85, up_to as many as his purse covers, Economy.camp_purse read through
+a due restock; none his purse can't pay one of), the pack and their gold. A "trade" with him
+(Main._camp_bought) is all or nothing: every thing given a raw he buys, no starter gear, no grave
+goods (only the fence), and the whole within his purse, else a why in economy's words ("wont",
+"purse"); then Economy.camp_buy pays for each kind and World.consume ends the things (he carries
+them off: no town's store is banked, as no town's treasury is in his purse), and he says
+camp_traders.say "bought" with what he paid. He buys at the same price at a toll camp (the toll is on
+what he sells) and gives a freer no better offer (the freer's price is on what he sells). Held
+captive he trades nothing: no "buys", the why his "held" word (townsfolk.json "camp"). Before
+economy's camp_purse lands his purse reads unbounded behind has_method and camp_buy's own "purse"
+refusal stands. ui's side: the client's Main._barters opens his window ("Resident_camp_"), Sell
+squares from "buys" beside his Buy list. resident_test _test_camp_sell. No new message kind ("barter"
+and "trade" already name a resident), no new class_name.
+
 ## 811. Umbrage's tavern as its own zone: the Last Light Mughouse
 
 The tavern zone (2026-11-05, buildings; the coordinator's approved design,

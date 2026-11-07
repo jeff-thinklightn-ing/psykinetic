@@ -13686,6 +13686,14 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			if not threat.is_empty():
 				_threat_told(entity as Player, body.person if not body.person.is_empty() else "The %s" % body.trade, threat)  # Shut (762).
 				return
+			if body.worker_id.begins_with(Offers.CAMP_TRADER):
+				# A camp's trader buys raws through Sell (799 amended (2), npc's side): his own barter.
+				var camp_why := "" if World.in_person(entity, body) else "too far away"
+				if command_name == "trade" and camp_why.is_empty():
+					var sold: Variant = args.get("give", [])
+					camp_why = _camp_bought(entity as Player, body, sold if sold is Array else [])
+				_send_camp_barter(entity as Player, body, camp_why)
+				return
 			maker = body.worker_id
 			shop = body
 			why = "" if World.in_person(entity, body) else "too far away"  # In person (562 amended (5)): reaches() is slots'.
@@ -18922,6 +18930,106 @@ func _camp_sells(player: Player, body: Resident, item: String) -> void:
 	var say := str(done.get("say", ""))
 	if not say.is_empty():
 		_resident_says(body, say, "", player)
+
+
+## What camp [param camp]'s trader pays for each of [param ids] (a player's
+## things; 799 amended (2), npc's side): id -> {gold: Economy.camp_offer,
+## up_to: as many as his purse (Economy.camp_purse) covers}; only the raws
+## he buys (camp_traders.buys), none his purse can't pay one of.
+func _camp_buys(camp: String, ids: Array) -> Dictionary:
+	var out := {}
+	if World.economy == null or not World.economy.has_method("camp_offer"):
+		return out
+	var purse := _camp_purse(camp)
+	for raw: Variant in ids:
+		var id := str(raw)
+		var each := int(World.economy.camp_offer(id)) if not id.is_empty() else 0
+		if each <= 0 or out.has(id) or purse < each:
+			continue
+		out[id] = {"gold": each, "up_to": purse / each}
+	return out
+
+
+## Camp [param camp]'s trader's purse now (Economy.camp_purse, a due
+## restock first); before economy's read lands, unbounded (camp_buy's own
+## "purse" refusal stands behind it).
+func _camp_purse(camp: String) -> int:
+	if World.economy == null or not World.economy.has_method("camp_purse"):
+		return 1 << 30
+	return int(World.economy.camp_purse(camp, _camp_mix(camp)))
+
+
+## Server: camp trader [param body]'s barter for [param player] (799 amended
+## (2), npc's side), the "barter" a maker's has: "resident" his path, no
+## "goods" (his wares are his "offers", minted as bought), "buys" for the
+## raws in their pack he takes (_camp_buys), their "pack" and "gold".
+## Held captive: no buys, the why his "held" word (townsfolk.json "camp").
+## Open with something he'd buy but his purse empty: economy's "purse" word.
+func _send_camp_barter(player: Player, body: Resident, why := "") -> void:
+	var camp := _camp_of(body.camp_trader)
+	var data := {"shop": "", "resident": str(body.get_path()), "town": camp, "gold": World.gold_of(player.player_id), "goods": [],
+		"buys": {}, "fenced": {}, "pack": _pack_rows(player), "why": why, "fence": ""}
+	if camp.is_empty() or _camp_captive(camp):
+		var held: Array = Townsfolk.rules().get("camp", {}).get("held", [])
+		if why.is_empty() and not held.is_empty():
+			data["why"] = str(held[absi(hash(body.worker_id + player.player_id)) % held.size()])
+	else:
+		data["buys"] = _camp_buys(camp, Array(player.slots))
+		if why.is_empty() and (data["buys"] as Dictionary).is_empty() and World.economy != null and World.economy.has_method("camp_offer") \
+				and Array(player.slots).any(func(id: Variant) -> bool: return int(World.economy.camp_offer(str(id))) > 0):
+			data["why"] = str(World.economy.camp_rule().get("say", {}).get("purse", "I've no coin left for that."))
+	Net.message_to(player.owner_peer, "barter", data)
+
+
+## [param player] sells [param give] (uids from their pack) to camp trader
+## [param body] (799 amended (2), npc's side): all or nothing, each a raw he
+## buys (Economy.camp_offer), none starter gear or grave goods, the whole
+## within his purse; then Economy.camp_buy for each kind pays and the things
+## leave the world (World.consume: he carries them off), and he says what he
+## paid (camp_traders.say "bought"). The why, "" when sold.
+func _camp_bought(player: Player, body: Resident, give: Array) -> String:
+	var camp := _camp_of(body.camp_trader)
+	if camp.is_empty() or _camp_captive(camp) or World.economy == null or not World.economy.has_method("camp_buy"):
+		return "nobody to trade with here"
+	if give.is_empty():
+		return "nothing to trade"
+	var words: Dictionary = World.economy.camp_rule().get("say", {})
+	var by_id := {}
+	var seen: Array[int] = []
+	for raw: Variant in give:
+		var uid := int(raw)
+		var slot := World.slot_of_unit(player, uid)
+		if uid == 0 or slot < 0 or uid in seen:
+			return "that is no longer in your pack"
+		if World.is_starter(uid):
+			return World.STARTER_REFUSED
+		if World.items.is_grave(uid):
+			return Economy.fence_refuses("")  # Only the fence buys grave goods (586).
+		seen.append(uid)
+		var id := str(player.slots[slot])
+		if int(World.economy.camp_offer(id)) <= 0:
+			return str(words.get("wont", "I've no use for that."))
+		var uids: Array = by_id.get(id, [])
+		uids.append(uid)
+		by_id[id] = uids
+	var total := 0
+	for id: String in by_id:
+		total += int(World.economy.camp_offer(id)) * (by_id[id] as Array).size()
+	if total > _camp_purse(camp):
+		return str(words.get("purse", "I've no coin left for that."))
+	var paid := 0
+	var mix := _camp_mix(camp)
+	for id: String in by_id:
+		var uids: Array = by_id[id]
+		var done: Dictionary = World.economy.camp_buy(camp, mix, player.player_id, id, uids.size())
+		for i in int(done.get("count", 0)):
+			World.consume(player, int(uids[i]), "sold to a camp trader")
+		paid += int(done.get("gold", 0))
+		if not bool(done.get("ok", false)):
+			return str(done.get("say", words.get("purse", "I've no coin left for that.")))
+	var line := str(words.get("bought", "There's %d gold for it."))
+	_resident_says(body, line % paid if line.contains("%d") else line, "", player)
+	return ""
 
 
 ## A camp's trader greeted (799, npc's side): a line by how his camp stands

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The forest's camp traders buy from you now too, through Sell in the trading window: hides and pelts, tusks, antlers, claws, feathers and meat, as far as a purse that fills again every few days will stretch (799 amended (2)).
 - Fights stand at a weapon's length now: you and your companion stop a step off a foe instead of chest to chest, and a sword reaches a little farther than a fist or a dagger, a hammer or a pick farther still, and the big axes and the sledge farthest (699 amended).
 - In town after dusk, a lit house's windows glow a warm amber, softer toward the edges and crossed by dark glazing bars, where before each was a flat cream square.
 - Your pack, and your companion's, has twelve slots now, three rows of four, where before it had eight (819).

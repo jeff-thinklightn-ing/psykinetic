@@ -5322,6 +5322,66 @@ func _test_relic() -> void:
 	voice.free()
 
 
+## The camp trader buys raws through Sell (799 amended (2), npc's side): a
+## hide sold at camp_offer and gone from the pack, his purse the less; a
+## thing he doesn't buy refused, nothing moved; past his purse refused;
+## held captive no barter. [param body] the open camp [param camp]'s trader,
+## [param held_spec] the captive's.
+func _test_camp_sell(player: Player, body: Resident, held_spec: Dictionary, camp: String) -> void:
+	print("\n== the camp trader buys your raws through Sell (799 amended (2), npc's side) ==")
+	if body == null or World.economy == null or not World.economy.has_method("camp_buy"):
+		_check(false, "(an open camp's trader and economy's camp_buy)")
+		return
+	var give := func(id: String) -> int:
+		var minted := World.items.mint(id, "made", "a test", World.zone.name, player.tile)
+		var slot := World.room_for(player, minted)
+		return minted if slot >= 0 and World.put_item(player, player, slot, minted) else 0
+	var each := int(World.economy.camp_offer("hide"))
+	var buys: Dictionary = _main._camp_buys(camp, ["hide", "bandaging_kit"])
+	_check(buys.has("hide") and int(buys["hide"]["gold"]) == each and each > 0 and not buys.has("bandaging_kit"),
+		"his Sell squares: the raws he buys at camp_offer (%s)" % [buys])
+	var hide: int = give.call("hide")
+	var purse_before := int(_main._camp_purse(camp))
+	var gold_before := World.gold_of(player.player_id)
+	var why: String = _main._camp_bought(player, body, [hide])
+	_check(why.is_empty() and World.gold_of(player.player_id) == gold_before + each and World.slot_of_unit(player, hide) < 0,
+		"a hide sold: %d gold paid, the hide gone with him (%s)" % [each, why])
+	if World.economy.has_method("camp_purse"):
+		_check(int(_main._camp_purse(camp)) == purse_before - each, "his purse the less by it")
+		var pelt_each := int(World.economy.camp_offer("hill_cat_pelt"))
+		var pelt: int = give.call("hill_cat_pelt")
+		var purse_pelt := int(_main._camp_purse(camp))
+		var gold_pelt := World.gold_of(player.player_id)
+		why = _main._camp_bought(player, body, [pelt])
+		_check(pelt_each == 17 and why.is_empty() and World.gold_of(player.player_id) == gold_pelt + pelt_each
+			and int(_main._camp_purse(camp)) == purse_pelt - pelt_each and World.slot_of_unit(player, pelt) < 0,
+			"a hill cat's pelt sold: %d gold, his purse %d to %d (%s)" % [pelt_each, purse_pelt, int(_main._camp_purse(camp)), why])
+	var kit: int = give.call("bandaging_kit")
+	var gold_kit := World.gold_of(player.player_id)
+	why = _main._camp_bought(player, body, [kit])
+	_check(not why.is_empty() and World.slot_of_unit(player, kit) >= 0 and World.gold_of(player.player_id) == gold_kit,
+		"a thing he doesn't buy: refused, nothing moved (%s)" % why)
+	if kit != 0:
+		World.consume(player, kit, "test")
+	if World.economy.has_method("camp_purse"):
+		var many: Array = []
+		for i in int(_main._camp_purse(camp)) / maxi(each, 1) + 1:
+			var more: int = give.call("hide")
+			if more != 0:
+				many.append(more)
+		var gold_many := World.gold_of(player.player_id)
+		why = _main._camp_bought(player, body, many)
+		_check(not many.is_empty() and not why.is_empty() and World.gold_of(player.player_id) == gold_many and World.slot_of_unit(player, int(many[0])) >= 0,
+			"past his purse: refused, nothing moved (%s)" % why)
+		for uid: Variant in many:
+			World.consume(player, int(uid), "test")
+	var held := _main._spawn_resident(held_spec) as Resident
+	_check(held != null and _main._camp_bought(player, held, [1]) == "nobody to trade with here",
+		"held captive: he buys nothing")
+	if held != null:
+		World.despawn(held)
+
+
 ## The forest camps' traders (799, npc's side): in the test town, an open
 ## camp "tc" (its trader by the fire by day, his bedroll his bed, the camp
 ## his ground; behind his cart while a fight is near), a captive's camp "tk"
@@ -5380,6 +5440,7 @@ func _test_camp_traders() -> void:
 	var body := _main._spawn_resident(wanted[open_key]) as Resident
 	_check(body != null and body.camp_trader == tc + "_trader" and Main.answers_clicks_only(body), "his body: camp_trader set (never a monster's foe), clicks only")
 	_check(Offers.of(held_key, Net.player_id).is_empty(), "held: no wares")
+	_test_camp_sell(player, body, wanted[held_key], tc)
 	# A fight near: behind his cart, out of the camp, away from the fire.
 	_main._camp_carts[World.zone.name] = [Vector2i(20, 11)]
 	var raider := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "name": "CampRaider%d" % World.tick, "tile": _main._nearest_free(Vector2i(16, 13))}) as Monster
