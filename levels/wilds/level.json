@@ -671,7 +671,7 @@
 			],
 			"kind": "fishing",
 			"holder": "nobody",
-			"radius": 3,
+			"radius": 6,
 			"name": "the pond"
 		},
 		"square_fire": {

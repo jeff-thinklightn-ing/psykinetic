@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_tomb()
 	_test_companion_verb()
 	_test_fishing()
+	_test_reed_pond_cells()
 	_test_notice()
 	_test_deeds()
 	_test_game_and_watch()
@@ -1825,6 +1826,45 @@ func _test_tomb() -> void:
 		"a tomb opened with her on a plate: a fact of her card and a deed of her bond")
 	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
 	_settle(pet)
+
+
+## The Reed Pond as built (Jeff, v0.1.207: "neither pond works for fishing but wren says
+## she'll lead to the pond"; its place now radius 6, it was 3 and missed 7 of 16 water cells):
+## every cell of its water, and every dry cell within FISH_REACH of it that she
+## or her player could fish from, is its fishing place's (pond_at's covers).
+func _test_reed_pond_cells() -> void:
+	print("
+== the Reed Pond: all its water and bank are its fishing place's (Jeff's live bug) ==")
+	var id := "wilds/reed_pond"
+	var level := Level.load_level("wilds")
+	var water: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in level["terrain"].get("water", []):
+		if (cell - Vector2i(32, 118)).length_squared() <= 36:
+			water[cell] = true
+	var dry: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		dry[cell] = true
+	for cell: Vector2i in level["terrain"].get("solid", []):
+		dry.erase(cell)
+	var open_water: Array[Vector2i] = []
+	var open_bank: Array[Vector2i] = []
+	if World.holdings._places.has(id):
+		for cell: Vector2i in water:
+			if not World.holdings.covers(id, cell):
+				open_water.append(cell)
+		for cell: Vector2i in dry:
+			if water.has(cell):
+				continue
+			var reach := false
+			var counted := World.holdings.covers(id, cell)
+			for each: Vector2i in water:
+				if maxi(absi(each.x - cell.x), absi(each.y - cell.y)) <= World.FISH_REACH:
+					reach = true
+					counted = counted or World.holdings.covers(id, each)
+			if reach and not counted:
+				open_bank.append(cell)
+	_check(World.holdings._places.has(id) and water.size() > 4 and open_water.is_empty() and open_bank.is_empty(),
+		"%d water cells; outside the place: water %s, bank %s" % [water.size(), open_water, open_bank])
 
 
 func _test_fishing() -> void:
