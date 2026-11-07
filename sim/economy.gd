@@ -3109,6 +3109,13 @@ func camp_sale(camp: String, mix: String, player_id: String, item: String, toll 
 	return {"ok": true, "price": cost, "say": str(words.get("sold", "Yours, for %d.")) % cost, "why": ""}
 
 
+## [param camp]'s trader's purse now (npc's Sell: each raw's up to and an
+## all-or-nothing check before camp_buy): read through _camp, so a restock
+## due refills it first. camp_buy is still the one that pays.
+func camp_purse(camp: String, mix: String) -> int:
+	return int(_camp(camp, mix)["purse"])
+
+
 ## What [param camp]'s trader pays for one [param item], or 0 where he
 ## doesn't buy it (not in camp_traders.buys): its value x buy (0.85), 1
 ## at least.

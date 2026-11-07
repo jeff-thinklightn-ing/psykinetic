@@ -102,7 +102,7 @@
 			"pilgrim": {"weight": 1, "needs": "temple", "offering": [2, 5], "names": ["Brother Anselm", "Sister Wyn", "Cuthbert", "Ide"]}}},
 	"camp_traders": {"_": "Decision 799, economy's side (npc's design; maps' forest camps): a camp's trader, outside every town (no store, treasury, tax or regard), keyed by the camp's place id, the mix its place's. His stock is draw (a range) lines of mixes[mix].wares by weight, drawn again every restock_days game days, when his purse is set back to purse. He sells at an item's value x sell, x toll where the camp's holders take a cut (C7), x freer for the player who freed him; buys the things in buys at value x buy while his purse lasts. gift: the freed trader's thanks (C3), his dearest ware worth at most gift_most. say: his words (voice's). Gold he takes leaves the world; gold he pays comes from outside it.",
 		"restock_days": 3, "purse": 30, "sell": 1.15, "toll": 1.5, "freer": 0.8, "buy": 0.85, "gift_most": 12,
-		"buys": ["hide", "tusks", "meat", "feathers", "antlers", "bear_claw"],
+		"buys": ["hide", "tusks", "meat", "feathers", "antlers", "bear_claw", "hill_cat_pelt"],
 		"say": {"sold": "Yours, for %d.", "short": "That's %d gold, friend.", "none": "I've none of that.", "bought": "There's %d gold for it.", "purse": "I've no coin left for that.", "wont": "I've no use for that."},
 		"mixes": {
 			"trader": {"draw": [5, 6], "wares": [{"item": "arrows", "count": 3, "weight": 3}, {"item": "bandaging_kit", "count": 2, "weight": 3}, {"item": "remedy", "count": 2, "weight": 2},

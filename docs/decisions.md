@@ -43267,6 +43267,13 @@ no foe of hers, nor a danger to a lead, behind a has_method guard: on guard
 she lets the band be. A quarry her player set her on still counts, and once
 the truce breaks the band are foes again. companion_test _test_truce.
 Server only, protocol unchanged, no new class_name, no bullet.
+
+799 amended (2), economy's side (2026-11-06, release's label; npc's camp Sell, the coordinator's approval;
+lands off, its package the camp Sell): Economy.camp_purse(camp, mix), his purse now, read through
+_camp so a restock due refills it first (npc's up to per raw and the all-or-nothing check before
+camp_buy, which still pays); camp_traders.buys gains the hill cat's pelt (the coordinator's ask; 17
+gold, so a fresh purse of 30 takes one); the wolves' cave drops plain hide, already bought.
+economy_test _test_camp_traders. Server only, protocol unchanged, no new class_name, no bullet.
 ## 811. Umbrage's tavern as its own zone: the Last Light Mughouse
 
 The tavern zone (2026-11-05, buildings; the coordinator's approved design,

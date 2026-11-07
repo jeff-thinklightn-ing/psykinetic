@@ -239,11 +239,16 @@ func _test_camp_traders() -> void:
 		"20 hides at 3: his 30 gold takes 10 (%s)" % [hides])
 	var broke := economy.camp_buy(CAMP, "trader", "p1", "feathers", 1)
 	_check(not broke["ok"] and broke["why"] == "purse", "his purse empty: refused")
+	_check(economy.camp_purse(CAMP, "trader") == 0, "npc's read: his purse at 0")
 
 	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, economy.rules, economy.catalog)
 	_check(again.camp_stock(CAMP, "trader") == economy.camp_stock(CAMP, "trader") and not again.camp_buy(CAMP, "trader", "p1", "meat", 1)["ok"],
 		"saved and loaded: the same stock, his purse still empty")
 	_now += 3 * DayNight.day_steps
+	_check(economy.camp_purse(CAMP, "trader") == 30, "three days on: the read restocks first, his purse 30 (%d)" % economy.camp_purse(CAMP, "trader"))
+	var pelt := economy.camp_buy(CAMP, "trader", "p1", "hill_cat_pelt", 1)
+	_check(pelt["ok"] and int(pelt["gold"]) == 17 and economy.camp_purse(CAMP, "trader") == 13,
+		"the hill cat's pelt: 17 gold, his purse 13 after (%s)" % [pelt])
 	_check(economy.camp_buy(CAMP, "trader", "p1", "meat", 1)["ok"], "three days on: restocked, his purse full again")
 
 	var gift := economy.camp_gift(CAMP, "trader")
