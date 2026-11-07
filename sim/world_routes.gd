@@ -93,20 +93,9 @@ var _make_fields := true
 class Shared:
 	## Set when the routes are freed: the tasks stop at their next portal.
 	var stopping := false
-	## Guards the layers' version, ready and fields, build_ms, the queue,
-	## the workers' count and the boot log's.
+	## Guards the layers' version, ready and fields, and build_ms.
 	var mutex := Mutex.new()
 	var build_ms: Dictionary[String, float] = {}
-	## Jobs' entries ({layer, name, version, portals, area, obstacles}) not
-	## yet taken, first come first made: the open layer's first.
-	var queue: Array[Dictionary] = []
-	## How many pool tasks are taking from the queue.
-	var workers := 0
-	## When the routes were made, and the layers whose first fields are all
-	## in (the boot line, once each).
-	var started_usec := Time.get_ticks_usec()
-	var logged: Dictionary[String, bool] = {}
-	var log_ready := false
 
 
 ## One faction's routes: its graph, its obstacles, its fields.
@@ -207,14 +196,6 @@ func set_obstacles(faction: String, area_name: String, cells: Dictionary) -> voi
 	_start([_job(layer, area_name)])
 
 
-## Logs a line as each layer's first fields are all in (the server's
-## routes: release reads the box's boot from it). Counts only.
-func log_layers_ready() -> void:
-	_mutex.lock()
-	_shared.log_ready = true
-	_mutex.unlock()
-
-
 ## Whether these routes make distance fields at all (some are made
 ## without: their walks are always the way they are).
 func makes_fields() -> bool:
@@ -271,52 +252,16 @@ func _job(layer: Layer, area_name: String) -> Dictionary:
 		"area": _copies[area_name], "obstacles": layer.obstacles[area_name].duplicate()}
 
 
-## Queues [param job]'s entries (a layer's area each) and starts pool tasks
-## to take them, up to tasks_most() at once: the box's 32 threads made the
-## four layers one after another in one task (55 s at boot with 793's
-## bandits), and all of them at once would crowd the tick and the voice
-## calls off the pool.
 func _start(job: Array[Dictionary]) -> void:
 	if job.is_empty() or not _make_fields:
 		return
 	_reap()
-	if not _threaded:
-		_make(_shared, job)
-		return
-	var more := 0
-	_mutex.lock()
-	_shared.queue.append_array(job)
-	more = mini(tasks_most(), _shared.queue.size() + _shared.workers) - _shared.workers
-	_shared.workers += maxi(more, 0)
-	_mutex.unlock()
-	for i in more:
+	if _threaded:
 		# The task holds the shared part and the job's copies, not these
 		# routes (Shared).
-		_tasks.append(WorkerThreadPool.add_task(WorldRoutes._work.bind(_shared), false, "world routes: distance fields"))
-
-
-## The most pool tasks making fields at once: a quarter of the machine's
-## threads, at least one, at most TASKS_MOST.
-const TASKS_MOST := 8
-static func tasks_most() -> int:
-	return clampi(OS.get_processor_count() / 4, 1, TASKS_MOST)
-
-
-## A pool task: takes the queue's entries one at a time till it is empty
-## (or the routes stop), each made by _make. Its count drops under the
-## same lock as the last look at the queue, so _start never counts on a
-## task that is leaving.
-static func _work(shared: Shared) -> void:
-	while true:
-		shared.mutex.lock()
-		if shared.queue.is_empty() or shared.stopping:
-			shared.workers -= 1
-			shared.mutex.unlock()
-			return
-		var entry: Dictionary = shared.queue.pop_front()
-		shared.mutex.unlock()
-		var one: Array[Dictionary] = [entry]
-		_make(shared, one)
+		_tasks.append(WorkerThreadPool.add_task(WorldRoutes._make.bind(_shared, job), false, "world routes: distance fields"))
+	else:
+		_make(_shared, job)
 
 
 ## Lets go of the tasks that are done.
@@ -350,11 +295,6 @@ static func _make(shared: Shared, job: Array[Dictionary]) -> void:
 			layer.fields.merge(made, true)
 			layer.ready[entry["name"]] = entry["version"]
 			shared.build_ms["%s %s" % [layer.faction, entry["name"]]] = (Time.get_ticks_usec() - started) / 1000.0
-			if shared.log_ready and not shared.logged.has(layer.faction) and layer.ready.size() == layer.version.size():
-				shared.logged[layer.faction] = true
-				print("[routes] layer %s ready %.1f s after the routes were made (%d areas; %d layers in; %d tasks at most)" % [
-					"open" if layer.faction == OPEN else layer.faction, (Time.get_ticks_usec() - shared.started_usec) / 1e6,
-					layer.version.size(), shared.logged.size(), tasks_most()])
 		shared.mutex.unlock()
 
 
