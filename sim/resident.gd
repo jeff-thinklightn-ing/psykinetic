@@ -41,6 +41,16 @@ const STUCK_TRIES := 3
 ## PATH_RETRY_SPREAD by its id, so a crowd at one door doesn't move as one (762 amended (3)).
 const PATH_RETRY_TICKS := 40
 const PATH_RETRY_SPREAD := 20
+## Its way somewhere looks at this many tiles at most (decision 818; the town soak at
+## 16 players: a goal walled off by a crowd made the unbounded search close
+## the whole wilds, 1.3-1.5 s in one tick; at this bound about 110 ms). The
+## wilds' winding ways of ~200 steps close up to 12000 (path_bound_test).
+## Not found within it, it waits PATH_RETRY_TICKS as for no way.
+const RESIDENT_SEARCH_TILES := 16000
+## Bodies farther than this from it are planned through (World.find_path's
+## bodies_within, 818): a crowd across the square moves; one beside it is met by
+## _step's stuck count.
+const RESIDENT_BODIES_WITHIN := 3
 const NO_CELL := Vector2i(-99999, -99999)
 const PLACE_OF := {Doing.WORK: "work", Doing.HOME: "home", Doing.SQUARE: "square", Doing.HIDE: "home",
 	Doing.WELL: "well", Doing.INN: "inn", Doing.TEMPLE: "temple", Doing.ROUNDS: "rounds", Doing.STRAYED: "strayed", Doing.ESCORT: "strayed",
@@ -1357,7 +1367,8 @@ func _step() -> void:
 	if tile == _goal or World.tick < next_move_tick:
 		return
 	if _route.is_empty():
-		_route = World.find_path(tile, _goal, false)
+		_route = World.find_path(tile, _goal, false, null, RESIDENT_SEARCH_TILES, false, {}, true,
+				World.PATH_FIRE_EXTRA, RESIDENT_BODIES_WITHIN)
 		if _route.is_empty():
 			_goal = tile  # No way there now: it waits, and chooses again later (762 amended (3): whatever it is doing).
 			_retry_at = World.tick + PATH_RETRY_TICKS + absi(id) % (PATH_RETRY_SPREAD + 1)

@@ -12224,9 +12224,13 @@ func _sight_crosses_edge(from: Vector2i, step: Vector2i) -> bool:
 ## [param fire_extra]: what a burning cell costs beyond a step
 ## (PATH_FIRE_EXTRA, a short detour; PATH_FIRE_AVOID, decision 707, for
 ## those that keep off fire).
+## [param bodies_within] > 0: a body blocks only within that many cells of
+## [param from] (the larger of the two offsets); one farther off is planned
+## through, as a crowd moves (a resident, RESIDENT_BODIES_WITHIN; decision
+## 818). 0: every body blocks (every other caller).
 func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 		ignore: GridEntity = null, max_tiles := 0, nearest := false, walls := {}, opens_doors := true,
-		fire_extra := PATH_FIRE_EXTRA) -> Array[Vector2i]:
+		fire_extra := PATH_FIRE_EXTRA, bodies_within := 0) -> Array[Vector2i]:
 	var path: Array[Vector2i] = []
 	if from == to or not is_walkable(to):
 		return path
@@ -12343,7 +12347,7 @@ func find_path(from: Vector2i, to: Vector2i, ignore_goal_occupant := false,
 			if shut and not opens_doors:
 				continue
 			var next := current + direction
-			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore 					and not (ignore != null and _own_companion_of(_occupancy[next], ignore)):
+			if next_at != to_at and _occupancy.has(next) and _occupancy[next] != ignore 					and not (ignore != null and _own_companion_of(_occupancy[next], ignore)) 					and (bodies_within <= 0 or maxi(absi(next.x - from.x), absi(next.y - from.y)) <= bodies_within):
 				continue
 			if walled and walls.has(next):
 				continue

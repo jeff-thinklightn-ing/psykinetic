@@ -44217,3 +44217,31 @@ numbered it, as every tree will hold a place back this way.
   checks read SHELVED, so the opening landing's checks come back on their own.
 
 Protocol unchanged, no new class_name.
+## 818. A resident's way is bounded, and bodies far off are planned through
+
+A resident's way to its goal (Resident._step's World.find_path) looks at
+RESIDENT_SEARCH_TILES (16000) tiles at most, as monsters' are bounded (209)
+and companions' short searches (685); residents are a third caller. In the
+town soak at 16 players a goal walled off by a crowd of players made the
+unbounded search close every reachable cell of the wilds before giving up:
+one cook's turn took 1.3 s (1.5 s measured alone), at the same step every run.
+Bounded, a failing search costs about 110 ms; not found within it, the
+resident waits PATH_RETRY_TICKS as for no way (762 amended (3)), as before.
+16000, not the 3000 first proposed: path_bound_test pairs cells up to 60
+apart on the wilds, the hills and Umbrage (held), and the wilds' winding
+ways of 90 to 206 steps closed up to 12000 tiles (13 of 274 missed at 3000;
+none at 16000). A soak probe ran every failed bounded resident search
+unbounded too: no way the bound missed, over a day at 16 players and at 3.
+
+World.find_path takes bodies_within (default 0): above 0, a body blocks
+only within that many cells of the search's start (the larger offset), one
+farther off is planned through, as a crowd moves. Residents pass 3
+(RESIDENT_BODIES_WITHIN); every other caller passes 0, as before. A body met
+on the way is _step's stuck count's (STUCK_TRIES, then a new way, which
+then sees it near). The town soak's worst tick at 16 players: 1309 ms to
+363 ms (the rest is not an entity's turn; nothing over 50 ms). Approved by
+the coordinator; npc's OK for resident.gd (its file). Tests: path_bound_test
+(the resident's bounded walks on three maps; a ring of bodies far off is
+planned through, the same ring beside the start still blocks, and with every
+body blocking there is no way); resident_test's _test_herder and
+_test_camp_traders walk the long ways.
