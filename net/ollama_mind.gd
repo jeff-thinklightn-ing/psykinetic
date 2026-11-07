@@ -162,6 +162,8 @@ func _send(what: String, ask: Dictionary) -> void:
 		{"role": "system", "content": str(ask.get("system", ""))},
 		{"role": "user", "content": str(ask.get("user", ""))},
 	])
+	if what == "voice" and not _openai.get(what, openai_shaped):
+		messages = prefilled(messages, str(ask.get("prefill", "")))
 	var error := _http[what].request(_urls[what], PackedStringArray(["Content-Type: application/json"]),
 			HTTPClient.METHOD_POST, request_messages(messages, what))
 	if error != OK:
@@ -282,6 +284,8 @@ func _on_request_completed(result: int, code: int, _headers: PackedStringArray,
 	var measures := measures_of(response)
 	if what == "voice":
 		last_error = ""
+		if not _openai.get(what, openai_shaped):
+			content = joined(str(_sent[what].get("ask", {}).get("prefill", "")), content)
 		_result(what, content, parse_voice(strip_think(content), str(_sent[what].get("ask", {}).get("speaker", ""))), "", measures)
 		return
 	var answer: Variant = _parse(_strip_fences(strip_think(content)))
@@ -325,6 +329,26 @@ static func _native_content_of(response: Variant) -> String:
 
 
 ## choices[0].message.content of an OpenAI-style response, or "".
+## [param messages] with her line begun as [param prefill] (place A/B arm C):
+## a last assistant turn, which Ollama's /api/chat goes on from. The empty
+## think block comes first, or qwen3 takes the words as its reasoning, closes
+## it and starts over.
+static func prefilled(messages: Array, prefill: String) -> Array:
+	if prefill.is_empty():
+		return messages
+	var out := messages.duplicate()
+	out.append({"role": "assistant", "content": "<think>\n\n</think>\n\n" + prefill})
+	return out
+
+
+## Her line whole: [param prefill] and what the model went on with. A reply
+## that started over (it says the words again) is kept as it is.
+static func joined(prefill: String, content: String) -> String:
+	if prefill.is_empty() or strip_think(content).strip_edges().begins_with(prefill):
+		return content
+	return prefill + content
+
+
 static func _openai_content_of(response: Variant) -> String:
 	if response is not Dictionary:
 		return ""

@@ -132,7 +132,8 @@ static func known_by(knower: String, about := PackedStringArray(), least := "agr
 				out.append({"id": fact.get("id", ""), "text": fact.get("text", ""),
 						"hearsay": known == "rumour", "memory": known == "lived", "secret": known == "secret",
 						"kept": known == "secret" and knower in fact.get("kept_by", []),
-						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT))})
+						"where": fact.get("where", []).duplicate(), "weight": float(fact.get("weight", DEFAULT_WEIGHT)),
+						"sight": str(fact.get("sight", ""))})  # A thing to point at there (lore's, for place talk).
 	return out
 
 

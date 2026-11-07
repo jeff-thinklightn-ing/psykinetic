@@ -10472,7 +10472,7 @@ func _tomb_opened(zone_name: String, room: String, by: Array, kind := "tomb") ->
 			continue
 		var her := Companion._name_of(pet)
 		pet.note_fact("%s and %s opened a sealed tomb together." % [her, pet.keeper_name()] if together
-			else "%s opened a sealed tomb while %s looked on." % [pet.keeper_name(), her])
+			else "%s opened a sealed tomb while %s looked on." % [pet.keeper_name(), her], "event", "that sealed tomb")
 		_bond(_record_of(pet), "tomb", "opened a sealed tomb with you")
 		pet.tomb_opened(together)
 

@@ -42712,6 +42712,32 @@ Unasked, new to her today: the quiet "place" focus is the same, and with none it
 not in her rules. companion_test (nothing known; a named spot, not the place's own; a fact of hers
 there first; asked and unasked). Server only, protocol unchanged, no new class_name.
 
+803 amended (7) (release's label; the coordinator's call after the place A/B: arm B, with C's begun
+line as its re-ask): the thing named in the question, and her line begun with it when she misses it.
+The A/B (qwen3:14b on the desktop, the Mughouse and the tomb route, three arms): A, 803 amended (6)
+as landed, still answered "This place..." with mood; B, the sight in the question, named the real thing
+most times; C, her line begun with the sight, every time. B is the question: a lore fact may carry a
+"sight" (lore's, "the hearth and the rooms upstairs"; Lore.known_by passes it), and a fact she notes may
+too (note_fact's sight, main.gd's tomb fact "that sealed tomb"); place_brief returns it and puts a
+sighted lore fact first; the question names it (PLACE_ASK_SIGHT: "What do you make of the lantern
+sign?"); PLACE_LEAD adds "Begin with the thing itself; never begin with 'This place'."; her player's
+own line goes last with the brief before it in brackets and the question after it; a "This place..."
+opening after one of hers is an echo (_echo_of). C is the re-ask: an answer that echoes, is empty, or
+does not name the sight's subject (names_sight: its last word, a plural too) is asked once more with
+her line begun for her (_reask_prefill, the ask's "prefill"): the sight's subject (sight_subject: its
+words up to and, in, of, over, under, by, on or at, then the article and the last word, "That tomb",
+"The hearth"; a possessive or a name whole, "The knight's spirit", "The Old Tower"). OllamaMind sends
+it as a last assistant turn after an empty think block (prefilled; without that block qwen3 took the
+words as its reasoning and started over) and gives back the begun words and what followed (joined;
+a reply that says them again kept as it is); the API mind sends none. The arrival notice (a place
+found): the place she is in gets its brief and NOTICE_PLACE_LEAD on its sight ("If you speak now, say
+something of %s, briefly, in your own way: one short line. Begin with the thing itself; never begin
+with 'This place'."), a place within it (a pond) that place itself (explore_focus). After a fight she is
+told "The fighting is over." (no longer "... It is quiet.", which led her place lines). companion_test
+(the subjects; named or not; missed, asked again begun "That tomb", the second said; named at once,
+asked once; the arrival notice both ways; the A/B's arm B checks). Server only, protocol unchanged, no
+new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

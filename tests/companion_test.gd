@@ -849,7 +849,7 @@ func _test_spoken_polish() -> void:
 			"any monster's fall, told back")
 	_check(pet.spoken("The brute is down the corridor.") == "The brute is down the corridor.", "but not a place")
 	_check(pet.spoken("The brute is dead.", false, true) == "The brute is dead.", "asked, she may say it")
-	pet._narrate("The fighting is over. It is quiet.")
+	pet._narrate("The fighting is over.")
 	_check(pet.spoken("The fighting is over.").is_empty(), "nor narration said back")
 	_check(pet.spoken("%s is hurt. I will not leave." % who) == "I will not leave.", "her player spoken of by name goes: %s"
 			% pet.spoken("%s is hurt. I will not leave." % who))
@@ -3828,6 +3828,23 @@ func _test_quiet_moment() -> void:
 	_check(bool(tavern["real"]) and not "locals call it" in str(tavern["text"]) and str(tavern["text"]).begins_with("You are in the Last Light Mughouse.")
 			and (tavern["kind"] != "lore" or ["hearth", "sign", "lamp"].any(func(word: String) -> bool: return word in str(tavern["text"]))),
 		"the Mughouse: its name the head's, and a thing to see there, not its .name fact (%s)" % tavern["text"])
+	# Place A/B arm B: a fact with a sight first, and the question names it.
+	_check(str(tavern["sight"]) in ["the hearth and the rooms upstairs", "the lantern sign", "the lamp in the window"]
+			and str(tavern["ask"]) == "What do you make of %s?" % tavern["sight"],
+		"arm B: the Mughouse's question names its sight (%s)" % tavern["ask"])
+	var echo_said: Array[String] = pet._said.duplicate()
+	pet._said.append("This place reeks of old smoke.")
+	_check(pet._echo_of("This place feels heavy with old fires.") == "her own line" and pet._echo_of("The hearth smells of old fires.").is_empty(),
+		"arm B: a \"This place ...\" opening after one of hers is an echo; another opening is not")
+	pet._said = echo_said
+	var was_zone: String = World.zone.name
+	var placed: Array[Dictionary] = []
+	var real_here: bool = pet.place_brief(was_zone)["real"]
+	placed = pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name())
+	if real_here:
+		var turn := str(placed.back()["content"])
+		_check(turn.ends_with(str(pet.place_brief(was_zone)["ask"])) and turn.find("[You are in ") < turn.find("What do you think of this place?"),
+			"arm B: the brief first, then her player's own line with the question after it (%s)" % turn.right(120))
 	var before_brief: Dictionary = pet.place_brief(World.zone.name)
 	pet.note_fact("%s and %s opened a sealed tomb together." % [Companion._name_of(pet), pet.keeper_name()])
 	var here_brief: Dictionary = pet.place_brief(World.zone.name)
@@ -3835,9 +3852,55 @@ func _test_quiet_moment() -> void:
 			and str(here_brief["text"]).ends_with("Something that happened here: %s and %s opened a sealed tomb together." % [Companion._name_of(pet), pet.keeper_name()]),
 		"what they did here comes first, the one thing she is given (%s; before it, %s)" % [here_brief["text"], before_brief["text"]])
 	_check(str(pet.grown.facts.back().get("zone", "")) == World.zone.name, "a new fact keeps where it happened")
+	pet._quiet_focus = ""  # A quiet moment's focus, left set above, would follow her player's turn.
 	var asked_place := str(pet.voice_messages(true, "%s: What do you think of this place?" % pet.keeper_name()).back()["content"])
-	_check("Something that happened here:" in asked_place and asked_place.ends_with("%s %s]" % [Companion.PLACE_ASK["done"], Companion.PLACE_LEAD]),
-		"asked of the place: that one thing, a question on it and its lead, last in the last turn")
+	_check("Something that happened here:" in asked_place and ("%s]" % Companion.PLACE_LEAD) in asked_place
+			and asked_place.ends_with("What do you think of this place? %s" % Companion.PLACE_ASK["done"]),
+		"asked of the place: that one thing and its lead, then her player's line with the question on it, last (%s)" % asked_place.right(160))
+	pet.grown.facts.back()["sight"] = "that sealed tomb"
+	_check(str(pet.place_brief(World.zone.name)["ask"]) == "What do you make of that sealed tomb, now you're back here?",
+		"arm B: a fact noted with a sight is named in the question")
+	# 803 amended (7): an answer that misses the sight is asked once more, her line begun with its subject.
+	var subjects := ["that sealed tomb", "the hearth and the rooms upstairs", "the lamp in the window", "the knight's spirit",
+			"the Old Tower", "that tower over the mine", "the Mughouse"].map(Companion.sight_subject)
+	_check(subjects == ["That tomb", "The hearth", "The lamp", "The knight's spirit", "The Old Tower", "That tower", "The Mughouse"],
+		"a sight's subject: its first words, the article and its last word, a possessive or a name whole (%s)" % [subjects])
+	_check(Companion.names_sight("Those tombs were never meant to open.", "that sealed tomb")
+			and not Companion.names_sight("Quiet here, too quiet.", "that sealed tomb"),
+		"an answer names the sight by its subject's word, a plural too")
+	var sight_mind := CountingMind.new()
+	pet.mind = sight_mind
+	_put(_player(), Vector2i(9, 6))
+	_put(pet, Vector2i(10, 6))
+	var said_were: Array[String] = pet._said.duplicate()
+	pet._said.clear()
+	pet._last_speech_tick = -1000
+	sight_mind.voice_answer = {"say": "Quiet here, too quiet for my liking.", "stance": ""}
+	sight_mind.next_voice_answers = [{"say": "That tomb still smells of the dead.", "stance": ""}]
+	var place_trigger := "%s just spoke to you." % pet.keeper_name()
+	var place_heard := "%s just said to you: \"What do you think of this place?\"" % pet.keeper_name()
+	pet._ask_voice(place_trigger, place_heard, true)
+	_check(sight_mind.voice_asks.size() == 2 and not sight_mind.voice_asks[0].has("prefill")
+			and str(sight_mind.voice_asks[1].get("prefill", "")) == "That tomb" and pet.said_lines().back() == "That tomb still smells of the dead.",
+		"missed the sight: asked once more, begun \"That tomb\", the second said (%s)" % [pet.said_lines().slice(-1)])
+	sight_mind.voice_asks.clear()
+	pet._last_speech_tick = -1000
+	sight_mind.voice_answer = {"say": "I keep thinking of that tomb we opened.", "stance": ""}
+	sight_mind.next_voice_answers = []
+	pet._ask_voice(place_trigger, place_heard, true)
+	_check(sight_mind.voice_asks.size() == 1 and pet.said_lines().back() == "I keep thinking of that tomb we opened.",
+		"named the first time: said, asked once (%s)" % [pet.said_lines().slice(-1)])
+	pet._said = said_were
+	pet.mind = mind_was
+	# The arrival notice (803 amended (7)): the place she is in found, its sight and the rule; a place within it, that place.
+	var zone_found := Companion.place_name(World.zone.name)
+	zone_found = "the " + zone_found.substr(4) if zone_found.begins_with("The ") else zone_found
+	var arrived := pet.explore_focus(zone_found, World.zone.name)
+	var pond := pet.explore_focus("the Reed Pond", World.zone.name)
+	_check(("Something that happened here:" in arrived and arrived.ends_with(Companion.NOTICE_PLACE_LEAD % "that sealed tomb"))
+			and pond == "%s has just found the Reed Pond. %s" % [pet.keeper_name(), Companion.NOTICE_PLACE_LEAD % "the Reed Pond"],
+		"a place found: the zone's sight and never 'This place'; a place within it, itself (%s / %s)" % [arrived.left(80), pond.left(60)])
+	pet.grown.facts.back().erase("sight")
 	pet._zone_new_today = true
 	var place_focus := ""
 	for i in 30:

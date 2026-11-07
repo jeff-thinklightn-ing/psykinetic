@@ -433,11 +433,14 @@ const QUIET_WANT_LEAD := "If you speak now, say so, in your own words."
 ## A place spoken of (803 amended (6), the coordinator after pair 7: given
 ## everything, she answered with made-up mood): the code picks the one real
 ## thing (place_brief), and she is asked of that alone.
-const PLACE_LEAD := "Answer in one line, in your own words. Don't make up what happened here; what you don't know, leave out. Never call it quiet, calm or peaceful."
+const PLACE_LEAD := "Answer in one line, in your own words. Don't make up what happened here; what you don't know, leave out. Never call it quiet, calm or peaceful. Begin with the thing itself; never begin with 'This place'."
 ## The direct question on place_brief's one thing, by its kind (the
 ## coordinator after voice8: qwen3:14b passed over a fact merely told, "the
 ## walls remember" for the Mughouse; a question on it is harder to ignore).
 const PLACE_ASK := {"done": "What do you make of that, now you're back here?", "named": "What do you make of %s?", "lore": "What do you make of that?"}
+## The same, with the thing named (place A/B arm B, voice's: qwen3 passed over
+## "that" for its stock "This place reeks of ..."): its sight, a few words.
+const PLACE_ASK_SIGHT := {"done": "What do you make of %s, now you're back here?", "named": "What do you make of %s?", "lore": "What do you make of %s?"}
 ## Asked of a place she knows nothing real of: no mood for filler.
 const PLACE_LITTLE := "You know little of this place yet. If you answer, say so plainly; don't make up what happened here. Never call it quiet, calm or peaceful."
 ## Her player's rewards (804 amended (14), the coordinator: Jeff's visible
@@ -449,6 +452,9 @@ const NOTICE_GAP_S := 120
 const NOTICE_STALE_S := 60
 const NOTICE_SKIP: Array[String] = ["gold", "catch", "practice", "item", "leisure", "adventure", "wonder", "faith", "safety", "company"]
 const NOTICE_LEAD := "If you speak now, react to that, briefly, in your own way: one short line."
+## A place found (803 amended (7), the coordinator after the A/B): she is told
+## the one thing there to speak of, and never to open with "This place".
+const NOTICE_PLACE_LEAD := "If you speak now, say something of %s, briefly, in your own way: one short line. Begin with the thing itself; never begin with 'This place'."
 const NOTICE_BOND_TIERS := {"fond": "fond of", "close": "close to", "devoted": "devoted to"}
 const NOTICE_BOND_LEAD := "If you want, say something of it, briefly; you need not."
 const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
@@ -965,6 +971,13 @@ var _reask_next := false
 ## Her own line her voice said again, to an event (228 amended): asked once
 ## more, told not to (voice_messages), "" when none.
 var _repeat_note := ""
+## The sight a place answer is to name (place_brief's, set by voice_messages),
+## by serial; and the words her next ask's line begins with (_reask_prefill,
+## the sight's subject: "The hearth"), when her first answer missed it (803
+## amended (7)).
+var _place_sight := ""
+var _sight_serials: Dictionary[int, String] = {}
+var _reask_prefill := ""
 ## When she last said what "we" should do unasked (WE_SHOULD).
 var _we_should_tick := -100000
 ## The trade she works in a town she stays in while her player is away
@@ -1669,16 +1682,30 @@ func noticed(data: Dictionary) -> void:
 		# quoted as what they saw, so its "your" never reads as hers; no bare banner.
 		var mid := of.substr(0, 4).to_lower() + of.substr(4) if of.begins_with("The ") else of
 		if track == "explore":
-			what = "%s has just found %s." % [who, mid]
+			focus = explore_focus(mid, World.zone.name if World.zone != null else "")
 		elif not words.is_empty() and words.left(1) == words.left(1).to_upper() and words.left(1) != words.left(1).to_lower():
 			what = "Just now %s saw: \"%s.\"" % [who, words.trim_suffix(".")]
 		elif not words.is_empty():
 			what = "%s has just %s." % [who, words.trim_suffix(".")]
 		else:
 			what = "%s has just earned %s." % [who, mid]
-		focus = "%s %s" % [what, NOTICE_LEAD]
+		if focus.is_empty():
+			focus = "%s %s" % [what, NOTICE_LEAD]
 	_notice = {"focus": focus, "kind": kind, "at": World.tick}
 	notice_counts["offered"] = int(notice_counts.get("offered", 0)) + 1
+
+
+## Her focus when her player has just found [param found] (a place's name, its
+## "The" lowered), in [param zone_name] (803 amended (7)): the place she is in
+## found, its one real thing (place_brief) and NOTICE_PLACE_LEAD on it; a
+## place within it (a pond, a stone), that place itself is the thing.
+func explore_focus(found: String, zone_name: String) -> String:
+	var what := "%s has just found %s." % [keeper_name(), found]
+	if not zone_name.is_empty() and _plain(place_name(zone_name)) == _plain(found):
+		var brief := place_brief(zone_name, false)
+		if bool(brief["real"]) and not str(brief.get("sight", "")).is_empty():
+			return "%s %s %s" % [what, brief["text"], NOTICE_PLACE_LEAD % brief["sight"]]
+	return "%s %s" % [what, NOTICE_PLACE_LEAD % found]
 
 
 ## Each tick (804 amended (14)): the waiting reward, once out of a fight and
@@ -2955,7 +2982,7 @@ func _watch() -> void:
 	if _silence_due and not fight and World.tick - _fight_ended_tick >= SILENCE_TICKS:
 		_silence_due = false
 		if _last_speech_tick < _fight_ended_tick:
-			_narrate("The fighting is over. It is quiet.")
+			_narrate("The fighting is over.")  # Not "It is quiet.": it led her place lines (place A/B).
 			if _fight_notable:
 				_ask_voice("The fight is over, and you have said nothing since.")
 			else:
@@ -3688,11 +3715,17 @@ func _ask_voice(trigger: String, heard := "", always := false, phrase := false, 
 	var messages := voice_messages(asked, heard)
 	if not _offering.is_empty():
 		_offered[_serial] = _offering
+	if not _place_sight.is_empty():
+		if _sight_serials.size() > 8:
+			_sight_serials.clear()
+		_sight_serials[_serial] = _place_sight
 	var ask := {
 		"kind": "voice", "serial": _serial, "trigger": trigger, "messages": messages, "speaker": _name_of(self),
 		"system": messages[0]["content"], "user": render(messages.slice(1)),
 		"hp": hp, "max_hp": max_hp, "spoken_to": asked, "asked": asked, "heard": heard, "always": always,
 	}
+	if not _reask_prefill.is_empty():
+		ask["prefill"] = _reask_prefill  # Her line begun for her (803 amended (7)); a local model's, OllamaMind.prefilled.
 	var answer := mind.voice(ask)
 	if not answer.is_empty():
 		_take_result(_sync_result(ask, answer))
@@ -3740,12 +3773,14 @@ func _take_card(answer: Dictionary, entry: Dictionary) -> void:
 
 ## [param text], what she witnessed, as a fact about her; told to her
 ## transcript and the mind log when new.
-func note_fact(text: String, from := "event") -> void:
+func note_fact(text: String, from := "event", sight := "") -> void:
 	var added := grown.add_fact(text, from, keeper_id)
 	if added.is_empty():
 		return
 	if World.zone != null:
 		added["zone"] = World.zone.name  # Where it happened (803 amended (6): place_brief's "what happened here").
+	if not sight.is_empty():
+		added["sight"] = sight  # The thing to point at there ("that sealed tomb"), for place talk.
 	Transcript.record(_name_of(self), "", "[Now true of her: %s]" % added["text"])
 	_log({"kind": "fact", "companion": _name_of(self), "trigger": from, "outcome": "added", "note": added["text"], "id": added["id"]})
 	facts_changed.emit()
@@ -3997,6 +4032,7 @@ func stance_prompt() -> String:
 ## player has just spoken to her, so she may answer with a stance.
 func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	_offering = []
+	_place_sight = ""
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
 	_sky_asked = asks_about_sky(heard)
@@ -4006,6 +4042,13 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	# In the last turn, after the question, as a quiet moment's focus is (pair 5:
 	# in Now:, both runs said "It's quiet here, but that doesn't mean it's safe").
 	var place_note := place_words_now() if asks_about_place(heard) else ""
+	var place_ask := ""
+	if not place_note.is_empty():
+		var brief := place_brief(World.zone.name if World.zone != null else "", false)
+		if bool(brief["real"]):
+			place_note = "%s %s" % [brief["text"], PLACE_LEAD]
+			place_ask = str(brief["ask"])
+			_place_sight = str(brief.get("sight", ""))
 	now.append(doing())
 	if not works_as.is_empty():
 		now.append("While %s is away you stay in this town and work as its %s." % [who, works_as])
@@ -4110,7 +4153,22 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 			messages.append({"role": role, "content": text})
 	if messages.back()["role"] != "user":
 		messages.append({"role": "user", "content": "[A moment passes.]"})
-	if not place_note.is_empty():
+	if not place_note.is_empty() and not place_ask.is_empty():
+		# Place A/B arm B: the brief first, then her player's own line with the
+		# question on the one thing after it, so their turn ends on that thing.
+		# Narration after their line stays above the brief; with no line of theirs
+		# in the turn, the question is theirs alone.
+		var lines := str(messages.back()["content"]).split("\n")
+		var theirs := "%s: What do you think of this place?" % who
+		for i in range(lines.size() - 1, -1, -1):
+			if lines[i].begins_with(who + ": "):
+				theirs = lines[i]
+				lines.remove_at(i)
+				break
+		lines.append("[%s]" % place_note)
+		lines.append("%s %s" % [theirs, place_ask])
+		messages.back()["content"] = "\n".join(lines)
+	elif not place_note.is_empty():
 		messages.back()["content"] += "\n[%s]" % place_note
 	if not _quiet_focus.is_empty():
 		# A quiet moment's one thing to speak of (803 amended), in the last turn.
@@ -4472,6 +4530,40 @@ static func asks_about_place(heard: String) -> bool:
 	return not heard.is_empty() and RegEx.create_from_string(PLACE_WORDS).search(heard) != null
 
 
+## Where a sight's words stop being its subject: "the lamp in the window" is
+## the lamp, "the hearth and the rooms upstairs" the hearth.
+const SIGHT_CUTS := [" and ", " in ", " of ", " over ", " under ", " by ", " on ", " at "]
+
+
+## [param sight]'s subject, capitalised, to begin her line with (803 amended
+## (7)): its first words up to a SIGHT_CUTS word, then the article and its
+## last word ("that sealed tomb": "That tomb"), a possessive or a name kept
+## whole ("The knight's spirit", "The Old Tower").
+static func sight_subject(sight: String) -> String:
+	var head := sight.strip_edges()
+	for cut: String in SIGHT_CUTS:
+		var at := head.find(cut)
+		if at > 0:
+			head = head.substr(0, at)
+	var words := head.split(" ", false)
+	if words.size() > 2 and ["the", "that", "this", "those", "these", "a", "an"].has(words[0].to_lower()):
+		var before := words[words.size() - 2]
+		var named := words[words.size() - 1].substr(0, 1) == words[words.size() - 1].substr(0, 1).to_upper()
+		if not (before.ends_with("'s") or before.ends_with("s'") or named):
+			head = "%s %s" % [words[0], words[words.size() - 1]]
+	return head.substr(0, 1).to_upper() + head.substr(1)
+
+
+## Whether [param line] names [param sight]'s thing: its subject's last word
+## (a plural or a possessive too).
+static func names_sight(line: String, sight: String) -> bool:
+	var words := sight_subject(sight).to_lower().split(" ", false)
+	if words.is_empty():
+		return true
+	var noun := words[words.size() - 1].trim_suffix("'s").trim_suffix("'")
+	return RegEx.create_from_string("(?i)\\b%s(s|es|'s)?\\b" % _escaped(noun)).search(line) != null
+
+
 ## For a question about the place (asks_about_place): place_brief's one thing,
 ## closed by PLACE_LEAD, or by PLACE_LITTLE when there is none.
 func place_words_now() -> String:
@@ -4494,11 +4586,13 @@ func place_brief(zone_name: String, new_today := false) -> Dictionary:
 		name = "the " + name.substr(4)  # "You are in the Barrow", mid-sentence.
 	var head := "You are in %s%s." % [name, ", where you have not been before today" if new_today else ""]
 	if zone_name.is_empty():
-		return {"text": head, "real": false, "kind": "", "ask": ""}
+		return {"text": head, "real": false, "kind": "", "ask": "", "sight": ""}
 	for i in range(grown.facts.size() - 1, -1, -1):
 		var entry: Dictionary = grown.facts[i]
 		if str(entry.get("zone", "")) == zone_name:
-			return {"text": "%s Something that happened here: %s" % [head, str(entry["text"])], "real": true, "kind": "done", "ask": PLACE_ASK["done"]}
+			var did := str(entry.get("sight", ""))
+			return {"text": "%s Something that happened here: %s" % [head, str(entry["text"])], "real": true, "kind": "done", "sight": did,
+				"ask": PLACE_ASK_SIGHT["done"] % did if not did.is_empty() else PLACE_ASK["done"]}
 	var bare := func(words: String) -> String: return words.to_lower().trim_prefix("the ").strip_edges()
 	var named := ""
 	if World.holdings != null:
@@ -4514,8 +4608,9 @@ func place_brief(zone_name: String, new_today := false) -> Dictionary:
 				named = word
 				break
 	if not named.is_empty():
-		return {"text": "%s There is %s here." % [head, named], "real": true, "kind": "named",
-			"ask": PLACE_ASK["named"] % ("the " + named.substr(2) if named.begins_with("a ") else named)}  # "a shed" asked as "the shed".
+		var the_named := "the " + named.substr(2) if named.begins_with("a ") else named  # "a shed" asked as "the shed".
+		return {"text": "%s There is %s here." % [head, named], "real": true, "kind": "named", "sight": the_named,
+			"ask": PLACE_ASK["named"] % the_named}
 	var knower := _name_of(self).to_lower() if Lore.knowers().has(_name_of(self).to_lower()) else "townsfolk"
 	# Never a place's bare name (its ".name" fact, "...locals call it the Mughouse"): the
 	# model would not say a name it was handed (voice9, twice), and the name is the head's;
@@ -4523,12 +4618,18 @@ func place_brief(zone_name: String, new_today := false) -> Dictionary:
 	var facts := Lore.known_by(knower, PackedStringArray([zone_name, name]), "agreed").filter(
 		func(fact: Dictionary) -> bool: return not str(fact.get("id", "")).ends_with(".name") and (not bool(fact.get("secret", false)) or not bool(fact.get("kept", false))))
 	if not facts.is_empty():
-		facts.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return float(x["weight"]) > float(y["weight"]))
+		# A fact with a sight first (a thing to name in the question), then by weight.
+		facts.sort_custom(func(x: Dictionary, y: Dictionary) -> bool:
+			var x_sees := not str(x.get("sight", "")).is_empty()
+			var y_sees := not str(y.get("sight", "")).is_empty()
+			return x_sees and not y_sees or x_sees == y_sees and float(x["weight"]) > float(y["weight"]))
 		var text := str(facts[0]["text"]).strip_edges()
 		if bool(facts[0].get("hearsay", false)):
 			text = "It is said that %s" % (text.left(1).to_lower() + text.substr(1))
-		return {"text": "%s One thing you know of it: %s" % [head, text], "real": true, "kind": "lore", "ask": PLACE_ASK["lore"]}
-	return {"text": head, "real": false, "kind": "", "ask": ""}
+		var seen := str(facts[0].get("sight", ""))
+		return {"text": "%s One thing you know of it: %s" % [head, text], "real": true, "kind": "lore", "sight": seen,
+			"ask": PLACE_ASK_SIGHT["lore"] % seen if not seen.is_empty() else PLACE_ASK["lore"]}
+	return {"text": head, "real": false, "kind": "", "ask": "", "sight": ""}
 
 
 static func asks_about_surroundings(heard: String) -> bool:
@@ -5151,6 +5252,26 @@ func _take_result(result: Dictionary) -> void:
 	# Her things may be spoken of when asked about, told of in a report, or
 	# given or fetched.
 	var items_told: bool = asks_about_items(str(result.get("heard", ""))) or report or chosen >= 0 and offered[chosen].has("item")
+	var sight: String = _sight_serials.get(serial, "")
+	_sight_serials.erase(serial)
+	if not second_try and not sight.is_empty() and (not echo.is_empty() or raw_line.is_empty() or not names_sight(raw_line, sight)):
+		# Asked of the place, she missed the thing there (803 amended (7), the
+		# coordinator after the A/B: B named it most times, C's begun line every
+		# time): asked once more, her line begun with its subject.
+		entry["outcome"] = "asked again"
+		entry["say_dropped"] = raw_line
+		entry["note"] = "missed the sight (%s)" % sight if echo.is_empty() else "echoes %s; the sight (%s) begun for her" % [echo, sight]
+		_log(entry)
+		if echo == "her own line":
+			_repeat_note = raw_line
+		_reask_prefill = sight_subject(sight)
+		_reask_next = true
+		_quiet_focus = focus_told
+		_ask_voice(str(result.get("trigger", "")), str(result.get("heard", "")), true, was_phrase, true, report)
+		_reask_next = false
+		_reask_prefill = ""
+		_quiet_focus = ""
+		return
 	if echo == "her own line" and not second_try:
 		# Her own line again, to something new (228 amended: three moments
 		# lost so at 21:56): asked once more, told not to say it. Her
@@ -5435,8 +5556,8 @@ func _echo_of(line: String) -> String:
 		if World.tick - int(heard["tick"]) <= ECHO_TICKS and _same_words(said_now, _plain(str(heard["text"]))):
 			return "%s's words" % keeper_name()
 	for own in _said:
-		if _same_words(said_now, _plain(own)):
-			return "her own line"
+		if _same_words(said_now, _plain(own)) or said_now.begins_with("this place ") and _plain(own).begins_with("this place "):
+			return "her own line"  # "This place ..." again: qwen3's stock opener (place A/B arm B).
 	if not _instruction.is_empty() and _same_words(said_now, _plain(_quoted(_instruction))):
 		return "the instruction she was given"
 	for sentence in card.split(".", false):
