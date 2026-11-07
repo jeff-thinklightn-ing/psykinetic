@@ -116,6 +116,7 @@ func _ready() -> void:
 		_test_tracks()
 		_test_cave_mouth()
 		_test_mine_mouth()
+		_test_shelter()
 		_test_thicket_mouth()
 		_test_den_mouth()
 		_test_rocks()
@@ -5181,6 +5182,75 @@ func _test_mine_mouth() -> void:
 	_check(int(slots.get(Client3D.MINE_FRAME, 0)) == 2 and int(slots.get("mine.track", 0)) >= 4 and int(slots.get("mine.track_end", 0)) == 1
 			and int(slots.get("prop.mine_cart", 0)) == 1 and stair_z > 0.5 and lit >= 1,
 			"timbered, railed out to a buffer and a cart, the stair down in the dark, a fire at the door (%s; the stair %.1f m in, %d light)" % [slots, stair_z, lit])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A rock shelter (798 amended (4): a place's "opens", the hills' hill cave):
+## an overhang you walk under, its rock shaded to a rock back, never black,
+## its roof falling toward the back, a lip jutting past its face; dressed as
+## a refuge.
+func _test_shelter() -> void:
+	print("
+== rock shelter: an overhang you walk under, a refuge's things inside ==")
+	var warnings: Array[String] = []
+	var places := Level.places_from({"places": {"cave": {"at": [4, 4], "kind": "refuge", "where": "hills", "name": "a cave", "opens": [1, 0]},
+			"odd": {"at": [8, 8], "opens": [1, 1]}}}, warnings)
+	var shelters := Level.shelters_of(places)
+	_check(shelters.size() == 1 and shelters[0]["at"] == Vector2i(4, 4) and shelters[0]["opens"] == Vector2i(1, 0)
+			and warnings.any(func(w: String) -> bool: return "odd opens" in w),
+			"a place's \"opens\" a shelter; a slant one warned and left out (%s)" % [shelters])
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	var floor_cells: Array = terrain["floor"]
+	var at := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		if floor_cells.has(cell + Vector2i(0, -5)) and floor_cells.has(cell + Vector2i(3, -5)) and floor_cells.has(cell + Vector2i(-3, -5)):
+			at = cell
+			break
+	_check(at.x >= 0, "the sample has room for a hill (%s)" % at)
+	if at.x < 0:
+		return
+	terrain["link_cues"] = []
+	terrain["shelters"] = [{"at": at, "opens": Vector2i(0, 1)}]
+	_rig.rebuild(terrain, sample["centre"])
+	var holder: Node3D = _rig._room.get_node_or_null("Shelter_%d_%d" % [at.x, at.y])
+	var body: MeshInstance3D = holder.get_node_or_null("Body") if holder != null else null
+	var dress: Node3D = holder.get_node_or_null("Refuge") if holder != null else null
+	_check(body != null and body.mesh != null and dress != null and _rig._mouth_cells().has(at + Vector2i(0, -1)),
+			"drawn behind the place's cell, its hill's cells kept, dressed")
+	if body == null or body.mesh == null or dress == null:
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var points: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var shades: PackedColorArray = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var cast := func(from: Vector3, way: Vector3) -> Array:
+		var near := INF
+		var met := Color.WHITE
+		for i in range(0, points.size(), 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(from, way, points[i], points[i + 1], points[i + 2])
+			if hit != null and from.distance_to(hit) < near:
+				near = from.distance_to(hit)
+				met = shades[i]
+		return [near, met]
+	var face := 0.5
+	var back: Array = cast.call(Vector3(0.0, 0.5, -2.0), Vector3(0, 0, 1))
+	var lip_high: float = cast.call(Vector3(0.0, 0.05, face + 0.3), Vector3.UP)[0]
+	var back_high: float = cast.call(Vector3(0.0, 0.05, face + Client3D.SHELTER_DEEP - 0.3), Vector3.UP)[0]
+	var jut := INF
+	for p in points:
+		if p.y > Client3D.SHELTER_ARCH.y * 0.8:
+			jut = minf(jut, p.z)
+	_check(back[0] > 2.0 + face + Client3D.SHELTER_DEEP - 0.2 and (back[1] as Color).get_luminance() > 0.02,
+			"open to a rock back, not black (met at %.2f m, %.3f)" % [back[0], (back[1] as Color).get_luminance()])
+	_check(lip_high > 1.6 and back_high < lip_high * 0.8 and Client3D.SHELTER_ARCH.x > Client3D.SHELTER_ARCH.y * 2.0 and jut < face - 0.5,
+			"wider than tall, its roof %.2f m at the lip and %.2f m at the back, its lip %.2f m past the face" % [lip_high, back_high, face - jut])
+	var slots := {}
+	for piece: Node in dress.get_children():
+		var slot := str(piece.get_meta("slot", ""))
+		slots[slot] = int(slots.get(slot, 0)) + 1
+	_check(int(slots.get("prop.campfire_cold", 0)) == 1 and int(slots.get("prop.bedroll", 0)) == 2,
+			"a cold fire ring and two old bedrolls under it (%s)" % [slots])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

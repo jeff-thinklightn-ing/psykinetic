@@ -43920,6 +43920,35 @@ view_test _test_mine_mouth: on the maps as a way down; on the link's cell, dress
 black; two frames, the rails to a buffer and a cart, the stair inside, a fire's light. No bullet here (maps' data
 commit carries the one players see). Client and Level's cue list only, protocol unchanged, no new class_name.
 
+798 amended (4): the rock shelter (2026-11-07; Jeff's play in the hills: "i noticed the cave sign post in the hills, but
+i went toward the cave, got a wayfinder flag, but don't see a cave anywhere"; the coordinator's order and picks on the
+stills; maps' place, rock and bank; release's label). A place may say "opens" (a step along x or y: the way it faces
+out; Level.places_from keeps it, a slant one warned and left out), and Level.shelters_of carries each to
+terrain["shelters"] ({at, opens}). Client3D draws a rock shelter there: _add_cave_mouth's "shelter" kind (beside
+"cave" and "mine"; its holder "Shelter_x_y", its hill's cells in _mouth_cells, none in _throat_cells, so the ground
+is drawn under it and walked on: maps lays the cells under the overhang as floor, the rest of the hill as rock). Its
+arch SHELTER_ARCH 4.8 x 2.1 m, flattened (SHELTER_SQUARE 4) and uneven (SHELTER_UNEVEN: its height wanders across
+it), SHELTER_DEEP 3 m deep, its roof falling to SHELTER_BACK of the lip's height at the back (the coordinator: you
+duck to reach the bedrolls); inside, the rock shaded SHELTER_SHADE of the hill's from the lip to the back, never
+black, to a rock back; the face's lip dark only SHELTER_LIP_DARK; over the arch a lip, a broken slab of the cliffs'
+rock SHELTER_LIP across, thick and deep, jutting SHELTER_JUT past the face, its front tilted up (the den's shelf,
+now Client3D._rock_slab for both, the den's unchanged; _rock_slab takes a facet count, a bend and a moss share
+toward its back). The lip is broken (the coordinator on the c5 stills: a straight slab on two legs read as "a built
+dolmen or a stone table"): _shelter_lip_bend steps its front edge SHELTER_LIP_STEPS times across, each step dropped
+and set back by its own roll (SHELTER_LIP_STEP), sags one corner SHELTER_LIP_SAG, tucks its ends back into the face,
+chips the edge and sinks its back SHELTER_LIP_SINK under the hill with the bank's grass over it. Its hill a
+SHELTER_HUMP hump with its roof set over its own floor (as the mine's), on a bank maps raises in the relief tying it
+into the high ground's edge behind (the coordinator: a hollow under that rock's edge, not a separate piece; the
+ledge's foot raised with the ground along it). The bank stays off the strip under the arch (the arch's width, the
+floor's depth, at the ground), and no step in it passes the walkable rise, so no relief cliff stands in the arch or
+at the face's corners (stills c2 to c4). Dressed as a refuge (_dress_shelter, a "Refuge" child; SHELTER_DRESS): a cold fire ring under the lip, two
+old bedrolls, a woodpile, a tuft of fur; a piece the kit lacks left out. Package hill cave: maps' place (its
+"opens"), W4's waystone, the track, the rock cells, the bank and a "rest" place for the rest camp's heal and drying,
+behind make_hills' SHELTER_BUILT, which flips with this landing. Stills: C:/dev/review/lands/hill_cave. view_test
+_test_shelter (a place's "opens" a shelter, a slant one warned; behind the place's cell, its cells kept, dressed;
+open to a rock back, not black; wider than tall, its roof lower at the back, its lip past the face; the fire ring
+and bedrolls). Client and Level only, protocol unchanged, no new class_name.
+
 780 amended (12): the boar's lair, forest phase D (2026-11-05, maps; enemy-ai's apex-lair rule,
 C:/dev/review/enemy-ai/apex_lairs_design.md, its residents as enemy-ai gave them; the coordinator's
 go and its ruling on the roof; terrain's mouth order; release's label). A new level, levels/boar_lair

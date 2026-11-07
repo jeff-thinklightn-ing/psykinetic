@@ -6914,7 +6914,7 @@ func _add_link_cues() -> void:
 			_add_cave_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
 			continue
 		if cue["cue"] == "mine":
-			_add_cave_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)), true)
+			_add_cave_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)), "mine")
 			continue
 		if cue["cue"] == "thicket":
 			_add_thicket_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
@@ -6937,6 +6937,8 @@ func _add_link_cues() -> void:
 			node.position = Vector3(cell.x, _elevation(cell), cell.y)
 			node.rotation.y = atan2(float(facing.x), float(facing.y))
 			_room.add_child(node)
+	for shelter: Dictionary in _terrain.get("shelters", []):
+		_add_cave_mouth(shelter["at"], -(shelter["opens"] as Vector2i), false, "shelter")
 
 
 ## A thicket mouth (798 amended; a link's cue "thicket", maps' boar lair,
@@ -7265,67 +7267,7 @@ func _add_den_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
 	var lean := 1.0 if _roll(at, 159) < 0.5 else -1.0
 	var shelf := Transform3D(Basis.from_euler(Vector3(-DEN_TILT.y, (_roll(at, 158) - 0.5) * 0.3, DEN_TILT.x * lean)),
 			Vector3((_roll(at, 160) - 0.5) * 0.3, DEN_FRONT + DEN_SHELF.y * 0.2, face - DEN_JUT + DEN_SHELF.z * 0.5))
-	var n := 4
-	var slab := func(i: int, j: int, top: bool) -> Vector3:
-		var key := Vector2i(at.x * 59 + i * 7 + (3 if top else 0), at.y * 59 + j)
-		var x := lerpf(-0.5, 0.5, i / float(n)) * DEN_SHELF.x
-		var z := lerpf(-0.5, 0.5, j / float(n)) * DEN_SHELF.z
-		var rim := i == 0 or i == n or j == 0 or j == n
-		# Its outline ragged: each rim point in or out a little.
-		if rim:
-			var inward := Vector2(x, z).normalized() * (_roll(key, 167) - 0.3) * 0.3
-			x -= inward.x
-			z -= inward.y
-		var y := DEN_SHELF.y * 0.5 * (1.0 if top else -1.0)
-		if top:
-			y += (_roll(key, 168) - 0.5) * 0.14 - (0.08 if rim else 0.0)
-		else:
-			y += (_roll(key, 169) - 0.5) * 0.08
-		return shelf * Vector3(x, y, z)
-	var rock_tone := func(key: Vector2i, darken: float, mossy: bool) -> Color:
-		if mossy and _roll(key, 170) < DEN_SHELF_MOSS:
-			return Color(grass * lerpf(0.4, 0.58, _roll(key, 171)) * darken, 1.0)
-		var tint := MOUTH_WARM if _roll(key, 165) < 0.5 else MOUTH_COLD
-		return Color(rock * (DEN_SHELF_SHADE * lerpf(0.8, 1.1, _roll(key, 164)) * darken), 1.0) * tint
-	var middle := shelf.origin
-	var lift := shelf.basis * Vector3.UP
-	for i in n:
-		for j in n:
-			var key := Vector2i(at.x * 61 + i, at.y * 61 + j)
-			var a: Vector3 = slab.call(i, j, true)
-			var b: Vector3 = slab.call(i + 1, j, true)
-			var c: Vector3 = slab.call(i + 1, j + 1, true)
-			var d: Vector3 = slab.call(i, j + 1, true)
-			put.call(a, b, c, lift, rock_tone.call(key, 1.0, true))
-			key.y += 101
-			put.call(a, c, d, lift, rock_tone.call(key, 0.95, true))
-			var ua: Vector3 = slab.call(i, j, false)
-			var ub: Vector3 = slab.call(i + 1, j, false)
-			var uc: Vector3 = slab.call(i + 1, j + 1, false)
-			var ud: Vector3 = slab.call(i, j + 1, false)
-			put.call(ua, ub, uc, -lift, rock_tone.call(key, 0.55, false))
-			put.call(ua, uc, ud, -lift, rock_tone.call(key, 0.55, false))
-	# Its edges, top rim to bottom rim all round.
-	var rim_path: Array[Vector2i] = []
-	for i in n:
-		rim_path.append(Vector2i(i, 0))
-	for j in n:
-		rim_path.append(Vector2i(n, j))
-	for i in range(n, 0, -1):
-		rim_path.append(Vector2i(i, n))
-	for j in range(n, 0, -1):
-		rim_path.append(Vector2i(0, j))
-	for k in rim_path.size():
-		var p := rim_path[k]
-		var q := rim_path[(k + 1) % rim_path.size()]
-		var a: Vector3 = slab.call(p.x, p.y, true)
-		var b: Vector3 = slab.call(q.x, q.y, true)
-		var c: Vector3 = slab.call(q.x, q.y, false)
-		var d: Vector3 = slab.call(p.x, p.y, false)
-		var out := (a + b) * 0.5 - middle
-		var key := Vector2i(at.x * 67 + k, at.y * 67)
-		put.call(a, b, c, out, rock_tone.call(key, 0.8, false))
-		put.call(a, c, d, out, rock_tone.call(key, 0.75, false))
+	_rock_slab(put, at, shelf, DEN_SHELF, DEN_SHELF_SHADE, DEN_SHELF_MOSS, rock, grass)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
@@ -7438,6 +7380,104 @@ func _add_den_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
 		holder.add_child(heap)
 
 
+## A broken slab of rock [param size] (across, thick, deep) at [param shelf]
+## into [param put] (a mesh's triangle adder): its top and edges in facets,
+## each rim point pushed a little in or out, the cliffs' [param rock] times
+## [param shade], its top mossy ([param grass]) one facet in [param moss],
+## its underside dark. The den's shelf, a shelter's lip. [param n] facets
+## each way; [param bend], if given, moves each point (its x and z in the
+## slab, top or not) by the Vector3 it returns, in the slab's frame; a top
+## facet's chance of moss grows by [param moss_back] toward the back (+z).
+func _rock_slab(put: Callable, at: Vector2i, shelf: Transform3D, size: Vector3, shade: float, moss: float, rock: Color, grass: Color,
+		n := 4, bend := Callable(), moss_back := 0.0) -> void:
+	var slab := func(i: int, j: int, top: bool) -> Vector3:
+		var key := Vector2i(at.x * 59 + i * 7 + (3 if top else 0), at.y * 59 + j)
+		var x := lerpf(-0.5, 0.5, i / float(n)) * size.x
+		var z := lerpf(-0.5, 0.5, j / float(n)) * size.z
+		var rim := i == 0 or i == n or j == 0 or j == n
+		# Its outline ragged: each rim point in or out a little.
+		if rim:
+			var inward := Vector2(x, z).normalized() * (_roll(key, 167) - 0.3) * 0.3
+			x -= inward.x
+			z -= inward.y
+		var y := size.y * 0.5 * (1.0 if top else -1.0)
+		if top:
+			y += (_roll(key, 168) - 0.5) * 0.14 - (0.08 if rim else 0.0)
+		else:
+			y += (_roll(key, 169) - 0.5) * 0.08
+		if bend.is_valid():
+			var moved: Vector3 = bend.call(x, z, top)
+			x += moved.x
+			y += moved.y
+			z += moved.z
+		return shelf * Vector3(x, y, z)
+	var rock_tone := func(key: Vector2i, darken: float, mossy: bool, chance := moss) -> Color:
+		if mossy and _roll(key, 170) < chance:
+			return Color(grass * lerpf(0.4, 0.58, _roll(key, 171)) * darken, 1.0)
+		var tint := MOUTH_WARM if _roll(key, 165) < 0.5 else MOUTH_COLD
+		return Color(rock * (shade * lerpf(0.8, 1.1, _roll(key, 164)) * darken), 1.0) * tint
+	var middle := shelf.origin
+	var lift := shelf.basis * Vector3.UP
+	for i in n:
+		for j in n:
+			var key := Vector2i(at.x * 61 + i, at.y * 61 + j)
+			var a: Vector3 = slab.call(i, j, true)
+			var b: Vector3 = slab.call(i + 1, j, true)
+			var c: Vector3 = slab.call(i + 1, j + 1, true)
+			var d: Vector3 = slab.call(i, j + 1, true)
+			var chance := moss + moss_back * smoothstep(-0.1, 0.35, (j + 0.5) / n - 0.5)
+			put.call(a, b, c, lift, rock_tone.call(key, 1.0, true, chance))
+			key.y += 101
+			put.call(a, c, d, lift, rock_tone.call(key, 0.95, true, chance))
+			var ua: Vector3 = slab.call(i, j, false)
+			var ub: Vector3 = slab.call(i + 1, j, false)
+			var uc: Vector3 = slab.call(i + 1, j + 1, false)
+			var ud: Vector3 = slab.call(i, j + 1, false)
+			put.call(ua, ub, uc, -lift, rock_tone.call(key, 0.55, false))
+			put.call(ua, uc, ud, -lift, rock_tone.call(key, 0.55, false))
+	# Its edges, top rim to bottom rim all round.
+	var rim_path: Array[Vector2i] = []
+	for i in n:
+		rim_path.append(Vector2i(i, 0))
+	for j in n:
+		rim_path.append(Vector2i(n, j))
+	for i in range(n, 0, -1):
+		rim_path.append(Vector2i(i, n))
+	for j in range(n, 0, -1):
+		rim_path.append(Vector2i(0, j))
+	for k in rim_path.size():
+		var p := rim_path[k]
+		var q := rim_path[(k + 1) % rim_path.size()]
+		var a: Vector3 = slab.call(p.x, p.y, true)
+		var b: Vector3 = slab.call(q.x, q.y, true)
+		var c: Vector3 = slab.call(q.x, q.y, false)
+		var d: Vector3 = slab.call(p.x, p.y, false)
+		var out := (a + b) * 0.5 - middle
+		var key := Vector2i(at.x * 67 + k, at.y * 67)
+		put.call(a, b, c, out, rock_tone.call(key, 0.8, false))
+		put.call(a, c, d, out, rock_tone.call(key, 0.75, false))
+
+
+## A shelter's lip's shape for _rock_slab's bend (its x and z in the slab,
+## -z its front): toward the front, SHELTER_LIP_STEPS steps across, each
+## dropped and set back by its own roll, one corner (by [param at]) sagging,
+## the ends tucked back toward the face, the edge chipped; toward the back,
+## sunk SHELTER_LIP_SINK.
+func _shelter_lip_bend(at: Vector2i) -> Callable:
+	var drops: Array[Vector2] = []
+	for k in SHELTER_LIP_STEPS:
+		drops.append(Vector2(_roll(at, 176 + k) * SHELTER_LIP_STEP.x, _roll(at, 180 + k) * SHELTER_LIP_STEP.y))
+	var side := 1.0 if _roll(at, 184) < 0.5 else -1.0
+	return func(x: float, z: float, top: bool) -> Vector3:
+		var across := clampf(x / (SHELTER_LIP.x * 0.5), -1.0, 1.0)
+		var front := smoothstep(0.0, 1.0, -z / (SHELTER_LIP.z * 0.5))
+		var back := smoothstep(0.0, 1.0, z / (SHELTER_LIP.z * 0.5))
+		var step: Vector2 = drops[clampi(int((across + 1.0) * 0.5 * SHELTER_LIP_STEPS), 0, SHELTER_LIP_STEPS - 1)]
+		var sag := SHELTER_LIP_SAG * smoothstep(0.3, 1.0, across * side)
+		var tuck := SHELTER_JUT * 0.9 * smoothstep(0.55, 1.0, absf(across))
+		var chip := 0.12 * _roll(Vector2i(roundi(x * 10.0), roundi(z * 10.0)), 185) if top else 0.0
+		return Vector3(0.0, -front * (step.x + sag + chip) - back * SHELTER_LIP_SINK, front * (step.y + tuck))
+
 ## A cave mouth (a link's cue "cave"; the forest plan's lairs): a
 ## hill of the cliffs' faceted rock behind the link cell, its face across
 ## the cell's far edge with a low dark arch in it and a throat going black,
@@ -7485,6 +7525,51 @@ const MINE_STAIR := 1.9
 ## The goblins' claim (lore: the Blood Rot daub their star in rust red on
 ## what they hold): art-kit's star daubs on the face frame's timbers, [x, y]
 ## on its front (m), each turned a little.
+## A rock shelter (798 amended (4): a place's "opens", the hills' hill cave;
+## the coordinator from Jeff's play: "i went toward the cave, got a wayfinder
+## flag, but don't see a cave anywhere"): the cave mouth's hill behind the
+## place's cell, its arch SHELTER_ARCH wide and low and flattened
+## (SHELTER_SQUARE), SHELTER_DEEP deep over walked ground (maps: the cells
+## under it floor, the rest of the hill rock), a SHELTER_HUMP hump; inside,
+## the rock shaded SHELTER_SHADE of the hill's from the lip to the back, never
+## black; the face's lip only SHELTER_LIP_DARK. Dressed as a refuge
+## (SHELTER_DRESS): a cold fire ring under the lip, two old bedrolls, wood.
+const SHELTER_ARCH := Vector2(4.8, 2.1)
+const SHELTER_SQUARE := 4.0
+## Its roof uneven: the arch's height wanders by up to this share across it.
+const SHELTER_UNEVEN := 0.14
+## Inside, its roof falls toward the back to this share of the lip's height
+## (the coordinator: you'd duck to reach the bedrolls).
+const SHELTER_BACK := 0.5
+## Its lip: a broken slab of the cliffs' rock (_rock_slab) SHELTER_LIP across,
+## thick and deep, over the arch, jutting SHELTER_JUT past the face, sunk in
+## the hill behind, tilted SHELTER_LIP_TILT (radians, its front up). Its
+## front edge broken (the coordinator on the stills: not "a built dolmen or a
+## stone table"): SHELTER_LIP_STEPS steps across, each dropped up to
+## SHELTER_LIP_STEP.x and set back up to SHELTER_LIP_STEP.y; one corner
+## sagging SHELTER_LIP_SAG; its ends tucked back into the face; chipped; its
+## back sunk SHELTER_LIP_SINK under the hill with the bank's grass over it.
+const SHELTER_LIP := Vector3(5.6, 0.55, 2.4)
+const SHELTER_LIP_FACETS := 9
+const SHELTER_LIP_STEPS := 3
+const SHELTER_LIP_STEP := Vector2(0.28, 0.4)
+const SHELTER_LIP_SAG := 0.45
+const SHELTER_LIP_SINK := 0.35
+const SHELTER_JUT := 0.9
+const SHELTER_LIP_TILT := 0.07
+const SHELTER_DEEP := 3.0
+const SHELTER_HUMP := 1.6
+const SHELTER_SHADE := Vector2(0.7, 0.4)
+const SHELTER_LIP_DARK := 0.55
+## Each piece: [slot, where in the shelter's frame past its face (y over
+## the ground there), turn (radians), size].
+const SHELTER_DRESS := [
+	["prop.campfire_cold", Vector3(0.1, 0.0, 0.5), 0.3, 1.0],
+	["prop.bedroll", Vector3(-1.0, 0.0, 2.05), PI * 0.5 + 0.15, 1.0],
+	["prop.bedroll", Vector3(0.95, 0.0, 1.95), PI * 0.5 - 0.2, 1.0],
+	["prop.woodpile", Vector3(1.55, 0.0, 0.5), 1.4, 0.7],
+	["prop.fur_tuft", Vector3(-0.6, 0.0, 1.7), 0.8, 1.0],
+]
 const MINE_DAUBS := [Vector2(-1.08, 1.45), Vector2(1.1, 1.05), Vector2(0.45, 2.72)]
 const MOUTH_THROAT := 2.6
 ## The throat's rock at its lip, of the cliffs' rock, darkening to nothing.
@@ -7566,6 +7651,12 @@ func _mouth_cells() -> Dictionary[Vector2i, bool]:
 		for z in range(1, MOUTH_CELLS.y + 1):
 			for x in range(-(MOUTH_CELLS.x / 2), MOUTH_CELLS.x / 2 + 1):
 				out[at + ahead * z + across * x] = true
+	for shelter: Dictionary in _terrain.get("shelters", []):
+		var ahead: Vector2i = -(shelter["opens"] as Vector2i)
+		var across := Vector2i(-ahead.y, ahead.x)
+		for z in range(1, MOUTH_CELLS.y + 1):
+			for x in range(-(MOUTH_CELLS.x / 2), MOUTH_CELLS.x / 2 + 1):
+				out[shelter["at"] + ahead * z + across * x] = true
 	return out
 
 
@@ -7592,13 +7683,21 @@ func _throat_cells() -> Dictionary[Vector2i, bool]:
 ## "Mouth_x_y". In its own frame +z runs into the hill, x across, the face
 ## at z 0.5 (the link cell's far edge). [param closed] (the link closed or
 ## sealed): a rockfall heaped in the arch (MOUTH_ROCKFALL), spilling out.
-## [param mine]: a mine's (cue "mine"): its arch MINE_ARCH, squared, and
-## dressed as one (_dress_mine).
-func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := false) -> void:
-	var arch := MINE_ARCH if mine else MOUTH_ARCH
-	var square := MINE_SQUARE if mine else 2.0
+## [param kind]: "cave"; "mine" (cue "mine"): its arch MINE_ARCH, squared,
+## and dressed as one (_dress_mine); "shelter" (a place's rock shelter, its
+## "opens"): its arch SHELTER_ARCH, wide and low, SHELTER_DEEP deep over the
+## ground (drawn under it, walked on), its rock shaded, not black, to a
+## rock back, and dressed as a refuge (_dress_shelter).
+func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, kind := "cave") -> void:
+	var mine := kind == "mine"
+	var shelter := kind == "shelter"
+	var arch := MINE_ARCH if mine else SHELTER_ARCH if shelter else MOUTH_ARCH
+	var square := MINE_SQUARE if mine else SHELTER_SQUARE if shelter else 2.0
+	var deep := SHELTER_DEEP if shelter else MOUTH_THROAT
+	# A mine's and a shelter's roof set over their own floor, not the ground.
+	var floored := kind != "cave"
 	var holder := Node3D.new()
-	holder.name = "Mouth_%d_%d" % [at.x, at.y]
+	holder.name = ("Shelter_%d_%d" if shelter else "Mouth_%d_%d") % [at.x, at.y]
 	var base := _height_in(at, Vector2(at))
 	holder.position = Vector3(at.x, base, at.y)
 	holder.rotation.y = atan2(float(ahead.x), float(ahead.y))
@@ -7613,9 +7712,12 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 		var world := holder.transform * Vector3(x, 0.0, z)
 		var cell := Vector2i(roundi(world.x), roundi(world.z))
 		return _height_in(cell, Vector2(world.x, world.z)) - base
+	var uneven := SHELTER_UNEVEN if shelter else 0.0
+	var wander := _roll(at, 172) * TAU
 	var arch_top := func(x: float) -> float:
 		var t := x / (arch.x * 0.5)
-		return arch.y * pow(maxf(0.0, 1.0 - pow(absf(t), square)), 1.0 / square) if absf(t) < 1.0 else -1.0
+		var high := arch.y * (1.0 + uneven * (0.6 * sin(x * 2.1 + wander) + 0.4 * sin(x * 4.7 + wander * 1.7)))
+		return high * pow(maxf(0.0, 1.0 - pow(absf(t), square)), 1.0 / square) if absf(t) < 1.0 else -1.0
 	# Inside the arch, the same height wherever two strips share an edge.
 	var arch_in := func(x: float) -> float:
 		return arch_top.call(clampf(x, -arch.x * 0.5 + 0.001, arch.x * 0.5 - 0.001))
@@ -7645,7 +7747,7 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 	var throat_cells := _throat_cells()
 	# A mine's hill a low hump on its slope (MINE_HUMP), its roof set by the
 	# throat's floor; a cave's MOUTH_HILL high.
-	var hill_high := MINE_HUMP if mine else MOUTH_HILL.y
+	var hill_high := MINE_HUMP if mine else SHELTER_HUMP if shelter else MOUTH_HILL.y
 	# In a bank (the ground already rising behind the face, the relief's):
 	# how far it stands in for the hill, 1 when the ground two metres in is
 	# as high as the arch's roof. Then the rock is its face, a roof over the
@@ -7687,18 +7789,18 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 			# A mine's over the throat's own floor (the mouth's base), not over
 			# the slope's ground rising behind it (on that, a tooth of rock).
 			var floor_need := -INF
-			if mine or z < face + MOUTH_THROAT + 0.6:
+			if floored or z < face + deep + 0.6:
 				var ceiling: float = arch_top.call(clampf(x * 0.92, -arch.x * 0.5 + 0.01, arch.x * 0.5 - 0.01))
 				var reach := 1.0 - smoothstep(arch.x * 0.5, arch.x * 0.5 + 0.9, absf(x))
 				var roof := (ceiling + MOUTH_ROOF + lump * 0.3) * reach
-				if mine:
+				if floored:
 					floor_need = roof
 				else:
 					h = maxf(h, roof)
 			# The cut face holds up about the arch, falling away a metre out.
 			var shoulder := 1.0 - smoothstep(arch.x * 0.5 + 0.2, arch.x * 0.5 + 1.4, absf(x))
 			var held := (arch.y + 0.5) * shoulder * (1.0 - smoothstep(face + 0.5, face + 1.5, z))
-			if mine:
+			if floored:
 				floor_need = maxf(floor_need, held)
 			else:
 				h = maxf(h, held)
@@ -7709,15 +7811,15 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 			var own := h + lay
 			# A mine's roof eases down from the throat's end into the slope
 			# at the hill's back, so the hillside carries it.
-			if mine and not rim:
-				own = maxf(own, lerpf(floor_need, lay, smoothstep(face + MOUTH_THROAT, MOUTH_HILL.z, z)))
+			if floored and not rim:
+				own = maxf(own, lerpf(floor_need, lay, smoothstep(face + deep, MOUTH_HILL.z, z)))
 			if bank > 0.0:
 				# The bank's way: its ground, an outcrop here and there and a
 				# rim of rock along the face; the roof over the throat.
 				var broken := _roll(Vector2i(at.x * 37 + c, at.y * 37 + r), 94)
 				var crag := MOUTH_RIM * (0.4 + 0.6 * broken) * (1.0 - smoothstep(face + MOUTH_RIM_REACH * 0.5, face + MOUTH_RIM_REACH, z))
 				var need := -INF
-				if z < face + MOUTH_THROAT + 0.6:
+				if z < face + deep + 0.6:
 					var ceiling: float = arch_top.call(clampf(x * 0.92, -arch.x * 0.5 + 0.01, arch.x * 0.5 - 0.01))
 					need = (ceiling + MOUTH_ROOF + lump * 0.3) * (1.0 - smoothstep(arch.x * 0.5, arch.x * 0.5 + 0.9, absf(x)))
 				own = lerpf(own, maxf(lay + crag, need), bank)
@@ -7865,7 +7967,7 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 			var over := absf(middle.x) - arch.x * 0.5
 			var lip_y: float = arch_top.call(middle.x)
 			var off := over if lip_y < 0.0 else middle.y - lip_y
-			var lip := lerpf(MOUTH_LIP_DARK, 1.0, smoothstep(0.0, MOUTH_LIP_REACH, maxf(off, 0.0)))
+			var lip := lerpf(SHELTER_LIP_DARK if shelter else MOUTH_LIP_DARK, 1.0, smoothstep(0.0, MOUTH_LIP_REACH, maxf(off, 0.0)))
 			var key := Vector2i(at.x * 13 + k, at.y * 13 + j)
 			put.call(a, b, c, hint, tone.call(Vector3(0.0, 0.0, -1.0), key, 0.85 * lip))
 			key.y += 101
@@ -7874,20 +7976,25 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 	# black; its floor, and a black end.
 	var rings := 6
 	for ring in rings:
-		var z0 := face + MOUTH_THROAT * ring / rings
-		var z1 := face + MOUTH_THROAT * (ring + 1) / rings
+		var z0 := face + deep * ring / rings
+		var z1 := face + deep * (ring + 1) / rings
 		var s0 := 1.0 - 0.15 * ring / rings
 		var s1 := 1.0 - 0.15 * (ring + 1) / rings
+		# Heights: a shelter's roof falls toward its back (SHELTER_BACK).
+		var h0 := lerpf(1.0, SHELTER_BACK, float(ring) / rings) if shelter else s0
+		var h1 := lerpf(1.0, SHELTER_BACK, float(ring + 1) / rings) if shelter else s1
 		var dark := MOUTH_LIP_SHADE * pow(1.0 - float(ring) / rings, 2.0)
+		if shelter:
+			dark = MOUTH_ROCK_SHADE * lerpf(SHELTER_SHADE.x, SHELTER_SHADE.y, (ring + 0.5) / rings)
 		var shade := Color(rock * dark, 1.0)
 		var floor_shade := Color(rock * dark * 0.6, 1.0)
 		for k in roundi(arch.x / fine):
 			var xa := -arch.x * 0.5 + k * fine
 			var xb := xa + fine
-			var a := Vector3(xa * s0, arch_in.call(xa) * s0, z0)
-			var b := Vector3(xb * s0, arch_in.call(xb) * s0, z0)
-			var c := Vector3(xb * s1, arch_in.call(xb) * s1, z1)
-			var d := Vector3(xa * s1, arch_in.call(xa) * s1, z1)
+			var a := Vector3(xa * s0, arch_in.call(xa) * h0, z0)
+			var b := Vector3(xb * s0, arch_in.call(xb) * h0, z0)
+			var c := Vector3(xb * s1, arch_in.call(xb) * h1, z1)
+			var d := Vector3(xa * s1, arch_in.call(xa) * h1, z1)
 			var inward := Vector3(0.0, arch.y * 0.3, (z0 + z1) * 0.5) - (a + c) * 0.5
 			put.call(a, b, c, inward, shade)
 			put.call(a, c, d, inward, shade)
@@ -7897,8 +8004,8 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 		# on the wolves' cave from above).
 		for side: float in [-1.0, 1.0]:
 			var e := side * arch.x * 0.5
-			var top0 := Vector3(e * s0, arch_in.call(e) * s0, z0)
-			var top1 := Vector3(e * s1, arch_in.call(e) * s1, z1)
+			var top0 := Vector3(e * s0, arch_in.call(e) * h0, z0)
+			var top1 := Vector3(e * s1, arch_in.call(e) * h1, z1)
 			var foot0 := Vector3(e * s0, -0.1, z0)
 			var foot1 := Vector3(e * s1, -0.1, z1)
 			var into := Vector3(-side, 0.0, 0.0)
@@ -7908,17 +8015,26 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 		var fb := Vector3(arch.x * 0.5 * s0, 0.02, z0)
 		var fc := Vector3(arch.x * 0.5 * s1, 0.02, z1)
 		var fd := Vector3(-arch.x * 0.5 * s1, 0.02, z1)
-		put.call(fa, fb, fc, Vector3.UP, floor_shade)
-		put.call(fa, fc, fd, Vector3.UP, floor_shade)
-	var back := face + MOUTH_THROAT
+		if not shelter:
+			put.call(fa, fb, fc, Vector3.UP, floor_shade)
+			put.call(fa, fc, fd, Vector3.UP, floor_shade)
+	var back := face + deep
+	var end_shade := Color(rock * MOUTH_ROCK_SHADE * SHELTER_SHADE.y * 0.9, 1.0) if shelter else Color.BLACK
 	var narrow := 0.85
+	var low := SHELTER_BACK if shelter else narrow
 	for k in roundi(arch.x / fine):
 		var xa := -arch.x * 0.5 + k * fine
 		var xb := xa + fine
 		put.call(Vector3(xa * narrow, 0.0, back), Vector3(xb * narrow, 0.0, back),
-				Vector3(xb * narrow, arch_in.call(xb) * narrow, back), Vector3(0.0, 0.0, -1.0), Color.BLACK)
-		put.call(Vector3(xa * narrow, 0.0, back), Vector3(xb * narrow, arch_in.call(xb) * narrow, back),
-				Vector3(xa * narrow, arch_in.call(xa) * narrow, back), Vector3(0.0, 0.0, -1.0), Color.BLACK)
+				Vector3(xb * narrow, arch_in.call(xb) * low, back), Vector3(0.0, 0.0, -1.0), end_shade)
+		put.call(Vector3(xa * narrow, 0.0, back), Vector3(xb * narrow, arch_in.call(xb) * low, back),
+				Vector3(xa * narrow, arch_in.call(xa) * low, back), Vector3(0.0, 0.0, -1.0), end_shade)
+	# A shelter's lip: a slab over the arch, jutting past the face.
+	if shelter:
+		var lip := Transform3D(Basis.from_euler(Vector3(SHELTER_LIP_TILT, (_roll(at, 173) - 0.5) * 0.2, (_roll(at, 174) - 0.5) * 0.08)),
+				Vector3((_roll(at, 175) - 0.5) * 0.4, arch.y + SHELTER_LIP.y * 0.35, face - SHELTER_JUT + SHELTER_LIP.z * 0.5))
+		_rock_slab(put, at + Vector2i(3, 5), lip, SHELTER_LIP, MOUTH_ROCK_SHADE, MOUTH_MOSS, rock, grass,
+				SHELTER_LIP_FACETS, _shelter_lip_bend(at), 1.0)
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = PackedVector3Array(vertices)
@@ -7978,8 +8094,32 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false, mine := fal
 	holder.add_child(scree)
 	if mine:
 		_dress_mine(holder, at, face, ground)
+	if shelter:
+		_dress_shelter(holder, at, face, ground)
 	_room.add_child(holder)
 
+
+
+## A rock shelter's dressing (SHELTER_DRESS) in [param holder]'s frame
+## (+z into the hill, its face at [param face]), on [param ground] (a height
+## in that frame: the shelter's floor is the ground). A piece the kit lacks
+## is left out.
+func _dress_shelter(holder: Node3D, at: Vector2i, face: float, ground: Callable) -> void:
+	var dress := Node3D.new()
+	dress.name = "Refuge"
+	holder.add_child(dress)
+	for k in SHELTER_DRESS.size():
+		var spec: Array = SHELTER_DRESS[k]
+		var slot := str(spec[0])
+		if not ArtKit.has(slot):
+			continue
+		var piece := ArtKit.instance(slot, 1 + posmod(hash(at) + k, maxi(ArtKit.variant_count(slot), 1)))
+		var where: Vector3 = spec[1]
+		piece.position = Vector3(where.x, where.y + float(ground.call(where.x, face + where.z)), face + where.z)
+		piece.rotation.y = float(spec[2])
+		piece.scale = Vector3.ONE * float(spec[3])
+		piece.set_meta("slot", slot)
+		dress.add_child(piece)
 
 
 ## A mine mouth's dressing (MINE_DRESS), in [param holder]'s frame (the

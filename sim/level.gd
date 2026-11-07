@@ -1306,6 +1306,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["neighbours"] = neighbours_from(config, warnings)
 	level["places"] = places_from(config, warnings)
 	level["terrain"]["camps"] = camps_of(level["places"])
+	level["terrain"]["shelters"] = shelters_of(level["places"])
 	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
 	level["forage"] = forage_from(config, warnings)
@@ -1536,6 +1537,18 @@ static func camps_of(places: Dictionary) -> Array[Dictionary]:
 	return out
 
 
+## The rock shelters drawn at places (798 amended (4): the hills' hill cave):
+## [{at, opens}] for each place whose "opens" (the way it faces out, a step
+## along x or y) is given; Client3D draws an overhang of rock behind its cell.
+static func shelters_of(places: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for key: String in places:
+		var place: Dictionary = places[key]
+		if place.get("opens") is Vector2i and place.get("cell") is Vector2i:
+			out.append({"at": place["cell"], "opens": place["opens"]})
+	return out
+
+
 static func places_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
 	var out: Dictionary[String, Dictionary] = {}
 	var listed: Variant = config.get("places", {})
@@ -1564,6 +1577,13 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 			out[str(key)]["lore_id"] = str(entry["lore_id"])
 		# The name a reached place's gain shows (804, maps' side; voice's), where its name is a where-phrase (613's).
 		out[str(key)]["shown"] = str(entry["shown"]).strip_edges() if entry.get("shown") is String and not str(entry["shown"]).strip_edges().is_empty() else out[str(key)]["name"]
+		# A rock shelter's way out (798 amended (4)): a step along x or y, else warned and left out.
+		if entry.has("opens"):
+			var opens: Variant = _tile(entry["opens"])
+			if opens is Vector2i and absi(opens.x) + absi(opens.y) == 1:
+				out[str(key)]["opens"] = opens
+			else:
+				warnings.append("the place %s opens %s: not a step along x or y, left out" % [key, entry["opens"]])
 		# A refuge's where (613 amended): one of REFUGE_WHERE, else warned and left out.
 		if kind == "refuge":
 			var where := str(entry.get("where", ""))
