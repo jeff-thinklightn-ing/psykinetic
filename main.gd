@@ -6190,6 +6190,7 @@ func _season_command(words: PackedStringArray) -> String:
 
 
 func _exit_tree() -> void:
+	World.stop_watch()  # Quitting runs no frames: no stall (decision 817).
 	# Clean shutdown (quit, window closed): keep the last state, unless it was
 	# kept before the zones were let go (_release_zones), which an empty world
 	# saved now would overwrite.

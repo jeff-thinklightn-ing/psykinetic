@@ -43976,3 +43976,47 @@ aura). Stills (C:/dev/review/lands/motes_1106): 3 cm barely showed at play zoom 
 6 cm soft read as small glints at night and under a roof, next to nothing on sunlit stone (faint by day,
 as asked; kept additive, no tint on the body); the coordinator took 8 cm. Client only, protocol
 unchanged, no new class_name, no bullet (the charm stays hidden until the bear's cave opens).
+
+## 817. The server ships with Godot's debug template, behind a tick watchdog
+
+Release found the box runs Godot's release template, which compiles out
+GDScript's runtime checks: a bad call prints nothing and can take the whole
+server down (a segfault), where the debug template prints "SCRIPT ERROR"
+with the line and goes on. Perf's bench (the town soak, 1 game day, one pck
+from main under the Windows 4.7.2 templates, bench lock): the debug
+template costs about +18% on the average tick at 3 players (1443-1457 us
+against 1224-1226) and +23% at 16 (1886 against 1532), about +8% memory
+(0.67-0.68 GB against 0.62), and the worst tick +10% at 3, +43% at 16 (1.27
+s against 0.89; one run). On a 100 ms tick that is cheap, and named errors
+are worth it (the coordinator). But under the debug template a script error
+ends only its function: a step left half done can wedge the server instead
+of crashing it. So the switch comes with a watchdog, in two landings:
+
+1. This one: the watchdog and an hourly tick line, on the release build.
+   sim/tick_watch.gd, made by World on a dedicated server (Net.mode SERVER)
+   on its first frame. A thread outside the sim looks every second at when
+   World's last frame ran (alive(); a tick held or not yet due still runs
+   frames, so only a main loop that never comes back counts). None for
+   STALL_MSEC, 30 s (the worst tick measured 1.3 s; the box's worst today
+   193 ms; a regeneration's apply once froze 16.8 s, now 65 ms), and it
+   prints one line, "[tick] stalled: the main loop stuck N s, since tick T;
+   the last part done: P; the last error: E; quitting for a restart",
+   naming the last part of a tick that finished (World.part) and the last
+   error the engine reported (a Logger added with OS.add_logger), then
+   kills its own process: SIGKILL on the box, a failure to systemd's
+   Restart=on-failure, which starts it again, and a restart in release's
+   crash check. Main._exit_tree stops it first (quitting runs no frames),
+   and World's _exit_tree. Each hour it prints "[tick] avg N ms, worst M
+   ms, ticks T over the last hour", for the average before and after the
+   switch. tick_watch_test: the line (none before the first frame or within
+   30 s; the tick, part and error named after), a frame again clears it,
+   the hourly sums, and a child Godot (tests/tick_watch_wedge.tscn, a 3 s
+   watch) whose main loop wedges is ended by its watchdog with the line.
+2. 817 amended, a day of hourly lines later: deploy.sh, stage.sh and
+   server_boot_test export with --export-debug, deploy checking the Linux
+   debug template is on the box; release deploys it in a quiet hour.
+
+The 0.9-1.3 s worst tick at 16 players is a fault of its own, whichever
+template: perf finds what it is next.
+
+Server only, protocol unchanged, no new class_name, no bullet.

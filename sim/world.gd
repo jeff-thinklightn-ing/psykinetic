@@ -1003,6 +1003,9 @@ var _slow_worst_frame := 0
 var _slow_said := -SLOW_SAY_MSEC
 var _frame_at := 0
 var _last_ticks_usec := 0
+## The tick watchdog (decision 817, sim/tick_watch.gd): a dedicated server's
+## only, made on its first frame; null elsewhere.
+var _watch: RefCounted
 
 
 ## Adds the time since [param since] (Time.get_ticks_usec) to this tick's
@@ -1015,6 +1018,8 @@ var senses_usec := 0
 func part(name: String, since: int) -> int:
 	var now := Time.get_ticks_usec()
 	tick_parts[name] = tick_parts.get(name, 0) + now - since
+	if _watch != null:
+		_watch.note_part(name)
 	return now
 
 
@@ -1088,6 +1093,11 @@ func _process(delta: float) -> void:
 		_clock_drift -= slew
 		tick_alpha = _clock - tick
 		return
+	if Net.mode == Net.Mode.SERVER:
+		if _watch == null:
+			_watch = preload("res://sim/tick_watch.gd").new()
+			_watch.start()
+		_watch.alive(tick)  # A frame: the main loop goes on, ticks due or held.
 	if Net.test_holds(tick):
 		_accumulator = 0.0
 		return
@@ -1107,6 +1117,8 @@ func _process(delta: float) -> void:
 			var took := Time.get_ticks_usec() - started
 			ticks_usec += took
 			Net.stats.record_tick(took, tick)
+			if _watch != null:
+				_watch.beat(tick, took)
 			_note_slow(took, 0)
 			steps += 1
 			if pause_at_tick >= 0 and tick >= pause_at_tick:
@@ -5198,6 +5210,19 @@ func try_barter(by: GridEntity, shop: GridEntity, give: Array, take: Array, bala
 ## Who last put each thing on the ground (a drop or a throw), by uid, for
 ## the stockpile's ledger; gone when it is taken off again.
 var _put_down_by: Dictionary[int, String] = {}
+
+
+## The tick watchdog's thread ended (decision 817): as the server begins to
+## quit (Main._exit_tree, whose saves and waits run no frames) and with the
+## world.
+func stop_watch() -> void:
+	if _watch != null:
+		_watch.stop()
+		_watch = null
+
+
+func _exit_tree() -> void:
+	stop_watch()
 
 
 func _ready() -> void:
