@@ -282,6 +282,19 @@ const WADE_MOST := 1.6
 ## The sought's refuges here (613 amended: one place a story, its key the
 ## story's tag), each {at, name}.
 const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave"}}
+## The hill cave's package (Jeff's rule, 820: a place never before what it
+## leads to; the coordinator): its place, the "Cave" waystone W4 and the
+## side track to it are laid only once terrain's shelter is built there.
+## Terrain's shelter landing sets it true and lays the hills again. While
+## false, economy's sought shepherd falls to its alt (the camp).
+const SHELTER_BUILT := false
+## What waits on SHELTER_BUILT: a REFUGES key, a TRACKS "to", a SIGHTS key.
+const SHELTER_PIECES: Array[String] = ["hill_cave", "waystone_cave"]
+
+
+## Whether [param key] (a refuge, a track's place, a sight) is laid now.
+static func _laid(key: String) -> bool:
+	return SHELTER_BUILT or key not in SHELTER_PIECES
 ## The herders' holdings (640, maps' side; Jeff: "herders exist as people"):
 ## refuges economy's herder.places names, each a building.fold (6 x 6, its
 ## gate the front row's middle two edges, open) whose gate looks across a
@@ -872,6 +885,8 @@ static func _herder_pads() -> Array[Rect2i]:
 func _places() -> void:
 	var places := {}
 	for key: String in REFUGES:
+		if not _laid(key):
+			continue
 		var at: Vector2i = REFUGES[key]["at"]
 		places[key] = {"at": [at.x, at.y], "kind": "refuge", "where": "hills", "radius": 3, "name": REFUGES[key]["name"]}
 	for herder in HERDERS:
@@ -909,6 +924,8 @@ func _tracks() -> void:
 		if map.walkable(cell) and map.cell(cell) != "water":
 			road_cells.append(cell)
 	for track: Dictionary in TRACKS:
+		if not _laid(track["to"]):
+			continue
 		var place: Dictionary = config["places"][track["to"]]
 		var to := Vector2i(int(place["at"][0]), int(place["at"][1]))
 		var from: Vector2i = road_cells[0]
@@ -1102,6 +1119,8 @@ static func _sight_rect(sight: Dictionary, at: Vector2i, facing: Vector2i) -> Re
 static func _sight_pads() -> Array[Rect2i]:
 	var out: Array[Rect2i] = []
 	for sight in SIGHTS:
+		if not _laid(sight["key"]):
+			continue
 		var facing: Vector2i = sight["facing"] if sight["facing"] != ROADWARD else Vector2i(0, 1)
 		var rect := _sight_rect(sight, sight["at"], facing)
 		if rect.size != Vector2i.ONE:
@@ -1133,6 +1152,8 @@ func _sights() -> void:
 	if not config.has("decor"):
 		config["decor"] = []
 	for sight in SIGHTS:
+		if not _laid(sight["key"]):
+			continue
 		var planned: Vector2i = sight["at"]
 		var placed := false
 		for reach in range(0, SIGHT_REACH + 1):

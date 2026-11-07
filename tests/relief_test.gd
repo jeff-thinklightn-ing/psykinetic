@@ -733,7 +733,9 @@ func _test_hills() -> void:
 	var on_deck := road_cells.keys().any(func(cell: Vector2i) -> bool: return deck.has_point(cell))
 	# Through the east valley's ford to the spur's foot: dirt but where it fords.
 	var forded := road_cells.keys().filter(func(cell: Vector2i) -> bool: return terrain["fords"].has(cell))
-	_check(roads.size() == 4 and roads[0]["kind"] == "dirt" and on_deck and road_points[0].x < 20.0 and road_points[-1].x > 160.0
+	# The road and 777's tracks: one fewer while the hill cave waits on its shelter (make_hills' SHELTER_BUILT, 820).
+	var ways := 4 if preload("res://tools/make_hills.gd").SHELTER_BUILT else 3
+	_check(roads.size() == ways and roads[0]["kind"] == "dirt" and on_deck and road_points[0].x < 20.0 and road_points[-1].x > 160.0
 		and not forded.is_empty()
 		and road_cells.keys().all(func(cell: Vector2i) -> bool: return wet.has(cell) or terrain["fords"].has(cell) or terrain["kinds"].get(cell, "dirt") == "dirt"),
 		"a dirt road from the link through the west escarpment's way, over the bridge, through the east ford and on to the spur (563, 756; %d cells, %d forded; on the bridge %s, from x %.1f to %.1f; not dirt %s)" % [road_cells.size(), forded.size(),

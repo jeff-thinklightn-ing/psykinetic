@@ -856,7 +856,9 @@ func _test_refuges() -> void:
 			var where_wanted := "castle_dungeon" if zone == "castle_halls" else zone
 			_check(place.get("where", "") == where_wanted and walked,
 				"%s's %s (%s): where %s, walked to in %d steps" % [zone, key, place["cell"], place.get("where", ""), path.size()])
-	_check(tags.size() == 12, "twelve refuges laid, the smith's forge under the castle among them (%s)" % [tags.keys()])
+	# The hill cave waits on terrain's shelter (make_hills' SHELTER_BUILT, 820's rule): its story falls to its alt.
+	var shelter: bool = preload("res://tools/make_hills.gd").SHELTER_BUILT
+	_check(tags.size() == (12 if shelter else 11), "the refuges laid, the smith's forge under the castle among them (%s)" % [tags.keys()])
 	var rules: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/economy.json"))
 	var trades: Dictionary = rules.get("sought", {}).get("trades", {})
 	var wanted := []
@@ -864,7 +866,7 @@ func _test_refuges() -> void:
 		for variant: Variant in [trades[trade], trades[trade].get("alt")]:
 			if variant is Dictionary and str(variant.get("place", "camp")) != "camp":
 				wanted.append(str(variant["place"]))
-	var missing := wanted.filter(func(tag: String) -> bool: return not tags.has(tag))
+	var missing := wanted.filter(func(tag: String) -> bool: return not tags.has(tag) and (shelter or tag != "hill_cave"))
 	_check(missing.is_empty(), "every story's place economy names is laid (%d named; missing %s)" % [wanted.size(), missing])
 	_main.load_map("test_room")
 
@@ -977,7 +979,9 @@ func _test_safe_paths() -> void:
 			dirt += 1
 	_check(wilds.has(Vector2i(185, 95)) and not wilds.has(Vector2i(13, 227)) and wilds.size() > 1400,
 		"the wilds: a track's cell a path, a cleared patch's not (%s)" % [counts])
-	_check(not hills.has(Vector2i(91, 149)) and hills.size() >= 690 and hills.size() < 760,
+	# Without the hill cave's track (SHELTER_BUILT false, 820) about 100 cells fewer.
+	var least := 690 if preload("res://tools/make_hills.gd").SHELTER_BUILT else 590
+	_check(not hills.has(Vector2i(91, 149)) and hills.size() >= least and hills.size() < least + 70,
 		"the hills: the road and 777's tracks, not the river's dirt bank (%d)" % hills.size())
 	_check(counts["forest"] == dirt, "the forest, no road curves: all its dirt on its floor (%d of %d)" % [counts["forest"], dirt])
 
@@ -1004,6 +1008,8 @@ func _test_fill_hills_sights() -> void:
 	var want := {"building.tower_ruin": 1, "tree.great_oak": 1, "building.standing_stone": 1, "building.milestone": 2,
 		"building.wayside_shrine": 1, "building.woodpile": 1, "building.hunters_blind": 1, "building.waystone": 2,
 		"building.cairn": 1, "building.grave": 1, "building.lean_to": 1}
+	if not preload("res://tools/make_hills.gd").SHELTER_BUILT:
+		want["building.waystone"] = 1  # W4 waits on the hill cave's shelter (820's rule).
 	var short := want.keys().filter(func(slot: String) -> bool: return int(counts.get(slot, 0)) != int(want[slot]))
 	_check(short.is_empty(), "the sights stand: a watchtower, an oak, a stone, two milestones, a shrine, a stack, a blind, two waystones, a cairn, a grave, a lean-to (off: %s)" % [short])
 	var decor := {}
@@ -1027,7 +1033,10 @@ func _test_fill_hills() -> void:
 	var paths: Dictionary = area["safe_paths"]
 	var places: Dictionary = area["places"]
 	var far_refuges := []
-	for key: String in ["herders_hut", "hill_cave", "hill_shieling"]:
+	# The hill cave's package waits on terrain's shelter (make_hills' SHELTER_BUILT, 820's rule).
+	var shelter: bool = preload("res://tools/make_hills.gd").SHELTER_BUILT
+	_check(places.has("hill_cave") == shelter, "the hill cave's place only with its shelter (%s)" % shelter)
+	for key: String in (["herders_hut", "hill_cave", "hill_shieling"] if shelter else ["herders_hut", "hill_shieling"]):
 		var at: Vector2i = places[key]["cell"]
 		var near := false
 		for dy in range(-3, 4):
@@ -3275,8 +3284,11 @@ func _test_explorables() -> void:
 		reached.sort()
 		by_level[level_name] = reached
 	_check(wrong.is_empty(), "no town place and no unnamed place is worth reaching (%s)" % [wrong])
-	_check(by_level["hills"] == ["bridge_camp", "herders_hut", "hill_cave", "hill_shieling", "spur_camp"] and by_level["held"] == ["old_tower"],
-		"the hills' five and the Old Tower are; Hollowfell's mouth is not, the zone counts (%s)" % [by_level])
+	var hill_found: Array = ["bridge_camp", "herders_hut", "hill_cave", "hill_shieling", "spur_camp"]
+	if not preload("res://tools/make_hills.gd").SHELTER_BUILT:
+		hill_found.erase("hill_cave")  # Its package waits on terrain's shelter (820's rule).
+	_check(by_level["hills"] == hill_found and by_level["held"] == ["old_tower"],
+		"the hills' refuges and camps and the Old Tower are; Hollowfell's mouth is not, the zone counts (%s)" % [by_level])
 	_check(not by_level["wilds"].has("store") and by_level["wilds"].has("old_farmstead") and not by_level["forest"].has("boar_path"),
 		"the wilds' farmstead is, its store is not, nor the forest's path to the hunters' camps (a way, not a place) (%s)" % [by_level])
 	var shown := {}
@@ -3361,6 +3373,8 @@ func _test_carved(hills: Dictionary) -> void:
 	print("== The hills' carved stones (800) ==")
 	var want := {"Umbrage": ["building.milestone", 2, ""], "Shieling": ["building.milestone", 2, ""],
 		"Hut": ["building.waystone", 3, "left"], "Cave": ["building.waystone", 3, "right"]}
+	if not preload("res://tools/make_hills.gd").SHELTER_BUILT:
+		want.erase("Cave")  # W4 waits on the hill cave's shelter (820's rule).
 	var carved := {}
 	for building: Dictionary in hills.get("buildings", []):
 		if building.has("carved"):

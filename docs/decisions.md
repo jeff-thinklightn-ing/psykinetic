@@ -44201,6 +44201,13 @@ numbered it, as every tree will hold a place back this way.
   out, in the landing that brings the rest of its package.
 - The den's CHANGELOG bullet (780 amended (14)) is taken out of Unreleased: nothing of it is met
   yet. The old grey's landing brings a bullet for the whole package.
+- A place in a land, not a level, is held back in its land's maker the same way. The hills' hill cave
+  (52, 176), where Jeff found a place with nothing at it: make_hills' SHELTER_BUILT, false till
+  terrain's shelter lands there, leaves out its refuge place, the "Cave" waystone W4 and the side track
+  to it (SHELTER_PIECES); terrain's landing sets it true and lays the hills again. The hills were
+  regenerated (make_hills reproduces main unchanged, so the diff is those pieces). Economy's sought
+  shepherd falls to its alt (the camp) with no warning while the place is missing. level_test's fill
+  check, found-places list and carved stones follow the flag.
 - level_test: _check_shelved for each (not in names, not playable, the heir cell floor, no link,
   spawn, bones or clawed tree where its mouth was); the forest's link list and the two lairs' land
   checks read SHELVED, so the opening landing's checks come back on their own.
