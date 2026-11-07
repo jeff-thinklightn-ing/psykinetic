@@ -34070,6 +34070,33 @@ foe would be met on its centre.
 companion_test _test_spear_reach (her strike cells two off; she closes to
 two and strikes); companion_test passes with free walk off and on. Server
 only, protocol unchanged, no new class_name.
+
+699 amended: striking distance (combat; the coordinator's approval of the
+pace program, item 1, package "striking distance", with enemy-ai's side;
+release's label; Jeff: "fights feel a little too fast"). Free bodies met
+chest to chest: a free body stood FREE_RADIUS (0.3) off a foe's cell, about
+0.8 between the centres, and every weapon struck from the same 1.5, so a
+fight was two bodies touching and a sword was no longer than a fist. Now:
+- A weapon's reach by bodies is its verb's "span" (Items.COMMON "span" 0,
+  World.span_of): the centres at most that far apart. A sword 1.6; a hammer,
+  pick, rot hammer 1.7; the Tomb Sledge, battle axe and great axe 1.8. A verb
+  with none (fists, the dagger, the rot spike, a monster's own blow) keeps
+  melee_reach + 2 x FREE_RADIUS (1.5); a reach verb at least its cells less
+  0.1 plus both radii (the spear 2.5). _body_reach, reach_limit and
+  strike_cells_at all read span_of, so a monster closes to the cells a longer
+  weapon strikes from.
+- A player's or a companion's free body walking into a foe it may strike
+  (_keeps_apart: a Monster can_target allows) stands FOE_GAP (0.5) off its
+  cell, so the two are at least 1.0 apart; a crate, a friend or a push's
+  slide (pass_own false) is met at FREE_RADIUS as before.
+- ui's chase (main.gd _free_chase) stops at CHASE_SPAN_SHARE (0.85) of the
+  weapon's span, a blade's length off, not at its edge.
+combat_test _test_striking_distance (the spans; 1.55 apart in a sword's
+reach and not a fist's; 1.75 in the great axe's; a foe's cell stood 1.0 off,
+a crate's 0.8); _test_body_reach's step-out now to 1.9, past the axe's 1.8.
+free_walk_test's walk into a dummy foe stops at 3.0. Server and client
+(the chase), protocol unchanged (item data is not in Net.protocol), no new
+class_name.
 ## 344 amended. The spear's strike is a jab
 
 Jeff on v0.1.187, Pip with a spear: "spear needs a jabbing animation

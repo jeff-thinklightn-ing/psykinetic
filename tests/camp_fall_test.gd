@@ -109,7 +109,8 @@ func _test_stays_cleared() -> void:
 	_main._respawned_at.clear()
 	_step(_main.RESPAWN_STAGGER_TICKS * 8)
 	_check(_slot_entity(IMP_SLOT) == null, "the imp, its spawn tile in the fallen camp, stays dead")
-	_check(_monsters() > 0, "the others, outside it, come back (%d; slots %s)" % [_monsters(), _main._dead_since.keys().map(
+	# A respawn recorded, not one alive at the check: the room's companion may have cut them down again.
+	_check(not _main._respawned_at.is_empty(), "the others, outside it, come back (%d alive; slots %s)" % [_monsters(), _main._dead_since.keys().map(
 		func(slot: int) -> String: return "%d %s" % [slot, _main._slot_spec(slot)["tile"]])])
 
 

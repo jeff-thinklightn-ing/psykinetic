@@ -507,6 +507,9 @@ const CLANK_MAX := 19
 ## A free body is a circle of this radius, in cells, against cell edges
 ## and others' cells (688).
 const FREE_RADIUS := 0.3
+## How far a free body stands off a foe's cell (699 amended): 0.5, so the
+## centres are at least 1.0 apart, not FREE_RADIUS's 0.8.
+const FOE_GAP := 0.5
 ## How strong a free body's walk must be to give up its wind-up (392
 ## amended): half a full intent, not within WIND_UP_KEEP_ANGLE of its target.
 const WIND_UP_LEAVE_INTENT := 0.5
@@ -10816,7 +10819,11 @@ func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vect
 	var low := Vector2(cell) - Vector2(0.5, 0.5)
 	var nearest := p.clamp(low, low + Vector2.ONE)
 	var gap := p - nearest
-	if gap.length() >= FREE_RADIUS:
+	# 699 amended: a foe's cell is stood off farther, so two in a fight are
+	# at least 1.0 apart centre to centre, never chest to chest. A push's
+	# slide (not pass_own) meets it body to body, as ever.
+	var keep := FOE_GAP if pass_own and _keeps_apart(entity, other) else FREE_RADIUS
+	if gap.length() >= keep:
 		return p
 	var axis := _free_axis(intent)
 	if effects and entity is Player and is_link_cell(cell) and tick - (entity as Player).free_bumped_tick >= FREE_BUMP_TICKS:
@@ -10828,13 +10835,20 @@ func _free_off_cell(entity: GridEntity, p: Vector2, cell: Vector2i, intent: Vect
 			entity.next_move_tick = tick + duration
 			return p
 	if gap.length() > 0.00001:
-		return p + gap.normalized() * (FREE_RADIUS - gap.length())
+		return p + gap.normalized() * (keep - gap.length())
 	# Its centre inside the cell (it took the cell under the body): out by
 	# the nearest face.
 	var into := p - Vector2(cell)
 	if absf(into.x) >= absf(into.y):
-		return Vector2(cell.x + signf(into.x) * (0.5 + FREE_RADIUS), p.y)
-	return Vector2(p.x, cell.y + signf(into.y) * (0.5 + FREE_RADIUS))
+		return Vector2(cell.x + signf(into.x) * (0.5 + keep), p.y)
+	return Vector2(p.x, cell.y + signf(into.y) * (0.5 + keep))
+
+
+## Whether [param entity] keeps FOE_GAP off [param other]'s cell (699
+## amended): a player's or a companion's free body and a monster it may
+## strike (an animal too), so a fight stands at blade's length.
+func _keeps_apart(entity: GridEntity, other: GridEntity) -> bool:
+	return (entity is Player or entity is Companion) and other is Monster and can_target(entity, other)
 
 
 ## [param entity]'s free body holds the cell its centre is in (free_cell),
@@ -11757,10 +11771,7 @@ func _cell_reach(from: Vector2i, to: Vector2i, verb: Dictionary) -> bool:
 ## plain blow's, no body on the cells between either.
 func _body_reach(from: Vector2, to: Vector2, attacker: GridEntity, target: GridEntity, verb: Dictionary, slack := 0.0) -> bool:
 	var apart := from.distance_to(to)
-	var reach := melee_reach + slack
-	if verb.get("kind") == "reach":
-		reach = maxf(reach, float(verb["cells"]) - 0.1)
-	if apart > reach + 2.0 * FREE_RADIUS or apart < 0.001:
+	if apart > span_of(verb) + slack or apart < 0.001:
 		return false
 	var cells := _cells_between(from, to)
 	if cells.is_empty():
@@ -11792,11 +11803,21 @@ func _cells_between(from: Vector2, to: Vector2) -> Array[Vector2i]:
 ## How far apart two centres may be for [param attacker]'s blow to land
 ## where a free body is in it (decision 699): its reach plus both radii.
 func reach_limit(attacker: GridEntity) -> float:
-	var verb := blow_verb(attacker)
-	var reach := melee_reach
+	return span_of(blow_verb(attacker))
+
+
+## How far apart two centres may be for a blow of [param verb] to land
+## where a free body is in it (699 amended: striking distance): the verb's
+## "span" in cells (metres), body to body, a sword's 1.6, an axe's 1.8;
+## none (0, fists' and most), melee_reach plus both radii (1.5) as before;
+## a reach verb at least its cells (a spear's 2.5).
+func span_of(verb: Dictionary) -> float:
+	var span := float(verb.get("span", 0.0))
+	if span <= 0.0:
+		span = melee_reach + 2.0 * FREE_RADIUS
 	if verb.get("kind") == "reach":
-		reach = maxf(reach, float(verb["cells"]) - 0.1)
-	return reach + 2.0 * FREE_RADIUS
+		span = maxf(span, float(verb["cells"]) - 0.1 + 2.0 * FREE_RADIUS)
+	return span
 
 
 ## Where [param entity]'s body is, in cells (decision 699): a free body's
@@ -11832,10 +11853,7 @@ func strike_cells(attacker: GridEntity, target: GridEntity) -> Array[Vector2i]:
 ## neighbours with no wall between (and a reach verb's line), as ever.
 func strike_cells_at(attacker: GridEntity, centre: Vector2, target: GridEntity) -> Array[Vector2i]:
 	var verb := blow_verb(attacker)
-	var reach := melee_reach
-	if verb.get("kind") == "reach":
-		reach = maxf(reach, float(verb["cells"]) - 0.1)
-	var span := ceili(reach + 2.0 * FREE_RADIUS)
+	var span := ceili(span_of(verb))
 	var at := Vector2i(centre.round())
 	var by_cells := not free_body(attacker) and not free_body(target)
 	var out: Array[Vector2i] = []

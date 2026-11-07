@@ -2795,6 +2795,8 @@ const FREE_PRESS_TOUCH := 0.001
 const FREE_PULL_CELLS := 12
 ## How often a chase sends its attack order again while out of reach (697).
 const FREE_CHASE_RESEND_MS := 1000
+## A chase stops this share of its weapon's span off its foe (699 amended).
+const CHASE_SPAN_SHARE := 0.85
 
 
 ## The own body's view while it is a free body, else null: a client's from
@@ -3158,7 +3160,13 @@ func _free_chase(player: Player, at: Vector2) -> void:
 	# In reach as the server judges a blow (World._body_reach, 699): near
 	# enough, and the line between clear, so a seam or a foe across a wall's
 	# corner is walked round to, never stopped short of (769 amended (12)).
-	if World._body_reach(at, World.body_centre(target), player, target, World.blow_verb(player), -0.02):
+	# 699 amended: stopping at CHASE_SPAN_SHARE of its weapon's span, a
+	# blade's length off, not at the edge chest to chest.
+	var verb := World.blow_verb(player)
+	# Once its blow has stopped the body inside the full span (World.halt,
+	# 688), it stands where it struck: the chase is over there too.
+	var halted := player.free_halt_until > World.tick and World._body_reach(at, World.body_centre(target), player, target, verb)
+	if halted or World._body_reach(at, World.body_centre(target), player, target, verb, -(1.0 - CHASE_SPAN_SHARE) * World.span_of(verb)):
 		_free["chase"] = null
 		_free["path"] = []
 		return

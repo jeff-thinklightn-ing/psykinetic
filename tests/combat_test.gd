@@ -31,6 +31,7 @@ func _ready() -> void:
 	_test_costs()
 	_test_paid_on_a_blow()
 	_test_committed_axe()
+	_test_striking_distance()
 	_test_winded()
 	_test_monsters_switch()
 	_test_telegraph_shapes()
@@ -172,6 +173,35 @@ func _test_committed_axe() -> void:
 	player.next_attack_tick = 0
 	player.next_move_tick = 0
 	_check(not World.braces_against(player, 1), "a sword's lead is never committed")
+
+
+## 699 amended: striking distance. A weapon's span, body to body: a sword's
+## 1.6, an axe's 1.8, fists' 1.5 as before, a spear's 2.5; a free body stands
+## off a foe's cell so the two are at least 1.0 apart, but not off a crate's.
+func _test_striking_distance() -> void:
+	print("
+== 699 amended: striking distance ==")
+	_check(is_equal_approx(World.span_of(Items.verb_of("sword")), 1.6) and is_equal_approx(World.span_of({}), 1.5)
+		and is_equal_approx(World.span_of(Items.verb_of("giant_axe")), 1.8) and is_equal_approx(World.span_of(Items.verb_of("spear")), 2.5)
+		and is_equal_approx(World.span_of(Items.verb_of("dagger")), 1.5),
+		"spans: sword 1.6, fists 1.5, great axe 1.8, spear 2.5, dagger 1.5 (%.2f %.2f %.2f %.2f %.2f)" % [World.span_of(Items.verb_of("sword")),
+		World.span_of({}), World.span_of(Items.verb_of("giant_axe")), World.span_of(Items.verb_of("spear")), World.span_of(Items.verb_of("dagger"))])
+	var e := _build(["#########", "#..P.m..#", "#########"])
+	var player: GridEntity = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	var foe_at := World.body_centre(foe)
+	var from := foe_at - Vector2(1.55, 0.0)
+	_check(World._body_reach(from, foe_at, player, foe, Items.verb_of("sword")) and not World._body_reach(from, foe_at, player, foe, {}),
+		"1.55 apart: in a sword's reach, not a fist's")
+	_check(World._body_reach(foe_at - Vector2(1.75, 0.0), foe_at, player, foe, Items.verb_of("giant_axe")), "1.75 apart: in the great axe's")
+	var stood := World._free_off_cell(player, foe_at - Vector2(0.75, 0.0), foe.tile, Vector2(1, 0), false)
+	_check(stood.distance_to(foe_at) >= 0.999, "a free body against a foe's cell stands 1.0 off its centre (%.2f)" % stood.distance_to(foe_at))
+	var crate := EntityFactory.build({"script": "res://sim/pushable.gd", "shape": "cube", "name": "ReachCrate"}) as GridEntity
+	_room.add_child(crate)
+	World.spawn(crate, Vector2i(2, 1))
+	if crate.spawned:
+		var by := World._free_off_cell(player, Vector2(2.75, 1.0), crate.tile, Vector2(-1, 0), false)
+		_check(absf(by.distance_to(Vector2(2, 1)) - 0.8) < 0.01, "a crate's cell: FREE_RADIUS's 0.8 as before (%.2f)" % by.distance_to(Vector2(2, 1)))
 
 
 func _test_winded() -> void:
@@ -476,11 +506,11 @@ func _test_body_reach() -> void:
 		var hp := host.hp
 		_check(World.try_wind_up(foe, host), "(%s) the axe wound up at 1.25" % ("steps out" if steps_out else "stands"))
 		if steps_out:
-			host.free_pos = Vector2(3.4, 2.0)  # 1.6, its cell still (4, 2).
+			host.free_pos = Vector2(3.1, 2.0)  # 1.9, past the axe's span 1.8 (699 amended).
 		for i in World.windup_ticks(foe) + 2:
 			World.step()
 		_check(host.hp == hp if steps_out else host.hp < hp,
-				"stepped out to 1.6 before it lands: missed" if steps_out else "stood at 1.25: struck (%d -> %d)" % [hp, host.hp])
+				"stepped out to 1.9 before it lands: missed" if steps_out else "stood at 1.25: struck (%d -> %d)" % [hp, host.hp])
 	# A spear: 2.5, straight or at a slant with a clear line; a body between stops it.
 	e = _build(_room_with(Vector2i(3, 2), Vector2i(5, 2)))
 	host = e["P"][0]

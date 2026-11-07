@@ -155,8 +155,9 @@ func _test_others() -> void:
 	var player := _build(OPEN, Vector2i(1, 2))
 	var dummy := _spawn("res://sim/monster.gd", "Dummy", Vector2i(4, 2))
 	_hold(player, Vector2(1, 0), 10)
-	_check(is_equal_approx(player.free_pos.x, 3.2) and player.tile == Vector2i(3, 2) and dummy.tile == Vector2i(4, 2),
-			"east into the dummy at (4, 2): stopped at 3.2, holding (3, 2) (%s)" % player.free_pos)
+	# 699 amended: a foe's cell is stood off FOE_GAP, so 1.0 from its centre.
+	_check(is_equal_approx(player.free_pos.x, 4.0 - 0.5 - World.FOE_GAP) and player.tile == Vector2i(3, 2) and dummy.tile == Vector2i(4, 2),
+			"east into the dummy at (4, 2): stopped at 3.0, holding (3, 2) (%s)" % player.free_pos)
 	_hold(player, Vector2(1, 1).normalized(), 5)
 	_check(player.free_pos.y > 3.0 and player.free_pos.x > 3.2,
 			"south-east along it: it slides past the dummy's corner (%s)" % player.free_pos)
