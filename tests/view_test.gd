@@ -10642,7 +10642,7 @@ func _test_phased_build() -> void:
 	var phasing := _rig.building_room
 	var frames: int = await _settled_room()
 	_check(phasing and not _rig.building_room and not _rig.ground_filling and _rig._fill_jobs.is_empty()
-			and frames >= _rig._room_phases().size() - 1 and built[0] == 1 and _rig._old_rooms.is_empty(),
+			and frames >= 2 and built[0] == 1 and _rig._old_rooms.is_empty(),  # Over more than one frame: phases share a frame while the budget allows (660 amended (7)).
 			"building over %d frames, then whole, told once (%d), the last room freed (phasing %s, building %s, filling %s, fill jobs %d, phases %d, old rooms %d)" % [
 			frames, built[0], phasing, _rig.building_room, _rig.ground_filling, _rig._fill_jobs.size(), _rig._room_phases().size(), _rig._old_rooms.size()])
 	await _frames(Client3D.WARM_FRAMES + 2)
