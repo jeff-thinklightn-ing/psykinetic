@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In town after dusk, a lit house's windows glow a warm amber, softer toward the edges and crossed by dark glazing bars, where before each was a flat cream square.
 - Your pack, and your companion's, has twelve slots now, three rows of four, where before it had eight (819).
 ## v0.1.207
 
