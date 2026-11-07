@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The pond in the wilds by the forest's way is four times the size now, with reeds all round its banks (805 amended (7)).
 - A correction to v0.1.208's notes: the old grey roams the foothills with two of his pack, and one more keeps his den, not three and two (780 amended (15)).
 
 ## v0.1.208

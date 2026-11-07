@@ -43044,6 +43044,24 @@ found; each state its clip; waiting, the tip 1.5 to 2.5 m up and 0.9 to 2.2 m ou
 stands). Strip of the poses C:/dev/review/fishing/. Client and tools only, protocol unchanged, no
 new class_name. CHANGELOG bullet of its own (voice's words; items' fishing bullet left as it is).
 
+805 amended (7): the Reed Pond enlarged, its place on the south bank (2026-11-07, release's label; the
+coordinator's order after Jeff's "wren doesn't fish at the reed pond" in v0.1.206). The wilds' west pond
+was 16 water cells and its place (32, 116) r3 took in only its north bank. It grows to 71, east and
+downhill where the ground is lowest (six rows nine wide or more, clear of the dirt path south of it),
+its water held at the old pond's 5.10 m; a reed margin of tall grass on its grass banks (44 cells); the
+ground within six cells lowered (never raised) to 0.35 m a cell above the water, so no step on its banks
+is over 0.35 m (WALK_RISE 0.45). The place "reed_pond" moves to (33, 120) on the south bank, radius 10:
+Level warns of a place off the floor, and pond_at's covers is the place's circle, so its cell is the
+bank cell beside the water needing the least radius to take in every water cell and every dry cell
+within World.FISH_REACH of it (C:/dev/review/lands/reed_pond: pond.py, pond_layout.png). Its closed outline
+in "waters" is redrawn round all 71 cells, 23 points on the cells' edges with the steps cut across (every
+water cell's centre in it, no land's): left round the old 16, the new cells were water off any curve, drawn
+as 595's built water, square and still, and view_land_test's shore check failed on them. Nobody walks to
+a fishing place's cell (Companion.fish_spot_near picks a dry cell by the water). level_test
+_test_reed_pond: kind, holder and name; at least 8 x 6 water joined to the place's bank; companions'
+check, every such water and bank cell inside the place; reeds on at least half its bank. Level data
+only; protocol unchanged, no new class_name.
+
 805 amended (8) (2026-11-07, release's label; the coordinator's approval, package "wilds basics: pond"
 with maps' 805 amended (7)): which water fishes is a rule, not a place's circle. Jeff on v0.1.207:
 "neither pond works for fishing but wren says she'll lead to the pond": the Reed Pond's place (radius

@@ -2187,24 +2187,73 @@ func _test_kind_lists() -> void:
 
 
 ## The Reed Pond (805, maps' side; economy's fishing slice 1): the wilds'
-## west pond's fishing place, on its north bank, the water beside it and two
-## dry rows behind it to stand and walk on.
+## west pond's fishing place. Enlarged (Jeff, v0.1.206: "wren doesn't fish at
+## the reed pond"; the coordinator): 8 x 6 water at least, a reed margin (tall
+## grass), and the place on its bank, its radius taking in all of
+## it and every dry cell within World.FISH_REACH of it (companions' check:
+## pond_at's covers is the place's circle).
 func _test_reed_pond() -> void:
 	print("
-== The Reed Pond (805): a fishing place on a dry bank ==")
+== The Reed Pond (805): all its water and banks its fishing place's ==")
 	var wilds := Level.load_level("wilds")
 	var place: Dictionary = wilds["places"].get("reed_pond", {})
 	var terrain: Dictionary = wilds["terrain"]
-	var floor := {}
-	for cell: Vector2i in terrain["floor"]:
-		floor[cell] = true
-	var water: Variant = terrain.get("water", [])
 	var at: Vector2i = place.get("cell", Vector2i(-1, -1))
-	var wet := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)].filter(func(step: Vector2i) -> bool: return at + step in water)
+	var radius: int = place.get("radius", 0)
+	var all_water: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("water", []):
+		all_water[cell] = true
+	var pond: Dictionary[Vector2i, bool] = {}
+	# The pond: the water beside the place's (dry) cell, and all joined to it.
+	var frontier: Array[Vector2i] = []
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		if all_water.has(at + step):
+			frontier.append(at + step)
+	while not frontier.is_empty():
+		var cell: Vector2i = frontier.pop_back()
+		if pond.has(cell) or not all_water.has(cell):
+			continue
+		pond[cell] = true
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			frontier.append(cell + step)
+	var covers := func(cell: Vector2i) -> bool: return (cell - at).length_squared() <= radius * radius
+	var open_water: Array = pond.keys().filter(func(cell: Vector2i) -> bool: return not covers.call(cell))
+	var open_bank: Array = []
+	var reeds := 0
+	var bank := 0
+	var tall: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("tall_grass", []):
+		tall[cell] = true
+	for cell: Vector2i in terrain["floor"]:
+		if maxi(absi(cell.x - at.x), absi(cell.y - at.y)) > radius + 3:
+			continue
+		var by := false
+		var beside := false
+		for each: Vector2i in pond:
+			var d := maxi(absi(each.x - cell.x), absi(each.y - cell.y))
+			by = by or d <= World.FISH_REACH
+			beside = beside or d == 1
+		if by and not covers.call(cell):
+			open_bank.append(cell)
+		if beside:
+			bank += 1
+			if tall.has(cell):
+				reeds += 1
+	# 8 x 6 whole: some 8-wide run in 6 rows running.
+	var rows := 0
+	var most := 0
+	for y in range(at.y - 6, at.y + 7):
+		var run := 0
+		var longest := 0
+		for x in range(at.x - 10, at.x + 11):
+			run = run + 1 if pond.has(Vector2i(x, y)) else 0
+			longest = maxi(longest, run)
+		rows = rows + 1 if longest >= 8 else 0
+		most = maxi(most, rows)
 	_check(place.get("kind", "") == "fishing" and place.get("name", "") == "the pond" and place.get("holder", "") == Factions.NOBODY
-			and floor.has(at) and not at in water and wet.size() >= 1
-			and floor.has(at + Vector2i(0, -1)) and floor.has(at + Vector2i(0, -2)) and floor.has(at + Vector2i(-1, -1)) and floor.has(at + Vector2i(1, -1)),
-		"reed_pond: fishing, nobody's, on dry floor at %s with water beside it (%s) and two dry rows behind" % [at, wet])
+			and pond.size() >= 48 and most >= 6 and open_water.is_empty() and open_bank.is_empty() and reeds * 2 >= bank,
+		"reed_pond: fishing, nobody's, %d water cells by %s (%d rows 8 wide), radius %d; outside it: water %s, bank %s; reeds on %d of %d bank cells"
+			% [pond.size(), at, most, radius, open_water, open_bank.slice(0, 4), reeds, bank])
 
 
 ## Umbrage's locker (722): one chest prop {"locker": true}, since 737 in
