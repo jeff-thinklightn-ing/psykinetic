@@ -16,6 +16,10 @@ const PATH := "res://levels/named_enemies.json"
 ## What a named one's strength multiplies on its kind's: hp and a blow's
 ## damage, and speed (its steps' ticks divided by it). Rolled within these.
 const STRENGTH_SPANS := {"hp": [0.8, 1.6], "damage": [0.8, 1.6], "speed": [0.85, 1.15]}
+## A strength its row gives (authored, not rolled: a chief's) is clamped to
+## these instead (716 amended, combat's: Hollowfell's chiefs' 2.2 and 2.0
+## were clamped to 1.6). Still fixed, never grown by play.
+const GIVEN_SPANS := {"hp": [0.5, 3.0], "damage": [0.5, 2.0], "speed": [0.7, 1.3]}
 ## Its days dead before it rises (the world clock's days), and the panel's span.
 const RISE_DAYS := 3.0
 const RISE_DAYS_SPAN := [0.5, 10.0]
@@ -67,19 +71,18 @@ static func rise_steps(id: String) -> int:
 
 
 ## A new record for [param id] (its first spawn) of [param kind]: its name,
-## its strength (the row's, each clamped to its span, else rolled by its id),
+## its strength (the row's, each clamped to GIVEN_SPANS, else rolled by its id),
 ## alive. npc's card, memories and track start empty.
 static func new_record(id: String, kind: String) -> Dictionary:
 	var row := def(id)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("named/" + id)
-	var given: Variant = row.get("strength", {})
 	var strength := {}
 	for key: String in STRENGTH_SPANS:
 		var span: Array = STRENGTH_SPANS[key]
 		var rolled := rng.randf_range(span[0], span[1])
-		var value: Variant = given.get(key) if given is Dictionary else null
-		strength[key] = clampf(float(value), span[0], span[1]) if value is float or value is int else snappedf(rolled, 0.01)
+		strength[key] = snappedf(rolled, 0.01)
+	strength.merge(given_strength(id), true)
 	return {"name": str(row.get("name", id.capitalize())), "kind": str(row.get("kind", kind)), "strength": strength,
 		"alive": true, "returns_at": 0, "weapon_uid": 0, "lives": 1, "card": {}, "memories": [], "track": {}}
 
@@ -87,6 +90,14 @@ static func new_record(id: String, kind: String) -> Dictionary:
 ## [param monster]'s numbers times its record's strength: max hp (full if it
 ## was full), a blow's damage, its pace. Once, as it spawns.
 static func strengthen(monster: Monster, record: Dictionary) -> void:
+	# The row's given strength wins over the record's (716 amended): a
+	# tune reaches a record made before it. Only the strength; a rolled one
+	# stays as it rolled, and the rest of the record is the world's.
+	var given := given_strength(monster.named_id)
+	if not given.is_empty():
+		var kept: Dictionary = record.get("strength", {})
+		kept.merge(given, true)
+		record["strength"] = kept
 	var strength: Dictionary = record.get("strength", {})
 	var full := monster.hp >= monster.max_hp
 	monster.max_hp = maxi(1, roundi(monster.max_hp * float(strength.get("hp", 1.0))))
@@ -94,6 +105,20 @@ static func strengthen(monster: Monster, record: Dictionary) -> void:
 		monster.hp = monster.max_hp
 	monster.attack_damage = maxi(1, roundi(monster.attack_damage * float(strength.get("damage", 1.0))))
 	monster.move_ticks = monster.move_ticks / maxf(float(strength.get("speed", 1.0)), 0.01)
+
+
+## The strength [param id]'s row gives, each field clamped to GIVEN_SPANS:
+## only those it gives ({} for a row that gives none; 716 amended).
+static func given_strength(id: String) -> Dictionary:
+	var given: Variant = def(id).get("strength", {}) if not id.is_empty() else {}
+	var out := {}
+	if not given is Dictionary:
+		return out
+	for key: String in GIVEN_SPANS:
+		var value: Variant = (given as Dictionary).get(key)
+		if value is float or value is int:
+			out[key] = clampf(float(value), GIVEN_SPANS[key][0], GIVEN_SPANS[key][1])
+	return out
 
 
 ## The tuning panel's source "named" (decision 716): named.<id>.rise_days,

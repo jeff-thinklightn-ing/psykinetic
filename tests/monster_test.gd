@@ -1810,6 +1810,53 @@ func _test_ambush() -> void:
 	_room.add_child(player)
 	World.spawn(player, Vector2i(3, 2))
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
+	_test_given_strength()
+
+
+## 716 amended: a row's given strength past the rolled spans (a chief's),
+## and winning over a record made before the tune; a rolled one kept.
+func _test_given_strength() -> void:
+	var rows: Array[String] = ["##############", "#............#", "#.s....b.....#", "#............#", "##############"]
+	var e := _build(rows)
+	var sneak_hp: int = (e["s"][0] as Monster).max_hp
+	var brute_hp: int = (e["b"][0] as Monster).max_hp
+	e = _build(rows, {"s": {"named": "skeech"}, "b": {"named": "grull"}})
+	var skeech: Monster = e["s"][0]
+	var grull: Monster = e["b"][0]
+	_check(skeech.max_hp == roundi(sneak_hp * 2.0) and grull.max_hp == roundi(brute_hp * 2.2),
+		"the chiefs as spawned: skeech %d (a sneak's %d x 2.0), grull %d (a brute's %d x 2.2)" % [skeech.max_hp, sneak_hp, grull.max_hp, brute_hp])
+	# A record made before the tune (the box's, from v0.1.206): its strength
+	# taken from the row at the next spawn, the rest of it kept.
+	var plain := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak6"})) as Monster
+	_room.add_child(plain)
+	World.spawn(plain, Vector2i(9, 3))
+	var built_hp := plain.max_hp  # Built here, not through _build: its own base.
+	var record: Dictionary = World.named["skeech"]
+	record["strength"] = {"hp": 1.2, "damage": 1.2, "speed": 1.1}
+	record["lives"] = 3
+	record["card"] = {"seen": "Player1"}
+	var again := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak9", "named": "skeech"})) as Monster
+	_room.add_child(again)
+	World.spawn(again, Vector2i(10, 1))
+	_check(again.max_hp == roundi(built_hp * 2.0) and is_equal_approx(float(World.named["skeech"]["strength"]["hp"]), 2.0),
+		"an older record's strength: the row's at the next spawn (%d, %s)" % [again.max_hp, World.named["skeech"]["strength"]])
+	_check(int(World.named["skeech"]["lives"]) == 3 and World.named["skeech"]["card"] == {"seen": "Player1"} and str(World.named["skeech"]["name"]) == "Kobold chief",
+		"and nothing else of the record touched (%s)" % [World.named["skeech"]])
+	_check(is_equal_approx(NamedEnemy.given_strength("grull")["hp"], 2.2) and NamedEnemy.GIVEN_SPANS["hp"][1] > NamedEnemy.STRENGTH_SPANS["hp"][1],
+		"a given strength may pass the rolled spans")
+	# A rolled strength stays as it rolled.
+	NamedEnemy.define_for_test("test_rolled", {"name": "Rolled One", "kind": "sneak"})
+	var rolled := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak8", "named": "test_rolled"})) as Monster
+	_room.add_child(rolled)
+	World.spawn(rolled, Vector2i(11, 1))
+	var first := float(World.named["test_rolled"]["strength"]["hp"])
+	_check(first >= 0.8 and first <= 1.6 and NamedEnemy.given_strength("test_rolled").is_empty(), "a row with none: rolled in the spans (%.2f)" % first)
+	World.named["test_rolled"]["strength"]["hp"] = 0.9
+	var rolled2 := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak7", "named": "test_rolled"})) as Monster
+	_room.add_child(rolled2)
+	World.spawn(rolled2, Vector2i(12, 1))
+	_check(rolled2.max_hp == roundi(built_hp * 0.9), "its stored strength kept at the next spawn (%d)" % rolled2.max_hp)
+	NamedEnemy.reset_for_test()  # The test row gone; the file's read again.
 
 
 func _test_bear_party() -> void:
