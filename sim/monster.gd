@@ -112,6 +112,11 @@ const BACKSTAB_DAMAGE := 1
 ## numbers; its named row's "moves" "ambush" over these): the windup's ticks,
 ## its damage, the ticks it stands open after a miss, and its cue's reach.
 const AMBUSH := {"windup": 8, "damage": 5, "recover": 8, "cue_reach": 8}
+## A kind's told lunge (790 amended (4), combat's; its kind row's "moves"
+## "lunge" over these): its blow from in front or side-on told as a line
+## "reach" cells long before it lands, "damage" on whoever is still on it,
+## standing open "recover" ticks after a miss. The crypt robbers'.
+const LUNGE := {"windup": 6, "damage": 3, "reach": 2, "recover": 8}
 ## Its manner, from its name: a step this much quicker or slower, a cooldown
 ## this many ticks either way, up to REACTION_TICKS_MAX to act on a new
 ## target, a chance a tick of PAUSE_CHANCE_MAX at most to stop a moment
@@ -757,7 +762,11 @@ func _rouse() -> void:
 ## Its told strike from behind (790 amended (4)): its numbers (AMBUSH's, by
 ## its named row), empty for one that has none.
 var ambush := {}
-## The ambush under way: {telegraph, lands, shape, aim, from}; empty for none.
+## Its told lunge's numbers (LUNGE's, by its kind row; 790 amended (4)),
+## empty for a kind with none.
+var lunge := {}
+## The told strike under way (an ambush or a lunge, one at a time):
+## {move, telegraph, lands, shape, aim, cells, from, at}; empty for none.
 var _ambush := {}
 ## Missed: it stands open till this tick.
 var _ambush_open_until := -1
@@ -785,9 +794,37 @@ func begin_ambush(on: GridEntity) -> bool:
 	var id := World.telegraph(self, "ambush", shape, ticks, true)
 	if id == 0:
 		return false
-	_ambush = {"telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": aim, "from": World.tick, "at": tile}
+	_ambush = {"move": &"ambush", "telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": aim,
+		"cells": [aim] as Array[Vector2i], "from": World.tick, "at": tile}
 	_cry(&"ambush", int(ambush["cue_reach"]))
 	print("[ambush] %s winds up at %s on %s at %s, lands in %d ticks" % [name, tile, on.name, aim, ticks])
+	return true
+
+
+## Begins its told lunge at [param on] (790 amended (4)): it faces them,
+## the line "reach" cells from it told (World.telegraph "lunge"; a step
+## aside from it spares, a step back along it does not), and it holds still
+## for "windup" ticks. False, nothing begun, when its kind has no lunge, a
+## told strike is under way, or the line does not reach their cell.
+func begin_lunge(on: GridEntity) -> bool:
+	if lunge.is_empty() or not _ambush.is_empty() or not is_instance_valid(on) or not on.spawned or on.tile == tile:
+		return false
+	var toward := Vector2(on.tile - tile).normalized()
+	var shape := Telegraph.line(tile, toward, float(lunge["reach"]), 1)
+	var cells: Array[Vector2i] = []
+	for cell in World.telegraph_cells(shape):
+		if cell != tile:
+			cells.append(cell)
+	if on.tile not in cells:
+		return false
+	World.face(self, Senses.way_toward(tile, on.tile))
+	var ticks := int(lunge["windup"])
+	var id := World.telegraph(self, "lunge", shape, ticks)
+	if id == 0:
+		return false
+	_ambush = {"move": &"lunge", "telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": on.tile,
+		"cells": cells, "from": World.tick, "at": tile}
+	print("[lunge] %s winds up at %s on %s, lands in %d ticks" % [name, tile, on.name, ticks])
 	return true
 
 
@@ -810,21 +847,30 @@ func _tend_ambush() -> bool:
 		return false
 	if World.tick < int(_ambush["lands"]):
 		return true
+	var move: StringName = _ambush["move"]
+	var numbers: Dictionary = lunge if move == &"lunge" else ambush
 	var aim: Vector2i = _ambush["aim"]
-	var cells := World.telegraph_cells(_ambush["shape"])
+	var struck: Array[Vector2i] = _ambush["cells"]
 	_end_ambush(true)
 	var hit: Array[GridEntity] = []
-	if aim in cells:
-		for each in World.tell_struck(self, [aim] as Array[Vector2i]):
-			if each != self and each.spawned and each.hp > 0 and each.max_hp > 0:
-				hit.append(each)
+	for each in World.tell_struck(self, struck):
+		if each != self and each.spawned and each.hp > 0 and each.max_hp > 0:
+			hit.append(each)
 	for each in hit:
-		World.damage(each, int(ambush["damage"]), self, &"ambush")
+		var amount := int(numbers["damage"])
+		if move == &"lunge":
+			# A raised guard facing it takes a lunge (World._meet_guard, 340)
+			# and, as a shot, is never broken by it (only too little stamina
+			# breaks it): a dagger's thrust, its tell all it has.
+			var met: Variant = World._meet_guard(each, self, amount, 0.0, true)
+			if met != null:
+				amount = int((met as Array)[0])
+		if amount > 0:
+			World.damage(each, amount, self, move)
+	next_attack_tick = maxi(next_attack_tick, World.tick + attack_ticks)
 	if hit.is_empty():
-		_ambush_open_until = World.tick + int(ambush["recover"])  # Stepped out of it: the opening.
-	else:
-		next_attack_tick = maxi(next_attack_tick, World.tick + attack_ticks)
-	print("[ambush] %s at %s -> %s" % [name, aim, "struck %d" % hit.size() if not hit.is_empty() else "missed"])
+		_ambush_open_until = World.tick + int(numbers["recover"])  # Stepped out of it: the opening.
+	print("[%s] %s at %s -> %s" % [move, name, aim, "struck %d" % hit.size() if not hit.is_empty() else "missed"])
 	return true
 
 
@@ -977,6 +1023,13 @@ func _temper() -> void:
 	if not kinds().has(kind):
 		return
 	tactic = kinds()[kind]["tactic"]
+	var moves: Variant = kinds()[kind].get("moves")
+	lunge = {}
+	if moves is Dictionary and (moves as Dictionary).get("lunge") is Dictionary:
+		lunge = LUNGE.duplicate()
+		for key: String in moves["lunge"]:
+			if lunge.has(key):
+				lunge[key] = moves["lunge"][key]
 	_rng.seed = hash(String(name))
 	_pace = move_ticks * (1.0 + _rng.randf_range(-pace_spread, pace_spread))
 	move_ticks = _pace
@@ -1353,6 +1406,8 @@ func _strike() -> void:
 			_world_winding(direction, windup_ticks)
 		Tactic.FLANK:
 			var behind := (World.body_centre(self) - World.body_centre(target)).dot(Vector2(target.facing)) < 0.0
+			if not behind and begin_lunge(target):
+				return  # From in front or side-on, told (790 amended (4)).
 			World.try_attack(self, target, attack_damage + (backstab_damage if behind else 0))
 		_:
 			if World.try_attack(self, target) and tactic == Tactic.DART:
@@ -2401,7 +2456,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"blows": _blows(kind, row.get("blows")),
 			"aim_spread": _aim_spread(path, kind, row.get("aim_spread", 0.0)),
 			"aim_hold_max": maxi(0, int(row.get("aim_hold_max", 0))),
-			# A kind's own moves' numbers (GreatBear's swipe, slam and charge; 780 amended (2)).
+			# A kind's own moves' numbers (GreatBear's swipe, slam and charge; 780 amended (2); a robber's lunge, 790 amended (4)).
 			"moves": (row["moves"] as Dictionary).duplicate(true) if row.get("moves") is Dictionary else {},
 			# Its sight, hearing and notice (decision 784): Monster._take_senses.
 			"senses": (row["senses"] as Dictionary).duplicate() if row.get("senses") is Dictionary else {},

@@ -747,8 +747,10 @@ func _test_free_chase() -> void:
 		foe.sight_range = 12
 		foe.senses.cone_cos = -1.0
 		var hits: Array[float] = []
-		var hurt := func(entity: GridEntity, _amount: int, source: GridEntity, _cause: StringName) -> void:
-			if entity == player and source == foe:
+		# Plain blows only: a told strike (the robber's lunge, 790 amended (4))
+		# lands on its told cells, "reach" of them, not by bodies.
+		var hurt := func(entity: GridEntity, _amount: int, source: GridEntity, cause: StringName) -> void:
+			if entity == player and source == foe and cause == &"attack":
 				hits.append(snappedf(player.free_pos.distance_to(Vector2(foe.tile)), 0.01))
 		World.entity_damaged.connect(hurt)
 		var turns := 0

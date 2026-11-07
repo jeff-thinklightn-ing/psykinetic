@@ -1814,7 +1814,110 @@ func _test_ambush() -> void:
 	_room.add_child(player)
 	World.spawn(player, Vector2i(3, 2))
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
+	_test_lunge()
 	_test_given_strength()
+
+
+func _telegraph_cells(kind: String) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for id: int in World.telegraphs():
+		var data: Dictionary = World.telegraphs()[id]
+		if str(data["kind"]) == kind:
+			for c: Array in data["cells"]:
+				out.append(Vector2i(c[0], c[1]))
+	return out
+
+
+## A robber and a player in a row: the robber at (2,2) facing east, the
+## player at (3,2) facing it.
+func _lunge_room() -> Array:
+	var rows: Array[String] = ["##############", "#............#", "#.x..........#", "#............#", "##############"]
+	var e := _build(rows, {"x": {"facing": Vector2i(1, 0)}})
+	var robber: Monster = e["x"][0]
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	player.facing = Vector2i(-1, 0)
+	robber.target = player
+	return [robber, player]
+
+
+## 790 amended (4): the crypt robbers' told lunge, from in front or
+## side-on: a line two cells long told before it lands, a step aside spares,
+## a step back along it does not, a miss stands it open; from behind its
+## plain poke as before; a raised guard still meets it.
+func _test_lunge() -> void:
+	var pair := _lunge_room()
+	var robber: Monster = pair[0]
+	var player: Player = pair[1]
+	_check(int(robber.lunge.get("windup", 0)) == 6 and int(robber.lunge.get("damage", 0)) == 3 and int(robber.lunge.get("reach", 0)) == 2,
+		"the robber has its row's lunge (%s)" % [robber.lunge])
+	var hp := player.hp
+	_check(robber.begin_lunge(player) and robber.ambushing(), "begun on the player in front")
+	var told := _telegraph_cells("lunge")
+	_check(Vector2i(3, 2) in told and Vector2i(4, 2) in told and not Vector2i(2, 2) in told,
+		"its line told, two cells, not its own (%s)" % [told])
+	_check(not robber.begin_lunge(player) and not robber.begin_ambush(player), "never two at once")
+	for i in 5:
+		World.tick += 1
+		robber._tend_ambush()
+	_check(player.hp == hp and robber.ambushing(), "held through its windup (%d)" % player.hp)
+	World.tick += 1
+	robber._tend_ambush()
+	_check(player.hp == hp - 3 and _telegraph_cells("lunge").is_empty(), "stayed: struck for 3, the tell gone (%d of %d)" % [player.hp, hp])
+	_check(World.tick >= robber._ambush_open_until and World.tick < robber.next_attack_tick, "struck home: no opening, its next blow later")
+	# A step back along the line is still struck.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	hp = player.hp
+	_check(robber.begin_lunge(player), "begun again")
+	_move_to(player, Vector2i(4, 2))
+	for i in 6:
+		World.tick += 1
+		robber._tend_ambush()
+	_check(player.hp == hp - 3, "a step back along it: still struck (%d of %d)" % [player.hp, hp])
+	# A step aside: missed, and it stands open.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	hp = player.hp
+	_check(robber.begin_lunge(player), "begun a third time")
+	_move_to(player, Vector2i(3, 3))
+	for i in 6:
+		World.tick += 1
+		robber._tend_ambush()
+	_check(player.hp == hp and robber.ambushing(), "a step aside: missed, and it stands open (%d)" % player.hp)
+	World.tick += int(robber.lunge["recover"])
+	_check(not robber.ambushing(), "the opening past: it fights on")
+	# Its blow from in front is told; from behind, its poke as before.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	robber._strike()
+	_check(robber.ambushing() and not _telegraph_cells("lunge").is_empty(), "its blow from in front: a told lunge")
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	player.facing = Vector2i(1, 0)
+	robber._strike()
+	_check(not robber.ambushing() and _telegraph_cells("lunge").is_empty(), "from behind: its plain poke, untold")
+	# A raised shield facing it still takes it.
+	pair = _lunge_room()
+	robber = pair[0]
+	player = pair[1]
+	player.slots[Items.LEFT_HAND] = "shield"
+	player.raised = "block"
+	player.stamina = player.max_stamina
+	hp = player.hp
+	_check(robber.begin_lunge(player), "begun on a raised shield")
+	for i in 6:
+		World.tick += 1
+		robber._tend_ambush()
+	_check(player.hp == hp, "the shield took it (%d of %d)" % [player.hp, hp])
+	# A kind with no lunge never begins one.
+	var e := _build(["#######", "#.sP..#", "#######"])
+	_check(not (e["s"][0] as Monster).begin_lunge(e["P"][0]) and (e["s"][0] as Monster).lunge.is_empty(), "a sneak has none")
 
 
 ## 716 amended: a row's given strength past the rolled spans (a chief's),

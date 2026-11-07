@@ -157,6 +157,7 @@
 		"temperament": {"bold": 1, "cautious": 2, "cowardly": 0},
 		"band_fights": true,
 		"wields": {"right": "dagger"},
+		"moves": {"lunge": {"windup": 6, "damage": 3, "reach": 2, "recover": 8}},
 		"lifts": 4,
 		"aim_spread": 10,
 		"aim_hold_max": 25
