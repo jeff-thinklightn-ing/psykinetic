@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The white outline on the foe a click would strike now hugs its body at any camera height, where before the low camera drew it as a shifted double (Jeff's playtest).
 - The great axe hits harder than a sword now and swings sooner, and a light blow no longer spoils its wind-up: you take the hurt and the swing still lands (392 amended (5)).
 - In the crypt, a grave robber facing you marks a short line on the ground before he lunges along it: step aside and he misses, open to you for a moment, or take it on a raised shield (790 amended (4)).
 - Wear the silver ring on a finger and the amber beads at your neck, out of your pack, and trinkets stack ten to a slot now, where before it was five (788, 619).

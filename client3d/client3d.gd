@@ -1600,9 +1600,10 @@ const HOVER := Color(1, 1, 1, 0.35)
 ## pixels each of the eight ways (one pass a way, OUTLINE_SHADER), only
 ## where the body did not: an even rim round its silhouette, ears and
 ## fingers too, whatever its normals. The passes are drawn OUTLINE_NEARER
-## (ground units) nearer the camera than the body, so the floor just in
-## front of its feet does not hide the rim there; anything further in
-## front still does.
+## (ground units) nearer the camera than the body, its depth alone (it draws
+## where the body does, so the rim stays tight under the low camera's
+## perspective too), so the floor just in front of its feet does not hide
+## the rim there; anything further in front still does.
 const TARGET_OUTLINE := Color(0.93, 0.9, 0.82)
 ## A foe seen through what hides it (the low-angle fight, combat's (b)):
 ## a monster hunting or fighting (or lately struck) whose chest a nearer
@@ -1624,8 +1625,13 @@ uniform vec2 nudge = vec2(0.0);
 uniform float nearer = 0.4;
 void vertex() {
 	vec4 view = MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
-	view.z += nearer;
+	// Where the body itself draws on the screen; only the depth from the
+	// point pulled nearer, so under the low camera's perspective the copy is
+	// not grown and slid toward the screen's middle (Jeff: "a shifted white
+	// copy").
 	POSITION = PROJECTION_MATRIX * view;
+	vec4 near = PROJECTION_MATRIX * (view + vec4(0.0, 0.0, nearer, 0.0));
+	POSITION.z = near.z / near.w * POSITION.w;
 	POSITION.xy += nudge * 2.0 / VIEWPORT_SIZE * POSITION.w;
 }
 void fragment() {
