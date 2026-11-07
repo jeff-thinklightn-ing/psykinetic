@@ -18,7 +18,7 @@
 				]
 			},
 			"type": "mesh",
-			"uses": "Amber beads (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+			"uses": "string of amber beads (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.antlers": {
 			"budget": 500,

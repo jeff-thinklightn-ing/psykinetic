@@ -2360,6 +2360,10 @@ func _test_worn() -> void:
 	_check(Items.worn_kind("cloak") == "back" and Items.worn_of("cloak").get("look") == "cloak"
 			and Items.worn_kind("encolpion_amulet") == "neck" and not Items.worn_of("encolpion_amulet").has("look"),
 			"a cloak for the back (look cloak); the Encolpion Amulet at the neck (art-kit's worn mesh)")
+	var trinkets := Items.ids().filter(func(id: String) -> bool: return Items.has_tag(id, "trinket"))
+	_check(Items.worn_kind("silver_ring") == "ring" and Items.worn_kind("amber_beads") == "neck" and Items.name_of("amber_beads") == "string of amber beads"
+			and not trinkets.is_empty() and trinkets.all(func(id: String) -> bool: return Items.stack_of(id) == 10),
+			"pack space (Jeff): the silver ring worn on a finger, the string of amber beads at the neck; every trinket stacks to 10 (%d)" % trinkets.size())
 	# An old record: 11 slots, everything where it was, the worn ones empty.
 	var eleven := ["ration", "", "", "", "sword", "shield", "robes", "knife", "", "", "arrows"]
 	var old := PlayerRecord.from_dict({"player_id": "old788", "tile": [1, 1], "slots": eleven})
