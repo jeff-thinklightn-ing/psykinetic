@@ -436,6 +436,10 @@ var holds_post := -1
 var lurks := false
 ## Till when a lurker is roused (World ticks).
 var _roused_until := -1
+## Its told strike from behind is ready (790 amended (4), enemy-ai's side):
+## armed while it lurks, spent on its first blow from behind or side-on
+## after (begin_ambush, else the plain blow).
+var _ambush_armed := true
 ## Decision 799, enemy-ai's side: the truce camp whose band it is ("" none;
 ## "?" not yet looked up). A camp place with "truce" (maps' level.json; the
 ## Toll Camp) keeps a truce with players: its band, of the holder's side and
@@ -969,6 +973,8 @@ func _sim_tick() -> void:
 	if not _bundle_rolled:
 		_wear_bundle()
 	_mind_the_rest()
+	if not _ambush_armed and lurks and lurking():
+		_ambush_armed = true  # Lurking again: its next first blow from behind is told.
 	if laid:
 		var woke_by := _waking_foe()
 		if woke_by == null:
@@ -1089,6 +1095,10 @@ func _sim_tick() -> void:
 			if round_to != NO_TILE and round_to != tile and _go_to(round_to):
 				return
 			if _front_ticks < flank_patience_ticks:
+				return
+		if _ambush_armed and not ambush.is_empty() and not _in_front():
+			_ambush_armed = false  # One a lurk-break, told or not (790 amended (4), enemy-ai's side).
+			if begin_ambush(target):
 				return
 		_strike()
 		return

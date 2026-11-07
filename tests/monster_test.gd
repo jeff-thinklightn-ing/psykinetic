@@ -88,6 +88,7 @@ func _ready() -> void:
 	_test_bandit_rows()
 	_test_chiefs()
 	_test_lone_guard()
+	_test_ambush_choice()
 	_test_watch_wave()
 	_test_wanderers()
 	_test_hill_cat()
@@ -1859,6 +1860,8 @@ func _test_given_strength() -> void:
 	World.spawn(rolled2, Vector2i(12, 1))
 	_check(rolled2.max_hp == roundi(built_hp * 0.9), "its stored strength kept at the next spawn (%d)" % rolled2.max_hp)
 	NamedEnemy.reset_for_test()  # The test row gone; the file's read again.
+
+
 ## A lone guard's standoff (806 amended (8); companions' barrow find: a timid
 ## robber on a cache's post, its band dead, held back FIGHTING for minutes).
 func _test_lone_guard() -> void:
@@ -1945,6 +1948,48 @@ func _test_lone_guard() -> void:
 	for i in 10:
 		World.step()
 	_check(robber.target == player, "2 from its post it takes them up again (%s)" % [robber.target])
+
+
+## Skeech chooses his told strike (790 amended (4), enemy-ai's side): once a
+## lurk-break, on his first blow from behind; never two; lurking again re-arms it.
+func _test_ambush_choice() -> void:
+	print("
+== skeech's told strike: once a lurk-break, on his first blow from behind ==")
+	var rows: Array[String] = ["##############", "#............#", "#.s.....b....#", "#............#", "##############"]
+	var e := _build(rows, {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
+	var guard: Monster = e["b"][0]
+	var skeech: Monster = e["s"][0]
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(4, 2))
+	World.face(player, Vector2i(1, 0))  # Its back to him.
+	var cries: Array[StringName] = []
+	skeech.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	_check(skeech.lurking() and skeech._ambush_armed, "lurking, his told strike armed")
+	skeech.sight_range = 7
+	for i in 6:
+		World.step()
+	World.noise(player.tile, Senses.NOISE_FIGHT, &"fight", guard)  # His side fights beside him.
+	var plain := 0
+	var hp := player.hp
+	for i in 300:
+		World.face(player, Vector2i(1, 0))
+		World.step()
+	for d: Dictionary in _damage_log:
+		if d["entity"] == player and d["source"] == skeech and d["cause"] != &"ambush":
+			plain += 1
+	_check(cries.count(&"ambush") == 1 and not skeech._ambush_armed,
+		"roused, his first blow from behind is the told strike, and only one (%d cues; %s at %s, target %s, alert %d, player at %s)" % [cries.count(&"ambush"), skeech.name, skeech.tile, skeech.target, skeech.alert, player.tile])
+	_check(plain >= 1 and player.hp < hp, "his blows after it are his plain ones (%d)" % plain)
+	World.despawn(player)
+	for i in 400:
+		World.step()
+		if skeech.lurking():
+			break
+	World.step()
+	_check(skeech.lurking() and skeech._ambush_armed, "nobody left, he lurks again, armed again")
+
+
 ## The lair rule (780 amended (13)): the great bear in its lair, out in its
 ## land, back, dead and risen, between two zones.
 func _test_apex_lair() -> void:
