@@ -2086,7 +2086,26 @@ func _test_barter() -> void:
 		"a refusal: why shown and said; a sword no longer on the shelf is dropped from the pick")
 	panel.close()
 	_check(not panel.is_open() and pack.selected.is_empty() and pack.prices.is_empty() and not pack.held_open and panel.button_shown() == "Buy",
-		"closed: nothing picked, no frames, no chips, the pack let go")
+		"closed: nothing picked, no frames, no chips, the pack let go (%s %s %s %s %s)" % [panel.is_open(), pack.selected, pack.prices, pack.held_open, panel.button_shown()])
+	# 799 amended (2): a camp's trader buys your raws through Sell (npc's "barter": goods [], buys, why).
+	var trader: Resident = load(Main.RESIDENT).new()
+	trader.name = ("Resident_" + Offers.CAMP_TRADER + "toll").validate_node_name()
+	_check(Main.is_camp_trader(trader) and _main._barters(trader) and Main.answers_clicks_only(trader),
+		"a camp's trader: his window barters (Sell), answering clicks only")
+	trader.free()
+	panel.open(null, "Hrolf")
+	var camp := {"shop": "", "resident": "", "town": "toll", "gold": 12, "goods": [], "fenced": {}, "why": "",
+		"buys": {"hide": {"gold": 4, "up_to": 2}}, "pack": [{"slot": 0, "uid": 301, "id": "hide"}, {"slot": 1, "uid": 302, "id": "dagger"}]}
+	panel.show_barter(camp)
+	panel.toggle_give(301)
+	_check(panel.pays_for(301) == 4 and panel.pays_for(302) == 0 and panel.button_shown() == "Sell (1 item)" and panel.total_shown() == "Total gold 4",
+		"his Sell: a hide he buys at 4, Sell (1 item); a dagger he won't (%s, %s)" % [panel.button_shown(), panel.total_shown()])
+	camp["buys"] = {}
+	camp["why"] = "I've no coin left for that."
+	panel.show_barter(camp)
+	_check(panel.why_shown() == "I've no coin left for that." and panel.pays_for(301) == 0,
+		"his purse empty: economy's purse word shown, nothing bought (%s)" % panel.why_shown())
+	panel.close()
 	# The bar under a greeting resident's bubble: without a bubble it closes at once.
 	var oda: GridEntity = load(Main.RESIDENT).new()
 	oda.person = "Oda"

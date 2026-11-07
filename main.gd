@@ -1869,7 +1869,18 @@ func _barters(resident: GridEntity) -> bool:
 	var trade := str(resident.get("trade")) if resident.get("trade") != null else ""
 	if trade == "merchant":
 		return _shop_counter_near(resident) != null
-	return trade in Items.TRADES or trade == "medicine_man"
+	return trade in Items.TRADES or trade == "medicine_man" or is_camp_trader(resident)
+
+
+## Whether [param body] is a camp's trader (Offers.CAMP_TRADER: his worker id
+## on the server, the node name it gives on a client). He buys your raws
+## through Sell (799 amended (2)): his window asks "barter" {resident}, the
+## Sell squares from its "buys", his own wares still his "offers".
+static func is_camp_trader(body: GridEntity) -> bool:
+	if body == null or not body is Resident:
+		return false
+	return (body as Resident).worker_id.begins_with(Offers.CAMP_TRADER) \
+			or String(body.name).begins_with(("Resident_" + Offers.CAMP_TRADER).validate_node_name())
 
 
 ## The bar's Barter: the window for the shop the merchant fronts (the shop
