@@ -2790,6 +2790,65 @@ func _test_tavern_inside() -> void:
 	var sign := _rig._room.get_node_or_null("Decor_180_207_inn_sign_-1_0") as Node3D
 	_check(sign != null and is_equal_approx(sign.position.x, 179.5) and is_equal_approx(sign.position.z, 207.0),
 			"the inn's sign out of its street front by the door (%s)" % [sign.position if sign != null else null])
+	# The slot houses and huts windowed as kinds are (489 amended (3), Jeff:
+	# "no windows, no light inside"): a window drawn on every side of each
+	# with a straight wall, its door side too, or a wall beside its door
+	# (the coordinator: a lit pane from the street), the same every build;
+	# each windowed building its
+	# light inside, out by day, over its floor's middle.
+	var slotted: Array = (wilds["buildings"] as Array).filter(func(building: Dictionary) -> bool:
+		return str(building["slot"]) in BuildingComposer.WINDOWED_SLOTS)
+	var bare: Array = []
+	var undrawn: Array = []
+	var unlit: Array = []
+	for building: Dictionary in slotted:
+		var shown := BuildingComposer.windows(building, wilds["terrain"]["edges"])
+		if shown != BuildingComposer.windows(building, wilds["terrain"]["edges"]):
+			bare.append(["unsteady", building["rect"]])
+		for key: Vector3i in shown:
+			if _rig._wall_states.get(key) != "window":
+				undrawn.append(key)
+		var lines: Dictionary = {}
+		var outline := Level.building_outline(building)
+		for key: Vector3i in outline:
+			var line := Vector2i(key.z, key.x if key.z == Terrain.EAST else key.y)
+			if not lines.has(line):
+				lines[line] = [false, false]
+			var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
+			var kind := func(edge: Vector3i) -> int: return wilds["terrain"]["edges"].get(edge, -1) if edge in outline else -1
+			var beyond := [kind.call(key - step), kind.call(key + step)]
+			if (kind.call(key) == Terrain.Edge.WALL and Terrain.Edge.WALL in beyond
+					and (beyond.count(Terrain.Edge.WALL) == 2 or Terrain.Edge.DOOR in beyond)):
+				lines[line][0] = true
+			if key in shown:
+				lines[line][1] = true
+		for line: Vector2i in lines:
+			if lines[line][0] and not lines[line][1]:
+				bare.append([building["rect"], line])
+		var corner: Vector2i = (building["rect"] as Rect2i).position
+		var light: OmniLight3D = _rig._house_lights[corner][0] if _rig._house_lights.has(corner) else null
+		var box: Rect2i = building["rect"]
+		var mid := Vector2(box.position) + Vector2(box.size - Vector2i.ONE) * 0.5
+		if (light == null or light.shadow_enabled or Vector2(light.position.x, light.position.z).distance_to(mid) > 0.6
+				or not is_equal_approx(light.omni_range, Client3D.house_light_range(box))):
+			unlit.append([building["rect"], light.position if light != null else null])
+	_check(slotted.size() >= 3 and bare.is_empty() and undrawn.is_empty(),
+			"the wilds' %d slot houses and huts windowed on every side with a straight wall, the door's too, drawn as art-kit's (bare %s, undrawn %s)" % [slotted.size(), bare, undrawn])
+	_check(unlit.is_empty() and is_equal_approx(Client3D.house_light_range(Rect2i(0, 0, 3, 3)), 2.5)
+			and is_equal_approx(Client3D.house_light_range(Rect2i(0, 0, 4, 6)), 4.0) and is_equal_approx(Client3D.house_light_range(Rect2i(0, 0, 10, 8)), 4.5),
+			"each its warm light inside, shadowless, over its floor's middle, reaching as far as its room (%s)" % [unlit])
+	# Lit only with its windows, and only the nearest HOUSE_LIGHT_NEAR, the
+	# one the view's aim stands in first.
+	var entries: Array = _rig._house_lights.values()
+	var inn_entry: Array = _rig._house_lights.get(rect.position, [])
+	var far := Vector2(rect.get_center()) + Vector2(200.0, 0.0)
+	var near := Client3D.house_lights_near(entries, Vector2(rect.get_center()), 2)
+	var from_far := Client3D.house_lights_near(entries, far, Client3D.HOUSE_LIGHT_NEAR)
+	_check(entries.size() > Client3D.HOUSE_LIGHT_NEAR and not inn_entry.is_empty() and near.size() == 2 and near[0] == inn_entry
+			and from_far.size() == Client3D.HOUSE_LIGHT_NEAR,
+			"the nearest lights picked, the house the aim stands in first (%d lights)" % entries.size())
+	var shares := not inn_entry.is_empty() and _rig._window_code.values().any(func(row: Array) -> bool: return is_same(row, inn_entry[1]))
+	_check(shares, "the inn's light reads its own windows' row, lit and put out as they are")
 	# Inside, its common room's fireplace over the hearth's two fire cells,
 	# its back to the west wall, at their middle.
 	var ground := Level.load_level("umbrage_tavern")
@@ -3972,7 +4031,8 @@ func _test_building_states() -> void:
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.STANDING, "level": 1}}})
 	_check(not house["damaged"] and house["roof"] == roof and roof.visible and roof.transform.is_equal_approx(house["roof_at"]) and not heaps.visible,
 			"repaired: standing again, its roof whole, its rubble gone")
-	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return not _rig._wall_states.has(key)), "and its walls whole")
+	_check(Level.outline(house["rect"]).all(func(key: Vector3i) -> bool: return _rig._wall_states.get(key, "") == ("window" if _rig._window_code.has(key) else "")),
+			"and its walls whole, its windows windows again (489 amended (3))")
 	_rig.rebuild(terrain, Vector2i(7, 7))
 	_check(_rig._buildings.any(func(b: Dictionary) -> bool: return b["use"] == "forge" and not b["damaged"]), "kept across a rebuild (as the town has it)")
 	_main._on_message("town", {"town": "fixture/square", "buildings": {"forge": {"state": Towns.DAMAGED, "level": 1}}})

@@ -118,6 +118,24 @@ const SHUTTERS_OPEN := 0.66
 ## and how high its foot stands (wall.wood.window's sill).
 const SILL_LAMP_SLOT := "prop.sill_lamp"
 const SILL_LAMP_LIFT := 1.3
+## A lit house's light inside (489 amended (3), Jeff: "no light inside";
+## environment's numbers): warm, shadowless, HOUSE_LIGHT_UP m over the
+## middle of its floor, on with its windows (_window_lit), flickering a
+## lamp's little; only the HOUSE_LIGHT_NEAR lit houses nearest the view's
+## aim on the ground at once (the house it stands in first), picked again
+## every HOUSE_LIGHT_PICK s, the rest left to their lit panes. Its reach
+## the room's (house_light_range: half its longer side and
+## HOUSE_LIGHT_BEYOND m, at most HOUSE_LIGHT_RANGE), so it pools under its
+## windows and never washes a whole wall (environment's look).
+const HOUSE_LIGHT := Color(1.0, 0.7, 0.4)
+const HOUSE_LIGHT_ENERGY := 1.4
+const HOUSE_LIGHT_RANGE := 4.5
+const HOUSE_LIGHT_BEYOND := 1.0
+const HOUSE_LIGHT_FALLOFF := 1.2
+const HOUSE_LIGHT_UP := 1.5
+const HOUSE_LIGHT_FLICKER := Flames.FIRE_FLICKER / 3.0
+const HOUSE_LIGHT_NEAR := 4
+const HOUSE_LIGHT_PICK := 0.5
 ## A window lit by the hour goes out at this hour, the sun down; how often
 ## the window lights are looked at, seconds (decision 566).
 const LAMP_OUT := 22.0
@@ -2471,6 +2489,12 @@ var _carried_clock := 0.0
 ## The room's wall lamps' lights (769 amended (6)) and the clock to the next pick.
 var _wall_lamps: Array[OmniLight3D] = []
 var _wall_lamp_clock := 0.0
+## The room's house lights (489 amended (3)) by their building's rect
+## corner: [light, its windows' _window_code row, rect, flicker phase];
+## the clock to the next pick and the flicker's own time.
+var _house_lights: Dictionary[Vector2i, Array] = {}
+var _house_light_clock := 0.0
+var _house_light_time := 0.0
 ## The room's skylights (797) and the clock to setting them again.
 var _skylights: Array[SpotLight3D] = []
 ## The dust in their beams (797 amended (2)), one each, and the material
@@ -2997,6 +3021,7 @@ func _process(delta: float) -> void:
 	_flicker_fires(delta)
 	_light_carriers(delta)
 	_light_wall_lamps(delta)
+	_light_houses(delta)
 	_light_skylights(delta)
 
 
@@ -6340,6 +6365,7 @@ func _phase_sets() -> void:
 	add_child(_room)
 	_door_lamps.clear()  # Hung again in the new room (782).
 	_wall_lamps.clear()  # And the mine's (769 amended (6)).
+	_house_lights.clear()  # And the houses' (489 amended (3)), freed with the old room.
 	_night_places = null
 	_stone_opaque = _stone(1.0)
 	# The map's sets; a building's walls and inside in its slot's sets
@@ -8356,14 +8382,18 @@ func _building_sets(building: Dictionary) -> void:
 	var windows: Array[Vector3i] = []
 	var cells: Dictionary[Vector2i, bool] = {}
 	var pad := Vector2i.ZERO
+	var lit_row: Array = []
+	# A slot house's windows as a kind's (489 amended (3)).
+	var windowed := building.has("kind") or str(building["slot"]) in BuildingComposer.WINDOWED_SLOTS
+	if windowed:
+		windows = BuildingComposer.windows(building, _terrain["edges"])
+		for cell in Level.building_cells(building):
+			cells[cell] = true
 	if building.has("kind"):
 		heights = BuildingComposer.wall_heights(building)
-		windows = BuildingComposer.windows(building, _terrain["edges"])
 		var sill := BuildingComposer.sill_lamp_edge(building, windows)
 		if sill != BuildingComposer.NO_SILL:
 			_sill_lamps[sill] = true
-		for cell in Level.building_cells(building):
-			cells[cell] = true
 		pad = cells.keys()[0]
 	for key in Level.building_outline(building):
 		if not _wall_sets.has(key):
@@ -8378,10 +8408,12 @@ func _building_sets(building: Dictionary) -> void:
 					_plinths[key] = true
 		# A kind's windows (489 amended), art-kit's window there by its wall's
 		# height (window_slot), turned so its shutters open outward.
-		if building.has("kind") and key in windows and not window_slot(wall_set, _height_of(key)).is_empty():
+		if key in windows and not window_slot(wall_set, _height_of(key)).is_empty():
 			_set_wall_state(key, "window")
 			_window_code[key] = [awake_town(building, str(_terrain.get("level", ""))), str(building.get("code", "")), true,
 				hut_id(building, str(_terrain.get("level", "")))]
+			if lit_row.is_empty():
+				lit_row = _window_code[key]
 			var sides := Terrain.edge_cells(key)
 			# A run's +x is east for an east edge, north (its first cell) for a south one.
 			var outside_first := not cells.has(sides[0])
@@ -8390,6 +8422,9 @@ func _building_sets(building: Dictionary) -> void:
 		if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL \
 				and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
 			_set_wall_state(key, "broken")
+	# Its light inside, lit with its windows (489 amended (3)).
+	if not lit_row.is_empty():
+		_add_house_light(building, lit_row)
 	if spec.has("floor_set"):
 		var floor_set := _known_set(str(spec["floor_set"]))
 		for cell in Level.building_cells(building):
@@ -8450,7 +8485,90 @@ func _drop_plot(at: Vector2i) -> Array[Vector3i]:
 				_wall_states.erase(key)
 			_building_walls.erase(key)
 			out.append(key)
+	if _house_lights.has(at):
+		var light := _house_lights[at][0] as OmniLight3D
+		if is_instance_valid(light):
+			light.queue_free()
+		_house_lights.erase(at)
 	return out
+
+
+## [param building]'s light inside (489 amended (3)), out until
+## _light_houses picks it: lit as [param row] (its windows' _window_code
+## row) says.
+func _add_house_light(building: Dictionary, row: Array) -> void:
+	var rect: Rect2i = building["rect"]
+	if _room == null or _house_lights.has(rect.position):
+		return
+	var cells := Level.building_cells(building)
+	var middle := Vector3.ZERO
+	for cell in cells:
+		middle += _tile_position(cell)
+	middle /= maxf(cells.size(), 1.0)
+	var light := _night_light(HOUSE_LIGHT, HOUSE_LIGHT_ENERGY, house_light_range(rect))
+	light.name = "HouseLight_%d_%d" % [rect.position.x, rect.position.y]
+	light.omni_attenuation = HOUSE_LIGHT_FALLOFF
+	light.position = middle + Vector3(0.0, HOUSE_LIGHT_UP, 0.0)
+	light.visible = false
+	_room.add_child(light)
+	_house_lights[rect.position] = [light, row, rect, _roll(rect.position, 149) * TAU]
+	_house_light_clock = HOUSE_LIGHT_PICK
+
+
+## Every HOUSE_LIGHT_PICK s: the lit houses' lights nearest the view's aim
+## on (house_lights_near), the rest out; each frame the lit ones flicker.
+func _light_houses(delta: float) -> void:
+	if _house_lights.is_empty():
+		return
+	_house_light_time += delta
+	_house_light_clock += delta
+	if _house_light_clock >= HOUSE_LIGHT_PICK:
+		_house_light_clock = 0.0
+		var now := DayNight.now()
+		var hour := DayNight.hour(now)
+		var sun := DayNight.elevation(now)
+		var lit: Array = []
+		for at: Vector2i in _house_lights:
+			var entry: Array = _house_lights[at]
+			if not is_instance_valid(entry[0]):
+				continue
+			if _window_lit(entry[1], hour, sun):
+				lit.append(entry)
+			else:
+				(entry[0] as OmniLight3D).visible = false
+		var near := house_lights_near(lit, Vector2(_camera_target.x, _camera_target.z), HOUSE_LIGHT_NEAR)
+		for entry: Array in lit:
+			(entry[0] as OmniLight3D).visible = near.has(entry)
+	for at: Vector2i in _house_lights:
+		var entry: Array = _house_lights[at]
+		var light := entry[0] as OmniLight3D
+		if is_instance_valid(light) and light.visible:
+			light.light_energy = HOUSE_LIGHT_ENERGY * Flames.flicker(_house_light_time, float(entry[3]), HOUSE_LIGHT_FLICKER)
+
+
+## How far a house light reaches in [param rect] (489 amended (3)): half
+## the room's longer side and HOUSE_LIGHT_BEYOND m, at most
+## HOUSE_LIGHT_RANGE (a 3 x 3 hut 2.5 m, a 4 x 6 house 4 m).
+static func house_light_range(rect: Rect2i) -> float:
+	return minf(maxf(rect.size.x, rect.size.y) * 0.5 + HOUSE_LIGHT_BEYOND, HOUSE_LIGHT_RANGE)
+
+
+## The [param most] of [param entries] (_house_lights' rows, [light, row,
+## rect, ...]) to light round [param aim] (the view's aim on the ground):
+## the house whose rect holds the aim's cell first, then by their lights'
+## distance on the ground.
+static func house_lights_near(entries: Array, aim: Vector2, most: int) -> Array:
+	var cell := Vector2i(roundi(aim.x), roundi(aim.y))
+	var out := entries.duplicate()
+	out.sort_custom(func(a: Array, b: Array) -> bool:
+		var a_in := (a[2] as Rect2i).has_point(cell)
+		var b_in := (b[2] as Rect2i).has_point(cell)
+		if a_in != b_in:
+			return a_in
+		var a_at := (a[0] as Node3D).position
+		var b_at := (b[0] as Node3D).position
+		return Vector2(a_at.x, a_at.z).distance_squared_to(aim) < Vector2(b_at.x, b_at.z).distance_squared_to(aim))
+	return out.slice(0, most)
 
 
 ## A building of a kind (Level.kinds, decision 488): its walls and floor are
@@ -8917,11 +9035,12 @@ func _show_damage(building: Dictionary, damaged: bool) -> void:
 	if heaps != null:
 		heaps.visible = damaged
 	# Its walls broken here and there (terrain's "broken": a ragged stub,
-	# never a way through; the sim keeps the wall).
+	# never a way through; the sim keeps the wall); mended, a window's its
+	# window again (489 amended (3): a slot house's too).
 	var changed: Array[Vector3i] = []
 	for key in building.get("outline", Level.outline(building["rect"])) if not building.get("open_air", false) else []:
 		if _terrain["edges"].get(key) == Terrain.Edge.WALL and _broken_pick(key):
-			_set_wall_state(key, "broken" if damaged else "")
+			_set_wall_state(key, "broken" if damaged else "window" if _window_code.has(key) else "")
 			changed.append(key)
 	if not changed.is_empty():
 		rebuild_walls(changed)
@@ -9009,7 +9128,7 @@ func _undo_decline(building: Dictionary) -> void:
 			_window_code[key][2] = true
 		_ruin_edges.erase(key)
 		if _wall_states.get(key, "") in ["rubble", "plot", "broken"]:
-			_set_wall_state(key, "window" if key in building.get("windows", []) else "")
+			_set_wall_state(key, "window" if _window_code.has(key) else "")
 			changed.append(key)
 		if _doorways.has(key):
 			(_doorways[key] as Node3D).visible = true

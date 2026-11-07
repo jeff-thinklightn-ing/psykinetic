@@ -107,6 +107,9 @@ const CRUCKS := {"longhouse": 0.8, "cottage": 0.4, "hut": 0.3, "house": 0.2}
 const CRUCK_SPAN := Vector2i(4, 6)
 ## How likely a wall of a straight stretch is a window (windows).
 const WINDOW_ODDS := 0.3
+## The art slots whose walls are the map's that take windows as a kind's
+## do (489 amended (3)): a house and a hut, not a shed.
+const WINDOWED_SLOTS: Array[String] = ["building.house", "building.hut"]
 ## sill_lamp_edge's answer when no lamp burns.
 const NO_SILL := Vector3i(-1, -1, -1)
 ## Posts under open edges (591): every this many vertices along a run, and
@@ -341,6 +344,12 @@ static func _edge_piece(slot: String, middle: Vector2, out: Vector2i) -> Node3D:
 ## a straight stretch (both neighbours along the line its walls too, not a
 ## corner, nor beside a door), at WINDOW_ODDS each, never two side by side.
 ## A ruin has none. [param edges] are the map's (Terrain.Edge by key).
+## Every side has one where it has a straight wall (489 amended (3), Jeff:
+## "no windows"), its door side too, so a lit pane shows from the street
+## (the coordinator): a side the roll left bare takes its straight wall
+## nearest its middle, or, with none, a wall beside its door whose other
+## neighbour is wall (a small house's front: the smithy's, by its door).
+## A slot house (WINDOWED_SLOTS: no seed of its own) is seeded by its cell.
 static func windows(building: Dictionary, edges: Dictionary) -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	if building.get("ruined", false):
@@ -349,14 +358,45 @@ static func windows(building: Dictionary, edges: Dictionary) -> Array[Vector3i]:
 	if not bays.is_empty():
 		return bays["windows"]  # A chapel's lancets (734), between its buttresses.
 	var outline := Level.building_outline(building)
+	var seed := int(building.get("seed", hash((building["rect"] as Rect2i).position)))
 	var wall := func(key: Vector3i) -> bool: return key in outline and edges.get(key) == Terrain.Edge.WALL
+	var doors: Array = building.get("doors", [])
+	var door := func(key: Vector3i) -> bool: return key in outline and (edges.get(key) == Terrain.Edge.DOOR or doors.has(key))
+	# Each side's line (its edges' kind and row or column): [straight walls, rolled,
+	# walls beside a door with wall beyond].
+	var sides: Dictionary[Vector2i, Array] = {}
 	for key in outline:
+		var line := Vector2i(key.z, key.x if key.z == Terrain.EAST else key.y)
+		if not sides.has(line):
+			sides[line] = [[], false, []]
 		var step := Vector3i(0, 1, 0) if key.z == Terrain.EAST else Vector3i(1, 0, 0)
-		if not wall.call(key) or not wall.call(key - step) or not wall.call(key + step) or out.has(key - step):
+		if wall.call(key) and ((door.call(key - step) and wall.call(key + step))
+				or (door.call(key + step) and wall.call(key - step))):
+			(sides[line][2] as Array).append(key)
+		if not wall.call(key) or not wall.call(key - step) or not wall.call(key + step):
 			continue
-		var roll := float(absi(hash([int(building["seed"]), key])) % 10007) / 10007.0
+		(sides[line][0] as Array).append(key)
+		if out.has(key - step):
+			continue
+		var roll := float(absi(hash([seed, key])) % 10007) / 10007.0
 		if roll < WINDOW_ODDS:
 			out.append(key)
+			sides[line][1] = true
+	for line: Vector2i in sides:
+		var side: Array = sides[line]
+		var straight: Array = side[0] if not (side[0] as Array).is_empty() else side[2]
+		if side[1] or straight.is_empty():
+			continue
+		var along := func(key: Vector3i) -> int: return key.y if key.z == Terrain.EAST else key.x
+		var middle := 0.0
+		for key: Vector3i in straight:
+			middle += along.call(key)
+		middle /= straight.size()
+		var best: Vector3i = straight[0]
+		for key: Vector3i in straight:
+			if absf(along.call(key) - middle) < absf(along.call(best) - middle):
+				best = key
+		out.append(best)
 	return out
 
 

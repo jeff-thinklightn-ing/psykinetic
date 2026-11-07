@@ -40,7 +40,8 @@ const VIEW: Array[StringName] = [
 	&"_turn_view", &"_walk", &"_walk_from", &"_hand_yaw", &"_line_fade", &"_fade_clock",
 	&"_inside_rect", &"_builder_marks", &"_code_labels", &"_codes_on", &"_aura_mote_material",
 	&"_aura_shader", &"drips", &"_shadow_checked", &"_lamp_clock", &"_roofs_clock",
-	&"scatter_reach_low", &"_sky_floor", &"_spark_material"
+	&"scatter_reach_low", &"_sky_floor", &"_spark_material",
+	&"_house_light_clock", &"_house_light_time"
 ]
 
 
@@ -85,5 +86,5 @@ const ROOM: Array[StringName] = [
 	&"_hid_at", &"_fade_key", &"_faded_close", &"_lined", &"_close_at", &"_inside_hiding",
 	&"_occluder_of", &"_mass_box", &"_mass_distance", &"_stood", &"_forest_low", &"_forest_high",
 	&"_blood", &"_blood_drawn", &"_blood_due", &"_blood_specks", &"_blood_shades", &"_tracks",
-	&"_tracks_drawn", &"_tracks_due", &"_track_parts", &"_track_shades"
+	&"_tracks_drawn", &"_tracks_due", &"_track_parts", &"_track_shades", &"_house_lights"
 ]

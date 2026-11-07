@@ -14682,6 +14682,34 @@ slot and changes nothing until the slot exists. view_test _test_window_slot (a s
 wall.wood.window_tall: plain at a storey, tall at two, none between, drawn heights; the lancet
 unchanged). Client only, protocol unchanged, no new class_name, no bullet.
 
+489 amended (3): town houses windowed and lit inside (Jeff, 2026-11-06: "houses don't look good,
+no windows, no light inside"; the coordinator's order, package "wilds basics: house windows and
+light"; release's label; environment's numbers; art-kit's warmer panes, e39f4ff1c; voice's
+words). Windows were drawn only on a kind (_building_sets' "kind" guard) and only where the roll
+fell, so the slot houses and huts had none and a kind could have none. BuildingComposer
+WINDOWED_SLOTS (building.house, building.hut) are windowed as kinds are, seeded by their cell
+(no seed of their own), and windows() gives every side one: a side the roll left bare takes its
+straight wall nearest its middle, its door side too (the coordinator: a lit pane from the
+street), or, with no straight wall, a wall beside its door whose other neighbour is wall (a
+small house's front; a 3-wide hut's front, all door and corners, has none). Lit as a kind's
+are (566: a building is lit while one of its own is awake, else before LAMP_OUT with no body
+known). Each windowed building has a warm light inside (Client3D._house_lights, made in
+_building_sets, freed with its plot): an OmniLight3D over its floor's middle, HOUSE_LIGHT_UP
+1.5 m, colour (1, 0.7, 0.4), energy 1.4, falloff 1.2, shadowless, reaching house_light_range =
+min(half its longer side + HOUSE_LIGHT_BEYOND 1.0, HOUSE_LIGHT_RANGE 4.5) so it stays in its
+room, a gentle flicker (Flames.FIRE_FLICKER / 3). It burns with its windows (the row of its
+first window), and only HOUSE_LIGHT_NEAR 4 at once: house_lights_near picks every
+HOUSE_LIGHT_PICK 0.5 s, the house the view's aim stands in first, then by ground distance. A
+repaired house's windows are windows again (the damage path keeps "window" where _window_code
+has the edge). Night bench (wilds (212, 200), 21.5, off-screen, gated, with and without): GPU
+median 1.93 ms and 95th 2.55 ms both ways, +34 draws and +169 objects (the window pieces).
+view_test _test_tavern_inside (every side windowed where it can be, drawn, steady; each light
+over its floor's middle at its range, shadowless; the nearest picked, the aim's first; the
+inn's light with its window row) and _test_building_states (repaired, its windows windows).
+Shots: C:/dev/review/house_light_on2. Sorted for swap_room (822):
+_house_lights is the room's (its lights are children of _room), _house_light_clock and
+_house_light_time the view's. Client only; protocol unchanged, no new class_name.
+
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
 A material's pipelines are compiled the first time it is drawn, so its first
