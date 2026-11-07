@@ -43719,6 +43719,9 @@ den, out unseen at once, out of its door and walking to its ground, beaten back 
 with its hp kept, a player in its lair seeing it go to its door, struck on the way and staying, killed
 and dead its rise, then in its lair). Server and level data; protocol per --print-protocol (a saved
 record, no wire change); new class_name Apex.
+The bear cave's package (the coordinator, 11-06, Jeff's package rule): the great bear's drops lose
+789's bear_grease (out of the table, not chance 0) till the medicine man's charms package gives it a
+use; its pelt and claws stay, for economy's tanner. monster_test and items_test pin the two drops.
 
 813 amended: the family tomb's wall and plates heard (release's label; dungeon's ask). Two positional oneshots on the sfx bus, which dungeon's Client3D plays through SoundKit.has: sfx.wall_sink (the vault's bricks sinking into the floor as its door goes shut to open, once: a heavy stone grind ending in a stop, about 1.5 s, -10 dB, heard like a door, noise "door", so the dead hear it as they hear the door; falling back to sfx.slab_grind) and sfx.plate_click (a plate going up to down: a soft stone click, range 6, -14, never heard by monsters; nothing on release or on first sight). Six Freesound CC0 takes: wall from 833925 (harrisonlace), 530987 (patchytherat) and 243699 (ertfelda); plate from 466272 (proolsen), 422870 (IPaddeh) and 508581 (Wdomino). Review: C:/dev/review/sound/crypt. Tests: sound_kit_test _test_ui_sounds (the wall a door's noise with the slab's fallback, the plate close and unheard, three takes each). Client only; protocol unchanged, no new class_name, no bullet (dungeon's 813 carries it).
 
