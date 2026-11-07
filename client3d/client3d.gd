@@ -2035,6 +2035,8 @@ var _shades_seeded := false
 ## A frame's time for the chunks: under the card (all dark anyway), after.
 const CARD_BUDGET_USEC := 14000
 const FILL_BUDGET_USEC := 4000
+## A held neighbour's frame (decision 822): built while the player walks.
+const NEIGHBOUR_BUDGET_USEC := 4000
 ## How long a chunk built in sight after the lift takes to dither in.
 const APPEAR_SECONDS := 0.4
 ## A chunk's height range for whether the camera sees it (m): lower than any
@@ -2663,6 +2665,9 @@ var _glimpse_ground: Dictionary[Vector2i, float] = {}
 var _glimpses: Array[Client3D] = []
 var _wooded: Dictionary[Vector2i, bool] = {}
 var _glimpse := false
+## This view is a held neighbour's (decision 822): its room built whole,
+## but no sky, camera or warm-ups of its own.
+var _neighbour := false
 ## The saplings at the forest's edge (_add_sapling), faded as trees are.
 var _saplings: Dictionary[Vector2i, Node3D] = {}
 ## The felled cells as drawn (591, terrain's side): cell -> stage; each
@@ -5679,6 +5684,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_clearing_props.clear()
 	_skirt = null
 	_far_root = null
+	_shafts = null  # Under the room (822), freed with it.
 	_far_marks.clear()
 	_scatter_nodes.clear()
 	_border = null
@@ -5706,7 +5712,10 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_hiding.clear()
 	_hid_at.clear()
 	_fade_key = ""
-	_apply_sky()
+	if _neighbour:
+		_outdoor = bool(_terrain.get("outdoor", false))  # Lit by the live view's sky (822).
+	else:
+		_apply_sky()
 	_camera_target = _tile_position(_centre)
 	# A new map: the view starts on the player.
 	pan = Vector3.ZERO
@@ -5724,10 +5733,109 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 ## What a rebuild does once its room is whole.
 func _room_built() -> void:
 	_classify_walls()
-	_apply_camera_mode()  # Outdoors or under stone now (623).
-	_start_warm_ups()
+	if not _neighbour:
+		_apply_camera_mode()  # Outdoors or under stone now (623).
+		_start_warm_ups()
 	building_room = false
 	room_built.emit()
+
+
+# --- The held neighbour (decision 822, P1) ------------------------------------------
+
+## Fields of the view itself, kept by its instance through swap_room: the
+## camera, input, puppets, aim, sound, the sky and the build's own state.
+## Every other script var is the room's (ROOM_FIELDS), traded by swap_room;
+## view_test fails on a var in neither.
+const RoomFields := preload("res://client3d/room_fields.gd")
+
+
+## A neighbour's whole view (822): this Client3D, not the live one, builds
+## [param terrain] (another zone's) as a room with no camera, sky, puppets
+## or warm-ups of its own, lit by the live view's [param sky_floor], over
+## frames when [param over_frames]. Its caller places it on the world plane
+## and turns its _process off.
+func build_neighbour(terrain: Dictionary, centre: Vector2i, sky_floor: float, over_frames := false) -> void:
+	_neighbour = true
+	_sky_floor = sky_floor
+	rebuild(terrain, centre, over_frames)
+	_set_sky_floor(sky_floor)
+
+
+## Whether this view's room is whole: not building, its ground filled and
+## no old room left to free (swap_room trades only whole rooms).
+func room_whole() -> bool:
+	return _room != null and not building_room and not ground_filling and _fill_jobs.is_empty() and _old_rooms.is_empty()
+
+
+## The live view and the held neighbour [param other] trade rooms (822): every
+## ROOM field, the two room nodes and the two places on the world plane, so
+## neither room moves and nothing is built. This one's camera keeps its
+## place in the world (it moves by the change of origin). The room it gives
+## up is left as built (no piece faded, every roof on). Both must be whole.
+func swap_room(other: Client3D) -> void:
+	assert(room_whole() and other.room_whole(), "swap_room: a room still building")
+	_leave_as_built()
+	var shift := position - other.position
+	for field: StringName in RoomFields.ROOM:
+		var mine: Variant = get(field)
+		set(field, other.get(field))
+		other.set(field, mine)
+	var here := position
+	position = other.position
+	other.position = here
+	if other._room != null:
+		other._room.reparent(other, false)
+	if _room != null:
+		_room.reparent(self, false)
+	for node: Node3D in [_camera]:
+		if node != null:
+			node.position += shift
+	_camera_target += shift
+	pan = Vector3.ZERO
+	_shadow_checked = 0.0
+	_set_sky_floor(_sky_floor)
+	other._set_sky_floor(_sky_floor)
+	if _environment != null:
+		_apply_sky()
+		_apply_camera_mode()
+	if not _neighbour:
+		# The live zone's doors and piles on its new room, as _phase_doors sets them.
+		for door in World.get_doors():
+			_doors_due[door.key] = true
+		_show_piles()
+
+
+## Every faded piece shown again, every roof put back and the live zone's
+## heaps taken off: what a room looks like with no player in it (a
+## neighbour's, 822).
+func _leave_as_built() -> void:
+	for piece: Node3D in _faded:
+		if is_instance_valid(piece):
+			_set_near(piece, false)
+	for piece: Node3D in _faded_close:
+		if is_instance_valid(piece):
+			_set_close(piece, false)
+	_faded.clear()
+	_faded_close.clear()
+	_hiding.clear()
+	_hid_at.clear()
+	_lined.clear()
+	_close_at.clear()
+	_inside_hiding.clear()
+	_fade_key = ""
+	_roofs_off.clear()
+	# The live zone's heaps (World's piles) go with it: a neighbour shows none.
+	for heap: Node3D in _pile_nodes.values():
+		if is_instance_valid(heap):
+			heap.free()
+	_pile_nodes.clear()
+	_pile_ids.clear()
+	for building: Dictionary in _buildings:
+		if building.get("off", false):
+			building["off"] = false
+			_ease_roof(building, 1.0)
+			if building["roof"] != null:
+				_set_near(building["roof"], false)  # Its shadow cast again, as _update_fade does.
 
 
 ## The room's builders a frame apart (decision 660), each whole but the
@@ -5737,9 +5845,10 @@ func _room_built() -> void:
 ## [member _build_generation]).
 func _build_room_over_frames(generation: int) -> void:
 	building_room = true
-	# The view where the card will lift: what it sees is built first.
-	_apply_camera_mode()
-	_place_camera()
+	if not _neighbour:
+		# The view where the card will lift: what it sees is built first.
+		_apply_camera_mode()
+		_place_camera()
 	# 660 amended (7): the next phase runs in the same frame while the time
 	# this frame has spent and its last cost fit CARD_BUDGET_USEC; a small
 	# room's twenty phase frames were 450 ms at 60 fps on a tavern stair.
@@ -5795,7 +5904,7 @@ func _build_room_over_frames(generation: int) -> void:
 		if generation != _build_generation or not is_inside_tree():
 			return
 	# Everything the camera sees, under the card.
-	while _fill_step(CARD_BUDGET_USEC, true):
+	while _fill_step(_card_budget(), true):
 		await get_tree().process_frame
 		if generation != _build_generation or not is_inside_tree():
 			return
@@ -5819,7 +5928,14 @@ var _phase_usec := {}
 ## CARD_BUDGET_USEC (660 amended (7)).
 func _phase_fits(frame_started: int, next: StringName) -> bool:
 	var spent := Time.get_ticks_usec() - frame_started
-	return spent + int(_phase_usec.get(next, 0)) < CARD_BUDGET_USEC
+	return spent + int(_phase_usec.get(next, 0)) < _card_budget()
+
+
+## A frame's time for the room's phases and its first chunks: under the
+## card, CARD_BUDGET_USEC; a held neighbour's, built while the player walks
+## (decision 822), NEIGHBOUR_BUDGET_USEC.
+func _card_budget() -> int:
+	return NEIGHBOUR_BUDGET_USEC if _neighbour else CARD_BUDGET_USEC
 
 
 ## The ground over frames (decision 660): its fields on a worker while the
@@ -5956,7 +6072,9 @@ func _fill_step(budget: int, seen_only: bool) -> bool:
 	var started := Time.get_ticks_usec()
 	if _fill_jobs.is_empty():
 		return _free_old_rooms(started, budget)
-	var frustum := _camera.get_frustum() if _camera != null else []
+	var frustum: Array[Plane] = []
+	if _camera != null:
+		frustum = _camera.get_frustum()  # A neighbour has none (822): every chunk counts as seen.
 	var aim := Vector2(_camera_target.x, _camera_target.z)
 	var order: Array[Array] = []
 	for job: Array in _fill_jobs:
@@ -6702,6 +6820,8 @@ func _phase_roofs() -> void:
 
 
 func _phase_doors() -> void:
+	if _neighbour:
+		return  # World's doors, piles and marks are the live zone's; a neighbour's doors stand as built, shut (822).
 	# Every door's leaf set once; from then on those that change.
 	if not World.door_shown.is_connected(_on_door_shown):
 		World.door_shown.connect(_on_door_shown)
@@ -13600,9 +13720,9 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 ## The canopy's light shafts (decision 477), over this map's clearings and
 ## gaps; none where it has no canopy.
 func _build_shafts() -> void:
-	if _shafts != null:
+	if is_instance_valid(_shafts):
 		_shafts.queue_free()
-		_shafts = null
+	_shafts = null
 	_skylights.clear()
 	_motes.clear()
 	var canopy: Dictionary = _terrain.get("canopy", {})
@@ -13612,7 +13732,7 @@ func _build_shafts() -> void:
 	if canopy.is_empty():
 		return
 	_shafts = LightShafts.new()
-	add_child(_shafts)
+	_room.add_child(_shafts)  # The room's (822: it goes with the room in swap_room).
 	_shafts.setup(_terrain.get("clearings", []), canopy, _tile_position)
 
 
@@ -13626,7 +13746,7 @@ func _build_skylights() -> void:
 	if skylights.is_empty():
 		return
 	_shafts = LightShafts.new()
-	add_child(_shafts)
+	_room.add_child(_shafts)  # The room's (822: it goes with the room in swap_room).
 	var gaps: Array[Dictionary] = []
 	for skylight: Dictionary in skylights:
 		var at: Vector2i = skylight["at"]

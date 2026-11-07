@@ -44679,3 +44679,52 @@ barter's materials alike. The switch-on moves bear_claw_charm and bear_grease_dr
 recipes and adds "charm" to always_want (items
 gives the charm made.stock 1, one on the shelf), with voice's pointer and bullet. Protocol unchanged
 (rows of kind "maker" and "trophies" since 52). economy_test _test_charm_inputs.
+## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
+
+Jeff approved T1+P1+T4+P2 from perf's seamless-zones page (C:/dev/review/umbrage_hill/seamless_zones.md).
+P1's design is C:/dev/review/umbrage_hill/p1_preload_swap.md, approved by the coordinator 2026-11-07
+with H = 8, PRELOAD_CELLS = 80, one neighbour at most, a `near` command and the field swap. Walking up to
+an outdoor link (the wilds to the foothills, forest, hills and held; the foothills to the castle), the
+client builds the zone ahead in a second Client3D placed on the world plane (650). At the crossing the
+two views trade rooms with no card and nothing built. The zone left behind stays as the neighbour. The
+whole package, "seamless crossings", stays off behind Main.seamless_crossings until perf switches it on
+after the "after" zone table, a windowed bench and Jeff's play check. The switch-on carries the bullet,
+in v0.1.208 or later.
+
+Step 1 (this entry), client only. Nothing calls it yet:
+- Client3D.build_neighbour(terrain, centre, sky_floor, over_frames) builds a `_neighbour` view: the
+  whole room, with no sky, environment, camera mode, camera placing or warm-ups of its own, lit by the
+  live view's sky floor. Its _phase_doors hooks nothing of World's (doors, piles, grass, blood, tracks:
+  the live zone's), so its doors stand shut as built; after a swap the live view marks World's doors
+  due and shows its piles on its new room, and the room given up drops its heaps. Built over frames, its phases and first chunks get NEIGHBOUR_BUDGET_USEC (4 ms)
+  a frame, not the card's 14 ms. With no camera, every chunk counts as seen. The fill's frustum is
+  typed (`Array[Plane]`), so a view with no camera no longer fails there.
+- client3d/room_fields.gd sorts every Client3D script var into VIEW (the view's own: camera, input,
+  puppets, aim, sound, sky and the build's state, kept by its instance) or ROOM (traded).
+  swap_room(other) needs both rooms whole (room_whole()). It leaves this view's room as built (fades
+  undone, roofs on), trades the ROOM fields and the two room nodes, and trades the two places on the
+  plane, so neither room moves in the world. It shifts the camera by the change of origin, then sets
+  both views' sky floor and applies this view's sky and camera mode for its new room.
+- The light shafts are under the room now (they were the instance's own child), so they go with it in
+  a swap and are freed with it.
+- view_test _test_neighbour_swap: every one of the 415 vars is sorted once, and every listed name is a
+  var. A neighbour holds its room alone. A swap moves nothing in the world and keeps the camera's place.
+  Swapping back restores everything. A neighbour built over frames is the same room as one built at
+  once.
+
+What a held neighbour costs (headless static RAM, a second Client3D beside held's live view): the wilds
++155 MB (+216 on the first build, 60 of it shared art loaded once), the forest +262, the hills +120,
+the foothills +103, held +68, the castle +12. Freeing one gives it back. The forest's cost is its grown
+trees: GrownTrees.data_for parses its 5.4 MB trees.json into dictionaries (115 MB in _phase_land, and
+the live forest view holds it too), and the trees built take 77 MB more. Compacting that data is a
+saving for the live view as well; it is perf's next memory piece, before the switch-on. GPU memory and
+draw calls wait for the windowed bench.
+
+Still to come, each behind the flag: (2) Main's preload within 80 cells of a P1 link and the client's
+`near {zone}` command (the server sends that zone's state, never opening it; within PRELOAD_CELLS + 16
+of a link, once per 5 s), a protocol revision from release; an Options switch, "Seamless crossings",
+and a free-RAM floor below which the preload is skipped. (3) maps: the five corridors, each
+neighbour's plane origin 16 cells toward the wilds (a 16-cell overlap at each seam), paired links at
+seam + 7 and seam − 8 with spawns on the same world cell, and a level_test check that both maps agree
+in the overlap. (4) The swap when the "map" message names the held neighbour, the clip's open edge at
+the seam, the fallback to the card for an unfinished neighbour, and a crossing test.

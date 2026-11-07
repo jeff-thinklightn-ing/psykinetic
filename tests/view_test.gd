@@ -182,6 +182,7 @@ func _ready() -> void:
 		await _test_phased_build()
 		await _test_kept_fields()
 		await _test_indoor_phased_build()
+		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_creature_down()
 		await _test_creature_tells()
@@ -10891,6 +10892,106 @@ func _test_indoor_phased_build() -> void:
 	_check(lifted > 0 and lifted <= INDOOR_LIFT_FRAMES, "the barrow's card lifts within %d frames (%d)" % [INDOOR_LIFT_FRAMES, lifted])
 	_check(at_once > 0 and drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Decision 822 (P1, step 1): a held neighbour's view and the swap. Every
+## Client3D var is sorted once into room_fields.gd's VIEW or ROOM; a
+## neighbour builds its room and nothing else (no camera, sky or warm-up),
+## at once or over frames; swap_room trades the rooms with nothing moving
+## in the world, the camera kept where it was; swapped back, all as before.
+func _test_neighbour_swap() -> void:
+	print("\n== a held neighbour's view: the fields sorted, its room alone, the swap and back (822) ==")
+	var fields := preload("res://client3d/room_fields.gd")
+	var unsorted: Array[String] = []
+	var twice: Array[String] = []
+	var names := {}
+	for property: Dictionary in (Client3D as Script).get_script_property_list():
+		if not property["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			continue
+		var field := StringName(property["name"])
+		names[field] = true
+		var view := fields.VIEW.has(field)
+		var room := fields.ROOM.has(field)
+		if view and room:
+			twice.append(field)
+		elif not view and not room:
+			unsorted.append(field)
+	var stale: Array[String] = []
+	for field: StringName in fields.VIEW + fields.ROOM:
+		if not names.has(field):
+			stale.append(field)
+	_check(names.size() > 300 and unsorted.is_empty() and twice.is_empty() and stale.is_empty(),
+			"every one of Client3D's %d vars in VIEW or ROOM, once (unsorted: %s; in both: %s; no such var: %s)" % [names.size(), unsorted, twice, stale])
+
+	var castle := Level.load_level("castle")
+	var drawn := func(room: Node3D) -> int:
+		return room.find_children("*", "", true, false).filter(
+				func(node: Node) -> bool: return not String(node.name).begins_with("Scatter_") and not _under_pile(node)).size()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+	await _frames(Client3D.WARM_FRAMES + 2)
+	var neighbour := Client3D.new()
+	neighbour.name = "Neighbour"
+	_main.add_child(neighbour)
+	neighbour.set_process(false)
+	neighbour.position = Vector3(40.0, 1.5, -24.0)
+	neighbour.build_neighbour(castle["terrain"], castle["centre"], _rig._sky_floor)
+	# Its room alone, and nothing of the live zone's World (its doors, piles, grass, marks) hooked.
+	_check(neighbour.room_whole() and neighbour.get_children() == [neighbour._room] and neighbour._camera == null
+			and neighbour._environment == null and neighbour._warming.is_empty() and neighbour._doors_due.is_empty()
+			and not World.grass_changed.is_connected(neighbour._on_grass_changed) and not World.door_shown.is_connected(neighbour._on_door_shown),
+			"a neighbour built at once holds its room alone (%s)" % neighbour.get_children().map(func(node: Node) -> String: return node.name))
+	var ours_terrain: Dictionary = _rig._terrain
+	var ours_room: Node3D = _rig._room
+	var theirs_room: Node3D = neighbour._room
+	var ours_count: int = drawn.call(ours_room)
+	var theirs_count: int = drawn.call(theirs_room)
+	var ours_at := ours_room.global_position
+	var theirs_at := theirs_room.global_position
+	var camera_at: Vector3 = _rig._camera.global_position
+	var rig_at := _rig.position
+	_rig.swap_room(neighbour)
+	_check(_rig._room == theirs_room and theirs_room.get_parent() == _rig and neighbour._room == ours_room
+			and ours_room.get_parent() == neighbour and _rig._terrain == castle["terrain"] and neighbour._terrain == ours_terrain,
+			"swapped: the castle's room and terrain the live view's, ours the neighbour's")
+	_check(ours_room.global_position.is_equal_approx(ours_at) and theirs_room.global_position.is_equal_approx(theirs_at)
+			and _rig._camera.global_position.is_equal_approx(camera_at),
+			"nothing moved in the world: both rooms and the camera where they were (%s, %s, %s)" % [ours_room.global_position, theirs_room.global_position, _rig._camera.global_position])
+	var piles := World.zone.piles.values().filter(func(pile: GroundPile) -> bool: return pile.is_inside_tree() and (pile.get_parent() as Node2D).visible).size()
+	_check(drawn.call(_rig._room) == theirs_count and drawn.call(neighbour._room) == ours_count and _rig._outdoor == bool(castle["terrain"].get("outdoor", false))
+			and _rig._pile_nodes.size() == piles and neighbour._pile_nodes.is_empty() and neighbour._room.find_children("Pile_*", "", false, false).is_empty(),
+			"each room whole as built (%d and %d nodes, %d and %d), the live zone's %d heaps on the live room alone (%d, %d)"
+			% [drawn.call(_rig._room), drawn.call(neighbour._room), theirs_count, ours_count, piles, _rig._pile_nodes.size(), neighbour._pile_nodes.size()])
+	_rig.swap_room(neighbour)
+	_check(_rig._room == ours_room and _rig._terrain == ours_terrain and _rig.position.is_equal_approx(rig_at)
+			and _rig._camera.global_position.is_equal_approx(camera_at) and drawn.call(ours_room) == ours_count
+			and drawn.call(theirs_room) == theirs_count and neighbour.get_children() == [theirs_room] and neighbour._pile_nodes.is_empty(),
+			"swapped back: all as before (%d and %d nodes)" % [drawn.call(ours_room), drawn.call(theirs_room)])
+	neighbour.free()
+
+	var later := Client3D.new()
+	later.name = "Neighbour"
+	_main.add_child(later)
+	later.set_process(false)
+	later.build_neighbour(castle["terrain"], castle["centre"], _rig._sky_floor, true)
+	var frames := 0
+	while not later.room_whole() and frames < 600:
+		await get_tree().process_frame
+		frames += 1
+	_check(later.room_whole() and later.get_children() == [later._room] and drawn.call(later._room) == theirs_count,
+			"a neighbour built over frames: whole in %d frames, the same room (%d nodes, %d)" % [frames, drawn.call(later._room), theirs_count])
+	later.free()
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## Whether [param node] is a heap (a "Pile_" node) or sits under one: the
+## live zone's piles, drawn on whichever room is live.
+func _under_pile(node: Node) -> bool:
+	var up := node
+	while up != null:
+		if String(up.name).begins_with("Pile_"):
+			return true
+		up = up.get_parent()
+	return false
 
 
 ## Decision 660 (a): a zone's ground fields kept for its next arrival, the
