@@ -5112,6 +5112,10 @@ func _test_meets_wind_up() -> void:
 			imp.temper = Monster.Temper.CAUTIOUS
 		if case == "shield" or case == "sword":
 			imp.slots = PackedStringArray(["", "", "", "", "", "shield"])
+		if case == "bold":
+			# Not a dart's step out after its own blow (392 amended (5)'s 6-tick
+			# wind-up lands in the imp's dart, an 8-tick one did not).
+			imp.tactic = Monster.Tactic.PLAIN
 		player.slots[Items.RIGHT_HAND] = "sword" if case == "sword" else "giant_axe"
 		for i in 30:
 			World.step()

@@ -10073,6 +10073,8 @@ deed, walks on to Foe2, and that win, inside the minute, is held and told
 once it is past. Without a count it is as before. Test servers only; no
 game, wire or class_name change.
 
+392 amended (5): two-handers you can fight with (combat; the coordinator's approval, package "two-handers"; release's label; voice's words). Jeff: "two hander attacks are so slow its impossible to fight with". The great axe hit for 3, a sword's (attack_damage 2 x 1.5), at 2.0 a swing to the sword's 1.4 and an 8-tick wind-up any poke spoilt. (1) levels/items.json giant_axe: damage 1.5 to 2.5 (5 a hit), speed 2.0 to 1.8, windup 8 to 6, recover (750's) 5 to 4, its arc and knock-down as they were; its "says" in voice's words. (2) A committed wind-up: a heavy weapon's verb may carry "committed" (the giant axe's 3); World.braces_against(entity, amount) is true while it winds such a heavy blow (never a lead, 338 amended) and the blow is lighter than that. In _resolve_hits a braced target takes the blow's hurt but not its push, its flank stagger (780) or a grudge's stagger (417), so nothing moves it off its cell or stuns it and the wind-up goes on (logged "windup: X stands through Y's blow"). A blow of "committed" or more, a stun, a knock-down, a bash or a broken guard still spoils it, as 392 says. The battle axe (the draugr's, 603) is left as it was. combat_test _test_committed_axe: 5 a hit, 6 ticks' wind-up, a blow of 2 in it hurts without moving or staggering and the blow lands, 3 is no light blow, a stun spoils it, a sword's lead never braces. Server and data only; protocol unchanged; no new class_name.
+
 ## 390. One rig plays a model's clips: an AnimationTree each, in layers (combat animation, phase A)
 
 Roadmap step 3. Every model's clips play through an AnimRig

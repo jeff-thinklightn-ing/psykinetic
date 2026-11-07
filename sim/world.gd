@@ -8374,6 +8374,18 @@ func windup_ticks(entity: GridEntity) -> int:
 	return heavy if heavy > 0 else int(verb.get("lead", 0))
 
 
+## Whether [param entity]'s wind-up is committed against a blow of
+## [param amount] (392 amended (5)): it is winding a heavy blow (no lead)
+## whose verb is "committed" and the blow is lighter than that. Such a blow
+## hurts it but neither pushes nor staggers it, so the wind-up goes on; a
+## stun, a knock-down, a bash or a broken guard still spoils it.
+func braces_against(entity: GridEntity, amount: int) -> bool:
+	if not is_instance_valid(entity) or entity.wind_up.is_empty() or bool(entity.wind_up.get("lead", false)):
+		return false
+	var committed := int(blow_verb(entity).get("committed", 0))
+	return committed > 0 and amount < committed
+
+
 ## The ticks [param entity] stands planted after its wound-up heavy blow
 ## lands or whiffs (decision 750; Jeff: the Tomb Sledge should "move like it
 ## has mass"): its verb's recover; 0 for none, or for a lead. A free body
@@ -9258,6 +9270,11 @@ func _resolve_hits() -> void:
 				hit.force = met[1] if met[1] >= knockback_min_force else 0.0
 		if hit.pierce:
 			hit.damage = armour_turns(hit.target, hit.damage, "deflect_pierce")
+		# 392 amended (5): a committed wind-up stands through a light blow.
+		var braced := not hit.shove and hit.bash <= 0 and braces_against(hit.target, hit.damage)
+		if braced:
+			hit.force = 0.0
+			_log("windup: %s stands through %s's blow (%d)" % [hit.target_name, hit.source_name, hit.damage])
 		var is_creature := hit.target.is_creature()
 		var landed := hit.damage > 0 and not is_sheltered(hit.target) and is_creature
 		if hit.damage > 0 and not is_sheltered(hit.target):  # (Arriving, 661: no harm, wear or credit.)
@@ -9265,13 +9282,13 @@ func _resolve_hits() -> void:
 			if hit.target is Monster and not hit.shove and wielded(hit.source) == "sword":
 				practise(hit.source, "swordplay", ART_DEED_BLOW * _art_worth(hit.target))  # 766.
 			damage(hit.target, hit.damage, hit.source, &"attack")
-			if not hit.shove:
+			if not hit.shove and not braced:
 				_try_flank(hit.source, hit.target)  # 780, combat's side.
 			if hit.down_ticks > 0 and _alive(hit.target) and hit.target.is_creature():
 				knock_down(hit.target, hit.source, hit.down_ticks)
 			if bool(Items.def(wielded(hit.source)).get("blunt", false)):
 				_wear_bundle(hit.target)
-			if creature and _alive(hit.target) and holder_grudge(hit.source, kind_of(hit.target)):
+			if creature and not braced and _alive(hit.target) and holder_grudge(hit.source, kind_of(hit.target)):
 				_stun_for(hit.target, int(Items.growth()["grudge_stagger"]))  # A grudge's blow (decision 417).
 		var lived := _alive(hit.target)
 		var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)

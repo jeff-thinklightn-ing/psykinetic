@@ -1195,10 +1195,10 @@ func _test_axe() -> void:
 	host.next_attack_tick = 0
 	host.next_move_tick = 0
 	var before: Array = foes.map(func(foe: GridEntity) -> int: return foe.hp)
-	_check(World.try_attack(host, foes[0]) and host.next_attack_tick - World.tick == 10, "a swing at the middle one; slow: 10 ticks to the next")
+	_check(World.try_attack(host, foes[0]) and host.next_attack_tick - World.tick == 9, "a swing at the middle one; slow: 9 ticks to the next (392 amended (5)) (%d)" % (host.next_attack_tick - World.tick))
 	World._resolve_hits()
-	var hurt := range(3).all(func(i: int) -> bool: return foes[i].hp == before[i] - 3)
-	_check(hurt, "all three in the arc struck for 3 (2 times 1.5) (%s -> %s)" % [before, foes.map(func(foe: GridEntity) -> int: return foe.hp)])
+	var hurt := range(3).all(func(i: int) -> bool: return foes[i].hp == before[i] - 5)
+	_check(hurt, "all three in the arc struck for 5 (2 times 2.5, 392 amended (5)) (%s -> %s)" % [before, foes.map(func(foe: GridEntity) -> int: return foe.hp)])
 	_check(foes.all(func(foe: GridEntity) -> bool: return World.is_down(foe) and World.is_stunned(foe) and foe.down_until == World.tick + 15),
 			"and all three knocked down for 15 ticks, unable to act")
 	var lying := foes[1]
@@ -1217,7 +1217,7 @@ func _test_axe() -> void:
 
 func _test_wind_up() -> void:
 	print("
-== the wind-up: a giant axe's blow wound up 8 ticks, then struck through any guard; a step or a stun gives it up; out of reach it whiffs (decision 392) ==")
+== the wind-up: a giant axe's blow wound up 6 ticks, then struck through any guard; a step or a stun gives it up; out of reach it whiffs (decision 392) ==")
 	var host := _player(Net.local_id)
 	var home := host.tile
 	var far := _open_line(host, 4)
@@ -1259,12 +1259,12 @@ func _test_wind_up() -> void:
 	_check(World.windup_ticks(host) == 0, "nor a hammer's")
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	_give(host, "giant_axe", Player.RIGHT_HAND)
-	_check(World.windup_ticks(host) == 8, "a giant axe winds up 8 ticks")
+	_check(World.windup_ticks(host) == 6, "a giant axe winds up 6 ticks (392 amended (5))")
 	ready.call()
 	var hp := imp.hp
 	World.command_attack(host, imp)
 	_steps(1)
-	_check(wound == [8] and not World.winding(host).is_empty() and imp.hp == hp, "the attack: wound up, the views told 8 ticks; nothing struck yet")
+	_check(wound == [6] and not World.winding(host).is_empty() and imp.hp == hp, "the attack: wound up, the views told 6 ticks; nothing struck yet")
 	_steps(8)
 	_check(World.winding(host).is_empty() and imp.hp < hp and imp.raised == "" and World.is_down(imp),
 			"8 ticks on it is struck through the raised shield, which breaks; the imp knocked down (%d -> %d)" % [hp, imp.hp])
@@ -1275,7 +1275,7 @@ func _test_wind_up() -> void:
 	_steps(1)
 	World.free_input(host, Vector2(-d).normalized(), 1.0)  # A free move straight away (392 amended).
 	_steps(1)
-	_check(World.winding(host).is_empty() and wound == [8, 0], "a free move away gives it up; the views told (0 ticks) (%s)" % [wound])
+	_check(World.winding(host).is_empty() and wound == [6, 0], "a free move away gives it up; the views told (0 ticks) (%s)" % [wound])
 	World.free_drop(host)
 	hp = imp.hp
 	_steps(10)
@@ -1287,7 +1287,7 @@ func _test_wind_up() -> void:
 	_steps(1)
 	World._stun_for(host, 3)
 	_steps(1)
-	_check(World.winding(host).is_empty() and wound == [8, 0], "a stun gives it up (%s)" % [wound])
+	_check(World.winding(host).is_empty() and wound == [6, 0], "a stun gives it up (%s)" % [wound])
 	# Out of reach when it lands: a whiff.
 	ready.call()
 	wound.clear()
@@ -1297,7 +1297,7 @@ func _test_wind_up() -> void:
 	hp = imp.hp
 	swings.clear()
 	_steps(8)
-	_check(imp.hp == hp and swings.size() == 1 and wound == [8], "its target stepped out of reach: the blow whiffs at the air")
+	_check(imp.hp == hp and swings.size() == 1 and wound == [6], "its target stepped out of reach: the blow whiffs at the air")
 	# However light, a wound-up blow breaks a guard.
 	ready.call()
 	_check(World._meet_guard(imp, host, 1, 0.0, false, true) == [1, 0.0] and imp.raised == "", "a wound-up blow breaks a guard however light it is")

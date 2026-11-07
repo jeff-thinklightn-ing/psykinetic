@@ -30,6 +30,7 @@ func _ready() -> void:
 	_test_rules_file()
 	_test_costs()
 	_test_paid_on_a_blow()
+	_test_committed_axe()
 	_test_winded()
 	_test_monsters_switch()
 	_test_telegraph_shapes()
@@ -122,6 +123,55 @@ func _test_paid_on_a_blow() -> void:
 	for i in World.windup_ticks(player) + 2:
 		World.step()
 	_check(player.stamina >= 88 and player.wind_up.is_empty(), "and its blow lands without paying again (%d)" % player.stamina)
+
+
+## 392 amended (5): the great axe hits for 5, and its wind-up stands
+## through a blow lighter than 3 (hurt, not pushed or staggered); a heavier
+## one, or a stun, spoils it as ever.
+func _test_committed_axe() -> void:
+	print("
+== 392 amended (5): the great axe's wind-up is committed ==")
+	var e := _build(["#########", "#..Pm...#", "#########"])
+	var player: GridEntity = e["P"][0]
+	var foe: GridEntity = e["m"][0]
+	_give(player, "giant_axe")
+	_check(_blow_damage(player, foe) == 5, "the great axe hits for 5, a sword's 3 outdone (%d)" % _blow_damage(player, foe))
+	_check(World.windup_ticks(player) == 6, "its wind-up 6 ticks (%d)" % World.windup_ticks(player))
+	e = _build(["#########", "#..Pm...#", "#########"])  # Afresh: the blows above knocked it down.
+	player = e["P"][0]
+	foe = e["m"][0]
+	_give(player, "giant_axe")
+	player.next_attack_tick = 0
+	player.next_move_tick = 0
+	player.stamina = 100
+	var at := player.tile
+	var hp := player.hp
+	_check(World.try_wind_up(player, foe), "wound up on the foe")
+	foe.next_attack_tick = 0
+	foe.next_move_tick = 0
+	World.try_attack(foe, player, 2)
+	World._resolve_hits()
+	_check(player.hp == hp - 2 and player.tile == at and not World.is_stunned(player) and not player.wind_up.is_empty(),
+		"a blow of 2 in it: hurt, not moved or staggered, still winding (%d, %s, %s)" % [player.hp, player.tile, player.wind_up])
+	var foe_hp := foe.hp
+	for i in World.windup_ticks(player) + 1:
+		World.step()
+	_check(player.wind_up.is_empty() and foe.hp < foe_hp, "and its blow lands (%d of %d)" % [foe.hp, foe_hp])
+	# A heavier blow, or a stun, spoils it as ever.
+	e = _build(["#########", "#..Pm...#", "#########"])
+	player = e["P"][0]
+	foe = e["m"][0]
+	_give(player, "giant_axe")
+	_check(World.try_wind_up(player, foe), "wound up again")
+	_check(not World.braces_against(player, 3) and World.braces_against(player, 2), "a blow of 3 is no light one")
+	World._stun_for(player, 5)
+	World.step()
+	_check(player.wind_up.is_empty(), "stunned in it: spoilt")
+	_clear(player)
+	_give(player, "sword")
+	player.next_attack_tick = 0
+	player.next_move_tick = 0
+	_check(not World.braces_against(player, 1), "a sword's lead is never committed")
 
 
 func _test_winded() -> void:
@@ -545,10 +595,11 @@ func _test_sledge_recover() -> void:
 	World._tend_wind_ups()
 	World._resolve_hits()
 	_check(lifter.free_halt_until >= landed + 8 and World.free_held(lifter), "held at least 8 ticks after it lands (until %d, landed %d)" % [lifter.free_halt_until, landed])
-	# 750, combat's side (2): the heavy axes' sweep, wound up 8, planted 5.
-	for axe: String in ["giant_axe", "battle_axe"]:
-		World.set_slots(lifter, Items.tidy(["", "", "", "", axe, ""], Items.CARRIED))
-		_check(World.windup_ticks(lifter) == 8 and World.recover_ticks(lifter) == 5, "a %s: wound up 8, planted 5 after (%d, %d)" % [axe, World.windup_ticks(lifter), World.recover_ticks(lifter)])
+	# 750, combat's side (2): the heavy axes' sweep, the battle axe's wound up 8,
+	# planted 5; the giant axe's 6 and 4 since 392 amended (5).
+	for axe: Array in [["giant_axe", 6, 4], ["battle_axe", 8, 5]]:
+		World.set_slots(lifter, Items.tidy(["", "", "", "", axe[0], ""], Items.CARRIED))
+		_check(World.windup_ticks(lifter) == axe[1] and World.recover_ticks(lifter) == axe[2], "a %s: wound up %d, planted %d after (%d, %d)" % [axe[0], axe[1], axe[2], World.windup_ticks(lifter), World.recover_ticks(lifter)])
 	World.set_slots(lifter, Items.tidy(["", "", "", "", "pick", ""], Items.CARRIED))
 	_check(World.windup_ticks(lifter) == 4 and World.recover_ticks(lifter) == 0, "a pick: wound up, no recover of its own")
 

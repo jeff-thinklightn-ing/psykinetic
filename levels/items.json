@@ -194,7 +194,7 @@
 			"tags": ["weapon"], "verb": {"kind": "knockdown", "says": "the draugr's own: winds up long, then falls through any guard on three in an arc, knocking them down", "arc": 1, "down_ticks": 15, "speed": 2.2, "damage": 1.6, "windup": 8, "recover": 5}},
 		{"id": "giant_axe", "name": "giant axe", "short": "Great axe", "color": "8c9098",
 			"art": "item.giant_axe", "kind": "held", "size": [0.6, 1.4, 0.1], "weight": 5.0, "hands": 2,
-			"tags": ["weapon"], "verb": {"kind": "knockdown", "says": "winds up, then falls through any guard on three in an arc, knocking them down", "arc": 1, "down_ticks": 15, "speed": 2.0, "damage": 1.5, "windup": 8, "recover": 5},
+			"tags": ["weapon"], "verb": {"kind": "knockdown", "says": "winds up through a light blow, then falls through any guard on three in an arc, knocking them down", "arc": 1, "down_ticks": 15, "speed": 1.8, "damage": 2.5, "windup": 6, "recover": 4, "committed": 3},
 			"made": {"by": "smith", "from": {"ore": 4, "wood": 2}, "steps": 4200}},
 		{"id": "tomb_sledge", "name": "Tomb Sledge", "short": "Sledge", "color": "6e6a62",
 			"art": "item.tomb_sledge", "kind": "held", "size": [0.36, 1.3, 0.2], "weight": 9.0, "hands": 2, "value": 18,

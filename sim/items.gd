@@ -677,7 +677,7 @@ const VERBS := {
 ## (338 amended: the sword's 2; World.try_wind_up); recover, the ticks a
 ## wound-up blow leaves its wielder planted after it lands or whiffs
 ## (decision 750: the Tomb Sledge's head in the ground; World.recover_ticks).
-const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0, "lead": 0, "recover": 0}
+const COMMON := {"speed": 1.0, "damage": 1.0, "force": 1.0, "windup": 0, "lead": 0, "recover": 0, "committed": 0}
 
 
 ## [param verb] as the catalog gives it, every number filled in from its
