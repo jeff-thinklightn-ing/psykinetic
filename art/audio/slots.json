@@ -1184,6 +1184,24 @@
 			"volume_db": -10.0,
 			"uses": "a wolf at peace growling low now and then (795 amended (3); SoundKit.IDLE, Client3D._idle_voices), never two within IDLE_APART_MS, none while it sits or is down"
 		},
+		"sfx.wolf_lunge": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 8,
+			"volume_db": -2.0,
+			"uses": "the old grey's told lunge: a short rising snarl as its 0.8 s tell starts, heard in time to step aside (780 amended (15); Monster.cried lunge; he sounds as a wolf, SoundKit.SOUNDS_AS, pitched 0.8)"
+		},
+		"sfx.wolf_pant": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 6,
+			"volume_db": -8.0,
+			"uses": "the old grey's sides heaving in the 2 s after a lunge, his opening (780 amended (15); Monster.cried pant; pitched 0.8)"
+		},
 		"sfx.rabbit_death": {
 			"category": "creatures",
 			"type": "oneshot",

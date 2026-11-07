@@ -251,7 +251,7 @@ const STEP_MASS := [50.0, 100.0]
 
 ## An animal's feet (enemy-ai's kinds), for its footsteps.
 const FEET := {"deer": "hooves", "stag": "hooves", "boar": "hooves", "rabbit": "paws", "wolf": "claws",
-		"boar_king": "hooves_heavy", "hill_cat": "paws"}
+		"boar_king": "hooves_heavy", "hill_cat": "paws", "old_wolf": "claws"}
 
 
 ## The footstep slot for a body of [param mass] on [param ground] (a floor
@@ -268,7 +268,7 @@ static func footstep(ground: String, mass: float, creature := "") -> String:
 ## The monster kinds that are goblins (and one of no kind), whose cries
 ## are the goblin's slots, pitched by size: an imp high, a brute low.
 const GOBLINS := ["", "imp", "brute", "sneak"]
-const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05, "great_bear": 0.85, "boar_king": 0.85}
+const CREATURE_PITCH := {"imp": 1.15, "brute": 0.8, "sneak": 1.05, "great_bear": 0.85, "boar_king": 0.85, "old_wolf": 0.8}
 ## The slot a blow lands with, by the weapon [param id] it was struck with
 ## (World.wielded): bare hands a fist's, a blunt weapon (Items' blunt) a
 ## blunt one's, any other weapon a blade's; on flesh, or on metal where the
@@ -389,7 +389,7 @@ const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"},
 		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}, "boar_king": {"call": "roar"},
 		"hill_cat": {"call": "snarl"}}
 ## A kind that sounds as another (a stag as a deer).
-const SOUNDS_AS := {"stag": "deer"}
+const SOUNDS_AS := {"stag": "deer", "old_wolf": "wolf"}
 ## A creature's sounds while it is at peace (795): slot -> its average
 ## seconds between, each body on its own; a kind in IDLE_AS has another's
 ## (the boar king a boar's, pitched his own; Client3D._idle_voices).
@@ -398,7 +398,7 @@ const IDLE := {"boar": {"sfx.boar_grunt": 20.0, "sfx.boar_root": 30.0},
 ## An idle slot never sounds again, from any body, within its ms here (795
 ## amended (3): a pack of four growls in turn, never two at once).
 const IDLE_APART_MS := {"sfx.wolf_growl": 5000}
-const IDLE_AS := {"boar_king": "boar"}
+const IDLE_AS := {"boar_king": "boar", "old_wolf": "wolf"}
 
 
 ## The sounds [param creature] (a monster's kind) makes at peace, slot ->

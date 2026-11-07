@@ -166,6 +166,15 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.takes("sfx.boar_king_charge").size() >= 2, "his charge, death and steps a boar's where he has none of his own; takes for his roar and charge")
 	# 814, sound's side: the hill cat snarls when seen, roars as it lands its
 	# leap, hisses struck, dies its own way (else a wolf's), on paws.
+	# 780 amended (15), sound's side: the old grey sounds as a wolf, a fifth
+	# deeper; his told lunge and the pant after it his own slots.
+	_check(SoundKit.cry("old_wolf", "howl") == "sfx.wolf_howl" and SoundKit.cry("old_wolf", "lunge") == "sfx.wolf_lunge"
+			and SoundKit.cry("old_wolf", "pant") == "sfx.wolf_pant" and SoundKit.death("old_wolf") == "sfx.wolf_death"
+			and SoundKit.idle("old_wolf") == SoundKit.idle("wolf") and float(SoundKit.CREATURE_PITCH.get("old_wolf", 1.0)) < 1.0
+			and SoundKit.footstep("dirt", 200.0, "old_wolf") == SoundKit.footstep("dirt", 200.0, "wolf")
+			and SoundKit.takes("sfx.wolf_lunge").size() >= 3 and SoundKit.takes("sfx.wolf_pant").size() >= 3
+			and SoundKit.noise("sfx.wolf_lunge") == "" and SoundKit.noise("sfx.wolf_pant") == "",
+			"the old grey: a wolf's howl, growl, death and feet, pitched deeper; his lunge and pant their own, three takes each, unheard by monsters")
 	_check(SoundKit.cry("hill_cat", "call") == "sfx.hill_cat_snarl" and SoundKit.cry("hill_cat", "pounce") == "sfx.hill_cat_pounce"
 			and SoundKit.struck("hill_cat") == "sfx.hill_cat_struck" and SoundKit.death("hill_cat") == "sfx.hill_cat_death"
 			and SoundKit.footstep("dirt", 200.0, "hill_cat") == "sfx.footstep_paws"

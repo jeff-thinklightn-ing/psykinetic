@@ -3140,6 +3140,64 @@
 				"license": "CC BY 4.0"
 			}
 		],
+		"sfx.wolf_lunge": [
+			{
+				"file": "sfx.wolf_lunge.ogg",
+				"from": "freesound",
+				"original": "freesound 442817: Goblin Growl (from 0.05 s for 0.55 s)",
+				"sha256": "782e4530025be9bd94eb7f9f296bb15db0f6f3be3a1d5918504e15bfdfa05860",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/442817/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_lunge.2.ogg",
+				"from": "freesound",
+				"original": "freesound 547369: Wolf & Dog Angry Bark (from 0.15 s for 0.55 s)",
+				"sha256": "4baf023ba6afdb3c150f1317a5432cd91e19b86f78fbe0ad7e2ffa1e583fbb79",
+				"by": "EminYILDIRIM",
+				"url": "https://freesound.org/people/EminYILDIRIM/sounds/547369/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.wolf_lunge.3.ogg",
+				"from": "freesound",
+				"original": "freesound 442815: Goblin Snarl (from 0 s for 0.55 s)",
+				"sha256": "5a7a9dff2aa976650ff4c202338df1f23e516933dbde39470f602fc0b9043ff6",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/442815/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.wolf_pant": [
+			{
+				"file": "sfx.wolf_pant.ogg",
+				"from": "freesound",
+				"original": "freesound 841349: Dog Panting Loop 2 (from 0 s for 1.6 s)",
+				"sha256": "83372bb8b69784aa0d84edc97b41dae8db8f40960b3d9d447559b6f94896638d",
+				"by": "qubodup",
+				"url": "https://freesound.org/people/qubodup/sounds/841349/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_pant.2.ogg",
+				"from": "freesound",
+				"original": "freesound 511319: Dog Panting (from 0 s for 1.6 s)",
+				"sha256": "00f6aadafecd25f6ac61c0c65c248b41723efc5a8ae8371a50f8e5a6d924da5e",
+				"by": "onehugeeye",
+				"url": "https://freesound.org/people/onehugeeye/sounds/511319/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.wolf_pant.3.ogg",
+				"from": "freesound",
+				"original": "freesound 152815: Pant1.wav (from 0 s for 1.6 s)",
+				"sha256": "82f5c3b1035960dd6ef6a9a405314f89090429c994cbf115515edbff8be7fb2c",
+				"by": "GB01",
+				"url": "https://freesound.org/people/GB01/sounds/152815/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"ui.chat_ping": [
 			{
 				"file": "ui.chat_ping.ogg",
