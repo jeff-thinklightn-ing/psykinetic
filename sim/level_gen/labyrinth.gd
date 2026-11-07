@@ -1041,6 +1041,10 @@ static func _beside_anchor(anchors: Array, cell: Vector2i) -> bool:
 	return false
 
 
+## How far a pack's followers stand from its lead (823, dungeon's side).
+const PACK_REACH := 2
+
+
 ## The markers the block asks for: "chests" on the blind ways' ends first,
 ## then room corners, then any room cell; "crates" in rooms; "monsters"
 ## {kind: count}, brutes in the great halls first, every kind in rooms and
@@ -1098,9 +1102,35 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 	if not counts is Dictionary:
 		return
 	var near: Variant = config.get("near", {})
+	# 823, dungeon's side (foes last longer): a kind the block's "packs" names
+	# leads packs, each lead laid "apart" from the others (a third to each
+	# depth band in a barrow) and its "size" - 1 followers of kind "of" on the
+	# free cells nearest it, PACK_REACH at most; those followers come off
+	# their kind's own count.
+	var packs: Dictionary = config["packs"] if config.get("packs") is Dictionary else {}
+	var following := {}
+	var leads: Array = packs.keys()
+	leads.sort()
+	for lead: String in leads:
+		var pack: Dictionary = packs[lead]
+		var marker := "monster_" + lead
+		var count := int(counts.get(lead, 0))
+		var apart := int(pack.get("apart", 0))
+		if barrow and int(depth.get("fixed_band", -1)) < 0:
+			count -= _lay_by_band(map, anchors, marker, count, everywhere, depth, apart)
+		_lay(map, anchors, marker, count, everywhere, apart)
+		var of := str(pack.get("of", ""))
+		for cell: Vector2i in Tools.sorted_cells(map.cells):
+			if map.cells[cell] != marker:
+				continue
+			var close: Array[Vector2i] = []
+			close.assign(everywhere.filter(func(other: Vector2i) -> bool: return maxi(absi(other.x - cell.x), absi(other.y - cell.y)) <= PACK_REACH))
+			following[of] = int(following.get(of, 0)) + _lay(map, anchors, "monster_" + of, int(pack.get("size", 1)) - 1, _nearest_first(cell, close))
 	var kinds: Array = counts.keys()
 	kinds.sort()
 	for kind: String in kinds:
+		if packs.has(kind):
+			continue
 		var spots: Array[Vector2i] = []
 		if kind == "brute":
 			spots.append_array(hall_cells)
@@ -1111,7 +1141,7 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 				if str(anchor.get("name", "")) == str(near[kind]):
 					var rect: Rect2i = anchor["rect"]
 					spots = _nearest_first(rect.position + rect.size / 2, spots)
-		var count := int(counts[kind])
+		var count := int(counts[kind]) - int(following.get(kind, 0))
 		var apart := int((config.get("apart", {}) as Dictionary).get(kind, 0)) if config.get("apart") is Dictionary else 0
 		if barrow and not sent and int(depth.get("fixed_band", -1)) < 0:
 			count -= _lay_by_band(map, anchors, "monster_" + kind, count, spots, depth, apart)

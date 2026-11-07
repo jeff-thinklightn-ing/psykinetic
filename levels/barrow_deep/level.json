@@ -307,11 +307,15 @@
 		},
 		"loops": 0.15,
 		"monsters": {
-			"skeleton": 12,
-			"skeleton_guard": 2
+			"skeleton": 6,
+			"skeleton_guard": 3
 		},
-		"near": {
-			"skeleton_guard": "lair"
+		"packs": {
+			"skeleton_guard": {
+				"of": "skeleton",
+				"size": 3,
+				"apart": 12
+			}
 		},
 		"chests": 5
 	},

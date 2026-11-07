@@ -4000,9 +4000,9 @@ func _test_barrow_level() -> void:
 		"the first hall holds two cobwebbed corners, a strip of moss and the light shaft under its skylight, the Ossuary's Hall of Fallen Souls its moss and four webbed corners (%d, %s, %d)" % [barrow["terrain"]["decor"].size(), skylights, deep["terrain"]["decor"].size()])
 	_check(Regen.marked("barrow") and Regen.config_of("barrow")["anchors"].size() == 4 and int(Regen.config_of("barrow").get("layer", 0)) == 1
 		and Regen.marked("barrow_deep") and Regen.config_of("barrow_deep")["anchors"].size() == 2 and int(Regen.config_of("barrow_deep").get("layer", 0)) == 2
-		and Regen.config_of("barrow_deep")["anchors"][1]["name"] == "lair" and Regen.config_of("barrow_deep").get("monsters") == {"skeleton": 12, "skeleton_guard": 2}
+		and Regen.config_of("barrow_deep")["anchors"][1]["name"] == "lair" and Regen.config_of("barrow_deep").get("monsters") == {"skeleton": 6, "skeleton_guard": 3}
 		and int(Regen.config_of("barrow").get("ways", 0)) == 5 and int(Regen.config_of("barrow_deep").get("ways", 0)) == 5,
-		"both depths are marked to regenerate in the barrow style, layers 1 and 2, every way five wide; the Ossuary's far anchor the lair, its dead twelve skeletons and two grave guards (666)")
+		"both depths are marked to regenerate in the barrow style, layers 1 and 2, every way five wide; the Ossuary's far anchor the lair, its dead three grave guards each leading two skeletons (823, dungeon's side)")
 	var kinds := {}
 	var grave_marked := {}
 	var guards_marked := 0

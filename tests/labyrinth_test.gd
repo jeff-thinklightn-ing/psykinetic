@@ -51,7 +51,7 @@ func _test_block() -> void:
 		and read["loops"] == 0.2 and read["chests"] == 3 and read["crates"] == 4 and read["monsters"] == {"imp": 6, "brute": 2, "sneak": 2}
 		and warnings.is_empty(), "style, rooms, loops, chests and crates come through beside the rest (%s)" % [read.keys()])
 	_check(Regen.marked("lab_dwarven") and Regen.config_of("lab_dwarven")["anchors"].size() == 4, "the sample halls regenerate, four anchors")
-	_check(Regen.config_of("lab_barrow")["anchors"].size() == 4 and Regen.config_of("lab_barrow")["near"] == {"robber_brute": "camp"} and Regen.config_of("lab_barrow_deep")["anchors"].size() == 2 and Regen.config_of("lab_barrow_deep")["near"] == {"skeleton_guard": "lair"}, "the sample barrow's two depths regenerate: four anchors, then two (580, 666), Brand sent near the robbers' camp (714 (4)) and the grave guards near the Hall")
+	_check(Regen.config_of("lab_barrow")["anchors"].size() == 4 and Regen.config_of("lab_barrow")["near"] == {"robber_brute": "camp"} and Regen.config_of("lab_barrow_deep")["anchors"].size() == 2 and not Regen.config_of("lab_barrow_deep").has("near") and Regen.config_of("lab_barrow_deep")["packs"].has("skeleton_guard"), "the sample barrow's two depths regenerate: four anchors, then two (580, 666), Brand sent near the robbers' camp (714 (4)) and the grave guards leading packs (823, dungeon's side)")
 
 
 func _test_style(style: String) -> void:
@@ -310,28 +310,42 @@ func _test_barrow() -> void:
 		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
 		if kind == "chest" and spec["tile"] != Sheet.LAIR_CHEST:
 			chest_depth += depth.call(spec["tile"])
-		elif kind == "skeleton":
-			# The generator's measure: the distance over the farthest the map reaches from the entrance.
+		elif kind == "skeleton" or kind == "skeleton_guard":
+			# The dead by band (823: packs led a third to each band, a lead's two
+			# beside it may cross a band's edge). The generator's measure: the distance over the farthest the map reaches from the entrance.
 			var far := 1
 			for corner: Vector2i in [Vector2i.ZERO, Vector2i(level["size"].x - 1, 0), Vector2i(0, level["size"].y - 1), level["size"] - Vector2i.ONE]:
 				far = maxi(far, depth.call(corner))
 			var d := float(depth.call(spec["tile"])) / float(far)
 			dead_by_band[0 if d < Regen.BANDS[0] else (1 if d < Regen.BANDS[1] else 2)] += 1
-	_check(kinds.get("skeleton", 0) == 12 and kinds.get("skeleton_guard", 0) == 2 and kinds.get("chest", 0) == 6 and kinds.get("draugr", 0) == 1
+	_check(kinds.get("skeleton", 0) == 6 and kinds.get("skeleton_guard", 0) == 3 and kinds.get("chest", 0) == 6 and kinds.get("draugr", 0) == 1
 		and kinds.get("robber", 0) == 0 and not kinds.has("altar"),
-		"twelve skeletons and two grave guards (drafts, 666), five chests laid and the Hall's own, the draugr kept on his throne; no robbers, no altar (%s)" % [kinds])
-	var guard_off := 0
+		"six skeletons and three grave guards (823, dungeon's side), five chests laid and the Hall's own, the draugr kept on his throne; no robbers, no altar (%s)" % [kinds])
+	# 823, dungeon's side (foes last longer): each guard leads a pack, two
+	# skeletons within PACK_REACH of it, the guards 12 apart at least.
+	var guards: Array[Vector2i] = []
+	var bones: Array[Vector2i] = []
 	for spec: Dictionary in level["entities"]:
-		if str(spec.get("kind", "")) == "skeleton_guard":
-			var at: Vector2i = spec["tile"]
-			guard_off = maxi(guard_off, maxi(absi(at.x - Sheet.LAIR_DOOR.x), absi(at.y - Sheet.LAIR_DOOR.y)))
-	_check(guard_off > 0 and guard_off <= 16, "the grave guards stand near the Hall's door (666: the farthest %d cells off)" % guard_off)
+		var kind := str(spec.get("kind", spec["name"].rstrip("0123456789").to_lower()))
+		if kind == "skeleton_guard":
+			guards.append(spec["tile"])
+		elif kind == "skeleton":
+			bones.append(spec["tile"])
+	var packs_ok := guards.size() == 3
+	for guard in guards:
+		var with := bones.filter(func(bone: Vector2i) -> bool: return maxi(absi(bone.x - guard.x), absi(bone.y - guard.y)) <= Labyrinth.PACK_REACH).size()
+		var nearest := 999
+		for other in guards:
+			if other != guard:
+				nearest = mini(nearest, maxi(absi(other.x - guard.x), absi(other.y - guard.y)))
+		packs_ok = packs_ok and with == 2 and nearest >= 12
+	_check(packs_ok, "the dead walk in threes: each grave guard with two skeletons by it, the guards 12 apart at least (%s; %s)" % [guards, bones])
 	_check(_dead_at_walls(a, anchors).is_empty() and _dead_at_walls(b, anchors).is_empty(),
 		"the Ossuary's dead stand on open floor in both generations: never a niche, a grave or a wall's foot (631 amended; %s)" % [_dead_at_walls(a, anchors) + _dead_at_walls(b, anchors)])
-	if kinds.get("skeleton", 0) == 12 and kinds.get("chest", 0) == 6:
+	if kinds.get("skeleton", 0) == 6 and kinds.get("chest", 0) == 6:
 		# The dead a third to each band (decision 631): the shallow band's share
 		# shows up a few rooms in, not only at the far end.
-		_check(chest_depth / 5.0 > mean_floor and dead_by_band[0] >= 3 and dead_by_band[1] >= 3 and dead_by_band[2] >= 3,
+		_check(chest_depth / 5.0 > mean_floor and dead_by_band.min() >= 1,
 			"the grave goods lie deeper than the floor's mean depth (%.1f over %.1f); the dead are spread a third to each band (%s)" % [chest_depth / 5.0, mean_floor, dead_by_band])
 	_check(level["warnings"].is_empty() and level["links"].size() == 2 and level["links"][0]["to_map"] == "barrow" and level["links"][1]["to_map"] == "wilds"
 		and level["links"][1]["sealed"] == "draugr" and level["links"][1]["tile"] == Sheet.DEEP_SHORTCUT_LINK and Sheet.LAIR_DAIS.has_point(level["links"][1]["tile"])

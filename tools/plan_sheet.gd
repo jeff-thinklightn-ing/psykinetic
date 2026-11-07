@@ -436,8 +436,10 @@ static func sample_barrow_deep() -> Dictionary:
 		"entities": [{"at": [LAIR_DRAUGR.x, LAIR_DRAUGR.y], "name": "Draugr"}, {"at": [LAIR_CHEST.x, LAIR_CHEST.y], "loot": "fallen_grave"}],
 		"regenerate": {"generator": "labyrinth", "style": "barrow", "layer": 2, "ways": 5, "every_days": 3, "anchors": DEEP_ANCHORS,
 			"entrance": "entrance", "rooms": {"count": [10, 14], "size": [[8, 7], [16, 12]]}, "loops": 0.15,
-			# Tune: twelve and two (666, drafts for Jeff), the dead spread by band (631), the guards by the Hall's door.
-			"monsters": {"skeleton": 12, "skeleton_guard": 2}, "near": {"skeleton_guard": "lair"}, "chests": 5},
+			# Tune (823, dungeon's side: foes last longer): three packs, each a
+			# grave guard leading two skeletons, a pack to each band (631), 12 apart.
+			"monsters": {"skeleton": 6, "skeleton_guard": 3}, "packs": {"skeleton_guard": {"of": "skeleton", "size": 3, "apart": 12}},
+			"chests": 5},
 		"stills": ["barrow"],  # The altar's guards above lie still with him (580).
 		"decor": LAIR_DECOR,  # The Hall's moss and its cobwebbed corners (647).
 		"rooms": DEEP_ROOMS,  # The Hall named on entering it (666; ui's 665 card).

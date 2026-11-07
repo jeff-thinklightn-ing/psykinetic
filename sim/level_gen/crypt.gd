@@ -1065,7 +1065,10 @@ static func _torches(map: LevelMap, anchors: Array, brush: int, plan: Dictionary
 
 ## The monsters: a guard (the block's "guard" kind, else the first kind) in
 ## each chest's room by the chest, then the rest of each kind nearest its
-## "near" anchor, "apart" as the block says; none in the chapel of rest.
+## "near" anchor, "apart" as the block says; none in the chapel of rest,
+## and (823, dungeon's side: foes last longer, the same lone robber tomb
+## after tomb) none in a room at all: the band out on the ways by its camp,
+## a tomb holding a robber only where its chest is.
 static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: RandomNumberGenerator, plan: Dictionary) -> void:
 	var counts: Variant = config.get("monsters", {})
 	if not counts is Dictionary or (counts as Dictionary).is_empty():
@@ -1075,7 +1078,9 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 	kinds.sort()
 	var guard := str(config.get("guard", kinds[0]))
 	var quiet := {}
+	var roomed := {}
 	for room: Dictionary in plan["rooms"]:
+		roomed.merge(room["cells"])
 		if room["use"] == "chapel_of_rest":
 			quiet.merge(room["cells"])
 	for room: Dictionary in plan["rooms"]:
@@ -1089,12 +1094,17 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 		left[guard] = int(left[guard]) - Labyrinth._lay(map, anchors, "monster_" + guard, 1, spots)
 	var floor: Array[Vector2i] = []
 	for cell: Vector2i in Tools.sorted_cells(map.cells):
-		if map.cell(cell) == FLOOR and not quiet.has(cell) and not plan["plate_cells"].has(cell) and not Level.in_anchors(anchors, cell) \
+		if map.cell(cell) == FLOOR and not quiet.has(cell) and not roomed.has(cell) and not plan["plate_cells"].has(cell) and not Level.in_anchors(anchors, cell) \
 				and Labyrinth._open_floor(map, cell):
 			floor.append(cell)
 	Tools.shuffle(floor, rng)
 	var near: Dictionary = config.get("near", {}) if config.get("near") is Dictionary else {}
 	var apart: Dictionary = config.get("apart", {}) if config.get("apart") is Dictionary else {}
+	# The guard kind last (823, dungeon's side): with the band close by its
+	# camp, its leader (Brand) takes the cells nearest it, the camp chest's post.
+	if kinds.has(guard):
+		kinds.erase(guard)
+		kinds.append(guard)
 	for kind: String in kinds:
 		var spots: Array[Vector2i] = floor.duplicate()
 		var anchor_name := str(near.get(kind, near.get("_all", "")))

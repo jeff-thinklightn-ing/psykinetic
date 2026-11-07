@@ -632,6 +632,7 @@ static func _lamps(map: LevelMap, anchors: Array, plan: Dictionary, config: Dict
 ## imp, else any kind), so every chamber has its fight; the brute in the bay
 ## nearest the route with an imp beside it if one is left; each sneak two
 ## cells into a gallery whose mouth is on the route, waiting in the dark
+## (the brute's bay one off the route's middle third first: 823, dungeon's side)
 ## off the way; the imps left along the route, ROUTE_APART apart. What finds
 ## no such spot goes anywhere, as before. Never within MOUTH_CLEAR of the
 ## entrance, on track, a stair or a pit.
@@ -673,9 +674,30 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 		for back in range(GUARD_OUT, path.size()):
 			if kind.is_empty() or lay.call(kind, path[path.size() - 1 - back]):
 				break
-	# The brute in the bay nearest the route, an imp at its side.
-	var bays: Array = (plan["bays"] as Array).duplicate()
-	bays.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return _gap(on_route, a["cells"]) < _gap(on_route, b["cells"]))
+	# The brute in the bay nearest the route, an imp at its side; (823,
+	# dungeon's side: foes last longer, the band by the mouth downed a hurt
+	# pair on the way out) a bay off the route's middle third first, so the
+	# brute is met deep in, never in the first third by the mouth.
+	var along := {}
+	for path: Array in routes:
+		for i in path.size():
+			var part := 1 if i * 3 >= path.size() and i * 3 < path.size() * 2 else 0
+			along[path[i]] = maxi(int(along.get(path[i], 0)), part)
+	var middle := func(bay: Dictionary) -> int:
+		var best := -1
+		var near := 0
+		for cell: Vector2i in along:
+			for inside: Vector2i in bay["cells"]:
+				var gap := Tools.distance(cell, inside)
+				if best < 0 or gap < best:
+					best = gap
+					near = int(along[cell])
+		return near
+	var ranked: Array = []
+	for bay: Dictionary in plan["bays"]:
+		ranked.append([middle.call(bay), _gap(on_route, bay["cells"]), bay])
+	ranked.sort_custom(func(a: Array, b: Array) -> bool: return a[0] > b[0] if a[0] != b[0] else a[1] < b[1])
+	var bays: Array = ranked.map(func(entry: Array) -> Dictionary: return entry[2])
 	if not bays.is_empty() and int(left.get("brute", 0)) > 0:
 		var cells: Array[Vector2i] = []
 		cells.assign(bays[0]["cells"])

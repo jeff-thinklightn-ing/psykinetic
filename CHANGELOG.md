@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Fights are fewer and last longer: common foes, brutes among them, take nearly twice the blows to bring down, the Ossuary's dead come as three packs of a grave guard and two skeletons, the castle's west side holds fewer foes, Hollowfell's brute waits deeper in the mine, and the crypt's grave robbers band by their camp with Brand at their chest, where before they waited alone in tomb after tomb (823).
 - Towns: a keeper's window says Sell where they pay you for what you hand over, as at Rolf's stall or the tanner's, and Donate where nothing comes back, as with ore for a build, the larder or a gift, where before both said Give (802 amended (8)).
 - Ask your companion what she makes of a place and she speaks of something there you can see, such as the Mughouse's hearth or a tomb the two of you opened, where before she gave the same stock line wherever you were (803 amended (7)).
 - In the foothills, a den opens under the high scarp west of the road: the old grey's, an old wolf bigger than the rest, who roams the foothills by day with three of his pack, his howl carrying far, while two more keep the den; he hangs back while his pack lives and comes in when you're down or turned away, his howl sends them at you all at once unless you strike him mid-howl, and after his lunge, along a line you can see, he stands panting, open to you; kill all but one of his pack and he goes home, and at his bed's foot a hunter's bundle holds a find of your own; the tanner buys his pelt and fang (780 amended (14); 780 amended (15)).
