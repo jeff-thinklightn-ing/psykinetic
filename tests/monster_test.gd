@@ -105,6 +105,7 @@ func _ready() -> void:
 	_test_wild_shot_near()
 	_test_far_pace()
 	_test_strike_cells()
+	_test_strike_reach()
 	_test_rout_way_out()
 	_test_named()
 	_test_band()
@@ -6102,3 +6103,59 @@ func _test_wolf_pack_bold() -> void:
 	DayNight.reset()
 	_indoors()
 	Monster.idling = true
+
+
+## Striking distance, enemy-ai's side (699 amended; combat's spec): on a
+## free body a monster takes the strike cell nearest its reach (0.85 of its
+## weapon's span), never one chest to chest (under 0.5 + FOE_GAP of the
+## body's centre), unless that is all there is.
+func _test_strike_reach() -> void:
+	print("%s== on a free body a monster strikes from near its reach, not chest to chest; a longer weapon farther; a close cell only when it is all ==" % char(10))
+	Monster.idling = false
+	var open: Array[String] = ["############"]
+	for y in 5:
+		open.append("#..........#")
+	open.append("############")
+	var bare := _strike_from(open, Vector2i(3, 2), Vector2(3.4, 2.0), Vector2i(9, 2), "")
+	_check(bare["struck"] and bare["gap"] >= 0.5 + World.FOE_GAP - 0.01,
+		"bare-handed (span %.1f), on a free player at the back of its cell: strikes from %s, %.2f off its centre" % [World.span_of({}), bare["from"], bare["gap"]])
+	var axe := _strike_from(open, Vector2i(3, 2), Vector2(3.4, 2.0), Vector2i(9, 2), "battle_axe")
+	_check(axe["struck"] and axe["wields"] == "battle_axe" and bare["wields"] == "" and axe["gap"] > bare["gap"],
+		"with a battle axe (span 1.8) it strikes from farther: %s, %.2f off" % [axe["from"], axe["gap"]])
+	var pocket: Array[String] = ["#######", "#######", "#.....#", "#######", "#######"]
+	var close := _strike_from(pocket, Vector2i(1, 2), Vector2(1.4, 2.0), Vector2i(5, 2), "")
+	_check(close["struck"] and close["from"] == Vector2i(2, 2),
+		"in a dead end with only a close cell open, it takes that cell and strikes (%s, %.2f off)" % [close["from"], close["gap"]])
+	Monster.idling = true
+
+
+## A bold robber (armed with [param weapon] alone, or bare-handed) from [param from] on a
+## free player held at [param free_pos] in [param cell]: whether it struck,
+## from where, and how far that cell is from the player's centre.
+func _strike_from(rows: Array[String], cell: Vector2i, free_pos: Vector2, from: Vector2i, weapon: String) -> Dictionary:
+	_build(rows)
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "HeldFree"})) as Player
+	_room.add_child(player)
+	World.spawn(player, cell)
+	player.free_pos = free_pos
+	var reacher := EntityFactory.build(SPECS["x"].merged({"name": "Reacher", "temperament": "bold", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(reacher)
+	World.spawn(reacher, from)
+	reacher._bundle_rolled = true  # Armed as the test says, not from its kind's bundle.
+	var hands := Items.tidy([], Items.CARRIED)
+	hands[Items.RIGHT_HAND] = weapon
+	reacher.slots = Items.tidy([], Items.CARRIED)
+	World.set_slots(reacher, hands)
+	reacher.sight_range = 12
+	reacher.senses.cone_cos = -1.0
+	var out := {"struck": false, "from": World.NO_CELL, "gap": 0.0, "wields": World.wielded(reacher)}
+	for i in 120:
+		var hp := player.hp
+		player.free_pos = free_pos
+		World.step()
+		if player.hp < hp:
+			out = {"struck": true, "from": reacher.tile, "gap": Vector2(reacher.tile).distance_to(free_pos), "wields": World.wielded(reacher)}
+			break
+	World.despawn(reacher)
+	World.despawn(player)
+	return out

@@ -34097,6 +34097,30 @@ a crate's 0.8); _test_body_reach's step-out now to 1.9, past the axe's 1.8.
 free_walk_test's walk into a dummy foe stops at 3.0. Server and client
 (the chase), protocol unchanged (item data is not in Net.protocol), no new
 class_name.
+
+699 amended, enemy-ai's side (combat's spec and its read of the score; the
+coordinator's approval, package "striking distance"; release's label). A
+monster on a free body (Monster._pick_slot) no longer strikes chest to chest:
+- Its strike cells are those at least 0.5 + World.FOE_GAP from the body's
+  centre (its strike plan's), where the body can stand off it; the cell it
+  stands on always stays, and its slot within STRIKE_GAP_SLACK (0.3) of that.
+  With none so far (a dead end), any strike cell, as before.
+- A cell short of STRIKE_SPAN_SHARE (0.85) of its weapon's span
+  (World.span_of, as ui's chase) from that centre costs the shortfall, as
+  cells walked; a farther one costs nothing, so it never steps back to
+  reach. A battle axe strikes from farther than a fist.
+- Holding its ground: once it has swung from the cell it stands on (its
+  next_attack_tick past its coming there), a body dodged out of reach but
+  within World.reach_limit + STRIKE_HOLD_SLACK (0.3) of that cell keeps it
+  its cell till STRIKE_HOLD_TICKS (8) after its next swing is ready. A body
+  pinned on a wall zig-zagging a row up and down had a skeleton step after
+  each zig and back after each zag (4 back-and-forth steps in
+  free_walk_test's chase; now 0). A body it has not swung at from there is
+  closed on as before (monster_test's robber at the back of a cell).
+monster_test _test_strike_reach (a bare-handed robber strikes from 1.17 off a
+free body at the back of its cell, with a battle axe 1.60, in a dead end
+from the one close cell, 0.60); free_walk_test's chase (skeleton 0, robber
+1). Server only, protocol unchanged, no new class_name.
 ## 344 amended. The spear's strike is a jab
 
 Jeff on v0.1.187, Pip with a spear: "spear needs a jabbing animation

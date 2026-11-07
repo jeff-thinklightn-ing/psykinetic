@@ -153,6 +153,25 @@ const HOLD_BACK_RANGE := 3
 ## How far a free target's centre moves before it works out its strike cells
 ## again (decision 699, enemy-ai's side).
 const STRIKE_REPLAN := 0.3
+## Its strike cell on a free body (699 amended, enemy-ai's side; combat's
+## spec): one at least 0.5 + World.FOE_GAP from the body's centre (a free
+## body stands that far off a monster's), and each cell short of this share
+## of its weapon's span (World.span_of; the player's chase stops at the same,
+## main.gd CHASE_SPAN_SHARE) costing what it is short as a cell walked; one
+## at it or past it costs nothing more (a two-sided cost re-picked cells
+## after a zig-zagging body, free_walk_test). None that far: any strike cell,
+## as before.
+const STRIKE_SPAN_SHARE := 0.85
+## How far under that gap the cell it is making for may fall before it is
+## given up (the body moving on).
+const STRIKE_GAP_SLACK := 0.3
+## A free body it has swung at from the cell it stands on, now at most this
+## far past its reach (World.reach_limit) of it: till STRIKE_HOLD_TICKS after
+## its next swing is ready, it holds that cell, waiting for a dodge to swing
+## back, rather than step after each zig and back after each zag. A body it
+## has not swung at from there is closed on, as before.
+const STRIKE_HOLD_SLACK := 0.3
+const STRIKE_HOLD_TICKS := 8
 ## How far ahead, in ticks, it leads a moving free body (lead-the-target):
 ## past this it makes for where it will be then.
 const LEAD_MAX_TICKS := 24
@@ -363,6 +382,11 @@ var boldness := 1.0
 var pause_chance := 0.0
 ## The tile beside its target it is making for (NO_TILE: none).
 var slot := NO_TILE
+## The cell it stands on as it last picked a strike cell, and the tick it
+## first did there: a swing since (next_attack_tick past it) was from there
+## (STRIKE_HOLD_TICKS).
+var _strike_held := NO_TILE
+var _strike_held_tick := -1
 ## Its last World.strike_cells against a free target, and where from (699).
 var _strike_plan := {}
 ## Its free target's way when it last led it, and the tick (lead-the-target).
@@ -1512,8 +1536,29 @@ func _pick_slot() -> Vector2i:
 	var nearest := NO_TILE
 	var nearest_score := INF
 	var cells: Array[Vector2i] = []
+	var meet := centre
+	var aim := -1.0
 	if free:
-		cells = _strike_cells()  # Where it can strike a free body from (699).
+		var any := _strike_cells()  # Where it can strike a free body from (699).
+		meet = _strike_plan.get("centre", centre)
+		for at in any:
+			# Not chest to chest (699 amended, enemy-ai's side); the cell it
+			# stands on always stays (the body is held FOE_GAP off it), and its
+			# slot with STRIKE_GAP_SLACK, so a zig-zagging body doesn't make
+			# it re-pick back and forth.
+			var gap := Vector2(at).distance_to(meet)
+			if at == tile or gap >= 0.5 + World.FOE_GAP or at == slot and gap >= 0.5 + World.FOE_GAP - STRIKE_GAP_SLACK:
+				cells.append(at)
+		if _strike_held != tile:
+			_strike_held = tile
+			_strike_held_tick = World.tick
+		if not cells.has(tile) and next_attack_tick > _strike_held_tick \
+				and World.tick <= next_attack_tick + STRIKE_HOLD_TICKS \
+				and Vector2(tile).distance_to(meet) <= World.reach_limit(self) + STRIKE_HOLD_SLACK:
+			cells.append(tile)  # Just dodged out of reach: it holds its ground.
+		if cells.is_empty():
+			cells = any  # None that far: never without a cell to fight from.
+		aim = STRIKE_SPAN_SHARE * World.span_of(World.blow_verb(self))
 	else:
 		for direction in World.DIRECTIONS:
 			cells.append(target.tile + direction)
@@ -1526,6 +1571,8 @@ func _pick_slot() -> Vector2i:
 		var score := float(World.distance(tile, at))
 		if at == tile or at == slot:
 			score -= 0.5
+		if aim > 0.0:
+			score += maxf(0.0, aim - Vector2(at).distance_to(meet))  # Short of its reach costs; no farther cell is chased.
 		if score < nearest_score:
 			nearest = at
 			nearest_score = score
