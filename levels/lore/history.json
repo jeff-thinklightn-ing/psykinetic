@@ -122,7 +122,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the family tombs"
 				},
 				{
 					"id": "crypt.top_floor",
@@ -133,7 +134,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the newer graves"
 				},
 				{
 					"id": "crypt.ossuary",
@@ -144,7 +146,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the old bones"
 				},
 				{
 					"id": "crypt.third_layer",
@@ -167,7 +170,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the broken tombs"
 				},
 				{
 					"id": "crypt.angry_dead",
@@ -191,7 +195,8 @@
 					"true": true,
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the Hall of Fallen Souls"
 				},
 				{
 					"id": "crypt.ghost_warriors",
@@ -344,7 +349,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the smashed tombs"
 				},
 				{
 					"id": "crypt.robbers_chest",
@@ -356,7 +362,8 @@
 					],
 					"tags": [],
 					"source": "game",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the robbers' chest"
 				},
 				{
 					"id": "crypt.camp_key",
@@ -382,7 +389,8 @@
 						"return"
 					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the knight's spirit"
 				},
 				{
 					"id": "crypt.way_below",

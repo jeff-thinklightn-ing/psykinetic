@@ -20,7 +20,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the dead land"
 				},
 				{
 					"id": "blood_rot_lands.neighbours",
@@ -205,7 +206,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the Old Tower"
 				},
 				{
 					"id": "old_tower.snagfin",
@@ -246,7 +248,8 @@
 					"tags": [
 						"return"
 					],
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the temple"
 				},
 				{
 					"id": "temple.charm_blessed",
@@ -286,7 +289,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the Mughouse"
 				},
 				{
 					"id": "last_light.inside",
@@ -297,7 +301,8 @@
 					],
 					"tags": [],
 					"source": "game",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the hearth and the rooms upstairs"
 				},
 				{
 					"id": "last_light.sign",
@@ -308,7 +313,8 @@
 					],
 					"tags": [],
 					"source": "game",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the lantern sign"
 				},
 				{
 					"id": "last_light.lamp",
@@ -319,7 +325,8 @@
 					],
 					"tags": [],
 					"source": "game",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the lamp in the window"
 				}
 			]
 		},
@@ -377,7 +384,8 @@
 					"tags": [
 						"return"
 					],
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the healer's hut"
 				}
 			]
 		},
@@ -410,7 +418,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the stripped land"
 				}
 			]
 		},
@@ -546,7 +555,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the mine"
 				},
 				{
 					"id": "mine.deeper",
@@ -604,7 +614,8 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "that tower over the mine"
 				},
 				{
 					"id": "tower.built",
@@ -669,7 +680,8 @@
 					"tags": [
 						"rot"
 					],
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the fallen star"
 				},
 				{
 					"id": "star_chamber.common_name",
@@ -726,7 +738,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the old workings"
 				},
 				{
 					"id": "hollowfell.lost",
@@ -737,7 +750,8 @@
 					],
 					"tags": [],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "agreed",
+					"sight": "the deep seams"
 				},
 				{
 					"id": "hollowfell.held",
