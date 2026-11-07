@@ -4,13 +4,14 @@ extends Control
 ## needs to learn early that they get rewarded for everything they do"). The
 ## server's "reward" message, one per gain, {track, amount, words, of, at,
 ## big, step, banner, bar, gold, bars} (Main.reward), comes here (add):
-##   - a float: "+1 Regard, Umbrage" (voice's form: the track's word, then
-##     whose), rising over the deed's cell (at) or over the player and fading;
+##   - a float: "Umbrage (Regard +1)" (Jeff's form: the thing, then the
+##     track's word and amount in brackets), rising over the deed's cell (at) or over the player and fading;
 ##     the same track and whose within MERGE_SECONDS rolls up the live one's
 ##     number, so a burst is one float; FLOATS_AT_ONCE at most, the rest wait;
 ##   - a banner, top centre, for a big gain or a step (a ladder's next rung):
 ##     its "banner" words (voice's: "Umbrage knows you", "Hollowfell"), else
-##     its words; one at a time, queued; a zone's name the arrival card already
+##     its words, the gain in brackets after; BANNER_SECONDS each, one at a
+##     time, queued; a zone's name the arrival card already
 ##     shows is not shown twice (shown_elsewhere);
 ##   - a line in the log (the talk panel's Gains), the session's last LOG_KEPT,
 ##     merged as the floats are, newest last;
@@ -21,7 +22,7 @@ extends Control
 ## (the log alone). In a fight (fighting: a blow given or taken lately) the
 ## floats are smaller and the banners and their cues wait until it is over.
 ## Each track's word, colour and cue are TRACKS'; one unknown shows in brass
-## with no word ("+1, Umbrage"), so a later emitter needs no new client.
+## with no word ("Umbrage (+1)"), so a later emitter needs no new client.
 
 ## The tracks (decision 804): label is voice's word (none for gold and item,
 ## whose "of" is the thing itself: "+12 gold", "+2 hides"), color the float's
@@ -45,6 +46,8 @@ const TRACKS := {
 }
 ## A track not in TRACKS.
 const OTHER := {"label": "", "color": "#c79a55", "cue": "ui.reward_gain"}
+## A thing the server words one way, shown another: Jeff's own capital.
+const THINGS := {"a fight won": "Fight Won"}
 ## Owed gold's float: the theme's dim text, not the coin's brass.
 static var OWED_COLOR: Color = UiTheme.color("text_dim")
 ## The cues over a track's own: a step, a want met (a big deed), and the
@@ -85,7 +88,8 @@ const FIGHT_SECONDS := 4.0
 ## A body this near (cells): a blow on it, or it hunting or fighting, is a
 ## fight (Main._in_fight).
 const FIGHT_NEAR := 8
-const BANNER_SECONDS := 2.5
+## Jeff, 2026-11-06: "banners fade too fast".
+const BANNER_SECONDS := 5.0
 const BANNER_FADE := 0.4
 ## The banner's middle, down the screen's height.
 const BANNER_AT := 0.18
@@ -147,16 +151,43 @@ func _init() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
 
-## The float's, the log's words for [param track] [param amount] of [param of]:
-## "+1 Regard, Umbrage", "+12 gold", "+2 hides", "+1 Deeds".
+## The float's, the log's words for [param track] [param amount] of [param of]
+## (Jeff, 2026-11-06: the thing first, the track and amount in brackets):
+## "Umbrage (Regard +1)", "Fight Won (Deeds +1)", "Deeds +1", "+12 gold",
+## "+2 hides".
 static func text_of(track: String, amount: float, of: String) -> String:
-	var number := "+" + (str(int(amount)) if is_equal_approx(amount, roundf(amount)) else String.num(amount, 1))
-	var label := str(TRACKS.get(track, OTHER)["label"])
 	if track == "gold":
-		return number + " gold"
-	if label.is_empty():
-		return number + (" " + counted(of, amount) if track == "item" else (", " + of if not of.is_empty() else ""))
-	return number + " " + label + (", " + of if not of.is_empty() else "")
+		return _number(amount) + " gold"
+	if track == "item":
+		return _number(amount) + " " + counted(of, amount)
+	var thing := thing_of(of)
+	return gain_of(track, amount) if thing.is_empty() else thing + " (" + gain_of(track, amount) + ")"
+
+
+## [param track]'s word and [param amount]: "Regard +1"; "+1" for a track
+## with no word.
+static func gain_of(track: String, amount: float) -> String:
+	var label := str(TRACKS.get(track, OTHER)["label"])
+	return _number(amount) if label.is_empty() else label + " " + _number(amount)
+
+
+## [param of] as a float or the log shows it (voice's label rule): THINGS'
+## own, else a leading a, an or the dropped and the first letter capitalised,
+## a name keeping its own ("a hill cat": "Hill cat"; "swordplay":
+## "Swordplay").
+static func thing_of(of: String) -> String:
+	var thing := of.strip_edges()
+	if THINGS.has(thing):
+		return str(THINGS[thing])
+	for article: String in ["a ", "an ", "the "]:
+		if thing.to_lower().begins_with(article) and thing.length() > article.length():
+			thing = thing.substr(article.length())
+			break
+	return thing.left(1).to_upper() + thing.substr(1)
+
+
+static func _number(amount: float) -> String:
+	return "+" + (str(int(amount)) if is_equal_approx(amount, roundf(amount)) else String.num(amount, 1))
 
 
 ## [param thing] counted [param amount]: its head word pluralised past one
@@ -243,9 +274,11 @@ func add(data: Dictionary) -> bool:
 		if text.is_empty():
 			text = words
 		var elsewhere := shown_elsewhere.is_valid() and bool(shown_elsewhere.call(text))
-		if not text.is_empty() and not elsewhere and not banners.any(func(each: Dictionary) -> bool: return each["text"] == text) \
-				and str(_banner.get("text", "")) != text:
-			banners.append({"text": text, "color": color_of(track)})
+		if not text.is_empty() and not elsewhere and not banners.any(func(each: Dictionary) -> bool: return each["bare"] == text) \
+				and str(_banner.get("bare", "")) != text:
+			# Its own words whole, the gain in brackets after (not gold's or an item's).
+			var line_up := text if track in ["gold", "item"] else text + " (" + gain_of(track, amount) + ")"
+			banners.append({"text": line_up, "bare": text, "color": color_of(track)})
 	if shown != "log":
 		var slot: String = str(TRACKS.get(track, OTHER)["cue"])
 		if not step.is_empty():

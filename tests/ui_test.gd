@@ -2501,17 +2501,20 @@ func _test_gains() -> void:
 	gains.fighting = func() -> bool: return false
 	gains.shown = "all"
 	clear.call()
-	_check(Gains.text_of("regard", 1, "Umbrage") == "+1 Regard, Umbrage" and Gains.text_of("bond", 0.5, "Wren") == "+0.5 Bond, Wren"
+	_check(Gains.text_of("regard", 1, "Umbrage") == "Umbrage (Regard +1)" and Gains.text_of("bond", 0.5, "Wren") == "Wren (Bond +0.5)"
 		and Gains.text_of("gold", 12, "") == "+12 gold" and Gains.text_of("item", 2, "hide") == "+2 hides"
 		and Gains.text_of("item", 2, "wood bundle") == "+2 wood bundles" and Gains.text_of("item", 20, "food") == "+20 food"
 		and Gains.text_of("item", 1, "perch") == "+1 perch" and Gains.text_of("item", 2, "bundle of wood") == "+2 bundles of wood"
 		and Gains.text_of("item", 2, "bone dice") == "+2 bone dice" and Gains.text_of("item", 3, "amber beads") == "+3 amber beads"
-		and Gains.text_of("deed", 1, "") == "+1 Deeds" and Gains.text_of("someday", 1, "Umbrage") == "+1, Umbrage",
-		"voice's form: the track's word, then whose; gold and things by name, counted (a mass not); an unknown track has no word")
+		and Gains.text_of("deed", 1, "") == "Deeds +1" and Gains.text_of("someday", 1, "Umbrage") == "Umbrage (+1)"
+		and Gains.text_of("deed", 1, "a fight won") == "Fight Won (Deeds +1)" and Gains.text_of("deed", 1, "against many") == "Against many (Deeds +1)"
+		and Gains.text_of("explore", 1, "a hill cat") == "Hill cat (Wayfaring +1)" and Gains.text_of("explore", 1, "Old Tower") == "Old Tower (Wayfaring +1)"
+		and Gains.text_of("practice", 1, "swordplay") == "Swordplay (Practice +1)",
+		"Jeff's form: the thing (no article, a capital first), the track and amount in brackets; gold and things by name, counted (a mass not); an unknown track has no word")
 	_main._on_message("reward", {"track": "regard", "amount": 1, "of": "Umbrage", "words": "gave ore the town was short of"})
 	_main._on_message("reward", {"track": "regard", "amount": 1, "of": "Umbrage"})
-	_check(gains.lines.size() == 1 and gains.lines[0]["text"] == "+2 Regard, Umbrage" and gains.floats.size() == 1
-		and gains.float_text(gains.floats[0]) == "+2 Regard, Umbrage" and gains.lines[0]["words"] == "gave ore the town was short of",
+	_check(gains.lines.size() == 1 and gains.lines[0]["text"] == "Umbrage (Regard +2)" and gains.floats.size() == 1
+		and gains.float_text(gains.floats[0]) == "Umbrage (Regard +2)" and gains.lines[0]["words"] == "gave ore the town was short of",
 		"two gains within a second are one float and one log line, rolled up (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])
 	_check(gains.cues.size() == 1 and gains.cues[0][0] == "ui.reward_gain", "one cue for the burst (%s)" % [gains.cues])
 	_check(not gains.add({"track": "regard", "amount": 0, "of": "Umbrage"}) and not gains.add({"track": "regard", "amount": -2, "of": "Umbrage"})
@@ -2523,7 +2526,17 @@ func _test_gains() -> void:
 	clear.call()
 	gains.add({"track": "regard", "amount": 1, "of": "Umbrage", "step": "trusted", "banner": "Umbrage trusts you"})
 	gains._process(0.0)
-	_check(gains.banner_shown() == "Umbrage trusts you" and gains.cues.back()[0] == Gains.STEP_CUE, "a step: its banner and the step cue")
+	_check(gains.banner_shown() == "Umbrage trusts you (Regard +1)" and gains.cues.back()[0] == Gains.STEP_CUE, "a step: its banner, the gain in brackets, and the step cue")
+	# Jeff: "banners fade too fast": BANNER_SECONDS up, the next waiting its whole turn.
+	gains.add({"track": "deed", "amount": 1, "big": true, "banner": "The bear, brought down", "of": ""})
+	gains._banner["born"] = gains._now() - 4.0
+	gains._process(0.0)
+	var kept_up := gains.banner_shown()
+	gains._banner["born"] = gains._now() - Gains.BANNER_SECONDS
+	gains._process(0.0)
+	_check(is_equal_approx(Gains.BANNER_SECONDS, 5.0) and kept_up == "Umbrage trusts you (Regard +1)"
+		and gains.banner_shown() == "The bear, brought down (Deeds +1)",
+		"a banner stays 5 s, the next after it, its own words whole (%s, %s)" % [kept_up, gains.banner_shown()])
 	clear.call()
 	gains.add({"track": "gold", "amount": 12})
 	_check(gains.cues.back()[0] == "ui.reward_coin", "gold: the coin")
@@ -2552,7 +2565,7 @@ func _test_gains() -> void:
 	await get_tree().process_frame
 	await get_tree().process_frame
 	var slots: Array = gains.cues.map(func(c: Array) -> String: return c[0])
-	_check(slots == [Gains.NEED_CUE] and Gains.text_of("safety", 1, "Wren") == "+1 Shelter, Wren" and Gains.text_of("adventure", 1, "Wren") == "+1 Venture, Wren",
+	_check(slots == [Gains.NEED_CUE] and Gains.text_of("safety", 1, "Wren") == "Wren (Shelter +1)" and Gains.text_of("adventure", 1, "Wren") == "Wren (Venture +1)",
 		"three needs in one frame: one need cue; the needs' words (%s)" % [slots])
 	clear.call()
 	# Her bond in the same frame: the bond's gain alone (sound: the bigger news; two takes clash).
@@ -2586,7 +2599,7 @@ func _test_gains() -> void:
 		and gains.cues.is_empty(), "in a fight: the floats small, the banner held, no cue")
 	gains.fighting = func() -> bool: return false
 	gains._process(0.0)
-	_check(gains.banner_shown() == "Umbrage knows you", "the fight over: the banner shows")
+	_check(gains.banner_shown() == "Umbrage knows you (Regard +1)", "the fight over: the banner shows")
 	clear.call()
 	# Practice in a fight (playtest's bear tour, eleven floats in 13 s): held, one float after.
 	gains.held.clear()
@@ -2596,7 +2609,7 @@ func _test_gains() -> void:
 	var held_quiet: bool = gains.floats.is_empty() and gains.lines.is_empty()
 	gains.add({"track": "practice", "amount": 2, "of": "swordplay", "whole": true})
 	var whole: Array = gains.floats.map(func(live: Dictionary) -> String: return gains.float_text(live))
-	_check(held_quiet and whole == ["+7 Practice, swordplay"] and gains.held.is_empty(),
+	_check(held_quiet and whole == ["Swordplay (Practice +7)"] and gains.held.is_empty(),
 		"in a fight an art's rises are held; a whole step floats at once, with them (%s)" % [whole])
 	clear.call()
 	for i in 3:
@@ -2606,13 +2619,13 @@ func _test_gains() -> void:
 	gains.held["swordplay"]["last"] = gains._now() - Gains.HOLD_SECONDS
 	gains._process(0.0)
 	whole = gains.floats.map(func(live: Dictionary) -> String: return gains.float_text(live))
-	_check(still and whole == ["+3 Practice, swordplay"], "none for %d s, still fighting: what was held floats as one (%s)" % [int(Gains.HOLD_SECONDS), whole])
+	_check(still and whole == ["Swordplay (Practice +3)"], "none for %d s, still fighting: what was held floats as one (%s)" % [int(Gains.HOLD_SECONDS), whole])
 	clear.call()
 	gains.add({"track": "practice", "amount": 2, "of": "bow"})
 	gains.fighting = func() -> bool: return false
 	gains._process(0.0)
 	whole = gains.lines.map(func(l: Dictionary) -> String: return l["text"])
-	_check(whole == ["+2 Practice, bow"] and gains.held.is_empty(), "the fight over: one float and one line (%s)" % [whole])
+	_check(whole == ["Bow (Practice +2)"] and gains.held.is_empty(), "the fight over: one float and one line (%s)" % [whole])
 	clear.call()
 	gains.fighting = func() -> bool: return true
 	_main._arts_seen = {"swordplay": 0.38}
@@ -2620,7 +2633,7 @@ func _test_gains() -> void:
 	var before_step: bool = gains.lines.is_empty()
 	_main._practice_gained({"swordplay": [0.41, false]})
 	whole = gains.lines.map(func(l: Dictionary) -> String: return l["text"])
-	_check(before_step and whole == ["+3 Practice, swordplay"], "Main: a rise past a tenth of the bar is a whole step (%s)" % [whole])
+	_check(before_step and whole == ["Swordplay (Practice +3)"], "Main: a rise past a tenth of the bar is a whole step (%s)" % [whole])
 	gains.fighting = func() -> bool: return false
 	_main._arts_seen = {}
 	gains.held.clear()
@@ -2643,7 +2656,7 @@ func _test_gains() -> void:
 	_main._on_message("arts", {"swordplay": [0.10, false]})
 	_main._on_message("arts", {"swordplay": [0.13, false], "bow": [0.02, false]})
 	var practice := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
-	_check(practice == ["+3 Practice, swordplay", "+2 Practice, bow"], "an art's peak risen is Practice; the first told only sets them (%s)" % [practice])
+	_check(practice == ["Swordplay (Practice +3)", "Bow (Practice +2)"], "an art's peak risen is Practice; the first told only sets them (%s)" % [practice])
 	if _main.talk != null:
 		_main.talk.show_gains(true)
 		var listed: int = _main.talk._gains_list.get_child_count()
@@ -2661,7 +2674,7 @@ func _test_gains() -> void:
 		clear.call()
 		World.fight_won.emit(me, Vector2i(2, 3), [{"name": "The wolf", "fled": false, "hard": false, "at": Vector2i(2, 3)}])
 		var won := gains.lines.map(func(l: Dictionary) -> String: return l["text"])
-		_check(_main.rewards_sent == sent + 2 and gains.lines.size() == 1 and gains.floats[0]["at"] == Vector2i(2, 3),
+		_check(_main.rewards_sent == sent + 2 and won == ["Fight Won (Deeds +1)"] and gains.floats[0]["at"] == Vector2i(2, 3),
 				"a fight won (804, combat's side): World.fight_won told as a deed where it ended (%s)" % [won])
 		clear.call()
 		_main._picked_gains(me, [{"id": "wood_bundle"}, {"id": "wood_bundle"}], 12)
@@ -2686,9 +2699,12 @@ func _test_gains() -> void:
 		_check(not burnt and struck, "a fight: a blow taken, never hit points a burn takes (burnt %s, struck %s)" % [burnt, struck])
 		_check(Gains.pop(0.0) < 1.0 and Gains.pop(Gains.POP_UP) > 1.0 and is_equal_approx(Gains.pop(1.0), 1.0),
 			"a float pops: a swell, then its size")
+		var over_me: Variant = _main._gain_anchor(null)
+		_check(_main._gain_anchor(me.tile) == over_me and (over_me == null or over_me == _main._bubble_anchor(me.get_instance_id()) - Vector2(0.0, Main.GAIN_OVER_NAME)),
+			"a gain on the player's own cell floats over them, above their name (%s)" % [over_me])
 		_main._discovered(me.owner_peer, me.zone)
-		_check(gains.lines.size() == 1 and gains.lines[0]["track"] == "explore" and str(gains.lines[0]["text"]).begins_with("+1 Wayfaring, "),
-			"a zone stood in the first time: +1 Wayfaring (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])
+		_check(gains.lines.size() == 1 and gains.lines[0]["track"] == "explore" and str(gains.lines[0]["text"]).ends_with(" (Wayfaring +1)"),
+			"a zone stood in the first time: Wayfaring +1 (%s)" % [gains.lines.map(func(l: Dictionary) -> String: return l["text"])])
 	else:
 		print("  (no player in this scene: the server's checks skipped)")
 	clear.call()

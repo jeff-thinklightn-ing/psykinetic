@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Gains read the thing first, with the track and amount after it in brackets, as in "Umbrage (Regard +1)", on floats, banners and the talk log alike, and banners stay up longer (804).
 
 - Towns: Rolf's window has a button to open your locker beside him and, until you take it, one for the practice kit he keeps for newcomers (807 amended (3)).
 - Outdoors, when a house, a tree or a wall hides you, the camera turns a little by itself to bring you back into view, never far from where you set it; turning it yourself holds it off for a few seconds, and Options can switch it off (801).

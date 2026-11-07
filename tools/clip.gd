@@ -19,6 +19,9 @@ extends Node
 ##   camera_turn: outdoors (801), a clump of trees in a field; the player
 ##   walks behind it from the camera, waits there (the camera turns to
 ##   show them), then walks round it and waits again.
+##   gains: in an open field (804) the player is told a fight won and a
+##     town's regard with its banner, then a step; the floats over them, the
+##     banners top centre, one after the other.
 ##   escape: an imp on guard sees the player, who runs down a corridor and
 ##     round two corners; the imp hunts to where it last saw them and on,
 ##     looks round, gives up and walks home.
@@ -206,6 +209,8 @@ func _ready() -> void:
 			_sneak()
 		"camera_turn":
 			_camera_turn()
+		"gains":
+			_gains()
 		"escape":
 			_escape()
 		"leash":
@@ -304,7 +309,7 @@ func _ready() -> void:
 		_main.hint_panel.visible = false  # The controls list would cover the caption.
 	if scenario.begins_with("items"):
 		_main.pack_panel.shown = true
-	if scenario == "camera_turn":
+	if scenario in ["camera_turn", "gains"]:
 		_main.pack_panel.shown = false
 	if scenario == "items_use":
 		World.get_doors()[0].lock = "cellar"
@@ -335,7 +340,7 @@ func _process(delta: float) -> void:
 		return
 	var at: Node3D = view._puppets.get(_player.get_instance_id())
 	var monster: Node3D = view._puppets.get(_monster.get_instance_id())
-	if at != null and monster != null and scenario != "camera_turn":  # 801: on the player alone.
+	if at != null and monster != null and not scenario in ["camera_turn", "gains"]:  # 801: on the player alone.
 		var middle: Vector3 = (monster.position - at.position) * 0.5
 		view.pan = view.pan.lerp(middle, 1.0 - exp(-3.0 * delta)).limit_length(view.PAN_MAX)
 
@@ -380,6 +385,25 @@ func _sneak() -> void:
 		["wait", 15, ""],
 		["lantern", true, "Lantern lit: seen."],
 		["wait", 50, ""],
+	]
+
+
+func _gains() -> void:
+	var rows: Array[String] = []
+	for y in 16:
+		rows.append(".".repeat(30))
+	var start := Vector2i(15, 8)
+	var markers := {start: "start", Vector2i(1, 15): "monster_imp"}
+	var config := {"name": "Clip", "outdoor": true,
+		"entities": [{"at": [1, 15], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [
+		["wait", 20, ""],
+		["reward", {"track": "deed", "amount": 1, "of": "a fight won", "words": "a fight won"}, ""],
+		["reward", {"track": "regard", "amount": 1, "of": "Umbrage", "big": true, "banner": "Umbrage knows you"}, ""],
+		["wait", 100, ""],
+		["reward", {"track": "explore", "amount": 1, "of": "Hollowfell", "big": true, "banner": "Hollowfell"}, ""],
+		["wait", 80, ""],
 	]
 
 
@@ -1564,6 +1588,10 @@ func _on_tick(tick: int) -> void:
 			if _wait_until < 0:
 				_wait_until = tick + int(step[1])
 				return
+		"reward":  # A gain told as the server tells it, over the player.
+			var told: Dictionary = step[1].duplicate()
+			told["at"] = [_player.tile.x, _player.tile.y]
+			_main._on_message("reward", told)
 		"lantern":
 			if (_player.emit_light > 0.0) != bool(step[1]):
 				_player.toggle_lantern()

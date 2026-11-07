@@ -448,6 +448,9 @@ var talk: TalkPanel
 var bubbles: SpeechBubbles
 ## 2D: a bubble's tail this many world px over an entity (above its name).
 const BUBBLE_OVER_2D := 40.0
+## A gain's float over the player starts this many px over their speech
+## bubble's point, clear of their name (Gains rises from there).
+const GAIN_OVER_NAME := 6.0
 ## The chat box (Enter opens it, Esc cancels); while it is open the game's
 ## keys do nothing.
 var _chat_box: LineEdit
@@ -23524,14 +23527,18 @@ func _practice_gained(marks: Dictionary) -> void:
 
 
 ## Where a gain's float rises: over [param at]'s cell, or over the local
-## player (null); null when not to be seen.
+## player (null, or their own cell), above their name; null when not to be
+## seen.
 func _gain_anchor(at: Variant) -> Variant:
-	if at is Vector2i:
+	var me := _local_player()
+	# On their own cell, over them as with none: above their name, never on
+	# it (the coordinator on the gains still).
+	if at is Vector2i and (me == null or at != me.tile):
 		if _client3d == null:
 			return null
 		return _client3d.screen_of_tile(at) - Vector2(0.0, _client3d.tile_px())
-	var me := _local_player()
-	return _bubble_anchor(me.get_instance_id()) if me != null else null
+	var over: Variant = _bubble_anchor(me.get_instance_id()) if me != null else null
+	return over - Vector2(0.0, GAIN_OVER_NAME) if over is Vector2 else over
 
 
 ## Whether the player is in a fight, lately (Gains.FIGHT_SECONDS; Gains asks
