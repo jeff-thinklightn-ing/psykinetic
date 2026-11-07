@@ -3112,8 +3112,9 @@ func _test_wolf_cave() -> void:
 ## foothills, its mouth at (97, 31) opening south under the high scarp
 ## (terrain's "den" cue: its footprint void, no cliff at the link or beside
 ## it), a two-wide run that turns once so the den is out of sight from the
-## door, his bed at the den's back with the hunter's pack at its foot, two
-## keepers, and its place, nobody's.
+## door, his bed at the den's back with the hunter's pack at its foot, one
+## keeper (780 amended (15): him and three wolves at home, with his escort of
+## two), and its place, nobody's.
 func _test_grey_den() -> void:
 	print("== The old grey's den (780 amended (14)) ==")
 	var den_level := Level.load_level("grey_den")
@@ -3138,8 +3139,8 @@ func _test_grey_den() -> void:
 			wolves.append(entity["tile"])
 		elif str(entity.get("props", {}).get("cache", "")) == "grey_den_cache":
 			caches.append(entity)
-	_check(wolves.size() == 2 and wolves.all(func(at: Vector2i) -> bool: return Vector2(at - bed).length() <= 6.0),
-		"two den keepers, in the den (%s)" % [wolves])
+	_check(wolves.size() == 1 and wolves.all(func(at: Vector2i) -> bool: return Vector2(at - bed).length() <= 6.0),
+		"one den keeper, in the den (%s)" % [wolves])
 	_check(caches.size() == 1 and Vector2(caches[0]["tile"] - bed).length() <= 1.5 and caches[0].get("art") == "prop.cache_pack",
 		"the hunter's pack at the bed's foot (%s)" % [caches])
 	_check(int(config.get("respawn_s", {}).get("wolf", 0)) >= DayNight.DEFAULT_DAY_MINUTES * 60, "the keepers back after a game day or more")

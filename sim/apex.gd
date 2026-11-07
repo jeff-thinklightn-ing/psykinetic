@@ -18,6 +18,16 @@ extends RefCounted
 ## Going either way it walks to the door if a player in its zone sees it,
 ## else it simply changes state. The body itself is never saved: the record
 ## lays it afresh.
+##
+## Its escort (780 amended (15), the old grey's pack; the row's "escort"
+## {kind, count, follow}): laid with it wherever it is laid, about it, each
+## following it (Animal.escort_lead) and fighting its target; gone with it
+## through its door. One killed stays dead (the record's "escort_down")
+## till it is back in its lair rise_s after its fall-back, or risen from
+## its death: clearing the pack lasts. Out, its escort down to
+## "fall_back_escort", it is beaten back. Never saved, as the body.
+## Beaten back (its hp or its escort), World.apex_beaten is emitted once
+## (companions' "apex_beaten").
 
 ## World steps between checks (5 s); a body walking to its door is looked at
 ## every step.
@@ -40,6 +50,8 @@ static var _leaving: Dictionary = {}
 static var _places: Dictionary = {}
 ## Kind -> the step it last took a new roaming ground.
 static var _roamed: Dictionary = {}
+## Kind -> its escort's living bodies (not saved).
+static var _escorts: Dictionary = {}
 
 
 ## The rows with a "lair" block: kind -> that block.
@@ -64,7 +76,14 @@ static func holds_marker(spec: Dictionary, zone_name: String) -> bool:
 
 ## Whether [param entity] is an apex's body (never saved, never retired).
 static func is_body(entity: GridEntity) -> bool:
-	return entity != null and _bodies.values().has(entity)
+	if entity == null:
+		return false
+	if _bodies.values().has(entity):
+		return true
+	for kind: String in _escorts:
+		if (_escorts[kind] as Array).has(entity):
+			return true
+	return false
 
 
 ## Every record and body forgotten (a test's fresh start); no despawns.
@@ -73,6 +92,7 @@ static func clear() -> void:
 	_leaving.clear()
 	_places.clear()
 	_roamed.clear()
+	_escorts.clear()
 
 
 ## [param kind]'s record, made the first time (in its lair, its wait to go
@@ -100,6 +120,8 @@ static func step() -> void:
 		return
 	var all := rows()
 	for kind: String in all:
+		if _escorts.has(kind):
+			_tend_escort(kind)
 		if World.steps % CHECK_STEPS == 0 or _leaving.has(kind):
 			_check(kind, all[kind])
 
@@ -122,6 +144,10 @@ static func _check(kind: String, row: Dictionary) -> void:
 				body = _lay(kind, row, str(row["zone"]), places["den"])
 			if body != null and body.target == null and World.steps - int(rec["attacked"]) >= LAIR_HEAL_STEPS:
 				body.hp = body.max_hp  # Whole again between fights.
+			if body != null and body.target == null and int(rec.get("escort_down", 0)) > 0 \
+					and World.steps >= int(rec.get("escort_whole_at", 0)):
+				rec["escort_down"] = 0  # Its pack whole again in its lair.
+				_lay_escort(kind, body)
 			if _may_venture(rec, row, body):
 				_go(kind, row, body, "out", "ventures", places["lair_door"])
 		"out":
@@ -132,7 +158,7 @@ static func _check(kind: String, row: Dictionary) -> void:
 			if body != null:
 				rec["hp"] = body.hp
 				_roam(kind, body, places)
-			var why := _fall_back_why(rec, row, body)
+			var why := _fall_back_why(kind, rec, row, body)
 			if why != "":
 				_go(kind, row, body, "lair", why, places["land_door"])
 
@@ -145,14 +171,19 @@ static func _may_venture(rec: Dictionary, row: Dictionary, body: Monster) -> boo
 		return false
 	if not _in_hours(row):
 		return false
+	if int(rec.get("escort_down", 0)) > 0:
+		return false  # Its pack not whole yet (780 amended (15)): it waits in its lair.
 	return body == null or body.target == null
 
 
 ## Why it goes home now, or "": beaten down to fall_back_hp (fighting or
 ## not), else, fighting nobody, its hours over or out out_most_s.
-static func _fall_back_why(rec: Dictionary, row: Dictionary, body: Monster) -> String:
+static func _fall_back_why(kind: String, rec: Dictionary, row: Dictionary, body: Monster) -> String:
 	if body != null and body.hp <= roundi(float(row.get("fall_back_hp", 0.4)) * body.max_hp):
 		return "beaten back"
+	if body != null and row.has("fall_back_escort") and not escort_row(kind).is_empty() \
+			and living_escort(kind) <= int(row["fall_back_escort"]):
+		return "beaten back"  # Its pack cleared (780 amended (15)): Jeff's "push him back by clearing".
 	if body != null and body.target != null:
 		return ""
 	if not _in_hours(row):
@@ -165,6 +196,8 @@ static func _fall_back_why(rec: Dictionary, row: Dictionary, body: Monster) -> S
 ## Its state to [param to] ([param why]): through the door at [param door]
 ## if a player in its zone sees it, else at once.
 static func _go(kind: String, _row: Dictionary, body: Monster, to: String, why: String, door: Vector2i) -> void:
+	if why == "beaten back" and body != null:
+		World.apex_beaten.emit(kind, body, body.tile)  # Companions' "apex_beaten" (780 amended (15)).
 	if body != null and _seen(body):
 		_leaving[kind] = {"to": to, "since": World.steps, "why": why}
 		body.set("apex_goal", door)
@@ -203,6 +236,10 @@ static func _set_state(kind: String, to: String, why: String) -> void:
 	var was := str(rec["state"])
 	rec["state"] = to
 	rec["since"] = World.steps
+	if to == "lair" and was == "dead":
+		rec["escort_down"] = 0  # Risen: its pack whole with it.
+	elif to == "lair":
+		rec["escort_whole_at"] = World.steps + _steps(rows().get(kind, {}), "rise_s", 1800.0)
 	var row: Dictionary = rows().get(kind, {})
 	print("[apex] %s %s: %s -> %s (%s)" % [kind, why, was, to, str(row.get("zone", "")) if to == "lair" else _land(row)])
 
@@ -230,6 +267,7 @@ static func _lay(kind: String, _row: Dictionary, zone_name: String, at: Vector2i
 			if str(rec["state"]) == "out" and int(rec["hp"]) > 0:
 				made.hp = mini(int(rec["hp"]), made.max_hp)
 			print("[apex] %s in %s at %s (%d/%d)" % [kind, zone_name, cell, made.hp, made.max_hp])
+			_lay_escort_here(kind, made)
 	World.enter(was)
 	return made
 
@@ -246,7 +284,85 @@ static func _free_near(at: Vector2i) -> Vector2i:
 
 static func _despawn(kind: String, body: Monster) -> void:
 	_bodies.erase(kind)
+	for each: Variant in _escorts.get(kind, []):
+		if is_instance_valid(each) and (each as GridEntity).spawned:
+			World.despawn(each)  # Through its door with it.
+	_escorts.erase(kind)
 	World.despawn(body)
+
+
+## [param kind]'s row's "escort" block, {} for none.
+static func escort_row(kind: String) -> Dictionary:
+	var escort: Variant = Monster.kinds().get(kind, {}).get("escort")
+	return escort if escort is Dictionary else {}
+
+
+## How many of [param kind]'s escort live.
+static func living_escort(kind: String) -> int:
+	var n := 0
+	for each: Variant in _escorts.get(kind, []):
+		if is_instance_valid(each) and (each as GridEntity).spawned and (each as GridEntity).hp > 0:
+			n += 1
+	return n
+
+
+## Its escort as it should be now (its count less those down) laid about
+## [param body], in its zone.
+static func _lay_escort(kind: String, body: Monster) -> void:
+	var zone: Zone = World.zones.get(body.zone)
+	if zone == null:
+		return
+	var was := World.zone
+	World.enter(zone)
+	_lay_escort_here(kind, body)
+	World.enter(was)
+
+
+## _lay_escort with World already in [param body]'s zone.
+static func _lay_escort_here(kind: String, body: Monster) -> void:
+	var escort := escort_row(kind)
+	if escort.is_empty():
+		return
+	var count: Variant = escort.get("count", [0, 0])
+	var full := int(count[0]) if count is Array and not (count as Array).is_empty() else int(count)
+	var list: Array = _escorts.get(kind, [])
+	_escorts[kind] = list
+	var want := full - int(record(kind).get("escort_down", 0)) - living_escort(kind)
+	var spec_of := Level._spec_for("monster_" + str(escort.get("kind", "wolf")), Level.MONSTER_TYPES)
+	if spec_of.is_empty():
+		return
+	for i in maxi(0, want):
+		var cell := _free_near(body.tile)
+		if cell == World.NO_CELL:
+			break
+		var spec := spec_of.duplicate(true)
+		spec["name"] = ("Apex_%s_escort_%d" % [kind, World.steps * 10 + i]).validate_node_name()
+		spec["tile"] = cell
+		spec["home"] = cell
+		var made: Variant = World.spawn_spec.call(spec)
+		if made is Animal:
+			(made as Animal).escort_lead = body
+			(made as Animal).escort_follow = int(escort.get("follow", 4))
+			list.append(made)
+	print("[apex] %s escort %d of %d about %s" % [kind, living_escort(kind), full, body.tile])
+
+
+## Each step: an escort killed is down (stays dead, the record's
+## "escort_down"); its lead dead, those fighting nobody are gone.
+static func _tend_escort(kind: String) -> void:
+	var list: Array = _escorts[kind]
+	var lead := body_of(kind)
+	var rec := record(kind)
+	for each: Variant in list.duplicate():
+		if not is_instance_valid(each) or not (each as GridEntity).spawned or (each as GridEntity).hp <= 0:
+			list.erase(each)
+			rec["escort_down"] = int(rec.get("escort_down", 0)) + 1
+			print("[apex] %s escort down, %d live" % [kind, living_escort(kind)])
+		elif lead == null and (each as Monster).target == null:
+			list.erase(each)
+			World.despawn(each)  # Its lead fallen, its fight over: gone.
+	if list.is_empty() and lead == null:
+		_escorts.erase(kind)
 
 
 ## Whether a player in its zone sees [param body] (within VIEW_TILES, a clear
@@ -323,8 +439,19 @@ static func _places_of(kind: String, row: Dictionary) -> Dictionary:
 		push_warning("Apex: %s has no den, or no door in %s or %s" % [kind, lair_name, land_name])
 		_places[kind] = {}
 		return {}
-	_places[kind] = {"den": den, "lair_door": lair_door, "land_door": land_door,
-			"roam": roaming_grounds(land, land_door, int(row.get("range", 40)), int(row.get("path_margin", 6)))}
+	var roam: Array = roaming_grounds(land, land_door, int(row.get("range", 40)), int(row.get("path_margin", 6)))
+	var pad_margin := float(row.get("pad_margin", 0))
+	if pad_margin > 0.0:
+		# Off the land's other links' pads (780 amended (15)): the old grey
+		# keeps clear of the castle's and the wilds' arrivals.
+		for link: Dictionary in land.get("links", []):
+			if str(link.get("to_map", "")) == lair_name:
+				continue
+			var at: Variant = link.get("tile", link.get("at"))  # A loaded level's "tile", a config's "at".
+			var pad: Vector2i = at if at is Vector2i else (Vector2i(int(at[0]), int(at[1])) if at is Array and (at as Array).size() == 2 else World.NO_CELL)
+			if pad != World.NO_CELL:
+				roam = roam.filter(func(cell: Vector2i) -> bool: return Vector2(cell - pad).length() > pad_margin)
+	_places[kind] = {"den": den, "lair_door": lair_door, "land_door": land_door, "roam": roam}
 	return _places[kind]
 
 

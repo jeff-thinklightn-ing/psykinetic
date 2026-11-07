@@ -8,14 +8,15 @@ make_foothills writes that side, "mouth": "den").
   one turn east (TURN, three wide where the pack turns), so the den can't be
   seen from the door.
 - The den (DEN, 11 x 11, its corners rounded): a round earth chamber (dirt), room for a
-  fight with five wolves; his bed (BED) at its back, the far corner from the
+  fight with him and three wolves; his bed (BED) at its back, the far corner from the
   way in.
 - Markers: the old wolf (monster_old_wolf) at his bed, held by Apex and never
   spawned as a level entity (as the bear's); enemy-ai's landing brings his
   row, so it sets HIS_MARKER True then and reruns this (till then his bed is
-  bare, the place's cell); two
-  den keepers (monster_wolf, ordinary wolves) that stay when he goes out;
-  they come back after "respawn_s" (6000, as the wolves' cave's).
+  bare, the place's cell); a
+  den keeper (monster_wolf, an ordinary wolf; one, the coordinator 11-07: him
+  and three wolves at home with his escort of two) that stays when he goes out;
+  it comes back after "respawn_s" (6000, as the wolves' cave's).
 - The find at the bed's foot (CACHE_AT): a hunter's pack (prop.cache_pack,
   decision 599), items' loot table grey_den_cache. Bones the pack dragged in,
   as decor; a heap by the bed. No spear: no item lies flat as decor yet.
@@ -43,7 +44,7 @@ COLOURS = {
 }
 WOLF = "monster_wolf"
 OLD_WOLF = "monster_old_wolf"
-HIS_MARKER = False
+HIS_MARKER = True
 LEGEND = {WOLF: "#6e6e78", OLD_WOLF: "#b4b4be"} if HIS_MARKER else {WOLF: "#6e6e78"}
 OUT = os.path.join("levels", "grey_den")
 
@@ -56,7 +57,7 @@ TURN = [(x, y) for x in (4, 5, 6) for y in (8, 9, 10)]
 DEN = (10, 2, 11, 11)  # x, y, w, h
 BED = (18, 4)
 CACHE_AT = (17, 5)
-KEEPERS = [(14, 6), (17, 9)]
+KEEPERS = [(14, 6)]
 BONES = [((19, 6), 2), ((12, 4), 1), ((15, 11), 1), ((5, 16), 1), ((8, 9), 1)]
 SKYLIGHTS = [{"at": [15, 7], "radius": 1.5}]
 CACHE = "grey_den_cache"

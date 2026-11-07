@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the foothills, a den opens under the high scarp west of the road: the old grey's, an old wolf bigger than the rest, who roams the foothills by day with three of his pack, his howl carrying far, while two more keep the den; he hangs back while his pack lives and comes in when you're down or turned away, his howl sends them at you all at once unless you strike him mid-howl, and after his lunge, along a line you can see, he stands panting, open to you; kill all but one of his pack and he goes home, and at his bed's foot a hunter's bundle holds a find of your own; the tanner buys his pelt and fang (780 amended (14); 780 amended (15)).
 - At night in Umbrage, the square's fire throws a warm orange glow across the cobbles round it, and the lanterns by the chapel's and the stores' doors glow softly on the stone, where before they burned a white spot on the wall beside them (782 amended).
 - Town houses and huts have shuttered windows now, and after dusk lamplight glows at the windows and open door of any where someone is still awake (489 amended (3)).
 - In the dwarven halls under the castle, work the cold forge's bellows and hold down the lever on the far wall at once, with your companion, a friend or a cart pushed onto the bellows, and the forge roars alight as a stone shutter grinds up on a find of your own; ask your companion and she may tell you how it's done (813 amended (4)).

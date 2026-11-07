@@ -165,6 +165,11 @@ var _blood_at := NO_TILE
 ## players, not game; a boar charging what it finds, not bolting, till
 ## driven off (under half its hp).
 var wanderer := ""
+## An apex's escort (780 amended (15), the old grey's pack; Apex lays it):
+## the lead it follows within escort_follow cells, whose target it fights.
+## Bold, no errands, no prey of its own; struck, it fights back.
+var escort_lead: Monster = null
+var escort_follow := 4
 var drawn := false
 
 
@@ -198,7 +203,9 @@ func _sim_tick() -> void:
 			_flee(_struck_by().tile if _struck_by() != null else (target.tile if target != null else tile - facing))
 			return
 		_settle_bold()
-		if _errand_step():
+		if _escort_step():
+			return
+		if escort_lead == null and _errand_step():
 			return
 		super()
 		return
@@ -376,6 +383,8 @@ func _cornered(threat: Vector2i) -> bool:
 ## A predator's quarry: its diet in sight (looked over every
 ## PREY_LOOK_TICKS), and players when bold; a boar's, the one it charges.
 func _nearest_visible_target() -> GridEntity:
+	if escort_lead != null:
+		return _escort_target()
 	match role:
 		Role.GAME:
 			return _foe if World.tick < _charge_until and is_instance_valid(_foe) and _foe.spawned else null
@@ -414,11 +423,51 @@ func _sees_prey() -> GridEntity:
 	return nearest
 
 
+## An escort's foe (780 amended (15)): its lead's, a player or companion
+## near; one that struck it lately; else nobody (no prey of its own).
+func _escort_target() -> GridEntity:
+	if is_instance_valid(escort_lead) and escort_lead.spawned:
+		var foe := escort_lead.target
+		if foe != null and is_instance_valid(foe) and foe.spawned and foe.hp > 0 and not foe is Animal 				and World.distance(tile, foe.tile) <= PACK_TILES * 2:
+			return foe
+	if World.tick - hurt_tick < CHARGE_TICKS:
+		var struck := _struck_by()
+		if struck != null and is_instance_valid(struck) and struck.spawned and not struck is Animal:
+			return struck
+	return null
+
+
+## An escort with nobody to fight, its lead fighting nobody, farther off
+## than escort_follow: after its lead at its pace. True while it does.
+func _escort_step() -> bool:
+	if escort_lead == null:
+		return false
+	if not is_instance_valid(escort_lead) or not escort_lead.spawned:
+		escort_lead = null
+		return false
+	if target != null or escort_lead.target != null or alert == Alert.FLEEING:
+		return false
+	if World.distance(tile, escort_lead.tile) <= escort_follow:
+		return false
+	if World.tick >= next_move_tick and not World.is_stunned(self):
+		move_ticks = _pace
+		if not _idle_step(escort_lead.tile, GreatBear.WALK_SEARCH_TILES):
+			next_move_tick = World.tick + 5
+	return true
+
+
 ## A predator: bold at night or with its pack about; then CAUTIOUS's
 ## holding back is gone and it sees farther. Looked at every
-## PREY_LOOK_TICKS.
+## PREY_LOOK_TICKS. An escort is always bold, its home its lead's cell.
 func _settle_bold() -> void:
 	if _bold_tick >= 0 and World.tick - _bold_tick < PREY_LOOK_TICKS:
+		return
+	if escort_lead != null and is_instance_valid(escort_lead):
+		_bold_tick = World.tick
+		_bold = true
+		temper = Temper.BOLD
+		home = escort_lead.tile
+		wander_radius = maxi(1, escort_follow / 2)
 		return
 	_bold_tick = World.tick
 	var night := DayNight.daylight(DayNight.now()) < NIGHT_LIGHT if World.fields.outdoor else false

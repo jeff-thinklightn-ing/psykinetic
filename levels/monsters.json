@@ -97,6 +97,23 @@
 			"charge": {"roar": 12, "cells": 6, "from": 3, "damage": 6, "impulse": 140.0, "every": 80}
 		}
 	},
+	"old_wolf": {
+		"side": "wild", "role": "predator", "herd": "wolf", "label": "The old grey", "art": "creature.old_wolf", "diet": ["deer", "stag"],
+		"script": "res://sim/old_wolf.gd", "apex": true,
+		"lair": {"zone": "grey_den", "land": ["foothills"], "range": 40, "hours": [6, 20], "venture_after_s": 1800,
+			"out_most_s": 2400, "fall_back_hp": 0.3, "fall_back_escort": 1, "rise_s": 1800, "path_margin": 6, "pad_margin": 30},
+		"escort": {"kind": "wolf", "count": [2, 2], "follow": 4},
+		"body": {"mass": 60.0, "max_hp": 40, "move_ticks": 2.9, "attack_damage": 4, "sight_range": 8},
+		"senses": {"cone": 160, "night": 0.6, "hearing": 2.0, "alert_sight": 2, "notice": 1.2},
+		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
+		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
+		"drops": [{"item": "grey_pelt", "count": [1, 1]}, {"item": "grey_fang", "count": [1, 1]}],
+		"moves": {
+			"howl": {"windup": 12, "every": 120, "rush_tiles": 6},
+			"spring": {"windup": 8, "cells": 3, "damage": 4, "drag": 60.0, "every": 50},
+			"pant": {"ticks": 20}
+		}
+	},
 	"hill_cat": {
 		"_": "Decision 814: lies up on a hill perch and drops on what passes (HillCat). Drops its pelt (items' hill_cat_pelt) and meat.",
 		"side": "wild", "role": "predator", "herd": "hill_cat", "label": "Hill cat", "art": "creature.hill_cat", "diet": ["deer", "rabbit"],

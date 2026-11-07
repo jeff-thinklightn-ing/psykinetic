@@ -2526,7 +2526,9 @@ static func read_kinds(path: String) -> Dictionary:
 			# An apex creature (780 amended (4)): companions keep off it (is_apex).
 			"apex": bool(row.get("apex", false)),
 			# Its lair and its land (Apex, 780 amended (13)).
-			"lair": (row["lair"] as Dictionary).duplicate(true) if row.get("lair") is Dictionary else {}}
+			"lair": (row["lair"] as Dictionary).duplicate(true) if row.get("lair") is Dictionary else {},
+			# Its escort (Apex, 780 amended (15)): the old grey's pack.
+			"escort": (row["escort"] as Dictionary).duplicate(true) if row.get("escort") is Dictionary else {}}
 	return out
 
 

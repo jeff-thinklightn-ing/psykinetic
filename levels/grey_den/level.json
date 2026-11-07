@@ -31,7 +31,8 @@
 		}
 	],
 	"legend": {
-		"monster_wolf": "#6e6e78"
+		"monster_wolf": "#6e6e78",
+		"monster_old_wolf": "#b4b4be"
 	},
 	"skylights": [
 		{

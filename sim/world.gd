@@ -749,6 +749,11 @@ signal tracks_changed(level: String, add: PackedInt32Array, gone: PackedInt32Arr
 ## from [param source] (GreatBear's roar), [param reach] cells. Main tells
 ## the players in its zone within reach who don't see it ("far_cry").
 signal far_cry(source: GridEntity, cry: StringName, reach: int)
+## An apex beaten back (780 amended (15)): [param kind] its row's id
+## ("great_bear", "old_wolf"), fought down to its fall_back_hp or its escort
+## cleared, at [param at], its cell then; once a fall-back (Apex). Server
+## only; companions' "apex_beaten" bond.
+signal apex_beaten(kind: String, body: GridEntity, at: Vector2i)
 ## Player [param player_id] spotted a hill cat lying up (decision 814,
 ## HillCat.mark_spotted), once a cat a player: Main floats them a gain.
 signal cat_spotted(cat: GridEntity, player_id: String)

@@ -66,7 +66,6 @@ const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vecto
 ## package's landing takes it out of here and lays its land again.
 const SHELVED: Dictionary[String, Array] = {
 	"boar_lair": ["forest", Vector2i(124, 175)],  # The boar king's (780 amended (12)).
-	"grey_den": ["foothills", Vector2i(97, 33)],  # The old grey's (780 amended (14), (15)).
 }
 ## Levels made again on a new grid (decision 756: layout A's step 3, the
 ## hills rebuilt bigger), each with the decision that remade it: a server's

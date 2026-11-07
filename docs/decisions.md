@@ -44763,6 +44763,47 @@ off the foothills, the bear's in the hills, so one trip never meets two apexes.
   door's line; the mouth's footprint void, no cliff at the link or its pad, the strip open, 30 from
   either pad.
 
+780 amended (15): the old grey and his pack (2026-11-07, enemy-ai; the old wolf design, approved by the
+coordinator 11-06 with "apex_beaten" and the lunge's no-downing check, and its 11-07 go: one package,
+"the old grey", the den opened in the same landing as him; release's label in 820). Package "the old
+grey": maps' den (780 amended (14)), terrain's den mouth (798 amended (2)), items' grey_pelt, grey_fang
+and grey_den_cache, art-kit's creature.old_wolf, economy's trophy buyer (821), sound's howl and growl,
+companions' "apex_beaten", voice's one bullet.
+- His row, "old_wolf" (herd "wolf", script sim/old_wolf.gd, class_name OldWolf, apex): mass 60, hp 40,
+  move_ticks 2.9, bite 4, a wolf's senses with sharper ears; drops grey_pelt and grey_fang; "lair"
+  {grey_den, the foothills, range 40, hours 6-20, venture 1800 s, out 2400 s, fall_back_hp 0.3,
+  fall_back_escort 1, rise 1800 s, path_margin 6, pad_margin 30}; "escort" {wolf, 2, follow 4};
+  "moves" howl, spring, pant (combat tunes). His told lunge's numbers are "spring", since a row's
+  "lunge" turns on combat's told lunge (790 amended (4)). No party scaling yet (combat's read).
+- His fight (OldWolf): while his pack (wolves of his herd within 8) lives he keeps 3-4 off his
+  target, facing it, and comes in only at one down or turned away from him; alone, a wolf's dart.
+  The howl: with two of his pack or more, every 12 s, a 1.2 s cry ("howl"; far, 50, when he is out),
+  then his pack within 6 of his target darts in at once; struck while he howls, he breaks it off.
+  The lunge: a line 3 long told 0.8 s (World.telegraph "lunge", flank-marked), then a rush along it;
+  the first foe met is bitten (4) and launched a cell toward his pack's middle. Never at a foe under
+  half hp with his pack within 2 of them. The pant: after each lunge he stands 2 s striking nobody.
+- The escort (Apex, for any row's "escort"; the boar king's sounder next): laid about him wherever
+  he is laid, each an ordinary wolf with Animal.escort_lead: bold, no errands or prey of its own,
+  its home his cell, after him past "follow", fighting his target (or one that struck it). Gone with
+  him through his door; never saved or retired (Apex.is_body). One killed is down (the record's
+  "escort_down") till he is back in his lair rise_s after his fall-back ("escort_whole_at") or risen
+  from his death; he never ventures with his pack short. Out, his escort down to fall_back_escort,
+  he is beaten back. His death: his pack fights on, and once its fight is over it is gone.
+- World.apex_beaten(kind, body, at), emitted once a fall-back when an apex is beaten back (its hp or
+  its escort), the bear's too: companions' "apex_beaten" bond. Never for its hours or its time out.
+- The roaming grounds keep pad_margin (30) off the land's other links (the castle's and the wilds'
+  pads), not off his own mouth.
+- At home, him and three wolves (the coordinator 11-07, from the den stills: six biters on one player
+  is a wall, not a fight, with 823's hp to come): his escort of two (so one killed, beaten back) and
+  one den keeper, make_grey_den's KEEPERS one (maps' den had two); level_test _test_grey_den to match.
+- grey_den is out of Level.SHELVED (820), HIS_MARKER True in make_grey_den, and the foothills laid
+  again with his mouth (byte for byte as maps' fd8e059cd). monster_test _test_old_wolf (hanging
+  back, the pack on his target, the opening, the howl's rush and its break, no lunge into a downing,
+  the lunge and the pant) and _test_old_wolf_lair (his real den, doors and roaming grounds off the
+  pads; laid with his escort, out with it following, beaten back by clearing it with apex_beaten
+  once, waiting in his lair till his pack is whole, his pack gone with his death). Server only,
+  protocol unchanged; new class_name OldWolf.
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a

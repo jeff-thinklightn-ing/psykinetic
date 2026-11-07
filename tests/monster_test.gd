@@ -21,10 +21,11 @@ const SPECS := {
 	"x": {"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber"},
 	"u": {"script": "res://sim/draugr.gd", "shape": "capsule", "kind": "draugr"},
 	"B": {"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear"},
+	"G": {"script": "res://sim/old_wolf.gd", "shape": "capsule", "kind": "old_wolf"},
 }
 const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
 	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer", "k": "Skeleton", "g": "Guard",
-	"x": "Robber", "u": "Draugr", "B": "Bear"}
+	"x": "Robber", "u": "Draugr", "B": "Bear", "G": "OldGrey"}
 
 var _failures := 0
 var _room: Node2D
@@ -90,6 +91,8 @@ func _ready() -> void:
 	_test_lone_guard()
 	_test_ambush_choice()
 	_test_band_robbers()
+	_test_old_wolf()
+	_test_old_wolf_lair()
 	_test_watch_wave()
 	_test_wanderers()
 	_test_hill_cat()
@@ -6233,3 +6236,244 @@ func _strike_from(rows: Array[String], cell: Vector2i, free_pos: Vector2, from: 
 	World.despawn(reacher)
 	World.despawn(player)
 	return out
+
+
+## The old grey (780 amended (15)): he hangs back while his pack lives and
+## comes in at an opening; his howl sends his pack in at once, and a blow
+## breaks it off; his told lunge bites and he pants after; never into a
+## downing; his pack fights his target.
+func _test_old_wolf() -> void:
+	print("\n== the old grey: hangs back behind his pack, the howl and its rush (broken by a blow), the told lunge and the pant, never into a downing ==")
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var row: Dictionary = Monster.kinds()["old_wolf"]
+	_check(Monster.is_apex("old_wolf") and str(row["escort"]["kind"]) == "wolf" and int(row["escort"]["count"][0]) == 2 and int(row["lair"]["fall_back_escort"]) == 1
+			and (row["drops"] as Array).map(func(d: Dictionary) -> String: return str(d["item"])) == ["grey_pelt", "grey_fang"]
+			and not (row["moves"] as Dictionary).has("lunge"),
+		"an apex, two wolves his escort, beaten back at one left; his pelt and fang; his spring is his own, not combat's told lunge")
+	var rows: Array[String] = ["#".repeat(30)]
+	for y in 7:
+		rows.append("#" + ".".repeat(28) + "#")
+	rows.append("#".repeat(30))
+	for put: Array in [[4, 4, "w"], [5, 3, "w"], [5, 5, "w"], [7, 4, "G"], [15, 4, "P"]]:
+		rows[put[1]] = rows[put[1]].substr(0, put[0]) + str(put[2]) + rows[put[1]].substr(put[0] + 1)
+	var e := _build(rows)
+	var grey: OldWolf = e["G"][0]
+	var player: GridEntity = e["P"][0]
+	var pack: Array = e["w"]
+	_check(int(grey.spring["windup"]) == int(row["moves"]["spring"]["windup"]) and int(grey.howl["every"]) == int(row["moves"]["howl"]["every"]),
+		"his moves' numbers are his row's (tuning is data)")
+	grey.sight_range = 12
+	for wolf: Animal in pack:
+		wolf.sight_range = 12
+		wolf.escort_lead = grey
+	World.face(player, Vector2i(-1, 0))  # Facing him: no opening.
+	grey._next_howl = World.tick + 100000
+	grey._next_spring = World.tick + 100000
+	var nearest := 99
+	var struck := false
+	var pack_fights := false
+	for i in 120:
+		World.step()
+		World.face(player, Senses.way_toward(player.tile, grey.tile))
+		if grey.target == player:
+			nearest = mini(nearest, World.distance(grey.tile, player.tile))
+		struck = struck or _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == grey)
+		pack_fights = pack_fights or pack.all(func(wolf: Animal) -> bool: return wolf.target == player)
+	_check(grey.target == player and nearest >= int(OldWolf.HANG[0]) - 1 and not struck,
+		"while his pack lives he keeps off at the fight's edge (nearest %d) and strikes nobody" % nearest)
+	_check(pack_fights, "his pack fights his target")
+	World.face(player, Senses.way_toward(grey.tile, player.tile))
+	_check(grey._opening(), "his target turned away: his opening")
+	World.face(player, Senses.way_toward(player.tile, grey.tile))
+	_check(not grey._opening(), "facing him: none")
+	# The howl: his pack sent in at once; a blow while he howls breaks it off.
+	var cries: Array[StringName] = []
+	grey.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	grey._begin_howl()
+	_check(cries.has(&"howl") and str(grey._move.get("move", "")) == "howl", "his howl, told (a cry, his head up)")
+	for i in int(grey.howl["windup"]) + 1:
+		World.step()
+	var rushed := pack.filter(func(wolf: Animal) -> bool: return wolf.spawned and wolf._burst_until > World.tick)
+	_check(grey._move.is_empty() and rushed.size() >= 2, "at its end his pack about his target darts in at once (%d)" % rushed.size())
+	grey._begin_howl()
+	grey.note_struck(player)
+	_check(grey._move.is_empty(), "struck while he howls, he breaks it off")
+	# No lunge into a downing.
+	var near_wolf: Animal = pack[0]
+	player.hp = player.max_hp / 2 - 1
+	World.despawn(near_wolf)
+	World.spawn(near_wolf, _free_beside(player.tile))
+	_check(not grey._may_lunge(grey.pack()), "his target under half hp with his pack beside them: no lunge")
+	player.hp = player.max_hp
+	_check(grey._may_lunge(grey.pack()), "whole: he may")
+	# Alone, the told lunge: a line, the bite, then the pant.
+	for wolf: Animal in pack:
+		if wolf.spawned:
+			World.despawn(wolf)
+	World.despawn(grey)
+	World.spawn(grey, player.tile + Vector2i(-3, 0))
+	World.face(grey, Vector2i(1, 0))
+	grey._move = {}
+	grey._next_spring = World.tick
+	grey.target = player
+	_damage_log.clear()
+	var told := false
+	var bitten := -1
+	for i in 40:
+		World.step()
+		told = told or str(grey._move.get("move", "")) == "lunge"
+		if _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == grey and d["entity"] == player):
+			bitten = World.tick
+			break
+	_check(told and bitten >= 0, "alone, his lunge told on a line, then the bite (%s, %d)" % [told, bitten])
+	var at := grey.tile
+	var stood := 0
+	for i in int(grey.pant["ticks"]) - 2:
+		World.step()
+		if grey.tile == at and str(grey._move.get("move", "")) == "pant":
+			stood += 1
+	_check(stood >= int(grey.pant["ticks"]) - 3 and not _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == grey and int(d["tick"]) > bitten),
+		"after it he pants, standing, striking nobody: the opening (%d ticks)" % stood)
+	DayNight.reset()
+	Monster.idling = true
+
+
+func _free_beside(at: Vector2i) -> Vector2i:
+	for way in World.DIRECTIONS:
+		if World.is_walkable(at + way) and World.is_free(at + way):
+			return at + way
+	return World.NO_CELL
+
+
+## The old grey's lair and land (780 amended (15)): his den in grey_den, off
+## the land's pads; laid with his escort; out with it following him; his
+## escort cleared, beaten back (apex_beaten, once); those killed stay dead
+## till his pack is whole again.
+func _test_old_wolf_lair() -> void:
+	print("\n== the old grey's lair: his den and doors, his escort laid with him and following, beaten back by clearing it, the dead staying dead ==")
+	Apex.clear()
+	var real_row: Dictionary = Monster.kinds()["old_wolf"]["lair"]
+	var real := Apex._places_of("old_wolf", real_row)
+	var roam: Array = real.get("roam", [])
+	var off_pads := roam.all(func(cell: Vector2i) -> bool:
+		return Vector2(cell - Vector2i(128, 0)).length() > 30.0 and Vector2(cell - Vector2i(128, 95)).length() > 30.0)
+	_check(real.get("den") == Vector2i(18, 4) and real.get("lair_door") == Vector2i(4, 20) and real.get("land_door") == Vector2i(97, 33)
+			and roam.size() > 20 and off_pads,
+		"his den in grey_den, the doors either side, and %d roaming grounds in the foothills, all 30 off the castle's and the wilds' pads" % roam.size())
+	_check(Apex.holds_marker({"spawn": 0, "kind": "old_wolf"}, "grey_den") and Level.playable("grey_den"),
+		"his marker in his den is his den; the den is open (out of Level.SHELVED)")
+	var land_rows: Array[String] = ["#".repeat(40)]
+	for y in 8:
+		land_rows.append("#" + ".".repeat(38) + "#")
+	land_rows.append("#".repeat(40))
+	_build(land_rows, {}, {}, "gw_land")
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var entity := EntityFactory.build(spec)
+		_room.add_child(entity)
+		if not World.spawn(entity, spec["tile"]):
+			entity.free()
+			return null
+		return entity
+	var land := World.zone
+	World.zones[land.name] = land
+	var lair := World.add_zone("gw_lair")
+	World.enter(lair)
+	var lair_rows: Array[String] = ["#".repeat(20)]
+	for y in 8:
+		lair_rows.append("#" + ".".repeat(18) + "#")
+	lair_rows.append("#".repeat(20))
+	World.load_terrain(Terrain.parse(Terrain.expand(lair_rows)))
+	World.enter(land)
+	var kinds := Monster.kinds()
+	var row_was: Dictionary = kinds["old_wolf"]["lair"]
+	var row: Dictionary = row_was.duplicate(true)
+	row["zone"] = "gw_lair"
+	row["land"] = ["gw_land"]
+	kinds["old_wolf"]["lair"] = row
+	Apex.clear()
+	World.apexes.clear()
+	Apex._places["old_wolf"] = {"den": Vector2i(14, 4), "lair_door": Vector2i(2, 4), "land_door": Vector2i(3, 4),
+			"roam": [Vector2i(30, 4)] as Array[Vector2i]}
+	DayNight.set_hour(12.0)
+	var idling_was := Monster.idling
+	Monster.idling = true
+	var beaten: Array = []
+	var on_beaten := func(kind: String, _body: GridEntity, at: Vector2i) -> void: beaten.append([kind, at])
+	World.apex_beaten.connect(on_beaten)
+	var keeper := EntityFactory.build(SPECS["P"].merged({"name": "DenKeeper"})) as Player
+	_room.add_child(keeper)
+	World.enter(lair)
+	World.spawn(keeper, Vector2i(2, 7))
+	World.enter(land)
+	Apex._check("old_wolf", row)
+	var grey := Apex.body_of("old_wolf")
+	var escort: Array = Apex._escorts.get("old_wolf", [])
+	_check(grey is OldWolf and grey.zone == "gw_lair" and Apex.living_escort("old_wolf") == 2
+			and escort.all(func(w: Animal) -> bool: return w.escort_lead == grey and w.zone == "gw_lair" and World.distance(w.tile, grey.tile) <= 3 and Apex.is_body(w)),
+		"in his lair: laid at his den with his two wolves about him, none ever saved")
+	# Out: his pack with him, following.
+	World.enter(lair)
+	World.despawn(keeper)
+	World.enter(land)
+	var walker := EntityFactory.build(SPECS["P"].merged({"name": "HillWalker"})) as Player
+	_room.add_child(walker)
+	World.spawn(walker, Vector2i(37, 8))
+	var rec := Apex.record("old_wolf")
+	rec["attacked"] = World.steps - Apex._steps(row, "venture_after_s", 1800.0)
+	Apex._check("old_wolf", row)
+	_check(rec["state"] == "out" and not Apex._escorts.has("old_wolf"), "out unseen: gone from his lair, his pack with him")
+	Apex._check("old_wolf", row)
+	grey = Apex.body_of("old_wolf")
+	escort = Apex._escorts.get("old_wolf", [])
+	_check(grey != null and grey.zone == "gw_land" and Apex.living_escort("old_wolf") == 2, "out of his door in his land, two wolves with him")
+	for i in 150:
+		World.step()
+	var far := 0
+	for w: Animal in escort:
+		far = maxi(far, World.distance(w.tile, grey.tile))
+	_check(World.distance(grey.tile, Vector2i(30, 4)) <= 10 and far <= int(Monster.kinds()["old_wolf"]["escort"]["follow"]) + 3,
+		"he walks out to his ground, his pack following within reach (%s, farthest %d)" % [grey.tile, far])
+	# His escort cleared to one: beaten back, once.
+	World.damage(escort[0], 999)
+	World.step()
+	_check(int(rec.get("escort_down", 0)) == 1 and Apex.living_escort("old_wolf") == 1, "one of his wolves killed: down, one lives")
+	Apex._check("old_wolf", row)
+	_check(beaten.size() == 1 and beaten[0][0] == "old_wolf", "his pack cleared to one: beaten back, apex_beaten once (%s)" % [beaten])
+	for i in 700:
+		World.step()
+		if rec["state"] == "lair":
+			break
+	_check(rec["state"] == "lair" and beaten.size() == 1 and not Apex._escorts.has("old_wolf"), "gone into his lair, his last wolf with him (%s)" % rec["state"])
+	# Back in his lair: those killed stay dead till his pack is whole again.
+	World.enter(lair)
+	World.spawn(keeper, Vector2i(2, 7))
+	World.enter(land)
+	Apex._check("old_wolf", row)
+	grey = Apex.body_of("old_wolf")
+	_check(grey != null and Apex.living_escort("old_wolf") == 1 and str(rec["state"]) == "lair" and grey.get("apex_goal") == Monster.NO_TILE,
+		"laid in his lair with the one left, and there he waits, his wait out or not, till his pack is whole (%d)" % Apex.living_escort("old_wolf"))
+	rec["attacked"] = World.steps
+	rec["escort_whole_at"] = World.steps
+	Apex._check("old_wolf", row)
+	_check(Apex.living_escort("old_wolf") == 2 and int(rec["escort_down"]) == 0, "his rise_s after: his pack whole again (%d)" % Apex.living_escort("old_wolf"))
+	# Killed: his pack, its fight over, is gone with him.
+	World.enter(lair)
+	World.damage(grey, grey.hp + 10)
+	World.enter(land)
+	World.step()
+	_check(rec["state"] == "dead" and not Apex._escorts.has("old_wolf"), "killed: dead his rise, his pack gone (%s)" % rec["state"])
+	World.apex_beaten.disconnect(on_beaten)
+	World.enter(lair)
+	World.despawn(keeper)
+	World.enter(land)
+	World.despawn(walker)
+	kinds["old_wolf"]["lair"] = row_was
+	Apex.clear()
+	World.apexes.clear()
+	World.zones.erase("gw_lair")
+	World.zones.erase("gw_land")
+	World.enter(land)
+	Monster.idling = idling_was
+	World.spawn_spec = Callable()
+	DayNight.reset()
