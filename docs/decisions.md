@@ -44790,11 +44790,36 @@ the live forest view holds it too), and the trees built take 77 MB more. Compact
 saving for the live view as well; it is perf's next memory piece, before the switch-on. GPU memory and
 draw calls wait for the windowed bench.
 
-Still to come, each behind the flag: (2) Main's preload within 80 cells of a P1 link and the client's
-`near {zone}` command (the server sends that zone's state, never opening it; within PRELOAD_CELLS + 16
-of a link, once per 5 s), a protocol revision from release; an Options switch, "Seamless crossings",
-and a free-RAM floor below which the preload is skipped. (3) maps: the five corridors, each
-neighbour's plane origin 16 cells toward the wilds (a 16-cell overlap at each seam), paired links at
-seam + 7 and seam − 8 with spawns on the same world cell, and a level_test check that both maps agree
-in the overlap. (4) The swap when the "map" message names the held neighbour, the clip's open edge at
-the seam, the fallback to the card for an unfinished neighbour, and a crossing test.
+Step 2, behind Main.seamless_crossings (off; --seamless turns it on for tests):
+- Main.plane_links(level): a level's links to zones on the world plane, [{tile, to}], closed ones left
+  out, read once a level. near_link(level, tile, reach): the zone past the nearest within reach (the
+  larger axis). plane_offset(from, to): where one zone lies from the other in the view's metres.
+- _update_neighbour, every NEIGHBOUR_LOOK_FRAMES (15): within PRELOAD_CELLS (80) of a plane link, any
+  other neighbour is let go first (drop_neighbour), then, with free memory at or over
+  neighbour_free_floor (1 GiB; said once when under), a host builds that zone's view (_build_neighbour)
+  and a client sends the command "near" {zone}. A held neighbour is kept walking off, and let go only
+  for another link's or at a crossing (_repaint's, every crossing as today until step 4).
+- _build_neighbour: Level.load_level, its felled cells and plots laid as _load_level lays them, a
+  Client3D beside the live one (the same parent) at the live view's place plus plane_offset,
+  build_neighbour over frames with the live view's sky floor; once up, the zone's towns, huts and roofs
+  as told.
+- Server: _show_zone_to's terrain-if-edited and clearing are _send_zone_ground, its towns (with folds
+  and huts) and roofs _send_zone_buildings, in the same order as before. The "near" command
+  (_near) is answered only for the zone past a plane link of the player's own zone within NEAR_REACH
+  (96), at most once per NEAR_EVERY_MS (5 s) a peer: _send_zone_ground, _send_zone_buildings, then a
+  new message "near" {zone}, on which the client builds (_on_near_told). The zone is never opened.
+  "near" keeps the arrival shelter (SHELTER_KEEPS). Wire: the command and the message are new, under
+  PROTOCOL_REVISION 53 (release's; it shares 53 with 819); an old client never sends "near".
+- tests/seamless_test (new scene, a host at held): the plane links and offsets; "near" answered with
+  the state then "near", and refused again within 5 s, for a zone with no link near, or 106 cells off,
+  the wilds never opened; off by default; on, none under the floor, none 100 cells off, the wilds built
+  30 cells from the link, beside the live view where it lies on the plane, its room alone, kept walking
+  off, let go at the crossing.
+- The Options switch (voice's "Travel: no wait between areas") comes with the switch-on: an off
+  package shows nothing.
+
+Still to come, each behind the flag: (3) maps: the five corridors, each neighbour's plane origin 16
+cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam − 8 with
+spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The
+swap when the "map" message names the held neighbour, the clip's open edge at the seam, the fallback
+to the card for an unfinished neighbour, and a crossing test.

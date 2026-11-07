@@ -184,7 +184,7 @@ var _where_told := {}
 ## How long a view's build or a call for her goes before the line is said
 ## again.
 const WHERE_AGAIN_MS := 2000
-const SHELTER_KEEPS: Array[String] = ["say", "party", "face", "greet", "town_sheet", "view_ready"]
+const SHELTER_KEEPS: Array[String] = ["say", "party", "face", "greet", "town_sheet", "view_ready", "near"]
 ## A client that loses the server it played on tries again this often, for
 ## this long (decision 240).
 const RECONNECT_EVERY := 2.0
@@ -859,6 +859,7 @@ func _ready() -> void:
 		return
 	# After every other node: see _process.
 	process_priority = 10
+	seamless_crossings = "--seamless" in OS.get_cmdline_user_args()  # 822, off till switched on.
 	var probe := Vector2i(3, 5)
 	if not ground.map_to_local(probe).is_equal_approx(Iso.tile_to_local(probe)):
 		push_error("Iso math disagrees with the TileSet: %s vs %s" % [
@@ -1271,6 +1272,7 @@ func _process(delta: float) -> void:
 	_measure_smoothness(delta)
 	_show_home_zone()
 	_follow_player(delta)
+	_update_neighbour()  # 822, off till switched on.
 	if _client3d != null and DisplayServer.get_name() != "headless":
 		# Alt shows every HP bar; the view only reads it.
 		_client3d.show_all_bars = Input.is_key_pressed(KEY_ALT)
@@ -4284,6 +4286,8 @@ func _repaint(crossing := false) -> void:
 		# The towns and folds go on the room once it is whole (_on_room_built).
 		if crossing and arrival_card != null:
 			arrival_card.begin(zone_display_name())
+		if crossing:
+			drop_neighbour()  # 822 step 2: every crossing as today; the swap is step 4.
 		_client3d.rebuild(_terrain, level_centre, crossing)
 
 
@@ -4960,22 +4964,35 @@ func _show_zone_to(peer: int, zone_name: String, leaving: Array[GridEntity] = []
 				entity.sync.update_visibility(peer)
 	if not old.is_empty() and old != zone_name:
 		World.update_visibility(peer, old)
-	if Level.overlaid(zone_name):
-		# Edited in the game: the client's own copy (its pck's) is not it.
-		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
-	if World.clearing != null:
-		# Before the map: the client lays its felled cells as it loads it (591).
-		Net.message_to(peer, "clearing", {"zone": zone_name, "whole": true, "cells": World.clearing.cells_of(zone_name),
-			"plots": World.clearing.plots_of(zone_name).map(_plot_told)})
+	_send_zone_ground(peer, zone_name)
 	Net.message_to(peer, "map", map_message(zone_name))
 	Net.message_to(peer, "notes", {"zone": zone_name, "notes": _sought_notes(zone_name)})  # The sought's door notes (decision 643).
 	Net.message_to(peer, "sky", sky_message())
-	_send_towns(peer, zone_name)
-	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
+	_send_zone_buildings(peer, zone_name)
 	Net.message_to(peer, "grass", {"level": zone_name, "full": true, "flat": World.trampled_cells(zone_name)})
 	Net.message_to(peer, "blood", {"level": zone_name, "full": true, "add": World.blood_cells(zone_name), "gone": PackedInt32Array()})
 	Net.message_to(peer, "tracks", {"level": zone_name, "full": true, "add": World.track_cells(zone_name), "gone": PackedInt32Array()})
 	World.update_visibility(peer, zone_name)
+
+
+## Server: zone [param zone_name]'s ground as [param peer] must lay it on
+## the level it loads: its terrain if edited in the game (the client's pck
+## copy is not it), and its felled cells and plots (591), before its "map"
+## (or its "near" reply, 822).
+func _send_zone_ground(peer: int, zone_name: String) -> void:
+	if Level.overlaid(zone_name):
+		Net.message_to(peer, "terrain", BuilderHost.terrain_message(zone_name))
+	if World.clearing != null:
+		Net.message_to(peer, "clearing", {"zone": zone_name, "whole": true, "cells": World.clearing.cells_of(zone_name),
+			"plots": World.clearing.plots_of(zone_name).map(_plot_told)})
+
+
+## Server: zone [param zone_name]'s buildings as they stand: its towns,
+## folds and huts, and its damaged roofs (after its "map"; in a "near"
+## answer, 822).
+func _send_zone_buildings(peer: int, zone_name: String) -> void:
+	_send_towns(peer, zone_name)
+	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
 
 
 ## The console's "move <player> <x> <y> [zone]" (decision 531; Jeff:
@@ -5270,6 +5287,184 @@ func tell_view_ready(zone_name: String) -> void:
 	var player := _local_player()
 	if player != null:
 		World.command(player, "view_ready", {"zone": zone_name})
+
+
+# --- Seamless crossings (decision 822, P1) ------------------------------------------
+
+## The package "seamless crossings", off until perf switches it on (822):
+## within PRELOAD_CELLS of a link between two zones on the world plane, the
+## zone past it is built in a second view beside the live one (_neighbour).
+## --seamless turns it on (tests).
+var seamless_crossings := false
+const PRELOAD_CELLS := 80
+## Server: a "near" is answered within this of the link (the client's reach
+## and a margin), once per NEAR_EVERY_MS a peer.
+const NEAR_REACH := PRELOAD_CELLS + 16
+const NEAR_EVERY_MS := 5000
+## Below this much free memory no neighbour is built: the crossing keeps
+## its card (the coordinator's floor; the biggest neighbour, the forest, is
+## 262 MB, 822). Bytes; seamless_test raises it.
+var neighbour_free_floor := 1 << 30
+## Frames between looks for a link near enough.
+const NEIGHBOUR_LOOK_FRAMES := 15
+## The held neighbour's view and zone, the level it was built from (its
+## felled cells laid), the zone a "near" was sent for and not yet answered,
+## and whether the memory floor was said.
+var _neighbour: Client3D = null
+var _neighbour_zone := ""
+var _neighbour_level := {}
+var _neighbour_asked := ""
+var _floor_said := false
+## Server: when each peer's last "near" was answered (msec).
+var _near_told: Dictionary[int, int] = {}
+## Each level's links to zones on the world plane, by level name.
+static var _plane_links := {}
+
+
+## [param level_name]'s links that lead to another zone on the world plane
+## (822's crossings): [{tile, to}], a closed one left out; none for a level
+## not on the plane. Read once a level.
+static func plane_links(level_name: String) -> Array:
+	if _plane_links.has(level_name):
+		return _plane_links[level_name]
+	var out: Array = []
+	var zones: Dictionary = Level.world_plane().get("zones", {})
+	if zones.has(level_name):
+		for link: Dictionary in Level.load_level(level_name).get("links", []):
+			if zones.has(str(link["to_map"])) and not link.get("closed", false):
+				out.append({"tile": link["tile"], "to": str(link["to_map"])})
+	_plane_links[level_name] = out
+	return out
+
+
+## The zone past [param level_name]'s nearest plane link within
+## [param reach] cells (the larger of the two axes) of [param tile], else "".
+static func near_link(level_name: String, tile: Vector2i, reach: int) -> String:
+	var best := ""
+	var best_d := reach + 1
+	for link: Dictionary in plane_links(level_name):
+		var at: Vector2i = link["tile"]
+		var d := maxi(absi(at.x - tile.x), absi(at.y - tile.y))
+		if d < best_d:
+			best_d = d
+			best = link["to"]
+	return best
+
+
+## Where zone [param to] lies from zone [param from] on the world plane, in
+## the view's metres (a cell a metre; the zones' heights).
+static func plane_offset(from: String, to: String) -> Vector3:
+	var zones: Dictionary = Level.world_plane().get("zones", {})
+	if not zones.has(from) or not zones.has(to):
+		return Vector3.ZERO
+	var a: Dictionary = zones[from]
+	var b: Dictionary = zones[to]
+	var d: Vector2i = (b["origin"] as Vector2i) - (a["origin"] as Vector2i)
+	return Vector3(d.x, float(b["height"]) - float(a["height"]), d.y)
+
+
+## Every NEIGHBOUR_LOOK_FRAMES with seamless crossings on: near a plane link,
+## that zone's view is built (a client asks the server for its state first);
+## any other neighbour is let go before, so two are never held.
+func _update_neighbour() -> void:
+	if not seamless_crossings or _client3d == null or Engine.get_process_frames() % NEIGHBOUR_LOOK_FRAMES != 0:
+		return
+	var player := _local_player()
+	if player == null:
+		return
+	var zone := near_link(map_name, player.tile, PRELOAD_CELLS)
+	if zone.is_empty() or zone == _neighbour_zone or zone == _neighbour_asked:
+		return
+	drop_neighbour()
+	var free := int(OS.get_memory_info().get("available", -1))
+	if free >= 0 and free < neighbour_free_floor:
+		if not _floor_said:
+			_floor_said = true
+			print("[zone] %d MB free, under the neighbour's floor: crossings keep their card" % (free >> 20))
+		return
+	if Net.is_authority():
+		_build_neighbour(zone)
+	else:
+		_neighbour_asked = zone
+		World.command(player, "near", {"zone": zone})
+
+
+## The held neighbour let go (another link nearer, a crossing, leaving).
+func drop_neighbour() -> void:
+	if is_instance_valid(_neighbour):
+		_neighbour.queue_free()
+	_neighbour = null
+	_neighbour_zone = ""
+	_neighbour_level = {}
+	_neighbour_asked = ""
+
+
+## Client: the server's "near" answer (822): the zone's state came before
+## it (its ground, towns and roofs, filed by zone as ever), so its view is
+## built now, if it is still the one asked for.
+func _on_near_told(data: Dictionary) -> void:
+	var zone := str(data.get("zone", ""))
+	if zone.is_empty() or zone != _neighbour_asked:
+		return
+	_neighbour_asked = ""
+	_build_neighbour(zone)
+
+
+## Zone [param zone]'s view built over frames beside the live one, where it
+## lies on the world plane, its felled cells and plots laid as _load_level
+## lays them.
+func _build_neighbour(zone: String) -> void:
+	var loaded := Level.load_level(zone)
+	if loaded.is_empty() or _client3d == null:
+		return
+	var terrain: Dictionary = loaded["terrain"]
+	if Net.is_authority():
+		if World.clearing != null:
+			World.clearing.apply(zone, terrain)
+	else:
+		if _clearing_told.has(zone):
+			Clearing.apply_cells(terrain, _clearing_cells(zone))
+		Clearing.lay_plots(terrain, _plots_told.get(zone, []))
+	var view := Client3D.new()
+	view.name = "Neighbour"
+	_client3d.get_parent().add_child(view)
+	view.set_process(false)
+	view.position = _client3d.position + plane_offset(map_name, zone)
+	view.room_built.connect(_on_neighbour_built.bind(view))
+	_neighbour = view
+	_neighbour_zone = zone
+	_neighbour_level = loaded
+	view.build_neighbour(terrain, loaded["centre"], _client3d._sky_floor, true)
+	print("[zone] building %s beside %s" % [zone, map_name])
+
+
+## The neighbour's room is up: its towns, huts and roofs as told.
+func _on_neighbour_built(view: Client3D) -> void:
+	if view != _neighbour:
+		return
+	for town: String in town_states:
+		if town.begins_with(_neighbour_zone + "/"):
+			view.set_town(town, town_states[town])
+	view.set_huts(hut_states)
+	if roof_states.has(_neighbour_zone):
+		view.set_roofs(_neighbour_zone, roof_states[_neighbour_zone])
+
+
+## Server: the "near" command (822): [param player]'s client builds zone
+## [param zone_name]'s view as they come up to its link, and is sent that
+## zone's ground, towns and roofs (never opening it), then "near" {zone}.
+## Only for a plane link of their own zone within NEAR_REACH, once per
+## NEAR_EVERY_MS.
+func _near(player: Player, zone_name: String) -> void:
+	if near_link(player.zone, player.tile, NEAR_REACH) != zone_name:
+		return
+	var now := Time.get_ticks_msec()
+	if _near_told.has(player.owner_peer) and now - _near_told[player.owner_peer] < NEAR_EVERY_MS:
+		return
+	_near_told[player.owner_peer] = now
+	_send_zone_ground(player.owner_peer, zone_name)
+	_send_zone_buildings(player.owner_peer, zone_name)
+	Net.message_to(player.owner_peer, "near", {"zone": zone_name})
 
 
 ## Tests and the eval: the host's player into zone [param level_name], the
@@ -13540,6 +13735,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		(entity as Player).crouched = false  # A blow, a shove, a guard or a draw stands it up (784 amended (2)).
 	if command_name == "view_ready" and entity is Player:
 		_view_ready(entity as Player, str(args.get("zone", "")))
+	elif command_name == "near" and entity is Player:
+		_near(entity as Player, str(args.get("zone", "")))
 	elif command_name == "guide" and entity is Player:
 		if args.has("stop"):
 			_guide_stop_asked(entity, str(args["stop"]))  # Their own key or click took over her route (695).
@@ -15030,6 +15227,8 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "notes":
 		_on_notes_message(data)  # 643, ui's side.
+	if kind == "near":
+		_on_near_told(data)  # 822.
 
 
 ## A name for the party log: players by record name, residents by the label
