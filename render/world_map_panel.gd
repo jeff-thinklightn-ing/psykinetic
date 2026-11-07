@@ -227,7 +227,7 @@ static func end_mark(way: Dictionary) -> String:
 	if cue == "sealed" or (bool(way.get("closed", false)) and not bool(way.get("hidden", false))):
 		return "sealed"
 	match cue:
-		"down":
+		"down", "mine":
 			return "mouth"
 		"up":
 			return "ring"

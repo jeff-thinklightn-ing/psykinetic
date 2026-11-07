@@ -43,7 +43,7 @@ static var START: Color = UiTheme.color("text")
 static var WAY_OUT: Color = UiTheme.color("party")
 static var SEALED: Color = UiTheme.color("text_dim")
 ## The cues drawn as a glyph on the big map; the rest are the dot.
-const GLYPH_CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed"]
+const GLYPH_CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "mine"]
 static var PLACE: Color = UiTheme.color("brass_bright")
 static var YOU: Color = UiTheme.color("text")
 
@@ -391,7 +391,8 @@ static func label_of(cue: String, to_map: String) -> String:
 ## The glyph for [param cue] at [param p], [param facing] the way it stands
 ## on screen (a unit vector), [param reach] its half size: an arch (two posts
 ## and a bow toward the facing), a pair of waystones either side of the way,
-## a dark mouth (down), a light ring (up), a struck dot (sealed).
+## a dark mouth (down, or a mine's door), a light ring (up), a struck dot
+## (sealed).
 func _draw_cue(p: Vector2, cue: String, facing: Vector2, reach: float) -> void:
 	var f := facing.normalized() if facing.length() > 0.001 else Vector2.DOWN
 	var r := f.rotated(PI / 2.0)
@@ -403,7 +404,7 @@ func _draw_cue(p: Vector2, cue: String, facing: Vector2, reach: float) -> void:
 		"waystones":
 			for side: float in [-1.0, 1.0]:
 				draw_line(p + r * reach * side - f * reach * 0.6, p + r * reach * side + f * reach * 0.6, WAY_OUT, 3.0, true)
-		"down":
+		"down", "mine":
 			draw_circle(p, reach, WALL)
 			draw_arc(p, reach, 0.0, TAU, 32, WAY_OUT, 2.0, true)
 		"up":

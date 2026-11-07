@@ -43767,6 +43767,33 @@ thicket's. view_test _test_den_mouth (low and on its cells, the way it faces; th
 shelf over it past the face; the lip and signs; the cells kept from the wood's trees; closed, the stones). No
 bullet. Client and Level's cue list only, protocol unchanged, no new class_name.
 
+798 amended (3): the mine mouth (2026-11-06; Jeff's play in the hills: "the actual hollowfell mine entrance is just
+a staircase?"; the coordinator's order and approval on the stills; lore's mark; art-kit's marker; release's label).
+A fourth mouth cue, beside 589's list (arch, waystones, down, up, sealed, none) and this decision's cave, thicket and
+den: Level.CUES takes "mine", given by the link's "cue" (maps' Hollowfell link at the hills' (167,58)). It is the
+cave mouth's hill (Client3D.MOUTH_CUES: "cave" and "mine" share _mouth_cells, _throat_cells and _add_cave_mouth, its
+holder still "Mouth_x_y"), with three differences. Its arch is MINE_ARCH 2.7 x 3.1 m and squared (MINE_SQUARE 6: the
+arch's curve |x|^p + |y|^p = 1, a cave's 2, unchanged), so art-kit's timber frame stands in it. Its hill is a
+MINE_HUMP 1 m hump, its throat's roof and the face over the arch set over the throat's own floor rather than over
+the slope's ground, easing into the slope at the hill's back. On its first stills the rock stood up from behind as a
+tooth; the coordinator: "make it a hillside you could walk up beside". That took the ground itself: maps raises a
+bank in hills' relief behind the face (49 cells, every walkable step at most 0.42 m, the old ledge's foot north of
+it left alone), and the mouth takes the cave's bank form on it. And it is dressed (_dress_mine, a "Mine" child, each
+piece's slot in its "slot" meta): art-kit's mine.arch_3 (MINE_FRAME) in the face and another 1.1 m in; mine.track
+from MINE_RAILS 3 m out, a track_end buffer at their outer end, in to building.stair_down MINE_STAIR 1.9 m inside,
+in the dark (the link cell unchanged, before the face); MINE_DRESS: a mine cart on the rails, grey stones for the
+spoil (the coordinator: not the crypt's pale rubble), and lore's goblin marker. Lore: the Blood Rot claim what they
+hold with a crude star daubed in rust red (goblins.star_mark, a draft). Art-kit's prop.goblin_marker, a skull on a
+crooked stake, stands out by the approach, and three prop.star_daub sit on the face frame's timbers (MINE_DAUBS). A
+prop.brazier by the door is lit (its flame socket, a _night_light like a watch post's, flickering in _fire_lights),
+and art-kit's mine lamp (WALL_LAMP_SLOT, its panes lit in its own swatch) hangs on the face. A piece the kit lacks
+is left out. The minimap's glyph and the world map's end mark show a "mine" as a "down" way (a dark mouth). Maps'
+data (the cue, rock at x 168-172 y 55-61, the bank) lands straight after, in the same window; until it does nothing
+changes in game. Stills: C:/dev/review/lands/hollowfell_mouth (a: the bare stair; b5: the bank; b6: the marker).
+view_test _test_mine_mouth: on the maps as a way down; on the link's cell, dressed; its arch open and squared to the
+black; two frames, the rails to a buffer and a cart, the stair inside, a fire's light. No bullet here (maps' data
+commit carries the one players see). Client and Level's cue list only, protocol unchanged, no new class_name.
+
 780 amended (12): the boar's lair, forest phase D (2026-11-05, maps; enemy-ai's apex-lair rule,
 C:/dev/review/enemy-ai/apex_lairs_design.md, its residents as enemy-ai gave them; the coordinator's
 go and its ruling on the roof; terrain's mouth order; release's label). A new level, levels/boar_lair

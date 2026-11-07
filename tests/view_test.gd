@@ -115,6 +115,7 @@ func _ready() -> void:
 		_test_blood()
 		_test_tracks()
 		_test_cave_mouth()
+		_test_mine_mouth()
 		_test_thicket_mouth()
 		_test_den_mouth()
 		_test_rocks()
@@ -5114,6 +5115,67 @@ func _test_thicket_mouth() -> void:
 ## bank over the boar's footprint, a hole into it at the link cell's far
 ## edge going black, a tilted shelf of rock over it, art-kit's root lip as
 ## its top and the signs before it; the wood's trees kept off the bank.
+## A mine's mouth (cue "mine": Hollowfell's door in the hills, the
+## coordinator from Jeff's play): the cave mouth's hill, its arch squared and
+## taller, open to the black; art-kit's timber frame in its face, rails out to
+## a buffer, the stair down inside the dark, a brazier lit at the door.
+func _test_mine_mouth() -> void:
+	print("
+== mine mouth: a timbered adit in a hill of rock, the dark beyond ==")
+	_check("mine" in Level.CUES and WorldMapPanel.end_mark({"cue": "mine"}) == "mouth" and "mine" in Minimap.GLYPH_CUES,
+			"a link cue, marked on the maps as a way down")
+	var sample := Level.load_level("sample")
+	var terrain: Dictionary = sample["terrain"].duplicate()
+	terrain["outdoor"] = true
+	var floor_cells: Array = terrain["floor"]
+	var at := Vector2i(-1, -1)
+	for cell: Vector2i in floor_cells:
+		if floor_cells.has(cell + Vector2i(0, -5)) and floor_cells.has(cell + Vector2i(3, -5)) and floor_cells.has(cell + Vector2i(-3, -5)) 				and floor_cells.has(cell + Vector2i(0, 3)):
+			at = cell
+			break
+	_check(at.x >= 0, "the sample has room for a hill (%s)" % at)
+	if at.x < 0:
+		return
+	terrain["link_cues"] = [{"tile": at, "cue": "mine", "facing": Vector2i(0, -1), "variant": 1}]
+	_rig.rebuild(terrain, sample["centre"])
+	var holder: Node3D = _rig._room.get_node_or_null("Mouth_%d_%d" % [at.x, at.y])
+	var body: MeshInstance3D = holder.get_node_or_null("Body") if holder != null else null
+	var dress: Node3D = holder.get_node_or_null("Mine") if holder != null else null
+	_check(body != null and body.mesh != null and dress != null, "drawn on the link's cell, dressed")
+	if body == null or body.mesh == null or dress == null:
+		_rig.rebuild(_main._terrain, Vector2i.ZERO)
+		return
+	var points: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var shades: PackedColorArray = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	var first_hit := func(from: Vector3) -> Array:
+		var near := INF
+		var met := Color.WHITE
+		for i in range(0, points.size(), 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(from, Vector3(0, 0, 1), points[i], points[i + 1], points[i + 2])
+			if hit != null and (hit as Vector3).z < near:
+				near = (hit as Vector3).z
+				met = shades[i]
+		return [near, met]
+	# Square: open at its shoulders, where a cave's round arch is rock.
+	var deep := 0.5 + Client3D.MOUTH_THROAT - 0.1
+	var middle: Array = first_hit.call(Vector3(0.0, 1.5, -2.0))
+	var shoulder: Array = first_hit.call(Vector3(Client3D.MINE_ARCH.x * 0.4, Client3D.MINE_ARCH.y * 0.8, -2.0))
+	_check(middle[0] > deep and (middle[1] as Color).get_luminance() < 0.01 and shoulder[0] > 1.0,
+			"its arch open and squared, the throat going black (met at %.2f m; at its shoulder %.2f m)" % [middle[0], shoulder[0]])
+	var slots := {}
+	var stair_z := -INF
+	for piece: Node in dress.get_children():
+		var slot := str(piece.get_meta("slot", ""))
+		slots[slot] = int(slots.get(slot, 0)) + 1
+		if slot == "building.stair_down":
+			stair_z = (piece as Node3D).position.z
+	var lit := dress.find_children("*", "OmniLight3D", true, false).size()
+	_check(int(slots.get(Client3D.MINE_FRAME, 0)) == 2 and int(slots.get("mine.track", 0)) >= 4 and int(slots.get("mine.track_end", 0)) == 1
+			and int(slots.get("prop.mine_cart", 0)) == 1 and stair_z > 0.5 and lit >= 1,
+			"timbered, railed out to a buffer and a cart, the stair down in the dark, a fire at the door (%s; the stair %.1f m in, %d light)" % [slots, stair_z, lit])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
 func _test_den_mouth() -> void:
 	print("
 == den mouth: a low hole under a shelf, roots over its lip ==")

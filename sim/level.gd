@@ -2907,8 +2907,11 @@ static func _check_fords(terrain: Dictionary, warnings: Array[String]) -> void:
 ## lair's way into a bramble mound, maps' boar lair; drawn by Client3D from
 ## art-kit's wall.thicket bushes; given by the link's "cue" or "mouth"), "den"
 ## (798 amended (2): a low hole dug under a tilted rock shelf, an animal's
-## den, maps' old grey's den; drawn by Client3D with art-kit's root lip).
-const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none", "cave", "thicket", "den"]
+## den, maps' old grey's den; drawn by Client3D with art-kit's root lip),
+## "mine" (a timbered adit cut into a hill of rock, a cave mouth's hill:
+## Hollowfell's door in the hills; drawn by Client3D with art-kit's mine
+## pieces, the stair inside its dark).
+const CUES: Array[String] = ["arch", "waystones", "down", "up", "sealed", "none", "cave", "thicket", "den", "mine"]
 ## Each cue's art-kit slot (waystones: two, either side of the link).
 const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.waystone", "down": "building.stair_down", "up": "building.stair_up"}
 
