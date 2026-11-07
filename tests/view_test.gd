@@ -10632,6 +10632,7 @@ func _test_phased_build() -> void:
 	_rig.rebuild(terrain, castle["centre"])
 	_rig.rebuild(terrain, castle["centre"])
 	await _frames(Client3D.WARM_FRAMES + 2)
+	await _settled_room()
 	var at_once: int = drawn.call()
 	var at_once_kinds: Dictionary = kinds.call()
 	var once: Dictionary = meshes.call()
@@ -10639,14 +10640,13 @@ func _test_phased_build() -> void:
 	built[0] = 0
 	_rig.rebuild(terrain, castle["centre"], true)
 	var phasing := _rig.building_room
-	var frames := 0
-	while (_rig.building_room or _rig.ground_filling) and frames < 400:
-		await get_tree().process_frame
-		frames += 1
+	var frames: int = await _settled_room()
 	_check(phasing and not _rig.building_room and not _rig.ground_filling and _rig._fill_jobs.is_empty()
 			and frames >= _rig._room_phases().size() - 1 and built[0] == 1 and _rig._old_rooms.is_empty(),
-			"building over %d frames, then whole, told once (%d), the last room freed" % [frames, built[0]])
+			"building over %d frames, then whole, told once (%d), the last room freed (phasing %s, building %s, filling %s, fill jobs %d, phases %d, old rooms %d)" % [
+			frames, built[0], phasing, _rig.building_room, _rig.ground_filling, _rig._fill_jobs.size(), _rig._room_phases().size(), _rig._old_rooms.size()])
 	await _frames(Client3D.WARM_FRAMES + 2)
+	await _settled_room()
 	_check(drawn.call() == at_once, "the same room as built at once (%d nodes, %d)" % [drawn.call(), at_once])
 	if drawn.call() != at_once:
 		# Under a suite's load once (2308, 2250, ui's landing 2026-10-27): which kinds differ.
@@ -10671,17 +10671,33 @@ func _test_phased_build() -> void:
 	await _frames(2)
 	var first_room: Node3D = _rig._room
 	_rig.rebuild(terrain, castle["centre"], true)
-	frames = 0
-	while (_rig.building_room or _rig.ground_filling) and frames < 400:
-		await get_tree().process_frame
-		frames += 1
+	await _settled_room()
 	await _frames(Client3D.WARM_FRAMES + 2)
+	await _settled_room()
 	_check(not is_instance_valid(first_room) and built[0] == 1 and drawn.call() == at_once,
 			"a rebuild mid-build: the first's room gone, told once, the same room (%d nodes)" % drawn.call())
 	_check(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT) == orphans,
 			"no orphan nodes left by the stopped build (%d, %d)" % [Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT), orphans])
 	_rig.room_built.disconnect(count_built)
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The room's build, its ground's fill, the last room's free and the
+## border's canopy done (perf, release's ask: a frame cap and a fixed
+## WARM_FRAMES wait both lost to a loaded machine, the fill and the canopy
+## run on workers; terrain found the canopy): frames waited, up to
+## SETTLE_MSEC of wall time.
+const SETTLE_MSEC := 20000
+func _settled_room() -> int:
+	var started := Time.get_ticks_msec()
+	var frames := 0
+	while (_rig.building_room or _rig.ground_filling or not _rig._fill_jobs.is_empty() or not _rig._old_rooms.is_empty()) \
+			and Time.get_ticks_msec() - started < SETTLE_MSEC:
+		await get_tree().process_frame
+		frames += 1
+	if is_instance_valid(_rig._border):
+		_rig._border.finish()  # Its canopy, worked out on a worker (terrain's finding).
+	return frames
 
 
 ## The most frames a small indoor room's card may take to lift (660 amended (7)).
