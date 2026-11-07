@@ -3517,6 +3517,109 @@
 				"license": "CC BY 4.0"
 			}
 		],
+		"voice.foe_death_female": [
+			{
+				"file": "voice.foe_death_female.ogg",
+				"from": "freesound",
+				"original": "freesound 242622: grunt2.wav (from 0.05 s for 0.35 s)",
+				"sha256": "32bfd739bb0b71f8be202731613b8de45c6ef52663c8f0bdf92dafe14292de9a",
+				"by": "Reitanna",
+				"url": "https://freesound.org/people/Reitanna/sounds/242622/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_female.2.ogg",
+				"from": "freesound",
+				"original": "freesound 242623: grunt.wav (from 0.05 s for 0.35 s)",
+				"sha256": "bc210cc58e5bef2ced4cb35640c7d62b014e75aa353b381d01b24cc001c628c7",
+				"by": "Reitanna",
+				"url": "https://freesound.org/people/Reitanna/sounds/242623/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_female.3.ogg",
+				"from": "freesound",
+				"original": "freesound 273919: Hurt4 - unh! (from 0.3 s for 0.35 s)",
+				"sha256": "5c4cf701bcd09142a88ba1355e7ae5e0026b7711a9c50dde3d1f4425818a9763",
+				"by": "lemonjolly",
+				"url": "https://freesound.org/people/lemonjolly/sounds/273919/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "voice.foe_death_female.4.ogg",
+				"from": "freesound",
+				"original": "freesound 464675: FemaleGrunt1.wav (from 0.05 s for 0.55 s)",
+				"sha256": "e9c94d233400b877f2829c9384db3b26f226566127355ece96d0d30ef3f38f06",
+				"by": "BranndyBottle",
+				"url": "https://freesound.org/people/BranndyBottle/sounds/464675/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_female.5.ogg",
+				"from": "freesound",
+				"original": "freesound 796094: Woman getting pain (from 0.05 s for 0.35 s)",
+				"sha256": "e194d1794c59c7db36781e2a2bbe95ab9cee80fd2060d0a2aa3e8262e8cd9aef",
+				"by": "Guinamun",
+				"url": "https://freesound.org/people/Guinamun/sounds/796094/",
+				"license": "CC0 1.0"
+			}
+		],
+		"voice.foe_death_male": [
+			{
+				"file": "voice.foe_death_male.ogg",
+				"from": "freesound",
+				"original": "freesound 547192: Voice_AdultMale_PainGrunts_13.wav (from 0 s for 0.3 s)",
+				"sha256": "710d5e696c64ccc7cf19249d4780217916eb33d6cf7e3ce54337c20544ce3a4d",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547192/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_male.2.ogg",
+				"from": "freesound",
+				"original": "freesound 547197: Voice_AdultMale_PainGrunts_18.wav (from 0 s for 0.26 s)",
+				"sha256": "6f2e7c4d91ca0edceb64b58219ba34f2acf07e5e72b7b302fc668c99ebd41323",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547197/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_male.3.ogg",
+				"from": "freesound",
+				"original": "freesound 547201: Voice_AdultMale_PainGrunts_03.wav (from 0 s for 0.3 s)",
+				"sha256": "4508c49094bc2eedc99bc96f5b4d09965e2b445d337a229b9fa7653854b46cbe",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547201/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_male.4.ogg",
+				"from": "freesound",
+				"original": "freesound 547206: Voice_AdultMale_PainGrunts_06.wav (from 0 s for 0.3 s)",
+				"sha256": "0024114a67bd4cb7fc6e182c6a8ccd266b079d3c0f8f1959e35ac4c7ce11d3e3",
+				"by": "MrFossy",
+				"url": "https://freesound.org/people/MrFossy/sounds/547206/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_male.5.ogg",
+				"from": "freesound",
+				"original": "freesound 719053: Oof (original) (from 0 s for 0.27 s)",
+				"sha256": "8a8af1d14ce84de4fe797d6f3f03506ac6ae736f3cfb95d107989ef15149fbf8",
+				"by": "unfa",
+				"url": "https://freesound.org/people/unfa/sounds/719053/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "voice.foe_death_male.6.ogg",
+				"from": "freesound",
+				"original": "freesound 413177: male_hurt3.ogg (from 0 s for 0.4 s)",
+				"sha256": "ec0ec07d326bb5249be21a702a1349df4da153d7425bc1345e9b2b89dda82be3",
+				"by": "micahlg",
+				"url": "https://freesound.org/people/micahlg/sounds/413177/",
+				"license": "CC0 1.0"
+			}
+		],
 		"voice.last_breath_female": [
 			{
 				"file": "voice.last_breath_female.ogg",

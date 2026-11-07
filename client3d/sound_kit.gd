@@ -360,12 +360,18 @@ static func step_pace(seconds: float) -> float:
 ## effort_lift, death), by its body (Player.body, Companion.body: male or
 ## female; decision 388), or [param body] for a monster drawn as a person
 ## (its look's, Client3D.person_words: a grave robber); "" for anyone else.
+## Such a foe dies with a short grunt of its own (FOE_VOICES), not a
+## player's scream (Jeff, the crypt's robbers: "too exaggerated").
 static func voice(entity: Object, what: String, body := &"") -> String:
 	if entity is Player or entity is Companion:
 		return "voice.%s_%s" % [what, "female" if entity.get("body") == &"female" else "male"]
 	if body in [&"male", &"female"]:
-		return "voice.%s_%s" % [what, body]
+		return "voice.%s_%s" % [FOE_VOICES.get(what, what), body]
 	return ""
+
+
+## A monster drawn as a person: its own voice for these, else a player's.
+const FOE_VOICES := {"death": "foe_death"}
 
 
 ## The slot a line of speech (the "speech" message) sounds as it is shown, ""

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Robbers and bandits, brutes among them, go down with a short grunt now, never quite the same twice, where before they gave a long scream.
 - Come somewhere new with your companion and listen: she speaks of something really there, or of what the two of you did there, where before she said how quiet it was; ask what she thinks of a place and she does the same (803 amended (6)).
 - Ask your companion something just after she's spoken and she answers you, where before an answer too like what she'd just said was dropped and you heard nothing (228 amended (3)).
 - The white outline on the foe a click would strike now hugs its body at any camera height, where before the low camera drew it as a shifted double (Jeff's playtest).

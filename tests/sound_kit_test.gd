@@ -194,8 +194,18 @@ func _test_noises_are_the_sims() -> void:
 	_check(SoundKit.hit("sword", "plate") == "sfx.hit_blade_armor" and SoundKit.hit("hammer", "mail") == "sfx.hit_blunt_armor"
 			and SoundKit.hit("", "plate") == "sfx.hit_blunt_armor" and SoundKit.hit("sword", "leather") == "sfx.hit_blade_flesh"
 			and SoundKit.hit("sword", "robes") == "sfx.hit_blade_flesh", "on worn plate or mail: a blade's or a knock's on metal; leather and robes as flesh")
-	_check(SoundKit.voice(null, "death", &"female") == "voice.death_female" and SoundKit.voice(null, "death") == "",
-			"a person-drawn monster's voice by its look's body; none without one")
+	_check(SoundKit.voice(null, "death", &"female") == "voice.foe_death_female" and SoundKit.voice(null, "death", &"male") == "voice.foe_death_male"
+			and SoundKit.voice(null, "effort_hurt", &"male") == "voice.effort_hurt_male" and SoundKit.voice(null, "death") == "",
+			"a person-drawn monster's voice by its look's body, its death a foe's grunt; none without one")
+	# Jeff, the crypt: a robber's death scream "too exaggerated": a short grunt,
+	# quieter than a player's cry, several to pick from.
+	var grunts := true
+	for body: String in ["male", "female"]:
+		var slot := "voice.foe_death_" + body
+		grunts = grunts and SoundKit.takes(slot).size() >= 5 and SoundKit.volume_db(slot) < SoundKit.volume_db("voice.death_" + body)
+		for take: Dictionary in SoundKit.takes(slot):
+			grunts = grunts and str(take.get("from", "")) == "freesound"
+	_check(grunts, "a foe's death grunt: five takes or more for each body, all Freesound, quieter than a player's death cry")
 	_check(SoundKit.takes("sfx.hit_blade_flesh").size() == 3 and SoundKit.takes("sfx.hit_blade_flesh").all(
 			func(take: Dictionary) -> bool: return str(take.get("from", "")) == "freesound"),
 			"the sword's hit: three freesound impacts with an onset (the slash swish gone)")

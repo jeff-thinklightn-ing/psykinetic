@@ -1431,6 +1431,22 @@
 			"volume_db": 0.0,
 			"uses": "a female death cry; a female-bodied person's death (Client3D._fall)"
 		},
+		"voice.foe_death_male": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "a male-bodied foe drawn as a person (a robber, a bandit) dying: a short umph or ugh, not a player's scream (Jeff, the crypt; SoundKit.FOE_VOICES, Client3D._fall)"
+		},
+		"voice.foe_death_female": {
+			"category": "voices",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": "fight",
+			"volume_db": -6.0,
+			"uses": "a female-bodied foe drawn as a person (a robber, a bandit) dying: a short umph or ugh, not a player's scream (Jeff, the crypt; SoundKit.FOE_VOICES, Client3D._fall)"
+		},
 		"voice.last_breath_female": {
 			"category": "voices",
 			"type": "oneshot",

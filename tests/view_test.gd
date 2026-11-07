@@ -8289,8 +8289,9 @@ func _test_person_monster() -> void:
 	_check(body in [&"male", &"female"] and ("voice.effort_hurt_%s" % body) in hurt and not "sfx.goblin_pain" in hurt,
 			"a grave robber struck cries out as a %s person (%s)" % [body, hurt])
 	var died := _heard(func() -> void: World.damage(robber, 999, null, &"attack"); _rig._process(0.0))
-	_check(("voice.death_%s" % body) in died and "sfx.death_player" in died and not "sfx.goblin_death" in died,
-			"and dies as one: a person's fall and cry, no monster's (%s)" % [died])
+	_check(("voice.foe_death_%s" % body) in died and not ("voice.death_%s" % body) in died and "sfx.death_player" in died
+			and not "sfx.goblin_death" in died,
+			"and dies as one: a person's fall and a short grunt, not a player's scream nor a monster's (%s)" % [died])
 	_rig._process(0.0)
 	row.erase("person")
 	var plain := _spawn_imp(Vector2i(9, 6), "robber")
