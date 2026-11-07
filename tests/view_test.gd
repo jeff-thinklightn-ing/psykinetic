@@ -11923,9 +11923,22 @@ func _test_worn_gear() -> void:
 	_rig._process(0.0)
 	var hat := (sockets["head"] as Node3D).get_node_or_null("Worn") as Node3D
 	_check(not hood.visible and hair.call() and (hat != null) == ArtKit.has("worn.felt_hat"), "the hood off for the felt hat: the hair again, the hat on the head")
+	# Items' cloak row (788 amended): its look draws the long cloak in its colour, over the garb's cape.
+	look.parts.append("Cape")
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	slots[Items.BACK] = "cloak"
+	player.slots = slots
+	_rig._process(0.0)
+	var cloak := model.find_child("Worn_Cloak", true, false) as MeshInstance3D
+	var cape := model.find_child("Cape", true, false) as MeshInstance3D
+	_check(str(Items.worn_of("cloak").get("look", "")) == "cloak" and cloak.visible
+			and cloak.get_instance_shader_parameter("tunic") == Items.color_of("cloak") and cape != null and not cape.visible,
+			"the cloak row on the back: the long cloak in its colour, the garb's cape hidden")
+	look.parts.erase("Cape")
 	player.slots = was
 	_rig._process(0.0)
-	_check(not hood.visible and not boots.visible and (sockets["head"] as Node3D).get_node_or_null("Worn") == null
+	_check(not hood.visible and not boots.visible and not cloak.visible and (sockets["head"] as Node3D).get_node_or_null("Worn") == null
 			and (sockets["neck"] as Node3D).get_node_or_null("Worn") == null and hair.call(), "all off: the look's own again")
 	look.parts.erase("Hair_Cropped")
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))
