@@ -5006,16 +5006,16 @@ func _test_keeper_buttons(player: Player, rolf: Resident) -> void:
 	_main._greet_at.clear()
 	_main._resident_fight_at.clear()
 	_main._greeted(player, rolf)
-	_check(panel.is_open() and panel.with == rolf and panel.keeper_buttons() == [true, false],
+	_check(panel.is_open() and panel.with == rolf and panel.keeper_buttons() == [true],
 		"greeted: Open locker, and no practice kit (807 amended (5)) (%s)" % [panel.keeper_buttons()])
 	panel._locker_button.pressed.emit()
 	var locker := World.locker_of(player.player_id)
 	_check(locker != null and World.distance(locker.tile, rolf.tile) <= 1, "Open locker: the locker beside him (%s)" % [locker.tile if locker != null else null])
 	var pedlar_wares: Array = [{"id": "visitor:x|wares|knife", "kind": Offers.WARES, "accept": Offers.WARES, "what": {"item": "knife"}}]
-	panel.set_keeper(pedlar_wares, true)
-	_check(panel.keeper_buttons() == [false, false], "a pedlar's wares: neither button")
+	panel.set_keeper(pedlar_wares)
+	_check(panel.keeper_buttons() == [false], "a pedlar's wares: no locker button")
 	panel.close()
-	_check(panel.keeper_buttons() == [false, false], "closed: neither")
+	_check(panel.keeper_buttons() == [false], "closed: no locker button")
 	if locker != null and is_instance_valid(locker):
 		World.despawn(locker)
 	record.kit_given = false

@@ -98,10 +98,10 @@ signal said(text: String)
 ## 802 Give: the rows' uids handed to [param to] (Main sends "give").
 signal give_asked(to: GridEntity, uids: Array)
 ## Rolf's stall (807 amended (3)): his Open locker button (the player's
-## locker opened beside him, "locker" {keeper}) and, while his "offers" say
-## one is owed, Take practice kit ("kit" {keeper}).
+## locker opened beside him, "locker" {keeper}). His Take practice kit went
+## with the kit (807 amended (5): Jeff, "a 'take practice kit' button that
+## just fills your inventory with junk you can't trade").
 signal locker_asked(keeper: GridEntity)
-signal kit_asked(keeper: GridEntity)
 
 ## 802: the chat area's height in lines, and how many lines it keeps.
 const CHAT_LINES := 6
@@ -115,9 +115,8 @@ const ASLEEP_WORDS := "asleep"
 ## Voice's words for Give (802): the toggle and the button's verb, a gift's line.
 const GIVE_WORDS := "Give"
 const GIFT_WORDS := "A gift"
-## Rolf's buttons (807 amended (3), voice's words).
+## Rolf's button (807 amended (3), voice's words).
 const LOCKER_WORDS := "Open locker"
-const KIT_WORDS := "Take practice kit"
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
@@ -166,7 +165,6 @@ var _box: PanelContainer
 var _title: Label
 var _give_tab: Button
 var _locker_button: Button
-var _kit_button: Button
 var _outcome: VBoxContainer
 var _state: Label
 var _chat_scroll: ScrollContainer
@@ -266,15 +264,6 @@ func _ready() -> void:
 		if with != null:
 			locker_asked.emit(with))
 	head.add_child(_locker_button)
-	_kit_button = Button.new()
-	_kit_button.name = "KitButton"
-	_kit_button.text = KIT_WORDS
-	_kit_button.focus_mode = Control.FOCUS_NONE
-	_kit_button.visible = false
-	_kit_button.pressed.connect(func() -> void:
-		if with != null:
-			kit_asked.emit(with))
-	head.add_child(_kit_button)
 	_state = Label.new()
 	_state.theme_type_variation = &"Caption"
 	_state.add_theme_color_override("font_color", DIM)
@@ -396,20 +385,18 @@ func show_wares(person: GridEntity, who: String, offers: Array, gold: int) -> vo
 	_rebuild()
 
 
-## Rolf's buttons (807 amended (3)) for the stall keeper whose wares show:
-## Open locker when [param offers] are his stall's (Offers.VENDOR_WARES), and
-## Take practice kit while [param kit] (his "offers" message's "kit").
-func set_keeper(offers: Array, kit: bool) -> void:
+## Rolf's button (807 amended (3)) for the stall keeper whose wares show:
+## Open locker when [param offers] are his stall's (Offers.VENDOR_WARES).
+func set_keeper(offers: Array) -> void:
 	var keeper := _open and offers.any(func(each: Variant) -> bool:
 		return each is Dictionary and str((each as Dictionary).get("kind", "")) == Offers.VENDOR_WARES)
 	if _locker_button != null:
 		_locker_button.visible = keeper
-		_kit_button.visible = keeper and kit
 
 
-## Whether Rolf's buttons show: [Open locker, Take practice kit].
+## Whether Rolf's buttons show: [Open locker].
 func keeper_buttons() -> Array[bool]:
-	return [_locker_button != null and _locker_button.visible, _kit_button != null and _kit_button.visible]
+	return [_locker_button != null and _locker_button.visible]
 
 
 ## The purse as Main last read it (a ware seller's window, no barter message).
@@ -555,7 +542,6 @@ func close() -> void:
 	_give_due = false
 	if _locker_button != null:
 		_locker_button.visible = false
-		_kit_button.visible = false
 	_focus_due = false
 	if _line != null:
 		_line.text = ""  # A half-typed line goes with the window (802).
