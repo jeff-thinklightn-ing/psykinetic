@@ -15,6 +15,7 @@ notes (decision 324).
 - In the hills, the cave north of the main road is clear of its rockfall, and the great bear dens inside; by day it comes out to roam the hills near its cave, off the roads, and goes back in when badly hurt, at dusk or after a while out, and you can follow it in; killed, it is back in its den within the half hour (780 amended (13)).
 - Towns: the tanner, or Rolf at the stall where there's none, buys your trophies by Give, up to 20 gold for the great bear's pelt: the bear's pelt and claws, the hill cat's pelt, antlers and tusks (821).
 
+- You, your companion and every creature walk across the bridges in the wilds and the hills on the deck now, stepping off onto the bank without a jump, where before you were drawn knee-deep in the stream below it (505 amended (5)).
 - Ask your companion to fish wherever you could and she does, where before she said there was nothing to fish in once you'd caught a few; when the water's fished out for the day, she tells you so (805).
 - Towns: Rolf at the stall sells a woollen cloak for 8 gold, to wear in the sheet's cloak square (788 amended).
 - Gains read the thing first, with the track and amount after it in brackets, as in "Umbrage (Regard +1)", on floats, banners and the talk log alike, and banners stay up longer (804).

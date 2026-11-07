@@ -2153,6 +2153,13 @@ var _dry_water: Dictionary[Vector2i, bool] = {}
 ## The water under a bridge (terrain "bridged", decision 505): its bed's
 ## elevation (m), the stream's, not the deck's (_measure_streams).
 var _bed_levels: Dictionary[Vector2i, float] = {}
+## Where a body stands on a bridge (505 amended (5)): each deck cell's top,
+## and each bank cell past its ends (x, y: the way out from the deck, z:
+## the deck's top), where the deck's top eases into the ground across the
+## cell, so a puppet walks on the deck, not on the bed under it, and off it
+## with no step (_ground_height; _measure_streams).
+var _deck_tops: Dictionary[Vector2i, float] = {}
+var _deck_ends: Dictionary[Vector2i, Vector3] = {}
 ## Fords (terrain "fords"): floor under a shallow sheet of the stream.
 var _fords: Dictionary[Vector2i, bool] = {}
 ## Rocks (terrain "rocks", decision 513): no floor to the sim, but ground of
@@ -4180,9 +4187,21 @@ func _mouse_ground() -> Vector2:
 
 
 ## How high the ground is under [param grid] (a puppet's place): its cell's
-## height, or on a stair, the ramp's.
+## height, or on a stair, the ramp's; on a bridge its deck's, and on the
+## bank cell past its end the deck's eased into the ground's across it
+## (505 amended (5): the ground's mesh under a deck is the stream's bed, and
+## a bank dips to the water).
 func _ground_height(grid: Vector2) -> float:
-	return _height_in(Vector2i(roundi(grid.x), roundi(grid.y)), grid)
+	var cell := Vector2i(roundi(grid.x), roundi(grid.y))
+	if _deck_tops.has(cell):
+		return _deck_tops[cell]
+	var ground := _height_in(cell, grid)
+	if not _deck_ends.has(cell):
+		return ground
+	var end := _deck_ends[cell]
+	var out := Vector2(end.x, end.y)
+	var t := clampf((grid - (Vector2(cell) - out * 0.5)).dot(out), 0.0, 1.0)
+	return lerpf(end.z, ground, t)
 
 
 ## How high [param cell]'s ground is at [param point] (on it or its edge),
@@ -6324,6 +6343,8 @@ func _edges_read() -> void:
 	_raise_glimpses()
 	_sight_key = Vector4.INF  # A new ground: ask again whether it hides the player.
 	_bed_levels.clear()
+	_deck_tops.clear()
+	_deck_ends.clear()
 	_corners.clear()
 	_wet.clear()
 	_shape_ramps()
@@ -13812,6 +13833,17 @@ func _measure_streams() -> void:
 		for cell in Level.rect_cells(rect):
 			if bridged.has(cell):
 				_bed_levels[cell] = level if level < INF else _elevation(cell)
+		if str(building.get("slot", "")) != Level.BRIDGE or not building.has("facing"):
+			continue
+		# Where bodies stand on it: the deck's top as _add_bridge lays it.
+		var top := _elevation(rect.position) + BRIDGE_LIFT
+		var facing: Vector2i = building["facing"]
+		var along := Vector2i(absi(facing.x), absi(facing.y))
+		for cell in Level.rect_cells(rect):
+			_deck_tops[cell] = top
+			for end: Vector2i in [along, -along]:
+				if not rect.has_point(cell + end):
+					_deck_ends[cell + end] = Vector3(end.x, end.y, top)
 
 
 ## The shore field (decision 553): an L8 image of [param size] cells from

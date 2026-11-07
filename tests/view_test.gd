@@ -110,6 +110,7 @@ func _ready() -> void:
 		_test_solid_ground()
 		_test_water()
 		_test_streams()
+		_test_bridge_walked()
 		_test_tall_grass()
 		_test_blood()
 		_test_tracks()
@@ -4241,7 +4242,9 @@ func _test_relief() -> void:
 		if k >= 4 and point.y > middles[k - 3].y + 0.001:
 			rising += 1
 		var spot := Vector2(point.x, point.z)
-		if point.y < _rig._ground_height(spot) - 0.001:
+		# Over the bed's mesh (_height_in): _ground_height is where a body
+		# stands, a bridge's deck over the stream (505 amended (5)).
+		if point.y < _rig._height_in(Vector2i(spot.round()), spot) - 0.001:
 			under_bed += 1
 	for k in range(1, middles.size(), 3):
 		var spot := Vector2(middles[k].x, middles[k].z)
@@ -5846,6 +5849,58 @@ func _test_ledge_curves() -> void:
 			covered += 1 if _rig._ledge_covers(edge[0], edge[0] + edge[1]) else 0
 		_check(covered > 0, "%s: %d cell-edge faces left to the ledges' curves" % [name, covered])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## A body walks on a bridge's deck (505 amended (5); Jeff, 2026-11-06: "the
+## bridge still doesn't work you glitch through it"): the ground's mesh under
+## a deck is the stream's bed and its banks dip to the water, so a puppet
+## stood on them (_ground_height) sank through the deck. Walked along each
+## deck row of the wilds' and the hills' bridges, bank to bank: on the deck
+## its top, at the deck's ends its top, no step between two points a tenth
+## of a cell apart (the bank cell past an end eases into the ground).
+func _test_bridge_walked() -> void:
+	print("\n== a body walks on a bridge's deck, not the bed under it (505 amended (5)) ==")
+	for name: String in ["wilds", "hills"]:
+		var level := Level.load_level(name)
+		var bridges: Array = level["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == Level.BRIDGE)
+		if bridges.is_empty():
+			_check(false, "%s has a bridge" % name)
+			continue
+		var bridge: Dictionary = bridges[0]
+		var rect: Rect2i = bridge["rect"]
+		_rig.rebuild(level["terrain"], rect.position)
+		var facing: Vector2i = bridge["facing"]
+		var along := Vector2i(absi(facing.x), absi(facing.y))
+		var across := Vector2i(along.y, along.x)
+		var top := _rig._elevation(rect.position) + Client3D.BRIDGE_LIFT
+		var length := rect.size.x if along.x != 0 else rect.size.y
+		var width := rect.size.y if along.x != 0 else rect.size.x
+		var off_deck := []
+		var under_at_ends := []
+		var jumps := []
+		var lowest_bed := INF
+		for row in width:
+			var start := Vector2(rect.position + across * row) - Vector2(along) * 1.5
+			var before := NAN
+			for k in int((length + 2) * 10) + 1:
+				var point := start + Vector2(along) * (0.1 * k)
+				var cell := Vector2i(roundi(point.x), roundi(point.y))
+				var height: float = _rig._ground_height(point)
+				if rect.has_point(cell):
+					lowest_bed = minf(lowest_bed, _rig._height_in(cell, point))
+					if absf(height - top) > 0.01:
+						off_deck.append([point, snappedf(height, 0.01)])
+				elif rect.has_point(cell - along) or rect.has_point(cell + along):
+					# The bank cell past an end: at the deck's edge, the deck's top.
+					var edge := Vector2(cell) + Vector2(along) * (0.5 if rect.has_point(cell + along) else -0.5)
+					if point.distance_to(edge) < 0.05 and absf(height - top) > 0.01:
+						under_at_ends.append([point, snappedf(height, 0.01)])
+				if not is_nan(before) and absf(height - before) > 0.1:
+					jumps.append([point, snappedf(before, 0.01), snappedf(height, 0.01)])
+				before = height
+		_check(off_deck.is_empty() and under_at_ends.is_empty() and jumps.is_empty(),
+			"%s: on the deck at its top %.2f (the bed's mesh under it as low as %.2f), off its ends at the same, no step (off %s, at the ends %s, steps %s)"
+			% [name, top, lowest_bed, off_deck.slice(0, 3), under_at_ends.slice(0, 3), jumps.slice(0, 3)])
 
 
 ## Built water (decision 595): water no curve lays (the wilds' wells) drawn

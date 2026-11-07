@@ -15570,6 +15570,26 @@ long: the end pieces reach onto each bank, and a longer one would move bank cell
 view_test _test_bridge_ends (the hills' four end cells; a one-wide bridge and a kit without the
 variants post both sides). Client only, protocol unchanged, no new class_name.
 
+505 amended (5) (2026-11-06, release's label; Jeff, playing the wilds: "the bridge still doesn't
+work you glitch through it"; the coordinator's top priority and approval): bodies are drawn on a
+bridge's deck. The sim was right. A headless walk over the wilds' bridge (95,130), by a player in
+free walk and by a companion, both ways and on both rows, crossed in 11 to 15 ticks with no snag,
+on the walked relief's deck (505 amended). The view was wrong. Client3D stood each puppet at
+_ground_height, the ground mesh's height, and under a deck that mesh is the stream's bed
+(_bed_levels): 0.6 m below the deck on the wilds' (3.49, bed 2.88) and on the hills' (3.54, 2.98).
+So everyone on a bridge sank through it into the water. Past its ends the bank's corners come down
+to the water's edge, which gave a step. Now _measure_streams keeps, for each bridge, its deck's top
+(_deck_tops: the banks' elevation plus BRIDGE_LIFT, as _add_bridge lays the pieces) and the bank
+cell past each end (_deck_ends). _ground_height stands a body at the deck's top on the deck, and on
+the bank cell past an end eases from the deck's top at the deck's edge into the ground's height
+across that cell, so stepping off has no jump. That easing is the new rule for how a bridge meets
+the ground. Piles, props and a toss's mark drawn there follow the same. The ground's mesh is
+unchanged, and the bed is still drawn under the water. view_test _test_bridge_walked walks every
+deck row of the wilds' and the hills' bridges bank to bank a tenth of a cell at a time: the deck's
+top on the deck and at each end, and no step over 0.1 m. Client only, protocol unchanged, no new
+class_name; the bullet is voice's. Its other half, the wilds' stream too deep to wade, is maps'
+(the stream's cells as ford, 505's).
+
 ## 506. The level editor's properties panel
 
 level.json had grown keys only a text editor reached (links' targets,
