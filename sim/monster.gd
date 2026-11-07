@@ -206,6 +206,10 @@ const GIVE_UP_TICKS := 100
 ## in sight) or where it idles, roused by a blow or by them within
 ## WATCH_ROUSE of its post (its own cell, not a guard).
 const STANDOFF_TICKS := 50
+## An idle walk whose way was not found waits this long before searching for
+## the same goal again (perf's heat run: failed plans, 0.74 ms a tick on castle
+## 256, most of them the same goal tick after tick).
+const IDLE_PLAN_RETRY_TICKS := 10
 const GUARD_REACH := 4
 const WATCH_TICKS := 600
 const WATCH_ROUSE := 2
@@ -488,6 +492,10 @@ var _quarry_at := NO_TILE
 var _quarry_from := NO_TILE
 var _post := NO_TILE
 var _given_up: Dictionary[int, int] = {}
+## An idle walk's last failed plan (_idle_step): to where, and the tick it
+## may search again (IDLE_PLAN_RETRY_TICKS).
+var _idle_failed_to := NO_TILE
+var _idle_retry_tick := -1
 ## The standoff (STANDOFF_TICKS): what it last did, since when, whether it
 ## presses in this fight, and the one it watches (an instance id; -1 none)
 ## and from where (WATCH_ROUSE).
@@ -3336,9 +3344,13 @@ func _idle_step(to: Vector2i, max_tiles := IDLE_SEARCH_TILES, straight_only := f
 			return World.try_move(self, direct)
 		if straight_only:
 			return false  # Out of everyone's view: it waits, or goes elsewhere.
+		if to == _idle_failed_to and World.tick < _idle_retry_tick:
+			return false  # No way there a moment ago: no search again yet.
 		_idle_path = World.find_path(tile, to, false, null, max_tiles, false, {}, opens_doors_now())
 		_idle_path_to = to
 		if _idle_path.is_empty():
+			_idle_failed_to = to
+			_idle_retry_tick = World.tick + IDLE_PLAN_RETRY_TICKS
 			return false
 	if World.try_move(self, _idle_path[0] - tile):
 		_idle_path.pop_front()
