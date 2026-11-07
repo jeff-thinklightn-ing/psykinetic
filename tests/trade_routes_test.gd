@@ -38,7 +38,9 @@ func _ready() -> void:
 	_test_saved()
 	_test_shown()
 	_test_before_fields()
+	_test_along_each()
 	_trade.finish()
+	_test_along_each_real()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -271,3 +273,104 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## along_each (202 amended): along()'s answers at every sample, one descent
+## a leg; on the strips' route both ways, and round the camp (a leg that
+## carries its own cells, route_round).
+func _test_along_each() -> void:
+	print("
+== along_each: along() at every sample, in one pass ==")
+	var routes := _trade.routes_now()
+	var way := _trade.route(ROUTE)
+	var legs: Array[Dictionary] = way["legs"]
+	var back := routes.route(legs[-1]["area"], legs[-1]["to"], legs[0]["area"], legs[0]["from"])
+	var avoid := {"tr_mid": {}}
+	for leg in legs:
+		if leg["area"] == "tr_mid":
+			for cell in routes.leg_cells(leg):
+				if cell != leg["from"] and cell != leg["to"]:
+					avoid["tr_mid"][cell] = true  # Its own way barred: it walks round.
+	var round := routes.route_round(legs[0]["area"], legs[0]["from"], legs[-1]["area"], legs[-1]["to"], avoid)
+	var cells_legs := round.filter(func(leg: Dictionary) -> bool: return leg.has("cells")).size()
+	_check(cells_legs > 0, "round the camp: %d leg(s) walked with their own cells" % cells_legs)
+	for each: Array in [["there", legs], ["back", back], ["round the camp", round]]:
+		_check(_same_along(routes, each[1]), "%s: the same as along() at each half step, and out of order" % each[0])
+
+
+## along_each over real levels (the wilds, the castle and the lands between):
+## every market and stockpile to every other, the same as along() at each
+## sample_steps; what each costs.
+func _test_along_each_real() -> void:
+	print("
+== along_each on real routes ==")
+	var names: Array[String] = []
+	for name in ["wilds", "castle", "foothills", "forest", "hills", "held"]:
+		if Level.exists(name):
+			names.append(name)
+	var map := WorldMap.build(names)
+	var holdings := Holdings.new(map, Factions.read(), {})
+	var routes := holdings.make_routes(map)
+	routes.wait()
+	var ends: Array[Array] = []
+	var markets := map.markets()
+	for id: String in markets:
+		ends.append([markets[id]["area"], markets[id]["cell"]])
+	for id in holdings.all_places():
+		var place := holdings.place(id)
+		if place.get("kind") in ["stockpile", "camp"]:
+			ends.append([place["area"], place["cell"]])
+	var asked := 0
+	var same := 0
+	var old_usec := 0
+	var new_usec := 0
+	for i in ends.size():
+		for j in range(i + 1, ends.size()):
+			var legs := routes.route(ends[i][0], ends[i][1], ends[j][0], ends[j][1])
+			if legs.is_empty():
+				continue
+			asked += 1
+			var steps := 0.0
+			for leg in legs:
+				steps += float(leg["steps"]) + WorldRoutes.CROSSING
+			var ats: Array[float] = []
+			var at := 0.0
+			while at <= steps:
+				ats.append(at)
+				at += 4.0
+			var t := Time.get_ticks_usec()
+			var one: Array[Dictionary] = []
+			for each in ats:
+				one.append(routes.along(legs, each))
+			old_usec += Time.get_ticks_usec() - t
+			t = Time.get_ticks_usec()
+			var all := routes.along_each(legs, ats)
+			new_usec += Time.get_ticks_usec() - t
+			if all == one:
+				same += 1
+	routes.retire()
+	routes.wait()
+	_check(asked >= 3 and same == asked, "%d of %d real routes the same at every sample (along() each %.1f ms, along_each %.1f ms)" % [
+		same, asked, old_usec / 1000.0, new_usec / 1000.0])
+
+
+func _same_along(routes: WorldRoutes, legs: Array[Dictionary]) -> bool:
+	var steps := 0.0
+	for leg in legs:
+		steps += float(leg["steps"]) + WorldRoutes.CROSSING
+	var ats: Array[float] = []
+	var at := -1.0
+	while at <= steps + 3.0:
+		ats.append(at)
+		at += 0.5
+	var shuffled := ats.duplicate()
+	shuffled.reverse()
+	for order: Array in [ats, shuffled]:
+		var typed: Array[float] = []
+		typed.assign(order)
+		var all := routes.along_each(legs, typed)
+		for i in typed.size():
+			if all[i] != routes.along(legs, typed[i]):
+				print("    at %.1f: along %s, along_each %s" % [typed[i], routes.along(legs, typed[i]), all[i]])
+				return false
+	return true

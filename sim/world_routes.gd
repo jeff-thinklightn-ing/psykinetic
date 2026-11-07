@@ -420,6 +420,101 @@ func along(legs: Array[Dictionary], cells: float, faction := OPEN) -> Dictionary
 	return {"area": last["area"], "cell": last["to"], "leg": legs.size() - 1, "done": true}
 
 
+## along() at each of [param ats], the same answers in one pass (202
+## amended): a leg's samples continue one descent down its field (towards its
+## exit in order, back from its end in reverse) where along() starts each
+## again from the leg's end, so sampling a whole route was quadratic in
+## its length (TradeRoutes._exposed: 104 ms a route in the town soak).
+func along_each(legs: Array[Dictionary], ats: Array[float], faction := OPEN) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	out.resize(ats.size())
+	if legs.is_empty():
+		return out
+	var layer: Layer = _layers.get(faction, _layers[OPEN])
+	var on_leg := {}  # Leg index -> [[sample index, covered], ...].
+	for i in ats.size():
+		var left := ats[i]
+		var found := false
+		for index in legs.size():
+			var leg: Dictionary = legs[index]
+			var steps: float = leg["steps"]
+			if left < steps:
+				if not on_leg.has(index):
+					on_leg[index] = []
+				on_leg[index].append([i, maxf(left, 0.0)])
+				found = true
+				break
+			left -= steps
+			if index + 1 < legs.size():
+				left -= CROSSING
+				if left < 0.0:
+					var next: Dictionary = legs[index + 1]
+					out[i] = {"area": next["area"], "cell": next["from"], "leg": index + 1, "done": false}
+					found = true
+					break
+		if not found:
+			var last: Dictionary = legs[-1]
+			out[i] = {"area": last["area"], "cell": last["to"], "leg": legs.size() - 1, "done": true}
+	for index: int in on_leg:
+		var leg: Dictionary = legs[index]
+		(on_leg[index] as Array).sort_custom(func(a: Array, b: Array) -> bool: return a[1] < b[1])
+		var cells := _cells_along(layer, leg, on_leg[index])
+		for k in cells.size():
+			out[on_leg[index][k][0]] = {"area": leg["area"], "cell": cells[k], "leg": index, "done": false}
+	return out
+
+
+## _cell_along for each of [param samples] ([[sample index, covered], ...],
+## in ascending covered, as along_each sorts them), in their order: one
+## descent or walk for them all.
+func _cells_along(layer: Layer, leg: Dictionary, samples: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	out.resize(samples.size())
+	var area_name: String = leg["area"]
+	var area: Dictionary = _areas[area_name]
+	var from: Vector2i = leg["from"]
+	var to: Vector2i = leg["to"]
+	if leg.has("cells"):
+		var cells: Array[Vector2i] = leg["cells"]
+		var i := 1
+		var spent := 0.0
+		var paid := false  # Whether the step into cells[i] is counted in spent.
+		for k in samples.size():
+			var covered: float = samples[k][1]
+			var at := Vector2i(-1, -1)
+			while i < cells.size():
+				if not paid:
+					var direction := cells[i] - cells[i - 1]
+					spent += _step_halves(area, cells[i - 1], direction, 3 if direction.x != 0 and direction.y != 0 else 2) / 2.0
+					paid = true
+				if spent > covered + 0.001:
+					at = cells[i - 1]
+					break
+				i += 1
+				paid = false
+			out[k] = at if i < cells.size() else cells[-1]
+		return out
+	var exit := _field(layer, _portal_id(area_name, to))
+	if _at(exit, area_name, from) >= 0.0:
+		var start := _at(exit, area_name, from)
+		var here := from
+		for k in samples.size():
+			here = _descend(area, exit, here, start - float(samples[k][1]))
+			out[k] = here
+		return out
+	var entry := _field(layer, _portal_id(area_name, from))
+	if _at(entry, area_name, to) >= 0.0:
+		var here := to
+		for k in range(samples.size() - 1, -1, -1):
+			here = _descend(area, entry, here, float(samples[k][1]))
+			out[k] = here
+		return out
+	for k in samples.size():
+		var point := Vector2(from).lerp(Vector2(to), float(samples[k][1]) / maxf(leg["steps"], 0.001)).round()
+		out[k] = _nearest_floor(area, Vector2i(point), from)
+	return out
+
+
 ## The cells of [param leg] (one of route()'s or route_round()'s, asked
 ## for [param faction]) from its "from" to its "to", both in, each one real
 ## step (can_step) from the one before, along a shortest walk: its own

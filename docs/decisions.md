@@ -2402,8 +2402,18 @@ map, headless, 4 tasks, this and main alternated twice (a scene, not a bench): e
 25.0-25.5 s against 64-84 s, the open layer ready at 13.4-13.7 s against about 17 s; the
 summed task time rises 64-84 s to 82-85 s with four at once. One area's fields are still one
 task, so the wilds, the largest, bounds a layer's readiness. world_map_test: the fields equal
-those made in one go, the queue empty and no task left counted. Server only, protocol
-unchanged, no new class_name.
+those made in one go, the queue empty and no task left counted. A group's place along a route
+is asked for many places at once by WorldRoutes.along_each(legs, ats): along()'s answers, each
+leg's samples one descent down its field (towards its exit in order, back from its end in
+reverse; a walked leg's cells once) where along() descended from the leg's end again for each.
+TradeRoutes._exposed (economy's OK) samples a route every sample_steps with it: along() at each
+was quadratic in the route's length, so a camp changing hands (every route made again, the next
+shown()) cost the box 170-183 ms ticks mid-play ("camps, lawspeaker"). Town soak, 16 players: a
+route's exposure 103.6 ms to 8.5 ms, a new caravan's way (wilds' store to the castle's market)
+91 ms to 6.3 ms; 36 real routes (wilds, castle and the lands between) sampled every 4 steps 2216
+ms to 106 ms. trade_routes_test: the same answers as along() at every half step, in and out of
+order, there, back and round a barred way; on the 36 real routes at every sample. Server only,
+protocol unchanged, no new class_name.
 
 ## 203. A light's lines are worked out once; a door asks only its doors
 

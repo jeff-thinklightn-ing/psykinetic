@@ -246,10 +246,17 @@ func _exposed(legs: Array[Dictionary], steps: float, town: String) -> Array[Dict
 	if hostile.is_empty():
 		return out
 	var reach := float(rules["raid_reach"])
-	var routes := routes_now()
+	var ats: Array[float] = []
 	var at := 0.0
 	while at <= steps:
-		var here := routes.along(legs, at)
+		ats.append(at)
+		at += float(rules["sample_steps"])
+	# One pass down the route for every sample (202 amended, perf; economy's OK): along() at each
+	# was quadratic in the route's length, 104 ms a route at a camp's taking.
+	var places := routes_now().along_each(legs, ats)
+	for i in ats.size():
+		at = ats[i]
+		var here: Dictionary = places[i]
 		if not here.is_empty() and holdings.ground(here["area"], here["cell"]) == Factions.NOBODY:
 			var nearest := ""
 			var nearest_d := INF
@@ -262,7 +269,6 @@ func _exposed(legs: Array[Dictionary], steps: float, town: String) -> Array[Dict
 					nearest_d = d
 			if nearest != "":
 				out.append({"at": at, "camp": nearest})
-		at += float(rules["sample_steps"])
 	return out
 
 
