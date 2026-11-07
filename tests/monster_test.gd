@@ -89,6 +89,7 @@ func _ready() -> void:
 	_test_chiefs()
 	_test_lone_guard()
 	_test_ambush_choice()
+	_test_band_robbers()
 	_test_watch_wave()
 	_test_wanderers()
 	_test_hill_cat()
@@ -1884,8 +1885,8 @@ func _test_lone_guard() -> void:
 		if struck_at < 0 and _damage_log.any(func(d: Dictionary) -> bool: return d["entity"] == player and d["source"] == robber):
 			struck_at = World.tick
 			break
-	_check(struck_at >= 0 and struck_at - start <= 90 and robber._pressing,
-		"a player 3 from its post: it holds back, then presses in and strikes (%d ticks; pressing %s)" % [struck_at - start, robber._pressing])
+	_check(struck_at >= 0 and struck_at - start <= 90,
+		"a player 3 from its post: alone, it comes in and strikes (806 amended (9); %d ticks)" % [struck_at - start])
 	World.despawn(player)
 	var home_at := -1
 	for i in 300:
@@ -1948,6 +1949,116 @@ func _test_lone_guard() -> void:
 	for i in 10:
 		World.step()
 	_check(robber.target == player, "2 from its post it takes them up again (%s)" % [robber.target])
+
+
+## The crypt's robbers fight right (806 amended (9); Jeff: "fighting the
+## robbers is not great right now"): alone, one comes in and strikes from the
+## front; it goes round only while a mate holds the front, and never the long
+## way round a sarcophagus; hurt, it runs only to call a mate, and comes back.
+func _test_band_robbers() -> void:
+	print("\n== the crypt's robbers fight right: alone straight in, round only with a mate, run only to call ==")
+	var weights: Dictionary = Monster.kinds()["robber"]["temperament"]
+	_check(weights[Monster.Temper.BOLD] == 1.0 and weights[Monster.Temper.CAUTIOUS] == 2.0 and weights[Monster.Temper.COWARDLY] == 0.0
+			and bool(Monster.kinds()["robber"]["band_fights"]) and not bool(Monster.kinds()["sneak"]["band_fights"]),
+		"the robber's temper roll is bold 1, cautious 2, cowardly 0, and it fights as a band (%s)" % [weights])
+	var room: Array[String] = ["############", "#..........#", "#.x...P....#", "#..........#", "############"]
+	var e := _build(room, {"x": {"facing": Vector2i(1, 0)}})
+	var robber: Monster = e["x"][0]
+	var player: GridEntity = e["P"][0]
+	World.face(player, Vector2i(-1, 0))
+	robber.sight_range = 9  # A lit crypt: it sees them.
+	robber.boldness = 0.05  # Timid: it held back alone before.
+	robber.temper = Monster.Temper.CAUTIOUS
+	var struck_at := -1
+	var start := World.tick
+	var went_round := false
+	for i in 120:
+		World.step()
+		went_round = went_round or robber._front_ticks > 0
+		if _damage_log.any(func(d: Dictionary) -> bool: return d["entity"] == player and d["source"] == robber):
+			struck_at = World.tick
+			break
+	_check(struck_at >= 0 and struck_at - start <= 45 and not went_round and robber._in_front(),
+		"alone, a timid robber comes straight in and strikes from the front (%d ticks, went round %s)" % [struck_at - start, went_round])
+
+	# A crypt's sarcophagi: the player's back is only the long way round.
+	var crypt: Array[String] = ["############", "#..........#", "#.x...####.#", "#...xP.....#", "#.....####.#", "#..........#", "############"]
+	e = _build(crypt, {"x": {"facing": Vector2i(1, 0)}})
+	var flanker: Monster = e["x"][0]
+	var mate: Monster = e["x"][1]
+	player = e["P"][0]
+	World.face(player, Vector2i(-1, 0))
+	flanker.target = player
+	mate.target = player
+	_check(flanker._flanks_now(), "with a mate beside the player, it may go round (%s)" % [mate.tile])
+	var picked := flanker._pick_slot()
+	flanker.slot = picked
+	_check(picked.x < player.tile.x and World.are_adjacent(picked, player.tile),
+		"but the way to the player's back is long round the sarcophagi: the nearest free cell (%s)" % [picked])
+	var open: Array[String] = ["############", "#..........#", "#.x........#", "#...xP.....#", "#..........#", "#..........#", "############"]
+	e = _build(open, {"x": {"facing": Vector2i(1, 0)}})
+	flanker = e["x"][0]
+	mate = e["x"][1]
+	player = e["P"][0]
+	World.face(player, Vector2i(-1, 0))
+	flanker.target = player
+	mate.target = player
+	picked = flanker._pick_slot()
+	_check(picked.x > player.tile.x - 1 and picked != mate.tile,
+		"in the open, with a mate in front, it makes for the player's side or back (%s)" % [picked])
+	World.despawn(mate)
+	flanker.slot = Monster.NO_TILE
+	_check(not flanker._flanks_now(), "its mate gone, it no longer goes round")
+
+	# Hurt, with a mate in the crypt: it runs to call, and comes back.
+	e = _build(room, {"x": {"facing": Vector2i(1, 0)}})
+	robber = e["x"][0]
+	player = e["P"][0]
+	var far_mate := EntityFactory.build(SPECS["x"].duplicate(true).merged({"name": "Mate"})) as Monster
+	_room.add_child(far_mate)
+	World.spawn(far_mate, Vector2i(10, 3))
+	robber.sight_range = 9
+	robber.temper = Monster.Temper.CAUTIOUS
+	robber.hp = 3  # Under its flee_below (0.35 of 10).
+	var cries: Array[StringName] = []
+	robber.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	var ran := false
+	for i in 40:
+		World.step()
+		if robber.alert == Monster.Alert.FLEEING:
+			ran = true
+			break
+	_check(ran and cries.has(&"call") and not cries.has(&"rout") and robber._ran_to_call,
+		"hurt, with a mate, it runs to call its band, never a rout (%s)" % [cries])
+	var back := false
+	for i in 200:
+		World.step()
+		if robber.target == player and robber.alert == Monster.Alert.FIGHTING:
+			back = true
+			break
+	_check(back, "it comes back to fight (%s, alert %d)" % [robber.target, robber.alert])
+	var ran_again := false
+	for i in 80:
+		World.step()
+		ran_again = ran_again or robber.alert == Monster.Alert.FLEEING
+	_check(not ran_again, "and fights on: it runs once a fight")
+
+	# Hurt and alone: it never runs.
+	e = _build(room, {"x": {"facing": Vector2i(1, 0)}})
+	robber = e["x"][0]
+	player = e["P"][0]
+	robber.sight_range = 9
+	robber.temper = Monster.Temper.CAUTIOUS
+	robber.hp = 3
+	ran = false
+	struck_at = -1
+	for i in 80:
+		World.step()
+		ran = ran or robber.alert == Monster.Alert.FLEEING
+		if _damage_log.any(func(d: Dictionary) -> bool: return d["entity"] == player and d["source"] == robber):
+			struck_at = World.tick
+			break
+	_check(not ran and struck_at >= 0, "hurt with no mate left, it never runs: it fights (struck %s)" % [struck_at >= 0])
 
 
 ## Skeech chooses his told strike (790 amended (4), enemy-ai's side): once a
@@ -2952,8 +3063,8 @@ func _test_band_stands() -> void:
 	rest[0].hp = rest[0].max_hp / 2  # Under a coward's FLEE_BELOW: it breaks, crying a rout.
 	for i in 10:
 		World.step()
-	_check(rest.all(func(r: Monster) -> bool: return r.alert == Monster.Alert.FLEEING),
-			"one of them hurt: it breaks, and its rout breaks the other (%s)" % [rest.map(func(r: Monster) -> String: return Monster.Alert.keys()[r.alert])])
+	_check(rest[0].alert == Monster.Alert.FLEEING and rest[0]._ran_to_call and rest[1].alert == Monster.Alert.FIGHTING,
+			"one of them hurt: it runs to call, no rout, and the other fights on (806 amended (9); %s)" % [rest.map(func(r: Monster) -> String: return Monster.Alert.keys()[r.alert])])
 	# A pair is no band (band_min 3): it holds back as before 698.
 	e = _build(["##################", "#................#", "#.........x......#", "#......P.........#",
 		"#......P.........#", "#..........x.....#", "#................#", "##################"])

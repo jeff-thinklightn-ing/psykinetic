@@ -210,6 +210,17 @@ const STANDOFF_TICKS := 50
 ## the same goal again (perf's heat run: failed plans, 0.74 ms a tick on castle
 ## 256, most of them the same goal tick after tick).
 const IDLE_PLAN_RETRY_TICKS := 10
+## A band fighter (a row's "band_fights", 806 amended (9); the robbers, Jeff:
+## "fighting the robbers is not great right now"): hurt to its flee_below, it
+## runs only to call its band, CALL_RUN_TICKS, toward its nearest mate, then
+## comes back and fights to the end; with no mate left it never runs. Alone
+## it never holds back, and it circles to a flank only while a mate is beside
+## its target.
+const CALL_RUN_TICKS := 20
+## FLANK's lean (806 amended (9)): a cell round the back whose walk is more
+## than this many steps longer than straight (round a sarcophagus) is not
+## worth it; the nearest free cell instead.
+const FLANK_DETOUR := 3
 const GUARD_REACH := 4
 const WATCH_TICKS := 600
 const WATCH_ROUSE := 2
@@ -440,6 +451,14 @@ var _roused_until := -1
 ## armed while it lurks, spent on its first blow from behind or side-on
 ## after (begin_ambush, else the plain blow).
 var _ambush_armed := true
+## 806 amended (9): its row's "band_fights"; whether it has run to call its
+## band this fight (once: then it fights on), and whom it comes back to.
+var band_fights := false
+var _ran_to_call := false
+var _rally: GridEntity = null
+var _call_to := NO_TILE
+## FLANK's lean checked by its path (806 amended (9)): [from, to, ok].
+var _detour_mark: Array = []
 ## Decision 799, enemy-ai's side: the truce camp whose band it is ("" none;
 ## "?" not yet looked up). A camp place with "truce" (maps' level.json; the
 ## Toll Camp) keeps a truce with players: its band, of the holder's side and
@@ -679,6 +698,7 @@ func _ready() -> void:
 		bound = bool(row.get("bound", false))
 		fearless = bool(row.get("fearless", false))
 		never_lies = bool(row.get("never_lies", false))
+		band_fights = bool(row.get("band_fights", false))
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
 		var props: Variant = spawn_spec.get("props", {})
 		keeps_room = bool(row.get("keeps_room", false)) or props is Dictionary and bool(props.get("keeps_room", false))
@@ -1006,6 +1026,7 @@ func _sim_tick() -> void:
 			if not _hunt(target):
 				# The fight is over: back to where it idles, then on as before.
 				_returning = idle != Idle.NONE
+				_ran_to_call = false  # The fight over: next time it may run to call again.
 				if alert == Alert.FIGHTING:
 					alert = Alert.IDLE
 			_idle_goal = NO_TILE
@@ -1038,8 +1059,7 @@ func _sim_tick() -> void:
 	if _wary:
 		if took_up and temper != Temper.BOLD:
 			_call_for_help()
-		if _should_flee():
-			_flee(target.tile)
+		if _should_flee() and _breaks():
 			return
 	if took_up:
 		_pressing = false
@@ -1088,7 +1108,7 @@ func _sim_tick() -> void:
 			return  # Its guard opened: the blows next.
 		if not can_strike:
 			return
-		if tactic == Tactic.FLANK and (_in_front() or not World.guarding(target, self).is_empty()) \
+		if tactic == Tactic.FLANK and _flanks_now() and (_in_front() or not World.guarding(target, self).is_empty()) \
 				and _front_ticks < flank_patience_ticks:
 			_front_ticks += 1
 			var round_to := _pick_slot()
@@ -1110,7 +1130,7 @@ func _sim_tick() -> void:
 		return  # Bare-handed: the weapon at its feet first.
 	if not _pressing and (boldness < HOLD_BACK_BELOW or _dreads_target()) \
 			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
-			and not _band_holds():
+			and not _band_holds() and (not band_fights or _mate_near()):
 		_standing_off()
 		return  # Waits for the others; a band that outnumbers them goes in together.
 	if not _pressing and _rng.randf() < pause_chance:
@@ -1433,6 +1453,9 @@ func _pick_slot() -> Vector2i:
 	var facing := Vector2(target.facing).normalized()
 	var centre := World.body_centre(target)
 	var free := World.free_body(target)
+	var lean := tactic == Tactic.FLANK and _flanks_now()
+	var nearest := NO_TILE
+	var nearest_score := INF
 	var cells: Array[Vector2i] = []
 	if free:
 		cells = _strike_cells()  # Where it can strike a free body from (699).
@@ -1446,18 +1469,106 @@ func _pick_slot() -> Vector2i:
 		if occupant != null and occupant != self:
 			continue
 		var score := float(World.distance(tile, at))
-		if tactic == Tactic.FLANK:
-			score += 3.0 * (Vector2(at) - centre).normalized().dot(facing)
 		if at == tile or at == slot:
 			score -= 0.5
+		if score < nearest_score:
+			nearest = at
+			nearest_score = score
+		if lean:
+			score += 3.0 * (Vector2(at) - centre).normalized().dot(facing)
 		if score < best_score:
 			best = at
 			best_score = score
+	if lean and best != nearest and not _short_way(best):
+		best = nearest  # The way round is long (806 amended (9)): the nearest free cell.
 	if best != NO_TILE:
 		if not claims.has(best):
 			claims[best] = []
 		(claims[best] as Array).append(self)  # Seen by those picking after it this tick, once its slot is set.
 	return best
+
+
+## FLANK goes round only while it may (806 amended (9)): a band fighter only
+## while a mate of its side is beside its target; any other always.
+func _flanks_now() -> bool:
+	return not band_fights or _mate_at_target()
+
+
+## Whether its walk to [param to] is at most FLANK_DETOUR steps longer than
+## straight; worked out once for where it stands and the cell.
+func _short_way(to: Vector2i) -> bool:
+	if _detour_mark.size() == 3 and _detour_mark[0] == tile and _detour_mark[1] == to:
+		return _detour_mark[2]
+	var straight := World.distance(tile, to)
+	var ok := straight <= 1
+	if not ok:
+		var path := World.find_path(tile, to, false, null, (straight + FLANK_DETOUR) * 8, false, {}, opens_doors_now())
+		ok = not path.is_empty() and path.size() <= straight + FLANK_DETOUR
+	_detour_mark = [tile, to, ok]
+	return ok
+
+
+## Another of its side, spawned and not running, beside its target.
+func _mate_at_target() -> bool:
+	if target == null:
+		return false
+	for direction in World.DIRECTIONS:
+		var other := World.get_entity_at(target.tile + direction) as Monster
+		if other != null and other != self and other.spawned and other.alert != Alert.FLEEING \
+				and other.tile == target.tile + direction and _same_side(other):
+			return true
+	return false
+
+
+## Another of its side who could join it (806 amended (9)): spawned, alive,
+## not running, within its call's reach or after the same target.
+func _mate_near() -> bool:
+	for entity in World.monsters():
+		var other := entity as Monster
+		if other != null and other != self and other.spawned and other.hp > 0 and other.alert != Alert.FLEEING \
+				and _same_side(other) and (World.distance(tile, other.tile) <= call_reach or target != null and other.target == target):
+			return true
+	return false
+
+
+## The nearest living mate of its side in the zone, not running; null for none.
+func _nearest_mate() -> Monster:
+	var best: Monster = null
+	var best_d := INF
+	for entity in World.monsters():
+		var other := entity as Monster
+		if other == null or other == self or not other.spawned or other.hp <= 0 or other.alert == Alert.FLEEING \
+				or not _same_side(other):
+			continue
+		var d := float(World.distance(tile, other.tile))
+		if d < best_d:
+			best = other
+			best_d = d
+	return best
+
+
+## It would break (_should_flee): true when it does. A band fighter runs only
+## to call its band, once a fight, toward its nearest mate, and comes back
+## (_flee_tick); with no mate left, or once run, it fights on.
+func _breaks() -> bool:
+	if not band_fights:
+		_flee(target.tile)
+		return true
+	if _ran_to_call:
+		return false
+	var mate := _nearest_mate()
+	if mate == null:
+		return false
+	_ran_to_call = true
+	_called_tick = -100000
+	_call_for_help()
+	var rally := target
+	_flee(target.tile, false)
+	_way_out = NO_TILE  # Not out of the level: to its mate, and back.
+	_rally = rally
+	_call_to = mate.tile
+	_alert_until = World.tick + CALL_RUN_TICKS
+	return true
 
 
 ## FLANK: beside its target's front (where it faces, or either side of it).
@@ -2276,7 +2387,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"picks_up": bool(row.get("picks_up", false)), "bound": bool(row.get("bound", false)), "art": str(row.get("art", "")),
 			"lifts": row.get("lifts"),
 			"label": str(row.get("label", "")), "fearless": bool(row.get("fearless", false)),
-			"never_lies": bool(row.get("never_lies", false)), "boss": bool(row.get("boss", false)),
+			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "boss": bool(row.get("boss", false)),
 			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
@@ -2521,6 +2632,8 @@ func _flee(threat: Vector2i, routs := true) -> void:
 		_post = tile
 	alert = Alert.FLEEING
 	_flee_from = threat
+	_rally = null
+	_call_to = NO_TILE
 	_alert_until = World.tick + flee_ticks
 	target = null
 	slot = NO_TILE
@@ -2552,10 +2665,19 @@ func _flee_tick() -> void:
 		_escape_tick()
 		return
 	for entity in World.sought():
-		if World.distance(tile, entity.tile) <= flee_near_tiles:
+		if _rally == null and World.distance(tile, entity.tile) <= flee_near_tiles:
 			_alert_until = World.tick + flee_ticks
 			_flee_from = entity.tile
 			break
+	if World.tick >= _alert_until and _rally != null:
+		# Its band called (806 amended (9)): back at the one it ran from.
+		var back := _rally
+		_rally = null
+		_call_to = NO_TILE
+		alert = Alert.SUSPICIOUS
+		if is_instance_valid(back) and back.spawned:
+			_follow(back.tile, Alert.SUSPICIOUS, SUSPICIOUS_TICKS)
+		return
 	if World.tick >= _alert_until:
 		alert = Alert.SUSPICIOUS
 		_follow(tile, Alert.SUSPICIOUS, SUSPICIOUS_TICKS / 2)  # A look about, then back.
@@ -2631,6 +2753,9 @@ func _pick_way_out(foe: Vector2i) -> Vector2i:
 ## Where it runs to: its post if that is farther from the threat than it
 ## is, else the farthest walkable tile of a few straight away from it.
 func _flee_goal() -> Vector2i:
+	if _call_to != NO_TILE and _call_to != tile \
+			and World.distance(_call_to, _flee_from) >= World.distance(tile, _flee_from):
+		return _call_to  # Running to call its band (806 amended (9)): to its mate.
 	if _post != NO_TILE and _post != tile \
 			and World.distance(_post, _flee_from) > World.distance(tile, _flee_from) + 1:
 		return _post
@@ -2688,8 +2813,8 @@ func _heard_rout() -> bool:
 		return false
 	var since := _rout_tick
 	_rout_tick = int(senses.heard.back()["tick"])
-	if temper == Temper.BOLD:
-		return false
+	if temper == Temper.BOLD or band_fights:
+		return false  # A band fighter runs only to call (806 amended (9)).
 	for noise: Dictionary in senses.heard:
 		if int(noise["tick"]) <= since or noise["kind"] != &"rout":
 			continue

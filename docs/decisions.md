@@ -43422,6 +43422,31 @@ since the crypt and the new barrows are built under them.
 806 amended (6): the chapel yard's grate over the barrow's first hall (buildings). Above the first hall's light shaft at (46, 13) (806 amended (3)), the wilds chapel yard gets the grate the daylight comes through. Level.DECOR_KINDS gains "yard_grate" (flat, unfaced, 2 variants: art-kit's prop.yard_grate, 1 an iron drain grate set in four flags, 2 a cracked, sunk flag), drawn and never solid like all decor. levels/wilds "decor" holds it at (201, 202), variant 1, in the open behind the chapel. level_test: the grate there, under no building, with the barrow's skylight at (46, 13). Level data and the decor table; protocol unchanged; no bullet (806's bullets cover the shaft).
 806 amended (8): a lone guard never hangs (the coordinator's approval and its check; companions' find in playtest's barrow runs, voice9; release's label). A robber on a cache chest's post (806 amended (5)), its band dead, sat FIGHTING its target 4 minutes and more without a step or a blow: timid (boldness under HOLD_BACK_BELOW), it held back within HOLD_BACK_RANGE until another monster was at its target, which none would ever be. Monster's fight step now asks _standing_off where it stalls (holding back, no way in): stalled STANDOFF_TICKS (50, 5 s) since it last stepped or struck (or raised or lowered a stance), it chooses. A guard (Idle.GUARD with a home) whose target is within GUARD_REACH (4) of its post, with a way to it, presses in (_pressing: no holding back or pausing that fight), so it fights for its chest, and after the fight walks back to its post as before. Otherwise it watches (_watch): lets that one be WATCH_TICKS (60 s), back to its post (a guard) or where it idles, and a guard at its post faces the one it watches while in its sight with a clear line (_watched_one); a blow rouses it, as does the watched one within WATCH_ROUSE (2) of its post (its own cell, not a guard), so one it can't reach doesn't flip it back to the same hang. Not touched: lurkers (not fighting while they lurk), the laid dead (547), a told move or windup (no stall point), a band that holds. monster_test _test_lone_guard (the real robber kind on guard, timid: a player 3 from its post, it presses in and strikes; the player gone, back at its post; sealed off by crates, it stops within 6 s and watches from its post facing them; a blow rouses it; watched, 8 and 4 from its post let be, 2 taken up). Server only; protocol unchanged; no new class_name.
 
+806 amended (9): the crypt's robbers fight right (2026-11-06, release's label; the coordinator's
+approval; Jeff: "fighting the robbers is not great right now", "robbers specifically they just run
+around"; combat's read). Package "crypt robbers fight right", with combat's told lunge (790 amended
+(4)). A monsters.json row's "band_fights" (the robber's; Monster.band_fights), and the robber's
+temperament bold 1, cautious 2, cowardly 0 (was 0, 2, 1). A band fighter:
+- runs only to call its band: at its flee_below it runs (Monster._breaks) only with a living mate of
+  its side in the zone (_nearest_mate), crying "call" (never "rout"), CALL_RUN_TICKS (2 s) toward
+  that mate and not out of the level, then follows the one it ran from (SUSPICIOUS) and fights on;
+  once a fight (_ran_to_call, cleared when the fight is over). With no mate left it never runs. It
+  never breaks on a rout heard.
+- holds back (HOLD_BACK_BELOW, dread) only while a mate could join it (_mate_near: within its call's
+  reach, or after the same target). Alone it comes in; 806 amended (8)'s standoff clock stays for the
+  stalls with no way in.
+- goes round to a flank (FLANK's front patience and its slot lean) only while a mate of its side is
+  beside its target (_flanks_now, _mate_at_target); alone it takes the nearest cell and strikes from
+  the front.
+For every FLANK kind, the lean's pick is checked by its path (_short_way, once per cell and where it
+stands): a walk more than FLANK_DETOUR (3) steps longer than straight (round a sarcophagus) gives the
+nearest free cell instead. The sneak and the bandit keep their ways but for that. monster_test
+_test_band_robbers with the real robber kind (alone straight in from the front; a crypt's
+sarcophagi refusing the long way round, the open room taking the back with a mate in front; hurt with
+a mate, running to call and back, once; hurt and alone, fighting); the band test's rout now runs to
+call while the other fights on; the lone guard's first case comes straight in. Server only, protocol
+unchanged, no new class_name.
+
 ## 808. A dungeon's chests: each a find of its own, per player and per generation
 
 Jeff, 2026-11-04: "all chests in the game should have some item in them, if theres no item to put
