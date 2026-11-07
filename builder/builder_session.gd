@@ -409,7 +409,7 @@ The grid shows the area and a margin round it, one character a cell (the margin 
 %s
 Each row starts with its y; the first line says the x of the first column. Walls and doors are listed after the grid by the cell and its side.
 
-Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
+Monsters idle until someone comes: guard (stands, glances about), wander (strolls near its cell, a radius), patrol (walks a route of cells, round or back and forth), gather (stands or sits round a point, such as a fire: every monster gathering at one cell is one group), none. Without one, a monster idles as its kind does (said above). Wild animals are of no faction: goblins leave them be, and they keep to their herd (grazing as they stroll), so put two to six of a herd together on open ground, never in a camp. Chests hold item ids; the items there are: %s. A chest of loot goes only in a dungeon (a level below ground, or one that regenerates) and always holds something: items or a loot table; outside a dungeon a chest is only a town store's depot or a shop counter (use). A loot table (place's loot, for a chest or a monster) is rolled as the level is built, the same every time; the tables and what each can give: %s.
 
 Running water is a stream: the stream tool lays its course, from where it rises to where it goes. Give it a ford or a bridge wherever a path meets it, or the far bank is cut off; a bridge needs level banks of floor at both ends.
 
@@ -1938,6 +1938,10 @@ func _place(given: Dictionary) -> Dictionary:
 		if not Items.has_loot(table):
 			return _no("no loot table %s (there are: %s)" % [table, ", ".join(Items.loot_tables().keys())])
 		entry["loot"] = table
+	if meaning == "chest" and not given.has("use"):
+		var wrong := chest_problem(working.config, entry)
+		if not wrong.is_empty():
+			return _no(wrong)
 	var changes := {"cells": {at: meaning}, "covers": [at]}
 	if entry.size() > 1:
 		changes["entries"] = [entry]
@@ -1947,6 +1951,27 @@ func _place(given: Dictionary) -> Dictionary:
 		legend[meaning] = "#" + kind_colour(meaning, working.map.colours.values()).to_html(false)
 		changes["config"] = {"legend": legend}
 	return _lay(changes, "placed %s at %s" % [thing, at])
+
+
+## Whether level.json [param config] is a dungeon's (Jeff's chest rule, 806):
+## dungeon's own test, a depth below ground or a regenerate block.
+static func is_dungeon(config: Dictionary) -> bool:
+	return int(config.get("depth", 0)) > 0 or config.get("regenerate") is Dictionary
+
+
+## Why a loot chest [param entry] can't go in the level [param config] is
+## for, or "" (Jeff's chest rule, 806): only in a dungeon, and never empty:
+## items, a loot table of its own, or the level's chest loot. A depot's or a
+## shop counter's chest (a use) is spared.
+static func chest_problem(config: Dictionary, entry: Dictionary) -> String:
+	if not is_dungeon(config):
+		return "a chest of loot goes only in a dungeon (a level below ground or one that regenerates); here a chest is a town store's depot or a shop counter (use)"
+	var slots: Array = entry.get("props", {}).get("slots", []) if entry.get("props") is Dictionary else []
+	var level_loot: Variant = config.get("loot")
+	if slots.any(func(id: Variant) -> bool: return id != null and str(id) != "") or entry.has("loot") \
+			or (level_loot is Dictionary and level_loot.has("chest")):
+		return ""
+	return "a chest must hold something: give it items or a loot table"
 
 
 ## [param changes] with its stairs made slopes when [param given] asks

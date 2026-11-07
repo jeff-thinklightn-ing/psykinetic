@@ -3261,7 +3261,7 @@ func _test_loot() -> void:
 	for y in 12:
 		for x in 12:
 			doc.map.set_cell(Vector2i(x, y), "grass")
-	doc.config = {"name": "Loot Test", "outdoor": true}
+	doc.config = {"name": "Loot Test", "outdoor": true, "depth": 1}  # a loot chest only in a dungeon (807 amended (4))
 	var session := BuilderSession.new(doc, Rect2i(1, 1, 10, 10), "loot_test", StubClaude.new())
 	_check(session.run_tool("place", {"at": [3, 3], "thing": "chest", "loot": "supplies"})["ok"]
 			and session.run_tool("place", {"at": [5, 5], "thing": "imp", "loot": "pockets"})["ok"], "the builder places a chest and an imp, each with a table")

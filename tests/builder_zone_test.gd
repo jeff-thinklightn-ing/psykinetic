@@ -78,7 +78,7 @@ func _test_ask_and_accept() -> void:
 	_check(FileAccess.file_exists(OVERLAY + "test_room/level.json"), "level.json too: the overlay is a whole level")
 	var level := Level.load_level("test_room")
 	var chests: Array = level["entities"].filter(func(spec: Dictionary) -> bool: return spec["tile"] == chest)
-	_check(chests.size() == 1 and chests[0]["props"]["slots"][0] == "bandaging_kit", "the game reads the chest from it, a kit inside")
+	_check(chests.size() == 1 and chests[0]["props"].get("shop", false), "the game reads the chest from it, a shop counter's (the test room is no dungeon: 807 amended (4))")
 	var was := World.enter_named("test_room")
 	var live := World.get_entities().filter(func(entity: GridEntity) -> bool: return entity is Chest and entity.tile == chest)
 	World.enter(was)

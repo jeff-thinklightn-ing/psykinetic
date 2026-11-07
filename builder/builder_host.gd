@@ -115,7 +115,7 @@ func _ask(peer: int, player_id: String, zone_name: String, args: Dictionary) -> 
 		_reply(peer, {"state": "error", "error": "still working on the last request"})
 		return
 	if session == null or session.area != area or _session_zone.get(peer, "") != zone_name or session.doc != doc:
-		session = BuilderSession.new(doc, area, zone_name, (StubClaude.new(test_turns) if not test_turns.is_empty() else _stub_for(area, text, doc.map.size)) if Net.builder_stub else claude)
+		session = BuilderSession.new(doc, area, zone_name, (StubClaude.new(test_turns) if not test_turns.is_empty() else _stub_for(area, text, doc.map.size, BuilderSession.is_dungeon(doc.config))) if Net.builder_stub else claude)
 		session.model = Net.builder_model
 		session.effort = Net.builder_effort
 		session.max_cost = Net.builder_max_cost
@@ -328,7 +328,7 @@ static func register_terrain(data: Dictionary) -> bool:
 ## The stub's script for an area: a patch of dirt in its middle third, a
 ## chest and a torch on it; or, asked for a "new area" with the area on the
 ## edge of a map [param size] across, a new level beyond that edge.
-static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO) -> StubClaude:
+static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO, dungeon := false) -> StubClaude:
 	if text.to_lower().begins_with("new area"):
 		var sides := {"north": area.position.y == 0, "east": area.end.x == size.x, "south": area.end.y == size.y, "west": area.position.x == 0}
 		for side: String in sides:
@@ -337,12 +337,15 @@ static func _stub_for(area: Rect2i, text := "", size := Vector2i.ZERO) -> StubCl
 					"(Stub) A new level beyond the %s edge." % side])
 	var middle := Rect2i(area.position + area.size / 3, (area.size / 3).max(Vector2i.ONE))
 	var centre := middle.position + middle.size / 2
-	return StubClaude.new([
-		[{"name": "paint", "input": {"ground": "dirt", "rects": [{"x": middle.position.x, "y": middle.position.y, "w": middle.size.x, "h": middle.size.y}]}},
-			{"name": "place", "input": {"at": [centre.x, centre.y], "thing": "chest", "items": ["bandaging_kit"]}},
-			{"name": "place", "input": {"at": [middle.position.x, middle.position.y], "thing": "torch"}}],
-		"(Stub) A patch of dirt with a chest and a torch.",
-	])
+	# Jeff's chest rules (807 amended (4), 806 amended (7)): a chest of things
+	# only in a dungeon, with a guard by it; elsewhere a shop counter's.
+	var calls: Array = [{"name": "paint", "input": {"ground": "dirt", "rects": [{"x": middle.position.x, "y": middle.position.y, "w": middle.size.x, "h": middle.size.y}]}},
+		{"name": "place", "input": {"at": [centre.x, centre.y], "thing": "chest", "items": ["bandaging_kit"]} if dungeon \
+			else {"at": [centre.x, centre.y], "thing": "chest", "use": "shop"}},
+		{"name": "place", "input": {"at": [middle.position.x, middle.position.y], "thing": "torch"}}]
+	if dungeon:
+		calls.append({"name": "place", "input": {"at": [middle.end.x - 1, middle.end.y - 1], "thing": "imp", "idle": {"mode": "guard"}}})
+	return StubClaude.new([calls, "(Stub) A patch of dirt with a chest and a torch."])
 
 
 ## Removes level [param level_name]'s files from the overlay.

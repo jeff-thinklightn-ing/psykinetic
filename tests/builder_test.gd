@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_narrow_ways()
 	_test_new_kinds()
 	_test_umbrage_kinds()
+	_test_chest_rule()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -183,8 +184,9 @@ func _test_heights() -> void:
 	print("
 == heights: a hill, a chest cut off on it and told, stairs up to it, the ghost and the save ==")
 	var doc := _doc()
+	doc.config["depth"] = 1  # a loot chest goes only in a dungeon (806)
 	var stub := StubClaude.new([
-		[{"name": "place", "input": {"at": [14, 12], "thing": "chest"}},
+		[{"name": "place", "input": {"at": [14, 12], "thing": "chest", "loot": "supplies"}},
 			{"name": "hill", "input": {"at": [14, 12], "radius": 4, "top": 2}},
 			{"name": "stairs", "input": {"at": [14, 17], "up": "north"}},
 			{"name": "stairs", "input": {"at": [14, 15], "up": "north"}},
@@ -273,6 +275,7 @@ func _test_prompt() -> void:
 func _test_session() -> void:
 	print("\n== a request: tool calls on a working copy, the proposal, accept ==")
 	var doc := _doc()
+	doc.config["depth"] = 1  # a loot chest goes only in a dungeon (806)
 	var stub := StubClaude.new([
 		[{"name": "pond", "input": {"rect": {"x": 6, "y": 6, "w": 6, "h": 5}, "seed": 3}},
 			{"name": "place", "input": {"at": [14, 12], "thing": "chest", "items": ["bandaging_kit"]}}],
@@ -456,6 +459,7 @@ func _test_loot() -> void:
 	_check("supplies (" in line and "ration" in line.get_slice("supplies (", 1).get_slice(")", 0), "the prompt lists each table with its items (%s)" % line)
 	_check(line in BuilderSession.system_prompt(), "in the system prompt")
 	var doc := _doc()
+	doc.config["depth"] = 1  # a loot chest goes only in a dungeon (806)
 	var stub := StubClaude.new([
 		[{"name": "place", "input": {"at": [10, 10], "thing": "chest", "loot": "supplies"}},
 			{"name": "place", "input": {"at": [11, 10], "thing": "chest", "loot": "treasure"}},
@@ -533,9 +537,10 @@ func _test_kind_building() -> void:
 func _test_slopes() -> void:
 	print("\n== slopes and rock (510 amended, maps' 513) ==")
 	var doc := _doc()
+	doc.config["depth"] = 1  # a loot chest goes only in a dungeon (806)
 	var stub := StubClaude.new([
 		[{"name": "height", "input": {"change": "set", "level": 2, "rects": [{"x": 5, "y": 5, "w": 12, "h": 3}]}},
-			{"name": "place", "input": {"at": [8, 6], "thing": "chest"}},
+			{"name": "place", "input": {"at": [8, 6], "thing": "chest", "loot": "supplies"}},
 			{"name": "stairs", "input": {"at": [10, 8], "up": "north", "slope": true}},
 			{"name": "paint", "input": {"ground": "rock", "cells": [[14, 12]]}}],
 		"A bank with a ramp.",
@@ -1049,3 +1054,28 @@ func _test_umbrage_kinds() -> void:
 	var kinds: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "building")[0]["input_schema"]["properties"]["kind"]["enum"]
 	var inns := (config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "inn")
 	_check(not inns.is_empty() and "inn" in kinds, "the building tool offers the inn's kind (%d in the wilds)" % inns.size())
+
+
+## Jeff's chest rule (806) in builder mode: a chest of loot only in a dungeon,
+## never empty; a town's depot or shop counter spared.
+func _test_chest_rule() -> void:
+	print("
+== 807 amended (4): a chest of loot only in a dungeon, and never empty ==")
+	var doc := _doc()
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var out := session.run_tool("place", {"at": [10, 10], "thing": "chest", "loot": "supplies"})
+	_check(not out.get("ok", true) and "only in a dungeon" in str(out.get("text")) and session.working.map.cell(Vector2i(10, 10)) == "grass",
+		"a chest of loot outdoors: refused (%s)" % out)
+	_check(session.run_tool("place", {"at": [11, 10], "thing": "chest", "use": "shop"}).get("ok", false), "a shop counter's chest outdoors: placed")
+	_check(session.run_tool("place", {"at": [12, 10], "thing": "chest", "use": "depot"}).get("ok", false), "a depot's chest outdoors: placed")
+	session.working.config["depth"] = 1
+	var empty := session.run_tool("place", {"at": [13, 10], "thing": "chest"})
+	_check(not empty.get("ok", true) and "hold something" in str(empty.get("text")), "an empty chest in a dungeon: refused (%s)" % empty)
+	_check(session.run_tool("place", {"at": [13, 10], "thing": "chest", "loot": "supplies"}).get("ok", false), "a chest with a loot table in a dungeon: placed")
+	_check(session.run_tool("place", {"at": [14, 10], "thing": "chest", "items": ["ration"]}).get("ok", false), "a chest with items in a dungeon: placed")
+	session.working.config.erase("depth")
+	session.working.config["regenerate"] = {}
+	session.working.config["loot"] = {"chest": "supplies"}
+	_check(session.run_tool("place", {"at": [15, 10], "thing": "chest"}).get("ok", false), "a regenerated level's chest with the level's chest loot: placed")
+	_check(BuilderSession.is_dungeon({"depth": 2}) and not BuilderSession.is_dungeon({"outdoor": true}), "a dungeon: below ground or regenerated")
+	_check("only in a dungeon" in BuilderSession.system_prompt(), "the prompt says the rule")
