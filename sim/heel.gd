@@ -70,6 +70,13 @@ const FAR := 12
 ## A failed search is not asked again for this long while neither the
 ## body nor its goal has moved (704).
 const NO_ROUTE_TICKS := 20
+## The cells step's search closes at most (818 amended, perf's bound for
+## residents applied to her): unbounded, a goal walled off from her searched
+## the whole zone (about 1.5 s on the wilds) before giving up. Sized from her
+## walks across whole maps (path_bound_test _test_companion_walks): the
+## winding wilds and hills need up to 24000 for their longest (over 120 cells
+## apart), Umbrage, the forest and the foothills 8000, the castle 2000.
+const STEP_SEARCH_TILES := 24000
 ## Kept routes by body (instance id): {goal, at, path (the cells still to
 ## walk)}; failed searches: {from, goal, until}.
 static var _routes := {}
@@ -375,7 +382,7 @@ static func step(body: GridEntity, goal: Vector2i, occupied_goal_ok: bool, leade
 		path.assign(route["path"])
 	else:
 		searches += 1
-		path = World.find_path(body.tile, goal, occupied_goal_ok, null, 0, false, {}, true, World.PATH_FIRE_AVOID)  # Off fire (707).
+		path = World.find_path(body.tile, goal, occupied_goal_ok, null, STEP_SEARCH_TILES, false, {}, true, World.PATH_FIRE_AVOID)  # Off fire (707); bounded (818 amended).
 		if path.is_empty():
 			_failed[id] = {"from": body.tile, "goal": goal, "until": World.tick + NO_ROUTE_TICKS}
 			_routes.erase(id)

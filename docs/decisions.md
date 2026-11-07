@@ -44537,3 +44537,23 @@ package rule wants a buyer the player can reach. The first piece of makers takin
 - ui's side: the Give window's "For F" line with no counts when a row's need is 0.
 - Protocol 52 ("## 52 (821)"): a takes row that was a gift is now a sale, and "takers" carries
   "trophies". economy_test _test_trophies.
+
+818 amended: a companion's way is bounded too (perf's ask through the coordinator; release's
+label). Heel.step's World.find_path (her every walk to a goal: following, catching up, errands,
+guide's steps) looks at Heel.STEP_SEARCH_TILES (24000) tiles at most, and so do guide.gd's
+_walk_of fallback and her errand's look for a door's side (Companion._errand_walk). Unbounded, a
+goal walled off from her (a crowd round her player, a door shut) closed every reachable cell of the
+zone before giving up: 926 ms on the wilds in path_bound_test, 77 ms bounded. Not found within it,
+she waits NO_ROUTE_TICKS as for no way (704), as before. 24000, not residents' 16000: her player can
+call her from across the whole map, not a town's 60 cells. path_bound_test pairs cells beside walls
+and doors with cells anywhere on the map, with heel's own arguments (a goal she may stand on, off
+fire); measured, the most tiles a found way needed: the wilds 24000 (16000 within 120 cells; 6 of
+795 walks needed more, all 130 to 180 cells apart), the hills 24000 (12 of 789, 160 to 190 apart),
+Umbrage (held) 8000, the forest 8000, the foothills 8000, the castle 2000. bodies_within stays 0
+for her: the bodies near her goal are her player's company, and her kept route (704) and pulled
+line (678) already walk round what moves. Tests: path_bound_test's _test_companion_walks (the
+wilds, the hills and Umbrage: every way across the map the unbounded search finds, the bounded one
+finds; every other cell beside a wall, 133, 132 and 136 walks, the farthest 212 cells off, none
+missed, about 10 s with the next) and _test_walled_off (a goal
+ringed by bodies: no way either way, both times printed). Server only, protocol unchanged, no new
+class_name.

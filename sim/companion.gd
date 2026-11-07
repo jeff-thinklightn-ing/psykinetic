@@ -6821,12 +6821,12 @@ func _errand_walk() -> bool:
 			for side in sides:
 				if World.tick < int(_errand_no_way.get(side, 0)):
 					later.append(side)
-				elif not World.find_path(tile, side).is_empty():
+				elif not World.find_path(tile, side, false, null, Heel.STEP_SEARCH_TILES).is_empty():
 					return _step_toward(side, false)
 				else:
 					_errand_no_way[side] = World.tick + ERRAND_RETRY_TICKS
 			for side in later:
-				if not World.find_path(tile, side).is_empty():
+				if not World.find_path(tile, side, false, null, Heel.STEP_SEARCH_TILES).is_empty():
 					return _step_toward(side, false)
 			return false
 		"open_chest", "fetch":

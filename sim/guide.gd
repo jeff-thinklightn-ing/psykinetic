@@ -480,7 +480,7 @@ func _walk_of(routes: WorldRoutes, leg: Dictionary) -> Array[Vector2i]:
 	if routes.has_method("leg_cells"):
 		cells.assign(routes.call("leg_cells", leg))
 	else:
-		cells.assign(World.find_path(pet.tile, leg["to"], true, null, 0, false, {}, true, World.PATH_FIRE_AVOID))  # Off fire (707).
+		cells.assign(World.find_path(pet.tile, leg["to"], true, null, Heel.STEP_SEARCH_TILES, false, {}, true, World.PATH_FIRE_AVOID))  # Off fire (707); bounded (818 amended).
 	var here := cells.find(pet.tile)
 	return cells.slice(here + 1) if here != -1 else cells
 

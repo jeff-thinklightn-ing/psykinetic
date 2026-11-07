@@ -10,6 +10,9 @@ extends Node
 ## town soak's 1.3 s tick) finds every walk of a town's size the unbounded
 ## search does, on the wilds, the hills and Umbrage (held); and bodies past
 ## Resident.RESIDENT_BODIES_WITHIN of it are planned through.
+## A companion's way (Heel.STEP_SEARCH_TILES, 818 amended) finds every walk
+## across the whole map the unbounded search does, on the wilds, the hills and
+## Umbrage, and a walled-off goal is given up at that bound.
 ## Run it with tests/run.ps1 or tests/run.sh.
 
 const FROM_CELLS := 250
@@ -37,6 +40,11 @@ func _ready() -> void:
 		World.enter_named(map)
 		_test_resident_walks(map)
 	_test_far_crowd()
+	for map in ["wilds", "hills", "held"]:
+		_main.load_map(map)
+		World.enter_named(map)
+		_test_companion_walks(map)
+	_test_walled_off()
 	print("RESULT: %s" % ("PASS" if _failures == 0 else "FAIL (%d)" % _failures))
 	get_tree().quit(0 if _failures == 0 else 1)
 
@@ -198,3 +206,78 @@ func _test_far_crowd() -> void:
 		for dx in range(-1, 2):
 			World._occupancy.erase(from + Vector2i(dx, dy))
 	body.free()
+
+
+## A companion's bounded way against the unbounded one (818 amended): from
+## cells beside walls and doors to cells anywhere on the map (her player can
+## call her from across it), every way the unbounded search finds, the bounded
+## one finds too, with heel's own arguments (a goal she may stand on, off fire).
+func _test_companion_walks(map: String) -> void:
+	print("== %s: her bounded way finds every walk across the map ==" % map)
+	var cells: Array[Vector2i] = []
+	for cell in World.floor_cells():
+		if World.is_walkable(cell):
+			cells.append(cell)
+	cells.sort()
+	var froms := _walled_cells()
+	var asked := 0
+	var missed := 0
+	var longest := 0
+	var farthest := 0
+	# Every other cell beside a wall (about 150 walks a map: the suite's
+	# scenes run at once, the longest setting its time; release).
+	for i in range(0, froms.size(), 2):
+		var from: Vector2i = froms[i]
+		var to: Vector2i = cells[(i * 97 + 113 * 1009) % cells.size()]
+		if to == from:
+			continue
+		var open := World.find_path(from, to, true, null, 0, false, {}, true, World.PATH_FIRE_AVOID)
+		if open.is_empty():
+			continue
+		asked += 1
+		longest = maxi(longest, open.size())
+		farthest = maxi(farthest, World.distance(from, to))
+		if World.find_path(from, to, true, null, Heel.STEP_SEARCH_TILES, false, {}, true, World.PATH_FIRE_AVOID).is_empty():
+			missed += 1
+			if missed <= 3:
+				print("    %s to %s: %d steps unbounded, none bounded" % [from, to, open.size()])
+	_check(asked >= 100 and farthest >= 150 and missed == 0, "%d walks found (the farthest %d cells off, the longest %d steps), %d missed at %d tiles" % [
+		asked, farthest, longest, missed, Heel.STEP_SEARCH_TILES])
+
+
+## A goal walled off on the wilds: her bounded search gives up having closed
+## its bound, where the unbounded one searched the zone (the time is printed,
+## not checked: the machine is shared).
+func _test_walled_off() -> void:
+	print("== a walled-off goal: given up at her bound ==")
+	_main.load_map("wilds")
+	World.enter_named("wilds")
+	var from := Vector2i.ZERO
+	var goal := Vector2i.ZERO
+	for cell in World.floor_cells():
+		if World.is_walkable(cell) and World.distance(cell, Vector2i(128, 128)) < 40 and not World._occupancy.has(cell):
+			from = cell
+			break
+	for cell in World.floor_cells():
+		if World.is_walkable(cell) and World.distance(cell, from) > 60 and not World._occupancy.has(cell):
+			goal = cell
+			break
+	var body := GridEntity.new()
+	var ring: Array[Vector2i] = []
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var at := goal + Vector2i(dx, dy)
+			if (dx != 0 or dy != 0) and not World._occupancy.has(at):
+				ring.append(at)
+	for cell in ring:
+		World._occupancy[cell] = body
+	var t0 := Time.get_ticks_usec()
+	var open := World.find_path(from, goal, true, null, 0, false, {}, true, World.PATH_FIRE_AVOID)
+	var t1 := Time.get_ticks_usec()
+	var bounded := World.find_path(from, goal, true, null, Heel.STEP_SEARCH_TILES, false, {}, true, World.PATH_FIRE_AVOID)
+	var t2 := Time.get_ticks_usec()
+	for cell in ring:
+		World._occupancy.erase(cell)
+	body.free()
+	_check(open.is_empty() and bounded.is_empty(), "%s to %s ringed by bodies: no way either way (unbounded %d ms, bounded %d ms)" % [
+		from, goal, (t1 - t0) / 1000, (t2 - t1) / 1000])
