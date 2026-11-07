@@ -43961,6 +43961,18 @@ changes in game. Stills: C:/dev/review/lands/hollowfell_mouth (a: the bare stair
 view_test _test_mine_mouth: on the maps as a way down; on the link's cell, dressed; its arch open and squared to the
 black; two frames, the rails to a buffer and a cart, the stair inside, a fire's light. No bullet here (maps' data
 commit carries the one players see). Client and Level's cue list only, protocol unchanged, no new class_name.
+798 amended (3), maps' side: the mine mouth's data in make_hills (2026-11-07, release's label; terrain's cells).
+HOLLOWFELL gains "cue": "mine", written on its link at (167, 58). MINE_ROCK, x 168..172 y 55..61 behind the
+link, is made rock after the lay (_mine_rock), not before it: rock laid first reshaped the ground round it,
+the slope east of the face lifted flat to the plateau's top and the mouth left in a slot (terrain's stills).
+The fords' limits and _soften still count its cells as ground, so the slope eases through them as before;
+after _soften, _mine_bank raises each of MINE_BANK's 49 cells [x, y, m] (terrain's, the rock 8.0 to 9.6 m
+eastward and the grass round it falling no faster than 0.42 a cell), never lowering one. The hills laid
+again: the relief differs from before only in those 49 cells, the layout only in the 35 rock cells off the
+floor, and level.json in the link's cue and one short traced ledge piece at x 170.5 by the block's north
+side (terrain's stills may take the block's north and south pieces off in a follow-up).
+level_test: the link's cue as written (from the file, Level keeping a cue only once it knows it), the rock no
+floor, every bank cell at least terrain's height. The one bullet. Level data; protocol unchanged.
 
 798 amended (4): the rock shelter (2026-11-07; Jeff's play in the hills: "i noticed the cave sign post in the hills, but
 i went toward the cave, got a wayfinder flag, but don't see a cave anywhere"; the coordinator's order and picks on the

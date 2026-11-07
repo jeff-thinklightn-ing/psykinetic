@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the hills, Hollowfell's way in is a timbered mine mouth cut into the hillside, with a cart and a brazier by it and the Blood Rot's mark, where before it was a bare stair (798 amended (3)).
 - Builder mode: a chest of loot goes only in a dungeon, never empty, with only a shop's or a store's chest elsewhere, and a change that would leave a room empty or a chest unguarded is refused (806 amended (7), 807 amended (4)).
 - You can fish the pond in the wilds from its south and west banks too, where the road comes in, where before they said nothing takes the line there (805).
 - The forest's camp traders buy from you now too, through Sell in the trading window: hides and pelts, tusks, antlers, claws, feathers and meat, as far as a purse that fills again every few days will stretch (799 amended (2)).

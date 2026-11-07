@@ -1012,6 +1012,23 @@ func _test_fill_hills_sights() -> void:
 		want["building.waystone"] = 1  # W4 waits on the hill cave's shelter (820's rule).
 	var short := want.keys().filter(func(slot: String) -> bool: return int(counts.get(slot, 0)) != int(want[slot]))
 	_check(short.is_empty(), "the sights stand: a watchtower, an oak, a stone, two milestones, a shrine, a stack, a blind, two waystones, a cairn, a grave, a lean-to (off: %s)" % [short])
+	# Hollowfell's mine mouth (798 amended (3), maps' side): its link's "mine" cue, the bank's rock
+	# behind it (no floor), and terrain's raised bank round it.
+	var MakeHills := preload("res://tools/make_hills.gd")
+	# From the file: Level keeps a cue only once it knows it (terrain's "mine", in its own landing).
+	var hills_json: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://levels/hills/level.json"))
+	var mine_link: Array = (hills_json["links"] as Array).filter(func(l: Dictionary) -> bool: return l["to_map"] == "hollowfell")
+	var mine_floor: Array = []
+	for y in range(55, 62):
+		for x in range(168, 173):
+			if Vector2i(x, y) in level["terrain"]["floor"]:
+				mine_floor.append(Vector2i(x, y))
+	var mine_relief: PackedFloat32Array = level["terrain"]["relief"]
+	var mine_size: Vector2i = level["terrain"]["relief_size"]
+	var low: Array = MakeHills.MINE_BANK.filter(func(row: Array) -> bool:
+		return Relief.at(mine_relief, mine_size, Vector2i(row[0], row[1])) < float(row[2]) - 0.05)
+	_check(mine_link.size() == 1 and str(mine_link[0].get("cue", "")) == "mine" and mine_floor.is_empty() and low.is_empty(),
+		"Hollowfell's mouth: the link's mine cue, its bank's rock no floor (%s), every bank cell at least terrain's height (%s)" % [mine_floor, low.slice(0, 3)])
 	var decor := {}
 	for piece: Dictionary in level["terrain"]["decor"]:
 		decor[piece["kind"]] = int(decor.get(piece["kind"], 0)) + 1

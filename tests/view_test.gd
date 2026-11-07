@@ -5020,7 +5020,15 @@ func _test_cave_mouth() -> void:
 			continue
 		var bear_points: PackedVector3Array = bear_body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
 		var to_frame := bear_holder.transform.affine_inverse()
+		# Its own throat's cells only: the hills' mine mouth (798 amended (3))
+		# has a throat of its own, under its own body.
+		var bear_ahead: Vector2i = cue["facing"]
+		var bear_across := Vector2i(-bear_ahead.y, bear_ahead.x)
 		for cell: Vector2i in _rig._throat_cells():
+			var deep := (cell - bear).x * bear_ahead.x + (cell - bear).y * bear_ahead.y
+			var side := (cell - bear).x * bear_across.x + (cell - bear).y * bear_across.y
+			if deep < 1 or deep > ceili(Client3D.MOUTH_THROAT) or absi(side) > ceili(Client3D.MOUTH_ARCH.x * 0.5 - 0.5):
+				continue
 			throat_count += 1
 			var over := to_frame * Vector3(cell.x, 0.0, cell.y)
 			var covered := false

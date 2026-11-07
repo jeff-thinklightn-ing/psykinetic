@@ -179,7 +179,25 @@ const CAMP_SIZE := 5
 ## the workings place between them, held by the goblins in it; the ground
 ## before it levelled (HOLLOWFELL_PAD).
 const HOLLOWFELL := {"at": Vector2i(167, 58), "open": Vector2i(-1, 0), "to_map": "hollowfell",
-	"place": "hollowfell", "name": "Hollowfell", "holder": "goblins"}
+	"place": "hollowfell", "name": "Hollowfell", "holder": "goblins", "cue": "mine"}
+## Hollowfell's mine mouth (798 amended (3), terrain's "mine" cue; the
+## coordinator: it reads from behind as a hillside): after the lay (main's
+## ground left as it is), the cells behind the link made rock (the adit's
+## bank stands on them, so they are no floor) and the ground round them
+## raised to terrain's bank, each cell [x, y, metres] only ever raised:
+## the rock 8.0 to 9.6 eastward, round it min(6.4 + 0.42 (x - 167), the
+## block less 0.42 a cell), so every walked step stays under WALK_RISE.
+const MINE_ROCK := Rect2i(168, 55, 5, 7)
+const MINE_BANK := [
+	[168, 55, 8.0], [168, 56, 8.0], [168, 57, 8.0], [168, 58, 8.0], [168, 59, 8.0], [168, 60, 8.0],
+	[168, 61, 8.0], [168, 62, 6.82], [169, 55, 9.2], [169, 56, 9.2], [169, 57, 9.2], [169, 58, 9.2],
+	[169, 59, 9.2], [169, 60, 9.2], [169, 61, 9.2], [169, 62, 7.24], [170, 55, 9.6], [170, 56, 9.6],
+	[170, 57, 9.6], [170, 58, 9.6], [170, 59, 9.6], [170, 60, 9.6], [170, 61, 9.6], [170, 62, 7.66],
+	[171, 54, 8.08], [171, 55, 9.6], [171, 56, 9.6], [171, 57, 9.6], [171, 58, 9.6], [171, 59, 9.6],
+	[171, 60, 9.6], [171, 61, 9.6], [171, 62, 8.08], [172, 54, 8.5], [172, 55, 9.3], [172, 56, 9.3],
+	[172, 57, 9.3], [172, 58, 9.3], [172, 59, 9.3], [172, 60, 9.3], [172, 61, 9.3], [172, 62, 8.5],
+	[173, 55, 8.88], [173, 56, 8.88], [173, 57, 8.88], [173, 58, 8.88], [173, 59, 8.88], [173, 60, 8.88],
+	[173, 61, 8.88]]
 const HOLLOWFELL_PAD := Rect2i(164, 56, 4, 5)
 ## The apex lairs' mouths here (enemy-ai's lair rule; the coordinator's
 ## fill_forest plan, phase B): each a link cell at "at" into its own small
@@ -392,6 +410,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	for at: Vector2i in laid["cells"]:
 		map.set_cell(at, laid["cells"][at])
 	_lair_ground()
+	_mine_rock()
 	# The river is its curve (decision 559): Level lays its cells and its
 	# "streams" path from it on load.
 	config["waters"] = laid["waters"].map(func(water: Dictionary) -> Dictionary:
@@ -424,6 +443,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 	for at in [Vector2i(CLIFF_X + 1, 34), Vector2i(CLIFF_X + 1, 36)]:
 		map.set_cell(at, "crate")
 	_soften()
+	_mine_bank()
 	_perches()
 	_save()
 
@@ -645,7 +665,7 @@ func _ford(water: Dictionary, row: int, columns: Vector2i) -> void:
 	# The plateau's top: its north-east corner stands on it.
 	var top := map.relief_at(Vector2i(CLIFF_X + PLATEAU_WIDE - 8, 4))
 	for at: Vector2i in map.cells:
-		if map.walkable(at) or map.cell(at) == "water":
+		if map.walkable(at) or map.cell(at) == "water" or MINE_ROCK.has_point(at):
 			heights[at] = map.relief_at(at)
 			# The foot the plateau's face wanders over held as laid (585: the
 			# face is no one column to keep); its top eases to its spur.
@@ -691,7 +711,7 @@ func _fall_ford(path: Array, water: Dictionary) -> void:
 		var fixed := {}
 		var wet := {}
 		for at: Vector2i in map.cells:
-			if map.walkable(at) or map.cell(at) == "water":
+			if map.walkable(at) or map.cell(at) == "water" or MINE_ROCK.has_point(at):
 				heights[at] = map.relief_at(at)
 				if at.distance_to(across[0]) > 5.0 or map.cell(at) in ["water", "ford"]:
 					fixed[at] = true
@@ -960,7 +980,7 @@ func _hollowfell() -> void:
 	var at: Vector2i = HOLLOWFELL["at"]
 	var open: Vector2i = HOLLOWFELL["open"]
 	map.set_cell(at, "link")
-	config["links"].append({"at": [at.x, at.y], "to_map": HOLLOWFELL["to_map"], "to_spawn": "from_hills"})
+	config["links"].append({"at": [at.x, at.y], "to_map": HOLLOWFELL["to_map"], "to_spawn": "from_hills", "cue": HOLLOWFELL["cue"]})
 	var arrival := at + open * 2
 	config["spawn_points"]["from_" + str(HOLLOWFELL["to_map"])] = [arrival.x, arrival.y]
 	var middle := at + open
@@ -996,6 +1016,25 @@ static func _lair_pads() -> Array[Rect2i]:
 		var b: Vector2i = at + open * 2 + side * LAIR_TRAMPLED
 		out.append(Rect2i(a.min(b), (a - b).abs() + Vector2i.ONE))
 	return out
+
+
+## Hollowfell's block (MINE_ROCK) made rock after the lay, not before it:
+## rock laid first reshaped the lay round it (the slope east of the face
+## lifted flat to the plateau's top, the mouth in a slot; terrain's stills),
+## where main's ground is to stay as it is. The fords' limits (_ford,
+## _fall_ford) and _soften still count its cells as ground, so the slope
+## eases through them as it did; _mine_bank raises them after.
+func _mine_rock() -> void:
+	for cell in _cells_of(MINE_ROCK):
+		map.set_cell(cell, "rock")
+
+
+## Hollowfell's bank, after _soften: each MINE_BANK cell raised to its
+## height, never lowered; nothing else moves.
+func _mine_bank() -> void:
+	for row: Array in MINE_BANK:
+		var i := int(row[1]) * SIZE.x + int(row[0])
+		map.relief[i] = maxf(map.relief[i], float(row[2]))
 
 
 ## Each lair's hill laid as rock before the ground is (no floor: the lay
@@ -1441,7 +1480,7 @@ func _soften() -> void:
 	for at: Vector2i in map.cells:
 		if map.cell(at) in ["water", "ford"]:
 			water[at] = true
-		if map.walkable(at) or water.has(at):
+		if map.walkable(at) or water.has(at) or MINE_ROCK.has_point(at):
 			heights[at] = map.relief_at(at)
 	Relief.soften_low_steps(heights, water)
 	for at: Vector2i in heights:
