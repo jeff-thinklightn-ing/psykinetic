@@ -87,6 +87,7 @@ func _ready() -> void:
 	_test_apex_lair()
 	_test_bandit_rows()
 	_test_chiefs()
+	_test_lone_guard()
 	_test_watch_wave()
 	_test_wanderers()
 	_test_hill_cat()
@@ -1858,6 +1859,92 @@ func _test_given_strength() -> void:
 	World.spawn(rolled2, Vector2i(12, 1))
 	_check(rolled2.max_hp == roundi(built_hp * 0.9), "its stored strength kept at the next spawn (%d)" % rolled2.max_hp)
 	NamedEnemy.reset_for_test()  # The test row gone; the file's read again.
+## A lone guard's standoff (806 amended (8); companions' barrow find: a timid
+## robber on a cache's post, its band dead, held back FIGHTING for minutes).
+func _test_lone_guard() -> void:
+	print("\n== a lone guard never hangs: it presses in near its post, or watches from it ==")
+	var room: Array[String] = ["##################", "#................#", "#.x..............#", "#................#", "##################"]
+	var guard_spec := {"x": {"idle": {"mode": "guard"}, "facing": Vector2i(1, 0)}}
+	var e := _build(room, guard_spec)
+	var robber: Monster = e["x"][0]
+	var post := robber.tile
+	robber.boldness = 0.05  # Timid: it holds back alone.
+	robber.temper = Monster.Temper.CAUTIOUS
+	robber.sight_range = 9
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, post + Vector2i(3, 0))
+	var struck_at := -1
+	var start := World.tick
+	for i in 200:
+		World.step()
+		if struck_at < 0 and _damage_log.any(func(d: Dictionary) -> bool: return d["entity"] == player and d["source"] == robber):
+			struck_at = World.tick
+			break
+	_check(struck_at >= 0 and struck_at - start <= 90 and robber._pressing,
+		"a player 3 from its post: it holds back, then presses in and strikes (%d ticks; pressing %s)" % [struck_at - start, robber._pressing])
+	World.despawn(player)
+	var home_at := -1
+	for i in 300:
+		World.step()
+		if robber.tile == post and robber.target == null:
+			home_at = World.tick
+			break
+	_check(home_at >= 0 and robber.alert != Monster.Alert.FIGHTING, "the player gone, it goes back to its post (%s, alert %d)" % [robber.tile, robber.alert])
+
+	# Sealed off by crates (no way in), 3 from its post and in its sight.
+	var sealed: Array[String] = ["##################", "#...c............#", "#.x.c............#", "#...c............#", "##################"]
+	e = _build(sealed, guard_spec)
+	robber = e["x"][0]
+	post = robber.tile
+	robber.boldness = 0.05
+	robber.temper = Monster.Temper.CAUTIOUS
+	robber.sight_range = 9
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, post + Vector2i(3, 0))
+	var fought := false
+	var watched_at := -1
+	start = World.tick
+	for i in 150:
+		World.step()
+		fought = fought or robber.alert == Monster.Alert.FIGHTING
+		if fought and robber.alert != Monster.Alert.FIGHTING and robber.target == null:
+			watched_at = World.tick
+			break
+	_check(fought and watched_at >= 0 and watched_at - start <= 80 and not robber._pressing and robber._watched >= 0,
+		"no way in: it stops fighting within about 6 s and watches, not pressing (%d ticks)" % [watched_at - start])
+	for i in 30:
+		World.step()
+	var way := Senses.way_toward(robber.tile, player.tile)
+	_check(robber.tile == post and robber.target == null and robber.alert != Monster.Alert.FIGHTING and robber.facing == way,
+		"at its post it watches them, facing them, 3 s on (%s facing %s, alert %d)" % [robber.tile, robber.facing, robber.alert])
+	robber.note_struck(player)
+	for i in 6:
+		World.step()
+	_check(robber.target == player, "watching, a blow rouses it (%s)" % [robber.target])
+
+	e = _build(room, guard_spec)
+	robber = e["x"][0]
+	post = robber.tile
+	robber.boldness = 0.05
+	robber.temper = Monster.Temper.CAUTIOUS
+	robber.sight_range = 9
+	player = EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, post + Vector2i(8, 0))
+	robber._watch(player)
+	for i in 10:
+		World.step()
+	_check(robber.target == null, "watched, 8 from its post, the player is let be (%s)" % [robber.target])
+	_move_to(player, post + Vector2i(4, 0))
+	for i in 10:
+		World.step()
+	_check(robber.target == null, "4 from its post, still let be (%s)" % [robber.target])
+	_move_to(player, post + Vector2i(2, 0))
+	for i in 10:
+		World.step()
+	_check(robber.target == player, "2 from its post it takes them up again (%s)" % [robber.target])
 ## The lair rule (780 amended (13)): the great bear in its lair, out in its
 ## land, back, dead and risen, between two zones.
 func _test_apex_lair() -> void:

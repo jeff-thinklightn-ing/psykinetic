@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the crypt, a robber left guarding a chest after its band falls comes at you when you're near its post, or goes back to it and watches you, coming again if you strike it or step close, where before it stood frozen facing you (806 amended (8)).
 - In the hills, the cave north of the main road is clear of its rockfall, and the great bear dens inside; by day it comes out to roam the hills near its cave, off the roads, and goes back in when badly hurt, at dusk or after a while out, and you can follow it in; killed, it is back in its den within the half hour (780 amended (13)).
 - Towns: the tanner, or Rolf at the stall where there's none, buys your trophies by Give, up to 20 gold for the great bear's pelt: the bear's pelt and claws, the hill cat's pelt, antlers and tusks (821).
 

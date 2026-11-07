@@ -198,6 +198,17 @@ const HUNT_ON_TILES := 2
 ## comes within LEASH / 2 of there or strikes it.
 const LEASH := 20
 const GIVE_UP_TICKS := 100
+## A standoff (806 amended (8)): FIGHTING STANDOFF_TICKS without acting (no
+## step, blow, windup, shot or guard), it chooses. A guard (Idle.GUARD at its
+## home) with the one it fights within GUARD_REACH of its post and a way there
+## presses in (no holding back or pausing that fight); otherwise it watches:
+## lets that one be WATCH_TICKS, back to its post (a guard, facing them while
+## in sight) or where it idles, roused by a blow or by them within
+## WATCH_ROUSE of its post (its own cell, not a guard).
+const STANDOFF_TICKS := 50
+const GUARD_REACH := 4
+const WATCH_TICKS := 600
+const WATCH_ROUSE := 2
 ## Doors: the kinds that open them (kinds' "opens_doors"; the rest, the
 ## brute, break them, "door_force" times their blow on a door; a level
 ## entry's "opens_doors" says otherwise).
@@ -477,6 +488,14 @@ var _quarry_at := NO_TILE
 var _quarry_from := NO_TILE
 var _post := NO_TILE
 var _given_up: Dictionary[int, int] = {}
+## The standoff (STANDOFF_TICKS): what it last did, since when, whether it
+## presses in this fight, and the one it watches (an instance id; -1 none)
+## and from where (WATCH_ROUSE).
+var _standoff_mark := []
+var _standoff_from := -1
+var _pressing := false
+var _watched := -1
+var _watched_from := NO_TILE
 var _glimpsed := NO_TILE
 ## Whether it opens doors (DOOR_OPENERS); whether its lead is a guess (a
 ## hunt's tiles on past where it saw them) and, if so, where it saw them;
@@ -1008,6 +1027,9 @@ func _sim_tick() -> void:
 		if _should_flee():
 			_flee(target.tile)
 			return
+	if took_up:
+		_pressing = false
+		_standoff_mark = []
 	if _tend_ambush():
 		return  # Its told strike from behind, or the opening after (790 amended (4)).
 	if not World.winding(self).is_empty():
@@ -1034,7 +1056,7 @@ func _sim_tick() -> void:
 			var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 			if not path.is_empty():
 				World.try_move(self, path[0] - tile)
-			else:
+			elif not _standing_off():
 				next_move_tick = World.tick + CHASE_RETRY_TICKS  # No way in: look again in a moment.
 		return
 	if not _windup.is_empty():
@@ -1068,11 +1090,12 @@ func _sim_tick() -> void:
 		return
 	if World.wielded(self).is_empty() and _pick_up(true):
 		return  # Bare-handed: the weapon at its feet first.
-	if (boldness < HOLD_BACK_BELOW or _dreads_target()) \
+	if not _pressing and (boldness < HOLD_BACK_BELOW or _dreads_target()) \
 			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
 			and not _band_holds():
+		_standing_off()
 		return  # Waits for the others; a band that outnumbers them goes in together.
-	if _rng.randf() < pause_chance:
+	if not _pressing and _rng.randf() < pause_chance:
 		next_move_tick = World.tick + _rng.randi_range(PAUSE_TICKS.x, PAUSE_TICKS.y)
 		return
 	if tactic == Tactic.HEAVY:
@@ -1085,7 +1108,7 @@ func _sim_tick() -> void:
 		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
 		if not path.is_empty():
 			World.try_move(self, path[0] - tile)
-		else:
+		elif not _standing_off():
 			next_move_tick = World.tick + CHASE_RETRY_TICKS  # No way in: look again in a moment.
 
 
@@ -1909,14 +1932,66 @@ func _give_up(who: GridEntity) -> void:
 	_returning = idle != Idle.NONE
 
 
+## The standoff (806 amended (8), STANDOFF_TICKS), asked where its fight
+## step stalls (holding back, no way in): true when, stalled that long since
+## it last stepped or struck, it watches instead (_watch). A guard in reach
+## with a way in presses in once (false: on with the fight).
+func _standing_off() -> bool:
+	var mark := [tile, next_attack_tick, raised]
+	if mark != _standoff_mark:
+		_standoff_mark = mark
+		_standoff_from = World.tick
+		return false
+	if World.tick - _standoff_from < STANDOFF_TICKS:
+		return false
+	_standoff_from = World.tick
+	if not _pressing and idle == Idle.GUARD and home != NO_TILE \
+			and World.distance(target.tile, home) <= GUARD_REACH \
+			and not World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now()).is_empty():
+		_pressing = true
+		return false
+	_watch(target)
+	return true
+
+
+## Lets [param who] be WATCH_TICKS (the standoff's way out, 806 amended (8)):
+## back to its post, roused by a blow or by them within WATCH_ROUSE of it.
+func _watch(who: GridEntity) -> void:
+	_watched = who.get_instance_id()
+	_watched_from = home if idle == Idle.GUARD and home != NO_TILE else tile
+	_give_up(who)
+	_given_up[_watched] = World.tick + WATCH_TICKS
+	_pressing = false
+	target = null
+	slot = NO_TILE
+	_drop_windup()
+
+
+## The one it watches from its post (_watch), while let be and in its sight
+## range with a clear line; else null.
+func _watched_one() -> GridEntity:
+	if _watched < 0 or _given_up.get(_watched, -1) < World.tick:
+		return null
+	var who := instance_from_id(_watched) as GridEntity
+	if who == null or not is_instance_valid(who) or who.zone != zone \
+			or World.distance(tile, who.tile) > sight_range or not World.has_clear_line(tile, who.tile):
+		return null
+	return who
+
+
 ## Whether it lets [param entity] be (given up on it, a while yet, and it is
-## not back near where it took up the chase).
+## not back near where it took up the chase; one it watches, not near its
+## post, _watch).
 func _letting_be(entity: GridEntity) -> bool:
 	var id := entity.get_instance_id()
 	var until: int = _given_up.get(id, -1)
 	if until < World.tick:
 		_given_up.erase(id)
+		if id == _watched:
+			_watched = -1
 		return false
+	if id == _watched:
+		return World.distance(entity.tile, _watched_from) > WATCH_ROUSE
 	return _post == NO_TILE or World.distance(entity.tile, _post) > leash / 2
 
 
@@ -3054,6 +3129,13 @@ func _guard() -> void:
 	if tile != home:
 		if not _idle_step(home, IDLE_SEARCH_TILES, beyond_view):
 			_idle_until = World.tick + PATROL_PAUSE_TICKS.y  # Someone is on it: wait.
+		return
+	var watched := _watched_one()
+	if watched != null:
+		var way := Senses.way_toward(tile, watched.tile)
+		if way != Vector2i.ZERO and facing != way:
+			World.face(self, way)  # Watching the one it let be from its post (806 amended (8)).
+		_glancing = true
 		return
 	if World.tick < _idle_until:
 		return
