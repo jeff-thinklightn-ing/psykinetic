@@ -57,6 +57,7 @@ func _ready() -> void:
 	_test_crouch_key()
 	_test_practice_bars()
 	await _test_gains()
+	_test_find_window()
 	_test_seam_click()
 	_test_fire_click()
 	await _test_person_window()
@@ -2478,6 +2479,34 @@ func _test_town_window() -> void:
 	_main.town_states = states_was
 	_main.town_sheets.erase(id)
 	_main._town_sheet_asked.clear()
+
+
+## 599 amended, ui's side: a cache's find in its own window; Take all asks
+## for it and closes; Esc, or the chest gone or left, closes and leaves it.
+func _test_find_window() -> void:
+	var panel: FindPanel = _main.find_panel
+	var me: Player = _main._local_player()
+	if panel == null or me == null:
+		print("  (no find window or no player in this scene: skipped)")
+		return
+	var find := {"chest": str(me.get_path()), "place": "the old farmstead", "title": "Old farmstead",
+		"rows": [{"id": "wood_bundle", "count": 2}, {"id": "herbs", "count": 1}], "gold": 12}
+	_main._on_message("find", find)
+	var rows := panel.rows_shown()
+	_check(panel.visible and panel.title_shown() == "Old farmstead" and rows.size() == 2
+		and rows[0] == "2 " + Gains.counted(Items.name_of("wood_bundle"), 2) and rows[1] == Items.name_of("herbs")
+		and panel.gold_shown() == "12 gold", "a find: its place the title, a row a thing counted, the gold (%s, %s)" % [rows, panel.gold_shown()])
+	_main._update_find()
+	_check(panel.visible, "beside the chest: it stays open")
+	panel.take_asked.emit()
+	_check(not panel.visible and _main.find_data.is_empty(), "Take all: asked for and closed")
+	_main._on_message("find", find)
+	_main.escape()
+	_check(not panel.visible and not _main.find_data.is_empty(), "Esc: closed, the find left in the chest")
+	_main._on_message("find", find.merged({"chest": "/root/nothing_here"}, true))
+	_main._update_find()
+	_check(not panel.visible, "the chest gone or left: closed")
+	_main.find_data = {}
 
 
 func _test_gains() -> void:

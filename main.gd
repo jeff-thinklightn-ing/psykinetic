@@ -737,6 +737,9 @@ var _town_sheet_asked: Dictionary = {}
 ## A talking monster's deals as buttons (629, ui's side): opened by his
 ## "offers" message after E on him, watched by _update_deal.
 var deal_panel: DealPanel
+## A cache chest's find (599 amended, ui's side): opened by "find"
+## (find_told), Take all is take_find_all; watched by _update_find.
+var find_panel: FindPanel
 ## The admin panel (672): F10 for an admin (admin_allowed); is_admin is the
 ## server's word ("admin" after the join); _admin_refused counts the
 ## server's refusals (logged as a count, never who).
@@ -1348,6 +1351,7 @@ func _process(delta: float) -> void:
 	_update_pack()
 	_update_talk()
 	_update_deal()
+	_update_find()
 	_update_store()
 	_update_note()
 	_update_room()
@@ -13950,6 +13954,11 @@ func _build_talk() -> void:
 	$HUD.add_child(town_panel)
 	deal_panel = DealPanel.new()
 	$HUD.add_child(deal_panel)
+	find_panel = FindPanel.new()
+	find_panel.icons = item_icons
+	find_panel.take_asked.connect(_take_find)
+	find_told.connect(find_panel.show_find)
+	$HUD.add_child(find_panel)
 	admin_panel = AdminPanel.new()  # 672.
 	admin_panel.ran.connect(send_admin)
 	$HUD.add_child(admin_panel)
@@ -14269,6 +14278,23 @@ func _offer_deal(id: String, amount: int) -> void:
 
 ## The deal window watched (629, ui's side): closed when he is gone, no
 ## longer peaceable or out of hearing; its buttons follow the purse.
+## The find window watched: closed, the find left in the chest, once the
+## player is FindPanel.REACH cells from the chest or the chest is gone.
+func _update_find() -> void:
+	if find_panel == null or not find_panel.visible:
+		return
+	var chest := get_node_or_null(NodePath(str(find_panel.data.get("chest", "")))) as GridEntity
+	var player := _local_player()
+	if chest == null or player == null or World.distance(player.tile, chest.tile) > FindPanel.REACH:
+		find_panel.close()
+
+
+## Take all in the find window: the server gives the lot and says so.
+func _take_find() -> void:
+	take_find_all()
+	find_panel.close()
+
+
 func _update_deal() -> void:
 	if deal_panel == null or not deal_panel.visible:
 		return
@@ -20274,6 +20300,8 @@ func escape() -> void:
 		_close_bar()  # 560, ui's side: the talk bar, then the barter window.
 	elif barter_panel != null and barter_panel.is_open():
 		close_other()
+	elif find_panel != null and find_panel.visible:
+		find_panel.close()  # 599 amended: the find left in the chest.
 	elif deal_panel != null and deal_panel.visible:
 		deal_panel.close()  # 629, ui's side: the deal window.
 	elif note_sheet != null and note_sheet.visible:
