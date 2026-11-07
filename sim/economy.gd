@@ -2049,6 +2049,35 @@ func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 	return paid
 
 
+## The recipes (sorted) whose makers buy item [param id] by Give (821
+## amended: receives.inputs.recipes, each taking it as a non-resource input,
+## not a raw with a yield); [] for none, or while the list is empty (off).
+func input_recipes(id: String) -> Array[String]:
+	var out: Array[String] = []
+	if id.is_empty() or not Items.yield_of(id).is_empty() or id in Stockpile.RESOURCES:
+		return out
+	for recipe: Variant in rules.get("receives", {}).get("inputs", {}).get("recipes", []):
+		var made: Variant = Items.def(str(recipe)).get("made")
+		if made is Dictionary and (made.get("from", {}) as Dictionary).has(id) and str(recipe) not in out:
+			out.append(str(recipe))
+	out.sort()
+	return out
+
+
+## Every item some maker buys by Give (821 amended), sorted; [] while off.
+func input_ids() -> Array[String]:
+	var out: Array[String] = []
+	for recipe: Variant in rules.get("receives", {}).get("inputs", {}).get("recipes", []):
+		var made: Variant = Items.def(str(recipe)).get("made")
+		if not made is Dictionary:
+			continue
+		for id: String in made.get("from", {}):
+			if id not in out and Items.yield_of(id).is_empty() and id not in Stockpile.RESOURCES:
+				out.append(id)
+	out.sort()
+	return out
+
+
 ## The trade that buys trophy [param id] by Give (821: receives.trophies,
 ## the tanner's pelts and bones), "" for none.
 func trophy_trade(id: String) -> String:

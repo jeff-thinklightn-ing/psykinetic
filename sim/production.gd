@@ -1605,8 +1605,12 @@ func _mends(shop: Dictionary, by: String) -> bool:
 
 
 ## Whether workshop [param workshop_id] makes item [param id] (641:
-## workshop_makes' list, every recipe of its trade without one).
+## workshop_makes' list, every recipe of its trade without one), never
+## one held off (821 amended: receives.inputs.off, the charm's recipes until
+## its package is in).
 func makes(workshop_id: String, id: String) -> bool:
+	if id in rules.get("receives", {}).get("inputs", {}).get("off", []):
+		return false
 	var listed: Array = workshop_makes.call(workshop_id) if workshop_makes.is_valid() else []
 	return listed.is_empty() or id in listed
 

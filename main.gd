@@ -15162,7 +15162,7 @@ func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
 		if not takes.has(uid):
 			continue
 		var units: Array = [uid] + Array(World.items.stack_of(uid))
-		var trophy := World.items.id_of(uid) if not World.economy.trophy_trade(World.items.id_of(uid)).is_empty() else ""
+		var trophy := World.items.id_of(uid) if not bought_by(town, World.items.id_of(uid)).is_empty() else ""  # A trophy or a maker's input (821).
 		for unit: int in units:
 			if World.donate(player, unit, town):
 				given.append(unit)
@@ -15209,6 +15209,42 @@ func trophy_taker(town: String, id: String, workers = null) -> String:
 		if trade in who["trades"] and not bool(who["away"]):
 			return str(who["id"])
 	return Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else ""
+
+
+## The maker in [param town] who buys item [param id] by Give as an input
+## of his own (821 amended): [worker, recipe] for the first recipe by id
+## (Economy.input_recipes) that the first seated, not away, resident of its
+## trade makes at his workshop (Production.makes); [] for none.
+func input_taker(town: String, id: String, workers = null) -> Array:
+	if World.economy == null or World.production == null:
+		return []
+	var recipes := World.economy.input_recipes(id)
+	if recipes.is_empty():
+		return []
+	var here: Array = workers if workers is Array else World.production.town_workers(town)
+	for recipe: String in recipes:
+		var trade := str(Items.def(recipe)["made"]["by"])
+		for who: Dictionary in here:
+			if trade not in who["trades"] or bool(who["away"]):
+				continue
+			var shop := World.production.workshop_of(str(who["id"]))
+			if not shop.is_empty() and World.production.makes(shop, recipe):
+				return [str(who["id"]), recipe]
+	return []
+
+
+## Who in [param town] buys item [param id] by Give, and for what (821 and
+## its amendment): {worker, for} with for the Give window's words ("a
+## bear's-claw charm" for a maker's input, which comes first; "tanning",
+## "selling on" for a trophy); {} for nobody.
+func bought_by(town: String, id: String, workers = null) -> Dictionary:
+	var maker := input_taker(town, id, workers)
+	if not maker.is_empty():
+		return {"worker": maker[0], "for": "a " + str(Items.def(str(maker[1])).get("name", maker[1]))}
+	var worker := trophy_taker(town, id, workers)
+	if worker.is_empty():
+		return {}
+	return {"worker": worker, "for": World.economy.trophy_for(id, worker.begins_with(Offers.VENDOR))}
 
 
 # --- Rewards shown (804, economy's side) ---------------------------------------
@@ -15768,7 +15804,7 @@ func takers_of(town: String) -> Dictionary:
 	var lacking: Dictionary = World.towns.shortfall(town).get("needs", {}) if World.towns != null else {}
 	var bodies := _bodies_by_worker()
 	# Every input of the build below (802 amended (7)): add to it anything takers_of comes to read.
-	var stamp := hash([workers, lacking.keys(), bodies, World.economy.rules.get("vendor", {}).get("towns", []), World.economy.rules.get("receives", {}).size()])
+	var stamp := hash([workers, lacking.keys(), bodies, World.economy.rules.get("vendor", {}).get("towns", []), World.economy.rules.get("receives", {}).size(), _input_seats(workers)])
 	var known: Dictionary = _takers_built.get(town, {})
 	if int(known.get("stamp", 0)) == stamp and known.has("data"):
 		return known["data"]  # Nothing it reads has changed (802 amended (7)): the last build.
@@ -15785,14 +15821,27 @@ func takers_of(town: String) -> Dictionary:
 	if town in World.economy.rules.get("vendor", {}).get("towns", []):
 		out["gear"] = _taker_entry(Offers.VENDOR + town, bodies, workers)
 	var trophies := {}
-	for id: String in World.economy.trophy_ids():  # 821: who buys each trophy, for the pack's tooltip.
-		var worker := trophy_taker(town, id, workers)
+	var bought := World.economy.trophy_ids()  # 821: who buys each trophy, for the pack's tooltip,
+	for id: String in World.economy.input_ids():  # and each maker's input (821 amended), in the same map.
+		if id not in bought:
+			bought.append(id)
+	for id: String in bought:
+		var worker := str(bought_by(town, id, workers).get("worker", ""))
 		if not worker.is_empty():
 			trophies[id] = _taker_entry(worker, bodies, workers)
 	if not trophies.is_empty():
 		out["trophies"] = trophies
 	_takers_built[town] = {"stamp": stamp, "data": out, "hash": hash(out)}
 	return out
+
+
+## The workshops of [param workers] while any maker buys inputs (821
+## amended: takers_of's stamp, as a maker seated or not changes who buys);
+## [] while off.
+func _input_seats(workers: Array) -> Array:
+	if World.economy.rules.get("receives", {}).get("inputs", {}).get("recipes", []).is_empty():
+		return []
+	return workers.map(func(who: Dictionary) -> String: return World.production.workshop_of(str(who["id"])))
 
 
 ## Every townsperson's body path by worker id (takers_of).
@@ -15908,6 +15957,7 @@ func person_takes(player: Player, worker: String) -> Array:
 		var uid := World.slot_uid(player, slot)
 		var count := 1 + World.items.stack_of(uid).size()
 		var yields := Items.yield_of(id)
+		var buyer := bought_by(town, id) if yields.is_empty() else {}  # 821: a trophy's or an input's.
 		var row := {}
 		if not yields.is_empty():
 			var raw := str(yields.keys()[0])
@@ -15915,12 +15965,13 @@ func person_takes(player: Player, worker: String) -> Array:
 				continue
 			row = give_outcome(town, player_id, raw, int(yields[raw]) * count)
 			row["raw"] = raw
-		elif not World.economy.trophy_trade(id).is_empty():
-			# A trophy (821): bought by its trade's resident, else the stall's keeper, from the pack only.
-			if not Items.is_pack(slot) or World.items.is_starter(uid) or trophy_taker(town, id) != worker:
+		elif not buyer.is_empty() or not World.economy.trophy_trade(id).is_empty():
+			# A trophy (821) or a maker's input (821 amended): bought by its maker, else its
+			# trade's resident, else the stall's keeper, from the pack only; nobody else takes it.
+			if buyer.is_empty() or not Items.is_pack(slot) or World.items.is_starter(uid) or buyer["worker"] != worker:
 				continue
 			var sale := World.economy.trophy_outcome(town, player_id, id, count)
-			row = {"for": {"kind": "maker", "name": World.economy.trophy_for(id, worker.begins_with(Offers.VENDOR))},
+			row = {"for": {"kind": "maker", "name": str(buyer["for"])},
 				"raw": "", "have": 0, "need": 0, "gold": int(sale["gold"]), "owed": int(sale["owed"])}
 		elif worker.begins_with(Offers.VENDOR) and Items.is_pack(slot) and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
 			# Gear only from the pack (802 amended (4); playtest: a tool in hand was offered
@@ -15951,10 +16002,12 @@ func depot_pointer(town: String, id: String) -> String:
 	var nobody := str(words.get("nobody", "Nobody here takes that."))
 	var yields := Items.yield_of(id)
 	var raw := str(yields.keys()[0]) if not yields.is_empty() else ""
-	var trophy_by := trophy_taker(town, id) if raw.is_empty() else ""
+	var trophy_by := str(bought_by(town, id).get("worker", "")) if raw.is_empty() else ""
 	if not trophy_by.is_empty() and not trophy_by.begins_with(Offers.VENDOR):
-		raw = "trophy"  # 821: "Pelts and trophies go to the tanner."
-	var worker := receiver_for(town, raw) if not raw.is_empty() and raw != "trophy" else trophy_by if raw == "trophy" \
+		# 821: "Pelts and trophies go to the tanner."; a maker's input (821 amended)
+		# pointers.input's words for his trade (voice's, with the switch-on).
+		raw = "input" if not input_taker(town, id).is_empty() else "trophy"
+	var worker := receiver_for(town, raw) if not raw.is_empty() and raw not in ["trophy", "input"] else trophy_by if raw in ["trophy", "input"] \
 			else (Offers.VENDOR + town if town in World.economy.rules.get("vendor", {}).get("towns", []) else "")
 	if worker.is_empty():
 		return nobody

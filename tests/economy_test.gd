@@ -777,6 +777,7 @@ func _test_town_sheet(host: Player) -> void:
 	await _test_town_window(host)
 	_test_person_takes(host)
 	_test_trophies(host)
+	_test_charm_inputs(host)
 	_test_admin_stock(host)
 
 
@@ -1001,6 +1002,114 @@ func _test_trophies(host: Player) -> void:
 	_check(sold.size() == 1 and World.count_of(host, "bear_pelt") == 0 and economy.gold(me) == purse + (int(pelt[0]["gold"]) if not pelt.is_empty() else -1),
 		"the pelt to the tanner: banked and paid")
 	World.production.remove_worker("trophy_tan")
+	for id in away:
+		World.production.set_away(id, false)
+	economy.rules["vendor"] = vendor
+
+
+## 821 amended: a maker buys his own recipes' non-resource inputs by Give
+## (the medicine man the claw, feathers and flint for the charm), before the
+## tanner or Rolf; off while receives.inputs.recipes is empty; banked by id,
+## the charm's bid follows once "charm" is wanted.
+func _test_charm_inputs(host: Player) -> void:
+	print("\n== 821 amended: a maker buys his own inputs ==")
+	var me: String = _main._id_of_player(host)
+	var economy: Economy = World.economy
+	var inputs: Dictionary = economy.rules["receives"].get("inputs", {}).duplicate(true)
+	var vendor: Dictionary = economy.rules.get("vendor", {}).duplicate(true)
+	economy.rules["vendor"] = {"towns": [STORE], "name": "Rolf", "price": 1, "wares": []}
+	_check(inputs.get("recipes", null) is Array and (inputs["recipes"] as Array).is_empty() and economy.input_ids().is_empty()
+		and _main.input_taker(STORE, "bear_claw").is_empty() and "charm" not in World.production.rules.get("always_want", [])
+		and World.production.rules.get("receives", {}).get("inputs", {}).get("off", []) == ["bear_claw_charm", "bear_grease_draught"],
+		"lands off: no recipe's inputs bought, charm not always wanted")
+	var away: Array[String] = []
+	for id: String in World.production.worker_ids(STORE):
+		var trades: Array = World.production.worker(id)["trades"]
+		if ("medicine_man" in trades or "tanner" in trades) and not World.production.worker(id).get("away", false):
+			World.production.set_away(id, true)  # Put back at the end.
+			away.append(id)
+	_check(str(_main.bought_by(STORE, "bear_claw").get("worker", "")) == Offers.VENDOR + STORE, "off: the claw still Rolf's to buy (821)")
+	# Off, the coordinator's check: a seated medicine man (who makes every recipe of his trade)
+	# with every part in the store never bids the charm or the draught; the claw goes to the tanner.
+	var hut := "test_charm_hut"
+	World.production.add_worker("charm_mm", "Probewort", ["medicine_man"], STORE, "test")
+	World.production.add_workshop(hut, "medicine_man", STORE)
+	World.production.assign(hut, "charm_mm")
+	World.production.add_worker("charm_tan", "Tamsin", ["tanner"], STORE, "test")
+	var parts: Array[int] = []
+	for id: String in ["bear_claw", "feathers", "flint", "bear_grease"]:
+		parts.append(World.items.mint(id, "found", "test"))
+		World.stockpile.bank(STORE, parts.back(), "test")
+	World.stockpile.deposit(STORE, "herbs", 4, "test")
+	var always_off: Array = World.production.rules.get("always_want", []).duplicate()
+	World.production.rules["always_want"] = always_off + ["charm"]  # Even were it wanted.
+	var cat_off := Production.items_catalog()
+	var signals_off := World.production.signals_of(STORE, cat_off)
+	var bid_off: Dictionary = World.production._bid(World.production.workshop(hut), ["charm", "medical", "goods"] as Array[String], signals_off, cat_off)
+	World.production.rules["always_want"] = always_off
+	_check(not World.production.makes(hut, "bear_claw_charm") and not World.production.makes(hut, "bear_grease_draught") and World.production.makes(hut, "remedy")
+		and str(bid_off.get("recipe", "")) not in ["bear_claw_charm", "bear_grease_draught"],
+		"off: his parts all in the store, he makes neither the charm nor the draught (bid %s)" % [bid_off.get("recipe", "")])
+	_check(str(_main.bought_by(STORE, "bear_claw").get("worker", "")) == "charm_tan" and _main.input_taker(STORE, "bear_claw").is_empty(),
+		"off: the claw still the tanner's (821)")
+	World.production.remove_worker("charm_tan")
+	for uid: int in parts:
+		World.stockpile.take_item(STORE, uid, "test")
+		World.items.end(uid, "gone")
+	World.stockpile.take(STORE, "herbs", 4, "test")
+	World.production.remove_worker("charm_mm")
+	var made_off: Variant = World.production.rules.get("receives", {}).get("inputs", {}).get("off")
+	economy.rules["receives"]["inputs"] = {"recipes": ["bear_claw_charm", "bear_grease_draught"], "off": []}
+	World.production.rules["receives"]["inputs"]["off"] = []  # Production's own copy of the rules.
+	_check(economy.input_ids() == ["bear_claw", "bear_grease", "feathers", "flint"] and economy.input_recipes("herbs").is_empty(),
+		"on: the claw, grease, feathers and flint; herbs stay a raw (%s)" % [economy.input_ids()])
+	_check(_main.input_taker(STORE, "feathers").is_empty() and _main.bought_by(STORE, "feathers").is_empty(), "no medicine man: nobody buys feathers")
+	World.production.add_worker("charm_mm", "Probewort", ["medicine_man"], STORE, "test")
+	World.production.assign(hut, "charm_mm")
+	_check(_main.input_taker(STORE, "bear_claw") == ["charm_mm", "bear_claw_charm"] and _main.bought_by(STORE, "bear_claw")["for"] == "a bear's-claw charm",
+		"a medicine man seated: he buys the claw, for a bear's-claw charm (%s)" % [_main.bought_by(STORE, "bear_claw")])
+	for slot: int in [Items.PACK_SLOTS[0], Items.PACK_SLOTS[1], Items.PACK_SLOTS[2]]:
+		if not str(host.slots[slot]).is_empty():
+			World.take_item(host, host, slot)
+	for id: String in ["bear_claw", "feathers", "flint"]:
+		_main._hand_item(me, id, "test")
+		var held: int = Array(host.slots).find(id)
+		if held not in Items.PACK_SLOTS:
+			World.try_transfer(host, host, held, host, Items.PACK_SLOTS[["bear_claw", "feathers", "flint"].find(id)])
+	var rolf: Array = _main.person_takes(host, Offers.VENDOR + STORE).filter(func(row: Dictionary) -> bool: return row["what"] in ["bear_claw", "feathers", "flint"])
+	_check(rolf.is_empty(), "Rolf no longer offers for them (%s)" % [rolf])
+	var rows: Array = _main.person_takes(host, "charm_mm").filter(func(row: Dictionary) -> bool: return row["what"] in ["bear_claw", "feathers", "flint"])
+	var paid := {}
+	for row: Dictionary in rows:
+		if row["for"].get("kind") == "maker" and row["for"].get("name") == "a bear's-claw charm" and int(row["count"]) == 1:
+			paid[row["what"]] = int(row["gold"]) + int(row["owed"])
+	_check(paid == {"bear_claw": 3, "feathers": 1, "flint": 1}, "his rows: for a bear's-claw charm, 3 for the claw, 1 each for feathers and flint (%s)" % [rows])
+	var takers: Dictionary = _main.takers_of(STORE)
+	_check(Main.taker_line(takers, "feathers") == "For the medicine man" and Main.taker_entry(takers, "bear_claw").get("name") == "Probewort",
+		"the pack's tooltip: for the medicine man (%s)" % [takers.get("trophies", {})])
+	var had := {}
+	for id: String in ["bear_claw", "feathers", "flint"]:
+		had[id] = World.stockpile.count(STORE, id)
+	var purse := economy.gold(me)
+	var given: Array = _main.give_to(host, "charm_mm", "Probewort", rows.map(func(row: Dictionary) -> int: return int(row["uid"])))
+	var gold := 0
+	for row: Dictionary in rows:
+		gold += int(row["gold"])
+	_check(given.size() == 3 and ["bear_claw", "feathers", "flint"].all(func(id: String) -> bool: return World.stockpile.count(STORE, id) == int(had[id]) + 1)
+		and economy.gold(me) == purse + gold, "given: each banked by id, paid what the rows said (%d gold)" % (economy.gold(me) - purse))
+	var always: Array = World.production.rules.get("always_want", []).duplicate()
+	World.production.rules["always_want"] = always + ["charm"]
+	var cat := Production.items_catalog()
+	var signals := World.production.signals_of(STORE, cat)
+	var wants := World.production._wants(STORE, signals)
+	var bid: Dictionary = World.production._bid(World.production.workshop(hut), ["charm"] as Array[String], signals, cat)
+	_check("charm" in wants and str(bid.get("recipe", "")) == "bear_claw_charm", "with charm wanted, his bid: the charm from the store's parts (%s)" % [bid])
+	World.production.rules["always_want"] = always
+	World.production.remove_worker("charm_mm")
+	World.production._workshops.erase(hut)
+	_check(str(_main.bought_by(STORE, "bear_claw").get("worker", "")) == Offers.VENDOR + STORE, "no maker again: the claw back to Rolf (821)")
+	economy.rules["receives"]["inputs"] = inputs
+	World.production.rules["receives"]["inputs"]["off"] = made_off
 	for id in away:
 		World.production.set_away(id, false)
 	economy.rules["vendor"] = vendor

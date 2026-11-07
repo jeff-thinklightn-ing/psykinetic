@@ -44636,3 +44636,23 @@ and slot_items are 22 long. tests: items_test _test_pack_twelve (the row,
 room_for filling all fourteen places, an 18-slot record, the guard),
 _test_worn and _test_armour's counts, ui_test's grid, state_test 2e (an
 18-slot record saved back as 22). No new class_name.
+821 amended (the medicine man's charms, the coordinator's approval; release's label; lands off, its
+package the charm's: enemy-ai's grease drop and the motes come first). A maker buys his own recipes'
+non-resource inputs by Give, as 821 buys trophies: levels/economy.json receives.inputs.recipes lists
+the recipes whose makers do (the medicine man's bear_claw_charm, claw, feathers and flint; his
+bear_grease_draught, the grease; herbs stay his raw). Economy.input_recipes(id) and input_ids();
+Main.input_taker(town, id): [worker, recipe] for the first recipe by id that the first seated, not
+away, resident of its trade makes at his workshop (Production.makes); Main.bought_by(town, id):
+{worker, for}, the maker first ("a bear's-claw charm"), else 821's trophy_taker. person_takes,
+give_to (paid as a trophy, value x store.trophy: claw 3, feathers 1, flint 1, grease 6, banked by id
+where Production finds it), takers_of (the same "trophies" map, so the tooltip says "For the
+medicine man") and depot_pointer (pointers.input by trade, voice's words with the switch-on) all ask
+bought_by; an input nobody makes falls back to Rolf's gift, as before. The switch is the recipes list,
+empty on landing, not the huts' makes lists the design named: a town's medicine man works at a shop
+with no Holdings place, so his makes list is empty and he makes every recipe of his trade. So that
+he never makes or shelves the charm or the draught before their package (the coordinator's check),
+receives.inputs.off lists them and Production.makes refuses any recipe there, for the bid and the
+barter's materials alike. The switch-on moves bear_claw_charm and bear_grease_draught from off to
+recipes and adds "charm" to always_want (items
+gives the charm made.stock 1, one on the shelf), with voice's pointer and bullet. Protocol unchanged
+(rows of kind "maker" and "trophies" since 52). economy_test _test_charm_inputs.
