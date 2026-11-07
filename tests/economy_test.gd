@@ -808,9 +808,11 @@ func _test_person_takes(host: Player) -> void:
 	_check(int(wood[0]["gold"]) + int(wood[0]["owed"]) > 0 if not wood.is_empty() else false, "and the gold it pays or owes")
 	_check(not takes.any(func(row: Dictionary) -> bool: return row["what"] in ["sword", "dagger"]), "the carpenter takes no gear")
 	var keeper: Array = _main.person_takes(host, Offers.VENDOR + STORE)
-	_check(keeper.any(func(row: Dictionary) -> bool: return row["what"] == "sword" and int(row["gold"]) == 0 and (row["for"] as Dictionary).is_empty())
-		and not keeper.any(func(row: Dictionary) -> bool: return row["what"] in ["dagger", "wood_bundle"]),
-		"the keeper takes the sword as a gift, not the starter dagger, not the carpenter's wood (%s)" % [keeper.map(func(row: Dictionary) -> String: return row["what"])])
+	var gift_row := func(what: String) -> bool:
+		return keeper.any(func(row: Dictionary) -> bool: return row["what"] == what and int(row["gold"]) == 0 and (row["for"] as Dictionary).is_empty())
+	# The starter dagger too, for nothing (807 amended (5): starter gear goes back to him, Donate).
+	_check(gift_row.call("sword") and gift_row.call("dagger") and not keeper.any(func(row: Dictionary) -> bool: return row["what"] == "wood_bundle"),
+		"the keeper takes the sword and the starter dagger as gifts, not the carpenter's wood (%s)" % [keeper.map(func(row: Dictionary) -> String: return row["what"])])
 	var no_smith := not World.production.worker_ids(STORE).any(func(id: String) -> bool: return "smith" in World.production.worker(id)["trades"])
 	_check(not no_smith or _main.receiver_for(STORE, "ore") == Offers.VENDOR + STORE, "ore with no smith in town: the keeper takes it")
 

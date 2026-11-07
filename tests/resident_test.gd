@@ -5006,14 +5006,11 @@ func _test_keeper_buttons(player: Player, rolf: Resident) -> void:
 	_main._greet_at.clear()
 	_main._resident_fight_at.clear()
 	_main._greeted(player, rolf)
-	_check(panel.is_open() and panel.with == rolf and panel.keeper_buttons() == [true, true],
-		"greeted, a kit owed: Open locker and Take practice kit (%s)" % [panel.keeper_buttons()])
+	_check(panel.is_open() and panel.with == rolf and panel.keeper_buttons() == [true, false],
+		"greeted: Open locker, and no practice kit (807 amended (5)) (%s)" % [panel.keeper_buttons()])
 	panel._locker_button.pressed.emit()
 	var locker := World.locker_of(player.player_id)
 	_check(locker != null and World.distance(locker.tile, rolf.tile) <= 1, "Open locker: the locker beside him (%s)" % [locker.tile if locker != null else null])
-	panel._kit_button.pressed.emit()
-	_check(record.kit_given and panel.is_open() and panel.keeper_buttons() == [true, false],
-		"Take practice kit: handed, and the button gone with his offers sent again (%s)" % [panel.keeper_buttons()])
 	var pedlar_wares: Array = [{"id": "visitor:x|wares|knife", "kind": Offers.WARES, "accept": Offers.WARES, "what": {"item": "knife"}}]
 	panel.set_keeper(pedlar_wares, true)
 	_check(panel.keeper_buttons() == [false, false], "a pedlar's wares: neither button")
@@ -5025,12 +5022,13 @@ func _test_keeper_buttons(player: Player, rolf: Resident) -> void:
 
 
 ## Rolf, the keeper of all hours (807 amended (2)): his own greeting; a
-## player's locker brought out beside him, not while he hides; his practice
-## kit once, one of each kit ware, marked starter, and the offers' "kit" flag
-## till then; the store's keeper asleep points to him, the temple's never.
+## player's locker brought out beside him, not while he hides; no practice
+## kit (807 amended (5): retired), starter gear handed back to him for
+## nothing and ended, or dropped; the store's keeper asleep points to him,
+## the temple's never.
 func _test_keeper(player: Player, rolf: Resident) -> void:
 	print("
-== Rolf keeps the lockers and hands his practice kit once (807 amended (2)) ==")
+== Rolf keeps the lockers, hands no kit and takes starter gear back (807 amended (2), (5)) ==")
 	var record: PlayerRecord = _main._records.get(player.player_id)
 	if record == null:
 		_check(false, "(a record for the player)")
@@ -5048,37 +5046,48 @@ func _test_keeper(player: Player, rolf: Resident) -> void:
 	_main._greet_at.clear()
 	_main._resident_fight_at.clear()
 	_main._greeted(player, rolf)
-	_check(said.call() == ["Store's open. What do you need?"], "his own greeting to one not yet kitted out (%s)" % [said.call()])
+	_check(said.call() == ["Store's open. What do you need?"] and record.kit_given, "his own greeting the first time, and met noted (%s)" % [said.call()])
 	var o: Array = offered.call()
-	_check(not o.is_empty() and bool(o[-1]["data"].get("kit", false)), "his offers say a kit is owed (%s)" % [o.map(func(m: Dictionary) -> Variant: return m["data"].get("kit"))])
+	_check(not o.is_empty() and not o[-1]["data"].has("kit"), "his offers carry no kit (807 amended (5)) (%s)" % [o.map(func(m: Dictionary) -> Variant: return m["data"].get("kit"))])
 	heard.clear()
 	var locker: Locker = _main.keeper_locker(player, rolf)
 	_check(locker != null and locker.opened >= 1 and locker.player_id == player.player_id and World.distance(locker.tile, rolf.tile) <= 1,
 		"the locker brought out beside him (%s)" % [locker.tile if locker != null else null])
 	_check(said.call() == ["Here's your locker, as you left it."], "and he says so (%s)" % [said.call()])
 	rolf.doing = Resident.Doing.HIDE
-	_check(_main.keeper_locker(player, rolf) == null and not _main.keeper_kit(player, rolf), "hiding: no locker, no kit")
+	_check(_main.keeper_locker(player, rolf) == null, "hiding: no locker")
 	rolf.doing = Resident.Doing.WORK
 	for slot in player.slots.size():
 		if not player.slots[slot].is_empty() and not World.soulbound(World.slot_uid(player, slot)):
 			World.items.place(World._take_out(player, slot), "the test")
 	heard.clear()
-	var wares: Array = (World.economy.rules["vendor"].get("wares", []) as Array).filter(func(w: Dictionary) -> bool: return bool(w.get("kit", true)))
-	_check(_main.keeper_kit(player, rolf) and record.kit_given, "the kit handed, and noted on the record")
-	var at_feet: Array[String] = []  # No room in the hands and pack: at their feet, as any handed thing.
-	for cell: Vector2i in World.zone.ground:
-		if World.distance(cell, player.tile) <= 2:
-			for uid: int in World.zone.ground[cell]:
-				at_feet.append(World.items.id_of(uid))
-	var missing: Array = wares.filter(func(w: Dictionary) -> bool: return not player.slots.has(str(w["item"])) and not str(w["item"]) in at_feet)
-	var dagger := player.slots.find("dagger")
-	_check(missing.is_empty() and dagger >= 0 and World.is_starter(World.slot_uid(player, dagger)), "one of each kit ware, in hand or at their feet, marked starter (missing %s)" % [missing])
-	_check(said.call() == ["Here, take this. Something to practise with."], "he says so (%s)" % [said.call()])
-	_check(not _main.keeper_kit(player, rolf), "only once")
+	var slots_before := Array(player.slots).duplicate()
+	_main._on_command(player, "kit", {"keeper": str(rolf.get_path())})
+	_check(Array(player.slots) == slots_before and said.call().is_empty(), "an old client's kit ask: nothing handed (%s)" % [said.call()])
+	var starter := func() -> int:
+		var minted := World.items.mint("dagger", "made", rolf.person, World.zone.name, player.tile)
+		World.mark_starter(minted)
+		var room := -1
+		for slot in player.slots.size():
+			if Items.is_pack(slot) and player.slots[slot].is_empty():
+				room = slot
+				break
+		return minted if room >= 0 and World.put_item(player, player, room, minted) else 0
+	var piece: int = starter.call()
+	var rows: Array = _main.person_takes(player, rolf.worker_id).filter(func(r: Dictionary) -> bool: return int(r["uid"]) == piece)
+	_check(piece != 0 and rows.size() == 1 and int(rows[0]["gold"]) == 0 and (rows[0]["for"] as Dictionary).is_empty(),
+		"a starter piece in the pack: his Give row for it, a gift, no gold (%s)" % [rows])
+	var gold_before := World.gold_of(player.player_id)
 	heard.clear()
-	_main._send_offers(rolf, player.player_id, player.owner_peer)
-	o = offered.call()
-	_check(not o.is_empty() and not o[-1]["data"].has("kit"), "his offers no longer owe one")
+	var given: Array = _main.give(player, {"entity": str(rolf.get_path()), "uids": [piece]})
+	var back: Array = Townsfolk.days().get("keeper", {}).get("back", [])
+	_check(given == [piece] and World.slot_of_unit(player, piece) < 0 and World.gold_of(player.player_id) == gold_before
+		and said.call().size() == 1 and str(said.call()[0]) in back,
+		"handed back: gone from the pack, no gold, his own word (%s)" % [said.call()])
+	_check(World.items.id_of(piece).is_empty(), "and ended, never his to sell on")
+	var dropped: int = starter.call()
+	var dslot := World.slot_of_unit(player, dropped)
+	_check(dropped != 0 and World.try_drop(player, dslot) and World.slot_of_unit(player, dropped) < 0, "a starter piece can be dropped")
 	heard.clear()
 	_main._greet_at.clear()
 	_main._greeted(player, rolf)

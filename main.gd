@@ -1959,10 +1959,10 @@ static func answers_clicks_only(body: GridEntity) -> bool:
 ## Give's button (802): "give" {entity: [param to]'s path, uids, barter
 ## while a maker's barter is open} (economy's give path; the answer an item
 ## reward, their thanks as speech and a fresh sheet). Sent only while the sheet carries "takes" (the tab shown).
-## Rolf's buttons (807 amended (3)): [param command] ("locker": the
-## player's locker opened beside him; "kit": his practice kit) asked of the
-## stall keeper [param keeper]; the server checks he serves them, and his
-## "offers" come again without "kit" once it is taken.
+## Rolf's button (807 amended (3)): [param command] ("locker": the
+## player's locker opened beside him; his practice kit's "kit" retired,
+## 807 amended (5)) asked of the stall keeper [param keeper]; the server
+## checks he serves them.
 func _keeper_command(keeper: GridEntity, command: String) -> void:
 	var me := _local_player()
 	if me != null and keeper != null and is_instance_valid(keeper) and keeper.is_inside_tree():
@@ -11881,8 +11881,6 @@ func _send_offers(body: Resident, player_id: String, peer: int) -> void:
 	var taker := _player_of_id(player_id)
 	if taker != null and not _worker_town(body.worker_id).is_empty():
 		data["takes"] = person_takes(taker, body.worker_id)  # What they'd take of the pack (802 amended (2), the Give tab).
-	if body.worker_id.begins_with(Offers.VENDOR) and _records.has(player_id) and not (_records[player_id] as PlayerRecord).kit_given:
-		data["kit"] = true  # His practice kit is owed (807 amended (2)): ui's Kit button.
 	var standing := _standing_for(player_id, body.worker_id)
 	if not standing.is_empty():
 		data["standing"] = {"id": standing["id"], "title": standing["title"]}  # PROTOCOL_REVISION 23 (decision 536).
@@ -13840,10 +13838,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			var prop := get_node_or_null(NodePath(str(args.get("prop", "")))) as Chest
 			if prop != null:
 				open_locker(entity as Player, prop)
-	elif command_name == "kit" and entity is Player:
-		if keeper_kit(entity as Player, get_node_or_null(NodePath(str(args.get("keeper", "")))) as Resident):
-			var kept := get_node_or_null(NodePath(str(args.get("keeper", "")))) as Resident
-			_send_offers(kept, (entity as Player).player_id, (entity as Player).owner_peer)  # Its button gone.
+	elif command_name == "kit":
+		pass  # The practice kit is retired (807 amended (5), Jeff): an old client's ask hands nothing.
 	elif command_name in ["deposit", "withdraw", "deposit_all"] and entity is Player:
 		var locker := World.locker_of((entity as Player).player_id)
 		if locker != null:
@@ -15365,6 +15361,9 @@ func give(player: Player, args: Dictionary) -> Array:
 	if body == null or not body.spawned or World.distance(body.tile, player.tile) > HEARING_RANGE:
 		return []
 	var given := give_to(player, body.worker_id, body.person, args.get("uids", []))
+	if _taken_back > 0:
+		_keeper_says(body, "back", player)  # Starter gear handed back (807 amended (5)): no thanks owed, his own word.
+	_taken_back = 0
 	_send_offers(body, player.player_id, player.owner_peer)
 	if bool(args.get("barter", false)) and not body.worker_id.begins_with(Offers.VENDOR):
 		_send_barter(player, body, "", body.worker_id)  # A maker's window (ui): its pack list fresh for Sell.
@@ -15385,11 +15384,21 @@ func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
 		takes[int(row["uid"])] = true
 	_giving_to = worker
 	_giving_name = who
+	_taken_back = 0
 	for raw: Variant in uids:
 		var uid := int(raw)
 		if not takes.has(uid):
 			continue
 		var units: Array = [uid] + Array(World.items.stack_of(uid))
+		if worker.begins_with(Offers.VENDOR) and World.is_starter(uid):
+			# Starter gear handed back to the stall's keeper (807 amended (5), Jeff: "Trade or
+			# Donate"): no gold (736 holds), and it ends, never his stock to sell on.
+			units.reverse()  # The stack's own units first, its head last.
+			for unit: int in units:
+				if World.consume(player, unit, "handed back to the stall"):
+					given.append(unit)
+					_taken_back += 1
+			continue
 		var trophy := World.items.id_of(uid) if not bought_by(town, World.items.id_of(uid)).is_empty() else ""  # A trophy or a maker's input (821).
 		for unit: int in units:
 			if World.donate(player, unit, town):
@@ -15406,6 +15415,8 @@ func give_to(player: Player, worker: String, who: String, uids: Array) -> Array:
 ## name, "" at a chest or the town window.
 var _giving_to := ""
 var _giving_name := ""
+## Starter units the last give_to handed back to the stall's keeper (807 amended (5)).
+var _taken_back := 0
 
 
 ## One trophy [param id] just banked at [param town] by give_to, sold (821):
@@ -16171,7 +16182,8 @@ func give_outcome(town: String, player_id: String, raw: String, count: int) -> D
 ## (the stack), raw (its unit word: "ore"; "" for gear), for {kind, name}
 ## ({} for a gift), have, need, gold, owed}], one row a slot. A
 ## raw goes to its receiver_for alone; gear only to the stall's keeper, a
-## gift (no gold), anything of value but a starter ware (736: never taken back).
+## gift (no gold), anything of value; a starter ware too, to him alone, from
+## the pack: a gift that ends (807 amended (5); 736: never paid for).
 func person_takes(player: Player, worker: String) -> Array:
 	var out: Array = []
 	var town := _worker_town(worker)
@@ -16187,7 +16199,13 @@ func person_takes(player: Player, worker: String) -> Array:
 		var yields := Items.yield_of(id)
 		var buyer := bought_by(town, id) if yields.is_empty() else {}  # 821: a trophy's or an input's.
 		var row := {}
-		if not yields.is_empty():
+		if World.items.is_starter(uid):
+			# Starter gear (736), the retired practice kit's too (807 amended (5)): only the stall's
+			# keeper takes it, from the pack, for nothing (Donate, ui's word for gold 0).
+			if not worker.begins_with(Offers.VENDOR) or not Items.is_pack(slot):
+				continue
+			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "owed": 0}
+		elif not yields.is_empty():
 			var raw := str(yields.keys()[0])
 			if raw == "gold" or receiver_for(town, raw) != worker:
 				continue
@@ -18757,9 +18775,12 @@ func _greeted(player: Player, body: Resident) -> void:
 		return
 	if body.worker_id.begins_with(Offers.VENDOR):
 		body.address(player, int(float(rules.get("stop_seconds", 8)) * World.TICK_RATE))
-		# His own words (807 amended (2); voice's): "greet" to one he hasn't kitted out yet, "greet_again" after.
+		# His own words (807 amended (2); voice's): "greet" the first time, "greet_again" after. PlayerRecord.kit_given
+		# now only says he has met them (807 amended (5): the kit retired; the saved key kept).
 		var record: PlayerRecord = _records.get(player.player_id)
 		_keeper_says(body, "greet_again" if record != null and record.kit_given else "greet", player)
+		if record != null:
+			record.kit_given = true
 		return
 	var busy := false
 	for each: Dictionary in _resident_asks:
@@ -21573,7 +21594,7 @@ func _keeper_serves(player: Player, keeper: Resident) -> bool:
 		and World.has_line_of_sight(player.tile, keeper.tile)
 
 
-## [param keeper]'s own line of [param kind] ("greet", "locker", "kit": residents.json
+## [param keeper]'s own line of [param kind] ("greet", "locker", "back": residents.json
 ## "keeper", voice's words) said to [param player] in passing, picked by
 ## their ids; none, nothing.
 func _keeper_says(keeper: Resident, kind: String, player: Player) -> void:
@@ -21604,29 +21625,6 @@ func _open_locker_at(player: Player, zone: String, tile: Vector2i) -> Locker:
 		World.update_visibility(player.owner_peer, zone)  # Asked at its spawn, before it had a viewer.
 	locker.opened += 1
 	return locker
-
-
-## Server: the stall's keeper's practice kit (807 amended (2); the
-## coordinator: one of each starter weapon, so a new player tries them all):
-## [param keeper] serving [param player] hands them each ware of the
-## vendor's (economy.json "vendor" wares, but a line "kit": false) its count
-## times, marked starter as his sales are, once a player (PlayerRecord
-## kit_given), free; he says so. Whether he handed it.
-func keeper_kit(player: Player, keeper: Resident) -> bool:
-	var record: PlayerRecord = _records.get(player.player_id) if player != null else null
-	if not Net.is_authority() or record == null or record.kit_given or World.economy == null or not _keeper_serves(player, keeper):
-		return false
-	record.kit_given = true
-	for line: Variant in World.economy.rules.get("vendor", {}).get("wares", []):
-		if not line is Dictionary or not bool((line as Dictionary).get("kit", true)):
-			continue
-		var item := str(line.get("item", line.get("id", "")))
-		if item.is_empty():
-			continue
-		for i in maxi(int(line.get("count", 1)), 1):
-			_hand_item(player.player_id, item, keeper.person, true)
-	_keeper_says(keeper, "kit", player)
-	return true
 
 
 ## Server: [param from]'s whole [param slot] (a stack whole) into the first

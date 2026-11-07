@@ -43407,6 +43407,23 @@ goes. resident_test _test_keeper_buttons drives the client's path. Client only, 
 unchanged (rev 51 is npc's), no new class_name.
 807 amended (4): builder mode places a chest of loot only in a dungeon, and never an empty one (the coordinator: "a chest placed in-game must hold something and stand in a dungeon level; outside dungeons, builder offers no chest at all"; release's label). BuilderSession.is_dungeon(config) is dungeon's test (806): a "depth" above 0 or a "regenerate" block. place's chest, unless it has a "use" (a town store's depot, a shop counter: buildings' plan, spared by 806's rule too), is refused by chest_problem: out of a dungeon "a chest of loot goes only in a dungeon ..."; in one, unless it has items, a loot table of its own, or the level has chest loot ("loot": {"chest": table}), "a chest must hold something: give it items or a loot table". The system prompt says the rule. Whether a placed chest is guarded is 806's, checked on accept (806 amended (7)). builder_test _test_chest_rule: a loot chest out of doors refused, a shop's and a depot's placed; in a dungeon an empty one refused, one with a table or items placed; a regenerating level's bare chest with the level's chest loot placed; is_dungeon; the prompt. The tests that placed a loot chest on the grass field mark it depth 1, items_test's builder case among them. BuilderHost's stub (Net.builder_stub, no Claude) keeps the rules: in a dungeon its chest of a kit with an imp on guard beside it, elsewhere a shop counter's chest; builder_zone_test reads the test room's as a shop counter's. Server and builder only; protocol unchanged, no new class_name.
 
+807 amended (5): the practice kit retired (release's label; Jeff: "Rolf's menu is confusing, it
+just says Give. I didn't want a 'take practice kit' button that just fills your inventory with junk
+you can't trade. It needs to say Trade or Donate."; the coordinator's approval, option A). Main.keeper_kit
+goes: Rolf hands no kit, his "offers" never carry "kit", and the "kit" command hands nothing (an old
+client's ask). residents.json's keeper "kit" line goes. PlayerRecord.kit_given stays, since saved records
+carry it, but now only says he has met the player: set at his first greeting, it picks "greet_again"
+after. So that nothing is stuck in a pack, starter gear (736's mark, the old kit's pieces and bought
+starter wares alike) can be handed back to him. Main.person_takes gives him, and nobody else, a row for a
+starter piece in the pack: a gift ("for" {}, gold 0; ui reads it as Donate). Main.give_to ends those
+units (World.consume, "handed back to the stall") rather than banking them, so they never come round as
+his stock, and Main.give has him say his own "back" line (voice's words). 736 holds: nobody pays for
+starter gear. Dropping it already worked (World.try_drop has no starter check), and resident_test now
+proves it. Open locker stays. ui's side drops the Take practice kit button and BarterPanel's kit words,
+straight after (807 amended (5), ui's side). resident_test _test_keeper. Protocol hash unchanged; a
+"53 (807 amended (5))" line under 53 records the field gone. No new class_name. Package: 807 amended (5),
+npc's side then ui's side, nothing switched off.
+
 ## 799. The forest camps' traders
 
 The coordinator's approved design (2026-11-04), on maps' forest phase C (793, maps' side,

@@ -601,6 +601,8 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## plane) and a new "near" message {zone}, sent after that zone's ground, towns and roofs; the
 ## server never opens the zone for it. Off until perf switches seamless crossings on: an old
 ## client never sends it. Shares 53 with 819.
+## 53 (807 amended (5)): "offers" no longer carries "kit"; the "kit" command hands nothing (the
+## practice kit retired). No new number (release): an absent optional field hides the button.
 const PROTOCOL_REVISION := 53
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
