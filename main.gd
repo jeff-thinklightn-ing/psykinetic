@@ -2774,19 +2774,22 @@ const FREE_GIVE_UP_SECONDS := 2.0
 ## where the block began, it got on, and the count starts again.
 const FREE_BLOCKED_MOVED := 0.15
 ## A click route pressing into a pushable on its way (a crate on the next
-## cell, or the cell clicked): it presses FREE_PRESS_SECONDS (one press: the
-## server shifts it a cell, then not again within the step's ticks), then
-## sends no way on until this peer sees the thing gone from that cell; if
+## cell, or the cell clicked): the walk that brings it against the thing is
+## the press (the server shifts it on the substep it touches, as this
+## peer's view stops it there), so from the moment its view touches the
+## thing it sends no way on until this peer sees it gone from that cell; if
 ## it is still there once the server has every command sent (none pending)
-## and FREE_PRESS_WAIT_SECONDS more, it presses again. Its view holds the
-## thing where it was till the shift is heard, and every command sent
-## pressing on meanwhile walked the server's body on into the freed cell
-## and shoved the thing a second time (net_test: Crate1 pushed at ticks 9
-## and 12). Wall time, not ticks: a server holding its ticks (a test's
-## wait for players, a stall) holds the client's too, and the press must
-## still end. Keys held push on as they always did.
-const FREE_PRESS_SECONDS := 0.2
+## and FREE_PRESS_WAIT_SECONDS more, it presses again for one frame. Its
+## view holds the thing where it was till the shift is heard, and any way
+## sent pressing on meanwhile walks the server's body on into the freed
+## cell: a cell's walk of it (about 0.3 s) shoved the thing a second time
+## (net_test under load: Crate1 pushed at ticks 9 and 12, a first 0.2 s
+## press and a slow frame's 0.1 s with it). Keys held push on as they
+## always did.
 const FREE_PRESS_WAIT_SECONDS := 0.5
+## How near (cells, beyond FREE_RADIUS) the view's body is to a pushable's
+## square to touch it: the free collision stops it at FREE_RADIUS.
+const FREE_PRESS_TOUCH := 0.001
 ## How far along its route a free body looks for a cell in clear line
 ## (_free_pull, 689 amended (5)): a few line checks a frame at most.
 const FREE_PULL_CELLS := 12
@@ -2928,25 +2931,24 @@ func _free_intent(player: Player, own: FreeNet.Own) -> Vector2:
 	return Vector2.ZERO
 
 
-## Whether a click route at [param at] waits, its press into a pushable on
-## [param cell] sent (FREE_PRESS_SECONDS, FREE_PRESS_WAIT_SECONDS): false
-## while no pushable stands there in this peer's view or the body is not
-## against it (within a cell's half and FREE_RADIUS and a little), and for
-## the press itself. [param pending]: commands not yet acknowledged by the
-## server; [param now]: msec (Time's, a test's).
+## Whether a click route at [param at] waits against a pushable on
+## [param cell] (FREE_PRESS_WAIT_SECONDS): false while no pushable stands
+## there in this peer's view or the body does not touch it (FREE_RADIUS and
+## FREE_PRESS_TOUCH of the cell's square), and on the one frame of a press
+## again. [param pending]: commands not yet acknowledged by the server;
+## [param now]: msec (Time's, a test's).
 func _free_press_waits(at: Vector2, cell: Vector2i, pending: bool, now := -1) -> bool:
 	if now < 0:
 		now = Time.get_ticks_msec()
 	var thing := World.get_entity_at(cell)
-	if thing == null or not thing.pushable or at.distance_to(Vector2(cell)) > 0.5 + World.FREE_RADIUS + 0.05:
+	var low := Vector2(cell) - Vector2(0.5, 0.5)
+	if thing == null or not thing.pushable or at.distance_to(at.clamp(low, low + Vector2.ONE)) > World.FREE_RADIUS + FREE_PRESS_TOUCH:
 		_free.erase("pressed")
 		return false
 	var pressed: Dictionary = _free.get("pressed", {})
 	if pressed.get("thing") != thing or pressed.get("cell") != cell:
-		_free["pressed"] = {"thing": thing, "cell": cell, "at": now, "heard": -1}
-		return false
-	if now - int(pressed["at"]) < FREE_PRESS_SECONDS * 1000.0:
-		return false  # The press.
+		_free["pressed"] = {"thing": thing, "cell": cell, "heard": -1}
+		return true  # Touched: the walk here was the press.
 	if pending:
 		pressed["heard"] = -1  # The server has not had it all yet: wait.
 		return true
@@ -2954,7 +2956,7 @@ func _free_press_waits(at: Vector2, cell: Vector2i, pending: bool, now := -1) ->
 		pressed["heard"] = now
 	if now - int(pressed["heard"]) < FREE_PRESS_WAIT_SECONDS * 1000.0:
 		return true
-	_free["pressed"] = {"thing": thing, "cell": cell, "at": now, "heard": -1}  # Heard, and still there: again.
+	pressed["heard"] = -1  # Heard, and still there: one frame's press again.
 	return false
 
 

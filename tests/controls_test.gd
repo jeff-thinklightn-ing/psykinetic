@@ -1270,12 +1270,13 @@ func _test_free_click() -> void:
 	Net.controls = saved
 
 
-## A click route into a crate presses once (Main.FREE_PRESS_SECONDS), then
-## waits to see it move (while commands are pending, FREE_PRESS_WAIT_SECONDS), so the commands sent while
-## the shift is on its way never shove it again (net_test under load:
-## Crate1 pushed twice). Here the host's shift is seen at once: one click on
-## the crate's cell, shifted one cell, the body on its old cell. And, the
-## shift not heard (lag): the press, then the wait, then a press again.
+## A click route into a crate presses only with the walk that touches it,
+## then waits to see it move (while commands are pending, and
+## Main.FREE_PRESS_WAIT_SECONDS), so no way sent while the shift is on its
+## way shoves it again (net_test under load: Crate1 pushed twice, ticks 9
+## and 12). Here the host's shift is seen at once: one click on the crate's
+## cell, shifted one cell, the body on its old cell. And, the shift not
+## heard (lag): a wait from the touch, however long, then one frame's press.
 func _test_free_press_once() -> void:
 	print("\n== a click route into a crate presses once, then waits to see it move ==")
 	var saved: String = Net.controls
@@ -1301,26 +1302,24 @@ func _test_free_press_once() -> void:
 	_check(arrived and moves == [Vector2i(7, 3)] and crate.tile == Vector2i(7, 3),
 			"one click on the crate's cell: shifted once, to (7, 3), the body on (6, 3) (moves %s, at %s)" % [moves, player.free_pos])
 	# Unheard: against it on (7, 3), the route's next cell its cell. Wall
-	# time (a held server holds the client's ticks): the press, then a wait
-	# while commands are pending and FREE_PRESS_WAIT_SECONDS past, then again.
+	# time (a held server holds the client's ticks).
 	_stop_walk()
 	_main._free.erase("pressed")
 	var against := Vector2(7, 3) - Vector2(0.5 + World.FREE_RADIUS, 0.0)
-	var press_ms := int(Main.FREE_PRESS_SECONDS * 1000.0)
 	var wait_ms := int(Main.FREE_PRESS_WAIT_SECONDS * 1000.0)
 	var t := 1000
 	var seen: Array[String] = []
-	var at_ms := func(ms: int, pending: bool) -> void:
-		seen.append("%d%s:%s" % [ms - t, "p" if pending else "", "wait" if _main._free_press_waits(against, Vector2i(7, 3), pending, ms) else "press"])
-	at_ms.call(t, false)  # First against it: the press.
-	at_ms.call(t + press_ms - 1, true)  # Still the press.
-	at_ms.call(t + press_ms, true)  # Pressed: waits while pending.
-	at_ms.call(t + 5000, true)  # A held server: still pending, still waits (no second press).
+	var at_ms := func(ms: int, pending: bool, where := against) -> void:
+		seen.append("%d%s:%s" % [ms - t, "p" if pending else "", "wait" if _main._free_press_waits(where, Vector2i(7, 3), pending, ms) else "go"])
+	at_ms.call(t, true, against + Vector2(-0.05, 0.0))  # Not touching yet: walks on.
+	at_ms.call(t + 16, true)  # Touched: the walk here was the press; waits at once.
+	at_ms.call(t + 5000, true)  # A held server: still pending, still waits.
 	at_ms.call(t + 5001, false)  # All heard, the crate still there: the grace begins.
 	at_ms.call(t + 5001 + wait_ms - 1, false)
-	at_ms.call(t + 5001 + wait_ms, false)  # Past it: presses again.
-	_check(seen == ["0:press", "%dp:press" % (press_ms - 1), "%dp:wait" % press_ms, "5000p:wait", "5001:wait", "%d:wait" % (5000 + wait_ms), "%d:press" % (5001 + wait_ms)],
-			"the shift unheard: one press, a wait however long the server holds, then once heard and %d ms on, a press again (%s)" % [wait_ms, seen])
+	at_ms.call(t + 5001 + wait_ms, false)  # Past it: one frame's press.
+	at_ms.call(t + 5017 + wait_ms, true)  # Its command closed, pending: waits again.
+	var want: Array[String] = ["0p:go", "16p:wait", "5000p:wait", "5001:wait", "%d:wait" % (5000 + wait_ms), "%d:go" % (5001 + wait_ms), "%dp:wait" % (5017 + wait_ms)]
+	_check(seen == want, "the shift unheard: a wait from the touch however long the server holds, then once heard and %d ms on, one frame's press (%s)" % [wait_ms, seen])
 	_check(not _main._free_press_waits(against, Vector2i(8, 3), true) and not _main._free_press_waits(Vector2(5, 3), Vector2i(7, 3), true),
 			"no wait where no pushable stands, nor when not against it")
 	World.despawn(crate)

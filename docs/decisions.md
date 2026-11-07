@@ -34387,7 +34387,23 @@ once, to the next cell, with the body ending on its old cell. With the shift unh
 waits while commands are pending however long the server holds (5 s here), waits the grace once
 all are heard, then presses again; there is no wait where no pushable stands or when the body is
 not against it. net_test's phase 1 (Player1's click three cells west onto Crate1) is the case it
-was found by. Client only, protocol unchanged, no new class_name, no bullet.
+was found by. That press still shoved twice under load (pc-character's landing at 06:30, and
+buildings' after: ticks 9 and 12 again), so before (7) shipped it became the touch is the press
+(release's ruling, folded into (7)): The server shifts the thing on the substep the body touches it, and from then on any
+way the client still sends carries the server's body on into the freed cell; a cell's walk there
+(about 0.3 s at three ticks a step) reaches the thing again, and the step's ticks past, shoves it
+twice. (7)'s 0.2 s press after the touch, with a loaded frame's 0.1 s (FreeNet.Own.hold takes up
+to 0.1 s a frame), was that cell. Main._free_press_waits now waits from the moment this peer's view
+touches the pushable (its body within FREE_RADIUS and FREE_PRESS_TOUCH, 0.001, of the thing's
+square: the free collision stops it at FREE_RADIUS), sending no way on till the thing is seen gone.
+Once every command is acknowledged and FREE_PRESS_WAIT_SECONDS (0.5 s) more have passed with the
+thing still there, it presses again for one frame, then waits again. What the server's body can
+overrun is now at most one frame, a third of a cell. FREE_PRESS_SECONDS is gone, and the
+press-for-0.2-s rule above with it. controls_test
+_test_free_press_once: on a host one click onto a crate's cell shifts it once; unheard, it walks
+on till it touches, waits from the touch however long the server holds, then once all is heard
+and the grace past, gives one frame's press and waits again. Client only, protocol unchanged, no
+new class_name; the bullet is voice's (so the "no bullet" above no longer holds).
 ## 677, pc-character's side. The lob drawn at the sky
 
 Combat asked for it, and the coordinator approved the design. While a body
