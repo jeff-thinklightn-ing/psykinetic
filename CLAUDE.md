@@ -27,6 +27,25 @@ which worktree owns each step, and the design rules not to break without asking 
 - New player-facing lines (dialogue, windows, signs, barks) go to the `voice` worktree session
   for wording before they land (Jeff, 2026-10-31); facts in them still go to `lore`.
 
+## Content ships as packages (Jeff, 2026-11-06)
+
+"Coordinate so that these additions go in as packages. So a sign can't go in before the
+place, and a text and loot don't go in before a quest is in."
+
+- A package is everything a player can see, hear or be told about one addition: the place
+  or building, its entrance and link, the signs and waystones pointing at it, its map name
+  and found-place reward, its creatures, its loot and caches, its quest steps, its lines
+  (barks, talk, lore facts given to residents or the companion) and its sounds.
+- A player meets a package whole or not at all. A piece may land on `main` before the rest
+  only switched off (hidden, unreachable and unmentioned) in a released build; nothing
+  visible points at a piece that isn't in.
+- The coordinator names each package and its pieces when approving the design, and says
+  which tree switches it on. Tell the coordinator in your landing message which package
+  your piece belongs to and whether it lands off.
+- Before each cut, release lists any player-visible piece on `main` whose package isn't
+  complete; the coordinator rules on each (switch it off, or hold the cut) before the
+  build goes out. Cut checklists list only complete packages.
+
 ## Landing work
 
 - Only `main` is released. In a worktree, rebase onto `origin/main` before each change,
