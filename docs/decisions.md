@@ -34297,6 +34297,30 @@ its free_press (688 amended (4)). free_walk_test _test_kick_respawn: kicked
 east, respawned at (2, 4) mid-slide: no slide, no momentum, no press, and it
 stands there 6 ticks on (without the fix it slid back to (4, 2)). Server
 only, protocol unchanged, no new class_name.
+
+688 amended (7) (2026-11-07, release's label; net_test's crate check failing landings under
+load: "pushed twice, server ticks 9 and 12, crate at (6, 2)"): a click route presses a pushable
+once, then waits to see it move. A client's replay never shifts a thing (free_glide touches
+nothing), so its body stands against a crate till the server's shift is heard. Meanwhile its
+click route went on sending its way into it, and those commands carried the server's body on
+into the freed cell and, the step's ticks past (next_move_tick), shoved the crate again. Main's
+route (_free_intent) now asks _free_press_waits first. Against a pushable standing on the route's
+next cell in this peer's view (within half a cell, FREE_RADIUS and 0.05 of its centre), it
+presses for Main.FREE_PRESS_SECONDS (0.2 s: the server shifts it a cell, and not again within the
+step's ticks), then sends no way on till the thing is seen gone from that cell. If it is still
+there once the server has acknowledged every command sent (FreeNet.Own's pending empty) and
+FREE_PRESS_WAIT_SECONDS (0.5 s) more have passed, the press is refused and it presses again. The
+times are wall time, not ticks. A first try counted World.tick, but in net_test's phase 1 the
+server holds its ticks till both players are in, and with them the client's, so the press never
+ended and the crate went twice still; however long the server holds now, the client waits, with
+no second press. Keys held and a held button's steering push on as they always did; only a
+click's route waits. On a host the shift is seen at once, so nothing changes there.
+controls_test _test_free_press_once covers two cases. One click onto a crate's cell shifts it
+once, to the next cell, with the body ending on its old cell. With the shift unheard, it presses,
+waits while commands are pending however long the server holds (5 s here), waits the grace once
+all are heard, then presses again; there is no wait where no pushable stands or when the body is
+not against it. net_test's phase 1 (Player1's click three cells west onto Crate1) is the case it
+was found by. Client only, protocol unchanged, no new class_name, no bullet.
 ## 677, pc-character's side. The lob drawn at the sky
 
 Combat asked for it, and the coordinator approved the design. While a body
