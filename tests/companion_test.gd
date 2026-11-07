@@ -2353,6 +2353,7 @@ func _bond_as(score: int, kept: Variant = null) -> Variant:
 func _test_sickness() -> void:
 	print("
 == sick while she rests in town, told when her player comes for her; well again in the party (decision 501, companions' side) ==")
+	_main.party_log._lines.clear()  # Lines added are counted by its size, which stops at MAX_LINES.
 	var pet := _companion()
 	var record: PlayerRecord = _main._records[Net.player_id]
 	var steps_were := World.steps
