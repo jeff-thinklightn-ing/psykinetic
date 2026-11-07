@@ -594,7 +594,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## {chest, place, title, rows [{id, count}], gold} and gives nothing; a new "take_find" command
 ## {target} gives it (hand or pack, the rest at the feet, said). An old client never sends
 ## take_find, so its finds stay in their chests. Shares 52 with 821 and 297 amended.
-const PROTOCOL_REVISION := 52
+## 53 (819): a carrier's slots are 22 (Items.CARRIED): the pack's third row, 18-21
+## (Items.PACK_SLOTS, 12), so "slots" and slot_items are 22 long; an old client reads 18.
+## Opens 53 (release's), the first wire change after v0.1.207.
+const PROTOCOL_REVISION := 53
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

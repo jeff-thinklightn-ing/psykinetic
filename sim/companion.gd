@@ -1259,7 +1259,7 @@ func knowledge_of(kinds: Array[String]) -> String:
 
 
 ## What she carries, in a sentence: her lantern, what is in her hands, what
-## she wears and what is in her pack (722: the pack is Items.PACK_SLOTS).
+## she wears and what is in her pack (722: the pack is World.pack_slots, 819).
 func carried() -> String:
 	var items: Array[String] = []
 	var held: Array[String] = []
@@ -1532,7 +1532,7 @@ func _rod_in_hand() -> bool:
 	if not held.is_empty() and rod == Items.LEFT_HAND:
 		# The rod in her off hand: her weapon to her pack first, not across.
 		held_at = -1
-		for slot: int in Items.PACK_SLOTS:
+		for slot: int in Items.pack_slots_of(slots):
 			if slot < slots.size() and slots[slot].is_empty():
 				held_at = slot
 				break
@@ -1558,7 +1558,7 @@ func _rod_away() -> void:
 	var back := int(_fish_put["rod_slot"])
 	if not (slots[back].is_empty() or (back == at and slots[back] == held)):
 		back = -1
-		for slot: int in Items.PACK_SLOTS:
+		for slot: int in Items.pack_slots_of(slots):
 			if slot < slots.size() and slots[slot].is_empty():
 				back = slot
 				break
@@ -6223,7 +6223,7 @@ func _mine_at_seam() -> bool:
 func _mine_room() -> bool:
 	if Seam.ORE in Array(World.ground_at(tile)):
 		return true
-	for slot: int in Items.PACK_SLOTS:
+	for slot: int in Items.pack_slots_of(slots):
 		if slot < slots.size() and (slots[slot].is_empty() or slots[slot] == Seam.ORE and World.slot_count(self, slot) < Items.stack_of(Seam.ORE)):
 			return true
 	return false

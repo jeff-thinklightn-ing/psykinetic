@@ -15720,7 +15720,7 @@ static func taker_marks(takers: Dictionary, player: Player) -> Dictionary:
 	var out := {}
 	if player == null or takers.get("takers", {}).is_empty() and takers.get("gear", {}).is_empty():
 		return out
-	for slot: int in Items.PACK_SLOTS:
+	for slot: int in World.pack_slots(player):
 		if slot < player.slots.size():
 			var body := str(taker_entry(takers, str(player.slots[slot])).get("body", ""))
 			if not body.is_empty():
@@ -15894,12 +15894,12 @@ func person_takes(player: Player, worker: String) -> Array:
 			row["raw"] = raw
 		elif not World.economy.trophy_trade(id).is_empty():
 			# A trophy (821): bought by its trade's resident, else the stall's keeper, from the pack only.
-			if slot not in Items.PACK_SLOTS or World.items.is_starter(uid) or trophy_taker(town, id) != worker:
+			if not Items.is_pack(slot) or World.items.is_starter(uid) or trophy_taker(town, id) != worker:
 				continue
 			var sale := World.economy.trophy_outcome(town, player_id, id, count)
 			row = {"for": {"kind": "maker", "name": World.economy.trophy_for(id, worker.begins_with(Offers.VENDOR))},
 				"raw": "", "have": 0, "need": 0, "gold": int(sale["gold"]), "owed": int(sale["owed"])}
-		elif worker.begins_with(Offers.VENDOR) and slot in Items.PACK_SLOTS and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
+		elif worker.begins_with(Offers.VENDOR) and Items.is_pack(slot) and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
 			# Gear only from the pack (802 amended (4); playtest: a tool in hand was offered
 			# as a gift): never what is held or worn.
 			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "owed": 0}  # A gift: "for" empty (ui).
@@ -21041,7 +21041,7 @@ func _item_command(player: Player, what: String, args: Dictionary) -> void:
 			var slot := held
 			if player.slots[slot].is_empty():
 				slot = -1
-				for i: int in Items.PACK_SLOTS:
+				for i: int in World.pack_slots(player):
 					if i < player.slots.size() and not player.slots[i].is_empty():
 						slot = i
 			if slot >= 0:
@@ -21253,7 +21253,7 @@ func _move_slot(by: GridEntity, from: GridEntity, slot: int, to: GridEntity) -> 
 func deposit_all(player: GridEntity, locker: Locker) -> int:
 	var moved := 0
 	var full := false
-	for slot: int in Items.PACK_SLOTS:
+	for slot: int in World.pack_slots(player):
 		if slot >= player.slots.size() or player.slots[slot].is_empty() or World.soulbound(World.slot_uid(player, slot)):
 			continue
 		var uid := World.slot_uid(player, slot)
@@ -22497,7 +22497,7 @@ func _companion_test_command(words: PackedStringArray) -> String:
 		return "no player %s with a companion in the game" % words[2]
 	match verb:
 		"rod":
-			for slot: int in Items.PACK_SLOTS:
+			for slot: int in World.pack_slots(pet):
 				if slot < pet.slots.size() and pet.slots[slot].is_empty():
 					World.put_item(pet, pet, slot, World.items.mint("fishing_rod", "built"))
 					return "%s: a rod in her pack (slot %d)" % [Companion._name_of(pet), slot]
@@ -23082,7 +23082,7 @@ func _run_test_show(player: Player) -> void:
 				var sample := "Wren's dagger (quiet), imp-bane
 felled 12 imps
 story: carried by Wren for 3 days; named for Wren"
-				pack_panel.tip.show_for("dagger", sample, pack_panel.box_in(true, Items.PACK_SLOTS[0]).get_global_rect().position)
+				pack_panel.tip.show_for("dagger", sample, pack_panel.box_in(true, Items.ALL_PACK_SLOTS[0]).get_global_rect().position)
 			"menu":
 				_show_menu()
 			"menu_options":

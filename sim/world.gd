@@ -2738,7 +2738,13 @@ func try_equip(by: GridEntity, carrier: GridEntity, slot: int) -> String:
 	var uids := slot_uids(carrier)
 	var why := ""
 	if not Items.is_pack(slot):
-		var free := free_pack_slot(carrier)
+		var off := slots.duplicate()
+		off[slot] = ""  # The pack it leaves (World.pack_slots, 819).
+		var free := -1
+		for each: int in Items.pack_slots_of(off):
+			if each < off.size() and off[each].is_empty():
+				free = each
+				break
 		if free < 0:
 			why = "no room in your pack for the %s" % Items.name_of(id)
 		else:
@@ -2782,7 +2788,7 @@ func try_equip(by: GridEntity, carrier: GridEntity, slot: int) -> String:
 			for i in out_ids.size():
 				var into := slot if i == 0 else -1
 				if into < 0:
-					for each: int in Items.PACK_SLOTS:
+					for each: int in Items.pack_slots_of(slots):
 						if each < slots.size() and slots[each].is_empty():
 							into = each
 							break
@@ -3651,7 +3657,7 @@ func mint_totem(player: GridEntity) -> int:
 func into_pack(player: GridEntity, uid: int) -> int:
 	var slot := free_pack_slot(player)
 	if slot < 0:
-		var pack := Items.PACK_SLOTS.filter(func(i: int) -> bool: return i < player.slots.size())
+		var pack := pack_slots(player).filter(func(i: int) -> bool: return i < player.slots.size())
 		pack.reverse()
 		var plain := pack.filter(func(i: int) -> bool: return not soulbound(slot_uid(player, i)))
 		if plain.is_empty():
@@ -6256,7 +6262,7 @@ func try_pick_up_near(by: GridEntity, radius := NEAR_REACH) -> Dictionary:
 ## Where a sweep (773) puts [param uid]: onto a stack of its kind, else the
 ## first free pack slot, else a free hand that can hold it; -1 for none.
 func _near_slot(by: GridEntity, uid: int) -> int:
-	for slot: int in ([Items.RIGHT_HAND, Items.LEFT_HAND] + Items.PACK_SLOTS) if has_hands(by) else range(by.slots.size()):
+	for slot: int in ([Items.RIGHT_HAND, Items.LEFT_HAND] + pack_slots(by)) if has_hands(by) else range(by.slots.size()):
 		if slot < by.slots.size() and stacks_onto(slot_uid(by, slot), uid):
 			return slot
 	var free := free_pack_slot(by) if has_hands(by) else -1
@@ -6306,7 +6312,7 @@ func _swap_bundle(by: GridEntity, cell: Vector2i, index: int) -> bool:
 ## stack it joins (decision 619; the hands, then the pack), else
 ## free_slot_for's; -1 for none.
 func room_for(entity: GridEntity, uid: int) -> int:
-	var order: Array = [Items.RIGHT_HAND, Items.LEFT_HAND] + Items.PACK_SLOTS if has_hands(entity) else range(entity.slots.size())
+	var order: Array = [Items.RIGHT_HAND, Items.LEFT_HAND] + pack_slots(entity) if has_hands(entity) else range(entity.slots.size())
 	for slot: int in order:
 		if slot < entity.slots.size() and stacks_onto(slot_uid(entity, slot), uid):
 			return slot
@@ -6357,10 +6363,18 @@ func locker_of(player_id: String) -> Locker:
 	return null
 
 
-## [param entity]'s first empty pack slot (Items.PACK_SLOTS, decision 722);
+## [param entity]'s pack slots now (decision 819, Items.pack_slots_of): the
+## pack's twelve. Every reader of the pack goes through this (items_test
+## fails a PACK_SLOTS read elsewhere), so what may open more (a satchel) is
+## seen by every caller.
+func pack_slots(entity: GridEntity) -> Array[int]:
+	return Items.pack_slots_of(entity.slots)
+
+
+## [param entity]'s first empty pack slot (pack_slots, decision 722);
 ## -1 for none.
 func free_pack_slot(entity: GridEntity) -> int:
-	for slot: int in Items.PACK_SLOTS:
+	for slot: int in pack_slots(entity):
 		if slot < entity.slots.size() and entity.slots[slot].is_empty():
 			return slot
 	return -1

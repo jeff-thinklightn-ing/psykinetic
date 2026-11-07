@@ -44557,3 +44557,31 @@ finds; every other cell beside a wall, 133, 132 and 136 walks, the farthest 212 
 missed, about 10 s with the next) and _test_walled_off (a goal
 ringed by bodies: no way either way, both times printed). Server only, protocol unchanged, no new
 class_name.
+## 819. The pack's twelve: a third row of four
+
+Jeff, after a night's play on v0.1.206 (tonight's cache finds went to the
+floor of a full pack): "pack space is a premium", then, through the
+coordinator, "players need more slots probably 12, 3 rows of 4" and "we
+don't want to show greyed out bars".
+- Items.PACK_SLOTS grows from 8 to 12: the first four, the four after the
+  armour, and a third row, 18-21, appended after the worn slots (788) as
+  they were after the armour, so nothing saved, laid out or named by index
+  moves. Items.CARRIED is 22 (Player.SLOTS, Companion.SLOTS with it: Wren's
+  pack grows too, a bonus for her keeper).
+- Every reader of the pack asks World.pack_slots(entity)
+  (Items.pack_slots_of, the twelve today), never PACK_SLOTS: room_for,
+  free_pack_slot, into_pack, the sweep's _near_slot, try_equip (taking off
+  into the pack the thing leaves), the drop key, deposit_all, the takers'
+  marks, the companion's rod and ore room, the debug "rod". Is_pack reads
+  ALL_PACK_SLOTS, and pack_panel lays the carrier's grid out 4 x 3 from it,
+  every box live. items_test fails any script but Items naming PACK_SLOTS
+  (comments aside), so a later way to open more (the satchel, approved as a
+  4th row hidden until worn: 819 amended when it comes) reaches every caller.
+- A stored record, a snapshot's carrier or a level spec of 7, 11 or 18
+  slots loads padded by Items.tidy: every slot where it was, the new row
+  empty. No migration.
+Wire: PROTOCOL_REVISION 53 (release's, the first after v0.1.207): "slots"
+and slot_items are 22 long. tests: items_test _test_pack_twelve (the row,
+room_for filling all fourteen places, an 18-slot record, the guard),
+_test_worn and _test_armour's counts, ui_test's grid, state_test 2e (an
+18-slot record saved back as 22). No new class_name.

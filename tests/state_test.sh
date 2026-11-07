@@ -153,6 +153,33 @@ check "$(count '\[level\] shelved boar_lair: 1 moved to forest, 1 saved states d
 check "$(count 'joined as Player1 at \(124, 175\) \(back\)' "$DIR/shelved.log")" 1 "the host comes back in the forest by the lair's old mouth"
 check "$(count '"boar_lair"' "$STATE")" 0 "the save no longer names the held-back level"
 
+# 2f. A record saved before the pack's third row (decision 819): 18 slots, a
+# ration in the pack and a hood on the head. It loads as 22, nothing moved,
+# the new row empty, and is saved back so.
+python -B - "$STATE" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+for record in data["players"]:
+    if record["player_id"] == "dev-host":
+        slots = [""] * 18
+        slots[0] = "ration"
+        slots[11] = "hood"
+        record["slots"] = slots
+        record.pop("items", None)
+json.dump(data, open(path, "w", encoding="utf-8"), indent="	")
+PY
+run_host old_slots --test-exit-after=2
+old_slots=$(python -B - "$STATE" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+record = [r for r in data["players"] if r["player_id"] == "dev-host"][0]
+slots = record["slots"]
+print("ok" if len(slots) == 22 and slots[0] == "ration" and slots[11] == "hood" and all(s == "" for s in slots[18:]) else "bad %d" % len(slots))
+PY
+)
+check "$old_slots" ok "an 18-slot record (before 819) loads and saves as 22: the ration and the hood where they were, the third row empty"
+
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 echo 'this is not json' >"$STATE"
 run_host third --test-exit-after=2

@@ -1099,7 +1099,7 @@ func _test_errands() -> void:
 	# (A ring to give: her own bandaging kit she keeps off her offers, 681.)
 	var ring := "silver_ring"
 	var hers := pet.slots.duplicate()
-	hers[hers.find("")] = ring
+	hers[Items.PACK_SLOTS[-1]] = ring  # In the pack's third row (819): offered as any.
 	World.set_slots(pet, hers)
 	for i in 21:
 		World.step()
@@ -4871,7 +4871,7 @@ func _test_follow_without_backsteps() -> void:
 ## then goes.
 func _test_carried_slots() -> void:
 	print("
-== what she carries reads the pack of 8, her hands and her armour (722) ==")
+== what she carries reads the pack of 12, her hands and her armour (722, 819) ==")
 	var pet := _companion()
 	var was: Array = pet.slots.duplicate()
 	var slots: Array[String] = []
@@ -4879,6 +4879,7 @@ func _test_carried_slots() -> void:
 	slots.fill("")
 	slots[0] = "ration"
 	slots[10] = "bandaging_kit"
+	slots[21] = "pewter_cup"  # The pack's third row (819).
 	slots[Items.RIGHT_HAND] = "dagger"
 	slots[Items.ARMOUR] = "leather_armour"
 	World.set_slots(pet, slots)
@@ -4886,6 +4887,16 @@ func _test_carried_slots() -> void:
 	_check(Items.name_of("bandaging_kit") in said.get_slice("In your hands", 0) and "In your hands: a %s." % Items.name_of("dagger") in said
 		and "You wear %s." % Items.name_of("leather_armour") in said and not "a %s" % Items.name_of("leather_armour") in said,
 		"slot 10 in her pack, the dagger in her hands, the armour worn, not held (%s)" % said)
+	_check(Items.name_of("pewter_cup") in said.get_slice("In your hands", 0), "slot 21, her pack's third row, is in her pack too (819)")
+	for slot: int in World.pack_slots(pet):
+		slots[slot] = "dagger"
+	slots[21] = ""
+	World.set_slots(pet, slots)
+	var room_with_one: bool = pet._mine_room() or Seam.ORE in Array(World.ground_at(pet.tile))
+	slots[21] = "dagger"
+	World.set_slots(pet, slots)
+	_check(room_with_one and (not pet._mine_room() or Seam.ORE in Array(World.ground_at(pet.tile))),
+		"her mining sees the third row: room while slot 21 is free, none once all twelve hold daggers (819)")
 	World.set_slots(pet, was)
 
 

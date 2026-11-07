@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your pack, and your companion's, has twelve slots now, three rows of four, where before it had eight (819).
 ## v0.1.207
 
 - What goes over the network changes, so v0.1.206 and older can't join the server: update through the launcher first.

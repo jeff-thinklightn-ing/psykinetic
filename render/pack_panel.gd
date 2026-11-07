@@ -371,7 +371,7 @@ func show_tip(box: SlotBox) -> void:
 		tip = ItemTip.new()
 		(get_parent() if get_parent() != null else self).add_child(tip)
 	var taker := ""
-	if entity is Player and (entity as Player).owner_peer == Net.local_id and box.index in Items.PACK_SLOTS:
+	if entity is Player and (entity as Player).owner_peer == Net.local_id and Items.is_pack(box.index):
 		taker = Main.taker_line(takers, str(entity.slots[box.index]))
 	tip.show_for(entity.slots[box.index], box.note, box.get_global_rect().position, taker)
 
@@ -399,7 +399,7 @@ func _title() -> Label:
 
 
 ## A row's layout for [param entity] (decision 722, ui's side): "carrier"
-## (a player's or a companion's Items.CARRIED: the pack's eight in a 4 x 2
+## (a player's or a companion's Items.CARRIED: the pack's twelve in a 4 x 3
 ## grid, the hands and the armour beside), "locker" (a personal chest's 48,
 ## LOCKER_COLUMNS a line) or "line:<n>" (a chest, crate or cart, one line).
 static func layout_of(entity: GridEntity) -> String:
@@ -412,7 +412,7 @@ static func layout_of(entity: GridEntity) -> String:
 
 ## A personal chest's boxes a line.
 const LOCKER_COLUMNS := 12
-## The pack's grid, boxes a line (4 x 2, decision 722).
+## The pack's grid, boxes a line (4 x 3: decision 722, 819).
 const PACK_COLUMNS := 4
 ## The pack's and the sheet's backing's alpha (solid_panel).
 const SOLID := 0.97
@@ -437,7 +437,7 @@ func _lay_out(row: HBoxContainer, mine: bool, layout: String) -> void:
 	var gap := UiTheme.constant("slot_gap")
 	var grids: Array[Array] = []  # [columns, indices]
 	if layout == "carrier":
-		grids.append([PACK_COLUMNS, Items.PACK_SLOTS])
+		grids.append([PACK_COLUMNS, Items.ALL_PACK_SLOTS])  # 3 x 4 (819).
 		if not mine:  # The player's hands and armour are on the sheet (787).
 			grids.append([2, [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]])
 	elif layout == "locker":

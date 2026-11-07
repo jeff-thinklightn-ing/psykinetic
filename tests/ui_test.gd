@@ -1884,9 +1884,9 @@ func _test_inventory_panel() -> void:
 	for box: PackPanel.SlotBox in pack.sheet.boxes.values():
 		gear.append(box.index)
 	_check(PackPanel.layout_of(null) == "carrier" and grids.size() == 1 and (grids[0] as GridContainer).columns == 4
-			and in_grid == Items.PACK_SLOTS and gear == CharacterSheet.SLOT_PLACES.keys()
+			and in_grid == Items.ALL_PACK_SLOTS and gear == CharacterSheet.SLOT_PLACES.keys()
 			and pack.box_in(true, Items.ARMOUR).theme_type_variation == &"HandSlot" and pack.box_in(true, Items.PACK_SLOTS[4]).theme_type_variation == &"Inset",
-			"the player's row: the pack's eight 4 x 2 (%s), the hands, the armour and the worn slots on the sheet (787, 788: %s)" % [in_grid, gear])
+			"the player's row: the pack's twelve 4 x 3 (819) (%s), the hands, the armour and the worn slots on the sheet (787, 788: %s)" % [in_grid, gear])
 	await _test_character_sheet(pack)
 	var locker := Locker.new()
 	locker.name = "TestLocker"
@@ -1897,6 +1897,19 @@ func _test_inventory_panel() -> void:
 			and (pack._other_row.get_child(0) as GridContainer).columns == PackPanel.LOCKER_COLUMNS
 			and pack.title_shown(false) == "Your chest" and pack._other_head.get_node(^"Deposit").visible,
 			"your chest: %d boxes, 12 a line, titled \"Your chest\", Deposit unequipped shown" % chest_boxes.size())
+	var carrier := Chest.new()  # A companion's row is a carrier's (Items.CARRIED slots), as here.
+	carrier.name = "TestCarrier"
+	carrier.slots = Items.tidy([], Items.CARRIED)
+	add_child(carrier)
+	pack.open(carrier)
+	var her_grid: Array[int] = []
+	for box in pack._other_row.get_child(0).get_children():
+		her_grid.append((box as PackPanel.SlotBox).index)
+	_check(PackPanel.layout_of(carrier) == "carrier" and her_grid == Items.ALL_PACK_SLOTS and (pack._other_row.get_child(0) as GridContainer).columns == 4
+			and pack._other_row.get_child_count() == 2,
+			"a companion's pack row: her twelve 4 x 3 (819), her hands and armour beside (%s)" % [her_grid])
+	pack.open(locker)  # Your chest again, for the double-clicks below.
+	carrier.queue_free()
 	var player: Player = _main._local_player()
 	if player != null:
 		var pack_slot: int = Items.PACK_SLOTS[5]

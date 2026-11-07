@@ -48,12 +48,19 @@ const FEET := 14
 const RING_1 := 15
 const RING_2 := 16
 const CHARM := 17
-const CARRIED := 18
+## The pack's third row (decision 819; Jeff: "players need more slots
+## probably 12, 3 rows of 4"): four more pack slots, appended after the
+## worn ones as 788's were. A save from before has 18; tidy pads.
+const CARRIED := 22
 ## Each worn slot's kind (788): a thing is worn only in a slot of its
 ## kind ("body" is 622's armour), and never held.
 const WORN := {ARMOUR: "body", HEAD: "head", NECK: "neck", BACK: "back", FEET: "feet", RING_1: "ring", RING_2: "ring", CHARM: "charm"}
-## The pack's slots, in order (decision 722): the first four, then the last.
-const PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10]
+## The pack's slots, in order (decision 722): the first four, then the four
+## after the armour, then the third row (819). Read only here and in
+## pack_slots_of: everything else asks World.pack_slots.
+const PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10, 18, 19, 20, 21]
+## Every slot a pack can show, for laying it out (pack_panel's grid, 3 x 4).
+const ALL_PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10, 18, 19, 20, 21]
 ## Slots enough to have hands (the pack and both): a monster armed by a
 ## level before armour (decision 622) has six, and still holds what it holds.
 const HANDED := LEFT_HAND + 1
@@ -68,7 +75,14 @@ const RENAMED := {"draugr_totem": "encolpion_amulet"}
 ## Whether slot [param i] of a carrier is in its pack (decision 722), not
 ## a hand or the armour.
 static func is_pack(i: int) -> bool:
-	return i in PACK_SLOTS
+	return i in ALL_PACK_SLOTS
+
+
+## The pack slots a carrier with [param slots] has now (decision 819): the
+## pack's twelve. Callers read this (World.pack_slots), never PACK_SLOTS,
+## so a later way to open more (a satchel, 819's bonus) reaches them all.
+static func pack_slots_of(_slots: PackedStringArray) -> Array[int]:
+	return PACK_SLOTS.duplicate()
 
 
 ## Tags whose things never stack (decision 619): each is its own. A token
