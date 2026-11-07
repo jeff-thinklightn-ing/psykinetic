@@ -4992,6 +4992,37 @@ func _test_cave_mouth() -> void:
 		heap_top = maxf(heap_top, box.end.y)
 	_check(heap_top < Client3D.MOUTH_ROCKFALL_TOP + 0.1 and heap_top < Client3D.MOUTH_ARCH.y - 1.0,
 			"the rockfall low in the arch, the throat black over it (top at %.2f m)" % heap_top)
+	# In a bank (the hills' bear cave): its top drawn over every throat cell,
+	# which draws no ground (the mouth audit: from behind the hill, the
+	# throat's black showed through a hole in its top).
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var open_over: Array[Vector2i] = []
+	var throat_count := 0
+	for cue: Dictionary in hills["terrain"].get("link_cues", []):
+		if cue["cue"] != "cave":
+			continue
+		var bear: Vector2i = cue["tile"]
+		var bear_holder: Node3D = _rig._room.get_node_or_null("Mouth_%d_%d" % [bear.x, bear.y])
+		var bear_body: MeshInstance3D = bear_holder.get_node_or_null("Body") if bear_holder != null else null
+		if bear_body == null:
+			open_over.append(bear)
+			continue
+		var bear_points: PackedVector3Array = bear_body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		var to_frame := bear_holder.transform.affine_inverse()
+		for cell: Vector2i in _rig._throat_cells():
+			throat_count += 1
+			var over := to_frame * Vector3(cell.x, 0.0, cell.y)
+			var covered := false
+			for i in range(0, bear_points.size(), 3):
+				var hit: Variant = Geometry3D.ray_intersects_triangle(Vector3(over.x, 60.0, over.z), Vector3.DOWN, bear_points[i], bear_points[i + 1], bear_points[i + 2])
+				if hit != null and (hit as Vector3).y > Client3D.MOUTH_ARCH.y + 0.1:  # Over the throat's own vault.
+					covered = true
+					break
+			if not covered:
+				open_over.append(cell)
+	_check(throat_count > 0 and open_over.is_empty(),
+			"in a bank (the hills' bear cave), its top over every throat cell (%d cells, open: %s)" % [throat_count, open_over])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

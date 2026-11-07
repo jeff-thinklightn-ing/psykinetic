@@ -6946,7 +6946,9 @@ const DEN_MOUND := Vector2i(5, 3)
 const DEN_BANK := 2.15
 const DEN_FRONT := 1.6
 const DEN_HOLE := Vector2(1.9, 1.45)
-const DEN_THROAT := 1.6
+## Short: past DEN_VEIL nothing shows from before it, and deeper its black
+## end came out through the bank's back (the mouth audit, from behind).
+const DEN_THROAT := 0.6
 const DEN_SHELF := Vector3(2.3, 0.42, 1.7)
 const DEN_TILT := Vector2(0.24, 0.12)
 const DEN_JUT := 0.25
@@ -7455,6 +7457,7 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
 	heights.resize((columns + 1) * (rows + 1))
 	var crest_x := (_roll(at, 86) - 0.5) * 1.6
 	var tilt := (_roll(at, 87) - 0.5) * 0.5
+	var throat_cells := _throat_cells()
 	# In a bank (the ground already rising behind the face, the relief's):
 	# how far it stands in for the hill, 1 when the ground two metres in is
 	# as high as the arch's roof. Then the rock is its face, a roof over the
@@ -7536,11 +7539,14 @@ func _add_cave_mouth(at: Vector2i, ahead: Vector2i, closed := false) -> void:
 			var cc := Vector3(x + step, heights[i + columns + 2], z + step)
 			var d := Vector3(x, heights[i + columns + 1], z + step)
 			# Nothing drawn where the rock is no more than its ground (a
-			# bank's grass shows through).
+			# bank's grass shows through), but over the throat, whose cells
+			# draw no ground (from behind the hill, the throat's black showed
+			# through a hole in its top).
 			var bare := true
 			for corner in [i, i + 1, i + columns + 2, i + columns + 1]:
 				bare = bare and heights[corner] < lays[corner] + 0.05
-			if bare:
+			var over := holder.transform * Vector3(x + step * 0.5, 0.0, z + step * 0.5)
+			if bare and not throat_cells.has(Vector2i(roundi(over.x), roundi(over.z))):
 				continue
 			var key := Vector2i(at.x * 17 + c * 2, at.y * 17 + r)
 			var first: Array[Vector3] = [a, b, cc]
