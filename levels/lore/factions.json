@@ -212,6 +212,17 @@
 					"where": [],
 					"source": "proposal",
 					"status": "draft"
+				},
+				{
+					"id": "goblins.star_mark",
+					"text": "The Blood Rot daub a crude star in rust-red on what they hold.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "lore",
+					"status": "draft"
 				}
 			]
 		},

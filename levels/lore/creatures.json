@@ -292,9 +292,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				},
 				{
 					"id": "wolfskin.missing",
@@ -353,9 +355,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				},
 				{
 					"id": "pale_lord.road",
@@ -413,9 +417,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				},
 				{
 					"id": "hollow_stag.rot",
@@ -450,9 +456,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				},
 				{
 					"id": "cave_troll.daylight",
@@ -461,9 +469,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				}
 			]
 		},
@@ -487,9 +497,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				},
 				{
 					"id": "old_wolf.hunter",
@@ -587,9 +599,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				},
 				{
 					"id": "boar_king.ventures",
@@ -598,9 +612,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed"
+					"status": "draft"
 				}
 			]
 		}

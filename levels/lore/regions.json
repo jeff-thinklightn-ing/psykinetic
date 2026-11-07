@@ -416,9 +416,11 @@
 					"where": [
 						"town_lands"
 					],
-					"tags": [],
+					"tags": [
+						"jeff_agreed"
+					],
 					"source": "Jeff",
-					"status": "agreed",
+					"status": "draft",
 					"sight": "the stripped land"
 				}
 			]
@@ -555,8 +557,11 @@
 					"where": [
 						"blood_rot_lands"
 					],
-					"status": "agreed",
-					"sight": "the mine"
+					"status": "draft",
+					"sight": "the mine",
+					"tags": [
+						"jeff_agreed"
+					]
 				},
 				{
 					"id": "mine.deeper",
@@ -566,7 +571,10 @@
 						"blood_rot_lands"
 					],
 					"true": true,
-					"status": "agreed"
+					"status": "draft",
+					"tags": [
+						"jeff_agreed"
+					]
 				},
 				{
 					"id": "mine.dug_toward",
@@ -678,9 +686,10 @@
 						"blood_rot_lands"
 					],
 					"tags": [
-						"rot"
+						"rot",
+						"jeff_agreed"
 					],
-					"status": "agreed",
+					"status": "draft",
 					"sight": "the fallen star"
 				},
 				{
