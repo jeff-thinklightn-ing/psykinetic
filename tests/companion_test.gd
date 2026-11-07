@@ -1818,6 +1818,16 @@ func _test_fishing() -> void:
 	World.put_item(pet, pet, Items.RIGHT_HAND, World.items.mint("sword", "built"))
 	var spot := pet.fish_spot_near(owner.tile)
 	_check(spot != World.NO_CELL and spot != owner.tile and Companion._water_by(spot) != World.NO_CELL, "a place to fish beside her player (%s)" % [spot])
+	# Jeff's Reed Pond: one fish left is enough, as for his own cast; none, and she says it is fished out.
+	var today: int = World.economy.now() / maxi(DayNight.day_steps, 1)
+	World.economy._ponds[pond] = {"fish": 1, "day": today}
+	_check(World.fish_refusal(owner) != "fished_out" and pet.fish_spot_near(owner.tile) != World.NO_CELL,
+		"one fish left: a place to fish, as for her player's cast (it was refused under FISH_LOW)")
+	World.economy._ponds[pond] = {"fish": 0, "day": today}
+	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
+	_check(pet.order != "fish" and Companion.FISH_FISHED_OUT in pet._said and pet.fish_spot_near(owner.tile) == World.NO_CELL,
+		"fished out: she says so (not \"we'd need a pond\"), and does not go")
+	World.economy._ponds.erase(pond)
 	pet._carry_out({"verb": "fish", "on": true}, "Let's fish.")
 	_check(pet.order == "fish" and pet.hold_tile == spot, "asked: she goes to the water's edge")
 	for i in 60:

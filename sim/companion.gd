@@ -182,8 +182,10 @@ const ORDER_VERBS: Array[String] = ["wait", "rest", "follow", "bandage", "carry"
 ## Fishing with her player (805 amended (5)): asked, or beside them as they fish.
 const ORDER_FISH := "\\b(let'?s (go )?fish(ing)?|fish with me|(go|come) fish(ing)?|(do|try) (some )?fishing|cast a line|have a fish)\\b"
 const ORDER_FISH_STOP := "\\b(stop fishing|reel (it )?in|enough fishing|done fishing|put (the|your) rod away)\\b"
-## She casts no line when her pond holds this few fish or fewer: what is
-## left is her player's (the coordinator: her catch never thins it against them).
+## She reels in when her pond holds this few fish or fewer while her player is
+## casting there: what is left is theirs (the coordinator: her catch never
+## thins it against them). Going to fish she needs only one, as their cast
+## does (Jeff's Reed Pond: she refused water he could fish).
 const FISH_LOW := 2
 ## How far from her player she looks for a place to fish, and how close she
 ## stays to them while she fishes beside them.
@@ -192,6 +194,8 @@ const FISH_NEAR := 5
 ## Her words when she cannot fish (voice's): no rod; no fish in the water here.
 const FISH_NO_ROD := "I've no rod to fish with."
 const FISH_NO_WATER := "Nothing to fish in here. We'd need a pond."
+## A fishing place near, fished out for today (voice's).
+const FISH_FISHED_OUT := "This water's fished out for today. Tomorrow, maybe."
 ## Once a game day, her player fishing beside her and she with no rod (the coordinator's hint toward the give).
 const FISH_WISH := "I'd join you, if I had a rod."
 ## Her own cast's end, told her voice at once (805 amended (5)).
@@ -1460,9 +1464,10 @@ static func _water_by(cell: Vector2i) -> Vector2i:
 
 
 ## A free dry cell within FISH_SEEK of [param near] she could fish from:
-## water within reach, a fishing place's, with fish above FISH_LOW; the one
-## nearest [param near] but not on it (beside her player), NO_CELL if none.
-func fish_spot_near(near: Vector2i) -> Vector2i:
+## water within reach, a fishing place's, with a fish left (as their cast
+## needs; [param stocked] false: any fishing place's, fished out or not); the
+## one nearest [param near] but not on it (beside her player), NO_CELL if none.
+func fish_spot_near(near: Vector2i, stocked := true) -> Vector2i:
 	var best := World.NO_CELL
 	var best_key := 1 << 30
 	for dy in range(-FISH_SEEK, FISH_SEEK + 1):
@@ -1471,7 +1476,8 @@ func fish_spot_near(near: Vector2i) -> Vector2i:
 			if cell == near or World.is_water(cell) or not (cell == tile or World.is_free(cell)):
 				continue
 			var water := _water_by(cell)
-			if water == World.NO_CELL or not _pond_ok(World.pond_at(water, cell)):
+			var pond := World.pond_at(water, cell) if water != World.NO_CELL else ""
+			if pond.is_empty() or stocked and _pond_fish(pond) <= 0:
 				continue
 			var key := World.distance(near, cell) * 100 + World.distance(tile, cell)
 			if key < best_key:
@@ -1482,10 +1488,13 @@ func fish_spot_near(near: Vector2i) -> Vector2i:
 
 ## Whether [param pond] is a fishing place with fish to spare for her.
 static func _pond_ok(pond: String) -> bool:
-	if pond.is_empty():
-		return false
+	return not pond.is_empty() and _pond_fish(pond) > FISH_LOW
+
+
+## [param pond]'s fish today (economy's stock), plenty without an economy.
+static func _pond_fish(pond: String) -> int:
 	var economy: Variant = World.economy
-	return economy == null or not economy.has_method("pond_fish") or int(economy.call("pond_fish", pond)) > FISH_LOW
+	return int(economy.call("pond_fish", pond)) if economy != null and economy.has_method("pond_fish") else 1 << 20
 
 
 ## Off to [param spot] to fish ([param asked] by her player, else beside them).
@@ -2071,7 +2080,10 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 				done = "%s asked you to fish, but you have no rod." % keeper_name()
 			else:
 				var spot := fish_spot_near(keeper.tile if _alive(keeper) else tile)
-				if spot == World.NO_CELL:
+				if spot == World.NO_CELL and fish_spot_near(keeper.tile if _alive(keeper) else tile, false) != World.NO_CELL:
+					_say(FISH_FISHED_OUT, true)
+					done = "%s asked you to fish, but the water here is fished out for today." % keeper_name()
+				elif spot == World.NO_CELL:
 					_say(FISH_NO_WATER, true)
 					done = "%s asked you to fish, but there is no water with fish in it near." % keeper_name()
 				else:

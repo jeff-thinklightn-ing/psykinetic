@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Ask your companion to fish wherever you could and she does, where before she said there was nothing to fish in once you'd caught a few; when the water's fished out for the day, she tells you so (805).
 - Towns: Rolf at the stall sells a woollen cloak for 8 gold, to wear in the sheet's cloak square (788 amended).
 - Gains read the thing first, with the track and amount after it in brackets, as in "Umbrage (Regard +1)", on floats, banners and the talk log alike, and banners stay up longer (804).
 
