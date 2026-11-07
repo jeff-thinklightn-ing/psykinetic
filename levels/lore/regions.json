@@ -289,15 +289,37 @@
 					"status": "agreed"
 				},
 				{
-					"id": "last_light.lamp",
-					"text": "The Last Light keeps a lamp burning in its window all night.",
+					"id": "last_light.inside",
+					"text": "The Mughouse has a hearth in its common room, ale on tap at the counter, and five rooms to hire upstairs under an attic.",
 					"known": "common",
 					"where": [
 						"town_lands"
 					],
 					"tags": [],
-					"source": "lore",
-					"status": "draft"
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "last_light.sign",
+					"text": "The Mughouse's sign hangs by its door: a board painted with a burning lantern and no letters, with a small iron lantern at the bracket's tip.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed"
+				},
+				{
+					"id": "last_light.lamp",
+					"text": "The Last Light keeps a lamp in the window nearest its door that never goes out, day or night.",
+					"known": "common",
+					"where": [
+						"town_lands"
+					],
+					"tags": [],
+					"source": "game",
+					"status": "agreed"
 				}
 			]
 		},
