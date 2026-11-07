@@ -1191,6 +1191,7 @@ func _go_online() -> void:
 		World.entity_died.connect(_bond_stood_by)
 		World.entity_damaged.connect(_bond_blow)  # Fights won together (decision 621).
 		World.entity_died.connect(_bond_won)
+		World.apex_beaten.connect(_bond_apex_beaten)  # 780 amended (15), companions' side.
 		World.bundle_swapped.connect(_narrate_swap)
 		World.shield_bashed.connect(_narrate_bash)
 		World.entity_bumped.connect(_on_bumped)
@@ -10475,6 +10476,26 @@ func _tomb_opened(zone_name: String, room: String, by: Array, kind := "tomb") ->
 			else "%s opened a sealed tomb while %s looked on." % [pet.keeper_name(), her], "event", "that sealed tomb")
 		_bond(_record_of(pet), "tomb", "opened a sealed tomb with you")
 		pet.tomb_opened(together)
+
+
+## An apex beaten back (780 amended (15), enemy-ai's World.apex_beaten, the
+## great bear or the old grey): each companion whose player stood within
+## HEARING_RANGE of it, in its zone, she within HEARING_RANGE of them, notes it
+## on her card and grows closer by "apex_beaten" (a milestone; adventure and
+## safety). Voice's words; it fell back alive, so never a kill.
+func _bond_apex_beaten(_kind: String, body: GridEntity, at: Vector2i) -> void:
+	if not is_instance_valid(body):
+		return
+	var beast := body.label.to_lower() if not body.label.is_empty() else "the beast"
+	if not beast.begins_with("the "):
+		beast = "the " + beast
+	for pet: Companion in _companions.values():
+		if not is_instance_valid(pet) or not is_instance_valid(pet.keeper) or pet.zone != body.zone or pet.keeper.zone != body.zone:
+			continue
+		if World.distance(pet.keeper.tile, at) > HEARING_RANGE or World.distance(pet.tile, pet.keeper.tile) > HEARING_RANGE:
+			continue
+		pet.note_fact("%s and %s drove %s back to its den." % [Companion._name_of(pet), pet.keeper_name(), beast])
+		_bond(_record_of(pet), "apex_beaten", "drove %s back with you" % beast)
 
 
 ## Whether [param player_id] has searched secret [param id] of [param

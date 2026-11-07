@@ -1839,6 +1839,31 @@ func _test_tomb() -> void:
 	_check(str(pet.grown.facts.back()["text"]) == "%s and %s woke a cold forge together." % [Companion._name_of(pet), pet.keeper_name()],
 		"woken together: her fact says so")
 	_bond_as(0, kept_forge)
+	# 780 amended (15): an apex beaten back near her player and her: her fact (voice's words), a milestone deed.
+	var card_was: Dictionary = record.companion.duplicate(true)
+	var facts_was := pet.grown.facts.duplicate(true)
+	var beast := GridEntity.new()
+	beast.label = "The old grey"
+	beast.zone = pet.zone
+	record.companion.erase("bond_today")
+	_main._bond_apex_beaten("old_wolf", beast, pet.keeper.tile + Vector2i(3, 0))
+	_check(str(pet.grown.facts.back()["text"]) == "%s and %s drove the old grey back to its den." % [Companion._name_of(pet), pet.keeper_name()]
+			and "apex_beaten" in record.companion.get("bond_today", {}).get("deeds", [])
+			and str(CompanionCard.tables()["bond"]["deeds"].get("apex_beaten", "")) == "milestone",
+		"the old grey beaten back beside them: her fact and a milestone deed (%s)" % pet.grown.facts.back()["text"])
+	record.companion.erase("bond_today")
+	var facts_now := pet.grown.facts.size()
+	beast.label = "Great bear"
+	_main._bond_apex_beaten("great_bear", beast, pet.keeper.tile + Vector2i(Companion.HEARING_RANGE + 4, 0))
+	_check(pet.grown.facts.size() == facts_now and not "apex_beaten" in record.companion.get("bond_today", {}).get("deeds", []),
+		"beaten back out of her player's hearing: nothing of hers")
+	_check(World.apex_beaten.is_connected(_main._bond_apex_beaten) or not Net.is_authority(), "the server hears World.apex_beaten")
+	beast.free()
+	# Her bond as it was: a milestone's raise would move her bond step, and with it how she heels in later checks.
+	record.companion.clear()
+	record.companion.merge(card_was)
+	pet.grown.facts = facts_was
+	_main._set_mood(record)
 	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
 	_settle(pet)
 

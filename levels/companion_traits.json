@@ -129,6 +129,7 @@
 			"answered": {"company": 0.05},
 			"tomb": {"adventure": 0.2, "wonder": 0.1},
 			"forge": {"wonder": 0.2, "adventure": 0.1},
+			"apex_beaten": {"adventure": 0.25, "safety": 0.15},
 			"fished": {"leisure": 0.15, "company": 0.05}
 		}
 	},
@@ -151,7 +152,7 @@
 		"deeds": {"gift": "warmth", "fed": "warmth", "day": "warmth", "bandaged": "warmth",
 			"road": "warmth", "fire": "warmth", "leisure": "warmth", "game": "warmth",
 			"tended": "trust", "stood_by": "trust", "cleared": "trust", "earned": "trust", "fought": "trust", "watched": "trust",
-			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust", "answered": "warmth", "tomb": "milestone", "fished": "warmth", "forge": "milestone"},
+			"rescued": "milestone", "blessed": "milestone", "reward": "milestone", "finished": "milestone", "want_met": "trust", "answered": "warmth", "tomb": "milestone", "fished": "warmth", "forge": "milestone", "apex_beaten": "milestone"},
 		"drops": {"kept_from": -1, "left_alone": -1, "let_bleed": -2, "grave": -1, "warned": -1, "harsh": -1, "mule": -1, "pressed": -1},
 		"harsh_a_day": 2,
 		"game": {"fire_cells": 2, "round_ticks": 60, "best_of": 3, "rounds_most": 9},

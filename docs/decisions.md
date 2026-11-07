@@ -44841,6 +44841,17 @@ companions' "apex_beaten", voice's one bullet.
   once, waiting in his lair till his pack is whole, his pack gone with his death). Server only,
   protocol unchanged; new class_name OldWolf.
 
+780 amended (15), companions' side: an apex beaten back is a milestone of hers (the approved old
+wolf design's "apex_beaten"; voice's words). Main connects World.apex_beaten (enemy-ai's, emitted
+once per "beaten back", the great bear and the old grey alike) to _bond_apex_beaten: each companion
+whose player is in the apex's zone within HEARING_RANGE of the cell it fell back from, and she within
+HEARING_RANGE of them, notes "{name} and {player} drove {the beast} back to its den." (the body's
+label lowered, "the old grey", "the great bear"; it lives, so never a kill) and grows closer by
+"apex_beaten" ("drove {the beast} back with you"): a milestone, needs adventure 0.25 and safety 0.15
+(companion_traits.json). Lands in the old grey's package, after enemy-ai's side. companion_test
+_test_tomb (beside them: the fact and the deed; out of hearing: nothing; the server connected).
+Server only, protocol unchanged, no new class_name.
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a
