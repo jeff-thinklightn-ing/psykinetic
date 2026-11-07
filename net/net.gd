@@ -585,7 +585,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 51 (807 amended (2)): "locker" takes {"keeper": the stall keeper's path} beside {"prop"}, a
 ## new "kit" command {"keeper"} hands his practice kit once, and "offers" carries "kit": true
 ## while one is owed; an old client opens lockers only at chests and shows no Kit button. Shares 51 with 814.
-const PROTOCOL_REVISION := 51
+## 52 (821): a takes row (the "offers" and "barter" messages' "takes") for a trophy carries for
+## {kind "maker", name: what it is for} and the gold paid and owed (a row that was a gift is now a
+## sale), and "takers" carries "trophies" {item id: its buyer}; an old client prints "For F: 0 of 0".
+const PROTOCOL_REVISION := 52
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

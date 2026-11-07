@@ -44241,3 +44241,31 @@ the coordinator; npc's OK for resident.gd (its file). Tests: path_bound_test
 planned through, the same ring beside the start still blocks, and with every
 body blocking there is no way); resident_test's _test_herder and
 _test_camp_traders walk the long ways.
+## 821. Trophies bought by Give: the tanner, else the stall's keeper (release's number; the coordinator's ruling)
+
+The bear cave (789) drops the great bear's pelt and claw, and the hill cat (814) its pelt, but on main
+nobody in a town bought them: they have no "yield", so they are no raw, the store refused them ("the
+town has enough of that": no wants tag), and only Rolf took them, as gifts that paid nothing. Jeff's
+package rule wants a buyer the player can reach. The first piece of makers taking their own inputs
+(the medicine man's charms come after, their own package):
+
+- levels/economy.json receives.trophies: {trade: {item id: voice's words for what it is for}}, the
+  tanner's "tanning" (bear_pelt, hill_cat_pelt, grey_pelt) and "trimming leather" (bear_claw,
+  grey_fang, antlers, tusks): every trophy of hide or bone; the trophy weapons stay out. "keeper":
+  "selling on", Rolf's words, who makes nothing. store.trophy 0.5.
+- Economy.trophy_trade(id), trophy_ids(), trophy_for(id, keeper), trophy_price(id) (value x
+  store.trophy, 1 at least: pelt 20, grey pelt 15, cat pelt 10, fang 4, claw 3, antlers 3, tusks 2),
+  trophy_outcome(town, player, id, count) {gold, owed} and trophy_sale(town, player, id): paid from
+  the treasury above gold_floor, the rest owed, past store.owed_cap a gift, as bank_sale pays a raw.
+- Main.trophy_taker(town, id): the first seated resident of the trade, else the stall's keeper where
+  the town has one (a trophy needs a buyer in every town, the coordinator's change); "" for none.
+  person_takes gives that taker a row for each trophy in the pack (never one held or worn, never a
+  starter): {for {kind "maker", name}, raw "", have 0, need 0, gold, owed}; the keeper's gear branch
+  no longer offers a trophy as a gift. give_to banks it (World.donate, as gear) and then
+  Main._trophy_sold pays it (World.add_gold) and adds the gold and owed to the hand-in being thanked,
+  so the thanks says "Pays N gold". takers_of carries "trophies" {id: taker entry}, which the pack
+  tooltip's taker_entry reads first ("For the tanner"); depot_pointer says voice's "Pelts and
+  trophies go to the tanner." (pointers.trophy) with a tanner seated, else Rolf's line.
+- ui's side: the Give window's "For F" line with no counts when a row's need is 0.
+- Protocol 52 ("## 52 (821)"): a takes row that was a gift is now a sale, and "takers" carries
+  "trophies". economy_test _test_trophies.

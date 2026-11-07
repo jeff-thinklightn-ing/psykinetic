@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Towns: the tanner, or Rolf at the stall where there's none, buys your trophies by Give, up to 20 gold for the great bear's pelt: the bear's pelt and claws, the hill cat's pelt, antlers and tusks (821).
 
 - Ask your companion to fish wherever you could and she does, where before she said there was nothing to fish in once you'd caught a few; when the water's fished out for the day, she tells you so (805).
 - Towns: Rolf at the stall sells a woollen cloak for 8 gold, to wear in the sheet's cloak square (788 amended).

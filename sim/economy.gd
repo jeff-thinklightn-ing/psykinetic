@@ -2049,6 +2049,75 @@ func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 	return paid
 
 
+## The trade that buys trophy [param id] by Give (821: receives.trophies,
+## the tanner's pelts and bones), "" for none.
+func trophy_trade(id: String) -> String:
+	var trophies: Dictionary = rules.get("receives", {}).get("trophies", {})
+	for trade: String in trophies:
+		if not trade.begins_with("_") and trophies[trade] is Dictionary and (trophies[trade] as Dictionary).has(id):
+			return trade
+	return ""
+
+
+## Every trophy a trade buys by Give (821), sorted.
+func trophy_ids() -> Array[String]:
+	var out: Array[String] = []
+	var trophies: Dictionary = rules.get("receives", {}).get("trophies", {})
+	for trade: String in trophies:
+		if not trade.begins_with("_") and trophies[trade] is Dictionary:
+			for id: String in trophies[trade]:
+				if id not in out:
+					out.append(id)
+	out.sort()
+	return out
+
+
+## What trophy [param id] is for, in voice's words for the Give window
+## ("tanning"): the trade's, or the stall keeper's ([param keeper]) "selling on".
+func trophy_for(id: String, keeper := false) -> String:
+	var trophies: Dictionary = rules.get("receives", {}).get("trophies", {})
+	if keeper:
+		return str(trophies.get("keeper", ""))
+	var trade := trophy_trade(id)
+	return str(trophies[trade][id]) if not trade.is_empty() else ""
+
+
+## What one trophy [param id] fetches (821): its value x store.trophy, 1 at least.
+func trophy_price(id: String) -> int:
+	return maxi(roundi(value_of(id) * float(rules.get("store", {}).get("trophy", 0.5))), 1)
+
+
+## What selling [param count] trophy [param id] to [param town] would pay
+## player [param player_id] now and owe them (821, as bank_sale would):
+## {gold, owed}. Past store.owed_cap owed there, nothing either way (a gift).
+func trophy_outcome(town: String, player_id: String, id: String, count := 1) -> Dictionary:
+	var owed := int(_player_owed.get(player_id, {}).get(town, 0))
+	if owed >= int(rules.get("store", {}).get("owed_cap", 30)):
+		return {"gold": 0, "owed": 0}
+	var price := trophy_price(id) * count
+	var paid := mini(price, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
+	return {"gold": paid, "owed": price - paid}
+
+
+## Player [param player_id] sells one trophy [param id] to [param town]
+## (821, the Give to its tanner or stall keeper): paid at trophy_price from
+## the treasury above gold_floor, the rest owed, as bank_sale; past
+## store.owed_cap a gift. {gold (the caller's to give), owed}.
+func trophy_sale(town: String, player_id: String, id: String) -> Dictionary:
+	var out := trophy_outcome(town, player_id, id)
+	if int(out["gold"]) == 0 and int(out["owed"]) == 0:
+		stockpile.note(town, "gold", 0, "gift:%s" % player_id, "the town can't pay %s for more: %s given" % [player_id, id])
+		return out
+	if int(out["gold"]) > 0 and not stockpile.take(town, "gold", int(out["gold"]), "bought:%s" % player_id):
+		out["owed"] = int(out["owed"]) + int(out["gold"])
+		out["gold"] = 0
+	if int(out["owed"]) > 0:
+		if not _player_owed.has(player_id):
+			_player_owed[player_id] = {}
+		_player_owed[player_id][town] = int(_player_owed[player_id].get(town, 0)) + int(out["owed"])
+	return out
+
+
 ## What the towns owe player [param player_id] for banked goods, paid as
 ## each treasury has gold above gold_floor (owed_paid tells World).
 func _pay_player(player_id: String) -> void:

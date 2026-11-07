@@ -771,6 +771,7 @@ func _test_town_sheet(host: Player) -> void:
 	_check(_main.ask_town_sheet(host, {"town": "nowhere/store"}).get("why") == "you don't know that town", "a town they don't know: refused")
 	await _test_town_window(host)
 	_test_person_takes(host)
+	_test_trophies(host)
 	_test_admin_stock(host)
 
 
@@ -927,6 +928,67 @@ func _test_person_takes(host: Player) -> void:
 	World.slot_refused.disconnect(hear)
 	chest.free()
 	World.economy.rules["vendor"] = vendor
+
+
+## Trophies bought by Give (821; the coordinator's ruling: the bear's loot
+## needs a buyer the player can reach): with no tanner seated, Rolf at the
+## stall buys a bear's claw at value x store.trophy, "for selling on"; with
+## one, the tanner buys the pelt "for tanning" and Rolf no longer offers for
+## it; the gold paid (or owed) reaches the player and the thanks; the
+## takers' tooltip and the store chest's pointer name the tanner.
+func _test_trophies(host: Player) -> void:
+	print("\n== 821: trophies bought by Give ==")
+	var me: String = _main._id_of_player(host)
+	var economy: Economy = World.economy
+	var vendor: Dictionary = economy.rules.get("vendor", {}).duplicate(true)
+	economy.rules["vendor"] = {"towns": [STORE], "name": "Rolf", "price": 1, "wares": []}
+	var away: Array[String] = []
+	for id: String in World.production.worker_ids(STORE):
+		if "tanner" in World.production.worker(id)["trades"] and not World.production.worker(id).get("away", false):
+			World.production.set_away(id, true)  # Put back at the end.
+			away.append(id)
+	_check(economy.trophy_trade("bear_claw") == "tanner" and economy.trophy_trade("sword") == "" and economy.trophy_price("bear_claw") == 3
+		and economy.trophy_price("bear_pelt") == 20, "the tanner's trophies, at half their worth: claw 3, pelt 20")
+	for slot: int in [Items.PACK_SLOTS[0], Items.PACK_SLOTS[1]]:  # Room in the pack: a trophy in hand is never offered.
+		if not str(host.slots[slot]).is_empty():
+			World.take_item(host, host, slot)
+	_main._hand_item(me, "bear_claw", "test")
+	_main._hand_item(me, "bear_claw", "test")
+	var held: int = Array(host.slots).find("bear_claw")
+	if held not in Items.PACK_SLOTS:
+		World.try_transfer(host, host, held, host, Items.PACK_SLOTS[0])  # Handed into a free hand: to the pack.
+	_check(_main.trophy_taker(STORE, "bear_claw") == Offers.VENDOR + STORE, "no tanner seated: Rolf buys trophies")
+	var rows: Array = _main.person_takes(host, Offers.VENDOR + STORE).filter(func(row: Dictionary) -> bool: return row["what"] == "bear_claw")
+	var row: Dictionary = rows[0] if rows.size() == 1 else {}
+	_check(row.get("for", {}).get("kind") == "maker" and row.get("for", {}).get("name") == "selling on" and row.get("raw") == ""
+		and int(row.get("need", -1)) == 0 and int(row.get("gold", 0)) + int(row.get("owed", 0)) == 3 * int(row.get("count", 0)) and int(row.get("count", 0)) >= 2,
+		"Rolf's row: for selling on, 3 gold a claw paid or owed (%s)" % [row])
+	var purse := economy.gold(me)
+	var given: Array = _main.give_to(host, Offers.VENDOR + STORE, "Rolf", [int(row.get("uid", 0))])
+	var thanks: Dictionary = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me and each["data"]["track"] == "item").back()["data"]
+	_check(not row.is_empty() and given.size() == int(row.get("count", 0)) and economy.gold(me) == purse + int(row.get("gold", 0)) and int(thanks.get("gold", 0)) == int(row.get("gold", 0))
+		and World.stockpile.count(STORE, "bear_claw") >= given.size(),
+		"given: banked, paid what the row said, the thanks carrying it (%d gold; %s)" % [economy.gold(me) - purse, thanks])
+	_check(_main.depot_pointer(STORE, "bear_claw") == "That goes to Rolf at the stall.", "the chest's pointer: to Rolf")
+	World.production.add_worker("trophy_tan", "Tamsin", ["tanner"], STORE, "test")
+	_main._hand_item(me, "bear_pelt", "test")
+	_check(_main.trophy_taker(STORE, "bear_pelt") == "trophy_tan", "a tanner seated: the tanner buys them")
+	_check(not _main.person_takes(host, Offers.VENDOR + STORE).any(func(each: Dictionary) -> bool: return each["what"] == "bear_pelt"), "and Rolf no longer offers for the pelt")
+	var pelt: Array = _main.person_takes(host, "trophy_tan").filter(func(each: Dictionary) -> bool: return each["what"] == "bear_pelt")
+	_check(pelt.size() == 1 and pelt[0]["for"]["name"] == "tanning" and int(pelt[0]["gold"]) + int(pelt[0]["owed"]) == 20,
+		"the tanner's row: for tanning, 20 gold (%s)" % [pelt])
+	var takers: Dictionary = _main.takers_of(STORE)
+	_check(Main.taker_entry(takers, "bear_pelt").get("trade") == "tanner" and Main.taker_entry(takers, "bear_pelt").get("name") == "Tamsin",
+		"the pack's tooltip: the pelt to Tamsin the tanner (%s)" % [takers.get("trophies", {})])
+	_check(_main.depot_pointer(STORE, "bear_pelt") == "Pelts and trophies go to the tanner.", "the chest's pointer: to the tanner (%s)" % _main.depot_pointer(STORE, "bear_pelt"))
+	purse = economy.gold(me)
+	var sold: Array = _main.give_to(host, "trophy_tan", "Tamsin", [int(pelt[0]["uid"]) if not pelt.is_empty() else 0])
+	_check(sold.size() == 1 and World.count_of(host, "bear_pelt") == 0 and economy.gold(me) == purse + (int(pelt[0]["gold"]) if not pelt.is_empty() else -1),
+		"the pelt to the tanner: banked and paid")
+	World.production.remove_worker("trophy_tan")
+	for id in away:
+		World.production.set_away(id, false)
+	economy.rules["vendor"] = vendor
 
 
 ## The admin's stock and give (709 amended; playtest's 804 tour): a store's
