@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the Mughouse, you leave the common room through its double front door into the street, where before the way out was only a mark on the floor (811 amended (3)).
 - A click into a crate or a boulder pushes it one cell now, even on a slow connection, where before it could go two (688 amended (7)).
 - Robbers and bandits, brutes among them, go down with a short grunt now, never quite the same twice, where before they gave a long scream.
 - Come somewhere new with your companion and listen: she speaks of something really there, or of what the two of you did there, where before she said how quiet it was; ask what she thinks of a place and she does the same (803 amended (6)).

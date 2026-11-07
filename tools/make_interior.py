@@ -3,8 +3,12 @@
 "probably, and allows multi floors, attics, rooms etc").
 
 A spec names the building, its town, its wall and floor sets, its front door
-(the floor and cells the street's link arrives on, and where they lead back
-out) and its floors. A floor has a level name, a size, an ambient light, its
+(the floor, the room's cells inside it, the "side" of them it is in, south
+if not said, and where it leads back out) and its floors. The front door is
+a door in the wall (Jeff, 2026-11-06: "no door to exit. just a spot on the
+ground"): a door edge from each of its cells to a doorstep cell outside
+every room, the doorstep the link out, so one walks out through the door;
+one arrives on its first cell, just inside. A floor has a level name, a size, an ambient light, its
 rooms and its stairs:
 
 - a room: an id, a use (USES), a rect; its doors, each the cells inside the
@@ -238,8 +242,15 @@ def check(spec):
             holds = any(room.get(key) for key in HOLDING) or any(o.startswith("floor:") for o in opens)
             if len(opens) <= 1 and not holds and room["use"] not in ("common",):
                 faults.append("%s/%s: a dead end holding nothing" % (level, room["id"]))
-    # Every room reached from the front door.
+    # Every room reached from the front door; the door in a wall, its
+    # doorstep outside every room.
     front = spec["front"]
+    for cell in front["cells"]:
+        step = doorstep(front, cell)
+        if (front["floor"], tuple(cell)) not in owner:
+            faults.append("the front door's cell %s is in no room" % (cell,))
+        if (front["floor"], step) in owner:
+            faults.append("the front door at %s opens into a room, not out of the building" % (cell,))
     start = (front["floor"], owner.get((front["floor"], tuple(front["cells"][0]))))
     seen = {start}
     todo = [start]
@@ -264,6 +275,12 @@ def check(spec):
     return faults
 
 
+def doorstep(front, cell):
+    """The cell outside the front door from [cell], on the door's side."""
+    dx, dy = SIDES[front.get("side", "south")]
+    return (cell[0] + dx, cell[1] + dy)
+
+
 def lay(spec, floor):
     level = floor["level"]
     w, h = floor["size"]
@@ -276,14 +293,20 @@ def lay(spec, floor):
     spawns = {}
     starts = []
     front = spec["front"]
+    steps = []
     if front["floor"] == level:
         for cell in front["cells"]:
-            markers[tuple(cell)] = "link"
-            links.append({"at": list(cell), "to_map": front["to_map"], "to_spawn": front["to_spawn"]})
-        # One arrives from the street a cell inside the door.
-        inside = [front["cells"][0][0], front["cells"][0][1] - 1]
+            step = doorstep(front, cell)
+            steps.append((tuple(cell), step))
+            markers[step] = "link"
+            links.append({"at": list(step), "to_map": front["to_map"], "to_spawn": front["to_spawn"]})
+        # One arrives from the street just inside the door.
+        inside = list(front["cells"][0])
         spawns[front["spawn"]] = inside
         starts.append(inside)
+        for _cell, step in steps:
+            w = max(w, step[0] + 1)
+            h = max(h, step[1] + 1)
     for stair in floor.get("stairs", []):
         for index, cell in enumerate(stair["cells"]):
             markers[tuple(cell)] = "link"
@@ -349,6 +372,10 @@ def lay(spec, floor):
     layout = Image.new("RGB", (w * 2 - 1, h * 2 - 1), COLOURS["void"])
     for (x, y) in room_of:
         layout.putpixel((2 * x, 2 * y), COLOURS[markers.get((x, y), "stone")])
+    # The front door: a door edge from each cell to its doorstep, the link.
+    for (x, y), (sx, sy) in steps:
+        layout.putpixel((2 * sx, 2 * sy), COLOURS["link"])
+        layout.putpixel((x + sx, y + sy), COLOURS["door"])
     for (x, y), room in room_of.items():
         for nx, ny, px, py in ((x + 1, y, 2 * x + 1, 2 * y), (x, y + 1, 2 * x, 2 * y + 1)):
             other = room_of.get((nx, ny))

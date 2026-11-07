@@ -1064,6 +1064,9 @@ static func _interior_from(level: Dictionary, config: Dictionary, warnings: Arra
 	for each: Variant in listed if listed is Array else []:
 		storeys.append(str(each))
 	level["storeys"] = storeys
+	# A building's inside (its storeys said): its doors drawn as its
+	# outline's are outside, two side by side one door.double (Client3D).
+	level["terrain"]["interior"] = not storeys.is_empty()
 	var floor := {}
 	for cell: Vector2i in level["terrain"]["floor"]:
 		floor[cell] = true

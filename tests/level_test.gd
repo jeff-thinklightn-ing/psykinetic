@@ -3520,6 +3520,16 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 			if (name != "wilds" or link["to_map"].begins_with("umbrage_tavern")) and not far.get("spawn_points", {}).has(link["to_spawn"]):
 				unpaired.append("%s %s -> %s/%s" % [name, link["tile"], link["to_map"], link["to_spawn"]])
 	_check(unpaired.is_empty(), "every link in and out lands on a spawn on its far side (%s)" % [unpaired])
+	# Its way out a door in its wall (Jeff, 2026-11-06: "no door to exit.
+	# just a spot on the ground"): each link to the wilds on a doorstep
+	# beyond a door edge from the common room, one arriving just inside it.
+	var tavern_floor: Dictionary = floors["umbrage_tavern"]
+	var outs: Array = (tavern_floor["links"] as Array).filter(func(link: Dictionary) -> bool: return link["to_map"] == "wilds")
+	var through_door := outs.all(func(link: Dictionary) -> bool:
+		return int(tavern_floor["terrain"]["edges"].get(Terrain.edge_key(link["tile"], Vector2i(0, -1)), Terrain.Edge.OPEN)) == Terrain.Edge.DOOR)
+	_check(outs.size() == 2 and through_door and tavern_floor["spawn_points"]["from_wilds"] == Vector2i(5, 13)
+		and outs.all(func(link: Dictionary) -> bool: return (link["tile"] as Vector2i).y == 14),
+		"the tavern's way out through a door in its south wall, the link on its doorstep, one arriving just inside (%s)" % [outs.map(func(link: Dictionary) -> Vector2i: return link["tile"])])
 	for name in names:
 		var level: Dictionary = floors[name]
 		var floor := {}

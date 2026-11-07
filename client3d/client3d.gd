@@ -16146,14 +16146,16 @@ func _add_doorway(key: Vector3i, pair := key) -> void:
 ## The doorways drawn as one door.double (decision 403): a building's door
 ## edges side by side on its outline, and in a generated level's halls
 ## every door edge's (725), two at a time from each run's start
-## (Level.door_pairs; a third left a door.single). First edge -> the next
-## along.
+## (Level.door_pairs; a third left a door.single), and in a building's
+## inside (Level terrain "interior") every door edge's, as its outline's
+## outside (its front door's inside, Jeff: "no door to exit"). First edge
+## -> the next along.
 func _double_doors() -> Dictionary[Vector3i, Vector3i]:
 	var edges: Dictionary = _terrain["edges"]
 	var door := func(key: Vector3i) -> bool:
 		return edges.get(key, Terrain.Edge.OPEN) == Terrain.Edge.DOOR and not _niche_at.has(key)
-	if _generated_doors():
-		return Level.door_pairs(edges.keys(), door)  # 725: every pair in a generated level's halls.
+	if _generated_doors() or bool(_terrain.get("interior", false)):
+		return Level.door_pairs(edges.keys(), door)  # 725: every pair in a generated level's halls; an inside's.
 	var out: Dictionary[Vector3i, Vector3i] = {}
 	for building: Dictionary in _drawn_buildings():
 		out.merge(Level.door_pairs(Level.building_outline(building), door))

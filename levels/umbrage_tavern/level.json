@@ -14,13 +14,13 @@
 	"starts": [
 		[
 			5,
-			12
+			13
 		]
 	],
 	"spawn_points": {
 		"from_wilds": [
 			5,
-			12
+			13
 		],
 		"from_umbrage_tavern_up_0": [
 			15,
@@ -35,7 +35,7 @@
 		{
 			"at": [
 				5,
-				13
+				14
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_tavern"
@@ -43,7 +43,7 @@
 		{
 			"at": [
 				6,
-				13
+				14
 			],
 			"to_map": "wilds",
 			"to_spawn": "from_tavern"

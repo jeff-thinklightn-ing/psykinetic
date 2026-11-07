@@ -43497,6 +43497,23 @@ four neighbours at 5.69 m (relief_test: every spawn on level ground; 0.25 m down
 floor at its door, walkable), and EditorFields.NOT_OFFERED names an interior's "town", "storeys"
 and "beds" (editor_test: every key a row). Client and level data, protocol unchanged, no new
 class_name.
+
+811 amended (3): an interior's way out is its front door, not a mark on the floor (Jeff, in the
+Mughouse, 2026-11-06: "inside of the tavern has no door to exit. just a spot on the ground"; the
+coordinator's ask; release's label; voice's words). tools/make_interior.py lays a spec's front door
+as a door in the wall: from each of its "cells" (the room's cells inside it) a door edge on its
+"side" (south if not said) to a doorstep cell outside every room, the doorstep the link back out,
+so one walks out through the door; one arrives on its first cell, just inside. The spec is refused
+when a front cell is in no room or its doorstep is in one. Level._interior_from sets terrain
+"interior" for a level whose storeys are said, and Client3D._double_doors pairs every door edge of
+such a level (Level.door_pairs, as a generated level's halls, 725): the front door's inside a
+door.double, as the inn's outline has it outside, and the two-cell doors between its rooms likewise.
+umbrage_tavern regenerated: its links to the wilds move from (5..6, 13) to the doorstep (5..6, 14),
+"from_wilds" to (5, 13). The stairs already drew building.stair_up and stair_down (their links'
+cues), so only the front door changes. level_test _test_tavern_zone: both links to the wilds on
+the doorstep beyond a door edge, the arrival just inside; view_test _test_tavern_inside: a double
+door at (5, 13) south. Level data, client and the tool; protocol unchanged, no new class_name.
+
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
 Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel

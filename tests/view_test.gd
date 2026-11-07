@@ -2749,6 +2749,13 @@ func _test_tavern_inside() -> void:
 	# its back to the west wall, at their middle.
 	var ground := Level.load_level("umbrage_tavern")
 	_rig.rebuild(ground["terrain"], ground["spawn_points"]["from_wilds"])
+	# Its way out the inside of its front door (Jeff: "no door to exit"):
+	# a door.double in the south wall over the doorstep's two cells, as the
+	# inn's outline has it outside.
+	var front_door := Vector3i(5, 13, Terrain.SOUTH)
+	_check(bool(ground["terrain"].get("interior", false)) and _rig._doorways.has(front_door)
+		and _rig._double_doors().get(front_door) == Vector3i(6, 13, Terrain.SOUTH),
+		"the Mughouse's way out a double door in its south wall (%s)" % [_rig._double_doors().get(front_door)])
 	var hearth := _rig._room.get_node_or_null("Decor_0_6_wall_hearth_-1_0") as Node3D
 	_check(hearth != null and is_equal_approx(hearth.position.x, -0.5) and is_equal_approx(hearth.position.z, 6.5)
 			and is_equal_approx(hearth.rotation.y, PI * 0.5),
