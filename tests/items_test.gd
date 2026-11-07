@@ -1867,7 +1867,7 @@ func _test_cache() -> void:
 	_beside(host, chest)
 	var had := _units_of(host)
 	var ground_before := World.ground_uids(host.tile)
-	_check(_main.search(host, chest), "searched: something found")
+	_check(_found(host, chest), "searched: something found")
 	var got: Array[int] = []
 	for uid in _units_of(host):
 		if not uid in had:
@@ -1888,7 +1888,7 @@ func _test_cache() -> void:
 	record.caches.erase("farmstead_cache")  # As another player's record, who has not searched it.
 	var held_now := _units_of(host)
 	var ground_now := World.ground_uids(host.tile)
-	_check(_main.search(host, chest), "a player who has not searched it finds theirs")
+	_check(_found(host, chest), "a player who has not searched it finds theirs")
 	for uid in _units_of(host):
 		if not uid in held_now:
 			got.append(uid)
@@ -1915,7 +1915,7 @@ func _test_cache() -> void:
 	var purse_was := World.gold_of(me)
 	var crypt_held := _units_of(host)
 	var crypt_ground := World.ground_uids(host.tile)
-	var crypt_found: bool = _main.search(host, chest)
+	var crypt_found: bool = _found(host, chest)
 	var paid := World.gold_of(me) - purse_was
 	var trinkets: Array[int] = []
 	for uid in _units_of(host):
@@ -1939,6 +1939,7 @@ func _test_cache() -> void:
 	World._relocate(host, host_at)
 	chest.cache = ""
 	chest.cache_place = ""
+	_test_find_window(host, chest)
 	_test_dungeon_caches(host, chest)
 	_test_coop_tomb(host, chest)
 
@@ -2032,6 +2033,156 @@ func _test_coop_tomb(host: Player, chest: Chest) -> void:
 		_main._regen[zone_name] = kept_regen
 
 
+## A cache searched and its find taken at once (599 amended: the window's
+## Take all), as one search gave it before the window.
+func _found(player: Player, chest: Chest) -> bool:
+	return _main.search(player, chest) and _main.take_find(player, chest)
+
+
+## Every cached find's uid there is now (wherever it lies).
+func _cached_uids() -> Array[int]:
+	var out: Array[int] = []
+	for uid: int in World.items._book.keys():
+		var events: Array = World.items.history(uid).get("events", [])
+		if not events.is_empty() and events[0]["kind"] == "cached":
+			out.append(uid)
+	return out
+
+
+## The cached finds there are now that were not in [param before].
+func _new_finds(before: Array[int]) -> Array[int]:
+	var out: Array[int] = []
+	for uid in _cached_uids():
+		if not uid in before:
+			out.append(uid)
+	return out
+
+
+## Ends [param uids] wherever they are: in [param host]'s slots or on the ground.
+func _end_finds(host: Player, uids: Array[int]) -> void:
+	for uid in uids:
+		var at := World.items.at_of(uid)
+		if World.slot_of_unit(host, uid) >= 0:
+			World.take_units(host, [uid])
+		elif at.contains("@"):
+			var xy := at.get_slice("@", 1).split(",")
+			var cell := Vector2i(int(xy[0]), int(xy[1]))
+			World.take_from_ground(cell, World.ground_uids(cell).find(uid))
+		World.items.end(uid, "gone")
+
+
+## 599 amended (Jeff: "boss chests just seem to report whats found instead
+## of being actually openable"): opening a cache shows its opener their own
+## find ("find") and gives nothing; closed and opened again, the same find;
+## Take all gives it, once, with voice's line; a full pack leaves the rest
+## at the feet, said; another player's find is their own.
+func _test_find_window(host: Player, chest: Chest) -> void:
+	print("\n== 599 amended: a cache's find shown in its window, given at Take all ==")
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var me := str(record.player_id)
+	var heard: Array[Dictionary] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "find" or kind == "party":
+			heard.append({"kind": kind, "data": data})
+	Net.message_received.connect(hear)
+	var host_at := host.tile
+	chest.cache = "farmstead_cache"
+	chest.cache_place = "the old farmstead"
+	_beside(host, chest)
+	var key: String = _main.cache_record_key(chest)
+	record.caches.erase(key)
+	var before := _cached_uids()
+	var held := _units_of(host)
+	var purse := World.gold_of(me)
+	_check(_main.search(host, chest) and _cached_uids() == before and _units_of(host) == held and World.gold_of(me) == purse
+			and not key in record.caches, "opened: nothing given, nothing minted, nothing on the record")
+	var shown: Array[Dictionary] = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "find")
+	var find: Dictionary = shown[0]["data"] if shown.size() == 1 else {}
+	var rows: Array = find.get("rows", [])
+	var units := 0
+	for row: Dictionary in rows:
+		units += int(row["count"])
+	_check(find.get("title") == "Old farmstead" and find.get("place") == "the old farmstead" and find.get("chest") == str(chest.get_path())
+			and rows.any(func(row: Dictionary) -> bool: return row["id"] == "bandaging_kit" and row["count"] == 2) and _main.find_data == find,
+			"the find message: its title the place as a label, its rows counted (%s)" % [find])
+	heard.clear()
+	_check(_main.search(host, chest) and heard.size() == 1 and heard[0]["kind"] == "find" and heard[0]["data"]["rows"] == rows
+			and _cached_uids() == before, "closed and opened again: the same find, still in the chest")
+	heard.clear()
+	var took: bool = _main.take_find(host, chest)
+	var given := _new_finds(before)
+	var said: String = heard[-1]["data"]["text"] if not heard.is_empty() else ""
+	var paid := World.gold_of(me) - purse
+	_check(took and key in record.caches and given.size() == units and given.all(func(uid: int) -> bool: return World.slot_of_unit(host, uid) >= 0)
+			and said == "You take %s." % _main._listed(rows, paid),
+			"Take all: every thing into hand or pack, on the record, voice's line (%s)" % said)
+	_check(not _main.take_find(host, chest) and not _main.search(host, chest), "taken: Take all again or opened again gives nothing more")
+	_end_finds(host, given)
+	World.add_gold(me, -paid, "test")
+	record.caches.erase(key)
+	# A full pack: hands and pack filled with daggers, which nothing found stacks onto.
+	var fill: Array[int] = []
+	for slot: int in [Items.RIGHT_HAND, Items.LEFT_HAND] + Items.PACK_SLOTS:
+		if slot < host.slots.size() and host.slots[slot].is_empty():
+			var dagger := World.items.mint("dagger", "test", "", host.zone, host.tile)
+			if World.put_item(host, host, slot, dagger):
+				fill.append(dagger)
+	heard.clear()
+	before = _cached_uids()
+	purse = World.gold_of(me)
+	_check(_main.search(host, chest) and _main.take_find(host, chest), "a full pack: searched and taken")
+	given = _new_finds(before)
+	said = heard[-1]["data"]["text"] if not heard.is_empty() else ""
+	paid = World.gold_of(me) - purse
+	var kept: Array = []
+	var left: Array = []
+	for uid in given:
+		var into: Array = left if World.items.at_of(uid).contains("@") else kept
+		var id := World.items.id_of(uid)
+		var at := into.find_custom(func(row: Dictionary) -> bool: return row["id"] == id)
+		if at >= 0:
+			into[at]["count"] += 1
+		else:
+			into.append({"id": id, "count": 1})
+	_check(given.size() == units and not left.is_empty() and said.contains("your pack is full") and said.ends_with("left at your feet.")
+			and said == _main.take_line(kept, paid, left),
+			"a full pack: what fits nowhere (no stack of its kind) is at the feet, and the line says so (%s)" % said)
+	_end_finds(host, given)
+	World.take_units(host, fill)
+	for uid in fill:
+		World.items.end(uid, "gone")
+	World.add_gold(me, -paid, "test")
+	record.caches.erase(key)
+	# Another player at the same chest: their own find, on their own record.
+	var entry := record.to_dict()
+	entry["player_id"] = "other_finder"
+	entry["caches"] = []
+	var other := PlayerRecord.from_dict(entry)
+	_check(_main.search(host, chest) and not key in record.caches, "the first opens it and closes the window")
+	var first_rows: Array = _main.find_data.get("rows", [])
+	_main._records[Net.player_id] = other
+	heard.clear()
+	before = _cached_uids()
+	purse = World.gold_of(me)
+	var other_rows: Array = []
+	if _main.search(host, chest) and not heard.is_empty():
+		other_rows = heard[-1]["data"].get("rows", [])
+	var other_took: bool = _main.take_find(host, chest)
+	_main._records[Net.player_id] = record
+	_check(other_took and key in other.caches and not key in record.caches and other_rows == _main.roll_find(other, key, chest.cache)["rows"]
+			and first_rows == _main.roll_find(record, key, chest.cache)["rows"],
+			"the second takes their own find (%s); the first's is still in the chest for them (%s)" % [other_rows, first_rows])
+	_end_finds(host, _new_finds(before))
+	World.add_gold(me, purse - World.gold_of(me), "test")
+	_check(_main.take_find(host, chest) and key in record.caches, "and the first takes theirs after")
+	_end_finds(host, _new_finds(before))
+	World.add_gold(me, purse - World.gold_of(me), "test")
+	record.caches.erase(key)
+	Net.message_received.disconnect(hear)
+	World._relocate(host, host_at)
+	chest.cache = ""
+	chest.cache_place = ""
+
 ## 808: in a regenerating level a cache is each chest's own, per player and
 ## per generation; a save keeps only the generations still laid.
 func _test_dungeon_caches(host: Player, chest: Chest) -> void:
@@ -2060,7 +2211,7 @@ func _test_dungeon_caches(host: Player, chest: Chest) -> void:
 		for who: PlayerRecord in [record, other]:
 			_main._records[Net.player_id] = who
 			var had := _units_of(host).size() + World.ground_uids(host.tile).size()
-			var found: bool = _main.search(host, chest)
+			var found: bool = _found(host, chest)
 			counts.append([found, _main.search(host, chest)])
 			_check(found and _units_of(host).size() + World.ground_uids(host.tile).size() > had,
 					"generation %d, %s: finds theirs" % [generation, who.player_id])

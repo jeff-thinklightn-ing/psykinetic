@@ -787,6 +787,11 @@ signal counter_told(data: Dictionary)
 ## The barter window's last "barter" message (decision 560), for ui's window.
 var barter_data := {}
 signal barter_told(data: Dictionary)
+## The find window's last "find" message (599 amended), for ui's window:
+## {chest (a path), place, title, rows [{id, count}], gold}; find_told
+## after each. Take all is take_find_all(); closing leaves it in the chest.
+var find_data := {}
+signal find_told(data: Dictionary)
 ## Client: the world map's server data (decision 446, WorldNews.merge):
 ## {holdings: {place_id: [faction, strength]}, known_areas, known_places,
 ## party: [{name, area, kind}]}; world_changed after each "world" message.
@@ -13515,6 +13520,8 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 			World.damage(entity, entity.hp, null, &"bled")  # Bleed Out (Mortally Wounded): the return follows at once.
 	elif command_name == "search" and entity is Player:
 		search(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
+	elif command_name == "take_find" and entity is Player:
+		take_find(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
 	elif command_name == "use" and entity is Player:
 		var used := int(args.get("slot", -1))
 		if not World.try_use(entity, used):
@@ -14857,6 +14864,10 @@ func _on_message(kind: String, data: Dictionary) -> void:
 		return
 	if kind == "shop":
 		_on_shop_message(data)
+	elif kind == "find":
+		find_data = data
+		find_told.emit(data)
+		return
 	elif kind == "barter":
 		barter_data = data
 		if data.has("gold"):
@@ -20538,43 +20549,140 @@ func search(player: Player, chest: Chest) -> bool:
 		tell.call("Nothing more here.")
 		return false
 	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
+	var find := roll_find(record, key, chest.cache)
+	if find["rows"].is_empty() and int(find["gold"]) == 0:
+		record.caches.append(key)
+		tell.call("Nothing here.")
+		return false
+	print("[cache] %s opened %s at %s: %s" % [player.name, key, place, _listed(find["rows"], int(find["gold"]))])
+	if player.owner_peer != 0:
+		Net.message_to(player.owner_peer, "find", {"chest": str(chest.get_path()), "place": place, "title": find_title(place),
+				"rows": find["rows"], "gold": find["gold"]})
+	return true
+
+
+## [param player] takes the find of the cache [param chest] shown them by
+## search (599 amended: Take all in the find window): given as
+## _give_cache gives it, once. True if anything was given.
+func take_find(player: Player, chest: Chest) -> bool:
+	if not Net.is_authority() or player == null or not is_instance_valid(chest) or chest.cache.is_empty() \
+			or not World.reaches(player, chest):
+		return false
+	var record: PlayerRecord = _records.get(str(player.player_id))
+	if record == null:
+		return false
+	var camp: Dictionary = _camp_rules()
+	if not camp.is_empty() and chest.cache == str(camp.get("cache", "")):
+		return false  # The camp chest is opened with Brand's key, never through the window.
+	var tell := func(text: String) -> void:
+		if player.owner_peer != 0:
+			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text})
+	var key := cache_record_key(chest)
+	if key in record.caches:
+		tell.call("Nothing more here.")
+		return false
+	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
 	return _give_cache(player, record, key, chest.cache, place, chest.zone, chest.tile, tell)
+
+
+## A cache's find for [param record] under [param key] (599; 808): table
+## [param table] rolled by them and the key, the same each time it is
+## rolled. {rows: [{id, count}] in the order rolled, gold}.
+static func roll_find(record: PlayerRecord, key: String, table: String) -> Dictionary:
+	var seed_text := "%s:%s" % [record.player_id, key]
+	var rows: Array[Dictionary] = []
+	for id in Items.roll_loot(table, seed_text, 64, true):
+		var at := rows.find_custom(func(row: Dictionary) -> bool: return row["id"] == id)
+		if at >= 0:
+			rows[at]["count"] += 1
+		else:
+			rows.append({"id": id, "count": 1})
+	return {"rows": rows, "gold": Items.roll_gold(table, seed_text)}
+
+
+## The find window's title for [param place] (voice: the place as a label,
+## its article dropped, a capital first, no full stop): "the forge's
+## sealed store" is "Forge's sealed store".
+static func find_title(place: String) -> String:
+	var title := place.strip_edges()
+	for article in ["the ", "a ", "an "]:
+		if title.to_lower().begins_with(article):
+			title = title.substr(article.length())
+			break
+	return title.left(1).to_upper() + title.substr(1)
 
 
 ## A cache's find (599; 808) given [param player]: table [param table]
 ## rolled by them and [param key] (kept on [param record]), gold to the
-## purse, things to their pack (else the ground), voice's find line told
-## (330 amended (2)). True if anything was found.
+## purse, things to their hands and pack, the rest at their feet, voice's
+## take line told, naming what is left at their feet (599 amended). True
+## if anything was given.
 func _give_cache(player: Player, record: PlayerRecord, key: String, table: String, place: String, zone_name: String, tile: Vector2i,
 		tell: Callable) -> bool:
 	record.caches.append(key)
-	var found := Items.roll_loot(table, "%s:%s" % [record.player_id, key], 64, true)
-	var gold := Items.roll_gold(table, "%s:%s" % [record.player_id, key])
+	var find := roll_find(record, key, table)
+	var gold := int(find["gold"])
 	if gold > 0:
 		World.add_gold(str(record.player_id), gold, "found in %s" % place)
-	var counts := {}
-	for id in found:
-		var uid := World.items.mint(id, "cached", place, zone_name, tile)
-		if Items.condition_max(id) > 1:
-			World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
-		var slot := World.room_for(player, uid)  # Onto a stack of its kind first (decision 619).
-		if slot < 0 or not World.put_item(player, player, slot, uid):
-			World.put_on_ground(uid, player.tile)
-		counts[id] = int(counts.get(id, 0)) + 1
-	var words := PackedStringArray()  # Voice's sentence, as the pickup line (330 amended (2)).
-	for id: String in counts:
-		var word := Items.name_of(id)
+	var kept: Array[Dictionary] = []
+	var left: Array[Dictionary] = []
+	for row: Dictionary in find["rows"]:
+		for n in int(row["count"]):
+			var id: String = row["id"]
+			var uid := World.items.mint(id, "cached", place, zone_name, tile)
+			if Items.condition_max(id) > 1:
+				World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
+			var slot := World.room_for(player, uid)  # Onto a stack of its kind first (decision 619).
+			var into := kept
+			if slot < 0 or not World.put_item(player, player, slot, uid):
+				if World.put_on_ground(uid, player.tile) == World.NO_CELL:
+					push_warning("[cache] no ground room for %s at %s" % [id, player.tile])
+				into = left
+			if not into.is_empty() and into[-1]["id"] == id:
+				into[-1]["count"] += 1
+			else:
+				into.append({"id": id, "count": 1})
+	var line := take_line(kept, gold, left)
+	print("[cache] %s took %s at %s: %s; at their feet: %s" % [player.name, key, place, _listed(kept, gold), _listed(left, 0)])
+	if not line.is_empty():
+		tell.call(line)
+	return not line.is_empty()
+
+
+## Voice's take line (599 amended) for [param kept] and [param gold] taken
+## and [param left] (rows [{id, count}]) left at the feet for a full pack:
+## "You take a knife, 2 rations and 6 gold."; "You take a knife; your pack
+## is full, and 2 rations are left at your feet."; "Your pack is full: a
+## knife and 2 rations are left at your feet." "" for nothing at all.
+static func take_line(kept: Array, gold: int, left: Array) -> String:
+	var taken := _listed(kept, gold)
+	if left.is_empty():
+		return "" if taken.is_empty() else "You take %s." % taken
+	var units := 0
+	for row: Dictionary in left:
+		units += int(row["count"])
+	var at_feet := "%s %s left at your feet" % [_listed(left, 0), "is" if units == 1 else "are"]
+	if taken.is_empty():
+		return "Your pack is full: %s." % at_feet
+	return "You take %s; your pack is full, and %s." % [taken, at_feet]
+
+
+## [param rows] ([{id, count}]) and [param gold] as voice's list (330
+## amended (2)): "a knife, 2 rations and 6 gold"; "" for nothing.
+static func _listed(rows: Array, gold: int) -> String:
+	var words := PackedStringArray()
+	for row: Dictionary in rows:
+		var word := Items.name_of(row["id"])
 		word = word.left(1).to_lower() + word.substr(1)
-		if counts[id] > 1:
-			words.append("%d %s" % [counts[id], _plural(word)])
+		if int(row["count"]) > 1:
+			words.append("%d %s" % [row["count"], _plural(word)])
 		else:
 			words.append(("an " if word.left(1) in "aeiou" else "a ") + word)
 	if gold > 0:
 		words.append("%d gold" % gold)
-	var listed := words[0] if words.size() == 1 else ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1] if not words.is_empty() else ""
-	print("[cache] %s searched %s at %s: %s" % [player.name, key, place, listed])
-	tell.call("You find %s in %s." % [listed, place] if not words.is_empty() else "Nothing here.")
-	return not words.is_empty()
+	if words.size() <= 1:
+		return "".join(words)
+	return ", ".join(words.slice(0, words.size() - 1)) + " and " + words[-1]
 
 
 ## [param word] for more than one, in a line: "2 bandaging kits", "2 bone
@@ -20665,6 +20773,17 @@ func _search_camp(player: Player, chest: Chest, camp: Dictionary, tell: Callable
 	return true
 
 
+## Client: Take all in the find window (599 amended): asks the server for
+## the find last shown (find_data), and forgets it. False with none shown.
+func take_find_all() -> bool:
+	var player := _local_player()
+	if player == null or find_data.is_empty():
+		return false
+	World.command(player, "take_find", {"target": str(find_data.get("chest", ""))})
+	find_data = {}
+	return true
+
+
 ## Opens [param target]'s row (a chest, or a companion's pack), with its sound.
 func open_other(target: GridEntity) -> void:
 	_pack_wanted = null
@@ -20675,7 +20794,9 @@ func open_other(target: GridEntity) -> void:
 			World.command(_local_player(), "locker", {"prop": str(target.get_path())})
 		return
 	if target is Chest and not (target as Chest).cache.is_empty():
-		# A cache is searched, not opened (decision 599): the server hands over the find.
+		# A cache is searched (decision 599): the server shows your own find in
+		# the find window ("find", 599 amended), given at Take all (take_find_all).
+		_sound(SoundKit.opening(target), target)
 		if _local_player() != null:
 			World.command(_local_player(), "search", {"target": str(target.get_path())})
 		return

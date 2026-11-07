@@ -24659,6 +24659,35 @@ that never respawns.
 Wire: under PROTOCOL_REVISION 31 (with 583). items_test _test_cache. No
 new class_name.
 
+599 amended: the find shown in its window, given at Take all (Jeff, on
+v0.1.206: "boss chests just seem to report whats found instead of being
+actually openable and i didnt get any of the loot that was said in the
+text either"; the coordinator's design and approval; release's label).
+The box's two caches that night logged no put into a hand or the pack:
+with the hands and pack full, room_for found no slot and every thing was
+laid at his feet, unlogged and unsaid, in a regenerating level whose
+ground goes when it is laid again. Now Main.search, on any cache but the
+robbers' camp chest (its key rule stands), rolls the find (Main.roll_find:
+rows [{id, count}] in rolled order and gold, seeded by the player and the
+record key as before) and sends its opener a "find" message {chest,
+place, title (Main.find_title: the place as a label, voice's), rows,
+gold}, giving nothing and keeping nothing on the record, so a window
+closed leaves the find in the chest, the same when opened again. The
+client keeps it as Main.find_data (find_told) for ui's find window, whose
+Take all is Main.take_find_all, a "take_find" command {target}. On the
+server Main.take_find gives it as before (_give_cache: the hands, then
+the pack, then the feet; gold to the purse; the key on the record), and
+voice's line says where it went (Main.take_line): "You take a knife, 2
+rations and 6 gold."; "You take a knife; your pack is full, and 2
+rations are left at your feet."; "Your pack is full: a knife and 2
+rations are left at your feet." The "[cache]" log line names what was
+taken and what was left at the feet by item; a drop with no ground room
+is warned. A second player at the same chest sees and takes only their
+own. The loose niche still gives on pressing, with the take line. ui
+draws the window and, after it, a glint on ground piles (the
+coordinator). Wire: PROTOCOL_REVISION 52 (shared with 297 amended), the
+"find" message kind. items_test _test_find_window. No new class_name.
+
 ## 584 amended, npc's side: the medicine man's care and the quests behind it
 
 Jeff (2026-10-22, through the coordinator): "5 herbs, 5 antlers or 10 gold

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Open a find chest, a chief's hoard, a hidden cache or a sealed store, and your own find shows in a window: Take all puts it in your pack, and what doesn't fit is left at your feet, where before the chest only told you what was in it and you got nothing (599 amended).
 - In the crypt, a robber left guarding a chest after its band falls comes at you when you're near its post, or goes back to it and watches you, coming again if you strike it or step close, where before it stood frozen facing you (806 amended (8)).
 - In the crypt, the robbers stand and fight now: one alone comes straight at you, they go round you only while another holds your front, and a badly hurt one runs only to shout for the others, then comes back to fight to the end, where before they ran around (806 amended (9)).
 - In the hills, the cave north of the main road is clear of its rockfall, and the great bear dens inside; by day it comes out to roam the hills near its cave, off the roads, and goes back in when badly hurt, at dusk or after a while out, and you can follow it in; killed, it is back in its den within the half hour (780 amended (13)).

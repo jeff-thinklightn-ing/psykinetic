@@ -590,11 +590,15 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## sale), and "takers" carries "trophies" {item id: its buyer}; an old client prints "For F: 0 of 0".
 ## 52 (297 amended): the "town" message carries "trades", its residents' trades (sorted, each once;
 ## Towns.resident_trades), sent again when they change; Main.town_has_trade reads it (an old client ignores it). Shares 52 with 821.
+## 52 (599 amended): opening a cache chest ("search") sends its opener a new "find" message
+## {chest, place, title, rows [{id, count}], gold} and gives nothing; a new "take_find" command
+## {target} gives it (hand or pack, the rest at the feet, said). An old client never sends
+## take_find, so its finds stay in their chests. Shares 52 with 821 and 297 amended.
 const PROTOCOL_REVISION := 52
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).
-const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "arts", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "far_cry", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "reward", "roofs", "shop", "sky", "speech", "takers", "telegraph", "terrain", "town", "town_sheet", "tracks", "wave", "world"]
+const MESSAGE_KINDS: Array[String] = ["admin", "admin_reply", "arts", "barter", "blood", "builder", "chat", "clearing", "counter", "death", "far_cry", "find", "folds", "grass", "huts", "map", "notes", "offers", "party", "return", "reward", "roofs", "shop", "sky", "speech", "takers", "telegraph", "terrain", "town", "town_sheet", "tracks", "wave", "world"]
 ## Properties entity subclasses add with replicate().
 const SUBCLASS_REPLICATED: Array[String] = ["activity", "addressing", "ailing", "ailments", "alert", "art_feel", "asleep", "aura", "body", "bond_bar", "bond_step", "bond_why", "boss", "buffs", "channel_of", "channel_until", "charge_room", "charges", "crouched", "down_until", "downed_until", "emit_light", "fishing", "free_state", "given_name", "gone", "guide_wait", "hands", "heart", "keeper_peer", "led_by", "led_to", "load_arms", "load_body", "lobbing", "mending", "move_ticks", "needs", "opened", "peaceable", "person", "pile_at", "pile_facing", "pose", "quest", "raised", "raised_tick", "sheltering", "slot_counts", "slot_notes", "slots", "spent", "teeter", "tending", "trade", "worn"]
 const SETTINGS_FILE := "settings.cfg"
