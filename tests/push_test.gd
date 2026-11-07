@@ -193,6 +193,7 @@ func _test_mass_gate() -> void:
 	var player: GridEntity = e["P"][0]
 	var imp: Monster = e["m"][0]
 	imp.sight_range = 7
+	imp.lead_ticks = 0  # Its blow at once: the lead is monster_test's (338 amended (4)).
 	World.step()
 	_check(player.hp == 19, "imp attack lands: player hp 20 -> 19 (got %d)" % player.hp)
 	_check(player.tile == Vector2i(2, 1), "imp (40) cannot move the player (80)")
@@ -205,6 +206,7 @@ func _test_mass_gate() -> void:
 	player = e["P"][0]
 	var brute: Monster = e["m"][0]
 	brute.sight_range = 7
+	brute.lead_ticks = 0  # Its blow at once: the lead is monster_test's (338 amended (4)).
 	brute.mass = 100.0
 	brute.strength = 20  # An attack carries half force: 20 * 100 / 80 * 0.1 / 2 = 1.25.
 	World.step()
@@ -219,6 +221,7 @@ func _test_mass_gate() -> void:
 	player = e["P"][0]
 	brute = e["m"][0]
 	brute.sight_range = 7
+	brute.lead_ticks = 0  # Its blow at once: the lead is monster_test's (338 amended (4)).
 	brute.mass = 100.0
 	brute.strength = 30  # 30 * 100 / 80 * 0.1 / 2 = 1.875, over the threshold.
 	World.step()
@@ -525,6 +528,7 @@ func _test_no_attack_mid_step() -> void:
 	var player: GridEntity = e["P"][0]
 	var imp: Monster = e["m"][0]
 	imp.sight_range = 7
+	imp.lead_ticks = 0  # Its blow at once: the lead is monster_test's (338 amended (4)).
 	World.step()
 	_check(imp.tile == Vector2i(2, 1), "imp steps next to the player on tick 1")
 	for i in imp.move_ticks - 1:

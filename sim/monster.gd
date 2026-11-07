@@ -106,6 +106,10 @@ const DART_AFTER_TICKS := 3
 const CHARGE_RANGE := 4
 const CHARGE_PACE := 0.5
 const WINDUP_TICKS := 6
+## Its plain blow's lead (338 amended (4), "blows you can see"): the ticks it
+## draws back, told as a winding, before the blow lands; out of its own
+## cycle, so it strikes no less often. 0: at once, as before.
+const LEAD_TICKS := 3
 const FLANK_PATIENCE_TICKS := 20
 const BACKSTAB_DAMAGE := 1
 ## A lurking chief's told strike from behind (790 amended (4), combat's
@@ -136,15 +140,16 @@ const FIGHT_DEFAULTS := {"windup_ticks": WINDUP_TICKS, "charge_range": CHARGE_RA
 	"cooldown_spread": COOLDOWN_SPREAD, "flank_patience_ticks": FLANK_PATIENCE_TICKS, "flee_ticks": FLEE_TICKS,
 	"flee_tiles": FLEE_TILES, "flee_near_tiles": FLEE_NEAR_TILES, "rout_hurt": ROUT_HURT,
 	"dread_flee_below": DREAD_FLEE_BELOW, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
-	"band_min": BAND_MIN}
+	"band_min": BAND_MIN, "lead_ticks": LEAD_TICKS}
 ## Each fight value's range on the tuning panel (673 step 2), by name
 ## (flee_below's three share one).
 const FIGHT_SPANS := {"windup_ticks": [1, 30], "charge_range": [1, 10], "charge_pace": [0.1, 1.5],
 	"dart_after_ticks": [0, 20], "backstab_damage": [0, 10], "pace_spread": [0.0, 0.5], "cooldown_spread": [0, 10],
 	"flank_patience_ticks": [0, 100], "flee_ticks": [0, 300], "flee_tiles": [1, 20], "flee_near_tiles": [1, 20],
-	"rout_hurt": [0.0, 1.0], "dread_flee_below": [0.0, 1.0], "flee_below": [0.0, 1.0], "band_min": [2, 10]}
+	"rout_hurt": [0.0, 1.0], "dread_flee_below": [0.0, 1.0], "flee_below": [0.0, 1.0], "band_min": [2, 10],
+	"lead_ticks": [0, 10]}
 const FIGHT_INTS: Array[String] = ["windup_ticks", "charge_range", "dart_after_ticks", "backstab_damage",
-	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles", "band_min"]
+	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles", "band_min", "lead_ticks"]
 const REACTION_TICKS_MAX := 6
 const PAUSE_CHANCE_MAX := 0.12
 const PAUSE_TICKS := Vector2i(2, 6)
@@ -607,6 +612,7 @@ var flee_tiles := FLEE_TILES
 var flee_near_tiles := FLEE_NEAR_TILES
 var rout_hurt := ROUT_HURT
 var band_min := BAND_MIN
+var lead_ticks := LEAD_TICKS
 var dread_flee_below := DREAD_FLEE_BELOW
 var flee_below := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 ## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
@@ -1323,12 +1329,12 @@ func _bash_guard() -> bool:
 	return World.bash_ready(self) and not World.guarding(target, self).is_empty() and World.try_bash(self, target)
 
 
-## A plain blow at its target: its heavy weapon's wind-up, else at once.
-func _blow() -> void:
-	if World.windup_ticks(self) > 0:
-		World.try_wind_up(self, target)
-	else:
-		World.try_attack(self, target)
+## A plain blow at its target: its heavy weapon's wind-up, else its lead
+## (338 amended (4)), else at once. Whether it began or struck.
+func _blow() -> bool:
+	if World.windup_ticks(self) > 0 or lead_ticks > 0:
+		return World.try_wind_up(self, target, lead_ticks)
+	return World.try_attack(self, target)
 
 
 ## Its target winding a heavy blow up at it (World.winding, 392; decision
@@ -1415,7 +1421,7 @@ func _step_back() -> bool:
 ## wind-up (World.try_wind_up, decision 392) in place of any of its kind's.
 func _strike() -> void:
 	if World.windup_ticks(self) > 0:
-		World.try_wind_up(self, target)
+		World.try_wind_up(self, target, lead_ticks)  # A heavy weapon's own, or a held lead at least lead_ticks.
 		return
 	match tactic:
 		Tactic.HEAVY:
@@ -1432,11 +1438,19 @@ func _strike() -> void:
 			var behind := (World.body_centre(self) - World.body_centre(target)).dot(Vector2(target.facing)) < 0.0
 			if not behind and begin_lunge(target):
 				return  # From in front or side-on, told (790 amended (4)).
-			World.try_attack(self, target, attack_damage + (backstab_damage if behind else 0))
+			if behind:
+				World.try_attack(self, target, attack_damage + backstab_damage)  # Unseen from behind: at once.
+			else:
+				_blow()
 		_:
-			if World.try_attack(self, target) and tactic == Tactic.DART:
-				_dart_from = World.tick + dart_after_ticks
-				_dart_until = next_attack_tick - ceili(_pace)
+			if _blow() and tactic == Tactic.DART:
+				# Out after the blow lands: its lead, then dart_after_ticks; back before the next.
+				if not World.winding(self).is_empty():
+					_dart_from = int(World.winding(self)["lands"]) + dart_after_ticks
+					_dart_until = World.tick + World.attack_ticks_of(self) - ceili(_pace)
+				else:
+					_dart_from = World.tick + dart_after_ticks
+					_dart_until = next_attack_tick - ceili(_pace)
 
 
 ## A wound-up blow (HEAVY): lands when due if its target is still in reach,

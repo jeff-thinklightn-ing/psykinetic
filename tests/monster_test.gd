@@ -1816,6 +1816,7 @@ func _test_ambush() -> void:
 	World.spawn(player, Vector2i(3, 2))
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
 	_test_lunge()
+	_test_plain_lead()
 	_test_given_strength()
 
 
@@ -1841,6 +1842,79 @@ func _lunge_room() -> Array:
 	player.facing = Vector2i(-1, 0)
 	robber.target = player
 	return [robber, player]
+
+
+## 338 amended (4), "blows you can see": a monster's plain blow draws back
+## its kind's lead_ticks (3), told as a winding, before it lands; it stands
+## through it, and strikes as often as before (the lead comes out of its
+## cycle). A step out of reach in the lead spares; lead_ticks 0, at once.
+func _test_plain_lead() -> void:
+	print("
+== 338 amended (4): a monster's plain blow is led ==")
+	var rows: Array[String] = ["########", "#......#", "#.kP...#", "#......#", "########"]
+	var e := _build(rows)
+	var skeleton: Monster = e["k"][0]
+	var player: Player = e["P"][0]
+	_check(skeleton.lead_ticks == 3, "a skeleton's lead is the fight block's 3 (%d)" % skeleton.lead_ticks)
+	_bold(skeleton)
+	skeleton.idle = Monster.Idle.NONE  # A crypt skeleton's homeward idle fights only what is in its way.
+	skeleton.target = player
+	skeleton.next_attack_tick = 0
+	var began: Array[int] = []
+	var struck: Array[int] = []
+	var hp := player.hp
+	var at := skeleton.tile
+	for i in 40:
+		World.step()
+		var w := World.winding(skeleton)
+		if not w.is_empty() and (began.is_empty() or began[-1] != int(w["began"])):
+			began.append(int(w["began"]))
+		if player.hp < hp:
+			struck.append(World.tick)
+			hp = player.hp
+	_check(began.size() >= 2 and struck.size() >= 2, "it led and struck more than once (began %s, struck %s)" % [began, struck])
+	var led := true
+	for k in mini(began.size(), struck.size()):
+		led = led and struck[k] - began[k] >= 3 and struck[k] - began[k] <= 4
+	_check(led, "each blow lands 3 ticks after it draws back (began %s, struck %s)" % [began, struck])
+	_check(skeleton.tile == at, "it stood its ground through them (%s)" % skeleton.tile)
+	var cycle := World.attack_ticks_of(skeleton)
+	_check(struck.size() >= 2 and struck[1] - struck[0] <= cycle + skeleton.cooldown_spread + 1,
+		"as often as before: %d ticks apart, its cycle %d" % [struck[1] - struck[0] if struck.size() >= 2 else -1, cycle])
+	# Stepped out of reach in the lead: spared.
+	e = _build(rows)
+	skeleton = e["k"][0]
+	player = e["P"][0]
+	_bold(skeleton)
+	skeleton.idle = Monster.Idle.NONE  # A crypt skeleton's homeward idle fights only what is in its way.
+	skeleton.target = player
+	skeleton.next_attack_tick = 0
+	hp = player.hp
+	for i in 10:
+		World.step()
+		if not World.winding(skeleton).is_empty():
+			break
+	_check(not World.winding(skeleton).is_empty(), "drawing back")
+	_move_to(player, Vector2i(5, 2))
+	World.step()
+	World.step()
+	World.step()
+	_check(player.hp == hp, "stepped out of reach in its lead: spared (%d of %d)" % [player.hp, hp])
+	# lead_ticks 0: at once, as before.
+	e = _build(rows)
+	skeleton = e["k"][0]
+	player = e["P"][0]
+	skeleton.lead_ticks = 0
+	_bold(skeleton)
+	skeleton.idle = Monster.Idle.NONE  # A crypt skeleton's homeward idle fights only what is in its way.
+	skeleton.target = player
+	skeleton.next_attack_tick = 0
+	hp = player.hp
+	var none := true
+	for i in 20:
+		World.step()
+		none = none and World.winding(skeleton).is_empty()
+	_check(none and player.hp < hp, "lead_ticks 0: struck at once, never wound (%d of %d)" % [player.hp, hp])
 
 
 ## 790 amended (4): the crypt robbers' told lunge, from in front or
@@ -4477,8 +4551,8 @@ func _test_fight_panel() -> void:
 	Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)
 	var rows: Array = Tuning.fields().filter(func(r: Dictionary) -> bool: return str(r["path"]).begins_with("monsters."))
 	var windup: Array = rows.filter(func(r: Dictionary) -> bool: return r["path"] == "monsters.fight.windup_ticks")
-	_check(rows.size() == 17 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
-		"17 rows listed (698's band_min too), windup_ticks an int taken at spawn (%s)" % [windup])
+	_check(rows.size() == 18 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
+		"18 rows listed (698's band_min, 338 amended (4)'s lead_ticks too), windup_ticks an int taken at spawn (%s)" % [windup])
 	_check(Tuning.apply("monsters.fight.windup_ticks", 9) and Tuning.apply("monsters.fight.flee_below.bold", 0.2),
 		"windup_ticks and the bold one's flee_below set")
 	var e := _build(["#####", "#.b.#", "#####"])

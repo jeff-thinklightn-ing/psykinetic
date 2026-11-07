@@ -251,12 +251,15 @@ func _set_party(n: int, with := 0) -> void:
 
 
 ## A plain blow (Monster's): never meant to land (every blow is told), so
-## logged if it does: a tripwire for the tours.
-func _blow() -> void:
+## logged if it does: a tripwire for the tours. At once, never led (338
+## amended (4)), so the tripwire sees it land.
+func _blow() -> bool:
+	lead_ticks = 0
 	var was := target.hp if is_instance_valid(target) else 0
-	super()
+	var began := super()
 	if is_instance_valid(target) and target.hp < was:
 		print("[apex] %s blow %s %d at %s (%d/%d)" % [_kind(), World.kind_of(target), was - target.hp, tile, hp, max_hp])
+	return began
 
 
 ## Whether it is night by its body's clock (DayNight's light under Animal's

@@ -35794,6 +35794,24 @@ the blade's path from above and the side: C:/dev/review/sword/blade_path.png (be
 blade_path_before.png).
 Client only, protocol unchanged, no new class_name.
 
+338 amended (4), combat's side (release's label; the coordinator's approval, the pace program's
+"blows you can see"; Jeff: "fights feel a little too fast"): a monster's plain blow is led. Before,
+a monster's blow without a windup in its verb landed the tick it chose it, with nothing to read.
+Now Monster._blow begins it through World.try_wind_up with the kind's lead_ticks (Monster.LEAD_TICKS
+3; the fight block's "lead_ticks", 0 to 10, in levels/monsters.json and the tuning rows), told as a
+winding like the sword's lead, and it stands while it winds. A lead lands with World.lead_slack of
+reach, and its next blow comes attack_ticks_of after it began, so it strikes as often as before; a
+step out of reach in the lead spares. A heavy verb keeps its own windup (the longer of the two).
+lead_ticks 0 strikes at once, as before. The blow from behind (FLANK, unseen) stays instant. A
+DART's step-out times from when the blow lands. The great bear's _blow sets lead_ticks 0 (its
+swipe and slam are told already). A monster's lead writes no windup lines to the log
+(World._logs_wind_up), so a fight's log reads as before. pc-character's side plays the draw-back
+over the lead; enemy-ai's stop-to-strike (strike_recover_ticks, settle_ticks) is its side.
+monster_test _test_plain_lead: lead 3 from the fight block, each blow 3 ticks after it begins, it
+stands, the cycle unchanged, a step out spares, lead_ticks 0 at once; free_walk_test's chase allows
+the lead's slack. Server only (a monster's winding is told as a heavy one's was), protocol unchanged, no new
+class_name.
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,

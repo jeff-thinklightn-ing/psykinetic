@@ -768,7 +768,9 @@ func _test_free_chase() -> void:
 				last_way = d
 				last_tile = foe.tile
 		World.entity_damaged.disconnect(hurt)
-		var reach := World.reach_limit(foe) + 0.005  # The hits are snapped to 0.01.
+		# A plain blow is led now (338 amended (4)): as a lead it lands up to
+		# lead_slack past reach, as a sword's lead does. The hits are snapped to 0.01.
+		var reach := World.reach_limit(foe) + World.lead_slack + 0.005
 		_check(not hits.is_empty() and hits.max() <= reach and (turns <= 1 or kind == "imp"),
 				"%s: %d blows, at centres %s apart (reach by bodies: at most %.2f); back-and-forth steps %d" % [kind, hits.size(), hits, reach, turns])
 

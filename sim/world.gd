@@ -8457,10 +8457,14 @@ func winding(entity: GridEntity) -> Dictionary:
 ## its way, _free_give_up_wind_up), a stun, a knockdown or being moved off its cell gives it up
 ## (cancel_wind_up); after, nothing does. The views wind up with it
 ## (GridEntity.winding). False, nothing begun, if it cannot strike now.
-func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
+func try_wind_up(by: GridEntity, target: GridEntity, lead_ticks := 0) -> bool:
 	if not Net.is_authority() or not is_instance_valid(by) or not is_instance_valid(target):
 		return false
-	var ticks := windup_ticks(by)
+	# 338 amended (4): [param lead_ticks] over 0 is a monster's plain blow's
+	# lead (its kind's fight "lead_ticks"), longer than its weapon's own; a
+	# heavy weapon's wind-up is never shortened by it.
+	var heavy := int(blow_verb(by).get("windup", 0)) > 0
+	var ticks := windup_ticks(by) if heavy or lead_ticks <= 0 else maxi(lead_ticks, windup_ticks(by))
 	if ticks <= 0 or not by.wind_up.is_empty() or not by.spawned or not target.spawned or by == target:
 		return false
 	if not can_target(by, target) or is_stunned(by) or is_down(by):
@@ -8470,7 +8474,7 @@ func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
 	var direction := melee_way(by, target)
 	# A lead (338 amended) is no heavy blow: never crushing, and its
 	# ticks come out of the weapon's own cycle, hit to hit attack_ticks_of.
-	var lead := int(blow_verb(by).get("windup", 0)) <= 0
+	var lead := not heavy
 	by.wind_up = {"target": target, "lands": tick + ticks, "direction": direction, "from": by.tile, "began": tick, "lead": lead}
 	_halt_for_blow(by, tick + ticks)
 	_pay_swing(by, false)  # Paid as it begins; given up, not refunded (decision 597).
@@ -8479,8 +8483,16 @@ func try_wind_up(by: GridEntity, target: GridEntity) -> bool:
 	by._world_note_exertion(tick)
 	by.protected = false
 	by._world_winding(direction, ticks)
-	_log("windup: %s winds up at %s, %d ticks" % [by.name, target.name, ticks])
+	if _logs_wind_up(by, by.wind_up):
+		_log("windup: %s winds up at %s, %d ticks" % [by.name, target.name, ticks])
 	return true
+
+
+## Whether [param entity]'s wind-up [param wound] is logged: not a monster's
+## plain blow's lead (338 amended (4)), every blow of every fight's two
+## lines more in the box's journal; its hurt line says it landed.
+func _logs_wind_up(entity: GridEntity, wound: Dictionary) -> bool:
+	return not (entity is Monster and bool(wound.get("lead", false)))
 
 
 ## [param entity]'s wind-up given up (decision 392): nothing is struck, and
@@ -8489,10 +8501,12 @@ func cancel_wind_up(entity: GridEntity) -> void:
 	if not is_instance_valid(entity) or entity.wind_up.is_empty():
 		return
 	var direction: Vector2i = entity.wind_up["direction"]
+	var logs := _logs_wind_up(entity, entity.wind_up)
 	entity.wind_up = {}
 	_winders.erase(entity)
 	entity._world_winding(direction, 0)
-	_log("windup: %s gives up its wind-up" % entity.name)
+	if logs:
+		_log("windup: %s gives up its wind-up" % entity.name)
 
 
 ## Each wind-up (try_wind_up) on: given up if its winder was moved off its
@@ -8516,6 +8530,7 @@ func _tend_wind_ups() -> void:
 		var direction: Vector2i = entity.wind_up["direction"]
 		var lead: bool = entity.wind_up.get("lead", false)
 		var began: int = entity.wind_up.get("began", tick)
+		var logs := _logs_wind_up(entity, entity.wind_up)
 		entity.wind_up = {}
 		_winders.erase(entity)
 		var first := _hits.size()
@@ -8523,10 +8538,12 @@ func _tend_wind_ups() -> void:
 				and _try_hit(entity, aimed as GridEntity, entity.attack_damage, false, Vector2i.ZERO, true, lead):
 			for i in range(first, _hits.size()):
 				_hits[i].crushing = not lead
-			_log("windup: %s at %s strikes %s at %s" % [entity.name, entity.tile, (aimed as GridEntity).name, (aimed as GridEntity).tile])
+			if logs:
+				_log("windup: %s at %s strikes %s at %s" % [entity.name, entity.tile, (aimed as GridEntity).name, (aimed as GridEntity).tile])
 		else:
 			try_swing(entity, direction, true)
-			_log("windup: %s at %s strikes the air" % [entity.name, entity.tile])
+			if logs:
+				_log("windup: %s at %s strikes the air" % [entity.name, entity.tile])
 		var recover := recover_ticks(entity)
 		if not lead and recover > 0:
 			# 750: the head in the ground; it stands planted, the striker's opening.
