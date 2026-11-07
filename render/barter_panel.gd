@@ -666,7 +666,8 @@ func toggle_gift(uid: int) -> void:
 
 ## What giving [param rows] does, voice's lines (802): one a thing it goes
 ## toward, "For the new forge: 12 of 20 ore" (the row there furthest on,
-## have and need as after the give); "A gift" for gear; then "Pays 3 gold"
+## have and need as after the give), or "For tanning" alone where it needs
+## no count (821: a trophy the tanner or Rolf buys, need 0); "A gift" for gear; then "Pays 3 gold"
 ## and "Owes you 3 gold" (nothing for neither). No full stops.
 static func give_lines(rows: Array) -> Array[String]:
 	var toward := {}
@@ -691,7 +692,10 @@ static func give_lines(rows: Array) -> Array[String]:
 	var out: Array[String] = []
 	for name: String in order:
 		var row: Dictionary = toward[name]
-		out.append("For %s: %d of %d %s" % [name, int(row.get("have", 0)), int(row.get("need", 0)), raw_word(row)])
+		if int(row.get("need", 0)) <= 0:
+			out.append("For %s" % name)  # 821: a trophy bought by its maker, no count toward ("For tanning").
+		else:
+			out.append("For %s: %d of %d %s" % [name, int(row.get("have", 0)), int(row.get("need", 0)), raw_word(row)])
 	if gifts:
 		out.append(GIFT_WORDS)
 	if gold > 0:

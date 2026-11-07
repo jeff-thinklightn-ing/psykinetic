@@ -3009,6 +3009,11 @@ func _test_person_give() -> void:
 		{"uid": 903, "what": "sword", "count": 1, "slot": 2, "for": {}, "have": 0, "need": 0, "gold": 0, "owed": 0}]
 	_check(BarterPanel.give_lines(rows) == ["For the new forge: 12 of 20 ore", "For the larder: 14 of 22 food", "A gift", "Pays 3 gold", "Owes you 2 gold"],
 		"voice's lines: toward a build, the larder, a gift, paid and owed (%s)" % [BarterPanel.give_lines(rows)])
+	var trophies := [{"what": "bear_pelt", "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 1, "owed": 19},
+		{"what": "wolf_pelt", "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 2, "owed": 0},
+		{"what": "bear_claw", "raw": "", "for": {"kind": "maker", "name": "trimming leather"}, "have": 0, "need": 0, "gold": 1, "owed": 0}]
+	_check(BarterPanel.give_lines(trophies) == ["For tanning", "For trimming leather", "Pays 4 gold", "Owes you 19 gold"],
+		"821: trophies to their maker: \"For tanning\", no count; the same merged (%s)" % [BarterPanel.give_lines(trophies)])
 	_check(BarterPanel.give_lines([rows[2]]) == ["A gift"] and BarterPanel.raw_word({"what": "wood_bundle"}) == "wood",
 		"a gift alone says so and nothing of gold; a row with no raw word reads its sack's")
 	var me: Player = _main._local_player()
