@@ -3100,8 +3100,11 @@ func _test_person_give() -> void:
 	var lights: Dictionary = window.pack.prices if window.pack != null else {}
 	_check(window.pack == null or int(lights.get(0, -9)) == 3 and int(lights.get(1, -9)) == -1 and int(lights.get(3, -9)) == 0,
 		"the squares they take lit (a coin where they pay now), the rest dim (%s)" % [lights])
-	_check(window._select_mine(true, 0) and window.gift.has(901) and window.action().get("words") == "Give (1 item)",
-		"a click on a square they take picks it: Give (1 item)")
+	_check(window._select_mine(true, 0) and window.gift.has(901) and window.action().get("words") == "Sell (1 item)" and window._give_tab.text == "Sell",
+		"a click on a square they take picks it: Sell (1 item), they pay (802 amended (8)) (%s, %s)" % [window.action().get("words"), window._give_tab.text])
+	_check(BarterPanel.give_word([{"uid": 1, "gold": 0, "for": {"kind": "build", "name": "the new forge"}}, {"uid": 2, "gold": 0, "for": {}}]) == "Donate"
+		and BarterPanel.give_word([{"uid": 1, "gold": 0}, {"uid": 2, "gold": 4}]) == "Sell" and BarterPanel.give_word([]) == "Donate",
+		"Jeff's Trade or Donate (voice's Sell): Sell where any row pays, Donate where none does")
 	window._select_mine(true, 3)
 	_check(window.gift.size() == 1, "a square they don't take: nothing picked")
 	var lines: Array[String] = []

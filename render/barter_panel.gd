@@ -43,11 +43,12 @@ extends Control
 ##
 ## Give (802, Jeff: things handed to a person, not a chest): with what the
 ## person takes from the player's pack (economy's "takes" rows in their
-## sheet, person_takes), a Give toggle beside the name; on, the pack's
+## sheet, person_takes), a Give toggle beside the name (Sell where they pay,
+## else Donate: give_word, 802 amended (8)); on, the pack's
 ## squares they take are lit (a coin where they pay now), the rest dim, a
 ## click picks a row, the lines under say what it does (voice's: "For the
 ## new forge: 12 of 20 ore", "Pays 3 gold", "Owes you 3 gold", "A gift")
-## and the button gives ("Give (2 items)": Main sends "give" {entity,
+## and the button gives ("Sell (2 items)", "Donate (2 items)": Main sends "give" {entity,
 ## uids}). Opened while carrying something they take, the window opens on
 ## Give. Nothing they take: no toggle.
 
@@ -112,8 +113,10 @@ const LINE_MOST := 200
 ## Voice's words (802): the button's foot while out of reach for a trade.
 const STEP_CLOSER := "Step closer to trade"
 const ASLEEP_WORDS := "asleep"
-## Voice's words for Give (802): the toggle and the button's verb, a gift's line.
-const GIVE_WORDS := "Give"
+## Voice's words for Give (802; 802 amended (8), give_word): the toggle and
+## the button's verb, Sell where the person pays, else Donate; a gift's line.
+const SELL_WORDS := "Sell"
+const DONATE_WORDS := "Donate"
 const GIFT_WORDS := "A gift"
 ## Rolf's button (807 amended (3), voice's words).
 const LOCKER_WORDS := "Open locker"
@@ -249,7 +252,7 @@ func _ready() -> void:
 	head.add_child(_title)
 	_give_tab = Button.new()
 	_give_tab.name = "GiveTab"
-	_give_tab.text = GIVE_WORDS
+	_give_tab.text = DONATE_WORDS
 	_give_tab.toggle_mode = true
 	_give_tab.focus_mode = Control.FOCUS_NONE
 	_give_tab.visible = false
@@ -639,6 +642,28 @@ func takes_at(slot: int) -> Dictionary:
 	return takes_row(int(entry.get("uid", 0))) if not entry.is_empty() else {}
 
 
+## Give's word (802 amended (8), voice's, Jeff: "it just says Give... It
+## needs to say Trade or Donate"): "Sell" where one of [param rows] pays
+## gold for what is handed over (Rolf's stall, the tanner's trophies),
+## "Donate" where none does (ore toward a build, the larder, a gift). The tab
+## takes it from all the person's rows; the button from those picked.
+static func give_word(rows: Array) -> String:
+	for row: Variant in rows:
+		if row is Dictionary and int((row as Dictionary).get("gold", 0)) > 0:
+			return SELL_WORDS
+	return DONATE_WORDS
+
+
+## The rows picked for Give.
+func gift_picked() -> Array:
+	var out := []
+	for uid: Variant in gift:
+		var row := takes_row(int(uid))
+		if not row.is_empty():
+			out.append(row)
+	return out
+
+
 ## A pick of the row [param uid] for Give, or its unpick.
 func toggle_gift(uid: int) -> void:
 	if not _open or not giving:
@@ -970,7 +995,7 @@ func action() -> Dictionary:
 	if giving:
 		if gift.is_empty():
 			return {}
-		return {"words": button_words(GIVE_WORDS, gift.size()), "gold": 0, "total": [], "signed": false, "ok": true}
+		return {"words": button_words(give_word(gift_picked()), gift.size()), "gold": 0, "total": [], "signed": false, "ok": true}
 	if not care_pay.is_empty():
 		var hands := care_hands(care_pay)
 		return {"words": pay_words(care_pay, hands), "gold": -hands if care_pay == "gold" else 0,
@@ -1285,6 +1310,7 @@ func _rebuild() -> void:
 	_state.visible = person != null and asleep
 	_line.visible = person != null and talks
 	_give_tab.visible = trades and not takes.is_empty()
+	_give_tab.text = give_word(takes)
 	_give_tab.set_pressed_no_signal(giving)
 	_grid.visible = trades and not giving
 	_foot_row.visible = trades

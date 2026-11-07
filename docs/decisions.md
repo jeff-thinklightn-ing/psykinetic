@@ -42542,6 +42542,17 @@ _test_person_takes proves the build moves with each: a tanner hired and removed,
 a body spawned and despawned, the temple's lacking raw tipped by one either way, the build cancelled
 and queued again. Server only; protocol unchanged, no new class_name, no bullet.
 
+802 amended (8) (release's label; Jeff on Rolf's window, through the coordinator: "Rolf's menu is confusing, it just says
+Give. ... It needs to say Trade or Donate."): Give's toggle and its button say what the hand-over does. BarterPanel.give_word:
+"Sell" where one of the rows pays gold for what is handed over (Rolf's stall, the tanner's trophies, a build that pays),
+"Donate" where none does (ore toward a build that pays nothing, the larder, a gift). The tab takes its word from all the
+person's takes rows; the button's verb ("Sell (2 items)", "Donate (1 item)") from the rows picked, so a mixed pick that
+pays anything says Sell. Voice's words: Sell, not Jeff's "Trade", since the window's own mode already has a Trade that
+does something else and both Sells pay you; "A gift" stays the gift row's line (it says why, Donate says what). Every
+keeper with takes rows reads it (Rolf, the tanner, makers' builds, the larder, gear gifts); nothing else changes in Give.
+ui_test: Sell (1 item) and the Sell tab on a row that pays; give_word Donate on rows that pay nothing. Client only;
+protocol unchanged, no new class_name.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when
