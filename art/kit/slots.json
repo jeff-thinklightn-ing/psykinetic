@@ -3201,12 +3201,12 @@
 			"category": "creatures",
 			"type": "mesh",
 			"kind": "creature",
-			"size": [0.53, 1.14, 2.36],
+			"size": [0.594, 1.285, 2.661],
 			"tolerance": 0.15,
 			"budget": 2500,
-			"source": {"by": "Quaternius (mesh, rig and clips: creature.wolf's), art-kit (the old wolf: ruff, grey muzzle, torn ear, coat, scale 1.2; amended: a white ruff, a lean flank, muzzle scars)", "tool": "blender",
+			"source": {"by": "Quaternius (mesh, rig and clips: creature.wolf's), art-kit (the old wolf: ruff, grey muzzle, torn ear, coat, scale 1.2; amended: a white ruff, a lean flank, muzzle scars; bigger and paler)", "tool": "blender",
 				"license": "CC0 1.0 (Quaternius, Ultimate Animated Animal Pack: Wolf, docs/licenses/quaternius-cc0_2026-10-15.txt); own (the changes)", "date": "2026-11-06",
-				"notes": "C:/dev/review/old_wolf/make_old_wolf.py run on creature.wolf.blend (enemy-ai's day apex, working name; pc-character: the stock wolf's skeleton): only the stock verts moved, none added, so every weight and clip is the wolf's: a shaggy ruff round the neck and shoulders, the right ear torn short and notched, the coat greyer with a dark saddle and a pale grizzled muzzle; the armature scaled 1.2; 1962 tris; amended 2026-11-06 for enemy-ai's old grey design (the coordinator's approval: a bigger, greyer wolf with a white ruff, old, a lean flank, a scarred muzzle) by C:/dev/review/old_wolf/amend_old_wolf.py on the landed body: the ruff white down the throat and chest, the flank drawn up and in under the ribs, three old scars pale across the muzzle; only verts moved and faces recoloured, so the weights, clips and size are unchanged"},
+				"notes": "C:/dev/review/old_wolf/make_old_wolf.py run on creature.wolf.blend (enemy-ai's day apex, working name; pc-character: the stock wolf's skeleton): only the stock verts moved, none added, so every weight and clip is the wolf's: a shaggy ruff round the neck and shoulders, the right ear torn short and notched, the coat greyer with a dark saddle and a pale grizzled muzzle; the armature scaled 1.2; 1962 tris; amended 2026-11-06 for enemy-ai's old grey design (the coordinator's approval: a bigger, greyer wolf with a white ruff, old, a lean flank, a scarred muzzle) by C:/dev/review/old_wolf/amend_old_wolf.py on the landed body: the ruff white down the throat and chest, the flank drawn up and in under the ribs, three old scars pale across the muzzle; only verts moved and faces recoloured, so the weights, clips and size are unchanged; bigger and paler 2026-11-07 for enemy-ai (the coordinator: \"barely bigger or paler than the others\" in the den) by C:/dev/review/old_wolf/bigger_paler.py: the armature object scaled 1.127 (not applied, so the clips' keys are untouched), about 1.4x the wolf's length; the coat a step paler, the back from neck to tail frosted near-white in a grizzled scatter where the dark saddle was, the head's top and the muzzle white-grizzled, the legs below the knee left mid grey; faces recoloured only"},
 			"uses": "the old wolf, the pack's old leader (enemy-ai's day apex): a rigged body (one Skeleton3D) and its clips, by the names listed (any one of a clip's names, after any \"Armature|\" prefix); front +z, origin under its middle, standing at rest. creature.wolf's mesh, rig and clips, made old and big; read at a distance by the ruff, the grey muzzle and the torn ear",
 			"clips": [
 				{"name": "idle", "names": ["idle"], "required": true},
@@ -3223,10 +3223,10 @@
 				{"name": "lie", "names": ["lie", "lie_down"]}
 			],
 			"grey": [
-				{"at": [0, 0.24, 0.137], "size": [0.424, 0.48, 1.043]},
-				{"at": [0, 0.72, 0.137], "size": [0.53, 0.48, 1.391]},
-				{"at": [0, 1.003, 1.006], "size": [0.371, 0.274, 0.348]},
-				{"at": [0, 0.66, -0.869], "size": [0.151, 0.12, 0.621]}
+				{"at": [0.0, 0.27, 0.154], "size": [0.478, 0.541, 1.175]},
+				{"at": [0.0, 0.811, 0.154], "size": [0.597, 0.541, 1.568]},
+				{"at": [0.0, 1.13, 1.134], "size": [0.418, 0.309, 0.392]},
+				{"at": [0.0, 0.744, -0.979], "size": [0.17, 0.135, 0.7]}
 			]
 		},
 		"creature.boar_king": {
