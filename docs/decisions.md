@@ -44140,3 +44140,38 @@ off the foothills, the bear's in the hills, so one trip never meets two apexes.
   HIS_MARKER, False till then. level_test _test_grey_den: the den in one piece, two wide, off the
   door's line; the mouth's footprint void, no cliff at the link or its pad, the strip open, 30 from
   either pad.
+
+## 820. Level.SHELVED: a level held back till its package lands
+
+Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a
+sign can't go in before the place." He had found a sealed cave he couldn't enter. The coordinator
+ruled there are no sealed mouths: a lair whose creature isn't in yet doesn't show at all. Release
+numbered it, as every tree will hold a place back this way.
+
+- `Level.SHELVED`: level name -> [the zone, the cell] a player saved there is put back at (RETIRED's
+  shape, 666). Today it holds "boar_lair" (forest (124, 175), till the boar king's package) and
+  "grey_den" (foothills (97, 33), till the old grey's, 780 amended (15)).
+- A shelved level stays on disk, and load_level still reads it (level_test checks it), but
+  Level.names() leaves it out. So the world map, Holdings and the zones never see it: no zone, no
+  place, no found reward. `Level.playable(name)` (exists and not shelved) guards what opens a zone:
+  Main._open_zone, a returning player's zone, travel and the console's move.
+- At boot, players saved in a shelved level are moved to its heir cell, and its saved zone state is
+  dropped and never opened, as a retired level's: one count-only line, "[level] shelved <name>: N
+  moved to <zone>, M saved states dropped". The box has had the boar lair live (sealed) since
+  v0.1.206. state_test 2e boots a save with the player and a crate in boar_lair: the player comes back
+  at (124, 175), the line says it, and the save no longer names it.
+- The lands' makers lay no mouth for a shelved lair: make_forest's LAIRS (through _open_lairs) and
+  make_foothills' GREY_DEN skip the footprint, pad, bones, sightline lane, link, spawn and clawed tree;
+  the ground there lays as the land round it. The forest and the foothills are regenerated. The
+  foothills come back byte for byte as before the den (641538017). The boar strip's three grown
+  trees, taken out by hand in 780 amended (12)'s sightline, are back in trees.json (the coordinator:
+  an empty lane would hint at nothing); the boar king's landing takes them out again.
+- Opening a level: its line out of SHELVED, its land made again, and (for the boar) the three trees
+  out, in the landing that brings the rest of its package.
+- The den's CHANGELOG bullet (780 amended (14)) is taken out of Unreleased: nothing of it is met
+  yet. The old grey's landing brings a bullet for the whole package.
+- level_test: _check_shelved for each (not in names, not playable, the heir cell floor, no link,
+  spawn, bones or clawed tree where its mouth was); the forest's link list and the two lairs' land
+  checks read SHELVED, so the opening landing's checks come back on their own.
+
+Protocol unchanged, no new class_name.

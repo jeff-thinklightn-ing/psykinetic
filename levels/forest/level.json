@@ -485,24 +485,11 @@
 				-1
 			],
 			"code": "C7"
-		},
-		{
-			"slot": "tree.clawed",
-			"at": [
-				123,
-				177
-			],
-			"facing": [
-				1,
-				0
-			],
-			"code": "T1"
 		}
 	],
 	"building_codes": {
 		"H": 1,
-		"C": 7,
-		"T": 1
+		"C": 7
 	},
 	"legend": {
 		"monster_bandit": "#b4643c",
@@ -678,22 +665,6 @@
 			1
 		],
 		[
-			123,
-			174,
-			1,
-			0,
-			"scattered_bones",
-			1
-		],
-		[
-			124,
-			176,
-			-1,
-			0,
-			"scattered_bones",
-			1
-		],
-		[
 			52,
 			75,
 			0,
@@ -741,10 +712,6 @@
 			168,
 			7
 		],
-		"from_boar_lair": [
-			124,
-			175
-		],
 		"from_wolf_cave": [
 			53,
 			74
@@ -766,16 +733,6 @@
 			],
 			"to_map": "stronghold",
 			"to_spawn": "from_forest",
-			"closed": true
-		},
-		{
-			"at": [
-				122,
-				175
-			],
-			"to_map": "boar_lair",
-			"to_spawn": "from_forest",
-			"mouth": "thicket",
 			"closed": true
 		},
 		{

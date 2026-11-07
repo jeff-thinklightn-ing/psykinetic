@@ -56,6 +56,18 @@ const DEFAULT_MAP := "test_room"
 ## player saved there lands at. An overlay copy of one is ignored, and the
 ## snapshot's state for it dropped (Main._boot, each with a count-only line).
 const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vector2i(49, 2)]}
+## Levels held back till their package lands (820; Jeff's rule, 2026-11-06:
+## "these additions go in as packages", a place never before what it leads
+## to): name -> [the zone, the cell] a player saved there lands at, as
+## RETIRED's. A shelved level stays on disk and loads in tests, but names()
+## leaves it out, so the world never opens it (no zone, no place, no found
+## reward), and the lands' makers lay no mouth for it (make_forest's LAIRS,
+## make_foothills' GREY_DEN: no link, footprint, pad, bones or lane). Its
+## package's landing takes it out of here and lays its land again.
+const SHELVED: Dictionary[String, Array] = {
+	"boar_lair": ["forest", Vector2i(124, 175)],  # The boar king's (780 amended (12)).
+	"grey_den": ["foothills", Vector2i(97, 33)],  # The old grey's (780 amended (14), (15)).
+}
 ## Levels made again on a new grid (decision 756: layout A's step 3, the
 ## hills rebuilt bigger), each with the decision that remade it: a server's
 ## state saved on the old grid is moved once, in code (Main._move_off_remade):
@@ -640,8 +652,16 @@ static func names() -> Array[String]:
 		if folder.ends_with("/") and level_name != "prefabs" and level_name not in out \
 				and ResourceLoader.exists(DIR + level_name + "/layout.png"):
 			out.append(level_name)
+	for held: String in SHELVED:
+		out.erase(held)
 	out.sort()
 	return out
+
+
+## Whether [param level_name] is a level the world opens: there, and not
+## held back (SHELVED, 820).
+static func playable(level_name: String) -> bool:
+	return exists(level_name) and not SHELVED.has(level_name)
 
 
 ## What level [param level_name] is made of: {layout: Image or null,

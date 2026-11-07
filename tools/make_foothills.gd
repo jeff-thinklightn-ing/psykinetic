@@ -118,7 +118,7 @@ func _build(wander_seed: int) -> void:
 		"slope": 0.3, "steep_bands": 0.3, "rock_step": Relief.MAX_M, "dirt_step": 0.33,
 		"valleys": [RIVER], "valley_depth": 1.5, "valley_floor": 8.0, "valley_fall": 3.0, "valley_width": 16.0, "kinds": true, "min_flow": 30,
 		"keep_flat": [Rect2i(arrivals[0] - Vector2i(3, 2), Vector2i(7, 5)), Rect2i(arrivals[1] - Vector2i(3, 2), Vector2i(7, 5)),
-			Rect2i(GREY_DEN["at"] - Vector2i(2, 0), Vector2i(5, 3))],
+			] + ([] if Level.SHELVED.has(GREY_DEN["to_map"]) else [Rect2i(GREY_DEN["at"] - Vector2i(2, 0), Vector2i(5, 3))]),
 		"streams": 0, "keep_clear": {},
 		"rivers": [{"line": RIVER, "wavelength": 24.0, "amplitude": 4.0, "width": RIVER_WIDTH}]})
 	map.relief = PackedFloat32Array()
@@ -261,6 +261,8 @@ func _clumps(road: Dictionary) -> void:
 ## it), its pad and link dirt with bones on the pad, its sightline grass, the
 ## link (open, "mouth": "den") and its "from_grey_den" spawn.
 func _den_mouth() -> void:
+	if Level.SHELVED.has(GREY_DEN["to_map"]):
+		return  # Held back till the old grey's package (820): no mouth at all.
 	var at: Vector2i = GREY_DEN["at"]
 	var open: Vector2i = GREY_DEN["open"]
 	var cells: Dictionary = MakeForest.lair_cells(GREY_DEN)

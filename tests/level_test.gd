@@ -1684,10 +1684,13 @@ func _test_forest() -> void:
 	print("== levels/forest ==")
 	var forest := Level.load_level("forest")
 	var links: Array = forest.get("links", [])
-	_check(forest.get("display_name") == "The Forest" and links.size() == 4 and links[0]["to_map"] == "wilds"
-		and links[1]["to_map"] == "stronghold" and links[1]["closed"] and links[2]["to_map"] == "boar_lair" and links[2]["closed"]
-		and links[3]["to_map"] == "wolf_cave" and not links[3]["closed"],
-		"The Forest: back to the wilds, on to the stronghold and the boar's lair closed, the wolves' cave open (%s)" % [links])
+	# The boar's lair is held back (820) till the boar king's package: no link then.
+	var lairs: Array = links.slice(2).filter(func(link: Dictionary) -> bool: return link["to_map"] != "boar_lair" or not Level.SHELVED.has("boar_lair"))
+	_check(forest.get("display_name") == "The Forest" and links.size() == 2 + lairs.size() and links[0]["to_map"] == "wilds"
+		and links[1]["to_map"] == "stronghold" and links[1]["closed"]
+		and lairs.map(func(link: Dictionary) -> String: return link["to_map"]) == (["wolf_cave"] if Level.SHELVED.has("boar_lair") else ["boar_lair", "wolf_cave"])
+		and lairs.all(func(link: Dictionary) -> bool: return link["closed"] == (link["to_map"] == "boar_lair")),
+		"The Forest: back to the wilds, on to the stronghold closed, the wolves' cave open, the boar's lair closed or held back (%s)" % [links])
 	_check(_main.load_map("forest") and World.outdoor, "forest loads, outdoors")
 	var player := _player()
 	var east: Vector2i = links[1]["tile"]
@@ -2935,6 +2938,9 @@ func _test_boar_lair() -> void:
 	var forest_floor := {}
 	for cell: Vector2i in forest["terrain"]["floor"]:
 		forest_floor[cell] = true
+	if Level.SHELVED.has("boar_lair"):
+		_check_shelved("boar_lair", "forest", Vector2i(122, 175))
+		return
 	var spawn: Array = Level.template_config("forest")["spawn_points"].get("from_boar_lair", [])
 	var at: Vector2i = mouth.get("tile", Vector2i(-1, -1))
 	_check(not mouth.is_empty() and mouth["closed"] and mouth["to_spawn"] == "from_forest" and spawn.size() == 2
@@ -2950,6 +2956,29 @@ func _test_boar_lair() -> void:
 		and not forest_floor.has(clawed[0]["cell"]) and bones.size() >= 2,
 		"a clawed tree (solid) and bones at the mouth, a sign of what lives there (%s, %d bones)" % [clawed, bones.size()])
 	_check_lair_sight(at, Vector2i(1, 0), forest_floor)
+
+
+## A level held back (820): not among Level.names() nor playable, players
+## saved there bound for its land at a floor cell by its old mouth; in its
+## land no link to it, no spawn from it, no bones or clawed tree within 4
+## cells of where its mouth was. The level itself still reads clean.
+func _check_shelved(level_name: String, land: String, mouth_at: Vector2i) -> void:
+	var level := Level.load_level(land)
+	var config := Level.template_config(land)
+	var floor := {}
+	for cell: Vector2i in level["terrain"]["floor"]:
+		floor[cell] = true
+	var heir: Array = Level.SHELVED.get(level_name, [])
+	var links: Array = level["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == level_name)
+	var signs: Array = level["terrain"].get("decor", []).filter(func(entry: Dictionary) -> bool:
+		return str(entry["kind"]).contains("bones") and Vector2(entry["cell"] - mouth_at).length() <= 4.0)
+	var clawed: Array = level["buildings"].filter(func(building: Dictionary) -> bool:
+		return building.get("slot") == "tree.clawed" and Vector2(building["cell"] - mouth_at).length() <= 4.0)
+	_check(level_name not in Level.names() and not Level.playable(level_name) and Level.exists(level_name)
+		and heir.size() == 2 and heir[0] == land and floor.has(heir[1]),
+		"%s held back (820): not opened, a player saved there put back in %s at %s" % [level_name, land, heir])
+	_check(links.is_empty() and not config["spawn_points"].has("from_" + level_name) and signs.is_empty() and clawed.is_empty(),
+		"%s: no mouth for %s, no spawn, no bones or clawed tree where it was (%s)" % [land, level_name, links])
 
 
 ## A lair's sightline (780 amended (12), the coordinator, terrain's still):
@@ -3096,7 +3125,10 @@ func _test_grey_den() -> void:
 		hidden = hidden and not (floor.has(Vector2i(mouth.x, y)) and Vector2(Vector2i(mouth.x, y) - bed).length() <= 5.0)
 	_check(floor.size() >= 130 and floor.size() <= 210 and hidden and absi(bed.x - mouth.x) >= 8,
 		"small (%d cells), the den off the door's line" % floor.size())
-	# The foothills' side.
+	# The foothills' side: held back (820) till the old grey's package.
+	if Level.SHELVED.has("grey_den"):
+		_check_shelved("grey_den", "foothills", Vector2i(97, 31))
+		return
 	var hills := Level.load_level("foothills")
 	var hills_floor := {}
 	for cell: Vector2i in hills["terrain"]["floor"]:

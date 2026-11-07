@@ -476,6 +476,16 @@ func _links(east: Vector2i, north: Vector2i) -> void:
 	config["entities"] = []
 
 
+## The lairs whose mouths are laid: LAIRS less those held back
+## (Level.SHELVED, 820), whose ground lays as the wood round it.
+static func _open_lairs() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for lair: Dictionary in LAIRS:
+		if not Level.SHELVED.has(str(lair["to_map"])):
+			out.append(lair)
+	return out
+
+
 ## Each lair's cells, by what they are: "mound" (the thicket behind and
 ## beside the link, void), "pad" (trampled dirt before it), "tree" (the
 ## clawed tree's cell, at the pad's side).
@@ -512,7 +522,7 @@ static func lair_cells(lair: Dictionary) -> Dictionary:
 ## rock (a cave's, with grass beside its link), the pad and the link's cell
 ## dirt, the clawed tree's cell grass.
 func _lair_grounds() -> void:
-	for lair: Dictionary in LAIRS:
+	for lair: Dictionary in _open_lairs():
 		var cells := lair_cells(lair)
 		for cell: Vector2i in cells["mound"]:
 			map.set_cell(cell, "rock" if lair["mouth"] == "cave" else "void")
@@ -534,7 +544,7 @@ func _lair_grounds() -> void:
 ## clawed tree.
 func _lairs() -> void:
 	var decor: Array = config.get("decor", [])
-	for lair: Dictionary in LAIRS:
+	for lair: Dictionary in _open_lairs():
 		var at: Vector2i = lair["at"]
 		var open: Vector2i = lair["open"]
 		var cells := lair_cells(lair)

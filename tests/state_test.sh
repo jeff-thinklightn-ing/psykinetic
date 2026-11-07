@@ -131,6 +131,28 @@ check "$(count 'joined as Player1 at \(220, 48\) \(back\)' "$DIR/forest_remade.l
 check "$(sed -n '/"remade": {/,/}/p' "$STATE" | grep -c '"forest": 760' || true)" 1 "the save keeps the forest's remake as done"
 check "$(count 'old-forest-deer' "$STATE")" 0 "the forest's old herd is gone from the save"
 
+# 2e. A level held back (Level.SHELVED, 820): the box's boar lair was live
+# from v0.1.206, so a save may hold a player inside it and its zone's state.
+# The boot puts the player back in the forest by its old mouth, drops the
+# zone's state, says so by count, and never opens it.
+python -B - "$STATE" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+room = data["zones"]["test_room"]
+crate = [e for e in room["entities"] if e.get("name") == "Crate1"][0]
+data["zones"]["boar_lair"] = {"tick": 0, "entities": [crate], "respawns": [], "ground": [], "records": []}
+for record in data["players"]:
+    if record["player_id"] == "dev-host":
+        record["zone"] = "boar_lair"
+        record["tile"] = [10, 10]
+json.dump(data, open(path, "w", encoding="utf-8"), indent="\t")
+PY
+run_host shelved --test-exit-after=2
+check "$(count '\[level\] shelved boar_lair: 1 moved to forest, 1 saved states dropped' "$DIR/shelved.log")" 1 "a player saved in a held-back level moved to its land, its zone's state dropped, said once by count (820)"
+check "$(count 'joined as Player1 at \(124, 175\) \(back\)' "$DIR/shelved.log")" 1 "the host comes back in the forest by the lair's old mouth"
+check "$(count '"boar_lair"' "$STATE")" 0 "the save no longer names the held-back level"
+
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 echo 'this is not json' >"$STATE"
 run_host third --test-exit-after=2

@@ -4618,7 +4618,7 @@ func _boot() -> void:
 	var saved: Dictionary = snapshot["zones"]
 	var restored := 0
 	for zone_name: String in saved:
-		if Level.RETIRED.has(zone_name):
+		if Level.RETIRED.has(zone_name) or Level.SHELVED.has(zone_name):
 			continue  # Dropped by _move_off_retired's count; never opened.
 		if not Level.exists(zone_name):
 			print("[state] the snapshot's zone %s is no map here; left out" % zone_name)
@@ -4677,12 +4677,15 @@ func _move_off_remade(snapshot: Dictionary) -> void:
 		print("[level] remade %s (%d): %d players moved; dropped %d entities, %d herd groups, %d plots, %d felled cells" % [level_name, made, moved, entities, groups, cleared["plots"], cleared["cells"]])
 
 
-## The players saved in a retired level (Level.RETIRED, 666) moved to its
-## heir's cell, offline or not, and the snapshot's zone, generation and rest
-## for it left out; one count-only line each, for release to grep.
+## The players saved in a retired level (Level.RETIRED, 666), or in one held
+## back (Level.SHELVED, 820), moved to its heir's cell, offline or not, and
+## the snapshot's zone, generation and rest for it left out; one count-only
+## line each, for release to grep.
 func _move_off_retired(snapshot: Dictionary) -> void:
-	for old: String in Level.RETIRED:
-		var to: Array = Level.RETIRED[old]
+	var gone: Dictionary[String, Array] = Level.RETIRED.duplicate()
+	gone.merge(Level.SHELVED)
+	for old: String in gone:
+		var to: Array = gone[old]
 		var moved := 0
 		for record: PlayerRecord in _records.values():
 			if record.zone == old:
@@ -4700,7 +4703,7 @@ func _move_off_retired(snapshot: Dictionary) -> void:
 			World.dead_rest.erase(old)
 			dropped += 1
 		if moved > 0 or dropped > 0:
-			print("[level] retired %s: %d moved to %s, %d saved states dropped" % [old, moved, to[0], dropped])
+			print("[level] %s %s: %d moved to %s, %d saved states dropped" % ["shelved" if Level.SHELVED.has(old) else "retired", old, moved, to[0], dropped])
 
 
 ## Loads zone [param zone_name] if it is not loaded yet: its map, its doors,
@@ -4710,7 +4713,7 @@ func _move_off_retired(snapshot: Dictionary) -> void:
 func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 	if World.zones.has(zone_name):
 		return World.zones[zone_name]
-	if not Level.exists(zone_name):
+	if not Level.playable(zone_name):
 		return null
 	# A regenerating level due is laid again before it opens (decision
 	# 465); the snapshot's section for it keeps only what sits in an anchor.
@@ -4835,7 +4838,7 @@ func _client_zone(zone_name: String) -> void:
 ## record's, else the default), opened if need be.
 func _admit(peer: int, id: String, player_name: String) -> void:
 	var record: PlayerRecord = _records.get(id)
-	var wanted := record.zone if record != null and Level.exists(record.zone) else default_zone()
+	var wanted := record.zone if record != null and Level.playable(record.zone) else default_zone()
 	var into := _open_zone(wanted)
 	if into == null:
 		into = _open_zone(default_zone())
@@ -4926,7 +4929,7 @@ func _move_command(words: PackedStringArray) -> String:
 	var peer := peers[0]
 	var mover: Player = _players[peer]
 	var zone_name := (words[3] if words.size() > 3 else mover.zone) if by_code else (words[4] if words.size() > 4 else mover.zone)
-	if not Level.exists(zone_name):
+	if not Level.playable(zone_name):
 		return "move: no zone %s" % zone_name
 	var parsed := Level.load_level(zone_name)
 	var target := Vector2i(int(words[2]), int(words[3])) if not by_code else World.NO_CELL
@@ -5055,7 +5058,7 @@ static func _walkable_near(parsed: Dictionary, target: Vector2i) -> Vector2i:
 func travel(peer: int, to_map: String, to_spawn := "", edge := {}, at := World.NO_CELL) -> bool:
 	var id: String = _peer_ids.get(peer, "")
 	var record: PlayerRecord = _records.get(id)
-	if record == null or not Level.exists(to_map):
+	if record == null or not Level.playable(to_map):
 		return false
 	# A regenerating level due is laid again before anyone arrives
 	# (decision 465); a zone already open does the same here.
