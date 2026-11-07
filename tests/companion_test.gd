@@ -3947,7 +3947,34 @@ func _test_quiet() -> void:
 	guard.alert = Monster.Alert.SUSPICIOUS
 	World.step()
 	_check(Companion.roused(guard) and pet.fight_roused() and pet.quiet(), "roused (suspicious): she hushes")
+	_check("SUSPICIOUS" in pet._fight_why and "from her" in pet._fight_why, "the held-tongue row's note says what keeps the fight on (%s)" % pet._fight_why)
 	World.despawn(guard)
+	for i in Companion.QUIET_AFTER + 1:
+		World.step()
+	# 675 amended (2), voice9: a crypt chest's guard robber at its post, FIGHTING her player,
+	# never coming (its band gone: it holds back, World never moves it). A standoff, not a fight.
+	spoken.clear()
+	var robber := _main._spawn({"script": "res://sim/monster.gd", "shape": "capsule", "kind": "robber",
+		"name": "TestRobber%d" % World.tick, "tile": _free_tile_between(pet, 2, 2)}) as Monster
+	_check(robber != null and Companion.kind_of(robber) == "robber" and pet._hostile(robber), "(a robber on guard two cells from her)")
+	robber.acts = false
+	robber.idle = Monster.Idle.GUARD
+	robber.alert = Monster.Alert.FIGHTING
+	robber.target = owner
+	World.step()
+	_check(pet.fight_roused() and pet.quiet() and "robber FIGHTING after someone" in pet._fight_why,
+		"a robber at its post set on her player: quiet at first (%s)" % pet._fight_why)
+	for i in Companion.STANDOFF_S * World.TICK_RATE + 2:
+		World.step()
+	for i in Companion.QUIET_AFTER + 1:
+		World.step()
+	_check(not pet.fight_roused() and not pet.quiet() and pet._say("It won't come.", true) and spoken == ["It won't come."],
+		"%d s with no step and no blow: a standoff, she speaks again (%s)" % [Companion.STANDOFF_S, spoken])
+	var moved_to: Vector2i = _main._nearest_free(robber.tile + Vector2i(0, 1))
+	World.try_move(robber, moved_to - robber.tile)
+	World.step()
+	_check(robber.tile == moved_to and pet.fight_roused() and pet.quiet(), "it steps: a fight again, hushed at once (%s)" % [robber.tile])
+	World.despawn(robber)
 	pet._carry_out({"verb": "follow"}, "Follow me.")
 	for i in Companion.QUIET_AFTER + 1:
 		World.step()

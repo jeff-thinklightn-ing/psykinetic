@@ -31401,6 +31401,23 @@ older check's imp now FIGHTING, as one coming at them is). resident_test: the st
 unroused, though it would fight the player: she talks. Server only, protocol unchanged, no new
 class_name.
 
+675 amended (2): a standoff is no fight to hush for (the coordinator's approval, a second
+hotfix; playtest's voice9, still live after the first). The first amendment counted a roused
+hostile; in the barrow the chest's guard robber, its band dead, stayed FIGHTING with her player
+its target, two cells from her, and never moved or struck for four minutes (Monster's hold-back:
+a timid one waits for others who never come; enemy-ai's side to fix), so she held her tongue
+throughout. Companion.roused now also asks that it act: a roused monster whose tile and
+next_attack_tick, alert and quarry have all stayed the same for STANDOFF_S (10 s) is standing
+off, and counts no more till one of them changes, when it counts again at once. The clock is
+static (Companion._stirred, by instance, cleared past STIRRED_MOST rows), so townsfolk's
+Main._fight_near, which reads Companion.roused, has the same rule. Each held-tongue row in the
+mind log now notes what kept the fight on (Companion._fight_cause: the nearest roused hostile as
+"<kind> <ALERT>[ after someone] <n> from her", else "her intent <X>"; no names or ids), which
+is how this one was found. companion_test _test_quiet: a robber (kind robber) on guard,
+FIGHTING her player and held still, two cells off: quiet at first, she speaks after STANDOFF_S,
+and its step hushes her again; the note names it. CHANGELOG: the first amendment's bullet
+widened (voice's words). Server only, protocol unchanged, no new class_name.
+
 ## 663 amended: she keeps out of her player's firing cone
 
 Jeff, 2026-10-25: "nocking and aiming an arrow should alert the companion

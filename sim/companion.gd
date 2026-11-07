@@ -36,6 +36,15 @@ const STANCE_NAMES: Array[String] = ["STAY_CLOSE", "HOLD", "PRESS", "GUARD", "PU
 const DEFAULT_STANCE := Stance.GUARD
 ## The last tick she or her player was in a fight (decision 675).
 var _fight_tick := -100000
+## What last marked a fighting tick (_note_fight), for the held-tongue row's
+## note: a kind, its alert and how far, or her intent; no names.
+var _fight_why := ""
+## 675 amended (2): a roused hostile that has neither moved nor struck for so
+## long is standing off, no fight to hush for (Companion.roused).
+const STANDOFF_S := 10
+const STIRRED_MOST := 256
+## Each roused monster's [tile, next_attack_tick, alert, quarry id, since tick].
+static var _stirred: Dictionary[int, Array] = {}
 ## A bump this soon after the last one is the same bump (a held key).
 const BUMP_REPEAT_TICKS := 10
 ## How far ahead of her player, along the way they were going, counts as
@@ -3382,12 +3391,36 @@ func _note_fight() -> void:
 		if World.tick - _fight_tick > QUIET_AFTER:
 			_pending_voice = {}
 		_fight_tick = World.tick
+		_fight_why = _fight_cause()
 
 
 ## Counted in the mind log (decision 675): what she held back, by kind
 ## ("say", "voice", "heard"), no words, no names.
 func _held_tongue(what: String) -> void:
-	_log({"kind": "voice", "trigger": what, "outcome": "held tongue", "note": ""})
+	_log({"kind": "voice", "trigger": what, "outcome": "held tongue", "note": _fight_why})
+
+
+## What keeps the fight on, for the mind log: the nearest roused hostile in
+## COMBAT_RANGE as "<kind> <ALERT>[ after someone] <n> from her", else her
+## intent. No names or ids.
+func _fight_cause() -> String:
+	var best: GridEntity = null
+	var best_d := COMBAT_RANGE + 1
+	var player_here := _alive(keeper)
+	for entity in World.get_entities():
+		if not _hostile(entity) or not roused(entity):
+			continue
+		var d := World.distance(tile, entity.tile)
+		var near := mini(d, World.distance(keeper.tile, entity.tile)) if player_here else d
+		if near <= COMBAT_RANGE and d < best_d:
+			best = entity
+			best_d = d
+	if best == null:
+		return "her intent %s" % intent_name()
+	var monster := best as Monster
+	var kind := kind_of(best)
+	var how: String = str(Monster.Alert.keys()[monster.alert]) if monster != null else "?"
+	return "%s %s%s %d from her" % [kind, how, " after someone" if monster != null and monster.target != null else "", best_d]
 
 
 ## Wounds seen to unasked (decision 681): calm, nothing near, her kit to
@@ -3474,11 +3507,31 @@ func fight_roused() -> bool:
 
 
 ## Whether [param entity] is stirred (675 amended): a monster not IDLE
-## (suspicious, hunting, fighting, fleeing) or going for someone. Anything
-## else is taken as roused. Main._fight_near (townsfolk's side) reads it too.
+## (suspicious, hunting, fighting, fleeing) or going for someone, and not
+## standing off (675 amended (2)): one that has neither moved nor struck,
+## its alert and quarry the same, for STANDOFF_S counts no more till it does
+## (voice9: a chest's guard robber stayed FIGHTING at its post, two cells
+## off, and never came; she held her tongue four minutes). Anything not a
+## monster is taken as roused. Main._fight_near (townsfolk's side) reads it
+## too, so the standoff clock (_stirred) is one, by instance.
 static func roused(entity: GridEntity) -> bool:
 	var monster := entity as Monster
-	return monster == null or monster.alert != Monster.Alert.IDLE or monster.target != null
+	if monster == null:
+		return true
+	var id := monster.get_instance_id()
+	if monster.alert == Monster.Alert.IDLE and monster.target == null:
+		_stirred.erase(id)
+		return false
+	var now := [monster.tile, monster.next_attack_tick, monster.alert,
+		monster.target.get_instance_id() if is_instance_valid(monster.target) else 0]
+	var was: Array = _stirred.get(id, [])
+	if was.size() != 5 or was.slice(0, 4) != now:
+		if _stirred.size() > STIRRED_MOST:
+			_stirred.clear()  # Gone ones' rows; the live re-enter at once, counted as stirring.
+		now.append(World.tick)
+		_stirred[id] = now
+		return true
+	return World.tick - int(was[4]) < STANDOFF_S * World.TICK_RATE
 
 
 func _hostile_within(reach: int) -> bool:
