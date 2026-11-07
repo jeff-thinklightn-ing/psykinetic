@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.207
+
+- What goes over the network changes, so v0.1.206 and older can't join the server: update through the launcher first.
 - In the Mughouse, you leave the common room through its double front door into the street, where before the way out was only a mark on the floor (811 amended (3)).
 - A click into a crate or a boulder pushes it one cell now, even on a slow connection, where before it could go two (688 amended (7)).
 - Robbers and bandits, brutes among them, go down with a short grunt now, never quite the same twice, where before they gave a long scream.
@@ -21,18 +24,15 @@ notes (decision 324).
 - In the crypt, the robbers stand and fight now: one alone comes straight at you, they go round you only while another holds your front, and a badly hurt one runs only to shout for the others, then comes back to fight to the end, where before they ran around (806 amended (9)).
 - In the hills, the cave north of the main road is clear of its rockfall, and the great bear dens inside; by day it comes out to roam the hills near its cave, off the roads, and goes back in when badly hurt, at dusk or after a while out, and you can follow it in; killed, it is back in its den within the half hour (780 amended (13)).
 - Towns: the tanner, or Rolf at the stall where there's none, buys your trophies by Give, up to 20 gold for the great bear's pelt: the bear's pelt and claws, the hill cat's pelt, antlers and tusks (821).
-
 - You, your companion and every creature walk across the bridges in the wilds and the hills on the deck now, stepping off onto the bank without a jump, where before you were drawn knee-deep in the stream below it (505 amended (5)).
 - Ask your companion to fish wherever you could and she does, where before she said there was nothing to fish in once you'd caught a few; when the water's fished out for the day, she tells you so (805).
 - Towns: Rolf at the stall sells a woollen cloak for 8 gold, to wear in the sheet's cloak square (788 amended).
 - Gains read the thing first, with the track and amount after it in brackets, as in "Umbrage (Regard +1)", on floats, banners and the talk log alike, and banners stay up longer (804).
-
 - Towns: Rolf's window has a button to open your locker beside him and, until you take it, one for the practice kit he keeps for newcomers (807 amended (3)).
 - Outdoors, when a house, a tree or a wall hides you, the camera turns a little by itself to bring you back into view, never far from where you set it; turning it yourself holds it off for a few seconds, and Options can switch it off (801).
-- What you and your companion wear now shows on you: a hood drawn up over the hair, a felt hat, a long cloak open in front, soft boots, an amulet at the throat and a charm at the belt (788 amended (2)).
+- What you and your companion wear now shows on you: a hood drawn up over the hair, a long cloak open in front, soft boots and an amulet at the throat (788 amended (2)).
 - Wind sighs at the mouth of a beast's cave and fades as you go in, and wolves not yet roused growl low now and then, one at a time, when you come near (795 amended (3)).
 - Your companion answers you and speaks up again near a foe that hasn't noticed anyone or only stands off watching, such as a robber guarding a crypt chest, where before she fell silent for minutes as if in a fight; only a fight under way keeps her, or townsfolk, quiet (675 amended; 675 amended (2)).
-
 - Hollowfell's chiefs make a longer fight of it, and the kobold chief hisses before he strikes from behind, marking the blow on the ground under you: step out of it and he misses, open to you for a moment (790 amended (4)).
 
 ## v0.1.206
