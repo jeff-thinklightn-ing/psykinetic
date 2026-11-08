@@ -5113,38 +5113,49 @@ func _test_cave_mouth() -> void:
 	var open_over: Array[Vector2i] = []
 	var throat_count := 0
 	for cue: Dictionary in hills["terrain"].get("link_cues", []):
-		if cue["cue"] != "cave":
-			continue
-		var bear: Vector2i = cue["tile"]
-		var bear_holder: Node3D = _rig._room.get_node_or_null("Mouth_%d_%d" % [bear.x, bear.y])
-		var bear_body: MeshInstance3D = bear_holder.get_node_or_null("Body") if bear_holder != null else null
-		if bear_body == null:
-			open_over.append(bear)
-			continue
-		var bear_points: PackedVector3Array = bear_body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
-		var to_frame := bear_holder.transform.affine_inverse()
-		# Its own throat's cells only: the hills' mine mouth (798 amended (3))
-		# has a throat of its own, under its own body.
-		var bear_ahead: Vector2i = cue["facing"]
-		var bear_across := Vector2i(-bear_ahead.y, bear_ahead.x)
-		for cell: Vector2i in _rig._throat_cells():
-			var deep := (cell - bear).x * bear_ahead.x + (cell - bear).y * bear_ahead.y
-			var side := (cell - bear).x * bear_across.x + (cell - bear).y * bear_across.y
-			if deep < 1 or deep > ceili(Client3D.MOUTH_THROAT) or absi(side) > ceili(Client3D.MOUTH_ARCH.x * 0.5 - 0.5):
-				continue
-			throat_count += 1
-			var over := to_frame * Vector3(cell.x, 0.0, cell.y)
-			var covered := false
-			for i in range(0, bear_points.size(), 3):
-				var hit: Variant = Geometry3D.ray_intersects_triangle(Vector3(over.x, 60.0, over.z), Vector3.DOWN, bear_points[i], bear_points[i + 1], bear_points[i + 2])
-				if hit != null and (hit as Vector3).y > Client3D.MOUTH_ARCH.y + 0.1:  # Over the throat's own vault.
-					covered = true
-					break
-			if not covered:
-				open_over.append(cell)
+		if cue["cue"] == "cave":
+			var found := _throat_open_over(cue, Client3D.MOUTH_ARCH)
+			throat_count += int(found[0])
+			open_over.append_array(found[1])
 	_check(throat_count > 0 and open_over.is_empty(),
 			"in a bank (the hills' bear cave), its top over every throat cell (%d cells, open: %s)" % [throat_count, open_over])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
+
+
+## The throat cells of the hills' cave mouth at `cue` (its own, by its tile
+## and facing, `arch` wide) and those its body's top leaves open over its
+## vault, `arch`.y high: [count, open cells]. A cell without a body is open.
+func _throat_open_over(cue: Dictionary, arch: Vector2) -> Array:
+	var at: Vector2i = cue["tile"]
+	var open: Array[Vector2i] = []
+	var holder: Node3D = _rig._room.get_node_or_null("Mouth_%d_%d" % [at.x, at.y])
+	var body: MeshInstance3D = holder.get_node_or_null("Body") if holder != null else null
+	if body == null:
+		open.append(at)
+		return [0, open]
+	var points: PackedVector3Array = body.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+	var to_frame := holder.transform.affine_inverse()
+	# Its own throat's cells only: the hills' bear cave and mine mouth each
+	# have one, under their own bodies.
+	var ahead: Vector2i = cue["facing"]
+	var across := Vector2i(-ahead.y, ahead.x)
+	var count := 0
+	for cell: Vector2i in _rig._throat_cells():
+		var deep := (cell - at).x * ahead.x + (cell - at).y * ahead.y
+		var side := (cell - at).x * across.x + (cell - at).y * across.y
+		if deep < 1 or deep > ceili(Client3D.MOUTH_THROAT) or absi(side) > ceili(arch.x * 0.5 - 0.5):
+			continue
+		count += 1
+		var over := to_frame * Vector3(cell.x, 0.0, cell.y)
+		var covered := false
+		for i in range(0, points.size(), 3):
+			var hit: Variant = Geometry3D.ray_intersects_triangle(Vector3(over.x, 60.0, over.z), Vector3.DOWN, points[i], points[i + 1], points[i + 2])
+			if hit != null and (hit as Vector3).y > arch.y + 0.1:  # Over the throat's own vault.
+				covered = true
+				break
+		if not covered:
+			open.append(cell)
+	return [count, open]
 
 
 ## A thicket mouth (798 amended, maps' boar lair): a mound of art-kit's
@@ -5293,6 +5304,22 @@ func _test_mine_mouth() -> void:
 	_check(int(slots.get(Client3D.MINE_FRAME, 0)) == 2 and int(slots.get("mine.track", 0)) >= 4 and int(slots.get("mine.track_end", 0)) == 1
 			and int(slots.get("prop.mine_cart", 0)) == 1 and stair_z > 0.5 and lit >= 1,
 			"timbered, railed out to a buffer and a cart, the stair down in the dark, a fire at the door (%s; the stair %.1f m in, %d light)" % [slots, stair_z, lit])
+	# In the hills (Hollowfell's door, in maps' bank): its own top over every
+	# throat cell, which draws no ground (as the bear cave's: else its black
+	# would show through from behind the hill).
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var mines := 0
+	var throat_count := 0
+	var open_over: Array[Vector2i] = []
+	for cue: Dictionary in hills["terrain"].get("link_cues", []):
+		if cue["cue"] == "mine":
+			mines += 1
+			var found := _throat_open_over(cue, Client3D.MINE_ARCH)
+			throat_count += int(found[0])
+			open_over.append_array(found[1])
+	_check(mines == 1 and throat_count > 0 and open_over.is_empty(),
+			"in the hills, its top over every throat cell (%d cells, open: %s)" % [throat_count, open_over])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
