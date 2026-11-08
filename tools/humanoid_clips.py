@@ -684,6 +684,47 @@ def slash(way: float) -> list:
 	return [(t, P("Sword_Idle", 0.0, pose, move=step)) for t, pose, step in zip(SLASH_KEYS, poses, steps)]
 CLIPS["Sword_Slash_F"] = {"keys": slash(1.0)}
 CLIPS["Sword_Slash_B"] = {"keys": slash(-1.0)}
+# Monster draw-backs (338 amended (6); Jeff: "enemies tend to look like they are
+# sliding into you and then no visible swing"): a monster's plain blow is told 3 ticks ahead (its
+# lead) and its strike plays over them, but the jab, the cross and the dagger's stab land 0.17 to
+# 0.21 s in with next to no pull-back, so the lead read as a stand and a flick. Each drawn clip
+# gathers first: weight onto the back foot, the striking shoulder turned away and the fist (or
+# blade) cocked back by the ear (the hip, for the stab), the head kept on the foe; then the blow
+# from early in its own clip, landing about 0.3 s in, so at the lead (0.225 s with the drawn
+# delay) it plays about 1.4x and the gather shows. Client3D's HUMANOID_MOVES "drawn" plays them for
+# a monster's led blow; a player's blows keep the plain clips.
+DRAW_AT = 0.2
+## The gather, for the striking side ("l" or "r"): trunk turned away from it, its arm drawn back
+## and bent, the head turned back toward the foe, a little back and down.
+def gather(side: str) -> list:
+	way = 1.0 if side == "l" else -1.0  # TURN toward its left draws the left shoulder back.
+	return [("spine_01", TURN, 10.0 * way), ("spine_02", TURN, 18.0 * way), ("spine_03", TURN, 10.0 * way),
+		("spine_01", LIFT, 5.0), ("neck_01", TURN, -16.0 * way), ("Head", TURN, -12.0 * way),
+		("upperarm_" + side, LIFT, -28.0), ("lowerarm_" + side, LIFT, 35.0), ("clavicle_" + side, TURN, 8.0 * way),
+		("thigh_" + ("r" if side == "l" else "l"), LIFT, -6.0), ("calf_" + ("r" if side == "l" else "l"), LIFT, 10.0)]
+DRAW_BACK = (0.0, 0.06, -0.03)  # Weight back (+Y is behind it) and a little down.
+def drawn_ual(base: str, side: str, start: float, length: float) -> list:
+	"""[base] (a UAL strike) gathered first: its first pose, the gather at DRAW_AT, then the clip
+	from [start] seconds to its [length], a key a frame."""
+	keys = [(0.0, P(base, 0.0)), (DRAW_AT, P(base, 0.0, gather(side), move=DRAW_BACK))]
+	frames = round((length - start) * FPS)
+	for f in range(1, frames + 1):
+		keys.append((DRAW_AT + f / FPS, P(base, start + f / FPS)))
+	return keys
+CLIPS["Punch_Jab_Drawn"] = {"keys": drawn_ual("Punch_Jab", "l", 0.04, 0.87)}
+CLIPS["Punch_Cross_Drawn"] = {"keys": drawn_ual("Punch_Cross", "r", 0.05, 1.0)}
+CLIPS["Dagger_Stab_Drawn"] = {"keys": [
+	(0.0, P("Sword_Idle", 0.0)),
+	# Drawn back to the hip, deeper than the plain stab's, the shoulders turned well away.
+	(DRAW_AT, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, -40.0), ("lowerarm_r", LIFT, 80.0), ("spine_01", TURN, -10.0),
+		("spine_02", TURN, -24.0), ("spine_03", TURN, -10.0), ("spine_01", LIFT, 5.0), ("neck_01", TURN, 16.0), ("Head", TURN, 12.0),
+		("thigh_l", LIFT, -6.0), ("calf_l", LIFT, 10.0)], move=DRAW_BACK)),
+	(DRAW_AT + 0.12, P("Sword_Idle", 0.0, [("upperarm_r", LIFT, 95.0), ("upperarm_r", TURN, 20.0), ("lowerarm_r", LIFT, -10.0), ("spine_02", TURN, 18.0),
+		("spine_01", LIFT, -6.0)], move=(0.0, -0.08, 0.0))),
+	(DRAW_AT + 0.45, P("Sword_Idle", 0.0)),
+]}
+for _name, _bone in (("Punch_Jab_Drawn", "hand_l"), ("Punch_Cross_Drawn", "hand_r"), ("Dagger_Stab_Drawn", "hand_r")):
+	STRIKES[_name] = _bone
 # The fallen knight's vigil (747; his astral projection stands still in the barrow's Altar Room and
 # talks): head bowed, his right hand across to rest on the hilt at his left hip, the left on the
 # scabbard below it, a slow breath (the chest and shoulders up and back), 4 s.

@@ -11351,6 +11351,20 @@ func _test_creature_puppets() -> void:
 	view._loop("walk", 0.8)
 	var walk_kept := is_equal_approx(rig.speed(), 0.8)
 	view._pace = {}
+	# A led blow's coil (338 amended (6)): drawn back with the head dipped over
+	# the lead, sprung past rest as it lands, settled after; a heavy wind-up doesn't coil.
+	var pose := view._pose
+	view.wind(0.3, true)
+	await get_tree().create_timer(0.2).timeout
+	var coiled := pose.position.x < -0.04 and pose.position.y < -0.01 and pose.rotation.x > 0.06
+	await get_tree().create_timer(0.7).timeout
+	var settled := is_zero_approx(snappedf(pose.position.x, 0.001)) and is_zero_approx(snappedf(pose.position.y, 0.001)) 			and is_zero_approx(snappedf(pose.rotation.x, 0.001))
+	view.unwind()
+	view.wind(0.3)
+	await get_tree().create_timer(0.2).timeout
+	var still := is_zero_approx(snappedf(pose.position.x, 0.001))
+	view.unwind()
+	_check(coiled and settled and still, "a led blow coils it (%s), settled after (%s); a wind-up without a lead doesn't (%s)" % [coiled, settled, still])
 	var old_idle: Array = (ArtKit.spec("creature.old_wolf").get("clips", []) as Array).filter(func(clip: Dictionary) -> bool: return clip["name"] == "idle")
 	_check(slow_idle and slow_alert and walk_kept and not old_idle.is_empty() and is_equal_approx(float(old_idle[0].get("speed", 1.0)), 0.7),
 			"a slot clip's speed: the idle at 0.7, the alert standing in with it too, the walk its own; the old grey's idle 0.7")
@@ -12175,6 +12189,25 @@ func _test_blows_seen() -> void:
 	await get_tree().create_timer(0.45).timeout
 	_check(not early in Client3D.HIT_CLIPS and hurt.playing() in Client3D.HIT_CLIPS,
 			"the struck orc flinches as the blow lands, not at its news (%s, then %s)" % [early, hurt.playing()])
+	# Its own led blow (338 amended (6)): the bare hands' drawn strike, gathered
+	# over the lead, its contact on the drawn blow's landing; a player's lead keeps the plain ones.
+	var drawn_names: Array = (Client3D.HUMANOID_MOVES["drawn"][""] as Array).map(func(choice: Array) -> String: return str(choice[0]))
+	_check(Client3D.drawn_strikes(target, imp, "", false).is_empty() and Client3D.drawn_strikes(puppet, player, "", true).is_empty()
+			and Client3D.drawn_strikes(target, imp, "", true).size() == drawn_names.size()
+			and Client3D.is_lead(imp, Monster.LEAD_TICKS) and not Client3D.is_lead(imp, Monster.WINDUP_TICKS) and not Client3D.is_lead(player, 3),
+			"drawn strikes only for a monster's lead (its lead_ticks, not a HEAVY wind-up; none for a player)")
+	hurt.cancel_strike()
+	target.set_meta("busy_until", 0)
+	var wound_at := Time.get_ticks_msec()
+	_rig._on_winding(Vector2i(-1, 0), 3, imp.get_instance_id())
+	var lands_at := wound_at + int((3 * World.TICK_DT + Client3D.STRIKE_LANDS_IN) * 1000.0)
+	var contact_at := int(target.get_meta("contact_msec", -1))
+	_check(hurt.striking() and hurt.playing() in drawn_names and absi(contact_at - lands_at) <= 20,
+			"the orc's led blow gathers first: %s, its contact on the landing (%d ms off)" % [hurt.playing(), contact_at - lands_at])
+	_rig._on_swung(Vector2i(-1, 0), imp.get_instance_id())
+	_check(hurt.playing() in drawn_names, "its swing's news starts no second strike (%s)" % hurt.playing())
+	hurt.cancel_strike()
+	target.set_meta("busy_until", 0)
 	World.despawn(imp)
 	_rig._swings.erase(player.get_instance_id())
 	_rig._process(0.0)

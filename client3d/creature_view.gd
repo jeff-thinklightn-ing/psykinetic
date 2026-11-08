@@ -40,6 +40,14 @@ const HEAD_UP_SECONDS := 0.3
 const FLINCH := 0.15
 const FLINCH_BACK := 0.06
 const FLINCH_SECONDS := 0.25
+## A led blow's coil (338 amended (6)): over the lead the body draws back this
+## share of its length, sinks this share of its height and dips its head and shoulders (radians),
+## a crouch; then springs a third of it past rest as the blow lands, settling back over
+## COIL_SETTLE seconds (the coordinator on the reel: "a crouch-and-spring at play distance").
+const COIL_BACK := 0.08
+const COIL_SINK := 0.06
+const COIL_DIP := 0.18
+const COIL_SETTLE := 0.25
 const BLEND := 0.2
 ## Where a blow lands in its clip when the slot's clip names no "contact":
 ## this far through it.
@@ -95,6 +103,7 @@ var _down := false
 var _down_ms := 0  # When it went down (or got up): the fall's, the rise's start.
 var _framed := false  # Drawn once: a body first seen down lies at once.
 var _life: Life
+var _coil: Tween
 
 
 ## For [param art] (an instance of [param creature_slot]) under
@@ -284,15 +293,47 @@ func swing() -> void:
 ## free for the gait or rest at once.
 func unwind() -> void:
 	_busy_until = 0
+	if _coil != null and _coil.is_valid() and _pose != null:
+		_coil.kill()
+		_coil = create_tween().set_parallel(true)
+		_coil.tween_property(_pose, "position:x", 0.0, COIL_SETTLE)
+		_coil.tween_property(_pose, "rotation:x", -HEAD_UP if _head_up else 0.0, COIL_SETTLE)
+		_coil.tween_property(_pose, "position:y", 0.0, COIL_SETTLE)
 	if rig != null:
 		rig.cancel_strike()
 
 
 ## A blow wound up over [param seconds] (GridEntity.winding: a brute's HEAVY
-## tactic, a heavy weapon's wind-up): the attack struck so that its contact,
-## the blow, lands as the sim's does.
-func wind(seconds: float) -> void:
+## tactic, a heavy weapon's wind-up, a plain blow's lead): the attack struck so that its
+## contact, the blow, lands as the sim's does. A [param lead] (a plain blow told ahead, 338
+## amended (4)) also coils the body over it (coil).
+func wind(seconds: float, lead := false) -> void:
 	_strike(maxf(seconds, 0.05))
+	if lead:
+		coil(maxf(seconds, 0.05))
+
+
+## The body gathered for a blow landing in [param seconds]: drawn back COIL_BACK of its length
+## with its head dipped, eased in over the lead, then sprung a third past rest as it lands and
+## settled; a wolf's bite seen coming, not slid into.
+func coil(seconds: float) -> void:
+	if _pose == null or _dead or _down:
+		return
+	if _coil != null and _coil.is_valid():
+		_coil.kill()
+	var back := ArtKit.size(slot).z * ArtKit.feel("creature_view.coil_back", COIL_BACK)
+	var sink := ArtKit.size(slot).y * ArtKit.feel("creature_view.coil_sink", COIL_SINK)
+	var rest := -HEAD_UP if _head_up else 0.0
+	var dip := ArtKit.feel("creature_view.coil_dip", COIL_DIP)
+	_coil = create_tween().set_parallel(true)
+	_coil.tween_property(_pose, "position:x", -back, seconds * 0.7).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_coil.tween_property(_pose, "rotation:x", rest + dip, seconds * 0.7).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_coil.tween_property(_pose, "position:y", -sink, seconds * 0.7).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_SINE)
+	_coil.chain().tween_property(_pose, "position:x", back / 3.0, seconds * 0.3).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+	_coil.parallel().tween_property(_pose, "rotation:x", rest - dip * 0.3, seconds * 0.3).set_ease(Tween.EASE_IN)
+	_coil.parallel().tween_property(_pose, "position:y", 0.0, seconds * 0.3).set_ease(Tween.EASE_IN)
+	_coil.chain().tween_property(_pose, "position:x", 0.0, COIL_SETTLE).set_ease(Tween.EASE_IN_OUT)
+	_coil.parallel().tween_property(_pose, "rotation:x", rest, COIL_SETTLE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## The attack struck over the gait or rest, its contact landing in

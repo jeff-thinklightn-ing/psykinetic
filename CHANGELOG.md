@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Foes' wind-ups are easier to read now: a goblin, an orc, a kobold or a skeleton draws its fist back and turns its shoulder before it strikes, a bandit draws its dagger back to the hip before the stab, and a wolf or any other beast crouches and dips before it bites (338 amended (6)).
 - Your companion leaves her post when you're about to fall with a foe on you, even if you told her to wait, and comes to fight beside you until you tell her again; and she speaks only of what's really there, where before she might tell of things that weren't, such as a key in a bare niche in the barrow's wall (803 amended (8)).
 - Brutes, among robbers and bandits, in the dwarven halls and in Hollowfell, and wild boars swing their big blows as often as they should now, with the same wind-up to read and step out of, where before each wind-up stretched the wait between blows (338 amended (5)).
 - The pond in the wilds by the forest's way is four times the size now, with reeds all round its banks (805 amended (7)).

@@ -1170,6 +1170,14 @@ const HUMANOID_MOVES := {
 		"shield": [["Shield_Bash", 0.17]],
 		"kick": [["Kick", 0.25]],
 	},
+	# A monster's led blow (338 amended (6)): the same strikes gathered first,
+	# weight back and the fist or blade drawn back, so its 3-tick lead reads as a draw-back, not a
+	# stand and a flick (tools/humanoid_clips.py's drawn clips; contacts by --contacts). A weapon
+	# not named here leads with its plain strike.
+	"drawn": {
+		"": [["Punch_Jab_Drawn", 0.33], ["Punch_Cross_Drawn", 0.38]],
+		"dagger": [["Dagger_Stab_Drawn", 0.29]],
+	},
 	"block": "Block_Idle", "knockdown": "Knockdown", "lying": "Lie", "get_up": "Get_Up",
 	# A blow taken, by the side it came from (each a list to pick from without repeats).
 	"hits": {"front": ["Hit_Chest", "Hit_Head"], "left": ["Hit_Shoulder_L"], "right": ["Hit_Shoulder_R"], "back": ["Hit_Back"]},
@@ -22701,9 +22709,12 @@ func _play_once(puppet: Node3D, clip: String) -> bool:
 ## blow ([param wound] seconds to its landing, WOUND_STRIKES) lands then
 ## instead, its lead played over the wind-up. A model with no strikes plays
 ## one of ATTACK_CLIPS. False if there is no model.
-func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0) -> bool:
+func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0, lead := false) -> bool:
 	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
 	var choices: Array = strikes.get(weapon, strikes.get("", []))
+	var drawn := drawn_strikes(puppet, swinger, weapon, lead)
+	if not drawn.is_empty():
+		choices = drawn
 	if choices.is_empty() or not puppet.has_meta("rig"):
 		return _play_once(puppet, _pick_clip(puppet, ATTACK_CLIPS))
 	var names: Array[String] = []
@@ -22753,6 +22764,31 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0) 
 	var seconds := rig.strike(clip, contact, lands_in, recover)
 	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
 	return true
+
+
+## Whether a winding of [param ticks] by [param swinger] is a plain blow's lead (338 amended
+## (4)): a monster's, no longer than its lead_ticks, with no heavy wind-up in its verb (a
+## brute's HEAVY tactic winds longer; a heavy weapon has its own).
+static func is_lead(swinger: GridEntity, ticks: int) -> bool:
+	if not swinger is Monster or ticks <= 0 or int(World.blow_verb(swinger).get("windup", 0)) > 0:
+		return false
+	# Its kind's row (a client never tempers a monster: its lead_ticks stays the default there).
+	var kind := str(swinger.spawn_spec.get("kind", ""))
+	return ticks <= int(Monster.fight_for(kind).get("lead_ticks", Monster.LEAD_TICKS))
+
+
+## A monster's led blow's strikes gathered first (HUMANOID_MOVES "drawn"; 338 amended (4),
+## animation's side): for a [param lead] (is_lead), the drawn clips for [param weapon] (its
+## bare hands' where its plain strikes are its bare hands') its rig has; else none.
+static func drawn_strikes(puppet: Node3D, swinger: GridEntity, weapon: String, lead: bool) -> Array:
+	if not lead or not swinger is Monster or not puppet.has_meta("rig"):
+		return []
+	var moves := puppet.get_meta("moves", {}) as Dictionary
+	var strikes: Dictionary = moves.get("strikes", {})
+	var drawn: Dictionary = moves.get("drawn", {})
+	var choices: Array = drawn.get(weapon if strikes.has(weapon) else "", [])
+	var rig := puppet.get_meta("rig") as AnimRig
+	return choices.filter(func(choice: Array) -> bool: return rig.has(str(choice[0])))
 
 
 static func _hook(sig: Signal, callable: Callable) -> void:
@@ -23516,7 +23552,8 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 		swinger.settle_for_blow()  # Still drawn coming: it slows into the cell it strikes from.
 	if puppet.has_meta("creature_view"):
 		# A creature's wound-up blow: its attack, timed to land with the drawn body's.
-		(puppet.get_meta("creature_view") as CreatureView).wind(seconds)
+		# A plain blow's lead (338 amended (4)) coils it too.
+		(puppet.get_meta("creature_view") as CreatureView).wind(seconds, is_lead(swinger, ticks))
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
 		return
 	var weapon := World.wielded(swinger) if swinger != null else ""
@@ -23525,7 +23562,7 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 	# (a robber's, a bandit's, a goblin's) whatever it holds, its bare hands' if no strike is
 	# made for it; the heavy swing only for a person's heavy wind-up of another weapon.
 	var mine := strikes.has(weapon) or (not (swinger is Player or swinger is Companion) and strikes.has(""))
-	if (weapon in WOUND_STRIKES or swinger is Monster) and mine and _strike(puppet, swinger, weapon, seconds):
+	if (weapon in WOUND_STRIKES or swinger is Monster) and mine and _strike(puppet, swinger, weapon, seconds, is_lead(swinger, ticks)):
 		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
 		return
 	if not puppet.has_meta("rig") or not (puppet.get_meta("rig") as AnimRig).has(CLIP_HEAVY):

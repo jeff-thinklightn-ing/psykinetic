@@ -174,6 +174,7 @@ const FEEL_RANGES := {"client3d.clip_blend": [0.0, 0.5], "client3d.clip_heavy_co
 	"client3d.shot_speed": [10.0, 80.0], "client3d.gait_rate": [0.5, 2.0], "anim_rig.strike_speed_min": [0.1, 1.0],
 	"anim_rig.strike_speed_max": [1.0, 6.0], "anim_rig.strike_fade_share": [0.05, 1.0], "art_kit.clip_contact": [0.1, 0.9], "creature_view.speed_min": [0.2, 1.0],
 	"creature_view.speed_max": [1.0, 3.0], "creature_view.charge_speed": [1.0, 3.0], "creature_view.blend": [0.0, 0.5],
+	"creature_view.coil_back": [0.0, 0.16], "creature_view.coil_sink": [0.0, 0.15], "creature_view.coil_dip": [0.0, 0.4],
 	"client3d.gait.Walk": [0.3, 2.0], "client3d.gait.Jog_Short": [1.5, 6.0], "client3d.gait.Sprint_Short": [2.5, 9.0],
 	"client3d.gait_f.Walk": [0.3, 2.0], "client3d.gait_f.Jog_Short": [1.5, 6.0], "client3d.gait_f.Sprint_Short": [2.5, 9.0]}
 const FEEL_ON_SPAWN: Array[String] = ["client3d.clip_blend", "creature_view.blend"]

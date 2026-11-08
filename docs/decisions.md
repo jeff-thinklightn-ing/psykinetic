@@ -35934,7 +35934,6 @@ move_ticks and a settle before it draws back; no step till 4 after its blow land
 _test_fight_panel's 20 rows; push_test _test_no_attack_mid_step (its step ended, it stands its settle, then
 hits). One never moved (_moved_tick -1) stands settled. Carries voice's package bullet. Server only, protocol unchanged, no new
 class_name.
-
 338 amended (5): a HEAVY one's own wind-up out of its cycle (combat's numbers and ask, after enemy-ai's armed
 brute trace, C:/dev/review/enemy-ai/brute_probe3.txt: playtest's brute "holding off" was plain cadence, a
 blow every 26 ticks against its hammer's 20, its windup_ticks 6 on top of attack_ticks_of; no knockback, guard
@@ -35945,6 +35944,33 @@ unchanged, its stop-to-strike recover after the fall as before. Every HEAVY kind
 the robbers' and the bandits'), the wild boar. A heavy weapon's own wind-up (World.try_wind_up, the draugr's
 battle axe) is not this. monster_test _test_heavy_cycle (blows attack_ticks_of apart, not and windup_ticks).
 Voice's bullet. Server only, protocol unchanged, no new class_name.
+
+338 amended (6): the monsters' draw-backs (animation; after "blows you can see", 338 amended (4), shipped in
+v0.1.208; the coordinator's approval of animation's design 1, part A, and of its reel; release's label; Jeff: "enemies tend to
+look like they are sliding into you and then no visible swing"). With pc-character's side a monster's
+led blow played its strike over the lead, but the bare hands' jab and cross and the dagger's stab land
+0.17 to 0.21 s in with next to no pull-back: it stood, then flicked. Now:
+- Drawn clips (tools/humanoid_clips.py, extracted into goblin.res): Punch_Jab_Drawn, Punch_Cross_Drawn
+  and Dagger_Stab_Drawn, each its strike gathered first, weight onto the back foot, the striking
+  shoulder turned away and the fist cocked back by the ear (the blade to the hip), the head kept on
+  the foe (DRAW_AT 0.2 s), then the blow from early in its own clip; contacts by --contacts 0.33,
+  0.38 and 0.29 s. HUMANOID_MOVES' "drawn" names them by weapon ("" and "dagger"); a weapon with none
+  (a hammer's Mace_Overhead already draws back) leads with its plain strike.
+- Client3D.is_lead(swinger, ticks): a monster's winding no longer than its kind's lead_ticks (read from
+  Monster.fight_for, as a client never tempers a monster) with no heavy wind-up in its verb; a brute's
+  HEAVY wind-up is not one. Client3D._strike takes the drawn clips for a lead (drawn_strikes); a player's
+  and a companion's blows keep the plain ones.
+- A creature's lead coils it (CreatureView.wind(seconds, lead), coil): a crouch, the Pose drawn back
+  COIL_BACK (0.08) of its slot's length, sunk COIL_SINK (0.06) of its height, head and shoulders
+  dipped COIL_DIP (0.18 rad), eased in over 70% of the lead, sprung a third past rest as it lands and
+  settled over COIL_SETTLE (0.25 s); unwind lets it go. All three in feel.json (creature_view.coil_back,
+  coil_sink, coil_dip); the coordinator doubled the reel's 0.04 and 0.1 ("a crouch-and-spring at play
+  distance"). No slot names a draw clip of its own yet.
+At the default 3-tick lead and STRIKE_LANDS_IN a drawn jab plays at about 0.7x, the gather in sight.
+view_test _test_blows_seen (drawn strikes only for a monster's lead; the orc's led blow gathers first,
+its contact on the landing, no second strike on its swing) and _test_creature_puppets (the coil, and
+none without a lead). Reel "drawbacks" (melee_audit against an imp, a robber, a skeleton, a wolf) for
+the coordinator. Client only, protocol unchanged, no new class_name; CHANGELOG (voice's words).
 
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 

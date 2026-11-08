@@ -21,7 +21,10 @@
 		"creature_view.speed_min": 0.6,
 		"creature_view.speed_max": 1.8,
 		"creature_view.charge_speed": 1.4,
-		"creature_view.blend": 0.2
+		"creature_view.blend": 0.2,
+		"creature_view.coil_back": 0.08,
+		"creature_view.coil_sink": 0.06,
+		"creature_view.coil_dip": 0.18
 	},
 	"camera": {
 		"about": "ui's camera feel (673 step 2): Client3D's eases and pulls, read at setup; the tuning panel's \"camera\" fields.",

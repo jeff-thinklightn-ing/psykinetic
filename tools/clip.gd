@@ -279,6 +279,8 @@ func _ready() -> void:
 			_boar()
 		"melee_audit":
 			_melee_audit()
+		"drawbacks":
+			_drawbacks()
 		"draugr", "draugr_walkback":
 			_draugr()
 		_:
@@ -294,7 +296,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -687,6 +689,25 @@ func _melee_audit() -> void:
 	_script.append(["say", 10, "Today's melee: %s against a %s." % [held, _foe]])
 	_script.append(["bout", 400, "Left click on it: walk up and attack."])
 	_script.append(["wait", 20, ""])
+
+
+## The monsters' draw-backs (338 amended (6)): the player stands still, unhurt
+## for good, while one hostile --foe (imp, robber, skeleton, wolf, ...) comes up and strikes, so
+## each led blow's gather, contact and recovery can be seen again and again.
+func _drawbacks() -> void:
+	var rows: Array[String] = [
+		"###########",
+		"#.........#",
+		"#.........#",
+		"#.........#",
+		"###########",
+	]
+	var markers := {Vector2i(3, 2): "start", Vector2i(6, 2): "monster_" + _foe}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9}
+	if _foe != "imp":
+		config["legend"] = {"monster_" + _foe: "#6a5f70"}  # A kind with no colour of its own.
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [["say", 10, "A %s's blows." % _foe], ["wait", 240, ""]]
 
 
 func _draugr() -> void:
