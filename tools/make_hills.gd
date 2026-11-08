@@ -299,13 +299,55 @@ const WADE_RINGS := 4
 const WADE_MOST := 1.6
 ## The sought's refuges here (613 amended: one place a story, its key the
 ## story's tag), each {at, name}.
-const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave"}}
+const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave", "opens": Vector2i(1, 0)}}
 ## The hill cave's package (Jeff's rule, 820: a place never before what it
 ## leads to; the coordinator): its place, the "Cave" waystone W4 and the
 ## side track to it are laid only once terrain's shelter is built there.
 ## Terrain's shelter landing sets it true and lays the hills again. While
 ## false, economy's sought shepherd falls to its alt (the camp).
-const SHELTER_BUILT := false
+const SHELTER_BUILT := true
+## The shelter's hill (798 amended (4), terrain's rock shelter): its rock
+## made after the lay, as Hollowfell's block, but SHELTER_FLOOR, the floor
+## under the overhang (walked on, drawn under it); the refuge's cell at
+## its mouth, east of it ("opens"). No rest place: its fire ring is cold,
+## and the warmed rest (Main._warm_rests) reads camps' fires only (the
+## coordinator: a found place; a lit rest is its own package later).
+const SHELTER_ROCK := Rect2i(47, 173, 5, 7)
+const SHELTER_FLOOR := Rect2i(49, 175, 3, 3)
+## Terrain's bank round it, each cell [x, y, metres] only ever raised (max
+## over the ground as laid), after _soften as Hollowfell's: none on the
+## strip under the arch (x 49..51 y 174..178, the ground kept), and no step
+## over the walkable rise, ramping from the face up to the plateau's 11.2.
+const SHELTER_BANK := [
+	[42, 185, 9.1], [42, 186, 8.68], [42, 187, 8.26], [43, 172, 11.2], [43, 173, 11.2], [43, 174, 11.2],
+	[43, 175, 11.2], [43, 176, 11.2], [43, 177, 11.2], [43, 178, 11.2], [43, 179, 11.2], [43, 180, 11.2],
+	[43, 181, 11.2], [43, 182, 10.78], [43, 183, 10.36], [43, 184, 9.94], [43, 185, 9.52], [43, 186, 9.1],
+	[43, 187, 8.68], [43, 188, 8.26], [44, 164, 8.26], [44, 165, 8.68], [44, 166, 9.1], [44, 167, 9.52],
+	[44, 168, 9.94], [44, 169, 10.36], [44, 170, 10.78], [44, 171, 11.2], [44, 172, 11.2], [44, 173, 11.2],
+	[44, 174, 11.2], [44, 175, 11.2], [44, 176, 11.2], [44, 177, 11.2], [44, 178, 11.2], [44, 179, 11.2],
+	[44, 180, 11.2], [44, 181, 11.2], [44, 182, 10.78], [44, 183, 10.36], [44, 184, 9.94], [44, 185, 9.52],
+	[44, 186, 9.1], [44, 187, 8.68], [44, 188, 8.26], [45, 164, 8.26], [45, 165, 8.68], [45, 166, 9.1],
+	[45, 167, 9.52], [45, 168, 9.94], [45, 169, 10.36], [45, 170, 10.78], [45, 171, 11.18], [45, 172, 11.18],
+	[45, 173, 11.18], [45, 174, 11.2], [45, 175, 11.2], [45, 176, 11.2], [45, 177, 11.2], [45, 178, 11.2],
+	[45, 179, 11.2], [45, 180, 11.1], [45, 181, 11], [45, 182, 10.78], [45, 183, 10.36], [45, 184, 9.94],
+	[45, 185, 9.52], [45, 186, 9.1], [45, 187, 8.68], [45, 188, 8.26], [46, 164, 8.26], [46, 165, 8.68],
+	[46, 166, 9.1], [46, 167, 9.52], [46, 168, 9.94], [46, 169, 10.36], [46, 170, 10.72], [46, 171, 10.74],
+	[46, 172, 10.74], [46, 173, 10.74], [46, 174, 11.18], [46, 175, 11.2], [46, 176, 11.2], [46, 177, 11.2],
+	[46, 178, 11.2], [46, 179, 10.82], [46, 180, 10.66], [46, 181, 10.56], [46, 182, 10.54], [46, 183, 10.36],
+	[46, 184, 9.94], [46, 185, 9.52], [46, 186, 9.1], [46, 187, 8.68], [46, 188, 8.26], [47, 165, 8.26],
+	[47, 166, 8.68], [47, 167, 9.1], [47, 168, 9.52], [47, 169, 9.94], [47, 170, 10.3], [47, 171, 10.3],
+	[47, 172, 10.3], [47, 173, 10.3], [47, 174, 10.74], [47, 175, 11.18], [47, 176, 11.2], [47, 177, 11.2],
+	[47, 178, 10.82], [47, 179, 10.38], [47, 180, 10.22], [47, 181, 10.12], [47, 182, 10.1], [47, 183, 9.94],
+	[47, 184, 9.52], [47, 185, 9.1], [47, 186, 8.68], [48, 166, 8.26], [48, 167, 8.68], [48, 168, 9.1],
+	[48, 169, 9.52], [48, 170, 9.88], [48, 171, 9.88], [48, 172, 9.88], [48, 173, 9.86], [48, 174, 10.3],
+	[48, 175, 10.74], [48, 176, 11.1], [48, 177, 10.82], [48, 178, 10.38], [48, 179, 9.94], [48, 180, 9.78],
+	[48, 181, 9.68], [48, 182, 9.66], [48, 183, 9.52], [48, 184, 9.1], [48, 185, 8.68], [49, 167, 8.28],
+	[49, 168, 8.7], [49, 169, 9.12], [49, 170, 9.46], [49, 171, 9.46], [49, 172, 9.44], [49, 173, 9.42],
+	[49, 179, 9.5], [49, 180, 9.34], [49, 181, 9.24], [49, 182, 9.22], [49, 183, 9.12], [49, 184, 8.7],
+	[50, 168, 8.28], [50, 169, 8.7], [50, 170, 9.04], [50, 171, 9.03], [50, 172, 9], [50, 173, 8.98], [50, 179, 9.06],
+	[50, 180, 8.9], [50, 181, 8.8], [50, 182, 8.78], [50, 183, 8.7], [50, 184, 8.28], [51, 169, 8.28],
+	[51, 170, 8.62], [51, 171, 8.59], [51, 172, 8.56], [51, 173, 8.54], [51, 179, 8.62], [51, 180, 8.46],
+	[51, 181, 8.36], [51, 182, 8.34], [51, 183, 8.28]]
 ## What waits on SHELTER_BUILT: a REFUGES key, a TRACKS "to", a SIGHTS key.
 const SHELTER_PIECES: Array[String] = ["hill_cave", "waystone_cave"]
 
@@ -411,6 +453,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 		map.set_cell(at, laid["cells"][at])
 	_lair_ground()
 	_mine_rock()
+	_shelter_rock()
 	# The river is its curve (decision 559): Level lays its cells and its
 	# "streams" path from it on load.
 	config["waters"] = laid["waters"].map(func(water: Dictionary) -> Dictionary:
@@ -444,6 +487,7 @@ func _build(wander_seed: int, river_seed: int) -> void:
 		map.set_cell(at, "crate")
 	_soften()
 	_mine_bank()
+	_shelter_bank()
 	_perches()
 	_save()
 
@@ -665,7 +709,7 @@ func _ford(water: Dictionary, row: int, columns: Vector2i) -> void:
 	# The plateau's top: its north-east corner stands on it.
 	var top := map.relief_at(Vector2i(CLIFF_X + PLATEAU_WIDE - 8, 4))
 	for at: Vector2i in map.cells:
-		if map.walkable(at) or map.cell(at) == "water" or MINE_ROCK.has_point(at):
+		if map.walkable(at) or map.cell(at) == "water" or _kept_ground(at):
 			heights[at] = map.relief_at(at)
 			# The foot the plateau's face wanders over held as laid (585: the
 			# face is no one column to keep); its top eases to its spur.
@@ -711,7 +755,7 @@ func _fall_ford(path: Array, water: Dictionary) -> void:
 		var fixed := {}
 		var wet := {}
 		for at: Vector2i in map.cells:
-			if map.walkable(at) or map.cell(at) == "water" or MINE_ROCK.has_point(at):
+			if map.walkable(at) or map.cell(at) == "water" or _kept_ground(at):
 				heights[at] = map.relief_at(at)
 				if at.distance_to(across[0]) > 5.0 or map.cell(at) in ["water", "ford"]:
 					fixed[at] = true
@@ -909,6 +953,9 @@ func _places() -> void:
 			continue
 		var at: Vector2i = REFUGES[key]["at"]
 		places[key] = {"at": [at.x, at.y], "kind": "refuge", "where": "hills", "radius": 3, "name": REFUGES[key]["name"]}
+		if REFUGES[key].has("opens"):
+			var opens: Vector2i = REFUGES[key]["opens"]
+			places[key]["opens"] = [opens.x, opens.y]
 	for herder in HERDERS:
 		var fold: Rect2i = herder["fold"]
 		var gate: Vector2i = herder["gate"]
@@ -1027,6 +1074,32 @@ static func _lair_pads() -> Array[Rect2i]:
 func _mine_rock() -> void:
 	for cell in _cells_of(MINE_ROCK):
 		map.set_cell(cell, "rock")
+
+
+## Cells the fords' limits and _soften count as ground though rock: the
+## blocks made rock after the lay (Hollowfell's, the shelter's), so the
+## slopes ease through them as they did before.
+static func _kept_ground(at: Vector2i) -> bool:
+	return MINE_ROCK.has_point(at) or (SHELTER_BUILT and SHELTER_ROCK.has_point(at))
+
+
+## The shelter's hill made rock after the lay (as _mine_rock), but its floor.
+func _shelter_rock() -> void:
+	if not SHELTER_BUILT:
+		return
+	for cell in _cells_of(SHELTER_ROCK):
+		if not SHELTER_FLOOR.has_point(cell):
+			map.set_cell(cell, "rock")
+
+
+## The shelter's bank, after _soften (as _mine_bank): each SHELTER_BANK
+## cell raised to its height, never lowered.
+func _shelter_bank() -> void:
+	if not SHELTER_BUILT:
+		return
+	for row: Array in SHELTER_BANK:
+		var i := int(row[1]) * SIZE.x + int(row[0])
+		map.relief[i] = maxf(map.relief[i], float(row[2]))
 
 
 ## Hollowfell's bank, after _soften: each MINE_BANK cell raised to its
@@ -1480,7 +1553,7 @@ func _soften() -> void:
 	for at: Vector2i in map.cells:
 		if map.cell(at) in ["water", "ford"]:
 			water[at] = true
-		if map.walkable(at) or water.has(at) or MINE_ROCK.has_point(at):
+		if map.walkable(at) or water.has(at) or _kept_ground(at):
 			heights[at] = map.relief_at(at)
 	Relief.soften_low_steps(heights, water)
 	for at: Vector2i in heights:

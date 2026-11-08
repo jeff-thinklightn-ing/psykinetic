@@ -1029,6 +1029,23 @@ func _test_fill_hills_sights() -> void:
 		return Relief.at(mine_relief, mine_size, Vector2i(row[0], row[1])) < float(row[2]) - 0.05)
 	_check(mine_link.size() == 1 and str(mine_link[0].get("cue", "")) == "mine" and mine_floor.is_empty() and low.is_empty(),
 		"Hollowfell's mouth: the link's mine cue, its bank's rock no floor (%s), every bank cell at least terrain's height (%s)" % [mine_floor, low.slice(0, 3)])
+	# The hill cave (798 amended (4), maps' side): the refuge opens east to a shelter, the
+	# cells under the overhang floor and the rest of its hill rock, terrain's bank raised round
+	# it; no rest place (its fire ring is cold, 798 amended (4), maps' side).
+	if MakeHills.SHELTER_BUILT:
+		var shelter_floor: Variant = level["terrain"]["floor"]
+		var wrong_cells: Array = []
+		for cell: Vector2i in Level.rect_cells(MakeHills.SHELTER_ROCK):
+			if (cell in shelter_floor) != MakeHills.SHELTER_FLOOR.has_point(cell):
+				wrong_cells.append(cell)
+		var shelter_low: Array = MakeHills.SHELTER_BANK.filter(func(row: Array) -> bool:
+			return Relief.at(mine_relief, mine_size, Vector2i(row[0], row[1])) < float(row[2]) - 0.05)
+		var shelters: Array = level["terrain"].get("shelters", [])
+		var cave: Dictionary = level["places"].get("hill_cave", {})
+		_check(shelters.size() == 1 and shelters[0]["at"] == Vector2i(52, 176) and shelters[0]["opens"] == Vector2i(1, 0)
+			and wrong_cells.is_empty() and shelter_low.is_empty() and cave.get("kind", "") == "refuge"
+			and not level["places"].has("hill_cave_camp"),
+			"the hill cave: a shelter opening east (%s), floor under the overhang and rock round it (%s), every bank cell at least terrain's height (%s), no rest place" % [shelters, wrong_cells.slice(0, 3), shelter_low.slice(0, 3)])
 	var decor := {}
 	for piece: Dictionary in level["terrain"]["decor"]:
 		decor[piece["kind"]] = int(decor.get(piece["kind"], 0)) + 1

@@ -44084,6 +44084,25 @@ _test_shelter (a place's "opens" a shelter, a slant one warned; behind the place
 open to a rock back, not black; wider than tall, its roof lower at the back, its lip past the face; the fire ring
 and bedrolls). Client and Level only, protocol unchanged, no new class_name.
 
+798 amended (4), maps' side: the hill cave switched on (2026-11-08; release's order, Hollowfell first; terrain's
+bank and rules; the coordinator's ruling on the rest place; voice's bullet). make_hills' SHELTER_BUILT flips to true. The refuge hill_cave at (52, 176) says
+"opens": [1, 0]. SHELTER_ROCK, x 47..51 y 173..179, is made rock after the lay (_shelter_rock, after _mine_rock, as
+Hollowfell's block, 798 amended (3)), except SHELTER_FLOOR, x 49..51 y 175..177, the floor under the overhang. The
+fords' limits and _soften count the whole block as ground (_kept_ground, Hollowfell's block and this one), and after
+_mine_bank, _shelter_bank raises each of SHELTER_BANK's 172 cells [x, y, m] (terrain's: none on the strip under the
+arch, x 49..51 y 174..178; no step between neighbours over 0.44 m), never lowering one. No "rest" place: 798
+amended (4)'s package named one "for the rest camp's heal and drying", but the warmed rest (Main._warm_rests, 777)
+and the client's drying (775) read only a camp building's fire (Level.camp_fire), so a rest place would heal and
+dry nobody, and the ring is cold. The coordinator: the cave is a found place, a dry overhang with an old camp; a
+ring a player lights, warming a rest there, is its own package after the cut ("hill cave rest"). With the switch, W4's waystone and the side
+track up from the road come in too, as 820 held them. The hills laid again: the relief differs only in the 172 bank
+cells; the layout in the block's 26 rock cells, the track, and one of the hill cat's perches. perch_3 moves from
+(110, 175) to (46, 184), since the bank's new drop onto grass scores higher there; it stays PERCH_CLEAR from the
+cave's place and its watch 8 or more cells from the fire ring (enemy-ai: fine, no pin). level_test: the hill cave a find; a
+shelter opening east, floor under the overhang and rock round it, every bank cell at least terrain's height, no
+rest place. The one bullet (voice's words). Level data; protocol
+unchanged.
+
 780 amended (12): the boar's lair, forest phase D (2026-11-05, maps; enemy-ai's apex-lair rule,
 C:/dev/review/enemy-ai/apex_lairs_design.md, its residents as enemy-ai gave them; the coordinator's
 go and its ruling on the roof; terrain's mouth order; release's label). A new level, levels/boar_lair

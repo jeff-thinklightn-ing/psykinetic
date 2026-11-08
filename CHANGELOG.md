@@ -10,6 +10,7 @@ notes (decision 324).
 - Towns: starter gear you've no more use for goes back to Rolf at the stall through his window, where before he also handed out a practice kit that only filled your pack (807 amended (5)).
 - In the wilds you can fish two small pools and the river's wide reach in the north too, not only the pond, and your companion fishes beside you at any of them (805 amended (8)).
 - In the hills, Hollowfell's way in is a timbered mine mouth cut into the hillside, with a cart and a brazier by it and the Blood Rot's mark, where before it was a bare stair (798 amended (3)).
+- In the hills, the cave the waystone points to is there now, a dry rock overhang under the hill's edge with an old camp gone cold, a fire ring, bedrolls and a woodpile, and a side track up to it from the road, where before the waystone pointed at bare hillside (798 amended (4)).
 - Builder mode: a chest of loot goes only in a dungeon, never empty, with only a shop's or a store's chest elsewhere, and a change that would leave a room empty or a chest unguarded is refused (806 amended (7), 807 amended (4)).
 - You can fish the pond in the wilds from its south and west banks too, where the road comes in, where before they said nothing takes the line there (805).
 - The forest's camp traders buy from you now too, through Sell in the trading window: hides and pelts, tusks, antlers, claws, feathers and meat, as far as a purse that fills again every few days will stretch (799 amended (2)).
