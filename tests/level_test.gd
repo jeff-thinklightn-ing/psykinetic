@@ -4387,8 +4387,8 @@ func _test_castle_halls_level() -> void:
 		"The Dwarven Halls, 90 x 70, depth 1, parse with no warning (%s)" % [halls["warnings"]])
 	var block := Regen.config_of("castle_halls")
 	_check(Regen.marked("castle_halls") and block.get("style") == "dwarven" and int(block.get("ways", 0)) == 5 and block["anchors"].size() == 3 and block.get("entrance") == "stair_foot"
-		and block.get("monsters") == {"imp": 7, "brute": 1} and block.get("uses") == "hold" and block.get("heart") == "forge",
-		"marked to regenerate in the dwarven style, ways five wide, three anchors, depth from the stair foot, enemy-ai's seven imps and a brute (806 amended (4): one a room, a guard before the forge), the hold's uses, the forge its heart (%s)" % [block.keys()])
+		and block.get("monsters") == {"imp": 4, "sneak": 3, "brute": 1} and block.get("packs") is Dictionary and block["packs"].keys() == ["sneak"] and str(block["packs"]["sneak"].get("of")) == "sneak" and int(block["packs"]["sneak"].get("size", 0)) == 3 and block.get("uses") == "hold" and block.get("heart") == "forge",
+		"marked to regenerate in the dwarven style, ways five wide, three anchors, depth from the stair foot, enemy-ai's four imps, three sneaks as a pack (824) and a brute (806 amended (4): one a room, a guard before the forge), the hold's uses, the forge its heart (%s)" % [block.keys()])
 	_check(halls["links"].size() == 1 and halls["links"][0]["tile"] == Vector2i(44, 1) and halls["links"][0]["to_map"] == "castle" and halls["links"][0]["to_spawn"] == "from_halls"
 		and halls["spawn_points"].get("from_castle") == Vector2i(44, 2) and halls["terrain"]["floor"].has(Vector2i(44, 2)),
 		"the stair up in the stair foot's north wall leads to the castle's from_halls; from_castle on the floor beside it")
@@ -5072,6 +5072,46 @@ func _test_castle_hold() -> void:
 		_check(block.get("coop_forge", false) == true and block.get("forge_cache") == "forge_cache",
 				"castle_halls generation %d: the block wakes the cold forge, its store forge_cache (%s, %s)" % [generation, block.get("coop_forge"), block.get("forge_cache")])
 		_check_cold_forge(generation, made, block, monsters)
+		_check_sneak_pack(generation, map, config)
+
+
+## Sneak packs (823, dungeon's side, amended) in castle_halls generation
+## [param generation]: the three sneaks one pack, wandering one guardroom,
+## each with the same "pack"; or, with no guardroom of two ways in, none and
+## seven imps. Eight foes either way.
+func _check_sneak_pack(generation: int, map: LevelMap, config: Dictionary) -> void:
+	var sneaks: Array[Vector2i] = []
+	var count := 0
+	var imps := 0
+	for cell: Vector2i in map.cells:
+		var what := str(map.cells[cell])
+		if what.begins_with("monster_"):
+			count += 1
+		if what == "monster_sneak":
+			sneaks.append(cell)
+		elif what == "monster_imp":
+			imps += 1
+	var rows := {}
+	for row: Dictionary in config.get("entities", []):
+		if row.get("at") is Array:
+			rows[Vector2i(int(row["at"][0]), int(row["at"][1]))] = row
+	var packs := {}
+	var wander := true
+	for cell in sneaks:
+		var row: Dictionary = rows.get(cell, {})
+		packs[str((row.get("props", {}) as Dictionary).get("pack", ""))] = true
+		wander = wander and (row.get("idle", {}) as Dictionary).get("mode") == "wander"
+	var rooms := 0
+	for laid: Dictionary in config.get("laid_rooms", []):
+		var inside := {}
+		for at: Variant in laid.get("cells", []):
+			inside[Vector2i(int(at[0]), int(at[1]))] = true
+		if laid.get("use") == "guardroom" and not sneaks.is_empty() and sneaks.all(func(cell: Vector2i) -> bool: return inside.has(cell)):
+			rooms += 1
+	var one_pack := sneaks.size() == 3 and packs.size() == 1 and not packs.has("") and wander and rooms == 1
+	_check(count == 8 and (one_pack or sneaks.is_empty() and imps == 7),
+			"castle_halls generation %d: the sneaks one pack wandering a guardroom, or none and seven imps; eight foes (%d sneaks %s, packs %s, wander %s, rooms %d, foes %d)"
+			% [generation, sneaks.size(), sneaks, packs.keys(), wander, rooms, count])
 
 
 ## The cold forge woken (813 amended (4)) in castle_halls generation

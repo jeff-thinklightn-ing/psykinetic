@@ -16,6 +16,7 @@ extends RefCounted
 ## class_name.
 
 const Tools := preload("res://sim/level_gen/gen_tools.gd")
+const Labyrinth := preload("res://sim/level_gen/labyrinth.gd")
 const DIRECTIONS: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const FLOOR := "stone"
 ## The level every dug cell stands at, and a pit's floor (three levels down:
@@ -38,6 +39,12 @@ const TRACK_LENGTH: Array[int] = [8, 14]
 const TRACK_WIDE := 4
 const TRACK_SPAN := 6
 const TRACK_CLEAR := 2
+## Sneak packs (823, dungeon's side, amended): a junction is a floor cell
+## whose ring JUNCTION_RING cells out crosses JUNCTION_WAYS runs of floor or
+## more, within JUNCTION_NEAR of the routes' middle third.
+const JUNCTION_RING := 3
+const JUNCTION_WAYS := 3
+const JUNCTION_NEAR := 4
 ## The track's tiers, tried in order until one lays a run: [least across,
 ## most across, clearance from anchors and galleries].
 const TRACK_TIERS: Array[Array] = [[TRACK_WIDE, TRACK_SPAN, TRACK_CLEAR], [TRACK_WIDE - 1, TRACK_SPAN, TRACK_CLEAR], [TRACK_WIDE - 1, TRACK_SPAN + 3, 1]]
@@ -708,6 +715,61 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 					if lay.call("imp", cell + d):
 						break
 				break
+	# Sneak packs (823, dungeon's side, amended; enemy-ai's design, the
+	# coordinator's approval): the block's pack of its own kind laid whole at
+	# a junction with JUNCTION_WAYS ways out or more, off the track, beside
+	# the routes' middle third (most ways out first, then nearest the route),
+	# the lead at its heart and the rest nearest it; each given its "pack"
+	# (Labyrinth.pack_rows). With no such junction its members lie loose, as
+	# the sneaks did.
+	var packs: Dictionary = config["packs"] if config.get("packs") is Dictionary else {}
+	for lead: String in packs:
+		var pack: Dictionary = packs[lead] if packs[lead] is Dictionary else {}
+		var size := maxi(1, int(pack.get("size", 1)))
+		if str(pack.get("of", "")) != lead or int(left.get(lead, 0)) < size:
+			continue
+		var middle_route: Array[Vector2i] = []
+		for cell: Vector2i in Tools.sorted_cells(along):
+			if int(along[cell]) == 1:
+				middle_route.append(cell)
+		var best := Vector2i(-1, -1)
+		var best_ways := 0
+		var best_gap := 0
+		var by_middle := {}
+		for on: Vector2i in middle_route:
+			for dy in range(-JUNCTION_NEAR, JUNCTION_NEAR + 1):
+				for dx in range(-JUNCTION_NEAR, JUNCTION_NEAR + 1):
+					by_middle[on + Vector2i(dx, dy)] = true
+		for cell in _floor_cells(map, anchors):
+			if not by_middle.has(cell) or not fit.call(cell):
+				continue
+			var gap := -1
+			for on: Vector2i in middle_route:
+				var d := Tools.distance(cell, on)
+				if gap < 0 or d < gap:
+					gap = d
+			if gap < 0 or gap > JUNCTION_NEAR:
+				continue
+			var ways := _ways_out(map, cell)
+			if ways >= JUNCTION_WAYS and (ways > best_ways or ways == best_ways and gap < best_gap):
+				best = cell
+				best_ways = ways
+				best_gap = gap
+		if best.x < 0 or not lay.call(lead, best):
+			continue
+		var members: Array[Vector2i] = [best]
+		var near: Array[Vector2i] = []
+		for dy in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
+			for dx in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
+				if dx != 0 or dy != 0:
+					near.append(best + Vector2i(dx, dy))
+		near.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return Tools.distance(a, best) < Tools.distance(b, best) if Tools.distance(a, best) != Tools.distance(b, best) else a < b)
+		for cell in near:
+			if members.size() >= size:
+				break
+			if lay.call(lead, cell):
+				members.append(cell)
+		plan["entities"].append_array(Labyrinth.pack_rows(members))
 	# Each sneak at the end of a gallery opening on the route.
 	var ends: Array = []
 	for pair: Array in _gallery_ends(plan["galleries"]):
@@ -1028,6 +1090,30 @@ static func _open_sides(map: LevelMap, cell: Vector2i) -> int:
 
 
 ## Plain floor cells outside the anchors, in row order.
+## The ways out of a tunnel junction at [param cell] (sneak packs): the
+## runs of floor round the ring JUNCTION_RING cells out from it, walked once
+## round; a chamber's open floor is one run, a tunnel's straight run two.
+static func _ways_out(map: LevelMap, cell: Vector2i) -> int:
+	var ring: Array[Vector2i] = []
+	var r := JUNCTION_RING
+	for x in range(-r, r):
+		ring.append(cell + Vector2i(x, -r))
+	for y in range(-r, r):
+		ring.append(cell + Vector2i(r, y))
+	for x in range(r, -r, -1):
+		ring.append(cell + Vector2i(x, r))
+	for y in range(r, -r, -1):
+		ring.append(cell + Vector2i(-r, y))
+	var open := ring.map(func(at: Vector2i) -> bool: return map.cell(at) == FLOOR or str(map.cell(at)).begins_with("monster_"))
+	if not open.has(false):
+		return 1 if open.has(true) else 0
+	var runs := 0
+	for i in open.size():
+		if open[i] and not open[i - 1]:
+			runs += 1
+	return runs
+
+
 static func _floor_cells(map: LevelMap, anchors: Array) -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for y in map.size.y:

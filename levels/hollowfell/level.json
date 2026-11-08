@@ -229,6 +229,13 @@
 			"sneak": 3,
 			"brute": 1
 		},
+		"packs": {
+			"sneak": {
+				"of": "sneak",
+				"size": 3,
+				"apart": 3
+			}
+		},
 		"bays": [
 			4,
 			6

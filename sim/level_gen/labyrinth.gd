@@ -1114,18 +1114,37 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 	for lead: String in leads:
 		var pack: Dictionary = packs[lead]
 		var marker := "monster_" + lead
+		var of := str(pack.get("of", ""))
+		var size := maxi(1, int(pack.get("size", 1)))
 		var count := int(counts.get(lead, 0))
+		# Sneak packs (823, dungeon's side, amended): a pack of the lead's own
+		# kind counts its members, so whole packs of "size" are laid.
+		if of == lead:
+			count /= size
+		var had := {}
+		for cell: Vector2i in map.cells:
+			if map.cells[cell] == marker:
+				had[cell] = true
 		var apart := int(pack.get("apart", 0))
 		if barrow and int(depth.get("fixed_band", -1)) < 0:
 			count -= _lay_by_band(map, anchors, marker, count, everywhere, depth, apart)
 		_lay(map, anchors, marker, count, everywhere, apart)
-		var of := str(pack.get("of", ""))
 		for cell: Vector2i in Tools.sorted_cells(map.cells):
-			if map.cells[cell] != marker:
+			if map.cells[cell] != marker or had.has(cell):
 				continue
 			var close: Array[Vector2i] = []
 			close.assign(everywhere.filter(func(other: Vector2i) -> bool: return maxi(absi(other.x - cell.x), absi(other.y - cell.y)) <= PACK_REACH))
-			following[of] = int(following.get(of, 0)) + _lay(map, anchors, "monster_" + of, int(pack.get("size", 1)) - 1, _nearest_first(cell, close))
+			var nearest := _nearest_first(cell, close)
+			var was := {}
+			for other in nearest:
+				was[other] = map.cells.get(other, "")
+			following[of] = int(following.get(of, 0)) + _lay(map, anchors, "monster_" + of, size - 1, nearest)
+			var members: Array[Vector2i] = [cell]
+			for other in nearest:
+				if map.cells.get(other, "") != was[other]:
+					members.append(other)
+					had[other] = true
+			add_rows(map, "entities", pack_rows(members))
 	var kinds: Array = counts.keys()
 	kinds.sort()
 	for kind: String in kinds:
@@ -1146,6 +1165,30 @@ static func _markers(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 		if barrow and not sent and int(depth.get("fixed_band", -1)) < 0:
 			count -= _lay_by_band(map, anchors, "monster_" + kind, count, spots, depth, apart)
 		_lay(map, anchors, "monster_" + kind, count, spots, apart)
+
+
+## A laid pack's rows (sneak packs, 823 amended): each member, the lead
+## ([param members] first) and those laid beside it, given props "pack":
+## the lead's cell as "pack_<x>_<y>", the same for all (enemy-ai reads it:
+## a pack is its band). A lead laid alone has none: no pack.
+static func pack_rows(members: Array[Vector2i]) -> Array:
+	if members.size() < 2:
+		return []
+	var id := "pack_%d_%d" % [members[0].x, members[0].y]
+	return members.map(func(cell: Vector2i) -> Dictionary: return {"at": [cell.x, cell.y], "props": {"pack": id}})
+
+
+## [param rows] added to [param map]'s generated rows (rows_of) under
+## [param section], beside the hold's.
+static func add_rows(map: LevelMap, section: String, rows: Array) -> void:
+	if rows.is_empty():
+		return
+	if not map.extras.get("rows") is Dictionary:
+		map.extras["rows"] = {}
+	var all: Dictionary = map.extras["rows"]
+	if not all.get(section) is Array:
+		all[section] = []
+	(all[section] as Array).append_array(rows)
 
 
 ## Whether [param cell] is open floor (631 amended, dungeon's side): floor
@@ -1317,9 +1360,45 @@ static func _hold(map: LevelMap, anchors: Array, rooms: Array[Dictionary], nodes
 			if spot != null and Tools.distance(spot, main) <= 4 and not _beside_anchor(anchors, spot):
 				map.set_cell(spot, "torch")
 				kept[spot] = true
+	# Sneak packs (823, dungeon's side, amended; enemy-ai's design, the
+	# coordinator's approval): the block's pack of its own kind laid whole in
+	# the guardroom with the most ways in (2 at least; the cold forge is no
+	# guardroom), its members wandering the room, each given its "pack"
+	# (pack_rows); that room takes no imps of its own. With no such room (a
+	# lone door everywhere) there is no pack: its members are imps, so the
+	# hold keeps its count.
+	var guard_done := {}
+	var pack_room := {}
+	var packs: Dictionary = config["packs"] if config.get("packs") is Dictionary else {}
+	for lead: String in packs:
+		var pack: Dictionary = packs[lead] if packs[lead] is Dictionary else {}
+		var size := maxi(1, int(pack.get("size", 1)))
+		if str(pack.get("of", "")) != lead or int(left_monsters.get(lead, 0)) <= 0:
+			continue
+		for room: Dictionary in ordered:
+			var ways := (room["doors"] as Array).size()
+			if room["use"] == "guardroom" and ways >= 2 and (pack_room.is_empty() or ways > (pack_room["doors"] as Array).size()):
+				pack_room = room
+		if pack_room.is_empty():
+			left_monsters["imp"] = int(left_monsters.get("imp", 0)) + int(left_monsters[lead])
+			left_monsters[lead] = 0
+			continue
+		var was := {}
+		for cell: Vector2i in pack_room["cells"]:
+			was[cell] = map.cell(cell)
+		var laid := _hold_guards(map, anchors, pack_room, lead, mini(size, int(left_monsters[lead])), {"mode": "wander", "radius": 2}, plan)
+		# Any the room had no floor for are imps, as with no room.
+		left_monsters["imp"] = int(left_monsters.get("imp", 0)) + int(left_monsters[lead]) - laid
+		left_monsters[lead] = 0
+		var members: Array[Vector2i] = []
+		for cell: Vector2i in Tools.sorted_cells(pack_room["cells"]):
+			if map.cell(cell) != was[cell]:
+				members.append(cell)
+		plan["entities"].append_array(pack_rows(members))
+		guard_done["guardroom"] = true  # The pack is the guardroom's: no other takes imps.
+		break
 	# Enemy-ai's guards: by the chest where the room has one, else on its
 	# open floor; facing the room's door, or at the forge.
-	var guard_done := {}
 	# The heart's approach (the coordinator, 806 (c): the forge is a refuge,
 	# its hoard the reward for the fight before it): an imp on guard by the
 	# walk's last cells before the heart, facing back up the way.
@@ -1332,7 +1411,7 @@ static func _hold(map: LevelMap, anchors: Array, rooms: Array[Dictionary], nodes
 				left_monsters["imp"] = int(left_monsters["imp"]) - _approach_guard(map, anchors, spine, heart_rect, plan)
 				heart_rect = Rect2i()
 		for room: Dictionary in ordered:
-			if room["use"] != row[0] or guard_done.has(room["use"]):
+			if room["use"] != row[0] or guard_done.has(room["use"]) or is_same(room, pack_room):
 				continue
 			# Every store its guard; the other uses' first room alone.
 			if room["use"] != "store":

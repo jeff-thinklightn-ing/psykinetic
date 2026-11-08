@@ -221,14 +221,23 @@
 		},
 		"loops": 0.2,
 		"monsters": {
-			"imp": 7,
+			"imp": 4,
+			"sneak": 3,
 			"brute": 1
+		},
+		"packs": {
+			"sneak": {
+				"of": "sneak",
+				"size": 3,
+				"apart": 3
+			}
 		},
 		"chests": 3
 	},
 	"home_kinds": ["imp", "brute"],
 	"respawn_s": {
 		"imp": 600,
-		"brute": 600
+		"brute": 600,
+		"sneak": 600
 	}
 }

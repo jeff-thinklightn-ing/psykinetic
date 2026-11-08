@@ -15,6 +15,7 @@ const LEVEL := "hollowfell"
 const GENERATIONS := 6
 
 var _failures := 0
+var _packs_laid := 0
 
 
 func _ready() -> void:
@@ -90,6 +91,8 @@ func _test_generations() -> void:
 			if layouts[i] == layouts[j]:
 				differ = false
 	_check(layouts.size() == GENERATIONS and differ, "the %d generations all differ" % layouts.size())
+	print("  sneak packs laid in %d of %d generations" % [_packs_laid, GENERATIONS])
+	_check(_packs_laid >= GENERATIONS / 2, "the sneaks a pack at a junction in half the generations at least (%d of %d)" % [_packs_laid, GENERATIONS])
 	var again := Regen.generate(LEVEL, 2)
 	_check(not again.is_empty() and (again["layout"] as Image).get_data() == layouts[1] and JSON.stringify(again["config"]) == JSON.stringify(Regen.generate(LEVEL, 2)["config"]),
 			"generation 2 laid twice is the same map, decor and all")
@@ -190,6 +193,26 @@ func _check_monsters(generation: int, level: Dictionary, config: Dictionary) -> 
 		if mouth.grow(6).has_point(spec["tile"]):
 			near.append(spec["tile"])
 	_check(counts == config["monsters"] and near.is_empty(), "generation %d: monsters %s, none within 6 of the mouth (%s)" % [generation, counts, near])
+	# Sneak packs (823, dungeon's side, amended): the three sneaks one pack
+	# at a junction (one "pack" shared, each within PACK_REACH of another
+	# member, none on the track), else loose with none.
+	var sneaks: Array[Vector2i] = []
+	var ids := {}
+	for spec: Dictionary in level["entities"]:
+		if str(spec.get("kind", "")) == "sneak" and not Level.in_anchors(config.get("anchors", []), spec["tile"]):
+			sneaks.append(spec["tile"])
+			ids[str((spec.get("props", {}) as Dictionary).get("pack", ""))] = true
+	var close := sneaks.all(func(cell: Vector2i) -> bool: return sneaks.any(func(other: Vector2i) -> bool: return other != cell and maxi(absi(other.x - cell.x), absi(other.y - cell.y)) <= 2))
+	var tracked := {}
+	for piece: Dictionary in level["terrain"].get("decor", []):
+		if piece["kind"] == "mine_track":
+			tracked[piece["cell"]] = true
+	var on_track := sneaks.filter(func(cell: Vector2i) -> bool: return tracked.has(cell))
+	var packed := ids.size() == 1 and not ids.has("") and sneaks.size() == 3 and close
+	if packed:
+		_packs_laid += 1
+	_check(on_track.is_empty() and (packed or ids.keys() == [""]),
+			"generation %d: the sneaks one pack at a junction, or loose with none (%s, packs %s, on the track %s)" % [generation, sneaks, ids.keys(), on_track])
 
 
 func _test_keep_ground() -> void:
