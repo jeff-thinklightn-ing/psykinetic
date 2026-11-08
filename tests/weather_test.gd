@@ -549,6 +549,9 @@ func _test_night_town() -> void:
 	_check(is_equal_approx(at.z, 10.0 - 0.5 + Client3D.DOOR_LAMP_OUT) and is_equal_approx(absf(at.x - 10.0), Client3D.DOOR_LAMP_ASIDE)
 			and is_equal_approx(at.y, Client3D.DOOR_LAMP_UP) and Client3D.DOOR_LAMP_OUT > 0.25,
 			"a door lantern hangs beside the door, %.2f m proud of its edge (clear of the chapel's 0.5 m wall), %.1f m up" % [Client3D.DOOR_LAMP_OUT, Client3D.DOOR_LAMP_UP])
+	var off_wall := Client3D.DOOR_LAMP_OUT + Client3D.DOOR_LAMP_LIGHT.z
+	_check(off_wall >= 0.9 and Client3D.DOOR_LAMP_LIGHT.y < 0.0 and Client3D.DOOR_LAMP_LIGHT.y > -1.0,
+			"its light stands %.2f m off the wall, under the lantern, so the stone beside it isn't burned white (782 amended)" % off_wall)
 	var buildings := [{"rect": Rect2i(0, 0, 4, 6), "facing": Vector2i(0, 1)}, {"rect": Rect2i(10, 0, 3, 3), "facing": Vector2i(1, 0)}]
 	_check(Client3D.building_holding(buildings, Vector2i(11, 1)) == buildings[1] and Client3D.building_holding(buildings, Vector2i(7, 1)).is_empty(),
 			"a counter's building is the one whose rect holds it; none in the open")

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- At night in Umbrage, the square's fire throws a warm orange glow across the cobbles round it, and the lanterns by the chapel's and the stores' doors glow softly on the stone, where before they burned a white spot on the wall beside them (782 amended).
 - Town houses and huts have shuttered windows now, and after dusk lamplight glows at the windows and open door of any where someone is still awake (489 amended (3)).
 - In the dwarven halls under the castle, work the cold forge's bellows and hold down the lever on the far wall at once, with your companion, a friend or a cart pushed onto the bellows, and the forge roars alight as a stone shutter grinds up on a find of your own; ask your companion and she may tell you how it's done (813 amended (4)).
 - Towns: starter gear you've no more use for goes back to Rolf at the stall through his window, where before he also handed out a practice kit that only filled your pack (807 amended (5)).

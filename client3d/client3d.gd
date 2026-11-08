@@ -805,19 +805,30 @@ const LAMP_PULSE_LOW := 0.9
 const LAMP_PERIOD := 4.0
 ## The night town (782; townsfolk up all night, 772). A cluster of fire
 ## cells outdoors (a town's square fire) casts one wide warm pool:
-## FIRE_POOL, POOL_ENERGY over POOL_RANGE m, POOL_UP m over the pit.
-const FIRE_POOL := Color(1.0, 0.62, 0.32)
-const POOL_ENERGY := 1.6
-const POOL_RANGE := 6.5
-const POOL_UP := 1.0
+## FIRE_POOL, POOL_ENERGY over POOL_RANGE m, POOL_UP m over the pit, falling
+## off as POOL_FALLOFF (782 amended): the cobbles glow warm to 3 or 4 cells
+## and fade, gone by the buildings across the square. Low, strong and steep
+## rather than wide: a flat falloff over 8 m dimmed the core and turned the
+## chapel's face 6 cells off pink. Orange, not red: under the blue night a
+## redder light reads pink on pale stone.
+const FIRE_POOL := Color(1.0, 0.7, 0.3)
+const POOL_ENERGY := 2.6
+const POOL_RANGE := 6.0
+const POOL_FALLOFF := 1.5
+const POOL_UP := 0.7
 ## A lantern hung beside the door of a store or a chapel (a building
 ## holding a shop's or temple's counter): DOOR_LAMP_UP m up the wall,
 ## DOOR_LAMP_ASIDE m along it from the door's middle, DOOR_LAMP_OUT m proud
 ## of the door's edge (a chapel's wall is 0.5 m thick); its light. A store
 ## with no building round it hangs one on a post, STORE_LAMP_UP m tall.
+## The light itself stands DOOR_LAMP_LIGHT from the arm's end (782
+## amended): out from the lantern into the street and a little under it. At
+## the lantern, 0.45 m off the wall, it burned the chapel's pale stone white
+## round it (as the mine's wall lamps grazed theirs, 769 amended (8)).
 const DOOR_LAMP_UP := 2.1
 const DOOR_LAMP_ASIDE := 0.8
 const DOOR_LAMP_OUT := 0.45
+const DOOR_LAMP_LIGHT := Vector3(0.0, -0.4, 0.5)
 const DOOR_LAMP_ENERGY := 1.2
 const DOOR_LAMP_RANGE := 4.5
 const STORE_LAMP_UP := 2.0
@@ -16877,6 +16888,7 @@ func _add_fire_pools() -> void:
 		light.light_color = FIRE_POOL
 		light.light_energy = POOL_ENERGY
 		light.omni_range = POOL_RANGE
+		light.omni_attenuation = POOL_FALLOFF
 		light.position = middle + Vector3(0.0, POOL_UP, 0.0)
 		_room.add_child(light)
 		_cast_shadows(light)
@@ -16953,7 +16965,7 @@ func _add_door_lamp(front: Vector2i, facing: Vector2i) -> Node3D:
 	lantern.position = Vector3(0.0, -0.2, 0.0)
 	lamp.add_child(lantern)
 	var light := _night_light(LANTERN, DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE)
-	light.position = Vector3(0.0, -0.1, 0.0)
+	light.position = DOOR_LAMP_LIGHT
 	lamp.add_child(light)
 	_fire_lights.append([light, DOOR_LAMP_ENERGY, _roll(front, 150) * TAU, LANTERN_FLICKER])
 	return lamp
