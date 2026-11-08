@@ -646,10 +646,12 @@ func takes_at(slot: int) -> Dictionary:
 ## needs to say Trade or Donate"): "Sell" where one of [param rows] pays
 ## gold for what is handed over (Rolf's stall, the tanner's trophies),
 ## "Donate" where none does (ore toward a build, the larder, a gift). The tab
-## takes it from all the person's rows; the button from those picked.
+## takes it from all the person's rows; the button from those picked. A row
+## whose price is owed (the treasury at its floor: gold 0, "owed" over 0) is
+## still a sale, paid later ("Owes you N gold", give_lines).
 static func give_word(rows: Array) -> String:
 	for row: Variant in rows:
-		if row is Dictionary and int((row as Dictionary).get("gold", 0)) > 0:
+		if row is Dictionary and (int((row as Dictionary).get("gold", 0)) > 0 or int((row as Dictionary).get("owed", 0)) > 0):
 			return SELL_WORDS
 	return DONATE_WORDS
 

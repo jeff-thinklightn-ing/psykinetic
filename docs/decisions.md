@@ -42644,6 +42644,8 @@ keeper with takes rows reads it (Rolf, the tanner, makers' builds, the larder, g
 ui_test: Sell (1 item) and the Sell tab on a row that pays; give_word Donate on rows that pay nothing. Client only;
 protocol unchanged, no new class_name.
 
+802 amended (9) (release's label; the coordinator: a trophy whose whole price is owed said Donate): give_word says Sell where a row pays gold now or owes it, gold or "owed" over 0. Economy's rows carry "owed" when the town's treasury is at its floor (the tanner's trophies, the stall's keeper's), the price banked as owed and none paid now; that row read Donate, as if nothing came back. Its line was already "Owes you N gold" (give_lines), so no new words. ui_test: a row with gold 0 and owed 5 reads Sell, its line "Owes you 5 gold" and no "Pays 0 gold". CHANGELOG (voice's). Package: none (a bug fix). Client only, protocol unchanged, no new class_name.
+
 ## 803. Her voice, measured: the context asked for, the prompt's size logged, counts in the journal
 
 Wren step 1 (the coordinator's diagnosis, 2026-11-04; Jeff: "the most fun i had was back when

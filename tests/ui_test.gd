@@ -3105,6 +3105,10 @@ func _test_person_give() -> void:
 	_check(BarterPanel.give_word([{"uid": 1, "gold": 0, "for": {"kind": "build", "name": "the new forge"}}, {"uid": 2, "gold": 0, "for": {}}]) == "Donate"
 		and BarterPanel.give_word([{"uid": 1, "gold": 0}, {"uid": 2, "gold": 4}]) == "Sell" and BarterPanel.give_word([]) == "Donate",
 		"Jeff's Trade or Donate (voice's Sell): Sell where any row pays, Donate where none does")
+	var owed_row := {"uid": 3, "gold": 0, "owed": 5, "for": {"kind": "maker", "name": "tanning"}}
+	var owed_lines := BarterPanel.give_lines([owed_row])
+	_check(BarterPanel.give_word([owed_row]) == "Sell" and "Owes you 5 gold" in owed_lines and not "Pays 0 gold" in owed_lines,
+		"a trophy's whole price owed (the treasury at its floor): still Sell, its line what is owed (%s)" % [owed_lines])
 	window._select_mine(true, 3)
 	_check(window.gift.size() == 1, "a square they don't take: nothing picked")
 	var lines: Array[String] = []
