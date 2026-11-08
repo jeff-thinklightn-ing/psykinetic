@@ -4,7 +4,9 @@ extends Node
 ## state, then "near"), refused far from the link, for another zone, or
 ## again within NEAR_EVERY_MS; off by default; switched on, the zone past a
 ## near link built beside the live view where it lies on the world plane,
-## none under the memory floor, and let go at a crossing. Prints PASS/FAIL
+## none under the memory floor; crossing into it swaps the rooms (no card,
+## no build, the zone left held, the view the same frame), and back again;
+## switched off, a crossing lets it go behind the card. Prints PASS/FAIL
 ## per assertion and quits with exit code 1 if any assertion failed, 0
 ## otherwise.
 
@@ -100,7 +102,7 @@ func _test_near() -> void:
 
 
 func _test_preload() -> void:
-	print("\n== switched on: the wilds built beside held near its link, on the plane; none under the floor; let go at a crossing ==")
+	print("\n== switched on: the wilds built beside held near its link, on the plane; none under the floor; the swap and back; off, let go at a crossing ==")
 	_check(not _main.seamless_crossings, "off unless switched on")
 	_main.seamless_crossings = true
 	_main.neighbour_free_floor = 1 << 62
@@ -127,10 +129,42 @@ func _test_preload() -> void:
 	_stand(_main.PRELOAD_CELLS + 20)
 	await _frames(_main.NEIGHBOUR_LOOK_FRAMES * 2)
 	_check(_main._neighbour == view, "walking off: kept (one neighbour, let go only for another)")
-	# Off before it crosses: at the wilds' end of the link the held would
-	# start building at once, and still be building as the scene quits.
+	await _test_swap(view)
+	# Off before it crosses: the card and a build, the held one let go.
+	view = _main._neighbour
 	_main.seamless_crossings = false
-	_check(_main.travel(Net.local_id, "wilds", "from_held"), "the host crosses to the wilds")
+	_check(_main.travel(Net.local_id, "wilds", "from_held"), "switched off, the host crosses to the wilds")
 	await _frames(2)
-	_check(_main._neighbour == null and (not is_instance_valid(view) or view.is_queued_for_deletion()),
-			"the crossing lets it go (step 2: every crossing as today)")
+	_check(_main._neighbour == null and (not is_instance_valid(view) or view.is_queued_for_deletion())
+			and _main._client3d.building_room and _main.arrival_card != null and _main.arrival_card.showing,
+			"the crossing lets it go and builds behind the card, as ever")
+
+
+## Step 4: the host crosses into the held wilds and back. Each time the
+## live view takes the held room (no card, no build), the zone left is held
+## where it lies, the live view stays at its place, the glimpse of the held
+## zone is hidden and plane_origin is the live room's place.
+func _test_swap(view: Client3D) -> void:
+	var live: Client3D = _main._client3d
+	var held_room: Node3D = live._room
+	var wilds_room: Node3D = view._room
+	var live_at := live.position
+	var pairs: Array = [["wilds", "from_held", wilds_room, held_room, "held"], ["held", "from_wilds", held_room, wilds_room, "wilds"]]
+	for pair: Array in pairs:
+		_check(_main.travel(Net.local_id, pair[0], pair[1]), "the host crosses to %s" % pair[0])
+		await _frames(2)
+		_check(live._room == pair[2] and _main._neighbour == view and view._room == pair[3] and _main._neighbour_zone == pair[4]
+				and _main._shown_zone == pair[0] and live._terrain == _main._terrain,
+				"swapped: %s's room live, %s's held, no other" % [pair[0], pair[4]])
+		_check(not live.building_room and (_main.arrival_card == null or not _main.arrival_card._building) and not _main._arriving(),
+				"no build and no card")
+		_check(live.position.is_equal_approx(live_at) and view.position.is_equal_approx(live_at + _main.plane_offset(pair[0], pair[4])),
+				"the live view kept its place, the held one where %s lies from it (%s)" % [pair[4], view.position])
+		_check(Client3D.plane_given.is_equal_approx(live._plane_at)
+				and view._plane_at.is_equal_approx(live._plane_at + _main.plane_offset(pair[0], pair[4])),
+				"plane_origin the live room's place (%s), the held one's beside it" % Client3D.plane_given)
+		var shown := live._glimpses.filter(func(g: Client3D) -> bool: return is_instance_valid(g) and g.visible and str(g.get_meta("to", "")) == pair[4])
+		_check(shown.is_empty(), "no glimpse of %s over its own room" % pair[4])
+		await _frames(_main.NEIGHBOUR_LOOK_FRAMES * 2)
+		_check(_main._neighbour == view, "at %s's side of the link: %s still held" % [pair[0], pair[4]])
+

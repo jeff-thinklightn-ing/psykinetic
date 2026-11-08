@@ -45146,6 +45146,36 @@ reading them on a worker (GrownTrees.start_reading) as it begins; _phase_land wa
 on the worker); a build at once still reads them in place. Client only, protocol unchanged, no new
 class_name.
 
+822 amended: step 4, the swap (behind the flag). A crossing into the zone held, both rooms whole, swaps in
+place of a build (Main._can_swap, _swap_neighbour): Client3D.swap_room, the zone left held as the
+neighbour where it lies, what a whole room gets (towns, folds, night places, the card's finish,
+view_ready) the same frame; no card and no build. Any other crossing (another zone, a room still
+building, the flag off) drops the neighbour and builds behind the card as ever. A client's crossing
+takes the held level as read (_load_level's kept: its felled cells and plots laid when it was built, so
+none laid twice); a host's takes its zone's, and the live view shares that terrain as a rebuild does.
+Main keeps the zone and level the live room shows (_shown_zone, _shown_level) to hold at the next swap.
+The live view stays at the origin (the coordinator's agreement, 2026-11-08): picks, the listener,
+unproject_position, occluder bounds, distances from the camera's aim and the see-through focus all
+take world space for the live view's own, so swap_room leaves the live view where it is and puts the
+other on its far side (position + the change of origin), the camera moved by the same in the view; the
+rooms and camera keep their places to one another, everything shifted together, nothing moved on
+screen. Patterns read at world positions would jump by that change, so with the flag on they are read
+on maps' world plane: Client3D._plane_at (a ROOM field) is where a room's zone lies on it (Level's plane
+origin and height; a neighbour is given the live view's plus their offset, a glimpse its room's; zero
+with the flag off, so nothing drawn changes), the live view gives its own to a new global shader
+uniform plane_origin (project.godot), and the ground's, water's, scatter's, season's and fire's noise
+reads world + plane_origin, the ground's and water's read origins (kinds_origin, mask_origin,
+far_centre) set on the plane too, so a pattern also runs on from one zone into the next. A particle
+already in the air (world space: smoke, sparks) is left where it was and jumps once by the change of
+origin; shifting them isn't offered by GPUParticles3D, so it stays (the coordinator: fine for now). Each
+room's glimpse toward the other is hidden while both are held (hide_glimpse_to). A neighbour no longer
+publishes the floor shade over the live view's (step 1's slip); swap_room publishes the live room's.
+Not done: the shader warm-ups a live room gets (a held room is swapped in unwarmed). view_test: the
+swap keeps the live view's place, rooms and camera shifted together, plane_origin the live room's.
+seamless_test: the host crosses into the held wilds and back, each a swap (no card or build, the zone
+left held where it lies, plane_origin, the glimpse hidden, still held after), then, off, the card.
+Client only, protocol unchanged, no new class_name.
+
 Still to come, each behind the flag: (3) maps: the five corridors, each neighbour's plane origin 16
 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam − 8 with
 spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The
@@ -45184,3 +45214,4 @@ monster_test's chiefs' checks at the new given hp; level_test's old test room ex
 (rev 53 kept, its hash moves); no new class_name.
 
 823, dungeon's side (the coordinator's approval of C:/dev/review/dungeon/foes_last_longer.md; combat's package "foes last longer", landing in its window): with common foes at about 1.8 times their hp, no fight should hold more than about four of them at once, nor be the same fight room after room. A survey of generations 1-6 of every dungeon found three that would drag. The Ossuary's twelve skeletons were laid in diagonal strings of four, two strings side by side in a third of generations. It now lays three packs, each a grave guard leading two skeletons: labyrinth.gd's block key "packs" {lead: {of, size, apart}} lays the leads a third to each depth band (631), "apart" cells from one another, and size - 1 of "of" on the free cells nearest each lead, PACK_REACH (2) at most; those come off their kind's count. barrow_deep: skeleton 6, skeleton_guard 3, packs {skeleton_guard: {of skeleton, size 3, apart 12}}, its "near" dropped (the deepest band's pack holds the Hall's door). The castle's west side held seven (two brutes, five imps) close enough to come as one, by the halls stair: two imps are gone, and a brute and an imp move to the north-west (18 foes to 16). Hollowfell's brute took the bay nearest the route, often the first third by the mouth (playtest's B3: that band downed the bot and Wren on the way out): mine.gd now ranks a bay off the route's middle third first. And the crypt's robbers spread "apart" 8 into every tomb, one lone robber each, up to five times: crypt.gd lays none in a room but a chest's guard, so the rest stand on the ways as a band by their camp ("apart" 4), the guard kind laid last so the band's leader (Brand) stands nearest the camp and keeps its chest's post. Tests: labyrinth_test (the packs: three guards each with two skeletons, 12 apart; the dead by band count the guards, a lead's two may cross its band's edge), level_test, mine_gen_test. Level data and generators; protocol unchanged; no new class_name.
+clip's open edge at the seam (with maps' overlap).

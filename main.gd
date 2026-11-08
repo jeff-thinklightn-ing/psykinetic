@@ -2318,6 +2318,8 @@ func _show_3d() -> void:
 	_client3d.fields_done.connect(_replay.bind(_held_clearings))
 	_client3d.room_filled.connect(_replay.bind(_held_redraws))
 	_client3d.setup(_terrain, level_centre)
+	_shown_zone = map_name  # 822 step 4: the zone the live room is.
+	_shown_level = level
 	_client3d.bubbles = bubbles
 	_show_towns()
 	if Tuning.allowed():
@@ -3615,8 +3617,10 @@ func _ground_tile(look: String, height: int) -> int:
 
 ## Reads level [param level_name] and makes it this peer's terrain and spawn
 ## table; the default map if there is no such level. False if neither loads.
-func _load_level(level_name: String) -> bool:
-	var loaded := Level.load_level(level_name)
+## [param kept]: that level already read, its felled cells and plots laid
+## (the held neighbour's, 822), taken as it is.
+func _load_level(level_name: String, kept := {}) -> bool:
+	var loaded := kept if not kept.is_empty() else Level.load_level(level_name)
 	if loaded.is_empty() and level_name != Level.DEFAULT_MAP:
 		push_warning("[level] no map %s; loading %s" % [level_name, Level.DEFAULT_MAP])
 		loaded = Level.load_level(Level.DEFAULT_MAP)
@@ -3629,7 +3633,9 @@ func _load_level(level_name: String) -> bool:
 	Companion.know_level(map_name, loaded)
 	_terrain = loaded["terrain"]
 	# Its felled cells (591): the server's own, a client's as told.
-	if Net.is_authority() and World.clearing != null:
+	if not kept.is_empty():
+		pass  # Laid when it was read (_build_neighbour).
+	elif Net.is_authority() and World.clearing != null:
 		World.clearing.apply(map_name, _terrain)
 	else:
 		if _clearing_told.has(map_name):
@@ -4285,10 +4291,15 @@ func _repaint(crossing := false) -> void:
 		minimap.rebuild(level)
 	if _client3d != null:
 		# The towns and folds go on the room once it is whole (_on_room_built).
+		if crossing and _can_swap():
+			_swap_neighbour()
+			return
 		if crossing and arrival_card != null:
 			arrival_card.begin(zone_display_name())
 		if crossing:
-			drop_neighbour()  # 822 step 2: every crossing as today; the swap is step 4.
+			drop_neighbour()  # Not the zone held, or not whole: the card, as ever (822).
+		_shown_zone = map_name
+		_shown_level = level
 		_client3d.rebuild(_terrain, level_centre, crossing)
 
 
@@ -4922,7 +4933,7 @@ func _client_zone(zone_name: String) -> void:
 	if spawner != null:
 		spawner.free()
 	World.mirror_reset()
-	_load_level(zone_name)
+	_load_level(zone_name, _neighbour_level if seamless_crossings and zone_name == _neighbour_zone else {})
 	_zone_nodes(zone_name)
 	World.mirror_terrain(_terrain)
 	_repaint(true)
@@ -5296,7 +5307,10 @@ func tell_view_ready(zone_name: String) -> void:
 ## within PRELOAD_CELLS of a link between two zones on the world plane, the
 ## zone past it is built in a second view beside the live one (_neighbour).
 ## --seamless turns it on (tests).
-var seamless_crossings := false
+var seamless_crossings := false:
+	set(on):
+		seamless_crossings = on
+		Client3D.on_plane = on  # Patterns read on the world plane, from the next build.
 const PRELOAD_CELLS := 80
 ## Server: a "near" is answered within this of the link (the client's reach
 ## and a margin), once per NEAR_EVERY_MS a peer.
@@ -5316,6 +5330,10 @@ var _neighbour_zone := ""
 var _neighbour_level := {}
 var _neighbour_asked := ""
 var _floor_said := false
+## The zone and level the live view's room was built from (step 4: given
+## up at a swap, they are the neighbour's).
+var _shown_zone := ""
+var _shown_level := {}
 ## Server: when each peer's last "near" was answered (msec).
 var _near_told: Dictionary[int, int] = {}
 ## Each level's links to zones on the world plane, by level name.
@@ -5390,10 +5408,41 @@ func _update_neighbour() -> void:
 		World.command(player, "near", {"zone": zone})
 
 
+## A crossing into the held neighbour swaps instead of building (822 step
+## 4): it is the zone now shown, built from the level now held, and it and
+## the live room are whole.
+func _can_swap() -> bool:
+	return (seamless_crossings and is_instance_valid(_neighbour) and _neighbour_zone == map_name
+			and str(_neighbour_level.get("name", "")) == map_name and _neighbour.room_whole() and _client3d.room_whole()
+			and not _shown_zone.is_empty())
+
+
+## The live view takes the held neighbour's room, the zone left held in its
+## place (822 step 4): no card, no build. Its terrain is the one this
+## peer now keeps (a host's zone's, a client's kept level's), shared as
+## a rebuild shares it; then what a whole room gets (_on_room_built).
+func _swap_neighbour() -> void:
+	var left_zone := _shown_zone
+	var left_level := _shown_level
+	_client3d.swap_room(_neighbour)
+	_client3d._terrain = _terrain
+	_shown_zone = map_name
+	_shown_level = level
+	_neighbour_zone = left_zone
+	_neighbour_level = left_level
+	_neighbour_asked = ""
+	_client3d.hide_glimpse_to(left_zone)
+	_neighbour.hide_glimpse_to(map_name)
+	print("[zone] swapped into %s, %s held" % [map_name, left_zone])
+	_on_room_built()
+
+
 ## The held neighbour let go (another link nearer, a crossing, leaving).
 func drop_neighbour() -> void:
 	if is_instance_valid(_neighbour):
 		_neighbour.queue_free()
+		if _client3d != null:
+			_client3d.hide_glimpse_to("")
 	_neighbour = null
 	_neighbour_zone = ""
 	_neighbour_level = {}
@@ -5435,7 +5484,7 @@ func _build_neighbour(zone: String) -> void:
 	_neighbour = view
 	_neighbour_zone = zone
 	_neighbour_level = loaded
-	view.build_neighbour(terrain, loaded["centre"], _client3d._sky_floor, true)
+	view.build_neighbour(terrain, loaded["centre"], _client3d._sky_floor, true, _client3d._plane_at + plane_offset(map_name, zone))
 	print("[zone] building %s beside %s" % [zone, map_name])
 
 
@@ -5449,6 +5498,9 @@ func _on_neighbour_built(view: Client3D) -> void:
 	view.set_huts(hut_states)
 	if roof_states.has(_neighbour_zone):
 		view.set_roofs(_neighbour_zone, roof_states[_neighbour_zone])
+	# Each room's glimpse of the other hidden: the room itself stands there.
+	_client3d.hide_glimpse_to(_neighbour_zone)
+	view.hide_glimpse_to(_shown_zone)
 
 
 ## Server: the "near" command (822): [param player]'s client builds zone

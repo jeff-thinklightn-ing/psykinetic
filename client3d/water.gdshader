@@ -22,6 +22,10 @@ render_mode blend_mix, depth_draw_never, cull_disabled, diffuse_burley, specular
 uniform sampler2D water : filter_linear, repeat_disable;
 // The world cell at the mask's texel (0, 0), and the mask's size in cells.
 uniform vec2 mask_origin;
+// Where the live zone lies on the world plane (decision 822, Client3D sets it):
+// added to a world position, the place on the plane, so a pattern read there
+// runs on across two zones drawn side by side and is the same after a swap.
+global uniform vec4 plane_origin;
 uniform vec2 mask_size;
 uniform sampler2D noise_tex : filter_linear_mipmap, repeat_enable;
 uniform vec3 shallow : source_color = vec3(0.25, 0.55, 0.7);
@@ -76,7 +80,7 @@ void vertex() {
 }
 
 void fragment() {
-	vec2 at = world.xz;
+	vec2 at = world.xz + plane_origin.xz;  // On the plane, as mask_origin (822).
 	// The shore: the field's half, read a little aside; about a cell from
 	// dry to wet, so a half less it is about how far into the water.
 	vec2 aside = vec2(noise(at * 0.9) - 0.5, noise(at * 0.9 + 17.0) - 0.5) * 2.0 * SHORE_WARP;
@@ -127,7 +131,7 @@ void fragment() {
 	// down its height, falling fast, every bit of it white.
 	float curtain = curved ? step(0.5, UV.y) : 0.0;
 	if (curtain > 0.5) {
-		along = vec2(dot(at, across) * 3.5, world.y * 0.5 + TIME * FLOW_SPEED * 4.0);
+		along = vec2(dot(at, across) * 3.5, (world.y + plane_origin.y) * 0.5 + TIME * FLOW_SPEED * 4.0);
 		churn = max(churn, 0.6);
 	}
 	float streaks = smoothstep(0.42, 0.62, noise(along * 9.0));

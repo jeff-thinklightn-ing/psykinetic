@@ -6,6 +6,10 @@
 // snow lies on what faces up. NEAR: the see-through copy, faded.
 
 global uniform vec4 season;
+// Where the live zone lies on the world plane (decision 822, Client3D sets it):
+// added to a world position, the place on the plane, so a pattern read there
+// runs on across two zones drawn side by side and is the same after a swap.
+global uniform vec4 plane_origin;
 uniform sampler2D albedo_texture : source_color, filter_nearest_mipmap, repeat_enable;
 uniform vec4 albedo_color : source_color = vec4(1.0);
 uniform bool use_texture = false;
@@ -58,7 +62,7 @@ vec3 to_linear(vec3 c) {
 
 void vertex() {
 	up = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
-	world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
+	world_xz = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz + plane_origin.xz;  // On the plane (822).
 #ifdef CUTAWAY
 	see_world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 #endif
@@ -92,7 +96,7 @@ void fragment() {
 		// rust; the light and dark of its foliage kept.
 		float foliage = smoothstep(0.004, 0.02, colour.g - max(colour.r, colour.b));
 		float shade = clamp(dot(colour, vec3(0.3, 0.55, 0.15)) * 4.0, 0.5, 1.4);
-		float which = fract(sin(dot(MODEL_MATRIX[3].xz, vec2(12.9898, 78.233))) * 43758.5453);
+		float which = fract(sin(dot(MODEL_MATRIX[3].xz + plane_origin.xz, vec2(12.9898, 78.233))) * 43758.5453);
 		vec3 turned = which < 0.4 ? vec3(0.55, 0.32, 0.03) : (which < 0.8 ? vec3(0.6, 0.17, 0.02) : vec3(0.36, 0.06, 0.02));
 		vec3 dried = mix(colour, vec3(0.3, 0.24, 0.09) * shade, (1.0 - season.x) * 0.55);
 		dried = mix(dried, turned * shade, season.y * 0.75);

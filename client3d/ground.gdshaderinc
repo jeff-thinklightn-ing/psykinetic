@@ -122,6 +122,10 @@ varying vec3 world;
 // dries toward straw out of season and turns in autumn; snow lies where the
 // ground faces up (slopes and steps stay bare), never on a building's floor.
 global uniform vec4 season;
+// Where the live zone lies on the world plane (decision 822, Client3D sets it):
+// added to a world position, the place on the plane, so a pattern read there
+// runs on across two zones drawn side by side and is the same after a swap.
+global uniform vec4 plane_origin;
 varying float up;
 varying vec2 shade;
 varying vec2 relief;
@@ -337,7 +341,8 @@ void fragment() {
 		discard;
 	}
 #endif
-	vec2 at = world.xz;
+	// On the plane (822): the kinds' origin and far_centre are set on it too.
+	vec2 at = world.xz + plane_origin.xz;
 	// Where the kinds are read: pushed about at two scales, a slow drift of
 	// up to a cell and a half (about 3 m across) and a quicker wobble (about
 	// 0.7 m), so a border wanders and frays and never follows the cells.

@@ -82,3 +82,7 @@ floor_shade_rect={
 "type": "vec4",
 "value": Vector4(0, 0, 0, 0)
 }
+plane_origin={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}

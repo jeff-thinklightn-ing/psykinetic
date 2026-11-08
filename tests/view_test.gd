@@ -11112,8 +11112,10 @@ func _test_indoor_phased_build() -> void:
 ## Decision 822 (P1, step 1): a held neighbour's view and the swap. Every
 ## Client3D var is sorted once into room_fields.gd's VIEW or ROOM; a
 ## neighbour builds its room and nothing else (no camera, sky or warm-up),
-## at once or over frames; swap_room trades the rooms with nothing moving
-## in the world, the camera kept where it was; swapped back, all as before.
+## at once or over frames; swap_room trades the rooms, the live view kept at
+## its place and the rooms and camera kept where they were to one another
+## (shifted together, the shaders' plane_origin with them); swapped back, all
+## as before.
 func _test_neighbour_swap() -> void:
 	print("\n== a held neighbour's view: the fields sorted, its room alone, the swap and back (822) ==")
 	var fields := preload("res://client3d/room_fields.gd")
@@ -11164,20 +11166,23 @@ func _test_neighbour_swap() -> void:
 	var theirs_at := theirs_room.global_position
 	var camera_at: Vector3 = _rig._camera.global_position
 	var rig_at := _rig.position
+	var neighbour_at := neighbour.position
 	_rig.swap_room(neighbour)
 	_check(_rig._room == theirs_room and theirs_room.get_parent() == _rig and neighbour._room == ours_room
 			and ours_room.get_parent() == neighbour and _rig._terrain == castle["terrain"] and neighbour._terrain == ours_terrain,
 			"swapped: the castle's room and terrain the live view's, ours the neighbour's")
-	_check(ours_room.global_position.is_equal_approx(ours_at) and theirs_room.global_position.is_equal_approx(theirs_at)
-			and _rig._camera.global_position.is_equal_approx(camera_at),
-			"nothing moved in the world: both rooms and the camera where they were (%s, %s, %s)" % [ours_room.global_position, theirs_room.global_position, _rig._camera.global_position])
+	var shift := rig_at - neighbour_at
+	_check(_rig.position.is_equal_approx(rig_at) and ours_room.global_position.is_equal_approx(ours_at + shift)
+			and theirs_room.global_position.is_equal_approx(theirs_at + shift) and _rig._camera.global_position.is_equal_approx(camera_at + shift)
+			and Client3D.plane_given.is_equal_approx(_rig._plane_at),
+			"the live view kept its place, both rooms and the camera shifted together by %s (%s, %s, %s), plane_origin the castle's" % [shift, ours_room.global_position, theirs_room.global_position, _rig._camera.global_position])
 	var piles := World.zone.piles.values().filter(func(pile: GroundPile) -> bool: return pile.is_inside_tree() and (pile.get_parent() as Node2D).visible).size()
 	_check(drawn.call(_rig._room) == theirs_count and drawn.call(neighbour._room) == ours_count and _rig._outdoor == bool(castle["terrain"].get("outdoor", false))
 			and _rig._pile_nodes.size() == piles and neighbour._pile_nodes.is_empty() and neighbour._room.find_children("Pile_*", "", false, false).is_empty(),
 			"each room whole as built (%d and %d nodes, %d and %d), the live zone's %d heaps on the live room alone (%d, %d)"
 			% [drawn.call(_rig._room), drawn.call(neighbour._room), theirs_count, ours_count, piles, _rig._pile_nodes.size(), neighbour._pile_nodes.size()])
 	_rig.swap_room(neighbour)
-	_check(_rig._room == ours_room and _rig._terrain == ours_terrain and _rig.position.is_equal_approx(rig_at)
+	_check(_rig._room == ours_room and _rig._terrain == ours_terrain and _rig.position.is_equal_approx(rig_at) and neighbour.position.is_equal_approx(neighbour_at)
 			and _rig._camera.global_position.is_equal_approx(camera_at) and drawn.call(ours_room) == ours_count
 			and drawn.call(theirs_room) == theirs_count and neighbour.get_children() == [theirs_room] and neighbour._pile_nodes.is_empty(),
 			"swapped back: all as before (%d and %d nodes)" % [drawn.call(ours_room), drawn.call(theirs_room)])

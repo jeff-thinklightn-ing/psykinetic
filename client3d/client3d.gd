@@ -2729,6 +2729,17 @@ var _glimpse := false
 ## This view is a held neighbour's (decision 822): its room built whole,
 ## but no sky, camera or warm-ups of its own.
 var _neighbour := false
+## Where this room's zone lies on maps' world plane (822: its origin x, its
+## height, its origin y), with on_plane; zero without. The ground's and the
+## water's read origins are set on the plane by it, and the live view gives
+## it to the shaders (plane_origin), so a pattern runs on across two zones
+## and stays put through a swap.
+var _plane_at := Vector3.ZERO
+## Patterns read on the world plane (822): Main sets it with seamless
+## crossings; off, every room's _plane_at is zero, as before.
+static var on_plane := false
+## The place last given to the shaders as plane_origin (tests read it).
+static var plane_given := Vector3.ZERO
 ## The saplings at the forest's edge (_add_sapling), faded as trees are.
 var _saplings: Dictionary[Vector2i, Node3D] = {}
 ## The felled cells as drawn (591, terrain's side): cell -> stage; each
@@ -2889,6 +2900,7 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 	load_camera_feel()  # 673 step 2.
 	_terrain = terrain
 	_centre = centre
+	_set_plane()
 	_ring_mesh = _make_ring(0.42, 0.5)
 	_build_environment()
 	_apply_sky()
@@ -3148,11 +3160,13 @@ func _size_lantern(light: OmniLight3D) -> void:
 ## image over the mask's cells, full until _shade_floor writes each one,
 ## published as the global "floor_shade" with its rect (origin, size in
 ## cells) indoors by the main view; outdoors (the sky lights the plants)
-## or in a glimpse, none (the rect's size 0).
+## or in a glimpse, none (the rect's size 0). A held neighbour publishes
+## nothing (the live view's are the shaders'); swap_room publishes the live
+## room's (822).
 func _publish_floor_shade() -> void:
 	_shade_image = null
 	_shade_texture = null
-	if _glimpse:
+	if _glimpse or _neighbour:
 		return
 	if _outdoor or _mask_size.x <= 0 or _mask_size.y <= 0:
 		RenderingServer.global_shader_parameter_set("floor_shade_rect", Vector4.ZERO)
@@ -3674,7 +3688,7 @@ func _place_camera() -> void:
 	_camera.position = _camera_target + _camera_offset()
 	_camera.look_at(_camera_target, Vector3.UP)
 	if _low and _ground_look != null:
-		_ground_look.set_shader_parameter("far_centre", Vector2(_camera_target.x, _camera_target.z))
+		_ground_look.set_shader_parameter("far_centre", Vector2(_camera_target.x + _plane_at.x, _camera_target.z + _plane_at.z))
 	if _low and _far_root != null:
 		_place_far_landmarks()
 	if _listener != null:
@@ -5711,6 +5725,7 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_cliffs_drawn.clear()
 	_terrain = terrain
 	_centre = centre
+	_set_plane()
 	if over_frames and str(terrain.get("canopy_kind", "")) != "":
 		# Read on a worker while the first phases go round (822, packed grown trees).
 		GrownTrees.start_reading(str(terrain.get("level", "")))
@@ -5819,8 +5834,9 @@ const RoomFields := preload("res://client3d/room_fields.gd")
 ## or warm-ups of its own, lit by the live view's [param sky_floor], over
 ## frames when [param over_frames]. Its caller places it on the world plane
 ## and turns its _process off.
-func build_neighbour(terrain: Dictionary, centre: Vector2i, sky_floor: float, over_frames := false) -> void:
+func build_neighbour(terrain: Dictionary, centre: Vector2i, sky_floor: float, over_frames := false, plane_at := Vector3.ZERO) -> void:
 	_neighbour = true
+	_plane_at = plane_at  # Where it lies on the plane: the live view's place and their offset.
 	_sky_floor = sky_floor
 	rebuild(terrain, centre, over_frames)
 	_set_sky_floor(sky_floor)
@@ -5833,10 +5849,14 @@ func room_whole() -> bool:
 
 
 ## The live view and the held neighbour [param other] trade rooms (822): every
-## ROOM field, the two room nodes and the two places on the world plane, so
-## neither room moves and nothing is built. This one's camera keeps its
-## place in the world (it moves by the change of origin). The room it gives
-## up is left as built (no piece faded, every roof on). Both must be whole.
+## ROOM field and the two room nodes, nothing built. This view stays where
+## it is, at the origin, and the other goes to the far side of it, so the
+## rooms keep their places to one another and the camera its place among
+## them (all of it shifted together by the change of origin, nothing moved
+## on screen); the shaders' plane_origin follows (_plane_at, a ROOM field).
+## The room it gives up is left as built (no piece faded, every roof on).
+## Both must be whole. A particle already in the air (world space) is left
+## where it was: it jumps once, by the change of origin.
 func swap_room(other: Client3D) -> void:
 	assert(room_whole() and other.room_whole(), "swap_room: a room still building")
 	_leave_as_built()
@@ -5845,9 +5865,7 @@ func swap_room(other: Client3D) -> void:
 		var mine: Variant = get(field)
 		set(field, other.get(field))
 		other.set(field, mine)
-	var here := position
-	position = other.position
-	other.position = here
+	other.position = position + shift
 	if other._room != null:
 		other._room.reparent(other, false)
 	if _room != null:
@@ -5860,6 +5878,8 @@ func swap_room(other: Client3D) -> void:
 	_shadow_checked = 0.0
 	_set_sky_floor(_sky_floor)
 	other._set_sky_floor(_sky_floor)
+	_give_plane()
+	_publish_floor_shade()
 	if _environment != null:
 		_apply_sky()
 		_apply_camera_mode()
@@ -5868,6 +5888,39 @@ func swap_room(other: Client3D) -> void:
 		for door in World.get_doors():
 			_doors_due[door.key] = true
 		_show_piles()
+
+
+## Every glimpse shown but the one toward [param zone] (822): a held
+## neighbour's own room stands where its glimpse would; "" shows them all.
+func hide_glimpse_to(zone: String) -> void:
+	for view in _glimpses:
+		if is_instance_valid(view):
+			view.visible = zone.is_empty() or str(view.get_meta("to", "")) != zone
+
+
+## This room's place on the world plane (_plane_at), from its terrain's
+## level, when on_plane; then the live view gives it to the shaders. A
+## neighbour keeps the place its caller gave it (beside the live view's, by
+## their offset, so the two always agree).
+func _set_plane() -> void:
+	if _neighbour:
+		return
+	_plane_at = Vector3.ZERO
+	if on_plane:
+		var zones: Dictionary = Level.world_plane().get("zones", {})
+		var zone: Dictionary = zones.get(str(_terrain.get("level", "")), {})
+		if zone.has("origin"):
+			var origin: Vector2i = zone["origin"]
+			_plane_at = Vector3(origin.x, float(zone.get("height", 0.0)), origin.y)
+	_give_plane()
+
+
+## The live view's place on the world plane given to the shaders (822):
+## world positions plus plane_origin are places on the plane.
+func _give_plane() -> void:
+	if not _neighbour and not _glimpse:
+		plane_given = _plane_at
+		RenderingServer.global_shader_parameter_set("plane_origin", Vector4(_plane_at.x, _plane_at.y, _plane_at.z, 0.0))
 
 
 ## Every faded piece shown again, every roof put back and the live zone's
@@ -11035,10 +11088,12 @@ func _add_glimpse(plan: Dictionary) -> void:
 	var view := Client3D.new()
 	view.name = "Glimpse_" + str(plan["to"])
 	view._glimpse = true
+	view.set_meta("to", str(plan["to"]))  # hide_glimpse_to (822).
 	_room.add_child(view)
 	# (After it is in the tree: being ready turns _process on.)
 	view.set_process(false)
 	view.position.y = float(plan.get("raise", 0.0))
+	view._plane_at = _plane_at  # Laid in our cells: our place on the plane (822).
 	view._draw_glimpse(plan["terrain"])
 	view._set_sky_floor(_sky_floor)
 	_glimpses.append(view)
@@ -13983,7 +14038,7 @@ func _ground_material(bytes: PackedByteArray, across: int, down: int, origin: Ve
 	_kinds_image = image
 	_kinds_texture = ImageTexture.create_from_image(image)
 	material.set_shader_parameter("kinds", _kinds_texture)
-	material.set_shader_parameter("kinds_origin", Vector2(origin))
+	material.set_shader_parameter("kinds_origin", Vector2(origin) + Vector2(_plane_at.x, _plane_at.z))  # On the plane (822).
 	material.set_shader_parameter("kinds_size", Vector2(across, down))
 	var tiles := Vector4.ONE * 4.0
 	for i in GROUND_KINDS.size():
@@ -15172,7 +15227,7 @@ func _water_material() -> ShaderMaterial:
 	material.shader = WATER_SHADER
 	material.render_priority = WATER_PRIORITY
 	material.set_shader_parameter("water", _water_mask)
-	material.set_shader_parameter("mask_origin", Vector2(_mask_origin))
+	material.set_shader_parameter("mask_origin", Vector2(_mask_origin) + Vector2(_plane_at.x, _plane_at.z))  # On the plane (822).
 	material.set_shader_parameter("mask_size", Vector2(_mask_size))
 	material.set_shader_parameter("noise_tex", _ground_noise())
 	material.set_shader_parameter("shallow", swatch(WATER_SHALLOW.x, WATER_SHALLOW.y))

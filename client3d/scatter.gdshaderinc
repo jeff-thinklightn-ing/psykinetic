@@ -29,6 +29,10 @@ global uniform sampler2D floor_shade : filter_linear, repeat_disable;
 global uniform vec4 floor_shade_rect;
 // The season (decision 362): x green, y turn (autumn), z snow cover.
 global uniform vec4 season;
+// Where the live zone lies on the world plane (decision 822, Client3D sets it):
+// added to a world position, the place on the plane, so a pattern read there
+// runs on across two zones drawn side by side and is the same after a swap.
+global uniform vec4 plane_origin;
 varying float up;
 varying vec3 world;
 varying float snow_cover;
@@ -78,7 +82,7 @@ void vertex() {
 	world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	COLOR.rgb = to_linear(COLOR.rgb);
 	COLOR.rgb = lift(max(hue_turn(COLOR.rgb, GRASS_HUE), vec3(0.0)), GRASS_SAT, GRASS_VAL);
-	vec2 at = MODEL_MATRIX[3].xz;
+	vec2 at = MODEL_MATRIX[3].xz + plane_origin.xz;  // On the plane (822).
 	float phase = dot(at, wind.xy) * 0.6 - TIME * (1.2 + 2.0 * wind.z);
 	float gust = 0.65 + 0.35 * sin(phase) + 0.12 * sin(TIME * 3.1 + at.x * 1.7 + at.y * 2.3);
 	float height = max(VERTEX.y, 0.0);
@@ -97,7 +101,7 @@ void vertex() {
 	float drift = fract(sin(dot(floor(at * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
 	float buried = season.z * snow_cover * INSTANCE_CUSTOM.a * (SNOW_SINK + (drift - 0.5) * 2.0 * SNOW_SINK_SPREAD);
 	VERTEX.y -= buried / max(INSTANCE_CUSTOM.g, 0.001);
-	VERTEX *= 1.0 - smoothstep(reach_fade.z, reach_fade.w, distance(at, reach_fade.xy));
+	VERTEX *= 1.0 - smoothstep(reach_fade.z, reach_fade.w, distance(MODEL_MATRIX[3].xz, reach_fade.xy));
 }
 
 void fragment() {

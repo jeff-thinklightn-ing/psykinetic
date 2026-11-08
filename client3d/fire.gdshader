@@ -9,6 +9,10 @@ render_mode blend_mix, depth_draw_never, cull_disabled, unshaded;
 uniform vec3 fire : source_color = vec3(1.0, 0.45, 0.1);
 uniform float glow = 2.0;
 global uniform vec4 wind;
+// Where the live zone lies on the world plane (decision 822, Client3D sets it):
+// added to a world position, the place on the plane, so a pattern read there
+// runs on across two zones drawn side by side and is the same after a swap.
+global uniform vec4 plane_origin;
 
 varying vec3 world;
 varying vec3 centre;
@@ -32,9 +36,9 @@ void fragment() {
 	vec2 bent = off + wind.xy * along * (1.0 / stretch - 1.0);
 	from_centre *= length(bent) / max(length(off), 0.0001);
 	vec2 flow = -wind.xy * wind.z * TIME * 1.5;
-	float edge = 0.78 + 0.16 * wave((world.xz + flow) * 3.0 + vec2(TIME * 0.7, -TIME * 0.5));
+	float edge = 0.78 + 0.16 * wave((world.xz + plane_origin.xz + flow) * 3.0 + vec2(TIME * 0.7, -TIME * 0.5));
 	float inside = 1.0 - smoothstep(edge - 0.3, edge, length(from_centre));
-	float flicker = 0.85 + 0.15 * wave(world.zx * 5.0 + TIME * 2.1);
+	float flicker = 0.85 + 0.15 * wave((world.zx + plane_origin.zx) * 5.0 + TIME * 2.1);
 	ALBEDO = fire * glow * flicker * mix(0.75, 1.25, inside);
 	ALPHA = inside;
 }
