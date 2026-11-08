@@ -35814,6 +35814,45 @@ stands, the cycle unchanged, a step out spares, lead_ticks 0 at once; free_walk_
 the lead's slack. Server only (a monster's winding is told as a heavy one's was), protocol unchanged, no new
 class_name.
 
+338 amended (4), pc-character's side: blows you can see, drawn (combat's package; the coordinator's
+approval of pc-character's plan after enemy-ai's slide diagnosis, Jeff: "enemies tend to look like they
+are sliding into you and then no visible swing"; release's label). How a blow is drawn so it is seen
+coming and seen landing, the sim's timing as combat's half sets it:
+- A wound-up blow plays its swinger's own strike (Client3D._on_winding): a person's for its weapon
+  (WOUND_STRIKES, as before), a monster's whatever it holds (HUMANOID_MOVES' strikes, its bare hands'
+  if none is made for it: a goblin's jab, a robber's with its weapon), a creature's attack clip; the
+  sword's heavy swing (CLIP_HEAVY) only for a person's heavy wind-up of another weapon. Its contact
+  lands as the drawn body's blow does: the lead, and STRIKE_LANDS_IN (390's display delay) after for
+  any body but the local player's own.
+- A body still drawn sliding into the cell it strikes from holds its wind-up till it stands
+  (Client3D._strike; GridEntity.arriving_in, the seconds left of a mirror's slides on the display
+  clock), the contact where it was: the lead cut only by the slide left, never past AnimRig's fastest
+  strike. A quick clip with a long wind-up to fill holds too, till even AnimRig's slowest lands it on
+  time (a goblin's jab, 0.17 s to its contact, for a brute's 0.75 s: slowed to 0.4 it struck 0.33 s
+  early). A blow given up meanwhile, or another begun, drops the held one (a strike token).
+- And it slows into that cell (GridEntity.settle_for_blow, on a wind-up's or a swing's news; _settling):
+  the last 40% of the slide that ends where the blow is struck from, nothing queued after it, eased on a
+  cubic from its pace to rest (s = a(u + u^2 - u^3): the pace unbroken, never past the cell; the time
+  kept, it peaks at 4/3 the pace a third in), decided once as that tail begins, as 655's bend is.
+  Only on a blow's news: eased on every last slide, a walk whose next step came late stopped between
+  steps (mirror_test). Cosmetic: the slide's time and end are as 350 and 680 set them; perf looked it
+  over (net_smooth wan, main against blows: no change, nor at arrival).
+- The struck body flinches (its hit clip, a creature's hit) as the drawn blow lands, with its thud
+  (_struck_with), not at the news before it (Client3D._flinch); the swinger's lunge leads its contact,
+  back at rest as it lands, where each clip's contact is placed (out furthest there, a pick's point went
+  0.26 m into the seam; the lunge is 0.3 m).
+- A body striking as it moves walks under the blow: 390's action layer, a strike over everything, now
+  gives its legs (AnimRig.LEG_BONES; the hips stay the blow's, so its turn and lean read) to a copy of
+  the base's gait (legs_clip, legs_walk, in step with the base from where it is), faded in and out
+  over LEGS_FADE by Client3D._animate, which keeps choosing the gait under a strike while the body
+  moves. Standing, a strike keeps its own footwork.
+- WALKING 0.4 -> 0.2 tiles a second, so a slow approach walks.
+anim_rig_test _test_legs_walk; view_test _test_blows_seen (the legs walk under a strike as it moves,
+its own again stood; the flinch at the contact, not the news) and the brute's wind-up (its own strike,
+landing on the drawn time); mirror_test _test_a_blow_settles_its_last_step_only (the eased step's time,
+end and pace, the step after it even). Client and cosmetic only, protocol unchanged, no new class_name,
+no bullet (the package's, voice's words, rides with enemy-ai's side, the last to land).
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,

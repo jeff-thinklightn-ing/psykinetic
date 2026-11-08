@@ -1483,8 +1483,14 @@ const HUMAN_F := {"scene": "res://art/models/characters/human_f.glb", "clips": "
 	"height": 1.66, "faces": PI * 0.5, "by_mass": false,
 	"gaits": HUMAN_F_GAITS, "backpedal": 4.66,
 	"parts": true, "fidgets": HUMAN_FIDGETS, "moves": HUMANOID_MOVES, "sockets": HUMAN_SOCKETS}
-## Moving faster than this (tiles a second) walks.
-const WALKING := 0.4
+## Moving faster than this (tiles a second) walks. 0.4 let a slow approach
+## (a monster easing into its last cell before a blow) slide standing
+## ("blows you can see", 2iii).
+const WALKING := 0.2
+## A wind-up held for a slide less than this starts at once (_strike).
+const STRIKE_HOLD_LEAST := 0.02
+## Seconds the legs take to give way to the gait under a strike, and back.
+const LEGS_FADE := 0.12
 const CLIP_BLEND := 0.15
 ## A body's pose's level of detail (_pose_every): metres from the camera's
 ## aim (the view is CAMERA_SIZE across) posed every frame, then every other; beyond, every POSE_FAR_EVERY; out
@@ -18981,9 +18987,15 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	var puppet: Node3D = _puppets.get(id)
 	if puppet != null and cause != &"impact":
-		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))  # An impact is shown by _on_impacted.
-		if puppet.has_meta("creature_view"):
-			(puppet.get_meta("creature_view") as CreatureView).hit()
+		# An impact is shown by _on_impacted. A blow's flinch waits for the drawn blade to land
+		# ("blows you can see" (a)), as its thud does: not as the news comes, before it.
+		var flinch := 0.0
+		if cause == &"attack" and instance_from_id(id) is GridEntity:
+			flinch = (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - Time.get_ticks_msec()) / 1000.0
+		if flinch > 0.0:
+			get_tree().create_timer(flinch).timeout.connect(_flinch.bind(puppet))
+		else:
+			_flinch(puppet)
 	if puppet != null and cause == &"shot":
 		var shot := instance_from_id(id) as GridEntity
 		sfx.play("sfx.arrow_hit_flesh", puppet.position + Vector3.UP * 0.8)
@@ -19018,6 +19030,15 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 			_pain(struck, puppet)
 		if music != null and struck != null and sfx.listener != null and _cells_apart(struck.tile, sfx.listener) <= Music.TENSION_NEAR:
 			music.fight_near()
+
+
+## A body struck: its hit clip, a creature's hit.
+func _flinch(puppet: Node3D) -> void:
+	if not is_instance_valid(puppet) or not puppet.is_inside_tree():
+		return
+	_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
+	if puppet.has_meta("creature_view"):
+		(puppet.get_meta("creature_view") as CreatureView).hit()
 
 
 ## Pushed [param tiles]: a model is knocked back (_animate), a backpedal or,
@@ -22154,6 +22175,15 @@ func _animate(puppet: Node3D) -> void:
 	if speed > WALKING and puppet.get_meta("seated", false):
 		puppet.set_meta("seated", false)
 		puppet.set_meta("busy_until", 0)
+	# A strike while it steps ("blows you can see", 2): the legs walk its gait under the blow,
+	# faded in and out over LEGS_FADE, so a step taken in a strike is not slid in its pose.
+	var stepping := rig.striking() and speed > WALKING
+	var legs_to := 1.0 if stepping else 0.0
+	if rig.legs_amount() != legs_to:
+		rig.legs_walk(move_toward(rig.legs_amount(), legs_to, seconds / ArtKit.feel("client3d.legs_fade", LEGS_FADE)))
+	if stepping and now < int(puppet.get_meta("busy_until", 0)):
+		_gait(puppet, rig, speed)
+		return
 	if now < int(puppet.get_meta("busy_until", 0)):
 		return
 	puppet.set_meta("fidgeting", false)
@@ -22190,9 +22220,7 @@ func _animate(puppet: Node3D) -> void:
 				* ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 		return
 	if speed > WALKING:
-		var gaits := paced(puppet.get_meta("gaits", GAITS))
-		var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
-		rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
+		_gait(puppet, rig, speed)
 		return
 	if entity != null and not entity.fishing.is_empty():
 		if _fishing_pose(puppet, rig, entity, now):
@@ -22229,6 +22257,14 @@ func _animate(puppet: Node3D) -> void:
 			_play_fidget(puppet, rig, fidget, now, tempo)
 			return
 	rig.loop(idle, tempo)
+
+
+## Its gait for [param speed] (m/s), looped at the stride's rate.
+func _gait(puppet: Node3D, rig: AnimRig, speed: float) -> void:
+	var pace: float = puppet.get_meta("pace", 1.0)
+	var gaits := paced(puppet.get_meta("gaits", GAITS))
+	var gait: Array = gaits[gait_for(rig.base_clip(), speed / pace, gaits)]
+	rig.loop(gait[0], clampf(speed / (float(gait[1]) * pace) * ArtKit.feel("client3d.gait_rate", GAIT_RATE), 0.3, 3.0))
 
 
 ## A work lain down to (its "down", 751: a sleeper) is lain down to once, its
@@ -22493,8 +22529,31 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0) 
 	var own_recover := World.recover_ticks(swinger) if swinger != null else 0
 	if own_recover > 0:
 		recover = own_recover * World.TICK_DT
+	# A body still drawn sliding into the cell it strikes from ("blows you can see" (c)): its
+	# wind-up waits till it stands, the contact where it was, the lead cut only by the slide
+	# left and never past the strike's fastest (AnimRig's speed cap).
+	var hold := 0.0
+	if swinger != null and not own:
+		var fastest := contact / ArtKit.feel("anim_rig.strike_speed_max", AnimRig.STRIKE_SPEED_MAX)
+		hold = clampf(swinger.arriving_in(), 0.0, maxf(lands_in - fastest, 0.0))
+	# A quick clip with a long wind-up to fill (a goblin's jab, 0.17 s to its contact, for the
+	# brute's 0.75 s): slowed only to AnimRig's slowest, it would land early; it waits the rest.
+	var slowest := contact / ArtKit.feel("anim_rig.strike_speed_min", AnimRig.STRIKE_SPEED_MIN)
+	hold = maxf(hold, lands_in - slowest)
+	var now := Time.get_ticks_msec()
+	puppet.set_meta("contact_msec", now + int((hold + AnimRig.lead_of(contact, lands_in - hold)) * 1000.0))
+	var token := int(puppet.get_meta("strike_token", 0)) + 1
+	puppet.set_meta("strike_token", token)
+	if hold > STRIKE_HOLD_LEAST:
+		# Till then its gait goes on (_animate): not busy. A blow given up meanwhile (_on_winding's
+		# 0 ticks) or another begun stops it (its token).
+		get_tree().create_timer(hold).timeout.connect(func() -> void:
+			if is_instance_valid(puppet) and is_instance_valid(rig) and int(puppet.get_meta("strike_token", 0)) == token:
+				var late := rig.strike(clip, contact, lands_in - hold, recover)
+				puppet.set_meta("busy_until", Time.get_ticks_msec() + int(late * 1000.0)))
+		return true
 	var seconds := rig.strike(clip, contact, lands_in, recover)
-	puppet.set_meta("busy_until", Time.get_ticks_msec() + int(seconds * 1000.0))
+	puppet.set_meta("busy_until", now + int(seconds * 1000.0))
 	return true
 
 
@@ -22713,6 +22772,8 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
 	var swinger := instance_from_id(id) as GridEntity
+	if swinger != null:
+		swinger.settle_for_blow()  # Still drawn coming: it slows into the cell it strikes from.
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
 	var weapon := World.wielded(swinger) if swinger != null else ""
 	var now := Time.get_ticks_msec()
@@ -22725,15 +22786,21 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 		_strike(puppet, swinger, weapon)
 		# Its blow heard as the drawn blade lands (_struck_with), not as it sets off.
 		var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
-		if rig != null and rig.contact_msec >= now:
-			_swings[id][2] = rig.contact_msec
+		if rig != null and int(puppet.get_meta("contact_msec", -1)) >= now:
+			_swings[id][2] = int(puppet.get_meta("contact_msec"))
 		if puppet.has_meta("creature_view"):
 			(puppet.get_meta("creature_view") as CreatureView).swing()
 	var body := puppet.get_node("Body") as Node3D
 	var rest := Vector3(0.0, body.position.y, 0.0)
 	var out := rest + Vector3(direction.x, 0.0, direction.y).normalized() * LUNGE
+	# Leading the drawn blow ("blows you can see" (b)), not its news: back at rest as it lands,
+	# where each clip's contact is placed (a pick's point at the seam's face, 769 amended (9)).
+	var reach := LUNGE_SECONDS * 0.4
+	var landing := (int(_swings[id][2]) - now) / 1000.0
 	var tween := create_tween()
-	tween.tween_property(body, "position", out, LUNGE_SECONDS * 0.4).set_ease(Tween.EASE_OUT)
+	if landing > LUNGE_SECONDS:
+		tween.tween_interval(landing - LUNGE_SECONDS)
+	tween.tween_property(body, "position", out, reach).set_ease(Tween.EASE_OUT)
 	tween.tween_property(body, "position", rest, LUNGE_SECONDS * 0.6).set_ease(Tween.EASE_IN)
 
 
@@ -23239,23 +23306,33 @@ func _on_winding(_direction: Vector2i, ticks: int, id: int) -> void:
 		elif puppet.has_meta("rig"):
 			(puppet.get_meta("rig") as AnimRig).cancel_strike()
 			puppet.set_meta("busy_until", 0)
+			puppet.set_meta("strike_token", int(puppet.get_meta("strike_token", 0)) + 1)  # A held one too.
 		return
 	_combat_at[id] = Time.get_ticks_msec()
-	if puppet.has_meta("creature_view"):
-		# A creature's wound-up blow: its attack, timed to land with the sim's.
-		(puppet.get_meta("creature_view") as CreatureView).wind(ticks * World.TICK_DT)
-		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) + 400)
-		return
 	var swinger := instance_from_id(id) as GridEntity
+	# The blow lands as the drawn body's does: a body drawn behind the sim (any but the local
+	# player's own) that far later ("blows you can see" 2ii).
+	var own := swinger is Player and (swinger as Player).owner_peer == Net.local_id
+	var seconds := ticks * World.TICK_DT + (0.0 if own else STRIKE_LANDS_IN)
+	if swinger != null:
+		swinger.settle_for_blow()  # Still drawn coming: it slows into the cell it strikes from.
+	if puppet.has_meta("creature_view"):
+		# A creature's wound-up blow: its attack, timed to land with the drawn body's.
+		(puppet.get_meta("creature_view") as CreatureView).wind(seconds)
+		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
+		return
 	var weapon := World.wielded(swinger) if swinger != null else ""
 	var strikes: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("strikes", {})
-	if weapon in WOUND_STRIKES and strikes.has(weapon) and _strike(puppet, swinger, weapon, ticks * World.TICK_DT):
-		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(ticks * World.TICK_DT * 1000.0) + 400)
+	# Its own strike over the lead: a person's for its weapon (WOUND_STRIKES), a monster's
+	# (a robber's, a bandit's, a goblin's) whatever it holds, its bare hands' if no strike is
+	# made for it; the heavy swing only for a person's heavy wind-up of another weapon.
+	var mine := strikes.has(weapon) or (not (swinger is Player or swinger is Companion) and strikes.has(""))
+	if (weapon in WOUND_STRIKES or swinger is Monster) and mine and _strike(puppet, swinger, weapon, seconds):
+		puppet.set_meta("wound_until", Time.get_ticks_msec() + int(seconds * 1000.0) + 400)
 		return
 	if not puppet.has_meta("rig") or not (puppet.get_meta("rig") as AnimRig).has(CLIP_HEAVY):
 		return
 	var rig := puppet.get_meta("rig") as AnimRig
-	var seconds := ticks * World.TICK_DT
 	puppet.set_meta("fidgeting", false)
 	# Its contact as the wound-up blow lands, the rest at the same pace.
 	var contact := ArtKit.feel("client3d.clip_heavy_contact", CLIP_HEAVY_CONTACT)

@@ -83,6 +83,8 @@ const TURN_RATE := 30.0
 ## body keeps nearer the cell it is on.
 const BEND_REACH := 0.5
 const BEND_REACH_NARROW := 0.25
+## The share of a mirror's last slide eased to a stop (_settling).
+const SETTLE_TAIL := 0.4
 ## No tile known: the step before or after the one shown (655).
 const UNKNOWN_TILE := Vector2i(-99999, -99999)
 ## A push not yet drawn this many ticks after it came is taken as over.
@@ -367,6 +369,12 @@ var _shown_angle := NAN
 var _prev_tile := UNKNOWN_TILE
 var _bend_next := UNKNOWN_TILE
 var _bend_decided := false
+## Mirrors only: whether the slide shown eases to a stop, settled as its tail
+## began (_settling).
+var _settle := false
+var _settle_decided := false
+## The display tick the slides a wound-up blow is struck after end at (settle_for_blow).
+var _settle_by := -INF
 # Mirrors only. A mirror is drawn display_delay_ticks in the past, so by the
 # time a tile change arrives the slide for the one before it is still on
 # screen. Changes wait here ({from, to, tick, duration}) until the display
@@ -615,7 +623,7 @@ func _process(delta: float) -> void:
 				# Where the slide on screen has the body at this frame's time:
 				# a slide that takes over starts here (_catch_up), not where
 				# the last frame drew it, a sample behind.
-				var here := _from_pos.lerp(Vector2(_to_tile), clampf((shown - _move_tick) / _move_duration, 0.0, 1.0)) 						if _move_duration > 0.0 else Iso.local_to_grid(position)
+				var here := _from_pos.lerp(Vector2(_to_tile), _settled(clampf((shown - _move_tick) / _move_duration, 0.0, 1.0))) 						if _move_duration > 0.0 else Iso.local_to_grid(position)
 				while not held and not _slides.is_empty() \
 						and (_slides[0].get("present", false) or not busy and shown >= _slides[0]["tick"]):
 					var slide: Dictionary = _slides.pop_front()
@@ -649,6 +657,8 @@ func _process(delta: float) -> void:
 							and not slide.has("from_pos") else UNKNOWN_TILE
 					_bend_decided = false
 					_bend_next = UNKNOWN_TILE
+					_settle = false
+					_settle_decided = false
 					_from_tile = slide["from"]
 					_to_tile = slide["to"]
 					_move_tick = slide["tick"]
@@ -669,6 +679,8 @@ func _process(delta: float) -> void:
 			var t := 1.0
 			if _move_duration > 0.0:
 				t = clampf((now - _move_tick) / _move_duration, 0.0, 1.0)
+			if _mirroring and not _present:
+				t = _settling(to, t)
 			var bent := _bent_step(to, t)  # 655: the corners rounded; [] for a slide drawn straight.
 			position = Iso.grid_to_local(bent[0] if not bent.is_empty() else _from_pos.lerp(Vector2(to), t))
 			var sliding := t < 1.0 and to != _from_tile
@@ -839,6 +851,40 @@ func _world_slide_from(from: Vector2i, at_tick: float, duration: float) -> void:
 	_prev_tile = UNKNOWN_TILE
 	_bend_next = UNKNOWN_TILE
 	_bend_decided = false
+
+
+## Mirrors only: the body is about to strike from where its slides end (a
+## wind-up's news, Client3D._on_winding): its last slide eases to a stop
+## (_settling). Only then: a slide's next is often not known as its tail
+## begins, and a walk eased on that guess stopped between its steps.
+func settle_for_blow() -> void:
+	var end := _slides_end()
+	_settle_by = end if _mirroring and end > World.tick + World.tick_alpha - World.display_delay_ticks else -INF
+
+
+## A mirror's last slide eased to a stop ("blows you can see" 2iii: a body
+## stopping in the cell it strikes from slowed into it, not halted at full
+## pace): as its last SETTLE_TAIL begins it is settled whether it eases out
+## (a blow is wound up, settle_for_blow, and no slide waits to join on) or
+## goes on at its pace; then never changed under way. [param t] of its time
+## to where along it is drawn. Cosmetic: the slide's time and end are as
+## before.
+func _settling(to: Vector2i, t: float) -> float:
+	if t > 1.0 - SETTLE_TAIL and not _settle_decided:
+		_settle_decided = true
+		_settle = absf(_move_tick + _move_duration - _settle_by) < 0.05 and _slides.is_empty() and to != _from_tile \
+				and not _on_push_line(_from_tile, to) and _from_pos == Vector2(_from_tile)
+	return _settled(t)
+
+
+## [param t] along the slide shown, eased if it is settling (_settling): over
+## its tail a cubic from its own pace to rest, at the same end and time (so,
+## averaging its pace, it peaks at 4/3 of it a third in; never past the end).
+func _settled(t: float) -> float:
+	if not _settle or t <= 1.0 - SETTLE_TAIL:
+		return t
+	var u := (t - (1.0 - SETTLE_TAIL)) / SETTLE_TAIL
+	return 1.0 - SETTLE_TAIL + SETTLE_TAIL * (u + u * u - u * u * u)
 
 
 ## 655: where the slide to [param to] at [param t] of its time is drawn
@@ -1141,6 +1187,24 @@ func _mirror_tile_changed(old: Vector2i) -> void:
 			start = _move_tick + _move_duration
 		duration = minf(duration, gap)
 	_slides.append({"from": old, "to": tile, "tick": start, "duration": duration})
+
+
+## Mirrors only: seconds till the drawn body reaches the end of its slides
+## (the one on screen and those waiting), on the display clock; 0 when it is
+## drawn standing, and for anything not a mirror. Cosmetic: a blow's wind-up
+## waits for it (Client3D._strike).
+func arriving_in() -> float:
+	if not _mirroring:
+		return 0.0
+	return maxf(_slides_end() - (World.tick + World.tick_alpha - World.display_delay_ticks), 0.0) * World.TICK_DT
+
+
+## Mirrors only: the display tick the slide shown and those waiting end at.
+func _slides_end() -> float:
+	var end := _move_tick + _move_duration
+	for slide: Dictionary in _slides:
+		end = maxf(end, float(slide["tick"]) + float(slide["duration"]))
+	return end
 
 
 ## Tile the sprite is drawn on, which for a free body may be ahead of

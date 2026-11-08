@@ -25,6 +25,10 @@ extends Node
 const UPPER_BONES: Array[String] = ["Spine", "Chest", "UpperChest", "Neck", "Head",
 	"LeftShoulder", "LeftUpperArm", "LeftLowerArm", "LeftHand",
 	"RightShoulder", "RightUpperArm", "RightLowerArm", "RightHand"]
+## The bones the legs layer takes from the base under a strike (legs_walk):
+## the hips stay the strike's, so its turn and lean read.
+const LEG_BONES: Array[String] = ["LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "LeftToes",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot", "RightToes"]
 ## A strike's speed is kept within these (a blow can be hurried or held back
 ## only so far before it no longer reads as that blow).
 const STRIKE_SPEED_MIN := 0.4
@@ -70,6 +74,7 @@ var contact_msec := -1
 ## The last strike's contact in its clip's own seconds (a test reads the pose there, not by the clock).
 var contact_at := 0.0
 var _busy_msec := 0  # A clip played once runs till then.
+var _legs := 0.0  # The legs layer's weight (legs_walk).
 var _strike_msec := 0  # A strike runs till then.
 var _rng: RandomNumberGenerator
 
@@ -147,7 +152,24 @@ func _build(upper: bool) -> void:
 	_root.connect_node("action_speed", 0, "action_seek")
 	_root.add_node("action", action)
 	_root.connect_node("action", 0, "posture")
-	_root.connect_node("action", 1, "action_speed")
+	var struck := "action_speed"
+	if upper:
+		# The legs under a strike (legs_walk): the base's gait (a copy of it, legs_clip: a node's
+		# output feeds one input only) in place of the strike's footwork.
+		_root.add_node("legs_clip", AnimationNodeAnimation.new())
+		_root.add_node("legs_seek", AnimationNodeTimeSeek.new())
+		_root.add_node("legs_speed", AnimationNodeTimeScale.new())
+		_root.connect_node("legs_seek", 0, "legs_clip")
+		_root.connect_node("legs_speed", 0, "legs_seek")
+		var legs := AnimationNodeBlend2.new()
+		legs.filter_enabled = true
+		for bone in LEG_BONES:
+			legs.set_filter_path(NodePath("%GeneralSkeleton:" + bone), true)
+		_root.add_node("legs", legs)
+		_root.connect_node("legs", 0, "action_speed")
+		_root.connect_node("legs", 1, "legs_speed")
+		struck = "legs"
+	_root.connect_node("action", 1, struck)
 	_root.connect_node("output", 0, "action")
 	tree = AnimationTree.new()
 	tree.name = "Tree"
@@ -163,6 +185,8 @@ func _build(upper: bool) -> void:
 		tree.set("parameters/upper/blend_amount", 0.0)
 		tree.set("parameters/sky/blend_amount", 0.0)
 	tree.set("parameters/posture/add_amount", 0.0)
+	if upper:
+		tree.set("parameters/legs/blend_amount", 0.0)
 	tree.active = true
 
 
@@ -410,6 +434,29 @@ func posture(pose: Animation, weight: float) -> void:
 		(_root.get_node("pose") as AnimationNodeAnimation).animation = key
 		_posture = pose
 	tree.set("parameters/posture/add_amount", weight)
+
+
+## How much of a strike's legs give way to the base's (0 its own footwork,
+## 1 the base's gait under it): a body striking while it steps walks. Only
+## on a rig with the upper layer (a humanoid).
+func legs_walk(amount: float) -> void:
+	if not _has_upper:
+		return
+	var was := _legs
+	_legs = clampf(amount, 0.0, 1.0)
+	var clip: String = _base_clip[_slot]
+	if _legs > 0.0 and clip != "":
+		var node := _root.get_node("legs_clip") as AnimationNodeAnimation
+		if node.animation != clip or was <= 0.0:
+			# The base's gait, in step with it from here.
+			node.animation = clip
+			tree.set("parameters/legs_seek/seek_request", base_position())
+		tree.set("parameters/legs_speed/scale", _base_speed[_slot])
+	tree.set("parameters/legs/blend_amount", _legs)
+
+
+func legs_amount() -> float:
+	return _legs
 
 
 ## Whether a clip played once or a strike is still going.

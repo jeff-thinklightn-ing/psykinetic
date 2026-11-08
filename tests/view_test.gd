@@ -159,6 +159,7 @@ func _ready() -> void:
 		_test_head_socket()
 		_test_sleeper()
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
+		await _test_blows_seen()  # It lets frames run too.
 		await _test_rest()
 		_test_wet()
 		_test_sword_whiff()
@@ -170,7 +171,7 @@ func _ready() -> void:
 		await _test_fishing_pose()  # Lets frames run: the rod's tip is read off the pose.
 		await _test_axe_edge_leads()
 		_test_guard_arms()
-		_test_goblins_differ()
+		await _test_goblins_differ()
 		_test_allies()
 		_test_barrow_dead()
 		_test_person_monster()
@@ -8860,14 +8861,21 @@ func _test_goblins_differ() -> void:
 	_check(animators[1].playing() == Client3D.CLIP_TIRED, "hurt, it stands tired (%s)" % animators[1].playing())
 	var heavy := big.get_meta("rig") as AnimRig
 	brute.winding.emit(Vector2i(-1, 0), Monster.WINDUP_TICKS)
-	_check(heavy.playing() == Client3D.CLIP_HEAVY
-			and is_equal_approx(heavy.speed(), ArtKit.feel("client3d.clip_heavy_contact", Client3D.CLIP_HEAVY_CONTACT) / (Monster.WINDUP_TICKS * World.TICK_DT)),
-			"a brute winding up swings, timed to connect as its blow lands (%s x%.2f)" % [heavy.playing(), heavy.speed()])
+	# Its own strike ("blows you can see" 2ii: a monster's own, not the sword's heavy swing for every
+	# wind-up), its contact as the drawn body's blow lands: the lead, and the drawn body's delay after.
+	# A jab slowed only so far: it waits the rest of the wind-up before it starts (_strike's hold).
+	var lands := (int(big.get_meta("contact_msec", 0)) - Time.get_ticks_msec()) / 1000.0
+	var meant := Monster.WINDUP_TICKS * World.TICK_DT + Client3D.STRIKE_LANDS_IN
+	await get_tree().create_timer(meant - 0.17 / AnimRig.STRIKE_SPEED_MIN + 0.05).timeout
+	var wound := heavy.playing()
+	var bare_strikes: Array = ((big.get_meta("moves", {}) as Dictionary).get("strikes", {}) as Dictionary).get("", [])
+	_check(heavy.striking() and bare_strikes.any(func(s: Array) -> bool: return str(s[0]) == wound) and absf(lands - meant) < 0.05,
+			"a brute winding up swings its own blow, timed to connect as its drawn blow lands (%s in %.2f s, %.2f meant)" % [wound, lands, meant])
 	brute.swung.emit(Vector2i(-1, 0))
-	_check(heavy.playing() == Client3D.CLIP_HEAVY, "and the blow itself plays no other clip over it (%s)" % heavy.playing())
+	_check(heavy.playing() == wound, "and the blow itself plays no other clip over it (%s)" % heavy.playing())
 	brute.winding.emit(Vector2i(-1, 0), Monster.WINDUP_TICKS)
 	brute.winding.emit(Vector2i(-1, 0), 0)
-	_check(not heavy.striking() and heavy.playing() != Client3D.CLIP_HEAVY and int(big.get_meta("busy_until", 0)) == 0,
+	_check(not heavy.striking() and int(big.get_meta("busy_until", 0)) == 0,
 			"a wind-up given up (ticks 0): the swing let go (%s)" % heavy.playing())
 	for each: GridEntity in [imps[0], imps[1], brute]:
 		World.despawn(each)
@@ -11987,6 +11995,71 @@ func _toes_ahead(puppet: Node3D) -> Vector2:
 		var toes := skeleton.global_transform * skeleton.get_bone_global_rest(skeleton.find_bone(side + "Toes")).origin
 		ahead += toes - foot
 	return Vector2(ahead.x, ahead.z).normalized()
+
+
+## "Blows you can see" (combat's package; enemy-ai's slide diagnosis, Jeff: "enemies tend to look
+## like they are sliding into you and then no visible swing"): a body struck while it moves walks
+## its gait under the blow; a struck body flinches as the drawn blow lands, not at its news.
+func _test_blows_seen() -> void:
+	print("\n== blows you can see: the legs walk under a strike, the flinch at the contact ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to strike with")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	# Put back after: the bow, guard and pick checks read this same puppet.
+	var kept := {}
+	for key: String in ["busy_until", "speed", "last_at", "last_ms"]:
+		kept[key] = puppet.get_meta(key) if puppet.has_meta(key) else null
+	rig.strike("Punch_Jab", 0.17, 0.34, 0.6)
+	puppet.set_meta("busy_until", Time.get_ticks_msec() + 900)
+	puppet.set_meta("speed", 2.0)
+	puppet.set_meta("last_at", puppet.position - Vector3(0.2, 0.0, 0.0))
+	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
+	_rig._animate(puppet)
+	var gaits: Array = (puppet.get_meta("gaits", Client3D.GAITS) as Array).map(func(gait: Array) -> String: return str(gait[0]))
+	_check(rig.striking() and rig.legs_amount() > 0.5 and rig.base_clip() in gaits,
+			"striking as it moves: the blow on, its legs walking (%.2f of them, %s under it)" % [rig.legs_amount(), rig.base_clip()])
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", 0)
+	puppet.set_meta("speed", 0.0)
+	puppet.set_meta("last_at", puppet.position)
+	puppet.set_meta("last_ms", Time.get_ticks_msec() - 100)
+	_rig._animate(puppet)
+	_check(rig.legs_amount() < 0.5, "and stood, its legs its own again (%.2f)" % rig.legs_amount())
+	rig.legs_walk(0.0)
+	for key: String in kept:
+		if kept[key] == null:
+			puppet.remove_meta(key)
+		else:
+			puppet.set_meta(key, kept[key])
+	# An orc struck by a swing whose drawn blow lands 0.3 s on: no flinch till then.
+	# Beside the player: _struck_with takes the nearest swing within BLOW_REACH.
+	var imp := _spawn_imp(player.tile + Vector2i(1, 0), "brute")
+	var target: Node3D = null
+	for i in 30:  # Its model may come a frame or more after its puppet.
+		_rig._process(0.0)
+		target = _rig._puppets.get(imp.get_instance_id())
+		if target != null and target.has_meta("rig"):
+			break
+		await get_tree().process_frame
+	if target == null or not target.has_meta("rig"):
+		_check(false, "a goblin to strike (%s, %s)" % [imp != null and is_instance_valid(imp), target != null])
+		World.despawn(imp)
+		return
+	var hurt := target.get_meta("rig") as AnimRig
+	var now := Time.get_ticks_msec()
+	_rig._swings[player.get_instance_id()] = [now, "", now + 300]
+	_rig._on_struck(1, &"attack", imp.get_instance_id())
+	var early := hurt.playing()
+	await get_tree().create_timer(0.45).timeout
+	_check(not early in Client3D.HIT_CLIPS and hurt.playing() in Client3D.HIT_CLIPS,
+			"the struck orc flinches as the blow lands, not at its news (%s, then %s)" % [early, hurt.playing()])
+	World.despawn(imp)
+	_rig._swings.erase(player.get_instance_id())
+	_rig._process(0.0)
 
 
 func _spawn_imp(tile: Vector2i, kind := "") -> Monster:

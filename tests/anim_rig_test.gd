@@ -19,6 +19,7 @@ func _ready() -> void:
 	_test_feel_moved()
 	_test_feel_source()
 	await _test_strike()
+	await _test_legs_walk()
 	await _test_one_strike_clip()
 	await _test_spear_jab()
 	await _test_sword_slash()
@@ -218,6 +219,36 @@ func _test_strike() -> void:
 	await _frames(2)
 	_check(is_equal_approx(rig.speed(), 1.0), "no contact named: halfway through the clip (x%.2f)" % rig.speed())
 	rig.get_parent().queue_free()
+
+
+## The legs under a strike ("blows you can see" 2): two bodies walking, the same blow struck on
+## each; one's legs given to its walk (legs_walk 1). Its legs differ from the other's (the walk's,
+## not the blow's footwork) and go on moving; above them both are the blow's alike.
+func _test_legs_walk() -> void:
+	print("== the legs walk under a strike ==")
+	var still := _goblin(true, 1)
+	var walking := _goblin(true, 1)
+	for rig: AnimRig in [still, walking]:
+		rig.loop("Walk", 1.0, 0.0, true)
+	await _frames(3)
+	for rig: AnimRig in [still, walking]:
+		rig.strike("Punch_Jab", 0.17, 0.34, 0.6)
+	walking.legs_walk(1.0)
+	await _frames(6)
+	var bone := func(rig: AnimRig, name: String) -> Quaternion:
+		var skeleton := _skeleton(rig)
+		return skeleton.get_bone_pose_rotation(skeleton.find_bone(name))
+	var leg_apart: float = (bone.call(still, "LeftUpperLeg") as Quaternion).angle_to(bone.call(walking, "LeftUpperLeg"))
+	var chest_apart: float = (bone.call(still, "UpperChest") as Quaternion).angle_to(bone.call(walking, "UpperChest"))
+	var leg_then: Quaternion = bone.call(walking, "LeftUpperLeg")
+	await _seconds(0.15)  # Time, not frames: headless frames come unthrottled.
+	var leg_moved: float = leg_then.angle_to(bone.call(walking, "LeftUpperLeg"))
+	_check(walking.striking() and walking.legs_amount() == 1.0 and leg_apart > 0.02 and leg_moved > 0.02 and chest_apart < 0.01,
+			"the legs the walk's, still moving (%.3f rad from the blow's, %.3f rad on); the chest the blow's (%.4f rad apart)"
+			% [leg_apart, leg_moved, chest_apart])
+	walking.legs_walk(0.0)
+	still.get_parent().queue_free()
+	walking.get_parent().queue_free()
 
 
 ## A strike fades in over a share of its own lead (338 amended (3); Jeff on v0.1.198: "punching

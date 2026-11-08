@@ -29,6 +29,7 @@ func _ready() -> void:
 	_test_the_display_clock_waits_out_a_stall()
 	_test_the_smooth_meter_names_who_went_back()
 	_test_a_standing_body_starts_without_leaps()
+	_test_a_blow_settles_its_last_step_only()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -383,6 +384,51 @@ func _test_a_standing_body_starts_without_leaps() -> void:
 # --- helpers ------------------------------------------------------------------
 
 ## The local player as a client sees it: a mirror of its own body.
+## "Blows you can see" (338 amended (4), pc-character's side; perf's case): a wind-up's news while a
+## step is drawn eases that step to a stop over its tail, at the same end; a step after it, with
+## no blow's news, is drawn at its even pace.
+func _test_a_blow_settles_its_last_step_only() -> void:
+	print("\n== a blow's news mid-step eases that step to a stop, and only that one ==")
+	var imp := _mirror("Settler", Vector2i(2, 17), 4)
+	var moves: Array[float] = []
+	_run_tick(imp, moves, Vector2i(1, 0))
+	for i in 2:
+		_run_tick(imp, moves)
+	imp.settle_for_blow()  # Its step on screen, under halfway.
+	for i in 8:
+		_run_tick(imp, moves)
+	var settled_at := imp.position
+	_run_tick(imp, moves, Vector2i(1, 0))
+	for i in 10:
+		_run_tick(imp, moves)
+	# The two steps as the runs of samples that moved, standing between.
+	var runs: Array = []
+	var run: Array[float] = []
+	for each: float in moves:
+		if each > 0.0:
+			run.append(each)
+		elif not run.is_empty():
+			runs.append(run)
+			run = []
+	if not run.is_empty():
+		runs.append(run)
+	var per_sample := _tile_pixels(Vector2i(1, 0)) / (4.0 * SAMPLES_PER_TICK)
+	_check(runs.size() == 2, "two steps drawn, standing between (%d runs)" % runs.size())
+	if runs.size() != 2:
+		return
+	var eased: Array = runs[0]
+	var even: Array = runs[1]
+	var head: Array = eased.slice(0, int(eased.size() * 0.5))
+	_check(absi(eased.size() - 4 * SAMPLES_PER_TICK) <= 1 and settled_at.is_equal_approx(Iso.tile_to_local(Vector2i(3, 17))),
+			"the eased step takes its time and ends on its tile (%d samples)" % eased.size())
+	# Its time kept, the tail's average is the pace: s' = 1 + 2u - 3u^2 tops out at 4/3 a third in.
+	_check(head.max() <= per_sample * 1.05 and head.min() >= per_sample * 0.95 and float(eased.back()) < per_sample * 0.3
+			and eased.max() <= per_sample * 4.0 / 3.0 * 1.05,
+			"at its pace, then slowed to a stop: its last sample %.2f px of %.2f, at most 4/3 its pace (%.2f)" % [float(eased.back()), per_sample, eased.max()])
+	_check(absi(even.size() - 4 * SAMPLES_PER_TICK) <= 1 and even.max() <= per_sample * 1.05 and even.min() >= per_sample * 0.95,
+			"the step after, with no blow's news, at its even pace (%.2f to %.2f px)" % [even.min(), even.max()])
+
+
 func _me(tile: Vector2i) -> GridEntity:
 	var me := EntityFactory.build({"script": "res://sim/player.gd", "shape": "capsule", "name": "Me", "tile": tile, "peer": 2})
 	add_child(me)
