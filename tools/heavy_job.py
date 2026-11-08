@@ -1059,8 +1059,13 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
     said = 0.0
     long_logged = False
     # Since when only backfilled jobs have kept this one out (394 amended
-    # (18)): its wait from then is the backfill's cost, logged as late.
+    # (18)): its wait from then is the backfill's cost, logged as late. Only
+    # while it is first in the queue: a job further back waits on those
+    # ahead of it too, and every waiter's late counted the same minutes again.
     held_by_backfill = None
+    # Since when it has been first in the queue: a long wait is mostly the
+    # queue ahead of it, its time at the head what held it alone.
+    head_since = None
     while True:
         with StateLock():
             queue = _entries("queue")
@@ -1092,13 +1097,19 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 print("heavy_job: %s %s out of reach (memory held outside the gate): runs lean, as %s (%.1f + %.0f GB)" % (
                     tree, kind, estimate, row["ram_gb"], MARGIN_GB), file=sys.stderr)
             now = time.time()
+            if place == 1 and head_since is None:
+                head_since = now
+                entry = _read(_path("queue", ticket))
+                if entry is not None:
+                    entry["head_since"] = head_since
+                    _write(_path("queue", ticket), entry)
             head, past, past_why = passes(row, ahead, running, free_ram, free_commit, table, now,
                 backfill_length(row, expect_minutes))
             ok, why = decide(row, running, head, free_ram, free_gpu, free_commit)
             stuck = blockers(row, running)
-            if stuck and all(each.get("backfill") for each in stuck):
+            if place == 1 and stuck and all(each.get("backfill") for each in stuck):
                 held_by_backfill = held_by_backfill or now
-            elif stuck:
+            elif stuck or place != 1:
                 held_by_backfill = None
             if not ok and head and out_of_reach(row, running, free_ram, free_commit):
                 why += "; out of reach even with no heavy job running (memory held outside the gate): jobs that fit go past it"
@@ -1144,7 +1155,8 @@ def wait_turn(tree, kind, pid, watched, expect_minutes=None):
                 _write(_path("running", name), entry)
                 waited = time.time() - queued
                 lean = ", lean" if estimate != kind else ""
-                log("start", tree, kind, ("waited %.0f s" % waited if waited >= POLL_SECONDS else "") + lean)
+                at_head = " (%.0f s of it first in the queue)" % (now - head_since) if head_since is not None else ""
+                log("start", tree, kind, ("waited %.0f s%s" % (waited, at_head) if waited >= POLL_SECONDS else "") + lean)
                 if waited >= POLL_SECONDS:
                     print("heavy_job: %s %s starts after waiting %.0f s%s" % (tree, kind, waited, lean), file=sys.stderr)
                 return name, estimate
@@ -1503,7 +1515,8 @@ def status():
             + (" (went past %s, due by %s)" % (backfill["past"], time.strftime("%H:%M", time.localtime(backfill["due"])))
                 if backfill else ""), flag))
     for place, entry in enumerate(queue, 1):
-        print("queued %s %s, %.0f s (%s)%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
+        print("queued %s %s, %.0f s (%s)%s%s" % (entry["tree"], entry["kind"], time.time() - entry["queued"], _ordinal(place),
+            ", first for %.0f s" % (time.time() - entry["head_since"]) if entry.get("head_since") else "",
             ", lean" if entry.get("estimate", entry["kind"]) != entry["kind"] else ""))
     if not running and not queue:
         print("no heavy jobs")

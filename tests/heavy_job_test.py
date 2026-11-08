@@ -689,10 +689,30 @@ gate.release("environment", "bench")
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tbackfill_late\tenvironment\tbench\twaited " in text, "the bench's wait on it logged as late")
+started_line = [line for line in text.splitlines() if "\tstart\tenvironment\tbench\t" in line]
+check(started_line and "first in the queue)" in started_line[-1], "its start says how long it was first in the queue: %s" % started_line[-1:])
+# A job behind the head while a backfilled scene holds them both: those
+# minutes are the head's, never logged as late again (only the head's own
+# wait). The scene ends before the head goes; before, it was logged late.
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(3)"])
+gate._write(gate._path("running", "ui-scene-%d.json" % child.pid), {"tree": "ui", "kind": "scene", "pid": child.pid,
+    "pid_since": gate.started_at(child.pid), "started": time.time(), "queued": time.time() - 100, "ram_gb": 0.1, "gpu": False, "using_gb": 0.1,
+    "watched": False, "backfill": {"past": "environment bench", "due": time.time() - 1}})
+first = "%019d-front-1.json" % time.time_ns()
+gate._write(gate._path("queue", first), {"tree": "front", "kind": "bench", "pid": None,
+    "waiter": os.getpid(), "waiter_since": gate.started_at(os.getpid()), "queued": time.time()})
+threading = __import__("threading")
+threading.Timer(5.0, lambda: gate._retried(os.remove, gate._path("queue", first))).start()
+gate.take("behind", "bench", os.getpid())
+child.wait()
+gate.release("behind", "bench")
+with open(gate._path("heavy_jobs.log")) as log:
+    text = log.read()
+check("\tbackfill_late\tbehind\tbench\t" not in text, "a job behind the head held by it too: not logged late")
 shown = io.StringIO()
 with contextlib.redirect_stdout(shown):
     gate.summary(datetime.date.today().isoformat())
-check("1 backfill, 1 late (" in shown.getvalue(), "the summary counts both: %s" % shown.getvalue().splitlines()[-1])
+check("1 backfill, 1 late (" in shown.getvalue(), "the summary counts both: %s" % [line for line in shown.getvalue().splitlines() if "late" in line])
 gate.POLL_SECONDS = real_poll
 gate.total_ram_gb = real_total
 os.remove(gate._path("kinds.json"))
@@ -740,7 +760,8 @@ check(row.get("last_commit_gb", 0.0) >= 0.25 and row["commit_gb"] >= 0.25, "rele
 with open(gate._path("heavy_jobs.log")) as log:
     text = log.read()
 check("\tattach\tart\tgodot_export\tpid " in text and "attached peak " in text, "the log has the attach and the peak")
-os.remove(gate._path("kinds.json"))
+if os.path.exists(gate._path("kinds.json")):  # Not there when the attach failed: the FAILs above say why.
+    os.remove(gate._path("kinds.json"))
 
 shutil.rmtree(STATE, ignore_errors=True)
 print("\nRESULT: %s" % ("PASS" if failed == 0 else "FAIL (%d failed)" % failed))
