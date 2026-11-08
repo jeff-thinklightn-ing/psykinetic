@@ -144,6 +144,8 @@
 		"held": ["door", "purpose", "dead_end", "loop", "chest"],
 		"prefer": ["spine", "wrap"],
 		"cache": "castle_cache",
+		"coop_forge": true,
+		"forge_cache": "forge_cache",
 		"armoury_cache": "armoury",
 		"carvings": [
 			{

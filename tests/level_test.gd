@@ -4954,26 +4954,11 @@ func _test_castle_hold() -> void:
 		var refuge: Array = config.get("entities", []).filter(func(entity: Dictionary) -> bool: return (entity.get("props", {}) as Dictionary).get("role", "") == "refuge")
 		_check(enter > 0 and watched and refuge.size() == 2,
 				"castle_halls generation %d: the forge (a refuge, its hoard tagged so) is reached past a guard on its approach (%d steps)" % [generation, enter])
-		# 813 amended (4): off in play till its pieces and flare are in.
-		var forge_sets: Array = config.get("plates", []).filter(func(plate: Dictionary) -> bool: return plate.get("kind") == "forge")
-		_check(forge_sets.size() == (1 if block.get("coop_forge", false) else 0),
-				"castle_halls generation %d: the cold forge's set laid only with the block's coop_forge on (%s)" % [generation, block.get("coop_forge", false)])
-	# The cold forge woken, switched on (as it will be): its set in each.
-	for generation in [1, 2]:
-		var prepared := Regen.prepare("castle_halls").duplicate()
-		prepared["config"] = (prepared["config"] as Dictionary).duplicate(true)
-		prepared["config"]["coop_forge"] = true
-		prepared["config"]["forge_cache"] = "forge_cache"
-		var made := Regen.generate_prepared(prepared, generation)
-		if made.is_empty():
-			_check(false, "castle_halls generation %d with the cold forge on is made" % generation)
-			continue
-		var map := LevelMap.from_image(made["layout"], made["config"])
-		var monsters: Array[Vector2i] = []
-		for cell: Vector2i in map.cells:
-			if str(map.cells[cell]).begins_with("monster_"):
-				monsters.append(cell)
-		_check_cold_forge(generation, made, prepared["config"], monsters)
+		# 813 amended (4), switched on (its pieces, sounds and flare in): the
+		# cold forge's set in every generation, its store the forge_cache table.
+		_check(block.get("coop_forge", false) == true and block.get("forge_cache") == "forge_cache",
+				"castle_halls generation %d: the block wakes the cold forge, its store forge_cache (%s, %s)" % [generation, block.get("coop_forge"), block.get("forge_cache")])
+		_check_cold_forge(generation, made, block, monsters)
 
 
 ## The cold forge woken (813 amended (4)) in castle_halls generation

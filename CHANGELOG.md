@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the dwarven halls under the castle, work the cold forge's bellows and hold down the lever on the far wall at once, with your companion, a friend or a cart pushed onto the bellows, and the forge roars alight as a stone shutter grinds up on a find of your own; ask your companion and she may tell you how it's done (813 amended (4)).
 - Towns: starter gear you've no more use for goes back to Rolf at the stall through his window, where before he also handed out a practice kit that only filled your pack (807 amended (5)).
 - In the wilds you can fish two small pools and the river's wide reach in the north too, not only the pond, and your companion fishes beside you at any of them (805 amended (8)).
 - In the hills, Hollowfell's way in is a timbered mine mouth cut into the hillside, with a cart and a brazier by it and the Blood Rot's mark, where before it was a bare stair (798 amended (3)).
