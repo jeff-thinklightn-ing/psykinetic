@@ -7,6 +7,8 @@ notes (decision 324).
 
 ## Unreleased
 
+- A correction to v0.1.208's notes: the old grey roams the foothills with two of his pack, and one more keeps his den, not three and two (780 amended (15)).
+
 ## v0.1.208
 
 - What goes over the network changes, so v0.1.207 and older can't join the server: update through the launcher first.
