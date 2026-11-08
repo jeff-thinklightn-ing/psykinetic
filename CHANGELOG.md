@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- Towns: the medicine man buys a bear's claw, feathers, flint and bear's grease by Give, and makes them into a bear's-claw charm, which gathers a faint light round you that grows the longer you wear it, and a bear's-grease draught that leaves you hard to shove and hard to stop for a while, both sold from his shelf (821 amended (2)).
 
 - In the wilds, you can wade the stream across the middle almost anywhere along it, where before it was deep and the bridge was the only way over (505 amended (6)).
 - Towns: when the town's purse is empty, a keeper's window still says Sell for a trophy and shows what they'll owe you for it, where before it said Donate as if you'd get nothing (802 amended (9)).

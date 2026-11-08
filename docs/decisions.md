@@ -45245,6 +45245,17 @@ barter's materials alike. The switch-on moves bear_claw_charm and bear_grease_dr
 recipes and adds "charm" to always_want (items
 gives the charm made.stock 1, one on the shelf), with voice's pointer and bullet. Protocol unchanged
 (rows of kind "maker" and "trophies" since 52). economy_test _test_charm_inputs.
+
+821 amended (2) (the medicine man's charms switched on; release's label; lore's check: one medicine man, at the healer's hut in the wilds; Umbrage has the
+temple and none): receives.inputs.off became only_listed, recipes Production.makes allows only
+where a hut's makes list names them, never at a shop with no list (a town's medicine man, who makes
+every recipe of his trade), so he neither makes them nor buys their parts. The wilds hut's makes
+list names bear_claw_charm and bear_grease_draught, receives.inputs.recipes lists both,
+always_want gains "charm" (items' made.stock 1: one on his shelf), pointers.input.medicine_man is
+voice's "That goes to the medicine man.", and the CHANGELOG bullet is voice's. economy_test: a town's
+medicine man with every part stored bids neither and the claw stays the tanner's; the wilds hut's
+buys the parts and bids the charm.
+
 ## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
 
 Jeff approved T1+P1+T4+P2 from perf's seamless-zones page (C:/dev/review/umbrage_hill/seamless_zones.md).
