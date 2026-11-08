@@ -10036,6 +10036,22 @@ func _test_wet() -> void:
 		_rig._terrain["buildings"] = buildings
 	else:
 		_rig._terrain.erase("buildings")
+	# A lit hearth (825, package "hill cave rest": World.lit_hearths, as the "hearths" message keeps
+	# them) dries as a fire does, within FIRE_REACH; gone out, not.
+	var zone_name: String = World.zone.name
+	var hearths_had = World.hearths_lit.get(zone_name)
+	World.hearths_lit[zone_name] = {cell + Vector2i(2, 2): World.tick + 100}
+	var by_hearth := WetLook.near_fire(_rig, cell)
+	World.hearths_lit[zone_name] = {cell + Vector2i(3, 0): World.tick + 100}
+	var beyond := WetLook.near_fire(_rig, cell)
+	World.hearths_lit[zone_name] = {cell + Vector2i(2, 2): World.tick}
+	var gone_out := WetLook.near_fire(_rig, cell)
+	if hearths_had == null:
+		World.hearths_lit.erase(zone_name)
+	else:
+		World.hearths_lit[zone_name] = hearths_had
+	_check(by_hearth and not beyond and not gone_out,
+		"a hearth lit two cells off: by a fire; three off, or gone out: not (%s, %s, %s)" % [by_hearth, beyond, gone_out])
 	# Rain: outdoors it wets all over and nothing dries; walled in, it wets nothing.
 	if weather != null:
 		var outdoor_was: bool = weather.outdoor

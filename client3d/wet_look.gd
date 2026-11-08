@@ -12,8 +12,9 @@ extends RefCounted
 ## Real seconds to dry from soaked (the coordinator: about 1.5 real minutes, some 25 game minutes
 ## of the 90-minute day; DayNight's game minutes would be too quick to see).
 const DRY_SECONDS := 90.0
-## Drying by a fire (a terrain fire cell, or a camp's fire ring (777, Level.camp_fire), within
-## FIRE_REACH cells, Chebyshev: the reach of the camp's warmed rest) this many times faster.
+## Drying by a fire (a terrain fire cell, a camp's fire ring (777, Level.camp_fire), or a lit
+## hearth (825, World.lit_hearths), within FIRE_REACH cells, Chebyshev: the reach of the camp's
+## warmed rest) this many times faster.
 const FIRE_DRY := 4.0
 const FIRE_REACH := 2
 ## Seconds of full rain to soak a body through; rain under this strength wets nothing.
@@ -70,9 +71,10 @@ static func depth_at(client, puppet: Node3D) -> float:
 	return maxf(surface - puppet.position.y, 0.0)
 
 
-## Whether [param cell] is within FIRE_REACH of one of [param client]'s fires.
+## Whether [param cell] is within FIRE_REACH of one of [param client]'s fires, or of a hearth lit in
+## the zone shown (825: the "hearths" message keeps World.hearths_lit on a client).
 static func near_fire(client, cell: Vector2i) -> bool:
-	for fire: Vector2i in client._terrain.get("fire", []) + camp_fires(client):
+	for fire: Vector2i in client._terrain.get("fire", []) + camp_fires(client) + World.lit_hearths(World.zone.name):
 		if maxi(absi(fire.x - cell.x), absi(fire.y - cell.y)) <= FIRE_REACH:
 			return true
 	return false
