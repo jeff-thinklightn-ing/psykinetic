@@ -26,6 +26,9 @@ rooms and its stairs:
   each the north-west cell of a building.tavern_table two by two (every
   other one laid, variant 2), a seat west of its top row and east of its
   bottom one. No piece on another, on a fire, a seat or a door's cell.
+  With "candles" true (811 amended (4)), lit candles stand on each table's
+  middle and the counter's (level.json "lit_candles", Level.lit_candles_from),
+  each with a warm light of its own.
   Never a chest: chests are for dungeons only (Jeff, 2026-11-04). A
   player's storage at home is its own container piece (a strongbox,
   wardrobe or vault), and the locker is opened through a person.
@@ -71,6 +74,17 @@ COUNTER = ("building.bar_counter", 3, 1)
 TAPS = ("building.tap_rack", 2, 1)
 # A wall hearth's cells along its wall (prop.wall_hearth, 2.04 m wide).
 HEARTH_WIDE = 2
+# A common room's "candles" (811 amended (4), environment's numbers): lit
+# prop.candles on each table's middle and the counter's, the metres up of the
+# top they stand on and of their light over it.
+TABLE_TOP = 0.79
+COUNTER_TOP = 1.05
+CANDLE_LIGHT_OVER_TABLE = 1.0
+CANDLE_LIGHT_OVER_COUNTER = 1.4
+# A table's candles a little softer and wider than the counter's, so a top
+# keeps its grain (environment, from the stills): their light's energy, reach
+# and falloff; the counter's are Client3D's own (CANDLE_ENERGY, _RANGE, _FALLOFF).
+TABLE_CANDLE_LIGHT = {"energy": 0.9, "reach": 4.5, "falloff": 1.0}
 # Godot imports a level's layout as an Image (Level._image), never a texture.
 IMPORT = '[remap]\n\nimporter="image"\ntype="Image"\n'
 
@@ -315,6 +329,7 @@ def lay(spec, floor):
             spawns[spawn_name(stair["to"], index)] = list(cell)
     buildings = []
     decor = []
+    lit_candles = []
     named = {}
     passages = {}
     places = {}
@@ -336,6 +351,16 @@ def lay(spec, floor):
             if room.get("hearth"):
                 way, _cells = hearth_cells(room["rect"], room["hearth"])
                 decor.append([room["hearth"][0], room["hearth"][1], way[0], way[1], "wall_hearth", 1])
+            if room.get("candles"):
+                # Lit candles (811 amended (4)): on each table's middle, where
+                # its four cells meet, and on the middle of the counter's top.
+                for x, y in room.get("tables", []):
+                    lit_candles.append(dict({"at": [x + (TABLE[1] - 1) / 2, y + (TABLE[2] - 1) / 2], "top": TABLE_TOP,
+                                             "up": CANDLE_LIGHT_OVER_TABLE}, **TABLE_CANDLE_LIGHT))
+                if room.get("counter"):
+                    x, y = room["counter"]
+                    lit_candles.append({"at": [x + (COUNTER[1] - 1) / 2, y], "top": COUNTER_TOP,
+                                        "up": CANDLE_LIGHT_OVER_COUNTER})
             if room.get("counter"):
                 # The tavern (772's keys, Level.tavern_of): the taverner
                 # behind the counter, a seat each side of every table; its
@@ -413,6 +438,8 @@ def lay(spec, floor):
         "rooms": named,
         "passages": passages,
     }
+    if lit_candles:
+        config["lit_candles"] = lit_candles
     with open(os.path.join(out, "level.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(config, f, indent="\t")
         f.write("\n")

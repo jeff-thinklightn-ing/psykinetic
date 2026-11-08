@@ -1026,6 +1026,7 @@ static func parse(layout: Image, height: Image, config: Dictionary, relief: Imag
 	level["terrain"]["streams"] = streams_from(derived, level["terrain"], warnings)
 	level["terrain"]["niches"] = niches_from(config, level["terrain"], warnings)
 	level["terrain"]["decor"] = decor_from(config, level["terrain"], warnings)
+	level["terrain"]["lit_candles"] = lit_candles_from(config, warnings)
 	level["carvings"] = carvings_from(config, warnings)
 	level["terrain"]["plates"] = plates_from(config, level["terrain"], warnings)
 	level["secrets"] = secrets_from(config, level["terrain"], warnings)
@@ -2651,6 +2652,34 @@ static func secret_at(level_name: String, cell: Vector2i) -> Dictionary:
 		if secret["cell"] == cell:
 			return secret
 	return {}
+
+
+## level.json's "lit_candles" (811 amended (4): the Mughouse's common room,
+## too dark), as [{at: Vector2 in cells (a cell's middle its whole numbers),
+## top: the metres up of the surface they stand on, up: the metres over it
+## of their light, and its energy, reach and falloff where given (else the
+## client's own)}]: art-kit's prop.candles burning on a table or a bar,
+## each with a warm light of its own, drawn on the client only (no heat, no
+## light in Fields). One without an "at" [x, y] is said in
+## [param warnings] and left out.
+static func lit_candles_from(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("lit_candles", [])
+	if not listed is Array:
+		warnings.append("\"lit_candles\" in level.json is not a list")
+		return out
+	for entry: Variant in listed:
+		var at: Variant = entry.get("at") if entry is Dictionary else null
+		if not at is Array or (at as Array).size() != 2:
+			warnings.append("lit candles in level.json with no \"at\" [x, y]: %s" % [entry])
+			continue
+		var lit := {"at": Vector2(float(at[0]), float(at[1])), "top": float(entry.get("top", 0.0)),
+				"up": float(entry.get("up", 0.0))}
+		for key: String in ["energy", "reach", "falloff"]:
+			if entry.has(key):
+				lit[key] = float(entry[key])
+		out.append(lit)
+	return out
 
 
 ## level.json's "decor" (647; 658): [[x, y, dx, dy, kind, variant], ...],

@@ -11,11 +11,11 @@
 			"level": "umbrage_tavern",
 			"name": "The Last Light Mughouse",
 			"size": [18, 14],
-			"ambient": 0.25,
+			"ambient": 0.35,
 			"rooms": [
 				{"id": "common", "use": "common", "name": "Common room", "rect": [0, 0, 12, 14],
 					"hearth": [0, 6], "counter": [8, 3], "taps": [9, 0],
-					"tables": [[3, 6], [8, 6], [3, 10], [8, 10]]},
+					"tables": [[3, 6], [8, 6], [3, 10], [8, 10]], "candles": true},
 				{"id": "kitchen", "use": "kitchen", "name": "Kitchen", "rect": [12, 0, 6, 6],
 					"doors": [{"to": "common", "cells": [[12, 2], [12, 3]], "side": "west"}],
 					"holds": [[16, 1], [16, 4]]},

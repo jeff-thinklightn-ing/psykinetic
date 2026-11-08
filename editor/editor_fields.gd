@@ -103,8 +103,9 @@ const NOT_OFFERED: Array[String] = ["legend", "became", "loot", "clearings", "ro
 	"carvings",
 	# The co-op tomb's (813: crypt.gd writes its plates, secrets and laid rooms).
 	"plates", "secrets", "laid_rooms",
-	# An interior's own (811: tools/make_interior.py writes them from its spec).
-	"town", "storeys", "beds"]
+	# An interior's own (811: tools/make_interior.py writes them from its spec;
+	# 811 amended (4): its common room's lit candles).
+	"town", "storeys", "beds", "lit_candles"]
 const FACINGS := {"north": [0, -1], "east": [1, 0], "south": [0, 1], "west": [-1, 0]}
 
 

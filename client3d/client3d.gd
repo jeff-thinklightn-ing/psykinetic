@@ -136,6 +136,14 @@ const HOUSE_LIGHT_UP := 1.5
 const HOUSE_LIGHT_FLICKER := Flames.FIRE_FLICKER / 3.0
 const HOUSE_LIGHT_NEAR := 4
 const HOUSE_LIGHT_PICK := 0.5
+## A level's lit candles (811 amended (4), environment's numbers: the
+## Mughouse's common room was too dark): art-kit's prop.candles on a table
+## or the bar, each with a shadowless warm light over it, as a house's, always
+## lit indoors.
+const CANDLES_SLOT := "prop.candles"
+const CANDLE_ENERGY := 1.0
+const CANDLE_RANGE := 4.0
+const CANDLE_FALLOFF := 1.2
 ## A window lit by the hour goes out at this hour, the sun down; how often
 ## the window lights are looked at, seconds (decision 566).
 const LAMP_OUT := 22.0
@@ -6642,6 +6650,7 @@ func _phase_lights() -> void:
 		_add_lantern(cell)
 	for cell: Vector2i in _terrain.get("lamps", []):
 		_add_lamp(cell)
+	_add_lit_candles()
 	if not World.fields_changed_signal.is_connected(_on_fields_changed):
 		World.fields_changed_signal.connect(_on_fields_changed)
 	_on_fields_changed()
@@ -15617,6 +15626,33 @@ func _add_lantern(cell: Vector2i) -> void:
 	light.omni_range = 4.0
 	light.position = at + Vector3(0.0, 0.95, 0.0)
 	_room.add_child(light)
+
+
+## Terrain "lit_candles"' each (811 amended (4), Level.lit_candles_from):
+## art-kit's prop.candles stood on its top (none until the slot is drawn), its
+## light "up" over that (its energy, reach and falloff the entry's if given,
+## else CANDLE_ENERGY, _RANGE and _FALLOFF), shadowless, flickering as a
+## house's (with the fires, _flicker_fires).
+func _add_lit_candles() -> void:
+	for entry: Dictionary in _terrain.get("lit_candles", []):
+		var at: Vector2 = entry["at"]
+		var cell := Vector2i(roundi(at.x), roundi(at.y))
+		var top := _height_in(cell, at) + float(entry.get("top", 0.0))
+		var tag := "%d_%d" % [roundi(at.x * 2.0), roundi(at.y * 2.0)]
+		if ArtKit.has(CANDLES_SLOT) and ArtKit.filled_by(CANDLES_SLOT) != "placeholder":
+			var candles := ArtKit.instance(CANDLES_SLOT)
+			candles.name = "Candles_" + tag
+			candles.position = Vector3(at.x, top, at.y)
+			candles.rotation.y = _roll(cell, 185) * TAU
+			_room.add_child(candles)
+		var energy := float(entry.get("energy", CANDLE_ENERGY))
+		var light := _night_light(HOUSE_LIGHT, energy, float(entry.get("reach", CANDLE_RANGE)))
+		light.name = "CandleLight_" + tag
+		light.omni_attenuation = float(entry.get("falloff", CANDLE_FALLOFF))
+		light.shadow_enabled = false
+		light.position = Vector3(at.x, top + float(entry.get("up", 0.0)), at.y)
+		_room.add_child(light)
+		_fire_lights.append([light, energy, _roll(cell, 186) * TAU, HOUSE_LIGHT_FLICKER])
 
 
 ## A cold lamp standing in its cell (659 amended): art-kit's prop.dark_lamp

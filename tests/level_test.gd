@@ -3705,6 +3705,20 @@ func _test_tavern_zone(wilds: Dictionary) -> void:
 	_check(Level.tavern_of(ground).keys() == ["wilds/store"] and tavern["seats"].size() == 8 and (ground["terrain"]["fire"] as Array).has(tavern["hearth"])
 		and cells.all(func(cell: Vector2i) -> bool: return (tavern["rect"] as Rect2i).has_point(cell) and ground_floor.has(cell)),
 		"the tavern on the ground floor, Umbrage's: its counter and eight seats on floor in the common room, its hearth a fire")
+	# Its lit candles (811 amended (4)): one on each table's middle, where its
+	# four cells meet, at the table's top, and one on the bar's middle.
+	var on_pieces: Array[String] = []
+	for entry: Dictionary in ground["terrain"].get("lit_candles", []):
+		var at: Vector2 = entry["at"]
+		for building: Dictionary in ground["buildings"]:
+			var rect: Rect2i = building["rect"]
+			if Rect2(Vector2(rect.position) - Vector2(0.5, 0.5), Vector2(rect.size)).has_point(at):
+				on_pieces.append("%s %.2f" % [building["slot"], float(entry["top"])])
+	on_pieces.sort()
+	_check(on_pieces == ["building.bar_counter 1.05", "building.tavern_table 0.79", "building.tavern_table 0.79",
+			"building.tavern_table 0.79", "building.tavern_table 0.79"]
+		and (floors["umbrage_tavern_up"]["terrain"].get("lit_candles", []) as Array).is_empty(),
+		"the Mughouse's lit candles on its four tables and its bar, at their tops, none upstairs (%s)" % [on_pieces])
 	var storeys := Level.storeys_of("umbrage_tavern")
 	var beds: Array = storeys["beds"]
 	var laid := beds.filter(func(bed: Dictionary) -> bool:

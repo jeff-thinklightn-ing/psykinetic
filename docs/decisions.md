@@ -43888,6 +43888,27 @@ cues), so only the front door changes. level_test _test_tavern_zone: both links 
 the doorstep beyond a door edge, the arrival just inside; view_test _test_tavern_inside: a double
 door at (5, 13) south. Level data, client and the tool; protocol unchanged, no new class_name.
 
+811 amended (4): the Mughouse's common room lit by candles (the coordinator: "too dark", from Jeff's
+houses note; package "wilds basics: house windows and light", on; environment's numbers; release's
+label; voice's words). A spec's common room with "candles" true has tools/make_interior.py write
+the floor's level.json "lit_candles" [{at: [x, y] in cells, a cell's middle its whole numbers,
+top, up, and energy, reach and falloff where given}]: one on each table's middle, where its four
+cells meet (TABLE_TOP 0.79 m, its light CANDLE_LIGHT_OVER_TABLE 1.0 m over it, TABLE_CANDLE_LIGHT
+energy 0.9, reach 4.5, falloff 1.0, so a top keeps its grain: environment, from the first stills,
+where 0.6 m blew the tops to a cream disc), and one on the middle of the counter (COUNTER_TOP
+1.05, CANDLE_LIGHT_OVER_COUNTER 1.4, the client's own numbers). Level.lit_candles_from reads them
+into terrain "lit_candles" (a list of its own: terrain "lamps" are the cold lamps, light in Fields
+too; these are the client's alone). Client3D._add_lit_candles (in _phase_lights) stands art-kit's
+prop.candles on each top and puts a shadowless OmniLight3D its "up" over it: HOUSE_LIGHT's colour,
+the entry's energy, reach and falloff or CANDLE_ENERGY 1.0, CANDLE_RANGE 4.0, CANDLE_FALLOFF 1.2,
+flickering as a house's light (HOUSE_LIGHT_FLICKER) with the
+fires (_fire_lights, so no new Client3D var), always lit indoors. umbrage_tavern's ground floor
+regenerated with them, its ambient 0.25 -> 0.35. level_test _test_tavern_zone: five, on the four
+tables and the bar at their tops, none upstairs; view_test _test_tavern_inside: each lit over its
+top at its reach and falloff, warm, shadowless, its candles drawn, the ambient 0.35. Shots:
+C:/dev/review/mughouse_lamps. EditorFields.NOT_OFFERED lists "lit_candles" with the interior's
+other keys (the tool writes it). Level data, client and the tool; protocol unchanged, no new class_name.
+
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
 Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel

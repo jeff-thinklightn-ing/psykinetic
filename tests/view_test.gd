@@ -2864,6 +2864,29 @@ func _test_tavern_inside() -> void:
 	_check(hearth != null and is_equal_approx(hearth.position.x, -0.5) and is_equal_approx(hearth.position.z, 6.5)
 			and is_equal_approx(hearth.rotation.y, PI * 0.5),
 			"the Mughouse's fireplace against its west wall, over its two fire cells (%s)" % [hearth.position if hearth != null else null])
+	# Its common room's candles (811 amended (4), environment's numbers):
+	# five, on its four tables and its bar, each lit over its top, warm,
+	# shadowless, at its reach, flickering with the fires.
+	var candle_lights: Array[OmniLight3D] = []
+	var candles_bad: Array = []
+	for entry: Dictionary in ground["terrain"].get("lit_candles", []):
+		var candle_at: Vector2 = entry["at"]
+		var candle_tag := "%d_%d" % [roundi(candle_at.x * 2.0), roundi(candle_at.y * 2.0)]
+		var candle_top := _rig._height_in(Vector2i(roundi(candle_at.x), roundi(candle_at.y)), candle_at) + float(entry["top"])
+		var candle_light := _rig._room.get_node_or_null("CandleLight_" + candle_tag) as OmniLight3D
+		var candle_piece := _rig._room.get_node_or_null("Candles_" + candle_tag) as Node3D
+		if (candle_light == null or candle_piece == null or candle_light.shadow_enabled
+				or not candle_light.position.is_equal_approx(Vector3(candle_at.x, candle_top + float(entry["up"]), candle_at.y))
+				or not candle_piece.position.is_equal_approx(Vector3(candle_at.x, candle_top, candle_at.y))
+				or not is_equal_approx(candle_light.omni_range, float(entry.get("reach", Client3D.CANDLE_RANGE)))
+				or not is_equal_approx(candle_light.omni_attenuation, float(entry.get("falloff", Client3D.CANDLE_FALLOFF)))
+				or candle_light.light_color != Client3D.HOUSE_LIGHT
+				or not _rig._fire_lights.any(func(fire: Array) -> bool: return fire[0] == candle_light)):
+			candles_bad.append(candle_tag)
+		if candle_light != null:
+			candle_lights.append(candle_light)
+	_check(candle_lights.size() == 5 and candles_bad.is_empty() and is_equal_approx(float(ground["terrain"]["ambient"]), 0.35),
+			"the Mughouse's candles lit on its four tables and its bar, warm and shadowless, over their tops (%d, wrong %s)" % [candle_lights.size(), candles_bad])
 	# A shell's lamp (811 amended, art-kit's prop.sill_lamp): one, on the
 	# sill of its window nearest its door, at the sill's height; none on a
 	# building that is no shell.
