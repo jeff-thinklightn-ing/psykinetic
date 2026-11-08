@@ -1826,6 +1826,7 @@ func _test_ambush() -> void:
 	_test_plain_lead()
 	_test_stop_to_strike()
 	_test_heavy_cycle()
+	_test_sneak_pack()
 	_test_given_strength()
 
 
@@ -2017,6 +2018,64 @@ func _test_heavy_cycle() -> void:
 	var apart := struck[1] - struck[0] if struck.size() >= 2 else -1
 	_check(struck.size() >= 2 and brute.tactic == Monster.Tactic.HEAVY and apart <= cycle + brute.cooldown_spread,
 		"its blows land %d ticks apart: its cycle %d, not with its windup %d on top (struck %s)" % [apart, cycle, brute.windup_ticks, struck])
+
+
+## 824, sneak packs: a pack (props "pack" on a kind whose row has a "pack"
+## block) wakes as one with one whistle, comes at its target from different
+## sides, never more than "in_reach" of it at it at once, and its last one
+## flees; the prop on another kind (barrow_deep's grave guards) changes nothing.
+func _test_sneak_pack() -> void:
+	print("\n== 824: a sneak pack harries from several sides ==")
+	var sneak_props: Dictionary = (Level.MONSTER_TYPES["sneak"] as Dictionary).duplicate()
+	sneak_props["pack"] = "pack_9_4"
+	var skeleton_props: Dictionary = (Level.MONSTER_TYPES["skeleton"] as Dictionary).duplicate()
+	skeleton_props["pack"] = "pack_2_2"
+	var e := _build(["###############", "#.............#", "#.k...........#", "#.............#", "#...P....s....#",
+			"#........s....#", "#.........s...#", "#.............#", "###############"],
+			{"s": {"props": sneak_props}, "k": {"props": skeleton_props}})
+	var sneaks: Array = e["s"]
+	var player: Player = e["P"][0]
+	var skeleton: Monster = e["k"][0]
+	_check((sneaks[0] as Monster).pack_id == "pack_9_4" and (sneaks[0] as Monster).band_fights
+		and int((sneaks[0] as Monster).pack_rules["in_reach"]) == 2,
+		"a sneak laid with a pack is of it, its row's rules (%s, %s)" % [(sneaks[0] as Monster).pack_id, (sneaks[0] as Monster).pack_rules])
+	_check(skeleton.pack_id == "", "a skeleton laid with the prop is of no pack: its row has no block")
+	player.max_hp = 999
+	player.hp = 999
+	var whistles: Array[StringName] = []
+	for s: Monster in sneaks:
+		s.cried.connect(func(kind: StringName) -> void: whistles.append(kind))
+		s.temper = Monster.Temper.CAUTIOUS
+	(sneaks[0] as Monster).sight_range = 8  # Only one sees: the rest take up its fight.
+	var woke := -1
+	var most_at := 0
+	var sides := {}
+	for i in 120:
+		World.step()
+		var fighting := sneaks.filter(func(s: Monster) -> bool: return s.target == player)
+		if woke < 0 and fighting.size() == 3:
+			woke = World.tick
+		var at := 0
+		for s: Monster in sneaks:
+			if s._in_strike_reach(player):
+				at += 1
+				var way := Vector2i(signi(s.tile.x - player.tile.x), signi(s.tile.y - player.tile.y))
+				sides[way] = true
+		most_at = maxi(most_at, at)
+	_check(woke >= 0, "the whole pack took up the one's fight (all three by tick %d)" % woke)
+	var whistled := whistles.filter(func(kind: StringName) -> bool: return kind == &"whistle").size()
+	_check(whistled == 1, "one whistle as it woke (%s)" % [whistles])
+	_check(most_at >= 1 and most_at <= 2, "never more than 2 of the pack at it at once (%d)" % most_at)
+	_check(sides.size() >= 2, "it came from more than one side (%s)" % [sides.keys()])
+	# Two of them down: the last one flees.
+	World.despawn(sneaks[1])
+	World.despawn(sneaks[2])
+	var last: Monster = sneaks[0]
+	var fled := false
+	for i in 10:
+		World.step()
+		fled = fled or last.alert == Monster.Alert.FLEEING
+	_check(fled, "the last of its pack flees")
 
 
 ## 790 amended (4): the crypt robbers' told lunge, from in front or

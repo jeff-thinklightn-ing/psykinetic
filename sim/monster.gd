@@ -255,6 +255,14 @@ const IDLE_PLAN_RETRY_TICKS := 10
 ## it never holds back, and it circles to a flank only while a mate is beside
 ## its target.
 const CALL_RUN_TICKS := 20
+## Sneak packs (824): a pack's members (props "pack", laid by dungeon, on a
+## kind whose row has a "pack" block) share a target within PACK_WAKE_REACH
+## of each other; the row's "pack" block over PACK_DEFAULTS: how much a cell
+## near a mate's side of the target costs ("spread"), how many of the pack may
+## be in reach of it at once ("in_reach"), and the ring the rest wait in
+## ("hover", cells).
+const PACK_WAKE_REACH := 8
+const PACK_DEFAULTS := {"spread": 1.0, "in_reach": 2, "hover": [2, 3]}
 ## FLANK's lean (806 amended (9)): a cell round the back whose walk is more
 ## than this many steps longer than straight (round a sarcophagus) is not
 ## worth it; the nearest free cell instead.
@@ -497,6 +505,13 @@ var _ambush_armed := true
 ## 806 amended (9): its row's "band_fights"; whether it has run to call its
 ## band this fight (once: then it fights on), and whom it comes back to.
 var band_fights := false
+## Its pack (824): props "pack" where its kind's row has a "pack" block, else
+## "" (fights as ever: barrow_deep's grave guards are laid with the prop and
+## no block); the block's rules (PACK_DEFAULTS); the most of its pack it has
+## seen alive in this fight (the last left flees).
+var pack_id := ""
+var pack_rules := {}
+var _pack_seen := 0
 var _ran_to_call := false
 var _rally: GridEntity = null
 var _call_to := NO_TILE
@@ -751,6 +766,12 @@ func _ready() -> void:
 		# A sought's guard keeps its room too (613, enemy-ai's side; Main._stand_band's props).
 		var props: Variant = spawn_spec.get("props", {})
 		keeps_room = bool(row.get("keeps_room", false)) or props is Dictionary and bool(props.get("keeps_room", false))
+		pack_id = ""
+		if row.get("pack") is Dictionary and props is Dictionary and str(props.get("pack", "")) != "":
+			pack_id = str(props["pack"])
+			pack_rules = PACK_DEFAULTS.duplicate(true)
+			pack_rules.merge(row["pack"], true)
+			band_fights = true  # Its pack is its band (806 amended (9)): mates its pack only (_mate_of).
 		pays_swings = bool(row.get("swing_stamina", false))  # Decision 597: off until enemy-ai's design.
 		stamina_regen_every = maxi(1, int(row.get("stamina_regen_every", 1)))  # Decision 603.
 		stamina_regen_amount = maxi(0, int(row.get("stamina_regen", 0)))  # 603 amended.
@@ -1112,6 +1133,8 @@ func _sim_tick() -> void:
 	var looked := Time.get_ticks_usec()
 	_fade_notice()
 	var seen := _nearest_visible_target()
+	if seen == null and pack_id != "":
+		seen = _pack_target()  # Its pack's fight is its own (824).
 	World.senses_usec += Time.get_ticks_usec() - looked  # Its own part, "senses" (784).
 	if seen != null and _wary and _beyond_leash():
 		_give_up(seen)
@@ -1154,8 +1177,16 @@ func _sim_tick() -> void:
 	if target.tile != _quarry_at:
 		_quarry_from = _quarry_at
 		_quarry_at = target.tile
+	if pack_id != "":
+		if took_up and _pack_target() == null:
+			_cry(&"whistle", 0)  # The first of its pack: heard by players, never by monsters (824).
+		var alive := _pack_alive()
+		_pack_seen = maxi(_pack_seen if not took_up else 0, alive)
+		if _pack_seen > 0 and alive == 0:
+			_flee(target.tile)  # The last of its pack (824): away, and out of the fight.
+			return
 	if _wary:
-		if took_up and temper != Temper.BOLD:
+		if took_up and temper != Temper.BOLD and pack_id == "":
 			_call_for_help()
 		if _should_flee() and _breaks():
 			return
@@ -1197,8 +1228,11 @@ func _sim_tick() -> void:
 	if World.tick - _noticed_tick < reaction_ticks:
 		return  # Sizing it up.
 	var can_strike := World.tick >= next_attack_tick and World.tick >= next_move_tick
+	if pack_id != "" and World.tick >= _dart_until and _pack_waits():
+		_hover()
+		return  # Faced, or enough of its pack at it: it waits its turn round it (824).
 	if _in_strike_reach(target) or can_strike and _meets_in_stride():
-		if tactic == Tactic.DART and World.tick < _dart_until:
+		if _darts() and World.tick < _dart_until:
 			if World.tick >= _dart_from:
 				_step_out()
 			return
@@ -1220,13 +1254,13 @@ func _sim_tick() -> void:
 				return
 		_strike()
 		return
-	if tactic == Tactic.DART and World.tick < _dart_until:
+	if _darts() and World.tick < _dart_until:
 		return  # Out of reach, cooling down.
 	if World.tick < next_move_tick:
 		return
 	if World.wielded(self).is_empty() and _pick_up(true):
 		return  # Bare-handed: the weapon at its feet first.
-	if not _pressing and (boldness < HOLD_BACK_BELOW or _dreads_target()) \
+	if pack_id == "" and not _pressing and (boldness < HOLD_BACK_BELOW or _dreads_target()) \
 			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
 			and not _band_holds() and (not band_fights or _mate_near()):
 		_standing_off()
@@ -1372,7 +1406,7 @@ func _stood_settle() -> bool:
 ## only once its striker's next_move_tick is past). A DART one steps out
 ## after its blow anyway (combat: "a wolf darts out anyway").
 func _recover_after_blow() -> void:
-	if tactic == Tactic.DART:
+	if _darts():
 		return
 	var w := World.winding(self)
 	if w.is_empty():
@@ -1497,17 +1531,24 @@ func _strike() -> void:
 				# Unseen from behind: at once (no settle: it was never seen coming).
 				if World.try_attack(self, target, attack_damage + backstab_damage):
 					_recover_after_blow()
-			else:
-				_blow()
+					if pack_id != "":
+						_dart_out()  # A pack's: in, and out again (824).
+			elif _blow() and pack_id != "":
+				_dart_out()
 		_:
 			if _blow() and tactic == Tactic.DART:
-				# Out after the blow lands: its lead, then dart_after_ticks; back before the next.
-				if not World.winding(self).is_empty():
-					_dart_from = int(World.winding(self)["lands"]) + dart_after_ticks
-					_dart_until = World.tick + World.attack_ticks_of(self) - ceili(_pace)
-				else:
-					_dart_from = World.tick + dart_after_ticks
-					_dart_until = next_attack_tick - ceili(_pace)
+				_dart_out()
+
+
+## Out after the blow it just began lands (DART, and a pack's, 824): its
+## lead, then dart_after_ticks; back before the next.
+func _dart_out() -> void:
+	if not World.winding(self).is_empty():
+		_dart_from = int(World.winding(self)["lands"]) + dart_after_ticks
+		_dart_until = World.tick + World.attack_ticks_of(self) - ceili(_pace)
+	else:
+		_dart_from = World.tick + dart_after_ticks
+		_dart_until = next_attack_tick - ceili(_pace)
 
 
 ## A wound-up blow (HEAVY): lands when due if its target is still in reach,
@@ -1613,6 +1654,15 @@ func _pick_slot() -> Vector2i:
 	var nearest_score := INF
 	var cells: Array[Vector2i] = []
 	var meet := centre
+	# Its pack's sides of the target (824): a cell on the side a mate takes costs more.
+	var sides: Array[Vector2] = []
+	if pack_id != "":
+		for other in _pack_members():
+			if other.target == target:
+				var at_mate := other.slot if other.slot != NO_TILE else other.tile
+				if at_mate != target.tile:
+					sides.append((Vector2(at_mate) - centre).normalized())
+	var spread := float(pack_rules.get("spread", 0.0))
 	var aim := -1.0
 	if free:
 		var any := _strike_cells()  # Where it can strike a free body from (699).
@@ -1654,6 +1704,8 @@ func _pick_slot() -> Vector2i:
 			nearest_score = score
 		if lean:
 			score += 3.0 * (Vector2(at) - centre).normalized().dot(facing)
+		for side in sides:
+			score += 2.0 * spread * maxf(0.0, (Vector2(at) - centre).normalized().dot(side))
 		if score < best_score:
 			best = at
 			best_score = score
@@ -1664,6 +1716,76 @@ func _pick_slot() -> Vector2i:
 			claims[best] = []
 		(claims[best] as Array).append(self)  # Seen by those picking after it this tick, once its slot is set.
 	return best
+
+
+## Whether it steps out after its blows (DART, and a pack's, 824).
+func _darts() -> bool:
+	return tactic == Tactic.DART or pack_id != ""
+
+
+## The others of its pack (824): spawned, alive, not running.
+func _pack_members() -> Array[Monster]:
+	var out: Array[Monster] = []
+	for entity in World.monsters():
+		var other := entity as Monster
+		if other != null and other != self and other.pack_id == pack_id and other.spawned and other.hp > 0 \
+				and other.alert != Alert.FLEEING:
+			out.append(other)
+	return out
+
+
+func _pack_alive() -> int:
+	return _pack_members().size()
+
+
+## A target one of its pack within PACK_WAKE_REACH is fighting (824), or null.
+func _pack_target() -> GridEntity:
+	for other in _pack_members():
+		if other.alert == Alert.FIGHTING and is_instance_valid(other.target) and other.target.spawned \
+				and World.distance(tile, other.tile) <= PACK_WAKE_REACH:
+			return other.target
+	return null
+
+
+## Whether it waits its turn (824): it is the one its target faces while
+## another of its pack could go in, or "in_reach" of its pack are at it
+## already and it is not.
+func _pack_waits() -> bool:
+	var others := _pack_members()
+	if _in_front() and not others.is_empty():
+		return true
+	if _in_strike_reach(target):
+		return false
+	var at := 0
+	for other in others:
+		if other.target == target and other._in_strike_reach(target):
+			at += 1
+	return at >= int(pack_rules["in_reach"])
+
+
+## Waiting its turn (824): in the ring "hover" cells off its target, facing it.
+func _hover() -> void:
+	if World.tick < next_move_tick:
+		return
+	var ring: Array = pack_rules["hover"]
+	var d := World.distance(tile, target.tile)
+	if d < int(ring[0]):
+		if _step_back():
+			return
+	elif d > int(ring[1]):
+		var path := World.find_path(tile, target.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
+		if not path.is_empty() and World.distance(path[0], target.tile) >= int(ring[0]):
+			World.try_move(self, path[0] - tile)
+			return
+	World.face(self, Senses.way_toward(tile, target.tile))
+
+
+## Its mate (806 amended (9)'s band rules): one of its pack where it has one
+## (824), else of its side.
+func _mate_of(other: GridEntity) -> bool:
+	if pack_id != "":
+		return other is Monster and (other as Monster).pack_id == pack_id
+	return _same_side(other)
 
 
 ## FLANK goes round only while it may (806 amended (9)): a band fighter only
@@ -1693,7 +1815,7 @@ func _mate_at_target() -> bool:
 	for direction in World.DIRECTIONS:
 		var other := World.get_entity_at(target.tile + direction) as Monster
 		if other != null and other != self and other.spawned and other.alert != Alert.FLEEING \
-				and other.tile == target.tile + direction and _same_side(other):
+				and other.tile == target.tile + direction and _mate_of(other):
 			return true
 	return false
 
@@ -1704,7 +1826,7 @@ func _mate_near() -> bool:
 	for entity in World.monsters():
 		var other := entity as Monster
 		if other != null and other != self and other.spawned and other.hp > 0 and other.alert != Alert.FLEEING \
-				and _same_side(other) and (World.distance(tile, other.tile) <= call_reach or target != null and other.target == target):
+				and _mate_of(other) and (World.distance(tile, other.tile) <= call_reach or target != null and other.target == target):
 			return true
 	return false
 
@@ -1716,7 +1838,7 @@ func _nearest_mate() -> Monster:
 	for entity in World.monsters():
 		var other := entity as Monster
 		if other == null or other == self or not other.spawned or other.hp <= 0 or other.alert == Alert.FLEEING \
-				or not _same_side(other):
+				or not _mate_of(other):
 			continue
 		var d := float(World.distance(tile, other.tile))
 		if d < best_d:
@@ -2568,6 +2690,7 @@ static func read_kinds(path: String) -> Dictionary:
 			"never_lies": bool(row.get("never_lies", false)), "band_fights": bool(row.get("band_fights", false)), "boss": bool(row.get("boss", false)),
 			"felled_by_surprise": bool(row.get("felled_by_surprise", false)),
 			"fight": (row["fight"] as Dictionary).duplicate(true) if row.get("fight") is Dictionary else {},
+			"pack": (row["pack"] as Dictionary).duplicate(true) if row.get("pack") is Dictionary else null,  # 824.
 			"keeps_room": bool(row.get("keeps_room", false)), "script": str(row.get("script", "")),
 			"call": int(row.get("call", Senses.NOISE_CALL)),
 			# Kept, or a peer reading the row never sees them: the client's
