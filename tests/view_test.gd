@@ -11963,6 +11963,19 @@ func _test_worn_gear() -> void:
 			and cloak.get_instance_shader_parameter("tunic") == Items.color_of("cloak") and cape != null and not cape.visible,
 			"the cloak row on the back: the long cloak in its colour, the garb's cape hidden")
 	look.parts.erase("Cape")
+	# Items' string of amber beads at the neck (9603f43af), drawn as art-kit's worn.amber_beads on the
+	# neck socket: that piece (its size the slot's), not the pack item.
+	slots[Items.NECK] = "amber_beads"
+	player.slots = slots
+	_rig._process(0.0)
+	var beads := (sockets["neck"] as Node3D).get_node_or_null("Worn") as Node3D
+	var beads_size := Vector3.ZERO
+	if beads != null:
+		for mesh: MeshInstance3D in beads.find_children("*", "MeshInstance3D", true, false):
+			beads_size = mesh.get_aabb().size
+	var beads_meant := Vector3(0.109, 0.104, 0.128)  # art/kit/slots.json's worn.amber_beads size
+	_check(not ArtKit.has("worn.amber_beads") or (beads != null and (beads_size - beads_meant).abs().length() < 0.03),
+			"the amber beads at the neck, as worn.amber_beads (%s, %s)" % [beads != null, beads_size])
 	player.slots = was
 	_rig._process(0.0)
 	_check(not hood.visible and not boots.visible and not cloak.visible and (sockets["head"] as Node3D).get_node_or_null("Worn") == null
