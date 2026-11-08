@@ -723,6 +723,19 @@ CLIPS["Dagger_Stab_Drawn"] = {"keys": [
 		("spine_01", LIFT, -6.0)], move=(0.0, -0.08, 0.0))),
 	(DRAW_AT + 0.45, P("Sword_Idle", 0.0)),
 ]}
+# Thrown back off a raised shield (340 amended, animation's side; combat's 4-tick recoil, stun_cause
+# "guarded"): the striking arm flung up and back off the shield, the trunk rocked back and turned
+# aside, the head turned away, a half step back; held a moment (the stun), then back to standing.
+RECOIL_BACK = [("spine_01", LIFT, 10.0), ("spine_02", LIFT, 8.0), ("spine_02", TURN, -14.0), ("spine_03", TURN, -8.0),
+	("neck_01", TURN, 18.0), ("Head", LIFT, 10.0), ("upperarm_r", LIFT, 55.0), ("upperarm_r", TURN, 25.0),
+	("lowerarm_r", LIFT, -25.0), ("upperarm_l", LIFT, -18.0), ("lowerarm_l", LIFT, 20.0),
+	("thigh_l", LIFT, 14.0), ("calf_l", LIFT, -10.0), ("thigh_r", LIFT, -10.0), ("calf_r", LIFT, 16.0)]
+CLIPS["Recoil"] = {"keys": [
+	(0.0, P("Sword_Idle", 0.0)),
+	(0.1, P("Sword_Idle", 0.0, RECOIL_BACK, move=(0.0, 0.12, -0.02))),
+	(0.3, P("Sword_Idle", 0.0, RECOIL_BACK[:6] + [("upperarm_r", LIFT, 30.0), ("lowerarm_r", LIFT, -10.0)], move=(0.0, 0.14, -0.03))),
+	(0.6, P("Sword_Idle", 0.0)),
+]}
 for _name, _bone in (("Punch_Jab_Drawn", "hand_l"), ("Punch_Cross_Drawn", "hand_r"), ("Dagger_Stab_Drawn", "hand_r")):
 	STRIKES[_name] = _bone
 # The fallen knight's vigil (747; his astral projection stands still in the barrow's Altar Room and

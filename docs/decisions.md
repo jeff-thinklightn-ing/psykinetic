@@ -7099,6 +7099,19 @@ none), _test_lowered_shield, _test_sword_beats_guard; items_test's break points 
 numbers. Protocol 54 (with 379 amended). animation's side (Recoil, the spark) and sound's (the
 thuds) follow.
 
+340 amended, animation's side (release's label; package "the shield"): the recoil and the
+spark seen. An attacker stunned with cause &"guarded" plays Recoil (tools/humanoid_clips.py, 0.58
+s, extracted into goblin.res: the striking arm flung up and back off the shield, the trunk rocked
+back and turned aside, the head turned away, a half step back, held, then standing), a creature
+its view's hit; it plays as that attacker's drawn blow lands (Client3D._swings' landing), not at
+the stun's news, so the blow meets the shield first. A blow a shield takes whole (guarded(false),
+a shield in hand) throws sparks off the shield as the drawn blow meets it: Client3D._spark, one
+shared mesh (spark_mesh, SPARK_COUNT 14 thin streaks in a cone, unshaded and added), at the
+strapped shield's place (else chest high ahead), flying toward the blow, grown to SPARK_REACH 0.35
+m and faded over SPARK_SECONDS 0.16 s, then freed. The other causes' stagger is as it was.
+view_test _test_shield_seen. Client only, protocol unchanged, no new class_name; no bullet here
+(sound's thud lands after and carries the package's).
+
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
 Weapons as verbs in the fight, part 4 of 5. A blow with a knockdown verb
@@ -10010,6 +10023,16 @@ new signal stunned(ticks, cause) fires, on every peer. Causes: &"guarded" (the r
 bash's slide) keeps the cause (stun_cause_tick). monster_test _test_bash_told. Server and
 client; PROTOCOL_REVISION 54 (release's; shared with any wire change before v0.1.209); no new
 class_name.
+
+379 amended, animation's side (release's label; package "the shield"): the bash drawn. On
+GridEntity.bashed the basher (by's path) plays Shield_Bash, its contact (0.17 s) on its swing's
+drawn landing (it swung as it bashed: the swing's strike gives way), and the bashed body takes it
+then from the basher's side: Client3D.hit_side(facing, from) picks HUMANOID_MOVES' "hits" by side
+("front", "back", "left", "right"; grid y down), any of HIT_CLIPS where its model has none, a
+creature its view's hit. A bash that did not move its body (direction ZERO: a guard met it) jolts
+the body BASH_JOLT (0.08) away and home over BASH_JOLT_SECONDS (0.18 s). view_test
+_test_shield_seen. Client only, protocol unchanged, no new class_name, no bullet (as 340 amended,
+animation's side).
 
 ## 400. What a companion knows of her town and the world, and her not knowing
 

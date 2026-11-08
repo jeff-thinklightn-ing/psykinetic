@@ -160,6 +160,7 @@ func _ready() -> void:
 		_test_sleeper()
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_blows_seen()  # It lets frames run too.
+		await _test_shield_seen()
 		await _test_rest()
 		_test_wet()
 		_test_sword_whiff()
@@ -12283,6 +12284,86 @@ func _test_blows_seen() -> void:
 	target.set_meta("busy_until", 0)
 	World.despawn(imp)
 	_rig._swings.erase(player.get_instance_id())
+	_rig._process(0.0)
+
+
+## The shield package, animation's side (340 and 379 amended): a bash's Shield_Bash on the basher and
+## the bashed body's hit from its side as the shield meets it; the attacker thrown back off a raised
+## shield recoils as its drawn blow lands; sparks off the shield, gone after.
+func _test_shield_seen() -> void:
+	print("\n== the shield seen: the bash, the recoil off a raised shield, sparks ==")
+	_check(Client3D.hit_side(Vector2(1, 0), Vector2(1, 0)) == "front" and Client3D.hit_side(Vector2(1, 0), Vector2(-1, 0)) == "back"
+			and Client3D.hit_side(Vector2(0, 1), Vector2(-1, 0)) == "right" and Client3D.hit_side(Vector2(0, 1), Vector2(1, 0)) == "left"
+			and Client3D.hit_side(Vector2(0, 1), Vector2.ZERO) == "front",
+			"a blow's side: ahead front, behind back, a quarter clockwise (y down) the right")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to bash with")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var rig := puppet.get_meta("rig") as AnimRig
+	var imp := _spawn_imp(player.tile + Vector2i(1, 0), "brute")
+	var target: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		target = _rig._puppets.get(imp.get_instance_id())
+		if target != null and target.has_meta("rig"):
+			break
+		await get_tree().process_frame
+	if target == null or not target.has_meta("rig"):
+		_check(false, "an orc to bash (%s)" % [target != null])
+		World.despawn(imp)
+		return
+	var hurt := target.get_meta("rig") as AnimRig
+	_check(rig.has(Client3D.CLIP_RECOIL) and rig.has(Client3D.CLIP_SHIELD_BASH), "the people's clips hold Recoil and Shield_Bash")
+	# The bash: the player swung as it bashed, its drawn blow landing 0.25 s on.
+	hurt.cancel_strike()
+	target.set_meta("busy_until", 0)
+	imp.facing = Vector2i(0, 1)
+	var now := Time.get_ticks_msec()
+	_rig._swings[player.get_instance_id()] = [now, "", now + 250]
+	_rig._on_bashed(Vector2i.ZERO, player.get_path(), imp.get_instance_id())
+	var early := hurt.playing()
+	_check(rig.striking() and rig.playing() == Client3D.CLIP_SHIELD_BASH, "the basher drives its shield in (%s)" % rig.playing())
+	await get_tree().create_timer(0.3).timeout
+	var right: Array = Client3D.HUMANOID_MOVES["hits"]["right"]
+	_check(not early in right and hurt.playing() in right,
+			"the bashed orc, facing south with the basher west, takes it on its right as it lands (%s, then %s)" % [early, hurt.playing()])
+	await get_tree().create_timer(0.25).timeout
+	var body := target.get_node("Body") as Node3D
+	_check(body.position.is_equal_approx(Vector3(0.0, body.position.y, 0.0)) or body.position.distance_to(Vector3(0.0, body.position.y, 0.0)) < 0.01,
+			"not moved, it jolted and came home (%s)" % body.position)
+	rig.cancel_strike()
+	puppet.set_meta("busy_until", 0)
+	# Thrown back off a raised shield: its drawn blow lands 0.2 s on, the recoil then; a bash's stun no recoil.
+	hurt.cancel_strike()
+	target.set_meta("busy_until", 0)
+	now = Time.get_ticks_msec()
+	_rig._swings[imp.get_instance_id()] = [now, "", now + 200]
+	_rig._on_stunned(4, &"guarded", imp.get_instance_id())
+	early = hurt.playing()
+	await get_tree().create_timer(0.3).timeout
+	_check(early != Client3D.CLIP_RECOIL and hurt.playing() == Client3D.CLIP_RECOIL,
+			"thrown back off a shield, it recoils as its blow lands (%s, then %s)" % [early, hurt.playing()])
+	hurt.cancel_strike()
+	target.set_meta("busy_until", 0)
+	_rig._swings.erase(imp.get_instance_id())
+	await get_tree().create_timer(0.7).timeout  # (The recoil played out.)
+	var was := hurt.playing()
+	_rig._on_stunned(4, &"bash", imp.get_instance_id())
+	_check(was != Client3D.CLIP_RECOIL and hurt.playing() == was, "a bash's stun plays no recoil (%s, then %s)" % [was, hurt.playing()])
+	# Sparks off the player's shield, gone after.
+	var mesh := Client3D.spark_mesh()
+	_check(mesh.get_surface_count() == 1 and mesh.surface_get_array_len(0) == Client3D.SPARK_COUNT * 3, "the sparks' one mesh: %d streaks" % Client3D.SPARK_COUNT)
+	var before := _rig.find_children("Spark", "MeshInstance3D", false, false).size()
+	_rig._spark(puppet, player)
+	var sparks := _rig.find_children("Spark", "MeshInstance3D", false, false).size()
+	await get_tree().create_timer(Client3D.SPARK_SECONDS + 0.15).timeout
+	var after := _rig.find_children("Spark", "MeshInstance3D", false, false).size()
+	_check(sparks == before + 1 and after == before, "a blow on the shield throws sparks, gone after (%d, %d, %d)" % [before, sparks, after])
+	_rig._swings.erase(player.get_instance_id())
+	World.despawn(imp)
 	_rig._process(0.0)
 
 

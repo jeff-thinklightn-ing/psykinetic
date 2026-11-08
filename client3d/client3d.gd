@@ -1905,6 +1905,21 @@ const ARROW_TRAIL_ALPHA := 0.3
 const CREAK_PITCH := Vector2(0.85, 1.25)
 const CREAK_DB := Vector2(-18.0, 0.0)
 const LUNGE_SECONDS := 0.16
+## The shield package (340 and 379 amended, animation's side). The attacker thrown back off a raised
+## shield (stunned, cause &"guarded": combat's 4-tick recoil) plays CLIP_RECOIL as its drawn blow
+## lands; a bash plays the basher's Shield_Bash, its contact on the bash's landing, and the bashed
+## body's hit from the basher's side, or a jolt where the bash didn't move it; a blow a shield takes
+## throws SPARK_COUNT streaks off the shield's face, SPARK_REACH metres out over SPARK_SECONDS.
+const CLIP_RECOIL := "Recoil"
+const CLIP_SHIELD_BASH := "Shield_Bash"
+const SHIELD_BASH_CONTACT := 0.17
+const SPARK_COUNT := 14
+const SPARK_SECONDS := 0.16
+const SPARK_REACH := 0.35
+const SPARK_CHEST := 1.1
+const BASH_JOLT := 0.08
+const BASH_JOLT_SECONDS := 0.18
+static var _spark_mesh: ArrayMesh
 ## Just above the floor, so the rings never z-fight with it.
 const ON_FLOOR := 0.02
 
@@ -23099,6 +23114,8 @@ func _make_puppet(entity: GridEntity) -> Node3D:
 		_hook(entity.lobbed, _on_lobbed.bind(id))
 		_hook(entity.winding, _on_winding.bind(id))
 		_hook(entity.guarded, _on_guarded.bind(id))
+		_hook(entity.bashed, _on_bashed.bind(id))
+		_hook(entity.stunned, _on_stunned.bind(id))
 		if entity is Player or entity is Companion:
 			puppet.set_meta("body", str(entity.get("body")))
 		_hook(entity.struck, _on_struck.bind(id))
@@ -23210,6 +23227,175 @@ func _on_guarded(broken: bool, id: int) -> void:
 	sfx.play(SoundKit.block(guard), puppet.position + Vector3.UP * 0.9, 1.0, 4.0 if broken else 0.0)
 	if broken:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
+	elif holder != null and guard != "" and Items.has_tag(guard, "shield"):
+		# Sparks off the shield as the drawn blow meets it (340 amended, animation's side).
+		var wait := (int(_struck_with(holder)[1]) - Time.get_ticks_msec()) / 1000.0
+		if wait > 0.0:
+			get_tree().create_timer(wait).timeout.connect(func() -> void:
+				if is_instance_valid(puppet) and puppet.is_inside_tree() and is_instance_valid(holder):
+					_spark(puppet, holder))
+		else:
+			_spark(puppet, holder)
+
+
+## The side of a body facing [param facing] that a blow from [param from] meets (a grid direction
+## from the body toward the blow, y down): "front", "back", "left" or "right" (HUMANOID_MOVES' "hits").
+static func hit_side(facing: Vector2, from: Vector2) -> String:
+	if from.length() < 0.001 or facing.length() < 0.001:
+		return "front"
+	var f := facing.normalized()
+	var d := from.normalized()
+	var ahead := f.dot(d)
+	if ahead > 0.5:
+		return "front"
+	if ahead < -0.5:
+		return "back"
+	# On the grid (y down) the facing turned a quarter clockwise, cross > 0, is the body's right.
+	return "right" if f.x * d.y - f.y * d.x > 0.0 else "left"
+
+
+## [param puppet]'s hit for a blow from [param from] (grid): its moves' "hits" for that side where it
+## has them, else one of HIT_CLIPS; a creature its view's hit. False if there is no model.
+func _hit_from(puppet: Node3D, entity: GridEntity, from: Vector2) -> bool:
+	if puppet.has_meta("creature_view"):
+		(puppet.get_meta("creature_view") as CreatureView).hit()
+		return true
+	var hits: Dictionary = (puppet.get_meta("moves", {}) as Dictionary).get("hits", {})
+	var names: Array[String] = []
+	for clip: String in hits.get(hit_side(Vector2(entity.facing), from), []):
+		if puppet.has_meta("rig") and (puppet.get_meta("rig") as AnimRig).has(clip):
+			names.append(clip)
+	return _play_once(puppet, _pick_clip(puppet, names if not names.is_empty() else HIT_CLIPS))
+
+
+## Shield-bashed (379 amended, animation's side): the basher (at [param by]) drives its shield in,
+## Shield_Bash's contact on its swing's drawn landing (_swings: it swung as it bashed); the bashed
+## body takes it then from the basher's side, and, not moved ([param direction] ZERO: a guard met
+## it), jolts back and home.
+func _on_bashed(direction: Vector2i, by: NodePath, id: int) -> void:
+	var puppet: Node3D = _puppets.get(id)
+	var target := instance_from_id(id) as GridEntity
+	if puppet == null or target == null:
+		return
+	_combat_at[id] = Time.get_ticks_msec()
+	var basher := get_node_or_null(by) as GridEntity if not by.is_empty() else null
+	var from := Vector2(-direction)
+	var lands := 0.0
+	if basher != null:
+		from = Vector2(basher.tile - target.tile)
+		var swung: Array = _swings.get(basher.get_instance_id(), [])
+		if not swung.is_empty():
+			lands = maxf((int(swung[2]) - Time.get_ticks_msec()) / 1000.0, 0.0)
+		var swinger: Node3D = _puppets.get(basher.get_instance_id())
+		if swinger != null and swinger.has_meta("rig") and (swinger.get_meta("rig") as AnimRig).has(CLIP_SHIELD_BASH):
+			var rig := swinger.get_meta("rig") as AnimRig
+			swinger.set_meta("fidgeting", false)
+			swinger.set_meta("strike_token", int(swinger.get_meta("strike_token", 0)) + 1)  # Its swing's strike gives way.
+			var seconds := rig.strike(CLIP_SHIELD_BASH, SHIELD_BASH_CONTACT, maxf(lands, 0.05),
+					maxf(rig.length(CLIP_SHIELD_BASH) - SHIELD_BASH_CONTACT, 0.1))
+			swinger.set_meta("busy_until", Time.get_ticks_msec() + int(seconds * 1000.0))
+	if lands > 0.0:
+		get_tree().create_timer(lands).timeout.connect(func() -> void:
+			if is_instance_valid(puppet) and puppet.is_inside_tree() and is_instance_valid(target):
+				_bash_taken(puppet, target, direction, from))
+	else:
+		_bash_taken(puppet, target, direction, from)
+
+
+## The bashed body's side of a bash, as the shield meets it (_on_bashed).
+func _bash_taken(puppet: Node3D, target: GridEntity, direction: Vector2i, from: Vector2) -> void:
+	_hit_from(puppet, target, from)
+	if direction != Vector2i.ZERO or not puppet.has_node("Body") or from.length() < 0.001:
+		return
+	var body := puppet.get_node("Body") as Node3D
+	var rest := body.position
+	var away := -Vector3(from.x, 0.0, from.y).normalized() * BASH_JOLT
+	var tween := body.create_tween()
+	tween.tween_property(body, "position", rest + away, BASH_JOLT_SECONDS * 0.3).set_ease(Tween.EASE_OUT)
+	tween.tween_property(body, "position", rest, BASH_JOLT_SECONDS * 0.7).set_ease(Tween.EASE_IN_OUT)
+
+
+## Stunned (379 amended) for [param cause]: thrown back off a raised shield (&"guarded"), a person
+## plays CLIP_RECOIL and a creature its hit, as its drawn blow lands (_swings); the other causes'
+## stagger as before (_reel_until).
+func _on_stunned(_ticks: int, cause: StringName, id: int) -> void:
+	if cause != &"guarded":
+		return
+	var puppet: Node3D = _puppets.get(id)
+	if puppet == null:
+		return
+	_combat_at[id] = Time.get_ticks_msec()
+	var swung: Array = _swings.get(id, [])
+	var wait := (int(swung[2]) - Time.get_ticks_msec()) / 1000.0 if not swung.is_empty() else 0.0
+	if wait > 0.0:
+		get_tree().create_timer(wait).timeout.connect(func() -> void:
+			if is_instance_valid(puppet) and puppet.is_inside_tree():
+				_recoil(puppet))
+	else:
+		_recoil(puppet)
+
+
+## [param puppet] thrown back off a shield: CLIP_RECOIL where its model has it, else a hit.
+func _recoil(puppet: Node3D) -> void:
+	if puppet.has_meta("creature_view"):
+		(puppet.get_meta("creature_view") as CreatureView).hit()
+	elif not _play_once(puppet, CLIP_RECOIL):
+		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
+
+
+## Sparks off [param puppet]'s shield (a blow [param holder] took on it): SPARK_COUNT streaks
+## flying out of its face toward the blow over SPARK_SECONDS, then gone. At the held shield where it
+## has one (_hold's strapped "Held"), else chest high a little ahead.
+func _spark(puppet: Node3D, holder: GridEntity) -> void:
+	var ahead := Vector3(holder.facing.x, 0.0, holder.facing.y).normalized()
+	if ahead.is_zero_approx():
+		ahead = Vector3.FORWARD
+	var at := puppet.global_position + Vector3.UP * SPARK_CHEST * float(puppet.get_meta("model_scale", 1.0)) + ahead * 0.3
+	for held: Node in puppet.find_children("Held", "Node3D", true, false):
+		if held.has_meta("strap") and (held as Node3D).is_inside_tree():
+			at = (held as Node3D).global_position + ahead * 0.1
+	var spark := MeshInstance3D.new()
+	spark.name = "Spark"
+	spark.mesh = spark_mesh()
+	spark.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(spark)
+	spark.global_position = at
+	spark.look_at(at + ahead, Vector3.UP)  # Its streaks fly along -Z: toward the blow.
+	spark.scale = Vector3.ONE * SPARK_REACH * 0.3
+	var tween := spark.create_tween().set_parallel(true)
+	tween.tween_property(spark, "scale", Vector3.ONE * SPARK_REACH, SPARK_SECONDS).set_ease(Tween.EASE_OUT)
+	tween.tween_property(spark, "transparency", 1.0, SPARK_SECONDS).set_ease(Tween.EASE_IN)
+	tween.chain().tween_callback(spark.queue_free)
+
+
+## The sparks' one mesh: SPARK_COUNT thin triangles from near the middle out along -Z in a cone, a
+## metre long at most (scaled by _spark), unshaded, added light, seen from both sides.
+static func spark_mesh() -> ArrayMesh:
+	if _spark_mesh != null:
+		return _spark_mesh
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 379
+	var verts := PackedVector3Array()
+	for i in SPARK_COUNT:
+		var way := Vector3(rng.randf_range(-0.8, 0.8), rng.randf_range(-0.5, 0.9), -1.0).normalized()
+		var side := way.cross(Vector3.UP).normalized() * 0.03
+		var near := way * rng.randf_range(0.1, 0.35)
+		var far := way * rng.randf_range(0.7, 1.0)
+		verts.append_array([near - side, near + side, far])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = Color(1.0, 0.85, 0.45)
+	mesh.surface_set_material(0, material)
+	_spark_mesh = mesh
+	return _spark_mesh
 
 
 ## A shot (World.shoot) stopped at [param point] (cells), [param struck]
