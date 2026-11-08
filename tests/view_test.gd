@@ -11200,6 +11200,18 @@ func _test_creature_puppets() -> void:
 	view._loop("walk", 1.3)
 	view._loop("walk", 0.8)
 	_check(rig.base_clip() == view.clips["walk"] and is_equal_approx(rig.speed(), 0.8), "a gait's pace changes its speed, not its clip")
+	# A slot clip's "speed" (the old grey's idle at 0.7): its loop at that, and a stand-in's for it.
+	view._pace = {"idle": 0.7}
+	view._loop("idle", 1.0)
+	var slow_idle := is_equal_approx(rig.speed(), 0.7)
+	view._loop("alert", 1.0)
+	var slow_alert: bool = rig.base_clip() == view.clips["idle"] and is_equal_approx(rig.speed(), 0.7)
+	view._loop("walk", 0.8)
+	var walk_kept := is_equal_approx(rig.speed(), 0.8)
+	view._pace = {}
+	var old_idle: Array = (ArtKit.spec("creature.old_wolf").get("clips", []) as Array).filter(func(clip: Dictionary) -> bool: return clip["name"] == "idle")
+	_check(slow_idle and slow_alert and walk_kept and not old_idle.is_empty() and is_equal_approx(float(old_idle[0].get("speed", 1.0)), 0.7),
+			"a slot clip's speed: the idle at 0.7, the alert standing in with it too, the walk its own; the old grey's idle 0.7")
 	view.wind(0.6)
 	var length := rig.length(view.clips["attack"])
 	_check(rig.striking() and rig.playing() == view.clips["attack"]

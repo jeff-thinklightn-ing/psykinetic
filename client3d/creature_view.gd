@@ -77,6 +77,9 @@ var rig: AnimRig
 var _pose: Node3D
 ## Slot clip name to how far through it its blow lands (the slot's "contact").
 var _contact := {}
+## Slot clip name to the speed its loop plays at, 1 where the slot names none (its clip's
+## "speed": the old grey's idle slower than his pack's, so he reads as the old one).
+var _pace := {}
 var _busy_until := 0
 ## The telegraph whose tell is playing (0 for none), and when the tell's clip ends (msec).
 var _tell_id := 0
@@ -118,6 +121,8 @@ func _init(creature_slot: String, art: Node3D, pose: Node3D) -> void:
 	for clip: Dictionary in wanted:
 		if clip.has("contact"):
 			_contact[str(clip["name"])] = float(clip["contact"])
+		if clip.has("speed"):
+			_pace[str(clip["name"])] = float(clip["speed"])
 	clips = clip_map(wanted, library.get_animation_list())
 	# A glTF's clips come in playing once; these loop (set on the shared
 	# clips, the same for every instance of the art, before the rig is made).
@@ -128,7 +133,7 @@ func _init(creature_slot: String, art: Node3D, pose: Node3D) -> void:
 	rig = AnimRig.make(root if root != null else art, library, ArtKit.feel("creature_view.blend", BLEND), false, rng)
 	var idle := resolve("idle")
 	if idle != "":
-		rig.loop(idle)
+		rig.loop(idle, pace("idle"))
 	var skeletons := art.find_children("*", "Skeleton3D", true, false)
 	if not skeletons.is_empty():
 		_life = Life.new()
@@ -167,6 +172,19 @@ func resolve(clip: String) -> String:
 		if at == "":
 			break
 	return ""
+
+
+## The speed [param clip]'s loop plays at: the slot's "speed" on the clip that plays for it
+## (its own, else its fallback's: an alert standing in with the idle takes the idle's).
+func pace(clip: String) -> float:
+	var at := clip
+	for i in 4:
+		if clips.has(at):
+			return float(_pace.get(at, 1.0))
+		at = str(FALLBACKS.get(at, ""))
+		if at == "":
+			break
+	return 1.0
 
 
 ## Every drawn frame: what it does now from [param puppet]'s movement and
@@ -243,7 +261,7 @@ func _lying(monster: Monster, now: int) -> bool:
 func _loop(clip: String, scale: float) -> void:
 	var animation := resolve(clip)
 	if animation != "":
-		rig.loop(animation, scale)
+		rig.loop(animation, scale * pace(clip))
 
 
 ## [param clip] once through, at [param scale], busy till it ends.

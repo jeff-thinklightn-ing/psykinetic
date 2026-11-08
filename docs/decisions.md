@@ -7899,6 +7899,8 @@ puppet, plays it from what the sim replicates, the same on every peer:
 Its pick shape is a cylinder round its middle, which needs no turning.
 `tools/blender/export_slot.py` exports a rigged slot's actions with it. Client
 only; the protocol is unchanged.
+
+359 amended: a slot clip's own speed (animation; the coordinator's ask through enemy-ai, package "the old grey": "slower in his idle", so he reads as the old one; release's label). A creature slot's clip may carry "speed", how fast its loop plays (ArtCheck: a number, 0.25 to 2, else an error). CreatureView.pace(clip) gives the speed of the slot clip that plays for it (its own, else its fallback's, so an alert standing in with the idle takes the idle's), 1 where the slot names none; its loops (the first idle, each frame's gait or rest, a body getting up) play at their pace times it. One-shots and strikes keep their timing to the sim. creature.old_wolf's idle is 0.7. view_test (_test_creature_puppets: the idle and its stand-in at 0.7, the walk its own; the old grey's slot), art_kit_test (the speed checked). Client only; protocol unchanged; no new class_name.
 ## 358. levels/hills, a showcase of the ground's heights
 
 Jeff asked for a demo map with varied terrain heights: lows, highs, a

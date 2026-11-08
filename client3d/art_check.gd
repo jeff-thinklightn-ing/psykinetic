@@ -200,6 +200,10 @@ static func _check_rig(entry: Dictionary, node: Node3D) -> Array[String]:
 		var contact: Variant = clip.get("contact", ArtKit.feel("art_kit.clip_contact", ArtKit.CLIP_CONTACT))
 		if not (contact is float or contact is int) or float(contact) <= 0.0 or float(contact) >= 1.0:
 			out.append("error: \"%s\" clip's contact %s: a fraction of the clip, over 0 and under 1, where its blow lands" % [clip["name"], contact])
+		# The speed its loop plays at (CreatureView), where it isn't 1.
+		var speed: Variant = clip.get("speed", 1.0)
+		if not (speed is float or speed is int) or float(speed) < 0.25 or float(speed) > 2.0:
+			out.append("error: \"%s\" clip's speed %s: how fast its loop plays, 0.25 to 2" % [clip["name"], speed])
 		var names: Array = clip.get("names", [clip["name"]])
 		if names.any(func(name: String) -> bool: return have.has(name.to_lower())):
 			continue

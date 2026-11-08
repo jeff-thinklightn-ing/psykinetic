@@ -502,6 +502,11 @@ func _test_creature_rig() -> void:
 	_check(timed.call(0.35).is_empty() and timed.call(1.5).any(func(line: String) -> bool: return "contact" in line)
 			and timed.call("mid").any(func(line: String) -> bool: return "contact" in line),
 			"a clip's contact (where its blow lands, for CreatureView): a fraction of it, else an error")
+	var paced := func(speed: Variant) -> Array[String]:
+		return ArtCheck._check_rig({"clips": [{"name": "death", "names": ["death"], "speed": speed}]}, grey)
+	_check(paced.call(0.7).is_empty() and paced.call(0.1).any(func(line: String) -> bool: return "speed" in line)
+			and paced.call("slow").any(func(line: String) -> bool: return "speed" in line),
+			"a clip's speed (its loop's, for CreatureView): 0.25 to 2, else an error")
 	# A humanoid body's clips come from a shared library (clip_library), none in its .glb.
 	var body := Node3D.new()
 	body.add_child(Skeleton3D.new())
