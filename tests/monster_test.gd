@@ -1764,8 +1764,8 @@ func _ambush_cells() -> Array:
 func _test_ambush() -> void:
 	var grull_row := NamedEnemy.def("grull")
 	var skeech_row := NamedEnemy.def("skeech")
-	_check(is_equal_approx(float(grull_row["strength"]["hp"]), 2.2) and is_equal_approx(float(skeech_row["strength"]["hp"]), 2.0),
-		"the chiefs make a longer fight of it: hp 2.2 and 2.0 (%s, %s)" % [grull_row["strength"], skeech_row["strength"]])
+	_check(is_equal_approx(float(grull_row["strength"]["hp"]), 1.2) and is_equal_approx(float(skeech_row["strength"]["hp"]), 1.15),
+		"the chiefs make a longer fight of it: hp 1.2 and 1.15 on 823's kinds (%s, %s)" % [grull_row["strength"], skeech_row["strength"]])
 	var rows: Array[String] = ["##############", "#............#", "#.s..........#", "#............#", "##############"]
 	var e := _build(rows, {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
 	var skeech: Monster = e["s"][0]
@@ -2008,8 +2008,8 @@ func _test_given_strength() -> void:
 	e = _build(rows, {"s": {"named": "skeech"}, "b": {"named": "grull"}})
 	var skeech: Monster = e["s"][0]
 	var grull: Monster = e["b"][0]
-	_check(skeech.max_hp == roundi(sneak_hp * 2.0) and grull.max_hp == roundi(brute_hp * 2.2),
-		"the chiefs as spawned: skeech %d (a sneak's %d x 2.0), grull %d (a brute's %d x 2.2)" % [skeech.max_hp, sneak_hp, grull.max_hp, brute_hp])
+	_check(skeech.max_hp == roundi(sneak_hp * 1.15) and grull.max_hp == roundi(brute_hp * 1.2),
+		"the chiefs as spawned: skeech %d (a sneak's %d x 1.15), grull %d (a brute's %d x 1.2; 823)" % [skeech.max_hp, sneak_hp, grull.max_hp, brute_hp])
 	# A record made before the tune (the box's, from v0.1.206): its strength
 	# taken from the row at the next spawn, the rest of it kept.
 	var plain := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak6"})) as Monster
@@ -2023,12 +2023,12 @@ func _test_given_strength() -> void:
 	var again := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak9", "named": "skeech"})) as Monster
 	_room.add_child(again)
 	World.spawn(again, Vector2i(10, 1))
-	_check(again.max_hp == roundi(built_hp * 2.0) and is_equal_approx(float(World.named["skeech"]["strength"]["hp"]), 2.0),
+	_check(again.max_hp == roundi(built_hp * 1.15) and is_equal_approx(float(World.named["skeech"]["strength"]["hp"]), 1.15),
 		"an older record's strength: the row's at the next spawn (%d, %s)" % [again.max_hp, World.named["skeech"]["strength"]])
 	_check(int(World.named["skeech"]["lives"]) == 3 and World.named["skeech"]["card"] == {"seen": "Player1"} and str(World.named["skeech"]["name"]) == "Kobold chief",
 		"and nothing else of the record touched (%s)" % [World.named["skeech"]])
-	_check(is_equal_approx(NamedEnemy.given_strength("grull")["hp"], 2.2) and NamedEnemy.GIVEN_SPANS["hp"][1] > NamedEnemy.STRENGTH_SPANS["hp"][1],
-		"a given strength may pass the rolled spans")
+	_check(is_equal_approx(NamedEnemy.given_strength("grull")["hp"], 1.2) and NamedEnemy.GIVEN_SPANS["hp"][1] > NamedEnemy.STRENGTH_SPANS["hp"][1],
+		"a given strength is the row's, and may pass the rolled spans (823: grull's 1.2 within them)")
 	# A rolled strength stays as it rolled.
 	NamedEnemy.define_for_test("test_rolled", {"name": "Rolled One", "kind": "sneak"})
 	var rolled := EntityFactory.build(SPECS["s"].duplicate(true).merged({"name": "Sneak8", "named": "test_rolled"})) as Monster

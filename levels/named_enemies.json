@@ -1,7 +1,7 @@
 {
 	"_about": "Named enemies (decision 716): a level entity's \"named\": <id> spawns that one. Each: name, kind, rise_days (world-clock days dead before it rises; F7) or rise_s (real seconds: the barrow's band, 300, 714 amended (2)), strength {hp, damage, speed} (multipliers, fixed for life; left out: rolled once by its id). boss: true marks it a boss over its head (decision 752; a monsters.json kind may say it too, as the draugr's); trophy: an item id it holds while one is due to be won (Main.trophy_due: once per generation of its level), dropped where it falls and not kept (714); else its kept weapon, or its kind's. The barrow's band, the mound-breakers (714; lore's names, Jeff passed): dungeon puts \"named\": <id> on its robbers.",
 	"named": {
-		"brand": {"name": "Brand the Ox", "kind": "robber_brute", "rise_s": 300, "strength": {"hp": 1.4, "damage": 1.3, "speed": 0.9}, "trophy": "tomb_sledge", "boss": true},
+		"brand": {"name": "Brand the Ox", "kind": "robber_brute", "rise_s": 300, "strength": {"hp": 1.0, "damage": 1.3, "speed": 0.9}, "trophy": "tomb_sledge", "boss": true},
 		"crake": {"name": "Crake", "kind": "robber", "rise_s": 300},
 		"mott": {"name": "Mott", "kind": "robber", "rise_s": 300},
 		"nabb": {"name": "Nabb", "kind": "robber", "rise_s": 300},
@@ -11,9 +11,9 @@
 		"sedge": {"name": "Sedge", "kind": "robber", "rise_s": 300},
 		"tull": {"name": "Tull", "kind": "robber", "rise_s": 300},
 		"grull": {"_": "790 amended (2): Hollowfell's east chief, an orc brute at his post at the stair's foot (dungeon's mark: a monster_brute marker whose entity says named grull). He holds it: no further than holds cells after anyone, then back. Name off screen till Jeff picks (C:/dev/review/decisions/hollowfell-chiefs.md).",
-			"name": "Orc chief", "kind": "brute", "rise_days": 3, "strength": {"hp": 2.2, "damage": 1.3, "speed": 0.85}, "trophy": "rot_hammer", "boss": true, "holds": 3},
+			"name": "Orc chief", "kind": "brute", "rise_days": 3, "strength": {"hp": 1.2, "damage": 1.3, "speed": 0.85}, "trophy": "rot_hammer", "boss": true, "holds": 3},
 		"skeech": {"_": "790 amended (2): Hollowfell's south chief, a kobold sneak in the dark of the south chamber's way in (dungeon's mark: a monster_sneak marker whose entity says named skeech). It lurks: takes up no one until its side engages near it or it is struck, then flanks. Name off screen till Jeff picks.",
-			"name": "Kobold chief", "kind": "sneak", "rise_days": 3, "strength": {"hp": 2.0, "damage": 1.2, "speed": 1.1}, "trophy": "rot_spike", "boss": true, "lurks": true,
+			"name": "Kobold chief", "kind": "sneak", "rise_days": 3, "strength": {"hp": 1.15, "damage": 1.2, "speed": 1.1}, "trophy": "rot_spike", "boss": true, "lurks": true,
 			"moves": {"ambush": {"windup": 8, "damage": 5, "recover": 8, "cue_reach": 8}}}
 	},
 	"lines": {

@@ -640,6 +640,8 @@ func _test_remedy_heal() -> void:
 	_check(Items.effects_of("remedy", remedy.get("effects", [])) == [{"kind": "heal", "amount": 1.0, "ticks": 200}]
 			and Items.value_of("remedy") == 6 and remedy["made"] == {"by": "medicine_man", "from": {"herbs": 2}, "steps": 600, "stock": 3},
 			"1 hp a second for 200 ticks; worth 6, a shelf of 3, still 2 herbs (%s)" % [remedy.get("effects")])
+	var had_noticing := Monster.noticing
+	Monster.noticing = false  # The room's imps (20 hp since 823) still about: none strikes through the counts.
 	var had := host.buffs.duplicate(true)
 	var had_max := host.max_hp
 	host.max_hp = 100  # Room to heal 20 and more (a player's own is 20).
@@ -727,6 +729,7 @@ func _test_remedy_heal() -> void:
 	World._relocate(host, had_tile)
 	host.max_hp = had_max
 	host.hp = host.max_hp
+	Monster.noticing = had_noticing
 
 
 func _test_weapons() -> void:

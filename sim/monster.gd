@@ -701,6 +701,7 @@ func _init() -> void:
 	replicate("teeter")  # Decision 783: a rim's wobble.
 	replicate("ailments")
 	replicate("peaceable")
+	replicate("max_hp")  # 823: a named foe's strength scales it on the server; its bar reads it.
 	# Its bow drawn, its guard up: the tell a player steps out of the line by
 	# (decision 455).
 	replicate("raised")

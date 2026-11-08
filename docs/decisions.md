@@ -45105,3 +45105,34 @@ cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 
 spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The
 swap when the "map" message names the held neighbour, the clip's open edge at the seam, the fallback
 to the card for an unfinished neighbour, and a crossing test.
+
+## 823. Foes last longer: common foes' hp about 1.8x, and a foe's max hp told to clients
+
+The coordinator's approval, the pace program's last step; release's number; Jeff: "fights feel a
+little too fast", "fighting the robbers is not great". Package "foes last longer": this is combat's
+side (no CHANGELOG bullet); dungeon's side (fewer foes in the rooms that would drag: barrow_deep in
+threes led by a guard, the castle's west side split, Hollowfell's brute moved deeper) lands straight
+after and carries voice's line.
+
+With striking distance (699 amended), the led blows (338 amended (4)) and the two-handers (392
+amended (5)), a fight is read, not just traded, and a common foe fell before any of it showed:
+playtest's v0.1.207 set (C:/dev/review/pace/pace.md) has a robber down in 1.9 s to the great axe and
+2.6 s to the sword. Each common kind's max hp in levels/monsters.json is about 1.8x:
+skeleton 6 to 12, skeleton_guard 10 to 18, sneak 8 to 14, robber and bandit 10 to 18, wolf 12 to 20
+(outdoors too), robber_brute and bandit_brute 20 to 34; the imp and the brute, which took Monster's
+default 12, now say 20 and 22. Animals, the great bear, the draugr and the fallen knight are as they
+were. A named foe's strength still scales on top (NamedEnemy), so the chiefs' given hp is lowered to
+keep them near where they stood: Brand the Ox 1.4 to 1.0 (34), grull 2.2 to 1.2 (26), skeech 2.0 to
+1.15 (16). Named robbers' rolled strength (0.8 to 1.6) scales with the robber's 18.
+
+No cap on a blow's damage: a foe that lasts longer lands more blows, but none is a one-blow death
+from a fresh player (20 hp): the heaviest, Brand's tomb sledge, is 5 and 1 of impact, and it is told.
+playtest reruns the barrow clear after this lands, its bar: the bot is never downed from above 10 hp.
+
+A foe's max hp is told to clients: Monster replicates "max_hp" (net.gd SUBCLASS_REPLICATED; rev 53,
+shared with 819). NamedEnemy scales it on the server only, so a client kept the kind's base: a named
+robber of 14 showed 14/10 and its bar stayed full through its first 4 hp. Now its bar falls from the
+first hit. An old client keeps the kind's base.
+
+monster_test's chiefs' checks at the new given hp; level_test's old test room expects the imp row's 20 on its kindless monsters; items_test's remedy counts keep the room's imps from noticing. Server and client; protocol changed
+(rev 53 kept, its hash moves); no new class_name.

@@ -4,7 +4,7 @@
 		"flee_near_tiles": 4, "rout_hurt": 0.7, "dread_flee_below": 0.5, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
 		"band_min": 3, "lead_ticks": 3},
 	"imp": {
-		"body": {"mass": 40.0},
+		"body": {"max_hp": 20, "mass": 40.0},
 		"tactic": "dart",
 		"idle": "wander",
 		"opens_doors": true,
@@ -17,7 +17,7 @@
 		"aim_hold_max": 12
 	},
 	"brute": {
-		"body": {"mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
+		"body": {"max_hp": 22, "mass": 70.0, "move_ticks": 5.0, "attack_ticks": 14, "attack_damage": 2},
 		"tactic": "heavy",
 		"idle": "guard",
 		"opens_doors": false,
@@ -30,7 +30,7 @@
 		"aim_hold_max": 8
 	},
 	"sneak": {
-		"body": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 8},
+		"body": {"mass": 25.0, "move_ticks": 3.0, "max_hp": 14},
 		"tactic": "flank",
 		"idle": "patrol",
 		"opens_doors": true,
@@ -74,7 +74,7 @@
 	},
 	"wolf": {
 		"side": "wild", "role": "predator", "herd": "wolf", "label": "Wolf", "art": "creature.wolf", "diet": ["rabbit", "deer", "stag"],
-		"body": {"mass": 40.0, "max_hp": 12, "move_ticks": 2.8, "attack_damage": 2, "sight_range": 8},
+		"body": {"mass": 40.0, "max_hp": 20, "move_ticks": 2.8, "attack_damage": 2, "sight_range": 8},
 		"senses": {"cone": 160, "night": 0.6, "hearing": 1.5, "alert_sight": 2, "notice": 1.2},
 		"tactic": "dart", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 15,
 		"temperament": {"bold": 0, "cautious": 1, "cowardly": 0},
@@ -131,7 +131,7 @@
 	"skeleton": {
 		"bound": true,
 		"label": "Skeleton",
-		"body": {"mass": 30.0, "move_ticks": 4.0, "max_hp": 6, "sight_range": 5},
+		"body": {"mass": 30.0, "move_ticks": 4.0, "max_hp": 12, "sight_range": 5},
 		"tactic": "plain",
 		"idle": "homeward",
 		"opens_doors": true,
@@ -146,7 +146,7 @@
 	"skeleton_guard": {
 		"bound": true,
 		"label": "Barrow guard",
-		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 10, "attack_damage": 2, "sight_range": 5},
+		"body": {"mass": 45.0, "move_ticks": 4.0, "max_hp": 18, "attack_damage": 2, "sight_range": 5},
 		"tactic": "plain",
 		"idle": "guard",
 		"opens_doors": true,
@@ -162,7 +162,7 @@
 	"robber": {
 		"label": "Grave robber",
 		"person": "headwear=hood garb=none apron=no clothes=grave",
-		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10, "sight_range": 5},
+		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 18, "sight_range": 5},
 		"senses": {"cone": 120, "night": 0.2, "hearing": 1.0, "alert_sight": 2, "notice": 1.0},
 		"tactic": "flank",
 		"idle": "wander",
@@ -182,7 +182,7 @@
 	"robber_brute": {
 		"label": "Big grave robber",
 		"person": "headwear=hood garb=none apron=no clothes=grave build=heavy stature=tall",
-		"body": {"mass": 110.0, "move_ticks": 4.5, "max_hp": 20, "attack_ticks": 14, "attack_damage": 2, "sight_range": 5},
+		"body": {"mass": 110.0, "move_ticks": 4.5, "max_hp": 34, "attack_ticks": 14, "attack_damage": 2, "sight_range": 5},
 		"senses": {"cone": 120, "night": 0.2, "hearing": 0.8, "alert_sight": 1, "notice": 0.7},
 		"tactic": "heavy",
 		"idle": "wander",
@@ -200,7 +200,7 @@
 	"bandit": {"_": "793: the bandits' (factions.json) robbers of the living on the forest paths, their camps' and raids' kinds; at first the grave robber's rows and body in a vest (pc-character's look comes in 793, pc-character's side).",
 		"label": "Bandit",
 		"person": "headwear=hood garb=vest apron=no clothes=forest",
-		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 10, "sight_range": 5},
+		"body": {"mass": 70.0, "move_ticks": 3.5, "max_hp": 18, "sight_range": 5},
 		"senses": {"cone": 120, "night": 0.2, "hearing": 1.0, "alert_sight": 2, "notice": 1.0},
 		"tactic": "flank",
 		"idle": "wander",
@@ -218,7 +218,7 @@
 	"bandit_brute": {
 		"label": "Big bandit",
 		"person": "headwear=hood garb=vest apron=no clothes=forest build=heavy stature=tall",
-		"body": {"mass": 110.0, "move_ticks": 4.5, "max_hp": 20, "attack_ticks": 14, "attack_damage": 2, "sight_range": 5},
+		"body": {"mass": 110.0, "move_ticks": 4.5, "max_hp": 34, "attack_ticks": 14, "attack_damage": 2, "sight_range": 5},
 		"senses": {"cone": 120, "night": 0.2, "hearing": 0.8, "alert_sight": 1, "notice": 0.7},
 		"tactic": "heavy",
 		"idle": "wander",

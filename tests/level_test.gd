@@ -184,6 +184,8 @@ func _test_test_room_unchanged() -> void:
 			# Crates carry things now (decision 259): a Cargo of 4, nothing else changed.
 			b["script"] = Level.CARGO
 			b["props"] = {"capacity": 4}
+		elif b["script"] == Level.MONSTER:
+			b["props"]["max_hp"] = 20  # 823: the imp row's max hp, a kindless monster's body.
 		for key in ["script", "shape", "name", "tile", "tint", "props"]:
 			if a.get(key) != b.get(key):
 				same = false
