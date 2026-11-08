@@ -433,7 +433,7 @@ const QUIET_WANT_LEAD := "If you speak now, say so, in your own words."
 ## A place spoken of (803 amended (6), the coordinator after pair 7: given
 ## everything, she answered with made-up mood): the code picks the one real
 ## thing (place_brief), and she is asked of that alone.
-const PLACE_LEAD := "Answer in one line, in your own words. Don't make up what happened here; what you don't know, leave out. Never call it quiet, calm or peaceful. Begin with the thing itself; never begin with 'This place'."
+const PLACE_LEAD := "Answer in one line, in your own words. Don't make up what happened here, or what lies here; what you don't know, leave out. Never call it quiet, calm or peaceful. Begin with the thing itself; never begin with 'This place'."
 ## The direct question on place_brief's one thing, by its kind (the
 ## coordinator after voice8: qwen3:14b passed over a fact merely told, "the
 ## walls remember" for the Mughouse; a question on it is harder to ignore).
@@ -454,7 +454,7 @@ const NOTICE_SKIP: Array[String] = ["gold", "catch", "practice", "item", "leisur
 const NOTICE_LEAD := "If you speak now, react to that, briefly, in your own way: one short line."
 ## A place found (803 amended (7), the coordinator after the A/B): she is told
 ## the one thing there to speak of, and never to open with "This place".
-const NOTICE_PLACE_LEAD := "If you speak now, say something of %s, briefly, in your own way: one short line. Begin with the thing itself; never begin with 'This place'."
+const NOTICE_PLACE_LEAD := "If you speak now, say something of %s, briefly, in your own way: one short line. Begin with the thing itself; never begin with 'This place'. Name nothing lying in it or on it unless you were told of it."
 const NOTICE_BOND_TIERS := {"fond": "fond of", "close": "close to", "devoted": "devoted to"}
 const NOTICE_BOND_LEAD := "If you want, say something of it, briefly; you need not."
 const QUIET_ASK_LEAD := "If you speak now, ask them, in your own words: a question, nothing else."
@@ -504,6 +504,13 @@ const ONE_WORD_ANSWERS: Array[String] = ["yes", "no", "ready", "here", "coming",
 ## Words that ask about what she carries: only then is her pack in her
 ## prompt, and only then may she speak of her lantern or bandages.
 const ITEM_WORDS := "\\b(carry\\w*|pack|bag|items?|lanterns?|bandag\\w*|kit|holding|what (do|have) you (got|have))\\b"
+## A sentence placing a thing somewhere (803 amended (8)): "the niche holds
+## a key", "there is a sword", "a key lies in it". With an item kind named
+## that is not there (invented_item), it goes.
+const PLACED := "(?i)\\b(holds?|holding|hides?|hiding|hidden|contains?|containing|lies|lying|rests?|resting|tucked|stashed|waits?|inside|there('?s| is| are| lies| lie| sits))\\b"
+## Said once as she breaks a wait or a hold for her player near death
+## (803 amended (8); voice's words).
+const BREAK_HOLD := "Orders or no, I'm not standing here while they kill you. I'm coming."
 const OWN_ITEMS := "\\b(lanterns?|bandag\\w*|pack)\\b"
 ## Narration in a line, not speech: her own name and a verb, a gesture,
 ## or herself moving into place ("You move to stand between ...").
@@ -722,6 +729,8 @@ var _last_speech_tick := -1000
 ## otherwise is a fixed one), and every companion's voice counts since the
 ## journal's last "[voice]" line (voice_report).
 var _saying_voice := false
+## The item kind spoken() last dropped a sentence for (invented_item), for the log.
+var _invented := ""
 ## Decision 803 amended (step 4): her quiet moments. The tick the next may
 ## come; how many times longer the gap is after quiet moments she let pass
 ## ("..."); the ticks of this hour's; the last focus; the focus told her
@@ -3002,9 +3011,109 @@ func _watch() -> void:
 			waiting.get("own", true), waiting.get("report", false))
 	elif not fight:
 		_quiet_moment()
+	_tend_keeper_falling()
 	_tend_reply()
 	_tend_fish()
 	_tend_notice()
+
+
+## The item kinds by their names' last word (803 amended (8)): "iron key"
+## a key, "fishing rod" a rod; three letters at least.
+static var _item_nouns: Dictionary[String, bool] = {}
+
+
+static func item_nouns() -> Dictionary[String, bool]:
+	if _item_nouns.is_empty():
+		for id: String in Items.all():
+			var noun := _item_noun(id)
+			if noun.length() >= 3:
+				_item_nouns[noun] = true
+	return _item_nouns
+
+
+static func _item_noun(id: String) -> String:
+	var words := str(Items.all().get(id, {}).get("name", id)).to_lower().replace("_", " ").split(" ", false)
+	return words[-1] if not words.is_empty() else ""
+
+
+## The item kind [param sentence] places somewhere (PLACED) that is not
+## among [param there] (nouns_there), "" for none (803 amended (8)): the
+## barrow's bare niche said to hold "a rusted iron key". Talk of a thing
+## not placed anywhere ("a sword's no use against that") is left alone.
+static func invented_item(sentence: String, there: Dictionary) -> String:
+	if RegEx.create_from_string(PLACED).search(sentence) == null:
+		return ""
+	var nouns := item_nouns()
+	var words := _plain(sentence).split(" ", false)
+	var kinds: Array[String] = []
+	for word in words:
+		var kind := ""
+		for noun: String in [word, word.trim_suffix("es"), word.trim_suffix("s")]:
+			if nouns.has(noun):
+				kind = noun
+				break
+		kinds.append(kind)
+	for i in kinds.size():
+		if kinds[i].is_empty() or i + 1 < kinds.size() and not kinds[i + 1].is_empty():
+			continue  # One kind before another names what it is made of ("an iron key"): the key is the thing.
+		if not there.has(kinds[i]):
+			return kinds[i]
+	return ""
+
+
+## The item kinds that are there for her to speak of (803 amended (8)):
+## carried by her or her player, lying within SIGHT_RANGE of her, or named
+## in what she was told lately (her exchange's turns from others).
+func nouns_there() -> Dictionary:
+	var there := {}
+	var nouns := item_nouns()
+	for body: GridEntity in [self, keeper]:
+		if is_instance_valid(body):
+			for id in body.slots:
+				if not id.is_empty():
+					there[_item_noun(id)] = true
+	if World.zone != null:
+		for cell: Vector2i in World.zone.ground:
+			if World.distance(tile, cell) <= SIGHT_RANGE:
+				for id in World.ground_at(cell):
+					there[_item_noun(id)] = true
+	for turn: Dictionary in _exchange:
+		if turn["role"] == "user":
+			for word in _plain(str(turn["text"])).split(" ", false):
+				for noun: String in [word, word.trim_suffix("es"), word.trim_suffix("s")]:
+					if nouns.has(noun):
+						there[noun] = true
+	return there
+
+
+## Her player near death breaks a wait or a hold (803 amended (8); the
+## coordinator, after playtest's place-b run 2: she held a plate four minutes
+## while two robbers beat them, every stance her voice asked refused): with
+## them under REFLEX_BELOW and a foe of hers within GUARD_RANGE of them, she
+## leaves it once, says BREAK_HOLD, and keeps beside them fighting (GUARD).
+## She does not go back to it on her own: her player orders her again.
+func _tend_keeper_falling() -> void:
+	if order != "wait" and stance != Stance.HOLD:
+		return
+	if not _sleeping.is_empty() or World.is_downed(self) or not _alive(keeper) or keeper.max_hp <= 0 			or float(keeper.hp) / keeper.max_hp >= REFLEX_BELOW:
+		return
+	var foe: GridEntity = null
+	for entity in World.get_entities():
+		if _hostile(entity) and World.distance(keeper.tile, entity.tile) <= GUARD_RANGE:
+			foe = entity
+			break
+	if foe == null:
+		return
+	var was := order if not order.is_empty() else "hold"
+	order = ""
+	_instruction = ""
+	_serial += 1
+	_set_stance(Stance.GUARD, _serial, "order")
+	_say(BREAK_HOLD, true, true)  # Said in the fight: it is why she comes.
+	_narrate("%s is near death with %s on them: you leave where you were told to %s and go to fight beside them." % [
+		keeper_name(), refer(foe, false), was])
+	_log({"kind": "stance", "companion": _name_of(self), "mind": "hands", "trigger": "her player near death, a foe on them",
+		"stance": "GUARD", "outcome": "applied", "note": "the order to %s broken" % was})
 
 
 ## Decision 803 amended (step 4): companion_traits.json "quiet" over
@@ -4193,7 +4302,10 @@ static func render(messages: Array) -> String:
 
 ## Something seen or done, for the exchange: "[Sneak died.]".
 func _narrate(text: String) -> void:
-	_add_turn("user", "[%s]" % text.strip_edges(), true)
+	var told := "[%s]" % text.strip_edges()
+	if not _exchange.is_empty() and _exchange[-1]["role"] == "user" and str(_exchange[-1]["text"]) == told:
+		return  # The same again in a row is told once (803 amended (8): a lunge leapt clear of, five times in one turn).
+	_add_turn("user", told, true)
 
 
 ## A turn of the exchange, written to her transcript as well. Words in a
@@ -4609,7 +4721,8 @@ func place_brief(zone_name: String, new_today := false) -> Dictionary:
 				break
 	if not named.is_empty():
 		var the_named := "the " + named.substr(2) if named.begins_with("a ") else named  # "a shed" asked as "the shed".
-		return {"text": "%s There is %s here." % [head, named], "real": true, "kind": "named", "sight": the_named,
+		# Nothing she was told lies in it (803 amended (8): playtest's barrow niche, "holds a rusted iron key").
+		return {"text": "%s There is %s here; you were told of nothing in it." % [head, named], "real": true, "kind": "named", "sight": the_named,
 			"ask": PLACE_ASK["named"] % the_named}
 	var knower := _name_of(self).to_lower() if Lore.knowers().has(_name_of(self).to_lower()) else "townsfolk"
 	# Never a place's bare name (its ".name" fact, "...locals call it the Mughouse"): the
@@ -5303,7 +5416,7 @@ func _take_result(result: Dictionary) -> void:
 	elif line.is_empty():
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = raw_line
-		entry["note"] = "nothing left once cleaned: said lately, narration, her own things, or not hers to say"
+		entry["note"] = "nothing left once cleaned: said lately, narration, her own things, or not hers to say" if _invented.is_empty() 				else "named a %s that is not there" % _invented
 	elif not spoken_to and _plain(line).split(" ", false).size() < FRAGMENT_WORDS and not line.ends_with("!"):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
@@ -5363,11 +5476,12 @@ func _set_stance(wanted: int, serial: int, source: String) -> void:
 
 
 ## Says [param line] (over her, to everyone) unless the rate limit holds it
-## back; [param always] for an answer to her player and her own notices.
-func _say(line: String, always: bool) -> bool:
+## back; [param always] for an answer to her player and her own notices;
+## [param in_fight] through a fight's hush (BREAK_HOLD, 803 amended (8)).
+func _say(line: String, always: bool, in_fight := false) -> bool:
 	if World.is_downed(self):
 		return false  # Downed (decision 544): no word.
-	if quiet():
+	if quiet() and not in_fight:
 		_held_tongue("say")  # A fight (decision 675): dropped, an answer that came back mid-fight too.
 		return false
 	if not always and World.tick - _last_speech_tick < SPEECH_INTERVAL_TICKS:
@@ -5450,6 +5564,8 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 	var name_list := RegEx.create_from_string(NAME_LIST)
 	var kept: Array[String] = []
 	var to := ""
+	_invented = ""
+	var there := nouns_there()
 	for raw in _sentences(text):
 		var sentence := raw.strip_edges()
 		var plain := _plain(sentence)
@@ -5483,6 +5599,10 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 			continue
 		if not items_asked and items.search(sentence) != null:
 			continue
+		var invented := invented_item(sentence, there)
+		if not invented.is_empty():
+			_invented = invented
+			continue  # A thing placed there that is not (803 amended (8)).
 		plain = _plain(sentence)
 		if plain.is_empty() or repeated.has(plain):
 			continue

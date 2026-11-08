@@ -42814,6 +42814,29 @@ told "The fighting is over." (no longer "... It is quiet.", which led her place 
 asked once; the arrival notice both ways; the A/B's arm B checks). Server only, protocol unchanged, no
 new class_name.
 
+803 amended (8) (2026-11-08, release's label; the coordinator's approval of playtest's place-b report,
+C:/dev/review/placeb/placeb.md). (1) Her player near death breaks a wait or a hold: in run 2 she held a
+plate four minutes while two robbers beat her player, every stance her voice asked refused ("her
+player's order (wait) stands"; only her spoken instruction lapsed at their last threshold). Now
+Companion._tend_keeper_falling, each tick: on a "wait" order or HOLD, her player alive, under
+REFLEX_BELOW, and a foe of hers within GUARD_RANGE of them, she leaves it once: the order and the
+instruction go, her stance is GUARD (beside them, fighting whatever comes at either), she says
+BREAK_HOLD through the fight's hush (_say's in_fight; voice's words: "Orders or no, I'm not standing
+here while they kill you. I'm coming."), it is narrated and logged. She does not take the wait up
+again; her player orders her. A rest is left as it was (it ends on monsters near already). (2) No
+invented things: the barrow's bare niche got "The niche holds a rusted iron key." and "...a rusted
+sword". The prompt: PLACE_LEAD "Don't make up what happened here, or what lies here"; a named place's
+brief "There is %s here; you were told of nothing in it."; NOTICE_PLACE_LEAD "Name nothing lying in it
+or on it unless you were told of it." Her output: spoken() drops a sentence that places something
+(PLACED: holds, lies, hidden, there is...) naming an item kind (item_nouns: each item's name's last
+word) not there (nouns_there: carried by her or her player, on the ground within SIGHT_RANGE, or
+named in her exchange's turns from others); talk of a thing not placed ("a sword's no use against
+that") is kept (the coordinator's watch: playtest's next tour counts the drops). A line left empty is
+"dropped", its note naming the item. (3) The same narration twice in a row is told once ("[You leap
+clear of Robber6's lunge.]" five times in one turn). companion_test _test_break_hold (60% holds; 20%
+with a foe beside them, broken once, GUARD, not resumed) and _test_invented_item. Server only,
+protocol unchanged, no new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

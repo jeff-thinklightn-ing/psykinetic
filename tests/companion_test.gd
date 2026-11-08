@@ -98,6 +98,8 @@ func _ready() -> void:
 	_test_wants()
 	_test_talk_rate()
 	_test_tomb()
+	_test_break_hold()
+	_test_invented_item()
 	_test_companion_verb()
 	_test_fishing()
 	_test_reed_pond_cells()
@@ -1866,6 +1868,72 @@ func _test_tomb() -> void:
 	_main._set_mood(record)
 	pet.room_of = func(cell: Vector2i) -> String: return Level.laid_room_at(Level.load_level(pet.zone), cell)
 	_settle(pet)
+
+
+## Her player near death breaks a wait (803 amended (8); the coordinator,
+## after playtest's place-b run 2): at 60% she holds; under REFLEX_BELOW with
+## a foe beside them she leaves it once, says so through the fight's hush,
+## and keeps beside them (GUARD); she does not take the wait up again.
+func _test_break_hold() -> void:
+	print("
+== her player near death: she leaves her wait to fight beside them (803 amended (8)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	_settle(pet)
+	var hp_was := owner.hp
+	var foe_at := Vector2i(-1, -1)
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 1), Vector2i(-1, -1)]:
+		if World.is_free(owner.tile + step):
+			foe_at = owner.tile + step
+			break
+	pet._carry_out({"verb": "wait"}, "Wait here.")
+	_check(pet.order == "wait" and pet.stance == Companion.Stance.HOLD, "told to wait: she holds (%s, %s)" % [pet.order, pet.stance_name()])
+	var foe := _spawn_imp(foe_at)
+	owner.hp = int(owner.max_hp * 0.6)
+	pet._tend_keeper_falling()
+	_check(pet.order == "wait" and pet.stance == Companion.Stance.HOLD, "her player at 60% with a foe beside them: she holds still")
+	owner.hp = maxi(int(owner.max_hp * 0.2), 1)
+	pet._tend_keeper_falling()
+	var said := pet._said.count(Companion.BREAK_HOLD)
+	_check(pet.order.is_empty() and pet.stance == Companion.Stance.GUARD and said == 1,
+		"at 20%% with a foe on them: the wait broken, beside them fighting, said once (%s, %s, %d)" % [pet.order, pet.stance_name(), said])
+	pet._tend_keeper_falling()
+	for i in 10:
+		World.step()
+	_check(pet._said.count(Companion.BREAK_HOLD) == 1 and pet.order.is_empty() and pet.stance != Companion.Stance.HOLD,
+		"once only, and she does not go back to waiting on her own")
+	World.despawn(foe)
+	owner.hp = hp_was
+	_kill_monsters()
+	_settle(pet)
+
+
+## No invented things (803 amended (8); playtest's barrow niche, "The niche
+## holds a rusted iron key."): a sentence placing an item kind that is not
+## there goes; one that is there, or talk of a thing not placed, stays.
+func _test_invented_item() -> void:
+	print("
+== she names no thing that is not there (803 amended (8)) ==")
+	var pet := _companion()
+	_check(Companion.item_nouns().has("key") and Companion.item_nouns().has("sword"), "item kinds by their names' last word (key, sword)")
+	var bare := {}
+	_check(Companion.invented_item("The niche holds a rusted iron key.", bare) == "key"
+			and Companion.invented_item("There's a sword lying in the dust.", bare) == "sword",
+		"a key or a sword placed where none is: named, to go")
+	_check(Companion.invented_item("A sword's no use against that.", bare).is_empty()
+			and Companion.invented_item("The niche is bare and cold.", bare).is_empty(),
+		"talk of a thing not placed anywhere, or a bare niche: kept")
+	_check(Companion.invented_item("The niche holds a rusted iron key.", {"key": true}).is_empty(), "a key that is there: kept")
+	var was_said := pet._said.duplicate()
+	var exchange_was := pet._exchange.duplicate(true)
+	pet._exchange.clear()  # Nothing told her of a key lately.
+	var key_about := pet.nouns_there().has("key")
+	var line := pet.spoken("The niche is cut deep. It holds a rusted iron key.", false, true)
+	_check(key_about or line == "The niche is cut deep." and pet._invented == "key",
+		"in her line, the invented key's sentence goes and the rest is said (%s)" % line)
+	pet._exchange = exchange_was
+	pet._said = was_said
 
 
 ## Which water fishes (805 amended (8)): a pool of eight cells or more, the
@@ -3844,7 +3912,7 @@ func _test_quiet_moment() -> void:
 	World.holdings._places.erase(zone_place)
 	World.holdings._places.erase(spot_place)
 	_check(not "There is the %s" % Companion.place_name(World.zone.name) in str(only_zone["text"]) and with_spot["kind"] == "named"
-			and str(with_spot["text"]).ends_with("There is the old well here.") and with_spot["ask"] == "What do you make of the old well?",
+			and str(with_spot["text"]).ends_with("There is the old well here; you were told of nothing in it.") and with_spot["ask"] == "What do you make of the old well?",
 		"a named spot, not the place's own name, and asked of by name (%s; %s; %s)" % [only_zone["text"], with_spot["text"], with_spot["ask"]])
 	_check(str(nowhere["ask"]).is_empty() and (Companion.PLACE_LITTLE in pet.place_words_now()) == (not bool(pet.place_brief(World.zone.name)["real"])),
 		"nothing real: no question, PLACE_LITTLE")
