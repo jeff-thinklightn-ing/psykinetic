@@ -127,7 +127,10 @@ func _test_preload() -> void:
 	_stand(_main.PRELOAD_CELLS + 20)
 	await _frames(_main.NEIGHBOUR_LOOK_FRAMES * 2)
 	_check(_main._neighbour == view, "walking off: kept (one neighbour, let go only for another)")
+	# Off before it crosses: at the wilds' end of the link the held would
+	# start building at once, and still be building as the scene quits.
+	_main.seamless_crossings = false
 	_check(_main.travel(Net.local_id, "wilds", "from_held"), "the host crosses to the wilds")
 	await _frames(2)
-	_check(_main._neighbour == null and not is_instance_valid(view) or view.is_queued_for_deletion(),
+	_check(_main._neighbour == null and (not is_instance_valid(view) or view.is_queued_for_deletion()),
 			"the crossing lets it go (step 2: every crossing as today)")
