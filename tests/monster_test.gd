@@ -1821,6 +1821,7 @@ func _test_ambush() -> void:
 	_test_lunge()
 	_test_plain_lead()
 	_test_stop_to_strike()
+	_test_heavy_cycle()
 	_test_given_strength()
 
 
@@ -1986,6 +1987,32 @@ func _test_stop_to_strike() -> void:
 		World.step()
 	_check(lands >= 0 and skeleton.next_move_tick < lands + 4,
 		"strike_recover_ticks 0: free to step once it lands (next step %d, landed %d)" % [skeleton.next_move_tick, lands])
+
+
+## 338 amended (5) (combat's numbers): a HEAVY one's own wind-up comes out
+## of its cycle, as a lead does: its blows land attack_ticks_of apart, not
+## that and its windup_ticks.
+func _test_heavy_cycle() -> void:
+	print("\n== 338 amended (5): a HEAVY one's wind-up out of its cycle ==")
+	var e := _build(["#######", "#.Pb..#", "#######"])
+	var brute: Monster = e["b"][0]
+	var player: Player = e["P"][0]
+	_bold(brute)
+	brute.target = player
+	brute.next_attack_tick = 0
+	var struck: Array[int] = []
+	var hp := player.hp
+	for i in 80:
+		World.step()
+		if player.hp < hp:
+			struck.append(World.tick)
+			hp = player.hp
+		if player.hp <= 0:
+			break
+	var cycle := World.attack_ticks_of(brute)
+	var apart := struck[1] - struck[0] if struck.size() >= 2 else -1
+	_check(struck.size() >= 2 and brute.tactic == Monster.Tactic.HEAVY and apart <= cycle + brute.cooldown_spread,
+		"its blows land %d ticks apart: its cycle %d, not with its windup %d on top (struck %s)" % [apart, cycle, brute.windup_ticks, struck])
 
 
 ## 790 amended (4): the crypt robbers' told lunge, from in front or

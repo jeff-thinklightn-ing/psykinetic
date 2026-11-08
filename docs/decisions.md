@@ -35898,6 +35898,17 @@ _test_fight_panel's 20 rows; push_test _test_no_attack_mid_step (its step ended,
 hits). One never moved (_moved_tick -1) stands settled. Carries voice's package bullet. Server only, protocol unchanged, no new
 class_name.
 
+338 amended (5): a HEAVY one's own wind-up out of its cycle (combat's numbers and ask, after enemy-ai's armed
+brute trace, C:/dev/review/enemy-ai/brute_probe3.txt: playtest's brute "holding off" was plain cadence, a
+blow every 26 ticks against its hammer's 20, its windup_ticks 6 on top of attack_ticks_of; no knockback, guard
+or spoiling; release's label). The HEAVY tactic's own wind-up (Monster._strike's _windup, now with its
+"began") sets, when it falls (_wind_on), next_attack_tick no later than began + World.attack_ticks_of, as
+338 amended (4)'s lead does in World, so it strikes as often as its row says; attack_ticks and windup_ticks
+unchanged, its stop-to-strike recover after the fall as before. Every HEAVY kind: the brutes (the plain one,
+the robbers' and the bandits'), the wild boar. A heavy weapon's own wind-up (World.try_wind_up, the draugr's
+battle axe) is not this. monster_test _test_heavy_cycle (blows attack_ticks_of apart, not and windup_ticks).
+Voice's bullet. Server only, protocol unchanged, no new class_name.
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,

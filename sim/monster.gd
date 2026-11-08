@@ -1486,7 +1486,7 @@ func _strike() -> void:
 				# Wound up on where it will be (lead-the-target): that way.
 				var to := _run_on(windup_ticks)[-1] - World.body_centre(self)
 				direction = Vector2i(roundi(cos(snappedf(to.angle(), PI / 4.0))), roundi(sin(snappedf(to.angle(), PI / 4.0))))
-			_windup = {"target": target, "lands": World.tick + windup_ticks, "direction": direction, "from": tile}
+			_windup = {"target": target, "lands": World.tick + windup_ticks, "direction": direction, "from": tile, "began": World.tick}
 			World.face(self, direction)
 			_world_winding(direction, windup_ticks)
 		Tactic.FLANK:
@@ -1522,11 +1522,15 @@ func _wind_on() -> void:
 	# cannot be put in a GridEntity.
 	var aimed: Variant = _windup["target"]
 	var direction: Vector2i = _windup["direction"]
+	var began := int(_windup["began"])
 	_windup = {}
 	if is_instance_valid(aimed) and (aimed as GridEntity).spawned and _in_strike_reach(aimed as GridEntity):
 		World.try_attack(self, aimed as GridEntity)
 	else:
 		World.try_swing(self, direction)
+	# Out of its cycle (338 amended (5), combat's numbers; as a lead is,
+	# 338 amended (4)): its next blow attack_ticks_of after it began winding.
+	next_attack_tick = mini(next_attack_tick, began + World.attack_ticks_of(self))
 	_recover_after_blow()  # Landed or swung at the air: it stands (338 amended (4)).
 
 
