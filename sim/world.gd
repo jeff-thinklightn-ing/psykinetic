@@ -704,6 +704,12 @@ var _water: Dictionary[Vector2i, bool] = {}
 ## Fords (decision 505): shallow water walked through at FORD_TICK_SCALE;
 ## floor.
 var _fords: Dictionary[Vector2i, bool] = {}
+## Each zone's fishable water (805 amended (8)): zone name -> {water cell ->
+## its body's key}, fish_waters_of its terrain, set each time it is laid.
+var _fish_waters: Dictionary[String, Dictionary] = {}
+## A body's stock (pond_at), "<zone>/<key>" -> the fishing place over it or
+## the body's own id; built as asked, cleared when a zone is laid.
+var _fish_stock_of: Dictionary[String, String] = {}
 ## A solid building's cells (terrain "solid", decision 550): no floor, and
 ## they stop sight and light as a wall does.
 var _solid: Dictionary[Vector2i, bool] = {}
@@ -2138,6 +2144,8 @@ func _set_terrain(terrain: Dictionary) -> void:
 		_solid[cell] = true
 	for cell: Vector2i in terrain.get("fords", []):
 		_fords[cell] = true
+	_fish_waters[zone.name] = fish_waters_of(terrain)
+	_fish_stock_of.clear()
 	_load_cover(terrain)
 	for t: Vector2i in terrain["floor"]:
 		_floor[t] = true
@@ -7699,6 +7707,9 @@ func _tend_wounds() -> void:
 
 ## A rod's reach: water within this many cells of the angler (any way round).
 const FISH_REACH := 2
+## The least cells a body of water fishes with (805 amended (8)): a pool
+## (standing water, no stream through it) or a river's wide reach.
+const FISH_BODY_LEAST := 8
 ## The cast's flight: the float in the air, then on the water.
 const FISH_CAST_TICKS := 15
 ## The wait after the cast lands, before the bite: FISH_WAIT_LEAST to
@@ -7759,16 +7770,101 @@ func cast_cell(entity: GridEntity) -> Vector2i:
 	return best
 
 
-## The fishing place (maps' place of kind "fishing", Holdings' id) whose
-## ground takes in [param cell] or [param from], "" for none.
-func pond_at(cell: Vector2i, from := NO_CELL) -> String:
-	if holdings == null:
+## The stock [param cell]'s water fishes from (805 amended (8)), "" if it
+## fishes none (no water, a ford, a body too small, a narrow or bridged
+## stream): a fishing place over any cell of its body (maps' "fishing"
+## place, Holdings' id: its stock and its name), else the body's own id,
+## "<zone>/pool_<x>_<y>" or "<zone>/river_<x>_<y>" (pond_name). The angler's
+## cell, [param _from], no longer decides: any bank of a body fishes it.
+func pond_at(cell: Vector2i, _from := NO_CELL) -> String:
+	return pond_in(zone.name, cell)
+
+
+## pond_at in zone [param zone_name] (laid once at least).
+func pond_in(zone_name: String, cell: Vector2i) -> String:
+	var waters: Dictionary = _fish_waters.get(zone_name, {})
+	var key := str(waters.get(cell, ""))
+	if key.is_empty():
 		return ""
-	for id in holdings.places_in(zone.name):
-		if str(holdings.place(id).get("kind", "")) == "fishing" \
-				and (holdings.covers(id, cell) or from != NO_CELL and holdings.covers(id, from)):
-			return id
-	return ""
+	var body := "%s/%s" % [zone_name, key]
+	if not _fish_stock_of.has(body):
+		var stock := body
+		if holdings != null:
+			for id in holdings.places_in(zone_name):
+				if str(holdings.place(id).get("kind", "")) != "fishing":
+					continue
+				for each: Vector2i in waters:
+					if waters[each] == key and holdings.covers(id, each):
+						stock = id
+						break
+				if stock != body:
+					break
+		_fish_stock_of[body] = stock
+	return _fish_stock_of[body]
+
+
+## What a stock (pond_at's) is called: its fishing place's name ("the
+## pond"), else "the river" for a river's reach and "a pool" for a pool
+## (805 amended (8)).
+func pond_name(pond: String) -> String:
+	if holdings != null and holdings.all_places().has(pond):
+		return str(holdings.place(pond).get("name", ""))
+	return "the river" if pond.get_file().begins_with("river_") else "a pool"
+
+
+## [param terrain]'s fishable water (805 amended (8)): water cell -> its
+## body's key. A body is 8-connected "water" (never a ford). One no stream
+## path runs through is a pool, "pool_<x>_<y>", with FISH_BODY_LEAST cells
+## or more; one a stream runs through is the river, "river_<x>_<y>", with
+## FISH_BODY_LEAST cells or more, three wide somewhere (a cell whose 3x3 is
+## all water) and no bridge over or beside it (a bridge's channel is no
+## reach). <x>, <y>: its first cell, least y then least x.
+static func fish_waters_of(terrain: Dictionary) -> Dictionary[Vector2i, String]:
+	var wet: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("water", []):
+		wet[cell] = true
+	var flowing: Dictionary[Vector2i, bool] = {}
+	for stream: Dictionary in terrain.get("streams", []):
+		for cell: Vector2i in stream.get("path", []):
+			flowing[cell] = true
+	var bridged: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in terrain.get("bridged", []):
+		bridged[cell] = true
+	var out: Dictionary[Vector2i, String] = {}
+	var seen: Dictionary[Vector2i, bool] = {}
+	for start: Vector2i in wet:
+		if seen.has(start):
+			continue
+		seen[start] = true
+		var body: Array[Vector2i] = [start]
+		var river := false
+		var wide := false
+		var spanned := false
+		var first := start
+		var i := 0
+		while i < body.size():
+			var cell := body[i]
+			i += 1
+			river = river or flowing.has(cell)
+			if cell.y < first.y or cell.y == first.y and cell.x < first.x:
+				first = cell
+			var all_wet := true
+			for dy in range(-1, 2):
+				for dx in range(-1, 2):
+					var next := cell + Vector2i(dx, dy)
+					spanned = spanned or bridged.has(next)
+					if not wet.has(next):
+						all_wet = false
+					elif not seen.has(next):
+						seen[next] = true
+						body.append(next)
+			wide = wide or all_wet
+		if body.size() < FISH_BODY_LEAST or river and (not wide or spanned):
+			continue
+		var key := "%s_%d_%d" % ["river" if river else "pool", first.x, first.y]
+		for cell in body:
+			out[cell] = key
+	return out
 
 
 ## Whom a pond counts a cast for (economy's anglers): a player's id, a
@@ -7782,8 +7878,8 @@ func _angler_id(entity: GridEntity) -> String:
 
 
 ## Why [param by] could not cast now (try_fish's checks, in its order), ""
-## if it could: "no_rod", "busy", "no_water", "no_fish" (water no fishing
-## place takes in), "fished_out" (its pond's stock is 0 today).
+## if it could: "no_rod", "busy", "no_water", "no_fish" (water that fishes
+## nothing, pond_at's ""), "fished_out" (its pond's stock is 0 today).
 func fish_refusal(by: GridEntity) -> String:
 	if rod_hand(by) < 0:
 		return "no_rod"

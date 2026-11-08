@@ -3750,10 +3750,13 @@ func _test_fishing() -> void:
 	_check(near_water or World.fish_refusal(host) == "no_water", "the rod in hand, no water near: no cast (%s)" % World.fish_refusal(host))
 	World._water[water] = true
 	_check(World.cast_cell(host) != World.NO_CELL and World.fish_refusal(host) == "no_fish",
-		"water within two, but no fishing place takes it in: nothing takes the line (%s)" % World.fish_refusal(host))
+		"water within two, too little to fish (805 amended (8): a body of eight cells or more): nothing takes the line (%s)" % World.fish_refusal(host))
 	var pond := "%s/test_pond" % World.zone.name
 	World.holdings._places[pond] = {"id": pond, "area": World.zone.name, "key": "test_pond", "cell": water, "name": "the test pond",
 		"kind": "fishing", "radius": 2, "worth": 1, "start": "nobody", "town": ""}
+	# 805 amended (8): its one cell a body that fishes (a pool's eight cells stood in), the place over it its stock.
+	World._fish_waters.get_or_add(World.zone.name, {})[water] = "pool_test"
+	World._fish_stock_of.clear()
 	World.holdings._holder[pond] = "nobody"
 	World.holdings._strength[pond] = 1
 	World.holdings._since[pond] = 0
@@ -3808,6 +3811,8 @@ func _test_fishing() -> void:
 	World._fire.erase(fire)
 	if not had_water:
 		World._water.erase(water)
+	(World._fish_waters.get(World.zone.name, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
 	World.holdings._places.erase(pond)
 	World.holdings._holder.erase(pond)
 	World.holdings._strength.erase(pond)

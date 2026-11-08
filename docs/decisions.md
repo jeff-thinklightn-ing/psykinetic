@@ -42918,6 +42918,29 @@ found; each state its clip; waiting, the tip 1.5 to 2.5 m up and 0.9 to 2.2 m ou
 stands). Strip of the poses C:/dev/review/fishing/. Client and tools only, protocol unchanged, no
 new class_name. CHANGELOG bullet of its own (voice's words; items' fishing bullet left as it is).
 
+805 amended (8) (2026-11-07, release's label; the coordinator's approval, package "wilds basics: pond"
+with maps' 805 amended (7)): which water fishes is a rule, not a place's circle. Jeff on v0.1.207:
+"neither pond works for fishing but wren says she'll lead to the pond": the Reed Pond's place (radius
+3) missed 7 of its 16 water cells, and the wilds' other waters were no fishing place at all (the
+hotfix 72c14e4c1 widened the radius; this replaces it as the test). World.fish_waters_of(terrain),
+laid with each zone (_set_terrain, kept per zone in _fish_waters): a body is 8-connected "water",
+never a ford. One no stream path runs through is a pool, fishable with FISH_BODY_LEAST (8) cells or
+more; one a stream runs through is the river, fishable only with as many, three wide somewhere (a
+cell whose 3x3 is all water) and no bridge over or beside it (the bridge's channel is no reach). Its
+key is "pool_<x>_<y>" or "river_<x>_<y>" by its first cell (least y, then x). World.pond_at(cell)
+(pond_in for a named zone) is the stock the cast cell's body fishes from: a fishing place covering
+any of its cells (its id, its stock and its name: "the pond"), else "<zone>/<key>"; the angler's own
+cell no longer decides, so any bank fishes a body. pond_name: the place's name, else "the river" or
+"a pool". Economy's stocks and the wanderer take any such id (an unknown one starts full). In the
+wilds: the pond, two pools (22 cells at 110..116, 57..60; 10 at 221..223, 224..228) and the river's
+wide reach (60..77, 16..40, which the coordinator kept deep water with maps' fords). Wren fishes
+any of them beside her player (fish_spot_near, as before); she leads only to the pond (the guide
+leads to places, and the pools and the river are none), so her "pond" want stays a pond. Tests:
+companion_test _test_fish_waters (a pool of 9 and a reach three wide fish; 6 cells, a two-wide
+stream, a bridged one and a ford do not; the wilds' pond, pools and reach, nothing by the bridge,
+the pond's every cell its place's stock); items_test and companion_test's fishing set their one test
+cell as a body. Server only, protocol unchanged, no new class_name.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

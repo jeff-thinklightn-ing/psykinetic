@@ -101,6 +101,7 @@ func _ready() -> void:
 	_test_companion_verb()
 	_test_fishing()
 	_test_reed_pond_cells()
+	_test_fish_waters()
 	_test_notice()
 	_test_deeds()
 	_test_game_and_watch()
@@ -1842,6 +1843,75 @@ func _test_tomb() -> void:
 	_settle(pet)
 
 
+## Which water fishes (805 amended (8)): a pool of eight cells or more, the
+## river's reach three wide with no bridge by it; never a small pool, a
+## narrow or bridged stream, a ford. The wilds as laid: its pond, its two
+## pools and the river's wide reach fish; the bridge's channel does not.
+func _test_fish_waters() -> void:
+	print("
+== which water fishes: any pool of eight, the river's wide reach, never a ford (805 amended (8)) ==")
+	var water: Array[Vector2i] = []
+	var block := func(at: Vector2i, size: Vector2i) -> Array[Vector2i]:
+		var cells: Array[Vector2i] = []
+		for y in size.y:
+			for x in size.x:
+				cells.append(at + Vector2i(x, y))
+		return cells
+	var pool: Array[Vector2i] = block.call(Vector2i(0, 0), Vector2i(3, 3))  # 9 cells, standing.
+	var puddle: Array[Vector2i] = block.call(Vector2i(10, 0), Vector2i(2, 3))  # 6 cells.
+	var reach: Array[Vector2i] = block.call(Vector2i(20, 0), Vector2i(3, 4))  # 12, a stream through it.
+	var narrow: Array[Vector2i] = block.call(Vector2i(30, 0), Vector2i(2, 6))  # 12, two wide.
+	var channel: Array[Vector2i] = block.call(Vector2i(40, 0), Vector2i(3, 4))  # 12, a bridge over it.
+	for cells: Array[Vector2i] in [pool, puddle, reach, narrow, channel]:
+		water.append_array(cells)
+	var streams: Array[Dictionary] = [
+		{"path": [Vector2i(21, 0), Vector2i(21, 1), Vector2i(21, 2), Vector2i(21, 3)]},
+		{"path": [Vector2i(30, 0), Vector2i(30, 5)]},
+		{"path": [Vector2i(41, 0), Vector2i(41, 3)]}]
+	var fished := World.fish_waters_of({"water": water, "streams": streams, "bridged": [Vector2i(41, 1)],
+		"fords": block.call(Vector2i(50, 0), Vector2i(3, 3))})
+	_check(fished.get(Vector2i(2, 2), "") == "pool_0_0" and fished.get(Vector2i(0, 0), "") == "pool_0_0"
+			and fished.get(Vector2i(22, 3), "") == "river_20_0"
+			and not fished.has(Vector2i(10, 0)) and not fished.has(Vector2i(30, 2)) and not fished.has(Vector2i(41, 2)) and not fished.has(Vector2i(51, 1)),
+		"a pool of 9 and a reach three wide fish; a puddle of 6, a two-wide stream, a bridged one and a ford do not (%s)" % [fished.values()])
+	_check(World.pond_name("wilds/river_20_0") == "the river" and World.pond_name("wilds/pool_0_0") == "a pool",
+		"named: the river, a pool")
+	# The wilds as laid.
+	var terrain: Dictionary = Level.load_level("wilds")["terrain"]
+	var wilds := World.fish_waters_of(terrain)
+	var kinds := {}
+	for cell: Vector2i in wilds:
+		kinds[wilds[cell]] = true
+	var pools := kinds.keys().filter(func(key: String) -> bool: return key.begins_with("pool_"))
+	var rivers := kinds.keys().filter(func(key: String) -> bool: return key.begins_with("river_"))
+	var by_bridge := 0
+	for cell: Vector2i in terrain.get("bridged", []):
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				by_bridge += 1 if wilds.has(cell + Vector2i(dx, dy)) else 0
+	var pond_key := str(wilds.get(Vector2i(32, 118), ""))
+	_check(pond_key.begins_with("pool_") and pools.size() >= 3 and rivers.size() >= 1 and by_bridge == 0
+			and wilds.keys().all(func(cell: Vector2i) -> bool: return not cell in terrain.get("fords", [])),
+		"the wilds: the pond and its pools fish (%s), the river's wide reach (%s); nothing by the bridge, no ford" % [pools, rivers])
+	# The pond's stock is its fishing place's, whatever bank it is fished from.
+	_check(World.holdings != null and World.holdings._places.has("wilds/reed_pond"), "the wilds' pond is a fishing place in play")
+	if World.holdings != null and World.holdings._places.has("wilds/reed_pond"):
+		var waters_were: Variant = World._fish_waters.get("wilds")
+		World._fish_waters["wilds"] = wilds
+		World._fish_stock_of.clear()
+		var stocks := {}
+		for cell: Vector2i in wilds:
+			if wilds[cell] == pond_key:
+				stocks[World.pond_in("wilds", cell)] = true
+		if waters_were == null:
+			World._fish_waters.erase("wilds")
+		else:
+			World._fish_waters["wilds"] = waters_were
+		World._fish_stock_of.clear()
+		_check(stocks.keys() == ["wilds/reed_pond"] and World.pond_name("wilds/reed_pond") == "the pond",
+			"every cell of the pond fishes the pond's stock, called the pond (%s)" % [stocks.keys()])
+
+
 ## The Reed Pond as built (Jeff, v0.1.207: "neither pond works for fishing but wren says
 ## she'll lead to the pond"; its place now radius 6, it was 3 and missed 7 of 16 water cells):
 ## every cell of its water, and every dry cell within FISH_REACH of it that she
@@ -1908,6 +1978,9 @@ func _test_fishing() -> void:
 	var pond := "%s/test_pond" % World.zone.name
 	World.holdings._places[pond] = {"id": pond, "area": World.zone.name, "key": "test_pond", "cell": water, "name": "the test pond",
 		"kind": "fishing", "radius": 3, "worth": 1, "start": "nobody", "town": ""}
+	# 805 amended (8): its one cell a body that fishes (a pool's eight cells stood in), the place over it its stock.
+	World._fish_waters.get_or_add(World.zone.name, {})[water] = "pool_test"
+	World._fish_stock_of.clear()
 	World.holdings._holder[pond] = "nobody"
 	World.holdings._strength[pond] = 1
 	World.holdings._since[pond] = 0
@@ -2036,6 +2109,8 @@ func _test_fishing() -> void:
 	owner.slots[Items.RIGHT_HAND] = their_hand_was
 	if not had_water:
 		World._water.erase(water)
+	(World._fish_waters.get(World.zone.name, {}) as Dictionary).erase(water)
+	World._fish_stock_of.clear()
 	World.holdings._places.erase(pond)
 	World.holdings._holder.erase(pond)
 	World.holdings._strength.erase(pond)

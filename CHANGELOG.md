@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the wilds you can fish two small pools and the river's wide reach in the north too, not only the pond, and your companion fishes beside you at any of them (805 amended (8)).
 - In the hills, Hollowfell's way in is a timbered mine mouth cut into the hillside, with a cart and a brazier by it and the Blood Rot's mark, where before it was a bare stair (798 amended (3)).
 - Builder mode: a chest of loot goes only in a dungeon, never empty, with only a shop's or a store's chest elsewhere, and a change that would leave a room empty or a chest unguarded is refused (806 amended (7), 807 amended (4)).
 - You can fish the pond in the wilds from its south and west banks too, where the road comes in, where before they said nothing takes the line there (805).
