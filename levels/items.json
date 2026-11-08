@@ -63,7 +63,7 @@
 			"art": "item.bear_claw_charm", "kind": "held", "size": [0.04, 0.12, 0.02], "weight": 0.1, "hands": 1,
 			"tags": ["charm"], "worn": {"slot": "charm", "cap": 0.5, "hours": 6}, "value": 30,
 			"about": "A great bear's claw on a thong, with a flint bead and two feathers, worn smooth and dark with handling.",
-			"made": {"by": "medicine_man", "from": {"bear_claw": 1, "feathers": 1, "flint": 1}, "steps": 1200}},
+			"made": {"by": "medicine_man", "from": {"bear_claw": 1, "feathers": 1, "flint": 1}, "steps": 1200, "stock": 1}},
 		{"id": "bear_grease", "name": "crock of bear's grease", "short": "Grease", "color": "c8b88a",
 			"art": "item.bear_grease", "kind": "held", "size": [0.09, 0.08, 0.09], "weight": 0.6, "hands": 1, "stack": 5,
 			"tags": ["material"], "value": 12,
