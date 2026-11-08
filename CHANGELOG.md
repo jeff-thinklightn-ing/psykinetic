@@ -7,6 +7,9 @@ notes (decision 324).
 
 ## Unreleased
 
+## v0.1.208
+
+- What goes over the network changes, so v0.1.207 and older can't join the server: update through the launcher first.
 - Foes show each blow coming now: a foe stops short of you instead of sliding in, draws back for a moment you can read, a goblin its jab, a robber its weapon, a wolf to bite, then strikes and stands still a beat after; step out of reach in the draw-back and it misses you, you flinch as a blow lands, not before, and anyone striking on the move walks under the blow, where before they glided in the strike pose (338 amended (4)).
 - Fights are fewer and last longer: common foes, brutes among them, take nearly twice the blows to bring down, the Ossuary's dead come as three packs of a grave guard and two skeletons, the castle's west side holds fewer foes, Hollowfell's brute waits deeper in the mine, and the crypt's grave robbers band by their camp with Brand at their chest, where before they waited alone in tomb after tomb (823).
 - Towns: a keeper's window says Sell where they pay you for what you hand over, as at Rolf's stall or the tanner's, and Donate where nothing comes back, as with ore for a build, the larder or a gift, where before both said Give (802 amended (8)).
@@ -25,6 +28,7 @@ notes (decision 324).
 - Fights stand at a weapon's length now: you and your companion stop a step off a foe instead of chest to chest, and a sword reaches a little farther than a fist or a dagger, a hammer or a pick farther still, and the big axes and the sledge farthest (699 amended).
 - In town after dusk, a lit house's windows glow a warm amber, softer toward the edges and crossed by dark glazing bars, where before each was a flat cream square.
 - Your pack, and your companion's, has twelve slots now, three rows of four, where before it had eight (819).
+
 ## v0.1.207
 
 - What goes over the network changes, so v0.1.206 and older can't join the server: update through the launcher first.
