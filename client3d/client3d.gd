@@ -5711,6 +5711,9 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	_cliffs_drawn.clear()
 	_terrain = terrain
 	_centre = centre
+	if over_frames and str(terrain.get("canopy_kind", "")) != "":
+		# Read on a worker while the first phases go round (822, packed grown trees).
+		GrownTrees.start_reading(str(terrain.get("level", "")))
 	if _room != null and over_frames:
 		# Freed a slice a frame once the new room is up (0.2 s at once on the wilds).
 		_room.visible = false
@@ -5928,6 +5931,15 @@ func _build_room_over_frames(generation: int) -> void:
 			for chunk: Vector2i in _fill_cliffs["chunks"]:
 				_fill_jobs.append(["cliff", chunk])
 		else:
+			if phase == _phase_land:
+				# The grown trees it reads, on their worker till then (822).
+				var level := str(_terrain.get("level", ""))
+				while not GrownTrees.ready_for(level):
+					await get_tree().process_frame
+					if generation != _build_generation or not is_inside_tree():
+						return
+					frame_started = Time.get_ticks_usec()
+					phase_started = frame_started
 			phase.call()
 			if phase == _phase_land:
 				_start_curves()

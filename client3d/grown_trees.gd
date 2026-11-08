@@ -64,6 +64,12 @@ const SNOW_PATCH := 0.8
 
 ## Tests: a level's trees by its name, read before the file.
 static var registered: Dictionary[String, Dictionary] = {}
+## Each level's trees as read and packed (data_for), kept: the files are the
+## build's and never change while it runs. The forest's are about 12 MB.
+static var _kept: Dictionary[String, Dictionary] = {}
+## The levels being read on a worker (start_reading): level -> task id.
+static var _reading: Dictionary[String, int] = {}
+static var _kept_mutex := Mutex.new()
 
 ## Each chunk's pieces: {"far": Node3D, "near": Node3D or null}.
 var chunks: Dictionary[Vector2i, Dictionary] = {}
@@ -93,15 +99,100 @@ var _mutex := Mutex.new()
 
 
 ## The trees grown for [param level_name]: registered, else its trees.json
-## (the level's own, never an overlay's), else {}.
+## (the level's own, never an overlay's), else {}; each tree packed
+## (packed): {"trees": [...]} alone. A file's are read once and kept
+## (_kept), shared by every view of that level, read on a worker if
+## start_reading began it (waited for here, if still going).
 static func data_for(level_name: String) -> Dictionary:
 	if registered.has(level_name):
-		return registered[level_name]
+		return packed(registered[level_name])
+	_kept_mutex.lock()
+	var task: int = _reading.get(level_name, -1)
+	_kept_mutex.unlock()
+	if task >= 0:
+		WorkerThreadPool.wait_for_task_completion(task)
+		_kept_mutex.lock()
+		_reading.erase(level_name)
+		_kept_mutex.unlock()
+	_kept_mutex.lock()
+	var kept: Variant = _kept.get(level_name)
+	_kept_mutex.unlock()
+	if kept != null:
+		return kept
+	var data := _read(level_name)
+	_kept_mutex.lock()
+	_kept[level_name] = data
+	_kept_mutex.unlock()
+	return data
+
+
+## [param level_name]'s trees read and packed on a worker (822: the
+## forest's 5 MB, about 0.4 s, under a neighbour's 4 ms frames), unless
+## kept, registered or already being read.
+static func start_reading(level_name: String) -> void:
+	if level_name.is_empty() or registered.has(level_name):
+		return
+	_kept_mutex.lock()
+	var busy := _kept.has(level_name) or _reading.has(level_name)
+	_kept_mutex.unlock()
+	if busy:
+		return
+	var task := WorkerThreadPool.add_task(func() -> void:
+		var data := _read(level_name)
+		_kept_mutex.lock()
+		_kept[level_name] = data
+		_kept_mutex.unlock(), true, "grown trees")
+	_kept_mutex.lock()
+	_reading[level_name] = task
+	_kept_mutex.unlock()
+
+
+## Whether data_for([param level_name]) has nothing to wait for.
+static func ready_for(level_name: String) -> bool:
+	_kept_mutex.lock()
+	var task: int = _reading.get(level_name, -1)
+	_kept_mutex.unlock()
+	return task < 0 or WorkerThreadPool.is_task_completed(task)
+
+
+## [param level_name]'s trees.json read and packed, else {}.
+static func _read(level_name: String) -> Dictionary:
 	var path := Level.DIR + level_name + "/" + FILE
 	if level_name.is_empty() or not FileAccess.file_exists(path):
 		return {}
 	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	return data if data is Dictionary else {}
+	return packed(data) if data is Dictionary else {}
+
+
+## [param data]'s trees as the view keeps them (822: the forest's, read as
+## JSON, held 115 MB, a Variant for every number of 265,000 branches): "at"
+## and "lean" a PackedFloat64Array of two; "whorls" one PackedFloat64Array,
+## a whorl its y, its branch count, then each branch's angle and length;
+## "dead" one, three a stick (y, angle, length); "height", "radius" and
+## "state" as read. 64-bit, so every number is the one read and the trees
+## drawn are the same. The rest of the file (the grower's stats, clearings,
+## path) is the grower's, not the view's.
+static func packed(data: Dictionary) -> Dictionary:
+	var trees: Array[Dictionary] = []
+	for tree: Dictionary in data.get("trees", []):
+		var whorls := PackedFloat64Array()
+		for whorl: Dictionary in tree.get("whorls", []):
+			var branches: Array = whorl["branches"]
+			whorls.append(float(whorl["y"]))
+			whorls.append(branches.size())
+			for branch: Array in branches:
+				whorls.append(float(branch[0]))
+				whorls.append(float(branch[1]))
+		var dead := PackedFloat64Array()
+		for stick: Array in tree.get("dead", []):
+			dead.append_array([float(stick[0]), float(stick[1]), float(stick[2])])
+		trees.append({
+			"at": PackedFloat64Array([float(tree["at"][0]), float(tree["at"][1])]),
+			"lean": PackedFloat64Array([float(tree["lean"][0]), float(tree["lean"][1])]),
+			"height": float(tree.get("height", 0.0)), "radius": float(tree.get("radius", 0.0)),
+			"state": str(tree.get("state", "")), "whorls": whorls, "dead": dead,
+		})
+	return {"trees": trees}
 
 
 ## The cell a tree of [param data] stands on.
@@ -430,31 +521,37 @@ func _draw(into: Array, tree: Dictionary, near: bool) -> void:
 		var y1 := high * (s + 1) / steps
 		_pipe(into, base + lean * y0 + Vector3.UP * y0, base + lean * y1 + Vector3.UP * y1,
 			lerpf(radius, 0.03, y0 / high), lerpf(radius, 0.03 if not snag else radius * 0.4, y1 / high), bark, sides)
-	var whorls: Array = tree["whorls"]
+	var whorls: PackedFloat64Array = tree["whorls"]
 	var crown := high
-	for whorl: Dictionary in whorls:
-		crown = minf(crown, float(whorl["y"]))
+	var w := 0
+	while w < whorls.size():
+		crown = minf(crown, whorls[w])
+		w += 2 + int(whorls[w + 1]) * 2
 	var top := float(tree["height"])
-	for whorl: Dictionary in whorls:
-		var y := float(whorl["y"])
+	w = 0
+	while w < whorls.size():
+		var y := whorls[w]
+		var count := int(whorls[w + 1])
+		var first := w + 2
+		w = first + count * 2
 		var h := clampf((y - crown) / maxf(top - crown, 0.5) + tone, 0.0, 1.0)
 		var lit := _ramp([needles[3], needles[2], needles[1]], h)
 		var under := _ramp([needles[3].darkened(0.4), needles[3]], h)
 		var from := base + lean * y + Vector3.UP * y
-		var branches: Array = whorl["branches"]
 		if not near:
 			# One pad a whorl, as wide as its branches reach.
 			var mean := 0.0
-			for branch: Array in branches:
-				mean += float(branch[1])
-			mean = mean / maxf(branches.size(), 1) * reach
-			if branches.is_empty() or tall and y < PAD_CLEAR:
+			for b in count:
+				mean += whorls[first + b * 2 + 1]
+			mean = mean / maxf(count, 1) * reach
+			if count == 0 or tall and y < PAD_CLEAR:
 				continue
 			_pad(into, from + Vector3.DOWN * mean * droop * 0.6, maxf(mean * 0.9, 0.3), Vector3.RIGHT.rotated(Vector3.UP, turn + y), 1.0, rng, lit, under, 0.12, 0.08)
 			continue
-		for branch: Array in branches:
-			var d := Vector3(cos(float(branch[0]) + turn), 0.0, sin(float(branch[0]) + turn))
-			var length := float(branch[1]) * reach
+		for b in count:
+			var angle := whorls[first + b * 2]
+			var d := Vector3(cos(angle + turn), 0.0, sin(angle + turn))
+			var length := whorls[first + b * 2 + 1] * reach
 			var low := y < HEAD_HIGH
 			var bend := droop * (1.6 if low else 1.0)
 			var tip := from + d * length + Vector3.DOWN * (bend * length)
@@ -476,12 +573,13 @@ func _draw(into: Array, tree: Dictionary, near: bool) -> void:
 	if not near:
 		return
 	var dry := bark.lerp(Color(0.5, 0.46, 0.4), 0.4)
-	for stick: Array in tree["dead"]:
-		var y := float(stick[0])
+	var dead: PackedFloat64Array = tree["dead"]
+	for k in range(0, dead.size(), 3):
+		var y := dead[k]
 		if y > high:
 			continue
-		var d := Vector3(cos(float(stick[1])), 0.0, sin(float(stick[1])))
-		var length := float(stick[2]) * rng.randf_range(0.35, 0.8)
+		var d := Vector3(cos(dead[k + 1]), 0.0, sin(dead[k + 1]))
+		var length := dead[k + 2] * rng.randf_range(0.35, 0.8)
 		if length < 0.15:
 			continue
 		var from := base + lean * y + Vector3.UP * y

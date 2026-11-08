@@ -44997,6 +44997,20 @@ Step 2, behind Main.seamless_crossings (off; --seamless turns it on for tests):
 - The Options switch (voice's "Travel: no wait between areas") comes with the switch-on: an off
   package shows nothing.
 
+822, packed grown trees (on for everyone; nothing drawn changes). The forest's neighbour cost 262 MB, 115 of
+it the grown trees' data: trees.json read as JSON, a Variant for every number of 265,074 branches.
+GrownTrees.data_for now keeps each tree packed (GrownTrees.packed): "at" and "lean" a PackedFloat64Array
+of two, "whorls" one PackedFloat64Array (a whorl's y, its branch count, then each branch's angle and
+length), "dead" one (three a stick), "height", "radius" and "state" as read; the grower's stats,
+clearings and path are left out. 64-bit, so every number is the one read: the forest's 4,364 trees drawn
+far and near hash the same as before (build/trees_probe), and the data held fell from 107 MB to 12 MB.
+Packing costs time (the read went from 209 to about 440 ms), so a level's trees are read once and kept
+(about 12 MB for the forest, shared by the live view and a neighbour), and a rebuild over frames starts
+reading them on a worker (GrownTrees.start_reading) as it begins; _phase_land waits frames for them
+(ready_for), the wait left out of its cost. On the main thread the read is now 0 ms (74 headless frames
+on the worker); a build at once still reads them in place. Client only, protocol unchanged, no new
+class_name.
+
 Still to come, each behind the flag: (3) maps: the five corridors, each neighbour's plane origin 16
 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam − 8 with
 spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The
