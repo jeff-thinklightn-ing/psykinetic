@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Shields hold better now: blocking costs half the stamina it did, and a shield that gives way leaves you what stamina you had; a blow taken on a raised shield, a robber's lunge among them, throws its attacker back with a deep wooden boom and a spark, an opening for you, and a robber's or a wolf's plain blow no longer breaks a round shield, though a heavy weapon's wound-up blow still does, a brute's hammer, Brand's sledge or the draugr's axe; lowered, a shield still partly guards your shield-arm's side, and a skeleton's raised shield throws you back the same way (340 amended; 379 amended).
 - In the hills, light the cold fire in the hill cave from its woodpile and rest by it as at a roadside camp: it heals you, dries you off and keeps wild beasts away, you can cook over it, and your companion sits with you; it burns a good while, and you can stoke it again (825).
 - Towns: the medicine man buys a bear's claw, feathers, flint and bear's grease by Give, and makes them into a bear's-claw charm, which gathers a faint light round you that grows the longer you wear it, and a bear's-grease draught that leaves you hard to shove and hard to stop for a while, both sold from his shelf (821 amended (2)).
 

@@ -41,7 +41,7 @@ const VIEW: Array[StringName] = [
 	&"_inside_rect", &"_builder_marks", &"_code_labels", &"_codes_on", &"_aura_mote_material",
 	&"_aura_shader", &"drips", &"_shadow_checked", &"_lamp_clock", &"_roofs_clock",
 	&"scatter_reach_low", &"_sky_floor", &"_spark_material",
-	&"_house_light_clock", &"_house_light_time", &"_hearths_heard", &"_hearths_settle_at"
+	&"_house_light_clock", &"_house_light_time", &"_hearths_heard", &"_hearths_settle_at", &"_recoil_frame"
 ]
 
 

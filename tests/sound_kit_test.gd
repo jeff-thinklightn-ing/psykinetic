@@ -188,6 +188,12 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.has("sfx.hearth_catch") and SoundKit.positional("sfx.hearth_catch") and SoundKit.noise("sfx.hearth_catch") == ""
 			and SoundKit.volume_db("sfx.hearth_catch") < SoundKit.volume_db("sfx.forge_whoomph"),
 			"a hearth just lit catches (sfx.hearth_catch, quieter than the forge's, unheard by monsters); stoked or gone cold, nothing")
+	# 340 amended, sound's side: a blow thrown back off a raised shield booms
+	# at the attacker, heavier than the block, which ducks under it.
+	_check(SoundKit.recoil(&"guarded") == "sfx.shield_recoil" and SoundKit.recoil(&"bash") == "" and SoundKit.recoil(&"") == ""
+			and SoundKit.positional("sfx.shield_recoil") and SoundKit.takes("sfx.shield_recoil").size() >= 3
+			and SoundKit.volume_db("sfx.shield_recoil") > SoundKit.volume_db("sfx.block_shield") and SoundKit.RECOIL_DUCK_DB > 0.0,
+			"a shield's recoil booms (sfx.shield_recoil, three takes, louder than the block, which ducks); a bash or other stun, none")
 	# 790 amended (4), sound's side: Skeech (a sneak) hisses as his ambush's
 	# windup starts, sharp and short, heard behind you, never by monsters.
 	_check(SoundKit.cry("sneak", "ambush") == "sfx.goblin_ambush" and SoundKit.positional("sfx.goblin_ambush")

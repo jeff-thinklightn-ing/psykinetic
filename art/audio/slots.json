@@ -170,6 +170,15 @@
 			"volume_db": -2.0,
 			"uses": "a blow taken on a shield; Client3D._on_guarded, a shield held (SoundKit.block)"
 		},
+		"sfx.shield_recoil": {
+			"category": "combat",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": "fight",
+			"volume_db": 0.0,
+			"uses": "a blow thrown back off a raised shield: a heavy, dull wooden boom, heavier than the block's knock, at the attacker as it recoils (340 amended; Client3D on GridEntity.stunned with cause guarded, the shield's block 3 dB down that frame)",
+			"fallback": "sfx.block_shield"
+		},
 		"sfx.block_weapon": {
 			"category": "combat",
 			"type": "oneshot",

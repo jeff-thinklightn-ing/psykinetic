@@ -2802,6 +2802,44 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.shield_recoil": [
+			{
+				"file": "sfx.shield_recoil.ogg",
+				"from": "freesound",
+				"original": "freesound 319590: Shield Bash Impact (from 0.05 s for 0.85 s)",
+				"sha256": "561a96841f4906dd646ac0bf47bc04fb4bc369f32c53bc045c1f12a34adda1cb",
+				"by": "Hybrid_V",
+				"url": "https://freesound.org/people/Hybrid_V/sounds/319590/",
+				"license": "CC BY 4.0"
+			},
+			{
+				"file": "sfx.shield_recoil.2.ogg",
+				"from": "freesound",
+				"original": "freesound 636102: SHIELDHIT2.wav (from 0 s for 0.6 s)",
+				"sha256": "9e0c62845a4513e993b1ca04342561c6d170d5cc48fcc8360b08e759abd395dd",
+				"by": "fonografico",
+				"url": "https://freesound.org/people/fonografico/sounds/636102/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.shield_recoil.3.ogg",
+				"from": "freesound",
+				"original": "freesound 529396: thump_thud_slam_fist_heavy.wav (from 0 s for 0.45 s)",
+				"sha256": "ff6eb1a0727cb10fa62010d48b109e2d17b060de08226ff883db88fb6e9bb575",
+				"by": "bouncyballblue",
+				"url": "https://freesound.org/people/bouncyballblue/sounds/529396/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.shield_recoil.4.ogg",
+				"from": "freesound",
+				"original": "freesound 529396: thump_thud_slam_fist_heavy.wav (the second blow) (from 1 s for 0.5 s)",
+				"sha256": "6f620a92af5227cf54d961a5d0fb0d8c48159aec5ffb66b56227a2d4eefa56ef",
+				"by": "bouncyballblue",
+				"url": "https://freesound.org/people/bouncyballblue/sounds/529396/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.slab_grind": [
 			{
 				"file": "sfx.slab_grind.ogg",

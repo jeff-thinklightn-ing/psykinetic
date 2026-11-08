@@ -311,6 +311,17 @@ static func block(guard_id: String) -> String:
 	return "sfx.block_shield" if guard_id != "" and Items.has_tag(guard_id, "shield") else "sfx.block_weapon"
 
 
+## How far a block's knock goes down in a frame a recoil booms (340 amended).
+const RECOIL_DUCK_DB := 3.0
+
+
+## The slot a stun of [param cause] makes at the stunned (GridEntity.stunned):
+## a blow thrown back off a raised shield (&"guarded", 340 amended) its
+## recoil's boom; any other stun, none ("").
+static func recoil(cause: StringName) -> String:
+	return "sfx.shield_recoil" if cause == &"guarded" else ""
+
+
 ## A swing's slot: a two-handed weapon's heavier whoosh.
 static func swing(id: String) -> String:
 	return "sfx.swing_heavy" if id != "" and int(Items.def(id).get("hands", 1)) >= 2 and not Items.verb_of(id).is_empty() 			and str(Items.verb_of(id).get("kind", "")) != "ranged" else "sfx.swing"

@@ -7134,6 +7134,19 @@ strapped shield's place (else chest high ahead), flying toward the blow, grown t
 m and faded over SPARK_SECONDS 0.16 s, then freed. The other causes' stagger is as it was.
 view_test _test_shield_seen. Client only, protocol unchanged, no new class_name; no bullet here
 (sound's thud lands after and carries the package's).
+340 amended, sound's side (release's label; combat's ask): the thuds. A blow taken on a shield
+keeps sfx.block_shield (Client3D._on_guarded, the lowered side guard's too, at the same weight),
+now heard as the drawn blow meets the guard (_struck_with, the moment of animation's sparks), not
+when the news comes. A recoil booms: in animation's Client3D._on_stunned, SoundKit.recoil gives a
+stun of cause &"guarded" sfx.shield_recoil (a heavy, dull wooden boom, sfx bus, 0 dB, falling back
+to the block's), played at the attacker as its drawn blow lands, with animation's recoil
+(_recoil_heard); any other stun, none. The holder's guarded(false) comes the same frame just
+before, so _on_guarded decides its knock at the frame's end (_play_block, deferred),
+SoundKit.RECOIL_DUCK_DB (3) down when a recoil boomed that frame, the two not piling up. Four
+Freesound takes (319590 Hybrid_V, CC BY 4.0; 636102 fonografico and two blows of 529396
+bouncyballblue, CC0). Review: C:/dev/review/sound/shield. sound_kit_test (the recoil's slot by
+cause, its takes, louder than the block, which ducks). Client only; protocol unchanged, no new
+class_name.
 
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 

@@ -23272,8 +23272,12 @@ func _on_guarded(broken: bool, id: int) -> void:
 			var held := holder.slots[slot] if slot < holder.slots.size() else ""
 			if held != "" and str(Items.verb_of(held).get("kind", "")) == "block":
 				guard = held if guard == "" or Items.has_tag(held, "shield") else guard
-	# A guard broken: the same knock, harder.
-	sfx.play(SoundKit.block(guard), puppet.position + Vector3.UP * 0.9, 1.0, 4.0 if broken else 0.0)
+	# A guard broken: the same knock, harder. Heard as the drawn blow meets the
+	# guard (_struck_with, the sparks' moment), decided at the frame's end so
+	# a recoil off this shield (the attacker's stunned, right after, 340
+	# amended, sound's side) can take it SoundKit.RECOIL_DUCK_DB down.
+	var lands := int(_struck_with(holder)[1]) if holder != null else Time.get_ticks_msec()
+	_play_block.call_deferred(SoundKit.block(guard), puppet, lands, 4.0 if broken else 0.0)
 	if broken:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	elif holder != null and guard != "" and Items.has_tag(guard, "shield"):
@@ -23285,6 +23289,25 @@ func _on_guarded(broken: bool, id: int) -> void:
 					_spark(puppet, holder))
 		else:
 			_spark(puppet, holder)
+
+
+## The frame a blow was last thrown back off a raised shield (_on_stunned).
+var _recoil_frame := -1
+
+
+## A block's knock (from _on_guarded, deferred to the frame's end) at
+## [param puppet] at [param lands] (msec, the drawn blow's landing), quieter
+## by SoundKit.RECOIL_DUCK_DB in a frame a recoil was heard (340 amended).
+func _play_block(slot: String, puppet: Node3D, lands: int, gain_db: float) -> void:
+	var gain := gain_db - (SoundKit.RECOIL_DUCK_DB if _recoil_frame == Engine.get_process_frames() else 0.0)
+	var wait := (lands - Time.get_ticks_msec()) / 1000.0
+	if wait <= 0.0:
+		if is_instance_valid(puppet):
+			sfx.play(slot, puppet.position + Vector3.UP * 0.9, 1.0, gain)
+		return
+	get_tree().create_timer(wait).timeout.connect(func() -> void:
+		if is_instance_valid(puppet) and puppet.is_inside_tree():
+			sfx.play(slot, puppet.position + Vector3.UP * 0.9, 1.0, gain))
 
 
 ## The side of a body facing [param facing] that a blow from [param from] meets (a grid direction
@@ -23374,14 +23397,25 @@ func _on_stunned(_ticks: int, cause: StringName, id: int) -> void:
 	if puppet == null:
 		return
 	_combat_at[id] = Time.get_ticks_msec()
+	_recoil_frame = Engine.get_process_frames()  # The holder's knock ducks under the boom (sound's side).
 	var swung: Array = _swings.get(id, [])
 	var wait := (int(swung[2]) - Time.get_ticks_msec()) / 1000.0 if not swung.is_empty() else 0.0
 	if wait > 0.0:
 		get_tree().create_timer(wait).timeout.connect(func() -> void:
 			if is_instance_valid(puppet) and puppet.is_inside_tree():
-				_recoil(puppet))
+				_recoil(puppet)
+				_recoil_heard(puppet, cause))
 	else:
 		_recoil(puppet)
+		_recoil_heard(puppet, cause)
+
+
+## The boom of a blow thrown back off a raised shield (340 amended, sound's
+## side: SoundKit.recoil, sfx.shield_recoil) at [param puppet], the attacker.
+func _recoil_heard(puppet: Node3D, cause: StringName) -> void:
+	var slot := SoundKit.recoil(cause)
+	if slot != "":
+		sfx.play(slot, puppet.position + Vector3.UP * 0.9)
 
 
 ## [param puppet] thrown back off a shield: CLIP_RECOIL where its model has it, else a hit.
