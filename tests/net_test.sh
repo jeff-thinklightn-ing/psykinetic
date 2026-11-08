@@ -202,17 +202,22 @@ phase_1_2() {
 phase_3() {
 	P=$((PORT + 1))
 	# Phase 3: Fay and Gus walk to opposite ends of the two-wide passage along
-	# the bottom of the room, both on its row 12, then at tick 70 cross it
+	# the bottom of the room, both on its row 12, then at tick 120 cross it
 	# toward each other along that row: head-on, whatever the timing (decision
-	# 724; physics: after a stall both met face to face and stayed). Fay is
+	# 724; physics: after a stall both met face to face and stayed). Tick 120,
+	# not 70: each walk is 10 or 11 cells (about 33 ticks), but a loaded
+	# client walks no faster than its frames (FreeNet.Own.hold counts at most
+	# 0.1 s of a frame), and on 2026-11-08 Gus was a cell short at tick 70
+	# (10 cells in 70 ticks), so the contest took him off before he arrived
+	# (the arrived check, 10 for 11). Fay is
 	# Player1 from (11, 2), Gus Player2 from (12, 1), the sim waiting for both.
 	server server3 --server --still-monsters --no-companions "--token=$TOKEN" \
-		--test-wait-players=2 --test-hold=70,2
+		--test-wait-players=2 --test-hold=120,2
 	wait_for server3 'listening on port'
 	# Fay is another build with the same protocol: she plays (decision 239).
-	client clientF $GOOD --name=Fay --test-version=0.0.2 --test-move=-6,10 --test-contest=12,12,70
+	client clientF $GOOD --name=Fay --test-version=0.0.2 --test-move=-6,10 --test-contest=12,12,120
 	wait_for server3 'Fay \([a-z0-9-]+\) joined as Player1 '
-	client clientG $GOOD --name=Gus --test-move=0,11 --test-contest=5,12,70
+	client clientG $GOOD --name=Gus --test-move=0,11 --test-contest=5,12,120
 	wait_for clientF 'reached the contested tile'
 	wait_for clientG 'reached the contested tile'
 	finish
