@@ -233,6 +233,7 @@ func _test_every_level() -> void:
 	_test_world_plane()
 	_test_safe_paths()
 	_test_fill_hills()
+	_test_hearth()
 	_test_fill_hills_sights()
 	_test_relaid()
 	print("
@@ -1123,6 +1124,66 @@ func _test_fill_hills() -> void:
 	_put(player, fire + Vector2i(_main.WARM_REACH + 3, 0) if World.is_walkable(fire + Vector2i(_main.WARM_REACH + 3, 0)) else fire - Vector2i(_main.WARM_REACH + 3, 0))
 	_main._warm_rests()
 	_check(World.buff(player, "heal") == 0.0, "a few cells off: not warmed")
+	player.buffs = {}
+	_main.load_map("test_room")
+
+
+## A hearth (825, "hill cave rest"): a place's "fire_ring" a cell within
+## Level.FIRE_RING_REACH of it (else warned and left out); none laid in any level
+## yet (the hill cave's switch puts the first). In the hills, one made there:
+## E from beside it lights it (the "hearth" command), from farther off not; lit,
+## it is fire and warms the rest as a camp's fire does (777), till its burn
+## runs out and it goes cold; the save keeps a burning one.
+func _test_hearth() -> void:
+	print("
+== a hearth (825): lit from beside it, fire while it burns, warming the rest, saved ==")
+	var warnings: Array[String] = []
+	var places := Level.places_from({"places": {
+		"cave_camp": {"at": [10, 10], "kind": "rest", "name": "a camp", "fire_ring": [9, 10]},
+		"far_camp": {"at": [30, 10], "kind": "rest", "name": "a camp", "fire_ring": [40, 10]}}}, warnings)
+	var hearth_warned := warnings.filter(func(w: String) -> bool: return w.contains("fire ring"))
+	_check(Level.fire_rings_of(places) == [Vector2i(9, 10)] and hearth_warned.size() == 1,
+		"a place's hearth beside it kept, one 10 off warned and left out (%s; %s)" % [Level.fire_rings_of(places), hearth_warned])
+	var laid := []
+	for level_name: String in ["hills", "wilds", "forest", "foothills"]:
+		if not (Level.load_level(level_name)["terrain"].get("fire_rings", []) as Array).is_empty():
+			laid.append(level_name)
+	_check(laid.is_empty(), "no level has a hearth yet: the package lands off (%s)" % [laid])
+	_check(_main.load_map("hills"), "the hills load")
+	var player := _player()
+	var ring := Vector2i(50, 176)
+	var zone_name: String = World.zone.name
+	World._hearth_cells[zone_name] = {ring: true}
+	var told := [0]
+	var count := func(_level: String) -> void: told[0] += 1
+	World.hearths_changed.connect(count)
+	_put(player, ring + Vector2i(3, 0))
+	_main._on_command(player, "hearth", {"at": [ring.x, ring.y]})
+	var far_lit := World.is_fire(ring)
+	_put(player, ring + Vector2i(1, 0))
+	_main._on_command(player, "hearth", {"at": [ring.x, ring.y]})
+	_check(not far_lit and World.is_fire(ring) and World.lit_hearths(zone_name) == [ring] and told[0] == 1,
+		"three off, not lit; beside it, lit and fire (%s), told once (%d)" % [World.lit_hearths(zone_name), told[0]])
+	player.buffs = {}
+	player.hurt_tick = World.tick - _main.WARM_UNHIT_TICKS - 1
+	_main._warm_rests()
+	_check(World.buff(player, "heal") == _main.WARM_HEAL, "beside it, unhurt: warmed as by a camp's fire (%.1f a second)" % World.buff(player, "heal"))
+	var saved: Variant = JSON.parse_string(JSON.stringify(World.hearths_to_dict()))
+	World.hearths_lit.clear()
+	World.hearths_from_dict(saved)
+	var left: int = int(World.hearths_lit.get(zone_name, {}).get(ring, 0)) - World.tick
+	_check(World.is_fire(ring) and left > World.HEARTH_BURN_TICKS - 20 and left <= World.HEARTH_BURN_TICKS,
+		"the save keeps it burning, its burn left (%d ticks)" % left)
+	World.hearths_lit[zone_name][ring] = World.tick
+	told[0] = 0
+	World.burn_hearths()
+	player.buffs = {}
+	_main._warm_rests()
+	_check(not World.is_fire(ring) and World.lit_hearths(zone_name).is_empty() and told[0] == 1 and World.buff(player, "heal") == 0.0,
+		"its burn run out: cold, told (%d), warming nobody" % told[0])
+	World.hearths_changed.disconnect(count)
+	World.hearths_lit.clear()
+	World._hearth_cells.erase(zone_name)
 	player.buffs = {}
 	_main.load_map("test_room")
 

@@ -1306,6 +1306,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["places"] = places_from(config, warnings)
 	level["terrain"]["camps"] = camps_of(level["places"])
 	level["terrain"]["shelters"] = shelters_of(level["places"])
+	level["terrain"]["fire_rings"] = fire_rings_of(level["places"])
 	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
 	level["forage"] = forage_from(config, warnings)
@@ -1548,6 +1549,21 @@ static func shelters_of(places: Dictionary) -> Array[Dictionary]:
 	return out
 
 
+## The fire rings (825, "hill cave rest"): hearths a player may light, each a
+## place's "fire_ring" cell, within FIRE_RING_REACH of the place's own (the
+## refuge's cell by the ring). Lit, World counts one as fire (World.lit_hearths)
+## and the warmed rest (777) warms by it as by a camp's fire.
+const FIRE_RING_REACH := 3
+
+static func fire_rings_of(places: Dictionary) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for key: String in places:
+		var ring: Variant = (places[key] as Dictionary).get("fire_ring")
+		if ring is Vector2i and not out.has(ring):
+			out.append(ring)
+	return out
+
+
 static func places_from(config: Dictionary, warnings: Array[String]) -> Dictionary[String, Dictionary]:
 	var out: Dictionary[String, Dictionary] = {}
 	var listed: Variant = config.get("places", {})
@@ -1583,6 +1599,15 @@ static func places_from(config: Dictionary, warnings: Array[String]) -> Dictiona
 				out[str(key)]["opens"] = opens
 			else:
 				warnings.append("the place %s opens %s: not a step along x or y, left out" % [key, entry["opens"]])
+		# A fire ring (825): a hearth a player may light, a cell within 3 of the
+		# place's own; else warned and left out ("hearth" is a tavern's seat shape).
+		if entry.has("fire_ring"):
+			var ring: Variant = _tile(entry["fire_ring"])
+			var cell: Variant = out[str(key)].get("cell")
+			if ring is Vector2i and cell is Vector2i and maxi(absi(ring.x - cell.x), absi(ring.y - cell.y)) <= FIRE_RING_REACH:
+				out[str(key)]["fire_ring"] = ring
+			else:
+				warnings.append("the place %s's fire ring %s: not a cell within %d of the place, left out" % [key, entry["fire_ring"], FIRE_RING_REACH])
 		# A refuge's where (613 amended): one of REFUGE_WHERE, else warned and left out.
 		if kind == "refuge":
 			var where := str(entry.get("where", ""))

@@ -45267,3 +45267,31 @@ A pack of sneaks no longer queues in front of you: they come from different side
 - Breaking: hurt with a packmate alive, the band rule as ever (it runs once to its nearest packmate and back); it gives no call for help as it wakes (the whistle is its pack's); the last left (it has seen one alive this fight, _pack_seen, and none is now) flees (_flee).
 
 monster_test _test_sneak_pack (a sneak of its pack, its row's rules; a skeleton with the prop of none; all three take up one's fight; one whistle; at most 2 at it at once, from more than one side; the last flees). Server only, protocol unchanged, no new class_name, no bullet (dungeon's switch-on carries it). Off till dungeon lays packs.
+## 825. Hearths: a fire ring a player lights, burning a while as fire, a warmed rest
+
+The coordinator's approval of maps' design (C:/dev/review/hill_cave_rest/design.md; release's
+number; after 798 amended (4): the hill cave a found place whose cold ring warmed nobody, since the
+warmed rest, decision 777, reads only camp buildings' fires). Package "hill cave rest": this is maps'
+side, landing off (no level has a hearth); terrain's side draws a hearth lit, pc-character's side
+dries by it, sound's crackle follows Client3D.campfire_cells, and the switch-on (maps', a "hearth" on
+the hill cave's place, "fire_ring") carries voice's line. The coordinator's calls: it burns about ten minutes, a
+light again renewing it; rain and fights leave it be (the cave is under its overhang, staying dry its
+point); a hearth is general, a field any level's place may carry, but each new one is its own package.
+A place may say "fire_ring": [x, y], a cell within Level.FIRE_RING_REACH (3) of its own, else warned
+and left out ("hearth" is already a tavern's seat shape, PLACE_SHAPES); Level.fire_rings_of gives
+terrain["fire_rings"]. World keeps each zone's hearth cells as its level
+loads, and hearths_lit {zone: {cell: the tick it goes out}}. The new "hearth" command {at} lights one
+from on it or a cell beside it at no cost (the woodpile by it is the wood): World.light_hearth sets
+its burn to HEARTH_BURN_TICKS (10 minutes) from now, renewing a burning one; burn_hearths, beside the
+warmed rest's step, puts out those run down. While it burns World.is_fire counts its cell, so what
+reads fire has it with nothing new: cooking (beside a fire), the companion's fireside, wildlife's din
+(740), monsters' and forage's paths keeping off it. Main._warm_rests warms by lit hearths as by camp
+fires (777's reach, heal and unhurt wait). World.hearths_changed is told to every peer in the new
+"hearths" message {level, lit: [[x, y, ticks left]]}, and to a peer arriving with its zone's
+buildings; a client's World holds the same (set_hearths), its is_fire and the view reading it. The
+save keeps "hearths" {zone: [[x, y, ticks left]]}, so a restart leaves a burning one burning. E (a
+tap) on a hearth from on or beside it sends the command. level_test _test_hearth (a hearth beside its
+place kept, one far off warned; none laid in any level; in the hills, one made at the cave's ring:
+three off not lit, beside lit and fire, told once, warming an unhurt player at WARM_HEAL; the save's
+JSON round trip keeps it burning; run down, cold, told, warming nobody). Server, Level and client;
+protocol 54 (the "hearths" message and "hearth" command); no new class_name.

@@ -2158,6 +2158,11 @@ func _set_terrain(terrain: Dictionary) -> void:
 	for cell: Vector2i in terrain.get("fords", []):
 		_fords[cell] = true
 	_fish_waters[zone.name] = fish_waters_of(terrain)
+	var hearths := {}
+	for cell: Variant in terrain.get("fire_rings", []):
+		if cell is Vector2i:
+			hearths[cell] = true
+	_hearth_cells[zone.name] = hearths  # 825: the zone's hearths, lit or cold.
 	_fish_stock_of.clear()
 	_load_cover(terrain)
 	for t: Vector2i in terrain["floor"]:
@@ -11605,7 +11610,109 @@ func is_free(at: Vector2i) -> bool:
 
 
 func is_fire(at: Vector2i) -> bool:
-	return _fire.has(at)
+	return _fire.has(at) or int((hearths_lit.get(zone.name, {}) as Dictionary).get(at, -1)) > tick
+
+
+# --- Hearths (825, "hill cave rest") -------------------------------------------
+
+## A hearth lit or renewed ([param zone_name]'s), and one gone out.
+signal hearths_changed(zone_name: String)
+## How long a lit hearth burns: about ten minutes, a light again renewing it
+## (the coordinator). Rain and fights leave it be.
+const HEARTH_BURN_TICKS := 10 * 60 * TICK_RATE
+## Each zone's lit hearths, {zone: {cell: the tick it goes out}}. Saved (as
+## ticks left), and to clients in the "hearths" message.
+var hearths_lit: Dictionary = {}
+## Each zone's hearth cells, {zone: {cell: true}}, from its terrain's
+## "fire_rings" (Level.fire_rings_of) as the level loads.
+var _hearth_cells: Dictionary = {}
+
+
+## [param by] lights the hearth at [param at], or renews its burn, from on
+## it or a cell beside it, at no cost (the woodpile by it is the wood).
+## False if there is no hearth there or [param by] is too far.
+func light_hearth(by: GridEntity, at: Vector2i) -> bool:
+	if not (_hearth_cells.get(zone.name, {}) as Dictionary).has(at):
+		return false
+	if maxi(absi(by.tile.x - at.x), absi(by.tile.y - at.y)) > 1:
+		return false
+	var lit: Dictionary = hearths_lit.get(zone.name, {})
+	lit[at] = tick + HEARTH_BURN_TICKS
+	hearths_lit[zone.name] = lit
+	hearths_changed.emit(zone.name)
+	return true
+
+
+## Whether [param at] is a hearth in this zone, lit or cold.
+func is_hearth(at: Vector2i) -> bool:
+	return (_hearth_cells.get(zone.name, {}) as Dictionary).has(at)
+
+
+## [param zone_name]'s burning hearths.
+func lit_hearths(zone_name: String) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var lit: Dictionary = hearths_lit.get(zone_name, {})
+	for cell: Vector2i in lit:
+		if int(lit[cell]) > tick:
+			out.append(cell)
+	return out
+
+
+## The hearths whose burn has run out go cold, each zone's change told.
+func burn_hearths() -> void:
+	for zone_name: String in hearths_lit.keys():
+		var lit: Dictionary = hearths_lit[zone_name]
+		var out := lit.keys().filter(func(cell: Vector2i) -> bool: return int(lit[cell]) <= tick)
+		for cell: Vector2i in out:
+			lit.erase(cell)
+		if lit.is_empty():
+			hearths_lit.erase(zone_name)
+		if not out.is_empty():
+			hearths_changed.emit(zone_name)
+
+
+## [param zone_name]'s burning hearths as [x, y, ticks left] (the save, and
+## the "hearths" message's "lit").
+func hearths_left(zone_name: String) -> Array:
+	var out := []
+	var lit: Dictionary = hearths_lit.get(zone_name, {})
+	for cell: Vector2i in lit:
+		if int(lit[cell]) > tick:
+			out.append([cell.x, cell.y, int(lit[cell]) - tick])
+	return out
+
+
+## The save's hearths, {zone: [[x, y, ticks left]]}.
+func hearths_to_dict() -> Dictionary:
+	var out := {}
+	for zone_name: String in hearths_lit:
+		var left := hearths_left(zone_name)
+		if not left.is_empty():
+			out[zone_name] = left
+	return out
+
+
+## [param zone_name]'s burning hearths from [x, y, ticks left] rows (a save's
+## or the "hearths" message's), as burning from now; the zone's change told.
+func set_hearths(zone_name: String, rows: Variant) -> void:
+	var lit := {}
+	if rows is Array:
+		for row: Variant in rows:
+			if row is Array and (row as Array).size() == 3:
+				lit[Vector2i(int(row[0]), int(row[1]))] = tick + maxi(1, int(row[2]))
+	if lit.is_empty():
+		hearths_lit.erase(zone_name)
+	else:
+		hearths_lit[zone_name] = lit
+	hearths_changed.emit(zone_name)
+
+
+## The save's hearths back (hearths_to_dict's).
+func hearths_from_dict(data: Variant) -> void:
+	hearths_lit.clear()
+	if data is Dictionary:
+		for zone_name: Variant in data:
+			set_hearths(str(zone_name), data[zone_name])
 
 
 # --- Din: what wildlife keeps away from (decision 740) -------------------------------

@@ -2199,6 +2199,11 @@ func _tap_e(player: Player) -> void:
 			and World.distance(player.tile, talk_cell(target)) <= HEARING_RANGE:
 		_open_talk(target)  # A resident (560), or a peaceable talking monster (629, ui's side).
 		return
+	# 825: a hearth under the cursor, from on it or beside it, lit (or its burn renewed).
+	var hearth := _mouse_tile()
+	if World.is_hearth(hearth) and maxi(absi(player.tile.x - hearth.x), absi(player.tile.y - hearth.y)) <= 1:
+		World.command(player, "hearth", {"at": [hearth.x, hearth.y]})
+		return
 	var door := _e_door
 	if is_instance_valid(door) and player.tile in Terrain.edge_cells(door.key):
 		World.command(player, "door", {"edge": [door.key.x, door.key.y, door.key.z]})
@@ -4450,6 +4455,10 @@ func _boot() -> void:
 		World.roofs_damaged[str(key)] = true
 	if not World.roof_changed.is_connected(_on_roof_changed):
 		World.roof_changed.connect(_on_roof_changed)
+	# The hearths still burning (825), and each change told to the players.
+	World.hearths_from_dict(snapshot.get("hearths", {}))
+	if not World.hearths_changed.is_connected(_on_hearths_changed):
+		World.hearths_changed.connect(_on_hearths_changed)
 	# The tall grass trampled flat and not yet standing again (decision 508).
 	World.trampled_from_dict(snapshot["trampled"] if snapshot.get("trampled") is Dictionary else {})
 	if not World.grass_changed.is_connected(_on_grass_changed):
@@ -5005,6 +5014,7 @@ func _send_zone_ground(peer: int, zone_name: String) -> void:
 func _send_zone_buildings(peer: int, zone_name: String) -> void:
 	_send_towns(peer, zone_name)
 	Net.message_to(peer, "roofs", {"level": zone_name, "damaged": World.damaged_roofs(zone_name)})
+	Net.message_to(peer, "hearths", {"level": zone_name, "lit": World.hearths_left(zone_name)})  # 825.
 
 
 ## The console's "move <player> <x> <y> [zone]" (decision 531; Jeff:
@@ -6401,6 +6411,7 @@ func _save_state(wait := true, final := false) -> void:
 		"clearing": World.clearing.to_dict() if World.clearing != null else {},
 		"plots": World.clearing.plots_to_dict() if World.clearing != null else {},
 		"roofs": World.roofs_damaged.keys(),
+		"hearths": World.hearths_to_dict(),  # 825: the hearths burning, as ticks left.
 		"trampled": World.trampled_to_dict(),
 		"blood": World.blood_to_dict(),  # Decision 764.
 		"tracks": World.tracks_to_dict(),  # Decision 780.
@@ -6731,6 +6742,13 @@ func _on_town_building_changed(town: String, _kind: String) -> void:
 func _on_roof_changed(level: String) -> void:
 	Net.broadcast("roofs", {"level": level, "damaged": World.damaged_roofs(level)})
 	_show_towns()
+
+
+## Server: a hearth lit, renewed or gone cold (825): everyone is told that
+## level's burning hearths ("hearths" {level, lit: [[x, y, ticks left]]}).
+func _on_hearths_changed(level: String) -> void:
+	if Net.is_authority():
+		Net.broadcast("hearths", {"level": level, "lit": World.hearths_left(level)})
 
 
 ## Server: a telegraph shown (decision 602): the players in its zone are told
@@ -11184,7 +11202,8 @@ func _sync_residents() -> void:
 ## rest camp's, a raid camp's too), unhurt for WARM_UNHIT_TICKS, not downed,
 ## gets physics' 682 heal at WARM_HEAL hp a second, renewed each WARM_TICKS
 ## for a little longer (so it never lapses between), so it ends a moment
-## after they step away or are hit.
+## after they step away or are hit. A lit hearth warms the same (825,
+## World.lit_hearths: the hill cave's ring, once a player lights it).
 const WARM_TICKS := World.TICK_RATE
 const WARM_REACH := 2
 const WARM_UNHIT_TICKS := 5 * World.TICK_RATE
@@ -11198,6 +11217,7 @@ func _warm_rests() -> void:
 		var fire := Level.camp_fire(building)
 		if fire.x >= 0:
 			fires.append(fire)
+	fires.append_array(World.lit_hearths(World.zone.name))
 	if fires.is_empty():
 		return
 	for player: Player in _players.values():
@@ -13840,6 +13860,10 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 		search(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
 	elif command_name == "take_find" and entity is Player:
 		take_find(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
+	elif command_name == "hearth" and entity is Player:
+		var at: Variant = args.get("at")
+		if at is Array and (at as Array).size() == 2:
+			World.light_hearth(entity, Vector2i(int(at[0]), int(at[1])))  # 825: lit or renewed.
 	elif command_name == "use" and entity is Player:
 		var used := int(args.get("slot", -1))
 		if not World.try_use(entity, used):
@@ -15168,6 +15192,12 @@ func _on_message(kind: String, data: Dictionary) -> void:
 			var gone: Variant = data.get("gone", PackedInt32Array())
 			_client3d._on_blood_changed(str(data["level"]), PackedInt32Array(add) if add is Array or add is PackedInt32Array else PackedInt32Array(),
 					PackedInt32Array(gone) if gone is Array or gone is PackedInt32Array else PackedInt32Array(), bool(data.get("full", false)))
+		return
+	if kind == "hearths":
+		# 825: a level's burning hearths, as the server holds them.
+		var hearth_level := str(data.get("level", ""))
+		if not hearth_level.is_empty() and not Net.is_authority():
+			World.set_hearths(hearth_level, data.get("lit", []))
 		return
 	if kind == "roofs":
 		var level := str(data.get("level", ""))
@@ -20503,7 +20533,8 @@ func _on_world_ticked(tick: int) -> void:
 			_sync_residents()
 			_sync_bands()
 		if tick % WARM_TICKS == 0:
-			_warm_rests()  # By a camp's fire (decision 777).
+			_warm_rests()  # By a camp's fire (decision 777), or a lit hearth's (825).
+			World.burn_hearths()  # 825: a hearth whose burn ran out goes cold.
 		t = World.part("residents", t)
 		if tick % World.WORLD_TICK_STEPS == 0 and World.zone == World.home():
 			_tend_bonds()
