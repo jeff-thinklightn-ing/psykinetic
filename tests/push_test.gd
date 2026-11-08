@@ -535,7 +535,10 @@ func _test_no_attack_mid_step() -> void:
 		World.step()
 	_check(player.hp == 20, "no damage while the imp is still crossing (tick %d, hp %d)" % [World.tick, player.hp])
 	World.step()
-	_check(player.hp == 19, "imp hits on the tick its step ends (tick %d, hp %d)" % [World.tick, player.hp])
+	_check(player.hp == 20, "its step ended, it stands its settle first (338 amended (4): tick %d, hp %d)" % [World.tick, player.hp])
+	for i in imp.settle_ticks:
+		World.step()
+	_check(player.hp == 19, "imp hits once it has stood its settle (tick %d, hp %d)" % [World.tick, player.hp])
 
 
 # --- helpers ------------------------------------------------------------------

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Foes show each blow coming now: a foe stops short of you instead of sliding in, draws back for a moment you can read, a goblin its jab, a robber its weapon, a wolf to bite, then strikes and stands still a beat after; step out of reach in the draw-back and it misses you, you flinch as a blow lands, not before, and anyone striking on the move walks under the blow, where before they glided in the strike pose (338 amended (4)).
 - Fights are fewer and last longer: common foes, brutes among them, take nearly twice the blows to bring down, the Ossuary's dead come as three packs of a grave guard and two skeletons, the castle's west side holds fewer foes, Hollowfell's brute waits deeper in the mine, and the crypt's grave robbers band by their camp with Brand at their chest, where before they waited alone in tomb after tomb (823).
 - Towns: a keeper's window says Sell where they pay you for what you hand over, as at Rolf's stall or the tanner's, and Donate where nothing comes back, as with ore for a build, the larder or a gift, where before both said Give (802 amended (8)).
 - Ask your companion what she makes of a place and she speaks of something there you can see, such as the Mughouse's hearth or a tomb the two of you opened, where before she gave the same stock line wherever you were (803 amended (7)).

@@ -1820,6 +1820,7 @@ func _test_ambush() -> void:
 	_check(not (e["s"][0] as Monster).begin_ambush(player) and (e["s"][0] as Monster).ambush.is_empty(), "grull has none")
 	_test_lunge()
 	_test_plain_lead()
+	_test_stop_to_strike()
 	_test_given_strength()
 
 
@@ -1918,6 +1919,73 @@ func _test_plain_lead() -> void:
 		World.step()
 		none = none and World.winding(skeleton).is_empty()
 	_check(none and player.hp < hp, "lead_ticks 0: struck at once, never wound (%d of %d)" % [player.hp, hp])
+
+
+## 338 amended (4), enemy-ai's side, stop to strike: a monster stands
+## settle_ticks where its step brought it before its blow begins, and takes
+## no step till strike_recover_ticks after its blow lands, so it is seen to
+## stop, strike and stand (combat's numbers, the fight block's 4 and 1).
+func _test_stop_to_strike() -> void:
+	print("\n== 338 amended (4), enemy-ai's side: stop to strike ==")
+	var e := _build(["#########", "#.......#", "#.k..P..#", "#.......#", "#########"])
+	var skeleton: Monster = e["k"][0]
+	var player: Player = e["P"][0]
+	_check(skeleton.strike_recover_ticks == 4 and skeleton.settle_ticks == 1,
+		"the fight block's strike_recover_ticks 4 and settle_ticks 1 (%d, %d)" % [skeleton.strike_recover_ticks, skeleton.settle_ticks])
+	_bold(skeleton)
+	skeleton.idle = Monster.Idle.NONE  # A crypt skeleton's homeward idle fights only what is in its way.
+	skeleton.target = player
+	skeleton.next_attack_tick = 0
+	var stepped := -1
+	var began := -1
+	var lands := -1
+	var at := skeleton.tile
+	for i in 60:
+		World.step()
+		if skeleton.tile != at:
+			at = skeleton.tile
+			stepped = World.tick
+		var w := World.winding(skeleton)
+		if not w.is_empty() and began < 0:
+			began = int(w["began"])
+			lands = int(w["lands"])
+			break
+	_check(stepped >= 0 and began >= 0, "it came in and drew back (stepped %d, began %d)" % [stepped, began])
+	var stood := began - stepped
+	_check(stood >= ceili(skeleton.move_ticks) + 1,
+		"it stood its step's %d ticks and a settle before drawing back (%d ticks after the step)" % [ceili(skeleton.move_ticks), stood])
+	# Its blow landed: the player steps off, and it stands its recover first.
+	while World.tick < lands:
+		World.step()
+	_move_to(player, Vector2i(7, 2))
+	var from := skeleton.tile
+	var moved := -1
+	for i in 30:
+		World.step()
+		if skeleton.tile != from:
+			moved = World.tick
+			break
+	_check(moved >= lands + 4, "no step till 4 ticks after its blow (landed %d, stepped %d)" % [lands, moved])
+	# strike_recover_ticks 0 and settle_ticks 0: as before.
+	e = _build(["#########", "#.......#", "#.kP....#", "#.......#", "#########"])
+	skeleton = e["k"][0]
+	player = e["P"][0]
+	skeleton.strike_recover_ticks = 0
+	_bold(skeleton)
+	skeleton.idle = Monster.Idle.NONE
+	skeleton.target = player
+	skeleton.next_attack_tick = 0
+	lands = -1
+	for i in 20:
+		World.step()
+		var w := World.winding(skeleton)
+		if not w.is_empty():
+			lands = int(w["lands"])
+			break
+	while World.tick < lands:
+		World.step()
+	_check(lands >= 0 and skeleton.next_move_tick < lands + 4,
+		"strike_recover_ticks 0: free to step once it lands (next step %d, landed %d)" % [skeleton.next_move_tick, lands])
 
 
 ## 790 amended (4): the crypt robbers' told lunge, from in front or
@@ -4554,8 +4622,8 @@ func _test_fight_panel() -> void:
 	Tuning.register_source("monsters", Monster.tuning_value, Monster.set_tuning_value, Monster.tuning_fields)
 	var rows: Array = Tuning.fields().filter(func(r: Dictionary) -> bool: return str(r["path"]).begins_with("monsters."))
 	var windup: Array = rows.filter(func(r: Dictionary) -> bool: return r["path"] == "monsters.fight.windup_ticks")
-	_check(rows.size() == 18 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
-		"18 rows listed (698's band_min, 338 amended (4)'s lead_ticks too), windup_ticks an int taken at spawn (%s)" % [windup])
+	_check(rows.size() == 20 and windup.size() == 1 and windup[0]["kind"] == "int" and windup[0]["takes"] == "spawn",
+		"20 rows listed (698's band_min, 338 amended (4)'s lead_ticks, strike_recover_ticks and settle_ticks too), windup_ticks an int taken at spawn (%s)" % [windup])
 	_check(Tuning.apply("monsters.fight.windup_ticks", 9) and Tuning.apply("monsters.fight.flee_below.bold", 0.2),
 		"windup_ticks and the bold one's flee_below set")
 	var e := _build(["#####", "#.b.#", "#####"])

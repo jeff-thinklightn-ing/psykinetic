@@ -110,6 +110,13 @@ const WINDUP_TICKS := 6
 ## draws back, told as a winding, before the blow lands; out of its own
 ## cycle, so it strikes no less often. 0: at once, as before.
 const LEAD_TICKS := 3
+## Stop to strike (338 amended (4), enemy-ai's side; combat's numbers): no
+## step for STRIKE_RECOVER_TICKS after any blow of its own lands or misses,
+## and a blow begun only once it has stood SETTLE_TICKS where its last step
+## (or push) brought it, so it is seen to stop, strike and stand, never to
+## slide into its target swinging. Its told lunge and ambush stand already.
+const STRIKE_RECOVER_TICKS := 4
+const SETTLE_TICKS := 1
 const FLANK_PATIENCE_TICKS := 20
 const BACKSTAB_DAMAGE := 1
 ## A lurking chief's told strike from behind (790 amended (4), combat's
@@ -140,16 +147,18 @@ const FIGHT_DEFAULTS := {"windup_ticks": WINDUP_TICKS, "charge_range": CHARGE_RA
 	"cooldown_spread": COOLDOWN_SPREAD, "flank_patience_ticks": FLANK_PATIENCE_TICKS, "flee_ticks": FLEE_TICKS,
 	"flee_tiles": FLEE_TILES, "flee_near_tiles": FLEE_NEAR_TILES, "rout_hurt": ROUT_HURT,
 	"dread_flee_below": DREAD_FLEE_BELOW, "flee_below": {"bold": 0.15, "cautious": 0.35, "cowardly": 0.6},
-	"band_min": BAND_MIN, "lead_ticks": LEAD_TICKS}
+	"band_min": BAND_MIN, "lead_ticks": LEAD_TICKS, "strike_recover_ticks": STRIKE_RECOVER_TICKS,
+	"settle_ticks": SETTLE_TICKS}
 ## Each fight value's range on the tuning panel (673 step 2), by name
 ## (flee_below's three share one).
 const FIGHT_SPANS := {"windup_ticks": [1, 30], "charge_range": [1, 10], "charge_pace": [0.1, 1.5],
 	"dart_after_ticks": [0, 20], "backstab_damage": [0, 10], "pace_spread": [0.0, 0.5], "cooldown_spread": [0, 10],
 	"flank_patience_ticks": [0, 100], "flee_ticks": [0, 300], "flee_tiles": [1, 20], "flee_near_tiles": [1, 20],
 	"rout_hurt": [0.0, 1.0], "dread_flee_below": [0.0, 1.0], "flee_below": [0.0, 1.0], "band_min": [2, 10],
-	"lead_ticks": [0, 10]}
+	"lead_ticks": [0, 10], "strike_recover_ticks": [0, 10], "settle_ticks": [0, 5]}
 const FIGHT_INTS: Array[String] = ["windup_ticks", "charge_range", "dart_after_ticks", "backstab_damage",
-	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles", "band_min", "lead_ticks"]
+	"cooldown_spread", "flank_patience_ticks", "flee_ticks", "flee_tiles", "flee_near_tiles", "band_min", "lead_ticks",
+	"strike_recover_ticks", "settle_ticks"]
 const REACTION_TICKS_MAX := 6
 const PAUSE_CHANCE_MAX := 0.12
 const PAUSE_TICKS := Vector2i(2, 6)
@@ -613,6 +622,10 @@ var flee_near_tiles := FLEE_NEAR_TILES
 var rout_hurt := ROUT_HURT
 var band_min := BAND_MIN
 var lead_ticks := LEAD_TICKS
+var strike_recover_ticks := STRIKE_RECOVER_TICKS
+var settle_ticks := SETTLE_TICKS
+## The tick its wound-up blow is due, its recover still to come (_tend_recover).
+var _recover_due := -1
 var dread_flee_below := DREAD_FLEE_BELOW
 var flee_below := {Temper.BOLD: 0.15, Temper.CAUTIOUS: 0.35, Temper.COWARDLY: 0.6}
 ## Its kind's "picks_up" (decision 349): it takes up a weapon lying beside it.
@@ -1076,6 +1089,7 @@ func _temper() -> void:
 func _sim_tick() -> void:
 	if not _bundle_rolled:
 		_wear_bundle()
+	_tend_recover()
 	_mind_the_rest()
 	if not _ambush_armed and lurks and lurking():
 		_ambush_armed = true  # Lurking again: its next first blow from behind is told.
@@ -1333,9 +1347,46 @@ func _bash_guard() -> bool:
 ## A plain blow at its target: its heavy weapon's wind-up, else its lead
 ## (338 amended (4)), else at once. Whether it began or struck.
 func _blow() -> bool:
+	if not _stood_settle():
+		return false
+	var began: bool
 	if World.windup_ticks(self) > 0 or lead_ticks > 0:
-		return World.try_wind_up(self, target, lead_ticks)
-	return World.try_attack(self, target)
+		began = World.try_wind_up(self, target, lead_ticks)
+	else:
+		began = World.try_attack(self, target)
+	if began:
+		_recover_after_blow()
+	return began
+
+
+## Stop to strike (338 amended (4), enemy-ai's side): whether it has stood
+## settle_ticks since its last step or push ended (GridEntity._moved_tick,
+## its step's move_ticks), so a blow begins only once it is seen to stand.
+func _stood_settle() -> bool:
+	return _moved_tick < 0 or World.tick >= _moved_tick + ceili(move_ticks) + settle_ticks  # Never moved: it stands.
+
+
+## Stop to strike: no step till strike_recover_ticks after the blow it just
+## began lands, landed or missed. Struck at once, from now; wound up, from
+## its "lands", set once World has struck it (_tend_recover: a blow lands
+## only once its striker's next_move_tick is past). A DART one steps out
+## after its blow anyway (combat: "a wolf darts out anyway").
+func _recover_after_blow() -> void:
+	if tactic == Tactic.DART:
+		return
+	var w := World.winding(self)
+	if w.is_empty():
+		next_move_tick = maxf(next_move_tick, World.tick + strike_recover_ticks)
+	else:
+		_recover_due = int(w["lands"])
+
+
+## Its wound-up blow fallen (or given up): its stop-to-strike recover from
+## when it was due to land (_recover_after_blow).
+func _tend_recover() -> void:
+	if _recover_due >= 0 and World.winding(self).is_empty():
+		next_move_tick = maxf(next_move_tick, _recover_due + strike_recover_ticks)
+		_recover_due = -1
 
 
 ## Its target winding a heavy blow up at it (World.winding, 392; decision
@@ -1422,10 +1473,13 @@ func _step_back() -> bool:
 ## wind-up (World.try_wind_up, decision 392) in place of any of its kind's.
 func _strike() -> void:
 	if World.windup_ticks(self) > 0:
-		World.try_wind_up(self, target, lead_ticks)  # A heavy weapon's own, or a held lead at least lead_ticks.
+		# A heavy weapon's own, or a held lead at least lead_ticks.
+		if _stood_settle() and World.try_wind_up(self, target, lead_ticks):
+			_recover_after_blow()
 		return
 	match tactic:
 		Tactic.HEAVY:
+			# Its own windup_ticks it stands through already (_wind_on): no settle.
 			move_ticks = _pace
 			var direction := World.melee_way(self, target)
 			if not _in_strike_reach(target):
@@ -1440,7 +1494,9 @@ func _strike() -> void:
 			if not behind and begin_lunge(target):
 				return  # From in front or side-on, told (790 amended (4)).
 			if behind:
-				World.try_attack(self, target, attack_damage + backstab_damage)  # Unseen from behind: at once.
+				# Unseen from behind: at once (no settle: it was never seen coming).
+				if World.try_attack(self, target, attack_damage + backstab_damage):
+					_recover_after_blow()
 			else:
 				_blow()
 		_:
@@ -1471,6 +1527,7 @@ func _wind_on() -> void:
 		World.try_attack(self, aimed as GridEntity)
 	else:
 		World.try_swing(self, direction)
+	_recover_after_blow()  # Landed or swung at the air: it stands (338 amended (4)).
 
 
 ## DART: a step out of its target's reach, as far from it as it can.

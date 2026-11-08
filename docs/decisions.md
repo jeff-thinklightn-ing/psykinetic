@@ -35881,6 +35881,23 @@ landing on the drawn time); mirror_test _test_a_blow_settles_its_last_step_only 
 end and pace, the step after it even). Client and cosmetic only, protocol unchanged, no new class_name,
 no bullet (the package's, voice's words, rides with enemy-ai's side, the last to land).
 
+338 amended (4), enemy-ai's side: stop to strike (combat's package "blows you can see", combat's numbers;
+enemy-ai's slide diagnosis, Jeff: "enemies tend to look like they are sliding into you and then no visible
+swing"). Two fight-block values (Monster.FIGHT_DEFAULTS and FIGHT_SPANS, levels/monsters.json's "fight",
+a kind's row may differ, the tuning panel's rows 18 to 20): settle_ticks (SETTLE_TICKS 1, 0 to 5), a blow
+begun (Monster._blow, and _strike's heavy weapon) only once it has stood that long past its last step or
+push's move_ticks (Monster._stood_settle, GridEntity._moved_tick), so from standing to contact is the settle and
+the lead, 1 + 3 ticks; strike_recover_ticks (STRIKE_RECOVER_TICKS 4, 0 to 10), no step (next_move_tick)
+till that long after its blow lands or misses (_recover_after_blow: its wind-up's "lands", set once it has fallen, _tend_recover, since World lands a blow only past its striker's next_move_tick; else now; the
+HEAVY tactic's own wind-up when it falls, _wind_on; the unseen blow from behind), inside every kind's
+attack_ticks, so it strikes no less often. Not for: a DART one (it darts out after its blow anyway), the
+HEAVY tactic's own wind-up's start (it stands through windup_ticks already), the told lunge and the
+ambush (they stand already). monster_test _test_stop_to_strike (the block's 4 and 1; a step, its
+move_ticks and a settle before it draws back; no step till 4 after its blow lands; 0, as before) and
+_test_fight_panel's 20 rows; push_test _test_no_attack_mid_step (its step ended, it stands its settle, then
+hits). One never moved (_moved_tick -1) stands settled. Carries voice's package bullet. Server only, protocol unchanged, no new
+class_name.
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,
