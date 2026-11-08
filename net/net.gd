@@ -605,7 +605,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## practice kit retired). No new number (release): an absent optional field hides the button.
 ## 53 (823): Monster.max_hp replicated (SUBCLASS_REPLICATED), so a named foe's bar reads its real
 ## strength (NamedEnemy scales it on the server); an old client keeps the kind's base. Shares 53 with 819 and 822.
-const PROTOCOL_REVISION := 53
+## 54 (340/379 amended): GridEntity._net_stunned carries the stun's cause (&"guarded", &"bash",
+## &"broken" or &""), and a new RPC _net_bashed(direction, by) tells the one bashed; an old client
+## can't take the new argument, so this bumps the number. The first wire change after v0.1.208.
+const PROTOCOL_REVISION := 54
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

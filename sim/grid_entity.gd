@@ -47,6 +47,14 @@ signal guarded(broken: bool)
 ## weapon's, World.try_wind_up; a brute's, Monster's HEAVY tactic). Views
 ## wind up, or stop. On every peer.
 signal winding(direction: Vector2i, ticks: int)
+## Stunned for [param ticks], for [param cause] (379 amended): &"guarded"
+## (thrown back off a raised shield, 340 amended), &"bash" (a bash's
+## stagger), &"broken" (its guard broken), &"" for any other. stun_cause is
+## set first. On every peer.
+signal stunned(ticks: int, cause: StringName)
+## Shield-bashed by the body at [param by], driven toward [param direction]
+## (Vector2i.ZERO: it did not move; World._bash_lands, 379 amended). On every peer.
+signal bashed(direction: Vector2i, by: NodePath)
 
 # Not called "Material"/"material": CanvasItem already owns that name.
 ## FLESH is a creature (hazards hurt it). WOOD takes impact and breaks at 0 hp.
@@ -337,6 +345,10 @@ var next_move_tick := 0.0
 var next_attack_tick := 0
 ## Set by World when a collision stuns this entity. Server only.
 var stunned_until_tick := 0
+## Why it was last stunned (stunned; 379 amended): &"guarded", &"bash", &"broken" or &"".
+var stun_cause := &""
+## The tick stun_cause was set (server): a stun later that tick with no cause keeps it.
+var stun_cause_tick := -1
 ## Where the local client points the body while it stands still (WASD:
 ## the cursor), in grid units from its tile; ZERO for none. Display only.
 var aim := Vector2.ZERO
@@ -1079,11 +1091,20 @@ func _world_guarded(broken: bool) -> void:
 		_net_guarded.rpc_id(peer, broken)
 
 
-func _world_stunned(until_tick: int, ticks: int) -> void:
+func _world_stunned(until_tick: int, ticks: int, cause: StringName = &"") -> void:
 	stunned_until_tick = until_tick
+	stun_cause = cause
+	stun_cause_tick = World.tick
 	_reel_until = until_tick
+	stunned.emit(ticks, cause)
 	for peer in viewers():
-		_net_stunned.rpc_id(peer, ticks)
+		_net_stunned.rpc_id(peer, ticks, cause)
+
+
+func _world_bashed(direction: Vector2i, by: NodePath) -> void:
+	bashed.emit(direction, by)
+	for peer in viewers():
+		_net_bashed.rpc_id(peer, direction, by)
 
 
 func _world_remove() -> void:
@@ -1322,8 +1343,15 @@ func _net_struck(amount: int, cause: StringName) -> void:
 
 
 @rpc("authority", "call_remote", "reliable")
-func _net_stunned(ticks: int) -> void:
+func _net_stunned(ticks: int, cause: StringName) -> void:
 	_reel_until = World.tick + ticks
+	stun_cause = cause  # Before stunned fires (379 amended): a view reads it there.
+	stunned.emit(ticks, cause)
+
+
+@rpc("authority", "call_remote", "reliable")
+func _net_bashed(direction: Vector2i, by: NodePath) -> void:
+	bashed.emit(direction, by)
 
 
 @rpc("authority", "call_remote", "reliable")

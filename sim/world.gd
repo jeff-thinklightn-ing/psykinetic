@@ -346,6 +346,14 @@ const NOISE_BOW := 3
 ## A guard broken (decision 340): its holder stunned this long, and no
 ## raising a guard again until GUARD_BROKEN_TICKS have passed.
 const GUARD_BREAK_STUN := 8
+## 340 amended: a blow a raised shield takes whole throws its attacker back,
+## stunned this long (cause &"guarded"): the shield-bearer's opening.
+const SHIELD_RECOIL_STUN := 4
+## 340 amended: a lowered shield guards its arm's side (the holder's left)
+## at this share of its raised absorb, over LOWERED_ARC 45-degree steps
+## either side of it.
+const LOWERED_ABSORB_SHARE := 0.5
+const LOWERED_ARC := 1
 const GUARD_BROKEN_TICKS := 20
 ## A body knocked down (decision 343) is pushed as if it weighed this much
 ## of its mass: lying, it cannot brace.
@@ -7144,6 +7152,34 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 + wider else {}
 
 
+## 340 amended: [param target]'s lowered shield, guarding its arm's side
+## against [param source]: not raised, a shield in its left hand, the source
+## within LOWERED_ARC of its left (facing turned a quarter left), not stunned,
+## winded, broken or in a bash's moment. Its verb with absorb at
+## LOWERED_ABSORB_SHARE and "lowered" true, else {}. Only _meet_guard reads
+## it: the monsters' AI (guarding) sees a lowered shield as no guard.
+func lowered_guard(target: GridEntity, source: GridEntity) -> Dictionary:
+	if not target.raised.is_empty() or target.facing == Vector2i.ZERO or not holds_in_hands(target) or is_stunned(target):
+		return {}
+	if target.winded or tick < target.guard_broken_until or tick < target.bash_moment_until:
+		return {}
+	if not is_instance_valid(source) or source.tile == target.tile:
+		return {}
+	var held: String = target.slots[Items.LEFT_HAND]
+	if held.is_empty() or not "shield" in Items.def(held).get("tags", []):
+		return {}
+	var verb := Items.verb_of(held)
+	if verb.get("kind") != "block":
+		return {}
+	var left := Vector2(target.facing.y, -target.facing.x)
+	if absf((body_centre(source) - body_centre(target)).angle_to(left)) > LOWERED_ARC * PI / 4.0 + 0.01:
+		return {}
+	var lowered := verb.duplicate()
+	lowered["absorb"] = float(verb["absorb"]) * LOWERED_ABSORB_SHARE
+	lowered["lowered"] = true
+	return lowered
+
+
 ## A blow of [param amount] damage and [param force] (its push before
 ## knockback_min_force; 0 for a shot) from [param source] on
 ## [param target], met by its guard (guarding; decision 340): null when
@@ -7159,11 +7195,13 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false,
 		crushing := false) -> Variant:
 	var verb := guarding(target, source)
+	if verb.is_empty():
+		verb = lowered_guard(target, source)  # 340 amended: its shield's side, at half.
 	if verb.is_empty() or is_sheltered(target):
 		return null  # (Arriving, decision 661: nothing reaches its guard.)
 	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
 	var weight := amount + force
-	var slot := Items.LEFT_HAND if target.raised == "block" else Items.RIGHT_HAND  # As guarding found it.
+	var slot := Items.LEFT_HAND if target.raised == "block" or verb.get("lowered", false) else Items.RIGHT_HAND  # As found.
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
 	var cost := maxi(1, ceili(float(verb["stamina"]) * weight * steady))
 	target._world_note_exertion(tick)
@@ -7172,7 +7210,7 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 			target.stamina = maxi(0, target.stamina - cost)
 		target.raised = ""
 		target.guard_broken_until = tick + GUARD_BROKEN_TICKS
-		_stun_for(target, GUARD_BREAK_STUN)
+		_stun_for(target, GUARD_BREAK_STUN, &"broken")
 		_log("guard: %s's guard broken by %s (a blow of %d, force %.2f)" % [target.name, source.name, amount, force])
 		target._world_guarded(true)
 		guard_met.emit(target, source, true)
@@ -7183,6 +7221,8 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	_log("guard: %s takes %s's blow (%d, force %.2f) for %d stamina" % [target.name, source.name, amount, force, cost])
 	target._world_guarded(false)
 	guard_met.emit(target, source, false)
+	if target.raised == "block" and not shot:
+		_stun_for(source, SHIELD_RECOIL_STUN, &"guarded")  # 340 amended: thrown back off it, the holder's opening.
 	_credit(target, slot, "guarded")
 	if slot == Items.RIGHT_HAND and target.slots[slot] == "sword" and source is Monster:
 		practise(target, "swordplay", ART_DEED_PARRY * _art_worth(source))  # 766.
@@ -8737,7 +8777,10 @@ func _bash_lands(hit: Hit) -> void:
 		hit.target.raised = ""
 		hit.target.guard_broken_until = tick + GUARD_BROKEN_TICKS
 		hit.target._world_guarded(true)
-	_stun_for(hit.target, hit.bash)
+	_stun_for(hit.target, hit.bash, &"bash")
+	# 379 amended: the one bashed told so, from whom and which way (ZERO: it did not move).
+	var moved := Vector2i.ZERO if hit.force <= 0.0 else Vector2i(hit.push_way.normalized().round())
+	hit.target._world_bashed(moved, hit.source.get_path() if is_instance_valid(hit.source) else NodePath())
 	_log("bash: %s bashes %s%s, force %.2f" % [hit.source_name, hit.target_name, ", its guard opened" if opened else "", hit.force])
 	if hit.target.is_creature():
 		_credit(hit.source, Items.LEFT_HAND, "guarded")
@@ -10422,11 +10465,13 @@ func _stun(entity: GridEntity, remaining_force: float) -> void:
 
 
 ## Stuns [param entity] for [param ticks] from now, if that is longer.
-func _stun_for(entity: GridEntity, ticks: int) -> void:
+func _stun_for(entity: GridEntity, ticks: int, cause: StringName = &"") -> void:
 	if not _alive(entity) or not entity.is_creature() or is_sheltered(entity):
 		return
+	if cause == &"" and entity.stun_cause_tick == tick:
+		cause = entity.stun_cause  # The same blow's stun drawn out (a bash's slide): its cause kept.
 	if tick + ticks > entity.stunned_until_tick:
-		entity._world_stunned(tick + ticks, ticks)
+		entity._world_stunned(tick + ticks, ticks, cause)  # Its cause told with it (379 amended).
 
 
 ## [param against] is what it hit: &"stone", &"wood", &"body", or &"" (it

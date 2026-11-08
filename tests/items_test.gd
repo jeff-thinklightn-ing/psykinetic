@@ -148,8 +148,8 @@ func _test_leather() -> void:
 	_check(Items.mend_of("sword").is_empty(), "a sword has no mend")
 	var buckler := Items.verb_of("buckler")
 	_check(buckler.get("kind") == "block" and buckler.get("arc") == 0 and buckler.get("absorb") == 0.75 and buckler.get("stamina") == 6
-			and buckler.get("breaks_at") == 1.5 and buckler.get("bash_force") == 1.0 and Items.weight_of("buckler") == 1.5,
-			"a buckler: straight ahead only, takes three quarters, 6 stamina, breaks at 1.5, a light bash; 1.5 kg (%s)" % buckler)
+			and buckler.get("breaks_at") == 2.5 and buckler.get("bash_force") == 1.0 and Items.weight_of("buckler") == 1.5,
+			"a buckler: straight ahead only, takes three quarters, 6 stamina, breaks at 2.5 (340 amended), a light bash; 1.5 kg (%s)" % buckler)
 	_check(Items.def("buckler")["made"] == {"by": "tanner", "from": {"leather": 2, "wood": 1}, "steps": 1800}
 			and "shield" in Items.def("buckler")["tags"], "made by the tanner from leather and wood, a shield the town wants")
 
@@ -1029,12 +1029,14 @@ func _test_block() -> void:
 	World._resolve_hits()
 	_check(host.hp == hp and host.raised == "block", "a real blow, resolved: the host unhurt, the shield still up")
 	met = World._meet_guard(host, imp, 2, 3.0)
-	_check(met == [2, 3.0] and host.raised == "" and World.is_stunned(host), "a hammer's blow (2, force 3; over the shield's 2): the guard breaks, the blow lands whole, the host staggered")
+	_check(met == [2, 3.0] and host.raised == "" and World.is_stunned(host), "a hammer's blow (2, force 3; over the shield's 3.0, 340 amended): the guard breaks, the blow lands whole, the host staggered")
 	host.stunned_until_tick = 0
 	host.guard_broken_until = World.tick
 	World.try_stance(host, "block")
-	met = World._meet_guard(host, imp, 2, 0.2)
-	_check(met == [2, 0.2] and host.raised == "", "a brute's (2, force 0.2): heavy enough to break it too")
+	met = World._meet_guard(host, imp, 2, 0.3)
+	_check(met == [0, 0.0] and host.raised == "block", "a robber's dagger poke (2, force 0.3; 2.3 under 3.0, 340 amended): taken whole, the guard held")
+	met = World._meet_guard(host, imp, 3, 0.2)
+	_check(met == [3, 0.2] and host.raised == "", "a blow of 3 and a little push: heavy enough to break it")
 	host.stunned_until_tick = 0
 	_check(not World.try_stance(host, "block"), "and the shield will not come up again at once")
 	host.guard_broken_until = World.tick
@@ -1058,6 +1060,7 @@ func _test_block() -> void:
 	World.items.end(World.take_item(host, host, Player.RIGHT_HAND), "gone")
 	imp.slots = Items.tidy(["", "", "", "", "", "shield"], Items.CARRIED)
 	imp.raised = "block"
+	imp.stunned_until_tick = 0  # Thrown back off the host's shield above (340 amended): over.
 	imp._world_set_facing(-ahead)
 	_give(host, "bow", Player.RIGHT_HAND)
 	hp = imp.hp

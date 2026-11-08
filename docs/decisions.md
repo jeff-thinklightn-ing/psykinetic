@@ -7062,6 +7062,31 @@ wood, or wood splitting and a stagger; World.guard_met for the party log
 through the same code (holds_in_hands, decision 338) when their AI raises
 (try_stance "block"). Protocol: the new RPC changes the fingerprint.
 
+340 amended (release's label; the coordinator's approval, package "the shield", the pace program's
+item 4; Jeff: "fights feel a little too fast", "fighting the robbers is not great"): the shield
+worth carrying. A blow a raised shield took cost its attacker nothing, so holding it up was a
+stalemate, and at breaks_at 2.0 a robber's dagger poke (2 and 0.3 of push) or a wolf's bite broke
+it anyway. Now:
+- The recoil: a blow a raised shield takes without breaking (not a sword's parry, never a shot)
+  stuns its attacker World.SHIELD_RECOIL_STUN (4 ticks, cause &"guarded"), the holder's opening.
+  It goes both ways (the coordinator's pick): a skeleton guard's raised shield throws a player
+  back too, met by flanking, a bash or a heavy blow; a sword's blow (3 and 0.9) breaks a round
+  shield, so a sword brings a shielded guard down from the front in about 4 s.
+- breaks_at: the round shield 2.0 to 3.0, the buckler 1.5 to 2.5. A robber's or a wolf's plain
+  blow is taken; a brute's hammer (force 3), a sword's on a buckler and every wound-up blow
+  (crushing, 392) still break it.
+- The lowered shield (World.lowered_guard): not raised, a shield in the left hand still guards
+  its arm's side, the cell to the holder's left and the two beside it (LOWERED_ARC 1), at
+  LOWERED_ABSORB_SHARE (0.5) of its absorb, for its stamina, breaking as raised; no recoil; not
+  stunned, winded, broken or in a bash's moment. Only _meet_guard reads it: guarding, the
+  monsters' AI's view, still sees a lowered shield as none, so their flanking and bashing are as
+  they were.
+The shield's and the buckler's "says" in voice's words. monster_test _test_shield_recoil (an
+imp's and a robber's blow on a round shield and a buckler; a parry and a breaking blow give
+none), _test_lowered_shield, _test_sword_beats_guard; items_test's break points at the new
+numbers. Protocol 54 (with 379 amended). animation's side (Recoil, the spark) and sound's (the
+thuds) follow.
+
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
 Weapons as verbs in the fight, part 4 of 5. A blow with a knockdown verb
@@ -9962,6 +9987,18 @@ to steady; not "struck", the right hand's deed. The party log says "X bashes Y's
 guard open" or "X shoves Y with a shield" (World.shield_bashed). Rejected: a key
 of its own (the hands are the buttons, 329); damage (an interruption, not a
 blow); counting it as the right hand's "struck".
+379 amended (release's label; the coordinator's approval, package "the shield"): the bash told.
+A client heard only the basher's swing and a stun, so it could not draw who bashed whom or which
+way, nor tell a bash's stagger, a shield's recoil (340 amended) and a broken guard apart. Now the
+one bashed is told GridEntity.bashed(direction, by) (RPC _net_bashed; direction the push's cell
+step, Vector2i.ZERO when it did not move; by the basher's path), sent from World._bash_lands, and
+every stun carries its cause: GridEntity._net_stunned(ticks, cause), stun_cause set before the
+new signal stunned(ticks, cause) fires, on every peer. Causes: &"guarded" (the recoil), &"bash",
+&"broken" (a guard broken), &"" for any other; a stun later the same tick with no cause (a
+bash's slide) keeps the cause (stun_cause_tick). monster_test _test_bash_told. Server and
+client; PROTOCOL_REVISION 54 (release's; shared with any wire change before v0.1.209); no new
+class_name.
+
 ## 400. What a companion knows of her town and the world, and her not knowing
 
 Jeff's play log (2026-10-17): Wren, working in the castle's town, said "I

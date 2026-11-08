@@ -149,6 +149,10 @@ func _ready() -> void:
 	_test_worn_bundles()
 	_test_shield()
 	_test_monster_bash()
+	_test_shield_recoil()
+	_test_lowered_shield()
+	_test_bash_told()
+	_test_sword_beats_guard()
 	_test_monster_wind_up()
 	_test_meets_wind_up()
 	_test_bane_and_grudge()
@@ -5169,6 +5173,168 @@ func _test_shield() -> void:
 				struck += 1
 	_check(struck > 0, "the sneak gets blows in (%d) round the shield" % struck)
 	Monster.idling = true
+
+
+## A blow at [param target] from [param by], at once (no lead, no AI), resolved.
+func _blow_at(by: Monster, target: GridEntity) -> void:
+	by.lead_ticks = 0
+	by.next_attack_tick = 0
+	by.next_move_tick = 0
+	World.try_attack(by, target)
+	World.step()
+
+
+## 340 amended: a blow a raised shield takes whole throws its attacker back,
+## stunned SHIELD_RECOIL_STUN (cause &"guarded"), the holder's opening; a
+## sword's parry, a broken guard, and the buckler too.
+func _test_shield_recoil() -> void:
+	print("
+== 340 amended: a blow taken on a raised shield throws its attacker back ==")
+	var had_noticing := Monster.noticing
+	Monster.noticing = false  # These test what a blow does, not how a monster picks one.
+	for shield: String in ["shield", "buckler"]:
+		for kind: String in ["i", "x"]:
+			var e := _build(["#######", "#.P%s..#" % kind, "#######"])
+			var foe: Monster = e[kind][0]
+			var player: GridEntity = e["P"][0]
+			player.slots[Items.LEFT_HAND] = shield
+			World.face(player, Vector2i(1, 0))
+			World.try_stance(player, "block")
+			var told: Array = []
+			foe.stunned.connect(func(ticks: int, cause: StringName) -> void: told.append([ticks, cause]))
+			var hp := player.hp
+			_blow_at(foe, player)
+			_check(World.is_stunned(foe) and foe.stun_cause == &"guarded" and told == [[World.SHIELD_RECOIL_STUN, &"guarded"]]
+					and player.raised == "block",
+					"%s's blow on a raised %s: thrown back %d ticks, &\"guarded\", the guard held (%s, %s, hp %d of %d)" % [
+					foe.name, shield, World.SHIELD_RECOIL_STUN, told, player.raised, player.hp, hp])
+	# A sword's parry: no recoil.
+	var e := _build(["#######", "#.Pi..#", "#######"])
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	player.slots[Items.RIGHT_HAND] = "sword"
+	World.face(player, Vector2i(1, 0))
+	player.next_attack_tick = 0
+	_blow_at(imp, player)
+	_check(not World.is_stunned(imp), "a sword's parry throws nothing back")
+	# A blow that breaks it: none, the holder stunned as before (&"broken").
+	e = _build(["#######", "#.Pi..#", "#######"])
+	imp = e["i"][0]
+	player = e["P"][0]
+	player.slots[Items.LEFT_HAND] = "shield"
+	World.face(player, Vector2i(1, 0))
+	World.try_stance(player, "block")
+	imp.attack_damage = 4
+	_blow_at(imp, player)
+	_check(not World.is_stunned(imp) and World.is_stunned(player) and player.stun_cause == &"broken",
+			"a blow that breaks it: no recoil, the holder stunned (&\"%s\")" % player.stun_cause)
+	Monster.noticing = had_noticing
+
+
+## 340 amended: a lowered shield guards its arm's side (the holder's left)
+## at half its absorb, with no recoil; the other side, nothing.
+func _test_lowered_shield() -> void:
+	print("
+== 340 amended: a lowered shield half-guards its own side ==")
+	var had_noticing := Monster.noticing
+	Monster.noticing = false
+	var taken := {}
+	for at: Vector2i in [Vector2i(3, 1), Vector2i(3, 3)]:  # Facing east: north is its left, south its right.
+		var e := _build(["#######", "#.....#", "#.....#", "#.....#", "#######"])
+		var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+		_room.add_child(player)
+		World.spawn(player, Vector2i(3, 2))
+		player.slots[Items.LEFT_HAND] = "shield"
+		World.face(player, Vector2i(1, 0))
+		var imp := EntityFactory.build(SPECS["i"].duplicate(true).merged({"name": "Imp9"})) as Monster
+		_room.add_child(imp)
+		World.spawn(imp, at)
+		_check(World.guarding(player, imp).is_empty(), "lowered, guarding (the AI's) sees no guard from %s" % at)
+		var hp := player.hp
+		_blow_at(imp, player)
+		taken[at] = hp - player.hp
+		_check(not World.is_stunned(imp), "no recoil off a lowered shield (from %s)" % at)
+	_check(int(taken[Vector2i(3, 1)]) == 0 and int(taken[Vector2i(3, 3)]) >= 1,
+			"an imp's poke from its shield side: %d taken; from the other: %d" % [taken[Vector2i(3, 1)], taken[Vector2i(3, 3)]])
+	var e := _build(["#######", "#.....#", "#.....#", "#######"])
+	var player := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(player)
+	World.spawn(player, Vector2i(3, 2))
+	player.slots[Items.LEFT_HAND] = "shield"
+	World.face(player, Vector2i(1, 0))
+	var imp := EntityFactory.build(SPECS["i"].duplicate(true).merged({"name": "Imp9"})) as Monster
+	_room.add_child(imp)
+	World.spawn(imp, Vector2i(3, 1))
+	var lowered := World.lowered_guard(player, imp)
+	_check(is_equal_approx(float(lowered.get("absorb", 0.0)), 0.5) and lowered.get("lowered", false),
+			"the round shield lowered: absorb 0.5 of its 1.0 (%s)" % [lowered.get("absorb")])
+	player.winded = true
+	_check(World.lowered_guard(player, imp).is_empty(), "winded, nothing")
+	Monster.noticing = had_noticing
+
+
+## 340 amended, the coordinator's check: recoil goes both ways, so a
+## skeleton guard's raised shield meets a sword player's blows; a sword still
+## beats it from the front in fair time (its blow weighs past 3.0 and breaks
+## the guard), no stalemate.
+func _test_sword_beats_guard() -> void:
+	print("
+== 340 amended: a sword beats a skeleton guard's shield from the front ==")
+	Monster.idling = false
+	var e := _build(["#########", "#.......#", "#..Pg...#", "#.......#", "#########"])  # Toe to toe: a guard holds its post.
+	var guard: Monster = e["g"][0]
+	var player: GridEntity = e["P"][0]
+	_bold(guard)
+	guard.slots = PackedStringArray(["", "", "", "", "", "shield"])  # As Level arms one with a shield.
+	player.slots[Items.RIGHT_HAND] = "sword"
+	player.max_hp = 999
+	player.hp = 999
+	var thrown: Array[int] = [0]  # Arrays: a lambda takes ints by value.
+	var broken: Array[int] = [0]
+	var swings: Array[int] = [0]
+	var on_stun := func(_ticks: int, cause: StringName) -> void:
+		if cause == &"guarded":
+			thrown[0] += 1
+	player.stunned.connect(on_stun)
+	var on_break := func(target: GridEntity, _source: GridEntity, was_broken: bool) -> void:
+		if target == guard and was_broken:
+			broken[0] += 1
+	World.guard_met.connect(on_break)
+	var ticks := 0
+	while ticks < 600 and guard.spawned and guard.hp > 0:
+		if World.distance(player.tile, guard.tile) <= 1:
+			World.face(player, guard.tile - player.tile)
+			swings[0] += 1 if World.try_attack(player, guard) else 0
+		World.step()
+		ticks += 1
+	World.guard_met.disconnect(on_break)
+	_check(not guard.spawned or guard.hp <= 0,
+			"a sword brings a shielded skeleton guard down in %.1f s (%d swings, its guard broken %d times, the player thrown back %d, raised %s)" % [ticks / 10.0, swings[0], broken[0], thrown[0], guard.raised])
+	_check(ticks <= 300, "in fair time, no stalemate (%d ticks)" % ticks)
+	Monster.idling = true
+
+
+## 379 amended: the one bashed is told so, which way and by whom, and its
+## stun carries &"bash".
+func _test_bash_told() -> void:
+	print("
+== 379 amended: a bash told to the one bashed ==")
+	var had_noticing := Monster.noticing
+	Monster.noticing = false
+	var e := _build(["########", "#.Pi...#", "########"])
+	var imp: Monster = e["i"][0]
+	var player: GridEntity = e["P"][0]
+	player.slots[Items.LEFT_HAND] = "shield"
+	World.face(player, Vector2i(1, 0))
+	World.try_stance(player, "block")
+	var told: Array = []
+	imp.bashed.connect(func(direction: Vector2i, by: NodePath) -> void: told.append([direction, by]))
+	_check(World.try_bash(player, imp), "the player bashes the imp")
+	World.step()
+	_check(told.size() == 1 and told[0][1] == player.get_path() and (told[0][0] == Vector2i(1, 0) or told[0][0] == Vector2i.ZERO),
+			"told once, by the player, driven east or held (%s)" % [told])
+	_check(imp.stun_cause == &"bash", "its stagger's cause: &\"%s\"" % imp.stun_cause)
+	Monster.noticing = had_noticing
 
 
 func _test_monster_bash() -> void:
