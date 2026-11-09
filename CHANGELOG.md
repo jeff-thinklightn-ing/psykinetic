@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Whoever buys from you, in town or at a forest camp, pays the full price at once, and nobody owes you gold any more: what a town owed you is paid into your purse, and a camp trader takes only so many of each good a day, where before a short purse left you waiting for your money (826).
 - Outdoors, a house, a wall, a tree or a landmark between you and the camera stays solid now, where before it turned see-through, and your outline shows through it, as do your companion's and the outline of whatever you've marked (623 amended (5)).
 - Shields hold better now: blocking costs half the stamina it did, and a shield that gives way leaves you what stamina you had; a blow taken on a raised shield, a robber's lunge among them, throws its attacker back with a deep wooden boom and a spark, an opening for you, and a robber's or a wolf's plain blow no longer breaks a round shield, though a heavy weapon's wound-up blow still does, a brute's hammer, Brand's sledge or the draugr's axe; lowered, a shield still partly guards your shield-arm's side, and a skeleton's raised shield throws you back the same way (340 amended; 379 amended).
 - In the hills, light the cold fire in the hill cave from its woodpile and rest by it as at a roadside camp: it heals you, dries you off and keeps wild beasts away, you can cook over it, and your companion sits with you; it burns a good while, and you can stoke it again (825).

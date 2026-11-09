@@ -612,6 +612,9 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## ticks left]]}, a level's burning hearths, to all on a change and to a peer arriving with its
 ## zone's buildings; the new "hearth" command {at: [x, y]} lights one from on or beside it. The
 ## terrain's new "fire_rings" (Level.fire_rings_of) is the level's own on both sides.
+## 54 (826, "the town pays in full"; shares 54, release): a person's takes rows and the town
+## window's sheet no longer carry "owed", a gold reward is never marked "owed", and a town's
+## "pays" carries no up_to; a camp trader's buys' up_to is his day's demand, not a purse.
 const PROTOCOL_REVISION := 54
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

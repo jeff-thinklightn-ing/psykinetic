@@ -4615,11 +4615,6 @@ func _boot() -> void:
 	# A hill cat spotted lying up (814): the careful player's gain (ui's path, voice's words).
 	if not World.cat_spotted.is_connected(_on_cat_spotted):
 		World.cat_spotted.connect(_on_cat_spotted)
-	# owed_paid's gold reaches the client by Economy.purse_changed, as every purse change does,
-	# and floats then, when it is paid (804, economy's side: never while only owed).
-	World.economy.owed_paid.connect(func(player_id: String, gold: int) -> void:
-		if gold > 0:
-			_reward(player_id, {"track": "gold", "amount": gold, "words": OWED_PAID % gold}))
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
 	World.economy.before_harvest = World.towns.before_harvest
@@ -15517,7 +15512,7 @@ func ask_town_sheet(player: Player, args: Dictionary) -> Dictionary:
 ## Server: the "contribute" command (768, the town window's Donate) {town,
 ## give: [uids in their pack], gold}: at [param player]'s own stand by that
 ## town's store or depot, each thing banked as the depot banks it
-## (World.donate: raw goods paid or owed, gear a gift) and the gold given
+## (World.donate: raw goods paid in full (826), gear a gift) and the gold given
 ## toward its next build (Economy.contribute); the town's regard moves for
 ## what it was short of and for gold toward a build. Answered with the
 ## town_sheet plus "paid" (gold paid now for the goods) and "given" (gold
@@ -15628,7 +15623,7 @@ var _taken_back := 0
 
 
 ## One trophy [param id] just banked at [param town] by give_to, sold (821):
-## Economy.trophy_sale pays [param player_id] or owes them, and the hand-in
+## Economy.trophy_sale pays [param player_id] in full (826), and the hand-in
 ## being thanked (its handed_in just counted it, as gear) carries the gold.
 func _trophy_sold(town: String, player_id: String, id: String) -> void:
 	if player_id.is_empty():
@@ -15639,7 +15634,6 @@ func _trophy_sold(town: String, player_id: String, id: String) -> void:
 	var it: Dictionary = _hand_ins.get(player_id, {}).get(town, {})
 	if not it.is_empty():
 		it["paid"] = int(it["paid"]) + int(sale["gold"])
-		it["owed"] = int(it["owed"]) + int(sale["owed"])
 
 
 ## Who in [param town] buys trophy [param id] by Give (821): the first
@@ -15697,7 +15691,7 @@ func bought_by(town: String, id: String, workers = null) -> Dictionary:
 # --- Rewards shown (804, economy's side) ---------------------------------------
 
 ## The hand-ins not yet thanked: {player_id: {place: {raws {what: count},
-## gear {id: count}, short {id: most short}, paid, owed, depot}}}, thanked
+## gear {id: count}, short {id: most short}, paid, depot}}}, thanked
 ## once a hand-in (_thank_hand_ins, deferred to the end of the frame, or at
 ## once by contribute), so a window's Donate and a pile dropped on the
 ## store's ground give one rise and one thanks alike.
@@ -15985,17 +15979,16 @@ func _on_regard_rose(town: String, player_id: String, halves: int, why: String, 
 
 
 func _on_handed_in(place: String, player_id: String, what: String, count: int, raw: bool, short: float, paid: int,
-		owed: int, depot: bool) -> void:
+		depot: bool) -> void:
 	if _hand_ins.is_empty():
 		_thank_hand_ins.call_deferred()
 	var theirs: Dictionary = _hand_ins.get_or_add(player_id, {})
-	var it: Dictionary = theirs.get_or_add(place, {"raws": {}, "gear": {}, "short": {}, "paid": 0, "owed": 0, "depot": depot})
+	var it: Dictionary = theirs.get_or_add(place, {"raws": {}, "gear": {}, "short": {}, "paid": 0, "depot": depot})
 	var into: Dictionary = it["raws"] if raw else it["gear"]
 	into[what] = int(into.get(what, 0)) + count
 	if not raw:
 		it["short"][what] = maxf(float(it["short"].get(what, -1.0)), short)
 	it["paid"] = int(it["paid"]) + paid
-	it["owed"] = int(it["owed"]) + owed
 	it["depot"] = bool(it["depot"]) or depot
 	if not _giving_to.is_empty():
 		it["worker"] = _giving_to  # Given to a person (802 amended (2)): their key and name.
@@ -16035,7 +16028,7 @@ const BUILT_WORDS := {"wood": "timber"}
 ## town could use (rules "town_regard" short for what it was short of, else
 ## "use" while it held under twice its enough: 804's bonus, inside the day's
 ## cap), then one "item" reward with the words, the gold paid and the need
-## bars, and the gold owed if the treasury could not pay.
+## bars (826: the gold always paid in full).
 func _thank_hand_ins() -> void:
 	var all := _hand_ins
 	_hand_ins = {}
@@ -16097,18 +16090,11 @@ func _thank_hand_ins() -> void:
 			_reward(player_id, data)
 			if int(it["paid"]) > 0:
 				_reward(player_id, {"track": "gold", "amount": int(it["paid"]), "words": PAID_WORDS % int(it["paid"])})
-			if int(it["owed"]) > 0:
-				# Owed, not received: "owed" (ui) shows the words plain, no "+" and no coin.
-				_reward(player_id, {"track": "gold", "of": _town_display(place), "amount": int(it["owed"]), "owed": true,
-					"words": OWED_WORDS % [_town_display(place), int(it["owed"])]})
 
 
-## Voice's words for gold a hand-in brings (804, economy's side): paid
-## now, a "+N gold" float; owed, a gold reward marked "owed" that Gains
-## shows as these words, plain; paid later, its float then.
+## Voice's words for gold a hand-in brings (804, economy's side): a "+N
+## gold" float, always paid in full (826).
 const PAID_WORDS := "Pays %d gold"
-const OWED_WORDS := "%s owes you %d gold"
-const OWED_PAID := "Paid %d gold you were owed"
 
 
 ## The names of [param player_id]'s companions within World.COMPANION_REACH
@@ -16359,10 +16345,10 @@ func _worker_town(worker: String) -> String:
 ## "build" (its queued build lacks it; name "the new forge") or "stores"
 ## (name "the larder" for food, else "the store")}, have and need after the
 ## give (toward the build's cost, or the store's enough), gold the treasury
-## pays now and owed what it would owe, as banking does}.
+## pays, in full, as banking does (826)}.
 func give_outcome(town: String, player_id: String, raw: String, count: int) -> Dictionary:
 	var out := {"for": {"kind": "stores", "name": str(World.economy.rules.get("receives", {}).get("stores", {}).get(raw, "the store"))},
-		"have": 0, "need": 0, "gold": 0, "owed": 0}
+		"have": 0, "need": 0, "gold": 0}
 	if World.economy == null or World.stockpile == null or raw.is_empty():
 		return out
 	var have := World.stockpile.count(town, raw)
@@ -16377,18 +16363,14 @@ func give_outcome(town: String, player_id: String, raw: String, count: int) -> D
 	out["have"] = have + count
 	var economy := World.economy
 	var store: Dictionary = economy.rules.get("store", {})
-	var worth := roundi(economy.raw_price(town, raw) * float(store.get("buy", 1.0)) * count)
-	var cap := int(store.get("owed_cap", 30))
-	var payable := maxi(World.stockpile.count(town, "gold") - int(economy.rules.get("gold_floor", 0)), 0)
-	out["gold"] = mini(worth, payable)
-	out["owed"] = mini(worth - int(out["gold"]), maxi(cap - economy.owed_to(player_id, town), 0)) if economy.owed_to(player_id, town) < cap else 0
+	out["gold"] = roundi(economy.raw_price(town, raw) * float(store.get("buy", 1.0)) * count)
 	return out
 
 
 ## What [param worker] would take from [param player]'s pack (the person's
 ## sheet's "takes", ui's Give tab): [{uid, slot, what (its item id), count
 ## (the stack), raw (its unit word: "ore"; "" for gear), for {kind, name}
-## ({} for a gift), have, need, gold, owed}], one row a slot. A
+## ({} for a gift), have, need, gold (paid in full, 826)}], one row a slot. A
 ## raw goes to its receiver_for alone; gear only to the stall's keeper, a
 ## gift (no gold), anything of value; a starter ware too, to him alone, from
 ## the pack: a gift that ends (807 amended (5); 736: never paid for).
@@ -16412,7 +16394,7 @@ func person_takes(player: Player, worker: String) -> Array:
 			# keeper takes it, from the pack, for nothing (Donate, ui's word for gold 0).
 			if not worker.begins_with(Offers.VENDOR) or not Items.is_pack(slot):
 				continue
-			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "owed": 0}
+			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0}
 		elif not yields.is_empty():
 			var raw := str(yields.keys()[0])
 			if raw == "gold" or receiver_for(town, raw) != worker:
@@ -16426,11 +16408,11 @@ func person_takes(player: Player, worker: String) -> Array:
 				continue
 			var sale := World.economy.trophy_outcome(town, player_id, id, count)
 			row = {"for": {"kind": "maker", "name": str(buyer["for"])},
-				"raw": "", "have": 0, "need": 0, "gold": int(sale["gold"]), "owed": int(sale["owed"])}
+				"raw": "", "have": 0, "need": 0, "gold": int(sale["gold"])}
 		elif worker.begins_with(Offers.VENDOR) and Items.is_pack(slot) and World.economy.value_of(id) > 0 and not World.items.is_starter(uid):
 			# Gear only from the pack (802 amended (4); playtest: a tool in hand was offered
 			# as a gift): never what is held or worn.
-			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0, "owed": 0}  # A gift: "for" empty (ui).
+			row = {"for": {}, "raw": "", "have": 0, "need": 0, "gold": 0}  # A gift: "for" empty (ui).
 			var tags: Array = Items.def(id).get("tags", [])
 			for each: Dictionary in town_stock(town):
 				if each["id"] in tags:
@@ -16507,16 +16489,15 @@ func _pack_rows(player: Player) -> Array:
 
 ## What the town window (768) adds to [param town]'s sheet for [param
 ## player]: at (standing by its store or depot), gold and pays and pack
-## (only there), owed, stock, build, regard, state, asks, recent.
+## (only there), stock, build, regard, state, asks, recent.
 func town_window(player: Player, town: String) -> Dictionary:
 	var player_id := player.player_id
 	var at := _at_town_store(player, town)
-	var out := {"at": at, "gold": 0, "pays": {}, "pack": [], "owed": 0, "stock": town_stock(town), "build": {},
+	var out := {"at": at, "gold": 0, "pays": {}, "pack": [], "stock": town_stock(town), "build": {},
 		"regard": World.towns.regard(town, player_id), "state": town_state_list(town), "asks": town_asks(town),
 		"recent": World.towns.recent(town, player_id)}
 	if World.economy == null:
 		return out
-	out["owed"] = World.economy.owed_to(player_id, town)
 	var wanted := World.economy.contribution_wanted(town)
 	if not wanted.is_empty():
 		out["build"] = {"kind": str(wanted["kind"]), "wants": int(wanted["gold"]), "fund": World.economy.fund(town, str(wanted["kind"]))}
@@ -19383,29 +19364,27 @@ func _camp_sells(player: Player, body: Resident, item: String) -> void:
 
 ## What camp [param camp]'s trader pays for each of [param ids] (a player's
 ## things; 799 amended (2), npc's side): id -> {gold: Economy.camp_offer,
-## up_to: as many as his purse (Economy.camp_purse) covers}; only the raws
-## he buys (camp_traders.buys), none his purse can't pay one of.
+## up_to: as many more as he takes today (826: Economy.camp_room, his
+## demand, never a purse)}; only the raws he buys (camp_traders.buys) and
+## still takes today.
 func _camp_buys(camp: String, ids: Array) -> Dictionary:
 	var out := {}
 	if World.economy == null or not World.economy.has_method("camp_offer"):
 		return out
-	var purse := _camp_purse(camp)
 	for raw: Variant in ids:
 		var id := str(raw)
 		var each := int(World.economy.camp_offer(id)) if not id.is_empty() else 0
-		if each <= 0 or out.has(id) or purse < each:
+		var room := _camp_room(camp, id) if each > 0 else 0
+		if each <= 0 or out.has(id) or room <= 0:
 			continue
-		out[id] = {"gold": each, "up_to": purse / each}
+		out[id] = {"gold": each, "up_to": room}
 	return out
 
 
-## Camp [param camp]'s trader's purse now (Economy.camp_purse, a due
-## restock first); before economy's read lands, unbounded (camp_buy's own
-## "purse" refusal stands behind it).
-func _camp_purse(camp: String) -> int:
-	if World.economy == null or not World.economy.has_method("camp_purse"):
-		return 1 << 30
-	return int(World.economy.camp_purse(camp, _camp_mix(camp)))
+## How many more [param id] camp [param camp]'s trader takes today (826:
+## Economy.camp_room).
+func _camp_room(camp: String, id: String) -> int:
+	return int(World.economy.camp_room(camp, _camp_mix(camp), id)) if World.economy != null else 0
 
 
 ## Server: camp trader [param body]'s barter for [param player] (799 amended
@@ -19413,7 +19392,7 @@ func _camp_purse(camp: String) -> int:
 ## "goods" (his wares are his "offers", minted as bought), "buys" for the
 ## raws in their pack he takes (_camp_buys), their "pack" and "gold".
 ## Held captive: no buys, the why his "held" word (townsfolk.json "camp").
-## Open with something he'd buy but his purse empty: economy's "purse" word.
+## Open with something he'd buy but has enough of today: economy's "enough" word (826).
 func _send_camp_barter(player: Player, body: Resident, why := "") -> void:
 	var camp := _camp_of(body.camp_trader)
 	var data := {"shop": "", "resident": str(body.get_path()), "town": camp, "gold": World.gold_of(player.player_id), "goods": [],
@@ -19426,14 +19405,15 @@ func _send_camp_barter(player: Player, body: Resident, why := "") -> void:
 		data["buys"] = _camp_buys(camp, Array(player.slots))
 		if why.is_empty() and (data["buys"] as Dictionary).is_empty() and World.economy != null and World.economy.has_method("camp_offer") \
 				and Array(player.slots).any(func(id: Variant) -> bool: return int(World.economy.camp_offer(str(id))) > 0):
-			data["why"] = str(World.economy.camp_rule().get("say", {}).get("purse", "I've no coin left for that."))
+			data["why"] = str(World.economy.camp_rule().get("say", {}).get("enough", "I've enough of that for now."))
 	Net.message_to(player.owner_peer, "barter", data)
 
 
 ## [param player] sells [param give] (uids from their pack) to camp trader
 ## [param body] (799 amended (2), npc's side): all or nothing, each a raw he
-## buys (Economy.camp_offer), none starter gear or grave goods, the whole
-## within his purse; then Economy.camp_buy for each kind pays and the things
+## buys (Economy.camp_offer), none starter gear or grave goods, none past
+## what he takes today (826: camp_room); then Economy.camp_buy for each kind
+## pays in full and the things
 ## leave the world (World.consume: he carries them off), and he says what he
 ## paid (camp_traders.say "bought"). The why, "" when sold.
 func _camp_bought(player: Player, body: Resident, give: Array) -> String:
@@ -19461,11 +19441,9 @@ func _camp_bought(player: Player, body: Resident, give: Array) -> String:
 		var uids: Array = by_id.get(id, [])
 		uids.append(uid)
 		by_id[id] = uids
-	var total := 0
 	for id: String in by_id:
-		total += int(World.economy.camp_offer(id)) * (by_id[id] as Array).size()
-	if total > _camp_purse(camp):
-		return str(words.get("purse", "I've no coin left for that."))
+		if (by_id[id] as Array).size() > _camp_room(camp, id):
+			return str(words.get("enough", "I've enough of that for now."))
 	var paid := 0
 	var mix := _camp_mix(camp)
 	for id: String in by_id:
@@ -19475,7 +19453,7 @@ func _camp_bought(player: Player, body: Resident, give: Array) -> String:
 			World.consume(player, int(uids[i]), "sold to a camp trader")
 		paid += int(done.get("gold", 0))
 		if not bool(done.get("ok", false)):
-			return str(done.get("say", words.get("purse", "I've no coin left for that.")))
+			return str(done.get("say", words.get("enough", "I've enough of that for now.")))
 	var line := str(words.get("bought", "There's %d gold for it."))
 	_resident_says(body, line % paid if line.contains("%d") else line, "", player)
 	return ""

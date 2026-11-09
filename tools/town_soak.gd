@@ -54,6 +54,17 @@ var _give := 0
 var _woodlot := Vector2i(-99999, -99999)
 var _woodlot_taken := -1
 const WOODLOT := "wilds/soak_woodlot"
+## --sell=GOLD: 826's check (Jeff: "town shouldn't owe players"): at noon
+## each day the first player sells the town about GOLD worth of hides and
+## bear's claws (Economy.bank_sale, trophy_sale: paid in full, the goods
+## banked), and as many hides as a camp trader takes (camp_buy), until
+## --sell-until=DAY; a "SOAK826" line each day: the treasury, the trade's
+## debt, the town's gold, workers owed, hungry, on the dole, what was paid.
+var _sell := 0
+var _sell_until := 20
+var _sold := {"town": 0, "camp": 0, "short": 0}
+var _last_day := -1
+const SOAK_CAMP := "forest/soak_camp"
 ## --retrain=NAME:TRADE:DAY: the resident named NAME turns to TRADE at the
 ## start of that day (npc's Production.retrain, as Pip turns acolyte),
 ## leaving their bench for economy's 552 newcomer.
@@ -122,6 +133,10 @@ func _run() -> void:
 				_retrain = {"name": parts[0], "trade": parts[1], "day": int(parts[2])}
 		elif arg.begins_with("--rescue-after="):
 			_rescue_after = maxf(float(arg.trim_prefix("--rescue-after=")), 0.0)
+		elif arg.begins_with("--sell="):
+			_sell = maxi(int(arg.trim_prefix("--sell=")), 0)
+		elif arg.begins_with("--sell-until="):
+			_sell_until = int(arg.trim_prefix("--sell-until="))
 		elif arg.begins_with("--woodlot-taken="):
 			_woodlot_taken = int(arg.trim_prefix("--woodlot-taken="))
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
@@ -269,6 +284,11 @@ func _hourly() -> void:
 	var hour := int(DayNight.hour(DayNight.now()))
 	var day := Townsfolk.day_of(World.steps)
 	_hours_seen += 1
+	if day != _last_day:
+		_last_day = day
+		_day_826(day)
+	if _sell > 0 and hour == 12 and day < _sell_until:
+		_sell_826()
 	for entity in World.townsfolk():
 		var body := entity as Resident
 		_stints.get_or_add(body.worker_id, {})[body.doing] = true
@@ -394,6 +414,44 @@ func _counter() -> GridEntity:
 ## At the counter: each player hears what the bodies within reach offer and
 ## takes the first thing that is not a sale (a commission, a plea, a page),
 ## and buys the first sale they can afford.
+## 826: the day's line (see --sell).
+func _day_826(day: int) -> void:
+	var owed := 0
+	var hungry := 0
+	for id: String in World.production.worker_ids(TOWN):
+		var who := World.production.worker(id)
+		owed += int(who.get("owed", 0))
+		hungry += 1 if str(who.get("fed", "")) == "hungry" else 0
+	print("SOAK826 day %d: treasury %d, trade debt %d, town gold %d, workers owed %d, hungry %d, dole %d, paid players town %d camp %d, short %d" % [day,
+		World.stockpile.count(TOWN, "gold"), World.economy.trade_debt(TOWN), World.economy.town_gold(TOWN), owed, hungry,
+		World.production.on_dole(TOWN), _sold["town"], _sold["camp"], _sold["short"]])
+
+
+## 826: the noon sale (see --sell): hides and a claw to the town, priced as
+## the store pays, each paid in full; hides to a camp trader up to his day's.
+func _sell_826() -> void:
+	if _players.is_empty() or not is_instance_valid(_players[0]):
+		return
+	var pid: String = _players[0].player_id
+	var got := 0
+	var guard := 0
+	while got < _sell and guard < 40:
+		guard += 1
+		var price := World.economy.bank_sale(TOWN, pid, {"hide": 1})
+		World.stockpile.deposit(TOWN, "hide", 1, "soak", "826 seller")
+		World.economy.add_gold(pid, price, "soak sale")
+		got += price
+		var claw := World.economy.trophy_sale(TOWN, pid, "bear_claw")
+		World.economy.add_gold(pid, int(claw["gold"]), "soak trophy")
+		got += int(claw["gold"])
+		if price <= 0 and int(claw["gold"]) <= 0:
+			_sold["short"] += 1
+			break
+	_sold["town"] += got
+	var camp := World.economy.camp_buy(SOAK_CAMP, "trader", pid, "hide", 50)
+	_sold["camp"] += int(camp.get("gold", 0))
+
+
 func _at_the_counter(day: int) -> void:
 	for player: Player in _players:
 		if not is_instance_valid(player):
@@ -551,6 +609,9 @@ func _report(days: int) -> void:
 		if is_instance_valid(player):
 			print("SOAK player %s: gold %d, commissions open %d" % [_main._display_name(player), World.economy.gold(player.player_id),
 				(_main._records.get(player.player_id).commissions.size() if _main._records.has(player.player_id) else -1)])
+	if _sell > 0:
+		print("SOAK826 total: paid players town %d, camp %d (outside gold), short %d, over %d days of selling; per player-day camp %.1f" % [_sold["town"], _sold["camp"], _sold["short"],
+			mini(_sell_until, days), float(_sold["camp"]) / maxi(mini(_sell_until, days), 1)])
 	print("SOAK hours seen %d; party log last lines:" % _hours_seen)
 	for line: String in _main.party_log.last(40):
 		print("SOAK party " + line)

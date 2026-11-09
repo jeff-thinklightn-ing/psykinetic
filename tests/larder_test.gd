@@ -298,8 +298,13 @@ func _test_offers() -> void:
 	stock.deposit(TOWN, "gold", floor_gold + 12)
 	var have := stock.count(TOWN, "gold")
 	var paid := economy.pay_commission("p2", TOWN, 1000)
-	_check(paid > 0 and paid == maxi(have - floor_gold, 0) and stock.count(TOWN, "gold") == mini(have, floor_gold) and economy.gold("p2") == paid,
-		"pay_commission: what the treasury has above its floor (%d)" % paid)
+	var most := int(rules.get("trade_credit", {}).get("most", 120))
+	_check(paid == 1000 and stock.count(TOWN, "gold") == floor_gold and economy.gold("p2") == 1000 and economy.trade_purse(TOWN) == 0
+		and economy.trade_debt(TOWN) == 1000 - (have - floor_gold) - most,
+		"826: pay_commission in full, the treasury down to its floor, the trade's credit, then its debt (%d, debt %d)" % [paid, economy.trade_debt(TOWN)])
+	economy._trade_debt.erase(TOWN)
+	economy._trade_purse.erase(TOWN)
+	stock.deposit(TOWN, "gold", have - floor_gold)
 	_check(int(rules["commissions"]["rescue"]) == 10 and int(rules["commissions"]["camp"]) == 20 and int(rules["commissions"]["fetch"]) == 1
 		and int(rules["commissions"]["dispute"]) == 5 and int(rules["commissions"]["escort"]) == 8, "commissions' rates in the rules")
 
@@ -561,7 +566,10 @@ func _test_maker_swap() -> void:
 	work._workers["mm_hut"]["purse"] = 0
 	stock.take(HUT, "gold", stock.count(HUT, "gold"), "test")
 	var alone := economy.maker_quote("mm_hut", "p1", [{"id": "herbs"}], [])
-	_check(not alone["ok"] and alone["why"] == "Hob has no coin for that today.", "nothing to pay with: he says so (%s)" % alone["why"])
+	var p1_was := economy.gold("p1")
+	var hut_credit := economy.trade_purse(HUT)
+	_check(alone["ok"] and economy.maker_sell("mm_hut", "p1", "herbs", int(alone["gives"][0])) and economy.gold("p1") == p1_was + int(alone["gives"][0])
+		and economy.trade_purse(HUT) == hut_credit - int(alone["gives"][0]), "nothing to pay with: still bought in full (826), the trade's credit paying (%s)" % [alone])
 	stock.deposit(HUT, "gold", 5, "test")
 	alone = economy.maker_quote("mm_hut", "p1", [{"id": "herbs"}], [])
 	var hut_gold := stock.count(HUT, "gold")
@@ -569,9 +577,13 @@ func _test_maker_swap() -> void:
 		"his hut's gold pays for a herb (%d left)" % stock.count(HUT, "gold"))
 	var treasury := stock.count(TOWN, "gold")
 	var town_alone := economy.maker_quote("mm_town", "p1", [{"id": "herbs"}], [])
-	_check(economy.maker_purse("mm_town") == 0 and not town_alone["ok"] and town_alone["why"] == "Ned has no coin for that today."
-		and not economy.maker_sell("mm_town", "p1", "herbs", 2) and stock.count(TOWN, "gold") == treasury,
-		"a town's medicine man never pays from the town's treasury (%d)" % stock.count(TOWN, "gold"))
+	economy._purse_of(TOWN)["gold"] = 0  # The trade's credit there spent: his shortfall his own debt.
+	_check(economy.maker_purse("mm_town") == 0 and town_alone["ok"]
+		and economy.maker_sell("mm_town", "p1", "herbs", 2) and stock.count(TOWN, "gold") == treasury and economy.trade_debt(Economy.WORKER_DEBT + "mm_town") == 2,
+		"a town's medicine man never pays from the town's treasury (%d): his own trade debt, 2" % stock.count(TOWN, "gold"))
+	work.pay("mm_town", 10, "test")
+	economy._repay_trade()
+	_check(economy.trade_debt(Economy.WORKER_DEBT + "mm_town") == 0 and int(work.worker("mm_town")["purse"]) == 8, "10 in his purse: he repays it from half (%d)" % int(work.worker("mm_town")["purse"]))
 
 
 ## A healer's hut nobody keeps decays and its keeper mends it (733): empty
@@ -714,20 +726,26 @@ func _test_delivery() -> void:
 		and int(work.worker("c1")["purse"]) == 0, "a cook at her loan cap still cooks: the town's meals on its account")
 	stock.take(TOWN, "gold", stock.count(TOWN, "gold") - floor_gold - 2)
 	var sale := roundi(economy.raw_price(TOWN, "hide") * float(_rules["store"]["buy"]) * 5)
+	economy._purse_of(TOWN)["gold"] = 0  # The trade's credit spent here: the debt path.
 	var now_paid := economy.bank_sale(TOWN, "p1", {"hide": 5})
-	_check(now_paid == mini(sale, 2) and economy.owed_to("p1", TOWN) == sale - now_paid, "a player banks 5 hides: %d paid now, %d owed" % [now_paid, economy.owed_to("p1", TOWN)])
-	var told := []
-	economy.owed_paid.connect(func(id: String, gold: int) -> void: told.append([id, gold]))
+	_check(now_paid == sale and stock.count(TOWN, "gold") == floor_gold + 2 - mini(sale, 2) and economy.trade_debt(TOWN) == maxi(sale - 2, 0) and sale > 2,
+		"826: a player banks 5 hides: all %d paid now, the treasury down to its floor, the trade fronting %d" % [now_paid, economy.trade_debt(TOWN)])
 	stock.deposit(TOWN, "gold", 100)
-	economy._pay_player("p1")
-	_check(economy.owed_to("p1", TOWN) == 0 and economy.gold("p1") == sale - now_paid and told == [["p1", sale - now_paid]], "the rest paid as gold comes in, and told")
+	var owing: Array = work.worker_ids(TOWN).filter(func(id: String) -> bool: return int(work.worker(id).get("owed", 0)) > 0)
+	economy._repay_trade()
+	_check(economy.trade_debt(TOWN) == 0 if owing.is_empty() else economy.trade_debt(TOWN) == maxi(sale - 2, 0),
+		"gold comes in: the trade repaid, once the town's people are (%s owed)" % [owing])
+	for id: String in owing:
+		work.set_owed(id, 0)
+	economy._repay_trade()
+	_check(economy.trade_debt(TOWN) == 0, "its people paid: the trade repaid")
 	# A bunch of herbs banked (items' herbs, 501 amended): only the medicine
 	# man buys herbs (562, Jeff: "other npcs don't find herbs useful"), so the
 	# town banks them unpaid.
 	stock.deposit(TOWN, "gold", 100)
-	var owed_before := economy.owed_to("p1", TOWN)
+	var debt_before := economy.trade_debt(TOWN)
 	_check(Items.yield_of("herbs") == {"herbs": 1} and economy.bank_sale(TOWN, "p1", Items.yield_of("herbs")) == 0
-		and economy.owed_to("p1", TOWN) == owed_before, "a bunch of herbs banked at the town: nothing paid, nothing owed")
+		and economy.trade_debt(TOWN) == debt_before, "a bunch of herbs banked at the town: nothing paid")
 	# Leather pays for its hides and the work (2 hides a piece): the tanner
 	# no longer makes it at a loss (by the value table, as stocks move both).
 	var value: Dictionary = _rules["value"]

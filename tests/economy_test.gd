@@ -164,8 +164,22 @@ func _test_selling() -> void:
 	_check(not economy.sell("p1", TOWN, "ore_sack")["ok"], "with 20 ore, it has enough")
 	economy.stockpile.take(TOWN, "ore", 20, "test")
 	economy.stockpile.take(TOWN, "gold", 65, "test")
-	_check(economy.stockpile.count(TOWN, "gold") == 26 and economy.refuses(TOWN, "ore_sack") == "the town can't pay for it now",
-		"26 gold, a floor of 20: it can't pay 9 for ore")
+	_check(economy.stockpile.count(TOWN, "gold") == 26 and economy.refuses(TOWN, "ore_sack").is_empty(),
+		"26 gold, a floor of 20: it still buys ore (826: never \"can't pay\")")
+	economy.stockpile.take(TOWN, "gold", 22, "test")
+	var short := economy.sell("p1", TOWN, "ore_sack")
+	var credit_most := int(economy.rules.get("trade_credit", {}).get("most", 120))
+	var per_day := int(economy.rules.get("trade_credit", {}).get("per_day", 60))
+	_check(short["ok"] and int(short["paid"]) == 9 and economy.stockpile.count(TOWN, "gold") == 4 and economy.trade_debt(TOWN) == 0
+		and economy.trade_purse(TOWN) == credit_most - 9,
+		"4 gold in the treasury, under its floor: the sack paid 9 in full from the trade's credit, the town's own gold untouched (%s, credit %d)" % [short, economy.trade_purse(TOWN)])
+	economy._trade_purse[TOWN]["gold"] = 0
+	economy.sell("p1", TOWN, "ore_sack")
+	_check(economy.trade_debt(TOWN) == 9 and economy.gold("p1") >= 18, "its credit spent: still paid in full, a debt of 9 booked")
+	_now += DayNight.day_steps
+	economy._repay_trade()
+	_check(economy.trade_debt(TOWN) == 0 and economy.trade_purse(TOWN) == per_day - 9 and economy.stockpile.count(TOWN, "gold") == 4,
+		"a day on: the refill pays the debt first, %d left in credit, the town's gold untouched" % economy.trade_purse(TOWN))
 
 
 ## The starter vendor (736): one of the wares at vendor.price from the
@@ -235,21 +249,22 @@ func _test_camp_traders() -> void:
 	_check(not wont["ok"] and wont["why"] == "wont" and int(wont["count"]) == 0, "spice: not a thing he buys")
 	var before := economy.gold("p1")
 	var hides := economy.camp_buy(CAMP, "trader", "p1", "hide", 20)
-	_check(hides["ok"] and int(hides["count"]) == 10 and int(hides["gold"]) == 30 and economy.gold("p1") == before + 30,
-		"20 hides at 3: his 30 gold takes 10 (%s)" % [hides])
-	var broke := economy.camp_buy(CAMP, "trader", "p1", "feathers", 1)
-	_check(not broke["ok"] and broke["why"] == "purse", "his purse empty: refused")
-	_check(economy.camp_purse(CAMP, "trader") == 0, "npc's read: his purse at 0")
+	_check(hides["ok"] and int(hides["count"]) == 5 and int(hides["gold"]) == 15 and economy.gold("p1") == before + 15,
+		"20 hides at 3: he takes his day's 5, paid in full (826) (%s)" % [hides])
+	var enough := economy.camp_buy(CAMP, "trader", "p1", "hide", 1)
+	_check(not enough["ok"] and enough["why"] == "enough" and enough["say"] == "I've enough of that for now." and economy.camp_room(CAMP, "trader", "hide") == 0,
+		"a sixth hide today: he has enough (%s)" % [enough])
+	_check(economy.camp_buy(CAMP, "trader", "p1", "feathers", 30)["count"] == 5 and economy.camp_room(CAMP, "trader", "spice") == 0,
+		"feathers: his own day's 5, not held back by the hides; spice he doesn't buy, no room")
 
 	var again := Economy.new(economy.to_dict(), economy.stockpile, economy.production, economy.clock, economy.rules, economy.catalog)
-	_check(again.camp_stock(CAMP, "trader") == economy.camp_stock(CAMP, "trader") and not again.camp_buy(CAMP, "trader", "p1", "meat", 1)["ok"],
-		"saved and loaded: the same stock, his purse still empty")
-	_now += 3 * DayNight.day_steps
-	_check(economy.camp_purse(CAMP, "trader") == 30, "three days on: the read restocks first, his purse 30 (%d)" % economy.camp_purse(CAMP, "trader"))
+	_check(again.camp_stock(CAMP, "trader") == economy.camp_stock(CAMP, "trader") and not again.camp_buy(CAMP, "trader", "p1", "hide", 1)["ok"],
+		"saved and loaded: the same stock, still enough hides today")
+	_now += DayNight.day_steps
+	_check(economy.camp_room(CAMP, "trader", "hide") == 5, "a day on: he takes 5 hides again (%d)" % economy.camp_room(CAMP, "trader", "hide"))
 	var pelt := economy.camp_buy(CAMP, "trader", "p1", "hill_cat_pelt", 1)
-	_check(pelt["ok"] and int(pelt["gold"]) == 17 and economy.camp_purse(CAMP, "trader") == 13,
-		"the hill cat's pelt: 17 gold, his purse 13 after (%s)" % [pelt])
-	_check(economy.camp_buy(CAMP, "trader", "p1", "meat", 1)["ok"], "three days on: restocked, his purse full again")
+	_check(pelt["ok"] and int(pelt["gold"]) == 17 and economy.camp_room(CAMP, "trader", "hill_cat_pelt") == 4,
+		"the hill cat's pelt: 17 gold, 4 more today (%s)" % [pelt])
 
 	var gift := economy.camp_gift(CAMP, "trader")
 	_check(not gift.is_empty() and economy.value_of(gift) <= 12, "freed, he gives a ware worth 12 at most (%s)" % gift)
@@ -377,7 +392,7 @@ func _test_barter() -> void:
 	_now = noon_at
 	_check(at_night and not economy.is_night(), "night when it is dark under the sky (step %d), day when not (%d)" % [night_at, noon_at])
 	economy.stockpile.take(TOWN, "gold", economy.stockpile.count(TOWN, "gold") - 25, "test")
-	_check(economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}], [])["why"] == "the town can't pay for it now", "25 gold over a floor of 20: can't pay 9")
+	_check(economy.barter_quote(TOWN, "p1", [{"id": "ore_sack"}], [])["ok"], "25 gold over a floor of 20: the sack still bought (826: paid in full)")
 
 
 ## The medicine man's barter (decision 562; Jeff: "hob can have a stamina
@@ -806,7 +821,7 @@ func _test_person_takes(host: Player) -> void:
 		and wood[0]["for"]["kind"] in ["build", "stores"] and not str(wood[0]["for"]["name"]).is_empty() and int(wood[0]["need"]) > 0
 		and wood[0]["raw"] == "wood" and str(host.slots[int(wood[0]["slot"])]) == "wood_bundle",
 		"the carpenter takes the wood: the stack, what it is for, have and need after (%s)" % [wood])
-	_check(int(wood[0]["gold"]) + int(wood[0]["owed"]) > 0 if not wood.is_empty() else false, "and the gold it pays or owes")
+	_check((int(wood[0]["gold"]) > 0 and not wood[0].has("owed")) if not wood.is_empty() else false, "and the gold it pays, in full (826)")
 	_check(not takes.any(func(row: Dictionary) -> bool: return row["what"] in ["sword", "dagger"]), "the carpenter takes no gear")
 	var keeper: Array = _main.person_takes(host, Offers.VENDOR + STORE)
 	var gift_row := func(what: String) -> bool:
@@ -953,7 +968,7 @@ func _test_person_takes(host: Player) -> void:
 ## needs a buyer the player can reach): with no tanner seated, Rolf at the
 ## stall buys a bear's claw at value x store.trophy, "for selling on"; with
 ## one, the tanner buys the pelt "for tanning" and Rolf no longer offers for
-## it; the gold paid (or owed) reaches the player and the thanks; the
+## it; the gold paid (in full, 826) reaches the player and the thanks; the
 ## takers' tooltip and the store chest's pointer name the tanner.
 func _test_trophies(host: Player) -> void:
 	print("\n== 821: trophies bought by Give ==")
@@ -980,8 +995,8 @@ func _test_trophies(host: Player) -> void:
 	var rows: Array = _main.person_takes(host, Offers.VENDOR + STORE).filter(func(row: Dictionary) -> bool: return row["what"] == "bear_claw")
 	var row: Dictionary = rows[0] if rows.size() == 1 else {}
 	_check(row.get("for", {}).get("kind") == "maker" and row.get("for", {}).get("name") == "selling on" and row.get("raw") == ""
-		and int(row.get("need", -1)) == 0 and int(row.get("gold", 0)) + int(row.get("owed", 0)) == 3 * int(row.get("count", 0)) and int(row.get("count", 0)) >= 2,
-		"Rolf's row: for selling on, 3 gold a claw paid or owed (%s)" % [row])
+		and int(row.get("need", -1)) == 0 and int(row.get("gold", 0)) == 3 * int(row.get("count", 0)) and int(row.get("count", 0)) >= 2 and not row.has("owed"),
+		"Rolf's row: for selling on, 3 gold a claw, paid in full (%s)" % [row])
 	var purse := economy.gold(me)
 	var given: Array = _main.give_to(host, Offers.VENDOR + STORE, "Rolf", [int(row.get("uid", 0))])
 	var thanks: Dictionary = _main.rewards_given.filter(func(each: Dictionary) -> bool: return each["player"] == me and each["data"]["track"] == "item").back()["data"]
@@ -994,7 +1009,7 @@ func _test_trophies(host: Player) -> void:
 	_check(_main.trophy_taker(STORE, "bear_pelt") == "trophy_tan", "a tanner seated: the tanner buys them")
 	_check(not _main.person_takes(host, Offers.VENDOR + STORE).any(func(each: Dictionary) -> bool: return each["what"] == "bear_pelt"), "and Rolf no longer offers for the pelt")
 	var pelt: Array = _main.person_takes(host, "trophy_tan").filter(func(each: Dictionary) -> bool: return each["what"] == "bear_pelt")
-	_check(pelt.size() == 1 and pelt[0]["for"]["name"] == "tanning" and int(pelt[0]["gold"]) + int(pelt[0]["owed"]) == 20,
+	_check(pelt.size() == 1 and pelt[0]["for"]["name"] == "tanning" and int(pelt[0]["gold"]) == 20,
 		"the tanner's row: for tanning, 20 gold (%s)" % [pelt])
 	var takers: Dictionary = _main.takers_of(STORE)
 	_check(Main.taker_entry(takers, "bear_pelt").get("trade") == "tanner" and Main.taker_entry(takers, "bear_pelt").get("name") == "Tamsin",
@@ -1021,8 +1036,6 @@ func _test_truffles(host: Player) -> void:
 	var economy: Economy = World.economy
 	var vendor: Dictionary = economy.rules.get("vendor", {}).duplicate(true)
 	economy.rules["vendor"] = {"towns": [STORE], "name": "Rolf", "price": 1, "wares": []}
-	var owed: Dictionary = economy._player_owed.duplicate(true)
-	economy._player_owed.erase(me)  # Earlier sales may have reached owed_cap (a gift past it); put back at the end.
 	_check(Items.def("truffles").get("value", 0) == 8 and economy.trophy_trade("truffles") == "taverner" and economy.trophy_for("truffles") == "the pot"
 		and economy.trophy_price("truffles") == 4, "truffles: the taverner's, for the pot, 4 gold (half of 8)")
 	_check(economy.trophy_trade("boar_king_hide") == "tanner" and economy.trophy_for("boar_king_hide") == "tanning"
@@ -1048,8 +1061,8 @@ func _test_truffles(host: Player) -> void:
 	_check(_main.trophy_taker(STORE, "truffles") == "truff_tav", "a taverner seated: she buys them")
 	_check(not _main.person_takes(host, Offers.VENDOR + STORE).any(func(each: Dictionary) -> bool: return each["what"] == "truffles"), "and Rolf no longer offers for them")
 	var rows: Array = _main.person_takes(host, "truff_tav").filter(func(each: Dictionary) -> bool: return each["what"] == "truffles")
-	_check(rows.size() == 1 and rows[0]["for"]["name"] == "the pot" and int(rows[0]["gold"]) + int(rows[0]["owed"]) == 4 * int(rows[0]["count"]),
-		"her row: for the pot, 4 gold a truffle paid or owed (%s)" % [rows])
+	_check(rows.size() == 1 and rows[0]["for"]["name"] == "the pot" and int(rows[0]["gold"]) == 4 * int(rows[0]["count"]),
+		"her row: for the pot, 4 gold a truffle, paid in full (%s)" % [rows])
 	_check(_main.depot_pointer(STORE, "truffles") == "That goes to the Mughouse.", "the chest's pointer: to the Mughouse (%s)" % _main.depot_pointer(STORE, "truffles"))
 	var purse := economy.gold(me)
 	var sold: Array = _main.give_to(host, "truff_tav", "Tess", [int(rows[0]["uid"]) if rows.size() == 1 else 0])
@@ -1059,7 +1072,6 @@ func _test_truffles(host: Player) -> void:
 	for id in away:
 		World.production.set_away(id, false)
 	economy.rules["vendor"] = vendor
-	economy._player_owed = owed
 
 
 ## 821 amended: a maker buys his own recipes' non-resource inputs by Give
@@ -1138,7 +1150,7 @@ func _test_charm_inputs(host: Player) -> void:
 	var paid := {}
 	for row: Dictionary in rows:
 		if row["for"].get("kind") == "maker" and row["for"].get("name") == "a bear's-claw charm" and int(row["count"]) == 1:
-			paid[row["what"]] = int(row["gold"]) + int(row["owed"])
+			paid[row["what"]] = int(row["gold"])
 	_check(paid == {"bear_claw": 3, "feathers": 1, "flint": 1}, "his rows: for a bear's-claw charm, 3 for the claw, 1 each for feathers and flint (%s)" % [rows])
 	var takers: Dictionary = _main.takers_of(STORE)
 	_check(Main.taker_line(takers, "feathers") == "For the medicine man" and Main.taker_entry(takers, "bear_claw").get("name") == "Probewort",
@@ -1200,7 +1212,7 @@ func _test_town_window(host: Player) -> void:
 	var sheet: Dictionary = _main.ask_town_sheet(host, {"town": STORE})
 	_check(sheet.get("at") == true and sheet["gold"] == World.gold_of(me) and sheet["pack"] == _main._pack_rows(host),
 		"at the store: at, their gold, their pack as the barter lists it")
-	_check(["stock", "pays", "build", "owed", "regard", "state", "asks", "recent"].all(func(key: String) -> bool: return sheet.has(key)),
+	_check(["stock", "pays", "build", "regard", "state", "asks", "recent"].all(func(key: String) -> bool: return sheet.has(key)) and not sheet.has("owed"),
 		"every field there (%s)" % [sheet.keys()])
 	var wood_row: Array = sheet["stock"].filter(func(row: Dictionary) -> bool: return row["id"] == "wood")
 	_check(wood_row.size() == 1 and int(wood_row[0]["enough"]) >= int(World.economy.rules["comfort"]["wood"]) and wood_row[0]["item"] == "wood",
@@ -1208,7 +1220,7 @@ func _test_town_window(host: Player) -> void:
 	_check(sheet["stock"].any(func(row: Dictionary) -> bool: return row["id"] == "weapon" and row.get("item") == "sword")
 		and not sheet["stock"].any(func(row: Dictionary) -> bool: return row["id"] in ["gold", "herbs"]), "a weapon row drawn as a sword; no gold or herbs")
 	_check(sheet["regard"]["word"] == "" and sheet["regard"]["score"] == 0.0 and sheet["regard"]["last"] == 0, "a stranger to the town at first")
-	# Wood short: a bundle donated is banked, paid or owed, and moves its regard.
+	# Wood short: a bundle donated is banked, paid in full, and moves its regard.
 	_no_wood()
 	var bundle := World.items.mint("wood_bundle", "found", "test")
 	World.put_item(host, host, 1, bundle)
@@ -1237,11 +1249,6 @@ func _test_town_window(host: Player) -> void:
 	var pay: Dictionary = sent[2]["data"] if sent.size() == 3 else {}
 	_check(pay.get("track") == "gold" and int(pay.get("amount", 0)) == int(given["paid"]) and pay.get("words") == Main.PAID_WORDS % int(given["paid"]),
 		"804, economy's side: the gold paid floats as gold (%s)" % [pay])
-	# Owed, never floated: said in the thanks' words; floated when paid.
-	var floats_before: int = _main.rewards_given.size()
-	World.economy.owed_paid.emit(me, 7)
-	_check(_main.rewards_given.size() == floats_before + 1 and _main.rewards_given.back()["data"] == {"track": "gold", "amount": 7, "words": Main.OWED_PAID % 7},
-		"804, economy's side: what was owed floats when it is paid (%s)" % [_main.rewards_given.back()["data"]])
 	# Wood at its enough, under twice it: handed in (World.donate, thanked at the frame's end), a
 	# half for what the town can use.
 	var enough := int(_main.town_stock(STORE).filter(func(row: Dictionary) -> bool: return row["id"] == "wood")[0]["enough"])
@@ -1278,11 +1285,12 @@ func _test_town_window(host: Player) -> void:
 	World.donate(host, hide_uid, STORE)
 	await get_tree().process_frame
 	var after: Array = _main.rewards_given.slice(count_before).map(func(each: Dictionary) -> Dictionary: return each["data"])
-	var owed_gold: Array = after.filter(func(data: Dictionary) -> bool: return data["track"] == "gold")
+	var gold_floats: Array = after.filter(func(data: Dictionary) -> bool: return data["track"] == "gold")
 	_check(after.any(func(data: Dictionary) -> bool: return data["track"] == "item" and data.get("counted") == "1 hide")
-		and owed_gold.size() == 1 and owed_gold[0].get("owed") == true and " owes you " in str(owed_gold[0]["words"]),
-		"804, economy's side: an empty treasury: the hide thanked, the gold owed marked owed, not received (%s)" % [after])
+		and gold_floats.size() == 1 and not gold_floats[0].has("owed") and int(gold_floats[0]["amount"]) > 0 and World.stockpile.count(STORE, "gold") == 0,
+		"826: an empty treasury: the hide thanked and paid in full, the trade's credit paying (%s)" % [after])
 	World.stockpile.deposit(STORE, "gold", treasury, "test")
+	World.economy._trade_debt.erase(STORE)  # The test's own debt: not left for later checks.
 
 
 ## 804 amended, the build credit: raws a queued build lacked, handed in,

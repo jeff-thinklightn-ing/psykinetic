@@ -1238,8 +1238,11 @@ func _test_watch_waves() -> void:
 	gold_before = World.gold_of(player.player_id)
 	told.clear()
 	World.raids.wave_beaten.emit("wave:test:2", STORE)
-	_check(World.gold_of(player.player_id) == gold_before and _told_any(told, "party", rule.get("beaten_unpaid", [])),
-		"beaten with an empty treasury: nothing paid, and they are told (%s)" % [told])
+	_check(World.gold_of(player.player_id) == gold_before + int(Production.read_rules().get("commissions", {}).get("watch_wave", 5))
+		and World.stockpile.count(STORE, "gold") == 0 and not _told_any(told, "party", rule.get("beaten_unpaid", [])),
+		"826: beaten with an empty treasury: paid in full all the same, the trade fronting it (%s)" % [told])
+	World.economy.stockpile.deposit(STORE, "gold", all_gold, "test")
+	World.economy._trade_debt.erase(STORE)
 	_main._watch_tick(Main.WATCH_TICKS)
 	_check(sent.size() == 2, "a post's waves done for the night: no third")
 	Net.message_received.disconnect(heard)
@@ -1454,8 +1457,11 @@ func _test_watch() -> void:
 	DayNight.set_hour(6.25)
 	_main._watch_tick(Main.WATCH_TICKS)
 	var unpaid := str(Townsfolk.days().get("watch", {}).get("unpaid", ""))
-	_check(World.gold_of(player.player_id) == gold_before and _told_any(told, "party", [unpaid]),
-		"an empty treasury: nothing paid, and they are told (%s)" % [told])
+	_check(World.gold_of(player.player_id) == gold_before + int(Production.read_rules().get("commissions", {}).get("watch_night", 10))
+		and not _told_any(told, "party", [unpaid]) and World.stockpile.count(STORE, "gold") == 0,
+		"826: an empty treasury: paid in full all the same, the trade fronting it (%s)" % [told])
+	World.economy.stockpile.deposit(STORE, "gold", all_gold, "test")
+	World.economy._trade_debt.erase(STORE)
 	Net.message_received.disconnect(heard)
 	_main.watch_posts.erase(STORE)
 	_main._watch.clear()
@@ -3628,7 +3634,7 @@ func _test_monster_talk() -> void:
 	_main._player_said(player, "Yes.")
 	World.step()
 	_check(talker.got == [0] and _main._standing.has(Net.player_id) and mind.asks.is_empty(), "a bare yes reaches him with no gold: his own refusal, and the deal still stands (no resident mind): %s" % [talker.got])
-	World.economy.add_gold(Net.player_id, 30, "the test")
+	World.economy.add_gold(Net.player_id, 30 - World.economy.gold(Net.player_id), "the test")  # 30 exactly: under his 40.
 	_main._chat_tick.clear()
 	_main._player_said(player, "give 40")
 	World.step()
@@ -5371,21 +5377,21 @@ func _test_camp_sell(player: Player, body: Resident, held_spec: Dictionary, camp
 	_check(buys.has("hide") and int(buys["hide"]["gold"]) == each and each > 0 and not buys.has("bandaging_kit"),
 		"his Sell squares: the raws he buys at camp_offer (%s)" % [buys])
 	var hide: int = give.call("hide")
-	var purse_before := int(_main._camp_purse(camp))
+	var room_before := int(_main._camp_room(camp, "hide"))
 	var gold_before := World.gold_of(player.player_id)
 	var why: String = _main._camp_bought(player, body, [hide])
 	_check(why.is_empty() and World.gold_of(player.player_id) == gold_before + each and World.slot_of_unit(player, hide) < 0,
 		"a hide sold: %d gold paid, the hide gone with him (%s)" % [each, why])
-	if World.economy.has_method("camp_purse"):
-		_check(int(_main._camp_purse(camp)) == purse_before - each, "his purse the less by it")
+	if World.economy.has_method("camp_room"):
+		_check(int(_main._camp_room(camp, "hide")) == room_before - 1, "one hide fewer he takes today (826)")
 		var pelt_each := int(World.economy.camp_offer("hill_cat_pelt"))
 		var pelt: int = give.call("hill_cat_pelt")
-		var purse_pelt := int(_main._camp_purse(camp))
+		var room_pelt := int(_main._camp_room(camp, "hill_cat_pelt"))
 		var gold_pelt := World.gold_of(player.player_id)
 		why = _main._camp_bought(player, body, [pelt])
 		_check(pelt_each == 17 and why.is_empty() and World.gold_of(player.player_id) == gold_pelt + pelt_each
-			and int(_main._camp_purse(camp)) == purse_pelt - pelt_each and World.slot_of_unit(player, pelt) < 0,
-			"a hill cat's pelt sold: %d gold, his purse %d to %d (%s)" % [pelt_each, purse_pelt, int(_main._camp_purse(camp)), why])
+			and int(_main._camp_room(camp, "hill_cat_pelt")) == room_pelt - 1 and World.slot_of_unit(player, pelt) < 0,
+			"a hill cat's pelt sold: %d gold, in full (%s)" % [pelt_each, why])
 	var kit: int = give.call("bandaging_kit")
 	var gold_kit := World.gold_of(player.player_id)
 	why = _main._camp_bought(player, body, [kit])
@@ -5393,16 +5399,16 @@ func _test_camp_sell(player: Player, body: Resident, held_spec: Dictionary, camp
 		"a thing he doesn't buy: refused, nothing moved (%s)" % why)
 	if kit != 0:
 		World.consume(player, kit, "test")
-	if World.economy.has_method("camp_purse"):
+	if World.economy.has_method("camp_room"):
 		var many: Array = []
-		for i in int(_main._camp_purse(camp)) / maxi(each, 1) + 1:
+		for i in int(_main._camp_room(camp, "hide")) + 1:
 			var more: int = give.call("hide")
 			if more != 0:
 				many.append(more)
 		var gold_many := World.gold_of(player.player_id)
 		why = _main._camp_bought(player, body, many)
 		_check(not many.is_empty() and not why.is_empty() and World.gold_of(player.player_id) == gold_many and World.slot_of_unit(player, int(many[0])) >= 0,
-			"past his purse: refused, nothing moved (%s)" % why)
+			"past what he takes today: \"enough\", nothing moved (%s)" % why)
 		for uid: Variant in many:
 			World.consume(player, int(uid), "test")
 	var held := _main._spawn_resident(held_spec) as Resident

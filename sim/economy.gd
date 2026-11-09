@@ -26,9 +26,6 @@ extends RefCounted
 ## sell factors on their trade, and a scoundrel's repay share.
 const TYPE_RULES: Array[String] = ["merchant", "scoundrel"]
 signal dole_changed(town: String, count: int)
-## A player was paid gold the town owed them for goods they banked
-## (decision 498), off any request of theirs: World tells their client.
-signal owed_paid(player_id: String, gold: int)
 ## A purse changed, whatever moved it (a sale, a quest's reward, the dole, a
 ## commission, a starter ware...): World relays it as gold_changed, so the
 ## owner's client is told every time (ui, playtest on v0.1.195: Rolf's
@@ -99,8 +96,15 @@ var _paid: Dictionary = {}
 var _hauled: Dictionary = {}
 ## "<worker>/<what>" told the store can't pay (said once till it can).
 var _cant_pay: Dictionary = {}
-## Player id -> {town: gold the town owes them for goods they banked}.
-var _player_owed: Dictionary = {}
+## Place -> gold the outside trade fronted it to pay players in full when its
+## treasury ran dry (826, Jeff: "town shouldn't owe players"): the NPC side's
+## debt, never shown to a player; repaid by _repay_trade (its gold above
+## gold_floor, once its workers are paid) and the caravan's takings.
+var _trade_debt: Dictionary = {}
+## Place -> {gold, day}: the outside trade's credit for paying players there
+## (826, the coordinator's capped, refilling credit): trade_credit.per_day a
+## game day, up to trade_credit.most, a day's refill paying any trade debt first.
+var _trade_purse: Dictionary = {}
 ## Maker id -> the step their apprentice's wage was last paid (498 amended).
 var _apprentice_paid: Dictionary = {}
 ## Town -> building id -> gold players gave toward it, not yet spent (499).
@@ -406,10 +410,7 @@ func refuses(town: String, id: String, cat := {}) -> String:
 		return str(rules["maker_only"][id])  # Only its maker buys it (562: the herbs).
 	if short_of(town, id, cat) <= 0.0:
 		return "the town has enough of that"
-	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1]
-	if stockpile.count(town, "gold") - pays < int(rules.get("gold_floor", 0)):
-		return "the town can't pay for it now"
-	return ""
+	return ""  # Never "can't pay" (826): a player's sale is paid in full (pay_for_player).
 
 
 ## [param town]'s shop, for a shop panel: [{uid, id, price}] by uid.
@@ -656,13 +657,8 @@ func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Arra
 		out["why"] = "not enough gold (%d)" % (cost - paid)
 		return out
 	# He pays for the gives from his purse and his hut's gold, with what the
-	# takes bring him in the same swap (562 amended (9)): only the difference.
-	var brings := 0
-	for i in takes.size():
-		brings += _maker_income(worker_id, int(takes[i]), int(out["takes"][i]))
-	if paid > maker_purse(worker_id) + brings:
-		out["why"] = "%s has no coin for that today." % production.worker(worker_id).get("name", "they")  # voice's words.
-		return out
+	# takes bring him in the same swap (562 amended (9)); what those don't
+	# cover the trade fronts (826: a player's sale is paid in full).
 	out["balance"] = paid - cost
 	out["ok"] = true
 	return out
@@ -674,8 +670,7 @@ func maker_quote(worker_id: String, player_id: String, gives: Array, takes: Arra
 ## share of what they make of it. The thing is the caller's to bank in the
 ## maker's store. False, nothing paid, if they can't.
 func maker_sell(worker_id: String, player_id: String, id: String, at: int) -> bool:
-	if not _maker_pays(worker_id, at, "bought %s from a player" % id):
-		return false
+	_maker_pays(worker_id, at, "bought %s from a player" % id)
 	add_gold(player_id, at, "sold %s to %s" % [id, production.worker(worker_id).get("name", "")])
 	return true
 
@@ -694,13 +689,11 @@ func maker_swap(worker_id: String, player_id: String, gives: Array, give_prices:
 	for each: Variant in give_prices:
 		paid += int(each)
 	var cost := 0
-	var brings := 0
 	for i in takes.size():
 		if int(takes[i]) not in stockpile.shop(town):
 			return false
 		cost += int(take_prices[i])
-		brings += _maker_income(worker_id, int(takes[i]), int(take_prices[i]))
-	if gold(player_id) + paid < cost or paid > maker_purse(worker_id) + brings:
+	if gold(player_id) + paid < cost:
 		return false
 	var name := str(production.worker(worker_id).get("name", ""))
 	for i in takes.size():
@@ -737,17 +730,27 @@ func maker_purse(worker_id: String) -> int:
 
 
 ## Pays [param amount] for maker [param worker_id]: their purse first, then
-## their hut's gold. False, nothing paid, if the two can't.
+## their hut's gold (pay_for_player at the hut), the rest fronted by the
+## trade (826: a player's sale is paid in full). A town's maker never pays
+## from its treasury (562 amended (9)): his shortfall is his own trade debt
+## ("worker:" + id), repaid from his purse.
 func _maker_pays(worker_id: String, amount: int, why: String) -> bool:
 	if amount <= 0:
 		return true
-	if maker_purse(worker_id) < amount:
-		return false
+	var place := str(production.worker(worker_id).get("town", ""))
 	var from_purse := mini(amount, int(production.worker(worker_id).get("purse", 0)))
 	if from_purse > 0:
 		production.spend(worker_id, from_purse, why)
 	if amount > from_purse:
-		stockpile.take(str(production.worker(worker_id).get("town", "")), "gold", amount - from_purse, "%s (%s)" % [why, production.worker(worker_id).get("name", "")])
+		var label := "%s (%s)" % [why, production.worker(worker_id).get("name", "")]
+		if _own_place(worker_id):
+			# His hut's gold is his working purse (562 amended (9)): all of it, then the trade.
+			var from_hut := mini(amount - from_purse, stockpile.count(place, "gold"))
+			if from_hut > 0 and not stockpile.take(place, "gold", from_hut, label):
+				from_hut = 0
+			pay_for_player(place, amount - from_purse - from_hut, label, false)
+		else:
+			pay_for_player(place, amount - from_purse, label, false, WORKER_DEBT + worker_id)
 	return true
 
 
@@ -807,9 +810,6 @@ func barter_quote(town: String, player_id: String, gives: Array, takes: Array, f
 		var each := fence_markup(item_price(town, uid, cat), fence)
 		out["takes"].append(each)
 		cost += each
-	if paid > 0 and stockpile.count(town, "gold") - paid < int(rules.get("gold_floor", 0)):
-		out["why"] = "the town can't pay for it now"
-		return out
 	if gold(player_id) + paid < cost:
 		out["why"] = "not enough gold (%d)" % (cost - paid)
 		return out
@@ -856,8 +856,7 @@ func sell(player_id: String, town: String, id: String, is_fenced := false, at :=
 	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1] if at < 0 else at
 	if is_fenced and at < 0:
 		pays = fence_price(pays)
-	if not stockpile.take(town, "gold", pays, "bought:%s" % player_id):
-		return {"ok": false, "why": "the town can't pay for it now"}
+	pay_for_player(town, pays, "bought:%s" % player_id)
 	add_gold(player_id, pays, "sold %s" % id)
 	return {"ok": true, "paid": pays, "id": id}
 
@@ -917,8 +916,7 @@ func tick() -> void:
 			_meet(id, need, rule, cat)
 			var rich := folk.has("rich_above") and int(production.worker(id)["purse"]) > int(folk["rich_above"])
 			production.set_need_due(id, need, at + maxi(int(every * (float(folk.get("rich_every", 1.0)) if rich else 1.0)), 1))
-	for player_id: String in _player_owed.keys():
-		_pay_player(player_id)
+	_repay_trade()
 	_drop_funds()
 	_trade_turn(towns.keys())
 	_floor_turn()
@@ -1514,6 +1512,11 @@ func _trader(town: String, entry: Dictionary, rule: Dictionary) -> String:
 		if count <= 0 or not stockpile.take(town, what, count, "trader:%s" % entry.get("id", "")):
 			continue
 		stockpile.deposit(town, "gold", gold, "trader:%s" % entry.get("id", ""), "%d %s sold to the trader from %s, %d" % [count, what, market, gold])
+		var kept := mini(gold, trade_debt(town))  # 826: he keeps it toward what the trade fronted.
+		if kept > 0 and stockpile.take(town, "gold", kept, "credit:caravan"):
+			_trade_debt[town] = trade_debt(town) - kept
+			if trade_debt(town) <= 0:
+				_trade_debt.erase(town)
 		if not _bought.has(market):
 			_bought[market] = {}
 		_bought[market][what] = float(_bought[market].get(what, 0.0)) + count
@@ -2018,18 +2021,12 @@ func _hauler_for(town: String, gatherer: String, trade: String) -> String:
 
 ## Player [param player_id] banks [param yields] (resource -> count) at
 ## [param town]'s store (Jeff: "players bank goods for gold"): bought as a
-## gatherer's delivery, at raw_price x store.buy from the treasury above
-## gold_floor (call it before the goods are banked: the price reads the
-## store as it was), the rest owed them and paid as gold comes in (owed_paid).
-## Past store.owed_cap owed in that town, the goods are the town's as a
-## gift, said in the ledger. A resource only its maker buys (maker_only:
-## the herbs, 562) is banked unpaid. The gold paid now (the caller's to give).
+## gatherer's delivery, at raw_price x store.buy (call it before the goods
+## are banked: the price reads the store as it was), paid in full now (826:
+## pay_for_player). A resource only its maker buys (maker_only: the herbs,
+## 562) is banked unpaid. The gold paid (the caller's to give).
 func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 	var store: Dictionary = rules.get("store", {})
-	var owed := int(_player_owed.get(player_id, {}).get(town, 0))
-	if owed >= int(store.get("owed_cap", 30)):
-		stockpile.note(town, "gold", 0, "gift:%s" % player_id, "the town can't pay %s for more: %s given" % [player_id, yields])
-		return 0
 	var price := 0
 	for what: String in yields:
 		if rules.get("maker_only", {}).has(what):
@@ -2039,14 +2036,8 @@ func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 		if not _paid.has(town):
 			_paid[town] = {}
 		_paid[town][what] = unit
-	var paid := mini(price, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
-	if paid > 0 and not stockpile.take(town, "gold", paid, "bought:%s" % player_id):
-		paid = 0
-	if paid < price:
-		if not _player_owed.has(player_id):
-			_player_owed[player_id] = {}
-		_player_owed[player_id][town] = owed + price - paid
-	return paid
+	pay_for_player(town, price, "bought:%s" % player_id)
+	return price
 
 
 ## The recipes (sorted) whose makers buy item [param id] by Give (821
@@ -2116,72 +2107,126 @@ func trophy_price(id: String) -> int:
 	return maxi(roundi(value_of(id) * float(rules.get("store", {}).get("trophy", 0.5))), 1)
 
 
-## What selling [param count] trophy [param id] to [param town] would pay
-## player [param player_id] now and owe them (821, as bank_sale would):
-## {gold, owed}. Past store.owed_cap owed there, nothing either way (a gift).
-func trophy_outcome(town: String, player_id: String, id: String, count := 1) -> Dictionary:
-	var owed := int(_player_owed.get(player_id, {}).get(town, 0))
-	if owed >= int(rules.get("store", {}).get("owed_cap", 30)):
-		return {"gold": 0, "owed": 0}
-	var price := trophy_price(id) * count
-	var paid := mini(price, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
-	return {"gold": paid, "owed": price - paid}
+## What selling [param count] trophy [param id] to [param town] pays
+## (821; 826: in full, at once): {gold}.
+func trophy_outcome(_town: String, _player_id: String, id: String, count := 1) -> Dictionary:
+	return {"gold": trophy_price(id) * count}
 
 
 ## Player [param player_id] sells one trophy [param id] to [param town]
-## (821, the Give to its tanner or stall keeper): paid at trophy_price from
-## the treasury above gold_floor, the rest owed, as bank_sale; past
-## store.owed_cap a gift. {gold (the caller's to give), owed}.
+## (821, the Give to its tanner, a maker or the stall's keeper): paid
+## trophy_price in full (826: pay_for_player). {gold (the caller's to give)}.
 func trophy_sale(town: String, player_id: String, id: String) -> Dictionary:
 	var out := trophy_outcome(town, player_id, id)
-	if int(out["gold"]) == 0 and int(out["owed"]) == 0:
-		stockpile.note(town, "gold", 0, "gift:%s" % player_id, "the town can't pay %s for more: %s given" % [player_id, id])
-		return out
-	if int(out["gold"]) > 0 and not stockpile.take(town, "gold", int(out["gold"]), "bought:%s" % player_id):
-		out["owed"] = int(out["owed"]) + int(out["gold"])
-		out["gold"] = 0
-	if int(out["owed"]) > 0:
-		if not _player_owed.has(player_id):
-			_player_owed[player_id] = {}
-		_player_owed[player_id][town] = int(_player_owed[player_id].get(town, 0)) + int(out["owed"])
+	pay_for_player(town, int(out["gold"]), "bought:%s" % player_id)
 	return out
 
 
-## What the towns owe player [param player_id] for banked goods, paid as
-## each treasury has gold above gold_floor (owed_paid tells World).
-func _pay_player(player_id: String) -> void:
-	var owed: Dictionary = _player_owed[player_id]
-	var got := 0
-	for town: String in owed.keys():
-		var paid := mini(int(owed[town]), maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
-		if paid > 0 and stockpile.take(town, "gold", paid, "owed:%s" % player_id):
-			got += paid
-			owed[town] = int(owed[town]) - paid
-		if int(owed[town]) <= 0:
-			owed.erase(town)
-	if owed.is_empty():
-		_player_owed.erase(player_id)
-	if got > 0:
-		owed_paid.emit(player_id, add_gold(player_id, got, "what the town owed for goods banked"))
+## [param amount] gold [param place] pays a player for what they sold it
+## (826, Jeff: "town shouldn't owe players -- if you need to balance the
+## economy for the npcs then do it another way"): its gold above gold_floor
+## (what pays its own people stays theirs), then the outside trade's credit
+## there (trade_purse: outside gold, refilled each day, capped); only past
+## both is a trade debt booked (_trade_debt), an NPC-side debt no player
+## sees, which the next refills pay first (_repay_trade). The player is paid
+## in full by the caller. [param from_gold] false skips the place's gold (a
+## town's maker never touches its treasury); [param debt_key] books the
+## debt elsewhere (his own, "worker:" + id).
+func pay_for_player(place: String, amount: int, why: String, from_gold := true, debt_key := "") -> void:
+	if amount <= 0:
+		return
+	var paid := mini(amount, maxi(stockpile.count(place, "gold") - int(rules.get("gold_floor", 0)), 0)) if from_gold else 0
+	if paid > 0 and not stockpile.take(place, "gold", paid, why):
+		paid = 0
+	var credit := _purse_of(place)
+	var fronted := mini(amount - paid, int(credit["gold"]))
+	if fronted > 0:
+		credit["gold"] = int(credit["gold"]) - fronted
+		paid += fronted
+		stockpile.note(place, "gold", 0, "credit:" + why.get_slice(":", 0), "the trade paid %d gold for it (%d of its credit left)" % [fronted, int(credit["gold"])])
+	if paid < amount:
+		var key := place if debt_key.is_empty() else debt_key
+		_trade_debt[key] = int(_trade_debt.get(key, 0)) + amount - paid
+		stockpile.note(place, "gold", 0, "credit:" + why.get_slice(":", 0),
+			"the trade fronted %d gold (%s); owed it %d" % [amount - paid, why.get_slice(":", 0), int(_trade_debt[key])])
 
 
-## What [param town] owes player [param player_id] for goods banked.
-func owed_to(player_id: String, town: String) -> int:
-	return int(_player_owed.get(player_id, {}).get(town, 0))
+## The trade-debt key of a town maker's own debt (826, _maker_pays).
+const WORKER_DEBT := "worker:"
+
+
+## The outside trade's credit at [param place] (826), refilled to today:
+## trade_credit.per_day a game day since its last, paying any trade debt
+## there first, the rest up to trade_credit.most. {gold, day}.
+func _purse_of(place: String) -> Dictionary:
+	var rule: Dictionary = rules.get("trade_credit", {})
+	var day := now() / maxi(DayNight.day_steps, 1)
+	var credit: Dictionary = _trade_purse.get_or_add(place, {"gold": int(rule.get("most", 120)), "day": day})
+	var days := day - int(credit["day"])
+	if days > 0:
+		credit["day"] = day
+		var fresh := days * int(rule.get("per_day", 60))
+		var debt := trade_debt(place)
+		if debt > 0:
+			var back := mini(debt, fresh)
+			fresh -= back
+			_trade_debt[place] = debt - back
+			if int(_trade_debt[place]) <= 0:
+				_trade_debt.erase(place)
+		credit["gold"] = mini(int(credit["gold"]) + fresh, int(rule.get("most", 120)))
+	return credit
+
+
+## What the outside trade's credit at [param place] holds now (826).
+func trade_purse(place: String) -> int:
+	return int(_purse_of(place)["gold"])
+
+
+## What [param place] owes the outside trade (826): 0 for none.
+func trade_debt(place: String) -> int:
+	return int(_trade_debt.get(place, 0))
+
+
+## Each place's trade debt repaid (826): its credit's day's refill first
+## (_purse_of), then its gold above gold_floor, but only once none of its
+## workers is owed: its people are paid first. A town maker's own
+## ("worker:" + id) from half his purse, as a loan is.
+func _repay_trade() -> void:
+	for place: String in _trade_debt.keys():
+		if place.begins_with(WORKER_DEBT):
+			var maker := place.trim_prefix(WORKER_DEBT)
+			var share := mini(int(_trade_debt[place]), int(production.worker(maker).get("purse", 0)) / 2)
+			if production.worker(maker).is_empty():
+				_trade_debt.erase(place)  # Gone: the trade writes it off.
+			elif share > 0 and production.spend(maker, share, "repaid the trade"):
+				_trade_debt[place] = int(_trade_debt[place]) - share
+				if int(_trade_debt[place]) <= 0:
+					_trade_debt.erase(place)
+			continue
+		_purse_of(place)
+		if not _trade_debt.has(place):
+			continue
+		var owed_people := false
+		for id: String in production.worker_ids(place):
+			if int(production.worker(id).get("owed", 0)) > 0:
+				owed_people = true
+				break
+		if owed_people:
+			continue
+		var back := mini(int(_trade_debt[place]), maxi(stockpile.count(place, "gold") - int(rules.get("gold_floor", 0)), 0))
+		if back > 0 and stockpile.take(place, "gold", back, "credit:repaid"):
+			_trade_debt[place] = int(_trade_debt[place]) - back
+		if int(_trade_debt[place]) <= 0:
+			_trade_debt.erase(place)
 
 
 ## What [param town]'s store would give player [param player_id] for each
 ## thing in [param slots] it buys as a delivery (768, the town window's
-## "pays"; bank_sale's price): {id: {gold, up_to}}, gold one brings today,
-## up_to how many before the town can neither pay nor owe more (its gold
-## above gold_floor and the room under store.owed_cap). Herbs (maker_only)
-## and gear (a gift, unpaid) are left out.
-func bank_pays(town: String, player_id: String, slots: Array) -> Dictionary:
+## "pays"; bank_sale's price): {id: {gold}}, gold one brings today, paid in
+## full whatever the treasury holds (826: no up_to). Herbs (maker_only) and
+## gear (a gift, unpaid) are left out.
+func bank_pays(town: String, _player_id: String, slots: Array) -> Dictionary:
 	var store: Dictionary = rules.get("store", {})
-	var room := maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0) \
-		+ maxi(int(store.get("owed_cap", 30)) - owed_to(player_id, town), 0)
-	if owed_to(player_id, town) >= int(store.get("owed_cap", 30)):
-		room = 0
 	var out := {}
 	var cat: Dictionary = catalog.call()
 	for id: Variant in slots:
@@ -2198,7 +2243,7 @@ func bank_pays(town: String, player_id: String, slots: Array) -> Dictionary:
 			price += raw_price(town, what) * float(store.get("buy", 1.0)) * int(yields[what])
 		var gold := roundi(price)
 		if gold > 0:
-			out[str(id)] = {"gold": gold, "up_to": room / gold}
+			out[str(id)] = {"gold": gold}  # No up_to (826): never limited by the treasury.
 	return out
 
 
@@ -2938,15 +2983,15 @@ func pay_loan(player_id: String, worker_id: String, gold_offered: int) -> int:
 	return paid
 
 
-## [param town]'s treasury pays player [param player_id] up to
-## [param gold] for a commission met (rules' "commissions" say how much
-## for what; npc's), never below gold_floor. The gold paid.
+## [param town] pays player [param player_id] [param gold_owed] for a
+## commission met (rules' "commissions" say how much for what; npc's), in
+## full (826: pay_for_player, the trade fronting what the treasury lacks).
+## The gold paid.
 func pay_commission(player_id: String, town: String, gold_owed: int) -> int:
 	if player_id.is_empty() or gold_owed <= 0:
 		return 0
-	var paid := mini(gold_owed, maxi(stockpile.count(town, "gold") - int(rules.get("gold_floor", 0)), 0))
-	if paid <= 0 or not stockpile.take(town, "gold", paid, "commission:%s" % player_id):
-		return 0
+	var paid := gold_owed
+	pay_for_player(town, paid, "commission:%s" % player_id)
 	add_gold(player_id, paid, "a commission from %s" % town)
 	stockpile.note(town, "gold", -paid, "commission:%s" % player_id, "paid %s %d gold for a commission" % [player_id, paid])
 	return paid
@@ -3089,7 +3134,7 @@ func _camp(camp: String, mix: String) -> Dictionary:
 		var line: Dictionary = pool[pick]
 		pool.remove_at(pick)
 		stock[str(line["item"])] = maxi(int(line.get("count", 1)), 1)
-	entry = {"stock": stock, "purse": int(rule.get("purse", 30)), "restocked": day}
+	entry = {"stock": stock, "taken": {}, "taken_day": day, "restocked": day}
 	_camp_traders[camp] = entry
 	return entry
 
@@ -3138,11 +3183,25 @@ func camp_sale(camp: String, mix: String, player_id: String, item: String, toll 
 	return {"ok": true, "price": cost, "say": str(words.get("sold", "Yours, for %d.")) % cost, "why": ""}
 
 
-## [param camp]'s trader's purse now (npc's Sell: each raw's up to and an
-## all-or-nothing check before camp_buy): read through _camp, so a restock
-## due refills it first. camp_buy is still the one that pays.
-func camp_purse(camp: String, mix: String) -> int:
-	return int(_camp(camp, mix)["purse"])
+## How many more [param item] [param camp]'s trader takes today (826: his
+## purse gone, a demand limit, camp_traders.per_day of each good a game day;
+## "I've enough of that for now." past it): 0 for one he doesn't buy.
+func camp_room(camp: String, mix: String, item: String) -> int:
+	if camp_offer(item) <= 0:
+		return 0
+	var entry := _camp_today(camp, mix)
+	return maxi(int(camp_rule().get("per_day", 5)) - int(entry["taken"].get(item, 0)), 0)
+
+
+## [param camp]'s entry with its day's takings counted from today.
+func _camp_today(camp: String, mix: String) -> Dictionary:
+	var entry := _camp(camp, mix)
+	var day := now() / maxi(DayNight.day_steps, 1)
+	if int(entry.get("taken_day", -1)) != day or not entry.get("taken") is Dictionary:
+		entry["taken"] = {}
+		entry["taken_day"] = day
+	entry.erase("purse")
+	return entry
 
 
 ## What [param camp]'s trader pays for one [param item], or 0 where he
@@ -3156,7 +3215,8 @@ func camp_offer(item: String) -> int:
 
 
 ## Player [param player_id] sells [param count] [param item] to
-## [param camp]'s trader: as many as his purse covers at camp_offer each.
+## [param camp]'s trader: as many as he takes today (camp_room) at camp_offer
+## each, paid in full with gold from outside the world (826).
 ## The caller takes [code]count[/code] of them from the player.
 ## {ok, gold (paid), count (taken), say, why}: why "" when bought, else
 ## "wont" (not a thing he buys), "purse" (no gold left for one).
@@ -3165,12 +3225,12 @@ func camp_buy(camp: String, mix: String, player_id: String, item: String, count 
 	var each := camp_offer(item)
 	if each <= 0 or count <= 0:
 		return {"ok": false, "gold": 0, "count": 0, "say": str(words.get("wont", "I've no use for that.")), "why": "wont"}
-	var entry := _camp(camp, mix)
-	var taken := mini(count, int(entry["purse"]) / each)
+	var entry := _camp_today(camp, mix)
+	var taken := mini(count, camp_room(camp, mix, item))
 	if taken <= 0:
-		return {"ok": false, "gold": 0, "count": 0, "say": str(words.get("purse", "I've no coin left for that.")), "why": "purse"}
+		return {"ok": false, "gold": 0, "count": 0, "say": str(words.get("enough", "I've enough of that for now.")), "why": "enough"}
 	var paid := taken * each
-	entry["purse"] = int(entry["purse"]) - paid
+	entry["taken"][item] = int(entry["taken"].get(item, 0)) + taken
 	add_gold(player_id, paid, "%d %s to a camp trader" % [taken, item])
 	return {"ok": true, "gold": paid, "count": taken, "say": str(words.get("bought", "There's %d gold for it.")) % paid, "why": ""}
 
@@ -3205,7 +3265,7 @@ func camp_captive(_camp_id: String) -> Dictionary:
 ## For the snapshot: {purses: {player id: gold}, log}.
 func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
-		"player_owed": _player_owed.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
+		"trade_debt": _trade_debt.duplicate(), "trade_purse": _trade_purse.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
 		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
 		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true), "camp_traders": _camp_traders.duplicate(true)}
 
@@ -3263,7 +3323,12 @@ func from_dict(saved: Dictionary) -> void:
 				var stock := {}
 				for item: Variant in each["stock"]:
 					stock[str(item)] = int(each["stock"][item])
-				_camp_traders[str(camp)] = {"stock": stock, "purse": int(each.get("purse", 0)), "restocked": int(each.get("restocked", 0))}
+				var taken := {}
+				var was: Variant = each.get("taken", {})
+				if was is Dictionary:
+					for item: Variant in was:
+						taken[str(item)] = int(was[item])
+				_camp_traders[str(camp)] = {"stock": stock, "taken": taken, "taken_day": int(each.get("taken_day", -1)), "restocked": int(each.get("restocked", 0))}
 		if not _camp_traders.is_empty():
 			print("[economy] loaded %d camp traders" % _camp_traders.size())
 	var commissions: Variant = saved.get("commissions", {})
@@ -3287,15 +3352,16 @@ func from_dict(saved: Dictionary) -> void:
 	if apprentice_paid is Dictionary:
 		for id: Variant in apprentice_paid:
 			_apprentice_paid[str(id)] = int(apprentice_paid[id])
-	var player_owed: Variant = saved.get("player_owed", {})
-	if player_owed is Dictionary:
-		for id: Variant in player_owed:
-			if player_owed[id] is Dictionary:
-				for town: Variant in player_owed[id]:
-					if int(player_owed[id][town]) > 0:
-						if not _player_owed.has(str(id)):
-							_player_owed[str(id)] = {}
-						_player_owed[str(id)][str(town)] = int(player_owed[id][town])
+	var purses_saved: Variant = saved.get("trade_purse", {})
+	if purses_saved is Dictionary:
+		for place: Variant in purses_saved:
+			if purses_saved[place] is Dictionary:
+				_trade_purse[str(place)] = {"gold": int(purses_saved[place].get("gold", 0)), "day": int(purses_saved[place].get("day", 0))}
+	var trade_debt_saved: Variant = saved.get("trade_debt", {})
+	if trade_debt_saved is Dictionary:
+		for place: Variant in trade_debt_saved:
+			if int(trade_debt_saved[place]) > 0:
+				_trade_debt[str(place)] = int(trade_debt_saved[place])
 	var hauled: Variant = saved.get("hauled", {})
 	if hauled is Dictionary:
 		for id: Variant in hauled:
@@ -3306,6 +3372,18 @@ func from_dict(saved: Dictionary) -> void:
 			var value: Variant = purses[id]
 			if value is int or value is float:
 				_purses[str(id)] = maxi(int(value), 0)
+	# 826: what a town owed a player before (498's "player_owed") is paid into
+	# their purse, quietly, and booked as the trade's credit to that town.
+	var player_owed: Variant = saved.get("player_owed", {})
+	if player_owed is Dictionary:
+		for id: Variant in player_owed:
+			if not player_owed[id] is Dictionary:
+				continue
+			for town: Variant in player_owed[id]:
+				var due := int(player_owed[id][town])
+				if due > 0:
+					_purses[str(id)] = int(_purses.get(str(id), 0)) + due
+					_trade_debt[str(town)] = int(_trade_debt.get(str(town), 0)) + due
 	var lines: Variant = saved.get("log", {})
 	if lines is Dictionary:
 		for id: Variant in lines:

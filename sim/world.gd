@@ -107,7 +107,7 @@ signal traded(by: GridEntity, shop: GridEntity, why: String)
 ## was of it before (Economy.short_of); [param paid] the gold paid for it,
 ## [param owed] what the town came to owe them for it, [param depot] true at
 ## a depot. Main thanks them once a hand-in (Main._thank_hand_ins).
-signal handed_in(place: String, player_id: String, what: String, count: int, raw: bool, short: float, paid: int, owed: int, depot: bool)
+signal handed_in(place: String, player_id: String, what: String, count: int, raw: bool, short: float, paid: int, depot: bool)
 ## A move of things between slots refused for the armour slot's rule
 ## (decision 622): [param why] is said to whoever moved them (Main).
 signal slot_refused(by: GridEntity, why: String)
@@ -4656,22 +4656,19 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 		if towns != null:
 			towns.note_recent(place, player_id, "donated", id, 1)  # 768: gear given is a gift.
 		if not player_id.is_empty():
-			handed_in.emit(place, player_id, id, 1, false, short, 0, 0, _at_depot)
+			handed_in.emit(place, player_id, id, 1, false, short, 0, _at_depot)
 		return
 	var paid := 0
-	var owed := 0
 	# A player's raw goods (or their companion's) are a sale at the delivery
 	# price (decision 498; Jeff: "players bank goods for gold"). A counter
 	# sale has no by_id: it was paid there.
 	if economy != null and not player_id.is_empty():
-		var owed_before := economy.owed_to(player_id, place)
 		paid = economy.bank_sale(place, player_id, yields)
-		owed = maxi(economy.owed_to(player_id, place) - owed_before, 0)
 		if paid > 0:
 			add_gold(player_id, paid, "banked %s" % [yields])
 		if towns != null:
-			# 768: paid now or owed, a sale; past the owed cap, a gift.
-			var sold := paid > 0 or economy.owed_to(player_id, place) > owed_before
+			# 768: paid, a sale (826: always in full); unpaid (a maker's herbs), a gift.
+			var sold := paid > 0
 			for what: String in yields:
 				towns.note_recent(place, player_id, "sold" if sold else "donated", what, int(yields[what]))
 	for what: String in yields:
@@ -4679,7 +4676,7 @@ func _bank_thing(place: String, uid: int, who: String, from: String, at_zone: St
 	if economy != null and not player_id.is_empty():
 		var first := true
 		for what: String in yields:  # The pay with the first: one sack, one sale.
-			handed_in.emit(place, player_id, what, int(yields[what]), true, 0.0, paid if first else 0, owed if first else 0, _at_depot)
+			handed_in.emit(place, player_id, what, int(yields[what]), true, 0.0, paid if first else 0, _at_depot)
 			first = false
 	if balance != null:
 		# Meat brought home (761), by its bringer's label: the depot's who, or

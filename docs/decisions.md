@@ -45698,3 +45698,84 @@ behind hints=on as every action hint, is voice's: "E  Light the fire" on a cold 
 fire" on a burning one. level_test _test_hearth: the one ring laid in any level is the hill cave's at
 (51, 176); view_test's check that every hills fire ring is a drawn ring now has one to check. The
 bullet is voice's. Level data and a client hint; protocol unchanged; no new class_name.
+824, dungeon's side (the coordinator's approval of enemy-ai's C:/dev/review/enemy-ai/sneak_packs_design.md; release's label; voice's words): the sneak packs laid, which switches the package on. It builds on 823's "packs" key (823, dungeon's side): a pack of the lead's own kind ({"sneak": {"of": "sneak", "size": 3}}) now counts its members, so whole packs of "size" are laid, and every pack laid gives each member, lead included, props "pack": "pack_<x>_<y>" of its lead's cell (Labyrinth.pack_rows, through the generated level's entity rows). Enemy-ai reads it, and pack fighting is on only where the kind's monsters.json row has its "pack" block (just the sneak), so barrow_deep's grave-guard packs carry the prop and fight as before. castle_halls (labyrinth.gd _hold): the block's monsters are imp 4, sneak 3, brute 1 (8 as before), packs as above, respawn_s sneak 600. The pack is laid whole in the guardroom with the most ways in (2 at least; the cold forge is no guardroom), its members wandering it (radius 2, enemy-ai's), and it stands for the guardrooms' foes: no other guardroom takes imps, so the chests keep their guards. With no guardroom of two ways in (a lone door everywhere), or a room too small for all three, the rest are imps. Hollowfell (mine.gd _monsters): packs as above. The pack's lead goes on the floor cell with the most ways out (_ways_out: runs of floor round the ring JUNCTION_RING 3 out, JUNCTION_WAYS 3 at least) within JUNCTION_NEAR 4 of the routes' middle third, off the track and clear of the mouth (ties nearest the route), the other two on the free cells nearest it. With no such junction they lie loose as before. Tests: level_test _check_sneak_pack in each played castle_halls generation (one pack of three wandering one guardroom, one shared "pack"; or none and seven imps; eight foes) and the template's counts; mine_gen_test (each generation's sneaks one pack within reach of each other and off the track, or loose with none; a pack in 6 of 6 generations, half required); labyrinth_test and regen_test pass. The packs show only in generations laid after this lands. CHANGELOG bullet in voice's words. Level data and generators; protocol unchanged; no new class_name. Package: sneak packs, switched on with this.
+825, pc-character's side (package "hill cave rest", landing off; release's label): a wet body dries
+by a lit hearth as by a fire. WetLook.near_fire, 775's drying FIRE_DRY times faster within FIRE_REACH
+(2, Chebyshev, the warmed rest's reach), now reads World.lit_hearths of the zone shown beside a
+terrain fire and a camp's fire ring (777, Level.camp_fire): on a client those are the "hearths"
+message's, read as asked, so one lit dries at once and one run down (its tick passed) no longer
+does, with nothing cached to clear. view_test _test_wet: a hearth lit two cells off dries; three off,
+or gone out, not. Client only, protocol unchanged, no new class_name, no bullet (none until the
+switch-on).
+825, terrain's side (package "hill cave rest", landing off; maps' design, the coordinator's notes on
+the lit sheet, C:/dev/review/lands/hill_cave_rest). Client3D draws a hearth lit by the ring a rock
+shelter draws (798 amended (4)): _dress_shelter keeps its cold ring (HEARTH_COLD) by the cell it is
+drawn on, _hearth_rings (a room's field, swapped with a held neighbour's, 822), so a place's
+"fire_ring" is that cell (the hills' (51, 176), under the lip). _draw_hearths, on
+World.hearths_changed and as the live room builds or swaps in: while World.lit_hearths has the cell,
+the cold ring hidden and art-kit's HEARTH_LIT ("Lit_x_y") in its place, its flame at the slot's
+socket and a fire's drawn light (523) in _fire_lights, HEARTH_ENERGY 1.5 over HEARTH_RANGE 5 m low
+over the fire (HEARTH_LIGHT_UP 0.7 m), so the lip is lit underneath and falls dark toward its edge
+(the coordinator: a watch post's light, 2.2 over 7 m, lit its front band a flat orange); gone cold,
+the lit one freed, its light dropped, the cold ring shown. A held neighbour's stay cold. Client3D
+.campfire_cells adds the burning ones, so sound's amb.campfire crackles there with no new asset.
+view_test _test_shelter (lit: the lit ring for the cold one, its light low and flickering, its
+crackle; gone out: cold, no light, no crackle; the hills' fire rings each on a drawn ring). Client
+only; protocol unchanged; no new class_name.
+
+## 826. The town pays in full: no player is ever owed
+
+Jeff (2026-11-08, via the coordinator): "town shouldn't owe players -- if you need to balance the
+economy for the npcs then do it another way." Release's number; the coordinator approved economy's
+design (the treasury, then the caravan's credit) and its two additions: a camp trader's demand limit in
+place of his purse, and the makers. It replaces owing players across the store's raws (498,
+768), barter (560), Give's trophies and inputs (821, 821 amended), a maker's barter (562 amended
+(9)), commissions and the camp traders (799), more than an amendment of 821 or 768.
+
+- What a player sees: every sale is paid in full, at once, at the price shown. Economy._player_owed,
+  owed_to, _pay_player and the owed_paid signal are gone, with store.owed_cap for players (it still
+  caps what a town owes its own people), the takes rows' and the town sheet's "owed", the "owed"
+  gold reward and its words (Main.OWED_WORDS, OWED_PAID), World.handed_in's owed argument, and the
+  refusals "the town can't pay for it now", "<name> has no coin for that today." and the camp's
+  "I've no coin left for that.". The limits left are demand ("the town has enough of that", a
+  thing nobody buys), shown before a sale. Donate is only for gifts the player chooses.
+- Where the gold comes from: Economy.pay_for_player(place, amount, why, from_gold, debt_key). The
+  place's gold above gold_floor pays first (what pays its own people stays theirs); then the outside
+  trade's credit there (the coordinator's capped, refilling credit: Economy._trade_purse,
+  trade_purse(place), levels' trade_credit.per_day 60 a game day up to most 120, outside gold); only
+  past both is a trade debt booked (Economy._trade_debt, trade_debt(place)), an NPC-side debt no
+  player sees, noted in the ledger as "credit:". bank_sale, trophy_sale, sell (barter's gives),
+  pay_commission (the watch's pay, so its short and unpaid lines no longer come) and _maker_pays all
+  use it. A maker pays from his purse, then his hut's gold, then the credit; a town's maker never
+  touches its treasury (562 amended (9)): from_gold false, and a shortfall past the credit is his own
+  debt, "worker:" + id (Economy.WORKER_DEBT).
+- What the NPC side does: a day's refill pays the place's debt first (_purse_of); _repay_trade then
+  repays from its gold above gold_floor, but only once none of its workers is owed (a worker's own
+  owed wages and deliveries are unchanged, NPC to NPC); a town maker's from half his purse, as a loan
+  is; a gone maker's is written off. The trade caravan (770's _trader) keeps what it pays a town for
+  its surplus toward any debt. Prices never fall because a town is short (raw_price's wants discount
+  is demand). bank_pays (the town window's "pays") has no up_to. Two shapes were soaked first and
+  dropped: the treasury down to 0 then a debt (the debt grew to 847 and never cleared; town gold 249
+  against 330), and repaying it in the town's spare goods (it took what the caravan sells for the
+  town: 229 against 365, owed up to 226).
+- Camp traders: no purse. camp_traders.per_day (5) of each good a game day, Economy.camp_room(camp,
+  mix, item) how many more today (saved with the camp); past it camp_buy says "enough", voice's
+  "I've enough of that for now.". Main._camp_buys' up_to is camp_room; Main._camp_purse goes.
+- The save: "player_owed" is read once, each sum paid quietly into the player's purse (no message)
+  and booked as that town's trade debt; it is never written again. "trade_debt" is saved.
+- Protocol: rows and sheets carry a field less; release kept it on unshipped 54 ("54 (826)" in net.gd).
+  ui's side ("826, ui's side", landing straight after): the window's "Owes you N gold", Gains' owed
+  branch, give_word back to gold above 0, and 802 amended (9)'s bullet out (unshipped).
+- Tests: economy_test (a sale paid in full from 4 gold, the debt repaid; the camp's day of 5 hides,
+  feathers apart, saved, a day on; Rolf's, the tanner's and the medicine man's rows; the town window
+  with an empty treasury), larder_test (a maker with nothing paid in full, the town maker's own debt
+  repaid from his purse; commissions in full; banked hides in full, the debt repaid once the town's
+  people are), resident_test (the watch paid in full on an empty treasury; the camp's Sell by camp_room).
+- The soak (tools/town_soak --days=30 --players=1, a seller of 60 gold a day of hides and claws to the
+  town and hides to a camp till day 20, beside a baseline): every sale paid in full (1247 by the
+  town, 300 by a camp, none short); the trade debt 0 every day; the town's gold 497 on day 29
+  against the baseline's 365; workers owed mostly 0 against the baseline's 12 to 180; nobody hungry
+  in either; dole 1 at most in either. Outside gold per player-day: the camp 15 (its 5 a good a day),
+  the town's credit at most 60.
+
+CHANGELOG (voice's). Server and client; protocol 54 (shared, unshipped); no new class_name.
