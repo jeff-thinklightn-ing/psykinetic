@@ -54,13 +54,15 @@ static var _roamed: Dictionary = {}
 static var _escorts: Dictionary = {}
 
 
-## The rows with a "lair" block: kind -> that block.
+## The rows with a "lair" block: kind -> that block. A lair held back
+## (Level.SHELVED, 820) holds nobody: its apex is not in the world, in its
+## lair or out, till its package opens the lair (780 amended (16)).
 static func rows() -> Dictionary:
 	var out := {}
 	var kinds := Monster.kinds()
 	for kind: String in kinds:
 		var row: Variant = kinds[kind]
-		if row is Dictionary and row.get("lair") is Dictionary and not (row["lair"] as Dictionary).is_empty():
+		if row is Dictionary and row.get("lair") is Dictionary and not (row["lair"] as Dictionary).is_empty() 				and not Level.SHELVED.has(str(row["lair"].get("zone", ""))):
 			out[kind] = row["lair"]
 	return out
 

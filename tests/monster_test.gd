@@ -22,10 +22,11 @@ const SPECS := {
 	"u": {"script": "res://sim/draugr.gd", "shape": "capsule", "kind": "draugr"},
 	"B": {"script": "res://sim/great_bear.gd", "shape": "capsule", "kind": "great_bear"},
 	"G": {"script": "res://sim/old_wolf.gd", "shape": "capsule", "kind": "old_wolf"},
+	"K": {"script": "res://sim/boar_king.gd", "shape": "capsule", "kind": "boar_king"},
 }
 const NAMES := {"P": "Player", "m": "Monster", "i": "Imp", "b": "Brute", "s": "Sneak", "c": "Crate",
 	"r": "Rabbit", "d": "Doe", "D": "Stag", "o": "Boar", "w": "Wolf", "a": "Archer", "k": "Skeleton", "g": "Guard",
-	"x": "Robber", "u": "Draugr", "B": "Bear", "G": "OldGrey"}
+	"x": "Robber", "u": "Draugr", "B": "Bear", "G": "OldGrey", "K": "BoarKing"}
 
 var _failures := 0
 var _room: Node2D
@@ -1827,6 +1828,7 @@ func _test_ambush() -> void:
 	_test_stop_to_strike()
 	_test_heavy_cycle()
 	_test_sneak_pack()
+	_test_boar_king()
 	_test_given_strength()
 
 
@@ -6658,6 +6660,157 @@ func _test_old_wolf() -> void:
 			stood += 1
 	_check(stood >= int(grey.pant["ticks"]) - 3 and not _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == grey and int(d["tick"]) > bitten),
 		"after it he pants, standing, striking nobody: the opening (%d ticks)" % stood)
+	DayNight.reset()
+	Monster.idling = true
+
+
+## The boar king (780 amended (16)): off while his lair is held back; his
+## told charge lands, gores and knocks aside; a miss skids him, a wall stuns
+## him (&"crash"); never at a foe under a third of their hp, and never
+## below 1 hp; his sounder joins his charge, and holds off a low foe while
+## he charges.
+func _test_boar_king() -> void:
+	print("
+== the boar king: the told charge, the skid, the crash, never into a downing, his sounder ==")
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var row: Dictionary = Monster.kinds()["boar_king"]
+	_check(Monster.is_apex("boar_king") and str(row["escort"]["kind"]) == "boar" and int(row["escort"]["count"][0]) == 3
+			and int(row["lair"]["fall_back_escort"]) == 0 and str(row["lair"]["zone"]) == "boar_lair"
+			and (row["drops"] as Array).map(func(d: Dictionary) -> String: return str(d["item"])) == ["boar_king_tusk", "boar_king_hide", "meat"],
+		"an apex, a sounder of three boars his escort, beaten back with it cleared; his tusk, hide and meat")
+	_check(Apex.rows().has("boar_king") == not Level.SHELVED.has("boar_lair") and Apex.rows().has("old_wolf"),
+		"while the boar's lair is held back (SHELVED) Apex holds no boar king: he is in the world only with his lair")
+	var arena: Array[String] = ["#".repeat(30)]
+	for y in 9:
+		arena.append("#" + ".".repeat(28) + "#")
+	arena.append("#".repeat(30))
+	var put := func(rows: Array[String], at: Vector2i, symbol: String) -> void:
+		rows[at.y] = rows[at.y].substr(0, at.x) + symbol + rows[at.y].substr(at.x + 1)
+	# The charge told, then run: the foe met gored and knocked aside.
+	var rows := arena.duplicate()
+	put.call(rows, Vector2i(5, 5), "K")
+	put.call(rows, Vector2i(11, 5), "P")
+	var e := _build(rows)
+	var king: BoarKing = e["K"][0]
+	var player: GridEntity = e["P"][0]
+	_check(int(king.charge["windup"]) == int(row["moves"]["charge"]["windup"]) and float(king.charge["not_below"]) == float(row["moves"]["charge"]["not_below"]),
+		"his charge's numbers are his row's (tuning is data)")
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	var cries: Array[StringName] = []
+	king.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	var told := -1
+	var gored := -1
+	var from_y := player.tile.y
+	for i in 60:
+		World.step()
+		if told < 0 and str(king._move.get("move", "")) == "charge":
+			told = World.tick
+		if _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == king and d["entity"] == player):
+			gored = World.tick
+			break
+	_check(told >= 0 and cries.has(&"snort") and gored > told + int(king.charge["windup"]) - 2 and cries.has(&"charge"),
+		"his charge told (a snort, a line) and run (its cry), then the blow (told %d, struck %d)" % [told, gored])
+	for i in 4:
+		World.step()
+	_check(player.tile.y != from_y, "the one he met knocked aside off his line (row %d to %d)" % [from_y, player.tile.y])
+	# A miss: he runs to its end and skids, standing, his flank open.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(4, 5), "K")
+	put.call(rows, Vector2i(9, 5), "P")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	cries = []
+	king.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+	var stepped_off := false
+	var skidded := -1
+	for i in 60:
+		World.step()
+		if not stepped_off and str(king._move.get("move", "")) == "charge":
+			stepped_off = true
+			World.despawn(player)
+			World.spawn(player, Vector2i(9, 8))  # Aside, off his line.
+		if str(king._move.get("move", "")) == "skid":
+			skidded = World.tick
+			break
+	_check(skidded >= 0 and cries.has(&"skid") and not _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == king),
+		"stepped aside, his charge meets nobody: he skids (%d)" % skidded)
+	var at := king.tile
+	var stood := 0
+	for i in int(king.charge["skid"]) - 2:
+		World.step()
+		if king.tile == at:
+			stood += 1
+	_check(stood >= int(king.charge["skid"]) - 3, "skidding he stands (%d ticks): the opening" % stood)
+	# A wall at its end: stunned, its cause the crash.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(20, 5), "K")
+	put.call(rows, Vector2i(27, 5), "P")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	var crashed := false
+	stepped_off = false
+	for i in 60:
+		World.step()
+		if not stepped_off and str(king._move.get("move", "")) == "charge":
+			stepped_off = true
+			World.despawn(player)
+			World.spawn(player, Vector2i(27, 8))
+		if World.is_stunned(king) and king.stun_cause == &"crash":
+			crashed = true
+			break
+	_check(crashed, "run into the wall, he is stunned, its cause the crash")
+	# Never into a downing.
+	rows = arena.duplicate()
+	put.call(rows, Vector2i(5, 5), "K")
+	put.call(rows, Vector2i(11, 5), "P")
+	put.call(rows, Vector2i(10, 3), "o")
+	put.call(rows, Vector2i(12, 3), "o")
+	e = _build(rows)
+	king = e["K"][0]
+	player = e["P"][0]
+	var sounder: Array = e["o"]
+	for boar: Animal in sounder:
+		boar.escort_lead = king
+		boar.sight_range = 12
+	player.max_hp = 100
+	player.hp = 30
+	king.sight_range = 12
+	_check(not king.may_charge(player), "a foe under a third of their hp: no charge")
+	king._move = {"move": "charge", "telegraph": 0, "lands": World.tick + 1000, "toward": Vector2(1, 0), "cells": 8, "from": World.tick}
+	_damage_log.clear()
+	for i in 30:
+		World.step()
+	_check(king.holds_sounder(player) and not _damage_log.any(func(d: Dictionary) -> bool: return sounder.has(d["source"])),
+		"while he charges, his sounder holds off a foe under a third of their hp")
+	king._move = {}
+	player.hp = 2
+	king._gore(player, Vector2(1, 0))
+	_check(player.hp == 1, "his charge's blow never takes a player below 1 hp (%d)" % player.hp)
+	# His sounder joins his charge.
+	player.hp = 100
+	for boar: Animal in sounder:
+		boar._charge_until = -1
+		boar._burst_until = -1
+	king.target = player
+	king._sounder_charge()
+	_check(sounder.all(func(boar: Animal) -> bool: return boar._charge_until > World.tick and boar._burst_until > World.tick and boar.target == player),
+		"as his charge ends, his sounder near his target charges it too")
+	player.hp = 30
+	for boar: Animal in sounder:
+		boar._burst_until = -1
+	king._sounder_charge()
+	_check(sounder.all(func(boar: Animal) -> bool: return boar._burst_until < 0), "but not at a foe under a third of their hp")
 	DayNight.reset()
 	Monster.idling = true
 

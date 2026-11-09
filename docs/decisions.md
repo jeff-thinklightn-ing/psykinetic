@@ -45067,6 +45067,41 @@ label lowered, "the old grey", "the great bear"; it lives, so never a kill) and 
 _test_tomb (beside them: the fact and the deed; out of hearing: nothing; the server connected).
 Server only, protocol unchanged, no new class_name.
 
+780 amended (16): the boar king and his sounder (2026-11-08, enemy-ai; the boar king design,
+approved by the coordinator, C:/dev/review/enemy-ai/boar_king_design.md; release's label; package
+"the boar king": maps' lair (phase D), art-kit's old body, sound, animation, items' rows, economy's
+truffles, companions' line; this side lands off, and enemy-ai's switch-on, taking boar_lair out of
+Level.SHELVED, carries voice's bullet). The apex lair rule's phase 2 (780 amended (13)), the old
+grey's pattern. Kind boar_king (monsters.json): an apex, the forest's, script sim/boar_king.gd
+(class_name BoarKing, extends Animal), on art-kit's creature.boar_king; lair boar_lair, land forest,
+range 40, hours [0, 24] (boars are about by day and by night), venture_after_s 2700, out_most_s 1800,
+fall_back_hp 0.4, fall_back_escort 0 (his sounder cleared sends him home: Jeff's "push him back into
+the lair by clearing"), rise_s 1800, path_margin 6, pad_margin 30; escort three boars, follow 4; body
+mass 180, hp 60, move_ticks 3.0, HEAVY (his hook), sight 7, a keen nose; drops boar_king_tusk and
+boar_king_hide always, meat 6-8. His fight (combat tunes the row's "moves" "charge"):
+- The charge (told): at a foe "from" 3 to "cells" 7 off, World.telegraph "charge" (flank-marked) on a
+  line through them and "past" 2 beyond, "windup" 12 ticks, a snort (cried "snort"); then he runs it
+  (World.rush, cried "charge"). The foe met takes "damage" 6 and is launched across the line
+  ("impulse" 140): the read is to step aside, not back.
+- The overrun: a run meeting nobody skids him "skid" 15 ticks, standing (cried "skid", radius 0); one
+  ending against the terrain (rush_ended "wall": a tree, a rock, a wall) stuns him "stun" 25 ticks with
+  cause &"crash" (379 amended's cause; sound's thud, animation's dazed clip). Every 60 ticks at most.
+- The hook: close, his kind's HEAVY blow (Monster's wound-up strike, 338 amended (5)).
+- His sounder joins: as a run ends each boar following him within "join_tiles" 8 of his target
+  charges it (its boar's charge, a burst).
+- Never into a downing (the coordinator's rule on approval): no charge, his or his sounder's joined
+  one, at a foe under "not_below" 0.33 of their hp; while he charges (its tell or its run) no boar of
+  his sounder goes at such a foe (BoarKing.holds_sounder: it stands, facing them); and his charge's
+  blow never takes a player or companion below 1 hp. His hook can down, as any blow.
+- The bellow: a fight's start and half his hp (cried "bellow"; World.far_cry while out).
+A boar's escort (Animal._sounder_tick): a GAME animal with an escort_lead follows it and fights its
+target, never bolting (the wolves' escort was a predator's only). Apex.rows leaves out a kind whose
+lair is in Level.SHELVED (820): a held-back lair holds nobody, its apex in the world neither in it nor
+out, so this side lands off. monster_test _test_boar_king (the row; no boar king while his lair is held
+back; the told charge, the blow and the knock aside; the skid standing; the wall's crash stun; no charge
+at a third; holds_sounder; never below 1; the sounder joining, and not at a low foe). Server only,
+protocol unchanged; new class_name BoarKing. Off: no bullet till the switch-on.
+
 780 amended (16), items' side: the boar king's rows (2026-11-08; enemy-ai's boar king design,
 approved by the coordinator; release's label). levels/items.json: boar_king_tusk ("boar king's tusk",
 token and trophy, 0.3 x 0.06 x 0.08 m, 0.4 kg, stacks 10, value 10) and boar_king_hide ("boar king's

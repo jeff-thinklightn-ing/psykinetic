@@ -221,6 +221,8 @@ func _sim_tick() -> void:
 			pose = Pose.STAND
 			return  # Startled: a moment before it bolts (764).
 		_startle_until = -1
+	if role == Role.GAME and escort_lead != null and _sounder_tick():
+		return  # A boar of an apex's sounder (780 amended (16)).
 	# Struck, a boar turns and charges though it was running (an arrow from
 	# afar); prey runs on.
 	if alert == Alert.FLEEING and not (role == Role.GAME and _struck_by() != null):
@@ -435,6 +437,38 @@ func _escort_target() -> GridEntity:
 		if struck != null and is_instance_valid(struck) and struck.spawned and not struck is Animal:
 			return struck
 	return null
+
+
+## A boar of an apex's escort (780 amended (16), the boar king's sounder):
+## it follows its lead and fights its lead's target, never bolting; while
+## its lead charges, never at a foe under his rule's share of their hp
+## (BoarKing.holds_sounder: it stands, facing them). True while it does.
+func _sounder_tick() -> bool:
+	if not is_instance_valid(escort_lead) or not escort_lead.spawned:
+		escort_lead = null
+		return false
+	_settle_bold()
+	var foe := _escort_target()
+	if foe == null:
+		_foe = null
+		_charge_until = -1
+		target = null
+		if not _escort_step():
+			_graze_tick()
+		return true
+	if escort_lead is BoarKing and (escort_lead as BoarKing).holds_sounder(foe):
+		target = null
+		pose = Pose.STAND
+		World.face(self, Senses.way_toward(tile, foe.tile))
+		return true
+	if _foe != foe or World.tick >= _charge_until:
+		_foe = foe
+		_charge_until = World.tick + CHARGE_TICKS
+	if alert == Alert.FLEEING:
+		alert = Alert.IDLE
+	pose = Pose.STAND
+	super._sim_tick()
+	return true
 
 
 ## An escort with nobody to fight, its lead fighting nobody, farther off
