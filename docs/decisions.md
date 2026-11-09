@@ -46221,3 +46221,37 @@ about 20 minutes), but only after waiting LEAN_AFTER_SECONDS (5 minutes) for a f
 heavy_job_test: lean at once, still full when it fits, not when the lean one doesn't fit either, and the
 suite's row is lean_first over a kinds.json written before it. Tools only; protocol unchanged; no
 class_name; no bullet.
+## 829. The day turn spread over ticks; production's gold in one line a tick
+
+The coordinator's order (the day-turn cost, "felt by everyone"), measured with perf's split of the
+world tick ("towns, production, economy" by call, Economy.tick by call) on a 10-day, 3-player
+tools/town_soak of main: the day's worst tick fell 300 steps after each dawn, Economy.tick's part 27
+to 50 ms, alternating by day (meal 15 ms; tools 14, mending 12 every second day). Every worker's
+needs came due in the same tick: their dues were seeded together and stayed in step. Nothing grew
+over ten days (no leak); production and trade stayed about 7 to 10 ms and flat.
+
+- Economy.tick meets at most folk.meets_per_tick (levels' 8) workers' due needs in one tick; the
+  rest wait a tick, still due, so a world whose folk all came due together (the box's included)
+  spreads out on its own within a day. No need is skipped: one is met a few ticks late at most
+  (300 steps a tick). 0 or no key is no cap.
+- Most of what was left was printing: Production.spend and pay printed a "[production] <name>
+  spent/paid N gold (...)" line for every purse move, about 45 in the dawn tick, and a print to a
+  file costs 0.3 ms on Windows (4 us to /dev/null; a worker record's copy 18 us); journald pays for
+  each on the box. They are now counted (Production._gold_moved) and told in one line a world tick,
+  "[production] purses to step S: A spent X gold, B paid Y gold" (Production._gold_line, from
+  Production.tick; none when no purse moved). The server, or any run, started with the user arg
+  --gold-lines (Production.gold_lines) prints the per-move lines as before. No tool, test, release
+  script or watcher read them (checked before landing); the coordinator's box log notes are updated.
+- folk_test _test_meets_per_tick: seven folk due at once with a cap of 3 are fed 3, 3 and 1 over
+  three ticks, each once, their next meals on three ticks.
+
+Measured after v0.1.209 (main ad1fb96ca, the same probe, 4 days, 3 players, stdout to /dev/null,
+through the gate beside other trees' suites): without the cap Economy.tick's worst was 20.7 ms
+(tools 6.8, mending 6.1, meal 3.1, in the one dawn tick); with 8 its worst tick of meeting needs was
+12.2 ms (tools 3.7, mending 3.4, meal 1.6). One tick at 24.5 ms with the cap was the day's
+trade_turn (17.5 ms, other runs under 2), in a tick slow throughout (herds 12 against 8 elsewhere),
+which this change doesn't touch. The longest wait for a need was the same in both runs, 19200 steps
+for a bed (a bed short, not the cap); before it the probe, which tells each new longest wait,
+reported one with the cap, a single tick (300 steps).
+
+Server only; protocol unchanged; no new class_name; no bullet (nothing a player sees).

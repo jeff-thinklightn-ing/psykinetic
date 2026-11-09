@@ -110,6 +110,13 @@ var wage_from := Callable()
 ## theft and the floor itself not counted, the town's debts to them
 ## counted when owed (note_earned), not again when paid.
 var _earned: Dictionary = {}
+## Each purse move its own "[production] ... spent/paid" line (--gold-lines):
+## off, they are counted and told in one line a world tick (_gold_line), since
+## a busy tick's few dozen lines cost the server more than its sim (a print to
+## a file 0.3 ms on Windows; journald pays for each on the box).
+static var gold_lines := "--gold-lines" in OS.get_cmdline_user_args()
+## Since the last line: spends, gold spent, payments, gold paid.
+var _gold_moved: PackedInt64Array = [0, 0, 0, 0]
 const NOT_EARNED: Array[String] = ["a loan from the town", "what the town owed", "the town's founding gold", "lifted", "the town's wage floor"]
 ## (town) -> {resource: count} the town's next build lacks (Towns.shortfall's
 ## needs; 522 amended (2)): a maker working one of those works on the
@@ -382,14 +389,26 @@ func worker_at(workshop_id: String) -> String:
 	return str(_workshops.get(workshop_id, {}).get("worker", ""))
 
 
+## One line for the purse moves since the last (gold_lines off), none for none.
+func _gold_line(at: int) -> void:
+	if _gold_moved[0] + _gold_moved[2] == 0:
+		return
+	print("[production] purses to step %d: %d spent %d gold, %d paid %d gold" % [at, _gold_moved[0], _gold_moved[1], _gold_moved[2], _gold_moved[3]])
+	_gold_moved = [0, 0, 0, 0]
+
+
 ## Takes [param amount] gold from worker [param worker_id]'s purse: false
 ## (nothing taken) if it hasn't that much.
 func spend(worker_id: String, amount: int, why := "") -> bool:
 	if not _workers.has(worker_id) or amount < 0 or int(_workers[worker_id]["purse"]) < amount:
 		return false
 	_workers[worker_id]["purse"] = int(_workers[worker_id]["purse"]) - amount
-	print("[production] %s spent %d gold (%s), step %d (%d left)" % [_workers[worker_id]["name"], amount, why, now(),
-		_workers[worker_id]["purse"]])
+	if gold_lines:
+		print("[production] %s spent %d gold (%s), step %d (%d left)" % [_workers[worker_id]["name"], amount, why, now(),
+			_workers[worker_id]["purse"]])
+	else:
+		_gold_moved[0] += 1
+		_gold_moved[1] += amount
 	return true
 
 
@@ -826,7 +845,11 @@ func pay(worker_id: String, amount: int, why := "") -> void:
 	_workers[worker_id]["purse"] = int(_workers[worker_id]["purse"]) + amount
 	if not NOT_EARNED.any(func(not_earned: String) -> bool: return why.begins_with(not_earned)) and not why.begins_with("fenced"):
 		_earned[worker_id] = int(_earned.get(worker_id, 0)) + amount
-	print("[production] %s paid %d gold (%s), step %d" % [_workers[worker_id]["name"], amount, why, now()])
+	if gold_lines:
+		print("[production] %s paid %d gold (%s), step %d" % [_workers[worker_id]["name"], amount, why, now()])
+	else:
+		_gold_moved[2] += 1
+		_gold_moved[3] += amount
 
 
 ## [param amount] the town now owes worker [param worker_id] for their
@@ -886,6 +909,7 @@ func note_sale(town: String, what: String, amount: int) -> void:
 ## Deterministic: by id throughout, timed by the clock alone.
 func tick() -> void:
 	var at := now()
+	_gold_line(at)
 	var cat: Dictionary = catalog.call()
 	_advance(at, cat)
 	_rent(at)

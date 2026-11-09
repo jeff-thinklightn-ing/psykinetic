@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_bank()
 	_test_hearsay()
 	_test_days()
+	_test_meets_per_tick()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -250,6 +251,43 @@ func _test_no_loan_for_services() -> void:
 
 
 ## The game's rules without the bank: the dole when broke.
+## 829: at most folk.meets_per_tick workers have their due needs met in one
+## tick, the rest a tick later (still due), so all coming due together spread
+## out; none is skipped.
+func _test_meets_per_tick() -> void:
+	print("
+== 829: a few workers' needs met a tick, the rest the next ==")
+	var rules := _no_bank()
+	rules["folk"]["meets_per_tick"] = 3
+	for need: String in rules["folk"]["needs"].keys():
+		if need != "meal":
+			rules["folk"]["needs"].erase(need)
+	_setup(rules)
+	_stock.deposit(TOWN, "food", 20)
+	var ids: Array[String] = []
+	for i in 7:
+		ids.append("w%d" % i)
+		_work.add_worker(ids[-1], "Folk %d" % i, ["hauler"], TOWN)
+		_work.pay(ids[-1], 50)
+	var every := int(rules["folk"]["needs"]["meal"]["every"])
+	_economy.tick()
+	_now = every
+	var fed := func() -> int: return ids.filter(func(id: String) -> bool: return _work.need_due(id, "meal") > every).size()
+	_economy.tick()
+	_check(fed.call() == 3, "all seven due at once: three fed this tick (%d)" % fed.call())
+	_now += World.WORLD_TICK_STEPS
+	_economy.tick()
+	_check(fed.call() == 6, "three more the next tick (%d)" % fed.call())
+	_now += World.WORLD_TICK_STEPS
+	_economy.tick()
+	_check(fed.call() == 7 and _stock.count(TOWN, "food") == 13, "the last the tick after, every one fed once (food %d)" % _stock.count(TOWN, "food"))
+	var dues: Array = ids.map(func(id: String) -> int: return _work.need_due(id, "meal"))
+	var ticks := {}
+	for due: int in dues:
+		ticks[due] = true
+	_check(ticks.size() == 3 and dues.max() - dues.min() == 2 * World.WORLD_TICK_STEPS, "their next meals fall on three ticks now, not one (%s)" % [dues])
+
+
 func _no_bank() -> Dictionary:
 	var rules := _rules.duplicate(true)
 	rules.erase("bank")

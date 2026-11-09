@@ -206,7 +206,8 @@
 		"skip": {"carpenter": ["mend"], "smith": ["tools"]},
 		"keep_in_shop": 1,
 		"rich_above": 25,
-		"rich_every": 0.5
+		"rich_every": 0.5,
+		"meets_per_tick": 8
 	},
 	"level_speed": 0.25,
 	"build_wait": {"days": 2, "most": 3},

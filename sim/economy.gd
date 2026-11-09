@@ -894,6 +894,12 @@ func tick() -> void:
 	names.sort()
 	var skip: Dictionary = folk.get("skip", {})
 	var towns := {}
+	# At most folk.meets_per_tick workers have their due needs met in one tick;
+	# the rest wait a tick (still due), so a world whose folk all came due
+	# together spreads out on its own and the day's first tick no longer meets
+	# every worker's meal, tools and mending at once (the day-turn cost).
+	var most := int(folk.get("meets_per_tick", 0))
+	var met := 0
 	for id in production.worker_ids():
 		var who := production.worker(id)
 		if bool(who["away"]) or str(who["town"]).is_empty() or production.outside(id):
@@ -902,6 +908,7 @@ func tick() -> void:
 		_bank_turn(id, str(who["town"]))
 		_pay_owed(id, str(who["town"]))
 		_apprentice_turn(id, str(who["town"]))
+		var counted := false
 		for need: String in names:
 			var rule: Dictionary = needs[need]
 			var every := int(rule.get("every", 0))
@@ -913,6 +920,11 @@ func tick() -> void:
 				continue
 			if at < due:
 				continue
+			if not counted:
+				if most > 0 and met >= most:
+					break
+				counted = true
+				met += 1
 			_meet(id, need, rule, cat)
 			var rich := folk.has("rich_above") and int(production.worker(id)["purse"]) > int(folk["rich_above"])
 			production.set_need_due(id, need, at + maxi(int(every * (float(folk.get("rich_every", 1.0)) if rich else 1.0)), 1))
