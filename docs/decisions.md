@@ -45895,3 +45895,39 @@ wood plinth under a low-ruin edge), a sill, boards rotted and broken off ragged 
 its foot; wall.wood.low_ruin_end (vertex) a corner post snapped off at about 1.2 m. view_test's ruined-house
 check (terrain's, from 827's terrain side) now expects every wall art-kit's low ruin when the set has
 RUIN_LOW, else the stub and rubble mix, as its stone check does (terrain's wording, terrain's OK). Off.
+## 828. Windowed runs on the laptop
+
+Release's number; the coordinator's approved design, the first step of the laptop runners plan (Jeff,
+2026-11-08: the old laptops as job runners on the tailnet, stills and clips first); Jeff allowed this
+session's remote writes to the Lenovo, 2026-11-09. A windowed Godot on this PC takes Jeff's screen and
+GPU and needs the coordinator's window check, and an off-screen window here presents at about 10 fps, so
+its frame times say nothing; on the Lenovo (lenovo-tethys, a GTX 1660 Ti) a run is on-screen and timed
+as a player's machine would be.
+
+tools/remote_shot.sh [--with FILE]... [--timeout MIN] <sha> <name> -- <godot args> runs one windowed
+Godot there and brings its out folder and godot.log back to C:/dev/review/<name>. Over ssh and scp
+only, with no agent forwarding and no port forwarding (BatchMode, ForwardAgent=no,
+ClearAllForwardings=yes); no token, key or box access goes with it. Its steps: the helper
+(tools/remote_shot_run.ps1) copied over; a lock on the laptop (D:\psykinetic-runs\.lock, stale after
+the run's timeout + 25 minutes), so one run at a time; the laptop's clone (D:\psykinetic, no remote)
+brought to <sha> by a git bundle, never touched if it has changes; the --with files copied; a headless
+import; then a one-shot scheduled task in the logged-on session (a window started over ssh gets no
+desktop) runs the helper, which waits while the laptop has had input in the last 5 minutes
+(GetLastInputInfo), checking each minute, and gives up with "laptop in use" at the timeout, changing
+nothing and never taking focus over Jeff. The game runs at a fixed 0,0 and 1600x900, windowed, with
+--audio-driver Dummy, its own APPDATA (the laptop user's user:// never touched), a settings.cfg of its
+own, and --bind=127.0.0.1 after the game's "--", so it never listens on the tailnet; it is stopped by
+its PID past the timeout. {out} in the args is the run's out folder.
+
+--with copies only files named on the command line, never a folder or a glob, and only from this tree;
+every one is checked before the laptop is touched, and one that reads as a credential or a token (by
+name: a .env, a key or certificate file, an id_ file, override.cfg, project.godot, anything named for a
+token, a secret, a password, a credential or the Freesound key; or by what it holds: an api key, token,
+secret or password set to a value) or as the box's (world.json, mind.log, a transcript) is refused. The
+laptop's run folder, its out folder and its APPDATA with it, is removed after the copy back, and however
+the run ends (the script's exit trap); the script warns if it is still there.
+
+The first trial: the hill cave rest's l045 night still on maps' flags, at main bbda2a865 with terrain's
+shot scene by --with, matched maps' switch_on_l045_night.png. Windowed stills, clips and benches go
+there from now; this PC's off-screen runs are for when the laptop is busy or off. Tools only; protocol
+unchanged; no class_name.
