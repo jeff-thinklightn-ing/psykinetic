@@ -40,6 +40,17 @@ extends RefCounted
 ## them guarded"); the rest of the monsters lie nearest their "near" anchor
 ## (the robbers' side: their camp), "apart" as the block says.
 ##
+## The deep (832, the crypt's ways in; the block's "deep": {"wing": id}):
+## the same processional, galleries and rooms, held to the same rules, but
+## the old dead's: every room a tomb_chamber (sarcophagi and niches, no
+## family's words) but the ossuary, no chapel of rest, no sealed vault, no
+## robbers' dig. The rooms wholly west of the processional are the named
+## wing [id] (laid_rooms "wing", so the spine rule measures them from it),
+## two at least, its farthest walked its heart, the first chest's. The
+## block's "packs" (823) are laid by the chests, farthest first: each lead
+## at a chest room, its followers the nearest free cells (Labyrinth's
+## PACK_REACH), sharing props "pack" (824).
+##
 ## What the generation lays besides the map's cells and edges goes to Regen
 ## by rows_of(map): "decor", "entities", "buildings", "niches",
 ## "carvings" ([{at, side, cut, look, fact}], the words of each carving) and
@@ -61,6 +72,9 @@ const GALLERY_LENGTH: Array[int] = [8, 18]
 const GALLERY_PITCH: Array[int] = [7, 10]
 ## Rock kept between two rooms, or a room and a way it has no door on.
 const ROOM_GAP := 1
+## The deep's (832): rock this far round a room but its door side, so no
+## gallery runs within layout_sense's WRAP_BAND of a second side.
+const DEEP_GAP := 2
 ## Rock kept between the map's rim and anything carved.
 const RIM := 2
 ## A pair of torches every so many cells along the processional.
@@ -73,7 +87,9 @@ const BRANCH_CHANCE := 0.5
 ## Floor kept this far off a room's sides and back (no way wraps it).
 const ROOM_CLEAR := 1
 
-const USES: Array[String] = ["family_tomb", "ossuary", "chapel_of_rest", "sealed_vault"]
+const USES: Array[String] = ["family_tomb", "ossuary", "chapel_of_rest", "sealed_vault", "tomb_chamber"]
+## The deep's wing: its rooms at least.
+const WING_LEAST := 2
 ## The co-op tomb's plates at least this far apart (cells, the longer
 ## axis): one body never holds both.
 const PLATES_APART := 3
@@ -93,7 +109,8 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	Labyrinth._move_hidden(map, Labyrinth.niche_plan(config, seed))
 	var carved: Dictionary[Vector2i, bool] = {}
 	var plan := {"rooms": [], "ways": {}, "decor": [], "entities": [], "buildings": [], "niches": [], "carvings": [],
-		"laid_rooms": [], "processional": [], "ends": [], "plates": [], "secrets": [], "plate_cells": {}}
+		"laid_rooms": [], "processional": [], "ends": [], "plates": [], "secrets": [], "plate_cells": {},
+		"gap": DEEP_GAP if config.get("deep") is Dictionary else ROOM_GAP}
 	var nodes := Labyrinth._anchor_nodes(template, given, {})
 	if nodes.is_empty():
 		return map
@@ -167,8 +184,11 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	for room: Dictionary in plan["rooms"]:
 		_wall_room(map, room)
 	_uses(map, anchors, entrance, nodes, plan)
+	if config.get("deep") is Dictionary:
+		_deep_uses(plan, str(config["deep"].get("wing", "")))
 	_furnish(map, anchors, config, rng, plan)
-	_torches(map, anchors, brush, plan)
+	if not config.get("deep") is Dictionary:
+		_torches(map, anchors, brush, plan)  # The deep stays dark, as it was.
 	_monsters(map, anchors, config, rng, plan)
 	_guard_rows(map, plan, nodes[entrance]["centre"])
 	_laid_rooms(given, plan)
@@ -455,15 +475,16 @@ static func _rooms_along(map: LevelMap, anchors: Array, run: Dictionary, brush: 
 static func _try_room(map: LevelMap, anchors: Array, start: Vector2i, x_way: Vector2i, y_way: Vector2i, wide: int, deep: int,
 		carved: Dictionary[Vector2i, bool], plan: Dictionary, tags: Dictionary) -> bool:
 	var cells: Dictionary[Vector2i, bool] = {}
-	for y in range(-ROOM_CLEAR, deep + ROOM_CLEAR):
-		for x in range(-ROOM_CLEAR, wide + ROOM_CLEAR):
+	var reach := maxi(ROOM_CLEAR, int(plan["gap"]))
+	for y in range(-reach, deep + reach):
+		for x in range(-reach, wide + reach):
 			var cell := start + x_way * x + y_way * y
 			if y < 0:
 				continue  # The near side: the way itself.
 			if map.walkable(cell):
 				return false  # Floor this near its sides or back: a way would wrap it.
 			var ring := maxi(maxi(-x, x - wide + 1), y - deep + 1)
-			if ring > ROOM_GAP:
+			if ring > int(plan["gap"]):
 				continue
 			if cell.x < RIM or cell.y < RIM or cell.x >= map.size.x - RIM or cell.y >= map.size.y - RIM:
 				return false
@@ -603,6 +624,30 @@ static func _uses(map: LevelMap, anchors: Array, entrance: int, nodes: Array[Dic
 		room["use"] = "family_tomb"
 
 
+## The deep's uses (832; the class doc): the ossuary kept, the rest tomb
+## chambers; the rooms wholly west of the processional the wing [param
+## wing], when there are WING_LEAST of them, its farthest walked its heart.
+static func _deep_uses(plan: Dictionary, wing: String) -> void:
+	var west := 1 << 30
+	for cell: Vector2i in plan["processional"]:
+		west = mini(west, cell.x)
+	var winged: Array = []
+	for room: Dictionary in plan["rooms"]:
+		if room["use"] != "ossuary":
+			room["use"] = "tomb_chamber"
+		if (room["cells"] as Dictionary).keys().all(func(cell: Vector2i) -> bool: return cell.x < west):
+			winged.append(room)
+	if wing.is_empty() or winged.size() < WING_LEAST:
+		return
+	winged.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
+	for room: Dictionary in winged:
+		room["wing"] = wing
+	for room: Dictionary in winged:
+		if room["use"] == "tomb_chamber":
+			room["heart"] = true
+			break
+
+
 ## Steps from [param start] over the walkable floor, doors open.
 static func _walk(map: LevelMap, start: Vector2i) -> Dictionary:
 	var dist := {start: 0}
@@ -638,6 +683,8 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 	var by_walk: Array = plan["rooms"].filter(func(room: Dictionary) -> bool: return room["use"] == "family_tomb")
 	by_walk.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
 	for room: Dictionary in by_walk:
+		if config.get("deep") is Dictionary:
+			break  # No robbers dig among the old dead.
 		if not _dig(map, room, kept, plan).is_empty():
 			room["dug"] = true
 			break
@@ -650,6 +697,10 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 			_niches_in(map, room, kept, 2, rng, plan)
 			if not tomb_lines.is_empty():
 				_carving(map, room, kept, tomb_lines.pop_front(), plan)
+		elif use == "tomb_chamber":
+			tombs.append(room)
+			_sarcophagi(map, room, kept, plan)
+			_niches_in(map, room, kept, 2, rng, plan)
 		elif use == "ossuary":
 			_niches_in(map, room, kept, 2, rng, plan)
 			_stacks(map, room, kept, plan)
@@ -672,6 +723,11 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 				if chests > 0 and _chest(map, room, kept, config, plan):
 					chests -= 1
 	tombs.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
+	# The deep's wing heart takes the first.
+	for room: Dictionary in tombs.duplicate():
+		if room.get("heart", false):
+			tombs.erase(room)
+			tombs.push_front(room)
 	for room: Dictionary in tombs:
 		if chests <= 0:
 			break
@@ -680,6 +736,8 @@ static func _furnish(map: LevelMap, anchors: Array, config: Dictionary, rng: Ran
 	# A tomb the robbers have been at (its chest theirs to guard, or their
 	# dig in it): its sarcophagi robbed (art-kit's variant 2, the lid off).
 	for room: Dictionary in tombs:
+		if room["use"] == "tomb_chamber":
+			continue  # The deep's: no robbers came this far.
 		if room.has("chest") or room.get("dug", false):
 			for entry: Dictionary in room.get("pieces", []):
 				if entry["slot"] == "building.sarcophagus":
@@ -1083,6 +1141,7 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 		roomed.merge(room["cells"])
 		if room["use"] == "chapel_of_rest":
 			quiet.merge(room["cells"])
+	_packs_by_chests(map, anchors, config, left, plan)
 	for room: Dictionary in plan["rooms"]:
 		if not room.has("chest") or int(left.get(guard, 0)) <= 0:
 			continue
@@ -1113,6 +1172,90 @@ static func _monsters(map: LevelMap, anchors: Array, config: Dictionary, rng: Ra
 				var rect: Rect2i = anchor["rect"]
 				spots = Labyrinth._nearest_first(rect.position + rect.size / 2, spots)
 		Labyrinth._lay(map, anchors, "monster_" + kind, int(left[kind]), spots, int(apart.get(kind, 0)))
+
+
+## The block's "packs" (823; 832 lays them in the crypt): each lead kind's
+## packs (a pack of the lead's own kind counting its members), each lead in
+## the next chest's room by its chest, farthest walked first, then on the
+## ways; its "size" - 1 followers of kind "of" on the free cells nearest it
+## within Labyrinth.PACK_REACH, off [param left]; every member's props
+## "pack" shared (Labyrinth.pack_rows, 824).
+static func _packs_by_chests(map: LevelMap, anchors: Array, config: Dictionary, left: Dictionary, plan: Dictionary) -> void:
+	var packs: Dictionary = config["packs"] if config.get("packs") is Dictionary else {}
+	if packs.is_empty():
+		return
+	var chest_rooms: Array = plan["rooms"].filter(func(room: Dictionary) -> bool: return room.has("chest"))
+	chest_rooms.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["walk"]) > int(b["walk"]))
+	var free := func(cell: Vector2i) -> bool:
+		return Labyrinth._open_floor(map, cell) and not plan["plate_cells"].has(cell) and not Level.in_anchors(anchors, cell)
+	var ways: Array[Vector2i] = []
+	for cell: Vector2i in Tools.sorted_cells(plan["ways"]):
+		if free.call(cell):
+			ways.append(cell)
+	var leads: Array = packs.keys()
+	leads.sort()
+	for lead: String in leads:
+		var pack: Dictionary = packs[lead]
+		var of := str(pack.get("of", lead))
+		var size := maxi(1, int(pack.get("size", 1)))
+		var count := int(left.get(lead, 0))
+		if of == lead:
+			count /= size
+		for n in count:
+			var spots: Array[Vector2i] = []
+			if not chest_rooms.is_empty():
+				var room: Dictionary = chest_rooms.pop_front()
+				for cell in Tools.sorted_cells(room["cells"]):
+					if free.call(cell):
+						spots.append(cell)
+				spots = Labyrinth._nearest_first(room["chest"], spots)
+			else:
+				spots = ways.duplicate()
+			var at := Vector2i(-1, -1)
+			for cell in spots:
+				if free.call(cell):
+					at = cell
+					break
+			if at.x < 0:
+				break
+			map.set_cell(at, "monster_" + lead)
+			left[lead] = int(left.get(lead, 0)) - 1
+			var close: Array[Vector2i] = []
+			for dy in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
+				for dx in range(-Labyrinth.PACK_REACH, Labyrinth.PACK_REACH + 1):
+					var cell := at + Vector2i(dx, dy)
+					if free.call(cell) and _walk_within(map, at, cell, Labyrinth.PACK_REACH * 2):
+						close.append(cell)
+			var members: Array[Vector2i] = [at]
+			for cell in Labyrinth._nearest_first(at, close):
+				if members.size() >= size or int(left.get(of, 0)) <= 0:
+					break
+				map.set_cell(cell, "monster_" + of)
+				left[of] = int(left[of]) - 1
+				members.append(cell)
+			plan["entities"].append_array(Labyrinth.pack_rows(members))
+
+
+## Whether [param to] is walked to from [param from] within [param most]
+## steps (a pack's follower on its lead's side of a wall).
+static func _walk_within(map: LevelMap, from: Vector2i, to: Vector2i, most: int) -> bool:
+	var dist := {from: 0}
+	var queue: Array[Vector2i] = [from]
+	var i := 0
+	while i < queue.size():
+		var cell := queue[i]
+		i += 1
+		if cell == to:
+			return true
+		if int(dist[cell]) >= most:
+			continue
+		for direction in DIRECTIONS:
+			var next := cell + direction
+			if dist.has(next) or not map.walkable(next) or map.edge(Terrain.edge_key(cell, direction)) == "wall":
+				continue
+			dist[next] = int(dist[cell]) + 1
+			queue.append(next)
+	return false
 
 
 ## Each chest's guard stays at it (806 amended (5); playtest's tour found
@@ -1164,4 +1307,7 @@ static func _laid_rooms(given: Array, plan: Dictionary) -> void:
 		var cells: Array = []
 		for cell in Tools.sorted_cells(room["cells"]):
 			cells.append([cell.x, cell.y])
-		plan["laid_rooms"].append({"id": room["id"], "use": room["use"], "cells": cells})
+		var laid := {"id": room["id"], "use": room["use"], "cells": cells}
+		if room.has("wing"):
+			laid["wing"] = room["wing"]
+		plan["laid_rooms"].append(laid)

@@ -22,6 +22,18 @@
 		]
 	],
 	"spawn_points": {
+		"from_chapel": [
+			40,
+			2
+		],
+		"from_deep": [
+			31,
+			8
+		],
+		"from_breach": [
+			10,
+			44
+		],
 		"from_wilds": [
 			40,
 			2

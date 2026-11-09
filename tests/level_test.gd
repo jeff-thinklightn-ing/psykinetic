@@ -75,6 +75,8 @@ func _ready() -> void:
 	_test_double_doors()
 	_test_camp_chest()
 	_test_band()
+	_test_crypt_ways()
+	_test_deep_crypt()
 	_test_barrow_quest()
 	_test_decor()
 	_test_barrow_level()
@@ -4807,6 +4809,88 @@ func _walk_free(player: Player, to: Vector2i) -> void:
 				break
 			World.free_input(player, way.normalized() if way.length() > 0.4 else way / 0.4, World.TICK_DT)
 			World.step()
+
+
+## 832 (the crypt's ways in): the barrow's arrivals, from_chapel and
+## from_deep in the First Hall and from_breach in the Robbers' Camp, inside
+## an anchor and on floor in the template and every generation, so the
+## switch-on's links (maps') land on ground.
+func _test_crypt_ways() -> void:
+	print("
+== the crypt's ways in (832): the barrow's arrivals ==")
+	var template := Level.load_level("barrow")
+	var arrivals := {"from_chapel": "entrance", "from_deep": "entrance", "from_breach": "camp"}
+	var wrong: Array[String] = []
+	var anchors: Dictionary = {}
+	for anchor: Dictionary in Regen.config_of("barrow")["anchors"]:
+		var rect: Variant = anchor["rect"]
+		anchors[str(anchor["name"])] = rect if rect is Rect2i else Rect2i(rect[0], rect[1], rect[2], rect[3])
+	for spawn: String in arrivals:
+		var at: Variant = template["spawn_points"].get(spawn)
+		if not at is Vector2i or not (anchors[arrivals[spawn]] as Rect2i).has_point(at):
+			wrong.append("template: %s at %s, not in %s" % [spawn, at, arrivals[spawn]])
+	for generation in range(1, 4):
+		var made := Regen.generate("barrow", generation)
+		var level := Level.parse(made["layout"], made["height"], made["config"])
+		var map := LevelMap.from_image(made["layout"], made["config"])
+		for spawn: String in arrivals:
+			var at: Variant = level["spawn_points"].get(spawn)
+			if not at is Vector2i or not map.walkable(at):
+				wrong.append("g%d: %s at %s" % [generation, spawn, at])
+	_check(wrong.is_empty() and template["warnings"].is_empty(), "the barrow's three arrivals in their anchors and on floor in the template and generations 1-3 (%s %s)" % [wrong, template["warnings"]])
+
+
+## 832 (the crypt's ways in): the deep laid by the crypt generator, its
+## "deep" block (the switch-on's keys, DEEP_SWITCH, until barrow_deep
+## carries them): generations 1-6 each with an ossuary and tomb chambers
+## only, the wing old_graves of two rooms or more (or none), the
+## block's guard packs whole (one shared "pack" each, three of three), the
+## draugr in the lair, both links kept, no torches out of the anchors, and
+## no fault of any layout rule, where the old caverns have a dozen.
+const DEEP_SWITCH := {"generator": "crypt", "heart": "lair", "deep": {"wing": "old_graves"}, "cache": "deep_cache", "chests": 3}
+func _test_deep_crypt() -> void:
+	print("
+== the deep laid as a crypt (832) ==")
+	var template := Level.template("barrow_deep")
+	var config: Dictionary = (template["config"] as Dictionary).duplicate(true)
+	if not config["regenerate"].has("deep"):
+		config["regenerate"].merge(DEEP_SWITCH, true)
+	Level.register("deep_crypt_test", template["layout"], template.get("height"), config)
+	var block: Dictionary = config["regenerate"]
+	for generation in range(1, 7):
+		var made := Regen.generate("deep_crypt_test", generation)
+		if made.is_empty():
+			_check(false, "deep crypt generation %d made" % generation)
+			continue
+		var laid_config: Dictionary = made["config"]
+		var level := Level.parse(made["layout"], made["height"], laid_config)
+		var uses := {}
+		var wing: Array = []
+		for laid: Dictionary in laid_config.get("laid_rooms", []):
+			uses[laid["use"]] = int(uses.get(laid["use"], 0)) + 1
+			if laid.has("wing"):
+				wing.append(laid)
+		var packs := {}
+		var kinds := {}
+		for spec: Dictionary in level["entities"]:
+			kinds[str(spec.get("kind", ""))] = int(kinds.get(str(spec.get("kind", "")), 0)) + 1
+			var id := str((spec.get("props", {}) as Dictionary).get("pack", ""))
+			if not id.is_empty():
+				packs[id] = int(packs.get(id, 0)) + 1
+		var rooms_ok: bool = int(uses.get("ossuary", 0)) == 1 and int(uses.get("tomb_chamber", 0)) >= 4 			and uses.keys().all(func(use: String) -> bool: return use in ["ossuary", "tomb_chamber", "entrance", "lair"])
+		var wing_ok: bool = wing.is_empty() or (wing.size() >= 2 and wing.all(func(laid: Dictionary) -> bool: return laid["wing"] == "old_graves"))
+		var packs_ok: bool = packs.size() == 3 and packs.values().all(func(n: int) -> bool: return n == 3)
+		var links: Array = level["links"].map(func(link: Dictionary) -> Vector2i: return link["tile"])
+		var torches := 0
+		var map := LevelMap.from_image(made["layout"], laid_config)
+		for cell: Vector2i in map.cells:
+			if map.cells[cell] == "torch" and not Level.in_anchors(block["anchors"], cell):
+				torches += 1
+		var faults: Array = LAYOUT_SENSE.check(level, laid_config.get("laid_rooms", []), Regen.layout_options(block))
+		_check(rooms_ok and wing_ok and packs_ok and int(kinds.get("draugr", 0)) == 1 and Vector2i(49, 1) in links and Vector2i(49, 77) in links
+				and torches == 0 and faults.is_empty() and level["warnings"].is_empty(),
+				"deep crypt generation %d: uses %s, the wing %d rooms, packs %s, the draugr, both links, %d torches, faults %s %s"
+				% [generation, uses, wing.size(), packs.values(), torches, LAYOUT_SENSE.counts(faults), level["warnings"]])
 
 
 ## 714, dungeon's side (4): the barrow's robbers are enemy-ai's named band
