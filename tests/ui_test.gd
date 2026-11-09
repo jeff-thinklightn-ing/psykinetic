@@ -2609,13 +2609,12 @@ func _test_gains() -> void:
 		and Main.mid_line("Umbrage") == "Umbrage" and Main.mid_line("Theodric's hall") == "Theodric's hall",
 		"a place mid-sentence: a small \"the\", the rest as it is (voice's)")
 	# Playtest's reward tour, an ore hand-in at Umbrage's store: the things by their own count,
-	# the gold owed a plain line (no "+", no coin).
+	# the gold paid in full "+40 gold" (826: no town owes a player).
 	gains.add({"track": "item", "amount": 10, "of": "Umbrage", "counted": "10 ore", "words": "The depot takes 10 ore"})
-	gains.add({"track": "gold", "amount": 40, "of": "Umbrage", "owed": true, "words": "Umbrage owes you 40 gold"})
+	gains.add({"track": "gold", "amount": 40, "of": "Umbrage"})
 	var texts: Array = gains.floats.map(func(live: Dictionary) -> String: return gains.float_text(live))
-	_check(texts == ["+10 ore", "Umbrage owes you 40 gold"] and gains.lines.map(func(l: Dictionary) -> String: return l["text"]) == texts
-		and not gains.cues.any(func(c: Array) -> bool: return c[0] == "ui.reward_coin") and gains.floats[1]["color"] == Gains.OWED_COLOR,
-		"a hand-in: \"+10 ore\", not the town; gold owed: a plain dim line, no coin (%s, %s)" % [texts, gains.cues])
+	_check(texts == ["+10 ore", "+40 gold"],
+		"a hand-in: \"+10 ore\", not the town; gold paid in full, \"+40 gold\" (826) (%s)" % [texts])
 	clear.call()
 	gains._need_frame = -1
 	gains._other_frame = -1
@@ -3065,15 +3064,15 @@ func _test_person_give() -> void:
 	print("
 == Give (802): the person's takes lit, voice's lines, the button gives ==")
 	var rows := [
-		{"uid": 901, "what": "ore_sack", "count": 2, "slot": 0, "raw": "ore", "for": {"kind": "build", "name": "the new forge"}, "have": 12, "need": 20, "gold": 3, "owed": 0},
-		{"uid": 902, "what": "bread", "count": 1, "slot": 1, "raw": "food", "for": {"kind": "stores", "name": "the larder"}, "have": 14, "need": 22, "gold": 0, "owed": 2},
-		{"uid": 903, "what": "sword", "count": 1, "slot": 2, "for": {}, "have": 0, "need": 0, "gold": 0, "owed": 0}]
-	_check(BarterPanel.give_lines(rows) == ["For the new forge: 12 of 20 ore", "For the larder: 14 of 22 food", "A gift", "Pays 3 gold", "Owes you 2 gold"],
-		"voice's lines: toward a build, the larder, a gift, paid and owed (%s)" % [BarterPanel.give_lines(rows)])
-	var trophies := [{"what": "bear_pelt", "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 1, "owed": 19},
-		{"what": "wolf_pelt", "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 2, "owed": 0},
-		{"what": "bear_claw", "raw": "", "for": {"kind": "maker", "name": "trimming leather"}, "have": 0, "need": 0, "gold": 1, "owed": 0}]
-	_check(BarterPanel.give_lines(trophies) == ["For tanning", "For trimming leather", "Pays 4 gold", "Owes you 19 gold"],
+		{"uid": 901, "what": "ore_sack", "count": 2, "slot": 0, "raw": "ore", "for": {"kind": "build", "name": "the new forge"}, "have": 12, "need": 20, "gold": 3},
+		{"uid": 902, "what": "bread", "count": 1, "slot": 1, "raw": "food", "for": {"kind": "stores", "name": "the larder"}, "have": 14, "need": 22, "gold": 0},
+		{"uid": 903, "what": "sword", "count": 1, "slot": 2, "for": {}, "have": 0, "need": 0, "gold": 0}]
+	_check(BarterPanel.give_lines(rows) == ["For the new forge: 12 of 20 ore", "For the larder: 14 of 22 food", "A gift", "Pays 3 gold"],
+		"voice's lines: toward a build, the larder, a gift, paid (%s)" % [BarterPanel.give_lines(rows)])
+	var trophies := [{"what": "bear_pelt", "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 20},
+		{"what": "wolf_pelt", "raw": "", "for": {"kind": "maker", "name": "tanning"}, "have": 0, "need": 0, "gold": 2},
+		{"what": "bear_claw", "raw": "", "for": {"kind": "maker", "name": "trimming leather"}, "have": 0, "need": 0, "gold": 1}]
+	_check(BarterPanel.give_lines(trophies) == ["For tanning", "For trimming leather", "Pays 23 gold"],
 		"821: trophies to their maker: \"For tanning\", no count; the same merged (%s)" % [BarterPanel.give_lines(trophies)])
 	_check(BarterPanel.give_lines([rows[2]]) == ["A gift"] and BarterPanel.raw_word({"what": "wood_bundle"}) == "wood",
 		"a gift alone says so and nothing of gold; a row with no raw word reads its sack's")
@@ -3105,10 +3104,10 @@ func _test_person_give() -> void:
 	_check(BarterPanel.give_word([{"uid": 1, "gold": 0, "for": {"kind": "build", "name": "the new forge"}}, {"uid": 2, "gold": 0, "for": {}}]) == "Donate"
 		and BarterPanel.give_word([{"uid": 1, "gold": 0}, {"uid": 2, "gold": 4}]) == "Sell" and BarterPanel.give_word([]) == "Donate",
 		"Jeff's Trade or Donate (voice's Sell): Sell where any row pays, Donate where none does")
-	var owed_row := {"uid": 3, "gold": 0, "owed": 5, "for": {"kind": "maker", "name": "tanning"}}
-	var owed_lines := BarterPanel.give_lines([owed_row])
-	_check(BarterPanel.give_word([owed_row]) == "Sell" and "Owes you 5 gold" in owed_lines and not "Pays 0 gold" in owed_lines,
-		"a trophy's whole price owed (the treasury at its floor): still Sell, its line what is owed (%s)" % [owed_lines])
+	var paid_row := {"uid": 3, "gold": 20, "for": {"kind": "maker", "name": "tanning"}}
+	var paid_lines := BarterPanel.give_lines([paid_row])
+	_check(BarterPanel.give_word([paid_row]) == "Sell" and paid_lines == ["For tanning", "Pays 20 gold"] and not str(paid_lines).contains("Owes"),
+		"826: a trophy paid in full, however low the town's purse: Sell, its whole price paid, never owed (%s)" % [paid_lines])
 	window._select_mine(true, 3)
 	_check(window.gift.size() == 1, "a square they don't take: nothing picked")
 	var lines: Array[String] = []

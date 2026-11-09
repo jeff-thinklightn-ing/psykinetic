@@ -47,7 +47,7 @@ extends Control
 ## else Donate: give_word, 802 amended (8)); on, the pack's
 ## squares they take are lit (a coin where they pay now), the rest dim, a
 ## click picks a row, the lines under say what it does (voice's: "For the
-## new forge: 12 of 20 ore", "Pays 3 gold", "Owes you 3 gold", "A gift")
+## new forge: 12 of 20 ore", "Pays 3 gold", "A gift")
 ## and the button gives ("Sell (2 items)", "Donate (2 items)": Main sends "give" {entity,
 ## uids}). Opened while carrying something they take, the window opens on
 ## Give. Nothing they take: no toggle.
@@ -158,7 +158,7 @@ var near := true
 ## 802: the person asleep (Resident's activity), shown under the name.
 var asleep := false
 ## 802 Give: what the person takes from the pack (economy's rows: uid, what,
-## count, slot, raw, for {kind, name}, have, need, gold, owed), whether the
+## count, slot, raw, for {kind, name}, have, need, gold), whether the
 ## window gives, and the rows picked (uid -> true).
 var takes: Array = []
 var giving := false
@@ -646,12 +646,12 @@ func takes_at(slot: int) -> Dictionary:
 ## needs to say Trade or Donate"): "Sell" where one of [param rows] pays
 ## gold for what is handed over (Rolf's stall, the tanner's trophies),
 ## "Donate" where none does (ore toward a build, the larder, a gift). The tab
-## takes it from all the person's rows; the button from those picked. A row
-## whose price is owed (the treasury at its floor: gold 0, "owed" over 0) is
-## still a sale, paid later ("Owes you N gold", give_lines).
+## takes it from all the person's rows; the button from those picked. Every
+## sale is paid in full at once (826: no town owes a player), so a row's gold
+## says it all (802 amended (9)'s owed row superseded).
 static func give_word(rows: Array) -> String:
 	for row: Variant in rows:
-		if row is Dictionary and (int((row as Dictionary).get("gold", 0)) > 0 or int((row as Dictionary).get("owed", 0)) > 0):
+		if row is Dictionary and int((row as Dictionary).get("gold", 0)) > 0:
 			return SELL_WORDS
 	return DONATE_WORDS
 
@@ -681,18 +681,16 @@ func toggle_gift(uid: int) -> void:
 ## toward, "For the new forge: 12 of 20 ore" (the row there furthest on,
 ## have and need as after the give), or "For tanning" alone where it needs
 ## no count (821: a trophy the tanner or Rolf buys, need 0); "A gift" for gear; then "Pays 3 gold"
-## and "Owes you 3 gold" (nothing for neither). No full stops.
+## (nothing for none; 826: never owed). No full stops.
 static func give_lines(rows: Array) -> Array[String]:
 	var toward := {}
 	var order: Array[String] = []
 	var gifts := false
 	var gold := 0
-	var owed := 0
 	for row: Variant in rows:
 		if not row is Dictionary:
 			continue
 		gold += int(row.get("gold", 0))
-		owed += int(row.get("owed", 0))
 		var target: Variant = row.get("for")
 		var name := str(target.get("name", "")) if target is Dictionary else ""
 		if name.is_empty():
@@ -713,8 +711,6 @@ static func give_lines(rows: Array) -> Array[String]:
 		out.append(GIFT_WORDS)
 	if gold > 0:
 		out.append("Pays %d gold" % gold)
-	if owed > 0:
-		out.append("Owes you %d gold" % owed)
 	return out
 
 
