@@ -11035,6 +11035,13 @@ while each frame is 1/30 s of the game, so a clip timed by the wall ended about 
 on film (the boar king's hook drawn 2 ticks of its 9). Client3D's own timings stay on the wall
 clock. view_test _test_reel_clock. Client only, play unchanged, protocol unchanged, no new
 class_name, no bullet.
+
+A second step (the coordinator: reels judge these timings): Client3D times a blow's drawn landing
+on the rigs' clock too, AnimRig.now_msec: a strike's contact_msec, _swings, _struck_with and those
+that wait on them (the hit's flinch and sound, the block's knock, a shield's sparks, a bash's
+contact and a guarded stun's recoil). Its other timings (busy_until, a wound, sparks' fade) stay on
+the wall clock. view_test _test_reel_clock checks a swing's landing on a reel's clock. Client only,
+play unchanged, protocol unchanged, no new class_name, no bullet.
 ## 391. A companion inside buildings and in doorways
 
 Jeff's play (2026-10-17, through the coordinator): in Pip's house her voice

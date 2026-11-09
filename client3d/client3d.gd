@@ -19579,7 +19579,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 		# ("blows you can see" (a)), as its thud does: not as the news comes, before it.
 		var flinch := 0.0
 		if cause == &"attack" and instance_from_id(id) is GridEntity:
-			flinch = (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - Time.get_ticks_msec()) / 1000.0
+			flinch = (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - AnimRig.now_msec()) / 1000.0
 		if flinch > 0.0:
 			get_tree().create_timer(flinch).timeout.connect(_flinch.bind(puppet))
 		else:
@@ -19593,7 +19593,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	if puppet != null and cause == &"attack" and instance_from_id(id) is Seam:
 		# A blow on an ore seam (769 amended (4)): the pick on rock, when the
 		# swing lands; no cry and no fight's music.
-		var landed := (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - Time.get_ticks_msec()) / 1000.0
+		var landed := (int(_struck_with(instance_from_id(id) as GridEntity)[1]) - AnimRig.now_msec()) / 1000.0
 		var seam := instance_from_id(id) as Seam
 		if landed > 0.0:
 			_play_later("sfx.pick_strike", puppet.position + Vector3.UP * 0.8, landed)
@@ -19607,7 +19607,7 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 	if puppet != null and cause == &"attack":
 		var struck := instance_from_id(id) as GridEntity
 		var blow := _struck_with(struck)
-		var wait := (int(blow[1]) - Time.get_ticks_msec()) / 1000.0
+		var wait := (int(blow[1]) - AnimRig.now_msec()) / 1000.0
 		if wait > 0.0:
 			_play_later(str(blow[0]), puppet.position + Vector3.UP * 0.8, wait)
 			get_tree().create_timer(wait).timeout.connect(func() -> void:
@@ -19938,8 +19938,8 @@ func _mourn_local() -> void:
 ## contact), now if that has passed or there was no swing.
 func _struck_with(struck: GridEntity) -> Array:
 	if struck == null:
-		return ["sfx.hit_flesh", Time.get_ticks_msec()]
-	var now := Time.get_ticks_msec()
+		return ["sfx.hit_flesh", AnimRig.now_msec()]
+	var now := AnimRig.now_msec()
 	var armour := SoundKit.armour_look(struck)
 	var best := -1
 	var best_cells := BLOW_REACH + 1
@@ -23132,7 +23132,8 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0, 
 	var slowest := contact / ArtKit.feel("anim_rig.strike_speed_min", AnimRig.STRIKE_SPEED_MIN)
 	hold = maxf(hold, lands_in - slowest)
 	var now := Time.get_ticks_msec()
-	puppet.set_meta("contact_msec", now + int((hold + AnimRig.lead_of(contact, lands_in - hold)) * 1000.0))
+	# On the rigs' clock (AnimRig.now_msec, 390 amended): a reel's frames, else the wall.
+	puppet.set_meta("contact_msec", AnimRig.now_msec() + int((hold + AnimRig.lead_of(contact, lands_in - hold)) * 1000.0))
 	var token := int(puppet.get_meta("strike_token", 0)) + 1
 	puppet.set_meta("strike_token", token)
 	if hold > STRIKE_HOLD_LEAST:
@@ -23394,13 +23395,13 @@ func _on_swung(direction: Vector2i, id: int) -> void:
 		swinger.settle_for_blow()  # Still drawn coming: it slows into the cell it strikes from.
 	var heft := clampf(inverse_lerp(20.0, 100.0, swinger.mass if swinger != null else 50.0), 0.0, 1.0)
 	var weapon := World.wielded(swinger) if swinger != null else ""
-	var now := Time.get_ticks_msec()
+	var now := AnimRig.now_msec()  # _swings on the rigs' clock (390 amended): a reel's frames, else the wall.
 	_swings[id] = [now, weapon, now]
 	sfx.play(SoundKit.swing(weapon), puppet.position + Vector3.UP * 0.8, lerpf(SWING_PITCH_LIGHT, SWING_PITCH_HEAVY, heft))
 	var effort := SoundKit.voice(swinger, "effort_swing", _person_body(puppet))
 	if effort != "" and randi() % EFFORT_EVERY == 0:
 		sfx.play(effort, puppet.position + Vector3.UP * 1.5)
-	if now > int(puppet.get_meta("wound_until", 0)):
+	if Time.get_ticks_msec() > int(puppet.get_meta("wound_until", 0)):
 		_strike(puppet, swinger, weapon)
 		# Its blow heard as the drawn blade lands (_struck_with), not as it sets off.
 		var rig := puppet.get_meta("rig") as AnimRig if puppet.has_meta("rig") else null
@@ -23443,13 +23444,13 @@ func _on_guarded(broken: bool, id: int) -> void:
 	# guard (_struck_with, the sparks' moment), decided at the frame's end so
 	# a recoil off this shield (the attacker's stunned, right after, 340
 	# amended, sound's side) can take it SoundKit.RECOIL_DUCK_DB down.
-	var lands := int(_struck_with(holder)[1]) if holder != null else Time.get_ticks_msec()
+	var lands := int(_struck_with(holder)[1]) if holder != null else AnimRig.now_msec()
 	_play_block.call_deferred(SoundKit.block(guard), puppet, lands, 4.0 if broken else 0.0)
 	if broken:
 		_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	elif holder != null and guard != "" and Items.has_tag(guard, "shield"):
 		# Sparks off the shield as the drawn blow meets it (340 amended, animation's side).
-		var wait := (int(_struck_with(holder)[1]) - Time.get_ticks_msec()) / 1000.0
+		var wait := (int(_struck_with(holder)[1]) - AnimRig.now_msec()) / 1000.0
 		if wait > 0.0:
 			get_tree().create_timer(wait).timeout.connect(func() -> void:
 				if is_instance_valid(puppet) and puppet.is_inside_tree() and is_instance_valid(holder):
@@ -23467,7 +23468,7 @@ var _recoil_frame := -1
 ## by SoundKit.RECOIL_DUCK_DB in a frame a recoil was heard (340 amended).
 func _play_block(slot: String, puppet: Node3D, lands: int, gain_db: float) -> void:
 	var gain := gain_db - (SoundKit.RECOIL_DUCK_DB if _recoil_frame == Engine.get_process_frames() else 0.0)
-	var wait := (lands - Time.get_ticks_msec()) / 1000.0
+	var wait := (lands - AnimRig.now_msec()) / 1000.0
 	if wait <= 0.0:
 		if is_instance_valid(puppet):
 			sfx.play(slot, puppet.position + Vector3.UP * 0.9, 1.0, gain)
@@ -23524,7 +23525,7 @@ func _on_bashed(direction: Vector2i, by: NodePath, id: int) -> void:
 		from = Vector2(basher.tile - target.tile)
 		var swung: Array = _swings.get(basher.get_instance_id(), [])
 		if not swung.is_empty():
-			lands = maxf((int(swung[2]) - Time.get_ticks_msec()) / 1000.0, 0.0)
+			lands = maxf((int(swung[2]) - AnimRig.now_msec()) / 1000.0, 0.0)
 		var swinger: Node3D = _puppets.get(basher.get_instance_id())
 		if swinger != null and swinger.has_meta("rig") and (swinger.get_meta("rig") as AnimRig).has(CLIP_SHIELD_BASH):
 			var rig := swinger.get_meta("rig") as AnimRig
@@ -23575,7 +23576,7 @@ func _on_stunned(ticks: int, cause: StringName, id: int) -> void:
 	_combat_at[id] = Time.get_ticks_msec()
 	_recoil_frame = Engine.get_process_frames()  # The holder's knock ducks under the boom (sound's side).
 	var swung: Array = _swings.get(id, [])
-	var wait := (int(swung[2]) - Time.get_ticks_msec()) / 1000.0 if not swung.is_empty() else 0.0
+	var wait := (int(swung[2]) - AnimRig.now_msec()) / 1000.0 if not swung.is_empty() else 0.0
 	if wait > 0.0:
 		get_tree().create_timer(wait).timeout.connect(func() -> void:
 			if is_instance_valid(puppet) and puppet.is_inside_tree():

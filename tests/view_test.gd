@@ -161,6 +161,7 @@ func _ready() -> void:
 		await _test_two_hands()  # It lets frames run (the pose the modifiers leave): after the tests that read a pose unrun.
 		await _test_blows_seen()  # It lets frames run too.
 		await _test_shield_seen()
+		await _test_reel_clock()
 		await _test_rest()
 		_test_wet()
 		_test_sword_whiff()
@@ -189,7 +190,6 @@ func _ready() -> void:
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
-		await _test_reel_clock()
 		await _test_creature_down()
 		await _test_creature_tells()
 		_test_piles()
@@ -11548,6 +11548,25 @@ func _test_reel_clock() -> void:
 	var step := AnimRig.now_msec() - from
 	var delta := roundi(get_tree().root.get_process_delta_time() * 1000.0)
 	_check(absi(step - delta) <= 1, "and on by the frame's own delta (%d ms, delta %d)" % [step, delta])
+	# A swing's drawn landing on it too (Client3D._swings, contact_msec): the reel's own moment.
+	OS.delay_msec(250)  # The wall now runs ahead of the frames, as in a reel.
+	var player := _player()
+	var id := player.get_instance_id()
+	var puppet: Node3D = _rig._puppets.get(id)
+	puppet.set_meta("wound_until", 0)
+	player._world_swung(Vector2i(1, 0))
+	var swing: Array = _rig._swings.get(id, [])
+	var at := AnimRig.now_msec()
+	_check(not swing.is_empty() and int(swing[0]) == at and int(swing[2]) >= at and int(swing[2]) - at < 1000
+			and int(swing[2]) == int(puppet.get_meta("contact_msec", -1)) and Time.get_ticks_msec() - at >= 200,
+			"a swing's landing timed on the reel's frames, its contact with it (%s at %d, wall %d ahead)"
+			% [swing, at, Time.get_ticks_msec() - at])
+	# Calm again for the tests after (a swing is combat; its strike done).
+	_rig._swings.erase(id)
+	_rig._combat_at.erase(id)
+	if puppet.has_meta("rig"):
+		(puppet.get_meta("rig") as AnimRig).cancel_strike()
+	puppet.set_meta("busy_until", 0)
 	AnimRig._clock_movie = -1
 	AnimRig._clock_frame = -1
 
