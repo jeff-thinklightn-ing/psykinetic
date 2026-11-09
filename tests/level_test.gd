@@ -234,6 +234,7 @@ func _test_every_level() -> void:
 	_test_safe_paths()
 	_test_fill_hills()
 	_test_wilds_on_foot()
+	_test_farm_and_barrow()
 	_test_hearth()
 	_test_fill_hills_sights()
 	_test_relaid()
@@ -389,7 +390,7 @@ func _test_link_cues() -> void:
 	_check(gate.get("cue") == "waystones" and gate.get("facing") == Vector2i(0, 1), "the castle's way out at its edge: waystones (%s)" % [gate])
 	_check(cue_of.call("barrow_deep", Vector2i(49, 1)).get("cue") == "up" and cue_of.call("barrow_deep", Vector2i(49, 77)).get("cue") == "sealed",
 			"the barrow's depths: the Ossuary's stair up to the shallower, the sealed shortcut behind the throne its slab (666)")
-	_check(cue_of.call("wilds", Vector2i(170, 180)).get("cue") == "none" and cue_of.call("wilds", Vector2i(199, 199)).get("cue") == "sealed",
+	_check(cue_of.call("wilds", Vector2i(160, 160)).get("cue") == "none" and cue_of.call("wilds", Vector2i(199, 199)).get("cue") == "sealed",
 			"the mound's door is its own cue; the sealed shortcut (in the temple since 715, its back corner since 734 amended (2), the chapel at the centre since 774) its slab")
 	var wilds := Level.load_level("wilds")
 	_check(wilds["links"].all(func(link: Dictionary) -> bool: return str(link.get("cue", "")) in Level.CUES),
@@ -793,7 +794,7 @@ func _test_held() -> void:
 		if str(building.get("town", "")) != "":
 			town_cells.append(building["cell"])
 	_check(town_cells.all(func(cell: Vector2i) -> bool: return Level.room_at(wilds, cell) == "umbrage") and wilds["rooms"]["umbrage"]["name"] == "Umbrage"
-			and Level.room_at(wilds, Vector2i(70, 202)) == "" and Level.room_at(wilds, Vector2i(170, 180)) == "" and Level.room_at(wilds, Vector2i(165, 180)) == "",
+			and Level.room_at(wilds, Vector2i(70, 202)) == "" and Level.room_at(wilds, Vector2i(160, 160)) == "" and Level.room_at(wilds, Vector2i(155, 160)) == "",
 		"the wilds' town ground is named Umbrage while the town stands there (665's rooms; the store, the woodlot, the town's buildings), the standing stones and the barrow's mound and link not (774 amended) (%s: %s)"
 			% [town_cells, town_cells.map(func(cell: Vector2i) -> String: return Level.room_at(wilds, cell))])
 	var back: Array = wilds["links"].filter(func(link: Dictionary) -> bool: return link["to_map"] == "held")
@@ -1163,6 +1164,67 @@ func _test_wilds_on_foot() -> void:
 	_check(World.is_walkable(start) and cut_off.is_empty() and fords.size() > 700,
 		"from the centre %s, every place reached on foot (%d cells walked; not: %s), the stream waded (%d ford cells)" % [start, reached.size(), cut_off, fords.size()])
 	_main.load_map("test_room")
+
+
+## Wilds basics: farm and barrow (827): the barrow's mound out past the town
+## (its middle 25 cells or more from every other building's), its door on the
+## link, from_barrow before it, the barrow post by its track; the old
+## farmstead a farm gone to ruin (a ruined cottage over its floorboard cache,
+## a rubble heap, two fields striped in furrows of dirt and weeds) and the
+## ruined barn a ruined barn; no lantern left at the farmstead.
+func _test_farm_and_barrow() -> void:
+	print("
+== wilds basics: farm and barrow (827) ==")
+	var wilds := Level.load_level("wilds")
+	var mound: Dictionary = {}
+	var nearest := INF
+	var ruins := {}
+	for building: Dictionary in wilds["buildings"]:
+		if building.get("slot") == "building.mound":
+			mound = building
+	var middle := Vector2(mound["rect"].get_center()) if not mound.is_empty() else Vector2(-1000, -1000)
+	for building: Dictionary in wilds["buildings"]:
+		if building == mound or not building.get("rect") is Rect2i:
+			continue
+		nearest = minf(nearest, middle.distance_to(Vector2((building["rect"] as Rect2i).get_center())))
+		if building.get("ruined", false):
+			ruins[str(building.get("kind", ""))] = building["rect"]
+	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow")
+	_check(not mound.is_empty() and nearest >= 25.0 and mound["door"] == Vector2i(160, 160) and link.size() == 1 and link[0]["tile"] == Vector2i(160, 160)
+		and wilds["spawn_points"].get("from_barrow") == Vector2i(160, 159)
+		and Vector2(wilds["places"]["post_barrow"]["cell"]).distance_to(Vector2(160, 160)) <= 16.0,
+		"the barrow out past the town: its mound %.0f cells from the nearest building, its door on the link (160, 160), the post by its track" % nearest)
+	var cottage: Variant = ruins.get("cottage")
+	var barn: Variant = ruins.get("barn")
+	var stripes := {"furrows": 0, "weeds": 0, "wrong": 0}
+	var kinds: Dictionary = wilds["terrain"]["kinds"]
+	var weeds := {}
+	for cell: Vector2i in wilds["terrain"]["tall_grass"]:
+		weeds[cell] = true
+	# Two plots west of the road beside the cottage (the coordinator), rows of
+	# dirt furrows and green weeds (grass), no tall grass (it reads as grain).
+	for plot: Rect2i in [Rect2i(112, 143, 8, 5), Rect2i(106, 154, 8, 5)]:
+		for y in range(plot.position.y, plot.end.y):
+			for x in range(plot.position.x, plot.end.x):
+				var want := "dirt" if (y - plot.position.y) % 2 == 0 else "grass"
+				if str(kinds.get(Vector2i(x, y), "")) == want and not weeds.has(Vector2i(x, y)):
+					stripes["furrows" if want == "dirt" else "weeds"] += 1
+				else:
+					stripes["wrong"] += 1
+	var lanterns: Array = wilds["terrain"].get("lanterns", []).filter(func(at: Vector2i) -> bool: return Vector2(at - Vector2i(118, 150)).length() <= 14.0)
+	_check(cottage is Rect2i and (cottage as Rect2i).has_point(Vector2i(119, 139)) and barn is Rect2i and (barn as Rect2i).has_point(Vector2i(75, 143))
+		and lanterns.is_empty(),
+		"the old farmstead's cottage in ruin over its cache, the barn in ruin, no lantern left (%s, %s, %s)" % [cottage, barn, lanterns])
+	var cottage_entry: Dictionary = {}
+	for building: Dictionary in wilds["buildings"]:
+		if building.get("kind") == "cottage" and building.get("ruined", false):
+			cottage_entry = building
+	_check(not cottage_entry.is_empty() and (cottage_entry["doors"] as Array).is_empty() and (cottage_entry["open"] as Array).size() == 3
+		and Terrain.edge_key(Vector2i(120, 142), Vector2i(0, 1)) in cottage_entry["open"],
+		"the ruin's gaps its entry's own (no doorway; the door's gap and a fallen corner open), not its kind's (%s)" % [cottage_entry.get("open")])
+	_check(stripes["furrows"] == 48 and stripes["weeds"] == 32 and stripes["wrong"] == 0 and str(kinds.get(Vector2i(127, 147), "")) == "dirt"
+		and not Vector2i(127, 147) in wilds["terrain"]["water"],
+		"two fallow fields beside the cottage, furrows of dirt and weeds between, and the well dry (%s)" % [stripes])
 
 
 ## A hearth (825, "hill cave rest"): a place's "fire_ring" a cell within
@@ -1790,8 +1852,8 @@ func _test_solid() -> void:
 	var wilds := Level.load_level("wilds")
 	var mounds: Array = wilds["buildings"].filter(func(b: Dictionary) -> bool: return b["slot"] == "building.mound")
 	var link: Array = wilds["links"].filter(func(l: Dictionary) -> bool: return l["to_map"] == "barrow" and l["to_spawn"] == "from_wilds")
-	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(170, 179)
-		and not Vector2i(170, 179) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
+	_check(mounds.size() == 1 and not link.is_empty() and mounds[0]["door"] == link[0]["tile"] and wilds["spawn_points"].get("from_barrow") == Vector2i(160, 159)
+		and not Vector2i(160, 159) in wilds["terrain"]["solid"], "the wilds' mound stands, its door on the barrow's link, from_barrow outside (%s)" % [wilds["warnings"]])
 	# Jeff: "add some of the melee weapons to the town chest for testing": two chests beside it (by Snagfin's stall since 774).
 	var held := []
 	for spec: Dictionary in wilds["entities"]:

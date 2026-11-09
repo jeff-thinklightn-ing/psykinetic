@@ -6,7 +6,7 @@ extends RefCounted
 ## seams, the forest floor) goes to stills, not here.
 
 ## The wilds' link to the barrow, and the barrow's links (its level.json).
-const WILDS_BARROW_LINK := Vector2i(170, 180)
+const WILDS_BARROW_LINK := Vector2i(160, 160)
 const BARROW_TO_WILDS := Vector2i(40, 1)
 const BARROW_TO_DEEP := Vector2i(52, 16)
 ## How far from the mound a way out of the barrow may set me down.
