@@ -5,7 +5,7 @@ extends RefCounted
 ## walk to the barrow, the arrival, the knight and his quest window.
 
 ## The wilds' link to the barrow and where the barrow's arrival is.
-const BARROW_LINK := Vector2i(160, 160)
+const BARROW_LINK := Vector2i(170, 180)
 const BARROW_ARRIVAL := Vector2i(40, 2)
 ## The fallen knight's post, below the Altar Room's altar (747).
 const KNIGHT_AT := Vector2i(38, 32)

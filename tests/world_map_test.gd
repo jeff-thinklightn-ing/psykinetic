@@ -251,10 +251,10 @@ func _test_plane_layout() -> void:
 			if door["zone"] == zone and door["cell"] == cell and door["via"] == via:
 				return door
 		return {}
-	var mound: Dictionary = door_at.call("barrow", "wilds", Vector2i(160, 160), [])
-	_check(not mound.is_empty() and mound["at"] == Vector2i(160, 160) and not mound["hidden"],
-		"the barrow's door: the wilds' mound at (160, 160), on the plane there, in sight (%s)" % [doors.get("barrow")])
-	var below: Dictionary = door_at.call("barrow_deep", "wilds", Vector2i(160, 160), ["barrow"])
+	var mound: Dictionary = door_at.call("barrow", "wilds", Vector2i(170, 180), [])
+	_check(not mound.is_empty() and mound["at"] == Vector2i(170, 180) and not mound["hidden"],
+		"the barrow's door: the wilds' mound at (170, 180), on the plane there, in sight (%s)" % [doors.get("barrow")])
+	var below: Dictionary = door_at.call("barrow_deep", "wilds", Vector2i(170, 180), ["barrow"])
 	var stair: Dictionary = {}
 	for door: Dictionary in doors.get("barrow_deep", []):
 		if door["zone"] == "wilds" and (door["via"] as Array).is_empty():

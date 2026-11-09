@@ -2442,8 +2442,6 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# The hills' stories and roadside sights (778): lying on the ground, faced.
 	"campfire_cold": {"sits": "flat", "variants": 1, "faced": true},
 	"broken_cart": {"sits": "flat", "variants": 1, "faced": true},
-	"scarecrow_fallen": {"sits": "flat", "variants": 1, "faced": true},  # 827: a farm gone to ruin (art-kit's prop.scarecrow_fallen).
-	"hay_rotten": {"sits": "flat", "variants": 2, "faced": true},  # 827: art-kit's prop.hay_rotten, in the yard and the barn.
 	"rusted_gear": {"sits": "flat", "variants": 1, "faced": true},
 	# The forest's camps (793, maps' side): a trader's bedroll and cart, sacks of goods or plunder (the sack below, shared).
 	"bedroll": {"sits": "flat", "variants": 1, "faced": true},
@@ -3883,9 +3881,6 @@ static func kind_open(entry: Dictionary) -> Array[Vector3i]:
 	return _kind_edges(entry, "open")
 
 
-## An entry's own "doors" or "open" ([x, y, side] in its kind's frame, as a
-## size's) stand instead of its size's when it gives them (827: a ruin's
-## gaps where its door and a corner fell, no doorway frame).
 static func _kind_edges(entry: Dictionary, list: String) -> Array[Vector3i]:
 	var out: Array[Vector3i] = []
 	var rect: Variant = building_rect(entry)
@@ -3894,8 +3889,7 @@ static func _kind_edges(entry: Dictionary, list: String) -> Array[Vector3i]:
 		return out
 	var size := _frame(spec)
 	var facing := building_facing(entry)
-	var given: Variant = entry.get(list)
-	for door: Array in (given if given is Array else spec.get(list, [])):
+	for door: Array in spec.get(list, []):
 		var cell: Vector2i = rect.position + _turned(Vector2i(int(door[0]), int(door[1])), size, facing)
 		out.append(Terrain.edge_key(cell, _turned_side(DOOR_SIDES[str(door[2])], facing)))
 	return out
