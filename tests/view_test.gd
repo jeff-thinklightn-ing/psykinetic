@@ -2853,6 +2853,64 @@ func _test_tavern_inside() -> void:
 			"the nearest lights picked, the house the aim stands in first (%d lights)" % entries.size())
 	var shares := not inn_entry.is_empty() and _rig._window_code.values().any(func(row: Array) -> bool: return is_same(row, inn_entry[1]))
 	_check(shares, "the inn's light reads its own windows' row, lit and put out as they are")
+	# Each lived-in house's doorway (489 amended (4)): art-kit's doorstep at
+	# each front door's foot, its set's variant, and its door lantern beside
+	# them, kept on its light's row, its light off the flame as 782
+	# amended's, a house's numbers; its flame shown while the house is lit,
+	# its light only while picked too.
+	var socket: Vector3 = Flames.socket_of(Client3D.DOOR_LAMP_SLOT)
+	var doorway_bad: Array = []
+	var lamped := 0
+	for building: Dictionary in slotted:
+		var corner: Vector2i = (building["rect"] as Rect2i).position
+		var entry: Array = _rig._house_lights.get(corner, [])
+		var own_cells := {}
+		for cell in Level.building_cells(building):
+			own_cells[cell] = true
+		var doors := Client3D.front_doors(building, wilds["terrain"]["edges"], own_cells)
+		var steps := 0
+		for door: Array in doors:
+			var step := _rig._room.get_node_or_null("Doorstep_%d_%d" % [door[0].x, door[0].y]) as Node3D
+			if step != null and step.position.distance_to(_rig._tile_position(door[0]) + Vector3(door[1].x, 0.0, door[1].y) * 0.5) < 0.01:
+				steps += 1
+		if entry.is_empty() or doors.is_empty():
+			doorway_bad.append(["no light or door", corner])
+			continue
+		if steps != doors.size():
+			doorway_bad.append(["steps %d of %d" % [steps, doors.size()], corner])
+		# Its light on the ground as built, not the ground before it (the
+		# room's houses come with its sets, _seat_houses after its ground).
+		var ground := 0.0
+		for cell in own_cells:
+			ground += _rig._tile_position(cell).y
+		ground /= maxf(own_cells.size(), 1.0)
+		if not is_equal_approx((entry[0] as Node3D).position.y, ground + Client3D.HOUSE_LIGHT_UP):
+			doorway_bad.append(["light at %.2f over ground %.2f" % [(entry[0] as Node3D).position.y, ground], corner])
+		if entry.size() < 8:
+			continue  # A trade building's: its door lamp is 782's (_hang_door_lamps).
+		lamped += 1
+		var lamp_light := entry[4] as OmniLight3D
+		var piece := entry[7] as Node3D
+		if (piece == null or lamp_light.get_parent() != piece or not lamp_light.position.is_equal_approx(socket + Client3D.DOOR_LAMP_ART_LIGHT)
+				or not is_equal_approx(lamp_light.omni_range, Client3D.HOUSE_DOOR_LAMP_RANGE) or lamp_light.shadow_enabled or entry[5] == null):
+			doorway_bad.append(["lamp", corner])
+			continue
+		var shown: Array = []
+		for state: Array in [[false, false], [true, false], [true, true]]:
+			Client3D._show_house_lamp(entry, state[0], state[1])
+			shown.append([(entry[5] as Node3D).visible, lamp_light.visible])
+		if shown != [[false, false], [true, false], [true, true]]:
+			doorway_bad.append(["shown %s" % [shown], corner])
+	_check(lamped >= 3 and doorway_bad.is_empty() and Client3D.DOORSTEP_VARIANTS == {"wood": 1, "stone": 2},
+			"each lived-in house its doorstep at each front door and its lantern beside them, its light %.2f m off the wall, %.1f m up, lit with its house, picked with it (%d lamps; bad %s)"
+			% [(socket + Client3D.DOOR_LAMP_ART_LIGHT).x, (socket + Client3D.DOOR_LAMP_ART_LIGHT).y, lamped, doorway_bad])
+	var lamp_spot := Client3D.house_lamp_at([[Vector2i(3, 8), Vector2i(0, 1)], [Vector2i(4, 8), Vector2i(0, 1)]],
+		[Vector3(3.0, 0.0, 8.5), Vector3(4.0, 0.0, 8.5)], true)
+	_check(lamp_spot.is_equal_approx(Vector3(3.0 - Client3D.DOOR_LAMP_ASIDE, 0.0, 8.5 + Client3D.DOOR_LAMP_STONE)),
+			"a two-door front's lantern beside its last door, on a stone wall %.1f m further out (%s)" % [Client3D.DOOR_LAMP_STONE, lamp_spot])
+	_check(Client3D.window_slot("stone", Client3D.WALL_HEIGHT) == ("wall.stone.window_house" if ArtKit.has("wall.stone.window_house") else "")
+			and Client3D.window_slot("wood", Client3D.WALL_HEIGHT) == "wall.wood.window",
+			"a stone house's one-storey wall its shuttered window_house (never the castle's grate), a wood one's wall.wood.window (%s)" % Client3D.window_slot("stone", Client3D.WALL_HEIGHT))
 	# Inside, its common room's fireplace over the hearth's two fire cells,
 	# its back to the west wall, at their middle.
 	var ground := Level.load_level("umbrage_tavern")
@@ -3308,13 +3366,30 @@ func _test_chimney_smoke() -> void:
 	var forge: Dictionary = _rig._buildings.filter(func(b: Dictionary) -> bool: return b["use"] == "forge")[0]
 	var hut: Dictionary = _rig._buildings.filter(func(b: Dictionary) -> bool: return b["rect"] == Rect2i(10, 3, 3, 3))[0]
 	var smoke: Node3D = forge.get("smoke")
-	_check(smoke != null and (forge["node"] as Node3D).find_child("Chimney", true, false) != null and hut.get("smoke") == null,
-			"a slot forge given a chimney and its smoke; a plain hut none")
+	# A lived-in house slot's chimney at its art's socket (489 amended (4)):
+	# the house's stack at "chimney_seat", the hut's vent at "chimney".
+	var seat_of := func(slot: String, name: String) -> Variant:
+		var at: Variant = (ArtKit.spec(slot).get("sockets", {}) as Dictionary).get(name)
+		return Vector3(float(at[0]), float(at[1]), float(at[2])) if at is Array else null
+	var forge_chimney := (forge["node"] as Node3D).find_child("Chimney", true, false) as Node3D
+	var hut_chimney := (hut["node"] as Node3D).find_child("Chimney", true, false) as Node3D
+	_check(smoke != null and forge_chimney != null and hut.get("smoke") != null and hut_chimney != null,
+			"a slot house given a chimney and its smoke, a hut its vent and its smoke")
+	if forge_chimney != null and hut_chimney != null:
+		# Its foot at the seat's x and z but at the eaves, its lower part in
+		# the roof (art-kit: the seat is where the stack meets the roof).
+		var seat: Vector3 = seat_of.call("building.house", "chimney_seat")
+		seat.y = float(ArtKit.spec("building.house").get("wall_height", Client3D.WALL_HEIGHT))
+		_check(forge_chimney.position.is_equal_approx(seat) and forge_chimney.get_child_count() == 2
+				and hut_chimney.position.is_equal_approx(seat_of.call("building.hut", "chimney")) and hut_chimney.get_child_count() == 1,
+				"the house's stack through its chimney_seat, its foot at the eaves (%s), under its smoke, the hut's vent at its chimney socket (%s), its smoke alone (%d, %d)"
+				% [forge_chimney.position, hut_chimney.position, forge_chimney.get_child_count(), hut_chimney.get_child_count()])
 	if smoke == null:
 		return
 	var top := smoke.global_position.y - Flames.CHIMNEY_SMOKE.y * 0.45
 	_check(top > _rig.global_position.y + Client3D.WALL_HEIGHT + 0.5, "the smoke rises from over the roof (%.2f m)" % (top - _rig.global_position.y))
-	_check(not smoke.visible, "nobody known inside: no smoke")
+	_rig.set_awake("smoke_town/square", {"H1": false})
+	_check(not smoke.visible, "all asleep inside: no smoke")
 	_rig.set_awake("smoke_town/square", {"H1": true})
 	_check(smoke.visible, "the smith at work (awake inside): it smokes")
 	_rig.set_town("smoke_town/square", {"forge": {"state": Towns.RUIN, "level": 0, "walls": false}})
@@ -3325,9 +3400,17 @@ func _test_chimney_smoke() -> void:
 	_check(not smoke.visible, "the forge emptied or asleep: no smoke")
 	_rig.set_awake("smoke_town/square", {})
 	_rig.town_states.erase("smoke_town/square")
-	var said := [Client3D.smoking({"H1": true}, "H1", Towns.DAMAGED, true), Client3D.smoking({"H1": true}, "H1", Towns.STANDING, false),
-		Client3D.smoking({"H1": true}, "H1", Towns.PLANNED, true), Client3D.smoking({}, "H1", Towns.STANDING, true)]
-	_check(said == [true, false, false, false], "damaged still smokes; being built, planned or nobody known: not (%s)" % [said])
+	var said := [Client3D.smoking({"H1": true}, "H1", Towns.DAMAGED, true, 12.0), Client3D.smoking({"H1": true}, "H1", Towns.STANDING, false, 12.0),
+		Client3D.smoking({"H1": true}, "H1", Towns.PLANNED, true, 12.0), Client3D.smoking({"H1": true}, "H1", Towns.STANDING, true, 3.0),
+		Client3D.smoking({"H1": false}, "H1", Towns.STANDING, true, 12.0)]
+	_check(said == [true, false, false, true, false], "damaged still smokes, awake at any hour; being built, planned or asleep: not (%s)" % [said])
+	# Nobody known inside (no body has been in): by the hour, as its windows
+	# (489 amended (4)): from SMOKE_FROM to LAMP_OUT, so a lit house smokes.
+	var by_hour: Array = [5.9, 6.0, 12.0, 21.5, 22.0, 23.0].map(func(hour: float) -> bool: return Client3D.smoking({}, "H1", Towns.STANDING, true, hour))
+	var lit_unsmoked: Array = [12.0, 18.0, 21.9].filter(func(hour: float) -> bool:
+		return Client3D.lamp_lit({}, "H1", hour, -1.0) and not Client3D.smoking({}, "H1", Towns.STANDING, true, hour))
+	_check(by_hour == [false, true, true, true, false, false] and lit_unsmoked.is_empty(),
+			"nobody known inside: smoke from 6:00 to LAMP_OUT, never a lit window unsmoked (%s; %s)" % [by_hour, lit_unsmoked])
 	# A composed kind's chimney (its composer's) has its smoke too.
 	var stamps: Array = []
 	for i in 6:
@@ -3555,7 +3638,8 @@ func _test_turf_house() -> void:
 	_check(quarters.all(func(q: Array) -> bool: return not far.has(q[0])), "outside it: none faded for being inside")
 	var smoke: Node3D = house.get("smoke")
 	var hearth: Node3D = house.get("hearth")
-	_check(smoke != null and hearth != null and not smoke.visible and not hearth.visible, "nobody known inside: no smoke, the pot's fire out")
+	_rig.set_awake("turf_town", {"T1": false})  # Nobody known smokes by the hour (489 amended (4)).
+	_check(smoke != null and hearth != null and not smoke.visible and not hearth.visible, "all asleep inside: no smoke, the pot's fire out")
 	if smoke == null or hearth == null:
 		return
 	_rig.set_awake("turf_town", {"T1": true})

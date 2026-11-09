@@ -1024,12 +1024,16 @@ static func _chimney(building: Dictionary, main: Rect2i, rect: Rect2i, eaves: fl
 	return out
 
 
-## A chimney for slot building [param slot] (its art has none) used as
+## A chimney for slot building [param slot]: a lived-in house's at its
+## art's socket (socket_chimney), else, its art having none, used as
 ## [param use]: one of SLOT_HEARTHS, art-kit's chimney.stone seated on the
 ## roof near one gable end, a little down the slope (the slot's ridge runs
 ## along z over its middle, its eaves at wall_height); null for another
 ## use, a slot without a pitched roof, or no chimney.stone.
 static func slot_chimney(slot: String, use: String, seed: int) -> Node3D:
+	var seated := socket_chimney(slot)
+	if seated != null:
+		return seated
 	if not use in SLOT_HEARTHS or not ArtKit.has("chimney.stone") or not ArtKit.has(slot):
 		return null
 	var spec := ArtKit.spec(slot)
@@ -1051,6 +1055,39 @@ static func slot_chimney(slot: String, use: String, seed: int) -> Node3D:
 	out.add_child(piece)
 	out.set_meta(SMOKE_AT, Vector3(0.0, piece.position.y + ArtKit.size("chimney.stone").y, 0.0))
 	return out
+
+
+## A lived-in house slot's chimney where its art says (489 amended (4);
+## WINDOWED_SLOTS, whatever its use): art-kit's chimney.stone through its
+## "chimney_seat" socket (building.house: where the stack meets the roof;
+## its foot at the seat's x and z, at the eaves, its lower part down in
+## the roof, art-kit's rule), its smoke at the stack's own
+## "smoke" socket (else its top); a smoke vent at a "chimney" socket
+## (building.hut: no stack, as the turf house's); null for a slot with
+## neither.
+static func socket_chimney(slot: String) -> Node3D:
+	if not slot in WINDOWED_SLOTS or not ArtKit.has(slot):
+		return null
+	var sockets: Variant = ArtKit.spec(slot).get("sockets", {})
+	if not sockets is Dictionary:
+		return null
+	var out := Node3D.new()
+	out.name = "Chimney"
+	if (sockets as Dictionary).has("chimney_seat") and ArtKit.has("chimney.stone"):
+		var seat: Array = sockets["chimney_seat"]
+		out.position = Vector3(float(seat[0]), float(ArtKit.spec(slot).get("wall_height", Client3D.WALL_HEIGHT)), float(seat[2]))
+		out.add_child(ArtKit.instance("chimney.stone"))
+		var stack: Variant = ArtKit.spec("chimney.stone").get("sockets", {})
+		var smoke: Variant = (stack as Dictionary).get("smoke") if stack is Dictionary else null
+		out.set_meta(SMOKE_AT, Vector3(float(smoke[0]), float(smoke[1]), float(smoke[2])) if smoke is Array 				else Vector3(0.0, ArtKit.size("chimney.stone").y, 0.0))
+		return out
+	if (sockets as Dictionary).has("chimney"):
+		var vent: Array = sockets["chimney"]
+		out.position = Vector3(float(vent[0]), float(vent[1]), float(vent[2]))
+		out.set_meta(SMOKE_AT, Vector3.ZERO)
+		return out
+	out.free()
+	return null
 
 
 ## An art-walled [param slot]'s [param node] (Level.ART_WALLED, 718: the turf house)

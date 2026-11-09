@@ -145,6 +145,9 @@ const CANDLE_FALLOFF := 1.2
 ## A window lit by the hour goes out at this hour, the sun down; how often
 ## the window lights are looked at, seconds (decision 566).
 const LAMP_OUT := 22.0
+## From when a chimney nobody is known in smokes, to LAMP_OUT (489
+## amended (4): a house lit by the hour is never without its smoke).
+const SMOKE_FROM := 6.0
 const LAMP_CHECK := 2.0
 ## Wall runs (_add_wall_runs), each in its set's profile and variation
 ## (_wall_set: art-kit's wall.<set>.profile, decision 287): at most this
@@ -848,6 +851,23 @@ const DOOR_LAMP_OUT := 0.45
 const DOOR_LAMP_LIGHT := Vector3(0.0, -0.4, 0.5)
 const DOOR_LAMP_ENERGY := 1.2
 const DOOR_LAMP_RANGE := 4.5
+## Art-kit's door lantern (489 amended (4)): edge decor, its bracket out to
+## +x, its "flame" socket the glow; on a stone wall DOOR_LAMP_STONE further
+## out (the piece is made for a wood wall's face). Its light stands
+## DOOR_LAMP_ART_LIGHT from the flame (environment: out into the street and
+## under it, as 782 amended's, off the wall). A lived-in house's lamp
+## burns HOUSE_DOOR_LAMP_ENERGY over HOUSE_DOOR_LAMP_RANGE, lit and picked
+## with its house's light (_light_houses); a trade building's keeps
+## DOOR_LAMP_ENERGY and DOOR_LAMP_RANGE.
+const DOOR_LAMP_SLOT := "prop.door_lamp"
+const DOOR_LAMP_STONE := 0.1
+const DOOR_LAMP_ART_LIGHT := Vector3(0.4, -0.4, 0.0)
+const HOUSE_DOOR_LAMP_ENERGY := 0.9
+const HOUSE_DOOR_LAMP_RANGE := 3.5
+## A lived-in house's doorstep (489 amended (4)): art-kit's, its variant
+## by the wall's set (wood plank, stone slab), at each front door's foot.
+const DOORSTEP_SLOT := "prop.doorstep"
+const DOORSTEP_VARIANTS := {"wood": 1, "stone": 2}
 const STORE_LAMP_UP := 2.0
 ## A lantern's flicker: half a torch's.
 const LANTERN_FLICKER := 0.04
@@ -2647,6 +2667,12 @@ var _wall_lamp_clock := 0.0
 ## corner: [light, its windows' _window_code row, rect, flicker phase];
 ## the clock to the next pick and the flicker's own time.
 var _house_lights: Dictionary[Vector2i, Array] = {}
+## Each lived-in house's pieces by its rect corner (489 amended (4)): its
+## light, door lantern and doorsteps, each [node, the cells it stands on,
+## metres over their mean ground]; set on the ground again once it is
+## built (_seat_houses: the room's houses come before it) and freed with
+## their plot.
+var _house_seats: Dictionary[Vector2i, Array] = {}
 var _house_light_clock := 0.0
 var _house_light_time := 0.0
 ## The room's skylights (797) and the clock to setting them again.
@@ -6662,6 +6688,7 @@ func _phase_sets() -> void:
 	_door_lamps.clear()  # Hung again in the new room (782).
 	_wall_lamps.clear()  # And the mine's (769 amended (6)).
 	_house_lights.clear()  # And the houses' (489 amended (3)), freed with the old room.
+	_house_seats.clear()  # Their pieces too (489 amended (4)).
 	_night_places = null
 	_stone_opaque = _stone(1.0)
 	# The map's sets; a building's walls and inside in its slot's sets
@@ -6847,6 +6874,7 @@ func _phase_ground() -> void:
 
 
 func _phase_lights() -> void:
+	_seat_houses()  # On the ground _phase_ground built (489 amended (4)).
 	_add_rocks()
 	for cell: Vector2i in _terrain.get("torches", []):
 		_add_torch(cell)
@@ -8596,8 +8624,9 @@ func _add_buildings() -> void:
 		var middle := Vector2(rect.position) + Vector2(rect.size - Vector2i.ONE) * 0.5
 		node.position = Vector3(middle.x, _elevation(rect.position), middle.y)
 		node.rotation.y = deg_to_rad(float(building["yaw"])) if building.has("yaw") else atan2(float(facing.x), float(facing.y))
-		# A forge or a kitchen in a slot house: a chimney for its fire, in
-		# its "parts" (a ruin hides them, as a kind's).
+		# A lived-in house slot's chimney at its art's socket (489 amended
+		# (4)), else a forge's or a kitchen's for its fire, in its "parts"
+		# (a ruin hides them, as a kind's).
 		var chimney := BuildingComposer.slot_chimney(slot, str(building.get("use", "")), hash(rect.position))
 		if chimney != null:
 			var parts := Node3D.new()
@@ -8749,6 +8778,7 @@ func _building_sets(building: Dictionary) -> void:
 	# Its light inside, lit with its windows (489 amended (3)).
 	if not lit_row.is_empty():
 		_add_house_light(building, lit_row)
+		_add_house_front(building, cells, wall_set)
 	if spec.has("floor_set"):
 		var floor_set := _known_set(str(spec["floor_set"]))
 		for cell in Level.building_cells(building):
@@ -8810,10 +8840,14 @@ func _drop_plot(at: Vector2i) -> Array[Vector3i]:
 			_building_walls.erase(key)
 			out.append(key)
 	if _house_lights.has(at):
-		var light := _house_lights[at][0] as OmniLight3D
-		if is_instance_valid(light):
-			light.queue_free()
 		_house_lights.erase(at)
+	for seat: Array in _house_seats.get(at, []):
+		var piece: Variant = seat[0]
+		if is_instance_valid(piece):
+			if (piece as Node).get_parent() != null:
+				(piece as Node).get_parent().remove_child(piece)  # Its name free for the plot built again.
+			(piece as Node).queue_free()
+	_house_seats.erase(at)
 	return out
 
 
@@ -8836,11 +8870,113 @@ func _add_house_light(building: Dictionary, row: Array) -> void:
 	light.visible = false
 	_room.add_child(light)
 	_house_lights[rect.position] = [light, row, rect, _roll(rect.position, 149) * TAU]
+	_house_seats[rect.position] = [[light, cells, HOUSE_LIGHT_UP]]
 	_house_light_clock = HOUSE_LIGHT_PICK
 
 
+## The front doors of [param building] (its outline's door edges whose
+## outside is its facing, else all of them; [param cells] its own cells):
+## [inside cell, the way out] each, in the outline's order.
+static func front_doors(building: Dictionary, edges: Dictionary, cells: Dictionary) -> Array:
+	var all: Array = []
+	var front: Array = []
+	for key: Vector3i in Level.building_outline(building):
+		if edges.get(key, Terrain.Edge.OPEN) != Terrain.Edge.DOOR:
+			continue
+		var sides := Terrain.edge_cells(key)
+		var inside: Vector2i = sides[0] if cells.has(sides[0]) else sides[1]
+		var out: Vector2i = (sides[1] if inside == sides[0] else sides[0]) - inside
+		all.append([inside, out])
+		if out == building["facing"]:
+			front.append([inside, out])
+	return front if not front.is_empty() else all
+
+
+## Where a lived-in house's door lantern stands (489 amended (4)), from its
+## front doors [param doors] (front_doors') at [param grounds] (each door's
+## edge middle, on the ground): beside the run of doors, DOOR_LAMP_ASIDE
+## past its last door's middle along the wall, [param stone] a stone wall's
+## DOOR_LAMP_STONE further out.
+static func house_lamp_at(doors: Array, grounds: Array, stone: bool) -> Vector3:
+	var out: Vector2i = doors[0][1]
+	var along := Vector3(-out.y, 0.0, out.x)
+	var far: Vector3 = grounds[0]
+	for ground: Vector3 in grounds:
+		if ground.dot(along) > far.dot(along):
+			far = ground
+	return far + along * DOOR_LAMP_ASIDE + Vector3(out.x, 0.0, out.y) * (DOOR_LAMP_STONE if stone else 0.0)
+
+
+## A lived-in house's doorway (489 amended (4)): art-kit's doorstep at each
+## front door's foot (none where its set has steps of its own, a chapel's,
+## BuildingComposer._steps), and its door lantern (_door_lamp_piece), out
+## till its house's light is lit (_light_houses), kept on its light's row.
+func _add_house_front(building: Dictionary, cells: Dictionary, wall_set: String) -> void:
+	var rect: Rect2i = building["rect"]
+	if _room == null or not _house_lights.has(rect.position) or building.get("ruined", false):
+		return
+	var doors := front_doors(building, _terrain["edges"], cells)
+	if doors.is_empty():
+		return
+	var grounds: Array = []
+	for door: Array in doors:
+		grounds.append(_tile_position(door[0]) + Vector3((door[1] as Vector2i).x, 0.0, (door[1] as Vector2i).y) * 0.5)
+	var out: Vector2i = doors[0][1]
+	var turn := atan2(-float(out.y), float(out.x))
+	if ArtKit.has(DOORSTEP_SLOT) and not (building.has("kind") and ArtKit.has("steps.%s" % wall_set)):
+		for index in doors.size():
+			var step := ArtKit.instance(DOORSTEP_SLOT, int(DOORSTEP_VARIANTS.get(wall_set, 1)))
+			step.name = "Doorstep_%d_%d" % [doors[index][0].x, doors[index][0].y]
+			step.position = grounds[index]
+			step.rotation.y = atan2(-float((doors[index][1] as Vector2i).y), float((doors[index][1] as Vector2i).x))
+			_room.add_child(step)
+			_house_seats[rect.position].append([step, [doors[index][0]], 0.0])
+	if not ArtKit.has(DOOR_LAMP_SLOT):
+		return
+	var made := _door_lamp_piece(house_lamp_at(doors, grounds, wall_set == "stone"), turn, HOUSE_DOOR_LAMP_ENERGY, HOUSE_DOOR_LAMP_RANGE)
+	made[0].name = "HouseLamp_%d_%d" % [rect.position.x, rect.position.y]
+	(made[1] as OmniLight3D).visible = false
+	if made[2] != null:
+		(made[2] as Node3D).visible = false
+	var inside: Array = doors.map(func(door: Array) -> Vector2i: return door[0])
+	_house_seats[rect.position].append([made[0], inside, 0.0])
+	var entry: Array = _house_lights[rect.position]
+	entry.append_array([made[1], made[2], Level.front_cell(rect, building["facing"]) if not building.has("front") else building["front"], made[0]])
+
+
+## Each lived-in house's pieces on the ground as it now stands (489 amended
+## (4)): the room's houses are made with its sets, before its ground.
+func _seat_houses() -> void:
+	for at: Vector2i in _house_seats:
+		for seat: Array in _house_seats[at]:
+			if not is_instance_valid(seat[0]):
+				continue
+			var ground := 0.0
+			for cell: Vector2i in seat[1]:
+				ground += _tile_position(cell).y
+			(seat[0] as Node3D).position.y = ground / maxf((seat[1] as Array).size(), 1.0) + float(seat[2])
+
+
+## Art-kit's door lantern (489 amended (4)) at [param at] (its edge's
+## middle, on the ground) turned [param turn] (its bracket's +x out of the
+## wall): [the piece, its light (DOOR_LAMP_ART_LIGHT from the flame,
+## [param energy], [param reach]), its glow (the "flame" part) or null].
+func _door_lamp_piece(at: Vector3, turn: float, energy: float, reach: float) -> Array:
+	var lamp := ArtKit.instance(DOOR_LAMP_SLOT)
+	lamp.position = at
+	lamp.rotation.y = turn
+	_room.add_child(lamp)
+	var socket: Variant = Flames.socket_of(DOOR_LAMP_SLOT)
+	var light := _night_light(LANTERN, energy, reach)
+	light.position = (socket if socket != null else Vector3(0.57, 1.92, 0.0)) + DOOR_LAMP_ART_LIGHT
+	lamp.add_child(light)
+	return [lamp, light, lamp.find_child("flame", true, false)]
+
+
 ## Every HOUSE_LIGHT_PICK s: the lit houses' lights nearest the view's aim
-## on (house_lights_near), the rest out; each frame the lit ones flicker.
+## on (house_lights_near), the rest out, each with its door lantern
+## (489 amended (4): a house lit whole or not, its lantern's flame shown
+## whenever it is lit); each frame the lit ones flicker.
 func _light_houses(delta: float) -> void:
 	if _house_lights.is_empty():
 		return
@@ -8856,18 +8992,35 @@ func _light_houses(delta: float) -> void:
 			var entry: Array = _house_lights[at]
 			if not is_instance_valid(entry[0]):
 				continue
-			if _window_lit(entry[1], hour, sun):
+			var on := _window_lit(entry[1], hour, sun)
+			if on:
 				lit.append(entry)
 			else:
 				(entry[0] as OmniLight3D).visible = false
+			_show_house_lamp(entry, on, false)
 		var near := house_lights_near(lit, Vector2(_camera_target.x, _camera_target.z), HOUSE_LIGHT_NEAR)
 		for entry: Array in lit:
 			(entry[0] as OmniLight3D).visible = near.has(entry)
+			_show_house_lamp(entry, true, near.has(entry))
 	for at: Vector2i in _house_lights:
 		var entry: Array = _house_lights[at]
 		var light := entry[0] as OmniLight3D
 		if is_instance_valid(light) and light.visible:
 			light.light_energy = HOUSE_LIGHT_ENERGY * Flames.flicker(_house_light_time, float(entry[3]), HOUSE_LIGHT_FLICKER)
+		if entry.size() > 4 and is_instance_valid(entry[4]) and (entry[4] as OmniLight3D).visible:
+			(entry[4] as OmniLight3D).light_energy = HOUSE_DOOR_LAMP_ENERGY * Flames.flicker(_house_light_time, float(entry[3]) + 1.0, LANTERN_FLICKER)
+
+
+## A house light's row [param entry]'s door lantern (_add_house_front; none on
+## a row without one): its flame shown while [param lit], its light only
+## while [param near] too (picked with the house's, house_lights_near).
+static func _show_house_lamp(entry: Array, lit: bool, near: bool) -> void:
+	if entry.size() <= 4:
+		return
+	if is_instance_valid(entry[4]):
+		(entry[4] as OmniLight3D).visible = lit and near
+	if entry[5] != null and is_instance_valid(entry[5]):
+		(entry[5] as Node3D).visible = lit
 
 
 ## How far a house light reaches in [param rect] (489 amended (3)): half
@@ -9299,7 +9452,8 @@ func _add_smoke(building: Dictionary) -> void:
 
 
 ## Whether [param building]'s chimney smokes: its fire in use, someone
-## awake inside (_awake, the "town" message's "awake": npc's bodies), the
+## awake inside (_awake, the "town" message's "awake": npc's bodies; else
+## by the hour, smoking), the
 ## building standing, built (a kind at its last stage) or damaged, never
 ## in decline or a ruin, nor a healer's hut told empty (hut_empty, 759).
 func _show_smoke(building: Dictionary) -> void:
@@ -9309,7 +9463,7 @@ func _show_smoke(building: Dictionary) -> void:
 		return
 	var state := _state_of(building)
 	var lit := not hut_empty(str(building.get("hut", ""))) and smoking(_awake.get(awake_town(building, str(_terrain.get("level", ""))), {}), str(building.get("code", "")), state,
-		not building.has("kind") or int(building["stage"]) == BuildingComposer.STANDING)
+		not building.has("kind") or int(building["stage"]) == BuildingComposer.STANDING, DayNight.hour(DayNight.now()))
 	if smoke != null and is_instance_valid(smoke):
 		smoke.visible = lit
 	# Its hearth's fire (718: the turf house's pot) burns as its chimney smokes.
@@ -9327,10 +9481,16 @@ static func awake_town(building: Dictionary, level_name: String) -> String:
 ## Whether a chimney smokes (_show_smoke): its building [param code] said
 ## awake in [param awake] ({code: bool}), its town's [param state] one it
 ## is lived in or worked (standing, damaged, in disrepair), [param built].
-## Nobody known inside: no smoke (the lamp falls back to the hour; a fire
-## is never guessed).
-static func smoking(awake: Dictionary, code: String, state: String, built: bool) -> bool:
-	return built and state in [Towns.STANDING, Towns.DAMAGED, Towns.DISREPAIR] and bool(awake.get(code, false))
+## Nobody known inside (no body has been in it): from SMOKE_FROM to
+## LAMP_OUT o'clock at [param hour], as its windows fall back to the hour
+## (489 amended (4): a lit house never stands without smoke); known awake
+## or asleep wins.
+static func smoking(awake: Dictionary, code: String, state: String, built: bool, hour: float) -> bool:
+	if not built or not state in [Towns.STANDING, Towns.DAMAGED, Towns.DISREPAIR]:
+		return false
+	if awake.has(code):
+		return bool(awake[code])
+	return hour >= SMOKE_FROM and hour < LAMP_OUT
 
 
 ## [param building] damaged or not (_show_state): a disrepair's too (649).
@@ -9714,10 +9874,7 @@ func _unbuilt(key: Vector3i) -> bool:
 ## npc's flag; decision 566): their window lights and chimneys as they say.
 func set_awake(town: String, awake: Dictionary) -> void:
 	_awake[town] = awake
-	_update_lamps()
-	for building in _buildings:
-		if awake_town(building, str(_terrain.get("level", ""))) == town:
-			_show_smoke(building)
+	_update_lamps()  # Its chimneys too.
 
 
 ## The beasts drawn in this zone's folds (640, maps' side; economy's
@@ -9785,6 +9942,10 @@ func _update_lamps() -> void:
 	_hang_door_lamps()
 	for each in _glows:
 		(each[0] as Node3D).visible = _window_lit(each[1], hour, sun)
+	# And the chimneys, as told or by the hour (489 amended (4)).
+	for building in _buildings:
+		if building.has("smoke") or building.has("hearth"):
+			_show_smoke(building)
 
 
 ## Whether a window of _window_code row [param row] is lit: its building
@@ -9821,13 +9982,18 @@ static func _broken_pick(key: Vector3i) -> bool:
 ## (489 amended (2): the Mughouse's two storeys, any set): a set's
 ## wall.<set>.window_tall on a wall two storeys high (within
 ## WINDOW_STRETCH), or on any wall when the set has no plain window (the
-## chapel's lancets, 734, their own height); a wood wall of a storey's
-## height its wall.wood.window; "" for none.
+## chapel's lancets, 734, their own height); a wall of a storey's height
+## its set's house window, wall.<set>.window_house, where it has one (489
+## amended (4): a stone house's shutters, never the castle's barred
+## wall.stone.window); a wood one its wall.wood.window; "" for none.
 static func window_slot(wall_set: String, height: float) -> String:
 	var tall := "wall.%s.window_tall" % wall_set
 	var plain := "wall.%s.window" % wall_set
 	if ArtKit.has(tall) and (not ArtKit.has(plain) or absf(height - 2.0 * WALL_HEIGHT) <= WINDOW_STRETCH):
 		return tall
+	var house := "wall.%s.window_house" % wall_set
+	if ArtKit.has(house) and absf(height - WALL_HEIGHT) <= WINDOW_STRETCH:
+		return house
 	if wall_set == "wood" and absf(height - WALL_HEIGHT) <= WINDOW_STRETCH:
 		return plain
 	return ""
@@ -17398,9 +17564,27 @@ func _hang_door_lamps() -> void:
 		_door_lamps[front] = _add_door_lamp(front, facing)
 
 
-## A door lantern (782): a short iron arm out from the wall, the hanging
-## lantern under its end, its warm light at the glow.
+## A door lantern (782): art-kit's prop.door_lamp where it is there (489
+## amended (4); its light DOOR_LAMP_ART_LIGHT from the flame, off the
+## wall, DOOR_LAMP_STONE further out on a stone wall), else a short iron
+## arm out from the wall, the hanging lantern under its end, its warm light
+## DOOR_LAMP_LIGHT from it. A lived-in house's own lantern at the same door
+## gives way to it (a trade's lamp is never picked out: _light_houses).
 func _add_door_lamp(front: Vector2i, facing: Vector2i) -> Node3D:
+	for at: Vector2i in _house_lights:
+		var entry: Array = _house_lights[at]
+		if entry.size() > 7 and entry[6] == front:
+			if is_instance_valid(entry[7]):
+				(entry[7] as Node3D).queue_free()
+			entry.resize(4)
+	if ArtKit.has(DOOR_LAMP_SLOT):
+		var out := Vector3(facing.x, 0.0, facing.y)
+		var stone := str(_wall_sets.get(Terrain.edge_key(front, -facing), "")) == "stone"
+		var at := _tile_position(front) - out * 0.5 + Vector3(-facing.y, 0.0, facing.x) * DOOR_LAMP_ASIDE + out * (DOOR_LAMP_STONE if stone else 0.0)
+		var made := _door_lamp_piece(at, atan2(-float(facing.y), float(facing.x)), DOOR_LAMP_ENERGY, DOOR_LAMP_RANGE)
+		made[0].name = "DoorLamp_%d_%d" % [front.x, front.y]
+		_fire_lights.append([made[1], DOOR_LAMP_ENERGY, _roll(front, 150) * TAU, LANTERN_FLICKER])
+		return made[0]
 	var lamp := Node3D.new()
 	lamp.name = "DoorLamp_%d_%d" % [front.x, front.y]
 	lamp.position = door_lamp_at(_tile_position(front), facing)

@@ -14845,6 +14845,68 @@ Shots: C:/dev/review/house_light_on2. Sorted for swap_room (822):
 _house_lights is the room's (its lights are children of _room), _house_light_clock and
 _house_light_time the view's. Client only; protocol unchanged, no new class_name.
 
+489 amended (4): the lived-in houses' doorsteps, door lanterns, stone windows and chimneys
+(package "lived-in town houses", on; the coordinator's step 2; environment's numbers; release's
+label; voice's words; art-kit's pieces 6c49e5cee). Each house that 489 amended (3) lights
+inside (its row in _house_lights) gets, by Client3D._add_house_front: art-kit's prop.doorstep at
+the foot of each front door (front_doors: its outline's door edges whose outside is its
+facing, else all), DOORSTEP_VARIANTS by its wall's set (wood 1, a plank; stone 2, a slab), none
+where its set has steps of its own (a chapel's, BuildingComposer._steps); and art-kit's
+prop.door_lamp beside the run of doors (house_lamp_at: DOOR_LAMP_ASIDE past the last door's
+middle, a stone wall's DOOR_LAMP_STONE 0.1 m further out), its light DOOR_LAMP_ART_LIGHT
+(0.4 m out, 0.4 m down) from the lantern's "flame" socket, about 0.97 m off the wall and 1.5 m
+up (environment: 782 amended's rule, so pale stone isn't burned white), HOUSE_DOOR_LAMP_ENERGY
+0.9 over HOUSE_DOOR_LAMP_RANGE 3.5, LANTERN's colour, LANTERN_FLICKER, shadowless. The lantern
+is kept on its house's light row and lit with it (_light_houses, _show_house_lamp): its flame
+(the piece's "flame" part, on the glow material) shown while the house is lit (at night,
+someone inside awake: 566's lamp_lit, so a sleeping house is dark), its light only while the
+house is among the HOUSE_LIGHT_NEAR picked, the house's pool and lantern together (environment:
+a house lit whole or not at all). The lantern 782 hung by a shop's or a temple's counter
+(_add_door_lamp: a short iron arm and a code-made hanging lantern, its light DOOR_LAMP_LIGHT off
+it) is now the same art-kit prop.door_lamp, its light DOOR_LAMP_ART_LIGHT off the flame,
+DOOR_LAMP_ENERGY 1.2 over DOOR_LAMP_RANGE 4.5 as before, outside the pick; it takes the place of
+a house's own lantern at the same door. 782's code lantern stays only where art-kit's piece is
+missing. window_slot gives a wall of a storey's height its set's wall.<set>.window_house where
+there is one (stone: art-kit's shuttered wall.stone.window_house, its shutters dressed as the
+wood window's), so a stone house is windowed; the castle's barred wall.stone.window is never a
+house's. BuildingComposer.socket_chimney: a lived-in house slot (WINDOWED_SLOTS), whatever its
+use, gets its chimney where its art says, art-kit's chimney.stone at building.house's
+"chimney_seat" socket (its smoke at the stack's "smoke" socket), a smoke vent at building.hut's
+"chimney" socket; slot_chimney's guessed seat stays for any other slot's forge or kitchen.
+Smoke as before (smoking: someone awake inside, the building standing). view_test
+_test_chimney_smoke (the house's stack at its socket, the hut's vent and its smoke) and the
+wilds' slot houses in _test_tavern_inside (each house's doorsteps at its front doors, its
+lantern's light off the flame at a house's range, shown and picked with its house; a two-door
+front's lantern beside its last door, further out on stone; a stone storey's window_house);
+weather_test _test_night_town (art-kit's lantern's light off the wall, a house's dimmer and
+shorter than a trade's). The room's houses are made with its sets (_phase_sets, via
+_building_sets), before its ground is built, where _tile_position still reads 0: 489 amended
+(3)'s light inside sat 1.5 m over 0, under the ground of any house on raised land, unlit, and
+the doorsteps and lantern did the same. Client3D._house_seats (ROOM) keeps each house's light,
+lantern and doorsteps by its rect corner, each with the cells it stands on and its height over
+them; _seat_houses sets them on the ground in _phase_lights, after _phase_ground, and
+_drop_plot frees them (each taken out of the room first, so a plot built again gets its own
+names). view_test checks each house's light 1.5 m over its cells' ground and its doorsteps
+there too.
+
+489 amended (4), the chimney at the eaves and smoke by the windows' hours (the coordinator,
+after the first stills; art-kit; environment; release: inside this amendment, which has not
+shipped). building.house's "chimney_seat" marks where the stack meets the roof, not the
+stack's foot (art-kit; its "uses" says so since 123d2d3fe): socket_chimney stands chimney.stone at the seat's x and z with its
+foot at the eaves (the slot's wall_height, else WALL_HEIGHT, 3 m), its lower 1.2 m down in the
+roof, its top about 1.1 m over the ridge; stood on the seat it rose 2.3 m over it. And smoke no
+longer waits to be told: Client3D.smoking takes the hour, and a building nobody is known in
+(Main._awake_tick tells a house's awake only once a resident's body has been in it, so most
+lived-in houses are never told) smokes from SMOKE_FROM 6:00 to LAMP_OUT 22:00, as lamp_lit's
+windows fall back to the hour (12:00 to LAMP_OUT, the sun down), so a lit house never stands
+without smoke (environment: one rule for both); known awake or asleep wins, a ruin, a house
+being built or a healer's hut told empty never smokes, and a turf house's pot fire (718)
+follows its smoke. This replaces smoking's old "a fire is never guessed". _update_lamps, every
+LAMP_CHECK, now shows every chimney too (the hour moves on), and set_awake leaves them to it.
+view_test: the stack's foot at the eaves under the seat; smoking at each hour with nobody
+known (5.9 no, 6 to 21.5 yes, 22 no) and never a lit window without smoke; asleep, not.
+Client only; protocol unchanged, no new class_name.
+
 ## 495. Shader warm-ups: a material drawn once at load, not first at play
 
 A material's pipelines are compiled the first time it is drawn, so its first

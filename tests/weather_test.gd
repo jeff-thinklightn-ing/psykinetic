@@ -552,6 +552,12 @@ func _test_night_town() -> void:
 	var off_wall := Client3D.DOOR_LAMP_OUT + Client3D.DOOR_LAMP_LIGHT.z
 	_check(off_wall >= 0.9 and Client3D.DOOR_LAMP_LIGHT.y < 0.0 and Client3D.DOOR_LAMP_LIGHT.y > -1.0,
 			"its light stands %.2f m off the wall, under the lantern, so the stone beside it isn't burned white (782 amended)" % off_wall)
+	# Art-kit's lantern (489 amended (4)) keeps it so: its light off its flame.
+	var flame: Variant = Flames.socket_of(Client3D.DOOR_LAMP_SLOT)
+	var art_light: Vector3 = (flame if flame != null else Vector3(0.57, 1.92, 0.0)) + Client3D.DOOR_LAMP_ART_LIGHT
+	_check(art_light.x >= 0.9 and art_light.y < 1.6 and art_light.y > 1.3 and Client3D.HOUSE_DOOR_LAMP_ENERGY < Client3D.DOOR_LAMP_ENERGY
+			and Client3D.HOUSE_DOOR_LAMP_RANGE == 3.5,
+			"art-kit's lantern's light %.2f m off the wall, %.2f m up; a house's dimmer and shorter than a trade's (environment)" % [art_light.x, art_light.y])
 	var buildings := [{"rect": Rect2i(0, 0, 4, 6), "facing": Vector2i(0, 1)}, {"rect": Rect2i(10, 0, 3, 3), "facing": Vector2i(1, 0)}]
 	_check(Client3D.building_holding(buildings, Vector2i(11, 1)) == buildings[1] and Client3D.building_holding(buildings, Vector2i(7, 1)).is_empty(),
 			"a counter's building is the one whose rect holds it; none in the open")
