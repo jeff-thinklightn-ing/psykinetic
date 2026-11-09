@@ -7366,14 +7366,37 @@ func _test_low_camera() -> void:
 	_check(_rig.within_near(near) == near and is_equal_approx(held.distance_to(aim), World.NEAR_TILES)
 			and is_equal_approx((held - aim).angle(), (far_off - aim).angle()),
 			"a far click lands NEAR_TILES out along its line; a near one where it is")
-	# 623 amended (2): a tall piece with no walls (Level.FADES_ON_LINE) fades on the line as a tree does.
+	# 623 amended (2): a tall piece with no walls (Level.FADES_ON_LINE, indoors and below ground: a throne) fades on the line as a tree does.
 	var stall := MeshInstance3D.new()
 	stall.mesh = BoxMesh.new()
 	_rig._room.add_child(stall)
-	_rig._buildings.append({"rect": Rect2i(0, 0, 1, 1), "node": stall, "roof": null, "off": false, "fades": "building.market_stall" in Level.FADES_ON_LINE})
+	_rig._buildings.append({"rect": Rect2i(0, 0, 1, 1), "node": stall, "roof": null, "off": false, "fades": "building.throne" in Level.FADES_ON_LINE})
 	_rig._index_occluders()
 	_check(_rig._occluders.any(func(entry: Array) -> bool: return entry[0] == stall) and "building.woodpile" not in Level.FADES_ON_LINE,
-			"a market stall is one of the pieces that fade on the line to the player; a woodpile is not")
+			"a throne is one of the pieces that fade on the line to the player; a woodpile is not")
+	# Jeff: "basic landmarks such as the barrows and signs shouldnt go transparent": outdoors they hide, never fade.
+	var landmark := MeshInstance3D.new()
+	landmark.mesh = SphereMesh.new()  # Radius 0.5, at the room's origin.
+	_rig._room.add_child(landmark)
+	_rig._buildings.append({"rect": Rect2i(0, 0, 1, 1), "node": landmark, "roof": null, "off": false,
+		"fades": "building.waystone" in Level.FADES_ON_LINE, "stands": "building.waystone" in Client3D.STANDS_IN_VIEW})
+	_rig._index_occluders()
+	var standing: Array = _rig._occluders.filter(func(entry: Array) -> bool: return entry[0] == landmark)
+	_check(standing.size() == 1 and (standing[0][3] as Array).is_empty()
+			and Level.FADES_ON_LINE.all(func(kind: String) -> bool: return kind not in Client3D.STANDS_IN_VIEW)
+			and ["building.mound", "building.waystone", "building.well", "tree.great_oak"].all(func(kind: String) -> bool: return kind not in Level.FADES_ON_LINE),
+			"an outdoor landmark (a waystone, a barrow's mound) hides the player but has nothing to fade")
+	var at := landmark.global_position
+	var shapes: Array = standing[0][4] if standing.size() == 1 and standing[0].size() > 4 else []
+	var corner_from := at + Vector3(-1.0, 0.45, 0.45)
+	var corner_to := at + Vector3(1.0, 0.45, 0.45)
+	_check(Client3D.shapes_meet(shapes, at + Vector3(-1, 0, 0), at + Vector3(1, 0, 0))
+			and not Client3D.shapes_meet(shapes, corner_from, corner_to)
+			and (standing[0][1] as AABB).intersects_segment(corner_from, corner_to) != null,
+			"a landmark hides along a line through its own shape, not over its box's empty corner")
+	_rig._buildings.pop_back()
+	landmark.queue_free()
+	_rig._index_occluders()
 	var faded_stall: Dictionary[Node3D, bool] = {stall: true}
 	var far_off_camera: bool = _rig._close_pieces(faded_stall).is_empty()
 	stall.global_position = _rig._camera.global_position + Vector3(2.0, -1.0, 0.0)
@@ -7491,7 +7514,8 @@ func _test_low_camera() -> void:
 ## they set that shows them whole (a sine out), the walk keys going by the
 ## yaw it set off from meanwhile, and stays (saved); the player's own turn
 ## stops one at once and holds it; with the turning off (or no yaw within
-## reach clearing them) what hides them fades as it always did.
+## reach clearing them) nothing fades either (623 amended (5)): their rim
+## shows through.
 func _test_camera_turn() -> void:
 	print("
 == outdoors the camera turns to keep you in view (801) ==")
@@ -7504,12 +7528,25 @@ func _test_camera_turn() -> void:
 			and CameraTurn.choose(0.0, func(degrees: float) -> bool: return degrees == -45.0, Vector2.ZERO, 0.0) == -45.0
 			and is_nan(CameraTurn.choose(0.0, only_far, Vector2.ZERO, 0.0)) and CameraTurn.choose(-30.0, only_far, Vector2.ZERO, -30.0) == -60.0,
 			"the nearest clearing yaw, 15 degrees a step, within 45 of the one they set; of two as near, the one looking the way they walk (%s); none: NAN" % pick)
-	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
-	_rig.set_process(false)
 	var player := _player()
 	var companion := _companion()
+	var spawned_her: Companion = null
+	if companion == null:
+		# Wren for the hidden-companion check (623 amended (5)), as _test_inside_is_his has one.
+		spawned_her = EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "TurnWren", "props": {"max_hp": 10}}) as Companion
+		spawned_her.keeper_peer = Net.local_id
+		for cell: Vector2i in [player.tile + Vector2i(3, 0), player.tile + Vector2i(0, 3), player.tile + Vector2i(-3, 0), player.tile + Vector2i(0, -3)]:
+			if World.is_walkable(cell) and World.get_entity_at(cell) == null and World.spawn(spawned_her, cell):
+				companion = spawned_her
+				break
+	_rig.rebuild(_building_terrain(), Vector2i(7, 7))
+	_rig._process(0.0)  # Her puppet drawn.
+	_rig.set_process(false)
+	_rig._hid_at.clear()  # What that frame faded round where she stood held no FADE_HOLD here (the clock stands).
+	_rig._close_at.clear()
 	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
 	var other: Node3D = _rig._puppets.get(companion.get_instance_id()) if companion != null else null
+	_check(other != null, "a companion drawn for the check (%s)" % ("spawned" if spawned_her != null else "the scene's"))
 	var was := puppet.global_position
 	var other_was := other.global_position if other != null else Vector3.ZERO
 	var yaw_was: float = _rig.yaw
@@ -7528,6 +7565,32 @@ func _test_camera_turn() -> void:
 	var faded_walls := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return _rig._walls.values().has(piece)).size()
 	_check(_rig._outdoor and _rig._player_hidden and not _rig._lined.is_empty() and faded_walls == 0,
 			"behind the house: hidden, and nothing fades for it (%d on the line, %d walls faded)" % [_rig._lined.size(), faded_walls])
+	_rig._update_seen_through()
+	var worn: Variant = puppet.get_meta("outline", null)
+	var fill: ShaderMaterial = _rig._player_through
+	var rim_pass := fill.next_pass as ShaderMaterial
+	_check(puppet.has_meta("seen_through") and worn == fill and rim_pass != null
+			and "write" in fill.shader.code and "depth_test_disabled" in fill.shader.code
+			and Color(fill.get_shader_parameter("colour")).b > Color(fill.get_shader_parameter("colour")).r
+			and Color(rim_pass.get_shader_parameter("colour")).get_luminance() > Color(fill.get_shader_parameter("colour")).get_luminance(),
+			"hidden outdoors: the player shows through what hides them, a cool fill marking its pixels and a brighter rim round it (623 amended (5))")
+	if other != null:
+		# Wren behind the house too (623 amended (5)): hers shows; marked, her rim is the target's, drawn through.
+		other.global_position = _rig.to_global(_rig._tile_position(Vector2i(2, 6)))
+		_rig._update_fade(true)
+		_rig._update_seen_through()
+		var hidden_her: bool = _rig._companion_hidden
+		var hers: bool = hidden_her and other.has_meta("seen_through")
+		_rig.target(companion)
+		_rig._update_seen_through()
+		var through: bool = other.get_meta("outline", null) == _rig._target_through and not other.has_meta("seen_through")
+		_rig.target(null)
+		other.global_position = _rig.to_global(_rig._tile_position(Vector2i(12, 11)))  # In the open, as the player's check below.
+		_rig._update_fade(true)
+		_rig._update_seen_through()
+		_check(hers and through and not _rig._companion_hidden and not other.has_meta("seen_through"),
+				"Wren hidden behind it: her rim shows; marked, the target's rim drawn through; in the open, off (hidden %s, rim %s; through %s; after %s %s)"
+				% [hidden_her, hers, through, _rig._companion_hidden, other.has_meta("seen_through")])
 	var target := CameraTurn.choose(0.0, _rig._clears, Vector2.ZERO, 0.0)
 	_check(not is_nan(target) and absf(target) <= CameraTurn.TURN_MOST and _rig._clears(target) and not _rig._clears(0.0),
 			"a yaw within 45 degrees shows them whole (%s)" % target)
@@ -7545,6 +7608,8 @@ func _test_camera_turn() -> void:
 	_check(not early and started and frame_kept and is_equal_approx(_rig.yaw, target) and not _rig._turn_view.turning
 			and is_equal_approx(Net.camera_yaw, Client3D.wrapped_yaw(target)) and not _rig._player_hidden,
 			"after HIDE_SECONDS it turns there and stays, the walk keys going by where it set off meanwhile (%s, mid-turn %.1f); seen now" % [_rig.yaw, mid])
+	_rig._update_seen_through()
+	_check(not puppet.has_meta("seen_through"), "seen again: their rim off")
 	# Back behind the house, the player's own turn stops a turn under way.
 	_rig._set_yaw(0.0)
 	_rig._update_fade(true)
@@ -7560,8 +7625,9 @@ func _test_camera_turn() -> void:
 	_rig._drive_turn(CameraTurn.HIDE_SECONDS + 0.1)
 	_rig._drive_turn(0.25)
 	var walls_faded := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return _rig._walls.values().has(piece)).size()
-	_check(turning_before and stopped and not _rig._turn_view.turning and _rig._line_fade and walls_faded > 0,
-			"A/D stops it at once, none for MANUAL_HOLD, and what hides them fades meanwhile (%d walls)" % walls_faded)
+	_rig._update_seen_through()
+	_check(turning_before and stopped and not _rig._turn_view.turning and _rig._line_fade and walls_faded == 0 and puppet.has_meta("seen_through"),
+			"A/D stops it at once, none for MANUAL_HOLD; nothing fades meanwhile, their rim shows (623 amended (5); %d walls)" % walls_faded)
 	# Turned off past TURN_MOST by hand's yaw: nothing within reach clears, so it fades.
 	_rig._turn_view = CameraTurn.new()
 	_rig._line_fade = false
@@ -7576,8 +7642,9 @@ func _test_camera_turn() -> void:
 	for i in 20:
 		_rig._drive_turn(0.1)
 	var off_faded := _rig._faded.keys().filter(func(piece: Node3D) -> bool: return _rig._walls.values().has(piece)).size()
-	_check(_rig.yaw == 0.0 and _rig._line_fade and off_faded > 0 and _rig._player_hidden,
-			"turning off in Options: it never turns, and what hides them fades (%d walls; still counted hidden, so it turns again when on)" % off_faded)
+	_rig._update_seen_through()
+	_check(_rig.yaw == 0.0 and _rig._line_fade and off_faded == 0 and _rig._player_hidden and puppet.has_meta("seen_through"),
+			"turning off in Options: it never turns, nothing fades, their rim shows (%d walls; still counted hidden, so it turns again when on)" % off_faded)
 	Net.camera_turn = true
 	# Out in the open: not hidden, nothing shown through.
 	puppet.global_position = _rig.to_global(_rig._tile_position(Vector2i(13, 11)))
@@ -7590,6 +7657,8 @@ func _test_camera_turn() -> void:
 	puppet.global_position = was
 	if other != null:
 		other.global_position = other_was
+	if spawned_her != null and spawned_her.spawned:
+		World.despawn(spawned_her)
 	_rig._turn_view = CameraTurn.new()
 	_rig._line_fade = false
 	_rig._set_yaw(yaw_was)

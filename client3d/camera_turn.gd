@@ -14,9 +14,9 @@ extends RefCounted
 ## player's own turning (A/D, a middle drag, the overhead key) stops a turn
 ## at once and holds the camera MANUAL_HOLD after. While they are hidden
 ## and no turn helps (none within TURN_MOST clears, their own turning holds
-## it, or Options' "Camera: keep you in view" is off), what hides them
-## fades as it always did (Client3D._line_fade). Indoors none of this:
-## what hides them fades as before.
+## it, or Options' "Camera: keep you in view" is off: Client3D._line_fade),
+## nothing fades either (623 amended (5)): their rim shows through what
+## hides them. Indoors none of this: what hides them fades as before.
 
 const HIDE_SECONDS := 0.6
 const COOL_DOWN := 1.5

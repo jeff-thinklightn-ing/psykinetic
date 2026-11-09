@@ -37,6 +37,7 @@ const VIEW: Array[StringName] = [
 	&"_wall_lamp_clock", &"_skylight_clock", &"_sky_material", &"_sky_horizon", &"_sky_step",
 	&"_look", &"_look_daylight", &"_floor_least", &"_look_elevation", &"_haze", &"_weather_view",
 	&"_canopy_cover", &"_toward_sun", &"_see_through", &"_pile_ring_mesh", &"_player_hidden",
+	&"_companion_hidden", &"_target_through", &"_player_through", &"_companion_through",  # 623 amended (5).
 	&"_turn_view", &"_walk", &"_walk_from", &"_hand_yaw", &"_line_fade", &"_fade_clock",
 	&"_inside_rect", &"_builder_marks", &"_code_labels", &"_codes_on", &"_aura_mote_material",
 	&"_aura_shader", &"drips", &"_shadow_checked", &"_lamp_clock", &"_roofs_clock",

@@ -22,6 +22,15 @@ extends Node
 ##   gains: in an open field (804) the player is told a fight won and a
 ##     town's regard with its banner, then a step; the floats over them, the
 ##     banners top centre, one after the other.
+##   sheet: the pack and the character sheet open in a field, still (stills
+##     of the inventory); --dressed: every worn slot and the pack filled.
+##   target: the low camera on a field, a still monster outlined as the
+##     click's target (--kind=imp|bandit; --far: 10 cells off, else 3).
+##   landmark: outdoors the player stands where a landmark hides them from
+##     the camera (--which=mound: behind a barrow's mound; waystone: just
+##     behind a waystone; waystone_aside: a step aside, the stone across
+##     part of them; house, mughouse: just off the far corner of a small
+##     house or inn, 623 amended (5)); nothing outdoors fades.
 ##   escape: an imp on guard sees the player, who runs down a corridor and
 ##     round two corners; the imp hunts to where it last saw them and on,
 ##     looks round, gives up and walks home.
@@ -211,6 +220,12 @@ func _ready() -> void:
 			_camera_turn()
 		"gains":
 			_gains()
+		"sheet":
+			_sheet()
+		"target":
+			_target()
+		"landmark":
+			_landmark()
 		"escape":
 			_escape()
 		"leash":
@@ -313,6 +328,14 @@ func _ready() -> void:
 		_main.pack_panel.shown = true
 	if scenario in ["camera_turn", "gains"]:
 		_main.pack_panel.shown = false
+	if scenario == "sheet":
+		_main.pack_panel.shown = true
+	if scenario in ["target", "landmark"]:
+		_main.pack_panel.shown = false
+		Net.camera_low = true  # Jeff's view in the wilds (623): the low camera.
+		if _main._client3d != null:
+			_main._client3d._apply_camera_mode()
+		process_priority = 100  # After Main, whose cursor would take the outline off.
 	if scenario == "items_use":
 		World.get_doors()[0].lock = "cellar"
 	_caption = Label.new()
@@ -332,6 +355,8 @@ func _ready() -> void:
 
 ## The camera on the middle of the player and the monster, so both are seen.
 func _process(delta: float) -> void:
+	if scenario == "target" and _main != null and _main._client3d != null and is_instance_valid(_monster) and _elapsed > 0.5:
+		_main._client3d.target(_monster)
 	_elapsed += delta
 	if _elapsed > max_seconds:
 		push_warning("clip: %s ran past %d s; stopped" % [scenario, max_seconds])
@@ -342,7 +367,7 @@ func _process(delta: float) -> void:
 		return
 	var at: Node3D = view._puppets.get(_player.get_instance_id())
 	var monster: Node3D = view._puppets.get(_monster.get_instance_id())
-	if at != null and monster != null and not scenario in ["camera_turn", "gains"]:  # 801: on the player alone.
+	if at != null and monster != null and not scenario in ["camera_turn", "gains", "sheet", "target", "landmark"]:  # 801: on the player alone.
 		var middle: Vector3 = (monster.position - at.position) * 0.5
 		view.pan = view.pan.lerp(middle, 1.0 - exp(-3.0 * delta)).limit_length(view.PAN_MAX)
 
@@ -407,6 +432,79 @@ func _gains() -> void:
 		["reward", {"track": "explore", "amount": 1, "of": "Hollowfell", "big": true, "banner": "Hollowfell"}, ""],
 		["wait", 80, ""],
 	]
+
+
+func _sheet() -> void:
+	var rows: Array[String] = []
+	for y in 16:
+		rows.append(".".repeat(30))
+	var markers := {Vector2i(15, 8): "start", Vector2i(1, 15): "monster_imp"}
+	var config := {"name": "Clip", "outdoor": true,
+		"entities": [{"at": [1, 15], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [["wait", 10, ""]]
+	if "--dressed" in OS.get_cmdline_user_args():
+		for each: Array in [["sword", Items.RIGHT_HAND], ["shield", Items.LEFT_HAND], ["leather_armour", Items.ARMOUR],
+				["felt_hat", Items.HEAD], ["encolpion_amulet", Items.NECK], ["cloak", Items.BACK], ["soft_boots", Items.FEET],
+				["signet_ring", Items.RING_1], ["signet_ring", Items.RING_2], ["bear_claw_charm", Items.CHARM],
+				["bow", 0], ["pick", 1], ["ore_sack", 2], ["ration", 3]]:
+			_script.append(["item_give", each, ""])
+	_script.append(["wait", 40, ""])
+
+
+func _target() -> void:
+	var kind := "imp"
+	var far := false
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--kind="):
+			kind = arg.trim_prefix("--kind=")
+		far = far or arg == "--far"
+	Monster.idling = false
+	Monster.noticing = false
+	var rows: Array[String] = []
+	for y in 16:
+		rows.append(".".repeat(30))
+	var start := Vector2i(8, 10)
+	var at := start + (Vector2i(8, -6) if far else Vector2i(2, -2))
+	var markers := {start: "start", at: "monster_" + kind}
+	var config := {"name": "Clip", "outdoor": true, "legend": {"monster_bandit": "#806040"},
+		"entities": [{"at": [at.x, at.y], "facing": [-1, 1], "idle": {"mode": "guard"}}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	_script = [["wait", 50, ""]]
+
+
+func _landmark() -> void:
+	var args := OS.get_cmdline_user_args()
+	var aside := "--which=waystone_aside" in args
+	var built := "house" if "--which=house" in args else "inn" if "--which=mughouse" in args else ""  # 623 amended (5): a house, the Mughouse's kind.
+	var mound := not "--which=waystone" in args and not aside
+	Monster.idling = false
+	Monster.noticing = false
+	var rows: Array[String] = []
+	for y in 26:
+		rows.append(".".repeat(34))
+	# The camera looks from +x +y: the player just off the mound's far corner (its 12 x 12 from [10, 8]).
+	var start := Vector2i(9, 7) if mound else Vector2i(16, 11) if aside else Vector2i(15, 11)  # Aside: the stone across part of them.
+	var piece := {"slot": "building.mound", "at": [10, 8], "facing": [0, 1]} if mound \
+		else {"slot": "building.waystone", "at": [16, 12], "facing": [0, 1], "carved": "Umbrage", "arrow": "left"}
+	if not built.is_empty():
+		piece = {"kind": built, "size": "small", "at": [10, 8], "facing": [1, 0] if built == "inn" else [0, 1]}
+	var markers := {start: "start", Vector2i(1, 24): "monster_imp"}
+	var config := {"name": "Clip", "outdoor": true, "buildings": [piece],
+		"entities": [{"at": [1, 24], "facing": [-1, 0], "idle": {"mode": "guard"}}]}
+	var wide := Terrain.expand(rows)
+	if not built.is_empty():
+		# A kind's walls are the level's edges round its blocks (Level's outline check), its own open ones left.
+		var open := Level.kind_open(piece)
+		for key in Level.blocks_outline(Level._union(Level.building_blocks(piece))):
+			if key in open:
+				continue
+			var sides := Terrain.edge_cells(key)
+			var at: Vector2i = sides[0] + sides[1]
+			var line := wide[at.y].rpad(at.x + 1)
+			wide[at.y] = line.substr(0, at.x) + "#" + line.substr(at.x + 1)
+	Level.register(NAME, Level.image_from_rows(wide, markers, config), null, config)
+	_script = [["wait", 60, ""]]
 
 
 func _camera_turn() -> void:

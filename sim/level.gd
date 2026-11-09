@@ -269,24 +269,20 @@ const CARVED_ARROWS: Array[String] = ["left", "right", "up"]
 ## player's middle (about 1.5 m, by art-kit's drawn heights): on the line
 ## from the camera to the player they fade as trees do (623 amended (2):
 ## the low camera nearer and flatter, Rolf's stall hid the player whole).
-## Buildings' list; the low ones (a woodpile, a table, a chair) stay.
+## Buildings' list; the low ones (a woodpile, a table, a chair) stay. Indoors
+## and below ground only (Jeff, 2026-11-06: "basic landmarks such as the
+## barrows and signs shouldnt go transparent just because you walk near
+## them"): outdoors no landmark fades (the mound, the waystone, the
+## standing stone, the cairn, the well, a stall, the great trees, the
+## ruined tower); the camera turns instead (801), and while it cannot the
+## player's rim shows through (Client3D.SEEN_OUTLINE).
 ## One entry a line, sorted, each with its comma (816: a new kind is its own line).
 const FADES_ON_LINE: Array[String] = [
-	"building.cairn",
 	"building.crypt_pillar",
 	"building.dark_pillar",
 	"building.dwarven_forge",
-	"building.great_tree",
-	"building.market_stall",
-	"building.mound",
-	"building.standing_stone",
 	"building.throne",
-	"building.tower_ruin",
-	"building.waystone",
 	"building.weapon_rack",
-	"building.well",
-	"tree.clawed",
-	"tree.great_oak",
 ]
 ## A herder's fold (640), and how far from its holding's place cell it may
 ## stand (fold_near).

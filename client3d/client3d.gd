@@ -1700,6 +1700,23 @@ const HOVER := Color(1, 1, 1, 0.35)
 ## perspective too), so the floor just in front of its feet does not hide
 ## the rim there; anything further in front still does.
 const TARGET_OUTLINE := Color(0.93, 0.9, 0.82)
+## The outdoor landmarks that stand taller than a player's middle (Jeff,
+## 2026-11-06: "basic landmarks such as the barrows and signs shouldnt go
+## transparent just because you walk near them"): off Level.FADES_ON_LINE,
+## they never fade, but still hide the player (Client3D._is_hidden), so the
+## camera turns (801) and the player's rim shows through them meanwhile.
+const STANDS_IN_VIEW: Array[String] = [
+	"building.cairn",
+	"building.great_tree",
+	"building.market_stall",
+	"building.mound",
+	"building.standing_stone",
+	"building.tower_ruin",
+	"building.waystone",
+	"building.well",
+	"tree.clawed",
+	"tree.great_oak",
+]
 ## A foe seen through what hides it (the low-angle fight, combat's (b)):
 ## a monster hunting or fighting (or lately struck) whose chest a nearer
 ## body (another's or the player's own) hides from the camera, or any
@@ -1709,6 +1726,16 @@ const TARGET_OUTLINE := Color(0.93, 0.9, 0.82)
 ## only bodies are asked (hidden_by_body), and what the sim did not send
 ## is not there to outline, so its sight rule still says what you know.
 const SEEN_OUTLINE := Color(0.93, 0.78, 0.52, 0.7)
+## A body hidden outdoors (623 amended (5), the coordinator: a flat cream
+## shape the colour of the planks read as a stain) drawn through what hides
+## it in a cool colour against warm wood and stone: its hidden part filled
+## (the first pass, marking the stencil as it draws) and a brighter rim of
+## TARGET_PIXELS round it, so it reads as a person. Each [fill, rim]: the
+## player pale blue, their companion her tint (Main.COMPANION_TINT), the
+## marked target red.
+const THROUGH_PLAYER: Array[Color] = [Color(0.6, 0.78, 1.0, 0.5), Color(0.86, 0.95, 1.0, 0.95)]
+const THROUGH_COMPANION: Array[Color] = [Color(0.45, 0.95, 0.85, 0.45), Color(0.78, 1.0, 0.95, 0.95)]
+const THROUGH_TARGET: Array[Color] = [Color(0.9, 0.22, 0.18, 0.5), Color(1.0, 0.55, 0.45, 0.95)]
 const TARGET_PIXELS := 3.0
 const OUTLINE_NEARER := 0.4
 const OUTLINE_STENCIL := 1
@@ -2383,10 +2410,14 @@ var _telegraphs: Dictionary = {}
 var _tells: Dictionary = {}
 var _cell_quad: ArrayMesh
 ## The outline's passes (the first; each the next's next_pass), the
-## outlined puppet (null: none), and each body material's copy that marks
-## the stencil, by the material.
+## seen-through rim's, the target's own rim drawn through what hides it
+## outdoors (623 amended (5)), the outlined puppet (null: none), and each
+## body material's copy that marks the stencil, by the material.
 var _outline: ShaderMaterial
 var _seen_through: ShaderMaterial
+var _target_through: ShaderMaterial
+var _player_through: ShaderMaterial
+var _companion_through: ShaderMaterial
 var _outlined: Node3D
 var _marking: Dictionary[Material, Material] = {}
 ## Body shaders' stencil-marking twins (_marking_shader).
@@ -2990,11 +3021,13 @@ var _faded_close: Dictionary[Node3D, bool] = {}
 ## state (client3d/camera_turn.gd); the way the player moves (x and z, a
 ## second's worth, eased) and where their puppet was; the yaw the player
 ## last set themselves (the turn's own stay within CameraTurn.TURN_MOST of
-## it); whether what hides them fades as indoors (no turn helps); the near
-## side of a building they are in.
+## it); whether no turn helps (_line_fade: nothing fades for it outdoors
+## since 623 amended (5), the rim shows instead); the near side of a
+## building they are in; whether their companion is hidden as they are.
 var _lined: Dictionary[Node3D, bool] = {}
 var _close_at: Dictionary[Node3D, float] = {}
 var _player_hidden := false
+var _companion_hidden := false
 const CameraTurn := preload("res://client3d/camera_turn.gd")
 var _turn_view: RefCounted = CameraTurn.new()
 var _walk := Vector2.ZERO
@@ -3073,6 +3106,11 @@ func setup(terrain: Dictionary, centre := Vector2i.ZERO) -> void:
 		pass_.next_pass = after
 		after = pass_
 	_seen_through = after
+	var core_shader := Shader.new()
+	core_shader.code = seen_shader.code.replace("stencil_mode read, compare_not_equal, 1;", "stencil_mode read, write, compare_not_equal, 1;")
+	_target_through = _through_passes(core_shader, seen_shader, THROUGH_TARGET)
+	_player_through = _through_passes(core_shader, seen_shader, THROUGH_PLAYER)
+	_companion_through = _through_passes(core_shader, seen_shader, THROUGH_COMPANION)
 	_toss = _make_flat(_make_arrow(TOSS_LENGTH), TOSS)
 	_toss.visible = false
 	add_child(_toss)
@@ -5600,8 +5638,31 @@ func _show_outline(puppet: Node3D, show: bool, rim: ShaderMaterial = null) -> vo
 		_mark_stencil(source, show)
 
 
+## A hidden body's passes drawn through what hides it (THROUGH_PLAYER):
+## first the fill over its hidden part ([param core], its pixels marked),
+## then the rim's eight nudged copies ([param rim]) round it only.
+func _through_passes(core: Shader, rim: Shader, colours: Array[Color]) -> ShaderMaterial:
+	var after: ShaderMaterial = null
+	for way: Vector2i in World.DIRECTIONS:
+		var pass_ := ShaderMaterial.new()
+		pass_.shader = rim
+		pass_.set_shader_parameter("colour", colours[1])
+		pass_.set_shader_parameter("nudge", Vector2(way).normalized() * TARGET_PIXELS)
+		pass_.set_shader_parameter("nearer", OUTLINE_NEARER)
+		pass_.next_pass = after
+		after = pass_
+	var fill := ShaderMaterial.new()
+	fill.shader = core
+	fill.set_shader_parameter("colour", colours[0])
+	fill.set_shader_parameter("nearer", OUTLINE_NEARER)
+	fill.next_pass = after
+	return fill
+
+
 ## Each frame: the foes seen through what hides them (SEEN_OUTLINE). The
-## marked target keeps its own rim.
+## marked target keeps its own rim, drawn through what hides it outdoors
+## (623 amended (5): nothing there fades for it), red (THROUGH_TARGET); the
+## player and their companion hidden outdoors theirs (THROUGH_PLAYER).
 func _update_seen_through() -> void:
 	if _camera == null:
 		return
@@ -5612,20 +5673,40 @@ func _update_seen_through() -> void:
 		if puppet == _outlined:
 			if had:
 				puppet.remove_meta("seen_through")  # Its target's rim is on it now (target()).
+			var rim := _target_through if _outdoor and puppet.visible and _body_hidden(puppet) else _outline
+			if puppet.get_meta("outline", null) != rim:
+				_show_outline(puppet, true, rim)
 			continue
 		var entity := instance_from_id(id) as GridEntity
 		var seen := false
+		var rim := _seen_through
 		if entity is Monster and entity.spawned and entity.hp > 0 and not _far.has(id) and puppet.visible:
 			var alert: Monster.Alert = (entity as Monster).alert
 			var fights: bool = alert == Monster.Alert.FIGHTING or alert == Monster.Alert.HUNTING \
 					or now - _combat_at.get(id, -100000) < COMBAT_SECONDS * 1000.0
 			seen = in_telegraph(entity.tile) or (fights and hidden_by_body(puppet, id))
+		elif entity is Player and entity.owner_peer == Net.local_id and puppet.visible:
+			# The player hidden outdoors (801): what hides them stays as it
+			# is (a landmark never fades, Level.FADES_ON_LINE), their rim
+			# shows through it until the camera's turn brings them back.
+			seen = _outdoor and _player_hidden
+			rim = _player_through
+		elif entity is Companion and entity.keeper_peer == Net.local_id and puppet.visible:
+			seen = _outdoor and _companion_hidden  # Their companion as they are (623 amended (5)).
+			rim = _companion_through
 		if seen != had:
 			if seen:
 				puppet.set_meta("seen_through", true)
 			else:
 				puppet.remove_meta("seen_through")
-			_show_outline(puppet, seen, _seen_through)
+			_show_outline(puppet, seen, rim)
+
+
+## Outdoors: whether something standing (_point_blocked) hides [param
+## puppet]'s chest from the camera, not counting what is see-through now.
+func _body_hidden(puppet: Node3D) -> bool:
+	var chest := puppet.global_position + Vector3.UP * (float(puppet.get_meta("pick_height", 1.0)) * 0.6)
+	return _point_blocked(chest, _camera.global_transform.basis.z, _see_through_now(_faded_close))
 
 
 ## Whether a body (a pick shape with an entity, not [param id]'s own)
@@ -8533,7 +8614,7 @@ func _add_buildings() -> void:
 		var roof: Node3D = node.get_node_or_null("roof")
 		_buildings.append({"rect": rect, "node": node, "roof": roof, "off": false, "roof_at": roof.transform if roof != null else Transform3D(),
 			"use": str(building.get("use", "")), "town_id": str(building.get("town_id", "")), "damaged": false,
-			"open_air": slot in Level.OPEN_AIR, "fades": slot in Level.FADES_ON_LINE, "crop": "", "code": str(building.get("code", "")),
+			"open_air": slot in Level.OPEN_AIR, "fades": slot in Level.FADES_ON_LINE, "stands": slot in STANDS_IN_VIEW, "crop": "", "code": str(building.get("code", "")),
 			"hut": hut_id(building, str(_terrain.get("level", "")))})
 		# A banked one's inside (718) is its block, not its plot: its ring
 		# is its bank, its walls round the block.
@@ -17864,12 +17945,11 @@ func _update_fade(force := false) -> void:
 		if _outdoor:
 			_inside_hiding = _inside_walls(points, toward)
 			_hiding = _inside_hiding.duplicate()
+			# What stands on the line never fades outdoors (623 amended (5):
+			# a house, a wall, a tree, a landmark), even where no turn helps
+			# (_line_fade): the hidden body's rim shows through instead
+			# (_update_seen_through); only those by the low camera's lens go.
 			_lined = _hiding_pieces(points, toward)
-			# No turn helps (none within TURN_MOST clears them, their own
-			# turning holds it, or Options' turning is off): what hides them
-			# fades as it always did.
-			if _line_fade:
-				_hiding.merge(_lined)
 		else:
 			_hiding = _hiding_pieces(fought, toward)
 			_hiding.merge(_inside_walls(points, toward))
@@ -17896,9 +17976,11 @@ func _update_fade(force := false) -> void:
 				_close_at.erase(piece)
 		if moved or close.size() != _faded_close.size():
 			_player_hidden = _is_hidden(points, toward, close)
+			_companion_hidden = _is_hidden(points, toward, close, FADE_HEIGHTS.size())
 	else:
 		_close_at.clear()
 		_player_hidden = false
+		_companion_hidden = false
 	if not force and not roofs_changed and now.size() == _faded.size() and now.keys().all(func(piece: Node3D) -> bool: return _faded.has(piece)) 			and close.size() == _faded_close.size() and close.keys().all(func(piece: Node3D) -> bool: return _faded_close.has(piece)):
 		return
 	for entry in _occluders:
@@ -18212,17 +18294,17 @@ func _hiding_pieces(points: Array[Vector3], toward: Vector3) -> Dictionary[Node3
 
 
 ## Outdoors (801): whether the local player (the first FADE_HEIGHTS of
-## [param points], _focus_points) is hidden from a camera looking back
-## along [param toward]: their chest and their feet or head behind
-## something standing (_point_blocked), not counting [param close] (hidden
-## by the lens) nor what is see-through already.
-func _is_hidden(points: Array[Vector3], toward: Vector3, close: Dictionary[Node3D, bool]) -> bool:
-	if _local_player() == null or points.size() < FADE_HEIGHTS.size():
+## [param points], _focus_points; their companion's from [param from]) is
+## hidden from a camera looking back along [param toward]: their chest and
+## their feet or head behind something standing (_point_blocked), not
+## counting [param close] (hidden by the lens) nor what is see-through already.
+func _is_hidden(points: Array[Vector3], toward: Vector3, close: Dictionary[Node3D, bool], from := 0) -> bool:
+	if _local_player() == null or points.size() < from + FADE_HEIGHTS.size():
 		return false
 	var skip := _see_through_now(close)
-	if not _point_blocked(points[1], toward, skip):
+	if not _point_blocked(points[from + 1], toward, skip):
 		return false
-	return _point_blocked(points[0], toward, skip) or _point_blocked(points[2], toward, skip)
+	return _point_blocked(points[from], toward, skip) or _point_blocked(points[from + 2], toward, skip)
 
 
 ## What does not hide them now: a building's near side, they being in it,
@@ -18254,8 +18336,38 @@ func _point_blocked(point: Vector3, toward: Vector3, skip: Dictionary[Node3D, bo
 					continue
 				var bounds: AABB = entry[1]
 				var ahead := bounds.get_center() - point
-				if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_segment(point, end) != null:
+				if ahead.x * toward.x + ahead.z * toward.z > 0.0 and bounds.intersects_segment(point, end) != null \
+						and (not (entry[3] as Array).is_empty() or shapes_meet(entry[4], point, end)):
 					return true
+	return false
+
+
+## [param piece]'s meshes' own triangles, each [MeshInstance3D,
+## TriangleMesh]: a landmark's shape (STANDS_IN_VIEW: a barrow's dome, a
+## stone) for _point_blocked, nearer than its box, whose corners stand
+## empty and whose stakes stretch it (a line over a mound's crest is not
+## behind it).
+func _shapes_of(piece: Node3D) -> Array:
+	var out := []
+	for node in _descendants(piece):
+		var mesh := node as MeshInstance3D
+		if mesh != null and mesh.mesh != null:
+			var triangles := mesh.mesh.generate_triangle_mesh()
+			if triangles != null:
+				out.append([mesh, triangles])
+	return out
+
+
+## Whether the segment [param from] to [param to] meets one of [param
+## shapes] (_shapes_of).
+static func shapes_meet(shapes: Array, from: Vector3, to: Vector3) -> bool:
+	for each: Array in shapes:
+		var mesh := each[0] as MeshInstance3D
+		if not is_instance_valid(mesh):
+			continue
+		var back := mesh.global_transform.affine_inverse()
+		if not (each[1] as TriangleMesh).intersect_segment(back * from, back * to).is_empty():
+			return true
 	return false
 
 
@@ -18430,6 +18542,9 @@ func _index_occluders() -> void:
 		# tree does (623 amended (2)).
 		if building.get("fades", false):
 			_occluders.append([building["node"], _bounds(building["node"]), true, [building["node"]]])
+		elif building.get("stands", false):
+			# A landmark hides the player (the turn, their rim) but never fades: nothing to fade.
+			_occluders.append([building["node"], _bounds(building["node"]), true, [], _shapes_of(building["node"])])
 	_occluder_chunks.clear()
 	_occluder_of.clear()
 	_occluder_top = 0.0
