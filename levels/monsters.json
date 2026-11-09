@@ -122,14 +122,15 @@
 		"lair": {"zone": "boar_lair", "land": ["forest"], "range": 40, "hours": [0, 24], "venture_after_s": 2700,
 			"out_most_s": 1800, "fall_back_hp": 0.4, "fall_back_escort": 0, "rise_s": 1800, "path_margin": 6, "pad_margin": 30},
 		"escort": {"kind": "boar", "count": [3, 3], "follow": 4},
-		"body": {"mass": 180.0, "max_hp": 60, "move_ticks": 3.0, "attack_ticks": 16, "attack_damage": 5, "sight_range": 7},
+		"body": {"mass": 180.0, "max_hp": 60, "move_ticks": 3.0, "attack_ticks": 30, "attack_damage": 3, "sight_range": 7},
 		"senses": {"cone": 140, "night": 0.8, "hearing": 1.5, "alert_sight": 2, "notice": 1.0},
 		"tactic": "heavy", "idle": "wander", "opens_doors": false, "door_force": 2, "leash": 30,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
 		"drops": [{"item": "boar_king_tusk", "count": [1, 1]}, {"item": "boar_king_hide", "count": [1, 1]}, {"item": "meat", "count": [6, 8]}],
 		"moves": {
 			"charge": {"windup": 12, "cells": 7, "past": 2, "from": 3, "damage": 6, "impulse": 140.0, "every": 60,
-				"skid": 15, "stun": 25, "not_below": 0.33, "join_tiles": 8}
+				"skid": 15, "stun": 25, "not_below": 0.33, "join_tiles": 8,
+				"paw": 6, "back": 20, "back_step": 5.0, "short": 2}
 		}
 	},
 	"hill_cat": {

@@ -147,7 +147,7 @@ static func _check(kind: String, row: Dictionary) -> void:
 			if body != null and body.target == null and World.steps - int(rec["attacked"]) >= LAIR_HEAL_STEPS:
 				body.hp = body.max_hp  # Whole again between fights.
 			if body != null and body.target == null and int(rec.get("escort_down", 0)) > 0 \
-					and World.steps >= int(rec.get("escort_whole_at", 0)):
+					and World.steps >= int(rec.get("escort_whole_at", 0)) and _fight_over(rec):
 				rec["escort_down"] = 0  # Its pack whole again in its lair.
 				_lay_escort(kind, body)
 			if _may_venture(rec, row, body):
@@ -163,6 +163,13 @@ static func _check(kind: String, row: Dictionary) -> void:
 			var why := _fall_back_why(kind, rec, row, body)
 			if why != "":
 				_go(kind, row, body, "lair", why, places["land_door"])
+
+
+## Its fight over: LAIR_HEAL_STEPS since the later of its last blow taken
+## and its escort's last fallen (playtest's boar king run: a boar killed in
+## the lair came back the step its lead's target lapsed between foes).
+static func _fight_over(rec: Dictionary) -> bool:
+	return World.steps - maxi(int(rec.get("attacked", -LAIR_HEAL_STEPS)), int(rec.get("escort_fell", -LAIR_HEAL_STEPS))) >= LAIR_HEAL_STEPS
 
 
 ## Unattacked venture_after_s since the later of its last blow and its death,
@@ -359,6 +366,7 @@ static func _tend_escort(kind: String) -> void:
 		if not is_instance_valid(each) or not (each as GridEntity).spawned or (each as GridEntity).hp <= 0:
 			list.erase(each)
 			rec["escort_down"] = int(rec.get("escort_down", 0)) + 1
+			rec["escort_fell"] = World.steps
 			print("[apex] %s escort down, %d live" % [kind, living_escort(kind)])
 		elif lead == null and (each as Monster).target == null:
 			list.erase(each)

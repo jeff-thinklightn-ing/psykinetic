@@ -1829,6 +1829,7 @@ func _test_ambush() -> void:
 	_test_heavy_cycle()
 	_test_sneak_pack()
 	_test_boar_king()
+	_test_boar_king_close()
 	_test_boar_king_lair()
 	_test_bold_comes_in()
 	_test_given_strength()
@@ -6856,6 +6857,97 @@ func _test_boar_king() -> void:
 	Monster.idling = true
 
 
+## The boar king up close (780 amended (16), his back-off; playtest's run:
+## a foe kept close never saw a charge): his charge ready, a foe under
+## "from" off, he stands pawing on his snort, backs off facing them, and
+## charges from "from" clear; followed step for step, the short charge from
+## where he stands; his bite one each 30 ticks, 3 hp.
+func _test_boar_king_close() -> void:
+	print("%s== the boar king up close: he backs off and charges; followed, the short charge; his bite slow ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var row: Dictionary = Monster.kinds()["boar_king"]
+	var arena: Array[String] = ["#".repeat(30)]
+	for y in 9:
+		arena.append("#" + ".".repeat(28) + "#")
+	arena.append("#".repeat(30))
+	var put := func(rows: Array[String], at: Vector2i, symbol: String) -> void:
+		rows[at.y] = rows[at.y].substr(0, at.x) + symbol + rows[at.y].substr(at.x + 1)
+	for follow: bool in [false, true]:
+		var rows := arena.duplicate()
+		put.call(rows, Vector2i(14, 5), "K")
+		put.call(rows, Vector2i(15, 5), "P")
+		var e := _build(rows)
+		var king: BoarKing = e["K"][0]
+		var player: GridEntity = e["P"][0]
+		player.protected = false
+		player.max_hp = 100
+		player.hp = 100
+		king.sight_range = 12
+		king.target = player
+		var cries: Array[StringName] = []
+		king.cried.connect(func(kind: StringName) -> void: cries.append(kind))
+		var start := World.tick
+		var pawed := -1
+		var paw_tile := Vector2i(-1, -1)
+		var still := true
+		var faced := true
+		var backed := 0
+		var told := -1
+		var run := 0
+		for i in 60:
+			World.step()
+			var move := str(king._move.get("move", ""))
+			if move == "paw":
+				if pawed < 0:
+					pawed = World.tick
+					paw_tile = king.tile
+				still = still and king.tile == paw_tile
+			if move == "back":
+				backed = maxi(backed, World.distance(king.tile, paw_tile))
+				faced = faced and king.facing == Senses.way_toward(king.tile, player.tile)
+			if move == "charge":
+				told = World.tick
+				run = int(king._move["cells"])
+				break
+			if follow and World.distance(player.tile, king.tile) > 1:
+				World.try_move(player, Senses.way_toward(player.tile, king.tile))
+		var snorts := cries.count(&"snort")
+		if not follow:
+			_check(pawed >= 0 and still and snorts == 1 and backed >= int(king.charge["from"]) - 1 and faced,
+				"a foe at his side: he stands pawing on one snort, then backs off facing them (%d cells, still %s, faced %s, %d snorts)" % [backed, still, faced, snorts])
+			_check(told >= 0 and told - start <= 30 and run >= int(king.charge["from"]),
+				"and charges from clear of them, told within 3 s (%d ticks, a run of %d)" % [told - start, run])
+		else:
+			_check(told >= 0 and told - start <= int(king.charge["paw"]) + int(king.charge["back"]) + 3 and run <= int(king.charge["from"]),
+				"followed step for step, he gets no room: the short charge from where he stands (%d ticks, a run of %d)" % [told - start, run])
+	# His bite, close, his charge not ready: one each 30 ticks, 3 hp.
+	var rows := arena.duplicate()
+	put.call(rows, Vector2i(14, 5), "K")
+	put.call(rows, Vector2i(15, 5), "P")
+	var e := _build(rows)
+	var king: BoarKing = e["K"][0]
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	king.target = player
+	king._next_charge = World.tick + 100000
+	_damage_log.clear()
+	for i in 150:
+		World.step()
+	var bites: Array = _damage_log.filter(func(d: Dictionary) -> bool: return d["source"] == king and d["entity"] == player)
+	var gap := 1 << 30
+	for k in range(1, bites.size()):
+		gap = mini(gap, int(bites[k]["tick"]) - int(bites[k - 1]["tick"]))
+	_check(int(row["body"]["attack_ticks"]) == 30 and int(row["body"]["attack_damage"]) == 3 and bites.size() >= 2 and gap >= 28
+			and bites.all(func(d: Dictionary) -> bool: return int(d["amount"]) <= 3),
+		"his bite slow and light: %d in 15 s, the shortest gap %d ticks, %s hp" % [bites.size(), gap, bites.map(func(d: Dictionary) -> int: return int(d["amount"]))])
+	DayNight.reset()
+	Monster.idling = true
+
+
 ## The boar king's lair and land (780 amended (16), the switch-on): his den
 ## in the open boar_lair, his door to the forest, roaming grounds off its
 ## pads; laid with his sounder about him; out with it following; his sounder
@@ -7115,8 +7207,13 @@ func _test_old_wolf_lair() -> void:
 	grey = Apex.body_of("old_wolf")
 	_check(grey != null and Apex.living_escort("old_wolf") == 1 and str(rec["state"]) == "lair" and grey.get("apex_goal") == Monster.NO_TILE,
 		"laid in his lair with the one left, and there he waits, his wait out or not, till his pack is whole (%d)" % Apex.living_escort("old_wolf"))
-	rec["attacked"] = World.steps
+	rec["attacked"] = World.steps - Apex.LAIR_HEAL_STEPS
 	rec["escort_whole_at"] = World.steps
+	rec["escort_fell"] = World.steps - 1
+	Apex._check("old_wolf", row)
+	_check(Apex.living_escort("old_wolf") == 1 and int(rec["escort_down"]) == 1,
+		"one of his pack just fallen, his target lapsed between foes: no new wolf till the fight is over (%d)" % Apex.living_escort("old_wolf"))
+	rec["escort_fell"] = World.steps - Apex.LAIR_HEAL_STEPS
 	Apex._check("old_wolf", row)
 	_check(Apex.living_escort("old_wolf") == 2 and int(rec["escort_down"]) == 0, "his rise_s after: his pack whole again (%d)" % Apex.living_escort("old_wolf"))
 	# Killed: his pack, its fight over, is gone with him.
