@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Leave the game away from town and your companion goes with you, back when you are, where you left her or at your side, where before she stood alone where you'd left her for anyone to come across (694 amended (2)).
 - A blow marked on the ground, such as the great bear's swipe, shows only as red on the ground now, faint at first and brightening as it comes, with a flash as it lands, where before a see-through red wall stood round it (602 amended (2)).
 - A bold wolf, at night or with its pack near, comes straight in to bite now, so take it on a raised shield, and a hill cat that's pounced on you keeps on fighting, where before the wolf hung back a few steps and the cat stood off for a while (806 amended (10)).
 - In the Mughouse, the stairs up and down between the floors stand in plain sight against the far wall now, and the stair to the attic beside them, where before the near wall hid them and you couldn't find your way down from upstairs (811 amended (5)).

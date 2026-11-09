@@ -17345,8 +17345,8 @@ func _leave(peer: int, player: Player, id: String) -> void:
 		World.despawn(player)
 	elif record != null:
 		record.last_seen = int(Time.get_unix_time_from_system())
-	# The companion stays, idle and of no interest to monsters, until its
-	# owner is back.
+	# The companion: kept, in town at her trade or rest, else off the world
+	# till her owner is back (694 amended (2)).
 	var pet: Companion = _companions.get(id)
 	if is_instance_valid(pet) and pet.spawned:
 		_remember_companion(id)
@@ -17354,12 +17354,24 @@ func _leave(peer: int, player: Player, id: String) -> void:
 		pet.current_intent = Companion.Intent.IDLE
 		# One from before the roll rests in town between trips only when her
 		# player left on its ground (Jeff's barrow: a deploy's restart mid-dungeon
-		# sent Pip home); elsewhere she waits, as any companion, and is beside
-		# them when they are back.
+		# sent Pip home).
 		var town_ground := _town_ground(pet.zone, pet.tile)
-		if record != null and not _stay_in_town(record, pet) and CompanionCard.is_legacy(str(record.companion.get("name", ""))) \
+		var stays := record != null and _stay_in_town(record, pet)
+		if record != null and not stays and CompanionCard.is_legacy(str(record.companion.get("name", ""))) \
 				and not town_ground.is_empty():
 			_rest_in_town(record, pet, id, town_ground)
+		elif not stays and _companions.get(id) == pet and pet.spawned:
+			# Elsewhere no body of hers stands in the world while her player is
+			# away (694 amended (2); Jeff on v0.1.208: another player's companion
+			# stood in the foothills all night): her record keeps her (above),
+			# and she comes back with them, at her tile when they come back
+			# within REJOIN_NEAR of it (705), else beside them, as after a restart.
+			print("[net] %s's companion %s kept off the world at %s in %s till they are back" % [
+				record.name if record != null else "?", pet.name, pet.tile, pet.zone])
+			_travelling = true
+			World.despawn(pet)
+			_travelling = false
+			_companions.erase(id)
 	print("[net] %s (%s) left" % [record.name if record != null else "?", id.left(8)])
 	party_log.add("%s left." % (record.name if record != null else "someone"))
 

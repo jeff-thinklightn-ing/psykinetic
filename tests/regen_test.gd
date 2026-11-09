@@ -331,7 +331,7 @@ func _test_returning_player_placed() -> void:
 	var record: PlayerRecord = _main._records[BO_ID]
 	_check(record.zone == "rg_halls" and record.tile == corridor, "Bo leaves standing in a corridor at %s" % [corridor])
 	var pet: Companion = _main._companions.get(BO_ID)
-	_check(pet != null and pet.zone == "rg_halls", "his companion waits there")
+	_check(pet == null and str(record.companion.get("tile_zone", "")) == "rg_halls", "his companion is kept there, off the world (694 amended (2))")
 	World.step()
 	World.step()
 	World.steps += _period

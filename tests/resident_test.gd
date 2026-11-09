@@ -318,7 +318,7 @@ func _test_rejoin_moved() -> void:
 	_put(_player(), _main._nearest_free(Vector2i(126, 152)))
 	_put(pet, _main._nearest_free(Vector2i(128, 154)))
 	_main._on_peer_disconnected(Net.local_id)
-	_check(pet.spawned and pet.zone == "wilds", "gone by the ruins: she waits there")
+	_check(not pet.spawned and str(record.companion.get("tile_zone", "")) == "wilds", "gone by the ruins: she is kept there, off the world (694 amended (2))")
 	record.tile = Vector2i(126, 22)  # Where the join puts him (the start tile, a hostile by the ruins).
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
 	pet = _companion()
@@ -377,8 +377,8 @@ func _test_legacy_rests_in_town() -> void:
 	var pet := _companion()
 	_check(pet != null and World.zone.name == ROAD, "(her player and she are on the road)")
 	_main._on_peer_disconnected(Net.local_id)
-	_check(pet.spawned and not record.companion.has("resident") and pet.zone == ROAD,
-		"her player gone off town ground: she does not go home; she waits on the road (%s)" % [record.companion.get("resident", {})])
+	_check(not pet.spawned and not record.companion.has("resident") and str(record.companion.get("tile_zone", "")) == ROAD,
+		"her player gone off town ground: she does not go home; she is kept on the road, off the world (%s)" % [record.companion.get("resident", {})])
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
 	pet = _companion()
 	_check(World.zone.name == ROAD and pet != null and pet.keeper == _player() and World.distance(pet.tile, _player().tile) <= 3,

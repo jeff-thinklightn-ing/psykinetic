@@ -339,8 +339,9 @@ func _test_companion_pack() -> void:
 	_main._leave(BO, _player(BO), BO_ID)
 	_main._admit(BO + 1, BO_ID, "Bo")
 	var bo_back := _player(BO + 1)
-	_check(_main._companions.get(BO_ID) == bo_pet and bo_pet.keeper_peer == BO + 1,
-			"back on a new peer, the companion who waited is theirs again (peer %d)" % bo_pet.keeper_peer)
+	bo_pet = _main._companions.get(BO_ID)  # (Kept off the world while Bo was away, 694 amended (2): back as a new body.)
+	_check(bo_pet != null and bo_pet.keeper_peer == BO + 1,
+			"back on a new peer, the companion who waited is theirs again (peer %d)" % (bo_pet.keeper_peer if bo_pet else -1))
 	World._relocate(bo_pet, bo_back.tile + Vector2i(0, 1) if World.is_free(bo_back.tile + Vector2i(0, 1)) else bo_back.tile + Vector2i(-1, 1))
 	_check(World.reaches(bo_back, bo_pet) and not World.reaches(host, bo_pet), "Bo reaches her pack again; the host does not")
 	_main._leave(BO + 1, bo_back, BO_ID)

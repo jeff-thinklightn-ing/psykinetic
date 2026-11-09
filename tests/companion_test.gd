@@ -32,7 +32,7 @@ func _ready() -> void:
 	_test_calm_guards()
 	_test_following()
 	_test_persists_and_resumes()
-	_test_idles_while_owner_offline()
+	await _test_idles_while_owner_offline()
 	_test_malformed_llm_reply()
 	_test_llm_reasoning_is_off_and_stripped()
 	_test_native_ollama_endpoint()
@@ -155,7 +155,7 @@ func _ready() -> void:
 	_test_drinks_a_remedy()
 	_test_plain_orders()  # Late: its many lines fill the capped party log and Tab panel.
 	_test_last_words()  # She dies in it: keep it last of those that need her.
-	_test_old_record_gets_a_companion()
+	await _test_old_record_gets_a_companion()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -455,25 +455,31 @@ func _test_persists_and_resumes() -> void:
 
 
 func _test_idles_while_owner_offline() -> void:
-	print("\n== idles, and monsters ignore it, while the owner is offline ==")
+	print("
+== her player logs out away from a town: no body of hers stands there; back with them where she was (694 amended (2)) ==")
 	var pet := _companion()
 	var owner := _player()
+	var record: PlayerRecord = _main._records.get(Net.player_id)
+	_check(_main._town_ground(pet.zone, pet.tile).is_empty(), "the test room is no town's ground")
+	pet.hp = maxi(pet.max_hp - 3, 1)
 	var where := pet.tile
+	var hp_was := pet.hp
+	var name_was := Companion._name_of(pet)
 	_main._on_peer_disconnected(Net.local_id)
 	_check(not is_instance_valid(owner) or not owner.spawned, "owner despawned")
 	World.step()
-	_check(pet.keeper == null and pet.current_intent == Companion.Intent.IDLE, "companion idles (%s)" % pet.intent_name())
-	var hp_before := pet.hp
-	var imp := _spawn_imp(where + Vector2i(-3, 0))
-	imp.sight_range = 7
-	for i in 20:
-		World.step()
-	_check(imp.tile == where + Vector2i(-3, 0), "a monster with line of sight does not come for it (imp at %s)" % imp.tile)
-	_check(pet.tile == where and pet.hp == hp_before, "and it stood still, unhurt")
-	World.damage(imp, 999)
+	await get_tree().process_frame  # Her old body freed, as on any real return.
+	var standing := World.get_entities().filter(func(e: GridEntity) -> bool: return e is Companion and Companion._name_of(e) == name_was)
+	_check(standing.is_empty() and not _main._companions.has(Net.player_id), "no body of hers stands in the world while they are away (%d)" % standing.size())
+	_check(record.companion.get("alive") == true and Snapshot.vector(record.companion.get("tile")) == where
+			and int(record.companion.get("hp", 0)) == hp_was and str(record.companion.get("tile_zone", "")) == World.zone.name,
+		"her record keeps her: alive (not counted fallen), her tile, her hp, the zone (%s)" % [record.companion.get("tile")])
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)
 	World.step()
-	_check(pet.keeper == _player() and pet.current_intent == Companion.Intent.FOLLOW, "owner back: FOLLOW again (%s)" % pet.intent_name())
+	var back := _companion()
+	_check(back != null and Companion._name_of(back) == name_was and back.hp == hp_was and World.distance(back.tile, where) <= 1,
+		"they are back: so is she, where she was, as she was (%s, hp %d)" % [back.tile if back else Vector2i(-1, -1), back.hp if back else -1])
+	_check(back != null and back.keeper == _player() and back.current_intent == Companion.Intent.FOLLOW, "and follows them again (%s)" % [back.intent_name() if back else ""])
 
 
 func _test_old_record_gets_a_companion() -> void:
@@ -526,8 +532,10 @@ func _test_old_record_gets_a_companion() -> void:
 
 	# A living companion left near monsters also returns beside its owner.
 	_main._on_peer_disconnected(Net.local_id)
+	await get_tree().process_frame  # (Her body off the world since 694 amended (2): freed.)
 	record.companion["tile"] = [3, 6]
-	World.despawn(_companion())
+	if _companion() != null:
+		World.despawn(_companion())  # (Since 694 amended (2) she is off the world already.)
 	record.companion["alive"] = true
 	_main._companions.clear()
 	_main._join_player(Net.local_id, Net.player_id, Net.player_name)

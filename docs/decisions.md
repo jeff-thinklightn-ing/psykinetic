@@ -34044,6 +34044,24 @@ trade in the town; back on the road, one line says where she is; back in
 the town, she goes with them again. Server only, protocol unchanged, no new
 class_name.
 
+694 amended (2): a companion left off town ground leaves the world with her player (2026-11-09,
+release's label; the coordinator's approval). Jeff on v0.1.208: another player's companion stood all
+night in the foothills where that player had logged out, a body in the wilds for anyone to come
+across, and when asked why she was there she could not say. 694 had her wait where she was as a live
+body. Now Main._leave, off town ground (no _stay_in_town, no legacy rest): her record keeps her
+(_remember_companion: hp, stamina, pack, tile, tile_zone, alive) and her body is taken off the world
+as one who travels (_travelling: never counted fallen, no return started), out of Main._companions.
+Her player's join spawns her from the record, as after a restart: at her tile when they come back
+within REJOIN_NEAR of it in its zone, as 705 has it, else beside them. So 694's promise holds (she is
+where they left her) with no body standing for others or for monsters while they are away. Town
+ground is unchanged (her trade, a legacy companion's rest). Checked against the rest: sickness runs
+on her record; monsters and the hill cat already passed over one with no keeper; camps count only
+companions with a keeper; a zone wakes for players; regen's rejoin puts her beside her player.
+companion_test _test_idles_while_owner_offline rewritten (logged out in the test room: no body, the
+record keeps her, back at her tile as she was, following); resident_test, regen_test and chest_test's
+"she waits there" checks read her record (or her new body) instead. Server only, protocol unchanged,
+no new class_name.
+
 ## 697, ui's side: the client chases what it clicked to strike
 
 Jeff on v0.1.186 in the barrow: "left click on grave robber does move to
