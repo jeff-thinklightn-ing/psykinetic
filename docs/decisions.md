@@ -45602,30 +45602,6 @@ three off not lit, beside lit and fire, told once, warming an unhurt player at W
 JSON round trip keeps it burning; run down, cold, told, warming nobody). Server, Level and client;
 protocol 54 (the "hearths" message and "hearth" command); no new class_name.
 
-824, dungeon's side (the coordinator's approval of enemy-ai's C:/dev/review/enemy-ai/sneak_packs_design.md; release's label; voice's words): the sneak packs laid, which switches the package on. It builds on 823's "packs" key (823, dungeon's side): a pack of the lead's own kind ({"sneak": {"of": "sneak", "size": 3}}) now counts its members, so whole packs of "size" are laid, and every pack laid gives each member, lead included, props "pack": "pack_<x>_<y>" of its lead's cell (Labyrinth.pack_rows, through the generated level's entity rows). Enemy-ai reads it, and pack fighting is on only where the kind's monsters.json row has its "pack" block (just the sneak), so barrow_deep's grave-guard packs carry the prop and fight as before. castle_halls (labyrinth.gd _hold): the block's monsters are imp 4, sneak 3, brute 1 (8 as before), packs as above, respawn_s sneak 600. The pack is laid whole in the guardroom with the most ways in (2 at least; the cold forge is no guardroom), its members wandering it (radius 2, enemy-ai's), and it stands for the guardrooms' foes: no other guardroom takes imps, so the chests keep their guards. With no guardroom of two ways in (a lone door everywhere), or a room too small for all three, the rest are imps. Hollowfell (mine.gd _monsters): packs as above. The pack's lead goes on the floor cell with the most ways out (_ways_out: runs of floor round the ring JUNCTION_RING 3 out, JUNCTION_WAYS 3 at least) within JUNCTION_NEAR 4 of the routes' middle third, off the track and clear of the mouth (ties nearest the route), the other two on the free cells nearest it. With no such junction they lie loose as before. Tests: level_test _check_sneak_pack in each played castle_halls generation (one pack of three wandering one guardroom, one shared "pack"; or none and seven imps; eight foes) and the template's counts; mine_gen_test (each generation's sneaks one pack within reach of each other and off the track, or loose with none; a pack in 6 of 6 generations, half required); labyrinth_test and regen_test pass. The packs show only in generations laid after this lands. CHANGELOG bullet in voice's words. Level data and generators; protocol unchanged; no new class_name. Package: sneak packs, switched on with this.
-825, pc-character's side (package "hill cave rest", landing off; release's label): a wet body dries
-by a lit hearth as by a fire. WetLook.near_fire, 775's drying FIRE_DRY times faster within FIRE_REACH
-(2, Chebyshev, the warmed rest's reach), now reads World.lit_hearths of the zone shown beside a
-terrain fire and a camp's fire ring (777, Level.camp_fire): on a client those are the "hearths"
-message's, read as asked, so one lit dries at once and one run down (its tick passed) no longer
-does, with nothing cached to clear. view_test _test_wet: a hearth lit two cells off dries; three off,
-or gone out, not. Client only, protocol unchanged, no new class_name, no bullet (none until the
-switch-on).
-825, terrain's side (package "hill cave rest", landing off; maps' design, the coordinator's notes on
-the lit sheet, C:/dev/review/lands/hill_cave_rest). Client3D draws a hearth lit by the ring a rock
-shelter draws (798 amended (4)): _dress_shelter keeps its cold ring (HEARTH_COLD) by the cell it is
-drawn on, _hearth_rings (a room's field, swapped with a held neighbour's, 822), so a place's
-"fire_ring" is that cell (the hills' (51, 176), under the lip). _draw_hearths, on
-World.hearths_changed and as the live room builds or swaps in: while World.lit_hearths has the cell,
-the cold ring hidden and art-kit's HEARTH_LIT ("Lit_x_y") in its place, its flame at the slot's
-socket and a fire's drawn light (523) in _fire_lights, HEARTH_ENERGY 1.5 over HEARTH_RANGE 5 m low
-over the fire (HEARTH_LIGHT_UP 0.7 m), so the lip is lit underneath and falls dark toward its edge
-(the coordinator: a watch post's light, 2.2 over 7 m, lit its front band a flat orange); gone cold,
-the lit one freed, its light dropped, the cold ring shown. A held neighbour's stay cold. Client3D
-.campfire_cells adds the burning ones, so sound's amb.campfire crackles there with no new asset.
-view_test _test_shelter (lit: the lit ring for the cold one, its light low and flickering, its
-crackle; gone out: cold, no light, no crackle; the hills' fire rings each on a drawn ring). Client
-only; protocol unchanged; no new class_name.
 825, sound's side (maps' ask, its label): a hearth lit catches. The crackle needs nothing new:
 Ambience reads Client3D.campfire_cells() each update, so a lit ring crackles (amb.campfire) and
 stops as it goes cold. Its lighting is heard: Client3D keeps each zone's World.lit_hearths as
