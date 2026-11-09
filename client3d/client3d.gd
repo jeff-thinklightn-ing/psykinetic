@@ -24139,6 +24139,10 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.roar()
 		elif cry == &"skid":
 			view.skid()
+		elif cry == &"pounce":
+			view.pounce()
+		elif cry == &"call":
+			view.snarl()
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))

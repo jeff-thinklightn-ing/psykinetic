@@ -62,9 +62,9 @@ const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze",
 ## A move's tell (780 amended (6): an apex beast's World.telegraph, its "kind" the move): the
 ## slot clip it plays, its contact landing on the telegraph's lands tick; a move not named here
 ## plays the clip of its own name (swipe, slam). Only a slot listing the clip has one.
-const TELL_CLIPS := {"charge": "charge_tell"}
+const TELL_CLIPS := {"charge": "charge_tell", "pounce": "crouch_tell"}
 ## Tells whose clip is all wind-up (the slot gives no contact): their end is the move's start.
-const TELL_ENDS_AT_LANDING: Array[String] = ["charge_tell"]
+const TELL_ENDS_AT_LANDING: Array[String] = ["charge_tell", "crouch_tell"]
 ## Monster.Pose.DOWN (enemy-ai's 764: a deer hurt past its sprint, lying a while, to be
 ## finished): drawn lying on its belly, alive (creature_life.gd, over its idle), lain down over
 ## DOWN_SECONDS, got up over UP_SECONDS; first seen down it lies at once; dying it unfolds over
@@ -93,6 +93,10 @@ var _busy_until := 0
 var _tell_id := 0
 var _tell_until := 0
 var _charge_until := 0
+## A slot clip played once when the one playing ends (the hill cat's recover after its leap).
+var _then := ""
+## Plain blows struck: a slot with a bite alternates its swipe (attack) and bite.
+var _blows := 0
 var _bolt_until := 0
 ## Dazed till (msec), for a view drawn without its monster: a crash's stun (the boar king's charge
 ## into the terrain), its slot's dazed looping. With its monster, its stun in ticks says (_dazed).
@@ -230,6 +234,11 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 			else monster.stun_cause == &"crash" and World.tick + World.tick_alpha < monster._reel_until)
 	if now < _busy_until:
 		return
+	if _then != "":
+		var then := _then
+		_then = ""
+		if _once(then):
+			return
 	if _dazed:
 		_set_head_up(false)
 		_loop("dazed", 1.0)
@@ -247,7 +256,8 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 			scale = maxf(scale, ArtKit.feel("creature_view.charge_speed", CHARGE_SPEED))
 	elif monster != null and monster.pose == Monster.Pose.SIT:
 		# Asleep, for a beast whose slot has a sleep (the great bear at its den); else grazing.
-		clip = "sleep" if clips.has("sleep") else "graze" if resolve("graze") != "" else "feed"
+		# Lying up, for one whose slot has a lie (the hill cat on its perch).
+		clip = "sleep" if clips.has("sleep") else "lie" if clips.has("lie") else "graze" if resolve("graze") != "" else "feed"
 	elif monster != null and monster.winded and clips.has("winded"):
 		clip = "winded"  # Standing heaving (597), after a charge that met nobody.
 	elif alert == Monster.Alert.SUSPICIOUS:
@@ -298,13 +308,21 @@ func _once(clip: String, scale := 1.0) -> bool:
 ## one or a hit is playing.
 func swing() -> void:
 	if rig != null and not rig.striking() and AnimRig.now_msec() >= _busy_until:
-		_strike(-1.0)
+		_strike(-1.0, _blow())
+
+
+## The next plain blow's clip: the attack, or for a slot with a bite (the hill cat's) swipe and
+## bite in turn.
+func _blow() -> String:
+	_blows += 1
+	return "bite" if clips.has("bite") and _blows % 2 == 0 else "attack"
 
 
 ## A wound-up blow given up (GridEntity.winding with 0 ticks; decision 392):
 ## free for the gait or rest at once.
 func unwind() -> void:
 	_busy_until = 0
+	_then = ""
 	if _coil != null and _coil.is_valid() and _pose != null:
 		_coil.kill()
 		_coil = create_tween().set_parallel(true)
@@ -321,7 +339,8 @@ func unwind() -> void:
 ## amended (4)) also coils the body over it (coil).
 func wind(seconds: float, lead := false) -> void:
 	# A heavy wind-up (not a lead) plays the slot's hook where it has one: the boar king's tusks.
-	_strike(maxf(seconds, 0.05), "hook" if not lead and clips.has("hook") else "attack")
+	# A plain one swipes and bites in turn for a slot with a bite (the hill cat's), as swing does.
+	_strike(maxf(seconds, 0.05), "hook" if not lead and clips.has("hook") else _blow())
 	if lead:
 		coil(maxf(seconds, 0.05))
 
@@ -416,6 +435,25 @@ func charge() -> void:
 	tween.tween_property(_pose, "position:x", 0.0, CHARGE_SECONDS * 0.7).set_ease(Tween.EASE_IN_OUT)
 
 
+## Its leap landing (cried "pounce": the hill cat's, enemy-ai's HillCat): its slot's pounce once,
+## landing as the slide does, then its recover once (the opening it gives); the tell over.
+func pounce() -> void:
+	if rig == null or _dead or not clips.has("pounce"):
+		return
+	_tell_until = 0
+	_charge_until = 0
+	rig.cancel_strike()
+	if _once("pounce") and clips.has("recover"):
+		_then = "recover"
+
+
+## Its quarry's notice (cried "call": the hill cat spotted): its slot's snarl once over the
+## gait or rest; none without one (a goblin's call has none).
+func snarl() -> void:
+	if rig != null and not _dead and clips.has("snarl") and not rig.striking():
+		_strike(-1.0, "snarl")
+
+
 ## A charge run out past its target (cried "skid"; the boar king's, enemy-ai's BoarKing): its slot's
 ## skid once, the charge over; none without one (it stands, as before).
 func skid() -> void:
@@ -469,6 +507,7 @@ func hit() -> void:
 ## Dead: its death clip once, held on its last frame; the seconds it takes
 ## (0 with none, and the puppet falls over as a body without art does).
 func die() -> float:
+	_then = ""
 	if rig == null or resolve("death") == "":
 		return 0.0
 	if _life != null and _life.weight > 0.0:

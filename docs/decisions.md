@@ -44801,6 +44801,20 @@ aura at once on wearing, growing with the charge to its cap; the light with the 
 the charge saved and kept when taken off; the draught's +15 kg and its wearing off). No bullet
 until the bear is in a real land (release; voice's line held). No new class_name.
 
+814 amended: the hill cat seen (tell, leap, lie, snarl, swipe and bite) (2026-11-09; release's
+label; the coordinator's approval and its reel; pc-character's rig and twelve clips on main). Its
+moves drawn from creature.hill_cat's slot clips in CreatureView: the pounce's telegraph plays
+crouch_tell (TELL_CLIPS "pounce", its end on the leap's start: TELL_ENDS_AT_LANDING), not the leap
+as a tell; its landing (cried "pounce") plays the pounce once, landing with the slide, then the
+recover once (CreatureView._then, the one after; the sim's opening, or its beat after a leap that
+landed); lying up (Pose SIT) it loops lie, where it fell to idle (a slot with a lie, after a
+sleep); spotted (cried "call") it snarls once over its gait or rest (a slot with a snarl: a
+goblin's call has none); its blows swipe and bite in turn (a slot with a bite: swing's and wind's
+alike, its blows in a fight coming wound up). Client3D
+hands the two cries to the view. tools/clip.gd: the "hillcat" reel (open ground, the near low
+camera). view_test _test_hill_cat_clips. CHANGELOG (voice's words). Client only, protocol
+unchanged, no new class_name.
+
 ## 814, companions' side: she points out a hill cat lying up, and never springs it
 
 enemy-ai's 814 (release's label; the coordinator's ask that the player gets

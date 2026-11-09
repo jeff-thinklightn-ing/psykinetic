@@ -190,6 +190,7 @@ func _ready() -> void:
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
+		await _test_hill_cat_clips()
 		await _test_creature_down()
 		await _test_creature_tells()
 		_test_piles()
@@ -11621,6 +11622,90 @@ func _test_reel_clock() -> void:
 	puppet.set_meta("busy_until", 0)
 	AnimRig._clock_movie = -1
 	AnimRig._clock_frame = -1
+
+
+func _test_hill_cat_clips() -> void:
+	print("
+== the hill cat's clips: crouch, leap and recover, lie, snarl, swipe and bite ==")
+	var body := Node3D.new()
+	var pose := Node3D.new()
+	body.add_child(pose)
+	_rig.add_child(body)
+	var art := ArtKit.instance("creature.hill_cat")
+	pose.add_child(art)
+	var view := CreatureView.new("creature.hill_cat", art, pose)
+	body.add_child(view)
+	var rig := view.rig
+	var wanted := ["crouch_tell", "pounce", "recover", "lie", "snarl", "bite", "attack"]
+	var has_all := rig != null and wanted.all(func(clip: String) -> bool: return view.clips.has(clip))
+	_check(has_all, "its art holds its clips (%s)" % [view.clips.keys()])
+	if not has_all:
+		body.queue_free()
+		return
+	view.frame(body, null)
+	_check(view.tell("pounce", 1.1, 9) and rig.playing() == view.clips["crouch_tell"],
+			"the pounce's telegraph plays crouch_tell, not the leap (%s)" % rig.playing())
+	view.tell_over(9, true)
+	view.pounce()
+	var leapt := rig.playing()
+	await get_tree().create_timer(rig.length(view.clips["pounce"]) + 0.1).timeout
+	view.frame(body, null)
+	_check(leapt == view.clips["pounce"] and rig.playing() == view.clips["recover"],
+			"its landing cry: the leap, then recover (%s, then %s)" % [leapt, rig.playing()])
+	await get_tree().create_timer(rig.length(view.clips["recover"]) + 0.1).timeout
+	view.frame(body, null)
+	rig.cancel_strike()
+	view.snarl()
+	_check(rig.playing() == view.clips["snarl"], "spotted (cried call): it snarls (%s)" % rig.playing())
+	rig.cancel_strike()
+	view._busy_until = 0
+	view.swing()
+	var first := rig.playing()
+	rig.cancel_strike()
+	view.swing()
+	var second := rig.playing()
+	rig.cancel_strike()
+	_check(first == view.clips["attack"] and second == view.clips["bite"], "its blows swipe, then bite (%s, %s)" % [first, second])
+	view.wind(0.6, true)
+	var led := rig.playing()
+	view.unwind()
+	view.wind(0.6, true)
+	var led_again := rig.playing()
+	view.unwind()
+	_check(led == view.clips["attack"] and led_again == view.clips["bite"],
+			"its wound-up blows too, as it fights (the reel's: every blow a lead): swipe, then bite (%s, %s)" % [led, led_again])
+	body.queue_free()
+	await _frames(1)
+	# Spawned and drawn: lying up (Pose.SIT) it lies.
+	var spec := Level._spec_for("monster_hill_cat", Level.MONSTER_TYPES)
+	spec["name"] = "ViewHillCat"
+	var player := _player()
+	var at := player.tile + Vector2i(3, 0) if player != null else Vector2i(9, 4)
+	if World.get_entity_at(at) != null:
+		World.despawn(World.get_entity_at(at))
+	spec["tile"] = at
+	var cat := _main._spawn(spec) as Monster
+	var puppet: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		puppet = _rig._puppets.get(cat.get_instance_id()) if cat != null else null
+		if puppet != null and puppet.has_meta("creature_view"):
+			break
+		await get_tree().process_frame
+	if puppet == null or not puppet.has_meta("creature_view"):
+		_check(false, "the hill cat drawn (%s, %s)" % [cat != null, puppet != null])
+		if cat != null:
+			World.despawn(cat)
+		return
+	var drawn := puppet.get_meta("creature_view") as CreatureView
+	cat.pose = Monster.Pose.SIT
+	drawn._speed = 0.0  # Standing where it was drawn (a step's speed would draw its gait).
+	drawn._last_at = puppet.position
+	drawn._busy_until = 0
+	drawn.frame(puppet, cat)
+	_check(drawn.rig.base_clip() == drawn.clips["lie"], "lying up (Pose.SIT), drawn lying, not standing idle (%s)" % drawn.rig.base_clip())
+	World.despawn(cat)
+	_rig._process(0.0)
 
 
 func _test_boar_king_clips() -> void:

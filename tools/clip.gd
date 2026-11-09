@@ -298,6 +298,8 @@ func _ready() -> void:
 			_drawbacks()
 		"boarking":
 			_boarking()
+		"hillcat":
+			_hillcat()
 		"draugr", "draugr_walkback":
 			_draugr()
 		_:
@@ -313,7 +315,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking", "hillcat"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -352,7 +354,7 @@ func _ready() -> void:
 	layer.add_child(_caption)
 	if _main._client3d != null:
 		_main._client3d._zoom_to = _main._client3d.ZOOM_MAX
-	if scenario in ["drawbacks", "boarking"]:
+	if scenario in ["drawbacks", "boarking", "hillcat"]:
 		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
 		if scenario == "drawbacks" and _monster is Animal:
 			(_monster as Animal).raid = "drawbacks"  # A beast closes and bites, as a raider does.
@@ -834,6 +836,65 @@ func _boarking() -> void:
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
 	max_seconds = maxf(max_seconds, 90.0)
 	_script = [["say", 10, "The boar king."], ["boar_fight", 0, ""], ["wait", 30, ""]]
+
+
+## The hill cat's reel (814 amended, the coordinator's staging): open ground, the near low camera;
+## the cat lying up, spotted (its snarl), then a walker it has not seen (the reel keeps it unseen):
+## its crouch, leap and recover, then its swipes and bites.
+func _hillcat() -> void:
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 22:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	var markers := {Vector2i(20, 15): "start", Vector2i(20, 10): "monster_hill_cat"}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9, "legend": {"monster_hill_cat": "#b08a50"},
+		"entities": [{"at": [20, 10], "facing": [0, 1]}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	max_seconds = maxf(max_seconds, 60.0)
+	_script = [["say", 10, "A hill cat lies up."], ["cat_fight", 0, ""], ["wait", 20, ""]]
+
+
+## One tick of the hill cat's reel; true once it is over (each part runs out after its limit).
+func _cat_step(tick: int) -> bool:
+	var cat := _monster
+	if not is_instance_valid(cat) or not cat is HillCat:
+		return true
+	if (cat as HillCat).watch.is_empty():
+		(cat as HillCat).perch_cell = cat.tile
+		for x in range(-4, 5):
+			for y in range(-4, 5):
+				(cat as HillCat).watch[cat.tile + Vector2i(x, y)] = true
+	if _fight_until >= 0 and tick > _fight_until:
+		print("[clip] hillcat: part %d ran out at tick %d" % [_part, tick])
+		_next_part(tick, 300)
+		if _part > 2:
+			return true
+	match _part:
+		0:
+			_caption.text = "Lying up. Looked at a while, it is seen: it snarls."
+			if _walk(cat.tile + Vector2i(0, 3)):  # Within its spotting reach by day and night.
+				World.face(_player, Senses.way_toward(_player.tile, cat.tile))
+			if not (cat as HillCat)._spotted.is_empty():
+				_aside = Vector2i(14, 12)
+				_next_part(tick, 300)
+		1:
+			# Unseen for the leap's sake: the reel forgets the look (a spotted player is never pounced on).
+			(cat as HillCat)._spotted.clear()
+			(cat as HillCat)._looking.clear()
+			var crouch: Dictionary = (cat as HillCat)._move
+			if not crouch.is_empty():
+				_walk(crouch["aim"])  # Onto the cell it leaps for: its leap lands, and the fight follows.
+			elif _aside == Vector2i(14, 12) and _walk(_aside):
+				_aside = Vector2i(30, 12)
+				_caption.text = "Walking on below it, eyes ahead: it crouches, leaps, recovers."
+			elif _aside == Vector2i(30, 12):
+				_walk(_aside)
+			if not (cat as HillCat).lying() and cat.target == _player:
+				_caption.text = "Its leap landed: it recovers, then swipes and bites."
+				_next_part(tick, 90)
+		2:
+			_walk(_beside_monster())  # Up to it: it gives ground between blows, and stands off a while.
+	return false
 
 
 ## One tick of the boar king's reel; true once it is over (each part runs out after its limit).
@@ -2062,6 +2123,9 @@ func _on_tick(tick: int) -> void:
 		"boar_fight":
 			if not _boar_step(tick):
 				return
+		"cat_fight":
+			if not _cat_step(tick):
+				return
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -2209,7 +2273,7 @@ func _log(tick: int) -> void:
 			_player.raised, " stunned" if World.is_stunned(_player) else "", " winding" if not World.winding(_player).is_empty() else "",
 			", ".join(them)])
 		return
-	if scenario in ["melee_audit", "drawbacks", "boarking"]:
+	if scenario in ["melee_audit", "drawbacks", "boarking", "hillcat"]:
 		var side := func(entity: GridEntity) -> String:
 			return "%s at %s hp %d/%d st %d/%d%s%s%s%s" % [entity.name, entity.tile, entity.hp, entity.max_hp, entity.stamina,
 				entity.max_stamina, " stunned" if World.is_stunned(entity) else "", " down" if World.is_down(entity) else "",
