@@ -41367,6 +41367,18 @@ scripted stance at her player's fall may drop her quarry first. companion_test _
 Server only, protocol unchanged (intent not replicated), no new class_name; no bullet (no level has
 a bear).
 
+780 amended (18): a bug fix, an apex with no "asleep" no longer stops her warning (2026-11-09,
+companions; release's label, the coordinator's ask; playtest's boar lair run on main 0afaf2a62).
+_apex_after_choose read `bool(entity.get("asleep"))`, and only GreatBear (and Companion) declare
+asleep: on OldWolf and BoarKing get gives null and bool(null) is a SCRIPT ERROR, so with the old grey
+or the boar king in her sight her apex warning, break-off and flank step were skipped every tick. It
+reads `entity.get("asleep") == true` now: no asleep is awake. Her APEX_SEEN and APEX_ASLEEP lines
+are a bear's ("That's a great bear."), so she says one only of a GreatBear (the coordinator's ruling,
+for the v0.1.209 freeze): another apex seen, she stays quiet, its narration, berth, break-off and
+flank step as for the bear; pools of the old grey's and the boar king's in voice's words, kept to
+lore, follow. companion_test _test_old_grey_seen: an OldWolf in her sight, no asleep on him, seen,
+no bear line, no error. Server only, protocol unchanged, no new class_name.
+
 780 amended (8): the bear tuned for one to three (enemy-ai, 2026-11-04; combat's draft from
 playtest's bear_yard runs, the coordinator's ruling; release's label). Playtest's players fell to
 an untold plain blow (attack_damage 5 a second), not to the moves: a player is a free body, kept on

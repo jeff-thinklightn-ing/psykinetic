@@ -7502,9 +7502,10 @@ func _apex_after_choose() -> void:
 		var last := int(_apex_seen.get(id, -APEX_WARN_AGAIN_TICKS - 1))
 		_apex_seen[id] = World.tick
 		if World.tick - last > APEX_WARN_AGAIN_TICKS and not _apex_engaged(entity):
-			var asleep_now := bool(entity.get("asleep"))
+			var asleep_now: bool = entity.get("asleep") == true
 			var pool := APEX_ASLEEP if asleep_now else APEX_SEEN
-			_say(pool[World.tick % pool.size()], true)
+			if entity is GreatBear:  # Her lines are a bear's; another apex's are to come (780 amended (18)).
+				_say(pool[World.tick % pool.size()], true)
 			_narrate("You see %s%s: too strong to take on lightly. Keep clear of it unless %s takes it on." % [
 				refer(entity), ", asleep" if asleep_now else "", keeper_name()])
 	if _apex_broke and _hp_over(self, HP_THRESHOLDS[0]) and (not _alive(keeper) or _hp_over(keeper, HP_THRESHOLDS[0])):

@@ -133,6 +133,7 @@ func _ready() -> void:
 	_test_mines_a_seam()
 	_test_mines_only_at_a_seam()
 	_test_brought_back_ends_wait()
+	_test_old_grey_seen()
 	_test_great_bear()
 	_test_heel_keeps_clear()
 	_test_heel_on_the_line()
@@ -4728,6 +4729,33 @@ func _walk_own(owner: Player, cell: Vector2i, most_ticks: int) -> bool:
 			World.free_input(owner, way / maxf(way.length(), speed), World.TICK_DT)
 		World.step()
 	return Walk.arrived(owner, cell)
+
+
+func _test_old_grey_seen() -> void:
+	print("\n== an apex with no \"asleep\" (the old grey): seen, no error, and no bear line of him (780 amended (18)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var owner_was := owner.tile
+	var pet_was := pet.tile
+	_put(owner, Vector2i(4, 3))
+	_put(pet, Vector2i(6, 3))
+	var grey := _main._spawn({"script": "res://sim/old_wolf.gd", "shape": "capsule", "kind": "old_wolf",
+		"name": "TestGrey%d" % World.tick, "tile": Vector2i(11, 3)}) as OldWolf
+	_check(grey != null and Companion.apex(grey) and grey.get("asleep") == null, "the old grey is an apex with no asleep")
+	_kill_monsters_but(grey)
+	pet._apex_seen.erase(grey.get_instance_id())
+	var said_before := 0
+	for line: String in Companion.APEX_SEEN + Companion.APEX_ASLEEP:
+		said_before += pet._said.count(line)
+	pet._apex_after_choose()
+	var said := -said_before
+	for line: String in Companion.APEX_SEEN + Companion.APEX_ASLEEP:
+		said += pet._said.count(line)
+	_check(pet._apex_seen.has(grey.get_instance_id()) and said == 0, "sighted, she sees him and says no bear's line of him (%d said: %s)" % [said, pet._said.slice(-2)])
+	World.despawn(grey)
+	_put(owner, owner_was)
+	_put(pet, pet_was)
 
 
 func _test_great_bear() -> void:
