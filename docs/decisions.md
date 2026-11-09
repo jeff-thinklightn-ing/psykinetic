@@ -40552,6 +40552,17 @@ of the town's tavern. Main._zone_level loads a zone's level once. Until economy 
 Mughouse has no staff and nothing else changes. resident_test _test_tavern_keeper. Server only, protocol
 measured at landing, no new class_name; no bullet (811's covers the Mughouse; economy's seating gets the taverner's).
 
+772 amended (3): an outdoor zone's level is never loaded for the tavern (release's label; perf's trace,
+routed by the coordinator). A player's first arrival in Umbrage stalled one tick about 240 ms: of
+_sync_residents' first planning, 218 ms was _tavern_folk's Main._zone_level("wilds"), a full read and parse
+of the wilds' level.json (some 50,000 cells) only to find no "town". No outdoor level carries "town", a
+tavern or a keeper's room (only the umbrage_tavern floors do, all indoor), so Main._zone_level now gives {}
+without loading for a zone known outdoor: World's current zone with World.outdoor, or one World.zones holds
+whose Zone.outdoor is set. _interior_town (the bard's listeners, per player's zone) gains the same. It is
+once per zone per process: on the box the first resident sync in each zone after a restart. resident_test
+(a stand-in outdoor Zone under a tavern floor's name: never loaded, no taverner). Server only, protocol
+unchanged, no new class_name, no bullet.
+
 ## 779. A left click opens what E opens
 
 A left click on a counter did nothing in the store tour: counters and depots are Chests, and a

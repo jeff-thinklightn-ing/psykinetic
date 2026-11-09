@@ -1041,6 +1041,27 @@ func _test_taverner_end_to_end() -> void:
 		var none := {}
 		_main._tavern_folk(none, TOWN)
 		_check(none.is_empty(), "a town's own zone is no tavern floor: no taverner wanted by it")
+		# An outdoor zone World holds is never read from disk (perf: the wilds' level.json parse
+		# stalled a tick ~220 ms on arrival): a stand-in outdoor Zone under the tavern floor's name.
+		var floor_name := "umbrage_tavern"
+		var cached: Variant = _main._zone_levels.get(floor_name)
+		var held_before: Variant = World.zones.get(floor_name)
+		var stand_in := Zone.new()
+		stand_in.name = floor_name
+		stand_in.outdoor = true
+		World.zones[floor_name] = stand_in
+		_main._zone_levels.erase(floor_name)
+		var outdoor_none := {}
+		_main._tavern_folk(outdoor_none, floor_name)
+		_check(outdoor_none.is_empty() and (_main._zone_level(floor_name) as Dictionary).is_empty(),
+			"a zone known outdoor: its level never loaded, no taverner wanted")
+		if held_before == null:
+			World.zones.erase(floor_name)
+		else:
+			World.zones[floor_name] = held_before
+		_main._zone_levels.erase(floor_name)
+		if cached != null:
+			_main._zone_levels[floor_name] = cached
 		if wilds_inn == null:
 			wilds_record["buildings"].erase("inn")
 		else:

@@ -12649,10 +12649,16 @@ static func _is_shell(building: Dictionary) -> bool:
 
 
 ## The level of zone [param zone_name], loaded once (the tavern's floors'
-## "town", tavern_of, beds and rooms); {} for a zone with no level.
+## "town", tavern_of, beds and rooms); {} for a zone with no level, and for
+## one known outdoor (World's current zone, or one World holds), never
+## loaded: an outdoor level carries no "town", tavern or keeper's room, and
+## reading the wilds' whole level.json for that stalled a tick ~220 ms on a
+## player's first arrival in Umbrage (perf, measured on f63bf2b55).
 func _zone_level(zone_name: String) -> Dictionary:
 	if not _zone_levels.has(zone_name):
-		_zone_levels[zone_name] = Level.load_level(zone_name) if not zone_name.is_empty() and Level.exists(zone_name) else {}
+		var held: Zone = World.zones.get(zone_name)
+		var outdoor := (World.zone != null and zone_name == World.zone.name and World.outdoor) or (held != null and held.outdoor)
+		_zone_levels[zone_name] = Level.load_level(zone_name) if not zone_name.is_empty() and not outdoor and Level.exists(zone_name) else {}
 	return _zone_levels[zone_name]
 
 
