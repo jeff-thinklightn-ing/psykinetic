@@ -15162,6 +15162,7 @@ func _read_niches() -> void:
 ## Each of terrain "decor"'s entries (647) as its piece, once its slot is
 ## drawn (no grey box): see DECOR_SLOT.
 func _add_decor() -> void:
+	_add_furrows()
 	# The edge posts stood so far, by their corner (in half cells).
 	var fence_posts: Dictionary[Vector2i, bool] = {}
 	for entry: Dictionary in _terrain.get("decor", []):
@@ -15227,6 +15228,135 @@ func _add_decor() -> void:
 				post.position = Vector3(end.x, _height_in(cell, end), end.y)
 				post.rotation.y = piece.rotation.y
 				_room.add_child(post)
+
+
+## A fallow field's furrows (827, terrain's side; maps' farm, Level
+## .furrows_from): ridges of turned earth FURROW_PITCH apart running its
+## "along", FURROW_HIGH at the crest (each crest point FURROW_WOBBLE of it
+## either way), in the ground's dirt by FURROW_EARTH, each ridge its own
+## shade (FURROW_SHADE either way), its crests FURROW_CREST lighter (a gentle band, so the rows read from the high camera); and
+## weeds (scatter.tuft, a plant.fern now and then), FURROW_WEEDS a cell,
+## FURROW_ON_RIDGE of them on a crest, the rest in the hollows. Green and
+## low: no grain heads, nothing yellow (the coordinator: fallow, not ripe).
+## Drawn only, never solid.
+const FURROW_PITCH := 0.9
+const FURROW_HIGH := 0.18
+const FURROW_WOBBLE := 0.3
+const FURROW_STEP := 0.5
+const FURROW_EARTH := 0.9
+const FURROW_SHADE := 0.03
+const FURROW_CREST := 1.15
+const FURROW_WEEDS := 1.5
+const FURROW_ON_RIDGE := 0.25
+const FURROW_LIFT := 0.01
+## The ridges' earth (the coordinator: flat tan read as plastic): the
+## ground's dirt texture (ground.dirt, at its tile_m) in the room's own
+## frame, so a change of origin (822) never slides it, tilled darker by
+## FURROW_TILLED; without the art, the dirt swatch over the ground's noise.
+const FURROW_TILLED := 0.8
+static var _furrow_look: StandardMaterial3D
+
+
+func _furrow_material() -> StandardMaterial3D:
+	if _furrow_look == null:
+		_furrow_look = StandardMaterial3D.new()
+		_furrow_look.vertex_color_use_as_albedo = true
+		_furrow_look.vertex_color_is_srgb = true  # FURROW_CREST's band as seen, not a third of it.
+		_furrow_look.roughness = 1.0
+		_furrow_look.cull_mode = BaseMaterial3D.CULL_DISABLED
+		var own := ground_texture("dirt")
+		_furrow_look.albedo_texture = own if own != null else _ground_noise()
+		var tile := float(ArtKit.spec("ground.dirt").get("tile_m", 4.0)) if own != null and ArtKit.has("ground.dirt") else 4.0
+		_furrow_look.uv1_triplanar = true
+		_furrow_look.uv1_world_triplanar = false
+		_furrow_look.uv1_scale = Vector3.ONE / tile
+	return _furrow_look
+
+
+func _add_furrows() -> void:
+	# Over the dirt's own texture the colour only tills it darker; else
+	# the dirt swatch itself.
+	var dirt_at: Vector2i = GROUND_SWATCHES["dirt"]
+	var earth := Color.WHITE * FURROW_TILLED / FURROW_EARTH if ground_texture("dirt") != null else swatch(dirt_at.x, dirt_at.y)
+	earth.a = 1.0
+	for field: Dictionary in _terrain.get("furrows", []):
+		var rect: Rect2i = field["rect"]
+		var along: Vector2i = field["along"]
+		var across := Vector2i(along.y, along.x)
+		var corner := Vector2(rect.position) - Vector2(0.5, 0.5)
+		var length := float(rect.size.x if along.x != 0 else rect.size.y)
+		var width := float(rect.size.y if along.x != 0 else rect.size.x)
+		var rows := maxi(1, floori(width / FURROW_PITCH))
+		var pitch := width / rows
+		var steps := maxi(1, ceili(length / FURROW_STEP))
+		var flat := func(u: float, v: float) -> Vector2:
+			return corner + Vector2(along) * u + Vector2(across) * v
+		var ground := func(at: Vector2) -> float:
+			return _height_in(Vector2i(roundi(at.x), roundi(at.y)), at) + FURROW_LIFT
+		var crest := func(row: int, k: int) -> float:
+			return FURROW_HIGH * (1.0 + (_roll(rect.position + Vector2i(row * 37, k), 187) - 0.5) * 2.0 * FURROW_WOBBLE)
+		var tool := SurfaceTool.new()
+		tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+		var face := func(a: Vector3, b: Vector3, c: Vector3, ca: Color, cb: Color, cc: Color) -> void:
+			var normal := (b - a).cross(c - a).normalized()
+			if normal.y < 0.0:
+				var swap := b
+				b = c
+				c = swap
+				var tone := cb
+				cb = cc
+				cc = tone
+				normal = -normal
+			for vertex: Array in [[a, ca], [b, cb], [c, cc]]:
+				tool.set_normal(normal)
+				tool.set_color(vertex[1])
+				tool.add_vertex(vertex[0])
+		for row in rows:
+			var shade := 1.0 + (_roll(rect.position + Vector2i(row, 3), 186) - 0.5) * 2.0 * FURROW_SHADE
+			var low := Color(earth.r * FURROW_EARTH * shade, earth.g * FURROW_EARTH * shade, earth.b * FURROW_EARTH * shade, 1.0)
+			var top := Color(low.r * FURROW_CREST, low.g * FURROW_CREST, low.b * FURROW_CREST, 1.0)
+			var mid := (row + 0.5) * pitch
+			for k in steps:
+				var u0 := length * k / steps
+				var u1 := length * (k + 1) / steps
+				var c0: Vector2 = flat.call(u0, mid)
+				var c1: Vector2 = flat.call(u1, mid)
+				var p0 := Vector3(c0.x, float(ground.call(c0)) + float(crest.call(row, k)), c0.y)
+				var p1 := Vector3(c1.x, float(ground.call(c1)) + float(crest.call(row, k + 1)), c1.y)
+				for v: float in [row * pitch, (row + 1) * pitch]:
+					var b0: Vector2 = flat.call(u0, v)
+					var b1: Vector2 = flat.call(u1, v)
+					var q0 := Vector3(b0.x, float(ground.call(b0)), b0.y)
+					var q1 := Vector3(b1.x, float(ground.call(b1)), b1.y)
+					face.call(q0, q1, p1, low, low, top)
+					face.call(q0, p1, p0, low, top, top)
+		var holder := Node3D.new()
+		holder.name = "Furrows_%d_%d" % [rect.position.x, rect.position.y]
+		var ridges := MeshInstance3D.new()
+		ridges.name = "Ridges"
+		ridges.mesh = tool.commit()
+		ridges.material_override = _furrow_material()
+		holder.add_child(ridges)
+		# Its weeds: on a crest now and then, else down in a hollow.
+		if ArtKit.has("scatter.tuft"):
+			for cell in Level.rect_cells(rect):
+				var count := floori(FURROW_WEEDS + _roll(cell, 188))
+				for n in count:
+					var key := cell + Vector2i(n * 101, 0)
+					var u := clampf(float(cell.x if along.x != 0 else cell.y) - float(rect.position.x if along.x != 0 else rect.position.y) + _roll(key, 189), 0.05, length - 0.05)
+					var row := clampi(floori((float(cell.y if along.x != 0 else cell.x) - float(rect.position.y if along.x != 0 else rect.position.x) + _roll(key, 190)) / pitch), 0, rows - 1)
+					var on_ridge := _roll(key, 191) < FURROW_ON_RIDGE
+					var v := (row + 0.5) * pitch if on_ridge else row * pitch + (pitch if _roll(key, 192) < 0.5 else 0.0)
+					v = clampf(v, 0.05, width - 0.05)
+					var at: Vector2 = flat.call(u, v)
+					var slot := "plant.fern" if _roll(key, 193) < 0.08 and ArtKit.has("plant.fern") else "scatter.tuft"
+					var weed := ArtKit.instance(slot)
+					weed.name = "Weed_%d_%d_%d" % [cell.x, cell.y, n]
+					weed.position = Vector3(at.x, float(ground.call(at)) + (FURROW_HIGH if on_ridge else 0.0), at.y)
+					weed.rotation.y = _roll(key, 194) * TAU
+					weed.scale = Vector3.ONE * lerpf(0.7, 1.1, _roll(key, 195))
+					holder.add_child(weed)
+		_room.add_child(holder)
 
 
 ## The art-kit slot a decor entry is drawn as: its kind's "slots" by its

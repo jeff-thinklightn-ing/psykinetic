@@ -105,7 +105,9 @@ const NOT_OFFERED: Array[String] = ["legend", "became", "loot", "clearings", "ro
 	"plates", "secrets", "laid_rooms",
 	# An interior's own (811: tools/make_interior.py writes them from its spec;
 	# 811 amended (4): its common room's lit candles).
-	"town", "storeys", "beds", "lit_candles"]
+	"town", "storeys", "beds", "lit_candles",
+	# A fallow field's furrows (827, terrain's side: written by hand, like decor).
+	"furrows"]
 const FACINGS := {"north": [0, -1], "east": [1, 0], "south": [0, 1], "west": [-1, 0]}
 
 

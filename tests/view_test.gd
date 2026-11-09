@@ -6157,6 +6157,39 @@ func _test_faced_decor() -> void:
 	_check(farm["warnings"].is_empty() and rails.size() == 4 and posts.size() == 5
 			and wanted.all(func(spot: Vector2) -> bool: return spots.any(func(each: Vector2) -> bool: return each.is_equal_approx(spot))),
 			"a fence: four rails, a post at each end, the corner's shared (%d rails, posts at %s) %s" % [rails.size(), spots, farm["warnings"]])
+	# A fallow field (827, the farm's): ridges of earth along its rows inside
+	# its rect, low, and green weeds on them and in the hollows; a bad entry
+	# warned and left out.
+	var field_rows: Array[String] = []
+	for py in 8 * 2 - 1:
+		var line := ""
+		for px in 10 * 2 - 1:
+			line += "." if px % 2 == 0 and py % 2 == 0 else " "
+		field_rows.append(line)
+	Level.register("vt_furrows", Level.image_from_rows(field_rows, {Vector2i(0, 0): "start"}), null,
+		{"outdoor": true, "furrows": [{"rect": [2, 2, 6, 4], "along": "x"}, {"rect": [1, 1], "along": "z"}]})
+	var fallow := Level.load_level("vt_furrows")
+	var listed: Array = fallow["terrain"]["furrows"]
+	_check(listed.size() == 1 and listed[0]["rect"] == Rect2i(2, 2, 6, 4) and listed[0]["along"] == Vector2i(1, 0)
+			and fallow["warnings"].any(func(w: String) -> bool: return "furrows entry" in w),
+			"a field's furrows read; a bad entry warned and left out (%s)" % [listed])
+	_rig.rebuild(fallow["terrain"], fallow["centre"])
+	var furrows := _rig._room.get_node_or_null("Furrows_2_2") as Node3D
+	var ridges := furrows.get_node_or_null("Ridges") as MeshInstance3D if furrows != null else null
+	var box := ridges.mesh.get_aabb() if ridges != null and ridges.mesh != null else AABB()
+	var floor_y := _rig._height_in(Vector2i(4, 3), Vector2(4, 3))
+	var weeds := furrows.get_children().filter(func(node: Node) -> bool: return str(node.name).begins_with("Weed_")) if furrows != null else []
+	var strays := weeds.filter(func(weed: Node3D) -> bool: return not Rect2(1.5, 1.5, 6, 4).has_point(Vector2(weed.position.x, weed.position.z)))
+	_check(ridges != null and Rect2(1.5, 1.5, 6.01, 4.01).encloses(Rect2(box.position.x, box.position.z, box.size.x, box.size.z))
+			and box.end.y - floor_y < Client3D.FURROW_HIGH * (1.0 + Client3D.FURROW_WOBBLE) + 0.05 and box.end.y - floor_y > Client3D.FURROW_HIGH * 0.5,
+			"its ridges of earth inside its rect, low (to %.2f m over the ground, %s)" % [box.end.y - floor_y, box])
+	var earth := ridges.material_override as StandardMaterial3D if ridges != null else null
+	var dirt := Client3D.ground_texture("dirt")
+	_check(earth != null and earth.albedo_texture != null and (dirt == null or earth.albedo_texture == dirt)
+			and earth.uv1_triplanar and not earth.uv1_world_triplanar,
+			"its earth the ground's dirt texture, in the room's frame (%s)" % [earth.albedo_texture if earth != null else null])
+	_check(not ArtKit.has("scatter.tuft") or weeds.size() >= 24 and strays.is_empty(),
+			"weeds on it, none outside it (%d, %d stray)" % [weeds.size(), strays.size()])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

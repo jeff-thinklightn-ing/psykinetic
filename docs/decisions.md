@@ -46084,6 +46084,22 @@ its foot; wall.wood.low_ruin_end (vertex) a corner post snapped off at about 1.2
 check (terrain's, from 827's terrain side) now expects every wall art-kit's low ruin when the set has
 RUIN_LOW, else the stub and rubble mix, as its stone check does (terrain's wording, terrain's OK). Off.
 
+827, terrain's side: a fallow field's furrows (the coordinator: maps' first stills read the fields as ripe
+wheat; the format agreed with maps). level.json "furrows", each {"rect": [x, y, w, h], "along": "x" | "y"}, the
+way its rows run: Level.furrows_from puts them in terrain["furrows"] as {rect: Rect2i, along: Vector2i}, a bad
+entry warned and left out. Client3D._add_furrows (from _add_decor) draws each as ridges of turned earth
+FURROW_PITCH (0.9 m, a real furrow's width) apart along its rows, FURROW_HIGH (0.18 m, each crest point
+FURROW_WOBBLE of it either way) over the ground, in the ground's own dirt texture (ground.dirt at its tile_m,
+mapped in the room's frame so a change of origin never slides it; without the art, the dirt swatch over the
+ground's noise), tilled darker (FURROW_TILLED), each crest FURROW_CREST (15%) lighter in sRGB (the
+coordinator: flat tan read as plastic; a stronger band would read as painted stripes from low), with green weeds
+(scatter.tuft, a plant.fern now and then) FURROW_WEEDS a cell, a quarter on the crests
+and the rest in the hollows: no grain heads, nothing yellow. From the high camera the rows barely show (the
+dirt's grain is as strong as the band): there the fields read as tilled dirt, which the coordinator accepted. Drawn only: never solid, never on the wire; the cells
+under it stay the layout's "dirt" (maps). view_test (the entries read, a bad one warned; the ridges inside the
+rect and low; its earth the dirt texture; weeds on it, none outside). Client and one Level reader; protocol unchanged; no new class_name. Off:
+no shipped level has "furrows" until maps' farm.
+
 ## 828. Windowed runs on the laptop
 
 Release's number; the coordinator's approved design, the first step of the laptop runners plan (Jeff,

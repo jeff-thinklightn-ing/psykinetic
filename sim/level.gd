@@ -1304,6 +1304,7 @@ static func _place(level: Dictionary, markers: Array[Dictionary], config: Dictio
 	level["terrain"]["camps"] = camps_of(level["places"])
 	level["terrain"]["shelters"] = shelters_of(level["places"])
 	level["terrain"]["fire_rings"] = fire_rings_of(level["places"])
+	level["terrain"]["furrows"] = furrows_from(config, warnings)
 	level["rooms"] = rooms_from(config, warnings)
 	level["markets"] = markets_from(config, warnings)
 	level["forage"] = forage_from(config, warnings)
@@ -1558,6 +1559,28 @@ static func fire_rings_of(places: Dictionary) -> Array[Vector2i]:
 		var ring: Variant = (places[key] as Dictionary).get("fire_ring")
 		if ring is Vector2i and not out.has(ring):
 			out.append(ring)
+	return out
+
+
+## A fallow field's furrows (827, terrain's side, maps' farm): level.json
+## "furrows", each {"rect": [x, y, w, h], "along": "x" | "y"}, the way its
+## rows run; as [{rect: Rect2i, along: Vector2i}]. Drawn only (Client3D's
+## ridges of earth and weeds), never solid, never on the wire. A bad entry
+## is warned and left out.
+static func furrows_from(config: Dictionary, warnings: Array[String]) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var listed: Variant = config.get("furrows", [])
+	if not listed is Array:
+		warnings.append("\"furrows\" in level.json is not a list")
+		return out
+	for entry: Variant in listed:
+		var rect: Variant = entry.get("rect") if entry is Dictionary else null
+		var along := str(entry.get("along", "")) if entry is Dictionary else ""
+		if not rect is Array or (rect as Array).size() != 4 or along not in ["x", "y"] 				or not (rect as Array).all(func(n: Variant) -> bool: return n is float or n is int) or int(rect[2]) < 1 or int(rect[3]) < 1:
+			warnings.append("a furrows entry needs \"rect\" [x, y, w, h] and \"along\" x or y (%s); left out" % [entry])
+			continue
+		out.append({"rect": Rect2i(int(rect[0]), int(rect[1]), int(rect[2]), int(rect[3])),
+				"along": Vector2i(1, 0) if along == "x" else Vector2i(0, 1)})
 	return out
 
 
