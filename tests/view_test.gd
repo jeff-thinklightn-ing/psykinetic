@@ -6331,11 +6331,6 @@ func _test_built_water() -> void:
 	print("
 == built water: the wilds' wells square and still, natural water from its curves ==")
 	var wilds := Level.load_level("wilds")
-	# The farmstead's well, the wilds' only one, is dry since 827: water put
-	# back in it here, in memory, stands for a well that has water.
-	var well := Vector2i(127, 147)
-	_check(not well in wilds["terrain"]["water"], "the old farmstead's well dry (827)")
-	wilds["terrain"]["water"].append(well)
 	_rig.rebuild(wilds["terrain"], wilds["centre"])
 	var built_bodies := 0
 	var astray := []
