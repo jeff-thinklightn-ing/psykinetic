@@ -45009,6 +45009,19 @@ label lowered, "the old grey", "the great bear"; it lives, so never a kill) and 
 _test_tomb (beside them: the fact and the deed; out of hearing: nothing; the server connected).
 Server only, protocol unchanged, no new class_name.
 
+780 amended (16), items' side: the boar king's rows (2026-11-08; enemy-ai's boar king design,
+approved by the coordinator; release's label). levels/items.json: boar_king_tusk ("boar king's tusk",
+token and trophy, 0.3 x 0.06 x 0.08 m, 0.4 kg, stacks 10, value 10) and boar_king_hide ("boar king's
+hide", trophy, 1.2 x 0.15 x 0.8 m, 6 kg, value 30), each dropped once, always, by enemy-ai's boar
+king; truffles ("handful of truffles", food and luxury, stacks 5, value 8: economy's), bought by the
+Mughouse's taverner by Give and the forest camp traders through Sell, and the tanner's lines for the
+tusk and hide, all economy's side. levels/loot.json: boar_lair_cache, what he roots up in his wallow:
+truffles 2-4 always (so never empty), mushrooms 1-2 0.5, ration 0.3, knife 0.25, bandaging kit 0.25,
+silver ring 0.1, and no gold (the coordinator's ruling: no forager's purse). All bonuses. Nothing
+references them until maps opens the lair and enemy-ai switches the king on: they land off. items_test
+checks the table (2 to 4 truffles, all known, no gold) and the rows. Data only: protocol unchanged, no
+new class_name, no bullet.
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a

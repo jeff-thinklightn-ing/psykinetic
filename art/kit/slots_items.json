@@ -296,6 +296,44 @@
 			"type": "mesh",
 			"uses": "handful of berries (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.boar_king_hide": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				1.2,
+				0.15,
+				0.8
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "boar king's hide (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.boar_king_tusk": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.3,
+				0.06,
+				0.08
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "boar king's tusk (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.bone_dice": {
 			"budget": 500,
 			"category": "items",
@@ -1552,6 +1590,25 @@
 			},
 			"type": "mesh",
 			"uses": "Tomb Sledge (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
+		"item.truffles": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.12,
+				0.06,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "handful of truffles (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
 		"item.tusks": {
 			"budget": 500,

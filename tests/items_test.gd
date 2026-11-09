@@ -3215,6 +3215,16 @@ func _test_loot() -> void:
 			and barrow.all(func(row: Dictionary) -> bool: return Items.exists(str(row["item"])))
 			and Items.roll_loot("barrow_goods", "y", 8).has("dagger"),
 			"every chest table always gives something; barrow_goods (a dagger sure), the hills' cairn_cache (a ration sure), the camp's pack (a bandaging kit sure), all known")
+	var wallow: Array = Items.loot_tables().get("boar_lair_cache", [])
+	var truffled := true
+	for i in 20:
+		var found := Items.roll_loot("boar_lair_cache", "wallow%d" % i, 8)
+		var n := found.count("truffles")
+		truffled = truffled and n >= 2 and n <= 4
+	_check(truffled and wallow.all(func(row: Dictionary) -> bool: return Items.exists(str(row["item"])))
+			and Items.roll_gold("boar_lair_cache", "x") == 0 and Items.stack_of("truffles") == 5 and Items.value_of("truffles") == 8
+			and Items.has_tag("boar_king_tusk", "trophy") and Items.has_tag("boar_king_hide", "trophy"),
+			"the boar king's wallow (boar_lair_cache): 2 to 4 truffles always, all known, no purse; truffles stack 5, value 8 (economy's); his tusk and hide are trophies")
 	var rows: Array[String] = ["#######", "#.....#", "#.....#", "#######"]
 	var markers := {Vector2i(1, 1): "chest", Vector2i(3, 1): "chest", Vector2i(5, 1): "chest", Vector2i(2, 2): "monster_imp",
 		Vector2i(4, 2): "monster_brute", Vector2i(5, 2): "start"}
