@@ -45256,7 +45256,11 @@ not change while it is shelved. Switching it on is enemy-ai's (with the bullet):
 make_forest run again, and the three grown trees put back in its sightline strip when it was shelved
 (820) taken out of trees.json again; a trial of that here passes but for those trees. level_test
 _test_boar_lair (marker, one keeper, the find by a wallow, the place; the mouth open once on) and
-_test_forest. Level data; protocol unchanged; no new class_name; no bullet.
+_test_forest. Level data; protocol unchanged; no new class_name; no bullet. The den keeper came out
+again before v0.1.209 ("780 amended (16), maps' side: no den keeper at the lair's mouth"): playtest's
+run found him loose at the mouth, one of five bodies on the bot, and the coordinator ruled no loose
+boar at the lair's mouth beyond his sounder; KEEPERS is empty, the lair holds the king's marker alone,
+and level_test checks none.
 780 amended (16), sound's side (release's label; enemy-ai's ask, package "the boar king"):
 his voice. Already his: CREATURE_PITCH 0.85, IDLE_AS boar, hooves_heavy, sfx.boar_king_roar
 (his call), sfx.boar_king_charge and sfx.boar_king_death. Now his "bellow", near or far

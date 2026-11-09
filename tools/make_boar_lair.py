@@ -17,9 +17,8 @@ its one way out a link up to the forest.
   piece). Apex brings his sounder of three with him.
 - An open middle (OPEN, 12 x 12: nothing laid in it, room for the king's
   charge); the wallows, bones and rooted-up ground round the edges.
-- One den keeper (monster_boar, an ordinary sow; enemy-ai's design) by the
-  west wallow, who stays when he ventures out, back after "respawn_s" (6000,
-  as the old grey's keeper), so the wallow's find is never unguarded.
+- No den keeper (780 amended (16), before v0.1.209: no loose boar at the
+  mouth beyond his sounder). KEEPERS stays for one, should one come back.
 - The find at the east wallow's edge (CACHE_AT): what he rooted up, a
   prop.cache_pack (decision 599) on items' loot table boar_lair_cache.
 - The "lair" place, "the boar's lair" (the zone's own name, named once,
@@ -58,7 +57,7 @@ FROM_FOREST = (13, 24)
 START = (14, 24)
 DEN = (14, 5)
 WALLOWS = [((10, 4), 1), ((18, 4), 2), ((5, 11), 1)]
-KEEPERS = [(10, 6)]
+KEEPERS = []  # 780 amended (16): no den keeper at the mouth (the coordinator: no loose boar beyond his sounder)
 CACHE_AT = (17, 5)
 CACHE = "boar_lair_cache"
 NAME = "the boar's lair"

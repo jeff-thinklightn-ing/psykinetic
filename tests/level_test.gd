@@ -3121,12 +3121,11 @@ func _test_boar_lair() -> void:
 		else:
 			others.append(entity)
 	# The boar king's package, maps' piece: his marker on his bed (Apex's, never
-	# spawned by Main), one den keeper, the wallow's find.
+	# spawned by Main), no den keeper (no loose boar at the mouth beyond his
+	# sounder, the coordinator, before v0.1.209), the wallow's find.
 	_check(kings == [den] and Apex.holds_marker({"kind": "boar_king", "spawn": {}}, "boar_lair"),
 		"the boar king's marker on his bed, the den, Apex's (%s)" % [kings])
-	_check(boars.size() == 1 and boars.all(func(at: Vector2i) -> bool: return Vector2(at - den).length() <= 4.5)
-		and int(config.get("respawn_s", {}).get("boar", 0)) >= DayNight.DEFAULT_DAY_MINUTES * 60,
-		"one den keeper within 4 cells of the den, back after a game day or more (%s)" % [boars])
+	_check(boars.is_empty(), "no den keeper, no boar but his sounder (%s)" % [boars])
 	var wallows: Array = lair["terrain"].get("decor", []).filter(func(entry: Dictionary) -> bool: return entry["kind"] == "wallow")
 	_check(caches.size() == 1 and caches[0].get("art") == "prop.cache_pack" and floor.has(caches[0]["tile"])
 		and wallows.any(func(entry: Dictionary) -> bool: return Vector2(entry["cell"] - caches[0]["tile"]).length() <= 1.5),
