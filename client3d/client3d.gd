@@ -23564,6 +23564,11 @@ func _on_stunned(ticks: int, cause: StringName, id: int) -> void:
 	if cause == &"crash" and puppet.has_meta("creature_view"):
 		# The boar king's charge into the terrain: dazed through the stun (its slot's clip).
 		(puppet.get_meta("creature_view") as CreatureView).daze(ticks * World.TICK_DT)
+		# And heard: a heavy dull thud at him, at his pitch (780 amended (16), sound's side).
+		var creature := str(puppet.get_meta("creature", ""))
+		var thud := SoundKit.crash(cause, creature)
+		if thud != "":
+			sfx.play(thud, puppet.position + Vector3.UP * 0.6, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))
 		return
 	if cause != &"guarded":
 		return

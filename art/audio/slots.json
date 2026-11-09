@@ -1159,6 +1159,34 @@
 			"uses": "the boar king killed (795; Client3D._fall)",
 			"fallback": "sfx.boar_death"
 		},
+		"sfx.boar_king_snort": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 14,
+			"volume_db": 0.0,
+			"uses": "the boar king's charge tell: a deep wet snort as he drops his head and paws, inside the 1.2 s tell (780 amended (16); Monster.cried snort)",
+			"fallback": "sfx.boar_grunt"
+		},
+		"sfx.boar_king_skid": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 12,
+			"volume_db": -4.0,
+			"uses": "the boar king's missed charge running out: hooves ploughing earth as he skids round, his flank open (780 amended (16); Monster.cried skid)"
+		},
+		"sfx.boar_king_crash": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 16,
+			"volume_db": 0.0,
+			"uses": "the boar king charging into a tree, rock or wall: a heavy dull body thud as he stuns himself (780 amended (16); Client3D on GridEntity.stunned with cause crash, SoundKit.stun_sound)"
+		},
 		"sfx.footstep_hooves_heavy": {
 			"category": "movement",
 			"type": "oneshot",

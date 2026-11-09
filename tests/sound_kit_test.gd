@@ -194,6 +194,17 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.positional("sfx.shield_recoil") and SoundKit.takes("sfx.shield_recoil").size() >= 3
 			and SoundKit.volume_db("sfx.shield_recoil") > SoundKit.volume_db("sfx.block_shield") and SoundKit.RECOIL_DUCK_DB > 0.0,
 			"a shield's recoil booms (sfx.shield_recoil, three takes, louder than the block, which ducks); a bash or other stun, none")
+	# 780 amended (16), sound's side: the boar king's snort, skid, crash and
+	# far bellow his own; a cry he has no slot for a boar's.
+	_check(SoundKit.cry("boar_king", "snort") == "sfx.boar_king_snort" and SoundKit.cry("boar_king", "skid") == "sfx.boar_king_skid"
+			and SoundKit.cry("boar_king", "bellow") == "sfx.boar_king_roar" and SoundKit.cry("boar_king", "charge") == "sfx.boar_king_charge"
+			and SoundKit.cry("boar_king", "rout") == "sfx.boar_rout" and SoundKit.cry("boar", "snort") == ""
+			and SoundKit.crash(&"crash", "boar_king") == "sfx.boar_king_crash" and SoundKit.crash(&"crash", "boar") == ""
+			and SoundKit.crash(&"guarded", "boar_king") == "" and SoundKit.recoil(&"crash") == ""
+			and SoundKit.takes("sfx.boar_king_snort").size() >= 3 and SoundKit.takes("sfx.boar_king_skid").size() >= 3
+			and SoundKit.takes("sfx.boar_king_crash").size() >= 3 and SoundKit.noise("sfx.boar_king_snort") == ""
+			and SoundKit.noise("sfx.boar_king_skid") == "" and SoundKit.noise("sfx.boar_king_crash") == "",
+			"the boar king: his snort, skid and crash his own, three takes each, unheard by monsters; his bellow his roar; his rout a boar's; a boar none of his")
 	# 790 amended (4), sound's side: Skeech (a sneak) hisses as his ambush's
 	# windup starts, sharp and short, heard behind you, never by monsters.
 	_check(SoundKit.cry("sneak", "ambush") == "sfx.goblin_ambush" and SoundKit.positional("sfx.goblin_ambush")

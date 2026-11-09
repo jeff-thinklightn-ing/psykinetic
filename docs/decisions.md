@@ -45223,6 +45223,20 @@ make_forest run again, and the three grown trees put back in its sightline strip
 (820) taken out of trees.json again; a trial of that here passes but for those trees. level_test
 _test_boar_lair (marker, one keeper, the find by a wallow, the place; the mouth open once on) and
 _test_forest. Level data; protocol unchanged; no new class_name; no bullet.
+780 amended (16), sound's side (release's label; enemy-ai's ask, package "the boar king"):
+his voice. Already his: CREATURE_PITCH 0.85, IDLE_AS boar, hooves_heavy, sfx.boar_king_roar
+(his call), sfx.boar_king_charge and sfx.boar_king_death. Now his "bellow", near or far
+(World.far_cry, 780), is his roar (OWN_CRIES), one voice; his charge tell's "snort" is
+sfx.boar_king_snort (a deep wet snort, voice bus, range 14, falling back to sfx.boar_grunt) and
+his missed charge's "skid" sfx.boar_king_skid (hooves ploughing earth, sfx bus, range 12, -4 dB),
+both through Monster.cried; his charge into a tree, rock or wall, GridEntity.stunned with cause
+&"crash", is sfx.boar_king_crash at him (a heavy dull body thud, range 16; SoundKit.crash, in
+animation's &"crash" branch of Client3D._on_stunned, as he dazes), at his pitch. A cry he has no slot
+for is a boar's (SoundKit.CRIES_AS: his rout sfx.boar_rout), never silent. None is heard by
+monsters. Nine Freesound takes (eight CC0; 108617 juskiddink, CC BY 4.0). Review:
+C:/dev/review/sound/boar_king. sound_kit_test (his snort, skid, crash and bellow; his rout a
+boar's; a boar none of his). Inert till his lair leaves SHELVED (enemy-ai's switch-on). Client
+only; protocol unchanged, no new class_name, no bullet.
 
 ## 820. Level.SHELVED: a level held back till its package lands
 

@@ -322,6 +322,14 @@ static func recoil(cause: StringName) -> String:
 	return "sfx.shield_recoil" if cause == &"guarded" else ""
 
 
+## The slot a [param creature] (a monster's kind, "" for anyone else) makes
+## stunned by its own charge into a tree, rock or wall (GridEntity.stunned,
+## cause &"crash", 780 amended (16)): its own crash, else none.
+static func crash(cause: StringName, creature: String) -> String:
+	var slot := "sfx.%s_crash" % creature
+	return slot if cause == &"crash" and creature != "" and has(slot) else ""
+
+
 ## A swing's slot: a two-handed weapon's heavier whoosh.
 static func swing(id: String) -> String:
 	return "sfx.swing_heavy" if id != "" and int(Items.def(id).get("hands", 1)) >= 2 and not Items.verb_of(id).is_empty() 			and str(Items.verb_of(id).get("kind", "")) != "ranged" else "sfx.swing"
@@ -407,7 +415,7 @@ static func speech(entity: Object, text: String) -> String:
 ## a creature's own name for one first (a wolf's call is its howl).
 const CRIES := {"call": "alert", "rout": "rout"}
 const OWN_CRIES := {"wolf": {"call": "howl"}, "deer": {"suspicious": "snort"},
-		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}, "boar_king": {"call": "roar"},
+		"great_bear": {"swipe": "growl", "slam": "growl", "charge": "growl"}, "boar_king": {"call": "roar", "bellow": "roar"},
 		"hill_cat": {"call": "snarl"}}
 ## A kind that sounds as another (a stag as a deer).
 const SOUNDS_AS := {"stag": "deer", "old_wolf": "wolf"}
@@ -439,7 +447,14 @@ static func creature_slot_name(creature: String) -> String:
 static func cry(creature: String, cry_kind: String) -> String:
 	var own: Dictionary = OWN_CRIES.get(creature_slot_name(creature), {})
 	var slot := "sfx.%s_%s" % [creature_slot_name(creature), own.get(cry_kind, CRIES.get(cry_kind, cry_kind))]
+	if not has(slot) and CRIES_AS.has(creature):
+		return cry(CRIES_AS[creature], cry_kind)  # His own first, else his kin's (780 amended (16)).
 	return slot if has(slot) else ""
+
+
+## A kind whose cries it has no slot of its own for are another's: the boar
+## king's rout, struck squeal or grunt a boar's, at his pitch (780 amended (16)).
+const CRIES_AS := {"boar_king": "boar"}
 
 
 ## The slot a night watch's wave announces itself with (771; the "wave"

@@ -1106,6 +1106,35 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.boar_king_crash": [
+			{
+				"file": "sfx.boar_king_crash.ogg",
+				"from": "freesound",
+				"original": "freesound 504626: BODY FALL - V HVY - DIRT (from 0.35 s for 0.9 s)",
+				"sha256": "1ce696a40d4b7ae16d54f63eb8c97453733c36e2209e5c3df60bb42b3cbe3ab6",
+				"by": "leonelmail",
+				"url": "https://freesound.org/people/leonelmail/sounds/504626/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_crash.2.ogg",
+				"from": "freesound",
+				"original": "freesound 673424: Falling body hits the floor (from 1.05 s for 1 s)",
+				"sha256": "de24f001cffb554e14d0180bf5825702a7fbb5d20a7e5a73af65a2f8bd011b92",
+				"by": "courtneyeck",
+				"url": "https://freesound.org/people/courtneyeck/sounds/673424/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_crash.3.ogg",
+				"from": "freesound",
+				"original": "freesound 108617: Thud-dry.wav (from 0 s for 0.32 s)",
+				"sha256": "80b8213932646648f155b30963de37dc66268727ef607223e5a3d0aa33cccc3a",
+				"by": "juskiddink",
+				"url": "https://freesound.org/people/juskiddink/sounds/108617/",
+				"license": "CC BY 4.0"
+			}
+		],
 		"sfx.boar_king_roar": [
 			{
 				"file": "sfx.boar_king_roar.ogg",
@@ -1123,6 +1152,64 @@
 				"sha256": "b32d8108472778b4845161c59243469d8f8d113c068799053c1be87da74371a5",
 				"by": "TheKingOfGeeks360",
 				"url": "https://freesound.org/people/TheKingOfGeeks360/sounds/839526/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.boar_king_skid": [
+			{
+				"file": "sfx.boar_king_skid.ogg",
+				"from": "freesound",
+				"original": "freesound 630008: SLIDING ON GRAVEL.wav (from 0 s for 1.2 s)",
+				"sha256": "ecb0a9e43bea08d726a40f3bf99366e01792ccbde6ba999cb543477ffb603fef",
+				"by": "trexlasso",
+				"url": "https://freesound.org/people/trexlasso/sounds/630008/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_skid.2.ogg",
+				"from": "freesound",
+				"original": "freesound 504356: Boots Gravel Feet Slide  1_3 (from 0.1 s for 1.2 s)",
+				"sha256": "a203557b5531466d75ab8d63650838c2c2ed4cd2f779ddc90a35eaa241946223",
+				"by": "Joao_Janz",
+				"url": "https://freesound.org/people/Joao_Janz/sounds/504356/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_skid.3.ogg",
+				"from": "freesound",
+				"original": "freesound 504382: Boots Gravel Feet Slide  1_6 (from 0 s for 1 s)",
+				"sha256": "a5a3fd3cc459fed2feff846d5d59bd692657622019eb69ea85dfc8e6498037b0",
+				"by": "Joao_Janz",
+				"url": "https://freesound.org/people/Joao_Janz/sounds/504382/",
+				"license": "CC0 1.0"
+			}
+		],
+		"sfx.boar_king_snort": [
+			{
+				"file": "sfx.boar_king_snort.ogg",
+				"from": "freesound",
+				"original": "freesound 233148: Pig - Snort 10 - 96kHz.wav (from 0.05 s for 0.7 s)",
+				"sha256": "c48d9e6f1857ed4774396172f34a6209cefc2ede2b5e504122bf5ab35bbca251",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233148/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_snort.2.ogg",
+				"from": "freesound",
+				"original": "freesound 233162: Pig - Snort 5 - 96kHz.wav (from 0.15 s for 0.75 s)",
+				"sha256": "74f4851d5477880c008e3dbe44e784f1a8556e346ff08ae4661f95ebe8618384",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233162/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.boar_king_snort.3.ogg",
+				"from": "freesound",
+				"original": "freesound 233165: Pig - Snort 6 - 96kHz.wav (from 0.15 s for 0.75 s)",
+				"sha256": "f8c4df65b120435705754a6f8727203c43f76bc52dad8e3b74c461035a710f8c",
+				"by": "JarredGibb",
+				"url": "https://freesound.org/people/JarredGibb/sounds/233165/",
 				"license": "CC0 1.0"
 			}
 		],
