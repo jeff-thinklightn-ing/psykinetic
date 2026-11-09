@@ -7072,6 +7072,18 @@ it anyway. Now:
   It goes both ways (the coordinator's pick): a skeleton guard's raised shield throws a player
   back too, met by flanking, a bash or a heavy blow; a sword's blow (3 and 0.9) breaks a round
   shield, so a sword brings a shielded guard down from the front in about 4 s.
+  A robber's told lunge met on a raised shield (Monster._tend_ambush, met as a thrust so it never
+  breaks the guard) recoils the robber the same 4 ticks (the coordinator's ruling: a body coming
+  in, 4 is plenty).
+- The shield's stamina (playtest's armed barrow runs: raised at every tell, the round shield was
+  broken 25 times against 7 taken, nearly every break at stamina 0; a sword swings about every 8
+  ticks, inside the 10 quiet ticks regen waits for, so nothing came back): "stamina" a weight
+  the round shield 8 to 4, the buckler 6 to 3 (a lunge 12, a robber's poke 10); and a guard that
+  gives way for want of stamina breaks as before (the stun, the blow whole) but takes nothing
+  more, the holder keeping what it had (the drain to 0 made every next take break too). A
+  weight-broken guard still pays its cost. The sword's parry unchanged. The coordinator's bar for
+  the rerun: no more heals than the sword alone, within about 1.3 times its time; if it misses,
+  regen under a raised guard not struck comes next, before the break points.
 - breaks_at: the round shield 2.0 to 3.0, the buckler 1.5 to 2.5. A robber's or a wolf's plain
   blow is taken; a brute's hammer (force 3), a sword's on a buckler and every wound-up blow
   (crushing, 392) still break it.

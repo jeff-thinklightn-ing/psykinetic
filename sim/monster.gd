@@ -930,6 +930,9 @@ func _tend_ambush() -> bool:
 			var met: Variant = World._meet_guard(each, self, amount, 0.0, true)
 			if met != null:
 				amount = int((met as Array)[0])
+				if each.raised == "block":
+					# 340 amended: taken on a raised shield, the robber thrown back as off a plain blow.
+					World._stun_for(self, World.SHIELD_RECOIL_STUN, &"guarded")
 		if amount > 0:
 			World.damage(each, amount, self, move)
 	next_attack_tick = maxi(next_attack_tick, World.tick + attack_ticks)

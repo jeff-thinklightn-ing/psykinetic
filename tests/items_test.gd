@@ -147,9 +147,9 @@ func _test_leather() -> void:
 			"every bundle is mended by the carpenter from leather and wood (%s)" % Items.mend_of("arrows"))
 	_check(Items.mend_of("sword").is_empty(), "a sword has no mend")
 	var buckler := Items.verb_of("buckler")
-	_check(buckler.get("kind") == "block" and buckler.get("arc") == 0 and buckler.get("absorb") == 0.75 and buckler.get("stamina") == 6
+	_check(buckler.get("kind") == "block" and buckler.get("arc") == 0 and buckler.get("absorb") == 0.75 and buckler.get("stamina") == 3
 			and buckler.get("breaks_at") == 2.5 and buckler.get("bash_force") == 1.0 and Items.weight_of("buckler") == 1.5,
-			"a buckler: straight ahead only, takes three quarters, 6 stamina, breaks at 2.5 (340 amended), a light bash; 1.5 kg (%s)" % buckler)
+			"a buckler: straight ahead only, takes three quarters, 3 stamina, breaks at 2.5 (340 amended), a light bash; 1.5 kg (%s)" % buckler)
 	_check(Items.def("buckler")["made"] == {"by": "tanner", "from": {"leather": 2, "wood": 1}, "steps": 1800}
 			and "shield" in Items.def("buckler")["tags"], "made by the tanner from leather and wood, a shield the town wants")
 
@@ -1020,7 +1020,7 @@ func _test_block() -> void:
 	_check(not World.guarding(host, imp).is_empty(), "faced one step aside: still within the shield's arc")
 	host._world_set_facing(ahead)
 	var met: Variant = World._meet_guard(host, imp, 1, 0.8)
-	_check(met == [0, 0.0] and host.stamina == host.max_stamina - 15, "an imp's blow (1, force 0.8, weighing 1.8): nothing gets through; 15 stamina (%s, %d)" % [met, host.stamina])
+	_check(met == [0, 0.0] and host.stamina == host.max_stamina - 8, "an imp's blow (1, force 0.8, weighing 1.8): nothing gets through; 8 stamina (340 amended: 4 a weight) (%s, %d)" % [met, host.stamina])
 	var hp := host.hp
 	imp._world_set_facing(-ahead)
 	imp.next_attack_tick = 0
@@ -1043,7 +1043,7 @@ func _test_block() -> void:
 	_check(World.try_stance(host, "block"), "a while later it will")
 	host.stamina = 3
 	met = World._meet_guard(host, imp, 1, 0.8)
-	_check(met == [1, 0.8] and host.raised == "" and host.stamina == 0, "out of stamina: the guard gives way")
+	_check(met == [1, 0.8] and host.raised == "" and host.stamina == 3, "out of stamina: the guard gives way, what was left kept (340 amended)")
 	host.stunned_until_tick = 0
 	host.guard_broken_until = 0
 	host.stamina = host.max_stamina

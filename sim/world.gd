@@ -7210,9 +7210,10 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
 	var cost := maxi(1, ceili(float(verb["stamina"]) * weight * steady))
 	target._world_note_exertion(tick)
-	if (weight >= float(verb["breaks_at"]) or crushing) and not shot or target.max_stamina > 0 and target.stamina < cost:
-		if target.max_stamina > 0:
-			target.stamina = maxi(0, target.stamina - cost)
+	var heavy := (weight >= float(verb["breaks_at"]) or crushing) and not shot
+	if heavy or target.max_stamina > 0 and target.stamina < cost:
+		if heavy and target.max_stamina > 0:
+			target.stamina = maxi(0, target.stamina - cost)  # 340 amended: one short of stamina keeps what it has.
 		target.raised = ""
 		target.guard_broken_until = tick + GUARD_BROKEN_TICKS
 		_stun_for(target, GUARD_BREAK_STUN, &"broken")

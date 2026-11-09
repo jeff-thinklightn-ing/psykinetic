@@ -2151,6 +2151,9 @@ func _test_lunge() -> void:
 		World.tick += 1
 		robber._tend_ambush()
 	_check(player.hp == hp, "the shield took it (%d of %d)" % [player.hp, hp])
+	_check(World.is_stunned(robber) and robber.stun_cause == &"guarded" and robber.stunned_until_tick - World.tick <= World.SHIELD_RECOIL_STUN
+			and player.raised == "block",
+			"340 amended: the robber thrown back off it, &\"guarded\" (%s, %d ticks left)" % [robber.stun_cause, robber.stunned_until_tick - World.tick])
 	# A kind with no lunge never begins one.
 	var e := _build(["#######", "#.sP..#", "#######"])
 	_check(not (e["s"][0] as Monster).begin_lunge(e["P"][0]) and (e["s"][0] as Monster).lunge.is_empty(), "a sneak has none")
