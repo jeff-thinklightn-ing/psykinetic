@@ -3046,7 +3046,8 @@ const CUE_SLOTS := {"arch": "building.link_arch", "waystones": "building.wayston
 ## at the map's edge (an arch would hang off it); else none. Facing the
 ## way out: toward the edge it is on, or away from the open ground it is
 ## walked into from (an arch's or waystones': toward the map's nearest
-## edge). "variant" as the link says (1: a timber arch, a stone
+## edge); a link's own "facing" [dx, dy] (one step) over all of these.
+## "variant" as the link says (1: a timber arch, a stone
 ## stair; 2: a stone arch, a timber stair or a ladder; 3: the dark
 ## tower's, art-kit's dark-stone arch and stairs, 659 amended).
 static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary]:
@@ -3105,6 +3106,11 @@ static func link_cues(level: Dictionary, config: Dictionary) -> Array[Dictionary
 			facing = -from.clamp(-Vector2i.ONE, Vector2i.ONE) if from != Vector2i.ZERO else Vector2i(0, 1)
 			if facing.x != 0 and facing.y != 0:
 				facing.y = 0
+		# Its own "facing" [dx, dy] wins (811 amended (5): an interior's
+		# stair, which the map's edge would turn into its outer wall).
+		var own: Variant = _tile(entry.get("facing"))
+		if own != null and (own as Vector2i).abs() in [Vector2i(1, 0), Vector2i(0, 1)]:
+			facing = own
 		link["cue"] = cue  # The big map marks it (ui).
 		out.append({"tile": at, "cue": cue, "facing": facing, "variant": maxi(1, int(entry.get("variant", 1))),
 				"closed": bool(link["closed"]) or link["sealed"] != ""})

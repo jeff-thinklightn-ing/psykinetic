@@ -26,7 +26,7 @@
 					"doors": [{"to": "common", "cells": [[12, 11], [12, 12]], "side": "west"}]}
 			],
 			"stairs": [
-				{"cells": [[15, 13], [16, 13]], "to": "umbrage_tavern_up", "spawns": [[15, 12], [16, 12]], "way": "up"}
+				{"cells": [[16, 10], [17, 10]], "to": "umbrage_tavern_up", "spawns": [[16, 11], [17, 11]], "way": "up", "facing": "north"}
 			]
 		},
 		{
@@ -50,8 +50,8 @@
 					"doors": [{"to": "hall_up", "cells": [[13, 8], [14, 8]], "side": "north"}]}
 			],
 			"stairs": [
-				{"cells": [[15, 13], [16, 13]], "to": "umbrage_tavern", "spawns": [[15, 12], [16, 12]], "way": "down"},
-				{"cells": [[16, 9], [17, 9]], "to": "umbrage_tavern_attic", "spawns": [[16, 10], [17, 10]], "way": "up"}
+				{"cells": [[16, 10], [17, 10]], "to": "umbrage_tavern", "spawns": [[16, 11], [17, 11]], "way": "down", "facing": "north"},
+				{"cells": [[12, 11], [12, 12]], "to": "umbrage_tavern_attic", "spawns": [[13, 11], [13, 12]], "way": "up", "facing": "west"}
 			]
 		},
 		{
@@ -64,7 +64,7 @@
 					"holds": [[1, 1], [2, 1], [1, 6], [9, 3]]}
 			],
 			"stairs": [
-				{"cells": [[16, 0], [17, 0]], "to": "umbrage_tavern_up", "spawns": [[16, 1], [17, 1]], "way": "down"}
+				{"cells": [[16, 0], [17, 0]], "to": "umbrage_tavern_up", "spawns": [[16, 1], [17, 1]], "way": "down", "facing": "north"}
 			]
 		}
 	]

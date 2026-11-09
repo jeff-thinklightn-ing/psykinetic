@@ -34,8 +34,11 @@ rooms and its stairs:
   wardrobe or vault), and the locker is opened through a person.
 - a stair: two cells side by side (the two-cell passages rule), the floor it
   reaches, the two cells beside it one arrives on from there, and its way
-  ("up" or "down"). Each cell is a link to the matching arrival on the other
-  floor, whose stair back must be as wide.
+  ("up" or "down"), and its "facing" (north, south, west or east: the way its
+  steps run, the link's own facing for its cue, Level.link_cues). Each cell
+  is a link to the matching arrival on the other floor, whose stair back must
+  be as wide. Never on the floor's south row, where the outer wall nearest
+  the view hides it (811 amended (5)).
 
 Every spec must make sense (the coordinator, 2026-11-04, with dungeon's
 layout-sense rules) or nothing is written: every door leads into the room it
@@ -237,6 +240,14 @@ def check(spec):
             back = [s for s in (other or {}).get("stairs", []) if s["to"] == level]
             if len(back) != 1:
                 faults.append("%s: the stair to %s has %d stairs back" % (level, stair["to"], len(back)))
+            # In sight (811 amended (5); Jeff: "no way to get down from the
+            # 2nd floor"): a stair faces a way of its own, and never stands
+            # on the floor's south row, where the outer wall nearest the
+            # view hides it.
+            if stair.get("facing") not in SIDES:
+                faults.append("%s: the stair to %s has no \"facing\" (north, south, west or east)" % (level, stair["to"]))
+            if any(c[1] == floor["size"][1] - 1 for c in stair["cells"]):
+                faults.append("%s: the stair to %s stands on the south row, behind the near wall" % (level, stair["to"]))
             room = owner.get((level, tuple(stair["cells"][0])))
             ways.setdefault((level, room), set()).add("floor:" + stair["to"])
     # A hall joins two rooms or more; a room with one way in holds something.
@@ -324,7 +335,8 @@ def lay(spec, floor):
     for stair in floor.get("stairs", []):
         for index, cell in enumerate(stair["cells"]):
             markers[tuple(cell)] = "link"
-            links.append({"at": list(cell), "to_map": stair["to"], "to_spawn": spawn_name(level, index), "cue": stair["way"]})
+            links.append({"at": list(cell), "to_map": stair["to"], "to_spawn": spawn_name(level, index), "cue": stair["way"],
+                          "facing": list(SIDES[stair["facing"]])})
         for index, cell in enumerate(stair["spawns"]):
             spawns[spawn_name(stair["to"], index)] = list(cell)
     buildings = []

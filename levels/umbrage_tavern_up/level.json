@@ -13,64 +13,80 @@
 	"floors": "wood",
 	"starts": [
 		[
-			15,
-			12
+			16,
+			11
 		]
 	],
 	"spawn_points": {
 		"from_umbrage_tavern_0": [
-			15,
-			12
+			16,
+			11
 		],
 		"from_umbrage_tavern_1": [
-			16,
-			12
+			17,
+			11
 		],
 		"from_umbrage_tavern_attic_0": [
-			16,
-			10
+			13,
+			11
 		],
 		"from_umbrage_tavern_attic_1": [
-			17,
-			10
+			13,
+			12
 		]
 	},
 	"links": [
 		{
 			"at": [
-				15,
-				13
+				16,
+				10
 			],
 			"to_map": "umbrage_tavern",
 			"to_spawn": "from_umbrage_tavern_up_0",
-			"cue": "down"
-		},
-		{
-			"at": [
-				16,
-				13
-			],
-			"to_map": "umbrage_tavern",
-			"to_spawn": "from_umbrage_tavern_up_1",
-			"cue": "down"
-		},
-		{
-			"at": [
-				16,
-				9
-			],
-			"to_map": "umbrage_tavern_attic",
-			"to_spawn": "from_umbrage_tavern_up_0",
-			"cue": "up"
+			"cue": "down",
+			"facing": [
+				0,
+				-1
+			]
 		},
 		{
 			"at": [
 				17,
-				9
+				10
+			],
+			"to_map": "umbrage_tavern",
+			"to_spawn": "from_umbrage_tavern_up_1",
+			"cue": "down",
+			"facing": [
+				0,
+				-1
+			]
+		},
+		{
+			"at": [
+				12,
+				11
+			],
+			"to_map": "umbrage_tavern_attic",
+			"to_spawn": "from_umbrage_tavern_up_0",
+			"cue": "up",
+			"facing": [
+				-1,
+				0
+			]
+		},
+		{
+			"at": [
+				12,
+				12
 			],
 			"to_map": "umbrage_tavern_attic",
 			"to_spawn": "from_umbrage_tavern_up_1",
-			"cue": "up"
+			"cue": "up",
+			"facing": [
+				-1,
+				0
+			]
 		}
 	],
 	"buildings": [],

@@ -23,12 +23,12 @@
 			13
 		],
 		"from_umbrage_tavern_up_0": [
-			15,
-			12
+			16,
+			11
 		],
 		"from_umbrage_tavern_up_1": [
-			16,
-			12
+			17,
+			11
 		]
 	},
 	"links": [
@@ -50,21 +50,29 @@
 		},
 		{
 			"at": [
-				15,
-				13
+				16,
+				10
 			],
 			"to_map": "umbrage_tavern_up",
 			"to_spawn": "from_umbrage_tavern_0",
-			"cue": "up"
+			"cue": "up",
+			"facing": [
+				0,
+				-1
+			]
 		},
 		{
 			"at": [
-				16,
-				13
+				17,
+				10
 			],
 			"to_map": "umbrage_tavern_up",
 			"to_spawn": "from_umbrage_tavern_1",
-			"cue": "up"
+			"cue": "up",
+			"facing": [
+				0,
+				-1
+			]
 		}
 	],
 	"buildings": [

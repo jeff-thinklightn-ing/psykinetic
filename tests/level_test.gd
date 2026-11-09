@@ -3035,6 +3035,7 @@ func _test_relaid() -> void:
 	_test_caches(wilds, hills)
 	_test_carved(hills)
 	_test_tavern_zone(wilds)
+	_test_storey_stairs()
 	_test_shelled(wilds)
 	_test_perches(hills)
 
@@ -3698,6 +3699,74 @@ func _test_shelled(wilds: Dictionary) -> void:
 ## every floor cell is reached from where one arrives; the tavern (its
 ## counter, eight seats, hearth) on the ground floor, Umbrage's; the beds
 ## counted over every floor; the stores drawn as decor.
+## Every building with floors (811 amended (5); Jeff: "in the tavern there's
+## no way to get down from the 2nd floor"): each level under levels/ whose
+## level.json names its "storeys", taken a building at a time. Every floor
+## reaches the ground floor (its first storey) by its links and is reached
+## from it; every link's cell and its arrival are floor; and every stair's
+## cue stands off the floor's south row (the outer wall nearest the view
+## hid the Mughouse's) and faces the way its link says.
+func _test_storey_stairs() -> void:
+	print("
+== Every floor of every building: down to the ground and back, its stairs in sight (811 amended (5)) ==")
+	var buildings := {}
+	for name: String in DirAccess.get_directories_at("res://levels"):
+		if not FileAccess.file_exists("res://levels/%s/level.json" % name):
+			continue
+		var storeys: Variant = Level.template_config(name).get("storeys")
+		if storeys is Array and not (storeys as Array).is_empty():
+			buildings[str(storeys[0])] = storeys
+	_check(buildings.has("umbrage_tavern"), "the buildings with floors found, the Mughouse among them (%s)" % [buildings.keys()])
+	for ground: String in buildings:
+		var names: Array = buildings[ground]
+		var floors := {}
+		for name: Variant in names:
+			floors[str(name)] = Level.load_level(str(name))
+		var ways := {}
+		var bad: Array[String] = []
+		for name: String in floors:
+			var level: Dictionary = floors[name]
+			var floor := {}
+			for cell: Vector2i in level["terrain"]["floor"]:
+				floor[cell] = true
+			var own := {}
+			for entry: Variant in Level.template_config(name).get("links", []):
+				if entry is Dictionary and Level._tile(entry.get("at")) != null:
+					own[Level._tile(entry.get("at"))] = entry
+			for link: Dictionary in level["links"]:
+				var to := str(link["to_map"])
+				if not floors.has(to):
+					continue
+				ways[name + ">" + to] = true
+				var arrival: Variant = (floors[to] as Dictionary)["spawn_points"].get(str(link["to_spawn"]))
+				var there := {}
+				for cell: Vector2i in floors[to]["terrain"]["floor"]:
+					there[cell] = true
+				if not floor.has(link["tile"]) or arrival == null or not there.has(arrival):
+					bad.append("%s %s: its cell or arrival %s not floor" % [name, link["tile"], arrival])
+			for cue: Dictionary in level["terrain"].get("link_cues", []):
+				if cue["cue"] not in ["up", "down"]:
+					continue
+				var at: Vector2i = cue["tile"]
+				var said: Variant = Level._tile((own.get(at, {}) as Dictionary).get("facing"))
+				if at.y >= (level["size"] as Vector2i).y - 1 or said == null or cue["facing"] != said:
+					bad.append("%s %s: on the south row or not facing as said (%s, %s)" % [name, at, cue["facing"], said])
+		var reach := func(from: String, back: bool) -> Array:
+			var seen := [from]
+			var i := 0
+			while i < seen.size():
+				for other: Variant in names:
+					var key: String = (str(other) + ">" + str(seen[i])) if back else (str(seen[i]) + ">" + str(other))
+					if ways.has(key) and str(other) not in seen:
+						seen.append(str(other))
+				i += 1
+			return seen
+		var down: Array = reach.call(ground, true)
+		var up: Array = reach.call(ground, false)
+		_check(down.size() == names.size() and up.size() == names.size() and bad.is_empty(),
+			"%s: all %d floors reach the ground and back (down %s, up %s), every stair in sight (bad %s)" % [ground, names.size(), down, up, bad])
+
+
 func _test_tavern_zone(wilds: Dictionary) -> void:
 	print("
 == Umbrage's tavern, its own zone: three floors, its way in, its tavern and beds ==")

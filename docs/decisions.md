@@ -44047,6 +44047,25 @@ top at its reach and falloff, warm, shadowless, its candles drawn, the ambient 0
 C:/dev/review/mughouse_lamps. EditorFields.NOT_OFFERED lists "lit_candles" with the interior's
 other keys (the tool writes it). Level data, client and the tool; protocol unchanged, no new class_name.
 
+811 amended (5): the Mughouse's stairs in plain sight (Jeff on v0.1.208: "In the tavern there's no
+way to get down from the 2nd floor"; the coordinator's ask; release's label; voice's words). The
+links worked (a probe walked a host up and back down), but the spec put the stair between the
+ground floor and upstairs on each floor's south row, against the outer wall nearest the view, and
+Level.link_cues turns a link on a map's edge toward that edge: the stair pieces faced into that
+wall and it hid them, so upstairs showed no way down. Level.link_cues takes a link's own "facing"
+[dx, dy] (one step) over all its other rules, cosmetic as before. A spec's stair names its
+"facing" (north, south, west or east), which tools/make_interior.py writes on each of its links,
+and the tool refuses a stair with none or one on its floor's south row. The Mughouse's stair
+between the ground floor and upstairs stands on (16,10),(17,10) of both floors facing north,
+against the stair room's back wall (arrivals (16,11),(17,11)); upstairs, the attic stair stands on
+the stair room's west side, (12,11),(12,12) facing west (arrivals (13,11),(13,12)); the attic's own
+stair stays on its north row, facing north. level_test _test_storey_stairs: every building whose
+levels name "storeys", every floor reaching its ground floor and reached from it by its links,
+every link's cell and arrival floor, every stair's cue off the south row and facing as its link
+says. Players saved on the old cells stand on floor in the same room (one saved on an old attic
+arrival, on the new stair down, takes nothing till they step). Level data, Level and the tool;
+protocol unchanged, no new class_name.
+
 ## 806. Layout sense: the rules an interior is laid under, checked on every generation
 
 Jeff, 2026-11-04: "i'm also not really happy with the how the maps are turning out. they still feel

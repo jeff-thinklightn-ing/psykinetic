@@ -35,7 +35,11 @@
 			],
 			"to_map": "umbrage_tavern_up",
 			"to_spawn": "from_umbrage_tavern_attic_0",
-			"cue": "down"
+			"cue": "down",
+			"facing": [
+				0,
+				-1
+			]
 		},
 		{
 			"at": [
@@ -44,7 +48,11 @@
 			],
 			"to_map": "umbrage_tavern_up",
 			"to_spawn": "from_umbrage_tavern_attic_1",
-			"cue": "down"
+			"cue": "down",
+			"facing": [
+				0,
+				-1
+			]
 		}
 	],
 	"buildings": [],
