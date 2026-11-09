@@ -45787,7 +45787,7 @@ place of his purse, and the makers. It replaces owing players across the store's
 - Where the gold comes from: Economy.pay_for_player(place, amount, why, from_gold, debt_key). The
   place's gold above gold_floor pays first (what pays its own people stays theirs); then the outside
   trade's credit there (the coordinator's capped, refilling credit: Economy._trade_purse,
-  trade_purse(place), levels' trade_credit.per_day 60 a game day up to most 120, outside gold); only
+  trade_purse(place), levels' trade_credit.per_day 40 a game day up to most 80, outside gold); only
   past both is a trade debt booked (Economy._trade_debt, trade_debt(place)), an NPC-side debt no
   player sees, noted in the ledger as "credit:". bank_sale, trophy_sale, sell (barter's gives),
   pay_commission (the watch's pay, so its short and unpaid lines no longer come) and _maker_pays all
@@ -45821,7 +45821,12 @@ place of his purse, and the makers. It replaces owing players across the store's
   town, 300 by a camp, none short); the trade debt 0 every day; the town's gold 497 on day 29
   against the baseline's 365; workers owed mostly 0 against the baseline's 12 to 180; nobody hungry
   in either; dole 1 at most in either. Outside gold per player-day: the camp 15 (its 5 a good a day),
-  the town's credit at most 60.
+  the town's credit at most 60. That ended the town 36% above the baseline, outside gold inflating it,
+  so (the coordinator's follow-up) per_day 60/most 120 became 40/80: the same seller, every sale paid
+  in full (1214 by the town, 300 by a camp, none short), the trade debt at most 51 and 0 from day 13,
+  the town's gold 336 on day 29 against 365 (8% under), workers owed peaking at 194 on day 22 against
+  the baseline's 180 that day, nobody hungry. 30/60 left the town 15% under (310), its debt 192 at
+  most, cleared six days after the seller stopped.
 
 CHANGELOG (voice's). Server and client; protocol 54 (shared, unshipped); no new class_name.
 
