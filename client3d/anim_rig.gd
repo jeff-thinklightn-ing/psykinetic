@@ -22,6 +22,11 @@ extends Node
 ## The bones the upper layer moves, by the humanoid profile's names
 ## (Godot's retargeted %GeneralSkeleton): the spine up, the clavicles,
 ## arms and hands.
+## The clock clips are timed by (now_msec): unset till its first read; -1 off a movie.
+static var _clock_msec := 0
+static var _clock_frame := -1
+static var _clock_movie := -1
+
 const UPPER_BONES: Array[String] = ["Spine", "Chest", "UpperChest", "Neck", "Head",
 	"LeftShoulder", "LeftUpperArm", "LeftLowerArm", "LeftHand",
 	"RightShoulder", "RightUpperArm", "RightLowerArm", "RightHand"]
@@ -233,7 +238,7 @@ func once(clip: String, speed := 1.0, fade := -1.0) -> float:
 	var length := player.get_animation(clip).length
 	_to_base(clip, speed, fade, length if speed < 0.0 else 0.0, true)
 	var seconds := length / absf(speed)
-	_busy_msec = Time.get_ticks_msec() + int(seconds * 1000.0)
+	_busy_msec = now_msec() + int(seconds * 1000.0)
 	return seconds
 
 
@@ -295,7 +300,7 @@ func strike(clip: String, contact: float, lands_in: float, recover: float) -> fl
 	tree.set("parameters/action_seek/seek_request", 0.0)
 	tree.set("parameters/action/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 	_apply()
-	var now := Time.get_ticks_msec()
+	var now := now_msec()
 	_contact_msec = now + int(contact / before * 1000.0)
 	contact_msec = _contact_msec
 	contact_at = contact
@@ -459,13 +464,33 @@ func legs_amount() -> float:
 	return _legs
 
 
+## Milliseconds clips are timed by: the wall clock in play; under movie maker (a reel, tools/clip.sh)
+## the frames' own time, each frame its fixed 1/fps, since a reel draws slower than real time and a
+## clip timed by the wall would end early (the boar king's hook drawn 2 ticks of its 9). Read once a
+## frame it holds through the frame, so every rig and view the same frame sees the same time.
+static func now_msec() -> int:
+	if _clock_movie < 0:
+		_clock_movie = 1 if Engine.get_write_movie_path() != "" else 0
+	if _clock_movie == 0:
+		return Time.get_ticks_msec()
+	var frame := Engine.get_process_frames()
+	if _clock_frame < 0:
+		_clock_msec = Time.get_ticks_msec()
+	elif frame != _clock_frame:
+		var tree := Engine.get_main_loop() as SceneTree
+		var delta := tree.root.get_process_delta_time() if tree != null else 0.0
+		_clock_msec += int(roundf(delta * 1000.0 * (frame - _clock_frame)))
+	_clock_frame = frame
+	return _clock_msec
+
+
 ## Whether a clip played once or a strike is still going.
 func busy() -> bool:
-	return Time.get_ticks_msec() < _busy_msec or striking()
+	return now_msec() < _busy_msec or striking()
 
 
 func striking() -> bool:
-	return Time.get_ticks_msec() < _strike_msec
+	return now_msec() < _strike_msec
 
 
 ## The clip on top: a strike's while it plays, else the base layer's.
@@ -518,7 +543,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if _contact_msec >= 0 and Time.get_ticks_msec() >= _contact_msec:
+	if _contact_msec >= 0 and now_msec() >= _contact_msec:
 		_contact_msec = -1
 		_set_action_speed(_recover_speed)
 	_since += delta

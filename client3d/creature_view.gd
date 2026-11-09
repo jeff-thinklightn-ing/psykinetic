@@ -207,7 +207,7 @@ func pace(clip: String) -> float:
 func frame(puppet: Node3D, monster: Monster) -> void:
 	if rig == null or _dead:
 		return
-	var now := Time.get_ticks_msec()
+	var now := AnimRig.now_msec()
 	var seconds := (now - _last_ms) / 1000.0
 	if _last_at != Vector3.INF and seconds > 0.0:
 		var step := Vector2(puppet.position.x - _last_at.x, puppet.position.z - _last_at.z)
@@ -290,14 +290,14 @@ func _once(clip: String, scale := 1.0) -> bool:
 	var animation := resolve(clip)
 	if rig == null or animation == "" or _dead:
 		return false
-	_busy_until = Time.get_ticks_msec() + int(rig.once(animation, scale) * 1000.0)
+	_busy_until = AnimRig.now_msec() + int(rig.once(animation, scale) * 1000.0)
 	return true
 
 
 ## A blow (GridEntity.swung): its attack at its own pace, unless a wound-up
 ## one or a hit is playing.
 func swing() -> void:
-	if rig != null and not rig.striking() and Time.get_ticks_msec() >= _busy_until:
+	if rig != null and not rig.striking() and AnimRig.now_msec() >= _busy_until:
 		_strike(-1.0)
 
 
@@ -374,7 +374,7 @@ func tell(move: String, lands_in: float, id: int) -> bool:
 		return false
 	_strike(maxf(lands_in, 0.05), clip)
 	_tell_id = id
-	_tell_until = Time.get_ticks_msec() + int(maxf(lands_in, 0.0) * 1000.0)
+	_tell_until = AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0)
 	return true
 
 
@@ -401,7 +401,7 @@ func roar() -> void:
 ## before its rush) runs on from the tell's end: the sim rushes once it lands, the client
 ## holds nothing back.
 func charge() -> void:
-	var now := Time.get_ticks_msec()
+	var now := AnimRig.now_msec()
 	var from := maxi(now, _tell_until)
 	_charge_until = from + int(CHARGE_SECONDS * 1000.0)
 	if from > now:
@@ -435,12 +435,12 @@ func daze(seconds: float) -> void:
 	_busy_until = 0
 	rig.cancel_strike()
 	# Only ever lengthened: a shorter stun the same tick keeps the crash's cause (a slide's), not its end.
-	_dazed_until = maxi(_dazed_until, Time.get_ticks_msec() + int(maxf(seconds, 0.0) * 1000.0))
+	_dazed_until = maxi(_dazed_until, AnimRig.now_msec() + int(maxf(seconds, 0.0) * 1000.0))
 
 
 ## The herd bolting (cried "rout"): run.
 func bolt() -> void:
-	_bolt_until = Time.get_ticks_msec() + int(BOLT_SECONDS * 1000.0)
+	_bolt_until = AnimRig.now_msec() + int(BOLT_SECONDS * 1000.0)
 
 
 ## A blow taken: its hit clip, else a flinch (tipped and pushed back); none lying down (it
@@ -448,12 +448,12 @@ func bolt() -> void:
 func hit() -> void:
 	if _dead or _down or (_life != null and _life.weight > 0.0):
 		return
-	if _dazed or Time.get_ticks_msec() < _dazed_until:
+	if _dazed or AnimRig.now_msec() < _dazed_until:
 		return  # Dazed wins over a blow for its whole stun (the coordinator): its opening stays shown.
 	if clips.has("hit"):
 		# Not under a blow (it would play unseen, then show held as the blow
 		# fades), nor over one played once.
-		if Time.get_ticks_msec() >= _busy_until and not rig.striking():
+		if AnimRig.now_msec() >= _busy_until and not rig.striking():
 			_once("hit")
 		return
 	if _pose == null:

@@ -11024,6 +11024,17 @@ talk panel's pin, fade and channel, the hint, the place, the two columns,
 the progress, cancel and status).
 `--test-show` gains tip (a sample named dagger: nothing in play is named
 until lore's holder form is agreed). Shots in docs/ui/shots/step3/.
+
+390 amended: a rig's clips are timed by the frames under movie maker (2026-11-09; release's label;
+the coordinator's ask after the boar king's reel). The new static AnimRig.now_msec() is the clock
+AnimRig and CreatureView time their clips by (a once clip's busy, a strike's contact and end, a
+tell, a bolt, a daze without its monster): the wall clock in play, and under movie maker
+(Engine.get_write_movie_path() set) the frames' own time, on by each frame's delta and still
+through a frame. tools/clip.sh records its reels that way, off-screen at about 10 frames a second
+while each frame is 1/30 s of the game, so a clip timed by the wall ended about three times early
+on film (the boar king's hook drawn 2 ticks of its 9). Client3D's own timings stay on the wall
+clock. view_test _test_reel_clock. Client only, play unchanged, protocol unchanged, no new
+class_name, no bullet.
 ## 391. A companion inside buildings and in doorways
 
 Jeff's play (2026-10-17, through the coordinator): in Pip's house her voice

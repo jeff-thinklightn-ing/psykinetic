@@ -189,6 +189,7 @@ func _ready() -> void:
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
+		await _test_reel_clock()
 		await _test_creature_down()
 		await _test_creature_tells()
 		_test_piles()
@@ -11532,6 +11533,25 @@ func _test_creature_puppets() -> void:
 ## art holds charge_tell, charge, skid, dazed and hook; the charge's telegraph plays charge_tell, a
 ## skid its skid, a crash's stun dazed looping till it's over, a heavy wind-up the hook and a lead
 ## the plain attack. On a view of its own (his row is enemy-ai's, shelved till its switch-on).
+func _test_reel_clock() -> void:
+	print("
+== a reel times clips by its frames (AnimRig.now_msec) ==")
+	var wall_from := AnimRig.now_msec()
+	OS.delay_msec(30)
+	_check(AnimRig.now_msec() - wall_from >= 30, "in play, the wall clock (%d ms over a 30 ms wait)" % (AnimRig.now_msec() - wall_from))
+	AnimRig._clock_movie = 1  # As under --write-movie.
+	AnimRig._clock_frame = -1
+	var from := AnimRig.now_msec()
+	OS.delay_msec(30)
+	_check(AnimRig.now_msec() == from, "under movie maker, still through a frame however long it draws")
+	await get_tree().process_frame
+	var step := AnimRig.now_msec() - from
+	var delta := roundi(get_tree().root.get_process_delta_time() * 1000.0)
+	_check(absi(step - delta) <= 1, "and on by the frame's own delta (%d ms, delta %d)" % [step, delta])
+	AnimRig._clock_movie = -1
+	AnimRig._clock_frame = -1
+
+
 func _test_boar_king_clips() -> void:
 	print("\n== the boar king's clips: tell, charge, skid, dazed, hook ==")
 	var body := Node3D.new()
