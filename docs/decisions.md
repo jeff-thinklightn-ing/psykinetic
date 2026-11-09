@@ -45779,3 +45779,14 @@ place of his purse, and the makers. It replaces owing players across the store's
   the town's credit at most 60.
 
 CHANGELOG (voice's). Server and client; protocol 54 (shared, unshipped); no new class_name.
+
+## 827. Wilds basics: farm and barrow
+
+827, art-kit's side: the pieces for the old farmstead and the ruined barn, by hand, palette only, landed off
+(nothing places them until terrain's "ruined" building draws them and maps lays the farm).
+wall.stone.low_ruin (edge, wall.stone's frame, 3 variants) is a low broken fieldstone wall, dry-laid, 0.35 to
+1.15 m, mossed here and there, stones and weeds at its foot; wall.stone.low_ruin_end (vertex) the quoin pier
+at its corners and gap ends. Lower and rougher than wall.<set>.straight_ruined, which stays the standing
+ruin of a town building; it blocks as any wall edge. prop.scarecrow_fallen (cell) and prop.hay_rotten (cell,
+2 variants) are decor, laid as DECOR_KINDS rows drawn as prop.<kind>, as prop.broken_cart is.
+C:/dev/review/farm_ruin/make_farm_ruin.py. Art only; protocol unchanged; no new class_name.
