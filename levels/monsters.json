@@ -43,7 +43,7 @@
 		"purse": [1, 3],
 		"aim_spread": 10,
 		"aim_hold_max": 20,
-		"pack": {"spread": 1.0, "in_reach": 2, "hover": [2, 3]}
+		"pack": {"spread": 1.0, "in_reach": 2, "hover": [1, 2]}
 	},
 	"rabbit": {
 		"side": "wild", "role": "prey", "felled_by_surprise": true, "herd": "rabbit", "label": "Wild rabbit", "art": "creature.rabbit",
