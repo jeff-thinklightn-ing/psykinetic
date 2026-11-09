@@ -300,7 +300,9 @@
 						"town_lands"
 					],
 					"source": "Jeff",
-					"status": "draft"
+					"status": "agreed",
+					"tags": [],
+					"sight": "the barrow mound"
 				},
 				{
 					"id": "crypt.mound",
@@ -454,7 +456,9 @@
 						"town_lands"
 					],
 					"source": "Jeff",
-					"status": "draft"
+					"status": "agreed",
+					"tags": [],
+					"sight": "the spears round the mound"
 				},
 				{
 					"id": "crypt.dead_rise",
