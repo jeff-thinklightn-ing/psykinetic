@@ -1830,6 +1830,7 @@ func _test_ambush() -> void:
 	_test_sneak_pack()
 	_test_boar_king()
 	_test_boar_king_lair()
+	_test_bold_comes_in()
 	_test_given_strength()
 
 
@@ -3062,6 +3063,19 @@ func _test_hill_cat() -> void:
 			break
 	_check(walker.hp == hp0 - int(cat.pounce["damage"]) and not cat.lying() and World.distance(cat.tile, walker.tile) <= 1 and spotted.is_empty(),
 		"one walking on below, eyes ahead, is pounced on: %d hurt, the cat beside them at %s" % [hp0 - walker.hp, cat.tile])
+	# Off its perch it fights as a bold predator, alone: no cautious holding
+	# back for mates who never come (its roll a cautious one's, its temper bold).
+	cat.boldness = 0.1
+	var after := walker.hp
+	var struck_at := -1
+	var from := World.tick
+	for i in 60:
+		World.step()
+		if walker.hp < after:
+			struck_at = World.tick - from
+			break
+	_check(struck_at >= 0 and struck_at <= 40, "after its pounce, off its perch, it fights on alone (struck again after %d ticks)" % struck_at)
+	walker.hp = walker.max_hp
 	# Never downed by it.
 	World.despawn(cat)
 	var cat2 := HillCat._lay("t/perch_t", place, true)
@@ -6952,6 +6966,36 @@ func _test_boar_king_lair() -> void:
 	Monster.idling = idling_was
 	World.spawn_spec = Callable()
 	DayNight.reset()
+
+
+## A beast made bold at run time (Animal._settle_bold: a wolf by night)
+## keeps no cautious holding back, alone (its spawn roll a cautious one's):
+## bold means it comes in.
+func _test_bold_comes_in() -> void:
+	print("
+== a wolf bold by night comes in alone: no cautious holding back ==")
+	var idling_was := Monster.idling
+	Monster.idling = false
+	var e := _build(["##########", "#........#", "#.w...P..#", "#........#", "##########"], {"w": {"facing": Vector2i(1, 0)}})
+	_outdoors("clear")
+	DayNight.set_hour(1.0)
+	var wolf: Animal = e["w"][0]
+	var player: GridEntity = e["P"][0]
+	player.max_hp = 100
+	player.hp = 100
+	wolf.sight_range = 8
+	wolf.boldness = 0.1  # A cautious roll (wolves' temperament is cautious).
+	player.protected = false
+	var struck := -1
+	for i in 120:
+		World.step()
+		if player.hp < 100:
+			struck = World.tick
+			break
+	_check(wolf.temper == Monster.Temper.BOLD and struck >= 0, "bold by night, it comes in and strikes, alone (tick %d, temper %d, target %s)" % [struck, wolf.temper, wolf.target])
+	DayNight.reset()
+	_indoors()
+	Monster.idling = idling_was
 
 
 func _free_beside(at: Vector2i) -> Vector2i:

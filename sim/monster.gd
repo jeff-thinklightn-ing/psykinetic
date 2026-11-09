@@ -1263,7 +1263,7 @@ func _sim_tick() -> void:
 		return
 	if World.wielded(self).is_empty() and _pick_up(true):
 		return  # Bare-handed: the weapon at its feet first.
-	if pack_id == "" and not _pressing and (boldness < HOLD_BACK_BELOW or _dreads_target()) \
+	if pack_id == "" and not _pressing and (boldness < HOLD_BACK_BELOW and temper != Temper.BOLD or _dreads_target()) \
 			and World.distance(tile, target.tile) <= HOLD_BACK_RANGE and not _target_beset(_others_needed()) \
 			and not _band_holds() and (not band_fights or _mate_near()):
 		_standing_off()

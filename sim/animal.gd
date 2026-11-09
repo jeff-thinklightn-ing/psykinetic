@@ -475,6 +475,7 @@ func _sounder_tick() -> bool:
 ## Its ring about [param foe]: back out inside SOUNDER_RING's near edge,
 ## closer outside its far one, else it stands facing them, striking nobody.
 func _ring(foe: GridEntity) -> void:
+	_drop_windup()  # One begun before it was told off never lands (playtest's run: two at a low foe).
 	target = null
 	_charge_until = -1
 	_burst_until = -1

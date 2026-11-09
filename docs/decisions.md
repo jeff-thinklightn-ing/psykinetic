@@ -44155,6 +44155,8 @@ a mate, running to call and back, once; hurt and alone, fighting); the band test
 call while the other fights on; the lone guard's first case comes straight in. Server only, protocol
 unchanged, no new class_name.
 
+806 amended (10): a beast grown bold never holds back for its roll (2026-11-09, release's label; the coordinator's go; found in animation's hill cat reel, where off its perch after a landed pounce the cat stood 2 cells from a passive player about 15 s, ticks 62 to 214, then came in). 806 amended (9)'s holding back read boldness, rolled at spawn within its temperament's span: a beast made BOLD at run time by Animal._settle_bold (the hill cat off its perch, a wolf by night or with its pack about, an escort), its kind cautious, kept a roll under HOLD_BACK_BELOW, so alone it waited for mates who never came till its standoff gave up, where Animal says bold means "CAUTIOUS's holding back is gone". Now a low roll holds back only a temper not BOLD; dread (_dreads_target: a bane, or holder dread for one not bold) holds back any, as before. Monsters not Animals are unchanged (a BOLD roll is 0.6 or more). Combat told: night wolves press harder (a raised round shield takes a wolf's plain bite whole, 340 amended). Tests: monster_test _test_hill_cat (after its pounce, its roll cautious, it strikes again within 40 ticks: 16) and _test_bold_comes_in (a lone wolf by night, a cautious roll, comes in and strikes: tick 21). CHANGELOG (voice's bullet). Server only, protocol unchanged, no new class_name.
+
 ## 808. A dungeon's chests: each a find of its own, per player and per generation
 
 Jeff, 2026-11-04: "all chests in the game should have some item in them, if theres no item to put
@@ -45293,7 +45295,7 @@ the dodge's opening is the player's, whole. (2) One boar of his sounder at his t
 facing it (Animal._ring), never striking. (3) maps takes the den keeper boar out of boar_lair (maps' side,
 below). (4) At a foe under not_below, one of them strikes, not three: no boar of his sounder while he can
 strike them himself; and his charge's hit leaves such a player or companion where they stand (no knock
-into anything that could down them). BoarKing.holds_sounder gone (may_engage, engager, open_now). monster_test
+into anything that could down them). BoarKing.holds_sounder gone (may_engage, engager, open_now). A boar told off his target drops any wind-up it began (Animal._ring: playtest's tally of the first run had two such blows at a low foe, him 1 off). monster_test
 _test_boar_king's sounder part (one boar struck in 150 ticks with two ringing; none during the skid; a
 dodged charge sends none, a hit one one; no tick of both at a low foe; never below 1). Server only,
 protocol unchanged, no new class_name; the bullet's charge clause in voice's new words.

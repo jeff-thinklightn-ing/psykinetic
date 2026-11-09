@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - A blow marked on the ground, such as the great bear's swipe, shows only as red on the ground now, faint at first and brightening as it comes, with a flash as it lands, where before a see-through red wall stood round it (602 amended (2)).
+- A bold wolf, at night or with its pack near, comes straight in to bite now, so take it on a raised shield, and a hill cat that's pounced on you keeps on fighting, where before the wolf hung back a few steps and the cat stood off for a while (806 amended (10)).
 - The hill cat lies flat on its perch now and snarls when it sees you; before a pounce it crouches low, then leaps, and lands a beat from striking again, your opening, and up close it swipes and bites in turn, where before it stood on its perch and gave no warning of the leap (814 amended).
 - In the forest, the boar king's lair stands open, and he roams out from it with three boars at his heels, one at you at a time while the others circle; his charge comes along a line you can see, so step aside and he skids past, open to you, or stuns himself on a tree or a rock, and his boars hold off while he's down; kill his three and he goes home, and he always leaves his great tusk and hide, which the tanner buys, while his wallow holds a find of truffles of your own, which the Mughouse and the forest's camp traders buy (780 amended (16)).
 - Gains, floating or on a banner, now fade away completely, where before the last one could linger faintly on screen until you went to another area (804 amended (16)).
