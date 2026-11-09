@@ -3917,18 +3917,20 @@ func _test_composer() -> void:
 	if cruck != null:
 		cruck.free()
 	var ruin := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 13, 6, 8))
-	# Every wall of it down (489 amended, the wilds' farmstead): a ragged stub
-	# or a low bank of rubble, none whole, none a gap (the sim keeps them).
+	# Every wall of it down (489 amended, the wilds' farmstead): art-kit's low
+	# ruin where the set has it, else a ragged stub or a low bank of rubble,
+	# none whole, none a gap (the sim keeps them).
 	var ruin_walls := Level.blocks_outline(Level._union([Rect2i(2, 13, 6, 8)])).filter(func(key: Vector3i) -> bool:
 			return _rig._terrain["edges"].get(key) == Terrain.Edge.WALL)
 	var down := {}
 	for key: Vector3i in ruin_walls:
 		var state := str(_rig._wall_states.get(key, ""))
 		down[state] = int(down.get(state, 0)) + 1
-	_check(ruin.size() == 1 and ruin[0]["roof"] == null and not _rig._building_at.has(Vector2i(4, 16))
-			and down.keys().all(func(state: String) -> bool: return state == "broken" or state == "rubble")
-			and int(down.get("broken", 0)) > 3 and int(down.get("rubble", 0)) > 3,
-			"the ruined house: no roof, no inside, every wall a stub or rubble (%s of %d)" % [down, ruin_walls.size()])
+	var low_wood := Client3D._has_art(Client3D.RUIN_LOW % "wood")
+	var as_drawn := (down.keys().all(func(state: String) -> bool: return state == "low_ruin") and int(down.get("low_ruin", 0)) == ruin_walls.size()) if low_wood \
+			else (down.keys().all(func(state: String) -> bool: return state == "broken" or state == "rubble") and int(down.get("broken", 0)) > 3 and int(down.get("rubble", 0)) > 3)
+	_check(ruin.size() == 1 and ruin[0]["roof"] == null and not _rig._building_at.has(Vector2i(4, 16)) and as_drawn,
+			"the ruined house: no roof, no inside, every wall %s (%s of %d)" % ["art-kit's low ruin" if low_wood else "a stub or rubble", down, ruin_walls.size()])
 	# A stone ruin (827, the wilds' farmhouse) in art-kit's low ruin, its
 	# piers at its corners, where the kit has them.
 	if not Client3D._has_art(Client3D.RUIN_LOW % "stone"):

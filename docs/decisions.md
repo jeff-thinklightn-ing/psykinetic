@@ -45857,3 +45857,10 @@ at a corner however many runs meet there; drawn only, never solid; a broken fenc
 view_test (the ruined house every wall a stub or rubble; a stone ruin in low ruin, its pieces and
 piers, where the kit has it; a fence's rails and shared posts). Client, and one DECOR_KINDS row;
 protocol unchanged; no new class_name.
+
+827, art-kit's side: the ruined barn's wood pieces (terrain: the ruined barn keeps wood walls). wall.wood.low_ruin
+(edge, wall.wood's frame, 3 variants) is a timber wall gone: its own fieldstone footing (so terrain drops the
+wood plinth under a low-ruin edge), a sill, boards rotted and broken off ragged to 0.3-1.2 m, boards fallen at
+its foot; wall.wood.low_ruin_end (vertex) a corner post snapped off at about 1.2 m. view_test's ruined-house
+check (terrain's, from 827's terrain side) now expects every wall art-kit's low ruin when the set has
+RUIN_LOW, else the stub and rubble mix, as its stone check does (terrain's wording, terrain's OK). Off.
