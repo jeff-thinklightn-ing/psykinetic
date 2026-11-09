@@ -45553,6 +45553,17 @@ the frame after it 64 -> 44. A server whose zones are open already never pays it
 wilds' zone opens on the held level. Server and host only, behind the flag, protocol unchanged, no
 new class_name.
 
+822 amended (5): the glimpses' levels read on workers (release's label). The held neighbour's land
+phase read the levels its glimpses show (_glimpse_level, Level.load_level) in its one frame: the
+wilds' four (foothills, forest, hills, held), 510 ms of a 611 ms phase, on the walk toward the link.
+Client3D._start_glimpse_reads, at a rebuild over frames of an outdoor level beside
+GrownTrees.start_reading, reads each one not kept as it is on a worker (the read left under
+_glimpse_mutex); the land phase waits for _glimpse_reads_ready a frame at a time, as for the grown
+trees, and takes the reads into _glimpse_levels on the main thread. Statics, not ROOM fields. A
+card's build over frames gets it too; nothing drawn changes. Headless, the neighbour's land phase
+611 -> 67 ms. seamless_test: the neighbour's glimpses' levels all read and kept before its land.
+Client only, protocol unchanged, no new class_name.
+
 Still to come, each behind the flag. Next, the maps step: the five corridors, each neighbour's plane
 origin 16 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam
 − 8 with spawns on the same world cell, and a level_test check that both maps agree in the overlap.

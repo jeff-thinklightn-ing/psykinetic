@@ -5924,6 +5924,8 @@ func rebuild(terrain: Dictionary, centre: Vector2i, over_frames := false) -> voi
 	if over_frames and str(terrain.get("canopy_kind", "")) != "":
 		# Read on a worker while the first phases go round (822, packed grown trees).
 		GrownTrees.start_reading(str(terrain.get("level", "")))
+	if over_frames and bool(terrain.get("outdoor", false)):
+		_start_glimpse_reads(str(terrain.get("level", "")))  # The same (822 amended (5)).
 	if _room != null and over_frames:
 		# Freed a slice a frame once the new room is up (0.2 s at once on the wilds).
 		_room.visible = false
@@ -6209,9 +6211,10 @@ func _build_room_over_frames(generation: int) -> void:
 				_fill_jobs.append(["cliff", chunk])
 		else:
 			if phase == _phase_land:
-				# The grown trees it reads, on their worker till then (822).
+				# The grown trees and the glimpses' levels it reads, on their
+				# workers till then (822, 822 amended (5)).
 				var level := str(_terrain.get("level", ""))
-				while not GrownTrees.ready_for(level):
+				while not GrownTrees.ready_for(level) or not _glimpse_reads_ready():
 					await get_tree().process_frame
 					if generation != _build_generation or not is_inside_tree():
 						return
@@ -11080,6 +11083,55 @@ static func _world_map_key() -> String:
 ## Level [param level_name] as last read for a glimpse, read again only
 ## when WorldMap's digest of it changed (a parse of the wilds is 55 ms).
 static var _glimpse_levels: Dictionary[String, Array] = {}
+
+
+## The glimpses' levels read on workers ahead of the land phase (822
+## amended (5)): the wilds' four, about 0.5 s, were read in its one frame.
+## A worker leaves its read in _glimpse_read (under _glimpse_mutex);
+## _glimpse_reads_ready takes it into _glimpse_levels on the main thread.
+static var _glimpse_mutex := Mutex.new()
+static var _glimpse_read: Dictionary[String, Array] = {}
+static var _glimpse_tasks: Dictionary[String, int] = {}
+
+
+## Starts reading on workers the levels [param area]'s glimpses will show
+## (_plan_glimpses' ways out) that _glimpse_level has not kept as they are.
+static func _start_glimpse_reads(area: String) -> void:
+	if area.is_empty() or not Level.names().has(area):
+		return
+	var world := _world_map()
+	if not world.areas.has(area):
+		return
+	for way: Dictionary in world.ways_out(area, GLIMPSE_GAP):
+		var level_name := str(way["to_map"])
+		if way["one_way"] or _glimpse_tasks.has(level_name):
+			continue
+		var digest := str(WorldMap._read_before.get(level_name, {}).get("digest", ""))
+		var kept: Array = _glimpse_levels.get(level_name, [])
+		if digest.is_empty() or (not kept.is_empty() and kept[0] == digest):
+			continue  # Kept as it is, or read again at the plan whatever happens.
+		_glimpse_tasks[level_name] = WorkerThreadPool.add_task(func() -> void:
+			var read := Level.load_level(level_name)
+			_glimpse_mutex.lock()
+			_glimpse_read[level_name] = [digest, read]
+			_glimpse_mutex.unlock(), true, "glimpse level")
+
+
+## Whether no glimpse level is still being read; the reads done are kept.
+static func _glimpse_reads_ready() -> bool:
+	for level_name: String in _glimpse_tasks.keys():
+		var task: int = _glimpse_tasks[level_name]
+		if not WorkerThreadPool.is_task_completed(task):
+			return false
+		WorkerThreadPool.wait_for_task_completion(task)
+		_glimpse_tasks.erase(level_name)
+		_glimpse_mutex.lock()
+		var read: Array = _glimpse_read.get(level_name, [])
+		_glimpse_read.erase(level_name)
+		_glimpse_mutex.unlock()
+		if not read.is_empty():
+			_glimpse_levels[level_name] = read
+	return true
 
 
 static func _glimpse_level(level_name: String) -> Dictionary:

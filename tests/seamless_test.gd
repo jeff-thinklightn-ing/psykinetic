@@ -126,6 +126,9 @@ func _test_preload() -> void:
 	_check(view.get_parent() == _main._client3d.get_parent() and view.position.is_equal_approx(_main._client3d.position + _main.plane_offset("held", "wilds")),
 			"beside the live view, where the wilds lie on the plane (%s)" % view.position)
 	_check(view.get_children() == [view._room] and _main._client3d._room != view._room, "its own room alone")
+	_check(Client3D._glimpse_tasks.is_empty() and Client3D._glimpse_read.is_empty() and not view._glimpse_plans.is_empty()
+			and view._glimpse_plans.all(func(plan: Dictionary) -> bool: return Client3D._glimpse_levels.has(str(plan.get("to", "")))),
+			"its glimpses' levels read on workers before its land, all taken in and kept (%d glimpses)" % view._glimpse_plans.size())
 	_stand(_main.PRELOAD_CELLS + 20)
 	await _frames(_main.NEIGHBOUR_LOOK_FRAMES * 2)
 	_check(_main._neighbour == view, "walking off: kept (one neighbour, let go only for another)")
