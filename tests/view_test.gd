@@ -3917,9 +3917,40 @@ func _test_composer() -> void:
 	if cruck != null:
 		cruck.free()
 	var ruin := _rig._buildings.filter(func(each: Dictionary) -> bool: return each["rect"] == Rect2i(2, 13, 6, 8))
-	var broken := Level.blocks_outline(Level._union([Rect2i(2, 13, 6, 8)])).filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "broken")
-	_check(ruin.size() == 1 and ruin[0]["roof"] == null and broken.size() > 3 and not _rig._building_at.has(Vector2i(4, 16)),
-			"the ruined house: no roof, no inside, %d of its walls broken" % broken.size())
+	# Every wall of it down (489 amended, the wilds' farmstead): a ragged stub
+	# or a low bank of rubble, none whole, none a gap (the sim keeps them).
+	var ruin_walls := Level.blocks_outline(Level._union([Rect2i(2, 13, 6, 8)])).filter(func(key: Vector3i) -> bool:
+			return _rig._terrain["edges"].get(key) == Terrain.Edge.WALL)
+	var down := {}
+	for key: Vector3i in ruin_walls:
+		var state := str(_rig._wall_states.get(key, ""))
+		down[state] = int(down.get(state, 0)) + 1
+	_check(ruin.size() == 1 and ruin[0]["roof"] == null and not _rig._building_at.has(Vector2i(4, 16))
+			and down.keys().all(func(state: String) -> bool: return state == "broken" or state == "rubble")
+			and int(down.get("broken", 0)) > 3 and int(down.get("rubble", 0)) > 3,
+			"the ruined house: no roof, no inside, every wall a stub or rubble (%s of %d)" % [down, ruin_walls.size()])
+	# A stone ruin (827, the wilds' farmhouse) in art-kit's low ruin, its
+	# piers at its corners, where the kit has them.
+	if not Client3D._has_art(Client3D.RUIN_LOW % "stone"):
+		print("  (art-kit's wall.stone.low_ruin is not made here: the stone ruin is not checked)")
+		return
+	var stone := _kinds_level([["building_cottage_small", Vector2i(2, 2), true]])
+	_rig.rebuild(stone["terrain"], Vector2i(4, 12))
+	var cottage: Dictionary = _rig._buildings[0] if not _rig._buildings.is_empty() else {}
+	var stone_walls: Array = (cottage.get("outline", []) as Array).filter(func(key: Vector3i) -> bool:
+			return _rig._terrain["edges"].get(key) == Terrain.Edge.WALL)
+	var low := stone_walls.filter(func(key: Vector3i) -> bool: return _rig._wall_states.get(key) == "low_ruin")
+	var low_pieces := 0
+	var holders := {}
+	for key: Vector3i in stone_walls:
+		if _rig._walls.has(key):
+			holders[_rig._walls[key]] = true
+	for holder: Node3D in holders:
+		low_pieces += holder.get_children().filter(func(node: Node) -> bool: return str(node.name).begins_with("Piece_")).size()
+	var corners := (cottage.get("outline", []) as Array).size() > 0 and _rig._posts.values().any(func(post: Node3D) -> bool:
+			return is_instance_valid(post) and post.scale.is_equal_approx(Vector3.ONE))
+	_check(not stone_walls.is_empty() and low.size() == stone_walls.size() and low_pieces == stone_walls.size() and corners,
+			"a stone ruin in art-kit's low ruin: %d of its %d walls, %d pieces, its piers as made" % [low.size(), stone_walls.size(), low_pieces])
 
 
 ## [param stamps] ([prefab, top-left, ruined]) stamped on grass, parsed.
@@ -6021,6 +6052,25 @@ func _test_faced_decor() -> void:
 	var fence_x := fence.transform.basis.x if fence != null else Vector3.ZERO
 	_check(fence != null and Vector2(fence.position.x, fence.position.z).is_equal_approx(Vector2(1, 1.5)) and Vector2(fence_x.x, fence_x.z).is_equal_approx(Vector2(0, 1)),
 		"the fence section stands at its open edge's midpoint, +x toward its cell, z along the edge (%s, %s)" % [fence.position if fence else null, fence_x])
+	# A farm's fence ("wilds basics"): a run of three on the north edges and
+	# one round the corner, a post at each end, one at a corner shared.
+	Level.register("vt_decor_farm_fence", Level.image_from_rows(rows, {Vector2i(0, 0): "start"}), null,
+		{"decor": [[1, 2, 0, -1, "fence", 1], [2, 2, 0, -1, "fence", 1], [3, 2, 0, -1, "fence", 1], [3, 2, 1, 0, "fence", 1]]})
+	var farm := Level.load_level("vt_decor_farm_fence")
+	if not ArtKit.has("prop.fence") or not ArtKit.has("prop.fence_post"):
+		_check(false, "art-kit's prop.fence and prop.fence_post")
+		return
+	_rig.rebuild(farm["terrain"], farm["centre"])
+	var rails := _rig._room.get_children().filter(func(node: Node) -> bool: return str(node.name).contains("_fence_"))
+	var posts := _rig._room.get_children().filter(func(node: Node) -> bool: return str(node.name).begins_with("FencePost_"))
+	var spots: Array[Vector2] = []
+	for post: Node3D in posts:
+		spots.append(Vector2(post.position.x, post.position.z))
+	var wanted: Array[Vector2] = [Vector2(0.5, 1.5), Vector2(1.5, 1.5), Vector2(2.5, 1.5), Vector2(3.5, 1.5), Vector2(3.5, 2.5)]
+	_check(farm["warnings"].is_empty() and rails.size() == 4 and posts.size() == 5
+			and wanted.all(func(spot: Vector2) -> bool: return spots.any(func(each: Vector2) -> bool: return each.is_equal_approx(spot))),
+			"a fence: four rails, a post at each end, the corner's shared (%d rails, posts at %s) %s" % [rails.size(), spots, farm["warnings"]])
+	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 
 ## The felled forest drawn (591, terrain's side; maps' Clearing): a stage

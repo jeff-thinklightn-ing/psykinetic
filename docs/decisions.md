@@ -45823,3 +45823,19 @@ ruin of a town building; it blocks as any wall edge. prop.scarecrow_fallen (cell
 2 variants) are decor, laid as DECOR_KINDS rows drawn as prop.<kind>, as prop.broken_cart is.
 C:/dev/review/farm_ruin/make_farm_ruin.py. Art only; protocol unchanged; no new class_name.
 826, ui's side: no town owes a player (economy's 826, Jeff: the town shouldn't owe players; release's label). Supersedes 802 amended (9) before it shipped: every sale is paid in full at once, so a person's takes rows carry no "owed" and BarterPanel.give_word is Sell where a row's gold is over 0, Donate otherwise (the build fund, the larder, starter gear back to Rolf); give_lines drops "Owes you N gold". Gains drops the owed-gold reward (owed_words, OWED_COLOR, its uncued dim line): gold comes as gold, with its coin. A camp trader's or the town's limit on a good reaches the window only through up_to (BarterPanel.up_to, TownSheet.up_to; absent, no limit) and the refusal through the barter's own "why", so nothing more changes here. 802 amended (9)'s CHANGELOG bullet comes out unshipped (voice: economy's 826 bullet covers it, as both land in one cut). ui_test: voice's lines paid only, a trophy paid in full reads Sell with no owed line, a hand-in's gold its coin. Client only; protocol unchanged on this side; no new class_name.
+
+827, terrain's side (package "wilds basics: farm and barrow", landing off; maps' design
+C:/dev/review/farmstead_barrow/design.md; art-kit's low ruin pieces; release's label). A level's
+"ruined" kind building (488, the wilds' farmhouse a cottage, the barn a barn) draws every wall edge
+down, never whole: until now a ruin's walls stood whole but for about 45% broken (489's RUIN_BROKEN,
+gone). Where its set has art-kit's wall.<set>.low_ruin (made, not a placeholder; Client3D.RUIN_LOW),
+each wall edge is that piece (state "low_ruin", its variant by the edge's hash, as made, never
+stretched), every post at it wall.<set>.low_ruin_end (RUIN_LOW_END) as made, and a wood wall no stone
+plinth (the piece has its own footing); else each is a ragged stub or a low bank of rubble
+(_ruin_stub: a town ruin's _ruin_wall, its gap a bank, since the sim keeps a laid ruin's walls; the
+ways in are the building's open edges, maps' entry "open"). A decor kind "fence" (Level.DECOR_KINDS:
+"sits" "edge", drawn as prop.fence) stands prop.fence_post (its "posts") at each end of its edge, one
+at a corner however many runs meet there; drawn only, never solid; a broken fence is its gaps.
+view_test (the ruined house every wall a stub or rubble; a stone ruin in low ruin, its pieces and
+piers, where the kit has it; a fence's rails and shared posts). Client, and one DECOR_KINDS row;
+protocol unchanged; no new class_name.

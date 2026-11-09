@@ -104,8 +104,6 @@ const WALL_HEIGHT := 3.0
 ## unless its kind names another ("roof_set" in levels/buildings.json) that
 ## art-kit has a material.roof.<set> for, as thatch once it reads as thatch.
 const KIND_ROOF := "shingle"
-## How much of a ruin's walls stand broken (decision 489).
-const RUIN_BROKEN := 0.45
 ## A window's wall may differ from a storey this much (it is stretched to
 ## it); how many windows stand with their shutters open (489 amended).
 const WINDOW_STRETCH := 0.6
@@ -8732,7 +8730,8 @@ func _building_sets(building: Dictionary) -> void:
 				_wall_heights[key] = tall
 			if building.has("kind"):
 				_pad_cell[key] = pad
-				if wall_set == "wood":
+				# No stone footing under a low ruin: art-kit's piece has its own (827).
+				if wall_set == "wood" and not (building.get("ruined", false) and _has_art(RUIN_LOW % wall_set)):
 					_plinths[key] = true
 		# A kind's windows (489 amended), art-kit's window there by its wall's
 		# height (window_slot), turned so its shutters open outward.
@@ -8746,10 +8745,12 @@ func _building_sets(building: Dictionary) -> void:
 			# A run's +x is east for an east edge, north (its first cell) for a south one.
 			var outside_first := not cells.has(sides[0])
 			_window_flipped[key] = outside_first if key.z == Terrain.EAST else not outside_first
-		# A ruin's walls broken here and there before they are drawn (489).
-		if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL \
-				and _roll(Vector2i(key.x, key.y), 40 + key.z) < RUIN_BROKEN:
-			_set_wall_state(key, "broken")
+		# A ruin's walls all down before they are drawn (489; amended for
+		# the wilds' farmstead and barn, maps' "wilds basics"): art-kit's
+		# low ruin where its set has it (RUIN_LOW), else each a ragged stub
+		# or a low bank of rubble (_ruin_stub); never whole.
+		if building.get("ruined", false) and _terrain["edges"].get(key) == Terrain.Edge.WALL:
+			_set_wall_state(key, "low_ruin" if _has_art(RUIN_LOW % wall_set) else _ruin_stub(key))
 	# Its light inside, lit with its windows (489 amended (3)).
 	if not lit_row.is_empty():
 		_add_house_light(building, lit_row)
@@ -9496,6 +9497,26 @@ func _kind_sag(building: Dictionary) -> Transform3D:
 
 ## A wall edge of a ruin (649), by its hash: "plot" (a gap), "broken" (a
 ## ragged stub) or "rubble" (a low bank), RUIN_GAP_EVERY and RUIN_STUBS.
+## A laid ruin's walls in art-kit's low ruin (wall.<set>.low_ruin, its
+## variant by the edge; 827, art-kit's), its piers (wall.<set>.low_ruin_end)
+## at its corners and its gaps' sides, each as made, never stretched.
+const RUIN_LOW := "wall.%s.low_ruin"
+const RUIN_LOW_END := "wall.%s.low_ruin_end"
+
+
+## Whether art-kit has [param slot] made, not a placeholder.
+static func _has_art(slot: String) -> bool:
+	return ArtKit.has(slot) and ArtKit.filled_by(slot) != "placeholder"
+
+
+## A laid ruin's wall (a level's "ruined" building, 489): its edge as a
+## town's ruin has it (_ruin_wall), but a gap a bank of rubble, since the
+## sim keeps the wall; the ways in are the building's open edges.
+static func _ruin_stub(key: Vector3i) -> String:
+	var state := _ruin_wall(key)
+	return "rubble" if state == "plot" else state
+
+
 static func _ruin_wall(key: Vector3i) -> String:
 	var turn := posmod(_edge_hash(key), RUIN_GAP_EVERY)
 	return "plot" if turn == 0 else "broken" if turn <= RUIN_STUBS else "rubble"
@@ -14980,6 +15001,8 @@ func _read_niches() -> void:
 ## Each of terrain "decor"'s entries (647) as its piece, once its slot is
 ## drawn (no grey box): see DECOR_SLOT.
 func _add_decor() -> void:
+	# The edge posts stood so far, by their corner (in half cells).
+	var fence_posts: Dictionary[Vector2i, bool] = {}
 	for entry: Dictionary in _terrain.get("decor", []):
 		var kind := str(entry["kind"])
 		var slot := decor_slot(entry)
@@ -15027,6 +15050,20 @@ func _add_decor() -> void:
 				post.name = "%s_post%d" % [piece.name, side]
 				var spot := at + Vector2(out) * half * side
 				post.position = Vector3(spot.x, base, spot.y)
+				post.rotation.y = piece.rotation.y
+				_room.add_child(post)
+		# An edge's posts (a fence's, "wilds basics"): at its two ends, one
+		# at a corner however many runs meet there.
+		if row.get("sits", "edge") == "edge" and posts != "" and ArtKit.has(posts):
+			var along := Vector2(absi(out.y), absi(out.x)) * 0.5
+			for end: Vector2 in [at - along, at + along]:
+				var corner := Vector2i(roundi(end.x * 2.0), roundi(end.y * 2.0))
+				if fence_posts.has(corner):
+					continue
+				fence_posts[corner] = true
+				var post := ArtKit.instance(posts)
+				post.name = "FencePost_%d_%d" % [corner.x, corner.y]
+				post.position = Vector3(end.x, _height_in(cell, end), end.y)
 				post.rotation.y = piece.rotation.y
 				_room.add_child(post)
 
@@ -16234,7 +16271,7 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 	for i in count:
 		match _wall_states.get(run[i], ""):
 			"rubble": states[i] = WALL_RUBBLE
-			"broken": states[i] = WALL_TOPLESS
+			"broken", "low_ruin": states[i] = WALL_TOPLESS
 	for i in count:
 		var cell := Vector2i(run[i].x, run[i].y)
 		if states[i] == WALL_WHOLE and count >= WALL_GAP_RUN and i >= 2 and i <= count - 3 and _roll(cell, 20 + run[i].z) < gap \
@@ -16258,6 +16295,8 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 		var piece := ""
 		if states[k] == WALL_RUBBLE:
 			piece = "wall.%s.rubble" % set_name
+		elif _wall_states.get(run[k]) == "low_ruin":
+			piece = RUIN_LOW % set_name
 		elif states[k] == WALL_TOPLESS and _wall_states.has(run[k]):
 			piece = "wall.%s.straight_ruined" % set_name
 		elif states[k] == WALL_WHOLE and _wall_states.get(run[k]) == "window":
@@ -16316,7 +16355,10 @@ func _add_wall_run(run: Array[Vector3i]) -> void:
 	holder.name = "Wall_%d_%d_%s" % [first.x, first.y, "e" if east else "s"]
 	for k: int in pieces:
 		var niche: Dictionary = _niche_at.get(run[k], {})
-		var made := ArtKit.instance(pieces[k], int(niche.get("variant", 1)))
+		var variant := int(niche.get("variant", 1))
+		if _wall_states.get(run[k]) == "low_ruin":
+			variant = 1 + posmod(_edge_hash(run[k]), maxi(1, ArtKit.variant_count(pieces[k])))
+		var made := ArtKit.instance(pieces[k], variant)
 		made.name = "Piece_%d" % k
 		made.position = Vector3(0.0, 0.0, k + 0.5)
 		if _wall_states.get(run[k]) == "window":
@@ -17132,6 +17174,22 @@ func _add_post(vertex: Vector2i) -> void:
 	var post: Node3D
 	var set_name := _post_set(vertex)
 	var slot := "wall.%s.post" % set_name if ArtKit.has("wall.%s.post" % set_name) else "wall.%s.end" % set_name
+	# A low ruin's pier (827), as art-kit made it.
+	var pier := RUIN_LOW_END % set_name
+	if _has_art(pier) and WallEdge.edges_at_vertex(vertex).any(func(entry: Array) -> bool: return _wall_states.get(entry[0]) == "low_ruin"):
+		var low := ArtKit.instance(pier, 1 + posmod(_cell_hash(vertex), maxi(1, ArtKit.variant_count(pier))))
+		low.name = "Post_%d_%d" % [vertex.x, vertex.y]
+		var floor_at := 0.0
+		for corner: Vector2i in [vertex, vertex - Vector2i(1, 0), vertex - Vector2i(0, 1), vertex - Vector2i(1, 1)]:
+			floor_at = maxf(floor_at, _elevation(corner))
+		for entry: Array in WallEdge.edges_at_vertex(vertex):
+			if _pad_cell.has(entry[0]):
+				floor_at = _elevation(_pad_cell[entry[0]])
+				break
+		low.position = Vector3(vertex.x - 0.5, floor_at, vertex.y - 0.5)
+		_room.add_child(low)
+		_posts[vertex] = low
+		return
 	# As tall as the tallest wall at it: the set's _tall piece where it has
 	# art, else the post stretched; squeezed where every wall at it is lower
 	# than a storey (a lean-to's, decision 489), so it stands no higher.

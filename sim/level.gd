@@ -2472,6 +2472,11 @@ const DECOR_KINDS: Dictionary[String, Dictionary] = {
 	# the paving over the barrow's first hall, the daylight down it the
 	# hall's light shaft (806 amended (3)); 2 a sunk, cracked flag.
 	"yard_grate": {"sits": "flat", "variants": 2, "faced": false},
+	# A farm's fence (maps' "wilds basics: farm and barrow"): prop.fence on
+	# an edge, prop.fence_post at each end (one a corner, shared by the
+	# runs meeting there); laid run by run, a broken fence its gaps.
+	# Drawn only, never solid, as all decor.
+	"fence": {"sits": "edge", "variants": 1, "posts": "prop.fence_post"},
 }
 
 
