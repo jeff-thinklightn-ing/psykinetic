@@ -110,15 +110,20 @@ void fragment() {
 	// Built water is still: its ripples a third as deep.
 	vec2 slope = moving.xy * (built ? 0.35 : 1.0);
 	float churn = built ? 0.0 : moving.z;
-	// A ford: shallow and clear, the stones showing, foam across it where
-	// the current meets them and flecks on it.
+	// A ford: shallow and clear, the stones showing, rough water broken over
+	// them and flecks on it.
 	float shoal = smoothstep(0.15, 0.85, curved ? UV.x : texture(water, uv).b);
 	depth *= 1.0 - shoal;
 	vec3 colour = mix(shallow, deep, depth);
 	// The foam: a band at the shore, on the land side, broken up and drifting.
 	float band = smoothstep(-FOAM, -FOAM * 0.4, into) * (1.0 - smoothstep(0.0, 0.06, into));
 	band *= smoothstep(0.3, 0.6, churn);
-	float riffle = shoal * (1.0 - shoal) * 4.0 * smoothstep(0.35, 0.6, churn) * min(length(way) * 2.0, 1.0);
+	// The riffle: broken patches over the whole ford, drifting down the
+	// flow, rising with how shallow it is. Never a line where deep water
+	// meets the ford: at full strength there it read as a bank across the
+	// stream, a wall where you can wade.
+	float rough = smoothstep(0.55, 0.75, noise((at - way * TIME * FLOW_SPEED) * 2.2 + 53.0));
+	float riffle = shoal * shoal * rough * 0.5 * smoothstep(0.35, 0.6, churn) * min(length(way) * 2.0, 1.0);
 	float flecks = shoal * smoothstep(0.7, 0.85, churn) * 0.35;
 	// A fall: white water down its step, not a band across it: streaks
 	// drawn out along the flow and carried down it, and white where it

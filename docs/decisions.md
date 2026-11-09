@@ -15699,6 +15699,16 @@ joins (ford beside ford joined, a ford beside deep water parted); the relief and
 untouched. level_test _test_wilds_on_foot: from the wilds' centre, every place (its cell or one beside
 it) reached over the floor and fords, no wall or shut door crossed; over 700 ford cells. level_test,
 relief_test, view_land_test and view_test pass. The bullet is voice's. Level data; protocol unchanged.
+505 amended (6), environment's side (2026-11-08, release's label; maps' question, the coordinator's
+ruling; package "wilds basics: river"): no line where deep water meets a ford. water.gdshader's
+riffle (505, terrain's side: foam where the current meets a ford's stones) was shoal x (1 - shoal) x
+4, full at the middle of the ford's ramp, so every deep/ford parting drew a broken white line across
+the stream, read as a bank: an edge you can't cross, the opposite of a ford (maps' bridge stills,
+C:/dev/review/lands/wilds_ford). The riffle is now broken patches over the whole ford: a noise
+carried down the flow, kept where it is above 0.55 (full by 0.75), x shoal squared x 0.5, still
+gated by the churn and the flow's speed as before. Deep fades into ford by colour alone. The shore's
+foam (water to land) is unchanged. Stills on maps' layout: C:/dev/review/lands/ford_riffle_1108.
+Client only (one shader), protocol unchanged, no new class_name, no bullet (maps' ford bullet).
 
 ## 506. The level editor's properties panel
 
