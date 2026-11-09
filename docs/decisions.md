@@ -45668,6 +45668,23 @@ dodged charge sends none, a hit one one; no tick of both at a low foe; never bel
 protocol unchanged, no new class_name; the bullet's charge clause in voice's new words.
 
 780 amended (16), his back-off (2026-11-09, the coordinator's approval of the fix plan after playtest's second boar king run, on 0afaf2a62: no charge told in 32 s, his 5 hp bite each 14 ticks taking the tour 15 to 2 twice, a sounder boar killed in the lair laid again at once; he was shelved for v0.1.209). His charge was for a foe 3 to 7 off only, and a foe kept at his side never saw one. Now, his charge ready and a foe under "from" off, he stands "paw" ticks (6) on his snort, pawing (animation's paw clip), then backs off facing them (animation's back_off, played when his motion runs against his facing), a cell each "back_step" ticks (5), and charges once "from" clear with no second snort; followed or cornered, "back" ticks (20) out or no step away, the short charge ("short", 2 cells, or one past them) from where he stands: a chasing player can't stop it. His bite slow and light (his row's attack_ticks 16 to 30, attack_damage 5 to 3): the charge is his threat; combat may retune all of it in his row. Apex lays an escort's fallen afresh in its lair only with the fight over (Apex._fight_over: LAIR_HEAL_STEPS since the later of its last blow taken and its escort's last fallen, the record's "escort_fell"). monster_test _test_boar_king_close (at his side, followed step for step, the bite) and _test_old_wolf_lair (no new wolf while the fight is on). He stays shelved till playtest's rerun passes and the coordinator's go; the bullet comes with the unshelve, voice naming the cue. Server only, protocol unchanged, no new class_name.
+780 amended (17): the old grey's howl, lunge and pant drawn (2026-11-09; release's label; the
+coordinator's apex check: each apex beast through every state CreatureView draws). The great bear
+and the boar king drew every move their sims send; the old grey (creature.old_wolf, the wolf's
+clips) drew none of his three. His howl (cried "howl", the pack called in) was heard, not seen: it
+plays his slot's howl once (CreatureView.roar(clip), the bear's roar's way). His lunge's tell
+("lunge", no clip of that name) drew nothing, so he slid in untold, Jeff's complaint: a tell with no
+clip of its own now gathers the body over it and springs as it lands (coil, a lead's draw-back),
+cut short as a blow given up is. His pant (cried "pant", the opening after a lunge, OldWolf.pant's
+ticks) stood idle: he stands heaving, his idle at PANT_PACE (0.55) with the head let down PANT_DIP
+(0.16 rad) and up again at its end (CreatureView.pant; a slot's winded where it has one); a proper
+pant clip from pc-character later if it reads weak (the coordinator). view_test _test_apex_sweep:
+the three spawned and drawn by Client3D through idle, walk, run, fleeing, suspicious, sitting,
+winded, teetering, a crash stun, a swing, a heavy wind-up, a lead, each tell and cry their sims send
+(through Client3D.creature_tell and _on_cried) and a hit, each drawing a clip its slot has (the
+lunge its gather); the old grey's pant. _test_creature_tells' boar, a slot with no swipe, now
+coils on a swipe's tell where it showed none. CHANGELOG (voice's words). Client only, protocol
+unchanged, no new class_name.
 
 ## 820. Level.SHELVED: a level held back till its package lands
 

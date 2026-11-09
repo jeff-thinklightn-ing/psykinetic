@@ -194,6 +194,7 @@ func _ready() -> void:
 		await _test_creature_puppets()
 		await _test_boar_king_clips()
 		await _test_hill_cat_clips()
+		await _test_apex_sweep()
 		await _test_creature_down()
 		await _test_creature_tells()
 		_test_piles()
@@ -11929,6 +11930,136 @@ func _test_reel_clock() -> void:
 	AnimRig._clock_frame = -1
 
 
+## Each apex beast (the great bear, the old grey, the boar king) spawned and drawn by Client3D, put
+## through every state CreatureView draws and every tell and cry its sim sends: each draws a clip its
+## slot has (or, for a tell with none, the body's gather), never nothing.
+func _test_apex_sweep() -> void:
+	print("
+== the apex beasts through every state (the coordinator's check) ==")
+	# kind: its tells (move -> slot clip, "" for the gather), its cries (cry -> slot clip, "" for none
+	# drawn), what it draws sitting, and its heavy wind-up's clip.
+	var apexes := {
+		"great_bear": {"tells": {"swipe": "swipe", "slam": "slam", "charge": "charge_tell"}, "cries": {"roar": "roar"},
+			"sit": "sleep", "heavy": "attack"},
+		"old_wolf": {"tells": {"lunge": ""}, "cries": {"howl": "howl"}, "sit": "lie", "heavy": "attack"},
+		"boar_king": {"tells": {"charge": "charge_tell"}, "cries": {"skid": "skid"}, "sit": "graze", "heavy": "hook"},
+	}
+	var player := _player()
+	for kind: String in apexes:
+		var want: Dictionary = apexes[kind]
+		var spec := Level._spec_for("monster_" + kind, Level.MONSTER_TYPES)
+		spec["name"] = "Sweep" + kind.capitalize().replace(" ", "")
+		var at := player.tile + Vector2i(3, 0) if player != null else Vector2i(9, 4)
+		if World.get_entity_at(at) != null:
+			World.despawn(World.get_entity_at(at))
+		spec["tile"] = at
+		var beast := _main._spawn(spec) as Monster
+		var puppet: Node3D = null
+		for i in 30:
+			_rig._process(0.0)
+			puppet = _rig._puppets.get(beast.get_instance_id()) if beast != null else null
+			if puppet != null and puppet.has_meta("creature_view"):
+				break
+			await get_tree().process_frame
+		if puppet == null or not puppet.has_meta("creature_view"):
+			_check(false, "%s drawn (%s, %s)" % [kind, beast != null, puppet != null])
+			if beast != null:
+				World.despawn(beast)
+			continue
+		var view := puppet.get_meta("creature_view") as CreatureView
+		var rig := view.rig
+		var fresh := func() -> void:
+			rig.cancel_strike()
+			view.unwind()
+			view._busy_until = 0
+			view._charge_until = 0
+			view._bolt_until = 0
+			view._pant_until = 0
+			view._dazed_until = 0
+			view._then = ""
+			beast.alert = Monster.Alert.IDLE
+			beast.pose = Monster.Pose.STAND
+			beast.winded = false
+			beast.teeter = Vector2i.ZERO
+			beast.stun_cause = &""
+			beast._reel_until = 0.0
+		var drawn := func(speed: float) -> String:
+			view._speed = speed
+			view._last_at = puppet.position
+			view._last_ms = AnimRig.now_msec()
+			view.frame(puppet, beast)
+			return rig.base_clip()
+		var states := []
+		var wrong := []
+		var expect := func(label: String, got: String, slot_clip: String) -> void:
+			var ok := got != "" and got == view.resolve(slot_clip)
+			states.append(label)
+			if not ok:
+				wrong.append("%s: %s, not %s" % [label, got, view.resolve(slot_clip)])
+		fresh.call()
+		expect.call("idle", drawn.call(0.0), "idle")
+		expect.call("walk", drawn.call(1.0), "walk")
+		expect.call("run", drawn.call(3.0), "run")
+		beast.alert = Monster.Alert.FLEEING
+		expect.call("fleeing", drawn.call(1.0), "run")
+		fresh.call()
+		beast.alert = Monster.Alert.SUSPICIOUS
+		expect.call("suspicious", drawn.call(0.0), "alert")
+		fresh.call()
+		beast.pose = Monster.Pose.SIT
+		expect.call("sitting", drawn.call(0.0), str(want["sit"]))
+		fresh.call()
+		beast.winded = true
+		expect.call("winded", drawn.call(0.0), "winded" if view.clips.has("winded") else "idle")
+		fresh.call()
+		beast.teeter = Vector2i(1, 0)
+		expect.call("teetering", drawn.call(0.0), "teeter" if view.clips.has("teeter") else "walk")
+		fresh.call()
+		beast.stun_cause = &"crash"
+		beast._reel_until = World.tick + 20.0
+		expect.call("crash stun", drawn.call(0.0), "dazed" if view.clips.has("dazed") else "idle")
+		fresh.call()
+		view.swing()
+		expect.call("swing", rig.playing(), "attack")
+		fresh.call()
+		view.wind(0.6)
+		expect.call("heavy wind-up", rig.playing(), str(want["heavy"]))
+		fresh.call()
+		view.wind(0.3, true)
+		expect.call("lead", rig.playing(), "attack")
+		for move: String in want["tells"]:
+			fresh.call()
+			var clip := str(want["tells"][move])
+			_rig.creature_tell(90 + states.size(), {"source": str(beast.get_path()), "kind": move, "lands_tick": World.tick + 10})
+			if clip == "":
+				states.append("tell " + move)
+				if not (view._coil != null and view._coil.is_valid() and _rig._tells.has(90 + states.size() - 1)):
+					wrong.append("tell %s: no gather" % move)
+			else:
+				expect.call("tell " + move, rig.playing(), clip)
+		for cry: String in want["cries"]:
+			fresh.call()
+			_rig._on_cried(StringName(cry), beast.get_instance_id())
+			expect.call("cry " + cry, rig.playing(), str(want["cries"][cry]))
+		fresh.call()
+		view.hit()
+		if view.clips.has("hit"):
+			expect.call("hit", rig.playing(), "hit")
+		fresh.call()
+		_check(wrong.is_empty(), "%s: every state drawn (%s)%s" % [kind, ", ".join(states), "" if wrong.is_empty() else "; WRONG " + "; ".join(wrong)])
+		if kind == "old_wolf":
+			fresh.call()
+			_rig._on_cried(&"pant", beast.get_instance_id())
+			var panting: String = drawn.call(0.0)
+			_check(panting == view.clips["idle"] and view._pant_until > AnimRig.now_msec() + 1500,
+					"the old grey's pant: his idle slowed, head low, for its 20 ticks (%s, %.2f s left)"
+					% [panting, (view._pant_until - AnimRig.now_msec()) / 1000.0])
+			fresh.call()
+		World.despawn(beast)
+		_rig._process(0.0)
+		await _frames(1)
+
+
 func _test_hill_cat_clips() -> void:
 	print("
 == the hill cat's clips: crouch, leap and recover, lie, snarl, swipe and bite ==")
@@ -12412,7 +12543,11 @@ func _test_creature_tells() -> void:
 		World.despawn(boar)
 		return
 	var rig := view.rig
-	_check(not view.tell("swipe", 0.6, 1) and not rig.striking(), "a slot with no swipe: no tell")
+	# No swipe clip: the body coils over the tell, no clip slid into (780 amended (17), the old grey's lunge).
+	var told := view.tell("swipe", 0.6, 1)
+	_check(told and not rig.striking() and view._coil != null and view._coil.is_running(),
+			"a slot with no swipe: it coils, no clip struck (%s)" % told)
+	view.tell_over(1, false)
 	boar.pose = Monster.Pose.SIT
 	view.frame(puppet, boar)
 	_check(rig.base_clip() == view.clips["graze"], "no sleep in the slot: sitting grazes, as before")

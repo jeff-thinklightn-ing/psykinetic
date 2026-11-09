@@ -24517,6 +24517,11 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.skid()
 		elif cry == &"pounce":
 			view.pounce()
+		elif cry == &"howl":
+			view.roar("howl")  # The old grey calling his pack in.
+		elif cry == &"pant":
+			var pant: Variant = monster.get("pant")  # The old grey's opening (OldWolf.pant's ticks).
+			view.pant(int((pant as Dictionary).get("ticks", 20) if pant is Dictionary else 20) * World.TICK_DT)
 		elif cry == &"call":
 			view.snarl()
 	var slot := SoundKit.cry(creature, String(cry))

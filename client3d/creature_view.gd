@@ -48,6 +48,11 @@ const COIL_BACK := 0.08
 const COIL_SINK := 0.06
 const COIL_DIP := 0.18
 const COIL_SETTLE := 0.25
+## A pant (cried "pant": the old grey's opening after a lunge, with no clip of its own): its idle
+## this slow, the head this far down (radians), eased in and out over PANT_EASE seconds.
+const PANT_PACE := 0.55
+const PANT_DIP := 0.16
+const PANT_EASE := 0.3
 const BLEND := 0.2
 ## Where a blow lands in its clip when the slot's clip names no "contact":
 ## this far through it.
@@ -93,6 +98,8 @@ var _busy_until := 0
 var _tell_id := 0
 var _tell_until := 0
 var _charge_until := 0
+## Panting till (msec, the rigs' clock): the old grey's opening after a lunge.
+var _pant_until := 0
 ## A slot clip played once when the one playing ends (the hill cat's recover after its leap).
 var _then := ""
 ## Plain blows struck: a slot with a bite alternates its swipe (attack) and bite.
@@ -243,6 +250,10 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		_set_head_up(false)
 		_loop("dazed", 1.0)
 		return
+	if now < _pant_until:
+		# Standing heaving, head low (pant): its winded where its slot has one, else its idle slowed.
+		_loop("winded" if clips.has("winded") else "idle", 1.0 if clips.has("winded") else PANT_PACE)
+		return
 	var alert := monster.alert if monster != null else Monster.Alert.IDLE
 	var clip := "idle"
 	var scale := 1.0
@@ -389,8 +400,17 @@ func _strike(lands_in: float, clip := "attack") -> void:
 ## struck over the gait or rest so that its contact lands with the move. Whether there was one.
 func tell(move: String, lands_in: float, id: int) -> bool:
 	var clip := str(TELL_CLIPS.get(move, move))
-	if rig == null or _dead or not clips.has(clip):
+	if rig == null or _dead:
 		return false
+	if not clips.has(clip):
+		# No clip of its own (the old grey's lunge): the body gathers over the tell and springs as it
+		# lands (coil, a lead's draw-back), never slid into untold (the coordinator).
+		if _pose == null or _down:
+			return false
+		coil(maxf(lands_in, 0.05))
+		_tell_id = id
+		_tell_until = AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0)
+		return true
 	_strike(maxf(lands_in, 0.05), clip)
 	_tell_id = id
 	_tell_until = AnimRig.now_msec() + int(maxf(lands_in, 0.0) * 1000.0)
@@ -408,11 +428,26 @@ func tell_over(id: int, landed: bool) -> void:
 		unwind()
 
 
-## A roar (cried "roar"): its slot clip once at its own pace, over the gait or rest; none
-## without one.
-func roar() -> void:
-	if clips.has("roar") and not rig.striking():
-		_strike(-1.0, "roar")
+## A roar (cried "roar"; or [param clip], the old grey's "howl" as he calls his pack in): its slot
+## clip once at its own pace, over the gait or rest; none without one.
+func roar(clip := "roar") -> void:
+	if clips.has(clip) and rig != null and not _dead and not rig.striking():
+		_strike(-1.0, clip)
+
+
+## A pant for [param seconds] (cried "pant": the old grey stands heaving after a lunge, open to a
+## blow, as Jeff's checklist has it): its idle slowed (a winded where its slot has one), the head
+## let down and back up at its end.
+func pant(seconds: float) -> void:
+	if rig == null or _dead or _pose == null:
+		return
+	_charge_until = 0
+	_pant_until = AnimRig.now_msec() + int(maxf(seconds, 0.0) * 1000.0)
+	var dip := ArtKit.feel("creature_view.pant_dip", PANT_DIP)
+	var tween := create_tween()
+	tween.tween_property(_pose, "rotation:x", dip, PANT_EASE).set_ease(Tween.EASE_OUT)
+	tween.tween_interval(maxf(seconds - PANT_EASE * 2.0, 0.0))
+	tween.tween_property(_pose, "rotation:x", 0.0, PANT_EASE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## A charge (cried "charge"): a faster run for a while, lunging as it goes
