@@ -9277,7 +9277,7 @@ func _test_seen_through() -> void:
 ## combat's outline cut to the sent cells, with a curtain along its edge
 ## drawn through bodies; one without a shape as the cells, as before.
 func _test_telegraph_smooth() -> void:
-	print("\n== a telegraph drawn smooth: the outline's fill cut to the sent cells, a curtain on its edge ==")
+	print("\n== a telegraph drawn smooth: the outline's fill cut to the sent cells, flat on the ground ==")
 	var shape := {"kind": "cone", "origin": [9, 4], "facing": [1, 0], "length": 2, "half_angle": 60}
 	var outline := Client3D.telegraph_outline(shape)
 	var all_cells: Array = Main.telegraph_cells(shape)
@@ -9290,8 +9290,7 @@ func _test_telegraph_smooth() -> void:
 	_rig.telegraph_show("smooth", cells, World.tick, World.tick + 10, shape)
 	var entry: Dictionary = _rig._telegraphs["smooth"]
 	var fill: MeshInstance3D = entry["quads"][0]
-	var curtain: MeshInstance3D = entry["curtain"]
-	_check(entry["quads"].size() == 1 and curtain != null, "one fill mesh and a curtain, not a quad a cell")
+	_check(entry["quads"].size() == 1 and entry["curtain"] == null, "one fill mesh on the ground, no curtain standing on its edge (602 amended (2): Jeff's \"3d block\")")
 	var struck: Array[Vector2i] = []
 	for cell in cells:
 		struck.append(Vector2i(cell))
@@ -9310,31 +9309,15 @@ func _test_telegraph_smooth() -> void:
 		if absf(vertex.x - out_cell.x) < 0.49 and absf(vertex.z - out_cell.y) < 0.49:
 			in_left_out += 1
 	_check(fill_faces.size() >= 3 and stray == 0 and in_left_out == 0, "the fill lies within the sent cells only, none in the cell left out (%d vertices, %d stray)" % [fill_faces.size(), stray])
-	var curtain_faces := (curtain.mesh as ArrayMesh).get_faces()
-	var lowest := INF
-	var highest := -INF
-	for vertex in curtain_faces:
-		lowest = minf(lowest, vertex.y)
-		highest = maxf(highest, vertex.y)
-	var material := curtain.material_override as StandardMaterial3D
-	_check(curtain_faces.size() >= 6 and absf((highest - lowest) - Client3D.TELEGRAPH_CURTAIN) < 0.2 and material != null and material.no_depth_test
-			and material.cull_mode == BaseMaterial3D.CULL_DISABLED,
-			"the curtain stands TELEGRAPH_CURTAIN tall on the edge, drawn with no depth test, both faces (%d vertices, %.2f tall)" % [curtain_faces.size(), highest - lowest])
-	var segments := Client3D.telegraph_curtain_segments(outline, Vector2(9, 4), struck)
-	var outside := 0
-	for segment in segments:
-		var middle: Vector2 = (segment[0] + segment[1]) * 0.5
-		# The outer rim may cross a cell past the reach: it bounds the one half a cell in.
-		var inward := Vector2(9, 4) + (middle - Vector2(9, 4)) * (1.0 - 0.5 / (middle - Vector2(9, 4)).length())
-		if not inside.call(Vector3(middle.x, 0.0, middle.y)) and not inside.call(Vector3(inward.x, 0.0, inward.y)):
-			outside += 1
-	_check(segments.size() > 0 and outside == 0, "every curtain piece stands over or against a sent cell (%d pieces)" % segments.size())
+	var fill_material := fill.material_override as StandardMaterial3D
 	_rig.telegraph_tick(World.tick)
-	var fill_alpha := (fill.material_override as StandardMaterial3D).albedo_color.a
-	_check(is_equal_approx(material.albedo_color.a, _rig.curtain_alpha(fill_alpha)) and material.albedo_color.a > fill_alpha,
-			"the tick tints the curtain brighter than the fill (%.2f over %.2f)" % [material.albedo_color.a, fill_alpha])
+	var faint := fill_material.albedo_color.a
+	_rig.telegraph_tick(World.tick + 8)
+	var later := fill_material.albedo_color.a
+	_check(fill.visible and fill_material.albedo_color.r > 0.5 and later > faint,
+			"the red fill stays and brightens as the blow comes: the tell kept (%.2f to %.2f)" % [faint, later])
 	_rig.telegraph_drop("smooth")
-	_check(not _rig._telegraphs.has("smooth"), "dropped: gone, curtain and all")
+	_check(not _rig._telegraphs.has("smooth"), "dropped: gone")
 	_rig.telegraph_show("plain", cells, World.tick, World.tick + 10)
 	_check(_rig._telegraphs["plain"]["quads"].size() == cells.size() and _rig._telegraphs["plain"]["curtain"] == null, "a message without a shape: a quad a cell, no curtain, as before")
 	_rig.telegraph_drop("plain")

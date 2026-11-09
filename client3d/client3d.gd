@@ -5185,13 +5185,8 @@ func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int, s
 		var fill := _make_flat(_ground_polygons_mesh(telegraph_fill_polygons(outline, origin, struck)), Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
 		add_child(fill)
 		quads.append(fill)
-		curtain = _make_flat(_curtain_mesh(telegraph_curtain_segments(outline, origin, struck)), Color(UiTheme.color("alarm"), TELEGRAPH_FAINT * TELEGRAPH_CURTAIN_ALPHA))
-		var material := curtain.material_override as StandardMaterial3D
-		if material != null:
-			material.no_depth_test = true
-			material.cull_mode = BaseMaterial3D.CULL_DISABLED
-			material.render_priority = 20
-		add_child(curtain)
+		# 602 amended (Jeff: "the ground swipe effect shows a 3d block, that looks amateur"): no
+		# curtain stands on the edge any more; the fill on the ground is the whole tell.
 	_telegraphs[id] = {"quads": quads, "curtain": curtain, "cells": struck, "from": from_tick, "lands": lands_tick, "landed_at": -1}
 
 

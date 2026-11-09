@@ -23540,6 +23540,15 @@ cone to the floor; shown, its data's cells the struck cells, landed, ended
 once, its source gone. controls_test: the host's client told, then told it
 landed. New class_name: Telegraph.
 
+602 amended (2) (release's label; the coordinator's approval; Jeff on v0.1.208, the great bear: "the
+ground swipe effect shows a 3d block, that looks amateur"): no curtain. The telegraph's outline no
+longer stands a curtain (TELEGRAPH_CURTAIN tall, drawn with no depth test so its far rim showed
+past a boss under a low camera); in red it read as a raised block. The flat fill on the ground,
+the outline cut to the sent cells, faint as the blow begins and full as it lands, with the
+landing's flash, is the whole tell. telegraph_curtain_segments and its rules are kept for the
+decal to come (a soft-edged flat fill, agreed with ui). view_test: one fill, no curtain, the fill
+red and brightening. Client only, protocol unchanged, no new class_name.
+
 ## 603. The draugr's moves: the spin, the axe throw, the charge to his axe, disarmed
 
 Jeff (2026-10-22): "the draugr will have a large battle axe that he drops as
