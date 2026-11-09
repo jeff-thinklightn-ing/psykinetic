@@ -7102,6 +7102,11 @@ it anyway. Now:
   weight-broken guard still pays its cost. The sword's parry unchanged. The coordinator's bar for
   the rerun: no more heals than the sword alone, within about 1.3 times its time; if it misses,
   regen under a raised guard not struck comes next, before the break points.
+- The round shield's breaks_at 3.0 to 3.5 (the coordinator's ruling, after playtest's shield
+  rerun: one break at stamina 58 was a strong robber's plain poke, 3 and 0.25 of push). A player
+  can't see which robber rolled strong, so a poke that sometimes broke it read as chance; now every
+  plain poke is taken and only a heavy blow breaks it, a rule to learn. A sword's blow (3.9) still
+  breaks a shielded skeleton guard. The buckler stays at 2.5: its trade is meant to be real.
 - breaks_at: the round shield 2.0 to 3.0, the buckler 1.5 to 2.5. A robber's or a wolf's plain
   blow is taken; a brute's hammer (force 3), a sword's on a buckler and every wound-up blow
   (crushing, 392) still break it.

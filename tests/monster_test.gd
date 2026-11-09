@@ -5339,7 +5339,7 @@ func _test_lowered_shield() -> void:
 
 ## 340 amended, the coordinator's check: recoil goes both ways, so a
 ## skeleton guard's raised shield meets a sword player's blows; a sword still
-## beats it from the front in fair time (its blow weighs past 3.0 and breaks
+## beats it from the front in fair time (its blow weighs past 3.5 and breaks
 ## the guard), no stalemate.
 func _test_sword_beats_guard() -> void:
 	print("
