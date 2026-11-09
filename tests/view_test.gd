@@ -5412,6 +5412,39 @@ func _test_shelter() -> void:
 		slots[slot] = int(slots.get(slot, 0)) + 1
 	_check(int(slots.get("prop.campfire_cold", 0)) == 1 and int(slots.get("prop.bedroll", 0)) == 2,
 			"a cold fire ring and two old bedrolls under it (%s)" % [slots])
+	# 825 ("hill cave rest"): its ring drawn lit while a player's fire burns
+	# on its cell, cold again when it goes out; its crackle with the camps'.
+	var ring := at + Vector2i(0, -1)
+	var cold: Node3D = _rig._hearth_rings.get(ring)
+	var zone_name: String = World.zone.name
+	var was: Variant = World.hearths_lit.get(zone_name)
+	World.hearths_lit[zone_name] = {ring: World.tick + 600}
+	World.hearths_changed.emit(zone_name)
+	var lit: Node3D = dress.get_node_or_null("Lit_%d_%d" % [ring.x, ring.y])
+	var lights: Array = lit.find_children("*", "OmniLight3D", true, false) if lit != null else []
+	var flickers := not lights.is_empty() and _rig._fire_lights.any(func(each: Array) -> bool: return each[0] == lights[0])
+	# Low over the fire and soft, so the lip is lit underneath, not banded.
+	var low := not lights.is_empty() and (lights[0] as OmniLight3D).position.y <= 0.8 and (lights[0] as OmniLight3D).omni_range <= 5.0
+	var lit_slot := ""
+	for piece: Node in (lit.get_children() if lit != null else []):
+		lit_slot = str(piece.get_meta("slot", lit_slot))
+	_check(_rig._hearth_rings.size() == 1 and cold != null and lit != null and not cold.visible and lit_slot == Client3D.HEARTH_LIT
+			and flickers and low and _rig.campfire_cells().has(ring),
+			"lit: a burning ring for the cold one, its light flickering, its crackle heard (%s on %s, %d light)" % [lit_slot, ring, lights.size()])
+	World.hearths_lit.erase(zone_name)
+	World.hearths_changed.emit(zone_name)
+	var still_flickers := not lights.is_empty() and _rig._fire_lights.any(func(each: Array) -> bool: return each[0] == lights[0])
+	_check(cold != null and cold.visible and dress.get_node_or_null("Lit_%d_%d" % [ring.x, ring.y]) == null
+			and not still_flickers and not _rig.campfire_cells().has(ring),
+			"gone out: the cold ring again, no light, no crackle")
+	if was != null:
+		World.hearths_lit[zone_name] = was
+	# The hills: every hearth (a place's "fire_ring") on the ring its shelter draws.
+	var hills := Level.load_level("hills")
+	_rig.rebuild(hills["terrain"], hills["centre"])
+	var rings: Array = hills["terrain"].get("fire_rings", [])
+	var undrawn := rings.filter(func(cell: Vector2i) -> bool: return not _rig._hearth_rings.has(cell))
+	_check(undrawn.is_empty(), "the hills' hearths each on a shelter's drawn ring (%s; drawn %s)" % [rings, _rig._hearth_rings.keys()])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

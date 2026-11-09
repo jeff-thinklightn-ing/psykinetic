@@ -45392,3 +45392,18 @@ message's, read as asked, so one lit dries at once and one run down (its tick pa
 does, with nothing cached to clear. view_test _test_wet: a hearth lit two cells off dries; three off,
 or gone out, not. Client only, protocol unchanged, no new class_name, no bullet (none until the
 switch-on).
+825, terrain's side (package "hill cave rest", landing off; maps' design, the coordinator's notes on
+the lit sheet, C:/dev/review/lands/hill_cave_rest). Client3D draws a hearth lit by the ring a rock
+shelter draws (798 amended (4)): _dress_shelter keeps its cold ring (HEARTH_COLD) by the cell it is
+drawn on, _hearth_rings (a room's field, swapped with a held neighbour's, 822), so a place's
+"fire_ring" is that cell (the hills' (51, 176), under the lip). _draw_hearths, on
+World.hearths_changed and as the live room builds or swaps in: while World.lit_hearths has the cell,
+the cold ring hidden and art-kit's HEARTH_LIT ("Lit_x_y") in its place, its flame at the slot's
+socket and a fire's drawn light (523) in _fire_lights, HEARTH_ENERGY 1.5 over HEARTH_RANGE 5 m low
+over the fire (HEARTH_LIGHT_UP 0.7 m), so the lip is lit underneath and falls dark toward its edge
+(the coordinator: a watch post's light, 2.2 over 7 m, lit its front band a flat orange); gone cold,
+the lit one freed, its light dropped, the cold ring shown. A held neighbour's stay cold. Client3D
+.campfire_cells adds the burning ones, so sound's amb.campfire crackles there with no new asset.
+view_test _test_shelter (lit: the lit ring for the cold one, its light low and flickering, its
+crackle; gone out: cold, no light, no crackle; the hills' fire rings each on a drawn ring). Client
+only; protocol unchanged; no new class_name.

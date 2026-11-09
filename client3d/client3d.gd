@@ -2472,7 +2472,8 @@ var torch_cells: Array[Vector2i] = []
 ## The cells under the camps' fires drawn (decision 777, sound's side: a
 ## rest camp's and a raid camp's, 649; Level.camp_fire, where
 ## BuildingComposer._camp lays prop.campfire), for their crackle
-## (Ambience, amb.campfire); a dropped plot's left out.
+## (Ambience, amb.campfire); a dropped plot's left out. And the fire rings
+## drawn lit (825, "hill cave rest"), while a player's fire burns there.
 func campfire_cells() -> Array[Vector2i]:
 	var out: Array[Vector2i] = []
 	for entry: Dictionary in _buildings:
@@ -2481,7 +2482,78 @@ func campfire_cells() -> Array[Vector2i]:
 		var fire := Level.camp_fire(entry["kind"])
 		if fire.x >= 0:
 			out.append(fire)
+	for cell: Vector2i in _hearths_burning():
+		out.append(cell)
 	return out
+
+
+## The fire rings drawn here (a rock shelter's cold ring, 798 amended (4)),
+## by the cell each is drawn on: {cell: the cold ring}. A hearth (825,
+## Level.fire_rings_of) is drawn by the ring on its cell.
+var _hearth_rings: Dictionary[Vector2i, Node3D] = {}
+
+
+## The drawn rings whose hearth burns now (World.lit_hearths, the live
+## zone's; a held neighbour's stay cold, 822).
+func _hearths_burning() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if _neighbour or World.zone == null or _hearth_rings.is_empty():
+		return out
+	for cell: Vector2i in World.lit_hearths(World.zone.name):
+		if _hearth_rings.has(cell) and is_instance_valid(_hearth_rings[cell]):
+			out.append(cell)
+	return out
+
+
+## Each drawn ring as its hearth is (825): while it burns, the cold ring
+## hidden and HEARTH_LIT in its place ("Lit_x_y", beside it), its flame at
+## the slot's socket and a fire's drawn light (523) flickering in
+## _fire_lights; gone cold, the lit one freed and the cold ring shown again.
+func _draw_hearths() -> void:
+	var burning := _hearths_burning()
+	for cell: Vector2i in _hearth_rings:
+		var cold := _hearth_rings[cell]
+		if not is_instance_valid(cold):
+			continue
+		var parent := cold.get_parent()
+		var lit_name := "Lit_%d_%d" % [cell.x, cell.y]
+		var lit: Node3D = parent.get_node_or_null(lit_name)
+		var on := burning.has(cell)
+		if on and lit == null:
+			lit = _lit_ring(cold, cell)
+			lit.name = lit_name
+			parent.add_child(lit)
+		elif not on and lit != null:
+			_fire_lights = _fire_lights.filter(func(each: Array) -> bool: return is_instance_valid(each[0]) and not lit.is_ancestor_of(each[0]))
+			parent.remove_child(lit)
+			lit.queue_free()
+		# The kit without a lit fire: flames over the cold ring itself.
+		cold.visible = not on or not ArtKit.has(HEARTH_LIT)
+
+
+## A burning ring where [param cold] lies: art-kit's HEARTH_LIT, its flame
+## and its light (HEARTH_ENERGY over HEARTH_RANGE).
+func _lit_ring(cold: Node3D, cell: Vector2i) -> Node3D:
+	var lit := Node3D.new()
+	lit.transform = cold.transform
+	var flame: Node3D = null
+	if ArtKit.has(HEARTH_LIT):
+		var fire := ArtKit.instance(HEARTH_LIT, 1)
+		fire.set_meta("slot", HEARTH_LIT)
+		lit.add_child(fire)
+		flame = Flames.at_socket(fire, HEARTH_LIT, hash(cell))
+	if flame == null:
+		Flames.light(lit, Vector3(0.0, HEARTH_FLAME_UP, 0.0), Flames.size_of(HEARTH_LIT), hash(cell))
+	var light := _night_light(FIRE_POOL, HEARTH_ENERGY, HEARTH_RANGE)
+	light.position = Vector3(0.0, HEARTH_LIGHT_UP, 0.0)
+	lit.add_child(light)
+	_fire_lights.append([light, HEARTH_ENERGY, _roll(cell, 155) * TAU, Flames.FIRE_FLICKER])
+	return lit
+
+
+func _on_hearths_changed(zone_name: String) -> void:
+	if World.zone != null and zone_name == World.zone.name:
+		_draw_hearths()
 
 
 var _hp_bar_shader: Shader
@@ -5904,6 +5976,9 @@ func swap_room(other: Client3D) -> void:
 		for door in World.get_doors():
 			_doors_due[door.key] = true
 		_show_piles()
+		if not World.hearths_changed.is_connected(_on_hearths_changed):
+			World.hearths_changed.connect(_on_hearths_changed)
+		_draw_hearths()
 
 
 ## Every glimpse shown but the one toward [param zone] (822): a held
@@ -6976,6 +7051,9 @@ func _phase_doors() -> void:
 		World.blood_changed.connect(_on_blood_changed)
 	if not World.tracks_changed.is_connected(_on_tracks_changed):
 		World.tracks_changed.connect(_on_tracks_changed)
+	if not World.hearths_changed.is_connected(_on_hearths_changed):
+		World.hearths_changed.connect(_on_hearths_changed)
+	_draw_hearths()
 	for door in World.get_doors():
 		_doors_due[door.key] = true
 	_show_piles()
@@ -7054,6 +7132,7 @@ func _edge_drawn(key: Vector3i, fences: Dictionary[Vector3i, bool]) -> bool:
 ## side of it (the cells beside, as scenery), a stair down or up; nothing for
 ## "sealed" (its own slab) or "none". Drawn only: the cell is walked on.
 func _add_link_cues() -> void:
+	_hearth_rings.clear()
 	for cue: Dictionary in _terrain.get("link_cues", []):
 		if cue["cue"] == "cave":
 			_add_cave_mouth(cue["tile"], cue["facing"], bool(cue.get("closed", false)))
@@ -7706,10 +7785,22 @@ const SHELTER_DEEP := 3.0
 const SHELTER_HUMP := 1.6
 const SHELTER_SHADE := Vector2(0.7, 0.4)
 const SHELTER_LIP_DARK := 0.55
+## A fire ring cold, and lit while a player's fire burns there (825): its
+## flame HEARTH_FLAME_UP over it when the kit's lit ring has no socket; its
+## light HEARTH_ENERGY over HEARTH_RANGE, low over the fire (HEARTH_LIGHT_UP,
+## as the square's), so a shelter's lip is lit underneath and falls dark
+## toward its edge (the coordinator: a watch post's light, 2.2 over 7 m at
+## 0.6 m, lit its front band a flat orange).
+const HEARTH_COLD := "prop.campfire_cold"
+const HEARTH_LIT := "prop.campfire"
+const HEARTH_FLAME_UP := 0.15
+const HEARTH_ENERGY := 1.5
+const HEARTH_RANGE := 5.0
+const HEARTH_LIGHT_UP := 0.7
 ## Each piece: [slot, where in the shelter's frame past its face (y over
 ## the ground there), turn (radians), size].
 const SHELTER_DRESS := [
-	["prop.campfire_cold", Vector3(0.1, 0.0, 0.5), 0.3, 1.0],
+	[HEARTH_COLD, Vector3(0.1, 0.0, 0.5), 0.3, 1.0],
 	["prop.bedroll", Vector3(-1.0, 0.0, 2.05), PI * 0.5 + 0.15, 1.0],
 	["prop.bedroll", Vector3(0.95, 0.0, 1.95), PI * 0.5 - 0.2, 1.0],
 	["prop.woodpile", Vector3(1.55, 0.0, 0.5), 1.4, 0.7],
@@ -8265,6 +8356,9 @@ func _dress_shelter(holder: Node3D, at: Vector2i, face: float, ground: Callable)
 		piece.scale = Vector3.ONE * float(spec[3])
 		piece.set_meta("slot", slot)
 		dress.add_child(piece)
+		if slot == HEARTH_COLD:
+			var on := holder.transform * piece.position
+			_hearth_rings[Vector2i(roundi(on.x), roundi(on.z))] = piece
 
 
 ## A mine mouth's dressing (MINE_DRESS), in [param holder]'s frame (the

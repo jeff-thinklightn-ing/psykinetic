@@ -59,6 +59,7 @@ const ROOM: Array[StringName] = [
 	&"_dry_water", &"_bed_levels", &"_deck_tops", &"_deck_ends", &"_fords", &"_rocks",
 	&"_solid_cells", &"_posts", &"_doorways", &"_door_hinges", &"_door_states", &"_doors_due",
 	&"torch_cells", &"_terrain", &"_plane_at", &"_outdoor", &"_fire_lights", &"_lamp_lights", &"_door_lamps",
+	&"_hearth_rings",
 	&"_night_posts", &"_night_stores", &"_night_places", &"_wall_lamps", &"_forge_lights", &"_skylights",
 	&"_motes", &"_mote_material", &"_shafts", &"_ground_shader_material", &"_cliff_material",
 	&"_land",
