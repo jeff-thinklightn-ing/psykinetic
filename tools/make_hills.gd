@@ -299,7 +299,7 @@ const WADE_RINGS := 4
 const WADE_MOST := 1.6
 ## The sought's refuges here (613 amended: one place a story, its key the
 ## story's tag), each {at, name}.
-const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave", "opens": Vector2i(1, 0)}}
+const REFUGES := {"hill_cave": {"at": Vector2i(52, 176), "name": "a hill cave", "opens": Vector2i(1, 0), "fire_ring": Vector2i(51, 176)}}
 ## The hill cave's package (Jeff's rule, 820: a place never before what it
 ## leads to; the coordinator): its place, the "Cave" waystone W4 and the
 ## side track to it are laid only once terrain's shelter is built there.
@@ -956,6 +956,10 @@ func _places() -> void:
 		if REFUGES[key].has("opens"):
 			var opens: Vector2i = REFUGES[key]["opens"]
 			places[key]["opens"] = [opens.x, opens.y]
+		if REFUGES[key].has("fire_ring"):
+			# 825: the ring a player lights, where terrain draws it (under the lip).
+			var ring: Vector2i = REFUGES[key]["fire_ring"]
+			places[key]["fire_ring"] = [ring.x, ring.y]
 	for herder in HERDERS:
 		var fold: Rect2i = herder["fold"]
 		var gate: Vector2i = herder["gate"]

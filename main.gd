@@ -1392,6 +1392,9 @@ func _process(delta: float) -> void:
 							break
 				if _hint_words.is_empty() and Net.hints and player != null and (not World.ground_at(tile).is_empty() or World.ground_gold(tile) > 0):
 					_hint_words = "%s  pick up %s" % [Keys.name_of("pick_up"), pile_words(World.ground_at(tile), World.ground_gold(tile))]  # Behind hints=on (Jeff, 2026-10-22).
+				if _hint_words.is_empty() and Net.hints and player != null and World.is_hearth(tile):
+					# 825: a fire ring (voice's words), lit or stoked with E from beside it.
+					_hint_words = "E  %s" % ("Stoke the fire" if World.is_fire(tile) else "Light the fire")
 				if _hint_words.is_empty() and tile != NONE:
 					# The building under the cursor (decision 537) and how far its town has
 					# built it (566): "H3 house, being built 40%" in builder mode, else a

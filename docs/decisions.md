@@ -45618,3 +45618,13 @@ ring of the live zone burning now that wasn't (SoundKit.newly_lit); a ring stoke
 gone cold, or burning when the zone was built (the arrival's "hearths", HEARTH_SETTLE_MSEC 3000),
 nothing. sound_kit_test (newly_lit; the slot quieter than the forge's, unheard by monsters).
 Client only; protocol unchanged, no new class_name, no bullet (the package's).
+
+825, switched on: the hill cave's fire ring (2026-11-08, release's label; the coordinator's nod on
+the lit still; package "hill cave rest" whole: maps' 3f9cf442c, pc-character's drying 2932fbe6c,
+terrain's lit ring 0528cf5f0, sound's catch). make_hills' REFUGES gives hill_cave "fire_ring":
+[51, 176], the cell terrain draws the ring on (under the lip, 0.5 m past the face; not (50, 176),
+2 m in between the bedrolls), one from the place, so a player in the mouth lights it. The hover hint,
+behind hints=on as every action hint, is voice's: "E  Light the fire" on a cold ring, "E  Stoke the
+fire" on a burning one. level_test _test_hearth: the one ring laid in any level is the hill cave's at
+(51, 176); view_test's check that every hills fire ring is a drawn ring now has one to check. The
+bullet is voice's. Level data and a client hint; protocol unchanged; no new class_name.

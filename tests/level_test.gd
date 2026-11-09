@@ -1181,11 +1181,14 @@ func _test_hearth() -> void:
 	var hearth_warned := warnings.filter(func(w: String) -> bool: return w.contains("fire ring"))
 	_check(Level.fire_rings_of(places) == [Vector2i(9, 10)] and hearth_warned.size() == 1,
 		"a place's hearth beside it kept, one 10 off warned and left out (%s; %s)" % [Level.fire_rings_of(places), hearth_warned])
-	var laid := []
+	var laid := {}
 	for level_name: String in ["hills", "wilds", "forest", "foothills"]:
-		if not (Level.load_level(level_name)["terrain"].get("fire_rings", []) as Array).is_empty():
-			laid.append(level_name)
-	_check(laid.is_empty(), "no level has a hearth yet: the package lands off (%s)" % [laid])
+		var rings: Array = Level.load_level(level_name)["terrain"].get("fire_rings", [])
+		if not rings.is_empty():
+			laid[level_name] = rings
+	var hills_rings: Array = laid.get("hills", [])
+	_check(laid.size() == 1 and hills_rings == [Vector2i(51, 176)],
+		"the one fire ring laid is the hill cave's, at (51, 176) under its lip, where terrain draws it (%s)" % [laid])
 	_check(_main.load_map("hills"), "the hills load")
 	var player := _player()
 	var ring := Vector2i(50, 176)

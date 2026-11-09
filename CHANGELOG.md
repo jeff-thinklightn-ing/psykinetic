@@ -6,6 +6,8 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+
+- In the hills, light the cold fire in the hill cave from its woodpile and rest by it as at a roadside camp: it heals you, dries you off and keeps wild beasts away, you can cook over it, and your companion sits with you; it burns a good while, and you can stoke it again (825).
 - Towns: the medicine man buys a bear's claw, feathers, flint and bear's grease by Give, and makes them into a bear's-claw charm, which gathers a faint light round you that grows the longer you wear it, and a bear's-grease draught that leaves you hard to shove and hard to stop for a while, both sold from his shelf (821 amended (2)).
 
 - In the forest, a boar's neck bends whole now when it lowers its head to graze, charge or fall, where before it split open (319 amended (3)).

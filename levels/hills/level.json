@@ -2573,6 +2573,10 @@
 			"opens": [
 				1,
 				0
+			],
+			"fire_ring": [
+				51,
+				176
 			]
 		},
 		"herders_hut": {
