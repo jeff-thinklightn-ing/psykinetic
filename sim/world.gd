@@ -349,6 +349,10 @@ const GUARD_BREAK_STUN := 8
 ## 340 amended: a blow a raised shield takes whole throws its attacker back,
 ## stunned this long (cause &"guarded"): the shield-bearer's opening.
 const SHIELD_RECOIL_STUN := 4
+## Jeff's lost clicks (after v0.1.208): a free body stands this many ticks
+## for a blow it lands, not its whole attack cycle; the cycle still gates
+## its next blow.
+const BLOW_STAND_TICKS := 2
 ## 340 amended: a lowered shield guards its arm's side (the holder's left)
 ## at this share of its raised absorb, over LOWERED_ARC 45-degree steps
 ## either side of it.
@@ -8505,7 +8509,7 @@ func try_swing(entity: GridEntity, direction: Vector2i, paid := false) -> bool:
 	if tick < entity.next_attack_tick or tick < entity.next_move_tick:
 		return false
 	entity.next_attack_tick = tick + attack_ticks_of(entity)
-	_halt_for_blow(entity, entity.next_attack_tick)
+	_halt_for_blow(entity, mini(entity.next_attack_tick, tick + BLOW_STAND_TICKS))  # A whiff as a blow (Jeff's lost clicks).
 	entity._world_set_facing(direction)
 	entity.protected = false
 	if not paid:
@@ -9373,7 +9377,9 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	# damage (twice from behind with a dagger) and its force.
 	var verb := {} if is_shove else blow_verb(attacker)
 	attacker.next_attack_tick = tick + attack_ticks_of(attacker) if not is_shove else tick + attacker.attack_ticks
-	_halt_for_blow(attacker, attacker.next_attack_tick)
+	# Jeff's lost clicks: a free body stands for the blow's own moment, not its cycle (the cycle still
+	# gates its next blow), so a click away walks at once after it.
+	_halt_for_blow(attacker, mini(attacker.next_attack_tick, tick + BLOW_STAND_TICKS))
 	attacker._world_set_facing(way)
 	if not is_shove:
 		attacker._world_swung(way)
@@ -10676,8 +10682,9 @@ func free_input(entity: GridEntity, intent: Vector2, seconds: float, seq := -1) 
 ## the command walks. Pressing on at the foe, as a chase's late commands
 ## do, keeps it.
 func _free_give_up_wind_up(player: Player, intent: Vector2) -> void:
+	_free_drop_order(player, intent)
 	if player.wind_up.is_empty() or player.wind_up.get("lead", false) or intent.length() < WIND_UP_LEAVE_INTENT:
-		return  # A lead is the swing itself, never walked off (338 amended).
+		return  # A lead is the swing itself, never walked off (338 amended): 2 ticks at most.
 	var target: Variant = player.wind_up.get("target")
 	var way := Vector2(player.wind_up["direction"])
 	if is_instance_valid(target):
@@ -10686,6 +10693,21 @@ func _free_give_up_wind_up(player: Player, intent: Vector2) -> void:
 		return
 	cancel_wind_up(player)
 	player.free_halt_until = tick
+
+
+## Jeff's lost clicks: a move away from [param player]'s ordered target (an
+## [param intent] of at least WIND_UP_LEAVE_INTENT not within
+## WIND_UP_KEEP_ANGLE of the way to it) drops the order, so a blow clicked
+## before the click away never fires after it and pins the body again.
+func _free_drop_order(player: Player, intent: Vector2) -> void:
+	if player.action_order == GridEntity.Order.NONE or intent.length() < WIND_UP_LEAVE_INTENT:
+		return
+	var target: Variant = player.action_target
+	if player.action_order != GridEntity.Order.SWING and is_instance_valid(target):
+		var way := body_centre(target as GridEntity) - body_centre(player)
+		if way.length() > 0.001 and intent.normalized().dot(way.normalized()) > cos(deg_to_rad(WIND_UP_KEEP_ANGLE)):
+			return
+	player._clear_action()
 
 
 ## [param command] is done with, whether applied or dropped (688 amended):

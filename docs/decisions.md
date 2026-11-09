@@ -33082,6 +33082,26 @@ a knock snap it; the helper round a wall either way. Wire: none with the
 flag off (free_pos and free_way are not replicated; ui's 689 packs them),
 protocol unchanged; no new class_name.
 
+688 amended (8) (release's label; the coordinator's approval; Jeff on v0.1.208, the great bear:
+"clicking to run away from the swipes took multiple clicks, with a timed move that feels bad"): a
+free body stands for a blow only World.BLOW_STAND_TICKS (2), not until its attack is ready again.
+A landed blow, a shove and a whiff (_try_hit, try_swing) halt it until the sooner of its
+next_attack_tick and tick + BLOW_STAND_TICKS; the cycle still gates its next blow. Every command a
+halted body got was used up standing, so a click away after a blow walked nowhere for the whole
+cycle (a sword's 5 ticks, a hammer's or a great axe's more). And a move away from an ordered
+target (World._free_drop_order, from free_input: an intent of at least WIND_UP_LEAVE_INTENT not
+within WIND_UP_KEEP_ANGLE of the way to it) drops the order waiting on the cooldown, so a blow
+clicked before the click away never fires after it and pins the body again. Players only: a free
+body is a player, and monsters and companions on their cells stand as they did, so chases and
+kiting are unchanged (the coordinator's ask). Kept: a player's own lead (338 amended (4), 2 ticks)
+is never walked off, and a heavy wind-up's stand and its walk-off (392 amended) as they were, so
+the worst wait after a click is about 4 ticks. combat_test _test_click_away (Jeff's case measured:
+the first step 5 ticks after the click before, 2 after; 10 ticks on, 2.8 cells off and not pinned
+again, with or without a second attack ordered); push_test's chained shoves fade 3, 2, 2, 1, 1, 1
+(the walk up between them is shorter). Follow-ups if Jeff still feels it: the client showing the
+halt (FreeNet.Own.held_by_server reading it, no walk-ahead and snap back), and ui narrowing ground
+clicks beside a tall monster. Server only, protocol unchanged, no new class_name.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float

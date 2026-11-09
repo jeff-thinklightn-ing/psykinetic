@@ -58,6 +58,7 @@ func _ready() -> void:
 	_test_draw_held()
 	_test_lob()
 	_test_free_blows()
+	_test_click_away()
 	_test_free_chase()
 	_test_body_reach()
 	_test_free_wind_up_given_up()
@@ -860,6 +861,54 @@ func _test_free_chase() -> void:
 ## refused, and stops the body until its attack is ready again; a wind-up
 ## until it lands; shots and lobs start from its own centre (shot_origin),
 ## so an arrow from the edge of its cell flies that line.
+## Jeff on v0.1.208 (the great bear): "clicking to run away from the swipes
+## took multiple clicks". The coordinator's bar: one click away from a told
+## blow always moves you at once, or as soon as a short pin ends. Measured:
+## the ticks from a move held away to the body's first step, after a blow
+## landed, and after a blow landed with another attack still ordered (a
+## player clicking the foe again before clicking away).
+func _test_click_away() -> void:
+	print("
+== Jeff's lost clicks: a click away after a blow moves you within a short pin ==")
+	for queued in [false, true]:
+		var e := _build(["##########", "#........#", "#...Pm...#", "#........#", "##########"])
+		var host: GridEntity = e["P"][0]
+		var foe: GridEntity = e["m"][0]
+		host.free_pos = Vector2(host.tile)
+		foe.acts = false
+		foe.max_hp = 999
+		foe.hp = 999
+		_give(host, "sword")
+		host.next_attack_tick = 0
+		host.wind_up = {}
+		World.command_attack(host, foe)
+		var struck_at := -1
+		for i in 20:
+			World.step()
+			if host.next_attack_tick > World.tick and struck_at < 0:
+				struck_at = World.tick
+				break
+		if queued:
+			World.command_attack(host, foe)  # Clicked again before clicking away.
+		var stood := host.free_pos
+		var waited := 0
+		while waited < 40 and host.free_pos.distance_to(stood) < 0.05:
+			World.free_input(host, Vector2.LEFT, World.TICK_DT)
+			World.step()
+			waited += 1
+		var stepped := host.free_pos
+		for i in 10:
+			World.free_input(host, Vector2.LEFT, World.TICK_DT)
+			World.step()
+		var pinned_again := World.free_held(host) or host.next_attack_tick > World.tick and host.free_pos.distance_to(stepped) < 0.5
+		print("  measured: %s, blow at tick %d, first step %d ticks after the click away (attack ticks %d); 10 ticks on, %.2f cells further%s"
+				% ["another attack ordered" if queued else "after one blow", struck_at, waited, World.attack_ticks_of(host),
+				host.free_pos.distance_to(stepped), ", pinned again" if pinned_again else ""])
+		_check(host.free_pos.distance_to(stepped) > 0.5 and not pinned_again, "%s: and it keeps walking away, no blow pinning it again" % ["another attack ordered" if queued else "after one blow"])
+		_check(struck_at >= 0 and waited <= World.BLOW_STAND_TICKS + 1,
+				"%s: a click away moves the body within the short pin (%d ticks, the bar %d)" % ["another attack ordered" if queued else "after one blow", waited, World.BLOW_STAND_TICKS + 1])
+
+
 func _test_free_blows() -> void:
 	print("\n== a free body: a swing mid-walk stops it for the blow; its shots fly from its own centre (688, combat's side) ==")
 	var e := _build(["############", "#P.........#", "#.........m#", "############"])

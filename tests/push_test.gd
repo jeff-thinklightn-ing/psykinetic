@@ -353,9 +353,11 @@ func _test_stamina() -> void:
 		_shove(player, imp)
 		thrown.append(imp.tile.x - before)
 	# Each shove comes straight off a walk, its momentum keeping the last
-	# one moving (decision 592): a free body's walk up (703, step 2) carries
-	# the fourth one cell farther than the grid's step did (3, 2, 2, 1, 1, 1).
-	_check(thrown == [3, 2, 2, 2, 1, 1], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
+	# one moving (decision 592). A free body's walk up (703, step 2) carried
+	# the fourth one cell farther than the grid's step did; with a blow's
+	# stand now BLOW_STAND_TICKS (Jeff's lost clicks) the walk up differs
+	# and it is the grid's again, (3, 2, 2, 1, 1, 1): fading either way.
+	_check(thrown == [3, 2, 2, 1, 1, 1], "knockback fades shove by shove instead of cutting out: %s" % [thrown])
 
 
 func _test_stun() -> void:
