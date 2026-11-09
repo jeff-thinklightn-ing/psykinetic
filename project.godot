@@ -50,7 +50,8 @@ theme/default_theme_scale=3.0
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
-rendering_device/driver.windows="d3d12"
+rendering_device/driver.windows="vulkan"
+rendering_device/fallback_to_d3d12=true
 
 [shader_globals]
 

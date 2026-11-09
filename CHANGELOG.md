@@ -6,6 +6,7 @@ above the bullets; `tools/release_client.ps1` uses the `## vX.Y.Z` section as th
 notes (decision 324).
 
 ## Unreleased
+- On Windows the game runs smoothly on some laptops where it crawled at a few frames a second, as it now draws with Vulkan, or with Direct3D 12 where there's no Vulkan (833).
 
 ## v0.1.209
 
