@@ -4850,7 +4850,7 @@ func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 		_move_items(sifted["moved"], zone_name, keep_to)
 	var opened := World.add_zone(zone_name)
 	var was := World.enter(opened)
-	_load_level(zone_name)
+	_load_level(zone_name, _open_kept(zone_name))
 	_zone_nodes(zone_name)
 	World.load_terrain(_terrain)
 	_spawn_doors()
@@ -4870,6 +4870,19 @@ func _open_zone(zone_name: String, saved := {}, regenerate := true) -> Zone:
 			Time.get_ticks_msec() - started])
 	World.enter(was)
 	return opened
+
+
+## The held neighbour's level (822 amended (4)), read on a worker, for its
+## zone's opening: a host's first crossing into it reads it from disk no
+## more (the wilds', 230 ms). Its felled cells are laid again now (Clearing
+## adds only). {} otherwise: the flag off, another zone, or a regenerating
+## level (it may have been laid again since).
+func _open_kept(zone_name: String) -> Dictionary:
+	if not seamless_crossings or zone_name != _neighbour_zone or _neighbour_level.is_empty() or Regen.marked(zone_name):
+		return {}
+	if Net.is_authority() and World.clearing != null:
+		World.clearing.apply(zone_name, _neighbour_level["terrain"])
+	return _neighbour_level
 
 
 ## The node zone [param zone_name]'s entities live under and its spawner,

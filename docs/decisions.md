@@ -45531,11 +45531,22 @@ at once, as ever; on for everyone (an arrival behind the card too). Headless, th
 went from 92 to 60 ms, into held from 27 to 22. seamless_test: each swap shows the map made while held
 and keeps the one left. Client only, protocol unchanged, no new class_name.
 
-Still to come, each behind the flag: (3) maps: the five corridors, each neighbour's plane origin 16
-cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam − 8 with
-spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The
-swap when the "map" message names the held neighbour, the clip's open edge at the seam, the fallback
-to the card for an unfinished neighbour, and a crossing test.
+822 amended (4): the first crossing opens the kept level (release's label). A host's first crossing
+into a zone opened it with Level.load_level, the held neighbour's level read from disk again (the
+wilds': 232 ms of a 324 ms travel call, in the crossing's frame). Main._open_kept gives _open_zone the
+held neighbour's level, read on a worker, its felled cells laid again first (Clearing.apply only
+adds); {} with the flag off, for another zone, or for a regenerating level (Regen.marked: it may have
+been laid again since). A level entity's spec is copied as it spawns (_slot_spec), so the open zone
+and the live view share the dictionary safely. Headless, the travel call into the wilds 324 -> 61 ms,
+the frame after it 64 -> 44. A server whose zones are open already never pays it. seamless_test: the
+wilds' zone opens on the held level. Server and host only, behind the flag, protocol unchanged, no
+new class_name.
+
+Still to come, each behind the flag. Next, the maps step: the five corridors, each neighbour's plane
+origin 16 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam
+− 8 with spawns on the same world cell, and a level_test check that both maps agree in the overlap.
+Then the clip's open edge: the swap when the "map" message names the held neighbour, the clip's open
+edge at the seam, the fallback to the card for an unfinished neighbour, and a crossing test.
 
 ## 823. Foes last longer: common foes' hp about 1.8x, and a foe's max hp told to clients
 

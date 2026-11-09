@@ -151,6 +151,10 @@ func _test_swap(view: Client3D) -> void:
 	var wilds_room: Node3D = view._room
 	var live_at := live.position
 	var pairs: Array = [["wilds", "from_held", wilds_room, held_room, "held"], ["held", "from_wilds", held_room, wilds_room, "wilds"]]
+	var kept: Dictionary = _main._open_kept("wilds")
+	_check(not World.zones.has("wilds") and not kept.is_empty() and is_same(kept, _main._neighbour_level)
+			and _main._open_kept("held").is_empty(),
+			"the wilds' zone opens on the held level, read on a worker (no read from disk at the crossing)")
 	for pair: Array in pairs:
 		var held_map: Dictionary = _main._held_map
 		var left_image: Image = _main.minimap.image
