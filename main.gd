@@ -4617,6 +4617,8 @@ func _boot() -> void:
 		World.cat_spotted.connect(_on_cat_spotted)
 	# Players' contributions toward the next build (decision 499).
 	World.economy.shortfall = World.towns.shortfall
+	World.economy.trusted_of = func(town: String, player_id: String) -> bool:  # 831.
+		return World.towns != null and str(World.towns.regard(town, player_id).get("word", "")) == "trusted"
 	World.economy.before_harvest = World.towns.before_harvest
 	# The hill herders' droves, bought by the town (640).
 	World.towns.drove = World.economy.buy_drove
@@ -8088,8 +8090,11 @@ func _send_shop(player: Player, shop: GridEntity, why := "") -> void:
 	var data := {"shop": str(shop.get_path()), "town": place, "gold": World.gold_of(player.player_id),
 		"goods": [], "offers": {}, "why": why}
 	if not place.is_empty() and World.economy != null:
-		data["goods"] = World.economy.goods(place, World.fence_state(shop))
-		data["offers"] = World.economy.offers(place, Array(player.slots))
+		var fence_now := World.fence_state(shop)
+		data["goods"] = World.economy.goods(place, fence_now, player.player_id)
+		data["offers"] = World.economy.offers(place, Array(player.slots), player.player_id if fence_now.is_empty() else "")
+		if fence_now.is_empty() and World.economy.trusted(place, player.player_id):
+			data["trusted"] = true  # 831: its prices are a trusted player's (ui's mark).
 	Net.message_to(player.owner_peer, "shop", data)
 
 
@@ -8120,8 +8125,10 @@ func _send_barter(player: Player, shop: GridEntity, why := "", maker := "") -> v
 				"in_care": in_care(player.player_id, hut), "by": care_via(player.player_id, hut),
 				"given": {"herbs": int(given.get("herbs", 0)), "antlers": int(given.get("antlers", 0))}}  # 584 amended (2).
 	elif not place.is_empty() and World.economy != null:
-		data["goods"] = World.economy.goods(place, data["fence"])
-		data["buys"] = World.economy.buys(place, Array(player.slots))
+		data["goods"] = World.economy.goods(place, data["fence"], player.player_id)
+		data["buys"] = World.economy.buys(place, Array(player.slots), player.player_id if str(data["fence"]).is_empty() else "")
+		if str(data["fence"]).is_empty() and World.economy.trusted(place, player.player_id):
+			data["trusted"] = true  # 831: its prices are a trusted player's (ui's mark).
 		for each: Dictionary in data["pack"]:
 			if data["fence"] == Economy.FENCE_NIGHT and data["buys"].has(each["id"]) and World.items.is_grave(int(each["uid"])):
 				data["fenced"][each["uid"]] = World.economy.fence_price(int(data["buys"][each["id"]]["gold"]))
@@ -16362,9 +16369,7 @@ func give_outcome(town: String, player_id: String, raw: String, count: int) -> D
 		var row: Array = town_stock(town).filter(func(each: Dictionary) -> bool: return each["id"] == raw)
 		out["need"] = int(row[0]["enough"]) if not row.is_empty() else 0
 	out["have"] = have + count
-	var economy := World.economy
-	var store: Dictionary = economy.rules.get("store", {})
-	out["gold"] = roundi(economy.raw_price(town, raw) * float(store.get("buy", 1.0)) * count)
+	out["gold"] = World.economy.bank_price(town, player_id, raw, count)
 	return out
 
 

@@ -615,7 +615,10 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 54 (826, "the town pays in full"; shares 54, release): a person's takes rows and the town
 ## window's sheet no longer carry "owed", a gold reward is never marked "owed", and a town's
 ## "pays" carries no up_to; a camp trader's buys' up_to is his day's demand, not a purse.
-const PROTOCOL_REVISION := 54
+## 55 (831, "trusted prices"; opened by economy after v0.1.209 shipped 54): "shop" and "barter"
+## carry "trusted": true when their prices are a trusted player's (ui's mark), and their goods,
+## offers and buys are that player's own prices.
+const PROTOCOL_REVISION := 55
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

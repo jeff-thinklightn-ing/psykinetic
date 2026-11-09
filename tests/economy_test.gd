@@ -46,6 +46,7 @@ func _ready() -> void:
 	_test_buying()
 	_test_selling()
 	_test_counter_raws()
+	_test_trusted_prices()
 	_test_barter()
 	_test_vendor()
 	_test_camp_traders()
@@ -185,6 +186,76 @@ func _test_selling() -> void:
 ## The starter vendor (736): one of the wares at vendor.price from the
 ## purse, the gold to nobody (no treasury), how many one buys; refused
 ## without the gold or for what it doesn't sell.
+## 831: a trusted player pays a tenth less and gets a tenth more in that
+## town, nobody else's price moves, and (the coordinator's condition) for
+## every priced thing the trusted sell stays under the trusted buy at the
+## same counter, so no buy and sell back prints gold: every item in the
+## catalog walked, on an empty store and on one at comfort.
+func _test_trusted_prices() -> void:
+	print("
+== 831: trusted prices, and no round trip ==")
+	_now = 0
+	var clock := func() -> int: return _now
+	var rules := Production.read_rules(Economy.PATH)
+	rules["town_regard"]["trusted_price"]["on"] = true
+	var cat := Items.all()
+	var book := ItemBook.new(clock)
+	var stock := Stockpile.new({}, clock, book)
+	stock.deposit(TOWN, "gold", 500, "test")
+	var work := Production.new({}, stock, null, clock, rules, func() -> Dictionary: return cat)
+	var economy := Economy.new({}, stock, work, clock, rules, func() -> Dictionary: return cat)
+	_check(not economy.trusted(TOWN, "pt"), "no regard reader: nobody is trusted")
+	economy.trusted_of = func(_town: String, player_id: String) -> bool: return player_id == "pt"
+	_check(economy.trusted(TOWN, "pt") and not economy.trusted(TOWN, "p1") and not economy.trusted(TOWN, ""), "pt trusted, p1 not")
+	var ids: Array = cat.keys()
+	ids.sort()
+	var bad: Array = []
+	var better := 0
+	for round in 2:
+		if round == 1:
+			for what: String in Stockpile.RESOURCES:
+				stock.deposit(TOWN, what, maxi(work.comfort(TOWN, what) - stock.count(TOWN, what), 0), "test")
+		var plain := economy.offers(TOWN, ids, "p1")
+		var trusted := economy.offers(TOWN, ids, "pt")
+		for id: String in ids:
+			var buy_plain := economy.price(TOWN, id, Economy.SELL, cat)
+			var buy_trusted := economy._trusted_buy_of(TOWN, id, buy_plain, cat)
+			if buy_trusted > buy_plain:
+				bad.append("%s buy %d -> %d" % [id, buy_plain, buy_trusted])
+			if plain.has(id):
+				if int(trusted[id]) < int(plain[id]):
+					bad.append("%s sells for less trusted (%d < %d)" % [id, trusted[id], plain[id]])
+				if int(trusted[id]) > int(plain[id]):
+					better += 1
+				if int(trusted[id]) >= buy_trusted and (int(trusted[id]) > int(plain[id]) or buy_trusted < buy_plain):
+					bad.append("%s round trip: sell %d, buy %d" % [id, trusted[id], buy_trusted])
+			if buy_trusted < buy_plain and buy_trusted <= economy._paid_back(TOWN, id, cat):
+				bad.append("%s bought trusted at %d, sold back plain for %d" % [id, buy_trusted, economy._paid_back(TOWN, id, cat)])
+			var trophy := int(economy.trophy_outcome(TOWN, "pt", id)["gold"])
+			if trophy > economy.trophy_price(id) and trophy >= buy_trusted:
+				bad.append("%s trophy round trip: %d, buy %d" % [id, trophy, buy_trusted])
+		for what: String in Stockpile.RESOURCES:
+			var each := economy.bank_price(TOWN, "pt", what, 1)
+			if each > economy.bank_price(TOWN, "p1", what, 1) and each >= economy._trusted_buy_of(TOWN, what, economy.price(TOWN, what, Economy.SELL, cat), cat):
+				bad.append("%s banked round trip: %d" % [what, each])
+			if economy.bank_price(TOWN, "pt", what, 3) < economy.bank_price(TOWN, "p1", what, 3):
+				bad.append("%s banked for less trusted" % what)
+	_check(bad.is_empty() and better > 10, "every priced item, empty and at comfort: trusted never worse, %d sell better, no round trip (%s)" % [better, bad.slice(0, 6)])
+	var uid := book.mint("sword", "made", "test")
+	stock.stock_shop(TOWN, uid, "test", "")
+	var shelf := economy.item_price(TOWN, uid, cat)
+	var rows := economy.goods(TOWN, "", "pt")
+	_check(rows.size() == 1 and int(rows[0]["price"]) == economy.trusted_buy(shelf) and int(rows[0]["price"]) < shelf
+		and int(economy.goods(TOWN, "", "p1")[0]["price"]) == shelf and int(economy.goods(TOWN)[0]["price"]) == shelf,
+		"a sword on the shelf at %d: %d to pt, %d to anyone else" % [shelf, rows[0]["price"], shelf])
+	_check(int(economy.goods(TOWN, Economy.FENCE_DAY, "pt")[0]["price"]) == economy.fence_markup(shelf, Economy.FENCE_DAY), "the fence stays the fence")
+	economy.add_gold("pt", 100, "test")
+	var deal := economy.buy("pt", TOWN, uid)
+	_check(deal["ok"] and int(deal["price"]) == economy.trusted_buy(shelf), "pt buys it at the trusted price (%s)" % [deal])
+	economy.rules["town_regard"]["trusted_price"]["on"] = false
+	_check(not economy.trusted(TOWN, "pt") and economy.trusted_buy(10) == 9, "switched off: nobody is trusted")
+
+
 func _test_vendor() -> void:
 	print("
 == the starter vendor: 1 gold, to nobody ==")

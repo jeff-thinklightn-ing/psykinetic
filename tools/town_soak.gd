@@ -62,6 +62,9 @@ const WOODLOT := "wilds/soak_woodlot"
 ## debt, the town's gold, workers owed, hungry, on the dole, what was paid.
 var _sell := 0
 var _sell_until := 20
+## --trusted: 831's check: trusted prices on, the seller trusted by the town
+## (Economy.trusted_of), so --sell sells at a trusted player's prices.
+var _trusted := false
 var _sold := {"town": 0, "camp": 0, "short": 0}
 var _last_day := -1
 const SOAK_CAMP := "forest/soak_camp"
@@ -137,6 +140,8 @@ func _run() -> void:
 			_sell = maxi(int(arg.trim_prefix("--sell=")), 0)
 		elif arg.begins_with("--sell-until="):
 			_sell_until = int(arg.trim_prefix("--sell-until="))
+		elif arg == "--trusted":
+			_trusted = true
 		elif arg.begins_with("--woodlot-taken="):
 			_woodlot_taken = int(arg.trim_prefix("--woodlot-taken="))
 	if _out.is_empty() or _out.begins_with("/var/lib/psykinetic") or _out.begins_with("user://"):
@@ -433,6 +438,9 @@ func _sell_826() -> void:
 	if _players.is_empty() or not is_instance_valid(_players[0]):
 		return
 	var pid: String = _players[0].player_id
+	if _trusted and not World.economy.trusted(TOWN, pid):
+		World.economy.rules["town_regard"]["trusted_price"]["on"] = true
+		World.economy.trusted_of = func(_town: String, player_id: String) -> bool: return player_id == pid
 	var got := 0
 	var guard := 0
 	while got < _sell and guard < 40:

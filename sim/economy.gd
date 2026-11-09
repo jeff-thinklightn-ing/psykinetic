@@ -65,6 +65,9 @@ var production: Production
 var clock := Callable()
 ## () -> Dictionary: id -> definition (Items' by default), what prices read.
 var catalog := Callable()
+## (town, player id) -> bool: whether [param town]'s regard of the player
+## reads "trusted" (Towns.regard_word; set by Main; 831). Never while unset.
+var trusted_of := Callable()
 ## (town, building kind) -> bool: whether it stands (Towns', set by Main),
 ## for a need met at a building. None stands while unset.
 var building_stands := Callable()
@@ -414,35 +417,104 @@ func refuses(town: String, id: String, cat := {}) -> String:
 
 
 ## [param town]'s shop, for a shop panel: [{uid, id, price}] by uid.
-func goods(town: String, fence := "") -> Array[Dictionary]:
+func goods(town: String, fence := "", player_id := "") -> Array[Dictionary]:
 	var cat: Dictionary = catalog.call()
 	var out: Array[Dictionary] = []
 	var uids := stockpile.shop(town)
 	uids.sort()
 	for uid in uids:
 		var id := stockpile.book.id_of(uid)
-		out.append({"uid": uid, "id": id, "price": fence_markup(item_price(town, uid, cat), fence)})
+		out.append({"uid": uid, "id": id, "price": shop_price(town, uid, fence, player_id, cat)})
 	return out
+
+
+## What player [param player_id] pays [param town]'s shop for [param uid]
+## (831): its price, the fence's by day, a trusted player's (trusted_buy)
+## where no fence is.
+func shop_price(town: String, uid: int, fence := "", player_id := "", cat := {}) -> int:
+	var asked := fence_markup(item_price(town, uid, cat), fence)
+	if not fence.is_empty() or not trusted(town, player_id):
+		return asked
+	return _trusted_buy_of(town, stockpile.book.id_of(uid), asked, cat)
+
+
+## A trusted player's price for one [param id] asked at [param asked]
+## (831): trusted_buy, but never down to what the town would pay anyone
+## back for one (its offer, its tanner's trophy price, its store's for the
+## raw), so buying it and selling it back makes no gold; never over asked.
+func _trusted_buy_of(town: String, id: String, asked: int, cat := {}) -> int:
+	return mini(asked, maxi(trusted_buy(asked), _paid_back(town, id, cat) + 1))
+
+
+## The most [param town] pays anyone (no trust) for one [param id] (831).
+func _paid_back(town: String, id: String, cat := {}) -> int:
+	if cat.is_empty():
+		cat = catalog.call()
+	var most := Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1] if refuses(town, id, cat).is_empty() else 0
+	if not trophy_trade(id).is_empty():
+		most = maxi(most, trophy_price(id))
+	if id in Stockpile.RESOURCES:
+		most = maxi(most, bank_price(town, "", id, 1))
+	var yields: Variant = cat.get(id, {}).get("yield", {})
+	if yields is Dictionary and not (yields as Dictionary).is_empty():
+		var banked := 0
+		for what: String in yields:
+			banked += bank_price(town, "", what, int(yields[what]))
+		most = maxi(most, banked)
+	return most
+
+
+## Whether [param town] gives player [param player_id] its trusted prices
+## (831): town_regard.trusted_price.on and its regard of them "trusted".
+func trusted(town: String, player_id: String) -> bool:
+	if player_id.is_empty() or not trusted_of.is_valid() or not bool(_trusted_rule().get("on", false)):
+		return false
+	return bool(trusted_of.call(town, player_id))
+
+
+func _trusted_rule() -> Dictionary:
+	return rules.get("town_regard", {}).get("trusted_price", {})
+
+
+## A trusted player's price for what costs [param asked] (831): asked x
+## trusted_price.buy, at least 1 gold off from 2 up; 1 stays 1.
+func trusted_buy(asked: int) -> int:
+	if asked < 2:
+		return asked
+	return mini(asked - 1, floori(asked * float(_trusted_rule().get("buy", 0.9))))
+
+
+## What [param town] pays player [param player_id] for one [param id]
+## whose plain price is [param plain] (831): a trusted player's is plain x
+## trusted_price.sell, at least 1 gold more from 2 up, but always under
+## what they would pay for one at that counter (trusted_buy of its asking
+## price), so no buy and sell back makes gold; never under plain.
+func trusted_sell(town: String, player_id: String, id: String, plain: int, cat := {}) -> int:
+	if plain < 2 or not trusted(town, player_id):
+		return plain
+	var up := maxi(plain + 1, ceili(plain * float(_trusted_rule().get("sell", 1.1))))
+	var asked := price(town, id, SELL, cat)
+	return maxi(plain, mini(up, _trusted_buy_of(town, id, asked, cat) - 1))
 
 
 ## What [param town] would pay for each of [param ids] (the things a player
 ## carries): id -> gold paid, the tax taken; the ones it won't buy left out.
-func offers(town: String, ids: Array) -> Dictionary:
+func offers(town: String, ids: Array, player_id := "") -> Dictionary:
 	var cat: Dictionary = catalog.call()
 	var out := {}
 	for id: Variant in ids:
 		var key := str(id)
 		if not key.is_empty() and not out.has(key) and refuses(town, key, cat).is_empty():
-			out[key] = Economy.taxed(price(town, key, BUY, cat), "buy", rules)[1]
+			out[key] = trusted_sell(town, player_id, key, Economy.taxed(price(town, key, BUY, cat), "buy", rules)[1], cat)
 	return out
 
 
 ## Barter's offers (decision 560): what [param town] pays for each of
 ## [param ids], the tax taken, and how many it takes at that price before
 ## it has enough: id -> {gold, up_to}; the ones it won't buy left out.
-func buys(town: String, ids: Array) -> Dictionary:
+func buys(town: String, ids: Array, player_id := "") -> Dictionary:
 	var cat: Dictionary = catalog.call()
-	var paid := offers(town, ids)
+	var paid := offers(town, ids, player_id)
 	var out := {}
 	for id: String in paid:
 		out[id] = {"gold": int(paid[id]), "up_to": up_to(town, id, cat)}
@@ -779,7 +851,7 @@ func barter_quote(town: String, player_id: String, gives: Array, takes: Array, f
 	var cat: Dictionary = catalog.call()
 	var out := {"ok": false, "gives": [], "takes": [], "balance": 0, "why": ""}
 	var ids: Array = gives.map(func(give: Dictionary) -> String: return str(give["id"]))
-	var offered := buys(town, ids)
+	var offered := buys(town, ids, player_id if fence.is_empty() else "")
 	var counts := {}
 	var paid := 0
 	for give: Dictionary in gives:
@@ -807,7 +879,7 @@ func barter_quote(town: String, player_id: String, gives: Array, takes: Array, f
 		if uid not in shelf or takes.count(uid) > 1:
 			out["why"] = "that is no longer for sale"
 			return out
-		var each := fence_markup(item_price(town, uid, cat), fence)
+		var each := shop_price(town, uid, fence, player_id, cat)
 		out["takes"].append(each)
 		cost += each
 	if gold(player_id) + paid < cost:
@@ -827,7 +899,7 @@ func buy(player_id: String, town: String, uid: int, at := -1, fence := "") -> Di
 	if uid not in stockpile.shop(town):
 		return {"ok": false, "why": "that is no longer for sale"}
 	var id := stockpile.book.id_of(uid)
-	var cost := fence_markup(item_price(town, uid), fence) if at < 0 else at
+	var cost := shop_price(town, uid, fence, player_id) if at < 0 else at
 	if gold(player_id) < cost:
 		return {"ok": false, "price": cost, "why": "not enough gold (%d)" % cost}
 	var maker := stockpile.maker_of(town, uid)
@@ -856,6 +928,8 @@ func sell(player_id: String, town: String, id: String, is_fenced := false, at :=
 	var pays: int = Economy.taxed(price(town, id, BUY, cat), "buy", rules)[1] if at < 0 else at
 	if is_fenced and at < 0:
 		pays = fence_price(pays)
+	elif at < 0 and fence.is_empty():
+		pays = trusted_sell(town, player_id, id, pays, cat)
 	pay_for_player(town, pays, "bought:%s" % player_id)
 	add_gold(player_id, pays, "sold %s" % id)
 	return {"ok": true, "paid": pays, "id": id}
@@ -2044,7 +2118,7 @@ func bank_sale(town: String, player_id: String, yields: Dictionary) -> int:
 		if rules.get("maker_only", {}).has(what):
 			continue  # The town has no use for it: only its maker buys it (562).
 		var unit := raw_price(town, what) * float(store.get("buy", 1.0))
-		price += roundi(unit * int(yields[what]))
+		price += bank_price(town, player_id, what, int(yields[what]))
 		if not _paid.has(town):
 			_paid[town] = {}
 		_paid[town][what] = unit
@@ -2121,8 +2195,19 @@ func trophy_price(id: String) -> int:
 
 ## What selling [param count] trophy [param id] to [param town] pays
 ## (821; 826: in full, at once): {gold}.
-func trophy_outcome(_town: String, _player_id: String, id: String, count := 1) -> Dictionary:
-	return {"gold": trophy_price(id) * count}
+func trophy_outcome(town: String, player_id: String, id: String, count := 1) -> Dictionary:
+	return {"gold": trusted_sell(town, player_id, id, trophy_price(id)) * count}
+
+
+## What [param town]'s store pays player [param player_id] for [param count]
+## of raw [param what] banked (bank_sale, bank_pays, Main.give_outcome): raw
+## price x store.buy; a trusted player's each unit trusted_sell (831).
+func bank_price(town: String, player_id: String, what: String, count: int) -> int:
+	var unit := raw_price(town, what) * float(rules.get("store", {}).get("buy", 1.0))
+	var plain := roundi(unit * count)
+	if count <= 0 or not trusted(town, player_id):
+		return plain
+	return maxi(plain, trusted_sell(town, player_id, what, roundi(unit)) * count)
 
 
 ## Player [param player_id] sells one trophy [param id] to [param town]
@@ -2237,8 +2322,7 @@ func _repay_trade() -> void:
 ## "pays"; bank_sale's price): {id: {gold}}, gold one brings today, paid in
 ## full whatever the treasury holds (826: no up_to). Herbs (maker_only) and
 ## gear (a gift, unpaid) are left out.
-func bank_pays(town: String, _player_id: String, slots: Array) -> Dictionary:
-	var store: Dictionary = rules.get("store", {})
+func bank_pays(town: String, player_id: String, slots: Array) -> Dictionary:
 	var out := {}
 	var cat: Dictionary = catalog.call()
 	for id: Variant in slots:
@@ -2247,13 +2331,12 @@ func bank_pays(town: String, _player_id: String, slots: Array) -> Dictionary:
 		var yields: Variant = cat.get(str(id), {}).get("yield", {})
 		if not yields is Dictionary or (yields as Dictionary).is_empty():
 			continue
-		var price := 0.0
+		var gold := 0
 		for what: String in yields:
 			if rules.get("maker_only", {}).has(what) or what not in Stockpile.RESOURCES:
-				price = -1.0
+				gold = -1
 				break
-			price += raw_price(town, what) * float(store.get("buy", 1.0)) * int(yields[what])
-		var gold := roundi(price)
+			gold += bank_price(town, player_id, what, int(yields[what]))
 		if gold > 0:
 			out[str(id)] = {"gold": gold}  # No up_to (826): never limited by the treasury.
 	return out

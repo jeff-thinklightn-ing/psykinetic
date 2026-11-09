@@ -46255,3 +46255,36 @@ for a bed (a bed short, not the cap); before it the probe, which tells each new 
 reported one with the cap, a single tick (300 steps).
 
 Server only; protocol unchanged; no new class_name; no bullet (nothing a player sees).
+## 831. Trusted prices: a trusted player pays a tenth less and gets a tenth more
+
+The coordinator's approval (economy's design; package "trusted prices": economy's prices, ui's mark,
+voice's word; economy switches it on), checked against bonuses, not penalties: a player a town
+trusts gets a better price there, and nobody gets a worse one.
+
+- Who: a player whose regard in that town reads "trusted" (Towns.regard_word, the residents'
+  ladder; Economy.trusted_of, set by Main, reads Towns.regard). Strangers, "known" and "wronged"
+  pay and get the plain price.
+- What (levels' town_regard.trusted_price {on, buy 0.9, sell 1.1}): Economy.trusted_buy, the price
+  x buy, at least 1 gold off from 2 up (1 stays 1); Economy.trusted_sell, the pay x sell, at least
+  1 more from 2 up, never under the plain pay.
+- No round trip (the coordinator's condition): a trusted buy never falls to what the town would
+  pay anyone back for one (Economy._paid_back: its offer, its tanner's trophy price, its store's
+  for the raw or the thing's yield; _trusted_buy_of), and a trusted sell is always under the
+  trusted buy of one at that counter, so buying a thing and selling it back makes no gold.
+  economy_test _test_trusted_prices walks every item in the catalog, on an empty store and on one
+  at comfort.
+- Where: the store's offers and buys, the shop's goods (Economy.goods, shop_price), buy, sell and
+  barter_quote, the banked hand-ins (Economy.bank_price, used by bank_sale, bank_pays and
+  Main.give_outcome) and the tanner's trophies (trophy_outcome). Not: camp traders (outside every
+  town and its regard), a maker's own swap from his purse (a person's, not the town's), the
+  starter stall, the fence (a fence state set: its prices as before).
+- Who pays: a trusted sale's tenth more is paid as any sale (826: gold above the floor, then the
+  trade's credit); the tenth off a buy is takings the town doesn't have.
+- Shown: the prices sent are the player's own; "shop" and "barter" carry "trusted": true when
+  they are a trusted player's (not a maker's barter, not the fence's), and ui marks the window's
+  title row with voice's one word, "Trusted", no caption (Jeff dislikes glosses). PROTOCOL_REVISION
+  55, opened here.
+- Lands off (trusted_price.on false: nobody is trusted, no "trusted" sent); ui's side ("831, ui's
+  side") follows, then economy's switch-on with voice's bullet.
+
+Server and client; protocol 55; no new class_name.
