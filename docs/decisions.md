@@ -5930,6 +5930,15 @@ C:/dev/review/boar_neck. The Pig's leg seams are left as they were (Run's hind l
 a later pass, and creature.pig (tools/pig_from_boar.py) takes the neck when it is next made from
 the boar.
 
+319 amended (4) (release's label; the coordinator's ask after (3)): the farm pig gets the neck
+too. creature.pig is the boar's mesh on the same rig (tools/pig_from_boar.py), made before (3), so it
+still tore as the boar did. neck_blend.py run on creature.pig.blend itself, not a remake from the
+blended boar (which would redo its ridge, tusks and coat for nothing); weights only, re-exported. At
+boar scale (the pig is 0.91 of it) the worst edge in Idle_Eating 50 cm to 24, Death 35 to 15,
+Headbutt 22 to 11; nothing past 0.6 of the head's length on any bone but Head (before, Body throat
+vertices reached there). A pig made again from the boar now carries the neck from it. Stills, stock
+and blended, grazing: C:/dev/review/boar_neck/pig_*.png.
+
 ## 313. Raids are real monsters in a played zone, handed back to maps when it sleeps
 
 maps moves raid groups on the world tick (WorldRaids). When a group's
