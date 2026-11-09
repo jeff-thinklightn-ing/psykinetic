@@ -39,6 +39,7 @@ func _ready() -> void:
 	_test_narrow_ways()
 	_test_new_kinds()
 	_test_umbrage_kinds()
+	_test_workings()
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	print("")
@@ -1054,6 +1055,34 @@ func _test_umbrage_kinds() -> void:
 	var kinds: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "building")[0]["input_schema"]["properties"]["kind"]["enum"]
 	var inns := (config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "inn")
 	_check(not inns.is_empty() and "inn" in kinds, "the building tool offers the inn's kind (%d in the wilds)" % inns.size())
+
+
+## Hollowfell's workings (790) as builder mode places and moves it: a plain
+## place, its key kept, its cell moved (the coordinator's job, dungeon's plan).
+func _test_workings() -> void:
+	print("
+== 790: Hollowfell's workings, placed and moved in builder mode ==")
+	var kinds: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "mark_place")[0]["input_schema"]["properties"]["kind"]["enum"]
+	_check("workings" in kinds, "mark_place offers the workings kind")
+	var config: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://levels/hills/level.json"))
+	_check(config is Dictionary and config.get("places", {}).get("hollowfell", {}).get("kind") == "workings", "the hills hold Hollowfell's workings")
+	if not config is Dictionary:
+		return
+	var real: Dictionary = config["places"]["hollowfell"]
+	var session := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var placed := session.run_tool("mark_place", {"key": "hollowfell", "kind": "workings", "at": [10, 10],
+		"radius": int(real.get("radius", 3)), "holder": str(real.get("holder", "goblins")), "name": str(real.get("name", "Hollowfell"))})
+	var places: Dictionary = session.working.config.get("places", {})
+	_check(placed.get("ok", false) and places.get("hollowfell", {}).get("kind") == "workings" and places["hollowfell"].get("holder") == real.get("holder"),
+		"mark_place lays a workings like the hills' (%s)" % [places.get("hollowfell", placed)])
+	var moved := session.run_tool("move", {"place": "hollowfell", "by": [3, 2]})
+	places = session.working.config.get("places", {})
+	_check(moved.get("ok", false) and places.keys().filter(func(key: String) -> bool: return places[key].get("kind") == "workings") == ["hollowfell"]
+		and places["hollowfell"].get("at") == [13, 12] and places["hollowfell"].get("name") == real.get("name"),
+		"move: the workings goes 3 east, 2 south, its key, name and holder kept (%s)" % [places.get("hollowfell", moved)])
+	var warnings: Array[String] = []
+	var read := Level.places_from({"places": {"hollowfell": BuilderSession._place_moved(real, Vector2i(1, 1))}}, warnings)
+	_check(warnings.is_empty() and read.has("hollowfell"), "the hills' own entry, moved, reads back (%s)" % [warnings])
 
 
 ## Jeff's chest rule (806) in builder mode: a chest of loot only in a dungeon,
