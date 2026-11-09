@@ -45997,3 +45997,59 @@ The first trial: the hill cave rest's l045 night still on maps' flags, at main b
 shot scene by --with, matched maps' switch_on_l045_night.png. Windowed stills, clips and benches go
 there from now; this PC's off-screen runs are for when the laptop is busy or off. Tools only; protocol
 unchanged; no class_name.
+
+828 amended (release's label; the coordinator's pick (b) of three). The first crossing benches on the
+laptop drew at about 6 frames a second, whatever the load. Four causes were looked for and the first
+three are handled here, for the run only and changing no setting of the laptop's. The display turns off
+after 5 idle minutes on mains, the idle rule's own length, so every run began on a dark screen: the
+helper wakes it (SC_MONITORPOWER on, no input faked, so the idle check still reads only Jeff's) and holds
+it on (SetThreadExecutionState) until the game ends. A window under others is drawn as a hidden one: the
+game's window is set on top without being activated (SetWindowPos, HWND_TOPMOST, SWP_NOACTIVATE), never
+taking focus or the keyboard. A window without focus is a background process to
+Windows 11, run at its efficiency speed: the game's process opts out of power throttling
+(SetProcessInformation, ProcessPowerThrottling), logged in the out folder's runner.log. The fourth
+cause, the one that held the 6 frames, was the renderer, D3D12 on this Optimus laptop (decision 833).
+Tools only; protocol unchanged; no class_name.
+Watch mode (Jeff, 2026-11-09, by the coordinator: "i want the visuals to show up on screen when the
+screen is on so i can see what being done"): the idle rule is gone. A run starts at once, in front without
+focus, 1600x900 or the screen's size where that is smaller; no input of his stops it. He stops one from
+its tray icon (a click: "stopped by user"; the process tree by its PID). runner.log gives the idle seconds
+at start and end, whether the laptop was used during the run, and its power at start and end (mains or
+battery, the scheme, the NVIDIA GPU's state, clocks, heat and draw: an atlas run slowed tenfold after it
+was unplugged), so a bench's caller says whether its timings count. <Dir>\shown.txt marks the window up,
+for a caller telling the coordinator. --runner picks the laptop: lenovo (D:, ssh into cmd, the default)
+or atlas (asus-atlas, C: only, ssh into PowerShell, so each command is passed to cmd through an encoded
+PowerShell line); --repeat N runs the game N times on the same user data (a player's next session, its
+caches warm). Tools only; protocol unchanged; no class_name.
+
+## 833. Windows renders with Vulkan, D3D12 as the fallback
+
+The coordinator's approval, on perf's laptop benches; release's number. project.godot's
+rendering_device/driver.windows was "d3d12" from phase 0's project template (8a867f03e), recorded by no
+decision. It is "vulkan" now, with rendering_device/fallback_to_d3d12=true: a Windows client whose
+Vulkan won't start comes up on Direct3D 12 instead of failing.
+
+Why: on the Lenovo (GTX 1660 Ti, an Optimus laptop, NVIDIA's D3D12) every windowed frame took about
+250 ms, 6 frames a second, whatever was drawn (even the arrival card's 240 draw calls), while the GPU
+reported 30 ms of work and the game's scripts under 7 ms: the time was Godot waiting on D3D12 to
+present. The same swap bench on Vulkan, the same window: ordinary frames 12 ms, 81 frames a second.
+This desktop (RTX 5090) showed nothing, which is why it went unseen.
+
+Checked before landing:
+- The look, on the Lenovo: the same four stills on each driver (held at 22:00 with its pond, the wilds
+  town at noon and at 21:00, the barrow). Mean pixel difference 0.04 to 0.19 of 255, under 0.15% of
+  pixels off by more than 24 (grass, water and figures moving between runs), brightness equal; no
+  SHADER ERROR, SCRIPT ERROR or ERROR line on either.
+- The look, on this desktop's GPU (RTX 5090, driver 616.56, Vulkan 1.4.351): one cleared off-screen run
+  of the same four views on Vulkan, no error lines, the noon town matching the Lenovo's.
+- The fallback, on the Lenovo with this project.godot and no --rendering-driver: with Vulkan made
+  unusable (the loader told to match no driver, VK_LOADER_DRIVERS_SELECT), Godot logs two engine errors
+  (VK_KHR_surface not found), warns "Your video card drivers seem not to support Vulkan, switching to
+  Direct3D 12", starts on D3D12 on the same GPU and runs on to its screenshot, no crash; as it is, it
+  starts on Vulkan.
+
+Not changed: the server and every headless run (no rendering device), Linux and macOS (Vulkan already,
+macOS through Metal's own default), the Forward+ renderer. The first frames after a new material
+appears are dearer on Vulkan until its pipeline is compiled and cached (one 2 s frame at the held
+swap in a fresh APPDATA on the Lenovo); that is the shader warming still to come under 822. Client
+only; protocol unchanged; no class_name.

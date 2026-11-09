@@ -1,42 +1,63 @@
 #!/usr/bin/env bash
 # A shot or clip run on the laptop runner (lenovo-tethys; the coordinator's
 # design, 2026-11-08), so a windowed run never takes this machine's screen:
-#   tools/remote_shot.sh [--with <local file>]... [--timeout MIN] <sha> <name> -- <godot args>
+#   tools/remote_shot.sh [--runner lenovo|atlas] [--with <local file>]... [--timeout MIN] [--repeat N] <sha> <name> -- <godot args>
+# --repeat N: the game run N times in a row with the same user data (the second
+# starts after the first has exited and saved its caches: a player's next
+# session); pass n's log comes back as out/godot-n.log.
+# --runner: lenovo (lenovo-tethys, its clone on D:, the default) or atlas
+# (asus-atlas, the low-spec player machine, C: only); D: below is the runner's drive.
 # 1. D:\psykinetic (a clone with no remote) brought to <sha> by a git bundle
 #    (only HEAD..sha when the laptop's HEAD is ours), refused if it has
 #    changes; each --with file (a git-ignored shot scene, say) copied to the
 #    same path in it; imported (headless, over ssh).
 # 2. The game run in the laptop's logged-on session as a one-shot task
 #    (an ssh session has no desktop: a window there fails its swapchain),
-#    only once the laptop has been idle 5 minutes (never over its user; it
-#    gives up with "laptop in use" at the timeout), silent, at 0,0 and
-#    1600x900, its user data its own, its host bound to 127.0.0.1 (never open
-#    on the tailnet), stopped past the timeout.
+#    at once, on the laptop's screen in front without taking focus (Jeff,
+#    2026-11-09: "i want the visuals to show up on screen when the screen is
+#    on so i can see what being done"), the display kept on, silent, at 0,0
+#    and 1600x900 or the screen's size, its user data its own, its host bound
+#    to 127.0.0.1 (never open on the tailnet), stopped past the timeout or
+#    from its tray icon ("stopped by user"). runner.log says whether the
+#    laptop was used during the run and its power (mains, scheme, GPU state)
+#    at start and end: a bench's caller says whether its timings count.
+#    <Dir>\shown.txt appears once the window is up.
 # 3. <Dir>\out (and the log) pulled to C:/dev/review/<name>, then the run's
 #    folder on the laptop deleted.
 # In the godot args, {out} is the run's output folder on the laptop. One run
 # at a time (a lock on the laptop). Nothing is passed but the bundle, the
 # --with files and the args: no agent, no forwarding, no token.
 set -u
-HOST="${REMOTE_SHOT_HOST:-jequi@lenovo-tethys}"
-ROOT='D:\psykinetic'
-RUNS='D:\psykinetic-runs'
+RUNNER=lenovo
+REPEAT=1
 TIMEOUT=15
 WITH=()
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--with) WITH+=("$2"); shift 2 ;;
 		--timeout) TIMEOUT="$2"; shift 2 ;;
+		--runner) RUNNER="$2"; shift 2 ;;
+		--repeat) REPEAT="$2"; shift 2 ;;
 		*) break ;;
 	esac
 done
-[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--with FILE]... [--timeout MIN] <sha> <name> -- <godot args>"; exit 2; }
+[ $# -ge 3 ] && [ "$3" = "--" ] || { echo "usage: remote_shot.sh [--runner lenovo|atlas] [--with FILE]... [--timeout MIN] <sha> <name> -- <godot args>"; exit 2; }
+# Each runner: its ssh address, the drive its clone and runs are on, and the
+# shell its ssh server starts (atlas's is PowerShell; every line here is cmd's).
+case "$REPEAT" in [1-5]) ;; *) echo "repeat: 1 to 5"; exit 2 ;; esac
+case "$RUNNER" in
+	lenovo) HOST=jequi@lenovo-tethys; DRIVE=D; SHELL_KIND=cmd ;;
+	atlas) HOST=jequi@asus-atlas; DRIVE=C; SHELL_KIND=powershell ;;
+	*) echo "runner: lenovo or atlas"; exit 2 ;;
+esac
+ROOT="$DRIVE:\\psykinetic"
+RUNS="$DRIVE:\\psykinetic-runs"
 SHA="$(git rev-parse --verify "$1^{commit}")" || exit 2
 NAME="$2"
 shift 3
 case "$NAME" in *[!A-Za-z0-9_-]*|"") echo "name: letters, digits, _ and - only"; exit 2 ;; esac
 DIR="$RUNS\\$NAME"
-OUT_FWD="D:/psykinetic-runs/$NAME/out"  # Forward slashes: a bash replacement eats backslashes.
+OUT_FWD="$DRIVE:/psykinetic-runs/$NAME/out"  # Forward slashes: a bash replacement eats backslashes.
 REVIEW="C:/dev/review/$NAME"
 SSH=(ssh -o BatchMode=yes -o ForwardAgent=no -o ClearAllForwardings=yes -o ConnectTimeout=15 "$HOST")
 SCP=(scp -q -o BatchMode=yes -o ForwardAgent=no -o ClearAllForwardings=yes)
@@ -67,7 +88,20 @@ trap 'rm -rf "$TMP"' EXIT
 # The laptop's paths for scp (forward slashes).
 fwd() { printf '%s' "$1" | tr '\\' '/'; }
 helper="$RUNS\\remote_shot_run.ps1"
-rps() { "${SSH[@]}" "powershell -NoProfile -ExecutionPolicy Bypass -File $helper $*"; }
+# A cmd line run on the runner. Where its ssh server starts PowerShell, the line
+# goes as base64 inside a -EncodedCommand script that hands it to cmd.exe as it is
+# (no quoting of PowerShell's between), its exit code back.
+rsh() {
+	if [ "$SHELL_KIND" = cmd ]; then
+		"${SSH[@]}" "$1"
+		return
+	fi
+	local line script
+	line="$(printf '%s' "$1" | base64 -w0)"
+	script="\$ProgressPreference = 'SilentlyContinue'; \$i = New-Object System.Diagnostics.ProcessStartInfo 'cmd.exe'; \$i.Arguments = '/c ' + [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$line')); \$i.UseShellExecute = \$false; \$p = [Diagnostics.Process]::Start(\$i); \$p.WaitForExit(); exit \$p.ExitCode"
+	"${SSH[@]}" "powershell -NoProfile -NonInteractive -EncodedCommand $(printf '%s' "$script" | iconv -f utf-8 -t utf-16le | base64 -w0)"
+}
+rps() { rsh "powershell -NoProfile -ExecutionPolicy Bypass -File $helper -Root $ROOT -Runs $RUNS $*"; }
 
 # The game's args: {out} filled in, and the host bound to 127.0.0.1 after the game's "--".
 ARGS=()
@@ -80,17 +114,17 @@ done
 ARGS+=("--bind=127.0.0.1")
 printf '%s\n' "${ARGS[@]}" >"$TMP/args.txt"
 
-"${SSH[@]}" "if not exist $RUNS mkdir $RUNS" >/dev/null || { echo "laptop not reachable"; exit 1; }
+rsh "if not exist $RUNS mkdir $RUNS" >/dev/null || { echo "laptop not reachable"; exit 1; }
 "${SCP[@]}" tools/remote_shot_run.ps1 "$HOST:$(fwd "$helper")" || exit 1
 rps -Mode lock -Dir "$NAME" -StaleMin $((TIMEOUT + 25)) || { echo "the laptop runner is busy"; exit 1; }
 release() { rps -Mode unlock >/dev/null 2>&1; }
 trap 'release; rm -rf "$TMP"' EXIT
 
 # 1. The clone to <sha>.
-state="$("${SSH[@]}" "git -C $ROOT rev-parse HEAD && git -C $ROOT status --porcelain --untracked-files=no" | tr -d '\r')"
+state="$(rsh "git -C $ROOT rev-parse HEAD && git -C $ROOT status --porcelain --untracked-files=no" | tr -d '\r')"
 remote_head="$(printf '%s\n' "$state" | head -1)"
 if [ "$(printf '%s\n' "$state" | sed -n '2,$p' | grep -c .)" -ne 0 ]; then
-	echo "D:\\psykinetic has changes; nothing touched:"; printf '%s\n' "$state" | sed -n '2,$p'; exit 1
+	echo "$ROOT has changes; nothing touched:"; printf '%s\n' "$state" | sed -n '2,$p'; exit 1
 fi
 if [ "$remote_head" != "$SHA" ]; then
 	git update-ref refs/remote-shot/tip "$SHA"
@@ -101,14 +135,14 @@ if [ "$remote_head" != "$SHA" ]; then
 	fi
 	git update-ref -d refs/remote-shot/tip
 	"${SCP[@]}" "$TMP/tip.bundle" "$HOST:$(fwd "$RUNS")/tip.bundle" || exit 1
-	"${SSH[@]}" "git -C $ROOT fetch -q $RUNS\\tip.bundle refs/remote-shot/tip && git -C $ROOT checkout -q --detach $SHA && del $RUNS\\tip.bundle" || { echo "refresh failed"; exit 1; }
+	rsh "git -C $ROOT fetch -q $RUNS\\tip.bundle refs/remote-shot/tip && git -C $ROOT checkout -q --detach $SHA && del $RUNS\\tip.bundle" || { echo "refresh failed"; exit 1; }
 fi
 for i in "${!WITH[@]}"; do
 	file="${WITH[$i]}"
 	rel="${WITH_REL[$i]}"
 	# Forward slashes throughout: a backslash before $( stops the substitution.
 	to="$(fwd "$ROOT")/$rel"
-	"${SSH[@]}" "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force '$(dirname "$to")' | Out-Null\"" >/dev/null \
+	rsh "powershell -NoProfile -Command \"New-Item -ItemType Directory -Force '$(dirname "$to")' | Out-Null\"" >/dev/null \
 		|| { echo "--with $file: no folder for it"; exit 1; }
 	"${SCP[@]}" "$file" "$HOST:$to" || { echo "--with $file: not copied"; exit 1; }
 done
@@ -116,27 +150,27 @@ rps -Mode import -TimeoutMin 20 || { echo "import failed"; exit 1; }
 
 # 2. The run, in the logged-on session.
 # (cmd: the parentheses keep the mkdir out of the if's body.)
-"${SSH[@]}" "(if exist $DIR rmdir /s /q $DIR) & mkdir $DIR" >/dev/null || { echo "no run folder"; exit 1; }
+rsh "(if exist $DIR rmdir /s /q $DIR) & mkdir $DIR" >/dev/null || { echo "no run folder"; exit 1; }
 # The run folder (its out and its APPDATA) goes however this ends (828).
-trap '"${SSH[@]}" "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
+trap 'rsh "if exist $DIR rmdir /s /q $DIR" >/dev/null 2>&1; release; rm -rf "$TMP"' EXIT
 "${SCP[@]}" "$TMP/args.txt" "$HOST:$(fwd "$DIR")/args.txt" || exit 1
 task="psyk_shot_$NAME"
-"${SSH[@]}" "schtasks /create /f /tn $task /sc once /st 00:00 /it /rl limited /tr \"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $helper -Mode run -Dir $DIR -TimeoutMin $TIMEOUT\" >nul && schtasks /run /tn $task >nul" \
+rsh "schtasks /create /f /tn $task /sc once /st 00:00 /it /rl limited /tr \"powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File $helper -Root $ROOT -Runs $RUNS -Mode run -Dir $DIR -TimeoutMin $TIMEOUT -Repeat $REPEAT\" >nul && schtasks /run /tn $task >nul" \
 	|| { echo "no task (is anyone logged on?)"; exit 1; }
 done=""
 for _ in $(seq 1 $(((TIMEOUT + 3) * 6))); do
-	done="$("${SSH[@]}" "if exist $DIR\\done.txt type $DIR\\done.txt" 2>/dev/null | tr -d '\r')"
+	done="$(rsh "if exist $DIR\\done.txt type $DIR\\done.txt" 2>/dev/null | tr -d '\r')"
 	[ -n "$done" ] && break
 	sleep 10
 done
-"${SSH[@]}" "schtasks /delete /f /tn $task" >/dev/null 2>&1
+rsh "schtasks /delete /f /tn $task" >/dev/null 2>&1
 echo "run: ${done:-no answer (no interactive session?)}"
 
 # 3. The frames back, the laptop's copy gone.
 mkdir -p "$REVIEW"
 "${SCP[@]}" -r "$HOST:$(fwd "$DIR")/out/." "$REVIEW/" 2>/dev/null
 "${SCP[@]}" "$HOST:$(fwd "$DIR")/godot.log" "$REVIEW/godot.log" 2>/dev/null
-"${SSH[@]}" "rmdir /s /q $DIR" >/dev/null 2>&1
-"${SSH[@]}" "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
+rsh "rmdir /s /q $DIR" >/dev/null 2>&1
+rsh "if exist $DIR (echo left) else (echo gone)" 2>/dev/null | grep -q gone || echo "warning: $DIR still on the laptop"
 ls "$REVIEW"
 case "$done" in "exit 0") exit 0 ;; *) exit 1 ;; esac
