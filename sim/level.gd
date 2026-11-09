@@ -64,9 +64,7 @@ const RETIRED: Dictionary[String, Array] = {"barrow_lair": ["barrow_deep", Vecto
 ## reward), and the lands' makers lay no mouth for it (make_forest's LAIRS,
 ## make_foothills' GREY_DEN: no link, footprint, pad, bones or lane). Its
 ## package's landing takes it out of here and lays its land again.
-const SHELVED: Dictionary[String, Array] = {
-	"boar_lair": ["forest", Vector2i(124, 175)],  # The boar king's (780 amended (12)).
-}
+const SHELVED: Dictionary[String, Array] = {}
 ## Levels made again on a new grid (decision 756: layout A's step 3, the
 ## hills rebuilt bigger), each with the decision that remade it: a server's
 ## state saved on the old grid is moved once, in code (Main._move_off_remade):
