@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 - Towns: the medicine man buys a bear's claw, feathers, flint and bear's grease by Give, and makes them into a bear's-claw charm, which gathers a faint light round you that grows the longer you wear it, and a bear's-grease draught that leaves you hard to shove and hard to stop for a while, both sold from his shelf (821 amended (2)).
 
+- In the forest, a boar's neck bends whole now when it lowers its head to graze, charge or fall, where before it split open (319 amended (3)).
 - In the wilds, you can wade the stream across the middle almost anywhere along it, where before it was deep and the bridge was the only way over (505 amended (6)).
 - Towns: when the town's purse is empty, a keeper's window still says Sell for a trophy and shows what they'll owe you for it, where before it said Donate as if you'd get nothing (802 amended (9)).
 - In the Mughouse, candles burn on each of the common room's tables and on the bar, flickering warm, and the room is a little brighter, where before it was too dark (811 amended (4)).

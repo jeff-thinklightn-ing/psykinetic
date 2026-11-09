@@ -5912,6 +5912,24 @@ images). Before and after: C:/dev/review/sheep/wool_compare.png. The rest of the
 line (7,7 and 8,0's bone white, 3,0, ground.sand) is listed for environment's tonemap trial, not
 repainted.
 
+319 amended (3) (release's label; the coordinator's option A after pc-character's skin check for
+the boar king): the Quaternius Pig's bodies get a neck. Every vertex of creature.boar sat rigid on
+one bone and the Neck bone held none, so a head move tore the Body-Head seam open: worst edge
+change in Idle_Eating 50 cm (the boar king, art-kit's 1.55x boar on the same rig, 56 cm), Death
+35, Headbutt 22. tools/blender/neck_blend.py (Blender, weights only, saves the .blend; export after)
+blends across the seam: a Body or Head vertex within a width (0.35 of the body's height, 0.30 m on
+the boar; 0.13, 0.2 and 0.4 tore more) of the other side's seam vertices goes Body to Neck to Head by
+its distance, Neck alone at the seam; and from 0.3 to 0.6 of the head's length in front of Head's
+pivot it fades (smoothstep) to Head alone, so the snout and tusks ride rigid (none past 0.6 has any
+other bone) and the Body throat vertices under the jaw go with the jaw (a hard cut there tore 7x).
+Measured at boar scale, the worst edge after: Idle_Eating 23 cm, Death 15, Headbutt 10 to 11, and
+animation's poses for the king's clips (charge_tell's neck 60 and head 45 degrees down: 31 to 20;
+hook's: 30 to 14). Applied to creature.boar (live now) and creature.boar_king (off with its
+package); verts, bones and clips unchanged. Stills, stock and blended, grazing:
+C:/dev/review/boar_neck. The Pig's leg seams are left as they were (Run's hind leg tears 15.5 cm);
+a later pass, and creature.pig (tools/pig_from_boar.py) takes the neck when it is next made from
+the boar.
+
 ## 313. Raids are real monsters in a played zone, handed back to maps when it sleeps
 
 maps moves raid groups on the world tick (WorldRaids). When a group's
