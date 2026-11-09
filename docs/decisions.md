@@ -43100,6 +43100,25 @@ clear of Robber6's lunge.]" five times in one turn). companion_test _test_break_
 with a foe beside them, broken once, GUARD, not resumed) and _test_invented_item. Server only,
 protocol unchanged, no new class_name.
 
+803 amended (9): she speaks of players only from what she knows, and only when spoken to (2026-11-09,
+release's label; the coordinator's approval; voice's words). Jeff's chat on v0.1.208: asked where
+another player was, his companion said "He's safe." (she could not know it, and guessed a pronoun);
+she cut in, unasked, with "I'd like to go fishing with you" while he talked with another player's
+companion. (1) What she knows: her prompt's now gains PLAYERS_UNSEEN after others_here (voice's: "You
+know nothing of anyone you can't see now: not where they are, nor how they are. If asked, say plainly
+that you don't know. Call others by their names, never he or she."; no word of the game in it).
+Companion.player_names (Main: every record's name) less her own and those she sees (friends_seen)
+are players_unseen. spoken() drops a sentence naming one of them with a VOUCHES phrase (safe, fine,
+not far, nearby, on the way, coming, waiting, resting, at home, in town...): "Bo is not far." goes,
+"The well is not far." and "Wolves are near." stay (the coordinator's watch: only a player as its
+subject). (2) No guessed pronoun: with an unseen player named in the last words she heard
+(asked_about_player), a sentence led by he, she, him, his or her goes ("He's safe."). Each drop is
+"dropped", its note "spoke of <name>, a player not seen", for playtest to count. (3) Not hers to cut
+into: a line naming another, not her, was already not hers to answer (addressed_to "other",
+VOICE_FOR_OTHER); now her quiet moment (her wants and notices of her own) also waits player_quiet_s
+after anyone else spoke within her hearing (_others_spoke_tick), as it waited after her player.
+companion_test _test_players_unseen. Server only, protocol unchanged, no new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

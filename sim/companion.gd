@@ -465,6 +465,14 @@ const QUIET_DEFAULTS := {"first_s": [60, 120], "gap_s": [150, 300], "max_gap_s":
 ## said her name, or no one else near enough to hear ("certain"); others
 ## near ("maybe"). Then VOICE_ASKED, the stances.
 const VOICE_FOR_HER := """%s has just spoken to you%s: it was meant for you. Answer out loud in words first, never with just "...", even if only to say you don't know."""
+## 803 amended (9) (Jeff on v0.1.208: asked where another player was, she
+## said "He's safe."): of a player she cannot see she knows nothing.
+const PLAYERS_UNSEEN := "You know nothing of anyone you can't see now: not where they are, nor how they are. If asked, say plainly that you don't know. Call others by their names, never he or she."
+## A sentence vouching for someone's whereabouts or state (803 amended (9)):
+## dropped when its subject is a player she cannot see.
+const VOUCHES := "(?i)\\b(safe|fine|all right|alright|unharmed|unhurt|not far|nearby|close by|close|near|around|on (his|her|their|the) way|coming|back soon|waiting|resting|asleep|sleeping|at home|in town|busy|out there|just ahead|behind us)\\b"
+## A sentence led by a guessed pronoun (803 amended (9)).
+const PRONOUN_LED := "(?i)^(he|she|him|his|her)\\b"
 const VOICE_FOR_OTHER := """%s has just spoken to %s, not to you: answer with just: ..."""
 const VOICE_OPEN := """%s has just spoken, naming no one, with %s near enough to hear: it is open to anyone. Answer out loud in words if you have something useful to say; if not, answer with just: ..."""
 const VOICE_NAMED := """%s has just said your name: it was meant for you. Answer out loud in words."""
@@ -731,6 +739,9 @@ var _last_speech_tick := -1000
 var _saying_voice := false
 ## The item kind spoken() last dropped a sentence for (invented_item), for the log.
 var _invented := ""
+## The player the last dropped sentence vouched for or guessed a pronoun of
+## (803 amended (9)), for the dropped line's note; "" none.
+var _vouched := ""
 ## Decision 803 amended (step 4): her quiet moments. The tick the next may
 ## come; how many times longer the gap is after quiet moments she let pass
 ## ("..."); the ticks of this hour's; the last focus; the focus told her
@@ -886,6 +897,9 @@ static var tends_unasked := true
 ## town; unset, never.
 var on_road := Callable()
 var in_town := Callable()
+## Every player's name the server knows (Main's records; 803 amended (9)):
+## of one not in her sight she knows nothing. Unset, none.
+var player_names := Callable()
 ## Main's (738 amended, on 739): whether a cell lies in a camp a player
 ## holds (occupied and cleared, so it does not refill); unset, never.
 var held_camp := Callable()
@@ -3017,6 +3031,51 @@ func _watch() -> void:
 	_tend_notice()
 
 
+## The players the server knows (player_names) not in her sight now and not
+## her own (803 amended (9)).
+func players_unseen() -> Array[String]:
+	var out: Array[String] = []
+	if not player_names.is_valid():
+		return out
+	var seen: Dictionary[String, bool] = {keeper_name(): true}
+	for entity in friends_seen():
+		if entity is Player:
+			seen[_name_of(entity)] = true
+	for each: Variant in player_names.call():
+		if not seen.has(str(each)) and not str(each).is_empty():
+			out.append(str(each))
+	return out
+
+
+## The unseen player (of [param unseen]) named in the last words she heard
+## lately (803 amended (9)): "where is Bo?" makes a he or she in her answer
+## Bo. "" none.
+func asked_about_player(unseen: Array[String]) -> String:
+	if _heard.is_empty() or World.tick - int(_heard.back()["tick"]) > OTHERS_SAID_TICKS:
+		return ""
+	for who in unseen:
+		if _named(str(_heard.back()["text"]), who):
+			return who
+	return ""
+
+
+## The player [param sentence] wrongly speaks of (803 amended (9)): one of
+## [param unseen] named with a VOUCHES phrase ("Bo is safe", "Bo's not
+## far"), or, with [param asked_of] just asked about, a sentence led by he
+## or she (a guessed pronoun: "He's safe."). "" if none: "Wolves are
+## near." and "The well is not far." stay.
+static func vouched_player(sentence: String, unseen: Array[String], asked_of: String) -> String:
+	var line := sentence.strip_edges()
+	if not asked_of.is_empty() and RegEx.create_from_string(PRONOUN_LED).search(line) != null:
+		return asked_of
+	if RegEx.create_from_string(VOUCHES).search(line) == null:
+		return ""
+	for who in unseen:
+		if _named(line, who):
+			return who
+	return ""
+
+
 ## The item kinds by their names' last word (803 amended (8)): "iron key"
 ## a key, "fishing rod" a rod; three letters at least.
 static var _item_nouns: Dictionary[String, bool] = {}
@@ -3166,8 +3225,8 @@ func _quiet_moment() -> void:
 		return
 	if _on_errand() or current_intent in [Intent.REST, Intent.SLEEP] or order in ["rest", "watch"] \
 			or _hostile_within(SIGHT_RANGE) or not heard_by_anyone() or mind.busy("voice") \
-			or World.tick - _keeper_spoke_tick < int(rules.get("player_quiet_s", 30)) * World.TICK_RATE:
-		return  # Not now: looked at again next tick.
+			or World.tick - _keeper_spoke_tick < int(rules.get("player_quiet_s", 30)) * World.TICK_RATE 			or World.tick - _others_spoke_tick() < int(rules.get("player_quiet_s", 30)) * World.TICK_RATE:
+		return  # Not now: looked at again next tick (others talking near her too: not hers to cut into, 803 amended (9)).
 	var hour := 3600 * World.TICK_RATE
 	_quiet_ticks = _quiet_ticks.filter(func(at: int) -> bool: return World.tick - at < hour)
 	if _quiet_ticks.size() >= int(rules.get("per_hour", 12)):
@@ -3184,6 +3243,17 @@ func _quiet_moment() -> void:
 	_quiet_focus = focus_text(focus)
 	_ask_voice("%s: %s" % [QUIET_TRIGGER, focus["key"]])
 	_quiet_focus = ""  # Told on that ask, or not asked at all: never carried to another.
+
+
+## When someone other than her player last spoke within her hearing (any
+## line she overheard; 803 amended (9): her quiet word waits while an
+## exchange not hers goes on).
+func _others_spoke_tick() -> int:
+	var keeper_word := keeper_name()
+	for i in range(_heard.size() - 1, -1, -1):
+		if str(_heard[i].get("speaker", keeper_word)) != keeper_word:
+			return int(_heard[i]["tick"])
+	return -100000
 
 
 ## Her wants' rules (803 amended (4)): companion_traits.json "wants".
@@ -4145,7 +4215,7 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 	var who := keeper_name()
 	var instructed := CARD_INSTRUCTED % [who, who] if not standing_instruction().is_empty() else ""
 	_sky_asked = asks_about_sky(heard)
-	var now: Array[String] = [voice_situation(), others_here()]
+	var now: Array[String] = [voice_situation(), others_here(), PLAYERS_UNSEEN]
 	if asks_about_items(heard):
 		now.append(carried())
 	# In the last turn, after the question, as a quiet moment's focus is (pair 5:
@@ -5416,7 +5486,7 @@ func _take_result(result: Dictionary) -> void:
 	elif line.is_empty():
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = raw_line
-		entry["note"] = "nothing left once cleaned: said lately, narration, her own things, or not hers to say" if _invented.is_empty() 				else "named a %s that is not there" % _invented
+		entry["note"] = ("named a %s that is not there" % _invented) if not _invented.is_empty() 				else ("spoke of %s, a player not seen" % _vouched) if not _vouched.is_empty() 				else "nothing left once cleaned: said lately, narration, her own things, or not hers to say"
 	elif not spoken_to and _plain(line).split(" ", false).size() < FRAGMENT_WORDS and not line.ends_with("!"):
 		entry["outcome"] = "dropped"
 		entry["say_dropped"] = line
@@ -5565,7 +5635,10 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 	var kept: Array[String] = []
 	var to := ""
 	_invented = ""
+	_vouched = ""
 	var there := nouns_there()
+	var unseen := players_unseen()
+	var asked_of := asked_about_player(unseen)
 	for raw in _sentences(text):
 		var sentence := raw.strip_edges()
 		var plain := _plain(sentence)
@@ -5603,6 +5676,10 @@ func spoken(line: String, items_asked := false, asked := false) -> String:
 		if not invented.is_empty():
 			_invented = invented
 			continue  # A thing placed there that is not (803 amended (8)).
+		var vouched := vouched_player(sentence, unseen, asked_of)
+		if not vouched.is_empty():
+			_vouched = vouched
+			continue  # A player she cannot see, placed or vouched for, or a guessed he or she (803 amended (9)).
 		plain = _plain(sentence)
 		if plain.is_empty() or repeated.has(plain):
 			continue

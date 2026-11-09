@@ -100,6 +100,7 @@ func _ready() -> void:
 	_test_tomb()
 	_test_break_hold()
 	_test_invented_item()
+	_test_players_unseen()
 	_test_companion_verb()
 	_test_fishing()
 	_test_reed_pond_cells()
@@ -1916,6 +1917,42 @@ func _test_break_hold() -> void:
 	owner.hp = hp_was
 	_kill_monsters()
 	_settle(pet)
+
+
+## Of a player she cannot see she knows nothing (803 amended (9); Jeff on
+## v0.1.208: asked where another player was, she said "He's safe."), names
+## them, never he or she, and her quiet word waits while others talk.
+func _test_players_unseen() -> void:
+	print("
+== she speaks of players only from what she sees, by name (803 amended (9)) ==")
+	var pet := _companion()
+	var me := pet.keeper_name()
+	var names_was := pet.player_names
+	pet.player_names = func() -> Array: return [me, "Bo"]
+	var unseen := pet.players_unseen()
+	_check(unseen == ["Bo"], "the players she cannot see: Bo, never her own (%s)" % [unseen])
+	_check(Companion.vouched_player("He's safe.", unseen, "Bo") == "Bo"
+			and Companion.vouched_player("She is with the others.", unseen, "Bo") == "Bo",
+		"asked of Bo: a guessed he or she goes")
+	_check(Companion.vouched_player("Bo is not far.", unseen, "") == "Bo"
+			and Companion.vouched_player("Bo's safe, I'm sure of it.", unseen, "") == "Bo",
+		"Bo placed or vouched for, unseen: it goes")
+	_check(Companion.vouched_player("The well is not far.", unseen, "Bo").is_empty()
+			and Companion.vouched_player("Wolves are near.", unseen, "Bo").is_empty()
+			and Companion.vouched_player("I don't know where Bo is.", unseen, "Bo").is_empty(),
+		"a place or a beast near, or not knowing: kept")
+	_check(Companion.PLAYERS_UNSEEN in pet.voice_prompt("test"), "her prompt says she knows nothing of a player she cannot see")
+	var heard_was := pet._heard.duplicate(true)
+	var said_was := pet._said.duplicate()
+	pet._heard.append({"text": "Where is Bo?", "tick": World.tick, "speaker": me})
+	_check(pet.asked_about_player(unseen) == "Bo", "her player just asked of Bo")
+	var line := pet.spoken("He's safe. I can't say where Bo is.", false, true)
+	_check(line == "I can't say where Bo is." and pet._vouched == "Bo", "her answer: the guess goes, the not knowing is said (%s)" % line)
+	pet._heard.append({"text": "Hello there.", "tick": World.tick, "speaker": "Bo's Rhea"})
+	_check(pet._others_spoke_tick() == World.tick, "someone else just spoke near her: her quiet word waits")
+	pet._heard = heard_was
+	pet._said = said_was
+	pet.player_names = names_was
 
 
 ## No invented things (803 amended (8); playtest's barrow niche, "The niche
