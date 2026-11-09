@@ -141,6 +141,10 @@ var _other_frame := -1
 var _burst := 0
 ## Practice held in a fight: art -> {amount, last} (HOLD_SECONDS).
 var held: Dictionary = {}
+## The floats and the banner drawn the last time (tests): the canvas keeps
+## its last drawing until the next, so one more is asked for after the last
+## goes (Jeff on v0.1.208: deed texts left faint on the screen till a zone change).
+var drawn := 0
 
 
 func _init() -> void:
@@ -356,6 +360,7 @@ func _process(_delta: float) -> void:
 	_flush_need()
 	var now := _now()
 	var in_fight := _fighting()  # Asked each frame, so a fall in hit points is seen.
+	var showing := not floats.is_empty() or not _banner.is_empty() or drawn > 0
 	for art: String in held.keys():
 		if not in_fight or now - float(held[art]["last"]) >= HOLD_SECONDS:
 			var amount := float(held[art]["amount"])
@@ -371,12 +376,15 @@ func _process(_delta: float) -> void:
 	if _banner.is_empty() and not banners.is_empty() and not in_fight:
 		_banner = banners.pop_front()
 		_banner["born"] = now
-	if not floats.is_empty() or not _banner.is_empty():
+	# Drawn again while anything shows, and once more after the last of it
+	# goes, so its last faint frame never stays on the canvas.
+	if showing or not floats.is_empty() or not _banner.is_empty():
 		queue_redraw()
 
 
 func _draw() -> void:
 	var now := _now()
+	drawn = 0
 	var font := UiTheme.font("serif_bold")
 	var outline := UiTheme.color("outline")
 	var px := float(tile_px.call()) if tile_px.is_valid() else SpeechBubbles.REFERENCE_TILE_PX
@@ -399,6 +407,7 @@ func _draw() -> void:
 		draw_string_outline(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, UiTheme.constant("outline") * 2,
 			Color(outline, outline.a * alpha))
 		draw_string(font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(color, alpha))
+		drawn += 1
 	if not _banner.is_empty():
 		var age := now - float(_banner["born"])
 		var alpha := clampf(minf(age / BANNER_FADE, (BANNER_SECONDS - age) / BANNER_FADE), 0.0, 1.0)
@@ -411,3 +420,4 @@ func _draw() -> void:
 		draw_string_outline(big_font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, UiTheme.constant("outline") * 3,
 			Color(outline, outline.a * alpha))
 		draw_string(big_font, at, text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size, Color(color, alpha))
+		drawn += 1

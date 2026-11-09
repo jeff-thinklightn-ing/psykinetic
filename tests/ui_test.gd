@@ -2628,6 +2628,25 @@ func _test_gains() -> void:
 	_check(slots == [Gains.NEED_CUE] and Gains.text_of("safety", 1, "Wren") == "Wren (Shelter +1)" and Gains.text_of("adventure", 1, "Wren") == "Wren (Venture +1)",
 		"three needs in one frame: one need cue; the needs' words (%s)" % [slots])
 	clear.call()
+	# A deed's float and banner run to their end (Jeff on v0.1.208: deed texts left
+	# faint on the screen till a zone change): once both are over nothing is drawn.
+	gains.fighting = Callable()
+	gains.shown = "all"
+	gains.add({"track": "deed", "amount": 1, "of": "a fight won", "big": true, "banner": "A test deed", "at": Vector2i(10, 10)})
+	await get_tree().process_frame
+	await get_tree().process_frame
+	var drawn_live := gains.drawn
+	var banner_live := gains.banner_shown()
+	for live: Dictionary in gains.floats:
+		live["born"] = float(live["born"]) - Gains.FLOAT_SECONDS - 1.0
+	if not gains._banner.is_empty():
+		gains._banner["born"] = float(gains._banner["born"]) - Gains.BANNER_SECONDS - 1.0
+	for i in 3:
+		await get_tree().process_frame
+	_check(drawn_live >= 1 and not banner_live.is_empty() and gains.floats.is_empty() and gains.banner_shown().is_empty() and gains.drawn == 0,
+		"a deed's float and banner run to their end, then nothing is left drawn (%d drawn live, %s; %d after)" % [drawn_live, banner_live, gains.drawn])
+	gains.fighting = fight_was
+	clear.call()
 	# Her bond in the same frame: the bond's gain alone (sound: the bigger news; two takes clash).
 	gains.add({"track": "leisure", "amount": 1, "of": "Wren"})
 	gains.add({"track": "bond", "amount": 1, "of": "Wren"})
