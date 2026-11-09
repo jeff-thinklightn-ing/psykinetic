@@ -233,6 +233,7 @@ func _test_every_level() -> void:
 	_test_world_plane()
 	_test_safe_paths()
 	_test_fill_hills()
+	_test_wilds_on_foot()
 	_test_hearth()
 	_test_fill_hills_sights()
 	_test_relaid()
@@ -1125,6 +1126,42 @@ func _test_fill_hills() -> void:
 	_main._warm_rests()
 	_check(World.buff(player, "heal") == 0.0, "a few cells off: not warmed")
 	player.buffs = {}
+	_main.load_map("test_room")
+
+
+## The wilds on foot ("wilds basics: river", the ford): the main stream waded,
+## its bridge over a deep channel, the river's wide reach deep; every place a
+## walker can reach from the level's centre (its cell or one beside it, a well's
+## or a store's being solid), the walk over the floor and the fords, never
+## through a wall or a closed door left shut.
+func _test_wilds_on_foot() -> void:
+	print("
+== the wilds on foot: every place reached from the centre, the stream waded ==")
+	_check(_main.load_map("wilds"), "the wilds load")
+	var level := Level.load_level("wilds")
+	var start: Vector2i = level["centre"]
+	var reached := {start: true}
+	var queue: Array[Vector2i] = [start]
+	while not queue.is_empty():
+		var at: Vector2i = queue.pop_back()
+		for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var next := at + step
+			if reached.has(next) or not World.is_walkable(next) or World.edge_blocks(at, step, true):
+				continue
+			reached[next] = true
+			queue.append(next)
+	var cut_off: Array[String] = []
+	for key: String in level["places"]:
+		var cell: Vector2i = level["places"][key]["cell"]
+		var near := false
+		for dy in range(-1, 2):
+			for dx in range(-1, 2):
+				near = near or reached.has(cell + Vector2i(dx, dy))
+		if not near:
+			cut_off.append(key)
+	var fords: Array = level["terrain"].get("fords", [])
+	_check(World.is_walkable(start) and cut_off.is_empty() and fords.size() > 700,
+		"from the centre %s, every place reached on foot (%d cells walked; not: %s), the stream waded (%d ford cells)" % [start, reached.size(), cut_off, fords.size()])
 	_main.load_map("test_room")
 
 

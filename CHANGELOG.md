@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the wilds, you can wade the stream across the middle almost anywhere along it, where before it was deep and the bridge was the only way over (505 amended (6)).
 - Towns: when the town's purse is empty, a keeper's window still says Sell for a trophy and shows what they'll owe you for it, where before it said Donate as if you'd get nothing (802 amended (9)).
 - In the Mughouse, candles burn on each of the common room's tables and on the bar, flickering warm, and the room is a little brighter, where before it was too dark (811 amended (4)).
 - Goblin sneaks come in threes now, in the dwarven halls under the castle, in the guardroom with the most ways in, and at a tunnel junction in Hollowfell: one comes at you while the others slip round, and whichever you're not facing darts in to stab and back out; put a wall at your back to blunt them, and when one falls the rest press harder until the last one runs (824).

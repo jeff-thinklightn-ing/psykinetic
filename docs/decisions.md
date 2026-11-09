@@ -15687,6 +15687,19 @@ top on the deck and at each end, and no step over 0.1 m. Client only, protocol u
 class_name; the bullet is voice's. Its other half, the wilds' stream too deep to wade, is maps'
 (the stream's cells as ford, 505's).
 
+505 amended (6) (2026-11-08, release's label; physics' ask, the coordinator's order and ruling;
+package "wilds basics: river"): the wilds' main stream waded. Its 770-cell body (the one water body of
+500 cells or more, flood-filled over "water") becomes ford in the layout, 764 cells, but the bridge's 6
+(x 95..97, y 130..131), so a bridge still spans water. The coordinator: the bridge crosses a channel,
+so the stream's cells three rows up and three down from it (y 127..129 and 132..134, x 86..105) go back
+to deep water, 21 cells: 743 of the stream ford, 745 with the wilds' two fords from before. The river's 106-cell wide reach in the north stays deep (the coordinator, on
+companions' fishing rule, 805 amended (8): it fishes as "the river", 3 wide with no bridge beside it), as
+do the Reed Pond, the small pools and the wells. Made by a script over the layout's cells and their
+joins (ford beside ford joined, a ford beside deep water parted); the relief and level.json are
+untouched. level_test _test_wilds_on_foot: from the wilds' centre, every place (its cell or one beside
+it) reached over the floor and fords, no wall or shut door crossed; over 700 ford cells. level_test,
+relief_test, view_land_test and view_test pass. The bullet is voice's. Level data; protocol unchanged.
+
 ## 506. The level editor's properties panel
 
 level.json had grown keys only a text editor reached (links' targets,
