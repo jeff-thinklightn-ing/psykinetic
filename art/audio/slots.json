@@ -1904,6 +1904,16 @@
 			"volume_db": -10.0,
 			"uses": "the crackle of a torch or brazier, from where it burns; Ambience, from the nearest torch heard"
 		},
+		"sfx.hearth_catch": {
+			"category": "ambience",
+			"type": "oneshot",
+			"bus": "sfx",
+			"noise": null,
+			"range": 10,
+			"volume_db": -8.0,
+			"uses": "a hearth lit (825, sound's side: the hill cave's fire ring): the fire catching, a soft whoomph, at the ring as it goes lit, before its crackle (amb.campfire); Client3D on World.hearths_changed, a cell new to World.lit_hearths",
+			"fallback": "sfx.forge_whoomph"
+		},
 		"amb.campfire": {
 			"category": "ambience",
 			"type": "loop",

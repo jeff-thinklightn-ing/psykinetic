@@ -295,6 +295,16 @@ static func armour_look(entity: Object) -> String:
 	return str(Items.armour_of(worn).get("look", "")) if worn is String else ""
 
 
+## The cells of [param now] not in [param before] (a zone's burning hearths,
+## World.lit_hearths, as last heard and now): the hearths just lit (825).
+static func newly_lit(before: Array, now: Array) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in now:
+		if not before.has(cell):
+			out.append(cell)
+	return out
+
+
 ## The slot a blow taken on a guard makes: a shield's (Items tag shield)
 ## knock, else a weapon's parry.
 static func block(guard_id: String) -> String:

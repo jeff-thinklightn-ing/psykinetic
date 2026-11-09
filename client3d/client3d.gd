@@ -376,6 +376,11 @@ const FORGE_PIECES := {"bellows": ["building.forge_bellows", "treadle", "sfx.bel
 	"lever": ["building.forge_lever", "handle", "sfx.lever_clank"]}
 const LEVER_DOWN := deg_to_rad(150.0)
 const FORGE_WHOOMPH_SOUND := "sfx.forge_whoomph"
+## A hearth lit (825, sound's side): its catch, at the ring.
+const HEARTH_CATCH_SOUND := "sfx.hearth_catch"
+## After the live zone is built, its hearths' changes this long are what was
+## burning on arrival (the "hearths" message a peer arriving gets), not lit.
+const HEARTH_SETTLE_MSEC := 3000
 ## A dais indoors (580 step 3, terrain's side; the Hall of Fallen Souls):
 ## an edge between two floors exactly one level apart is art-kit's
 ## dais.edge in place of a cliff face, dais.steps where the low cell is a
@@ -6003,6 +6008,11 @@ func swap_room(other: Client3D) -> void:
 		if not World.hearths_changed.is_connected(_on_hearths_changed):
 			World.hearths_changed.connect(_on_hearths_changed)
 		_draw_hearths()
+		if not World.hearths_changed.is_connected(_hear_hearths):
+			World.hearths_changed.connect(_hear_hearths)
+		if World.zone != null:
+			_hearths_heard[World.zone.name] = World.lit_hearths(World.zone.name)
+		_hearths_settle_at = Time.get_ticks_msec() + HEARTH_SETTLE_MSEC
 
 
 ## A held neighbour let go (822): its room and any older ones freed
@@ -7096,6 +7106,11 @@ func _phase_doors() -> void:
 	if not World.hearths_changed.is_connected(_on_hearths_changed):
 		World.hearths_changed.connect(_on_hearths_changed)
 	_draw_hearths()
+	if not World.hearths_changed.is_connected(_hear_hearths):
+		World.hearths_changed.connect(_hear_hearths)
+	if World.zone != null:
+		_hearths_heard[World.zone.name] = World.lit_hearths(World.zone.name)
+	_hearths_settle_at = Time.get_ticks_msec() + HEARTH_SETTLE_MSEC
 	for door in World.get_doors():
 		_doors_due[door.key] = true
 	_show_piles()
@@ -19222,6 +19237,26 @@ const TRACK_HARD: Array[String] = ["stone"]
 ## [x, y, seconds left, facing, ...], [param gone] flat [x, y, ...]; [param
 ## full] sets the level's whole list (a zone joined). Drawn at once if it is
 ## this zone's.
+## Each zone's burning hearths as last heard ({zone: [cell]}, 825).
+var _hearths_heard: Dictionary = {}
+## Till when the live zone's hearth changes are its arrival's (msec).
+var _hearths_settle_at := 0
+
+
+## [param zone_name]'s hearths changed (World.hearths_changed, 825; beside
+## _on_hearths_changed's drawing): a ring
+## of the live zone burning now that wasn't is lit, its catch heard there;
+## one stoked or still burning, gone cold, or burning on arrival, nothing.
+func _hear_hearths(zone_name: String) -> void:
+	var now := World.lit_hearths(zone_name)
+	var before: Variant = _hearths_heard.get(zone_name)
+	_hearths_heard[zone_name] = now
+	if before == null or World.zone == null or zone_name != World.zone.name or Time.get_ticks_msec() < _hearths_settle_at:
+		return
+	for cell: Vector2i in SoundKit.newly_lit(before, now):
+		sfx.play(HEARTH_CATCH_SOUND, _tile_position(cell) + Vector3.UP * 0.4)
+
+
 func _on_tracks_changed(level: String, add: PackedInt32Array, gone: PackedInt32Array, full := false) -> void:
 	var now := Time.get_ticks_msec()
 	if full or not _tracks.has(level):

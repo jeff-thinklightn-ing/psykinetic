@@ -181,6 +181,13 @@ func _test_noises_are_the_sims() -> void:
 			and str(SoundKit.spec("sfx.hill_cat_death").get("fallback", "")) == "sfx.wolf_death"
 			and ["snarl", "pounce", "struck", "death"].all(func(cry: String) -> bool: return SoundKit.takes("sfx.hill_cat_" + cry).size() >= 3),
 			"the hill cat: its snarl, pounce, hurt and death its own, three takes each, its death a wolf's without; on paws")
+	# 825, sound's side: a hearth lit catches, a soft whoomph at the ring;
+	# one stoked (still burning) or gone cold, nothing.
+	_check(SoundKit.newly_lit([Vector2i(3, 4)], [Vector2i(3, 4), Vector2i(7, 2)]) == [Vector2i(7, 2)]
+			and SoundKit.newly_lit([Vector2i(3, 4)], [Vector2i(3, 4)]).is_empty() and SoundKit.newly_lit([Vector2i(3, 4)], []).is_empty()
+			and SoundKit.has("sfx.hearth_catch") and SoundKit.positional("sfx.hearth_catch") and SoundKit.noise("sfx.hearth_catch") == ""
+			and SoundKit.volume_db("sfx.hearth_catch") < SoundKit.volume_db("sfx.forge_whoomph"),
+			"a hearth just lit catches (sfx.hearth_catch, quieter than the forge's, unheard by monsters); stoked or gone cold, nothing")
 	# 790 amended (4), sound's side: Skeech (a sneak) hisses as his ambush's
 	# windup starts, sharp and short, heard behind you, never by monsters.
 	_check(SoundKit.cry("sneak", "ambush") == "sfx.goblin_ambush" and SoundKit.positional("sfx.goblin_ambush")
