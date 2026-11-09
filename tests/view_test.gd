@@ -188,6 +188,7 @@ func _ready() -> void:
 		await _test_indoor_phased_build()
 		await _test_neighbour_swap()
 		await _test_creature_puppets()
+		await _test_boar_king_clips()
 		await _test_creature_down()
 		await _test_creature_tells()
 		_test_piles()
@@ -11525,6 +11526,90 @@ func _test_creature_puppets() -> void:
 	_check(view.die() > 0.0 and rig.playing() == view.clips["death"], "dying plays its death")
 	World.despawn(boar)
 	await _frames(2)
+
+
+## The boar king's own clips (package "the boar king", animation's piece): creature.boar_king's
+## art holds charge_tell, charge, skid, dazed and hook; the charge's telegraph plays charge_tell, a
+## skid its skid, a crash's stun dazed looping till it's over, a heavy wind-up the hook and a lead
+## the plain attack. On a view of its own (his row is enemy-ai's, shelved till its switch-on).
+func _test_boar_king_clips() -> void:
+	print("\n== the boar king's clips: tell, charge, skid, dazed, hook ==")
+	var body := Node3D.new()
+	var pose := Node3D.new()
+	body.add_child(pose)
+	_rig.add_child(body)
+	var art := ArtKit.instance("creature.boar_king")
+	pose.add_child(art)
+	var view := CreatureView.new("creature.boar_king", art, pose)
+	body.add_child(view)
+	var five := ["charge_tell", "charge", "skid", "dazed", "hook"]
+	_check(five.all(func(clip: String) -> bool: return view.clips.has(clip)) and view.clips.has("idle"),
+			"his art holds his five beside the Pig's (%s)" % [view.clips.keys()])
+	var rig := view.rig
+	if rig == null or not five.all(func(clip: String) -> bool: return view.clips.has(clip)):
+		body.queue_free()
+		return
+	_check(absf(rig.length(view.clips["charge_tell"]) - 1.2) < 0.06 and absf(rig.length(view.clips["skid"]) - 1.5) < 0.06
+			and rig.player.get_animation(view.clips["dazed"]).loop_mode == Animation.LOOP_LINEAR,
+			"the tell 1.2 s and the skid 1.5 s (BoarKing's 12 and 15 ticks), dazed looping")
+	view.frame(body, null)
+	_check(view.tell("charge", 1.2, 7) and rig.playing() == view.clips["charge_tell"], "the charge's telegraph plays charge_tell (%s)" % rig.playing())
+	view.tell_over(7, true)
+	view.charge()
+	rig.cancel_strike()
+	view._busy_until = 0
+	view.skid()
+	_check(rig.playing() == view.clips["skid"] and view._charge_until == 0, "a skid plays skid, the charge over (%s)" % rig.playing())
+	view._busy_until = 0
+	view.daze(0.4)
+	view.frame(body, null)
+	var dazed := rig.base_clip()
+	await get_tree().create_timer(0.5).timeout
+	view.frame(body, null)
+	_check(dazed == view.clips["dazed"] and rig.base_clip() == view.clips["idle"],
+			"a crash's stun loops dazed through it, then idle (%s, then %s)" % [dazed, rig.base_clip()])
+	view.wind(0.6)
+	var hooked := rig.playing()
+	view.unwind()
+	view.wind(0.3, true)
+	var led := rig.playing()
+	view.unwind()
+	_check(hooked == view.clips["hook"] and led == view.clips["attack"], "a heavy wind-up hooks, a lead the plain attack (%s, %s)" % [hooked, led])
+	body.queue_free()
+	await _frames(1)
+	# Spawned and drawn by Client3D: his crash's stun (stunned, cause &"crash") holds him dazed through it.
+	var spec := Level._spec_for("monster_boar_king", Level.MONSTER_TYPES)
+	spec["name"] = "ViewBoarKing"
+	var player := _player()
+	var at := player.tile + Vector2i(3, 0) if player != null else Vector2i(9, 4)
+	if World.get_entity_at(at) != null:
+		World.despawn(World.get_entity_at(at))
+	spec["tile"] = at
+	var king := _main._spawn(spec) as Monster
+	var puppet: Node3D = null
+	for i in 30:
+		_rig._process(0.0)
+		puppet = _rig._puppets.get(king.get_instance_id()) if king != null else null
+		if puppet != null and puppet.has_meta("creature_view"):
+			break
+		await get_tree().process_frame
+	if puppet == null or not puppet.has_meta("creature_view"):
+		_check(false, "the boar king drawn (%s, %s)" % [king != null, puppet != null])
+		if king != null:
+			World.despawn(king)
+		return
+	var drawn := puppet.get_meta("creature_view") as CreatureView
+	World._stun_for(king, 25, &"crash")
+	World._stun_for(king, 3)  # The same tick's slide: its cause kept, its end not the daze's.
+	var seen := []
+	for i in 6:
+		await get_tree().create_timer(0.35).timeout
+		_rig._process(0.0)
+		seen.append(drawn.rig.base_clip() if drawn.rig != null else "")
+	_check(king.stun_cause == &"crash" and seen.all(func(clip: String) -> bool: return clip == drawn.clips.get("dazed", "-")),
+			"his crash's stun, drawn: dazed through it (%s)" % [seen])
+	World.despawn(king)
+	await _frames(1)
 
 
 ## An apex beast's tells (780 amended (6)): a telegraph's move plays the slot clip of its name

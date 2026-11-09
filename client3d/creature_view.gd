@@ -58,7 +58,7 @@ const FALLBACKS := {"graze": "idle", "feed": "graze", "trot": "walk", "charge": 
 	"howl": "idle", "sit": "idle", "lie": "idle"}
 ## The slot clips that loop; the rest (attack, hit, death) play once.
 const LOOPED: Array[String] = ["idle", "walk", "trot", "run", "charge", "graze", "feed", "alert", "howl", "sit", "lie",
-	"sleep", "winded"]
+	"sleep", "winded", "dazed"]
 ## A move's tell (780 amended (6): an apex beast's World.telegraph, its "kind" the move): the
 ## slot clip it plays, its contact landing on the telegraph's lands tick; a move not named here
 ## plays the clip of its own name (swipe, slam). Only a slot listing the clip has one.
@@ -94,6 +94,12 @@ var _tell_id := 0
 var _tell_until := 0
 var _charge_until := 0
 var _bolt_until := 0
+## Dazed till (msec), for a view drawn without its monster: a crash's stun (the boar king's charge
+## into the terrain), its slot's dazed looping. With its monster, its stun in ticks says (_dazed).
+var _dazed_until := 0
+## Dazed this frame: its monster's stun, cause &"crash", not yet worn off (in game ticks, so a reel
+## run slower than real time holds it as long), else _dazed_until.
+var _dazed := false
 var _dead := false
 var _head_up := false
 var _last_at := Vector3.INF
@@ -220,7 +226,13 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 		else:
 			_loop("walk", ArtKit.feel("creature_view.teeter_pace", TEETER_PACE))
 		return
+	_dazed = clips.has("dazed") and (now < _dazed_until if monster == null
+			else monster.stun_cause == &"crash" and World.tick + World.tick_alpha < monster._reel_until)
 	if now < _busy_until:
+		return
+	if _dazed:
+		_set_head_up(false)
+		_loop("dazed", 1.0)
 		return
 	var alert := monster.alert if monster != null else Monster.Alert.IDLE
 	var clip := "idle"
@@ -308,7 +320,8 @@ func unwind() -> void:
 ## contact, the blow, lands as the sim's does. A [param lead] (a plain blow told ahead, 338
 ## amended (4)) also coils the body over it (coil).
 func wind(seconds: float, lead := false) -> void:
-	_strike(maxf(seconds, 0.05))
+	# A heavy wind-up (not a lead) plays the slot's hook where it has one: the boar king's tusks.
+	_strike(maxf(seconds, 0.05), "hook" if not lead and clips.has("hook") else "attack")
 	if lead:
 		coil(maxf(seconds, 0.05))
 
@@ -403,6 +416,28 @@ func charge() -> void:
 	tween.tween_property(_pose, "position:x", 0.0, CHARGE_SECONDS * 0.7).set_ease(Tween.EASE_IN_OUT)
 
 
+## A charge run out past its target (cried "skid"; the boar king's, enemy-ai's BoarKing): its slot's
+## skid once, the charge over; none without one (it stands, as before).
+func skid() -> void:
+	if rig == null or _dead or not clips.has("skid"):
+		return
+	_charge_until = 0
+	rig.cancel_strike()
+	_once("skid")
+
+
+## Stunned by a crash for [param seconds] (stunned, cause &"crash": the boar king's charge into the
+## terrain): its slot's dazed looping through it, over any blow's hit; none without one.
+func daze(seconds: float) -> void:
+	if rig == null or _dead or not clips.has("dazed"):
+		return
+	_charge_until = 0
+	_busy_until = 0
+	rig.cancel_strike()
+	# Only ever lengthened: a shorter stun the same tick keeps the crash's cause (a slide's), not its end.
+	_dazed_until = maxi(_dazed_until, Time.get_ticks_msec() + int(maxf(seconds, 0.0) * 1000.0))
+
+
 ## The herd bolting (cried "rout"): run.
 func bolt() -> void:
 	_bolt_until = Time.get_ticks_msec() + int(BOLT_SECONDS * 1000.0)
@@ -413,6 +448,8 @@ func bolt() -> void:
 func hit() -> void:
 	if _dead or _down or (_life != null and _life.weight > 0.0):
 		return
+	if _dazed or Time.get_ticks_msec() < _dazed_until:
+		return  # Dazed wins over a blow for its whole stun (the coordinator): its opening stays shown.
 	if clips.has("hit"):
 		# Not under a blow (it would play unseen, then show held as the blow
 		# fades), nor over one played once.

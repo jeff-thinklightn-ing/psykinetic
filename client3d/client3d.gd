@@ -23505,11 +23505,15 @@ func _bash_taken(puppet: Node3D, target: GridEntity, direction: Vector2i, from: 
 ## Stunned (379 amended) for [param cause]: thrown back off a raised shield (&"guarded"), a person
 ## plays CLIP_RECOIL and a creature its hit, as its drawn blow lands (_swings); the other causes'
 ## stagger as before (_reel_until).
-func _on_stunned(_ticks: int, cause: StringName, id: int) -> void:
-	if cause != &"guarded":
-		return
+func _on_stunned(ticks: int, cause: StringName, id: int) -> void:
 	var puppet: Node3D = _puppets.get(id)
 	if puppet == null:
+		return
+	if cause == &"crash" and puppet.has_meta("creature_view"):
+		# The boar king's charge into the terrain: dazed through the stun (its slot's clip).
+		(puppet.get_meta("creature_view") as CreatureView).daze(ticks * World.TICK_DT)
+		return
+	if cause != &"guarded":
 		return
 	_combat_at[id] = Time.get_ticks_msec()
 	_recoil_frame = Engine.get_process_frames()  # The holder's knock ducks under the boom (sound's side).
@@ -24017,6 +24021,8 @@ func _on_cried(cry: StringName, id: int) -> void:
 			view.bolt()
 		elif cry == &"roar":
 			view.roar()
+		elif cry == &"skid":
+			view.skid()
 	var slot := SoundKit.cry(creature, String(cry))
 	if slot != "":
 		sfx.play(slot, puppet.position + Vector3.UP * 0.8, float(SoundKit.CREATURE_PITCH.get(creature, 1.0)))

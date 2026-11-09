@@ -296,6 +296,8 @@ func _ready() -> void:
 			_melee_audit()
 		"drawbacks":
 			_drawbacks()
+		"boarking":
+			_boarking()
 		"draugr", "draugr_walkback":
 			_draugr()
 		_:
@@ -311,7 +313,7 @@ func _ready() -> void:
 	_player = _main._local_player()
 	for entity in World.monsters():
 		_monster = entity
-	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks"]:
+	if scenario in ["sneak", "sounds", "pack", "sound_hearing", "sound_reel", "raid", "sound_ambience", "sound_music", "sound_combat", "sound_world", "wild", "boar", "drawbacks", "boarking"]:
 		_player.max_hp = 1000000
 		_player.hp = _player.max_hp
 	if scenario in ["sound_hearing", "sound_reel", "sound_ambience"]:
@@ -350,6 +352,14 @@ func _ready() -> void:
 	layer.add_child(_caption)
 	if _main._client3d != null:
 		_main._client3d._zoom_to = _main._client3d.ZOOM_MAX
+	if scenario in ["drawbacks", "boarking"]:
+		# The near low camera, so a blow's gather reads (the coordinator's ask for the reels).
+		if scenario == "drawbacks" and _monster is Animal:
+			(_monster as Animal).raid = "drawbacks"  # A beast closes and bites, as a raider does.
+		Net.set_camera_low(true, false)
+		_main.pack_panel.shown = false
+		if _main._client3d != null:
+			_main._client3d._zoom_to = _main._client3d.LOW_ZOOM_MIN
 	World.ticked.connect(_on_tick)
 
 
@@ -800,12 +810,75 @@ func _drawbacks() -> void:
 		"#.........#",
 		"###########",
 	]
-	var markers := {Vector2i(3, 2): "start", Vector2i(6, 2): "monster_" + _foe}
-	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9}
+	var markers := {Vector2i(3, 2): "start", Vector2i(4, 2): "monster_" + _foe}
+	var config := {"name": "Clip", "zone": "outdoors", "ambient": 0.9, "entities": [{"at": [4, 2], "temperament": "bold"}]}
 	if _foe != "imp":
 		config["legend"] = {"monster_" + _foe: "#6a5f70"}  # A kind with no colour of its own.
 	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
-	_script = [["say", 10, "A %s's blows." % _foe], ["wait", 240, ""]]
+	_script = [["say", 10, "A %s's blows." % _foe], ["brawl", 12, ""], ["wait", 230, ""]]
+
+
+## The boar king's clips (780 amended (16), animation's side): in a walled 30 x 11 hall (indoors,
+## so its walls are stone, not trees round the camera) the player, unhurt for good, steps off his
+## told charge into the open (the tell, the run, the skid), then stands before the east wall and
+## steps off again (the run into the wall, dazed), then stands at his tusks (the hook). The near low
+## camera.
+func _boarking() -> void:
+	var rows: Array[String] = ["#".repeat(30)]
+	for y in 9:
+		rows.append("#" + ".".repeat(28) + "#")
+	rows.append("#".repeat(30))
+	var markers := {Vector2i(20, 5): "start", Vector2i(12, 5): "monster_boar_king"}
+	var config := {"name": "Clip", "ambient": 0.9, "legend": {"monster_boar_king": "#5b4636"},
+		"entities": [{"at": [12, 5], "facing": [1, 0], "temperament": "bold"}]}
+	Level.register(NAME, Level.image_from_rows(Terrain.expand(rows), markers, config), null, config)
+	max_seconds = maxf(max_seconds, 90.0)
+	_script = [["say", 10, "The boar king."], ["boar_fight", 0, ""], ["wait", 30, ""]]
+
+
+## One tick of the boar king's reel; true once it is over (each part runs out after its limit).
+func _boar_step(tick: int) -> bool:
+	var king := _monster
+	if not is_instance_valid(king):
+		return true
+	king.sight_range = 12
+	var move := str(king.get("_move").get("move", "")) if king.get("_move") is Dictionary else ""
+	if _fight_until >= 0 and tick > _fight_until:
+		print("[clip] boarking: part %d ran out at tick %d" % [_part, tick])
+		_next_part(tick, 400)
+		if _part > 3:
+			return true
+	match _part:
+		0:
+			_caption.text = "His charge told: head down, pawing."
+			if move == "charge":
+				_aside = _player.tile + Vector2i(0, 2)
+				_next_part(tick, 300)
+		1:
+			_walk(_aside)
+			if move == "skid":
+				_caption.text = "Stepped aside: he runs past and skids."
+			if move == "" and _player.tile == _aside and king.alert != Monster.Alert.IDLE and _caption.text.begins_with("Stepped"):
+				_next_part(tick, 500)
+		2:
+			if _walk(Vector2i(27, 5)) and move == "charge":
+				_aside = Vector2i(27, 8)
+				_part = 3
+				_fight_until = tick + 300
+			else:
+				_caption.text = "A wall at my back."
+		3:
+			_walk(_aside)
+			if king.stun_cause == &"crash" and king.stunned_until_tick > World.tick:
+				_caption.text = "Into the wall: dazed, wide open."
+				_next_part(tick, 600)
+		4:
+			_walk(_beside_monster())
+			if king.stunned_until_tick <= World.tick:
+				_caption.text = "Beside his tusks: the hook."
+			if tick > _fight_until - 400:
+				return true
+	return false
 
 
 func _draugr() -> void:
@@ -1986,6 +2059,9 @@ func _on_tick(tick: int) -> void:
 		"draugr_fight":
 			if not _draugr_step(tick):
 				return
+		"boar_fight":
+			if not _boar_step(tick):
+				return
 		"walk":
 			if not _walk(_beside_monster() if step[1] is String else step[1]):
 				return
@@ -2133,7 +2209,7 @@ func _log(tick: int) -> void:
 			_player.raised, " stunned" if World.is_stunned(_player) else "", " winding" if not World.winding(_player).is_empty() else "",
 			", ".join(them)])
 		return
-	if scenario == "melee_audit":
+	if scenario in ["melee_audit", "drawbacks", "boarking"]:
 		var side := func(entity: GridEntity) -> String:
 			return "%s at %s hp %d/%d st %d/%d%s%s%s%s" % [entity.name, entity.tile, entity.hp, entity.max_hp, entity.stamina,
 				entity.max_stamina, " stunned" if World.is_stunned(entity) else "", " down" if World.is_down(entity) else "",
@@ -2141,7 +2217,12 @@ func _log(tick: int) -> void:
 		var them := []
 		for entity in World.monsters():
 			them.append(side.call(entity))
-		print("[clip] tick %d: %s; %s" % [tick, side.call(_player), ", ".join(them)])
+		var drawn := ""
+		var puppet: Node3D = _main._client3d._puppets.get(_monster.get_instance_id()) if _main._client3d != null and is_instance_valid(_monster) else null
+		if puppet != null and puppet.has_meta("creature_view"):
+			var view := puppet.get_meta("creature_view") as CreatureView
+			drawn = " drawn %s/%s" % [view.rig.base_clip(), view.rig.playing()] if view.rig != null else ""
+		print("[clip] tick %d: %s; %s%s" % [tick, side.call(_player), ", ".join(them), drawn])
 		return
 	if scenario.begins_with("draugr") and _monster is Draugr:
 		var draugr := _monster as Draugr

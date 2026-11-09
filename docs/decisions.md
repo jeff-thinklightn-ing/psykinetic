@@ -45166,6 +45166,26 @@ them by Sell (camp_traders.buys gains "truffles", 7 at 0.85). The tanner's troph
 king's hide ("tanning", 15) and tusk ("trimming leather", 5). Unreachable till the switch-on: no
 truffle, hide or tusk exists before it. Give's word is Sell, paid or owed (ui's give_word fix).
 economy_test _test_truffles. Server only, data; protocol unchanged; no bullet (the switch-on's).
+780 amended (16), animation's side: the boar king's clips (2026-11-08; the coordinator's approval of
+C:/dev/review/animation/boar_king.md and of its reel; release's label; pc-character's neck weights,
+319 amended (3), first). Five clips keyed on the Quaternius Pig's rig by tools/blender/boar_clips.py
+(poses in the armature's axes over the stock Idle, Charge over the stock Run; the bend on Neck more
+than Head; the trunk turned only from All, the legs with it), beside the stock clips in
+creature.boar_king's .blend and .glb and named in its slot: charge_tell (1.2 s, BoarKing's 12-tick
+tell: head right down, the haunches gathered, the right fore pawing twice in big strokes, a snort's
+toss, leaning into the run; its end on the run's start, TELL_CLIPS), charge (the Run, head low, the
+tusks near level), skid (1.5 s, the 15 ticks he stands: the fore legs braced, the body slewed round
+from the root and back, the head swinging, a shake), dazed (a 1.2 s loop through the crash's 25-tick
+stun: head low and swaying, the fore legs splayed wide, a stagger and a head shake; more open than
+the skid, the coordinator's ask) and hook (0.9 s, contact 0.667: the head dipped and turned to his
+right, then up and across). CreatureView.skid (cried "skid": the skid once, the charge over) and
+daze(seconds) (Client3D._on_stunned, cause &"crash": dazed looping through the stun, held by the
+monster's own stun in game ticks, stun_cause and _reel_until, so a reel run slower than real time
+holds it too; a blow's hit never cuts it short, the coordinator: "dazed must win over hit"); wind
+plays a slot's hook for a wind-up that is not a lead (the plain attack else). tools/clip.gd: the
+"boarking" reel scenario (the near low camera; the drawbacks scenario's staging as shot, lost before
+338 amended (6) landed, back with it). view_test _test_boar_king_clips. Client and art only, protocol
+unchanged, no new class_name, no bullet (off: his row stays shelved till enemy-ai's switch-on).
 
 ## 820. Level.SHELVED: a level held back till its package lands
 
