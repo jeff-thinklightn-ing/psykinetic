@@ -1829,6 +1829,7 @@ func _test_ambush() -> void:
 	_test_heavy_cycle()
 	_test_sneak_pack()
 	_test_boar_king()
+	_test_boar_king_lair()
 	_test_given_strength()
 
 
@@ -6813,6 +6814,118 @@ func _test_boar_king() -> void:
 	_check(sounder.all(func(boar: Animal) -> bool: return boar._burst_until < 0), "but not at a foe under a third of their hp")
 	DayNight.reset()
 	Monster.idling = true
+
+
+## The boar king's lair and land (780 amended (16), the switch-on): his den
+## in the open boar_lair, his door to the forest, roaming grounds off its
+## pads; laid with his sounder about him; out with it following; his sounder
+## cleared, beaten back (apex_beaten, once), home with nobody.
+func _test_boar_king_lair() -> void:
+	print("
+== the boar king's lair: open, his den and doors, his sounder laid with him and following, beaten back by clearing it ==")
+	Apex.clear()
+	var real_row: Dictionary = Monster.kinds()["boar_king"]["lair"]
+	var real := Apex._places_of("boar_king", real_row)
+	var roam: Array = real.get("roam", [])
+	print("  his places: den %s, lair door %s, land door %s, %d roaming grounds" % [real.get("den"), real.get("lair_door"), real.get("land_door"), roam.size()])
+	_check(Level.playable("boar_lair") and Apex.rows().has("boar_king") and Apex.holds_marker({"spawn": 0, "kind": "boar_king"}, "boar_lair"),
+		"the boar's lair open (out of Level.SHELVED): Apex holds the boar king, his marker in it his den")
+	_check(real.get("den") == Vector2i(14, 5) and real.get("lair_door") is Vector2i and real.get("land_door") is Vector2i and roam.size() > 20
+			and roam.all(func(cell: Vector2i) -> bool: return World.distance(cell, real["land_door"]) <= int(real_row["range"]) + 1),
+		"his den in the lair, its door and the forest's, and %d roaming grounds within his range" % roam.size())
+	var land_rows: Array[String] = ["#".repeat(40)]
+	for y in 8:
+		land_rows.append("#" + ".".repeat(38) + "#")
+	land_rows.append("#".repeat(40))
+	_build(land_rows, {}, {}, "bk_land")
+	World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+		var entity := EntityFactory.build(spec)
+		_room.add_child(entity)
+		if not World.spawn(entity, spec["tile"]):
+			entity.free()
+			return null
+		return entity
+	var land := World.zone
+	World.zones[land.name] = land
+	var lair := World.add_zone("bk_lair")
+	World.enter(lair)
+	var lair_rows: Array[String] = ["#".repeat(20)]
+	for y in 8:
+		lair_rows.append("#" + ".".repeat(18) + "#")
+	lair_rows.append("#".repeat(20))
+	World.load_terrain(Terrain.parse(Terrain.expand(lair_rows)))
+	World.enter(land)
+	var kinds := Monster.kinds()
+	var row_was: Dictionary = kinds["boar_king"]["lair"]
+	var row: Dictionary = row_was.duplicate(true)
+	row["zone"] = "bk_lair"
+	row["land"] = ["bk_land"]
+	kinds["boar_king"]["lair"] = row
+	Apex.clear()
+	World.apexes.clear()
+	Apex._places["boar_king"] = {"den": Vector2i(14, 4), "lair_door": Vector2i(2, 4), "land_door": Vector2i(3, 4),
+			"roam": [Vector2i(30, 4)] as Array[Vector2i]}
+	DayNight.set_hour(2.0)  # By night too: boars keep no hours.
+	var idling_was := Monster.idling
+	Monster.idling = true
+	var beaten: Array = []
+	var on_beaten := func(kind: String, _body: GridEntity, at: Vector2i) -> void: beaten.append([kind, at])
+	World.apex_beaten.connect(on_beaten)
+	var keeper := EntityFactory.build(SPECS["P"].merged({"name": "WallowKeeper"})) as Player
+	_room.add_child(keeper)
+	World.enter(lair)
+	World.spawn(keeper, Vector2i(2, 7))
+	World.enter(land)
+	Apex._check("boar_king", row)
+	var king := Apex.body_of("boar_king")
+	var sounder: Array = Apex._escorts.get("boar_king", [])
+	_check(king is BoarKing and king.zone == "bk_lair" and Apex.living_escort("boar_king") == 3
+			and sounder.all(func(b: Animal) -> bool: return b.escort_lead == king and b.zone == "bk_lair" and World.distance(b.tile, king.tile) <= 3 and Apex.is_body(b)),
+		"in his lair: laid at his den with his three boars about him, none ever saved")
+	World.enter(lair)
+	World.despawn(keeper)
+	World.enter(land)
+	var walker := EntityFactory.build(SPECS["P"].merged({"name": "Forager"})) as Player
+	_room.add_child(walker)
+	World.spawn(walker, Vector2i(37, 8))
+	var rec := Apex.record("boar_king")
+	rec["attacked"] = World.steps - Apex._steps(row, "venture_after_s", 2700.0)
+	Apex._check("boar_king", row)
+	_check(rec["state"] == "out", "left alone his while, by night as by day, he goes out (%s)" % rec["state"])
+	Apex._check("boar_king", row)
+	king = Apex.body_of("boar_king")
+	sounder = Apex._escorts.get("boar_king", [])
+	_check(king != null and king.zone == "bk_land" and Apex.living_escort("boar_king") == 3, "out of his door in his land, his sounder with him")
+	for i in 150:
+		World.step()
+	var far := 0
+	for b: Animal in sounder:
+		if b.spawned:
+			far = maxi(far, World.distance(b.tile, king.tile))
+	_check(World.distance(king.tile, Vector2i(30, 4)) <= 10 and far <= int(Monster.kinds()["boar_king"]["escort"]["follow"]) + 3,
+		"he walks out to his ground, his boars following, never bolting (%s, farthest %d)" % [king.tile, far])
+	for b: Animal in sounder.duplicate():
+		World.damage(b, 999)
+	World.step()
+	Apex._check("boar_king", row)
+	_check(Apex.living_escort("boar_king") == 0 and beaten.size() == 1 and beaten[0][0] == "boar_king",
+		"his sounder cleared: beaten back, apex_beaten once (%s)" % [beaten])
+	for i in 700:
+		World.step()
+		if rec["state"] == "lair":
+			break
+	_check(rec["state"] == "lair" and beaten.size() == 1, "gone home to his lair (%s)" % rec["state"])
+	World.apex_beaten.disconnect(on_beaten)
+	World.despawn(walker)
+	kinds["boar_king"]["lair"] = row_was
+	Apex.clear()
+	World.apexes.clear()
+	World.zones.erase("bk_lair")
+	World.zones.erase("bk_land")
+	World.enter(land)
+	Monster.idling = idling_was
+	World.spawn_spec = Callable()
+	DayNight.reset()
 
 
 func _free_beside(at: Vector2i) -> Vector2i:

@@ -45245,6 +45245,19 @@ C:/dev/review/sound/boar_king. sound_kit_test (his snort, skid, crash and bellow
 boar's; a boar none of his). Inert till his lair leaves SHELVED (enemy-ai's switch-on). Client
 only; protocol unchanged, no new class_name, no bullet.
 
+780 amended (16), switched on: the boar king in the world (2026-11-09, enemy-ai; package "the boar
+king" whole: items' rows 312c45bba, art-kit's old body 480e6a9fc and its item meshes b0ddb5f34,
+economy's buyers 3b116819a, animation's clips 60c3d4dca, maps' lair 36b1fea8e, sound's voice, and
+enemy-ai's fight a6a710888; companions' line follows straight after). maps: boar_lair off SHELVED, the
+forest laid again with its mouth open, the three sightline trees out of trees.json again (2e8b3adec,
+under this commit). So Apex.rows holds the boar king: his record lays him at his den (14, 5) with his
+three boars, by night as by day; left alone 45 minutes he goes out by the lair's door (13, 24) to the
+forest's (124, 175), roaming 1213 grounds within 40 and off the pads; his sounder cleared, he is
+beaten back (apex_beaten once, companions' line) and goes home. monster_test _test_boar_king_lair (his
+real places; in his lair with three; out by night with them following, never bolting; cleared, beaten
+back once, home). CHANGELOG: voice's bullet. Server and level data; protocol unchanged; no new
+class_name.
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a
