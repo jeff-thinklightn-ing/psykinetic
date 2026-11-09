@@ -45300,6 +45300,24 @@ seamless_test: the host crosses into the held wilds and back, each a swap (no ca
 left held where it lies, plane_origin, the glimpse hidden, still held after), then, off, the card.
 Client only, protocol unchanged, no new class_name.
 
+822 amended (2): the crossing's frame (behind the flag). Timed headless on a host at held (a bench, not
+landed), the swap into the held wilds cost 159 to 218 ms in its frame and a 214 to 325 ms frame a few
+frames later, against 15 ms at most for an ordinary frame: not shaders, the main thread. swap_room
+moved each room node to the other view (reparent: every node out of the tree and back in, 50 to 83
+ms); now each room stays under the view that built it and is only placed (about 5 ms): the live view's
+new room where the view is, the other's past it. A view let go may hold the live room still: Main frees
+its own room and lets its room fields go (Client3D.release_room, a new view's values), keeps it
+(_room_holders) and frees it once empty. The late frame was plane_links reading the level again (0.2 s
+a zone): it now takes the links from the level already read. A neighbour's level was read in one frame
+(0.86 s as the player walks up to a link): it is read on a worker (_read_neighbour, polled each frame),
+laid once read if still wanted, dropped if let go or the flag went off meanwhile. Now the swap into the
+wilds is 92 ms (the minimap's rebuild 26 to 36 ms of it, the wilds' creatures' models made at once 19
+ms), back into held 27 ms; still to do before the switch-on: the held level's minimap made while held,
+the models made over frames, then the windowed look for shader hitches. seamless_test: the rooms under
+their builders through each swap; let go after a swap, the held room freed, the live room kept under
+its holder, freed after the next build; the wilds held again. Client only, protocol unchanged, no new
+class_name.
+
 Still to come, each behind the flag: (3) maps: the five corridors, each neighbour's plane origin 16
 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam − 8 with
 spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The

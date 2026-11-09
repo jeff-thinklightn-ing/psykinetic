@@ -130,6 +130,7 @@ func _test_preload() -> void:
 	await _frames(_main.NEIGHBOUR_LOOK_FRAMES * 2)
 	_check(_main._neighbour == view, "walking off: kept (one neighbour, let go only for another)")
 	await _test_swap(view)
+	await _test_let_go(view)
 	# Off before it crosses: the card and a build, the held one let go.
 	view = _main._neighbour
 	_main.seamless_crossings = false
@@ -158,8 +159,10 @@ func _test_swap(view: Client3D) -> void:
 				"swapped: %s's room live, %s's held, no other" % [pair[0], pair[4]])
 		_check(not live.building_room and (_main.arrival_card == null or not _main.arrival_card._building) and not _main._arriving(),
 				"no build and no card")
-		_check(live.position.is_equal_approx(live_at) and view.position.is_equal_approx(live_at + _main.plane_offset(pair[0], pair[4])),
-				"the live view kept its place, the held one where %s lies from it (%s)" % [pair[4], view.position])
+		_check(live.position.is_equal_approx(live_at) and live._room.global_position.is_equal_approx(live_at)
+				and view._room.global_position.is_equal_approx(live_at + _main.plane_offset(pair[0], pair[4]))
+				and wilds_room.get_parent() == view and held_room.get_parent() == live,
+				"the live view and room kept their place, the held room where %s lies from it (%s), each under the view that built it" % [pair[4], view._room.global_position])
 		_check(Client3D.plane_given.is_equal_approx(live._plane_at)
 				and view._plane_at.is_equal_approx(live._plane_at + _main.plane_offset(pair[0], pair[4])),
 				"plane_origin the live room's place (%s), the held one's beside it" % Client3D.plane_given)
@@ -168,3 +171,36 @@ func _test_swap(view: Client3D) -> void:
 		await _frames(_main.NEIGHBOUR_LOOK_FRAMES * 2)
 		_check(_main._neighbour == view, "at %s's side of the link: %s still held" % [pair[0], pair[4]])
 
+
+## A room stays under the view that built it: crossed into the wilds (its
+## room under the neighbour's view), the held one let go frees the held
+## room alone, keeps the view holding the live room (its room fields let go)
+## and frees it once the live room has gone; then the wilds held again.
+func _test_let_go(view: Client3D) -> void:
+	var live: Client3D = _main._client3d
+	_check(_main.travel(Net.local_id, "wilds", "from_held"), "the host crosses to the wilds again")
+	await _frames(2)
+	var wilds_room: Node3D = live._room
+	var held_room: Node3D = view._room
+	_check(wilds_room.get_parent() == view and held_room.get_parent() == live, "the live room under the held view, the held room under the live view")
+	_main.drop_neighbour()
+	await _frames(1)
+	_check(is_instance_valid(wilds_room) and live._room == wilds_room and not is_instance_valid(held_room)
+			and is_instance_valid(view) and _main._room_holders.has(view) and view._room == null and view._terrain.is_empty(),
+			"let go: the held room freed, the live room kept, its builder kept as a holder with nothing of its own")
+	_main.seamless_crossings = false
+	_check(_main.travel(Net.local_id, "held", "from_wilds"), "switched off, the host crosses to held (a build)")
+	var frames := 0
+	while (is_instance_valid(view) or live.building_room) and frames < 3000:
+		await get_tree().process_frame
+		frames += 1
+	_check(not is_instance_valid(view) and _main._room_holders.is_empty() and not is_instance_valid(wilds_room),
+			"the old live room freed after the build, and its holder with it (%d frames)" % frames)
+	_main.seamless_crossings = true
+	_stand(30)
+	frames = 0
+	while (_main._neighbour == null or not _main._neighbour.room_whole()) and frames < 3000:
+		await get_tree().process_frame
+		frames += 1
+	_check(_main._neighbour != null and _main._neighbour.room_whole() and _main._neighbour_zone == "wilds",
+			"the wilds held again (%d frames)" % frames)

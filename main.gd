@@ -5344,6 +5344,13 @@ var _floor_said := false
 ## up at a swap, they are the neighbour's).
 var _shown_zone := ""
 var _shown_level := {}
+## The held neighbour's level read on a worker (822 amended (2): about
+## 0.9 s in one frame on the main thread): the task, and what it read.
+var _read_task := -1
+var _read_level := {}
+## Views let go whose room node still holds the live room (a room stays
+## under the view that built it, swap_room): freed once empty.
+var _room_holders: Array[Client3D] = []
 ## Server: when each peer's last "near" was answered (msec).
 var _near_told: Dictionary[int, int] = {}
 ## Each level's links to zones on the world plane, by level name.
@@ -5352,14 +5359,16 @@ static var _plane_links := {}
 
 ## [param level_name]'s links that lead to another zone on the world plane
 ## (822's crossings): [{tile, to}], a closed one left out; none for a level
-## not on the plane. Read once a level.
-static func plane_links(level_name: String) -> Array:
+## not on the plane. Read once a level, from [param loaded] when that is
+## the level already read (reading it again costs 0.2 s in a frame).
+static func plane_links(level_name: String, loaded := {}) -> Array:
 	if _plane_links.has(level_name):
 		return _plane_links[level_name]
 	var out: Array = []
 	var zones: Dictionary = Level.world_plane().get("zones", {})
 	if zones.has(level_name):
-		for link: Dictionary in Level.load_level(level_name).get("links", []):
+		var read := loaded if str(loaded.get("name", "")) == level_name else Level.load_level(level_name)
+		for link: Dictionary in read.get("links", []):
 			if zones.has(str(link["to_map"])) and not link.get("closed", false):
 				out.append({"tile": link["tile"], "to": str(link["to_map"])})
 	_plane_links[level_name] = out
@@ -5396,11 +5405,20 @@ static func plane_offset(from: String, to: String) -> Vector3:
 ## that zone's view is built (a client asks the server for its state first);
 ## any other neighbour is let go before, so two are never held.
 func _update_neighbour() -> void:
-	if not seamless_crossings or _client3d == null or Engine.get_process_frames() % NEIGHBOUR_LOOK_FRAMES != 0:
+	_poll_neighbour_read()
+	if Engine.get_process_frames() % NEIGHBOUR_LOOK_FRAMES != 0:
+		return
+	for holder: Client3D in _room_holders.duplicate():
+		if not is_instance_valid(holder) or holder.get_child_count() == 0:
+			if is_instance_valid(holder):
+				holder.queue_free()
+			_room_holders.erase(holder)
+	if not seamless_crossings or _client3d == null:
 		return
 	var player := _local_player()
 	if player == null:
 		return
+	plane_links(map_name, level)  # This level's links from the level already read.
 	var zone := near_link(map_name, player.tile, PRELOAD_CELLS)
 	if zone.is_empty() or zone == _neighbour_zone or zone == _neighbour_asked:
 		return
@@ -5450,7 +5468,11 @@ func _swap_neighbour() -> void:
 ## The held neighbour let go (another link nearer, a crossing, leaving).
 func drop_neighbour() -> void:
 	if is_instance_valid(_neighbour):
-		_neighbour.queue_free()
+		_neighbour.release_room()
+		if _client3d != null and is_instance_valid(_client3d._room) and _client3d._room.get_parent() == _neighbour:
+			_room_holders.append(_neighbour)  # The live room hangs under it still.
+		else:
+			_neighbour.queue_free()
 		if _client3d != null:
 			_client3d.hide_glimpse_to("")
 	_neighbour = null
@@ -5470,13 +5492,48 @@ func _on_near_told(data: Dictionary) -> void:
 	_build_neighbour(zone)
 
 
-## Zone [param zone]'s view built over frames beside the live one, where it
-## lies on the world plane, its felled cells and plots laid as _load_level
-## lays them.
+## Zone [param zone]'s view built beside the live one: its level read on a
+## worker first (_read_neighbour), then laid (_lay_neighbour) where it lies
+## on the world plane, its felled cells and plots laid as _load_level lays
+## them, and built over frames.
 func _build_neighbour(zone: String) -> void:
-	var loaded := Level.load_level(zone)
-	if loaded.is_empty() or _client3d == null:
+	if _client3d == null:
 		return
+	_neighbour_zone = zone  # Asked for: not asked again while it is read.
+	if _read_task == -1:
+		_read_task = WorkerThreadPool.add_task(_read_neighbour.bind(zone), false, "neighbour level")
+
+
+## On a worker: zone [param zone]'s level read (Level.load_level parses
+## its images and files; nothing shared is written).
+func _read_neighbour(zone: String) -> void:
+	_read_level = Level.load_level(zone)
+
+
+## Each frame: a read done is laid if its zone is still the one wanted
+## (another wanted meanwhile is read next; one let go, dropped).
+func _poll_neighbour_read() -> void:
+	if _read_task == -1 or not WorkerThreadPool.is_task_completed(_read_task):
+		return
+	WorkerThreadPool.wait_for_task_completion(_read_task)
+	_read_task = -1
+	var loaded := _read_level
+	_read_level = {}
+	if not seamless_crossings or _neighbour != null or _neighbour_zone.is_empty() or _client3d == null:
+		return
+	if str(loaded.get("name", "")) != _neighbour_zone:
+		_build_neighbour(_neighbour_zone)
+		return
+	_lay_neighbour(_neighbour_zone, loaded)
+
+
+## Zone [param zone]'s view built over frames from [param loaded] (its
+## level as read), its felled cells and plots laid first.
+func _lay_neighbour(zone: String, loaded: Dictionary) -> void:
+	if loaded.is_empty():
+		_neighbour_zone = ""
+		return
+	plane_links(zone, loaded)
 	var terrain: Dictionary = loaded["terrain"]
 	if Net.is_authority():
 		if World.clearing != null:

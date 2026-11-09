@@ -11184,8 +11184,9 @@ func _test_indoor_phased_build() -> void:
 ## Decision 822 (P1, step 1): a held neighbour's view and the swap. Every
 ## Client3D var is sorted once into room_fields.gd's VIEW or ROOM; a
 ## neighbour builds its room and nothing else (no camera, sky or warm-up),
-## at once or over frames; swap_room trades the rooms, the live view kept at
-## its place and the rooms and camera kept where they were to one another
+## at once or over frames; swap_room trades the rooms (each node left under
+## the view that built it), the live view kept at its place and the rooms
+## and camera kept where they were to one another
 ## (shifted together, the shaders' plane_origin with them); swapped back, all
 ## as before.
 func _test_neighbour_swap() -> void:
@@ -11240,9 +11241,9 @@ func _test_neighbour_swap() -> void:
 	var rig_at := _rig.position
 	var neighbour_at := neighbour.position
 	_rig.swap_room(neighbour)
-	_check(_rig._room == theirs_room and theirs_room.get_parent() == _rig and neighbour._room == ours_room
-			and ours_room.get_parent() == neighbour and _rig._terrain == castle["terrain"] and neighbour._terrain == ours_terrain,
-			"swapped: the castle's room and terrain the live view's, ours the neighbour's")
+	_check(_rig._room == theirs_room and theirs_room.get_parent() == neighbour and neighbour._room == ours_room
+			and ours_room.get_parent() == _rig and _rig._terrain == castle["terrain"] and neighbour._terrain == ours_terrain,
+			"swapped: the castle's room and terrain the live view's, ours the neighbour's, each room node still under the view that built it")
 	var shift := rig_at - neighbour_at
 	_check(_rig.position.is_equal_approx(rig_at) and ours_room.global_position.is_equal_approx(ours_at + shift)
 			and theirs_room.global_position.is_equal_approx(theirs_at + shift) and _rig._camera.global_position.is_equal_approx(camera_at + shift)

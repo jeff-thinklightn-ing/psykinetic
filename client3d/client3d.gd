@@ -5937,27 +5937,30 @@ func room_whole() -> bool:
 
 
 ## The live view and the held neighbour [param other] trade rooms (822): every
-## ROOM field and the two room nodes, nothing built. This view stays where
-## it is, at the origin, and the other goes to the far side of it, so the
+## ROOM field, nothing built. Each room node stays under the view that
+## built it (moving one between views takes every node out of the tree and
+## back in: 50 to 80 ms; placing it, about 3 ms): this one's new room is
+## put where this view is (the origin) and the other's past it, so the
 ## rooms keep their places to one another and the camera its place among
 ## them (all of it shifted together by the change of origin, nothing moved
 ## on screen); the shaders' plane_origin follows (_plane_at, a ROOM field).
+## The other view's own position no longer says where its room is.
 ## The room it gives up is left as built (no piece faded, every roof on).
 ## Both must be whole. A particle already in the air (world space) is left
 ## where it was: it jumps once, by the change of origin.
 func swap_room(other: Client3D) -> void:
 	assert(room_whole() and other.room_whole(), "swap_room: a room still building")
 	_leave_as_built()
-	var shift := position - other.position
+	var shift := (_room.global_position if _room != null else global_position) \
+			- (other._room.global_position if other._room != null else other.global_position)
 	for field: StringName in RoomFields.ROOM:
 		var mine: Variant = get(field)
 		set(field, other.get(field))
 		other.set(field, mine)
-	other.position = position + shift
-	if other._room != null:
-		other._room.reparent(other, false)
 	if _room != null:
-		_room.reparent(self, false)
+		_room.global_position = global_position
+	if other._room != null:
+		other._room.global_position = global_position + shift
 	for node: Node3D in [_camera]:
 		if node != null:
 			node.position += shift
@@ -5979,6 +5982,24 @@ func swap_room(other: Client3D) -> void:
 		if not World.hearths_changed.is_connected(_on_hearths_changed):
 			World.hearths_changed.connect(_on_hearths_changed)
 		_draw_hearths()
+
+
+## A held neighbour let go (822): its room and any older ones freed
+## (wherever they hang: a room stays under the view that built it), every
+## ROOM field back to a new view's, so what it held (a few hundred MB for
+## the forest) goes with it. The view is left empty; Main frees it, or
+## keeps it while the live room it once built still hangs under it.
+func release_room() -> void:
+	_end_fields_task()
+	for old in _old_rooms:
+		if is_instance_valid(old):
+			old.queue_free()
+	if is_instance_valid(_room):
+		_room.queue_free()
+	var fresh := Client3D.new()
+	for field: StringName in RoomFields.ROOM:
+		set(field, fresh.get(field))
+	fresh.free()
 
 
 ## Every glimpse shown but the one toward [param zone] (822): a held
