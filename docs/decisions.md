@@ -45187,6 +45187,21 @@ plays a slot's hook for a wind-up that is not a lead (the plain attack else). to
 338 amended (6) landed, back with it). view_test _test_boar_king_clips. Client and art only, protocol
 unchanged, no new class_name, no bullet (off: his row stays shelved till enemy-ai's switch-on).
 
+780 amended (16), maps' side: the lair laid for him (2026-11-09, release's label; enemy-ai's design,
+the coordinator's approval; package "the boar king", maps' piece, off while boar_lair stays in
+Level.SHELVED). The lair itself is 780 amended (12)'s, and make_boar_lair.py lays it again: the
+king's marker monster_boar_king on his bed, the den (14, 5), held by Apex (holds_marker) and never
+spawned by Main, as the old grey's; its sounder of three ordinary boars down to one den keeper (10, 6)
+by the west wallow, back after respawn_s 6000, since Apex brings his escort of three with him; the
+find, prop.cache_pack on items' boar_lair_cache, at the east wallow's edge (17, 5); the lair place
+"the boar's lair", the zone's own name so it reads once (815), nobody's, "explore": true. make_forest:
+the boar lair's mouth, laid only once off SHELVED, is laid open, not sealed. The forest's data does
+not change while it is shelved. Switching it on is enemy-ai's (with the bullet): off SHELVED, then
+make_forest run again, and the three grown trees put back in its sightline strip when it was shelved
+(820) taken out of trees.json again; a trial of that here passes but for those trees. level_test
+_test_boar_lair (marker, one keeper, the find by a wallow, the place; the mouth open once on) and
+_test_forest. Level data; protocol unchanged; no new class_name; no bullet.
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a

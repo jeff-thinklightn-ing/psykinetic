@@ -29,7 +29,8 @@
 		}
 	],
 	"legend": {
-		"monster_boar": "#8b5a2b"
+		"monster_boar": "#8b5a2b",
+		"monster_boar_king": "#5a3214"
 	},
 	"skylights": [
 		{
@@ -69,14 +70,28 @@
 			],
 			"kind": "lair",
 			"radius": 10,
-			"name": "a boar's lair",
+			"name": "the boar's lair",
 			"holder": "nobody",
 			"den": [
 				14,
 				5
-			]
+			],
+			"explore": true
 		}
 	},
+	"entities": [
+		{
+			"at": [
+				17,
+				5
+			],
+			"art": "prop.cache_pack",
+			"props": {
+				"cache": "boar_lair_cache",
+				"cache_place": "the boar's lair"
+			}
+		}
+	],
 	"decor": [
 		[
 			10,
@@ -230,5 +245,8 @@
 			"trodden_run",
 			1
 		]
-	]
+	],
+	"respawn_s": {
+		"boar": 6000
+	}
 }

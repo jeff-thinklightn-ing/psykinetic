@@ -129,8 +129,9 @@ const CAMPS: Array[Dictionary] = [
 const CAMP_MARGIN := 2
 const CAMP_LEGEND := {"monster_bandit": "#b4643c", "monster_bandit_brute": "#6e3218"}
 ## The apex lairs' mouths here (780 amended (12), forest phase D; enemy-ai's
-## lair rule): each a link cell "at" into its own small level, sealed
-## ("closed") till enemy-ai's phase 2 brings its apex, "open" the side
+## lair rule): each a link cell "at" into its own small level, laid only
+## once its package takes it off Level.SHELVED (the boar's lair: open, the
+## boar king's package, maps' piece), "open" the side
 ## toward the nearest path (10 cells off it, so the apex's roam crosses a
 ## road now and then). Behind and beside the link the thicket: LAIR_MOUND
 ## cells void (terrain's "thicket" mouth draws a bramble mound on them,
@@ -140,7 +141,7 @@ const CAMP_LEGEND := {"monster_bandit": "#b4643c", "monster_bandit_brute": "#6e3
 ## by tusks (tree.clawed, solid) at its side ("clawed"); the lair's "from_<lair>" spawn two
 ## cells out.
 const LAIRS: Array[Dictionary] = [
-	{"to_map": "boar_lair", "at": Vector2i(122, 175), "open": Vector2i(1, 0), "mouth": "thicket", "closed": true, "clawed": true},
+	{"to_map": "boar_lair", "at": Vector2i(122, 175), "open": Vector2i(1, 0), "mouth": "thicket", "closed": false, "clawed": true},
 	# Forest phase E: the wolves' cave, an ordinary pack's den (not the old
 	# wolf's, the coordinator), open from the start; bones its only sign.
 	{"to_map": "wolf_cave", "at": Vector2i(53, 76), "open": Vector2i(0, -1), "mouth": "cave", "closed": false, "clawed": false}]

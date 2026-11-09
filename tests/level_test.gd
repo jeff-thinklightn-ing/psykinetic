@@ -1835,8 +1835,8 @@ func _test_forest() -> void:
 	_check(forest.get("display_name") == "The Forest" and links.size() == 2 + lairs.size() and links[0]["to_map"] == "wilds"
 		and links[1]["to_map"] == "stronghold" and links[1]["closed"]
 		and lairs.map(func(link: Dictionary) -> String: return link["to_map"]) == (["wolf_cave"] if Level.SHELVED.has("boar_lair") else ["boar_lair", "wolf_cave"])
-		and lairs.all(func(link: Dictionary) -> bool: return link["closed"] == (link["to_map"] == "boar_lair")),
-		"The Forest: back to the wilds, on to the stronghold closed, the wolves' cave open, the boar's lair closed or held back (%s)" % [links])
+		and lairs.all(func(link: Dictionary) -> bool: return not link["closed"]),
+		"The Forest: back to the wilds, on to the stronghold closed, the wolves' cave open, the boar's lair open or held back (%s)" % [links])
 	_check(_main.load_map("forest") and World.outdoor, "forest loads, outdoors")
 	var player := _player()
 	var east: Vector2i = links[1]["tile"]
@@ -3104,17 +3104,33 @@ func _test_boar_lair() -> void:
 	if places.has("boar_lair"):
 		den = places["boar_lair"]["den"]
 	_check(places.size() == 1 and places.has("boar_lair") and places["boar_lair"]["kind"] == "lair"
-		and places["boar_lair"]["holder"] == "nobody" and places["boar_lair"]["cell"] == den and floor.has(den),
-		"its one place, the lair, held by nobody, at its den (%s)" % [places])
+		and places["boar_lair"]["holder"] == "nobody" and places["boar_lair"]["cell"] == den and floor.has(den)
+		and places["boar_lair"].get("explore") == true and places["boar_lair"]["name"] == "the boar's lair",
+		"its one place, the boar's lair, held by nobody, at its den, explored (%s)" % [places])
 	var boars: Array[Vector2i] = []
+	var kings: Array[Vector2i] = []
+	var caches: Array = []
 	var others: Array = []
 	for entity: Dictionary in lair["entities"]:
 		if str(entity.get("kind", "")) == "boar":
 			boars.append(entity["tile"])
+		elif str(entity.get("kind", "")) == "boar_king":
+			kings.append(entity["tile"])
+		elif str(entity.get("props", {}).get("cache", "")) == "boar_lair_cache":
+			caches.append(entity)
 		else:
 			others.append(entity)
-	_check(boars.size() == 3 and boars.all(func(at: Vector2i) -> bool: return Vector2(at - den).length() <= 4.5),
-		"three boars within 4 cells of the den, nothing else (%s; %s)" % [boars, others])
+	# The boar king's package, maps' piece: his marker on his bed (Apex's, never
+	# spawned by Main), one den keeper, the wallow's find.
+	_check(kings == [den] and Apex.holds_marker({"kind": "boar_king", "spawn": {}}, "boar_lair"),
+		"the boar king's marker on his bed, the den, Apex's (%s)" % [kings])
+	_check(boars.size() == 1 and boars.all(func(at: Vector2i) -> bool: return Vector2(at - den).length() <= 4.5)
+		and int(config.get("respawn_s", {}).get("boar", 0)) >= DayNight.DEFAULT_DAY_MINUTES * 60,
+		"one den keeper within 4 cells of the den, back after a game day or more (%s)" % [boars])
+	var wallows: Array = lair["terrain"].get("decor", []).filter(func(entry: Dictionary) -> bool: return entry["kind"] == "wallow")
+	_check(caches.size() == 1 and caches[0].get("art") == "prop.cache_pack" and floor.has(caches[0]["tile"])
+		and wallows.any(func(entry: Dictionary) -> bool: return Vector2(entry["cell"] - caches[0]["tile"]).length() <= 1.5),
+		"the find (boar_lair_cache, a pack) at a wallow's edge (%s)" % [caches])
 	_check(others.is_empty(), "no chest, no other entity in the lair (%s)" % [others])
 	var open := Rect2i(8, 8, 12, 12)
 	var open_floor := true
@@ -3138,9 +3154,9 @@ func _test_boar_lair() -> void:
 		return
 	var spawn: Array = Level.template_config("forest")["spawn_points"].get("from_boar_lair", [])
 	var at: Vector2i = mouth.get("tile", Vector2i(-1, -1))
-	_check(not mouth.is_empty() and mouth["closed"] and mouth["to_spawn"] == "from_forest" and spawn.size() == 2
+	_check(not mouth.is_empty() and not mouth["closed"] and mouth["to_spawn"] == "from_forest" and spawn.size() == 2
 		and forest_floor.has(Vector2i(spawn[0], spawn[1])) and Vector2(Vector2i(spawn[0], spawn[1]) - at).length() == 2.0,
-		"the forest's mouth sealed, its spawn two cells out on the pad (%s, %s)" % [mouth, spawn])
+		"the forest's mouth open, its spawn two cells out on the pad (%s, %s)" % [mouth, spawn])
 	var behind := at - Vector2i(1, 0)
 	_check(not forest_floor.has(behind) and not forest_floor.has(at + Vector2i(0, 1)) and not forest_floor.has(at + Vector2i(0, -1)),
 		"the thicket behind and beside the mouth is no floor")

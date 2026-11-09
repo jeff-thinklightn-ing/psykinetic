@@ -11,13 +11,19 @@ its one way out a link up to the forest.
   den, two at the sides.
 - The way in from the south: two cells wide (no one-cell walkways), the
   link at its foot, "from_forest" just inside, a trodden run along it.
-- The den at the north, the "lair" place's "at" and "den" (enemy-ai's
-  phase 2 lays the boar king's marker there; until then none).
+- The den at the north, the "lair" place's "at" and "den": the boar king's
+  bed, his marker (monster_boar_king) on it, held by Apex and never spawned
+  as a level entity (as the old grey's; enemy-ai's "the boar king", maps'
+  piece). Apex brings his sounder of three with him.
 - An open middle (OPEN, 12 x 12: nothing laid in it, room for the king's
   charge); the wallows, bones and rooted-up ground round the edges.
-- The sounder: three monster_boar lying by the wallows, 3 to 4 cells from
-  the den (ordinary boars till phase 2 makes them the king's escort).
-- No chest and no loot (enemy-ai: the find is the king's own drops).
+- One den keeper (monster_boar, an ordinary sow; enemy-ai's design) by the
+  west wallow, who stays when he ventures out, back after "respawn_s" (6000,
+  as the old grey's keeper), so the wallow's find is never unguarded.
+- The find at the east wallow's edge (CACHE_AT): what he rooted up, a
+  prop.cache_pack (decision 599) on items' loot table boar_lair_cache.
+- The "lair" place, "the boar's lair" (the zone's own name, named once,
+  815), held by nobody, "explore": true (a first visit's float).
 
 Run from the checkout: python -B tools/make_boar_lair.py. The same seed
 makes the same level.
@@ -36,9 +42,11 @@ COLOURS = {
     "stone": (0x9A, 0x9A, 0x9A),
     "start": (0x00, 0xFF, 0xFF),
     "link": (0xFF, 0x00, 0xFF),
+    "chest": (0x8C, 0x4A, 0x1C),
 }
 BOAR = "monster_boar"
-LEGEND = {BOAR: "#8b5a2b"}
+KING = "monster_boar_king"
+LEGEND = {BOAR: "#8b5a2b", KING: "#5a3214"}
 OUT = os.path.join("levels", "boar_lair")
 
 CENTRE = (14.0, 12.5)
@@ -50,7 +58,10 @@ FROM_FOREST = (13, 24)
 START = (14, 24)
 DEN = (14, 5)
 WALLOWS = [((10, 4), 1), ((18, 4), 2), ((5, 11), 1)]
-BOARS = [(10, 6), (18, 6), (12, 8)]
+KEEPERS = [(10, 6)]
+CACHE_AT = (17, 5)
+CACHE = "boar_lair_cache"
+NAME = "the boar's lair"
 BONES = [((12, 3), 1), ((16, 3), 2), ((16, 22), 1)]
 ROOTED = [(7, 6), (21, 8), (23, 13), (5, 16), (7, 20), (21, 19), (9, 22)]
 SKYLIGHTS = [{"at": [14, 21], "radius": 2.0}, {"at": [14, 5], "radius": 2.5},
@@ -81,7 +92,7 @@ def in_open(cell):
 
 def main():
     floor = hollow() | set(WAY)
-    markers = {LINK: "link", START: "start"}
+    markers = {LINK: "link", START: "start", CACHE_AT: "chest"}
     decor = []
     for cell, variant in WALLOWS:
         decor.append([cell[0], cell[1], 0, 1, "wallow", variant])
@@ -93,15 +104,18 @@ def main():
         decor.append([cell[0], cell[1], way[0], way[1], "rooted_ground", 1])
     for y in range(21, 27):
         decor.append([13, y, 0, 1, "trodden_run", 1])
-    for cell in BOARS:
+    markers[DEN] = KING
+    for cell in KEEPERS:
         markers[cell] = BOAR
     for row in decor:
         assert (row[0], row[1]) in floor and not in_open((row[0], row[1])), row
-    for cell in list(markers) + [DEN, FROM_FOREST]:
+    for cell in list(markers) + [DEN, FROM_FOREST, CACHE_AT]:
         assert cell in floor, cell
+    assert all((row[0], row[1]) != CACHE_AT for row in decor)
 
     colours = dict(COLOURS)
-    colours[BOAR] = tuple(int(LEGEND[BOAR][i:i + 2], 16) for i in (1, 3, 5))
+    for kind in LEGEND:
+        colours[kind] = tuple(int(LEGEND[kind][i:i + 2], 16) for i in (1, 3, 5))
     meaning = {cell: markers.get(cell, "stone") for cell in floor}
     layout = Image.new("RGB", (W * 2 - 1, H * 2 - 1), COLOURS["void"])
     for (x, y), what in meaning.items():
@@ -130,16 +144,19 @@ def main():
         "links": [{"at": list(LINK), "to_map": "forest", "to_spawn": "from_boar_lair"}],
         "legend": LEGEND,
         "skylights": SKYLIGHTS,
-        "places": {"boar_lair": {"at": list(DEN), "kind": "lair", "radius": 10, "name": "a boar's lair",
-                                 "holder": "nobody", "den": list(DEN)}},
+        "places": {"boar_lair": {"at": list(DEN), "kind": "lair", "radius": 10, "name": NAME,
+                                 "holder": "nobody", "den": list(DEN), "explore": True}},
+        "entities": [{"at": list(CACHE_AT), "art": "prop.cache_pack",
+                      "props": {"cache": CACHE, "cache_place": NAME}}],
         "decor": decor,
+        "respawn_s": {"boar": 6000},
     }
     with open(os.path.join(OUT, "level.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(config, f, indent="\t")
         f.write("\n")
-    print("boar_lair: %d floor cells, %d decor rows, %d boars" % (len(floor), len(decor), len(BOARS)))
+    print("boar_lair: %d floor cells, %d decor rows, %d keepers" % (len(floor), len(decor), len(KEEPERS)))
     for y in range(H):
-        print("".join("L" if (x, y) == LINK else "b" if (x, y) in BOARS else "D" if (x, y) == DEN
+        print("".join("L" if (x, y) == LINK else "b" if (x, y) in KEEPERS else "K" if (x, y) == DEN else "c" if (x, y) == CACHE_AT
                       else "o" if (x, y) in floor and in_open((x, y)) else "." if (x, y) in floor else " "
                       for x in range(W)))
 
