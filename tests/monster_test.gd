@@ -6771,12 +6771,15 @@ func _test_boar_king() -> void:
 			crashed = true
 			break
 	_check(crashed, "run into the wall, he is stunned, its cause the crash")
-	# Never into a downing.
+	# His sounder (the coordinator's ruling after playtest's run): one boar at
+	# his target at a time, the rest ringing; nobody at a dodge's opening; a
+	# dodged charge sends nobody, a hit one the one; at a low foe, one of them.
 	rows = arena.duplicate()
 	put.call(rows, Vector2i(5, 5), "K")
 	put.call(rows, Vector2i(11, 5), "P")
 	put.call(rows, Vector2i(10, 3), "o")
 	put.call(rows, Vector2i(12, 3), "o")
+	put.call(rows, Vector2i(11, 8), "o")
 	e = _build(rows)
 	king = e["K"][0]
 	player = e["P"][0]
@@ -6784,34 +6787,57 @@ func _test_boar_king() -> void:
 	for boar: Animal in sounder:
 		boar.escort_lead = king
 		boar.sight_range = 12
-	player.max_hp = 100
-	player.hp = 30
+	player.max_hp = 200
+	player.hp = 200
+	player.protected = false
 	king.sight_range = 12
-	_check(not king.may_charge(player), "a foe under a third of their hp: no charge")
-	king._move = {"move": "charge", "telegraph": 0, "lands": World.tick + 1000, "toward": Vector2(1, 0), "cells": 8, "from": World.tick}
+	king._next_charge = World.tick + 100000  # His plain fight, no charge.
+	var striking := {}
+	var ringed := 0
 	_damage_log.clear()
-	for i in 30:
+	for i in 150:
 		World.step()
-	_check(king.holds_sounder(player) and not _damage_log.any(func(d: Dictionary) -> bool: return sounder.has(d["source"])),
-		"while he charges, his sounder holds off a foe under a third of their hp")
+		if i > 40:
+			ringed = maxi(ringed, sounder.filter(func(b: Animal) -> bool:
+				return b.spawned and World.distance(b.tile, player.tile) >= Animal.SOUNDER_RING.x and World.distance(b.tile, player.tile) <= Animal.SOUNDER_RING.y + 1).size())
+	for d: Dictionary in _damage_log:
+		if sounder.has(d["source"]):
+			striking[d["source"]] = true
+	_check(striking.size() == 1 and ringed >= 2,
+		"one boar of his sounder at his target at a time (%d struck), the rest ringing it (%d)" % [striking.size(), ringed])
+	# His opening: skidding, nobody strikes.
+	king._move = {"move": "skid", "telegraph": 0, "lands": World.tick + 15, "from": World.tick}
+	_damage_log.clear()
+	for i in 14:
+		World.step()
+	_check(not _damage_log.any(func(d: Dictionary) -> bool: return sounder.has(d["source"]) or d["source"] == king),
+		"while he skids, nobody strikes: the dodge's opening is whole")
+	# A dodged charge sends nobody; a hit one sends the one.
+	for boar: Animal in sounder:
+		boar._burst_until = -1
+	king.target = player
+	king._move = {"move": "rush", "toward": Vector2(1, 0)}
+	World.rush_ended.emit(king, "arrived", king.tile, {"struck": []})
+	_check(sounder.all(func(b: Animal) -> bool: return b._burst_until < 0), "a dodged charge: none of his sounder sent in")
+	king._move = {"move": "rush", "toward": Vector2(1, 0)}
+	World.rush_ended.emit(king, "body", king.tile, {"struck": [{"body": player}]})
+	_check(sounder.filter(func(b: Animal) -> bool: return b._burst_until > World.tick).size() == 1, "a charge that hits: the one sent in behind it")
+	# Never into a downing: no charge at a third, and one of them at such a foe.
 	king._move = {}
+	player.hp = 50
+	_check(not king.may_charge(player), "a foe under a third of their hp: no charge")
+	_damage_log.clear()
+	var piled := 0
+	for i in 80:
+		World.step()
+		player.hp = 50
+		var king_in := king._in_strike_reach(player) or World.distance(king.tile, player.tile) <= 1
+		if king_in and _damage_log.any(func(d: Dictionary) -> bool: return sounder.has(d["source"]) and int(d["tick"]) == World.tick):
+			piled += 1
+	_check(piled == 0, "at a low foe his sounder strikes not while he can (%d ticks of both)" % piled)
 	player.hp = 2
 	king._gore(player, Vector2(1, 0))
 	_check(player.hp == 1, "his charge's blow never takes a player below 1 hp (%d)" % player.hp)
-	# His sounder joins his charge.
-	player.hp = 100
-	for boar: Animal in sounder:
-		boar._charge_until = -1
-		boar._burst_until = -1
-	king.target = player
-	king._sounder_charge()
-	_check(sounder.all(func(boar: Animal) -> bool: return boar._charge_until > World.tick and boar._burst_until > World.tick and boar.target == player),
-		"as his charge ends, his sounder near his target charges it too")
-	player.hp = 30
-	for boar: Animal in sounder:
-		boar._burst_until = -1
-	king._sounder_charge()
-	_check(sounder.all(func(boar: Animal) -> bool: return boar._burst_until < 0), "but not at a foe under a third of their hp")
 	DayNight.reset()
 	Monster.idling = true
 

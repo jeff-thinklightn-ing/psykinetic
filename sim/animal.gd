@@ -67,6 +67,9 @@ const PACK_TILES := 8
 const PREY_LOOK_TICKS := 10
 ## A boar's charge is heard so far (a "charge" cry).
 const NOISE_CHARGE := 6
+## A boar king's sounder not let at his target keeps this far off it,
+## [near, far] (780 amended (16), the coordinator's ruling after playtest).
+const SOUNDER_RING := Vector2i(2, 3)
 ## A predator by day keeps to its den: it wanders this far from home; by
 ## night twice its own wander radius (decision 317, W4).
 const DEN_RADIUS := 1
@@ -440,9 +443,9 @@ func _escort_target() -> GridEntity:
 
 
 ## A boar of an apex's escort (780 amended (16), the boar king's sounder):
-## it follows its lead and fights its lead's target, never bolting; while
-## its lead charges, never at a foe under his rule's share of their hp
-## (BoarKing.holds_sounder: it stands, facing them). True while it does.
+## it follows its lead and fights its lead's target, never bolting; under the
+## boar king, only the one he lets (BoarKing.may_engage): the rest keep a
+## ring SOUNDER_RING off its target, facing it. True while it does.
 func _sounder_tick() -> bool:
 	if not is_instance_valid(escort_lead) or not escort_lead.spawned:
 		escort_lead = null
@@ -456,10 +459,8 @@ func _sounder_tick() -> bool:
 		if not _escort_step():
 			_graze_tick()
 		return true
-	if escort_lead is BoarKing and (escort_lead as BoarKing).holds_sounder(foe):
-		target = null
-		pose = Pose.STAND
-		World.face(self, Senses.way_toward(tile, foe.tile))
+	if escort_lead is BoarKing and not (escort_lead as BoarKing).may_engage(self, foe):
+		_ring(foe)
 		return true
 	if _foe != foe or World.tick >= _charge_until:
 		_foe = foe
@@ -469,6 +470,33 @@ func _sounder_tick() -> bool:
 	pose = Pose.STAND
 	super._sim_tick()
 	return true
+
+
+## Its ring about [param foe]: back out inside SOUNDER_RING's near edge,
+## closer outside its far one, else it stands facing them, striking nobody.
+func _ring(foe: GridEntity) -> void:
+	target = null
+	_charge_until = -1
+	_burst_until = -1
+	pose = Pose.STAND
+	if World.tick >= next_move_tick and not World.is_stunned(self):
+		move_ticks = _pace
+		var d := World.distance(tile, foe.tile)
+		if d < SOUNDER_RING.x:
+			var best := Vector2i.ZERO
+			var best_d := d
+			for way in World.DIRECTIONS:
+				var off := World.distance(tile + way, foe.tile)
+				if off > best_d and World.is_walkable(tile + way) and World.is_free(tile + way):
+					best = way
+					best_d = off
+			if best != Vector2i.ZERO:
+				World.try_move(self, best)
+		elif d > SOUNDER_RING.y:
+			var path := World.find_path(tile, foe.tile, true, null, CHASE_SEARCH_TILES, false, {}, opens_doors_now())
+			if not path.is_empty() and World.distance(path[0], foe.tile) >= SOUNDER_RING.x:
+				World.try_move(self, path[0] - tile)
+	World.face(self, Senses.way_toward(tile, foe.tile))
 
 
 ## An escort with nobody to fight, its lead fighting nobody, farther off

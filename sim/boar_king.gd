@@ -18,14 +18,17 @@ extends Animal
 ##   stuns him "stun" ticks instead (World._stun_for, cause &"crash"): the
 ##   bigger opening, made by the one who dodged with a tree at their back.
 ## - The hook: close, his kind's HEAVY blow (Monster's wound-up strike).
-## - His sounder joins his charge: as it ends, each boar of his escort within
-##   "join_tiles" of his target charges it too (its own boar's charge). A
-##   cleared sounder makes his charges single again.
-## - Never into a downing (the coordinator): no charge, his or his sounder's
-##   joined one, at a foe under "not_below" of their hp; while he charges no
-##   boar of his sounder goes at such a foe (holds_sounder); and his charge's
-##   hit never takes a player or companion below 1 hp. His hook can down, as
-##   any blow.
+## - His sounder, one at a time (the coordinator's ruling after playtest's
+##   run): one boar of it engages his target (engager); the rest keep a ring
+##   2 to 3 off (Animal._sounder_tick). A charge that hits sends the engager
+##   in behind it ("join_tiles"); a dodged one sends nobody, and while he
+##   charges, skids or lies stunned by a crash no boar strikes: the dodge's
+##   opening is the player's, whole.
+## - Never into a downing (the coordinator): no charge at a foe under
+##   "not_below" of their hp, and at such a foe one of them strikes, not
+##   three: none of his sounder while he can strike them himself; his
+##   charge's hit never takes a player or companion below 1 hp. His hook can
+##   down, as any blow.
 ## - The bellow: at a fight's start and at half his hp ("bellow", heard
 ##   TELL_REACH; told far, BELLOW_REACH, while he is out: World.far_cry).
 ## Every move logs "[apex]" with his hp, never a player's name.
@@ -54,6 +57,8 @@ var _next_charge := 0
 var _hooked := false
 var _bellowed_fight := false
 var _bellowed_half := false
+## The boar of his sounder at his target (engager), kept while it lives.
+var _engager: Animal = null
 
 
 func _ready() -> void:
@@ -128,10 +133,34 @@ func charging_now() -> bool:
 	return str(_move.get("move", "")) in ["charge", "rush"]
 
 
-## Whether a boar of his sounder holds off [param foe] (the coordinator's
-## rule): while he charges, never at a foe under "not_below" of their hp.
-func holds_sounder(foe: GridEntity) -> bool:
-	return charging_now() and not may_charge(foe)
+## His opening after a dodge: skidding, or stunned by a crash.
+func open_now() -> bool:
+	return str(_move.get("move", "")) == "skid" or World.is_stunned(self) and stun_cause == &"crash"
+
+
+## The one boar of his sounder that may be at [param foe] now, or null: none
+## while he charges or lies open (a dodge's opening is the player's), none at
+## a foe under "not_below" while he can strike them himself; else the
+## nearest of his sounder to them, kept while it lives and follows him.
+func engager(foe: GridEntity) -> Animal:
+	if foe == null or charging_now() or open_now():
+		return null
+	if not may_charge(foe) and (World.distance(tile, foe.tile) <= 1 or _in_strike_reach(foe)):
+		return null
+	if _engager == null or not is_instance_valid(_engager) or not _engager.spawned or _engager.hp <= 0 			or _engager.escort_lead != self:
+		_engager = null
+		var best := 1 << 30
+		for boar in sounder():
+			var d := World.distance(boar.tile, foe.tile)
+			if d < best:
+				best = d
+				_engager = boar
+	return _engager
+
+
+## Whether [param boar] of his sounder may go at [param foe] now.
+func may_engage(boar: Animal, foe: GridEntity) -> bool:
+	return engager(foe) == boar
 
 
 ## His charge at a player or companion in its reach; else Monster's fight
@@ -224,7 +253,8 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 		_move = {"move": "skid", "telegraph": 0, "lands": World.tick + int(charge["skid"]), "from": World.tick}
 		_cry(&"skid", 0)
 		_log_move("charge", "dodged (%s), skids %d ticks" % [reason, int(charge["skid"])])
-	_sounder_charge()
+	if hit > 0:
+		_sounder_charge()  # A dodged one sends nobody: the opening is the player's.
 
 
 ## [param body] met by his run: its damage, never below 1 hp for a player or
@@ -237,6 +267,8 @@ func _gore(body: GridEntity, toward: Vector2) -> void:
 		World.damage(body, damage, self, &"attack")
 	if not is_instance_valid(body) or not body.spawned or body.hp <= 0:
 		return
+	if not body is Monster and not may_charge(body):
+		return  # Left low: not thrown into anything (a knock's impact could down them).
 	var aside := Vector2(-toward.y, toward.x)
 	var cell := body.tile + Vector2i(roundi(aside.x), roundi(aside.y))
 	if not (World.is_walkable(cell) and World.is_free(cell)):
@@ -244,8 +276,8 @@ func _gore(body: GridEntity, toward: Vector2) -> void:
 	World.launch(self, body, aside, float(charge["impulse"]))
 
 
-## His charge's end: each boar of his sounder near his target charges it too,
-## unless they are under "not_below" of their hp.
+## His charge's hit: the engager of his sounder, near his target, charges in
+## behind it, unless they are under "not_below" of their hp.
 func _sounder_charge() -> void:
 	if not is_instance_valid(target) or not target.spawned or target.hp <= 0:
 		return
@@ -253,9 +285,8 @@ func _sounder_charge() -> void:
 		_log_move("charge", "his sounder held (a foe low)")
 		return
 	var sent := 0
-	for boar in sounder():
-		if World.distance(boar.tile, target.tile) > int(charge["join_tiles"]):
-			continue
+	var boar := engager(target)
+	if boar != null and World.distance(boar.tile, target.tile) <= int(charge["join_tiles"]):
 		boar.target = target
 		boar._foe = target
 		boar._charge_until = World.tick + CHARGE_TICKS
@@ -265,7 +296,7 @@ func _sounder_charge() -> void:
 		boar._cry(&"charge", NOISE_CHARGE)
 		sent += 1
 	if sent > 0:
-		_log_move("charge", "his sounder joins, %d" % sent)
+		_log_move("charge", "one of his sounder joins")
 
 
 func _bellow(why: String) -> void:

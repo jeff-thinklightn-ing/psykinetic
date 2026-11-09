@@ -45260,6 +45260,21 @@ real places; in his lair with three; out by night with them following, never bol
 back once, home). CHANGELOG: voice's bullet. Server and level data; protocol unchanged; no new
 class_name.
 
+780 amended (16), his sounder one at a time (2026-11-09, enemy-ai; the coordinator's ruling on
+playtest's run of his lair, review/pace/pace.md "The boar king's lair": the bot downed from full in 2.2 s
+under five bodies, his sounder joining the moment his dodged charge ended, so the skid gave no opening,
+22 of 38 hp from the sounder's plain blows). (1) A charge that hits sends one boar in behind it; a dodged
+one sends none, and while he charges, skids or lies stunned by a crash no boar of his sounder strikes:
+the dodge's opening is the player's, whole. (2) One boar of his sounder at his target at a time
+(BoarKing.engager: the nearest, kept while it lives); the rest keep a ring Animal.SOUNDER_RING 2 to 3 off,
+facing it (Animal._ring), never striking. (3) maps takes the den keeper boar out of boar_lair (maps' side,
+below). (4) At a foe under not_below, one of them strikes, not three: no boar of his sounder while he can
+strike them himself; and his charge's hit leaves such a player or companion where they stand (no knock
+into anything that could down them). BoarKing.holds_sounder gone (may_engage, engager, open_now). monster_test
+_test_boar_king's sounder part (one boar struck in 150 ticks with two ringing; none during the skid; a
+dodged charge sends none, a hit one one; no tick of both at a low foe; never below 1). Server only,
+protocol unchanged, no new class_name; the bullet's charge clause in voice's new words.
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a
