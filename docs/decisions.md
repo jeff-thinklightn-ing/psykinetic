@@ -45925,6 +45925,8 @@ place of his purse, and the makers. It replaces owing players across the store's
 
 CHANGELOG (voice's). Server and client; protocol 54 (shared, unshipped); no new class_name.
 
+826, ui's side: no town owes a player (economy's 826, Jeff: the town shouldn't owe players; release's label). Supersedes 802 amended (9) before it shipped: every sale is paid in full at once, so a person's takes rows carry no "owed" and BarterPanel.give_word is Sell where a row's gold is over 0, Donate otherwise (the build fund, the larder, starter gear back to Rolf); give_lines drops "Owes you N gold". Gains drops the owed-gold reward (owed_words, OWED_COLOR, its uncued dim line): gold comes as gold, with its coin. A camp trader's or the town's limit on a good reaches the window only through up_to (BarterPanel.up_to, TownSheet.up_to; absent, no limit) and the refusal through the barter's own "why", so nothing more changes here. 802 amended (9)'s CHANGELOG bullet comes out unshipped (voice: economy's 826 bullet covers it, as both land in one cut). ui_test: voice's lines paid only, a trophy paid in full reads Sell with no owed line, a hand-in's gold its coin. Client only; protocol unchanged on this side; no new class_name.
+
 ## 827. Wilds basics: farm and barrow
 
 827, art-kit's side: the pieces for the old farmstead and the ruined barn, by hand, palette only, landed off
@@ -45935,7 +45937,6 @@ at its corners and gap ends. Lower and rougher than wall.<set>.straight_ruined, 
 ruin of a town building; it blocks as any wall edge. prop.scarecrow_fallen (cell) and prop.hay_rotten (cell,
 2 variants) are decor, laid as DECOR_KINDS rows drawn as prop.<kind>, as prop.broken_cart is.
 C:/dev/review/farm_ruin/make_farm_ruin.py. Art only; protocol unchanged; no new class_name.
-826, ui's side: no town owes a player (economy's 826, Jeff: the town shouldn't owe players; release's label). Supersedes 802 amended (9) before it shipped: every sale is paid in full at once, so a person's takes rows carry no "owed" and BarterPanel.give_word is Sell where a row's gold is over 0, Donate otherwise (the build fund, the larder, starter gear back to Rolf); give_lines drops "Owes you N gold". Gains drops the owed-gold reward (owed_words, OWED_COLOR, its uncued dim line): gold comes as gold, with its coin. A camp trader's or the town's limit on a good reaches the window only through up_to (BarterPanel.up_to, TownSheet.up_to; absent, no limit) and the refusal through the barter's own "why", so nothing more changes here. 802 amended (9)'s CHANGELOG bullet comes out unshipped (voice: economy's 826 bullet covers it, as both land in one cut). ui_test: voice's lines paid only, a trophy paid in full reads Sell with no owed line, a hand-in's gold its coin. Client only; protocol unchanged on this side; no new class_name.
 
 827, terrain's side (package "wilds basics: farm and barrow", landing off; maps' design
 C:/dev/review/farmstead_barrow/design.md; art-kit's low ruin pieces; release's label). A level's
@@ -45959,6 +45960,7 @@ wood plinth under a low-ruin edge), a sill, boards rotted and broken off ragged 
 its foot; wall.wood.low_ruin_end (vertex) a corner post snapped off at about 1.2 m. view_test's ruined-house
 check (terrain's, from 827's terrain side) now expects every wall art-kit's low ruin when the set has
 RUIN_LOW, else the stub and rubble mix, as its stone check does (terrain's wording, terrain's OK). Off.
+
 ## 828. Windowed runs on the laptop
 
 Release's number; the coordinator's approved design, the first step of the laptop runners plan (Jeff,
