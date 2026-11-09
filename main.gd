@@ -4290,14 +4290,19 @@ func _show_night_places() -> void:
 ## frames behind the arrival card (decision 660); the zone's own terrain
 ## again (a building raised, a ruin) builds it at once, as it always has.
 func _repaint(crossing := false) -> void:
+	var swapping := crossing and _client3d != null and _can_swap()
+	# The map left kept for the zone left, held (822 amended (3)).
+	var left_map := {"level": _shown_level, "cells": minimap.cells, "image": minimap.image} if swapping and minimap != null and minimap.image != null else {}
 	_paint_level()
 	if minimap != null:
 		_door_marks_at = -1  # A new level: its doors.
-		minimap.rebuild(level)
+		var made := _held_map if swapping and str(_held_map.get("level", {}).get("name", "")) == map_name else {}
+		minimap.rebuild(level, made)
 	if _client3d != null:
 		# The towns and folds go on the room once it is whole (_on_room_built).
-		if crossing and _can_swap():
+		if swapping:
 			_swap_neighbour()
+			_held_map = left_map
 			return
 		if crossing and arrival_card != null:
 			arrival_card.begin(zone_display_name())
@@ -5348,6 +5353,12 @@ var _shown_level := {}
 ## 0.9 s in one frame on the main thread): the task, and what it read.
 var _read_task := -1
 var _read_level := {}
+## The held level's minimap (Minimap.made_for), made on a worker once it is
+## laid (822 amended (3): 26 to 36 ms in the crossing's frame): the task, what
+## it made, and the map kept for the zone held.
+var _map_task := -1
+var _map_made := {}
+var _held_map := {}
 ## Views let go whose room node still holds the live room (a room stays
 ## under the view that built it, swap_room): freed once empty.
 var _room_holders: Array[Client3D] = []
@@ -5479,6 +5490,7 @@ func drop_neighbour() -> void:
 	_neighbour_zone = ""
 	_neighbour_level = {}
 	_neighbour_asked = ""
+	_held_map = {}
 
 
 ## Client: the server's "near" answer (822): the zone's state came before
@@ -5504,6 +5516,12 @@ func _build_neighbour(zone: String) -> void:
 		_read_task = WorkerThreadPool.add_task(_read_neighbour.bind(zone), false, "neighbour level")
 
 
+## On a worker: the held level's minimap (it reads the level as laid; the
+## neighbour's build reads it too and nothing writes it).
+func _make_held_map(loaded: Dictionary) -> void:
+	_map_made = Minimap.made_for(loaded)
+
+
 ## On a worker: zone [param zone]'s level read (Level.load_level parses
 ## its images and files; nothing shared is written).
 func _read_neighbour(zone: String) -> void:
@@ -5513,6 +5531,12 @@ func _read_neighbour(zone: String) -> void:
 ## Each frame: a read done is laid if its zone is still the one wanted
 ## (another wanted meanwhile is read next; one let go, dropped).
 func _poll_neighbour_read() -> void:
+	if _map_task != -1 and WorkerThreadPool.is_task_completed(_map_task):
+		WorkerThreadPool.wait_for_task_completion(_map_task)
+		_map_task = -1
+		if is_same(_map_made.get("level"), _neighbour_level):
+			_held_map = _map_made
+		_map_made = {}
 	if _read_task == -1 or not WorkerThreadPool.is_task_completed(_read_task):
 		return
 	WorkerThreadPool.wait_for_task_completion(_read_task)
@@ -5552,6 +5576,9 @@ func _lay_neighbour(zone: String, loaded: Dictionary) -> void:
 	_neighbour_zone = zone
 	_neighbour_level = loaded
 	view.build_neighbour(terrain, loaded["centre"], _client3d._sky_floor, true, _client3d._plane_at + plane_offset(map_name, zone))
+	_held_map = {}
+	if minimap != null and _map_task == -1:
+		_map_task = WorkerThreadPool.add_task(_make_held_map.bind(loaded), false, "held minimap")
 	print("[zone] building %s beside %s" % [zone, map_name])
 
 

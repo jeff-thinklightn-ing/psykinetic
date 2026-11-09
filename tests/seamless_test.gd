@@ -152,8 +152,15 @@ func _test_swap(view: Client3D) -> void:
 	var live_at := live.position
 	var pairs: Array = [["wilds", "from_held", wilds_room, held_room, "held"], ["held", "from_wilds", held_room, wilds_room, "wilds"]]
 	for pair: Array in pairs:
+		var held_map: Dictionary = _main._held_map
+		var left_image: Image = _main.minimap.image
+		_check(str(held_map.get("level", {}).get("name", "")) == pair[0] and held_map.get("image") is Image,
+				"%s's minimap made while it is held" % pair[0])
 		_check(_main.travel(Net.local_id, pair[0], pair[1]), "the host crosses to %s" % pair[0])
 		await _frames(2)
+		_check(is_same(_main.minimap.image, held_map.get("image")) and is_same(_main._held_map.get("image"), left_image)
+				and str(_main._held_map.get("level", {}).get("name", "")) == pair[4],
+				"the minimap the one made while held, %s's kept for it held in turn" % pair[4])
 		_check(live._room == pair[2] and _main._neighbour == view and view._room == pair[3] and _main._neighbour_zone == pair[4]
 				and _main._shown_zone == pair[0] and live._terrain == _main._terrain,
 				"swapped: %s's room live, %s's held, no other" % [pair[0], pair[4]])

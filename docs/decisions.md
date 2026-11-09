@@ -45440,6 +45440,17 @@ their builders through each swap; let go after a swap, the held room freed, the 
 its holder, freed after the next build; the wilds held again. Client only, protocol unchanged, no new
 class_name.
 
+822 amended (3): the minimap and the far puppets at the crossing (the coordinator's bar for the
+switch-on: the crossing's frame and the ten after it under 33 ms each, on the windowed bench). The
+minimap's image is made apart (Minimap.made_for, static, reading the level only): Main makes the held
+level's on a worker once it is laid (_make_held_map, polled with the level's read) and rebuild takes it
+at the swap (the caller sees it is that level's); the map of the zone left is kept for it, held in
+turn. Puppets for entities beyond the view's reach (unseen and unheard, stopped as soon as made) are
+made for FAR_MAKE_USEC (3 ms) a frame at most, the rest in the frames after; those within it are made
+at once, as ever; on for everyone (an arrival behind the card too). Headless, the swap into the wilds
+went from 92 to 60 ms, into held from 27 to 22. seamless_test: each swap shows the map made while held
+and keeps the one left. Client only, protocol unchanged, no new class_name.
+
 Still to come, each behind the flag: (3) maps: the five corridors, each neighbour's plane origin 16
 cells toward the wilds (a 16-cell overlap at each seam), paired links at seam + 7 and seam − 8 with
 spawns on the same world cell, and a level_test check that both maps agree in the overlap. (4) The

@@ -772,6 +772,12 @@ const REACH_EASE := 0.5
 ## A puppet left far off is looked at again every this many frames (its
 ## coming near, its hp), not every frame.
 const FAR_EVERY := 4
+## A frame makes puppets for entities beyond the reach (unseen, unheard,
+## stopped once made) for this long at most (µs); the rest wait for the
+## next frames. Those within it are always made at once. An arrival's
+## thousands no longer land in one frame (822 amended (3): 19 ms entering
+## the wilds).
+const FAR_MAKE_USEC := 3000
 const SHADOW_RECHECK := 0.5
 ## Warm white, whatever the body's colour.
 const PLAYER_LIGHT := Color(1.0, 0.93, 0.82)
@@ -18567,6 +18573,7 @@ func _sync_puppets() -> void:
 	var reach := maxf(_view_reach() + PUPPET_MARGIN, Sfx.MAX_DISTANCE) if _camera != null else INF
 	var aim := Vector2(_camera_target.x, _camera_target.z)
 	var frame := Engine.get_process_frames()
+	var far_making := 0
 	# World's own list, not a copy: nothing here spawns or despawns.
 	for entity in World.entities():
 		if not entity.spawned:
@@ -18584,8 +18591,15 @@ func _sync_puppets() -> void:
 				target(null)
 			_puppets[id].queue_free()
 			made = true
+		var far_off := made and Vector2(entity.tile).distance_to(aim) > reach
+		if far_off and far_making >= FAR_MAKE_USEC and not _puppets.has(id):
+			seen.erase(id)
+			continue  # Made in a later frame (FAR_MAKE_USEC).
+		var making := Time.get_ticks_usec()
 		if made:
 			_puppets[id] = _make_puppet(entity)
+			if far_off:
+				far_making += Time.get_ticks_usec() - making
 		var puppet := _puppets[id]
 		if not made and Vector2(entity.tile).distance_to(aim) > reach:
 			# Far off: unseen and unheard. Its tile and hp are kept, so it

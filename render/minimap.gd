@@ -156,11 +156,26 @@ static func ground_colour(kind: String) -> Color:
 ## The map drawn again from [param level] (Level.load_level's, as Main holds
 ## it for the zone it shows): on a change of zone and when the level is
 ## edited (a builder's "terrain").
-func rebuild(level: Dictionary) -> void:
-	var terrain: Dictionary = level.get("terrain", {})
-	cells = level.get("size", Vector2i.ZERO)
+## [param made] the image made apart for this level (made_for; 822: a held
+## neighbour's, made on a worker while it is held; the caller sees it is
+## this level's), else made here.
+func rebuild(level: Dictionary, made := {}) -> void:
+	if made.is_empty():
+		made = made_for(level)
+	cells = made["cells"]
 	title = str(level.get("display_name", "")) if str(level.get("display_name", "")) != "" else str(level.get("name", ""))
-	image = Image.create(maxi(cells.x, 1), maxi(cells.y, 1), false, Image.FORMAT_RGBA8)
+	image = made["image"]
+	texture = ImageTexture.create_from_image(image)
+	_rest_of_rebuild(level)
+
+
+## What this map draws for [param level] (its cells' colours, its water, its
+## walls): {level, cells, image}. Reads the level and writes nothing else,
+## so a worker may make it (822 amended (3); 26 to 36 ms for the wilds).
+static func made_for(level: Dictionary) -> Dictionary:
+	var terrain: Dictionary = level.get("terrain", {})
+	var size: Vector2i = level.get("size", Vector2i.ZERO)
+	var image := Image.create(maxi(size.x, 1), maxi(size.y, 1), false, Image.FORMAT_RGBA8)
 	image.fill(Color(0, 0, 0, 0))
 	var kinds: Dictionary = terrain.get("kinds", {})
 	var heights: Dictionary = terrain.get("heights", {})
@@ -175,13 +190,13 @@ func rebuild(level: Dictionary) -> void:
 			colour = colour.lightened(0.05 * height) if height > 0 else colour.darkened(0.06 * -height)
 		image.set_pixelv(cell, colour)
 	for cell: Vector2i in terrain.get("water", []):
-		if Rect2i(Vector2i.ZERO, cells).has_point(cell):
+		if Rect2i(Vector2i.ZERO, size).has_point(cell):
 			image.set_pixelv(cell, WATER)
 	# A wall between two cells darkens the floor either side, once, so it shows
 	# at one pixel a cell. The walls Level puts round the zone's border are
 	# the map's own edge, drawn by its frame.
 	var edges: Dictionary = terrain.get("edges", {})
-	var inside := Rect2i(Vector2i.ZERO, cells)
+	var inside := Rect2i(Vector2i.ZERO, size)
 	var walled := {}
 	for key: Vector3i in edges:
 		if int(edges[key]) != Terrain.Edge.WALL:
@@ -194,7 +209,12 @@ func rebuild(level: Dictionary) -> void:
 	for cell: Vector2i in walled:
 		if image.get_pixelv(cell).a > 0.0:
 			image.set_pixelv(cell, image.get_pixelv(cell).lerp(WALL, 0.65))
-	texture = ImageTexture.create_from_image(image)
+	return {"level": level, "cells": size, "image": image}
+
+
+## The rest of rebuild: the starts, the ways out and the places.
+func _rest_of_rebuild(level: Dictionary) -> void:
+	var terrain: Dictionary = level.get("terrain", {})
 	starts.assign(level.get("starts", []))
 	ways_out.clear()
 	var cues := {}  # tile -> {cue, facing, variant} (Level.link_cues, 589).
