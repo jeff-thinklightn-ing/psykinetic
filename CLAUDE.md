@@ -112,6 +112,10 @@ place, and a text and loot don't go in before a quest is in."
   happen puts its window off-screen (`--position 4000,4000`) and never takes focus.
   Every test, shot or clip Godot a session starts also runs silent, with `--audio-driver Dummy`
   (Jeff, 2026-10-28: test windows' music rang on his speakers).
+  Stills, clips and windowed benches run on the Lenovo through `tools/remote_shot.sh` (decision
+  828); there they need no clearance, since its idle rule (5 minutes without input, else it stops
+  with "laptop in use") keeps it off Jeff's screen. This PC's off-screen runs are for when the
+  laptop is busy or off, and still need the coordinator's window check.
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
   generation, a full test suite, a bench, a Godot import or export, run it through the gate:
   `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
