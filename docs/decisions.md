@@ -36263,6 +36263,19 @@ its contact on the landing, no second strike on its swing) and _test_creature_pu
 none without a lead). Reel "drawbacks" (melee_audit against an imp, a robber, a skeleton, a wolf) for
 the coordinator. Client only, protocol unchanged, no new class_name; CHANGELOG (voice's words).
 
+338 amended (7): no hit clip over a corpse (the barrow death freeze) (2026-11-09; release's label;
+Jeff on v0.1.208: "barrows enemies when dying no longer fall to ground they just freeze in place").
+Since 338 amended (4) a struck body's flinch waits for the attacker's drawn blade to land
+(_struck_with); on a killing blow the death came between, _fall played its death, and the flinch's
+hit clip then played over it, and a corpse, out of _puppets, is never drawn again: it stood frozen
+in the hit's last frame, then sank. A held wind-up's delayed strike could do the same to one killed
+holding it. Client3D now leaves a puppet marked "corpse" alone in each delayed path: _flinch, the
+held strike's timer, _recoil and _hit_from. Creatures were spared (CreatureView.hit does nothing
+once it dies). The blow's delayed pain cry (_on_struck) already finds the struck body by its id
+(836): one the blow killed is freed before the blade lands, which this test now covers. view_test _test_barrow_deaths: a robber and a skeleton killed by the player's drawn
+blow, at rest and mid-wind-up, each end on a death clip. CHANGELOG (voice's words). Client only,
+protocol unchanged, no new class_name.
+
 ## 672 amended, ui's side: quests reset all takes everything quest-shaped
 
 Jeff (decisions/quest-reset-captive.md): "allow everything to be reset ,

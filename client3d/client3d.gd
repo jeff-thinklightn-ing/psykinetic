@@ -19996,7 +19996,10 @@ func _on_struck(_amount: int, cause: StringName, id: int) -> void:
 
 ## A body struck: its hit clip, a creature's hit.
 func _flinch(puppet: Node3D) -> void:
-	if not is_instance_valid(puppet) or not puppet.is_inside_tree():
+	# Not a corpse: the killing blow's flinch waits for the drawn blade, by then its death plays, and
+	# a hit over it left the body standing frozen (Jeff on v0.1.208: "barrows enemies when dying no
+	# longer fall to ground they just freeze in place").
+	if not is_instance_valid(puppet) or not puppet.is_inside_tree() or puppet.has_meta("corpse"):
 		return
 	_play_once(puppet, _pick_clip(puppet, HIT_CLIPS))
 	if puppet.has_meta("creature_view"):
@@ -23518,7 +23521,8 @@ func _strike(puppet: Node3D, swinger: GridEntity, weapon: String, wound := 0.0, 
 		get_tree().create_timer(hold).timeout.connect(func() -> void:
 			var fired_body := instance_from_id(ids_held[0]) as Node3D
 			var fired_rig := instance_from_id(ids_held[1]) as AnimRig
-			if is_instance_valid(fired_body) and is_instance_valid(fired_rig) and int(fired_body.get_meta("strike_token", 0)) == token:
+			if is_instance_valid(fired_body) and is_instance_valid(fired_rig) and int(fired_body.get_meta("strike_token", 0)) == token \
+					and not fired_body.has_meta("corpse"):  # Killed while it held its wind-up: its death stays.
 				var late := fired_rig.strike(clip, contact, lands_in - hold, recover)
 				fired_body.set_meta("busy_until", Time.get_ticks_msec() + int(late * 1000.0)))
 		return true
@@ -23880,6 +23884,8 @@ static func hit_side(facing: Vector2, from: Vector2) -> String:
 ## [param puppet]'s hit for a blow from [param from] (grid): its moves' "hits" for that side where it
 ## has them, else one of HIT_CLIPS; a creature its view's hit. False if there is no model.
 func _hit_from(puppet: Node3D, entity: GridEntity, from: Vector2) -> bool:
+	if puppet.has_meta("corpse"):
+		return true  # A delayed blow on the dead: its death stays (as _flinch).
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).hit()
 		return true
@@ -23985,6 +23991,8 @@ func _recoil_heard(puppet: Node3D, cause: StringName) -> void:
 
 ## [param puppet] thrown back off a shield: CLIP_RECOIL where its model has it, else a hit.
 func _recoil(puppet: Node3D) -> void:
+	if puppet.has_meta("corpse"):
+		return  # Killed before its blow met the guard: its death stays (as _flinch).
 	if puppet.has_meta("creature_view"):
 		(puppet.get_meta("creature_view") as CreatureView).hit()
 	elif not _play_once(puppet, CLIP_RECOIL):

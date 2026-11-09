@@ -162,6 +162,7 @@ func _ready() -> void:
 		await _test_blows_seen()  # It lets frames run too.
 		await _test_shield_seen()
 		await _test_reel_clock()
+		await _test_barrow_deaths()
 		await _test_rest()
 		_test_wet()
 		_test_sword_whiff()
@@ -11791,6 +11792,66 @@ func _test_creature_puppets() -> void:
 ## art holds charge_tell, charge, skid, dazed and hook; the charge's telegraph plays charge_tell, a
 ## skid its skid, a crash's stun dazed looping till it's over, a heavy wind-up the hook and a lead
 ## the plain attack. On a view of its own (his row is enemy-ai's, shelved till its switch-on).
+## Jeff on v0.1.208: "barrows enemies when dying no longer fall to ground they just freeze in place".
+## A robber and a skeleton killed at rest and mid-wind-up each play a death and lie down.
+func _test_barrow_deaths() -> void:
+	print("
+== the barrow's dead fall (Jeff: they froze in place) ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to kill them")
+		return
+	# A cell beside the player it can stand on (wherever earlier sections left them), and the way to it.
+	var way := Vector2i.ZERO
+	for each: Vector2i in [Vector2i(2, 0), Vector2i(-2, 0), Vector2i(0, 2), Vector2i(0, -2), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var cell := player.tile + each
+		if World.is_walkable(cell) and not World.is_water(cell) and World.get_entity_at(cell) == null:
+			way = each
+			break
+	if way == Vector2i.ZERO:
+		_check(false, "an open cell beside the player (%s)" % player.tile)
+		return
+	var ahead := Vector2i(signi(way.x), signi(way.y))
+	for kind: String in ["robber", "skeleton"]:
+		for winding in [false, true]:
+			var foe := _spawn_imp(player.tile + way, kind)
+			if foe == null:
+				_check(false, "a %s placed beside the player (%s)" % [kind, player.tile + way])
+				continue
+			var puppet: Node3D = null
+			for i in 30:
+				_rig._process(0.0)
+				puppet = _rig._puppets.get(foe.get_instance_id())
+				if puppet != null and puppet.has_meta("rig"):
+					break
+				await get_tree().process_frame
+			if puppet == null or not puppet.has_meta("rig"):
+				_check(false, "%s drawn with a model (%s)" % [kind, puppet != null])
+				World.despawn(foe)
+				continue
+			var rig := puppet.get_meta("rig") as AnimRig
+			await _frames(3)
+			_rig._process(0.0)
+			if winding:
+				_rig._on_winding(-ahead, 3, foe.get_instance_id())
+				await _frames(2)
+				_rig._process(0.0)
+			var before := rig.playing()
+			# Killed by a drawn blow (the player swung): its flinch waits for the blade to land, after the death.
+			player._world_swung(ahead)
+			World.damage(foe, foe.hp + 100, player, &"attack")
+			var seen := []
+			for i in 12:
+				await get_tree().create_timer(0.1).timeout
+				_rig._process(0.0)
+				if is_instance_valid(puppet):
+					seen.append(rig.playing() if is_instance_valid(rig) else "")
+			var died := not seen.is_empty() and str(seen[-1]).begins_with("Death")
+			_check(is_instance_valid(puppet) and puppet.has_meta("corpse") and died,
+					"a %s killed %s plays its death and lies down (%s, then %s)" % [kind, "mid-wind-up" if winding else "at rest", before, seen])
+			await _frames(1)
+
+
 func _test_reel_clock() -> void:
 	print("
 == a reel times clips by its frames (AnimRig.now_msec) ==")
@@ -12911,7 +12972,8 @@ func _spawn_imp(tile: Vector2i, kind := "") -> Monster:
 	if not kind.is_empty():
 		spec["kind"] = kind
 	var imp := _main._spawn(spec) as Monster
-	imp.sight_range = 0
+	if imp != null:
+		imp.sight_range = 0
 	return imp
 
 
