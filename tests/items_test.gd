@@ -3652,7 +3652,7 @@ func _test_starter_gear() -> void:
 ## Magic, phase 1 (789): the bear's-claw charm worn in the charm slot gives
 ## an aura at once and charges while worn, kept in the charm; the aura's
 ## glow is a light the senses see by; the bear's-grease draught makes you
-## heavy for ten minutes; the bear drops no grease till a use is made for it.
+## heavy for ten minutes; the bear drops its grease a quarter of the time (the charms use it).
 func _test_charm() -> void:
 	print("\n== magic, phase 1 (789): the charm, its charge and glow; the grease draught ==")
 	var host := _player(Net.local_id)
@@ -3666,7 +3666,8 @@ func _test_charm() -> void:
 	for drop: Dictionary in Monster.kinds()["great_bear"]["drops"]:
 		if drop.get("item") == "bear_grease":
 			grease = drop
-	_check(grease.is_empty(), "the great bear drops no grease till the medicine man's charms give it a use (the coordinator, 11-06; %s)" % grease)
+	_check(is_equal_approx(float(grease.get("chance", 0.0)), 0.25) and grease.get("count") is Array and int(grease["count"][0]) == 1 and int(grease["count"][1]) == 1,
+		"the great bear drops its grease, one crock a quarter of the time, now the medicine man's charms use it (789; the coordinator, 11-08; %s)" % grease)
 	_check(host.aura == 0.0 and World.worn_charm(host) == 0, "no charm: no aura")
 	var charm := _give(host, "bear_claw_charm", 0)
 	_check(host.aura == 0.0, "a charm in the pack gives none")

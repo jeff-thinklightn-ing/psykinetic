@@ -90,7 +90,7 @@
 		"senses": {"cone": 120, "night": 0.3, "hearing": 1.0, "alert_sight": 1, "notice": 0.8},
 		"tactic": "plain", "idle": "wander", "opens_doors": false, "door_force": 0, "leash": 30,
 		"temperament": {"bold": 1, "cautious": 0, "cowardly": 0},
-		"drops": [{"item": "bear_pelt", "count": [1, 1]}, {"item": "bear_claw", "count": [1, 3]}],
+		"drops": [{"item": "bear_pelt", "count": [1, 1]}, {"item": "bear_claw", "count": [1, 3]}, {"item": "bear_grease", "count": [1, 1], "chance": 0.25}],
 		"party": {"hp_per_player": 0.9, "companion_share": 0.75, "flank_guard_per_player": 25, "most": 3},
 			"moves": {
 			"swipe": {"windup": 10, "length": 2.0, "half_angle": 60.0, "damage": 4, "impulse": 140.0, "every": 20},

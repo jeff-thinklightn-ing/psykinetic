@@ -44852,6 +44852,8 @@ aura). Stills (C:/dev/review/lands/motes_1106): 3 cm barely showed at play zoom 
 as asked; kept additive, no tint on the body); the coordinator took 8 cm. Client only, protocol
 unchanged, no new class_name, no bullet (the charm stays hidden until the bear's cave opens).
 
+Amended (789 amended (2)): the bear's grease back in its drops (2026-11-08, release's label; the coordinator: owed to the medicine man's charms package, 821 amended, which buys the grease by Give and makes it into the draught). The great bear cave's package took 789's {bear_grease, [1, 1], chance 0.25} out of the great bear's drops till the grease had a use; with the charms' switch-on it has one, so it is back as 789 laid it, after the pelt and claws. Tests: items_test _test_charm (the drop at 0.25, one crock), monster_test's apex row pin (pelt, claws, grease). Server data only; protocol unchanged, no new class_name, no bullet (economy's charms switch-on carries the line).
+
 ## 817. The server ships with Godot's debug template, behind a tick watchdog
 
 Release found the box runs Godot's release template, which compiles out

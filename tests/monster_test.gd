@@ -2691,8 +2691,8 @@ func _test_great_bear() -> void:
 			and int(bear.charge["every"]) == int(row_moves["charge"]["every"]), "its moves' numbers are its monsters.json row's \"moves\" (tuning is data)")
 	var drop_items: Array = (Monster.kinds()["great_bear"]["drops"] as Array).map(func(d: Dictionary) -> String: return str(d["item"]))
 	_check(Monster.is_apex("great_bear") and not Monster.is_apex("wolf") and not Monster.is_apex("no_such_kind")
-			and drop_items == ["bear_pelt", "bear_claw"] and drop_items.all(func(item: String) -> bool: return Items.all().has(item)),
-			"an apex creature by its row (Monster.is_apex), its pelt and claws its drops, its grease off till a use is made for it (780 amended (4), 789, the coordinator 11-06; %s)" % [drop_items])
+			and drop_items == ["bear_pelt", "bear_claw", "bear_grease"] and drop_items.all(func(item: String) -> bool: return Items.all().has(item)),
+			"an apex creature by its row (Monster.is_apex), its pelt and claws its drops, and its grease now the medicine man's charms use it (780 amended (4), 789, the coordinator 11-06 and 11-08; %s)" % [drop_items])
 	var cries: Array[StringName] = []
 	bear.cried.connect(func(kind: StringName) -> void: cries.append(kind))
 	for i in 5:
