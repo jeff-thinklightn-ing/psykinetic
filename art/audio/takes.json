@@ -2084,6 +2084,44 @@
 				"license": "CC0 1.0"
 			}
 		],
+		"sfx.goblin_whistle": [
+			{
+				"file": "sfx.goblin_whistle.ogg",
+				"from": "freesound",
+				"original": "freesound 137106: Whistle 07 (from 0 s for 0.6 s)",
+				"sha256": "7b8eeff8f08ba6ccc7205eb6a642c479cd83d04faf87efd1194776e87aa769ef",
+				"by": "chaosportal",
+				"url": "https://freesound.org/people/chaosportal/sounds/137106/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_whistle.2.ogg",
+				"from": "freesound",
+				"original": "freesound 256552: Attention Whistle.wav (from 0 s for 0.45 s)",
+				"sha256": "abe9d11487000ceede936cddcf71fa9e7580510c981948b03cf94d660df40428",
+				"by": "Skiggz",
+				"url": "https://freesound.org/people/Skiggz/sounds/256552/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_whistle.3.ogg",
+				"from": "freesound",
+				"original": "freesound 74388: Trill Whistle.wav (from 0 s for 0.6 s)",
+				"sha256": "9ba31801a512144e2babf83175bc9bc4530327ecdc3347ed3edf6102c596c272",
+				"by": "dland",
+				"url": "https://freesound.org/people/dland/sounds/74388/",
+				"license": "CC0 1.0"
+			},
+			{
+				"file": "sfx.goblin_whistle.4.ogg",
+				"from": "freesound",
+				"original": "freesound 19825: Pfiff_whistle.wav (from 0 s for 0.95 s)",
+				"sha256": "2e8ba59020d559d855066b6bc55edb8923a161fe3905c4e17e9b75cdd009478f",
+				"by": "tommorawe",
+				"url": "https://freesound.org/people/tommorawe/sounds/19825/",
+				"license": "CC0 1.0"
+			}
+		],
 		"sfx.grass_rustle": [
 			{
 				"file": "sfx.grass_rustle.ogg",

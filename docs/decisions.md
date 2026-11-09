@@ -45630,6 +45630,15 @@ reach and cuts in at once. "in_reach" 2 (one or two at a time) and "spread" 1.0 
 different sides) kept; the damage as it was. The rerun's bar: no downs from above 10, the pack
 landing 8 blows or more, the hp lost split by attacker. Data only, server, protocol unchanged.
 
+824, sound's side (release's label; enemy-ai's ask): the pack's whistle. sfx.goblin_whistle (a
+short, sharp whistle, voice bus, range 12, -4 dB, noise null, never heard by monsters) is what
+SoundKit.cry gives a sneak's &"whistle" (a sneak sounds as a goblin), so Client3D._on_cried plays
+it at the first of the pack to take up the fight, pitched as a sneak (1.05); any kind with no
+whistle slot, none. Four CC0 Freesound takes: 137106 (chaosportal), 256552 (Skiggz), 74388
+(dland) and 19825 (tommorawe). Review: C:/dev/review/sound/sneak_whistle. sound_kit_test (a
+sneak's whistle, three takes or more, positional, unheard by monsters; a wolf's, none). Client
+only; protocol unchanged, no new class_name, no bullet (dungeon's switch-on carries it).
+
 ## 825. Hearths: a fire ring a player lights, burning a while as fire, a warmed rest
 
 The coordinator's approval of maps' design (C:/dev/review/hill_cave_rest/design.md; release's

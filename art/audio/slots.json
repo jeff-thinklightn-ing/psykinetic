@@ -1023,6 +1023,15 @@
 			"volume_db": -2.0,
 			"uses": "a lurker breaking cover behind you: a sharp hiss as its 0.8 s windup starts, heard in time to step aside (790 amended (4): Skeech, the kobold chief; Monster.cried ambush, SoundKit.cry)"
 		},
+		"sfx.goblin_whistle": {
+			"category": "creatures",
+			"type": "oneshot",
+			"bus": "voice",
+			"noise": null,
+			"range": 12,
+			"volume_db": -4.0,
+			"uses": "a sneak pack waking: a short sharp whistle from the first to wake, so the player knows a flanking pack is coming; never heard by monsters (824, sound's side; Monster.cried whistle, SoundKit.cry)"
+		},
 		"sfx.goblin_pain": {
 			"category": "creatures",
 			"type": "oneshot",

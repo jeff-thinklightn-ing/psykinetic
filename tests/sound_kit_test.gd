@@ -200,6 +200,12 @@ func _test_noises_are_the_sims() -> void:
 			and SoundKit.noise("sfx.goblin_ambush") == "" and SoundKit.bus("sfx.goblin_ambush") == "voice"
 			and SoundKit.takes("sfx.goblin_ambush").size() >= 3 and SoundKit.cry("wolf", "ambush") == "",
 			"a sneak's ambush hisses (sfx.goblin_ambush, three takes, positional, unheard by monsters); a kind with no ambush slot, nothing")
+	# 824, sound's side: a sneak pack's first to wake whistles, heard from
+	# farther than the ambush, never by monsters.
+	_check(SoundKit.cry("sneak", "whistle") == "sfx.goblin_whistle" and SoundKit.positional("sfx.goblin_whistle")
+			and SoundKit.noise("sfx.goblin_whistle") == "" and SoundKit.bus("sfx.goblin_whistle") == "voice"
+			and SoundKit.takes("sfx.goblin_whistle").size() >= 3 and SoundKit.cry("wolf", "whistle") == "",
+			"a waking sneak pack whistles (sfx.goblin_whistle, three takes, positional, unheard by monsters); a kind with no whistle slot, nothing")
 	_check(SoundKit.idle("boar").has("sfx.boar_grunt") and SoundKit.idle("boar").has("sfx.boar_root") and SoundKit.idle("boar_king") == SoundKit.idle("boar")
 			and SoundKit.idle("deer").is_empty() and SoundKit.takes("sfx.boar_grunt").size() >= 2 and SoundKit.takes("sfx.boar_root").size() >= 2
 			and SoundKit.positional("sfx.boar_grunt") and SoundKit.noise("sfx.boar_grunt") == "",
