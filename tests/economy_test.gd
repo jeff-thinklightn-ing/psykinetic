@@ -778,6 +778,7 @@ func _test_town_sheet(host: Player) -> void:
 	_test_person_takes(host)
 	_test_trophies(host)
 	_test_charm_inputs(host)
+	_test_truffles(host)
 	_test_admin_stock(host)
 
 
@@ -1007,6 +1008,58 @@ func _test_trophies(host: Player) -> void:
 	for id in away:
 		World.production.set_away(id, false)
 	economy.rules["vendor"] = vendor
+
+
+## 780 amended (16), economy's side: the boar king's find. The Mughouse's
+## taverner buys truffles by Give, "for the pot", at half their worth (821's
+## trophy path; else Rolf, selling on); the forest camps' traders buy them by
+## Sell; the tanner takes the boar king's hide and tusk.
+func _test_truffles(host: Player) -> void:
+	print("
+== 780 amended (16): truffles, the boar king's hide and tusk ==")
+	var me: String = _main._id_of_player(host)
+	var economy: Economy = World.economy
+	var vendor: Dictionary = economy.rules.get("vendor", {}).duplicate(true)
+	economy.rules["vendor"] = {"towns": [STORE], "name": "Rolf", "price": 1, "wares": []}
+	var owed: Dictionary = economy._player_owed.duplicate(true)
+	economy._player_owed.erase(me)  # Earlier sales may have reached owed_cap (a gift past it); put back at the end.
+	_check(Items.def("truffles").get("value", 0) == 8 and economy.trophy_trade("truffles") == "taverner" and economy.trophy_for("truffles") == "the pot"
+		and economy.trophy_price("truffles") == 4, "truffles: the taverner's, for the pot, 4 gold (half of 8)")
+	_check(economy.trophy_trade("boar_king_hide") == "tanner" and economy.trophy_for("boar_king_hide") == "tanning"
+		and economy.trophy_trade("boar_king_tusk") == "tanner" and economy.trophy_for("boar_king_tusk") == "trimming leather"
+		and economy.trophy_price("boar_king_hide") == 15 and economy.trophy_price("boar_king_tusk") == 5,
+		"the boar king's hide (15, tanning) and tusk (5, trimming leather) go to the tanner")
+	var camps := _fresh()
+	camps.rules = camps.rules.duplicate(true)
+	camps.rules["camp_traders"] = Production.read_rules()["camp_traders"]
+	camps.catalog = Economy.items_defs
+	_check(camps.camp_offer("truffles") == 7, "a camp trader buys truffles at 7 (%d)" % camps.camp_offer("truffles"))
+	var away: Array[String] = []
+	for id: String in World.production.worker_ids(STORE):
+		if "taverner" in World.production.worker(id)["trades"] and not World.production.worker(id).get("away", false):
+			World.production.set_away(id, true)  # Put back at the end.
+			away.append(id)
+	for slot: int in [Items.PACK_SLOTS[0], Items.PACK_SLOTS[1], Items.PACK_SLOTS[2]]:
+		if not str(host.slots[slot]).is_empty():
+			World.take_item(host, host, slot)
+	_main._hand_item(me, "truffles", "test")
+	_check(_main.trophy_taker(STORE, "truffles") == Offers.VENDOR + STORE, "no taverner seated: Rolf buys truffles")
+	World.production.add_worker("truff_tav", "Tess", ["taverner"], STORE, "test")
+	_check(_main.trophy_taker(STORE, "truffles") == "truff_tav", "a taverner seated: she buys them")
+	_check(not _main.person_takes(host, Offers.VENDOR + STORE).any(func(each: Dictionary) -> bool: return each["what"] == "truffles"), "and Rolf no longer offers for them")
+	var rows: Array = _main.person_takes(host, "truff_tav").filter(func(each: Dictionary) -> bool: return each["what"] == "truffles")
+	_check(rows.size() == 1 and rows[0]["for"]["name"] == "the pot" and int(rows[0]["gold"]) + int(rows[0]["owed"]) == 4 * int(rows[0]["count"]),
+		"her row: for the pot, 4 gold a truffle paid or owed (%s)" % [rows])
+	_check(_main.depot_pointer(STORE, "truffles") == "That goes to the Mughouse.", "the chest's pointer: to the Mughouse (%s)" % _main.depot_pointer(STORE, "truffles"))
+	var purse := economy.gold(me)
+	var sold: Array = _main.give_to(host, "truff_tav", "Tess", [int(rows[0]["uid"]) if rows.size() == 1 else 0])
+	_check(sold.size() == 1 and World.count_of(host, "truffles") == 0 and economy.gold(me) == purse + (int(rows[0]["gold"]) if rows.size() == 1 else -1)
+		and World.stockpile.count(STORE, "truffles") >= 1, "given: banked, paid what the row said")
+	World.production.remove_worker("truff_tav")
+	for id in away:
+		World.production.set_away(id, false)
+	economy.rules["vendor"] = vendor
+	economy._player_owed = owed
 
 
 ## 821 amended: a maker buys his own recipes' non-resource inputs by Give

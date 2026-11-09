@@ -45133,6 +45133,18 @@ references them until maps opens the lair and enemy-ai switches the king on: the
 checks the table (2 to 4 truffles, all known, no gold) and the rows. Data only: protocol unchanged, no
 new class_name, no bullet.
 
+780 amended (16), economy's side: the boar king's find bought (the coordinator's approval; release's label;
+lands off, its package the boar king's, after items' truffles row and before enemy-ai's switch-on).
+The Mughouse's taverner buys truffles (items' row: value 8, a stack of 5, 2 to 4 in boar_lair_cache)
+by Give through 821's trophy path: receives.trophies gains "taverner": {"truffles": "the pot"}, the
+town's first seated taverner paying value x store.trophy (4) from the treasury above gold_floor, the
+rest owed; with none seated the stall's keeper buys them, selling on. pointers.trophy.taverner is
+voice's "That goes to the Mughouse.", Give's "For the pot" voice's. The forest camps' traders buy
+them by Sell (camp_traders.buys gains "truffles", 7 at 0.85). The tanner's trophies gain the boar
+king's hide ("tanning", 15) and tusk ("trimming leather", 5). Unreachable till the switch-on: no
+truffle, hide or tusk exists before it. Give's word is Sell, paid or owed (ui's give_word fix).
+economy_test _test_truffles. Server only, data; protocol unchanged; no bullet (the switch-on's).
+
 ## 820. Level.SHELVED: a level held back till its package lands
 
 Jeff, 2026-11-06, via the coordinator: "coordinate so that these additions go in as packages. so a
