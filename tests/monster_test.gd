@@ -6863,6 +6863,9 @@ func _test_boar_king() -> void:
 func _test_boar_king_lair() -> void:
 	print("
 == the boar king's lair: open, his den and doors, his sounder laid with him and following, beaten back by clearing it ==")
+	if not Level.playable("boar_lair"):
+		print("  the boar's lair held back (Level.SHELVED): his lair's checks shelved, skipped")
+		return
 	Apex.clear()
 	var real_row: Dictionary = Monster.kinds()["boar_king"]["lair"]
 	var real := Apex._places_of("boar_king", real_row)
