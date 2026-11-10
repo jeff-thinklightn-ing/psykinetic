@@ -4,7 +4,10 @@ extends PanelContainer
 ## Main.find_data): the place as its title (items' "title", voice's label),
 ## a row a thing with its icon (ItemIcons) and count in the rolled order,
 ## the gold, and one button, Take all (voice's words), which asks the
-## server for the lot (Main.take_find_all) and closes. Closing (its X, Esc,
+## server for the lot (Main.take_find_all) and closes; a click on a row (the
+## gold's too) takes that one (one loot window: Main.take_find_one), the
+## server sending what is left, and a find with nothing left closes it
+## (Jeff: "on 4 square chests, you can only drag and drop loot"). Closing (its X, Esc,
 ## or walking off from the chest) leaves the find in the chest; the server
 ## sends it again when the chest is opened. The server's party line says
 ## what was taken and what fell at the feet. In the shared theme's look
@@ -21,6 +24,8 @@ const REACH := 3
 
 ## Take all pressed.
 signal take_asked
+## A row clicked: its thing's id, "gold" for the gold.
+signal take_one(id: String)
 ## Closed without taking (its X).
 signal closed
 
@@ -69,6 +74,7 @@ func _ready() -> void:
 	column.add_child(_rows)
 	_gold = Label.new()
 	_gold.add_theme_color_override("font_color", UiTheme.color("brass"))
+	_takes_on_click(_gold, "gold")
 	column.add_child(_gold)
 	_take = Button.new()
 	_take.name = "Take"
@@ -79,11 +85,29 @@ func _ready() -> void:
 	_rebuild()
 
 
-## Shows [param find] (a "find" message); an empty one closes.
+## Shows [param find] (a "find" message); an empty one, or one with nothing
+## left (rows [], gold 0: all taken), closes.
 func show_find(find: Dictionary) -> void:
-	data = find
-	visible = not find.is_empty()
+	var rows: Variant = find.get("rows", [])
+	var left := (rows is Array and not (rows as Array).is_empty()) or int(find.get("gold", 0)) > 0
+	data = find if left else {}
+	visible = left
 	_rebuild()
+
+
+## [param control] takes [param id] on a left click (a double click's
+## second press asks nothing more), lit while the pointer is over it.
+func _takes_on_click(control: Control, id: String) -> void:
+	control.mouse_filter = Control.MOUSE_FILTER_STOP
+	control.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	control.mouse_entered.connect(func() -> void: control.modulate = Color(1.25, 1.2, 1.1))
+	control.mouse_exited.connect(func() -> void: control.modulate = Color.WHITE)
+	control.gui_input.connect(func(event: InputEvent) -> void:
+		var click := event as InputEventMouseButton
+		if click != null and click.pressed and click.button_index == MOUSE_BUTTON_LEFT:
+			control.accept_event()
+			if not click.double_click:
+				take_one.emit(id))
 
 
 ## Closes, the find left in the chest.
@@ -148,6 +172,7 @@ func _rebuild() -> void:
 		row.add_child(label)
 		row.set_meta("id", id)
 		row.set_meta("shown", label.text)
+		_takes_on_click(row, id)
 		_rows.add_child(row)
 	var gold := int(data.get("gold", 0))
 	_gold.text = "%d gold" % gold

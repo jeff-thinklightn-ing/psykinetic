@@ -14432,6 +14432,7 @@ func _build_talk() -> void:
 	find_panel = FindPanel.new()
 	find_panel.icons = item_icons
 	find_panel.take_asked.connect(_take_find)
+	find_panel.take_one.connect(take_find_one)
 	find_told.connect(find_panel.show_find)
 	$HUD.add_child(find_panel)
 	admin_panel = AdminPanel.new()  # 672.
@@ -15372,7 +15373,9 @@ func _on_message(kind: String, data: Dictionary) -> void:
 	if kind == "shop":
 		_on_shop_message(data)
 	elif kind == "find":
-		find_data = data
+		# Nothing left (one loot window: all taken a row at a time) is no find.
+		var left: bool = (data.get("rows") is Array and not (data["rows"] as Array).is_empty()) or int(data.get("gold", 0)) > 0
+		find_data = data if left else {}
 		find_told.emit(data)
 		return
 	elif kind == "barter":
@@ -21596,6 +21599,24 @@ func _search_camp(player: Player, chest: Chest, camp: Dictionary, tell: Callable
 	return true
 
 
+## Client: a row clicked in the find window (one loot window): asks the
+## server for that one thing ([param id], "gold" for the gold) of the find
+## last shown; the server sends what is left, and an empty find closes the
+## window. The args asked (tests), {} with none shown.
+func take_find_one(id: String) -> Dictionary:
+	var player := _local_player()
+	if player == null or find_data.is_empty() or id.is_empty():
+		return {}
+	var args := {"target": str(find_data.get("chest", "")), "id": id}
+	World.command(player, "take_find", args)
+	find_asked = args
+	return args
+
+
+## The last take_find_one's args (tests).
+var find_asked := {}
+
+
 ## Client: Take all in the find window (599 amended): asks the server for
 ## the find last shown (find_data), and forgets it. False with none shown.
 func take_find_all() -> bool:
@@ -21661,6 +21682,17 @@ func pack_double_click(mine: bool, index: int) -> String:
 	var open := pack_panel.other
 	var command := ""
 	var args := {"slot": index}
+	if open is Chest and not open is Locker and _stores(open as Chest):
+		# A storage chest (one loot window, the coordinator: Jeff's "you can only
+		# drag and drop"): a double click moves the thing across, to the pack's
+		# first free square or the chest's, as a drag onto it would.
+		var to: GridEntity = open if mine else player
+		var from: GridEntity = player if mine else open
+		var slot := _first_empty(open) if mine else World.free_pack_slot(player)
+		if slot < 0 or index >= from.slots.size() or from.slots[index].is_empty():
+			return ""
+		_transfer(from, index, to, slot)
+		return "transfer"
 	if open is Locker:
 		command = ("deposit" if Items.is_pack(index) else "equip") if mine else "withdraw"
 	elif mine:
@@ -21672,6 +21704,20 @@ func pack_double_click(mine: bool, index: int) -> String:
 		return ""
 	World.command(player, command, args)
 	return command
+
+
+## Whether [param chest] is a plain store of things (one loot window): not
+## a depot, a shop's counter, a temple's or a cache (a cache opens its find).
+static func _stores(chest: Chest) -> bool:
+	return not chest.depot and not chest.shop and not chest.temple and chest.cache.is_empty()
+
+
+## [param entity]'s first empty slot, -1 for none.
+static func _first_empty(entity: GridEntity) -> int:
+	for i in entity.slots.size():
+		if entity.slots[i].is_empty():
+			return i
+	return -1
 
 
 ## 722, ui's side, a few times a second: your own chest (Locker; only its

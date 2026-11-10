@@ -25034,6 +25034,23 @@ once empty, so no level needs regenerating for it. items_test
 _test_one_loot_window; record_keys_test samples cache_taken. No new
 class_name; no bullet of mine (ui's side carries the package's).
 
+599 amended (2), ui's side: the one loot window's clicks (the coordinator's approval of the
+design; package "one loot window", landing on, straight behind items' 1f997a33d). FindPanel
+takes a left press on a row (a thing, or the gold row, id "gold") as "take that one"
+(FindPanel.take_one, a double click's second press asks nothing more; Main.take_find_one sends
+"take_find" {target, id}); Take all stays. The server sends the find again with what is left,
+and the window redraws from it: a click on a row already gone asks, shows no error, and the find
+sent again redraws; rows [] with gold 0 closes it, so show_find closes on an empty find. A
+storage chest (Main._stores: not a depot, shop or temple, and no cache) keeps the pack view,
+and a double-click on a square moves it chest to pack or pack to chest (Main.pack_double_click,
+_transfer, with the first empty square or World.free_pack_slot); an empty square moves nothing.
+That is what empties a chest saved before this with its old stock (items' paragraph above). Your
+own pack is where a taken thing goes, "Your pack is full." being items'. ui_test: the row and
+gold clicks, a double click's second press, the find sent again, a stale click, closing on empty,
+and the double-click both ways (wood_bundle: Items.tidy drops an unknown id). Client only,
+protocol unchanged (55 is items' and 831's), no new class_name. A CHANGELOG bullet (voice's
+words).
+
 ## 584 amended, npc's side: the medicine man's care and the quests behind it
 
 Jeff (2026-10-22, through the coordinator): "5 herbs, 5 antlers or 10 gold

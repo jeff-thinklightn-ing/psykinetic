@@ -1918,6 +1918,27 @@ func _test_inventory_panel() -> void:
 		_check(_main.pack_double_click(true, pack_slot) == "deposit" and _main.pack_double_click(true, Items.RIGHT_HAND) == "equip"
 				and _main.pack_double_click(false, 3) == "withdraw",
 				"chest open, a double-click: a pack thing deposited, a hand's taken off, a chest thing withdrawn")
+	# A storage chest (one loot window, Jeff: "you can only drag and drop"): a
+	# double click moves a thing across, both ways; a cache's opens its find.
+	if player != null:
+		var store := Chest.new()
+		store.name = "TestStore"
+		store.slots = Items.tidy(["", "wood_bundle", "", ""], Chest.SLOTS)
+		add_child(store)
+		pack.open(store)
+		var was := player.slots.duplicate()
+		player.slots[Items.PACK_SLOTS[2]] = "herbs"
+		var rope := store.slots.find("wood_bundle")
+		var bare := store.slots.find("")
+		var moved: Array = [Main._stores(store), _main.pack_double_click(false, rope), _main.pack_double_click(true, Items.PACK_SLOTS[2]),
+			_main.pack_double_click(false, bare), rope, bare]
+		_check(moved.slice(0, 4) == [true, "transfer", "transfer", ""],
+				"a storage chest open, a double-click moves a thing to the pack, and from the pack into the chest; an empty square nothing (%s)" % [moved])
+		store.cache = "crypt_cache"
+		_check(not Main._stores(store), "a cache is no store: it opens its find")
+		player.slots = was
+		pack.open(null)
+		store.queue_free()
 	pack.open(null)
 	_check(not pack._other_head.get_node(^"Deposit").visible and (player == null or _main.pack_double_click(true, Items.PACK_SLOTS[0]) == "equip"),
 			"the chest closed: no deposit button; a double-click in the pack equips")
@@ -2564,6 +2585,44 @@ func _test_find_window() -> void:
 		and panel.gold_shown() == "12 gold", "a find: its place the title, a row a thing counted, the gold (%s, %s)" % [rows, panel.gold_shown()])
 	_main._update_find()
 	_check(panel.visible, "beside the chest: it stays open")
+	# One loot window: a click on a row takes that thing, the gold's the gold;
+	# the server sends what is left, and nothing left closes it.
+	var row := panel._rows.get_child(0) as Control
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	row.gui_input.emit(press)
+	var asked_row: Dictionary = _main.find_asked.duplicate()
+	panel._gold.gui_input.emit(press)
+	var asked_gold: Dictionary = _main.find_asked.duplicate()
+	press.double_click = true
+	_main.find_asked = {}
+	row.gui_input.emit(press)
+	_check(asked_row == {"target": find["chest"], "id": "wood_bundle"} and asked_gold.get("id") == "gold" and _main.find_asked.is_empty() and panel.visible,
+		"a click on a row asks for that thing, on the gold for the gold; a double click's second press asks nothing more (%s, %s)" % [asked_row, asked_gold])
+	_main._on_message("find", find.merged({"rows": [{"id": "herbs", "count": 1}], "gold": 0}, true))
+	_check(panel.visible and panel.rows_shown() == [Items.name_of("herbs")] and panel.gold_shown() == "",
+		"what is left, sent again: the rows left, no gold (%s)" % [panel.rows_shown()])
+	# A click on a row already gone (another player took it): the click still
+	# asks, nothing is shown of it, and the "find" the server re-sends redraws.
+	var stale: Control = null
+	for child: Node in panel._rows.get_children():
+		if not child.is_queued_for_deletion():
+			stale = child as Control
+			break
+	var stale_press := InputEventMouseButton.new()
+	stale_press.button_index = MOUSE_BUTTON_LEFT
+	stale_press.pressed = true
+	_main.find_asked = {}
+	stale.gui_input.emit(stale_press)
+	var asked_stale: Dictionary = _main.find_asked.duplicate()
+	_main._on_message("find", find.merged({"rows": [{"id": "wood_bundle", "count": 1}], "gold": 0}, true))
+	_check(asked_stale.get("id") == "herbs" and panel.visible
+		and panel.rows_shown() == [Items.name_of("wood_bundle")],
+		"a click on a row already gone asks, shows no error, and the find sent again redraws (%s, %s)" % [asked_stale, panel.rows_shown()])
+	_main._on_message("find", find.merged({"rows": [], "gold": 0}, true))
+	_check(not panel.visible and _main.find_data.is_empty(), "nothing left: closed, no find kept")
+	_main._on_message("find", find)
 	panel.take_asked.emit()
 	_check(not panel.visible and _main.find_data.is_empty(), "Take all: asked for and closed")
 	_main._on_message("find", find)
