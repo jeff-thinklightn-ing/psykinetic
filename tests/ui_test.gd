@@ -2051,6 +2051,13 @@ func _test_barter() -> void:
 	panel.show_barter(sample)
 	_check(panel.is_open() and panel.title_shown() == "Snagfin" and panel.button_shown() == "Buy" and panel._button.disabled,
 		"opened for the merchant: his name the title, Buy dim with nothing picked (%s)" % panel.title_shown())
+	_check(panel.trusted_shown() == "", "no \"trusted\" in the barter: no mark")
+	panel.show_barter(sample.merged({"trusted": true}, true))
+	var trusted_on := panel.trusted_shown()
+	var trusted_tip := panel._trusted.tooltip_text
+	panel.show_barter(sample)
+	_check(trusted_on == "Trusted" and trusted_tip.is_empty() and panel.trusted_shown() == "" and panel.title_shown() == "Snagfin",
+		"the town's trusted prices: \"Trusted\" after the title, no hover; gone when the key is left out (%s)" % trusted_on)
 	_check(panel.boxes_shown() == ["good 101 gold 10", "good 102 gold 1"] and panel.box_words("good", 101) == Items.name_of("sword"),
 		"his goods as squares, each price a chip over it, the name on hover (%s)" % [panel.boxes_shown()])
 	_check(pack.prices == {0: 20, 1: 6, 2: 20, 3: 3, 4: 0} and pack.held_open,

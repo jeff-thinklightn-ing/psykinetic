@@ -113,6 +113,8 @@ const LINE_MOST := 200
 ## Voice's words (802): the button's foot while out of reach for a trade.
 const STEP_CLOSER := "Step closer to trade"
 const ASLEEP_WORDS := "asleep"
+## The mark of the town's trusted prices (voice's word, the regard ladder's; no hover).
+const TRUSTED_WORDS := "Trusted"
 ## Voice's words for Give (802; 802 amended (8), give_word): the toggle and
 ## the button's verb, Sell where the person pays, else Donate; a gift's line.
 const SELL_WORDS := "Sell"
@@ -166,6 +168,9 @@ var gift: Dictionary = {}
 var _give_due := false
 var _box: PanelContainer
 var _title: Label
+## "Trusted" (economy's trusted prices, voice's word, no hover) after the
+## title, while the barter's prices are the town's trusted ones ("trusted").
+var _trusted: Label
 var _give_tab: Button
 var _locker_button: Button
 var _outcome: VBoxContainer
@@ -250,6 +255,18 @@ func _ready() -> void:
 	_title.theme_type_variation = &"Heading"
 	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(_title)
+	_trusted = Label.new()
+	_trusted.name = "Trusted"
+	_trusted.text = TRUSTED_WORDS
+	_trusted.theme_type_variation = &"Caption"
+	_trusted.add_theme_color_override("font_color", UiTheme.color("brass"))
+	_trusted.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_trusted.visible = false
+	head.add_child(_trusted)
+	_title.size_flags_horizontal = Control.SIZE_FILL
+	var title_spacer := Control.new()
+	title_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(title_spacer)
 	_give_tab = Button.new()
 	_give_tab.name = "GiveTab"
 	_give_tab.text = DONATE_WORDS
@@ -1153,6 +1170,11 @@ func title_shown() -> String:
 	return _title.text
 
 
+## "Trusted" while shown, "" otherwise (tests).
+func trusted_shown() -> String:
+	return _trusted.text if _trusted.visible else ""
+
+
 func foot_shown() -> String:
 	return _foot.text if _foot.visible else ""
 
@@ -1304,6 +1326,7 @@ func _rebuild() -> void:
 		_total.visible = false
 		return
 	_title.text = title_words(merchant, str(counter.get("kind", "")) if not counter.is_empty() else "")
+	_trusted.visible = data.get("trusted") == true
 	_state.text = ASLEEP_WORDS
 	_state.visible = person != null and asleep
 	_line.visible = person != null and talks
