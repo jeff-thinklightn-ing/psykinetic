@@ -8907,7 +8907,10 @@ func _test_fishing_pose() -> void:
 	var cast: Dictionary = _rig.fishing_view.casts.get(key, {})
 	var lap: Variant = cast.get("lap")
 	var held := lap != null and is_instance_valid(lap) and str(lap.get_meta("slot", "")) == "sfx.fish_wait"
-	_check(held == SoundKit.has("sfx.fish_wait"), "waiting: the float's lap held at it (%s; takes here: %s)" % [held, SoundKit.has("sfx.fish_wait")])
+	# Its takes are external (synced from the sound library), as the bow's creak: a
+	# checkout without them holds none (Sfx.hold's null).
+	var lapping := not SoundKit.files("sfx.fish_wait").is_empty()
+	_check(held == lapping, "waiting: the float's lap held at it (%s; takes here: %s)" % [held, lapping])
 	player.fishing = {"state": "missed", "at": player.tile + Vector2i(0, 2)}
 	for i in 2:
 		await get_tree().process_frame
