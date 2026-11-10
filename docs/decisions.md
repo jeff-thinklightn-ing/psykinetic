@@ -15866,6 +15866,22 @@ carried down the flow, kept where it is above 0.55 (full by 0.75), x shoal squar
 gated by the churn and the flow's speed as before. Deep fades into ford by colour alone. The shore's
 foam (water to land) is unchanged. Stills on maps' layout: C:/dev/review/lands/ford_riffle_1108.
 Client only (one shader), protocol unchanged, no new class_name, no bullet (maps' ford bullet).
+505 amended (7), terrain's side: a wide ford's bed is sand and a few round stones, not paving (the
+coordinator's ask and approval after maps' farm stills, release's label; package "wilds basics: river",
+already on). Since the main stream was waded (505 amended (6)), its middle cells have only fords round
+them, and Level._ground_around, which gives a ford the ground most of its four neighbours are, falls
+back to stone for them. The ground drew that stone as ground.stone's flagstones, so a paved road showed
+under the water along the whole stream (hills' wide ford worst, in square cell blocks). Client3D now
+draws a ford cell with no floor beside it but other fords (_ford_bed, kept in _ford_beds) as
+FORD_BED_KIND, ground.sand (its own art), and scatters FORD_BED_STONES (0.35 a cell) of scatter.stone on
+it and nothing else; fords otherwise still take no scatter. The sim's kind stays stone, so footing,
+prints and the safe paths are unchanged. A narrow crossing (ground beside every cell) keeps its bank's
+ground as before, and so does a ford next to a paved floor. Stills on the laptop
+(C:/dev/review/fordbed_*): the farm's stretch and hills' wide ford read as a pale sandbar between the
+banks' grass or dirt under the clear water, the stones too few and small to read as rubble or loot.
+view_test: a ford three rows deep across grass, its middle row sand with the sim's kind still stone, its
+edges the bank's grass; on its bed a few stones, under one a cell, nothing else; nothing on its edges.
+Client only, protocol unchanged, no new class_name; the bullet is voice's.
 
 ## 506. The level editor's properties panel
 

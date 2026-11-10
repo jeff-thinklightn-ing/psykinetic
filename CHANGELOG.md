@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the wilds, the stream's bed is sand and a few round stones now, where before squared paving showed under the water all along it (505 amended (7)).
 - Every chest opens the same loot window now, each thing in it and its gold on a row of its own: click a row to take just that, or Take all for the lot; and a storage chest opened beside your pack moves things either way on a double-click, where before a found stash gave you only Take all, and a chest in the dwarven halls or a storage chest let you only drag (599 amended (2)).
 - Your character sheet and your pack are one window now: your figure on the left, with what you wear set on its body in larger squares and one load bar beneath, and your pack on the right; hover an empty square on the figure and it names its place, where before the sheet and the pack were two windows side by side and your worn squares carried R, L and A letters (787 amended (2)).
 - The draugr's window always shows his own demand now, even when you're short of gold, where before it put a line about refusing him in his mouth (735 amended).

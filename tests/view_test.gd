@@ -6193,6 +6193,39 @@ func _test_faced_decor() -> void:
 			"its earth the ground's dirt texture, in the room's frame (%s)" % [earth.albedo_texture if earth != null else null])
 	_check(not ArtKit.has("scatter.tuft") or weeds.size() >= 24 and strays.is_empty(),
 			"weeds on it, none outside it (%d, %d stray)" % [weeds.size(), strays.size()])
+	# A wide ford's middle (505 amended (7)): a ford three rows deep across
+	# grass; its middle row, no ground beside it, a bed of sand with a few
+	# round stones, not the stone floor's paving; its edge rows the bank's
+	# grass, bare.
+	var wading: Dictionary = {Vector2i(0, 0): "start"}
+	for y in 8:
+		for x in 10:
+			if Vector2i(x, y) != Vector2i.ZERO:
+				wading[Vector2i(x, y)] = "ford" if y >= 3 and y <= 5 else "grass"
+	Level.register("vt_ford_bed", Level.image_from_rows(field_rows, wading), null, {"outdoor": true})
+	var stream := Level.load_level("vt_ford_bed")
+	_rig.rebuild(stream["terrain"], stream["centre"])
+	var middles: Array[Vector2i] = []
+	var edges: Array[Vector2i] = []
+	for x in 10:
+		middles.append(Vector2i(x, 4))
+		edges.append_array([Vector2i(x, 3), Vector2i(x, 5)])
+	_check(str(stream["terrain"]["kinds"].get(Vector2i(4, 4), "")) == "stone"
+			and middles.all(func(cell: Vector2i) -> bool: return _rig._ford_beds.has(cell) and _rig._ground_kinds.get(cell, "") == Client3D.FORD_BED_KIND)
+			and edges.all(func(cell: Vector2i) -> bool: return not _rig._ford_beds.has(cell) and _rig._ground_kinds.get(cell, "") == "grass"),
+			"a wide ford's middle drawn as sand, the sim's kind still stone; its edges the bank's grass (%s, %s)" % [_rig._ground_kinds.get(Vector2i(4, 4), ""), _rig._ground_kinds.get(Vector2i(4, 3), "")])
+	var on_bed := {}
+	var on_edge := 0
+	for chunk: Vector2i in _rig._scatter_chunks:
+		var plan := _rig._scatter_plan(chunk)
+		for kind: String in plan:
+			for item: Array in plan[kind]:
+				if middles.has(item[0]):
+					on_bed[kind] = int(on_bed.get(kind, 0)) + 1
+				elif edges.has(item[0]):
+					on_edge += 1
+	_check(on_bed.keys() == ["stone"] and int(on_bed["stone"]) >= 1 and int(on_bed["stone"]) < middles.size() and on_edge == 0,
+			"on its bed a few round stones, nothing else, under one a cell; nothing on its edges (%s, %d)" % [on_bed, on_edge])
 	_rig.rebuild(_main._terrain, Vector2i.ZERO)
 
 

@@ -270,6 +270,10 @@ const CONCAVITY_MOST := 0.5
 ## CREST_MOST of the ledge top's lift at CONCAVITY_FULL metres over.
 const CREST_MOST := 1.0
 const WATER_BED_KIND := "dirt"
+## A wide ford's middle (505 amended (7)): its bed's ground and its round
+## stones per cell (scatter.stone, sparse: a bed, not rubble).
+const FORD_BED_KIND := "sand"
+const FORD_BED_STONES := 0.35
 ## The water's edge unsquared (decision 553): the shore field (shore_image)
 ## has SHORE_RES texels a cell; a one-wide stream winds within its cells up
 ## to STREAM_WIND either side of their middles, STREAM_HALF wide each side
@@ -2325,6 +2329,11 @@ var _deck_tops: Dictionary[Vector2i, float] = {}
 var _deck_ends: Dictionary[Vector2i, Vector3] = {}
 ## Fords (terrain "fords"): floor under a shallow sheet of the stream.
 var _fords: Dictionary[Vector2i, bool] = {}
+## A wide ford's middle (505, terrain's side of the waded stream): a ford
+## cell with no ground beside it, whose kind the sim leaves as stone, drawn
+## as a bed of sand (FORD_BED_KIND) with a few round stones (FORD_BED_STONES),
+## not the stone floor's paving; _build_ground fills it.
+var _ford_beds: Dictionary[Vector2i, bool] = {}
 ## Rocks (terrain "rocks", decision 513): no floor to the sim, but ground of
 ## their footing here, under a rock, and never a tree.
 var _rocks: Dictionary[Vector2i, bool] = {}
@@ -10831,6 +10840,15 @@ func _scatter_plan(chunk: Vector2i) -> Dictionary[String, Array]:
 	var roof: Dictionary = _terrain.get("canopy", {})
 	for index: int in _scatter_chunks[chunk]:
 		var cell: Vector2i = _ground_cells[index]
+		# A wide ford's bed: a few round stones under the water, nothing
+		# growing (505 amended (7)).
+		if _ford_beds.has(cell):
+			for n in floori(FORD_BED_STONES + _roll(cell, 160)):
+				var on := Vector2(cell) + Vector2(_roll(cell, 161 + n * 7), _roll(cell, 162 + n * 7)) - Vector2(0.5, 0.5)
+				if not placed.has("stone"):
+					placed["stone"] = []
+				placed["stone"].append([cell, on, n + 160, false])
+			continue
 		if index >= _ground_floor_end and index < _ground_water_end or fire.has(cell) or _dry_water.has(cell) or _fords.has(cell) \
 				or _rocks.has(cell):
 			continue
@@ -12372,6 +12390,8 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 				kind = _road_kind_round(cell, kinds)
 			if not GROUND_CHANNELS.has(kind):
 				kind = "stone"
+			if i < floor_size and kind == "stone" and _ford_bed(cell, grounds, floor_size):
+				kind = FORD_BED_KIND
 			slice_kinds.append(kind)
 			slice_heights.append_array(_ground_corners(cell, kept))
 		return [slice_kinds, slice_heights, kept]
@@ -12386,6 +12406,8 @@ func _ground_fields(input: Dictionary) -> Dictionary:
 		var cell: Vector2i = cells[i]
 		var kind: String = looked[i][0]
 		ground_kinds[cell] = kind
+		if i < floor_size and kind == FORD_BED_KIND and _fords.has(cell):
+			_ford_beds[cell] = true
 		var corner_heights: PackedFloat32Array = looked[i][1]
 		corners[cell] = corner_heights
 		for c in 4:
@@ -14498,6 +14520,19 @@ func _shore_cell(cell: Vector2i, positions: PackedVector3Array, indices: PackedI
 			indices.append_array([made[q], made[q + 1], made[q + row], made[q + 1], made[q + row + 1], made[q + row]])
 
 
+## Whether ford [param cell] is a wide ford's middle (505 amended (7)): no
+## floor beside it but other fords ([param grounds] the cells' places, the
+## first [param floor_count] floor), so the sim gave it no ground's kind.
+func _ford_bed(cell: Vector2i, grounds: Dictionary, floor_count: int) -> bool:
+	if not _fords.has(cell):
+		return false
+	for step: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+		var near := cell + step
+		if grounds.get(near, floor_count) < floor_count and not _fords.has(near):
+			return false
+	return true
+
+
 ## What a water cell's bed is: the ground of the land beside it, so its bank
 ## runs on under the water; out of sight of land, WATER_BED_KIND.
 ## ([param floor_count]: the indices below it are floor, already placed.)
@@ -14930,6 +14965,7 @@ func _build_water() -> void:
 ## of the water and fords round its bridge (the sim has the deck's).
 func _measure_streams() -> void:
 	_fords.clear()
+	_ford_beds.clear()
 	for cell: Vector2i in _terrain.get("fords", []):
 		_fords[cell] = true
 	var bridged: Dictionary[Vector2i, bool] = {}
