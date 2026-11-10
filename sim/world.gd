@@ -9582,7 +9582,9 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 	var line := way / maxf(absf(way.x), absf(way.y))
 	var body: GridEntity = first
 	var u: float = force
+	var set_moving: Dictionary[GridEntity, bool] = {}  # 688 amended (11): each met once a push.
 	while body != null and u > 0.0:
+		set_moving[body] = true
 		if is_sheltered(body):
 			# Arriving (decision 661): it does not give, and the push ends.
 			if _logs_for(mover):
@@ -9709,6 +9711,14 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 				stopped = true
 				stopped_by = "fire"
 				break
+		# A body this push already set moving, met again (688 amended (11)): the chain ends
+		# there, and the end hurts neither (no wall's slam, no speed handed back), so a blow's
+		# impact reaches each body once however the chain turned.
+		var met_again := blocker != null and set_moving.has(blocker)
+		if met_again:
+			stopped_by = "%s (met again)" % blocker.name
+			blocker = null
+			collided = false
 		if tiles > 0:
 			body.step_velocity = Vector2.ZERO  # Thrown off its feet: no step's momentum left.
 			if _rushers.has(body) and body != mover:
@@ -9716,7 +9726,7 @@ func _push(mover: GridEntity, first: GridEntity, way: Vector2, force: float, tos
 
 		# Speed spent on travel; what is left is what hits.
 		var remaining := 0.0
-		if stopped and fall == 0 and teeter_way == Vector2i.ZERO:  # A rim hurts nothing.
+		if stopped and fall == 0 and teeter_way == Vector2i.ZERO and not met_again:  # A rim hurts nothing.
 			remaining = maxf(u - spent / slide_per_speed, 0.0)
 		var impact := 0
 		var passed := 0.0
@@ -11096,6 +11106,12 @@ func _free_claim(entity: GridEntity, duration: float) -> void:
 	_stepped_off(entity, held, duration)
 
 
+## Tests only (push_test, 688 amended (11)): a slide shoved forward or across out of an
+## overlap is read as stopped, as before the mend, so the push's chain end for a body met
+## again is tested on the shape that found it.
+var _test_overlap_stops := false
+
+
 ## A free body's slide from a push (688 amended (2)), decided at once as
 ## _push's cells are: [param body]'s centre traced from its free_pos along
 ## [param way] at speed [param u], a substep at a time through the free
@@ -11148,6 +11164,12 @@ func _free_slide(body: GridEntity, way: Vector2, u: float) -> Dictionary:
 			continue
 		# Something stopped it: what lies the way it was pressed.
 		var into := (want - to).normalized()
+		if dir.dot(into) <= 0.0 and not _test_overlap_stops:
+			# Put forward or across its way, not held back (688 amended (11)): shoved out of an
+			# overlap, its own companion's cell, which it walks through (_free_resolve's pass_own),
+			# met as solid by a slide. Nothing stopped it, so it goes on from there; read as a
+			# stop, she was named its blocker behind it and the push bounced between them.
+			continue
 		var met := _free_met(body, to, into)
 		if met != null:
 			out["stopped"] = true

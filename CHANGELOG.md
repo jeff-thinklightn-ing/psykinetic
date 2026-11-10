@@ -8,6 +8,7 @@ notes (decision 324).
 ## Unreleased
 
 - You walk on smoothly from the moment you arrive, where before, often a few seconds after reaching somewhere, you were suddenly put back two to four cells (847).
+- A big blow that knocks you into your companion, or her into you, hurts each of you once now, where before it could bounce between you and hurt you both two or three times over, sometimes felling her at a stroke (688 amended (11)).
 - When the server restarts, the game joins you back once, where before it sometimes let you in, dropped you two seconds later and joined you again, loading the world twice while others saw you leave and come back twice (240 amended).
 - Your companion, once she pulls back from the great bear or the old grey, stays well clear of it and its pack while it still fights you, never in your way if you run, and comes back to your side once it falls or you get away, where before she soon walked back into its reach and was bitten (780 amended (21)).
 ## v0.1.210

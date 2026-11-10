@@ -33326,6 +33326,31 @@ committed, and the corrections sorted by cause. Left for a lagged pair to show i
 stun's end tick on the wire in place of its length (a protocol change). Server and client,
 protocol unchanged, no new class_name.
 
+688 amended (11): a push's slide never bounces between a player and his own companion (release's
+label; the coordinator's approval; playtest's find in companions' bear run, brk_1 tick 168: the
+bear's swipe sent Rhea into Player1, Player1 "stopped_by=Rhea" behind him, and back three times,
+6+2+1 impact each in one tick, taking her from 9 hp to 0). It mends 688 amended (2) (a push on a
+free body). A player walks through his own companion (_free_resolve's pass_own), so his centre may
+stand within FREE_RADIUS of her cell; a push's slide (_free_slide) meets her as solid, so when it
+overlapped her by more than its first substep, that substep shoved him out of her cell, forward or
+across his way, and any gap between where he was sent and where he came to was read as a stop by
+whatever lay the way he was pressed back: her, behind him. She took the speed, was pushed into
+him, handed it back, and so on until it was spent. Live since 688 amended (2) (v0.1.183); only a
+player and his own companion can overlap. Now (a) _free_slide counts a stop only when the body was
+held back along its way (the press's dot with its way above 0); put forward or across, out of an
+overlap, it goes on from there. (b) Within one _push, a body the push already set moving, met
+again, ends the chain: stopped_by "<name> (met again)", no impact to either and no speed handed
+on (no wall's slam: it is only an end), so a blow's impact reaches each body once however the
+chain turned. Pushed toward her, into her, he still meets her once and she slides on. No impact
+number changed; a slide passing through one's own companion, as walking does, would be a ruling.
+push_test _test_beside_own_companion: his centre at 2.55 in (3, 1), 0.25 into her cell; with
+World._test_overlap_stops (the old reading, tests only) pushed east he is stopped by her behind
+him, as in the run; now he slides on, neither hurt; pushed into her, one knock-on, each hurt once
+at most; three in a row (the swipe on her, his edge in her cell), with the old reading the chain
+ends at her met again, unhurt by its end, and as it is now he slides on: each takes the one blow's
+impact once (13). Server only, protocol unchanged, no new class_name. One CHANGELOG bullet in
+voice's words.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float

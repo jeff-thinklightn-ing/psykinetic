@@ -47,6 +47,7 @@ func _ready() -> void:
 	_test_stamina()
 	_test_stun()
 	_test_toss()
+	_test_beside_own_companion()
 
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
@@ -518,6 +519,78 @@ func _test_toss() -> void:
 	World.order_shove(player, imp, Vector2i(2, 0))
 	World.step()
 	_check(imp.tile == Vector2i(3, 2) and player.action_order == GridEntity.Order.NONE, "a direction that is not a grid step is ignored")
+
+
+## 688 amended (11), playtest's bear run (companions' brk_1, tick 168): a player walks through
+## his own companion, so his free body may stand in her cell's edge; a push's slide meets her
+## as solid, and the shove out of her cell was read as meeting her, behind him: the push
+## bounced between them, three impacts each in one tick. Now a slide stops only when held back
+## along its way, and a body a push already set moving, met again, ends its chain unhurt.
+func _test_beside_own_companion() -> void:
+	print("\n== 688 amended (11): a push beside his own companion meets her once, or not at all ==")
+	var rows: Array[String] = ["m.......", "...P....", "........"]
+	# His centre at 2.55 in (3, 1), 0.25 into her cell's edge: deeper than a slide's first
+	# substep (FREE_SUBSTEP 0.2) carries him, so that substep shoves him out of her cell.
+	# Pushed away from her, his edge in her cell: the old reading named her, behind him.
+	var e := _build(rows)
+	var player: Player = e["P"][0]
+	var her := _companion_of(player, Vector2i(2, 1))
+	player.free_pos = Vector2(2.55, 1)
+	World._test_overlap_stops = true
+	var slid := World._push(e["m"][0], player, Vector2(1, 0), 2.0)
+	World._test_overlap_stops = false
+	_check(not slid.is_empty() and slid[0]["stopped_by"] == her.name,
+			"before the mend: pushed east off her edge, he was stopped by her behind him (%s)" % [slid[0]["stopped_by"] if not slid.is_empty() else "-"])
+	e = _build(rows)
+	player = e["P"][0]
+	her = _companion_of(player, Vector2i(2, 1))
+	player.free_pos = Vector2(2.55, 1)
+	slid = World._push(e["m"][0], player, Vector2(1, 0), 2.0)
+	_check(slid.size() == 1 and slid[0]["stopped_by"] == "nothing (force spent)" and player.tile.x > 3,
+			"pushed east off her edge: he slides on, nothing named (%s, to %s)" % [slid[0]["stopped_by"] if not slid.is_empty() else "-", player.tile])
+	_check(_hits(player) == 0 and _hits(her) == 0, "and neither takes impact (%d, %d)" % [_hits(player), _hits(her)])
+	# Pushed toward her, into her: the honest knock-on, once.
+	e = _build(rows)
+	player = e["P"][0]
+	her = _companion_of(player, Vector2i(4, 1))
+	player.free_pos = Vector2(3.25, 1)
+	slid = World._push(e["m"][0], player, Vector2(1, 0), 2.0)
+	_check(slid.size() == 2 and slid[0]["stopped_by"] == her.name and slid[1]["body"] == her and her.tile.x > 4,
+			"pushed east into her: he meets her, she slides on (%s)" % [slid.map(func(s: Dictionary) -> String: return "%s %s" % [s["body"].name, s["stopped_by"]])])
+	_check(_hits(player) <= 1 and _hits(her) <= 1, "each hurt once at most (%d, %d)" % [_hits(player), _hits(her)])
+	# Three in a row, the bear's swipe on her, his edge in her cell: she knocks him on.
+	for old_reading in [true, false]:
+		e = _build(rows)
+		player = e["P"][0]
+		her = _companion_of(player, Vector2i(2, 1))
+		player.free_pos = Vector2(2.55, 1)
+		World._test_overlap_stops = old_reading
+		slid = World._push(e["m"][0], her, Vector2(1, 0), 3.73)
+		World._test_overlap_stops = false
+		var blow: int = slid[0]["impact"] if not slid.is_empty() else -1
+		var how := "the overlap read as a stop" if old_reading else "as it is now"
+		_check(slid.size() == 2 and slid[0]["stopped_by"] == player.name and slid[1]["body"] == player,
+				"%s: swiped into him, she knocks him on, and the chain ends there (%s)" % [how, slid.map(func(s: Dictionary) -> String: return "%s %s" % [s["body"].name, s["stopped_by"]])])
+		_check(blow > 0 and _hits(her) == 1 and _hits(player) == 1 and _damage(her, &"impact") == blow and _damage(player, &"impact") == blow,
+				"%s: each takes the one blow's impact once (%d: her %d, him %d)" % [how, blow, _damage(her, &"impact"), _damage(player, &"impact")])
+		if old_reading:
+			_check(slid.size() == 2 and slid[1]["stopped_by"] == "%s (met again)" % her.name and slid[1]["impact"] == 0,
+					"the overlap read as a stop: she, met again, ends the chain, and the end hurts nobody (%s)" % [slid[1]["stopped_by"] if slid.size() > 1 else "-"])
+
+
+## [param player]'s own companion, standing still at [param tile].
+func _companion_of(player: Player, tile: Vector2i) -> Companion:
+	var her := EntityFactory.build({"script": "res://sim/companion.gd", "shape": "capsule", "name": "Rhea", "props": {"max_hp": 20}}) as Companion
+	her.acts = false
+	_room.add_child(her)
+	World.spawn(her, tile)
+	her.keeper = player
+	return her
+
+
+## How many times [param entity] took impact.
+func _hits(entity: GridEntity) -> int:
+	return _damage_log.filter(func(entry: Dictionary) -> bool: return entry.entity == entity and entry.cause == &"impact").size()
 
 
 func _test_no_attack_mid_step() -> void:
