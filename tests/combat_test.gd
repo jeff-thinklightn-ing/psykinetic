@@ -59,6 +59,7 @@ func _ready() -> void:
 	_test_lob()
 	_test_free_blows()
 	_test_click_away()
+	_test_hammer_shove()
 	_test_free_chase()
 	_test_body_reach()
 	_test_free_wind_up_given_up()
@@ -907,6 +908,48 @@ func _test_click_away() -> void:
 		_check(host.free_pos.distance_to(stepped) > 0.5 and not pinned_again, "%s: and it keeps walking away, no blow pinning it again" % ["another attack ordered" if queued else "after one blow"])
 		_check(struck_at >= 0 and waited <= World.BLOW_STAND_TICKS + 1,
 				"%s: a click away moves the body within the short pin (%d ticks, the bar %d)" % ["another attack ordered" if queued else "after one blow", waited, World.BLOW_STAND_TICKS + 1])
+
+
+## Jeff on v0.1.208: the war hammer's knockback too high; the
+## coordinator's ask: a stagger and a one-cell shove (its verb's
+## "max_cells"). Measured: a player's hammer blow, standing and walking in,
+## on foes of three weights: the cells slid and whether it is staggered.
+func _test_hammer_shove() -> void:
+	print("
+== the war hammer's blow: a stagger and a one-cell shove (Jeff: knockback too high) ==")
+	for walking in [false, true]:
+		for mass: float in [40.0, 70.0, 120.0]:
+			var e := _build(["##############", "#............#", "#..P.m.......#", "#............#", "##############"])
+			var host: GridEntity = e["P"][0]
+			var foe: GridEntity = e["m"][0]
+			host.free_pos = Vector2(host.tile)
+			foe.acts = false
+			foe.max_hp = 999
+			foe.hp = 999
+			foe.mass = mass
+			_give(host, "hammer")
+			host.next_attack_tick = 0
+			host.wind_up = {}
+			if not walking:
+				World._relocate(host, foe.tile - Vector2i(1, 0))
+				host.free_pos = Vector2(host.tile)
+			var from := foe.tile
+			World.command_attack(host, foe)
+			var landed := false
+			for i in 30:
+				if walking:
+					World.free_input(host, Vector2.RIGHT, World.TICK_DT)
+				World.step()
+				if host.next_attack_tick > World.tick:
+					landed = true
+					break
+			var staggered := World.is_stunned(foe)
+			var cells := World.distance(from, foe.tile)
+			var label := "%s, a %d kg foe" % ["walking in" if walking else "standing", int(mass)]
+			print("  measured: %s: slid %d cells, %s" % [label, cells, "staggered" if staggered else "not staggered"])
+			_check(landed and cells <= 1, "%s: the blow lands and shoves it a cell at most (%d)" % [label, cells])
+			if mass <= 70.0:
+				_check(cells == 1 and staggered, "%s: a cell, and staggered (%d, %s)" % [label, cells, staggered])
 
 
 func _test_free_blows() -> void:

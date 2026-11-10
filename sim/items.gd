@@ -639,7 +639,9 @@ static func weight_of(id: String) -> float:
 ## weapon makes an attack do. Each kind with its own numbers and their
 ## defaults; every verb also has COMMON's. Combat reads them (roadmap's
 ## "weapons as verbs"); nothing here acts on them.
-##   knockback (hammer): force, a multiple of the blow's push force.
+##   knockback (hammer): force, a multiple of the blow's push force;
+##     max_cells, the most cells its blow slides a body (0: as far as the
+##     force goes; the hammer's 1, a stagger and a one-cell shove).
 ##   block (sword, shield): the guard's arc (cells either side of facing:
 ##     0 straight ahead, 1 the three in front), absorb (the share of a
 ##     blow's damage taken off), stamina per blow taken, breaks_at (a blow
@@ -673,7 +675,7 @@ static func weight_of(id: String) -> float:
 ##     cell's; lob_circle, the circle's radius in cells by step, at least
 ##     lob_volley_min.
 const VERBS := {
-	"knockback": {"force": 3.0},
+	"knockback": {"force": 3.0, "max_cells": 0},
 	"block": {"arc": 1, "absorb": 1.0, "stamina": 8, "breaks_at": 2.0,
 		"bash_force": 0.0, "bash_stagger": 4, "bash_stamina": 3, "bash_ticks": 20},
 	"knockdown": {"arc": 1, "down_ticks": 15},

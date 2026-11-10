@@ -2575,7 +2575,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | A holy knight's bones, wrapped in linen. Bring them to Aldous at the temple. | `items[9].about` |
 |  | half a cut coin | `items[10].name` |
 |  | the coin's other half | `items[11].name` |
-|  | knocks back whoever it hits; its blunt blows wear their arrows | `items[21].verb.says` |
+|  | staggers whoever it hits and shoves them back a step; its blunt blows wear their arrows | `items[21].verb.says` |
 |  | parries a blow from straight ahead when ready to strike | `items[22].verb.says` |
 |  | raised (right button), takes blows from ahead; the left button bashes with it | `items[23].verb.says` |
 |  | raised, takes most of a blow from straight ahead; a light bash | `items[24].verb.says` |

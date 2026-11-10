@@ -9462,6 +9462,20 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	return true
 
 
+## [param hit]'s push, held to its weapon's "max_cells" (the war hammer's
+## 1: Jeff on v0.1.208, its knockback too high; a stagger and a one-cell
+## shove): no more speed than slides it that far, so what it knocks on and
+## any impact are a cell's too. A shove, or a verb without it (or 0), as
+## it was.
+func _capped_blow_push(hit: Hit) -> float:
+	if hit.shove or not is_instance_valid(hit.source):
+		return hit.force
+	var cells := int(blow_verb(hit.source).get("max_cells", 0))
+	if cells <= 0:
+		return hit.force
+	return minf(hit.force, (float(cells) + 0.5) / slide_per_speed)  # Half a cell over: _push floors its reach.
+
+
 ## A Hit of [param attacker] on [param target] queued for _resolve_hits.
 func _queue_hit(attacker: GridEntity, target: GridEntity, aim: Vector2i, push_direction: Vector2i, hit_damage: int,
 		force: float, raw_force: float, is_shove: bool, down_ticks: int) -> void:
@@ -9527,7 +9541,7 @@ func _resolve_hits() -> void:
 		var lived := _alive(hit.target)
 		var way := hit.push_way if hit.push_way != Vector2.ZERO else Vector2(hit.push_direction)
 		if hit.force > 0.0 and _alive(hit.target):
-			_push(hit.source, hit.target, way, hit.force, hit.push_direction != hit.direction)
+			_push(hit.source, hit.target, way, _capped_blow_push(hit), hit.push_direction != hit.direction)
 		if _alive(hit.target) and not is_sheltered(hit.target):
 			if not _teeter_struck(hit.target, hit.source, way.normalized() * hit.raw_force):  # Over the rim (783).
 				_rush_struck(hit.target, way.normalized() * hit.raw_force)  # A rush slowed or stopped (604).

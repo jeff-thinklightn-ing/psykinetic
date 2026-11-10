@@ -5045,6 +5045,19 @@ falls, door impacts and try_bash_door. No stagger state for blows under it
 for now; Jeff can ask for one after the clip. Weapons as data (items step 5)
 give the knockback verb by raising a blow's force over the line.
 
+305 amended (release's label; the coordinator's approval; Jeff on v0.1.208: the war hammer's
+knockback too high): the knockback verb gains max_cells (Items.VERBS, default 0: as far as the
+force goes), the most cells its blow slides a body, and the war hammer's is 1: a stagger and a
+one-cell shove, so its wielder keeps the fight in reach rather than walking after the foe he has
+just struck. World._capped_blow_push holds a landed blow's push (after the guard, the brace and
+momentum) to (max_cells + 0.5) / slide_per_speed, half a cell over since _push floors its reach;
+so whatever it knocks on and any impact are a cell's worth too, and the stagger after the slide
+(knockback_stun_ticks) is as before. A blow under knockback_min_force still pushes nothing, so a
+heavy foe is not moved. Monsters that wield a hammer have the same. Shoves, tosses, a shield's
+bash and the other verbs are unchanged. combat_test _test_hammer_shove, a player's hammer
+standing and walking in: before, a 40 kg foe slid 4 cells, a 70 kg 2, a 120 kg 0; after, 1, 1
+and 0, each that moved staggered. Server and data (levels/items.json), protocol unchanged.
+
 ## 298. A town's wall is a ring of the map's walls, its look the town's walls level
 
 A town wall is content, in the layout, like any wall: it blocks whatever

@@ -28,6 +28,9 @@ func _ready() -> void:
 	World.set_process(false)
 	World.entity_damaged.connect(_on_entity_damaged)
 	World.rush_ended.connect(_on_rush_ended)
+	# The model measured with the hammer as its tool: its one-cell cap (305
+	# amended, checked in combat_test) lifted in this process only.
+	_check(Items.set_verb("hammer", "max_cells", 0), "the hammer's cap lifted for the model's numbers")
 
 	_test_rules_file()
 	_test_mass_decides()
