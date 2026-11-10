@@ -398,9 +398,11 @@ func _special_tick() -> bool:
 			_next_swipe = World.tick + int(swipe["every"])
 		return true  # Between blows it stands its ground: no blow without a tell.
 	if d >= int(charge["from"]) and d <= int(charge["cells"]) and World.tick >= _next_charge:
-		var toward := Vector2(target.tile - tile).normalized()
+		# Drawn to the cell a blow on it strikes (a free body's centre), as the
+		# check (the boar king's hold run: the tile and that cell part).
+		var toward := Vector2(World.struck_cell(target) - tile).normalized()
 		var shape := Telegraph.line(tile, toward, float(charge["cells"]), 1)
-		if World.struck_cell(target) in World.telegraph_cells(shape):  # Aimed at where it is (decision 810).
+		if toward != Vector2.ZERO and World.struck_cell(target) in World.telegraph_cells(shape):  # Aimed at where it is (decision 810).
 			_begin("charge", shape, int(charge["roar"]))
 			_move["toward"] = toward
 			_next_charge = World.tick + int(charge["every"])

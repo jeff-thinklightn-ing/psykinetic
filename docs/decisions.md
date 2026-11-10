@@ -43846,6 +43846,8 @@ lands, owed gold still floats as "+40 gold". The missing banner was economy's da
 town's first regard), not Gains' shown-elsewhere skip. ui_test _test_gains (the hand-in's count, the
 owed line, no coin). No bullet (804's line says what a gain shows). Client only, protocol unchanged,
 no new class_name.
+810 amended (2026-11-09, release's label; the coordinator's approval; combat's ruling): a told line drawn to where a blow strikes. Who stands in a told cell is World.struck_cell, a free body's centre's cell, which parts from its held tile when the centre is past its cell's middle (FREE_HYSTERESIS). Lines drawn to the tile then missed it. The great bear's charge and the old grey's spring checked the struck cell and so held the move back (found in the boar king's hold run; forced in monster_test, a centre 0.6 off failing every time); the base ambush (skeech's) and lunge (the crypt robbers') checked the tile, so told it and spared a body standing off its middle. All four now draw their line, check and aim to World.struck_cell(target); a grid body is unchanged (its struck cell is its tile). The boar king's charge takes the same aim inside 780 amended (16). monster_test _test_aim_struck_cell (each at a body 0.6 off its cell's middle: fails on the old code, passes now). CHANGELOG (voice's words). Server only, protocol unchanged, no new class_name.
+
 ## 792. Builder mode: the new kinds
 
 As Jeff turns to content (the coordinator, 2026-11-03), builder mode has to place and edit the

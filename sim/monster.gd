@@ -847,7 +847,7 @@ var _ambush_open_until := -1
 func begin_ambush(on: GridEntity) -> bool:
 	if ambush.is_empty() or not _ambush.is_empty() or not is_instance_valid(on) or not on.spawned:
 		return false
-	var aim := on.tile
+	var aim := World.struck_cell(on)  # Who a told blow strikes is struck_cell's (combat's ruling, 810 amended).
 	if aim == tile:
 		return false
 	var toward := Vector2(aim - tile).normalized()
@@ -872,22 +872,25 @@ func begin_ambush(on: GridEntity) -> bool:
 ## for "windup" ticks. False, nothing begun, when its kind has no lunge, a
 ## told strike is under way, or the line does not reach their cell.
 func begin_lunge(on: GridEntity) -> bool:
-	if lunge.is_empty() or not _ambush.is_empty() or not is_instance_valid(on) or not on.spawned or on.tile == tile:
+	if lunge.is_empty() or not _ambush.is_empty() or not is_instance_valid(on) or not on.spawned:
 		return false
-	var toward := Vector2(on.tile - tile).normalized()
+	var at := World.struck_cell(on)  # Who a told blow strikes is struck_cell's (combat's ruling, 810 amended).
+	if at == tile:
+		return false
+	var toward := Vector2(at - tile).normalized()
 	var shape := Telegraph.line(tile, toward, float(lunge["reach"]), 1)
 	var cells: Array[Vector2i] = []
 	for cell in World.telegraph_cells(shape):
 		if cell != tile:
 			cells.append(cell)
-	if on.tile not in cells:
+	if at not in cells:
 		return false
-	World.face(self, Senses.way_toward(tile, on.tile))
+	World.face(self, Senses.way_toward(tile, at))
 	var ticks := int(lunge["windup"])
 	var id := World.telegraph(self, "lunge", shape, ticks)
 	if id == 0:
 		return false
-	_ambush = {"move": &"lunge", "telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": on.tile,
+	_ambush = {"move": &"lunge", "telegraph": id, "lands": World.tick + ticks, "shape": shape, "aim": at,
 		"cells": cells, "from": World.tick, "at": tile}
 	print("[lunge] %s winds up at %s on %s, lands in %d ticks" % [name, tile, on.name, ticks])
 	return true

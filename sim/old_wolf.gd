@@ -132,7 +132,7 @@ func _special_tick() -> bool:
 		_begin_howl()
 		return true
 	if World.tick >= _next_spring and d >= 2 and d <= int(spring["cells"]) and _may_lunge(mates):
-		var toward := Vector2(target.tile - tile).normalized()
+		var toward := Vector2(World.struck_cell(target) - tile).normalized()  # As its check (the boar king's hold run).
 		var shape := Telegraph.line(tile, toward, float(spring["cells"]), 1)
 		var cells := World.telegraph_cells(shape)
 		if World.struck_cell(target) in cells and not mates.any(func(m: Monster) -> bool: return m.tile in cells):

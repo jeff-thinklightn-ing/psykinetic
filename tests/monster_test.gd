@@ -1828,6 +1828,7 @@ func _test_ambush() -> void:
 	_test_stop_to_strike()
 	_test_heavy_cycle()
 	_test_sneak_pack()
+	_test_aim_struck_cell()
 	_test_boar_king()
 	_test_boar_king_close()
 	_test_boar_king_lair()
@@ -6693,6 +6694,80 @@ func _test_old_wolf() -> void:
 			stood += 1
 	_check(stood >= int(grey.pant["ticks"]) - 3 and not _damage_log.any(func(d: Dictionary) -> bool: return d["source"] == grey and int(d["tick"]) > bitten),
 		"after it he pants, standing, striking nobody: the opening (%d ticks)" % stood)
+	DayNight.reset()
+	Monster.idling = true
+
+
+## A told line drawn to where a blow strikes (810 amended): the great
+## bear's charge and the old grey's spring at a body off its cell's middle
+## (its free centre in the next cell) are told through that cell, not held
+## back (the boar king's hold run found the line to the tile missing it).
+func _test_aim_struck_cell() -> void:
+	print("%s== the great bear's charge and the old grey's spring at a body off its cell's middle: told through where it is struck (810 amended) ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	for kind: String in ["B", "G"]:
+		var rows: Array[String] = ["#".repeat(20)]
+		for y in 9:
+			rows.append("#" + ".".repeat(18) + "#")
+		rows.append("#".repeat(20))
+		var at := Vector2i(9, 5) if kind == "B" else Vector2i(8, 5)
+		rows[5] = rows[5].substr(0, 5) + kind + rows[5].substr(6)
+		rows[at.y] = rows[at.y].substr(0, at.x) + "P" + rows[at.y].substr(at.x + 1)
+		var e := _build(rows)
+		var beast: Monster = e[kind][0]
+		var player: GridEntity = e["P"][0]
+		player.protected = false
+		player.max_hp = 100
+		player.hp = 100
+		beast.sight_range = 12
+		beast.target = player
+		player.free_pos = Vector2(at) + Vector2(0.0, 0.6)
+		var struck := World.struck_cell(player)
+		var move := "charge" if kind == "B" else "lunge"
+		if kind == "B":
+			beast.set("_roared_fight", true)
+			beast.set("_next_charge", 0)
+		else:
+			beast.set("_next_howl", World.tick + 100000)
+			beast.set("_next_spring", 0)
+		beast.call("_special_tick")
+		var begun: Dictionary = beast.get("_move")
+		var told: Array[Vector2i] = []
+		if begun.has("shape"):
+			told = World.telegraph_cells(begun["shape"])
+		_check(struck != player.tile and str(begun.get("move", "")) == move and struck in told,
+			"the %s's %s at a body struck at %s (its tile %s): told, through it" % ["great bear" if kind == "B" else "old grey", move, struck, player.tile])
+		if int(begun.get("telegraph", 0)) != 0:
+			World.end_telegraph(int(begun["telegraph"]), false)
+	# The base told strikes (combat's ruling: a told blow strikes its told
+	# cells, who is in one World.struck_cell): an ambush and a lunge at a body
+	# off its cell's middle tell the cell it is struck in.
+	var rows: Array[String] = ["##############", "#............#", "#.s..........#", "#............#", "##############"]
+	var e := _build(rows, {"s": {"named": "skeech", "facing": Vector2i(1, 0)}})
+	var skeech: Monster = e["s"][0]
+	var someone := EntityFactory.build(SPECS["P"].duplicate(true).merged({"name": "Player1"})) as Player
+	_room.add_child(someone)
+	World.spawn(someone, Vector2i(3, 2))
+	someone.free_pos = Vector2(3.0, 2.6)
+	var at := World.struck_cell(someone)
+	var begun := skeech.begin_ambush(someone)
+	var cells: Array = skeech._ambush.get("cells", [])
+	_check(at != someone.tile and begun and at in cells,
+		"the ambush at a body struck at %s (its tile %s): its told cell is that one (%s)" % [at, someone.tile, cells])
+	if begun:
+		World.end_telegraph(int(skeech._ambush["telegraph"]), false)
+	var pair := _lunge_room()
+	var robber: Monster = pair[0]
+	var player: Player = pair[1]
+	player.free_pos = Vector2(3.0, 2.6)
+	at = World.struck_cell(player)
+	begun = robber.begin_lunge(player)
+	cells = robber._ambush.get("cells", [])
+	_check(at != player.tile and begun and at in cells,
+		"the lunge at a body struck at %s (its tile %s): told through it (%s)" % [at, player.tile, cells])
+	if begun:
+		World.end_telegraph(int(robber._ambush["telegraph"]), false)
 	DayNight.reset()
 	Monster.idling = true
 
