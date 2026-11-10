@@ -40,6 +40,7 @@ func _ready() -> void:
 	_test_new_kinds()
 	_test_umbrage_kinds()
 	_test_workings()
+	_test_kind_lines()
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	print("")
@@ -426,7 +427,7 @@ func _test_monster_kinds() -> void:
 	_check(offered.has("wolf") and offered.has("sneak") and offered.has("chest"), "place's enum has every kind and the things (%s)" % [offered])
 	var system := BuilderSession.system_prompt()
 	_check("- imp: a Blood Rot goblin" in system and "- brute: an orc" in system and "(idles: guard)" in system
-			and "- wolf: wolf, a wild animal: hunts rabbit, deer, stag" in system and "W wolf" in system,
+			and "- wolf: a wolf, a wild animal: hunts in the wilds, worse at night; hunts rabbit, deer, stag" in system and "W wolf" in system,
 			"the prompt says each kind in lore's words or its row's, and how it idles")
 	var doc := _doc()
 	var stub := StubClaude.new([
@@ -1055,6 +1056,35 @@ func _test_umbrage_kinds() -> void:
 	var kinds: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "building")[0]["input_schema"]["properties"]["kind"]["enum"]
 	var inns := (config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "inn")
 	_check(not inns.is_empty() and "inn" in kinds, "the building tool offers the inn's kind (%d in the wilds)" % inns.size())
+
+
+## 792 amended: lore's line for each kind, the new cues said, the apex
+## bosses drawn but never placed.
+func _test_kind_lines() -> void:
+	print("
+== 792 amended: lore's lines for the kinds, the new cues, no apex placed ==")
+	var prompt := BuilderSession.system_prompt()
+	var tools := JSON.stringify(BuilderSession.tools())
+	print("  (the prompt %d characters, the tools %d: about %d tokens a request together, at 4 a token)" % [prompt.length(), tools.length(), (prompt.length() + tools.length()) / 4])
+	var apex := ["great_bear", "old_wolf", "boar_king"]
+	_check(apex.all(func(kind: String) -> bool: return BuilderSession.is_apex(kind)), "the great bear, the old grey and the boar king are apex")
+	var offered: Array = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "place")[0]["input_schema"]["properties"]["thing"]["enum"]
+	_check(not apex.any(func(kind: String) -> bool: return kind in offered) and "wolf" in offered and "skeleton" in offered, "place offers no apex, still the wolf and the skeleton")
+	_check(apex.all(func(kind: String) -> bool: return BuilderSession.chars().has("monster_" + kind)), "the grid still draws one where it stands")
+	_check(not apex.any(func(kind: String) -> bool: return ("- %s:" % kind) in prompt), "the prompt's monster lines leave them out")
+	_check("one of the barrow's dead, angry at being disturbed" in prompt and "an outlaw from the forest's camps" in prompt and "lies up in the rocks" in prompt,
+		"the prompt has lore's lines (the skeleton, the bandit, the hill cat)")
+	var unsaid := BuilderSession.monster_kinds().filter(func(kind: String) -> bool: return not BuilderSession.is_apex(kind) and not BuilderSession.KIND_WORDS.has(kind))
+	if not unsaid.is_empty():
+		print("  (kinds with no line of lore's yet, said by their label: %s)" % [unsaid])
+	var session := BuilderSession.new(_doc(), Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var bear := session.run_tool("place", {"at": [10, 10], "thing": "great_bear"})
+	_check(not bear.get("ok", true) and "one of a kind" in str(bear.get("text")) and "great bear" in str(bear.get("text")),
+		"a request naming the great bear is refused in words (%s)" % bear)
+	_check(not session.working.config.get("entities", []).any(func(entry: Variant) -> bool: return entry is Dictionary and str(entry.get("at")) == str([10, 10])),
+		"and nothing is laid")
+	var cue: String = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "link")[0]["input_schema"]["properties"]["cue"]["description"]
+	_check("thicket" in cue and "den" in cue and "mine" in cue, "the link's cue says thicket, den and mine")
 
 
 ## Hollowfell's workings (790) as builder mode places and moves it: a plain

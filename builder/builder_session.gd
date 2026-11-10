@@ -39,6 +39,21 @@ const KIND_WORDS := {
 	"imp": "a Blood Rot goblin, small, darts in and out",
 	"brute": "an orc, ally of the Blood Rot, big and heavy",
 	"sneak": "a kobold, ally of the Blood Rot, quick, comes at its prey from the side",
+	# lore's lines (792 amended), from facts it holds, with where lore puts each.
+	"skeleton": "one of the barrow's dead, angry at being disturbed, attacks whoever comes down; in the barrow",
+	"skeleton_guard": "one of the barrow's dead, moved by the draugr's magic, keeps its post; in the barrow",
+	"robber": "a Mound-breaker, a grave robber plundering the barrow for its relics; in the robbers' camp in the barrow",
+	"robber_brute": "the biggest Mound-breaker, who swings the Tomb Sledge and smashes walls; in the robbers' camp in the barrow",
+	"bandit": "an outlaw from the forest's camps who robs travellers on its paths; on forest paths and in camps",
+	"bandit_brute": "a bigger, heavier outlaw of the forest's camps; on forest paths and in camps",
+	"astral_knight": "the spirit of a fallen holy knight of Theus, keeping watch; in the barrow's Altar Room",
+	"draugr": "the barrow's undead master, keeper of the Hall of Fallen Souls, bargains for gold, fights those who refuse; beneath the barrow's temple",
+	"wolf": "a wolf, a wild animal: hunts in the wilds, worse at night",
+	"hill_cat": "a great cat, a wild animal: lies up in the rocks and drops on what passes; in the hill rocks",
+	"boar": "a wild boar, a wild animal: flees, but charges when cornered; in the wilds",
+	"deer": "a wild doe, a wild animal: grazes, flees with the herd; in the wilds",
+	"stag": "a stag, a wild animal: a deer with antlers, keeps with the deer; in the wilds",
+	"rabbit": "a wild rabbit, a wild animal: grazes, flees with the others; in the wilds",
 }
 ## What a wild animal's role (levels/monsters.json) does, said to Claude.
 const ROLE_WORDS := {
@@ -285,10 +300,20 @@ static func chars(config := {}) -> Dictionary:
 	return out
 
 
-## What place() can put down: each monster kind by its name, then THINGS.
+## Whether [param kind] is an apex (Monster.is_apex: one of a kind with its
+## own lair, the great bear, the old grey, the boar king): drawn on the grid
+## where one stands, never placed by a request (the coordinator, 792 amended).
+static func is_apex(kind: String) -> bool:
+	return Monster.is_apex(kind)
+
+
+## What place() can put down: each monster kind by its name but an apex,
+## then THINGS.
 static func things(config := {}) -> Dictionary:
 	var out := {}
 	for kind in monster_kinds(config):
+		if is_apex(kind):
+			continue
 		out[kind] = "monster_" + kind
 	out.merge(THINGS)
 	return out
@@ -310,6 +335,9 @@ static func kind_line(kind: String) -> String:
 			if role == "predator":
 				does = does % (", ".join(row.get("diet", [])) if not (row.get("diet", []) as Array).is_empty() else "what it can")
 			words += ", a wild animal" + (": " + does if not does.is_empty() else "")
+	elif not (row.get("diet", []) as Array).is_empty():
+		# What it hunts is the sim's (monsters.json's diet), not lore's: read, so it stays true (the coordinator).
+		words += "; hunts " + ", ".join(row["diet"])
 	var idle := "none"
 	if not row.is_empty():
 		idle = str(Monster.IDLE_MODES.find_key(row["idle"]))
@@ -390,7 +418,8 @@ static func system_prompt(prefabs_from := Prefab.DIR) -> String:
 		legend.append("%s %s" % [chars_now[meaning], meaning.trim_prefix("monster_")])
 	var monsters := PackedStringArray()
 	for kind in monster_kinds():
-		monsters.append(kind_line(kind))
+		if not is_apex(kind):
+			monsters.append(kind_line(kind))
 	var prefabs := PackedStringArray()
 	for prefab_name in Prefab.names(prefabs_from) + Prefab.kind_names():
 		var prefab := Prefab.load_prefab(prefab_name, prefabs_from)
@@ -723,7 +752,7 @@ const TOOLS := [
 			"to_spawn": {"type": "string", "description": "the spawn point there it leads to"},
 			"arrive": _CELL,
 			"closed": {"type": "boolean", "description": "shut till opened; false opens it"},
-			"cue": {"type": "string", "enum": [], "description": "how the way looks (an arch, waystones, a way down or up, sealed, a cave mouth); empty: worked out from where it leads"},
+			"cue": {"type": "string", "enum": [], "description": "how the way looks (an arch, waystones, a way down or up, sealed, a cave mouth, thicket a way into a bramble mound, den a low hole under a tilted rock shelf, mine a timbered adit cut into a hill of rock); empty: worked out from where it leads"},
 			"remove": {"type": "boolean"}},
 			"required": ["at"]}},
 	{"name": "skylight", "description": "Opens a gap in a cave's roof over a cell (indoors only): the sky's light falls through it on the cells within radius, bright by day, faint by night. A gap already on that cell is replaced; remove closes it.",
@@ -1900,6 +1929,8 @@ func _place(given: Dictionary) -> Dictionary:
 	var at: Variant = Level._tile(given.get("at"))
 	var thing := str(given.get("thing", ""))
 	var offered := things(working.config)
+	if is_apex(thing):
+		return _no("%s is one of a kind, with a lair of its own: builder mode never places one" % str(Monster.kinds()[thing].get("label", thing)).to_lower())
 	if at == null or not offered.has(thing):
 		return _no("place needs at: [x, y] and a thing (%s)" % ", ".join(offered.keys()))
 	if not area.has_point(at):
