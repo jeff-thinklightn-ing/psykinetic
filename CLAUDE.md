@@ -31,7 +31,10 @@ which worktree owns each step, and the design rules not to break without asking 
 - The interface is two trees (Jeff, 2026-11-09): `ui` owns what a window does (behaviour and
   flow), `ui-design` owns how it looks (theme, fonts, the shared parts, spacing). A new or
   changed window gets `ui-design`'s mock before `ui` builds it, and no window script sets a
-  colour, font or size of its own.
+  colour, font or size of its own. Since 840 every landing checks it (`tests/style_test`): each
+  file's line in `tests/style_budget.txt` (theme overrides, loose colours, fonts) only falls, so
+  a new one goes into `ui-design`'s theme, and lowering a file's count lowers its line in the
+  same commit. A raise is asked of `ui-design`, who brings it to the coordinator.
 
 ## Content ships as packages (Jeff, 2026-11-06)
 
