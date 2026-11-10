@@ -11131,13 +11131,13 @@ func _test_goblin() -> void:
 			"pushed back (+x): it backpedals, turning (not snapping) toward whence it came (-x), yaw %.2f from %.2f (%.2f expected after a %.0f ms frame)"
 			% [yaw, was, PI - eased, float(turn[1]) * 1000.0])
 	await _run_clock(0.3)
-	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), PI, 0.05)
 	_check(absf(angle_difference(yaw, PI)) < 0.05, "and comes round to face it, yaw %.2f" % yaw)
 	_check(animator.playing() == Client3D.CLIP_IMPACT,
 			"there, hit nothing, it doubles over all the same, still facing it (%s)" % animator.playing())
 	await _run_clock(Client3D.KNOCK_MIN_SECONDS + 0.8)
 	_check(not puppet.has_meta("knock") and animator.playing() == Client3D.CLIP_IDLE, "come to rest: Idle again (%s)" % animator.playing())
-	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), was, 0.05)
 	_check(absf(angle_difference(yaw, was)) < 0.05, "and turned back to its own facing, yaw %.2f" % yaw)
 	_push_imp(imp, Vector2i(1, 0))
 	await _run_clock(0.05)
@@ -11145,7 +11145,7 @@ func _test_goblin() -> void:
 	await _run_clock(0.15)
 	_step_imp(imp, Vector2i(-1, 0))
 	await _run_clock(0.1)
-	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), PI, 0.3)
 	_check(not puppet.has_meta("knock") and Client3D.is_gait(animator.playing()) and absf(angle_difference(yaw, PI)) < 0.3,
 			"walking straight back: the knock is over and it walks back facing the way it goes, not backpedals (%s, yaw %.2f)" % [animator.playing(), yaw])
 	await _run_clock(1.0)
@@ -11157,7 +11157,7 @@ func _test_goblin() -> void:
 	await _run_clock(0.1)
 	_check(animator.playing() == Client3D.CLIP_BACKPEDAL, "a push whose slide never showed: it still backpedals where it stands (%s)" % animator.playing())
 	await _run_clock(0.3)
-	yaw = (puppet.get_node("Body") as Node3D).rotation.y
+	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), PI, 0.05)
 	_check(absf(angle_difference(yaw, PI)) < 0.05, "facing whence it came, from what the sim says, yaw %.2f" % yaw)
 	await _run_clock(1.0)
 	_push_imp(imp, Vector2i(0, 1))
@@ -11172,10 +11172,11 @@ func _test_goblin() -> void:
 	await _run_clock(1.0)
 	_push_imp(imp, Vector2i(0, -2), true)
 	await _run_clock(0.3)
-	yaw = (puppet.get_node("Body") as Node3D).rotation.y
-	_check(animator.playing() == Client3D.CLIP_ROLL and animator.speed() < 0.0
-			and absf(angle_difference(yaw, -Vector2(0, 1).angle())) < 0.05,
-			"tossed (-z): it rolls over backwards, facing whence it came (+z), yaw %.2f, speed %.2f" % [yaw, animator.speed()])
+	var rolled := animator.playing() == Client3D.CLIP_ROLL and animator.speed() < 0.0
+	var roll_speed := animator.speed()
+	yaw = await _yaw_settles((puppet.get_node("Body") as Node3D), -Vector2(0, 1).angle(), 0.05)
+	_check(rolled and absf(angle_difference(yaw, -Vector2(0, 1).angle())) < 0.05,
+			"tossed (-z): it rolls over backwards, facing whence it came (+z), yaw %.2f, speed %.2f" % [yaw, roll_speed])
 	var roll := animator.length(Client3D.CLIP_ROLL) / ArtKit.feel("client3d.roll_speed", Client3D.ROLL_SPEED)
 	await _run_clock(roll)
 	_check(animator.playing() == Client3D.CLIP_LAND, "then lands (%s)" % animator.playing())
@@ -11217,6 +11218,22 @@ func _run_clock(seconds: float) -> void:
 		while World.tick_alpha >= 1.0:
 			World.tick += 1
 			World.tick_alpha -= 1.0
+
+
+## Waits on a turn's state, not the wall clock (a loaded machine eases a turn late: the tossed roll
+## and the teeter read mid-turn and failed, passing on a rerun): a frame at a time, the drawing
+## clock run as _run_clock does when [param clock], until [param body]'s yaw is within
+## [param tolerance] of [param want] or [param cap] seconds have passed; its yaw then.
+func _yaw_settles(body: Node3D, want: float, tolerance: float, cap := 3.0, clock := true) -> float:
+	var until := Time.get_ticks_msec() + int(cap * 1000.0)
+	while absf(angle_difference(body.rotation.y, want)) >= tolerance and Time.get_ticks_msec() < until:
+		await get_tree().process_frame
+		if clock:
+			World.tick_alpha += get_process_delta_time() * World.TICK_RATE
+			while World.tick_alpha >= 1.0:
+				World.tick += 1
+				World.tick_alpha -= 1.0
+	return body.rotation.y
 
 
 ## Runs the drawing clock as _run_clock does, a frame at a time, until
@@ -12640,9 +12657,10 @@ func _test_teeter() -> void:
 	player.teeter = way
 	var toward := -1.0
 	var start := Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 400:
+	while Time.get_ticks_msec() - start < 400 or (toward <= sin(deg_to_rad(6.0)) and Time.get_ticks_msec() - start < 3000):
 		await _frames(1)
 		toward = maxf(toward, body.global_transform.basis.y.dot(Vector3(way.x, 0.0, way.y)))
+	await _yaw_settles(body, drop_yaw, 0.1, 3.0, false)
 	_check(absf(angle_difference(body.rotation.y, drop_yaw)) < 0.1, "teetering: the model faces the drop (%.2f, the drop %.2f)" % [body.rotation.y, drop_yaw])
 	_check(toward > sin(deg_to_rad(6.0)), "it rocks out over the drop (%.1f degrees at most)" % rad_to_deg(asin(clampf(toward, -1.0, 1.0))))
 	_check(rig.base_clip() == Client3D.CLIP_TEETER, "a person wheels its arms (%s)" % rig.base_clip())
@@ -12667,6 +12685,8 @@ func _test_teeter() -> void:
 	while Time.get_ticks_msec() - start < 600:
 		await _frames(1)
 	_check(is_zero_approx(body.rotation.x) and is_zero_approx(body.rotation.z), "off the rim: upright again")
+	if facing != null:
+		await _yaw_settles(body, facing.rotation.y, 0.05, 3.0, false)
 	_check(facing == null or absf(angle_difference(body.rotation.y, facing.rotation.y)) < 0.05,
 			"and turned back to its own facing (%.2f, its facing %.2f)" % [body.rotation.y, facing.rotation.y if facing != null else 0.0])
 	_check(rig.base_clip() != Client3D.CLIP_TEETER, "no longer wheeling (%s)" % rig.base_clip())
@@ -12684,9 +12704,10 @@ func _test_teeter() -> void:
 	boar.teeter = Vector2i(0, 1)
 	toward = -1.0
 	start = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 400:
+	while Time.get_ticks_msec() - start < 400 or (toward <= sin(deg_to_rad(6.0)) and Time.get_ticks_msec() - start < 3000):
 		await _frames(1)
 		toward = maxf(toward, beast_body.global_transform.basis.y.dot(Vector3(0.0, 0.0, 1.0)))
+	await _yaw_settles(beast_body, -Vector2(0, 1).angle(), 0.1, 3.0, false)
 	_check(not view.clips.has("teeter") and view.rig.base_clip() == view.clips["walk"]
 			and is_equal_approx(view.rig.speed(), CreatureView.TEETER_PACE),
 			"a beast with no teeter clip scrabbles: its walk, quick (%s x%.2f)" % [view.rig.base_clip(), view.rig.speed()])
