@@ -30,8 +30,9 @@ does it give her something to want or react to, or reward the player visibly? Te
 - **Iron from Hollowfell** (economy leads and switches it on). On main and on: Rolf's pick at 5 gold
   (479 amended), the resident's tip (837), Hollowfell's seams and mine art. Off or owed: 835 the
   yield (economy, off); companions' side of 835 (Wren's dig want and the "dug" deed); `item.ore`
-  for the town window (art-kit, with `item.wood` and `item.stone`); the hills waystone reading the
-  mine's name where it says "Cave" (maps, voice's word, lore's fact; lands with the switch-on); the
+  for the town window (art-kit, with `item.wood` and `item.stone`); a new "Hollowfell"
+  waystone where the hills road comes nearest the mine (maps, voice's word; lands on when ready,
+  since the place is already in; W4's "Cave" points at the hill cave refuge and stays); the
   town smithy 811 amended (2) and npc's smith; playtest's whole-loop run (ore dug against the town's
   need); then the switch-on (workings on, the "lacks ore" line, the dig template, voice's bullet).
   Polish, not gating: `mine.spoil`, `prop.smithy_sign` (the smithy's package).
