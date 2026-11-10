@@ -2343,10 +2343,22 @@ func _carry_out(read: Dictionary, text: String) -> bool:
 ## walked together in a game day, road_share of them on roads), fire (both
 ## within fire_cells of a fire, out of a fight, fire_ticks), leisure (her
 ## player in a town, no fight, no errand of hers, town_ticks), mule (her
-## pack over heavy_share of her slots for heavy_cells walked, warned at
+## pack over heavy_share of its slots for heavy_cells walked, warned at
 ## half; once until she rests); under low_hp out of a fight she asks to
 ## rest first (rest or bandaging clears it), and her player striking a
 ## monster not already after them is pressed (struck_first).
+## Whether more than [param share] of the pack in [param of] is filled (621
+## amended (3)): its pack slots only (Items.pack_slots_of, 12, or 16 with a
+## satchel worn), never what she wears or holds, nor slots that are not hers.
+static func pack_heavy(of: PackedStringArray, share: float) -> bool:
+	var pack := Items.pack_slots_of(of)
+	var filled := 0
+	for slot: int in pack:
+		if slot < of.size() and not of[slot].is_empty():
+			filled += 1
+	return not pack.is_empty() and float(filled) > pack.size() * share
+
+
 func _watch_deeds() -> void:
 	if World.tick % DEED_EVERY != 0 or not _alive(keeper):
 		return
@@ -2382,8 +2394,7 @@ func _watch_deeds() -> void:
 		_deeds["town"] = 0
 	if current_intent == Intent.REST or current_intent == Intent.SLEEP:
 		_deeds.merge({"heavy": 0, "warned_heavy": false, "mule_spent": false, "asked_rest": false}, true)
-	var filled := slots.size() - slots.count("")
-	if slots.is_empty() or float(filled) <= slots.size() * float(rules.get("heavy_share", 0.75)):
+	if not pack_heavy(slots, float(rules.get("heavy_share", 0.75))):
 		_deeds.merge({"heavy": 0, "warned_heavy": false}, true)
 	elif moved > 0 and not _deeds["mule_spent"]:
 		_deeds["heavy"] += moved

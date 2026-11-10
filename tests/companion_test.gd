@@ -2545,6 +2545,27 @@ func _test_deeds() -> void:
 	tick_on.call()
 	_check(seen.count("mule") == 1, "and then a drop, once until she rests (%s)" % [seen])
 	World.set_slots(pet, slots_were)
+	# 621 amended (3): her pack's slots only, never what she wears or holds;
+	# the same at 22 slots and at items' 27 with no satchel worn (padded).
+	var share := float(watch["heavy_share"])
+	var pack := Items.pack_slots_of(PackedStringArray())
+	var need := int(floor(pack.size() * share)) + 1  # More than share: 10 of 12.
+	var counts := []
+	for size: int in [Items.CARRIED, 27]:
+		for packed: int in [need, need - 1]:
+			var lot := PackedStringArray()
+			lot.resize(size)
+			var put := 0
+			for i in size:
+				if pack.has(i):
+					lot[i] = "ration" if put < packed else ""
+					put += 1
+				elif i < Items.CARRIED:
+					lot[i] = "ration"  # Every worn slot and both hands filled.
+			counts.append(Companion.pack_heavy(lot, share))
+	_check(counts == [true, false, true, false],
+			"mule: heavy past %s of her %d pack slots (%d filled, not %d), whatever she wears; the same at %d slots and at 27 (%s)" % [
+			share, pack.size(), need, need - 1, Items.CARRIED, counts])
 	# Pressed on hurt: she asks to rest; a new fight then costs her.
 	var mind_was: CompanionMind = pet.mind
 	var counting := CountingMind.new()

@@ -26277,6 +26277,22 @@ tests: companion_test _test_deeds (each deed and drop, the tags, the caps).
 Server only (the voice's tags are the server's prompt and parse), protocol
 unchanged, no new class_name.
 
+621 amended (3): the mule deed's heavy share counts her pack (2026-11-10, companions; release's
+label; the coordinator's ruling on the share; ahead of items' satchel, 819 amended). The rule was
+"her pack over heavy_share", but _watch_deeds counted every filled slot over all of slots.size():
+the 12 pack slots, both hands and the 8 worn, 22, heavy at 17. So what she wore decided a deed about
+what she carried (lightly dressed she could never reach it), and items' satchel, making
+Companion.SLOTS 27 (the bag slot and its row, empty unless one is worn), would have moved it to 21
+with the satchel off. Now Companion.pack_heavy(slots, share): more than heavy_share (0.75, kept,
+the coordinator's) of Items.pack_slots_of(slots) filled, 10 of 12, 13 of 16 with a satchel worn;
+it matches what a well-dressed companion needed before (seven worn or held and 10 in the pack). The
+warning at half, the drop once until she rests and her words are unchanged. Survey, the
+coordinator's ask: no other rule of hers divides by or counts all her slots (her rod, her
+remedies and giving gear back loop over every slot to find a thing; the ore room and her note of
+what she carries read the pack). companion_test _test_deeds: heavy at 10 pack slots filled, not at
+9 with every worn slot and both hands filled, the same at 22 slots and at 27 padded. Server only,
+protocol unchanged, no new class_name; no bullet.
+
 ## 621 (3): knucklebones, and keeping watch while she sleeps
 
 The last part of 621, from Jeff's list, on draft numbers (companion_traits
