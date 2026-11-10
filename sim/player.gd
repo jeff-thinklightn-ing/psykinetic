@@ -252,12 +252,14 @@ func _pursue_action() -> void:
 		var swing := action_direction
 		_clear_action()
 		var struck := World.stand_target(self, swing)  # Whatever is in the way takes it (decision 593).
-		if struck == null:
-			World.try_swing(self, swing)
-		elif World.windup_ticks(self) > 0:
-			World.try_wind_up(self, struck)
-		else:
-			World.try_attack(self, struck)
+		# What it fires as: World.blow_of, as _test_blow_stands reckons its stand (688 amended (13)).
+		match World.blow_of(self, Order.SWING, struck, swing):
+			&"swing":
+				World.try_swing(self, swing)
+			&"wind_up":
+				World.try_wind_up(self, struck)
+			_:
+				World.try_attack(self, struck)
 		return
 	if action_order == Order.SIGNATURE:
 		# From where it stands (decision 593): out of reach, dropped.
@@ -282,12 +284,13 @@ func _pursue_action() -> void:
 		var target := action_target
 		var direction := action_direction
 		_clear_action()
-		if order == Order.ATTACK and World.windup_ticks(self) > 0:
-			World.try_wind_up(self, target)  # A heavy weapon winds up first (decision 392).
-		elif order == Order.ATTACK:
-			World.try_attack(self, target)
-		else:
-			World.try_shove(self, target, direction)
+		match World.blow_of(self, order, target, direction):  # As _test_blow_stands reckons it (688 amended (13)).
+			&"wind_up":
+				World.try_wind_up(self, target)  # A heavy weapon winds up first (decision 392).
+			&"blow":
+				World.try_attack(self, target)
+			_:
+				World.try_shove(self, target, direction)
 		return
 	# Out of reach: a free body (688) closes in by its own commands, its
 	# client chasing (697): the order held till in reach, given up after

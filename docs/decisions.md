@@ -33386,6 +33386,35 @@ ends at her met again, unhurt by its end, and as it is now he slides on: each ta
 impact once (13). Server only, protocol unchanged, no new class_name. One CHANGELOG bullet in
 voice's words.
 
+688 amended (13): every blow's stand is reckoned in one place on World and held there by a test,
+so a change to how long a blow stands a free body is seen in the landing that makes it (release's
+label; the coordinator's ruling (a), after the halt class was measured). The halt class, the rest
+of wire2's snaps besides the foe class: a body stands while a blow it fired plays out, and the
+client, which doesn't know it fired, walks on. Measured in a fire window (wire2's shapes on a test
+room, each blow fired walking): the backlog dropped at the fire is 0.05 cells on average, 0.26 at
+most; a plain blow stands 0.39 cells, the sword 0.39 to 1.92 (its verb's lead 2 ticks, never given
+up by walking off, then its strike's 2). Two of wire2's halt snaps were sword stands; a third was
+the foe class's back-through shape. World.blow_stand_ticks(entity, part, lead_ticks) is now the
+one reckoning for each part (&"blow", &"shove", &"wind_up", &"recover", &"bash"), read by try_swing,
+_try_hit, try_wind_up, recover and try_bash; World.blow_of(entity, order, target, direction) is
+what an order fires as, and Player._pursue_action fires by it; World.blow_stand(entity, kind)
+gives the whole stand ({ticks, lands, walked_off}): a heavy's wind-up plus the longer of its
+blow and its recovery, walked off before it lands; a lead's wind-up plus its strike, cut to its
+next blow's start. free_net_test _test_blow_stands fires 116 blows, every verb and order, a
+shield's bash among them, and checks the server's stand tick for tick against blow_stand: 0 wrong
+(plain 2, sword 4, pick and rot hammer 6, giant axe 10, battle axe 13, tomb sledge 17, bash 4; a
+heavy walked off stands 0). Tried on the client and not built: the client foreseeing the stand
+(Own.stand, the server's halt heard and lifted) never beat showing it at once as now. With jitter,
+the sword's stands shown at once went from 2 to 6 of the runs at 170 ms and from 3 to 10 at
+300 ms, and a wrong guess put him back 1.53 to 1.60 cells, past any blend. The cause is the
+order, not the reckoning: walking past a foe, a click whose next move is more than
+WIND_UP_KEEP_ANGLE off the way to its target is dropped (_free_drop_order), so whether it fires
+at all is a race the jitter settles and the client can't know; and the server walks a tick's
+moves (tend_free_body) before _pursue_action fires, so the two stands sit up to a tick apart.
+Whether that race should go (the order kept, or the stand begun only once the server says it
+fired) is combat's question, put to it after 843 and 340 amended (2). Server only and
+behaviour-neutral: every stand as before, protocol unchanged, no new class_name, no bullet.
+
 ## 688, combat's side: blows and shots from a free body
 
 ui's design, physics' free body (688): while World.free_walk is on, a player's body has a float

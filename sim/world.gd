@@ -8525,7 +8525,7 @@ func try_swing(entity: GridEntity, direction: Vector2i, paid := false) -> bool:
 	if tick < entity.next_attack_tick or tick < entity.next_move_tick:
 		return false
 	entity.next_attack_tick = tick + attack_ticks_of(entity)
-	_halt_for_blow(entity, mini(entity.next_attack_tick, tick + BLOW_STAND_TICKS))  # A whiff as a blow (Jeff's lost clicks).
+	_halt_for_blow(entity, tick + blow_stand_ticks(entity, &"blow"))  # A whiff as a blow (Jeff's lost clicks; 688 amended (13)).
 	entity._world_set_facing(direction)
 	entity.protected = false
 	if not paid:
@@ -8628,7 +8628,7 @@ func try_wind_up(by: GridEntity, target: GridEntity, lead_ticks := 0) -> bool:
 	# lead (its kind's fight "lead_ticks"), longer than its weapon's own; a
 	# heavy weapon's wind-up is never shortened by it.
 	var heavy := int(blow_verb(by).get("windup", 0)) > 0
-	var ticks := windup_ticks(by) if heavy or lead_ticks <= 0 else maxi(lead_ticks, windup_ticks(by))
+	var ticks := blow_stand_ticks(by, &"wind_up", lead_ticks)  # 688 amended (13).
 	if ticks <= 0 or not by.wind_up.is_empty() or not by.spawned or not target.spawned or by == target:
 		return false
 	if not can_target(by, target) or is_stunned(by) or is_down(by):
@@ -8708,7 +8708,7 @@ func _tend_wind_ups() -> void:
 			try_swing(entity, direction, true)
 			if logs:
 				_log("windup: %s at %s strikes the air" % [entity.name, entity.tile])
-		var recover := recover_ticks(entity)
+		var recover := blow_stand_ticks(entity, &"recover")  # 688 amended (13).
 		if not lead and recover > 0:
 			# 750: the head in the ground; it stands planted, the striker's opening.
 			entity.next_move_tick = maxf(entity.next_move_tick, tick + recover)
@@ -8779,7 +8779,7 @@ func try_bash(by: GridEntity, target: GridEntity) -> bool:
 		by.stamina -= int(verb["bash_stamina"])
 	by.next_bash_tick = tick + int(verb["bash_ticks"])
 	by.bash_moment_until = tick + int(verb["bash_stagger"])
-	_halt_for_blow(by, by.bash_moment_until)  # A free body stands for its bash (688).
+	_halt_for_blow(by, tick + blow_stand_ticks(by, &"bash"))  # A free body stands for its bash's moment (688; 688 amended (13)).
 	by._world_set_facing(line)
 	by._world_swung(line)
 	entity_swung.emit(by, line)
@@ -9398,7 +9398,7 @@ func _try_hit(attacker: GridEntity, target: GridEntity, hit_damage: int, is_shov
 	attacker.next_attack_tick = tick + attack_ticks_of(attacker) if not is_shove else tick + attacker.attack_ticks
 	# Jeff's lost clicks: a free body stands for the blow's own moment, not its cycle (the cycle still
 	# gates its next blow), so a click away walks at once after it.
-	_halt_for_blow(attacker, mini(attacker.next_attack_tick, tick + BLOW_STAND_TICKS))
+	_halt_for_blow(attacker, tick + blow_stand_ticks(attacker, &"shove" if is_shove else &"blow"))  # 688 amended (13).
 	attacker._world_set_facing(way)
 	if not is_shove:
 		attacker._world_swung(way)
@@ -10671,6 +10671,72 @@ func swap_places(a: GridEntity, b: GridEntity, duration: float, start := -1.0) -
 func _halt_for_blow(entity: GridEntity, until_tick: int) -> void:
 	if free_body(entity):
 		halt(entity, until_tick)
+
+
+## How long a free body stands for one part of a blow it fires now (688 amended (13)): the one
+## reckoning every server halt for a blow reads (_halt_for_blow's callers), whole in blow_stand,
+## which free_net_test _test_blow_stands holds to what the server stands for every verb and
+## order, so a change to any stand is seen there. [param part]: &"blow" a plain blow, a swing at
+## nothing or a lead's strike (its moment, not its cycle: Jeff's lost clicks); &"shove"; &"wind_up"
+## a heavy's wind-up or a lead (338 amended; [param lead_ticks] a monster kind's own lead, never
+## shortening a heavy's); &"recover" a heavy's head in the ground after it lands (750); &"bash" a
+## bash's moment. 0 for anything else.
+func blow_stand_ticks(entity: GridEntity, part: StringName, lead_ticks := 0) -> int:
+	match part:
+		&"blow":
+			return mini(attack_ticks_of(entity), BLOW_STAND_TICKS)
+		&"shove":
+			return mini(entity.attack_ticks, BLOW_STAND_TICKS)
+		&"wind_up":
+			var heavy := int(blow_verb(entity).get("windup", 0)) > 0
+			return windup_ticks(entity) if heavy or lead_ticks <= 0 else maxi(lead_ticks, windup_ticks(entity))
+		&"recover":
+			return recover_ticks(entity)
+		&"bash":
+			return int(bash_verb(entity).get("bash_stagger", 0))
+	return 0
+
+
+## What a player's [param order] at [param target] (or [param direction], a swing) fires as, in
+## reach and ready (Player._pursue_action, which reads it): &"swing" at nothing, &"blow",
+## &"wind_up" (its weapon winds up, heavy or a lead), &"shove", &"bash" (a signature that is
+## one), &"" none.
+func blow_of(entity: GridEntity, order: GridEntity.Order, target: GridEntity, direction := Vector2i.ZERO) -> StringName:
+	match order:
+		GridEntity.Order.SWING:
+			if stand_target(entity, direction) == null:
+				return &"swing"
+			return &"wind_up" if windup_ticks(entity) > 0 else &"blow"
+		GridEntity.Order.ATTACK:
+			return &"wind_up" if windup_ticks(entity) > 0 else &"blow"
+		GridEntity.Order.SHOVE:
+			return &"shove"
+		GridEntity.Order.SIGNATURE:
+			return &"bash" if signature_of(entity) == "bash" else &""
+	return &""
+
+
+## The whole stand of a blow of kind [param kind] fired now (688 amended (13)), its parts as
+## the server halts them: {"ticks": from the fire to its end, "lands": ticks to a wind-up's
+## landing (0 none), "walked_off": whether a walk off its way gives it up before it lands (a
+## heavy's, _free_give_up_wind_up; a lead never is)}.
+func blow_stand(entity: GridEntity, kind: StringName) -> Dictionary:
+	match kind:
+		&"blow", &"swing":
+			return {"ticks": blow_stand_ticks(entity, &"blow"), "lands": 0, "walked_off": false}
+		&"shove":
+			return {"ticks": blow_stand_ticks(entity, &"shove"), "lands": 0, "walked_off": false}
+		&"bash":
+			return {"ticks": blow_stand_ticks(entity, &"bash"), "lands": 0, "walked_off": false}
+		&"wind_up":
+			var w := blow_stand_ticks(entity, &"wind_up")
+			var heavy := int(blow_verb(entity).get("windup", 0)) > 0
+			if heavy:
+				# Landed through _try_hit (its moment), then planted recover ticks (750).
+				return {"ticks": w + maxi(blow_stand_ticks(entity, &"blow"), blow_stand_ticks(entity, &"recover")), "lands": w, "walked_off": true}
+			# A lead: its strike's moment, cut to its next blow's start (attack_ticks_of after it began).
+			return {"ticks": mini(w + blow_stand_ticks(entity, &"blow"), attack_ticks_of(entity)), "lands": w, "walked_off": false}
+	return {"ticks": 0, "lands": 0, "walked_off": false}
 
 
 ## Where [param entity]'s shots and lobs start (688, combat's side): a free

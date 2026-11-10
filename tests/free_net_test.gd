@@ -53,6 +53,7 @@ func _ready() -> void:
 	_test_rebuilt_body()
 	_test_resend()
 	_test_throttle_steady()
+	_test_blow_stands()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -668,3 +669,80 @@ func _check(ok: bool, what: String) -> void:
 	print("  %s  %s" % ["PASS" if ok else "FAIL", what])
 	if not ok:
 		_failures += 1
+
+
+## 688 amended (13): a blow's stand as World reckons it (World.blow_of, World.blow_stand) is
+## what the server stands, tick for tick, for every verb in items.json held in the right hand
+## (a bash's shield in the left) and every player order that fires one: an attack, a shove, a
+## swing at a foe and at nothing, and a signature that is a bash. At lag 0, on the server
+## alone, a bear beside him; the ticks his free body is held from the blow's fire. And what
+## ends it: a heavy wind-up walked off its way is given up at once, a lead never is. A change
+## to any stand (combat's) fails here until blow_stand_ticks says it.
+func _test_blow_stands() -> void:
+	print("\n== a blow's stand: what World reckons is what the server stands ==")
+	var checked := 0
+	var wrong: Array[String] = []
+	var ids: Array = Items.all().keys()
+	ids.sort()
+	for id: String in [""] + ids:
+		if id != "" and Items.verb_of(id).is_empty():
+			continue
+		for order: GridEntity.Order in [GridEntity.Order.ATTACK, GridEntity.Order.SHOVE, GridEntity.Order.SWING, GridEntity.Order.SIGNATURE]:
+			for at_nothing: bool in ([false, true] if order == GridEntity.Order.SWING else [false]):
+				for walk_off: bool in [false, true]:
+					var r := _blow_stand_run(id, order, at_nothing, walk_off)
+					if r.is_empty():
+						continue
+					checked += 1
+					if int(r["served"]) != int(r["predicted"]):
+						wrong.append("%s %s%s%s: predicted %d, served %d" % [id if id != "" else "bare hands", GridEntity.Order.keys()[order],
+								" at nothing" if at_nothing else "", " walked off" if walk_off else "", r["predicted"], r["served"]])
+	print("  %d blows checked (%d items with a verb, bare hands, each order)" % [checked, ids.filter(func(i: String) -> bool: return not Items.verb_of(i).is_empty()).size()])
+	for line in wrong.slice(0, 12):
+		print("    " + line)
+	_check(checked > 0 and wrong.is_empty(), "every blow's stand as World reckons it is the server's, tick for tick (%d wrong)" % wrong.size())
+
+
+## One of _test_blow_stands's: [param id] in his right hand, the bear beside him east, the
+## order given; {} if it fires nothing. With [param walk_off], a move straight away from the
+## bear sent the tick it fires.
+func _blow_stand_run(id: String, order: GridEntity.Order, at_nothing: bool, walk_off: bool) -> Dictionary:
+	var player := _build(OPEN, Vector2i(2, 2))
+	player.owner_peer = 4242
+	if id != "":
+		# A signature's bash is a shield's in the left hand (World.signature_of, bash_verb).
+		var hands := ["", "", "", "", "", id] if order == GridEntity.Order.SIGNATURE else ["", "", "", "", id, ""]
+		World.set_slots(player, Items.tidy(hands, Items.CARRIED))
+	var foe := _spawn("res://sim/monster.gd", "Bear", Vector2i(3, 2)) as Monster
+	foe.acts = false
+	foe.sight_range = 0
+	foe.max_hp = 100000
+	foe.hp = 100000
+	var direction := Vector2i.LEFT if at_nothing else Vector2i.RIGHT
+	var kind := World.blow_of(player, order, null if at_nothing else foe, direction)
+	if kind == &"":
+		return {}
+	var stand := World.blow_stand(player, kind)
+	match order:
+		GridEntity.Order.ATTACK: World.order_attack(player, foe)
+		GridEntity.Order.SHOVE: World.order_shove(player, foe)
+		GridEntity.Order.SWING: World.order_swing(player, direction)
+		GridEntity.Order.SIGNATURE: World.order_signature(player, foe)
+	var fired := -1
+	var held := 0
+	for i in 40:
+		World.step()
+		if fired < 0 and World.free_held(player):
+			fired = World.tick
+			if walk_off:
+				player.free_allowance = World.FREE_COMMANDS_PER_SECOND
+				World.free_input(player, Vector2.LEFT, World.TICK_DT)
+		if fired >= 0:
+			if not World.free_held(player):
+				break
+			held += 1
+	if fired < 0:
+		return {"predicted": int(stand["ticks"]), "served": -1}
+	# Walked off its way, a heavy's wind-up is given up there and then (World._free_give_up_wind_up).
+	var predicted := 0 if walk_off and bool(stand["walked_off"]) else int(stand["ticks"])
+	return {"predicted": predicted, "served": held}
