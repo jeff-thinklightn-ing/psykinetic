@@ -232,7 +232,7 @@ func _test_plea() -> void:
 	_work.set_card("o-mara", card)
 	var mine := _offers()
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.CARRY and mine[0]["what"]["to"] == "o-bram"
-		and mine[0]["title"] == "A word for Bram", "a word to carry to Bram: %s" % [mine])
+		and mine[0]["title"] == "Carry word to Bram", "a word to carry to Bram: %s" % [mine])
 	_work.set_loan("o-mara", 14.0, false)
 	mine = _offers()
 	_check(mine.size() == 1 and mine[0]["accept"] == Offers.LEND and mine[0]["cost"] == 14 and mine[0]["words"] == "I owe the town 14 gold; could you spare some of it?",
@@ -379,7 +379,7 @@ func _test_quarrel() -> void:
 	_check(not Townsfolk.note_disputes(_work, TOWN, _log, _now + 1) and _log.size() == 1, "and not twice")
 	var mine := _offers()
 	_check(mine.size() == 1 and mine[0]["kind"] == Offers.PLEA and mine[0]["accept"] == Offers.CARRY and mine[0]["what"].get("law") == "o-law"
-		and mine[0]["title"] == "Speak for me" and str(mine[0]["words"]).begins_with("Lay my quarrel with Bram before the lawspeaker"),
+		and mine[0]["title"] == "Speak for Mara" and str(mine[0]["words"]).begins_with("Lay my quarrel with Bram before the lawspeaker"),
 		"Mara's plea: speak for her before the lawspeaker: %s" % [mine])
 	var taken := Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"] if not mine.is_empty() else "", 0, _ctx)
 	_check(taken["ok"] and taken["line"] == "Jeff will speak for Mara before the lawspeaker." and _asked.size() == 1, "taken, interest only: %s" % [taken])
@@ -415,7 +415,7 @@ func _test_quarrel() -> void:
 	var before := _log.size()
 	_check(not Townsfolk.note_disputes(_work, TOWN, _log, _now) and _log.size() == before, "with rulings off no quarrel is noted")
 	var word := _offers("o-bram")
-	_check(word.size() == 1 and word[0]["what"].has("to") and word[0]["title"] == "A word for Tam", "and the plea is 435's carried word: %s" % [word])
+	_check(word.size() == 1 and word[0]["what"].has("to") and word[0]["title"] == "Carry word to Tam", "and the plea is 435's carried word: %s" % [word])
 	_model = "claude-haiku-5-5"
 	_law = ""
 	_check(_offers("o-bram")[0]["what"].has("to"), "no sitting lawspeaker: the carried word too")
@@ -480,7 +480,7 @@ func _test_chronicle() -> void:
 	_ctx["statuses"] = func() -> Dictionary: return {}
 	# _setup's day is at home all day: the desk.
 	var mine := _offers("o-odo")
-	_check(mine.size() >= 1 and mine[0]["kind"] == Offers.PAGE and mine[0]["title"] == "Read the chronicle" and mine[0]["accept"] == Offers.READ and mine[0]["cost"] == 0,
+	_check(mine.size() >= 1 and mine[0]["kind"] == Offers.PAGE and mine[0]["title"] == "Hear the chronicle" and mine[0]["accept"] == Offers.READ and mine[0]["cost"] == 0,
 		"at home, the scholar offers the chronicle first: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["kind"]))])
 	_check(_offers("o-tam").all(func(o: Dictionary) -> bool: return o["kind"] != Offers.PAGE), "a hauler keeps no chronicle")
 	var read := Offers.accept("o-odo", "p1", "Jeff", mine[0]["id"], 0, _ctx)
@@ -555,7 +555,7 @@ func _test_sick_pleas() -> void:
 	_healer = ""
 	Townsfolk._set_sickness(_work, "o-tam", {"since": 1, "kind": "the shakes", "treated": -1, "cured_by": ""})
 	mine = _offers()
-	_check(mine.size() == 1 and mine[0]["title"] == "Take Tam to the healer" and mine[0]["what"].get("hut") == "o/hut", "with no medicine man but a hut, walk him there: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
+	_check(mine.size() == 1 and mine[0]["title"] == "Walk Tam to the healer's" and mine[0]["what"].get("hut") == "o/hut", "with no medicine man but a hut, walk him there: %s" % [mine.map(func(o: Dictionary) -> String: return str(o["title"]))])
 	Offers.accept("o-mara", "p1", "Jeff", mine[0]["id"], 0, _ctx)
 	Offers.healed(TOWN, "o-tam", "", "", "died", _ctx)
 	_check(_done.size() == 2 and _done[1][3] == 0 and str(_done[1][2]) == "Tam died of the sickness." and Townsfolk.card_of(_work, "o-mara")["asks"].is_empty(),

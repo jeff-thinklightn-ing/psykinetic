@@ -67,7 +67,7 @@
 			"sick_title": "Walk the sick to him",
 			"sick": "There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door.",
 			"sick_done": "%s walked %s to %s, who saw to them.",
-			"brew_title": "The makings of a brew",
+			"brew_title": "Bring the makings of a brew",
 			"brew": "Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours.",
 			"brew_done": "%s brews what %s brought and hands them the potion.",
 			"kept": "%s is in %s's care now: fall where they will, he will see to them.",

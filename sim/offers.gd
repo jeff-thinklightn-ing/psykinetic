@@ -659,7 +659,7 @@ static func _page_offer(worker_id: String, who: Dictionary, town: String, given:
 	if not Townsfolk.whereabouts(_trade_of(who), hour, Season.name_at(at), SCHOLAR, worker_id, Townsfolk.day_of(at)) in PAGE_AT:
 		return {}
 	var name := str(who.get("name", worker_id))
-	return _offer(worker_id, PAGE, "chronicle", "Read the chronicle",
+	return _offer(worker_id, PAGE, "chronicle", "Hear the chronicle",
 		"%s keeps the town's chronicle, with %s copy always to hand, and will read it to you." % [name, _their(who.get("card", {}))], {"page": "chronicle"}, READ)  # Voice's words (491 amended).
 
 
@@ -721,7 +721,7 @@ static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, to
 				{"sick": str(kin_id), "name": name, "healer": healer, "sub": "healing"}, TAKE)
 		var hut := str(_call(given, "healers_hut", [town]))
 		if not hut.is_empty() and hut != "<null>":
-			return _offer(worker_id, PLEA, "heal:" + str(kin_id), "Take %s to the healer" % name,
+			return _offer(worker_id, PLEA, "heal:" + str(kin_id), "Walk %s to the healer's" % name,
 				"My %s %s lies sick with %s. If you could walk %s to the healer's hut, the healer would see to %s." % [_relation(str(kin[kin_id]), theirs), name, sick.get("kind", "a fever"), _them(theirs), _them(theirs)],
 				{"sick": str(kin_id), "name": name, "hut": hut, "sub": "healing"}, TAKE)
 	# Kin lost beyond the walls (decision 487): walk them home.
@@ -746,10 +746,10 @@ static func _plea_offer(worker_id: String, who: Dictionary, card: Dictionary, to
 		var name := str(theirs.get("name", other))
 		if not law.is_empty() and law != worker_id and law != str(other):
 			# A quarrel for the lawspeaker (decision 486): speak for them when you see him.
-			return _offer(worker_id, PLEA, "quarrel:" + str(other), "Speak for me",
+			return _offer(worker_id, PLEA, "quarrel:" + str(other), "Speak for %s" % str(who.get("name", "them")),
 				"Lay my quarrel with %s before the lawspeaker when you see %s; say I was wronged." % [name, _them(production.worker(law).get("card", {}))],
 				{"other": str(other), "name": name, "law": law}, CARRY)
-		return _offer(worker_id, PLEA, "word:" + str(other), "A word for %s" % name,
+		return _offer(worker_id, PLEA, "word:" + str(other), "Carry word to %s" % name,
 			"If you see %s, tell %s the matter between us is forgotten." % [name, _them(theirs.get("card", {}))],
 			{"to": str(other), "name": name}, CARRY)
 	return {}
@@ -805,7 +805,7 @@ static func _care_offers(worker_id: String, who: Dictionary, town: String, playe
 			str(words.get("sick", "There is sickness in the town and I cannot be everywhere. Find one who is sick and walk them to my door.")),
 			{"sub": CARE_SICK, "hut": hut}, TAKE))
 	elif not done.get("brew", false) and not _has_ask(card, player_id, CARE_BREW):
-		out.append(_offer(worker_id, PLEA, CARE_BREW, str(words.get("brew_title", "The makings of a brew")),
+		out.append(_offer(worker_id, PLEA, CARE_BREW, str(words.get("brew_title", "Bring the makings of a brew")),
 			str(words.get("brew", "Bring me %d handfuls of herbs and a pair of antlers and I'll brew you something for the road; the potion is yours.")) % BREW_HERBS,
 			{"sub": CARE_BREW, "hut": hut, "herbs": BREW_HERBS, "antlers": BREW_ANTLERS}, TAKE))
 	return out

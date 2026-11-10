@@ -122,6 +122,10 @@ const DONATE_WORDS := "Donate"
 const GIFT_WORDS := "A gift"
 ## Rolf's button (807 amended (3), voice's words).
 const LOCKER_WORDS := "Open locker"
+## Offers that are shown as squares or by the counter, never as rows (536 amended).
+## The asks seen before the list scrolls (ui-design's ruling, 11-11).
+const ASKS_VISIBLE := 4
+const NOT_ROWS: Array[String] = [Offers.VENDOR_WARES, Offers.WARES, Offers.CAMP_WARES]
 
 ## The pack panel the window sits beside (its boxes are the player's side).
 var pack: PackPanel
@@ -178,6 +182,12 @@ var _state: Label
 var _chat_scroll: ScrollContainer
 var _chat: VBoxContainer
 var _line: LineEdit
+## 536 amended: the person's asks as rows (their open offers that are not wares), a click each.
+var asks: Array[Dictionary] = []
+var ask_why := ""
+var _asks_box: VBoxContainer
+## The asks' list scrolls past ASKS_VISIBLE rows (ui-design's ruling); the window stops growing there.
+var _asks_scroll: ScrollContainer
 var _foot_row: HBoxContainer
 var _focus_due := false
 var _grid: GridContainer
@@ -305,6 +315,18 @@ func _ready() -> void:
 	_line.text_submitted.connect(_submit)
 	_line.gui_input.connect(_line_input)
 	column.add_child(_line)
+	_asks_scroll = ScrollContainer.new()
+	_asks_scroll.name = "AsksScroll"
+	_asks_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_asks_scroll.visible = false
+	column.add_child(_asks_scroll)
+	_asks_box = VBoxContainer.new()
+	_asks_box.name = "Asks"
+	_asks_box.theme_type_variation = &"OfferList"  # ui-design defines it (the row constant between rows).
+	_asks_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_asks_box.visible = false
+	_asks_scroll.add_child(_asks_box)
+	column.move_child(_line, _asks_scroll.get_index() + 1)  # The typing line below the asks (ui-design's mock).
 	_grid = GridContainer.new()
 	_grid.columns = COLUMNS
 	_grid.add_theme_constant_override("h_separation", UiTheme.constant("slot_gap"))
@@ -378,6 +400,8 @@ func open(person: GridEntity, who := "") -> void:
 		data = {}
 		counter = {}
 		wares = []
+		asks = []
+		ask_why = ""
 	with = person
 	merchant = who
 	_clear_picks()
@@ -403,6 +427,94 @@ func show_wares(person: GridEntity, who: String, offers: Array, gold: int) -> vo
 		if ware_entry(str(id)).is_empty():
 			wares_pick.erase(id)
 	_rebuild()
+
+
+## 536 amended: [param body]'s asks among [param offers] (asks_of), shown as rows while the window is
+## theirs; [param gold] in the purse. Called with every "offers" message for a townsperson.
+func show_asks(body: GridEntity, offers: Array, gold: int) -> void:
+	if not _open or with != body:
+		return
+	asks = asks_of(offers, trades)
+	ask_why = ""
+	purse = gold
+	_rebuild()
+
+
+## The offers of [param offers] a person's window shows as rows (536 amended): open ones (already
+## taken, the pack's Promised line has them), wares (the squares), the camp trader's goods, words
+## only ones (accept "") and, where the person has squares of their own, a plain buy are not.
+static func asks_of(offers: Array, squares: bool) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for each: Variant in offers:
+		if not each is Dictionary or str(each.get("id", "")).is_empty() or bool(each.get("open", false)):
+			continue
+		var accept := str(each.get("accept", ""))
+		if accept.is_empty() or accept == DealPanel.WORDS_ONLY or accept in NOT_ROWS or (squares and accept == Offers.BUY):
+			continue
+		out.append(each)
+	return out
+
+
+## The asks' height: the rows up to ASKS_VISIBLE and the separations between them, measured from a row's
+## own minimum height (so it follows the text scale), the rest scrolling.
+func _size_asks() -> void:
+	var count := _asks_box.get_child_count()
+	var shown := mini(count, ASKS_VISIBLE)
+	if shown == 0:
+		_asks_scroll.custom_minimum_size = Vector2.ZERO
+		return
+	var row_h := (_asks_box.get_child(0) as Control).get_combined_minimum_size().y
+	var gap := float(_asks_box.get_theme_constant(&"separation"))
+	_asks_scroll.custom_minimum_size = Vector2(0.0, shown * row_h + (shown - 1) * gap)
+
+
+## One row of the asks (the part ui-design swaps for UiRow): [param title] on the left, [param amount] gold on
+## the right (-1: none), [param short] when it is more than the purse (shown by the theme, never dimmed).
+func _row(title: String, amount: int, short: bool) -> Button:
+	var row := Button.new()
+	row.theme_type_variation = &"OfferRow"
+	row.focus_mode = Control.FOCUS_NONE
+	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	row.text = title
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.set_meta("shown", title)
+	row.set_meta("gold", str(amount) if amount >= 0 else "")
+	row.set_meta("short", short)
+	if amount >= 0:
+		var price := UiPrice.new()  # ui-design's chip: the coin, rust when it can't be paid.
+		price.name = "Price"
+		price.set_gold(amount, short)
+		price.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+		price.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		price.grow_vertical = Control.GROW_DIRECTION_BOTH
+		var inset := float(row.get_theme_stylebox(&"normal").get_margin(SIDE_LEFT))  # The words' left inset, on the right too.
+		price.offset_right = -inset
+		row.add_child(price)
+	return row
+
+
+## A row clicked: the offer asked as it reads ("offer" {id, gold: its cost}); more than the purse is
+## refused here, in the window's why line, and nothing is sent; out of reach likewise.
+func _ask_pressed(id: String, cost: int) -> void:
+	if not _open:
+		return
+	if not near:
+		ask_why = STEP_CLOSER
+	elif cost > purse:
+		ask_why = shortfall_words(-cost, purse)
+	else:
+		ask_why = ""
+		offer_asked.emit(id, cost)
+	_rebuild()
+
+
+## The rows' titles, then the price shown on each ("title|10", a free one "title|") (tests).
+func asks_shown() -> Array[String]:
+	var out: Array[String] = []
+	for row: Node in _asks_box.get_children():
+		if not row.is_queued_for_deletion():
+			out.append("%s|%s" % [row.get_meta("shown", ""), row.get_meta("gold", "")])
+	return out
 
 
 ## Rolf's button (807 amended (3)) for the stall keeper whose wares show:
@@ -571,6 +683,14 @@ func close() -> void:
 	data = {}
 	counter = {}
 	wares = []
+	asks = []
+	ask_why = ""
+	if _asks_box != null:
+		for child: Node in _asks_box.get_children():
+			_asks_box.remove_child(child)
+			child.queue_free()
+		_asks_box.visible = false
+		_asks_scroll.visible = false
 	_hover_words = ""
 	_hide_tip()
 	_rebuild()
@@ -1330,6 +1450,17 @@ func _rebuild() -> void:
 	_state.text = ASLEEP_WORDS
 	_state.visible = person != null and asleep
 	_line.visible = person != null and talks
+	for child: Node in _asks_box.get_children():
+		_asks_box.remove_child(child)
+		child.queue_free()
+	_asks_box.visible = person != null and not asks.is_empty() and not giving
+	_asks_scroll.visible = _asks_box.visible
+	for each: Dictionary in ([] as Array[Dictionary] if giving else asks):
+		var cost := int(each.get("cost", 0))
+		var row := _row(str(each.get("title", each.get("words", ""))), cost if cost > 0 else -1, cost > purse)
+		row.pressed.connect(_ask_pressed.bind(str(each.get("id", "")), maxi(cost, 0)))
+		_asks_box.add_child(row)
+	_size_asks()
 	_give_tab.visible = trades and not takes.is_empty()
 	_give_tab.text = give_word(takes)
 	_give_tab.set_pressed_no_signal(giving)
@@ -1402,8 +1533,10 @@ func _rebuild() -> void:
 	_foot.text = short if near else STEP_CLOSER
 	_foot.visible = not _foot.text.is_empty()
 	var why := job_why if not job_why.is_empty() else str(data.get("why", counter.get("why", "")))
+	if not ask_why.is_empty():
+		why = ask_why
 	_why.text = why
-	_why.visible = not why.is_empty() and trades
+	_why.visible = not why.is_empty() and (trades or not ask_why.is_empty())
 	if pack != null and giving:
 		# Give: the squares they take lit (a coin where they pay now), the rest dim.
 		var slots := []

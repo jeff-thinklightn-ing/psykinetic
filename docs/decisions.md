@@ -19356,6 +19356,33 @@ standing offer per player and resident, taken by "yes", "I'll take it",
 ui_test: no panel, the standing words, an offers message's effect and its
 absence, Y's default. Client only; the protocol change is npc's.
 
+536 amended: a townsperson's asks are rows in their window (release's label; the coordinator's
+approval as 3a of the window rules, C:/dev/review/ui/window_rules.md; Jeff's "interface optimized
+for human interaction", found by npc: a resident's pleas, commissions, the scholar's "Read the
+chronicle" and the walk to the healer could only be taken by typing the word). This puts the
+offers back in front of the player as clicks, as 436's panel listed them before this decision
+removed it. The window is the townsperson window that was already there (BarterPanel in person
+mode, 802: chat, the typing line, their squares), not a new panel: between the chat and the
+squares an asks strip draws one row per offer (BarterPanel.asks_of: open ones, wares, the camp
+trader's goods and words-only offers are no rows; a plain buy is one only where the person has no
+squares of their own). Main._on_offers_message gives every townsperson's offers to
+BarterPanel.show_asks, so the rows follow the server's message; a taken offer is gone with it. A
+row is title on the left, its price on the right when it costs gold, and one click asks the
+existing "offer" command {id, gold: its cost}, which Main._accept_offer already took for a
+resident (the server needs nothing). The spoken word still takes an offer, the same Offers.accept
+path, so taking one by word or by row clears the other (the standing offer is erased and the
+offers sent again). A row never commits more than it reads: a cost over the purse is refused in
+the window's why line ("You need N more gold.") and nothing is sent; out of reach, STEP_CLOSER.
+Each row is made by one function (BarterPanel._row: title, amount, short) with theme type
+variation OfferRow, its price a Label of type Price, or PriceShort (rust) when over the purse, and
+the strip is a VBox of type OfferList: ui-design's theme half (no number of its own, release's
+ruling; it rides 840's take); ui-design's parts landing swaps the one function for UiRow; no
+colour, font, size or override in the script. The rows
+do not close the window on a blow (the Source rule, window_rules.md rule 8). The monsters'
+DealPanel is unchanged; merging it into this window is a later change. ui_test
+_test_resident_asks. A CHANGELOG bullet (voice's words). Client only, protocol unchanged, no new
+class_name.
+
 ## 544, ui's side: downed and brought back, read on the HUD
 
 Companions' 544 replicates downed_until, channel_of (the body's node

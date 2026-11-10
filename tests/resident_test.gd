@@ -2244,7 +2244,7 @@ func _test_sick_body() -> void:
 		_sync()
 		var walked := _body("rs-folk08")
 		var plea := Offers.of("rs-folk09", player.player_id).filter(func(o: Dictionary) -> bool: return str(o.get("what", {}).get("sick", "")) == "rs-folk08")
-		_check(plea.size() == 1 and str(plea[0]["title"]).begins_with("Take ") and plea[0]["what"].get("hut") == hut, "the kin asks for the walk to the healer: %s" % [plea.map(func(o: Dictionary) -> String: return str(o["title"]))])
+		_check(plea.size() == 1 and str(plea[0]["title"]).begins_with("Walk ") and plea[0]["what"].get("hut") == hut, "the kin asks for the walk to the healer: %s" % [plea.map(func(o: Dictionary) -> String: return str(o["title"]))])
 		if walked != null and not plea.is_empty():
 			Offers.accept("rs-folk09", player.player_id, "Jeff", plea[0]["id"], 0)
 			_main._ask_resident(walked, "Jeff", "Come, to the healer.", player)

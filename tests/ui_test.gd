@@ -52,6 +52,7 @@ func _ready() -> void:
 	_test_options_tabs()
 	_test_inventory_panel()
 	_test_barter()
+	await _test_resident_asks()
 	await _test_window_clicks()
 	await _test_window_body_clicks()
 	await _test_fight_clears_readings()
@@ -3398,3 +3399,78 @@ func _test_person_give() -> void:
 	window.close()
 	World.despawn(body)
 	body.queue_free()
+
+
+## 536 amended: a townsperson's asks as rows in their window; a click asks the offer as it reads, a cost over
+## the purse is refused in the window, the rows follow the "offers" message.
+func _test_resident_asks() -> void:
+	print("
+== a townsperson's asks as rows (536 amended) ==")
+	var panel: BarterPanel = _main.barter_panel
+	var me: Player = _main._local_player()
+	if panel == null or me == null:
+		print("  (no window or no player in this scene: its checks skipped)")
+		return
+	var offers: Array = [
+		{"id": "hob|commission|a", "kind": "commission", "title": "Take the rescue", "words": "Kin held.", "accept": "take", "cost": 0},
+		{"id": "hob|give|b", "kind": "give", "title": "Give toward the well", "words": "The well waits.", "accept": "give", "cost": 10},
+		{"id": "hob|shop|c", "kind": "shop", "title": "Buy a knife", "words": "A knife.", "accept": "buy", "cost": 5},
+		{"id": "hob|wares|d", "kind": "wares", "title": "A hide", "words": "", "accept": "wares", "cost": 3},
+		{"id": "hob|rumour|e", "kind": "rumour", "title": "A rumour", "words": "They say.", "accept": "", "cost": 0},
+		{"id": "hob|commission|f", "kind": "commission", "title": "Open one", "words": "", "accept": "take", "cost": 0, "open": true}]
+	_check(BarterPanel.asks_of(offers, false).map(func(o: Dictionary) -> String: return str(o["title"])) == ["Take the rescue", "Give toward the well", "Buy a knife"]
+		and BarterPanel.asks_of(offers, true).size() == 2,
+		"asks: the open one, the ware and the words-only one are no rows; a plain buy is one only where the person has no squares")
+	var asked: Array = []
+	panel.offer_asked.connect(func(id: String, gold: int) -> void: asked.append([id, gold]))
+	panel.open(me, "Hob")
+	panel.set_person(me, true, false)
+	panel.show_asks(me, offers, 7)
+	_check(panel.asks_shown() == ["Take the rescue|", "Give toward the well|10", "Buy a knife|5"],
+		"three rows, a price only where it costs (%s)" % [panel.asks_shown()])
+	var rows := panel._asks_box.get_children()
+	_check(bool((rows[1] as Control).get_meta("short")) and not bool((rows[2] as Control).get_meta("short")) and not (rows[1] as Button).disabled,
+		"a price over the purse is marked short and the row stays clickable")
+	(rows[1] as Button).pressed.emit()
+	_check(asked.is_empty() and panel.why_shown() == "You need 3 more gold.", "over the purse: refused in the window, nothing sent (%s)" % [panel.why_shown()])
+	(panel._asks_box.get_child(0) as Button).pressed.emit()
+	(panel._asks_box.get_child(2) as Button).pressed.emit()
+	_check(asked == [["hob|commission|a", 0], ["hob|shop|c", 5]] and panel.why_shown().is_empty(),
+		"a click asks the offer as it reads: its id and its cost (%s)" % [asked])
+	panel.set_near(false)
+	asked.clear()
+	(panel._asks_box.get_child(0) as Button).pressed.emit()
+	_check(asked.is_empty() and panel.why_shown() == BarterPanel.STEP_CLOSER, "out of reach: nothing sent, the window says so")
+	panel.set_near(true)
+	panel.show_asks(me, offers.slice(0, 1), 7)
+	_check(panel.asks_shown() == ["Take the rescue|"], "the rows follow the next \"offers\" message (one taken: gone)")
+	# ui-design's rulings (11-11): the price is their UiPrice chip with the coin, and the list shows four rows, the rest scrolling.
+	panel.show_asks(me, offers.slice(0, 2), 7)
+	var chip: Node = panel._asks_box.get_child(1).get_node_or_null("Price")
+	_check(chip is UiPrice and (chip as UiPrice).shown() == "10" and (chip as UiPrice).mode == "gold" and panel._asks_box.get_child(0).get_node_or_null("Price") == null,
+		"a priced row carries the UiPrice chip (the coin and the number), a free one none")
+	var many: Array = []
+	for i in 6:
+		many.append({"id": "hob|commission|m%d" % i, "kind": "commission", "title": "Ask %d" % i, "words": "", "accept": "take", "cost": 0})
+	panel.show_asks(me, many, 7)
+	await get_tree().process_frame
+	var box: VBoxContainer = panel._asks_box
+	var one: float = (box.get_child(0) as Control).get_combined_minimum_size().y
+	var gap := float(box.get_theme_constant(&"separation"))
+	_check(box.get_child_count() == 6 and is_equal_approx(panel._asks_scroll.custom_minimum_size.y, 4.0 * one + 3.0 * gap)
+		and panel._asks_scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED and panel._asks_scroll.visible,
+		"six asks: the list is four rows and three gaps high, the rest scroll, never sideways (%s)" % [panel._asks_scroll.custom_minimum_size])
+	panel.show_asks(me, many.slice(0, 2), 7)
+	_check(is_equal_approx(panel._asks_scroll.custom_minimum_size.y, 2.0 * one + gap), "two asks: it shrinks to fit")
+	panel.show_asks(me, offers.slice(0, 1), 7)
+	panel.show_asks(null, offers, 7)
+	_check(panel.asks_shown() == ["Take the rescue|"], "another person's offers change nothing")
+	var pack_was: bool = _main.pack_panel.shown
+	var talk_line: Node = panel._line
+	_check(talk_line.get_index() > panel._asks_scroll.get_index(), "the typing line sits below the asks")
+	_main.pack_panel.shown = false
+	_main.toggle_pack()
+	_check(_main.pack_panel.shown and not panel.is_open(), "opening the pack closes a talk window: they take the same place")
+	_main.pack_panel.shown = pack_was
+	panel.close()
+	_check(panel.asks_shown().is_empty() and panel.why_shown().is_empty() and not panel._asks_box.visible, "closed: no rows, no refusal")
