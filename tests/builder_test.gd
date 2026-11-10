@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_kind_lines()
 	_test_place_cells()
 	_test_decor()
+	_test_piece()
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	print("")
@@ -279,7 +280,7 @@ func _test_prompt() -> void:
 	_check(body["system"][0].has("cache_control") and body["model"] == "claude-opus-5-5" and body["output_config"]["effort"] == "medium",
 			"the request: the system prompt cached, Opus 5.5, effort medium")
 	_check((body["tools"] as Array).map(func(tool: Dictionary) -> String: return tool["name"])
-			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "decor", "town_wall", "roof", "look", "new_area"], "and the tools")
+			== ["paint", "edges", "stream", "path", "pond", "grove", "scatter", "fence", "height", "hill", "stairs", "place", "stamp", "mark_place", "set_building", "building", "move", "link", "skylight", "decor", "piece", "town_wall", "roof", "look", "new_area"], "and the tools")
 
 
 func _test_session() -> void:
@@ -1275,6 +1276,78 @@ func _test_decor() -> void:
 	var hall := Level.parse(inside.working.map.to_image(), null, inside.working.config)
 	_check(fire.get("ok", false) and (hall["terrain"]["decor"] as Array).any(func(piece: Dictionary) -> bool: return piece["kind"] == "wall_hearth"),
 		"indoors: a wall_hearth on the north wall, read back (%s)" % fire)
+
+
+## The piece tool (842): a milestone carved with a reachable name (never a
+## shelved level's or nowhere's), a hunter's blind, a lean-to and an empty
+## stall laid and read back; the shrine and the grave not yet; a piece
+## leaving a one-cell way, by an arrival or before a door refused; remove.
+func _test_piece() -> void:
+	print("
+== 842: the piece tool, its standing pieces laid and read back ==")
+	var props: Dictionary = BuilderSession.tools().filter(func(tool: Dictionary) -> bool: return tool["name"] == "piece")[0]["input_schema"]["properties"]
+	_check(props["kind"]["enum"] == ["milestone", "hunters_blind", "lean_to", "market_stall"] and props["arrow"]["enum"] == Level.CARVED_ARROWS.duplicate(),
+		"piece offers the milestone, the blind, the lean-to and the stall, never the shrine or the grave (%s)" % [props["kind"]["enum"]])
+	var prompt := BuilderSession.system_prompt()
+	_check("piece lays a standing piece" in prompt and "an empty stall where nobody sells" in prompt and not "wayside_shrine (" in prompt, "the prompt says each piece, the stall empty")
+	var was := WorldMap.settings_path
+	WorldMap.settings_path = "res://levels/world_map.json"
+	var names := BuilderSession.reachable_names()
+	_check(names.has("umbrage") and names.has("shieling") and names.has("hills") and not names.has("boar's lair"),
+		"reachable: Umbrage (the wilds' town), the shieling, the Hills; never the shelved boar's lair (%d names)" % names.size())
+	var doc := _doc()
+	doc.config["roads"] = [{"points": [[0, 28, 2], [39, 28, 2]], "kind": "stone"}]
+	doc.config["spawn_points"] = {"from_hills": [5, 24]}
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	var stone := session.run_tool("piece", {"at": [10, 27], "kind": "milestone", "facing": "south", "carved": "Umbrage", "arrow": "left"})
+	_check(stone.get("ok", false) and "carved \"Umbrage\", its arrow left (a draft until voice has seen it)" in str(stone.get("text")) and not "no road" in str(stone.get("text")),
+		"a milestone by the road carved Umbrage, its arrow left, a draft (%s)" % stone)
+	var nowhere := session.run_tool("piece", {"at": [14, 26], "kind": "milestone", "carved": "Nowhere"})
+	_check(not nowhere.get("ok", true) and "no level, town or named place a player can reach is called Nowhere" in str(nowhere.get("text"))
+		and "Umbrage" in str(nowhere.get("text")) and not "boar's lair" in str(nowhere.get("text")), "a milestone to nowhere: refused, the list naming no shelved place")
+	_check(not session.run_tool("piece", {"at": [14, 26], "kind": "milestone", "carved": "The boar's lair"}).get("ok", true), "a milestone to the shelved boar's lair: refused")
+	_check(not session.run_tool("piece", {"at": [14, 26], "kind": "milestone"}).get("ok", true), "a milestone with nothing carved: refused")
+	var far := session.run_tool("piece", {"at": [30, 4], "kind": "milestone", "carved": "the Hills"})
+	_check(far.get("ok", false) and "no road is at or beside it" in str(far.get("text")), "a milestone off the road: laid, the answer saying so (%s)" % far)
+	WorldMap.settings_path = was
+	_check(not session.run_tool("piece", {"at": [20, 4], "kind": "lean_to", "carved": "Umbrage"}).get("ok", true), "words on a lean-to: refused")
+	_check(session.run_tool("piece", {"at": [20, 4], "kind": "hunters_blind", "facing": "east"}).get("ok", false), "a hunter's blind laid")
+	_check(session.run_tool("piece", {"at": [25, 4], "kind": "lean_to"}).get("ok", false), "a lean-to laid")
+	var places_before: Variant = session.working.config.get("places", {}).duplicate(true)
+	var stall := session.run_tool("piece", {"at": [30, 10], "kind": "market_stall"})
+	_check(stall.get("ok", false) and "nobody sells there" in str(stall.get("text")) and session.working.config.get("places", {}) == places_before,
+		"a market stall laid, empty, said so, no place written (%s)" % stall)
+	for kind in ["wayside_shrine", "grave"]:
+		var held := session.run_tool("piece", {"at": [34, 14], "kind": kind})
+		_check(not held.get("ok", true) and "not yet" in str(held.get("text")), "a %s: not yet (%s)" % [kind, held])
+	var level := Level.parse(session.working.map.to_image(), null, session.working.config)
+	var slots: Array = level["buildings"].map(func(building: Dictionary) -> String: return str(building.get("slot", "")))
+	_check(["building.milestone", "building.hunters_blind", "building.lean_to", "building.market_stall"].all(func(slot: String) -> bool: return slot in slots)
+		and level["buildings"].any(func(building: Dictionary) -> bool: return building.get("carved") == "Umbrage" and building.get("arrow") == "left")
+		and not Vector2i(10, 27) in level["terrain"]["floor"], "Level reads each piece back, the milestone's words with it, its cell solid (%s)" % [level["warnings"]])
+	# Kept clear: an arrival, a door, a one-cell way.
+	var arrival := session.run_tool("piece", {"at": [6, 24], "kind": "milestone", "carved": "Umbrage"})
+	_check(not arrival.get("ok", true) and "arrival from_hills" in str(arrival.get("text")), "a piece beside an arrival: refused (%s)" % arrival)
+	var built := session.run_tool("building", {"kind": "camp", "size": "small", "at": [4, 4], "facing": "south"})
+	var camps: Array = (session.working.config.get("buildings", []) as Array).filter(func(entry: Dictionary) -> bool: return entry.get("kind") == "camp")
+	if built.get("ok", false) and camps.size() == 1:
+		var front := Level.front_cell(Level.building_rect(camps[0]), Vector2i(0, 1))
+		var door := session.run_tool("piece", {"at": [front.x, front.y + 1], "kind": "lean_to"})
+		_check(not door.get("ok", true) and "door" in str(door.get("text")), "a lean-to before a door: refused (%s)" % door)
+	else:
+		_check(false, "a camp to stand a door (%s)" % built)
+	for y in range(14, 19):
+		session.working.map.set_edge(Terrain.edge_key(Vector2i(16, y), Vector2i.RIGHT), "wall")
+		session.working.map.set_edge(Terrain.edge_key(Vector2i(18, y), Vector2i.RIGHT), "wall")
+	WorldMap.settings_path = "res://levels/world_map.json"
+	var lane := session.run_tool("piece", {"at": [17, 16], "kind": "milestone", "carved": "Umbrage"})
+	WorldMap.settings_path = was
+	_check(not lane.get("ok", true) and "one cell wide at (18, 16)" in str(lane.get("text")), "a milestone in a two-cell lane: refused, naming the way (%s)" % lane)
+	var gone := session.run_tool("piece", {"at": [25, 4], "remove": true})
+	_check(gone.get("ok", false) and not (session.working.config["buildings"] as Array).any(func(entry: Dictionary) -> bool: return entry.get("slot") == "building.lean_to"),
+		"remove: the lean-to taken away (%s)" % gone)
+	var stall_place := session.run_tool("mark_place", {"key": "a_stall", "kind": "stall", "at": [30, 12], "holder": "town"})
+	_check("lay a market_stall with piece, dressing only" in str(stall_place.get("text")), "mark_place's stall refusal names piece now")
 
 
 ## Jeff's chest rule (806) in builder mode: a chest of loot only in a dungeon,

@@ -115,6 +115,25 @@ const DECOR_KEPT_OUT := {
 	"captive_post": "a captive's post comes with its captive's camp, not by hand",
 	"inn_sign": "an inn's sign comes with its tavern, not by hand",
 }
+## The standing pieces (Level.BUILDINGS slots, "building.<kind>"; solid and
+## doorless) a request lays by hand with piece (842; the coordinator's
+## ruling), each said in the prompt.
+const PIECE_WORDS := {
+	"milestone": "a squat stone by a road, where the road goes cut in its face (carved, needed: a level, a town or a named place players can reach) with an arrow if given (left, right or up, as one reading its front sees it)",
+	"hunters_blind": "a hunter's blind, a screen of branches where a hunter waits unseen for game: at a wood's edge or by a game trail",
+	"lean_to": "a lean-to, a rough shelter of poles and boughs, open at its front",
+	"market_stall": "a market stall, dressing only: an empty stall where nobody sells; no shop comes with it",
+}
+## Standing pieces held back, why in words (842): whose a shrine is and
+## where a lone grave may lie are world facts that wait on Jeff (lore's W1,
+## C:/dev/review/lore/bandits_and_hills_sights.md). Unreachable in builder
+## mode till then: not offered, refused when named.
+const PIECES_NOT_YET := {
+	"wayside_shrine": "not yet: whose a wayside shrine is waits on Jeff's word",
+	"grave": "not yet: where a lone grave may lie waits on Jeff's word",
+}
+## What an empty stall's answer says (842; the coordinator's ruling).
+const STALL_EMPTY := "an empty stall, dressing only: nobody sells there, and no shop comes with it"
 ## Who keeps a forest camp (maps' fill_forest).
 const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## The quarter turns that face a kind building (south as made) to a side.
@@ -439,6 +458,9 @@ static func tools(config := {}) -> Array:
 			tool["input_schema"]["properties"]["cue"]["enum"] = Level.CUES + [""]
 		elif tool["name"] == "decor":
 			tool["input_schema"]["properties"]["kind"]["enum"] = DECOR_WORDS.keys()
+		elif tool["name"] == "piece":
+			tool["input_schema"]["properties"]["kind"]["enum"] = PIECE_WORDS.keys()
+			tool["input_schema"]["properties"]["arrow"]["enum"] = Level.CARVED_ARROWS.duplicate()
 	return out
 
 
@@ -509,12 +531,14 @@ Places are what factions hold (a faction of levels/factions.json, such as the go
 
 %s
 
+%s
+
 Ground has a height, 0 to 6 (the grid's Heights block, shown when any cell has one). A step of a level or more between two cells is a ledge: a wall to anyone walking, though a body pushed off it falls to the ground below, and higher ground sees over walls. Stairs join one level to the next: a stair climbs to the one cell beside it a level up. A slope is a stair that looks like a ramp of earth: use slopes outdoors (on hills, banks, outcrops) and stairs in and round buildings; hill and stairs make slopes when asked. Rock is bare rock standing out of the ground, walled round: no one walks on or through it. height raises, lowers or sets cells; hill makes a rounded hill of rings a level each, with stairs up the sides asked; stairs puts a stair or a flight onto a ledge or up from flat ground. Whatever stands on raised ground (things, starts, buildings) needs stairs to it, and a building stands on one height: when a change leaves something cut off or a stair climbing nowhere, the tool's answer says so: put it right. Some outdoor levels have their ground shaped in metres (the request says so): there the Heights block is in half metres (0-9, then a, b, c ...), a rise of more than 0.45 m between neighbours is a cliff no one walks, height, hill and stairs are refused (the ground is shaped in the editor), and a building needs ground flat within 0.05 m under it: stamp it where the ground is flat, or stamp it with pad to cut the ground flat under it (the only shaping you do: a house on a hillside sits on a cut pad).
 
 A town keeps what players bring home in its store: a place of kind stockpile that the town holds. Stamp town_store for one (an open yard with its depot, its shop counter and the store's place, all in one), once per town, near the middle of town on open ground reachable from the gate, its counter facing where players will stand. A depot is a chest placed with use depot: what is put in it is banked. A shop counter is a chest placed with use shop: players buy what the town's workers made and sell what it is short of. Either works only inside the town's store, and is never given items. When a change leaves the store wrong, the tool's answer says so: put it right.
 
 Prefabs to stamp (their top-left at a cell, turned 0-3 quarter turns clockwise; their # is void and leaves the map as it was):
-%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), site_line(), ", ".join(building_uses()), decor_line(), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
+%s""" % ["\n".join(monsters), ", ".join(legend), ", ".join(Items.ids()), loot_line(), site_line(), ", ".join(building_uses()), decor_line(), piece_line(), "\n\n".join(prefabs) if not prefabs.is_empty() else "(none)"]
 
 
 ## What the first request starts with: the level, the area, what is in it.
@@ -830,6 +854,16 @@ const TOOLS := [
 			"variant": {"type": "integer", "minimum": 1, "description": "the piece's variant (1 if not given)"},
 			"remove": {"type": "boolean"}},
 			"required": ["at"]}},
+	{"name": "piece", "description": "Lays a standing piece with no walls or roof (the system prompt says each kind) with its top-left at a cell and its front to a side: solid, no one walks its cells. remove takes away the piece standing on a cell.",
+		"input_schema": {"type": "object", "properties": {
+			"at": _CELL,
+			"kind": {"type": "string", "enum": []},
+			"facing": {"type": "string", "enum": ["north", "east", "south", "west"], "description": "the side its front faces (south if not given)"},
+			"variant": {"type": "integer", "minimum": 1},
+			"carved": {"type": "string", "description": "a milestone only, and needed: where its road goes, cut in its face (a level, a town or a named place players can reach), up to 24 letters; a draft until voice has seen it"},
+			"arrow": {"type": "string", "enum": [], "description": "a milestone only, optional: the way the carved arrow points, as one reading its front sees it"},
+			"remove": {"type": "boolean"}},
+			"required": ["at"]}},
 	{"name": "town_wall", "description": "Walls a town in: a wall on the edges just outside a rectangle of cells, gates (doors) in it, recorded as that town's wall (a town walled again gets the new one). Leaves the cells as they are.",
 		"input_schema": {"type": "object", "properties": {
 			"town": {"type": "string", "description": "the key of the town's stockpile place in this level"},
@@ -1023,6 +1057,8 @@ func _run_tool(tool: String, input: Variant) -> Dictionary:
 			return _skylight(given)
 		"decor":
 			return _decor(given)
+		"piece":
+			return _piece(given)
 		"set_building":
 			return _set_building(given)
 		"town_wall":
@@ -1099,7 +1135,7 @@ func _mark_place(given: Dictionary) -> Dictionary:
 	if working.map.cell(at) in ["void", "water"]:
 		return _no("%s is %s: a place stands on ground" % [at, working.map.cell(at)])
 	if kind == "stall":
-		return _no(STALL_SAYS)
+		return _no(STALL_SAYS + ": lay a market_stall with piece, dressing only")
 	if kind not in Level.PLACE_KINDS:
 		return _no("kind is one of %s" % ", ".join(Level.PLACE_KINDS))
 	if not Factions.read().has(holder):
@@ -2521,6 +2557,174 @@ func _hearth_outside(at: Vector2i, step: Vector2i) -> String:
 		if rect is Rect2i and (rect as Rect2i).has_point(at) and (rect as Rect2i).has_point(at + along):
 			return ""
 	return "a wall_hearth stands against an inside wall: outdoors, only on a building's wall, inside it"
+
+
+## The prompt's paragraph on standing pieces (842).
+static func piece_line() -> String:
+	var kinds := PackedStringArray()
+	for kind: String in PIECE_WORDS:
+		kinds.append("%s (%s)" % [kind, PIECE_WORDS[kind]])
+	return "piece lays a standing piece with no walls or roof, solid (no one walks its cells), its top-left at a cell and its front to a side, on flat ground clear of things, ways off the level, arrivals and doors: %s. Words cut on a milestone are a draft: they go to voice when the level is put up to land." % "; ".join(kinds)
+
+
+## The names a milestone may carry (842): of every area a player can reach
+## from the world's start (WorldMap.root) over ways that are not closed (a
+## hidden or sealed link is closed; a shelved level is no area), its name, its
+## towns' (a named room, as Main._town_display says a town) and its named
+## places' names and shown names; [method _name_key] of each -> as written.
+static func reachable_names() -> Dictionary:
+	var world := WorldMap.build()
+	var seen := {WorldMap.root(): true}
+	var queue: Array[String] = [WorldMap.root()]
+	while not queue.is_empty():
+		var from: String = queue.pop_back()
+		for way: Dictionary in world.ways:
+			if str(way["from"]) == from and not bool(way.get("closed", false)) and world.areas.has(str(way["to"])) and not seen.has(str(way["to"])):
+				seen[str(way["to"])] = true
+				queue.append(str(way["to"]))
+	var out := {}
+	for area_name: String in seen:
+		if not world.areas.has(area_name):
+			continue
+		var names: Array = [world.areas[area_name].get("display_name", "")]
+		var config: Dictionary = world._configs.get(area_name, {})
+		for key: Variant in config.get("rooms", {}) if config.get("rooms") is Dictionary else {}:
+			if config["rooms"][key] is Dictionary:
+				names.append(config["rooms"][key].get("name", ""))
+		for key: Variant in config.get("places", {}) if config.get("places") is Dictionary else {}:
+			if config["places"][key] is Dictionary:
+				names.append(config["places"][key].get("name", ""))
+				names.append(config["places"][key].get("shown", ""))
+		for each: Variant in names:
+			if each is String and not _name_key(each).is_empty():
+				out[_name_key(each)] = str(each).strip_edges()
+	return out
+
+
+## [param words] as reachable_names keys them: lower case, no "the" or "a" before.
+static func _name_key(words: String) -> String:
+	return words.strip_edges().to_lower().trim_prefix("the ").trim_prefix("a ").strip_edges()
+
+
+## The piece tool (842): a standing piece (PIECE_WORDS) laid as a level.json
+## "buildings" entry {slot, at, facing, variant, carved, arrow}, solid and
+## doorless as Level has it; or the piece on a cell taken away.
+func _piece(given: Dictionary) -> Dictionary:
+	var at: Variant = Level._tile(given.get("at"))
+	if at == null:
+		return _no("piece needs at: [x, y]")
+	var buildings: Array = (working.config["buildings"] as Array).duplicate(true) if working.config.get("buildings") is Array else []
+	if bool(given.get("remove", false)):
+		for i in buildings.size():
+			var rect: Variant = Level.building_rect(buildings[i])
+			if rect is Rect2i and (rect as Rect2i).has_point(at) and str(buildings[i].get("slot", "")).trim_prefix("building.") in PIECE_WORDS:
+				var kind_gone := str(buildings[i]["slot"]).trim_prefix("building.")
+				buildings.remove_at(i)
+				working.apply_changes({"config": {"buildings": buildings}})
+				return {"ok": true, "text": "took away the %s at %s" % [kind_gone, at]}
+		return _no("no piece stands on %s" % [at])
+	var kind := str(given.get("kind", "")).strip_edges()
+	if PIECES_NOT_YET.has(kind):
+		return _no("%s: %s" % [kind, PIECES_NOT_YET[kind]])
+	if not PIECE_WORDS.has(kind):
+		return _no("kind is one of %s" % ", ".join(PIECE_WORDS.keys()))
+	var facing := str(given.get("facing", "south"))
+	if not SIDES.has(facing):
+		return _no("facing is one of %s" % ", ".join(SIDES.keys()))
+	var entry := {"slot": "building." + kind, "at": [at.x, at.y], "facing": [SIDES[facing].x, SIDES[facing].y]}
+	if given.has("variant"):
+		entry["variant"] = maxi(1, int(given["variant"]))
+	var carved := str(given.get("carved", "")).strip_edges()
+	if kind != "milestone" and (not carved.is_empty() or given.has("arrow")):
+		return _no("only a milestone has words cut in it")
+	if kind == "milestone":
+		if carved.is_empty():
+			return _no("a milestone says where its road goes: give carved, a level, a town or a named place players can reach")
+		if carved.length() > Level.CARVED_MAX:
+			return _no("carved is %d letters at most" % Level.CARVED_MAX)
+		var names := reachable_names()
+		if not names.has(_name_key(carved)):
+			var listed: Array = names.values()
+			listed.sort()
+			return _no("no level, town or named place a player can reach is called %s (there are: %s)" % [carved, ", ".join(listed)])
+		entry["carved"] = carved
+		if given.has("arrow"):
+			if str(given["arrow"]) not in Level.CARVED_ARROWS:
+				return _no("arrow is one of %s" % ", ".join(Level.CARVED_ARROWS))
+			entry["arrow"] = str(given["arrow"])
+	var rect: Rect2i = Level.building_rect(entry)
+	if not area.encloses(rect):
+		return _no("a %s facing %s is %d x %d: at %s it does not fit in the area" % [kind, facing, rect.size.x, rect.size.y, at])
+	for cell in Level.rect_cells(rect):
+		if working.map.cell(cell) not in WALKED:
+			return _no("%s is %s: a %s stands on ground" % [cell, working.map.cell(cell), kind])
+		if not working.entry_of(cell).is_empty() or not working.link_of(cell).is_empty():
+			return _no("something stands on %s already" % [cell])
+	for other: Variant in buildings:
+		var taken: Variant = Level.building_rect(other)
+		if taken is Rect2i and (taken as Rect2i).intersects(rect):
+			return _no("the %s at %s stands there already" % [building_name(other), (taken as Rect2i).position])
+	var kept := _kept_clear(rect)
+	if not kept.is_empty():
+		return _no("a %s at %s would stand %s: keep it a cell clear" % [kind, at, kept])
+	var uneven := pad_problem(entry)
+	if not uneven.is_empty():
+		return _no(uneven)
+	var before := narrow_ways()
+	var solid := {}
+	for cell in Level.rect_cells(rect):
+		solid[cell] = true
+	var shut := narrow_ways(solid).filter(func(cell: Vector2i) -> bool: return cell not in before)
+	if not shut.is_empty():
+		return _no("a %s at %s would leave a way one cell wide at %s: players walk with companions" % [kind, at, ", ".join(shut.slice(0, NARROW_SHOWN).map(func(cell: Vector2i) -> String: return str(cell)))])
+	buildings.append(entry)
+	working.apply_changes({"config": {"buildings": buildings}})
+	var text := "laid a %s at %s, its front %s" % [kind, at, facing]
+	if kind == "milestone":
+		text += ", carved \"%s\"%s (a draft until voice has seen it)" % [carved, ", its arrow " + str(entry["arrow"]) if entry.has("arrow") else ""]
+		var streets := {}
+		for road: Dictionary in Curves.parse(working.config, "roads", [] as Array[String]):
+			streets.merge(Curves.cells(road["curve"], false))
+		if not Level.rect_cells(rect.grow(1)).any(func(cell: Vector2i) -> bool: return streets.has(cell)):
+			text += "; no road is at or beside it: a milestone stands by the road it names"
+	elif kind == "market_stall":
+		text += "; " + STALL_EMPTY
+	return {"ok": true, "text": text}
+
+
+## What [param rect] (a piece's cells) stands on or beside (842), in words,
+## or "": a start or an arrival (spawn point), a way off the level, or a
+## building's door or the cell before it.
+func _kept_clear(rect: Rect2i) -> String:
+	var near := rect.grow(1)
+	var level := working.parsed()
+	for start: Vector2i in level.get("starts", []):
+		if near.has_point(start):
+			return "on or beside the start at %s" % [start]
+	var arrivals: Dictionary = level.get("spawn_points", {})
+	for spawn_name: String in arrivals:
+		if near.has_point(arrivals[spawn_name]):
+			return "on or beside the arrival %s at %s" % [spawn_name, arrivals[spawn_name]]
+	for link: Variant in working.config.get("links", []) if working.config.get("links") is Array else []:
+		var cell: Variant = Level._tile(link.get("at")) if link is Dictionary else null
+		if cell is Vector2i and near.has_point(cell):
+			return "on or beside the way off the level at %s" % [cell]
+	for other: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		var their: Variant = Level.building_rect(other)
+		if not their is Rect2i:
+			continue
+		var facing := Level.building_facing(other)
+		var door: Vector2i = Level.NO_DOOR
+		if str(other.get("slot", "")) in Level.SOLID:
+			door = solid_door(other)
+		else:
+			door = Level.front_cell(their, facing) - facing
+		if door == Level.NO_DOOR:
+			continue
+		for cell: Vector2i in [door, door + facing]:
+			if near.has_point(cell):
+				return "on or beside the door of the %s at %s" % [building_name(other), door]
+	return ""
 
 
 ## A side's word: (0, 1) "south".

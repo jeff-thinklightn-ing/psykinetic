@@ -46850,3 +46850,45 @@ named. The prompt and tools grow by about 2,310 characters (about 580 tokens a r
 taught in the tools' answers (the coordinator's ruling): builder_test's PREFIX_CEILING_TOKENS (20,000, at 4
 characters a token) fails the test past it, and only the coordinator moves it. No bullet (builder mode is Jeff's tool). Server and builder only; protocol
 unchanged; no new class_name.
+
+## 842. Builder mode's piece tool
+
+Builder's, on the coordinator's approval of builder's catch-up list (item d); release's number. The
+standing pieces with no prefab (Level.BUILDINGS slots that are SOLID and DOORLESS: 778's roadside sights,
+736's stall) had no way into a level from builder mode. piece {at, kind, facing, variant, carved, arrow,
+remove} lays one as a level.json "buildings" entry {slot "building.<kind>", at, facing, variant, carved,
+arrow}, its footprint Level.BUILDINGS' turned by its facing, solid as Level has it: no one walks its
+cells, so narrow_ways counts it.
+
+The kinds open now (BuilderSession.PIECE_WORDS, each said in the prompt): milestone, hunters_blind,
+lean_to and market_stall. A milestone's words are the package rule (Jeff, 2026-11-06: no sign before its
+place): "carved" is needed, up to Level.CARVED_MAX letters, and must name a level, a town (a named room,
+as Main._town_display names one) or a named place (its name or shown) in an area a player can reach from
+the world's start (WorldMap.root) over ways that are not closed: a hidden or sealed link is closed, and a
+shelved level (Level.SHELVED, 820) is no area at all. BuilderSession.reachable_names lists them, and a
+refusal names only those ("no level, town or named place a player can reach is called Nowhere (there
+are: ...)"). An "arrow" is one of Level.CARVED_ARROWS. The carved words are a draft until voice has seen
+them, as names are (792 amended (2)); the answer says when no road is at or beside the stone. A
+market_stall is dressing only, by the coordinator's ruling on economy's answer: Main._vendor_spot stands a
+vendor town's seller at its first stall place, so no tool writes a stall place (792 amended (2)), and the
+stall's prompt line and its answer say plainly that it is empty and nobody sells there. mark_place's stall
+refusal now ends "lay a market_stall with piece, dressing only".
+
+Held back, unreachable in builder mode (not offered, refused "not yet" when named; PIECES_NOT_YET):
+wayside_shrine, since whose a shrine is waits on Jeff (lore's W1 in
+C:/dev/review/lore/bandits_and_hills_sights.md, nothing may be carved on one), and grave, since where a
+lone grave may lie waits on Jeff's answer to lore's line under W1 (Jeff: the dead are in the barrows; the
+tower is where they lived). Both open in one small change with lore's lines when he answers.
+
+Refused in words: a piece outside the area, on anything but ground, over a thing, a way off the level or
+another building, on uneven ground (pad_problem), on or beside a start, an arrival (a spawn point), a way
+off the level or a building's door or the cell before it (until the arrival warning takes the arrivals
+over), and one that would leave a way one cell wide. remove takes away the piece on a cell.
+
+builder_test _test_piece: each open kind laid and read back by Level.parse, the milestone's words and
+arrow with it and its cell out of the floor; Umbrage, the shieling and the Hills reachable, the shelved
+boar's lair not; a milestone to nowhere and to the boar's lair refused, the list naming no shelved place;
+words on a lean-to refused; the stall laid with no place written; the shrine and the grave not yet; a
+piece beside an arrival and before a door refused; a milestone in a two-cell lane refused, naming the way; remove. The prompt and tools grow by about 1,880 characters (about 470
+tokens a request; 13,826 of the coordinator's 20,000 by _test_kind_lines' count). No bullet
+(builder mode is Jeff's tool). Server and builder only; protocol unchanged; no new class_name.
