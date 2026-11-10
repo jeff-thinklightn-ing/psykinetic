@@ -1834,6 +1834,7 @@ func _test_ambush() -> void:
 	_test_boar_king()
 	_test_boar_king_close()
 	_test_boar_king_aim()
+	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
 	_test_bold_comes_in()
 	_test_given_strength()
@@ -7013,6 +7014,47 @@ func _test_boar_king() -> void:
 ## coordinator's forcing of its cause): mid back-off at the run's two clear
 ## spots, the bot's free centre set off its tile's middle; each offset
 ## charges, none paws again.
+## His told line stays down until his run stops (810 amended (2), his half;
+## the coordinator: before he is unshelved).
+func _test_boar_king_tell_through_rush() -> void:
+	print("%s== the boar king's told line live at every tick of his run (810 amended (2)) ==" % char(10))
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var rows: Array[String] = ["#".repeat(30)]
+	for y in 14:
+		rows.append("#" + ".".repeat(28) + "#")
+	rows.append("#".repeat(30))
+	rows[7] = rows[7].substr(0, 6) + "K" + rows[7].substr(7, 5) + "P" + rows[7].substr(13)
+	var e := _build(rows)
+	var king: BoarKing = e["K"][0]
+	var player: GridEntity = e["P"][0]
+	player.protected = false
+	player.max_hp = 100
+	player.hp = 100
+	king.sight_range = 12
+	king.target = player
+	king._next_charge = 0
+	king._move = {"move": "back", "telegraph": 0, "lands": World.tick + 14, "from": World.tick}
+	var id := 0
+	var rush_ticks := 0
+	var live := 0
+	var over := false
+	for i in 80:
+		World.step()
+		if id == 0 and str(king._move.get("move", "")) == "charge":
+			id = int(king._move.get("telegraph", 0))
+		if World.rushing(king):
+			rush_ticks += 1
+			live += 1 if World.telegraphs().has(id) else 0
+		elif rush_ticks > 0:
+			over = true
+			break
+	_check(id != 0 and rush_ticks > 0 and live == rush_ticks and over and not World.telegraphs().has(id),
+		"his told line live at every tick of his run (%d of %d), ended once it stopped" % [live, rush_ticks])
+	DayNight.reset()
+	Monster.idling = true
+
+
 func _test_boar_king_aim() -> void:
 	print("%s== the boar king's aim at a body off its cell's middle: clear, he charges ==" % char(10))
 	var pawed: Array[String] = []

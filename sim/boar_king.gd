@@ -442,14 +442,16 @@ func _tend_move() -> bool:
 		return true
 	match move:
 		"charge":
-			World.end_telegraph(int(_move["telegraph"]), true)
+			# His told line stays down until the run stops (810 amended (2)): ended in _on_rush_ended.
+			var told := int(_move["telegraph"])
 			var toward: Vector2 = _move["toward"]
 			var cells := int(_move["cells"])
 			_move = {}
 			if World.rush(self, toward, cells, {"blow": {"impulse": 0.0}}):
-				_move = {"move": "rush", "toward": toward}
+				_move = {"move": "rush", "toward": toward, "telegraph": told}
 				_cry(&"charge", NOISE_CHARGE)
 				return true
+			World.end_telegraph(told, false)
 			_log_move("charge", "no room")
 		"skid":
 			_move = {}
@@ -467,6 +469,7 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 	if entity != self or _move.get("move", "") != "rush":
 		return
 	var toward: Vector2 = _move.get("toward", Vector2(facing))
+	World.end_telegraph(int(_move.get("telegraph", 0)), true)  # Landed, as ever; his told line down till now (810 amended (2)).
 	_move = {}
 	var hit := 0
 	for each: Variant in result.get("struck", []):
