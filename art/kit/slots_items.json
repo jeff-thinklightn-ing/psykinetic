@@ -1357,6 +1357,25 @@
 			"type": "mesh",
 			"uses": "Chief's spike (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
 		},
+		"item.satchel": {
+			"budget": 500,
+			"category": "items",
+			"kind": "held",
+			"size": [
+				0.3,
+				0.25,
+				0.1
+			],
+			"sockets": {
+				"grip": [
+					0,
+					0,
+					0
+				]
+			},
+			"type": "mesh",
+			"uses": "leather satchel (Items: levels/items.json): in a pack or chest as its icon, in a hand, on the ground"
+		},
 		"item.shield": {
 			"budget": 500,
 			"category": "items",

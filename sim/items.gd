@@ -51,15 +51,23 @@ const CHARM := 17
 ## The pack's third row (decision 819; Jeff: "players need more slots
 ## probably 12, 3 rows of 4"): four more pack slots, appended after the
 ## worn ones as 788's were. A save from before has 18; tidy pads.
-const CARRIED := 22
+## The satchel's slot and the row it opens (819 amended; Jeff: "pack space
+## is a premium"): a satchel worn in BAG opens SATCHEL_SLOTS, a fourth row
+## of four, appended as 788's and 819's were, so nothing saved or laid out
+## by index moves. A save from before has 22; tidy pads.
+const BAG := 22
+const SATCHEL_SLOTS: Array[int] = [23, 24, 25, 26]
+const CARRIED := 27
 ## Each worn slot's kind (788): a thing is worn only in a slot of its
 ## kind ("body" is 622's armour), and never held.
-const WORN := {ARMOUR: "body", HEAD: "head", NECK: "neck", BACK: "back", FEET: "feet", RING_1: "ring", RING_2: "ring", CHARM: "charm"}
+const WORN := {ARMOUR: "body", HEAD: "head", NECK: "neck", BACK: "back", FEET: "feet", RING_1: "ring", RING_2: "ring", CHARM: "charm",
+	BAG: "bag"}
 ## The pack's slots, in order (decision 722): the first four, then the four
 ## after the armour, then the third row (819). Read only here and in
 ## pack_slots_of: everything else asks World.pack_slots.
 const PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10, 18, 19, 20, 21]
-## Every slot a pack can show, for laying it out (pack_panel's grid, 3 x 4).
+## The pack's own slots, for laying it out (pack_panel's grid, 3 x 4); the
+## satchel's row (SATCHEL_SLOTS) is laid out only while one is worn.
 const ALL_PACK_SLOTS: Array[int] = [0, 1, 2, 3, 7, 8, 9, 10, 18, 19, 20, 21]
 ## Slots enough to have hands (the pack and both): a monster armed by a
 ## level before armour (decision 622) has six, and still holds what it holds.
@@ -75,14 +83,32 @@ const RENAMED := {"draugr_totem": "encolpion_amulet"}
 ## Whether slot [param i] of a carrier is in its pack (decision 722), not
 ## a hand or the armour.
 static func is_pack(i: int) -> bool:
-	return i in ALL_PACK_SLOTS
+	return i in ALL_PACK_SLOTS or i in SATCHEL_SLOTS
 
 
 ## The pack slots a carrier with [param slots] has now (decision 819): the
-## pack's twelve. Callers read this (World.pack_slots), never PACK_SLOTS,
-## so a later way to open more (a satchel, 819's bonus) reaches them all.
-static func pack_slots_of(_slots: PackedStringArray) -> Array[int]:
-	return PACK_SLOTS.duplicate()
+## pack's twelve, then the satchel's row while a satchel is worn in BAG
+## (819 amended). Callers read this (World.pack_slots), never PACK_SLOTS,
+## so none misses the row.
+static func pack_slots_of(slots: PackedStringArray) -> Array[int]:
+	var out: Array[int] = PACK_SLOTS.duplicate()
+	if wears_satchel(slots):
+		out.append_array(SATCHEL_SLOTS)
+	return out
+
+
+## Whether [param slots] (a carrier's) have a satchel worn in BAG (819
+## amended): the satchel's row is theirs then.
+static func wears_satchel(slots: PackedStringArray) -> bool:
+	return slots.size() > SATCHEL_SLOTS[-1] and not slots[BAG].is_empty() and worn_kind(slots[BAG]) == "bag"
+
+
+## Whether anything is in the satchel's row of [param slots] (819 amended).
+static func satchel_holds(slots: PackedStringArray) -> bool:
+	for i in SATCHEL_SLOTS:
+		if i < slots.size() and not slots[i].is_empty():
+			return true
+	return false
 
 
 ## Tags whose things never stack (decision 619): each is its own. A token

@@ -55,7 +55,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 | %s's camp%s falls. | `main.gd` _check_camps() |
 | %s %s at knucklebones (%d games to %d). | `main.gd` _bond_played() |
 
-## Lines in the code (2808)
+## Lines in the code (2811)
 
 ### companions (Pip, Wren, Nix) (658)
 
@@ -1300,7 +1300,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 
-### other (sim) (599)
+### other (sim) (602)
 
 | | Line | Where |
 |---|---|---|
@@ -1777,6 +1777,9 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | only boots are worn there | `sim/world.gd` worn_refusal() |
 |  | only a ring is worn there | `sim/world.gd` worn_refusal() |
 |  | only a charm is worn there | `sim/world.gd` worn_refusal() |
+|  | only a satchel is worn there | `sim/world.gd` worn_refusal() |
+|  | empty the satchel first | `sim/world.gd` SATCHEL_FULL |
+|  | wear a satchel first | `sim/world.gd` SATCHEL_NONE |
 |  | not yours to change | `sim/world.gd` try_equip() |
 |  | no room in your pack for the %s | `sim/world.gd` try_equip() |
 |  | the %s can't be held or worn | `sim/world.gd` try_equip() |
@@ -2955,7 +2958,7 @@ A line Main builds from another file's text (an offer's result line) isn't caugh
 |  | borrowed from the town's coffer | `sim/townsfolk.gd` _loan() |
 |  | %s paid the town's coffer back. | `sim/townsfolk.gd` _loan() |
 
-## Lines in the data (880)
+## Lines in the data (881)
 
 `levels/lore/*.json` are lore's facts: what is so, said to players through
 residents, rumours and companions. Their wording is voice's to suggest and lore's to take.
@@ -3156,7 +3159,7 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | a bed at the inn | `folk.needs.bed.what` |
 |  | work on their tools | `folk.needs.tools.what` |
 
-### levels/items.json (55)
+### levels/items.json (56)
 
 | | Line | Key |
 |---|---|---|
@@ -3205,9 +3208,10 @@ residents, rumours and companions. Their wording is voice's to suggest and lore'
 |  | Worn in the armour slot, not held. Light: the bow draws quicker and reaches its full range | `items[72].about` |
 |  | Worn in the armour slot, not held. Turns some of an arrow and a thrust; a bow worn with it reaches less far | `items[73].about` |
 |  | Worn in the armour slot, not held. Heavy: hard to push and pushes hard, turns arrows and thrusts; a bow worn with it reaches least | `items[74].about` |
-|  | Worn in the armour slot, not held. A veil of magic about the wearer | `items[79].about` |
-|  | bundle of flame arrows | `items[83].name` |
-|  | bundle of barbed arrows | `items[84].name` |
+|  | A flap-topped leather bag on a strap, worn at the hip, with room for four more things. | `items[79].about` |
+|  | Worn in the armour slot, not held. A veil of magic about the wearer | `items[80].about` |
+|  | bundle of flame arrows | `items[84].name` |
+|  | bundle of barbed arrows | `items[85].name` |
 |  | guarding with it costs a quarter less stamina | `naming.strengths.steady.says` |
 |  | it draws in four fifths of the time | `naming.strengths.quick.says` |
 |  | its blows make half the fight noise | `naming.strengths.quiet.says` |

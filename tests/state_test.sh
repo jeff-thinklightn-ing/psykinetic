@@ -154,8 +154,9 @@ check "$(count 'joined as Player1 at \(124, 175\) \(back\)' "$DIR/shelved.log")"
 check "$(count '"boar_lair"' "$STATE")" 0 "the save no longer names the held-back level"
 
 # 2f. A record saved before the pack's third row (decision 819): 18 slots, a
-# ration in the pack and a hood on the head. It loads as 22, nothing moved,
-# the new row empty, and is saved back so.
+# ration in the pack and a hood on the head. It loads as 27 (the satchel's
+# slot and row after the third row, 819 amended), nothing moved, the new
+# rows empty, and is saved back so.
 python -B - "$STATE" <<'PY'
 import json, sys
 path = sys.argv[1]
@@ -175,10 +176,42 @@ import json, sys
 data = json.load(open(sys.argv[1], encoding="utf-8"))
 record = [r for r in data["players"] if r["player_id"] == "dev-host"][0]
 slots = record["slots"]
-print("ok" if len(slots) == 22 and slots[0] == "ration" and slots[11] == "hood" and all(s == "" for s in slots[18:]) else "bad %d" % len(slots))
+print("ok" if len(slots) == 27 and slots[0] == "ration" and slots[11] == "hood" and all(s == "" for s in slots[18:]) else "bad %d" % len(slots))
 PY
 )
-check "$old_slots" ok "an 18-slot record (before 819) loads and saves as 22: the ration and the hood where they were, the third row empty"
+check "$old_slots" ok "an 18-slot record (before 819) loads and saves as 27: the ration and the hood where they were, the third row empty"
+
+# 2g. A record in today's shape (819 amended): 22 slots, a ration in the pack,
+# a sword in the right hand, robes worn, a hood on the head and arrows in
+# the third row's last. It loads as 27, everything where it was, still in
+# hand and worn, the satchel's slot and row empty, and is saved back so.
+python -B - "$STATE" <<'PY'
+import json, sys
+path = sys.argv[1]
+data = json.load(open(path, encoding="utf-8"))
+for record in data["players"]:
+    if record["player_id"] == "dev-host":
+        slots = [""] * 22
+        slots[0] = "ration"
+        slots[4] = "sword"
+        slots[6] = "robes"
+        slots[11] = "hood"
+        slots[21] = "arrows"
+        record["slots"] = slots
+        record.pop("items", None)
+json.dump(data, open(path, "w", encoding="utf-8"), indent="	")
+PY
+run_host today_slots --test-exit-after=2
+today_slots=$(python -B - "$STATE" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+record = [r for r in data["players"] if r["player_id"] == "dev-host"][0]
+slots = record["slots"]
+want = {0: "ration", 4: "sword", 6: "robes", 11: "hood", 21: "arrows"}
+print("ok" if len(slots) == 27 and all(slots[i] == want.get(i, "") for i in range(27)) else "bad %s" % slots)
+PY
+)
+check "$today_slots" ok "a 22-slot record (today's, before 819 amended) loads and saves as 27: the ration, the sword in hand, the robes, the hood and the arrows where they were; the bag and its row empty"
 
 # 3. Corrupt file: start fresh, and overwrite it with a good one on exit.
 echo 'this is not json' >"$STATE"

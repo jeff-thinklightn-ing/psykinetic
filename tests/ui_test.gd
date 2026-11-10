@@ -1908,6 +1908,10 @@ func _test_inventory_panel() -> void:
 			and in_grid == Items.ALL_PACK_SLOTS and gear == CharacterSheet.SLOT_PLACES.keys()
 			and pack.box_in(true, Items.ARMOUR).theme_type_variation == &"HandSlot" and pack.box_in(true, Items.PACK_SLOTS[4]).theme_type_variation == &"Inset",
 			"the player's row: the pack's twelve 4 x 3 (819) (%s), the hands, the armour and the worn slots on the sheet (787, 788: %s)" % [in_grid, gear])
+	var drawn: Array[int] = in_grid + gear
+	_check(in_grid.size() == 12 and gear.size() == 10 and not Items.BAG in drawn
+			and not Items.SATCHEL_SLOTS.any(func(i: int) -> bool: return i in drawn),
+			"the satchel off (819 amended): twelve pack boxes and ten on the sheet, none for the bag or its row (%d, %d)" % [in_grid.size(), gear.size()])
 	await _test_character_sheet(pack)
 	var locker := Locker.new()
 	locker.name = "TestLocker"
@@ -1929,6 +1933,12 @@ func _test_inventory_panel() -> void:
 	_check(PackPanel.layout_of(carrier) == "carrier" and her_grid == Items.ALL_PACK_SLOTS and (pack._other_row.get_child(0) as GridContainer).columns == 4
 			and pack._other_row.get_child_count() == 2,
 			"a companion's pack row: her twelve 4 x 3 (819), her hands and armour beside (%s)" % [her_grid])
+	var her_drawn: Array[int] = []
+	for grid in pack._other_row.get_children():
+		for box in grid.get_children():
+			her_drawn.append((box as PackPanel.SlotBox).index)
+	_check(her_drawn.size() == 15 and not Items.BAG in her_drawn and not Items.SATCHEL_SLOTS.any(func(i: int) -> bool: return i in her_drawn),
+			"the satchel off (819 amended): her row draws 15 boxes, none for the bag or its row (%s)" % [her_drawn])
 	pack.open(locker)  # Your chest again, for the double-clicks below.
 	carrier.queue_free()
 	var player: Player = _main._local_player()

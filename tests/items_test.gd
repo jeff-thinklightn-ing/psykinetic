@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_armour()
 	_test_worn()
 	_test_pack_twelve()
+	_test_satchel()
 	_test_story()
 	_test_bless()
 	_test_reforge()
@@ -2593,8 +2594,8 @@ func _test_worn() -> void:
 	print("
 == the worn slots: head, neck, back, feet, two rings, the charm (decision 788) ==")
 	_check(Items.HEAD == 11 and Items.NECK == 12 and Items.BACK == 13 and Items.FEET == 14 and Items.RING_1 == 15
-			and Items.RING_2 == 16 and Items.CHARM == 17 and Items.CARRIED == 22 and Items.WORN.size() == 8,
-			"the worn slots appended after the pack's last, the charm's last; the pack's third row after (819); 22 carried")
+			and Items.RING_2 == 16 and Items.CHARM == 17 and Items.CARRIED == 27 and Items.WORN.size() == 9,
+			"the worn slots appended after the pack's last, the charm's last; the pack's third row after (819), the satchel's after it (819 amended); 27 carried")
 	_check(Items.worn_kind("hood") == "head" and Items.worn_kind("felt_hat") == "head" and Items.worn_kind("soft_boots") == "feet"
 			and Items.worn_kind("robes") == "body" and Items.worn_kind("knife") == "" and Items.worn_kind("") == ""
 			and Items.worn_slots("ring") == [Items.RING_1, Items.RING_2] and float(Items.worn_of("soft_boots").get("noise", 0.0)) == 0.75,
@@ -2617,7 +2618,7 @@ func _test_worn() -> void:
 		kept = kept and old.slots[i] == eleven[i]
 	for slot: int in range(11, Items.CARRIED):
 		kept = kept and old.slots[slot] == ""
-	_check(old.slots.size() == Items.CARRIED and kept, "case: an 11-slot record reads as 22, the first 11 where they were, the worn slots and the third row empty")
+	_check(old.slots.size() == Items.CARRIED and kept, "case: an 11-slot record reads as 27, the first 11 where they were, the worn slots and the third row empty")
 	var host := _player(Net.local_id)
 	var had_slots := host.slots.duplicate()
 	var had_uids := World.slot_uids(host)
@@ -2664,9 +2665,9 @@ func _with(entity: GridEntity, slot: int, id: String) -> PackedStringArray:
 ## PACK_SLOTS, so every pack reader goes through World.pack_slots.
 func _test_pack_twelve() -> void:
 	print("\n== 819: the pack's twelve, 3 rows of 4 ==")
-	_check(Items.PACK_SLOTS.size() == 12 and Items.PACK_SLOTS.slice(8) == [18, 19, 20, 21] and Items.CARRIED == 22
+	_check(Items.PACK_SLOTS.size() == 12 and Items.PACK_SLOTS.slice(8) == [18, 19, 20, 21] and Items.CARRIED == 27
 			and Items.ALL_PACK_SLOTS == Items.PACK_SLOTS and Items.PACK_SLOTS.all(func(i: int) -> bool: return Items.is_pack(i) and not Items.WORN.has(i)),
-			"the third row appended after the worn slots: 12 pack slots, 22 carried")
+			"the third row appended after the worn slots: 12 pack slots (the satchel's slot and row after, 819 amended)")
 	var readers: Array[String] = []
 	var plain := RegEx.create_from_string("\\bPACK_SLOTS\\b")
 	var paths: Array[String] = ["res://main.gd"]
@@ -2712,8 +2713,172 @@ func _test_pack_twelve() -> void:
 		kept = kept and old.slots[i] == eighteen[i]
 	for i in range(18, Items.CARRIED):
 		kept = kept and old.slots[i] == ""
-	_check(kept, "an 18-slot record (before 819) reads as 22: every slot where it was, the third row empty")
+	_check(kept, "an 18-slot record (before 819) reads as 27: every slot where it was, the third row empty")
 
+
+## Decision 819 amended (the satchel; Jeff: "pack space is a premium"): a
+## satchel worn in BAG opens a fourth row of four, SATCHEL_SLOTS, appended
+## after the pack's third row, so a record of today's 22 pads to 27 with
+## nothing moved, a player's and a companion's. A worn one won't come off,
+## by any way, while its row holds things; nothing goes in the row with none
+## worn. Off for now: no loot row, stall line or recipe gives one.
+func _test_satchel() -> void:
+	print("\n== 819 amended: the satchel's slot and its row ==")
+	_check(Items.BAG == 22 and Items.SATCHEL_SLOTS == [23, 24, 25, 26] and Items.CARRIED == 27 and Items.WORN[Items.BAG] == "bag"
+			and Items.worn_kind("satchel") == "bag" and Items.worn_slots("bag") == [Items.BAG]
+			and Items.SATCHEL_SLOTS.all(func(i: int) -> bool: return Items.is_pack(i) and not i in Items.ALL_PACK_SLOTS),
+			"the bag slot and the satchel's row appended after the pack's third row: 27 carried; the row laid out only while worn")
+	var givers: Array[String] = []
+	for path in _files_under("res://levels", ".json"):
+		if path != "res://levels/items.json" and FileAccess.get_file_as_string(path).contains("\"satchel\""):
+			givers.append(path)
+	_check(givers.is_empty() and Items.def("satchel").get("made", {}).is_empty() and not Items.has_tag("satchel", "luxury"),
+			"off: no loot table, stall, recipe or caravan gives a satchel (%s)" % [givers])
+	var host := _player(Net.local_id)
+	var had_slots := host.slots.duplicate()
+	var had_uids := World.slot_uids(host)
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	var said: Array[String] = []
+	var hear := func(_by: GridEntity, why: String) -> void: said.append(why)
+	World.slot_refused.connect(hear)
+	var satchel := World.items.mint("satchel", "built")
+	World.put_item(host, host, 0, satchel)
+	var ration := World.items.mint("ration", "built")
+	World.put_item(host, host, 1, ration)
+	var knife := World.items.mint("knife", "built")
+	_check(World.pack_slots(host) == Items.PACK_SLOTS and not World.put_item(host, host, 23, knife),
+			"no satchel worn: the pack's twelve, the row not its")
+	World.items.end(knife, "gone")
+	_check(not World.try_transfer(host, host, 1, host, 23) and said == [World.SATCHEL_NONE] and host.slots[1] == "ration",
+			"a thing into the row with none worn: refused, voice's words (%s)" % [said])
+	said.clear()
+	_check(World.try_equip(host, host, 0) == "" and host.slots[Items.BAG] == "satchel" and host.slots[0] == ""
+			and World.pack_slots(host) == Items.PACK_SLOTS + Items.SATCHEL_SLOTS,
+			"worn: double-clicked into its slot, the pack sixteen")
+	var placed: Array[int] = []
+	for i in 20:
+		var dagger := World.items.mint("dagger", "built")
+		var slot := World.room_for(host, dagger)
+		if slot >= 0 and World.put_item(host, host, slot, dagger):
+			placed.append(dagger)
+		else:
+			World.items.end(dagger, "gone")
+	_check(placed.size() == 17 and Items.SATCHEL_SLOTS.all(func(i: int) -> bool: return host.slots[i] == "dagger"),
+			"room_for fills both hands, the pack and the satchel's row last (%d placed)" % placed.size())
+	var in_row: Array[int] = placed.filter(func(uid: int) -> bool: return World.slot_of_unit(host, uid) in Items.SATCHEL_SLOTS)
+	var out_row: Array[int] = placed.filter(func(uid: int) -> bool: return not uid in in_row)
+	World.take_units(host, out_row)
+	for uid in out_row:
+		World.items.end(uid, "gone")
+	_check(World.try_equip(host, host, Items.BAG) == World.SATCHEL_FULL and host.slots[Items.BAG] == "satchel",
+			"taken off holding things: refused, voice's words, still worn")
+	said.clear()
+	_check(not World.try_transfer(host, host, Items.BAG, host, 2) and said == [World.SATCHEL_FULL], "dragged to the pack: refused (%s)" % [said])
+	var pet: Companion = _main._companions.get(Net.player_id)
+	var pet_slots := pet.slots.duplicate()
+	var pet_uids := World.slot_uids(pet)
+	var pet_at := pet.tile
+	World._relocate(pet, _open_line(host, 1))
+	World.set_slots(pet, Items.tidy([], Companion.SLOTS), [])
+	said.clear()
+	var to_her := World.try_transfer(host, host, Items.BAG, pet, 0)
+	var taken := World.take_item(host, host, Items.BAG)
+	var units := World.take_units(host, [satchel])
+	var used := World.consume(host, satchel, "test")
+	_check(World.reaches(host, pet) and not to_her and said == [World.SATCHEL_FULL] and taken == 0 and units.is_empty() and not used
+			and host.slots[Items.BAG] == "satchel",
+			"given, sold, banked, thrown or used up while it holds things: none, the row's things never lost with it (%s %s %d %s %s)"
+			% [to_her, said, taken, units, used])
+	var gone: Array[int] = in_row.slice(1)
+	World.take_units(host, gone)
+	for uid in gone:
+		World.items.end(uid, "gone")
+	var last := World.slot_of_unit(host, in_row[0])
+	_check(World.try_transfer(host, host, last, host, 2) and World.try_equip(host, host, Items.BAG) == ""
+			and World.slot_of_unit(host, satchel) in Items.PACK_SLOTS and World.pack_slots(host) == Items.PACK_SLOTS,
+			"emptied, it comes off into the pack, and the row with it")
+	_check(World.try_transfer(host, host, World.slot_of_unit(host, satchel), pet, Items.BAG) and Items.pack_slots_of(pet.slots).size() == 16
+			and "leather satchel" in pet.carried(), "Wren may wear one: her row too, and she says she wears it (%s)" % pet.carried())
+	World.take_units(pet, [satchel])
+	World.items.end(satchel, "gone")
+	var leftover: Array[int] = [in_row[0], ration]
+	World.take_units(host, leftover)
+	for uid in leftover:
+		World.items.end(uid, "gone")
+	var orphan := Items.tidy([], Player.SLOTS)
+	orphan[24] = "ration"
+	World.set_slots(host, orphan, [])
+	_check(World.try_transfer(host, host, 24, host, 0) and host.slots[0] == "ration",
+			"a row left holding things with no satchel (an admin's slots): still emptied, nothing stuck")
+	var stray := host.slot_items[0]
+	World.take_units(host, [stray])
+	World.items.end(stray, "gone")
+	World.slot_refused.disconnect(hear)
+	# Today's records (22 slots), made by hand: a player's and a companion's.
+	var today := Items.tidy([], 22)
+	today[0] = "ration"
+	today[Items.RIGHT_HAND] = "sword"
+	today[Items.ARMOUR] = "robes"
+	today[Items.HEAD] = "hood"
+	today[Items.CHARM] = "bear_claw_charm"
+	today[21] = "arrows"
+	var hers := Items.tidy([], 22)
+	hers[3] = "knife"
+	hers[Items.FEET] = "soft_boots"
+	hers[18] = "ration"
+	var old := PlayerRecord.from_dict({"player_id": "today", "tile": [1, 1], "slots": Array(today), "items": _zeros(22),
+		"companion": {"name": "Wren", "slots": Array(hers), "items": _zeros(22)}})
+	var again := PlayerRecord.from_dict(old.to_dict())
+	var kept: bool = old.slots.size() == 27 and again.slots == old.slots and Array(old.companion["slots"]).size() == 27 \
+			and again.companion["slots"] == old.companion["slots"]
+	for i in 27:
+		kept = kept and old.slots[i] == (today[i] if i < 22 else "") and old.companion["slots"][i] == (hers[i] if i < 22 else "")
+	_check(kept, "a record of today's 22, a player's and her companion's, reads and saves as 27: every slot where it was, the bag and the row empty")
+	var uids: Array = []
+	for i in 22:
+		uids.append(World.items.mint(today[i], "built") if not today[i].is_empty() else 0)
+	World.set_slots(host, today, uids)
+	var carried: bool = host.slots[Items.RIGHT_HAND] == "sword" and host.worn == "robes" and host.slots[21] == "arrows"
+	for i in 22:
+		carried = carried and host.slot_items[i] == int(uids[i])
+	var pet_uids22: Array = []
+	for i in 22:
+		pet_uids22.append(World.items.mint(hers[i], "built") if not hers[i].is_empty() else 0)
+	World.set_slots(pet, hers, pet_uids22)
+	for i in 22:
+		carried = carried and pet.slot_items[i] == int(pet_uids22[i])
+	_check(carried and host.slots.size() == 27 and pet.slots.size() == 27 and World.pack_slots(host) == Items.PACK_SLOTS,
+			"loaded on a player and on a companion: the same things in the same slots, the sword still in hand, the robes worn, no satchel")
+	World.set_slots(pet, Items.tidy([], Companion.SLOTS), [])
+	World.set_slots(host, Items.tidy([], Player.SLOTS), [])
+	for uid in uids + pet_uids22:
+		if int(uid) != 0:
+			World.items.end(int(uid), "gone")
+	World.set_slots(pet, pet_slots, pet_uids)
+	World._relocate(pet, pet_at)
+	World.set_slots(host, had_slots, had_uids)
+
+
+## [param n] zeros.
+func _zeros(n: int) -> Array:
+	var out := []
+	out.resize(n)
+	out.fill(0)
+	return out
+
+
+## Every file under [param dir] ending [param ending], recursively.
+func _files_under(dir: String, ending: String) -> Array[String]:
+	var out: Array[String] = []
+	var at := DirAccess.open(dir)
+	if at == null:
+		return out
+	for file in at.get_files():
+		if file.ends_with(ending):
+			out.append(dir.path_join(file))
+	for sub in at.get_directories():
+		out.append_array(_files_under(dir.path_join(sub), ending))
+	return out
 
 ## Every .gd under [param dir], recursively.
 func _scripts_under(dir: String) -> Array[String]:
@@ -2731,7 +2896,7 @@ func _scripts_under(dir: String) -> Array[String]:
 
 func _test_armour() -> void:
 	print("\n== armour: one slot, worn, never held (decision 622) ==")
-	_check(Items.CARRIED == 22 and Items.ARMOUR == 6 and Player.SLOTS == 22 and Companion.SLOTS == 22 and Items.PACK_SLOTS == [0, 1, 2, 3, 7, 8, 9, 10, 18, 19, 20, 21],
+	_check(Items.CARRIED == 27 and Items.ARMOUR == 6 and Player.SLOTS == 27 and Companion.SLOTS == 27 and Items.PACK_SLOTS == [0, 1, 2, 3, 7, 8, 9, 10, 18, 19, 20, 21],
 			"a seventh carried slot, the armour worn; the pack round it (722); the worn slots after (788), the pack's third row after them (819)")
 	_check(Items.armour_of("mail_armour").get("look") == "mail" and Items.armour_of("robes").get("look") == "robes"
 			and Items.armour_of("knife").is_empty() and not Items.armour_of("plate_armour").has("range_steps"),
@@ -3672,7 +3837,7 @@ func _test_inventory() -> void:
 			and Items.is_pack(7) and Items.is_pack(10) and Items.is_pack(21) and not Items.is_pack(Items.HEAD), "case: the pack 12 (0-3, 7-10 and 18-21), the hands, armour and worn slots not in it")
 	var old := PlayerRecord.from_dict({"player_id": "old", "tile": [1, 1], "slots": ["ration", "", "", "", "sword", "", "robes"]})
 	_check(old.slots.size() == Items.CARRIED and old.slots[0] == "ration" and old.slots[Items.RIGHT_HAND] == "sword" and old.slots[Items.ARMOUR] == "robes"
-			and old.slots[10] == "", "case: a record saved with 7 slots reads as 22, everything where it was")
+			and old.slots[10] == "", "case: a record saved with 7 slots reads as 27, everything where it was")
 	# Double-click equips.
 	var sword := _give(host, "sword", 0)
 	_check(World.try_equip(host, host, 0) == "" and host.slots[Items.RIGHT_HAND] == "sword" and host.slots[0] == "",

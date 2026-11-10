@@ -47223,6 +47223,38 @@ always_want gains "charm" (items' made.stock 1: one on his shelf), pointers.inpu
 voice's "That goes to the medicine man.", and the CHANGELOG bullet is voice's. economy_test: a town's
 medicine man with every part stored bids neither and the claw stays the tanner's; the wilds hut's
 buys the parts and bids the charm.
+819 amended (the satchel, the sim's side; release's label; the coordinator's approval after the
+pack's twelve, landing off, package "satchel", items switching it on). Jeff's rule stands: no greyed
+squares, so the satchel's row exists only while one is worn, more room as a thing found or bought.
+Items.BAG (22), a worn slot of kind "bag" (Items.WORN), and SATCHEL_SLOTS (23-26), a fourth pack row,
+are appended after the third row as 788's and 819's were, so Items.CARRIED (Player.SLOTS,
+Companion.SLOTS) is 27 and nothing saved or laid out by index moves: a record, snapshot or level
+spec of 22 (or fewer) slots loads padded by Items.tidy, every slot where it was, a carried thing
+still carried (its uid kept by set_slots), the bag and the row empty; no migration beyond that.
+Rolling back: v0.1.210's Items.tidy keeps the first 22 of a longer record and its uid readers are
+bounds-checked, so a 27-slot save loads there clean, the five empties dropped; once a satchel can be
+worn, a rollback past this would drop the satchel and its row's things, so it is checked again at
+the switch-on.
+Items.pack_slots_of adds the row while Items.wears_satchel, so room_for, free_pack_slot, into_pack,
+the sweep, try_equip and Wren's own pack readers reach it; is_pack counts it; ALL_PACK_SLOTS, what
+pack_panel lays out, stays the twelve until ui builds the row from ui-design's mock. The rule
+(World.satchel_refusal, in worn_refusal): a worn satchel won't come off while its row holds things
+("empty the satchel first"), and nothing goes into the row with none worn ("wear a satchel first";
+"only a satchel is worn there" for anything else in the bag slot; voice's words). A satchel lost
+another way: packs survive death (370), no one takes things from a player, and World.satchel_held
+keeps a worn satchel holding things from leaving its slot by any path (given, traded, sold, banked,
+handed to the priest, donated, thrown, used up: try_transfer, _take_out, take_units, donate,
+consume), so its row's things are never lost with it; a row left holding things with no satchel (a
+level's or an admin's slots) may still be emptied, never stuck. Wren may wear one: her pack is 16
+then, and carried() says she wears it. Catalog: satchel ("leather satchel", voice's about, value 20,
+worn bag, art placeholder item.satchel); no loot row, stall line, recipe or luxury tag names it, so
+a released build shows nothing (items_test checks levels/). Wire: PROTOCOL_REVISION 56 (opened
+here, after v0.1.210 shipped 55): "slots" and slot_items are 27 long. Tests: items_test
+_test_satchel (the slots, off, the row, both refusals, every way off refused while full, Wren's,
+an orphan row emptied, a 22-slot player's and companion's record read, saved and loaded where
+they were), _test_worn/_test_pack_twelve/_test_armour's counts, state_test 2g (a 22-slot record
+saved back as 27, everything where it was). The switch-on: economy's stall line and price,
+pc-character's worn.satchel look, ui's row, voice's lines, the item's art. No new class_name.
 
 ## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
 

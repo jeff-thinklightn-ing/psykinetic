@@ -627,7 +627,12 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## closes it); a chest stocked from a loot table now spawns as a cache (props "cache",
 ## "cache_cell"), so an old client's Take all is its only take there.
 ## 55 (853): Resident.activity may be "sit"/"lean" (later slices more words); an old client without the word in ACTIVITIES draws no pose. No new number (release).
-const PROTOCOL_REVISION := 55
+## 56 (819 amended, "the satchel"; opened by items after v0.1.210 shipped 55): a carrier's slots
+## are 27 (Items.CARRIED): BAG (22), a worn satchel's slot, and SATCHEL_SLOTS (23-26), the pack
+## row it opens, so "slots" and slot_items are 27 long; an old client reads 22.
+## One number for the 11-12 cut (release): 56 is shared with items' 805 amended (11) (fishing) and
+## companions' 485 amended (2) (the follow mend); each adds its own reason here as it lands, no 57.
+const PROTOCOL_REVISION := 56
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]
 ## Every kind of message (message, message_to, broadcast, broadcast_to).

@@ -2618,6 +2618,9 @@ func try_transfer(by: GridEntity, from: GridEntity, from_slot: int, to: GridEnti
 		return false
 	if from != to and soulbound(slot_uid(from, from_slot)):
 		return false  # Never given to the priest, banked or sold (decision 573 amended).
+	if from != to and satchel_held(from, from_slot):
+		slot_refused.emit(by, SATCHEL_FULL)  # Off only once its row is empty (819 amended).
+		return false
 	if to is Chest and (to as Chest).temple:
 		return _hand_to_priest(by, from, from_slot, to)
 	if to is Chest and (to as Chest).depot:
@@ -2710,6 +2713,8 @@ func _take_out(from: GridEntity, slot: int) -> int:
 		return 0
 	if soulbound(slot_uid(from, slot)):
 		return 0  # Not dropped, thrown, eaten or banked (decision 573 amended).
+	if satchel_held(from, slot):
+		return 0  # A satchel holding things stays worn (819 amended).
 	var uid := _unit_out(from, slot)
 	items.place(uid, "")
 	_slots_changed(from)
@@ -2785,6 +2790,9 @@ func worn_refusal(entity: GridEntity, slots: PackedStringArray) -> String:
 	for slot: int in Items.WORN:
 		if slot < slots.size() and not slots[slot].is_empty() and Items.worn_kind(slots[slot]) != Items.WORN[slot]:
 			return "only armour is worn there" if slot == Items.ARMOUR else WORN_REFUSALS[Items.WORN[slot]]
+	var satchel := satchel_refusal(entity, slots)
+	if not satchel.is_empty():
+		return satchel
 	for hand in [Items.RIGHT_HAND, Items.LEFT_HAND]:
 		var kind := Items.worn_kind(slots[hand])
 		if kind == "body":
@@ -2798,7 +2806,37 @@ func worn_refusal(entity: GridEntity, slots: PackedStringArray) -> String:
 ## voice's words.
 const WORN_REFUSALS := {"head": "only a hat or a helm is worn there", "neck": "only an amulet is worn there",
 	"back": "only a cloak is worn there", "feet": "only boots are worn there", "ring": "only a ring is worn there",
-	"charm": "only a charm is worn there"}
+	"charm": "only a charm is worn there", "bag": "only a satchel is worn there"}
+## The satchel's refusals (819 amended; voice's words): taking off a
+## satchel whose row holds things, and putting a thing in the row with none
+## worn.
+const SATCHEL_FULL := "empty the satchel first"
+const SATCHEL_NONE := "wear a satchel first"
+
+
+## The satchel's rule for [param entity]'s [param slots] (819 amended): its
+## row holds things only while a satchel is worn, so a worn one won't come
+## off holding things (SATCHEL_FULL) and nothing goes in with none worn
+## (SATCHEL_NONE); "" if they keep to it. A row left holding things without
+## one (a level's or an admin's slots) may still be emptied, so nothing in
+## it is ever stuck.
+func satchel_refusal(entity: GridEntity, slots: PackedStringArray) -> String:
+	if Items.wears_satchel(slots) or not Items.satchel_holds(slots):
+		return ""
+	if Items.wears_satchel(entity.slots):
+		return SATCHEL_FULL
+	for i in Items.SATCHEL_SLOTS:
+		if i < slots.size() and not slots[i].is_empty() and (i >= entity.slots.size() or slots[i] != entity.slots[i]):
+			return SATCHEL_NONE
+	return ""
+
+
+## Whether [param entity]'s [param slot] is a worn satchel whose row holds
+## things (819 amended): it doesn't leave its slot by any way (sold, given,
+## banked, traded, thrown) till the row is empty, so nothing in the row is
+## ever lost with it.
+func satchel_held(entity: GridEntity, slot: int) -> bool:
+	return slot == Items.BAG and has_hands(entity) and Items.wears_satchel(entity.slots) and Items.satchel_holds(entity.slots)
 
 
 ## False, a move refused: [param by] is told why if it broke the armour
@@ -3457,7 +3495,7 @@ func take_units(entity: GridEntity, uids: Array[int]) -> Array[int]:
 	var taken: Array[int] = []
 	for uid in uids:
 		var slot := slot_of_unit(entity, uid)
-		if slot >= 0 and not soulbound(uid) and _unit_out(entity, slot, uid) == uid:
+		if slot >= 0 and not soulbound(uid) and not satchel_held(entity, slot) and _unit_out(entity, slot, uid) == uid:
 			items.place(uid, "")
 			taken.append(uid)
 	if not taken.is_empty():
@@ -3642,7 +3680,7 @@ func consume(entity: GridEntity, uid: int, why: String) -> bool:
 		return false
 	for slot in entity.slots.size():
 		if slot_uid(entity, slot) == uid or uid in items.stack_of(slot_uid(entity, slot)):
-			if _unit_out(entity, slot, uid) != uid:
+			if satchel_held(entity, slot) or _unit_out(entity, slot, uid) != uid:
 				return false
 			_slots_changed(entity)
 			items.end(uid, why)
@@ -4648,6 +4686,8 @@ func donate(by: GridEntity, uid: int, place: String) -> bool:
 		return false
 	if not items.yields_of(uid).is_empty() and items.is_grave(uid):
 		return false  # Only the fence takes them (586).
+	if satchel_held(by, slot):
+		return false  # A satchel holding things stays worn (819 amended).
 	var item := by.slots[slot]
 	if items.yields_of(uid).keys().any(func(what: Variant) -> bool: return str(what) not in Stockpile.RESOURCES):
 		return false
