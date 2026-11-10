@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- In the hills, a spoil heap lies beside Hollowfell's mine mouth now, a mound of gravel tipped out of the mine with broken grey rock over it and at its foot and a few split timbers, where before a loose boulder and a scatter of rocks lay there (798 amended (5)).
 - A swing you click while walking always comes through now, a sword's quick blow or a heavy weapon's wind-up alike, where before it was often lost just as it should land, its stamina spent for nothing, most of all as you walked away (392 amended (6)).
 - A named foe you've struck turns and fights you now, however wary his temper, so Brand the Ox and the robbers named beside him no longer stand idle under your blows, where before a cautious one could hang back and let you hit him (806 amended (12)).
 - Townsfolk at work can be heard now: a woodcutter's axe bites into the wood at each chop, and a carpenter at a build rasps the saw on each push and pull and knocks with the hammer at each blow (804 amended (18)).

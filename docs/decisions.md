@@ -45490,6 +45490,17 @@ the room's "mechanism" secret goes through her asked-only hint path, counted fou
 (dungeon's Main._secrets_unfound). companion_test _test_tomb. Server only, protocol unchanged, no new
 class_name.
 
+798 amended (5) (art-kit; release's label; the coordinator's Hollowfell iron list, item 3; maps' MINE_DRESS,
+798 amended (3), carried here at maps' ask): Hollowfell's mine mouth gets a spoil heap, mine.spoil, in place
+of the boulder and five small rocks Client3D.MINE_DRESS stood beside it: one entry at (2.5, -0.05, -1.9) in
+the mouth's frame, turned 0.8 so its tongue points out and away from the mouth. By hand, palette only, 632
+tris: a grey-brown gravel mound tipped out of the mine, broken grey waste rock over it and at its foot, two
+split timber scraps (C:/dev/review/mine_pieces/make_mine.py; the look at
+C:/dev/review/mine_pieces/mine.spoil.png). view_test _test_mine_mouth counts it. The mouth is live (798
+amended (3); 837's residents send players there since v0.1.210), so it lands on, with a bullet in voice's
+words that stays to the heap (nothing of iron, economy's package to switch on). Client only, protocol
+unchanged, no new class_name.
+
 ## 814. The hill cat: a predator that lies up and drops on what passes
 
 The coordinator's approval of C:/dev/review/enemy-ai/hill_cat_design.md (the apex lairs design left it

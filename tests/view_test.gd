@@ -5532,8 +5532,8 @@ func _test_mine_mouth() -> void:
 			stair_z = (piece as Node3D).position.z
 	var lit := dress.find_children("*", "OmniLight3D", true, false).size()
 	_check(int(slots.get(Client3D.MINE_FRAME, 0)) == 2 and int(slots.get("mine.track", 0)) >= 4 and int(slots.get("mine.track_end", 0)) == 1
-			and int(slots.get("prop.mine_cart", 0)) == 1 and stair_z > 0.5 and lit >= 1,
-			"timbered, railed out to a buffer and a cart, the stair down in the dark, a fire at the door (%s; the stair %.1f m in, %d light)" % [slots, stair_z, lit])
+			and int(slots.get("prop.mine_cart", 0)) == 1 and int(slots.get("mine.spoil", 0)) == 1 and stair_z > 0.5 and lit >= 1,
+			"timbered, railed out to a buffer and a cart, the spoil heap beside it (798 amended (5)), the stair down in the dark, a fire at the door (%s; the stair %.1f m in, %d light)" % [slots, stair_z, lit])
 	# In the hills (Hollowfell's door, in maps' bank): its own top over every
 	# throat cell, which draws no ground (as the bear cave's: else its black
 	# would show through from behind the hill).

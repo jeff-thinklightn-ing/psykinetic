@@ -8022,12 +8022,8 @@ const MINE_RAILS := 3.0
 ## or the throat's floor inside), turn (radians), size].
 const MINE_DRESS := [
 	["prop.mine_cart", Vector3(0.0, 0.0, -2.1), 0.0, 1.0],
-	["rock.boulder", Vector3(2.3, -0.25, -1.4), 0.6, 0.75],
-	["rock.small", Vector3(2.5, -0.1, -2.4), 1.1, 0.9],
-	["rock.small", Vector3(2.1, -0.1, -1.9), 2.6, 0.6],
-	["rock.small", Vector3(2.9, -0.1, -1.0), 0.3, 0.7],
-	["rock.small", Vector3(1.9, -0.1, -2.9), 2.0, 0.55],
-	["rock.small", Vector3(3.2, -0.15, -2.2), 4.0, 0.8],
+	# The spoil heap (798 amended (5)), its tongue tipped out and away from the mouth.
+	["mine.spoil", Vector3(2.5, -0.05, -1.9), 0.8, 1.0],
 	["scatter.stone", Vector3(1.5, 0.0, -1.0), 0.7, 1.0],
 	["prop.goblin_marker", Vector3(-2.7, 0.0, -2.9), PI - 0.5, 1.0],
 ]
