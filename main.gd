@@ -4024,7 +4024,7 @@ func _apply_generation(level_name: String, config: Dictionary, generation: int, 
 		return false
 	_regen[level_name] = {"generation": generation, "at_step": World.steps}
 	print("[regen] %s: generation %d (seed %d, %d of %d tries, every %d days)" % [level_name, generation, made["seed"], made["tries"],
-		Regen.TRIES, config["every_days"]])
+		Regen.HELD_TRIES if not (config.get("held", []) as Array).is_empty() else Regen.TRIES, config["every_days"]])  # A held level tries up to 16 (806).
 	if World.zones.has(level_name):
 		_rebuilding = true  # Its bodies cleared for the new floor: no robber's clear latched by that (714).
 		_rebuild_regenerated(level_name, made["anchors"])

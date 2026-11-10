@@ -47675,3 +47675,29 @@ sack a seam, the quota full and from the deeper half, a dug sack counted, the mi
 the period holding only what is left, the full ones varied over periods, off as 769). Server only;
 protocol unchanged (Seam.spent already replicates); no new class_name; no bullet (the package's comes
 with the switch-on, voice's).
+
+## 838. Layout sense in every generated map: the hold and Hollowfell laid to every rule
+
+Release's number; the roadmap's step 4 (dungeon leads), the coordinator's plan and passes on the
+sheets. Since 806 a level's block may hold layout_sense's rules ("held": Regen retries a try that
+faults, up to HELD_TRIES) or only prefer them; the barrow held them all, castle_halls and Hollowfell held
+some and laid faults of the rest on most first tries. Each now holds all nine (door, purpose, wrap,
+dead_end, spine, loop, chest, coop, arrival), castle_halls first and Hollowfell in the paragraph below;
+barrow_deep, and the barrow's arrival, are held with maps' 832 switch-on. The generators lay to the rules by shape, so a retry is
+rare, not the way they pass. castle_halls (the dwarven hold, labyrinth.gd's "hold" use): _hold_trunk lays a main way from the
+entrance anchor to the cold forge first, routed round every other anchor's band (HOLD_BAND 2 cells off
+its side; a step inside one costs HOLD_DETOUR) and carved with the brush; _hold_ways joins each other
+anchor by a way of its own, nearest the ways first; each room is joined as it is placed
+(_fit_hold_room), out of its door toward the nearest way cell, round every room before it, never
+through one, and kept only where that way runs near straight (at most HOLD_STRAIGHT 1.25 times the
+cells across, plus HOLD_SLACK 3), so each room is one step off the main way at most and no way wraps
+another room. The block's "loops" share then joins the nearest room pairs (_hold_loops), each loop kept
+only where every ring of rock it closes in (_new_rock_rings, pieces of LAYOUT_LOOP_ROCK 3 cells or more)
+has two rooms on it, else put back (_hold_snapshot, _hold_restore). _torches lights each way as walked
+(_carve_route records the hold's ways in extras "hold_ways"), a torch every TORCH_EVERY, none nearer
+another than HOLD_LIGHT_APART 5. Main's [regen] line prints HELD_TRIES for a held level. level_test
+_test_sense_everywhere: every marked level on disk holds every rule (SENSE_NOT_YET names a level that waits,
+SENSE_RULES_NOT_YET a rule, each with what it waits on) and its generations 1-4 lay with no fault; the barrow and castle_halls among them. Server
+only; protocol unchanged; no new class_name. Sheets: C:/dev/review/dungeon/838_castle_halls_g{1,2,3}.png.
+The box lays the new hold at its next regeneration (every 3 game days). One CHANGELOG bullet in voice's
+words.

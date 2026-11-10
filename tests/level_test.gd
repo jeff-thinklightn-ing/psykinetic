@@ -43,6 +43,7 @@ func _ready() -> void:
 	_test_step_cache()
 	_test_layout_sense()
 	_test_castle_hold()
+	_test_sense_everywhere()
 	_test_hollow_chiefs()
 	_test_falls()
 	_test_sight_over_walls()
@@ -5412,6 +5413,49 @@ func _test_tower_levels() -> void:
 
 const LABYRINTH := preload("res://sim/level_gen/labyrinth.gd")
 const LAYOUT_SENSE := preload("res://sim/layout_sense.gd")
+
+
+## Layout sense in every generated map (the roadmap's step 4, dungeon
+## leads): every level marked to regenerate holds all of layout_sense's
+## rules (its block's "held", so Regen retries a try that faults), and
+## its generations 1-4 lay with no fault of any rule. SENSE_NOT_YET names
+## the ones still to come and what they wait on; a level there is checked
+## all the same once its block holds every rule. SENSE_RULES_NOT_YET names
+## a rule a level holds later, and on what; the level is checked on the rest.
+const SENSE_NOT_YET := {"hollowfell": "the mine's spine and purpose faults, next in step 4", "barrow_deep": "held with 832's switch-on (maps)"}
+const SENSE_RULES_NOT_YET := {"barrow": {"arrival": "held with 832's switch-on (maps)"}}
+func _test_sense_everywhere() -> void:
+	print("
+== layout sense in every generated map (step 4) ==")
+	var checked: Array[String] = []
+	for level_name: String in Regen.marked_levels():
+		if not FileAccess.file_exists(Level.DIR + level_name + "/level.json"):
+			continue  # A test's level, registered in memory.
+		var block: Dictionary = Regen.config_of(level_name)
+		var held: Array = block.get("held", [])
+		var later: Dictionary = SENSE_RULES_NOT_YET.get(level_name, {})
+		var holds_all := LAYOUT_SENSE.RULES.all(func(rule: String) -> bool: return rule in held or later.has(rule))
+		for rule: String in later:
+			if not rule in held:
+				print("  (not yet: %s's %s, %s)" % [level_name, rule, later[rule]])
+		if not holds_all and SENSE_NOT_YET.has(level_name):
+			print("  (not yet: %s, %s)" % [level_name, SENSE_NOT_YET[level_name]])
+			continue
+		checked.append(level_name)
+		_check(holds_all, "%s holds every layout rule (%s)" % [level_name, held])
+		var faults := {}
+		var tries: Array[int] = []
+		for generation in range(1, 5):
+			var made := Regen.generate(level_name, generation)
+			if made.is_empty():
+				faults[generation] = "not made"
+				continue
+			tries.append(int(made.get("tries", 0)))
+			var found: Array = Regen.layout_faults(made, block)
+			if not found.is_empty():
+				faults[generation] = LAYOUT_SENSE.counts(found)
+		_check(faults.is_empty(), "%s generations 1-4 lay with no layout fault (tries %s; %s)" % [level_name, tries, faults])
+	_check(checked.has("barrow") and checked.has("castle_halls"), "the barrow and the castle halls among them (%s)" % [checked])
 
 
 ## castle_halls under the layout rules (806 (c), the coordinator's plan):

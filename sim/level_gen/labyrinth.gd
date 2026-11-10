@@ -108,6 +108,22 @@ const LEAN := 0.65
 ## 612: the rock between any two rooms, and from the anchors (two: a way
 ## squeezed between them is two wide).
 const ROOM_GAP := 2
+## 838: how near a way of the hold may run to a room or an anchor it does
+## not serve, in cells off its side (layout_sense's WRAP_BAND: a way within
+## it along two sides is the wrap fault); a step there costs HOLD_DETOUR.
+const HOLD_BAND := 2
+const HOLD_DETOUR := 30
+## 838: a room of the hold is placed only where its way runs near straight
+## to the ways: its steps at most HOLD_STRAIGHT times the cells across from
+## its door to where it joins, plus HOLD_SLACK. A way round another room
+## (the rock it leaves between, layout_sense's loop rule) is longer.
+const HOLD_STRAIGHT := 1.25
+const HOLD_SLACK := 3
+## layout_sense's LOOP_ROCK: rock closed in, in a piece this big or more, is
+## a ring with no meaning.
+const LAYOUT_LOOP_ROCK := 3
+## 838: the hold's lights along its ways no nearer each other than this.
+const HOLD_LIGHT_APART := 5
 const BLIND_SHORT := 5
 const BLIND_LONG := 10
 ## 608: the niche roll's own seed salt (the layout's rng is not touched),
@@ -137,34 +153,40 @@ static func generate(template: LevelMap, config: Dictionary, seed: int) -> Level
 	# another anchor: the barrow's hidden passage, the shortcut's nook) is
 	# joined through its neighbour, never a node of its own.
 	nodes = nodes.filter(func(node: Dictionary) -> bool: return _exit(map, template, anchors, node, node["centre"]) != null)
-	var rooms := _place_rooms(map, anchors, config, old, rng, carved, depth)
-	nodes.append_array(rooms)
 	var corridors: Dictionary[Vector2i, bool] = {}
+	var hold := str(config.get("uses", "")) == "hold"
+	var paths: Dictionary[Vector2i, bool] = {}
+	var brush := _brush_of(config) if style == "barrow" or config.has("ways") else 0
+	var rooms: Array[Dictionary] = []
+	if hold:
+		# 838 (roadmap step 4): the hold laid so layout_sense's rules hold by
+		# its shape, not by retries: the trunk first, the rooms kept off it,
+		# each room joined by its own way to the nearest way (never through
+		# another room), the loops room to room (_hold_ways).
+		_hold_trunk(map, template, anchors, nodes, config, carved, corridors, paths, brush)
+		_hold_ways(map, template, anchors, nodes, config, carved, corridors, paths, brush)
+		var keep_off: Array[Rect2i] = []
+		for cell: Vector2i in paths:
+			keep_off.append(Rect2i(cell, Vector2i.ONE).grow(HOLD_BAND + brush))
+		var placed: Array[Dictionary] = []
+		var fit := func(room: Dictionary) -> Variant:
+			return _fit_hold_room(map, template, anchors, nodes, placed, room, carved, corridors, paths, brush)
+		rooms = _place_rooms(map, anchors, config, old, rng, carved, depth, keep_off, fit)
+		nodes.append_array(rooms)
+		_hold_loops(map, template, anchors, nodes, rooms, config, rng, carved, corridors, paths, brush)
+	else:
+		rooms = _place_rooms(map, anchors, config, old, rng, carved, depth)
+		nodes.append_array(rooms)
 	# Barrow: the brush carves the way right up to a tomb's wall (612: no
 	# ring narrows it to the door); _wall_rooms keeps the tomb shut but
 	# for its door.
 	# Dwarven (613, the Dwarven Halls): the same brush when the level names
 	# "ways"; unsaid, its ways stay two wide as before.
-	var brush := _brush_of(config) if style == "barrow" or config.has("ways") else 0
-	var paths: Dictionary[Vector2i, bool] = {}
-	# 806 (c), the hold: a trunk way from the entrance straight to the heart,
-	# carved first (the spine rule: the walk at most 1.6 times the straight line).
-	var trunk: Array = []
-	if str(config.get("uses", "")) == "hold":
-		var from := -1
-		var to := -1
-		for index in nodes.size():
-			if nodes[index]["kind"] != "anchor":
-				continue
-			if nodes[index]["name"] == str(config.get("entrance", "")):
-				from = index
-			if nodes[index]["name"] == str(config.get("heart", "")):
-				to = index
-		if from >= 0 and to >= 0 and from != to:
-			trunk = [from, to]
-	var ways := _ways(nodes, config, rng)
-	if not trunk.is_empty():
-		ways.push_front(trunk)
+	# The hold's ways are _hold_ways' (838, above: since 806 (c) a trunk
+	# from the entrance to the heart, carved first); the rest a tree.
+	var ways: Array[Array] = []
+	if not hold:
+		ways = _ways(nodes, config, rng)
 	for way in ways:
 		_carve_way(map, template, anchors, nodes[way[0]], nodes[way[1]], old, rng, carved, corridors, paths, depth, [], brush)
 	var ends := _blind_ways(map, anchors, rooms, corridors, old, rng, carved, depth)
@@ -453,7 +475,7 @@ static func _anchor_nodes(template: LevelMap, anchors: Array, depth: Dictionary)
 ## down the middle, kind "hall"); old: caverns, a blob grown inside the
 ## rectangle. Each a node {cells, rect, centre, kind, doors}.
 static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old: bool, rng: RandomNumberGenerator,
-		carved: Dictionary[Vector2i, bool], depth: Dictionary) -> Array[Dictionary]:
+		carved: Dictionary[Vector2i, bool], depth: Dictionary, keep_off: Array[Rect2i] = [], fit: Callable = Callable()) -> Array[Dictionary]:
 	var spec: Variant = config.get("rooms", {})
 	if not spec is Dictionary:
 		spec = {}
@@ -472,6 +494,7 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 	var taken: Array[Rect2i] = []
 	for anchor: Dictionary in anchors:
 		taken.append((anchor["rect"] as Rect2i).grow(ROOM_GAP))
+	taken.append_array(keep_off)  # 838: the hold's trunk, laid first, kept clear of rooms.
 	var rooms: Array[Dictionary] = []
 	var barrow := not depth.is_empty()
 	var tower := str(config.get("style", "")) == "tower"  # 659: small rooms only, no great hall in a tower's floor.
@@ -521,13 +544,28 @@ static func _place_rooms(map: LevelMap, anchors: Array, config: Dictionary, old:
 				if hall and _pillar(rect, cell):
 					continue
 				cells[cell] = true
+		var newly: Array[Vector2i] = []
 		for cell: Vector2i in cells:
+			if map.cell(cell) == "void":
+				newly.append(cell)
 			Tools.carve(map, cell, carved)
-		taken.append(rect.grow(ROOM_GAP))
 		var kind := "hall" if hall else "room"
 		if barrow:
 			kind = ["room", "grave", "cavern"][band]
-		rooms.append({"cells": cells, "rect": rect, "centre": centre, "kind": kind, "doors": [], "band": band, "name": ""})
+		var room := {"cells": cells, "rect": rect, "centre": centre, "kind": kind, "doors": [], "band": band, "name": ""}
+		# 838: [param fit] (the hold's) joins the room as it is placed, its
+		# keep-off rects back, or null where it can't: the room taken out.
+		if fit.is_valid():
+			var kept: Variant = fit.call(room)
+			if not kept is Array:
+				for cell in newly:
+					map.set_cell(cell, "void")
+					carved.erase(cell)
+				continue
+			for other: Rect2i in kept:
+				taken.append(other)
+		taken.append(rect.grow(ROOM_GAP))
+		rooms.append(room)
 	return rooms
 
 
@@ -663,6 +701,384 @@ static func _carve_way(map: LevelMap, template: LevelMap, anchors: Array, a: Dic
 			var inside: Vector2i = end[1][0]
 			map.set_edge(Terrain.edge_key(inside, end[1][1]), "door")
 			node["doors"].append(inside)
+
+
+## 838 (roadmap step 4): the hold's trunk, from its entrance anchor to its
+## heart, routed round every other anchor's band (_route) and carved with
+## the brush. Its path's cells ([] with no trunk).
+static func _hold_trunk(map: LevelMap, template: LevelMap, anchors: Array, nodes: Array[Dictionary], config: Dictionary,
+		carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], paths: Dictionary[Vector2i, bool], brush: int) -> Array[Vector2i]:
+	var from: Dictionary = {}
+	var to: Dictionary = {}
+	for node in nodes:
+		if node["kind"] != "anchor":
+			continue
+		if node["name"] == str(config.get("entrance", "")):
+			from = node
+		elif node["name"] == str(config.get("heart", "")):
+			to = node
+	if from.is_empty() or to.is_empty():
+		return []
+	var exit: Variant = _exit(map, template, anchors, from, to["centre"])
+	var entry: Variant = _exit(map, template, anchors, to, from["centre"])
+	if exit == null or entry == null:
+		return []
+	var bands: Array[Rect2i] = []
+	for node in nodes:
+		if node != from and node != to:
+			bands.append((node["rect"] as Rect2i).grow(HOLD_BAND + brush))
+	var goal: Vector2i = entry[0] + entry[1]
+	var path := _route(map, anchors, exit[0] + exit[1], {goal: true}, bands, {}, {})
+	_carve_route(map, anchors, path, carved, corridors, paths, brush)
+	return path
+
+
+## 838: every anchor of the hold but the trunk's ends joined to the ways
+## by a way of its own, nearest the ways first: out of its exit toward the
+## nearest way cell, routed to any way cell (_route) round the bands of the
+## anchors it does not serve, near straight where it can be (HOLD_STRAIGHT),
+## else as it must. The rooms come after, each joined as it is placed
+## (_fit_hold_room), so each has a way of its own to the trunk: one step off
+## the spine at most (layout_sense's spine rule).
+static func _hold_ways(map: LevelMap, template: LevelMap, anchors: Array, nodes: Array[Dictionary], config: Dictionary,
+		carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], paths: Dictionary[Vector2i, bool], brush: int) -> void:
+	var waiting: Array[Dictionary] = []
+	for node in nodes:
+		if node["kind"] == "anchor" and (node["name"] == str(config.get("entrance", "")) or node["name"] == str(config.get("heart", ""))):
+			continue
+		waiting.append(node)
+	while not waiting.is_empty():
+		# The waiting node nearest a way cell goes next.
+		var best := -1
+		var best_d := 1 << 30
+		var best_at := Vector2i.ZERO
+		for index in waiting.size():
+			var centre: Vector2i = waiting[index]["centre"]
+			for cell: Vector2i in paths:
+				var d := Tools.distance(centre, cell)
+				if d < best_d:
+					best_d = d
+					best = index
+					best_at = cell
+		if best < 0:
+			break
+		var node: Dictionary = waiting[best]
+		waiting.remove_at(best)
+		var goals := {}
+		for cell: Vector2i in paths:
+			goals[cell] = true
+		if not _join_hold_node(map, template, anchors, nodes, node, best_at, goals, {}, carved, corridors, paths, brush, {}, true):
+			_join_hold_node(map, template, anchors, nodes, node, best_at, goals, {}, carved, corridors, paths, brush)
+
+
+## 838: [param room], just placed (its cells carved), joined to the ways by
+## a way of its own toward the nearest way cell, round the bands of every
+## node and room placed before it ([param placed]), never through a room,
+## near straight (HOLD_STRAIGHT); the rects later rooms keep off (its way's
+## cells, HOLD_BAND and the brush round each), or null where it can't be
+## joined so (the room not kept there).
+static func _fit_hold_room(map: LevelMap, template: LevelMap, anchors: Array, nodes: Array[Dictionary], placed: Array[Dictionary],
+		room: Dictionary, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], paths: Dictionary[Vector2i, bool],
+		brush: int) -> Variant:
+	var toward := Vector2i.ZERO
+	var best_d := 1 << 30
+	var goals := {}
+	for cell: Vector2i in paths:
+		goals[cell] = true
+		var d := Tools.distance(room["centre"], cell)
+		if d < best_d:
+			best_d = d
+			toward = cell
+	if goals.is_empty():
+		return null
+	var others: Array[Dictionary] = []
+	others.append_array(nodes)
+	others.append_array(placed)
+	var blocked := {}
+	blocked.merge(room["cells"])
+	for other in placed:
+		blocked.merge(other["cells"])
+	var before := paths.duplicate()
+	var snap := _hold_snapshot(map, carved, corridors, paths, [room])
+	var enclosed := _enclosed_cells(map)
+	if not _join_hold_node(map, template, anchors, others, room, toward, goals, blocked, carved, corridors, paths, brush, {}, true):
+		return null
+	# Its way closing rock in (layout_sense's loop rule: a ring round plain
+	# rock): the way taken out again, the room not kept there.
+	if not _new_rock_rings(map, enclosed, [], 1).is_empty():
+		_hold_restore(map, carved, corridors, paths, snap)
+		return null
+	placed.append(room)
+	var kept: Array[Rect2i] = []
+	for cell: Vector2i in paths:
+		if not before.has(cell):
+			kept.append(Rect2i(cell, Vector2i.ONE).grow(HOLD_BAND + brush))
+	return kept
+
+
+## 838: the rock pieces of [param map] no walk over rock reaches from its
+## edge (layout_sense's loop rule finds them so), each an array of cells,
+## the pieces under LOOP_ROCK left out.
+static func _rock_rings(map: LevelMap) -> Array:
+	var width := map.size.x
+	var height := map.size.y
+	var open := PackedByteArray()
+	open.resize(width * height)
+	for at: Vector2i in map.cells:
+		if map.walkable(at) and at.x >= 0 and at.y >= 0 and at.x < width and at.y < height:
+			open[at.y * width + at.x] = 1
+	# 0 rock not yet reached, 1 floor, 2 rock reached from the edge.
+	var queue := PackedInt32Array()
+	for x in width:
+		for y: int in [0, height - 1]:
+			if open[y * width + x] == 0:
+				open[y * width + x] = 2
+				queue.append(y * width + x)
+	for y in height:
+		for x: int in [0, width - 1]:
+			if open[y * width + x] == 0:
+				open[y * width + x] = 2
+				queue.append(y * width + x)
+	var at := 0
+	while at < queue.size():
+		var index := queue[at]
+		at += 1
+		var x := index % width
+		var y := index / width
+		for next: int in [index - 1 if x > 0 else -1, index + 1 if x < width - 1 else -1, index - width if y > 0 else -1, index + width if y < height - 1 else -1]:
+			if next >= 0 and open[next] == 0:
+				open[next] = 2
+				queue.append(next)
+	var out: Array = []
+	for index in open.size():
+		if open[index] != 0:
+			continue
+		var piece := PackedInt32Array([index])
+		open[index] = 3
+		var i := 0
+		while i < piece.size():
+			var cell := piece[i]
+			i += 1
+			var x := cell % width
+			var y := cell / width
+			for next: int in [cell - 1 if x > 0 else -1, cell + 1 if x < width - 1 else -1, cell - width if y > 0 else -1, cell + width if y < height - 1 else -1]:
+				if next >= 0 and open[next] == 0:
+					open[next] = 3
+					piece.append(next)
+		if piece.size() >= LAYOUT_LOOP_ROCK:
+			var cells: Array[Vector2i] = []
+			for cell in piece:
+				cells.append(Vector2i(cell % width, cell / width))
+			out.append(cells)
+	return out
+
+
+## 838: every cell of [param map]'s closed-in rock (_rock_rings), a set.
+static func _enclosed_cells(map: LevelMap) -> Dictionary:
+	var out := {}
+	for piece: Array in _rock_rings(map):
+		for cell: Vector2i in piece:
+			out[cell] = true
+	return out
+
+
+## 838: the rock rings of [param map] not closed in before
+## ([param enclosed], _enclosed_cells), each with fewer than [param least]
+## of [param rooms] beside it: what a way just laid closed in that
+## layout_sense's loop rule finds (a ring round plain rock through under
+## two rooms).
+static func _new_rock_rings(map: LevelMap, enclosed: Dictionary, rooms: Array, least: int) -> Array:
+	var owner := {}
+	for index in rooms.size():
+		for cell: Vector2i in rooms[index]["cells"]:
+			owner[cell] = index
+	var out: Array = []
+	for piece: Array in _rock_rings(map):
+		if piece.all(func(cell: Vector2i) -> bool: return enclosed.has(cell)):
+			continue
+		var beside := {}
+		for cell: Vector2i in piece:
+			for dy in [-1, 0, 1]:
+				for dx in [-1, 0, 1]:
+					var near := cell + Vector2i(dx, dy)
+					if owner.has(near):
+						beside[owner[near]] = true
+		if beside.size() < least:
+			out.append(piece)
+	return out
+
+
+## 838: what a way laid next may change, to put back (_hold_restore): the
+## carved, corridor and path cells, the edges, and [param rooms]' doors.
+static func _hold_snapshot(map: LevelMap, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool],
+		paths: Dictionary[Vector2i, bool], rooms: Array) -> Dictionary:
+	var doors := []
+	for room: Dictionary in rooms:
+		doors.append([room, (room["doors"] as Array).duplicate()])
+	return {"carved": carved.duplicate(), "corridors": corridors.duplicate(), "paths": paths.duplicate(), "edges": map.edges.duplicate(),
+		"doors": doors, "ways": (map.extras.get("hold_ways", []) as Array).size()}
+
+
+## 838: [param snap] (_hold_snapshot) put back: the cells carved since rock
+## again, the corridor and path cells and doors since taken out.
+static func _hold_restore(map: LevelMap, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool],
+		paths: Dictionary[Vector2i, bool], snap: Dictionary) -> void:
+	for cell: Vector2i in carved.keys():
+		if not snap["carved"].has(cell):
+			map.set_cell(cell, "void")
+			carved.erase(cell)
+	for cell: Vector2i in corridors.keys():
+		if not snap["corridors"].has(cell):
+			corridors.erase(cell)
+	for cell: Vector2i in paths.keys():
+		if not snap["paths"].has(cell):
+			paths.erase(cell)
+	map.edges = snap["edges"]
+	for pair: Array in snap["doors"]:
+		pair[0]["doors"] = pair[1]
+	if map.extras.has("hold_ways"):
+		(map.extras["hold_ways"] as Array).resize(int(snap["ways"]))
+
+
+## 838: the block's "loops" share of the hold's rooms joined room to room,
+## the nearest pairs, each way near straight (HOLD_STRAIGHT) or not laid (a
+## loop through two rooms, layout_sense's loop rule).
+static func _hold_loops(map: LevelMap, template: LevelMap, anchors: Array, nodes: Array[Dictionary], rooms: Array[Dictionary], config: Dictionary,
+		rng: RandomNumberGenerator, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool], paths: Dictionary[Vector2i, bool],
+		brush: int) -> void:
+	var blocked := {}
+	for room in rooms:
+		blocked.merge(room["cells"])
+	var extra := roundi(clampf(float(config.get("loops", DEFAULT_LOOPS)), 0.0, 1.0) * rooms.size())
+	if extra <= 0 or rooms.size() < 2:
+		return
+	var pairs: Array = []
+	for i in rooms.size():
+		for j in range(i + 1, rooms.size()):
+			pairs.append([i, j, Tools.distance(rooms[i]["centre"], rooms[j]["centre"])])
+	pairs.sort_custom(func(a: Array, b: Array) -> bool: return a[2] < b[2] if a[2] != b[2] else [a[0], a[1]] < [b[0], b[1]])
+	var pool := pairs.slice(0, mini(pairs.size(), extra * 2))
+	Tools.shuffle(pool, rng)
+	for pair: Array in pool.slice(0, mini(pool.size(), extra)):
+		var a: Dictionary = rooms[pair[0]]
+		var b: Dictionary = rooms[pair[1]]
+		var entry: Variant = _exit(map, template, anchors, b, a["centre"])
+		if entry == null:
+			continue
+		var goal: Vector2i = entry[0] + entry[1]
+		var snap := _hold_snapshot(map, carved, corridors, paths, [a, b])
+		var enclosed := _enclosed_cells(map)
+		if _join_hold_node(map, template, anchors, nodes, a, b["centre"], {goal: true}, blocked, carved, corridors, paths, brush, b, true):
+			map.set_edge(Terrain.edge_key(entry[0], entry[1]), "door")
+			b["doors"].append(entry[0])
+			# A loop is a ring through two rooms (layout_sense's loop rule):
+			# one closing rock in with fewer on it taken out again.
+			if not _new_rock_rings(map, enclosed, rooms, 2).is_empty():
+				_hold_restore(map, carved, corridors, paths, snap)
+
+
+## 838: [param node] joined by a way out of its exit toward [param toward]
+## to any cell of [param goals], round the bands of every node but it (and
+## [param also], the room a loop runs to), never through [param blocked]
+## (rooms' cells); the way carved, a door on a room's side; with
+## [param straight] only a way near straight (HOLD_STRAIGHT). Whether a way
+## was laid.
+static func _join_hold_node(map: LevelMap, template: LevelMap, anchors: Array, nodes: Array[Dictionary], node: Dictionary, toward: Vector2i,
+		goals: Dictionary, blocked: Dictionary, carved: Dictionary[Vector2i, bool], corridors: Dictionary[Vector2i, bool],
+		paths: Dictionary[Vector2i, bool], brush: int, also: Dictionary = {}, straight := false) -> bool:
+	var exit: Variant = _exit(map, template, anchors, node, toward)
+	if exit == null:
+		return false
+	var start: Vector2i = exit[0] + exit[1]
+	var bands: Array[Rect2i] = []
+	for other in nodes:
+		if other != node and other != also:
+			bands.append((other["rect"] as Rect2i).grow(HOLD_BAND + brush))
+	# The first cells straight out of its own door are free of its own band.
+	var own := (node["rect"] as Rect2i).grow(HOLD_BAND + brush)
+	var free := {}
+	for k in HOLD_BAND + brush + 1:
+		free[start + (exit[1] as Vector2i) * k] = true
+	var path := _route(map, anchors, start, goals, bands, blocked, free, own)
+	if path.is_empty():
+		return false
+	# With [param straight], only a way near straight (HOLD_STRAIGHT).
+	var across := absi(path.back().x - start.x) + absi(path.back().y - start.y)
+	if straight and path.size() - 1 > HOLD_STRAIGHT * across + HOLD_SLACK:
+		return false
+	_carve_route(map, anchors, path, carved, corridors, paths, brush)
+	if node["kind"] != "anchor":
+		map.set_edge(Terrain.edge_key(exit[0], exit[1]), "door")
+		node["doors"].append(exit[0])
+	return true
+
+
+## 838: the cheapest walk from [param from] to any cell of [param goals]
+## over rock (Tools.rock) outside [param blocked], a step 1, or HOLD_DETOUR
+## inside any of [param bands] or [param own] (a node's own band, but for
+## its [param free] cells). [] when none reaches.
+static func _route(map: LevelMap, anchors: Array, from: Vector2i, goals: Dictionary, bands: Array[Rect2i], blocked: Dictionary,
+		free: Dictionary, own := Rect2i()) -> Array[Vector2i]:
+	if goals.has(from):
+		return [from]
+	var cost := {from: 0}
+	var came := {}
+	var buckets: Array = [[from]]
+	var at := 0
+	while at < buckets.size():
+		var bucket: Array = buckets[at]
+		var i := 0
+		while i < bucket.size():
+			var cell: Vector2i = bucket[i]
+			i += 1
+			if int(cost[cell]) != at:
+				continue
+			if goals.has(cell):
+				var path: Array[Vector2i] = [cell]
+				while came.has(path[0]):
+					path.push_front(came[path[0]])
+				return path
+			for direction in DIRECTIONS:
+				var next := cell + direction
+				if next.x <= 0 or next.y <= 0 or next.x >= map.size.x - 1 or next.y >= map.size.y - 1:
+					continue
+				if blocked.has(next) or not (Tools.rock(map, anchors, next) or goals.has(next)):
+					continue
+				var step := 1
+				if not free.has(next) and (own.has_point(next) or _in_any(bands, next)):
+					step = HOLD_DETOUR
+				var c := at + step
+				if cost.has(next) and int(cost[next]) <= c:
+					continue
+				cost[next] = c
+				came[next] = cell
+				while buckets.size() <= c:
+					buckets.append([])
+				(buckets[c] as Array).append(next)
+		at += 1
+	return []
+
+
+static func _in_any(rects: Array[Rect2i], cell: Vector2i) -> bool:
+	for rect in rects:
+		if rect.has_point(cell):
+			return true
+	return false
+
+
+## 838: [param path] carved as a way: each cell a corridor cell and a path
+## cell, the brush round it.
+static func _carve_route(map: LevelMap, anchors: Array, path: Array[Vector2i], carved: Dictionary[Vector2i, bool],
+		corridors: Dictionary[Vector2i, bool], paths: Dictionary[Vector2i, bool], brush: int) -> void:
+	# Its cells in walking order, for the lights along it (_torches).
+	if not map.extras.has("hold_ways"):
+		map.extras["hold_ways"] = []
+	(map.extras["hold_ways"] as Array).append(path)
+	for cell in path:
+		paths[cell] = true
+		_carve_corridor(map, anchors, cell, carved, corridors)
+		if brush > 0:
+			_carve_brush(map, anchors, cell, carved, [], brush)
 
 
 ## The cells within [param brush] of [param cell] carved (541 amended: a
@@ -963,6 +1379,22 @@ static func _torches(map: LevelMap, anchors: Array, rooms: Array[Dictionary], co
 			if spot != null and not _beside_anchor(anchors, spot):
 				map.set_cell(spot, light)
 				kept[spot] = true
+	# 838 (the coordinator: no long run of nothing): the hold's ways lit
+	# along each way as it is walked, a light by its wall every TORCH_EVERY
+	# cells, none within HOLD_LIGHT_APART of another.
+	if map.extras.has("hold_ways"):
+		var lit_at: Array[Vector2i] = []
+		for path: Array in map.extras["hold_ways"]:
+			for k in range(TORCH_EVERY / 2, path.size(), TORCH_EVERY):
+				var spot := _by_wall(map, path[k])
+				if map.cell(spot) != FLOOR or _beside_anchor(anchors, spot) or kept.has(spot):
+					continue
+				if lit_at.any(func(other: Vector2i) -> bool: return maxi(absi(other.x - spot.x), absi(other.y - spot.y)) < HOLD_LIGHT_APART):
+					continue
+				map.set_cell(spot, light)
+				kept[spot] = true
+				lit_at.append(spot)
+		return
 	var i := 0
 	for cell in Tools.sorted_cells(corridors):
 		if barrow and _band_of(depth, cell) > 0:
