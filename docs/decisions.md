@@ -42695,6 +42695,16 @@ keeps the last sheet and shows its why as a line. Away from the store nothing st
 the pack's clicks are the store's again. ui_test _test_town_window. No bullet beyond economy's
 (it says the window). Client only; no new class_name (TownSheet is 624's).
 
+768 amended (2) (art-kit; release's label; the coordinator's Hollowfell iron list, item 1, economy's survey): the
+window's raw goods drawn: item.ore, item.wood and item.stone, beside item.wool, item.fish and item.sheep, drawn by
+ItemIcons' by-slot path ("item.<raw id>" for a raw with no items row). Wood and stone are town stock today and were
+blank; ore is too (towns keep, sell and buy it), and is iron from Hollowfell's raw later. Kit cells nobody places,
+by hand, palette only, sized and turned for ItemIcons' corner view at 128 px: ore a small heap of rust-brown lumps
+flecked with dark gangue (prop.heap_ore's colours), wood seven short split logs, bark up, laid across a wide pile so
+its face of pale cut ends reads first, stone four rough-cut grey blocks. C:/dev/review/town_items/make_town_items.py;
+the strip beside wool and fish at C:/dev/review/town_items/raw_goods_strip.png. Lands on (the coordinator: plain
+polish). Art only, protocol unchanged, no new class_name; bullet in voice's words.
+
 790 amended (release's label): the two chiefs' trophies (dungeon's phase B, enemy-ai's named
 rows), each a stock tool made better, so a trophy only adds (Jeff's bonus rule). rot_hammer,
 "Chief's pick-hammer", the orc brute's: the pick (3.5 kg, force 1.5) made heavy, 6 kg, two hands,

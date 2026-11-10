@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: the town sheet shows a picture for wood, stone and ore now, a few split logs, a few rough-cut stones and a small heap of rust-brown ore, where before they had none (768 amended (2)).
 - The old grey gives you time to get clear of him now: there's a pause before each bite, long enough to step out of it, and he bites far less often; and step off the line of his lunge and he misses you, where before he snapped about once a second with hardly a warning and his lunge could still bite you at the end of its run (780 amended (23)).
 - You walk on smoothly from the moment you arrive, where before, often a few seconds after reaching somewhere, you were suddenly put back two to four cells (847).
 - A big blow that knocks you into your companion, or her into you, hurts each of you once now, where before it could bounce between you and hurt you both two or three times over, sometimes felling her at a stroke (688 amended (11)).
