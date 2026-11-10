@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your shield and your sword's parry never break or leave you stunned now: a raised shield holds any blow for stamina, a heavier one costing more and a wound-up heavy swing twice, and when you run short it gives out, letting that blow through and staying down a moment; your sword's ready parry turns light blows and lets heavier ones by; and the sword and the buckler catch a blow from a foe standing a little off your line, where before a heavy bite broke your guard and left you stunned, worse than holding nothing (340 amended (2)).
 - When a fight starts, your companion's card, the town sheet, the maps and any note you're reading close so you can see the fight; open one again whenever you like, though a blow you take closes it again, where before they stayed open over the middle of the screen (846).
 - Esc closes the controls list and then your pack, one at a time, before it opens the menu, and a click on the controls list stays on it, where before Esc opened the menu over both and a click on the list walked you to the ground beneath it (845).
 - Gains each have a sound of their own now: a low drum strike for a deed, two warm plucks, the second higher, for a town's regard, a soft held note for your companion's bond, a quick wooden rattle for practice, a leather bag set down for goods handed in or picked up, and one soft high harp note for a creature spotted, where before most shared one harp pluck (804 amended (17)).

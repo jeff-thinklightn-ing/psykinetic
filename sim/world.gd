@@ -7196,9 +7196,26 @@ func guarding(target: GridEntity, source: GridEntity) -> Dictionary:
 	var verb := Items.verb_of(held) if not held.is_empty() else {}
 	if verb.get("kind") != "block" or target.facing == Vector2i.ZERO:
 		return {}
-	var off := absf((body_centre(source) - body_centre(target)).angle_to(Vector2(target.facing)))  # Centres (699).
+	var off := off_facing(target, source)  # Any of its body (340 amended (2)), not its centre alone.
 	var wider := ART_SWORD_ARC * art_feel(target, "swordplay") if held == "sword" else 0.0  # Swordplay (766).
 	return verb if off <= float(verb["arc"]) * PI / 4.0 + 0.01 + wider else {}
+
+
+## How far [param source]'s body lies off [param target]'s facing, in
+## radians (340 amended (2), the coordinator's: a guard meets a blow when
+## any of the striker's body is in its arc, not only its centre, so a
+## straight-ahead guard isn't skipped by a body standing off the line): its
+## centre's angle less the half-angle its body spans from there, never
+## under 0. A body on the grid is its cell's inscribed circle (half a cell
+## across each way: its cell's, without the corners, so a neighbour a
+## diagonal off stays off a straight-ahead guard), a free body FREE_RADIUS.
+func off_facing(target: GridEntity, source: GridEntity) -> float:
+	var at := body_centre(source) - body_centre(target)
+	var facing := Vector2(target.facing)
+	if at.length() < 0.001 or facing == Vector2.ZERO:
+		return 0.0
+	var radius := FREE_RADIUS if free_body(source) else 0.5
+	return maxf(0.0, absf(facing.angle_to(at)) - asin(clampf(radius / at.length(), 0.0, 1.0)))
 
 
 ## 340 amended: [param target]'s lowered shield, guarding its arm's side
@@ -7240,7 +7257,9 @@ func lowered_guard(target: GridEntity, source: GridEntity) -> Dictionary:
 ## breaks it: the blow lands whole, the shield is lowered, its holder
 ## stunned GUARD_BREAK_STUN and unable to raise one again for
 ## GUARD_BROKEN_TICKS. A [param crushing] blow (a wound-up one, decision
-## 392) breaks it whatever it weighs.
+## 392) breaks it whatever it weighs. A player's guard is the exception
+## (340 amended (2), _meet_player_guard): never broken by a blow, never a
+## stun for having raised it.
 func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: float, shot := false,
 		crushing := false) -> Variant:
 	var verb := guarding(target, source)
@@ -7248,11 +7267,13 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 		verb = lowered_guard(target, source)  # 340 amended: its shield's side, at half.
 	if verb.is_empty() or is_sheltered(target):
 		return null  # (Arriving, decision 661: nothing reaches its guard.)
-	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
 	var weight := amount + force
 	var slot := Items.LEFT_HAND if target.raised == "block" or verb.get("lowered", false) else Items.RIGHT_HAND  # As found.
 	var steady := float(Items.strength_value(slot_strength(target, slot), "guard_stamina", 1.0))
 	var cost := maxi(1, ceili(float(verb["stamina"]) * weight * steady))
+	if target is Player:
+		return _meet_player_guard(target as Player, source, verb, slot, amount, force, cost, shot, crushing)
+	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
 	target._world_note_exertion(tick)
 	var heavy := (weight >= float(verb["breaks_at"]) or crushing) and not shot
 	if heavy or target.max_stamina > 0 and target.stamina < cost:
@@ -7277,6 +7298,57 @@ func _meet_guard(target: GridEntity, source: GridEntity, amount: int, force: flo
 	if slot == Items.RIGHT_HAND and target.slots[slot] == "sword" and source is Monster:
 		practise(target, "swordplay", ART_DEED_PARRY * _art_worth(source))  # 766.
 	return [maxi(0, amount - ceili(amount * absorb - 0.001)), force * (1.0 - absorb)]
+
+
+## A player's guard meeting a blow (340 amended (2), the coordinator's
+## rulings on combat's guard table, Jeff's rule that a choice is a bonus,
+## never a penalty): what _meet_guard returns. Its weight sets only the
+## stamina it costs; no blow breaks it and nothing stuns its holder for
+## having raised it. A [param crushing] blow (a wound-up weapon's, 392: the
+## draugr's axe) costs twice. A shield short of the stamina gives out: the
+## blow lands whole, the shield is lowered and can't come up for
+## GUARD_BROKEN_TICKS. The sword's parry (the right hand's, made without
+## asking) is never worse than a bare hand: it costs at most parry_cap, and
+## a blow it can't hold (crushing, of its breaks_at or more, or one it
+## hasn't the stamina for) it doesn't meet: null, nothing paid.
+func _meet_player_guard(target: Player, source: GridEntity, verb: Dictionary, slot: int, amount: int, force: float,
+		cost: int, shot: bool, crushing: bool) -> Variant:
+	var heavy := crushing and not shot
+	if slot == Items.RIGHT_HAND:
+		cost = mini(cost, parry_cap(target))
+		if heavy or amount + force >= float(verb["breaks_at"]) or target.max_stamina > 0 and target.stamina < cost:
+			return null  # A parry it can't hold is none, as on a bare hand.
+	elif heavy:
+		cost *= 2  # A wound-up blow taken on a shield: twice the stamina.
+	_mark_fight(source, target)  # A blow met is still a fight (804, combat's side).
+	target._world_note_exertion(tick)
+	if target.max_stamina > 0 and target.stamina < cost:
+		target.raised = ""
+		target.guard_broken_until = tick + GUARD_BROKEN_TICKS
+		_log("guard: %s's guard gives out under %s's blow (a blow of %d, force %.2f; %d stamina for %d)" % [
+				target.name, source.name, amount, force, target.stamina, cost])
+		target._world_guarded(true)
+		guard_met.emit(target, source, true)
+		return [amount, force]
+	if target.max_stamina > 0:
+		target.stamina -= cost
+	var absorb := clampf(float(verb["absorb"]), 0.0, 1.0)
+	_log("guard: %s takes %s's blow (%d, force %.2f) for %d stamina" % [target.name, source.name, amount, force, cost])
+	target._world_guarded(false)
+	guard_met.emit(target, source, false)
+	if target.raised == "block" and not shot:
+		_stun_for(source, SHIELD_RECOIL_STUN, &"guarded")  # 340 amended: thrown back off it, the holder's opening.
+	_credit(target, slot, "guarded")
+	if slot == Items.RIGHT_HAND and target.slots[slot] == "sword" and source is Monster:
+		practise(target, "swordplay", ART_DEED_PARRY * _art_worth(source))  # 766.
+	return [maxi(0, amount - ceili(amount * absorb - 0.001)), force * (1.0 - absorb)]
+
+
+## The most [param target]'s parry costs (340 amended (2), the coordinator's
+## cap): what one light blow of its own costs (swing_cost), so a parry made
+## without asking never takes the stamina its own blows want.
+func parry_cap(target: GridEntity) -> int:
+	return maxi(1, swing_cost(target))
 
 
 ## Whether [param by]'s arrow spares [param body] (decision 456; Jeff:

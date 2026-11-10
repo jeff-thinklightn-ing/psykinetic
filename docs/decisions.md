@@ -7258,6 +7258,54 @@ bouncyballblue, CC0). Review: C:/dev/review/sound/shield. sound_kit_test (the re
 cause, its takes, louder than the block, which ducks). Client only; protocol unchanged, no new
 class_name.
 
+340 amended (2) (release's label; the coordinator's rulings on combat's guard table; Jeff's rule
+that a choice is a bonus, never a penalty): a player's guard is never broken by a blow and never
+stuns its holder. Combat's table (each boss and big beast against each guard, a still player
+facing him, 60 s) found the guard a penalty in v0.1.210: the old grey's bite, 4.21, broke the
+round shield (3.5) on every bite, the harm a bare hand's and the holder stunned besides; the
+draugr's wound-up axe broke every guard, 14 of 14; the sword's parry, made without asking, broke
+under every big beast (its 2.0), stunning a sword player up to half the time and emptying his
+stamina at 10 a point; and a straight-ahead guard (the buckler, the parry) never met the boar
+king, whose centre stood off its line. For a player's guard (World._meet_player_guard), a blow's
+weight now sets only its cost: the stamina a point of weight costs, as before, twice for a
+crushing blow (a heavy weapon's wound up, 392: the draugr's axe) on a shield. This replaces the
+heading's "heavy blows break it" for players: no blow breaks a player's guard by its weight or by
+being crushing, and nothing stuns its holder for having raised it. A shield short of the stamina
+gives out: the blow lands whole, the shield is lowered and can't come up for GUARD_BROKEN_TICKS,
+and no one is stunned. The sword's parry is never worse than a bare hand in harm, stun or stamina:
+it costs at most World.parry_cap, what one light blow of the holder's own costs (swing_cost: 6
+with the sword), and a blow it can't hold (crushing, of the sword's breaks_at or more, or one it
+hasn't the stamina for) it doesn't meet at all: as on a bare hand, nothing paid, no stun. A
+monster's guard keeps the rule as it was: a blow of its breaks_at or more, or a crushing one,
+breaks it, the blow whole and the monster stunned GUARD_BREAK_STUN, so a player's hammer and heavy
+weapons still break a skeleton guard's shield (305). The arc meets any of the striker's body,
+for every guard (World.off_facing): the angle to its centre less the half-angle its body spans,
+a body on the grid its cell's inscribed circle (half a cell each way, without the corners, so a
+neighbour a diagonal off stays off a straight-ahead guard), a free body FREE_RADIUS. A held
+block's recoil on the striker (SHIELD_RECOIL_STUN, 4 ticks) is unchanged and goes through 843's
+steady: a boss or apex recoiled is steadied, so a shield blocking him every time costs him one
+recoil a steady, not a stagger a blow. Told moves are 340 amended (3)'s. The table, 843's stack
+against the same with this, the same scene and the same rolls (every row with no guard raised,
+and every row where the player fights, is unchanged): the grey's bites held 20 of 20 on the round
+shield (128 hp a minute to 44, the lunge's) and the buckler (to 64), stunned 84 ticks of 600 to
+none; the draugr's axe held 14 of 14 on the round shield (70 to 0, at 28 stamina a block, never
+spent in the minute) and the buckler (to 14), stunned 112 to none; the king's bites held 7 on the
+shield and 7 on the buckler, which never met him before (72 to 51 both); Grull's and a boar's
+held on the buckler where they broke it (63 and 84 to 0); a sword parry held alone stunned its
+holder 112 to 273 ticks of 600 against the grey, the draugr, Grull, a brute, a boar and the hill
+cat and now none, the harm unchanged (it now meets none of their blows), and Skeech's 38 times
+(46 to 22); a spent shield gives out where it broke, without a stun (Skeech 14 a minute, a boar
+1); the striker's ticks lost to a held block 4 for ordinary foes, 1.3 for Grull and 2.0 for the
+grey (steadied). The great bear makes no plain blow (his swipe, slam and charge are told:
+340 amended (3)). combat_test _test_guard_rework (a 5.5 held on the round shield at 22 stamina; a
+shot held; a crushing 4.2 held at twice, 34, its striker recoiled; 20 stamina for 34: given out,
+the blow whole, no stun either side, unraised a while; the parry capped at a light blow, none
+over its 2.0, none crushing, none without the stamina; the buckler meeting a foe 8.5 degrees off
+by its body and not one two cells down); _test_weapon_memory's swordplay arc measured to the
+foe's body (11 degrees at its nearest); items_test's heavy and crushing blows held, given out
+without a stun; monster_test's broken shield now one that gives out. The sword's tooltip in
+voice's words (levels/items.json). Server and data; protocol unchanged, no new class_name.
+
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
 Weapons as verbs in the fight, part 4 of 5. A blow with a knockdown verb

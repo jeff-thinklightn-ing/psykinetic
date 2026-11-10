@@ -1028,18 +1028,26 @@ func _test_block() -> void:
 	World.try_attack(imp, host)
 	World._resolve_hits()
 	_check(host.hp == hp and host.raised == "block", "a real blow, resolved: the host unhurt, the shield still up")
+	var before := host.stamina
 	met = World._meet_guard(host, imp, 2, 3.0)
-	_check(met == [2, 3.0] and host.raised == "" and World.is_stunned(host), "a hammer's blow (2, force 3; over the shield's 3.5, 340 amended): the guard breaks, the blow lands whole, the host staggered")
-	host.stunned_until_tick = 0
-	host.guard_broken_until = World.tick
-	World.try_stance(host, "block")
+	_check(met == [0, 0.0] and host.raised == "block" and not World.is_stunned(host) and host.stamina == before - 20,
+			"a blow of 2, force 3 (5, over the shield's 3.5): held, its weight only its cost (340 amended (2); %d stamina)" % (before - host.stamina))
+	host.stamina = host.max_stamina
 	met = World._meet_guard(host, imp, 2, 0.3)
 	_check(met == [0, 0.0] and host.raised == "block", "a robber's dagger poke (2, force 0.3; 2.3 under 3.5, 340 amended): taken whole, the guard held")
 	met = World._meet_guard(host, imp, 3, 0.25)
 	_check(met == [0, 0.0] and host.raised == "block", "a strong robber's poke (3, force 0.25; 3.25 under 3.5, 340 amended): taken")
 	met = World._meet_guard(host, imp, 3, 0.6)
-	_check(met == [3, 0.6] and host.raised == "", "a blow of 3 and more push (3.6): heavy enough to break it")
-	host.stunned_until_tick = 0
+	_check(met == [0, 0.0] and host.raised == "block", "a blow of 3 and more push (3.6): taken too (340 amended (2))")
+	before = host.stamina
+	met = World._meet_guard(host, imp, 3, 0.6, false, true)
+	_check(met == [0, 0.0] and host.raised == "block" and not World.is_stunned(host) and host.stamina == before - 30,
+			"the same, crushing (wound up, 392): held, at twice the stamina (%d)" % (before - host.stamina))
+	host.stamina = 20
+	met = World._meet_guard(host, imp, 3, 0.6, false, true)
+	_check(met == [3, 0.6] and host.raised == "" and not World.is_stunned(host) and host.stamina == 20,
+			"crushing, with 20 stamina for 30: the shield gives out, the blow whole, no stun")
+	host.stamina = host.max_stamina
 	_check(not World.try_stance(host, "block"), "and the shield will not come up again at once")
 	host.guard_broken_until = World.tick
 	_check(World.try_stance(host, "block"), "a while later it will")

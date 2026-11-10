@@ -70,6 +70,7 @@ func _ready() -> void:
 	_test_sledge_recover()
 	_test_sword_lead()
 	_test_weapon_memory()
+	_test_guard_rework()
 	_test_arts_marks()
 	_test_lob_aim_on_client()
 	_test_armour()
@@ -682,6 +683,87 @@ func _test_arts_marks() -> void:
 	World.set_arts(host, {})
 
 
+## 340 amended (2), the coordinator's rulings on the guard table (Jeff's
+## rule: a choice is a bonus, never a penalty): a player's guard is never
+## broken by a blow and never stuns its holder; a blow's weight sets only
+## its cost, a crushing one twice; short of the stamina a shield gives out,
+## the blow whole; the sword's parry never worse than a bare hand; a
+## monster's guard as before (broken by weight or a crushing blow, stunned);
+## the arc meets any of a striker's body.
+func _test_guard_rework() -> void:
+	print("\n== the guard: a player's never broken nor a stun, its weight only its cost, the parry never worse than a bare hand (340 amended (2)) ==")
+	var e := _build(["#########", "#.......#", "#..Pm...#", "#.......#", "#########"])
+	var holder: Player = e["P"][0]
+	var striker: GridEntity = e["m"][0]
+	var raise := func() -> void:
+		holder.guard_broken_until = 0
+		holder.stunned_until_tick = 0
+		holder.facing = Vector2i(1, 0)
+		World.try_stance(holder, "block")
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	raise.call()
+	_check(holder.raised == "block", "a round shield raised at a monster")
+	holder.stamina = 100
+	var met: Variant = World._meet_guard(holder, striker, 5, 0.5)
+	_check(met == [0, 0.0] and holder.raised == "block" and not World.is_stunned(holder) and holder.stamina == 100 - 22,
+			"a blow of 5.5, over the shield's 3.5: held, 4 stamina a point of it paid (%s, %d stamina)" % [met, holder.stamina])
+	_check(World._meet_guard(holder, striker, 3, 0.4, true) == [0, 0.0] and holder.raised == "block", "a shot of 3.4: held")
+	holder.stamina = 100
+	met = World._meet_guard(holder, striker, 3, 1.2, false, true)
+	_check(met == [0, 0.0] and holder.raised == "block" and not World.is_stunned(holder) and holder.stamina == 100 - 34,
+			"a crushing blow (a wound-up one, 392) of 4.2: held, at twice the stamina (%s, %d paid)" % [met, 100 - holder.stamina])
+	_check(World.is_stunned(striker), "and thrown back off the shield as any blow it takes")
+	striker.stunned_until_tick = 0
+	holder.stamina = 20
+	met = World._meet_guard(holder, striker, 3, 1.2, false, true)
+	_check(met == [3, 1.2] and holder.raised == "" and not World.is_stunned(holder) and holder.stamina == 20
+			and holder.guard_broken_until == World.tick + World.GUARD_BROKEN_TICKS and not World.is_stunned(striker),
+			"20 stamina for 34: it gives out, the blow whole, no stun either side, unraised a while (%s)" % [met])
+	_check(World.try_stance(holder, "block") == false, "and no raising it again for a while")
+	raise.call()
+	holder.stamina = 5
+	met = World._meet_guard(holder, striker, 3, 0.0)
+	_check(met == [3, 0.0] and holder.raised == "" and not World.is_stunned(holder) and holder.stamina == 5,
+			"5 stamina for a block of 12: it gives out the same (%s)" % [met])
+	# (A monster's guard keeps the old rule: monster_test's _test_sword_beats_guard, items_test.)
+	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+	# The parry: the sword's guard made without asking.
+	_give(holder, "sword")
+	holder.raised = ""
+	holder.guard_broken_until = 0
+	holder.stunned_until_tick = 0
+	holder.next_attack_tick = 0
+	holder.facing = Vector2i(1, 0)
+	var cap := World.parry_cap(holder)
+	_check(cap == World.swing_cost(holder) and cap < 15, "the parry costs at most a light blow of its own (%d)" % cap)
+	holder.stamina = 100
+	_check(World._meet_guard(holder, striker, 2, 0.5) == null and holder.stamina == 100 and not World.is_stunned(holder),
+			"a blow of 2.5, over the sword's 2.0: not parried at all, nothing paid, no stun")
+	_check(World._meet_guard(holder, striker, 1, 0.0, false, true) == null and holder.stamina == 100 and not World.is_stunned(holder),
+			"a crushing blow: not parried, nothing paid, no stun")
+	met = World._meet_guard(holder, striker, 1, 0.5)
+	_check(met == [0, 0.25] and holder.stamina == 100 - cap and not World.is_stunned(holder),
+			"a blow of 1.5: parried, half off, %d stamina where 15 was (%s)" % [100 - holder.stamina, met])
+	holder.stamina = cap - 1
+	_check(World._meet_guard(holder, striker, 1, 0.5) == null and holder.stamina == cap - 1 and not World.is_stunned(holder),
+			"too little stamina for it: not parried, nothing paid, no stun")
+	# The arc against the striker's body (the coordinator's: any of it).
+	e = _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#.....m.#", "#########"])
+	holder = e["P"][0]
+	var ahead: GridEntity = e["m"][0]
+	var off: GridEntity = e["m"][1]
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("buckler", "built"))
+	holder.facing = Vector2i(1, 0)
+	holder.free_pos = Vector2(3.0, 2.3)
+	World.try_stance(holder, "block")
+	var centre_off := rad_to_deg(absf((World.body_centre(ahead) - World.body_centre(holder)).angle_to(Vector2(1, 0))))
+	_check(centre_off > 5.0 and World.guarding(holder, ahead).get("kind") == "block",
+			"a buckler (straight ahead only) meets a foe whose centre is %.1f degrees off: its body is on the line" % centre_off)
+	_check(World.guarding(holder, off).is_empty() and rad_to_deg(World.off_facing(holder, off)) > 15.0,
+			"and not one two cells down, its body %.1f degrees off at its nearest" % rad_to_deg(World.off_facing(holder, off)))
+	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+
+
 func _test_weapon_memory() -> void:
 	print("\n== weapon memory: swordplay and the bow fill with use, fade only idle (766) ==")
 	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
@@ -705,9 +787,11 @@ func _test_weapon_memory() -> void:
 	World.set_arts(host, {"swordplay": {"m": 1.0, "peak": 1.0, "quiet": 0}})
 	_check(World.attack_ticks_of(host) == 6, "swordplay full: a blow every 6, not 7 (%d)" % World.attack_ticks_of(host))
 	_check(_blow_damage(host, foe) == damage_fresh, "and its blow no harder (%d)" % damage_fresh)
-	# The parry arc: a blow from 11 degrees off the facing.
+	# The parry arc: a blow from 11 degrees off the facing (340 amended (2): the nearest of the
+	# foe's body, its cell's circle, from (4.0, 2.705): 35.2 degrees to its centre, less 24.1).
 	host.facing = Vector2i(1, 0)
-	host.free_pos = Vector2(4.0, 2.2)
+	host.free_pos = Vector2(4.0, 2.705)
+	_check(is_equal_approx(snappedf(rad_to_deg(World.off_facing(host, foe)), 0.1), 11.1), "the foe's cell 11 degrees off at its nearest (%.2f)" % rad_to_deg(World.off_facing(host, foe)))
 	host.next_attack_tick = 0
 	host.raised = ""
 	World.set_arts(host, {})
