@@ -117,11 +117,11 @@ var _other_mood: Label
 var _other_row: HBoxContainer
 var _player_title: Label
 var _player_row: HBoxContainer
-## The character sheet beside the pack (787): the player's hands and armour,
-## and the load drawn; it shows whenever the pack does.
+## The character sheet (787), the window's left side since the sheet pass:
+## the player's hands, armour and worn things on a figure, the load drawn.
 var sheet: CharacterSheet
 ## The player's load lines as last shown (676, ui's side; since 787 the
-## sheet's bars' hover words).
+## sheet's bar's hover words).
 var _load_lines := PackedStringArray()
 ## What the player has promised the townsfolk (open commissions, npc's
 ## "offers" with "open"; 536, ui's side): a caption in the foot, "Promised:
@@ -335,20 +335,25 @@ func _ready() -> void:
 	_other_head.add_child(deposit)
 	_other_row = _row(false)
 	column.add_child(_other_row)
-	_player_title = _title()
-	column.add_child(_player_title)
-	_player_row = _row(true)
-	column.add_child(_player_row)
-	add_theme_stylebox_override("panel", solid_panel())
+	# One window (the coordinator's sheet pass, Jeff: "keep iterating"): the
+	# character sheet on the left, the pack on the right, their titles on one
+	# row, the same squares.
+	var mine := HBoxContainer.new()
+	mine.name = "Mine"
+	mine.add_theme_constant_override("separation", UiTheme.constant("slot_gap") * 4)
+	column.add_child(mine)
 	sheet = CharacterSheet.new()
 	sheet.build(self)
-	add_sibling.call_deferred(sheet)  # Drawn with the pack, under windows opened over it (the world map).
-	visibility_changed.connect(func() -> void:
-		if is_instance_valid(sheet):
-			sheet.visible = visible)
-	tree_exiting.connect(func() -> void:
-		if is_instance_valid(sheet):
-			sheet.queue_free())
+	mine.add_child(sheet)
+	var pack_side := VBoxContainer.new()
+	pack_side.add_theme_constant_override("separation", UiTheme.constant("row"))
+	pack_side.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	mine.add_child(pack_side)
+	_player_title = _title()
+	pack_side.add_child(_player_title)
+	_player_row = _row(true)
+	pack_side.add_child(_player_row)
+	add_theme_stylebox_override("panel", solid_panel())
 	_promised = Label.new()
 	_promised.theme_type_variation = &"Caption"
 	_promised.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -526,8 +531,11 @@ func _box(mine: bool, i: int, hand: bool) -> SlotBox:
 	box.mine = mine
 	box.index = i
 	box.custom_minimum_size = SLOT_SIZE
+	# On the sheet no letters (the sheet pass): a worn square's place on the
+	# figure says what goes there, its name on hover while empty. A
+	# companion's hands and armour, beside her pack with no figure, keep R, L, A.
 	box.theme_type_variation = &"HandSlot" if hand else &"Inset"
-	if hand and i in [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]:  # 788's worn slots unlettered: their place says it.
+	if hand and not mine and i in [Items.RIGHT_HAND, Items.LEFT_HAND, Items.ARMOUR]:
 		var mark := Label.new()
 		mark.text = "R" if i == Items.RIGHT_HAND else "L" if i == Items.LEFT_HAND else "A"  # The armour worn (622).
 		mark.theme_type_variation = &"Small"
@@ -582,8 +590,6 @@ func _process(_delta: float) -> void:
 	var began := Time.get_ticks_usec()
 	if _signature() != _signature_shown:
 		_refresh()
-	if sheet != null and sheet.visible:
-		sheet.place_beside(self)
 	UiCost.add("pack", Time.get_ticks_usec() - began)
 
 
@@ -845,11 +851,9 @@ func _refresh() -> void:
 		sound.call(SoundKit.opening(landed), landed)
 	var lines := load_lines(player) if is_instance_valid(player) else PackedStringArray()
 	_load_lines = lines
-	# The sheet (787): beside the pack whenever it shows, the load drawn.
-	if sheet != null:
-		sheet.visible = visible
-		if visible:
-			sheet.show_for(player, lines)
+	# The sheet (787), the pack's left side: the load drawn, the empty squares named.
+	if sheet != null and visible:
+		sheet.show_for(player, lines)
 	_promised.text = "Promised: %s" % ", ".join(promised) if not promised.is_empty() else ""
 	_promised.visible = not promised.is_empty()
 	var held := charges_of(player if is_instance_valid(player) else null)

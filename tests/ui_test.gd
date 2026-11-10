@@ -236,7 +236,8 @@ func _test_stacks_ui() -> void:
 	print("== stacks on the interface (619, ui's side): the corner count, one unit by shift, the pile's words ==")
 	_check(PackPanel.count_words(5) == "5" and PackPanel.count_words(1) == "" and PackPanel.count_words(0) == "",
 		"the corner badge: the number above one, nothing for one or none")
-	# The armour slot (622, ui's side): the seventh box beside the hands, brass-edged and marked A, a drag's target.
+	# The armour slot (622, ui's side): the seventh box beside the hands, brass-edged, a drag's target; marked A
+	# in a companion's row, unlettered on the player's sheet (the sheet pass: its place on the figure says it).
 	var pack_for_armour: PackPanel = _main.pack_panel
 	if pack_for_armour != null:
 		for mine: bool in [true, false]:
@@ -246,8 +247,8 @@ func _test_stacks_ui() -> void:
 			for child in armour_box.get_children():
 				if child is Label and child != armour_box.label and child != armour_box.count:
 					marks.append((child as Label).text)
-			_check(pack_for_armour.row_boxes(row).size() > Items.ARMOUR and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ["A"],
-				"%s row: the seventh box is the armour worn, edged like the hands, marked A" % ["the player's" if mine else "the other"])
+			_check(pack_for_armour.row_boxes(row).size() > Items.ARMOUR and armour_box.index == Items.ARMOUR and armour_box.theme_type_variation == &"HandSlot" and marks == ([] if mine else ["A"]),
+				"%s row: the seventh box is the armour worn, edged like the hands, %s (%s)" % ["the player's" if mine else "the other", "unlettered" if mine else "marked A", marks])
 		var right_box: PackPanel.SlotBox = pack_for_armour.box_in(true, Items.RIGHT_HAND)
 		var armour_data := {"slots_of": _main._local_player(), "slot": 0, "count": 0}
 		_check(_main._local_player() == null or pack_for_armour.box_in(true, Items.ARMOUR)._can_drop_data(Vector2.ZERO, armour_data)
@@ -2367,16 +2368,16 @@ func _test_character_sheet(pack: PackPanel) -> void:
 		return
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(sheet.is_inside_tree() and sheet.visible == pack.visible, "the sheet shows with the pack (%s, %s)" % [sheet.visible, pack.visible])
-	_check(sheet.get_index() == pack.get_index() + 1 and sheet.get_parent() == pack.get_parent(),
-		"the sheet drawn right after the pack, so a window opened over the pack (the world map) covers it too")
+	_check(sheet.is_inside_tree() and sheet.is_visible_in_tree() == pack.visible and pack.is_ancestor_of(sheet),
+		"one window: the sheet is the pack's own left side, shown with it (%s, %s)" % [sheet.is_visible_in_tree(), pack.visible])
 	_check(sheet.boxes.keys() == CharacterSheet.SLOT_PLACES.keys() and pack.box_in(true, Items.LEFT_HAND) == sheet.boxes[Items.LEFT_HAND]
 			and pack.box_in(true, Items.CHARM) == sheet.boxes[Items.CHARM]
 			and sheet.boxes[Items.RIGHT_HAND].position.x < sheet.boxes[Items.ARMOUR].position.x and sheet.boxes[Items.ARMOUR].position.x < sheet.boxes[Items.LEFT_HAND].position.x,
-		"R on the figure's right (your left), A on the chest, L on its left, and 788's worn slots; the pack finds them as its own")
-	# Each worn square where it is worn (Jeff's tidy, for v0.1.205): down the
-	# middle the hat, the amulet, the chest, the charm, the boots; a ring
-	# under each hand; the cloak at a shoulder; none overlapping, all on the figure.
+		"the right hand on the figure's right (your left), the body in the middle, the left hand on its left, and 788's worn slots; the pack finds them as its own")
+	# Each worn square at its place on the body (the sheet pass, point 2): down
+	# the middle the hat, the amulet, the body, the charm, the boots; a ring
+	# under each hand; the cloak at the left shoulder; none overlapping, all on
+	# the figure, each the pack's size (point 1).
 	var at := func(slot: int) -> Rect2: return Rect2(sheet.boxes[slot].position, sheet.boxes[slot].size)
 	var middle: Array[int] = [Items.HEAD, Items.NECK, Items.ARMOUR, Items.CHARM, Items.FEET]
 	var down := true
@@ -2389,26 +2390,43 @@ func _test_character_sheet(pack: PackPanel) -> void:
 			if (rects[i] as Rect2).intersects(rects[j]):
 				overlaps += 1
 	var figure_rect := Rect2(Vector2.ZERO, sheet.figure.custom_minimum_size)
-	_check(down and at.call(Items.RING_1).position.y > at.call(Items.RIGHT_HAND).end.y and at.call(Items.RING_2).position.y > at.call(Items.LEFT_HAND).end.y
-			and at.call(Items.RING_1).position.x == at.call(Items.RIGHT_HAND).position.x and at.call(Items.BACK).position.y == at.call(Items.NECK).position.y
-			and overlaps == 0 and rects.all(func(r: Rect2) -> bool: return figure_rect.encloses(r)),
-		"head to feet down the middle, a ring under each hand, the cloak at the shoulder; no square over another, all on the figure (%d overlapping)" % overlaps)
-	_check(sheet.boxes[Items.HEAD].get_children().filter(func(c: Node) -> bool: return c is Label and c.text.length() == 1).is_empty()
-			and sheet.boxes[Items.ARMOUR].get_children().any(func(c: Node) -> bool: return c is Label and c.text == "A"),
-		"the worn slots carry no letter; R, L and A keep theirs")
+	var on_figure := true
+	for r: Rect2 in rects:
+		on_figure = on_figure and figure_rect.encloses(r) and r.size.is_equal_approx(PackPanel.SLOT_SIZE)
+	var placed := [at.call(Items.RING_1).position.y > at.call(Items.RIGHT_HAND).end.y, at.call(Items.RING_2).position.y > at.call(Items.LEFT_HAND).end.y,
+		is_equal_approx(at.call(Items.RING_1).position.x, at.call(Items.RIGHT_HAND).position.x), at.call(Items.BACK).position.x > at.call(Items.NECK).end.x,
+		at.call(Items.BACK).end.y < at.call(Items.LEFT_HAND).position.y]
+	_check(down and placed.all(func(b: bool) -> bool: return b) and overlaps == 0 and on_figure,
+		"head to feet down the middle, a ring under each hand, the cloak at the shoulder; the pack's size, none over another, all on the figure (%s %s %d %s)" % [down, placed, overlaps, on_figure])
+	var gap := float(UiTheme.constant("slot_gap"))
+	_check(sheet.figure.custom_minimum_size.y >= 4 * PackPanel.SLOT_SIZE.y + 3 * gap,
+		"the figure at least four rows tall, so a fourth (a satchel) never grows the window (%s)" % sheet.figure.custom_minimum_size)
+	_check(sheet.boxes.values().all(func(b: PackPanel.SlotBox) -> bool: return b.get_children().filter(func(c: Node) -> bool: return c is Label and c.text.length() == 1).is_empty()),
+		"no letters on the worn squares (point 2)")
+	var right_was := player.slots[Items.RIGHT_HAND]
+	var head_was := player.slots[Items.HEAD]
+	player.slots[Items.RIGHT_HAND] = "sword"
+	player.slots[Items.HEAD] = ""
+	pack._refresh()
+	_check(sheet.boxes[Items.HEAD].tooltip_text == "Head" and sheet.boxes[Items.BACK].tooltip_text == "Shoulders" and sheet.boxes[Items.ARMOUR].tooltip_text in ["Body", ""]
+			and sheet.boxes[Items.RIGHT_HAND].tooltip_text == "",
+		"an empty square's name on hover (voice's: Head, Shoulders, Body); a filled one shows its thing's tip instead (%s)" % sheet.boxes[Items.RIGHT_HAND].tooltip_text)
+	player.slots[Items.RIGHT_HAND] = right_was
+	player.slots[Items.HEAD] = head_was
+	pack._refresh()
 	if pack.visible:
 		var a := pack.get_global_rect()
 		var b := sheet.get_global_rect()
-		_check(b.end.x <= a.position.x and absf(b.end.y - a.end.y) < 1.0, "the sheet left of the pack, their feet level (%s, %s)" % [a, b])
-		var gold: Control = _main.shop_panel._gold_box if _main.shop_panel != null else null
 		var title := pack.pack_title_rect()
+		_check(a.encloses(b) and b.end.x <= title.position.x and absf(sheet.title.get_global_rect().position.y - title.position.y) < 1.0,
+			"the sheet left of the pack in its window, the two titles on one row (%s, %s)" % [b, title])
+		var gold: Control = _main.shop_panel._gold_box if _main.shop_panel != null else null
 		_check(gold == null or not gold.visible or (a.encloses(gold.get_global_rect()) and absf(gold.get_global_rect().get_center().y - title.get_center().y) < 1.0
 				and absf(gold.get_global_rect().end.x - title.end.x) < 1.0),
 			"the gold at the right end of the pack's title row, inside the pack (%s, %s)" % [gold.get_global_rect(), title])
 		var screen := get_viewport().get_visible_rect()
-		_check(screen.encloses(b) and screen.encloses(a), "the sheet and the pack on the screen (%s, %s in %s)" % [b, a, screen])
-		_check(pack.flank_rect().position.x <= b.position.x and pack.beside(Vector2(100, 100), 20).x + 100 <= b.position.x,
-			"a store window goes clear of the sheet")
+		_check(screen.encloses(a), "the window on the screen (%s in %s)" % [a, screen])
+		_check(pack.beside(Vector2(100, 100), 20).x + 100 <= a.position.x, "a store window goes clear of it")
 	# The two modes: read-only takes no drag from or onto a square.
 	var data := {"slots_of": player, "slot": Items.PACK_SLOTS[0], "count": 0}
 	var right: PackPanel.SlotBox = sheet.boxes[Items.RIGHT_HAND]
@@ -2424,9 +2442,11 @@ func _test_character_sheet(pack: PackPanel) -> void:
 	pack._refresh()
 	var shown := sheet.load_shown()
 	var mass := World.load_capacity(player)
-	_check(is_equal_approx(float(shown[0]), 21.6 / mass) and is_equal_approx(float(shown[1]), 5.6 / (mass * World.ARMS_SHARE))
-			and str(shown[2]).begins_with("carrying 21.6 of ") and str(shown[3]).begins_with("arms 5.6 kg"),
-		"the bars: the whole against the mass, the arms against their share; today's lines on hover (%s)" % [shown])
+	_check(is_equal_approx(float(shown[0]), 21.6 / mass) and str(shown[1]).begins_with("carrying 21.6 of ") and "
+arms 5.6 kg" in str(shown[1])
+			and "
+body 16 kg" in str(shown[1]),
+		"one bar (point 4): the whole against the mass; the whole's, the arms' and the body's lines on hover (%s)" % [shown])
 	_check(CharacterSheet.band_color(0.1) == UiTheme.color("brass") and CharacterSheet.band_color(World.load_heavy) == UiTheme.color("rust")
 			and CharacterSheet.band_color(0.9) == UiTheme.color("alarm"), "brass, then rust heavy, red overloaded")
 	player.load_arms = arms_was

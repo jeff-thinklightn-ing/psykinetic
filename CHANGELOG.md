@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Your character sheet and your pack are one window now: your figure on the left, with what you wear set on its body in larger squares and one load bar beneath, and your pack on the right; hover an empty square on the figure and it names its place, where before the sheet and the pack were two windows side by side and your worn squares carried R, L and A letters (787 amended (2)).
 - The draugr's window always shows his own demand now, even when you're short of gold, where before it put a line about refusing him in his mouth (735 amended).
 - Towns: when a town is short of ore, its folk tell you of the old iron workings at Hollowfell, up in the hills, and Hollowfell goes on your map (837).
 - Robbers and skeletons fall when you kill them again, where before they froze standing where they died (338 amended (7)).

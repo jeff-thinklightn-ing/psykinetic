@@ -42451,6 +42451,27 @@ title row, both panels on screen. A CHANGELOG bullet (voice's words). Client onl
 unchanged, no new class_name. The felt hat's, the soft boots' and the hood's icons wait on
 art-kit's slots (placeholders until then).
 
+787 amended (2): the character sheet and the pack are one window (the coordinator's approval of
+C:/dev/review/sheet3, after-dressed-1080.png; release's label; Jeff's split of the interface:
+this is a structural change, built and tested before it, so ui-design restyles it later).
+CharacterSheet is a VBoxContainer inside the pack's own window, not a panel placed beside it:
+PackPanel's "Mine" row holds the sheet and, beside it, the pack's title and grid
+(PackPanel.place_beside, the sibling hooks and the visibility sync are gone). The figure is
+shaded (vertex-colour polygons), with a cloak, a belt and hands with fingers, and the slots sit
+on its body (Figure.PLACES, WIDE 4.45 x TALL 6.62 slot units); the theme's slot is 160 (was
+132). Hovering an empty worn square names its place in voice's words (SLOT_WORDS: Head, Neck,
+Shoulders, Body, Right hand, Left hand, Ring, Charm, Feet), a tooltip on empty squares only;
+the R, L and A letters stay only on a companion's row (not on your own). One LoadBar under the
+figure, its hover joining every load line (CharacterSheet.load_shown() returns [share, words]).
+ui_test _test_character_sheet: one window, the titles on one row, the figure at least four
+pack rows tall, no letters on your own squares, the hover names, one bar; the armour check
+reads [] for your row and ["A"] for the other. What a restyle must not break: slot 160, the
+figure column's size, the pack's 4x3 grid, the fit of the sheet and pack together, SLOT_WORDS,
+load_shown. Not checked: the 720p fit (the 1280x720 stills came out at 1920x1080; the layout
+scales with the stretch, the coordinator accepted that). Open for the window rules: the window
+covers about a third of the screen with the pack's lower half empty, so whether it shrinks to
+its rows. A CHANGELOG bullet (voice's words). Client only, protocol unchanged, no new class_name.
+
 ## 774. Umbrage laid out again round its chapel (plan B), and Relaid
 
 Jeff picked plan B of the two Umbrage layouts (2026-11-03); the coordinator approved the stills
