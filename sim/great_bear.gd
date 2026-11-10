@@ -354,7 +354,7 @@ func note_struck(by: GridEntity) -> void:
 	if is_instance_valid(by) and by != self:
 		_struck_at[by.get_instance_id()] = World.tick
 		_join(by)
-	Apex.struck(self)  # Its wait to go out starts again (780 amended (13)).
+	Apex.struck(self, by)  # Its wait to go out starts again (780 amended (13)); by, one of its fighters (780 amended (20)).
 	if asleep:
 		_wake()
 	if not _roared_half and hp * 2 < max_hp:

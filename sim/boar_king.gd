@@ -403,7 +403,7 @@ func _bellow(why: String) -> void:
 
 func note_struck(by: GridEntity) -> void:
 	super(by)
-	Apex.struck(self)  # His wait to go out starts again (780 amended (13)).
+	Apex.struck(self, by)  # His wait to go out starts again (780 amended (13)); by, one of its fighters (780 amended (20)).
 	if not _bellowed_half and hp * 2 < max_hp:
 		_bellowed_half = true
 		_bellow("half")

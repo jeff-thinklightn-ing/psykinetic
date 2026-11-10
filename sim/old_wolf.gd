@@ -317,7 +317,7 @@ func _same_pack(other: Monster) -> bool:
 
 func note_struck(by: GridEntity) -> void:
 	super(by)
-	Apex.struck(self)  # His wait to go out starts again (780 amended (13)).
+	Apex.struck(self, by)  # His wait to go out starts again (780 amended (13)); by, one of its fighters (780 amended (20)).
 	if str(_move.get("move", "")) == "howl":
 		_move = {}
 		_log_move("howl", "broken (struck)")

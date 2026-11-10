@@ -8854,6 +8854,8 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 		var ticks := int(downed.call(target, source, cause))
 		if ticks > 0:
 			lay_downed(target, ticks, source, cause)
+			if target is Player:
+				Apex.forget_fighter(target)  # Out of an apex's fight till they strike again (780 amended (20)).
 			entity_downed.emit(target, source, ticks)
 			return
 	if target.hp == 0:
@@ -8865,6 +8867,7 @@ func damage(target: GridEntity, amount: int, source: GridEntity = null,
 			_foe_beaten(target as Monster, false)  # 804, combat's side.
 		elif target is Player:
 			_forget_fight(target as Player)
+			Apex.forget_fighter(target)  # 780 amended (20).
 		entity_died.emit(target, cause)
 		var spilt: Array[int] = []
 		if target is Cargo:

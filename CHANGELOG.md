@@ -24,6 +24,7 @@ notes (decision 324).
 - In town, a pig's neck bends whole now when it puts its head down to feed or falls, where before it split open (319 amended (4)).
 - On Windows the game runs smoothly on some laptops where it crawled at a few frames a second, as it now draws with Vulkan, or with Direct3D 12 where there's no Vulkan (833).
 - The red line marked for a charge stays on the ground now until the run is over, for the great bear's charge, the old grey's lunge and the draugr's run for his thrown axe, where before it vanished as the run began and its far end struck you unmarked (810 amended (2)).
+- The great bear in its cave and the old grey in his den stay hurt now while you're still in there, so you can draw back and catch your breath, and heal only once you've all been gone a while, where before they healed back to full after half a minute without a blow (780 amended (20)).
 
 ## v0.1.209
 

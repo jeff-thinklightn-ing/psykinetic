@@ -34,7 +34,8 @@ extends RefCounted
 const CHECK_STEPS := 50
 ## Steps a walk to the door may take before it simply goes (a crowd in the way).
 const LEAVE_MOST_STEPS := 600
-## Steps after its last blow in the lair before it is whole again.
+## Steps after its last blow in the lair, and after the last who struck it
+## in this fight was in its lair (780 amended (20)), before it is whole again.
 const LAIR_HEAL_STEPS := 300
 ## Steps between new roaming grounds while out.
 const ROAM_STEPS := 1200
@@ -52,6 +53,11 @@ static var _places: Dictionary = {}
 static var _roamed: Dictionary = {}
 ## Kind -> its escort's living bodies (not saved).
 static var _escorts: Dictionary = {}
+## Kind -> who struck it in this fight, by fighter_key (780 amended (20);
+## not saved): one downed or killed since is out of it till they strike again.
+static var _fighters: Dictionary = {}
+## Kind -> the step one of its fighters was last seen in its lair zone.
+static var _fight_seen: Dictionary = {}
 
 
 ## The rows with a "lair" block: kind -> that block. A lair held back
@@ -95,6 +101,8 @@ static func clear() -> void:
 	_places.clear()
 	_roamed.clear()
 	_escorts.clear()
+	_fighters.clear()
+	_fight_seen.clear()
 
 
 ## [param kind]'s record, made the first time (in its lair, its wait to go
@@ -144,10 +152,13 @@ static func _check(kind: String, row: Dictionary) -> void:
 		"lair":
 			if body == null:
 				body = _lay(kind, row, str(row["zone"]), places["den"])
-			if body != null and body.target == null and World.steps - int(rec["attacked"]) >= LAIR_HEAL_STEPS:
-				body.hp = body.max_hp  # Whole again between fights.
+			_note_fighters(kind, str(row["zone"]))
+			if body != null and body.target == null and World.steps - int(rec["attacked"]) >= LAIR_HEAL_STEPS \
+					and World.steps - int(_fight_seen.get(kind, -LAIR_HEAL_STEPS)) >= LAIR_HEAL_STEPS:
+				body.hp = body.max_hp  # Whole again between fights: none who fought it in its lair for a while (780 amended (20)).
+				_fighters.erase(kind)
 			if body != null and body.target == null and int(rec.get("escort_down", 0)) > 0 \
-					and World.steps >= int(rec.get("escort_whole_at", 0)) and _fight_over(rec):
+					and World.steps >= int(rec.get("escort_whole_at", 0)) and _fight_over(rec, kind):
 				rec["escort_down"] = 0  # Its pack whole again in its lair.
 				_lay_escort(kind, body)
 			if _may_venture(rec, row, body):
@@ -168,8 +179,46 @@ static func _check(kind: String, row: Dictionary) -> void:
 ## Its fight over: LAIR_HEAL_STEPS since the later of its last blow taken
 ## and its escort's last fallen (playtest's boar king run: a boar killed in
 ## the lair came back the step its lead's target lapsed between foes).
-static func _fight_over(rec: Dictionary) -> bool:
-	return World.steps - maxi(int(rec.get("attacked", -LAIR_HEAL_STEPS)), int(rec.get("escort_fell", -LAIR_HEAL_STEPS))) >= LAIR_HEAL_STEPS
+static func _fight_over(rec: Dictionary, kind := "") -> bool:
+	var last := maxi(int(rec.get("attacked", -LAIR_HEAL_STEPS)), int(rec.get("escort_fell", -LAIR_HEAL_STEPS)))
+	last = maxi(last, int(_fight_seen.get(kind, -LAIR_HEAL_STEPS)))  # And its fighters gone (780 amended (20)).
+	return World.steps - last >= LAIR_HEAL_STEPS
+
+
+## Who [param player] is among an apex's fighters: its player_id, else
+## (a test's) its instance.
+static func fighter_key(player: GridEntity) -> String:
+	var id := str(player.get("player_id")) if "player_id" in player else ""
+	return id if id != "" and id != "<null>" else "i%d" % player.get_instance_id()
+
+
+## Whether one who struck [param kind] in this fight stands in its lair
+## zone [param zone_name] now; if so, the step is noted (_fight_seen).
+static func _note_fighters(kind: String, zone_name: String) -> void:
+	var fought: Dictionary = _fighters.get(kind, {})
+	if fought.is_empty():
+		return
+	var zone: Zone = World.zones.get(zone_name)
+	if zone == null:
+		return
+	var was := World.zone
+	World.enter(zone)
+	for each in World.sought():
+		if each is Player and each.spawned and each.hp > 0 and fought.has(fighter_key(each)):
+			_fight_seen[kind] = World.steps
+			break
+	World.enter(was)
+
+
+## [param player] downed or killed (World.damage, 780 amended (20)): out of
+## every apex's fight till they strike it again, so coming back fresh never
+## holds its healing off.
+static func forget_fighter(player: GridEntity) -> void:
+	if not is_instance_valid(player):
+		return
+	var key := fighter_key(player)
+	for kind: String in _fighters:
+		(_fighters[kind] as Dictionary).erase(key)
 
 
 ## Unattacked venture_after_s since the later of its last blow and its death,
@@ -488,11 +537,16 @@ static func roaming_grounds(level: Dictionary, from: Vector2i, reach: int, margi
 
 
 ## A blow on an apex's body (GreatBear.note_struck): its wait to go out
-## starts again, and a walk out is given up.
-static func struck(body: GridEntity) -> void:
+## starts again, and a walk out is given up. A player who struck it
+## [param by] is one of its fighters till it is whole again (780 amended (20)).
+static func struck(body: GridEntity, by: GridEntity = null) -> void:
 	for kind: String in _bodies:
 		if _bodies[kind] == body:
 			record(kind)["attacked"] = World.steps
+			if by is Player and is_instance_valid(by):
+				if not _fighters.has(kind):
+					_fighters[kind] = {}
+				(_fighters[kind] as Dictionary)[fighter_key(by)] = true
 			return
 
 
@@ -503,6 +557,8 @@ static func died(body: GridEntity) -> void:
 			continue
 		_bodies.erase(kind)
 		_leaving.erase(kind)
+		_fighters.erase(kind)  # Its fight over with it (780 amended (20)).
+		_fight_seen.erase(kind)
 		var rec := record(kind)
 		var row: Dictionary = rows().get(kind, {})
 		rec["died"] = World.steps

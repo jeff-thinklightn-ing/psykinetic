@@ -94,6 +94,7 @@ func _ready() -> void:
 	_test_band_robbers()
 	_test_old_wolf()
 	_test_old_wolf_lair()
+	_test_apex_heal_fighters()
 	_test_watch_wave()
 	_test_wanderers()
 	_test_hill_cat()
@@ -7239,6 +7240,117 @@ func _free_beside(at: Vector2i) -> Vector2i:
 		if World.is_walkable(at + way) and World.is_free(at + way):
 			return at + way
 	return World.NO_CELL
+
+
+## No lair heal while one who struck it in this fight is in its lair (780
+## amended (20); the coordinator's ruling on playtest's boar king den-side
+## runs: broken off the far way, out of the fight, he was whole again 30 s
+## on with the player still by his den). Whole once they have all been out
+## of it LAIR_HEAL_STEPS; one fresh, or downed and back, counts once they strike.
+func _test_apex_heal_fighters() -> void:
+	print("%s== an apex is not whole again while one who struck it stands in its lair: the great bear, the old grey (780 amended (20)) ==" % char(10))
+	var idling_was := Monster.idling
+	Monster.idling = true
+	DayNight.set_hour(12.0)
+	for kind: String in ["great_bear", "old_wolf"]:
+		Apex.clear()
+		var land_rows: Array[String] = ["#".repeat(40)]
+		for y in 8:
+			land_rows.append("#" + ".".repeat(38) + "#")
+		land_rows.append("#".repeat(40))
+		_build(land_rows, {}, {}, "ah_land")
+		World.spawn_spec = func(spec: Dictionary) -> GridEntity:
+			var entity := EntityFactory.build(spec)
+			_room.add_child(entity)
+			if not World.spawn(entity, spec["tile"]):
+				entity.free()
+				return null
+			return entity
+		var land := World.zone
+		World.zones[land.name] = land
+		var lair := World.add_zone("ah_lair")
+		World.enter(lair)
+		var lair_rows: Array[String] = ["#".repeat(20)]
+		for y in 8:
+			lair_rows.append("#" + ".".repeat(18) + "#")
+		lair_rows.append("#".repeat(20))
+		World.load_terrain(Terrain.parse(Terrain.expand(lair_rows)))
+		World.enter(land)
+		var kinds := Monster.kinds()
+		var row_was: Dictionary = kinds[kind]["lair"]
+		var row: Dictionary = row_was.duplicate(true)
+		row["zone"] = "ah_lair"
+		row["land"] = ["ah_land"]
+		kinds[kind]["lair"] = row
+		World.apexes.clear()
+		Apex._places[kind] = {"den": Vector2i(14, 4), "lair_door": Vector2i(2, 4), "land_door": Vector2i(3, 4),
+				"roam": [Vector2i(30, 4)] as Array[Vector2i]}
+		var fighter := EntityFactory.build(SPECS["P"].merged({"name": "Fighter"})) as Player
+		_room.add_child(fighter)
+		var fresh := EntityFactory.build(SPECS["P"].merged({"name": "Fresh"})) as Player
+		_room.add_child(fresh)
+		World.enter(lair)
+		World.spawn(fighter, Vector2i(2, 7))
+		World.enter(land)
+		Apex._check(kind, row)
+		var body := Apex.body_of(kind)
+		var rec := Apex.record(kind)
+		var who := "great bear" if kind == "great_bear" else "old grey"
+		if body == null:
+			_check(false, "the %s laid in its lair" % who)
+			kinds[kind]["lair"] = row_was
+			continue
+		# Struck, then 30 s with its fighter out of its sight but in its lair.
+		Apex.struck(body, fighter)
+		var half := roundi(body.max_hp * 0.5)
+		body.hp = half
+		body.target = null
+		rec["attacked"] = World.steps - Apex.LAIR_HEAL_STEPS
+		Apex._check(kind, row)
+		_check(body.hp == half, "the %s struck, its foe out of its sight 30 s but still in its lair: not whole (%d of %d)" % [who, body.hp, body.max_hp])
+		# The fighter gone, a fresh one come: whole once the fighter has been gone the while.
+		World.enter(lair)
+		World.despawn(fighter)
+		World.spawn(fresh, Vector2i(5, 7))
+		World.enter(land)
+		Apex._check(kind, row)
+		var soon := body.hp
+		Apex._fight_seen[kind] = World.steps - Apex.LAIR_HEAL_STEPS
+		Apex._check(kind, row)
+		_check(soon == half and body.hp == body.max_hp,
+			"its foe just gone: not yet (%d); gone the while, one who never struck it there: whole (%d of %d)" % [soon, body.hp, body.max_hp])
+		# The fresh one strikes: their fight; downed and back, out of it till they strike again.
+		Apex.struck(body, fresh)
+		body.hp = half
+		body.target = null
+		rec["attacked"] = World.steps - Apex.LAIR_HEAL_STEPS
+		Apex._check(kind, row)
+		var fought := body.hp
+		World.enter(lair)
+		fresh.protected = false
+		World.damage(fresh, fresh.hp + 10)
+		if fresh.spawned:
+			World.despawn(fresh)
+		fresh.hp = fresh.max_hp
+		World.spawn(fresh, Vector2i(5, 7))
+		World.enter(land)
+		Apex._fight_seen[kind] = World.steps - Apex.LAIR_HEAL_STEPS
+		Apex._check(kind, row)
+		_check(fought == half and body.hp == body.max_hp,
+			"one who struck it there: not whole (%d); they fell and came back, not striking: whole (%d of %d)" % [fought, body.hp, body.max_hp])
+		World.enter(lair)
+		if fresh.spawned:
+			World.despawn(fresh)
+		World.enter(land)
+		kinds[kind]["lair"] = row_was
+		Apex.clear()
+		World.apexes.clear()
+		World.zones.erase("ah_lair")
+		World.zones.erase("ah_land")
+		World.enter(land)
+	Monster.idling = idling_was
+	World.spawn_spec = Callable()
+	DayNight.reset()
 
 
 ## The old grey's lair and land (780 amended (15)): his den in grey_den, off
