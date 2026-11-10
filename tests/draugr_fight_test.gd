@@ -44,6 +44,7 @@ func _ready() -> void:
 		return
 	_play_through()
 	_test_real_throw()
+	_test_told_sites()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -227,6 +228,154 @@ func _test_real_throw() -> void:
 		World.dead_rest.clear()
 		World.reset()
 		_room.free()
+
+
+## 340 amended (3), the draugr's told moves met at their sites (combat's
+## ask; _test_told_guard covers the spin and told_guard/told_hit as units):
+## his throw (physics' hurl, the live path) and his charge to his axe, each
+## on a raised shield facing the line: half of it taken for stamina, the
+## throw's launch and the charge's push unchanged, the charger's own share
+## whole; from the side of the line, the whole of it.
+func _test_told_sites() -> void:
+	print("\n== the draugr's told moves on a raised shield: his throw, his charge (340 amended (3)) ==")
+	var bare := _told_throw("", Vector2i(-1, 0))
+	var ahead := _told_throw("block", Vector2i(-1, 0))
+	var side := _told_throw("block", Vector2i(0, 1))
+	var harm := int(bare["attack"])
+	var spent := _told_spent(harm)
+	_check(harm > 0 and bare["hit"], "his throw, bare: %d harm, the player struck and launched to %s" % [harm, bare["tile"]])
+	_check(int(ahead["attack"]) == _told_left(harm) and int(ahead["stamina"]) == spent and ahead["raised"],
+			"his throw on a shield facing its line: %d of %d left (half its absorb), %d stamina (%d), the shield still up" % [ahead["attack"], harm, ahead["stamina"], spent])
+	_check(ahead["tile"] == bare["tile"] and int(ahead["body"]) == int(bare["body"]),
+			"the throw's launch unchanged: to %s as bare (%s), its impact %d as bare (%d)" % [ahead["tile"], bare["tile"], ahead["body"], bare["body"]])
+	_check(int(side["attack"]) == harm and int(side["stamina"]) == 0,
+			"a shield raised to the side of his throw's line: the whole %d (%d), no stamina" % [harm, side["attack"]])
+	var plain := _told_charge("")
+	var met := _told_charge("block")
+	var impact := int(plain["body"])
+	_check(impact > 0 and plain["over"], "his charge, bare: through the player in its line, %d impact, him %d" % [impact, plain["self"]])
+	_check(int(met["body"]) == _told_left(impact) and int(met["stamina"]) == _told_spent(impact) and met["raised"],
+			"his charge on a shield facing its line: %d of %d left, %d stamina (%d), the shield still up" % [met["body"], impact, met["stamina"], _told_spent(impact)])
+	_check(int(met["self"]) == int(plain["self"]) and met["tile"] == plain["tile"],
+			"the charger takes his whole share (%d, bare %d), the push unchanged (to %s, bare %s)" % [met["self"], plain["self"], met["tile"], plain["tile"]])
+
+
+## What a raised round shield leaves of [param harm] from a told move (told_guard).
+func _told_left(harm: int) -> int:
+	var absorb := clampf(float(Items.verb_of("shield")["absorb"]) * World.LOWERED_ABSORB_SHARE, 0.0, 1.0)
+	return maxi(0, harm - ceili(harm * absorb - 0.001))
+
+
+## The stamina a raised round shield spends on [param harm] (told_guard; a plain player's steadiness).
+func _told_spent(harm: int) -> int:
+	return maxi(1, ceili(float(Items.verb_of("shield")["stamina"]) * harm))
+
+
+## A seated draugr at (4, 3), his axe in hand, and a player at
+## [param player_at], a round shield in hand: {draugr, player}.
+func _told_room(player_at: Vector2i) -> Dictionary:
+	Monster.idling = true
+	Level.register(LEVEL, Level.image_from_rows(ROWS), null, {"regenerate": {"anchors": [{"rect": [1, 1, 18, 5], "name": "lair"}]}})
+	World.reset()
+	_room = Node2D.new()
+	add_child(_room)
+	World.load_terrain(Terrain.parse(Terrain.expand(ROWS)))
+	World.zone.name = LEVEL
+	var draugr := EntityFactory.build(SPECS["u"].merged({"name": "Draugr1", "tile": Vector2i(4, 3),
+		"props": Level.MONSTER_TYPES["draugr"].duplicate()})) as Draugr
+	_room.add_child(draugr)
+	World.spawn(draugr, Vector2i(4, 3))
+	draugr.max_stamina = 100
+	draugr.stamina = 100
+	draugr.slots = Items.tidy(["", "", "", "", "", ""], Items.CARRIED)
+	var axe := "battle_axe" if Items.exists("battle_axe") else "giant_axe"
+	World.set_slots(draugr, Items.tidy(["", "", "", "", axe, ""], Items.CARRIED))
+	var player := EntityFactory.build(SPECS["P"].merged({"name": "Player1"})) as Player
+	player.player_id = "p1"
+	_room.add_child(player)
+	World.spawn(player, player_at)
+	player.max_hp = 100000
+	player.hp = player.max_hp
+	player.max_stamina = 1000
+	player.stamina = 1000
+	World.put_item(player, player, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	return {"draugr": draugr, "player": player}
+
+
+## Steps the world till [param done], the player's [param stance] raised
+## again toward [param facing] whenever it drops: {attack, body (the
+## player's &"impact" from him), self (his own), stamina (spent), raised,
+## tile, over}.
+func _told_watch(e: Dictionary, stance: String, facing: Vector2i, ticks: int, done: Callable) -> Dictionary:
+	var draugr: Draugr = e["draugr"]
+	var player: Player = e["player"]
+	var tally := {"attack": 0, "body": 0, "self": 0}
+	var on := func(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
+		if source != draugr:
+			return
+		if entity == player and cause == &"attack":
+			tally["attack"] += amount
+		elif entity == player and cause == &"impact":
+			tally["body"] += amount
+		elif entity == draugr:
+			tally["self"] += amount
+	World.entity_damaged.connect(on)
+	var before := player.stamina
+	var finished := _until(ticks, func() -> bool:
+		if not stance.is_empty() and player.raised != stance and not World.is_down(player) and not World.rushing(player):
+			player.facing = facing
+			World.try_stance(player, stance)
+		return bool(done.call()))
+	World.entity_damaged.disconnect(on)
+	tally["stamina"] = before - player.stamina
+	tally["raised"] = player.raised == stance
+	tally["tile"] = player.tile
+	tally["over"] = finished
+	return tally
+
+
+## His throw at a player five off down the row, a shield [param stance]
+## (or none) toward [param facing].
+func _told_throw(stance: String, facing: Vector2i) -> Dictionary:
+	var e := _told_room(Vector2i(9, 3))
+	var draugr: Draugr = e["draugr"]
+	var player: Player = e["player"]
+	player.facing = facing
+	if not stance.is_empty():
+		World.try_stance(player, stance)
+	var ok := World.try_axe_throw(draugr, player.tile)
+	var hp := player.hp
+	var out := _told_watch(e, stance, facing, 60, func() -> bool: return str(World.axe_state(draugr)["where"]) != "hand")
+	out["hit"] = ok and player.hp < hp
+	_told_end()
+	return out
+
+
+## His charge to his axe, thrown first down an empty row, through a player
+## standing between, a shield [param stance] (or none) toward him.
+func _told_charge(stance: String) -> Dictionary:
+	var e := _told_room(Vector2i(4, 1))
+	var draugr: Draugr = e["draugr"]
+	var player: Player = e["player"]
+	World.try_axe_throw(draugr, Vector2i(12, 3))
+	_until(60, func() -> bool: return str(World.axe_state(draugr)["where"]) == "ground")
+	World._relocate(player, Vector2i(7, 3))
+	player.facing = Vector2i(-1, 0)
+	if not stance.is_empty():
+		World.try_stance(player, stance)
+	draugr.stamina = 100
+	var began := World.try_axe_charge(draugr)
+	var out := _told_watch(e, stance, Vector2i(-1, 0), 120, func() -> bool:
+		return began and not World._boss_moves.has(draugr))
+	_told_end()
+	return out
+
+
+func _told_end() -> void:
+	World.dead_rest.clear()
+	World.reset()
+	_room.free()
+	Level.unregister(LEVEL)
 
 
 ## The draugr's mind's constant [param name] (enemy-ai's, read by name so
