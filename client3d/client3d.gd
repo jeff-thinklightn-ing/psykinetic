@@ -1857,6 +1857,13 @@ const TELEGRAPH_NIGHT := Vector2(0.2, 0.45)
 ## How far a telegraph's fill fades out past its struck cells, in cells
 ## (602 amended (3); ui-design's to pick): full at their edge, none here.
 const TELEGRAPH_FEATHER := 0.2
+## Closing a telegraph's cells (602 amended (4)): out half a cell with round
+## joins and back in, so a stair or a corner between struck cells reads as
+## one shape, not steps. For whole cells that is exact: an unstruck cell
+## with struck cells across both edges at a corner is filled in that corner
+## outside its inscribed circle (telegraph_fillets), so its centre is never
+## covered; TELEGRAPH_ARC_STEPS chords to the quarter circle.
+const TELEGRAPH_ARC_STEPS := 6
 const TELEGRAPH_FLASH := 0.95
 const TELEGRAPH_FLASH_MSEC := 300
 ## A telegraph drawn smooth (combat's 602 amended, Telegraph.outline; the
@@ -5313,14 +5320,96 @@ static func telegraph_curtain_segments(outline: PackedVector2Array, origin: Vect
 
 ## [param polygons] (grid units) as one mesh on the ground, each vertex at
 ## the ground's height under it plus a hair.
+## [param struck] closed (602 amended (4), the coordinator's rule: every
+## struck cell covered whole, no unstruck cell's centre covered): in each
+## unstruck cell beside them that [param floor_ok] calls floor, at each
+## corner where the cells straight across both its edges there are struck
+## and [param passable] lets through both edges (a wall or the drop never
+## bridged), the corner's quarter outside the cell's inscribed circle. A
+## cell struck all round (a hole) is skipped: it stays open. A convex
+## corner is never rounded (a block of cells keeps its square corners).
+## [{cell, polygon}], grid units, anticlockwise.
+static func telegraph_fillets(struck: Array[Vector2i], floor_ok: Callable, passable: Callable) -> Array[Dictionary]:
+	var hit := {}
+	for cell in struck:
+		hit[cell] = true
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var out: Array[Dictionary] = []
+	var seen := {}
+	for each in struck:
+		for way in sides:
+			var near := each + way
+			if hit.has(near) or seen.has(near):
+				continue
+			seen[near] = true
+			if not bool(floor_ok.call(near)):
+				continue
+			var round_it := 0
+			for side in sides:
+				if hit.has(near + side):
+					round_it += 1
+			if round_it == 4:
+				continue  # A hole: closing skips it.
+			for corner: Vector2i in [Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]:
+				var across_x := Vector2i(corner.x, 0)
+				var across_y := Vector2i(0, corner.y)
+				if hit.has(near + across_x) and hit.has(near + across_y) \
+						and bool(passable.call(near, across_x)) and bool(passable.call(near, across_y)):
+					out.append({"cell": near, "polygon": _fillet(near, corner)})
+	return out
+
+
+## [param cell]'s [param corner] (a diagonal) outside its inscribed circle:
+## the corner, the two edges' midpoints and the arc between, anticlockwise.
+static func _fillet(cell: Vector2i, corner: Vector2i) -> PackedVector2Array:
+	var centre := Vector2(cell)
+	var from := Vector2(corner.x, 0.0).angle()
+	var to := Vector2(0.0, corner.y).angle()
+	var points := PackedVector2Array([centre + Vector2(corner) * 0.5])
+	for i in TELEGRAPH_ARC_STEPS + 1:
+		points.append(centre + Vector2.from_angle(lerp_angle(from, to, float(i) / TELEGRAPH_ARC_STEPS)) * 0.5)
+	if Geometry2D.is_polygon_clockwise(points):
+		points.reverse()
+	return points
+
+
+## How far [param point] lies from the closed mark (602 amended (4)): 0 on
+## a struck cell's square or a fillet, else the nearest of them.
+static func telegraph_closed_distance(point: Vector2, struck: Array[Vector2i], fillets: Array[Dictionary] = []) -> float:
+	var nearest := INF
+	for cell in struck:
+		var off := ((point - Vector2(cell)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO)
+		nearest = minf(nearest, off.length())
+	for fillet: Dictionary in fillets:
+		var polygon: PackedVector2Array = fillet["polygon"]
+		if nearest <= 0.0:
+			break
+		if (Vector2(Vector2i(fillet["cell"])) - point).length() > 1.0 + nearest:
+			continue
+		if Geometry2D.is_point_in_polygon(point, polygon):
+			return 0.0
+		for i in polygon.size():
+			var on := Geometry2D.get_closest_point_to_segment(point, polygon[i], polygon[(i + 1) % polygon.size()])
+			nearest = minf(nearest, (on - point).length())
+	return nearest
+
+
 ## The feathered band outside [param struck] (602 amended (3)): in each
 ## cell beside them that [param floor_ok] (a cell) calls floor, the part
 ## within [param feather] of a struck cell's square that reaches it
 ## straight across an edge [param passable] (a cell and a way) lets
 ## through, or across a corner with floor on both sides, each part once
-## (no two overlapping, so the fade never doubles). [{cell, polygon}], in
-## grid units.
-static func telegraph_band_polygons(struck: Array[Vector2i], feather: float, floor_ok: Callable, passable: Callable) -> Array[Dictionary]:
+## (no two overlapping, so the fade never doubles). With [param fillets]
+## (602 amended (4)), the cell's own fillets are its sources too, and none
+## of the band lies on them. [{cell, polygon}], in grid units.
+static func telegraph_band_polygons(struck: Array[Vector2i], feather: float, floor_ok: Callable, passable: Callable,
+		fillets: Array[Dictionary] = []) -> Array[Dictionary]:
+	var own := {}
+	for fillet: Dictionary in fillets:
+		var at := Vector2i(fillet["cell"])
+		if not own.has(at):
+			own[at] = []
+		own[at].append(fillet["polygon"])
 	var hit := {}
 	for cell in struck:
 		hit[cell] = true
@@ -5362,6 +5451,29 @@ static func telegraph_band_polygons(struck: Array[Vector2i], feather: float, flo
 						parts = left
 					pieces.append_array(parts)
 					grown_before.append(grown)
+				for filled: PackedVector2Array in own.get(near, []):
+					# Its own fillet's band (602 amended (4)), then nothing on a fillet.
+					var grown: PackedVector2Array = Geometry2D.offset_polygon(filled, feather, Geometry2D.JOIN_ROUND)[0]
+					var parts: Array[PackedVector2Array] = []
+					for part: PackedVector2Array in Geometry2D.intersect_polygons(square, grown):
+						if part.size() >= 3 and not Geometry2D.is_polygon_clockwise(part):
+							parts.append(part)
+					for earlier in grown_before:
+						var left: Array[PackedVector2Array] = []
+						for part in parts:
+							for rest: PackedVector2Array in Geometry2D.clip_polygons(part, earlier):
+								if rest.size() >= 3 and not Geometry2D.is_polygon_clockwise(rest):
+									left.append(rest)
+						parts = left
+					pieces.append_array(parts)
+					grown_before.append(grown)
+				for filled: PackedVector2Array in own.get(near, []):
+					var left: Array[PackedVector2Array] = []
+					for piece in pieces:
+						for rest: PackedVector2Array in Geometry2D.clip_polygons(piece, filled):
+							if rest.size() >= 3 and not Geometry2D.is_polygon_clockwise(rest):
+								left.append(rest)
+					pieces = left
 				for piece in pieces:
 					out.append({"cell": near, "polygon": piece})
 	return out
@@ -5374,34 +5486,35 @@ static func _cell_square(cell: Vector2i) -> PackedVector2Array:
 
 
 ## A point's alpha in the band (602 amended (3)): 1 on a struck cell's
-## square, falling to 0 at [param feather] from the nearest.
-static func telegraph_band_alpha(point: Vector2, struck: Array[Vector2i], feather: float) -> float:
-	var nearest := INF
-	for cell in struck:
-		var off := ((point - Vector2(cell)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO)
-		nearest = minf(nearest, off.length())
+## square (or a fillet, 602 amended (4)), falling to 0 at [param feather]
+## from the nearest.
+static func telegraph_band_alpha(point: Vector2, struck: Array[Vector2i], feather: float, fillets: Array[Dictionary] = []) -> float:
+	var nearest := telegraph_closed_distance(point, struck, fillets)
 	return clampf(1.0 - nearest / feather, 0.0, 1.0) if feather > 0.0 else (1.0 if nearest <= 0.0 else 0.0)
 
 
 ## A telegraph's ground (602 amended (3)): [param struck]'s squares whole,
-## alpha 1 in the vertex colour, and the band outside them fading to 0
+## alpha 1 in the vertex colour, closed (602 amended (4): telegraph_fillets,
+## alpha 1 too), and the band outside them fading to 0
 ## (telegraph_band_polygons, the floor and the edges as World has them),
 ## each piece at its own cell's height.
 func _telegraph_ground_mesh(struck: Array[Vector2i]) -> ArrayMesh:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var floor_ok := func(cell: Vector2i) -> bool: return World.is_walkable(cell)
+	var passable := func(cell: Vector2i, way: Vector2i) -> bool: return not World.edge_blocks(cell, way)
+	var fillets := telegraph_fillets(struck, floor_ok, passable)
 	var pieces: Array[Dictionary] = []
 	for cell in struck:
 		pieces.append({"cell": cell, "polygon": _cell_square(cell)})
-	pieces.append_array(telegraph_band_polygons(struck, TELEGRAPH_FEATHER,
-			func(cell: Vector2i) -> bool: return World.is_walkable(cell),
-			func(cell: Vector2i, way: Vector2i) -> bool: return not World.edge_blocks(cell, way)))
+	pieces.append_array(fillets)
+	pieces.append_array(telegraph_band_polygons(struck, TELEGRAPH_FEATHER, floor_ok, passable, fillets))
 	for piece: Dictionary in pieces:
 		var polygon: PackedVector2Array = piece["polygon"]
 		var cell: Vector2i = piece["cell"]
 		for index in Geometry2D.triangulate_polygon(polygon):
 			var point := polygon[index]
-			surface.set_color(Color(1.0, 1.0, 1.0, telegraph_band_alpha(point, struck, TELEGRAPH_FEATHER)))
+			surface.set_color(Color(1.0, 1.0, 1.0, telegraph_band_alpha(point, struck, TELEGRAPH_FEATHER, fillets)))
 			surface.set_normal(Vector3.UP)
 			surface.add_vertex(Vector3(point.x, _height_in(cell, point) + ON_FLOOR * 1.5, point.y))
 	return surface.commit()

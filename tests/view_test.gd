@@ -143,6 +143,7 @@ func _ready() -> void:
 		await _test_near_miss_picks()
 		await _test_seen_through()
 		_test_telegraph_smooth()
+		_test_telegraph_closing()
 		_test_telegraph_fill_honest()
 		_test_telegraph_disc_rim()
 		await _test_target_marked()
@@ -9618,6 +9619,142 @@ func _test_seen_through() -> void:
 	World.despawn(far_imp)
 	World.despawn(near_imp)
 	await _frames(2)
+## The closing (602 amended (4), the coordinator's rule): a telegraph's
+## cells closed half a cell out and back in, so a stair reads as one shape;
+## every struck cell whole, no unstruck cell's centre covered at any
+## strength; a block keeps its square corners; a one-cell hole stays open;
+## a wall or non-floor never bridged; two marks overlapping each closed on
+## its own.
+func _test_telegraph_closing() -> void:
+	print("\n== a telegraph's cells closed: a stair one shape, no unstruck centre covered (602 amended (4)) ==")
+	var floor_all := func(_cell: Vector2i) -> bool: return true
+	var open := func(_cell: Vector2i, _way: Vector2i) -> bool: return true
+	var feather := Client3D.TELEGRAPH_FEATHER
+	# Every unstruck cell beside [param struck]: its centre never on a piece, its alpha 0.
+	var centres_clear := func(struck: Array[Vector2i], floor_ok: Callable, passable: Callable) -> Array[String]:
+		var fillets := Client3D.telegraph_fillets(struck, floor_ok, passable)
+		var pieces: Array[Dictionary] = fillets.duplicate()
+		pieces.append_array(Client3D.telegraph_band_polygons(struck, feather, floor_ok, passable, fillets))
+		var wrong: Array[String] = []
+		var seen := {}
+		for each in struck:
+			for dy in [-1, 0, 1]:
+				for dx in [-1, 0, 1]:
+					var near := each + Vector2i(dx, dy)
+					if struck.has(near) or seen.has(near):
+						continue
+					seen[near] = true
+					var at := Vector2(near)
+					if Client3D.telegraph_band_alpha(at, struck, feather, fillets) > 0.0:
+						wrong.append("%s lit" % near)
+					for piece: Dictionary in pieces:
+						if Geometry2D.is_point_in_polygon(at, piece["polygon"]):
+							wrong.append("%s under a piece" % near)
+		return wrong
+
+	var stair: Array[Vector2i] = [Vector2i(0, 0), Vector2i(1, 0), Vector2i(1, 1), Vector2i(2, 1), Vector2i(2, 2)]
+	var fillets := Client3D.telegraph_fillets(stair, floor_all, open)
+	var notches := {}
+	for fillet: Dictionary in fillets:
+		notches[Vector2i(fillet["cell"])] = true
+	_check(notches.has(Vector2i(0, 1)) and notches.has(Vector2i(1, 2)) and notches.has(Vector2i(2, 0)) and fillets.size() == 3,
+			"a stair: each notch between its steps filled in its corner (%s)" % [notches.keys()])
+	var in_notch := Vector2(0.45, 0.55)  # In (0, 1), beside the inner corner the steps meet at.
+	_check(is_equal_approx(Client3D.telegraph_band_alpha(in_notch, stair, feather, fillets), 1.0)
+			and Client3D.telegraph_band_alpha(in_notch, stair, feather) < 1.0,
+			"the notch's corner at full strength, where unclosed it faded (%.2f before)" % Client3D.telegraph_band_alpha(in_notch, stair, feather))
+	var whole := true
+	for cell in stair:
+		for offset: Vector2 in [Vector2.ZERO, Vector2(0.49, 0.49), Vector2(-0.49, 0.49), Vector2(0.49, -0.49), Vector2(-0.49, -0.49)]:
+			whole = whole and is_equal_approx(Client3D.telegraph_band_alpha(Vector2(cell) + offset, stair, feather, fillets), 1.0)
+	_check(whole, "every struck cell whole at full strength")
+	var clear: Array[String] = centres_clear.call(stair, floor_all, open)
+	_check(clear.is_empty(), "no unstruck cell's centre covered or lit (%s)" % [clear])
+	var nearest := INF
+	for fillet: Dictionary in fillets:
+		for point: Vector2 in fillet["polygon"]:
+			nearest = minf(nearest, (point - Vector2(Vector2i(fillet["cell"]))).length())
+	_check(nearest > 0.45, "a fillet's nearest point to its cell's centre %.3f of a cell (the arc's chords)" % nearest)
+
+	var block: Array[Vector2i] = []
+	for y in 2:
+		for x in 3:
+			block.append(Vector2i(x, y))
+	var corner := Vector2(2.49, 1.49)
+	var past := Client3D.telegraph_band_alpha(Vector2(2.6, 1.6), block, feather)
+	_check(Client3D.telegraph_fillets(block, floor_all, open).is_empty() and is_equal_approx(Client3D.telegraph_band_alpha(corner, block, feather), 1.0)
+			and past < 0.5,
+			"a block of cells (a swipe's): no fill, its corners square, only the band past them (%.2f off the corner)" % past)
+
+	var ring: Array[Vector2i] = []
+	for y in [-1, 0, 1]:
+		for x in [-1, 0, 1]:
+			if x != 0 or y != 0:
+				ring.append(Vector2i(x, y))
+	var ring_fillets := Client3D.telegraph_fillets(ring, floor_all, open)
+	var in_hole := 0
+	for fillet: Dictionary in ring_fillets:
+		if Vector2i(fillet["cell"]) == Vector2i.ZERO:
+			in_hole += 1
+	clear = centres_clear.call(ring, floor_all, open)
+	_check(in_hole == 0 and clear.is_empty() and is_equal_approx(Client3D.telegraph_band_alpha(Vector2.ZERO, ring, feather, ring_fillets), 0.0),
+			"a ring round one cell: the hole kept open, its centre bare (%d fillets in it; %s)" % [in_hole, clear])
+
+	var walled := func(cell: Vector2i, way: Vector2i) -> bool: return not (cell == Vector2i(0, 1) and way == Vector2i(1, 0))
+	var by_wall := Client3D.telegraph_fillets(stair, floor_all, walled)
+	var pit := func(cell: Vector2i) -> bool: return cell != Vector2i(0, 1)
+	var by_pit := Client3D.telegraph_fillets(stair, pit, open)
+	var bridged := 0
+	for fillet: Dictionary in by_wall + by_pit:
+		if Vector2i(fillet["cell"]) == Vector2i(0, 1):
+			bridged += 1
+	var pit_band := 0
+	for piece: Dictionary in Client3D.telegraph_band_polygons(stair, feather, pit, open, by_pit):
+		if Vector2i(piece["cell"]) == Vector2i(0, 1):
+			pit_band += 1
+	clear = centres_clear.call(stair, floor_all, walled)
+	_check(bridged == 0 and pit_band == 0 and by_wall.size() == 2 and by_pit.size() == 2 and clear.is_empty(),
+			"a wall on the notch's edge, or the notch not floor: no fill there, no band on non-floor, the other notches as before (%d, %d)" % [bridged, pit_band])
+
+	# Two marks overlapping, each its own mesh: each covers its own cells whole, and none of
+	# its triangles covers an unstruck cell's centre of its own (the other's cells aside).
+	var shape := {"kind": "cone", "origin": [9, 4], "facing": [1, 0], "length": 2, "half_angle": 60}
+	if Client3D.telegraph_outline(shape).is_empty():
+		print("  (no Telegraph.outline here: the overlap checks skipped)")
+		return
+	var marks := {"close_a": [Vector2i(8, 3), Vector2i(9, 3), Vector2i(9, 4)], "close_b": [Vector2i(9, 4), Vector2i(10, 4), Vector2i(10, 5)]}
+	for id: String in marks:
+		_rig.telegraph_show(id, marks[id], World.tick, World.tick + 10, shape)
+	var faults: Array[String] = []
+	for id: String in marks:
+		var own: Array[Vector2i] = []
+		own.assign(marks[id])
+		var entry: Dictionary = _rig._telegraphs[id]
+		var arrays := ((entry["quads"][0] as MeshInstance3D).mesh as ArrayMesh).surface_get_arrays(0)
+		var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+		var covers := func(at: Vector2) -> float:
+			var most := 0.0
+			for i in range(0, points.size(), 3):
+				var triangle := PackedVector2Array([Vector2(points[i].x, points[i].z), Vector2(points[i + 1].x, points[i + 1].z), Vector2(points[i + 2].x, points[i + 2].z)])
+				if Geometry2D.is_point_in_polygon(at, triangle):
+					most = maxf(most, maxf(colours[i].a, maxf(colours[i + 1].a, colours[i + 2].a)))
+			return most
+		for cell in own:
+			if covers.call(Vector2(cell) + Vector2(0.01, 0.02)) < 0.999:  # Off the squares' diagonals.
+				faults.append("%s: its cell %s not whole" % [id, cell])
+		for cell in own:
+			for dy in [-1, 0, 1]:
+				for dx in [-1, 0, 1]:
+					var near := cell + Vector2i(dx, dy)
+					if not own.has(near) and covers.call(Vector2(near)) > 0.0:
+						faults.append("%s: covers %s" % [id, near])
+	_check(_rig._telegraphs.has("close_a") and _rig._telegraphs.has("close_b") and faults.is_empty(),
+			"two marks overlapping: each closed on its own, its cells whole, no centre of its own unstruck cells covered (%s)" % [faults])
+	for id: String in marks:
+		_rig.telegraph_drop(id)
+
+
 ## The low-angle fight, combat's (a): a telegraph with a shape is drawn as
 ## combat's outline cut to the sent cells, with a curtain along its edge
 ## drawn through bodies; one without a shape as the cells, as before.
@@ -9645,15 +9782,17 @@ func _test_telegraph_smooth() -> void:
 	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
 	var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
 	var feather := Client3D.TELEGRAPH_FEATHER
+	# 602 amended (4): the closed mark, its fillets as the mesh has them.
+	var fillets := Client3D.telegraph_fillets(struck,
+			func(cell: Vector2i) -> bool: return World.is_walkable(cell),
+			func(cell: Vector2i, way: Vector2i) -> bool: return not World.edge_blocks(cell, way))
 	var inner_dim := 0
 	var too_far := 0
 	var band := 0
 	var rim_lit := 0
 	for i in points.size():
 		var at := Vector2(points[i].x, points[i].z)
-		var nearest := INF
-		for cell in struck:
-			nearest = minf(nearest, ((at - Vector2(cell)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO).length())
+		var nearest := Client3D.telegraph_closed_distance(at, struck, fillets)
 		if nearest <= 0.001 and colours[i].a < 0.999:
 			inner_dim += 1
 		if nearest > feather + 0.01:

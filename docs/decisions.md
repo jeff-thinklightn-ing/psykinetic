@@ -23795,6 +23795,29 @@ band none at its edge and nothing past it, none on a wall's cell or through a wa
 fill, no curtain, in danger_ground, the three settings' faint and full, dusk halfway, night's full
 under a hall's. Client only, protocol unchanged, no new class_name.
 
+602 amended (4) (release's label; ui-design's closing from its stills, the coordinator's rule):
+the ground mark closed. Drawn as whole cells, a diagonal or a cone's edge read as steps. ui-design
+asked for a closing, out half a cell with round joins and back in, so a stair of cells reads as one
+shape; the coordinator's rule for it is that every struck cell stays covered whole and no unstruck
+cell's centre is ever covered, at any strength, since a body is struck by its centre's cell. For
+whole cells that closing is exact and needs no general offset: an unstruck floor cell with struck
+cells straight across both edges at one of its corners, both edges passable, is filled in that
+corner outside its inscribed circle (Client3D.telegraph_fillets, a quarter circle in
+TELEGRAPH_ARC_STEPS 6 chords), so the notch between two steps fills to a curve and the cell's
+centre, half a cell from the arc, stays bare. A convex corner is never rounded (closing only fills
+in), so a block of cells, a swipe's, keeps its square corners; a cell struck on all four sides is
+a hole and is skipped, so it still reads open; a wall on either edge (World.edge_blocks) or a cell
+that is not floor (World.is_walkable) gets no fill, as the band gets none. The fillets are drawn at
+full alpha with the cells, and the feathered band runs from them too (telegraph_band_polygons'
+fillets, its pieces clipped off them; telegraph_band_alpha by telegraph_closed_distance), so the
+fade is the same 0.2 of a cell all round. Each telegraph closes on its own cells: two marks that
+overlap are two meshes, neither filling the other's notch. view_test _test_telegraph_closing: a
+stair's three notches filled, its inner corner at full strength (0.75 before), every struck cell
+whole, no unstruck centre covered or lit; a block unfilled; a ring's hole open, its centre bare; a
+wall or a pit on a notch's edge leaves it unfilled; two overlapping marks each whole, neither
+covering a centre of its own unstruck cells; _test_telegraph_smooth measures its band from the
+closed mark. Client only, protocol unchanged, no new class_name.
+
 ## 603. The draugr's moves: the spin, the axe throw, the charge to his axe, disarmed
 
 Jeff (2026-10-22): "the draugr will have a large battle axe that he drops as
