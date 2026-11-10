@@ -25,6 +25,27 @@ places (the crypt under the temple, the new barrows). Every new system is weighe
 does it give her something to want or react to, or reward the player visibly? Tests check fun too
 (playtest's voiced tours: reward moments, her own lines against fixed ones, repeats).
 
+**Packages in flight (2026-11-10; each ships whole or not at all, CLAUDE.md "Content ships as packages").**
+
+- **Iron from Hollowfell** (economy leads and switches it on). On main and on: Rolf's pick at 5 gold
+  (479 amended), the resident's tip (837), Hollowfell's seams and mine art. Off or owed: 835 the
+  yield (economy, off); companions' side of 835 (Wren's dig want and the "dug" deed); `item.ore`
+  for the town window (art-kit, with `item.wood` and `item.stone`); the hills waystone reading the
+  mine's name where it says "Cave" (maps, voice's word, lore's fact; lands with the switch-on); the
+  town smithy 811 amended (2) and npc's smith; playtest's whole-loop run (ore dug against the town's
+  need); then the switch-on (workings on, the "lacks ore" line, the dig template, voice's bullet).
+  Polish, not gating: `mine.spoil`, `prop.smithy_sign` (the smithy's package).
+- **Satchel** (819 amended; items leads and switches it on in one take). A worn bag that adds a
+  fourth row to the pack. Off or owed: the sim side (rev 56, after companions' 621 amended (3));
+  pc-character's worn look (hip socket, skinned strap); art-kit's `worn.satchel` and
+  `item.satchel`; how one is got (Rolf's stall, economy's line and price; a rare row in the grey's
+  den and the dwarven hall's caches, items); the pack window with its slot and row (ui-design then
+  ui, after Jeff's layout pick in `C:\dev\review\decisions\ui-look-confirm.md`); voice's lines. At
+  its switch-on a rollback of the box drops a worn satchel and its row.
+- **The boar king** (enemy-ai; shelved, on main and off). Before his switch-on: companions' 780
+  amended (21), combat's 843 and the guard rules (340 amended (2) and (3)), then one pair tour and
+  one solo tour with the shield-holder in his rate check.
+
 ## Earlier goal (2026-10-14)
 
 The foundations work (co-op server, zones, physics combat, talking companions, level
