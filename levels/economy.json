@@ -21,7 +21,7 @@
 		"carpenter": "%s the carpenter comes to raise the town's sheds and workshops"},
 	"gatherers_days": 7,
 	"town_regard": {"_": "768: a town's regard of each player, in half points (half the herder's weight is 1)", "short": 2, "use": 1, "build": 2, "build_gold": 5, "home": 1, "left": -1, "thanks": 2, "day_most": 4, "thriving_off": 0.75,
-		"trusted_price": {"_": "831 (the coordinator: bonuses, not penalties): where a town trusts a player (the residents' ladder word), they pay buy x the price at its store and shop (at least 1 gold off from 2 up) and get sell x its pay for what they sell it, banked hand-ins and trophies (at least 1 more from 2 up), never as much as they would pay for one there. Not camps, makers' purses, the stall or the fence. Off until ui's mark is in.", "on": false, "buy": 0.9, "sell": 1.1}},
+		"trusted_price": {"_": "831 (the coordinator: bonuses, not penalties): where a town trusts a player (the residents' ladder word), they pay buy x the price at its store and shop (at least 1 gold off from 2 up) and get sell x its pay for what they sell it, banked hand-ins and trophies (at least 1 more from 2 up), never as much as they would pay for one there. Not camps, makers' purses, the stall or the fence. On since ui's mark is in (831 switched on).", "on": true, "buy": 0.9, "sell": 1.1}},
 	"sites": {"trades": {"woodcutter": "woodlot", "hunter": "hunting_ground", "farmer": "farm", "fisherman": "fishing"}, "steps_per_cell": 4, "work_steps": 120, "other_area": 3000},
 	"woodcutter": {"trade": "woodcutter", "every": 3000, "wood": 2, "per_level": 1, "wood_per_tree": 2, "deadwood": 1, "growth_days": 2,
 		"names": ["Bran", "Alder", "Rowan", "Hazel", "Ash", "Birk"]},
