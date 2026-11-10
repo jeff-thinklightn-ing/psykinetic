@@ -7408,6 +7408,14 @@ func told_guard(body: GridEntity, by: GridEntity, harm: int, way := Vector2.ZERO
 ## comes out of what is left; the rest lands as &"attack". With no impulse
 ## nothing is launched and what is left lands whole. What it took in all.
 ## Server only.
+## Which moves come here (the coordinator's ruling on 340 amended (3)): only
+## a told move that skips a raised guard today (the draugr's spin, throw,
+## hurl and charge; the bear's swipe, slam and charge; the grey's lunge; the
+## king's charge; the cat's pounce; Skeech's ambush). A told move that already meets the guard
+## as a plain blow (the robber's lunge, World._meet_guard in
+## Monster._tend_ambush) keeps that path whole, full absorb and its maker
+## thrown back: a raised shield never does less than it did. monster_test
+## _test_lunge fails if the robber's lunge is routed here.
 func told_hit(by: GridEntity, body: GridEntity, harm: int, push_dir: Vector2, impulse: float, way := Vector2.ZERO) -> int:
 	if not _alive(body):
 		return 0

@@ -7333,7 +7333,12 @@ charger his whole, _push and its chain untouched (688 amended (11) holds; physic
 whose shield takes all of it has no impact (no impact stagger, no wear) and the rush's struck
 counts what it took. Enemy-ai converts the great beasts' sites to told_hit in its own change
 behind this one (the bear's charge, swipe and slam, the grey's lunge, the king's gore, the cat's
-pounce, the robber's lunge). combat_test _test_told_guard (6 along the line from ahead: 3 left
+pounce, and Skeech's ambush, which skips the guard today), landing back to back with this in one cut (the coordinator: one rule, never true of one
+foe alone). Only a told move that skips a raised guard today comes to told_guard (the
+coordinator's ruling on enemy-ai's first look): one that already meets it as a plain blow (the
+robber's lunge, World._meet_guard in Monster._tend_ambush) keeps that path whole, full absorb and
+its maker thrown back, so a raised shield never does less than it did; monster_test _test_lunge
+fails if it is routed through told_guard. combat_test _test_told_guard (6 along the line from ahead: 3 left
 for 24 stamina, the shield up, no stun either side; from the side of its line nothing; no line,
 met by his body; 10 stamina for 24 given out, whole; a lowered shield and a sword meet none;
 told_hit 8 with no launch 4, with a launch into the wall its impact counted in; the draugr's spin

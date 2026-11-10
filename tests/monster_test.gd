@@ -2159,7 +2159,9 @@ func _test_lunge() -> void:
 	player.facing = Vector2i(1, 0)
 	robber._strike()
 	_check(not robber.ambushing() and _telegraph_cells("lunge").is_empty(), "from behind: its plain poke, untold")
-	# A raised shield facing it still takes it.
+	# A raised shield facing it still takes it, whole, the robber thrown back:
+	# a told move that meets the guard as a plain blow keeps that path, never
+	# told_guard's half (the coordinator's ruling on 340 amended (3)).
 	pair = _lunge_room()
 	robber = pair[0]
 	player = pair[1]
@@ -2171,7 +2173,7 @@ func _test_lunge() -> void:
 	for i in 6:
 		World.tick += 1
 		robber._tend_ambush()
-	_check(player.hp == hp, "the shield took it (%d of %d)" % [player.hp, hp])
+	_check(player.hp == hp, "the shield took it whole, not told_guard's half (%d of %d)" % [player.hp, hp])
 	_check(World.is_stunned(robber) and robber.stun_cause == &"guarded" and robber.stunned_until_tick - World.tick <= World.SHIELD_RECOIL_STUN
 			and player.raised == "block",
 			"340 amended: the robber thrown back off it, &\"guarded\" (%s, %d ticks left)" % [robber.stun_cause, robber.stunned_until_tick - World.tick])
