@@ -46486,6 +46486,12 @@ dirt's grain is as strong as the band): there the fields read as tilled dirt, wh
 under it stay the layout's "dirt" (maps). view_test (the entries read, a bad one warned; the ridges inside the
 rect and low; its earth the dirt texture; weeds on it, none outside). Client and one Level reader; protocol unchanged; no new class_name. Off:
 no shipped level has "furrows" until maps' farm.
+827, art-kit's side: the farm's dry well and leaning scarecrow (the coordinator's ask and maps'; the fallen
+scarecrow is lost under terrain's furrows, so a landmark stands). prop.well_dry (cell) is a low dry-laid
+fieldstone ring in the cottage ruin's stone, fallen in on its east, the shaft filled with earth and stones, moss
+on its north; no roof, windlass, bucket or water, and nothing a resident treats as a well. prop.scarecrow_leaning
+(cell) is the fallen one's scarecrow still on its pole, leaning to about 1.7 m, one arm hanging. Both decor,
+laid by maps as DECOR_KINDS rows. Art only; off.
 
 ## 828. Windowed runs on the laptop
 
