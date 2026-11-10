@@ -172,6 +172,10 @@ func _test_escape() -> void:
 	var settings_was: String = Net._settings_override
 	var hints_was: bool = Net.hints
 	var pack_was: bool = _main.pack_panel.shown
+	# 787 amended (3), the window rules' rule 7: the pack is closed at join (I, or a chest, opens it).
+	var fresh_pack := PackPanel.new()
+	_check(not fresh_pack.shown and not pack_was, "the pack is closed at join (%s, %s)" % [fresh_pack.shown, pack_was])
+	fresh_pack.free()
 	Net._settings_override = preload("res://tests/test_ports.gd").scratch_path("ui_test.cfg")
 	Net.hints = true
 	_main.hint_panel.visible = true
@@ -2520,6 +2524,7 @@ func _test_character_sheet(pack: PackPanel) -> void:
 	if sheet == null or player == null:
 		_check(sheet != null, "the pack makes its sheet")
 		return
+	pack.shown = true  # 787 amended (3): closed at join; these checks read it open (the later tests look at the pack).
 	await get_tree().process_frame
 	await get_tree().process_frame
 	_check(sheet.is_inside_tree() and sheet.is_visible_in_tree() == pack.visible and pack.is_ancestor_of(sheet),

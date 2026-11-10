@@ -72,8 +72,8 @@ var player: GridEntity:
 			_refresh()
 ## The open chest or companion, or null.
 var other: GridEntity
-## Shown without anything else open (I).
-var shown := true:
+## Shown without anything else open (I). Closed at join (787 amended (3), the window rules' rule 7).
+var shown := false:
 	set(value):
 		shown = value
 		if is_node_ready():

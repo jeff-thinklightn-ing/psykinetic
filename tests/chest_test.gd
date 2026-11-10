@@ -68,14 +68,16 @@ func _test_there_and_back() -> void:
 	var panel: PackPanel = _main.pack_panel
 	await get_tree().process_frame
 	await get_tree().process_frame
-	_check(panel.visible and panel.other == null, "the slots panel shows the player's slots, no chest")
-	_main.toggle_pack()
-	await get_tree().process_frame
-	_check(not panel.visible, "I hides it")
+	_check(not panel.visible and panel.other == null, "the pack is closed at join (787 amended (3)), no chest")
 	_main.sounds.clear()
 	_main.toggle_pack()
 	await get_tree().process_frame
-	_check(panel.visible and _main.sounds == ["sfx.pack_open %s" % host.name], "and shows it again, with a rustle (%s)" % [_main.sounds])
+	_check(panel.visible and panel.other == null and _main.sounds == ["sfx.pack_open %s" % host.name], "I opens the player's slots, with a rustle (%s)" % [_main.sounds])
+	_main.toggle_pack()
+	await get_tree().process_frame
+	_check(not panel.visible, "and I hides it again")
+	_main.toggle_pack()
+	await get_tree().process_frame
 	_check(World.can_melee(host.tile, chest.tile), "the host, at %s, is beside it" % host.tile)
 	_main.sounds.clear()
 	_main._open_pack(host, chest)

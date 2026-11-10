@@ -43813,6 +43813,14 @@ and the Options' Controls row "Your gear and pack" (Keys.WORDS "pack"). Left as 
 carried things only: the chest tooltip, "no room in your pack", E's "your companion's pack", G's "hand,
 else pack". ui_test and chest_test's title checks. A CHANGELOG bullet (voice's words, no "where before":
 it answers Jeff's own words). Client only, protocol unchanged, no new class_name.
+787 amended (3): the pack is closed at join (release's label; the coordinator's ruling on the
+window rules' rule 7, C:/dev/review/ui/window_rules.md). PackPanel.shown starts false: a fresh
+join has no pack and sheet over the middle of the screen, and the window's own key (I), or a
+chest or a companion's pack opening beside it (PackPanel.other), shows it; Esc closes it last
+(845). A new player learns the key from what is already there, with no new caption on screen:
+the controls list's line and the keys' name for it now say "your pack and what you wear"
+(voice's words), so the list says the sheet is in it. ui_test _test_escape: the pack is closed
+at join. Client only, protocol unchanged, no new class_name.
 
 ## 774. Umbrage laid out again round its chapel (plan B), and Relaid
 
