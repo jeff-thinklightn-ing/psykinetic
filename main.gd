@@ -20804,7 +20804,7 @@ func hint_lines() -> Array[String]:
 		"RMB in pack\tuse it (eat, open a purse, bandage)",
 		"%s\ttalk (/w whisper)" % Keys.name_of("talk"), "%s\ttalk log" % Keys.name_of("talk_log"), "%s\tmap" % Keys.name_of("map"), "%s\tworld map" % Keys.name_of("world_map"), "%s\tlantern" % Keys.name_of("lantern"),
 		"%s\treset the room" % Keys.name_of("reset"), "%s\toptions" % Keys.name_of("options"), "%s\tdebug" % Keys.name_of("debug"), "%s\tfullscreen" % Keys.name_of("fullscreen"),
-		"%s\tscreenshot, saved under %s" % [Keys.name_of("screenshot"), ProjectSettings.globalize_path(str(screenshot_folder()[0]))],
+		"%s\tscreenshot, saved in the %s folder" % [Keys.name_of("screenshot"), ProjectSettings.globalize_path(str(screenshot_folder()[0])).trim_suffix("/").get_file()],
 		"%s\tsay yes to an offer that stands (or type it)" % Keys.name_of("yes"), "%s\thide these" % Keys.name_of("hints")])
 	if Net.mode == Net.Mode.HOST:
 		lines.append("%s\tbuilder mode" % Keys.name_of("builder"))

@@ -14,6 +14,8 @@ signal leave_pressed
 signal quit_pressed
 
 const WIDTH := 640.0
+## The warning under the title (418 amended (2), voice's words).
+const NOTE_WORDS := "The world doesn't stop."
 
 var close: Button
 var options: Button
@@ -45,7 +47,7 @@ func _ready() -> void:
 	_title.theme_type_variation = &"Title"
 	column.add_child(_title)
 	var note := Label.new()
-	note.text = "The world goes on while this is open."
+	note.text = NOTE_WORDS
 	note.theme_type_variation = &"Caption"
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(note)

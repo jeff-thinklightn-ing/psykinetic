@@ -158,6 +158,7 @@ func _test_game_menu() -> void:
 	menu.close.pressed.emit()
 	_check(closed[0], "Close asks Main to close it")
 	_check(menu.close.text == "Close" and menu.leave.text == "Leave" and menu.quit.text == "Quit", "nothing says pause or resume")
+	_check(GameMenu.NOTE_WORDS == "The world doesn't stop.", "the warning under the title: the world doesn't stop")
 	menu.queue_free()
 
 
@@ -1961,6 +1962,12 @@ func _test_keys() -> void:
 	var scheme := Net.controls
 	Net.controls = "wasd"
 	_check(Keys.walk_names() == "WASD" and _main.hint_lines().has("WASD\twalk"), "the walk's keys by default: WASD, named so in the controls list")
+	var folder_line := ""
+	for line: String in _main.hint_lines():
+		if line.contains("screenshot, saved in the"):
+			folder_line = line
+	_check(not folder_line.is_empty() and not folder_line.contains("\\") and not folder_line.contains(":/") and not folder_line.contains("C:"),
+		"the controls list names the screenshots folder, not its full path (%s)" % folder_line)
 	Input.parse_input_event(_key_event(KEY_Z, true, KEY_W))  # W's place on an AZERTY keyboard sends Z.
 	Input.flush_buffered_events()
 	_check(Keys.walk_held() == "w", "a walk key at its default is read by its physical place too (AZERTY's Z walks forward)")

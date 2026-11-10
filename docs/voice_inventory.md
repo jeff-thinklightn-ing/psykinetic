@@ -905,7 +905,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | Slow Heart (Hold) | `render/down_screen.gd` _ready() |
 |  | Bleed Out (Respawn) | `render/down_screen.gd` _ready() |
 |  | all come back in %d s | `render/down_screen.gd` count_words() |
-|  | The world goes on while this is open. | `render/game_menu.gd` _ready() |
+|  | The world doesn't stop. | `render/game_menu.gd` NOTE_WORDS |
 |  | Back to the main menu | `render/game_menu.gd` _ready() |
 |  | [color=#%s]%s[/color] %s | `render/hint_panel.gd` set_lines() |
 |  | blocks blows from ahead | `render/item_tip.gd` VERB_WORDS |

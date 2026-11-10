@@ -22766,6 +22766,13 @@ nothing changes. --test-show=menu_options for the shot
 the options over it). ui_test: the options on top with the menu aside,
 Esc bringing it back, the panel's place. Client only; no new class_name.
 
+418 amended (2): the Esc game menu's line under its title, "The world goes
+on while this is open.", becomes "The world doesn't stop." (voice's words,
+the coordinator's ruling). It is a warning, from Jeff's 10-17 note that
+the game has no pause (you can die behind the menu in a fight), and stays
+one, in fewer words. render/game_menu.gd and docs/voice_inventory.md; no
+bullet, the same warning. Client only; no new class_name.
+
 ## 597, ui's side: "winded" on the HUD's state line
 
 Combat's step 2 (597): swings cost stamina and a body at 0 is winded
