@@ -36622,6 +36622,22 @@ does. controls_test _test_free_pull_round_a_wall (the test room's west door,
 the same turn mirrored): at (3.6, 12.25) the door's cell (4, 13) is kept
 (without the guard dropped), and a route from (3, 11) opens the door and
 reaches (3, 13). Client only, protocol unchanged, no new class_name.
+
+724 amended (3) (release's label; the coordinator's approval; physics): net_test's phase 3 flake,
+"head-on, one stepped to its right" and "both reached their ends of the passage" failing on a
+loaded machine (ui's 11-10 take, pc-character 10-29, economy and maps 11-07). Cause, from the kept
+logs: Gus's client joined after the server's --test-wait-players wait had given up at 60 s
+("[test] gave up waiting for 2 players" in server3.log), so the sim ran without him; at the tick-120
+contest his first leg was unwalked and there was no head-on meeting. The wait is now
+Net.TEST_WAIT_PLAYERS_MS, 180 s (the server runs 300 s, its clients 240 s; --test-hold's order wait
+stays 20 s, TEST_HOLD_MS). The same late join failed economy's 11-10 take at phase 1 ("client 2 saw
+its own move replicated", after "gave up waiting for 2 players"; release's), so every phase whose
+server waits for its players (1, 3, 4, 4b) checks that all of them were in before the sim began (its
+"[test] player n of n in at" line, no "gave up waiting for n players"): a late join fails as itself,
+not as the check after it. Net prints each test player's join up to the count (the server's ms since
+start) whenever --test-wait-players is set, and net_test prints each phase's for perf. Test only: no
+bullet, protocol unchanged, no new class_name. With it on main, release's one-rerun rule for a late
+join ends.
 ## 727. The ringing at every map: the town's bells retired, the draft's line notched
 
 Jeff: "theres this annoying ringing that starts with the map, it happens a lot

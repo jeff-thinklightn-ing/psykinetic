@@ -1869,6 +1869,9 @@ func _on_peer_disconnected(peer: int) -> void:
 func _admit(peer: int, id: String, player_name_given: String) -> void:
 	_authenticated[peer] = id
 	_admitted_ever += 1
+	if test_wait_players > 0 and _admitted_ever <= test_wait_players:
+		# 724 amended (3): when each of a test's players got in, for perf (net_test prints it).
+		print("[test] player %d of %d in at %d ms" % [_admitted_ever, test_wait_players, Time.get_ticks_msec()])
 	print("[net] peer %d authenticated as %s (%s) (%d of %d)" % [
 		peer, player_name_given, id.left(8), _authenticated.size(), max_players])
 	peer_authenticated.emit(peer, id, player_name_given)
@@ -1878,14 +1881,21 @@ func _admit(peer: int, id: String, player_name_given: String) -> void:
 ## starts the clock when the test's players are all in, and --test-hold keeps
 ## [param tick] until every contestant's order is in, so a test counts in
 ## ticks from the same start and a contest's orders land on one tick, however
-## slowly each process starts on a loaded machine. Each gives up after a while.
+## slowly each process starts on a loaded machine. Each gives up after a while:
+## TEST_WAIT_PLAYERS_MS for the players (724 amended (3): at 60 s a client
+## started late on a loaded machine joined after the sim had begun, and phase
+## 3's contest went off without him), TEST_HOLD_MS for the orders.
+const TEST_WAIT_PLAYERS_MS := 180000
+const TEST_HOLD_MS := 20000
+
+
 func test_holds(tick: int) -> bool:
 	if test_wait_players > 0 and _admitted_ever < test_wait_players:
-		if _held("for %d players" % test_wait_players, 60000):
+		if _held("for %d players" % test_wait_players, TEST_WAIT_PLAYERS_MS):
 			return true
 		test_wait_players = 0
 	elif test_hold_tick > 0 and tick == test_hold_tick and _hold_senders.size() < test_hold_orders:
-		if _held("at tick %d for %d orders" % [test_hold_tick, test_hold_orders], 20000):
+		if _held("at tick %d for %d orders" % [test_hold_tick, test_hold_orders], TEST_HOLD_MS):
 			return true
 		test_hold_tick = 0
 	elif _hold_since >= 0:

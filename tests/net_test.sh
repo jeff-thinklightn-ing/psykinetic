@@ -364,6 +364,18 @@ check "$(count '\[net\] Dana \(d0d0d0d0\) joined as Player4 at \([0-9]+, [0-9]+\
 check "$(count '\[net\] replaced a stale peer' "$LOGS/server2.log")" 1 "phase 2: a second connection with an online id replaces the first (721)"
 check "$(count '\[net\] Impostor \(c0ffee00\) joined as Player3 at \(11, 3\) \(back\)' "$LOGS/server2.log")" 1 "phase 2: and comes in as her, where she stood"
 check "$(count '\[net\] you joined from elsewhere' "$LOGS/clientC.log")$(count 'reconnecting' "$LOGS/clientC.log")$(count 'Casey \(c0ffee00\) joined' "$LOGS/server2.log")" 101 "phase 2: the first is told so and stays off"
+# 724 amended (3): every phase whose sim waits for its players had them all in
+# before it began. On a loaded machine a client joined after the server's 60 s
+# players wait gave up, so the sim ran without it: phase 3's contest went off
+# before Gus had walked, phase 1's "client 2 saw its own move" failed (economy,
+# 11-10). The wait is Net.TEST_WAIT_PLAYERS_MS, now 180 s; a late join fails here
+# as itself. When each got in (its server's ms since start) is printed for perf.
+for waited in "server 2 phase 1" "server3 2 phase 3" "server4 2 phase 4" "server8 1 phase 4b"; do
+	read -r log_name players word phase <<< "$waited"
+	grep -E '\[test\] player [0-9]+ of [0-9]+ in at' "$LOGS/$log_name.log" 2>/dev/null | sed "s/^/  $word $phase join: /" || true
+	check "$(count "\\[test\\] player $players of $players in at" "$LOGS/$log_name.log")$(count "\\[test\\] gave up waiting for $players players" "$LOGS/$log_name.log")" 10 \
+		"$word $phase: all its players were in before the sim began"
+done
 check "$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientF.log")$(count '\[test\] Player[0-9]+ arrived' "$LOGS/clientG.log")" 11 "phase 3: both reached their ends of the passage"
 check "$(count '\[test\] display: .*server_tile=\(12, 12\)' "$LOGS/clientF.log")" 1 "phase 3: Fay crossed to (12, 12)"
 check "$(count '\[net\] peer [0-9]+ is v0\.0\.2, the server v[0-9.]+: the same protocol' "$LOGS/server3.log")" 1 "phase 3: Fay is another build with the same protocol, and the server let her play"
