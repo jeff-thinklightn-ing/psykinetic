@@ -46075,6 +46075,26 @@ winded, teetering, a crash stun, a swing, a heavy wind-up, a lead, each tell and
 lunge its gather); the old grey's pant. _test_creature_tells' boar, a slot with no swipe, now
 coils on a swipe's tell where it showed none. CHANGELOG (voice's words). Client only, protocol
 unchanged, no new class_name.
+
+780 amended (22), his back-off held whatever the pace reads, animation's side (2026-11-10; release's
+label, the old grey's leap to follow under it; the coordinator's ruling after view_test's back step
+drew "Run" in dungeon's 806am11 take with 50e47437c in, then switched report-only in c5a3fa5c5). The
+view chose the boar king's back_off only below RUN_ABOVE (2.2 cells a second) and above WALKING, by
+the pace it read off his drawn moves, so a step's opening frame could draw Idle (the pace not yet
+read) or Run: World.try_move stamps a step's slide on the whole tick (start := float(tick)) and the
+test stepped him with the tick's fraction anywhere in 0..1, so a loaded first frame found him up to
+a fifth of a cell along and read it as a run. No player's client takes that path (a host's step is
+taken on the tick, a mirror's slide starts ahead on its display clock), but a frame after a hitch
+could read past RUN_ABOVE the same way. Now CreatureView draws a backing body's back_off (its slot
+has one, it slides against its shown facing, no charge or flight on) while the sim slides it
+(GridEntity.stepping) or its pace reads past WALKING, whatever the pace, its scale from the walk's;
+_backing reads the slide's own way (_to_tile - _from_tile) while it slides, so from the step's first
+frame; the pace chooses walk or run only going forward. view_test _test_boar_king_clips' real back
+step is hard again, back_off alone while the slide runs (any other clip fails): from rest, from a
+pace read at twice RUN_ABOVE with the step taken at 0.95 of a tick, and mid-tick from rest
+(_back_step's pace and alpha); main's view drew ["Run", "Back_Off"] on the second, dungeon's clips. Client only, protocol unchanged, no
+new class_name; the king's package (off: he is shelved).
+
 780 amended (16), his wallow (2026-11-09, the coordinator's approval after playtest's third boar king run on cba208549, hold and follow: no downs, bites and escort right, but at 7/60 he hovered off a foe 30 s, a charge took 8 where his row says 6, and some waits for a tell ran long). He never flees (Monster's flee_below and dread_flee_below his at 0): under "wallow_below" (0.15) of his hp in his lair he takes no new fight and walks to his den, where Apex's lair heal makes him whole left alone; on the way he bites back at the one who struck him if beside him, never chasing nor charging (the coordinator: not a free kill walking off, not drawn back in); at his wallow, cornered, he fights. Out, Apex's beaten back at fall_back_hp takes him home first. His charge's hit is "damage" in all: the knock-aside first, its impact taken out of the blow (World.launch dealt 2 on top). After a hit no boar of his sounder strikes for "quiet" ticks (20), then the one joins: the charge is the hit, not a pile-on's start. The back-off "back" 20 to 14 ticks (paw and back-off 20 at most). The long waits were his not-under-a-third rule at a low bot, as meant. monster_test _test_boar_king (the quiet) and _test_boar_king_close (the hit's 6, the wallow, the bite back). Still shelved. Server only, protocol unchanged, no new class_name.
 
 780 amended (16), his hold fixes (2026-11-09, the coordinator's approval after playtest's branch run of his wallow, ee4312abc: follow read right; hold did not: twice clear he pawed again, no told charge in some 200 ticks; his boars did 30 of 45 hp while he pawed; his den stood by the bot, so going home cornered him). The paw loop, forced in monster_test on that parent: a body's free centre past its cell's middle (0.6 off along x or y) makes World.struck_cell another cell than its tile; his line drawn to the tile missed it, the check failed, and 5 ticks on he walked in and pawed again (8 of 8 such offsets at the run's two clear spots). Now he draws it to the struck cell (one cell longer if that takes it in); clear but blocked, a step more for a line; his back-off's time out with none, no second paw till his charge comes round ("every"), logged with the reason (off the line, blocked at a cell by the ground, no sight; no names). His move windows are his: while he paws, backs off, tells, runs, skids or is stunned, and "quiet" after a hit, no boar of his sounder engages (BoarKing.in_move_window); they ring, and one standing on his told line (told_line) steps off it. His wallow is away and alone: Apex's lair heal needs no den, so with the foe within 3 of his den when he breaks off he goes the far way, each step away from them within his roam (never back through their reach), and stands WALLOW_CLEAR (6) off; no step away and them beside him, cornered, he fights. The great bear's charge and the old grey's spring had the same line: 810 amended. monster_test _test_boar_king_aim (every offset at both spots charges) and _test_boar_king_close (off-centre, a rock behind, his windows, a told charge each 100 ticks held still with his boars under 40% of the harm, the den-side stand). Still shelved. Server only, protocol unchanged, no new class_name.

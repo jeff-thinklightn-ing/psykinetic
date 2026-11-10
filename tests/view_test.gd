@@ -12321,12 +12321,20 @@ func _test_boar_king_clips() -> void:
 	# through the slide his shown facing stays on them and he is drawn backing, never walking. The
 	# edges (the coordinator's): a step at a slant to his facing turns him to it as before; his
 	# back-off ended mid-slide (his facing put on his step) turns him to it then, eased, no snap.
+	# Back_off alone while the slide runs, from its first frame (the view draws it by the slide's own
+	# way, whatever the pace reads): from rest, then from a pace read past RUN_ABOVE and taken late in
+	# a tick (dungeon's take drew Run on the opening frame: the slide stamped on the whole tick, a
+	# loaded first frame read the jump along it as a run), then mid-tick from rest.
+	var only_back := func(clips: Dictionary) -> bool:
+		return clips.keys() == [drawn.clips.get("back_off", "-")]
 	var back := await _back_step(king, drawn, true, false)
-	# Its clips report-only (the coordinator, after dungeon's take): which it drew is printed, not
-	# failed, till the view draws back_off whatever the pace reads; the face is still checked.
-	_check(back["stepped"] and king.faces_back_steps and back["kept"] > 0.9,
-			"a real back step: his face kept on his foe through the slide (the least %.2f), drawn %s (clips report-only)"
-			% [back["kept"], back["clips"].keys()])
+	var hurried := await _back_step(king, drawn, true, false, CreatureView.RUN_ABOVE * 2.0, 0.95)
+	var late := await _back_step(king, drawn, true, false, 0.0, 0.6)
+	_check(back["stepped"] and hurried["stepped"] and late["stepped"] and king.faces_back_steps and back["kept"] > 0.9
+			and hurried["kept"] > 0.9 and late["kept"] > 0.9 and only_back.call(back["clips"]) and only_back.call(hurried["clips"])
+			and only_back.call(late["clips"]),
+			"a real back step: his face kept on his foe through the slide (the least %.2f), drawn only backing off %s; at a pace read past the run's, the step taken late in a tick %s; mid-tick %s"
+			% [minf(back["kept"], minf(hurried["kept"], late["kept"])), back["clips"].keys(), hurried["clips"].keys(), late["clips"].keys()])
 	var slant := await _back_step(king, drawn, false, false)
 	_check(slant["stepped"] and slant["to_step"] > 0.7,
 			"a step at a slant to his facing: turned to his step within the slide, as before (%.2f toward it, the most %.2f rad a frame)"
@@ -12347,8 +12355,10 @@ func _test_boar_king_clips() -> void:
 ## "to_step" (the most his shown facing came round along the step while the slide ran,
 ## GridEntity.stepping),
 ## "jump" (the most the shown facing turned in one frame, rad: TURN_RATE's ease, for the print) and
-## "clips" (the base clips drawn).
-func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool) -> Dictionary:
+## "clips" (the base clips drawn while the slide ran). [param pace]: the pace the view last read
+## as the step starts (one past RUN_ABOVE: a hitch's); [param alpha] (0..1), the tick's fraction
+## it is taken at (the slide stamped on the whole tick, its opening frame a jump along it).
+func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool, pace := 0.0, alpha := -1.0) -> Dictionary:
 	var out := {"stepped": false, "kept": 1.0, "to_step": -1.0, "jump": 0.0, "clips": {}}
 	king.stunned_until_tick = 0
 	king.next_move_tick = 0
@@ -12377,8 +12387,11 @@ func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool)
 		king._world_set_facing(held)
 		king.turn_shown_from(Vector2(held).angle())
 		view._last_at = Vector3.INF  # No step left over from before: the slide's own.
-		view._speed = 0.0
+		view._speed = pace
 		_rig._process(0.0)  # Its view drawn once, so it knows it backs (faces_back_steps).
+		view._speed = pace
+		if alpha >= 0.0:
+			World.tick_alpha = alpha
 		if World.try_move(king, way):
 			stepped = way
 			break
@@ -12418,7 +12431,7 @@ func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool)
 		last = shown.angle()
 		if king.stepping:  # Within the slide only: after it he turns to his facing as every body does.
 			out["to_step"] = maxf(out["to_step"], shown.dot(Vector2(stepped).normalized()))
-		out["clips"][view.rig.base_clip()] = true
+			out["clips"][view.rig.base_clip()] = true
 	AnimRig._clock_movie = -1  # The wall's again, as the rest of the test is timed.
 	_rig.set_process(processing)
 	king.set_process(moving)

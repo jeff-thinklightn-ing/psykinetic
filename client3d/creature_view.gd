@@ -263,16 +263,24 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 	var alert := monster.alert if monster != null else Monster.Alert.IDLE
 	var clip := "idle"
 	var scale := 1.0
-	if _speed > WALKING:
-		var running := _speed > RUN_ABOVE or alert == Monster.Alert.FLEEING or now < _charge_until or now < _bolt_until
+	# Backing off facing its foe (the boar king's, before a charge): its back_off from the step's
+	# first frame to its last, whatever its pace reads (a step's opening frame, or one after a hitch,
+	# can read past RUN_ABOVE or under WALKING; the coordinator); the pace chooses walk or run only
+	# going forward.
+	var fled := alert == Monster.Alert.FLEEING or now < _bolt_until
+	var backing := now >= _charge_until and not fled and _backing(monster)
+	if backing and (_speed > WALKING or monster.stepping):
+		clip = "back_off"
+		scale = clampf(_speed / WALK_PACE, ArtKit.feel("creature_view.speed_min", SPEED_MIN),
+				ArtKit.feel("creature_view.speed_max", SPEED_MAX))
+	elif _speed > WALKING:
+		var running := _speed > RUN_ABOVE or fled or now < _charge_until
 		clip = "run" if running else "walk"
 		scale = clampf(_speed / (RUN_PACE if running else WALK_PACE), ArtKit.feel("creature_view.speed_min", SPEED_MIN),
 				ArtKit.feel("creature_view.speed_max", SPEED_MAX))
 		if now < _charge_until:
 			clip = "charge" if clips.has("charge") else "run"
 			scale = maxf(scale, ArtKit.feel("creature_view.charge_speed", CHARGE_SPEED))
-		elif not running and _backing(monster):
-			clip = "back_off"  # Backing away facing its foe (the boar king's, before a charge).
 	elif monster != null and monster.pose == Monster.Pose.SIT:
 		# Asleep, for a beast whose slot has a sleep (the great bear at its den); else grazing.
 		# Lying up, for one whose slot has a lie (the hill cat on its perch).
@@ -286,13 +294,18 @@ func frame(puppet: Node3D, monster: Monster) -> void:
 
 
 ## Whether [param monster] walks away from where it faces (enemy-ai's boar king backing off to
-## charge, World.face on his foe each step), for a slot with a back_off.
+## charge, World.face on his foe each step), for a slot with a back_off: by its slide's own way
+## while the sim slides it (GridEntity.stepping, so from the step's first frame, before a drawn
+## move has shown it), else by its last drawn step's.
 func _backing(monster: Monster) -> bool:
 	if monster == null or not clips.has("back_off"):
 		return false
 	monster.faces_back_steps = true  # Its slide keeps the face on its foe (GridEntity).
 	var facing := Vector2(monster.shown_facing())
-	return facing != Vector2.ZERO and _way.dot(facing.normalized()) < -BACKING_DOT
+	var way := _way
+	if monster.stepping and monster._to_tile != monster._from_tile:
+		way = Vector2(monster._to_tile - monster._from_tile).normalized()
+	return facing != Vector2.ZERO and way.dot(facing.normalized()) < -BACKING_DOT
 
 
 ## Whether [param monster] is drawn down (Pose DOWN) or still getting up this frame: on its
