@@ -483,9 +483,52 @@ const PLAYERS_UNSEEN := "You know nothing of anyone you can't see now: not where
 const VOUCHES := "(?i)\\b(safe|fine|all right|alright|unharmed|unhurt|not far|nearby|close by|close|near|around|on (his|her|their|the) way|coming|back soon|waiting|resting|asleep|sleeping|at home|in town|busy|out there|just ahead|behind us)\\b"
 ## A sentence led by a guessed pronoun (803 amended (9)).
 const PRONOUN_LED := "(?i)^(he|she|him|his|her)\\b"
+## A sentence led by they, them or their: of the one just asked about, only
+## when it also tells where they are or how (803 amended (9)'s fix).
+const THEY_LED := "(?i)^(they|they're|they've|they'll|them|their)\\b"
+## A direction or a distance: where someone is (803 amended (9)'s fix).
+const WHEREABOUTS := "(?i)\\b(north|south|east|west|north-east|north-west|south-east|south-west|northeast|northwest|southeast|southwest|some way off|far off|a long way off|paces|upriver|downriver|upstream|downstream)\\b"
 const VOICE_FOR_OTHER := """%s has just spoken to %s, not to you: answer with just: ..."""
 const VOICE_OPEN := """%s has just spoken, naming no one, with %s near enough to hear: it is open to anyone. Answer out loud in words if you have something useful to say; if not, answer with just: ..."""
 const VOICE_NAMED := """%s has just said your name: it was meant for you. Answer out loud in words."""
+## Her plain answer to her player's own question when her voice gave none,
+## or only her own line again (803 amended (9)'s fix; voice's words): no
+## place, no direction, nothing of where anyone might be.
+const VOICE_DONT_KNOW: Array[String] = ["I don't know.", "I wish I knew.", "I couldn't tell you.", "No idea, I'm afraid."]
+## A question by its first word, with no question mark typed ("where is bo").
+const QUESTION_LED := "(?i)^\\W*(where|who|what|when|why|how|is|are|do|does|did|can|have|has|will)\\b"
+
+
+## Whether [param heard] is her player's own question put to her: their
+## words for her (her name, or no one else named within hearing) with a
+## question mark, or led by a question word (QUESTION_LED, the coordinator's:
+## players type "where is bo"). Words naming no one with others near
+## ("open") are her player's to her too (playtest's rerun of a31372505: three
+## of four went unanswered with another player by); words naming another,
+## not her ("other"), are not.
+func direct_question(heard: String) -> bool:
+	if not heard.begins_with(keeper_name() + " just said to you") or addressed_to(heard) == "other":
+		return false
+	var words := _quoted(heard)
+	return "?" in words or RegEx.create_from_string(QUESTION_LED).search(words) != null
+
+
+## A plain don't-know of VOICE_DONT_KNOW: the first she has not said among
+## her last lines, else the one said longest ago.
+func dont_know() -> String:
+	for line: String in VOICE_DONT_KNOW:
+		if not _said.has(line):
+			return line
+	var best := VOICE_DONT_KNOW[0]
+	for line: String in VOICE_DONT_KNOW:
+		if _said.find(line) < _said.find(best):
+			best = line
+	return best
+
+
+## Someone not her player said her name (803 amended (9), voice's words;
+## playtest's voice_players: she answered another player as her own).
+const VOICE_NAMED_OTHER := """%s is not the one you travel with; you travel with %s. Answer %s as you would anyone you meet, and never talk to %s as if the two of you travel together."""
 const VOICE_ASKED := """Then, only if %s asked you to do something, add one more line saying
 what you will do, exactly one of:
 [STANCE: STAY_CLOSE] keep beside %s and fight only what is next to you
@@ -738,7 +781,9 @@ var _retreat_at := NONE
 var _retreat_heading := Vector2i.ZERO
 var _known_hostiles: Dictionary[int, bool] = {}
 ## The friends she has seen (friends_seen), so each comes into sight once.
-var _known_friends: Dictionary[int, bool] = {}
+## Friends she has seen come into sight, by instance id: the words their
+## arrival was told in, "" once out of sight and those notes dropped.
+var _known_friends: Dictionary[int, String] = {}
 ## Hostiles that have been next to her or her player this fight: one that
 ## steps away and back is not new.
 var _adjacent_before: Dictionary[int, bool] = {}
@@ -1198,13 +1243,16 @@ static func _named(words: String, who: String) -> bool:
 	return not who.is_empty() and RegEx.create_from_string("(?i)\\b%s\\b" % who).search(words) != null
 
 
-## The others in her zone [param heard] names (not her, not who said it).
+## The others in her zone and within her hearing [param heard] names (not
+## her, not who said it): the ones it may have been said to. One named who
+## is away ("Where is Bo?") was spoken of, not to (803 amended (9)'s fix).
 func _others_named(heard: String) -> Array[String]:
 	var words := _quoted(heard)
 	var speaker := heard.get_slice(" ", 0)
 	var named: Array[String] = []
 	for entity in World.get_entities():
-		if entity != self and entity.spawned and (entity is Player or entity is Companion):
+		if entity != self and entity.spawned and (entity is Player or entity is Companion) and entity.zone == zone \
+				and World.distance(tile, entity.tile) <= HEARING_RANGE:
 			var who := _name_of(entity)
 			if who != speaker and _named(words, who):
 				named.append(who)
@@ -1364,6 +1412,23 @@ func friends_seen() -> Array[GridEntity]:
 	return out
 
 
+## A friend out of her sight (803 amended (9)'s fix; the coordinator: no
+## stale direction shown her to be stopped repeating): her exchange's
+## "[X came into sight, ...]" notes of them go, once. Gone from her zone
+## (or from the world), they are forgotten too, and told again on coming
+## back into sight.
+func _forget_sighting(id: int) -> void:
+	var who := _known_friends[id]
+	if not who.is_empty():
+		var lead := "[%s came into sight" % who
+		_exchange.assign(_exchange.filter(func(turn: Dictionary) -> bool:
+			return not (turn["role"] == "user" and str(turn["speaker"]).is_empty() and str(turn["text"]).begins_with(lead))))
+		_known_friends[id] = ""
+	var body: Object = instance_from_id(id)
+	if body == null or not is_instance_valid(body) or not (body as GridEntity).spawned or (body as GridEntity).zone != zone:
+		_known_friends.erase(id)
+
+
 ## A friend by name: a companion with whom she travels, a resident with
 ## their trade ("Snagfin the smith").
 func friend_words(entity: GridEntity) -> String:
@@ -1425,6 +1490,14 @@ func owner_spoke(text: String, phrase := 0) -> void:
 		var clue := next_clue()
 		if not clue.is_empty():
 			_quiet_focus = CLUE_FOCUS % clue  # Asked (813 amended (2)): never offered unasked.
+	if phrase == 0 and addressed_to(heard) == "other":
+		# Her player's words to someone else by name, not her (803 amended (9),
+		# playtest's voice_players: the model answered past VOICE_FOR_OTHER):
+		# in her exchange, unanswered.
+		_quiet_focus = ""
+		_log({"kind": "voice", "companion": _name_of(self), "trigger": "%s just spoke to you." % keeper_name(), "outcome": "not asked",
+			"note": "her player's words named another, not her"})
+		return
 	_ask_voice("%s just spoke to you." % keeper_name(), heard, false, PHRASE_STANCES.has(phrase))
 	_quiet_focus = ""
 
@@ -2972,13 +3045,18 @@ func _watch() -> void:
 				threats.append("%s came into sight, %s." % [refer(entity, true), _paces_toward(Vector2(entity.tile))])
 				if _hostile(entity) and danger.is_empty():
 					danger = refer(entity, true)
+	var friends_now := {}
 	for friend in friends_seen():
+		friends_now[friend.get_instance_id()] = true
 		if not _known_friends.has(friend.get_instance_id()):
-			_known_friends[friend.get_instance_id()] = true
+			var who := _name_of(friend) if friend is Companion else friend_words(friend)
+			_known_friends[friend.get_instance_id()] = who
 			if not fight and not _was_in_fight:
-				var who := _name_of(friend) if friend is Companion else friend_words(friend)
 				events.append("%s came into sight." % who)
 				arrivals.append("%s came into sight, %s." % [who, _paces_toward(Vector2(friend.tile))])
+	for id: int in _known_friends.keys():
+		if not friends_now.has(id):
+			_forget_sighting(id)
 	# A threat leads (228 amended: an imp closing and a friend arriving in
 	# one moment, she offered the friend help with his carpentry): told
 	# last, nearest her answer, and named as the danger.
@@ -3079,8 +3157,12 @@ static func vouched_player(sentence: String, unseen: Array[String], asked_of: St
 	var line := sentence.strip_edges()
 	if not asked_of.is_empty() and RegEx.create_from_string(PRONOUN_LED).search(line) != null:
 		return asked_of
-	if RegEx.create_from_string(VOUCHES).search(line) == null:
+	# A whereabouts: a VOUCHES phrase, or a direction or distance (playtest's
+	# voice_players: "They're still to the north").
+	if RegEx.create_from_string(VOUCHES).search(line) == null and RegEx.create_from_string(WHEREABOUTS).search(line) == null:
 		return ""
+	if not asked_of.is_empty() and RegEx.create_from_string(THEY_LED).search(line) != null:
+		return asked_of
 	for who in unseen:
 		if _named(line, who):
 			return who
@@ -4316,6 +4398,8 @@ func voice_messages(asked := false, heard := "") -> Array[Dictionary]:
 				system += "\n" + VOICE_CAN_DO % ["\n".join(listed), who]
 	elif addressed == "her":
 		system += "\n\n" + VOICE_NAMED % speaker
+		if speaker != keeper_name():
+			system += " " + VOICE_NAMED_OTHER % [speaker, keeper_name(), speaker, speaker]
 	elif addressed == "open":
 		system += "\n\n" + VOICE_OPEN % [speaker, " and ".join(others_near())]
 	elif addressed == "other":
@@ -5515,6 +5599,28 @@ func _take_result(result: Dictionary) -> void:
 		line = ""
 	_saying_voice = false
 	entry["say"] = line
+	var heard_text := str(result.get("heard", ""))
+	var questioned := spoken_to and direct_question(heard_text)
+	if questioned:
+		voice_counts["question"] = int(voice_counts.get("question", 0)) + 1  # The journal's "asked N" (the coordinator's).
+	if questioned and line.is_empty() and chosen < 0:
+		# Her player's own question gets an answer (the coordinator, on
+		# playtest's voice_players rerun: silence after a direct question is
+		# worse than a repeated line). Of a player she cannot see, with
+		# nothing back or only her own line again: a plain don't-know
+		# (VOICE_DONT_KNOW), never the one she said last. Of anything else,
+		# her own line again is said again ("I don't know" is no answer to
+		# "Are you hurt?").
+		var about_unseen := not asked_about_player(players_unseen()).is_empty()
+		var answer_line := dont_know() if about_unseen else raw_line.strip_edges() if echo == "her own line" else ""
+		if not answer_line.is_empty() and _say(answer_line, true):
+			line = answer_line
+			entry["say"] = line
+			entry["note"] = "%s; her player's question answered: %s" % [entry.get("note", entry["outcome"]),
+				"a plain don't-know" if about_unseen else "her own line again"]
+			entry["outcome"] = "said"
+	if questioned and line.is_empty() and chosen < 0:
+		voice_counts["question unanswered"] = int(voice_counts.get("question unanswered", 0)) + 1
 	if spoken_to and line.is_empty():
 		# Unsaid to her player (a true repeat, or nothing): her turn is "...", so the
 		# next moment does not answer their stale question (voice7_hot2's bond notice).
@@ -6693,6 +6799,10 @@ static func voice_report(minutes: int) -> String:
 		line += "; prompt tokens median %d, worst %d of %d" % [_median(voice_prompt_tokens), voice_prompt_tokens.max(), OllamaMind.NUM_CTX]
 	line += talk_report()
 	line += notice_report()
+	if voice_counts.has("question"):
+		# Her player's direct questions, and those she left unanswered (803
+		# amended (9)'s fix; the coordinator's count, for the follow-up).
+		line += "; questions asked %d, unanswered %d" % [voice_counts["question"], int(voice_counts.get("question unanswered", 0))]
 	voice_counts.clear()
 	voice_latencies.clear()
 	voice_prompt_tokens.clear()

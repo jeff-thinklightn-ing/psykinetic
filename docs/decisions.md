@@ -43288,6 +43288,50 @@ VOICE_FOR_OTHER); now her quiet moment (her wants and notices of her own) also w
 after anyone else spoke within her hearing (_others_spoke_tick), as it waited after her player.
 companion_test _test_players_unseen. Server only, protocol unchanged, no new class_name.
 
+803 amended (9), her words her player's own: lines for others, unseen players, others' words framed
+as theirs (2026-11-09, companions; release: no new label, before the cut; the coordinator's approval;
+voice's words; playtest's voice_players run on main 9e44b8af0, three bots). (1) Her player's words
+naming another (a player or companion) and not her are no longer asked of her voice: the model
+answered past VOICE_FOR_OTHER (Rhea answered six lines her player gave Maud by name). They stay in
+her exchange; the mind log has "not asked", "her player's words named another, not her". Naming
+both, or no one, she answers as before; orders are as before. (2) A player gone from her sight
+leaves no stale direction: Companion._forget_sighting drops her exchange's "[X came into sight,
+...]" notes of them once they are out of sight (dropped, not followed by a note: the exchange is
+a list of turns, and a note left in would still show the old direction), and gone from her zone or
+the world they are forgotten and told again on coming back (Rhea told an unseen player "is to the
+north, some way off", from such a note). The filter backs it: for a player she cannot see, a
+sentence naming them with a whereabouts (VOUCHES, or WHEREABOUTS: a direction or a distance), or,
+asked of them, one led by they, them or their with one (THEY_LED), goes. (3) Another's words to
+her: VOICE_NAMED adds VOICE_NAMED_OTHER when the speaker is not her player (voice's words: "%s is
+not the one you travel with; you travel with %s. Answer %s as you would anyone you meet, and never
+talk to %s as if the two of you travel together."): Maud told another player "I've been keeping
+close to you, as I always do". (4) Her player's question answered (playtest's rerun: with the
+stale note gone her one true answer, "I don't know. I haven't seen them.", was dropped as her own
+line again, and 3 of 4 questions met silence; the coordinator: silence after a direct question is
+worse than a repeated line). A direct question (direct_question) is her player's words for her
+with a "?" or led by a question word (QUESTION_LED: "where is bo" as typed); words naming no one
+count with another player near too ("open"), only words naming another, not her, do not (playtest's
+second rerun: with a third player by, 3 of 4 questions still met silence). Of a player she
+cannot see, nothing back or only her own line again: a plain don't-know (VOICE_DONT_KNOW, voice's
+words: "I don't know.", "I wish I knew.", "I couldn't tell you.", "No idea, I'm afraid."; never the
+one she said last; no place, no direction). Of anything else, her own line again is said again (a
+don't-know is no answer to "Are you hurt?"), and truly nothing stays unsaid for now, counted: the
+journal's "[voice]" line gains "; questions asked N, unanswered K" (counts only), and more than a
+rare miss brings a neutral ask-again pool (the coordinator's follow-up, designed after the cut).
+An errand chosen is an answer. And _others_named counts only those in her zone and within
+HEARING_RANGE: one named who is away ("Where is Bo?") is spoken of, not to, so (1) never leaves her
+player's question about an absent friend unanswered. companion_test _test_heard_fixes: named
+another, unanswered, both or none answered; the line in her prompt, no game words; seen, gone,
+the note dropped, a direction for them or for "they" dropped and the well's kept; asked of one
+away, a don't-know, again a different one, with no "?" too, a thank-you none; the counts.
+_test_questions_live: the rerun's four questions as typed, another player near, the voice giving
+the same line each time: all four answered, the last three a don't-know (it failed on the first
+cut of this fix the way the rerun did). zone_test's line to Bo: heard and labelled by both
+companions, Pip's voice not asked ("not asked"), no line, no stance (before, she was asked and told
+it was not hers). The
+older test's true repeat twice to "What do you think of this place?" is now said again, not
+"...". (9)'s bullet reworded by voice. Server only, protocol unchanged, no new class_name.
+
 ## 804. Gains: what the player gains, shown as it happens
 
 ui's, the coordinator's design (approved 2026-11-04, Jeff: "the player needs to learn early

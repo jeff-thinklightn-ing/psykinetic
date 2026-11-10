@@ -425,24 +425,23 @@ func _test_overheard() -> void:
 	_check(pip.others_here() in pip.voice_prompt("test"), "it is in her voice's now")
 	_check(others.begins_with("Friends near you:") and bo in pip.friends_seen() and not pip._hostile(bo),
 		"another player is a friend she sees, not a threat (decision 381)")
-	# A line to Bo: Pip hears it as her player's, Nix as Jeff's; neither is told it is for them.
-	pip_mind.voice_answer = {"say": "...", "stance": "PRESS"}
+	# A line to Bo: Pip hears it as her player's, Nix as Jeff's; neither is
+	# asked (803 amended (9): her player's words naming another, not her, are
+	# not asked of her voice; before, she was asked and told it was not hers).
+	pip_mind.voice_answer = {"say": "Holding the left.", "stance": "PRESS"}
 	nix_mind.voice_answer = {"say": "...", "stance": "PRESS"}
 	_main._chat_tick.clear()
+	var pip_asks_before := pip_mind.voice_asks.size()
 	_main._player_said(host, "Bo, take the left side.")
-	var pip_ask: Dictionary = pip_mind.voice_asks.back() if not pip_mind.voice_asks.is_empty() else {}
 	var nix_ask: Dictionary = nix_mind.voice_asks.back() if not nix_mind.voice_asks.is_empty() else {}
-	var pip_text := Companion.render(pip_ask.get("messages", []))
 	var nix_text := Companion.render(nix_ask.get("messages", []))
-	_check(pip_text.ends_with("%s: Bo, take the left side." % Net.player_name)
+	_check(("%s: Bo, take the left side." % Net.player_name) in Companion.render(pip.voice_messages())
 			and ("%s: Bo, take the left side." % Net.player_name) in Companion.render(nix.voice_messages()),
 		"both companions hear the line, labelled with who said it")
-	_check(("has just spoken to Bo, not to you") in pip_text and "Bo is " in pip_text,
-		"Pip is told a line may not be for her, and that Bo is there to be spoken to")
-	_check(MindLog.last[String(pip.name)].get("outcome") == "silent" and pip._said.is_empty() and pip.stance != Companion.Stance.PRESS
-			and MindLog.last[String(pip.name)].get("stance_ignored") == "PRESS",
-		"meant for Bo: she answers \"...\", says nothing, and the stance with it is not taken (%s)" % MindLog.last[String(pip.name)].get("note", ""))
-	_check("spoken to Bo, not to you" in pip_text, "Pip is told it named Bo, not her")
+	_check(pip_mind.voice_asks.size() == pip_asks_before and MindLog.last[String(pip.name)].get("outcome") == "not asked",
+		"meant for Bo: Pip's voice is not asked (%s)" % MindLog.last[String(pip.name)].get("note", ""))
+	_check(pip._said.is_empty() and pip.stance != Companion.Stance.PRESS,
+		"she says nothing, and takes no stance from it")
 	_check(nix_mind.voice_asks.is_empty() and nix_text.is_empty() and nix.stance != Companion.Stance.PRESS,
 		"Nix: someone else's player's words, naming Bo: hers to hear, not to answer, never a stance")
 	# A line to her: she answers.

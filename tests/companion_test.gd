@@ -101,6 +101,8 @@ func _ready() -> void:
 	_test_break_hold()
 	_test_invented_item()
 	_test_players_unseen()
+	_test_heard_fixes()
+	_test_questions_live()
 	_test_companion_verb()
 	_test_fishing()
 	_test_reed_pond_cells()
@@ -819,17 +821,19 @@ func _test_answer_echo() -> void:
 	mind.next_voice_answers = [{"say": "This place reeks of old bones.", "stance": ""}]
 	pet._ask_voice(trigger, asked, true)
 	var last_turn: Dictionary = pet._exchange.back()
-	_check(mind.voice_asks.size() == 2 and pet.said_lines().size() == lines_were and last_turn["role"] == "assistant" and last_turn["text"] == "...",
-		"a true repeat twice: nothing said, her turn kept as \"...\" (%s)" % [last_turn])
+	# Her player's question is answered (803 amended (9)'s fix): her own line again, said again, not silence.
+	_check(mind.voice_asks.size() == 2 and pet.said_lines().size() == lines_were + 1 and pet.said_lines().back() == "This place reeks of old bones."
+			and last_turn["role"] == "assistant" and last_turn["text"] == "This place reeks of old bones.",
+		"a true repeat twice to her player's question: said again rather than silence (%s)" % [last_turn])
 	# The stale question (voice7_hot2): the bond notice after that dropped reply is its own moment.
 	pet._add_turn("user", "What do you think of this place?")
 	pet._ask_voice(trigger, asked, true)
 	pet._quiet_focus = "You and %s have just grown closer; you are close to %s now. %s" % [pet.keeper_name(), pet.keeper_name(), Companion.NOTICE_BOND_LEAD]
 	var notice := pet.voice_messages(false, "")
 	var final_turn := str(notice.back()["content"])
-	_check(notice[notice.size() - 2]["role"] == "assistant" and notice[notice.size() - 2]["content"] == "..."
+	_check(notice[notice.size() - 2]["role"] == "assistant"
 			and final_turn.begins_with("[A moment passes. You and") and not "What do you think of this place" in final_turn,
-		"then the bond notice: its own moment after her \"...\", not tacked onto the stale question (%s)" % final_turn.left(90))
+		"then the bond notice: its own moment after her answer, not tacked onto the stale question (%s)" % final_turn.left(90))
 	pet.mind = ScriptedMind.new()
 	_settle(pet)
 
@@ -1953,6 +1957,133 @@ func _test_players_unseen() -> void:
 	pet._heard = heard_was
 	pet._said = said_was
 	pet.player_names = names_was
+
+
+## 803 amended (9)'s fix (playtest's voice_players on 9e44b8af0): her
+## player's words to another by name go unanswered; a player gone from her
+## sight leaves no stale direction in her exchange, and none is said; and
+## another's words to her are framed as theirs, not her player's.
+func _test_heard_fixes() -> void:
+	print("\n== her words her player's own: lines for others, unseen players, others' words framed as theirs (803 amended (9)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var me := pet.keeper_name()
+	var her := Companion._name_of(pet)
+	var mind_was: CompanionMind = pet.mind
+	var names_was := pet.player_names
+	var mind := CountingMind.new()
+	pet.mind = mind
+	_put(owner, Vector2i(4, 3))
+	_put(pet, Vector2i(5, 3))
+	var other := _main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "Cyl", "tile": Vector2i(7, 3),
+		"peer": 78, "label": "Cylinder"}) as Player
+	pet.player_names = func() -> Array: return [me, "Cylinder"]
+	# Her player's words naming another, not her: unanswered; naming both, or no one: answered as today.
+	for case: Array in [["Cylinder, where is the well?", false], ["Cylinder, %s, where is the well?" % her, true], ["Where is the well?", true]]:
+		mind.clear()
+		pet.owner_spoke(str(case[0]))
+		_check((not mind.voice_asks.is_empty()) == bool(case[1]), "\"%s\": %s" % [case[0], "answered" if case[1] else "not hers, unanswered"])
+	# Another names her: told who she travels with.
+	mind.clear()
+	pet._last_speech_tick = -999999  # Past the speech interval: an overheard line's ask waits on it.
+	pet.overheard("Cylinder", "%s, have you seen the well?" % her)
+	var told := Companion.VOICE_NAMED_OTHER % ["Cylinder", me, "Cylinder", "Cylinder"]
+	_check(not mind.voice_asks.is_empty() and str(mind.voice_asks[-1]["system"]).contains(told) and not Companion.VOICE_NAMED_OTHER.to_lower().contains("player"),
+			"Cylinder said her name: her prompt says she travels with %s, not Cylinder, in no game words" % me)
+	# Seen to the north, then gone: the note of where goes, and a direction of them is not said.
+	pet._known_friends.erase(other.get_instance_id())
+	pet._watch()
+	var noted := func() -> bool: return pet._exchange.any(func(turn: Dictionary) -> bool: return str(turn["text"]).begins_with("[Cylinder came into sight"))
+	_check(noted.call(), "Cylinder in sight: told where, in her exchange")
+	World.despawn(other)
+	pet._watch()
+	_check(not noted.call() and not pet._known_friends.has(other.get_instance_id()), "gone from her zone: that note of where is dropped")
+	var unseen := pet.players_unseen()
+	_check(unseen.has("Cylinder"), "and Cylinder is unseen now")
+	_check(Companion.vouched_player("Cylinder is to the north, some way off.", unseen, "") == "Cylinder"
+			and Companion.vouched_player("They're still to the north.", unseen, "Cylinder") == "Cylinder"
+			and Companion.vouched_player("The well is to the north.", unseen, "Cylinder").is_empty()
+			and Companion.vouched_player("They could be anywhere.", unseen, "Cylinder").is_empty(),
+		"a direction for Cylinder, or for \"they\" asked of: goes; the well's, or not knowing: kept")
+	var heard_was := pet._heard.duplicate(true)
+	pet._heard.append({"text": "Where is Cylinder?", "tick": World.tick, "speaker": me})
+	var line := pet.spoken("I don't know. They're still to the north.", false, true)
+	_check(line == "I don't know." and pet._vouched == "Cylinder", "asked where: the stale direction goes, the not knowing is said (%s)" % line)
+	pet._heard = heard_was
+	# Her player's own question always answered: asked of one away, her voice silent, or her own line again.
+	pet._said.clear()
+	mind.clear()
+	mind.voice_answer = {"say": "", "stance": ""}
+	pet.owner_spoke("Where is Cylinder?")
+	_check(not mind.voice_asks.is_empty() and Companion.VOICE_DONT_KNOW.has(pet._said.back() if not pet._said.is_empty() else ""),
+			"asked of Cylinder, away: hers to answer, and her voice silent, a plain don't-know (%s)" % [pet._said])
+	var first: String = pet._said.back() if not pet._said.is_empty() else ""
+	mind.clear()
+	mind.voice_answer = {"say": first, "stance": ""}
+	pet.owner_spoke("Do you know where Cylinder went?")
+	_check(pet._said.size() >= 2 and Companion.VOICE_DONT_KNOW.has(pet._said.back()) and pet._said.back() != first,
+			"her own line again: dropped as before, and another don't-know said, not the same one (%s)" % [pet._said])
+	mind.clear()
+	mind.voice_answer = {"say": "", "stance": ""}
+	pet.owner_spoke("where is cylinder")
+	_check(Companion.VOICE_DONT_KNOW.has(pet._said.back()) and pet._said.size() >= 3 and pet._said.back() != pet._said[-2],
+			"typed with no question mark, led by \"where\": answered too (%s)" % [pet._said.slice(-1)])
+	Companion.voice_report(10)  # Counted out, then one answered and one not.
+	mind.clear()
+	mind.voice_answer = {"say": "", "stance": ""}
+	pet.owner_spoke("Where is Cylinder?")
+	pet.owner_spoke("Are you hurt?")
+	var counts := Companion.voice_report(10)
+	_check(counts.contains("questions asked 2, unanswered 1"), "the journal counts her player's questions and the unanswered: %s" % counts)
+	var said_before := pet._said.size()
+	mind.clear()
+	mind.voice_answer = {"say": "", "stance": ""}
+	pet.owner_spoke("Thanks for that.")
+	_check(pet._said.size() == said_before, "no question, nothing said: no don't-know (%s)" % [pet._said.slice(-1)])
+	mind.voice_answer = {"say": "", "stance": ""}
+	pet.player_names = names_was
+	pet.mind = mind_was
+
+
+## Playtest's rerun of a31372505, as it ran (the coordinator: a test that
+## fails the way the live run did): someone else within earshot, so her
+## player's words naming no one are open to anyone; the four questions in
+## order, two with no question mark; her voice returning the same line each
+## time, through the real reply path and echo filter. Each is answered.
+func _test_questions_live() -> void:
+	print("\n== her player's four questions of an unseen player, with another near, her voice saying the same each time: each answered (803 amended (9)) ==")
+	_kill_monsters()
+	var owner := _player()
+	var pet := _companion()
+	var me := pet.keeper_name()
+	var mind_was: CompanionMind = pet.mind
+	var names_was := pet.player_names
+	var mind := CountingMind.new()
+	pet.mind = mind
+	_put(owner, Vector2i(4, 3))
+	_put(pet, Vector2i(5, 3))
+	var near := _main._spawn({"script": "res://sim/player.gd", "shape": "capsule", "name": "Wedge", "tile": Vector2i(6, 4),
+		"peer": 79, "label": "Wedge"}) as Player
+	pet.player_names = func() -> Array: return [me, "Wedge", "Tourbot2"]
+	_check(pet.players_unseen() == ["Tourbot2"] and pet.addressed_to("%s just said to you: \"where is tourbot2\"" % me) == "open",
+			"Tourbot2 unseen; with Wedge near, her player's words naming no one are open to anyone")
+	pet._said.clear()
+	mind.voice_answer = {"say": "I don't know. I've never seen Tourbot2. Have you?", "stance": ""}
+	var unanswered: Array[String] = []
+	for question: String in ["Where is Tourbot2?", "where is tourbot2", "Is Tourbot2 all right?", "do you know where tourbot2 went"]:
+		var before := pet._said.size()
+		for i in 21:
+			World.step()
+		pet.owner_spoke(question)
+		if pet._said.size() != before + 1:
+			unanswered.append(question)
+	_check(unanswered.is_empty(), "each of the four answered, with or without the mark (unanswered: %s; said: %s)" % [unanswered, pet._said])
+	_check(pet._said.size() == 4 and pet._said.slice(1).all(func(line: String) -> bool: return Companion.VOICE_DONT_KNOW.has(line)),
+			"after the first, her same line again each time: a plain don't-know (%s)" % [pet._said.slice(1)])
+	World.despawn(near)
+	pet.player_names = names_was
+	pet.mind = mind_was
 
 
 ## No invented things (803 amended (8); playtest's barrow niche, "The niche
