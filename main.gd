@@ -694,6 +694,7 @@ var _arts_seen := {}
 ## looked at (-1: not yet), and until when a fall in them keeps the fight on.
 var _fight_hp := {}
 var _fight_until := 0.0
+var _fight_open := false  # 846: whether the last look found a fight on (the edge that clears the reading windows).
 ## The named room the local player's shown cell is in (665, ui's side;
 ## Level.room_at), and when each room was last left (msec), so stepping
 ## out and back within ROOM_AGAIN_MSEC says nothing.
@@ -24837,6 +24838,8 @@ func _in_fight() -> bool:
 		return now < _fight_until
 	var seen := {}
 	var fight := _blow_on(me, seen)
+	if fight:
+		clear_readings()  # 846: a blow taken closes a reading window again.
 	for body: GridEntity in World.sought():
 		if is_instance_valid(body) and _is_own_companion(body):
 			fight = _blow_on(body, seen) or fight
@@ -24850,7 +24853,35 @@ func _in_fight() -> bool:
 	_fight_hp = seen
 	if fight:
 		_fight_until = now + Gains.FIGHT_SECONDS
-	return now < _fight_until
+	var on := now < _fight_until
+	if on and not _fight_open:
+		clear_readings()  # 846: the first blow of a fight, given or taken.
+	_fight_open = on
+	return on
+
+
+## The windows that cover the middle of the screen, closed (846; window rule 8: a fight
+## clears them, nothing is refused, and they may be opened again): the character card, the
+## town page, the world map, the zone's big map and a note sheet. The pack and a chest or
+## store at the left edge, the menus, and the controls list stay. True if any was open.
+func clear_readings() -> bool:
+	var closed := false
+	if card_page != null and card_page.visible:
+		card_page.visible = false
+		closed = true
+	if town_panel != null and town_panel.visible:
+		town_panel.visible = false
+		closed = true
+	if world_map_panel != null and world_map_panel.visible:
+		world_map_panel.close()
+		closed = true
+	if minimap != null and minimap.big:
+		minimap.toggle()
+		closed = true
+	if note_sheet != null and note_sheet.visible:
+		note_sheet.close()
+		closed = true
+	return closed
 
 
 ## Whether [param body]'s hit points fell since the last frame by a blow (not

@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When a fight starts, your companion's card, the town sheet, the maps and any note you're reading close so you can see the fight; open one again whenever you like, though a blow you take closes it again, where before they stayed open over the middle of the screen (846).
 - Esc closes the controls list and then your pack, one at a time, before it opens the menu, and a click on the controls list stays on it, where before Esc opened the menu over both and a click on the list walked you to the ground beneath it (845).
 - Gains each have a sound of their own now: a low drum strike for a deed, two warm plucks, the second higher, for a town's regard, a soft held note for your companion's bond, a quick wooden rattle for practice, a leather bag set down for goods handed in or picked up, and one soft high harp note for a creature spotted, where before most shared one harp pluck (804 amended (17)).
 - In the hills, a waystone carved "Mine" stands where the road ends, at the foot of the spur where the shieling's track turns north, and a dirt track from it climbs north-west to Hollowfell's mine mouth, where before no path led there and nothing pointed the way (790 amended (5)).

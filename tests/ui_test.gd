@@ -54,6 +54,7 @@ func _ready() -> void:
 	_test_barter()
 	await _test_window_clicks()
 	await _test_window_body_clicks()
+	await _test_fight_clears_readings()
 	_test_sweep_key()
 	_test_crouch_key()
 	_test_practice_bars()
@@ -2445,6 +2446,61 @@ func _test_window_body_clicks() -> void:
 	print("  window body clicks that reached the world: %s (-1: not shown here)" % [reached])
 	_check(reached.values().all(func(n: int) -> bool: return n <= 0),
 		"a press in the middle of a window never reaches the world (%s)" % [reached])
+
+
+## 846 (window rule 8): the first blow of a fight, given or taken, closes the reading windows;
+## a blow taken while one is open closes it again; nothing is refused and the Dock stays.
+func _test_fight_clears_readings() -> void:
+	print("
+== a fight clears the reading windows, and they may be opened again (846) ==")
+	var me: Player = _main._local_player()
+	if me == null or World.zone == null or _main.card_page == null or _main.town_panel == null:
+		print("  (no player or windows in this scene: its checks skipped)")
+		return
+	var hp_was := me.hp
+	var fight_until_was: float = _main._fight_until
+	var pack: PackPanel = _main.pack_panel
+	var pack_was: bool = pack.shown
+	pack.shown = true
+	me.hp = 10
+	_main._fight_until = 0.0
+	_main._fight_open = false
+	_main._fight_hp = {}
+	_main._in_fight()  # Primes the hit points seen.
+	_main._fight_until = 0.0
+	_main._fight_open = false
+	_main.card_page.visible = true
+	_main.town_panel.visible = true
+	_check(_main.clear_readings() and not _main.card_page.visible and not _main.town_panel.visible and pack.shown,
+		"clear_readings closes the card and the town page, not the pack")
+	_check(not _main.clear_readings(), "and says nothing was open the second time")
+	# The first blow taken: the open card closes.
+	_main.card_page.visible = true
+	me.hp -= 1
+	_main._in_fight()
+	_check(not _main.card_page.visible and pack.shown, "a blow taken: the card closes, the pack stays")
+	# Opened again in the fight: it stays (nothing is refused) ...
+	_main.card_page.visible = true
+	_main._in_fight()
+	_check(_main.card_page.visible, "opened mid-fight: it stays open till the next blow")
+	# ... and the next blow taken closes it again.
+	me.hp -= 1
+	_main._in_fight()
+	_check(not _main.card_page.visible, "the next blow taken closes it again")
+	# A fight beginning with the window open (the edge).
+	_main._fight_until = 0.0
+	_main._fight_open = false
+	_main.town_panel.visible = true
+	me.hp -= 1
+	_main._in_fight()
+	_check(not _main.town_panel.visible, "the first blow of a new fight closes the town page")
+	me.hp = hp_was
+	_main._fight_until = fight_until_was
+	_main._fight_open = false
+	_main._fight_hp = {}
+	_main.card_page.visible = false
+	_main.town_panel.visible = false
+	pack.shown = pack_was
 
 
 func _test_character_sheet(pack: PackPanel) -> void:
