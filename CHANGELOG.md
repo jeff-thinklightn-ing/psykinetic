@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The old grey gives you time to get clear of him now: there's a pause before each bite, long enough to step out of it, and he bites far less often; and step off the line of his lunge and he misses you, where before he snapped about once a second with hardly a warning and his lunge could still bite you at the end of its run (780 amended (23)).
 - You walk on smoothly from the moment you arrive, where before, often a few seconds after reaching somewhere, you were suddenly put back two to four cells (847).
 - A big blow that knocks you into your companion, or her into you, hurts each of you once now, where before it could bounce between you and hurt you both two or three times over, sometimes felling her at a stroke (688 amended (11)).
 - When the server restarts, the game joins you back once, where before it sometimes let you in, dropped you two seconds later and joined you again, loading the world twice while others saw you leave and come back twice (240 amended).

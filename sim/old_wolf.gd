@@ -284,8 +284,9 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 				and not (met is Monster and _same_pack(met as Monster)):
 			bitten = met
 			break
-	if bitten == null and is_instance_valid(target) and target.spawned and World.distance(tile, target.tile) <= 1:
-		bitten = target  # Run up to them: the bite at its end.
+	if bitten == null and is_instance_valid(target) and target.spawned and World.distance(tile, target.tile) <= 1 \
+			and _on_told(target, told):
+		bitten = target  # Run up to them on his line: the bite at its end. Stepped off it, they're clear (780 amended (23)).
 	if bitten != null:
 		World.damage(bitten, int(spring["damage"]), self, &"attack")
 		var drag := _drag_way(bitten)
@@ -296,6 +297,19 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 		_log_move("lunge", "dodged (%s)" % reason)
 	World.end_telegraph(told, true)  # Landed, as ever; its told line down till now (810 amended (2)).
 	_begin_pant()
+
+
+## Whether [param body] stands on telegraph [param told]'s cells (the cell a
+## blow on it strikes, World.struck_cell): the run-up bite's reach.
+func _on_told(body: GridEntity, told: int) -> bool:
+	var shown: Variant = World.telegraphs().get(told)
+	if not shown is Dictionary:
+		return false
+	var at := World.struck_cell(body)
+	for cell: Variant in (shown as Dictionary)["cells"]:
+		if Vector2i(int(cell[0]), int(cell[1])) == at:
+			return true
+	return false
 
 
 ## The way from [param bitten] toward his pack's middle; none with no pack.
