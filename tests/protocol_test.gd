@@ -26,6 +26,7 @@ func _ready() -> void:
 	_test_token_credential()
 	_test_no_unsafe_tls()
 	_test_token_lockout()
+	await _test_reconnect_one_attempt()
 	print("")
 	print("RESULT: %s (%d failed)" % ["PASS" if _failures == 0 else "FAIL", _failures])
 	get_tree().quit(1 if _failures > 0 else 0)
@@ -248,6 +249,87 @@ func _check(ok: bool, label: String) -> void:
 	if not ok:
 		_failures += 1
 	print("  %s  %s" % ["PASS" if ok else "FAIL", label])
+
+
+## Getting back in after a restart, one attempt at a time (240 amended):
+## a raw ENet host stands in for the restarted server and counts the
+## connections that reach it. A port bound by a socket that never answers is
+## a server not up yet (no refusal comes back, as on the box).
+var _host: ENetConnection = null
+var _host_connects := 0
+
+
+func _process(_delta: float) -> void:
+	if _host == null:
+		return
+	while true:
+		var event: Array = _host.service(0)
+		if event[0] == ENetConnection.EVENT_NONE or event[0] == ENetConnection.EVENT_ERROR:
+			break
+		if event[0] == ENetConnection.EVENT_CONNECT:
+			_host_connects += 1
+
+
+func _host_up(port: int) -> void:
+	_host = ENetConnection.new()
+	_host.create_host_bound("127.0.0.1", port, 4)
+	_host_connects = 0
+
+
+func _host_down() -> void:
+	if _host != null:
+		_host.destroy()
+		_host = null
+
+
+func _wait(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
+
+func _test_reconnect_one_attempt() -> void:
+	print("== a reconnect makes one attempt at a time (240 amended) ==")
+	var port: int = preload("res://tests/test_ports.gd").of(17875)
+	var saved := [Net.address, Net.port]
+	Net.address = "127.0.0.1"
+	Net.port = port
+	# The server comes up in the wait after an attempt has passed its limit:
+	# that attempt is closed, so only the next one gets in.
+	var silent := PacketPeerUDP.new()
+	silent.bind(port, "127.0.0.1")
+	var first: bool = await Net.reconnect_settled(1.0)
+	_check(not first, "an attempt with no server up is given up at its limit")
+	silent.close()
+	_host_up(port)
+	await _wait(2.5)
+	_check(_host_connects == 0, "the server up in the wait after it: the given-up attempt never gets in (%d)" % _host_connects)
+	var second: bool = await Net.reconnect_settled(1.0)
+	await _wait(0.5)
+	_check(second and _host_connects == 1, "the next attempt gets in: one connection, not two (%s, %d)" % [second, _host_connects])
+	Net.shutdown()
+	_host_down()
+	await _wait(0.3)
+	# The ordinary case: the server comes up partway through an attempt,
+	# well before its limit; that same attempt gets in.
+	silent = PacketPeerUDP.new()
+	silent.bind(port, "127.0.0.1")
+	var started := Time.get_ticks_msec()
+	var done := [false, false]  # Got in, finished (a lambda captures by value: an array it shares).
+	var attempt := func() -> void:
+		done[0] = await Net.reconnect_settled(4.0)
+		done[1] = true
+	attempt.call()
+	await _wait(0.5)
+	silent.close()
+	_host_up(port)
+	while not done[1] and Time.get_ticks_msec() - started < 6000:
+		await _wait(0.1)
+	await _wait(0.5)
+	_check(done[0] and _host_connects == 1, "up partway through an attempt: that attempt gets in, once (%s, %d, %d ms)" % [
+		done[0], _host_connects, Time.get_ticks_msec() - started])
+	Net.shutdown()
+	_host_down()
+	Net.address = saved[0]
+	Net.port = saved[1]
 
 
 ## A token guessed at (701): TOKEN_TRIES wrong ones from one address within

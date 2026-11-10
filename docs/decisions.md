@@ -4001,6 +4001,23 @@ client play, the console restart the server in 3 s, the script start it
 again from the snapshot as systemd would, and the client come back on its
 tile by itself.
 
+240 amended (perf, 2026-11-10; the coordinator's approval, release's label): a reconnect makes one attempt
+at a time. Each try waited up to 10 s for its connection to settle and, if it was still connecting then,
+counted it failed but left it open until the next try's Net.reconnect closed it 2 s later; ENet went on
+trying it in that wait, and when the restarted server came up then, it got in (authenticated, put back on
+its saved tile), and the next try shut it and joined again: the player joined twice, the world loaded
+twice, and others saw them leave and come back twice (net_test phase 5, "back on (9, 2)" got 2, where
+server6 starts slowly beside a landing; on the box, any player online through a deploy whose restart
+outlasts a try). The server side was always clean: the first session left before the second came in, and
+a lost leave is covered by a second connection with the same id replacing the first (721). Now
+Net.reconnect_settled(limit) begins the attempt, waits up to ATTEMPT_SECONDS (10) and closes one still
+connecting there, before the wait; a link already connected when a try begins is that try's, never
+replaced. The cadence (2 s, then up to 10 s), the try count, the status lines and the 180 s give-up are
+unchanged; Main._connection_settled is gone. protocol_test, a raw ENet host for the server and a silent
+socket for one not up yet: an attempt given up at its limit never gets in when the server comes up in
+the wait after it (before this, it did), the next one gets in once, and a server up partway through an
+attempt lets that attempt in, once. Client only; protocol unchanged; no class_name.
+
 ## 241. An out-of-date client updates itself once, and starts again
 
 A client turned away as "client out of date" used to say so and stop:

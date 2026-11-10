@@ -164,6 +164,9 @@ extends Node
 enum Mode { HOST, SERVER, CLIENT }
 
 const DEFAULT_PORT := 7777
+## Seconds one reconnect attempt may stay connecting before it is closed
+## and the next begun (reconnect_settled, 240 amended).
+const ATTEMPT_SECONDS := 10.0
 ## ENet connections, including ones still waiting to authenticate.
 const MAX_CLIENTS := 8
 ## Authenticated peers at once by default; later ones are refused.
@@ -2146,6 +2149,31 @@ func reconnect() -> bool:
 	local_id = multiplayer.get_unique_id()
 	online = true
 	return true
+
+
+## Client: one try at getting back in after a restart (240 amended): a
+## connection begun by reconnect() and waited on for [param limit] seconds
+## at most. One still connecting then is closed here, so only one attempt is
+## ever live: left open, it went on trying through the wait before the next,
+## got in if the server came up then, and was replaced by the next try's,
+## and the player joined twice (net_test phase 5, "back on (9, 2)" twice).
+## True once connected, through the one path a first connection takes
+## (connected_to_server, authenticate). A link already connected when it is
+## called is that try's, never replaced by a second.
+func reconnect_settled(limit := ATTEMPT_SECONDS) -> bool:
+	var link := multiplayer.multiplayer_peer
+	if online and link is ENetMultiplayerPeer and link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		return true
+	if not reconnect():
+		return false
+	link = multiplayer.multiplayer_peer
+	var deadline := Time.get_ticks_msec() + int(limit * 1000.0)
+	while link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTING and Time.get_ticks_msec() < deadline:
+		await get_tree().create_timer(0.1).timeout
+	if link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED:
+		return true
+	shutdown()
+	return false
 
 
 func _on_connected_to_server() -> void:

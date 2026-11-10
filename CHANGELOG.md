@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- When the server restarts, the game joins you back once, where before it sometimes let you in, dropped you two seconds later and joined you again, loading the world twice while others saw you leave and come back twice (240 amended).
 ## v0.1.210
 
 - What goes over the network changes, so v0.1.209 and older can't join the server: update through the launcher first.

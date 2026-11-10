@@ -22296,24 +22296,15 @@ func _reconnect() -> void:
 		await get_tree().create_timer(RECONNECT_EVERY).timeout
 		tries += 1
 		_connect_status("the server is restarting; trying again (%d)" % tries)
-		if Net.reconnect() and await _connection_settled():
+		# One attempt at a time: one still connecting at its limit is closed
+		# before the next (240 amended).
+		if await Net.reconnect_settled():
 			print("[net] reconnected (try %d)" % tries)
 			_reconnecting = false
 			return
 	print("[net] gave up reconnecting after %d tries" % tries)
 	_connect_status("the server is gone", true)
 	_reconnecting = false
-
-
-## Whether the connection Net.reconnect began got through (false when it
-## failed or is still trying after 10 s).
-func _connection_settled() -> bool:
-	var deadline := Time.get_ticks_msec() + 10000
-	var link := multiplayer.multiplayer_peer
-	while link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTING \
-			and Time.get_ticks_msec() < deadline:
-		await get_tree().create_timer(0.1).timeout
-	return link.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
 
 ## Client: the zone's entities go, as on a change of zone, with the map left
