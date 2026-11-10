@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The draugr's window always shows his own demand now, even when you're short of gold, where before it put a line about refusing him in his mouth (735 amended).
 - Towns: when a town is short of ore, its folk tell you of the old iron workings at Hollowfell, up in the hills, and Hollowfell goes on your map (837).
 - Robbers and skeletons fall when you kill them again, where before they froze standing where they died (338 amended (7)).
 - Wherever you can fish, rings spread on the water now and then where fish rise, with a fleck of spray when they feed hard; they rise most at dawn and dusk and in light or steady rain, and a bite comes sooner then (805 amended (10)).

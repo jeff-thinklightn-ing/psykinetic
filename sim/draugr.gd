@@ -124,7 +124,11 @@ const AGAIN_WORDS := "Your gold is paid. Come, then."
 ## Hall opens (573 amended). First of his offers when the purse is under
 ## his least deal (today's panel shows the first deal), else last.
 const REFUSE_TITLE := "Refuse"
-const REFUSE_WORDS := "Refuse him, and he fights you for it."
+## The refusal's words are his own demand (735 amended, playtest's tour,
+## voice's trace): the deal window shows the first offer's words under his
+## name as his speech, and the free refusal comes first for a thin purse;
+## a line describing the button read as if he said it.
+const REFUSE_WORDS := WORDS
 ## His words on being refused (Jeff's own).
 const REFUSED := "Then I'll take it from you by force!"
 

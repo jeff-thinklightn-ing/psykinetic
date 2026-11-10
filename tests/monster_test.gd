@@ -4970,9 +4970,9 @@ func _test_draugr() -> void:
 	World.add_gold("p1", -held_gold, "test")
 	var poor := draugr.offers_for("p1")
 	_check(poor.size() == 2 and poor[0]["id"] == "deal:%d:refuse" % draugr.id and int(poor[0]["cost"]) == 0 and (poor[0]["what"]["steps"] as Array).is_empty()
-		and poor[0]["title"] == "Refuse" and int(poor[1]["cost"]) == 10 and DealPanel.no_deal(poor) == poor[0]
+		and poor[0]["title"] == "Refuse" and poor[0]["words"] == Draugr.WORDS and int(poor[1]["cost"]) == 10 and DealPanel.no_deal(poor) == poor[0]
 		and DealPanel.first_deal(poor) == poor[1],
-		"no gold: his first deal is the free refusal (what an older panel shows), the panel's Refuse, his gold deal after (%s)" % [poor.map(func(o: Dictionary) -> String: return str(o["id"]))])
+		"no gold: his first deal is the free refusal (what an older panel shows), the panel's Refuse, his own demand its words (735 amended), his gold deal after (%s)" % [poor.map(func(o: Dictionary) -> String: return str(o["id"]))])
 	var anger_was := said.count(Draugr.ANGER)
 	var drawn := draugr.accept_offer(player, poor[0], 0)
 	World.step()

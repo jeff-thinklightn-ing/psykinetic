@@ -37548,6 +37548,9 @@ resident_test `_test_hut_ruin`: standing and disrepair bring them back at
 the hut, a ruin elsewhere with the care kept, the line, no care offered at
 a ruin, nobody seated at 5 days empty and a new keeper at vacant_days.
 Server only; protocol unchanged.
+
+735 amended: the refusal speaks his own demand (2026-11-10, release's label; the coordinator's ask, found by playtest's draugr tour, traced by voice). A player under his least deal (10 gold) saw "Refuse him, and he fights you for it." under the draugr's name as if he said it: DealPanel shows the first offer's "words" as the speaker's, and for a thin purse the free Refuse offer comes first (735), its REFUSE_WORDS a line describing the button. Now Draugr.REFUSE_WORDS is WORDS, his demand ("Return the gold your people stole from this place, when you do that you may leave."), so the window shows what he asks whichever offer comes first; the Refuse button, taking it (REFUSED, his laugh, the fight at his own level) and his gold deals unchanged. No new words. monster_test (the poor player's first offer carries WORDS). CHANGELOG (voice's bullet). Server only, protocol unchanged, no new class_name.
+
 ## 736. A starter weapon vendor, outside the town's economy
 
 Jeff: "add a vendor with the base weapons for 1g each, bow, arrow, sword,
