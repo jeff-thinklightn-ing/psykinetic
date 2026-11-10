@@ -47186,3 +47186,53 @@ corrections later (states 238-544, the bear 0.2-2.2 cells off) came in the fight
 the blow halt's, not this.
 Server and client; the wire is unchanged (protocol unchanged); no new
 class_name. One CHANGELOG bullet in voice's words.
+## 834. Decision numbers come from a script, not from release
+
+(perf, 2026-11-10; the number release's, by hand, the last one; the coordinator's approved design with its
+seven changes. Jeff agreed that numbers come from a script.) In the week before, the land lock was held 20 to 22
+hours a day, about 450 landings each waited on release for a number, and release was the top token user,
+much of it on hand-outs.
+- `sh tools/decision_number.sh new <tree> "<what>"` prints the next number, and `amend <tree> <decision>
+  "<what>"` prints the next label ("D amended (k)"; an example with real numbers here would itself be
+  counted). `drop <tree> <label> "<why>"` marks a hand-out that will
+  never land; only its holder or release may drop it. `status` lists what is out and not on origin/main
+  (`--all`: the whole log). The number or label is printed alone on stdout with exit 0; any failure prints
+  nothing on stdout and exits non-zero (2 refused, 3 not open yet, 4 lock held), so `n=$(...)` is safe.
+- State lives in C:/dev/decision_numbers, beside the land lock, outside every checkout: log.tsv is append-only
+  (time, tree, event, label, what, with tabs and newlines stripped from what), and a lock folder (atomic
+  mkdir) is held only for the read and the append. `git show origin/main:docs/decisions.md` runs before the
+  lock is taken, so the hold stays milliseconds even beside a suite. A lock is taken over only when it is past
+  30 s and its holder's process is gone. Two trees asking at once are serialised and never get the same number.
+- The next number is one over the highest of: any heading starting "## N" on origin/main (every shape: "## N.",
+  "## N amended: ...", "## N, economy's side"), the floor release's open wrote, and every label's leading number
+  in the log. The next amendment of D is one over the highest k of "D amended (k)" anywhere on main (headings
+  and paragraphs; a bare "D amended", or brackets holding a date or a sha, is (1)) and in the log, release's
+  seeds as written included. A decision that is neither on main nor handed out is refused, so a typo can't
+  start a series. There is no fetch per ask: every checkout shares one origin/main, and the log covers
+  anything newer. Over-counting only makes a gap.
+- Closed until release opens it. `seed release <label> <tree> "<what>"` records each hand-out release has out
+  and unlanded, in its own shapes ("831 plus the (b) paragraph" is listed in status until dropped; a "D amended
+  (k)" inside one counts toward k; a bare "D amended", which may be the first or the next after main's, holds
+  the one after main's highest and is listed until dropped). `open release` fetches and writes main's highest heading as the floor. Until
+  then new and amend refuse with "not open yet: ask release", so a tree that rebases onto this landing can't
+  take a number before the hand-over is in. Seeding after open is refused.
+- A dropped number stays a gap and is never returned. A returned one could reach two trees: the one that
+  dropped it and later took its work back up under that number, and the next one to ask. Gaps are already
+  common in this file.
+- Follow-ups (the coordinator's ruling): a follow-up that lands on its own takes the next "amended (k)"; a
+  paragraph added to work not yet landed stays under its hand-out and takes nothing; a tree landing its side
+  of a decision the coordinator named uses that decision's number and takes nothing. No more folding or
+  sub-letters; the ten (b), (c), (d) on main stay as history.
+- PROTOCOL_REVISION numbers and release versions stay with release, and trees still tell release when they
+  land (commit, protocol change, new class_name). A land.sh warning for a commit whose number wasn't handed to
+  its tree is a later step.
+tests/decision_number_test.py, in land.sh beside heavy_job_test (Python only, a few seconds), uses a state
+folder and a decisions.md of its own. It checks: every heading shape and the bare, date and sha forms placed;
+new and amend refused before open; seed and open release's alone; a seeded number and a seeded label as
+written skipped; a number on main skipped; a bare one counted as (1); an unknown decision, a prefix of one or a
+word refused; drop by another tree refused, by its holder or release accepted, never twice, never returned;
+status without what landed or was dropped, release's shapes kept; 12 processes asking new at the same instant
+get 12 consecutive numbers, and 6 asking amend 688 get (k+1) to (k+6); a stale lock whose holder is gone taken
+over, an old one whose holder lives not (exit 4). Over the real file it places every "## " heading and every
+"D amended" label (none unplaced) and new gives 845 today, over 833. Tools only; protocol unchanged; no
+class_name; no bullet.

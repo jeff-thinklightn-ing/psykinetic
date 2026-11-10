@@ -90,6 +90,7 @@ part() {
 	echo "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)  $name ${took}s"
 }
 part heavy_job_test python -B tests/heavy_job_test.py
+part decision_number_test python -B tests/decision_number_test.py
 part changelog_check_test python -B tests/changelog_check_test.py
 part changelog_resolve_test python -B tests/changelog_resolve_test.py
 # Started a little apart, as the suite starts its scenes (decision 530: Godots
@@ -118,7 +119,7 @@ wait
 
 code=0
 failed=""
-for name in heavy_job_test changelog_check_test changelog_resolve_test suite net_test state_test server_boot_test; do
+for name in heavy_job_test decision_number_test changelog_check_test changelog_resolve_test suite net_test state_test server_boot_test; do
 	# A part killed before it wrote its status (no file, or empty) fails: an
 	# empty status passed the test once, and economy's landing pushed over a
 	# suite killed mid-run (2026-10-23). Only a status of exactly 0 passes.
@@ -150,7 +151,7 @@ if [ -n "$failed" ]; then
 fi
 echo
 if [ "$code" -eq 0 ]; then
-	line="LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, changelog_check_test, changelog_resolve_test; $(( $(date +%s) - started ))s)"
+	line="LANDING TESTS: PASS (suite, net_test, state_test, server_boot_test, heavy_job_test, decision_number_test, changelog_check_test, changelog_resolve_test; $(( $(date +%s) - started ))s)"
 else
 	line="LANDING TESTS: FAIL ($failed; $(( $(date +%s) - started ))s)"
 fi
