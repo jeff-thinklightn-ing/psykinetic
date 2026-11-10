@@ -26,6 +26,12 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	# Every Godot the tooling starts writes its own log in build/logs, never
 	# the shared user:// logs folder (decision 664).
 	python -B tools/godot_log_check.py || { echo "LANDING TESTS: FAIL (a Godot launch without --log-file, silence or off-screen, decision 664 and its amendments: fix it as above)"; exit 1; }
+	# docs/voice_inventory.md is generated: a changed player's line means
+	# re-running its tool, never a hand edit (748 amended (6)). A warning, said
+	# again before the result line, until v0.1.211's unfreeze; then it fails here.
+	inventory_stale=""
+	python -B tools/voice_inventory.py --check || inventory_stale="VOICE INVENTORY STALE (a warning now; this fails landings from v0.1.211): run python -B tools/voice_inventory.py and commit docs/voice_inventory.md with your change"
+	[ -n "$inventory_stale" ] && echo "$inventory_stale"
 	echo "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No
@@ -44,6 +50,7 @@ if [ -z "${HEAVY_JOB_INSIDE:-}" ]; then
 	rm -f "$result"
 	[ -n "$line" ] || line="LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)"
 	echo
+	[ -n "$inventory_stale" ] && echo "$inventory_stale"
 	echo "$line"
 	case "$line" in
 		"LANDING TESTS: PASS"*) exit $code ;;

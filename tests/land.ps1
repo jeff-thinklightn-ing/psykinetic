@@ -29,6 +29,15 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 		Write-Output "LANDING TESTS: FAIL (a Godot launch without --log-file, decision 664: fix it as above)"
 		exit 1
 	}
+	# docs/voice_inventory.md is generated: a changed player's line means
+	# re-running its tool, never a hand edit (748 amended (6)). A warning, said
+	# again before the result line, until v0.1.211's unfreeze; then it fails here.
+	$inventoryStale = ''
+	& python -B (Join-Path $root 'tools\voice_inventory.py') --check
+	if ($LASTEXITCODE -ne 0) {
+		$inventoryStale = 'VOICE INVENTORY STALE (a warning now; this fails landings from v0.1.211): run python -B tools/voice_inventory.py and commit docs/voice_inventory.md with your change'
+		Write-Output $inventoryStale
+	}
 	Write-Output "landing tests: through the heavy-job gate as $tree suite (decision 394)"
 	# The result line said again last, after the gate's own lines (its
 	# memory table): a check reading the log's tail reads the result. No
@@ -64,6 +73,7 @@ if (-not $env:HEAVY_JOB_INSIDE) {
 	Remove-Item $result -ErrorAction SilentlyContinue
 	if (-not $line) { $line = "LANDING TESTS: FAIL (the gated run ended, exit $code, with no result)" }
 	Write-Output ''
+	if ($inventoryStale) { Write-Output $inventoryStale }
 	Write-Output $line
 	if ($line.StartsWith('LANDING TESTS: PASS')) { exit $code }
 	if ($code -ne 0) { exit $code }
