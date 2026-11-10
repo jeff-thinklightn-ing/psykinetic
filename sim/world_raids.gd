@@ -378,7 +378,9 @@ func _arrive(id: String, last: Dictionary) -> void:
 		# Home to a camp its side no longer holds (decision 429): the group
 		# breaks up, its captives go free (Towns.free_held, decision 428) and
 		# what it took is left at the camp for whoever finds it.
-		var freed: Array[String] = towns.free_held(id) if towns != null else []
+		var freed: Array[String] = []  # Typed: a bare [] in a ternary is untyped and fails the assign.
+		if towns != null:
+			freed = towns.free_held(id)
 		print("[raids] %s comes home to %s, fallen: it breaks up, freeing %s" % [id, group["from"], freed])
 		_stow(id)
 		_end(id)

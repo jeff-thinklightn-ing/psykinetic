@@ -34547,6 +34547,25 @@ _test_rout_way_out: a robber routed where robbers are at home seeks no way
 out and is still there 120 ticks on. Server only, protocol unchanged, no
 new class_name.
 
+702 amended (2) (playtest's barrow tour on maps-832; release's label; the
+coordinator's order): a camp robber routed beside the camp's door threw
+"Trying to assign an array of type "Array" to a variable of type
+"Array[Vector2i]"" in Monster._pick_way_out. Its path to a way out within
+a cell was a bare [] in a ternary, untyped, so the typed assign failed
+whenever a fleer already stood beside its way out; the call returned
+Vector2i(0, 0) for its way out, and it ran for the level's corner, away
+from the door (12 cells off it 40 ticks on, in the test). Now a typed
+empty path, filled by an if. sim/world_raids.gd's fallen-camp freeing
+(decision 429) had the same shape (`... if towns != null else []`) and is
+mended the same way; no test reaches it cheaply, since with no Towns no
+group is sent (targets is empty) and _stow, the line after, reads
+towns.production. monster_test _test_rout_way_out: a robber routed beside
+the barrow's entrance makes for it and is gone by it within 40 ticks (on
+the old code it made for (0, 0) and fails). No bullet: the flee was meant
+to work already. The box's journal showed no logged error or crash since
+v0.1.209 went up, though the release build may not print script errors.
+Server only, protocol unchanged, no new class_name.
+
 ## 177 amended: every body shader marks the stencil under the target outline
 
 Jeff on v0.1.187: "mousing over or left clicking an enemy causes their whole

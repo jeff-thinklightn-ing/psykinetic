@@ -3041,7 +3041,9 @@ func _pick_way_out(foe: Vector2i) -> Vector2i:
 	var best_size := INF
 	var start := World.distance(tile, foe)
 	for at in World.ways_out():
-		var path: Array[Vector2i] = [] if World.distance(tile, at) <= 1 				else World.find_path(tile, at, false, null, ESCAPE_SEARCH_TILES, false, {}, opens_doors_now())
+		var path: Array[Vector2i] = []  # Typed: a bare [] in a ternary is untyped and fails the assign.
+		if World.distance(tile, at) > 1:
+			path = World.find_path(tile, at, false, null, ESCAPE_SEARCH_TILES, false, {}, opens_doors_now())
 		if path.is_empty() and World.distance(tile, at) > 1 or path.size() >= best_size:
 			continue
 		var past := false

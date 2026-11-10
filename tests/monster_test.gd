@@ -3676,6 +3676,23 @@ func _test_rout_way_out() -> void:
 	_check(bones._way_out == Monster.NO_TILE and bones.spawned and not gone.has("Bones"),
 			"a skeleton routed beside them (bound to its barrow): no way out, still there at %s" % bones.tile)
 	World.entity_despawned.disconnect(left)
+	# One routed beside the way out: its path there was a bare [] in a ternary,
+	# untyped, and the assign failed (playtest's barrow tour, a camp robber at its door).
+	var beside := EntityFactory.build(SPECS["x"].merged({"name": "Beside", "props": Monster.bodies()["robber"]})) as Monster
+	_room.add_child(beside)
+	World.spawn(beside, entrance + Vector2i(0, 1))
+	beside._flee(player.tile)
+	var sought_out := beside._way_out
+	var out_by := -1
+	for i in 40:
+		World.step()
+		if not beside.spawned:
+			out_by = i + 1
+			break
+	_check(sought_out == entrance and out_by > 0,
+			"a robber routed beside the entrance: making for it (%s), gone by it at tick %d (at %s)" % [sought_out, out_by, beside.tile])
+	if beside.spawned:
+		World.despawn(beside)
 	World.outdoor = true
 	var outside := EntityFactory.build(SPECS["x"].merged({"name": "Outside", "props": Monster.bodies()["robber"]})) as Monster
 	_room.add_child(outside)
