@@ -1834,6 +1834,7 @@ func _test_ambush() -> void:
 	_test_boar_king()
 	_test_boar_king_close()
 	_test_boar_king_far_chase()
+	_test_boar_king_rates()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -7425,6 +7426,127 @@ func _test_boar_king_far_chase() -> void:
 		else:
 			_check(far and first_away >= 0 and died >= 0 and died - first_away <= 150,
 				"followed and struck, the far way, he falls %d ticks after his first step away (%d steps)" % [died - first_away if died >= 0 else -1, steps])
+	DayNight.reset()
+	Monster.idling = true
+
+
+## His harm per minute alone on one player (the coordinator, for his
+## unshelve), 2 minutes each in the open: held still; circling him 1-2 off;
+## a reader stepping off every told line and striking him when beside; and
+## one missing every 2nd told line, held still through it; and a reader who
+## also steps out of his bite's wind-up. Every blow of his that hurts is told:
+## the reader takes no charge, the still and the missing ones do, and one who
+## answers his bite too takes nothing. Rates printed for the tuning (today:
+## still 78 hp/min, circling 0, reader 24, every 2nd missed 48, answering 0).
+func _test_boar_king_rates() -> void:
+	print("%s== the boar king's harm per minute, alone on one player: told charges read are never struck ==" % char(10))
+	var rate := {}
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	var arena: Array[String] = ["#".repeat(46)]
+	for y in 25:
+		arena.append("#" + ".".repeat(44) + "#")
+	arena.append("#".repeat(46))
+	for cfg: Array in [[int(Monster.kinds()["boar_king"]["body"]["attack_damage"]), int(BoarKing.CHARGE["every"]), "today"]]:
+		for mode: String in ["still", "circling", "reader", "miss2", "answers"]:
+			var rows := arena.duplicate()
+			rows[13] = rows[13].substr(0, 18) + "K" + rows[13].substr(19)
+			rows[13] = rows[13].substr(0, 23) + "P" + rows[13].substr(24)
+			var e := _build(rows)
+			var king: BoarKing = e["K"][0]
+			var player: GridEntity = e["P"][0]
+			player.protected = false
+			player.max_hp = 1000
+			player.hp = 1000
+			king.max_hp = 100000
+			king.hp = 100000
+			king.sight_range = 12
+			king.attack_damage = int(cfg[0])
+			king.charge["every"] = int(cfg[1])
+			king.target = player
+			_damage_log.clear()
+			var tells := 0
+			var was := ""
+			var bites := 0
+			var bite_hp := 0
+			var hits := 0
+			var hit_hp := 0
+			var spin := 1
+			var reader_next := 0
+			var leads_answered := 0
+			var ignoring := false
+			var strikes := 0
+			var ticks := 1200
+			for i in ticks:
+				var before := str(king._move.get("move", ""))
+				if mode == "answers" and not king._windup.is_empty() and king._windup.get("target") == player:
+					# His bite's lead seen: a step out of his reach, away from him.
+					var out := Vector2i.ZERO
+					for way: Vector2i in World.DIRECTIONS:
+						var cell := player.tile + way
+						if World.distance(cell, king.tile) >= 2 and not cell in king.told_line and World.is_walkable(cell) and World.is_free(cell):
+							out = way
+							break
+					if out != Vector2i.ZERO:
+						if World.try_move(player, out):
+							leads_answered += 1
+				elif mode == "reader" or mode == "miss2" or mode == "answers":
+					# Reads every tell (miss2: every 2nd missed, held still through it): off his told line at once; else at him, striking when beside and ready.
+					if player.tile in king.told_line and not ignoring:
+						var off := Vector2i.ZERO
+						for way: Vector2i in World.DIRECTIONS:
+							if not (player.tile + way) in king.told_line and World.is_walkable(player.tile + way) and World.is_free(player.tile + way):
+								off = way
+								break
+						if off != Vector2i.ZERO:
+							World.try_move(player, off)
+					elif World.distance(player.tile, king.tile) <= 1:
+						if World.tick >= reader_next:
+							World.face(player, king.tile - player.tile)
+							if World.try_attack(player, king):
+								reader_next = World.tick + World.attack_ticks_of(player)
+								strikes += 1
+					elif king.told_line.is_empty() and not ignoring:
+						World.try_move(player, Senses.way_toward(player.tile, king.tile))
+				elif mode == "circling":
+					var d := World.distance(player.tile, king.tile)
+					if d > 2:
+						World.try_move(player, Senses.way_toward(player.tile, king.tile))
+					else:
+						var v := player.tile - king.tile
+						var way := Vector2i(clampi(-v.y * spin, -1, 1), clampi(v.x * spin, -1, 1))
+						if not World.try_move(player, way) and World.tick >= player.next_move_tick:
+							spin = -spin
+				World.step()
+				var move := str(king._move.get("move", ""))
+				if move == "charge" and was != "charge":
+					tells += 1
+					ignoring = mode == "miss2" and tells % 2 == 0
+				if move == "" and was == "rush" or move == "skid":
+					ignoring = false
+				was = move
+				for dd: Dictionary in _damage_log:
+					if int(dd["tick"]) != World.tick or dd["entity"] != player or dd["source"] != king:
+						continue
+					if before == "rush" or move == "rush" or before == "charge":
+						hits += 1
+						hit_hp += int(dd["amount"])
+					else:
+						bites += 1
+						bite_hp += int(dd["amount"])
+				player.hp = maxi(player.hp, 900)
+			var per := 600.0 / float(ticks)
+			rate[mode] = [hit_hp * per, (hit_hp + bite_hp) * per, strikes * per]
+			if mode == "answers":
+				print("  his bite's wind-up %d ticks; steps out of it %d" % [king.windup_ticks, leads_answered])
+			print("  rate %s, %s: per minute %.1f tells, %.1f charge hits (%.1f hp), %.1f bites (%.1f hp), harm %.1f hp/min; its strikes %.1f/min" % [cfg[2], mode,
+				tells * per, hits * per, hit_hp * per, bites * per, bite_hp * per, (hit_hp + bite_hp) * per, strikes * per])
+	_check(rate["reader"][0] == 0.0 and rate["still"][0] > 0.0 and rate["miss2"][0] > 0.0,
+		"his charge strikes only one in its told line: a reader %.0f hp/min of charge, held still %.0f, every 2nd tell missed %.0f" % [rate["reader"][0], rate["still"][0], rate["miss2"][0]])
+	_check(rate["answers"][1] == 0.0 and rate["answers"][2] > 0.0,
+		"his bite is answered too: one who also steps out of its %d-tick wind-up takes %.0f hp/min, striking %.0f times a minute" % [int(Monster.WINDUP_TICKS), rate["answers"][1], rate["answers"][2]])
+	_check(rate["still"][1] > rate["miss2"][1] and rate["miss2"][1] > rate["reader"][1],
+		"each misread costs: harm a minute held still %.0f, every 2nd tell missed %.0f, reading every one %.0f, circling %.0f" % [rate["still"][1], rate["miss2"][1], rate["reader"][1], rate["circling"][1]])
 	DayNight.reset()
 	Monster.idling = true
 
