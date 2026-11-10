@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The old grey's lunge and the great bear's charge stop where their red line ends now, at any angle, so past its end you're clear, where before one run on a slant could carry a cell or two further and strike you there (780 amended (27)).
 - The red a big foe marks for a slanting or fanned blow runs in one smooth shape along its edge now, still over just the ground it will strike, where before that edge stepped from square to square (602 amended (4)).
 - In the hills, a spoil heap lies beside Hollowfell's mine mouth now, a mound of gravel tipped out of the mine with broken grey rock over it and at its foot and a few split timbers, where before a loose boulder and a scatter of rocks lay there (798 amended (5)).
 - A swing you click while walking always comes through now, a sword's quick blow or a heavy weapon's wind-up alike, where before it was often lost just as it should land, its stamina spent for nothing, most of all as you walked away (392 amended (6)).

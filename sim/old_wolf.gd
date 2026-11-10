@@ -230,7 +230,7 @@ func _tend_move() -> bool:
 			var told := int(_move["telegraph"])
 			var toward: Vector2 = _move["toward"]
 			_move = {}
-			if World.rush(self, toward, int(spring["cells"]), {"blow": {"impulse": 0.0}}):
+			if World.rush(self, toward, int(spring["cells"]), {"blow": {"impulse": 0.0}, "within": World.told_cells(told)}):  # Never past its told end (780 amended (27)).
 				_move = {"move": "rush", "telegraph": told}
 				return true
 			World.end_telegraph(told, false)
@@ -302,14 +302,7 @@ func _on_rush_ended(entity: GridEntity, reason: String, _at: Vector2i, result: D
 ## Whether [param body] stands on telegraph [param told]'s cells (the cell a
 ## blow on it strikes, World.struck_cell): the run-up bite's reach.
 func _on_told(body: GridEntity, told: int) -> bool:
-	var shown: Variant = World.telegraphs().get(told)
-	if not shown is Dictionary:
-		return false
-	var at := World.struck_cell(body)
-	for cell: Variant in (shown as Dictionary)["cells"]:
-		if Vector2i(int(cell[0]), int(cell[1])) == at:
-			return true
-	return false
+	return World.struck_cell(body) in World.told_cells(told)
 
 
 ## The way from [param bitten] toward his pack's middle; none with no pack.

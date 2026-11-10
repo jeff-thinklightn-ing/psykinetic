@@ -5484,6 +5484,16 @@ func end_telegraph(id: int, landed: bool) -> void:
 	telegraph_ended_in.emit(zone_name, id, landed)
 
 
+## The cells telegraph [param id] shows, as sent (decision 602); none
+## once it has ended.
+func told_cells(id: int) -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	if _telegraphs.has(id):
+		for cell: Array in _telegraphs[id]["data"]["cells"]:
+			out.append(Vector2i(int(cell[0]), int(cell[1])))
+	return out
+
+
 ## The telegraphs showing now, by id: their data as sent (decision 602).
 func telegraphs() -> Dictionary:
 	var out := {}
@@ -10011,7 +10021,11 @@ func lunge(entity: GridEntity, toward: Vector2, cells: int, opts := {}) -> Dicti
 ## it cannot go on through ("body"), the terrain ("wall") and a stun
 ## ("stunned"); reaching its cell or running its cells is "arrived". Each
 ## end emits rush_ended(entity, reason, at, result). True if it started.
-## Server only. A rushing body does not walk or strike on its own.
+## Server only. A rushing body does not walk or strike on its own. A told
+## run passes "within": its telegraph's cells (told_cells), and it stops,
+## "arrived", before a cell its mark didn't show: a slanted run steps its
+## cells along its slant, further than the line it told (780 amended (27),
+## 602's promise that a blow lands where it's marked).
 func rush(entity: GridEntity, toward: Vector2, cells: int, opts := {}) -> bool:
 	if _rushers.has(entity):
 		return false
@@ -10339,7 +10353,7 @@ func _lunge_begin(entity: GridEntity, toward: Vector2, cells: int, opts: Diction
 	entity.protected = false
 	return {"entity": entity, "start": entity.tile, "line": line, "cells": cells, "ticks": ticks,
 		"u": line.length() / ticks, "blow": opts.get("blow", {}), "through": bool(opts.get("through", false)),
-		"to": opts.get("to", NO_CELL), "moved": 0, "drag": 1.0, "cell_ticks": ticks, "spent_ticks": 0.0, "reason": "", "stopped_by": "", "struck": [], "impact": 0}
+		"to": opts.get("to", NO_CELL), "within": opts.get("within", []), "moved": 0, "drag": 1.0, "cell_ticks": ticks, "spent_ticks": 0.0, "reason": "", "stopped_by": "", "struck": [], "impact": 0}
 
 
 ## One cell of a lunge or a rush ([param timed]: a rush's, drawn as it is
@@ -10358,6 +10372,11 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 			or entity.is_creature() and is_burning(next) or not entity is Player and is_link_cell(next):
 		state["reason"] = "wall"
 		state["stopped_by"] = "wall" if _closed_door_across(entity.tile, direction) == null else "a door"
+		return
+	# After the terrain: a wall at its told end is still a wall (the king crashes).
+	if not (state["within"] as Array).is_empty() and not next in (state["within"] as Array):
+		state["reason"] = "arrived"
+		state["stopped_by"] = "nothing (its told line's end)"
 		return
 	# The ground (607 amended): this cell takes ground_drag times its time, and
 	# the body is at that cell's speed in it (what a spear or a body met

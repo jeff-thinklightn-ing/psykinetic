@@ -466,7 +466,8 @@ func _tend_move() -> bool:
 			_log_move(move, "landed on %d" % hit.size() if not hit.is_empty() else "dodged")
 		"charge":
 			# Its told line stays down until the rush stops (810 amended (2)): ended in _on_rush_ended.
-			if World.rush(self, _move["toward"], int(charge["cells"]), {"blow": {"impulse": float(charge["impulse"])}}):
+			if World.rush(self, _move["toward"], int(charge["cells"]), {"blow": {"impulse": float(charge["impulse"])},
+					"within": World.told_cells(id)}):  # Never past its told end (780 amended (27)).
 				_move = {"move": "rush", "telegraph": id}
 				return true
 			World.end_telegraph(id, false)

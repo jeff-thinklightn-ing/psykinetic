@@ -447,7 +447,7 @@ func _tend_move() -> bool:
 			var toward: Vector2 = _move["toward"]
 			var cells := int(_move["cells"])
 			_move = {}
-			if World.rush(self, toward, cells, {"blow": {"impulse": 0.0}}):
+			if World.rush(self, toward, cells, {"blow": {"impulse": 0.0}, "within": World.told_cells(told)}):  # Never past its told end (780 amended (27)).
 				_move = {"move": "rush", "toward": toward, "telegraph": told}
 				_cry(&"charge", NOISE_CHARGE)
 				return true

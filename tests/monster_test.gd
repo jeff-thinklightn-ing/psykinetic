@@ -1838,6 +1838,7 @@ func _test_ambush() -> void:
 	_test_boar_king_rates()
 	_test_old_wolf_lunge_line()
 	_test_old_wolf_rates()
+	_test_told_runs_stop()
 	_test_boar_king_aim()
 	_test_boar_king_tell_through_rush()
 	_test_boar_king_lair()
@@ -7507,6 +7508,169 @@ func _test_boar_king_far_chase() -> void:
 	Monster.idling = true
 
 
+## The rate checks' one step (the coordinator's ruling, 780 amended (27)):
+## [param player] steps to the free cell off [param line] furthest from
+## [param boss], at least [param reach] off him when given (out of his
+## bite); false if there is none or the step is refused. Every boss's rate
+## check reads and answers with it, so the tables compare, and no test
+## player walks herself into a corner by DIRECTIONS order.
+func _step_clear(player: GridEntity, boss: GridEntity, line: Array[Vector2i], reach := 0) -> bool:
+	var best := Vector2i.ZERO
+	var best_d := -1
+	for way: Vector2i in World.DIRECTIONS:
+		var cell := player.tile + way
+		var d := World.distance(cell, boss.tile)
+		if d >= reach and d > best_d and not cell in line and World.is_walkable(cell) and World.is_free(cell):
+			best_d = d
+			best = way
+	return best != Vector2i.ZERO and World.try_move(player, best)
+
+
+## A told run never passes its red (780 amended (27), 602's promise): the
+## old grey's lunge, the great bear's charge and the boar king's charge tell
+## a straight line of their run's length, and World._lunge_cell steps a run
+## along its slant (toward over its longer axis), which on a slant is longer
+## than the line told. With its telegraph's cells as "within" the run stops
+## at the told end. Over every aim each would begin (his reach, his told
+## line taking in the aim, open ground): a body standing at the first cell
+## past the told end is never struck, and the run enters no cell its mark
+## didn't show; without "within" the same sweep strikes there. Then each
+## on his own body: she steps back along his slant past the told end
+## during his tell, and nothing strikes her.
+func _test_told_runs_stop() -> void:
+	print("%s== a told run stops at its told end, at every angle: the grey's lunge, the bear's and the king's charge ==" % char(10))
+	var ended := {}
+	var on_end := func(entity: GridEntity, _reason: String, _at: Vector2i, result: Dictionary) -> void:
+		ended[entity] = result
+	World.rush_ended.connect(on_end)
+	var grey_row: Dictionary = Monster.kinds()["old_wolf"]["moves"]["spring"]
+	var bear_row: Dictionary = Monster.kinds()["great_bear"]["moves"]["charge"]
+	var king_row: Dictionary = Monster.kinds()["boar_king"]["moves"]["charge"]
+	# [who, nearest aim, furthest aim, his run's cells for an aim (his told length the same)].
+	var movers: Array = [
+		["the grey's lunge", 2, int(grey_row["cells"]), func(_d: int) -> int: return int(grey_row["cells"])],
+		["the bear's charge", int(bear_row["from"]), int(bear_row["cells"]), func(_d: int) -> int: return int(bear_row["cells"])],
+		["the king's charge", int(king_row["from"]), int(king_row["cells"]), func(d: int) -> int: return d + int(king_row["past"])]]
+	var rows: Array[String] = ["#".repeat(40)]
+	for y in 38:
+		rows.append("#" + ".".repeat(38) + "#")
+	rows.append("#".repeat(40))
+	var origin := Vector2i(19, 19)
+	for each: Array in movers:
+		var reach: int = each[2]
+		var aims := 0
+		var past := {true: 0, false: 0}
+		var left := 0
+		for within: bool in [false, true]:
+			for y in range(-reach, reach + 1):
+				for x in range(-reach, reach + 1):
+					var aim := Vector2i(x, y)
+					var d := maxi(absi(x), absi(y))
+					if d < int(each[1]) or d > reach:
+						continue
+					var run: int = (each[3] as Callable).call(d)
+					var toward := Vector2(aim).normalized()
+					var told := Telegraph.cells(Telegraph.line(origin, toward, float(run), 1))
+					if not origin + aim in told:
+						if each[0] != "the king's charge" or not origin + aim in Telegraph.cells(Telegraph.line(origin, toward, float(run + 1), 1)):
+							continue
+						run += 1  # As his _try_charge: a cell longer when his line falls just short.
+						told = Telegraph.cells(Telegraph.line(origin, toward, float(run), 1))
+					var line := toward / maxf(absf(toward.x), absf(toward.y))
+					var beyond := World.NO_CELL
+					for k in range(1, run + 1):
+						var cell := origin + Vector2i((line * k).round())
+						if not cell in told:
+							beyond = cell
+							break
+					if within:
+						aims += 1
+					if beyond == World.NO_CELL:
+						continue
+					var e := _build(rows)
+					var mover := EntityFactory.build(SPECS["P"].merged({"name": "Mover", "tile": origin})) as Player
+					_room.add_child(mover)
+					World.spawn(mover, origin)
+					var stand := EntityFactory.build(SPECS["P"].merged({"name": "Stand", "tile": beyond})) as Player
+					_room.add_child(stand)
+					World.spawn(stand, beyond)
+					ended.clear()
+					var opts := {"blow": {"impulse": 0.0}}
+					if within:
+						opts["within"] = told
+					var went := World.rush(mover, toward, run, opts)
+					var outside := false
+					for i in 80:
+						World.step()
+						if mover.tile != origin and not mover.tile in told:
+							outside = true
+						if ended.has(mover) or not World.rushing(mover):
+							break
+					var struck: Array = (ended.get(mover, {}) as Dictionary).get("struck", [])
+					if went and struck.any(func(s: Variant) -> bool: return s is Dictionary and (s as Dictionary).get("body") == stand):
+						past[within] += 1
+					if within and outside:
+						left += 1
+					e.clear()
+		print("  %s: %d aims he'd begin; struck past the told end %d without its told cells, %d with; runs leaving the told cells %d" % [each[0], aims, past[false], past[true], left])
+		_check(past[false] > 0 and past[true] == 0 and left == 0,
+			"%s never passes its red: of %d aims, %d struck past the told end (%d before)" % [each[0], aims, past[true], past[false]])
+	World.rush_ended.disconnect(on_end)
+	# Each on his own body, a slanted aim: she stands on his line's last told
+	# cell and steps back along his slant during his tell, past its end.
+	Monster.idling = false
+	DayNight.set_hour(12.0)
+	for who: String in ["old_wolf", "great_bear", "boar_king"]:
+		var aim := Vector2i(2, 2) if who == "old_wolf" else Vector2i(4, 4)
+		var e := _build(rows)
+		var player := EntityFactory.build(SPECS["P"].merged({"name": "P", "tile": origin + aim})) as Player
+		_room.add_child(player)
+		World.spawn(player, origin + aim)
+		player.protected = false
+		player.max_hp = 1000
+		player.hp = 1000
+		var spec := Level._spec_for("monster_" + who, Level.MONSTER_TYPES)
+		spec["name"] = ("Apex_" + who).validate_node_name()
+		spec["tile"] = origin
+		Level.arm(spec)
+		var boss := EntityFactory.build(spec) as Monster
+		_room.add_child(boss)
+		World.spawn(boss, origin)
+		boss.sight_range = 12
+		boss.target = player
+		World.face(boss, Vector2i(1, 1))
+		_damage_log.clear()
+		var told: Array[Vector2i] = []
+		for i in 60:
+			World.step()
+			for id: int in World.telegraphs():
+				if World._telegraphs[id]["source"] == boss and str(World.telegraphs()[id]["kind"]) in ["lunge", "charge"]:
+					told = World.told_cells(id)
+			if not told.is_empty():
+				break
+		var back := origin + aim + Vector2i(1, 1)
+		var stepped := false
+		for i in 8:
+			if World.try_move(player, Vector2i(1, 1)):
+				stepped = true
+				break
+			World.step()
+		var harm := 0
+		for i in 60:
+			World.step()
+			if not World.rushing(boss) and str(boss.get("_move").get("move", "")) not in ["lunge", "charge", "rush"]:
+				break
+		for d: Dictionary in _damage_log:
+			if d["entity"] == player and d["source"] == boss:
+				harm += int(d["amount"])
+		_check(not told.is_empty() and origin + aim in told and not back in told and stepped and player.tile == back and harm == 0
+			and boss.tile in told,
+			"%s's told run at a slant stops at its told end: she stepped back past it to %s and took %d; he stopped at %s" % [who, back, harm, boss.tile - origin])
+		e.clear()
+	DayNight.reset()
+	Monster.idling = true
+
+
 ## The old grey as the server lays him (Apex._lay names him "Apex_old_wolf",
 ## and his name seeds his roll: Monster's _rng) at [param at] in this room.
 ## His roll is asserted where he's measured, so a rename or a change to the
@@ -7651,21 +7815,9 @@ func _test_old_wolf_rates() -> void:
 			if mode != "still":
 				var acted := false
 				if not held_line.is_empty() and player.tile in held_line and not ignoring:
-					for way: Vector2i in World.DIRECTIONS:
-						var cell := player.tile + way
-						if not cell in held_line and World.is_walkable(cell) and World.is_free(cell):
-							acted = World.try_move(player, way)
-							break
+					acted = _step_clear(player, grey, held_line)
 				elif mode == "answers" and aimed:
-					var best := Vector2i.ZERO
-					var best_d := 0
-					for way: Vector2i in World.DIRECTIONS:
-						var cell := player.tile + way
-						if World.is_walkable(cell) and World.is_free(cell) and not cell in held_line and World.distance(cell, grey.tile) > best_d:
-							best_d = World.distance(cell, grey.tile)
-							best = way
-					if best != Vector2i.ZERO:
-						World.try_move(player, best)
+					_step_clear(player, grey, held_line)
 					acted = true
 				if not acted:
 					if World.distance(player.tile, grey.tile) <= 1:
@@ -7730,8 +7882,11 @@ func _test_old_wolf_rates() -> void:
 ## one missing every 2nd told line, held still through it; and a reader who
 ## also steps out of his bite's wind-up. Every blow of his that hurts is told:
 ## the reader takes no charge, the still and the missing ones do, and one who
-## answers his bite too takes nothing. Rates printed for the tuning (today:
-## still 78 hp/min, circling 0, reader 24, every 2nd missed 48, answering 0).
+## answers his bite too takes nothing. On his live body, laid and named as
+## Apex._lay lays him (his name seeds his roll; asserted), his told run
+## stopped at its told end (780 amended (27)). Rates printed for the tuning
+## (today: still 75 hp/min, circling 12, reader 24, every 2nd missed 48,
+## answering 0).
 func _test_boar_king_rates() -> void:
 	print("%s== the boar king's harm per minute, alone on one player: told charges read are never struck ==" % char(10))
 	var rate := {}
@@ -7744,10 +7899,19 @@ func _test_boar_king_rates() -> void:
 	for cfg: Array in [[int(Monster.kinds()["boar_king"]["body"]["attack_damage"]), int(BoarKing.CHARGE["every"]), "today"]]:
 		for mode: String in ["still", "circling", "reader", "miss2", "answers"]:
 			var rows := arena.duplicate()
-			rows[13] = rows[13].substr(0, 18) + "K" + rows[13].substr(19)
 			rows[13] = rows[13].substr(0, 23) + "P" + rows[13].substr(24)
 			var e := _build(rows)
-			var king: BoarKing = e["K"][0]
+			var kspec := Level._spec_for("monster_boar_king", Level.MONSTER_TYPES)
+			kspec["name"] = ("Apex_" + "boar_king").validate_node_name()  # As Apex._lay names him: his name seeds his roll.
+			kspec["tile"] = Vector2i(18, 13)
+			Level.arm(kspec)
+			var king := EntityFactory.build(kspec) as BoarKing
+			_room.add_child(king)
+			World.spawn(king, Vector2i(18, 13))
+			if mode == "still":
+				_check(World.attack_ticks_of(king) == 28 and absf(king.boldness - 0.73) < 0.005 and king.reaction_ticks == 6,
+					"his roll as the server lays him (%s): attack_ticks 28, boldness 0.73, reaction 6 (%d, %.3f, %d)" % [
+					king.name, World.attack_ticks_of(king), king.boldness, king.reaction_ticks])
 			var player: GridEntity = e["P"][0]
 			player.protected = false
 			player.max_hp = 1000
@@ -7775,25 +7939,12 @@ func _test_boar_king_rates() -> void:
 				var before := str(king._move.get("move", ""))
 				if mode == "answers" and not king._windup.is_empty() and king._windup.get("target") == player:
 					# His bite's lead seen: a step out of his reach, away from him.
-					var out := Vector2i.ZERO
-					for way: Vector2i in World.DIRECTIONS:
-						var cell := player.tile + way
-						if World.distance(cell, king.tile) >= 2 and not cell in king.told_line and World.is_walkable(cell) and World.is_free(cell):
-							out = way
-							break
-					if out != Vector2i.ZERO:
-						if World.try_move(player, out):
-							leads_answered += 1
+					if _step_clear(player, king, king.told_line, 2):
+						leads_answered += 1
 				elif mode == "reader" or mode == "miss2" or mode == "answers":
 					# Reads every tell (miss2: every 2nd missed, held still through it): off his told line at once; else at him, striking when beside and ready.
 					if player.tile in king.told_line and not ignoring:
-						var off := Vector2i.ZERO
-						for way: Vector2i in World.DIRECTIONS:
-							if not (player.tile + way) in king.told_line and World.is_walkable(player.tile + way) and World.is_free(player.tile + way):
-								off = way
-								break
-						if off != Vector2i.ZERO:
-							World.try_move(player, off)
+						_step_clear(player, king, king.told_line)
 					elif World.distance(player.tile, king.tile) <= 1:
 						if World.tick >= reader_next:
 							World.face(player, king.tile - player.tile)
