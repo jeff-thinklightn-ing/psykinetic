@@ -50,6 +50,7 @@ func _ready() -> void:
 	_test_place_cells()
 	_test_decor()
 	_test_piece()
+	_test_cut_off()
 	_test_chest_rule()
 	await _test_layout_on_accept()
 	print("")
@@ -1348,6 +1349,50 @@ func _test_piece() -> void:
 		"remove: the lean-to taken away (%s)" % gone)
 	var stall_place := session.run_tool("mark_place", {"key": "a_stall", "kind": "stall", "at": [30, 12], "holder": "town"})
 	_check("lay a market_stall with piece, dressing only" in str(stall_place.get("text")), "mark_place's stall refusal names piece now")
+
+
+## The cut-off check (844): an edit that leaves ground unreachable from
+## every start and arrival is undone and refused, naming what is cut off;
+## a detour passes; a removal never trips it; its time on the hills.
+func _test_cut_off() -> void:
+	print("
+== 844: no edit cuts ground off from the starts and arrivals ==")
+	var doc := _doc()
+	doc.config["starts"] = [[2, 2]]
+	doc.config["links"] = [{"at": [30, 10], "to": "wilds", "to_spawn": "from_test"}]
+	# A wall down x 20 (its east edges), open only at y 10 and 11: the east side's one way in.
+	for y in 30:
+		if y != 10 and y != 11:
+			doc.map.set_edge(Terrain.edge_key(Vector2i(20, y), Vector2i.RIGHT), "wall")
+	var session := BuilderSession.new(doc, Rect2i(0, 0, 40, 30), "test_field", StubClaude.new([]))
+	_check(session.reached().has(Vector2i(35, 25)) and session.narrow_ways().is_empty(), "the east side is reached through the two-cell gap")
+	var blind := session.run_tool("piece", {"at": [21, 10], "kind": "hunters_blind"})
+	_check(not blind.get("ok", true) and "cut off the way off the level at (30, 10) (to wilds)" in str(blind.get("text"))
+		and not (session.working.config.get("buildings", []) as Array).any(func(entry: Dictionary) -> bool: return entry.get("slot") == "building.hunters_blind"),
+		"a 2 x 2 blind filling the gap: refused, naming the link beyond, and undone (%s)" % blind)
+	var one := session.run_tool("decor", {"at": [21, 10], "kind": "barrel"})
+	var row := session.run_tool("decor", {"at": [21, 11], "kind": "barrel"})
+	_check(one.get("ok", false) and not row.get("ok", true) and "cut off" in str(row.get("text")) and (session.working.config.get("decor", []) as Array).size() == 1,
+		"a row of barrels across the gap: the first laid, the second refused, undone (%s; %s)" % [one, row])
+	var gone := session.run_tool("decor", {"at": [21, 10], "remove": true})
+	_check(gone.get("ok", false), "removing the barrel: never refused (%s)" % gone)
+	var stall := session.run_tool("piece", {"at": [21, 10], "kind": "lean_to"})
+	_check(not stall.get("ok", true) and "the way off the level at (30, 10)" in str(stall.get("text")), "a lean-to over the only path to the link: refused, naming it (%s)" % stall)
+	# A second gap lower down: the same lean-to leaves a longer way round, and passes.
+	session.working.map.set_edge(Terrain.edge_key(Vector2i(20, 20), Vector2i.RIGHT), "clear")
+	session.working.map.set_edge(Terrain.edge_key(Vector2i(20, 21), Vector2i.RIGHT), "clear")
+	session._reached = {}
+	var detour := session.run_tool("piece", {"at": [21, 10], "kind": "lean_to"})
+	_check(detour.get("ok", false) and session.reached().has(Vector2i(35, 25)), "with a way round by y 20: the lean-to laid (%s)" % detour)
+	var removed := session.run_tool("piece", {"at": [21, 10], "remove": true})
+	_check(removed.get("ok", false), "removing the lean-to: never refused (%s)" % removed)
+	# Its time on the biggest level.
+	var hills := MapDoc.from_level("hills")
+	var big := BuilderSession.new(hills, Rect2i(0, 0, 10, 10), "hills", StubClaude.new([]))
+	var began := Time.get_ticks_usec()
+	var reach := big.reached()
+	print("  (the hills, %d x %d: %d cells reached in %d ms)" % [hills.map.size.x, hills.map.size.y, reach.size(), (Time.get_ticks_usec() - began) / 1000])
+	_check(reach.size() > 1000, "the hills are flooded from their starts and arrivals")
 
 
 ## Jeff's chest rule (806) in builder mode: a chest of loot only in a dungeon,

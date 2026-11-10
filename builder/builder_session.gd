@@ -134,6 +134,10 @@ const PIECES_NOT_YET := {
 }
 ## What an empty stall's answer says (842; the coordinator's ruling).
 const STALL_EMPTY := "an empty stall, dressing only: nobody sells there, and no shop comes with it"
+## The tools that change nothing a walker meets: no cut-off check (844).
+const UNCUT_TOOLS: Array[String] = ["look", "new_area"]
+## How many cut-off patches a refusal names (844).
+const CUT_SHOWN := 3
 ## Who keeps a forest camp (maps' fill_forest).
 const CAMP_MIXES: Array[String] = ["bandit", "trader", "mixed"]
 ## The quarter turns that face a kind building (south as made) to a side.
@@ -197,6 +201,7 @@ func _fresh_working() -> void:
 	working.map = doc.map.copy()
 	working.config = doc.config.duplicate(true)
 	working.had_heights = doc.had_heights
+	_reached = {}
 
 
 ## Asks for [param text] (the first request, or a follow-up), running
@@ -898,7 +903,27 @@ const FACINGS := {"north": Vector2i(0, -1), "north-east": Vector2i(1, -1), "east
 
 ## Runs tool [param tool] with [param input] on the working copy: {ok, text}.
 func run_tool(tool: String, input: Variant) -> Dictionary:
+	if tool in UNCUT_TOOLS:
+		return _run_tool(tool, input)
+	var before := reached()
+	var last: Variant = working.undo_steps.back() if not working.undo_steps.is_empty() else null
 	var out := _run_tool(tool, input)
+	var changed := not working.undo_steps.is_empty() and not is_same(working.undo_steps.back(), last)
+	if changed and not out.get("ok", false):
+		_reached = {}
+	elif changed:
+		# Ground the edit cut off from every start and arrival (844): the edit undone, said in words.
+		_reached = {}
+		var after := reached()
+		# Cut off: walkable still, reached before and not now; the edit's own cells (now solid) are not.
+		var ground := flood_ground()
+		var lost := before.keys().filter(func(cell: Vector2i) -> bool: return not after.has(cell) and HeightTools._walks(working.map, ground, cell))
+		if not lost.is_empty():
+			while not working.undo_steps.is_empty() and not is_same(working.undo_steps.back(), last):
+				working.undo()
+			working.redo_steps.clear()
+			_reached = before
+			return _no("that would cut off %s from the level's starts and arrivals: leave a way through (a longer way round is fine)" % cut_off_words(lost))
 	# A building it made gets its code now, for the next tool and the answer (decision 537).
 	Level.fill_codes(working.config)
 	return out
@@ -2725,6 +2750,134 @@ func _kept_clear(rect: Rect2i) -> String:
 			if near.has_point(cell):
 				return "on or beside the door of the %s at %s" % [building_name(other), door]
 	return ""
+
+
+## The working copy's walkable cells a player reaches from any start or
+## arrival (844): the level's whole floor, flooded from its starts (level.json
+## "starts" and start markers), its spawn points and, on an edge with a
+## neighbour, that edge's cells, stepping as HeightTools.steps has it (no
+## wall edge; a door is open; a ledge or cliff only by a stair) round solid
+## buildings and bulky decor (walk_ground, bulky_cells). Kept between tool
+## calls: an edit's after is the next one's before.
+func reached() -> Dictionary:
+	if not _reached.is_empty():
+		return _reached
+	var ground := flood_ground()
+	var map := working.map
+	var seen: Dictionary = {}
+	var queue: Array[Vector2i] = []
+	for cell: Vector2i in arrival_cells():
+		if not seen.has(cell) and HeightTools._walks(map, ground, cell):
+			seen[cell] = true
+			queue.append(cell)
+	var head := 0
+	while head < queue.size():
+		var at := queue[head]
+		head += 1
+		for side in HeightTools.FOUR:
+			var next := at + side
+			if not seen.has(next) and HeightTools.steps(map, at, next, ground):
+				seen[next] = true
+				queue.append(next)
+	_reached = seen
+	return seen
+
+var _reached: Dictionary = {}
+
+
+## What reached() steps over (844): walk_ground (the relief and the solid
+## buildings) with the bulky decor solid too.
+func flood_ground() -> Dictionary:
+	var ground := walk_ground()
+	var solid: Dictionary = (ground.get("solid", {}) as Dictionary).duplicate()
+	solid.merge(bulky_cells())
+	ground["solid"] = solid
+	return ground
+
+
+## Where players come into the working copy (844): its starts, its spawn
+## points and the cells of each edge with a neighbour beyond it.
+func arrival_cells() -> Array[Vector2i]:
+	var out: Array[Vector2i] = []
+	var size := working.map.size
+	for value: Variant in working.config.get("starts", []) if working.config.get("starts") is Array else []:
+		if Level._tile(value) != null:
+			out.append(Level._tile(value))
+	for y in size.y:
+		for x in size.x:
+			if working.map.cell(Vector2i(x, y)) == "start":
+				out.append(Vector2i(x, y))
+	var named: Variant = working.config.get("spawn_points", {})
+	for spawn_name: Variant in named if named is Dictionary else {}:
+		if Level._tile(named[spawn_name]) != null:
+			out.append(Level._tile(named[spawn_name]))
+	var neighbours: Variant = working.config.get("neighbours", {})
+	for side: Variant in neighbours if neighbours is Dictionary else {}:
+		if str(neighbours[side]).is_empty():
+			continue
+		match str(side):
+			"north":
+				for x in size.x: out.append(Vector2i(x, 0))
+			"south":
+				for x in size.x: out.append(Vector2i(x, size.y - 1))
+			"west":
+				for y in size.y: out.append(Vector2i(0, y))
+			"east":
+				for y in size.y: out.append(Vector2i(size.x - 1, y))
+	return out
+
+
+## [param lost] (cells cut off) said by what a person knows in each patch of
+## it (844): a way off the level, a building's door, a place, else the cell
+## and the patch's size; the biggest CUT_SHOWN patches.
+func cut_off_words(lost: Array) -> String:
+	var left := {}
+	for cell: Vector2i in lost:
+		left[cell] = true
+	var patches: Array[Array] = []
+	while not left.is_empty():
+		var first: Vector2i = left.keys()[0]
+		var patch: Array[Vector2i] = [first]
+		left.erase(first)
+		var head := 0
+		while head < patch.size():
+			for side in HeightTools.FOUR:
+				var next: Vector2i = patch[head] + side
+				if left.has(next):
+					left.erase(next)
+					patch.append(next)
+			head += 1
+		patches.append(patch)
+	patches.sort_custom(func(a: Array, b: Array) -> bool: return a.size() > b.size())
+	var said := PackedStringArray()
+	for patch: Array in patches.slice(0, CUT_SHOWN):
+		said.append(_known_in(patch))
+	if patches.size() > CUT_SHOWN:
+		said.append("%d more patches" % (patches.size() - CUT_SHOWN))
+	return ", ".join(said)
+
+
+## The nearest thing a person knows in [param patch] (cells), in words.
+func _known_in(patch: Array) -> String:
+	var cells := {}
+	for cell: Vector2i in patch:
+		cells[cell] = true
+	for link: Variant in working.config.get("links", []) if working.config.get("links") is Array else []:
+		var at: Variant = Level._tile(link.get("at")) if link is Dictionary else null
+		if at is Vector2i and cells.has(at):
+			return "the way off the level at %s%s" % [at, " (to %s)" % link["to"] if not str(link.get("to", "")).is_empty() else ""]
+	for entry: Variant in working.config.get("buildings", []) if working.config.get("buildings") is Array else []:
+		var rect: Variant = Level.building_rect(entry)
+		if rect is Rect2i and str(entry.get("slot", "")) not in Level.SOLID:
+			var door := Level.front_cell(rect, Level.building_facing(entry)) - Level.building_facing(entry)
+			if cells.has(door) or cells.has(door + Level.building_facing(entry)):
+				return "the door of the %s at %s" % [building_name(entry), door]
+	var places: Dictionary = working.config.get("places", {}) if working.config.get("places") is Dictionary else {}
+	for key: Variant in places:
+		var at: Variant = Level._tile(places[key].get("at")) if places[key] is Dictionary else null
+		if at is Vector2i and cells.has(at):
+			return "the place %s (a %s) at %s" % [key, places[key].get("kind", "place"), at]
+	return "the ground at %s (%d cell%s)" % [patch[0], patch.size(), "" if patch.size() == 1 else "s"]
 
 
 ## A side's word: (0, 1) "south".

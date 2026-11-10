@@ -46892,3 +46892,38 @@ words on a lean-to refused; the stall laid with no place written; the shrine and
 piece beside an arrival and before a door refused; a milestone in a two-cell lane refused, naming the way; remove. The prompt and tools grow by about 1,880 characters (about 470
 tokens a request; 13,826 of the coordinator's 20,000 by _test_kind_lines' count). No bullet
 (builder mode is Jeff's tool). Server and builder only; protocol unchanged; no new class_name.
+
+## 844. Builder mode never cuts ground off
+
+Builder's, on the coordinator's ask after 842 (a 2 x 2 piece dropped into a two-cell lane closed it and
+passed, since narrow_ways only finds a way left one cell wide); release's number. Every tool that makes a
+cell solid (decor's bulky pieces, piece, place, building, fence, stamp, paint and any edit that turns floor
+to non-floor) is guarded by one check in BuilderSession.run_tool, not by each tool: the working copy's
+walkable cells are flooded from the level's starts (level.json "starts" and start markers), its spawn
+points and, on each edge with a neighbour, that edge's cells, before the edit and after
+(BuilderSession.reached). The check is level-wide, not area-wide, since a lane closed here cuts off
+something over there. The step is HeightTools.steps' (no wall edge; a door is open; a ledge or cliff only
+by a stair), round the solid buildings and the bulky decor (flood_ground: walk_ground and bulky_cells).
+A cell still walkable after the edit that was reached before and is not now is cut off, and the edit is
+undone and refused in plain words that name what was cut off by the nearest thing a person knows in each
+patch: a way off the level (and where it goes), a building's door, a place, else the ground's first cell
+and its size, the biggest three patches ("that would cut off the way off the level at (30, 10) (to
+wilds) from the level's starts and arrivals: leave a way through (a longer way round is fine)"). The
+edit's own cells, solid now, are not cut off. A way that only grows longer passes; a way left one cell
+wide is narrow_ways' as before. Links are ways off the level, not steps within it, so a sealed or closed
+link counts as it did before the edit: the check never blames an edit for a seal. look and new_area are
+not checked; a tool that fails changes nothing.
+
+The flood before an edit is the one after the last, kept between tool calls (reset with the working
+copy), so an edit costs one flood: the hills (224 x 224, the biggest level) flood in about 275-305 ms on this
+machine, inside a tool call that already waits on the model; not optimised.
+
+site_checks' cut-off test stays its own: it asks whether one work site is reached from its own town's
+store, a pair, with its own words for the person building, which this check (any ground reached from any
+start or arrival) does not answer. Both step by HeightTools.steps, so they agree on what a step is.
+
+builder_test _test_cut_off: a wall with a two-cell gap, the east side's only way in; a 2 x 2 blind in the
+gap refused, naming the link beyond it, and undone; a row of barrels across it, the first laid and the
+second refused; a lean-to over the only path to the link refused, naming it; with a second gap, the same
+lean-to laid (a detour); removing a barrel and a piece never refused; the hills' flood timed. No bullet
+(builder mode is Jeff's tool). Server and builder only; protocol unchanged; no new class_name.
