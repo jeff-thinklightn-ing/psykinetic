@@ -1949,6 +1949,7 @@ func _test_cache() -> void:
 	chest.cache = ""
 	chest.cache_place = ""
 	_test_find_window(host, chest)
+	_test_one_loot_window(host, chest)
 	_test_dungeon_caches(host, chest)
 	_test_coop_tomb(host, chest)
 	_test_coop_forge(host, chest)
@@ -2257,6 +2258,163 @@ func _test_find_window(host: Player, chest: Chest) -> void:
 	World._relocate(host, host_at)
 	chest.cache = ""
 	chest.cache_place = ""
+
+## 599 amended (2), one loot window (Jeff: "chests in dwarven hall are
+## inconsistent, some are 4 squares, other text windows"): a chest stocked
+## from a loot table is laid as a cache of it, keyed by its own cell; a row
+## clicked takes that row alone, kept on the record, the rest sent again; a
+## stale click takes nothing and says nothing; a row that doesn't fit stays;
+## a world saved with the old stock keeps it as a plain chest.
+func _test_one_loot_window(host: Player, chest: Chest) -> void:
+	print("\n== 599 amended (2): one loot window ==")
+	# Level._stock: a loot chest laid as its cache, a depot's, a role's and a kit's left as they were.
+	var warnings: Array[String] = []
+	var laid := {}
+	Level._stock(laid, {"script": Level.CHEST}, {"loot": "farmstead_cache"}, {"name": "olw"}, warnings, Vector2i(3, 4))
+	var by_default := {}
+	Level._stock(by_default, {"script": Level.CHEST}, {}, {"name": "olw", "loot": {"chest": "crypt_cache"}}, warnings, Vector2i(5, 4))
+	var role := {"role": "altar"}
+	Level._stock(role, {"script": Level.CHEST}, {}, {"name": "olw", "loot": {"chest": "crypt_cache"}}, warnings, Vector2i(6, 4))
+	var kit := {"stock": ["bow"]}
+	Level._stock(kit, {"script": Level.CHEST}, {"loot": "farmstead_cache"}, {"name": "olw"}, warnings, Vector2i(7, 4))
+	_check(laid.get("cache") == "farmstead_cache" and laid.get("cache_cell") == "3,4" and not laid.has("slots")
+			and by_default.get("cache") == "crypt_cache" and by_default.get("cache_cell") == "5,4"
+			and not role.has("cache") and not kit.has("cache") and (kit.get("slots", []) as Array).count("") < Chest.SLOTS and warnings.is_empty(),
+			"a loot chest is laid as its table's cache on its cell; a quest's or a kit's chest is not (%s %s %s %s %s)" % [laid, by_default, role, kit, warnings])
+	var record: PlayerRecord = _main._records[Net.player_id]
+	var me := str(record.player_id)
+	var heard: Array[Dictionary] = []
+	var hear := func(kind: String, data: Dictionary) -> void:
+		if kind == "find" or kind == "party":
+			heard.append({"kind": kind, "data": data})
+	Net.message_received.connect(hear)
+	var host_at := host.tile
+	chest.cache = "farmstead_cache"
+	chest.cache_cell = "3,4"
+	var spec_was: Dictionary = chest.spawn_spec.duplicate(true)
+	var graved: Dictionary = (chest.spawn_spec.get("props", {}) as Dictionary).duplicate()
+	graved["grave"] = true
+	chest.spawn_spec["props"] = graved  # A barrow's chest: its goods grave marked (555).
+	_beside(host, chest)
+	var key: String = _main.cache_record_key(chest)
+	chest.cache_cell = "9,9"
+	var other_cell: String = _main.cache_record_key(chest)
+	chest.cache_cell = "3,4"
+	var keys: Array[String] = [key]
+	_check(key == "farmstead_cache@%s:3,4" % chest.zone and other_cell != key and _main.prune_caches(keys) == keys,
+			"a laid chest's find is its own cell's, and kept: %s" % key)
+	record.caches.erase(key)
+	record.cache_taken.erase(key)
+	var before := _cached_uids()
+	var purse := World.gold_of(me)
+	# One row clicked: the two bandaging kits, and the rest sent again.
+	heard.clear()
+	_main.search(host, chest)
+	var whole: Array = _main.find_data.get("rows", [])
+	heard.clear()
+	var took: bool = _main.take_find(host, chest, "bandaging_kit")
+	var given := _new_finds(before)
+	var said: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "party").map(func(h: Dictionary) -> String: return h["data"]["text"])
+	var sent: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "find")
+	var rest: Array = sent[-1]["data"]["rows"] if not sent.is_empty() else []
+	_check(took and given.size() == 2 and given.all(func(uid: int) -> bool: return World.items.id_of(uid) == "bandaging_kit" and World.slot_of_unit(host, uid) >= 0)
+			and said == ["You take 2 bandaging kits."] and record.cache_taken.get(key) == {"bandaging_kit": 2} and not key in record.caches
+			and rest.size() == whole.size() - 1 and not rest.any(func(row: Dictionary) -> bool: return row["id"] == "bandaging_kit"),
+			"a row clicked: that row alone given, on the record, voice's line, the rest sent again (%s; %s)" % [said, rest])
+	# A stale click (the row already taken): nothing taken, nothing said, the window refreshed.
+	heard.clear()
+	var again: bool = _main.take_find(host, chest, "bandaging_kit")
+	_check(not again and _new_finds(before).size() == 2 and heard.size() == 1 and heard[0]["kind"] == "find" and heard[0]["data"]["rows"] == rest,
+			"a stale click takes nothing, says nothing and sends the window again (%s)" % [heard])
+	# Saved and loaded, the part taken is kept; opened again, only what is left.
+	var loaded := PlayerRecord.from_dict(record.to_dict())
+	heard.clear()
+	_main.search(host, chest)
+	_check(loaded.cache_taken == record.cache_taken and heard.size() == 1 and heard[0]["data"]["rows"] == rest,
+			"saved and loaded, the part taken kept; opened again, only what is left (%s)" % [loaded.cache_taken])
+	# A row that doesn't fit: the pack full of daggers, the row stays, nothing minted, the pack's line.
+	var fill: Array[int] = []
+	for slot: int in [Items.RIGHT_HAND, Items.LEFT_HAND] + World.pack_slots(host):
+		if slot < host.slots.size() and host.slots[slot].is_empty():
+			var dagger := World.items.mint("dagger", "test", "", host.zone, host.tile)
+			if World.put_item(host, host, slot, dagger):
+				fill.append(dagger)
+	heard.clear()
+	var book := World.items.size()
+	var full: bool = _main.take_find(host, chest, "knife")
+	var full_said: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "party").map(func(h: Dictionary) -> String: return h["data"]["text"])
+	var full_sent: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "find")
+	_check(not full and full_said == ["Your pack is full."] and World.items.size() == book and _new_finds(before).size() == 2
+			and not full_sent.is_empty() and full_sent[-1]["data"]["rows"] == rest and Array(World.ground_uids(host.tile)).all(func(uid: int) -> bool: return not uid in _cached_uids()),
+			"a row that doesn't fit stays in the find, nothing at the feet, the pack's line (%s)" % [full_said])
+	World.take_units(host, fill)
+	for uid in fill:
+		World.items.end(uid, "gone")
+	# The rest a row at a time: the last take closes the window and puts the find on the record.
+	var last: Array = []
+	for row: Dictionary in rest:
+		heard.clear()
+		_main.take_find(host, chest, str(row["id"]))
+		var got: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "find")
+		last = [got[-1]["data"]] if not got.is_empty() else []
+	_check(not last.is_empty() and (last[0]["rows"] as Array).is_empty() and int(last[0]["gold"]) == 0 and key in record.caches
+			and not record.cache_taken.has(key) and _new_finds(before).size() == _main.roll_find(record, key, chest.cache)["rows"].reduce(func(n: int, row: Dictionary) -> int: return n + int(row["count"]), 0),
+			"taken a row at a time: the last closes the window (an empty find), the find on the record")
+	var finds := _new_finds(before)
+	_check(finds.all(func(uid: int) -> bool: return World.items.is_grave(uid) and (Items.condition_max(World.items.id_of(uid)) <= 1
+			or World.items.condition_of(uid) == Items.condition_max(World.items.id_of(uid)))),
+			"a laid chest's goods as its stock was: whole, and grave marked from a barrow's chest")
+	heard.clear()
+	_check(not _main.take_find(host, chest, "knife") and heard.size() == 1 and (heard[0]["data"]["rows"] as Array).is_empty(),
+			"a click after all is taken: nothing, and an empty find closes the window")
+	_end_finds(host, _new_finds(before))
+	record.caches.erase(key)
+	# The gold clicked, then Take all gives only what is left.
+	chest.cache = "crypt_cache"
+	key = _main.cache_record_key(chest)
+	record.caches.erase(key)
+	record.cache_taken.erase(key)
+	before = _cached_uids()
+	purse = World.gold_of(me)
+	var crypt: Dictionary = _main.roll_find(record, key, chest.cache)
+	_main.search(host, chest)
+	heard.clear()
+	var gold_took: bool = _main.take_find(host, chest, "gold")
+	var gold_said: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "party").map(func(h: Dictionary) -> String: return h["data"]["text"])
+	var gold_sent: Array = heard.filter(func(h: Dictionary) -> bool: return h["kind"] == "find")
+	_check(gold_took and World.gold_of(me) == purse + int(crypt["gold"]) and gold_said == ["You take %d gold." % int(crypt["gold"])]
+			and not gold_sent.is_empty() and int(gold_sent[-1]["data"]["gold"]) == 0 and gold_sent[-1]["data"]["rows"] == crypt["rows"],
+			"the gold clicked: into the purse, and the rest sent again without it (%s)" % [gold_said])
+	heard.clear()
+	var all_took: bool = _main.take_find(host, chest)
+	var all_said: String = heard[-1]["data"]["text"] if not heard.is_empty() else ""
+	_check(all_took and World.gold_of(me) == purse + int(crypt["gold"]) and key in record.caches and not record.cache_taken.has(key)
+			and all_said == "You take %s." % _main._listed(crypt["rows"], 0),
+			"then Take all: only what is left, no gold twice (%s)" % all_said)
+	_end_finds(host, _new_finds(before))
+	World.add_gold(me, purse - World.gold_of(me), "test")
+	record.caches.erase(key)
+	# A world saved before: a laid chest still holding its old stock stays a plain chest; an empty one is its cache.
+	var old := Chest.new()
+	old.cache = "farmstead_cache"
+	old.cache_cell = "3,4"
+	old.spawn_spec = {"props": {"cache": "farmstead_cache", "cache_cell": "3,4"}}
+	old.slots[0] = "knife"
+	_main._keep_old_stock(old)
+	var emptied := Chest.new()
+	emptied.cache = "farmstead_cache"
+	emptied.cache_cell = "3,4"
+	_main._keep_old_stock(emptied)
+	_check(old.cache.is_empty() and old.cache_cell.is_empty() and not (old.spawn_spec["props"] as Dictionary).has("cache")
+			and emptied.cache == "farmstead_cache" and emptied.cache_cell == "3,4",
+			"a saved chest with its old stock opens as a plain chest, to be emptied; an empty one is laid as its cache")
+	old.free()
+	emptied.free()
+	Net.message_received.disconnect(hear)
+	World._relocate(host, host_at)
+	chest.cache = ""
+	chest.cache_cell = ""
+	chest.spawn_spec = spec_was
 
 ## 808: in a regenerating level a cache is each chest's own, per player and
 ## per generation; a save keeps only the generations still laid.

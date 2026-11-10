@@ -4278,6 +4278,15 @@ static func _stock(props: Dictionary, spec: Dictionary, entry: Dictionary, confi
 	if not Items.has_loot(table):
 		warnings.append("loot at %s: no loot table \"%s\" (levels/loot.json has %s)" % [at, table, ", ".join(Items.loot_tables().keys())])
 		return
+	if chest and not props.get("temple", false) and not props.has("role") and not props.has("stock") and Items.tidy(props.get("slots", []), Chest.SLOTS).count("") == Chest.SLOTS:
+		# One loot window (599 amended (2); Jeff: "chests in dwarven hall are
+		# inconsistent, some are 4 squares, other text windows"): a chest
+		# stocked from a table is laid as a cache of it, its slots empty, the
+		# find opened in its window; keyed by its own cell (Chest.cache_cell),
+		# so two chests of one table in a level are two finds.
+		props["cache"] = table
+		props["cache_cell"] = "%d,%d" % [at.x, at.y]
+		return
 	var slots := Items.tidy(props.get("slots", []), Chest.SLOTS if chest else MONSTER_CARRIES)
 	var empty: Array[int] = []
 	for slot in slots.size():

@@ -31,6 +31,11 @@ var cache := ""
 ## Where a cache's find is said to come from (props {"cache_place": "the
 ## old farmstead"}): its story's "found in"; "" for its label.
 var cache_place := ""
+## The cell a chest laid as a cache from its loot table was laid on (599
+## amended (2), Level._stock: "x,y"): its find is kept per chest even in a
+## level that never regenerates (Main.cache_record_key); "" for a cache laid
+## as one by hand, kept by its table alone (599).
+var cache_cell := ""
 
 
 func _init() -> void:

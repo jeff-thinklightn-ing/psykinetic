@@ -618,6 +618,11 @@ signal status_received(address: String, port: int, result: Dictionary)
 ## 55 (831, "trusted prices"; opened by economy after v0.1.209 shipped 54): "shop" and "barter"
 ## carry "trusted": true when their prices are a trusted player's (ui's mark), and their goods,
 ## offers and buys are that player's own prices.
+## 55 also (599 amended (2), "one loot window"; release's, the one number for the wire changes
+## before v0.1.210, shared with 831): "take_find" may carry "id" (one row of the find, "gold" its
+## gold), after which the server sends "find" again with what is left (rows [] and gold 0
+## closes it); a chest stocked from a loot table now spawns as a cache (props "cache",
+## "cache_cell"), so an old client's Take all is its only take there.
 const PROTOCOL_REVISION := 55
 ## The scripts whose RPCs are part of the wire.
 const RPC_SCRIPTS: Array[String] = ["res://net/net.gd", "res://sim/world.gd", "res://sim/grid_entity.gd", "res://sim/monster.gd"]

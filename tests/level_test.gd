@@ -4420,10 +4420,14 @@ func _test_barrow_level() -> void:
 			var props: Dictionary = spec.get("props", {})
 			if props.get("grave", false) != true:
 				unmarked += 1
+			# 599 amended (2): a loot chest is laid as its table's cache, so its goods
+			# are what that table gives (rolled here by the generation and cell).
+			var goods: Array = Array(Items.roll_loot(str(props["cache"]), "deep%d:%s" % [generation, spec["tile"]], 64, true)) if props.has("cache") \
+					else props.get("slots", [])
 			if spec["tile"] == Sheet.LAIR_CHEST:
-				if (props.get("slots", []) as Array).has("plate_armour") and first_plate == 0:
+				if goods.has("plate_armour") and first_plate == 0:
 					first_plate = generation
-			elif (props.get("slots", []) as Array).has("mail_armour") and first_mail == 0:
+			elif goods.has("mail_armour") and first_mail == 0:
 				first_mail = generation
 		if first_mail > 0 and first_plate > 0:
 			break

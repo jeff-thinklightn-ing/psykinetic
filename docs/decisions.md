@@ -24994,6 +24994,39 @@ draws the window and, after it, a glint on ground piles (the
 coordinator). Wire: PROTOCOL_REVISION 52 (shared with 297 amended), the
 "find" message kind. items_test _test_find_window. No new class_name.
 
+599 amended (2): one loot window (Jeff, on v0.1.208: "chests in dwarven
+hall are inconsistent, some are 4 squares, other text windows. on 4
+square chests, you can only drag and drop loot"; the coordinator's
+package "one loot window", landing on, this and ui's side back to back
+with no cut between; release's label; PROTOCOL_REVISION 55, shared with
+831). Level._stock lays a chest stocked from a loot table (an entry's
+"loot", or the level's "loot": {"chest"}) as a cache of that table, props
+"cache" the table and "cache_cell" its "x,y" (Chest.cache_cell), its
+slots empty, so it opens in the find window; depots, shops, lockers,
+temples, a quest's chest (props "role") and a kit's (props "stock") are
+as they were, and monster loot is unchanged. Today only castle_halls
+(dwarven_hoard) and barrow_deep (ossuary_grave) have such chests.
+Main.cache_record_key keys a laid chest by its cell even in a level that
+never regenerates ("<table>@<level>:<x>,<y>", which prune_caches keeps),
+so two chests of one table are two finds; a regenerating level keys by
+cell and generation as 808 does. "take_find" may carry "id", one row of
+the find ("gold" its gold): Main._take_row gives as much of the row as
+the hands and pack take, the rest staying in the find, never at the
+feet, with "You take X." and, where some didn't fit, the pack's own "Your
+pack is full." (that alone when none did). PlayerRecord.cache_taken
+({key: {id: count, "gold": n}}, saved) keeps what was taken, and the
+server sends "find" again with what is left (Main.find_left); an empty
+one (rows [], gold 0) closes the window, and the last take puts the key
+in caches. Take all, with no id, gives only what is left, as before. A
+stale click on a row already taken takes nothing, says nothing and sends
+the window again. A world saved before this still holds the old stock in
+those chests' slots: one the level now lays as a cache whose saved slots
+hold anything stays a plain chest (Main._keep_old_stock), opened with its
+squares and emptied as before, and is laid as its cache at the next load
+once empty, so no level needs regenerating for it. items_test
+_test_one_loot_window; record_keys_test samples cache_taken. No new
+class_name; no bullet of mine (ui's side carries the package's).
+
 ## 584 amended, npc's side: the medicine man's care and the quests behind it
 
 Jeff (2026-10-22, through the coordinator): "5 herbs, 5 antlers or 10 gold

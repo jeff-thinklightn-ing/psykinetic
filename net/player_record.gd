@@ -90,6 +90,10 @@ var care_given: Dictionary = {}
 ## The caches they have searched (decision 599: Chest.cache, a loot
 ## table's name): each gives a player its find once.
 var caches: Array[String] = []
+## A find taken a row at a time and not yet whole (599 amended (2), one loot
+## window): a cache's key (Main.cache_record_key) -> {id: how many taken,
+## "gold": gold taken}; the key moves to caches when the last is taken.
+var cache_taken: Dictionary = {}
 ## Their own chest (decision 722, Locker): its ids ("" empty) and the
 ## instance in each, LOCKER_SLOTS of them; saved only while it holds something.
 var locker_slots := Items.tidy([], Locker.LOCKER_SLOTS)
@@ -150,6 +154,7 @@ func to_dict() -> Dictionary:
 		"paid_deals": paid_deals.duplicate(true),
 		"barrow_task": barrow_task.duplicate(true),
 		"caches": caches.duplicate(),
+		"cache_taken": cache_taken.duplicate(true),
 		"locker": {"slots": Array(locker_slots), "items": Array(locker_items)} if locker_slots.count("") < locker_slots.size() else {},
 		"former": former.duplicate(true),
 		"arts": arts.duplicate(true),
@@ -211,6 +216,16 @@ static func from_dict(entry: Variant) -> PlayerRecord:
 		var slain: Variant = task.get("slain", [])
 		record.barrow_task = {"taken": bool(task.get("taken", false)),
 			"slain": (slain as Array).map(func(id: Variant) -> String: return str(id)) if slain is Array else []}
+	var part: Variant = entry.get("cache_taken", {})  # Before 599 amended (2): none.
+	if part is Dictionary:
+		for key: Variant in part:
+			if part[key] is Dictionary:
+				var took := {}
+				for id: Variant in part[key]:
+					if int(part[key][id]) > 0:
+						took[str(id)] = int(part[key][id])
+				if not took.is_empty() and str(key) not in record.caches:
+					record.cache_taken[str(key)] = took
 	var tallies: Variant = entry.get("care_given", {})
 	if tallies is Dictionary:
 		for place: Variant in tallies:

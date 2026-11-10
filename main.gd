@@ -6178,6 +6178,7 @@ func _recall(record: Dictionary) -> GridEntity:
 	World.restore(entity, parsed["hp"], parsed["stamina"], parsed["facing"])
 	if parsed.get("slots") != null:
 		World.set_slots(entity, parsed["slots"], parsed.get("items", []))
+		_keep_old_stock(entity)
 	var monster := entity as Monster
 	if monster != null:
 		var route: Array[Vector2i] = []
@@ -6190,6 +6191,24 @@ func _recall(record: Dictionary) -> GridEntity:
 		monster._route_index = clampi(int(record.get("route_index", 0)), 0, maxi(monster.route.size() - 1, 0))
 		monster._route_step = int(record.get("route_step", 1))
 	return entity
+
+
+## A chest its level now lays as a cache of its loot table (599 amended
+## (2), Chest.cache_cell) that a world saved before then still has things
+## in (its old stock, rolled into its slots) stays a plain chest, opened
+## and emptied as before; once empty, the next load lays it as its cache.
+func _keep_old_stock(entity: GridEntity) -> void:
+	var chest := entity as Chest
+	if chest == null or chest.cache_cell.is_empty() or chest.slots.count("") == chest.slots.size():
+		return
+	chest.cache = ""
+	chest.cache_cell = ""
+	var props: Dictionary = (entity.spawn_spec.get("props", {}) as Dictionary).duplicate()
+	props.erase("cache")
+	props.erase("cache_cell")
+	entity.spawn_spec = entity.spawn_spec.duplicate()
+	entity.spawn_spec["props"] = props
+	print("[state] %s keeps its old stock; laid as its cache once empty" % entity.name)
 
 
 ## A level chest's starting kit brought to a saved world (decision 468;
@@ -6470,6 +6489,10 @@ func _save_state(wait := true, final := false) -> void:
 	records.assign(_records.values())
 	for record in records:
 		record.caches = prune_caches(record.caches)  # 808: finds of generations gone.
+		for key: String in record.cache_taken.keys():
+			var kept: Array[String] = [key]
+			if prune_caches(kept).is_empty():
+				record.cache_taken.erase(key)  # 599 amended (2): a part-taken find, likewise.
 	var zones := {}
 	var level_held := 0
 	var keyed := 0
@@ -13968,7 +13991,7 @@ func _on_command(entity: GridEntity, command_name: String, args: Dictionary) -> 
 	elif command_name == "search" and entity is Player:
 		search(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
 	elif command_name == "take_find" and entity is Player:
-		take_find(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest)
+		take_find(entity, get_node_or_null(NodePath(str(args.get("target", "")))) as Chest, str(args.get("id", "")))
 	elif command_name == "hearth" and entity is Player:
 		var at: Variant = args.get("at")
 		if at is Array and (at as Array).size() == 2:
@@ -21209,22 +21232,34 @@ func search(player: Player, chest: Chest) -> bool:
 		tell.call("Nothing more here.")
 		return false
 	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
-	var find := roll_find(record, key, chest.cache)
+	var find := find_left(record, key, chest.cache)
 	if find["rows"].is_empty() and int(find["gold"]) == 0:
 		record.caches.append(key)
+		record.cache_taken.erase(key)
 		tell.call("Nothing here.")
 		return false
 	print("[cache] %s opened %s at %s: %s" % [player.name, key, place, _listed(find["rows"], int(find["gold"]))])
+	_send_find(player, chest, place, find)
+	return true
+
+
+## The "find" message (599 amended) of [param chest] to [param player]:
+## [param find] ({rows, gold}) at [param place]; rows [] and gold 0 closes
+## the window (599 amended (2)).
+func _send_find(player: Player, chest: Chest, place: String, find: Dictionary) -> void:
 	if player.owner_peer != 0:
 		Net.message_to(player.owner_peer, "find", {"chest": str(chest.get_path()), "place": place, "title": find_title(place),
 				"rows": find["rows"], "gold": find["gold"]})
-	return true
 
 
 ## [param player] takes the find of the cache [param chest] shown them by
 ## search (599 amended: Take all in the find window): given as
-## _give_cache gives it, once. True if anything was given.
-func take_find(player: Player, chest: Chest) -> bool:
+## _give_cache gives it, once. With [param id] (599 amended (2), one loot
+## window: a row clicked; "gold" the gold), that row alone (_take_row), what
+## is left of the find sent again ("find"; rows [] and gold 0 closes it); a
+## row no longer there (a stale window) takes nothing and says nothing.
+## True if anything was given.
+func take_find(player: Player, chest: Chest, id := "") -> bool:
 	if not Net.is_authority() or player == null or not is_instance_valid(chest) or chest.cache.is_empty() \
 			or not World.reaches(player, chest):
 		return false
@@ -21238,11 +21273,90 @@ func take_find(player: Player, chest: Chest) -> bool:
 		if player.owner_peer != 0:
 			Net.broadcast_to([player.owner_peer], "party", {"from": "Server", "text": text})
 	var key := cache_record_key(chest)
+	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
+	if not id.is_empty():
+		var given := false
+		if key not in record.caches:
+			given = _take_row(player, record, key, chest, id, place, tell)
+		var left := {"rows": [], "gold": 0} if key in record.caches else find_left(record, key, chest.cache)
+		_send_find(player, chest, place, left)
+		return given
 	if key in record.caches:
 		tell.call("Nothing more here.")
 		return false
-	var place := chest.cache_place if not chest.cache_place.is_empty() else World._label_of(chest)
-	return _give_cache(player, record, key, chest.cache, place, chest.zone, chest.tile, tell)
+	return _give_cache(player, record, key, chest.cache, place, chest.zone, chest.tile, tell, chest)
+
+
+## One row of a cache's find taken (599 amended (2), one loot window):
+## [param id]'s row of what is left of [param record]'s find under
+## [param key] (find_left), or its gold for "gold". As many of the row as
+## the hands and pack take; the rest stays in the find, never at the feet,
+## and the line says the pack is full (PACK_FULL alone when none fit). What
+## is taken is kept on the record (PlayerRecord.cache_taken); the last of it
+## puts the key in its caches. True if anything was given.
+func _take_row(player: Player, record: PlayerRecord, key: String, chest: Chest, id: String, place: String, tell: Callable) -> bool:
+	var table := chest.cache
+	var zone_name := chest.zone
+	var tile := chest.tile
+	var left := find_left(record, key, table)
+	var taken: Dictionary = (record.cache_taken.get(key, {}) as Dictionary).duplicate()
+	var line := ""
+	if id == "gold":
+		var gold := int(left["gold"])
+		if gold <= 0:
+			return false
+		World.add_gold(str(record.player_id), gold, "found in %s" % place)
+		taken["gold"] = int(taken.get("gold", 0)) + gold
+		line = take_line([], gold, [])
+	else:
+		var at: int = (left["rows"] as Array).find_custom(func(row: Dictionary) -> bool: return row["id"] == id)
+		if at < 0:
+			return false
+		var count := int(left["rows"][at]["count"])
+		var kept := 0
+		for n in count:
+			var uid := _mint_find(id, place, zone_name, tile, chest)
+			var slot := World.room_for(player, uid)  # Onto a stack of its kind first (decision 619).
+			if slot < 0 or not World.put_item(player, player, slot, uid):
+				World.items.end(uid, "unmade", "no room", zone_name, tile)
+				break
+			kept += 1
+		if kept == 0:
+			tell.call(PACK_FULL)
+			return false
+		taken[id] = int(taken.get(id, 0)) + kept
+		line = take_line([{"id": id, "count": kept}], 0, [])
+		if kept < count:
+			line += " " + PACK_FULL
+	record.cache_taken[key] = taken
+	var rest := find_left(record, key, table)
+	if rest["rows"].is_empty() and int(rest["gold"]) == 0:
+		record.caches.append(key)
+		record.cache_taken.erase(key)
+	print("[cache] %s took %s from %s at %s: %s" % [player.name, id, key, place, line])
+	tell.call(line)
+	return true
+
+
+## The line for a take with no room: the pack's own, as a full pack's
+## refusals say it today.
+const PACK_FULL := "Your pack is full."
+
+
+## What is left of [param record]'s find under [param key] (599 amended
+## (2)): roll_find less what PlayerRecord.cache_taken says was taken a row
+## at a time. {rows: [{id, count}], gold}.
+static func find_left(record: PlayerRecord, key: String, table: String) -> Dictionary:
+	var find := roll_find(record, key, table)
+	var taken: Dictionary = record.cache_taken.get(key, {})
+	if taken.is_empty():
+		return find
+	var rows: Array[Dictionary] = []
+	for row: Dictionary in find["rows"]:
+		var count := int(row["count"]) - int(taken.get(row["id"], 0))
+		if count > 0:
+			rows.append({"id": row["id"], "count": count})
+	return {"rows": rows, "gold": maxi(0, int(find["gold"]) - int(taken.get("gold", 0)))}
 
 
 ## A cache's find for [param record] under [param key] (599; 808): table
@@ -21278,9 +21392,10 @@ static func find_title(place: String) -> String:
 ## take line told, naming what is left at their feet (599 amended). True
 ## if anything was given.
 func _give_cache(player: Player, record: PlayerRecord, key: String, table: String, place: String, zone_name: String, tile: Vector2i,
-		tell: Callable) -> bool:
+		tell: Callable, from: Chest = null) -> bool:
+	var find := find_left(record, key, table)  # Less what was taken a row at a time (599 amended (2)).
 	record.caches.append(key)
-	var find := roll_find(record, key, table)
+	record.cache_taken.erase(key)
 	var gold := int(find["gold"])
 	if gold > 0:
 		World.add_gold(str(record.player_id), gold, "found in %s" % place)
@@ -21289,9 +21404,7 @@ func _give_cache(player: Player, record: PlayerRecord, key: String, table: Strin
 	for row: Dictionary in find["rows"]:
 		for n in int(row["count"]):
 			var id: String = row["id"]
-			var uid := World.items.mint(id, "cached", place, zone_name, tile)
-			if Items.condition_max(id) > 1:
-				World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
+			var uid := _mint_find(id, place, zone_name, tile, from)
 			var slot := World.room_for(player, uid)  # Onto a stack of its kind first (decision 619).
 			var into := kept
 			if slot < 0 or not World.put_item(player, player, slot, uid):
@@ -21307,6 +21420,20 @@ func _give_cache(player: Player, record: PlayerRecord, key: String, table: Strin
 	if not line.is_empty():
 		tell.call(line)
 	return not line.is_empty()
+
+
+## One thing of a cache's find minted, "cached" from [param place]: worn
+## (half its condition: nothing fine) from a cache laid by hand (599), but
+## from a chest laid as the cache of its loot table (599 amended (2),
+## Chest.cache_cell) as its stock was: whole, in the chest's style and with
+## its grave mark (decision 555), so its goods lose nothing by the window.
+func _mint_find(id: String, place: String, zone_name: String, tile: Vector2i, from: Chest) -> int:
+	var uid := World.items.mint(id, "cached", place, zone_name, tile, World.style_from(from) if from != null else "")
+	if from != null:
+		World.items.mark_grave(uid, World.grave_from(from), zone_name, tile)  # Decision 555.
+	if (from == null or from.cache_cell.is_empty()) and Items.condition_max(id) > 1:
+		World.items.set_condition(uid, maxi(1, Items.condition_max(id) / 2))
+	return uid
 
 
 ## Voice's take line (599 amended) for [param kept] and [param gold] taken
@@ -21364,7 +21491,9 @@ static func _plural(word: String) -> String:
 ## (330 amended (2)).
 func cache_record_key(chest: Chest) -> String:
 	if not Regen.marked(chest.zone):
-		return chest.cache
+		# A chest laid as a cache from its loot table (599 amended (2)) is a
+		# find of its own: "<table>@<level>:<x>,<y>", which prune_caches keeps.
+		return chest.cache if chest.cache_cell.is_empty() else "%s@%s:%s" % [chest.cache, chest.zone, chest.cache_cell]
 	return "%s@%s:%d,%d#%d" % [chest.cache, chest.zone, chest.tile.x, chest.tile.y, generation_of(chest.zone)]
 
 

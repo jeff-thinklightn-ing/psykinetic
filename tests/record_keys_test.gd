@@ -57,7 +57,7 @@ func _ready() -> void:
 		"known_areas": ["a", "b"] as Array[String], "known_places": ["p"] as Array[String], "seen_generation": {"barrow": 2},
 		"marks": ["draugr"] as Array[String], "barrow": {"best": "hard", "containers": ["c1"]}, "care": {"hut": "gold"},
 		"paid_deals": {"barrow": {"level": "easy", "paid_step": 40}}, "barrow_task": {"taken": true, "slain": ["brand", "crake"]}, "care_given": {"hut": {"herbs": 2}},
-		"caches": ["k1"] as Array[String], "explored_places": ["wilds/far_bank"] as Array[String],
+		"caches": ["k1"] as Array[String], "cache_taken": {"farmstead_cache@t:3,4": {"bandaging_kit": 2, "gold": 3}}, "explored_places": ["wilds/far_bank"] as Array[String],
 		"arts": {"swordplay": {"m": 0.42, "peak": 0.5, "quiet": 1200}, "bow": {"m": 0.1, "peak": 0.1, "quiet": 0}},
 		"locker_slots": Items.tidy(["bandaging_kit"], Locker.LOCKER_SLOTS), "locker_items": PackedInt32Array([6]), "kit_given": true,
 		"former": [{"companion": {"name": "Nix", "card": "", "hp": 0, "stamina": 0, "tile": null, "alive": true, "said": [],
