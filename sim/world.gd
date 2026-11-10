@@ -4908,9 +4908,15 @@ func counter_order(by: GridEntity, counter: GridEntity, slot: int, effect: Strin
 	var fee := reforge_fee(to_id)
 	var workshop := _counter_workshop(counter, town)
 	var why := _reforge_refusal(by, uid, town, workshop, cost, fee)
-	if not why.is_empty():
-		return why
 	var who := owner.trim_prefix("player:")
+	var short_ore := int(cost.get("from", {}).get("ore", 0)) - stockpile.count(town, "ore")
+	if not why.is_empty():
+		if short_ore > 0 and why.begins_with("the town lacks") and economy != null:
+			economy.note_wanted(town, who, short_ore)  # 835: their ore wanted, for the workings' yield.
+			var pointed := str(economy.workings_rule().get("lacks_ore", "")) if economy.workings_on() else ""
+			if not pointed.is_empty() and why == "the town lacks %d ore" % short_ore:
+				why = pointed % short_ore  # Voice's words, pointing at Hollowfell.
+		return why
 	var taken := by.slots.duplicate()
 	var taken_uids := by.slot_items.duplicate()
 	taken[slot] = ""
@@ -4920,6 +4926,7 @@ func counter_order(by: GridEntity, counter: GridEntity, slot: int, effect: Strin
 	by.slots = taken
 	by.slot_items = taken_uids
 	economy.add_gold(who, -fee, "a reforge at %s" % town)
+	economy.wanted_met(town, who)  # 835.
 	stockpile.deposit(town, "gold", fee, "reforge:%s" % who, "a fee for a reforge")
 	items.note(uid, "handed in", "at %s's forge by %s, to be a %s, %d gold paid" % [town, _label_of(by), Items.name_of(to_id), fee],
 		counter.zone, counter.tile)
@@ -8921,6 +8928,10 @@ func _strike_seam(seam: Seam, source: GridEntity, cause: StringName) -> void:
 		else:
 			seam.hp = seam.max_hp
 		seam.keep()
+		if economy != null and economy.workings_on():
+			var place := economy.workings_of_zone(str(seam.zone))
+			if not place.is_empty():
+				economy.workings_mined(place)  # 835: one of the period's sacks dug.
 		_log("seam: %s mines a sack from %s, %d left" % [source.name, seam.name, seam.sacks])
 	seam_mined.emit(seam, source, uid)
 
@@ -8931,11 +8942,16 @@ func refill_seams() -> int:
 	if not Net.is_authority():
 		return 0
 	var filled := 0
-	var lists: Array = [_entities]  # The zone entered, registered or not (a test's room).
+	var lists: Array = [[_entities, zone]]  # The zone entered, registered or not (a test's room).
 	for each: Zone in zones.values():
 		if not is_same(each.entities, _entities):
-			lists.append(each.entities)
-	for list: Array in lists:
+			lists.append([each.entities, each])
+	for pair: Array in lists:
+		var list: Array = pair[0]
+		var place := economy.workings_of_zone((pair[1] as Zone).name) if economy != null and economy.workings_on() else ""
+		if not place.is_empty():
+			filled += _wake_workings(list, pair[1], place)  # 835: the period's sacks, not each seam's own clock.
+			continue
 		for entity: GridEntity in list:
 			var seam := entity as Seam
 			if seam == null or not seam.spent or seam.spent_at < 0:
@@ -8948,6 +8964,81 @@ func refill_seams() -> int:
 			seam.keep()
 			filled += 1
 	return filled
+
+
+## The seams of workings [param place] in zone [param here] ([param list],
+## its entities) as Economy.workings_plan says (835): once a period, and
+## again whenever its seams are new (the mine laid again), each holds one
+## sack; quota less those dug this period are full, the rest worked out.
+## The full ones are picked from the deeper deep_share of the seams by
+## steps from the "from" spawn over the zone's floor, shuffled by the
+## period, so the trip passes the guards but is not one fixed walk. The
+## count newly filled.
+func _wake_workings(list: Array, here: Zone, place: String) -> int:
+	var plan := economy.workings_plan(place)
+	var period := int(plan["period"])
+	var seams: Array[Seam] = []
+	var stale := false
+	for entity: GridEntity in list:
+		var seam := entity as Seam
+		if seam != null:
+			seams.append(seam)
+			stale = stale or int(seam.spawn_spec.get("props", {}).get("period", -1)) != period
+	if seams.is_empty() or not stale:
+		return 0
+	var depth := _steps_from_spawn(here, economy.workings_rule().get("places", {}).get(place, {}).get("from", ""))
+	seams.sort_custom(func(a: Seam, b: Seam) -> bool:
+		var da := int(depth.get(a.tile, -1))
+		var db := int(depth.get(b.tile, -1))
+		return da > db if da != db else (a.tile.x < b.tile.x if a.tile.x != b.tile.x else a.tile.y < b.tile.y))
+	var want := clampi(int(plan["quota"]) - int(plan["mined"]), 0, seams.size())
+	var deeper := clampi(ceili(seams.size() * float(economy.workings_rule().get("deep_share", 0.5))), want, seams.size())
+	var pool := seams.slice(0, deeper)
+	var dice := RandomNumberGenerator.new()
+	dice.seed = hash("%s:%d" % [place, period])
+	for i in range(pool.size() - 1, 0, -1):
+		var j := dice.randi_range(0, i)
+		var swap: Seam = pool[i]
+		pool[i] = pool[j]
+		pool[j] = swap
+	var chosen := pool.slice(0, want)
+	var filled := 0
+	for seam: Seam in seams:
+		var full := seam in chosen
+		if full and seam.spent:
+			filled += 1
+		seam.full_sacks = 1  # Sets sacks 1 too.
+		if not full:
+			seam.sacks = 0
+		seam.spent_at = -1 if full else steps
+		seam.hp = seam.max_hp
+		var props: Dictionary = seam.spawn_spec.get("props", {})
+		props["period"] = period
+		seam.spawn_spec["props"] = props
+		seam.keep()
+	_log("workings: %s laid for period %d, %d of %d seams full" % [place, period, chosen.size(), seams.size()])
+	return filled
+
+
+## Steps over [param here]'s floor from [param from] (835): a spawn point's
+## name in its level, or a cell [x, y]; {cell: steps}, 4 ways; {} without it.
+func _steps_from_spawn(here: Zone, from: Variant) -> Dictionary:
+	var start: Variant = Vector2i(int(from[0]), int(from[1])) if from is Array and (from as Array).size() == 2 		else Level.load_level(here.name).get("spawn_points", {}).get(str(from))
+	var out := {}
+	if not start is Vector2i:
+		return out
+	var queue: Array[Vector2i] = [start]
+	out[start] = 0
+	var at := 0
+	while at < queue.size():
+		var cell := queue[at]
+		at += 1
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.DOWN, Vector2i.UP]:
+			var next := cell + way
+			if here.floor.has(next) and not out.has(next):
+				out[next] = int(out[cell]) + 1
+				queue.append(next)
+	return out
 
 
 ## Whether [param cell] of the zone entered is a recess (decision

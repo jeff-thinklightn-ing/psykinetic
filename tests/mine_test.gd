@@ -22,6 +22,7 @@ func _ready() -> void:
 	_test_rings_without_a_tool()
 	_test_mined()
 	_test_kept_and_refilled()
+	_test_workings()
 	_test_mine_look()
 
 	print("")
@@ -119,6 +120,68 @@ func _test_kept_and_refilled() -> void:
 			"then full: %d sacks, %d hp" % [seam.sacks, seam.hp])
 	_check(seam.label == Seam.LABEL, "named \"%s\" again (%s)" % [Seam.LABEL, seam.label])
 	_check(int(seam.spawn_spec["props"]["sacks"]) == Seam.SACKS and int(seam.spawn_spec["props"]["spent_at"]) == -1, "and kept so for the next save")
+	World.steps = 0
+
+
+## 835: a workings' seams hold one sack each and only the period's quota
+## are full, from the deeper half by steps from its way in, varied by the
+## period; a sack dug counts, a mine laid again holds only what is left.
+func _test_workings() -> void:
+	print("
+== 835: the workings' period: one sack a seam, the quota full, deep ==")
+	var e := _build(["##########", "#s#s#s#s##", "#P.......#", "#s#s######", "##########"])
+	World.zone.name = "wk"
+	var seams: Array = e["s"]
+	for seam: Seam in seams:
+		seam.zone = "wk"
+	var player: GridEntity = e["P"][0]
+	var was := World.economy
+	var clock := func() -> int: return World.steps
+	var book := ItemBook.new(clock)
+	var stock := Stockpile.new({}, clock, book)
+	var rules := {"comfort": {"ore": 10}, "workings": {"on": true, "every_days": 3, "meet": 1.0, "deep_share": 0.5, "wanted_days": 3,
+		"places": {"wk": {"zone": "wk", "from": [8, 2], "towns": ["t"]}}}}
+	var economy := Economy.new({}, stock, null, clock, rules, func() -> Dictionary: return Items.all())
+	economy.building_stands = func(_town: String, _kind: String) -> bool: return true
+	World.economy = economy
+	World.steps = 0
+	World.refill_seams()
+	var full: Array = seams.filter(func(seam: Seam) -> bool: return not seam.spent)
+	var at: Array = full.map(func(seam: Seam) -> Vector2i: return seam.tile)
+	at.sort()
+	var deepest := [Vector2i(1, 1), Vector2i(1, 3), Vector2i(3, 1)]
+	_check(full.size() == 2 and seams.all(func(seam: Seam) -> bool: return seam.full_sacks == 1),
+		"10 ore wanted, meet 1: 2 of 6 seams full, one sack each (%s)" % [at])
+	_check(at.all(func(cell: Vector2i) -> bool: return cell in deepest), "both among the deeper half from the way in at (8, 2) (%s)" % [at])
+	_give(player, "pick")
+	var top: Seam = full.filter(func(seam: Seam) -> bool: return seam.tile.x == 1)[0]
+	for i in Seam.BLOWS:
+		_blow(player, top)
+	_check(top.spent and int(economy.workings_plan("wk")["mined"]) == 1 and World.ground_uids(player.tile).size() == 1,
+		"a sack dug from the deepest: spent, counted (%s)" % [economy.workings_plan("wk")])
+	_check(World.refill_seams() == 0 and top.spent, "the same period: nothing refills")
+	for seam: Seam in seams:
+		seam.spawn_spec["props"].erase("period")  # The mine laid again: new seams.
+		seam.full_sacks = 3
+	World.refill_seams()
+	_check(seams.filter(func(seam: Seam) -> bool: return not seam.spent).size() == 1, "laid again within the period: 2 less the 1 dug full")
+	var sets := {}
+	for period in 6:
+		World.steps = (period + 1) * roundi(3 * DayNight.day_steps)
+		World.refill_seams()
+		var now_full: Array = seams.filter(func(seam: Seam) -> bool: return not seam.spent).map(func(seam: Seam) -> String: return str(seam.tile))
+		now_full.sort()
+		sets[str(now_full)] = true
+		if now_full.size() != 2:
+			_check(false, "period %d: 2 full (%s)" % [period + 1, now_full])
+	_check(sets.size() >= 2, "over 6 periods the full ones vary, always 2 (%s)" % [sets.keys()])
+	rules["workings"]["on"] = false
+	for seam: Seam in seams:
+		seam.sacks = 0
+		seam.spent_at = 0
+	World.steps = roundi(30 * DayNight.day_steps)
+	_check(World.refill_seams() == seams.size(), "off: every seam on its own clock again (769)")
+	World.economy = was
 	World.steps = 0
 
 

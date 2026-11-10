@@ -47312,3 +47312,43 @@ ui-design, 2026-11-09; the coordinator's approval, release's number. Jeff split 
 - The budget is main as it stood at c9adea16b, ui's last three branches in (the coordinator's ruling: they were already on main, and the check's job is to stop new ones). Against the count when the check was first written (173, 47): render/barter_panel.gd 23 to 24 overrides (ui-trusted); render/pack_panel.gd 17 to 19 and render/character_sheet.gd 2 to 1 (ui-sheet); render/find_panel.gd 0 to 2 loose colours, find_panel.gd:103–104, the row's hover tint (modulate Color(1.25, 1.2, 1.1) and Color.WHITE, 599 amended (2), ui's side), which go when UiRow's hover look replaces the modulate.
 - From here the numbers only fall: a tree that needs a line raised asks ui-design, and ui-design asks the coordinator.
 Tests: style_test (the budget, and the counting rule checked on ten made-up lines). A test and its budget only; protocol unchanged; no class_name; no bullet (players see nothing: release).
+## 835. Iron from Hollowfell: the workings give about what is wanted
+
+The core loop's second slice (the roadmap's: "iron from Hollowfell with a tight yield (one trip meets
+most of a need, never 45 of 10)"; economy leads; the coordinator's approval, package "iron from
+Hollowfell": economy's yield and companions' want, switched on by economy; release's number). Before
+it a full floor held 7 to 10 seams of 3 sacks, 5 ore a sack (105 to 150 ore), refilling every 3 game
+days, against a need of at most 20 (comfort ore) and a forge's 5, and the store refuses ore past
+comfort: a trip dug far more than anyone wanted.
+
+- The rule (economy.json "workings", on false): a workings place names its zone, its way in ("from",
+  a spawn point's name or a cell) and the towns that draw on it (Hollowfell: "hollowfell",
+  "from_hills", Umbrage's "wilds/store"). While on, its seams each hold one sack, and in each period
+  (every_days 3 game days) only ceil(meet 0.8 x the ore wanted / a sack's 5), at least 1, are full;
+  the rest are worked out until the next period. A need of 10 wakes 2 sacks, 20 wakes 4.
+- The ore wanted (Economy.ore_wanted, the coordinator's ruling: every open want for ore, so a player
+  who wants gear is never starved by a town that has enough): for each town, its comfort ore, the ore
+  of every build queued there and not begun, the forge's cost while no forge stands and none is
+  queued, and each player's ore short at its smith, less the store's ore. A reforge refused for the
+  ore it lacks (World.counter_order) is noted against the player (Economy.note_wanted, the newest
+  only), kept wanted_days 3 or until their reforge goes through (wanted_met). The note is sim state
+  only: no log line carries a name or id.
+- Which seams (World._wake_workings, from refill_seams, which skips a workings zone's seams' own
+  clocks while on): the deeper deep_share 0.5 by steps over the zone's floor from the way in, shuffled
+  by the period (the coordinator: past the guards, not one fixed walk), the rest worked out.
+- The period's plan is Economy's (workings_plan: {period, quota, mined}, set lazily when a new period
+  is first read; saved as "workings", the notes as "wanted"). A sack dug there counts (World
+  _strike_seam: workings_mined). World applies the plan when the period turns and whenever its
+  seams are new (each seam's spawn props carry the period it was laid for), so Hollowfell's own
+  regen every 3 days, with new tunnels and new seams, can't hand out more than the period's quota:
+  quota less the dug ones are full.
+- The refusal: with workings on, "the town lacks N ore" becomes voice's words pointing at Hollowfell
+  (workings.lacks_ore, "%d" the ore short; empty until the switch-on).
+- Off (on false): every seam as 769, on its own refill clock.
+
+Tests: economy_test _test_workings_wanted (the sum, with the forge, a queued build and a player's
+note, its lapse and its meeting; the quota and its period; saved); mine_test _test_workings (one
+sack a seam, the quota full and from the deeper half, a dug sack counted, the mine laid again within
+the period holding only what is left, the full ones varied over periods, off as 769). Server only;
+protocol unchanged (Seam.spent already replicates); no new class_name; no bullet (the package's comes
+with the switch-on, voice's).

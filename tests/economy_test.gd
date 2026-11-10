@@ -49,6 +49,7 @@ func _ready() -> void:
 	_test_trusted_prices()
 	_test_barter()
 	_test_vendor()
+	_test_workings_wanted()
 	_test_camp_traders()
 	_test_ponds()
 	_test_maker_barter()
@@ -307,6 +308,56 @@ func _on_a_shelf(economy: Economy, id: String, cat: Dictionary) -> bool:
 	var made: Variant = cat.get(id, {}).get("made")
 	return (made is Dictionary and not (made as Dictionary).is_empty()) or economy.is_luxury(id, cat) \
 		or (cat.get(id, {}).get("yield", {}) as Dictionary).is_empty()
+
+
+## 835: the ore a workings is wanted for, and its period's sacks.
+func _test_workings_wanted() -> void:
+	print("
+== 835: the ore wanted from the workings, its sacks a period ==")
+	var economy := _fresh()
+	economy.rules = economy.rules.duplicate(true)
+	economy.rules["comfort"] = {"ore": 20}
+	economy.rules["buildings"] = {"forge": {"cost": {"wood": 10, "ore": 5}}}
+	economy.rules["workings"] = {"on": true, "every_days": 3, "meet": 0.8, "deep_share": 0.5, "wanted_days": 3,
+		"places": {"mine": {"zone": "mine", "from": [0, 0], "towns": [TOWN]}}}
+	var forge := {"stands": false}
+	economy.building_stands = func(_town: String, kind: String) -> bool: return kind == "forge" and forge["stands"]
+	_check(economy.ore_wanted("mine") == 25, "an empty store, no forge: comfort 20 and the forge's 5 (%d)" % economy.ore_wanted("mine"))
+	forge["stands"] = true
+	economy.stockpile.deposit(TOWN, "ore", 10, "test")
+	_check(economy.ore_wanted("mine") == 10, "a forge stands, 10 in store: 10 (%d)" % economy.ore_wanted("mine"))
+	var job := economy.production.order_build(TOWN, "smithy", "carpenter", {"wood": 4, "ore": 6}, 100)
+	_check(economy.ore_wanted("mine") == 16, "a build queued for 6 ore: 16 (%d)" % economy.ore_wanted("mine"))
+	economy.production.cancel(job)
+	economy.note_wanted(TOWN, "p1", 4)
+	economy.note_wanted(TOWN, "p1", 3)
+	var with_note := economy.ore_wanted("mine")
+	_check(economy.production.job(job).is_empty() and with_note == 13, "the build cancelled; a player 3 ore short at the smith, the newest note only: 13 (%d)" % with_note)
+	_now = 4 * DayNight.day_steps
+	var lapsed := economy.ore_wanted("mine")
+	_check(lapsed == with_note - 3, "past wanted_days the note lapses (%d)" % lapsed)
+	economy.note_wanted(TOWN, "p1", 3)
+	economy.wanted_met(TOWN, "p1")
+	_check(economy.ore_wanted("mine") == lapsed, "their reforge went through: met")
+	_check(economy.ore_wanted("nowhere") == 0, "no such workings: 0")
+	var plan := economy.workings_plan("mine")
+	_check(int(plan["quota"]) == ceili(0.8 * lapsed / 5.0) and int(plan["mined"]) == 0,
+		"this period's quota ceil(0.8 x %d / 5) = %d" % [lapsed, plan["quota"]])
+	economy.workings_mined("mine")
+	economy.stockpile.deposit(TOWN, "ore", 100, "test")
+	plan = economy.workings_plan("mine")
+	_check(int(plan["mined"]) == 1 and int(plan["quota"]) == ceili(0.8 * lapsed / 5.0), "one dug; the quota holds within its period though the store filled")
+	var at := _now
+	var back := _fresh()  # Sets _now 0.
+	_now = at
+	back.from_dict(JSON.parse_string(JSON.stringify(economy.to_dict())))
+	_check(int(back._workings["mine"]["mined"]) == 1 and back._workings["mine"]["period"] == economy._workings["mine"]["period"],
+		"saved and loaded: the period and its dug sack")
+	_now += 3 * DayNight.day_steps
+	plan = economy.workings_plan("mine")
+	_check(int(plan["quota"]) == 1 and int(plan["mined"]) == 0, "next period, nothing wanted: at least 1 sack, none dug (%s)" % [plan])
+	economy.rules["workings"]["on"] = false
+	_check(not economy.workings_on(), "off: nothing wanted of it")
 
 
 func _test_vendor() -> void:

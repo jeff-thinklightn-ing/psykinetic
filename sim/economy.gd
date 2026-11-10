@@ -151,6 +151,13 @@ var _ponds: Dictionary = {}
 var _anglers: Dictionary = {}
 ## Wanderers sent (805): {pond: {player id: {count, day}}}; saved.
 var _wandered: Dictionary = {}
+## The workings' yield (835): {place: {period, quota, mined}}, the sacks
+## its seams hold this period and how many were dug; saved.
+var _workings: Dictionary = {}
+## A player's ore wanted at a town's smith (835): {town: {player id:
+## {ore, day}}}, a reforge refused for the ore it lacks; sim state only,
+## never a log line; saved.
+var _wanted: Dictionary = {}
 ## Camp traders (799): camp place id -> {stock {item: count}, purse, restocked (day)}.
 var _camp_traders: Dictionary = {}
 const LOG_SIZE := 50
@@ -3402,6 +3409,102 @@ func camp_captive(_camp_id: String) -> Dictionary:
 	return {}
 
 
+# --- The workings' tight yield (835) ------------------------------------------------
+
+## economy.json "workings": {on, every_days, meet, deep_share, wanted_days,
+## places {place: {zone, from, towns}}}.
+func workings_rule() -> Dictionary:
+	return rules.get("workings", {})
+
+
+## Whether the workings' yield rule holds (835; off: every seam as 769).
+func workings_on() -> bool:
+	return bool(workings_rule().get("on", false))
+
+
+## The workings place whose seams are in zone [param zone_name], "" for none.
+func workings_of_zone(zone_name: String) -> String:
+	var places: Dictionary = workings_rule().get("places", {})
+	for place: String in places:
+		if places[place] is Dictionary and str(places[place].get("zone", "")) == zone_name:
+			return place
+	return ""
+
+
+## The ore wanted from [param place] (835): over each town that draws on it,
+## its comfort ore, the ore of every build it has queued and not begun, the
+## forge's cost while no forge stands there and none is queued, and each
+## player's ore short at its smith (note_wanted, within wanted_days), less
+## the ore in its store; never under 0.
+func ore_wanted(place: String) -> int:
+	var spec: Dictionary = workings_rule().get("places", {}).get(place, {})
+	var total := 0
+	for each: Variant in spec.get("towns", []):
+		var town := str(each)
+		var want := int(rules.get("comfort", {}).get("ore", 0))
+		var forge_queued := false
+		if production != null:
+			for id in production.jobs():
+				var job := production.job(id)
+				if job.get("kind") == "build" and job.get("town") == town and job.get("state") == "queued":
+					want += int((job.get("cost", {}) as Dictionary).get("ore", 0))
+					forge_queued = forge_queued or str(job.get("recipe", "")) == "forge"
+		var forge: Dictionary = rules.get("buildings", {}).get("forge", {})
+		if not forge_queued and not forge.is_empty() and not (building_stands.is_valid() and bool(building_stands.call(town, "forge"))):
+			want += int((forge.get("cost", {}) as Dictionary).get("ore", 0))
+		var day := now() / maxi(DayNight.day_steps, 1)
+		var notes: Dictionary = _wanted.get(town, {})
+		for who: String in notes.keys():
+			if day - int(notes[who].get("day", 0)) > int(workings_rule().get("wanted_days", 3)):
+				notes.erase(who)
+			else:
+				want += int(notes[who].get("ore", 0))
+		total += maxi(want - stockpile.count(town, "ore"), 0)
+	return total
+
+
+## Player [param player_id] was refused a reforge at [param town]'s forge
+## for [param short] ore it lacks (835; World.counter_order): kept as their
+## ore wanted there, the newest only, for wanted_days. Sim state only.
+func note_wanted(town: String, player_id: String, short: int) -> void:
+	if town.is_empty() or player_id.is_empty() or short <= 0:
+		return
+	if not _wanted.has(town):
+		_wanted[town] = {}
+	_wanted[town][player_id] = {"ore": short, "day": now() / maxi(DayNight.day_steps, 1)}
+
+
+## Player [param player_id]'s reforge at [param town] went through (835):
+## their ore wanted there is met.
+func wanted_met(town: String, player_id: String) -> void:
+	if _wanted.has(town):
+		_wanted[town].erase(player_id)
+		if _wanted[town].is_empty():
+			_wanted.erase(town)
+
+
+## [param place]'s yield this period (835): {period, quota, mined}. A new
+## period (every_days game days) sets quota ceil(meet x ore_wanted / a
+## sack's ore), at least 1, and mined 0.
+func workings_plan(place: String) -> Dictionary:
+	var rule := workings_rule()
+	var period := now() / maxi(roundi(float(rule.get("every_days", 3)) * DayNight.day_steps), 1)
+	var entry: Dictionary = _workings.get(place, {})
+	if entry.is_empty() or int(entry.get("period", -1)) != period:
+		var sack := maxi(int(Items.yield_of(Seam.ORE).get("ore", 5)), 1)
+		var quota := maxi(ceili(float(rule.get("meet", 0.8)) * ore_wanted(place) / sack), 1)
+		entry = {"period": period, "quota": quota, "mined": 0}
+		_workings[place] = entry
+	return entry.duplicate()
+
+
+## One sack dug at [param place]'s seams this period (835; World's
+## _strike_seam).
+func workings_mined(place: String) -> void:
+	workings_plan(place)
+	_workings[place]["mined"] = int(_workings[place]["mined"]) + 1
+
+
 # --- Saving --------------------------------------------------------------------------
 
 ## For the snapshot: {purses: {player id: gold}, log}.
@@ -3409,7 +3512,8 @@ func to_dict() -> Dictionary:
 	return {"purses": _purses.duplicate(), "log": _log.duplicate(true), "paid": _paid.duplicate(true), "hauled": _hauled.duplicate(),
 		"trade_debt": _trade_debt.duplicate(), "trade_purse": _trade_purse.duplicate(true), "apprentice_paid": _apprentice_paid.duplicate(), "funds": _funds.duplicate(true),
 		"caravans": _caravans.duplicate(true), "bought": _bought.duplicate(true), "trade_day": _trade_day, "floor_day": _floor_day, "alms": _alms.duplicate(), "below": _below.duplicate(), "down_day": _down_day.duplicate(), "bands": _bands.duplicate(), "band_day": _band_day, "landed": _landed.duplicate(), "owed_what": _owed_what.duplicate(true),
-		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true), "camp_traders": _camp_traders.duplicate(true)}
+		"commissions": _commissions.duplicate(), "priest_since": _priest_since.duplicate(), "ponds": _ponds.duplicate(true), "wandered": _wandered.duplicate(true),
+		"workings": _workings.duplicate(true), "wanted": _wanted.duplicate(true), "camp_traders": _camp_traders.duplicate(true)}
 
 
 func from_dict(saved: Dictionary) -> void:
@@ -3450,10 +3554,10 @@ func from_dict(saved: Dictionary) -> void:
 		for id: Variant in owed_what:
 			if owed_what[id] is Array:
 				_owed_what[str(id)] = (owed_what[id] as Array).map(func(what: Variant) -> String: return str(what))
-	for key: String in ["ponds", "wandered"]:
+	for key: String in ["ponds", "wandered", "workings", "wanted"]:
 		var each: Variant = saved.get(key, {})
 		if each is Dictionary:
-			var into: Dictionary = _ponds if key == "ponds" else _wandered
+			var into: Dictionary = {"ponds": _ponds, "wandered": _wandered, "workings": _workings, "wanted": _wanted}[key]
 			for pond: Variant in each:
 				if each[pond] is Dictionary:
 					into[str(pond)] = (each[pond] as Dictionary).duplicate(true)
