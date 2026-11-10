@@ -121,14 +121,16 @@ place, and a text and loot don't go in before a quest is in."
   on the laptop's screen, in front without taking focus, silent, so Jeff can watch (Jeff, 11-09:
   "i want the visuals to show up on screen ... so i can see what being done"); he stops it from its
   tray icon. Its runner.log says whether the laptop was used during the run and its power at start
-  and end, so a bench says whether its timings count. Each session needs Jeff's own OK, in that
+  and end, so a bench says whether its timings count. Since 828 amended (2) it adds `--host` when
+  no mode is named (without it the game sits at the connect screen and its numbers are void) and
+  refuses a locked laptop; check a bench number against its "BENCH ran:" line. Each session needs Jeff's own OK, in that
   session, before writing to a laptop; a peer can't pass it on. This PC's off-screen runs are for
   when the laptops are busy or off, or a session lacks that OK, and still need the coordinator's
   window check.
 - Heavy jobs go through the resource gate (Jeff, 2026-10-17): before a mesh or image
   generation, a full test suite, a bench, a Godot import or export, run it through the gate:
   `sh tools/heavy_job.sh run <tree> <kind> -- <command>` (or `heavy_job.ps1`; kinds:
-  trellis_mesh, comfy_batch, suite, bench, godot_import, godot_export, soak, scene; `status`, `kinds` and
+  trellis_mesh, comfy_batch, suite, bench, godot_import, godot_export, soak, scene, net; `status`, `kinds` and
   `summary` show the rest; `take`/`release` only for a script that can't wrap). Perf lands
   it; until then, one such job per session at a time and the bench lock. The gate checks
   free RAM (and GPU memory for GPU jobs) against the kind's recorded estimate plus an 8 GB
@@ -147,7 +149,9 @@ place, and a text and loot don't go in before a quest is in."
   memory falls under
   the margin while jobs run, the newest job's own wrapper stops it first and retries;
   nobody stops another session's job. The daily summary lists jobs that waited or were
-  stopped. A soak (a run that counts sim days, not timings: town_soak, town_balance, npc's 30-day
+  stopped. Only release moves a queued job to the front (`heavy_job front <tree> <kind> --by
+  release --why "<reason>"`, 394 amended (25)), for a change every queued landing pays for or on
+  Jeff's word; a tree tells the coordinator why, never asks release. A soak (a run that counts sim days, not timings: town_soak, town_balance, npc's 30-day
   run) is the `soak` kind since 394's eighth amendment (751cb726): it runs beside suites, never beside a
   bench, one at a time, at below-normal priority, with a 180-minute default limit (`--expect` overrides);
   never register a soak as a bench (economy's 150-minute soak as a bench held five landings and a cut,
@@ -155,6 +159,8 @@ place, and a text and loot don't go in before a quest is in."
   <tree> scene -- /usr/bin/timeout 900 "$GODOT_PATH" --headless --path . --scene tests/x.tscn --
   --run-marker=<n> </dev/null`): beside a suite at below-normal priority, two at most, never beside a
   bench (394 amended (17); ungated solo scenes stole CPU from landings and failed their timing checks).
+  net_test run alone is the `net` kind (394 amended (24)): it starts several Godots (about 12 GB at
+  once), so it runs one at a time, never beside a bench, and the gate refuses it under any other kind.
 - Stop only processes you started, by PID. Never `taskkill /IM` or `pkill` a program
   name: that kills every tree's Godot, including other sessions' tests and benches.
   Stopping a background task can leave its shell script and Godot children running: after
