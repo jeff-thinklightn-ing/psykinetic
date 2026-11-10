@@ -12355,6 +12355,20 @@ func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool)
 	view._busy_until = 0
 	view._charge_until = 0
 	view.rig.cancel_strike()
+	# One clock and one order, as in play (World's clock, then the body, then Client3D's draw, a frame
+	# at a time): the view's clock is its frames' own (AnimRig's reel clock, read once a frame), the
+	# slide's clock runs on it, and the test alone moves him and draws him (his and Client3D's own
+	# frames stopped through the step). Before, the view timed the slide by the wall between its draws
+	# while the test moved it by the frame's delta, his place was a frame behind the draw, and Client3D
+	# drew him again between: on a loaded machine the 2 cells a second he backs at read past RUN_ABOVE
+	# (2.2), so "Run" was drawn (builder's take; a trace beside a suite read 2.16, its draws 3-20 ms
+	# apart, each delta 8 ms, and with the clocks alone made one, up to 2.46 off the frame-late place).
+	var processing := _rig.is_processing()
+	var moving := king.is_processing()
+	_rig.set_process(false)
+	king.set_process(false)
+	AnimRig._clock_movie = 1
+	AnimRig._clock_frame = -1
 	var stepped := Vector2i.ZERO
 	var held := Vector2i.ZERO
 	for way: Vector2i in [Vector2i(-1, 0), Vector2i(0, -1), Vector2i(0, 1), Vector2i(1, 0)]:
@@ -12368,22 +12382,33 @@ func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool)
 			stepped = way
 			break
 	if stepped == Vector2i.ZERO:
+		AnimRig._clock_movie = -1
+		_rig.set_process(processing)
+		king.set_process(moving)
 		return out
 	out["stepped"] = true
 	king._world_set_facing(held)
 	var last := king.shown_facing().angle()
-	var began := Time.get_ticks_msec()
+	var began := AnimRig.now_msec()
+	var clock := began
+	var walled := Time.get_ticks_msec()
 	var ended := false
-	while Time.get_ticks_msec() - began < 450:  # The slide's 5 ticks, before his own mind moves him again.
+	# The slide's 5 ticks on the view's clock, through to its end (World doesn't tick here, so his mind
+	# doesn't move him again), 3 s of the wall at most.
+	while (clock - began < 450 or king.stepping) and Time.get_ticks_msec() - walled < 3000:
 		await get_tree().process_frame
-		# The drawing clock run as _run_clock does (World doesn't tick here): the slide moves.
-		World.tick_alpha += get_process_delta_time() * World.TICK_RATE
+		# The drawing clock run as _run_clock does, by the time the view sees pass: the slide moves.
+		var now := AnimRig.now_msec()
+		var seconds := (now - clock) / 1000.0
+		World.tick_alpha += seconds * World.TICK_RATE
+		clock = now
 		while World.tick_alpha >= 1.0:
 			World.tick += 1
 			World.tick_alpha -= 1.0
-		if end_mid and not ended and Time.get_ticks_msec() - began >= 200:
+		if end_mid and not ended and clock - began >= 200:
 			ended = true
 			king._world_set_facing(stepped)
+		king._process(seconds)  # His place and shown facing at this clock, before he is drawn.
 		_rig._process(0.0)
 		var shown := king.shown_facing()
 		if not ended:
@@ -12393,6 +12418,9 @@ func _back_step(king: Monster, view: CreatureView, backing: bool, end_mid: bool)
 		if king.stepping:  # Within the slide only: after it he turns to his facing as every body does.
 			out["to_step"] = maxf(out["to_step"], shown.dot(Vector2(stepped).normalized()))
 		out["clips"][view.rig.base_clip()] = true
+	AnimRig._clock_movie = -1  # The wall's again, as the rest of the test is timed.
+	_rig.set_process(processing)
+	king.set_process(moving)
 	return out
 
 
