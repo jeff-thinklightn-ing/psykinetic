@@ -8,7 +8,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 (`docs/lore/`) quote it word for word, usually a line Jeff passed. The guide is
 `docs/voice.md`; Jeff's own words in it are never reworded without asking him.
 
-## Lines in the code (2742)
+## Lines in the code (2743)
 
 ### companions (Pip, Wren, Nix) (626)
 
@@ -1221,7 +1221,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | wheel: zoom drag: pan Esc or M: close | `render/world_map_panel.gd` _draw() |
 |  | a marked place: ask %s to lead you there | `render/world_map_panel.gd` _draw() |
 
-### other (sim) (582)
+### other (sim) (583)
 
 | | Line | Where |
 |---|---|---|
@@ -1765,6 +1765,7 @@ who says it (by file, a best guess), where it lives, and **L** when lore's pages
 |  | nothing (no room to land) | `sim/world.gd` _push() |
 |  | the rim (teetering) | `sim/world.gd` _push() |
 |  | a fall of %d | `sim/world.gd` _push() |
+|  | %s (met again) | `sim/world.gd` _push() |
 |  | (%s takes %d, goes on at %.2f) | `sim/world.gd` _push() |
 |  | pushed to a stop | `sim/world.gd` _start_roll() |
 |  | the track's end | `sim/world.gd` _roll_step() |
