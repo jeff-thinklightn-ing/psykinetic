@@ -71,6 +71,7 @@ func _ready() -> void:
 	_test_sword_lead()
 	_test_weapon_memory()
 	_test_guard_rework()
+	_test_told_guard()
 	_test_arts_marks()
 	_test_lob_aim_on_client()
 	_test_armour()
@@ -762,6 +763,84 @@ func _test_guard_rework() -> void:
 	_check(World.guarding(holder, off).is_empty() and rad_to_deg(World.off_facing(holder, off)) > 15.0,
 			"and not one two cells down, its body %.1f degrees off at its nearest" % rad_to_deg(World.off_facing(holder, off)))
 	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+
+
+## 340 amended (3), the coordinator's rule 2: a told move is stepped out of;
+## a raised shield facing its line takes half, for stamina, never breaks
+## and stuns no one; a lowered shield or a sword meets none; told_hit
+## meets the guard on the whole harm and takes a launch's impact out of
+## what is left; the draugr's spin takes half on a shield and still throws.
+func _test_told_guard() -> void:
+	print("\n== told moves: a raised shield facing the line takes half, never breaks, no stun (340 amended (3)) ==")
+	var e := _build(["#########", "#.......#", "#..P.m..#", "#.......#", "#########"])
+	var holder: Player = e["P"][0]
+	var by: GridEntity = e["m"][0]
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	holder.facing = Vector2i(1, 0)
+	World.try_stance(holder, "block")
+	holder.stamina = 100
+	var left := World.told_guard(holder, by, 6, Vector2(-1, 0))
+	_check(left == 3 and holder.stamina == 100 - 24 and holder.raised == "block" and not World.is_stunned(holder) and not World.is_stunned(by),
+			"6 along a line from ahead: half taken, 3 left, 24 stamina, the shield up, no stun either side (%d)" % left)
+	_check(World.told_guard(holder, by, 6, Vector2(0, 1)) == 6 and holder.stamina == 76, "from the side of its line: nothing met")
+	_check(World.told_guard(holder, by, 6) == 3, "no line (a ring, a spin): by his body, ahead: met")
+	holder.stamina = 10
+	left = World.told_guard(holder, by, 6, Vector2(-1, 0))
+	_check(left == 6 and holder.raised == "" and not World.is_stunned(holder) and holder.stamina == 10
+			and holder.guard_broken_until == World.tick + World.GUARD_BROKEN_TICKS,
+			"10 stamina for 24: it gives out, the harm whole, no stun, unraised a while")
+	holder.guard_broken_until = 0
+	holder.stamina = 100
+	_check(World.told_guard(holder, by, 6, Vector2(-1, 0)) == 6 and holder.stamina == 100, "lowered: no told move met")
+	World.items.end(World.take_item(holder, holder, Player.LEFT_HAND), "gone")
+	_give(holder, "sword")
+	holder.next_attack_tick = 0
+	_check(World.told_guard(holder, by, 6, Vector2(-1, 0)) == 6 and holder.stamina == 100, "a sword's parry: none")
+	_clear(holder)
+	# told_hit: the guard on the whole, the launch unchanged, its impact out of the rest.
+	World.put_item(holder, holder, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	World.try_stance(holder, "block")
+	var hp := holder.hp
+	var took := World.told_hit(by, holder, 8, Vector2.ZERO, 0.0, Vector2(-1, 0))
+	_check(took == 4 and holder.hp == hp - 4, "told_hit, 8 with no launch: 4 taken (%d)" % (hp - holder.hp))
+	holder.max_hp = 500
+	holder.hp = 500
+	hp = holder.hp
+	holder.stamina = 100
+	World.try_stance(holder, "block")
+	took = World.told_hit(by, holder, 8, Vector2(-1, 0), 240.0, Vector2(-1, 0))
+	_check(took == hp - holder.hp and took >= 4 and holder.tile != Vector2i(3, 2),
+			"8 with a launch into the wall: thrown (%s), its impact counted in the 4 left, %d in all" % [holder.tile, took])
+	# The draugr's spin on a shield raised at him.
+	e = _build(["#########", "#..PmP..#", "#########"])
+	var boss: GridEntity = e["m"][0]
+	_boss(boss)
+	boss.strength = 0
+	World.set_slots(boss, Items.tidy(["", "", "", "", "battle_axe", ""], Items.CARRIED))
+	var bearer: Player = e["P"][0]  # (3,1), ahead of him.
+	var bare: Player = e["P"][1]  # (5,1), behind.
+	World.put_item(bearer, bearer, Player.LEFT_HAND, World.items.mint("shield", "built"))
+	bearer.facing = Vector2i(1, 0)
+	bearer.max_hp = 200
+	bearer.hp = 200
+	bare.max_hp = 200
+	bare.hp = 200
+	_check(World.try_spin(boss), "he winds up the spin")
+	var taken := {}
+	var on := func(entity: GridEntity, amount: int, source: GridEntity, cause: StringName) -> void:
+		if source == boss and cause == &"attack":
+			taken[entity] = int(taken.get(entity, 0)) + amount
+	World.entity_damaged.connect(on)
+	for i in 20:
+		if bearer.raised != "block" and not World.is_down(bearer):
+			bearer.facing = Vector2i(1, 0)
+			World.try_stance(bearer, "block")
+		World.step()
+	World.entity_damaged.disconnect(on)
+	var a := int(taken.get(bearer, 0))
+	var b := int(taken.get(bare, 0))
+	_check(b > 0 and a > 0 and a <= ceili(b / 2.0) and World.is_down(bearer) and not World.is_stunned(boss),
+			"the spin: the shield ahead takes half of it (%d against %d bare), still thrown down, no break, he isn't thrown back" % [a, b])
 
 
 func _test_weapon_memory() -> void:

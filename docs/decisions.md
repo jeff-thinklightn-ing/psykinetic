@@ -7306,6 +7306,41 @@ foe's body (11 degrees at its nearest); items_test's heavy and crushing blows he
 without a stun; monster_test's broken shield now one that gives out. The sword's tooltip in
 voice's words (levels/items.json). Server and data; protocol unchanged, no new class_name.
 
+340 amended (3) (release's label; the coordinator's rule 2 on combat's guard table, enemy-ai's
+option (c)): a told move meets a raised shield. A told move (a red-marked one) is stepped out of,
+and was met by guards three ways: most skipped them (World.damage, a launch or a rush direct: the
+great bear's swipe, slam and charge, the old grey's lunge, the boar king's gore and charge, the
+draugr's throw and charge, the hill cat's pounce), the draugr's spin met them as a crushing blow
+and broke every one, a robber's ambush lunge was absorbed whole as a shot. Now one rule,
+World.told_guard(body, by, harm, way): a raised shield (raised "block"; not a lowered one, not a
+sword's parry) facing the move takes half its absorb of the harm (LOWERED_ABSORB_SHARE) for the
+stamina a point of harm costs, never breaks, stuns no one and throws its maker back not at all;
+short of the stamina it gives out as against a plain blow (340 amended (2)): the harm whole, the
+shield down for GUARD_BROKEN_TICKS, no stun. Facing: [way] is the told line's direction, the way
+its maker comes along, read as -way against the holder's facing within the shield's arc, so a
+shield turned onto a charge's line meets him whatever cell he arrives on (enemy-ai's ask); with
+none (a ring, a spin, a slam) his body, as a plain blow's (off_facing). The push, the throw and
+the knockdown are unchanged: a shield never shortens them. World.told_hit(by, body, harm,
+push_dir, impulse, way) is the whole hit for a site that launches: the guard met on the move's
+whole harm, its launch's impact counted in (as BoarKing._gore counts it), the body launched by
+World.launch unchanged, the impact taken out of what the guard left and the rest landed as
+&"attack"; so the shield's half is a true half and an unguarded hit is as before. Here, the
+draugr's (world.gd): the spin's every body through told_guard by his body, then thrown and
+knocked down as before; the throw and physics' hurl through told_guard along the throw's line;
+his charge to his axe a told rush (rush's opts "told", carried in the lunge's state): the body met
+takes its share of the collision's impact through told_guard along the charge's line, the
+charger his whole, _push and its chain untouched (688 amended (11) holds; physics' read); one
+whose shield takes all of it has no impact (no impact stagger, no wear) and the rush's struck
+counts what it took. Enemy-ai converts the great beasts' sites to told_hit in its own change
+behind this one (the bear's charge, swipe and slam, the grey's lunge, the king's gore, the cat's
+pounce, the robber's lunge). combat_test _test_told_guard (6 along the line from ahead: 3 left
+for 24 stamina, the shield up, no stun either side; from the side of its line nothing; no line,
+met by his body; 10 stamina for 24 given out, whole; a lowered shield and a sword meet none;
+told_hit 8 with no launch 4, with a launch into the wall its impact counted in; the draugr's spin
+4 on the shield ahead against 8 bare, the holder still thrown down, the draugr not thrown back).
+The shield's tooltip and the CHANGELOG in voice's words. Server and data; protocol unchanged, no
+new class_name.
+
 ## 343. The giant axe: a 3-cell arc that knocks down; prone
 
 Weapons as verbs in the fight, part 4 of 5. A blow with a knockdown verb

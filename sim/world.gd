@@ -5944,8 +5944,9 @@ func _tend_disarmed() -> void:
 			_take_axe(by)
 
 
-## The spin's sweep (decision 603): every body in its cells struck, guard
-## broken, pushed outward and knocked down; then its maker spent.
+## The spin's sweep (decision 603): every body in its cells struck (a
+## raised shield facing him takes half: told_guard, 340 amended (3)),
+## pushed outward and knocked down; then its maker spent.
 func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
 	var move: Dictionary = moves["spin"]
 	var slot := _axe_slot(by)
@@ -5958,11 +5959,9 @@ func _spin_lands(by: GridEntity, shape: Dictionary) -> void:
 	for body in tell_struck(by, telegraph_cells(shape)):  # Decision 810.
 		if not can_target(by, body):
 			continue
-		var amount := maxi(1, roundi(by.attack_damage * float(move["damage_scale"])))
-		var met: Variant = _meet_guard(body, by, amount, 99.0, false, true)
-		if met != null:
-			amount = met[0]
-		damage(body, amount, by, &"attack")
+		var amount := told_guard(body, by, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))))  # 340 amended (3).
+		if amount > 0:
+			damage(body, amount, by, &"attack")
 		if _alive(body):
 			apply_blow(by, body, {"impulse": impulse, "direction": Vector2(body.tile - by.tile), "no_floor": true})  # It throws (603 amended (4)).
 		if _alive(body):
@@ -6009,7 +6008,9 @@ func _throw_lands(by: GridEntity, shape: Dictionary) -> void:
 	by._world_shot(Vector2(rest if hit == null else hit.tile), &"ground" if hit == null else &"body")  # 583's shot: a point and what stopped it.
 	noise(by.tile, Senses.NOISE_FIGHT, &"fight", by)
 	if hit != null and can_target(by, hit):
-		damage(hit, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), by, &"attack")
+		var harm := told_guard(hit, by, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), Vector2(Telegraph.facing_of(shape)))  # 340 amended (3).
+		if harm > 0:
+			damage(hit, harm, by, &"attack")
 		if _alive(hit):
 			var impulse := weight * float(move["speed"])
 			if has_method("launch"):
@@ -6028,7 +6029,9 @@ func _hurl_lands(by: GridEntity, slot: int, shape: Dictionary) -> void:
 	var result: Dictionary = call("hurl", by, slot, Telegraph.facing_of(shape), int(float(move["length"])), float(move["speed"]))
 	var hit: Variant = result.get("hit")
 	if hit is GridEntity and _alive(hit) and can_target(by, hit):
-		damage(hit, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), by, &"attack")
+		var harm := told_guard(hit, by, maxi(1, roundi(by.attack_damage * float(move["damage_scale"]))), Vector2(Telegraph.facing_of(shape)))  # 340 amended (3).
+		if harm > 0:
+			damage(hit, harm, by, &"attack")
 	var landed: Variant = result.get("landed")
 	if landed is Vector2i and uid != 0:
 		_axes[by] = {"uid": uid, "cell": landed, "disarmed": false}
@@ -6058,7 +6061,7 @@ func _tend_charge(by: GridEntity, job: Dictionary) -> void:
 	if has_method("rush"):
 		if not has_signal("rush_ended") or not is_connected("rush_ended", _on_rush_ended):
 			connect("rush_ended", _on_rush_ended)
-		job["rushing"] = bool(call("rush", by, Vector2(to - by.tile), distance(by.tile, to), {"through": true, "to": to}))
+		job["rushing"] = bool(call("rush", by, Vector2(to - by.tile), distance(by.tile, to), {"through": true, "to": to, "told": true}))
 		if not job["rushing"]:
 			_charge_over(by, job, "wall")
 		return
@@ -7349,6 +7352,73 @@ func _meet_player_guard(target: Player, source: GridEntity, verb: Dictionary, sl
 ## without asking never takes the stamina its own blows want.
 func parry_cap(target: GridEntity) -> int:
 	return maxi(1, swing_cost(target))
+
+
+## A told move's harm met by [param body]'s raised shield (340 amended (3),
+## the coordinator's rule 2, enemy-ai's option (c)): what is left of
+## [param harm]. A told move is stepped out of; a raised shield facing it
+## takes half its absorb (LOWERED_ABSORB_SHARE) for the stamina a point of
+## harm costs, never breaks and stuns no one, and its maker isn't thrown
+## back. Short of the stamina it gives out, as a plain blow's (the harm
+## whole, the shield lowered for GUARD_BROKEN_TICKS, no stun). Facing:
+## [param way] is the told line's direction, the way [param by] comes along
+## (a charge's, a throw's, a cone's), read as -way against the holder's
+## facing so a shield turned onto the line meets him whatever cell he
+## arrives in; Vector2.ZERO (a ring, a spin) reads his body (off_facing).
+## A sword's parry and a lowered shield meet no told move.
+func told_guard(body: GridEntity, by: GridEntity, harm: int, way := Vector2.ZERO) -> int:
+	if harm <= 0 or body.raised != "block" or is_sheltered(body) or not holds_in_hands(body) or is_stunned(body):
+		return harm
+	if tick < body.bash_moment_until or body.facing == Vector2i.ZERO or not is_instance_valid(by) or by == body:
+		return harm
+	var verb := Items.verb_of(body.slots[Items.LEFT_HAND]) if not body.slots[Items.LEFT_HAND].is_empty() else {}
+	if verb.get("kind") != "block":
+		return harm
+	var off := absf(Vector2(body.facing).angle_to(-way)) if way != Vector2.ZERO else off_facing(body, by)
+	if off > float(verb["arc"]) * PI / 4.0 + 0.01:
+		return harm
+	var steady := float(Items.strength_value(slot_strength(body, Items.LEFT_HAND), "guard_stamina", 1.0))
+	var cost := maxi(1, ceili(float(verb["stamina"]) * harm * steady))
+	_mark_fight(by, body)
+	body._world_note_exertion(tick)
+	if body.max_stamina > 0 and body.stamina < cost:
+		body.raised = ""
+		body.guard_broken_until = tick + GUARD_BROKEN_TICKS
+		_log("guard: %s's guard gives out under %s's told move (%d harm; %d stamina for %d)" % [body.name, by.name, harm, body.stamina, cost])
+		body._world_guarded(true)
+		guard_met.emit(body, by, true)
+		return harm
+	if body.max_stamina > 0:
+		body.stamina -= cost
+	var absorb := clampf(float(verb["absorb"]) * LOWERED_ABSORB_SHARE, 0.0, 1.0)
+	var left := maxi(0, harm - ceili(harm * absorb - 0.001))
+	_log("guard: %s takes %s's told move on its shield (%d harm, %d left) for %d stamina" % [body.name, by.name, harm, left, cost])
+	body._world_guarded(false)
+	guard_met.emit(body, by, false)
+	_credit(body, Items.LEFT_HAND, "guarded")
+	return left
+
+
+## A told move landing on [param body] (340 amended (3); enemy-ai's sites
+## and the draugr's): [param harm] is the move's whole harm, its launch's
+## impact counted in it (as BoarKing._gore counts it). It meets the guard
+## first on the whole (told_guard, [param way] as there); then, with
+## [param impulse] over 0, the body is launched along [param push_dir]
+## unchanged (the guard never shortens the throw) and the launch's impact
+## comes out of what is left; the rest lands as &"attack". With no impulse
+## nothing is launched and what is left lands whole. What it took in all.
+## Server only.
+func told_hit(by: GridEntity, body: GridEntity, harm: int, push_dir: Vector2, impulse: float, way := Vector2.ZERO) -> int:
+	if not _alive(body):
+		return 0
+	var left := told_guard(body, by, harm, way)
+	var impact := 0
+	if impulse > 0.0 and push_dir != Vector2.ZERO:
+		impact = int(launch(by, body, push_dir, impulse)["impact_damage"])
+	var rest := maxi(0, left - impact)
+	if rest > 0 and _alive(body):
+		damage(body, rest, by, &"attack")
+	return rest + impact
 
 
 ## Whether [param by]'s arrow spares [param body] (decision 456; Jeff:
@@ -10446,7 +10516,7 @@ func _lunge_begin(entity: GridEntity, toward: Vector2, cells: int, opts: Diction
 	entity._world_note_exertion(tick)
 	entity.protected = false
 	return {"entity": entity, "start": entity.tile, "line": line, "cells": cells, "ticks": ticks,
-		"u": line.length() / ticks, "blow": opts.get("blow", {}), "through": bool(opts.get("through", false)),
+		"u": line.length() / ticks, "blow": opts.get("blow", {}), "through": bool(opts.get("through", false)), "told": bool(opts.get("told", false)),
 		"to": opts.get("to", NO_CELL), "within": opts.get("within", []), "moved": 0, "drag": 1.0, "cell_ticks": ticks, "spent_ticks": 0.0, "reason": "", "stopped_by": "", "struck": [], "impact": 0}
 
 
@@ -10517,11 +10587,15 @@ func _lunge_cell(state: Dictionary, timed: bool) -> void:
 		for each: Dictionary in pushed:
 			if each["body"] == body:
 				went = each["cells"]
+		# A told charge (340 amended (3)): the one met takes it on a raised shield facing the line;
+		# all of it taken there, it has no impact (no stagger, no wear) and struck counts what it took.
+		var taken := told_guard(body, entity, impact, line) if impact > 0 and bool(state.get("told", false)) else impact
 		if impact > 0:
-			_impact(body, impact, entity, &"body")
+			if taken > 0:
+				_impact(body, taken, entity, &"body")
 			_impact(entity, impact, entity, &"body")
 			state["impact"] = int(state["impact"]) + impact
-		state["struck"].append({"body": body, "cells": went, "impact": impact})
+		state["struck"].append({"body": body, "cells": went, "impact": taken})
 		_log("lunge: %s meets %s at %.2f: it goes %d, the charge goes on at %.2f" % [entity.name, body.name, u, went, kept])
 		kept *= drag  # Back to its drive.
 		state["u"] = kept
