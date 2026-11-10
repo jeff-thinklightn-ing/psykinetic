@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- Towns: Rolf at the stall sells a pick for 5 gold, for digging ore (479 amended).
 - You can move again the moment after you strike, and one click away from a foe sets you moving and calls off the blow you'd clicked, where before you stood until your weapon was ready and it took several clicks to get clear of a swipe (688 amended (8)).
 - Your companion warns you of the old grey when she sees him, and of his jaws and his pack when you send her at him or she pulls back from him, where before she said nothing at the sight of him and spoke of a bear's paws in a fight with him (780 amended (19)).
 - Your companion speaks of other players only from what she can see: ask after one out of sight and she says she doesn't know, where before she might guess where they were or say they were safe; she calls them by name, and she keeps her own wishes to herself while others are talking near her (803 amended (9)).

@@ -328,6 +328,10 @@ func _test_vendor() -> void:
 	economy.add_gold("p1", 8, "test")
 	var cloak := economy.vendor_sale("p1", "cloak")
 	_check(cloak["ok"] and int(cloak["gold"]) == 8 and economy.gold("p1") == 0, "Rolf's woollen cloak: 8 gold (788 amended; %s)" % [cloak])
+	economy.add_gold("p1", 5, "test")
+	var pick := economy.vendor_sale("p1", "pick")
+	_check(pick["ok"] and int(pick["gold"]) == 5 and int(pick["count"]) == 1 and economy.gold("p1") == 0
+		and economy.stockpile.count(TOWN, "gold") == treasury, "Rolf's pick: 5 gold, none of it the treasury's (479 amended; %s)" % [pick])
 
 
 ## A forest camp's trader (799, economy's side): stock drawn from his mix,

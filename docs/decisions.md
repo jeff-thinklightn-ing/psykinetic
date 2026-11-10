@@ -13653,6 +13653,15 @@ spawn-spec key the client reads: pc-character's side); no new class_name.
 Rejected: new art (he is the imp Jeff knows); an official's place (tolerated,
 not trusted); a house (a stall); keeping a respawn.
 
+479 amended (release's label; the coordinator's ruling on the iron slice, 835): the pick at Rolf's
+stall. A new player had no sure pick to dig Hollowfell's seams with: the smith makes one only once
+the town's forge stands, and the forge's cost is ore; otherwise it came by chance (a farmstead cache
+0.5, a goblin's drop 0.2). vendor.wares gains {"item": "pick", "count": 1, "price": 5} (rod 3,
+cloak 8 for scale; the pick is no bargain weapon, its swing slow), sold as every ware: paid from
+the buyer's purse into nothing, minted and marked starter, never bought back by a shop, maker or
+fence. Not a package piece: it mends a gap in mining that is live today, so it lands on.
+economy_test _test_vendor. Data only; server; protocol unchanged; no new class_name.
+
 ## 478. The orc and the kobold: the Blood Rot's allies' own bodies
 
 Lore and Jeff (416, the primer): brutes are orcs, paid muscle, big and heavy,
