@@ -47026,7 +47026,8 @@ and released lines left out) written once and logged, a process's own peak betwe
 lean, full and gone lean; one behind a full suite out of reach doesn't pass it; queued while a suite runs it
 stays full and status says it waits on the count; room at its turn starts full; no room at its turn goes lean
 with no wait, and its lean line is written once with the full figure. Tools only; protocol unchanged; no
-class_name; no bullet.
+class_name; no bullet. Landed, `heavy_job kinds` failed on the both-figures column (its format string one
+%s short; nothing the gate decides read it); fixed after, with a check that runs kinds and reads the suite's line.
 
 ## 829. The day turn spread over ticks; production's gold in one line a tick
 

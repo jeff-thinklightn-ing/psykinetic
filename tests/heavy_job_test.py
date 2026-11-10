@@ -969,6 +969,12 @@ check(gate.kinds()["suite"]["ram_gb"] == 16.56, "kinds: ram_gb is the at-once es
 gate._write(gate._path("kinds.json"), {"suite": dict(gate.KINDS["suite"], ram_gb=21.0, ram_once_gb=16.56, ram_peaks_gb=20.4)})
 check(gate.kinds()["suite"]["ram_gb"] == 16.56, "over a ram_gb an older heavy_job.py wrote from summed peaks")
 check(gate.measures(gate.kinds()["suite"]) == "; RAM by at once 16.6, summed peaks 20.4", "both figures shown: %s" % gate.measures(gate.kinds()["suite"]))
+shown = io.StringIO()
+with contextlib.redirect_stdout(shown):
+    shown_code = gate.main(["kinds"])
+suite_line = [line for line in shown.getvalue().splitlines() if line.startswith("suite ")]
+check(shown_code == 0 and suite_line and suite_line[0].endswith("; RAM by at once 16.6, summed peaks 20.4"),
+    "heavy_job kinds prints, both figures on the suite's line: %s" % (suite_line[0] if suite_line else "none"))
 gate.RAM_MEASURE = gate.SUMMED_PEAKS
 check(gate.kinds()["suite"]["ram_gb"] == 20.4 and gate.measures(gate.kinds()["suite"]).startswith("; RAM by summed peaks 20.4"),
     "RAM_MEASURE back to summed peaks: every kind back at once")

@@ -1724,7 +1724,7 @@ def status():
 
 def show_kinds():
     for name, row in sorted(kinds().items()):
-        print("%-14s %5.1f GB RAM, %.1f GB commit%s%s%s%s" % (name, row["ram_gb"], commit_of(row),
+        print("%-14s %5.1f GB RAM, %.1f GB commit%s%s%s%s%s" % (name, row["ram_gb"], commit_of(row),
             ", GPU %.1f GB" % row["gpu_gb"] if row["gpu"] else "",
             ", at most %d at once" % row["max_running"] if row.get("max_running") is not None else "",
             ", last peak %.1f GB" % row["last_peak_gb"] if "last_peak_gb" in row else "",
