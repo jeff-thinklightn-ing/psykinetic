@@ -1375,6 +1375,23 @@ func _test_work_clear() -> void:
 	var blade_box := blade.get_aabb()
 	var head := chopper.global_transform.affine_inverse() * blade.global_transform * Vector3(blade_box.get_center().x, blade_box.end.y - 0.08, blade_box.get_center().z)
 	_check(head.distance_to(CHOP_BLOCK) < 0.1, "the chop's blow lands on the block's top (%s, the top at %s)" % [head, CHOP_BLOCK])
+	# The edge leads the blow (the coordinator's CHOP_* edges check; 769 amended (9) found the pick's
+	# head drawn across its swing): tool.axe's edge toward its own +x, so through the downswing the
+	# edge points the way the head moves, and at the block it bites down into the log.
+	var to_body := chopper.global_transform.affine_inverse()
+	var heads: Array[Vector3] = []
+	var edges: Array[Vector3] = []
+	for at: float in [0.54, 0.62, 0.7]:
+		for i in 3:
+			chopper_rig.upper_at("Chop", at)
+			await get_tree().process_frame
+		heads.append(to_body * blade.global_transform * Vector3(blade_box.get_center().x, blade_box.end.y - 0.08, blade_box.get_center().z))
+		edges.append((to_body.basis * axe.global_basis.x).normalized())
+	var leads := [edges[0].dot((heads[1] - heads[0]).normalized()), edges[1].dot((heads[2] - heads[1]).normalized())]
+	print("    chop: the head %s -> %s -> %s; the edge %s, %s, %s; leading %.2f, %.2f" % [heads[0], heads[1], heads[2],
+			edges[0], edges[1], edges[2], leads[0], leads[1]])
+	_check(leads[0] > 0.5 and leads[1] > 0.5 and edges[2].y < -0.5,
+			"chopping, the axe's edge leads its swing (%.2f, %.2f) and bites down into the block (%.2f)" % [leads[0], leads[1], edges[2].y])
 	chopper.queue_free()
 	chopper_holder.free()
 	# The log on the shoulder (Carry_Shoulder over the walk, held level by _level_load): none of
