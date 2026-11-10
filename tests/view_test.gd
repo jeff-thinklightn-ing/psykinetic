@@ -9552,21 +9552,56 @@ func _test_telegraph_smooth() -> void:
 	var struck: Array[Vector2i] = []
 	for cell in cells:
 		struck.append(Vector2i(cell))
-	var inside := func(point: Vector3) -> bool:
+	# 602 amended (3) (the coordinator's: a warning never understates): every point of the sent
+	# cells at the fill's full alpha, a band fading outside them to none at TELEGRAPH_FEATHER.
+	var arrays := (fill.mesh as ArrayMesh).surface_get_arrays(0)
+	var points: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var colours: PackedColorArray = arrays[Mesh.ARRAY_COLOR]
+	var feather := Client3D.TELEGRAPH_FEATHER
+	var inner_dim := 0
+	var too_far := 0
+	var band := 0
+	var rim_lit := 0
+	for i in points.size():
+		var at := Vector2(points[i].x, points[i].z)
+		var nearest := INF
 		for cell in struck:
-			if absf(point.x - cell.x) <= 0.51 and absf(point.z - cell.y) <= 0.51:
+			nearest = minf(nearest, ((at - Vector2(cell)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO).length())
+		if nearest <= 0.001 and colours[i].a < 0.999:
+			inner_dim += 1
+		if nearest > feather + 0.01:
+			too_far += 1
+		if nearest > 0.001:
+			band += 1
+		if nearest >= feather - 0.01 and colours[i].a > 0.01:
+			rim_lit += 1
+	_check(points.size() >= 3 and colours.size() == points.size() and inner_dim == 0,
+			"every point of the sent cells drawn at the fill's full alpha: none understated (%d vertices, %d dim)" % [points.size(), inner_dim])
+	_check(band > 0 and too_far == 0 and rim_lit == 0,
+			"a soft band outside them, %.1f of a cell, fading to none at its edge (%d band vertices, %d too far, %d lit at the rim)" % [feather, band, too_far, rim_lit])
+	var walled := Vector2i(struck[0]) + Vector2i(0, -1)
+	while struck.has(walled):
+		walled += Vector2i(0, -1)
+	var floor_ok := func(cell: Vector2i) -> bool: return cell != walled
+	var open := func(_cell: Vector2i, _way: Vector2i) -> bool: return true
+	var over_wall := 0
+	for piece: Dictionary in Client3D.telegraph_band_polygons(struck, feather, floor_ok, open):
+		if Vector2i(piece["cell"]) == walled:
+			over_wall += 1
+	# Just past the struck cell's edge, mid-side: only the band straight across that edge reaches
+	# it (a side neighbour's or a corner's is 0.5 away), so a wall on that edge leaves it bare.
+	var probe := Vector2(walled) + Vector2(0.0, 0.5 - feather * 0.5)
+	var floor_all := func(_cell: Vector2i) -> bool: return true
+	var covered := func(passable: Callable) -> bool:
+		for piece: Dictionary in Client3D.telegraph_band_polygons(struck, feather, floor_all, passable):
+			if Vector2i(piece["cell"]) == walled and Geometry2D.is_point_in_polygon(probe, piece["polygon"]):
 				return true
 		return false
-	var fill_faces := (fill.mesh as ArrayMesh).get_faces()
-	var out_cell := Vector2i(left_out)
-	var stray := 0
-	var in_left_out := 0
-	for vertex in fill_faces:
-		if not inside.call(vertex):
-			stray += 1
-		if absf(vertex.x - out_cell.x) < 0.49 and absf(vertex.z - out_cell.y) < 0.49:
-			in_left_out += 1
-	_check(fill_faces.size() >= 3 and stray == 0 and in_left_out == 0, "the fill lies within the sent cells only, none in the cell left out (%d vertices, %d stray)" % [fill_faces.size(), stray])
+	var shut := func(cell: Vector2i, way: Vector2i) -> bool: return not (cell == walled and way == Vector2i(0, 1))
+	var open_covers: bool = covered.call(open)
+	var shut_covers: bool = covered.call(shut)
+	_check(over_wall == 0 and open_covers and not shut_covers,
+			"nothing drawn beyond a wall: none on a wall's cell (%d); past an open edge the band (%s), past a walled one none (%s)" % [over_wall, open_covers, shut_covers])
 	var fill_material := fill.material_override as StandardMaterial3D
 	_rig.telegraph_tick(World.tick)
 	var faint := fill_material.albedo_color.a
@@ -9574,6 +9609,35 @@ func _test_telegraph_smooth() -> void:
 	var later := fill_material.albedo_color.a
 	_check(fill.visible and fill_material.albedo_color.r > 0.5 and later > faint,
 			"the red fill stays and brightens as the blow comes: the tell kept (%.2f to %.2f)" % [faint, later])
+	# 602 amended (3), ui-design's: the theme's danger_ground, strong out of doors (read over
+	# grass), lower indoors (no slab over the floor).
+	var ground := UiTheme.color("danger_ground")
+	_check(ground != Color.MAGENTA and Color(fill_material.albedo_color, 1.0).is_equal_approx(Color(ground, 1.0)),
+			"the fill in the theme's danger_ground (%s)" % fill_material.albedo_color.to_html(false))
+	var was_outdoor: bool = _rig._outdoor
+	var was_light := DayNight.light
+	for setting: Array in [[true, 1.0, Client3D.TELEGRAPH_DAY, "out of doors by day"],
+			[true, DayNight.NIGHT, Client3D.TELEGRAPH_NIGHT, "out of doors at night"],
+			[false, 1.0, Client3D.TELEGRAPH_INDOORS, "indoors"]]:
+		_rig._outdoor = setting[0]
+		DayNight.light = setting[1]
+		var pair: Vector2 = setting[2]
+		_rig.telegraph_tick(World.tick)
+		var at_start := fill_material.albedo_color.a
+		_rig.telegraph_tick(World.tick + 10)
+		var at_lands := fill_material.albedo_color.a
+		_check(is_equal_approx(at_start, pair.x) and is_equal_approx(at_lands, pair.y),
+				"%s: faint %.2f as it begins, full %.2f as it lands (%.2f, %.2f)" % [setting[3], pair.x, pair.y, at_start, at_lands])
+	_rig._outdoor = was_outdoor
+	DayNight.light = was_light
+	var dusk := Client3D.telegraph_strengths(true, lerpf(DayNight.NIGHT, 1.0, 0.5))
+	var day := Client3D.telegraph_strengths(true, 1.0)
+	var night := Client3D.telegraph_strengths(true, DayNight.NIGHT)
+	var indoors := Client3D.telegraph_strengths(false, DayNight.NIGHT)
+	_check(dusk.is_equal_approx((day + night) * 0.5) and day.y < 1.0 and night.x > 0.0,
+			"at dusk halfway from night's to day's, never opaque (%s)" % dusk)
+	_check(night.y < indoors.y,
+			"at night out of doors the full mark under a hall's, so a night fight never blares more than a hall (%.2f < %.2f)" % [night.y, indoors.y])
 	_rig.telegraph_drop("smooth")
 	_check(not _rig._telegraphs.has("smooth"), "dropped: gone")
 	_rig.telegraph_show("plain", cells, World.tick, World.tick + 10)

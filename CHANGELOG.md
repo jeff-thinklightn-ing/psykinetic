@@ -7,6 +7,7 @@ notes (decision 324).
 
 ## Unreleased
 
+- The red a big foe marks on the ground before a blow lies flat now and shows plainly on grass, solid over just the ground it will strike with a soft edge round it, so step off the solid red and you're clear, where before it faded into a brown patch on grass and its hard edge could look like a raised block (602 amended (3)).
 - A war hammer's blow staggers a foe and shoves it back a step, so the fight stays within your reach, where before it sent the foe flying several steps clear (305 amended).
 - Free movement: knocked back and stunned, you stand still through the stun and walk on from where you are when it ends, even on a slow connection, where before the moves you'd held were all walked at once and you jumped two or three cells a moment after the blow (688 amended (10)).
 - In rain, drops prick the water with small quick rings, a scatter in drizzle and the whole surface in a downpour, fewer on running water, thinning as the shower passes, and a fish's rise still shows among them (309 amended (2)).

@@ -1842,10 +1842,19 @@ const DRAW_PULL_RATE := 7.5
 var draw_pull_margin := DRAW_PULL_MARGIN
 var draw_pull_most := DRAW_PULL_MOST
 var draw_pull_rate := DRAW_PULL_RATE
-## A telegraph's fill: faint at its start, full as it lands; the landing
-## flash's alpha and length.
-const TELEGRAPH_FAINT := 0.18
-const TELEGRAPH_FULL := 0.6
+## A telegraph's fill: faint at its start, full as it lands, in the theme's
+## danger_ground, by the setting and the light (602 amended (3), ui-design's
+## from stills): out of doors by day strong enough to read over grass, where
+## the old 0.6 of alarm mixed to a brown dirt patch; at night lower, or it
+## lies on dark grass like a lit slab; indoors between, the floor's joints
+## still showing at full (telegraph_strengths). Then the landing flash's
+## alpha and length, the same everywhere.
+const TELEGRAPH_INDOORS := Vector2(0.25, 0.6)
+const TELEGRAPH_DAY := Vector2(0.4, 0.85)
+const TELEGRAPH_NIGHT := Vector2(0.2, 0.45)
+## How far a telegraph's fill fades out past its struck cells, in cells
+## (602 amended (3); ui-design's to pick): full at their edge, none here.
+const TELEGRAPH_FEATHER := 0.2
 const TELEGRAPH_FLASH := 0.95
 const TELEGRAPH_FLASH_MSEC := 300
 ## A telegraph drawn smooth (combat's 602 amended, Telegraph.outline; the
@@ -5211,13 +5220,16 @@ func telegraph_show(id: String, cells: Array, from_tick: int, lands_tick: int, s
 	var curtain: MeshInstance3D = null
 	if outline.is_empty() or struck.is_empty():
 		for cell in struck:
-			var quad := _make_flat(_cell_quad, Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
+			var quad := _make_flat(_cell_quad, Color(UiTheme.color("danger_ground"), telegraph_strengths(_outdoor, DayNight.light).x))
 			_lay_on_ground(quad, cell, ON_FLOOR * 1.5)
 			add_child(quad)
 			quads.append(quad)
 	else:
-		var origin := Vector2(float(shape["origin"][0]), float(shape["origin"][1]))
-		var fill := _make_flat(_ground_polygons_mesh(telegraph_fill_polygons(outline, origin, struck)), Color(UiTheme.color("alarm"), TELEGRAPH_FAINT))
+		# 602 amended (3) (the coordinator's: a warning never understates): the struck cells whole at
+		# the fill's alpha, every point a centre is struck from (699), and a soft band fading
+		# outside them (telegraph_band_polygons), so no hard red edge reads as a block.
+		var fill := _make_flat(_telegraph_ground_mesh(struck), Color(UiTheme.color("danger_ground"), telegraph_strengths(_outdoor, DayNight.light).x))
+		(fill.material_override as StandardMaterial3D).vertex_color_use_as_albedo = true
 		add_child(fill)
 		quads.append(fill)
 		# 602 amended (Jeff: "the ground swipe effect shows a 3d block, that looks amateur"): no
@@ -5299,6 +5311,100 @@ static func telegraph_curtain_segments(outline: PackedVector2Array, origin: Vect
 
 ## [param polygons] (grid units) as one mesh on the ground, each vertex at
 ## the ground's height under it plus a hair.
+## The feathered band outside [param struck] (602 amended (3)): in each
+## cell beside them that [param floor_ok] (a cell) calls floor, the part
+## within [param feather] of a struck cell's square that reaches it
+## straight across an edge [param passable] (a cell and a way) lets
+## through, or across a corner with floor on both sides, each part once
+## (no two overlapping, so the fade never doubles). [{cell, polygon}], in
+## grid units.
+static func telegraph_band_polygons(struck: Array[Vector2i], feather: float, floor_ok: Callable, passable: Callable) -> Array[Dictionary]:
+	var hit := {}
+	for cell in struck:
+		hit[cell] = true
+	var out: Array[Dictionary] = []
+	var seen := {}
+	for each in struck:
+		for dy in [-1, 0, 1]:
+			for dx in [-1, 0, 1]:
+				var near := each + Vector2i(dx, dy)
+				if hit.has(near) or seen.has(near):
+					continue
+				seen[near] = true
+				if not bool(floor_ok.call(near)):
+					continue
+				var square := _cell_square(near)
+				var pieces: Array[PackedVector2Array] = []
+				var grown_before: Array[PackedVector2Array] = []
+				for way: Vector2i in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
+						Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]:
+					var from := near + way
+					if not hit.has(from):
+						continue
+					if way.x != 0 and way.y != 0:
+						if not (bool(floor_ok.call(near + Vector2i(way.x, 0))) and bool(floor_ok.call(near + Vector2i(0, way.y)))):
+							continue
+					elif not bool(passable.call(near, way)):
+						continue
+					var grown: PackedVector2Array = Geometry2D.offset_polygon(_cell_square(from), feather, Geometry2D.JOIN_ROUND)[0]
+					var parts: Array[PackedVector2Array] = []
+					for part: PackedVector2Array in Geometry2D.intersect_polygons(square, grown):
+						if part.size() >= 3 and not Geometry2D.is_polygon_clockwise(part):
+							parts.append(part)
+					for earlier in grown_before:
+						var left: Array[PackedVector2Array] = []
+						for part in parts:
+							for rest: PackedVector2Array in Geometry2D.clip_polygons(part, earlier):
+								if rest.size() >= 3 and not Geometry2D.is_polygon_clockwise(rest):
+									left.append(rest)
+						parts = left
+					pieces.append_array(parts)
+					grown_before.append(grown)
+				for piece in pieces:
+					out.append({"cell": near, "polygon": piece})
+	return out
+
+
+## [param cell]'s square, in grid units, anticlockwise.
+static func _cell_square(cell: Vector2i) -> PackedVector2Array:
+	var at := Vector2(cell)
+	return PackedVector2Array([at + Vector2(-0.5, -0.5), at + Vector2(0.5, -0.5), at + Vector2(0.5, 0.5), at + Vector2(-0.5, 0.5)])
+
+
+## A point's alpha in the band (602 amended (3)): 1 on a struck cell's
+## square, falling to 0 at [param feather] from the nearest.
+static func telegraph_band_alpha(point: Vector2, struck: Array[Vector2i], feather: float) -> float:
+	var nearest := INF
+	for cell in struck:
+		var off := ((point - Vector2(cell)).abs() - Vector2(0.5, 0.5)).max(Vector2.ZERO)
+		nearest = minf(nearest, off.length())
+	return clampf(1.0 - nearest / feather, 0.0, 1.0) if feather > 0.0 else (1.0 if nearest <= 0.0 else 0.0)
+
+
+## A telegraph's ground (602 amended (3)): [param struck]'s squares whole,
+## alpha 1 in the vertex colour, and the band outside them fading to 0
+## (telegraph_band_polygons, the floor and the edges as World has them),
+## each piece at its own cell's height.
+func _telegraph_ground_mesh(struck: Array[Vector2i]) -> ArrayMesh:
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var pieces: Array[Dictionary] = []
+	for cell in struck:
+		pieces.append({"cell": cell, "polygon": _cell_square(cell)})
+	pieces.append_array(telegraph_band_polygons(struck, TELEGRAPH_FEATHER,
+			func(cell: Vector2i) -> bool: return World.is_walkable(cell),
+			func(cell: Vector2i, way: Vector2i) -> bool: return not World.edge_blocks(cell, way)))
+	for piece: Dictionary in pieces:
+		var polygon: PackedVector2Array = piece["polygon"]
+		var cell: Vector2i = piece["cell"]
+		for index in Geometry2D.triangulate_polygon(polygon):
+			var point := polygon[index]
+			surface.set_color(Color(1.0, 1.0, 1.0, telegraph_band_alpha(point, struck, TELEGRAPH_FEATHER)))
+			surface.set_normal(Vector3.UP)
+			surface.add_vertex(Vector3(point.x, _height_in(cell, point) + ON_FLOOR * 1.5, point.y))
+	return surface.commit()
+
+
 func _ground_polygons_mesh(polygons: Array[PackedVector2Array]) -> ArrayMesh:
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
@@ -5386,20 +5492,31 @@ func telegraph_tick(tick: int) -> void:
 				continue
 			alpha = telegraph_flash
 		else:
-			alpha = lerpf(TELEGRAPH_FAINT, TELEGRAPH_FULL, telegraph_fill(int(entry["from"]), int(entry["lands"]), tick))
+			var strengths := telegraph_strengths(_outdoor, DayNight.light)
+			alpha = lerpf(strengths.x, strengths.y, telegraph_fill(int(entry["from"]), int(entry["lands"]), tick))
 		for quad: MeshInstance3D in entry["quads"]:
 			var material := quad.material_override as StandardMaterial3D
 			if material != null:
-				material.albedo_color = Color(UiTheme.color("alarm"), alpha)
+				material.albedo_color = Color(UiTheme.color("danger_ground"), alpha)
 		var curtain: MeshInstance3D = entry.get("curtain")
 		if curtain != null and curtain.material_override is StandardMaterial3D:
-			(curtain.material_override as StandardMaterial3D).albedo_color = Color(UiTheme.color("alarm"), curtain_alpha(alpha))
+			(curtain.material_override as StandardMaterial3D).albedo_color = Color(UiTheme.color("danger_ground"), curtain_alpha(alpha))
 
 
 ## The curtain's alpha for the fill's [param alpha]: TELEGRAPH_CURTAIN_ALPHA
 ## times it, TELEGRAPH_LOW_BOOST more under a pitch below TELEGRAPH_LOW_PITCH.
 func curtain_alpha(alpha: float) -> float:
 	return clampf(alpha * TELEGRAPH_CURTAIN_ALPHA * (TELEGRAPH_LOW_BOOST if pitch < TELEGRAPH_LOW_PITCH else 1.0), 0.0, 1.0)
+
+
+## A telegraph fill's faint and full alpha (x, y) (602 amended (3)):
+## indoors TELEGRAPH_INDOORS; out of doors from TELEGRAPH_NIGHT to
+## TELEGRAPH_DAY as [param light] (DayNight.light, the open sky's: NIGHT to
+## 1) rises.
+static func telegraph_strengths(outdoor: bool, light: float) -> Vector2:
+	if not outdoor:
+		return TELEGRAPH_INDOORS
+	return TELEGRAPH_NIGHT.lerp(TELEGRAPH_DAY, clampf(inverse_lerp(DayNight.NIGHT, 1.0, light), 0.0, 1.0))
 
 
 ## How far a telegraph has run (0 to 1) from [param from_tick] to [param

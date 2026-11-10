@@ -23,8 +23,8 @@ const SIZED_TYPES: Array[StringName] = [&"Title", &"Heading", &"Hud", &"Caption"
 ## colour blindness (friend blue, party pale cyan, alarm magenta: each a
 ## different lightness as well as hue, so a simulation keeps them apart).
 const COLOUR_SETS := {
-	"normal": {"friend": "#8fa857", "party": "#3fb8a8", "alarm": "#b8322a", "rust": "#e8792e"},
-	"distinct": {"friend": "#7ab8ec", "party": "#c8ecfa", "alarm": "#9c1f5f", "rust": "#e8792e"},
+	"normal": {"friend": "#8fa857", "party": "#3fb8a8", "alarm": "#b8322a", "danger_ground": "#f0402a", "rust": "#e8792e"},
+	"distinct": {"friend": "#7ab8ec", "party": "#c8ecfa", "alarm": "#9c1f5f", "danger_ground": "#d040c0", "rust": "#e8792e"},
 }
 
 static var _theme: Theme

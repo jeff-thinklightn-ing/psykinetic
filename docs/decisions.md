@@ -23701,6 +23701,29 @@ landing's flash, is the whole tell. telegraph_curtain_segments and its rules are
 decal to come (a soft-edged flat fill, agreed with ui). view_test: one fill, no curtain, the fill
 red and brightening. Client only, protocol unchanged, no new class_name.
 
+602 amended (3) (release's label; the coordinator's ruling; ui-design's width and colour; Jeff on
+v0.1.208: "the ground swipe effect shows a 3d block, that looks amateur"): the soft ground mark.
+The fill is the struck cells whole, at its full alpha: a body is struck when its centre lies in a
+struck cell (World.struck_cell, bodies_struck_at), so the old fill, the outline cut to the cells,
+drew less than the blow takes, and a warning never understates. Outside them a band
+Client3D.TELEGRAPH_FEATHER (0.2 of a cell) wide fades to nothing, per vertex
+(telegraph_band_polygons, telegraph_band_alpha, _telegraph_ground_mesh), each piece at its own
+cell's height. The band stops at a wall's edge (World.edge_blocks) and at a cell that is not
+floor (World.is_walkable), so it never shows a blow reaching through a wall. It is one flat
+mesh. The shape now reads as cells, softened at the rim, where before it followed the outline's
+curve. ui-design's stills found the larger fault, live before this: over grass the alarm red at
+0.6 mixed to brown and the warning read as a dirt patch. So the fill is a theme colour of its own,
+danger_ground (render/ui_theme.gd's sets, #f0402a, the distinct set's #d040c0, checked against
+both kinds of red-green blindness on grass, dirt and hall stone; render/ui_theme.tres), and its
+faint and full strengths follow the setting and the light (Client3D.telegraph_strengths(outdoor,
+light)): indoors 0.25 to 0.6, the floor's joints still showing; out of doors 0.4 to 0.85 by day,
+0.2 to 0.45 at night, between them by DayNight.light (NIGHT to 1), so a night fight never blares
+more than a hall. The landing flash stays 0.95 everywhere: 300 ms as the blow lands, a slab then
+is the point. view_test _test_telegraph_smooth: every point of the struck cells at full alpha, the
+band none at its edge and nothing past it, none on a wall's cell or through a wall's edge, one
+fill, no curtain, in danger_ground, the three settings' faint and full, dusk halfway, night's full
+under a hall's. Client only, protocol unchanged, no new class_name.
+
 ## 603. The draugr's moves: the spin, the axe throw, the charge to his axe, disarmed
 
 Jeff (2026-10-22): "the draugr will have a large battle axe that he drops as
