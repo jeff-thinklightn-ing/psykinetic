@@ -23611,10 +23611,28 @@ static func _front_socket(skeleton: Skeleton3D, name: String) -> Array:
 ## bear's-claw charm hangs from its own loop); a hat hides the look's own
 ## headwear. Rings draw nothing. Off, the look's own parts again. A body
 ## without the part or the socket (an ally's) wears nothing new.
+## A satchel in the bag slot (819 amended, the satchel; the coordinator's
+## approval of pc-character's design) shows its strap, a body part skinned to
+## the torso so it bends with the chest (body_gen's Worn_Strap*: the one over
+## what is worn under it, STRAP_OVER, else the tunic's), tinted its item's
+## colour, and hangs its art on the "bag" socket between the strap's two ends
+## at the right hip's back quarter (_bag_socket, measured off the shown strap
+## as its shape keys stand). Under a worn cloak, Worn_Cloak_Strapped in the
+## cloak's place: the same cloak eased over the strap, so it shows only in the
+## cloak's open front.
 const WORN_PARTS := {"hood": "Worn_Hood", "cloak": "Worn_Cloak", "boots_soft": "Worn_Boots"}
-const WORN_SOCKET_OF := {Items.HEAD: "head", Items.NECK: "neck", Items.CHARM: "belt_c"}
-const WORN_DRAWN: Array[int] = [Items.HEAD, Items.BACK, Items.FEET, Items.NECK, Items.CHARM]
+const WORN_SOCKET_OF := {Items.HEAD: "head", Items.NECK: "neck", Items.CHARM: "belt_c", Items.BAG: "bag"}
+const WORN_DRAWN: Array[int] = [Items.HEAD, Items.BACK, Items.FEET, Items.NECK, Items.CHARM, Items.BAG]
 const HAIR_MESHES: Array[String] = ["Hair_Cropped", "Hair_Bound", "Hair_Long"]
+## The strap over each covering, first shown first ([covering mesh, strap]); none shown, Worn_Strap.
+const STRAP_OVER := [["Armour_Plate", "Worn_Strap_Plate"], ["Armour_Mail", "Worn_Strap_Sleeved"],
+	["Armour_Robes", "Worn_Strap_Sleeved"], ["Armour_Leather", "Worn_Strap_Over"], ["Cape", "Worn_Strap_Cape"],
+	["Vest", "Worn_Strap_Over"], ["Coat", "Worn_Strap_Over"]]
+## The lantern on belt_r while a satchel is worn (819am2; the coordinator's ruling, option A), in
+## the socket's frame (turned about 13 degrees from the body's): 5 cm toward the front and 1 cm out,
+## clear of the bag's front end, of the right hand and of a haft held in it through the gaits, the
+## swing and the chop (build/satchel/lantern/probe.gd); with none worn, where 451 hung it.
+const LANTERN_BY_BAG := Vector3(-0.002, 0.0, 0.051)
 func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 	if not (entity is Player or entity is Companion) or not puppet.has_meta("look"):
 		return
@@ -23632,6 +23650,22 @@ func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 	var sockets: Dictionary = puppet.get_meta("sockets", {})
 	var shown := {}  # Worn_* part -> its item.
 	var hats := false
+	var armoured := false
+	for mesh: MeshInstance3D in model.find_children("Armour_*", "MeshInstance3D", true, false):
+		armoured = armoured or mesh.visible
+	var cloak_id := ""
+	for id in ids:
+		if not id.is_empty() and str(Items.worn_of(id).get("look", "")) == "cloak":
+			cloak_id = id
+	var bag_id := ids[WORN_DRAWN.find(Items.BAG)]
+	var strap := _strap_shown(model, look, not cloak_id.is_empty(), armoured) if Items.worn_kind(bag_id) == "bag" else ""
+	if not strap.is_empty():
+		shown[strap] = bag_id
+		_place_bag_socket(model, sockets, model.find_child(strap, true, false) as MeshInstance3D)
+	var belt := sockets.get("belt_r") as Node3D
+	var lamp := belt.get_node_or_null("LanternBody") as Node3D if belt != null else null
+	if lamp != null:
+		lamp.position = LANTERN_BY_BAG if not strap.is_empty() else Vector3.ZERO
 	for i in WORN_DRAWN.size():
 		var id := ids[i]
 		var slot := WORN_DRAWN[i]
@@ -23654,11 +23688,11 @@ func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 		piece.name = "Worn"
 		socket.add_child(piece)
 		hats = hats or slot == Items.HEAD
-	var armoured := false
-	for mesh: MeshInstance3D in model.find_children("Armour_*", "MeshInstance3D", true, false):
-		armoured = armoured or mesh.visible
 	var hooded := shown.has("Worn_Hood") and model.find_child("Worn_Hood", true, false) != null
 	var cloaked := shown.has("Worn_Cloak") and model.find_child("Worn_Cloak", true, false) != null
+	if cloaked and not strap.is_empty() and model.find_child("Worn_Cloak_Strapped", true, false) != null:
+		shown["Worn_Cloak_Strapped"] = shown["Worn_Cloak"]
+		shown.erase("Worn_Cloak")
 	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
 		var name := String(mesh.name)
 		if name.begins_with("Worn_"):
@@ -23673,6 +23707,108 @@ func _sync_worn_gear(entity: GridEntity, puppet: Node3D) -> void:
 			mesh.visible = name in look.parts and not hooded and not hats
 		elif name == "Cape":
 			mesh.visible = name in look.parts and not cloaked and not armoured
+
+
+## The satchel's strap for what [param model] shows under it (STRAP_OVER: its
+## armour as worn, else its garb, the cape only while no cloak or armour hides
+## it), "" where the body has none (an ally's).
+func _strap_shown(model: Node3D, look: PersonLook, cloaked: bool, armoured: bool) -> String:
+	var strap := "Worn_Strap"
+	for pair: Array in STRAP_OVER:
+		var under := model.find_child(pair[0], true, false) as MeshInstance3D
+		if under == null:
+			continue
+		var on: bool = under.visible if String(pair[0]).begins_with("Armour_") else (pair[0] in look.parts and not armoured
+			and not (pair[0] == "Cape" and cloaked))
+		if on:
+			strap = pair[1]
+			break
+	return strap if model.find_child(strap, true, false) != null else ""
+
+
+## The "bag" socket (819 amended) on Hips, made the first time, set between
+## the shown strap's two ends (its lowest vertices, in two bunches, as its
+## shape keys stand), level in the bag's frame: +x toward the front end, +y up,
+## +z out from the body; the socket's scale the other sockets' (the model's).
+static func _place_bag_socket(model: Node3D, sockets: Dictionary, strap: MeshInstance3D) -> void:
+	var skeletons := model.find_children("*", "Skeleton3D", true, false)
+	if strap == null or strap.mesh == null or skeletons.is_empty():
+		return
+	var skeleton := skeletons[0] as Skeleton3D
+	var hips := skeleton.find_bone("Hips")
+	if hips < 0:
+		return
+	var at := _bag_frame(strap)
+	if at == Transform3D():
+		return
+	var socket := sockets.get("bag") as Node3D
+	if socket == null:
+		var on := BoneAttachment3D.new()
+		on.name = "OnHipsBag"
+		on.bone_name = "Hips"
+		skeleton.add_child(on)
+		socket = Node3D.new()
+		socket.name = "bag"
+		on.add_child(socket)
+		sockets["bag"] = socket
+	var scale := (sockets["belt_r"] as Node3D).scale if sockets.get("belt_r") is Node3D else Vector3.ONE
+	socket.transform = skeleton.get_bone_global_rest(hips).affine_inverse() * at
+	socket.scale = scale
+
+
+## The bag's frame off [param strap]'s two ends, in its mesh's (the skeleton's)
+## space as its blend shapes stand; identity where it can't be told.
+static func _bag_frame(strap: MeshInstance3D) -> Transform3D:
+	var arrays := strap.mesh.surface_get_arrays(0)
+	var points: PackedVector3Array = (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate()
+	var shapes := strap.mesh.surface_get_blend_shape_arrays(0)
+	for i in shapes.size():
+		var w := strap.get_blend_shape_value(i)
+		if is_zero_approx(w):
+			continue
+		var shape: PackedVector3Array = shapes[i][Mesh.ARRAY_VERTEX]
+		for v in points.size():
+			points[v] += (shape[v] - (arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array)[v]) * w
+	if points.is_empty():
+		return Transform3D()
+	var low := INF
+	for p in points:
+		low = minf(low, p.y)
+	var ends: Array[Vector3] = []
+	for p in points:
+		if p.y < low + BAG_END_BAND:
+			ends.append(p)
+	var a := ends[0]
+	for p in ends:
+		if p.distance_to(ends[0]) > a.distance_to(ends[0]):
+			a = p
+	var b := a
+	for p in ends:
+		if p.distance_to(a) > b.distance_to(a):
+			b = p
+	var near_a := Vector3.ZERO
+	var near_b := Vector3.ZERO
+	var count := Vector2.ZERO
+	for p in ends:
+		if p.distance_to(a) < p.distance_to(b):
+			near_a += p
+			count.x += 1.0
+		else:
+			near_b += p
+			count.y += 1.0
+	if count.x == 0.0 or count.y == 0.0:
+		return Transform3D()
+	near_a /= count.x
+	near_b /= count.y
+	# The body faces +z: the front end the one further forward.
+	var front := near_a if near_a.z > near_b.z else near_b
+	var back := near_b if near_a.z > near_b.z else near_a
+	var across := Vector3(front.x - back.x, 0.0, front.z - back.z).normalized()
+	if across == Vector3.ZERO:
+		return Transform3D()
+	return Transform3D(Basis(across, Vector3.UP, across.cross(Vector3.UP)), (front + back) * 0.5)
+## How far over the strap's lowest point a vertex counts as one of its ends.
+const BAG_END_BAND := 0.015
 
 
 ## A hat by its look word (npc's look_spec "hat=<word>"; the bard's): HATS'

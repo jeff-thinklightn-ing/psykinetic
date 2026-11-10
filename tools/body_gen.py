@@ -1581,7 +1581,7 @@ def cloak_ring(centre: Vector, w: float, d: float, span: float, n: int = 16) -> 
 	return outer + list(reversed(inner))
 
 
-def cloak(J: dict) -> list:
+def cloak(J: dict, strapped: bool = False) -> list:
 	p = Part("Cloak", "Tunic")
 	p.bones = ["pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "clavicle_l", "clavicle_r"]
 	n, s3, s1, pelvis = J["neck_01"], J["spine_03"], J["spine_01"], J["pelvis"]
@@ -1594,11 +1594,148 @@ def cloak(J: dict) -> list:
 		(s3.z - 0.10, 0.275 * ws, 0.17 * wt, 0.02, 0.6), (s1.z, 0.27 * wt, 0.18 * wt, 0.03, 0.58),
 		(pelvis.z, 0.27 * wt, 0.19 * wt, 0.04, 0.58), (hem, 0.275 * wt, 0.2 * wt, 0.06, 0.58),
 		(knee.z, 0.29 * wt, 0.21 * wt, 0.09, 0.58), (knee.lerp(ankle, 0.45).z, 0.3 * wt, 0.22 * wt, 0.11, 0.58)]
+	if strapped:
+		# Rows enough over the hips that the bag's ease bends the cloak there and not to the knee.
+		def between(a, b, t):
+			return tuple(x + (y - x) * t for x, y in zip(a, b))
+		# From the spine's row to the knee's (the bag, its strap's ends just under the belt, hangs
+		# within them), each gap in thirds: the same count for every body, so its keys match.
+		top = rows.index(next(r for r in rows if r[0] == s1.z))
+		low = rows.index(next(r for r in rows if r[0] == knee.z))
+		dense = []
+		for k in range(top, low):
+			dense += [rows[k], between(rows[k], rows[k + 1], 1.0 / 3.0), between(rows[k], rows[k + 1], 2.0 / 3.0)]
+		rows = rows[:top] + dense + rows[low:]
 	for k, (z, w, d, back, span) in enumerate(rows):
-		p.add(cloak_ring(Vector((0.0, back, z)), w, d, span))
+		p.add(cloak_ring(Vector((0.0, back, z)), w, d, span, CLOAK_STRAPPED_ROUND if strapped else 16))
 		if z <= pelvis.z + 0.001:
 			p.pins[k] = "pelvis"
+	if strapped:
+		_ease_over_strap(J, p, rows)
+		_ease_over_bag(J, p)
 	return [p]
+
+
+## Worn_Cloak_Strapped (819 amended, the satchel): the cloak shown while a satchel is worn, eased
+## out where the strap runs under it (over the tunic; a vest, coat or leather; mail or robes), so
+## the strap shows only in the cloak's open front and never through it. A strap point nearer than
+## CLOAK_OVER_STRAP to the cloak's inside (or past it) moves the face it is nearest out along that
+## face's normal, its four corners and their twins on the other sheet together, till none is (at
+## most CLOAK_EASE_PASSES passes): on the shoulder's slope that lifts the cloak a little, where a
+## level push would have stood it far out.
+CLOAK_OVER_STRAP = 0.004
+CLOAK_EASE_PASSES = 12
+CLOAK_EDGE_IN = math.radians(4.0)
+CLOAK_EASED_OVER = ("Worn_Strap", "Worn_Strap_Over")
+
+
+## The bag the strapped cloak also eases over (819am2): art-kit's worn.satchel's bounds in its frame
+## (Client3D._bag_frame: the origin midway between the strap's two ends, +x toward the front end,
+## +y up, +z out). Each cloak vertex over it, in each fit's frame a cloak may cover (the cape is
+## hidden under one), moves out along that frame's +z till it is CLOAK_OVER_BAG past the bag's front,
+## less and less over BAG_FEATHER past its sides, top and bottom; on the bag's side only (never
+## mirrored as the strap's ease is), so the cloak is fuller over the bag and nowhere else.
+BAG_HALF_WIDE, BAG_TOP, BAG_BOTTOM, BAG_FRONT = 0.113, 0.024, -0.19, 0.094
+BAG_FEATHER = 0.10
+## Past the bag's bounds still eased in full (the cloak's faces are flat between its vertices: round
+## the bag's front corner, where the cloak turns toward the side, the face beyond cut the corner).
+BAG_PAD = 0.03
+## The strapped cloak's vertices round each ring (the plain cloak's 16): its faces fit the bag.
+CLOAK_STRAPPED_ROUND = 24
+CLOAK_OVER_BAG = 0.010
+BAG_UNDER_CLOAK = ("Worn_Strap", "Worn_Strap_Over", "Worn_Strap_Sleeved", "Worn_Strap_Plate")
+
+
+def _ease_over_bag(J: dict, p: Part) -> None:
+	frames = []
+	for name in BAG_UNDER_CLOAK:
+		r = strap(J, name)[0].rings
+		front = sum(r[0], Vector()) / len(r[0])
+		back = sum(r[-1], Vector()) / len(r[-1])
+		mid = (front + back) / 2.0
+		x = Vector((front.x - back.x, front.y - back.y, 0.0)).normalized()
+		z = x.cross(Vector((0.0, 0.0, 1.0)))
+		if z.dot(Vector((mid.x, mid.y, 0.0))) < 0.0:
+			z = -z
+		frames.append((mid, x, z))
+
+	def fade(past: float) -> float:
+		t = min(max(past / BAG_FEATHER, 0.0), 1.0)
+		return 1.0 - t * t * (3.0 - 2.0 * t)
+
+	for k, ring in enumerate(p.rings):
+		n = len(ring)
+		# Measured on the inner sheet (what the bag meets), moved with its twin on the outer.
+		for i in range(n // 2, n):
+			v = ring[i]
+			move = Vector()
+			for mid, x, z in frames:
+				d = v - mid
+				bz = d.dot(z)
+				if bz <= 0.0:
+					continue
+				w = fade(abs(d.dot(x)) - BAG_HALF_WIDE - BAG_PAD) * fade(max(BAG_BOTTOM - BAG_PAD - d.z, d.z - BAG_TOP - BAG_PAD))
+				need = (BAG_FRONT + CLOAK_OVER_BAG - bz) * w
+				if need > move.length:
+					move = z * need
+			p.rings[k][i] = v + move
+			p.rings[k][n - 1 - i] = ring[n - 1 - i] + move
+
+
+def _ease_over_strap(J: dict, p: Part, rows: list) -> None:
+	from mathutils.bvhtree import BVHTree
+	samples = []
+	for name in CLOAK_EASED_OVER:
+		r = strap(J, name)[0].rings
+		for k in range(len(r)):
+			samples += r[k]
+			if k + 1 < len(r):
+				samples += [a.lerp(b, 0.5) for a, b in zip(r[k], r[k + 1])]
+	n = len(p.rings[0])
+	half = n // 2
+	# Only what the cloak covers: a strap point in its open front (round from the back further than
+	# the C's span at its height, less CLOAK_EDGE_IN) is meant to show.
+	covered = []
+	for q in samples:
+		for k in range(len(rows) - 1):
+			(z0, _w0, _d0, b0, s0), (z1, _w1, _d1, b1, s1) = rows[k], rows[k + 1]
+			if z1 <= q.z <= z0:
+				v = (z0 - q.z) / (z0 - z1)
+				back, span = b0 + (b1 - b0) * v, s0 + (s1 - s0) * v
+				if abs(math.atan2(q.x, q.y - back)) < math.pi * span - CLOAK_EDGE_IN:
+					covered.append((q, back))
+				break
+	faces = [(k, i) for k in range(len(p.rings) - 1) for i in range(n)]
+	for _pass in range(CLOAK_EASE_PASSES):
+		verts = [q for r in p.rings for q in r]
+		tree = BVHTree.FromPolygons(verts, [(k * n + i, k * n + (i + 1) % n, (k + 1) * n + (i + 1) % n, (k + 1) * n + i) for k, i in faces])
+		push = {}
+		for q, back in covered:
+			# The face over it: level out from the upright line through the ring's centre.
+			axis = Vector((0.0, back, q.z))
+			way = Vector((q.x, q.y - back, 0.0))
+			if way.length < 1e-6:
+				continue
+			loc, normal, index, _t = tree.ray_cast(axis, way.normalized(), 1.0)
+			if loc is None:
+				continue
+			k, i = faces[index]
+			if normal.dot(way) < 0.0:
+				normal = -normal
+			need = (q - loc).dot(normal) + CLOAK_OVER_STRAP
+			if need <= 0.0:
+				continue
+			for kk in (k, k + 1):
+				for ii in (i, (i + 1) % n):
+					col = ii if ii < half else n - 1 - ii
+					key = (kk, col)
+					if key not in push or need > push[key][0]:
+						push[key] = (need, normal.copy())
+		if not push:
+			break
+		for (k, col), (need, normal) in push.items():
+			for ii in (col, n - 1 - col):
+				p.rings[k][ii] = p.rings[k][ii] + normal * need
 
 
 SOFT_SOLE = 0.002
@@ -1631,6 +1768,160 @@ def soft_boot(J: dict, side: str) -> Part:
 	return p
 
 
+## A satchel's strap (819 amended, the satchel; the coordinator's approval of pc-character's
+## design): a leather band from the bag at the right hip's back quarter up across the chest,
+## over the left shoulder between the neck and the shoulder's point, and down across the back
+## to the bag again. Skinned as the torso is, so it bends and twists with the chest; the bag
+## itself is art on the "bag" socket at its two ends (Client3D). Each Worn_Strap* lies over
+## what the body wears under it (STRAP_FITS: the tunic alone; the vest, coat or leather; mail or
+## robes, their sleeves' tops over the shoulder; the garb's cape; plate, its pauldron), pushed
+## out along the torso's normal past the outermost of them (at its middle and both edges) and
+## STRAP_CLEAR more. Under a worn cloak the cloak is eased over it (Worn_Cloak_Strapped).
+## STRAP_HALF half-wide, STRAP_THICK thick.
+STRAP_CLEAR = 0.003
+STRAP_HALF = 0.018
+STRAP_THICK = 0.004
+## Its path on the torso's rings: (ring, place round it), the ring fractional between two of
+## torso_rings' (2 just under the belt .. 7.8 on the shoulder's top, halfway from the neck to the
+## shoulder's point), the place 0 the left side, 3 the front, 6 the right, 9 (or -3) the back.
+## The two ends are the bag's lugs, either side of the right hip's back quarter (8.25), 0.16 m apart
+## as art-kit's worn.satchel's tabs are: back of
+## the right side, so the bag's front edge clears the lantern hung forward of belt_r while a
+## satchel is worn (Client3D.LANTERN_BY_BAG; the coordinator's ruling, option A).
+STRAP_PATH = [(2.0, 7.4), (3.0, 6.25), (4.0, 5.0), (5.0, 3.7), (6.0, 2.3), (7.1, 1.1), (7.8, 0.0),
+	(7.3, -1.6), (6.5, -2.2), (5.5, -2.6), (4.5, -2.8), (3.5, -2.85), (2.0, -2.9)]
+STRAP_STEPS = 3
+## How far in from the tunic a push-out starts and how far out it looks.
+STRAP_IN, STRAP_REACH = 0.03, 0.16
+## A gap this wide past a surface ends the push-out (what lies beyond is another thing).
+STRAP_GAP = 0.01
+## Each strap and what it goes over (WEARABLES' names; the body itself always).
+STRAP_FITS = {
+	"Worn_Strap": [],
+	"Worn_Strap_Over": ["Vest", "Coat", "Armour_Leather"],
+	"Worn_Strap_Sleeved": ["Armour_Mail", "Armour_Robes"],
+	"Worn_Strap_Cape": ["Cape"],
+	"Worn_Strap_Plate": ["Armour_Plate"],
+}
+
+
+def _bvh(parts: list):
+	"""The parts' lofts as one BVH tree (as Part.mesh builds them, capped), no object made."""
+	from mathutils.bvhtree import BVHTree
+	verts, faces = [], []
+	for p in parts:
+		p.densify(per(1, *DENSITY_OF))
+		n, base = len(p.rings[0]), len(verts)
+		for r in p.rings:
+			verts.extend(r)
+		for k in range(len(p.rings) - (0 if p.closed else 1)):
+			nxt = (k + 1) % len(p.rings)
+			for i in range(n):
+				faces.append((base + k * n + i, base + k * n + (i + 1) % n, base + nxt * n + (i + 1) % n, base + nxt * n + i))
+		if not p.closed:
+			faces.append(tuple(base + i for i in reversed(range(n))))
+			last = base + (len(p.rings) - 1) * n
+			faces.append(tuple(range(last, last + n)))
+	# Every face outward (the lofts wind either way), so a ray tells a way out from a way in.
+	import bmesh
+	bm = bmesh.new()
+	for q in verts:
+		bm.verts.new(q)
+	bm.verts.ensure_lookup_table()
+	for f in faces:
+		try:
+			bm.faces.new([bm.verts[i] for i in f])
+		except ValueError:
+			pass  # A cap's ring that repeats a point.
+	bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+	tree = BVHTree.FromBMesh(bm)
+	bm.free()
+	return tree
+
+
+def _outside(tree, start: Vector, ray: Vector, reach: float) -> float:
+	"""How far along [ray] from [start] (inside what it lies on) it comes out for good: the first
+	way out (a face looking along the ray) followed by nothing, or by a way in more than STRAP_GAP
+	on (another thing apart: a T-posed arm beside the shoulder), not by another way out (still
+	inside something that overlaps). 0 if it never comes out."""
+	hits, t = [], 0.0
+	while t < reach:
+		hit = tree.ray_cast(start + ray * t, ray, reach - t)
+		if hit[0] is None:
+			break
+		t += hit[3]
+		hits.append((t, hit[1].dot(ray) > 0.0))
+		t += 1e-4
+	for j, (t, out) in enumerate(hits):
+		if not out:
+			continue
+		if j + 1 == len(hits) or (not hits[j + 1][1] and hits[j + 1][0] - t > STRAP_GAP):
+			return t
+	return max((t for t, out in hits if out), default=0.0)
+
+
+def strap(J: dict, name: str = "Worn_Strap") -> list:
+	fit = STRAP_FITS[name]
+	rings = torso_rings(J)
+
+	def at(r, f):
+		i = int(math.floor(f)) % len(r)
+		return r[i].lerp(r[(i + 1) % len(r)], f - math.floor(f))
+
+	def surface(k, f):
+		kk = min(int(math.floor(k)), len(rings) - 2)
+		return at(rings[kk], f).lerp(at(rings[kk + 1], f), k - kk)
+
+	def cr(p0, p1, p2, p3, t):
+		return tuple(0.5 * (2.0 * b + (-a + c) * t + (2.0 * a - 5.0 * b + 4.0 * c - d) * t * t
+			+ (-a + 3.0 * b - 3.0 * c + d) * t * t * t) for a, b, c, d in zip(p0, p1, p2, p3))
+
+	path = []
+	n = len(STRAP_PATH)
+	for i in range(n - 1):
+		p0, p1, p2, p3 = (STRAP_PATH[max(0, i - 1)], STRAP_PATH[i], STRAP_PATH[i + 1], STRAP_PATH[min(n - 1, i + 2)])
+		for s in range(STRAP_STEPS):
+			path.append(cr(p0, p1, p2, p3, s / STRAP_STEPS))
+	path.append(STRAP_PATH[-1])
+	# What it lies over: the body's torso, belt, collar, neck and sleeves, and the fit's parts.
+	under = [torso(J), belt(J), neck(J), sleeve(J, "l"), sleeve(J, "r")] + per([collar(J)], [], [])
+	for wearable in fit:
+		under += WEARABLES[wearable](J)
+	under_tree = _bvh(under)
+	e = 0.05
+	bases, normals = [], []
+	for k, f in path:
+		q = surface(k, f)
+		normal = (surface(k, f + e) - surface(k, f - e)).cross(surface(k + e, f) - surface(k - e, f)).normalized()
+		if normal.dot(Vector((q.x, q.y, 0.0))) < 0.0:
+			normal = -normal
+		bases.append(q)
+		normals.append(normal)
+	# Across the run on the torso, so its edges are fitted as well as its middle (a 3.6 cm band
+	# on a curved shoulder: fitted down the middle, its edges dipped in and stood out).
+	acrosses = []
+	for j, normal in enumerate(normals):
+		run = (bases[min(j + 1, len(bases) - 1)] - bases[max(j - 1, 0)]).normalized()
+		acrosses.append(normal.cross(run).normalized())
+	offsets = []
+	for q, normal, across in zip(bases, normals, acrosses):
+		pushed = 0.0
+		for side in (-1.0, 0.0, 1.0):
+			start = q + across * (STRAP_HALF * side) - normal * STRAP_IN
+			pushed = max(pushed, _outside(under_tree, start, normal, STRAP_IN + STRAP_REACH) - STRAP_IN)
+		offsets.append(pushed + STRAP_CLEAR)
+	# Smoothed along its run, never in past where it was pushed.
+	offsets = [max(o, sum(offsets[max(0, j - 1):j + 2]) / len(offsets[max(0, j - 1):j + 2])) for j, o in enumerate(offsets)]
+	points = [q + normal * o for q, normal, o in zip(bases, normals, offsets)]
+	p = Part(name, "Tunic")
+	p.bones = TORSO_BONES
+	for j, normal in enumerate(normals):
+		q, across = points[j], acrosses[j]
+		a, b = q + across * STRAP_HALF, q - across * STRAP_HALF
+		p.add([a, b, b + normal * STRAP_THICK, a + normal * STRAP_THICK])
+	return [p]
+
+
 ## The parts a person may wear, by name: each its own mesh on the skeleton, shape-keyed
 ## as the body is, shown or not by the game. Bald is no hair part.
 WEARABLES = {
@@ -1659,6 +1950,11 @@ WEARABLES = {
 	"Worn_Cloak": cloak,
 	"Worn_Boots": lambda J: [soft_boot(J, "l"), soft_boot(J, "r")],
 }
+# The satchel's straps (no look word: one shown while the bag slot holds one, by what is worn
+# under it) and the cloak eased over them.
+for _fit in STRAP_FITS:
+	WEARABLES[_fit] = lambda J, _fit=_fit: strap(J, _fit)
+WEARABLES["Worn_Cloak_Strapped"] = lambda J: cloak(J, strapped=True)
 ## An ally's own (decision 478): an orc may crop or bind its hair (a topknot); a kobold wears
 ## its cap or goes bare-headed.
 PEOPLE_WEARABLES = {

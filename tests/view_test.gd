@@ -154,6 +154,7 @@ func _ready() -> void:
 		_test_humans()
 		_test_worn()
 		_test_worn_gear()
+		_test_satchel_worn()
 		_test_asleep()
 		_test_person_looks()
 		_test_person_garb()
@@ -14290,6 +14291,100 @@ func _test_worn_gear() -> void:
 	look.apply(model, puppet.get_meta("tint", Color.WHITE))
 	model.set_meta("worn_gear", "")
 	_rig._process(0.0)
+
+
+func _test_satchel_worn() -> void:
+	print("
+== the satchel worn (819 amended): its strap over what is worn, the bag on its socket at the strap's ends ==")
+	var player := _player()
+	if player == null:
+		_check(false, "a player to dress")
+		return
+	_rig._process(0.0)
+	var puppet: Node3D = _rig._puppets[player.get_instance_id()]
+	var look := puppet.get_meta("look") as PersonLook
+	var model := puppet.get_node_or_null("Body/Model") as Node3D
+	var sockets: Dictionary = puppet.get_meta("sockets", {})
+	var straps := ["Worn_Strap", "Worn_Strap_Over", "Worn_Strap_Sleeved", "Worn_Strap_Cape", "Worn_Strap_Plate"]
+	_check(model != null and straps.all(func(n: String) -> bool: return model.find_child(n, true, false) != null)
+			and model.find_child("Worn_Cloak_Strapped", true, false) != null, "a person's body has the five straps and the strapped cloak")
+	if model == null:
+		return
+	var slots := player.slots
+	while slots.size() < Items.CARRIED:
+		slots.append("")
+	var was := slots.duplicate()
+	var keys_were := look.keys.duplicate()
+	var shown := func() -> Array:
+		var out := []
+		for n: String in straps + ["Worn_Cloak", "Worn_Cloak_Strapped"]:
+			var mesh := model.find_child(n, true, false) as MeshInstance3D
+			if mesh != null and mesh.visible:
+				out.append(n)
+		return out
+	var feet := puppet.global_position
+	var front := (model.global_basis * Vector3(0, 0, 1)).normalized()
+	var right := (model.global_basis * Vector3(-1, 0, 0)).normalized()
+	var body_y := model.global_basis.y.length()
+	# The lantern (451) where it has always hung, the package being off: not a millimetre moved.
+	var lamp := (sockets["belt_r"] as Node3D).get_node_or_null("LanternBody") as Node3D if sockets.get("belt_r") is Node3D else null
+	_check(lamp != null and lamp.position == Vector3.ZERO, "no satchel: the lantern where 451 hung it (%s)" % [lamp.position if lamp != null else "none"])
+	var lamp_at := lamp.global_position if lamp != null else Vector3.ZERO
+	slots[Items.BAG] = "satchel"
+	player.slots = slots
+	_rig._process(0.0)
+	if lamp != null:
+		var moved := lamp.global_position - lamp_at
+		_check(lamp.position == Client3D.LANTERN_BY_BAG and moved.dot(front) > 0.04 * body_y and absf(moved.dot(right)) < 0.02 * body_y,
+				"a satchel worn: the lantern forward of the bag (%.3f m forward, %.3f out)" % [moved.dot(front), moved.dot(right)])
+	var strap := model.find_child("Worn_Strap", true, false) as MeshInstance3D
+	var socket := sockets.get("bag") as Node3D
+	_check(shown.call() == ["Worn_Strap"] and strap.get_instance_shader_parameter("tunic") == Items.color_of("satchel"),
+			"the satchel on: its strap over the tunic, in its colour (%s)" % [shown.call()])
+	_check(socket != null, "the bag socket made")
+	if socket == null:
+		player.slots = was
+		_rig._process(0.0)
+		return
+	var bag := socket.global_position - feet
+	var level := Vector3(bag.x, 0, bag.z)
+	_check(bag.y > 0.85 * body_y and bag.y < 1.1 * body_y and level.dot(right) > 0.03 and level.dot(front) < -0.10,
+			"the bag socket at the right hip's back quarter, the strap's ends (%.2f m up, %.2f right, %.2f behind)" % [bag.y, level.dot(right), -level.dot(front)])
+	var bag_art := socket.get_node_or_null("Worn") as Node3D
+	_check((bag_art != null) == (ArtKit.has("worn.satchel") or ArtKit.has("item.satchel")), "the bag's art on its socket as it is made (%s)" % [bag_art != null])
+	_check(socket.global_basis.y.normalized().dot(model.global_basis.y.normalized()) > 0.99
+			and socket.global_basis.z.normalized().dot(level.normalized()) > 0.5, "the bag's frame level, +y up and +z out from the body")
+	# A heavy body: the strap's ends further out, the socket with them (its shape keys as they stand).
+	look.keys["heavy"] = 1.0
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	_rig._process(0.0)
+	var heavy := socket.global_position - feet
+	var out_by := Vector3(heavy.x, 0, heavy.z).length() - level.length()
+	_check(out_by > 0.005 and out_by < 0.06, "a heavy body's bag further out with its strap's ends (%.3f m)" % out_by)
+	look.keys = keys_were.duplicate()
+	look.apply(model, puppet.get_meta("tint", Color.WHITE))
+	model.set_meta("worn_gear", "")
+	var worn_was: String = player.worn
+	for row: Array in [["leather_armour", "Worn_Strap_Over"], ["mail_armour", "Worn_Strap_Sleeved"], ["plate_armour", "Worn_Strap_Plate"]]:
+		player.worn = row[0]
+		_rig._process(0.0)
+		_check(shown.call() == [row[1]], "in %s, the strap over it: %s (%s)" % [row[0], row[1], shown.call()])
+	player.worn = worn_was
+	slots[Items.BACK] = "cloak"
+	player.slots = slots
+	_rig._process(0.0)
+	var strapped := model.find_child("Worn_Cloak_Strapped", true, false) as MeshInstance3D
+	_check(shown.call() == ["Worn_Strap", "Worn_Cloak_Strapped"] and strapped.get_instance_shader_parameter("tunic") == Items.color_of("cloak"),
+			"under a cloak: the strapped cloak in its colour over the strap, not the plain one (%s)" % [shown.call()])
+	slots[Items.BAG] = ""
+	player.slots = slots
+	_rig._process(0.0)
+	_check(shown.call() == ["Worn_Cloak"] and socket.get_node_or_null("Worn") == null, "the satchel off: the plain cloak again, no strap, the socket empty (%s)" % [shown.call()])
+	_check(lamp == null or (lamp.position == Vector3.ZERO and lamp.global_position.is_equal_approx(lamp_at)), "the satchel off: the lantern back where 451 hung it")
+	player.slots = was
+	_rig._process(0.0)
+	_check(shown.call().is_empty(), "all off")
 
 
 func _test_worn() -> void:

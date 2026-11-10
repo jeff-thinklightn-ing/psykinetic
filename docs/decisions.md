@@ -47834,6 +47834,55 @@ an orphan row emptied, a 22-slot player's and companion's record read, saved and
 they were), _test_worn/_test_pack_twelve/_test_armour's counts, state_test 2g (a 22-slot record
 saved back as 27, everything where it was). The switch-on: economy's stall line and price,
 pc-character's worn.satchel look, ui's row, voice's lines, the item's art. No new class_name.
+819 amended (2) (the satchel worn, pc-character's side; release's label 819am2; the coordinator's
+approval of the design, and its ruling (option A) after the first stills showed the bag's front end
+enclosing the lantern; package "satchel", landing off). The bag hangs at the right hip's back
+quarter, between the right side and the spine, clear of the sword's sheath at the left hip and of
+the stowed shield, bow and quiver on the back. A leather strap runs from it up across the chest,
+over the left shoulder between the neck and the shoulder's point, and down across the back to it
+again. The strap is body art (tools/body_gen.py strap(), STRAP_PATH on the torso's rings), skinned
+as the torso is, so it bends and twists with the chest in a swing or a chop, which a piece on a bone
+could not do. Its two ends, the bag's lugs, are at places 7.4 and 9.1 round the hip ring, 0.16 m
+apart as art-kit's worn.satchel's tabs are. It comes in five fits, each pushed out along the torso's
+normal past what it lies over and STRAP_CLEAR more (rays against a BVH of those parts, then
+smoothed): Worn_Strap on the tunic; Worn_Strap_Over on the vest, coat or leather;
+Worn_Strap_Sleeved on mail or robes, over their sleeves' tops; Worn_Strap_Cape on the garb's cape;
+Worn_Strap_Plate on plate, over the pauldron. Its back run keeps inward of the body's own sleeve-root
+block, which already shows through the cloak. A cloak over a strap is Worn_Cloak_Strapped: the cloak
+eased out along its faces over the strap's span (CLOAK_OVER_STRAP, CLOAK_EASE_PASSES), and over the
+bag (_ease_over_bag: each vertex of its inner sheet over the bag's bounds, in each fit's bag frame
+but the cape's, moved out with its outer twin till it is CLOAK_OVER_BAG past the bag's front,
+fading over BAG_FEATHER past its edges, on the bag's side only). It has more vertices than the plain
+cloak (CLOAK_STRAPPED_ROUND round, and each row from the spine to the knee in thirds), so the ease
+bends it over the hip and not down to the knee. Neither the strap nor the bag shows through it on
+any fit or body key (build/satchel/clear.py, bagcloak.py). Under a cloak the bag shows from behind
+only as that swell; ui's pack window is the sure tell that a cloaked companion carries one. Every
+existing part of human_m and human_f is the same to the vertex (build/worn/cmp_body.py), and the
+straps and the strapped cloak are Worn_* parts hidden unless shown, so with no satchel worn a body
+looks as before. Client3D draws Items.BAG (WORN_DRAWN, WORN_SOCKET_OF "bag"). _strap_shown picks
+the fit from the armour shown, else the garb (STRAP_OVER), with the cape fit only while no cloak or
+armour hides the cape; _sync_worn_gear swaps in the strapped cloak. _place_bag_socket hangs the
+"bag" socket (OnHipsBag, a BoneAttachment3D on Hips) at the strap's two lower ends, read off the
+shown strap's mesh with the look's blend shapes applied (_bag_frame): level, +x the body's front,
++z out. A heavy body's bag sits further out, as its strap does. The bag is art-kit's worn.satchel
+in that frame (its tabs' rings at the strap ends, its front inside a cloak's), and item.satchel
+until it lands. While a satchel is worn the lantern on belt_r (451) hangs LANTERN_BY_BAG from where
+451 put it, 5 cm forward and 1 cm out, and with none worn exactly where it was. Swept on the five
+builds through the gaits, the sword's forehand and the chop (build/satchel/lantern/probe.gd), it
+keeps at least 4.9 cm from the bag, 1.7 cm from the right forearm and hand, and 1.0 cm from an axe's
+haft held in the right hand. The right thigh reaches into it as far as it reached the lantern where
+451 hung it, or less. The bag's tabs sit at the strap's ends, partly inside the hip's bulge, as they
+did before the move; of the bag itself only its lower front corner touches a woman's thigh, in the
+idle stand and a walk's first step (2.8 cm at most, five points), which is fewer than at the first
+place. Nothing about the bag is in the sim or on the wire. Off: nothing gives a satchel (items'
+paragraph above), so no body shows the strap, the bag or the moved lantern. view_test
+_test_satchel_worn checks the straps and the strapped cloak, the tint, the socket's place and frame,
+a heavy body, each armour's fit, the cloak swap, the lantern where 451 hung it with none worn,
+forward of the bag with one and back again after, and nothing shown with none worn. Stills: perf's
+Lenovo runs of build/satchel/shot (the player and Wren; tunic, cloak, mail and shield, plate with
+cloak and shield, leather and bow with quiver, cloak and bow; a swing and a chop; then the tunic,
+cloak and mail rows again after the move, with the lantern's zoom). Client and art only; protocol
+unchanged; no new class_name.
 
 ## 822. Seamless crossings (P1): the neighbour's view held beside the live one, swapped at the crossing
 
