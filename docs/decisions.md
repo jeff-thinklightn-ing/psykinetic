@@ -43588,6 +43588,11 @@ a storm doesn't, the wait 120 to 270 at feeding 0 and never past it, 160 at full
 only on a body that fishes, not a 2-cell puddle; over three times as many at full feeding as at none; reused rings;
 none by a float). Server and client, protocol unchanged, no new class_name; the bullet is voice's.
 
+805 amended (10), its test made sure (release's ruling, after it failed economy's 835 take): view_test
+_test_fish_rise asked for a ring showing at the moment its two-minute run stopped, and a ring lives RISE_SECONDS
+1.2 s against a gap of 0.75 to 2.25 s at full feeding, so the last step could fall between two rises ("2 made for
+73 rises", none showing). It now takes the most rings showing at once over the run. Test only, no bullet.
+
 ## 809. Hearsay of hand-ins: the town talks of what a player brings
 
 Jeff: "nothing happens when I hand things in"; the coordinator's order (the reward loop first); release's

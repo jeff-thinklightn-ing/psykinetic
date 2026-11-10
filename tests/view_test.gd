@@ -8945,15 +8945,24 @@ func _test_fish_rise() -> void:
 	var puddle: Array[Vector2i] = [base + Vector2i(8, 0), base + Vector2i(9, 0)]  # Too small to fish.
 	var terrain := {"water": water + puddle}
 	fv.rose.clear()
+	# The most rings showing at once over a run: its last step may fall
+	# between two rises (a ring's RISE_SECONDS under the gap), so the end alone
+	# says nothing.
+	var seen := {"most": 0}
 	var count_at := func(keen: float, seconds: float) -> int:
 		fv.feeding_override = keen
 		fv.rose.clear()
 		fv._next_rise.clear()
+		seen["most"] = 0
 		var t := 0.0
 		while t < seconds:
 			fv._clock += 0.1
 			t += 0.1
 			fv.step_rises(terrain)
+			var showing := 0
+			for rise: Dictionary in fv.rises:
+				showing += 1 if (rise["ring"] as MeshInstance3D).visible else 0
+			seen["most"] = maxi(seen["most"], showing)
 		return fv.rose.size()
 	var slow: int = count_at.call(0.0, 120.0)
 	var on_water := true
@@ -8964,10 +8973,7 @@ func _test_fish_rise() -> void:
 		on_water = on_water and water.has(entry[1])
 	_check(fv.bodies.size() == 1, "one body fishes (the 16-cell pool), not the 2-cell puddle (%s)" % fv.bodies.keys())
 	_check(on_water and slow > 0 and fast > slow * 3, "rings only on the pool, %d in two minutes hardly feeding, %d at their keenest" % [slow, fast])
-	var showing := 0
-	for rise: Dictionary in fv.rises:
-		showing += 1 if (rise["ring"] as MeshInstance3D).visible else 0
-	_check(fv.rises.size() <= 4 and showing >= 1, "the rings reused, %d made for %d rises" % [fv.rises.size(), fast])
+	_check(fv.rises.size() <= 4 and seen["most"] >= 1, "the rings reused, %d made for %d rises (%d showing at most)" % [fv.rises.size(), fast, seen["most"]])
 	# A float on the pool: no rise within RISE_CLEAR of it.
 	if player != null:
 		player.fishing = {"state": "wait", "at": base + Vector2i(1, 1)}
