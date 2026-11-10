@@ -27,3 +27,4 @@ physics 4000
 voice 4200
 playtest 4400
 animation 4600
+ui-design 4800

@@ -26,6 +26,10 @@ which worktree owns each step, and the design rules not to break without asking 
   from release.
 - New player-facing lines (dialogue, windows, signs, barks) go to the `voice` worktree session
   for wording before they land (Jeff, 2026-10-31); facts in them still go to `lore`.
+- The interface is two trees (Jeff, 2026-11-09): `ui` owns what a window does (behaviour and
+  flow), `ui-design` owns how it looks (theme, fonts, the shared parts, spacing). A new or
+  changed window gets `ui-design`'s mock before `ui` builds it, and no window script sets a
+  colour, font or size of its own.
 
 ## Content ships as packages (Jeff, 2026-11-06)
 
