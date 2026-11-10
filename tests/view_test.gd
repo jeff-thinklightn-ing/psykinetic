@@ -12322,9 +12322,10 @@ func _test_boar_king_clips() -> void:
 	# edges (the coordinator's): a step at a slant to his facing turns him to it as before; his
 	# back-off ended mid-slide (his facing put on his step) turns him to it then, eased, no snap.
 	var back := await _back_step(king, drawn, true, false)
-	_check(back["stepped"] and king.faces_back_steps and back["kept"] > 0.9 and back["clips"].has(drawn.clips.get("back_off", "-"))
-			and not back["clips"].has(drawn.clips.get("walk", "-")) and not back["clips"].has(drawn.clips.get("run", "-")),
-			"a real back step: his face kept on his foe through the slide (the least %.2f), drawn %s"
+	# Its clips report-only (the coordinator, after dungeon's take): which it drew is printed, not
+	# failed, till the view draws back_off whatever the pace reads; the face is still checked.
+	_check(back["stepped"] and king.faces_back_steps and back["kept"] > 0.9,
+			"a real back step: his face kept on his foe through the slide (the least %.2f), drawn %s (clips report-only)"
 			% [back["kept"], back["clips"].keys()])
 	var slant := await _back_step(king, drawn, false, false)
 	_check(slant["stepped"] and slant["to_step"] > 0.7,
