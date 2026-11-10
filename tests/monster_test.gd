@@ -5458,7 +5458,8 @@ func _test_shield_recoil() -> void:
 	player.next_attack_tick = 0
 	_blow_at(imp, player)
 	_check(not World.is_stunned(imp), "a sword's parry throws nothing back")
-	# A blow that breaks it: none, the holder stunned as before (&"broken").
+	# A shield that gives out (340 amended (2): short of the stamina; no blow breaks a
+	# player's): no recoil, and the holder not stunned.
 	e = _build(["#######", "#.Pi..#", "#######"])
 	imp = e["i"][0]
 	player = e["P"][0]
@@ -5466,9 +5467,10 @@ func _test_shield_recoil() -> void:
 	World.face(player, Vector2i(1, 0))
 	World.try_stance(player, "block")
 	imp.attack_damage = 4
+	player.stamina = 2
 	_blow_at(imp, player)
-	_check(not World.is_stunned(imp) and World.is_stunned(player) and player.stun_cause == &"broken",
-			"a blow that breaks it: no recoil, the holder stunned (&\"%s\")" % player.stun_cause)
+	_check(not World.is_stunned(imp) and not World.is_stunned(player) and player.raised == "",
+			"a shield that gives out: no recoil, the holder not stunned, the shield down")
 	Monster.noticing = had_noticing
 
 
